@@ -1,0 +1,130 @@
+# The local stack, for real, on every change that could break it: the image is built in the job,
+# the desktop's compose file brings up the three containers from an EMPTY Postgres (the first boot
+# a person gets), and .github/local-stack/assert.sh checks what the desktop will rely on — health,
+# nm-config, the seeded human, the token mint, /v1/me, PowerSync accepting the minted token, and
+# the schema the runner built. Then a SECOND stack whose Postgres holds the pg lane's fixtures at
+# the 0001 schema is migrated forward by the image's own runner, and the pg suite runs against it.
+name: local stack smoke
+
+on:
+  pull_request:
+    paths:
+      - packages/control-api/**
+      - packages/shared/**
+      - supabase/migrations/**
+      - supabase/validate/**
+      - dev/stack/init/**
+      - dev/stack/powersync/**
+      - apps/desktop/resources/local/**
+      - .github/local-stack/**
+      - .github/workflows/local-stack-smoke.yml
+      - pnpm-lock.yaml
+  push:
+    branches: [main]
+    paths:
+      - packages/control-api/**
+      - packages/shared/**
+      - supabase/migrations/**
+      - supabase/validate/**
+      - dev/stack/init/**
+      - dev/stack/powersync/**
+      - apps/desktop/resources/local/**
+      - .github/local-stack/**
+      - .github/workflows/local-stack-smoke.yml
+      - pnpm-lock.yaml
+  workflow_dispatch:
+
+concurrency:
+  group: local-stack-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # the name the compose file defaults to; the job builds this tag itself and never pulls it
+  IMAGE: ghcr.io/neuramesh-ai/neuramesh-control-api
+  TAG: smoke
+  COMPOSE: apps/desktop/resources/local/docker-compose.yaml
+
+jobs:
+  smoke:
+    name: compose up from the image · asserts · pg lane on its Postgres
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the control-api image
+        run: docker build -f packages/control-api/Dockerfile -t "$IMAGE:$TAG" .
+
+      - name: Render the env the desktop would write
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/nm-local/pgdata" "$RUNNER_TEMP/nm-local/powersync"
+          TOKEN="nmh_$(openssl rand -hex 24)"
+          echo "::add-mask::$TOKEN"
+          echo "NMH_TOKEN=$TOKEN" >> "$GITHUB_ENV"
+          cat > "$RUNNER_TEMP/local.env" <<EOF
+          NM_IMAGE_TAG=$TAG
+          NM_LOCAL_DIR=$RUNNER_TEMP/nm-local
+          NM_SYNC_KEY=$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=')
+          NM_ADMIN_TOKEN=$(openssl rand -hex 24)
+          NM_LOCAL_HUMAN_TOKEN_HASH=$(printf %s "$TOKEN" | sha256sum | cut -d ' ' -f 1)
+          NM_API_PORT=8788
+          NM_POWERSYNC_PORT=58081
+          EOF
+
+      - name: Up — the first boot, from an empty Postgres
+        run: docker compose --env-file "$RUNNER_TEMP/local.env" -f "$COMPOSE" -p nm-local-smoke up -d --wait --wait-timeout 300
+
+      - name: The stack answers
+        run: bash .github/local-stack/assert.sh http://127.0.0.1:8788 http://127.0.0.1:58081 nm-local-smoke "$NMH_TOKEN"
+
+      - name: Logs (on failure)
+        if: failure()
+        run: docker compose --env-file "$RUNNER_TEMP/local.env" -f "$COMPOSE" -p nm-local-smoke logs --no-color | tail -300
+
+      - name: Down (never -v)
+        if: always()
+        run: docker compose --env-file "$RUNNER_TEMP/local.env" -f "$COMPOSE" -p nm-local-smoke down || true
+
+      # ── the pg lane, against a Postgres the image's runner migrated ──────────────────────────
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.8.1
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+
+      - name: Up — fixtures at 0001, migrated forward by the image's runner
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/nm-pglane/pgdata" "$RUNNER_TEMP/nm-pglane/powersync"
+          sed -e "s#nm-local#nm-pglane#" -e "s#^NM_API_PORT=.*#NM_API_PORT=8789#" -e "s#^NM_POWERSYNC_PORT=.*#NM_POWERSYNC_PORT=58082#" \
+            "$RUNNER_TEMP/local.env" > "$RUNNER_TEMP/pglane.env"
+          docker compose --project-directory . --env-file "$RUNNER_TEMP/pglane.env" -f "$COMPOSE" -f .github/local-stack/compose.pg-lane.yaml -p nm-local-pglane up -d --wait --wait-timeout 300
+
+      - name: The pg lane
+        run: pnpm --filter @neuramesh/control-api exec vitest run .pg.test
+        env:
+          DATABASE_URL: postgresql://postgres:nm@127.0.0.1:55436/nm
+          FLEET_AUTOPROVISION: "off"
+          NM_ALLOW_ACTOR_HEADER: "1"
+
+      - name: Logs (on failure)
+        if: failure()
+        run: docker compose --project-directory . --env-file "$RUNNER_TEMP/pglane.env" -f "$COMPOSE" -f .github/local-stack/compose.pg-lane.yaml -p nm-local-pglane logs --no-color | tail -300
+
+      - name: Down (never -v)
+        if: always()
+        run: docker compose --project-directory . --env-file "$RUNNER_TEMP/pglane.env" -f "$COMPOSE" -f .github/local-stack/compose.pg-lane.yaml -p nm-local-pglane down || true

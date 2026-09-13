@@ -1,0 +1,932 @@
+<title>Rail &amp; Ink Round</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300..700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400..700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400..700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@1&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400..600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400..600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400..600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400..600&display=swap">
+<style>
+/* ────────────────────────────────────────────────────────────────────────────
+   Rail & Ink Round — design contract, 2026-09-04.
+   Tokens copied from apps/desktop/src/renderer/src/tokens.css (all four themes, lines 42–146).
+   Geometry copied from the REAL classes this round touches: .navnewchat (5757), .navsecttoggle
+   (1431), .navitem/.navsub (1462–1506), .navscoperow/.cchip (7331/3266), .navhistrow +
+   .navhistdot + .navhistmeta (6833–6947, 7379), .msg .body (3158), .qcard/.qfoot (2840–2865).
+   Judge this as the app, not as a sketch. "Now" columns are locked to today's ink; the
+   "Proposed" columns follow the switches in the bar.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+/* page chrome — cream-oak proposed ink by default, graphite when the viewer is dark */
+:root {
+  --pg-win:#f0e5d3; --pg-bg:#fbf8f4; --pg-panel2:#f6eee1; --pg-card:#ffffff; --pg-border:#e6dbca; --pg-border2:#d3c2a8;
+  --pg-text:#3a2c22; --pg-body:#5b4c3d; --pg-muted:#8b7861; --pg-dim:#a99680; --pg-link:#9c5730; --pg-accent:#834a2b;
+  --fdisp:'Source Serif 4', Georgia, serif; --fbody:'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --fmono:'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace; --fbrand:'Bricolage Grotesque', var(--fbody);
+  --ease:cubic-bezier(.22,1,.36,1);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --pg-win:#0d0d0d; --pg-bg:#141414; --pg-panel2:#212121; --pg-card:#1e1e1e; --pg-border:#272727; --pg-border2:#383838;
+    --pg-text:#d9d9d9; --pg-body:#b0b0b0; --pg-muted:#8c8c8c; --pg-dim:#6e6e6e; --pg-link:#d19a72; --pg-accent:#d9d9d9;
+  }
+}
+:root[data-theme="dark"] {
+  --pg-win:#0d0d0d; --pg-bg:#141414; --pg-panel2:#212121; --pg-card:#1e1e1e; --pg-border:#272727; --pg-border2:#383838;
+  --pg-text:#d9d9d9; --pg-body:#b0b0b0; --pg-muted:#8c8c8c; --pg-dim:#6e6e6e; --pg-link:#d19a72; --pg-accent:#d9d9d9;
+}
+* { box-sizing:border-box; }
+body { margin:0; background:var(--pg-bg); color:var(--pg-body); font:14px/1.55 var(--fbody); -webkit-font-smoothing:antialiased; }
+a { color:var(--pg-link); }
+.wrap { max-width:1180px; margin:0 auto; padding:28px 28px 80px; }
+h1 { font:640 30px/1.1 var(--fdisp); letter-spacing:-.012em; color:var(--pg-text); margin:0 0 6px; text-wrap:balance; }
+h2 { font:640 21px/1.2 var(--fdisp); letter-spacing:-.01em; color:var(--pg-text); margin:0 0 4px; text-wrap:balance; }
+.lede { max-width:62ch; margin:0 0 18px; color:var(--pg-body); }
+.kick { font:650 9.5px var(--fmono); letter-spacing:.15em; text-transform:uppercase; color:var(--pg-dim); }
+section { margin-top:54px; }
+.sechd { display:flex; align-items:baseline; gap:14px; margin-bottom:14px; }
+.sechd .kick { min-width:44px; }
+.note { max-width:70ch; color:var(--pg-body); font-size:13.5px; }
+.note b { color:var(--pg-text); font-weight:600; }
+.note code, .tbl code { font:12px var(--fmono); color:var(--pg-text); background:var(--pg-panel2); padding:1px 5px; border-radius:5px; }
+
+/* the sticky switch bar */
+.bar { position:sticky; top:0; z-index:5; display:flex; flex-wrap:wrap; gap:18px; align-items:center; padding:10px 0 10px; margin:0 0 6px; background:color-mix(in srgb, var(--pg-bg) 88%, transparent); backdrop-filter:blur(10px); border-bottom:1px solid var(--pg-border); }
+.grp { display:flex; align-items:center; gap:6px; }
+.grp .kick { margin-right:4px; }
+.sw { font:550 12px var(--fbody); color:var(--pg-muted); background:none; border:1px solid transparent; border-radius:999px; padding:4px 10px; cursor:pointer; transition:color .13s var(--ease), background .13s var(--ease); }
+.sw:hover { color:var(--pg-text); background:color-mix(in srgb, var(--pg-text) 6%, transparent); }
+.sw.on { color:var(--pg-text); background:var(--pg-card); border-color:var(--pg-border); }
+.sw:focus-visible { outline:none; box-shadow:0 0 0 2px var(--pg-border2); }
+
+/* comparison grids */
+.cmp { display:grid; gap:22px; align-items:start; }
+.cmp.c3 { grid-template-columns:repeat(3, minmax(0, 1fr)); }
+.cmp.c2 { grid-template-columns:repeat(2, minmax(0, 1fr)); }
+.cmp.c1 { grid-template-columns:1fr; }
+.cmp.c1 .col .cap { max-width:70ch; }
+@media (max-width:900px) { .cmp.c3, .cmp.c2 { grid-template-columns:1fr; } }
+.col > .kick { display:block; margin-bottom:8px; }
+.col .cap { font-size:12.5px; color:var(--pg-muted); margin-top:10px; max-width:40ch; }
+.col .cap b { color:var(--pg-text); font-weight:600; }
+
+/* ─── the app's theme token sets, applied per STAGE ─────────────────────────── */
+.stage { position:relative; border-radius:14px; overflow:hidden; border:1px solid var(--pg-border); }
+.stage.t-dark, .stage.t-soft { color-scheme:dark; }
+.stage.t-dark { --win:#0d0d0d; --bg:#141414; --panel:#191919; --panel2:#212121; --panel3:#2b2b2b; --border:#272727; --border2:#383838; --card:#1e1e1e; --card-border:#2c2c2c;
+  --text:#eaeaea; --body:#b6b6b6; --muted:#898989; --dim:#676767; --link:#d19a72; --accent:var(--text); --accent-ink:#101010; --accent-soft:var(--panel3);
+  --ring:#525252; --hover-bg:color-mix(in srgb, var(--text) 7%, transparent); --sel-bg:color-mix(in srgb, var(--text) 10%, transparent);
+  --shadow-card:0 1px 2px rgba(0,0,0,.25); --btn:#232323; --btn-fg:#efefef; --done:#77ac8d; --prog:#8ba0c0; --warn:#c9a15e; --blocked:#9ca0a8; --review:#a89ccf; }
+.stage.t-light { --win:#e9e5db; --bg:#fcfbf8; --panel:#fcfbf8; --panel2:#f4f1ea; --panel3:#ebe7dd; --border:#e2ded4; --border2:#cec5b7; --card:#ffffff; --card-border:#e2ded4;
+  --text:#2f2a24; --body:#524c43; --muted:#837d72; --dim:#a09889; --link:#8f4f2a; --accent:var(--text); --accent-ink:#ffffff; --accent-soft:var(--panel3);
+  --ring:color-mix(in srgb, var(--accent) 40%, var(--border2)); --hover-bg:color-mix(in srgb, var(--text) 6%, transparent); --sel-bg:color-mix(in srgb, var(--text) 8%, transparent);
+  --shadow-card:0 1px 2px rgba(70,58,44,.05); --btn:#f1eee6; --btn-fg:#2f2a24; --done:#2f9e6b; --prog:#4f80c4; --warn:#a9762a; --blocked:#7c7f88; --review:#7d6cc4; }
+.stage.t-soft { --win:#1d1d1d; --bg:#262626; --panel:#2a2a2a; --panel2:#313131; --panel3:#3b3b3b; --border:#363636; --border2:#454545; --card:#2f2f2f; --card-border:#3d3d3d;
+  --text:#ececec; --body:#c2c2c2; --muted:#979797; --dim:#737373; --link:#d3a07a; --accent:var(--text); --accent-ink:#141414; --accent-soft:var(--panel3);
+  --ring:#5f5f5f; --hover-bg:color-mix(in srgb, var(--text) 6%, transparent); --sel-bg:color-mix(in srgb, var(--text) 9%, transparent);
+  --shadow-card:0 1px 2px rgba(0,0,0,.22); --btn:#343434; --btn-fg:#efefef; --done:#77ac8d; --prog:#8ba0c0; --warn:#c9a15e; --blocked:#9ca0a8; --review:#a89ccf; }
+.stage.t-cream { --win:#f0e5d3; --bg:#fbf8f4; --panel:#fbf8f4; --panel2:#f6eee1; --panel3:#efe1cd; --border:#e6dbca; --border2:#d3c2a8; --card:#ffffff; --card-border:#eadfce;
+  --text:#2a1c13; --body:#574838; --muted:#97846c; --dim:#b5a289; --link:#9c5730; --accent:#834a2b; --accent-ink:#fff7ee; --accent-soft:#f1e3d2;
+  --ring:color-mix(in srgb, var(--accent) 42%, var(--border2)); --hover-bg:color-mix(in srgb, var(--text) 5%, transparent); --sel-bg:color-mix(in srgb, var(--accent) 8%, transparent);
+  --shadow-card:0 1px 2px rgba(70,42,18,.05); --btn:#f3ebdf; --btn-fg:#2a1c13; --done:#2f9e6b; --prog:#4f80c4; --warn:#a06a1f; --blocked:#7c7f88; --review:#7d6cc4; }
+/* the PROPOSED ink ramp (item 4) — one step down from white in the darks, the papers keep their
+   ink and lift their dims into AA-large. Applied only where the bar says so. */
+.stage.ink-new.t-dark  { --text:#cbcbcb; --body:#a6a6a6; --muted:#848484; --dim:#6a6a6a; }
+.stage.ink-new.t-soft  { --text:#d2d2d2; --body:#b0b0b0; --muted:#8f8f8f; --dim:#747474; }
+.stage.ink-s1.t-dark   { --text:#d9d9d9; --body:#b0b0b0; --muted:#8c8c8c; --dim:#6e6e6e; }
+.stage.ink-s1.t-soft   { --text:#dedede; --body:#bdbdbd; --muted:#999999; --dim:#777777; }
+.stage.ink-s1.t-light  { --text:#3a3632; --body:#57524a; --muted:#7a746a; --dim:#98918a; }
+.stage.ink-s1.t-cream  { --text:#3a2c22; --body:#5b4c3d; --muted:#8b7861; --dim:#a99680; }
+.stage.ink-new.t-light { --text:#3a3632; --body:#57524a; --muted:#7a746a; --dim:#98918a; }
+.stage.ink-new.t-cream { --text:#3a2c22; --body:#5b4c3d; --muted:#8b7861; --dim:#a99680; }
+/* the candidate type stacks (item 5) — proposed stages only */
+.stage.f-geist  { --fbody:'Geist', sans-serif; }
+.stage.f-hanken { --fbody:'Hanken Grotesk', sans-serif; }
+.stage.f-plex   { --fbody:'IBM Plex Sans', sans-serif; }
+.stage.f-public { --fbody:'Public Sans', sans-serif; }
+.stage.m-geist  { --fmono:'Geist Mono', monospace; }
+.stage.m-jb     { --fmono:'JetBrains Mono', monospace; }
+.stage { font-family:var(--fbody); color:var(--body); }
+
+/* ─── the rail (266px, the app's default width) ─────────────────────────────── */
+.rail { width:266px; background:var(--win); padding:8px 0 0; display:flex; flex-direction:column; min-height:640px; }
+.rail.wide { width:100%; }
+.stage.railstage { display:flex; }
+.stage.railstage .sheet { flex:1; background:var(--bg); border-left:1px solid var(--border); min-width:40px; }
+svg.i { width:16px; height:16px; flex:none; stroke:currentColor; fill:none; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; }
+svg.i.s14 { width:14px; height:14px; }
+svg.i.s12 { width:12px; height:12px; }
+svg.i.s15 { width:15px; height:15px; }
+
+/* NOW — .navnew / .navnewchat (tokens.css 5757–5790) */
+.navnew { display:flex; align-items:center; gap:4px; padding:8px 8px 4px; }
+.navnewchat { display:flex; align-items:center; gap:9px; height:40px; flex:1; min-width:0; padding:0 12px 0 13px; border:1px solid transparent; border-radius:999px; background:var(--accent); color:var(--accent-ink); font-family:inherit; font-size:13px; font-weight:620; box-shadow:var(--shadow-card); }
+.navnewchat .nncplus { flex:none; width:16px; text-align:center; font-size:14px; color:color-mix(in srgb, var(--accent-ink) 80%, transparent); }
+.navnewchat .lbl { flex:1; text-align:left; }
+.navnewchat .nnck { font:600 9.5px var(--fmono); color:color-mix(in srgb, var(--accent-ink) 68%, transparent); border:1px solid color-mix(in srgb, var(--accent-ink) 28%, transparent); border-radius:5px; padding:1px 5px; }
+.navnewcaret { width:28px; height:28px; border-radius:999px; background:none; border:0; color:var(--dim); display:grid; place-items:center; }
+/* NOW — section heading (.navsecttoggle 1431 inside .navband 1453) */
+.navsecthd { display:flex; align-items:center; padding:2px 14px 6px; gap:7px; font:650 9.5px var(--fmono); letter-spacing:.15em; text-transform:uppercase; color:var(--muted); }
+.navsecthd .chev { color:var(--muted); opacity:.65; display:inline-flex; }
+/* NOW — .navitem (1462) inside .navdest (5747) */
+.navitem { display:flex; align-items:center; gap:11px; width:calc(100% - 16px); margin:0 8px; padding:7px 9px; border-radius:8px; border:0; background:none; color:var(--muted); font:inherit; font-size:13px; font-weight:500; text-align:left; }
+.navitem .lbl { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.navitem.on { background:var(--panel3); color:var(--text); font-weight:600; }
+.t-light .navitem.on, .t-cream .navitem.on { background:var(--card); box-shadow:var(--shadow-card), inset 0 0 0 1px var(--card-border); }
+.navitem.navparent.ingroup { color:var(--text); font-weight:600; }
+.navitem .pchev { color:var(--dim); margin-left:2px; display:inline-grid; }
+.navitem.navsub { margin-left:30px; width:calc(100% - 38px); padding:5px 9px 5px 13px; gap:9px; font-size:12.5px; border-radius:0 8px 8px 0; border-left:1px solid var(--border2); }
+.navitem.navsub:first-of-type { margin-top:2px; }
+.navitem.navsub:last-of-type { margin-bottom:3px; }
+.navitembadge { min-width:18px; height:18px; padding:0 5px; border-radius:999px; background:var(--panel3); color:var(--body); border:1px solid var(--border2); font:800 10px var(--fmono); display:inline-grid; place-items:center; }
+/* NOW — scope row (7331) + .cchip (3266) */
+.navscoperow { display:flex; align-items:center; gap:4px; padding:9px 8px 8px 12px; min-width:0; margin-top:10px; }
+.navprojchev { width:15px; height:17px; border-radius:5px; color:var(--dim); display:grid; place-items:center; }
+.cchip { display:inline-flex; align-items:center; gap:5px; max-width:190px; padding:4px 11px; border-radius:999px; border:1px solid var(--border); background:transparent; color:var(--muted); font-size:11px; font-weight:600; white-space:nowrap; }
+.cchip .car { font-size:8px; color:var(--dim); }
+.navscopegrow { flex:1; }
+.navhistfind { width:22px; height:22px; opacity:.5; color:var(--muted); display:grid; place-items:center; }
+/* NOW — thread rows (.navhistrow 6833 …) */
+.navhistlist { flex:1; min-height:0; padding:0 8px 4px 14px; }
+.navhistrow { display:flex; align-items:flex-start; gap:8px; width:100%; margin:1px 0; padding:5px 9px; border:1px solid transparent; border-radius:8px; background:none; text-align:left; }
+.navhistrow.on { background:var(--panel3); }
+.t-light .navhistrow.on, .t-cream .navhistrow.on { background:var(--card); border-color:var(--card-border); box-shadow:var(--shadow-card); }
+.navhistrow .navhistdot { flex:none; width:6px; height:6px; border-radius:50%; background:currentColor; margin-top:5px; }
+.navhistrow .navhistdot.thread { background:transparent; box-shadow:inset 0 0 0 1.5px var(--dim); }
+.navhistdot.ask { box-shadow:0 0 0 3px color-mix(in srgb, var(--accent) 26%, transparent); animation:nm-askpulse 1.8s ease-in-out infinite; }
+.navhistdot.thread.ask { background:var(--accent); }
+@keyframes nm-askpulse { 50% { box-shadow:0 0 0 1.5px color-mix(in srgb, var(--accent) 12%, transparent); } }
+.navhistdot.live { animation:navdot-pulse 1.9s var(--ease) infinite; }
+@keyframes navdot-pulse { 0% { box-shadow:0 0 0 0 color-mix(in srgb, currentColor 55%, transparent); } 70% { box-shadow:0 0 0 5px color-mix(in srgb, currentColor 0%, transparent); } 100% { box-shadow:0 0 0 0 transparent; } }
+.c-done { color:var(--done); } .c-in_progress { color:var(--prog); } .c-blocked { color:var(--blocked); } .c-in_review { color:var(--review); } .c-todo { color:var(--dim); } .c-accepted { color:var(--done); }
+.navhistbody { flex:1; min-width:0; display:flex; flex-direction:column; gap:1.5px; }
+.navhistline1 { display:flex; align-items:baseline; gap:6px; min-width:0; }
+.navhistnum { font:700 10.5px var(--fmono); color:var(--muted); }
+.navhisttitle { flex:1; min-width:0; font-size:12.5px; color:var(--body); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.navhistrow.on .navhisttitle { color:var(--text); font-weight:600; }
+.navhistwhen { font:500 10px var(--fmono); color:var(--dim); }
+.navhistmeta { display:flex; align-items:center; gap:5px; font-size:10px; font-weight:600; color:var(--dim); min-width:0; }
+.navhistmeta .pj { flex:none; max-width:92px; color:var(--muted); display:flex; align-items:center; gap:4px; }
+.navhistmeta .sep { opacity:.55; }
+.navhistmeta .rm, .navhistmeta .br { font-family:var(--fmono); font-size:9.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.navhistmeta .rm .h { color:var(--muted); }
+.projlogo { width:11px; height:11px; border-radius:3.5px; background:var(--panel3); border:1px solid var(--border2); display:inline-block; }
+.navprojmore { font:620 10.5px var(--fbody); color:var(--dim); padding:5px 9px; margin:3px 8px 3px 0; }
+.nhroutine { flex:none; width:14px; height:14px; display:grid; place-items:center; color:var(--dim); margin-top:1px; }
+/* NOW — setup dock + foot (paths only in the round; drawn for context) */
+.setupdock { margin:auto 8px 6px; padding:8px 12px; border:1px solid var(--border); border-radius:12px; background:var(--panel); display:flex; align-items:center; gap:9px; font-size:12.5px; font-weight:600; color:var(--text); }
+.setupdock .ring { width:14px; height:14px; border-radius:50%; background:conic-gradient(var(--done) 60%, color-mix(in srgb, var(--dim) 30%, transparent) 0); -webkit-mask:radial-gradient(circle, transparent 4px, #000 4.6px); mask:radial-gradient(circle, transparent 4px, #000 4.6px); }
+.setupdock .cnt { margin-left:auto; font:600 10.5px var(--fmono); color:var(--dim); }
+.navwsfoot { display:flex; align-items:center; gap:9px; padding:10px 14px 12px; border-top:1px solid var(--border); font-size:13px; font-weight:600; color:var(--text); }
+.navwsfoot .tile { width:20px; height:20px; border-radius:6px; background:var(--panel3); border:1px solid var(--border2); font:700 10px var(--fmono); color:var(--muted); display:grid; place-items:center; }
+.navwsfoot .cring { margin-left:auto; width:16px; height:16px; border-radius:50%; border:2px solid var(--done); border-right-color:color-mix(in srgb, var(--dim) 35%, transparent); }
+
+/* ─── PROPOSED rail ─────────────────────────────────────────────────────────── */
+.p .prow { display:flex; align-items:center; gap:10px; height:30px; padding:0 10px; margin:0 8px; border-radius:8px; color:var(--body); font-size:13px; font-weight:500; white-space:nowrap; position:relative; }
+.p .prow.new { height:32px; margin-top:2px; color:var(--text); font-weight:560; font-size:13.5px; }
+.p .prow.new .kbd { margin-left:auto; font:500 9.5px var(--fmono); color:var(--dim); }
+.p .prow .lbl { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; }
+.p .prow svg.i { color:var(--muted); }
+.p .prow:hover { background:var(--hover-bg); color:var(--text); }
+.p .prow.on { background:var(--panel3); color:var(--text); font-weight:560; }
+.t-light .p .prow.on, .t-cream .p .prow.on { background:var(--card); box-shadow:var(--shadow-card), inset 0 0 0 1px var(--card-border); }
+.p .prow.on svg.i { color:var(--text); }
+.p .gap { height:22px; }
+.p .phd { position:relative; display:flex; align-items:center; gap:7px; padding:0 14px; height:22px; font:650 9.5px var(--fmono); letter-spacing:.15em; text-transform:uppercase; color:var(--dim); }
+.p .phd .chev { display:inline-flex; color:var(--dim); }
+.p .phd .cnt { margin-left:auto; letter-spacing:0; font-weight:600; opacity:.8; }
+.p .phd.scope { margin-top:14px; text-transform:none; letter-spacing:0; font:560 12px var(--fbody); color:var(--body); height:26px; padding:0 14px 0 12px; }
+.p .phd.scope .car { color:var(--dim); font-size:10px; }
+.p .phd.scope .find { margin-left:auto; color:var(--dim); display:grid; }
+.p .prow.l1 { padding-left:22px; }        /* ② one step in from the heading */
+.p .prow.l2 { padding-left:44px; font-size:12.5px; }  /* children of Scheduled: a second step, no guide line */
+.p .prow .tchev { margin-left:auto; color:var(--dim); display:inline-grid; }
+/* proposed thread rows — ONE line */
+.p .trow { display:flex; align-items:center; gap:9px; height:30px; padding:0 9px 0 10px; margin:0 8px; border-radius:8px; color:var(--body); font-size:13px; font-weight:450; position:relative; }
+.p .trow .g { flex:none; width:14px; height:14px; display:grid; place-items:center; color:var(--dim); }
+.p .trow .t { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.p .trow .m { flex:none; font:500 10px var(--fmono); color:var(--dim); }
+.p .trow:hover { background:var(--hover-bg); color:var(--text); }
+.p .trow.on { background:var(--panel3); color:var(--text); font-weight:560; }
+.t-light .p .trow.on, .t-cream .p .trow.on { background:var(--card); box-shadow:var(--shadow-card), inset 0 0 0 1px var(--card-border); }
+.p .trow .dot { flex:none; width:6px; height:6px; border-radius:50%; background:currentColor; }
+.p .trow .askdot { flex:none; width:6px; height:6px; border-radius:50%; background:var(--accent); box-shadow:0 0 0 3px color-mix(in srgb, var(--accent) 26%, transparent); animation:nm-askpulse 1.8s ease-in-out infinite; }
+.p .trow .frac { font:600 9.5px var(--fmono); color:var(--muted); }
+.orb { width:14px; height:14px; border-radius:50%; background:radial-gradient(circle at 35% 35%, color-mix(in srgb, var(--text) 85%, transparent), color-mix(in srgb, var(--text) 25%, transparent) 60%, transparent 72%); animation:orbspin 2.4s linear infinite; }
+@keyframes orbspin { to { transform:rotate(360deg); } }
+.p .more { padding:0 10px; margin:2px 8px; height:28px; display:flex; align-items:center; font-size:12px; color:var(--dim); }
+.p .foot { margin-top:auto; }
+.p .setuprow { display:flex; align-items:center; gap:9px; height:32px; padding:0 14px; color:var(--body); font-size:12.5px; font-weight:500; }
+.p .setuprow .cnt { margin-left:auto; font:500 10px var(--fmono); color:var(--dim); }
+/* the rail head (item 7) — mark + wordmark + fold, nothing else; the breadcrumb is gone */
+.p .rhead { display:flex; align-items:center; gap:9px; height:42px; padding:0 12px 0 14px; margin-bottom:2px; }
+.p .rhead .mark { width:18px; height:18px; border-radius:5px; background:#834a2b; display:grid; place-items:center; flex:none; }
+.p .rhead .mark i { display:block; width:8px; height:8px; border-radius:2px; background:#fff7ee; opacity:.92; }
+.p .rhead .wm { flex:1; font:600 14px var(--fbrand); letter-spacing:-.015em; color:var(--text); }
+.p .rhead .fold { color:var(--dim); display:grid; }
+/* the one mode switch (item 3c) — a segmented control under the head; NOT a destination tab strip */
+.p .seg { display:flex; margin:0 12px 8px; padding:3px; background:var(--panel2); border-radius:999px; }
+.p .seg span { flex:1; text-align:center; font:560 12px var(--fbody); color:var(--muted); padding:5px 0; border-radius:999px; }
+.p .seg span.on { background:var(--panel3); color:var(--text); }
+.t-light .p .seg span.on, .t-cream .p .seg span.on { background:var(--card); box-shadow:var(--shadow-card); }
+/* today's top bar, drawn across the Now stage so the head can be compared */
+.stage.railstage.now { flex-wrap:wrap; }
+.topbarnow { width:100%; height:40px; display:flex; align-items:center; gap:9px; padding:0 14px; background:var(--win); border-bottom:1px solid var(--border); font-size:12.5px; color:var(--muted); }
+.topbarnow .mark { width:18px; height:18px; border-radius:5px; background:#834a2b; display:grid; place-items:center; flex:none; }
+.topbarnow .mark i { display:block; width:8px; height:8px; border-radius:2px; background:#fff7ee; opacity:.92; }
+.topbarnow .wm { font:600 14px var(--fbrand); letter-spacing:-.015em; color:var(--text); }
+.topbarnow .fold { color:var(--dim); display:grid; margin:0 4px; }
+.topbarnow .sep { color:var(--dim); }
+.topbarnow .cur { color:var(--text); font-weight:600; }
+/* hover: the row tells the rest (item 8/9) */
+.p .trow.hov, .p .prow.hov { background:var(--hover-bg); color:var(--text); }
+.p .act { display:none; margin-left:auto; gap:1px; flex:none; }
+.p .trow.hov .act, .p .prow.hov .act { display:flex; }
+.p .trow.hov > .m, .p .trow.hov > .askdot, .p .trow.hov > .frac, .p .prow.hov > .tchev { display:none; }
+.p .act span { width:20px; height:20px; border-radius:6px; display:grid; place-items:center; color:var(--muted); }
+.p .act span.on { background:var(--sel-bg); color:var(--text); }
+.hcard, .hmenu, .pcard { position:absolute; background:var(--card); border:1px solid var(--card-border); border-radius:11px; box-shadow:0 12px 30px -8px rgba(0,0,0,.45), 0 1px 2px rgba(0,0,0,.2); z-index:3; font-family:var(--fbody); }
+.t-light .hcard, .t-light .hmenu, .t-light .pcard, .t-cream .hcard, .t-cream .hmenu, .t-cream .pcard { box-shadow:0 12px 30px -10px rgba(70,58,44,.25), 0 1px 2px rgba(70,58,44,.06); }
+.hcard { width:236px; padding:10px 12px 11px; }
+.hcard .ht { font-size:12.5px; font-weight:560; color:var(--text); line-height:1.4; }
+.hcard .hs { margin-top:5px; font-size:11.5px; color:var(--muted); line-height:1.45; }
+.hcard .hf { margin-top:7px; font:500 10px var(--fmono); color:var(--dim); display:flex; flex-wrap:wrap; gap:3px 7px; }
+.hcard .hf b { color:var(--muted); font-weight:500; }
+.hmenu { width:176px; padding:5px; }
+.hmenu div { display:flex; align-items:center; gap:9px; height:30px; padding:0 9px; border-radius:7px; font-size:12.5px; color:var(--body); }
+.hmenu div svg.i { color:var(--muted); }
+.hmenu div.on { background:var(--hover-bg); color:var(--text); }
+.hmenu div.warn { color:var(--blocked); }
+.hmenu hr { border:0; border-top:1px solid var(--border); margin:4px 6px; }
+.pcard { width:250px; padding:10px 12px 8px; }
+.pcard .ph { display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600; color:var(--text); }
+.pcard .ph .tile { width:18px; height:18px; border-radius:5px; background:var(--panel3); border:1px solid var(--border2); font:700 9px var(--fmono); color:var(--muted); display:grid; place-items:center; }
+.pcard .ph .pin { margin-left:auto; color:var(--dim); display:grid; }
+.pcard .pr { display:flex; align-items:center; gap:8px; height:28px; font-size:12px; color:var(--body); }
+.pcard .pr svg.i { color:var(--muted); }
+.pcard .pr.path { font:500 11px var(--fmono); color:var(--muted); }
+.pcard .pr.edit { border-top:1px solid var(--border); margin-top:3px; padding-top:3px; color:var(--text); }
+/* callouts */
+.co { position:absolute; right:-9px; top:50%; transform:translateY(-50%); width:18px; height:18px; border-radius:50%; background:var(--pg-link); color:#fff; font:700 10px var(--fmono); display:grid; place-items:center; box-shadow:0 0 0 2px var(--win); }
+.stage .co { z-index:2; }
+
+/* ─── glyph vocabulary table ─────────────────────────────────────────────────── */
+.tbl { width:100%; border-collapse:collapse; font-size:13px; }
+.tbl th { text-align:left; font:650 9.5px var(--fmono); letter-spacing:.15em; text-transform:uppercase; color:var(--pg-dim); padding:8px 10px; border-bottom:1px solid var(--pg-border); }
+.tbl td { padding:9px 10px; border-bottom:1px solid var(--pg-border); vertical-align:middle; color:var(--pg-body); }
+.tbl td:first-child { width:120px; }
+.tbl .gcell { display:flex; align-items:center; gap:10px; }
+.tbl .gcell .g { width:14px; height:14px; display:grid; place-items:center; color:var(--pg-dim); }
+.tbl .num { font-variant-numeric:tabular-nums; font-family:var(--fmono); font-size:12px; }
+.tbl .aa { font:600 10px var(--fmono); border-radius:5px; padding:1px 6px; }
+.tbl .aa.ok { color:#2f9e6b; background:color-mix(in srgb, #2f9e6b 14%, transparent); }
+.tbl .aa.lg { color:#a9762a; background:color-mix(in srgb, #a9762a 14%, transparent); }
+.tbl .aa.no { color:#c64545; background:color-mix(in srgb, #c64545 14%, transparent); }
+.sw-cell { display:inline-flex; align-items:center; gap:8px; }
+.swatch { width:34px; height:20px; border-radius:5px; border:1px solid var(--pg-border2); display:inline-block; }
+
+/* ─── ink demo ──────────────────────────────────────────────────────────────── */
+.inkdemo { padding:18px 20px; background:var(--bg); }
+.inkdemo h4 { font:640 17px/1.2 var(--fdisp); color:var(--text); margin:0 0 6px; }
+.inkdemo p { margin:0 0 8px; color:var(--body); font-size:13.5px; max-width:52ch; }
+.inkdemo .m { color:var(--muted); font-size:12.5px; }
+.inkdemo .d { color:var(--dim); font:500 10.5px var(--fmono); }
+.inkdemo .t { color:var(--text); font-weight:600; }
+
+/* ─── type specimen ─────────────────────────────────────────────────────────── */
+.spec { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:14px; }
+@media (max-width:1000px) { .spec { grid-template-columns:repeat(2, minmax(0,1fr)); } }
+.spec .stage { padding:14px 16px 12px; background:var(--win); }
+.spec .fname { font:650 9.5px var(--fmono); letter-spacing:.15em; text-transform:uppercase; color:var(--dim); margin-bottom:10px; display:flex; justify-content:space-between; }
+.spec .fname b { color:var(--text); letter-spacing:0; text-transform:none; font:600 12px var(--fbody); }
+.spec .row { display:flex; align-items:center; gap:9px; height:28px; color:var(--body); font-size:13px; font-weight:450; }
+.spec .row.on { color:var(--text); font-weight:560; background:var(--panel3); border-radius:7px; padding:0 8px; margin:0 -8px; }
+.spec .row .g { width:14px; height:14px; display:grid; place-items:center; color:var(--dim); }
+.spec .big { font-size:23px; font-weight:500; line-height:1.15; color:var(--text); letter-spacing:-.012em; margin:0 0 10px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.fl { font:600 9px var(--fmono); letter-spacing:.08em; text-transform:uppercase; padding:1px 6px; border-radius:5px; margin-left:6px; }
+.fl.ok { color:#2f9e6b; background:color-mix(in srgb, #2f9e6b 14%, transparent); }
+.fl.no { color:#c64545; background:color-mix(in srgb, #c64545 14%, transparent); }
+.spec .para { margin:10px 0 0; font-size:13.5px; line-height:1.55; color:var(--body); }
+.spec .para b { color:var(--text); font-weight:600; }
+.spec .title { margin-top:10px; font-size:14px; font-weight:560; color:var(--text); }
+.spec .meta { font:500 10.5px var(--fmono); color:var(--dim); margin-top:3px; }
+.mono2 { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:14px; margin-top:14px; }
+.mono2 .stage { padding:14px 16px; background:var(--win); }
+.term { font:12.5px/1.6 var(--fmono); color:var(--text); background:var(--bg); border-radius:8px; padding:10px 12px; white-space:pre; overflow-x:auto; border:1px solid var(--border); }
+.term .c { color:var(--muted); } .term .g { color:var(--done); } .term .y { color:var(--warn); }
+.kickline { margin-top:10px; display:flex; gap:14px; align-items:baseline; font:650 9.5px var(--fmono); letter-spacing:.15em; text-transform:uppercase; color:var(--dim); }
+.kickline .tag { letter-spacing:0; text-transform:none; font-weight:500; font-size:10px; }
+
+/* ─── thread column (item 6) ─────────────────────────────────────────────────── */
+.thr { background:var(--panel); padding:16px 14px 14px; display:flex; flex-direction:column; gap:12px; min-height:420px; }
+.msg { display:flex; gap:11px; padding:7px 4px; }
+.msg .av { flex:none; width:26px; height:26px; border-radius:50%; background:var(--panel3); border:1px solid var(--border2); display:grid; place-items:center; font-size:13px; }
+.msg .body { min-width:0; flex:1; }
+.msg .head { display:flex; align-items:center; gap:8px; }
+.msg .head b { font-size:12.5px; color:var(--text); }
+.msg .time { font-size:10.5px; color:var(--dim); }
+.rolechip { font-size:6.5px; font-weight:800; letter-spacing:.5px; text-transform:uppercase; padding:1.5px 4.5px; border-radius:6px; background:color-mix(in srgb, var(--muted) 16%, transparent); color:var(--muted); }
+.msg p { color:var(--body); font-size:13px; margin:6px 0 0; line-height:1.5; }
+/* NOW — .tmsgs .msg .body (3158) */
+.now .msg.agent .body { border:1px solid var(--border); background:var(--panel); border-radius:14px; padding:8px 12px 9px; }
+.msg.mine { flex-direction:row-reverse; }
+.msg.mine .body { flex:0 1 auto; max-width:min(560px, 82%); border:1px solid var(--border); background:var(--panel); border-radius:14px; padding:7px 12px 8px; }
+.msg.mine .head { justify-content:flex-end; }
+/* NOW — .qcard (2840) + .qfoot (2861) */
+.qcard { border:1px solid var(--card-border); background:var(--card); border-radius:10px; padding:10px 12px; margin:6px 0; max-width:480px; font:12.5px/1.5 var(--fbody); }
+.qcard .qhead { font-size:12.5px; font-weight:700; margin-bottom:8px; color:var(--text); }
+.qfoot { display:flex; gap:6px; margin-top:4px; align-items:center; }
+.qfoot .in { flex:1; background:var(--card); border:1px solid var(--border); border-radius:10px; padding:7px 11px; font-size:12px; color:var(--dim); }
+.btn { padding:8px 16px; border-radius:999px; border:1px solid var(--border); background:var(--btn); color:var(--btn-fg); font-size:13px; font-weight:600; font-family:inherit; }
+.btn.primary { background:var(--accent); color:var(--accent-ink); border-color:transparent; }
+.btn.primary:disabled { background:var(--panel3); color:var(--dim); border-color:transparent; }
+/* PROPOSED A — the card dissolves into a section; only the field is elevated */
+.pa .msg.agent .body { border:1px solid var(--border); background:var(--panel); border-radius:14px; padding:8px 12px 10px; }
+.q2 { margin:8px 0 2px; }
+.q2 .qk { font:650 9.5px var(--fmono); letter-spacing:.15em; text-transform:uppercase; color:var(--dim); margin-bottom:4px; }
+.q2 .qhead { font-size:13px; font-weight:600; color:var(--text); line-height:1.45; max-width:56ch; }
+.q2 .opts { display:flex; flex-wrap:wrap; gap:6px; margin:9px 0 0; }
+.q2 .opt { font:550 12px var(--fbody); color:var(--body); background:transparent; border:1px solid var(--border2); border-radius:999px; padding:5px 11px; }
+.q2 .opt:hover { color:var(--text); background:var(--hover-bg); }
+.q2 .field { margin-top:9px; display:flex; align-items:center; gap:8px; background:var(--card); border:1px solid var(--card-border); border-radius:999px; padding:4px 4px 4px 13px; box-shadow:var(--shadow-card); max-width:520px; }
+.q2 .field .ph { flex:1; font-size:12.5px; color:var(--dim); }
+.q2 .field .send { width:26px; height:26px; border-radius:50%; background:var(--accent); color:var(--accent-ink); display:grid; place-items:center; font-size:13px; }
+/* PROPOSED B — agent messages have no box; the card is the one elevated object */
+.pb .msg.agent .body { padding:1px 0 0; }
+.pb .msg.agent p { font-size:13.5px; line-height:1.55; }
+.pb .qcardB { margin:10px 0 2px; border:1px solid var(--card-border); background:var(--card); border-radius:12px; padding:11px 13px 12px; max-width:520px; box-shadow:var(--shadow-card); }
+.pb .qcardB .qhead { font-size:13px; font-weight:600; color:var(--text); line-height:1.45; }
+.pb .qcardB .field { background:var(--panel); }
+.t-light .pb .qcardB .field, .t-cream .pb .qcardB .field { background:var(--bg); }
+
+
+/* ─── the frame (round 3): conversation · workbench card · side dock ─────── */
+.frame3 { display:grid; grid-template-columns: 220px minmax(0,1fr) 340px; gap:6px; padding:8px; background:var(--win); min-height:540px; font-family:var(--fbody); }
+.frame3.two { grid-template-columns: 220px minmax(0,1fr); }
+.f3rail { display:flex; flex-direction:column; gap:2px; padding:6px 2px; }
+.f3rail .r { display:flex; align-items:center; gap:8px; height:26px; padding:0 8px; border-radius:7px; color:var(--body); font-size:12px; }
+.f3rail .r.on { background:var(--panel3); color:var(--text); }
+.f3rail .k { font:650 9px var(--fmono); letter-spacing:.15em; text-transform:uppercase; color:var(--dim); padding:10px 8px 4px; }
+.f3rail .seg { display:flex; margin:2px 4px 6px; padding:3px; background:var(--panel2); border-radius:999px; }
+.f3rail .seg span { flex:1; text-align:center; font:560 11px var(--fbody); color:var(--muted); padding:4px 0; border-radius:999px; }
+.f3rail .seg span.on { background:var(--panel3); color:var(--text); }
+.f3sheet { position:relative; background:var(--panel); border:1px solid transparent; border-radius:14px; box-shadow:var(--shadow-card); overflow:hidden; display:flex; flex-direction:column; }
+.t-light .f3sheet, .t-cream .f3sheet, .t-light .f3dock, .t-cream .f3dock { border-color:color-mix(in srgb, var(--card-border) 70%, transparent); }
+.f3hd { display:flex; align-items:center; gap:10px; padding:10px 14px; border-bottom:1px solid var(--border); font-size:11.5px; color:var(--muted); }
+.f3hd b { color:var(--text); font-weight:600; font-size:12.5px; }
+.f3hd .sp { flex:1; }
+.f3hd .ic { width:22px; height:22px; border-radius:6px; display:grid; place-items:center; color:var(--dim); }
+.f3hd .ic.on { background:var(--sel-bg); color:var(--text); }
+.f3body { position:relative; flex:1; display:flex; min-height:0; }
+.f3thread { flex:1; min-width:0; padding:18px 18px 0; display:flex; flex-direction:column; gap:12px; }
+.f3thread .m { display:flex; gap:9px; }
+.f3thread .av { width:22px; height:22px; border-radius:50%; background:var(--panel3); border:1px solid var(--border2); flex:none; display:grid; place-items:center; font-size:11px; }
+.f3thread .hb { max-width:78%; border:1px solid var(--border); border-radius:12px; padding:6px 10px; font-size:12px; color:var(--body); }
+.f3thread .ag { font-size:12px; color:var(--body); line-height:1.5; }
+.f3thread .ag b { color:var(--text); font-size:11.5px; }
+.f3thread .card { border:1px solid var(--card-border); background:var(--card); border-radius:11px; padding:9px 11px; font-size:12px; color:var(--text); box-shadow:var(--shadow-card); max-width:360px; }
+.f3thread .card .pills { display:flex; gap:5px; margin-top:7px; } .f3thread .card .pills span { border:1px solid var(--border2); border-radius:999px; padding:3px 9px; font:550 11px var(--fbody); color:var(--body); }
+.f3comp { margin:auto 18px 14px; border:1px solid var(--card-border); background:var(--card); border-radius:12px; padding:9px 12px; font-size:12px; color:var(--dim); box-shadow:var(--shadow-card); }
+.f3wb { position:absolute; right:12px; top:12px; bottom:12px; width:236px; background:var(--card); border:1px solid var(--card-border); border-radius:12px; box-shadow:var(--shadow-card); padding:10px 12px; overflow:hidden; }
+.f3wb .h { display:flex; align-items:center; gap:8px; font-size:12px; font-weight:600; color:var(--text); }
+.f3wb .h .chip { margin-left:auto; font:600 9px var(--fmono); color:var(--dim); background:var(--panel2); border-radius:5px; padding:2px 6px; }
+.f3wb .k { font:650 9px var(--fmono); letter-spacing:.15em; text-transform:uppercase; color:var(--dim); margin:12px 0 5px; }
+.f3wb p { margin:0; font-size:11.5px; color:var(--body); line-height:1.45; }
+.f3wb .li { display:flex; align-items:center; gap:6px; font:500 11px var(--fmono); color:var(--body); height:22px; }
+.f3wb .li i { font-style:normal; font:650 8px var(--fmono); color:var(--dim); border:1px solid var(--border2); border-radius:4px; padding:1px 4px; }
+.f3thread.withwb { padding-right:266px; }
+.f3dock { background:var(--panel); border:1px solid transparent; border-radius:14px; box-shadow:var(--shadow-card); overflow:hidden; display:flex; flex-direction:column; }
+.f3tabs { display:flex; align-items:center; gap:2px; padding:8px 8px 0; border-bottom:1px solid var(--border); }
+.f3tabs .tab { display:flex; align-items:center; gap:6px; padding:6px 10px; border-radius:8px 8px 0 0; font-size:11.5px; color:var(--muted); }
+.f3tabs .tab.on { background:var(--panel2); color:var(--text); border:1px solid var(--border); border-bottom-color:var(--panel2); margin-bottom:-1px; }
+.f3tabs .add { margin-left:2px; width:22px; height:22px; border-radius:6px; display:grid; place-items:center; color:var(--dim); }
+.f3pane { flex:1; padding:14px; font-size:12px; color:var(--body); }
+.f3pane .ttl { font:640 15px var(--fdisp); color:var(--text); margin-bottom:6px; }
+.f3pane .code { font:11px/1.55 var(--fmono); color:var(--text); background:var(--panel2); border-radius:8px; padding:8px 10px; white-space:pre; }
+.f3dock .menu { position:absolute; right:14px; top:44px; width:170px; background:var(--card); border:1px solid var(--card-border); border-radius:11px; padding:5px; box-shadow:0 12px 30px -8px rgba(0,0,0,.45); }
+.f3dock .menu div { display:flex; align-items:center; gap:8px; height:28px; padding:0 9px; border-radius:7px; font-size:12px; color:var(--body); }
+.f3dock .menu div.on { background:var(--hover-bg); color:var(--text); }
+.f3dock .menu .k { font:650 9px var(--fmono); letter-spacing:.15em; text-transform:uppercase; color:var(--dim); padding:6px 9px 2px; height:auto; }
+
+/* decisions list */
+.dec { list-style:none; margin:0; padding:0; display:grid; gap:10px; }
+.dec li { display:grid; grid-template-columns:28px 1fr; gap:12px; padding:12px 14px; background:var(--pg-card); border:1px solid var(--pg-border); border-radius:12px; font-size:13.5px; }
+.dec li .n { font:700 12px var(--fmono); color:var(--pg-link); padding-top:2px; }
+.dec li b { color:var(--pg-text); font-weight:600; }
+.dec li.done { opacity:.8; } .dec li.done .n { color:#2f9e6b; }
+.dec li .rec { display:inline-block; margin-left:6px; font:600 9.5px var(--fmono); letter-spacing:.08em; text-transform:uppercase; color:var(--pg-link); }
+footer { margin-top:60px; padding-top:16px; border-top:1px solid var(--pg-border); font-size:12.5px; color:var(--pg-muted); }
+@media (prefers-reduced-motion: reduce) { .orb, .askdot, .navhistdot.ask, .navhistdot.live { animation:none !important; } }
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-compose" viewBox="0 0 16 16"><path d="M8 3.5H4.5A1.5 1.5 0 0 0 3 5v6.5A1.5 1.5 0 0 0 4.5 13H11a1.5 1.5 0 0 0 1.5-1.5V8"/><path d="M12.2 2.8l1 1L8.5 8.5 7 9l.5-1.5z"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 16 16"><path d="M8 3.5v9M3.5 8h9"/></symbol>
+  <symbol id="i-board" viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="9" rx="1.5"/><path d="M5 9l2.2-2.4L9 8.4 11 6"/></symbol>
+  <symbol id="i-sched" viewBox="0 0 16 16"><path d="M3 6a5 5 0 0 1 9-2.5M13 10a5 5 0 0 1-9 2.5"/><path d="M12 1.5v2.5h-2.5M4 14.5V12h2.5"/></symbol>
+  <symbol id="i-files" viewBox="0 0 16 16"><path d="M3 3.5A1.5 1.5 0 0 1 4.5 2H11l2 2v8.5A1.5 1.5 0 0 1 11.5 14h-7A1.5 1.5 0 0 1 3 12.5z"/><path d="M6 8h4M6 10.5h4"/></symbol>
+  <symbol id="i-trend" viewBox="0 0 16 16"><path d="M2 11l4-4 3 3 5-5"/><path d="M10.5 5H14v3.5"/></symbol>
+  <symbol id="i-term" viewBox="0 0 16 16"><path d="M3 4.5l3.5 3.5L3 11.5"/><path d="M8 12h5"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 16 16"><path d="M3 4.5A1.5 1.5 0 0 1 4.5 3h7A1.5 1.5 0 0 1 13 4.5v5a1.5 1.5 0 0 1-1.5 1.5H7l-3 2.5V11H4.5A1.5 1.5 0 0 1 3 9.5z"/></symbol>
+  <symbol id="i-circle" viewBox="0 0 16 16"><circle cx="8" cy="8" r="4.2"/></symbol>
+  <symbol id="i-check" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.2"/><path d="M5.6 8.2l1.7 1.7 3.2-3.6"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.2"/><path d="M8 5.2V8l1.9 1.3"/></symbol>
+  <symbol id="i-branch" viewBox="0 0 16 16"><circle cx="4.5" cy="3.5" r="1.5"/><circle cx="4.5" cy="12.5" r="1.5"/><circle cx="11.5" cy="5.5" r="1.5"/><path d="M4.5 5v6M11.5 7a3 3 0 0 1-3 3h-1a2.5 2.5 0 0 0-2.5 1"/></symbol>
+  <symbol id="i-find" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4"/><path d="M10 10l3 3"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 16 16"><path d="M5 6.5l3 3 3-3"/></symbol>
+  <symbol id="i-chevr" viewBox="0 0 16 16"><path d="M6.5 5l3 3-3 3"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 16 16"><path d="M2 4.5A1.5 1.5 0 0 1 3.5 3h3l1.5 1.5h4.5A1.5 1.5 0 0 1 14 6v5.5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 11.5z"/></symbol>
+  <symbol id="i-folder-open" viewBox="0 0 16 16"><path d="M2 4.5A1.5 1.5 0 0 1 3.5 3h3l1.5 1.5h4.5A1.5 1.5 0 0 1 14 6v1"/><path d="M2 12.5V7.5h9.6a1 1 0 0 1 .95 1.3L11.3 12a1 1 0 0 1-.95.7H3.5A1.5 1.5 0 0 1 2 11.2z"/></symbol>
+  <symbol id="i-pr" viewBox="0 0 16 16"><circle cx="4.5" cy="3.5" r="1.5"/><circle cx="4.5" cy="12.5" r="1.5"/><circle cx="11.5" cy="12.5" r="1.5"/><path d="M4.5 5v6M11.5 11V7a2 2 0 0 0-2-2H8.5"/><path d="M10 3.5L8.5 5 10 6.5"/></symbol>
+  <symbol id="i-more" viewBox="0 0 16 16"><circle cx="3.5" cy="8" r="1.1" fill="currentColor" stroke="none"/><circle cx="8" cy="8" r="1.1" fill="currentColor" stroke="none"/><circle cx="12.5" cy="8" r="1.1" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-pen" viewBox="0 0 16 16"><path d="M11.3 2.7l2 2L6 12H4v-2z"/></symbol>
+  <symbol id="i-archive" viewBox="0 0 16 16"><rect x="2.5" y="3" width="11" height="3" rx="1"/><path d="M3.5 6v5.5A1.5 1.5 0 0 0 5 13h6a1.5 1.5 0 0 0 1.5-1.5V6M6.5 9h3"/></symbol>
+  <symbol id="i-link" viewBox="0 0 16 16"><path d="M6.5 9.5l3-3M7 5l1-1a2.5 2.5 0 0 1 3.5 3.5l-1 1M9 11l-1 1a2.5 2.5 0 0 1-3.5-3.5l1-1"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 16 16"><circle cx="8" cy="8" r="2"/><path d="M8 2.5v1.5M8 12v1.5M2.5 8H4M12 8h1.5M4.1 4.1l1.1 1.1M10.8 10.8l1.1 1.1M4.1 11.9l1.1-1.1M10.8 5.2l1.1-1.1"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 16 16"><path d="M6 2.5h4l-.5 4 2 2v1H4.5v-1l2-2z"/><path d="M8 9.5V14"/></symbol>
+  <symbol id="i-fold" viewBox="0 0 16 16"><rect x="2.5" y="3" width="11" height="10" rx="1.5"/><path d="M6.5 3v10"/></symbol>
+</svg>
+
+<div class="wrap">
+<header>
+  <div class="kick">design round · 2026-09-04 · docs/design/rail-ink-type-2026-09</div>
+  <h1>Rail &amp; Ink Round</h1>
+  <p class="lede">Nine asks from George in one contract: menus as text, shortcuts that nest, a one-line thread list with honest glyphs, ink that is grey rather than white, a type stack with more character, a question card that stops drawing a box inside a box, a head that is just the mark and the fold, and hover that gives a one-line row its facts back. Every stage below is built from the app's real classes and tokens; the "Now" columns are locked to today's values, the "Proposed" columns obey the bar.</p>
+</header>
+
+<div class="bar" role="toolbar" aria-label="Preview switches">
+  <div class="grp"><span class="kick">Theme</span>
+    <button class="sw" data-k="theme" data-v="t-dark">Graphite</button><button class="sw" data-k="theme" data-v="t-light">Paper</button><button class="sw" data-k="theme" data-v="t-soft">Soft dark</button><button class="sw" data-k="theme" data-v="t-cream">Cream oak</button></div>
+  <div class="grp"><span class="kick">Ink in proposed</span>
+    <button class="sw" data-k="ink" data-v="ink-new">Softer, step 2</button><button class="sw" data-k="ink" data-v="ink-s1">Step 1</button><button class="sw" data-k="ink" data-v="ink-old">Today's</button></div>
+  <div class="grp"><span class="kick">Sans</span>
+    <button class="sw" data-k="sans" data-v="f-geist">Geist (today)</button><button class="sw" data-k="sans" data-v="f-hanken">Hanken Grotesk</button><button class="sw" data-k="sans" data-v="f-plex">IBM Plex Sans</button><button class="sw" data-k="sans" data-v="f-public">Public Sans</button></div>
+  <div class="grp"><span class="kick">Mono</span>
+    <button class="sw" data-k="mono" data-v="m-geist">Geist Mono (today)</button><button class="sw" data-k="mono" data-v="m-jb">JetBrains Mono</button></div>
+</div>
+
+<!-- ───────────────────────── 1–3 · the rail ───────────────────────── -->
+<section id="rail">
+  <div class="sechd"><span class="kick">1 · 2 · 3</span><h2>The rail: menus are text, shortcuts nest, threads take one line</h2></div>
+  <p class="note">The rail is one object, so the three asks are one drawing. Callouts mark where each ask lands. Both proposed columns keep the app's selection surface (<code>--panel3</code> on the darks, the white card on the papers) because <b>the neutral card means selected</b> is a settled ruling; everything else that was a box becomes a row.</p>
+  <div class="cmp c3" style="margin-top:16px">
+    <div class="col"><span class="kick">Now</span>
+      <div class="stage railstage t-dark now" data-fixed="1">
+        <div class="topbarnow"><span class="mark"><i></i></span><span class="wm">neuramesh</span><span class="fold"><svg class="i s15"><use href="#i-fold"/></svg></span><span class="sep">/</span><span>default</span><span class="sep">›</span><span class="cur">Conversation</span></div>
+        <div class="rail">
+          <div class="navnew"><div class="navnewchat"><span class="nncplus">＋</span><span class="lbl">New chat</span><span class="nnck">⌘N</span></div><span class="navnewcaret"><svg class="i s14"><use href="#i-chev"/></svg></span></div>
+          <div class="navsecthd"><span class="chev"><svg class="i s12"><use href="#i-chev"/></svg></span>Shortcuts</div>
+          <div class="navitem"><svg class="i"><use href="#i-board"/></svg><span class="lbl">Whiteboards</span></div>
+          <div class="navitem navparent ingroup"><svg class="i"><use href="#i-sched"/></svg><span class="lbl">Scheduled</span><span class="navitembadge">15</span><span class="pchev"><svg class="i s12"><use href="#i-chev"/></svg></span></div>
+          <div class="navitem navsub"><span class="lbl">Routines</span></div>
+          <div class="navitem navsub"><span class="lbl">Calendar</span></div>
+          <div class="navitem"><svg class="i"><use href="#i-files"/></svg><span class="lbl">Files</span></div>
+          <div class="navitem"><svg class="i"><use href="#i-trend"/></svg><span class="lbl">Marketing OS</span></div>
+          <div class="navitem on"><svg class="i"><use href="#i-term"/></svg><span class="lbl">Code</span></div>
+          <div class="navscoperow"><span class="navprojchev"><svg class="i s12"><use href="#i-chev"/></svg></span><span class="cchip">All threads <span class="car">·</span></span><span class="navscopegrow"></span><span class="navhistfind"><svg class="i s14"><use href="#i-find"/></svg></span></div>
+          <div class="navhistlist">
+            <div class="navhistrow"><span class="navhistdot thread"></span><div class="navhistbody"><div class="navhistline1"><span class="navhisttitle">what are some popular progr…</span><span class="navhistwhen">15m</span></div><div class="navhistmeta"><span class="pj">Code</span><span class="sep">·</span><span class="rm"><span class="h">e2e-local</span></span><span class="sep">·</span><span class="br">main</span></div></div></div>
+            <div class="navhistrow"><span class="navhistdot thread"></span><div class="navhistbody"><div class="navhistline1"><span class="navhisttitle">New Code task</span><span class="navhistwhen">24m</span></div><div class="navhistmeta"><span class="pj">Code</span><span class="sep">·</span><span class="rm"><span class="h">e2e-local</span></span><span class="sep">·</span><span class="br">main</span></div></div></div>
+            <div class="navhistrow"><span class="navhistdot c-done live"></span><div class="navhistbody"><div class="navhistline1"><span class="navhistnum">1107</span><span class="navhisttitle">no shortcut back to work</span><span class="navhistwhen">2w</span></div><div class="navhistmeta"><span class="pj"><span class="projlogo"></span>Default</span><span class="sep">·</span><span class="rm"><span class="h">#</span>build</span></div></div></div>
+            <div class="navhistrow"><span class="navhistdot c-done live"></span><div class="navhistbody"><div class="navhistline1"><span class="navhistnum">1105</span><span class="navhisttitle">reopen me</span><span class="navhistwhen">2w</span></div><div class="navhistmeta"><span class="pj"><span class="projlogo"></span>Default</span><span class="sep">·</span><span class="rm"><span class="h">#</span>build</span></div></div></div>
+            <div class="navhistrow on"><span class="navhistdot c-in_progress live"></span><div class="navhistbody"><div class="navhistline1"><span class="navhistnum">1084</span><span class="navhisttitle">no shortcut back to work</span><span class="navhistwhen">2w</span></div><div class="navhistmeta"><span class="pj"><span class="projlogo"></span>Default</span><span class="sep">·</span><span class="rm"><span class="h">#</span>build</span></div></div></div>
+            <div class="navhistrow"><span class="navhistdot c-done live"></span><div class="navhistbody"><div class="navhistline1"><span class="navhistnum">1079</span><span class="navhisttitle">reopen me</span><span class="navhistwhen">2w</span></div><div class="navhistmeta"><span class="pj"><span class="projlogo"></span>Default</span><span class="sep">·</span><span class="rm"><span class="h">#</span>build</span></div></div></div>
+            <div class="navhistrow"><span class="navhistdot c-in_review ask"></span><div class="navhistbody"><div class="navhistline1"><span class="navhistnum">1061</span><span class="navhisttitle">no shortcut back to work</span><span class="navhistwhen">2w</span></div><div class="navhistmeta"><span class="pj"><span class="projlogo"></span>Default</span><span class="sep">·</span><span class="rm"><span class="h">#</span>build</span></div></div></div>
+            <div class="navhistrow"><span class="nhroutine"><svg class="i s12"><use href="#i-clock"/></svg></span><div class="navhistbody"><div class="navhistline1"><span class="navhisttitle">Routine — Daily room digest</span><span class="navhistwhen">3h</span></div><div class="navhistmeta"><span class="pj"><span class="projlogo"></span>Default</span><span class="sep">·</span><span class="rm"><span class="h">#</span>general</span></div></div></div>
+            <div class="navprojmore">Everything else ⌘Y</div>
+          </div>
+          <div class="setupdock"><span class="ring"></span>Finish setting up<span class="cnt">3/5</span></div>
+          <div class="navwsfoot"><span class="tile">A</span>Acme Robotics<span class="cring"></span></div>
+        </div>
+      </div>
+      <div class="cap">Three embossed objects before the list starts (the pill, the badge, the chip), a hairline tree for two children, and every thread spends two lines and three facts.</div>
+    </div>
+
+    <div class="col"><span class="kick">Proposed · one list</span>
+      <div class="stage railstage t-dark p ink-new f-geist m-geist">
+        <div class="rail">
+          <div class="rhead" style="position:relative"><span class="mark"><i></i></span><span class="wm">neuramesh</span><span class="fold"><svg class="i s15"><use href="#i-fold"/></svg></span><span class="co" style="right:-9px">7</span></div>
+          <div class="prow new"><svg class="i s15"><use href="#i-compose"/></svg><span class="lbl">New chat</span><span class="kbd">⌘N</span><span class="co">1</span></div>
+          <div class="gap"></div>
+          <div class="phd"><span class="chev"><svg class="i s12"><use href="#i-chev"/></svg></span>Shortcuts<span class="co" style="right:-9px">2</span></div>
+          <div class="prow l1"><svg class="i s15"><use href="#i-board"/></svg><span class="lbl">Whiteboards</span></div>
+          <div class="prow l1"><svg class="i s15"><use href="#i-sched"/></svg><span class="lbl">Scheduled</span><span class="tchev"><svg class="i s12"><use href="#i-chev"/></svg></span></div>
+          <div class="prow l2"><span class="lbl">Routines</span></div>
+          <div class="prow l2"><span class="lbl">Calendar</span></div>
+          <div class="prow l1"><svg class="i s15"><use href="#i-files"/></svg><span class="lbl">Files</span></div>
+          <div class="prow l1"><svg class="i s15"><use href="#i-trend"/></svg><span class="lbl">Marketing OS</span></div>
+          <div class="prow l1 on"><svg class="i s15"><use href="#i-term"/></svg><span class="lbl">Code</span></div>
+          <div class="phd scope"><span class="chev"><svg class="i s12"><use href="#i-chev"/></svg></span>All threads <span class="car">▾</span><span class="find"><svg class="i s14"><use href="#i-find"/></svg></span><span class="co" style="right:-9px">1</span></div>
+          <div class="trow"><span class="g"><svg class="i s14"><use href="#i-term"/></svg></span><span class="t">what are some popular programming languages</span><span class="co">3</span></div>
+          <div class="trow"><span class="g"><svg class="i s14"><use href="#i-term"/></svg></span><span class="t">New Code task</span></div>
+          <div class="trow"><span class="g"><svg class="i s14"><use href="#i-check"/></svg></span><span class="t">no shortcut back to work</span><span class="m">#build</span></div>
+          <div class="trow"><span class="g"><svg class="i s14"><use href="#i-check"/></svg></span><span class="t">reopen me</span><span class="m">#build</span></div>
+          <div class="trow on"><span class="g"><span class="orb"></span></span><span class="t">no shortcut back to work</span><span class="frac">2/5</span></div>
+          <div class="trow"><span class="g"><span class="dot c-in_review"></span></span><span class="t">reopen me</span><span class="m">#build</span></div>
+          <div class="trow"><span class="g"><svg class="i s14"><use href="#i-circle"/></svg></span><span class="t">no shortcut back to work</span><span class="askdot"></span></div>
+          <div class="trow"><span class="g"><svg class="i s14"><use href="#i-chat"/></svg></span><span class="t">Explain downloading X videos</span><span class="m">2w</span></div>
+          <div class="trow"><span class="g"><svg class="i s14"><use href="#i-clock"/></svg></span><span class="t">Daily room digest</span><span class="m">#general</span></div>
+          <div class="more">Show more</div>
+          <div class="foot">
+            <div class="setuprow"><span class="ring" style="width:14px;height:14px;border-radius:50%;background:conic-gradient(var(--done) 60%, color-mix(in srgb, var(--dim) 30%, transparent) 0);-webkit-mask:radial-gradient(circle, transparent 4px, #000 4.6px);mask:radial-gradient(circle, transparent 4px, #000 4.6px)"></span>Finish setting up<span class="cnt">3/5</span></div>
+            <div class="navwsfoot"><span class="tile">A</span>Acme Robotics<span class="cring"></span></div>
+          </div>
+        </div>
+      </div>
+      <div class="cap"><b>⑦</b> The head is the mark, the wordmark and the fold; the project lives in the scope row and the surface in its tab, so the breadcrumb had nothing left to say. <b>①</b> New chat and All threads become text rows with an icon; the pill and the chip go. <b>②</b> Shortcut rows step in 22px from the heading, children a second step, no guide line. <b>③</b> One line per thread: a kind glyph, the title, and one trailing fact only when the scope does not already say it. The needs-you pulse moves to the trailing edge as a signal, not a default. Recommended.</div>
+    </div>
+
+    <div class="col"><span class="kick">Proposed · grouped by project (Codex)</span>
+      <div class="stage railstage t-dark p ink-new f-geist m-geist">
+        <div class="rail">
+          <div class="rhead"><span class="mark"><i></i></span><span class="wm">neuramesh</span><span class="fold"><svg class="i s15"><use href="#i-fold"/></svg></span></div>
+          <div class="prow new"><svg class="i s15"><use href="#i-compose"/></svg><span class="lbl">New chat</span><span class="kbd">⌘N</span></div>
+          <div class="gap"></div>
+          <div class="phd"><span class="chev"><svg class="i s12"><use href="#i-chev"/></svg></span>Shortcuts</div>
+          <div class="prow l1"><svg class="i s15"><use href="#i-board"/></svg><span class="lbl">Whiteboards</span></div>
+          <div class="prow l1"><svg class="i s15"><use href="#i-sched"/></svg><span class="lbl">Scheduled</span><span class="tchev"><svg class="i s12"><use href="#i-chevr"/></svg></span></div>
+          <div class="prow l1"><svg class="i s15"><use href="#i-files"/></svg><span class="lbl">Files</span></div>
+          <div class="prow l1"><svg class="i s15"><use href="#i-trend"/></svg><span class="lbl">Marketing OS</span></div>
+          <div class="prow l1 on"><svg class="i s15"><use href="#i-term"/></svg><span class="lbl">Code</span></div>
+          <div class="phd" style="margin-top:14px">Projects<span class="cnt">4</span></div>
+          <div class="prow l1"><svg class="i s15"><use href="#i-folder-open"/></svg><span class="lbl">Default</span><span class="tchev"><svg class="i s12"><use href="#i-chev"/></svg></span></div>
+          <div class="trow" style="padding-left:32px"><span class="g"><svg class="i s14"><use href="#i-check"/></svg></span><span class="t">no shortcut back to work</span><span class="m">#build</span></div>
+          <div class="trow on" style="padding-left:32px"><span class="g"><span class="orb"></span></span><span class="t">no shortcut back to work</span><span class="frac">2/5</span></div>
+          <div class="trow" style="padding-left:32px"><span class="g"><svg class="i s14"><use href="#i-circle"/></svg></span><span class="t">reopen me</span><span class="askdot"></span></div>
+          <div class="trow" style="padding-left:32px"><span class="g"><svg class="i s14"><use href="#i-clock"/></svg></span><span class="t">Daily room digest</span><span class="m">#general</span></div>
+          <div class="more" style="padding-left:32px">Show more</div>
+          <div class="prow l1"><svg class="i s15"><use href="#i-folder-open"/></svg><span class="lbl">Code</span><span class="tchev"><svg class="i s12"><use href="#i-chev"/></svg></span></div>
+          <div class="trow" style="padding-left:32px"><span class="g"><svg class="i s14"><use href="#i-term"/></svg></span><span class="t">what are some popular programming languages</span></div>
+          <div class="trow" style="padding-left:32px"><span class="g"><svg class="i s14"><use href="#i-term"/></svg></span><span class="t">New Code task</span></div>
+          <div class="prow l1"><svg class="i s15"><use href="#i-folder"/></svg><span class="lbl">Flowe</span><span class="m" style="font:500 10px var(--fmono);color:var(--dim)">12</span><span class="tchev"><svg class="i s12"><use href="#i-chevr"/></svg></span></div>
+          <div class="foot">
+            <div class="setuprow"><span style="width:14px;height:14px;border-radius:50%;background:conic-gradient(var(--done) 60%, color-mix(in srgb, var(--dim) 30%, transparent) 0);-webkit-mask:radial-gradient(circle, transparent 4px, #000 4.6px);mask:radial-gradient(circle, transparent 4px, #000 4.6px)"></span>Finish setting up<span class="cnt">3/5</span></div>
+            <div class="navwsfoot"><span class="tile">A</span>Acme Robotics<span class="cring"></span></div>
+          </div>
+        </div>
+      </div>
+      <div class="cap">Same rows, folded under project folders with a capped tail; a folder is open or closed by its state (Flowe is folded, with its count). If D1 goes to the one list, the same open/closed folder rides the project picker's rows. It reads well at four projects, and it is the collapsible-header rail the 2026-08-17 ruling replaced: recency no longer runs top to bottom, and the scope row loses its job. Offered because Codex does it, not recommended.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ───────────────────────── 3c · code as its own mode ───────────────────────── -->
+<section id="codemode">
+  <div class="sechd"><span class="kick">3c</span><h2>Code as its own mode, not another shortcut</h2></div>
+  <p class="note">A code session is a different animal from a thread: it belongs to a <b>repo and a branch</b>, not a project and a room; its states are streaming / awaiting approval / completed rather than the board's FSM; and its surfaces are the diff, the terminal and the approval card. Mixing them into the thread list is what produced rows like <code>Code · e2e-local · main</code>. Gemini's Chat | Spark is the right shape: one segmented switch under the head, and the rail changes what it lists, never its anatomy. This is the shell's single mode switch, not a destination growing a tab strip (docs/33 §8), and it is the only place the rail changes shape. It depends on the engineering-os work (the Codex branch) landing; the rail below is drawn to that branch's session model.</p>
+  <div class="cmp c2" style="margin-top:16px">
+    <div class="col"><span class="kick">Chat mode</span>
+      <div class="stage railstage t-dark p ink-new f-geist m-geist">
+        <div class="rail">
+          <div class="rhead"><span class="mark"><i></i></span><span class="wm">neuramesh</span><span class="fold"><svg class="i s15"><use href="#i-fold"/></svg></span></div>
+          <div class="seg"><span class="on">Chat</span><span>Code</span></div>
+          <div class="prow new"><svg class="i s15"><use href="#i-compose"/></svg><span class="lbl">New chat</span><span class="kbd">⌘N</span></div>
+          <div class="gap"></div>
+          <div class="phd"><span class="chev"><svg class="i s12"><use href="#i-chev"/></svg></span>Shortcuts</div>
+          <div class="prow l1"><svg class="i s15"><use href="#i-board"/></svg><span class="lbl">Whiteboards</span></div>
+          <div class="prow l1"><svg class="i s15"><use href="#i-sched"/></svg><span class="lbl">Scheduled</span><span class="tchev"><svg class="i s12"><use href="#i-chevr"/></svg></span></div>
+          <div class="prow l1"><svg class="i s15"><use href="#i-files"/></svg><span class="lbl">Files</span></div>
+          <div class="prow l1"><svg class="i s15"><use href="#i-trend"/></svg><span class="lbl">Marketing OS</span></div>
+          <div class="phd scope"><span class="chev"><svg class="i s12"><use href="#i-chev"/></svg></span>All threads <span class="car">▾</span><span class="find"><svg class="i s14"><use href="#i-find"/></svg></span></div>
+          <div class="trow"><span class="g"><svg class="i s14"><use href="#i-check"/></svg></span><span class="t">no shortcut back to work</span><span class="m">#build</span></div>
+          <div class="trow on"><span class="g"><span class="orb"></span></span><span class="t">no shortcut back to work</span><span class="frac">2/5</span></div>
+          <div class="trow"><span class="g"><span class="dot c-in_review"></span></span><span class="t">reopen me</span><span class="m">#build</span></div>
+          <div class="trow"><span class="g"><svg class="i s14"><use href="#i-circle"/></svg></span><span class="t">no shortcut back to work</span><span class="askdot"></span></div>
+          <div class="trow"><span class="g"><svg class="i s14"><use href="#i-chat"/></svg></span><span class="t">Explain downloading X videos</span><span class="m">2w</span></div>
+          <div class="trow"><span class="g"><svg class="i s14"><use href="#i-clock"/></svg></span><span class="t">Daily room digest</span><span class="m">#general</span></div>
+          <div class="more">Show more</div>
+          <div class="foot"><div class="navwsfoot"><span class="tile">A</span>Acme Robotics<span class="cring"></span></div></div>
+        </div>
+      </div>
+      <div class="cap">Chat is the rail you approved above, with the switch under the head. The Code shortcut row disappears: it was a mode wearing a row's clothes.</div>
+    </div>
+    <div class="col"><span class="kick">Code mode</span>
+      <div class="stage railstage t-dark p ink-new f-geist m-geist">
+        <div class="rail">
+          <div class="rhead"><span class="mark"><i></i></span><span class="wm">neuramesh</span><span class="fold"><svg class="i s15"><use href="#i-fold"/></svg></span></div>
+          <div class="seg"><span>Chat</span><span class="on">Code</span></div>
+          <div class="prow new"><svg class="i s15"><use href="#i-compose"/></svg><span class="lbl">New session</span><span class="kbd">⌘N</span></div>
+          <div class="gap"></div>
+          <div class="phd"><span class="chev"><svg class="i s12"><use href="#i-chev"/></svg></span>Shortcuts</div>
+          <div class="prow l1"><svg class="i s15"><use href="#i-pr"/></svg><span class="lbl">Pull requests</span><span class="m" style="font:500 10px var(--fmono);color:var(--dim)">3</span></div>
+          <div class="prow l1"><svg class="i s15"><use href="#i-branch"/></svg><span class="lbl">Worktrees</span></div>
+          <div class="prow l1"><svg class="i s15"><use href="#i-board"/></svg><span class="lbl">Footprint</span></div>
+          <div class="phd scope"><span class="chev"><svg class="i s12"><use href="#i-chev"/></svg></span>All repos <span class="car">▾</span><span class="find"><svg class="i s14"><use href="#i-find"/></svg></span></div>
+          <div class="trow on"><span class="g"><span class="orb"></span></span><span class="t">Evaluate Engineering workspace</span><span class="m">neuramesh</span></div>
+          <div class="trow"><span class="g"><svg class="i s14"><use href="#i-term"/></svg></span><span class="t">Add tweet profile connectors</span><span class="askdot"></span></div>
+          <div class="trow"><span class="g"><svg class="i s14"><use href="#i-term"/></svg></span><span class="t">Create NeuraMesh launch deck</span><span class="m">neuramesh</span></div>
+          <div class="trow"><span class="g"><svg class="i s14"><use href="#i-check"/></svg></span><span class="t">Cap Gemini thinking budget in getChatResponse callers</span><span class="g" style="color:var(--dim)"><svg class="i s14"><use href="#i-pr"/></svg></span></div>
+          <div class="trow"><span class="g"><svg class="i s14"><use href="#i-term"/></svg></span><span class="t">Deep dive gbrain codebase</span><span class="m">kinshi</span></div>
+          <div class="trow"><span class="g"><svg class="i s14"><use href="#i-check"/></svg></span><span class="t">Windows support for Flowe desktop app</span><span class="m">flowe</span></div>
+          <div class="more">Show more</div>
+          <div class="foot"><div class="navwsfoot"><span class="tile">A</span>Acme Robotics<span class="cring"></span></div></div>
+        </div>
+      </div>
+      <div class="cap">Same anatomy, different nouns: New session; Pull requests, Worktrees and Footprint as the shortcuts; the scope narrows by <b>repo</b>; a row's trailing fact is the repo when unscoped and the branch inside one. The orb is a streaming session, the pulse is an approval waiting on you, the check is completed, and a trailing PR glyph marks a session that opened one.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ───────────────────────── 3d · hover ───────────────────────── -->
+<section id="hover">
+  <div class="sechd"><span class="kick">3d</span><h2>Hover: the row tells the rest</h2></div>
+  <p class="note">A one-line row can afford to drop facts because hover gives them back. A thread row shows a card with the <b>full title</b>, the first line of its snippet, and everything the row no longer carries: project, room, branch, age. At the trailing edge the row's fact swaps for two controls, <b>rename</b> and the <b>⋯ menu</b> (rename · archive · copy link · delete), which is where today's hidden archive button already lives. A project row, in the folder variant and in the picker, gets Codex's pair on hover: <b>new chat here</b> and the <b>⋯ menu</b>, and a card with what the project is: its counts, its rooms, its repo, and Edit project. Cards are the elevated stratum: <code>--card</code>, one hairline, the pop shadow, never a native title.</p>
+  <div class="cmp c2" style="margin-top:16px">
+    <div class="col"><span class="kick">A thread row, hovered · and its menu</span>
+      <div class="stage railstage t-dark p ink-new f-geist m-geist" style="min-height:460px">
+        <div class="rail" style="min-height:460px">
+          <div class="rhead"><span class="mark"><i></i></span><span class="wm">neuramesh</span><span class="fold"><svg class="i s15"><use href="#i-fold"/></svg></span></div>
+          <div class="phd scope" style="margin-top:6px"><span class="chev"><svg class="i s12"><use href="#i-chev"/></svg></span>All threads <span class="car">▾</span><span class="find"><svg class="i s14"><use href="#i-find"/></svg></span></div>
+          <div class="trow"><span class="g"><svg class="i s14"><use href="#i-term"/></svg></span><span class="t">what are some popular programming languages</span></div>
+          <div class="trow hov"><span class="g"><svg class="i s14"><use href="#i-check"/></svg></span><span class="t">no shortcut back to work</span><span class="m">#build</span><span class="act"><span><svg class="i s14"><use href="#i-pen"/></svg></span><span><svg class="i s14"><use href="#i-more"/></svg></span></span></div>
+          <div class="trow"><span class="g"><svg class="i s14"><use href="#i-check"/></svg></span><span class="t">reopen me</span><span class="m">#build</span></div>
+          <div class="trow on"><span class="g"><span class="orb"></span></span><span class="t">no shortcut back to work</span><span class="frac">2/5</span></div>
+          <div class="trow"><span class="g"><span class="dot c-in_review"></span></span><span class="t">reopen me</span><span class="m">#build</span></div>
+          <div class="trow hov"><span class="g"><svg class="i s14"><use href="#i-chat"/></svg></span><span class="t">Explain downloading X videos</span><span class="m">2w</span><span class="act"><span><svg class="i s14"><use href="#i-pen"/></svg></span><span class="on"><svg class="i s14"><use href="#i-more"/></svg></span></span></div>
+          <div class="trow"><span class="g"><svg class="i s14"><use href="#i-clock"/></svg></span><span class="t">Daily room digest</span><span class="m">#general</span></div>
+          <div class="trow"><span class="g"><svg class="i s14"><use href="#i-circle"/></svg></span><span class="t">no shortcut back to work</span><span class="askdot"></span></div>
+          <div class="more">Show more</div>
+        </div>
+        <div class="sheet"></div>
+        <div class="hcard" style="left:262px; top:96px"><div class="ht">#1107 · no shortcut back to work</div><div class="hs">Reopening a closed task should land on the thread, not the board.</div><div class="hf"><b>Default</b><span>#build</span><span>⎇ nm/1107-no-shortcut-back</span><span>done · 2w</span></div></div>
+        <div class="hmenu" style="left:262px; top:238px"><div class="on"><svg class="i s14"><use href="#i-pen"/></svg>Rename</div><div><svg class="i s14"><use href="#i-archive"/></svg>Archive</div><div><svg class="i s14"><use href="#i-link"/></svg>Copy link</div><hr/><div class="warn"><svg class="i s14"><use href="#i-archive"/></svg>Delete…</div></div>
+      </div>
+      <div class="cap">Row two is hovered: the trailing <code>#build</code> gives way to rename and ⋯, and the card carries the full title, the snippet, and the four facts D2 removes from the row. Row six shows the menu open.</div>
+    </div>
+    <div class="col"><span class="kick">A project row, hovered · and its card</span>
+      <div class="stage railstage t-dark p ink-new f-geist m-geist" style="min-height:460px">
+        <div class="rail" style="min-height:460px">
+          <div class="rhead"><span class="mark"><i></i></span><span class="wm">neuramesh</span><span class="fold"><svg class="i s15"><use href="#i-fold"/></svg></span></div>
+          <div class="phd" style="margin-top:6px">Projects<span class="cnt">4</span></div>
+          <div class="prow l1 hov"><svg class="i s15"><use href="#i-folder-open"/></svg><span class="lbl">Default</span><span class="act"><span><svg class="i s14"><use href="#i-compose"/></svg></span><span class="on"><svg class="i s14"><use href="#i-more"/></svg></span></span></div>
+          <div class="trow" style="padding-left:32px"><span class="g"><svg class="i s14"><use href="#i-check"/></svg></span><span class="t">no shortcut back to work</span><span class="m">#build</span></div>
+          <div class="trow on" style="padding-left:32px"><span class="g"><span class="orb"></span></span><span class="t">no shortcut back to work</span><span class="frac">2/5</span></div>
+          <div class="trow" style="padding-left:32px"><span class="g"><svg class="i s14"><use href="#i-circle"/></svg></span><span class="t">reopen me</span><span class="askdot"></span></div>
+          <div class="trow" style="padding-left:32px"><span class="g"><svg class="i s14"><use href="#i-clock"/></svg></span><span class="t">Daily room digest</span><span class="m">#general</span></div>
+          <div class="more" style="padding-left:32px">Show more</div>
+          <div class="prow l1"><svg class="i s15"><use href="#i-folder-open"/></svg><span class="lbl">Code</span><span class="tchev"><svg class="i s12"><use href="#i-chev"/></svg></span></div>
+          <div class="trow" style="padding-left:32px"><span class="g"><svg class="i s14"><use href="#i-term"/></svg></span><span class="t">what are some popular programming languages</span></div>
+          <div class="prow l1"><svg class="i s15"><use href="#i-folder"/></svg><span class="lbl">Flowe</span><span class="m" style="font:500 10px var(--fmono);color:var(--dim)">12</span><span class="tchev"><svg class="i s12"><use href="#i-chevr"/></svg></span></div>
+        </div>
+        <div class="sheet"></div>
+        <div class="pcard" style="left:262px; top:70px"><div class="ph"><span class="tile">D</span>Default<span class="pin"><svg class="i s14"><use href="#i-pin"/></svg></span></div><div class="pr"><svg class="i s14"><use href="#i-chat"/></svg>5 tasks · 3 chats · 1 needs you</div><div class="pr"><svg class="i s14"><use href="#i-folder"/></svg>general · build · marketing</div><div class="pr path"><svg class="i s14"><use href="#i-branch"/></svg>alonge-dev/neuramesh</div><div class="pr edit"><svg class="i s14"><use href="#i-gear"/></svg>Edit project</div></div>
+      </div>
+      <div class="cap">The folder row hovered: new chat here and ⋯ at the trailing edge, the card with counts, rooms, the attached repo, and Edit project. In the one-list rail the same pair sits on the scope row's project label, and the card is the picker row's hover.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ───────────────────────── 3b · glyphs ───────────────────────── -->
+<section id="glyphs">
+  <div class="sechd"><span class="kick">3b</span><h2>Row glyphs say what kind of thing a row is; the pulse says it wants you</h2></div>
+  <p class="note">Today every task row leads with the same 6px dot, and the dot pulses for liveness and for needs-you alike, so a settled thread and a live one look like siblings. The proposed vocabulary gives each session kind an outline glyph in <code>--dim</code>, keeps colour for state only while a task is active, and spends animation on exactly two things: a run in progress and a question waiting on you.</p>
+  <table class="tbl" style="margin-top:14px">
+    <thead><tr><th>Row</th><th>Glyph</th><th>When</th></tr></thead>
+    <tbody>
+      <tr><td>Chat</td><td><span class="gcell"><span class="g"><svg class="i s14"><use href="#i-chat"/></svg></span> speech outline</span></td><td>a conversation; no FSM state, so never a colour</td></tr>
+      <tr><td>Code session</td><td><span class="gcell"><span class="g"><svg class="i s14"><use href="#i-term"/></svg></span> prompt</span></td><td>a Workbench / terminal session</td></tr>
+      <tr><td>Task, waiting</td><td><span class="gcell"><span class="g"><svg class="i s14"><use href="#i-circle"/></svg></span> hollow circle</span></td><td>backlog · todo · plan_review — nothing is happening yet</td></tr>
+      <tr><td>Task, active</td><td><span class="gcell"><span class="g"><span style="width:6px;height:6px;border-radius:50%;background:#8ba0c0"></span></span> 6px dot in the state hue</span></td><td>in_progress · in_review · blocked · shipping — the one place colour survives (unchanged)</td></tr>
+      <tr><td>Task, running</td><td><span class="gcell"><span class="g"><span class="orb" style="--text:var(--pg-text)"></span></span> the orb + <span class="num">2/5</span> trailing</span></td><td>an open run; the verb line moves to the tooltip so the row stays one line (today it grows a second line)</td></tr>
+      <tr><td>Task, settled</td><td><span class="gcell"><span class="g"><svg class="i s14"><use href="#i-check"/></svg></span> check in a circle</span></td><td>done · accepted · closed — the "boring pulsing dot" today</td></tr>
+      <tr><td>Routine run</td><td><span class="gcell"><span class="g"><svg class="i s14"><use href="#i-clock"/></svg></span> clock</span></td><td>unchanged</td></tr>
+      <tr><td>Needs you</td><td><span class="gcell"><span class="g"><span style="width:6px;height:6px;border-radius:50%;background:var(--pg-accent);box-shadow:0 0 0 3px color-mix(in srgb, var(--pg-accent) 26%, transparent)"></span></span> the accent pulse, trailing</span></td><td>a question card or a gate waiting on a human — the only pulse that is not a run</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ───────────────────────── 4 · ink ───────────────────────── -->
+<section id="ink">
+  <div class="sechd"><span class="kick">4</span><h2>Ink: one step down from white, and chrome wears the body grey</h2></div>
+  <p class="note">Two changes, and the second matters more. The darks' <code>--text</code> drops from <code>#eaeaea</code> to <code>#cbcbcb</code> (George asked for more than the first step; the bar still carries step 1 at <code>#d9d9d9</code> to compare), 10.8:1 on the panel. And the rail, the composer hints and message bodies stop reaching for <code>--text</code> at all: rows rest in <code>--body</code>, titles in <code>--text</code> only when selected, meta in <code>--dim</code>. That is what makes Claude read as grey — its primary ink is <code>#faf9f5</code>, near white, but almost nothing in its chrome uses it. The papers keep their ink and lift <code>--dim</code> into AA-large, since today it fails on both.</p>
+  <div class="cmp c2" style="margin-top:16px">
+    <div class="col"><span class="kick">Now · graphite</span>
+      <div class="stage t-dark" data-fixed="1"><div class="inkdemo"><h4>Good evening, george. What's next in default?</h4><p class="t">1084 · no shortcut back to work</p><p>Rex routed this to patch, who is returning focus to the trigger. The reviewer gates on CI plus the definition of done, then acceptance is yours.</p><p class="m">Assuming X, Y, Z — correct me or I proceed.</p><p class="d">SEEN 4 MINS AGO · SLEEPS AFTER 48H IDLE</p></div></div></div>
+    <div class="col"><span class="kick">Proposed · graphite</span>
+      <div class="stage t-dark ink-new f-geist m-geist"><div class="inkdemo"><h4>Good evening, george. What's next in default?</h4><p class="t">1084 · no shortcut back to work</p><p>Rex routed this to patch, who is returning focus to the trigger. The reviewer gates on CI plus the definition of done, then acceptance is yours.</p><p class="m">Assuming X, Y, Z — correct me or I proceed.</p><p class="d">SEEN 4 MINS AGO · SLEEPS AFTER 48H IDLE</p></div></div></div>
+  </div>
+  <table class="tbl" style="margin-top:18px">
+    <thead><tr><th>Theme · token</th><th>Now</th><th>Proposed</th><th>Contrast on the panel</th></tr></thead>
+    <tbody>
+      <tr><td>Graphite <code>--text</code></td><td><span class="sw-cell"><span class="swatch" style="background:#eaeaea"></span><span class="num">#eaeaea</span></span></td><td><span class="sw-cell"><span class="swatch" style="background:#cbcbcb"></span><span class="num">#cbcbcb</span></span></td><td><span class="num">14.6 → 10.8</span> <span class="aa ok">AA</span></td></tr>
+      <tr><td>Graphite <code>--body</code></td><td><span class="sw-cell"><span class="swatch" style="background:#b6b6b6"></span><span class="num">#b6b6b6</span></span></td><td><span class="sw-cell"><span class="swatch" style="background:#a6a6a6"></span><span class="num">#a6a6a6</span></span></td><td><span class="num">8.7 → 7.2</span> <span class="aa ok">AA</span></td></tr>
+      <tr><td>Graphite <code>--muted</code></td><td><span class="sw-cell"><span class="swatch" style="background:#898989"></span><span class="num">#898989</span></span></td><td><span class="sw-cell"><span class="swatch" style="background:#848484"></span><span class="num">#848484</span></span></td><td><span class="num">5.0 → 4.7</span> <span class="aa ok">AA</span></td></tr>
+      <tr><td>Graphite <code>--dim</code></td><td><span class="sw-cell"><span class="swatch" style="background:#676767"></span><span class="num">#676767</span></span></td><td><span class="sw-cell"><span class="swatch" style="background:#6a6a6a"></span><span class="num">#6a6a6a</span></span></td><td><span class="num">3.1 → 3.3</span> <span class="aa lg">AA large</span></td></tr>
+      <tr><td>Paper <code>--muted</code></td><td><span class="sw-cell"><span class="swatch" style="background:#837d72"></span><span class="num">#837d72</span></span></td><td><span class="sw-cell"><span class="swatch" style="background:#7a746a"></span><span class="num">#7a746a</span></span></td><td><span class="num">3.9 → 4.5</span> <span class="aa ok">AA</span></td></tr>
+      <tr><td>Paper <code>--dim</code></td><td><span class="sw-cell"><span class="swatch" style="background:#a09889"></span><span class="num">#a09889</span></span></td><td><span class="sw-cell"><span class="swatch" style="background:#98918a"></span><span class="num">#98918a</span></span></td><td><span class="num">2.8 → 3.0</span> <span class="aa no">fails</span> → <span class="aa lg">AA large</span></td></tr>
+      <tr><td>Cream oak <code>--muted</code></td><td><span class="sw-cell"><span class="swatch" style="background:#97846c"></span><span class="num">#97846c</span></span></td><td><span class="sw-cell"><span class="swatch" style="background:#8b7861"></span><span class="num">#8b7861</span></span></td><td><span class="num">3.4 → 4.0</span> <span class="aa lg">AA large</span></td></tr>
+      <tr><td>Cream oak <code>--dim</code></td><td><span class="sw-cell"><span class="swatch" style="background:#b5a289"></span><span class="num">#b5a289</span></span></td><td><span class="sw-cell"><span class="swatch" style="background:#a99680"></span><span class="num">#a99680</span></span></td><td><span class="num">2.3 → 2.7</span> <span class="aa no">decorative only</span></td></tr>
+    </tbody>
+  </table>
+  <p class="note" style="margin-top:12px">Every value above is mirrored into <code>client-core</code> THEMES in the same PR, or CI fails (trap 8). <code>--dim</code> stays a decorative step in every theme; anything that must be read wears <code>--muted</code> or up.</p>
+</section>
+
+<!-- ───────────────────────── 5 · type ───────────────────────── -->
+<section id="type">
+  <div class="sechd"><span class="kick">5</span><h2>Type: what Claude and Ghostty use, and what we can</h2></div>
+  <p class="note"><b>Claude</b> sets its interface in <b>Anthropic Sans</b>, with Anthropic Serif for headlines and Anthropic Mono for code, a family drawn for the 2025 brand and not licensable; before that it ran Styrene B with Tiempos. <b>Ghostty</b> embeds <b>JetBrains Mono</b> as its default terminal face, and its window chrome is the OS font. <b>NeuraMesh already runs on Geist</b> for UI text, Geist Mono for kickers, Source Serif 4 for display, all bundled and offline. So the family is not what reads as basic. The treatment is: near-white ink, rail titles at weight 700, 9px kickers in the same mono as the terminal. The specimen below sets the same rail and paragraph in Geist with the new treatment and in three free faces that share Anthropic Sans's humanist warmth. Switch the sans in the bar to try each across the whole page. Each cell carries a badge that says whether its face really loaded; a red <code>fallback</code> means the page is offline and that cell is showing the system font. The 23px line is the tell: the <b>R</b> leg, the double-storey <b>g</b>, the <b>1</b> and <b>7</b>, and the <b>@</b> differ between all four.</p>
+  <div class="spec" style="margin-top:16px">
+    <div class="stage t-dark ink-new f-geist"><div class="fname"><span>today's face<span class="fl" data-fam="Geist"></span></span><b>Geist</b></div>
+      <div class="big">Rag 17 @ Qy → nm/1057</div>
+      <div class="row"><span class="g"><svg class="i s14"><use href="#i-check"/></svg></span>no shortcut back to work</div><div class="row on"><span class="g"><span class="orb"></span></span>no shortcut back to work</div><div class="row"><span class="g"><svg class="i s14"><use href="#i-chat"/></svg></span>Explain downloading X videos</div>
+      <p class="para">Rex routed this to <b>patch</b>, who is returning focus to the trigger. Acceptance is yours.</p><div class="title">1084 · no shortcut back to work</div><div class="meta">SEEN 4 MINS AGO · #BUILD</div></div>
+    <div class="stage t-dark ink-new f-hanken"><div class="fname"><span>candidate<span class="fl" data-fam="Hanken Grotesk"></span></span><b>Hanken Grotesk</b></div>
+      <div class="big">Rag 17 @ Qy → nm/1057</div>
+      <div class="row"><span class="g"><svg class="i s14"><use href="#i-check"/></svg></span>no shortcut back to work</div><div class="row on"><span class="g"><span class="orb"></span></span>no shortcut back to work</div><div class="row"><span class="g"><svg class="i s14"><use href="#i-chat"/></svg></span>Explain downloading X videos</div>
+      <p class="para">Rex routed this to <b>patch</b>, who is returning focus to the trigger. Acceptance is yours.</p><div class="title">1084 · no shortcut back to work</div><div class="meta">SEEN 4 MINS AGO · #BUILD</div></div>
+    <div class="stage t-dark ink-new f-plex"><div class="fname"><span>candidate<span class="fl" data-fam="IBM Plex Sans"></span></span><b>IBM Plex Sans</b></div>
+      <div class="big">Rag 17 @ Qy → nm/1057</div>
+      <div class="row"><span class="g"><svg class="i s14"><use href="#i-check"/></svg></span>no shortcut back to work</div><div class="row on"><span class="g"><span class="orb"></span></span>no shortcut back to work</div><div class="row"><span class="g"><svg class="i s14"><use href="#i-chat"/></svg></span>Explain downloading X videos</div>
+      <p class="para">Rex routed this to <b>patch</b>, who is returning focus to the trigger. Acceptance is yours.</p><div class="title">1084 · no shortcut back to work</div><div class="meta">SEEN 4 MINS AGO · #BUILD</div></div>
+    <div class="stage t-dark ink-new f-public"><div class="fname"><span>candidate<span class="fl" data-fam="Public Sans"></span></span><b>Public Sans</b></div>
+      <div class="big">Rag 17 @ Qy → nm/1057</div>
+      <div class="row"><span class="g"><svg class="i s14"><use href="#i-check"/></svg></span>no shortcut back to work</div><div class="row on"><span class="g"><span class="orb"></span></span>no shortcut back to work</div><div class="row"><span class="g"><svg class="i s14"><use href="#i-chat"/></svg></span>Explain downloading X videos</div>
+      <p class="para">Rex routed this to <b>patch</b>, who is returning focus to the trigger. Acceptance is yours.</p><div class="title">1084 · no shortcut back to work</div><div class="meta">SEEN 4 MINS AGO · #BUILD</div></div>
+  </div>
+  <div class="mono2">
+    <div class="stage t-dark ink-new m-geist"><div class="fname" style="font:650 9.5px var(--fmono);letter-spacing:.15em;text-transform:uppercase;color:var(--dim);margin-bottom:10px">today's mono · Geist Mono</div>
+      <div class="term"><span class="c">$</span> gh pr checks 412
+<span class="g">✓</span> typecheck · test · build   <span class="c">5m18s</span>
+<span class="g">✓</span> regenerate index.js        <span class="c">1m02s</span>
+<span class="y">●</span> Vercel – neuramesh-web     <span class="c">pending</span></div>
+      <div class="kickline">Shortcuts <span class="tag">#build · ⎇ nm/1057-fix-x-token-auth · 2/5</span></div></div>
+    <div class="stage t-dark ink-new m-jb"><div class="fname" style="font:650 9.5px var(--fmono);letter-spacing:.15em;text-transform:uppercase;color:var(--dim);margin-bottom:10px">candidate · JetBrains Mono (Ghostty's default)</div>
+      <div class="term"><span class="c">$</span> gh pr checks 412
+<span class="g">✓</span> typecheck · test · build   <span class="c">5m18s</span>
+<span class="g">✓</span> regenerate index.js        <span class="c">1m02s</span>
+<span class="y">●</span> Vercel – neuramesh-web     <span class="c">pending</span></div>
+      <div class="kickline">Shortcuts <span class="tag">#build · ⎇ nm/1057-fix-x-token-auth · 2/5</span></div></div>
+  </div>
+  <p class="note" style="margin-top:14px"><b>Recommendation.</b> Retreat the type before replacing it: grey ink, rail titles at 450–560 instead of 700, body 13.5px at 1.55, kickers kept but demoted to <code>--dim</code>. That is most of the distance to the Claude feel and costs no bundle. Then adopt <b>JetBrains Mono</b> for the terminal pane and code, where Ghostty parity is a real feature. If the sans still feels flat after that, <b>Hanken Grotesk</b> is the swap: the closest free cousin of Anthropic Sans, tight enough for a 224px rail, and it sits well beside Source Serif 4. Plex is handsome but wider, and costs rail characters.</p>
+</section>
+
+<!-- ───────────────────────── 6 · cards in bubbles ───────────────────────── -->
+<section id="bubble">
+  <div class="sechd"><span class="kick">6</span><h2>A question is a section of the message, not a card in a card</h2></div>
+  <p class="note">Today an agent bubble is a hairline on <code>--panel</code> — the same colour as the thread behind it — and the question card inside it is a second hairline on <code>--card</code>, five points lighter. Two edges, no material, so the eye reads a box in a box. The unit card already had this ruled on in August: "an embossed card read as a foreign panel inside a conversation; now it is a line of the transcript." The same rule, applied to every answerable card, gives two shapes.</p>
+  <div class="cmp c3" style="margin-top:16px">
+    <div class="col"><span class="kick">Now</span>
+      <div class="stage t-dark now" data-fixed="1"><div class="thr">
+        <div class="msg mine"><span class="av">G</span><div class="body"><div class="head"><span class="time">09:41 PM</span><b>george</b></div><p>@patch pick this up</p></div></div>
+        <div class="msg agent"><span class="av">🦊</span><div class="body"><div class="head"><b>rex</b><span class="rolechip">orchestrator</span><span class="time">09:43 PM</span></div>
+          <div class="qcard"><div class="qhead">#1029 "no shortcut back to work" has no executable scope, acceptance criteria, or target repository. Please provide those details so I can route it to the online developer.</div><div class="qfoot"><span class="in">Type your own answer…</span><button class="btn primary" disabled>Send ↵</button></div></div>
+        </div></div>
+      </div></div>
+      <div class="cap">Bubble hairline + card hairline + input hairline: three edges nested, the innermost carrying the only thing you can act on.</div>
+    </div>
+    <div class="col"><span class="kick">Proposed A · bubble stays, card dissolves</span>
+      <div class="stage t-dark pa ink-new f-geist m-geist"><div class="thr">
+        <div class="msg mine"><span class="av">G</span><div class="body"><div class="head"><span class="time">09:41 PM</span><b>george</b></div><p>@patch pick this up</p></div></div>
+        <div class="msg agent"><span class="av">🦊</span><div class="body"><div class="head"><b>rex</b><span class="rolechip">orchestrator</span><span class="time">09:43 PM</span></div>
+          <div class="q2"><div class="qk">Question · needs you</div><div class="qhead">#1029 "no shortcut back to work" has no executable scope, acceptance criteria, or target repository. What should I route to the developer?</div>
+            <div class="opts"><span class="opt">Scope it with me</span><span class="opt">Park it in the backlog</span><span class="opt">Close it</span></div>
+            <div class="field"><span class="ph">Type your own answer…</span><span class="send">↑</span></div></div>
+        </div></div>
+      </div></div>
+      <div class="cap">The card becomes a section: a kicker, the question in the message's own ink, ghost-pill options, and one elevated field with Send inside it, the composer's recipe. Only the thing you type into is a box.</div>
+    </div>
+    <div class="col"><span class="kick">Proposed B · agents speak without a box</span>
+      <div class="stage t-dark pb ink-new f-geist m-geist"><div class="thr">
+        <div class="msg mine"><span class="av">G</span><div class="body"><div class="head"><span class="time">09:41 PM</span><b>george</b></div><p>@patch pick this up</p></div></div>
+        <div class="msg agent"><span class="av">🦊</span><div class="body"><div class="head"><b>rex</b><span class="rolechip">orchestrator</span><span class="time">09:43 PM</span></div>
+          <p>#1029 has no executable scope, acceptance criteria, or target repository yet, so there is nothing I can hand the developer.</p>
+          <div class="qcardB"><div class="qhead">What should I route?</div>
+            <div class="q2" style="margin:0"><div class="opts" style="margin-top:8px"><span class="opt">Scope it with me</span><span class="opt">Park it in the backlog</span><span class="opt">Close it</span></div>
+            <div class="field"><span class="ph">Type your own answer…</span><span class="send">↑</span></div></div></div>
+        </div></div>
+      </div></div>
+      <div class="cap">Agent prose runs on the thread ground like Claude and Codex; the human keeps a bubble; a card is then the one elevated object in the message, and needs-you material is exactly as visible as it should be. Recommended.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ───────────────────────── 10 · the frame ───────────────────────── -->
+<section id="frame">
+  <div class="sechd"><span class="kick">10</span><h2>The frame: the conversation owns the sheet, the Workbench is its card, the tabs get a dock of their own</h2></div>
+  <p class="note">Today a file, an article or a whiteboard opened from a thread <b>replaces</b> the conversation in the main area — which is why "Back to chat ⌘1" exists at all — and the Workbench sits as a third column on the frame. George's read (2026-09-04, Codex as the reference): the conversation should own the sheet edge to edge; the Workbench is the open thread's own details, so it belongs <b>inside</b> the thread as a card floating on the sheet; and the tab strip — with its <code>+</code> menu and every content kind it opens — moves into a <b>side dock</b> at the right edge, toggled from the frame top's side-panel icon. Content opened from a thread lands there as a tab beside the conversation instead of over it. Three columns: rail · sheet (conversation + Workbench card) · dock (tabs). The dock is resizable and collapsible; the Workbench toggle moves into the thread header with a glyph of its own.</p>
+  <div class="cmp c1" style="margin-top:16px">
+    <div class="col"><span class="kick">Now</span>
+      <div class="stage t-dark now" data-fixed="1">
+        <div class="frame3">
+          <div class="f3rail"><div class="seg"><span class="on">Chat</span><span>Code</span></div><div class="r">New chat</div><div class="k">Projects</div><div class="r">Flowe AI</div><div class="r on">1032 Research Flowe…</div><div class="r">1025 Two X posts…</div></div>
+          <div class="f3sheet">
+            <div class="f3tabs" style="border-bottom:1px solid var(--border)"><span class="tab on">#1032 · Research…</span><span class="tab">FLOWE_RESEARCH_REPORT.md ×</span><span class="add">+</span><span class="sp" style="flex:1"></span><span class="tab" style="color:var(--dim)">‹ Back to chat ⌘1</span></div>
+            <div class="f3body"><div class="f3pane"><div class="ttl">Flowe — feature gaps, UX/onboarding, and retention</div><p>Outside-in analysis of 8 competitors against Flowe's shipped feature set. Every quantitative claim is inline-cited…</p><p style="color:var(--dim);margin-top:10px">the conversation is behind this tab now</p></div></div>
+          </div>
+          <div class="f3dock" style="background:transparent;border:0;box-shadow:none"><div class="f3wb" style="position:static;width:auto;height:100%;background:transparent;border:0;box-shadow:none;padding:6px 8px"><div class="h">Workbench<span class="chip">nm-1032</span></div><div class="k">Description</div><p>Outside-in competitive + UX research.</p><div class="k">Artifacts · 6</div><div class="li"><i>DOC</i>FLOWE_RESEARCH_REPORT.md</div><div class="li"><i>FILE</i>competitor-matrix.csv</div><div class="li"><i>FILE</i>posts.json</div><div class="k">Subtasks</div><p>none yet · capped at 8</p></div></div>
+        </div>
+      </div>
+      <div class="cap">The report tab took the sheet from the conversation; the Workbench is a naked third column on the frame; the tab strip and the panel both compete with the thread for the same width.</div>
+    </div>
+    <div class="col"><span class="kick">Proposed · conversation · workbench card · side dock</span>
+      <div class="stage t-dark p ink-new f-geist m-geist">
+        <div class="frame3">
+          <div class="f3rail"><div class="seg"><span class="on">Chat</span><span>Code</span></div><div class="r">New chat</div><div class="k">Projects</div><div class="r">Flowe AI</div><div class="r on">1032 Research Flowe…</div><div class="r">1025 Two X posts…</div></div>
+          <div class="f3sheet">
+            <div class="f3hd"><span>‹ Home · v0.9 release › #dev</span><b>#1032 Research Flowe: feature gaps…</b><span class="sp"></span><span class="ic on" title="Workbench">▤</span><span class="ic">🔔</span></div>
+            <div class="f3body">
+              <div class="f3thread withwb">
+                <div class="m"><span class="av">🦊</span><div class="ag"><b>rex · orchestrator</b><br/>@george — the research is delivered and #dev has no reviewer registered, so this one needs your verdict to move.<div class="card" style="margin-top:8px">Approve #1032 — Research Flowe: feature gaps, UX/onboarding, and retention?<div class="pills"><span>✓ Approve</span><span>Request changes</span></div></div></div></div>
+                <div class="m" style="justify-content:flex-end"><div class="hb">open the report for me</div><span class="av">G</span></div>
+                <div class="f3comp">Reply in #1032 thread — @ mention · / skill · ↵ send</div>
+              </div>
+              <div class="f3wb"><div class="h">Workbench<span class="chip">nm-1032</span></div><div class="k">Description</div><p>Outside-in competitive + UX research.</p><div class="k">Definition of done</div><p>one consolidated report, every stat sourced</p><div class="k">Artifacts · 6</div><div class="li"><i>DOC</i>FLOWE_RESEARCH_REPORT.md</div><div class="li"><i>FILE</i>competitor-matrix.csv</div><div class="li"><i>FILE</i>posts.json</div><div class="k">Review loop · 2</div><div class="li">R2 · @gem approved ✓</div></div>
+            </div>
+          </div>
+          <div class="f3dock" style="position:relative">
+            <div class="f3tabs"><span class="tab on">▤ FLOWE_RESEARCH…</span><span class="tab">⌘ Terminal</span><span class="add">+</span></div>
+            <div class="f3pane"><div class="ttl">Flowe — feature gaps, UX/onboarding, and retention</div><p>Outside-in analysis of 8 competitors against Flowe's shipped feature set. Every quantitative claim is inline-cited to a fetched source; third-party estimates are flagged as such.</p><div class="code" style="margin-top:10px">## Why the gap grew so wide
+The case for AI in mental health is real…</div></div>
+            <div class="menu"><div class="k">Open here</div><div class="on">📄 Open a file…</div><div>⌘ Terminal</div><div>🌐 Browser</div><div class="k">Create</div><div>📝 New markdown</div><div>▦ New whiteboard</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="cap">The conversation keeps the sheet; the Workbench floats inside it as the elevated card it always was, and the thread recentres in the width beside it; the report opened from the thread lands as a tab in the side dock, whose <code>+</code> carries the same Open / Create menu — in the row-menu recipe — and whose icon on the frame top shows and hides it. The Workbench's own toggle lives in the thread header.</div>
+    </div>
+  </div>
+  <div class="cmp c1" style="margin-top:22px">
+    <div class="col"><span class="kick">Proposed · cream oak · dock folded</span>
+      <div class="stage t-cream p ink-new f-geist m-geist">
+        <div class="frame3 two">
+          <div class="f3rail"><div class="seg"><span class="on">Chat</span><span>Code</span></div><div class="r">New chat</div><div class="k">Projects</div><div class="r">Flowe AI</div><div class="r on">1032 Research Flowe…</div></div>
+          <div class="f3sheet">
+            <div class="f3hd"><span>‹ Home · v0.9 release › #dev</span><b>#1032 Research Flowe: feature gaps…</b><span class="sp"></span><span class="ic on" title="Workbench">▤</span><span class="ic">▯</span></div>
+            <div class="f3body">
+              <div class="f3thread withwb">
+                <div class="m"><span class="av">🦊</span><div class="ag"><b>rex · orchestrator</b><br/>@george — the research is delivered and #dev has no reviewer registered, so this one needs your verdict to move.<div class="card" style="margin-top:8px">Approve #1032?<div class="pills"><span>✓ Approve</span><span>Request changes</span></div></div></div></div>
+                <div class="f3comp">Reply in #1032 thread — @ mention · / skill · ↵ send</div>
+              </div>
+              <div class="f3wb"><div class="h">Workbench<span class="chip">nm-1032</span></div><div class="k">Description</div><p>Outside-in competitive + UX research.</p><div class="k">Artifacts · 6</div><div class="li"><i>DOC</i>FLOWE_RESEARCH_REPORT.md</div><div class="li"><i>FILE</i>competitor-matrix.csv</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="cap">With the dock folded (the frame-top side-panel icon), the sheet spans to the right edge; the Workbench card stays with its thread. Opening a file from the thread unfolds the dock and lands the tab there.</div>
+    </div>
+    <div class="col"><span class="kick">What moves where</span>
+      <table class="tbl"><thead><tr><th>Today</th><th>Proposed</th></tr></thead><tbody>
+        <tr><td>Tab strip at the top of the main sheet: conversation slot 0 + content tabs + <code>+</code></td><td>Tab strip at the top of the <b>side dock</b>; the conversation is never a tab</td></tr>
+        <tr><td>Opening a file/article/whiteboard replaces the conversation; "Back to chat ⌘1"</td><td>Opens a dock tab beside the conversation; the dock unfolds if it was folded; ⌘1 focuses the composer</td></tr>
+        <tr><td>Workbench: a third column on the frame, toggled from the frame top</td><td>A card floating inside the thread's sheet, toggled from the <b>thread header</b> with its own glyph; the thread recentres beside it</td></tr>
+        <tr><td>Frame-top side-panel icon → the Workbench</td><td>Frame-top side-panel icon → the <b>dock</b> (show/hide; width persisted, 360px to 60% of the window)</td></tr>
+        <tr><td>Terminal · browser · file openers in the frame top's utility cluster open main-area tabs</td><td>Same openers, same kinds — they open <b>dock</b> tabs</td></tr>
+        <tr><td>Destinations (Tasks, Files, Calendar…) take the main sheet</td><td>Unchanged: a destination takes the sheet; the dock keeps its tabs beside it</td></tr>
+      </tbody></table>
+    </div>
+  </div>
+</section>
+
+<!-- ───────────────────────── decisions ───────────────────────── -->
+<section id="decisions">
+  <div class="sechd"><span class="kick">next</span><h2>Decisions this round needs from you</h2></div>
+  <ul class="dec">
+    <li><span class="n">D1</span><span><b>Thread list shape.</b> One recency list under the text scope row<span class="rec">recommended</span> or Codex-style project folders, which reverses the 2026-08-17 scope-row ruling.</span></li>
+    <li><span class="n">D2</span><span><b>Facts on a row.</b> One trailing fact only when the scope does not say it (room when unscoped, nothing inside a room); project and branch move to the tooltip and the open session's crumb. This reverses the 2026-07-30 "branch always" ruling<span class="rec">recommended</span></span></li>
+    <li><span class="n">D3</span><span><b>New chat.</b> A text row with the compose icon and ⌘N<span class="rec">recommended</span>, or keep the accent pill as the one embossed object in the rail.</span></li>
+    <li><span class="n">D4</span><span><b>Type.</b> Retreat Geist now and adopt JetBrains Mono for terminal and code<span class="rec">recommended</span>; swap the sans to Hanken Grotesk only if the specimen still feels flat to you.</span></li>
+    <li class="done"><span class="n">D5</span><span><b>Agent bubbles.</b> Decided 2026-09-04: <b>B</b>. Agents speak without a box; the human keeps the bubble; a card is the one elevated object.</span></li>
+    <li><span class="n">D6</span><span><b>Code as a mode.</b> A Chat | Code segmented switch under the head, the rail relisting by repo in Code mode<span class="rec">recommended</span>, or keep Code as a shortcut row with its sessions mixed into the thread list. Sequenced after the engineering-os branch lands.</span></li>
+    <li><span class="n">D8</span><span><b>The frame.</b> Conversation owns the sheet · Workbench as a card inside it, toggled from the thread header · a side dock at the right edge carries the tab strip and every content kind, toggled from the frame-top side-panel icon<span class="rec">recommended</span>. Reverses the 2026-08-16 right-edge tenant and the 2026-07 main-area tabs.</span></li>
+    <li><span class="n">D7</span><span><b>The head.</b> Mark + wordmark + fold, breadcrumb retired; the project stays in the scope row and the surface in its tab<span class="rec">recommended</span>.</span></li>
+  </ul>
+</section>
+
+<footer>Design round for <a href="plan.md">plan.md</a> — rail, ink, type, and cards, 2026-09-04. Stages mirror the app's classes and all four token sets; switch the theme in the bar and judge each in graphite and cream oak before approving.</footer>
+</div>
+
+<script>
+(function () {
+  var stages = Array.prototype.slice.call(document.querySelectorAll('.stage'));
+  var groups = { theme: ['t-dark','t-light','t-soft','t-cream'], ink: ['ink-new','ink-s1','ink-old'], sans: ['f-geist','f-hanken','f-plex','f-public'], mono: ['m-geist','m-jb'] };
+  var state = { theme: null, ink: 'ink-new', sans: 'f-geist', mono: 'm-geist' };
+  try { var saved = JSON.parse(localStorage.getItem('nm-rail-ink-round') || 'null'); if (saved) state = Object.assign(state, saved); } catch (e) {}
+  if (!state.theme) {
+    var root = document.documentElement.getAttribute('data-theme');
+    var dark = root === 'dark' || (!root && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    state.theme = dark ? 't-dark' : 't-cream';
+  }
+  function apply() {
+    stages.forEach(function (s) {
+      var fixed = s.getAttribute('data-fixed') === '1';
+      groups.theme.forEach(function (c) { s.classList.remove(c); }); s.classList.add(state.theme);
+      if (fixed) return; // "Now" stages keep today's ink and faces
+      s.classList.remove('ink-new'); s.classList.remove('ink-s1'); if (state.ink !== 'ink-old') s.classList.add(state.ink);
+      if (!s.classList.contains('spec-fixed')) {
+        if (s.parentElement && s.parentElement.classList.contains('spec')) return; // the specimen pins its own face per cell
+        groups.sans.forEach(function (c) { s.classList.remove(c); }); s.classList.add(state.sans);
+        if (s.parentElement && s.parentElement.classList.contains('mono2')) return;
+        groups.mono.forEach(function (c) { s.classList.remove(c); }); s.classList.add(state.mono);
+      }
+    });
+    document.querySelectorAll('.sw').forEach(function (b) { b.classList.toggle('on', state[b.getAttribute('data-k')] === b.getAttribute('data-v')); });
+    try { localStorage.setItem('nm-rail-ink-round', JSON.stringify(state)); } catch (e) {}
+  }
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () {
+    document.querySelectorAll('.fl').forEach(function (el) { var ok = document.fonts.check('13px "' + el.getAttribute('data-fam') + '"'); el.textContent = ok ? 'loaded' : 'fallback'; el.classList.add(ok ? 'ok' : 'no'); });
+  });
+  document.querySelectorAll('.sw').forEach(function (b) { b.addEventListener('click', function () { state[b.getAttribute('data-k')] = b.getAttribute('data-v'); apply(); }); });
+  apply();
+})();
+</script>

@@ -1,0 +1,1752 @@
+<!doctype html>
+<html lang="en" data-theme="cream">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NeuraMesh — Cabinet-grade revamp · R2</title>
+<!-- Mockup-only webfonts (implementation bundles these via @fontsource, same as Geist today) -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/geist@5.2.5/wght.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/geist-mono@5.2.5/wght.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/source-serif-4@5.2.5/opsz-wght.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/instrument-serif@5.2.5/400-italic.css">
+<style>
+/* ════════════════════════════════════════════════════════════════════════════
+   NeuraMesh × Cabinet — R2. Faithful to the v0.57 app inventory:
+   nav rail (Home · Channels · People · Agents), 15-column board, zoned task
+   panel (Thread · Review · Diff · Terminal), Home = needs-you + in-flight,
+   DockBar → the frame's status band, DiceBear Thumbs agents, real gate cards.
+   Chrome per Cabinet: the FRAME (cream) owns every global control; the SHEET
+   (white) owns content only; folder tabs attach to the sheet's top edge.
+   ════════════════════════════════════════════════════════════════════════════ */
+:root {
+  --fdisp: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+  --fital: 'Instrument Serif', Georgia, serif;
+  --fbody: 'Geist Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --fmono: 'Geist Mono Variable', ui-monospace, 'SF Mono', Menlo, monospace;
+  --dur-fast: .12s; --dur: .15s; --dur-enter: .22s; --dur-exit: .13s;
+  --ease: cubic-bezier(.22,1,.36,1);
+  --ease-exit: cubic-bezier(.4,0,1,1);
+  --r-xs: 6px; --r-sm: 8px; --r-md: 10px; --r-lg: 14px; --r-xl: 18px; --r-full: 999px;
+  --sheet-r: 16px;
+  --col: 780px;
+}
+[data-theme="cream"] {
+  --win: #f0e5d3; --band: #e7d9c3;
+  /* the sheet is a whisper off white — cards, boards and the composer are the
+     pure-white flat layer on it; the difference should be felt, not seen */
+  --bg: #fbf8f4; --sheet: #fbf8f4;
+  --panel2: #f6eee1; --panel3: #efe1cd;
+  --border: #e6dbca; --border2: #d3c2a8; --framedge: #e0d1b7;
+  --text: #2a1c13; --body: #574838; --muted: #97846c; --dim: #b5a289;
+  --link: #9c5730;
+  --accent: #834a2b; --accent-ink: #fff7ee;
+  --btn: #f8f2e8; --btn-fg: #43301f; --btn-hover: #efe4d2;
+  --green: #2f9e6b; --green-soft: #e3f0e8; --violet: #7d6cc4;
+  --todo: #7d8590; --prog: #4f80c4; --review: #6d5ce0; --done: #0f9d63; --acc: #2f8f8a;
+  --blocked: #7d7f86; --plan: #2c7d88; --planrev: #7d56b8; --design: #b0498f; --designrev: #8a3fc0;
+  --backlog: #5d6b7a; --ship: #1f7f96; --shiprev: #6d5ce0; --rel: #22997d; --verif: #279183; --closed: #897a60;
+  --role-orch: #6a63bc; --role-arch: #7d6cc4; --role-dev: #3f9268; --role-rev: #4f7bb0;
+  --role-design: #b0498f; --role-ship: #1f7f96; --role-mkt: #b04f55; --role-cur: #2f8f8a;
+  --shadow-sheet: 0 8px 26px -8px rgba(70,42,18,.16), 0 1px 2px rgba(70,42,18,.05);
+  --shadow-card: 0 1px 2px rgba(70,42,18,.05);
+  --shadow-lift: 0 8px 20px -8px rgba(70,42,18,.20);
+  --shadow-pop: 0 20px 55px -14px rgba(70,42,18,.30);
+  --overlay: #ffffff; --card: #ffffff; --card-border: #eadfce;
+  --scrim: rgba(53,36,22,.32);
+  --ring: color-mix(in srgb, var(--accent) 55%, var(--border2));
+  --hover-bg: rgba(53,36,22,.05); --sel-bg: rgba(131,74,43,.08);
+}
+[data-theme="dark"] {
+  --win: #0d0d0d; --band: #090909;
+  --bg: #141414; --sheet: #191919;
+  --panel2: #212121; --panel3: #2b2b2b;
+  --border: #272727; --border2: #383838; --framedge: #1b1b1b;
+  --text: #eaeaea; --body: #b6b6b6; --muted: #898989; --dim: #676767;
+  --link: #9cb1f0;
+  --accent: #eaeaea; --accent-ink: #101010;
+  --btn: #232323; --btn-fg: #efefef; --btn-hover: #2f2f2f;
+  --green: #77ac8d; --green-soft: #16241a; --violet: #a89ccf;
+  --todo: #949494; --prog: #8ba0c0; --review: #a89ccf; --done: #77ac8d; --acc: #6fb0ab;
+  --blocked: #9ca0a8; --plan: #7fa5ab; --planrev: #a89ccf; --design: #cc8fb9; --designrev: #b78bd8;
+  --backlog: #8f9aa6; --ship: #7cb0bd; --shiprev: #a89ccf; --rel: #74b19c; --verif: #6fb3a4; --closed: #727272;
+  --role-orch: #9793d2; --role-arch: #a89ccf; --role-dev: #77ac8d; --role-rev: #7ba1c4;
+  --role-design: #cc8fb9; --role-ship: #7cb0bd; --role-mkt: #c98f8f; --role-cur: #6fb0ab;
+  --shadow-sheet: inset 0 1px 0 rgba(255,255,255,.05), 0 12px 30px -6px rgba(0,0,0,.5);
+  --shadow-card: 0 1px 2px rgba(0,0,0,.25);
+  --shadow-lift: 0 8px 20px -8px rgba(0,0,0,.55);
+  --shadow-pop: 0 20px 55px -14px rgba(0,0,0,.65);
+  --overlay: #222; --card: #1e1e1e; --card-border: #2c2c2c;
+  --scrim: rgba(0,0,0,.5);
+  --ring: #525252;
+  --hover-bg: rgba(255,255,255,.06); --sel-bg: rgba(255,255,255,.09);
+}
+[data-theme="light"] {
+  --win: #e9e5db; --band: #ded9cc;
+  --bg: #fcfbf8; --sheet: #fcfbf8;
+  --panel2: #f4f1ea; --panel3: #ebe7dd;
+  --border: #e2ded4; --border2: #cec5b7; --framedge: #dbd5c7;
+  --text: #2f2a24; --body: #524c43; --muted: #837d72; --dim: #a09889;
+  --link: #4a5ec9;
+  --accent: #2f2a24; --accent-ink: #ffffff;
+  --btn: #f1eee6; --btn-fg: #2f2a24; --btn-hover: #e6e2d6;
+  --green: #2f9e6b; --green-soft: #e4f2e9; --violet: #7d6cc4;
+  --todo: #7d8590; --prog: #4f80c4; --review: #6d5ce0; --done: #2f9e6b; --acc: #2f8f8a;
+  --blocked: #7c7f88; --plan: #2c7d88; --planrev: #7d56b8; --design: #b0498f; --designrev: #8a3fc0;
+  --backlog: #5d6b7a; --ship: #1f7f96; --shiprev: #6d5ce0; --rel: #22997d; --verif: #279183; --closed: #8a847a;
+  --role-orch: #635fc0; --role-arch: #7d6cc4; --role-dev: #3f9268; --role-rev: #4f7bb0;
+  --role-design: #b0498f; --role-ship: #1f7f96; --role-mkt: #a85a5a; --role-cur: #2f8f8a;
+  --shadow-sheet: 0 8px 26px -8px rgba(70,58,44,.15), 0 1px 2px rgba(70,58,44,.05);
+  --shadow-card: 0 1px 2px rgba(70,58,44,.05);
+  --shadow-lift: 0 8px 20px -8px rgba(70,58,44,.18);
+  --shadow-pop: 0 20px 55px -14px rgba(70,58,44,.26);
+  --overlay: #ffffff; --card: #ffffff; --card-border: #e2ded4;
+  --scrim: rgba(47,42,36,.30);
+  --ring: color-mix(in srgb, var(--accent) 55%, var(--border2));
+  --hover-bg: rgba(47,42,36,.05); --sel-bg: rgba(47,42,36,.07);
+}
+[data-theme="soft-dark"] {
+  --win: #1d1d1d; --band: #181818;
+  --bg: #262626; --sheet: #2a2a2a;
+  --panel2: #313131; --panel3: #3b3b3b;
+  --border: #363636; --border2: #454545; --framedge: #292929;
+  --text: #ececec; --body: #c2c2c2; --muted: #979797; --dim: #737373;
+  --link: #a6baf2;
+  --accent: #ececec; --accent-ink: #141414;
+  --btn: #383838; --btn-fg: #f0f0f0; --btn-hover: #444;
+  --green: #7fb495; --green-soft: #243026; --violet: #aaa0d2;
+  --todo: #9c9c9c; --prog: #94aacb; --review: #aaa0d2; --done: #7fb495; --acc: #74b6b1;
+  --blocked: #a4a8b0; --plan: #86adb3; --planrev: #aaa0d2; --design: #cf99c1; --designrev: #bd96da;
+  --backlog: #97a1ac; --ship: #86b8c4; --shiprev: #aaa0d2; --rel: #7fb8a3; --verif: #79baab; --closed: #707070;
+  --role-orch: #a29ed9; --role-arch: #aaa0d2; --role-dev: #7fb495; --role-rev: #86aacc;
+  --role-design: #cf99c1; --role-ship: #86b8c4; --role-mkt: #cf9a9a; --role-cur: #74b6b1;
+  --shadow-sheet: inset 0 1px 0 rgba(255,255,255,.04), 0 12px 30px -6px rgba(0,0,0,.4);
+  --shadow-card: 0 1px 2px rgba(0,0,0,.22);
+  --shadow-lift: 0 8px 20px -8px rgba(0,0,0,.45);
+  --shadow-pop: 0 20px 55px -14px rgba(0,0,0,.55);
+  --overlay: #333; --card: #2f2f2f; --card-border: #3d3d3d;
+  --scrim: rgba(0,0,0,.45);
+  --ring: #5f5f5f;
+  --hover-bg: rgba(255,255,255,.055); --sel-bg: rgba(255,255,255,.085);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; }
+body { background: var(--win); color: var(--text); font: 13.5px/1.55 var(--fbody); -webkit-font-smoothing: antialiased; overflow: hidden; transition: background .25s var(--ease); }
+button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+::selection { background: color-mix(in srgb, var(--accent) 24%, transparent); }
+
+/* ── motion vocabulary ── */
+@keyframes a-rise { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: none; } }
+@keyframes a-drop { from { opacity: 0; transform: translateY(-7px); } to { opacity: 1; transform: none; } }
+@keyframes a-pop  { from { opacity: 0; transform: scale(.955) translateY(5px); } to { opacity: 1; transform: none; } }
+@keyframes a-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes a-exit-rise { to { opacity: 0; transform: translateY(5px); } }
+@keyframes a-exit-pop  { to { opacity: 0; transform: scale(.97) translateY(4px); } }
+@keyframes a-exit-fade { to { opacity: 0; } }
+@keyframes pulse-dot { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+@keyframes beat-sweep { from { background-position: -160px 0; } to { background-position: 160px 0; } }
+@keyframes typing-b { 0%,80%,100% { transform: none; opacity:.45 } 40% { transform: translateY(-3px); opacity:1 } }
+@keyframes spin { to { transform: rotate(360deg); } }
+.a-rise { animation: a-rise var(--dur-enter) var(--ease) both; }
+.a-pop  { animation: a-pop var(--dur-enter) var(--ease) both; }
+[data-exit="rise"] { animation: a-exit-rise var(--dur-exit) var(--ease-exit) both !important; }
+[data-exit="pop"]  { animation: a-exit-pop var(--dur-exit) var(--ease-exit) both !important; }
+[data-exit="fade"] { animation: a-exit-fade var(--dur-exit) var(--ease-exit) both !important; }
+.stagger > * { animation: a-rise var(--dur-enter) var(--ease) both; animation-delay: calc(var(--i, 0) * 24ms); }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
+/* ?calm=1 — screenshot/QA mode: entrances render settled (the Browser pane pauses
+   CSS animations while hidden, freezing entrances mid-flight in captures) */
+html[data-calm] .stagger > *, html[data-calm] .a-rise, html[data-calm] .a-pop, html[data-calm] .a-fade,
+html[data-calm] .scrim.on, html[data-calm] .scrim.on .modal, html[data-calm] .menu.on, html[data-calm] .toast.on { animation: none !important; opacity: 1; transform: none; }
+
+/* ════════ FRAME ════════ */
+.frame { display: flex; flex-direction: column; height: 100vh; }
+.topbar { flex: none; display: flex; align-items: center; gap: 10px; padding: 9px 14px 7px; }
+.lights { display: flex; gap: 7px; margin-right: 4px; }
+.lights i { width: 11px; height: 11px; border-radius: 50%; }
+.lights i:nth-child(1) { background: #e0604f; } .lights i:nth-child(2) { background: #dfa123; } .lights i:nth-child(3) { background: #58a942; }
+.brand { display: inline-flex; align-items: center; gap: 7px; padding: 4px 8px; border-radius: var(--r-md); }
+.brand b { font: 700 15px var(--fdisp); letter-spacing: -.02em; }
+.brand b span { color: var(--accent); }
+[data-theme="cream"] .brand b span { color: #b4602f; }
+.crumb { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); }
+.crumb .sep { color: var(--dim); font-size: 10px; }
+.crumb button { padding: 4px 8px; border-radius: var(--r-sm); color: var(--muted); transition: all var(--dur-fast) var(--ease); }
+.crumb button:hover { background: var(--hover-bg); color: var(--text); }
+.crumb b { color: var(--body); font-weight: 600; }
+.topbar .grow { flex: 1; }
+.searchpill { display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 14px; border-radius: var(--r-full); background: color-mix(in srgb, var(--text) 5%, transparent); color: var(--dim); font-size: 12.5px; min-width: 210px; transition: all var(--dur-fast) var(--ease); }
+.searchpill:hover { background: color-mix(in srgb, var(--text) 8%, transparent); color: var(--muted); }
+.searchpill b { margin-left: auto; font: 600 10px var(--fmono); border: 1px solid var(--border2); border-radius: 5px; padding: 1px 5px; color: var(--dim); }
+.framebtn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 32px; min-width: 32px; padding: 0 10px; border-radius: var(--r-full); color: var(--body); font-size: 13px; transition: all var(--dur-fast) var(--ease); position: relative; }
+.framebtn:hover { background: color-mix(in srgb, var(--text) 7%, transparent); color: var(--text); }
+.framebtn .badge { position: absolute; top: -1px; right: -1px; min-width: 15px; height: 15px; padding: 0 4px; border-radius: var(--r-full); background: var(--accent); color: var(--accent-ink); font: 700 9px/15px var(--fmono); text-align: center; }
+
+.b { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: var(--r-full); font-weight: 600; transition: all var(--dur-fast) var(--ease); border: 1px solid transparent; white-space: nowrap; }
+.b:active { transform: scale(.97); }
+.b-sm { height: 28px; padding: 0 13px; font-size: 12px; }
+.b-md { height: 34px; padding: 0 16px; font-size: 13px; }
+.b-lg { height: 40px; padding: 0 20px; font-size: 13.5px; }
+.b-primary { background: var(--accent); color: var(--accent-ink); }
+.b-primary:hover { background: color-mix(in srgb, var(--accent) 90%, black); box-shadow: var(--shadow-lift); }
+.b-soft { background: var(--btn); color: var(--btn-fg); border-color: color-mix(in srgb, var(--border) 70%, transparent); }
+.b-soft:hover { background: var(--btn-hover); }
+.b-ghost { color: var(--body); border-color: var(--border2); }
+.b-ghost:hover { color: var(--text); background: var(--hover-bg); }
+.b-green { background: var(--green-soft); color: var(--green); }
+.b-green:hover { box-shadow: var(--shadow-lift); }
+
+.framebody { flex: 1; display: flex; min-height: 0; }
+
+/* ── nav rail — naked on the frame (real rail: head · Home · Channels · People · Agents) ── */
+.nav { width: 226px; flex: none; display: flex; flex-direction: column; min-height: 0; padding: 0 8px 0 12px; }
+.navhead { display: flex; align-items: center; gap: 9px; padding: 7px 9px; border-radius: var(--r-md); transition: background var(--dur-fast) var(--ease); width: 100%; text-align: left; }
+.navhead:hover { background: color-mix(in srgb, var(--text) 6%, transparent); }
+.navbadge { width: 27px; height: 27px; border-radius: 8px; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; font: 700 12.5px var(--fdisp); flex: none; }
+.wsproj { flex: 1; min-width: 0; }
+.wsproj b { display: block; font-size: 13px; font-weight: 650; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wsproj small { display: block; font-size: 10.5px; color: var(--muted); margin-top: -1px; }
+.wscaret { color: var(--dim); font-size: 11px; }
+.navscroll { flex: 1; overflow-y: auto; min-height: 0; padding: 4px 0 10px; scrollbar-width: none; }
+.navscroll::-webkit-scrollbar { display: none; }
+.kicker { font: 650 9.5px/1 var(--fmono); letter-spacing: .15em; text-transform: uppercase; color: var(--muted); display: flex; align-items: center; gap: 8px; padding: 0 9px; margin: 15px 0 7px; }
+.kicker .kadd { margin-left: auto; color: var(--dim); font-size: 12px; width: 18px; height: 18px; border-radius: 6px; display: grid; place-items: center; transition: all var(--dur-fast) var(--ease); opacity: 0; }
+.kicker:hover .kadd { opacity: 1; }
+.kicker .kadd:hover { background: var(--hover-bg); color: var(--text); }
+.chan { display: flex; align-items: center; gap: 9px; width: 100%; text-align: left; padding: 6px 9px; border-radius: var(--r-md); color: var(--body); font-size: 13px; border: 1px solid transparent; transition: all var(--dur-fast) var(--ease); }
+.chan:hover { background: color-mix(in srgb, var(--text) 6%, transparent); color: var(--text); }
+.chan.on { background: var(--sheet); color: var(--text); font-weight: 600; border-color: var(--card-border); box-shadow: var(--shadow-card); }
+[data-theme="dark"] .chan.on, [data-theme="soft-dark"] .chan.on { background: var(--panel3); border-color: transparent; }
+.chan .ico { width: 16px; text-align: center; color: var(--muted); font-size: 13px; flex: none; }
+.chan .hash { color: var(--dim); font-family: var(--fmono); font-size: 12px; width: 16px; text-align: center; flex: none; }
+.chan .cnt { margin-left: auto; font: 600 10px var(--fmono); color: var(--muted); background: color-mix(in srgb, var(--text) 7%, transparent); border-radius: var(--r-full); padding: 2px 7px; }
+.chan .cnt.attn { background: var(--accent); color: var(--accent-ink); }
+.chan .dotlive { margin-left: auto; width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: pulse-dot 2.4s ease-in-out infinite; }
+.chan .mkico { margin-left: auto; font-size: 10px; color: var(--dim); }
+/* agent rows: avatar + name + rolechip over status line */
+.navagent { display: flex; align-items: flex-start; gap: 9px; width: 100%; text-align: left; padding: 6px 9px; border-radius: var(--r-md); transition: all var(--dur-fast) var(--ease); border: 1px solid transparent; }
+.navagent:hover { background: color-mix(in srgb, var(--text) 6%, transparent); }
+.agwrap { position: relative; flex: none; }
+.agping { position: absolute; right: -2px; top: -2px; width: 8px; height: 8px; border-radius: 50%; background: var(--prog); border: 2px solid var(--win); animation: pulse-dot 1.6s ease-in-out infinite; }
+.agping.review { background: var(--review); }
+.navabody { flex: 1; min-width: 0; }
+.navaname { display: flex; align-items: center; gap: 6px; }
+.navaname b { font-size: 12.5px; font-weight: 600; color: var(--text); }
+.rolechip { font: 650 8.5px var(--fmono); letter-spacing: .09em; text-transform: uppercase; color: var(--tone, var(--muted)); background: color-mix(in srgb, var(--tone, var(--muted)) 11%, transparent); padding: 2px 7px; border-radius: var(--r-full); }
+.navstatus { font-size: 10.5px; color: var(--muted); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* DiceBear thumbs avatar */
+.pav { display: inline-grid; place-items: center; overflow: hidden; background: var(--panel3); flex: none; }
+.pav img { width: 100%; height: 100%; display: block; }
+.pav.letter { color: var(--text); font-weight: 650; background: var(--panel3); }
+.navfoot { flex: none; padding: 8px 4px 10px; border-top: 1px solid var(--framedge); }
+.navuser { display: flex; align-items: center; gap: 9px; width: 100%; text-align: left; padding: 6px 8px; border-radius: var(--r-md); transition: background var(--dur-fast) var(--ease); }
+.navuser:hover { background: var(--hover-bg); }
+.navuserav { width: 26px; height: 26px; border-radius: 50%; background: linear-gradient(135deg, #d9a05b, #a86a32); color: #fff; display: grid; place-items: center; font: 650 11px var(--fbody); flex: none; }
+.navusermeta { flex: 1; min-width: 0; font-size: 12.5px; }
+.navusermeta b { font-weight: 600; }
+.navuserplan { color: var(--muted); font-size: 11px; }
+.navuserchev { color: var(--dim); font-size: 10px; }
+
+/* ── sheet area ── */
+.sheetarea { flex: 1; min-width: 0; display: flex; flex-direction: column; padding: 6px 12px 0 4px; }
+/* in-sheet room lens (marketing: Feed · Calendar · Library) */
+.roomlensbar { flex: none; display: flex; align-items: center; gap: 10px; padding: 14px 22px 0; }
+.roomlens { display: flex; gap: 2px; background: var(--panel2); border-radius: var(--r-full); padding: 3px; }
+.roomlens button { padding: 5px 14px; border-radius: var(--r-full); font-size: 12px; font-weight: 550; color: var(--muted); transition: all var(--dur-fast) var(--ease); }
+.roomlens button.on { background: var(--sheet); color: var(--text); font-weight: 600; box-shadow: var(--shadow-card); }
+[data-theme="dark"] .roomlens button.on, [data-theme="soft-dark"] .roomlens button.on { background: var(--panel3); }
+
+.sheet { flex: 1; min-height: 0; background: var(--sheet); border-radius: var(--sheet-r); box-shadow: var(--shadow-sheet); border: 1px solid color-mix(in srgb, var(--card-border) 70%, transparent); position: relative; overflow: hidden; display: flex; flex-direction: column; transition: background .25s var(--ease); }
+[data-theme="dark"] .sheet, [data-theme="soft-dark"] .sheet { border-color: transparent; }
+.viewwrap { flex: 1; min-height: 0; position: relative; }
+.view { position: absolute; inset: 0; display: none; flex-direction: column; min-height: 0; }
+.view.on { display: flex; }
+.hintstrip { flex: none; display: flex; align-items: center; gap: 14px; padding: 5px 20px 8px; font-size: 10.5px; color: var(--dim); }
+.hintstrip b { font: 600 10px var(--fmono); background: var(--panel2); border: 1px solid color-mix(in srgb, var(--border) 60%, transparent); border-radius: 5px; padding: 1.5px 5.5px; color: var(--muted); }
+.hintstrip .grow { flex: 1; }
+
+/* ── status band — the DockBar, moved onto the frame ── */
+.statusband { flex: none; display: flex; align-items: center; gap: 4px; padding: 5px 14px; background: var(--band); font-size: 11.5px; color: var(--muted); transition: background .25s var(--ease); white-space: nowrap; overflow: hidden; }
+.statusband .sbit { flex: none; }
+@media (max-width: 1000px) { .statusband .sbit.mono, #sbAgent { display: none; } }
+.sbit { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border-radius: var(--r-full); transition: all var(--dur-fast) var(--ease); color: var(--muted); font-weight: 500; position: relative; }
+.sbit:hover { background: color-mix(in srgb, var(--text) 8%, transparent); color: var(--text); }
+.sbit .g { color: var(--green); }
+.sbit i.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); animation: pulse-dot 2.4s ease-in-out infinite; }
+.sbit .badge { min-width: 14px; height: 14px; border-radius: var(--r-full); background: color-mix(in srgb, var(--text) 12%, transparent); color: var(--body); font: 650 8.5px/14px var(--fmono); text-align: center; padding: 0 4px; }
+.statusband .grow { flex: 1; }
+.sbit.mono { font-family: var(--fmono); font-size: 10.5px; }
+
+/* ════════ SHARED CONTENT ════════ */
+.scroll { flex: 1; overflow-y: auto; min-height: 0; }
+.colwrap { max-width: var(--col); margin: 0 auto; padding: 24px 26px 10px; }
+.eyebrow { font: 650 10px var(--fmono); letter-spacing: .15em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+.hero h2 { font: 640 26px/1.2 var(--fdisp); letter-spacing: -.015em; }
+.hero .sub { margin-top: 5px; color: var(--muted); font-size: 13px; }
+.hero .sub em, .hero h2 em { font-family: var(--fital); font-style: italic; color: var(--body); }
+.sechead { display: flex; align-items: baseline; gap: 9px; margin: 24px 0 10px; }
+.sechead h3 { font: 630 16.5px/1.2 var(--fdisp); letter-spacing: -.01em; }
+.sechead .n { font: 600 10px var(--fmono); color: var(--muted); background: color-mix(in srgb, var(--text) 7%, transparent); padding: 2px 8px; border-radius: var(--r-full); }
+.sechead small { font-size: 11.5px; color: var(--muted); }
+.sechead .more { margin-left: auto; font-size: 12px; color: var(--link); font-weight: 550; padding: 3px 8px; border-radius: var(--r-sm); transition: background var(--dur-fast) var(--ease); }
+.sechead .more:hover { background: var(--hover-bg); }
+.daysep { display: flex; align-items: center; gap: 12px; margin: 14px 0 8px; color: var(--dim); font: 650 9.5px var(--fmono); letter-spacing: .15em; text-transform: uppercase; }
+.daysep::before, .daysep::after { content: ''; flex: 1; height: 1px; background: color-mix(in srgb, var(--border) 70%, transparent); }
+
+.chip { font: 650 9px var(--fmono); letter-spacing: .08em; text-transform: uppercase; color: var(--c, var(--muted)); background: color-mix(in srgb, var(--c, var(--muted)) 10%, transparent); padding: 3px 9px; border-radius: var(--r-full); white-space: nowrap; }
+.kindchip { font: 650 9px var(--fmono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); border: 1px solid var(--border2); padding: 2px 8px; border-radius: var(--r-full); }
+.humanonly { font: 650 8.5px var(--fmono); letter-spacing: .12em; color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); padding: 2.5px 8px; border-radius: var(--r-full); }
+[data-theme="dark"] .humanonly { color: #d8b28f; background: color-mix(in srgb, #d8b28f 10%, transparent); }
+
+.msg { display: flex; gap: 12px; padding: 9px 12px; border-radius: var(--r-lg); transition: background var(--dur-fast) var(--ease); }
+.msg:hover { background: color-mix(in srgb, var(--text) 3.5%, transparent); }
+.msg .pav { width: 30px; height: 30px; border-radius: 9px; }
+.msg .mbody { flex: 1; min-width: 0; }
+.mhead { display: flex; align-items: center; gap: 7px; margin-bottom: 2px; }
+.mhead b { font-size: 13px; font-weight: 650; }
+.mhead time { font-size: 10.5px; color: var(--dim); }
+.mtext { color: var(--body); font-size: 13.5px; line-height: 1.6; }
+.mtext b { color: var(--text); font-weight: 600; }
+.msg.me { flex-direction: row-reverse; }
+.msg.me:hover { background: none; }
+.msg.me .mbody { flex: none; max-width: 74%; }
+.msg.me .mtext { background: var(--panel2); border: 1px solid color-mix(in srgb, var(--border) 55%, transparent); padding: 10px 15px; border-radius: var(--r-lg); border-bottom-right-radius: var(--r-xs); color: var(--text); }
+.msg.me .mhead { justify-content: flex-end; }
+
+.taskpill { display: inline-flex; align-items: center; gap: 7px; padding: 3.5px 11px 3.5px 5px; border-radius: var(--r-full); border: 1px solid color-mix(in srgb, var(--link) 30%, transparent); background: color-mix(in srgb, var(--link) 6%, transparent); color: var(--link); font-size: 12px; font-weight: 600; transition: all var(--dur-fast) var(--ease); vertical-align: 1px; }
+.taskpill:hover { box-shadow: var(--shadow-lift); transform: translateY(-1px); }
+.taskpill .tno { font: 650 10px var(--fmono); background: color-mix(in srgb, var(--link) 13%, transparent); border-radius: var(--r-full); padding: 2px 7px; }
+.taskpill .st { width: 7px; height: 7px; border-radius: 50%; background: var(--c, var(--prog)); }
+
+.fcard { border: 1px solid var(--card-border); background: var(--card); border-radius: var(--r-lg); padding: 14px 16px; margin: 6px 0; box-shadow: var(--shadow-card); transition: box-shadow var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease); }
+.fcard.hoverable:hover { box-shadow: var(--shadow-lift); transform: translateY(-1px); }
+.fk { font: 650 9px var(--fmono); letter-spacing: .15em; text-transform: uppercase; color: var(--muted); display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+.fk .spacer { flex: 1; }
+.fcard h4 { font: 620 15px/1.35 var(--fdisp); margin-bottom: 4px; letter-spacing: -.005em; }
+.fcard p { font-size: 12.5px; color: var(--body); line-height: 1.55; }
+.frow { display: flex; align-items: center; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+
+/* needs-you card (.mcqcard) */
+.mcqcard { border: 1px solid var(--card-border); background: var(--card); border-radius: var(--r-lg); padding: 12px 15px; margin-bottom: 8px; box-shadow: var(--shadow-card); transition: all var(--dur-fast) var(--ease); }
+.mcqcard:hover { box-shadow: var(--shadow-lift); transform: translateY(-1px); }
+.mcqtop { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.mcqid { font: 650 10px var(--fmono); color: var(--muted); }
+.mcqbadges { margin-left: auto; font: 550 10px var(--fmono); color: var(--dim); }
+.mcqtitle { font-size: 13.5px; font-weight: 600; margin: 7px 0 2px; letter-spacing: -.003em; }
+.mcqtitle .asker b { color: var(--text); }
+.mcqmeta { font-size: 11.5px; color: var(--muted); }
+.mcqacts { display: flex; gap: 7px; margin-top: 10px; flex-wrap: wrap; }
+.mcdopts { margin-top: 9px; display: flex; flex-direction: column; gap: 6px; }
+.mcdopt { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; border: 1px solid var(--border); border-radius: var(--r-md); padding: 8px 12px; font-size: 12.5px; color: var(--body); transition: all var(--dur-fast) var(--ease); }
+.mcdopt:hover { border-color: var(--border2); background: var(--hover-bg); color: var(--text); transform: translateY(-1px); }
+.mcdnum { font: 650 10px var(--fmono); color: var(--muted); border: 1px solid var(--border2); border-radius: 5px; padding: 1px 6px; flex: none; }
+.mcdopt b { font-weight: 600; }
+
+/* in-flight rows */
+.frowline { display: flex; align-items: center; gap: 10px; border: 1px solid transparent; border-radius: var(--r-md); padding: 7px 10px; transition: background var(--dur-fast) var(--ease); cursor: pointer; width: 100%; text-align: left; }
+.frowline:hover { background: color-mix(in srgb, var(--text) 4%, transparent); }
+.rring { width: 16px; height: 16px; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--prog) 30%, transparent); border-top-color: var(--prog); animation: spin 1.4s linear infinite; flex: none; }
+.frowline .what { flex: 1; min-width: 0; font-size: 12.5px; color: var(--body); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.frowline .what b { color: var(--text); font-weight: 600; }
+.frowline .roomtag { font: 550 10px var(--fmono); color: var(--muted); }
+.frowline time { font-size: 10.5px; color: var(--dim); flex: none; }
+.hfoot { margin: 18px 0 4px; text-align: center; font: 550 10.5px var(--fmono); color: var(--dim); }
+
+/* deliverables (v0.55) */
+.deliveryhead { font: 650 9px var(--fmono); letter-spacing: .15em; text-transform: uppercase; color: var(--muted); margin: 8px 0 5px; }
+.filecard { border: 1px solid var(--card-border); background: var(--card); border-radius: var(--r-lg); overflow: hidden; margin-top: 6px; max-width: 470px; box-shadow: var(--shadow-card); transition: all var(--dur-fast) var(--ease); }
+.filecard:hover { box-shadow: var(--shadow-lift); transform: translateY(-1px); }
+.filehead { display: flex; align-items: center; gap: 9px; padding: 8px 12px; width: 100%; text-align: left; }
+.filekind { font: 650 9px var(--fmono); letter-spacing: .08em; text-transform: uppercase; color: var(--c, var(--muted)); background: color-mix(in srgb, var(--c, var(--muted)) 10%, transparent); padding: 3px 8px; border-radius: var(--r-full); flex: none; }
+.filename { font-size: 12.5px; font-weight: 600; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fopen { font-size: 11.5px; color: var(--link); font-weight: 600; flex: none; }
+.filemeta { font: 500 10px var(--fmono); color: var(--dim); flex: none; }
+.fbody { border-top: 1px solid color-mix(in srgb, var(--border) 55%, transparent); background: var(--panel2); padding: 12px 14px; max-height: 130px; overflow: hidden; position: relative; }
+.fbody .l { height: 7px; border-radius: 4px; background: color-mix(in srgb, var(--text) 11%, transparent); margin-bottom: 7px; }
+.fbody .fmd h5 { font: 630 13px var(--fdisp); margin-bottom: 6px; }
+.fbody .fmd p { font-size: 11.5px; color: var(--body); line-height: 1.5; }
+
+/* question / decision cards in feed */
+.qcard { border-left: 3px solid var(--role-orch); }
+.qopt { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; border: 1px solid var(--border); border-radius: var(--r-md); padding: 9px 13px; margin-top: 7px; font-size: 12.5px; color: var(--body); transition: all var(--dur-fast) var(--ease); }
+.qopt:hover { border-color: var(--border2); background: var(--hover-bg); color: var(--text); transform: translateY(-1px); }
+.qopt b { font-weight: 600; color: var(--text); }
+.qcard.sent { opacity: .8; }
+.qcompact { display: flex; align-items: center; gap: 9px; font-size: 12.5px; color: var(--body); }
+.qcompact .qtick { color: var(--green); }
+
+/* suggestion pills + typing */
+.sugrow { display: flex; gap: 7px; padding: 0 2px 7px; flex-wrap: wrap; align-items: center; }
+.sug { font-size: 12px; color: var(--body); border: 1px solid var(--border); border-radius: var(--r-full); padding: 5.5px 13px; transition: all var(--dur-fast) var(--ease); background: color-mix(in srgb, var(--sheet) 60%, transparent); }
+.sug:hover { border-color: var(--border2); color: var(--text); background: var(--hover-bg); transform: translateY(-1px); }
+.sugx { color: var(--dim); font-size: 11px; padding: 4px 6px; border-radius: var(--r-sm); }
+.sugx:hover { color: var(--text); background: var(--hover-bg); }
+.typingbar { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 11.5px; padding: 2px 12px 6px; }
+.typist { display: inline-flex; align-items: center; gap: 6px; }
+.typist .pav { width: 16px; height: 16px; border-radius: 5px; }
+.typistcue { color: var(--dim); font-size: 10.5px; }
+.tdots { display: inline-flex; gap: 3px; }
+.tdots i { width: 4px; height: 4px; border-radius: 50%; background: var(--muted); animation: typing-b 1.2s ease-in-out infinite; }
+.tdots i:nth-child(2) { animation-delay: .15s; } .tdots i:nth-child(3) { animation-delay: .3s; }
+
+/* composer — real row: @ · attach · | · Project · Brain · Threads · … · send */
+.composer { flex: none; padding: 6px 26px 2px; }
+.cbox { max-width: var(--col); margin: 0 auto; background: var(--card); border: 1px solid var(--border); border-radius: var(--r-xl); box-shadow: var(--shadow-card); transition: all var(--dur-fast) var(--ease); }
+[data-theme="dark"] .cbox, [data-theme="soft-dark"] .cbox { background: var(--panel2); }
+.cbox:focus-within { border-color: var(--ring); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 9%, transparent), var(--shadow-lift); }
+.chint { display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--muted); padding: 9px 16px 0; }
+.chint .pav { width: 15px; height: 15px; border-radius: 4px; }
+.chintat { color: var(--link); font-weight: 600; }
+.cbox textarea { width: 100%; background: none; border: none; outline: none; resize: none; color: var(--text); font: 14px/1.5 var(--fbody); padding: 8px 18px 4px; height: 44px; }
+.cbox textarea::placeholder { color: var(--dim); }
+.crow { display: flex; align-items: center; gap: 6px; padding: 4px 10px 10px 12px; }
+.ctool { width: 30px; height: 30px; border-radius: var(--r-full); display: grid; place-items: center; color: var(--muted); font-size: 14px; transition: all var(--dur-fast) var(--ease); }
+.ctool:hover { background: var(--hover-bg); color: var(--text); }
+.cdiv { width: 1px; height: 18px; background: color-mix(in srgb, var(--border) 80%, transparent); margin: 0 3px; }
+.cchip { display: inline-flex; align-items: center; gap: 6px; height: 29px; padding: 0 12px; border-radius: var(--r-full); border: 1px solid var(--border); font-size: 12px; font-weight: 550; color: var(--body); transition: all var(--dur-fast) var(--ease); }
+.cchip:hover { border-color: var(--border2); background: var(--hover-bg); color: var(--text); }
+.cchip .cc { color: var(--dim); font-size: 9px; }
+.csend { margin-left: auto; width: 38px; height: 38px; border-radius: 50%; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; transition: all var(--dur-fast) var(--ease); }
+.csend:hover { background: color-mix(in srgb, var(--accent) 88%, black); box-shadow: var(--shadow-lift); transform: translateY(-1px); }
+.csend:active { transform: scale(.94); }
+.csend svg { display: block; }
+
+/* ════════ BOARD — the real 15 columns ════════ */
+.boardhead { flex: none; display: flex; align-items: center; gap: 12px; padding: 16px 22px 0; }
+.boardhead h2 { font: 640 20px/1.2 var(--fdisp); letter-spacing: -.012em; }
+.boardhead .projscope { color: var(--muted); font: 500 13px var(--fbody); }
+.boardscope { display: flex; gap: 2px; background: var(--panel2); border-radius: var(--r-full); padding: 3px; margin-left: auto; }
+.boardscope button { padding: 5px 13px; border-radius: var(--r-full); font-size: 12px; font-weight: 550; color: var(--muted); transition: all var(--dur-fast) var(--ease); }
+.boardscope button.on { background: var(--sheet); color: var(--text); font-weight: 600; box-shadow: var(--shadow-card); }
+[data-theme="dark"] .boardscope button.on, [data-theme="soft-dark"] .boardscope button.on { background: var(--panel3); }
+.boardsub { flex: none; font-size: 11.5px; color: var(--muted); padding: 3px 22px 0; }
+.boardscroll { flex: 1; min-height: 0; overflow: auto; padding: 14px 22px 18px; }
+.board { display: flex; gap: 12px; min-height: 100%; }
+.bcol { width: 228px; flex: none; display: flex; flex-direction: column; gap: 8px; }
+.colhead { display: flex; align-items: center; gap: 7px; padding: 2px 2px; }
+.colhead .count { font: 600 10px var(--fmono); color: var(--dim); }
+.colempty { color: var(--dim); font-size: 12px; padding: 8px 6px; }
+.ideaadd { display: flex; flex-direction: column; gap: 6px; border: 1.5px dashed var(--border2); border-radius: var(--r-md); padding: 9px 11px; }
+.ideaadd input { background: none; border: none; outline: none; font: 12.5px var(--fbody); color: var(--text); }
+.ideaadd input::placeholder { color: var(--dim); }
+.tcard { border: 1px solid var(--card-border); background: var(--card); border-radius: var(--r-lg); padding: 11px 12px 10px; box-shadow: var(--shadow-card); cursor: pointer; transition: all var(--dur-fast) var(--ease); text-align: left; width: 100%; }
+.tcard:hover { transform: translateY(-2px); box-shadow: var(--shadow-lift); border-color: var(--border2); }
+.tid { display: flex; align-items: center; gap: 6px; font: 650 10px var(--fmono); color: var(--muted); }
+.tid .unread { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+.tid .tbranch { margin-left: auto; font-weight: 550; color: var(--dim); }
+.tt { font-size: 12.5px; font-weight: 600; line-height: 1.35; margin-top: 5px; letter-spacing: -.003em; }
+.spectrum { display: flex; gap: 3px; margin-top: 9px; height: 4px; }
+.spectrum i { flex: 1; border-radius: 2px; background: color-mix(in srgb, var(--border) 80%, var(--text) 4%); }
+.spectrum i.f { background: var(--c, var(--done)); }
+.spectrum i.live { background: var(--c); background-image: linear-gradient(90deg, transparent, rgba(255,255,255,.55), transparent); background-size: 160px 100%; background-repeat: no-repeat; animation: beat-sweep 1.8s linear infinite; }
+.spectrum i.dash { background: repeating-linear-gradient(90deg, var(--border) 0 4px, transparent 4px 8px); }
+.subfold { display: flex; align-items: center; gap: 7px; margin-top: 8px; font: 550 10px var(--fmono); color: var(--muted); background: var(--panel2); border-radius: var(--r-sm); padding: 4px 8px; }
+[data-theme="dark"] .subfold, [data-theme="soft-dark"] .subfold { background: var(--panel3); }
+.subfold .subbar { flex: 1; height: 3px; border-radius: 2px; background: color-mix(in srgb, var(--text) 10%, transparent); position: relative; overflow: hidden; }
+.subfold .subbar i { position: absolute; inset: 0; width: var(--w, 50%); background: var(--done); border-radius: 2px; }
+.tfoot { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+.tfoot .pav { width: 15px; height: 15px; border-radius: 4px; }
+.tfoot .tassignee { font-size: 10.5px; color: var(--muted); }
+.tfoot .meta { margin-left: auto; font: 550 9.5px var(--fmono); color: var(--dim); }
+
+/* ════════ LIBRARY (workspace) ════════ */
+.libwrap { padding: 18px 24px; max-width: 980px; }
+.libgallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
+.tile { border: 1px solid var(--card-border); background: var(--card); border-radius: var(--r-lg); overflow: hidden; cursor: pointer; box-shadow: var(--shadow-card); transition: all var(--dur-fast) var(--ease); text-align: left; }
+.tile:hover { transform: translateY(-2px); box-shadow: var(--shadow-lift); }
+.tprev { height: 100px; background: var(--panel2); display: grid; place-items: center; font-size: 24px; border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent); position: relative; overflow: hidden; }
+.tprev .fakeui { position: absolute; inset: 10px 14px auto; }
+.tprev .l { height: 7px; border-radius: 4px; background: color-mix(in srgb, var(--text) 11%, transparent); margin-bottom: 6px; }
+.tmeta { padding: 9px 12px 10px; }
+.tmeta b { display: block; font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tmeta small { font: 550 9.5px var(--fmono); color: var(--muted); letter-spacing: .04em; }
+.tmeta small .k { color: var(--c, var(--muted)); font-weight: 650; }
+.libitem { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: var(--r-md); transition: background var(--dur-fast) var(--ease); cursor: pointer; width: 100%; text-align: left; }
+.libitem:hover { background: color-mix(in srgb, var(--text) 4%, transparent); }
+.akind { font: 650 9px var(--fmono); letter-spacing: .08em; text-transform: uppercase; color: var(--c, var(--muted)); background: color-mix(in srgb, var(--c, var(--muted)) 10%, transparent); padding: 3px 8px; border-radius: var(--r-full); flex: none; }
+.libitem b { font-size: 12.5px; font-weight: 600; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.libmeta { font: 550 10px var(--fmono); color: var(--dim); flex: none; }
+.libstar { color: var(--dim); flex: none; }
+.libstar.on { color: #d9a03f; }
+
+/* ════════ MARKETING ════════ */
+.mkbody { flex: 1; min-height: 0; display: flex; }
+.mkmain { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.mkrail { width: 232px; flex: none; border-left: 1px solid color-mix(in srgb, var(--border) 60%, transparent); padding: 16px 14px; overflow-y: auto; }
+.mkrail .kicker { padding: 0 2px; margin: 14px 0 7px; }
+.mkrail .kicker:first-child { margin-top: 0; }
+.mkrailrow { display: flex; align-items: center; gap: 8px; padding: 6px 7px; border-radius: var(--r-sm); font-size: 12px; color: var(--body); width: 100%; text-align: left; transition: background var(--dur-fast) var(--ease); }
+.mkrailrow:hover { background: var(--hover-bg); }
+.mkrailrow .when { margin-left: auto; font: 550 10px var(--fmono); color: var(--dim); }
+.mkrailgen { font-size: 11px; color: var(--muted); padding: 4px 7px; display: flex; align-items: center; gap: 7px; }
+.mkcalwrap { flex: 1; overflow: auto; padding: 18px 22px; }
+.mkcalbar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.mkcalrange { font: 630 15px var(--fdisp); }
+.mkcalgrid { display: grid; grid-template-columns: 86px repeat(7, minmax(96px, 1fr)); gap: 6px; min-width: 780px; }
+.mkcal-h { font: 650 9.5px var(--fmono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); padding: 6px 4px; text-align: center; }
+.mkcal-h.today { color: var(--accent); }
+.mkcal-p { font-size: 12px; color: var(--body); font-weight: 600; display: flex; align-items: center; gap: 7px; padding: 8px 4px; }
+.mkcal-p .pic { width: 20px; height: 20px; border-radius: 6px; background: var(--panel2); display: grid; place-items: center; font-size: 11px; }
+.mkcell { min-height: 52px; border: 1px solid color-mix(in srgb, var(--border) 55%, transparent); border-radius: var(--r-sm); padding: 4px; display: flex; flex-direction: column; gap: 4px; }
+.mkcalitem { font: 550 10px var(--fmono); border-radius: 7px; padding: 4px 7px; text-align: left; line-height: 1.35; transition: all var(--dur-fast) var(--ease); cursor: pointer; }
+.mkcalitem:hover { transform: translateY(-1px); box-shadow: var(--shadow-card); }
+.mkcalitem.draft { border: 1.5px dashed var(--border2); color: var(--muted); }
+.mkcalitem.scheduled { border: 1px solid color-mix(in srgb, var(--prog) 40%, transparent); background: color-mix(in srgb, var(--prog) 8%, transparent); color: var(--body); }
+.mkcalitem.published { border: 1px solid color-mix(in srgb, var(--green) 40%, transparent); background: color-mix(in srgb, var(--green) 9%, transparent); color: var(--green); }
+.folderchips { display: flex; gap: 7px; padding: 16px 22px 0; flex-wrap: wrap; }
+.folder { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 550; color: var(--body); border: 1px solid var(--border); border-radius: var(--r-full); padding: 6px 14px; transition: all var(--dur-fast) var(--ease); }
+.folder:hover { border-color: var(--border2); color: var(--text); background: var(--hover-bg); }
+.folder.on { background: var(--sel-bg); border-color: var(--ring); color: var(--text); font-weight: 600; }
+.mklibcount { margin-left: auto; font: 550 10.5px var(--fmono); color: var(--dim); align-self: center; }
+
+/* ════════ PROJECTS ════════ */
+.projwrap { padding: 20px 26px; }
+.ptoolbar { display: flex; align-items: center; gap: 10px; margin: 14px 0 16px; }
+.psearch { flex: none; width: 260px; display: flex; align-items: center; gap: 8px; background: var(--panel2); border: 1px solid var(--border); border-radius: var(--r-full); padding: 7px 14px; font-size: 12.5px; color: var(--dim); }
+.chiptoggle { display: inline-flex; align-items: center; gap: 5px; padding: 6px 13px; border-radius: var(--r-full); border: 1px solid var(--border); color: var(--muted); font-size: 12px; transition: all var(--dur-fast) var(--ease); }
+.chiptoggle:hover { color: var(--text); border-color: var(--border2); }
+.projgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; max-width: 1000px; }
+.pcard { border: 1px solid var(--card-border); background: var(--card); border-radius: var(--r-xl); padding: 16px; cursor: pointer; box-shadow: var(--shadow-card); transition: all var(--dur-fast) var(--ease); text-align: left; position: relative; }
+.pcard:hover { transform: translateY(-2px); box-shadow: var(--shadow-lift); }
+.pcard.current { border-color: color-mix(in srgb, var(--accent) 40%, var(--card-border)); }
+.pchead { display: flex; align-items: center; gap: 10px; }
+.plogo { width: 38px; height: 38px; border-radius: 9px; display: grid; place-items: center; font: 700 15px var(--fdisp); background: var(--accent); color: var(--accent-ink); flex: none; }
+.plogo.alt { background: var(--panel3); color: var(--text); }
+.pcid { flex: 1; min-width: 0; }
+.pcid b { display: block; font: 640 15px/1.2 var(--fdisp); letter-spacing: -.008em; }
+.pcid small { font-size: 11px; color: var(--muted); }
+.pctags { display: flex; gap: 5px; }
+.pcdesc { font-size: 12px; color: var(--body); margin-top: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pcspec { display: flex; gap: 3px; height: 4px; margin-top: 12px; border-radius: 2px; overflow: hidden; }
+.pcspec i { border-radius: 2px; }
+.pcfacts { font-size: 11.5px; color: var(--muted); margin-top: 10px; }
+.pcwhen { font: 550 10px var(--fmono); color: var(--dim); margin-top: 4px; }
+.pcnew { border: 1.5px dashed var(--border2); border-radius: var(--r-xl); background: none; display: grid; place-items: center; min-height: 158px; cursor: pointer; transition: all var(--dur-fast) var(--ease); }
+.pcnew:hover { border-color: var(--accent); background: var(--hover-bg); }
+.pcnew .in { text-align: center; color: var(--muted); }
+.pcnewico { width: 38px; height: 38px; border-radius: var(--r-md); border: 1.5px dashed var(--border2); display: grid; place-items: center; font-size: 17px; margin: 0 auto 8px; color: var(--dim); }
+
+/* ════════ TASK PANEL ════════ */
+.tsheet { position: absolute; inset: 0; background: var(--sheet); display: flex; flex-direction: column; transform: translateX(28px); opacity: 0; pointer-events: none; transition: transform var(--dur-enter) var(--ease), opacity var(--dur-enter) var(--ease); z-index: 5; }
+.tsheet.on { transform: none; opacity: 1; pointer-events: auto; }
+.tshead { flex: none; padding: 13px 22px 0; border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent); }
+.tsrow1 { display: flex; align-items: center; gap: 10px; }
+.backbtn { width: 30px; height: 30px; border-radius: var(--r-full); border: 1px solid var(--border); display: grid; place-items: center; color: var(--muted); font-size: 13px; transition: all var(--dur-fast) var(--ease); flex: none; }
+.backbtn:hover { color: var(--text); border-color: var(--border2); background: var(--hover-bg); }
+.tsrow1 .tidt { font: 650 10.5px var(--fmono); color: var(--muted); background: var(--panel2); padding: 3px 9px; border-radius: var(--r-full); }
+[data-theme="dark"] .tsrow1 .tidt, [data-theme="soft-dark"] .tsrow1 .tidt { background: var(--panel3); }
+.tsrow1 h2 { font: 630 18px/1.25 var(--fdisp); letter-spacing: -.012em; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tsfacts { display: flex; align-items: center; gap: 7px; margin: 10px 0 0; flex-wrap: wrap; }
+.specnow { font: 600 11px var(--fmono); color: var(--text); }
+.tok { display: inline-flex; align-items: center; gap: 6px; font: 550 10.5px var(--fmono); color: var(--muted); background: var(--panel2); border-radius: var(--r-full); padding: 4px 11px; transition: all var(--dur-fast) var(--ease); }
+.tok.warm { color: var(--accent); background: color-mix(in srgb, var(--accent) 9%, transparent); }
+[data-theme="dark"] .tok, [data-theme="soft-dark"] .tok { background: var(--panel3); }
+[data-theme="dark"] .tok.warm { color: #d8b28f; background: color-mix(in srgb, #d8b28f 10%, transparent); }
+.tspectrum { display: flex; gap: 4px; height: 5px; margin: 12px 0 0; }
+.tspectrum i { flex: 1; border-radius: 3px; background: color-mix(in srgb, var(--border) 80%, var(--text) 4%); position: relative; transition: background .3s var(--ease); }
+.tspectrum i.f { background: var(--c); }
+.tspectrum i.live { background: var(--c); background-image: linear-gradient(90deg, transparent, rgba(255,255,255,.5), transparent); background-size: 160px 100%; background-repeat: no-repeat; animation: beat-sweep 1.8s linear infinite; }
+.tspectrum i::after { content: attr(data-leg); position: absolute; top: 9px; left: 50%; transform: translateX(-50%); font: 550 8.5px var(--fmono); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); opacity: 0; transition: opacity var(--dur-fast) var(--ease); white-space: nowrap; }
+.tspectrum:hover i::after { opacity: 1; }
+.specfoot { font: 500 9.5px var(--fmono); color: var(--dim); margin-top: 12px; opacity: 0; transition: opacity var(--dur-fast) var(--ease); }
+.tshead:hover .specfoot { opacity: 1; }
+.ttabs { display: flex; gap: 2px; margin-top: 4px; }
+.ttabs button { padding: 7px 14px 9px; font-size: 12.5px; font-weight: 550; color: var(--muted); border-bottom: 2px solid transparent; transition: all var(--dur-fast) var(--ease); }
+.ttabs button:hover { color: var(--text); }
+.ttabs button.on { color: var(--text); font-weight: 600; border-color: var(--accent); }
+.ttabs button.dis { opacity: .5; cursor: not-allowed; }
+.ttabs button .n { font: 600 9.5px var(--fmono); color: var(--muted); background: color-mix(in srgb, var(--text) 7%, transparent); padding: 1px 6px; border-radius: var(--r-full); margin-left: 5px; }
+.tsbody { flex: 1; min-height: 0; position: relative; }
+.tstab { position: absolute; inset: 0; display: none; flex-direction: column; min-height: 0; }
+.tstab.on { display: flex; }
+.tsthread { flex: 1; overflow-y: auto; min-height: 0; padding: 16px 22px 8px; }
+.tscol { max-width: var(--col); margin: 0 auto; }
+/* drawers */
+.drawer { max-width: var(--col); margin: 0 auto 8px; border: 1px solid var(--card-border); border-radius: var(--r-md); background: var(--card); overflow: hidden; width: 100%; }
+.drawerhead { display: flex; align-items: center; gap: 9px; width: 100%; text-align: left; padding: 8px 13px; font-size: 12px; transition: background var(--dur-fast) var(--ease); }
+.drawerhead:hover { background: var(--hover-bg); }
+.drawerhead .t { font-weight: 600; }
+.drawerhead .dmeta { margin-left: auto; font: 550 10px var(--fmono); color: var(--dim); }
+.drawerbody { border-top: 1px solid color-mix(in srgb, var(--border) 55%, transparent); padding: 10px 13px; display: none; }
+.drawer.open .drawerbody { display: block; animation: a-fade var(--dur-enter) var(--ease) both; }
+.artchip { display: flex; align-items: center; gap: 9px; padding: 6px 8px; border-radius: var(--r-sm); font-size: 12px; transition: background var(--dur-fast) var(--ease); }
+.artchip:hover { background: var(--hover-bg); }
+.artchip b { flex: 1; min-width: 0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.latesttag { font: 650 8.5px var(--fmono); color: var(--green); }
+/* review tab */
+.trvwrap { flex: 1; overflow-y: auto; padding: 18px 22px; }
+.trvcol { max-width: var(--col); margin: 0 auto; }
+.trvmeta { font: 550 11px var(--fmono); color: var(--muted); margin-bottom: 14px; }
+.trvhead { font: 630 14.5px var(--fdisp); margin: 16px 0 8px; display: flex; align-items: center; gap: 8px; }
+.trvhead .edit { margin-left: auto; font: 550 11px var(--fbody); color: var(--link); }
+.treq { display: flex; gap: 8px; font-size: 12.5px; color: var(--body); padding: 3px 0; }
+.treq .c { color: var(--green); }
+.dodbox { border: 1px solid var(--card-border); background: var(--panel2); border-radius: var(--r-md); padding: 12px 14px; font-size: 12.5px; color: var(--body); line-height: 1.6; }
+.auditrow { display: flex; align-items: center; gap: 9px; font-size: 12px; color: var(--body); padding: 5px 0; }
+.auditrow .r { font: 650 9.5px var(--fmono); color: var(--muted); border: 1px solid var(--border2); border-radius: 5px; padding: 1px 6px; }
+.auditrow .ok { color: var(--green); font-weight: 600; }
+.auditrow .rq { color: var(--designrev); font-weight: 600; }
+.auditrow time { margin-left: auto; font-size: 10.5px; color: var(--dim); }
+/* diff tab */
+.diffwrap { flex: 1; overflow: auto; padding: 16px 22px; }
+.diffbox { max-width: var(--col); margin: 0 auto; border: 1px solid var(--card-border); border-radius: var(--r-md); overflow: hidden; font: 11.5px/1.7 var(--fmono); }
+.diffhead { padding: 7px 13px; background: var(--panel2); font-weight: 600; font-size: 11px; display: flex; gap: 10px; }
+.diffhead .add { color: var(--green); } .diffhead .del { color: #c25e5e; }
+.diffbox pre { padding: 10px 0; overflow-x: auto; background: var(--card); }
+.dl { padding: 0 13px; white-space: pre; }
+.dl.add { background: color-mix(in srgb, var(--green) 9%, transparent); color: var(--green); }
+.dl.del { background: color-mix(in srgb, #c25e5e 9%, transparent); color: #c25e5e; }
+.dl.ctx { color: var(--muted); }
+/* gate cards */
+.gatezone { flex: none; padding: 0 22px; }
+.gate { max-width: var(--col); margin: 0 auto 10px; border: 1px solid color-mix(in srgb, var(--c, var(--review)) 30%, transparent); border-left: 3px solid var(--c, var(--review)); background: color-mix(in srgb, var(--c, var(--review)) 5%, var(--card)); border-radius: var(--r-lg); padding: 12px 15px; }
+.gate .gk { font: 650 9px var(--fmono); letter-spacing: .15em; text-transform: uppercase; color: var(--c, var(--review)); margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+.gate .gk .spacer { flex: 1; }
+.gate h4 { font: 620 14px/1.35 var(--fdisp); margin-bottom: 3px; }
+.gate p { font-size: 12px; color: var(--body); line-height: 1.5; }
+.riskchip { font: 650 8.5px var(--fmono); letter-spacing: .08em; text-transform: uppercase; padding: 2px 8px; border-radius: var(--r-full); }
+.risk-low { color: var(--green); background: color-mix(in srgb, var(--green) 10%, transparent); }
+.shipitems { margin-top: 8px; display: flex; flex-direction: column; gap: 5px; }
+.shiprow { display: flex; align-items: center; gap: 9px; font-size: 12px; color: var(--body); }
+.shiprow .cb { width: 15px; height: 15px; border-radius: 5px; border: 1.5px solid var(--border2); display: grid; place-items: center; font-size: 9px; color: transparent; flex: none; transition: all var(--dur-fast) var(--ease); }
+.shiprow.done .cb { background: var(--green); border-color: var(--green); color: #fff; }
+.ownchip { margin-left: auto; font: 550 9.5px var(--fmono); color: var(--dim); border: 1px solid var(--border); padding: 1px 7px; border-radius: var(--r-full); }
+.shipnote { font: 500 10px var(--fmono); color: var(--dim); margin-top: 8px; }
+.ticker { max-width: var(--col); margin: 0 auto 10px; display: flex; align-items: center; gap: 9px; font: 500 10.5px var(--fmono); color: var(--muted); padding: 7px 13px; border-radius: var(--r-full); background: var(--panel2); cursor: pointer; transition: background var(--dur-fast) var(--ease); width: 100%; }
+[data-theme="dark"] .ticker, [data-theme="soft-dark"] .ticker { background: var(--panel3); }
+.ticker:hover { background: var(--panel3); }
+.tring { width: 14px; height: 14px; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--prog) 30%, transparent); border-top-color: var(--prog); animation: spin 1.4s linear infinite; flex: none; }
+.beatcnt { color: var(--dim); }
+.beathint { margin-left: auto; color: var(--dim); }
+/* flow rail */
+.flowrail { flex: none; display: flex; align-items: center; gap: 5px; padding: 8px 22px 12px; border-top: 1px solid color-mix(in srgb, var(--border) 55%, transparent); overflow-x: auto; scrollbar-width: none; }
+.flowrail::-webkit-scrollbar { display: none; }
+.fstep { display: inline-flex; align-items: center; gap: 6px; font: 550 9.5px var(--fmono); letter-spacing: .05em; text-transform: uppercase; color: var(--dim); padding: 5px 10px; border-radius: var(--r-full); border: 1px solid transparent; transition: all var(--dur-fast) var(--ease); white-space: nowrap; cursor: pointer; }
+.fstep:hover { color: var(--text); background: var(--hover-bg); }
+.fstep.done { color: var(--c); }
+.fstep.now { color: var(--c); border-color: color-mix(in srgb, var(--c) 40%, transparent); background: color-mix(in srgb, var(--c) 9%, transparent); font-weight: 650; }
+.fstep .fdot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: .7; }
+.farrow { color: var(--dim); font-size: 9px; flex: none; }
+
+/* ════════ OVERLAYS ════════ */
+.scrim { position: fixed; inset: 0; background: var(--scrim); backdrop-filter: blur(3px); display: none; place-items: center; z-index: 40; }
+.scrim.on { display: grid; animation: a-fade var(--dur-enter) var(--ease) both; }
+.scrim[data-exit] > * { animation: a-exit-pop var(--dur-exit) var(--ease-exit) both; }
+.modal { width: 540px; max-width: calc(100vw - 48px); max-height: calc(100vh - 80px); overflow-y: auto; background: var(--overlay); border-radius: var(--r-xl); box-shadow: var(--shadow-pop); border: 1px solid color-mix(in srgb, var(--border) 60%, transparent); padding: 22px 22px 18px; }
+.modal.wide { width: 760px; }
+.scrim.on .modal { animation: a-pop var(--dur-enter) var(--ease) both; }
+.modal .mk { font: 650 9px var(--fmono); letter-spacing: .15em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+.modal h3 { font: 630 19px/1.3 var(--fdisp); letter-spacing: -.01em; margin-bottom: 5px; }
+.modal .msub { font-size: 12.5px; color: var(--body); line-height: 1.55; }
+.modal textarea { width: 100%; margin-top: 14px; background: var(--panel2); border: 1px solid var(--border); border-radius: var(--r-md); padding: 12px 14px; font: 13.5px/1.5 var(--fbody); color: var(--text); outline: none; resize: none; height: 74px; transition: all var(--dur-fast) var(--ease); }
+.modal textarea:focus { border-color: var(--ring); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 9%, transparent); }
+.modal .mrow { display: flex; align-items: center; gap: 8px; margin-top: 16px; }
+.modal .mrow .grow { flex: 1; }
+.wstabs { display: flex; gap: 2px; margin: 14px 0 18px; border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent); }
+.wstabs button { padding: 7px 13px 9px; font-size: 12.5px; font-weight: 550; color: var(--muted); border-bottom: 2px solid transparent; transition: all var(--dur-fast) var(--ease); }
+.wstabs button.on { color: var(--text); font-weight: 600; border-bottom-color: var(--accent); }
+.wstabs button:hover { color: var(--text); }
+.packgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.packcard { border: 1.5px solid var(--card-border); border-radius: var(--r-lg); padding: 13px 14px; background: var(--card); cursor: pointer; transition: all var(--dur-fast) var(--ease); text-align: left; }
+.packcard:hover { box-shadow: var(--shadow-lift); transform: translateY(-1px); }
+.packcard.active { border-color: var(--accent); }
+.packcardtop { display: flex; align-items: center; gap: 8px; }
+.packname { font: 640 14px var(--fdisp); flex: 1; }
+.packbadge { font: 650 9.5px var(--fmono); letter-spacing: .06em; color: var(--green); background: color-mix(in srgb, var(--green) 10%, transparent); padding: 3px 9px; border-radius: var(--r-full); }
+.packbadge.apply { color: var(--body); background: var(--panel2); }
+.packbadge.locked { color: var(--dim); background: var(--panel2); }
+.packtag { font-size: 11px; color: var(--muted); margin: 3px 0 9px; }
+.packrolerow { display: flex; align-items: center; gap: 7px; font: 550 10.5px var(--fmono); color: var(--body); padding: 2.5px 0; }
+.packrolerow .parrow { color: var(--dim); }
+.packrolerow .plat { margin-left: auto; color: var(--dim); font-size: 9.5px; }
+.packsupport { font: 500 9.5px var(--fmono); color: var(--dim); margin-top: 7px; }
+.packconnect { font-size: 11.5px; color: var(--link); font-weight: 600; margin-top: 8px; }
+.themegrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(155px, 1fr)); gap: 11px; margin-top: 8px; }
+.themecard { border: 1.5px solid var(--card-border); border-radius: var(--r-lg); overflow: hidden; cursor: pointer; transition: all var(--dur-fast) var(--ease); text-align: left; background: var(--card); }
+.themecard:hover { transform: translateY(-2px); box-shadow: var(--shadow-lift); }
+.themecard.on { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent); }
+.themeprev { height: 72px; display: flex; padding: 9px; gap: 5px; }
+.themeprev .tnav { width: 30%; border-radius: 5px; }
+.themeprev .tmain { flex: 1; border-radius: 5px; display: flex; flex-direction: column; gap: 4px; padding: 6px; }
+.themeprev .tl { height: 5px; border-radius: 3px; }
+.themename { display: flex; align-items: center; gap: 7px; padding: 8px 11px 3px; font-size: 12px; font-weight: 600; }
+.themedesc { padding: 0 11px 9px; font-size: 10px; color: var(--muted); line-height: 1.45; }
+.switchrow { display: flex; align-items: center; gap: 12px; margin-top: 18px; padding-top: 14px; border-top: 1px solid color-mix(in srgb, var(--border) 55%, transparent); }
+.switchrow .lbl { flex: 1; }
+.switchrow .lbl b { display: block; font-size: 13px; font-weight: 600; }
+.switchrow .lbl small { font-size: 11px; color: var(--muted); line-height: 1.45; display: block; margin-top: 2px; }
+.sw { width: 36px; height: 21px; border-radius: var(--r-full); background: var(--green); position: relative; flex: none; cursor: pointer; }
+.sw i { position: absolute; top: 2.5px; left: 17.5px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: left var(--dur-fast) var(--ease); }
+
+.menu { position: fixed; min-width: 240px; background: var(--overlay); border: 1px solid color-mix(in srgb, var(--border) 70%, transparent); border-radius: var(--r-lg); box-shadow: var(--shadow-pop); padding: 6px; z-index: 50; display: none; }
+.menu.on { display: block; animation: a-drop var(--dur-enter) var(--ease) both; }
+.menu.up.on { animation-name: a-rise; }
+.menu[data-exit] { animation: a-exit-fade var(--dur-exit) var(--ease-exit) both; }
+.menu .mk { font: 650 8.5px var(--fmono); letter-spacing: .15em; text-transform: uppercase; color: var(--dim); padding: 8px 10px 5px; }
+.menu .msep { height: 1px; background: color-mix(in srgb, var(--border) 70%, transparent); margin: 5px 4px; }
+.mitem { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; padding: 8px 10px; border-radius: var(--r-sm); font-size: 12.5px; color: var(--body); transition: all var(--dur-fast) var(--ease); }
+.mitem:hover { background: var(--hover-bg); color: var(--text); }
+.mitem .mi { width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; font-size: 12px; background: var(--panel2); flex: none; }
+.mitem .lbl { flex: 1; min-width: 0; }
+.mitem .sub { display: block; font-size: 10.5px; color: var(--dim); }
+.mitem .chk { color: var(--accent); font-size: 12px; }
+.mitem .cnt2 { font: 600 10px var(--fmono); color: var(--muted); background: color-mix(in srgb, var(--text) 7%, transparent); padding: 1px 7px; border-radius: var(--r-full); }
+.acctplan { display: flex; align-items: center; gap: 9px; margin: 4px 6px 2px; padding: 9px 10px; border: 1px solid var(--card-border); border-radius: var(--r-md); background: var(--panel2); font-size: 12px; }
+.acctplan b { font-weight: 650; }
+.acctplan small { display: block; color: var(--muted); font-size: 10.5px; }
+.acctplan .up { margin-left: auto; font: 650 10px var(--fmono); color: var(--accent); }
+.dockseg { display: flex; gap: 2px; background: var(--panel2); border-radius: var(--r-full); padding: 3px; margin: 6px 8px 4px; }
+.dockseg button { flex: 1; padding: 5px 0; border-radius: var(--r-full); font-size: 11px; color: var(--muted); transition: all var(--dur-fast) var(--ease); }
+.dockseg button.on { background: var(--overlay); color: var(--text); font-weight: 600; box-shadow: var(--shadow-card); }
+
+.toast { position: fixed; left: 50%; bottom: 44px; transform: translateX(-50%); background: var(--overlay); color: var(--text); border: 1px solid color-mix(in srgb, var(--border) 70%, transparent); box-shadow: var(--shadow-pop); border-radius: var(--r-full); padding: 9px 17px; font-size: 12.5px; font-weight: 550; display: none; align-items: center; gap: 9px; z-index: 60; max-width: 80vw; }
+.toast.on { display: inline-flex; animation: a-rise var(--dur-enter) var(--ease) both; }
+.toast[data-exit] { animation: a-exit-rise var(--dur-exit) var(--ease-exit) both; }
+.toast .tdot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); flex: none; }
+/* the launcher split control + routine fields */
+.ftnew { position: relative; display: inline-flex; }
+.ftnewmain { display: inline-flex; align-items: center; height: 34px; padding: 0 16px; border-radius: var(--r-full) 0 0 var(--r-full); background: var(--accent); color: var(--accent-ink); font-size: 13px; font-weight: 600; transition: background var(--dur-fast) var(--ease); }
+.ftnewmain:hover { background: color-mix(in srgb, var(--accent) 90%, black); }
+.ftnewcaret { width: 30px; height: 34px; border-radius: 0 var(--r-full) var(--r-full) 0; background: var(--accent); color: var(--accent-ink); font-size: 10px; border-left: 1px solid color-mix(in srgb, var(--accent-ink) 22%, transparent); }
+.ftnewcaret:hover { background: color-mix(in srgb, var(--accent) 88%, black); }
+.ftmenu { top: calc(100% + 8px); right: 0; left: auto; position: absolute; }
+.modal .mrow.cadrow { margin-top: 12px; }
+.launchsel { background: var(--card); border: 1px solid var(--border); border-radius: var(--r-md); padding: 5px 9px; font: 600 12px var(--fbody); color: var(--text); outline: none; }
+.launchmk { display: flex; align-items: center; gap: 7px; }
+/* the launcher's ideas beat: ghost ask → rex's typing dots → pills rising in */
+.launchsug { margin: 2px 0 12px; }
+.launchsug .sug.ideabtn { display: inline-flex; align-items: center; gap: 7px; padding-left: 7px; }
+.launchsug .pav, .ideathinking .pav { width: 15px; height: 15px; border-radius: 4px; overflow: hidden; display: inline-grid; place-items: center; }
+.launchsug .pav img, .ideathinking .pav img { width: 100%; height: 100%; display: block; }
+.ideathinking { display: inline-flex; align-items: center; gap: 8px; padding: 5px 13px 5px 7px; border: 1px solid var(--border); border-radius: var(--r-full); background: var(--hover-bg); animation: a-rise var(--dur-enter) var(--ease) both; }
+.ideatxt { font-size: 11.5px; font-weight: 550; color: var(--dim); }
+.launchsug .sug.ideain { animation: a-rise .26s var(--ease) both; }
+.launchbox textarea { height: 128px; font: 14px/1.6 var(--fbody); padding: 12px 18px 4px; }
+.launchcads { display: inline-flex; align-items: center; gap: 6px; }
+.modal.launch { width: min(600px, 94vw); }
+</style>
+</head>
+<body data-theme="cream">
+
+<div class="frame">
+  <header class="topbar">
+    <span class="lights"><i></i><i></i><i></i></span>
+    <span class="brand">
+      <svg width="21" height="21" viewBox="0 0 48 48" fill="none" stroke-linecap="round" stroke-width="3.4">
+        <path d="M8 10 c12 0 16 28 32 28" stroke="var(--accent)"/>
+        <path d="M8 38 c12 0 16 -28 32 -28" stroke="var(--text)"/>
+        <circle cx="24" cy="24" r="2.9" fill="var(--accent)" stroke="none"/>
+      </svg>
+      <b>Neura<span>Mesh</span></b>
+    </span>
+    <span class="crumb"><span class="sep">/</span><button id="crumbProj">neuramesh</button><span class="sep">›</span><b id="crumbHere">Home</b></span>
+    <span class="grow"></span>
+    <button class="searchpill">⌕ Search — rooms, tasks, artifacts <b>⌘K</b></button>
+    <button class="framebtn" id="histBtn" data-tip="#product history">◷</button>
+    <div class="ftnew">
+      <button class="ftnewmain" id="newTaskBtn">＋ New task</button>
+      <button class="ftnewcaret" id="newTaskCaret">▾</button>
+      <div class="menu ftmenu" id="ftMenu">
+        <button class="mitem" data-mode="task"><span class="mi">⚡</span><span class="lbl">New task <span class="sub">Run once, right now — in any room</span></span></button>
+        <button class="mitem" data-mode="routine"><span class="mi">⟳</span><span class="lbl">New routine <span class="sub">Run this prompt on a schedule</span></span></button>
+      </div>
+    </div>
+  </header>
+
+  <div class="framebody">
+    <nav class="nav">
+      <button class="navhead" id="projBtn" title="All projects">
+        <span class="navbadge">N</span>
+        <span class="wsproj"><b>neuramesh</b><small>Alonge Labs</small></span>
+        <span class="wscaret">▾</span>
+      </button>
+      <div class="navscroll">
+        <button class="chan navv on" data-screen="home" style="margin-top:6px"><span class="ico">⌂</span> Home <span class="cnt attn" id="needsBadge">3</span></button>
+        <button class="chan navv" data-screen="board"><span class="ico">▦</span> Board <span class="cnt">9</span></button>
+        <button class="chan navv" data-screen="library"><span class="ico">▤</span> Library</button>
+
+        <div class="kicker">Channels <button class="kadd">+</button></div>
+        <button class="chan roomv" data-room="product"><span class="hash">#</span> product <span class="dotlive"></span></button>
+        <button class="chan roomv" data-room="engineering"><span class="hash">#</span> engineering <span class="cnt">4</span></button>
+        <button class="chan roomv" data-room="design"><span class="hash">#</span> design</button>
+        <button class="chan roomv" data-room="marketing"><span class="hash">#</span> marketing-hq <span class="mkico">📣</span></button>
+
+        <div class="kicker">People <button class="kadd">+</button></div>
+        <button class="chan"><span class="pav letter" style="width:22px;height:22px;border-radius:7px;font-size:10px">G</span> george (you)</button>
+
+        <div class="kicker">Agents <button class="kadd">+</button></div>
+        <button class="navagent"><span class="agwrap"><span class="pav" data-seed="rex" style="width:28px;height:28px;border-radius:8px"></span></span><span class="navabody"><span class="navaname"><b>rex</b><span class="rolechip" style="--tone:var(--role-orch)">orchestrator</span></span><span class="navstatus">watching the room</span></span></button>
+        <button class="navagent"><span class="agwrap"><span class="pav" data-seed="atlas" style="width:28px;height:28px;border-radius:8px"></span></span><span class="navabody"><span class="navaname"><b>atlas</b><span class="rolechip" style="--tone:var(--role-arch)">architect</span></span><span class="navstatus">idle</span></span></button>
+        <button class="navagent"><span class="agwrap"><span class="pav" data-seed="patch" style="width:28px;height:28px;border-radius:8px"></span><span class="agping"></span></span><span class="navabody"><span class="navaname"><b>patch</b><span class="rolechip" style="--tone:var(--role-dev)">developer</span></span><span class="navstatus">building #208 · 24m</span></span></button>
+        <button class="navagent"><span class="agwrap"><span class="pav" data-seed="gem" style="width:28px;height:28px;border-radius:8px"></span><span class="agping review"></span></span><span class="navabody"><span class="navaname"><b>gem</b><span class="rolechip" style="--tone:var(--role-rev)">reviewer</span></span><span class="navstatus">reviewing #204</span></span></button>
+        <button class="navagent"><span class="agwrap"><span class="pav" data-seed="iris" style="width:28px;height:28px;border-radius:8px"></span></span><span class="navabody"><span class="navaname"><b>iris</b><span class="rolechip" style="--tone:var(--role-design)">designer</span></span><span class="navstatus">idle</span></span></button>
+        <button class="navagent"><span class="agwrap"><span class="pav" data-seed="bosun" style="width:28px;height:28px;border-radius:8px"></span></span><span class="navabody"><span class="navaname"><b>bosun</b><span class="rolechip" style="--tone:var(--role-ship)">shipper</span></span><span class="navstatus">holding ship #203</span></span></button>
+      </div>
+      <div class="navfoot">
+        <button class="navuser" id="acctBtn">
+          <span class="navuserav">G</span>
+          <span class="navusermeta"><b>George</b> <span class="navuserplan">· Cloud</span></span>
+          <span class="navuserchev">▾</span>
+        </button>
+      </div>
+    </nav>
+
+    <div class="sheetarea">
+      <main class="sheet">
+        <div class="viewwrap">
+
+          <!-- ════ HOME ════ -->
+          <section class="view on" id="screen-home">
+            <div class="scroll"><div class="colwrap" id="homeList">
+              <div class="hero">
+                <div class="eyebrow" id="eyebrow">Sunday · Jul 26</div>
+                <h2 id="greet">Good evening, George. <em>Your org didn't sleep.</em></h2>
+                <div class="sub">1 is ready for your accept · 1 decision awaits your call · 1 release plan awaits your approval.</div>
+              </div>
+
+              <div class="sechead"><h3>Needs you</h3><span class="n">3</span></div>
+
+              <div class="mcqcard">
+                <div class="mcqtop"><span class="chip" style="--c:var(--done)">done</span><span class="kindchip">feature</span><span class="mcqid">#204</span><span class="mcqbadges">#product · neuramesh</span></div>
+                <div class="mcqtitle">Library previews, one reading column</div>
+                <div class="mcqmeta">review passed · DoD attached · PR #204 · 3 artifacts</div>
+                <div class="mcqacts"><button class="b b-md b-green opens-task">✓ Accept &amp; merge PR #204</button><button class="b b-md b-ghost opens-task">Review</button></div>
+              </div>
+
+              <div class="mcqcard mcdec">
+                <div class="mcqtop"><span class="chip" style="--c:var(--blocked)">decision</span><span class="mcqid">#208</span><span class="mcqbadges">#product · asked 4m ago</span></div>
+                <div class="mcqtitle"><span class="asker"><b>rex</b> asks:</span> Merge #204 tonight, or hold and bundle with the revamp?</div>
+                <div class="mcdopts">
+                  <button class="mcdopt" data-answer="Merge tonight"><span class="mcdnum">1</span><span><b>Merge tonight</b> — it's user-facing polish, ship it</span></button>
+                  <button class="mcdopt" data-answer="Hold for the bundle"><span class="mcdnum">2</span><span><b>Hold</b> — bundle with #208 tomorrow morning</span></button>
+                </div>
+                <div class="mcqacts"><button class="b b-sm b-ghost">Open thread</button><button class="b b-sm b-ghost">Dismiss</button></div>
+              </div>
+
+              <div class="mcqcard">
+                <div class="mcqtop"><span class="chip" style="--c:var(--shiprev)">ship review</span><span class="kindchip">feature</span><span class="mcqid">#203</span><span class="mcqbadges">#engineering · neuramesh</span></div>
+                <div class="mcqtitle">Home &amp; Feed — the feed is the room</div>
+                <div class="mcqmeta">release plan awaiting your approval · PR #203 · the shipper merges when the checklist clears</div>
+                <div class="mcqacts"><button class="b b-md b-primary">Review release plan</button><button class="b b-md b-ghost">Open thread</button></div>
+              </div>
+
+              <div class="sechead"><h3>In flight</h3><span class="n">3</span></div>
+              <div>
+                <button class="frowline"><span class="rring"></span><span class="what"><b>Cabinet-grade UI revamp</b> · patch · 3 of 5</span><span class="roomtag">#product</span><time>24m</time></button>
+                <button class="frowline opens-task"><span class="chip" style="--c:var(--review)">in review</span><span class="what"><b>#204 · Library previews</b> · gem is reading the diff</span><span class="roomtag">#product</span><time>8m</time></button>
+                <button class="frowline"><span class="chip" style="--c:var(--prog)">chat</span><span class="what"><b>pricing page copy</b> · rex is replying…</span><span class="roomtag">#marketing-hq</span><time>1m</time></button>
+              </div>
+
+              <div class="hfoot">⌘K anywhere · Esc closes anything</div>
+            </div></div>
+
+            <div class="composer">
+              <div class="cbox">
+                <div class="chint"><span class="pav" data-seed="rex"></span><span>Mention <button class="chintat">@rex</button> or another teammate whenever you want their help.</span></div>
+                <textarea placeholder="Describe the work — the team takes it from there. @ mention · / skill · ⏎ send"></textarea>
+                <div class="crow">
+                  <button class="cchip"># product <span class="cc">⌄</span></button>
+                  <button class="cchip">▦ neuramesh</button>
+                  <button class="cchip brainchip">🧠 Brain · Flagship <span class="cc">⌄</span></button>
+                  <button class="ctool" title="Mention a teammate · @">@</button>
+                  <button class="ctool" title="Attach images or files">📎</button>
+                  <button class="csend" title="Send · ↵"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+                </div>
+              </div>
+            </div>
+            <div class="hintstrip"><span class="grow"></span><span><b>⏎</b> send</span><span><b>⇧⏎</b> newline</span><span><b>@</b> mention</span></div>
+          </section>
+
+          <!-- ════ ROOM: #product ════ -->
+          <section class="view" id="screen-product">
+            <div class="scroll"><div class="colwrap" id="feedList">
+              <div class="hero">
+                <h2>#product</h2>
+                <div class="sub">the loop, end to end — plan · fan out · review · accept · <em>everyone's here.</em></div>
+              </div>
+              <div class="daysep">Today</div>
+
+              <div class="fcard hoverable">
+                <div class="fk">Digest · rex <span class="spacer"></span> 6:00 pm</div>
+                <h4>Two tasks moved while you were away.</h4>
+                <p><b>Library previews</b> cleared review and waits on your accept. <b>Composer explains itself</b> took gem's notes and went back through CI green. Nothing is blocked.</p>
+                <div class="frow"><button class="b b-sm b-soft">Open board</button><button class="b b-sm b-ghost">Dismiss</button></div>
+              </div>
+
+              <div class="msg">
+                <span class="pav" data-seed="patch"></span>
+                <div class="mbody">
+                  <div class="mhead"><b>patch</b><span class="rolechip" style="--tone:var(--role-dev)">developer</span><time>6:12 pm</time></div>
+                  <div class="mtext">Submitted <button class="taskpill opens-task"><span class="tno">#204</span> Library previews, one reading column <span class="st" style="--c:var(--review)"></span></button> — branch pushed, PR open, CI green.</div>
+                  <div class="deliveryhead">Delivered · 2 files</div>
+                  <div class="filecard">
+                    <button class="filehead"><span class="filekind" style="--c:var(--prog)">md</span><span class="filename">library-previews-evidence.md</span><span class="fopen">Open ↗</span><span class="filemeta">1,240 w · 8 KB</span></button>
+                    <div class="fbody"><div class="fmd"><h5>Evidence — library previews</h5><p>Preview windows are clipped and inert per the design contract. Recall stays under the 200ms budget (p50 67ms). Both themes verified against the round-3 mockups…</p></div></div>
+                  </div>
+                  <div class="filecard">
+                    <button class="filehead"><span class="filekind" style="--c:var(--green)">png</span><span class="filename">both-themes-verify.png</span><span class="fopen">Open ↗</span><span class="filemeta">1.2 MB</span></button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="msg me">
+                <div class="mbody">
+                  <div class="mhead"><time>6:14 pm</time><b>you</b></div>
+                  <div class="mtext">Nice. Queue the accept once bosun's plan clears — and let's do the empty-state copy pass tomorrow.</div>
+                </div>
+              </div>
+
+              <div class="msg">
+                <span class="pav" data-seed="rex"></span>
+                <div class="mbody">
+                  <div class="mhead"><b>rex</b><span class="rolechip" style="--tone:var(--role-orch)">orchestrator</span><time>6:15 pm</time></div>
+                  <div class="mtext">Parked the copy pass in the backlog with your note. The board shows <b>9 open</b> — two need you tonight.</div>
+                  <div class="fcard qcard" style="margin-bottom:0">
+                    <div class="fk">Question · 1/1 <span class="spacer"></span><span class="humanonly">HUMAN ONLY</span></div>
+                    <h4>Merge #204 tonight, or hold and bundle?</h4>
+                    <button class="qopt" data-answer="Merge tonight"><b>Merge tonight</b> — user-facing polish, ship it</button>
+                    <button class="qopt" data-answer="Hold for the bundle"><b>Hold</b> — bundle with #208 tomorrow</button>
+                  </div>
+                </div>
+              </div>
+            </div></div>
+
+            <div class="composer">
+              <div class="typingbar"><span class="typist"><span class="pav" data-seed="gem"></span> gem is thinking</span><span class="tdots"><i></i><i></i><i></i></span><button class="typistcue">view activity ›</button></div>
+              <div style="max-width:var(--col);margin:0 auto" class="sugrow">
+                <button class="sug" data-fill="Accept #204 and merge.">Accept #204 and merge</button>
+                <button class="sug" data-fill="What's blocked right now?">What's blocked right now?</button>
+                <button class="sugx">✕</button>
+              </div>
+              <div class="cbox">
+                <textarea id="roomTa" placeholder="Message #product — @ mention · / skill · ↵ send"></textarea>
+                <div class="crow">
+                  <button class="ctool" title="Mention a teammate · @">@</button>
+                  <button class="ctool" title="Attach images or files">📎</button>
+                  <span class="cdiv"></span>
+                  <button class="cchip">▦ neuramesh <span class="cc">⌄</span></button>
+                  <button class="cchip brainchip">🧠 Brain · Flagship <span class="cc">⌄</span></button>
+                  <button class="cchip">🧵 Threads · On <span class="cc">⌄</span></button>
+                  <button class="csend" title="Send · ↵"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+                </div>
+              </div>
+            </div>
+            <div class="hintstrip"><span><b>/</b> skill</span><span class="grow"></span><span><b>⏎</b> send</span><span><b>⇧⏎</b> newline</span><span><b>@</b> mention</span></div>
+          </section>
+
+          <!-- ════ ROOM: #marketing-hq (feed + brand rail) ════ -->
+          <section class="view" id="screen-marketing">
+            <div class="mkbody">
+              <div class="mkmain">
+                <div class="roomlensbar"><div class="roomlens"><button class="on">Feed</button><button data-go="mkcal">Calendar</button><button data-go="mklib">Library</button></div></div>
+                <div class="scroll"><div class="colwrap" id="mkFeed">
+                  <div class="hero">
+                    <h2>#marketing-hq <span style="font-size:14px">📣</span></h2>
+                    <div class="sub">agents draft · you approve · it publishes at the slot · <em>nothing posts itself.</em></div>
+                  </div>
+                  <div class="daysep">Today</div>
+                  <div class="msg">
+                    <span class="pav" data-seed="sage"></span>
+                    <div class="mbody">
+                      <div class="mhead"><b>sage</b><span class="rolechip" style="--tone:var(--role-mkt)">marketer</span><time>5:40 pm</time></div>
+                      <div class="mtext">Thursday's launch thread is drafted — three variants, X + LinkedIn. The picture is attached to variant A.</div>
+                      <div class="filecard">
+                        <button class="filehead"><span class="filekind" style="--c:var(--role-mkt)">post</span><span class="filename">launch-thread · variant A</span><span class="fopen">Open ↗</span><span class="filemeta">𝕏 · 4 posts</span></button>
+                        <div class="fbody"><div class="fmd"><p>Your people. Your agents. Your projects. Today we're shipping the room they all share — threads, boards and a loop that ends in an accept, not a maybe. 🧵</p></div></div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="fcard qcard" style="border-left-color:var(--role-mkt)">
+                    <div class="fk" style="color:var(--role-mkt)">Schedule · sage <span class="spacer"></span><span class="humanonly">HUMAN ONLY</span></div>
+                    <h4>Slot these three drafts?</h4>
+                    <div class="mcdopts">
+                      <button class="mcdopt"><span class="mcdnum">A</span><span>𝕏 · launch thread · <b>Thu 9:00 AM</b></span></button>
+                      <button class="mcdopt"><span class="mcdnum">B</span><span>in · founder note · <b>Thu 11:30 AM</b></span></button>
+                      <button class="mcdopt"><span class="mcdnum">C</span><span>✉ · changelog digest · <b>Fri 8:00 AM</b></span></button>
+                    </div>
+                    <div class="frow"><button class="b b-md b-primary">✓ Schedule all</button><button class="b b-md b-ghost">Not now</button></div>
+                    <p style="margin-top:8px;font-size:10.5px;color:var(--dim)">Sets the slots; NeuraMesh posts each at its time. Nothing publishes until you confirm.</p>
+                  </div>
+                </div></div>
+                <div class="composer">
+                  <div class="cbox">
+                    <textarea placeholder="Message #marketing-hq — @ mention · / skill · ↵ send"></textarea>
+                    <div class="crow">
+                      <button class="ctool">@</button><button class="ctool">📎</button><span class="cdiv"></span>
+                      <button class="cchip">▦ neuramesh <span class="cc">⌄</span></button>
+                      <button class="cchip brainchip">🧠 Brain · Flagship <span class="cc">⌄</span></button>
+                      <button class="csend"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+                    </div>
+                  </div>
+                </div>
+                <div class="hintstrip"><span class="grow"></span><span><b>⏎</b> send</span><span><b>@</b> mention</span></div>
+              </div>
+              <aside class="mkrail">
+                <div class="kicker">Brand docs</div>
+                <button class="mkrailrow">📄 voice-and-tone.md <span class="when">2d</span></button>
+                <button class="mkrailrow">📄 launch-brief.md <span class="when">4h</span></button>
+                <div class="mkrailgen"><span class="rring" style="width:12px;height:12px"></span> writing audience-notes.md…</div>
+                <div class="kicker">Upcoming</div>
+                <button class="mkrailrow">⏱ <b>launch thread</b> <span class="when">in 3d</span></button>
+                <button class="mkrailrow">⏱ <b>changelog digest</b> <span class="when">in 4d</span></button>
+                <div class="kicker">Connections</div>
+                <button class="mkrailrow">𝕏 X · connected <span class="when">✓</span></button>
+                <button class="mkrailrow">in LinkedIn · connected <span class="when">✓</span></button>
+                <button class="mkrailrow">◫ Instagram <span class="when">soon</span></button>
+              </aside>
+            </div>
+          </section>
+
+          <!-- ════ MARKETING CALENDAR ════ -->
+          <section class="view" id="screen-mkcal">
+            <div class="roomlensbar"><div class="roomlens"><button data-go="marketing">Feed</button><button class="on">Calendar</button><button data-go="mklib">Library</button></div></div>
+            <div class="mkcalwrap">
+              <div class="mkcalbar">
+                <button class="b b-sm b-ghost">‹</button><button class="b b-sm b-ghost">›</button>
+                <span class="mkcalrange">Jul 20 – Jul 26</span>
+                <button class="b b-sm b-soft">Today</button>
+                <span style="flex:1"></span>
+                <button class="b b-md b-primary">+ Schedule</button>
+              </div>
+              <div class="mkcalgrid" id="mkcalGrid">
+                <div class="mkcal-h"></div><div class="mkcal-h">Mon 20</div><div class="mkcal-h">Tue 21</div><div class="mkcal-h">Wed 22</div><div class="mkcal-h">Thu 23</div><div class="mkcal-h">Fri 24</div><div class="mkcal-h">Sat 25</div><div class="mkcal-h today">Sun 26</div>
+                <div class="mkcal-p"><span class="pic">𝕏</span> X</div>
+                <div class="mkcell"></div><div class="mkcell"><button class="mkcalitem published">✓ 09:00 the loop, explained</button></div><div class="mkcell"></div><div class="mkcell"><button class="mkcalitem scheduled">09:00 launch thread</button></div><div class="mkcell"></div><div class="mkcell"><button class="mkcalitem draft">teaser clip</button></div><div class="mkcell"></div>
+                <div class="mkcal-p"><span class="pic">in</span> LinkedIn</div>
+                <div class="mkcell"></div><div class="mkcell"></div><div class="mkcell"><button class="mkcalitem published">✓ 11:30 hiring note</button></div><div class="mkcell"><button class="mkcalitem scheduled">11:30 founder note</button></div><div class="mkcell"></div><div class="mkcell"></div><div class="mkcell"></div>
+                <div class="mkcal-p"><span class="pic">◫</span> Instagram</div>
+                <div class="mkcell"></div><div class="mkcell"></div><div class="mkcell"></div><div class="mkcell"><button class="mkcalitem draft">office b-roll</button></div><div class="mkcell"></div><div class="mkcell"></div><div class="mkcell"></div>
+                <div class="mkcal-p"><span class="pic">♪</span> TikTok</div>
+                <div class="mkcell"></div><div class="mkcell"></div><div class="mkcell"></div><div class="mkcell"></div><div class="mkcell"><button class="mkcalitem draft">demo cut</button></div><div class="mkcell"></div><div class="mkcell"></div>
+                <div class="mkcal-p"><span class="pic">✉</span> Email</div>
+                <div class="mkcell"></div><div class="mkcell"></div><div class="mkcell"></div><div class="mkcell"></div><div class="mkcell"><button class="mkcalitem scheduled">08:00 changelog digest</button></div><div class="mkcell"></div><div class="mkcell"></div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ════ MARKETING ROOM LIBRARY ════ -->
+          <section class="view" id="screen-mklib">
+            <div class="roomlensbar"><div class="roomlens"><button data-go="marketing">Feed</button><button data-go="mkcal">Calendar</button><button class="on">Library</button></div></div>
+            <div class="folderchips" style="padding-top:12px">
+              <button class="folder on">All</button><button class="folder">Docs</button><button class="folder">Media</button><button class="folder">Design</button>
+              <span class="mklibcount">8 items</span>
+            </div>
+            <div class="scroll"><div class="libwrap">
+              <div class="libgallery" id="mklibGrid">
+                <button class="tile" style="--c:var(--role-mkt)"><span class="tprev">🖼</span><div class="tmeta"><b>social-launch-16x9.png</b><small><span class="k">media</span> · ★ · Jul 24</small></div></button>
+                <button class="tile" style="--c:var(--prog)"><span class="tprev"><span class="fakeui"><span class="l" style="width:50%;display:block"></span><span class="l" style="width:82%;display:block"></span><span class="l" style="width:66%;display:block"></span></span></span><div class="tmeta"><b>voice-and-tone.md</b><small><span class="k">docs</span> · Jul 22</small></div></button>
+                <button class="tile" style="--c:var(--design)"><span class="tprev">🎬</span><div class="tmeta"><b>launch-teaser.mp4</b><small><span class="k">media</span> · Jul 23</small></div></button>
+                <button class="tile" style="--c:var(--design)"><span class="tprev"><span class="fakeui"><span class="l" style="width:38%;display:block"></span><span class="l" style="width:72%;display:block"></span><span class="l" style="width:55%;display:block"></span></span></span><div class="tmeta"><b>landing-hero · round 2</b><small><span class="k">design</span> · ★ · Jul 21</small></div></button>
+              </div>
+            </div></div>
+          </section>
+
+          <!-- ════ BOARD (real 15 columns) ════ -->
+          <section class="view" id="screen-board">
+            <div class="boardhead">
+              <h2>Board</h2><span class="projscope">· neuramesh</span>
+              <div class="boardscope"><button>This room</button><button class="on">Whole project</button></div>
+            </div>
+            <div class="boardsub">9 open · transitions enforced by the server</div>
+            <div class="boardscroll"><div class="board" id="boardCols"></div></div>
+          </section>
+
+          <!-- ════ WORKSPACE LIBRARY ════ -->
+          <section class="view" id="screen-library">
+            <div class="scroll"><div class="libwrap" id="libList">
+              <div class="hero" style="margin-bottom:4px"><h2>Library <span style="font:500 14px var(--fbody);color:var(--muted)">· neuramesh</span></h2>
+              <div class="sub">curated by orchestrators and humans — <em>what the team keeps.</em></div></div>
+              <div class="sechead"><h3>Shared in chat</h3><span class="n">3</span></div>
+              <div class="libgallery">
+                <button class="tile" style="--c:var(--green)"><span class="tprev">🖼</span><div class="tmeta"><b>both-themes-verify.png</b><small><span class="k">png</span> · #204 · patch</small></div></button>
+                <button class="tile" style="--c:var(--role-mkt)"><span class="tprev">🖼</span><div class="tmeta"><b>social-launch-16x9.png</b><small><span class="k">png</span> · #marketing-hq</small></div></button>
+                <button class="tile" style="--c:var(--prog)"><span class="tprev">📄</span><div class="tmeta"><b>perf-decomposition.html</b><small><span class="k">html</span> · #198</small></div></button>
+              </div>
+              <div class="sechead"><h3>Design</h3><span class="n">2</span></div>
+              <div class="libgallery">
+                <button class="tile" style="--c:var(--design)"><span class="tprev"><span class="fakeui"><span class="l" style="width:46%;display:block"></span><span class="l" style="width:80%;display:block"></span><span class="l" style="width:64%;display:block"></span></span></span><div class="tmeta"><b>#204 · library-redesign-r3</b><small><span class="k">design</span> · approved · iris</small></div></button>
+                <button class="tile" style="--c:var(--design)"><span class="tprev"><span class="fakeui"><span class="l" style="width:58%;display:block"></span><span class="l" style="width:74%;display:block"></span><span class="l" style="width:40%;display:block"></span></span></span><div class="tmeta"><b>#208 · cabinet-revamp-r1</b><small><span class="k">design</span> · in review · iris</small></div></button>
+              </div>
+              <div class="sechead"><h3>Promoted artifacts</h3><span class="n">3</span></div>
+              <div>
+                <button class="libitem"><span class="akind" style="--c:var(--plan)">plan</span><b>implementation-plan-v2.md</b><span class="libmeta">#product · #204 · Jul 25</span><span class="libstar on">★</span></button>
+                <button class="libitem"><span class="akind" style="--c:var(--ship)">ship</span><b>ship-plan-v1.md</b><span class="libmeta">#engineering · #203 · Jul 26</span><span class="libstar on">★</span></button>
+                <button class="libitem"><span class="akind" style="--c:var(--verif)">evidence</span><b>library-previews-evidence.md</b><span class="libmeta">#product · #204 · Jul 26</span><span class="libstar">☆</span></button>
+              </div>
+            </div></div>
+          </section>
+
+          <!-- ════ PROJECTS ════ -->
+          <section class="view" id="screen-projects">
+            <div class="scroll"><div class="projwrap">
+              <div class="hero"><h2>Projects <span style="font:500 14px var(--fbody);color:var(--muted)">· Alonge Labs · 2 active</span></h2></div>
+              <div class="ptoolbar">
+                <span class="psearch">⌕ Search projects…</span>
+                <button class="chiptoggle">Archived · 1</button>
+                <span style="flex:1"></span>
+                <button class="b b-md b-primary">＋ New project</button>
+              </div>
+              <div class="projgrid" id="projGrid">
+                <button class="pcard current">
+                  <div class="pchead"><span class="plogo">N</span><span class="pcid"><b>neuramesh</b><small>NeuraMesh</small></span><span class="pctags"><span class="chip" style="--c:var(--green)">current</span><span class="kindchip">default</span></span></div>
+                  <div class="pcdesc">The collaboration platform — humans and agents, one loop.</div>
+                  <div class="pcspec"><i style="width:18%;background:var(--backlog)"></i><i style="width:34%;background:var(--prog)"></i><i style="width:26%;background:var(--review)"></i><i style="width:22%;background:var(--done)"></i></div>
+                  <div class="pcfacts">4 rooms · 9 open · 6 agents</div>
+                  <div class="pcwhen">active just now</div>
+                </button>
+                <button class="pcard">
+                  <div class="pchead"><span class="plogo alt">A</span><span class="pcid"><b>alonge-web</b><small>Alonge Labs site</small></span></div>
+                  <div class="pcdesc">Marketing site + landing experiments.</div>
+                  <div class="pcspec"><i style="width:55%;background:var(--backlog)"></i><i style="width:25%;background:var(--prog)"></i><i style="width:20%;background:var(--done)"></i></div>
+                  <div class="pcfacts">2 rooms · 1 open · 2 agents</div>
+                  <div class="pcwhen">active 2d ago</div>
+                </button>
+                <button class="pcnew"><span class="in"><span class="pcnewico">＋</span><b style="font-size:13px">New project</b><br><small style="font-size:11px;color:var(--dim)">Cloud · unlimited</small></span></button>
+              </div>
+            </div></div>
+          </section>
+
+        </div>
+
+        <!-- ════ TASK PANEL ════ -->
+        <aside class="tsheet" id="tsheet">
+          <div class="tshead">
+            <div class="tsrow1">
+              <button class="backbtn" id="tsBack" title="close thread — Esc">✕</button>
+              <span class="tidt">#204</span>
+              <h2>Library previews, one reading column</h2>
+              <span class="chip" id="tsStatus" style="--c:var(--review)">in review</span>
+              <span class="kindchip">feature</span>
+              <button class="b b-sm b-ghost" id="playLoop">▶ Play the loop</button>
+            </div>
+            <div class="tsfacts">
+              <span class="specnow" id="specNow">Review · gem</span>
+              <span class="tok" id="tokReqs">✓ reqs</span>
+              <span class="tok">artifacts 3</span>
+              <span class="tok">subtasks 2/2</span>
+              <span class="tok warm" id="tokPR">PR #204</span>
+            </div>
+            <div class="tspectrum" id="tsSpec">
+              <i data-leg="design" style="--c:var(--design)"></i>
+              <i data-leg="plan" style="--c:var(--plan)"></i>
+              <i data-leg="build" style="--c:var(--prog)"></i>
+              <i data-leg="review" style="--c:var(--review)"></i>
+              <i data-leg="ship" style="--c:var(--ship)"></i>
+              <i data-leg="accept" style="--c:var(--acc)"></i>
+            </div>
+            <div class="specfoot">hover a segment · derived from routing + staffing</div>
+            <div class="ttabs">
+              <button class="on" data-ttab="thread">Thread</button>
+              <button data-ttab="review">Review</button>
+              <button data-ttab="diff">Diff <span class="n">+412 −96</span></button>
+              <button class="dis" title="No local workspace yet — opens once an agent runs this task here">Terminal ↧</button>
+            </div>
+          </div>
+          <div class="tsbody">
+            <div class="tstab on" id="ttab-thread">
+              <div class="tsthread"><div class="tscol" id="threadList">
+                <div class="drawer">
+                  <button class="drawerhead"><span>▸</span><span class="t">Branch &amp; PR</span><span class="dmeta">2 rounds</span></button>
+                  <div class="drawerbody">
+                    <div class="artchip"><span class="akind" style="--c:var(--prog)">branch</span><b>nm/204-library-previews</b></div>
+                    <div class="artchip"><span class="akind" style="--c:var(--done)">pr</span><b>#204 · squash-merges on accept</b><span class="latesttag">CI green</span></div>
+                  </div>
+                </div>
+                <div class="drawer">
+                  <button class="drawerhead"><span>▸</span><span class="t">Artifacts</span><span class="dmeta">3 on this task · ★ promotes to the library</span></button>
+                  <div class="drawerbody">
+                    <div class="artchip"><span class="akind" style="--c:var(--design)">design</span><b>library-redesign-r3.html</b><span class="latesttag">latest</span><span class="libstar on">★</span></div>
+                    <div class="artchip"><span class="akind" style="--c:var(--plan)">plan</span><b>implementation-plan-v2.md</b><span class="libstar on">★</span></div>
+                    <div class="artchip"><span class="akind" style="--c:var(--verif)">evidence</span><b>library-previews-evidence.md</b><span class="libstar">☆</span></div>
+                  </div>
+                </div>
+                <div class="msg">
+                  <span class="pav" data-seed="iris"></span>
+                  <div class="mbody">
+                    <div class="mhead"><b>iris</b><span class="rolechip" style="--tone:var(--role-design)">designer</span><time>Tue</time></div>
+                    <div class="mtext">Round 3 — preview windows clipped and inert, tiles carry the type kicker. Studied from the repo's real tokens; both themes attached.</div>
+                  </div>
+                </div>
+                <div class="msg">
+                  <span class="pav" data-seed="atlas"></span>
+                  <div class="mbody">
+                    <div class="mhead"><b>atlas</b><span class="rolechip" style="--tone:var(--role-arch)">architect</span><time>Tue</time></div>
+                    <div class="mtext">Plan v2 approved inline. The Definition of Done encodes the PR flow and the 200ms preview budget.</div>
+                  </div>
+                </div>
+                <div class="msg">
+                  <span class="pav" data-seed="patch"></span>
+                  <div class="mbody">
+                    <div class="mhead"><b>patch</b><span class="rolechip" style="--tone:var(--role-dev)">developer</span><time>5:58 pm</time></div>
+                    <div class="mtext">Built to the contract, evidence in <b>.nm-evidence/design/</b>. Both themes verified, budgets measured. Submitting.</div>
+                  </div>
+                </div>
+                <div class="msg">
+                  <span class="pav" data-seed="gem"></span>
+                  <div class="mbody">
+                    <div class="mhead"><b>gem</b><span class="rolechip" style="--tone:var(--role-rev)">reviewer</span><time>6:07 pm</time></div>
+                    <div class="mtext">Diff read against the DoD, CI green on the pinned SHA. <b>Approving.</b></div>
+                  </div>
+                </div>
+              </div></div>
+              <div class="gatezone" id="gateZone"></div>
+              <div class="composer" style="padding:0 22px 2px">
+                <div class="cbox">
+                  <textarea placeholder="Reply in #204 thread — @ mention · / skill · ↵ send" style="height:40px"></textarea>
+                  <div class="crow" style="padding-top:2px">
+                    <button class="ctool">@</button><button class="ctool">📎</button>
+                    <button class="csend" style="width:34px;height:34px"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="tstab" id="ttab-review">
+              <div class="trvwrap"><div class="trvcol">
+                <div class="trvmeta">@patch · nm/204-library-previews · PR #204 · 2 rounds</div>
+                <div class="trvhead">Acceptance criteria</div>
+                <div class="treq"><span class="c">✓</span> Preview renders inline for md · html · diff · csv · images</div>
+                <div class="treq"><span class="c">✓</span> One reading column — feed, thread and Home share --col</div>
+                <div class="treq"><span class="c">✓</span> Both themes verified against round-3 mockups</div>
+                <div class="trvhead">Definition of Done <span class="edit">✎ Edit</span></div>
+                <div class="dodbox">Branch pushed · PR open with deploy notes · CI green on the submitted SHA · evidence artifacts attached · budgets measured (preview &lt; 200ms) · reviewer approves against this contract. Never commit to main.</div>
+                <div class="trvhead">Validation artifacts</div>
+                <div class="artchip"><span class="akind" style="--c:var(--verif)">evidence</span><b>library-previews-evidence.md</b></div>
+                <div class="artchip"><span class="akind" style="--c:var(--green)">png</span><b>both-themes-verify.png</b></div>
+                <div class="trvhead">Review loop</div>
+                <div class="auditrow"><span class="r">R1</span> gem · <span class="rq">changes requested</span> — tile hover shadow off-token <time>Wed</time></div>
+                <div class="auditrow"><span class="r">R2</span> gem · <span class="ok">approved ✓</span> <time>6:07 pm</time></div>
+              </div></div>
+            </div>
+            <div class="tstab" id="ttab-diff">
+              <div class="diffwrap">
+                <div class="diffbox">
+                  <div class="diffhead">apps/desktop/src/renderer/src/tokens.css <span class="add">+412</span> <span class="del">−96</span> <span style="margin-left:auto;color:var(--dim)">pinned to 8f3c2a1</span></div>
+                  <pre><span class="dl ctx">/* library tiles — the preview window */</span>
+<span class="dl del">- .libtile { border-radius: 8px; }</span>
+<span class="dl add">+ .tile { border-radius: var(--r-lg); box-shadow: var(--shadow-card); }</span>
+<span class="dl add">+ .tile:hover { transform: translateY(-2px); box-shadow: var(--shadow-lift); }</span>
+<span class="dl ctx">  .tprev { pointer-events: none; overflow: hidden; }</span>
+<span class="dl add">+ .tprev iframe { transform: scale(.25); transform-origin: 0 0; }</span></pre>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="flowrail" id="flowRail"></div>
+        </aside>
+
+      </main>
+      <footer class="statusband">
+        <span class="sbit"><i class="dot"></i> <span class="g">Live</span></span>
+        <span class="sbit" id="sbAgent">🦉 patch · building #208</span>
+        <span class="sbit mono">⑂ nm/204-library-previews</span>
+        <span class="grow"></span>
+        <span class="sbit">⌘K</span>
+        <span class="sbit">Editor</span>
+        <span class="sbit">Browser</span>
+        <span class="sbit">Terminal</span>
+        <span class="sbit">Processes <span class="badge">2</span></span>
+        <button class="sbit" id="themeBtn">◐ Theme</button>
+      </footer>
+    </div>
+  </div>
+</div>
+
+<!-- ════ OVERLAYS ════ -->
+<div class="scrim" id="scrim">
+  <div class="modal launch">
+    <h3 id="launchTitle">What should the room take on?</h3>
+    <!-- "Give me ideas": rex reads the ROOM (board · backlog · roster) live, then
+         his pills stagger in — canned 1.4s here; the real app runs the one-shot. -->
+    <div class="sugrow launchsug" id="ideasRow">
+      <button class="sug ideabtn" id="ideasBtn"><span class="pav" data-seed="rex"></span> Give me ideas</button>
+    </div>
+    <div class="cbox launchbox">
+      <div class="chint" id="launchHint"><span class="pav" data-seed="rex"></span><span><span class="chintat">@rex</span> triages it — user-facing work is designed first; <b>Backlog</b> parks it with no thread.</span></div>
+      <textarea id="launchTa" placeholder="Describe the work — the team takes it from there. ↵ send"></textarea>
+      <div class="crow">
+        <button class="cchip" id="launchChanChip"># product <span class="cc">⌄</span></button>
+        <span class="launchcads" id="cadRow" style="display:none">
+          <button class="cchip">⟳ Daily <span class="cc">⌄</span></button>
+          <input class="launchsel" type="time" value="09:00">
+        </span>
+        <span class="cdiv"></span>
+        <button class="ctool" title="Attach images or files">📎</button>
+        <button class="cchip" id="launchBacklog">＋ Backlog</button>
+        <span class="grow"></span>
+        <button class="csend" id="launchSend" title="Send · ↵"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="scrim" id="wsScrim">
+  <div class="modal wide">
+    <h3>Workspace settings</h3>
+    <div class="wstabs"><button>Members</button><button>Billing</button><button>Providers</button><button class="on">Brains</button><button>Policy</button><button>General</button></div>
+    <div class="msub" style="margin-bottom:12px"><b>Team brains</b> — a curated model per role, or build your own. Switching re-points every pack-managed agent at once; agents you've pinned by hand stay as they are.</div>
+    <div class="packgrid">
+      <button class="packcard active">
+        <div class="packcardtop"><span class="packname">Flagship</span><span class="packbadge">✓ Active</span></div>
+        <div class="packtag">The newest Mythos-class brain on every seat.</div>
+        <div class="packrolerow">◆ orchestrator <span class="parrow">→</span> fable-5 <span class="plat">curated</span></div>
+        <div class="packrolerow">◆ architect <span class="parrow">→</span> fable-5 <span class="plat">4.1s</span></div>
+        <div class="packrolerow">◆ developer <span class="parrow">→</span> fable-5 <span class="plat">3.2s</span></div>
+        <div class="packrolerow">◆ reviewer <span class="parrow">→</span> fable-5 <span class="plat">2.8s</span></div>
+        <div class="packsupport">support · designer → fable-5 · shipper → fable-5</div>
+      </button>
+      <button class="packcard">
+        <div class="packcardtop"><span class="packname">Fast</span><span class="packbadge apply">Apply</span></div>
+        <div class="packtag">Flagship leads, fast workers — no mini seats.</div>
+        <div class="packrolerow">◆ orchestrator <span class="parrow">→</span> fable-5 <span class="plat">curated</span></div>
+        <div class="packrolerow">◆ architect <span class="parrow">→</span> fable-5 <span class="plat">4.1s</span></div>
+        <div class="packrolerow">◇ developer <span class="parrow">→</span> sol-4.6 <span class="plat">1.1s</span></div>
+        <div class="packrolerow">◇ reviewer <span class="parrow">→</span> sol-4.6 <span class="plat">0.9s</span></div>
+        <div class="packsupport">support · designer → fable-5 · shipper → sol-4.6</div>
+      </button>
+      <button class="packcard">
+        <div class="packcardtop"><span class="packname">Codex Pack</span><span class="packbadge locked">Locked</span></div>
+        <div class="packtag">OpenAI seats end to end.</div>
+        <div class="packrolerow">◇ developer <span class="parrow">→</span> gpt-5.5-codex <span class="plat">—</span></div>
+        <div class="packconnect">Connect OpenAI →</div>
+      </button>
+      <button class="packcard">
+        <div class="packcardtop"><span class="packname">＋ New custom brain</span><span class="packbadge apply">Custom · yours</span></div>
+        <div class="packtag">Pick a model per role, name it, activate it — yours to tune.</div>
+      </button>
+    </div>
+    <div class="mrow"><span class="grow"></span><button class="b b-lg b-ghost wsClose">Close</button></div>
+  </div>
+</div>
+
+<div class="scrim" id="themeScrim">
+  <div class="modal">
+    <h3>Appearance</h3>
+    <div class="msub">Choose how NeuraMesh looks. Pick a single theme, or sync with your system to switch automatically between light and dark.</div>
+    <div class="themegrid" id="themeGrid">
+      <button class="themecard" data-th="system">
+        <span class="themeprev" style="background:linear-gradient(105deg,#f0e5d3 50%,#0d0d0d 50%)"><span class="tnav" style="background:#e6d8c2"></span><span class="tmain" style="background:linear-gradient(105deg,#fdfbf8 50%,#191919 50%)"></span></span>
+        <span class="themename">Sync with system</span><span class="themedesc">Follow your OS — light by day, dark by night.</span>
+      </button>
+      <button class="themecard on" data-th="cream">
+        <span class="themeprev" style="background:#f0e5d3"><span class="tnav" style="background:#e7d9c3"></span><span class="tmain" style="background:#fbf8f4"><span class="tl" style="width:70%;background:#e6dbca"></span><span class="tl" style="width:45%;background:#834a2b"></span><span class="tl" style="width:58%;background:#efe1cd"></span></span></span>
+        <span class="themename">Cream Oak</span><span class="themedesc">Warm cream frame, oak ink — the signature light.</span>
+      </button>
+      <button class="themecard" data-th="dark">
+        <span class="themeprev" style="background:#0d0d0d"><span class="tnav" style="background:#151515"></span><span class="tmain" style="background:#191919"><span class="tl" style="width:70%;background:#2b2b2b"></span><span class="tl" style="width:45%;background:#eaeaea"></span><span class="tl" style="width:58%;background:#242424"></span></span></span>
+        <span class="themename">Dark</span><span class="themedesc">Near-black graphite, crisp text — the NeuraMesh standard dark.</span>
+      </button>
+      <button class="themecard" data-th="soft-dark">
+        <span class="themeprev" style="background:#1d1d1d"><span class="tnav" style="background:#242424"></span><span class="tmain" style="background:#2a2a2a"><span class="tl" style="width:70%;background:#3b3b3b"></span><span class="tl" style="width:45%;background:#ececec"></span><span class="tl" style="width:58%;background:#333"></span></span></span>
+        <span class="themename">Soft Dark</span><span class="themedesc">A softer, lifted calm dark — gentler contrast, easy on the eyes.</span>
+      </button>
+      <button class="themecard" data-th="light">
+        <span class="themeprev" style="background:#e9e5db"><span class="tnav" style="background:#ded9cc"></span><span class="tmain" style="background:#fcfbf8"><span class="tl" style="width:70%;background:#e2ded4"></span><span class="tl" style="width:45%;background:#2f2a24"></span><span class="tl" style="width:58%;background:#ebe7dd"></span></span></span>
+        <span class="themename">Light</span><span class="themedesc">Near-white paper, crisp edges and ink — bright and clean.</span>
+      </button>
+    </div>
+    <div class="switchrow">
+      <span class="lbl"><b>Desktop notifications</b><small>Get a desktop alert when an agent needs you, or a task is ready to accept — even in the background.</small></span>
+      <span class="sw"><i></i></span>
+    </div>
+    <div class="mrow"><span class="grow"></span><button class="b b-lg b-ghost" id="themeClose">Done</button></div>
+  </div>
+</div>
+
+<div class="menu" id="acctMenu">
+  <div style="display:flex;align-items:center;gap:10px;padding:9px 10px 6px">
+    <span class="navuserav" style="width:32px;height:32px;font-size:13px">G</span>
+    <span style="min-width:0"><b style="font-size:13px">George</b><br><small style="color:var(--muted);font-size:10.5px">george@acme.dev</small></span>
+  </div>
+  <div class="acctplan"><span><b>Cloud · Synced</b><small>unlimited projects &amp; machines</small></span><span class="up">Upgrade</span></div>
+  <div class="mk">Workspace</div>
+  <button class="mitem"><span class="mi">🤖</span><span class="lbl">Agents &amp; machines</span></button>
+  <button class="mitem"><span class="mi">↻</span><span class="lbl">Retro</span></button>
+  <button class="mitem" id="openWs"><span class="mi">⚙</span><span class="lbl">Workspace settings</span></button>
+  <div class="mk">You</div>
+  <button class="mitem"><span class="mi">◉</span><span class="lbl">Your profile</span></button>
+  <button class="mitem"><span class="mi">▶</span><span class="lbl">Replay the walkthrough</span></button>
+  <button class="mitem"><span class="mi">⏻</span><span class="lbl">Sign out</span></button>
+  <div class="msep"></div>
+  <button class="mitem" id="openTheme"><span class="mi">◐</span><span class="lbl">Theme</span></button>
+  <div class="dockseg"><button class="on">Dock left</button><button>Top</button><button>Right</button></div>
+</div>
+
+<div class="menu" id="projMenu">
+  <div class="mk">Switch project</div>
+  <button class="mitem"><span class="mi" style="background:var(--accent);color:var(--accent-ink)">N</span><span class="lbl">neuramesh <span class="sub">default · 9 open</span></span><span class="chk">✓</span></button>
+  <button class="mitem"><span class="mi">A</span><span class="lbl">alonge-web <span class="sub">1 open</span></span></button>
+  <div class="msep"></div>
+  <button class="mitem" id="projAll"><span class="mi">▦</span><span class="lbl">All projects…</span></button>
+  <button class="mitem"><span class="mi">＋</span><span class="lbl">New project</span></button>
+</div>
+
+<div class="menu up" id="brainMenu">
+  <div class="mk">Brain · this message</div>
+  <button class="mitem"><span class="mi">🧠</span><span class="lbl">Flagship <span class="sub">fable-5 on every seat</span></span><span class="chk">✓</span></button>
+  <button class="mitem"><span class="mi">⚡</span><span class="lbl">Fast <span class="sub">sol-4.6 workers</span></span></button>
+  <button class="mitem"><span class="mi">🛠</span><span class="lbl">Manual… <span class="sub">pick a model for this run</span></span></button>
+</div>
+
+<div class="menu" id="histMenu">
+  <div class="mk">#product history</div>
+  <button class="mitem"><span class="mi">🧵</span><span class="lbl">#204 · Library previews <span class="sub">gem approved · 8m</span></span><span class="cnt2">3</span></button>
+  <button class="mitem"><span class="mi">🧵</span><span class="lbl">#208 · Cabinet revamp <span class="sub">patch is building · 24m</span></span></button>
+  <button class="mitem"><span class="mi">🧵</span><span class="lbl">pricing page copy <span class="sub">rex replied · 1h</span></span></button>
+</div>
+
+<div class="toast" id="toast"><span class="tdot"></span><span id="toastMsg">Done.</span></div>
+
+<script type="module">
+/* ── DiceBear Thumbs (the real agent avatar system) ── */
+const $ = (s, r=document) => r.querySelector(s);
+const $$ = (s, r=document) => [...r.querySelectorAll(s)];
+try {
+  const [{ createAvatar }, thumbs] = await Promise.all([
+    import('https://cdn.jsdelivr.net/npm/@dicebear/core@9/+esm'),
+    import('https://cdn.jsdelivr.net/npm/@dicebear/thumbs@9/+esm'),
+  ]);
+  const cache = new Map();
+  const uri = seed => { if (!cache.has(seed)) cache.set(seed, createAvatar(thumbs, { seed }).toDataUri()); return cache.get(seed); };
+  const paint = (root=document) => $$('.pav[data-seed]', root).forEach(el => { if (el.firstChild) return; const img = new Image(); img.src = uri(el.dataset.seed.toLowerCase()); el.appendChild(img); });
+  paint();
+  window.paintAvatars = paint; // late-born avatars (the launcher's ideas beat) repaint on demand
+} catch {
+  const paint = (root=document) => $$('.pav[data-seed]', root).forEach(el => { if (el.firstChild || el.classList.contains('letter')) return; el.classList.add('letter'); el.textContent = el.dataset.seed[0].toUpperCase(); el.style.fontSize = '11px'; });
+  paint();
+  window.paintAvatars = paint;
+}
+window.__nm = { $, $$ };
+</script>
+<script>
+const { $, $$ } = window.__nm ?? { $: (s,r=document)=>r.querySelector(s), $$: (s,r=document)=>[...r.querySelectorAll(s)] };
+
+function stagger(container) {
+  if (!container) return;
+  container.classList.remove('stagger');
+  void container.offsetWidth;
+  $$(':scope > *', container).forEach((el, i) => el.style.setProperty('--i', Math.min(i, 9)));
+  container.classList.add('stagger');
+}
+function exitThen(el, kind, done) {
+  el.setAttribute('data-exit', kind);
+  let fin = false;
+  const finish = () => { if (fin) return; fin = true; el.removeAttribute('data-exit'); el.removeEventListener('animationend', h); done(); };
+  function h(e) { if (e.target !== el || !e.animationName.startsWith('a-exit')) return; finish(); }
+  el.addEventListener('animationend', h);
+  setTimeout(finish, 220); /* animations may be disabled (reduced-motion / hidden pane) — never strand an exit */
+}
+let toastT;
+function toast(msg) {
+  const t = $('#toast'); $('#toastMsg').textContent = msg;
+  t.removeAttribute('data-exit'); t.classList.remove('on'); void t.offsetWidth; t.classList.add('on');
+  clearTimeout(toastT);
+  toastT = setTimeout(() => exitThen(t, 'rise', () => t.classList.remove('on')), 2400);
+}
+
+/* QA mode — entrances settled for hidden-pane screenshots */
+if (location.search.includes('calm')) document.documentElement.dataset.calm = '1';
+
+/* greeting + eyebrow */
+const now = new Date(), hh = now.getHours();
+$('#eyebrow').textContent = now.toLocaleDateString('en-US', { weekday: 'long' }) + ' · ' + now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+$('#greet').innerHTML = (hh < 12 ? 'Good morning' : hh < 18 ? 'Good afternoon' : 'Good evening') + ", George. <em>Your org didn't sleep.</em>";
+
+/* ── board data (real 15 columns) ── */
+const BOARD = [
+  ['backlog','backlog','--backlog', [{ n:207, t:'Empty-state copy pass for the library', room:'product' }, { n:205, t:'Onboarding names the first room', room:'product' }], 'idea'],
+  ['todo','todo','--todo', [{ n:206, t:'Recall panel keyboard flow', room:'engineering', legs:[['dash']] }]],
+  ['designing','designing','--design', [{ n:209, t:'Board density pass — calm columns', room:'design', a:'iris', legs:[['live','--design']] }]],
+  ['design_review','design review','--designrev', []],
+  ['planning','planning','--plan', []],
+  ['plan_review','plan review','--planrev', [{ n:210, t:'Recall context packets v2', room:'engineering', a:'atlas', legs:[['f','--design'],['live','--planrev']] }]],
+  ['in_progress','in progress','--prog', [{ n:208, t:'Cabinet-grade UI revamp — cream oak v2', room:'product', a:'patch', legs:[['f','--design'],['f','--plan'],['live','--prog']], sub:[1,3], branch:'nm/208-revamp' }]],
+  ['blocked','blocked','--blocked', [{ n:199, t:'Remote agent handshake', room:'engineering', a:'scout', legs:[['f','--plan'],['f','--blocked']] }]],
+  ['in_review','in review','--review', [{ n:204, t:'Library previews, one reading column', room:'product', a:'gem', legs:[['f','--design'],['f','--plan'],['f','--prog'],['live','--review']], branch:'nm/204-library-previews', opens: true }]],
+  ['done','done','--done', []],
+  ['shipping','shipping','--ship', []],
+  ['ship_review','ship review','--shiprev', [{ n:203, t:'Home & Feed — the feed is the room', room:'engineering', a:'bosun', legs:[['f','--design'],['f','--plan'],['f','--prog'],['f','--review'],['live','--shiprev']] }]],
+  ['releasing','releasing','--rel', []],
+  ['verifying','verifying','--verif', []],
+  ['accepted','accepted','--acc', [{ n:202, t:'Composer explains itself', room:'product', a:'gem', legs:[['f','--design'],['f','--plan'],['f','--prog'],['f','--review'],['f','--acc']] }]],
+];
+const bhost = $('#boardCols');
+BOARD.forEach(([key, label, c, cards, idea]) => {
+  const col = document.createElement('div');
+  col.className = 'bcol'; col.style.setProperty('--c', `var(${c})`);
+  let inner = `<div class="colhead"><span class="chip" style="--c:var(${c})">${label}</span><span class="count">${cards.length}</span></div>`;
+  if (idea) inner += `<div class="ideaadd"><input placeholder="Park an idea, then ↵"><div style="display:flex;gap:6px"><button class="b b-sm b-soft">+ Add</button></div></div>`;
+  inner += cards.map(t => `
+    <button class="tcard ${t.opens ? 'opens-task' : ''}">
+      <div class="tid">#${t.n} ${t.n === 204 ? '<span class="unread"></span>' : ''}<span class="kindchip" style="border:none;padding:0 2px">${key==='backlog'?'idea':'feature'}</span><span class="tbranch">#${t.room}</span></div>
+      <div class="tt">${t.t}</div>
+      ${t.legs ? `<div class="spectrum">${[0,1,2,3,4,5].map(i => { const l = t.legs[i]; return l ? `<i class="${l[0]}" style="--c:var(${l[1]||c})"></i>` : '<i></i>'; }).join('')}</div>` : ''}
+      ${t.sub ? `<div class="subfold">▾ subtasks <span class="subbar"><i style="--w:${t.sub[0]/t.sub[1]*100}%"></i></span> ${t.sub[0]}/${t.sub[1]}</div>` : ''}
+      ${t.a ? `<div class="tfoot"><span class="pav" data-seed="${t.a}" style="width:15px;height:15px;border-radius:4px"></span><span class="tassignee">${t.a}</span><span class="meta">${t.branch ?? ''}</span></div>` : ''}
+    </button>`).join('');
+  if (!cards.length && !idea) inner += `<div class="colempty">—</div>`;
+  col.innerHTML = inner;
+  bhost.appendChild(col);
+});
+
+/* ── router ── */
+const ROOM_SCREEN = { product: 'product', engineering: 'product', design: 'product', marketing: 'marketing' };
+const LISTS = { home: '#homeList', product: '#feedList', marketing: '#mkFeed', mkcal: '#mkcalGrid', mklib: '#mklibGrid', board: '#boardCols', library: '#libList', projects: '#projGrid' };
+const CRUMB = { home: 'Home', board: 'Board', library: 'Library', projects: 'Projects', product: '#product', marketing: '#marketing-hq', mkcal: '#marketing-hq › Calendar', mklib: '#marketing-hq › Library' };
+let curScreen = 'home', curTabset = 'home';
+let navToken = 0;
+function showScreen(screen, tabset) {
+  const old = $('.view.on'), next = $('#screen-' + screen);
+  if (!next || old === next) return;
+  closeTask();
+  const token = ++navToken;
+  const commit = () => {
+    if (token !== navToken) return;
+    $$('[data-exit]').forEach(x => x.removeAttribute('data-exit'));
+    $$('.view.on').forEach(v => v.classList.remove('on'));
+    next.classList.add('on');
+    stagger($(LISTS[screen]));
+  };
+  if (old) {
+    exitThen(old.firstElementChild || old, 'fade', commit);
+    setTimeout(() => { if (token === navToken && !next.classList.contains('on')) commit(); }, 280);
+  } else commit();
+  curScreen = screen; curTabset = tabset || screen;
+  $$('.nav .chan').forEach(c => c.classList.remove('on'));
+  ($(`.navv[data-screen="${curTabset}"]`) || $(`.roomv[data-room="${curTabset}"]`))?.classList.add('on');
+  const ROOM_LABEL = { product: '#product', engineering: '#engineering', design: '#design', marketing: '#marketing-hq' };
+  $('#crumbHere').textContent = (ROOM_SCREEN[curTabset] === screen && ROOM_LABEL[curTabset]) || CRUMB[screen] || screen;
+}
+$$('.navv').forEach(b => b.addEventListener('click', () => showScreen(b.dataset.screen)));
+$$('.roomv').forEach(b => b.addEventListener('click', () => {
+  const r = b.dataset.room;
+  showScreen(ROOM_SCREEN[r], r);
+}));
+$$('.roomlens button[data-go]').forEach(b => b.addEventListener('click', () => showScreen(b.dataset.go, 'marketing')));
+
+/* ── task panel + flow player (real states) ── */
+const tsheet = $('#tsheet');
+const FLOW = [
+  { key:'backlog', lbl:'backlog', c:'--backlog', legs:0, status:'backlog', now:'parked idea',
+    gate:{ c:'--backlog', k:'Parked idea', h:'Anyone can park it — only you or rex promote it.', p:'Context and images collect in this thread while it waits.', btns:[['↑ Promote','b-primary'],['Edit details','b-ghost']] } },
+  { key:'todo', lbl:'todo', c:'--todo', legs:0, status:'todo', now:'unassigned',
+    gate:{ c:'--todo', k:'Route · rex', h:'User-facing — design comes first.', p:'Iris owns the design round and brings the result back here for approval.', btns:[['🎨 Request design','b-primary'],['Skip to plan','b-ghost']] } },
+  { key:'designing', lbl:'designing', c:'--design', legs:1, live:true, status:'designing', now:'Design · iris', ticker:['--design','Designing','1/2','iris · drafting round 1 mockups'] },
+  { key:'design_review', lbl:'design review', c:'--designrev', legs:1, status:'design review', now:'Design · you',
+    gate:{ c:'--designrev', k:'Gate · design review', human:true, h:'Round 1 renders in the thread — your approval locks the visual contract.', p:'Approved rounds auto-promote to the room library and bind the plan, the build and the review.', btns:[['🎨 Review design','b-primary'],['✓ Approve design','b-green'],['Request changes','b-ghost']] } },
+  { key:'planning', lbl:'planning', c:'--plan', legs:2, live:true, status:'planning', now:'Plan · atlas', ticker:['--plan','Planning','2/3','atlas · deriving the plan from the contract'] },
+  { key:'plan_review', lbl:'plan review', c:'--planrev', legs:2, status:'plan review', now:'Plan · you',
+    gate:{ c:'--planrev', k:'Gate · plan review', h:'implementation-plan-v2.md — comment inline, approve inline.', p:'The Definition of Done encodes the PR flow, never “commit to main”.', btns:[['✓ Approve','b-primary'],['Comment','b-ghost']] } },
+  { key:'in_progress', lbl:'in progress', c:'--prog', legs:3, live:true, status:'in progress', now:'Build · patch', ticker:['--prog','Building','3/5','patch · running desktop tests'] },
+  { key:'in_review', lbl:'in review', c:'--review', legs:4, live:true, status:'in review', now:'Review · gem',
+    gate:{ c:'--review', k:'Gate · reviewer', h:'gem reads the diff against the DoD, pinned to the submitted SHA.', p:'PR #204 · CI green — failing or pending checks bounce it back.', btns:[['Approve','b-primary'],['Request changes','b-ghost'],['Review Artifacts ↗','b-ghost']] } },
+  { key:'done', lbl:'done', c:'--done', legs:4, status:'done', now:'Accept · you',
+    gate:{ c:'--acc', k:'Gate · your accept', human:true, h:'gem approved — the accept is yours.', p:'Ship gate is ON for this project, so bosun takes the release from here.', btns:[['✓ Accept & merge PR #204','b-green'],['Request changes','b-ghost'],['Review Artifacts ↗','b-ghost']] } },
+  { key:'shipping', lbl:'shipping', c:'--ship', legs:5, live:true, status:'shipping', now:'Ship · bosun', ticker:['--ship','Shipping','1/3','bosun · studying the change + deploy notes'] },
+  { key:'ship_review', lbl:'ship review', c:'--shiprev', legs:5, status:'ship review', now:'Ship · you',
+    gate:{ c:'--shiprev', k:'Release plan · v1', human:true, risk:'low', h:'ship-plan-v1.md — 3 items · 1 needs you.', ship:[['Deploy notes verified','bosun',true],['Sync-rule step green','bosun',true],['Smoke-check the packaged build','you',false]],
+      note:'⌀ bosun merges the moment every box clears — nothing ships early', btns:[['✓ Approve release plan','b-primary'],['Request changes','b-ghost'],['Open plan ↗','b-ghost'],['Skip gate — accept','b-ghost']] } },
+  { key:'releasing', lbl:'releasing', c:'--rel', legs:5, live:true, status:'releasing', now:'Ship · bosun', ticker:['--rel','Releasing','2/3','bosun · squash-merging PR #204 to main'] },
+  { key:'verifying', lbl:'verifying', c:'--verif', legs:5, live:true, status:'verifying', now:'Verify · bosun',
+    gate:{ c:'--verif', k:'Verifying the release', h:'Post-merge CI on the merge commit + triggered release workflows.', p:'confirm_release earns accepted only after the release proves it landed.', btns:[['Open plan ↗','b-ghost'],['Request changes','b-ghost'],['Accept anyway','b-ghost']] } },
+  { key:'accepted', lbl:'accepted', c:'--acc', legs:6, status:'accepted', now:'Accepted',
+    gate:{ c:'--acc', k:'Released · v0.57.0', h:'Squash-merged to main. The release landed and proved itself.', p:'Lesson recorded — corrected mistakes don’t repeat. Thread archives itself.', btns:[['Open PR #204 ↗','b-soft'],['Close','b-ghost']] } },
+];
+let flowIdx = 7, playT = null;
+function renderFlow() {
+  const f = FLOW[flowIdx];
+  const st = $('#tsStatus'); st.style.setProperty('--c', `var(${f.c})`); st.textContent = f.status;
+  $('#specNow').textContent = f.now;
+  $$('#tsSpec i').forEach((leg, i) => {
+    leg.classList.toggle('f', i < f.legs);
+    leg.classList.toggle('live', !!f.live && i === Math.max(0, f.legs - 1));
+  });
+  $('#tokPR').textContent = flowIdx >= 7 ? 'PR #204' : 'branch';
+  $('#tokReqs').textContent = flowIdx >= 1 ? '✓ reqs' : '○ reqs';
+  const gz = $('#gateZone');
+  const build = () => {
+    gz.innerHTML = '';
+    if (f.gate) {
+      const g = document.createElement('div');
+      g.className = 'gate a-pop';
+      g.style.setProperty('--c', `var(${f.gate.c})`);
+      let inner = `<div class="gk">${f.gate.k}${f.gate.risk ? ` <span class="riskchip risk-low">risk · low</span>` : ''}${f.gate.human ? '<span class="spacer"></span><span class="humanonly">HUMAN ONLY</span>' : ''}</div><h4>${f.gate.h}</h4>`;
+      if (f.gate.p) inner += `<p>${f.gate.p}</p>`;
+      if (f.gate.ship) inner += `<div class="shipitems">` + f.gate.ship.map(([t, o, d]) => `<div class="shiprow ${d ? 'done' : ''}"><span class="cb">✓</span>${t}<span class="ownchip">${o}</span></div>`).join('') + `</div><div class="shipnote">${f.gate.note}</div>`;
+      inner += `<div class="frow">` + f.gate.btns.map(([t, k]) => `<button class="b b-md ${k} gadv">${t}</button>`).join('') + `</div>`;
+      g.innerHTML = inner;
+      gz.appendChild(g);
+    } else if (f.ticker) {
+      const [c, phase, cnt, line] = f.ticker;
+      const t = document.createElement('button');
+      t.className = 'ticker a-rise';
+      t.innerHTML = `<span class="tring" style="border-color:color-mix(in srgb,var(${c}) 30%,transparent);border-top-color:var(${c})"></span><b>${phase}</b><span class="beatcnt">(${cnt})</span><span>· ${line}</span><span class="beathint">click for steps</span>`;
+      gz.appendChild(t);
+    }
+  };
+  const cur = gz.firstElementChild;
+  if (cur) exitThen(cur, 'pop', build); else build();
+  const rail = $('#flowRail');
+  rail.innerHTML = '';
+  FLOW.forEach((s, i) => {
+    const b = document.createElement('button');
+    b.className = 'fstep' + (i < flowIdx ? ' done' : i === flowIdx ? ' now' : '');
+    b.style.setProperty('--c', `var(${s.c})`);
+    b.innerHTML = `<span class="fdot"></span>${s.lbl}`;
+    b.addEventListener('click', () => { stopPlay(); flowIdx = i; renderFlow(); });
+    rail.appendChild(b);
+    if (i < FLOW.length - 1) { const a = document.createElement('span'); a.className = 'farrow'; a.textContent = '›'; rail.appendChild(a); }
+  });
+  $('.fstep.now', rail)?.scrollIntoView({ inline: 'center', block: 'nearest' });
+}
+const FLOW_TOASTS = { todo: 'Promoted — rex is routing it.', design_review: 'Round 1 is in — your approval locks the contract.', plan_review: 'Plan v2 is up for inline review.', in_review: 'PR #204 opened · CI green.', done: 'gem approved against the DoD.', ship_review: 'bosun proposed release plan v1.', releasing: 'Every box cleared — squash-merging.', accepted: '✓ Released and verified · v0.57.0' };
+function advanceFlow() {
+  if (flowIdx >= FLOW.length - 1) return stopPlay();
+  flowIdx++;
+  renderFlow();
+  const k = FLOW[flowIdx].key;
+  if (FLOW_TOASTS[k]) toast(FLOW_TOASTS[k]);
+}
+function stopPlay() { clearInterval(playT); playT = null; $('#playLoop').textContent = '▶ Play the loop'; }
+$('#playLoop').addEventListener('click', () => {
+  if (playT) return stopPlay();
+  flowIdx = 0; renderFlow();
+  $('#playLoop').textContent = '◼ Stop';
+  playT = setInterval(advanceFlow, 1700);
+});
+document.addEventListener('click', e => {
+  if (e.target.closest('.gadv') && !playT) advanceFlow();
+  if (e.target.closest('.opens-task')) openTask();
+  const dh = e.target.closest('.drawerhead');
+  if (dh) { const d = dh.parentElement; const was = d.classList.contains('open'); $$('.drawer.open').forEach(x => x.classList.remove('open')); if (!was) d.classList.add('open'); }
+});
+function openTask() { flowIdx = 7; tsheet.classList.add('on'); stagger($('#threadList')); renderFlow(); }
+function closeTask() { stopPlay(); tsheet.classList.remove('on'); }
+$('#tsBack').addEventListener('click', closeTask);
+$$('.ttabs button[data-ttab]').forEach(b => b.addEventListener('click', () => {
+  $$('.ttabs button').forEach(x => x.classList.toggle('on', x === b));
+  $$('.tstab').forEach(t => t.classList.toggle('on', t.id === 'ttab-' + b.dataset.ttab));
+  const inner = $('#ttab-' + b.dataset.ttab).firstElementChild;
+  if (inner) { inner.classList.remove('a-rise'); void inner.offsetWidth; inner.classList.add('a-rise'); }
+}));
+
+/* ── overlays ── */
+function wireScrim(scrim, onClose) {
+  scrim.addEventListener('click', e => { if (e.target === scrim) closeScrim(scrim, onClose); });
+}
+function closeScrim(scrim, extra) {
+  exitThen(scrim, 'fade', () => { scrim.classList.remove('on'); extra?.(); });
+}
+const scrim = $('#scrim'), wsScrim = $('#wsScrim'), themeScrim = $('#themeScrim');
+let launchMode = 'task', ideasT = null;
+const IDEA_SETS = {
+  task: ['Promote "offline diff cache" off the backlog — it blocks review', 'Audit the 3 in-review tasks — two have sat 4 days', 'Summarize what moved in #product this week'],
+  routine: ['Morning: post overnight board movement and anything stuck', 'Friday 16:00: recap what shipped and what stalled', 'Weekly: sweep the backlog for stale parked items'],
+};
+const resetIdeas = () => {
+  clearTimeout(ideasT);
+  $('#ideasRow').innerHTML = '<button class="sug ideabtn" id="ideasBtn"><span class="pav" data-seed="rex"></span> Give me ideas</button>';
+  window.paintAvatars?.($('#ideasRow'));
+};
+// the launcher's signature beat: rex reads the room (typing dots), then his pills rise in
+document.addEventListener('click', (e) => {
+  if (e.target.closest('#ideasBtn')) {
+    $('#ideasRow').innerHTML = '<span class="ideathinking"><span class="pav" data-seed="rex"></span><span class="tdots"><i></i><i></i><i></i></span><span class="ideatxt">rex is reading the room…</span></span>';
+    window.paintAvatars?.($('#ideasRow'));
+    ideasT = setTimeout(() => {
+      $('#ideasRow').innerHTML = IDEA_SETS[launchMode].map((s, i) => `<button class="sug ideain" style="animation-delay:${i * 60}ms" data-idea>${s}</button>`).join('');
+    }, 1400);
+  }
+  const pill = e.target.closest('[data-idea]');
+  if (pill) { $('#launchTa').value = pill.textContent; $('#launchTa').focus(); }
+});
+const openLauncher = (routine) => {
+  launchMode = routine ? 'routine' : 'task';
+  $('#launchTitle').textContent = routine ? 'What should run on a schedule?' : 'What should the room take on?';
+  $('#launchHint').innerHTML = routine
+    ? '<span class="pav" data-seed="rex"></span><span><span class="chintat">@rex</span> addresses each run — the prompt fires into the room at its slot.</span>'
+    : '<span class="pav" data-seed="rex"></span><span><span class="chintat">@rex</span> triages it — user-facing work is designed first; <b>Backlog</b> parks it with no thread.</span>';
+  $('#launchTa').placeholder = routine
+    ? 'The prompt this routine runs — e.g. "Summarize yesterday\'s board movement and flag anything stuck."'
+    : 'Describe the work — the team takes it from there. ↵ send';
+  $('#cadRow').style.display = routine ? 'inline-flex' : 'none';
+  $('#launchBacklog').style.display = routine ? 'none' : '';
+  $('#launchTa').value = '';
+  resetIdeas();
+  window.paintAvatars?.($('#launchHint'));
+  scrim.classList.add('on');
+};
+$('#newTaskBtn').addEventListener('click', () => openLauncher(false));
+bindMenu($('#newTaskCaret'), $('#ftMenu'));
+$$('#ftMenu .mitem').forEach((m) => m.addEventListener('click', () => { hideMenu($('#ftMenu')); setTimeout(() => openLauncher(m.dataset.mode === 'routine'), 150); }));
+$('#launchBacklog').addEventListener('click', () => closeScrim(scrim, () => toast('Parked on the backlog — no thread, promote it when ready.')));
+$('#launchSend').addEventListener('click', () => closeScrim(scrim, () => toast(launchMode === 'routine' ? 'Routine armed — first run tomorrow 09:00.' : 'Sent to #product — the room takes it from here.')));
+$('#modalCancel').addEventListener('click', () => closeScrim(scrim));
+$('#modalCreate').addEventListener('click', () => closeScrim(scrim, () => toast($('#launchKind').textContent.includes('routine') ? 'Routine armed — first run tomorrow 09:00.' : 'Sent — the room takes it from here.')));
+wireScrim(scrim); wireScrim(wsScrim); wireScrim(themeScrim);
+$('.wsClose').addEventListener('click', () => closeScrim(wsScrim));
+$('#themeClose').addEventListener('click', () => closeScrim(themeScrim));
+
+function bindMenu(btn, menu, opts = {}) {
+  btn.addEventListener('click', e => {
+    e.stopPropagation();
+    if (menu.classList.contains('on')) return hideMenu(menu);
+    $$('.menu.on').forEach(hideMenu);
+    const r = btn.getBoundingClientRect();
+    menu.style.left = Math.min(opts.right ? r.right - 250 : r.left, innerWidth - 265) + 'px';
+    if (opts.up) { menu.style.bottom = (innerHeight - r.top + 8) + 'px'; menu.style.top = ''; }
+    else { menu.style.top = (r.bottom + 8) + 'px'; menu.style.bottom = ''; }
+    menu.classList.add('on');
+  });
+}
+function hideMenu(menu) { exitThen(menu, 'fade', () => menu.classList.remove('on')); }
+bindMenu($('#projBtn'), $('#projMenu'));
+bindMenu($('#acctBtn'), $('#acctMenu'), { up: true });
+bindMenu($('#histBtn'), $('#histMenu'), { right: true });
+$$('.brainchip').forEach(b => bindMenu(b, $('#brainMenu'), { up: true }));
+document.addEventListener('click', () => $$('.menu.on').forEach(hideMenu));
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  for (const s of [scrim, wsScrim, themeScrim]) if (s.classList.contains('on')) return closeScrim(s);
+  if (tsheet.classList.contains('on')) return closeTask();
+  $$('.menu.on').forEach(hideMenu);
+});
+$('#projAll').addEventListener('click', () => setTimeout(() => showScreen('projects'), 150));
+$('#crumbProj').addEventListener('click', () => showScreen('projects'));
+$('#openWs').addEventListener('click', () => setTimeout(() => wsScrim.classList.add('on'), 150));
+$('#openTheme').addEventListener('click', () => setTimeout(() => themeScrim.classList.add('on'), 150));
+
+/* theme */
+function setTheme(th) {
+  if (th === 'system') th = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'cream';
+  document.body.dataset.theme = th;
+  document.documentElement.dataset.theme = th;
+  $$('#themeGrid .themecard').forEach(c => c.classList.toggle('on', c.dataset.th === th));
+}
+$$('#themeGrid .themecard').forEach(c => c.addEventListener('click', () => { setTheme(c.dataset.th); }));
+const THEME_CYCLE = ['cream', 'dark', 'light', 'soft-dark'];
+$('#themeBtn').addEventListener('click', e => {
+  e.stopPropagation();
+  const cur = document.body.dataset.theme;
+  const next = THEME_CYCLE[(THEME_CYCLE.indexOf(cur) + 1) % THEME_CYCLE.length];
+  setTheme(next);
+  toast({ cream: 'Cream Oak — the signature light.', dark: 'Dark — the standard graphite.', light: 'Light — near-white paper.', 'soft-dark': 'Soft Dark — lifted and calm.' }[next]);
+});
+
+/* decisions + suggestions */
+document.addEventListener('click', e => {
+  const q = e.target.closest('.qopt, .mcdopt');
+  if (!q || !q.dataset.answer) return;
+  const card = q.closest('.fcard, .mcqcard');
+  toast('Answered: ' + q.dataset.answer + ' — rex relays it.');
+  exitThen(card, 'rise', () => {
+    card.style.display = 'none';
+    const b = $('#needsBadge'); if (b) b.textContent = Math.max(0, +b.textContent - 1) || '';
+  });
+});
+$$('.sug').forEach(b => b.addEventListener('click', () => { const ta = $('#roomTa'); ta.value = b.dataset.fill; ta.focus(); }));
+
+/* boot */
+stagger($('#homeList'));
+</script>
+</body>
+</html>

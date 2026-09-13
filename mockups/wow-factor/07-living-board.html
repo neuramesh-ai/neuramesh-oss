@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NeuraMesh · Living Board</title>
+<link rel="stylesheet" href="nm.css">
+<style>
+  .boardtop{display:flex;align-items:center;gap:14px;padding:12px 20px;border-bottom:1px solid var(--border)}
+  .presence{display:flex;gap:14px}
+  .pmember{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted)}
+  .pmember b{color:var(--text);font-weight:600}
+  .thrubadge{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted)}
+  .thrubadge b{color:var(--build);font-weight:800;font-size:15px}
+  .playbtn{display:inline-flex;align-items:center;gap:6px;font-size:12px;background:var(--panel2);border:1px solid var(--border2);
+    border-radius:9px;padding:5px 11px;cursor:pointer;color:var(--body)}
+  .playbtn:hover{border-color:color-mix(in srgb,var(--accent) 45%,var(--border2))}
+
+  .board{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;flex:1;overflow:hidden;padding:16px 18px 8px}
+  @media(max-width:1100px){.board{grid-template-columns:repeat(3,1fr)}}
+  .bcol{background:var(--bg2);border:1px solid var(--border);border-radius:13px;display:flex;flex-direction:column;overflow:hidden;min-height:0}
+  .bcol-h{padding:11px 12px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border)}
+  .bcol-h .cnt{margin-left:auto;font-size:10.5px;color:var(--dim);background:var(--panel2);border-radius:99px;padding:1px 8px}
+  .bcol-body{flex:1;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:9px}
+  .bcard{background:var(--panel);border:1px solid var(--border);border-radius:11px;padding:11px;
+    transition:opacity .22s var(--ease),transform .22s var(--ease),border-color .22s;will-change:transform,opacity}
+  .bcard.justmoved{border-color:color-mix(in srgb,var(--accent) 45%,var(--border));box-shadow:0 0 0 3px var(--accent-glow)}
+  .bc-top{display:flex;align-items:center;gap:7px;margin-bottom:7px}
+  .bc-id{font-family:'Geist Mono',monospace;font-size:10px;font-weight:700;color:var(--dim)}
+  .bc-title{font-size:12.5px;color:var(--text);font-weight:500;line-height:1.35;margin-bottom:9px}
+  .bc-foot{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--muted)}
+  .bc-foot .branch{font-family:'Geist Mono',monospace;font-size:9.5px;color:var(--dim);margin-left:auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .bc-stream{display:inline-flex;gap:6px;align-items:center;font-size:10.5px;color:var(--accent);margin-top:7px}
+
+  .ticker{border-top:1px solid var(--border);padding:9px 20px;display:flex;align-items:center;gap:10px;overflow:hidden;height:38px}
+  .ticker .lbl{font-size:9.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--dim);flex:none}
+  .ticker .events{display:flex;gap:18px;font-size:12px;color:var(--muted);white-space:nowrap}
+  .ticker .events b{color:var(--text);font-weight:600}
+  .ev-new{animation:nm-rise .4s var(--ease)}
+</style>
+</head>
+<body>
+<div class="confetti" id="confetti"></div>
+
+<div class="app">
+  <aside class="side">
+    <div class="ws"><div class="wsav">AR</div><div class="wsinfo"><b>default</b><span>Acme Robotics</span></div><span class="caret">▾</span></div>
+    <div class="navlist">
+      <div class="navitem"><span class="ni">⌂</span> Home</div>
+      <div class="navitem on"><span class="ni">▦</span> Tasks <span class="nb" id="taskTotal">0</span></div>
+      <div class="navitem"><span class="ni">⛁</span> Artifacts</div>
+      <div class="navitem"><span class="ni">◉</span> Agents</div>
+      <div class="navitem"><span class="ni">☰</span> Activity</div>
+    </div>
+    <div class="sidehead">Channels</div>
+    <div class="sideitem on"><span class="hash">#</span><span class="lbl">dev</span></div>
+    <div class="sideitem"><span class="hash">#</span><span class="lbl">research</span></div>
+    <div class="sidehead">Agents</div>
+    <div class="sideitem"><div class="av sm orch">🦊</div><span class="lbl">rex</span><span class="dot busy"></span></div>
+    <div class="sideitem"><div class="av sm arch">🦅</div><span class="lbl">atlas</span><span class="dot" id="p-atlas"></span></div>
+    <div class="sideitem"><div class="av sm dev">🦉</div><span class="lbl">patch</span><span class="dot" id="p-patch"></span></div>
+    <div class="sideitem"><div class="av sm rev">🐝</div><span class="lbl">scout</span><span class="dot" id="p-scout"></span></div>
+    <div class="selfcard"><div class="av sm you">🧑‍💻</div><div class="nm-self"><b>You</b><span>online</span></div>
+      <button class="themetog" id="tt" title="Toggle theme" style="margin-left:auto;width:30px;height:30px">◐</button></div>
+  </aside>
+
+  <main class="main">
+    <div class="boardtop">
+      <span class="ct" style="font-size:15px;font-weight:700;color:var(--text)">🌊 Board</span>
+      <span class="badge accent" style="gap:6px"><span class="dot busy"></span> live</span>
+      <div class="thrubadge"><span>shipped today</span> <b id="thru">12</b>
+        <button class="playbtn" id="play" style="margin-left:10px">⏸ pause</button></div>
+    </div>
+
+    <div class="board" id="board">
+      <div class="bcol" data-col="todo"><div class="bcol-h"><span class="chip s-todo">To do</span><span class="cnt">0</span></div><div class="bcol-body"></div></div>
+      <div class="bcol" data-col="planning"><div class="bcol-h"><span class="chip s-planning">Planning</span><span class="cnt">0</span></div><div class="bcol-body"></div></div>
+      <div class="bcol" data-col="building"><div class="bcol-h"><span class="chip s-in_progress">Building</span><span class="cnt">0</span></div><div class="bcol-body"></div></div>
+      <div class="bcol" data-col="review"><div class="bcol-h"><span class="chip s-in_review">Review</span><span class="cnt">0</span></div><div class="bcol-body"></div></div>
+      <div class="bcol" data-col="done"><div class="bcol-h"><span class="chip s-accepted">Shipped</span><span class="cnt">0</span></div><div class="bcol-body"></div></div>
+    </div>
+
+    <div class="ticker">
+      <span class="lbl">Activity</span>
+      <div class="events" id="events"></div>
+    </div>
+  </main>
+</div>
+
+<script>
+  const tt=document.getElementById('tt');
+  const apply=t=>{document.documentElement.dataset.theme=t;tt.textContent=t==='cream'?'☀':'◐';try{sessionStorage.nmTheme=t}catch(e){}};
+  apply(sessionStorage.nmTheme||'dark');
+  tt.onclick=()=>apply(document.documentElement.dataset.theme==='cream'?'dark':'cream');
+
+  const TITLES=['Add rate-limiting to the public API','Fix the flaky checkout test','Dark-mode for settings',
+    'Migrate avatars to the CDN','CSV export on the dashboard','Search result highlighting','Webhook retry with backoff',
+    'Cache invalidation on profile edit','Onboarding tooltip pass','Compress hero images','Add /health endpoint',
+    'Paginate the activity log','Keyboard shortcuts for the board','Sentry breadcrumbs','Debounce the search input',
+    'Fix N+1 on the roster query','Add empty-state illustrations','Rotate API keys on revoke'];
+  const ROLE={planning:['atlas','🦅','arch'],building:['patch','🦉','dev'],review:['scout','🐝','rev']};
+  const CHIP={todo:['s-todo','To do'],planning:['s-planning','Planning'],building:['s-in_progress','Building'],review:['s-in_review','Review'],done:['s-accepted','Shipped']};
+  const NEXT={todo:'planning',planning:'building',building:'review',review:'done'};
+
+  let seq=620, thru=12, tIdx=0, paused=false;
+  const tasks=new Map(); // id -> {id,title,state,prog,age}
+  const colBody=c=>document.querySelector(`.bcol[data-col="${c}"] .bcol-body`);
+  const nextTitle=()=>{for(let i=0;i<TITLES.length;i++){const c=TITLES[(tIdx++)%TITLES.length];
+    if(![...tasks.values()].some(t=>t.title===c))return c;}return TITLES[(tIdx++)%TITLES.length];};
+
+  function cardHTML(t){
+    const a=ROLE[t.state];
+    const assignee=a?`<div class="av sm ${a[2]}">${a[1]}</div><span>${a[0]}</span>`:(t.state==='done'?'<span style="color:var(--build)">✓ merged</span>':'<span class="dim">unassigned</span>');
+    const branch=(t.state==='building'||t.state==='review')?`<span class="branch">nm/${t.id}</span>`:'';
+    const prog=t.state==='building'?`<div class="bar" style="margin:2px 0 7px"><i style="width:${t.prog}%"></i></div>`:'';
+    const stream=t.state==='building'?`<div class="bc-stream">streaming <span class="typing"><i></i><i></i><i></i></span></div>`:'';
+    const ev=t.state==='review'?`<div class="evrow" style="margin:0 0 6px 0"><span class="ev">✓ tests</span><span class="ev ci">CI ✓</span></div>`:'';
+    return `<div class="bc-top"><span class="bc-id">#${t.id}</span><span class="chip ${CHIP[t.state][0]}">${CHIP[t.state][1]}</span></div>
+      <div class="bc-title">${t.title}</div>${prog}${ev}<div class="bc-foot">${assignee}${branch}</div>${stream}`;
+  }
+  function makeEl(t){const el=document.createElement('div');el.className='bcard';el.dataset.id=t.id;el.innerHTML=cardHTML(t);return el;}
+  function addTask(state,title,prog){const id=seq++;const t={id,title:title||nextTitle(),state,prog:prog||0,age:0};
+    tasks.set(id,t);const el=makeEl(t);el.classList.add('pop');colBody(state).prepend(el);counts();return t;}
+
+  function counts(){
+    let total=0;
+    document.querySelectorAll('.bcol').forEach(c=>{const n=c.querySelectorAll('.bcard').length;
+      c.querySelector('.cnt').textContent=n; if(c.dataset.col!=='done')total+=n;});
+    document.getElementById('taskTotal').textContent=total;
+    // presence: agent busy if it has a card in its state
+    setPresence('atlas','planning');setPresence('patch','building');setPresence('scout','review');
+  }
+  function setPresence(name,state){const has=[...tasks.values()].some(t=>t.state===state);
+    const dot=document.getElementById('p-'+name);if(dot)dot.className='dot '+(has?'busy':'on');}
+
+  function logEvent(html){const e=document.getElementById('events');const span=document.createElement('span');
+    span.className='ev-new';span.innerHTML=html;e.prepend(span);while(e.children.length>4)e.lastChild.remove();}
+
+  function move(t,ns){
+    const el=document.querySelector(`.bcard[data-id="${t.id}"]`);if(!el)return;
+    el.style.opacity='0';el.style.transform='scale(.95) translateY(-4px)';
+    setTimeout(()=>{
+      t.state=ns;t.age=0;if(ns==='building')t.prog=6;
+      el.innerHTML=cardHTML(t);colBody(ns).prepend(el);
+      el.style.opacity='1';el.style.transform='none';el.classList.add('justmoved');
+      setTimeout(()=>el.classList.remove('justmoved'),900);
+      const a=ROLE[ns];
+      if(ns==='building')logEvent(`<b>patch</b> 🦉 claimed <b>#${t.id}</b>`);
+      else if(ns==='review')logEvent(`<b>scout</b> 🐝 reviewing <b>#${t.id}</b>`);
+      else if(ns==='planning')logEvent(`<b>atlas</b> 🦅 planning <b>#${t.id}</b>`);
+      else if(ns==='done'){thru++;document.getElementById('thru').textContent=thru;
+        logEvent(`🚀 shipped <b>#${t.id}</b> — ${t.title.slice(0,22)}…`);shipFx(el);}
+      counts();
+    },220);
+  }
+  function shipFx(el){const r=el.getBoundingClientRect();const c=document.getElementById('confetti');
+    const cols=['#ff7a52','#54c08c','#a899f5','#7aa6e2'];
+    for(let i=0;i<14;i++){const p=document.createElement('i');p.style.left=(r.left+r.width/2)+'px';p.style.top=r.top+'px';
+      p.style.background=cols[i%cols.length];p.style.animationDuration=(1.1+Math.random())+'s';c.appendChild(p);setTimeout(()=>p.remove(),2200);}}
+
+  // engine
+  function tick(){
+    if(paused)return;
+    // 1) progress building cards
+    [...tasks.values()].filter(t=>t.state==='building').forEach(t=>{
+      t.prog=Math.min(100,t.prog+12+Math.random()*16);
+      const bar=document.querySelector(`.bcard[data-id="${t.id}"] .bar > i`);if(bar)bar.style.width=t.prog+'%';
+      if(t.prog>=100)move(t,'review');
+    });
+    // 2) age review cards, ship the matured
+    [...tasks.values()].filter(t=>t.state==='review').forEach(t=>{t.age++;if(t.age>=2&&Math.random()>.4)move(t,'done');});
+    // 3) keep flow: pull forward when downstream is light
+    const inState=s=>[...tasks.values()].filter(t=>t.state===s);
+    if(inState('building').length<2&&inState('planning').length){move(inState('planning')[0],'building');}
+    if(inState('planning').length<2&&inState('todo').length&&Math.random()>.3){move(inState('todo')[0],'planning');}
+    // 4) spawn + prune
+    if(inState('todo').length<3&&Math.random()>.45)addTask('todo');
+    const done=inState('done');if(done.length>5){const old=done[done.length-1];const el=document.querySelector(`.bcard[data-id="${old.id}"]`);
+      if(el){el.style.opacity='0';setTimeout(()=>{el.remove();tasks.delete(old.id);counts();},220);}}
+  }
+
+  // seed a believable in-flight board
+  ['Add rate-limiting to the public API','Fix the flaky checkout test'].forEach(t=>addTask('todo',t));
+  addTask('planning','Search result highlighting');
+  addTask('building','Add OAuth login (Google + GitHub)',54);
+  addTask('building','CSV export on the dashboard',28);
+  addTask('review','Migrate avatars to the CDN');
+  ['Add /health endpoint','Compress hero images','Webhook retry with backoff'].forEach(t=>{const x=addTask('done',t);});
+  counts();
+  ['atlas 🦅 planned #618','patch 🦉 claimed #619','🚀 shipped #612 — Migrate avatars'].forEach(logEvent);
+
+  let timer=setInterval(tick,1700);
+  document.getElementById('play').onclick=function(){paused=!paused;this.textContent=paused?'▶ play':'⏸ pause';};
+</script>
+</body>
+</html>

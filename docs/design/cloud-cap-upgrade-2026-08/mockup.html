@@ -1,0 +1,470 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<title>Free compute cap → Cloud upgrade — design round</title>
+<style>
+/* ─────────────────────────────────────────────────────────────────────────────
+   TOKENS — copied VERBATIM from apps/desktop/src/renderer/src/tokens.css.
+   Nothing here is eyeballed; if a value is wrong it is wrong in the app too.
+   ───────────────────────────────────────────────────────────────────────────── */
+:root {
+  --r-sm: 8px; --r-md: 10px; --r-lg: 14px; --r-xl: 18px; --r-full: 999px;
+  --fdisp: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+  --fbody: 'Geist Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --fmono: 'Geist Mono Variable', ui-monospace, 'SF Mono', Menlo, monospace;
+  --ease: cubic-bezier(.22,1,.36,1); --dur: .15s; --dur-fast: .12s; --dur-enter: .22s;
+}
+/* Graphite (the app's default :root) */
+[data-theme='dark'] {
+  --win: #0d0d0d; --bg: #141414; --panel: #191919; --panel2: #212121; --panel3: #2b2b2b;
+  --border: #272727; --border2: #383838;
+  --text: #eaeaea; --body: #b6b6b6; --muted: #898989; --dim: #676767;
+  --link: #d19a72; --accent: var(--text); --accent-ink: #101010; --accent-soft: var(--panel3);
+  --brand: #834a2b; --brand-ink: #fff7ee;
+  --btn: #232323; --btn-fg: #efefef; --btn-hover: #2f2f2f;
+  --green: #77ac8d; --warn: #c9a15e; --done: #77ac8d; --todo: #949494;
+  --card: #1e1e1e; --card-border: #2c2c2c; --overlay: #222222;
+  --shadow-sheet: inset 0 1px 0 rgba(255,255,255,.05), 0 12px 30px -6px rgba(0,0,0,.5);
+  --shadow-card: 0 1px 2px rgba(0,0,0,.25); --shadow-lift: 0 8px 20px -8px rgba(0,0,0,.55);
+  --shadow-pop: 0 20px 55px -14px rgba(0,0,0,.65);
+  --ring: #525252; --hover-bg: color-mix(in srgb, var(--text) 7%, transparent);
+  --sel-bg: color-mix(in srgb, var(--text) 10%, transparent);
+}
+/* Cream Oak */
+[data-theme='cream-oak'] {
+  --win: #f0e5d3; --bg: #fbf8f4; --panel: #fbf8f4; --panel2: #f6eee1; --panel3: #efe1cd;
+  --border: #e6dbca; --border2: #d3c2a8;
+  --text: #2a1c13; --body: #574838; --muted: #97846c; --dim: #b5a289;
+  --link: #9c5730; --accent: #834a2b; --accent-ink: #fff7ee; --accent-soft: #f1e3d2;
+  --brand: #834a2b; --brand-ink: #fff7ee;
+  --btn: #f8f2e8; --btn-fg: #43301f; --btn-hover: #efe4d2;
+  --green: #2f9e6b; --warn: #a06a1f; --done: #0f9d63; --todo: #7d8590;
+  --card: #ffffff; --card-border: #eadfce; --overlay: #ffffff;
+  --shadow-sheet: 0 8px 26px -8px rgba(70,42,18,.16), 0 1px 2px rgba(70,42,18,.05);
+  --shadow-card: 0 1px 2px rgba(70,42,18,.05); --shadow-lift: 0 8px 20px -8px rgba(70,42,18,.20);
+  --shadow-pop: 0 20px 55px -14px rgba(70,42,18,.30);
+  --ring: color-mix(in srgb, var(--accent) 42%, var(--border2));
+  --hover-bg: color-mix(in srgb, var(--text) 5%, transparent);
+  --sel-bg: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: var(--win); color: var(--text); font: 14px/1.5 var(--fbody); padding: 28px 24px 80px; }
+
+/* ── the mockup page's own chrome (NOT part of the design) ───────────────────── */
+.mk { max-width: 1180px; margin: 0 auto; }
+.mkbar { position: sticky; top: 0; z-index: 90; display: flex; align-items: center; gap: 14px;
+  background: var(--win); padding: 6px 0 16px; margin-bottom: 6px; }
+.mktitle { font: 640 21px/1.2 var(--fdisp); letter-spacing: -.01em; }
+.mkspacer { flex: 1; }
+.mkbtn { font: 550 12px var(--fbody); padding: 7px 14px; border-radius: var(--r-full);
+  border: 1px solid var(--border2); background: var(--card); color: var(--text); cursor: pointer; }
+.mksec { margin: 34px 0 0; }
+.mkeye { font: 500 10.5px var(--fmono); letter-spacing: .09em; text-transform: uppercase;
+  color: var(--dim); margin-bottom: 7px; }
+.mkh { font: 640 17px/1.3 var(--fdisp); letter-spacing: -.01em; margin-bottom: 4px; }
+.mknote { font-size: 12.5px; color: var(--muted); max-width: 74ch; margin-bottom: 14px; }
+.mkframe { background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 18px; }
+.mkrow { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-start; }
+.mkcap { font: 500 10.5px var(--fmono); letter-spacing: .07em; text-transform: uppercase;
+  color: var(--dim); margin-top: 8px; }
+
+/* ── SHARED APP IDIOMS (real ones, from tokens.css / docs/33) ────────────────── */
+.btn { font: 600 12.5px var(--fbody); padding: 9px 17px; border-radius: var(--r-full);
+  border: 1px solid var(--border2); background: var(--card); color: var(--text);
+  cursor: pointer; transition: box-shadow var(--dur) var(--ease), transform var(--dur) var(--ease); }
+.btn:hover { box-shadow: var(--shadow-lift); transform: translateY(-1px); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+.btn.ghost { background: transparent; }
+.btn.sm { font-size: 11.5px; padding: 6px 13px; }
+/* §6: a control with a second explanatory line is a BLOCK, not a pill */
+.btn.block { border-radius: var(--r-lg); padding: 11px 16px; text-align: left; display: grid; gap: 2px; }
+.btn.block small { font: 500 11px var(--fbody); opacity: .72; }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   A. THE COMPUTE PILL — top-right chrome, beside the sync mark
+   ───────────────────────────────────────────────────────────────────────────── */
+.topbar { display: flex; align-items: center; gap: 10px; justify-content: flex-end;
+  background: var(--win); padding: 8px 12px; border-radius: var(--r-md); }
+.cpill { display: inline-flex; align-items: center; gap: 7px; height: 26px; padding: 0 10px;
+  border-radius: var(--r-full); background: transparent; border: 1px solid transparent;
+  color: var(--muted); font: 550 11.5px var(--fbody); cursor: pointer;
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
+.cpill:hover { background: var(--hover-bg); color: var(--text); }
+.cdot { width: 7px; height: 7px; border-radius: var(--r-full); background: var(--muted); flex: none; }
+/* online — quiet by design: a filled dot, no label. calm surfaces speak only when it matters */
+.cpill.online .cdot { background: var(--green); }
+/* asleep — hollow, because nothing is wrong */
+.cpill.asleep .cdot { background: transparent; box-shadow: inset 0 0 0 1.5px var(--dim); }
+/* waking — the state that does not exist today */
+.cpill.waking .cdot { background: var(--todo); animation: cbreathe 1.4s var(--ease) infinite; }
+.cpill.waking { color: var(--body); }
+@keyframes cbreathe { 0%,100% { opacity: .35 } 50% { opacity: 1 } }
+/* capped — the only state that earns a wash + a word */
+.cpill.capped { color: var(--warn); background: color-mix(in srgb, var(--warn) 12%, transparent); }
+.cpill.capped .cdot { background: var(--warn); }
+.cpill.unreachable { color: var(--warn); }
+.cpill.unreachable .cdot { background: transparent; box-shadow: inset 0 0 0 1.5px var(--warn); }
+@media (prefers-reduced-motion: reduce) { .cpill.waking .cdot { animation: none; opacity: .8 } }
+.syncmark { width: 22px; height: 22px; display: grid; place-items: center; color: var(--dim); }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   B. THE BLOCKING MOMENT — a gate card docked above the composer (docs/25:
+   exactly ONE contextual gate card docks there)
+   ───────────────────────────────────────────────────────────────────────────── */
+.thread { background: var(--bg); border-radius: var(--r-lg); padding: 16px; display: grid; gap: 12px; }
+.msg { display: flex; gap: 10px; align-items: flex-start; }
+.av { width: 26px; height: 26px; border-radius: var(--r-sm); background: var(--panel2);
+  color: var(--body); font: 700 11px var(--fbody); display: grid; place-items: center; flex: none; }
+.mbody { background: var(--card); border: 1px solid var(--card-border); border-radius: var(--r-lg);
+  padding: 9px 13px; box-shadow: var(--shadow-card); max-width: 60ch; }
+.mwho { font: 600 12px var(--fbody); color: var(--text); margin-bottom: 2px; }
+.mwhen { font: 500 10.5px var(--fmono); color: var(--dim); margin-left: 7px; }
+.mtext { font-size: 13.5px; color: var(--body); }
+
+/* the gate card itself — elevated stratum, warn accent as a LEFT rule not a fill */
+.gate { background: var(--card); border: 1px solid var(--card-border); border-radius: var(--r-lg);
+  box-shadow: var(--shadow-card); overflow: hidden; display: grid;
+  grid-template-columns: 3px 1fr; }
+.gaterule { background: var(--warn); }
+.gateinner { padding: 14px 16px; display: grid; gap: 11px; }
+.gatetop { display: flex; align-items: baseline; gap: 9px; }
+.gateeye { font: 500 10.5px var(--fmono); letter-spacing: .08em; text-transform: uppercase; color: var(--warn); }
+.gatetime { margin-left: auto; font: 500 11px var(--fmono); color: var(--dim); }
+.gateh { font: 640 16px/1.25 var(--fdisp); letter-spacing: -.01em; color: var(--text); }
+.gatep { font-size: 13px; color: var(--body); max-width: 66ch; }
+.gatep b { color: var(--text); font-weight: 600; }
+.gateacts { display: flex; gap: 9px; align-items: center; flex-wrap: wrap; }
+.gatequeued { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--muted); }
+.qtick { width: 15px; height: 15px; border-radius: var(--r-full); background: color-mix(in srgb, var(--green) 18%, transparent);
+  color: var(--green); display: grid; place-items: center; font-size: 9px; flex: none; }
+
+/* the day meter — a status meter, NOT a chart series (docs/33 §4: --viz-* is for series) */
+.meter { display: grid; gap: 5px; }
+.mtrack { height: 5px; border-radius: var(--r-full); background: var(--panel2); overflow: hidden; }
+.mfill { height: 100%; border-radius: var(--r-full); background: var(--body); }
+.mfill.low { background: var(--warn); }
+.mfill.spent { background: var(--warn); }
+.mlabel { display: flex; justify-content: space-between; font: 500 11px var(--fmono); color: var(--dim); }
+.mlabel .spentink { color: var(--warn); }
+
+.composer { background: var(--card); border: 1px solid var(--card-border); border-radius: var(--r-lg);
+  padding: 11px 13px; box-shadow: var(--shadow-card); color: var(--dim); font-size: 13px; }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   C. THE COMPUTE VIEW — machine row + the day meter in situ
+   ───────────────────────────────────────────────────────────────────────────── */
+.cmp { display: grid; gap: 14px; }
+.cmphd { font: 640 19px/1.2 var(--fdisp); letter-spacing: -.01em; }
+.cmpsub { font-size: 12.5px; color: var(--muted); }
+.mrow { background: var(--card); border: 1px solid var(--card-border); border-radius: var(--r-lg);
+  box-shadow: var(--shadow-card); padding: 14px 16px; display: grid; gap: 11px; }
+.mtop { display: flex; align-items: center; gap: 9px; }
+.mname { font: 600 13.5px var(--fbody); }
+.mowner { font-size: 12px; color: var(--muted); }
+.mstate { margin-left: auto; display: inline-flex; align-items: center; gap: 6px;
+  font: 550 11.5px var(--fbody); color: var(--warn); }
+.chip { font: 500 10.5px var(--fmono); letter-spacing: .05em; text-transform: uppercase;
+  padding: 2px 7px; border-radius: var(--r-full); background: var(--panel2); color: var(--muted); }
+.mwhy { font-size: 12.5px; color: var(--body); }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   D. THE UPGRADE MODAL — the EXISTING shared surface (sheets.tsx UpgradeModal),
+   entered with a cap-specific reason. Same two-card grid, same $22 price.
+   ───────────────────────────────────────────────────────────────────────────── */
+.overlay { background: color-mix(in srgb, var(--win) 62%, transparent); border-radius: var(--r-lg);
+  padding: 26px; display: grid; place-items: center; }
+.upmodal { background: var(--overlay); border: 1px solid var(--card-border); border-radius: var(--r-xl);
+  box-shadow: var(--shadow-pop); padding: 24px 26px; max-width: 660px; width: 100%; }
+.upeyebrow { font: 500 10.5px var(--fmono); letter-spacing: .09em; text-transform: uppercase; color: var(--dim); }
+.uptitle { font: 640 24px/1.2 var(--fdisp); letter-spacing: -.015em; margin: 6px 0 6px; }
+.upsub { font-size: 13px; color: var(--muted); margin-bottom: 13px; max-width: 62ch; }
+/* the reason line — the one new element, and it wears warn because it IS the block */
+.upreason { display: flex; gap: 9px; align-items: flex-start; font-size: 12.5px; color: var(--body);
+  background: color-mix(in srgb, var(--warn) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warn) 26%, transparent);
+  border-radius: var(--r-md); padding: 10px 12px; margin-bottom: 15px; }
+.upreason b { color: var(--text); }
+.upgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.upcard { background: var(--card); border: 1px solid var(--card-border); border-radius: var(--r-lg);
+  padding: 15px; box-shadow: var(--shadow-card); display: grid; gap: 9px; align-content: start; }
+.upcard.rec { border-color: var(--ring); }
+.uphead { display: flex; align-items: center; gap: 9px; }
+.upico { width: 30px; height: 30px; border-radius: var(--r-sm); background: var(--panel2);
+  display: grid; place-items: center; color: var(--body); flex: none; }
+.upico.accent { background: var(--accent-soft); color: var(--accent); }
+.upname { font: 600 13.5px var(--fbody); }
+.uprec { font: 500 9.5px var(--fmono); letter-spacing: .07em; text-transform: uppercase;
+  color: var(--accent); background: var(--accent-soft); padding: 2px 6px; border-radius: var(--r-full); margin-left: 6px; }
+.uptag { font-size: 11.5px; color: var(--muted); }
+.upprice { font: 640 21px/1 var(--fdisp); }
+.upprice small { font: 500 11.5px var(--fbody); color: var(--muted); }
+.uplist { list-style: none; display: grid; gap: 5px; font-size: 12.5px; color: var(--body); }
+.uplist li { display: flex; gap: 7px; }
+.uplist li::before { content: '·'; color: var(--dim); }
+.uplist li.win { color: var(--text); font-weight: 550; }
+.uplist li.win::before { content: '✓'; color: var(--green); font-size: 10px; }
+.upcta { width: 100%; margin-top: 3px; text-align: center; display: block; }
+.upfoot { font-size: 11.5px; color: var(--muted); margin-top: 13px; }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   E. THE ATTENTION BAR ROW — the existing failure-alerts idiom
+   ───────────────────────────────────────────────────────────────────────────── */
+.attn { display: flex; align-items: center; gap: 10px; background: var(--card);
+  border: 1px solid var(--card-border); border-left: 3px solid var(--warn);
+  border-radius: var(--r-lg); box-shadow: var(--shadow-card); padding: 10px 14px; }
+.attnk { font: 600 12.5px var(--fbody); color: var(--text); }
+.attnt { font-size: 12.5px; color: var(--body); }
+.attna { margin-left: auto; font: 600 12px var(--fbody); color: var(--link);
+  background: none; border: 0; cursor: pointer; }
+</style>
+</head>
+<body>
+<div class="mk">
+
+  <div class="mkbar">
+    <div class="mktitle">Free compute cap → Cloud upgrade</div>
+    <div class="mkspacer"></div>
+    <button class="mkbtn" id="tt">Cream Oak ↔ Graphite</button>
+  </div>
+  <p class="mknote" style="margin-bottom:0">
+    Design round for the moment a free workspace's cloud machine will not start because the day's
+    machine hours are spent. Tokens are copied verbatim from <code>tokens.css</code>; every idiom
+    below is an existing one (docs/33 §8) except the compute pill and the reason line, which are
+    called out. Flip the theme with the button — both must hold (§9.9).
+  </p>
+
+  <!-- ══════════════════════════════════════════════════════════════════ A ── -->
+  <section class="mksec">
+    <div class="mkeye">A · new idiom</div>
+    <div class="mkh">The compute pill, beside the sync mark</div>
+    <p class="mknote">
+      Machine state has two axes today — <i>intent</i> (<code>desired_replicas</code>) and
+      <i>liveness</i> (<code>last_seen_at</code>) — and the UI renders only liveness, so one word
+      "offline" covers five situations. The pill renders a single derived state instead. It is
+      <b>quiet when nothing is wrong</b>: a bare dot for online and asleep, and only the states that
+      want you to act earn a word and a wash.
+    </p>
+    <div class="mkframe">
+      <div class="topbar">
+        <span class="syncmark">⟳</span>
+        <button class="cpill online"><span class="cdot"></span></button>
+        <button class="cpill asleep"><span class="cdot"></span></button>
+        <button class="cpill waking"><span class="cdot"></span>Waking</button>
+        <button class="cpill capped"><span class="cdot"></span>Capped</button>
+        <button class="cpill unreachable"><span class="cdot"></span>Unreachable</button>
+      </div>
+      <div class="mkcap">online · asleep · waking · capped · unreachable — click opens Compute</div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════════════ B ── -->
+  <section class="mksec">
+    <div class="mkeye">B · the blocking moment · existing idiom (docs/25 gate card)</div>
+    <div class="mkh">In the thread, where the unanswered message is</div>
+    <p class="mknote">
+      This is the case George hit: a message sent, no reply, no explanation. The cap notice belongs
+      <b>in the conversation</b>, docked above the composer, because that is where the person is
+      waiting — not only in a settings page they have no reason to open. docs/25 allows exactly one
+      contextual gate card there, and a conversation that cannot proceed is exactly a gate.
+      <br><br>
+      The line that matters most is the last one: the message is <b>not lost</b>. The host already
+      sweeps messages it slept through (<code>chatsweep.ts</code>), so "we will answer it when the
+      machine wakes" is a promise the system actually keeps.
+    </p>
+    <div class="mkframe">
+      <div class="thread">
+        <div class="msg">
+          <span class="av">G</span>
+          <div class="mbody">
+            <div class="mwho">george<span class="mwhen">01:40 PM</span></div>
+            <div class="mtext">hey @rex what can you do for us</div>
+          </div>
+        </div>
+
+        <div class="gate">
+          <div class="gaterule"></div>
+          <div class="gateinner">
+            <div class="gatetop">
+              <span class="gateeye">Cloud machine · paused</span>
+              <span class="gatetime">resets in 6h 12m</span>
+            </div>
+            <div class="gateh">Today's free machine hours are used up</div>
+            <p class="gatep">
+              Your agents run on a cloud machine, and the free plan includes
+              <b>60 minutes a day</b>. Today's are spent, so the machine did not start.
+              It resets at <b>midnight UTC</b>.
+            </p>
+            <div class="meter">
+              <div class="mtrack"><div class="mfill spent" style="width:100%"></div></div>
+              <div class="mlabel"><span class="spentink">60 of 60 min used today</span><span>resets 00:00 UTC</span></div>
+            </div>
+            <div class="gatequeued">
+              <span class="qtick">✓</span>
+              Your message is queued — rex answers it the moment a machine is awake.
+            </div>
+            <div class="gateacts">
+              <button class="btn primary block">Go Cloud — unlimited machine hours<small>$22 / seat / mo · cancel anytime</small></button>
+              <button class="btn ghost">See usage</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="composer">Reply — @ mention · / skill · ⏎ send</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════════════ C ── -->
+  <section class="mksec">
+    <div class="mkeye">C · existing surface, extended</div>
+    <div class="mkh">Compute — the machine says why, and the meter is always visible</div>
+    <p class="mknote">
+      Today this row renders the word "offline" and nothing else. It gains the derived state, the
+      reason, and the day meter — so the cap is legible <b>before</b> you hit it, not only after.
+      The meter turns <code>--warn</code> in its last fifth; that is the heads-up that costs nobody
+      an interruption.
+    </p>
+    <div class="mkframe">
+      <div class="cmp">
+        <div>
+          <div class="cmphd">Compute</div>
+          <div class="cmpsub">the machines your agents run on, and who lends them</div>
+        </div>
+
+        <div class="mrow">
+          <div class="mtop">
+            <span class="mname">runner</span>
+            <span class="mowner">owner</span>
+            <span class="chip">Free plan</span>
+            <span class="mstate"><span class="cdot" style="background:var(--warn)"></span>Capped</span>
+          </div>
+          <div class="meter">
+            <div class="mtrack"><div class="mfill spent" style="width:100%"></div></div>
+            <div class="mlabel"><span class="spentink">60 of 60 min used today</span><span>resets 00:00 UTC · in 6h 12m</span></div>
+          </div>
+          <div class="mwhy">Stopped because today's free machine hours are spent. It will start again after the reset — or immediately on Cloud.</div>
+          <div class="gateacts">
+            <button class="btn primary sm">Go Cloud →</button>
+            <button class="btn ghost sm">Wake now</button>
+          </div>
+        </div>
+
+        <div class="mrow">
+          <div class="mtop">
+            <span class="mname">runner</span>
+            <span class="mowner">owner</span>
+            <span class="chip">Cloud</span>
+            <span class="mstate" style="color:var(--muted)"><span class="cdot" style="background:var(--todo)"></span>Waking</span>
+          </div>
+          <div class="meter">
+            <div class="mtrack"><div class="mfill" style="width:38%"></div></div>
+            <div class="mlabel"><span>23 min today</span><span>no daily cap on Cloud</span></div>
+          </div>
+          <div class="mwhy">Starting up — agents pick their work back up automatically.</div>
+        </div>
+      </div>
+      <div class="mkcap">capped (free) · waking (cloud, for contrast — no cap, no CTA)</div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════════════ D ── -->
+  <section class="mksec">
+    <div class="mkeye">D · existing surface (sheets.tsx UpgradeModal) + one new element</div>
+    <div class="mkh">The upgrade decision, entered with the cap as its reason</div>
+    <p class="mknote">
+      <code>UpgradeModal</code> already takes a <code>reason</code> and is described in code as
+      "the single shared surface every gated Local↔Cloud affordance routes to" — so the cap routes
+      here rather than growing a second upgrade screen. Two things change: the eyebrow and headline
+      speak to <i>hours</i> rather than <i>machines</i>, and the reason line becomes a real element
+      instead of a bare string. The Cloud card's bullets are reordered so the one that answers
+      today's block sits first.
+    </p>
+    <div class="mkframe">
+      <div class="overlay">
+        <div class="upmodal">
+          <div class="upeyebrow">Free plan · 60 min a day</div>
+          <h2 class="uptitle">Keep your agents awake</h2>
+          <p class="upsub">The full loop is free. Cloud lifts the daily limit on machine hours and keeps the machine up — nothing is taken away.</p>
+          <div class="upreason">
+            <span style="color:var(--warn)">◆</span>
+            <span><b>Today's 60 free machine minutes are spent</b>, so rex could not start. Free hours reset at midnight UTC, in 6h 12m — or upgrade and the machine wakes now.</span>
+          </div>
+          <div class="upgrid">
+            <div class="upcard">
+              <div class="uphead">
+                <span class="upico">⌂</span>
+                <div><div class="upname">Free</div><div class="uptag">Your plan</div></div>
+              </div>
+              <div class="upprice">$0 <small>forever</small></div>
+              <ul class="uplist">
+                <li>60 machine minutes a day</li>
+                <li>Full agent loop — plan, review, ship</li>
+                <li>Up to 3 projects</li>
+                <li>Bring your own keys</li>
+              </ul>
+            </div>
+            <div class="upcard rec">
+              <div class="uphead">
+                <span class="upico accent">☁</span>
+                <div><div class="upname">Cloud <span class="uprec">Recommended</span></div></div>
+              </div>
+              <div class="upprice">$22 <small>/ seat / mo</small></div>
+              <ul class="uplist">
+                <li class="win">Unlimited machine hours</li>
+                <li class="win">Machine stays awake for your agents</li>
+                <li>Sync across all your devices</li>
+                <li>Unlimited projects &amp; machines</li>
+                <li>Everything in Free</li>
+              </ul>
+              <button class="btn primary upcta">Go Cloud →</button>
+            </div>
+          </div>
+          <div class="upfoot">BYOK on every plan — your inference bill stays yours. Cancel anytime.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════════════ E ── -->
+  <section class="mksec">
+    <div class="mkeye">E · existing idiom (failure-alerts attention bar)</div>
+    <div class="mkh">And once, at the top, for the person who was not looking</div>
+    <p class="mknote">
+      The cap can also be reached while nobody is in a thread — the sweep stops the machine
+      mid-afternoon. The attention bar already exists for exactly this class of thing (a dead
+      connector raises one today), so the cap joins it rather than inventing a banner.
+    </p>
+    <div class="mkframe">
+      <div class="attn">
+        <span class="attnk">1 needs attention</span>
+        <span class="attnt">Free machine hours used up — agents paused until 00:00 UTC</span>
+        <button class="attna">Go Cloud →</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="mksec">
+    <div class="mkeye">Open questions for review</div>
+    <div class="mkh">Three things I did not decide alone</div>
+    <p class="mknote">
+      <b>1.</b> On cap, should the message (a) refuse and explain — drawn above, (b) wake anyway and
+      borrow tomorrow's minutes, or (c) fall back to the metered starter proxy so the agent answers
+      without a machine? (c) is the friendliest and the most work.<br><br>
+      <b>2.</b> "Wake now" on a capped free machine — hide it, or show it disabled with the reason?
+      Drawn as shown-and-enabled only on the non-capped row.<br><br>
+      <b>3.</b> The gate card appears in the thread you are in. If you have three rooms with pending
+      messages, does it appear in all three (drawn) or only the active one?
+    </p>
+  </section>
+
+</div>
+<script>
+  const el = document.documentElement;
+  document.getElementById('tt').addEventListener('click', () => {
+    el.dataset.theme = el.dataset.theme === 'dark' ? 'cream-oak' : 'dark';
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,64 @@
+{
+  "expo": {
+    "name": "neuramesh",
+    "slug": "neuramesh",
+    "scheme": "neuramesh",
+    "version": "0.2.2",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "icon": "./assets/icon.png",
+    "newArchEnabled": true,
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/96d465a0-dfbc-42a0-84b9-e383ff665571"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "app.neuramesh.mobile",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "app.neuramesh.mobile"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-web-browser",
+      "expo-notifications",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "NeuraMesh needs your photos so you can attach one to a message."
+        }
+      ],
+      "./plugins/withThirdPartySQLitePod",
+      "./plugins/withFmtCxx17",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 128,
+          "backgroundColor": "#f5f4f2",
+          "dark": {
+            "image": "./assets/splash-icon.png",
+            "backgroundColor": "#0d0d0d"
+          }
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": false
+    },
+    "extra": {
+      "eas": {
+        "projectId": "96d465a0-dfbc-42a0-84b9-e383ff665571"
+      },
+      "router": {}
+    },
+    "owner": "gad-systems"
+  }
+}

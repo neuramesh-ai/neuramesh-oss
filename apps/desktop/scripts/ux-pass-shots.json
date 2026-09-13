@@ -1,0 +1,10 @@
+[
+  { "name": "ux1-permission-dark", "query": { "theme": "dark", "channel": "general" }, "settle": 1900 },
+  { "name": "ux1-permission-cream", "query": { "theme": "cream-oak", "channel": "general" }, "settle": 1900 },
+  { "name": "ux2-oneclick-answered-dark", "query": { "theme": "dark", "channel": "general" }, "settle": 1900, "js": "const b=[...document.querySelectorAll('.qopt')].find(x=>(x.textContent||'').includes('Add @gem')); if(b)b.click(); void 0" },
+  { "name": "ux3-armed-dark", "query": { "theme": "dark", "openTask": "1042", "tab": "thread" }, "settle": 2400, "js": "const b=[...document.querySelectorAll('.tactions .btn')].find(x=>(x.textContent||'').trim()==='Request changes'); if(b)b.click(); void 0" },
+  { "name": "ux3-armed-cream", "query": { "theme": "cream-oak", "openTask": "1042", "tab": "thread" }, "settle": 2400, "js": "const b=[...document.querySelectorAll('.tactions .btn')].find(x=>(x.textContent||'').trim()==='Request changes'); if(b)b.click(); void 0" },
+  { "name": "ux4-beats-folded-dark", "query": { "theme": "dark", "openTask": "1046", "tab": "thread" }, "settle": 2400 },
+  { "name": "ux4-beats-expanded-dark", "query": { "theme": "dark", "openTask": "1046", "tab": "thread" }, "settle": 2400, "js": "const h=document.querySelector('.phasefoldhead'); if(h)h.click(); void 0" },
+  { "name": "ux4-beats-folded-cream", "query": { "theme": "cream-oak", "openTask": "1046", "tab": "thread" }, "settle": 2400 }
+]

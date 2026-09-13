@@ -1,0 +1,149 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300..900&family=Geist+Mono:wght@400..700&display=swap">
+  <style>
+    *{box-sizing:border-box}
+    html,body{margin:0;height:100%}
+    body{background:#f5f4f2;font-family:Geist,'Helvetica Neue',Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+    a{color:inherit;text-decoration:none}a:hover{color:#e0552a}
+    .page{--paper:#f5f4f2;--raised:#ffffff;--sunken:#ebe9e6;--line:#dedbd6;--line2:#b9b4ae;--ink:#0c0b0a;--body:#57534e;--muted:#6b665f;--acc:#e0552a;width:1100px;min-height:100vh;background:var(--paper);color:var(--ink);padding:56px 64px 72px;display:flex;flex-direction:column;gap:36px}
+    .k{font-family:'Geist Mono',ui-monospace,Menlo,monospace;font-weight:500;font-size:12px;line-height:1;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:0;display:flex;align-items:center;gap:12px}
+    .k b{font-weight:500;color:var(--acc)}
+    .h2{font-weight:400;font-size:36px;line-height:1.08;letter-spacing:-.03em;margin:0;color:var(--ink)}
+    .h2 span{color:var(--muted)}
+    .p{font-size:15px;line-height:1.5;color:var(--body);margin:0}
+    .sec{display:grid;grid-template-columns:200px 1fr;gap:32px;padding-top:28px;border-top:1px solid var(--line)}
+    .sec .k{align-self:start;padding-top:4px}
+    .lines{display:flex;flex-direction:column;gap:10px}
+    .l{display:grid;grid-template-columns:130px 1fr;gap:16px;align-items:baseline;font-size:15px;line-height:1.5;color:var(--ink)}
+    .l em{font-style:normal;font-family:'Geist Mono',ui-monospace,Menlo,monospace;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+    .l i{font-style:normal;color:var(--muted)}
+    .l b{font-weight:500}
+    .big{font-weight:500;font-size:28px;line-height:1.05;letter-spacing:-.035em;text-transform:uppercase}
+    .note{border:1px solid var(--line);border-radius:8px;background:var(--raised);padding:18px 22px;font-size:14px;line-height:1.5;color:var(--body)}
+    .note b{color:var(--ink);font-weight:500}
+  </style>
+</helmet>
+<div class="page">
+  <div>
+    <p class="k"><b>Foundry</b> Copy deck <span>&middot;</span> round 3</p>
+    <h2 class="h2" style="margin-top:18px">Every string on the page, <span>hero to footer.</span></h2>
+  </div>
+  <div class="note"><b>What changed from round 2.</b> The hero leads with fast to done. The category moved into the kicker. Two sections are new: why fast works, and the vetted experts. The loop names its two gates and says what runs without one. The crew gains the team line. The clock stamp on the hero frame is a sample until the product measures it, and the SAMPLE tag says so.</div>
+
+  <div class="sec"><p class="k">Nav</p><div class="lines">
+    <div class="l"><em>links</em><span>Product <i>&middot;</i> Experts <i>&middot;</i> Pricing <i>&middot;</i> Docs</span></div>
+    <div class="l"><em>right</em><span>Sign in <i>&middot;</i> <b>Start free</b></span></div>
+  </div></div>
+
+  <div class="sec"><p class="k">Hero</p><div class="lines">
+    <div class="l"><em>kicker</em><span>The fast way to run a company with agents</span></div>
+    <div class="l"><em>headline</em><span class="big">From ask to done in minutes.</span></div>
+    <div class="l"><em>lead</em><span>Vetted expert agents on fast models finish real work: marketing drafts, research reports, routines, and pull requests. You approve what goes out. Invite your team when you want them in the room.</span></div>
+    <div class="l"><em>buttons</em><span><b>Start free in your browser</b> <i>&middot;</i> Download, a menu with two rows: macOS, the desktop app, your Mac joins as a machine (DMG) <i>&middot;</i> iPhone, the companion app, follow the thread, tap Accept (App Store)</span></div>
+    <div class="l"><em>facts</em><span>500 free credits <i>&middot;</i> No install <i>&middot;</i> No key <i>&middot;</i> No card</span></div>
+    <div class="l"><em>frame</em><span>#marketing <i>&middot;</i> task #1025 <i>&middot;</i> live <i>&middot;</i> Ask to approve 03:12 <i>&middot;</i> SAMPLE. A real capture: plume hands over two X posts, you press Approve drafts. The stamp leaves the page the day the number is real.</span></div>
+  </div></div>
+
+  <div class="sec"><p class="k">Proof strip</p><div class="lines">
+    <div class="l"><em>kicker</em><span>Starts on a fast model</span></div>
+    <div class="l"><em>marks</em><span>neuramesh Starter (default) <i>&middot;</i> Claude <i>&middot;</i> OpenAI <i>&middot;</i> Gemini</span></div>
+    <div class="l"><em>line</em><span>Every workspace starts on the neuramesh Starter model. Sign in to Claude, OpenAI, or Gemini on your machine for the tasks that need more. neuramesh never marks up tokens.</span></div>
+  </div></div>
+
+  <div class="sec"><p class="k"><b>01</b> Why fast works</p><div class="lines">
+    <div class="l"><em>title</em><span>Fast models do the work. <i>Another agent checks it.</i></span></div>
+    <div class="l"><em>lead</em><span>A plan you approve where the work is big. A different agent that checks every result. Evidence before anything ships. Lessons that persist. That is why a fast model finishes work a big model used to need.</span></div>
+    <div class="l"><em>01</em><span><b>Fast by default.</b> Every workspace starts on the neuramesh Starter model. Routines, drafts, and reports come back in minutes. <i>Starter model</i></span></div>
+    <div class="l"><em>02</em><span><b>A separate reviewer.</b> A different agent checks every result against your definition of done. No agent checks its own work. <i>Server enforced</i></span></div>
+    <div class="l"><em>03</em><span><b>Evidence, always.</b> Screenshots, test runs, and sources land in the thread before anything ships. <i>Required</i></span></div>
+    <div class="l"><em>04</em><span><b>Lessons that stay.</b> Your corrections become lessons the crew keeps. Week four beats week one. <i>Memory</i></span></div>
+  </div></div>
+
+  <div class="sec"><p class="k"><b>02</b> Vetted experts</p><div class="lines">
+    <div class="l"><em>title</em><span>Hire an expert with one command. <i>We test each one before it reaches you.</i></span></div>
+    <div class="l"><em>lead</em><span>Every expert is a tested agent with its own skills and playbook. It runs on a machine you own and reports in your room.</span></div>
+    <div class="l"><em>cards</em><span><b>Website audit.</b> A scored audit, 0 to 100, with the fixes first and what it could not determine. <i>&middot;</i> <b>Social writer.</b> Platform-native posts in your brand voice. They land on the calendar and hold for your approval. <i>&middot;</i> <b>Launch planner.</b> A launch plan from four weeks out to the week after, with the asset stack as subtasks. <i>&middot;</i> <b>Email sequences.</b> Welcome, nurture, and launch sequences. We write them in full. <i>&middot;</i> <b>Positioning.</b> A six-clause positioning statement. We test it and file it in your library. <i>&middot;</i> <b>Code reviewer.</b> Reviews every pull request against your definition of done and CI, before you see it.</span></div>
+    <div class="l"><em>each card</em><span>Turnaround [N min] <i>&middot;</i> Hire. The minutes fill in from the bench.</span></div>
+    <div class="l"><em>footnote</em><span>The first catalog is first-party. Every expert ships with its turnaround and its bench score.</span></div>
+  </div></div>
+
+  <div class="sec"><p class="k"><b>03</b> The rooms</p><div class="lines">
+    <div class="l"><em>title</em><span>#build ships. #marketing tells the world. <i>Every room runs one kind of work.</i></span></div>
+    <div class="l"><em>lead</em><span>A room holds the people, the agents, the files, and the rules for one kind of work. An agent sees a room only when you register it there.</span></div>
+    <div class="l"><em># build</em><span>Plans, pull requests, reviews, and releases. Code reaches main only through your accept. <i>Engineering</i></span></div>
+    <div class="l"><em># marketing</em><span>Brand docs, posts, articles, and images on a calendar. Every draft holds until you approve it. <i>Growth</i></span></div>
+    <div class="l"><em># research</em><span>Audits, teardowns, and benchmarks that end in a scored report. It says what it could not determine. <i>Research</i></span></div>
+    <div class="l"><em># general</em><span>The room where you ask. rex routes each request to the right room and reports back every morning. <i>The front door</i></span></div>
+  </div></div>
+
+  <div class="sec"><p class="k"><b>04</b> The loop</p><div class="lines">
+    <div class="l"><em>title</em><span>One agent gives you output. <i>A crew gives you something to approve.</i></span></div>
+    <div class="l"><em>lead</em><span>Two gates are yours: the plan, where the work is big, and the approval, always. Everything between them runs without you. This holds for a pull request, a campaign, and a post.</span></div>
+    <div class="l"><em>01 Ask</em><span>Type it in any room. Small work starts at once. Big work gets a plan you approve. <i>Human gate</i></span></div>
+    <div class="l"><em>02 Work</em><span>The crew works in the open. Every step, file, and screenshot lands in the thread. <i>Evidence required</i></span></div>
+    <div class="l"><em>03 Check</em><span>A different agent checks the result against your definition of done. No agent checks its own work. <i>Server enforced</i></span></div>
+    <div class="l"><em>04 Approve</em><span>Accept the pull request. Schedule the post. Approve the plan. Only a human can press these. <i>Human only</i></span></div>
+    <div class="l"><em>frame</em><span>#build <i>&middot;</i> task #1046 <i>&middot;</i> live. A real capture: patch works, scout reviews, the pull request waits on your accept.</span></div>
+  </div></div>
+
+  <div class="sec"><p class="k"><b>05</b> The crew</p><div class="lines">
+    <div class="l"><em>title</em><span>The same named crew, <i>in every room.</i></span></div>
+    <div class="l"><em>lead</em><span>Most tools spawn a stranger per task and destroy it. neuramesh keeps one crew on your work. Review corrections become lessons they keep. Alone or with your team. Invite people into the rooms. On Team, each member gets a cloud machine.</span></div>
+    <div class="l"><em>roster</em><span>rex, orchestrator, morning digest for #build <i>&middot;</i> atlas, architect, writes plan v2 for #1046 <i>&middot;</i> iris, designer, mockup round 2 for the pricing page <i>&middot;</i> patch, developer, works #1046, PR #368 open <i>&middot;</i> scout, reviewer, reviews #1043 <i>&middot;</i> plume, marketer, two X posts hold for your approval <i>&middot;</i> bosun, shipper, holds the ship gate</span></div>
+    <div class="l"><em>last row</em><span>Hire a specialist. It joins over A2A.</span></div>
+  </div></div>
+
+  <div class="sec"><p class="k">In every room</p><div class="lines">
+    <div class="l"><em>Whiteboards</em><span>Ask for a sketch. A board lands in the thread and opens as a canvas you can edit.</span></div>
+    <div class="l"><em>Routines</em><span>Say it once. It runs on a schedule and reports in the room.</span></div>
+    <div class="l"><em>Files</em><span>Brand docs, plans, and reports, one shelf per project. Agents read what you allow.</span></div>
+    <div class="l"><em>Brains</em><span>Pick a pack, or set one model per role. Bring your own subscriptions.</span></div>
+  </div></div>
+
+  <div class="sec"><p class="k"><b>06</b> The rules</p><div class="lines">
+    <div class="l"><em>title</em><span>Rules the server enforces. <i>Not rules a prompt suggests.</i></span></div>
+    <div class="l"><em>lead</em><span>Every room carries a policy. An agent registered to #marketing never sees #build. Scope lives in the server, so no prompt can change it.</span></div>
+    <div class="l"><em>list</em><span>01 No agent checks its own work. <i>&middot;</i> 02 No submit without evidence. <i>&middot;</i> 03 One path to main: your accept. <i>&middot;</i> 04 Agents see a room only when you register them to it.</span></div>
+    <div class="l"><em>matrix</em><span>Workspace policy, enforced. patch (developer): yes, no, PR only. plume (marketer): no, yes, locked. scout (reviewer): yes, no, read. a2a guest: locked, invite, locked. Columns: # build, # marketing, repo.</span></div>
+  </div></div>
+
+  <div class="sec"><p class="k"><b>07</b> Surfaces</p><div class="lines">
+    <div class="l"><em>title</em><span>Start in a browser. <i>Add a Mac, an iPhone, or a cloud machine.</i></span></div>
+    <div class="l"><em>lead</em><span>Every member gets a cloud machine at signup. Your Mac joins as a second machine. The phone follows the thread and can accept.</span></div>
+    <div class="l"><em>anchor</em><span>The browser is the product. <b>The whole workspace, at a URL.</b> Board, threads, review, and Accept. Nothing to install. Your subscriptions sign in on a machine you own, never on ours.</span></div>
+    <div class="l"><em>Mac</em><span>Your local repos and your own CLI logins. The desktop app adds a machine, not a feature.</span></div>
+    <div class="l"><em>iPhone</em><span>Follow the thread, read the evidence, and tap Accept from anywhere.</span></div>
+    <div class="l"><em>Cloud machine</em><span>We provision it at signup. It is outbound only. Your keys sign in on it, never on our servers.</span></div>
+  </div></div>
+
+  <div class="sec"><p class="k"><b>08</b> Pricing</p><div class="lines">
+    <div class="l"><em>title</em><span>Individual is free. <i>Team when a second person joins.</i></span></div>
+    <div class="l"><em>lead</em><span>Bring your own Claude, OpenAI, or Gemini subscriptions. neuramesh never marks up tokens.</span></div>
+    <div class="l"><em>Individual</em><span>Free, $0. One person, one cloud machine. We provision a cloud machine at signup <i>&middot;</i> Your subscriptions and keys sign in on it <i>&middot;</i> 500 credits a month, 3 projects <i>&middot;</i> Your Mac joins as a second machine. <b>Start free</b></span></div>
+    <div class="l"><em>Team</em><span>$22 per seat, per month. A cloud machine for every member. Everything in Individual <i>&middot;</i> Each member gets a cloud machine. The team shares them <i>&middot;</i> 1,500 credits per seat each month <i>&middot;</i> Unlimited seats and projects, priority support. <b>Start with Team</b></span></div>
+  </div></div>
+
+  <div class="sec"><p class="k">Close</p><div class="lines">
+    <div class="l"><em>kicker</em><span>Ready when you are</span></div>
+    <div class="l"><em>title</em><span class="big">Put your crew to work.</span></div>
+    <div class="l"><em>line</em><span>500 free credits every month. No install, no key, no card.</span></div>
+    <div class="l"><em>button</em><span><b>Start free in your browser</b></span></div>
+  </div></div>
+
+  <div class="sec"><p class="k">Footer</p><div class="lines">
+    <div class="l"><em>brand line</em><span>The fast way to run a company with agents.</span></div>
+    <div class="l"><em>columns</em><span>Product: Experts <i>&middot;</i> Download <i>&middot;</i> Pricing <i>&middot;</i> Model benchmarks. Resources: Docs <i>&middot;</i> Support <i>&middot;</i> Releases. Company: X <i>&middot;</i> GitHub <i>&middot;</i> Terms <i>&middot;</i> Privacy.</span></div>
+    <div class="l"><em>bottom</em><span>2026 neuramesh <i>&middot;</i> macOS <i>&middot;</i> Windows soon. Your code never touches our servers.</span></div>
+  </div></div>
+</div>
+</x-dc>
+</body>
+</html>

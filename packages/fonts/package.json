@@ -1,0 +1,24 @@
+{
+  "name": "@neuramesh/fonts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "NeuraMesh Sans, the house face: a renamed build of Geist under the SIL Open Font License 1.1, built by scripts/build.py",
+  "license": "OFL-1.1",
+  "exports": {
+    "./neuramesh-sans.css": "./neuramesh-sans.css",
+    "./files/*": "./files/*",
+    "./manifest.json": "./manifest.json",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "fonts:build": "python3 scripts/build.py",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "typescript": "^5.6.3",
+    "vitest": "^3.0.5"
+  }
+}

@@ -1,0 +1,107 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;450;500;600&amp;family=Geist+Mono:wght@500;600&amp;display=swap">
+  <style>
+    .frame { --win:#0d0d0d;--bg:#141414;--panel:#161616;--panel2:#1a1a1a;--panel3:#262626;--border:#262626;--border2:#3a3a3a;--card-border:#2c2c2c;--card:#1e1e1e;--text:#cbcbcb;--body:#a6a6a6;--muted:#848484;--dim:#6a6a6a;--link:#d19a72;--brand:#834a2b;--brand-ink:#fff7ee;--green:#77ac8d;--warn:#c9a15e;--prog:#8ba0c0;--accent:#cbcbcb;--overlay:#222222;--shadow:rgba(0,0,0,0.62);--hover-bg:color-mix(in srgb, #cbcbcb 7%, transparent);--sel-bg:color-mix(in srgb, #cbcbcb 10%, transparent);--ring:#525252;--shadow-card:0 1px 2px rgba(0,0,0,.25); }
+    
+  body { margin: 0; }
+  a { color: var(--link); } a:hover { color: var(--text); }
+  .frame { --fbody: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; --fmono: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+    position: relative; box-sizing: border-box; background: var(--win); color: var(--text); font: 13.5px/1.5 var(--fbody); -webkit-font-smoothing: antialiased; overflow: hidden; display: flex; }
+  .frame *, .frame *::before, .frame *::after { box-sizing: border-box; }
+  /* the naked rail on the frame, 266px, and a sliver of the sheet beside it */
+  .nav { width: 266px; flex: none; display: flex; flex-direction: column; padding: 10px 0 0; height: 100%; }
+  .sheet { flex: 1; margin: 2px 8px 8px 4px; background: var(--bg); border-radius: 8px; box-shadow: var(--shadow-card); }
+  .navseg { display: flex; margin: 6px 8px 2px; padding: 3px; background: var(--panel2); border-radius: 3px; }
+  .navseg span { flex: 1; text-align: center; font: 500 12px var(--fbody); color: var(--muted); padding: 5px 0; border-radius: 3px; }
+  .navseg span.on { background: var(--panel3); color: var(--text); }
+  .navnew { display: flex; align-items: center; gap: 4px; padding: 6px 8px 14px; }
+  .navnew .row { display: flex; align-items: center; gap: 11px; flex: 1; padding: 7px 9px; border-radius: 6px; color: var(--body); font-size: 13px; font-weight: 560; }
+  .navnew .row svg { color: var(--muted); } .navnew .kbd { margin-left: auto; font: 500 10px var(--fmono); color: var(--dim); }
+  .navnew .caret { width: 26px; height: 26px; display: grid; place-items: center; color: var(--muted); }
+  .navsect { padding: 13px 16px 5px; font: 500 9.5px var(--fmono); letter-spacing: -.02em; color: var(--muted); text-transform: uppercase; display: flex; align-items: center; gap: 6px; }
+  .navsect .chev { color: var(--dim); display: inline-grid; }
+  .navitem { display: flex; align-items: center; gap: 11px; width: 100%; margin: 0 8px; width: calc(100% - 16px); padding: 7px 9px; border-radius: 6px; color: var(--body); font-size: 13px; font-weight: 500; }
+  .navitem svg { color: var(--muted); flex: none; }
+  .navitem .navlabel { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .navitem.sub { padding-left: 44px; }
+  .navitembadge { font: 600 10px var(--fmono); color: var(--muted); background: var(--panel3); border-radius: 999px; padding: 1px 7px; }
+  .navitem .chev { color: var(--dim); }
+  .navlist { flex: 1; min-height: 0; overflow: hidden; }
+  /* the band head: the list's name as a kicker, the fold-all chevron, the ⌘Y magnifier */
+  .navgrphd { display: flex; align-items: center; gap: 7px; padding: 12px 8px 4px 12px; min-width: 0; }
+  .navprojchev { width: 18px; height: 18px; display: grid; place-items: center; color: var(--dim); }
+  .navgrphdlbl { font: 500 9.5px var(--fmono); letter-spacing: -.02em; text-transform: uppercase; color: var(--dim); }
+  .navgrphdlbl.on { color: var(--text); }
+  .navgrphdlbl.door { color: var(--dim); cursor: pointer; } .navgrphdlbl.door:hover { color: var(--text); }
+  .navgrphdsep { font: 500 9.5px var(--fmono); color: var(--dim); opacity: .6; }
+  .navgrphdcnt { font: 600 9.5px var(--fmono); color: var(--dim); opacity: .8; }
+  .navscopegrow { flex: 1; }
+  .navhistfind { width: 22px; height: 22px; display: grid; place-items: center; color: var(--muted); opacity: .5; border-radius: 4px; }
+  .navhistfind.on { opacity: 1; color: var(--text); background: var(--sel-bg); }
+  .viewtog { display: inline-flex; gap: 1px; padding: 2px; background: var(--panel2); border-radius: 3px; margin-right: 2px; }
+  .viewtog span { width: 20px; height: 18px; display: grid; place-items: center; color: var(--dim); border-radius: 2px; }
+  .viewtog span.on { color: var(--text); background: var(--panel3); }
+  /* rows */
+  .navgrp { margin-top: 2px; }
+  .navgrprow { display: flex; align-items: center; gap: 9px; width: calc(100% - 16px); margin: 1px 8px; height: 30px; padding: 0 9px 0 10px; border-radius: 6px; color: var(--body); }
+  .navgrprow .navhistglyph { color: var(--muted); }
+  .navgrpname { flex: 1; min-width: 0; font-size: 13px; font-weight: 500; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .navhisttrail { display: inline-flex; align-items: center; gap: 6px; flex: none; }
+  .navhistfact { font: 500 10px var(--fmono); color: var(--dim); }
+  .navgrpchev { display: inline-grid; color: var(--dim); } .navgrpchev.c { transform: rotate(-90deg); }
+  .navhistask { width: 6px; height: 6px; border-radius: 50%; background: var(--warn); box-shadow: 0 0 0 3px color-mix(in srgb, var(--warn) 26%, transparent); }
+  .navhistrow { display: flex; align-items: center; gap: 9px; width: calc(100% - 16px); margin: 1px 8px; height: 30px; padding: 0 9px 0 10px; border-radius: 6px; color: var(--body); }
+  .navhistrow.in { padding-left: 32px; }
+  .navhistrow.on { background: var(--card); box-shadow: var(--shadow-card); }
+  .navhistglyph { flex: none; width: 14px; height: 14px; display: grid; place-items: center; color: var(--dim); }
+  .navhistglyph .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .navhisttitle { flex: 1; min-width: 0; font-size: 13px; font-weight: 450; color: var(--body); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .navhisttitle b { font: 500 11px var(--fmono); color: var(--dim); margin-right: 5px; font-weight: 500; }
+  .navhiststat { font: 500 9px var(--fmono); letter-spacing: -.01em; white-space: nowrap; padding: 2px 5px; border-radius: 3px; border: 1px solid transparent; flex: none; }
+  .st-settled { background: var(--panel3); color: var(--muted); border-color: var(--border2); }
+  .st-ip { background: color-mix(in srgb, var(--prog) 16%, transparent); color: var(--prog); }
+  .st-ny { background: color-mix(in srgb, var(--warn) 16%, transparent); color: var(--warn); }
+  .navhistproj { font: 500 9.5px var(--fmono); letter-spacing: -.02em; color: var(--dim); white-space: nowrap; flex: none; }
+  .navgrpmore { display: block; margin: 1px 8px 4px; padding: 0 9px 0 32px; height: 26px; font: 500 12px var(--fbody); color: var(--dim); line-height: 26px; }
+  .navgrpmore.flat { padding-left: 19px; }
+  /* the scope row (the flat round's shape) */
+  .navscoperow { display: flex; align-items: center; gap: 4px; padding: 12px 8px 6px 12px; min-width: 0; }
+  .scopelbl { display: inline-flex; align-items: center; gap: 5px; padding: 3.5px 8px; color: var(--muted); font-size: 11.5px; font-weight: 600; white-space: nowrap; border-radius: 3px; }
+  .scopelbl .car { font-size: 8px; color: var(--dim); }
+  .scopelbl.set { background: var(--sel-bg); color: var(--text); }
+  /* the foot */
+  .navfoot { display: flex; align-items: center; gap: 8px; padding: 8px; margin-top: auto; }
+  .wstile { width: 22px; height: 22px; border-radius: 4px; background: var(--panel3); border: 1px solid var(--border2); display: grid; place-items: center; font: 600 11px var(--fmono); color: var(--body); position: relative; }
+  .wstile i { position: absolute; top: -3px; right: -3px; width: 7px; height: 7px; border-radius: 50%; background: var(--warn); border: 1.5px solid var(--win); }
+  .wsname { font-size: 13px; font-weight: 600; color: var(--text); flex: 1; }
+  .credring { width: 22px; height: 22px; }
+  .lbl { position: absolute; left: 12px; bottom: 8px; font: 500 9.5px var(--fmono); letter-spacing: -.02em; text-transform: uppercase; color: var(--dim); }
+
+  </style>
+</helmet>
+<div class="frame" style="width: 300px; height: 780px;">
+  <div class="nav">
+  <div class="navseg"><span class="on">Chat</span><span class="">Code</span></div>
+  <div class="navnew"><span class="row"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-6"/><path d="M18.4 3.6a2 2 0 0 1 2.8 2.8L13 14.6l-3.8.9.9-3.8z"/></svg>New chat<span class="kbd">⌘N</span></span><span class="caret"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span></div>
+  <div class="navsect"><span class="chev"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span>Shortcuts</div>
+  <div class="navitem"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 14.5 3.2-4.2 2.6 3 3.9-5.3"/></svg><span class="navlabel">Whiteboards</span></div>
+  <div class="navitem"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 2.5l4 4-4 4"/><path d="M3 11.5v-2a3 3 0 0 1 3-3h15"/><path d="M7 21.5l-4-4 4-4"/><path d="M21 12.5v2a3 3 0 0 1-3 3H3"/></svg><span class="navlabel">Scheduled</span><span class="chev"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span></div>
+  <div class="navitem sub"><span class="navlabel">Routines</span><span class="navitembadge">2</span></div>
+  <div class="navitem sub"><span class="navlabel">Calendar</span><span class="navitembadge">12</span></div>
+  <div class="navitem"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><span class="navlabel">Files</span></div>
+  <div class="navitem"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m22 7-8.5 8.5-5-5L2 17"/><path d="M16 7h6v6"/></svg><span class="navlabel">Marketing OS</span></div>
+  <div class="navitem"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 17l6-6-6-6"/><path d="M13 19h7"/></svg><span class="navlabel">Code</span></div><div class="navgrphd"><span class="navgrphdlbl on">Threads</span><span class="navgrphdcnt">189</span><span class="navscopegrow"></span><span class="viewtog"><span class="on"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></span><span class=""><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg></span></span><span class="navhistfind"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg></span></div><div class="navlist"><div class="navhistrow"><span class="navhistglyph"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="6.5"/></svg></span><span class="navhisttitle"><b>1059</b>Set up your marketing HQ</span><span class="navhistask"></span></div><div class="navhistrow"><span class="navhistglyph"><span class="dot" style="color: var(--prog)"></span></span><span class="navhisttitle">X content schedule</span><span class="navhiststat st-ip">in progress</span></div><div class="navhistrow"><span class="navhistglyph"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span><span class="navhisttitle">Give me ideas</span><span class="navhiststat st-settled">settled</span></div><div class="navhistrow"><span class="navhistglyph"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3.2 2"/></svg></span><span class="navhisttitle">Routine · hey rex, can we do some research</span><span class="navhiststat st-settled">settled</span></div><div class="navhistrow"><span class="navhistglyph"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="m8.5 12.3 2.4 2.4 4.6-5"/></svg></span><span class="navhisttitle">AI harness reply sweep</span><span class="navhiststat st-settled">settled</span></div><div class="navhistrow"><span class="navhistglyph"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span><span class="navhisttitle">Agent Interoperability Map</span><span class="navhiststat st-settled">settled</span></div><div class="navhistrow"><span class="navhistglyph"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="m8.5 12.3 2.4 2.4 4.6-5"/></svg></span><span class="navhisttitle">Week-one X drafts</span><span class="navhiststat st-settled">settled</span></div><div class="navhistrow"><span class="navhistglyph"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span><span class="navhisttitle">Flowe competitor social media scan</span><span class="navhiststat st-settled">settled</span></div><div class="navhistrow"><span class="navhistglyph"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="m8.5 12.3 2.4 2.4 4.6-5"/></svg></span><span class="navhisttitle">X post schedule</span><span class="navhiststat st-settled">settled</span></div><div class="navhistrow"><span class="navhistglyph"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span><span class="navhisttitle">Competitor Social Media Intel</span><span class="navhiststat st-settled">settled</span></div><div class="navhistrow"><span class="navhistglyph"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span><span class="navhisttitle">Token audit for the docs site</span><span class="navhiststat st-settled">settled</span></div><div class="navhistrow"><span class="navhistglyph"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="m8.5 12.3 2.4 2.4 4.6-5"/></svg></span><span class="navhisttitle">Reply radar, @joinflowe on X</span><span class="navhiststat st-settled">settled</span></div><div class="navgrpmore flat">Show 177 more</div></div><div class="navfoot"><span class="wstile">G<i></i></span><span class="wsname">GADS INC</span><span class="navhistglyph"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span><svg class="credring" viewBox="0 0 22 22"><circle cx="11" cy="11" r="8.5" fill="none" stroke="var(--panel3)" stroke-width="3"/><circle cx="11" cy="11" r="8.5" fill="none" stroke="var(--green)" stroke-width="3" stroke-dasharray="40 53.4" stroke-linecap="round" transform="rotate(-90 11 11)"/></svg></div></div>
+  <div class="sheet"></div>
+  
+</div>
+</x-dc>
+</body>
+</html>

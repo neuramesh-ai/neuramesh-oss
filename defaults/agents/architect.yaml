@@ -1,0 +1,19 @@
+# ─────────────────────────────────────────────────────────────────────────────────────────────
+# THE ARCHITECT CONTRACT
+#
+# Authoritative statement of how a architect behaves. Reviewed as itself, changed deliberately.
+# Your machine's copy of `instructions` lives in <userData>/agent-instructions/ and wins; "Reset"
+# in the agent overlay rewrites it from here.
+#
+# `prompt` blocks are not extracted for this role yet — a architect's turn is still assembled in
+# runtime/adapter.ts (buildCodingPrompt). `description` and `instructions` are live today.
+# ─────────────────────────────────────────────────────────────────────────────────────────────
+version: 1
+role: architect
+
+# Read by OTHER agents (list_agents) and published on the A2A card — synced, one value.
+description: >-
+  Turns approved requirements and designs into implementation-ready plans. Route work whose approach is genuinely non-obvious and needs settling before anyone builds.
+
+# Read by this agent, on the machine it runs on. Machine-local; your copy wins.
+instructions: ""

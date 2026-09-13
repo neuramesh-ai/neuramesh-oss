@@ -1,0 +1,674 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Agent identity — two fields, two audiences</title>
+<style>
+/* ── Real tokens (tokens.css, Porch brand) — Graphite dark + Cream Oak light ── */
+[data-theme] {
+  --fdisp:'Source Serif 4 Variable',Georgia,serif;
+  --fbody:'Geist Variable',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --fmono:'Geist Mono Variable',ui-monospace,'SF Mono',Menlo,monospace;
+  --font:var(--fbody);
+  --dur-fast:.12s; --dur:.15s; --dur-enter:.22s; --ease:cubic-bezier(.22,1,.36,1);
+  --r-xs:6px; --r-sm:8px; --r-md:10px; --r-lg:14px; --r-xl:18px; --r-full:999px;
+}
+[data-theme='dark'] {
+  --win:#0d0d0d; --bg:#141414; --panel:#191919; --panel2:#212121; --panel3:#2b2b2b;
+  --border:#272727; --border2:#383838;
+  --text:#eaeaea; --body:#b6b6b6; --muted:#898989; --dim:#676767;
+  --link:#d19a72; --accent:var(--text); --accent-ink:#101010; --accent-soft:var(--panel3);
+  --brand:#834a2b; --brand-ink:#fff7ee;
+  --btn:#232323; --btn-fg:#efefef; --btn-hover:#2f2f2f;
+  --green:#77ac8d; --violet:#a89ccf;
+  --todo:#949494; --prog:#8ba0c0; --review:#a89ccf; --done:#77ac8d; --blocked:#9ca0a8; --warn:#c9a15e;
+  --role-orch:#9793d2; --role-arch:#a89ccf; --role-dev:#77ac8d; --role-rev:#7ba1c4; --role-design:#cc8fb9; --role-cur:#6fb0ab; --role-ship:#7cb0bd; --role-mkt:#c98f8f; --role-tone:17%;
+  --shadow:rgba(0,0,0,.62); --code:#0a0a0a; --codeink:#e8e8e8; --overlay:#222222;
+  --card:#1e1e1e; --card-border:#2c2c2c;
+  --shadow-card:0 1px 2px rgba(0,0,0,.25); --shadow-lift:0 8px 20px -8px rgba(0,0,0,.55); --shadow-pop:0 20px 55px -14px rgba(0,0,0,.65);
+  --shadow-sheet:inset 0 1px 0 rgba(255,255,255,.05), 0 12px 30px -6px rgba(0,0,0,.5);
+  --ring:#525252; --hover-border:#404040; --hover-bg:color-mix(in srgb, var(--text) 7%, transparent); --sel-bg:color-mix(in srgb, var(--text) 10%, transparent);
+}
+[data-theme='cream-oak'] {
+  --win:#f0e5d3; --bg:#fbf8f4; --panel:#fbf8f4; --panel2:#f6eee1; --panel3:#efe1cd;
+  --border:#e6dbca; --border2:#d3c2a8;
+  --text:#2a1c13; --body:#574838; --muted:#97846c; --dim:#b5a289;
+  --link:#9c5730; --accent:#834a2b; --accent-ink:#fff7ee; --accent-soft:#f1e3d2;
+  --brand:#834a2b; --brand-ink:#fff7ee;
+  --btn:#f8f2e8; --btn-fg:#43301f; --btn-hover:#efe4d2;
+  --green:#2f9e6b; --violet:#7d6cc4;
+  --todo:#7d8590; --prog:#4f80c4; --review:#6d5ce0; --done:#0f9d63; --blocked:#7d7f86; --warn:#a06a1f;
+  --role-orch:#6a63bc; --role-arch:#7d6cc4; --role-dev:#3f9268; --role-rev:#4f7bb0; --role-design:#b0498f; --role-cur:#2f8f8a; --role-ship:#1f7f96; --role-mkt:#b04f55; --role-tone:14%;
+  --shadow:rgba(70,42,18,.16); --code:#2b2018; --codeink:#f3e6d8; --overlay:#ffffff;
+  --card:#ffffff; --card-border:#eadfce;
+  --shadow-card:0 1px 2px rgba(70,42,18,.05); --shadow-lift:0 8px 20px -8px rgba(70,42,18,.20); --shadow-pop:0 20px 55px -14px rgba(70,42,18,.30);
+  --shadow-sheet:0 8px 26px -8px rgba(70,42,18,.16), 0 1px 2px rgba(70,42,18,.05);
+  --ring:color-mix(in srgb, var(--accent) 42%, var(--border2)); --hover-border:color-mix(in srgb, var(--text) 10%, var(--border2)); --hover-bg:color-mix(in srgb, var(--text) 5%, transparent); --sel-bg:color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#0d0d0d; font-family:'Geist Variable',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; }
+.page { max-width:1620px; margin:0 auto; padding:34px 26px 70px; }
+.pagehead { color:#eaeaea; margin-bottom:20px; }
+.pagehead h1 { font-family:'Source Serif 4 Variable',Georgia,serif; font-size:25px; font-weight:600; letter-spacing:-.012em; }
+.pagehead p { color:#898989; font-size:13px; line-height:1.65; margin-top:9px; max-width:100ch; }
+.pagehead b { color:#b6b6b6; font-weight:600; }
+.pagehead code { font-family:'Geist Mono Variable',ui-monospace,Menlo,monospace; font-size:11px; color:#d19a72; background:rgba(255,255,255,.06); border-radius:4px; padding:1px 5px; }
+.themes { display:grid; grid-template-columns:1fr 1fr; gap:22px; }
+@media (max-width:1240px){ .themes { grid-template-columns:1fr; } }
+.theme { background:var(--bg); border:1px solid var(--border2); border-radius:18px; padding:20px 18px 26px; color:var(--text); min-width:0; }
+.theme > h2 { font:700 10.5px var(--fmono); letter-spacing:.09em; text-transform:uppercase; color:var(--dim); margin:0 4px 16px; }
+.scene { margin-top:30px; }
+.scene:first-of-type { margin-top:0; }
+.scene > h3 { font-family:var(--fdisp); font-size:16px; font-weight:600; letter-spacing:-.01em; margin:0 4px 5px; }
+.scene > .note { font-size:11.5px; color:var(--muted); line-height:1.6; margin:0 4px 12px; max-width:80ch; }
+.scene > .note b { color:var(--body); font-weight:600; }
+.scene > .note code, .sem code, .flownode code { font-family:var(--fmono); font-size:10.5px; color:var(--body); background:var(--hover-bg); border-radius:4px; padding:1px 4px; }
+.tag { display:inline-flex; align-items:center; font:800 9px var(--fbody); letter-spacing:.6px; text-transform:uppercase; padding:2px 7px; border-radius:5px; }
+.tag.good { background:color-mix(in srgb, var(--done) 18%, transparent); color:var(--done); }
+.tag.bad { background:color-mix(in srgb, var(--role-mkt) 18%, transparent); color:var(--role-mkt); }
+.tag.new { background:color-mix(in srgb, var(--violet) 20%, transparent); color:var(--violet); }
+.sem { display:flex; gap:8px; align-items:flex-start; margin:10px 4px 0; font-size:11.5px; color:var(--muted); line-height:1.6; max-width:82ch; }
+.sem .dot { width:6px; height:6px; border-radius:99px; margin-top:5px; flex:none; background:var(--done); }
+.sem.warn .dot { background:var(--warn); } .sem.bad .dot { background:var(--role-mkt); }
+.sem b { color:var(--body); font-weight:600; }
+.cap { font:700 9.5px var(--fmono); letter-spacing:.08em; text-transform:uppercase; color:var(--dim); margin:16px 4px 7px; display:flex; align-items:center; gap:8px; }
+.cap i { flex:1; height:1px; background:var(--border); }
+
+/* ── thread chrome ── */
+.msgs { background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:14px 12px; }
+.msg { display:flex; gap:11px; padding:7px 10px; border-radius:10px; }
+.pav { width:26px; height:26px; min-width:26px; border-radius:8px; display:grid; place-items:center;
+  background:color-mix(in srgb, var(--rc, var(--role-mkt)) var(--role-tone), transparent);
+  box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--rc, var(--role-mkt)) 32%, var(--border2)); }
+.pav svg { width:18px; height:18px; display:block; color:color-mix(in srgb, var(--rc, var(--role-mkt)) 65%, var(--text)); }
+.pav.big { width:44px; height:44px; border-radius:12px; } .pav.big svg { width:29px; height:29px; }
+.pavbtn { border:0; padding:0; background:none; cursor:pointer; border-radius:8px; display:block;
+  transition:transform var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease); }
+.pavbtn:hover { transform:translateY(-1px); }
+.pavbtn:hover .pav { box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--rc) 45%, var(--border2)), var(--shadow-lift); }
+.msg .body { min-width:0; flex:1; }
+.msg .head { display:flex; align-items:center; gap:8px; }
+.msg .head .nmbtn { border:0; background:none; padding:0; color:var(--text); font:700 12.5px var(--fbody); cursor:pointer; border-bottom:1px solid transparent; }
+.msg .head .nmbtn:hover { border-bottom-color:color-mix(in srgb, var(--text) 30%, transparent); }
+.rolechip { font:800 8px var(--fbody); letter-spacing:.5px; text-transform:uppercase; padding:1.5px 5px; border-radius:4px;
+  background:color-mix(in srgb, var(--rc, var(--muted)) 16%, transparent); color:color-mix(in srgb, var(--rc, var(--muted)) 80%, var(--muted)); }
+.time { font-size:10.5px; color:var(--dim); }
+.msg p { color:var(--body); font-size:13px; line-height:1.55; margin-top:3px; }
+
+/* ── the hover card (.agentpop — sibling of .taskrefpop) ── */
+.popstage { padding-left:22px; margin-top:10px; }
+.agentpop { width:300px; background:var(--overlay); border:1px solid var(--border2); border-radius:12px;
+  padding:11px 12px 10px; box-shadow:var(--shadow-pop); }
+.aptop { display:flex; align-items:center; gap:9px; }
+.apname { min-width:0; flex:1; }
+.apname b { display:block; font-size:13px; font-weight:650; letter-spacing:-.005em; }
+.apname .apseat { display:block; margin-top:2px; font:500 10px var(--fmono); color:var(--dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.appresence { display:inline-flex; align-items:center; gap:5px; font:600 9.5px var(--fbody); letter-spacing:.03em; text-transform:uppercase; color:var(--done); }
+.appresence .pd { width:6px; height:6px; border-radius:99px; background:var(--done); }
+.appresence.busy { color:var(--prog); } .appresence.busy .pd { background:var(--prog); }
+/* ONE line of what it does — the routing description, never the instructions (founder call) */
+.apdesc { margin-top:9px; padding-top:9px; border-top:1px solid var(--border); font-size:11.5px; line-height:1.5; color:var(--body);
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.aprooms { display:flex; flex-wrap:wrap; gap:5px; margin-top:9px; }
+.chchip { font:600 10px var(--fmono); color:var(--muted); border:1px solid var(--border); border-radius:var(--r-full); padding:2px 8px; }
+.apfoot { display:flex; align-items:center; gap:8px; margin-top:10px; padding-top:9px; border-top:1px solid var(--border); font-size:10.5px; color:var(--dim); }
+.apfoot .kbd { margin-left:auto; font:600 9.5px var(--fmono); color:var(--muted); border:1px solid var(--border2); border-radius:5px; padding:1.5px 6px; }
+
+/* ── the overlay ── */
+.modalveil { background:color-mix(in srgb, var(--win) 72%, transparent); border-radius:16px; padding:20px 16px; }
+.modal { max-width:520px; margin:0 auto; background:var(--panel); border:1px solid var(--border2); border-radius:16px;
+  box-shadow:var(--shadow-sheet); overflow:hidden; }
+.modalhd { display:flex; align-items:center; gap:11px; padding:15px 17px 14px; border-bottom:1px solid var(--border); }
+.modalhd .who { min-width:0; flex:1; }
+.modalhd .who b { display:block; font-family:var(--fdisp); font-size:19px; font-weight:600; letter-spacing:-.01em; }
+.modalhd .who .sub { display:block; margin-top:3px; font:500 10.5px var(--fmono); color:var(--dim); }
+.modalx { width:26px; height:26px; border-radius:var(--r-xs); border:1px solid var(--border); background:none; color:var(--muted); cursor:pointer; font-size:12px; }
+.modalbody { padding:14px 17px 17px; }
+.sect { display:flex; align-items:center; gap:9px; margin:18px 0 8px; font:700 9.5px var(--fbody); letter-spacing:.09em; text-transform:uppercase; color:var(--dim); }
+.sect:first-child { margin-top:2px; }
+.sect i { flex:1; height:1px; background:var(--border); }
+.sect .edit { border:0; background:none; color:var(--muted); font:600 10px var(--fbody); letter-spacing:.02em; text-transform:none; cursor:pointer; padding:2px 7px; border-radius:var(--r-full); }
+.sect .edit:hover { color:var(--text); background:var(--hover-bg); }
+.subhint { font-size:10.5px; line-height:1.55; color:var(--dim); margin:0 0 7px; }
+.subhint b { color:var(--muted); font-weight:600; }
+.kvline { display:flex; align-items:center; gap:12px; padding:7px 0; border-bottom:1px solid var(--border); font-size:12px; }
+.kvline:last-child { border-bottom:0; }
+.kvline > span:first-child { width:92px; flex:none; color:var(--muted); font-size:11px; }
+.kvline b { font-weight:600; font-size:12px; }
+/* description — short, quoted, the routing signal */
+.descbox { border:1px solid var(--border); border-radius:var(--r-md); background:var(--panel2); padding:9px 12px;
+  font-size:12px; line-height:1.55; color:var(--text); }
+/* instructions — a warm well, passive, scrollable */
+.instr { border:1px solid var(--border); border-radius:var(--r-md); background:var(--panel2); padding:11px 13px;
+  font-size:12px; line-height:1.62; color:var(--body); white-space:pre-wrap; max-height:150px; overflow-y:auto; }
+.instredit { width:100%; border:1px solid var(--ring); border-radius:var(--r-md); background:var(--card); color:var(--text);
+  font:400 12px/1.62 var(--fbody); padding:11px 13px; min-height:120px; resize:vertical; outline:none; box-shadow:var(--shadow-card); }
+.descedit { width:100%; border:1px solid var(--ring); border-radius:var(--r-md); background:var(--card); color:var(--text);
+  font:400 12px/1.55 var(--fbody); padding:9px 12px; min-height:52px; resize:vertical; outline:none; box-shadow:var(--shadow-card); }
+.instrfoot { display:flex; align-items:center; gap:9px; margin-top:9px; }
+.instrfoot .count { margin-left:auto; font:500 10px var(--fmono); color:var(--dim); }
+.instrfoot .count.over { color:var(--warn); }
+.roomsrow { display:flex; flex-wrap:wrap; gap:6px; }
+.roomchip { display:inline-flex; align-items:center; gap:6px; font:600 11px var(--fmono); color:var(--body);
+  border:1px solid var(--border2); border-radius:var(--r-full); padding:4px 10px; background:var(--panel); }
+.roomchip .x { color:var(--dim); cursor:pointer; font-size:11px; }
+.roomchip.add { color:var(--muted); border-style:dashed; cursor:pointer; }
+.roomchip .proj { font:600 9px var(--fbody); letter-spacing:.04em; text-transform:uppercase; color:var(--dim); }
+.brainrow { display:flex; gap:8px; }
+.sel { flex:1; display:flex; align-items:center; justify-content:space-between; border:1px solid var(--border); background:var(--card);
+  border-radius:var(--r-sm); padding:7px 10px; font-size:12px; color:var(--text); box-shadow:var(--shadow-card); }
+.sel .cv { color:var(--dim); font-size:10px; }
+.btn { border:1px solid var(--border2); background:var(--btn); color:var(--btn-fg); border-radius:var(--r-full); padding:7px 15px; font:600 12px var(--fbody); cursor:pointer; }
+.btn.sm { padding:4.5px 11px; font-size:11px; }
+.btn.primary { background:var(--accent); color:var(--accent-ink); border-color:transparent; }
+.btn.ghost { background:none; color:var(--muted); }
+.btn.danger { background:none; color:var(--role-mkt); border-color:color-mix(in srgb, var(--role-mkt) 40%, var(--border2)); }
+.gatelock { margin-left:6px; font:800 8px var(--fbody); letter-spacing:.5px; text-transform:uppercase; color:var(--dim); border:1px solid var(--border2); border-radius:4px; padding:1px 4px; }
+.humanonly { display:inline-flex; align-items:center; gap:5px; font:700 8.5px var(--fbody); letter-spacing:.06em; text-transform:uppercase;
+  color:var(--brand); background:color-mix(in srgb, var(--brand) 14%, transparent); border-radius:5px; padding:2px 7px; }
+.readby { display:inline-flex; align-items:center; gap:4px; font:600 8.5px var(--fbody); letter-spacing:.05em; text-transform:uppercase;
+  color:var(--role-orch); background:color-mix(in srgb, var(--role-orch) 15%, transparent); border-radius:5px; padding:2px 7px; }
+
+/* create */
+.fld { margin-top:13px; }
+.fld > label { display:block; font:600 11px var(--fbody); color:var(--muted); margin-bottom:6px; }
+.fld input { width:100%; border:1px solid var(--border); background:var(--card); color:var(--text); border-radius:var(--r-sm);
+  padding:8px 11px; font:400 12.5px var(--fbody); outline:none; box-shadow:var(--shadow-card); }
+.rolegrid { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; }
+.rolecard { border:1px solid var(--border); background:var(--card); border-radius:var(--r-sm); padding:8px 6px; text-align:center; cursor:pointer;
+  box-shadow:var(--shadow-card); transition:transform var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease); }
+.rolecard:hover { transform:translateY(-1px); box-shadow:var(--shadow-lift); }
+.rolecard.on { background:var(--accent-soft); border-color:var(--ring); }
+.rolecard .rg { display:block; width:22px; height:22px; margin:0 auto 5px; border-radius:6px;
+  background:color-mix(in srgb, var(--rc, var(--muted)) var(--role-tone), transparent);
+  box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--rc, var(--muted)) 30%, var(--border2)); }
+.rolecard .rn { font:600 10px var(--fbody); color:var(--body); }
+.rolecard.on .rn { color:var(--text); }
+.tmplrow { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:7px; }
+.tmpl { font:600 10.5px var(--fbody); color:var(--muted); border:1px dashed var(--border2); background:none; border-radius:var(--r-full); padding:3px 10px; cursor:pointer; }
+.tmpl:hover { color:var(--text); border-color:var(--hover-border); }
+
+/* research + flow */
+.flow { display:grid; gap:8px; }
+.flownode { display:grid; grid-template-columns:122px 1fr; gap:12px; align-items:center;
+  border:1px solid var(--border); background:var(--panel); border-radius:var(--r-md); padding:10px 12px; }
+.flownode .k { font:700 9.5px var(--fmono); letter-spacing:.05em; text-transform:uppercase; color:var(--dim); line-height:1.5; }
+.flownode .k b { display:block; color:var(--body); font:600 11px var(--fbody); letter-spacing:0; text-transform:none; margin-top:2px; }
+.flownode .v { font-size:11.5px; line-height:1.55; color:var(--muted); }
+.flownode.gap { border-style:dashed; } .flownode.gap .v { color:var(--warn); }
+.srcs { display:grid; gap:7px; }
+.src { border:1px solid var(--border); border-radius:var(--r-md); background:var(--panel); padding:10px 12px; }
+.srchd { display:flex; align-items:baseline; gap:8px; margin-bottom:5px; }
+.srchd b { font-size:11.5px; font-weight:650; }
+.srchd .u { font:500 9.5px var(--fmono); color:var(--dim); }
+.src .q { font-size:11.5px; line-height:1.6; color:var(--body); border-left:2px solid var(--border2); padding-left:9px; }
+.src .m { font-size:11px; line-height:1.55; color:var(--muted); margin-top:6px; }
+.src .m b { color:var(--body); font-weight:600; }
+.split { display:grid; grid-template-columns:1fr; gap:8px; }
+.splitrow { border:1px solid var(--border); border-radius:var(--r-md); overflow:hidden; }
+.splitrow .was { padding:9px 12px; background:var(--panel2); font-size:11.5px; line-height:1.55; color:var(--muted); }
+.splitrow .was b { color:var(--body); font-weight:600; }
+.splitrow .to { display:grid; grid-template-columns:104px 1fr; gap:10px; padding:9px 12px; border-top:1px solid var(--border); font-size:11.5px; line-height:1.55; }
+.splitrow .to + .to { border-top:1px dashed var(--border2); }
+.splitrow .to .lbl { font:700 9px var(--fmono); letter-spacing:.06em; text-transform:uppercase; color:var(--dim); padding-top:2px; }
+.splitrow .to .val { color:var(--text); }
+.wire { border:1px solid var(--border2); border-radius:var(--r-md); overflow:hidden; margin-top:11px; }
+.wirehd { display:flex; align-items:center; justify-content:space-between; padding:5px 11px; background:var(--panel2); border-bottom:1px solid var(--border); font:700 9.5px var(--fmono); letter-spacing:.07em; text-transform:uppercase; color:var(--dim); }
+.wire pre { font:11px/1.68 var(--fmono); background:var(--code); color:var(--codeink); padding:10px 12px; overflow-x:auto; white-space:pre; }
+.wire pre .dm { opacity:.42; } .wire pre .hl { color:#d19a72; font-weight:700; } .wire pre .cm { color:#77ac8d; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="pagehead">
+    <h1>Agent identity — two fields, two audiences</h1>
+    <p><b>Round 2, after the founder’s notes.</b> The hover card drops instructions (click through for those), and <code>list_agents</code> must
+    carry a brief of what each agent does so rex can pick one — or decide it needs a new one. That second ask is not a small addition: it means the
+    field has a <b>second reader with a different job</b>, and the research below says every serious agent framework splits exactly there.</p>
+    <p><b>So: two fields.</b> <code>description</code> — short, third person, written for the router. <code>instructions</code> — long, second person,
+    written for the agent itself. Today NeuraMesh has one field, <code>agents.brief</code>, doing both jobs badly: capped at 2000 (too long to list,
+    too short to instruct), injected as a system-prompt fragment, and never shown to rex at all.</p>
+  </div>
+
+  <div class="themes">
+  <!-- ══════════════════════════════════════════════════════════════════════════ -->
+  <div class="theme" data-theme="dark"><h2>Graphite dark</h2>
+
+    <!-- SCENE 0 — research -->
+    <div class="scene">
+      <h3>0 · What the field split should be <span class="tag new">research</span></h3>
+      <p class="note">Three independent frameworks, one shape: a <b>routing</b> string separate from the <b>system prompt</b>.</p>
+      <div class="srcs">
+        <div class="src">
+          <div class="srchd"><b>Claude Code subagents</b><span class="u">code.claude.com/docs/en/sub-agents</span></div>
+          <div class="q">“<b>description</b> · Required · <b>When Claude should delegate to this subagent</b>”<br>“Claude uses the description to decide when to delegate.”</div>
+          <div class="m">Required field, separate from the markdown body (the system prompt). Its own examples are third person, capability + trigger:
+          <b>“Expert code review specialist. Proactively reviews code for quality, security, and maintainability. Use immediately after writing or modifying code.”</b></div>
+        </div>
+        <div class="src">
+          <div class="srchd"><b>OpenAI Agents SDK</b><span class="u">openai.github.io/openai-agents-python</span></div>
+          <div class="q">“<b>handoff_description</b> — a description of the agent, used when the agent is used inside tools/handoffs.”</div>
+          <div class="m">Appended to the handoff tool description so the router knows when to pick it — while <b>instructions</b> is the system prompt
+          that configures the agent’s own behavior. Same split, different names.</div>
+        </div>
+        <div class="src">
+          <div class="srchd"><b>A2A 1.0 — the protocol we already implement</b><span class="u">a2a-protocol.org</span></div>
+          <div class="q">“Client agents use the Agent Card to determine an agent’s <b>suitability</b>, structure requests, and ensure secure communication.”</div>
+          <div class="m">The card’s <code>description</code> and <code>skills[].description</code> exist for <b>another agent’s</b> selection decision.
+          The spec gives no composition guidance — so we take Claude Code’s, which is the most explicit of the three.</div>
+        </div>
+        <div class="src">
+          <div class="srchd"><b>Anthropic — context engineering for agents</b><span class="u">anthropic.com/engineering</span></div>
+          <div class="q">“the minimal set of information that fully outlines your expected behavior” — and minimal “does not necessarily mean short.”</div>
+          <div class="m">On the instructions side: aim for <b>the right altitude</b> — not brittle hardcoded logic, not vague platitudes; organize with
+          markdown headings. This is what governs the long field, and why 2000 chars is a real cap rather than a placeholder.</div>
+        </div>
+      </div>
+      <div class="sem"><span class="dot"></span><b>Verdict:</b> the split is not our invention — it is the convergent design. NeuraMesh is the outlier for having one field.</div>
+    </div>
+
+    <!-- SCENE 1 — hover -->
+    <div class="scene">
+      <h3>1 · Hover: identity, not instructions <span class="tag new">draft B1</span></h3>
+      <p class="note">Founder call: no instructions in the peek. What stays is the one thing a glance actually wants —
+      <b>who this is, what it does in one line, where it works, and whether it’s busy</b>. The line is the <code>description</code>, which is short
+      by construction, so the card can never grow into a wall of prose.</p>
+      <div class="msgs">
+        <div class="msg" style="--rc:var(--role-mkt)">
+          <button class="pavbtn"><span class="pav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="7" width="16" height="12" rx="3"/><path d="M12 3v4M9 12h.01M15 12h.01M9.5 16h5"/></svg></span></button>
+          <div class="body">
+            <div class="head"><button class="nmbtn">plume</button><span class="rolechip">marketer</span><span class="time">now</span></div>
+            <p>All three X drafts, below. I added image briefs to b and c.</p>
+          </div>
+        </div>
+      </div>
+      <div class="popstage">
+        <div class="agentpop">
+          <div class="aptop">
+            <span class="pav big" style="--rc:var(--role-mkt)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="7" width="16" height="12" rx="3"/><path d="M12 3v4M9 12h.01M15 12h.01M9.5 16h5"/></svg></span>
+            <span class="apname">
+              <b>plume <span class="rolechip" style="--rc:var(--role-mkt); vertical-align:2px">marketer</span></b>
+              <span class="apseat">claude-code · opus-4-8 · geo-mbp</span>
+            </span>
+            <span class="appresence busy"><span class="pd"></span>working</span>
+          </div>
+          <div class="apdesc">Drafts platform-native social copy and brand docs in the product’s voice. Use for any post, campaign or messaging task.</div>
+          <div class="aprooms"><span class="chchip">#marketing</span><span class="chchip">#general</span></div>
+          <div class="apfoot"><span>#1048 · drafting 3 posts</span><span class="kbd">click for details</span></div>
+        </div>
+      </div>
+      <div class="sem"><span class="dot"></span>Built on <code>TaskRef</code>’s popover, which already portals to <code>&lt;body&gt;</code> (masked scrollers clip fixed children) and flips with a clamped edge (§9.6).</div>
+      <div class="sem warn"><span class="dot"></span>Same PR pays the a11y debt: <code>AgentAvatar</code> is <code>aria-hidden</code> today; as a control it needs a real button + label.</div>
+    </div>
+
+    <!-- SCENE 2 — overlay -->
+    <div class="scene">
+      <h3>2 · Click: both fields, labelled by audience <span class="tag new">draft B2</span></h3>
+      <p class="note">The overlay is where the full record lives. Description and Instructions sit adjacent so the difference is <b>visible</b>
+      rather than documented — one is tagged <i>read by rex</i>, the other <i>read by plume</i>.</p>
+      <div class="modalveil">
+        <div class="modal">
+          <div class="modalhd">
+            <span class="pav big" style="--rc:var(--role-mkt)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="7" width="16" height="12" rx="3"/><path d="M12 3v4M9 12h.01M15 12h.01M9.5 16h5"/></svg></span>
+            <span class="who"><b>@plume</b><span class="sub">marketer · hired 24 Jul · 31 tasks · 4 lessons</span></span>
+            <button class="modalx">✕</button>
+          </div>
+          <div class="modalbody">
+            <div class="sect">Description<i></i><span class="readby">read by rex</span><button class="edit">Edit</button></div>
+            <p class="subhint">One or two sentences, third person, ending in <b>when to route work here</b>. This is what the orchestrator sees in <code>list_agents</code> when it decides who takes a task — or whether to hire someone new.</p>
+            <div class="descbox">Drafts platform-native social copy and brand docs in the product’s voice. Use for any post, campaign, launch announcement or messaging task; never for code.</div>
+
+            <div class="sect">Instructions<i></i><span class="humanonly">human only</span><button class="edit">Edit</button></div>
+            <p class="subhint">Second person, <b>how</b> the work is done. Injected into every turn this agent takes.</p>
+            <div class="instr">One concrete claim per post — a thing the product does, not an adjective about it.
+
+Voice: lowercase, plain, no hashtags, no emoji, no “excited to announce”. An arrow (→) may carry the payoff line.
+
+Never publish. Every post is a draft the human approves; if asked to schedule, propose slots and stop.</div>
+
+            <div class="sect">Brain<i></i></div>
+            <div class="brainrow"><div class="sel">Anthropic <span class="cv">▾</span></div><div class="sel">Opus 4.8 <span class="cv">▾</span></div></div>
+
+            <div class="sect">Rooms<i></i><button class="edit">Edit</button></div>
+            <div class="roomsrow"><span class="roomchip">#marketing <span class="proj">growth</span></span><span class="roomchip">#general</span></div>
+
+            <div class="sect">Wiring<i></i></div>
+            <div class="kvline"><span>credential</span><b>workspace key ····8f21</b></div>
+            <div class="kvline"><span>machine</span><b>geo-mbp · online</b></div>
+            <div class="kvline"><span>A2A card</span><b style="color:var(--dim)">Private<span class="gatelock">Cloud</span></b></div>
+
+            <div class="sect">Retirement<i></i></div>
+            <button class="btn danger">Retire @plume…</button>
+          </div>
+        </div>
+      </div>
+      <div class="sem"><span class="dot"></span>The <code>description</code> is also what the A2A Agent Card publishes — one string, one meaning, whether the reader is rex or an external agent.</div>
+    </div>
+
+    <!-- SCENE 3 — editing -->
+    <div class="scene">
+      <h3>3 · Editing <span class="tag new">draft B2b</span></h3>
+      <p class="note">Two caps that mean two different things: <b>280</b> on the description (it rides rex’s context on every staffing decision —
+      a long one is a tax paid per turn), <b>2000</b> on the instructions.</p>
+      <div class="modalveil">
+        <div class="modal">
+          <div class="modalhd">
+            <span class="pav big" style="--rc:var(--role-mkt)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="7" width="16" height="12" rx="3"/><path d="M12 3v4M9 12h.01M15 12h.01M9.5 16h5"/></svg></span>
+            <span class="who"><b>@plume</b><span class="sub">marketer · editing</span></span>
+            <button class="modalx">✕</button>
+          </div>
+          <div class="modalbody">
+            <div class="sect">Description<i></i><span class="readby">read by rex</span></div>
+            <textarea class="descedit">Drafts platform-native social copy and brand docs in the product’s voice. Use for any post, campaign, launch announcement or messaging task; never for code.</textarea>
+            <div class="instrfoot"><span class="count">152 / 280</span></div>
+            <p class="subhint" style="margin-top:6px">Write it as a routing rule, not a title: <b>what it does</b> + <b>when to send work here</b>.</p>
+
+            <div class="sect">Instructions<i></i><span class="humanonly">human only</span></div>
+            <textarea class="instredit">One concrete claim per post — a thing the product does, not an adjective about it.
+
+Voice: lowercase, plain, no hashtags, no emoji. An arrow (→) may carry the payoff line.
+
+Never publish. Every post is a draft the human approves.</textarea>
+            <div class="instrfoot">
+              <button class="btn primary sm">Save</button>
+              <button class="btn ghost sm">Cancel</button>
+              <span class="count">287 / 2000</span>
+            </div>
+            <p class="subhint" style="margin-top:6px">Takes effect on <b>plume’s next turn</b>. A run already in flight keeps what it started with.</p>
+
+            <div class="sect">Rooms<i></i></div>
+            <div class="roomsrow">
+              <span class="roomchip">#marketing <span class="proj">growth</span> <span class="x">✕</span></span>
+              <span class="roomchip">#general <span class="x">✕</span></span>
+              <span class="roomchip add">+ add room</span>
+            </div>
+            <p class="subhint" style="margin-top:7px">A room is this agent’s <b>ACL boundary</b> — it can see and be offered work only in the rooms listed here.</p>
+          </div>
+        </div>
+      </div>
+      <div class="sem warn"><span class="dot"></span><b>Enforced, not prompted:</b> both edits are <code>HUMAN_ONLY</code> at the handler. rex writes the first draft of both at hire; only a human rewrites them.</div>
+    </div>
+
+    <!-- SCENE 4 — create -->
+    <div class="scene">
+      <h3>4 · Creation asks for both <span class="tag new">draft B3</span></h3>
+      <p class="note">Description is <b>required</b> (an agent rex cannot describe is an agent rex will never pick); instructions are optional and
+      default to the role’s behaviour. Starter chips are a click, never pre-filled text you have to delete.</p>
+      <div class="modalveil">
+        <div class="modal">
+          <div class="modalhd"><span class="who"><b>Create agent</b><span class="sub">it runs on this machine, in the rooms you pick</span></span><button class="modalx">✕</button></div>
+          <div class="modalbody">
+            <div class="fld"><label>Name *</label><input value="plume" /></div>
+            <div class="fld"><label>Base role — what it is allowed to do on the board</label>
+              <div class="rolegrid">
+                <div class="rolecard" style="--rc:var(--role-dev)"><span class="rg"></span><span class="rn">developer</span></div>
+                <div class="rolecard" style="--rc:var(--role-rev)"><span class="rg"></span><span class="rn">reviewer</span></div>
+                <div class="rolecard" style="--rc:var(--role-design)"><span class="rg"></span><span class="rn">designer</span></div>
+                <div class="rolecard on" style="--rc:var(--role-mkt)"><span class="rg"></span><span class="rn">marketer</span></div>
+              </div>
+            </div>
+            <div class="fld">
+              <label>Description * — what it does and when to route work here</label>
+              <textarea class="descedit" style="min-height:46px" placeholder="e.g. Drafts platform-native social copy in the product’s voice. Use for any post, campaign or messaging task."></textarea>
+              <p class="subhint" style="margin-top:5px">Read by <b>rex</b> when it staffs a task. <b>0 / 280</b></p>
+            </div>
+            <div class="fld">
+              <label>Instructions — how this one works <span style="color:var(--dim); font-weight:500">optional</span></label>
+              <div class="tmplrow">
+                <button class="tmpl">＋ marketer starter</button>
+                <button class="tmpl">＋ voice &amp; tone</button>
+                <button class="tmpl">＋ never publish</button>
+              </div>
+              <textarea class="instredit" style="min-height:96px" placeholder="e.g. One concrete claim per post. Lowercase, no hashtags. Never publish — every post is a draft the human approves."></textarea>
+              <p class="subhint" style="margin-top:5px">Rides <b>every</b> turn: board tasks, thread replies, and any subagent rex spawns onto this seat. <b>0 / 2000</b></p>
+            </div>
+            <div class="fld"><label>Brain</label><div class="brainrow"><div class="sel">Anthropic <span class="cv">▾</span></div><div class="sel">Opus 4.8 <span class="cv">▾</span></div></div></div>
+            <div class="fld"><label>Rooms (fan-out scope)</label>
+              <div class="roomsrow"><span class="roomchip">#marketing <span class="proj">growth</span> <span class="x">✕</span></span><span class="roomchip add">+ add room</span></div></div>
+            <div style="margin-top:16px"><button class="btn primary">Create agent</button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SCENE 5 — list_agents -->
+    <div class="scene">
+      <h3>5 · What rex sees <span class="tag new">draft B4</span></h3>
+      <p class="note"><code>list_agents</code> selects <code>name, role, model, status</code> today — a roster with no capabilities in it, which is
+      why the staffing ladder leans on role names alone. Adding <code>description</code> is the whole ask: rex can now tell a “developer who owns the
+      sync layer” from a “developer who does UI”, and can justify a hire because nobody’s description covers the work.</p>
+      <div class="wire">
+        <div class="wirehd"><span>list_agents · before → after</span></div>
+        <pre><span class="cm">// today</span>
+{"in_channel":[{"name":"plume","role":"marketer","model":"opus-4-8","status":"online"}]}
+
+<span class="cm">// after</span>
+{"in_channel":[{"name":"plume","role":"marketer","status":"online",
+  <span class="hl">"description"</span>:"Drafts platform-native social copy and brand docs in the
+   product's voice. Use for any post, campaign or messaging task; never for code."}],
+ "workspace_not_in_this_channel":[{"name":"kestrel","role":"developer",
+  <span class="hl">"description"</span>:"Owns the PowerSync + sync-rules layer. Route schema,
+   replication and offline-state work here."}]}</pre>
+      </div>
+      <div class="sem"><span class="dot"></span><b>Budget:</b> 280 chars × a 12-agent workspace ≈ 3.4 KB — about 900 tokens on a staffing turn. Real, bounded, and the reason the cap is 280 and not 2000.</div>
+      <div class="sem"><span class="dot"></span>The same string already has three other readers: the hover card, the roster page, and the A2A Agent Card. One field, four surfaces.</div>
+    </div>
+
+    <!-- SCENE 6 — backfill -->
+    <div class="scene">
+      <h3>6 · The backfill <span class="tag new">draft B5</span></h3>
+      <p class="note">Every existing <code>brief</code> is <b>already both fields glued together</b> — a capability clause, then behaviour. The seeded
+      ones make it obvious. So the migration splits at the first sentence, deterministically and reversibly, and both fields are editable from day one.</p>
+      <div class="split">
+        <div class="splitrow">
+          <div class="was"><b>bosun · brief today</b> — “Production-readiness plans and release coordination: study the approved change, surface every manual prod step with its owner, and merge only when the checklist clears.”</div>
+          <div class="to"><span class="lbl">description</span><span class="val">Production-readiness plans and release coordination. Route release, deploy-step and merge-gate work here.</span></div>
+          <div class="to"><span class="lbl">instructions</span><span class="val">Study the approved change, surface every manual prod step with its owner, and merge only when the checklist clears.</span></div>
+        </div>
+        <div class="splitrow">
+          <div class="was"><b>plume · brief today</b> — “Brand and growth: study the product and its market for real, write the brand docs, draft platform-native content in the brand voice — and never publish anything; humans approve everything outbound.”</div>
+          <div class="to"><span class="lbl">description</span><span class="val">Brand and growth — brand docs and platform-native content. Route posts, campaigns and messaging here.</span></div>
+          <div class="to"><span class="lbl">instructions</span><span class="val">Study the product and its market for real, write the brand docs, draft platform-native content in the brand voice — and never publish anything; humans approve everything outbound.</span></div>
+        </div>
+      </div>
+      <div class="sem"><span class="dot"></span><b>Seeded agents are code, not data</b> — rex, iris, bosun, plume get hand-written descriptions in <code>seed.ts</code>, reviewed once, in the PR.</div>
+      <div class="sem"><span class="dot"></span><b>Hired agents get a deterministic split:</b> <code>description</code> = first sentence, capped 280; <code>instructions</code> = the brief verbatim. Nothing is lost, nothing is invented.</div>
+      <div class="sem warn"><span class="dot"></span><b>Null is legal.</b> An agent with no description lists as <code>role</code> alone — exactly today’s behaviour — so the backfill can never break staffing if a row is missed.</div>
+    </div>
+
+    <!-- SCENE 7 — where they land -->
+    <div class="scene">
+      <h3>7 · Where each field lands</h3>
+      <div class="flow">
+        <div class="flownode"><span class="k">instructions<b>board work</b></span><span class="v"><code>agents.ts:1023</code> <b style="color:var(--done)">✓ already</b></span></div>
+        <div class="flownode"><span class="k">instructions<b>chat mode</b></span><span class="v"><code>chatmode.ts:176</code> <b style="color:var(--done)">✓ already</b></span></div>
+        <div class="flownode"><span class="k">instructions<b>rex’s subagents</b></span><span class="v"><code>agents.ts:2287</code> — a leg seats on the room’s specialist and inherits its brief. <b style="color:var(--done)">✓ already</b></span></div>
+        <div class="flownode gap"><span class="k">instructions<b>thread reply</b></span><span class="v"><code>runtime/adapter.ts:259</code> — <b>dropped.</b> A hired specialist answers in its own task thread as a generic teammate.</span></div>
+        <div class="flownode gap"><span class="k">description<b>list_agents</b></span><span class="v"><code>agents.ts:6832</code> — <b>not selected.</b> This is the founder’s ask.</span></div>
+        <div class="flownode gap"><span class="k">description<b>A2A card</b></span><span class="v"><code>store.getAgentCard</code> — the card’s own <code>description</code> should be this string.</span></div>
+      </div>
+      <div class="wire">
+        <div class="wirehd"><span>schema · one new column</span></div>
+        <pre><span class="cm">-- 0NNN_agent_description.sql</span>
+alter table agents add column <span class="hl">description</span> text;
+update agents set description = <span class="dm">…first sentence of brief, ≤280…</span> where brief is not null;
+
+<span class="cm">-- sync rules unchanged: `select * from agents` already carries it</span></pre>
+      </div>
+      <div class="sem warn"><span class="dot"></span><b>Deploy notes:</b> migration auto-applies on prod deploy; the client schema gains one column with the desktop build. Sync rules untouched — but <b>verify the column reaches a live client</b> before the PR claims it does.</div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════════ -->
+  <div class="theme" data-theme="cream-oak"><h2>Cream oak light</h2>
+
+    <div class="scene">
+      <h3>1 · Hover: identity, not instructions <span class="tag new">draft B1</span></h3>
+      <p class="note">In light the popover floats on pure white with <code>--shadow-pop</code>; the role hue survives at 14% tone, which is why
+      <code>--role-tone</code> is a per-theme token.</p>
+      <div class="msgs">
+        <div class="msg" style="--rc:var(--role-mkt)">
+          <button class="pavbtn"><span class="pav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="7" width="16" height="12" rx="3"/><path d="M12 3v4M9 12h.01M15 12h.01M9.5 16h5"/></svg></span></button>
+          <div class="body">
+            <div class="head"><button class="nmbtn">plume</button><span class="rolechip">marketer</span><span class="time">now</span></div>
+            <p>All three X drafts, below. I added image briefs to b and c.</p>
+          </div>
+        </div>
+      </div>
+      <div class="popstage">
+        <div class="agentpop">
+          <div class="aptop">
+            <span class="pav big" style="--rc:var(--role-mkt)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="7" width="16" height="12" rx="3"/><path d="M12 3v4M9 12h.01M15 12h.01M9.5 16h5"/></svg></span>
+            <span class="apname">
+              <b>plume <span class="rolechip" style="--rc:var(--role-mkt); vertical-align:2px">marketer</span></b>
+              <span class="apseat">claude-code · opus-4-8 · geo-mbp</span>
+            </span>
+            <span class="appresence busy"><span class="pd"></span>working</span>
+          </div>
+          <div class="apdesc">Drafts platform-native social copy and brand docs in the product’s voice. Use for any post, campaign or messaging task.</div>
+          <div class="aprooms"><span class="chchip">#marketing</span><span class="chchip">#general</span></div>
+          <div class="apfoot"><span>#1048 · drafting 3 posts</span><span class="kbd">click for details</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="scene">
+      <h3>2 · Click: both fields, labelled by audience <span class="tag new">draft B2</span></h3>
+      <div class="modalveil">
+        <div class="modal">
+          <div class="modalhd">
+            <span class="pav big" style="--rc:var(--role-mkt)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="7" width="16" height="12" rx="3"/><path d="M12 3v4M9 12h.01M15 12h.01M9.5 16h5"/></svg></span>
+            <span class="who"><b>@plume</b><span class="sub">marketer · hired 24 Jul · 31 tasks · 4 lessons</span></span>
+            <button class="modalx">✕</button>
+          </div>
+          <div class="modalbody">
+            <div class="sect">Description<i></i><span class="readby">read by rex</span><button class="edit">Edit</button></div>
+            <p class="subhint">One or two sentences, third person, ending in <b>when to route work here</b>. This is what the orchestrator sees in <code>list_agents</code>.</p>
+            <div class="descbox">Drafts platform-native social copy and brand docs in the product’s voice. Use for any post, campaign, launch announcement or messaging task; never for code.</div>
+
+            <div class="sect">Instructions<i></i><span class="humanonly">human only</span><button class="edit">Edit</button></div>
+            <p class="subhint">Second person, <b>how</b> the work is done. Injected into every turn this agent takes.</p>
+            <div class="instr">One concrete claim per post — a thing the product does, not an adjective about it.
+
+Voice: lowercase, plain, no hashtags, no emoji, no “excited to announce”. An arrow (→) may carry the payoff line.
+
+Never publish. Every post is a draft the human approves; if asked to schedule, propose slots and stop.</div>
+
+            <div class="sect">Brain<i></i></div>
+            <div class="brainrow"><div class="sel">Anthropic <span class="cv">▾</span></div><div class="sel">Opus 4.8 <span class="cv">▾</span></div></div>
+
+            <div class="sect">Rooms<i></i><button class="edit">Edit</button></div>
+            <div class="roomsrow"><span class="roomchip">#marketing <span class="proj">growth</span></span><span class="roomchip">#general</span></div>
+
+            <div class="sect">Wiring<i></i></div>
+            <div class="kvline"><span>credential</span><b>workspace key ····8f21</b></div>
+            <div class="kvline"><span>machine</span><b>geo-mbp · online</b></div>
+
+            <div class="sect">Retirement<i></i></div>
+            <button class="btn danger">Retire @plume…</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="scene">
+      <h3>3 · Editing <span class="tag new">draft B2b</span></h3>
+      <div class="modalveil">
+        <div class="modal">
+          <div class="modalhd">
+            <span class="pav big" style="--rc:var(--role-mkt)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="7" width="16" height="12" rx="3"/><path d="M12 3v4M9 12h.01M15 12h.01M9.5 16h5"/></svg></span>
+            <span class="who"><b>@plume</b><span class="sub">marketer · editing</span></span>
+            <button class="modalx">✕</button>
+          </div>
+          <div class="modalbody">
+            <div class="sect">Description<i></i><span class="readby">read by rex</span></div>
+            <textarea class="descedit">Drafts platform-native social copy and brand docs in the product’s voice. Use for any post, campaign, launch announcement or messaging task; never for code.</textarea>
+            <div class="instrfoot"><span class="count">152 / 280</span></div>
+            <p class="subhint" style="margin-top:6px">Write it as a routing rule, not a title: <b>what it does</b> + <b>when to send work here</b>.</p>
+
+            <div class="sect">Instructions<i></i><span class="humanonly">human only</span></div>
+            <textarea class="instredit">One concrete claim per post — a thing the product does, not an adjective about it.
+
+Voice: lowercase, plain, no hashtags, no emoji. An arrow (→) may carry the payoff line.
+
+Never publish. Every post is a draft the human approves.</textarea>
+            <div class="instrfoot">
+              <button class="btn primary sm">Save</button>
+              <button class="btn ghost sm">Cancel</button>
+              <span class="count">287 / 2000</span>
+            </div>
+            <p class="subhint" style="margin-top:6px">Takes effect on <b>plume’s next turn</b>. A run already in flight keeps what it started with.</p>
+
+            <div class="sect">Rooms<i></i></div>
+            <div class="roomsrow">
+              <span class="roomchip">#marketing <span class="proj">growth</span> <span class="x">✕</span></span>
+              <span class="roomchip">#general <span class="x">✕</span></span>
+              <span class="roomchip add">+ add room</span>
+            </div>
+            <p class="subhint" style="margin-top:7px">A room is this agent’s <b>ACL boundary</b> — it can see and be offered work only in the rooms listed here.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="scene">
+      <h3>4 · Creation asks for both <span class="tag new">draft B3</span></h3>
+      <div class="modalveil">
+        <div class="modal">
+          <div class="modalhd"><span class="who"><b>Create agent</b><span class="sub">it runs on this machine, in the rooms you pick</span></span><button class="modalx">✕</button></div>
+          <div class="modalbody">
+            <div class="fld"><label>Name *</label><input value="plume" /></div>
+            <div class="fld"><label>Base role — what it is allowed to do on the board</label>
+              <div class="rolegrid">
+                <div class="rolecard" style="--rc:var(--role-dev)"><span class="rg"></span><span class="rn">developer</span></div>
+                <div class="rolecard" style="--rc:var(--role-rev)"><span class="rg"></span><span class="rn">reviewer</span></div>
+                <div class="rolecard" style="--rc:var(--role-design)"><span class="rg"></span><span class="rn">designer</span></div>
+                <div class="rolecard on" style="--rc:var(--role-mkt)"><span class="rg"></span><span class="rn">marketer</span></div>
+              </div>
+            </div>
+            <div class="fld">
+              <label>Description * — what it does and when to route work here</label>
+              <textarea class="descedit" style="min-height:46px" placeholder="e.g. Drafts platform-native social copy in the product’s voice. Use for any post, campaign or messaging task."></textarea>
+              <p class="subhint" style="margin-top:5px">Read by <b>rex</b> when it staffs a task. <b>0 / 280</b></p>
+            </div>
+            <div class="fld">
+              <label>Instructions — how this one works <span style="color:var(--dim); font-weight:500">optional</span></label>
+              <div class="tmplrow">
+                <button class="tmpl">＋ marketer starter</button>
+                <button class="tmpl">＋ voice &amp; tone</button>
+                <button class="tmpl">＋ never publish</button>
+              </div>
+              <textarea class="instredit" style="min-height:96px" placeholder="e.g. One concrete claim per post. Lowercase, no hashtags. Never publish — every post is a draft the human approves."></textarea>
+              <p class="subhint" style="margin-top:5px">Rides <b>every</b> turn: board tasks, thread replies, and any subagent rex spawns onto this seat. <b>0 / 2000</b></p>
+            </div>
+            <div class="fld"><label>Brain</label><div class="brainrow"><div class="sel">Anthropic <span class="cv">▾</span></div><div class="sel">Opus 4.8 <span class="cv">▾</span></div></div></div>
+            <div class="fld"><label>Rooms (fan-out scope)</label>
+              <div class="roomsrow"><span class="roomchip">#marketing <span class="proj">growth</span> <span class="x">✕</span></span><span class="roomchip add">+ add room</span></div></div>
+            <div style="margin-top:16px"><button class="btn primary">Create agent</button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="scene">
+      <h3>6 · The backfill <span class="tag new">draft B5</span></h3>
+      <div class="split">
+        <div class="splitrow">
+          <div class="was"><b>bosun · brief today</b> — “Production-readiness plans and release coordination: study the approved change, surface every manual prod step with its owner, and merge only when the checklist clears.”</div>
+          <div class="to"><span class="lbl">description</span><span class="val">Production-readiness plans and release coordination. Route release, deploy-step and merge-gate work here.</span></div>
+          <div class="to"><span class="lbl">instructions</span><span class="val">Study the approved change, surface every manual prod step with its owner, and merge only when the checklist clears.</span></div>
+        </div>
+        <div class="splitrow">
+          <div class="was"><b>plume · brief today</b> — “Brand and growth: study the product and its market for real, write the brand docs, draft platform-native content in the brand voice — and never publish anything; humans approve everything outbound.”</div>
+          <div class="to"><span class="lbl">description</span><span class="val">Brand and growth — brand docs and platform-native content. Route posts, campaigns and messaging here.</span></div>
+          <div class="to"><span class="lbl">instructions</span><span class="val">Study the product and its market for real, write the brand docs, draft platform-native content in the brand voice — and never publish anything; humans approve everything outbound.</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  </div>
+</div>
+</body>
+</html>

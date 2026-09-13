@@ -1,0 +1,473 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>The projects rail — build spec (R2, tweaked)</title>
+<style>
+/* tokens verbatim from apps/desktop/src/renderer/src/tokens.css (graphite dark · paper light) */
+[data-theme] {
+  --fdisp:'Source Serif 4 Variable','Source Serif 4',Georgia,serif;
+  --font:'Geist Variable',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --fmono:'Geist Mono Variable',ui-monospace,'SF Mono',Menlo,monospace;
+  --dur-fast:.12s; --dur:.15s; --dur-enter:.22s; --ease:cubic-bezier(.22,1,.36,1);
+  --r-xs:6px; --r-sm:8px; --r-md:10px; --r-lg:14px; --r-xl:18px; --r-full:999px;
+  --projrail-w:30px; --nav-w:266px;
+}
+[data-theme='dark'] {
+  --win:#0d0d0d; --bg:#141414; --panel:#191919; --panel2:#212121; --panel3:#2b2b2b;
+  --border:#272727; --border2:#383838;
+  --text:#eaeaea; --body:#b6b6b6; --muted:#898989; --dim:#676767;
+  --link:#d19a72; --accent:var(--text); --accent-ink:#101010; --brand:#834a2b;
+  --prog:#8ba0c0; --review:#a89ccf; --done:#77ac8d; --ship:#7cb0bd; --blocked:#9ca0a8; --design:#cc8fb9; --closed:#727272;
+  --shadow:rgba(0,0,0,.62); --overlay:#222222; --card:#1e1e1e; --card-border:#2c2c2c;
+  --shadow-card:0 1px 2px rgba(0,0,0,.25); --shadow-lift:0 8px 20px -8px rgba(0,0,0,.55); --shadow-pop:0 20px 55px -14px rgba(0,0,0,.65);
+  --ring:#525252; --hover-border:#404040;
+  --hover-bg:color-mix(in srgb,var(--text) 7%,transparent); --sel-bg:color-mix(in srgb,var(--text) 10%,transparent);
+}
+[data-theme='light'] {
+  --win:#e9e5db; --bg:#fcfbf8; --panel:#fcfbf8; --panel2:#f4f1ea; --panel3:#ebe7dd;
+  --border:#e2ded4; --border2:#cec5b7;
+  --text:#2f2a24; --body:#524c43; --muted:#837d72; --dim:#a09889;
+  --link:#8f4f2a; --accent:var(--text); --accent-ink:#ffffff; --brand:#834a2b;
+  --prog:#4f80c4; --review:#6d5ce0; --done:#2f9e6b; --ship:#1f7f96; --blocked:#7c7f88; --design:#b0498f; --closed:#8a847a;
+  --shadow:rgba(70,58,44,.14); --overlay:#ffffff; --card:#ffffff; --card-border:#e2ded4;
+  --shadow-card:0 1px 2px rgba(70,58,44,.05); --shadow-lift:0 8px 20px -8px rgba(70,58,44,.18); --shadow-pop:0 20px 55px -14px rgba(70,58,44,.26);
+  --ring:color-mix(in srgb,var(--accent) 40%,var(--border2)); --hover-border:color-mix(in srgb,var(--text) 12%,var(--border2));
+  --hover-bg:color-mix(in srgb,var(--text) 6%,transparent); --sel-bg:color-mix(in srgb,var(--text) 8%,transparent);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#131210; font-family:'Geist Variable',-apple-system,sans-serif; -webkit-font-smoothing:antialiased; }
+.page { max-width:1720px; margin:0 auto; padding:34px 24px 90px; }
+.pagehead { color:#eaeaea; }
+.pagehead h1 { font-family:'Source Serif 4',Georgia,serif; font-size:24px; font-weight:640; letter-spacing:-.012em; }
+.pagehead p { color:#898989; font-size:13px; line-height:1.64; margin-top:9px; max-width:102ch; }
+.pagehead b { color:#b6b6b6; } .pagehead code { font-family:'Geist Mono Variable',monospace; font-size:12px; color:#b6b6b6; }
+.tweaks { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-top:18px; }
+.tw { border:1px solid #2a2a2a; border-radius:12px; padding:13px 14px; background:#171717; }
+.tw h4 { font:700 9.5px 'Geist Mono Variable',monospace; letter-spacing:.13em; text-transform:uppercase; color:#6f6f6f; margin-bottom:7px; }
+.tw p { font-size:12px; line-height:1.6; color:#8f8f8f; } .tw b { color:#c8c8c8; }
+.tw .got { display:block; margin-top:8px; padding-top:8px; border-top:1px solid #2a2a2a; color:#77ac8d; font-size:11.5px; }
+.stophd { color:#eaeaea; font-size:15.5px; font-weight:660; margin:46px 0 4px; font-family:'Source Serif 4',Georgia,serif; }
+.stopno { font:700 10px 'Geist Mono Variable',monospace; letter-spacing:.12em; color:#6f6f6f; text-transform:uppercase; margin-right:9px; }
+.stopp { color:#898989; font-size:12.5px; line-height:1.64; max-width:106ch; margin-bottom:18px; }
+.stopp b { color:#b6b6b6; } .stopp code { font-family:'Geist Mono Variable',monospace; font-size:11.5px; color:#b6b6b6; }
+.duo { display:grid; grid-template-columns:1fr 1fr; gap:18px; align-items:start; }
+/* a frame is spine 30 + column 266 + a content stub that must stay readable — below ~1200px
+   two of them side by side squeeze the stub to nothing, so the pair stacks instead */
+@media (max-width:1200px){ .duo, .tweaks { grid-template-columns:1fr; } }
+.theme { background:var(--win); border:1px solid var(--border2); border-radius:16px; padding:15px; color:var(--text); }
+.theme > h2 { font-size:10.5px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--dim); margin:0 2px 11px; }
+.theme > h2 .thm { float:right; opacity:.7; letter-spacing:.06em; }
+.callouts { display:flex; flex-direction:column; gap:7px; margin-top:12px; }
+.co { font-size:11.5px; color:var(--muted); line-height:1.56; } .co b { color:var(--body); }
+.co code { font-family:var(--fmono); font-size:10.5px; color:var(--body); }
+.co .n { display:inline-grid; place-items:center; width:16px; height:16px; border-radius:50%; background:var(--panel3); color:var(--link); font:700 10px var(--fmono); margin-right:6px; vertical-align:-3px; }
+
+/* ── the frame ────────────────────────────────────────────────────────────────────────── */
+.frame { position:relative; display:flex; height:432px; background:var(--win); border-radius:12px; overflow:hidden; border:1px solid var(--border); }
+
+/* ── THE SPINE — 30px, transparent, name only (tweak 1) ───────────────────────────────── */
+.spine { position:relative; z-index:3; width:var(--projrail-w); flex:none; display:flex; flex-direction:column; align-items:center; gap:9px; padding:11px 0 9px; background:transparent; color:var(--dim); }
+.spine.hot { background:var(--hover-bg); }
+.sp-home { position:relative; width:24px; height:24px; border-radius:8px; display:grid; place-items:center; color:var(--body); }
+.sp-home.on { background:var(--panel3); color:var(--text); }
+[data-theme='light'] .sp-home.on { background:var(--card); box-shadow:var(--shadow-card); }
+.sp-home .pip { position:absolute; right:-4px; top:-4px; min-width:14px; height:14px; padding:0 3px; border-radius:99px; background:var(--accent); color:var(--accent-ink); font:700 8.5px var(--fmono); display:grid; place-items:center; border:1.5px solid var(--win); }
+.sp-rule { width:14px; height:1px; background:var(--border2); flex:none; }
+/* the ACTIVE project = its name, nothing else. --body not --dim: it is now the only thing
+   in the strip naming where you are, so it outranks the fold tab's incidental vitals. */
+.sp-name { writing-mode:vertical-rl; text-orientation:mixed; font:700 9.5px var(--fmono); letter-spacing:.15em; text-transform:uppercase; color:var(--body); }
+.spine.hot .sp-name, .sp-name.on { color:var(--text); }
+/* work happening HERE — the pulse sits at the head of the name it belongs to */
+.sp-live { width:5px; height:5px; border-radius:50%; background:var(--prog); flex:none; box-shadow:0 0 0 3px color-mix(in srgb,var(--prog) 20%,transparent); animation:pulse 1.8s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity:.34; } }
+/* work happening ELSEWHERE — one quiet dot per other project */
+.sp-dots { display:flex; flex-direction:column; align-items:center; gap:5px; margin-top:3px; }
+.sp-dot { width:4px; height:4px; border-radius:50%; background:var(--border2); }
+.sp-dot.live { background:var(--prog); box-shadow:0 0 0 2.5px color-mix(in srgb,var(--prog) 20%,transparent); animation:pulse 1.8s ease-in-out infinite; }
+.sp-foot { margin-top:auto; display:flex; flex-direction:column; align-items:center; gap:9px; }
+.sp-chev { color:var(--dim); display:grid; place-items:center; width:22px; height:22px; }
+.sp-chev svg { transform:rotate(-90deg); display:block; }
+
+/* ── THE COLUMN — one width, two faces (tweak 2) ──────────────────────────────────────── */
+.col { position:relative; width:var(--nav-w); flex:none; display:flex; flex-direction:column; padding-bottom:8px; background:transparent; }
+.face { display:flex; flex-direction:column; flex:1; min-height:0; }
+.avatar { position:relative; overflow:hidden; border-radius:11px; background:linear-gradient(160deg,var(--panel3),var(--panel2)); color:var(--text); display:grid; place-items:center; flex:none; border:1px solid var(--border2); font-weight:700; }
+.avatar.s34 { width:34px; height:34px; font-size:13px; }
+.avatar.s24 { width:24px; height:24px; border-radius:8px; font-size:10px; }
+.avatar.s22 { width:22px; height:22px; border-radius:7px; font-size:9.5px; }
+.avatar.on { color:var(--text); border-color:var(--ring); box-shadow:0 0 0 2px color-mix(in srgb,var(--text) 14%,transparent); }
+.avatar .livedot { position:absolute; right:-2px; top:-2px; width:8px; height:8px; border-radius:50%; background:var(--prog); border:2px solid var(--win); }
+
+/* rooms face */
+.navnew { display:flex; align-items:stretch; }
+.navnewchat { display:flex; align-items:center; gap:8px; width:calc(100% - 40px); margin:10px 0 6px 8px; padding:7px 10px; border:1px solid var(--card-border); border-radius:var(--r-md) 0 0 var(--r-md); background:var(--card); box-shadow:var(--shadow-card); color:var(--text); font-size:12.5px; font-weight:620; }
+.nncplus { flex:none; font-size:12px; color:var(--muted); } .navlbl { flex:1; } .nnck { flex:none; font:600 10px var(--fmono); color:var(--dim); }
+.navnewcaret { flex:none; width:26px; margin:10px 8px 6px 0; border:1px solid var(--card-border); border-left:0; border-radius:0 10px 10px 0; background:var(--card); color:var(--muted); font-size:9px; display:grid; place-items:center; }
+.navband { padding:8px 0 4px; }
+.navsecttoggle { display:flex; align-items:center; gap:7px; padding:2px 14px 6px; font:650 9.5px var(--fmono); letter-spacing:.15em; text-transform:uppercase; color:var(--muted); }
+.navsectcnt { font:800 9px var(--fmono); color:var(--dim); opacity:.75; letter-spacing:0; }
+.chan { display:flex; align-items:center; gap:8px; padding:5px 9px; margin:0 8px 0 14px; border-radius:var(--r-md); color:var(--body); font-size:12.5px; }
+.chan.on { background:var(--panel3); color:var(--text); font-weight:600; }
+[data-theme='light'] .chan.on { background:var(--card); box-shadow:var(--shadow-card), inset 0 0 0 1px var(--card-border); }
+.chan .h { color:var(--dim); font-weight:600; }
+.hrow { display:flex; align-items:flex-start; gap:8px; padding:4px 9px; margin:1px 8px 1px 14px; border:1px solid transparent; border-radius:8px; }
+.hrow.raised { background:var(--card); border-color:var(--card-border); box-shadow:var(--shadow-card); }
+.hdot { flex:none; width:6px; height:6px; border-radius:50%; background:currentColor; margin-top:5px; }
+.hdot.thread { background:transparent; box-shadow:inset 0 0 0 1.5px var(--dim); }
+.hdot.prog { color:var(--prog); } .hdot.review { color:var(--review); } .hdot.ship { color:var(--ship); } .hdot.closed { color:var(--closed); }
+.hdot.live { box-shadow:0 0 0 3px color-mix(in srgb,currentColor 24%,transparent); }
+.hbody { flex:1; min-width:0; display:flex; flex-direction:column; gap:1.5px; }
+.hl1 { display:flex; align-items:baseline; gap:6px; min-width:0; }
+.hnum { flex:none; font:700 10.5px var(--fmono); color:var(--muted); }
+.htitle { flex:1; min-width:0; font-size:12.5px; color:var(--body); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.hchan { flex:none; font:600 9.5px var(--fmono); color:var(--dim); }
+.hwhen { flex:none; font:500 10px var(--fmono); color:var(--dim); }
+.hlive { display:flex; align-items:center; gap:6px; font-size:10.5px; color:var(--body); }
+.hlive .ind { width:5px; height:5px; border-radius:50%; background:var(--prog); animation:pulse 1.6s ease-in-out infinite; }
+.hlive .verb { font-style:italic; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+/* projects face — same column, same width, no shadow: a FACE, not a popover */
+.pf-hd { display:flex; align-items:center; gap:9px; padding:11px 12px 8px; }
+.pf-hd .t b { display:block; font-weight:700; font-size:13.5px; color:var(--text); }
+.pf-hd .t small { display:block; font-weight:500; font-size:10.5px; color:var(--dim); }
+.pf-hd .x { margin-left:auto; color:var(--dim); font-size:11px; }
+.pf-home { display:flex; align-items:center; gap:9px; margin:0 8px 4px; padding:7px 10px; border-radius:9px; color:var(--body); font:600 12.5px var(--font); }
+.pf-home.on { background:var(--panel3); color:var(--text); }
+[data-theme='light'] .pf-home.on { background:var(--card); box-shadow:var(--shadow-card); }
+.pf-home svg { flex:none; color:var(--muted); } .pf-home.on svg { color:var(--text); }
+.pf-home .lbl { flex:1; }
+.pf-home .cnt { flex:none; font:700 10px var(--fmono); color:var(--accent-ink); background:var(--accent); border-radius:99px; padding:1px 7px; }
+.pf-sep { height:1px; background:var(--border); margin:8px 14px; }
+.pf-row { display:flex; align-items:center; gap:9px; margin:1px 8px; padding:6px 10px; border-radius:var(--r-md); color:var(--body); font-size:12.5px; }
+.pf-row.on { background:var(--panel3); color:var(--text); font-weight:620; }
+[data-theme='light'] .pf-row.on { background:var(--card); box-shadow:var(--shadow-card), inset 0 0 0 1px var(--card-border); }
+.pf-row .rt { flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.pf-row .rsub { font:600 9.5px var(--fmono); color:var(--dim); flex:none; }
+.pf-row .rck { color:var(--done); font-size:11px; flex:none; }
+.pf-new { display:flex; align-items:center; gap:9px; margin:1px 8px; padding:6px 10px; border-radius:var(--r-md); color:var(--muted); font-size:12px; }
+.pf-foot { margin-top:auto; display:flex; align-items:center; gap:8px; padding:8px 14px 0; margin-top:auto; color:var(--dim); font-size:10.5px; border-top:1px solid var(--border); }
+.pf-foot .k { margin-left:auto; font:600 9.5px var(--fmono); border:1px solid var(--border2); border-radius:4px; padding:1px 5px; }
+
+/* content stub */
+.content { flex:1; min-width:0; margin:8px 8px 8px 0; border-radius:var(--r-lg); background:var(--panel); border:1px solid var(--border); padding:14px 16px; }
+.ctitle { font-family:var(--fdisp); font-size:17px; font-weight:640; color:var(--text); letter-spacing:-.01em; }
+.csub { font-size:11.5px; color:var(--dim); margin-top:3px; }
+.cline { height:8px; border-radius:99px; background:var(--panel2); margin-top:13px; }
+.cline.s { width:62%; } .cline.m { width:84%; } .cline.l { width:73%; }
+
+/* gain marker */
+.gain { position:absolute; left:0; right:0; border:1px dashed var(--done); border-radius:6px; background:color-mix(in srgb,var(--done) 9%,transparent); }
+.gain span { position:absolute; right:6px; top:50%; transform:translateY(-50%); font:700 9px var(--fmono); color:var(--done); letter-spacing:.08em; }
+.slice { display:flex; gap:11px; align-items:flex-start; padding:10px 0; border-top:1px solid var(--border); }
+.slice:first-child { border-top:none; }
+.slice .sn { flex:none; width:22px; height:22px; border-radius:7px; background:var(--panel3); color:var(--body); font:700 10px var(--fmono); display:grid; place-items:center; }
+.slice .sb { flex:1; font-size:12px; color:var(--muted); line-height:1.6; }
+.slice .sb b { color:var(--body); display:block; margin-bottom:2px; font-size:12.5px; }
+.kbd { font:600 9.5px var(--fmono); color:var(--body); border:1px solid var(--border2); border-radius:4px; padding:1px 5px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<div class="pagehead">
+  <h1>The projects rail — build spec</h1>
+  <p>R2 approved (2026-08-01) with three tweaks. All three land, and the second one changes the shape for the better: it turns the sidebar into <b>one column with two faces</b> rather than a strip plus a menu plus a nav.</p>
+  <div class="tweaks">
+    <div class="tw">
+      <h4>Tweak 1 · no tile at rest</h4>
+      <p><i>“I don't think we need the logo of the active project showing in the left rail when collapsed; just name is fine with the pulsing animations as needed.”</i></p>
+      <span class="got">Right — the name <b style="color:#77ac8d">becomes</b> the identity, so it steps up from <code>--dim</code> to <code>--body</code>, and the strip loses its only non-essential object. Logos are for <i>choosing</i>, which only happens on the open face.</span>
+    </div>
+    <div class="tw">
+      <h4>Tweak 2 · the rail becomes the nav</h4>
+      <p><i>“On reveal, the project rail becomes the project nav instead of a separate nav appearing right of it.”</i></p>
+      <span class="got">The strongest note of the round. R2 had a 216px panel <b style="color:#77ac8d">beside</b> a 266px nav — two nav-shaped things, one job. Now: one 266px column, two faces, and a 30px spine that switches them.</span>
+    </div>
+    <div class="tw">
+      <h4>Tweak 3 · workspace to the rail</h4>
+      <p><i>“It seems we are moving the profile/workspace icon to that rail? If that's best, it's fine with me.”</i></p>
+      <span class="got">Yes — and it pays for itself: with the project named in the spine and the account in its foot, the nav head has nothing left to say. Deleting it returns <b style="color:#77ac8d">56px</b> to Recents.</span>
+    </div>
+  </div>
+</div>
+
+<div class="stophd"><span class="stopno">At rest</span>The spine — a name, two pulses, and nothing else</div>
+<div class="stopp">30px, transparent, <code>--win</code> showing straight through. Top to bottom: <b>Home</b> with its needs-you count (the only filled tile — workspace scope), a hairline rule, a <b>live pulse</b> when an agent is working in <i>this</i> project, the <b>active project's name</b> in vertical mono, one <b>quiet dot per other project</b> (pulsing where work is happening <i>there</i>), and the account tile in the foot. Everything above the rule is the workspace; everything below it, and the whole column to its right, is the named project.</div>
+
+<div class="duo">
+  <div class="theme" data-theme="dark">
+    <h2>Rest · rooms face <span class="thm">graphite</span></h2>
+    <div class="frame">
+      <div class="spine">
+        <span class="sp-home"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg><span class="pip">3</span></span>
+        <span class="sp-rule"></span>
+        <span class="sp-live" title="an agent is working in this project"></span>
+        <span class="sp-name">neuramesh</span>
+        <span class="sp-dots"><span class="sp-dot live"></span><span class="sp-dot"></span></span>
+        <span class="sp-foot"><span class="avatar s24">G</span></span>
+      </div>
+      <div class="col">
+        <div class="face">
+          <div class="navnew"><div class="navnewchat"><span class="nncplus">＋</span><span class="navlbl">New chat</span><span class="nnck">⌘N</span></div><div class="navnewcaret">▾</div></div>
+          <div class="navband">
+            <div class="navsecttoggle">Channels <span class="navsectcnt">5</span></div>
+            <div class="chan on"><span class="h">#</span>build</div>
+            <div class="chan"><span class="h">#</span>dev</div>
+            <div class="chan"><span class="h">#</span>general</div>
+            <div class="chan"><span class="h">#</span>marketing</div>
+            <div class="chan"><span class="h">#</span>research</div>
+          </div>
+          <div class="navband">
+            <div class="navsecttoggle">Recents <span class="navsectcnt">6</span></div>
+            <div class="hrow raised"><span class="hdot prog live"></span><div class="hbody"><div class="hl1"><span class="hnum">1046</span><span class="htitle">Focus-trap release</span><span class="hchan">#build</span><span class="hwhen">2m</span></div><div class="hlive"><span class="ind"></span><span class="verb">patch · returning focus</span></div></div></div>
+            <div class="hrow"><span class="hdot thread"></span><div class="hbody"><div class="hl1"><span class="htitle">Competitor social report</span><span class="hchan">#marketing</span><span class="hwhen">12m</span></div></div></div>
+            <div class="hrow"><span class="hdot review"></span><div class="hbody"><div class="hl1"><span class="hnum">1042</span><span class="htitle">Mobile nav drawer</span><span class="hchan">#dev</span><span class="hwhen">5h</span></div></div></div>
+            <div class="hrow"><span class="hdot closed"></span><div class="hbody"><div class="hl1"><span class="hnum">1004</span><span class="htitle">Validation: provider…</span><span class="hchan">#dev</span><span class="hwhen">6d</span></div></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="content">
+        <div class="ctitle">#build</div>
+        <div class="csub">neuramesh · 6 conversations</div>
+        <div class="cline m"></div><div class="cline s"></div><div class="cline l"></div><div class="cline s"></div><div class="cline m"></div>
+      </div>
+    </div>
+    <div class="callouts">
+      <div class="co"><span class="n">1</span><b>The name is the identity now.</b> At <code>--body</code> and 9.5px it is the strip's loudest object after Home's pip — correct, because it is the one fact that scopes everything to its right.</div>
+      <div class="co"><span class="n">2</span><b>Two pulses, two meanings.</b> Above the name = work in <i>this</i> project. In the dots = work <i>elsewhere</i>. Same <code>openRuns</code> watch the Recents pulse already reads — no new query.</div>
+      <div class="co"><span class="n">3</span><b>No head on the column.</b> It opens straight into New chat, and Recents gets four rows where it used to fit three.</div>
+    </div>
+  </div>
+
+  <div class="theme" data-theme="light">
+    <h2>Rest · rooms face <span class="thm">paper</span></h2>
+    <div class="frame">
+      <div class="spine">
+        <span class="sp-home"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg><span class="pip">3</span></span>
+        <span class="sp-rule"></span>
+        <span class="sp-live"></span>
+        <span class="sp-name">neuramesh</span>
+        <span class="sp-dots"><span class="sp-dot live"></span><span class="sp-dot"></span></span>
+        <span class="sp-foot"><span class="avatar s24">G</span></span>
+      </div>
+      <div class="col">
+        <div class="face">
+          <div class="navnew"><div class="navnewchat"><span class="nncplus">＋</span><span class="navlbl">New chat</span><span class="nnck">⌘N</span></div><div class="navnewcaret">▾</div></div>
+          <div class="navband">
+            <div class="navsecttoggle">Channels <span class="navsectcnt">5</span></div>
+            <div class="chan on"><span class="h">#</span>build</div>
+            <div class="chan"><span class="h">#</span>dev</div>
+            <div class="chan"><span class="h">#</span>general</div>
+            <div class="chan"><span class="h">#</span>marketing</div>
+            <div class="chan"><span class="h">#</span>research</div>
+          </div>
+          <div class="navband">
+            <div class="navsecttoggle">Recents <span class="navsectcnt">6</span></div>
+            <div class="hrow raised"><span class="hdot prog live"></span><div class="hbody"><div class="hl1"><span class="hnum">1046</span><span class="htitle">Focus-trap release</span><span class="hchan">#build</span><span class="hwhen">2m</span></div><div class="hlive"><span class="ind"></span><span class="verb">patch · returning focus</span></div></div></div>
+            <div class="hrow"><span class="hdot thread"></span><div class="hbody"><div class="hl1"><span class="htitle">Competitor social report</span><span class="hchan">#marketing</span><span class="hwhen">12m</span></div></div></div>
+            <div class="hrow"><span class="hdot review"></span><div class="hbody"><div class="hl1"><span class="hnum">1042</span><span class="htitle">Mobile nav drawer</span><span class="hchan">#dev</span><span class="hwhen">5h</span></div></div></div>
+            <div class="hrow"><span class="hdot closed"></span><div class="hbody"><div class="hl1"><span class="hnum">1004</span><span class="htitle">Validation: provider…</span><span class="hchan">#dev</span><span class="hwhen">6d</span></div></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="content">
+        <div class="ctitle">#build</div>
+        <div class="csub">neuramesh · 6 conversations</div>
+        <div class="cline m"></div><div class="cline s"></div><div class="cline l"></div><div class="cline s"></div><div class="cline m"></div>
+      </div>
+    </div>
+    <div class="callouts">
+      <div class="co"><span class="n">4</span><b>Transparent is load-bearing in paper.</b> A filled 30px column here would read as a second chrome edge against <code>--win #e9e5db</code>; painting nothing keeps the spine part of the window rather than a panel on it.</div>
+      <div class="co"><span class="n">5</span><b>Home's pip is the one accent object</b> in the whole strip — <code>--accent</code> on <code>--accent-ink</code>, the same treatment the nav's <code>.navhomecount</code> already uses. Nothing else competes with it.</div>
+    </div>
+  </div>
+</div>
+
+<div class="stophd"><span class="stopno">Tweak 2</span>One column, two faces — the money shot</div>
+<div class="stopp">The column never changes width and never moves. Hovering the spine (or <span class="kbd">⌘⇧P</span>) swaps its <b>face</b>: rooms out, projects in, a 130ms cross-fade with a 4px slide. No shadow, no scrim, no second panel — because this is not a popover appearing over the nav, it is <b>the nav showing its other side</b>. Picking a project swaps the face back, and the rooms underneath are that project's. <b>Layout shift: 0px</b>, by construction rather than by care.</div>
+
+<div class="duo">
+  <div class="theme" data-theme="dark">
+    <h2>Projects face <span class="thm">graphite</span></h2>
+    <div class="frame">
+      <div class="spine hot">
+        <span class="sp-home"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg><span class="pip">3</span></span>
+        <span class="sp-rule"></span>
+        <span class="sp-live"></span>
+        <span class="sp-name on">neuramesh</span>
+        <span class="sp-dots"><span class="sp-dot live"></span><span class="sp-dot"></span></span>
+        <span class="sp-foot"><span class="avatar s24">G</span></span>
+      </div>
+      <div class="col">
+        <div class="face">
+          <div class="pf-hd">
+            <span class="avatar s34">G</span>
+            <span class="t"><b>GADS INC</b><small>workspace</small></span>
+            <span class="x">esc</span>
+          </div>
+          <div class="pf-home on"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg><span class="lbl">Home</span><span class="cnt">3</span></div>
+          <div class="pf-sep"></div>
+          <div class="navsecttoggle">Projects <span class="navsectcnt">3</span></div>
+          <div class="pf-row on"><span class="avatar s22 on">N</span><span class="rt">neuramesh</span><span class="rck">✓</span></div>
+          <div class="pf-row"><span class="avatar s22">F<span class="livedot"></span></span><span class="rt">flowe-ai</span><span class="rsub">6 open</span></div>
+          <div class="pf-row"><span class="avatar s22">D</span><span class="rt">default</span><span class="rsub">default</span></div>
+          <div class="pf-sep"></div>
+          <div class="pf-new">＋ New project</div>
+          <div class="pf-new"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.6"/></svg> All projects</div>
+          <div class="pf-foot">Click the spine to pin <span class="k">⌘⇧P</span></div>
+        </div>
+      </div>
+      <div class="content">
+        <div class="ctitle">#build</div>
+        <div class="csub">neuramesh · 6 conversations</div>
+        <div class="cline m"></div><div class="cline s"></div><div class="cline l"></div><div class="cline s"></div><div class="cline m"></div>
+      </div>
+    </div>
+    <div class="callouts">
+      <div class="co"><span class="n">6</span><b>The content never moves.</b> Same 266px, same position, same transparent ground — only what is drawn inside changes. Compare R2's version, where a 216px panel appeared and a dimmed nav sat behind it looking like it had been abandoned.</div>
+      <div class="co"><span class="n">7</span><b>The workspace header lives here</b>, not in the rooms face. It appears exactly when it is relevant — when you are choosing which world to be in — which is the answer to tweak 3.</div>
+      <div class="co"><span class="n">8</span><b>Projects rows reuse the channel-row anatomy</b> (<code>.chan</code>'s padding, radius and active treatment) — a project and a channel are both “a place you pick from a list”, and they should not look like two inventions.</div>
+    </div>
+  </div>
+
+  <div class="theme" data-theme="light">
+    <h2>Projects face <span class="thm">paper</span></h2>
+    <div class="frame">
+      <div class="spine hot">
+        <span class="sp-home"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg><span class="pip">3</span></span>
+        <span class="sp-rule"></span>
+        <span class="sp-live"></span>
+        <span class="sp-name on">neuramesh</span>
+        <span class="sp-dots"><span class="sp-dot live"></span><span class="sp-dot"></span></span>
+        <span class="sp-foot"><span class="avatar s24">G</span></span>
+      </div>
+      <div class="col">
+        <div class="face">
+          <div class="pf-hd">
+            <span class="avatar s34">G</span>
+            <span class="t"><b>GADS INC</b><small>workspace</small></span>
+            <span class="x">esc</span>
+          </div>
+          <div class="pf-home on"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg><span class="lbl">Home</span><span class="cnt">3</span></div>
+          <div class="pf-sep"></div>
+          <div class="navsecttoggle">Projects <span class="navsectcnt">3</span></div>
+          <div class="pf-row on"><span class="avatar s22 on">N</span><span class="rt">neuramesh</span><span class="rck">✓</span></div>
+          <div class="pf-row"><span class="avatar s22">F<span class="livedot"></span></span><span class="rt">flowe-ai</span><span class="rsub">6 open</span></div>
+          <div class="pf-row"><span class="avatar s22">D</span><span class="rt">default</span><span class="rsub">default</span></div>
+          <div class="pf-sep"></div>
+          <div class="pf-new">＋ New project</div>
+          <div class="pf-new"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.6"/></svg> All projects</div>
+          <div class="pf-foot">Click the spine to pin <span class="k">⌘⇧P</span></div>
+        </div>
+      </div>
+      <div class="content">
+        <div class="ctitle">#build</div>
+        <div class="csub">neuramesh · 6 conversations</div>
+        <div class="cline m"></div><div class="cline s"></div><div class="cline l"></div><div class="cline s"></div><div class="cline m"></div>
+      </div>
+    </div>
+    <div class="callouts">
+      <div class="co"><span class="n">9</span><b>The face has no shadow and no border.</b> That is the whole tell: a popover floats on the window, a face is part of it. If it needed a <code>--shadow-pop</code> to read, tweak 2 would not have worked.</div>
+      <div class="co"><span class="n">10</span><b>The spine stays lit while the face is open</b> (<code>.hot</code>) — it is the thing you move back to, and it must not look dismissed while its own face is showing.</div>
+    </div>
+  </div>
+</div>
+
+<div class="stophd"><span class="stopno">Tweak 3</span>What moving the workspace to the spine actually buys</div>
+<div class="stopp">The nav head today is a 38px badge in 9px/11px padding = <b>56px</b> of column, and it exists to say two things: which project (now the spine's job) and which workspace (now the projects face's). With both re-homed it has no remaining content, so it goes — and the 266px column that docs/32 §12 measured as too tight to hold a full Recents row gets those 56px back. That is <b>two more Recents rows</b> at the current 27px row height, or one row plus the branch line.</div>
+
+<div class="duo">
+  <div class="theme" data-theme="dark">
+    <h2>Before — the head, and the promise it made <span class="thm">graphite</span></h2>
+    <div class="frame" style="height:300px">
+      <div class="col" style="position:relative">
+        <div class="gain" style="top:0; height:56px"><span>56px</span></div>
+        <div style="display:flex; align-items:center; gap:10px; padding:9px 11px">
+          <span class="avatar s34" style="width:38px;height:38px;border-radius:14px;font-size:16px">N</span>
+          <span><b style="display:block;font-size:14.5px;font-weight:700">neuramesh</b><small style="display:block;font-size:11px;color:var(--dim)">GADS INC</small></span>
+        </div>
+        <div class="navband" style="padding-top:2px">
+          <div class="navsecttoggle">Channels <span class="navsectcnt">5</span></div>
+          <div class="chan on"><span class="h">#</span>build</div>
+          <div class="chan"><span class="h">#</span>dev</div>
+        </div>
+        <div class="navband">
+          <div class="navsecttoggle">Recents <span class="navsectcnt">6</span></div>
+          <div class="hrow"><span class="hdot prog live"></span><div class="hbody"><div class="hl1"><span class="hnum">1046</span><span class="htitle">Focus-trap release</span><span class="hwhen">2m</span></div></div></div>
+          <div class="hrow"><span class="hdot thread"></span><div class="hbody"><div class="hl1"><span class="htitle">Competitor social report</span><span class="hwhen">12m</span></div></div></div>
+          <div class="hrow"><span class="hdot review"></span><div class="hbody"><div class="hl1"><span class="hnum">1042</span><span class="htitle">Mobile nav drawer</span><span class="hwhen">5h</span></div></div></div>
+        </div>
+      </div>
+      <div class="content"><div class="ctitle">#build</div><div class="cline m"></div><div class="cline s"></div><div class="cline l"></div></div>
+    </div>
+    <div class="callouts">
+      <div class="co"><span class="n">11</span><b>This is the object that started round 1.</b> The largest thing in the rail, naming the project, sitting above a Home row whose count spans every project. The redesign does not label the contradiction — it removes the object that made it.</div>
+    </div>
+  </div>
+
+  <div class="theme" data-theme="light">
+    <h2>After — 56px back, three Recents rows become five <span class="thm">paper</span></h2>
+    <div class="frame" style="height:300px">
+      <div class="spine">
+        <span class="sp-home"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg><span class="pip">3</span></span>
+        <span class="sp-rule"></span>
+        <span class="sp-live"></span>
+        <span class="sp-name">neuramesh</span>
+        <span class="sp-foot"><span class="avatar s24">G</span></span>
+      </div>
+      <div class="col">
+        <div class="navband" style="padding-top:10px">
+          <div class="navsecttoggle">Channels <span class="navsectcnt">5</span></div>
+          <div class="chan on"><span class="h">#</span>build</div>
+          <div class="chan"><span class="h">#</span>dev</div>
+        </div>
+        <div class="navband">
+          <div class="navsecttoggle">Recents <span class="navsectcnt">6</span></div>
+          <div class="hrow"><span class="hdot prog live"></span><div class="hbody"><div class="hl1"><span class="hnum">1046</span><span class="htitle">Focus-trap release</span><span class="hwhen">2m</span></div></div></div>
+          <div class="hrow"><span class="hdot thread"></span><div class="hbody"><div class="hl1"><span class="htitle">Competitor social report</span><span class="hwhen">12m</span></div></div></div>
+          <div class="hrow"><span class="hdot review"></span><div class="hbody"><div class="hl1"><span class="hnum">1042</span><span class="htitle">Mobile nav drawer</span><span class="hwhen">5h</span></div></div></div>
+          <div class="hrow"><span class="hdot ship"></span><div class="hbody"><div class="hl1"><span class="hnum">1034</span><span class="htitle">flowe logo revamp</span><span class="hwhen">3d</span></div></div></div>
+          <div class="hrow"><span class="hdot closed"></span><div class="hbody"><div class="hl1"><span class="hnum">1004</span><span class="htitle">Validation: provider…</span><span class="hwhen">6d</span></div></div></div>
+        </div>
+      </div>
+      <div class="content"><div class="ctitle">#build</div><div class="cline m"></div><div class="cline s"></div><div class="cline l"></div></div>
+    </div>
+    <div class="callouts">
+      <div class="co"><span class="n">12</span><b>Net frame cost: −26px.</b> The spine takes 30 and the head gives back 56. The redesign is <i>narrower</i> than what it replaces, which is not the usual direction for adding a navigation element.</div>
+      <div class="co"><span class="n">13</span><b>Folded (⌘\), the spine survives</b> and absorbs the unfold chevron — so at 30px total the app can still name its project, which today's 26px fold tab cannot do at all.</div>
+    </div>
+  </div>
+</div>
+
+<div class="stophd"><span class="stopno">Build</span>Three slices, and what each one is done when</div>
+<div class="stopp">Data scoping already landed (<code>6c22869</code>) — Recents, ⌘Y, In flight and Home's greeting follow the active project; the needs-you queue and its badge stay workspace-wide per docs/12 §6. What follows is chrome only: no schema, no sync rules, no migration.</div>
+
+<div class="duo">
+  <div class="theme" data-theme="dark">
+    <h2>Slices <span class="thm">graphite</span></h2>
+    <div class="slice"><span class="sn">1</span><span class="sb"><b>The spine + the head deleted</b>New <code>ProjectRail</code> beside <code>&lt;nav className="navpanel"&gt;</code>: Home + pip, rule, live pulse, vertical name, other-project dots, account tile. <code>.navhead</code> and <code>.navhome</code> come out of the nav. No hover behaviour yet — clicking the spine opens the Projects page, exactly as the head does today. <i>Done when:</i> both themes shot, folded + unfolded, and the 56px reclaim measured on the real rail.</span></div>
+    <div class="slice"><span class="sn">2</span><span class="sb"><b>The second face</b><code>navFace: 'rooms' | 'projects'</code> in the nav column. 140ms hover intent in, 240ms grace out, 130ms cross-fade, click-to-pin persisted like <code>nm:navFolded</code>, <span class="kbd">⌘⇧P</span> / <span class="kbd">↑↓⏎</span> / <span class="kbd">Esc</span>. <i>Done when:</i> face swap measured &lt;150ms (CLAUDE.md #2), 0px layout shift proven, and the edge-hover false-fire checked against the traffic-light corner on the preview harness.</span></div>
+    <div class="slice"><span class="sn">3</span><span class="sb"><b>The fold absorbed</b><code>.navfoldtab</code> merges into the spine; <code>--navfold-w</code> retires. The fold's two vitals are already what the spine says. <i>Done when:</i> ⌘\ round-trips with the spine intact and the scroll position preserved, per <code>tokens.css:754</code>'s existing promise.</span></div>
+    <div class="slice"><span class="sn">＋</span><span class="sb"><b>Riding slice 1 (from round 1, independent of this shape)</b>The ⌘Y overlay's <code>neuramesh ⇄ All projects</code> toggle — required, or narrowing the rail silently deletes cross-project search (docs/32 §12) — and the composer chip's project icon, which its own dropdown already renders.</span></div>
+    <div class="callouts">
+      <div class="co"><span class="n">14</span><b>docs/33</b> gains the spine-and-face idiom; <b>docs/06 §v1 / docs/12 §6</b> gain the note that the deviation is now expressed spatially — Home lives outside the project column, so it needs no asterisk on screen.</div>
+    </div>
+  </div>
+
+  <div class="theme" data-theme="light">
+    <h2>Still open — four calls I need from you <span class="thm">paper</span></h2>
+    <div class="slice"><span class="sn">①</span><span class="sb"><b>Dots, or one dot?</b>One quiet dot per other project (mocked) reads precisely at three projects and stops scaling around eight. The alternative is a single dot meaning “work is happening elsewhere”, which never stops scaling but says less.</span></div>
+    <div class="slice"><span class="sn">②</span><span class="sb"><b>Long names.</b>Vertical mono at 9.5px/.15em measures <b>7.1px of rail per character</b> (<code>NEURAMESH</code> = 64px in this page), so <code>ACME-MARKETING-SITE</code> would run ~135px — most of a short window's rail. Truncate with an ellipsis, or drop to the first word?</span></div>
+    <div class="slice"><span class="sn">③</span><span class="sb"><b>Clicking the active project's own row</b>— close the face and stay put, or open the Projects page focused on it? (Carried over from round 2; the face makes “close and stay” the more natural read.)</span></div>
+    <div class="slice"><span class="sn">④</span><span class="sb"><b>Right-docked nav</b> (<code>navPos: 'right'</code>) — does the spine follow to the right edge, mirrored, or is it always the leftmost column regardless of where the nav sits?</span></div>
+    <div class="callouts">
+      <div class="co"><span class="n">15</span>None of the four blocks slice 1. Say go and I will build the spine and delete the head; ① and ② can be answered off the real rail rather than a mockup, which is where they will actually be decidable.</div>
+    </div>
+  </div>
+</div>
+
+</div>
+</body>
+</html>

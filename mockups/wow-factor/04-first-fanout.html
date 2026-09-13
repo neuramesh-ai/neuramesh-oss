@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NeuraMesh · Your first fan-out</title>
+<link rel="stylesheet" href="nm.css">
+<style>
+  .firstrun-pill{font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;
+    background:var(--accent-soft);color:var(--accent);padding:2px 8px;border-radius:99px}
+  .msg .mtext b{color:var(--text)}
+  .building .dot{background:var(--accent)!important;box-shadow:0 0 0 3px var(--accent-glow)}
+  .machines-on .dot{background:var(--ok);box-shadow:0 0 0 3px color-mix(in srgb,var(--ok) 22%,transparent)}
+</style>
+</head>
+<body>
+<div class="confetti" id="confetti"></div>
+
+<div class="app">
+  <!-- SIDEBAR -->
+  <aside class="side">
+    <div class="ws">
+      <div class="wsav">AR</div>
+      <div class="wsinfo"><b>default</b><span>Acme Robotics</span></div>
+      <span class="caret">▾</span>
+    </div>
+    <div class="navlist">
+      <div class="navitem on"><span class="ni">⌂</span> Home</div>
+      <div class="navitem"><span class="ni">▦</span> Tasks <span class="nb" id="taskCount">0</span></div>
+      <div class="navitem"><span class="ni">⛁</span> Artifacts</div>
+      <div class="navitem"><span class="ni">◉</span> Agents</div>
+      <div class="navitem"><span class="ni">☰</span> Activity</div>
+    </div>
+    <div class="sidehead">Channels</div>
+    <div class="sideitem"><span class="hash">#</span><span class="lbl">general</span></div>
+    <div class="sideitem on"><span class="hash">#</span><span class="lbl">dev</span></div>
+    <div class="sideitem"><span class="hash">#</span><span class="lbl">research</span></div>
+    <div class="sidehead">Agents</div>
+    <div class="sideitem"><div class="av sm orch">🦊</div><span class="lbl">rex</span><span class="dot busy" id="dot-rex"></span></div>
+    <div class="sideitem"><div class="av sm arch">🦅</div><span class="lbl">atlas</span><span class="dot on"></span></div>
+    <div class="sideitem" id="row-patch"><div class="av sm dev">🦉</div><span class="lbl">patch</span><span class="dot on" id="dot-patch"></span></div>
+    <div class="sideitem"><div class="av sm rev">🐝</div><span class="lbl">scout</span><span class="dot on"></span></div>
+    <div class="sidehead" id="connect">Machines</div>
+    <div class="sideitem machines-on" id="row-mac"><span style="font-size:14px">💻</span><span class="lbl">your-mac</span><span class="dot on" id="dot-mac"></span></div>
+    <div class="selfcard">
+      <div class="av sm you">🧑‍💻</div>
+      <div class="nm-self"><b>You</b><span>online</span></div>
+      <button class="themetog" id="tt" title="Toggle theme" style="margin-left:auto;width:30px;height:30px">◐</button>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+    <div class="chhead">
+      <span class="ct"># dev</span>
+      <span class="ctopic">ship things, fast</span>
+      <span class="firstrun-pill" style="margin-left:10px">first run</span>
+      <span class="sync"><span class="dot on"></span> synced</span>
+    </div>
+    <div class="cfeed" id="feed">
+      <div class="coach" id="coach">👋 <div><b style="color:var(--text)">Welcome to #dev.</b> Your team is here and idle. Pick the starter below and watch them ship it — you just approve the result. Nothing touches your real code.</div><span class="x" onclick="this.parentElement.style.display='none'">✕</span></div>
+    </div>
+    <div class="composer">
+      <div class="cbox">
+        <input id="ask" placeholder="Reply in #dev — or type your own ask for @rex…" autocomplete="off">
+        <button class="btn primary" id="askGo">Send ↵</button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+  const tt=document.getElementById('tt');
+  const apply=t=>{document.documentElement.dataset.theme=t;tt.textContent=t==='cream'?'☀':'◐';try{sessionStorage.nmTheme=t}catch(e){}};
+  apply(sessionStorage.nmTheme||'dark');
+  tt.onclick=()=>apply(document.documentElement.dataset.theme==='cream'?'dark':'cream');
+
+  const feed=document.getElementById('feed');
+  const scrollFeed=()=>feed.scrollTop=feed.scrollHeight;
+  let timers=[]; const at=(ms,fn)=>timers.push(setTimeout(fn,ms)); const clearAll=()=>{timers.forEach(clearTimeout);timers=[]};
+  const av=(role,e)=>`<div class="av sm ${role}">${e}</div>`;
+  function msg(role,e,name,time,html){const d=document.createElement('div');d.className='msg pop';
+    d.innerHTML=`${av(role,e)}<div class="mbody"><div class="mhead"><span class="mname">${name}</span><span class="mtime">${time}</span></div><div class="mtext">${html}</div></div>`;
+    feed.appendChild(d);scrollFeed();return d;}
+  function typing(role,e,name,label){const d=document.createElement('div');d.className='msg';d.dataset.t='1';
+    d.innerHTML=`${av(role,e)}<div class="mbody"><div class="mhead"><span class="mname">${name}</span></div><div class="mtext muted" style="display:flex;gap:7px;align-items:center">${label} <span class="typing"><i></i><i></i><i></i></span></div></div>`;
+    feed.appendChild(d);scrollFeed();return d;}
+  const killT=()=>feed.querySelectorAll('[data-t]').forEach(e=>e.remove());
+  const tick=k=>{const li=document.querySelector(`#dod li[data-k="${k}"]`);if(li)li.classList.add('ok');};
+  const setTasks=n=>document.getElementById('taskCount').textContent=n;
+
+  // intro: rex welcome + starter
+  function intro(){
+    at(400,()=>{var t=typing('orch','🦊','rex','waving hello')});
+    at(1700,()=>{killT();
+      msg('orch','🦊','rex','now',`Welcome aboard — I'm <b>rex</b>, your orchestrator. Let's ship one together so you can feel the loop. I picked a safe one on a sandbox repo:`);
+      const s=document.createElement('div');s.className='starter pop';
+      s.innerHTML=`<div class="srepo">📁 neuramesh/demo-api · base main</div>
+        <div class="stitle">Add a <span class="mono">/health</span> endpoint that returns <span class="mono">{status:"ok"}</span></div>
+        <div class="sacts"><button class="btn primary" id="goStarter">Let's do it →</button><span class="hint">or type your own ask above</span></div>`;
+      feed.appendChild(s);scrollFeed();
+      document.getElementById('goStarter').onclick=()=>{s.remove();run('Add a /health endpoint that returns {status:"ok"}');};
+    });
+  }
+
+  function run(feat){
+    clearAll();
+    document.querySelectorAll('.starter').forEach(s=>s.remove());
+    const featShort=feat.length>46?feat.slice(0,46)+'…':feat;
+    msg('you','🧑‍💻','You','now',`@rex ${feat}`);
+
+    at(500,()=>{var t=typing('orch','🦊','rex','planning')});
+    at(2000,()=>{killT();
+      msg('orch','🦊','rex','now',`Got it. Here's the plan for <b>${featShort}</b>, gated on a Definition of Done. Fanning out.`);
+      const pc=document.createElement('div');pc.className='planc pop';
+      pc.innerHTML=`<h5>📐 Definition of Done</h5><ul class="dod" id="dod">
+        <li data-k="impl"><span class="ck">✓</span><span class="mono">/health</span> returns 200 <span class="mono">{status:"ok"}</span></li>
+        <li data-k="test"><span class="ck">✓</span>Test added &amp; green</li>
+        <li data-k="pr"><span class="ck">✓</span>PR opened · CI passing</li></ul>`;
+      feed.appendChild(pc);scrollFeed();
+    });
+
+    at(3100,()=>{msg('orch','🦊','rex','now','Fanned out:');setTasks(3);
+      [['#501','atlas','🦅','arch','Draft plan &amp; DoD'],['#502','patch','🦉','dev','Build the endpoint'],['#503','scout','🐝','rev','Review against DoD']]
+        .forEach((t,i)=>at(i*240,()=>{const el=document.createElement('div');el.className='taskmini pop';
+          el.innerHTML=`<span class="tid">${t[0]}</span><span class="tt">${t[4]}</span>${av(t[3],t[2])}<span class="chip s-todo">queued</span>`;feed.appendChild(el);scrollFeed();}));
+    });
+    at(4000,()=>tick('impl'));
+
+    // build — machine comes alive
+    at(4400,()=>{
+      document.getElementById('row-patch').classList.add('building');
+      document.getElementById('dot-patch').className='dot busy';
+      var t=typing('dev','🦉','patch','claiming #502 · building');
+      const mc=document.createElement('div');mc.className='machinechip pop';
+      mc.innerHTML=`<span class="pulse"></span> 💻 running on <b style="color:var(--text)">your-mac</b> · outbound-only, your code never leaves`;
+      feed.appendChild(mc);scrollFeed();
+    });
+    at(5000,()=>{const bb=document.createElement('div');bb.style.margin='4px 0 6px 36px';
+      bb.innerHTML='<div class="bar"><i style="width:8%"></i></div>';feed.appendChild(bb);scrollFeed();
+      const fill=bb.querySelector('i');[26,52,78,100].forEach((w,i)=>at(i*430,()=>fill.style.width=w+'%'));});
+    at(7100,()=>{killT();
+      document.getElementById('row-patch').classList.remove('building');document.getElementById('dot-patch').className='dot on';
+      msg('dev','🦉','patch','now',`Done. Pushed <span class="mono">nm/502-health-endpoint</span> · opened PR <b>#502</b> · <b>+37 −2</b>.`);
+    });
+
+    // review
+    at(7800,()=>{var t=typing('rev','🐝','scout','reviewing #502 against the DoD')});
+    at(8700,()=>tick('test'));
+    at(9300,()=>{killT();
+      msg('rev','🐝','scout','now','Checked it line by line against the Definition of Done:');
+      const ev=document.createElement('div');ev.className='evrow';
+      ev.innerHTML=`<span class="ev">✓ 6 tests pass</span><span class="ev ci">✓ CI green</span><span class="ev shot">200 · {status:"ok"}</span>`;
+      feed.appendChild(ev);scrollFeed();at(500,()=>tick('pr'));
+    });
+
+    // accept
+    at(10600,()=>{
+      const ac=document.createElement('div');ac.className='acceptc pop';
+      ac.innerHTML=`<div class="pr"><span class="num">PR #502</span> · <span class="chip s-done">DoD met</span> · your call</div>
+        <div class="acts"><button class="btn accept" id="acceptBtn">✓ Accept &amp; merge</button><button class="btn ghost" id="rcBtn">Request changes</button></div>`;
+      feed.appendChild(ac);scrollFeed();
+      document.getElementById('acceptBtn').onclick=ship;
+      document.getElementById('rcBtn').onclick=()=>document.getElementById('rcBtn').textContent='Bounced back to patch ↩';
+    });
+  }
+
+  function ship(){
+    const b=document.getElementById('acceptBtn');if(!b)return;b.closest('.acceptc').remove();setTasks(0);
+    const sh=document.createElement('div');sh.className='shipped pop';
+    sh.innerHTML=`<div class="big">🎉</div><h4>You just shipped your first PR.</h4>
+      <p>#502 squash-merged to main · branch deleted · learnings written back — <b style="color:var(--text)">without opening an editor</b>.</p>
+      <div class="stat"><span>⏱ <b>3m 48s</b></span><span>👀 you reviewed <b>22s</b></span><span>⌨️ <b>0</b> lines typed</span></div>
+      <p style="margin-top:12px">This is the loop. Everything else is just more of it. Hand rex your next ask anytime ↑</p>`;
+    feed.appendChild(sh);scrollFeed();confetti();
+  }
+
+  document.getElementById('askGo').onclick=()=>{const v=document.getElementById('ask').value.trim();if(v){document.getElementById('ask').value='';run(v);}};
+  document.getElementById('ask').addEventListener('keydown',e=>{if(e.key==='Enter'){const v=e.target.value.trim();if(v){e.target.value='';run(v);}}});
+
+  function confetti(){const c=document.getElementById('confetti');const cols=['#ff7a52','#ec5a32','#54c08c','#a899f5','#7aa6e2','#f0b35a'];
+    for(let i=0;i<72;i++){const p=document.createElement('i');p.style.left=Math.random()*100+'vw';p.style.background=cols[i%cols.length];
+      p.style.animationDuration=(1.6+Math.random()*1.4)+'s';p.style.animationDelay=(Math.random()*.4)+'s';c.appendChild(p);setTimeout(()=>p.remove(),3400);}}
+
+  intro();
+</script>
+</body>
+</html>

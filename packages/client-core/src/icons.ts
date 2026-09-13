@@ -1,0 +1,68 @@
+// THE ICON SHEET, SHARED (the mobile-cloud round, S1.4 — "icons, not words" needs the same glyphs
+// on both clients). GENERATED from apps/desktop/src/renderer/src/ui/icons.tsx by the round's
+// build script and asserted against it by test/icons.test.ts: every entry is the desktop icon's
+// inner markup verbatim, on a 24-grid, stroke 2, currentColor, round caps and joins. The phone
+// draws them with react-native-svg (apps/mobile/src/icon.tsx parses the three primitives this
+// sheet uses — path, circle, rect); the desktop keeps its JSX sheet. Never hand-edit an entry:
+// change the desktop icon and regenerate.
+export const ICON_PATHS = {
+  threads: "<path d=\"M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z\" />",
+  code: "<path d=\"M4 17l6-6-6-6\" /><path d=\"M13 19h7\" />",
+  routineClock: "<circle cx=\"12\" cy=\"12\" r=\"9\" /><path d=\"M12 7.5V12l3.2 2\" />",
+  board: "<rect x=\"3\" y=\"3\" width=\"7\" height=\"9\" rx=\"1\" /><rect x=\"14\" y=\"3\" width=\"7\" height=\"5\" rx=\"1\" /><rect x=\"3\" y=\"16\" width=\"7\" height=\"5\" rx=\"1\" /><rect x=\"14\" y=\"12\" width=\"7\" height=\"9\" rx=\"1\" />",
+  calendar: "<rect x=\"3\" y=\"4.5\" width=\"18\" height=\"17\" rx=\"2.5\" /><path d=\"M8 2.5v4M16 2.5v4M3 9.5h18\" />",
+  home: "<path d=\"m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z\" /><path d=\"M9 22V12h6v10\" />",
+  search: "<circle cx=\"11\" cy=\"11\" r=\"8\" /><path d=\"M21 21l-4.3-4.3\" />",
+  compose: "<path d=\"M12 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-6\" /><path d=\"M18.4 3.6a2 2 0 0 1 2.8 2.8L13 14.6l-3.8.9.9-3.8z\" />",
+  machine: "<rect x=\"2\" y=\"4\" width=\"20\" height=\"12\" rx=\"2\" /><path d=\"M2 20h20\" /><path d=\"M9 20v-4h6v4\" />",
+  cloud: "<path d=\"M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9z\" />",
+  cloudMachine: "<rect x=\"2\" y=\"7\" width=\"13.5\" height=\"9.8\" rx=\"2\" /><path d=\"M5.5 20.5h6.5\" /><path d=\"M8.75 16.8v3.7\" /><path d=\"M17.2 8.4h4.5a2.25 2.25 0 0 0 .3-4.5 3.2 3.2 0 0 0-6.1 1.1 1.9 1.9 0 0 0 1.3 3.4z\" />",
+  auto: "<path d=\"M12 21v-7\" /><path d=\"M12 14c0-3.5-5-3.5-5-7.5\" /><path d=\"M12 14c0-3.5 5-3.5 5-7.5\" /><path d=\"M4.5 9 7 6.5 9.5 9\" /><path d=\"M14.5 9 17 6.5 19.5 9\" />",
+  checkCircle: "<circle cx=\"12\" cy=\"12\" r=\"8\" /><path d=\"m8.5 12.3 2.4 2.4 4.6-5\" />",
+  circleGlyph: "<circle cx=\"12\" cy=\"12\" r=\"6.5\" />",
+  check: "<path d=\"M20 6 9 17l-5-5\" />",
+  arrowUp: "<path d=\"M12 19V5\" /><path d=\"m5 12 7-7 7 7\" />",
+  paperclip: "<path d=\"m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48\" />",
+  chevron: "<path d=\"M6 9l6 6 6-6\" />",
+  arrowL: "<path d=\"M19 12H5\" /><path d=\"m12 19-7-7 7-7\" />",
+  arrowR: "<path d=\"M5 12h14\" /><path d=\"m12 5 7 7-7 7\" />",
+  resend: "<path d=\"M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8\" /><path d=\"M21 3v5h-5\" /><path d=\"M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16\" /><path d=\"M3 21v-5h5\" />",
+  term: "<rect x=\"3\" y=\"4\" width=\"18\" height=\"16\" rx=\"2\" /><path d=\"m7 9 2.5 2.5L7 14\" /><path d=\"M12.5 14H17\" />",
+  branch: "<circle cx=\"6\" cy=\"6\" r=\"3\" /><circle cx=\"6\" cy=\"18\" r=\"3\" /><circle cx=\"18\" cy=\"6\" r=\"3\" /><path d=\"M6 9v6\" /><path d=\"M18 9a9 9 0 0 1-9 9\" />",
+  folder: "<path d=\"M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z\" />",
+  folderOpen: "<path d=\"M3 7a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v1\" /><path d=\"M3 19v-8h16.4a1 1 0 0 1 .96 1.28l-1.7 6a1 1 0 0 1-.96.72H5a2 2 0 0 1-2-2z\" />",
+  play: "<path d=\"M7 4.5v15l12-7.5z\" />",
+  pause: "<path d=\"M9 5v14\" /><path d=\"M15 5v14\" />",
+  image: "<rect x=\"3\" y=\"3\" width=\"18\" height=\"18\" rx=\"2\" ry=\"2\" /><circle cx=\"9\" cy=\"9\" r=\"1.6\" /><path d=\"m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21\" />",
+  file: "<path d=\"M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z\" /><path d=\"M14 2v6h6\" />",
+  brain: "<path d=\"M12 4.5a3 3 0 0 0-3 3.1c-1.8.4-3.1 1.9-3.1 3.8a3.9 3.9 0 0 0 1.5 3.1 3.4 3.4 0 0 0 3.3 4.4c.4 0 .9-.1 1.3-.2.4.1.9.2 1.3.2a3.4 3.4 0 0 0 3.3-4.4 3.9 3.9 0 0 0 1.5-3.1c0-1.9-1.3-3.4-3.1-3.8a3 3 0 0 0-3-3.1z\" /><path d=\"M12 4.5v15\" />",
+  project: "<rect x=\"3\" y=\"3\" width=\"18\" height=\"18\" rx=\"4\" /><path d=\"M8 9h8\" /><path d=\"M8 13h5\" />",
+  close: "<path d=\"M18 6 6 18\" /><path d=\"M6 6l12 12\" />",
+  external: "<path d=\"M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6\" /><path d=\"M15 3h6v6\" /><path d=\"M10 14 21 3\" />",
+  agents: "<circle cx=\"12\" cy=\"5\" r=\"2.4\" /><circle cx=\"5\" cy=\"19\" r=\"2.4\" /><circle cx=\"19\" cy=\"19\" r=\"2.4\" /><path d=\"M12 7.4v3.6M12 11l-5.4 6M12 11l5.4 6\" />",
+  lock: "<rect x=\"4\" y=\"11\" width=\"16\" height=\"10\" rx=\"2\" /><path d=\"M8 11V7a4 4 0 0 1 8 0v4\" />",
+  settings: "<path d=\"M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z\" /><circle cx=\"12\" cy=\"12\" r=\"3\" />",
+  user: "<path d=\"M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2\" /><circle cx=\"12\" cy=\"7\" r=\"4\" />",
+  signOut: "<path d=\"M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4\" /><path d=\"m16 17 5-5-5-5\" /><path d=\"M21 12H9\" />",
+  alert: "<path d=\"M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z\" /><path d=\"M12 9v4\" /><path d=\"M12 17h.01\" />",
+  history: "<circle cx=\"12\" cy=\"12\" r=\"8.6\" /><path d=\"M12 7.5V12l3 2\" />",
+  repeat: "<path d=\"M17 2.5l4 4-4 4\" /><path d=\"M3 11.5v-2a3 3 0 0 1 3-3h15\" /><path d=\"M7 21.5l-4-4 4-4\" /><path d=\"M21 12.5v2a3 3 0 0 1-3 3H3\" />",
+  credits: "<circle cx=\"12\" cy=\"12\" r=\"9\" /><path d=\"M9.5 9.2a2.6 2.6 0 1 0 0 5.6\" /><path d=\"M13 8.5v7\" />",
+  trash: "<path d=\"M3 6h18\" /><path d=\"M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6\" /><path d=\"M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2\" /><path d=\"M10 11v6\" /><path d=\"M14 11v6\" />",
+  pen: "<path d=\"M17 3.6a2.2 2.2 0 0 1 3.1 3.1L8.5 18.3 4 19.5l1.2-4.5z\" />",
+  inbox: "<path d=\"M22 12h-6l-2 3h-4l-2-3H2\" /><path d=\"M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z\" />",
+  grid: "<rect x=\"3.5\" y=\"3.5\" width=\"7\" height=\"7\" rx=\"1.6\" /><rect x=\"13.5\" y=\"3.5\" width=\"7\" height=\"7\" rx=\"1.6\" /><rect x=\"3.5\" y=\"13.5\" width=\"7\" height=\"7\" rx=\"1.6\" /><rect x=\"13.5\" y=\"13.5\" width=\"7\" height=\"7\" rx=\"1.6\" />",
+  whiteboard: "<rect x=\"3\" y=\"4\" width=\"18\" height=\"16\" rx=\"2\" /><path d=\"m7 14.5 3.2-4.2 2.6 3 3.9-5.3\" />",
+  library: "<path d=\"M4 19.5A2.5 2.5 0 0 1 6.5 17H20\" /><path d=\"M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z\" />",
+  activity: "<path d=\"M22 12h-4l-3 9L9 3l-3 9H2\" />",
+  globe: "<circle cx=\"12\" cy=\"12\" r=\"9\" /><path d=\"M3 12h18\" /><path d=\"M12 3a13.5 13.5 0 0 1 0 18 13.5 13.5 0 0 1 0-18z\" />",
+  download: "<path d=\"M12 3v12\" /><path d=\"m7 10 5 5 5-5\" /><path d=\"M3 21h18\" />",
+  archive: "<rect x=\"3\" y=\"3.5\" width=\"18\" height=\"5\" rx=\"1.5\" /><path d=\"M5 8.5V19a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8.5\" /><path d=\"M10 12.5h4\" />",
+  theme: "<circle cx=\"12\" cy=\"12\" r=\"9\" /><path d=\"M12 3a9 9 0 0 0 0 18z\" fill=\"currentColor\" stroke=\"none\" />",
+  skill: "<path d=\"M21.42 10.92a1 1 0 0 0-.02-1.84L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.83l8.57 3.91a2 2 0 0 0 1.66 0z\" /><path d=\"M22 10v6\" /><path d=\"M6 12.5V16a6 3 0 0 0 12 0v-3.5\" />",
+  pack: "<path d=\"M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z\" /><path d=\"M3.3 7 12 12l8.7-5\" /><path d=\"M12 22V12\" />",
+  send: "<path d=\"M12 19V5\" /><path d=\"m5 12 7-7 7 7\" />",
+} as const;
+export type IconName = keyof typeof ICON_PATHS;
+/** the wrapper every icon assumes — the desktop's <Svg> props, as data */
+export const ICON_SVG = { viewBox: '0 0 24 24', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' } as const;

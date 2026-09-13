@@ -1,0 +1,20 @@
+# machine-image build context (infra/images/machine/Dockerfile builds from the repo root).
+# keep the context lean: dependency manifests + the source the daemon needs.
+node_modules
+**/node_modules
+.git
+.claude
+.vercel
+**/dist
+**/.output
+**/out
+apps/mobile
+apps/web
+mockups
+docs
+supabase
+dev
+e2e
+research
+skills
+*.log

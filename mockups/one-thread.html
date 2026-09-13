@@ -1,0 +1,558 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>One thread — unifying chat · task · content</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<style>
+/* ─────────────────────────────────────────────────────────────────────────────
+   Tokens lifted VERBATIM from apps/desktop/src/renderer/src/tokens.css so this
+   page is on-system, not an invention. Two themes, because a design that only
+   works in one is half a design (doctrine §10).
+   ───────────────────────────────────────────────────────────────────────────── */
+:root, [data-theme='dark'] {
+  --win:#0d0d0d; --bg:#141414; --panel:#191919; --panel2:#212121; --panel3:#2b2b2b;
+  --border:#272727; --border2:#383838;
+  --text:#eaeaea; --body:#b6b6b6; --muted:#898989; --dim:#676767;
+  --link:#d19a72; --accent:var(--text); --accent-ink:#101010; --accent-soft:var(--panel3);
+  --brand:#834a2b; --brand-ink:#fff7ee;
+  --btn:#232323; --btn-fg:#efefef; --btn-hover:#2f2f2f;
+  --green:#77ac8d; --green-soft:#16241a; --violet:#a89ccf;
+  --todo:#949494; --prog:#8ba0c0; --review:#a89ccf; --done:#77ac8d; --design:#cc8fb9; --warn:#c9a15e;
+  --role-orch:#9793d2; --role-dev:#77ac8d; --role-design:#cc8fb9; --role-mkt:#c98f8f; --role-tone:17%;
+  --shadow:rgba(0,0,0,0.62); --code:#0a0a0a; --codeink:#e8e8e8; --overlay:#222;
+  --card:#1e1e1e; --card-border:#2c2c2c;
+  --shadow-card:0 1px 2px rgba(0,0,0,.25); --shadow-lift:0 8px 20px -8px rgba(0,0,0,.55);
+  --shadow-sheet:inset 0 1px 0 rgba(255,255,255,.05), 0 12px 30px -6px rgba(0,0,0,.5);
+  --hover-bg:color-mix(in srgb, var(--text) 7%, transparent);
+}
+[data-theme='cream-oak'] {
+  --win:#f0e5d3; --bg:#fbf8f4; --panel:#fbf8f4; --panel2:#f6eee1; --panel3:#efe1cd;
+  --border:#e6dbca; --border2:#d3c2a8;
+  --text:#2a1c13; --body:#574838; --muted:#97846c; --dim:#b5a289;
+  --link:#9c5730; --accent:#834a2b; --accent-ink:#fff7ee; --accent-soft:#f1e3d2;
+  --brand:#834a2b; --brand-ink:#fff7ee;
+  --btn:#f8f2e8; --btn-fg:#43301f; --btn-hover:#efe4d2;
+  --green:#2f9e6b; --green-soft:#e3f0e8; --violet:#7d6cc4;
+  --todo:#7d8590; --prog:#4f80c4; --review:#6d5ce0; --done:#0f9d63; --design:#b0498f; --warn:#a06a1f;
+  --role-orch:#6a63bc; --role-dev:#3f9268; --role-design:#b0498f; --role-mkt:#b04f55; --role-tone:14%;
+  --shadow:rgba(70,42,18,0.16); --code:#2b2018; --codeink:#f3e6d8; --overlay:#fff;
+  --card:#fff; --card-border:#eadfce;
+  --shadow-card:0 1px 2px rgba(70,42,18,.05); --shadow-lift:0 8px 20px -8px rgba(70,42,18,.20);
+  --shadow-sheet:0 8px 26px -8px rgba(70,42,18,.16), 0 1px 2px rgba(70,42,18,.05);
+  --hover-bg:color-mix(in srgb, var(--text) 5%, transparent);
+}
+:root {
+  --fdisp:'Source Serif 4','Source Serif 4 Variable',Georgia,serif;
+  --fbody:'Geist','Geist Variable',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --fmono:'Geist Mono','Geist Mono Variable',ui-monospace,'SF Mono',Menlo,monospace;
+  --r-xs:6px; --r-sm:8px; --r-md:10px; --r-lg:14px; --r-xl:18px; --r-full:999px;
+  --dur:.15s; --ease:cubic-bezier(.22,1,.36,1);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--win);color:var(--text);font-family:var(--fbody);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;padding:34px 30px 90px}
+.wrap{max-width:1420px;margin:0 auto}
+
+/* ── page chrome ───────────────────────────────────────────────────────────── */
+.phead{display:flex;align-items:flex-start;gap:20px;margin-bottom:8px}
+h1{font-family:var(--fdisp);font-size:31px;font-weight:600;letter-spacing:-.015em;line-height:1.15}
+h1 em{font-style:italic;color:var(--link)}
+.sub{color:var(--muted);font-size:14.5px;max-width:72ch;margin-top:9px}
+.sub b{color:var(--body);font-weight:600}
+.themer{margin-left:auto;display:flex;gap:5px;background:var(--panel2);border:1px solid var(--border);border-radius:var(--r-full);padding:4px;flex:none}
+.themer button{font:inherit;font-size:12px;padding:5px 13px;border-radius:var(--r-full);border:0;background:transparent;color:var(--muted);cursor:pointer;transition:var(--dur) var(--ease)}
+.themer button.on{background:var(--panel);color:var(--text);box-shadow:var(--shadow-card)}
+
+h2{font-family:var(--fdisp);font-size:20px;font-weight:600;letter-spacing:-.01em;margin:44px 0 5px;display:flex;align-items:baseline;gap:11px}
+h2 .n{font-family:var(--fmono);font-size:11px;color:var(--dim);letter-spacing:.06em;font-weight:400}
+.lede{color:var(--muted);font-size:13.5px;max-width:86ch;margin-bottom:20px}
+.lede b{color:var(--body);font-weight:600}
+.lede code,.cell code,td code{font-family:var(--fmono);font-size:.87em;background:var(--panel2);padding:1px 5px;border-radius:var(--r-xs);color:var(--body)}
+
+/* ── the divergence audit ──────────────────────────────────────────────────── */
+.audit{border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;background:var(--panel)}
+.audit table{width:100%;border-collapse:collapse;font-size:12.5px}
+.audit th{text-align:left;padding:10px 14px;background:var(--panel2);color:var(--muted);font-weight:500;font-size:11px;letter-spacing:.05em;text-transform:uppercase;border-bottom:1px solid var(--border)}
+.audit th:nth-child(2),.audit th:nth-child(3){width:96px;text-align:center}
+.audit td{padding:8px 14px;border-bottom:1px solid var(--border);color:var(--body)}
+.audit tr:last-child td{border-bottom:0}
+.audit td:nth-child(2),.audit td:nth-child(3){text-align:center;font-family:var(--fmono);font-size:12px}
+.yes{color:var(--green)}
+.no{color:var(--dim)}
+.bad{background:color-mix(in srgb,var(--warn) 8%,transparent)}
+.bad td:first-child{color:var(--text);font-weight:500}
+.verdict{font-family:var(--fmono);font-size:10.5px;color:var(--warn);white-space:nowrap}
+.audit tr.grp td{background:var(--panel2);color:var(--muted);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;font-weight:500;padding:7px 14px}
+
+/* ── the four states ───────────────────────────────────────────────────────── */
+.states{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;align-items:start}
+@media (max-width:1180px){.states{grid-template-columns:repeat(2,1fr)}}
+.st{background:var(--bg);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;box-shadow:var(--shadow-lift)}
+.sthd{padding:11px 13px 10px;border-bottom:1px solid var(--border);background:var(--panel2)}
+.sthd b{display:block;font-size:12.5px;letter-spacing:-.005em}
+.sthd span{display:block;color:var(--muted);font-size:11px;margin-top:2px}
+.sthd .carries{font-family:var(--fmono);font-size:10px;color:var(--dim);margin-top:6px}
+
+/* the thread skeleton — SAME rows in every column, that is the whole argument */
+.thr{padding:0}
+.row{padding:8px 12px;border-bottom:1px solid var(--border)}
+.row:last-child{border-bottom:0}
+.row.off{background:repeating-linear-gradient(135deg,transparent,transparent 5px,var(--hover-bg) 5px,var(--hover-bg) 6px);min-height:31px;display:flex;align-items:center}
+.row.off i{font-style:normal;font-family:var(--fmono);font-size:9.5px;color:var(--dim);letter-spacing:.04em}
+
+/* layer 1 — identity */
+.idl{display:flex;align-items:center;gap:7px;min-height:31px}
+.crumb{font-size:10.5px;color:var(--muted);flex:none}
+.ttl{font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tasknum{font-family:var(--fmono);font-size:10px;color:var(--muted);flex:none}
+.dial{width:15px;height:15px;border-radius:50%;flex:none;background:conic-gradient(var(--prog) 0 62%,color-mix(in srgb,var(--prog) 20%,transparent) 62% 100%);position:relative}
+.dial::after{content:'';position:absolute;inset:3.5px;border-radius:50%;background:var(--bg)}
+.av{width:16px;height:16px;border-radius:50%;flex:none;display:grid;place-items:center;font-size:8px;font-weight:600;color:var(--accent-ink)}
+.av.dev{background:var(--role-dev)} .av.mkt{background:var(--role-mkt)} .av.orch{background:var(--role-orch)}
+.spacer{flex:1}
+.trackpill{font-size:9.5px;font-family:var(--fmono);border:1px solid var(--border2);color:var(--muted);padding:2px 7px;border-radius:var(--r-full);flex:none}
+.trackpill.on{border-color:transparent;background:color-mix(in srgb,var(--prog) var(--role-tone),transparent);color:var(--prog)}
+
+/* layer 2 — facts line */
+.facts{display:flex;flex-wrap:wrap;gap:5px;min-height:31px;align-items:center}
+.tok{font-family:var(--fmono);font-size:9.5px;color:var(--muted);background:var(--panel2);border:1px solid var(--border);padding:2px 6px;border-radius:var(--r-xs);white-space:nowrap}
+.tok.warm{border-color:color-mix(in srgb,var(--warn) 45%,transparent);color:var(--warn)}
+.tok.ok{color:var(--green)}
+
+/* layer 3 — transcript */
+.tape{padding:9px 12px;display:flex;flex-direction:column;gap:8px;min-height:186px;background:var(--bg)}
+.msg{display:flex;gap:6px;align-items:flex-start}
+.msg .who{font-size:10px;font-weight:600;flex:none}
+.msg .txt{font-size:10.5px;color:var(--body);line-height:1.42}
+.msg.me{justify-content:flex-end}
+.msg.me .txt{background:var(--panel2);border-radius:var(--r-sm);padding:5px 8px;max-width:88%}
+.card{border:1px solid var(--card-border);background:var(--card);border-radius:var(--r-sm);padding:7px 8px;box-shadow:var(--shadow-card)}
+.card .ch{display:flex;align-items:center;gap:5px;font-family:var(--fmono);font-size:8.5px;color:var(--muted);margin-bottom:5px}
+.card .cb{font-size:10px;color:var(--body);line-height:1.4}
+.chip{font-family:var(--fmono);font-size:8px;padding:1px 5px;border-radius:var(--r-full);margin-left:auto}
+.chip.draft{background:color-mix(in srgb,var(--todo) var(--role-tone),transparent);color:var(--todo)}
+.chip.wb{background:color-mix(in srgb,var(--violet) var(--role-tone),transparent);color:var(--violet)}
+.cardacts{display:flex;gap:5px;margin-top:6px;align-items:center}
+.mini{font-size:8.5px;padding:2.5px 7px;border-radius:var(--r-xs);border:1px solid var(--border2);color:var(--body);background:transparent}
+.mini.pri{background:var(--accent);color:var(--accent-ink);border-color:transparent}
+.mini.img{border-style:dashed;color:var(--muted)}
+.runline{display:flex;align-items:center;gap:6px;font-family:var(--fmono);font-size:9px;color:var(--muted);border:1px solid var(--border);border-radius:var(--r-sm);padding:5px 7px}
+.pulse{width:5px;height:5px;border-radius:50%;background:var(--prog);flex:none;animation:p 1.6s var(--ease) infinite}
+@keyframes p{0%,100%{opacity:.35}50%{opacity:1}}
+
+/* layer 4 — gate */
+.gate{background:color-mix(in srgb,var(--warn) 9%,var(--panel));border-top:1px solid color-mix(in srgb,var(--warn) 32%,transparent);border-bottom:1px solid var(--border);padding:8px 12px}
+.gate .gh{font-size:10.5px;font-weight:600;margin-bottom:5px}
+.gate .gsub{font-size:9.5px;color:var(--muted);margin-bottom:6px}
+
+/* layer 5 — composer */
+.comp{padding:9px 12px;background:var(--panel);border-top:1px solid var(--border)}
+.cin{border:1px solid var(--border2);border-radius:var(--r-md);padding:7px 8px;font-size:10px;color:var(--dim);background:var(--bg)}
+.ctools{display:flex;gap:7px;margin-top:6px;align-items:center;font-size:11px;color:var(--dim)}
+.ctools .send{margin-left:auto;width:19px;height:19px;border-radius:50%;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-size:9px}
+.armed{display:flex;align-items:center;gap:5px;margin-bottom:6px}
+.armchip{font-family:var(--fmono);font-size:8.5px;background:var(--panel3);border-radius:var(--r-xs);padding:2px 6px;color:var(--body)}
+
+/* the in-column sliver: not the rail at size, just proof it is THERE and what it holds */
+.tapewrap{display:flex;border-bottom:1px solid var(--border)}
+.tapewrap .tape{flex:1;min-width:0;border-bottom:0}
+.sliver{width:84px;flex:none;border-left:1px solid var(--border);padding:9px 7px;display:flex;flex-direction:column;gap:7px}
+.sliver .sh{font:700 8px var(--fmono);text-transform:uppercase;letter-spacing:.07em;color:var(--muted);display:flex;gap:4px;align-items:baseline}
+.sliver .sh i{font-style:normal;margin-left:auto;color:var(--dim);letter-spacing:0}
+.sliver .sh.warm{color:var(--warn)}
+.sliver .ln{height:3px;border-radius:2px;background:var(--panel3)}
+.sliver .ln.s{width:64%}
+
+/* ── the rail, at real proportions ─────────────────────────────────────────── */
+:root{--mkrail-w:258px; --mkrail-tab-w:26px}
+.railset{display:flex;gap:16px;align-items:stretch}
+.railset .big{flex:1;min-width:0}
+.railset .small{width:224px;flex:none;display:flex;flex-direction:column;gap:16px}
+.win{background:var(--bg);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;box-shadow:var(--shadow-lift);display:flex;flex-direction:column}
+.winhd{padding:9px 13px;border-bottom:1px solid var(--border);background:var(--panel2);font-size:11.5px;color:var(--muted);display:flex;align-items:center;gap:8px}
+.winhd b{color:var(--text);font-size:12px}
+.winhd .r{margin-left:auto;font-family:var(--fmono);font-size:9.5px;color:var(--dim)}
+.winbody{display:flex;min-height:352px}
+.winbody .col{flex:1;min-width:0;display:flex;flex-direction:column}
+.winbody .tape{flex:1}
+
+/* the rail itself — .mkrail geometry verbatim */
+.rail{width:var(--mkrail-w);flex:none;border-left:1px solid var(--border);padding:12px 12px 14px;display:flex;flex-direction:column;gap:6px;overflow:hidden;background:var(--bg)}
+.rail.narrow{width:150px}
+.railhd{font:700 10.5px var(--fmono);text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin-bottom:2px;display:flex;align-items:center;gap:6px}
+.railhd.n2{margin-top:13px}
+.railhd .ct{margin-left:auto;color:var(--dim);letter-spacing:0}
+.railhd .chev{margin-left:auto;color:var(--dim);font-size:11px}
+.railrow{display:flex;align-items:center;gap:7px;padding:6px 8px;border:1px solid transparent;border-radius:var(--r-md);background:transparent;transition:background var(--dur) var(--ease)}
+.railrow:hover{background:var(--hover-bg)}
+.railrow b{font:600 11px var(--fmono);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--body)}
+.railrow .when{font-size:10px;color:var(--dim);flex:none}
+.railrow .mk{flex:none;font-size:10px;width:11px;text-align:center}
+.railrow .mk.on{color:var(--green)} .railrow .mk.off{color:var(--dim)}
+.railhint{font-size:10.5px;color:var(--dim);margin:3px 2px 0;line-height:1.45}
+.railtab{width:var(--mkrail-tab-w);flex:none;border-left:1px solid var(--border);background:none;color:var(--dim);display:flex;flex-direction:column;align-items:center;padding-top:13px;gap:9px}
+.railtab .gl{font-size:11px}
+.railtab .badge{font:600 9px var(--fmono);writing-mode:vertical-rl;letter-spacing:.08em;color:var(--muted)}
+.railtab .dot{width:5px;height:5px;border-radius:50%;background:var(--warn)}
+.prline{display:flex;align-items:center;gap:6px;font-family:var(--fmono);font-size:10px;color:var(--body);padding:6px 8px;border:1px solid var(--border);border-radius:var(--r-md)}
+.ok{color:var(--green)}
+.cap{font-size:11.5px;color:var(--muted);margin-top:9px;line-height:1.5}
+.cap b{color:var(--body);font-weight:600}
+
+/* ── the room × thread matrix ──────────────────────────────────────────────── */
+.matrix{display:grid;grid-template-columns:118px 1fr 1fr;gap:1px;background:var(--border);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden}
+.mx{background:var(--panel);padding:13px 14px;min-height:52px}
+.mx.mhd{background:var(--panel2);font:700 10px var(--fmono);text-transform:uppercase;letter-spacing:.08em;color:var(--muted);min-height:0;padding:9px 14px;display:flex;align-items:baseline;gap:7px}
+.mx.mhd span{font-weight:400;text-transform:none;letter-spacing:0;color:var(--dim);font-size:9.5px}
+.mx.mrh{background:var(--panel2);font:700 10px var(--fmono);text-transform:uppercase;letter-spacing:.08em;color:var(--muted);display:flex;flex-direction:column;justify-content:center}
+.mx.mrh i{font-style:normal;font-weight:400;text-transform:none;letter-spacing:0;color:var(--dim);font-size:9px;margin-top:3px}
+.mx b{display:block;font-size:12.5px;color:var(--text);font-weight:600;letter-spacing:-.005em}
+.mx span{display:block;color:var(--muted);font-size:11.5px;margin-top:4px;line-height:1.45}
+.mx.on{background:color-mix(in srgb,var(--link) 8%,var(--panel))}
+
+/* ── rules table ───────────────────────────────────────────────────────────── */
+.rules{border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;background:var(--panel)}
+.rules table{width:100%;border-collapse:collapse;font-size:13px}
+.rules th{text-align:left;padding:10px 15px;background:var(--panel2);color:var(--muted);font-weight:500;font-size:11px;letter-spacing:.05em;text-transform:uppercase;border-bottom:1px solid var(--border)}
+.rules td{padding:10px 15px;border-bottom:1px solid var(--border);color:var(--body);vertical-align:top}
+.rules tr:last-child td{border-bottom:0}
+.rules td:first-child{color:var(--text);font-weight:500;white-space:nowrap}
+.rules td:nth-child(2){font-family:var(--fmono);font-size:11.5px;color:var(--link);white-space:nowrap}
+.always{background:color-mix(in srgb,var(--green) 7%,transparent)}
+.always td:nth-child(2){color:var(--green)}
+
+.note{border-left:2px solid var(--link);padding:2px 0 2px 15px;margin:22px 0 0;color:var(--body);font-size:13.5px;max-width:88ch}
+.note b{color:var(--text)}
+.foot{margin-top:44px;padding-top:18px;border-top:1px solid var(--border);color:var(--dim);font-size:11.5px;font-family:var(--fmono)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="phead">
+    <div>
+      <h1>One thread. <em>Everything else is a layer.</em></h1>
+      <p class="sub">There is no such thing as a chat thread, a task thread and a content thread — there is <b>a thread</b>, which may additionally carry a task id, a state machine, drafts, or files. Today those are three different screens with three different feature sets, and the feature set is gated on <b>what the thread is called</b> rather than on what it holds. This proposes the opposite rule: <b>every capability is available in every thread; a layer appears when its data exists.</b> Round 2 folds the facts pills and their drawer into <b>one right rail</b> — the panel the marketing room already has.</p>
+    </div>
+    <div class="themer">
+      <button class="on" data-t="dark">Graphite</button>
+      <button data-t="cream-oak">Cream Oak</button>
+    </div>
+  </div>
+
+  <h2><span class="n">01</span> What diverged, measured</h2>
+  <p class="lede">Read off <code>ConvoThread</code> and <code>TaskThread</code> in <code>App.tsx</code> — not from memory. The bottom group is the problem: capabilities a conversation is denied <b>for no reason anyone chose</b>. They were never designed away; they just never got built twice.</p>
+
+  <div class="audit">
+    <table>
+      <thead><tr><th>Capability</th><th>Chat</th><th>Task</th><th>Verdict</th></tr></thead>
+      <tbody>
+        <tr class="grp"><td colspan="4">Already identical — the shared spine is bigger than it looks</td></tr>
+        <tr><td>Messages · streaming · agent ghost · typing bar</td><td class="yes">yes</td><td class="yes">yes</td><td class="no">—</td></tr>
+        <tr><td>Run cards + the resting run dock</td><td class="yes">yes</td><td class="yes">yes</td><td class="no">—</td></tr>
+        <tr><td>Whiteboard cards · doc-drop cards</td><td class="yes">yes</td><td class="yes">yes</td><td class="no">—</td></tr>
+        <tr><td><code>nmq</code> answers collapse · <code>nms</code> reply pills</td><td class="yes">yes</td><td class="yes">yes</td><td class="no">—</td></tr>
+        <tr><td>Mentions · <code>/</code> skills · post draft cards</td><td class="yes">yes</td><td class="yes">yes</td><td class="no">—</td></tr>
+
+        <tr class="grp"><td colspan="4">Genuinely task-shaped — keep, but as a layer, not a screen</td></tr>
+        <tr><td>Phase spectrum · assignee · state</td><td class="no">—</td><td class="yes">yes</td><td class="no">correct</td></tr>
+        <tr><td>Gate cards (verdict · design · ship)</td><td class="no">—</td><td class="yes">yes</td><td class="no">correct</td></tr>
+        <tr><td>Drawers: reqs · PR · subtasks · rounds</td><td class="no">—</td><td class="yes">yes</td><td class="no">correct</td></tr>
+        <tr><td>Definition of Done editing</td><td class="no">—</td><td class="yes">yes</td><td class="no">correct</td></tr>
+        <tr><td>Beats — the live step tracker</td><td class="no">—</td><td class="yes">yes</td><td class="no">correct</td></tr>
+
+        <tr class="grp"><td colspan="4">Withheld for no reason — the actual bug</td></tr>
+        <tr class="bad"><td>Drag a file into the thread</td><td class="no">—</td><td class="yes">yes</td><td class="verdict">accident</td></tr>
+        <tr class="bad"><td>See an image you sent (render + lightbox)</td><td class="no">—</td><td class="yes">yes</td><td class="verdict">accident</td></tr>
+        <tr class="bad"><td>Deliverable file cards</td><td class="no">—</td><td class="yes">yes</td><td class="verdict">accident</td></tr>
+        <tr class="bad"><td>Model / brain pill for this thread</td><td class="no">—</td><td class="yes">yes</td><td class="verdict">accident</td></tr>
+        <tr class="bad"><td><b>Generate image on a draft card</b></td><td class="no">—</td><td class="yes">yes</td><td class="verdict">reported</td></tr>
+        <tr class="bad"><td>Pinned root message (what this answers)</td><td class="yes">yes</td><td class="no">—</td><td class="verdict">accident</td></tr>
+        <tr class="bad"><td><b>Brand docs rail</b> — in a marketing room</td><td class="yes">yes</td><td class="no">—</td><td class="verdict">inverted</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2><span class="n">02</span> One skeleton, four states</h2>
+  <p class="lede">The same five rows, in the same order, in every thread. Hatched rows are <b>absent, not different</b> — nothing below them moves, so the surface never re-learns itself. Read left to right: a thread accumulates layers; it never changes species.</p>
+
+  <div class="states">
+
+    <!-- 1 · plain conversation -->
+    <div class="st">
+      <div class="sthd"><b>Conversation</b><span>no task, no drafts</span><div class="carries">carries: messages</div></div>
+      <div class="thr">
+        <div class="row"><div class="idl">
+          <span class="crumb">‹ #dev</span><span class="ttl">Sketch the pipeline</span>
+          <span class="spacer"></span><span class="trackpill">Track as task</span>
+        </div></div>
+        <div class="tape">
+          <div class="msg me"><div class="txt">sol — sketch the wake → triage → run pipeline, boxes for the dedupe bits</div></div>
+          <div class="msg"><span class="av dev">S</span><div><div class="who">sol</div><div class="txt">Drew it from wake.ts — every box is a real shape, so drag things around.</div></div></div>
+          <div class="card"><div class="ch">⊞ wake pipeline<span class="chip wb">board</span></div><div class="cb">flowchart · 11 shapes</div></div>
+        </div>
+        <div class="row off"><i>gate — nothing needs you</i></div>
+        <div class="comp">
+          <div class="cin">Ask anything — ↵ send</div>
+          <div class="ctools"><span>@</span><span>/</span><span>⎘</span><span class="send">↑</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2 · conversation with drafts -->
+    <div class="st">
+      <div class="sthd"><b>Conversation + drafts</b><span>no task — "content thread" stops existing</span><div class="carries">carries: messages · drafts</div></div>
+      <div class="thr">
+        <div class="row"><div class="idl">
+          <span class="crumb">‹ #dev</span><span class="ttl">Posts on the memory spine</span>
+          <span class="spacer"></span><span class="trackpill">Track as task</span>
+        </div></div>
+        <div class="tapewrap">
+        <div class="tape">
+          <div class="msg me"><div class="txt">draft me 3 posts — one linkedin, two x</div></div>
+          <div class="card">
+            <div class="ch">𝕏 X · draft b<span class="chip draft">draft</span></div>
+            <div class="cb">Memory is not a bigger context window. It is a record the whole team reads.</div>
+            <div class="cardacts"><span class="mini">↩ changes</span><span class="mini pri">Review · schedule</span></div>
+          </div>
+          <div class="card">
+            <div class="ch">in LinkedIn · draft c<span class="chip draft">draft</span></div>
+            <div class="cb">We stopped re-explaining our codebase every morning.</div>
+            <div class="cardacts"><span class="mini img">⛭ Generate image</span><span class="mini pri">Review · schedule</span></div>
+          </div>
+        </div>
+        <div class="sliver">
+            <div class="sh">Files<i>1</i></div><span class="ln"></span><span class="ln s"></span>
+          </div>
+        </div>
+        <div class="row off"><i>gate — nothing needs you</i></div>
+        <div class="comp">
+          <div class="armed"><span class="armchip">↩ Request changes · draft c</span><span style="font-size:9px;color:var(--dim)">esc</span></div>
+          <div class="cin">What should change on draft c?</div>
+          <div class="ctools"><span>@</span><span>/</span><span>⎘</span><span class="send">↑</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3 · tracked -->
+    <div class="st">
+      <div class="sthd"><b>Tracked</b><span>the same thread, with a task on it</span><div class="carries">carries: messages · task</div></div>
+      <div class="thr">
+        <div class="row"><div class="idl">
+          <span class="crumb">‹ #dev</span><span class="dial"></span><span class="tasknum">1042</span>
+          <span class="ttl">Mobile nav drawer</span><span class="av dev">P</span>
+          <span class="spacer"></span><span class="trackpill on">in progress</span>
+        </div></div>
+        <div class="tapewrap">
+        <div class="tape">
+          <div class="msg"><span class="av dev">P</span><div><div class="who">patch</div><div class="txt">Root cause: the backdrop keeps focus after a route change. Guard + regression test pushed.</div></div></div>
+          <div class="runline"><span class="pulse"></span>build · step 3 of 5 · 4m</div>
+          <div class="card"><div class="ch">◆ diff · 6 files<span class="chip draft">+184 −22</span></div><div class="cb">nav/Drawer.tsx · focus-trap.ts …</div></div>
+        </div>
+        <div class="sliver">
+            <div class="sh">Reqs<i>4</i></div><span class="ln"></span><span class="ln s"></span>
+            <div class="sh">Files<i>3</i></div><span class="ln"></span><span class="ln s"></span>
+            <div class="sh">Subtasks<i>1/2</i></div><span class="ln"></span>
+            <div class="sh">PR<i>214</i></div><span class="ln"></span>
+          </div>
+        </div>
+        <div class="gate">
+          <div class="gh">Ready for your verdict</div>
+          <div class="gsub">CI green · gated on the Definition of Done</div>
+          <div class="cardacts"><span class="mini pri">Accept</span><span class="mini">Request changes</span></div>
+        </div>
+        <div class="comp">
+          <div class="cin">Reply — @ mention · / skill · ↵ send</div>
+          <div class="ctools"><span>@</span><span>/</span><span>⎘</span><span class="send">↑</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4 · tracked + drafts -->
+    <div class="st">
+      <div class="sthd"><b>Tracked + drafts</b><span>today's "content task" — now just both layers</span><div class="carries">carries: messages · task · drafts</div></div>
+      <div class="thr">
+        <div class="row"><div class="idl">
+          <span class="crumb">‹ #mktg</span><span class="dial"></span><span class="tasknum">1028</span>
+          <span class="ttl">Launch week posts</span><span class="av mkt">P</span>
+          <span class="spacer"></span><span class="trackpill on">in review</span>
+        </div></div>
+        <div class="tapewrap">
+        <div class="tape">
+          <div class="msg"><span class="av mkt">P</span><div><div class="who">plume</div><div class="txt">Four drafts, two with art direction. Nothing publishes until you approve.</div></div></div>
+          <div class="card">
+            <div class="ch">𝕏 X · draft a<span class="chip draft">draft</span></div>
+            <div class="cb">Your agents forget everything the second a task ends.</div>
+            <div class="cardacts"><span class="mini img">⛭ Generate image</span><span class="mini pri">Review · schedule</span></div>
+          </div>
+        </div>
+        <div class="sliver">
+            <div class="sh">Reqs<i>3</i></div><span class="ln"></span>
+            <div class="sh warm">Files<i>2</i></div><span class="ln"></span>
+            <div class="sh">Brand<i>4</i></div><span class="ln"></span><span class="ln s"></span>
+            <div class="sh">Connect</div><span class="ln"></span>
+          </div>
+        </div>
+        <div class="gate">
+          <div class="gh">Schedule 4 posts?</div>
+          <div class="gsub">Mon 9:00 · Tue 9:00 · Thu 9:00 · Fri 9:00</div>
+          <div class="cardacts"><span class="mini pri">Schedule all</span><span class="mini">Not now</span></div>
+        </div>
+        <div class="comp">
+          <div class="cin">Reply — @ mention · / skill · ↵ send</div>
+          <div class="ctools"><span>@</span><span>/</span><span>⎘</span><span class="send">↑</span></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <h2><span class="n">03</span> The rail replaces the pills</h2>
+  <p class="lede">Requirements, artifacts, subtasks and the PR stop being a row of toks with a drawer under them and become <b>sections of one right rail</b> — the same panel the marketing room already has (<code>.mkrail</code>, 258px, collapsing to a 26px tab). Shown here at real width. The rule that makes it calm: <b>a section renders only if it has rows, and the rail renders only if a section does.</b> Nothing is ever an empty heading.</p>
+
+  <div class="railset">
+    <div class="big">
+      <div class="win">
+        <div class="winhd"><b>#1042 · Mobile nav drawer</b><span>tracked · in progress</span><span class="r">rail open · 258px</span></div>
+        <div class="winbody">
+          <div class="col">
+            <div class="tape" style="min-height:0">
+              <div class="msg"><span class="av dev">P</span><div><div class="who">patch</div><div class="txt">Root cause: the backdrop keeps focus after a route change. Guard + regression test pushed.</div></div></div>
+              <div class="runline"><span class="pulse"></span>build · step 3 of 5 · 4m</div>
+              <div class="card"><div class="ch">◆ diff · 6 files<span class="chip draft">+184 −22</span></div><div class="cb">nav/Drawer.tsx · focus-trap.ts …</div></div>
+            </div>
+            <div class="gate">
+              <div class="gh">Ready for your verdict</div>
+              <div class="gsub">CI green · gated on the Definition of Done</div>
+              <div class="cardacts"><span class="mini pri">Accept</span><span class="mini">Request changes</span></div>
+            </div>
+            <div class="comp"><div class="cin">Reply — @ mention · / skill · ↵ send</div>
+              <div class="ctools"><span>@</span><span>/</span><span>⎘</span><span class="send">↑</span></div></div>
+          </div>
+          <aside class="rail">
+            <div class="railhd">Requirements<span class="chev">›</span></div>
+            <div class="railrow"><span class="mk on">✓</span><b>Focus returns to the trigger</b></div>
+            <div class="railrow"><span class="mk on">✓</span><b>Regression test added</b></div>
+            <div class="railrow"><span class="mk off">○</span><b>Verified on iPadOS 18</b></div>
+            <p class="railhint">The acceptance contract the reviewer gates on. Editable here.</p>
+
+            <div class="railhd n2">Artifacts<span class="ct">3</span></div>
+            <div class="railrow"><b>drawer-focus.diff</b><span class="when">11:04</span></div>
+            <div class="railrow"><b>before-after.png</b><span class="when">11:04</span></div>
+            <div class="railrow"><b>result.md</b><span class="when">11:06</span></div>
+
+            <div class="railhd n2">Subtasks<span class="ct">1/2</span></div>
+            <div class="railrow"><span class="mk on">✓</span><b>Audit the other drawers</b></div>
+            <div class="railrow"><span class="mk off">○</span><b>Changelog note</b></div>
+
+            <div class="railhd n2">Pull request</div>
+            <div class="prline"><span class="ok">✓</span> #214 · CI green · nm/1042-mobile-nav</div>
+          </aside>
+        </div>
+      </div>
+      <p class="cap"><b>One rail, whatever the thread is.</b> In a marketing room its brand-docs and connections sections sit in this same panel under the task's — not a second rail beside it. The rail holds <b>standing reference</b> (what the work IS, what it produced, what it needs); the transcript holds <b>events</b> (what happened, including draft cards). That line is what tells you where anything goes.</p>
+    </div>
+
+    <div class="small">
+      <div class="win">
+        <div class="winhd"><b>Collapsed</b><span class="r">26px tab</span></div>
+        <div class="winbody" style="min-height:150px">
+          <div class="col"><div class="tape" style="min-height:0"><div class="msg"><span class="av dev">P</span><div><div class="txt">…</div></div></div></div></div>
+          <div class="railtab"><span class="gl">‹</span><span class="dot"></span><span class="badge">3 · 1/2</span></div>
+        </div>
+      </div>
+      <p class="cap" style="margin-top:-6px">The tab keeps the glance the pills gave you: counts, and a warm dot when a section is holding a gate. Machine-local, like <code>nm:mkrail-collapsed</code>.</p>
+
+      <div class="win">
+        <div class="winhd"><b>Absent</b><span class="r">no rail, no tab</span></div>
+        <div class="winbody" style="min-height:126px">
+          <div class="col"><div class="tape" style="min-height:0"><div class="msg me"><div class="txt">what should we prioritise?</div></div><div class="msg"><span class="av orch">R</span><div><div class="txt">Bar-rail polish first…</div></div></div></div></div>
+        </div>
+      </div>
+      <p class="cap" style="margin-top:-6px">A thread with nothing standing gets the <b>full width</b> — no empty panel, no tab stub to explain.</p>
+    </div>
+  </div>
+
+  <h2><span class="n">04</span> So what IS a marketing thread?</h2>
+  <p class="lede">Nothing. There is no <code>thread.kind</code>, and after this week there can't be one — every surviving <code>kind === 'marketing'</code> check in the codebase is <b>room</b>-level, not thread-level. What we've been calling a marketing thread is <b>two independent things co-occurring</b>: a room that supplies brand context, and a thread that happens to hold drafts. Neither implies the other, and both compose into the same rail.</p>
+
+  <div class="railset">
+    <div class="big">
+      <div class="matrix">
+        <div class="mx mhd"></div>
+        <div class="mx mhd">plain room</div>
+        <div class="mx mhd">marketing room <span>kind = 'marketing'</span></div>
+
+        <div class="mx mrh">no drafts</div>
+        <div class="mx"><b>A conversation.</b><span>No rail unless it produced files.</span></div>
+        <div class="mx"><b>A conversation, with the room's shelf.</b><span>Rail carries Brand docs · Connections · Upcoming.</span></div>
+
+        <div class="mx mrh">has drafts<br><i>content_items</i></div>
+        <div class="mx"><b>Posts drafted in #dev.</b><span>Legal and working since <code>521b595</code> — publishing resolves its account through the <b>project</b>, never the room.</span></div>
+        <div class="mx on"><b>The classic "marketing thread".</b><span>Both sources in one rail. Nothing about the screen is different — it just holds more.</span></div>
+      </div>
+      <p class="cap"><b>The correction that makes the point.</b> Today the brand rail renders in a conversation and in the room home — but <b>not</b> in a task thread. So a marketing room's own content task, the one place you most need the voice and the guidelines, is the one place they vanish. That is not a rule anyone wrote; it is a component that got built once. Under the rail it inverts by construction: sections arrive from the room and from the thread independently, so both are always there.</p>
+    </div>
+
+    <div class="small" style="width:300px">
+      <div class="win">
+        <div class="winhd"><b>Where each section comes from</b></div>
+        <div style="padding:11px 12px 14px">
+          <div class="railhd">From the <span style="color:var(--link)">room</span><span class="ct">context</span></div>
+          <div class="railrow"><b>Brand docs</b><span class="when">4</span></div>
+          <div class="railrow"><b>Connections</b><span class="when">X · in</span></div>
+          <div class="railrow"><b>Upcoming</b><span class="when">calendar</span></div>
+          <div class="railhd n2">From the <span style="color:var(--link)">thread</span><span class="ct">its own state</span></div>
+          <div class="railrow"><b>Requirements</b><span class="when">task</span></div>
+          <div class="railrow"><b>Artifacts</b><span class="when">any</span></div>
+          <div class="railrow"><b>Subtasks</b><span class="when">task</span></div>
+          <div class="railrow"><b>Pull request</b><span class="when">repo</span></div>
+          <p class="railhint">Two sources, one panel, one appearance rule — a section shows when it has rows. Nothing asks what kind of thread this is.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h2><span class="n">05</span> The appearance rule, in full</h2>
+  <p class="lede">One table replaces "is this a chat, a task, or a content thread?". Nothing keys off a <b>kind</b> — every row keys off <b>data that either exists or doesn't</b>. Green rows are unconditional: those are the capabilities that stop being gated. The rail follows the same logic one level down — sections, not screens.</p>
+
+  <div class="rules">
+    <table>
+      <thead><tr><th>Layer</th><th>Shows when</th><th>Why that, and not "it's a task"</th></tr></thead>
+      <tbody>
+        <tr class="always"><td>Transcript &amp; composer</td><td>always</td><td>Mentions, skills, attachments, drag-and-drop, whiteboards, run cards, file cards, post cards, image generation. A capability is a property of the product, not of a row's label.</td></tr>
+        <tr class="always"><td>Pinned root message</td><td>a root exists elsewhere</td><td>Already correct in chat; task threads simply never got it. Same rule, both surfaces.</td></tr>
+        <tr class="always"><td>Beats ticker</td><td>a run declared beats</td><td>A chat leg declares beats exactly like a task worker. The tracker follows the run, not the row.</td></tr>
+        <tr class="always"><td>Model / brain pill</td><td>always</td><td>Choosing who answers is a thread decision. It is arbitrary that only tracked threads can.</td></tr>
+        <tr><td>Phase dial + assignee</td><td><code>thread.task_id</code></td><td>There is no phase without a state machine. This is the one honest task-only affordance.</td></tr>
+        <tr><td>Right rail</td><td>any section has rows</td><td>Requirements · Artifacts · Subtasks · Pull request · Brand docs · Connections. Each section independent and shown only when it has rows — so <code>Artifacts</code> can stand alone on an untracked thread, and <code>Pull request</code> appears only where a PR exists. <b>Supersedes the docs/25 facts line + one-drawer rule.</b></td></tr>
+        <tr><td>Rail tab</td><td>rail exists, collapsed</td><td>26px, carrying the counts and a warm dot when a section holds a gate — the glance the pills used to give. Collapse state is machine-local, like <code>nm:mkrail-collapsed</code>.</td></tr>
+        <tr><td>One gate card</td><td>an open gate targets you</td><td>Verdict, design round, ship plan — <b>and schedule-posts</b>, which is a gate a plain conversation can raise. Gates are about consent, not about the board.</td></tr>
+        <tr><td>Design studio</td><td>a live design round</td><td>The one panel that takes its own width instead of a rail section — mockups need room to be looked at.</td></tr>
+        <tr><td>Track-as-task</td><td>always</td><td>Off: a pill that attaches a task in place. On: the state chip. One control, two readings — the escalation valve made literal, replacing today's Tasks toggle.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note">
+    <b>What this buys, concretely.</b> Image generation works on any draft card, because the daemon branch stops asking <code>t.kind === 'content'</code> and asks "which thread is this draft on". You can drag a screenshot into a conversation and see it. A conversation that produced files shows them as cards instead of nothing. The reqs/artifacts/subtasks drawer stops being a task privilege — a conversation that produced three files shelves them in the same panel. And <code>draft_posts</code> stops needing its refusal guard — the strip renders wherever drafts exist, so there is no thread left where a draft would be invisible.
+  </div>
+
+  <div class="note" style="border-color:var(--green);margin-top:26px">
+    <b>Built, 2026-08-08.</b> Every row in the withheld group has crossed, and the three surfaces that kept drifting are now single components — <code>ThreadMessage</code>, <code>ThreadRootPin</code>, <code>ThreadRail</code>. A capability-by-capability re-audit of <code>ConvoThread</code> vs <code>TaskThread</code> reports <b>zero gaps</b>. One correction to this page in the doing: <b>beats were not withheld</b>. <code>TOOL_KINDS.declare_beats</code> excludes <code>'chat'</code> by an explicit harness ruling and beats key on <code>task_id</code> in the schema — so they are task-shaped like the phase dial, and the row moved to the group above. The components themselves remain two files (1486 + 373 lines), but the shared spine now owns everything that had drifted.
+  </div>
+
+  <div class="foot">mockups/one-thread.html · tokens verbatim from apps/desktop/src/renderer/src/tokens.css · both themes · audit read from App.tsx, not from memory</div>
+</div>
+
+<script>
+  document.querySelectorAll('.themer button').forEach((b) => {
+    b.addEventListener('click', () => {
+      document.documentElement.setAttribute('data-theme', b.dataset.t);
+      document.querySelectorAll('.themer button').forEach((x) => x.classList.toggle('on', x === b));
+    });
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,139 @@
+[
+  {
+    "name": "mk-greet-typing-dark",
+    "query": {
+      "theme": "dark"
+    },
+    "settle": 2200,
+    "js": "(async () => { Array.from(document.querySelectorAll('.chan')).find((c) => (c.textContent || '').includes('marketing'))?.click(); await new Promise((r) => setTimeout(r, 120)); document.querySelector('.msgs')?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })); })()"
+  },
+  {
+    "name": "mk-setup-card-dark",
+    "query": {
+      "theme": "dark"
+    },
+    "settle": 2200,
+    "js": "(async () => { Array.from(document.querySelectorAll('.chan')).find((c) => (c.textContent || '').includes('marketing'))?.click(); await new Promise((r) => setTimeout(r, 200)); document.querySelector('.msgs')?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })); document.querySelector('.msgs')?.click(); await new Promise((r) => setTimeout(r, 1300)); })()"
+  },
+  {
+    "name": "mk-setup-card-cream",
+    "query": {
+      "theme": "cream-oak"
+    },
+    "settle": 2200,
+    "js": "(async () => { Array.from(document.querySelectorAll('.chan')).find((c) => (c.textContent || '').includes('marketing'))?.click(); await new Promise((r) => setTimeout(r, 200)); document.querySelector('.msgs')?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })); document.querySelector('.msgs')?.click(); await new Promise((r) => setTimeout(r, 1300)); })()"
+  },
+  {
+    "name": "mk-setup-sug-filled-dark",
+    "query": {
+      "theme": "dark",
+      "project": "p-flowe"
+    },
+    "settle": 2200,
+    "js": "(async () => { Array.from(document.querySelectorAll('.chan')).find((c) => (c.textContent || '').includes('marketing'))?.click(); await new Promise((r) => setTimeout(r, 200)); document.querySelector('.msgs')?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })); document.querySelector('.msgs')?.click(); await new Promise((r) => setTimeout(r, 1300)); const kp = Array.from(document.querySelectorAll('button')).find((b) => (b.textContent || '').includes('Turn into Marketing HQ')); kp?.click(); await new Promise((r) => setTimeout(r, 1400)); const sug = Array.from(document.querySelectorAll('.sug')).find((b) => (b.textContent || '').includes('project site')); sug?.click(); await new Promise((r) => setTimeout(r, 300)); })()"
+  },
+  {
+    "name": "mk-setup-submitted-dark",
+    "query": {
+      "theme": "dark"
+    },
+    "settle": 2200,
+    "js": "(async () => { Array.from(document.querySelectorAll('.chan')).find((c) => (c.textContent || '').includes('marketing'))?.click(); await new Promise((r) => setTimeout(r, 200)); document.querySelector('.msgs')?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })); document.querySelector('.msgs')?.click(); await new Promise((r) => setTimeout(r, 1300)); const go = Array.from(document.querySelectorAll('.mksetup .btn.primary')).find((b) => (b.textContent || '').includes('crew')); go?.click(); await new Promise((r) => setTimeout(r, 1500)); })()"
+  },
+  {
+    "name": "mk-sched-picker-dark",
+    "query": {
+      "theme": "dark",
+      "plan": "cloud"
+    },
+    "settle": 2200,
+    "js": "(async () => { Array.from(document.querySelectorAll('.chan')).find((c)=>(c.textContent||'').includes('marketing'))?.click(); await new Promise((r)=>setTimeout(r,200)); document.querySelector('.msgs')?.dispatchEvent(new MouseEvent('mousedown',{bubbles:true})); document.querySelector('.msgs')?.click(); await new Promise((r)=>setTimeout(r,1300)); const go=Array.from(document.querySelectorAll('.mksetup .btn.primary')).find((b)=>(b.textContent||'').includes('crew')); go?.click(); await new Promise((r)=>setTimeout(r,1500)); Array.from(document.querySelectorAll('.mkschedadd')).at(0)?.click(); await new Promise((r)=>setTimeout(r,250)); const sv=(el,v)=>{const d=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value');d.set.call(el,v);el.dispatchEvent(new Event('input',{bubbles:true}))};const ins=document.querySelectorAll('.mkwhenpop .mkwtitle'); if(ins[0]) sv(ins[0],'Daily post drafts'); if(ins[1]) sv(ins[1],'Draft one post from the narrative pillars.'); await new Promise((r)=>setTimeout(r,150)); })()"
+  },
+  {
+    "name": "mk-sched-armed-dark",
+    "query": {
+      "theme": "dark",
+      "plan": "cloud"
+    },
+    "settle": 2200,
+    "js": "(async () => { Array.from(document.querySelectorAll('.chan')).find((c)=>(c.textContent||'').includes('marketing'))?.click(); await new Promise((r)=>setTimeout(r,200)); document.querySelector('.msgs')?.dispatchEvent(new MouseEvent('mousedown',{bubbles:true})); document.querySelector('.msgs')?.click(); await new Promise((r)=>setTimeout(r,1300)); const go=Array.from(document.querySelectorAll('.mksetup .btn.primary')).find((b)=>(b.textContent||'').includes('crew')); go?.click(); await new Promise((r)=>setTimeout(r,1500)); Array.from(document.querySelectorAll('.mkschedadd')).at(0)?.click(); await new Promise((r)=>setTimeout(r,250)); const sv=(el,v)=>{const d=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value');d.set.call(el,v);el.dispatchEvent(new Event('input',{bubbles:true}))};const ins=document.querySelectorAll('.mkwhenpop .mkwtitle'); if(ins[0]) sv(ins[0],'Daily post drafts'); if(ins[1]) sv(ins[1],'Draft one post from the narrative pillars.'); await new Promise((r)=>setTimeout(r,150)); Array.from(document.querySelectorAll('.mkwhenpop .btn.primary')).at(0)?.click(); await new Promise((r)=>setTimeout(r,900)); })()"
+  },
+  {
+    "name": "mk-sched-paywall-dark",
+    "query": {
+      "theme": "dark"
+    },
+    "settle": 2200,
+    "js": "(async () => { Array.from(document.querySelectorAll('.chan')).find((c)=>(c.textContent||'').includes('marketing'))?.click(); await new Promise((r)=>setTimeout(r,200)); document.querySelector('.msgs')?.dispatchEvent(new MouseEvent('mousedown',{bubbles:true})); document.querySelector('.msgs')?.click(); await new Promise((r)=>setTimeout(r,1300)); const go=Array.from(document.querySelectorAll('.mksetup .btn.primary')).find((b)=>(b.textContent||'').includes('crew')); go?.click(); await new Promise((r)=>setTimeout(r,1500)); Array.from(document.querySelectorAll('.mkschedadd')).at(0)?.click(); await new Promise((r)=>setTimeout(r,250)); const sv=(el,v)=>{const d=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value');d.set.call(el,v);el.dispatchEvent(new Event('input',{bubbles:true}))};const ins=document.querySelectorAll('.mkwhenpop .mkwtitle'); if(ins[0]) sv(ins[0],'Daily post drafts'); if(ins[1]) sv(ins[1],'Draft one post from the narrative pillars.'); await new Promise((r)=>setTimeout(r,150)); Array.from(document.querySelectorAll('.mkwhenpop .btn.primary')).at(0)?.click(); await new Promise((r)=>setTimeout(r,900)); })()"
+  },
+  {
+    "name": "mk-cal-week-dark",
+    "query": {
+      "theme": "dark",
+      "plan": "cloud"
+    },
+    "settle": 2200,
+    "js": "(async () => { Array.from(document.querySelectorAll('.chan')).find((c)=>(c.textContent||'').includes('marketing'))?.click(); await new Promise((r)=>setTimeout(r,200)); document.querySelector('.msgs')?.dispatchEvent(new MouseEvent('mousedown',{bubbles:true})); document.querySelector('.msgs')?.click(); await new Promise((r)=>setTimeout(r,1300)); const go=Array.from(document.querySelectorAll('.mksetup .btn.primary')).find((b)=>(b.textContent||'').includes('crew')); go?.click(); await new Promise((r)=>setTimeout(r,1500)); Array.from(document.querySelectorAll('.mkviewchips button')).find((b)=>(b.textContent||'')==='Calendar')?.click(); await new Promise((r)=>setTimeout(r,400)); document.querySelector('.mkcalrange')?.dispatchEvent(new MouseEvent('mousedown',{bubbles:true})); document.querySelector('.mkcalrange')?.click(); await new Promise((r)=>setTimeout(r,250)); })()"
+  },
+  {
+    "name": "mk-cal-week-cream",
+    "query": {
+      "theme": "cream-oak",
+      "plan": "cloud"
+    },
+    "settle": 2200,
+    "js": "(async () => { Array.from(document.querySelectorAll('.chan')).find((c)=>(c.textContent||'').includes('marketing'))?.click(); await new Promise((r)=>setTimeout(r,200)); document.querySelector('.msgs')?.dispatchEvent(new MouseEvent('mousedown',{bubbles:true})); document.querySelector('.msgs')?.click(); await new Promise((r)=>setTimeout(r,1300)); const go=Array.from(document.querySelectorAll('.mksetup .btn.primary')).find((b)=>(b.textContent||'').includes('crew')); go?.click(); await new Promise((r)=>setTimeout(r,1500)); Array.from(document.querySelectorAll('.mkviewchips button')).find((b)=>(b.textContent||'')==='Calendar')?.click(); await new Promise((r)=>setTimeout(r,400)); document.querySelector('.mkcalrange')?.dispatchEvent(new MouseEvent('mousedown',{bubbles:true})); document.querySelector('.mkcalrange')?.click(); await new Promise((r)=>setTimeout(r,250)); })()"
+  },
+  {
+    "name": "mk-cal-approve-dark",
+    "query": {
+      "theme": "dark",
+      "plan": "cloud"
+    },
+    "settle": 2200,
+    "js": "(async () => { Array.from(document.querySelectorAll('.chan')).find((c)=>(c.textContent||'').includes('marketing'))?.click(); await new Promise((r)=>setTimeout(r,200)); document.querySelector('.msgs')?.dispatchEvent(new MouseEvent('mousedown',{bubbles:true})); document.querySelector('.msgs')?.click(); await new Promise((r)=>setTimeout(r,1300)); const go=Array.from(document.querySelectorAll('.mksetup .btn.primary')).find((b)=>(b.textContent||'').includes('crew')); go?.click(); await new Promise((r)=>setTimeout(r,1500)); Array.from(document.querySelectorAll('.mkviewchips button')).find((b)=>(b.textContent||'')==='Calendar')?.click(); await new Promise((r)=>setTimeout(r,400)); Array.from(document.querySelectorAll('.mkcalitem.draft')).at(0)?.click(); await new Promise((r)=>setTimeout(r,300)); document.querySelector('.mkcalrange')?.dispatchEvent(new MouseEvent('mousedown',{bubbles:true})); document.querySelector('.mkcalrange')?.click(); await new Promise((r)=>setTimeout(r,250)); })()"
+  },
+  {
+    "name": "mk-conn-row-dark",
+    "query": {
+      "theme": "dark"
+    },
+    "settle": 2200,
+    "js": "(async () => { Array.from(document.querySelectorAll('.chan')).find((c)=>(c.textContent||'').includes('marketing'))?.click(); await new Promise((r)=>setTimeout(r,200)); document.querySelector('.msgs')?.dispatchEvent(new MouseEvent('mousedown',{bubbles:true})); document.querySelector('.msgs')?.click(); await new Promise((r)=>setTimeout(r,1300)); })()"
+  },
+  {
+    "name": "mk-conn-connected-dark",
+    "query": {
+      "theme": "dark"
+    },
+    "settle": 2200,
+    "js": "(async () => { Array.from(document.querySelectorAll('.chan')).find((c)=>(c.textContent||'').includes('marketing'))?.click(); await new Promise((r)=>setTimeout(r,200)); document.querySelector('.msgs')?.dispatchEvent(new MouseEvent('mousedown',{bubbles:true})); document.querySelector('.msgs')?.click(); await new Promise((r)=>setTimeout(r,1300)); Array.from(document.querySelectorAll('.mkconnbtn')).at(0)?.click(); await new Promise((r)=>setTimeout(r,4600)); })()"
+  },
+  {
+    "name": "mk-lib-grid-dark",
+    "query": {
+      "theme": "dark",
+      "plan": "cloud"
+    },
+    "settle": 2200,
+    "js": "(async () => { Array.from(document.querySelectorAll('.chan')).find((c)=>(c.textContent||'').includes('marketing'))?.click(); await new Promise((r)=>setTimeout(r,200)); document.querySelector('.msgs')?.dispatchEvent(new MouseEvent('mousedown',{bubbles:true})); document.querySelector('.msgs')?.click(); await new Promise((r)=>setTimeout(r,1300)); const go=Array.from(document.querySelectorAll('.mksetup .btn.primary')).find((b)=>(b.textContent||'').includes('crew')); go?.click(); await new Promise((r)=>setTimeout(r,1500)); Array.from(document.querySelectorAll('.mkviewchips button')).find((b)=>(b.textContent||'')==='Library')?.click(); await new Promise((r)=>setTimeout(r,400)); })()"
+  },
+  {
+    "name": "mk-lib-grid-cream",
+    "query": {
+      "theme": "cream-oak",
+      "plan": "cloud"
+    },
+    "settle": 2200,
+    "js": "(async () => { Array.from(document.querySelectorAll('.chan')).find((c)=>(c.textContent||'').includes('marketing'))?.click(); await new Promise((r)=>setTimeout(r,200)); document.querySelector('.msgs')?.dispatchEvent(new MouseEvent('mousedown',{bubbles:true})); document.querySelector('.msgs')?.click(); await new Promise((r)=>setTimeout(r,1300)); const go=Array.from(document.querySelectorAll('.mksetup .btn.primary')).find((b)=>(b.textContent||'').includes('crew')); go?.click(); await new Promise((r)=>setTimeout(r,1500)); Array.from(document.querySelectorAll('.mkviewchips button')).find((b)=>(b.textContent||'')==='Library')?.click(); await new Promise((r)=>setTimeout(r,400)); })()"
+  },
+  {
+    "name": "mk-lib-reader-dark",
+    "query": {
+      "theme": "dark",
+      "plan": "cloud"
+    },
+    "settle": 2200,
+    "js": "(async () => { Array.from(document.querySelectorAll('.chan')).find((c)=>(c.textContent||'').includes('marketing'))?.click(); await new Promise((r)=>setTimeout(r,200)); document.querySelector('.msgs')?.dispatchEvent(new MouseEvent('mousedown',{bubbles:true})); document.querySelector('.msgs')?.click(); await new Promise((r)=>setTimeout(r,1300)); const go=Array.from(document.querySelectorAll('.mksetup .btn.primary')).find((b)=>(b.textContent||'').includes('crew')); go?.click(); await new Promise((r)=>setTimeout(r,1500)); Array.from(document.querySelectorAll('.mkviewchips button')).find((b)=>(b.textContent||'')==='Library')?.click(); await new Promise((r)=>setTimeout(r,400)); Array.from(document.querySelectorAll('.mklibtile')).at(0)?.click(); await new Promise((r)=>setTimeout(r,350)); })()"
+  }
+]

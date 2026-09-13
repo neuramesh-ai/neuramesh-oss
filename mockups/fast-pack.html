@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<title>Fast pack — Brains grid + pill popup + seat evidence (mockup)</title>
+<style>
+/* ── Real app tokens (tokens.css, monochrome v0.27.3) — dark · light · cream-oak ── */
+:root {
+  --fbody: 'Geist Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --fmono: 'Geist Mono Variable', ui-monospace, 'SF Mono', Menlo, monospace;
+  --dur-fast: .12s; --dur: .18s; --ease: cubic-bezier(.21,.61,.35,1);
+}
+:root, [data-theme='dark'] {
+  --win:#131210; --bg:#1b1a18; --panel:#201f1c; --panel2:#272522; --panel3:#302e2b;
+  --border:#2a2825; --border2:#383530;
+  --text:#d9d5ce; --body:#b7b4ac; --muted:#8f8a82; --dim:#6b675f;
+  --accent:var(--text); --accent-ink:#12171f; --accent-soft:var(--panel3);
+  --green:#77ac8d;
+  --shadow:rgba(0,0,0,0.5); --overlay:var(--panel);
+  --ring:#57544c; --hover-border:#46443d; --sel-bg:color-mix(in srgb, var(--text) 9%, transparent);
+  --role-orch:#9793d2; --role-arch:#a89ccf; --role-dev:#77ac8d; --role-rev:#7ba1c4; --role-design:#cc8fb9; --role-cur:#6fb0ab;
+  --prov-anthropic:#d97757; --prov-openai:#b7b4ac; --prov-gemini:#9793d2;
+}
+[data-theme='light'] {
+  --win:#e6e3dd; --bg:#f4f2ed; --panel:#fbfaf7; --panel2:#f0eee8; --panel3:#e8e5df;
+  --border:#e7e2da; --border2:#d6cfc4;
+  --text:#38332d; --body:#585249; --muted:#8a847a; --dim:#a59e93;
+  --accent:var(--text); --accent-ink:#ffffff; --accent-soft:var(--panel3);
+  --green:#2f9e6b;
+  --shadow:rgba(80,60,40,0.16); --overlay:var(--panel);
+  --ring:color-mix(in srgb, var(--accent) 55%, var(--border2)); --hover-border:color-mix(in srgb, var(--text) 22%, var(--border2)); --sel-bg:color-mix(in srgb, var(--text) 7%, transparent);
+  --role-orch:#635fc0; --role-arch:#7d6cc4; --role-dev:#3f9268; --role-rev:#4f7bb0; --role-design:#b0498f; --role-cur:#2f8f8a;
+  --prov-anthropic:#c96442; --prov-openai:#585249; --prov-gemini:#635fc0;
+}
+[data-theme='cream-oak'] {
+  --win:#efe6d7; --bg:#f7efe2; --panel:#fffaf2; --panel2:#f4e7d6; --panel3:#ecdcc5;
+  --border:#ecdfcd; --border2:#dbc6ad;
+  --text:#352a20; --body:#5c5040; --muted:#8a7969; --dim:#a8967f;
+  --accent:var(--text); --accent-ink:#ffffff; --accent-soft:var(--panel3);
+  --green:#2f9e6b;
+  --shadow:rgba(80,50,25,0.16); --overlay:var(--panel);
+  --ring:color-mix(in srgb, var(--accent) 55%, var(--border2)); --hover-border:color-mix(in srgb, var(--text) 20%, var(--border2)); --sel-bg:color-mix(in srgb, var(--text) 7%, transparent);
+  --role-orch:#6a63bc; --role-arch:#7d6cc4; --role-dev:#3f9268; --role-rev:#4f7bb0; --role-design:#b0498f; --role-cur:#2f8f8a;
+  --prov-anthropic:#c96442; --prov-openai:#5c5040; --prov-gemini:#6a63bc;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:var(--win); color:var(--text); font:13px/1.5 var(--fbody); -webkit-font-smoothing:antialiased; padding:34px 40px 80px; }
+button { font:inherit; color:inherit; background:none; border:none; cursor:pointer; }
+
+/* mockup scaffolding (matches mockups/brain-pill.html) */
+.mkhead { display:flex; align-items:baseline; justify-content:space-between; max-width:1060px; margin:0 auto 6px; }
+.mkhead h1 { font-size:17px; font-weight:700; }
+.mkhead p { font-size:11.5px; color:var(--muted); margin-top:2px; }
+.themes { display:flex; gap:4px; background:var(--panel2); border:1px solid var(--border2); border-radius:999px; padding:3px; }
+.themes button { font-size:10.5px; font-weight:700; padding:4px 11px; border-radius:999px; color:var(--muted); }
+.themes button.on { background:var(--accent); color:var(--accent-ink); }
+.sect { max-width:1060px; margin:34px auto 0; }
+.sect > h2 { font-size:12px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--muted); }
+.sect > .why { font-size:11.5px; color:var(--dim); margin:3px 0 13px; max-width:760px; line-height:1.55; }
+.frame { background:var(--bg); border:1px solid var(--border); border-radius:16px; padding:22px; box-shadow:0 1px 3px -1px var(--shadow); }
+.cap { font-size:10.5px; color:var(--dim); margin-top:10px; line-height:1.5; }
+.cap b { color:var(--muted); }
+.reco { display:inline-block; font-size:9px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--green); border:1px solid color-mix(in srgb, var(--green) 40%, transparent); border-radius:999px; padding:2px 8px; margin-left:8px; vertical-align:2px; }
+
+/* provider glyphs + role dots (mockup stand-ins for ProviderLogo, per brain-pill.html) */
+.pg { width:12px; height:12px; border-radius:4px; display:inline-grid; place-items:center; font-size:8.5px; font-weight:800; flex:none; }
+.pg.anthropic { color:var(--prov-anthropic); }
+.pg.openai { color:var(--prov-openai); }
+.pg.gemini { color:var(--prov-gemini); }
+.roledot { width:6px; height:6px; border-radius:99px; flex:none; }
+
+/* ── Settings → Brains (real classes: .packgrid .packcard …) ── */
+.setwrap { max-width:680px; }
+.packselhd { display:flex; flex-direction:column; gap:2px; margin-bottom:11px; }
+.packselhd b { font-size:13px; }
+.packselhd span { font-size:11px; color:var(--dim); max-width:560px; line-height:1.5; }
+.packgrid { display:grid; grid-template-columns:1fr 1fr; gap:9px; }
+.packcard { text-align:left; display:flex; flex-direction:column; gap:6px; padding:12px 13px; border-radius:11px; background:var(--panel2); border:1px solid var(--border2); cursor:pointer; transition:border-color var(--dur) var(--ease), background var(--dur) var(--ease), box-shadow var(--dur) var(--ease); }
+.packcard:hover:not(.on):not(.off) { border-color:var(--hover-border); }
+.packcard.on { border-color:var(--accent); background:var(--accent-soft); box-shadow:0 1px 3px -1px var(--shadow); }
+.packcard.off { opacity:.58; cursor:not-allowed; }
+.packcardtop { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.packname { font-size:13px; font-weight:700; color:var(--text); }
+.packbadge { font-size:9px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; padding:3px 7px; border-radius:999px; color:var(--muted); background:var(--panel3); flex:none; }
+.packbadge.on { color:var(--accent-ink); background:var(--accent); }
+.packbadge.off { color:var(--dim); }
+.packtag { font-size:10.5px; color:var(--dim); line-height:1.4; margin-top:-1px; }
+.packroster { display:flex; flex-direction:column; gap:4px; margin-top:3px; }
+.packrolerow { display:flex; align-items:center; gap:6px; font-size:10.5px; color:var(--body); }
+.packrolename { color:var(--muted); min-width:62px; }
+.packarrow { color:var(--dim); }
+.packmodelname { color:var(--text); font-weight:600; }
+.packsupport { margin-top:5px; padding-top:6px; border-top:1px dashed var(--border); font-size:9.5px; color:var(--dim); line-height:1.5; }
+.packconnect { margin-top:6px; align-self:flex-start; border:1px solid var(--border2); color:var(--text); font-size:10.5px; font-weight:700; padding:5px 11px; border-radius:8px; cursor:pointer; }
+.packconnect:hover { border-color:var(--hover-border); background:var(--sel-bg); }
+/* the ONE new element this feature proposes: measured-latency toks on the Fast roster */
+.lat { margin-left:auto; font:600 9.5px var(--fmono); color:var(--dim); background:var(--panel3); border-radius:5px; padding:1px 5px; flex:none; }
+.packcard.on .lat { background:color-mix(in srgb, var(--text) 10%, transparent); }
+.lat.cur { background:none; font-style:italic; padding-right:0; }
+
+/* ── Brain pill popup (real classes: .brainpop .bplist .bpdetail …) ── */
+.brainpop { position:relative; width:560px; background:var(--overlay); border:1px solid var(--border2); border-radius:13px; box-shadow:0 18px 44px -14px var(--shadow); overflow:hidden; }
+.bphead { display:flex; align-items:baseline; justify-content:space-between; padding:12px 14px 9px; border-bottom:1px solid var(--border); }
+.bphead b { font-size:12.5px; }
+.bphead span { font-size:10.5px; color:var(--dim); }
+.bpbody { display:flex; min-height:298px; }
+.bplist { width:188px; flex:none; border-right:1px solid var(--border); padding:8px 7px; display:flex; flex-direction:column; gap:2px; }
+.bplbl { font-size:9px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--dim); padding:6px 8px 3px; }
+.bpitem { display:flex; align-items:center; gap:7px; text-align:left; padding:6.5px 9px; border-radius:8px; font-size:11.5px; font-weight:600; color:var(--body); border:1px solid transparent; }
+.bpitem:hover { background:var(--sel-bg); color:var(--text); }
+.bpitem.sel { background:var(--sel-bg); border-color:var(--border2); color:var(--text); }
+.bpitem .nm { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.bpitem .on { font-size:9px; font-weight:700; color:var(--green); }
+.bpitem .lock { font-size:9px; color:var(--dim); }
+.bpnew { margin-top:auto; display:flex; align-items:center; gap:7px; padding:7px 9px; border-radius:8px; border:1px dashed var(--border2); color:var(--muted); font-size:11px; font-weight:600; }
+.bpnew:hover { color:var(--text); border-color:var(--hover-border); background:var(--sel-bg); }
+.bpdetail { flex:1; padding:13px 15px 12px; display:flex; flex-direction:column; }
+.bpdtop { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.bpdname { font-size:13.5px; font-weight:700; }
+.bpdtag { font-size:10.5px; color:var(--dim); margin-top:1px; }
+.bpbadge { font-size:9px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; padding:3px 8px; border-radius:999px; color:var(--muted); background:var(--panel3); flex:none; }
+.bpbadge.on { color:var(--accent-ink); background:var(--accent); }
+.bproster { display:flex; flex-direction:column; gap:5.5px; margin-top:12px; }
+.bprow { display:flex; align-items:center; gap:7px; font-size:11px; color:var(--body); }
+.bprole { color:var(--muted); min-width:76px; display:inline-flex; align-items:center; gap:6px; }
+.bpmodel { color:var(--text); font-weight:600; }
+.bpsupport { margin-top:9px; padding-top:8px; border-top:1px dashed var(--border); display:flex; gap:14px; font-size:10px; color:var(--dim); flex-wrap:wrap; }
+.bpsupport b { color:var(--muted); font-weight:600; }
+.bpfoot { margin-top:auto; padding-top:11px; display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.bpneeds { font-size:10px; color:var(--dim); line-height:1.4; }
+.bpneeds .ok { color:var(--green); }
+.bpapply { background:var(--accent); color:var(--accent-ink); font-size:11px; font-weight:700; padding:6.5px 15px; border-radius:8px; }
+.bpapply.ghost { background:var(--panel3); color:var(--muted); cursor:default; }
+
+/* ── evidence table ── */
+.evtbl { width:100%; border-collapse:collapse; font-size:11px; }
+.evtbl th { text-align:left; font-size:9px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--dim); padding:0 10px 7px 0; border-bottom:1px solid var(--border2); }
+.evtbl td { padding:7px 10px 7px 0; border-bottom:1px solid var(--border); color:var(--body); vertical-align:top; }
+.evtbl tr:last-child td { border-bottom:none; }
+.evtbl .seat { display:inline-flex; align-items:center; gap:6px; color:var(--text); font-weight:600; white-space:nowrap; }
+.evtbl .num { font:600 10.5px var(--fmono); color:var(--text); white-space:nowrap; }
+.evtbl .sub { color:var(--dim); font-size:10px; }
+.evagg { display:flex; gap:26px; margin-top:14px; padding-top:12px; border-top:1px solid var(--border2); flex-wrap:wrap; }
+.evagg .st { display:flex; flex-direction:column; gap:1px; }
+.evagg .st b { font:700 16px var(--fmono); color:var(--text); }
+.evagg .st span { font-size:9.5px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--dim); }
+.evnote { margin-top:13px; padding:10px 12px; border:1px dashed var(--border2); border-radius:10px; font-size:10.5px; color:var(--dim); line-height:1.55; }
+.evnote b { color:var(--muted); }
+</style>
+</head>
+<body>
+<div class="mkhead">
+  <div>
+    <h1>Fast pack — the sixth curated brain</h1>
+    <p>Fastest full-strength seat per role (no mini/lite tier) · seats from the docs/11 bench (2026-07-02) · plan: docs/design/fast-pack-2026-07/plan.md</p>
+  </div>
+  <div class="themes">
+    <button class="on" data-t="dark">Dark</button>
+    <button data-t="light">Light</button>
+    <button data-t="cream-oak">Cream-oak</button>
+  </div>
+</div>
+
+<!-- ═══ 1 · Settings → Brains grid ═══ -->
+<div class="sect">
+  <h2>1 · Settings → Brains — Fast joins the grid <span class="reco">zero new UI code</span></h2>
+  <p class="why">The grid renders from <b>PACK_ORDER</b> — Fast slots in after Balanced (cross-provider packs first). The one proposed addition: muted <b>measured-latency toks</b> on the Fast roster rows, so the pack's promise is legible at a glance (optional scope — the card works without them).</p>
+  <div class="frame setwrap">
+    <div class="packselhd">
+      <b>Team brains</b>
+      <span>A curated model per role — or build your own. Switching re-points every pack-managed agent at once; agents you've pinned by hand stay as they are.</span>
+    </div>
+    <div class="packgrid">
+      <button class="packcard">
+        <div class="packcardtop"><span class="packname">Ultracode</span><span class="packbadge">Apply</span></div>
+        <div class="packtag">Best-in-market brain per role — mixes providers</div>
+        <div class="packroster">
+          <span class="packrolerow"><span class="pg anthropic">✳</span><span class="packrolename">orchestrator</span><span class="packarrow">→</span><span class="packmodelname">Claude Fable 5</span></span>
+          <span class="packrolerow"><span class="pg anthropic">✳</span><span class="packrolename">architect</span><span class="packarrow">→</span><span class="packmodelname">Claude Fable 5</span></span>
+          <span class="packrolerow"><span class="pg anthropic">✳</span><span class="packrolename">developer</span><span class="packarrow">→</span><span class="packmodelname">Claude Opus 4.8</span></span>
+          <span class="packrolerow"><span class="pg gemini">✦</span><span class="packrolename">reviewer</span><span class="packarrow">→</span><span class="packmodelname">Gemini 3.5 Flash</span></span>
+          <span class="packrolerow"><span class="pg anthropic">✳</span><span class="packrolename">designer</span><span class="packarrow">→</span><span class="packmodelname">Claude Opus 4.8</span></span>
+        </div>
+        <div class="packsupport">support · shipper → Claude Fable 5 · sales → Claude Sonnet 4.6 · curator → Claude Haiku 4.5</div>
+      </button>
+      <button class="packcard">
+        <div class="packcardtop"><span class="packname">Balanced</span><span class="packbadge">Apply</span></div>
+        <div class="packtag">Cost + performance across providers</div>
+        <div class="packroster">
+          <span class="packrolerow"><span class="pg anthropic">✳</span><span class="packrolename">orchestrator</span><span class="packarrow">→</span><span class="packmodelname">Claude Sonnet 4.6</span></span>
+          <span class="packrolerow"><span class="pg anthropic">✳</span><span class="packrolename">architect</span><span class="packarrow">→</span><span class="packmodelname">Claude Opus 4.8</span></span>
+          <span class="packrolerow"><span class="pg anthropic">✳</span><span class="packrolename">developer</span><span class="packarrow">→</span><span class="packmodelname">Claude Sonnet 5</span></span>
+          <span class="packrolerow"><span class="pg gemini">✦</span><span class="packrolename">reviewer</span><span class="packarrow">→</span><span class="packmodelname">Gemini 3.5 Flash</span></span>
+          <span class="packrolerow"><span class="pg anthropic">✳</span><span class="packrolename">designer</span><span class="packarrow">→</span><span class="packmodelname">Claude Sonnet 5</span></span>
+        </div>
+        <div class="packsupport">support · shipper → Claude Sonnet 5 · sales → Claude Haiku 4.5 · curator → Claude Haiku 4.5</div>
+      </button>
+      <button class="packcard on">
+        <div class="packcardtop"><span class="packname">Fast</span><span class="packbadge on">✓ Active</span></div>
+        <div class="packtag">Fastest full-strength brain per role — mixes providers</div>
+        <div class="packroster">
+          <span class="packrolerow"><span class="pg gemini">✦</span><span class="packrolename">orchestrator</span><span class="packarrow">→</span><span class="packmodelname">Gemini 3.5 Flash</span><span class="lat">6.6s</span></span>
+          <span class="packrolerow"><span class="pg gemini">✦</span><span class="packrolename">architect</span><span class="packarrow">→</span><span class="packmodelname">Gemini 3.1 Pro (preview)</span><span class="lat">25.8s</span></span>
+          <span class="packrolerow"><span class="pg anthropic">✳</span><span class="packrolename">developer</span><span class="packarrow">→</span><span class="packmodelname">Claude Sonnet 5</span><span class="lat">10.2s</span></span>
+          <span class="packrolerow"><span class="pg gemini">✦</span><span class="packrolename">reviewer</span><span class="packarrow">→</span><span class="packmodelname">Gemini 3.5 Flash</span><span class="lat">2.1s</span></span>
+          <span class="packrolerow"><span class="pg anthropic">✳</span><span class="packrolename">designer</span><span class="packarrow">→</span><span class="packmodelname">Claude Sonnet 5</span><span class="lat cur">curated</span></span>
+        </div>
+        <div class="packsupport">support · shipper → Claude Sonnet 5 · sales → Claude Haiku 4.5 · curator → Claude Haiku 4.5</div>
+      </button>
+      <button class="packcard">
+        <div class="packcardtop"><span class="packname">Claude Core</span><span class="packbadge">Apply</span></div>
+        <div class="packtag">Best per role on Anthropic</div>
+        <div class="packroster">
+          <span class="packrolerow"><span class="pg anthropic">✳</span><span class="packrolename">orchestrator</span><span class="packarrow">→</span><span class="packmodelname">Claude Fable 5</span></span>
+          <span class="packrolerow"><span class="pg anthropic">✳</span><span class="packrolename">architect</span><span class="packarrow">→</span><span class="packmodelname">Claude Fable 5</span></span>
+          <span class="packrolerow"><span class="pg anthropic">✳</span><span class="packrolename">developer</span><span class="packarrow">→</span><span class="packmodelname">Claude Opus 4.8</span></span>
+          <span class="packrolerow"><span class="pg anthropic">✳</span><span class="packrolename">reviewer</span><span class="packarrow">→</span><span class="packmodelname">Claude Haiku 4.5</span></span>
+          <span class="packrolerow"><span class="pg anthropic">✳</span><span class="packrolename">designer</span><span class="packarrow">→</span><span class="packmodelname">Claude Sonnet 5</span></span>
+        </div>
+        <div class="packsupport">support · shipper → Claude Sonnet 5 · sales → Claude Sonnet 4.6 · curator → Claude Haiku 4.5</div>
+      </button>
+      <button class="packcard">
+        <div class="packcardtop"><span class="packname">OpenAI Core</span><span class="packbadge">Apply</span></div>
+        <div class="packtag">Best per role on OpenAI</div>
+        <div class="packroster">
+          <span class="packrolerow"><span class="pg openai">✽</span><span class="packrolename">orchestrator</span><span class="packarrow">→</span><span class="packmodelname">GPT-5.6 Sol</span></span>
+          <span class="packrolerow"><span class="pg openai">✽</span><span class="packrolename">architect</span><span class="packarrow">→</span><span class="packmodelname">GPT-5.4 mini</span></span>
+          <span class="packrolerow"><span class="pg openai">✽</span><span class="packrolename">developer</span><span class="packarrow">→</span><span class="packmodelname">GPT-5.5</span></span>
+          <span class="packrolerow"><span class="pg openai">✽</span><span class="packrolename">reviewer</span><span class="packarrow">→</span><span class="packmodelname">GPT-5.5</span></span>
+          <span class="packrolerow"><span class="pg openai">✽</span><span class="packrolename">designer</span><span class="packarrow">→</span><span class="packmodelname">GPT-5.5</span></span>
+        </div>
+        <div class="packsupport">support · shipper → GPT-5.5 · sales → GPT-5.4 mini · curator → GPT-5.4 mini</div>
+      </button>
+      <button class="packcard">
+        <div class="packcardtop"><span class="packname">Gemini Core</span><span class="packbadge">Apply</span></div>
+        <div class="packtag">Best per role on Gemini</div>
+        <div class="packroster">
+          <span class="packrolerow"><span class="pg gemini">✦</span><span class="packrolename">orchestrator</span><span class="packarrow">→</span><span class="packmodelname">Gemini 3.5 Flash</span></span>
+          <span class="packrolerow"><span class="pg gemini">✦</span><span class="packrolename">architect</span><span class="packarrow">→</span><span class="packmodelname">Gemini 3.1 Pro (preview)</span></span>
+          <span class="packrolerow"><span class="pg gemini">✦</span><span class="packrolename">developer</span><span class="packarrow">→</span><span class="packmodelname">Gemini 3.1 Flash-Lite</span></span>
+          <span class="packrolerow"><span class="pg gemini">✦</span><span class="packrolename">reviewer</span><span class="packarrow">→</span><span class="packmodelname">Gemini 3.5 Flash</span></span>
+          <span class="packrolerow"><span class="pg gemini">✦</span><span class="packrolename">designer</span><span class="packarrow">→</span><span class="packmodelname">Gemini 3.5 Flash</span></span>
+        </div>
+        <div class="packsupport">support · shipper → Gemini 3.1 Pro (preview) · sales → Gemini 3.1 Flash-Lite · curator → Gemini 3.1 Flash-Lite</div>
+      </button>
+    </div>
+    <p class="cap"><b>Latency toks</b> = measured median wall-clock per real task from the docs/11 bench (5 runs, 2026-07-02) — shown only on Fast, whose identity they are. No mini/lite-tier model holds a working seat (founder rule, 2026-07-17); the designer seat has no bench dimension yet → <i>curated</i>. Verified in both themes via the toggle ↑.</p>
+  </div>
+</div>
+
+<!-- ═══ 2 · Locked state ═══ -->
+<div class="sect">
+  <h2>2 · The gate, honest — Anthropic-only workspace</h2>
+  <p class="why">Fast needs <b>Anthropic + Google</b> — the same gate as Ultracode and Balanced (the no-mini rule removed every OpenAI seat, so the third-provider question from the first draft is moot). Locked is the standard treatment: dimmed card, missing provider named, one-click connect.</p>
+  <div class="frame setwrap" style="max-width:420px;">
+    <div class="packgrid" style="grid-template-columns:1fr;">
+      <div class="packcard off">
+        <div class="packcardtop"><span class="packname">Fast</span><span class="packbadge off">Locked</span></div>
+        <div class="packtag">Fastest full-strength brain per role — mixes providers</div>
+        <div class="packroster">
+          <span class="packrolerow"><span class="pg gemini">✦</span><span class="packrolename">orchestrator</span><span class="packarrow">→</span><span class="packmodelname">Gemini 3.5 Flash</span><span class="lat">6.6s</span></span>
+          <span class="packrolerow"><span class="pg gemini">✦</span><span class="packrolename">architect</span><span class="packarrow">→</span><span class="packmodelname">Gemini 3.1 Pro (preview)</span><span class="lat">25.8s</span></span>
+          <span class="packrolerow"><span class="pg anthropic">✳</span><span class="packrolename">developer</span><span class="packarrow">→</span><span class="packmodelname">Claude Sonnet 5</span><span class="lat">10.2s</span></span>
+          <span class="packrolerow"><span class="pg gemini">✦</span><span class="packrolename">reviewer</span><span class="packarrow">→</span><span class="packmodelname">Gemini 3.5 Flash</span><span class="lat">2.1s</span></span>
+          <span class="packrolerow"><span class="pg anthropic">✳</span><span class="packrolename">designer</span><span class="packarrow">→</span><span class="packmodelname">Claude Sonnet 5</span><span class="lat cur">curated</span></span>
+        </div>
+        <div class="packsupport">support · shipper → Claude Sonnet 5 · sales → Claude Haiku 4.5 · curator → Claude Haiku 4.5</div>
+      </div>
+      <button class="packconnect">Connect Google →</button>
+    </div>
+    <p class="cap">Same construction as every locked pack today — <b>missingProviders()</b> names the gap, the CTA deep-links to the Providers tab. No new states invented.</p>
+  </div>
+</div>
+
+<!-- ═══ 3 · Brain pill popup ═══ -->
+<div class="sect">
+  <h2>3 · Composer Brain pill — Fast in the split-pane popup</h2>
+  <p class="why">The pill popup lists every brain on the left and the selection's full roster on the right (v0.28.0 anatomy, unchanged). Fast appears in the curated group via <b>PACK_ORDER</b>; the roster rows carry the same latency toks.</p>
+  <div class="frame" style="display:flex; justify-content:center; padding:30px 22px;">
+    <div class="brainpop">
+      <div class="bphead"><b>Workspace brain</b><span>a curated model per role · applies to pack-managed agents</span></div>
+      <div class="bpbody">
+        <div class="bplist">
+          <div class="bplbl">Curated</div>
+          <button class="bpitem"><span class="nm">Ultracode</span></button>
+          <button class="bpitem"><span class="nm">Balanced</span></button>
+          <button class="bpitem sel"><span class="nm">Fast</span><span class="on">● Active</span></button>
+          <button class="bpitem"><span class="nm">Claude Core</span></button>
+          <button class="bpitem"><span class="nm">OpenAI Core</span></button>
+          <button class="bpitem"><span class="nm">Gemini Core</span></button>
+          <div class="bplbl">Yours</div>
+          <button class="bpitem"><span class="nm">Weekend budget</span><span class="lock">◇</span></button>
+          <button class="bpnew">＋ New custom brain</button>
+        </div>
+        <div class="bpdetail">
+          <div class="bpdtop">
+            <div><div class="bpdname">Fast</div><div class="bpdtag">Fastest full-strength brain per role — mixes providers</div></div>
+            <span class="bpbadge on">✓ Active</span>
+          </div>
+          <div class="bproster">
+            <span class="bprow"><span class="bprole"><span class="roledot" style="background:var(--role-orch)"></span>orchestrator</span><span class="pg gemini">✦</span><span class="bpmodel">Gemini 3.5 Flash</span><span class="lat">6.6s</span></span>
+            <span class="bprow"><span class="bprole"><span class="roledot" style="background:var(--role-arch)"></span>architect</span><span class="pg gemini">✦</span><span class="bpmodel">Gemini 3.1 Pro (preview)</span><span class="lat">25.8s</span></span>
+            <span class="bprow"><span class="bprole"><span class="roledot" style="background:var(--role-dev)"></span>developer</span><span class="pg anthropic">✳</span><span class="bpmodel">Claude Sonnet 5</span><span class="lat">10.2s</span></span>
+            <span class="bprow"><span class="bprole"><span class="roledot" style="background:var(--role-rev)"></span>reviewer</span><span class="pg gemini">✦</span><span class="bpmodel">Gemini 3.5 Flash</span><span class="lat">2.1s</span></span>
+            <span class="bprow"><span class="bprole"><span class="roledot" style="background:var(--role-design)"></span>designer</span><span class="pg anthropic">✳</span><span class="bpmodel">Claude Sonnet 5</span><span class="lat cur">curated</span></span>
+          </div>
+          <div class="bpsupport"><span><b>shipper</b> Claude Sonnet 5</span><span><b>sales</b> Claude Haiku 4.5</span><span><b>curator</b> Claude Haiku 4.5</span></div>
+          <div class="bpfoot">
+            <div class="bpneeds">Needs <span class="ok">Anthropic ✓</span> · <span class="ok">Google ✓</span></div>
+            <button class="bpapply ghost">Active</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="cap"><b>Nothing else moves:</b> hire defaults (planAgentHire), the designer/bosun boot-seeds, pinned-agent badges and capacity-failover all resolve through <b>resolvePackRoles</b> — Fast rides every seam for free.</p>
+</div>
+
+<!-- ═══ 4 · Evidence ═══ -->
+<div class="sect">
+  <h2>4 · Why these seats — fastest full-strength, with the rejected runner-ups</h2>
+  <p class="why">Every benched seat is the fastest <b>non-mini/lite</b> option with quality ≥ 90 on our own held-out tasks; the reviewer additionally must sit on a different family than the developer (independent judgment). Not vendor tok/s claims — wall-clock per real NeuraMesh task.</p>
+  <div class="frame">
+    <table class="evtbl">
+      <tr><th>Role</th><th>Seat</th><th>Measured</th><th>Rejected runner-up</th></tr>
+      <tr>
+        <td>orchestrator</td>
+        <td><span class="seat"><span class="pg gemini">✦</span>Gemini 3.5 Flash</span></td>
+        <td><span class="num">6.6s · q97 · $0.0041</span></td>
+        <td>GPT-5.5 <span class="sub">(8.8s, q99 — slower, and drags in a third provider for one seat). Beats Balanced's Sonnet 4.6 seat on both axes (23.1s, q88).</span></td>
+      </tr>
+      <tr>
+        <td>architect</td>
+        <td><span class="seat"><span class="pg gemini">✦</span>Gemini 3.1 Pro (preview)</span></td>
+        <td><span class="num">25.8s · q94 · $0.0182</span></td>
+        <td>Opus 4.8 <span class="sub">(45.3s, q96 — +2q for 1.8× the wall-clock, 4.6× the cost). Preview-as-default = the existing gemini-core exception, same seat, same evidence.</span></td>
+      </tr>
+      <tr>
+        <td>developer</td>
+        <td><span class="seat"><span class="pg anthropic">✳</span>Claude Sonnet 5</span></td>
+        <td><span class="num">10.2s · 100% pass · $0.0209</span></td>
+        <td>Opus 4.8 <span class="sub">(11.4s, 100%, 1.4× cost)</span> · GPT-5.5 <span class="sub">(14.2s, 100%)</span></td>
+      </tr>
+      <tr>
+        <td>reviewer</td>
+        <td><span class="seat"><span class="pg gemini">✦</span>Gemini 3.5 Flash</span></td>
+        <td><span class="num">2.1s · q92 · $0.0010</span></td>
+        <td>Haiku 4.5 <span class="sub">(1.4s, F1 1.00 — same family as the Sonnet 5 developer → no independent judgment)</span> · Opus <span class="sub">(2.6s, q100 — same family + cost)</span></td>
+      </tr>
+      <tr>
+        <td>designer · shipper</td>
+        <td><span class="seat"><span class="pg anthropic">✳</span>Claude Sonnet 5</span> <span class="sub">(both)</span></td>
+        <td><span class="num">curated</span></td>
+        <td><span class="sub">No bench dimension (docs/10 EXCEPTIONs): Anthropic leads design taste, and Sonnet 5 is the fastest full-strength Claude; shipper per docs/23 tiering "at/near the architect line" — the Balanced/Claude-Core seats.</span></td>
+      </tr>
+    </table>
+    <div class="evagg">
+      <div class="st"><b>44.7s</b><span>working-loop turns (sum, 4 benched roles)</span></div>
+      <div class="st"><b>vs 79.0s · 80.7s</b><span>Ultracode · Balanced — ~1.8× faster than either</span></div>
+      <div class="st"><b>$0.044</b><span>per loop vs $0.275 / $0.124 — 6× / 3× cheaper</span></div>
+    </div>
+    <div class="evnote">
+      <b>Founder rule (2026-07-17):</b> mini/lite-tier models hold no working seats — Flash-Lite and GPT-5.4 mini sprint the bench but aren't trusted for real work. Haiku 4.5 stays on the support roles only (sales/curator — same as Balanced/Claude Core); flag if it should go too.
+      <br /><b>Catalog note (research 2026-07-17):</b> OpenAI GA'd the GPT-5.6 family on 07-09 — <b>Luna</b> ($1/$6, 1M ctx) is now OpenAI's fastest. It joins the codex catalog + manual picker (with a FALL_FORWARD hop to GPT-5.4 mini) but takes <b>no seat</b>: unbenched, and small-tier by class. Luna and Sol are the headline candidates for the next docs/11 re-run. Terra stays out.
+    </div>
+  </div>
+</div>
+
+<script>
+document.querySelectorAll('.themes button').forEach((b) => {
+  b.addEventListener('click', () => {
+    document.documentElement.dataset.theme = b.dataset.t;
+    document.querySelectorAll('.themes button').forEach((x) => x.classList.toggle('on', x === b));
+  });
+});
+</script>
+</body>
+</html>

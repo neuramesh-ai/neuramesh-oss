@@ -1,0 +1,160 @@
+{
+  "name": "@neuramesh/desktop",
+  "version": "0.132.0",
+  "private": true,
+  "license": "Elastic-2.0",
+  "main": "out/main/index.js",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node -e \"new (require('better-sqlite3'))(':memory:')\" >/dev/null 2>&1 || pnpm rebuild better-sqlite3 >/dev/null 2>&1; tsx --test 'src/main/**/*.test.ts' 'src/renderer/web/**/*.test.ts' 'src/renderer/src/**/*.test.ts'",
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "rebuild:native": "electron-rebuild -f -w better-sqlite3 -w node-pty",
+    "smoke": "electron-vite build && electron . --smoke",
+    "dist": "NM_DIST=1 electron-vite build && electron-builder --arm64",
+    "web:dev": "vite --config vite.web.config.mts",
+    "web:build": "vite build --config vite.web.config.mts"
+  },
+  "build": {
+    "appId": "dev.neuramesh.app",
+    "productName": "NeuraMesh",
+    "beforePack": "scripts/dmg-beforepack.cjs",
+    "directories": {
+      "buildResources": "build",
+      "output": "release"
+    },
+    "files": [
+      "out/**/*",
+      "!**/node_modules/@openai/codex/vendor/**"
+    ],
+    "extraResources": [
+      {
+        "from": "../../defaults/agents",
+        "to": "defaults/agents"
+      },
+      {
+        "from": "resources/local",
+        "to": "local"
+      }
+    ],
+    "asarUnpack": [
+      "**/node_modules/better-sqlite3/**",
+      "**/node_modules/node-pty/**",
+      "**/node_modules/@powersync/**",
+      "**/node_modules/@anthropic-ai/claude-agent-sdk/**",
+      "**/node_modules/@anthropic-ai/claude-agent-sdk-*/**"
+    ],
+    "mac": {
+      "icon": "build/icon.png",
+      "category": "public.app-category.developer-tools",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist"
+    },
+    "dmg": {
+      "background": "build/.generated/dmg-bg.png",
+      "window": {
+        "width": 640,
+        "height": 440
+      },
+      "iconSize": 112,
+      "contents": [
+        {
+          "x": 170,
+          "y": 228,
+          "type": "file"
+        },
+        {
+          "x": 470,
+          "y": 228,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "alonge-dev",
+        "repo": "neuramesh-desktop-releases"
+      }
+    ],
+    "win": {
+      "icon": "build/icon.png"
+    },
+    "linux": {
+      "icon": "build/icon.png",
+      "category": "Development"
+    }
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "latest",
+    "@anthropic-ai/sdk": "^0.104.1",
+    "@clerk/clerk-js": "6.30.1",
+    "@cline/sdk": "0.0.81",
+    "@dicebear/core": "^9.4.3",
+    "@dicebear/thumbs": "^9.4.2",
+    "@excalidraw/excalidraw": "0.18.1",
+    "@excalidraw/mermaid-to-excalidraw": "2.2.2",
+    "@fontsource-variable/geist-mono": "^5.3.0",
+    "@google/genai": "^2.8.0",
+    "@openai/codex-sdk": "^0.153.4",
+    "@powersync/common": "1.57.3",
+    "@powersync/node": "0.19.0",
+    "@powersync/web": "1.39.1",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
+    "better-sqlite3": "^12.11.1",
+    "electron-updater": "^6.8.9",
+    "js-yaml": "^4.1.0",
+    "node-pty": "^1.1.0",
+    "qrcode": "1.5.4",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
+    "thinking-orbs": "^0.2.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@electron/rebuild": "^4.0.4",
+    "@fontsource-variable/bricolage-grotesque": "^5.3.0",
+    "@neuramesh/fonts": "workspace:^",
+    "@neuramesh/relay": "workspace:^",
+    "@neuramesh/relay-client": "workspace:^",
+    "@neuramesh/shared": "workspace:^",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^22.10.2",
+    "@types/qrcode": "^1.5.6",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@types/ws": "^8.5.13",
+    "@vitejs/plugin-react": "^4.3.4",
+    "electron": "^41.0.0",
+    "electron-builder": "^25",
+    "electron-vite": "^5.0.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
+    "vite": "^7.3.5",
+    "vite-plugin-static-copy": "^3",
+    "ws": "^8.18.0"
+  }
+}

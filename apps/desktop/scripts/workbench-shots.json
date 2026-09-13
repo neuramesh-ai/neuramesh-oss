@@ -1,0 +1,5 @@
+[
+  { "name": "wb1-task-dark", "settle": 2600, "query": { "theme": "dark", "openTask": "1032" } },
+  { "name": "wb2-task-cream", "settle": 2600, "query": { "theme": "cream-oak", "openTask": "1032" } },
+  { "name": "wb3-home-dark", "settle": 2400, "query": { "theme": "dark" } }
+]

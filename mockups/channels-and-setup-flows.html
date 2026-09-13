@@ -1,0 +1,501 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Channels in the open · default rooms · setup flows</title>
+<style>
+[data-theme] { --font:'Geist Variable',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; --fmono:'Geist Mono Variable',ui-monospace,'SF Mono',Menlo,monospace; --fdisp:'Source Serif 4','Iowan Old Style',Georgia,serif; --ease:cubic-bezier(.22,1,.36,1); --dur:.15s; }
+/* verbatim from apps/desktop/src/renderer/src/tokens.css */
+[data-theme='dark'] {
+  --win:#0d0d0d; --bg:#141414; --panel:#191919; --panel2:#212121; --panel3:#2b2b2b;
+  --border:#272727; --border2:#383838; --card:#1b1b1b; --card-border:#2e2e2e;
+  --text:#eaeaea; --body:#b6b6b6; --muted:#898989; --dim:#676767; --ring:#585858;
+  --accent:#eaeaea; --accent-ink:#101010; --link:#d19a72; --hover-bg:rgba(234,234,234,.06);
+  --brand:#834a2b; --brand-ink:#fff7ee; --btn:#232323; --btn-fg:#efefef;
+  --todo:#7d8590; --prog:#8ba0c0; --review:#a89ccf; --done:#77ac8d; --acc:#6fb0ab;
+  --blocked:#9ca0a8; --closed:#727272; --warn:#c8a06a; --orch:#9793d2; --role-mkt:#c07f84;
+  --shadow:rgba(0,0,0,.6); --shadow-pop:0 20px 55px -14px rgba(0,0,0,.7);
+}
+[data-theme='cream-oak'] {
+  --win:#f0e5d3; --bg:#fbf8f4; --panel:#fbf8f4; --panel2:#f6eee1; --panel3:#efe1cd;
+  --border:#e6dbca; --border2:#d3c2a8; --card:#ffffff; --card-border:#eadfce;
+  --text:#2a1c13; --body:#574838; --muted:#97846c; --dim:#b5a289; --ring:#b08a5e;
+  --accent:#834a2b; --accent-ink:#fff7ee; --link:#9c5730; --hover-bg:rgba(42,28,19,.05);
+  --brand:#834a2b; --brand-ink:#fff7ee; --btn:#f8f2e8; --btn-fg:#43301f;
+  --todo:#7d8590; --prog:#4f80c4; --review:#6d5ce0; --done:#0f9d63; --acc:#2f8f8a;
+  --blocked:#7d7f86; --closed:#897a60; --warn:#a06a1f; --orch:#6a63bc; --role-mkt:#b04f55;
+  --shadow:rgba(70,42,18,.22); --shadow-pop:0 20px 55px -14px rgba(70,42,18,.30);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#131210; font-family:'Geist Variable',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; -webkit-font-smoothing:antialiased; }
+.page { max-width:1720px; margin:0 auto; padding:30px 24px 90px; }
+.pagehead h1 { font-family:'Source Serif 4',Georgia,serif; font-size:25px; font-weight:640; letter-spacing:-.014em; color:#eaeaea; }
+.pagehead p { color:#8b8b8b; font-size:13px; line-height:1.65; margin-top:9px; max-width:104ch; }
+.pagehead b { color:#c4c4c4; font-weight:600; }
+.pagehead code { font-family:'Geist Mono Variable',ui-monospace,Menlo,monospace; font-size:11.5px; color:#c8a06a; background:rgba(200,160,106,.08); padding:1px 5px; border-radius:4px; }
+.sec { margin-top:40px; border-top:1px solid #262626; padding-top:24px; }
+.sec > h2 { color:#eaeaea; font-size:16px; font-weight:660; letter-spacing:-.008em; display:flex; align-items:center; gap:9px; }
+.sec > h2 .n { font-size:10.5px; font-weight:700; letter-spacing:.06em; color:#0d0d0d; background:#8f8f8f; border-radius:999px; padding:2px 7px; }
+.sec > p { color:#8b8b8b; font-size:12.5px; line-height:1.65; margin-top:9px; max-width:104ch; }
+.sec > p b { color:#c4c4c4; } .sec > p code { font-family:'Geist Mono Variable',monospace; font-size:11px; color:#c8a06a; }
+.verdict { display:inline-block; font-size:10.5px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; border-radius:999px; padding:3px 9px; margin-top:12px; }
+.v-free { background:rgba(119,172,141,.14); color:#8fbf9f; border:1px solid rgba(119,172,141,.3); }
+.v-bug { background:rgba(200,160,106,.13); color:#c8a06a; border:1px solid rgba(200,160,106,.3); }
+.v-build { background:rgba(151,147,210,.14); color:#a89ccf; border:1px solid rgba(151,147,210,.3); }
+.themes { display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-top:18px; }
+@media (max-width:1300px){ .themes { grid-template-columns:1fr; } }
+.theme { background:var(--win); border:1px solid var(--border2); border-radius:16px; padding:15px; color:var(--text); }
+.theme > h3 { font-size:10px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--dim); margin:0 2px 12px; }
+.cap { color:#6f6f6f; font-size:11.5px; line-height:1.55; margin-top:10px; font-style:italic; }
+
+/* ── the real left nav (tokens.css .navpanel = 266px) ── */
+.nav { width:266px; background:var(--panel2); border:1px solid var(--border); border-radius:12px; padding:8px 0; font-size:12.5px; }
+.navsec { display:flex; align-items:center; gap:6px; padding:5px 10px 5px 12px; color:var(--dim); font-size:9.5px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; }
+.navsec .sp { flex:1; }
+.navsec button { background:none; border:none; color:var(--dim); cursor:pointer; padding:2px 3px; border-radius:5px; font-size:12px; line-height:1; }
+.navsec button:hover { background:var(--hover-bg); color:var(--text); }
+.navsec button.hl { color:var(--accent); background:color-mix(in srgb, var(--accent) 12%, transparent); }
+.projhead { display:flex; align-items:center; gap:7px; padding:5px 8px 5px 6px; border-radius:7px; margin:0 6px; cursor:pointer; }
+.projhead:hover { background:var(--hover-bg); }
+.projhead.on { background:color-mix(in srgb, var(--accent) 8%, transparent); }
+.chev { color:var(--dim); font-size:9px; width:10px; }
+.plogo { width:15px; height:15px; border-radius:4px; background:var(--panel3); color:var(--body); font-size:8.5px; font-weight:700; display:grid; place-items:center; flex:none; }
+.pname { font-weight:600; color:var(--text); flex:1; letter-spacing:-.005em; }
+.pdot { width:5px; height:5px; border-radius:50%; background:var(--accent); flex:none; }
+.projbtn { background:none; border:none; color:var(--dim); font-size:12px; cursor:pointer; padding:1px 3px; border-radius:4px; opacity:0; }
+.projhead:hover .projbtn { opacity:1; }
+
+/* the NEW persistent channel strip */
+.chanstrip { display:flex; flex-wrap:wrap; gap:4px; padding:3px 10px 7px 27px; }
+.chanchip { display:inline-flex; align-items:center; gap:3px; font-size:11px; font-weight:550; color:var(--muted); background:var(--panel3); border:1px solid transparent; border-radius:999px; padding:2px 8px; cursor:pointer; }
+.chanchip:hover { color:var(--text); border-color:var(--border2); }
+.chanchip.on { color:var(--text); background:color-mix(in srgb, var(--accent) 12%, transparent); border-color:color-mix(in srgb, var(--accent) 30%, transparent); }
+.chanchip .h { color:var(--dim); font-weight:600; }
+.chanchip .ask { width:4px; height:4px; border-radius:50%; background:var(--warn); }
+.chanchip.add { background:none; color:var(--dim); border:1px dashed var(--border2); }
+
+/* thread rows */
+.row { display:flex; gap:8px; align-items:flex-start; padding:5px 10px 5px 27px; border-radius:7px; margin:0 6px; cursor:pointer; position:relative; }
+.row:hover { background:var(--hover-bg); }
+.row.on { background:color-mix(in srgb, var(--text) 7%, transparent); }
+.dot { width:6px; height:6px; border-radius:50%; margin-top:5px; flex:none; }
+.rbody { flex:1; min-width:0; }
+.rchan { font-size:10px; font-weight:650; letter-spacing:.02em; color:var(--dim); display:flex; align-items:center; gap:4px; margin-bottom:1px; }
+.rchan .k { color:var(--muted); }
+.rline { display:flex; align-items:baseline; gap:6px; }
+.rnum { font-family:'Geist Mono Variable',monospace; font-size:10.5px; color:var(--dim); }
+.rtitle { flex:1; color:var(--text); font-size:12.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.rwhen { font-size:10px; color:var(--dim); flex:none; }
+.rbranch { display:flex; align-items:center; gap:4px; font-family:'Geist Mono Variable',monospace; font-size:10px; color:var(--dim); margin-top:2px; }
+.empty { color:var(--dim); font-size:11.5px; padding:4px 10px 8px 27px; line-height:1.5; }
+
+/* before/after framing */
+.pair { display:flex; gap:14px; align-items:flex-start; flex-wrap:wrap; }
+.bacol { display:flex; flex-direction:column; gap:7px; }
+.balabel { font-size:9.5px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--dim); padding-left:3px; }
+.balabel.now { color:var(--warn); }
+.balabel.next { color:var(--done); }
+
+/* thread header + composer */
+.thead { background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:12px 14px; width:520px; max-width:100%; }
+.crumb { display:flex; align-items:center; gap:6px; font-size:11px; color:var(--dim); margin-bottom:7px; flex-wrap:wrap; }
+.crumb .sep { color:var(--border2); }
+.crumb .cchan { display:inline-flex; align-items:center; gap:3px; color:var(--body); background:var(--panel3); border-radius:999px; padding:1.5px 8px; font-weight:600; font-size:10.5px; }
+.crumb .cproj { display:inline-flex; align-items:center; gap:4px; color:var(--muted); font-weight:600; }
+.ttitle { font-family:'Source Serif 4',Georgia,serif; font-size:18px; font-weight:620; letter-spacing:-.01em; color:var(--text); }
+.composer { background:var(--panel); border:1px solid var(--border2); border-radius:12px; padding:10px 12px; width:520px; max-width:100%; margin-top:12px; }
+.cph { color:var(--dim); font-size:12.5px; }
+.crow { display:flex; align-items:center; gap:7px; margin-top:10px; }
+.cchip { display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:600; color:var(--body); background:var(--panel3); border:1px solid var(--border); border-radius:999px; padding:3px 9px; }
+.cchip.locked { color:var(--muted); opacity:.72; cursor:default; }
+.cchip.locked .lk { font-size:9px; color:var(--dim); }
+.cchip .cv { color:var(--dim); font-size:8px; }
+.cspacer { flex:1; }
+.csend { width:24px; height:24px; border-radius:50%; background:var(--accent); color:var(--accent-ink); display:grid; place-items:center; font-size:11px; }
+
+/* modal */
+.modal { background:var(--card); border:1px solid var(--card-border); border-radius:14px; padding:16px; width:430px; max-width:100%; box-shadow:var(--shadow-pop); }
+.modal h4 { font-family:'Source Serif 4',Georgia,serif; font-size:16px; font-weight:620; color:var(--text); margin-bottom:12px; }
+.fld { margin-bottom:13px; }
+.fld > label { display:block; font-size:10px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--dim); margin-bottom:6px; }
+.fake-input { background:var(--panel2); border:1px solid var(--border); border-radius:8px; padding:7px 10px; font-size:12.5px; color:var(--text); }
+.fake-input.ph { color:var(--dim); }
+.chipselect { display:flex; flex-wrap:wrap; gap:6px; }
+.chiptoggle { display:inline-flex; align-items:center; gap:5px; font-size:11.5px; font-weight:550; color:var(--muted); background:var(--panel2); border:1px solid var(--border); border-radius:999px; padding:4px 10px; cursor:pointer; }
+.chiptoggle.on { color:var(--accent-ink); background:var(--accent); border-color:var(--accent); }
+.chiptoggle .tag { font-size:8.5px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; opacity:.62; }
+.chiptoggle.on .tag { opacity:.72; }
+.hint { color:var(--dim); font-size:11px; line-height:1.55; margin-top:7px; }
+.btnrow { display:flex; gap:8px; justify-content:flex-end; margin-top:14px; }
+.btn { font-size:12px; font-weight:600; border-radius:8px; padding:6px 13px; border:1px solid var(--border2); background:var(--btn); color:var(--btn-fg); cursor:pointer; }
+.btn.primary { background:var(--accent); color:var(--accent-ink); border-color:var(--accent); }
+.btn.ghost { background:none; border-color:transparent; color:var(--muted); }
+
+/* setup thread + cards */
+.card { background:var(--card); border:1px solid var(--card-border); border-radius:12px; padding:13px; width:460px; max-width:100%; }
+.qhead { display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:640; color:var(--text); margin-bottom:11px; }
+.qcount { font-family:'Geist Mono Variable',monospace; font-size:10px; font-weight:700; color:var(--muted); background:var(--panel3); border-radius:5px; padding:2px 6px; }
+.qopt { color:var(--dim); font-weight:500; font-size:11px; }
+.steps { display:flex; align-items:center; gap:0; margin-bottom:12px; }
+.step { flex:1; height:3px; border-radius:2px; background:var(--panel3); position:relative; }
+.step + .step { margin-left:4px; }
+.step.done { background:var(--done); }
+.step.now { background:var(--prog); }
+.steplbl { display:flex; gap:4px; margin-bottom:4px; }
+.steplbl span { flex:1; font-size:9px; font-weight:650; letter-spacing:.04em; text-transform:uppercase; color:var(--dim); }
+.steplbl span.now { color:var(--prog); }
+.steplbl span.done { color:var(--done); }
+.connrow { display:flex; align-items:center; gap:9px; padding:8px 2px; border-bottom:1px solid color-mix(in srgb, var(--border) 55%, transparent); }
+.connico { width:18px; text-align:center; color:var(--muted); font-size:12px; }
+.connname { flex:1; font-size:12px; color:var(--text); }
+.connname .note { color:var(--dim); font-size:10.5px; font-weight:500; }
+.connok { color:var(--done); font-size:11px; font-weight:600; }
+
+/* needs-you row */
+.nyrow { display:flex; align-items:center; gap:10px; background:var(--card); border:1px solid var(--card-border); border-radius:10px; padding:10px 12px; width:560px; max-width:100%; }
+.nykind { font-size:9px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--role-mkt); background:color-mix(in srgb, var(--role-mkt) 14%, transparent); border-radius:5px; padding:2.5px 6px; flex:none; }
+.nybody { flex:1; min-width:0; }
+.nyt { font-size:12.5px; color:var(--text); font-weight:550; }
+.nym { font-size:11px; color:var(--dim); margin-top:2px; }
+.nywhen { font-size:10.5px; color:var(--dim); flex:none; }
+
+/* toast + confirm */
+.toast { display:flex; align-items:center; gap:12px; background:var(--panel3); border:1px solid var(--border2); border-radius:10px; padding:9px 13px; font-size:12px; color:var(--body); width:520px; max-width:100%; box-shadow:var(--shadow-pop); }
+.toast b { color:var(--text); font-weight:620; }
+.toast button { margin-left:auto; background:none; border:none; color:var(--link); font-size:12px; font-weight:650; cursor:pointer; flex:none; }
+
+/* arch table */
+.tbl { width:100%; border-collapse:collapse; font-size:12px; color:var(--body); }
+.tbl th { text-align:left; font-size:9.5px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--dim); padding:0 10px 7px 0; border-bottom:1px solid var(--border); }
+.tbl td { padding:8px 10px 8px 0; border-bottom:1px solid color-mix(in srgb, var(--border) 60%, transparent); vertical-align:top; }
+.tbl code { font-family:'Geist Mono Variable',monospace; font-size:11px; color:var(--link); }
+.tbl td b { color:var(--text); font-weight:620; }
+
+.codeblk { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:12px 14px; font-family:'Geist Mono Variable',ui-monospace,Menlo,monospace; font-size:11.5px; line-height:1.75; color:var(--body); overflow-x:auto; white-space:pre; }
+.codeblk .k { color:var(--orch); } .codeblk .s { color:var(--done); } .codeblk .c { color:var(--dim); font-style:italic; }
+.note { border-left:2px solid var(--warn); padding:2px 0 2px 12px; margin-top:14px; color:#9a9a9a; font-size:12.5px; line-height:1.65; max-width:100ch; }
+.note b { color:#c8a06a; }
+.note.ask { border-left-color:var(--orch); } .note.ask b { color:#a89ccf; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<div class="pagehead">
+  <h1>Channels in the open · default rooms · setup flows</h1>
+  <p>Design round for four asks: make channels visible and make a thread say which room it lives in; ship the four default channels pre-selected; reach project settings from the nav (and stop showing archived projects); and make an abandoned channel setup <b>recoverable</b> by giving it a thread.</p>
+  <p>Every scene is drawn from the real tokens in <code>tokens.css</code> and the real class metrics (nav = 266px). Both themes, side by side, because a nav that only reads in graphite is half done.</p>
+</div>
+
+<!-- ══════════════════════════ 1 ══════════════════════════ -->
+<div class="sec">
+  <h2><span class="n">1</span> Channels stop hiding behind a hover</h2>
+  <p>Today a project's rooms live behind a <code>#</code> button that only appears on <b>hover of the project row</b> (<code>App.tsx:7602</code>) — so on a touch pass, a screenshot, or a first look, the workspace appears to have no channels at all. Meanwhile every thread row already knows its room: <code>r.channelSlug</code> is computed and then spent entirely on a <code>title</code> tooltip.</p>
+  <p><b>The proposal:</b> a persistent channel strip under each project head, and the room promoted out of the tooltip onto its own line above the thread title. The list stays <b>recency-first</b> — that is deliberate and I did not change it. Nesting threads under channels would sort by room instead of by time and turn the rail from "what I was just doing" into a file tree.</p>
+  <span class="verdict v-bug">1 hover-only affordance · 1 unused datum</span>
+
+  <div class="themes">
+    <div class="theme" data-theme="dark"><h3>Graphite dark</h3>
+      <div class="pair">
+        <div class="bacol"><div class="balabel now">Now</div>
+          <div class="nav">
+            <div class="navsec">Projects<span class="sp"></span><button>＋</button><button>⌕</button></div>
+            <div class="projhead on"><span class="chev">⌄</span><span class="plogo">F</span><span class="pname">flowe-ai</span><button class="projbtn">#</button><button class="projbtn">＋</button></div>
+            <div class="empty">No conversations yet — <b>＋</b> starts one here</div>
+            <div class="projhead"><span class="chev">›</span><span class="plogo">D</span><span class="pname">Default</span><span class="pdot"></span></div>
+            <div class="projhead"><span class="chev">›</span><span class="plogo">A</span><span class="pname">acme-site</span></div>
+          </div>
+          <div class="cap">Three projects, zero visible channels. The <b>#</b> is only there because the cursor is.</div>
+        </div>
+        <div class="bacol"><div class="balabel next">Proposed</div>
+          <div class="nav">
+            <div class="navsec">Projects<span class="sp"></span><button class="hl">⚙</button><button>＋</button><button>⌕</button></div>
+            <div class="projhead on"><span class="chev">⌄</span><span class="plogo">F</span><span class="pname">flowe-ai</span><button class="projbtn">＋</button></div>
+            <div class="chanstrip">
+              <span class="chanchip on"><span class="h">#</span>general</span>
+              <span class="chanchip"><span class="h">#</span>build</span>
+              <span class="chanchip"><span class="h">#</span>research</span>
+              <span class="chanchip"><span class="h">#</span>marketing<span class="ask"></span></span>
+              <span class="chanchip add">＋</span>
+            </div>
+            <div class="row on"><span class="dot" style="background:var(--role-mkt)"></span><span class="rbody">
+              <span class="rchan"><span class="k">#</span>marketing</span>
+              <span class="rline"><span class="rtitle">Set up your marketing HQ</span><span class="rwhen">2m</span></span></span></div>
+            <div class="row"><span class="dot" style="background:var(--prog)"></span><span class="rbody">
+              <span class="rchan"><span class="k">#</span>build</span>
+              <span class="rline"><span class="rnum">1046</span><span class="rtitle">iOS Safari focus-trap</span><span class="rwhen">10h</span></span>
+              <span class="rbranch">⑂ nm/1046-ios-focus-trap</span></span></div>
+            <div class="row"><span class="dot" style="background:var(--muted)"></span><span class="rbody">
+              <span class="rchan"><span class="k">#</span>general</span>
+              <span class="rline"><span class="rtitle">Pricing questions from the call</span><span class="rwhen">1d</span></span></span></div>
+            <div class="projhead"><span class="chev">›</span><span class="plogo">D</span><span class="pname">Default</span><span class="pdot"></span></div>
+            <div class="projhead"><span class="chev">›</span><span class="plogo">A</span><span class="pname">acme-site</span></div>
+          </div>
+          <div class="cap">Rooms always on screen; each row says where it lives. Chips filter the group (the old <b>#</b> menu's job, now visible), and one carries an ask dot.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="theme" data-theme="cream-oak"><h3>Cream oak light</h3>
+      <div class="pair">
+        <div class="bacol"><div class="balabel now">Now</div>
+          <div class="nav">
+            <div class="navsec">Projects<span class="sp"></span><button>＋</button><button>⌕</button></div>
+            <div class="projhead on"><span class="chev">⌄</span><span class="plogo">F</span><span class="pname">flowe-ai</span><button class="projbtn">#</button><button class="projbtn">＋</button></div>
+            <div class="empty">No conversations yet — <b>＋</b> starts one here</div>
+            <div class="projhead"><span class="chev">›</span><span class="plogo">D</span><span class="pname">Default</span><span class="pdot"></span></div>
+            <div class="projhead"><span class="chev">›</span><span class="plogo">A</span><span class="pname">acme-site</span></div>
+          </div>
+          <div class="cap">Three projects, zero visible channels.</div>
+        </div>
+        <div class="bacol"><div class="balabel next">Proposed</div>
+          <div class="nav">
+            <div class="navsec">Projects<span class="sp"></span><button class="hl">⚙</button><button>＋</button><button>⌕</button></div>
+            <div class="projhead on"><span class="chev">⌄</span><span class="plogo">F</span><span class="pname">flowe-ai</span><button class="projbtn">＋</button></div>
+            <div class="chanstrip">
+              <span class="chanchip on"><span class="h">#</span>general</span>
+              <span class="chanchip"><span class="h">#</span>build</span>
+              <span class="chanchip"><span class="h">#</span>research</span>
+              <span class="chanchip"><span class="h">#</span>marketing<span class="ask"></span></span>
+              <span class="chanchip add">＋</span>
+            </div>
+            <div class="row on"><span class="dot" style="background:var(--role-mkt)"></span><span class="rbody">
+              <span class="rchan"><span class="k">#</span>marketing</span>
+              <span class="rline"><span class="rtitle">Set up your marketing HQ</span><span class="rwhen">2m</span></span></span></div>
+            <div class="row"><span class="dot" style="background:var(--prog)"></span><span class="rbody">
+              <span class="rchan"><span class="k">#</span>build</span>
+              <span class="rline"><span class="rnum">1046</span><span class="rtitle">iOS Safari focus-trap</span><span class="rwhen">10h</span></span>
+              <span class="rbranch">⑂ nm/1046-ios-focus-trap</span></span></div>
+            <div class="row"><span class="dot" style="background:var(--muted)"></span><span class="rbody">
+              <span class="rchan"><span class="k">#</span>general</span>
+              <span class="rline"><span class="rtitle">Pricing questions from the call</span><span class="rwhen">1d</span></span></span></div>
+            <div class="projhead"><span class="chev">›</span><span class="plogo">D</span><span class="pname">Default</span><span class="pdot"></span></div>
+            <div class="projhead"><span class="chev">›</span><span class="plogo">A</span><span class="pname">acme-site</span></div>
+          </div>
+          <div class="cap">Same structure, warm ground. The room line reads as metadata, never competing with the title.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note"><b>One judgement call to confirm.</b> The channel line costs ~13px of height per row, so a 12-row rail grows by about one row's worth of scroll. The alternative is a right-aligned <code>#build</code> tag on the title line, which costs nothing vertically but truncates the title sooner. I picked the line because titles are the thing you scan; say the word and I'll draw the inline variant.</div>
+</div>
+
+<!-- ══════════════════════════ 2 ══════════════════════════ -->
+<div class="sec">
+  <h2><span class="n">2</span> The thread says its room — header, and a locked composer chip</h2>
+  <p>Inside a thread the room is currently invisible: the header shows the title, and the composer shows a channel chip that reads as a <b>picker</b> even though a thread's room is frozen at birth. The fix is one line of breadcrumb and one disabled chip that explains itself instead of going quiet.</p>
+  <span class="verdict v-build">Small · both surfaces</span>
+
+  <div class="themes">
+    <div class="theme" data-theme="dark"><h3>Graphite dark</h3>
+      <div class="thead">
+        <div class="crumb"><span class="cproj"><span class="plogo" style="width:13px;height:13px;font-size:7.5px">F</span>flowe-ai</span><span class="sep">/</span><span class="cchan"># marketing</span><span class="sep">/</span><span>Today · 2:14 PM</span></div>
+        <div class="ttitle">Set up your marketing HQ</div>
+      </div>
+      <div class="composer">
+        <div class="cph">Reply — @ mention · / skill · ⏎ send</div>
+        <div class="crow">
+          <span class="cchip locked"><span class="lk">🔒</span># marketing</span>
+          <span class="cchip">Brain · Balanced <span class="cv">⌄</span></span>
+          <span class="cspacer"></span><span class="csend">↑</span>
+        </div>
+      </div>
+      <div class="cap">The chip keeps its shape but loses its chevron and gains a lock — hover reads <i>"a thread stays in the room it was born in."</i> Compare the Brain chip beside it, which still has its ⌄ because it <b>is</b> changeable.</div>
+    </div>
+    <div class="theme" data-theme="cream-oak"><h3>Cream oak light</h3>
+      <div class="thead">
+        <div class="crumb"><span class="cproj"><span class="plogo" style="width:13px;height:13px;font-size:7.5px">F</span>flowe-ai</span><span class="sep">/</span><span class="cchan"># marketing</span><span class="sep">/</span><span>Today · 2:14 PM</span></div>
+        <div class="ttitle">Set up your marketing HQ</div>
+      </div>
+      <div class="composer">
+        <div class="cph">Reply — @ mention · / skill · ⏎ send</div>
+        <div class="crow">
+          <span class="cchip locked"><span class="lk">🔒</span># marketing</span>
+          <span class="cchip">Brain · Balanced <span class="cv">⌄</span></span>
+          <span class="cspacer"></span><span class="csend">↑</span>
+        </div>
+      </div>
+      <div class="cap">A disabled control must still say what it is and why it's disabled, or it reads as broken.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════ 3 ══════════════════════════ -->
+<div class="sec">
+  <h2><span class="n">3</span> Default channels — already built, wrong default</h2>
+  <p>This one is nearly free. <code>DEFAULT_CHANNELS = ['general','build','research','marketing']</code> already exists (<code>App.tsx:14726</code>) and the New-project modal already renders them as toggle chips with an <code>auto</code> tag. The only reason you don't get all four is the seed: <code>useState(['general','build'])</code> (<code>App.tsx:6824</code>). Flip the seed to all four and the "unless the user unselects them" behaviour is <b>already</b> the toggle they're sitting in.</p>
+  <span class="verdict v-free">One-line default + copy</span>
+
+  <div class="themes">
+    <div class="theme" data-theme="dark"><h3>Graphite dark</h3>
+      <div class="modal">
+        <h4>New project</h4>
+        <div class="fld"><label>Name</label><div class="fake-input">Flowe AI</div></div>
+        <div class="fld"><label>Channels</label>
+          <div class="chipselect">
+            <span class="chiptoggle on">#general <span class="tag">auto</span></span>
+            <span class="chiptoggle on">#build <span class="tag">auto</span></span>
+            <span class="chiptoggle on">#research <span class="tag">auto</span></span>
+            <span class="chiptoggle on">#marketing <span class="tag">auto</span></span>
+          </div>
+          <div class="hint">Every project starts with these four — tap any to leave it out. <b>#marketing</b> opens with a guided setup you can finish whenever.</div>
+        </div>
+        <div class="btnrow"><button class="btn ghost">Cancel</button><button class="btn primary">Create project</button></div>
+      </div>
+    </div>
+    <div class="theme" data-theme="cream-oak"><h3>Cream oak light</h3>
+      <div class="modal">
+        <h4>New project</h4>
+        <div class="fld"><label>Name</label><div class="fake-input">Flowe AI</div></div>
+        <div class="fld"><label>Channels</label>
+          <div class="chipselect">
+            <span class="chiptoggle on">#general <span class="tag">auto</span></span>
+            <span class="chiptoggle on">#build <span class="tag">auto</span></span>
+            <span class="chiptoggle on">#research <span class="tag">auto</span></span>
+            <span class="chiptoggle on">#marketing <span class="tag">auto</span></span>
+          </div>
+          <div class="hint">Every project starts with these four — tap any to leave it out. <b>#marketing</b> opens with a guided setup you can finish whenever.</div>
+        </div>
+        <div class="btnrow"><button class="btn ghost">Cancel</button><button class="btn primary">Create project</button></div>
+      </div>
+    </div>
+  </div>
+  <div class="note ask"><b>Worth deciding.</b> Four rooms per project × 3 projects is 12 rooms in the rail on day one, most of them empty. The channel strip in §1 absorbs that (chips, not rows), but if it still feels heavy the honest alternative is three defaults with <code>#research</code> off — it is the least-used of the four in this repo's own history.</div>
+</div>
+
+<!-- ══════════════════════════ 4 ══════════════════════════ -->
+<div class="sec">
+  <h2><span class="n">4</span> Projects cog · archived projects · the archive toast that exists but never shows</h2>
+  <p>Three separate things, one section.</p>
+  <p><b>The cog</b> — added to the Projects section head in §1, opening the All-projects page (the surface that already owns rename / archive / delete). It sits left of <code>＋</code> so the creating action stays rightmost.</p>
+  <p><b>Archived projects in the nav — root cause found.</b> <code>nm:workspace-meta</code> selects <code>from projects p where p.workspace_id = ?</code> with <b>no status filter</b> (<code>sync.ts:1687</code>), so archived rows sync down and <code>navTree</code> renders them — its <code>projects</code> parameter has no <code>status</code> field at all, so it <i>cannot</i> filter. The Projects page filters client-side and looks fine, which is why this hid. Two prop type comments in App.tsx already claim <i>"active (non-archived) only"</i>; both are false today.</p>
+  <p><b>The archive toast.</b> It already exists, already offers Undo, and already names Settings › Archived chats — but it renders inside <code>roomhome</code> only (<code>App.tsx:20498</code>). Archive from the <b>nav rail</b> and you are not on that surface, so you get silence. That is precisely the trap the code comment three hundred lines above it warns about: <i>one row-set, three renderers</i>.</p>
+  <span class="verdict v-bug">2 real bugs · 1 placement</span>
+
+  <div class="themes">
+    <div class="theme" data-theme="dark"><h3>Graphite dark</h3>
+      <div class="balabel next" style="margin-bottom:7px">Recommended — lift the existing toast to the shell</div>
+      <div class="toast"><span><b>Pricing questions from the call</b> archived — it's in Settings › Archived chats.</span><button>Undo</button></div>
+      <div class="cap">No new component, no new copy. It moves out of <code>roomhome</code> so it fires wherever you archived from.</div>
+      <div class="balabel now" style="margin:16px 0 7px">If you want a confirm as well</div>
+      <div class="modal" style="width:390px">
+        <h4>Archive this conversation?</h4>
+        <div class="hint" style="margin-top:0"><b>Pricing questions from the call</b> leaves your rail and moves to <b>Settings › Archived chats</b>, where you can restore it any time. Nothing is deleted.</div>
+        <div class="btnrow"><button class="btn ghost">Cancel</button><button class="btn primary">Archive</button></div>
+      </div>
+    </div>
+    <div class="theme" data-theme="cream-oak"><h3>Cream oak light</h3>
+      <div class="balabel next" style="margin-bottom:7px">Recommended — lift the existing toast to the shell</div>
+      <div class="toast"><span><b>Pricing questions from the call</b> archived — it's in Settings › Archived chats.</span><button>Undo</button></div>
+      <div class="cap">No new component, no new copy.</div>
+      <div class="balabel now" style="margin:16px 0 7px">If you want a confirm as well</div>
+      <div class="modal" style="width:390px">
+        <h4>Archive this conversation?</h4>
+        <div class="hint" style="margin-top:0"><b>Pricing questions from the call</b> leaves your rail and moves to <b>Settings › Archived chats</b>, where you can restore it any time. Nothing is deleted.</div>
+        <div class="btnrow"><button class="btn ghost">Cancel</button><button class="btn primary">Archive</button></div>
+      </div>
+    </div>
+  </div>
+  <div class="note"><b>My recommendation is the toast, not the dialog.</b> You asked for a confirm because you saw nothing happen — the real defect is that the feedback never rendered on the surface you archived from. Archiving is reversible and one click; a modal on every archive taxes the common case to explain the rare one. Both are drawn above: if you still want the dialog after seeing the toast land, it's a small addition on top.</div>
+</div>
+
+<!-- ══════════════════════════ 5 ══════════════════════════ -->
+<div class="sec">
+  <h2><span class="n">5</span> Setup flows — an abandoned setup becomes a thread you can finish</h2>
+  <p>Today the marketing setup is a <b>card rendered from absence</b>: the room shows it because <code>channels.marketing</code> is null. Walk away mid-way and nothing was created — no thread, no task, no queue entry — so there is no object to come back to. The card is the only door and it only exists while the room is empty.</p>
+  <p><b>The proposal:</b> a channel gets a <b>setup thread</b> the moment it is created. It is a task-shaped thread so it is trackable, it holds a human gate so it lands in <b>needs you</b>, and it survives abandonment because it is a row, not a rendering condition.</p>
+  <span class="verdict v-build">The real build · designed to generalise</span>
+
+  <div class="themes">
+    <div class="theme" data-theme="dark"><h3>Graphite dark</h3>
+      <div class="balabel" style="margin-bottom:7px">Home · needs you</div>
+      <div class="nyrow">
+        <span class="nykind">Setup</span>
+        <span class="nybody"><span class="nyt">Set up your marketing HQ</span><span class="nym">plume · step 2 of 4 — brand, then connections</span></span>
+        <span class="nywhen">2m</span>
+      </div>
+      <div class="balabel" style="margin:16px 0 7px">The thread itself — resumable, stateful</div>
+      <div class="card">
+        <div class="steplbl"><span class="done">Product</span><span class="done">Goal</span><span class="now">Focus</span><span>Connect</span></div>
+        <div class="steps"><span class="step done"></span><span class="step done"></span><span class="step now"></span><span class="step"></span></div>
+        <div class="qhead"><span class="qcount">3/4</span> What should the crew focus on?</div>
+        <div class="chipselect">
+          <span class="chiptoggle on">Social</span><span class="chiptoggle on">Content</span>
+          <span class="chiptoggle">SEO</span><span class="chiptoggle">Email</span><span class="chiptoggle">Paid ads</span>
+        </div>
+        <div class="btnrow"><button class="btn ghost">‹ Back</button><button class="btn primary">Next →</button></div>
+        <div class="hint">Picked up where you left off — your product and goal are saved.</div>
+      </div>
+      <div class="cap">Same question cards as today, but each answer is written to the thread as it lands, so leaving is a pause rather than a loss.</div>
+    </div>
+    <div class="theme" data-theme="cream-oak"><h3>Cream oak light</h3>
+      <div class="balabel" style="margin-bottom:7px">Home · needs you</div>
+      <div class="nyrow">
+        <span class="nykind">Setup</span>
+        <span class="nybody"><span class="nyt">Set up your marketing HQ</span><span class="nym">plume · step 2 of 4 — brand, then connections</span></span>
+        <span class="nywhen">2m</span>
+      </div>
+      <div class="balabel" style="margin:16px 0 7px">The thread itself — resumable, stateful</div>
+      <div class="card">
+        <div class="steplbl"><span class="done">Product</span><span class="done">Goal</span><span class="now">Focus</span><span>Connect</span></div>
+        <div class="steps"><span class="step done"></span><span class="step done"></span><span class="step now"></span><span class="step"></span></div>
+        <div class="qhead"><span class="qcount">3/4</span> What should the crew focus on?</div>
+        <div class="chipselect">
+          <span class="chiptoggle on">Social</span><span class="chiptoggle on">Content</span>
+          <span class="chiptoggle">SEO</span><span class="chiptoggle">Email</span><span class="chiptoggle">Paid ads</span>
+        </div>
+        <div class="btnrow"><button class="btn ghost">‹ Back</button><button class="btn primary">Next →</button></div>
+        <div class="hint">Picked up where you left off — your product and goal are saved.</div>
+      </div>
+      <div class="cap">The four connectors from the last round land on step 4, unchanged.</div>
+    </div>
+  </div>
+
+  <h2 style="font-size:13.5px; margin-top:26px; color:#eaeaea;">How it generalises</h2>
+  <p style="color:#8b8b8b; font-size:12.5px; line-height:1.65; margin-top:8px; max-width:104ch;">The point of building it this way is that <b>marketing is just the first flow</b>. A flow is a declaration; the thread, the queue entry, the progress bar and the resume behaviour are shared machinery that never has to be written twice.</p>
+
+  <div class="themes" style="grid-template-columns:1fr;">
+    <div class="theme" data-theme="dark"><h3>The registry</h3>
+      <div class="codeblk"><span class="c">// packages/shared/src/setupflows.ts — pure data + a pure reducer, like beats.ts/stall.ts</span>
+<span class="k">export const</span> SETUP_FLOWS: Record&lt;<span class="s">ChannelKind</span>, SetupFlow&gt; = {
+  marketing: {
+    <span class="s">id</span>: <span class="s">'marketing.v1'</span>,          <span class="c">// versioned: a changed flow re-runs, an unchanged one never does</span>
+    <span class="s">title</span>: <span class="s">'Set up your marketing HQ'</span>,
+    <span class="s">owner</span>: <span class="s">'marketer'</span>,              <span class="c">// falls back to the room's orchestrator</span>
+    <span class="s">steps</span>: [
+      { <span class="s">id</span>: <span class="s">'product'</span>, <span class="s">kind</span>: <span class="s">'text'</span>,    <span class="s">writes</span>: <span class="s">'marketing.website'</span> },
+      { <span class="s">id</span>: <span class="s">'goal'</span>,    <span class="s">kind</span>: <span class="s">'text'</span>,    <span class="s">writes</span>: <span class="s">'marketing.goal'</span>, <span class="s">optional</span>: <span class="k">true</span> },
+      { <span class="s">id</span>: <span class="s">'focus'</span>,   <span class="s">kind</span>: <span class="s">'pills'</span>,   <span class="s">writes</span>: <span class="s">'marketing.focus'</span> },
+      { <span class="s">id</span>: <span class="s">'connect'</span>, <span class="s">kind</span>: <span class="s">'connectors'</span>, <span class="s">optional</span>: <span class="k">true</span> },
+    ],
+    <span class="s">onComplete</span>: <span class="s">'marketing.bootstrap'</span>,  <span class="c">// the schedule that already exists today</span>
+  },
+  <span class="c">// build: { … } — the next one is a data entry, not a feature</span>
+};</div>
+      <div class="cap">Everything user-visible in §5 is derived from this: the step labels, the <b>n/4</b> counter, the progress bar, which step resumes, and what "complete" means.</div>
+    </div>
+  </div>
+
+  <div class="themes" style="grid-template-columns:1fr; margin-top:16px;">
+    <div class="theme" data-theme="dark"><h3>The moving parts</h3>
+      <table class="tbl">
+        <tr><th style="width:20%">Piece</th><th style="width:32%">What it is</th><th>Why this way</th></tr>
+        <tr><td><b>The thread</b></td><td>A task with <code>kind:'setup'</code>, created with the channel</td><td>You asked for trackable states, and a task already has them. But it must <b>not</b> ride the full board FSM — no offer, no claim, no reviewer, no acceptance. It follows the <b>subtask precedent</b> (docs/24): a lean <code>todo → in_progress → done</code> with cancel as the other valve.</td></tr>
+        <tr><td><b>Needs you</b></td><td>An open setup step is a human gate</td><td><code>needsyou.ts</code> already routes on "who holds the ball". A setup task whose current step awaits a human answer holds it — no new queue, no new badge logic.</td></tr>
+        <tr><td><b>Resume</b></td><td>Answers write to <code>channels.marketing</code> as they land</td><td>The current card holds all four answers in React state and commits once at the end — which is exactly why abandoning loses everything. Writing per step is what makes the thread resumable at all.</td></tr>
+        <tr><td><b>Idempotence</b></td><td>Unique on <code>(channel_id, flow_id)</code></td><td>Backfill, channel re-creation and two desktops racing must all converge on one setup thread. The same constraint shape as the wake-dedupe index (0060).</td></tr>
+        <tr><td><b>Backfill</b></td><td>Boot pass over channels with a flow and no thread</td><td>Same idempotent-boot-backfill path the skill packs and the bosun seat already use — so existing projects get theirs without a migration dance.</td></tr>
+        <tr><td><b>Opt-out</b></td><td>Cancel the task</td><td>Somebody who does not want a marketing HQ needs a way out that is not "ignore this forever". Cancel closes the thread and the room behaves like any other.</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="note"><b>The one thing I would push back on.</b> Making setup a <i>board task</i> in the full sense would put "Set up your marketing HQ" on the board next to real engineering work, in a column, needing an assignee and an acceptance. That is why the table proposes the lean subtask-style lifecycle instead: trackable and visible in the queue, but never a card the reviewer pool can pick up. If you want it on the board proper, that is a different and heavier design — worth saying out loud before I build either.</div>
+  <div class="note ask"><b>Open question.</b> Backfill on release will create a setup thread in every existing marketing room — including rooms already fully configured. The safe rule is <i>only create where the flow's <code>writes</code> targets are still empty</i>, so a configured room stays quiet. Confirm that's the behaviour you want, or whether configured rooms should get a "review your setup" thread instead.</div>
+</div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang="en" data-theme="cream-oak">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Playbook next-step cards — marketing-os round 4</title>
+<style>
+/* Tokens copied verbatim from apps/desktop/src/renderer/src/tokens.css (Graphite dark, Cream Oak).
+   Geometry mirrors the REAL classes this round composes — .schedrecs/.schedrecrow (tokens.css:900+,
+   the nmsched arm rows), .qcard/.qopt (:2521+, the in-thread option idiom), .unitcard (:7148+),
+   .msg column widths. NOTHING here is a new idiom: the next-steps card is the nmsched row
+   grammar with a KIND chip and per-kind arm verbs, in the same --card surface the founder
+   standardized in round 3. Judge this as the app, not as a sketch.
+   Plan: docs/design/marketing-os-2026-08/plan.md §13 (round 4). */
+:root, [data-theme='dark'] {
+  --win:#0d0d0d; --bg:#141414; --panel:#191919; --panel2:#212121; --panel3:#2b2b2b;
+  --border:#272727; --border2:#383838;
+  --text:#eaeaea; --body:#b6b6b6; --muted:#898989; --dim:#676767;
+  --link:#d19a72; --accent:var(--text);
+  --btn:#232323; --btn-fg:#efefef; --btn-hover:#2f2f2f;
+  --green:#77ac8d; --warn:#c9a15e; --violet:#a89ccf;
+  --prog:#8ba0c0; --done:#77ac8d; --plan:#7fa5ab;
+  --role-mkt:#c98f8f; --role-orch:#9793d2;
+  --card:#1e1e1e; --card-border:#2c2c2c;
+  --code:#0a0a0a; --codeink:#e8e8e8;
+  --shadow-card:0 1px 2px rgba(0,0,0,.25);
+  --ring:#525252; --hover-bg:color-mix(in srgb, var(--text) 7%, transparent);
+  --hover-border:#404040;
+  --viz-score:#5b93d8;
+}
+[data-theme='cream-oak'] {
+  --win:#f0e5d3; --bg:#fbf8f4; --panel:#fbf8f4; --panel2:#f6eee1; --panel3:#efe1cd;
+  --border:#e6dbca; --border2:#d3c2a8;
+  --text:#2a1c13; --body:#574838; --muted:#97846c; --dim:#b5a289;
+  --link:#9c5730; --accent:#834a2b;
+  --btn:#f8f2e8; --btn-fg:#43301f; --btn-hover:#efe4d2;
+  --green:#2f9e6b; --warn:#a06a1f; --violet:#7d6cc4;
+  --prog:#4f80c4; --done:#0f9d63; --plan:#2c7d88;
+  --role-mkt:#b04f55; --role-orch:#6a63bc;
+  --card:#ffffff; --card-border:#eadfce;
+  --code:#2b2018; --codeink:#f3e6d8;
+  --shadow-card:0 1px 2px rgba(70,42,18,.05);
+  --ring:color-mix(in srgb, var(--accent) 42%, var(--border2));
+  --hover-bg:color-mix(in srgb, var(--text) 5%, transparent);
+  --hover-border:color-mix(in srgb, var(--text) 10%, var(--border2));
+  --viz-score:#2f6fc2;
+}
+* { box-sizing:border-box; margin:0; }
+:root { --fbody:'Avenir Next','Segoe UI',system-ui,sans-serif; --fmono:'SF Mono',ui-monospace,Menlo,monospace;
+  --fserif:'Iowan Old Style','Palatino Linotype',Georgia,serif;
+  --r-xs:4px; --r-md:8px; --r-lg:11px; --r-full:999px;
+  --dur-fast:.12s; --dur-enter:.16s; --ease:cubic-bezier(.3,.7,.4,1); }
+body { background:var(--win); color:var(--text); font:14px/1.5 var(--fbody); padding:0 0 90px; }
+header.doc { position:sticky; top:0; z-index:9; display:flex; align-items:center; gap:14px;
+  background:color-mix(in srgb, var(--win) 88%, transparent); backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--border); padding:14px 26px; }
+header.doc h1 { font:700 16px var(--fserif); }
+header.doc .sub { font:11.5px var(--fmono); color:var(--muted); }
+header.doc .spacer { flex:1; }
+.ctl { background:var(--btn); color:var(--btn-fg); border:1px solid var(--border2); border-radius:var(--r-full);
+  padding:6px 14px; font:600 12px var(--fbody); cursor:pointer; }
+.ctl:hover { background:var(--btn-hover); }
+main { max-width:980px; margin:0 auto; padding:10px 26px; }
+section { margin:44px 0; }
+h2 { font:700 20px var(--fserif); margin:0 0 4px; display:flex; align-items:baseline; gap:10px; }
+h2 .n { font:700 11px var(--fmono); color:var(--muted); }
+p.why { color:var(--body); font-size:13.5px; max-width:74ch; margin:8px 0 16px; }
+p.why b { color:var(--text); }
+code.ic { font:600 11.5px var(--fmono); background:var(--panel2); border:1px solid var(--border);
+  border-radius:var(--r-xs); padding:1px 5px; color:var(--body); }
+.note { display:flex; gap:9px; align-items:flex-start; max-width:74ch; margin:10px 0; font-size:12.5px; color:var(--body); }
+.note .dot { flex:none; width:6px; height:6px; border-radius:50%; background:var(--accent); margin-top:6px; }
+.note b { color:var(--text); }
+/* ── the thread stage: one message column, exactly the app's ── */
+.stage { background:var(--bg); border:1px solid var(--border); border-radius:14px; padding:22px 26px;
+  box-shadow:var(--shadow-card); max-width:760px; }
+.msg { display:flex; gap:11px; padding:7px 0; }
+.avatar { flex:none; width:30px; height:30px; border-radius:8px; background:var(--panel3);
+  border:1px solid var(--border2); display:flex; align-items:center; justify-content:center; font-size:15px; }
+.mbody { flex:1; min-width:0; background:var(--panel); border:1px solid var(--border); border-radius:var(--r-lg);
+  padding:10px 14px; }
+.mhead { display:flex; align-items:center; gap:8px; margin-bottom:4px; }
+.mhead b { font-size:13px; }
+.rolechip { font:700 8.5px var(--fmono); letter-spacing:.06em; text-transform:uppercase; color:var(--role-mkt);
+  border:1px solid color-mix(in srgb, var(--role-mkt) 40%, var(--border)); border-radius:var(--r-xs); padding:1px 5px; }
+.rolechip.orch { color:var(--role-orch); border-color:color-mix(in srgb, var(--role-orch) 40%, var(--border)); }
+.mwhen { font:11px var(--fmono); color:var(--dim); }
+.mtext { font-size:13px; color:var(--body); }
+.mtext b { color:var(--text); }
+.mtext code { font:600 11.5px var(--fmono); background:var(--panel2); border:1px solid var(--border);
+  border-radius:var(--r-xs); padding:1px 5px; }
+/* the report chip line the completion note already renders */
+.filechip { display:inline-flex; align-items:center; gap:6px; font:600 11.5px var(--fmono); color:var(--body);
+  background:var(--panel2); border:1px solid var(--border); border-radius:var(--r-xs); padding:2px 7px; }
+/* ══ THE NEXT-STEPS CARD — the nmsched grammar with kind chips + per-kind verbs ══ */
+.nextcard { margin:10px 0 2px; border:1px solid var(--card-border); border-radius:var(--r-lg);
+  background:var(--card); padding:10px 12px; max-width:560px; box-shadow:var(--shadow-card); }
+.nexthead { font:700 10.5px var(--fmono); text-transform:uppercase; letter-spacing:.08em; color:var(--muted);
+  margin-bottom:2px; display:flex; align-items:center; gap:8px; }
+.nexthead .x { margin-left:auto; border:0; background:none; color:var(--dim); cursor:pointer; font-size:12px; }
+.nextsrc { font:11px var(--fmono); color:var(--dim); margin-bottom:6px; }
+.nextsrc code { color:var(--body); }
+.nrow { display:flex; align-items:center; gap:10px; padding:8px 0; border-top:1px solid var(--border); }
+.nrow:first-of-type { border-top:none; }
+.nkind { flex:none; font:700 8.5px var(--fmono); letter-spacing:.07em; text-transform:uppercase;
+  border-radius:var(--r-xs); padding:2px 6px; border:1px solid; }
+.nkind.task { color:var(--prog); border-color:color-mix(in srgb, var(--prog) 45%, var(--border)); }
+.nkind.routine { color:var(--violet); border-color:color-mix(in srgb, var(--violet) 45%, var(--border)); }
+.nkind.research { color:var(--plan); border-color:color-mix(in srgb, var(--plan) 45%, var(--border)); }
+.nmeta { flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; }
+.nmeta b { font-size:12.5px; }
+.nmeta span { font-size:11px; color:var(--dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.nmeta span .src { color:var(--muted); }
+.nbtn { flex:none; background:var(--btn); color:var(--btn-fg); border:1px solid var(--border2);
+  border-radius:var(--r-full); padding:4px 12px; font:600 11.5px var(--fbody); cursor:pointer; white-space:nowrap; }
+.nbtn:hover { background:var(--btn-hover); border-color:var(--hover-border); }
+.nbtn.later { padding:4px 9px; color:var(--muted); background:none; border-color:var(--border); }
+.nok { flex:none; font-size:11.5px; color:var(--green); white-space:nowrap; }
+.nok a { color:var(--link); text-decoration:none; font-weight:600; }
+.nfoot { margin-top:7px; font-size:11px; color:var(--dim); }
+/* dismissed / compact end state */
+.nextcard.settled { padding:7px 12px; }
+.nextcard.settled .qcompact { display:flex; gap:7px; align-items:baseline; font-size:12px; padding:2px 0; }
+.nextcard.settled .qtick { color:var(--muted); font-weight:700; }
+.nextcard.settled .qca { color:var(--dim); font-size:11.5px; }
+/* the later-popover (task rows) */
+.laterpop { position:relative; display:inline-block; }
+.laterpanel { position:absolute; right:0; top:calc(100% + 6px); z-index:5; background:var(--card);
+  border:1px solid var(--border2); border-radius:var(--r-md); box-shadow:0 8px 20px -8px rgba(0,0,0,.35);
+  padding:6px; width:190px; }
+.laterpanel button { display:block; width:100%; text-align:left; background:none; border:0; color:var(--body);
+  font:12px var(--fbody); border-radius:6px; padding:6px 8px; cursor:pointer; }
+.laterpanel button:hover { background:var(--hover-bg); }
+.laterpanel .lh { font:700 9px var(--fmono); letter-spacing:.07em; text-transform:uppercase; color:var(--dim);
+  padding:3px 8px 4px; }
+/* mini report card stand-in (context above the next card) */
+.repmini { display:flex; gap:12px; align-items:center; border:1px solid var(--card-border); background:var(--card);
+  border-radius:var(--r-lg); padding:10px 12px; max-width:560px; margin:8px 0; }
+.repdial { flex:none; width:46px; height:46px; border-radius:50%; display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  background:conic-gradient(var(--viz-score) calc(var(--frac)*360deg), var(--panel3) 0);
+  -webkit-mask:radial-gradient(circle at 50% 50%, transparent 55%, #000 56%); mask:radial-gradient(circle at 50% 50%, transparent 55%, #000 56%); }
+.repminiwrap { position:relative; width:46px; height:46px; flex:none; }
+.repminiwrap .num { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  font:700 14px var(--fserif); }
+.reptxt b { font:700 13.5px var(--fserif); display:block; }
+.reptxt span { font-size:11px; color:var(--dim); }
+kbd.blk { display:block; font:11.5px var(--fmono); background:var(--code); color:var(--codeink);
+  border-radius:var(--r-md); padding:12px 14px; white-space:pre; overflow-x:auto; max-width:74ch; margin:10px 0; }
+@keyframes nm-rise { from { opacity:0; transform:translateY(7px); } to { opacity:1; transform:none; } }
+.rise { animation:nm-rise var(--dur-enter) var(--ease) both; }
+@media (prefers-reduced-motion: reduce){ * { animation:none !important; transition:none !important; } }
+</style>
+</head>
+<body>
+
+<header class="doc">
+  <h1>Playbook next-step cards</h1>
+  <span class="sub">marketing-os round 4 · docs/design/marketing-os-2026-08/plan.md §13 · four scenes</span>
+  <div class="spacer"></div>
+  <button class="ctl" onclick="flip()">Toggle theme (t)</button>
+</header>
+
+<main>
+
+<!-- ══════════════════════════ 00 ══════════════════════════ -->
+<section id="s0">
+  <h2><span class="n">00</span>The gap this round closes</h2>
+  <p class="why"><b>A playbook run ends at a report today.</b> The GEO run lands
+    <code class="ic">geo-report-2026-08-21.md</code> at 74/100 with a "Recommended Next Tests" section —
+    and then nothing consumes it. The recommendations are prose inside an artifact; acting on any of them
+    means the human re-typing what the report already said. <b>Round 4: the agent that finished the run reads
+    its own report and hands over a next-steps card</b> — individual items, each armed by one click, each
+    click firing a REAL command from the human's client (the nmsched / task-proposal / verdict idiom:
+    agents draft, the human's click is the consent).</p>
+  <div class="note"><span class="dot"></span><div><b>Three kinds, three verbs, all existing machinery.</b>
+    <code class="ic">task</code> (a code/site change) arms via <code class="ic">nm.createTask</code> — the
+    TaskProposalCard route, born to the board's normal gates. <code class="ic">routine</code> (recurring
+    marketing work) arms via <code class="ic">nm.scheduleCreate</code> — literally the nmsched + Arm row.
+    <code class="ic">research</code> (a question worth its own thread) opens a new conversation with the
+    opener prefilled — the destination pill's stage idiom.</div></div>
+  <div class="note"><span class="dot"></span><div><b>Enforced, not prompted:</b> the agent writes the card
+    through a schema-validated tool (<code class="ic">propose_next_steps</code> → a <code class="ic">```nmnext</code>
+    block, the draft_posts lesson: a tool inventory beats a prompt rule). The agent can never arm anything —
+    every verb is the human's click.</div></div>
+</section>
+
+<!-- ══════════════════════════ 01 ══════════════════════════ -->
+<section id="s1">
+  <h2><span class="n">01</span>The main thread, after the run settles</h2>
+  <p class="why">The completion note already lands here (round 3). The next-steps card follows it — same
+    author, same moment, the report's own recommendations distilled to ≤5 armable rows. Source anchors
+    (<span style="font-family:var(--fmono); font-size:11.5px;">Fix these first · #2</span>) keep every row
+    traceable to the section it came from.</p>
+
+  <div class="stage">
+    <div class="msg">
+      <div class="avatar">🪶</div>
+      <div class="mbody">
+        <div class="mhead"><b>plume</b><span class="rolechip">marketer</span><span class="mwhen">11:12 AM</span></div>
+        <div class="mtext">The report is in — save it to the library if it looks right.</div>
+        <div class="repmini">
+          <div class="repminiwrap"><div class="repdial" style="--frac:.74"></div><div class="num">74</div></div>
+          <div class="reptxt"><b>GEO Citability Report: Plausible Analytics</b>
+            <span>basis: brand docs · site pages via web index · heuristic scores</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="msg rise">
+      <div class="avatar">🦉</div>
+      <div class="mbody">
+        <div class="mhead"><b>rex</b><span class="rolechip orch">orchestrator</span><span class="mwhen">11:13 AM</span></div>
+        <div class="mtext">✅ <b>#1118 is done</b> — <code>geo-report-2026-08-21.md</code> delivered. Here's what I'd
+          do with it — arm what you like, each is one click:</div>
+
+        <div class="nextcard">
+          <div class="nexthead">Next steps — arm what you like <button class="x" title="Dismiss">✕</button></div>
+          <div class="nextsrc">from <code>geo-report-2026-08-21.md</code> · 74/100 · four of nine recommendations</div>
+
+          <div class="nrow">
+            <span class="nkind task">task</span>
+            <span class="nmeta"><b>Add JSON-LD product schema to the homepage</b>
+              <span><span class="src">Fix these first · #1</span> · biggest single citability lift — the answer engines can't parse the hero</span></span>
+            <span class="laterpop">
+              <button class="nbtn later" title="Schedule the task instead of creating it now">⏱</button>
+            </span>
+            <button class="nbtn">Create task ›</button>
+          </div>
+
+          <div class="nrow">
+            <span class="nkind task">task</span>
+            <span class="nmeta"><b>Homepage CTA test — “Try one reset free”</b>
+              <span><span class="src">Recommended tests · #1</span> · variant vs download-led CTAs · measures /try starts</span></span>
+            <span class="nok">✓ <a href="#">#1121</a> · subtask below</span>
+          </div>
+
+          <div class="nrow">
+            <span class="nkind routine">routine</span>
+            <span class="nmeta"><b>Weekly GEO re-measure</b>
+              <span><span class="src">Re-measure · closing</span> · Mon 08:00 · re-run the query set, diff vs this baseline</span></span>
+            <button class="nbtn">+ Arm</button>
+          </div>
+
+          <div class="nrow">
+            <span class="nkind research">research</span>
+            <span class="nmeta"><b>Why Fathom outranks us in AI answers</b>
+              <span><span class="src">What I couldn't determine · #2</span> · asks in THIS thread — rex digs in without losing context</span></span>
+            <button class="nbtn">Ask here ›</button>
+          </div>
+
+          <div class="nfoot">Each click runs from <b>your</b> client — and everything stays HERE: tasks land as subtasks of this
+            thread's task (or anchored units in a conversation), research asks below, routines land in Scheduled.
+            Dismiss puts the card down; the report keeps everything.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note"><span class="dot"></span><div><b>The armed row is the receipt.</b> Row two shows the settled
+    state: ✓ + the created task as a live link (<code class="ic">#1121 created · todo</code> — state read live, the
+    SchedRecsCard dedupe idiom, so two mounts or two machines can't double-arm).</div></div>
+  <div class="note"><span class="dot"></span><div><b>The ⏱ on task rows</b> answers “not now, but don’t lose it”:
+    schedule the creation instead of doing it now (scene 02). Routine rows don’t need it — a routine IS a schedule.</div></div>
+</section>
+
+<!-- ══════════════════════════ 02 ══════════════════════════ -->
+<section id="s2">
+  <h2><span class="n">02</span>The task row's ⏱ — arm later, without losing it</h2>
+  <p class="why">A task recommendation you're not ready to staff still deserves one click. The ⏱ opens the
+    smallest possible chooser — park it in the backlog (the board's own “parked ideas” shelf), or schedule
+    the creation for a quiet day. Both are existing commands (<code class="ic">task.create backlog:true</code> ·
+    a <code class="ic">once</code> schedule whose prompt files the task).</p>
+
+  <div class="stage" style="max-width:640px;">
+    <div class="nextcard">
+      <div class="nexthead">Next steps — arm what you like</div>
+      <div class="nrow">
+        <span class="nkind task">task</span>
+        <span class="nmeta"><b>Add JSON-LD product schema to the homepage</b>
+          <span><span class="src">Fix these first · #1</span> · biggest single citability lift</span></span>
+        <span class="laterpop">
+          <button class="nbtn later">⏱</button>
+          <div class="laterpanel">
+            <div class="lh">Not now</div>
+            <button>Park in backlog</button>
+            <button>Create Monday 09:00</button>
+            <button>Create in 2 weeks</button>
+          </div>
+        </span>
+        <button class="nbtn">Create task ›</button>
+      </div>
+    </div>
+  </div>
+  <div class="note"><span class="dot"></span><div><b>Open decision (a):</b> the ⏱ could instead be a plain
+    “› backlog” secondary. The popover keeps one affordance; the flat button is one less click. Both shown to
+    the founder — the popover is drawn, the flat variant is the fallback.</div></div>
+</section>
+
+<!-- ══════════════════════════ 03 ══════════════════════════ -->
+<section id="s3">
+  <h2><span class="n">03</span>Where it comes from, where it lives</h2>
+  <p class="why"><b>Producer:</b> the run's finishing seam (the same one that posts the completion note) wakes
+    ONE distill turn for the agent that owns the thread — it reads the report artifact it just delivered and calls
+    <code class="ic">propose_next_steps(items)</code>. The tool validates kinds and fields, refuses more than five
+    items, dedupes against a card already posted for this report, and writes the block:</p>
+
+  <kbd class="blk">```nmnext
+{ "report": "geo-report-2026-08-21.md",
+  "items": [
+    { "kind": "task",     "title": "Add JSON-LD product schema to the homepage",
+      "why": "biggest single citability lift", "src": "Fix these first · #1",
+      "taskKind": "chore", "description": "…" },
+    { "kind": "routine",  "title": "Weekly GEO re-measure",
+      "cadence": "weekly", "weekday": 1, "atTime": "08:00",
+      "prompt": "Re-run the GEO query set; diff vs geo-report-2026-08-21." },
+    { "kind": "research", "title": "Why Fathom outranks us in AI answers",
+      "opener": "Trace which sources AI answers cite for privacy-analytics queries…" } ] }
+```</kbd>
+
+  <div class="note"><span class="dot"></span><div><b>One derivation, every surface:</b> the block renders as this
+    card in the setup task's thread, in a playbook conversation, and in the subtask peek — the same
+    <code class="ic">postCardsFrom</code> ruling as social drafts. One card per report (dedupe by report name);
+    a re-run's fresh report earns a fresh card.</div></div>
+  <div class="note"><span class="dot"></span><div><b>Arm truth is live:</b> task rows resolve by title against open
+    tasks, routine rows against active schedules, research rows against the thread it opened — the armed ✓
+    survives reloads and shows work armed from another machine (the SchedRecsCard rule).</div></div>
+  <div class="note"><span class="dot"></span><div><b>The report stays the source of truth.</b> The card is ≤5 items —
+    a distillation, not a mirror. “four of nine recommendations” in the card head says honestly that the agent
+    chose; Open report is one click away on the chip above it.</div></div>
+</section>
+
+<!-- ══════════════════════════ 04 ══════════════════════════ -->
+<section id="s4">
+  <h2><span class="n">04</span>End states</h2>
+  <p class="why">Fully-armed and dismissed cards collapse to the compact answered grammar
+    (<code class="ic">.qcompact</code>) — the thread keeps its receipt without the card holding the floor.</p>
+  <div class="stage" style="max-width:640px;">
+    <div class="nextcard settled">
+      <div class="qcompact"><span class="qtick">✓</span><span>Next steps — geo-report-2026-08-21</span>
+        <span class="qca">#1121 · #1122 as subtasks below — Weekly GEO re-measure armed — 1 asked here — 1 dismissed</span></div>
+    </div>
+  </div>
+  <div class="note"><span class="dot"></span><div><b>Resolved (round 4a, George):</b> armed tasks and research keep custody of the thread the card lives in —
+    tasks as subtasks / anchored units (the run_playbook lanes), research as the opener posted below in the same
+    thread. Context never leaves the thread.</div></div>
+  <div class="note"><span class="dot"></span><div><b>Open decision (c):</b> does the distill turn run for EVERY unit
+    playbook, or only scored ones? Teardown/positioning reports carry recommendations too — proposal: every playbook,
+    the tool's five-item cap is the noise floor.</div></div>
+</section>
+
+</main>
+
+<script>
+function flip(){
+  const d = document.documentElement.getAttribute('data-theme') === 'dark';
+  document.documentElement.setAttribute('data-theme', d ? 'cream-oak' : 'dark');
+}
+addEventListener('keydown', e => { if (e.key === 't') flip(); });
+</script>
+</body>
+</html>

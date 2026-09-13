@@ -1,0 +1,296 @@
+{
+  "artboards": [
+    {
+      "file": "A1-NoEngine.dc.html",
+      "x": 0,
+      "y": 0,
+      "w": 760,
+      "h": 520,
+      "title": "A1 · Choose a container runtime (the app installs it)"
+    },
+    {
+      "file": "A1b-Installing.dc.html",
+      "x": 800,
+      "y": 0,
+      "w": 760,
+      "h": 520,
+      "title": "A1b · The runtime installs, no password"
+    },
+    {
+      "file": "A2-EngineStopped.dc.html",
+      "x": 1600,
+      "y": 0,
+      "w": 760,
+      "h": 520,
+      "title": "A2 · Installed, stopped: the app starts it"
+    },
+    {
+      "file": "A3-Download.dc.html",
+      "x": 2400,
+      "y": 0,
+      "w": 760,
+      "h": 520,
+      "title": "A3 · First run: the stack downloads, no clock"
+    },
+    {
+      "file": "A4-Starting.dc.html",
+      "x": 3200,
+      "y": 0,
+      "w": 760,
+      "h": 520,
+      "title": "A4 · The stack starts"
+    },
+    {
+      "file": "A6-Update.dc.html",
+      "x": 4000,
+      "y": 0,
+      "w": 760,
+      "h": 520,
+      "title": "A6 · An app update moves the stack"
+    },
+    {
+      "file": "A1-NoEngine-cream.dc.html",
+      "x": 4800,
+      "y": 0,
+      "w": 760,
+      "h": 520,
+      "title": "A1 · cream oak"
+    },
+    {
+      "file": "A5-Ready.dc.html",
+      "x": 0,
+      "y": 660,
+      "w": 1180,
+      "h": 760,
+      "title": "A5 · Ready: Free, one connection, the sync mark reads LOCAL"
+    },
+    {
+      "file": "A5-Ready-cream.dc.html",
+      "x": 1220,
+      "y": 660,
+      "w": 1180,
+      "h": 760,
+      "title": "A5 · cream oak"
+    },
+    {
+      "file": "B0-RailFree.dc.html",
+      "x": 0,
+      "y": 1560,
+      "w": 340,
+      "h": 780,
+      "title": "B0 · Free: today’s rail, no bands"
+    },
+    {
+      "file": "B1-RailBandsProjects.dc.html",
+      "x": 380,
+      "y": 1560,
+      "w": 340,
+      "h": 780,
+      "title": "B1 · Pro: LOCAL and CLOUD bands, Projects"
+    },
+    {
+      "file": "B2-RailBandsRecents.dc.html",
+      "x": 760,
+      "y": 1560,
+      "w": 340,
+      "h": 780,
+      "title": "B2 · The bands in Recents, Cloud folded"
+    },
+    {
+      "file": "B1-RailBandsProjects-cream.dc.html",
+      "x": 1140,
+      "y": 1560,
+      "w": 340,
+      "h": 780,
+      "title": "B1 · cream oak"
+    },
+    {
+      "file": "B4-FootMenu.dc.html",
+      "x": 1520,
+      "y": 1560,
+      "w": 340,
+      "h": 780,
+      "title": "B4 · The foot’s menu: workspaces by connection"
+    },
+    {
+      "file": "C1-UpgradeToPro.dc.html",
+      "x": 0,
+      "y": 2480,
+      "w": 1180,
+      "h": 760,
+      "title": "C1 · Upgrade to Pro"
+    },
+    {
+      "file": "C1-UpgradeToPro-cream.dc.html",
+      "x": 1220,
+      "y": 2480,
+      "w": 1180,
+      "h": 760,
+      "title": "C1 · cream oak"
+    },
+    {
+      "file": "C2-UpgradeWaiting.dc.html",
+      "x": 2440,
+      "y": 2480,
+      "w": 1180,
+      "h": 760,
+      "title": "C2 · Finish in your browser"
+    },
+    {
+      "file": "D-Connections.dc.html",
+      "x": 0,
+      "y": 3380,
+      "w": 1180,
+      "h": 760,
+      "title": "D · Settings › Connections"
+    },
+    {
+      "file": "D-Connections-cream.dc.html",
+      "x": 1220,
+      "y": 3380,
+      "w": 1180,
+      "h": 760,
+      "title": "D · cream oak"
+    },
+    {
+      "file": "E-HostedShell.dc.html",
+      "x": 0,
+      "y": 4280,
+      "w": 1180,
+      "h": 760,
+      "title": "E · A hosted free workspace: the gate replaces the composer"
+    },
+    {
+      "file": "E-HostedShell-cream.dc.html",
+      "x": 1220,
+      "y": 4280,
+      "w": 1180,
+      "h": 760,
+      "title": "E · cream oak"
+    },
+    {
+      "file": "F-Pricing.dc.html",
+      "x": 0,
+      "y": 5180,
+      "w": 1180,
+      "h": 760,
+      "title": "F · The pricing section on the site (Paper)"
+    },
+    {
+      "file": "F-Pricing-dark.dc.html",
+      "x": 1220,
+      "y": 5180,
+      "w": 1180,
+      "h": 760,
+      "title": "F · dark"
+    },
+    {
+      "file": "G-KeysLocal.dc.html",
+      "x": 0,
+      "y": 6080,
+      "w": 1180,
+      "h": 760,
+      "title": "G · Onboarding › Keys in Local mode: no starter-brain door"
+    },
+    {
+      "file": "G-KeysLocal-cream.dc.html",
+      "x": 1220,
+      "y": 6080,
+      "w": 1180,
+      "h": 760,
+      "title": "G · cream oak"
+    },
+    {
+      "file": "H1-MoveToCloud.dc.html",
+      "x": 0,
+      "y": 6980,
+      "w": 1180,
+      "h": 760,
+      "title": "H1 · Migrate a local workspace into a Pro workspace"
+    },
+    {
+      "file": "H1-MoveToCloud-cream.dc.html",
+      "x": 1220,
+      "y": 6980,
+      "w": 1180,
+      "h": 760,
+      "title": "H1 · cream oak"
+    },
+    {
+      "file": "H2-Moved.dc.html",
+      "x": 2440,
+      "y": 6980,
+      "w": 1180,
+      "h": 760,
+      "title": "H2 · Migrated"
+    }
+  ],
+  "annotations": [
+    {
+      "id": "note-a",
+      "x": 0,
+      "y": -190,
+      "w": 1500,
+      "text": "A · FIRST RUN (Local mode)\nThe app does the setup. It looks for a running container engine and uses it. When none is found (A1) it asks ONE question, which runtime, with Colima preselected because it is free for every company and installs with no password. Install <pick> is the one button. The app downloads the runtime (A1b), starts it (A2, also the state when a runtime is installed but stopped), pulls the stack (A3, sizes and bars, never a clock), and starts it (A4). Nobody types a command. Manual setup lives in Settings › Connections and in docs/local-mode.md for people who want the terminal. Busy states say Please wait…"
+    },
+    {
+      "id": "note-a5",
+      "x": 0,
+      "y": 1440,
+      "w": 1400,
+      "text": "A5 · READY. Free is today’s shell exactly. What changes: the frame top’s sync mark reads LOCAL (a fact about the connection sits with the sync fact), the machine chip says This Mac, the foot wears a laptop glyph beside the workspace name and draws no credit ring (a meter that cannot read renders nothing). No banner, no badge, no nag."
+    },
+    {
+      "id": "note-b",
+      "x": 0,
+      "y": 2360,
+      "w": 1500,
+      "text": "B · THE RAIL WITH TWO CONNECTIONS (after upgrade)\nFree changes nothing (B0). With a Cloud connection the list grows two bands, LOCAL and CLOUD, in the section-kicker voice with a count and a fold. The RECENTS · PROJECTS switch stays ONE control above both bands and applies to each. Rows are unchanged. A folded band keeps its count, its ask dot and its live pulse, so a fold never silences an ask. Opening a row on the other connection swaps the foreground in place (no relaunch, under 100ms). The foot names the foreground workspace with its connection glyph and its menu (B4) lists workspaces under the same two kickers."
+    },
+    {
+      "id": "note-c",
+      "x": 0,
+      "y": 3260,
+      "w": 1500,
+      "text": "C · UPGRADE TO PRO. The UpgradeModal recipe with new words: Free is your Mac, Pro is the cloud. Two cards, Free says what stays, Pro says what the cloud adds. Get Pro opens neuramesh.app in the browser (the desktop OAuth handoff, 15 minute window) and the sheet waits (C2). No trial, no card in the app, no per-reply price anywhere."
+    },
+    {
+      "id": "note-d",
+      "x": 0,
+      "y": 4160,
+      "w": 1500,
+      "text": "D · SETTINGS › CONNECTIONS. One card per connection. This Mac: the engine, the stack version, where the data lives (Show in Finder), the loopback ports, and the one toggle (keep the stack after quit, off by default). neuramesh.app: account, plan, workspaces, sign out. Migrate to Cloud is the door to H. Manual setup is the custom profile for people who run the stack themselves, from a terminal or on a server they own. The UI never says compose."
+    },
+    {
+      "id": "note-f",
+      "x": 0,
+      "y": 5960,
+      "w": 1500,
+      "text": "F · THE SITE. The pricing section keeps its markup (.l-plans, .l-plan, .l-chip, .l-price) and changes its words: Free is your Mac, Pro is the cloud. The Free card says the app sets up the local stack, so nobody meets the runtime as a surprise after the download. The primary CTA is Download for Mac, the secondary Get Pro. One footer line says source available under the Elastic License 2.0, never open source."
+    },
+    {
+      "id": "note-g",
+      "x": 0,
+      "y": 6860,
+      "w": 1500,
+      "text": "G · THE WIZARD IN LOCAL MODE. The Keys step loses the starter-brain door (Start with 500 credits) because Local has no credits. A provider is required, so the step says so in one sentence and Continue lights when one is signed in. The Machine step already reads This Mac becomes home base. The setup tracker renders no cloud rows (absent, never unknown) and the credit ring does not render."
+    },
+    {
+      "id": "note-h",
+      "x": 0,
+      "y": 7760,
+      "w": 1500,
+      "text": "H · MOVE A LOCAL WORKSPACE TO CLOUD. On Pro, a local workspace moves INTO a Pro workspace (its projects, rooms, threads, tasks, inline files, memory, and agents merged by name). A new cloud workspace would need its own subscription, so the move targets one you already pay for. The sheet says what moves, what stays (keys, files on disk, the local copy as a backup), and the storage it takes against the plan. The move runs in the background in batches through the export lane, so a big workspace never blocks the app. On Free the same door opens the Upgrade sheet."
+    },
+    {
+      "id": "note-e",
+      "x": 0,
+      "y": 5060,
+      "w": 1500,
+      "text": "E · A HOSTED WORKSPACE ON THE FREE PLAN. Everything stays readable. The composer is gone and the gate card docks where it stood (an absent control beats a disabled one): Get Pro, Export workspace, and the one honest line about the cloud machine’s files. This is the shell an existing hosted sign-up sees on their next action, and what a browser tab of the browser app shows."
+    }
+  ],
+  "launch": {
+    "view": "canvas"
+  }
+}

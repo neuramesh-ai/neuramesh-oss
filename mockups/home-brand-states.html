@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="en" data-theme="cream">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Home × Porch — empty · partial · full</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/geist@5.2.5/wght.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/geist-mono@5.2.5/wght.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/source-serif-4@5.2.5/opsz-wght.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/bricolage-grotesque@5.2.5/wght.css">
+<style>
+/* ════════════════════════════════════════════════════════════════════════════
+   Home × Porch. How the new identity behaves as Home fills up.
+
+   Geometry verbatim from design_handoff_brand_porch (48-unit grid) and from
+   brand.tsx in PR #206 — this mockup is a PORT TARGET, not a new mark.
+   The mark rides --brand/--brand-ink (constant oak/cream in every theme, like
+   status hues) and NEVER --accent, which is achromatic in the dark themes.
+
+   The proposal in one line: BRAND PRESENCE IS A FUNCTION OF HOW FULL HOME IS.
+   Empty, the workspace introduces itself. Busy, it gets out of the way.
+   ════════════════════════════════════════════════════════════════════════════ */
+:root {
+  --fdisp:'Source Serif 4 Variable',Georgia,serif;
+  --fbrand:'Bricolage Grotesque Variable','Geist Variable',sans-serif;
+  --fbody:'Geist Variable',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --fmono:'Geist Mono Variable',ui-monospace,Menlo,monospace;
+  --dur-fast:.12s; --dur:.15s; --dur-enter:.22s;
+  --ease:cubic-bezier(.22,1,.36,1);
+  --r-sm:8px; --r-md:10px; --r-lg:14px; --r-xl:18px; --r-full:999px;
+  --col:720px;
+  --wm-ink:.055; --porch-scale:1;
+  /* the identity is constant across themes — that is the whole point of --brand */
+  --brand:#834a2b; --brand-ink:#fff7ee;
+}
+[data-theme="cream"]{--win:#f0e5d3;--band:#e7d9c3;--bg:#fbf8f4;--panel2:#f6eee1;--panel3:#efe1cd;
+  --border:#e6dbca;--border2:#d3c2a8;--framedge:#e0d1b7;--text:#2a1c13;--body:#574838;--muted:#97846c;--dim:#b5a289;
+  --link:#9c5730;--accent:#834a2b;--accent-ink:#fff7ee;--done:#0f9d63;--prog:#4f80c4;--review:#6d5ce0;--designrev:#8a3fc0;
+  --shadow-sheet:0 8px 26px -8px rgba(70,42,18,.16),0 1px 2px rgba(70,42,18,.05);--shadow-card:0 1px 2px rgba(70,42,18,.05);
+  --shadow-lift:0 8px 20px -8px rgba(70,42,18,.20);--card:#fff;--card-border:#eadfce;
+  --hover-bg:rgba(53,36,22,.05);--sel-bg:rgba(131,74,43,.08);--wm-ink-color:#834a2b;}
+[data-theme="dark"]{--win:#0d0d0d;--band:#090909;--bg:#141414;--panel2:#212121;--panel3:#2b2b2b;
+  --border:#272727;--border2:#383838;--framedge:#1b1b1b;--text:#eaeaea;--body:#b6b6b6;--muted:#898989;--dim:#676767;
+  --link:#9cb1f0;--accent:#eaeaea;--accent-ink:#101010;--done:#77ac8d;--prog:#8ba0c0;--review:#a89ccf;--designrev:#b78bd8;
+  --shadow-sheet:inset 0 1px 0 rgba(255,255,255,.05),0 12px 30px -6px rgba(0,0,0,.5);--shadow-card:0 1px 2px rgba(0,0,0,.25);
+  --shadow-lift:0 8px 20px -8px rgba(0,0,0,.55);--card:#1e1e1e;--card-border:#2c2c2c;
+  --hover-bg:rgba(255,255,255,.06);--sel-bg:rgba(255,255,255,.09);--wm-ink-color:#f2ece2;}
+[data-theme="light"]{--win:#e9e5db;--band:#ded9cc;--bg:#fcfbf8;--panel2:#f4f1ea;--panel3:#ebe7dd;
+  --border:#e2ded4;--border2:#cec5b7;--framedge:#dbd5c7;--text:#2f2a24;--body:#524c43;--muted:#837d72;--dim:#a09889;
+  --link:#4a5ec9;--accent:#2f2a24;--accent-ink:#fff;--done:#2f9e6b;--prog:#4f80c4;--review:#6d5ce0;--designrev:#8a3fc0;
+  --shadow-sheet:0 8px 26px -8px rgba(70,58,44,.15),0 1px 2px rgba(70,58,44,.05);--shadow-card:0 1px 2px rgba(70,58,44,.05);
+  --shadow-lift:0 8px 20px -8px rgba(70,58,44,.18);--card:#fff;--card-border:#e2ded4;
+  --hover-bg:rgba(47,42,36,.05);--sel-bg:rgba(47,42,36,.07);--wm-ink-color:#2f2a24;}
+[data-theme="soft-dark"]{--win:#1d1d1d;--band:#181818;--bg:#262626;--panel2:#313131;--panel3:#3b3b3b;
+  --border:#363636;--border2:#454545;--framedge:#292929;--text:#ececec;--body:#c2c2c2;--muted:#979797;--dim:#737373;
+  --link:#a6baf2;--accent:#ececec;--accent-ink:#141414;--done:#7fb495;--prog:#94aacb;--review:#aaa0d2;--designrev:#bd96da;
+  --shadow-sheet:inset 0 1px 0 rgba(255,255,255,.04),0 12px 30px -6px rgba(0,0,0,.42);--shadow-card:0 1px 2px rgba(0,0,0,.2);
+  --shadow-lift:0 8px 20px -8px rgba(0,0,0,.45);--card:#2e2e2e;--card-border:#3a3a3a;
+  --hover-bg:rgba(255,255,255,.05);--sel-bg:rgba(255,255,255,.08);--wm-ink-color:#f2ece2;}
+
+*{margin:0;padding:0;box-sizing:border-box}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+body{background:#0e0e0e;color:#e6e6e6;font-family:var(--fbody);-webkit-font-smoothing:antialiased}
+.page{max-width:1560px;margin:0 auto;padding:26px 22px 70px}
+h1{font:640 22px/1.25 var(--fdisp);letter-spacing:-.012em;color:#f2f2f2}
+.sub{color:#8f8f8f;font-size:13px;line-height:1.65;margin-top:9px;max-width:106ch}
+.sub b{color:#c3c3c3;font-weight:600}
+.sub code{font-family:var(--fmono);font-size:11.5px;background:rgba(255,255,255,.07);border-radius:4px;padding:1px 5px;color:#c3c3c3}
+.bars{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;margin:18px 0 14px}
+.ctl{display:flex;align-items:center;gap:8px}
+.ctlk{font:700 9px var(--fmono);letter-spacing:.1em;text-transform:uppercase;color:#6a6a6a}
+.seg{display:inline-flex;border:1px solid #333;border-radius:10px;overflow:hidden}
+.seg button{color:#9a9a9a;font:600 11.5px var(--fbody);padding:7px 12px}
+.seg button.on{background:#2c2c2c;color:#fff}
+input[type=range]{-webkit-appearance:none;width:120px;height:3px;background:#333;border-radius:9px}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;border-radius:50%;background:#e0e0e0;cursor:pointer}
+.val{font:600 10.5px var(--fmono);color:#8a8a8a;width:40px}
+.stage{display:grid;grid-template-columns:1fr 300px;gap:18px;align-items:start}
+@media (max-width:1160px){.stage{grid-template-columns:1fr}}
+
+/* app frame */
+.frame{border:1px solid #2b2b2b;border-radius:15px;overflow:hidden;background:var(--win)}
+.app{display:flex;flex-direction:column;height:700px;background:var(--win);color:var(--text);font-size:14px}
+.topbar{flex:none;height:44px;display:flex;align-items:center;gap:10px;padding:0 14px;border-bottom:1px solid var(--framedge)}
+.lockup{display:inline-flex;align-items:center;gap:7px}
+.wordmark{font-family:var(--fbrand);font-weight:600;font-size:13px;letter-spacing:-.015em;color:var(--text)}
+.crumb{font-size:11.5px;color:var(--muted)}
+.searchpill{margin-left:auto;display:flex;align-items:center;gap:7px;height:27px;padding:0 11px;border-radius:var(--r-full);border:1px solid var(--border2);color:var(--dim);font-size:11.5px}
+.framebody{flex:1;min-height:0;display:grid;grid-template-columns:196px 1fr}
+.nav{display:flex;flex-direction:column;padding:12px 9px;gap:2px}
+.navk{font:700 9px var(--fmono);letter-spacing:.11em;text-transform:uppercase;color:var(--dim);padding:11px 9px 5px}
+.navitem{display:flex;align-items:center;gap:8px;padding:6px 9px;border-radius:9px;font-size:12.5px;color:var(--body);text-align:left}
+.navitem.on{background:var(--sel-bg);color:var(--text);font-weight:600}
+.navitem .h{color:var(--dim)}
+.navitem .cnt{margin-left:auto;font:700 9px var(--fmono);color:var(--muted)}
+.sheetwrap{padding:0 12px 12px 0;min-height:0;display:flex}
+.sheet{flex:1;min-width:0;background:var(--bg);border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow-sheet);overflow:hidden}
+
+/* Home */
+.hwrap{height:100%;display:flex;flex-direction:column;align-items:center;padding:0 22px;position:relative}
+.hcol{width:100%;max-width:var(--col);flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;padding-top:18px;scrollbar-width:none;position:relative;z-index:1}
+.hcol::-webkit-scrollbar{width:0}
+.hcomposer{width:100%;max-width:var(--col);margin:0 0 14px;flex:none;position:relative;z-index:2;
+  background:var(--card);border:1px solid var(--border);border-radius:var(--r-xl);padding:13px 14px 11px;box-shadow:var(--shadow-card)}
+[data-theme="dark"] .hcomposer,[data-theme="soft-dark"] .hcomposer{background:var(--panel2)}
+
+/* ══ the wordmark watermark — clipped by the composer, cropped by the sheet ══ */
+.wm{position:absolute;left:0;right:0;bottom:var(--wm-bottom,150px);height:210px;overflow:hidden;
+  display:flex;align-items:flex-end;justify-content:center;pointer-events:none;user-select:none;z-index:0;
+  transition:opacity var(--dur-enter) var(--ease)}
+.wm span{font-family:var(--fbrand);font-weight:600;font-size:150px;letter-spacing:-.03em;line-height:.84;
+  color:var(--wm-ink-color);opacity:var(--wm-ink);white-space:nowrap}
+
+/* ══ the brand block in the body ══ */
+.brandblk{display:flex;flex-direction:column;align-items:center;text-align:center;gap:12px;
+  animation:rise var(--dur-enter) var(--ease) both}
+@keyframes rise{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
+.brandblk .line{font-family:var(--fdisp);font-weight:640;letter-spacing:-.014em;font-size:21px}
+.brandblk .sub2{font-size:12.5px;color:var(--muted);max-width:46ch;line-height:1.6}
+.porch{display:block}
+/* the empty state owns the vertical middle; partial tucks it above the queue */
+.emptyzone{flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;padding-bottom:26px}
+
+.hgreetblk{margin-bottom:16px}
+.hkick{font:700 9.5px var(--fmono);letter-spacing:.11em;text-transform:uppercase;color:var(--dim)}
+.hgreet{font-family:var(--fdisp);font-size:25px;font-weight:640;letter-spacing:-.015em;line-height:1.2;margin-top:6px;display:flex;align-items:center;gap:11px}
+.hlede{font-size:13px;line-height:1.6;color:var(--muted);margin-top:7px}
+.sechead{display:flex;align-items:center;gap:8px;margin:18px 0 9px}
+.sechead h3{font:700 9.5px var(--fmono);letter-spacing:.11em;text-transform:uppercase;color:var(--dim)}
+.sechead .n{font:700 9.5px var(--fmono);color:var(--muted)}
+.mcqcard{background:var(--card);border:1px solid var(--card-border);border-radius:var(--r-lg);padding:12px 14px;margin-bottom:8px;box-shadow:var(--shadow-card)}
+.mcqtop{display:flex;align-items:center;gap:7px;margin-bottom:6px}
+.mcqid{font:600 10.5px var(--fmono);color:var(--muted)}
+.mcqbadges{margin-left:auto;font-size:10.5px;color:var(--dim)}
+.mcqtitle{font-size:13.5px;font-weight:600}
+.mcqmeta{font-size:11.5px;color:var(--muted);margin-top:4px}
+.chip{display:inline-flex;align-items:center;height:18px;padding:0 8px;border-radius:var(--r-full);font:600 10px var(--fbody);color:var(--c,var(--muted));background:color-mix(in srgb,var(--c,var(--muted)) 14%,transparent)}
+.kindchip{font:600 9.5px var(--fmono);letter-spacing:.04em;text-transform:uppercase;color:var(--dim);border:1px solid var(--border);border-radius:var(--r-full);padding:1px 7px}
+.frowline{display:flex;align-items:center;gap:9px;width:100%;padding:7px 9px;border-radius:var(--r-md);font-size:12.5px;color:var(--body);text-align:left}
+.frowline b{color:var(--text);font-weight:600}
+.frowline .roomtag{margin-left:auto;font-size:10.5px;color:var(--dim)}
+.frowline time{font-size:10.5px;color:var(--dim);width:34px;text-align:right}
+.rring{width:11px;height:11px;border-radius:50%;border:2px solid color-mix(in srgb,var(--prog) 40%,transparent);border-top-color:var(--prog);animation:spin 1s linear infinite;flex:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* composer */
+.chint{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--muted);margin:-13px -14px 10px;padding:8px 14px;background:var(--panel2);border-bottom:1px solid var(--border);border-radius:var(--r-xl) var(--r-xl) 0 0}
+.chintat{color:var(--link);font-weight:600}
+.hcomposer .ph{min-height:38px;color:var(--dim);font-size:14px;line-height:1.5}
+.hrow{display:flex;align-items:center;gap:6px;margin-top:8px}
+.hchip{display:inline-flex;align-items:center;gap:5px;height:26px;padding:0 9px;border-radius:var(--r-full);border:1px solid transparent;color:var(--dim);font-size:11.5px}
+.hchip .cc{font-size:9px}
+.tasksval{font-style:italic;color:inherit}
+.hsend{margin-left:auto;width:34px;height:34px;border-radius:50%;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center}
+
+/* notes rail */
+.rail{position:sticky;top:18px;display:flex;flex-direction:column;gap:12px}
+.note{border:1px solid #2a2a2a;border-radius:13px;background:#151515;padding:15px 16px}
+.note h4{font:640 14px var(--fdisp);color:#ededed;margin-bottom:7px}
+.note p{font-size:12.5px;line-height:1.68;color:#9d9d9d}
+.note p+p{margin-top:8px}
+.note b{color:#d2d2d2;font-weight:600}
+.note code{font-family:var(--fmono);font-size:11.5px;background:rgba(255,255,255,.07);border-radius:4px;padding:1px 5px;color:#c9c9c9}
+.mini{border-top:1px solid #262626;margin-top:11px;padding-top:11px}
+.mini .k{font:700 9px var(--fmono);letter-spacing:.09em;text-transform:uppercase;color:#6a6a6a}
+.mini p{margin-top:5px;font-size:12px}
+.verdict{display:inline-flex;align-items:center;gap:6px;font:700 9px var(--fmono);letter-spacing:.09em;text-transform:uppercase;border-radius:99px;padding:3px 9px;margin-bottom:9px}
+.verdict.rec{color:#7fd0a4;background:rgba(127,208,164,.13)}
+.verdict.ok{color:#9fb6dd;background:rgba(159,182,221,.13)}
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>Home × Porch — empty · partial · full</h1>
+  <p class="sub">
+    The new mark is a <b>character</b>, not a monogram — so the interesting question isn't "where does the logo go",
+    it's <b>when does it speak</b>. The proposal: <b>brand presence is a function of how full Home is</b>. On a caught-up
+    day the workspace introduces itself; as the queue fills it steps back; on a busy morning the identity lives only in
+    the top bar. One derived number, three states, no new settings. Geometry and <code>--brand</code> tokens are ported
+    verbatim from <code>brand.tsx</code> in PR #206 — this is a target for that implementation, not a second mark.
+  </p>
+
+  <div class="bars">
+    <div class="ctl"><span class="ctlk">Home state</span>
+      <div class="seg" id="stateSeg">
+        <button data-state="empty" class="on">Empty</button>
+        <button data-state="partial">Partial</button>
+        <button data-state="full">Full</button>
+      </div>
+    </div>
+    <div class="ctl"><span class="ctlk">Treatment</span>
+      <div class="seg" id="varSeg">
+        <button data-var="both" class="on">Porch + wordmark</button>
+        <button data-var="porch">Porch only</button>
+        <button data-var="wm">Wordmark only</button>
+        <button data-var="none">None</button>
+      </div>
+    </div>
+    <div class="ctl"><span class="ctlk">Empty voice</span>
+      <div class="seg" id="voiceSeg">
+        <button data-voice="quiet" class="on">Greeting carries it</button>
+        <button data-voice="loud">Porch gets a headline</button>
+      </div>
+    </div>
+    <div class="ctl"><span class="ctlk">Theme</span>
+      <div class="seg" id="themeSeg">
+        <button data-theme-set="cream" class="on">Cream Oak</button>
+        <button data-theme-set="dark">Graphite</button>
+        <button data-theme-set="light">Light</button>
+        <button data-theme-set="soft-dark">Soft dark</button>
+      </div>
+    </div>
+    <div class="ctl"><span class="ctlk">WM ink</span><input type="range" id="inkR" min="1" max="14" step="0.5" value="5.5"><span class="val" id="inkV">5.5%</span></div>
+    <div class="ctl"><span class="ctlk">Mark</span><input type="range" id="scaleR" min="50" max="150" step="2" value="100"><span class="val" id="scaleV">100%</span></div>
+  </div>
+
+  <div class="stage">
+    <div class="frame">
+      <div class="app">
+        <header class="topbar">
+          <span class="lockup"><span id="tbMark"></span><span class="wordmark">neuramesh</span></span>
+          <span class="crumb">/ flowe-ai › Home</span>
+          <span class="searchpill">⌕ Search — rooms, tasks, artifacts ⌘K</span>
+        </header>
+        <div class="framebody">
+          <nav class="nav">
+            <button class="navitem on">⌂ Home <span class="cnt" id="navCnt">0</span></button>
+            <div class="navk">Channels</div>
+            <button class="navitem"><span class="h">#</span> build</button>
+            <button class="navitem"><span class="h">#</span> general</button>
+            <button class="navitem"><span class="h">#</span> marketing</button>
+            <button class="navitem"><span class="h">#</span> research</button>
+          </nav>
+          <div class="sheetwrap"><div class="sheet">
+            <div class="hwrap" id="hwrap">
+              <div class="wm" id="wm"><span>neuramesh</span></div>
+              <div class="hcol" id="hcol"></div>
+              <div class="hcomposer">
+                <div class="chint"><span id="chintMark"></span><span>Mention <button class="chintat">@rex</button> or another teammate whenever you want their help.</span></div>
+                <div class="ph">Describe the work. The team takes it from there. @ mention · / skill · ⏎ send</div>
+                <div class="hrow">
+                  <button class="hchip"># build <span class="cc">⌄</span></button>
+                  <button class="hchip">▦ flowe-ai</button>
+                  <button class="hchip">🧠 Brain · Balanced <span class="cc">⌄</span></button>
+                  <button class="hchip">Tasks <span style="color:var(--dim);opacity:.55">·</span> <span class="tasksval">ON</span></button>
+                  <button class="hchip">@</button>
+                  <button class="hchip">📎</button>
+                  <button class="hsend"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
+                </div>
+              </div>
+            </div>
+          </div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="rail">
+      <div class="note" id="note"></div>
+      <div class="note">
+        <h4>The rules this obeys</h4>
+        <div class="mini" style="border:0;margin:0;padding:0"><span class="k">One derived number</span>
+          <p><code>fill = needsYou + inFlight</code>. Empty = 0 · partial = 1–3 · full = 4+. Nothing new to configure, and the states can't drift apart.</p></div>
+        <div class="mini"><span class="k">The mark keeps oak</span>
+          <p><code>--brand</code> / <code>--brand-ink</code> are constant in all four themes. Dark surfaces stay achromatic graphite — Porch is the one warm object on them.</p></div>
+        <div class="mini"><span class="k">Never two display moments</span>
+          <p>The greeting already speaks in serif. Porch is a <em>picture</em>, so it can share the screen with it — but the giant wordmark can't, which is why its ink stays under ~6%.</p></div>
+        <div class="mini"><span class="k">Standard cut ≥ 24px</span>
+          <p>Below that the handoff's small cut takes over (wider arch, r=3.5 eyes, stroke-4 smile). The top bar and the composer cap use it.</p></div>
+        <div class="mini"><span class="k">Clipped, not floating</span>
+          <p>The wordmark sinks behind the composer and is cropped by the sheet. Cropping is what turns a logo into texture.</p></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = (s, r=document) => r.querySelector(s);
+const $$ = (s, r=document) => [...r.querySelectorAll(s)];
+
+/* Porch — geometry verbatim from brand.tsx / the handoff SVGs (48-unit grid) */
+const CUTS = {
+  std: { arch:'M6.5 22 C6.5 11 14 4.5 24 4.5 C34 4.5 41.5 11 41.5 22 L41.5 38.5 C41.5 41.8 39.3 43.5 36.5 43.5 L11.5 43.5 C8.7 43.5 6.5 41.8 6.5 38.5 Z',
+        eyes:[[18.4,21.5,2.75],[29.6,21.5,2.75]], smile:'M17.6 28.4 C20.3 32.8 27.7 32.8 30.4 28.4', smileW:2.9 },
+  sm:  { arch:'M5.5 22 C5.5 10.5 13.5 3.5 24 3.5 C34.5 3.5 42.5 10.5 42.5 22 L42.5 39 C42.5 42.5 40 44.5 37 44.5 L11 44.5 C8 44.5 5.5 42.5 5.5 39 Z',
+        eyes:[[17.8,21,3.5],[30.2,21,3.5]], smile:'M17 28.6 C20.2 33.6 27.8 33.6 31 28.6', smileW:4 },
+};
+const porch = (size, cut) => {
+  const c = CUTS[cut ?? (size < 24 ? 'sm' : 'std')];
+  return `<svg class="porch" width="${size}" height="${size}" viewBox="0 0 48 48" aria-label="neuramesh">
+    <path d="${c.arch}" fill="var(--brand)"/>
+    ${c.eyes.map(([x,y,r]) => `<circle cx="${x}" cy="${y}" r="${r}" fill="var(--brand-ink)"/>`).join('')}
+    <path d="${c.smile}" fill="none" stroke="var(--brand-ink)" stroke-width="${c.smileW}" stroke-linecap="round"/>
+  </svg>`;
+};
+$('#tbMark').innerHTML = porch(20);
+$('#chintMark').innerHTML = porch(15);
+
+const CARD_DONE = `
+  <div class="mcqcard">
+    <div class="mcqtop"><span class="chip" style="--c:var(--done)">done</span><span class="kindchip">feature</span><span class="mcqid">#1042</span><span class="mcqbadges">#build · flowe-ai</span></div>
+    <div class="mcqtitle">Mobile nav: drawer + focus management</div>
+    <div class="mcqmeta">review passed · DoD attached · PR #1042</div>
+  </div>`;
+const CARD_DESIGN = `
+  <div class="mcqcard">
+    <div class="mcqtop"><span class="chip" style="--c:var(--designrev)">design review</span><span class="kindchip">design</span><span class="mcqid">#1047</span><span class="mcqbadges">#build · flowe-ai</span></div>
+    <div class="mcqtitle">Onboarding — the second run</div>
+    <div class="mcqmeta">iris proposed 3 mockups · your approval is the visual contract</div>
+  </div>`;
+const CARD_SHIP = `
+  <div class="mcqcard">
+    <div class="mcqtop"><span class="chip" style="--c:var(--review)">ship review</span><span class="kindchip">feature</span><span class="mcqid">#1039</span><span class="mcqbadges">#build · flowe-ai</span></div>
+    <div class="mcqtitle">Chat mode — the Tasks toggle</div>
+    <div class="mcqmeta">release plan awaiting your approval · PR #1039</div>
+  </div>`;
+const FLIGHT = `
+  <div class="frowline"><span class="rring"></span><span><b>Review every Flowe NSDR protocol</b> · patch · 3 of 5</span><span class="roomtag">#build</span><time>24m</time></div>
+  <div class="frowline"><span class="chip" style="--c:var(--review)">in review</span><span><b>#1033 · NSDR session protocol</b> · gem is reading it</span><span class="roomtag">#build</span><time>8m</time></div>`;
+
+/* Porch's line changes with the state — it is a character, so it gets to say something */
+const BRAND_BLOCK = (size, line, sub) => `
+  <div class="brandblk">
+    <div style="transform:scale(var(--porch-scale));transform-origin:center">${porch(size)}</div>
+    <div>
+      <div class="line">${line}</div>
+      ${sub ? `<div class="sub2">${sub}</div>` : ''}
+    </div>
+  </div>`;
+
+/* The greeting is the ONE constant of this screen — eyebrow, "Good evening, geo.", and a
+   one-line report — and the real app renders it in every state (hgreetblk is unconditional).
+   So the states differ in the LEDE, never in whether you get greeted. That also settles the
+   double-display-moment question: the greeting is the serif voice, and Porch is the picture. */
+const GREET = (lede) => `
+  <div class="hgreetblk">
+    <div class="hkick">Monday · Jul 27</div>
+    <div class="hgreet">Good evening, geo.</div>
+    ${lede ? `<div class="hlede">${lede}</div>` : ''}
+  </div>`;
+
+const STATES = {
+  empty: {
+    fill: 0, wmScale: 1,
+    body: (v, voice) => {
+      const withMark = v === 'porch' || v === 'both';
+      const line = 'All clear. Nothing needs you, and 2 are in flight.';
+      const block = voice === 'loud'
+        // Porch takes the serif headline. Reads as a bigger moment, but it is a SECOND display
+        // voice on a screen that already has one — compare them and see if it earns that.
+        ? `<div class="brandblk">${withMark ? `<div style="transform:scale(var(--porch-scale));transform-origin:center">${porch(64)}</div>` : ''}
+             <div><div class="line">All clear.</div><div class="sub2">Nothing needs you, and 2 are in flight.</div></div></div>`
+        // …or the greeting keeps the voice and Porch is purely the picture, with one muted line.
+        : `<div class="brandblk">${withMark ? `<div style="transform:scale(var(--porch-scale));transform-origin:center">${porch(56)}</div>` : ''}
+             <div class="sub2">${line}</div></div>`;
+      return GREET('<b>2</b> passed review while you were away. All handled.')
+        + `<div class="emptyzone">${block}</div>`;
+    },
+    note: {
+      v: ['rec', 'The brand moment'],
+      h: 'Empty — greeted first, then reassured',
+      p: [`<b>The greeting is the constant</b> — eyebrow, "Good evening, geo.", and one line of report. It renders in every state in the real app, so it renders in every state here. An empty Home that <em>doesn't</em> greet you would be the only screen in the product that forgets who you are.`,
+          `That settles the voice question underneath it: the greeting is the serif moment, so Porch is the <em>picture</em> and takes one muted line. Flip <b>Empty voice</b> to compare — "Porch gets a headline" gives the mark its own serif line, which reads bigger but puts two display voices on one screen.`],
+      k: 'A mark alone is a loading state', kp: 'Whichever voice wins, the mark never appears without words next to it. That is the difference between an empty state and a spinner.',
+    },
+  },
+  partial: {
+    fill: 2, wmScale: .42,
+    body: () => GREET('<b>2</b> passed review while you were away, both ready for your accept.')
+      + `<div class="sechead"><h3>Needs you</h3><span class="n">2</span></div>${CARD_DONE}${CARD_SHIP}`
+      + `<div class="sechead"><h3>In flight</h3><span class="n">1</span></div>${FLIGHT.split('</div>')[0]}</div>`,
+    note: {
+      v: ['ok', 'Stepping back'],
+      h: 'Partial — the queue leads, Porch withdraws',
+      p: [`Two cards is enough to make the body the point, so the brand block leaves entirely and the wordmark drops to about <b>40%</b> of its ink. Nothing moves position — it just gets quieter, which is why the transition never feels like a layout change.`,
+          `Porch is still on screen twice: the top bar and the composer's cap. That is the right amount of identity for a working screen.`],
+      k: 'The threshold', kp: '1–3 open items. Chosen because that is where the column still has whitespace under the cards — past it, the fade is doing nothing anyone can see.',
+    },
+  },
+  full: {
+    fill: 5, wmScale: 0,
+    body: () => GREET('<b>3</b> need you. Everything else is moving.')
+      + `<div class="sechead"><h3>Needs you</h3><span class="n">3</span></div>${CARD_DONE}${CARD_DESIGN}${CARD_SHIP}`
+      + `<div class="sechead"><h3>In flight</h3><span class="n">2</span></div>${FLIGHT}`,
+    note: {
+      v: ['ok', 'Out of the way'],
+      h: 'Full — identity lives in the chrome only',
+      p: [`Four or more open items and the body belongs to the work: no brand block, no watermark. docs/33 §1 is explicit that chrome stays out of the content's way, and a busy morning is exactly when that matters.`,
+          `You have not lost the identity — Porch is in the top bar, in the composer cap, and on every agent row. It just stops asking for attention on the one screen where attention is scarce.`],
+      k: 'The honest test', kp: 'Flip to None on this state. If you cannot tell the difference, the fade is correct — the brand was already doing its job elsewhere.',
+    },
+  },
+};
+
+let state = 'empty', variant = 'both', voice = 'quiet';
+
+function anchor() {
+  const c = $('.hcomposer');
+  if (c) document.documentElement.style.setProperty('--wm-bottom', `${c.offsetHeight + 14 - 28}px`);
+}
+
+function render() {
+  const s = STATES[state];
+  $('#hcol').innerHTML = s.body(variant, voice);
+  $('#navCnt').textContent = String(s.fill);
+  // the watermark shows only when the treatment includes it AND the state allows it
+  const showWm = (variant === 'both' || variant === 'wm') && s.wmScale > 0;
+  $('#wm').style.display = showWm ? 'flex' : 'none';
+  $('#wm').style.opacity = String(s.wmScale);
+  anchor();
+
+  const n = s.note;
+  $('#note').innerHTML =
+    `<span class="verdict ${n.v[0]}">${n.v[1]}</span><h4>${n.h}</h4>` +
+    n.p.map(p => `<p>${p}</p>`).join('') +
+    `<div class="mini"><span class="k">${n.k}</span><p>${n.kp}</p></div>`;
+}
+
+$$('#stateSeg button').forEach(b => b.onclick = () => {
+  $$('#stateSeg button').forEach(x => x.classList.toggle('on', x === b));
+  state = b.dataset.state; render();
+});
+$$('#varSeg button').forEach(b => b.onclick = () => {
+  $$('#varSeg button').forEach(x => x.classList.toggle('on', x === b));
+  variant = b.dataset.var; render();
+});
+$$('#voiceSeg button').forEach(b => b.onclick = () => {
+  $$('#voiceSeg button').forEach(x => x.classList.toggle('on', x === b));
+  voice = b.dataset.voice; render();
+});
+$$('#themeSeg button').forEach(b => b.onclick = () => {
+  $$('#themeSeg button').forEach(x => x.classList.toggle('on', x === b));
+  document.documentElement.dataset.theme = b.dataset.themeSet;
+});
+$('#inkR').oninput = e => {
+  document.documentElement.style.setProperty('--wm-ink', String(+e.target.value / 100));
+  $('#inkV').textContent = (+e.target.value).toFixed(1) + '%';
+};
+$('#scaleR').oninput = e => {
+  document.documentElement.style.setProperty('--porch-scale', String(+e.target.value / 100));
+  $('#scaleV').textContent = e.target.value + '%';
+};
+
+render();
+window.addEventListener('resize', anchor);
+</script>
+</body>
+</html>

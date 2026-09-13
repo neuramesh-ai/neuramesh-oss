@@ -1,0 +1,38 @@
+[
+  {
+    "name": "rp1-feed-footer",
+    "settle": 2600,
+    "query": {
+      "theme": "dark",
+      "channel": "dev"
+    },
+    "js": "(async () => { const w=(ms)=>new Promise(r=>setTimeout(r,ms)); const feed=[...document.querySelectorAll('.roomtabs button')].find(b=>(b.getAttribute('aria-label')||'')==='Feed'); if(feed) feed.click(); await w(1400); const hb=[...document.querySelectorAll('button')].find(b=>/history/i.test(b.getAttribute('aria-label')||b.getAttribute('title')||'')); if(hb) hb.click(); await w(700); const f=document.querySelector('.replyfoot'); if(f) f.scrollIntoView({block:'center'}); await w(500); })()"
+  },
+  {
+    "name": "rp2-thread-root",
+    "settle": 2600,
+    "query": {
+      "theme": "dark",
+      "channel": "dev"
+    },
+    "js": "(async () => { const w=(ms)=>new Promise(r=>setTimeout(r,ms)); const feed=[...document.querySelectorAll('.roomtabs button')].find(b=>(b.getAttribute('aria-label')||'')==='Feed'); if(feed) feed.click(); await w(1400); const hb=[...document.querySelectorAll('button')].find(b=>/history/i.test(b.getAttribute('aria-label')||b.getAttribute('title')||'')); if(hb) hb.click(); await w(700); const f=document.querySelector('.replyfoot'); if(f) f.click(); await w(1700); })()"
+  },
+  {
+    "name": "rp3-thread-root-cream",
+    "settle": 2600,
+    "query": {
+      "theme": "cream-oak",
+      "channel": "dev"
+    },
+    "js": "(async () => { const w=(ms)=>new Promise(r=>setTimeout(r,ms)); const feed=[...document.querySelectorAll('.roomtabs button')].find(b=>(b.getAttribute('aria-label')||'')==='Feed'); if(feed) feed.click(); await w(1400); const hb=[...document.querySelectorAll('button')].find(b=>/history/i.test(b.getAttribute('aria-label')||b.getAttribute('title')||'')); if(hb) hb.click(); await w(700); const f=document.querySelector('.replyfoot'); if(f) f.click(); await w(1700); })()"
+  },
+  {
+    "name": "rp4-composer-pill",
+    "settle": 2600,
+    "query": {
+      "theme": "dark",
+      "channel": "dev"
+    },
+    "js": "(async () => { const w=(ms)=>new Promise(r=>setTimeout(r,ms)); const feed=[...document.querySelectorAll('.roomtabs button')].find(b=>(b.getAttribute('aria-label')||'')==='Feed'); if(feed) feed.click(); await w(1400); const hb=[...document.querySelectorAll('button')].find(b=>/history/i.test(b.getAttribute('aria-label')||b.getAttribute('title')||'')); if(hb) hb.click(); await w(700); const m=[...document.querySelectorAll('.msg')].find(x=>(x.textContent||'').includes('traps focus on iPad')); if(m){ m.dispatchEvent(new MouseEvent('mouseover',{bubbles:true})); await w(250); const b=m.querySelector('.msgactions button'); if(b) b.click(); } await w(900); const c=document.querySelector('.rpill'); if(c) c.scrollIntoView({block:'center'}); await w(300); })()"
+  }
+]

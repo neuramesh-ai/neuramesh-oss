@@ -1,0 +1,697 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Nav · Home · New chat — the shell round</title>
+<style>
+/* ══ house mockup scaffold (sessions-shell.html lineage) — the page commits to the studio ground;
+   the SHELLS carry both themes, which is the point of the page ══ */
+[data-theme] { --fbody:'Geist Variable',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; --fmono:'Geist Mono Variable',ui-monospace,'SF Mono',Menlo,monospace; --fdisp:'Source Serif 4','Iowan Old Style',Georgia,serif; --fital:'Instrument Serif',Georgia,serif; --ease:cubic-bezier(.22,1,.36,1); --dur-fast:.12s; --dur-enter:.22s; --dur-exit:.13s; }
+/* verbatim from apps/desktop/src/renderer/src/tokens.css */
+[data-theme='dark'] {
+  --win:#0d0d0d; --bg:#141414; --panel:#191919; --panel2:#212121; --panel3:#2b2b2b;
+  --border:#272727; --border2:#383838; --card:#1e1e1e; --card-border:#2c2c2c;
+  --text:#eaeaea; --body:#b6b6b6; --muted:#898989; --dim:#676767; --ring:#525252;
+  --accent:#eaeaea; --accent-ink:#101010; --accent-soft:#2b2b2b; --link:#d19a72;
+  --hover-bg:rgba(234,234,234,.07); --sel-bg:rgba(234,234,234,.10);
+  --prog:#8ba0c0; --review:#a89ccf; --done:#77ac8d; --acc:#6fb0ab; --plan:#7fa5ab; --planrev:#a89ccf; --orch:#9793d2;
+  --shadow-card:0 1px 2px rgba(0,0,0,.25); --shadow-lift:0 8px 20px -8px rgba(0,0,0,.55); --shadow-pop:0 20px 55px -14px rgba(0,0,0,.65);
+  --shadow-sheet:inset 0 1px 0 rgba(255,255,255,.05), 0 12px 30px -6px rgba(0,0,0,.5);
+  --overlay:#222222; --focus-glow:rgba(234,234,234,.22);
+}
+[data-theme='cream-oak'] {
+  --win:#f0e5d3; --bg:#fbf8f4; --panel:#fbf8f4; --panel2:#f6eee1; --panel3:#efe1cd;
+  --border:#e6dbca; --border2:#d3c2a8; --card:#ffffff; --card-border:#eadfce;
+  --text:#2a1c13; --body:#574838; --muted:#97846c; --dim:#b5a289; --ring:#b08a5e;
+  --accent:#834a2b; --accent-ink:#fff7ee; --accent-soft:#f1e3d2; --link:#9c5730;
+  --hover-bg:rgba(42,28,19,.05); --sel-bg:rgba(131,74,43,.08);
+  --prog:#4f80c4; --review:#6d5ce0; --done:#0f9d63; --acc:#2f8f8a; --plan:#2c7d88; --planrev:#7d56b8; --orch:#6a63bc;
+  --shadow-card:0 1px 2px rgba(70,42,18,.05); --shadow-lift:0 8px 20px -8px rgba(70,42,18,.20); --shadow-pop:0 20px 55px -14px rgba(70,42,18,.30);
+  --shadow-sheet:0 8px 26px -8px rgba(70,42,18,.16), 0 1px 2px rgba(70,42,18,.05);
+  --overlay:#ffffff; --focus-glow:rgba(131,74,43,.09);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body { background:#131210; }
+body { font-family:'Geist Variable',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; -webkit-font-smoothing:antialiased; }
+.page { max-width:1560px; margin:0 auto; padding:34px 26px 80px; }
+.pagehead { color:#eaeaea; margin-bottom:10px; max-width:110ch; }
+.pagehead h1 { font-family:'Source Serif 4',Georgia,serif; font-size:24px; font-weight:640; letter-spacing:-.012em; text-wrap:balance; }
+.pagehead p { color:#8f8b84; font-size:13px; line-height:1.66; margin-top:9px; }
+.pagehead b { color:#c2beb6; font-weight:600; }
+.pagehead .warn { color:#c8a06a; font-weight:600; }
+.stophd { color:#eaeaea; font-size:16px; font-weight:660; margin:52px 0 4px; font-family:'Source Serif 4',Georgia,serif; }
+.stopno { font:700 10px 'Geist Mono Variable',ui-monospace,monospace; letter-spacing:.12em; color:#6f6b64; text-transform:uppercase; margin-right:8px; }
+.stopp { color:#8f8b84; font-size:12.5px; line-height:1.66; max-width:106ch; margin-bottom:16px; }
+.stopp b { color:#c2beb6; font-weight:600; }
+.stopp .warn { color:#c8a06a; font-weight:600; }
+.stopp .ok { color:#8fbf9f; font-weight:600; }
+.stopp .kbd, .legend .kbd { font:600 10px 'Geist Mono Variable',ui-monospace,monospace; border:1px solid #3a3733; border-radius:5px; padding:1px 5px; color:#a29d95; }
+.legend { color:#8f8b84; font-size:12px; line-height:1.7; max-width:106ch; margin:12px 2px 0; }
+.legend b { color:#c2beb6; font-weight:600; }
+.legend .pin { display:inline-grid; place-items:center; width:16px; height:16px; border-radius:50%; background:#2a2723; color:#d8b98e; font:700 9.5px 'Geist Mono Variable',ui-monospace,monospace; margin-right:6px; }
+.themes { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+.themes.tall { grid-template-columns:1fr; }
+@media (max-width:1240px){ .themes { grid-template-columns:1fr; } }
+.theme { background:var(--win); border:1px solid #333029; border-radius:16px; padding:14px; color:var(--text); font-family:var(--fbody); overflow:hidden; }
+.theme > h2 { font-size:10.5px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--dim); margin:0 2px 11px; font-family:var(--fmono); }
+.pin { display:inline-grid; place-items:center; width:16px; height:16px; border-radius:50%; background:#2a2723; color:#d8b98e; font:700 9.5px 'Geist Mono Variable',ui-monospace,monospace; vertical-align:2px; }
+.theme .pin { position:absolute; z-index:9; box-shadow:0 0 0 2px color-mix(in srgb, var(--win) 70%, transparent); }
+
+/* ══ the shell — frame model: --win frame · frame top · naked nav · floating sheet ══ */
+.shell { position:relative; display:flex; flex-direction:column; background:var(--win); border-radius:14px; min-height:600px; padding:0 10px 10px 0; overflow:hidden; }
+.shellrow { flex:1; display:flex; min-height:0; }
+/* the frame top (round 3): wordmark · crumb · ⌘K · the dock's utilities · Synced. The bottom
+   strip is gone — this row was already here and now carries its tenants. */
+.ftop { flex:none; display:flex; align-items:center; gap:8px; height:42px; padding:0 6px 0 13px; }
+.ftfold { color:var(--dim); display:grid; place-items:center; }
+.ftwm { font-weight:650; font-size:12.5px; letter-spacing:-.015em; }
+.ftcrumb { font-size:11.5px; color:var(--dim); }
+.ftk { margin-left:auto; display:inline-flex; align-items:center; gap:7px; height:28px; padding:0 12px; border-radius:999px; background:color-mix(in srgb, var(--text) 5%, transparent); color:var(--dim); font-size:11.5px; cursor:pointer; }
+.ftk:hover { background:color-mix(in srgb, var(--text) 8%, transparent); color:var(--muted); }
+.ftk kbd { font:600 9.5px var(--fmono); border:1px solid var(--border2); border-radius:5px; padding:1px 5px; }
+.ftop .utilclu { margin-left:0; padding-left:2px; }
+.spine { flex:none; width:30px; display:flex; flex-direction:column; align-items:center; padding:10px 0 8px; }
+.spname { writing-mode:vertical-rl; text-orientation:mixed; font:700 9.5px var(--fmono); letter-spacing:.15em; color:var(--muted); padding:6px 0; }
+.spfoot { margin-top:auto; display:flex; flex-direction:column; gap:8px; align-items:center; }
+.spav { width:22px; height:22px; border-radius:6px; background:var(--panel3); border:1px solid var(--border2); display:grid; place-items:center; font:700 10px var(--fbody); color:var(--body); }
+.appnav { flex:none; width:266px; min-width:0; display:flex; flex-direction:column; padding:2px 0 8px; overflow:hidden; }
+.shell.dragging .appnav { transition:none; }
+.shell.dragging { cursor:col-resize; user-select:none; }
+
+/* the grip — ask 1. Rest: invisible (the gutter). Hover: a 3px pill. Drag: --ring + readout. */
+.grip { flex:none; width:10px; margin:0 -1px; position:relative; cursor:col-resize; display:grid; place-items:center; touch-action:none; }
+.gripbar { width:3px; height:64px; border-radius:99px; background:var(--border2); opacity:0; transition:opacity var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease); }
+.grip:hover .gripbar { opacity:1; }
+.shell.dragging .gripbar { opacity:1; background:var(--ring); }
+.gripout { position:absolute; top:14px; left:50%; transform:translateX(-50%); background:var(--overlay); color:var(--body); border:1px solid var(--card-border); border-radius:7px; padding:2px 7px; font:600 10px var(--fmono); box-shadow:var(--shadow-pop); opacity:0; pointer-events:none; transition:opacity var(--dur-fast) var(--ease); white-space:nowrap; z-index:8; }
+.shell.dragging .gripout { opacity:1; }
+
+/* ── nav anatomy ── */
+.newrow { display:flex; align-items:center; gap:5px; padding:8px 10px 4px; }
+.newchat { flex:1; min-width:0; display:flex; align-items:center; gap:9px; height:40px; padding:0 13px 0 14px; border:1px solid var(--card-border); background:var(--card); border-radius:999px; box-shadow:var(--shadow-card); font:620 13px var(--fbody); color:var(--text); cursor:pointer; transition:transform var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease); }
+.newchat:hover { transform:translateY(-1px); box-shadow:var(--shadow-lift); }
+.newchat .plus { font-size:15px; color:var(--muted); font-weight:500; }
+.newchat kbd { margin-left:auto; font:600 9.5px var(--fmono); color:var(--dim); border:1px solid var(--border2); border-radius:5px; padding:1px 5px; }
+.newcaret { flex:none; width:28px; height:28px; display:grid; place-items:center; border-radius:99px; color:var(--dim); cursor:pointer; border:none; background:none; }
+.newcaret:hover { background:var(--hover-bg); color:var(--text); }
+.navsec { display:flex; align-items:center; gap:7px; padding:14px 16px 5px; font:650 9.5px var(--fmono); letter-spacing:.15em; text-transform:uppercase; color:var(--muted); }
+.navsec .r { margin-left:auto; display:flex; gap:2px; }
+.navsec .r button { width:22px; height:22px; display:grid; place-items:center; border:none; background:none; color:var(--dim); border-radius:6px; cursor:pointer; opacity:.7; }
+.navsec .r button:hover { background:var(--hover-bg); color:var(--text); opacity:1; }
+.navitem { display:flex; align-items:center; gap:11px; margin:1px 8px; padding:7px 9px; border-radius:8px; font-size:13px; font-weight:500; color:var(--muted); cursor:pointer; border:none; background:none; text-align:left; }
+.navitem:hover { background:var(--hover-bg); color:var(--text); }
+.navitem.on { background:var(--card); color:var(--text); font-weight:600; box-shadow:var(--shadow-card), inset 0 0 0 1px var(--card-border); }
+.navitem svg { flex:none; color:var(--muted); }
+.navitem.on svg { color:var(--text); }
+.navitem .badge { margin-left:auto; min-width:18px; height:18px; padding:0 5px; border-radius:999px; background:var(--panel3); color:var(--body); border:1px solid var(--border2); font:800 10px var(--fmono); display:grid; place-items:center; }
+.navitem .badge.attn { background:var(--link); border-color:var(--link); color:var(--bg); }
+.proj { margin-top:2px; }
+.projhead { display:flex; align-items:center; gap:6px; padding:5px 10px 5px 12px; }
+.projhead .chev { color:var(--dim); display:grid; place-items:center; width:14px; transition:transform var(--dur-fast) var(--ease); }
+.projhead .chev.c { transform:rotate(-90deg); }
+.plogo { width:16px; height:16px; border-radius:5px; background:var(--panel3); border:1px solid var(--border2); display:grid; place-items:center; font:700 8.5px var(--fbody); color:var(--body); flex:none; }
+.projname { font-size:13px; font-weight:600; color:var(--body); }
+.projhead.on .projname { color:var(--text); }
+.pplive { width:6px; height:6px; border-radius:50%; background:var(--prog); animation:pulse 1.6s var(--ease) infinite; }
+.ppask { width:6px; height:6px; border-radius:50%; background:var(--link); }
+.pplus { margin-left:auto; color:var(--dim); font-size:13px; border:none; background:none; cursor:pointer; border-radius:6px; width:20px; height:20px; display:grid; place-items:center; }
+.pplus:hover { background:var(--hover-bg); color:var(--text); }
+@keyframes pulse { 0%,100% { box-shadow:0 0 0 0 color-mix(in srgb, var(--prog) 34%, transparent); } 50% { box-shadow:0 0 0 4px transparent; } }
+.chipstrip { display:flex; flex-wrap:wrap; gap:4px; padding:1px 10px 5px 32px; }
+.chanchip { display:inline-flex; align-items:center; gap:3px; height:20px; padding:0 8px; border-radius:999px; border:1px solid var(--border); color:var(--muted); font-size:11px; background:none; cursor:pointer; }
+.chanchip i { font-style:normal; color:var(--dim); font-weight:600; }
+.chanchip:hover { background:var(--hover-bg); color:var(--text); }
+.chanchip.add { color:var(--dim); }
+.sessrow { display:flex; gap:9px; margin:1px 8px 1px 26px; padding:6px 9px; border-radius:9px; cursor:pointer; border:none; background:none; text-align:left; min-width:0; }
+.sessrow:hover { background:var(--hover-bg); }
+.sessrow.on { background:var(--card); box-shadow:var(--shadow-card), inset 0 0 0 1px var(--card-border); }
+.sdot { flex:none; width:8px; height:8px; border-radius:50%; margin-top:5px; border:1.5px solid var(--dim); }
+.sdot.live { background:var(--prog); border-color:var(--prog); animation:pulse 1.6s var(--ease) infinite; }
+.sdot.review { background:var(--review); border-color:var(--review); }
+.sdot.chat { border-color:var(--dim); }
+.sessbody { min-width:0; flex:1; }
+.sessbody b { display:block; font-size:12.5px; font-weight:560; color:var(--body); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.sessrow:hover .sessbody b, .sessrow.on .sessbody b { color:var(--text); }
+.sessbody small { display:block; font:500 10px var(--fmono); color:var(--dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px; }
+.sessbody small.verb { font-family:var(--fbody); font-style:italic; color:var(--muted); }
+
+/* ── the sheet ── */
+.sheet { flex:1; min-width:120px; background:var(--bg); border:1px solid var(--border); border-radius:14px; box-shadow:var(--shadow-sheet); display:flex; flex-direction:column; overflow:hidden; }
+.sheet.ghost { align-items:center; justify-content:center; }
+.ghostlbl { font:600 10.5px var(--fmono); letter-spacing:.08em; text-transform:uppercase; color:var(--dim); text-align:center; line-height:2; }
+.ghostrows { width:min(420px, 84%); opacity:.5; margin-top:18px; }
+.ghostrow { height:34px; border:1px solid var(--border); border-radius:9px; margin-bottom:7px; background:var(--panel); }
+.ghostrow.w2 { width:72%; } .ghostrow.w3 { width:86%; }
+
+/* ── Home (stop 2) ── */
+.homescroll { flex:1; overflow:hidden; padding:18px clamp(14px, 4%, 40px) 18px; }
+.homecol { max-width:760px; margin:0 auto; }
+/* Home's first line (round 3): the greeting left, the scope + crew right. No search field —
+   ⌘K is global chrome and history search lives behind Recent's icon (the ⌘Y overlay stays). */
+.hgreetrow { display:flex; align-items:flex-start; gap:14px; }
+.htools { margin-left:auto; display:flex; align-items:center; gap:6px; flex:none; padding-top:4px; }
+.crewclu { display:flex; align-items:center; flex:none; margin-left:3px; cursor:pointer; }
+.crewclu .cav { width:23px; height:23px; border-radius:7px; background:var(--panel2); border:2px solid var(--bg); margin-left:-6px; display:grid; place-items:center; font:700 9px var(--fbody); color:var(--body); }
+.crewclu .cav:first-child { margin-left:0; }
+.crewclu:hover .cav { border-color:var(--card); }
+.utilclu { margin-left:auto; display:flex; align-items:center; gap:1px; flex:none; padding-left:6px; }
+.utilico { width:27px; height:26px; border-radius:8px; display:grid; place-items:center; border:none; background:none; color:var(--dim); cursor:pointer; }
+.utilico:hover { background:var(--hover-bg); color:var(--text); }
+.synced { display:inline-flex; align-items:center; gap:6px; height:26px; padding:0 11px; margin-left:5px; border-radius:999px; border:1px solid var(--border); color:var(--muted); font:600 11px var(--fbody); flex:none; }
+.synced .dot { width:6px; height:6px; border-radius:50%; background:var(--done); }
+.eyebrow { font:650 9.5px var(--fmono); letter-spacing:.15em; text-transform:uppercase; color:var(--dim); margin-bottom:7px; }
+.greet { font-family:var(--fdisp); font-size:25px; font-weight:640; letter-spacing:-.012em; }
+.popwrap { position:relative; }
+/* R4: the pills are ELEVATED — card fill + hairline + resting shadow, the stratum for anything
+   you click (docs/33 §3) — not a ghost chip */
+.fpill { display:inline-flex; align-items:center; gap:6px; height:27px; padding:0 11px; border-radius:999px; border:1px solid var(--card-border); background:var(--card); box-shadow:0 1px 2px var(--shadow); color:var(--body); font:560 11.5px var(--fbody); cursor:pointer; transition:background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
+.fpill:hover { background:var(--hover-bg); color:var(--text); }
+.fpill i { font-style:normal; color:var(--dim); font-weight:600; }
+.fpill .chev { color:var(--dim); display:grid; }
+.popwrap.open .fpill { background:var(--sel-bg); color:var(--text); border-color:var(--border2); }
+.fpill.set { background:var(--accent-soft); border-color:var(--border2); color:var(--text); font-weight:620; }
+.fpill.set .x { color:var(--dim); margin-left:2px; }
+.pop { position:absolute; top:calc(100% + 7px); right:0; min-width:200px; background:var(--overlay); border:1px solid var(--card-border); border-radius:12px; box-shadow:var(--shadow-pop); padding:5px; z-index:30; display:none; }
+.popwrap.open .pop { display:block; animation:rise var(--dur-enter) var(--ease); }
+.pop.left { right:auto; left:0; }
+@keyframes rise { from { opacity:0; transform:translateY(6px); } }
+.poprow { display:flex; align-items:center; gap:8px; width:100%; padding:7px 9px; border-radius:8px; border:none; background:none; color:var(--body); font:520 12.5px var(--fbody); cursor:pointer; text-align:left; animation:rise var(--dur-enter) var(--ease) both; }
+.pop .poprow:nth-child(2){ animation-delay:24ms; } .pop .poprow:nth-child(3){ animation-delay:48ms; } .pop .poprow:nth-child(4){ animation-delay:72ms; } .pop .poprow:nth-child(5){ animation-delay:96ms; } .pop .poprow:nth-child(6){ animation-delay:120ms; } .pop .poprow:nth-child(7){ animation-delay:144ms; }
+.poprow:hover { background:var(--hover-bg); color:var(--text); }
+.poprow.on { background:var(--sel-bg); color:var(--text); font-weight:620; }
+.poprow .h { color:var(--dim); font-weight:600; }
+.poprow .tick { margin-left:auto; color:var(--muted); font-size:11px; }
+.popsec { font:650 9px var(--fmono); letter-spacing:.13em; text-transform:uppercase; color:var(--dim); padding:9px 9px 3px; }
+.popdiv { height:1px; background:var(--border); margin:5px 4px; }
+.poprow.newp { color:var(--muted); }
+.hsect { display:flex; align-items:baseline; gap:8px; font-family:var(--fdisp); font-size:15.5px; font-weight:640; margin:24px 2px 9px; }
+.hsect .n { font:700 10.5px var(--fmono); color:var(--dim); }
+.sectsearch { align-self:center; width:24px; height:24px; border-radius:7px; display:grid; place-items:center; color:var(--dim); border:none; background:none; cursor:pointer; }
+.sectsearch:hover { background:var(--hover-bg); color:var(--text); }
+.sectsearch svg { display:block; }
+.nycard { display:flex; align-items:center; gap:12px; background:var(--card); border:1px solid var(--card-border); border-radius:12px; box-shadow:var(--shadow-card); padding:11px 13px; margin-bottom:8px; }
+.nycard:hover { box-shadow:var(--shadow-lift); }
+.statechip { flex:none; font:640 9.5px var(--fmono); letter-spacing:.05em; text-transform:uppercase; border-radius:7px; padding:2.5px 7px; }
+.statechip.done { color:var(--done); background:color-mix(in srgb, var(--done) 13%, transparent); }
+.statechip.planrev { color:var(--planrev); background:color-mix(in srgb, var(--planrev) 13%, transparent); }
+.statechip.chat { color:var(--muted); background:var(--panel2); }
+.statechip.prog { color:var(--prog); background:color-mix(in srgb, var(--prog) 13%, transparent); }
+.statechip.review { color:var(--review); background:color-mix(in srgb, var(--review) 13%, transparent); }
+.nybody { flex:1; min-width:0; }
+.nybody b { display:block; font-size:13px; font-weight:620; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.nybody small { display:block; font-size:11.5px; color:var(--muted); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.nyav { flex:none; width:26px; height:26px; border-radius:8px; background:var(--panel2); display:grid; place-items:center; font:700 11px var(--fbody); color:var(--body); }
+.nybtns { flex:none; display:flex; gap:6px; }
+.btn { height:29px; padding:0 13px; border-radius:999px; font:620 12px var(--fbody); cursor:pointer; border:1px solid transparent; }
+.btn.primary { background:var(--accent); color:var(--accent-ink); }
+.btn.ghost { background:none; border-color:var(--border2); color:var(--body); }
+.btn.ghost:hover { background:var(--hover-bg); color:var(--text); }
+.frow { display:flex; align-items:center; gap:10px; padding:8px 11px; border-radius:10px; cursor:pointer; }
+.frow:hover { background:var(--hover-bg); }
+.orb { flex:none; width:13px; height:13px; border-radius:50%; border:2px dotted var(--muted); animation:orbspin 2.6s linear infinite; }
+@keyframes orbspin { to { transform:rotate(360deg); } }
+.ftitle { font-size:12.5px; font-weight:560; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.fbeat { flex:none; font-size:11.5px; color:var(--muted); font-style:italic; }
+.fwhen { flex:none; margin-left:auto; font:500 10.5px var(--fmono); color:var(--dim); }
+.fwhen.flive { color:var(--prog); font-family:var(--fbody); font-style:italic; }
+.dayhead { font:700 9.5px var(--fmono); letter-spacing:.13em; text-transform:uppercase; color:var(--dim); padding:12px 2px 5px; }
+.srow { display:flex; align-items:center; gap:11px; padding:8px 11px; border-radius:11px; cursor:pointer; min-width:0; }
+.srow:hover { background:var(--card); box-shadow:var(--shadow-card), inset 0 0 0 1px var(--card-border); }
+.tring { width:18px; height:18px; border-radius:50%; flex:none; background:conic-gradient(var(--prog) var(--frac,40%), color-mix(in srgb, var(--dim) 32%, transparent) 0); position:relative; }
+.tring::after { content:''; position:absolute; inset:3.5px; border-radius:50%; background:var(--bg); }
+.srow:hover .tring::after { background:var(--card); }
+.tring.r { background:conic-gradient(var(--review) var(--frac,80%), color-mix(in srgb, var(--dim) 32%, transparent) 0); }
+.tring.d { background:conic-gradient(var(--done) 100%, var(--done) 0); }
+.chatglyph { width:18px; height:18px; flex:none; border-radius:6px; border:1.5px solid var(--dim); }
+.srow .body { min-width:0; flex:1; }
+.srow .t { font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.srow .snip { font-size:11.5px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:1.5px; }
+.srow .meta { flex:none; text-align:right; }
+.srow .when { font:500 10.5px var(--fmono); color:var(--dim); }
+.srow .roomtag { font:600 10px var(--fmono); color:var(--muted); background:var(--panel2); border-radius:7px; padding:2px 7px; margin-left:7px; }
+.morerow { display:block; width:100%; text-align:center; padding:9px; margin-top:6px; border:none; background:none; color:var(--dim); font:560 11.5px var(--fbody); cursor:pointer; border-radius:9px; }
+.morerow:hover { background:var(--hover-bg); color:var(--muted); }
+
+/* ── New chat stage (stop 3) ── */
+.stage { align-items:center; justify-content:center; position:relative; }
+.stagecol { width:min(600px, 88%); display:flex; flex-direction:column; align-items:center; padding:30px 0; }
+.stagehead { font-family:var(--fdisp); font-size:27px; font-weight:640; letter-spacing:-.012em; text-align:center; line-height:1.3; text-wrap:balance; }
+.projpick { display:inline; }
+.projpickbtn { font-family:var(--fital); font-style:italic; font-weight:500; font-size:29px; color:var(--link); background:none; border:none; cursor:pointer; padding:0 2px; border-bottom:2px dotted color-mix(in srgb, var(--link) 45%, transparent); }
+.projpickbtn:hover { border-bottom-color:var(--link); }
+.projpick .pop { left:50%; right:auto; transform:translateX(-50%); top:calc(100% + 9px); min-width:220px; text-align:left; font-family:var(--fbody); }
+.composer { width:100%; margin-top:26px; background:var(--card); border:1px solid var(--card-border); border-radius:15px; box-shadow:var(--shadow-card); overflow:visible; }
+.chint { display:flex; align-items:center; gap:9px; background:var(--panel2); border-radius:14px 14px 0 0; padding:8px 13px; font-size:11.5px; color:var(--muted); }
+.chint .nyav { width:22px; height:22px; border-radius:7px; background:var(--panel3); font-size:10px; }
+.ctext { padding:15px 15px 8px; font-size:13.5px; color:var(--dim); min-height:58px; }
+.crow { display:flex; align-items:center; gap:6px; padding:8px 10px 10px; }
+.cchip { display:inline-flex; align-items:center; gap:5px; height:26px; padding:0 10px; border-radius:999px; border:1px solid transparent; color:var(--body); font:560 11.5px var(--fbody); cursor:pointer; background:none; }
+.cchip:hover { border-color:var(--border); background:var(--hover-bg); }
+.cchip i { font-style:normal; color:var(--dim); font-weight:600; }
+.cchip .chev { color:var(--dim); }
+.brainavs { display:flex; }
+.brainavs span { width:14px; height:14px; border-radius:5px; background:var(--panel3); border:1px solid var(--card); margin-left:-5px; display:grid; place-items:center; font:700 7px var(--fbody); color:var(--body); }
+.brainavs span:first-child { margin-left:0; }
+.send { margin-left:auto; width:30px; height:30px; border-radius:50%; border:none; background:var(--accent); color:var(--accent-ink); font-size:14px; cursor:pointer; display:grid; place-items:center; }
+.sugg { display:flex; gap:8px; margin-top:18px; flex-wrap:wrap; justify-content:center; }
+.spill { height:29px; padding:0 13px; border-radius:999px; border:1px solid var(--border2); background:none; color:var(--body); font:560 12px var(--fbody); cursor:pointer; }
+.spill:hover { background:var(--hover-bg); color:var(--text); }
+
+/* ── spec cards (stop 4) ── */
+.specgrid { display:grid; grid-template-columns:repeat(auto-fit, minmax(340px, 1fr)); gap:14px; }
+.spec { background:#1a1815; border:1px solid #2c2923; border-radius:13px; padding:16px 17px; color:#b6b1a9; font-size:12.5px; line-height:1.66; }
+.spec h3 { color:#e6e2da; font-size:13px; font-weight:660; margin-bottom:8px; font-family:'Source Serif 4',Georgia,serif; }
+.spec b { color:#d8d3ca; font-weight:600; }
+.spec .k { font:600 10.5px 'Geist Mono Variable',ui-monospace,monospace; color:#d8b98e; }
+.spec ul { list-style:none; }
+.spec li { padding:3px 0 3px 16px; position:relative; }
+.spec li::before { content:'·'; position:absolute; left:4px; color:#6f6b64; }
+table.alts { width:100%; border-collapse:collapse; color:#b6b1a9; font-size:12.5px; margin-top:14px; }
+.alts th { text-align:left; font:650 10px 'Geist Mono Variable',ui-monospace,monospace; letter-spacing:.1em; text-transform:uppercase; color:#6f6b64; padding:8px 12px; border-bottom:1px solid #2c2923; }
+.alts td { padding:10px 12px; border-bottom:1px solid #211f1b; vertical-align:top; line-height:1.6; }
+.alts td b { color:#d8d3ca; font-weight:620; }
+.alts .pick { color:#8fbf9f; font-weight:650; }
+.alts .no { color:#6f6b64; }
+@media (prefers-reduced-motion: reduce) { .pplive, .sdot.live, .orb { animation:none; } .popwrap.open .pop, .poprow { animation:none; } }
+</style>
+</head>
+<body>
+<div class="page">
+
+<div class="pagehead">
+  <h1>The shell round — a nav you can size, Home becomes a place, New chat becomes a stage</h1>
+  <p><b>Five asks, one shape.</b> Today ⌘N and Home are the same surface (Home <i>is</i> the composer landing), the nav has no Home entry, and the nav is welded at 266px.
+  This round splits the two jobs — <b>Home = the briefing</b> (what needs you · what's moving · everything that happened, searchable and filterable) and
+  <b>New chat = the stage</b> (a centered composer that names its project) — then re-cuts the nav Google-Chat-wise: one big New chat verb, a Shortcuts band with Home in it, the projects tree unchanged below, and a grip to size the whole column.</p>
+  <p class="warn">Note: the Google Chat / t3 screenshots didn't arrive with the message — designed from knowledge of both (Google Chat: prominent New-chat pill above a Shortcuts cluster above Spaces; t3: centered greeting + composer on an otherwise quiet sheet). Shells below are built from the real tokens.css values, cream-oak + graphite. <b>The dropdowns and the nav grip are live — click and drag them.</b></p>
+  <p><b>Rounds 2–3</b> (same day, George's passes): ① The frame's bottom-right utilities — terminal · browser · console · activity · the <b>Synced</b> pill — move to the <b>frame top bar, beside the ⌘K search</b> (they show on almost every page, so they live in the chrome that does, never inside a page component). The bottom dock strip retires (~38px of standing chrome returned), and the dock's ⌘ tile folds into the ⌘K pill — one palette door. ② <b>Home has no search bar</b>: ⌘K is the global search, and history search lives behind a small icon beside the <b>Recent</b> heading that opens the ⌘Y overlay — which therefore <b>stays</b> (round 1's "retire it" recommendation is dead). ③ The greeting's report sentence is <b>removed</b> — the queue cards one inch below it say the same thing with buttons on. ④ The main section's top-right controls (crew clusters · views burger · split · file-pane toggle) become <b>one aligned rail</b> — the real app's "Files" toggle currently collides with the cluster row; the fix is one flex container with a fixed order, not two absolutely-positioned groups sharing a corner. <b>Rounds 4–5</b> (on the live build, George driving): Home's own crew clusters are <b>gone</b> (the strip's rail already carries the crew), and the scope pills moved again — onto the <b>strip's sticky rail itself</b>, leading the clusters in their skin (30px bordered pills) with a leading glyph each (grid for projects, <b>#</b> for channels); the greeting row carries nothing but the greeting, and the shell owns <span class="kbd">nm:homescope</span>. The nav's icon controls all took the house <b>data-tip</b> bubbles (right-edge ones open leftward past the scroller clip), the <b>Shortcuts band collapses</b> like Projects, and the archive toast's full-height-slab bug fell out of the round: its floating variant was classed <span class="kbd">shell</span> and inherited the app shell's <span class="kbd">height: 100vh</span> — renamed <span class="kbd">afloat</span>.</p>
+</div>
+
+<!-- ══════════════════ STOP 1 ══════════════════ -->
+<div class="stophd"><span class="stopno">Stop 1</span>The nav, re-cut — and you can finally size it</div>
+<div class="stopp">
+  <b>Drag the gutter between the nav and the sheet.</b> The grip is the split-stage idiom (docs/33 §8) moved to the nav edge: invisible at rest, a 3px pill on hover,
+  live width readout while dragging. Clamped <b>224–356px</b>, double-click resets 266, width persists per machine (<span class="kbd">nm:navw</span>, like the theme and the fold — never synced). <span class="kbd">⌘\</span> still folds to zero; the grip hides with it.
+  Above the tree: <b>＋ New chat</b> grows into a full elevated pill (40px, card stratum, hover lift — the caret keeps New task · New routine), and a <b>SHORTCUTS</b> band arrives holding
+  <b>Home</b> — a real nav destination at last — with Tasks · Whiteboards · Automations · Files under it. Home's badge is the one notification-treated count (things waiting on <i>you</i>); Tasks' stays informational. Skills · Memory · Activity · Agents stay behind the views burger and ⌘K, unchanged. The projects tree below is untouched by this round.
+</div>
+<div class="themes">
+  <div class="theme" data-theme="cream-oak" data-src="s1">
+    <h2>Cream Oak</h2>
+    <div class="shell" data-live-grip>
+      <div class="ftop">
+        <span class="ftfold"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="10" rx="2" stroke="currentColor" stroke-width="1.4"/><path d="M6 3v10" stroke="currentColor" stroke-width="1.4"/></svg></span>
+        <span class="ftwm">neuramesh</span>
+        <span class="ftcrumb">· home</span>
+        <span class="ftk"><svg width="12" height="12" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="4.5" stroke="currentColor" stroke-width="1.6"/><path d="M10.5 10.5L14 14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg> Search <kbd>⌘K</kbd></span>
+        <span class="utilclu">
+          <button class="utilico" title="Terminal"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 5l3.5 3L3 11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M8.5 11H13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
+          <button class="utilico" title="Mini browser"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5.6" stroke="currentColor" stroke-width="1.4"/><path d="M2.4 8h11.2M8 2.4c1.9 1.7 1.9 9.5 0 11.2M8 2.4c-1.9 1.7-1.9 9.5 0 11.2" stroke="currentColor" stroke-width="1.2"/></svg></button>
+          <button class="utilico" title="Console"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="10" rx="2" stroke="currentColor" stroke-width="1.4"/><path d="M4.5 6.5l2 1.7-2 1.7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <button class="utilico" title="Activity"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M1.5 8h3l1.6-3.6L9.4 12l1.6-4h3.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <span class="synced"><span class="dot"></span> Synced</span>
+        </span>
+      </div>
+      <div class="shellrow">
+      <div class="spine"><div class="spname">NEURAMESH</div><div class="spfoot"><span class="spav">G</span></div></div>
+      <div class="appnav">
+        <div class="newrow">
+          <button class="newchat"><span class="plus">＋</span> New chat <kbd>⌘N</kbd></button>
+          <button class="newcaret" title="New task · New routine"><svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        </div>
+        <div class="navsec">Shortcuts</div>
+        <button class="navitem on"><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M2.5 7.5L8 2.5l5.5 5v5.5a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1V7.5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg> Home <span class="badge attn">3</span></button>
+        <button class="navitem"><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><rect x="2" y="2.5" width="3.4" height="11" rx="1" stroke="currentColor" stroke-width="1.4"/><rect x="6.8" y="2.5" width="3.4" height="7" rx="1" stroke="currentColor" stroke-width="1.4"/><rect x="11.6" y="2.5" width="3.4" height="9" rx="1" stroke="currentColor" stroke-width="1.4"/></svg> Tasks <span class="badge">12</span></button>
+        <button class="navitem"><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="9" rx="1.5" stroke="currentColor" stroke-width="1.5"/><path d="M5 9.5l2.4-3 2 2.2L11 6.8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Whiteboards</button>
+        <button class="navitem"><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M12.5 6.5a4.8 4.8 0 1 0 .9 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M13.7 3.6v3h-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Automations <span class="badge">2</span></button>
+        <button class="navitem"><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M2 4.5A1.5 1.5 0 0 1 3.5 3h3l1.5 2h4.5A1.5 1.5 0 0 1 14 6.5v5A1.5 1.5 0 0 1 12.5 13h-9A1.5 1.5 0 0 1 2 11.5v-7z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg> Files</button>
+        <div class="navsec">Projects
+          <span class="r">
+            <button title="Manage projects"><svg width="12" height="12" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.2" stroke="currentColor" stroke-width="1.4"/><path d="M8 1.8v2M8 12.2v2M1.8 8h2M12.2 8h2M3.6 3.6l1.4 1.4M11 11l1.4 1.4M12.4 3.6L11 5M5 11l-1.4 1.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></button>
+            <button title="New project">＋</button>
+          </span>
+        </div>
+        <div class="proj">
+          <div class="projhead on">
+            <span class="chev"><svg width="11" height="11" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            <span class="plogo">N</span><span class="projname">neuramesh</span><span class="pplive"></span>
+            <button class="pplus" title="New chat here">＋</button>
+          </div>
+          <div class="chipstrip"><button class="chanchip"><i>#</i>general</button><button class="chanchip"><i>#</i>build</button><button class="chanchip"><i>#</i>marketing</button><button class="chanchip add">＋</button></div>
+          <button class="sessrow"><span class="sdot live"></span><span class="sessbody"><b>#1046 · iOS Safari focus-trap release</b><small>⎇ nm/1046-ios-safari-focus-trap</small><small class="verb">mira · patch · returning focus to the trigger · 2 of 5</small></span></button>
+          <button class="sessrow on"><span class="sdot review"></span><span class="sessbody"><b>#1048 · Whiteboard snapshot cache</b><small>⎇ nm/1048-wb-snapshot-cache</small></span></button>
+          <button class="sessrow"><span class="sdot chat"></span><span class="sessbody"><b>Pricing page copy — with rex</b></span></button>
+        </div>
+        <div class="proj">
+          <div class="projhead">
+            <span class="chev c"><svg width="11" height="11" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            <span class="plogo">F</span><span class="projname">flowe-ai</span><span class="ppask" title="Needs you"></span>
+            <button class="pplus" title="New chat here">＋</button>
+          </div>
+        </div>
+        <div class="proj">
+          <div class="projhead">
+            <span class="chev c"><svg width="11" height="11" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            <span class="plogo">A</span><span class="projname">acme-yoga</span>
+            <button class="pplus" title="New chat here">＋</button>
+          </div>
+        </div>
+      </div>
+      <div class="grip" title="Drag to resize · double-click resets"><span class="gripbar"></span><span class="gripout">266px</span></div>
+      <div class="sheet ghost">
+        <div class="ghostlbl">the sheet — stop 2's surface<br/>reflows live as you drag ↔</div>
+        <div class="ghostrows"><div class="ghostrow"></div><div class="ghostrow w2"></div><div class="ghostrow w3"></div><div class="ghostrow w2"></div></div>
+      </div>
+      </div>
+    </div>
+  </div>
+  <div class="theme" data-theme="dark" data-clone="s1"><h2>Graphite</h2></div>
+</div>
+<div class="legend">
+  <span class="pin">1</span><b>New chat, at last a button</b> — full-width elevated pill, ＋ · label · <span class="kbd">⌘N</span>, hover lift; the caret beside it keeps New task · New routine. This amends the v0.76 "a verb in a rail is a row" ruling — the context that wrote it (a card fighting a Home row and a project head) died when both left for the spine.<br/>
+  <span class="pin">2</span><b>Shortcuts</b> — mono kicker, five doors. Home wears the needs-you count in the notification treatment (<b>--link</b> fill — it's things waiting on you); Tasks/Automations keep the quiet informational badge.<br/>
+  <span class="pin">3</span><b>The grip</b> — rest: nothing (the gutter is the hit area, 10px). Hover: 3px pill. Drag: pill takes --ring and a mono px readout floats. No transition while dragging — direct manipulation; the .22s ease only plays on double-click reset and on fold.<br/>
+  <span class="pin">4</span><b>Projects tree unchanged</b> — groups, channel chips, session rows, live pulse and ask dots all as shipped in the nav round.<br/>
+  <span class="pin">5</span><b>The frame top carries the utilities</b> (round 3) — terminal · browser · console · activity · Synced sit beside the ⌘K search on the row that shows on every page; the bottom dock strip is gone from every shell, and the dock's ⌘ tile folded into the ⌘K pill (one palette door).
+</div>
+
+<!-- ══════════════════ STOP 2 ══════════════════ -->
+<div class="stophd"><span class="stopno">Stop 2</span>Home — the briefing: queue · in flight · everything, searchable and scoped out loud</div>
+<div class="stopp">
+  Home becomes the workspace's <b>reading surface</b>: the composer moves out (composing is New chat's whole job now, one <span class="kbd">⌘N</span> away), and Home carries <b>no search bar of its own</b> —
+  ⌘K in the frame top is the global search, and the <b>Recent</b> heading wears a small search icon that opens the ⌘Y history overlay (which stays the everything-lens, exactly as docs/32 §12 ruled).
+  Top-right, where a room hangs its crew, Home hangs its scope and its people: <b>All projects · All channels</b>, then the people and agent clusters. <b>Click either pill</b>: the menu rises with the house stagger; channels group under project heads because #general exists three times. Picking narrows <i>every</i> section — queue, in flight, recent — and the pill wears the accent-soft selection wash with an × to clear.
+  This also retires an old contradiction: In&nbsp;flight silently followed the <i>active project</i> while the queue was workspace-wide. Now both follow one visible filter, default all — <b>a filter you can see instead of a scope you had to infer</b>. The greeting is two quiet lines (the report sentence is gone — the cards under it <i>are</i> the report); day-grouped session rows (the docs/35 anatomy, #room tag on every row) carry the history.
+</div>
+<div class="themes tall">
+  <div class="theme" data-theme="cream-oak" data-src="s2">
+    <h2>Cream Oak</h2>
+    <div class="shell">
+      <div class="ftop">
+        <span class="ftfold"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="10" rx="2" stroke="currentColor" stroke-width="1.4"/><path d="M6 3v10" stroke="currentColor" stroke-width="1.4"/></svg></span>
+        <span class="ftwm">neuramesh</span>
+        <span class="ftcrumb">· home</span>
+        <span class="ftk"><svg width="12" height="12" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="4.5" stroke="currentColor" stroke-width="1.6"/><path d="M10.5 10.5L14 14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg> Search <kbd>⌘K</kbd></span>
+        <span class="utilclu">
+          <button class="utilico" title="Terminal"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 5l3.5 3L3 11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M8.5 11H13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
+          <button class="utilico" title="Mini browser"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5.6" stroke="currentColor" stroke-width="1.4"/><path d="M2.4 8h11.2M8 2.4c1.9 1.7 1.9 9.5 0 11.2M8 2.4c-1.9 1.7-1.9 9.5 0 11.2" stroke="currentColor" stroke-width="1.2"/></svg></button>
+          <button class="utilico" title="Console"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="10" rx="2" stroke="currentColor" stroke-width="1.4"/><path d="M4.5 6.5l2 1.7-2 1.7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <button class="utilico" title="Activity"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M1.5 8h3l1.6-3.6L9.4 12l1.6-4h3.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <span class="synced"><span class="dot"></span> Synced</span>
+        </span>
+      </div>
+      <div class="shellrow">
+      <div class="spine"><div class="spname">NEURAMESH</div><div class="spfoot"><span class="spav">G</span></div></div>
+      <div class="appnav" style="width:236px">
+        <div class="newrow">
+          <button class="newchat"><span class="plus">＋</span> New chat <kbd>⌘N</kbd></button>
+          <button class="newcaret"><svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        </div>
+        <div class="navsec">Shortcuts</div>
+        <button class="navitem on"><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M2.5 7.5L8 2.5l5.5 5v5.5a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1V7.5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg> Home <span class="badge attn">3</span></button>
+        <button class="navitem"><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><rect x="2" y="2.5" width="3.4" height="11" rx="1" stroke="currentColor" stroke-width="1.4"/><rect x="6.8" y="2.5" width="3.4" height="7" rx="1" stroke="currentColor" stroke-width="1.4"/><rect x="11.6" y="2.5" width="3.4" height="9" rx="1" stroke="currentColor" stroke-width="1.4"/></svg> Tasks <span class="badge">12</span></button>
+        <button class="navitem"><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="9" rx="1.5" stroke="currentColor" stroke-width="1.5"/><path d="M5 9.5l2.4-3 2 2.2L11 6.8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Whiteboards</button>
+        <button class="navitem"><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M12.5 6.5a4.8 4.8 0 1 0 .9 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M13.7 3.6v3h-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Automations <span class="badge">2</span></button>
+        <button class="navitem"><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M2 4.5A1.5 1.5 0 0 1 3.5 3h3l1.5 2h4.5A1.5 1.5 0 0 1 14 6.5v5A1.5 1.5 0 0 1 12.5 13h-9A1.5 1.5 0 0 1 2 11.5v-7z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg> Files</button>
+        <div class="navsec">Projects<span class="r"><button>＋</button></span></div>
+        <div class="proj">
+          <div class="projhead on"><span class="chev"><svg width="11" height="11" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="plogo">N</span><span class="projname">neuramesh</span><span class="pplive"></span></div>
+          <button class="sessrow"><span class="sdot live"></span><span class="sessbody"><b>#1046 · iOS Safari focus-trap release</b></span></button>
+          <button class="sessrow"><span class="sdot chat"></span><span class="sessbody"><b>Pricing page copy — with rex</b></span></button>
+        </div>
+        <div class="proj"><div class="projhead"><span class="chev c"><svg width="11" height="11" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="plogo">F</span><span class="projname">flowe-ai</span><span class="ppask"></span></div></div>
+        <div class="proj"><div class="projhead"><span class="chev c"><svg width="11" height="11" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="plogo">A</span><span class="projname">acme-yoga</span></div></div>
+      </div>
+      <div class="grip"><span class="gripbar"></span><span class="gripout">236px</span></div>
+      <div class="sheet">
+        <div class="homescroll"><div class="homecol">
+          <div class="hgreetrow">
+            <div>
+              <div class="eyebrow">Sunday · Aug 10</div>
+              <div class="greet">Good morning, George.</div>
+            </div>
+            <div class="htools">
+              <div class="popwrap">
+                <button class="fpill" data-pop>All projects <span class="chev"><svg width="11" height="11" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></span></button>
+                <div class="pop">
+                  <button class="poprow on">All projects <span class="tick">✓</span></button>
+                  <button class="poprow"><span class="plogo">N</span> neuramesh</button>
+                  <button class="poprow"><span class="plogo">F</span> flowe-ai</button>
+                  <button class="poprow"><span class="plogo">A</span> acme-yoga</button>
+                </div>
+              </div>
+              <div class="popwrap">
+                <button class="fpill" data-pop><i>#</i> All channels <span class="chev"><svg width="11" height="11" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></span></button>
+                <div class="pop">
+                  <button class="poprow on">All channels <span class="tick">✓</span></button>
+                  <div class="popsec">neuramesh</div>
+                  <button class="poprow"><span class="h">#</span> general</button>
+                  <button class="poprow"><span class="h">#</span> build</button>
+                  <button class="poprow"><span class="h">#</span> marketing</button>
+                  <div class="popsec">flowe-ai</div>
+                  <button class="poprow"><span class="h">#</span> general</button>
+                  <button class="poprow"><span class="h">#</span> mobile</button>
+                </div>
+              </div>
+              <!-- R4: no crew here — the workspace strip's rail one line up already carries it -->
+            </div>
+          </div>
+          <div class="hsect">Needs you <span class="n">3</span></div>
+          <div class="nycard">
+            <span class="statechip done">done</span>
+            <span class="nybody"><b>#1044 · Landing hero copy pass</b><small>sage approved · PR #263 · CI green</small></span>
+            <span class="nybtns"><button class="btn primary">Accept — merges PR #263</button><button class="btn ghost">Open</button></span>
+          </div>
+          <div class="nycard">
+            <span class="nyav">rx</span>
+            <span class="nybody"><b>Ship pricing behind a flag, or hold for the A/B result?</b><small>rex asks · #marketing · flowe-ai</small></span>
+            <span class="nybtns"><button class="btn ghost">Flag it</button><button class="btn ghost">Hold</button></span>
+          </div>
+          <div class="nycard">
+            <span class="statechip planrev">plan review</span>
+            <span class="nybody"><b>#1049 · Session search index</b><small>sage's plan waits on you · #build</small></span>
+            <span class="nybtns"><button class="btn ghost">Review plan</button></span>
+          </div>
+          <div class="hsect">In flight <span class="n">3</span></div>
+          <div class="frow"><span class="orb"></span><span class="ftitle">#1046 · iOS Safari focus-trap release</span><span class="fbeat">mira · patch · 2 of 5</span><span class="fwhen">12m</span></div>
+          <div class="frow"><span class="statechip review">review</span><span class="ftitle">#1048 · Whiteboard snapshot cache</span><span class="fbeat">sage reviewing</span><span class="fwhen">4m</span></div>
+          <div class="frow"><span class="statechip chat">chat</span><span class="ftitle">Brand voice pass</span><span class="fbeat">#marketing</span><span class="fwhen flive">rex is replying…</span></div>
+          <div class="hsect">Recent
+            <button class="sectsearch" title="Search history — opens the ⌘Y overlay" aria-label="Search history"><svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="4.5" stroke="currentColor" stroke-width="1.6"/><path d="M10.5 10.5L14 14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
+          </div>
+          <div class="dayhead">Today</div>
+          <div class="srow"><span class="tring" style="--frac:40%"></span><span class="body"><span class="t">#1046 · iOS Safari focus-trap release</span><span class="snip">patch · returning focus to the trigger · 2 of 5</span></span><span class="meta"><span class="when">2:14 PM</span><span class="roomtag">#build</span></span></div>
+          <div class="srow"><span class="chatglyph"></span><span class="body"><span class="t">Pricing page copy — with rex</span><span class="snip">you → rex · "tighten the second stanza, keep the CTA"</span></span><span class="meta"><span class="when">1:02 PM</span><span class="roomtag">#marketing</span></span></div>
+          <div class="dayhead">Yesterday</div>
+          <div class="srow"><span class="tring d"></span><span class="body"><span class="t">#1044 · Landing hero copy pass</span><span class="snip">sage approved · ready for your accept</span></span><span class="meta"><span class="when">6:40 PM</span><span class="roomtag">#marketing</span></span></div>
+          <div class="srow"><span class="tring r" style="--frac:80%"></span><span class="body"><span class="t">#1043 · Recall latency budget check</span><span class="snip">round 2 · lesson recorded</span></span><span class="meta"><span class="when">11:18 AM</span><span class="roomtag">#build</span></span></div>
+          <div class="dayhead">This week</div>
+          <div class="srow"><span class="chatglyph"></span><span class="body"><span class="t">Yoga retreat launch ideas</span><span class="snip">rex → you · "three angles, the second is the strongest"</span></span><span class="meta"><span class="when">Thu</span><span class="roomtag">#content</span></span></div>
+          <button class="morerow">Everything earlier ›</button>
+        </div></div>
+      </div>
+      </div>
+    </div>
+  </div>
+  <div class="theme" data-theme="dark" data-clone="s2"><h2>Graphite</h2></div>
+</div>
+<div class="legend">
+  <span class="pin">1</span><b>The scope, top-right</b> (R4) — project pill · channel pill on the greeting line, wearing the elevated card skin (whitish fill + hairline, the click stratum); a set filter swaps to the accent-soft wash + ×. <b>No crew clusters here</b> — the workspace strip's rail one line above already carries them, and two stacks 30px apart said it twice. Channel menu groups by project (slugs repeat across projects); picking a channel from a group also implies its project.<br/>
+  <span class="pin">2</span><b>No search bar on Home</b> (round 3) — ⌘K in the frame top is the global search; the <b>Recent</b> heading carries a quiet search icon that opens the ⌘Y history overlay. The overlay stays the everything-lens with the product's one history-search field.<br/>
+  <span class="pin">3</span><b>Sections in priority order</b> — the greeting is two quiet lines (report sentence removed — the cards ARE the report); Needs you keeps its cards <i>and their buttons</i>; In flight keeps orbs and live verbs; Recent is the docs/35 session list, day-grouped, every row naming its room.<br/>
+  <span class="pin">4</span><b>No composer here</b> — the recommendation of this round: Home reads, New chat writes. If that feels wrong in the hand, the fallback is the docked composer exactly as today (open question ①).
+</div>
+
+<!-- ══════════════════ STOP 3 ══════════════════ -->
+<div class="stophd"><span class="stopno">Stop 3</span>New chat — the stage: same composer, center of the room, the project in the headline</div>
+<div class="stopp">
+  <span class="kbd">⌘N</span>, the nav pill, or a project head's ＋ all land here: an otherwise quiet sheet, the greeting in the display serif, and <b>the same composer card</b> — chint cap, chips, round send — not a rebuilt one (docs/33 §8: new features inherit the composer). The project name is the round's one <b>Instrument-Serif italic moment</b>, link-colored with a dotted underline: <b>click it</b> — the menu lists projects and ＋ New project, and picking retargets the room chip to that project's default room (the spine and tree follow, exactly like the old project pill this replaces — one control, promoted into the sentence). The #room chip still answers <i>where</i>; rex's cap still names the consequence. On send, the stage docks: the composer slides to the bottom edge as the thread mounts above it — one gesture, nothing blocking.
+</div>
+<div class="themes">
+  <div class="theme" data-theme="cream-oak" data-src="s3">
+    <h2>Cream Oak</h2>
+    <div class="shell" style="min-height:560px">
+      <div class="ftop">
+        <span class="ftfold"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="10" rx="2" stroke="currentColor" stroke-width="1.4"/><path d="M6 3v10" stroke="currentColor" stroke-width="1.4"/></svg></span>
+        <span class="ftwm">neuramesh</span>
+        <span class="ftcrumb">· new chat</span>
+        <span class="ftk"><svg width="12" height="12" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="4.5" stroke="currentColor" stroke-width="1.6"/><path d="M10.5 10.5L14 14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg> Search <kbd>⌘K</kbd></span>
+        <span class="utilclu">
+          <button class="utilico" title="Terminal"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 5l3.5 3L3 11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M8.5 11H13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
+          <button class="utilico" title="Mini browser"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5.6" stroke="currentColor" stroke-width="1.4"/><path d="M2.4 8h11.2M8 2.4c1.9 1.7 1.9 9.5 0 11.2M8 2.4c-1.9 1.7-1.9 9.5 0 11.2" stroke="currentColor" stroke-width="1.2"/></svg></button>
+          <button class="utilico" title="Console"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="10" rx="2" stroke="currentColor" stroke-width="1.4"/><path d="M4.5 6.5l2 1.7-2 1.7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <button class="utilico" title="Activity"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M1.5 8h3l1.6-3.6L9.4 12l1.6-4h3.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <span class="synced"><span class="dot"></span> Synced</span>
+        </span>
+      </div>
+      <div class="shellrow">
+      <div class="spine"><div class="spname">NEURAMESH</div><div class="spfoot"><span class="spav">G</span></div></div>
+      <div class="appnav" style="width:216px">
+        <div class="newrow">
+          <button class="newchat" style="box-shadow:var(--shadow-lift)"><span class="plus">＋</span> New chat <kbd>⌘N</kbd></button>
+          <button class="newcaret"><svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        </div>
+        <div class="navsec">Shortcuts</div>
+        <button class="navitem"><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M2.5 7.5L8 2.5l5.5 5v5.5a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1V7.5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg> Home <span class="badge attn">3</span></button>
+        <button class="navitem"><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><rect x="2" y="2.5" width="3.4" height="11" rx="1" stroke="currentColor" stroke-width="1.4"/><rect x="6.8" y="2.5" width="3.4" height="7" rx="1" stroke="currentColor" stroke-width="1.4"/><rect x="11.6" y="2.5" width="3.4" height="9" rx="1" stroke="currentColor" stroke-width="1.4"/></svg> Tasks <span class="badge">12</span></button>
+        <button class="navitem"><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="9" rx="1.5" stroke="currentColor" stroke-width="1.5"/><path d="M5 9.5l2.4-3 2 2.2L11 6.8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg> Whiteboards</button>
+        <button class="navitem"><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M12.5 6.5a4.8 4.8 0 1 0 .9 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M13.7 3.6v3h-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Automations</button>
+        <button class="navitem"><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M2 4.5A1.5 1.5 0 0 1 3.5 3h3l1.5 2h4.5A1.5 1.5 0 0 1 14 6.5v5A1.5 1.5 0 0 1 12.5 13h-9A1.5 1.5 0 0 1 2 11.5v-7z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg> Files</button>
+        <div class="navsec">Projects<span class="r"><button>＋</button></span></div>
+        <div class="proj"><div class="projhead on"><span class="chev"><svg width="11" height="11" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="plogo">N</span><span class="projname">neuramesh</span></div></div>
+        <div class="proj"><div class="projhead"><span class="chev c"><svg width="11" height="11" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="plogo">F</span><span class="projname">flowe-ai</span></div></div>
+        <div class="proj"><div class="projhead"><span class="chev c"><svg width="11" height="11" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="plogo">A</span><span class="projname">acme-yoga</span></div></div>
+      </div>
+      <div class="grip"><span class="gripbar"></span><span class="gripout">216px</span></div>
+      <div class="sheet stage">
+        <div class="stagecol">
+          <div class="stagehead">What would you like to work on in
+            <span class="popwrap projpick"><button class="projpickbtn" data-pop>neuramesh</button>
+              <div class="pop">
+                <button class="poprow on"><span class="plogo">N</span> neuramesh <span class="tick">✓</span></button>
+                <button class="poprow"><span class="plogo">F</span> flowe-ai</button>
+                <button class="poprow"><span class="plogo">A</span> acme-yoga</button>
+                <div class="popdiv"></div>
+                <button class="poprow newp">＋ New project</button>
+              </div>
+            </span>?</div>
+          <div class="composer">
+            <div class="chint"><span class="nyav">rx</span> rex triages this — chat stays chat; real work becomes a task on the board.</div>
+            <div class="ctext">Describe the work — or just ask. @ mention · / skill · ⏎ send</div>
+            <div class="crow">
+              <button class="cchip"><i>#</i> general <span class="chev"><svg width="10" height="10" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></button>
+              <button class="cchip"><span class="brainavs"><span>rx</span><span>mi</span><span>sg</span></span> <span class="chev"><svg width="10" height="10" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span></button>
+              <button class="cchip"><svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M13 7.5l-5 5a3.2 3.2 0 0 1-4.5-4.5l5.5-5.5a2.1 2.1 0 0 1 3 3L6.8 11a1 1 0 0 1-1.5-1.5L10 5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg></button>
+              <button class="send">↑</button>
+            </div>
+          </div>
+          <div class="sugg">
+            <button class="spill">Give me ideas</button>
+            <button class="spill">What moved while I was away?</button>
+            <button class="spill">Plan the next release</button>
+          </div>
+        </div>
+      </div>
+      </div>
+    </div>
+  </div>
+  <div class="theme" data-theme="dark" data-clone="s3"><h2>Graphite</h2></div>
+</div>
+<div class="legend">
+  <span class="pin">1</span><b>The headline carries the switcher</b> — the project pill leaves the chips row and becomes the italic serif name in the sentence (the docs/33 §5 "one word in a hero line" moment, finally earned). Dotted underline + pointer = the affordance; the menu is the same chpop the chips use.<br/>
+  <span class="pin">2</span><b>The composer is THE composer</b> — chint cap naming who answers, #room chip, brain pill, attach, round accent send. In graphite the send circle is light-on-dark because --accent is achromatic there — correct by token, no special-casing.<br/>
+  <span class="pin">3</span><b>Suggestion pills</b> — the ghost recipe; "Give me ideas" keeps its ghost-ask → dots → pills-rise sequence when generated live.<br/>
+  <span class="pin">4</span><b>Empty by design</b> — no report line, no queue echo here, nothing in the sheet's corners. The stage is a fresh page; the briefing lives one door up on Home, and the ambient chrome (⌘K · utilities · Synced) stays on the frame top where it belongs.
+</div>
+
+<!-- ══════════════════ STOP 4 ══════════════════ -->
+<div class="stophd"><span class="stopno">Stop 4</span>Anatomy &amp; motion — the spec the implementation is gated on</div>
+<div class="stopp">Numbers and rules, so the build round has no judgment calls left in it.</div>
+<div class="specgrid">
+  <div class="spec">
+    <h3>The nav grip</h3>
+    <ul>
+      <li><b>Hit area</b> 10px in the nav↔sheet gutter · visible affordance only on hover (3px × 64px pill, <span class="k">--border2</span>) — no resting hairline (trap 9b: the nav is naked on the frame; a standing rule would fence it).</li>
+      <li><b>Drag</b>: <span class="k">transition: none</span> (direct manipulation, tracks the pointer at 60fps) · readout bubble in <span class="k">--overlay</span> shows live px · pill takes <span class="k">--ring</span>.</li>
+      <li><b>Clamp 224–356px</b>, default 266. Double-click resets (this one animates, .22s <span class="k">--ease</span>).</li>
+      <li><b>Keyboard</b>: the grip is a focusable <span class="k">role="separator"</span>, ← → nudge ±12px — the split-stage contract.</li>
+      <li><b>Persistence</b>: <span class="k">localStorage nm:navw</span> — machine-local like the theme, the fold, the file pane. Never synced.</li>
+      <li><b>Fold interplay</b>: <span class="k">⌘\</span> unchanged — folds to 0 (spine remains), grip hides with the panel; unfold restores <span class="k">nm:navw</span>, not 266. Both faces of the column share the width by construction (same box).</li>
+    </ul>
+  </div>
+  <div class="spec">
+    <h3>The reveal (filter + project menus)</h3>
+    <ul>
+      <li>The chip-pop recipe: enter <span class="k">--dur-enter</span> (.22s) with a 6px rise; rows stagger 24ms apart, capped at 8; exit <span class="k">--dur-exit</span> (.13s). Non-blocking — the page stays interactive.</li>
+      <li>Scrim click and <span class="k">Esc</span> close; Esc unwinds exactly one layer.</li>
+      <li>Menus portal to <span class="k">&lt;body&gt;</span> — Home's column scrolls, and a scrolling container cannot host a dropdown (docs/33 §8, three-time offender).</li>
+      <li>Filter pill states: rest = ghost (border, muted) · open = <span class="k">--sel-bg</span> · applied = <span class="k">--accent-soft</span> wash + label swap (<b>#build · flowe-ai</b>) + ×. Warm-as-selection is the idiom; the pill never changes hue for anything else.</li>
+      <li>Set filters persist per machine (<span class="k">nm:homescope</span>) so Home reopens as you left it; the pills make the carried state visible, which is what makes persistence safe.</li>
+    </ul>
+  </div>
+  <div class="spec">
+    <h3>The frame top &amp; the retired dock (round 3)</h3>
+    <ul>
+      <li><b>The utilities live on the frame top</b>, right end, after the ⌘K search pill: terminal · browser · console · activity · the Synced pill — the bottom strip's cluster verbatim, one row that exists on every page. The dock's ⌘ tile <b>folds into the ⌘K pill</b>: one palette door, not two.</li>
+      <li><b>The bottom dock strip retires</b>: the frame's <span class="k">.shell</span> padding gives its 38px back to the sheet. The frame top's height is unchanged — its right end had the room.</li>
+      <li>Everything there is <span class="k">-webkit-app-region: no-drag</span> inside the drag bar, exactly as the ⌘K pill already is. Under ~880px the icon cluster folds into a ⋯ overflow — never a second row.</li>
+      <li>Synced keeps its pill anatomy (dot + word); the dot goes <span class="k">--warn</span>-toned while the upload queue holds writes, exactly as the dock's did.</li>
+      <li><b>The main section's right rail is ONE container</b> (the collision fix): crew clusters · views burger · split · file-pane toggle in one flex row, fixed order, uniform 30px targets, one positioning context — two absolutely-positioned groups sharing a corner is how the Files toggle ended up under the burger. Tooltips near the right edge mirror their offset (docs/33 §8) so a label can never cover a neighbour.</li>
+    </ul>
+  </div>
+  <div class="spec">
+    <h3>Home &amp; the stage</h3>
+    <ul>
+      <li>Home's column stays on <span class="k">--col</span> (860px); one scroller for the whole page; sections keep the serif <span class="k">.hsect</span> voice; day heads keep the mono voice. 60fps list: rings are conic-gradients, one row component.</li>
+      <li>The greeting is two lines — mono date eyebrow + the serif hello. The report sentence is deleted, not conditional: the queue cards below carry the same facts with their buttons on (round 2).</li>
+      <li><b>Home renders no search field</b> (round 3): ⌘K stays the global door; the <b>Recent</b> heading's icon (and <span class="k">⌘Y</span>, unchanged) opens the history overlay, which keeps the product's one history-search field — the docs/32 §12 ruling stands.</li>
+      <li><span class="k">⌘N</span> opens the stage. Boot lands on Home.</li>
+      <li>The stage centers on a 600px column, optically ~42% down the sheet; greeting 27px <span class="k">--fdisp</span>, the project name <span class="k">--fital</span> italic in <span class="k">--link</span> with a 45%-alpha dotted underline.</li>
+      <li>On send the composer docks bottom and the thread mounts above — one animated number (the column's top padding), .22s, non-blocking; reduced motion cuts straight to the docked layout.</li>
+      <li>Needs-you cards keep every button they have today — the queue's one-click contract (docs/32 §10) survives the move intact.</li>
+    </ul>
+  </div>
+</div>
+
+<table class="alts">
+  <tr><th>Decision</th><th class="pick">Chosen</th><th>Considered &amp; set aside</th></tr>
+  <tr><td><b>Nav sizing</b></td><td class="pick">Grip drag, free within 224–356, per machine</td><td class="no">Preset S/M/L in Appearance (a menu for a hand gesture) · icon-collapse at narrow widths (the fold already owns "minimal nav", and two collapse idioms at one edge is the rule docs/33 §2 exists to stop)</td></tr>
+  <tr><td><b>Home's filters</b></td><td class="pick">Header pills top-right, "Showing" voice, ScopePill mechanics</td><td class="no">The full ScopeBar row (right mechanics, wrong furniture — Home is a greeting page, not a table) · a funnel icon hiding the state (an invisible filter is the bug the ScopeBar ruling was written about)</td></tr>
+  <tr><td><b>Home vs New chat</b></td><td class="pick">Split: Home reads, the stage writes</td><td class="no">Keep them merged with the list below the composer (one surface doing two jobs is today's ⌘N confusion, restated) · New chat as a modal over Home (a composer in a veil is a launcher, and the launcher already exists for tasks)</td></tr>
+  <tr><td><b>Project in the stage</b></td><td class="pick">In the headline, italic serif, click to switch/create</td><td class="no">Keep the project chip in the chips row (two controls for one fact once the headline names it) · a full project dropdown header bar (chrome on a page whose point is quiet)</td></tr>
+  <tr><td><b>History's home</b></td><td class="pick">Recent section on Home (day-grouped session rows)</td><td class="no">A second scrollable list inside the nav itself (Google Chat literalism — but the nav already has the projects tree, and two scrollers in one 266px column fight for the same height; docs/35 §9③ anticipated Home absorbing this)</td></tr>
+  <tr><td><b>The utilities' home</b></td><td class="pick">The frame top bar's right end, beside ⌘K (round 3 — they show on almost every page, so they live in the chrome that does); bottom dock retires</td><td class="no">Inside the sheet's first line (the round-2 draft — rejected: app chrome inside a page component means every page re-hosts it) · keep the bottom strip (a 38px standing band whose only tenants were these six)</td></tr>
+  <tr><td><b>History search</b></td><td class="pick">No field on Home — ⌘K global; a search icon on the Recent heading opens the ⌘Y overlay (round 3)</td><td class="no">A 42px field on Home (the round-1/2 draft — rejected: two search boxes within 60px of ⌘K, and the overlay already owns history search) · retiring the overlay into Home (round 1's recommendation — reversed by George)</td></tr>
+</table>
+
+<div class="stophd" style="margin-top:44px">What this round writes into docs/33 — and what it doesn't touch</div>
+<div class="stopp">
+  <b>Amendments (land with the PR or the PR doesn't land):</b> ① New chat regains its lifted card — dated founder reversal of the v0.76 "a verb in a rail is a row" ruling, with the reasoning above. ② The nav gains a machine-local width + the grip idiom (the split-stage grip, extended to the nav edge). ③ Home becomes a Shortcuts destination; the Home badge is the one notification-treated nav count. ④ Home narrows on visible header pills — supersedes the "In flight follows the active project" exception (the .hscope tok retires with it). ⑤ The session list lands on Home as Recent — supersedes the 2026-07-29 §9a "Home keeps its face" ruling. ⑥ The stage idiom: centered composer + serif greeting whose project name is the switcher. ⑦ <b>The dock strip retires</b> (round 3) — §2's frame model loses its bottom band; the utility cluster + Synced join the frame top's right end beside ⌘K, and the dock's ⌘ tile folds into the ⌘K pill. ⑧ Home's greeting drops the report sentence — the queue cards are the report (round 2). ⑨ <b>The main section's right rail is one container</b> — crew clusters, views burger, split and the file-pane toggle share one flex row with a fixed order; a second absolutely-positioned group in that corner is the defect class the Files-toggle collision came from (round 3).<br/><br/>
+  <b>Untouched:</b> the spine and its workspace menu · the projects tree, channel chips and session rows · every room surface, the board, destinations and their ScopeBars · the launcher (New task · New routine) · needs-you derivation and card actions · ⌘K · mobile (mirrors later).
+</div>
+
+<div class="stophd">Open questions for George</div>
+<div class="stopp">
+  <b>Settled by rounds 2–3:</b> the utilities live on the frame top beside ⌘K (bottom dock retires) · Home has no search bar and the ⌘Y overlay <b>stays</b>, opened from Recent's icon · the greeting's report sentence is gone.<br/><br/>
+  <b>① Home's composer.</b> Shown removed — Home reads, the stage writes, ⌘N is one key. If losing "type right where the briefing is" feels wrong in the hand, it docks back exactly as today with everything else in this round unchanged. <span class="warn">Recommend: remove, and let the week of use decide.</span><br/>
+  <b>② Boot surface.</b> Shown: boot lands on Home (the queue is the job; Claude/t3 boot to a composer, but their home has no queue). Alternative: boot to the stage when the queue is empty. <span class="warn">Recommend: always Home — one predictable landing.</span><br/>
+  <b>③ Skills · Memory · Activity.</b> Left behind the views burger. If Shortcuts should hold them all, the band scrolls fine — but five doors is the Google-Chat calm this round is copying. <span class="warn">Recommend: five.</span>
+</div>
+
+</div>
+<script>
+/* clone each cream shell into its graphite twin — parity by construction */
+document.querySelectorAll('[data-clone]').forEach((t) => {
+  const src = document.querySelector(`[data-src="${t.dataset.clone}"]`);
+  if (src) { const inner = src.cloneNode(true); inner.querySelectorAll('h2').forEach(h=>h.remove()); t.append(...inner.children); }
+});
+/* delegated popovers — one handler serves originals and clones */
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-pop]');
+  const wrap = e.target.closest('.popwrap');
+  document.querySelectorAll('.popwrap.open').forEach((w) => { if (!btn || w !== btn.parentElement) w.classList.remove('open'); });
+  if (btn) btn.parentElement.classList.toggle('open');
+  else if (!wrap) return;
+});
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') document.querySelectorAll('.popwrap.open').forEach((w) => w.classList.remove('open')); });
+/* the live grip — pointer-captured drag, clamped, dblclick reset */
+document.addEventListener('pointerdown', (e) => {
+  const grip = e.target.closest('.grip'); if (!grip) return;
+  const shell = grip.closest('.shell'); const nav = shell.querySelector('.appnav'); const out = grip.querySelector('.gripout');
+  const startX = e.clientX, startW = nav.getBoundingClientRect().width;
+  shell.classList.add('dragging'); grip.setPointerCapture(e.pointerId);
+  const move = (ev) => { const w = Math.max(224, Math.min(356, startW + (ev.clientX - startX))); nav.style.width = w + 'px'; out.textContent = Math.round(w) + 'px'; };
+  const up = () => { shell.classList.remove('dragging'); grip.removeEventListener('pointermove', move); grip.removeEventListener('pointerup', up); };
+  grip.addEventListener('pointermove', move); grip.addEventListener('pointerup', up);
+});
+document.addEventListener('dblclick', (e) => {
+  const grip = e.target.closest('.grip'); if (!grip) return;
+  const nav = grip.closest('.shell').querySelector('.appnav');
+  nav.style.transition = 'width .22s cubic-bezier(.22,1,.36,1)'; nav.style.width = '266px';
+  const out = grip.querySelector('.gripout'); out.textContent = '266px';
+  setTimeout(() => { nav.style.transition = ''; }, 260);
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,32 @@
+[
+  {
+    "name": "hf9-today-reply",
+    "settle": 700,
+    "js": "(async () => { const w=(ms)=>new Promise(r=>setTimeout(r,ms)); document.querySelector('#mode button[data-mode=\"today\"]').click(); await w(150); document.querySelector('.step[data-step=\"reply\"]').click(); await w(350); })()"
+  },
+  {
+    "name": "hf10-prop-reply",
+    "settle": 700,
+    "js": "(async () => { const w=(ms)=>new Promise(r=>setTimeout(r,ms)); document.querySelector('#mode button[data-mode=\"prop\"]').click(); await w(150); document.querySelector('.step[data-step=\"reply\"]').click(); await w(350); })()"
+  },
+  {
+    "name": "hf11-today-marketing",
+    "settle": 700,
+    "js": "(async () => { const w=(ms)=>new Promise(r=>setTimeout(r,ms)); document.querySelector('#mode button[data-mode=\"today\"]').click(); await w(150); document.querySelector('.step[data-step=\"marketing\"]').click(); await w(350); })()"
+  },
+  {
+    "name": "hf12-prop-marketing",
+    "settle": 700,
+    "js": "(async () => { const w=(ms)=>new Promise(r=>setTimeout(r,ms)); document.querySelector('#mode button[data-mode=\"prop\"]').click(); await w(150); document.querySelector('.step[data-step=\"marketing\"]').click(); await w(350); })()"
+  },
+  {
+    "name": "hf13-prop-threadsoff",
+    "settle": 700,
+    "js": "(async () => { const w=(ms)=>new Promise(r=>setTimeout(r,ms)); document.querySelector('#mode button[data-mode=\"prop\"]').click(); await w(150); document.querySelector('.step[data-step=\"threadsoff\"]').click(); await w(350); })()"
+  },
+  {
+    "name": "hf14-prop-reply-cream",
+    "settle": 700,
+    "js": "(async () => { const w=(ms)=>new Promise(r=>setTimeout(r,ms)); document.querySelector('#mode button[data-mode=\"prop\"]').click(); await w(150); document.querySelector('.step[data-step=\"reply\"]').click(); await w(350);  document.querySelector('#theme button[data-theme-set=\"cream-oak\"]').click(); await w(250); })()"
+  }
+]

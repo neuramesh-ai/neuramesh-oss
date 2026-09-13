@@ -1,0 +1,678 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>The channel stops being a place you go — nav · scope knob · auto-filing</title>
+<style>
+[data-theme] { --font:'Geist Variable',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; --fmono:'Geist Mono Variable',ui-monospace,'SF Mono',Menlo,monospace; --fdisp:'Source Serif 4','Iowan Old Style',Georgia,serif; --ease:cubic-bezier(.2,.8,.2,1); }
+/* verbatim from apps/desktop/src/renderer/src/tokens.css (Graphite / Cream Oak v2) */
+[data-theme='dark'] {
+  --win:#0d0d0d; --bg:#141414; --panel:#191919; --panel2:#212121; --panel3:#2b2b2b;
+  --border:#272727; --border2:#383838; --card:#1e1e1e; --card-border:#2c2c2c; --overlay:#222222;
+  --text:#eaeaea; --body:#b6b6b6; --muted:#898989; --dim:#676767; --ring:#525252;
+  --accent:#eaeaea; --link:#d19a72; --orch:#9793d2; --hover-bg:rgba(234,234,234,.07);
+  --prog:#8ba0c0; --review:#a89ccf; --done:#77ac8d; --acc:#6fb0ab; --ship:#7cb0bd; --design:#cc8fb9;
+  --blocked:#9ca0a8; --closed:#727272; --warn:#c9a15e; --todo:#949494; --shadow:rgba(0,0,0,.62);
+  --role-orch:#9793d2; --role-dev:#77ac8d; --role-design:#cc8fb9; --role-mkt:#c98f8f;
+}
+[data-theme='cream-oak'] {
+  --win:#f0e5d3; --bg:#fbf8f4; --panel:#fbf8f4; --panel2:#f6eee1; --panel3:#efe1cd;
+  --border:#e6dbca; --border2:#d3c2a8; --card:#ffffff; --card-border:#eadfce; --overlay:#ffffff;
+  --text:#2a1c13; --body:#574838; --muted:#97846c; --dim:#b5a289; --ring:#b08a5e;
+  --accent:#834a2b; --link:#9c5730; --orch:#6a63bc; --hover-bg:rgba(42,28,19,.05);
+  --prog:#4f80c4; --review:#6d5ce0; --done:#0f9d63; --acc:#2f8f8a; --ship:#1f7f96; --design:#b0498f;
+  --blocked:#7d7f86; --closed:#897a60; --warn:#a06a1f; --todo:#7d8590; --shadow:rgba(70,42,18,.16);
+  --role-orch:#6a63bc; --role-dev:#3f9268; --role-design:#b0498f; --role-mkt:#b04f55;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#131210; font-family:'Geist Variable',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; }
+.page { max-width:1680px; margin:0 auto; padding:32px 24px 80px; }
+.pagehead { color:#eaeaea; margin-bottom:6px; }
+.pagehead h1 { font-family:'Source Serif 4',Georgia,serif; font-size:24px; font-weight:640; letter-spacing:-.012em; }
+.pagehead p { color:#898989; font-size:13px; line-height:1.65; margin-top:9px; max-width:100ch; }
+.pagehead b { color:#b6b6b6; font-weight:600; }
+.warn { color:#c8a06a; font-weight:600; } .ok { color:#8fbf9f; font-weight:600; } .no { color:#c8846a; font-weight:600; }
+.stophd { color:#eaeaea; font-size:15.5px; font-weight:660; margin:48px 0 4px; font-family:'Source Serif 4',Georgia,serif; }
+.stopno { font:700 10px 'Geist Mono Variable',ui-monospace,monospace; letter-spacing:.12em; color:#6f6f6f; text-transform:uppercase; margin-right:8px; }
+.stopp { color:#898989; font-size:12.5px; line-height:1.64; max-width:104ch; margin-bottom:16px; }
+.stopp b { color:#b6b6b6; } .stopp code { font:600 11.5px 'Geist Mono Variable',ui-monospace,monospace; color:#c8a06a; }
+.themes { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+@media (max-width:1340px){ .themes { grid-template-columns:1fr; } }
+.theme { background:var(--win); border:1px solid var(--border2); border-radius:16px; padding:16px; color:var(--text); }
+.theme > h2 { font-size:10.5px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--dim); margin:0 2px 12px; }
+
+/* ── map diagram ─────────────────────────────────────────── */
+.map { display:grid; grid-template-columns:1fr 40px 1fr; gap:12px; align-items:start; }
+.mapcol { background:var(--panel); border:1px solid var(--border); border-radius:13px; padding:13px; }
+.mapcol h3 { font-size:10.5px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); margin-bottom:9px; }
+.mapbox { border:1px solid var(--card-border); background:var(--card); border-radius:10px; padding:9px 11px; margin-bottom:7px; }
+.mapbox b { font-size:12.5px; display:block; }
+.mapbox span { font-size:11px; color:var(--muted); line-height:1.5; display:block; margin-top:2px; }
+.mapbox.dead { opacity:.5; border-style:dashed; } .mapbox.dead b { text-decoration:line-through; text-decoration-thickness:1px; }
+.mapbox.new { border-color:color-mix(in srgb, var(--done) 42%, transparent); }
+.maparrow { display:grid; place-items:center; color:var(--dim); font-size:20px; padding-top:40px; }
+.maplane { border-left:3px solid var(--border2); padding-left:10px; margin:10px 0 2px; font-size:11px; color:var(--dim); font-style:italic; line-height:1.55; }
+
+/* ── shell ───────────────────────────────────────────────── */
+.shell { display:flex; background:var(--win); border-radius:14px; overflow:hidden; border:1px solid var(--border); min-height:600px; position:relative; }
+.spine { width:34px; min-width:34px; background:var(--win); border-right:1px solid var(--border); display:flex; flex-direction:column; align-items:center; padding:10px 0; gap:9px; }
+.spdot { width:22px; height:22px; border-radius:7px; background:var(--panel3); display:grid; place-items:center; font:700 10px var(--fmono); color:var(--muted); }
+.spdot.on { background:var(--card); border:1px solid var(--card-border); color:var(--text); }
+.spgrow { margin-top:auto; }
+.nav { width:238px; min-width:238px; background:var(--bg); border-right:1px solid var(--border); display:flex; flex-direction:column; padding-bottom:10px; }
+/* THE KNOB — the head of the nav column. A name at the top of a column promises the column,
+   and now it keeps the promise: everything under it is scoped to this. */
+.navhd { display:flex; align-items:center; gap:7px; margin:10px 9px 3px; padding:8px 9px; border-radius:9px; font-size:13.5px; font-weight:640; color:var(--text); }
+.navhd.hot { background:var(--hover-bg); }
+.navhd .nhh { color:var(--dim); font-weight:520; font-size:13px; line-height:1.15; width:15px; text-align:center; flex:none; }
+.navhd .nhn { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.navhd .nhcar { margin-left:auto; color:var(--dim); font-size:11px; }
+.navhd .nhdot { width:6px; height:6px; border-radius:50%; background:var(--prog); flex:none; }
+.navhdsub { margin:0 18px 8px; font-size:10.5px; color:var(--dim); }
+.newchat { margin:4px 10px 9px; padding:9px 12px; border:1px solid var(--card-border); background:var(--card); border-radius:10px; font-size:12.5px; font-weight:640; display:flex; align-items:center; gap:8px; box-shadow:0 1px 2px var(--shadow); }
+.newchat .plus { font-size:14px; color:var(--muted); } .newchat .k { margin-left:auto; font:600 9.5px var(--fmono); color:var(--dim); }
+.newchat .car { margin-left:auto; color:var(--dim); font-size:10px; }
+.navitem { display:flex; align-items:center; gap:10px; margin:1px 8px; padding:7px 10px; border-radius:8px; font-size:12.5px; color:var(--body); }
+.navitem.on { background:var(--panel3); color:var(--text); font-weight:620; }
+.navitem .gl { width:15px; text-align:center; color:var(--dim); font-size:12px; }
+.navitem.on .gl { color:var(--text); }
+.navitem .badge { margin-left:auto; font:640 10px var(--fmono); background:var(--panel3); border-radius:9px; padding:2px 7px; color:var(--muted); }
+.navitem .badge.attn { background:color-mix(in srgb, var(--prog) 20%, transparent); color:var(--prog); }
+.navitem.ghost { opacity:.42; border:1px dashed var(--border2); background:transparent; }
+.navsec { display:flex; align-items:center; gap:7px; padding:14px 14px 5px; font:700 9.5px var(--fmono); letter-spacing:.1em; text-transform:uppercase; color:var(--dim); }
+.navsec .n { color:var(--muted); font-weight:600; } .navsec .r { margin-left:auto; font-size:11px; }
+.navrule { height:1px; background:var(--border); margin:9px 12px 2px; }
+.sess { display:flex; align-items:center; gap:8px; margin:1px 8px; padding:6px 10px; border-radius:8px; font-size:12px; color:var(--body); min-width:0; }
+.sess.on { background:var(--panel3); color:var(--text); }
+.sess .t { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.sess .rm { flex:none; font:600 9.5px var(--fmono); color:var(--dim); }
+.sess .when { margin-left:auto; font:500 10px var(--fmono); color:var(--dim); flex:none; }
+.sdot { width:7px; height:7px; border-radius:50%; border:1.5px solid var(--dim); flex:none; }
+.sdot.live { background:var(--prog); border-color:var(--prog); box-shadow:0 0 0 3px color-mix(in srgb, var(--prog) 22%, transparent); }
+.sdot.review { background:var(--review); border-color:var(--review); }
+.sdot.done { background:var(--done); border-color:var(--done); }
+
+/* ── main ────────────────────────────────────────────────── */
+.main { flex:1; min-width:0; display:flex; flex-direction:column; background:var(--panel); }
+.mainhead { padding:14px 20px 0; }
+.crumb { font-size:11px; color:var(--dim); margin-bottom:5px; }
+.scoperow { display:flex; align-items:center; gap:10px; }
+.scope, .mtitle { display:inline-flex; align-items:baseline; gap:7px; font-family:var(--fdisp); font-size:20px; font-weight:640; letter-spacing:-.012em; color:var(--text); }
+.scope .car { font-family:var(--font); font-size:12px; color:var(--dim); font-weight:500; }
+.scope .h, .mtitle .h { color:var(--dim); font-weight:520; }
+.scopesub { font-size:11.5px; color:var(--muted); margin-top:3px; }
+.crew { margin-left:auto; display:flex; align-items:center; }
+.crew .av { width:24px; height:24px; border-radius:8px; background:var(--panel3); border:2px solid var(--panel); margin-left:-7px; display:grid; place-items:center; font-size:11px; }
+.crew .n { margin-left:7px; font:600 10.5px var(--fmono); color:var(--dim); }
+.tabbar { display:flex; gap:3px; margin-top:13px; border-bottom:1px solid var(--border); }
+.tab { padding:7px 12px; font-size:12px; font-weight:620; color:var(--muted); border-bottom:2px solid transparent; margin-bottom:-1px; }
+.tab.on { color:var(--text); border-color:var(--accent); }
+.tab .n { font:600 9.5px var(--fmono); color:var(--dim); margin-left:5px; }
+
+/* ── the dropdown ────────────────────────────────────────── */
+/* anchored under the nav head — spine (34) + the head's own 9px margin */
+.dd { position:absolute; top:54px; left:43px; width:286px; background:var(--overlay); border:1px solid var(--border2); border-radius:13px; box-shadow:0 20px 55px -14px var(--shadow); padding:7px; z-index:5; }
+.ddsearch { display:flex; align-items:center; gap:8px; padding:8px 10px; margin-bottom:4px; border-radius:9px; background:var(--panel2); font-size:12.5px; color:var(--dim); }
+.ddsearch .cur { width:1px; height:13px; background:var(--text); display:inline-block; }
+.ddgrp { font:700 9.5px var(--fmono); letter-spacing:.1em; text-transform:uppercase; color:var(--dim); padding:9px 10px 4px; }
+.ddrow { display:flex; align-items:center; gap:9px; padding:7px 10px; border-radius:9px; font-size:12.5px; color:var(--body); }
+.ddrow .h { color:var(--dim); width:13px; text-align:center; font-size:12px; }
+.ddrow .n { margin-left:auto; font:600 10px var(--fmono); color:var(--dim); }
+.ddrow .gear { color:var(--dim); font-size:11px; }
+.ddrow.on { background:var(--panel3); color:var(--text); font-weight:620; }
+.ddrow.hov { background:var(--hover-bg); }
+.ddrow .tick { color:var(--accent); font-size:11px; }
+.unread { width:6px; height:6px; border-radius:50%; background:var(--prog); flex:none; }
+.ddfoot { border-top:1px solid var(--border); margin-top:6px; padding:8px 10px 4px; font-size:12px; color:var(--muted); display:flex; align-items:center; gap:8px; }
+.ddhint { padding:2px 10px 4px; font-size:10.5px; color:var(--dim); line-height:1.5; }
+
+/* ── surface content ─────────────────────────────────────── */
+.body { flex:1; padding:12px 14px 0; overflow:hidden; }
+.queue { margin:0 6px 6px; border:1px solid var(--card-border); background:var(--card); border-radius:12px; padding:10px 13px; display:flex; align-items:center; gap:11px; box-shadow:0 1px 2px var(--shadow); }
+.queue .qk { font:700 9.5px var(--fmono); letter-spacing:.09em; text-transform:uppercase; color:var(--dim); }
+.queue .qt { font-size:12.5px; color:var(--body); } .queue .qt b { color:var(--text); font-weight:640; }
+.queue .qbtn { margin-left:auto; font-size:11.5px; font-weight:620; color:var(--text); border:1px solid var(--card-border); border-radius:8px; padding:4px 10px; background:var(--panel2); }
+.brief { margin:0 6px 8px; border:1px solid var(--card-border); background:var(--card); border-radius:11px; padding:9px 13px; display:flex; gap:10px; align-items:baseline; font-size:12px; color:var(--body); }
+.brief .k { font:700 9.5px var(--fmono); letter-spacing:.09em; color:var(--dim); text-transform:uppercase; flex:none; }
+.brief .exp { margin-left:auto; color:var(--dim); font-size:11px; flex:none; }
+.sgroup { font:700 9.5px var(--fmono); letter-spacing:.1em; text-transform:uppercase; color:var(--dim); padding:11px 8px 5px; }
+.srow { display:flex; align-items:center; gap:11px; padding:9px 12px; border-radius:11px; border:1px solid transparent; min-width:0; }
+.srow.on { background:var(--card); border-color:var(--card-border); }
+.srow .bd { min-width:0; flex:1; }
+.srow .t { font-size:13px; font-weight:620; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.srow .snip { font-size:11.5px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:1.5px; }
+.srow .meta { flex:none; text-align:right; display:flex; flex-direction:column; align-items:flex-end; gap:3px; }
+.srow .when { font:500 10.5px var(--fmono); color:var(--dim); }
+.roomtag { font:600 10px var(--fmono); color:var(--muted); background:var(--panel2); border-radius:7px; padding:2px 7px; display:inline-flex; align-items:center; gap:4px; }
+.roomtag.filing { color:var(--link); border:1px dashed color-mix(in srgb, var(--link) 45%, transparent); background:transparent; }
+.roomtag.fresh { color:var(--done); background:color-mix(in srgb, var(--done) 13%, transparent); }
+.tring { width:18px; height:18px; border-radius:50%; flex:none; background:conic-gradient(var(--prog) var(--frac,40%), color-mix(in srgb, var(--dim) 30%, transparent) 0); position:relative; }
+.tring::after { content:''; position:absolute; inset:3px; border-radius:50%; background:var(--panel); }
+.srow.on .tring::after { background:var(--card); }
+.tring.r { background:conic-gradient(var(--review) var(--frac,80%), color-mix(in srgb, var(--dim) 30%, transparent) 0); }
+.chatglyph { width:18px; height:18px; flex:none; border-radius:6px; border:1.5px solid var(--dim); display:grid; place-items:center; font-size:9px; color:var(--dim); }
+
+/* composer */
+.compose { margin:8px 14px 14px; border:1px solid var(--card-border); background:var(--card); border-radius:13px; box-shadow:0 1px 3px var(--shadow); }
+.chips { display:flex; align-items:center; gap:7px; padding:9px 12px 0; }
+.chip { display:inline-flex; align-items:center; gap:6px; font:620 11px var(--fmono); color:var(--body); border:1px solid var(--card-border); border-radius:99px; padding:4px 10px; background:var(--panel); }
+.chip .h { color:var(--dim); } .chip .car { color:var(--dim); font-size:9px; }
+.chip.auto { color:var(--link); border-style:dashed; border-color:color-mix(in srgb, var(--link) 45%, transparent); }
+.cinput { padding:11px 14px 12px; font-size:13.5px; color:var(--dim); }
+.cfoot { display:flex; align-items:center; gap:10px; padding:0 12px 11px; color:var(--dim); font-size:11.5px; }
+.csend { margin-left:auto; width:30px; height:30px; border-radius:50%; background:var(--panel3); display:grid; place-items:center; font-size:13px; color:var(--muted); }
+
+/* conversation bits */
+.msgs { padding:14px 20px 4px; display:flex; flex-direction:column; gap:13px; }
+.msg { display:flex; gap:11px; }
+.mav { width:28px; height:28px; border-radius:9px; background:var(--panel3); flex:none; display:grid; place-items:center; font-size:12px; }
+.mav.orch { background:color-mix(in srgb, var(--role-orch) 20%, transparent); color:var(--role-orch); }
+.mbody { min-width:0; flex:1; }
+.mhead { display:flex; align-items:baseline; gap:8px; font-size:12.5px; }
+.mhead b { font-weight:660; } .mhead .role { font:640 8.5px var(--fmono); letter-spacing:.07em; text-transform:uppercase; color:var(--muted); background:var(--panel2); padding:2px 6px; border-radius:6px; }
+.mhead .tm { color:var(--dim); font-size:10.5px; }
+.mtext { font-size:13px; line-height:1.62; color:var(--body); margin-top:3px; max-width:76ch; }
+.mtext b { color:var(--text); font-weight:620; }
+.me { background:var(--panel2); border-radius:13px; padding:10px 14px; margin-left:auto; max-width:72%; font-size:13px; line-height:1.6; color:var(--body); }
+.sysline { display:flex; align-items:center; gap:9px; margin:2px 0 0 39px; font-size:11.5px; color:var(--muted); }
+.sysline .fl { font:600 10px var(--fmono); color:var(--done); background:color-mix(in srgb, var(--done) 13%, transparent); border-radius:7px; padding:2px 8px; }
+.sysline .undo { color:var(--link); font-weight:620; }
+.taskpill { display:inline-flex; align-items:center; gap:8px; border:1px solid var(--card-border); background:var(--card); border-radius:10px; padding:7px 11px; font-size:12px; font-weight:620; box-shadow:0 1px 2px var(--shadow); margin-top:9px; }
+.taskpill .num { font:640 10.5px var(--fmono); color:var(--muted); }
+
+/* automations */
+.autorow { display:flex; align-items:center; gap:12px; padding:11px 13px; margin:0 6px 7px; border:1px solid var(--card-border); background:var(--card); border-radius:12px; }
+.autorow .ico { width:26px; height:26px; border-radius:8px; background:var(--panel2); display:grid; place-items:center; font-size:12px; color:var(--muted); flex:none; }
+.autorow .bd { min-width:0; flex:1; }
+.autorow .t { font-size:12.5px; font-weight:640; }
+.autorow .p { font-size:11.5px; color:var(--muted); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.autorow .cad { font:600 10.5px var(--fmono); color:var(--body); flex:none; }
+.autorow .nxt { font:500 10px var(--fmono); color:var(--dim); flex:none; }
+.autorow.paused { opacity:.6; } .autorow.paused .cad { color:var(--dim); }
+
+/* decision panels */
+.panels { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
+@media (max-width:1100px){ .panels { grid-template-columns:1fr; } }
+.pnl { background:#171717; border:1px solid #2a2a2a; border-radius:13px; padding:14px 15px; }
+.pnl h4 { font-size:12px; font-weight:700; color:#eaeaea; margin-bottom:8px; letter-spacing:-.005em; }
+.pnl p { font-size:12px; line-height:1.6; color:#909090; }
+.pnl p + p { margin-top:8px; } .pnl b { color:#c4c4c4; }
+.pnl.no { border-color:#4a2f26; } .pnl.yes { border-color:#2c4436; }
+.tag { display:inline-block; font:700 9px 'Geist Mono Variable',monospace; letter-spacing:.1em; text-transform:uppercase; padding:3px 8px; border-radius:7px; margin-bottom:9px; }
+.tag.no { background:#3a231c; color:#d99a7c; } .tag.yes { background:#20362a; color:#8fbf9f; } .tag.ask { background:#3a3320; color:#d0b06a; }
+
+/* tables */
+.alts { width:100%; border-collapse:collapse; font-size:12.5px; color:#b6b6b6; }
+.alts th { text-align:left; font:700 10px 'Geist Mono Variable',monospace; letter-spacing:.09em; text-transform:uppercase; color:#6f6f6f; padding:8px 12px; border-bottom:1px solid #2c2c2c; }
+.alts td { padding:10px 12px; border-bottom:1px solid #222; vertical-align:top; line-height:1.55; }
+.alts td:first-child { white-space:nowrap; font-weight:640; color:#eaeaea; }
+.alts .pick { color:#8fbf9f; font-weight:700; }
+.callouts { display:flex; flex-wrap:wrap; gap:8px 20px; margin-top:13px; }
+.co { font-size:11.5px; color:#898989; line-height:1.55; max-width:46ch; }
+.co b { color:#b6b6b6; }
+.co .n { display:inline-grid; place-items:center; width:16px; height:16px; border-radius:50%; background:#2b2b2b; color:#c8a06a; font:700 10px monospace; margin-right:6px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<div class="pagehead">
+  <h1>The channel stops being a place you go</h1>
+  <p><b>The ask (George, 2026-08-03):</b> left nav shows Automations · New chat · Whiteboard. Channels become a searchable text-style dropdown <i>filter</i> at the top, defaulting to <b>All</b>, which scopes Recents, Home and Automations. Rex triages the first prompt and files it into a channel automatically — <code>#general</code> when it genuinely can't decide. Routines leave the individual channel homes.</p>
+  <p><b>Verdict: three of four are right, and one of them is the best idea in the set.</b> Auto-filing removes the single decision a human should never have had to make, and it closes a defect this repo has already written down — <i>docs/35 §1: "a send that lands in <code>#general</code> looks exactly like a send that lands in <code>#dev</code>."</i> Today you must guess the room correctly <b>and</b> you can't see the consequence. Both halves die here.</p>
+  <p><b>Where it lives (round 2, George):</b> the selector stays in the <b>left nav</b> — its head row, caret on the right — not in the main surface. That is the stronger placement, and there's an argument on the record for it: <i>App.tsx:16720</i> retired the old nav head with <i>"a name at the top of a column promises the column."</i> A <b>channel</b> name at the top of that column <b>keeps</b> the promise — Recents, the destinations and the surface under it are all scoped to exactly that. And the hierarchy reads down the left edge in one line: <b>spine = project · nav head = channel · rail = sessions</b>.</p>
+  <p><b>The one correction.</b> <i>docs/35 §8</i> already considered and <span class="no">rejected</span> "channels become pure labels/filters" — <i>"the crew, board, brief and ACL need a face. A label cannot hold a kanban or a roster."</i> That objection still stands, and the fix is one line: the dropdown is not a filter over chat rows, it is the <b>scope knob for everything below and beside it</b>. <b>All</b> = the workspace lens. <b>#dev</b> = #dev's home — brief, crew, board, settings — rendered in the main surface exactly as it is today. Rooms keep their face; they stop being a <i>list</i> you scroll past to reach anything else.</p>
+  <p><b>Whiteboard is the one I'd hold.</b> <span class="warn">It has no job yet</span> — see Stop 6. Everything else here is buildable in three slices with no schema change.</p>
+</div>
+
+<!-- ══════════ STOP 1 ══════════ -->
+<div class="stophd"><span class="stopno">Stop 1</span>Three decisions before you can type → one</div>
+<div class="stopp">Trace one request — <i>"the sync watch drops replies when the room switches"</i> — from intent to filed work. Today the human makes three filing decisions in a row, and gets no feedback on any of them. Proposed: they type; the filing is <b>done for them, visibly, and undoably</b>.</div>
+<div class="themes">
+  <div class="theme" data-theme="cream-oak">
+    <h2>Today — the human files, blind</h2>
+    <div class="map">
+      <div class="mapcol">
+        <h3>You decide</h3>
+        <div class="mapbox"><b>① Which room?</b><span>the composer's chip. Wrong guess = wrong roster, wrong board, wrong project.</span></div>
+        <div class="mapbox"><b>② Go there first?</b><span>clicking a channel in the rail also NAVIGATES — scoping and travelling are the same gesture.</span></div>
+        <div class="mapbox"><b>③ Where do routines live?</b><span>a room tab that only exists when routineCount &gt; 0. Invisible until it isn't.</span></div>
+        <div class="maplane">the rail spends ~200px listing rooms you rarely open —</div>
+      </div>
+      <div class="maparrow">→</div>
+      <div class="mapcol">
+        <h3>What you get</h3>
+        <div class="mapbox"><b>A send with no receipt</b><span>#general and #dev look identical at the moment of sending (docs/35 §1).</span></div>
+        <div class="mapbox"><b>Two homes</b><span>Home = queue + in-flight. Room home = briefs + sessions. Same nouns, two faces.</span></div>
+        <div class="mapbox"><b>Hidden standing behavior</b><span>a routine armed in #build is unfindable from anywhere else.</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="theme" data-theme="dark">
+    <h2>Proposed — rex files, you can see it and undo it</h2>
+    <div class="map">
+      <div class="mapcol">
+        <h3>You do</h3>
+        <div class="mapbox new"><b>Type.</b><span>New chat · ⌘N. The room chip reads <i>auto</i>. That's the whole interaction.</span></div>
+        <div class="maplane">the rail's 200px goes to Recents — the list you actually click —</div>
+        <div class="mapbox dead"><b>Channel list in the rail</b><span>collapses into ONE row at the head of the same column</span></div>
+        <div class="mapbox dead"><b>Routines room tab</b><span>promoted to a workspace destination</span></div>
+      </div>
+      <div class="maparrow">→</div>
+      <div class="mapcol">
+        <h3>What happens</h3>
+        <div class="mapbox new"><b>rex files it in the turn it already runs</b><span>it wakes on every human message anyway — filing rides that turn, so overhead stays inside the &lt;10% budget.</span></div>
+        <div class="mapbox new"><b>The row announces it</b><span>"filing…" → <i>#dev</i> · <i>Change</i>. A receipt, not a silent move.</span></div>
+        <div class="mapbox new"><b>One knob, at the head of the column</b><span>spine = project · head = channel · rail = sessions. All = workspace; #dev = #dev's home, brief · crew · board and all.</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ STOP 2 ══════════ -->
+<div class="stophd"><span class="stopno">Stop 2</span>The scope knob — the head of the nav column</div>
+<div class="stopp">The trigger sits where the channel list used to start: <b>the top row of the left nav</b>, text-style, caret at the right. Closed it reads as a label for the column; open it drops a searchable menu carrying everything the rail list carried and could not fit — unread dots, the marketing megaphone, session counts, the gear, <code>+ New channel</code> — plus type-ahead, which a 12-room list never had. <b>⌘⇧K</b> opens it from anywhere; ⌘K still spans the workspace. The main surface is <b>untouched</b>: Home is still Home, a room is still that room's home.</div>
+<div class="themes">
+  <div class="theme" data-theme="dark">
+    <h2>Graphite · closed — the knob reads as a title</h2>
+    <div class="shell">
+      <div class="spine"><div class="spdot on">N</div><div class="spdot">f</div><div class="spdot">a</div><div class="spdot spgrow">G</div></div>
+      <div class="nav">
+        <div class="navhd hot"><span class="nhh">◇</span><span class="nhn">All channels</span><span class="nhdot"></span><span class="nhcar">⌄</span></div>
+        <div class="navhdsub">5 rooms · flowe-ai</div>
+        <div class="newchat"><span class="plus">＋</span> New chat <span class="k">⌘N</span></div>
+        <div class="navitem on"><span class="gl">⌂</span> Home <span class="badge attn">3</span></div>
+        <div class="navitem"><span class="gl">▤</span> Board <span class="badge">7</span></div>
+        <div class="navitem"><span class="gl">↻</span> Automations <span class="badge">4</span></div>
+        <div class="navitem"><span class="gl">◫</span> Library</div>
+        <div class="navrule"></div>
+        <div class="navsec">Recents <span class="n">24</span><span class="r">⌄</span></div>
+        <div class="sess on"><span class="sdot live"></span><span class="t">Sync watch drops replies</span><span class="rm">#dev</span><span class="when">2m</span></div>
+        <div class="sess"><span class="sdot review"></span><span class="t">#1098 Ship plan · v0.79</span><span class="rm">#build</span><span class="when">18m</span></div>
+        <div class="sess"><span class="sdot"></span><span class="t">Pricing page — 3 directions</span><span class="rm">#design</span><span class="when">1h</span></div>
+        <div class="sess"><span class="sdot done"></span><span class="t">#1094 Archive conversations</span><span class="rm">#dev</span><span class="when">3h</span></div>
+        <div class="sess"><span class="sdot"></span><span class="t">Competitors of Flowe?</span><span class="rm">#general</span><span class="when">y'day</span></div>
+        <div class="sess"><span class="sdot"></span><span class="t">Launch thread for v0.78</span><span class="rm">#marketing</span><span class="when">y'day</span></div>
+      </div>
+      <div class="main">
+        <div class="mainhead">
+          <div class="crumb">neuramesh</div>
+          <div class="scoperow">
+            <span class="mtitle">Home</span>
+            <span class="crew"><span class="av">G</span><span class="av">R</span><span class="av">A</span><span class="n">+6</span></span>
+          </div>
+          <div class="scopesub">everything that needs you · 24 conversations across 5 rooms</div>
+          <div class="tabbar"><div class="tab on">Conversations <span class="n">24</span></div><div class="tab">Board <span class="n">7</span></div></div>
+        </div>
+        <div class="body">
+          <div class="queue"><span class="qk">Needs you</span><span class="qt"><b>#1098</b> ready to accept · <b>1</b> plan to review · <b>1</b> question</span><span class="qbtn">Open queue</span></div>
+          <div class="sgroup">Today</div>
+          <div class="srow on"><span class="tring" style="--frac:35%"></span><div class="bd"><div class="t">Sync watch drops replies when the room switches</div><div class="snip">rex → poe · investigating the watch teardown</div></div><div class="meta"><span class="when">2m</span><span class="roomtag">#dev</span></div></div>
+          <div class="srow"><span class="tring r" style="--frac:82%"></span><div class="bd"><div class="t">#1098 · Ship plan for v0.79</div><div class="snip">bosun · 4 of 5 checklist items cleared</div></div><div class="meta"><span class="when">18m</span><span class="roomtag">#build</span></div></div>
+          <div class="srow"><span class="chatglyph">✎</span><div class="bd"><div class="t">Pricing page — three directions</div><div class="snip">iris · round 2 attached, awaiting your approval</div></div><div class="meta"><span class="when">1h</span><span class="roomtag">#design</span></div></div>
+          <div class="sgroup">Yesterday</div>
+          <div class="srow"><span class="chatglyph">✎</span><div class="bd"><div class="t">Competitors of Flowe?</div><div class="snip">rex · Zapier, Make, n8n, Workato — workflow &amp; automation</div></div><div class="meta"><span class="when">y'day</span><span class="roomtag">#general</span></div></div>
+        </div>
+        <div class="compose">
+          <div class="chips"><span class="chip auto"><span class="h">✦</span> auto <span class="car">⌄</span></span><span class="chip">＠ mention</span><span class="chip">◇ skills</span></div>
+          <div class="cinput">Describe it, or just ask…</div>
+          <div class="cfoot">rex files it in the right room · you can change it after <span class="csend">↑</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="callouts">
+      <div class="co"><span class="n">1</span><b>One row replaces the list.</b> The channel section was a header + n rows + a <i>+</i>; it is now a single row that still names where you are, with the count on the line under it.</div>
+      <div class="co"><span class="n">2</span><b>Recents keeps its room tags.</b> With no channel list, the tag on the row is how you read where each session lives — it was already there.</div>
+      <div class="co"><span class="n">3</span><b>The composer chip says <i>auto</i>.</b> Still clickable — picking a room is an override, not the price of entry.</div>
+      <div class="co"><span class="n">4</span><b>The dot on the head is the rail's dot, summed.</b> Unread in a room you aren't scoped to has to surface somewhere, or a quiet room becomes an invisible one.</div>
+    </div>
+  </div>
+
+  <div class="theme" data-theme="cream-oak">
+    <h2>Cream Oak · open — type-ahead, unread, gear, new</h2>
+    <div class="shell">
+      <div class="spine"><div class="spdot on">N</div><div class="spdot">f</div><div class="spdot">a</div><div class="spdot spgrow">G</div></div>
+      <div class="nav">
+        <div class="navhd hot"><span class="nhh">◇</span><span class="nhn">All channels</span><span class="nhdot"></span><span class="nhcar">⌃</span></div>
+        <div class="navhdsub">5 rooms · flowe-ai</div>
+        <div class="newchat"><span class="plus">＋</span> New chat <span class="k">⌘N</span></div>
+        <div class="navitem on"><span class="gl">⌂</span> Home <span class="badge attn">3</span></div>
+        <div class="navitem"><span class="gl">▤</span> Board <span class="badge">7</span></div>
+        <div class="navitem"><span class="gl">↻</span> Automations <span class="badge">4</span></div>
+        <div class="navitem"><span class="gl">◫</span> Library</div>
+        <div class="navrule"></div>
+        <div class="navsec">Recents <span class="n">24</span><span class="r">⌄</span></div>
+        <div class="sess"><span class="sdot live"></span><span class="t">Sync watch drops replies</span><span class="rm">#dev</span><span class="when">2m</span></div>
+        <div class="sess"><span class="sdot review"></span><span class="t">#1098 Ship plan · v0.79</span><span class="rm">#build</span><span class="when">18m</span></div>
+        <div class="sess"><span class="sdot"></span><span class="t">Pricing page — 3 directions</span><span class="rm">#design</span><span class="when">1h</span></div>
+        <div class="sess"><span class="sdot done"></span><span class="t">#1094 Archive conversations</span><span class="rm">#dev</span><span class="when">3h</span></div>
+        <div class="sess"><span class="sdot"></span><span class="t">Competitors of Flowe?</span><span class="rm">#general</span><span class="when">y'day</span></div>
+      </div>
+      <div class="main">
+        <div class="mainhead">
+          <div class="crumb">neuramesh</div>
+          <div class="scoperow">
+            <span class="mtitle">Home</span>
+          </div>
+          <div class="scopesub">everything that needs you · 24 conversations across 5 rooms</div>
+          <div class="tabbar"><div class="tab on">Conversations <span class="n">24</span></div><div class="tab">Board <span class="n">7</span></div></div>
+        </div>
+        <div class="dd">
+          <div class="ddsearch">⌕ de<span class="cur"></span></div>
+          <div class="ddrow on"><span class="h">◇</span> All channels <span class="n">24</span><span class="tick">✓</span></div>
+          <div class="ddgrp">Matching “de”</div>
+          <div class="ddrow hov"><span class="h">#</span> dev <span class="unread"></span><span class="n">9</span><span class="gear">⚙</span></div>
+          <div class="ddrow"><span class="h">#</span> design <span class="n">4</span></div>
+          <div class="ddgrp">All rooms · flowe-ai</div>
+          <div class="ddrow"><span class="h">#</span> general <span class="n">6</span></div>
+          <div class="ddrow"><span class="h">#</span> build <span class="n">3</span></div>
+          <div class="ddrow"><span class="h">📣</span> marketing <span class="n">2</span></div>
+          <div class="ddfoot">＋ New channel</div>
+          <div class="ddhint">↑↓ move · ↵ scope · ⌥↵ open the room · ⌘⇧K anywhere</div>
+        </div>
+        <div class="body" style="opacity:.42">
+          <div class="queue"><span class="qk">Needs you</span><span class="qt"><b>#1098</b> ready to accept · <b>1</b> plan to review · <b>1</b> question</span><span class="qbtn">Open queue</span></div>
+          <div class="sgroup">Today</div>
+          <div class="srow"><span class="tring" style="--frac:35%"></span><div class="bd"><div class="t">Sync watch drops replies when the room switches</div><div class="snip">rex → poe · investigating the watch teardown</div></div><div class="meta"><span class="when">2m</span><span class="roomtag">#dev</span></div></div>
+          <div class="srow"><span class="tring r" style="--frac:82%"></span><div class="bd"><div class="t">#1098 · Ship plan for v0.79</div><div class="snip">bosun · 4 of 5 checklist items cleared</div></div><div class="meta"><span class="when">18m</span><span class="roomtag">#build</span></div></div>
+          <div class="srow"><span class="chatglyph">✎</span><div class="bd"><div class="t">Pricing page — three directions</div><div class="snip">iris · round 2 attached, awaiting your approval</div></div><div class="meta"><span class="when">1h</span><span class="roomtag">#design</span></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="callouts">
+      <div class="co"><span class="n">5</span><b>The menu drops from the head, over the nav.</b> It is wider than the column (286px vs 238px) because a room row carries a count and a gear — anchored left, overhanging right, the way every switcher in the app already behaves.</div>
+      <div class="co"><span class="n">6</span><b>Scope ≠ travel.</b> ↵ scopes what you're looking at; ⌥↵ opens that room's home outright. Today one click does both and you cannot ask for only one.</div>
+      <div class="co"><span class="n">7</span><b>The gear survives.</b> Rename/delete lived on the rail row's hover; it lives on the menu row's hover. Nothing loses its home.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ STOP 3 ══════════ -->
+<div class="stophd"><span class="stopno">Stop 3</span>One surface, two scopes — this is what answers docs/35 §8</div>
+<div class="stopp">The reason "channels as filters" was rejected is that a filter can't hold a roster or a kanban. It doesn't have to: <b>picking #dev turns the surface into #dev's home.</b> The brief comes back, the crew cluster fills, the tabs become that room's tabs (a marketing room grows Calendar · Library), the composer targets it explicitly. Same component, one prop. Home and the room home stop being two designs of one thing.</div>
+<div class="themes">
+  <div class="theme" data-theme="dark">
+    <h2>Graphite · scoped to #dev — the room's face returns</h2>
+    <div class="shell">
+      <div class="spine"><div class="spdot on">N</div><div class="spdot">f</div><div class="spdot spgrow">G</div></div>
+      <div class="nav">
+        <div class="navhd"><span class="nhh">#</span><span class="nhn">dev</span><span class="nhcar">⌄</span></div>
+        <div class="navhdsub">the build room · 4 agents</div>
+        <div class="newchat"><span class="plus">＋</span> New chat <span class="k">⌘N</span></div>
+        <div class="navitem on"><span class="gl">⌂</span> Home <span class="badge attn">3</span></div>
+        <div class="navitem"><span class="gl">▤</span> Board <span class="badge">5</span></div>
+        <div class="navitem"><span class="gl">↻</span> Automations <span class="badge">2</span></div>
+        <div class="navitem"><span class="gl">◫</span> Library</div>
+        <div class="navrule"></div>
+        <div class="navsec">Recents <span class="n">9</span><span class="r">#dev</span></div>
+        <div class="sess on"><span class="sdot live"></span><span class="t">Sync watch drops replies</span><span class="when">2m</span></div>
+        <div class="sess"><span class="sdot done"></span><span class="t">#1094 Archive conversations</span><span class="when">3h</span></div>
+        <div class="sess"><span class="sdot"></span><span class="t">#1091 Rootless thread fix</span><span class="when">1d</span></div>
+      </div>
+      <div class="main">
+        <div class="mainhead">
+          <div class="crumb">neuramesh · flowe-ai</div>
+          <div class="scoperow">
+            <span class="mtitle"><span class="h">#</span>dev</span>
+            <span class="crew"><span class="av">R</span><span class="av">A</span><span class="av">P</span><span class="av">M</span><span class="n">4 agents · 1 person</span></span>
+          </div>
+          <div class="scopesub">the build room · neuramesh/neuramesh · 9 conversations</div>
+          <div class="tabbar"><div class="tab on">Conversations <span class="n">9</span></div><div class="tab">Board <span class="n">5</span></div><div class="tab">Automations <span class="n">2</span></div></div>
+        </div>
+        <div class="body">
+          <div class="brief"><span class="k">Room brief</span><span>3 tasks moved overnight · #1094 accepted and merged · poe is on the sync watch regression · nothing blocked</span><span class="exp">view</span></div>
+          <div class="sgroup">Today</div>
+          <div class="srow on"><span class="tring" style="--frac:35%"></span><div class="bd"><div class="t">Sync watch drops replies when the room switches</div><div class="snip">rex → poe · investigating the watch teardown</div></div><div class="meta"><span class="when">2m</span></div></div>
+          <div class="srow"><span class="tring" style="--frac:100%; background:conic-gradient(var(--done) 100%, var(--done) 0)"></span><div class="bd"><div class="t">#1094 · Archive conversations</div><div class="snip">accepted · PR #239 squashed to main</div></div><div class="meta"><span class="when">3h</span></div></div>
+          <div class="sgroup">Yesterday</div>
+          <div class="srow"><span class="chatglyph">✎</span><div class="bd"><div class="t">Why does the rootless thread swallow its opener?</div><div class="snip">rex · root_message_id is written only when the client names one</div></div><div class="meta"><span class="when">1d</span></div></div>
+        </div>
+        <div class="compose">
+          <div class="chips"><span class="chip"><span class="h">#</span> dev <span class="car">⌄</span></span><span class="chip">＠ mention</span></div>
+          <div class="cinput">Message #dev…</div>
+          <div class="cfoot">scoped here, so this one lands here — no triage needed <span class="csend">↑</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="callouts">
+      <div class="co"><span class="n">8</span><b>Scope beats triage.</b> When you've explicitly scoped to a room, the chip is that room and rex doesn't file — you already did. Auto-filing only runs from <b>All</b>.</div>
+      <div class="co"><span class="n">9</span><b>Recents narrows with the knob.</b> It is the same <code>historyRows()</code> call with a channelId, which is exactly how it already works.</div>
+    </div>
+  </div>
+
+  <div class="theme" data-theme="cream-oak">
+    <h2>Cream Oak · scoped to #marketing — a kind-specific room, same shell</h2>
+    <div class="shell">
+      <div class="spine"><div class="spdot on">N</div><div class="spdot">f</div><div class="spdot spgrow">G</div></div>
+      <div class="nav">
+        <div class="navhd"><span class="nhh">📣</span><span class="nhn">marketing</span><span class="nhcar">⌄</span></div>
+        <div class="navhdsub">marketing HQ · 3 agents</div>
+        <div class="newchat"><span class="plus">＋</span> New chat <span class="k">⌘N</span></div>
+        <div class="navitem"><span class="gl">⌂</span> Home <span class="badge attn">3</span></div>
+        <div class="navitem"><span class="gl">▤</span> Board <span class="badge">2</span></div>
+        <div class="navitem on"><span class="gl">↻</span> Automations <span class="badge">2</span></div>
+        <div class="navitem"><span class="gl">◫</span> Library</div>
+        <div class="navrule"></div>
+        <div class="navsec">Recents <span class="n">2</span><span class="r">#marketing</span></div>
+        <div class="sess"><span class="sdot"></span><span class="t">Launch thread for v0.78</span><span class="when">y'day</span></div>
+        <div class="sess"><span class="sdot"></span><span class="t">August content calendar</span><span class="when">3d</span></div>
+      </div>
+      <div class="main">
+        <div class="mainhead">
+          <div class="crumb">neuramesh · flowe-ai</div>
+          <div class="scoperow">
+            <span class="mtitle"><span class="h">📣</span> marketing</span>
+            <span class="crew"><span class="av">R</span><span class="av">P</span><span class="av">I</span><span class="n">3 agents</span></span>
+          </div>
+          <div class="scopesub">marketing HQ · LinkedIn · Instagram connected</div>
+          <div class="tabbar"><div class="tab on">Conversations <span class="n">2</span></div><div class="tab">Board <span class="n">2</span></div><div class="tab">Calendar</div><div class="tab">Library</div><div class="tab">Automations <span class="n">2</span></div></div>
+        </div>
+        <div class="body">
+          <div class="brief"><span class="k">Room brief</span><span>2 posts scheduled this week · the v0.78 launch thread is drafted and waiting on your sign-off</span><span class="exp">view</span></div>
+          <div class="sgroup">Yesterday</div>
+          <div class="srow on"><span class="chatglyph">✎</span><div class="bd"><div class="t">Launch thread for v0.78</div><div class="snip">plume · 6 posts drafted, 2 images from iris attached</div></div><div class="meta"><span class="when">y'day</span></div></div>
+          <div class="sgroup">Earlier</div>
+          <div class="srow"><span class="chatglyph">✎</span><div class="bd"><div class="t">August content calendar</div><div class="snip">plume · cadence set to 3×/week, Tue · Thu · Sat</div></div><div class="meta"><span class="when">3d</span></div></div>
+        </div>
+        <div class="compose">
+          <div class="chips"><span class="chip"><span class="h">📣</span> marketing <span class="car">⌄</span></span><span class="chip">＠ mention</span></div>
+          <div class="cinput">Message #marketing…</div>
+          <div class="cfoot">a marketing room routes content work to plume <span class="csend">↑</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="callouts">
+      <div class="co"><span class="n">10</span><b>Room-kind tabs are unchanged.</b> <code>roomTabsFor()</code> already computes them from kind + readiness — the knob just decides which room it's asked about.</div>
+      <div class="co"><span class="n">11</span><b>Automations appears as a room tab AND a destination.</b> Same list, two scopes. The tab is not a second entry point; it is the destination pre-scoped.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ STOP 4 ══════════ -->
+<div class="stophd"><span class="stopno">Stop 4</span>The filing moment — the receipt is the whole feature</div>
+<div class="stopp">A silent move is worse than no move: you'd watch a session change rooms under you and learn not to trust the list. So filing is <b>announced in three places at once</b> — the row's tag animates from <i>filing…</i> to the room, rex says which room and <i>why</i> in one clause, and a system line under it offers <b>Undo</b>. If rex can't decide, it stays in <code>#general</code> and says so; "no move" is a first-class answer, not a failure.</div>
+<div class="themes">
+  <div class="theme" data-theme="dark">
+    <h2>Graphite · the session list, mid-filing</h2>
+    <div class="shell" style="min-height:420px">
+      <div class="main">
+        <div class="mainhead">
+          <div class="crumb">neuramesh</div>
+          <div class="scoperow"><span class="mtitle">Home</span></div>
+          <div class="scopesub">All channels · 25 conversations across 5 rooms</div>
+        </div>
+        <div class="body">
+          <div class="sgroup">Today</div>
+          <div class="srow on"><span class="chatglyph">✎</span><div class="bd"><div class="t">The sync watch drops replies when the room switches</div><div class="snip">rex is reading it…</div></div><div class="meta"><span class="when">now</span><span class="roomtag filing">✦ filing…</span></div></div>
+          <div class="srow"><span class="tring" style="--frac:35%"></span><div class="bd"><div class="t">Pricing page — three directions</div><div class="snip">iris · round 2 attached, awaiting your approval</div></div><div class="meta"><span class="when">1h</span><span class="roomtag fresh">#design</span></div></div>
+          <div class="srow"><span class="chatglyph">✎</span><div class="bd"><div class="t">Competitors of Flowe?</div><div class="snip">rex · answered here — not work, so nothing to file</div></div><div class="meta"><span class="when">y'day</span><span class="roomtag">#general</span></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="callouts">
+      <div class="co"><span class="n">12</span><b>“filing…” is a real state, not a spinner.</b> It is the honest answer to "which room is this in?" for the ~4s rex takes, and it is the same dashed treatment the composer's <i>auto</i> chip wears.</div>
+      <div class="co"><span class="n">13</span><b>A question isn't work.</b> Chat that produces no task stays where it landed — the taxonomy already distinguishes these (docs/16 §4, the "not everything is a work request" rule).</div>
+    </div>
+  </div>
+  <div class="theme" data-theme="cream-oak">
+    <h2>Cream Oak · the thread, one beat later</h2>
+    <div class="shell" style="min-height:420px">
+      <div class="main">
+        <div class="mainhead">
+          <div class="crumb">‹ Home · <b>#dev</b></div>
+          <div class="scoperow"><span class="mtitle" style="font-size:18px">The sync watch drops replies</span></div>
+        </div>
+        <div class="msgs">
+          <div class="msg"><div class="me">the sync watch drops replies when the room switches — replies land in the old room's list until I reload</div></div>
+          <div class="msg">
+            <div class="mav orch">R</div>
+            <div class="mbody">
+              <div class="mhead"><b>rex</b><span class="role">orchestrator</span><span class="tm">now</span></div>
+              <div class="mtext">Filed this in <b>#dev</b> — it's a bug in the channel watch, and #dev owns the sync surface. <b>#1104</b> created and offered to <b>poe</b> to investigate root-cause first; the fix comes back here as a PR.</div>
+              <div class="taskpill"><span class="num">#1104</span> Sync watch drops replies on room switch <span style="color:var(--muted);font-weight:500">· poe</span></div>
+            </div>
+          </div>
+          <div class="sysline"><span class="fl">moved to #dev</span> filed by rex · <span class="undo">Undo</span> · <span class="undo">Change room</span></div>
+        </div>
+        <div class="compose">
+          <div class="chips"><span class="chip"><span class="h">#</span> dev <span class="car">⌄</span></span></div>
+          <div class="cinput">Reply…</div>
+          <div class="cfoot">this conversation lives in #dev now <span class="csend">↑</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="callouts">
+      <div class="co"><span class="n">14</span><b>The reason is one clause, not a paragraph.</b> "it's a bug in the channel watch, and #dev owns the sync surface" — enough to disagree with, short enough to skip.</div>
+      <div class="co"><span class="n">15</span><b>Undo is cheap because the move is cheap.</b> One <code>channel_id</code> on the thread + its messages. Sync is workspace-wide, so nothing re-downloads.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ STOP 5 ══════════ -->
+<div class="stophd"><span class="stopno">Stop 5</span>Automations — the destination Routines should always have been</div>
+<div class="stopp">Today <code>roomTabsFor()</code> only shows Routines when <code>routineCount &gt; 0</code>, and the code comment already names the cost: <i>"an invisible standing behavior is the silent-manual-step failure wearing a timer."</i> A tab that only exists once you've already used it cannot fix that. As a destination scoped by the same knob, every standing behavior in the workspace is one click from anywhere — and the room tab stays as the pre-scoped view, not a second list.</div>
+<div class="themes">
+  <div class="theme" data-theme="cream-oak">
+    <h2>Cream Oak · Automations at All scope</h2>
+    <div class="shell" style="min-height:440px">
+      <div class="spine"><div class="spdot on">N</div><div class="spdot">f</div><div class="spdot spgrow">G</div></div>
+      <div class="nav">
+        <div class="navhd"><span class="nhh">◇</span><span class="nhn">All channels</span><span class="nhcar">⌄</span></div>
+        <div class="navhdsub">5 rooms · flowe-ai</div>
+        <div class="newchat"><span class="plus">＋</span> New automation <span class="car">⌄</span></div>
+        <div class="navitem"><span class="gl">⌂</span> Home <span class="badge attn">3</span></div>
+        <div class="navitem"><span class="gl">▤</span> Board <span class="badge">7</span></div>
+        <div class="navitem on"><span class="gl">↻</span> Automations <span class="badge">4</span></div>
+        <div class="navitem"><span class="gl">◫</span> Library</div>
+        <div class="navrule"></div>
+        <div class="navsec">Recents <span class="n">24</span></div>
+        <div class="sess"><span class="sdot live"></span><span class="t">Sync watch drops replies</span><span class="rm">#dev</span><span class="when">2m</span></div>
+        <div class="sess"><span class="sdot review"></span><span class="t">#1098 Ship plan · v0.79</span><span class="rm">#build</span><span class="when">18m</span></div>
+      </div>
+      <div class="main">
+        <div class="mainhead">
+          <div class="crumb">neuramesh · automations</div>
+          <div class="scoperow"><span class="mtitle">Automations</span></div>
+          <div class="scopesub">All channels · 4 standing behaviors · next fires in 42m</div>
+        </div>
+        <div class="body">
+          <div class="sgroup">Active</div>
+          <div class="autorow"><span class="ico">↻</span><div class="bd"><div class="t">Morning digest</div><div class="p">Summarize yesterday's board movement and flag anything stuck</div></div><span class="roomtag">#dev</span><span class="cad">daily 09:00</span><span class="nxt">in 42m</span></div>
+          <div class="autorow"><span class="ico">↻</span><div class="bd"><div class="t">Weekly retro prep</div><div class="p">Collect lessons recorded this week and draft the retro agenda</div></div><span class="roomtag">#build</span><span class="cad">Fri 16:00</span><span class="nxt">in 2d</span></div>
+          <div class="autorow"><span class="ico">↻</span><div class="bd"><div class="t">Content cadence</div><div class="p">Draft three posts from this week's shipped work</div></div><span class="roomtag">📣 marketing</span><span class="cad">Tue · Thu · Sat</span><span class="nxt">tomorrow</span></div>
+          <div class="sgroup">Paused</div>
+          <div class="autorow paused"><span class="ico">⏸</span><div class="bd"><div class="t">Dependency sweep</div><div class="p">Check for outdated deps and park upgrades in the backlog</div></div><span class="roomtag">#dev</span><span class="cad">weekly</span><span class="nxt">paused</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="callouts">
+      <div class="co"><span class="n">16</span><b>The room tag is load-bearing.</b> A routine fires its prompt <i>into a room</i> — that's the agent pool that answers it. It can never be roomless, so it always names one.</div>
+      <div class="co"><span class="n">17</span><b>Paused is a section, not a badge.</b> Nearly every automation is active; a badge on every row was noise (the same reasoning already in room-tabs.ts).</div>
+    </div>
+  </div>
+  <div class="theme" data-theme="dark">
+    <h2>Graphite · what the room home loses</h2>
+    <div class="map" style="grid-template-columns:1fr">
+      <div class="mapcol">
+        <h3>Removed from the channel home</h3>
+        <div class="mapbox dead"><b>Routines tab (conditional)</b><span>appeared only when routineCount &gt; 0 — invisible exactly when you needed to discover it</span></div>
+        <div class="mapbox dead"><b>"New routine" swapping the nav's primary verb</b><span>the New-chat button changed meaning depending on which tab you were on. One button, two verbs, decided by where you happened to be standing</span></div>
+        <div class="maplane">…and what replaces it —</div>
+        <div class="mapbox new"><b>Automations · a workspace destination</b><span>always present, always countable, scoped by the same knob as everything else</span></div>
+        <div class="mapbox new"><b>The room tab stays — unconditionally</b><span>at #dev scope the tab reads <i>Automations 2</i>, and <i>Automations 0</i> is a fact worth showing: it means nothing is running behind your back in this room</span></div>
+        <div class="mapbox new"><b>＋ New automation follows the destination</b><span>the primary verb changes with the PAGE you chose, never with a tab you drifted onto</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ STOP 6 ══════════ -->
+<div class="stophd"><span class="stopno">Stop 6</span>Whiteboard — the one I'd hold, and what I'd ask first</div>
+<div class="stopp">This isn't a no. It's that the litmus can't be run on it yet: <i>does it make plan → fan out → execute → validate → review → accept faster, safer, or more delightful?</i> A whiteboard could serve at least three different jobs, and they have three different (much cheaper) answers. Name the job and the build gets obvious.</div>
+<div class="panels">
+  <div class="pnl no">
+    <span class="tag no">already has a home</span>
+    <h4>“Somewhere to see the designs”</h4>
+    <p>Mockups already render <b>inline in the thread</b> as self-contained HTML; the approved round becomes the visual contract in <code>.nm-evidence/design/</code> and auto-promotes into the channel artifact library.</p>
+    <p>A whiteboard here would be a <b>fourth</b> home for one artifact — and the docs/32 §1 lesson is that two surfaces disagreeing about one noun is the bug, not the feature.</p>
+  </div>
+  <div class="pnl no">
+    <span class="tag no">exists, unfinished</span>
+    <h4>“Somewhere to see the work spatially”</h4>
+    <p>That's the <b>board</b> plus the <b>phase spectrum</b> (docs/24) — derived, never stored, already drawn on every card as a 4px whisper.</p>
+    <p>If the complaint is that the board doesn't show <i>relationships</i> (this blocks that, these three are one epic), the honest fix is dependencies on tasks — a schema change with a clear payoff — not a free-draw canvas nothing can read.</p>
+  </div>
+  <div class="pnl ask">
+    <span class="tag ask">the one that might be real</span>
+    <h4>“Somewhere to think <i>with</i> an agent before there's a task”</h4>
+    <p>A shared canvas where you sketch boxes and iris reads them. This is genuinely new — and it is the only version where the agent is a participant rather than a viewer.</p>
+    <p>But it needs an <b>agent contract</b> first: what can an agent read off a canvas, what can it write back, how does that become a task. Without that it's a drawing app inside a collaboration platform. <b>Ask:</b> is this the job? If yes it deserves its own design round, not a nav slot.</p>
+  </div>
+</div>
+<div class="stopp" style="margin-top:14px"><b>What I'd put in the slot instead, if the nav wants a fourth destination:</b> <b>Library</b> (the artifact library is workspace-wide, curated, and today lives behind a burger menu) — or nothing. An empty slot costs less than a surface with no job.</div>
+
+<!-- ══════════ STOP 7 ══════════ -->
+<div class="stophd"><span class="stopno">Stop 7</span>Alternatives, and the four things that must not break</div>
+<div class="themes" style="grid-template-columns:1fr">
+  <div class="theme" data-theme="dark" style="background:#171717;border-color:#2a2a2a">
+    <table class="alts">
+      <tr><th>direction</th><th>shape</th><th>verdict</th></tr>
+      <tr>
+        <td>A · pure filter</td>
+        <td>channels become labels; the dropdown filters lists only; rooms cease to be surfaces</td>
+        <td><span class="no">Rejected</span> — this is docs/35 §8 direction A wearing a new hat. The board, brief, roster, marketing Calendar/Library and channel settings have nowhere to live.</td>
+      </tr>
+      <tr>
+        <td class="pick">B · scope knob in the nav head</td>
+        <td>one row at the top of the left nav scopes everything under and beside it: <b>All</b> = workspace lens, <b>#room</b> = that room's home. Rooms keep their face; the rail stops listing them</td>
+        <td><span class="pick">Recommended</span> — gets the ask (one selector, defaults to All, no room-picking before you type) while keeping every face, and leaves the main surface exactly as it is.</td>
+      </tr>
+      <tr>
+        <td>C · keep the rail, add auto-filing</td>
+        <td>ship only the triage half; the channel list stays exactly as it is</td>
+        <td><span class="ok">Viable fallback</span> — auto-filing is independently valuable and is slice 1 either way. If the knob proves wrong in dogfooding, this is where you stop.</td>
+      </tr>
+      <tr>
+        <td>D · nullable channel (an Inbox)</td>
+        <td><code>threads.channel_id</code> becomes nullable; unfiled sessions live in a real Inbox until rex files them</td>
+        <td><span class="no">Rejected</span> — conceptually cleanest, but it touches the sync rules, the ACL, and every query that assumes a channel, to buy ~4 seconds of honesty that a "filing…" tag buys for free.</td>
+      </tr>
+    </table>
+  </div>
+</div>
+<div class="stopp" style="margin-top:18px"><b>Honest limits — what the build must not strand:</b></div>
+<div class="panels">
+  <div class="pnl yes"><span class="tag yes">invariant</span><h4>A session must never change project</h4><p>Channels belong to exactly one project and exactly one project is active. Triage picks only from the <b>active project's</b> channels, or the session vanishes from the view that created it.</p></div>
+  <div class="pnl yes"><span class="tag yes">invariant</span><h4>Filing freezes when work starts</h4><p>Once a task exists, its channel binds the board, the roster and the branch. An agent may file a thread <b>once</b>, before its first task. A human may move any chat thread, any time.</p></div>
+  <div class="pnl yes"><span class="tag yes">invariant</span><h4>The turn must not double</h4><p>rex already wakes on every human channel message. Filing rides <b>that</b> turn — no pre-pass classifier — or agent overhead breaks the &lt;10% budget for a label.</p></div>
+</div>
+<div class="panels" style="margin-top:14px">
+  <div class="pnl"><span class="tag ask">watch it</span><h4>The #general black hole</h4><p>If "can't decide" is cheap, everything lands in #general and the channel axis quietly dies. Store the decision + the reason on the move. <b>If more than ~half of filings land in #general, the rooms are wrong — not the triage.</b></p></div>
+  <div class="pnl"><span class="tag ask">watch it</span><h4>The room you can't see any more</h4><p>The rail list was also the answer to "what rooms exist?". The knob must show every room on open, with unread — and an unread room while the knob is closed needs a dot on the trigger, or a quiet room becomes an invisible one.</p></div>
+  <div class="pnl"><span class="tag ask">watch it</span><h4>Filing is a visibility change</h4><p>A channel is the ACL boundary for agents. Filing into #dev grants #dev's roster sight of the conversation. Harmless today (sync is workspace-wide, one human) — it stops being harmless the day channels become private.</p></div>
+</div>
+
+</div>
+</body>
+</html>

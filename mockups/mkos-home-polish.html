@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en" data-theme="cream-oak">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Marketing OS home polish</title>
+<style>
+/* Tokens verbatim from tokens.css. Geometry mirrors the LIVE destination (.mkosview 980px
+   column, .scopebar 42px band, .mkcard, .pbrow) — three founder concerns from production:
+   connectors invisible on the home · the scope bar narrower than its content (a double
+   gutter: the bar pads 18px inside an already-padded column — fix is CSS, shown here at the
+   true width) · "pick a project" is direction, not usability (it becomes a working picker).
+   Plan note: docs/design/marketing-os-2026-08 §14. */
+:root, [data-theme='dark'] {
+  --win:#0d0d0d; --bg:#141414; --panel:#191919; --panel2:#212121; --panel3:#2b2b2b;
+  --border:#272727; --border2:#383838;
+  --text:#eaeaea; --body:#b6b6b6; --muted:#898989; --dim:#676767;
+  --link:#d19a72; --accent:var(--text);
+  --btn:#232323; --btn-fg:#efefef; --btn-hover:#2f2f2f;
+  --green:#77ac8d; --warn:#c9a15e; --card:#1e1e1e; --card-border:#2c2c2c;
+  --shadow-card:0 1px 2px rgba(0,0,0,.25); --shadow-lift:0 8px 20px -8px rgba(0,0,0,.55);
+  --shadow-pop:0 20px 55px -14px rgba(0,0,0,.65);
+  --hover-bg:color-mix(in srgb, var(--text) 7%, transparent);
+  --viz-score:#5b93d8;
+}
+[data-theme='cream-oak'] {
+  --win:#f0e5d3; --bg:#fbf8f4; --panel:#fbf8f4; --panel2:#f6eee1; --panel3:#efe1cd;
+  --border:#e6dbca; --border2:#d3c2a8;
+  --text:#2a1c13; --body:#574838; --muted:#97846c; --dim:#b5a289;
+  --link:#9c5730; --accent:#834a2b;
+  --btn:#f8f2e8; --btn-fg:#43301f; --btn-hover:#efe4d2;
+  --green:#2f9e6b; --warn:#a06a1f; --card:#ffffff; --card-border:#eadfce;
+  --shadow-card:0 1px 2px rgba(70,42,18,.05); --shadow-lift:0 8px 20px -8px rgba(70,42,18,.20);
+  --shadow-pop:0 20px 55px -14px rgba(70,42,18,.30);
+  --hover-bg:color-mix(in srgb, var(--text) 5%, transparent);
+  --viz-score:#2f6fc2;
+}
+* { box-sizing:border-box; margin:0; }
+:root { --fbody:'Avenir Next','Segoe UI',system-ui,sans-serif; --fmono:'SF Mono',ui-monospace,Menlo,monospace;
+  --fserif:'Iowan Old Style','Palatino Linotype',Georgia,serif;
+  --r-xs:4px; --r-md:8px; --r-lg:11px; --r-full:999px; --ease:cubic-bezier(.3,.7,.4,1); --dur-fast:.12s; }
+body { background:var(--win); color:var(--text); font:14px/1.5 var(--fbody); padding:0 0 90px; }
+header.doc { display:flex; align-items:center; gap:14px; border-bottom:1px solid var(--border); padding:14px 26px; }
+header.doc h1 { font:700 16px var(--fserif); }
+header.doc .sub { font:11.5px var(--fmono); color:var(--muted); }
+header.doc .spacer { flex:1; }
+.ctl { background:var(--btn); color:var(--btn-fg); border:1px solid var(--border2); border-radius:var(--r-full);
+  padding:6px 14px; font:600 12px var(--fbody); cursor:pointer; }
+main { max-width:1040px; margin:0 auto; padding:10px 26px; }
+section { margin:44px 0; }
+h2 { font:700 20px var(--fserif); margin:0 0 4px; display:flex; align-items:baseline; gap:10px; }
+h2 .n { font:700 11px var(--fmono); color:var(--muted); }
+p.why { color:var(--body); font-size:13.5px; max-width:76ch; margin:8px 0 16px; }
+p.why b { color:var(--text); }
+code.ic { font:600 11.5px var(--fmono); background:var(--panel2); border:1px solid var(--border);
+  border-radius:var(--r-xs); padding:1px 5px; color:var(--body); }
+.note { display:flex; gap:9px; align-items:flex-start; max-width:76ch; margin:10px 0; font-size:12.5px; color:var(--body); }
+.note .dot { flex:none; width:6px; height:6px; border-radius:50%; background:var(--accent); margin-top:6px; }
+.note b { color:var(--text); }
+/* ── the destination stage, at the REAL column width ── */
+.stage { background:var(--bg); border:1px solid var(--border); border-radius:14px; padding:18px; box-shadow:var(--shadow-card); }
+.col { max-width:940px; margin:0 auto; }
+/* the scope bar — FULL column width now: zero side padding (the page gutter already exists) */
+.scopebar { display:flex; align-items:center; gap:10px; padding:0 0 10px; }
+.scopesearch { flex:1; min-width:0; display:flex; align-items:center; gap:9px; min-height:42px; padding:0 16px;
+  background:var(--card); border:1px solid var(--card-border); border-radius:var(--r-lg); box-shadow:var(--shadow-card);
+  color:var(--dim); font-size:13.5px; }
+.scopepill { flex:none; display:flex; align-items:center; gap:8px; min-height:42px; padding:0 16px;
+  background:var(--card); border:1px solid var(--card-border); border-radius:var(--r-lg); box-shadow:var(--shadow-card);
+  font-size:13.5px; font-weight:600; }
+.scopepill .car { font-size:10px; opacity:.7; }
+.pgk { font:700 10.5px var(--fmono); text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin:16px 0 8px; }
+/* project cards + the NEW connector strip */
+.mkcards { display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:12px; }
+.mkcard { text-align:left; background:var(--card); border:1px solid var(--card-border); border-radius:var(--r-lg);
+  padding:12px 14px; box-shadow:var(--shadow-card); display:flex; flex-direction:column; gap:6px; cursor:pointer; }
+.mkcard:hover { box-shadow:var(--shadow-lift); }
+.mkchd2 { display:flex; align-items:center; gap:8px; font-weight:700; }
+.mklogo { width:22px; height:22px; border-radius:6px; background:var(--panel3); display:inline-flex; align-items:center;
+  justify-content:center; font:700 11px var(--fbody); }
+.mkscore { display:flex; align-items:center; gap:8px; font:700 20px var(--fserif); }
+.mkscore.quiet { font:600 13px var(--fbody); color:var(--muted); }
+.mkdial { width:30px; height:30px; border-radius:50%;
+  background:conic-gradient(var(--viz-score) calc(var(--frac)*360deg), var(--panel3) 0);
+  -webkit-mask:radial-gradient(circle at 50% 50%, transparent 56%, #000 57%); mask:radial-gradient(circle at 50% 50%, transparent 56%, #000 57%); }
+.mkfacts { font:11px var(--fmono); color:var(--dim); }
+.mkcta { font-size:12px; font-weight:600; color:var(--link); }
+/* NEW — the connector strip: providers with live status, one glance */
+.mkconns { display:flex; align-items:center; gap:7px; margin-top:2px; padding-top:8px; border-top:1px solid var(--border); }
+.mkc { position:relative; width:22px; height:22px; border-radius:6px; border:1px solid var(--border);
+  display:inline-flex; align-items:center; justify-content:center; font-size:11px; color:var(--dim); background:var(--panel); }
+.mkc.on { color:var(--text); border-color:color-mix(in srgb, var(--green) 45%, var(--border)); }
+.mkc.on::after { content:''; position:absolute; right:-2px; bottom:-2px; width:7px; height:7px; border-radius:50%;
+  background:var(--green); border:1.5px solid var(--card); }
+.mkc.warnc { color:var(--text); border-color:color-mix(in srgb, var(--warn) 55%, var(--border)); }
+.mkc.warnc::after { content:''; position:absolute; right:-2px; bottom:-2px; width:7px; height:7px; border-radius:50%;
+  background:var(--warn); border:1.5px solid var(--card); }
+.mkconnlbl { font:11px var(--fmono); color:var(--dim); margin-left:auto; }
+/* scoped view: the full Connections section (the room's real ConnectionsList) */
+.connrow { display:flex; align-items:center; gap:10px; padding:8px 0; border-top:1px solid var(--border); font-size:13px; }
+.connrow:first-of-type { border-top:none; }
+.connrow .ci { width:20px; text-align:center; }
+.connrow b { font-weight:600; }
+.connrow .st { font:11px var(--fmono); color:var(--green); margin-left:auto; }
+.connrow .st.off { color:var(--dim); }
+.connrow .st.warn { color:var(--warn); }
+.connbtn { flex:none; background:var(--btn); color:var(--btn-fg); border:1px solid var(--border2); border-radius:var(--r-full);
+  padding:4px 14px; font:600 12px var(--fbody); cursor:pointer; }
+.conncard { background:var(--card); border:1px solid var(--card-border); border-radius:var(--r-lg); padding:6px 14px; box-shadow:var(--shadow-card); }
+/* catalog rows + the Run-for picker */
+.pbrow { position:relative; width:100%; display:flex; align-items:center; gap:12px; text-align:left; background:none;
+  border:0; border-top:1px solid var(--border); padding:11px 4px; cursor:pointer; }
+.pbrow:hover { background:var(--hover-bg); }
+.pbtxt { flex:1; min-width:0; }
+.pbtxt b { font-size:13.5px; display:block; }
+.pbtxt span { font-size:11.5px; color:var(--dim); }
+.pbmeta { flex:none; font:11px var(--fmono); color:var(--dim); }
+.pbrun { flex:none; background:var(--btn); color:var(--btn-fg); border:1px solid var(--border2); border-radius:var(--r-full);
+  padding:4px 13px; font:600 11.5px var(--fbody); }
+.pbrow:hover .pbrun { background:var(--btn-hover); }
+/* the picker — anchored on the row, listing marketing-ready projects with THIS playbook's state */
+.runforpop { position:absolute; right:4px; top:calc(100% - 6px); z-index:6; width:280px; background:var(--card);
+  border:1px solid var(--border2); border-radius:var(--r-lg); box-shadow:var(--shadow-pop); padding:7px; }
+.runforh { font:700 9.5px var(--fmono); letter-spacing:.07em; text-transform:uppercase; color:var(--dim); padding:3px 8px 6px; }
+.runforrow { display:flex; align-items:center; gap:9px; width:100%; border:0; background:none; text-align:left;
+  border-radius:8px; padding:7px 8px; cursor:pointer; }
+.runforrow:hover { background:var(--hover-bg); }
+.runforrow b { font-size:12.5px; flex:1; }
+.runforrow .rst { font:10.5px var(--fmono); color:var(--dim); }
+.runforrow.off { opacity:.55; cursor:default; }
+.runforrow.off .rst { color:var(--warn); }
+</style>
+</head>
+<body>
+
+<header class="doc">
+  <h1>Marketing OS home polish</h1>
+  <span class="sub">three production concerns · full-width bar · connectors on the home · Run for…</span>
+  <div class="spacer"></div>
+  <button class="ctl" onclick="flip()">Toggle theme (t)</button>
+</header>
+
+<main>
+
+<!-- ══════════════════════════ 01 ══════════════════════════ -->
+<section id="s1">
+  <h2><span class="n">01</span>The home, unscoped — bar at content width, connectors at a glance</h2>
+  <p class="why"><b>The bar:</b> a one-line CSS fix — the scope bar carried its own 18px side padding inside an
+    already-padded column, so it always sat 36px short of the content. It goes to zero side padding and every
+    destination (Routines, Whiteboards, Files) inherits the fix. <b>Connectors:</b> each project card grows a
+    connector strip — the four publish networks + analytics as glyphs with live status dots (green = connected,
+    amber = needs re-auth, dim = off). The strip is a glance, not a control: clicking the card still scopes to the
+    project, where the full Connections section lives (scene 02).</p>
+
+  <div class="stage"><div class="col">
+    <div class="scopebar">
+      <span class="scopesearch">⌕ Search marketing…</span>
+      <span class="scopepill">All projects <span class="car">▾</span></span>
+      <span class="scopepill">All rooms <span class="car">▾</span></span>
+    </div>
+    <div class="pgk">Projects</div>
+    <div class="mkcards">
+      <div class="mkcard">
+        <span class="mkchd2"><span class="mklogo">N</span><b>Neuramesh</b></span>
+        <span class="mkscore quiet"><b>no baseline yet</b></span>
+        <span class="mkfacts">docs ✓ · 0 cadences armed</span>
+        <span class="mkcta">Run the baseline audit ›</span>
+        <span class="mkconns">
+          <span class="mkc warnc" title="X — needs re-authorizing">𝕏</span>
+          <span class="mkc" title="LinkedIn — not connected">in</span>
+          <span class="mkc" title="Instagram — not connected">◫</span>
+          <span class="mkc" title="TikTok — not connected">♪</span>
+          <span class="mkc on" title="PostHog — connected">◔</span>
+          <span class="mkconnlbl">1 live · 1 needs re-auth</span>
+        </span>
+      </div>
+      <div class="mkcard">
+        <span class="mkchd2"><span class="mklogo">P</span><b>Plausible</b></span>
+        <span class="mkscore"><span class="mkdial" style="--frac:.86"></span><b>86</b></span>
+        <span class="mkfacts">1 cadence armed · audited today</span>
+        <span class="mkconns">
+          <span class="mkc on" title="X — connected">𝕏</span>
+          <span class="mkc on" title="LinkedIn — connected">in</span>
+          <span class="mkc" title="Instagram — not connected">◫</span>
+          <span class="mkc" title="TikTok — not connected">♪</span>
+          <span class="mkc" title="PostHog — not connected">◔</span>
+          <span class="mkconnlbl">2 live</span>
+        </span>
+      </div>
+    </div>
+  </div></div>
+
+  <div class="note"><span class="dot"></span><div><b>The strip reads from the rows the AlertsBar already
+    watches</b> (<code class="ic">nm.connectors(room.id)</code> — status <code class="ic">connected · reauth_required
+    · off</code>), so the amber dot and the attention bar can never disagree about the same account.</div></div>
+</section>
+
+<!-- ══════════════════════════ 02 ══════════════════════════ -->
+<section id="s2">
+  <h2><span class="n">02</span>Scoped — the full Connections section</h2>
+  <p class="why">Scoped to one project, the desk gains a <b>Connections</b> section between the project card and
+    the playbooks — the room's REAL ConnectionsList (the same component the setup wizard and the room rail mount),
+    so connect/reconnect is right where the growth work happens instead of two navigations away.</p>
+
+  <div class="stage"><div class="col">
+    <div class="scopebar">
+      <span class="scopesearch">⌕ Search marketing…</span>
+      <span class="scopepill">Neuramesh <span class="car">▾</span></span>
+      <span class="scopepill">All rooms <span class="car">▾</span></span>
+    </div>
+    <div class="pgk">Connections</div>
+    <div class="conncard">
+      <div class="connrow"><span class="ci">𝕏</span><b>X (Twitter)</b><span class="st warn">needs re-auth</span><button class="connbtn">Reconnect</button></div>
+      <div class="connrow"><span class="ci">in</span><b>LinkedIn</b><span class="st off">not connected</span><button class="connbtn">Connect</button></div>
+      <div class="connrow"><span class="ci">◔</span><b>PostHog</b><span class="st">connected</span></div>
+    </div>
+  </div></div>
+</section>
+
+<!-- ══════════════════════════ 03 ══════════════════════════ -->
+<section id="s3">
+  <h2><span class="n">03</span>"pick a project" becomes Run for…</h2>
+  <p class="why">The old label was direction with no verb — the row was DISABLED until the human found the scope
+    pill. Now the row works from every scope: in all-projects it carries a <b>Run for… ›</b> pill, and clicking
+    opens a picker of marketing-ready projects with <b>this playbook's own state per room</b> — pick one and the
+    ask drafts exactly as a scoped run. One ready room in the workspace? No picker — the click just runs.
+    A not-set-up room shows dimmed with the reason, never hidden.</p>
+
+  <div class="stage"><div class="col">
+    <div class="pgk">Playbooks · foundations</div>
+    <div class="pbrow">
+      <span class="pbtxt"><b>Site &amp; funnel audit</b><span>six dimensions, weighted 0–100, fix-first list</span></span>
+      <span class="pbrun">Run for… ›</span>
+      <div class="runforpop">
+        <div class="runforh">Run the audit for</div>
+        <button class="runforrow"><span class="mklogo">P</span><b>Plausible</b><span class="rst">86 · today</span></button>
+        <button class="runforrow"><span class="mklogo">R</span><b>Raycast</b><span class="rst">never run</span></button>
+        <button class="runforrow off"><span class="mklogo">G</span><b>GADS INC</b><span class="rst">finish setup first</span></button>
+      </div>
+    </div>
+    <div class="pbrow" style="margin-top:120px;">
+      <span class="pbtxt"><b>AI search (GEO)</b><span>citability: who gets cited, rewrites, re-measure</span></span>
+      <span class="pbrun">Run for… ›</span>
+    </div>
+  </div></div>
+
+  <div class="note"><span class="dot"></span><div><b>Scoped rows are unchanged</b> — they keep the room's state
+    meta and run on click, as today. The picker rides only the all-projects lens, and the chat-engine playbooks
+    get the same treatment (pick → the ask drafts into that room's thread).</div></div>
+</section>
+
+</main>
+
+<script>
+function flip(){
+  const d = document.documentElement.getAttribute('data-theme') === 'dark';
+  document.documentElement.setAttribute('data-theme', d ? 'cream-oak' : 'dark');
+}
+addEventListener('keydown', e => { if (e.key === 't') flip(); });
+</script>
+</body>
+</html>

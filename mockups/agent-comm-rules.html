@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en" data-theme="cream-oak">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Agent communication rules — workspace voice</title>
+<style>
+/* Tokens verbatim from apps/desktop/src/renderer/src/tokens.css. Geometry mirrors the
+   workspace-settings panel idioms (section heads, toggle rows, the model-packs list rows).
+   Plan: docs/design/agent-comm-rules-2026-08/plan.md */
+:root, [data-theme='dark'] {
+  --win:#0d0d0d; --bg:#141414; --panel:#191919; --panel2:#212121; --panel3:#2b2b2b;
+  --border:#272727; --border2:#383838;
+  --text:#eaeaea; --body:#b6b6b6; --muted:#898989; --dim:#676767;
+  --link:#d19a72; --accent:var(--text);
+  --btn:#232323; --btn-fg:#efefef; --btn-hover:#2f2f2f;
+  --green:#77ac8d; --card:#1e1e1e; --card-border:#2c2c2c;
+  --code:#0a0a0a; --codeink:#e8e8e8;
+  --shadow-card:0 1px 2px rgba(0,0,0,.25);
+  --hover-bg:color-mix(in srgb, var(--text) 7%, transparent);
+}
+[data-theme='cream-oak'] {
+  --win:#f0e5d3; --bg:#fbf8f4; --panel:#fbf8f4; --panel2:#f6eee1; --panel3:#efe1cd;
+  --border:#e6dbca; --border2:#d3c2a8;
+  --text:#2a1c13; --body:#574838; --muted:#97846c; --dim:#b5a289;
+  --link:#9c5730; --accent:#834a2b;
+  --btn:#f8f2e8; --btn-fg:#43301f; --btn-hover:#efe4d2;
+  --green:#2f9e6b; --card:#ffffff; --card-border:#eadfce;
+  --code:#2b2018; --codeink:#f3e6d8;
+  --shadow-card:0 1px 2px rgba(70,42,18,.05);
+  --hover-bg:color-mix(in srgb, var(--text) 5%, transparent);
+}
+* { box-sizing:border-box; margin:0; }
+:root { --fbody:'Avenir Next','Segoe UI',system-ui,sans-serif; --fmono:'SF Mono',ui-monospace,Menlo,monospace;
+  --fserif:'Iowan Old Style','Palatino Linotype',Georgia,serif;
+  --r-xs:4px; --r-md:8px; --r-lg:11px; --r-full:999px; }
+body { background:var(--win); color:var(--text); font:14px/1.5 var(--fbody); padding:0 0 90px; }
+header.doc { display:flex; align-items:center; gap:14px; border-bottom:1px solid var(--border); padding:14px 26px; }
+header.doc h1 { font:700 16px var(--fserif); }
+header.doc .sub { font:11.5px var(--fmono); color:var(--muted); }
+header.doc .spacer { flex:1; }
+.ctl { background:var(--btn); color:var(--btn-fg); border:1px solid var(--border2); border-radius:var(--r-full);
+  padding:6px 14px; font:600 12px var(--fbody); cursor:pointer; }
+main { max-width:940px; margin:0 auto; padding:10px 26px; }
+section { margin:40px 0; }
+h2 { font:700 20px var(--fserif); margin:0 0 4px; display:flex; align-items:baseline; gap:10px; }
+h2 .n { font:700 11px var(--fmono); color:var(--muted); }
+p.why { color:var(--body); font-size:13.5px; max-width:74ch; margin:8px 0 16px; }
+p.why b { color:var(--text); }
+code.ic { font:600 11.5px var(--fmono); background:var(--panel2); border:1px solid var(--border);
+  border-radius:var(--r-xs); padding:1px 5px; color:var(--body); }
+.note { display:flex; gap:9px; align-items:flex-start; max-width:74ch; margin:10px 0; font-size:12.5px; color:var(--body); }
+.note .dot { flex:none; width:6px; height:6px; border-radius:50%; background:var(--accent); margin-top:6px; }
+.note b { color:var(--text); }
+/* ── the settings panel stage ── */
+.panel { background:var(--bg); border:1px solid var(--border); border-radius:14px; padding:20px 24px;
+  box-shadow:var(--shadow-card); max-width:640px; }
+.sech { font:700 10.5px var(--fmono); text-transform:uppercase; letter-spacing:.08em; color:var(--muted);
+  margin:18px 0 8px; }
+.sech:first-child { margin-top:0; }
+.trow { display:flex; align-items:flex-start; gap:12px; padding:10px 0; border-top:1px solid var(--border); }
+.trow:first-of-type { border-top:none; }
+.tmeta { flex:1; min-width:0; }
+.tmeta b { font-size:13px; display:block; }
+.tmeta span { font-size:11.5px; color:var(--dim); }
+.tog { flex:none; width:34px; height:20px; border-radius:var(--r-full); background:var(--green);
+  position:relative; cursor:pointer; border:1px solid transparent; margin-top:2px; }
+.tog::after { content:''; position:absolute; top:2px; right:2px; width:14px; height:14px; border-radius:50%;
+  background:#fff; box-shadow:0 1px 2px rgba(0,0,0,.3); }
+.tog.off { background:var(--panel3); border-color:var(--border2); }
+.tog.off::after { right:auto; left:2px; }
+.rulerow { display:flex; align-items:center; gap:10px; padding:7px 0; border-top:1px solid var(--border); }
+.rulerow:first-of-type { border-top:none; }
+.rulerow .txt { flex:1; font-size:12.5px; color:var(--body); }
+.rulerow .x { border:0; background:none; color:var(--dim); cursor:pointer; font-size:12px; }
+.addrow { display:flex; gap:8px; margin-top:8px; }
+.addrow input { flex:1; background:var(--card); border:1px solid var(--border); border-radius:var(--r-md);
+  padding:7px 11px; font:12.5px var(--fbody); color:var(--text); outline:none; }
+.addrow button { background:var(--btn); color:var(--btn-fg); border:1px solid var(--border2);
+  border-radius:var(--r-full); padding:6px 14px; font:600 12px var(--fbody); cursor:pointer; }
+.preview { margin-top:14px; }
+.preview .ph { font:700 10.5px var(--fmono); text-transform:uppercase; letter-spacing:.08em; color:var(--muted);
+  margin-bottom:6px; }
+kbd.blk { display:block; font:11.5px/1.6 var(--fmono); background:var(--code); color:var(--codeink);
+  border-radius:var(--r-md); padding:12px 14px; white-space:pre-wrap; }
+/* before/after sample */
+.ba { display:grid; grid-template-columns:1fr 1fr; gap:14px; max-width:860px; }
+.bacard { background:var(--card); border:1px solid var(--card-border); border-radius:var(--r-lg);
+  padding:12px 14px; box-shadow:var(--shadow-card); }
+.bacard .bh { font:700 10px var(--fmono); text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin-bottom:7px; }
+.bacard p { font-size:12.5px; color:var(--body); margin:0 0 8px; }
+.bacard .ti { font:700 12.5px var(--fbody); color:var(--text); margin-bottom:4px; }
+@media (max-width:720px){ .ba { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+
+<header class="doc">
+  <h1>Agent communication rules</h1>
+  <span class="sub">workspace voice · docs/design/agent-comm-rules-2026-08/plan.md · two scenes</span>
+  <div class="spacer"></div>
+  <button class="ctl" onclick="flip()">Toggle theme (t)</button>
+</header>
+
+<main>
+
+<!-- ══════════════════════════ 01 ══════════════════════════ -->
+<section id="s1">
+  <h2><span class="n">01</span>Workspace settings → Voice</h2>
+  <p class="why">A new section in the existing workspace settings panel. Two shipped rules with
+    toggles (<b>on by default</b> — this is NeuraMesh's voice; the toggle is the opt-out), a
+    single-line house-rules list (≤8 rules, ≤200 chars each), and a live preview of the exact
+    block every agent receives — what you toggle is what they read.</p>
+
+  <div class="panel">
+    <div class="sech">Voice — how agents write, everywhere</div>
+
+    <div class="trow">
+      <span class="tmeta"><b>No em dashes</b>
+        <span>Agents use a comma, a period, or parentheses instead of — in everything they write.</span></span>
+      <span class="tog"></span>
+    </div>
+    <div class="trow">
+      <span class="tmeta"><b>STE-100 writing style</b>
+        <span>Short sentences, one idea each, active voice, the same word for the same thing.
+        Applies to task names, descriptions, replies, and documents.</span></span>
+      <span class="tog"></span>
+    </div>
+
+    <div class="sech">House rules — one line each, verbatim to every agent</div>
+    <div class="rulerow"><span class="txt">Never open a reply with "Great question" or restate the ask.</span><button class="x">✕</button></div>
+    <div class="rulerow"><span class="txt">Dates are absolute (2026-08-21), never "yesterday" or "last week".</span><button class="x">✕</button></div>
+    <div class="addrow"><input placeholder="Add a rule — one sentence, applies to every agent in this workspace" /><button>Add</button></div>
+
+    <div class="preview">
+      <div class="ph">What agents receive (appended last, supersedes their defaults)</div>
+      <kbd class="blk">HOUSE STYLE (workspace rule — supersedes any conflicting style guidance):
+- Do not use em dashes (—). Use a comma, a period, or parentheses.
+- Write in STE-100 style: sentences of at most 20 words. One instruction
+  or idea per sentence. Active voice. Use the same word for the same thing.
+- Never open a reply with "Great question" or restate the ask.
+- Dates are absolute (2026-08-21), never "yesterday" or "last week".</kbd>
+    </div>
+  </div>
+
+  <div class="note"><span class="dot"></span><div><b>One module, four injection sites, one
+    cannot-fail test.</b> <code class="ic">housestyle.ts</code> renders the block; the orchestrator
+    contract, the chat-teammate system, the coding system prompt, and the bare
+    <code class="ic">complete()</code> utilities all append it LAST. A sentinel-rule test builds
+    every composer's output and asserts the sentinel is present in all of them.</div></div>
+</section>
+
+<!-- ══════════════════════════ 02 ══════════════════════════ -->
+<section id="s2">
+  <h2><span class="n">02</span>What it changes — the same task, both voices</h2>
+  <p class="why">Left: today's default register. Right: the same content under both rules.
+    Quoted material and code are exempt by construction — the rules govern what agents
+    <b>write</b>, never what they cite.</p>
+
+  <div class="ba">
+    <div class="bacard">
+      <div class="bh">Before</div>
+      <div class="ti">Homepage CTA experiment — "Try one reset free" vs. download-led CTAs</div>
+      <p>#1121 is underway — it'll baseline the current CTAs, stand up the variant, and wire the
+        measurement plan — click-through to /try, reset starts and completions — so we can read
+        lift within a week or so.</p>
+    </div>
+    <div class="bacard">
+      <div class="bh">After — no em dashes · STE-100</div>
+      <div class="ti">Homepage CTA test: "Try one reset free"</div>
+      <p>#1121 is underway. It baselines the current CTAs. It stands up the variant and wires the
+        measurement plan (click-through to /try, reset starts, reset completions). Expect a
+        readable lift number in one week.</p>
+    </div>
+  </div>
+
+  <div class="note"><span class="dot"></span><div><b>The em-dash rule gets teeth in slice 3:</b>
+    with the toggle on, the daemon scrubs agent-authored titles, descriptions, and message bodies
+    at the post boundary (code-fence aware). STE-100 stays prompt-level — a writing discipline
+    only the model can follow.</div></div>
+  <div class="note"><span class="dot"></span><div><b>Honesty:</b> "STE-100 style" means the
+    principles (sentence caps, one idea per sentence, active voice, consistent terms). Full
+    ASD-STE100 is a controlled dictionary; the settings copy never claims dictionary compliance.</div></div>
+</section>
+
+</main>
+
+<script>
+function flip(){
+  const d = document.documentElement.getAttribute('data-theme') === 'dark';
+  document.documentElement.setAttribute('data-theme', d ? 'cream-oak' : 'dark');
+}
+addEventListener('keydown', e => { if (e.key === 't') flip(); });
+document.querySelectorAll('.tog').forEach(t => t.addEventListener('click', () => t.classList.toggle('off')));
+</script>
+</body>
+</html>

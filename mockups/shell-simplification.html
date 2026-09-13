@@ -1,0 +1,1189 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>The quiet shell — four cuts: the bell, the foot, the strip, the pane</title>
+<style>
+/* ══ house mockup scaffold (home-nav-round.html lineage) — the page commits to the studio ground;
+   the SHELLS carry both themes, which is the point of the page ══ */
+[data-theme] { --fbody:'Geist Variable',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; --fmono:'Geist Mono Variable',ui-monospace,'SF Mono',Menlo,monospace; --fdisp:'Source Serif 4','Iowan Old Style',Georgia,serif; --fital:'Instrument Serif',Georgia,serif; --ease:cubic-bezier(.22,1,.36,1); --dur-fast:.12s; --dur:.15s; --dur-enter:.22s; --dur-exit:.13s; }
+/* verbatim from apps/desktop/src/renderer/src/tokens.css */
+[data-theme='dark'] {
+  --win:#0d0d0d; --bg:#141414; --panel:#191919; --panel2:#212121; --panel3:#2b2b2b;
+  --border:#272727; --border2:#383838; --card:#1e1e1e; --card-border:#2c2c2c;
+  --text:#eaeaea; --body:#b6b6b6; --muted:#898989; --dim:#676767; --ring:#525252;
+  --accent:#eaeaea; --accent-ink:#101010; --accent-soft:#2b2b2b; --link:#d19a72;
+  --hover-bg:rgba(234,234,234,.07); --sel-bg:rgba(234,234,234,.10);
+  --todo:#949494; --prog:#8ba0c0; --review:#a89ccf; --done:#77ac8d; --acc:#6fb0ab; --plan:#7fa5ab; --planrev:#a89ccf; --orch:#9793d2; --blocked:#9ca0a8; --warn:#c9a15e; --designrev:#b78bd8; --shiprev:#a89ccf;
+  --shadow-card:0 1px 2px rgba(0,0,0,.25); --shadow-lift:0 8px 20px -8px rgba(0,0,0,.55); --shadow-pop:0 20px 55px -14px rgba(0,0,0,.65);
+  --shadow-sheet:inset 0 1px 0 rgba(255,255,255,.05), 0 12px 30px -6px rgba(0,0,0,.5);
+  --overlay:#222222; --focus-glow:rgba(234,234,234,.22);
+}
+[data-theme='cream-oak'] {
+  --win:#f0e5d3; --bg:#fbf8f4; --panel:#fbf8f4; --panel2:#f6eee1; --panel3:#efe1cd;
+  --border:#e6dbca; --border2:#d3c2a8; --card:#ffffff; --card-border:#eadfce;
+  --text:#2a1c13; --body:#574838; --muted:#97846c; --dim:#b5a289; --ring:#b08a5e;
+  --accent:#834a2b; --accent-ink:#fff7ee; --accent-soft:#f1e3d2; --link:#9c5730;
+  --hover-bg:rgba(42,28,19,.05); --sel-bg:rgba(131,74,43,.08);
+  --todo:#7d8590; --prog:#4f80c4; --review:#6d5ce0; --done:#0f9d63; --acc:#2f8f8a; --plan:#2c7d88; --planrev:#7d56b8; --orch:#6a63bc; --blocked:#7c7f88; --warn:#a9762a; --designrev:#8a3fc0; --shiprev:#6d5ce0;
+  --shadow-card:0 1px 2px rgba(70,42,18,.05); --shadow-lift:0 8px 20px -8px rgba(70,42,18,.20); --shadow-pop:0 20px 55px -14px rgba(70,42,18,.30);
+  --shadow-sheet:0 8px 26px -8px rgba(70,42,18,.16), 0 1px 2px rgba(70,42,18,.05);
+  --overlay:#ffffff; --focus-glow:rgba(131,74,43,.09);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body { background:#131210; }
+body { font-family:'Geist Variable',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; -webkit-font-smoothing:antialiased; }
+.page { max-width:1620px; margin:0 auto; padding:34px 26px 90px; }
+.pagehead { color:#eaeaea; margin-bottom:10px; max-width:112ch; }
+.pagehead h1 { font-family:'Source Serif 4',Georgia,serif; font-size:25px; font-weight:640; letter-spacing:-.012em; text-wrap:balance; }
+.pagehead p { color:#8f8b84; font-size:13px; line-height:1.66; margin-top:9px; }
+.pagehead b { color:#c2beb6; font-weight:600; }
+.pagehead .warn { color:#c8a06a; font-weight:600; }
+.pagehead .ok { color:#8fbf9f; font-weight:600; }
+.stophd { color:#eaeaea; font-size:16.5px; font-weight:660; margin:54px 0 4px; font-family:'Source Serif 4',Georgia,serif; }
+.stopno { font:700 10px 'Geist Mono Variable',ui-monospace,monospace; letter-spacing:.12em; color:#6f6b64; text-transform:uppercase; margin-right:8px; }
+.stopp { color:#8f8b84; font-size:12.5px; line-height:1.68; max-width:108ch; margin-bottom:16px; }
+.stopp b { color:#c2beb6; font-weight:600; }
+.stopp .warn { color:#c8a06a; font-weight:600; }
+.stopp .ok { color:#8fbf9f; font-weight:600; }
+.stopp i { color:#a29d95; }
+.kbd { font:600 10px 'Geist Mono Variable',ui-monospace,monospace; border:1px solid #3a3733; border-radius:5px; padding:1px 5px; color:#a29d95; white-space:nowrap; }
+.themes { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+.themes.tall { grid-template-columns:1fr; }
+@media (max-width:1300px){ .themes { grid-template-columns:1fr; } }
+.theme { background:var(--win); border:1px solid #333029; border-radius:16px; padding:14px; color:var(--text); font-family:var(--fbody); overflow:hidden; position:relative; }
+.theme > h2 { font-size:10.5px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--dim); margin:0 2px 11px; font-family:var(--fmono); }
+
+/* ══ the shell — frame model: --win frame · frame top · naked nav · floating sheet ══ */
+.shell { position:relative; display:flex; flex-direction:column; background:var(--win); border-radius:14px; min-height:596px; padding:0 10px 10px 0; overflow:hidden; }
+.shellrow { flex:1; display:flex; min-height:0; }
+.ftop { flex:none; display:flex; align-items:center; gap:8px; height:42px; padding:0 6px 0 13px; }
+.ftwm { font-weight:650; font-size:12.5px; letter-spacing:-.015em; }
+.ftfold { width:24px; height:24px; display:grid; place-items:center; border-radius:7px; color:var(--dim); border:none; background:none; cursor:pointer; position:relative; }
+.ftfold:hover { background:var(--hover-bg); color:var(--text); }
+.ftcrumb { font-size:11.5px; color:var(--dim); display:flex; align-items:center; gap:6px; }
+.ftcrumb b { color:var(--body); font-weight:600; }
+.ftk { margin-left:auto; display:inline-flex; align-items:center; gap:7px; height:28px; padding:0 12px; border-radius:999px; background:color-mix(in srgb, var(--text) 5%, transparent); color:var(--dim); font-size:11.5px; cursor:pointer; border:none; }
+.ftk:hover { background:color-mix(in srgb, var(--text) 8%, transparent); color:var(--muted); }
+.ftk kbd { font:600 9.5px var(--fmono); border:1px solid var(--border2); border-radius:5px; padding:1px 5px; }
+.utilclu { display:flex; align-items:center; gap:1px; flex:none; padding-left:6px; }
+.utilico { width:27px; height:26px; border-radius:8px; display:grid; place-items:center; border:none; background:none; color:var(--dim); cursor:pointer; position:relative; }
+.utilico:hover { background:var(--hover-bg); color:var(--text); }
+.utilico.on { background:var(--sel-bg); color:var(--text); box-shadow:inset 0 0 0 1px var(--border2); }
+.utilico .ct { position:absolute; top:1px; right:0; min-width:13px; height:13px; padding:0 3px; border-radius:99px; background:var(--panel3); border:1px solid var(--border2); color:var(--body); font:800 8px var(--fmono); display:grid; place-items:center; }
+.synced { display:inline-flex; align-items:center; gap:6px; height:26px; padding:0 11px; margin-left:5px; border-radius:999px; border:1px solid var(--border); color:var(--muted); font:600 11px var(--fbody); flex:none; }
+.synced .dot { width:6px; height:6px; border-radius:50%; background:var(--done); }
+
+/* ── nav column ── */
+.appnav { flex:none; width:262px; min-width:0; display:flex; flex-direction:column; padding:2px 0 6px; overflow:hidden; position:relative; }
+.navscroll { flex:1; min-height:0; overflow:hidden; }
+.newrow { display:flex; align-items:center; gap:5px; padding:8px 10px 4px; }
+.newchat { flex:1; min-width:0; display:flex; align-items:center; gap:9px; height:40px; padding:0 13px 0 14px; border:1px solid var(--card-border); background:var(--card); border-radius:999px; box-shadow:var(--shadow-card); font:620 13px var(--fbody); color:var(--text); cursor:pointer; transition:transform var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease); }
+.newchat:hover { transform:translateY(-1px); box-shadow:var(--shadow-lift); }
+.newchat .plus { font-size:15px; color:var(--muted); font-weight:500; }
+.newchat kbd { margin-left:auto; font:600 9.5px var(--fmono); color:var(--dim); border:1px solid var(--border2); border-radius:5px; padding:1px 5px; }
+.newcaret { flex:none; width:28px; height:28px; display:grid; place-items:center; border-radius:99px; color:var(--dim); cursor:pointer; border:none; background:none; }
+.newcaret:hover { background:var(--hover-bg); color:var(--text); }
+.navsec { display:flex; align-items:center; gap:7px; padding:15px 16px 5px; font:650 9.5px var(--fmono); letter-spacing:.15em; text-transform:uppercase; color:var(--muted); }
+.navsec .r { margin-left:auto; display:flex; gap:2px; }
+.navsec .r button { width:22px; height:22px; display:grid; place-items:center; border:none; background:none; color:var(--dim); border-radius:6px; cursor:pointer; opacity:.7; }
+.navsec .r button:hover { background:var(--hover-bg); color:var(--text); opacity:1; }
+.navitem { display:flex; align-items:center; gap:11px; margin:1px 8px; padding:7px 9px; border-radius:8px; font-size:13px; font-weight:500; color:var(--muted); cursor:pointer; border:none; background:none; text-align:left; width:calc(100% - 16px); }
+.navitem:hover { background:var(--hover-bg); color:var(--text); }
+.navitem.on { background:var(--card); color:var(--text); font-weight:600; box-shadow:var(--shadow-card), inset 0 0 0 1px var(--card-border); }
+.navitem svg { flex:none; color:var(--muted); }
+.navitem.on svg { color:var(--text); }
+.navitem .badge { margin-left:auto; min-width:18px; height:18px; padding:0 5px; border-radius:999px; background:var(--panel3); color:var(--body); border:1px solid var(--border2); font:800 10px var(--fmono); display:grid; place-items:center; }
+.navitem .badge.attn { background:var(--link); border-color:var(--link); color:var(--bg); }
+/* ✦ the Scheduled submenu (stop 3) — a section the HUMAN owns, not one the route opens.
+   The parent toggles; the children navigate. No parent fill, ever: one selection per band. */
+.navparent { display:flex; align-items:center; gap:11px; margin:1px 8px; padding:7px 9px; border-radius:8px; font-size:13px; font-weight:500; color:var(--muted); cursor:pointer; border:none; background:none; text-align:left; width:calc(100% - 16px); }
+.navparent:hover { background:var(--hover-bg); color:var(--text); }
+.navparent svg.g { flex:none; color:var(--muted); }
+.navparent.ingroup { color:var(--text); font-weight:600; }
+.navparent.ingroup svg.g { color:var(--text); }
+.navparent .pchev { margin-left:auto; color:var(--dim); display:grid; place-items:center; transition:transform var(--dur-fast) var(--ease); }
+.navparent.folded .pchev { transform:rotate(-90deg); }
+.navparent .pn { font:800 10px var(--fmono); color:var(--dim); }
+.navsubs { margin:1px 8px 3px 30px; padding-left:12px; border-left:1px solid var(--border2); }
+.navsub { position:relative; display:flex; align-items:center; gap:8px; width:100%; padding:6px 10px; border-radius:8px; font-size:12.5px; font-weight:500; color:var(--muted); border:none; background:none; cursor:pointer; text-align:left; }
+.navsub:hover { background:var(--hover-bg); color:var(--text); }
+.navsub.on { background:var(--card); color:var(--text); font-weight:600; box-shadow:var(--shadow-card), inset 0 0 0 1px var(--card-border); }
+/* the hairline brightens beside the child you are standing on — a fold must not cost the trail */
+.navsub.on::before { content:''; position:absolute; left:-13px; top:4px; bottom:4px; width:1px; background:var(--ring); }
+.navsub .badge { margin-left:auto; min-width:18px; height:18px; padding:0 5px; border-radius:999px; background:var(--panel3); color:var(--body); border:1px solid var(--border2); font:800 10px var(--fmono); display:grid; place-items:center; }
+.projhead { display:flex; align-items:center; gap:6px; padding:5px 10px 5px 12px; cursor:pointer; }
+.projhead:hover { background:var(--hover-bg); border-radius:8px; margin:0 8px; padding-left:4px; }
+.projhead .chev { color:var(--dim); display:grid; place-items:center; width:14px; transition:transform var(--dur-fast) var(--ease); }
+.projhead .chev.c { transform:rotate(-90deg); }
+.plogo { width:16px; height:16px; border-radius:5px; background:var(--panel3); border:1px solid var(--border2); display:grid; place-items:center; font:700 8.5px var(--fbody); color:var(--body); flex:none; }
+.projname { font-size:13px; font-weight:600; color:var(--body); }
+.projhead.on .projname { color:var(--text); }
+.pplive { width:6px; height:6px; border-radius:50%; background:var(--prog); animation:pulse 1.6s var(--ease) infinite; }
+.ppask { width:6px; height:6px; border-radius:50%; background:var(--link); }
+.pplus { margin-left:auto; color:var(--dim); font-size:13px; border:none; background:none; cursor:pointer; border-radius:6px; width:20px; height:20px; display:grid; place-items:center; }
+.pplus:hover { background:var(--hover-bg); color:var(--text); }
+@keyframes pulse { 0%,100% { box-shadow:0 0 0 0 color-mix(in srgb, var(--prog) 34%, transparent); } 50% { box-shadow:0 0 0 4px transparent; } }
+.chipstrip { display:flex; flex-wrap:wrap; gap:4px; padding:1px 10px 5px 32px; }
+.chanchip { display:inline-flex; align-items:center; gap:3px; height:20px; padding:0 8px; border-radius:999px; border:1px solid var(--border); color:var(--muted); font-size:11px; background:none; cursor:pointer; }
+.chanchip i { font-style:normal; color:var(--dim); font-weight:600; }
+.chanchip:hover { background:var(--hover-bg); color:var(--text); }
+.sessrow { display:flex; gap:9px; margin:1px 8px 1px 26px; padding:6px 9px; border-radius:9px; cursor:pointer; border:none; background:none; text-align:left; min-width:0; width:calc(100% - 34px); }
+.sessrow:hover { background:var(--hover-bg); }
+.sessrow.on { background:var(--card); box-shadow:var(--shadow-card), inset 0 0 0 1px var(--card-border); }
+.sdot { flex:none; width:8px; height:8px; border-radius:50%; margin-top:5px; border:1.5px solid var(--dim); }
+.sdot.live { background:var(--prog); border-color:var(--prog); animation:pulse 1.6s var(--ease) infinite; }
+.sdot.review { background:var(--review); border-color:var(--review); }
+.sessbody { min-width:0; flex:1; }
+.sessbody b { display:block; font-size:12.5px; font-weight:560; color:var(--body); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.sessrow:hover .sessbody b, .sessrow.on .sessbody b { color:var(--text); }
+.sessbody small { display:block; font:500 10px var(--fmono); color:var(--dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px; }
+.sessbody small.verb { font-family:var(--fbody); font-style:italic; color:var(--muted); }
+
+/* ── ✦ NEW: the nav's workspace foot (stop 2) ── */
+.navfoot { flex:none; display:flex; align-items:center; gap:8px; margin:6px 8px 0; padding:7px 8px; border-radius:11px; cursor:pointer; border:1px solid transparent; transition:background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease); }
+.navfoot:hover, .appnav.faceon .navfoot { background:var(--card); border-color:var(--card-border); box-shadow:var(--shadow-card); }
+.wstile { position:relative; flex:none; width:24px; height:24px; border-radius:7px; background:var(--panel3); border:1px solid var(--border2); display:grid; place-items:center; font:700 11px var(--fbody); color:var(--body); }
+.wstile .live { position:absolute; inset:-3px; border-radius:10px; box-shadow:0 0 0 1.5px color-mix(in srgb, var(--prog) 55%, transparent); animation:pulse 1.9s var(--ease) infinite; }
+.wstile .unread { position:absolute; top:-3px; right:-3px; width:7px; height:7px; border-radius:50%; background:var(--link); box-shadow:0 0 0 2px var(--win); }
+.wsname { flex:1; min-width:0; font-size:12.5px; font-weight:600; color:var(--body); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.navfoot:hover .wsname { color:var(--text); }
+.wscar { color:var(--dim); display:grid; transform:rotate(180deg); }
+.wsacct { flex:none; width:22px; height:22px; border-radius:7px; background:var(--panel2); border:1px solid var(--border); display:grid; place-items:center; font:700 10px var(--fbody); color:var(--body); }
+
+/* the workspace FACE — same column, same width, no shadow, 0px layout shift */
+.wsface { position:absolute; inset:0; background:var(--win); display:flex; flex-direction:column; padding:8px 0 6px; opacity:0; pointer-events:none; transform:translateY(4px); transition:opacity var(--dur-enter) var(--ease), transform var(--dur-enter) var(--ease); z-index:6; }
+.appnav.faceon .wsface { opacity:1; pointer-events:auto; transform:none; }
+.appnav.faceon .navscroll { opacity:0; transition:opacity var(--dur-exit) var(--ease-exit,linear); }
+.pfhd { display:flex; align-items:center; gap:9px; padding:6px 14px 12px; }
+.pfhdav { width:26px; height:26px; border-radius:8px; background:var(--panel3); border:1px solid var(--border2); display:grid; place-items:center; font:700 12px var(--fbody); color:var(--body); }
+.pfhdt b { display:block; font-size:13px; font-weight:640; }
+.pfhdt small { display:block; font:650 8.5px var(--fmono); letter-spacing:.14em; text-transform:uppercase; color:var(--dim); margin-top:1px; }
+.pfesc { margin-left:auto; font:600 9px var(--fmono); color:var(--dim); border:1px solid var(--border); border-radius:5px; padding:1px 5px; }
+.pfrow { display:flex; align-items:center; gap:11px; margin:1px 8px; padding:7px 10px; border-radius:9px; font-size:12.5px; font-weight:520; color:var(--body); border:none; background:none; cursor:pointer; text-align:left; width:calc(100% - 16px); animation:rise var(--dur-enter) var(--ease) both; }
+.pfrow:hover { background:var(--hover-bg); color:var(--text); }
+.pfrow svg { color:var(--muted); flex:none; }
+.pfrow .gauge { margin-left:auto; display:flex; align-items:center; gap:6px; font:700 9.5px var(--fmono); color:var(--dim); }
+.ring { width:15px; height:15px; border-radius:50%; background:conic-gradient(var(--prog) var(--frac,16%), color-mix(in srgb, var(--dim) 30%, transparent) 0); position:relative; }
+.ring::after { content:''; position:absolute; inset:3px; border-radius:50%; background:var(--win); }
+.pfsep { height:1px; background:var(--border); margin:8px 14px; }
+.pfplan { display:flex; align-items:center; gap:10px; margin:2px 8px; padding:9px 10px; border-radius:11px; background:var(--card); border:1px solid var(--card-border); box-shadow:var(--shadow-card); cursor:pointer; width:calc(100% - 16px); text-align:left; }
+.pfplan b { display:block; font-size:12px; font-weight:640; color:var(--text); }
+.pfplan span.s { display:block; font-size:10.5px; color:var(--muted); margin-top:1px; }
+.pfupg { margin-left:auto; font:700 9.5px var(--fmono); letter-spacing:.06em; text-transform:uppercase; color:var(--link); }
+.pffoot { margin-top:auto; display:flex; align-items:center; gap:9px; padding:8px 14px 2px; border-top:1px solid var(--border); }
+.pffoot .wsacct { width:26px; height:26px; font-size:11px; }
+.pffoot .id { flex:1; min-width:0; }
+.pffoot .id b { display:block; font-size:12px; font-weight:620; }
+.pffoot .id small { display:block; font-size:10.5px; color:var(--dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+/* ── the sheet + the workspace tab strip ── */
+.sheet { flex:1; min-width:120px; background:var(--bg); border:1px solid var(--border); border-radius:14px; box-shadow:var(--shadow-sheet); display:flex; flex-direction:column; overflow:hidden; }
+.wtstrip { flex:none; display:flex; align-items:center; gap:6px; padding:7px 8px 6px 9px; border-bottom:1px solid var(--border); }
+.wtab { display:inline-flex; align-items:center; gap:7px; height:27px; padding:0 11px; border-radius:9px; font-size:11.5px; font-weight:560; color:var(--muted); cursor:pointer; border:none; background:none; }
+.wtab.on { background:var(--card); color:var(--text); box-shadow:var(--shadow-card), inset 0 0 0 1px var(--card-border); }
+.wtab svg { color:var(--dim); } .wtab.on svg { color:var(--body); }
+.wtadd { width:24px; height:24px; border-radius:7px; display:grid; place-items:center; border:none; background:none; color:var(--dim); font-size:14px; cursor:pointer; }
+.wtadd:hover { background:var(--hover-bg); color:var(--text); }
+.wtright { margin-left:auto; display:flex; align-items:center; gap:5px; position:relative; }
+/* ✦ NEW: the bell (stop 1) — ungated, first in the rail, on every surface */
+.bell { position:relative; width:28px; height:27px; border-radius:8px; display:grid; place-items:center; border:none; background:none; color:var(--muted); cursor:pointer; }
+.bell:hover { background:var(--hover-bg); color:var(--text); }
+.bell.on { background:var(--sel-bg); color:var(--text); box-shadow:inset 0 0 0 1px var(--border2); }
+.bell .n { position:absolute; top:-1px; right:-2px; min-width:15px; height:15px; padding:0 4px; border-radius:99px; background:var(--link); color:var(--bg); font:800 9px var(--fmono); display:grid; place-items:center; box-shadow:0 0 0 2px var(--bg); }
+.crewclu { display:flex; align-items:center; height:27px; padding:0 8px 0 5px; border-radius:999px; border:1px solid var(--border); cursor:pointer; gap:6px; }
+.crewclu:hover { background:var(--hover-bg); }
+.crewclu .cav { display:flex; }
+.crewclu .cav span { width:20px; height:20px; border-radius:6px; background:var(--panel2); border:1.5px solid var(--bg); margin-left:-6px; display:grid; place-items:center; font:700 8.5px var(--fbody); color:var(--body); }
+.crewclu .cav span:first-child { margin-left:0; }
+.crewclu .n { font:700 10px var(--fmono); color:var(--muted); }
+.burger { width:28px; height:27px; border-radius:8px; display:grid; place-items:center; border:none; background:none; color:var(--muted); cursor:pointer; }
+.burger:hover, .burger.on { background:var(--hover-bg); color:var(--text); }
+
+/* ── the notification overlay (stop 1) ── */
+.bellpop { position:absolute; top:calc(100% + 9px); right:0; width:432px; max-width:92vw; background:var(--overlay); border:1px solid var(--card-border); border-radius:14px; box-shadow:var(--shadow-pop); z-index:40; display:none; overflow:hidden; }
+.wtright.popon .bellpop { display:block; animation:rise var(--dur-enter) var(--ease); }
+@keyframes rise { from { opacity:0; transform:translateY(6px); } }
+.bphd { display:flex; align-items:baseline; gap:8px; padding:12px 14px 8px; }
+.bphd h4 { font-family:var(--fdisp); font-size:14.5px; font-weight:640; }
+.bphd .n { font:700 10px var(--fmono); color:var(--dim); }
+.bphd .esc { margin-left:auto; font:600 9px var(--fmono); color:var(--dim); border:1px solid var(--border); border-radius:5px; padding:1px 5px; }
+.bplist { max-height:344px; overflow:auto; padding:0 7px 7px; }
+.nyrow { display:flex; align-items:center; gap:9px; padding:8px 8px; border-radius:9px; cursor:pointer; min-width:0; }
+.nyrow:hover { background:var(--hover-bg); }
+.nykind { flex:none; font:640 8.5px var(--fmono); letter-spacing:.07em; text-transform:uppercase; border-radius:6px; padding:2.5px 6px; }
+.nykind.decision { color:var(--orch); background:color-mix(in srgb, var(--orch) 14%, transparent); }
+.nykind.ready { color:var(--done); background:color-mix(in srgb, var(--done) 14%, transparent); }
+.nykind.setup { color:var(--warn); background:color-mix(in srgb, var(--warn) 14%, transparent); }
+.nykind.planrev { color:var(--planrev); background:color-mix(in srgb, var(--planrev) 14%, transparent); }
+.nytext { flex:1; min-width:0; font-size:12px; color:var(--body); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.nytext b { color:var(--text); font-weight:620; }
+.nymeta { flex:none; font:500 9.5px var(--fmono); color:var(--dim); }
+.nygo { flex:none; color:var(--dim); font-size:12px; }
+.bpsec { display:flex; align-items:center; gap:7px; font:650 9px var(--fmono); letter-spacing:.14em; text-transform:uppercase; color:var(--dim); padding:12px 9px 4px; }
+.bpsec .rule { flex:1; height:1px; background:var(--border); }
+.frow { display:flex; align-items:center; gap:9px; padding:7px 8px; border-radius:9px; cursor:pointer; }
+.frow:hover { background:var(--hover-bg); }
+.orb { flex:none; width:12px; height:12px; border-radius:50%; border:2px dotted var(--muted); animation:orbspin 2.6s linear infinite; }
+@keyframes orbspin { to { transform:rotate(360deg); } }
+.chip { flex:none; font:640 8.5px var(--fmono); letter-spacing:.05em; text-transform:uppercase; border-radius:6px; padding:2.5px 6px; color:var(--muted); background:var(--panel2); }
+.chip.prog { color:var(--prog); background:color-mix(in srgb, var(--prog) 13%, transparent); }
+.chip.ship { color:var(--shiprev); background:color-mix(in srgb, var(--shiprev) 13%, transparent); }
+.ftitle { flex:1; min-width:0; font-size:12px; font-weight:540; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.fbeat { flex:none; font-size:11px; color:var(--muted); font-style:italic; }
+.fwhen { flex:none; font:500 9.5px var(--fmono); color:var(--dim); }
+.bpfoot { display:flex; align-items:center; gap:10px; padding:8px 14px; border-top:1px solid var(--border); font-size:11px; color:var(--dim); }
+.bpfoot button { margin-left:auto; border:none; background:none; color:var(--muted); font:560 11px var(--fbody); cursor:pointer; }
+.bpfoot button:hover { color:var(--text); }
+
+/* ── the landing stage (stop 1) ── */
+.stage { flex:1; display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden; }
+.stagecol { width:min(620px, 90%); display:flex; flex-direction:column; align-items:center; padding:22px 0 26px; }
+.eyebrow { font:650 9.5px var(--fmono); letter-spacing:.15em; text-transform:uppercase; color:var(--dim); margin-bottom:9px; }
+.stagehead { font-family:var(--fdisp); font-size:26px; font-weight:640; letter-spacing:-.012em; text-align:center; line-height:1.3; text-wrap:balance; }
+.projpick { position:relative; display:inline-block; }
+.projpickbtn { font-family:var(--fital); font-style:italic; font-weight:500; font-size:28px; color:var(--link); background:none; border:none; cursor:pointer; padding:0 2px; border-bottom:2px dotted color-mix(in srgb, var(--link) 45%, transparent); }
+.projpickbtn:hover { border-bottom-color:var(--link); }
+.composer { width:100%; margin-top:22px; background:var(--card); border:1px solid var(--card-border); border-radius:15px; box-shadow:var(--shadow-card); }
+.chint { display:flex; align-items:center; gap:9px; background:var(--panel2); border-radius:14px 14px 0 0; padding:8px 13px; font-size:11.5px; color:var(--muted); }
+.chint .av { width:20px; height:20px; border-radius:6px; background:var(--panel3); display:grid; place-items:center; font:700 9px var(--fbody); color:var(--body); }
+.chint .at { color:var(--link); font-weight:620; }
+.ctext { padding:15px 15px 8px; font-size:13.5px; color:var(--dim); min-height:54px; }
+.crow { display:flex; align-items:center; gap:6px; padding:8px 10px 10px; }
+.cchip { display:inline-flex; align-items:center; gap:5px; height:26px; padding:0 10px; border-radius:999px; border:1px solid transparent; color:var(--body); font:560 11.5px var(--fbody); cursor:pointer; background:none; }
+.cchip:hover { border-color:var(--border); background:var(--hover-bg); }
+.cchip i { font-style:normal; color:var(--dim); font-weight:600; }
+.send { margin-left:auto; width:30px; height:30px; border-radius:50%; border:none; background:var(--accent); color:var(--accent-ink); cursor:pointer; display:grid; place-items:center; }
+.sugg { display:flex; gap:8px; margin-top:16px; flex-wrap:wrap; justify-content:center; }
+.spill { height:28px; padding:0 13px; border-radius:999px; border:1px solid var(--border2); background:none; color:var(--body); font:560 11.5px var(--fbody); cursor:pointer; }
+.spill:hover { background:var(--hover-bg); color:var(--text); }
+.watermark { position:absolute; right:-40px; bottom:-46px; width:250px; height:250px; border-radius:50%; border:1px solid var(--border); opacity:.5; pointer-events:none; }
+.watermark::after { content:''; position:absolute; inset:38px; border-radius:50%; border:1px solid var(--border); }
+
+/* ── the views menu (stop 3) ── */
+.viewmenu { position:absolute; top:calc(100% + 9px); right:0; min-width:214px; background:var(--overlay); border:1px solid var(--card-border); border-radius:12px; box-shadow:var(--shadow-pop); padding:5px; z-index:40; display:none; }
+.wtright.menuon .viewmenu { display:block; animation:rise var(--dur-enter) var(--ease); }
+.vmrow { display:flex; align-items:center; gap:10px; width:100%; padding:7px 9px; border-radius:8px; border:none; background:none; color:var(--body); font:520 12.5px var(--fbody); cursor:pointer; text-align:left; }
+.vmrow:hover { background:var(--hover-bg); color:var(--text); }
+.vmrow svg { color:var(--muted); flex:none; }
+.vmrow .n { margin-left:auto; font:800 9.5px var(--fmono); color:var(--dim); }
+.vmsep { height:1px; background:var(--border); margin:5px 4px; }
+.vmsec { font:650 9px var(--fmono); letter-spacing:.13em; text-transform:uppercase; color:var(--dim); padding:8px 9px 3px; }
+
+/* ── thread body (stop 4 shell) ── */
+.threadwrap { flex:1; display:flex; min-height:0; }
+.threadcol { flex:1; min-width:0; overflow:hidden; padding:16px clamp(12px,3%,26px); }
+.msg { display:flex; gap:10px; margin-bottom:16px; }
+.msgav { flex:none; width:26px; height:26px; border-radius:8px; background:var(--panel2); border:1px solid var(--border); display:grid; place-items:center; font:700 10.5px var(--fbody); color:var(--body); }
+.msgb { min-width:0; }
+.msgb .who { font-size:12px; font-weight:640; margin-bottom:3px; }
+.msgb .who small { font:500 9.5px var(--fmono); color:var(--dim); margin-left:7px; font-weight:500; }
+.msgb p { font-size:12.5px; line-height:1.65; color:var(--body); }
+.msgb code { font:600 11px var(--fmono); background:var(--panel2); border-radius:5px; padding:1px 5px; color:var(--link); }
+.crumb { display:inline-flex; align-items:center; gap:6px; font:600 10px var(--fmono); letter-spacing:.05em; text-transform:uppercase; color:var(--dim); margin-bottom:14px; }
+
+/* ── ✦ NEW: the file pane at the FRAME's right edge (stop 4) ── */
+.fpgrip { flex:none; width:10px; position:relative; cursor:col-resize; display:grid; place-items:center; touch-action:none; }
+.fpgripbar { width:3px; height:64px; border-radius:99px; background:var(--border2); opacity:0; transition:opacity var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease); }
+.fpgrip:hover .fpgripbar { opacity:1; }
+.shell.dragging .fpgripbar { opacity:1; background:var(--ring); }
+.shell.dragging { cursor:col-resize; user-select:none; }
+.fpgripout { position:absolute; top:14px; left:50%; transform:translateX(-50%); background:var(--overlay); color:var(--body); border:1px solid var(--card-border); border-radius:7px; padding:2px 7px; font:600 10px var(--fmono); box-shadow:var(--shadow-pop); opacity:0; pointer-events:none; white-space:nowrap; z-index:8; }
+.shell.dragging .fpgripout { opacity:1; }
+.filepane { flex:none; width:var(--panew,284px); min-width:0; display:flex; flex-direction:column; padding:4px 0 6px; overflow:hidden; }
+.shell.dragging .filepane { transition:none; }
+.fphd { display:flex; align-items:center; gap:8px; padding:6px 6px 8px 4px; }
+.fphd b { font-size:12.5px; font-weight:640; }
+.fpwt { font:600 9.5px var(--fmono); color:var(--dim); background:var(--panel2); border-radius:6px; padding:2px 6px; }
+.fpx { margin-left:auto; width:22px; height:22px; border-radius:6px; display:grid; place-items:center; border:none; background:none; color:var(--dim); cursor:pointer; }
+.fpx:hover { background:var(--hover-bg); color:var(--text); }
+.fpseg { display:flex; gap:2px; padding:2px; margin:0 4px 8px; background:var(--panel2); border-radius:9px; }
+.fpseg button { flex:1; height:24px; border-radius:7px; border:none; background:none; color:var(--muted); font:600 11px var(--fbody); cursor:pointer; }
+.fpseg button.on { background:var(--card); color:var(--text); box-shadow:var(--shadow-card); }
+.fpfind { margin:0 4px 7px; }
+.fpfind div { display:flex; align-items:center; gap:7px; height:29px; padding:0 10px; border-radius:9px; background:var(--card); border:1px solid var(--card-border); color:var(--dim); font-size:11.5px; }
+.fpfind kbd { margin-left:auto; font:600 9px var(--fmono); border:1px solid var(--border2); border-radius:5px; padding:1px 4px; }
+.fpbr { display:inline-flex; align-items:center; gap:5px; height:22px; padding:0 8px; border-radius:999px; border:1px solid var(--border); color:var(--muted); font:600 10px var(--fmono); background:none; cursor:pointer; }
+.fpbr:hover { background:var(--hover-bg); color:var(--text); }
+.fplist { flex:1; min-height:0; overflow:hidden; padding:0 4px; }
+.ftdir, .ftfile { display:flex; align-items:center; gap:6px; width:100%; padding:4px 8px; border-radius:7px; border:none; background:none; color:var(--body); font-size:11.5px; cursor:pointer; text-align:left; }
+.ftdir:hover, .ftfile:hover { background:var(--hover-bg); color:var(--text); }
+.ftfile.on { background:var(--card); color:var(--text); box-shadow:var(--shadow-card), inset 0 0 0 1px var(--card-border); font-weight:600; }
+.ftcaret { color:var(--dim); font-size:9px; width:9px; }
+.ftdot { width:4px; height:4px; border-radius:50%; background:var(--dim); flex:none; margin:0 2px 0 3px; }
+.ftfile .m { margin-left:auto; font:700 9px var(--fmono); color:var(--link); }
+.fpkind { margin-left:auto; font:500 9.5px var(--fmono); color:var(--dim); }
+
+/* ── the name candidates strip (stop 4) ── */
+.namegrid { display:grid; grid-template-columns:repeat(auto-fit, minmax(230px, 1fr)); gap:12px; }
+.namecard { background:var(--win); border-radius:12px; padding:10px; }
+.namecard .hdr { display:flex; align-items:center; gap:8px; padding:6px 6px 9px 4px; }
+.namecard .hdr b { font-size:12.5px; font-weight:640; color:var(--text); }
+.namecard .why { font-size:11.5px; line-height:1.6; color:var(--muted); padding:8px 4px 2px; }
+.namecard .why b { color:var(--body); font-weight:620; }
+.namecard.top { box-shadow:inset 0 0 0 1px var(--ring); }
+.namecard .tag { position:relative; top:-2px; font:700 8px var(--fmono); letter-spacing:.1em; text-transform:uppercase; color:var(--done); }
+
+/* ── before/after nav diff (stop 3) ── */
+.diffgrid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.diffcol { background:var(--win); border-radius:12px; padding:8px 0; position:relative; }
+.difftag { position:absolute; top:-9px; left:12px; font:700 8.5px var(--fmono); letter-spacing:.12em; text-transform:uppercase; padding:2px 7px; border-radius:6px; z-index:2; }
+.difftag.was { background:#2a2723; color:#c8a06a; }
+.difftag.now { background:#1e2a22; color:#8fbf9f; }
+.strike { position:relative; opacity:.42; }
+.strike::after { content:''; position:absolute; left:12px; right:12px; top:50%; height:1px; background:#c8a06a; }
+
+/* ── spec cards ── */
+.specgrid { display:grid; grid-template-columns:repeat(auto-fit, minmax(330px, 1fr)); gap:14px; }
+.spec { background:#1a1815; border:1px solid #2c2923; border-radius:13px; padding:16px 17px; color:#b6b1a9; font-size:12.5px; line-height:1.66; }
+.spec h3 { color:#e6e2da; font-size:13px; font-weight:660; margin-bottom:8px; font-family:'Source Serif 4',Georgia,serif; }
+.spec b { color:#d8d3ca; font-weight:600; }
+.spec .k { font:600 10.5px 'Geist Mono Variable',ui-monospace,monospace; color:#d8b98e; }
+.spec ul { list-style:none; }
+.spec li { padding:3px 0 3px 16px; position:relative; }
+.spec li::before { content:'·'; position:absolute; left:4px; color:#6f6b64; }
+table.alts { width:100%; border-collapse:collapse; color:#b6b1a9; font-size:12.5px; margin-top:14px; }
+.alts th { text-align:left; font:650 10px 'Geist Mono Variable',ui-monospace,monospace; letter-spacing:.1em; text-transform:uppercase; color:#6f6b64; padding:8px 12px; border-bottom:1px solid #2c2923; }
+.alts td { padding:10px 12px; border-bottom:1px solid #211f1b; vertical-align:top; line-height:1.6; }
+.alts td b { color:#d8d3ca; font-weight:620; }
+.alts .pick { color:#8fbf9f; font-weight:650; }
+.alts .no { color:#6f6b64; }
+.qs { counter-reset:q; }
+.q { background:#1a1815; border:1px solid #2c2923; border-left:2px solid #c8a06a; border-radius:0 12px 12px 0; padding:14px 17px; margin-bottom:11px; color:#b6b1a9; font-size:12.5px; line-height:1.68; }
+.q h3 { color:#e6e2da; font-size:13px; font-weight:660; margin-bottom:6px; font-family:'Source Serif 4',Georgia,serif; }
+.q b { color:#d8d3ca; font-weight:600; }
+.q .rec { color:#8fbf9f; font-weight:620; }
+@media (prefers-reduced-motion: reduce) { .pplive, .sdot.live, .orb, .wstile .live { animation:none; } .wtright.popon .bellpop, .pfrow { animation:none; } }
+</style>
+</head>
+<body>
+<div class="page">
+
+<div class="pagehead">
+  <h1>The quiet shell — four cuts: the bell, the foot, the strip, the pane</h1>
+  <p><b>One idea under four asks: the frame stops being a place, and goes back to being a frame.</b> Today the window carries a 30px spine that holds one vertical string, a Home screen that is largely a third copy of the nav tree, and <i>two</i> different things called Files at opposite corners. Every one of those is chrome that earns its space by being always visible rather than by being used. This round returns them: the landing becomes the composer, the queue becomes a <b>bell</b>, the workspace moves to the <b>nav's foot</b>, Tasks leaves the band for the landing, and the two Files resolve into <b>Files</b> (workspace documents — a place you go) and <b>Workbench</b> (this thread's code and artifacts — a panel that opens beside your work).</p>
+  <p class="warn">Rounds 2–3 (your passes): the <b>Shortcuts band survives</b> — Whiteboards · Scheduled · Files stay in the nav and only Tasks leaves. And Tasks lands <b>nowhere</b>: the board is being <b>deprecated in a later round</b>, so putting it on the landing would be building a door onto a room that is coming down. It keeps the views menu and ⌘K until it goes. The stage is therefore <b>greeting · composer · pills</b> and nothing else. <b>Scheduled keeps Routines and Calendar</b>, and its submenu is rebuilt (stop 3): the parent stops being a half-selected pseudo-destination and becomes a fold the human owns, the children stop appearing and disappearing as you navigate, and both are one click from anywhere. And <b>"Editor" is dead</b> — the panel is contextual, so it needed a name that is the parent of <i>code</i> and <i>artifacts</i>, not the name of one tool inside it (stop 4).</p>
+  <p><b>Net frame budget:</b> <span class="ok">−30px</span> horizontal (the spine) and <span class="ok">−60px</span> of nav vertical (Home + Tasks), against <span class="warn">+1</span> control in the tab strip's rail (the bell). The sheet gets all of it.</p>
+  <p class="warn">Shells below are built from the real <span class="kbd">tokens.css</span> values, graphite + cream-oak, both themes for every stop. <b>Live: the bell popover, the views menu, the workspace face (hover the nav's foot), and the file pane's grip (drag it).</b> Nothing here is implemented yet — this is the design review docs/33 §11 gates the build on.</p>
+</div>
+
+<!-- ══════════════════ STOP 1 ══════════════════ -->
+<div class="stophd"><span class="stopno">Stop 1</span>The landing is the composer; the queue is a bell</div>
+<div class="stopp">
+  <b>Home stops being a screen.</b> <span class="kbd">view:'dashboard'</span> and <span class="kbd">view:'newchat'</span> merge — ⌘N, the Home key and boot all land on the stage. Of Home's three sections, two were already elsewhere:
+  <b>Recent</b> is the nav tree and the ⌘Y overlay (the same <span class="kbd">historyRows</span> derivation, rendered three times), and <b>In flight</b> is the tree's live rows, the tab-0 pulse and the processes popover (docs/29 §10 asks for one liveness signal, and Home was the fourth).
+  Only the <b>needs-you queue</b> had no other home — so it gets one that is <i>not</i> a screen: a bell at the head of the strip's right rail, leading the crew clusters, <b>ungated</b> (the clusters vanish the moment a task or thread opens; the bell never does).
+  The overlay is the docs/33 popover — <span class="kbd">--overlay</span> + <span class="kbd">--shadow-pop</span>, 432px — carrying the rows verbatim (<i>a row is a door, not a form</i>, 2026-08-07): click navigates and closes, ✕ dismisses, the full card still answers in the thread. <b>In flight rides below it as a quieter second section</b>, so the one place you check "what is happening" answers both halves of the question.
+  The greeting survives as the stage's headline, and the eyebrow keeps Home's date line. And nothing else: no board row, no destination tiles. Tasks left the band but does <b>not</b> land here — the board is deprecating, and a landing screen is the last place to add a door to a surface that is going away. What the landing loses in glanceability, the bell gives back: <i>In flight</i> rides in the popover, one click from the same place the queue is. <span class="ok">Click a bell.</span>
+</div>
+<div class="themes tall">
+
+  <!-- ░░ DARK ░░ -->
+  <div class="theme" data-theme="dark">
+    <h2>graphite · the landing, bell open</h2>
+    <div class="shell" style="min-height:688px">
+      <div class="ftop">
+        <span class="ftwm">neuramesh</span>
+        <button class="ftfold" title="Hide the sidebar · ⌘\"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="16" rx="2"/><rect x="4.5" y="5.5" width="4" height="13" rx="1" fill="currentColor" stroke="none"/></svg></button>
+        <span class="ftcrumb"><span>/</span> flowe-ai <span>›</span> <b>New chat</b></span>
+        <button class="ftk">⌕ <span>Search — channels, tasks, artifacts</span> <kbd>⌘K</kbd></button>
+        <span class="utilclu">
+          <button class="utilico" title="Workbench — this session&#39;s code and artifacts · ⌘P"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 17l6-6-6-6"/><path d="M13 19h7"/></svg></button>
+          <button class="utilico" title="Browser"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a13.5 13.5 0 0 1 0 18 13.5 13.5 0 0 1 0-18z"/></svg></button>
+          <button class="utilico" title="Terminal"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 2.5 2.5L7 14"/><path d="M12.5 14H17"/></svg></button>
+          <button class="utilico" title="Background processes"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg><span class="ct">2</span></button>
+          <span class="synced"><span class="dot"></span> Synced</span>
+        </span>
+      </div>
+      <div class="shellrow">
+        <div class="appnav" data-face>
+          <div class="navscroll">
+            <div class="newrow">
+              <button class="newchat"><span class="plus">＋</span> New chat <kbd>⌘N</kbd></button>
+              <button class="newcaret"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 9l6 6 6-6"/></svg></button>
+            </div>
+            <div class="navsec">Shortcuts</div>
+            <button class="navitem"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 14.5 3.2-4.2 2.6 3 3.9-5.3"/></svg><span>Whiteboards</span></button>
+            <button class="navparent"><svg class="g" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M17 2.5l4 4-4 4"/><path d="M3 11.5v-2a3 3 0 0 1 3-3h15"/><path d="M7 21.5l-4-4 4-4"/><path d="M21 12.5v2a3 3 0 0 1-3 3H3"/></svg><span>Scheduled</span><span class="pchev"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></span></button>
+            <div class="navsubs">
+              <button class="navsub">Routines<span class="badge">3</span></button>
+              <button class="navsub">Calendar<span class="badge">7</span></button>
+            </div>
+            <button class="navitem"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><span>Files</span></button>
+            <div class="navsec">Projects <span class="r"><button>⚙</button><button>＋</button><button>⌕</button></span></div>
+            <div class="projhead on"><span class="chev"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></span><span class="plogo">F</span><span class="projname">Flowe AI</span><span class="ppask"></span><button class="pplus">＋</button></div>
+            <div class="chipstrip"><span class="chanchip"><i>#</i>build</span><span class="chanchip"><i>#</i>marketing</span><span class="chanchip">+2 more</span></div>
+            <button class="sessrow on"><span class="sdot live"></span><span class="sessbody"><b>#1057 · Fix X token auto-refresh</b><small class="verb">plume · patching · 2 of 5</small></span></button>
+            <button class="sessrow"><span class="sdot review"></span><span class="sessbody"><b>#1034 · flowe logo revamp</b><small>⎇ nm/1034-logo-revamp</small></span></button>
+            <button class="sessrow"><span class="sdot"></span><span class="sessbody"><b>X engagement sweep</b><small>#marketing · 1d</small></span></button>
+            <div class="projhead"><span class="chev c"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></span><span class="plogo">A</span><span class="projname">AI Demos</span><span class="pplive"></span><button class="pplus">＋</button></div>
+            <div class="projhead"><span class="chev c"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></span><span class="plogo">N</span><span class="projname">Neuramesh</span><button class="pplus">＋</button></div>
+          </div>
+          <div class="wsface"></div>
+          <div class="navfoot"><span class="wstile">N<span class="live"></span><span class="unread"></span></span><span class="wsname">neuramesh</span><span class="wscar"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></span><span class="wsacct">G</span></div>
+        </div>
+        <div class="sheet">
+          <div class="wtstrip">
+            <button class="wtab on"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> New chat</button>
+            <button class="wtadd">＋</button>
+            <div class="wtright popon" data-rail>
+              <button class="bell on" data-bell><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M18 8a6 6 0 1 0-12 0c0 6-2 7-2 7h16s-2-1-2-7"/><path d="M13.7 20a2 2 0 0 1-3.4 0"/></svg><span class="n">8</span></button>
+              <button class="crewclu"><span class="cav"><span>G</span><span>M</span></span><span class="n">2</span></button>
+              <button class="crewclu"><span class="cav"><span>r</span><span>p</span><span>b</span></span><span class="n">9</span></button>
+              <button class="burger"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+              <div class="bellpop">
+                <div class="bphd"><h4>Needs you</h4><span class="n">8</span><span class="esc">esc</span></div>
+                <div class="bplist">
+                  <div class="nyrow"><span class="nykind ready">ready</span><span class="nytext"><b>#1058</b> Draft + schedule 7 Flowe X posts for week of Aug 17</span><span class="nymeta">#marketing · 2h</span><span class="nygo">›</span></div>
+                  <div class="nyrow"><span class="nykind decision">decision</span><span class="nytext"><b>rex asks: </b>How should the #1057 X token-refresh fix be routed?</span><span class="nymeta">#marketing · 2d</span><span class="nygo">›</span></div>
+                  <div class="nyrow"><span class="nykind decision">decision</span><span class="nytext"><b>rex asks: </b>Add @plume to #marketing?</span><span class="nymeta">#marketing · 20h</span><span class="nygo">›</span></div>
+                  <div class="nyrow"><span class="nykind decision">decision</span><span class="nytext"><b>rex asks: </b>Schedule 7 posts? (Aug 17, 8:00 PM · Aug 18, 9:00 AM …)</span><span class="nymeta">#marketing · 1d</span><span class="nygo">›</span></div>
+                  <div class="nyrow"><span class="nykind planrev">plan review</span><span class="nytext"><b>#1061</b> Berth sweep: warm-eviction budget</span><span class="nymeta">#build · 5h</span><span class="nygo">›</span></div>
+                  <div class="nyrow"><span class="nykind setup">setup</span><span class="nytext"><b>#1059</b> Set up your marketing HQ · step 1 of 4 — Product</span><span class="nymeta">#marketing · 21h</span><span class="nygo">›</span></div>
+                  <div class="bpsec">In flight <span class="rule"></span> 4</div>
+                  <div class="frow"><span class="orb"></span><span class="ftitle">#1057 · Fix X token auto-refresh failing with 400</span><span class="fbeat">plume · 2 of 5</span><span class="fwhen">6m</span></div>
+                  <div class="frow"><span class="chip">chat</span><span class="ftitle">Agent Interoperability Map</span><span class="fbeat">awaiting your reply</span><span class="fwhen">20h</span></div>
+                  <div class="frow"><span class="chip ship">shipping</span><span class="ftitle">#1034 · flowe logo revamp</span><span class="fbeat">bosun</span><span class="fwhen">Jul 29</span></div>
+                </div>
+                <div class="bpfoot"><span>Answering happens in the thread.</span><button>Search history ⌘Y ›</button></div>
+              </div>
+            </div>
+          </div>
+          <div class="stage">
+            <span class="watermark"></span>
+            <div class="stagecol">
+              <div class="eyebrow">Sunday · Aug 16</div>
+              <h1 class="stagehead">Good afternoon, geo. What&rsquo;s next in <span class="projpick"><button class="projpickbtn">flowe-ai</button></span>?</h1>
+              <div class="composer">
+                <div class="chint"><span class="av">r</span><span>Mention <span class="at">@rex</span> or another teammate whenever you want their help.</span></div>
+                <div class="ctext">Describe the work — or just ask. The orchestrator decides what becomes a task.</div>
+                <div class="crow">
+                  <button class="cchip"><i>#</i> marketing <span style="color:var(--dim)">⌄</span></button>
+                  <button class="cchip">Sol · balanced <span style="color:var(--dim)">⌄</span></button>
+                  <button class="cchip">@</button>
+                  <button class="cchip"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></button>
+                  <button class="send"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button>
+                </div>
+              </div>
+              <div class="sugg">
+                <button class="spill">Give me ideas</button>
+                <button class="spill">What moved while I was away?</button>
+                <button class="spill">Plan the next release</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ░░ CREAM ░░ -->
+  <div class="theme" data-theme="cream-oak">
+    <h2>cream oak · the landing at rest — click the bell</h2>
+    <div class="shell" style="min-height:688px">
+      <div class="ftop">
+        <span class="ftwm">neuramesh</span>
+        <button class="ftfold"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="16" rx="2"/><rect x="4.5" y="5.5" width="4" height="13" rx="1" fill="currentColor" stroke="none"/></svg></button>
+        <span class="ftcrumb"><span>/</span> flowe-ai <span>›</span> <b>New chat</b></span>
+        <button class="ftk">⌕ <span>Search — channels, tasks, artifacts</span> <kbd>⌘K</kbd></button>
+        <span class="utilclu">
+          <button class="utilico" title="Workbench — this session&#39;s code and artifacts · ⌘P"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 17l6-6-6-6"/><path d="M13 19h7"/></svg></button>
+          <button class="utilico"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a13.5 13.5 0 0 1 0 18 13.5 13.5 0 0 1 0-18z"/></svg></button>
+          <button class="utilico"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 2.5 2.5L7 14"/><path d="M12.5 14H17"/></svg></button>
+          <button class="utilico"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg><span class="ct">2</span></button>
+          <span class="synced"><span class="dot"></span> Synced</span>
+        </span>
+      </div>
+      <div class="shellrow">
+        <div class="appnav" data-face>
+          <div class="navscroll">
+            <div class="newrow">
+              <button class="newchat"><span class="plus">＋</span> New chat <kbd>⌘N</kbd></button>
+              <button class="newcaret"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 9l6 6 6-6"/></svg></button>
+            </div>
+            <div class="navsec">Shortcuts</div>
+            <button class="navitem"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 14.5 3.2-4.2 2.6 3 3.9-5.3"/></svg><span>Whiteboards</span></button>
+            <button class="navparent"><svg class="g" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M17 2.5l4 4-4 4"/><path d="M3 11.5v-2a3 3 0 0 1 3-3h15"/><path d="M7 21.5l-4-4 4-4"/><path d="M21 12.5v2a3 3 0 0 1-3 3H3"/></svg><span>Scheduled</span><span class="pchev"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></span></button>
+            <div class="navsubs">
+              <button class="navsub">Routines<span class="badge">3</span></button>
+              <button class="navsub">Calendar<span class="badge">7</span></button>
+            </div>
+            <button class="navitem"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><span>Files</span></button>
+            <div class="navsec">Projects <span class="r"><button>⚙</button><button>＋</button><button>⌕</button></span></div>
+            <div class="projhead on"><span class="chev"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></span><span class="plogo">F</span><span class="projname">Flowe AI</span><span class="ppask"></span><button class="pplus">＋</button></div>
+            <div class="chipstrip"><span class="chanchip"><i>#</i>build</span><span class="chanchip"><i>#</i>marketing</span><span class="chanchip">+2 more</span></div>
+            <button class="sessrow on"><span class="sdot live"></span><span class="sessbody"><b>#1057 · Fix X token auto-refresh</b><small class="verb">plume · patching · 2 of 5</small></span></button>
+            <button class="sessrow"><span class="sdot review"></span><span class="sessbody"><b>#1034 · flowe logo revamp</b><small>⎇ nm/1034-logo-revamp</small></span></button>
+            <button class="sessrow"><span class="sdot"></span><span class="sessbody"><b>X engagement sweep</b><small>#marketing · 1d</small></span></button>
+            <div class="projhead"><span class="chev c"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></span><span class="plogo">A</span><span class="projname">AI Demos</span><span class="pplive"></span><button class="pplus">＋</button></div>
+            <div class="projhead"><span class="chev c"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></span><span class="plogo">N</span><span class="projname">Neuramesh</span><button class="pplus">＋</button></div>
+          </div>
+          <div class="wsface"></div>
+          <div class="navfoot"><span class="wstile">N<span class="live"></span><span class="unread"></span></span><span class="wsname">neuramesh</span><span class="wscar"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></span><span class="wsacct">G</span></div>
+        </div>
+        <div class="sheet">
+          <div class="wtstrip">
+            <button class="wtab on"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> New chat</button>
+            <button class="wtadd">＋</button>
+            <div class="wtright" data-rail>
+              <button class="bell" data-bell><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M18 8a6 6 0 1 0-12 0c0 6-2 7-2 7h16s-2-1-2-7"/><path d="M13.7 20a2 2 0 0 1-3.4 0"/></svg><span class="n">8</span></button>
+              <button class="crewclu"><span class="cav"><span>G</span><span>M</span></span><span class="n">2</span></button>
+              <button class="crewclu"><span class="cav"><span>r</span><span>p</span><span>b</span></span><span class="n">9</span></button>
+              <button class="burger" data-menu><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+              <div class="bellpop">
+                <div class="bphd"><h4>Needs you</h4><span class="n">8</span><span class="esc">esc</span></div>
+                <div class="bplist">
+                  <div class="nyrow"><span class="nykind ready">ready</span><span class="nytext"><b>#1058</b> Draft + schedule 7 Flowe X posts for week of Aug 17</span><span class="nymeta">#marketing · 2h</span><span class="nygo">›</span></div>
+                  <div class="nyrow"><span class="nykind decision">decision</span><span class="nytext"><b>rex asks: </b>How should the #1057 X token-refresh fix be routed?</span><span class="nymeta">#marketing · 2d</span><span class="nygo">›</span></div>
+                  <div class="nyrow"><span class="nykind decision">decision</span><span class="nytext"><b>rex asks: </b>Add @plume to #marketing?</span><span class="nymeta">#marketing · 20h</span><span class="nygo">›</span></div>
+                  <div class="nyrow"><span class="nykind planrev">plan review</span><span class="nytext"><b>#1061</b> Berth sweep: warm-eviction budget</span><span class="nymeta">#build · 5h</span><span class="nygo">›</span></div>
+                  <div class="nyrow"><span class="nykind setup">setup</span><span class="nytext"><b>#1059</b> Set up your marketing HQ · step 1 of 4 — Product</span><span class="nymeta">#marketing · 21h</span><span class="nygo">›</span></div>
+                  <div class="bpsec">In flight <span class="rule"></span> 4</div>
+                  <div class="frow"><span class="orb"></span><span class="ftitle">#1057 · Fix X token auto-refresh failing with 400</span><span class="fbeat">plume · 2 of 5</span><span class="fwhen">6m</span></div>
+                  <div class="frow"><span class="chip">chat</span><span class="ftitle">Agent Interoperability Map</span><span class="fbeat">awaiting your reply</span><span class="fwhen">20h</span></div>
+                </div>
+                <div class="bpfoot"><span>Answering happens in the thread.</span><button>Search history ⌘Y ›</button></div>
+              </div>
+              <div class="viewmenu">
+                <div class="vmsec">Destinations</div>
+                <button class="vmrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/></svg> Tasks <span class="n">14</span></button>
+                <button class="vmrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 14.5 3.2-4.2 2.6 3 3.9-5.3"/></svg> Whiteboards</button>
+                <button class="vmrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M17 2.5l4 4-4 4"/><path d="M3 11.5v-2a3 3 0 0 1 3-3h15"/><path d="M7 21.5l-4-4 4-4"/><path d="M21 12.5v2a3 3 0 0 1-3 3H3"/></svg> Scheduled <span class="n">3</span></button>
+                <button class="vmrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg> Files</button>
+                <div class="vmsep"></div>
+                <button class="vmrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M21.42 10.92a1 1 0 0 0-.02-1.84L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.83l8.57 3.91a2 2 0 0 0 1.66 0z"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/></svg> Skills</button>
+                <button class="vmrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.66 3.58 3 8 3s8-1.34 8-3V5"/><path d="M4 11v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/></svg> Memory</button>
+                <button class="vmrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg> Activity</button>
+                <button class="vmrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="5" r="2.4"/><circle cx="5" cy="19" r="2.4"/><circle cx="19" cy="19" r="2.4"/><path d="M12 7.4v3.6M12 11l-5.4 6M12 11l5.4 6"/></svg> Agents</button>
+                <button class="vmrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="8.6"/><path d="M12 7.5V12l3 2"/></svg> History <span class="n">⌘Y</span></button>
+              </div>
+            </div>
+          </div>
+          <div class="stage">
+            <span class="watermark"></span>
+            <div class="stagecol">
+              <div class="eyebrow">Sunday · Aug 16</div>
+              <h1 class="stagehead">Good afternoon, geo. What&rsquo;s next in <span class="projpick"><button class="projpickbtn">flowe-ai</button></span>?</h1>
+              <div class="composer">
+                <div class="chint"><span class="av">r</span><span>Mention <span class="at">@rex</span> or another teammate whenever you want their help.</span></div>
+                <div class="ctext">Describe the work — or just ask. The orchestrator decides what becomes a task.</div>
+                <div class="crow">
+                  <button class="cchip"><i>#</i> marketing <span style="color:var(--dim)">⌄</span></button>
+                  <button class="cchip">Sol · balanced <span style="color:var(--dim)">⌄</span></button>
+                  <button class="cchip">@</button>
+                  <button class="cchip"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></button>
+                  <button class="send"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button>
+                </div>
+              </div>
+              <div class="sugg">
+                <button class="spill">Give me ideas</button>
+                <button class="spill">What moved while I was away?</button>
+                <button class="spill">Plan the next release</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════ STOP 2 ══════════════════ -->
+<div class="stophd"><span class="stopno">Stop 2</span>The spine retires; the workspace moves to the nav's foot</div>
+<div class="stopp">
+  <b>30px of frame carrying one vertical string.</b> The spine (v0.76) exists to keep two scopes from sharing a heading — the workspace above the rule, the project below it. That contract survives without a column: the workspace sits at the <b>foot</b> of the nav, under everything it contains, which says the same thing by position and costs nothing.
+  <span class="ok">Hover the foot bar in either shell.</span> The two-face machinery is untouched (same column, same width, both faces mounted, <b>0px layout shift</b>) — only its trigger moves. Hover arms it on <b>140ms of intent</b> (a foot you sweep past on the way to a session row must not flip the column, the same intent gate the agent popover uses); leaving the column crosses back; <b>clicking pins</b> it until Esc or a click away; <span class="kbd">⌘⇧P</span> unchanged.
+  The spine's other tenants come along: the workspace <b>live pulse</b> and <b>unread dot</b> ride the foot's logo tile, and the account avatar keeps its seat at the bar's right end, opening the same disclosure inside the face.
+  Two consequences worth naming: <b>the fold loses its last strip</b> — which is right, because docs/33 §2 already says the fold control belongs on the frame top (<span class="kbd">.ftfold</span>, present in every view) rather than on the rail it folds; the panel still collapses to zero, and while folded the frame-top pin wears the unread dot so the signal survives the fold.
+  And <b>Footprint gets its number back</b>: Home's corner ring was a gauge with no door beside it — here it is the trailing mark on the row that opens it.
+</div>
+<div class="themes">
+  <div class="theme" data-theme="dark">
+    <h2>graphite · at rest → hover the foot</h2>
+    <div class="shell" style="min-height:520px">
+      <div class="ftop"><span class="ftwm">neuramesh</span><button class="ftfold"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="16" rx="2"/><rect x="4.5" y="5.5" width="4" height="13" rx="1" fill="currentColor" stroke="none"/></svg></button><span class="ftcrumb"><span>/</span> flowe-ai <span>›</span> <b>#marketing</b></span><button class="ftk">⌕ <span>Search</span> <kbd>⌘K</kbd></button></div>
+      <div class="shellrow">
+        <div class="appnav" data-face>
+          <div class="navscroll">
+            <div class="newrow"><button class="newchat"><span class="plus">＋</span> New chat <kbd>⌘N</kbd></button><button class="newcaret"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 9l6 6 6-6"/></svg></button></div>
+            <div class="navsec">Shortcuts</div>
+            <button class="navitem"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 14.5 3.2-4.2 2.6 3 3.9-5.3"/></svg><span>Whiteboards</span></button>
+            <button class="navparent"><svg class="g" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M17 2.5l4 4-4 4"/><path d="M3 11.5v-2a3 3 0 0 1 3-3h15"/><path d="M7 21.5l-4-4 4-4"/><path d="M21 12.5v2a3 3 0 0 1-3 3H3"/></svg><span>Scheduled</span><span class="pchev"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></span></button>
+            <div class="navsubs">
+              <button class="navsub">Routines<span class="badge">3</span></button>
+              <button class="navsub">Calendar<span class="badge">7</span></button>
+            </div>
+            <button class="navitem"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><span>Files</span></button>
+            <div class="navsec">Projects <span class="r"><button>⚙</button><button>＋</button><button>⌕</button></span></div>
+            <div class="projhead on"><span class="chev"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></span><span class="plogo">F</span><span class="projname">Flowe AI</span><span class="ppask"></span><button class="pplus">＋</button></div>
+            <div class="chipstrip"><span class="chanchip"><i>#</i>build</span><span class="chanchip"><i>#</i>marketing</span></div>
+            <button class="sessrow on"><span class="sdot live"></span><span class="sessbody"><b>#1057 · Fix X token auto-refresh</b><small class="verb">plume · patching · 2 of 5</small></span></button>
+            <button class="sessrow"><span class="sdot"></span><span class="sessbody"><b>X engagement sweep</b><small>#marketing · 1d</small></span></button>
+            <div class="projhead"><span class="chev c"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></span><span class="plogo">A</span><span class="projname">AI Demos</span><span class="pplive"></span><button class="pplus">＋</button></div>
+          </div>
+          <div class="wsface">
+            <div class="pfhd"><span class="pfhdav">N</span><span class="pfhdt"><b>neuramesh</b><small>workspace</small></span><span class="pfesc">esc</span></div>
+            <button class="pfrow" style="--i:0"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.6"/></svg> All projects</button>
+            <button class="pfplan"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" style="color:var(--muted)"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9z"/></svg><span><b>Cloud · Synced</b><span class="s">unlimited projects &amp; machines</span></span></button>
+            <div class="pfsep"></div>
+            <div class="navsec" style="padding:4px 16px 3px">Workspace</div>
+            <button class="pfrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="5" r="2.4"/><circle cx="5" cy="19" r="2.4"/><circle cx="19" cy="19" r="2.4"/><path d="M12 7.4v3.6M12 11l-5.4 6M12 11l5.4 6"/></svg> Agents &amp; machines</button>
+            <button class="pfrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 9 9"/><path d="M12 12V3"/><path d="M12 12h9"/></svg> Footprint <span class="gauge"><span class="ring" style="--frac:16%"></span> 16%</span></button>
+            <button class="pfrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="2" y="4" width="20" height="12" rx="2"/><path d="M2 20h20"/><path d="M9 20v-4h6v4"/></svg> Compute</button>
+            <button class="pfrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="8" r="6"/><path d="M15.48 12.89 17 22l-5-3-5 3 1.52-9.11"/></svg> Retro</button>
+            <button class="pfrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="3"/><path d="M12.2 2h-.4a2 2 0 0 0-2 2v.2a2 2 0 0 1-1 1.7l-.4.3a2 2 0 0 1-2 0l-.2-.1a2 2 0 0 0-2.7.8l-.2.4a2 2 0 0 0 .7 2.7l.2.1a2 2 0 0 1 1 1.7v.5a2 2 0 0 1-1 1.8l-.2.1a2 2 0 0 0-.7 2.7l.2.4a2 2 0 0 0 2.7.7l.2-.1a2 2 0 0 1 2 0l.4.3a2 2 0 0 1 1 1.7V20a2 2 0 0 0 2 2h.4a2 2 0 0 0 2-2v-.2a2 2 0 0 1 1-1.7l.4-.3a2 2 0 0 1 2 0l.2.1a2 2 0 0 0 2.7-.7l.2-.4a2 2 0 0 0-.7-2.7l-.2-.1a2 2 0 0 1-1-1.8v-.5a2 2 0 0 1 1-1.7l.2-.1a2 2 0 0 0 .7-2.7l-.2-.4a2 2 0 0 0-2.7-.8l-.2.1a2 2 0 0 1-2 0l-.4-.3a2 2 0 0 1-1-1.7V4a2 2 0 0 0-2-2z"/></svg> Workspace settings</button>
+            <div class="pffoot"><span class="wsacct">G</span><span class="id"><b>george alonge</b><small>george@acme.dev</small></span><span class="wscar" style="transform:none"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></span></div>
+          </div>
+          <div class="navfoot"><span class="wstile">N<span class="live"></span><span class="unread"></span></span><span class="wsname">neuramesh</span><span class="wscar"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></span><span class="wsacct">G</span></div>
+        </div>
+        <div class="sheet" style="align-items:center; justify-content:center">
+          <div style="text-align:center; color:var(--dim); font:600 10.5px var(--fmono); letter-spacing:.09em; text-transform:uppercase; line-height:2.1">the sheet<br>+30px wider than today</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="theme" data-theme="cream-oak">
+    <h2>cream oak · the face, revealed</h2>
+    <div class="shell" style="min-height:520px">
+      <div class="ftop"><span class="ftwm">neuramesh</span><button class="ftfold"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="16" rx="2"/><rect x="4.5" y="5.5" width="4" height="13" rx="1" fill="currentColor" stroke="none"/></svg></button><span class="ftcrumb"><span>/</span> flowe-ai <span>›</span> <b>#marketing</b></span><button class="ftk">⌕ <span>Search</span> <kbd>⌘K</kbd></button></div>
+      <div class="shellrow">
+        <div class="appnav faceon" data-face>
+          <div class="navscroll">
+            <div class="newrow"><button class="newchat"><span class="plus">＋</span> New chat <kbd>⌘N</kbd></button></div>
+          </div>
+          <div class="wsface">
+            <div class="pfhd"><span class="pfhdav">N</span><span class="pfhdt"><b>neuramesh</b><small>workspace</small></span><span class="pfesc">esc</span></div>
+            <button class="pfrow" style="--i:0"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.6"/></svg> All projects</button>
+            <button class="pfplan"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" style="color:var(--muted)"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9z"/></svg><span><b>Cloud · Synced</b><span class="s">unlimited projects &amp; machines</span></span></button>
+            <div class="pfsep"></div>
+            <div class="navsec" style="padding:4px 16px 3px">Workspace</div>
+            <button class="pfrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="5" r="2.4"/><circle cx="5" cy="19" r="2.4"/><circle cx="19" cy="19" r="2.4"/><path d="M12 7.4v3.6M12 11l-5.4 6M12 11l5.4 6"/></svg> Agents &amp; machines</button>
+            <button class="pfrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 9 9"/><path d="M12 12V3"/><path d="M12 12h9"/></svg> Footprint <span class="gauge"><span class="ring" style="--frac:16%"></span> 16%</span></button>
+            <button class="pfrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="2" y="4" width="20" height="12" rx="2"/><path d="M2 20h20"/><path d="M9 20v-4h6v4"/></svg> Compute</button>
+            <button class="pfrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="8" r="6"/><path d="M15.48 12.89 17 22l-5-3-5 3 1.52-9.11"/></svg> Retro</button>
+            <button class="pfrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="3"/><path d="M12.2 2h-.4a2 2 0 0 0-2 2v.2a2 2 0 0 1-1 1.7l-.4.3a2 2 0 0 1-2 0l-.2-.1a2 2 0 0 0-2.7.8l-.2.4a2 2 0 0 0 .7 2.7l.2.1a2 2 0 0 1 1 1.7v.5a2 2 0 0 1-1 1.8l-.2.1a2 2 0 0 0-.7 2.7l.2.4a2 2 0 0 0 2.7.7l.2-.1a2 2 0 0 1 2 0l.4.3a2 2 0 0 1 1 1.7V20a2 2 0 0 0 2 2h.4a2 2 0 0 0 2-2v-.2a2 2 0 0 1 1-1.7l.4-.3a2 2 0 0 1 2 0l.2.1a2 2 0 0 0 2.7-.7l.2-.4a2 2 0 0 0-.7-2.7l-.2-.1a2 2 0 0 1-1-1.8v-.5a2 2 0 0 1 1-1.7l.2-.1a2 2 0 0 0 .7-2.7l-.2-.4a2 2 0 0 0-2.7-.8l-.2.1a2 2 0 0 1-2 0l-.4-.3a2 2 0 0 1-1-1.7V4a2 2 0 0 0-2-2z"/></svg> Workspace settings</button>
+            <div class="pffoot"><span class="wsacct">G</span><span class="id"><b>george alonge</b><small>george@acme.dev</small></span><span class="wscar" style="transform:none"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></span></div>
+          </div>
+          <div class="navfoot"><span class="wstile">N<span class="live"></span><span class="unread"></span></span><span class="wsname">neuramesh</span><span class="wscar"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></span><span class="wsacct">G</span></div>
+        </div>
+        <div class="sheet" style="align-items:center; justify-content:center">
+          <div style="text-align:center; color:var(--dim); font:600 10.5px var(--fmono); letter-spacing:.09em; text-transform:uppercase; line-height:2.1">the sheet never dims<br>no scrim · no shadow · 0px shift</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════ STOP 3 ══════════════════ -->
+<div class="stophd"><span class="stopno">Stop 3</span>Tasks leaves the band — and the Scheduled submenu is rebuilt</div>
+<div class="stopp">
+  <b>The band keeps Whiteboards · Scheduled · Files; only Home and Tasks leave</b> — Home to the bell, and Tasks to <b>nowhere new</b>: the board is deprecating in a later round, so it simply stops having a nav row and keeps the views menu and ⌘K until it goes. <b>Automations → Scheduled</b> is a label rename only — <span class="kbd">view</span> keys, ids, routes and docs keep <span class="kbd">automations</span>/<span class="kbd">calendar</span>, exactly the Board → Tasks precedent (2026-08-05).
+  The views burger still becomes <b>ungated</b> — today it hides whenever a task or thread is open, which is most of the time, and it is the only door to Skills · Memory · Activity · Agents · Retro. That is a bug fix either way.
+  <br><br>
+  <b>The submenu, and what is actually wrong with it.</b> Today's nesting (2026-08-13) does four things that read as chrome moving on its own:
+  <b>①</b> the children exist <i>only while you are inside Scheduled</i> — so Calendar is two clicks from everywhere else, and the second click's door does not exist until the first one is made;
+  <b>②</b> the parent wears a "section marker" while a child wears the fill, so one selection renders as one-and-a-half;
+  <b>③</b> the disclosure opens and closes itself as you navigate — every other section in this nav folds because <i>you</i> folded it (<span class="kbd">nm:navSec</span>);
+  <b>④</b> the parent is a link to its own default child, which is two doors to one surface.
+  <br><br>
+  <b>The rebuild — one rule: the parent folds, the children navigate.</b> Scheduled becomes a real section head with a glyph: clicking it toggles, never navigates, and its state persists per machine like Shortcuts and Projects already do. Default is <b>expanded</b>, so Routines and Calendar are one click from anywhere. The children carry <b>no glyphs</b> — the 12px indent and the hairline do the subordinating, and a second <span class="kbd">IconRepeat</span> under the first was noise. Exactly <b>one fill</b> in the band at a time: the active child. The parent's own signal is quieter and different in kind — its label and glyph tint to <span class="kbd">--text</span> (<i>you are in here</i>) and the hairline brightens to <span class="kbd">--ring</span> beside the child you are on. <span class="kbd">.navparent</span>'s pseudo-selected state is deleted.
+</div>
+<div class="themes">
+  <div class="theme" data-theme="dark">
+    <h2>graphite · the band, before → after (the submenu is the subject)</h2>
+    <div class="diffgrid">
+      <div class="diffcol"><span class="difftag was">was · spine + 5 rows + a self-opening submenu</span>
+        <div style="display:flex">
+          <div style="width:30px; display:flex; flex-direction:column; align-items:center; padding:10px 0; border-right:1px dashed #3a3733">
+            <span style="writing-mode:vertical-rl; font:700 9px var(--fmono); letter-spacing:.15em; color:var(--muted); padding:6px 0">NEURAMESH</span>
+            <span style="margin-top:auto; width:20px; height:20px; border-radius:6px; background:var(--panel3); border:1px solid var(--border2); display:grid; place-items:center; font:700 9px var(--fbody); color:var(--body)">G</span>
+          </div>
+          <div style="flex:1; min-width:0">
+            <div class="newrow"><button class="newchat" style="height:36px; font-size:12px"><span class="plus">＋</span> New chat</button></div>
+            <div class="navsec">Shortcuts</div>
+            <button class="navitem strike"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg><span>Home</span><span class="badge attn">7</span></button>
+            <button class="navitem strike"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/></svg><span>Tasks</span><span class="badge">14</span></button>
+            <button class="navitem"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 14.5 3.2-4.2 2.6 3 3.9-5.3"/></svg><span>Whiteboards</span></button>
+            <button class="navitem" style="font-weight:660; color:var(--text)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M17 2.5l4 4-4 4"/><path d="M3 11.5v-2a3 3 0 0 1 3-3h15"/><path d="M7 21.5l-4-4 4-4"/><path d="M21 12.5v2a3 3 0 0 1-3 3H3"/></svg><span>Automations</span></button>
+            <div style="margin:1px 8px 3px 30px; padding-left:12px; border-left:1px solid var(--border2)">
+              <button class="navsub"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M17 2.5l4 4-4 4"/><path d="M3 11.5v-2a3 3 0 0 1 3-3h15"/><path d="M7 21.5l-4-4 4-4"/><path d="M21 12.5v2a3 3 0 0 1-3 3H3"/></svg> Routines<span class="badge">3</span></button>
+              <button class="navsub on"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4.5" width="18" height="17" rx="2.5"/><path d="M8 2.5v4M16 2.5v4M3 9.5h18"/></svg> Calendar<span class="badge">7</span></button>
+            </div>
+            <button class="navitem"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><span>Files</span></button>
+            <div class="navsec">Projects</div>
+            <div class="projhead"><span class="plogo" style="margin-left:14px">F</span><span class="projname">Flowe AI</span></div>
+            <button class="sessrow"><span class="sdot live"></span><span class="sessbody"><b>#1057 · Fix X token…</b></span></button>
+          </div>
+        </div>
+        <div style="font-size:11px; line-height:1.6; color:var(--muted); padding:10px 12px 4px; border-top:1px dashed var(--border2); margin:8px 10px 0">
+          Two glyphs of the same loop, one above the other. The parent is <b style="color:var(--text)">bold like a selection</b> while Calendar holds the fill. Leave this section and both children vanish.
+        </div>
+      </div>
+      <div class="diffcol"><span class="difftag now">now · 3 rows, a fold you own, one fill</span>
+        <div class="newrow"><button class="newchat" style="height:36px; font-size:12px"><span class="plus">＋</span> New chat <kbd>⌘N</kbd></button></div>
+        <div class="navsec">Shortcuts</div>
+        <button class="navitem"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 14.5 3.2-4.2 2.6 3 3.9-5.3"/></svg><span>Whiteboards</span></button>
+        <button class="navparent ingroup"><svg class="g" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M17 2.5l4 4-4 4"/><path d="M3 11.5v-2a3 3 0 0 1 3-3h15"/><path d="M7 21.5l-4-4 4-4"/><path d="M21 12.5v2a3 3 0 0 1-3 3H3"/></svg><span>Scheduled</span><span class="pchev"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></span></button>
+        <div class="navsubs">
+          <button class="navsub">Routines<span class="badge">3</span></button>
+          <button class="navsub on">Calendar<span class="badge">7</span></button>
+        </div>
+        <button class="navitem"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><span>Files</span></button>
+        <div class="navsec">Projects <span class="r"><button>＋</button></span></div>
+        <div class="projhead on"><span class="plogo" style="margin-left:14px">F</span><span class="projname">Flowe AI</span><span class="ppask"></span></div>
+        <div class="chipstrip"><span class="chanchip"><i>#</i>build</span><span class="chanchip"><i>#</i>marketing</span></div>
+        <button class="sessrow"><span class="sdot live"></span><span class="sessbody"><b>#1057 · Fix X token auto-refresh</b><small class="verb">plume · patching · 2 of 5</small></span></button>
+        <div class="projhead"><span class="plogo" style="margin-left:14px">A</span><span class="projname">AI Demos</span><span class="pplive"></span></div>
+        <div class="navfoot" style="margin-top:12px"><span class="wstile">N<span class="unread"></span></span><span class="wsname">neuramesh</span><span class="wscar"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></span><span class="wsacct">G</span></div>
+        <div style="font-size:11px; line-height:1.6; color:var(--muted); padding:10px 12px 4px; border-top:1px dashed var(--border2); margin:8px 10px 0">
+          One fill (Calendar). The parent tints instead of filling — <i>you are in here</i>, not <i>you are on this</i>. The hairline brightens beside the active child. The children stay put wherever you go.
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="theme" data-theme="cream-oak">
+    <h2>cream oak · the folded state, and the band at rest</h2>
+    <div class="diffgrid">
+      <div class="diffcol"><span class="difftag now">folded — your choice, remembered</span>
+        <div class="newrow"><button class="newchat" style="height:36px; font-size:12px"><span class="plus">＋</span> New chat <kbd>⌘N</kbd></button></div>
+        <div class="navsec">Shortcuts</div>
+        <button class="navitem"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 14.5 3.2-4.2 2.6 3 3.9-5.3"/></svg><span>Whiteboards</span></button>
+        <button class="navparent folded"><svg class="g" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M17 2.5l4 4-4 4"/><path d="M3 11.5v-2a3 3 0 0 1 3-3h15"/><path d="M7 21.5l-4-4 4-4"/><path d="M21 12.5v2a3 3 0 0 1-3 3H3"/></svg><span>Scheduled</span><span class="pn">10</span><span class="pchev"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></span></button>
+        <button class="navitem"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><span>Files</span></button>
+        <div class="navsec">Projects <span class="r"><button>＋</button></span></div>
+        <div class="projhead on"><span class="plogo" style="margin-left:14px">F</span><span class="projname">Flowe AI</span><span class="ppask"></span></div>
+        <button class="sessrow"><span class="sdot live"></span><span class="sessbody"><b>#1057 · Fix X token auto-refresh</b><small class="verb">plume · patching · 2 of 5</small></span></button>
+        <div style="font-size:11px; line-height:1.6; color:var(--muted); padding:10px 12px 4px; border-top:1px dashed var(--border2); margin:8px 10px 0">
+          A fold must not cost information (docs/33 §8, the thread rail's rule): folded, the parent carries the children's <b style="color:var(--body)">summed count</b>.
+        </div>
+      </div>
+      <div class="diffcol"><span class="difftag now">expanded, nothing selected</span>
+        <div class="newrow"><button class="newchat" style="height:36px; font-size:12px"><span class="plus">＋</span> New chat <kbd>⌘N</kbd></button></div>
+        <div class="navsec">Shortcuts</div>
+        <button class="navitem"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 14.5 3.2-4.2 2.6 3 3.9-5.3"/></svg><span>Whiteboards</span></button>
+        <button class="navparent"><svg class="g" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M17 2.5l4 4-4 4"/><path d="M3 11.5v-2a3 3 0 0 1 3-3h15"/><path d="M7 21.5l-4-4 4-4"/><path d="M21 12.5v2a3 3 0 0 1-3 3H3"/></svg><span>Scheduled</span><span class="pchev"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></span></button>
+        <div class="navsubs">
+          <button class="navsub">Routines<span class="badge">3</span></button>
+          <button class="navsub">Calendar<span class="badge">7</span></button>
+        </div>
+        <button class="navitem"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><span>Files</span></button>
+        <div class="navsec">Projects <span class="r"><button>＋</button></span></div>
+        <div class="projhead on"><span class="plogo" style="margin-left:14px">F</span><span class="projname">Flowe AI</span><span class="ppask"></span></div>
+        <div class="chipstrip"><span class="chanchip"><i>#</i>build</span><span class="chanchip"><i>#</i>marketing</span></div>
+        <button class="sessrow on"><span class="sdot live"></span><span class="sessbody"><b>#1057 · Fix X token auto-refresh</b><small class="verb">plume · patching · 2 of 5</small></span></button>
+        <div class="projhead"><span class="plogo" style="margin-left:14px">A</span><span class="projname">AI Demos</span><span class="pplive"></span></div>
+        <div class="navfoot" style="margin-top:12px"><span class="wstile">N<span class="unread"></span></span><span class="wsname">neuramesh</span><span class="wscar"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></span><span class="wsacct">G</span></div>
+        <div style="font-size:11px; line-height:1.6; color:var(--muted); padding:10px 12px 4px; border-top:1px dashed var(--border2); margin:8px 10px 0">
+          The resting state: three shortcuts, both Scheduled surfaces one click away, and the selection living on the session you are actually in.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════ STOP 4 ══════════════════ -->
+<div class="stophd"><span class="stopno">Stop 4</span>Two things called Files become <i>Files</i> and <i>the Workbench</i> — a contextual panel at the frame's edge</div>
+<div class="stopp">
+  <b>The collision is a naming failure on top of a duplication.</b> Left-nav <b>Files</b> is the workspace's <i>documents</i> — project folders, room docs, task deliverables, the ★ shelf, ACL'd by room, cloud-synced. The tab strip's <span class="kbd">▯ Files ⌘P</span> is <i>this thread's</i> stuff — its worktree, or its artifacts. Same word, opposite nouns, opposite corners. And there is a third: the frame-top <b>Editor</b> opens a full tab rendering <i>its own</i> file tree beside a code pane — the same tree, in the main area instead of a panel. Three trees, two names.
+  <br><br>
+  <b>Why "Editor" had to go, and what the name has to do.</b> The panel is <b>contextual</b>: it is bound to the session in front of you and it holds two different kinds of thing — the <b>code</b> it works on (browsable by worktree and branch) and the <b>artifacts</b> it produced. "Editor" names one tool inside it, so it is wrong the moment the thread has no repo and the panel is all artifacts. The name has to be the <i>parent</i> of code and artifacts.
+  <b class="ok">Recommendation: Workbench.</b> A workbench is exactly the surface that holds what you are making <i>and</i> what you have made; it belongs to the product's own spatial vocabulary (porch · spine · berth · shelf · stage · sheet), and it survives the day the panel grows a third face. Two alternates and the reasoning are below the shells — <b>the tab strip's ▯ is gone in both, and the frame-top glyph is the toggle.</b>
+  <br><br>
+  <b>Three faces, decided by context, never by a setting.</b> ① A session <i>with</i> a repo → <b>Code · Artifacts</b>, Code leading, branch chip live. ② A session <i>without</i> one → <b>Artifacts</b> alone, no segment (a one-tab tab strip is a lie). ③ No session — the landing, a destination → <b>the active project's repos</b>, pick one to browse; that is the old Editor tab's only remaining job, done in the panel that already had the tree.
+  <b>It docks on the frame, not in the sheet</b> — outside the sheet's right edge, a mirror of the nav, same grip (<span class="kbd">--nm-panew</span>, machine-local <span class="kbd">nm:panew</span>, 220–460, double-click resets to 284, arrow keys nudge). That is why the frame-top toggle and the frame-edge pane are one decision: a panel on the frame is toggled from the frame. The thread rail (<span class="kbd">.mkrail</span>) still lives <i>inside</i> the sheet, so docs/33's "one panel at that edge" survives — different edges. It stays a <b>doorway, never a viewer</b>: a click opens a file <i>tab</i>. <span class="ok">Drag the grip.</span>
+</div>
+<div class="themes tall">
+  <div class="theme" data-theme="dark">
+    <h2>graphite · face ① — a session with a repo: Code leading, Artifacts beside it</h2>
+    <div class="shell" data-grip style="min-height:520px">
+      <div class="ftop">
+        <span class="ftwm">neuramesh</span>
+        <button class="ftfold"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="16" rx="2"/><rect x="4.5" y="5.5" width="4" height="13" rx="1" fill="currentColor" stroke="none"/></svg></button>
+        <span class="ftcrumb"><span>/</span> flowe-ai <span>›</span> <b>#1057</b></span>
+        <button class="ftk">⌕ <span>Search — channels, tasks, artifacts</span> <kbd>⌘K</kbd></button>
+        <span class="utilclu">
+          <button class="utilico on" title="Workbench · ⌘P"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 17l6-6-6-6"/><path d="M13 19h7"/></svg></button>
+          <button class="utilico"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a13.5 13.5 0 0 1 0 18 13.5 13.5 0 0 1 0-18z"/></svg></button>
+          <button class="utilico"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 2.5 2.5L7 14"/><path d="M12.5 14H17"/></svg></button>
+          <button class="utilico"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg><span class="ct">2</span></button>
+          <span class="synced"><span class="dot"></span> Synced</span>
+        </span>
+      </div>
+      <div class="shellrow">
+        <div class="appnav" data-face style="width:236px">
+          <div class="navscroll">
+            <div class="newrow"><button class="newchat" style="height:36px; font-size:12px"><span class="plus">＋</span> New chat <kbd>⌘N</kbd></button></div>
+            <div class="navsec">Projects</div>
+            <div class="projhead on"><span class="plogo" style="margin-left:14px">F</span><span class="projname">Flowe AI</span></div>
+            <button class="sessrow on"><span class="sdot live"></span><span class="sessbody"><b>#1057 · Fix X token auto-refresh</b><small class="verb">plume · patching · 2 of 5</small></span></button>
+            <button class="sessrow"><span class="sdot"></span><span class="sessbody"><b>X engagement sweep</b><small>#marketing · 1d</small></span></button>
+          </div>
+          <div class="wsface"></div>
+          <div class="navfoot"><span class="wstile">N<span class="live"></span></span><span class="wsname">neuramesh</span><span class="wscar"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></span><span class="wsacct">G</span></div>
+        </div>
+        <div class="sheet">
+          <div class="wtstrip">
+            <button class="wtab on"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> #1057</button>
+            <button class="wtab"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg> oauth.ts</button>
+            <button class="wtadd">＋</button>
+            <div class="wtright" data-rail>
+              <button class="bell" data-bell><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M18 8a6 6 0 1 0-12 0c0 6-2 7-2 7h16s-2-1-2-7"/><path d="M13.7 20a2 2 0 0 1-3.4 0"/></svg><span class="n">8</span></button>
+              <button class="burger"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+              <div class="bellpop">
+                <div class="bphd"><h4>Needs you</h4><span class="n">8</span><span class="esc">esc</span></div>
+                <div class="bplist">
+                  <div class="nyrow"><span class="nykind ready">ready</span><span class="nytext"><b>#1058</b> Draft + schedule 7 Flowe X posts</span><span class="nymeta">#marketing · 2h</span><span class="nygo">›</span></div>
+                  <div class="nyrow"><span class="nykind decision">decision</span><span class="nytext"><b>rex asks: </b>Add @plume to #marketing?</span><span class="nymeta">#marketing · 20h</span><span class="nygo">›</span></div>
+                </div>
+                <div class="bpfoot"><span>The bell is never gated — the clusters are.</span><button>⌘Y ›</button></div>
+              </div>
+            </div>
+          </div>
+          <div class="threadwrap">
+            <div class="threadcol">
+              <div class="crumb">‹ #marketing · sessions</div>
+              <div class="msg"><span class="msgav">p</span><div class="msgb"><div class="who">plume <small>developer · 6m</small></div><p>Reproduced: the refresh call posts <code>grant_type=refresh_token</code> without the PKCE verifier, so X returns 400 and the connector drops to manual. Patch is in <code>src/connectors/x/oauth.ts</code> — opening it beside this.</p></div></div>
+              <div class="msg"><span class="msgav">G</span><div class="msgb"><div class="who">george <small>4m</small></div><p>Good. Keep the retry ceiling at 3 and log the verdict.</p></div></div>
+              <div class="msg"><span class="msgav">p</span><div class="msgb"><div class="who">plume <small>just now</small></div><p>Done. Two files touched, tests green, pushing the branch and opening the PR.</p></div></div>
+            </div>
+          </div>
+        </div>
+        <div class="fpgrip" data-fpgrip><span class="fpgripbar"></span><span class="fpgripout">284px</span></div>
+        <aside class="filepane">
+          <div class="fphd"><b>Workbench</b><span class="fpwt">⎇ nm-1057</span><button class="fpx"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg></button></div>
+          <div class="fpseg"><button class="on">Code</button><button>Artifacts</button></div>
+          <div class="fpfind"><div><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg> Find files… <kbd>⌘P</kbd></div></div>
+          <div style="padding:0 6px 8px"><button class="fpbr"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="6" r="3"/><path d="M6 9v6"/><path d="M18 9a9 9 0 0 1-9 9"/></svg> nm/1057-x-token ▾</button></div>
+          <div class="fplist">
+            <button class="ftdir"><span class="ftcaret">▾</span> src</button>
+            <button class="ftdir" style="padding-left:20px"><span class="ftcaret">▾</span> connectors</button>
+            <button class="ftdir" style="padding-left:33px"><span class="ftcaret">▾</span> x</button>
+            <button class="ftfile on" style="padding-left:46px"><span class="ftdot"></span>oauth.ts<span class="m">M</span></button>
+            <button class="ftfile" style="padding-left:46px"><span class="ftdot"></span>publish.ts</button>
+            <button class="ftfile" style="padding-left:46px"><span class="ftdot"></span>types.ts</button>
+            <button class="ftdir" style="padding-left:20px"><span class="ftcaret">▸</span> lib</button>
+            <button class="ftdir"><span class="ftcaret">▸</span> tests</button>
+            <button class="ftfile"><span class="ftdot"></span>package.json</button>
+            <button class="ftfile"><span class="ftdot"></span>README.md</button>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </div>
+
+  <div class="theme" data-theme="cream-oak">
+    <h2>cream oak · face ② — no repo on this session: Artifacts alone, no segment</h2>
+    <div class="shell" data-grip style="min-height:470px">
+      <div class="ftop">
+        <span class="ftwm">neuramesh</span>
+        <button class="ftfold"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="16" rx="2"/><rect x="4.5" y="5.5" width="4" height="13" rx="1" fill="currentColor" stroke="none"/></svg></button>
+        <span class="ftcrumb"><span>/</span> flowe-ai <span>›</span> <b>#1058</b></span>
+        <button class="ftk">⌕ <span>Search</span> <kbd>⌘K</kbd></button>
+        <span class="utilclu">
+          <button class="utilico on" title="Workbench · ⌘P"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 17l6-6-6-6"/><path d="M13 19h7"/></svg></button>
+          <button class="utilico"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a13.5 13.5 0 0 1 0 18 13.5 13.5 0 0 1 0-18z"/></svg></button>
+          <button class="utilico"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 2.5 2.5L7 14"/><path d="M12.5 14H17"/></svg></button>
+          <span class="synced"><span class="dot"></span> Synced</span>
+        </span>
+      </div>
+      <div class="shellrow">
+        <div class="appnav" data-face style="width:236px">
+          <div class="navscroll">
+            <div class="newrow"><button class="newchat" style="height:36px; font-size:12px"><span class="plus">＋</span> New chat <kbd>⌘N</kbd></button></div>
+            <div class="navsec">Projects</div>
+            <div class="projhead on"><span class="plogo" style="margin-left:14px">F</span><span class="projname">Flowe AI</span></div>
+            <button class="sessrow on"><span class="sdot review"></span><span class="sessbody"><b>#1058 · Draft + schedule 7 X posts</b><small>#marketing · ready to accept</small></span></button>
+          </div>
+          <div class="wsface"></div>
+          <div class="navfoot"><span class="wstile">N</span><span class="wsname">neuramesh</span><span class="wscar"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></span><span class="wsacct">G</span></div>
+        </div>
+        <div class="sheet">
+          <div class="wtstrip">
+            <button class="wtab on"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> #1058</button>
+            <button class="wtadd">＋</button>
+            <div class="wtright" data-rail>
+              <button class="bell" data-bell><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M18 8a6 6 0 1 0-12 0c0 6-2 7-2 7h16s-2-1-2-7"/><path d="M13.7 20a2 2 0 0 1-3.4 0"/></svg><span class="n">8</span></button>
+              <button class="burger"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+              <div class="bellpop">
+                <div class="bphd"><h4>Needs you</h4><span class="n">8</span><span class="esc">esc</span></div>
+                <div class="bplist"><div class="nyrow"><span class="nykind ready">ready</span><span class="nytext"><b>#1058</b> Draft + schedule 7 Flowe X posts</span><span class="nymeta">#marketing · 2h</span><span class="nygo">›</span></div></div>
+                <div class="bpfoot"><span>Answering happens in the thread.</span><button>⌘Y ›</button></div>
+              </div>
+            </div>
+          </div>
+          <div class="threadwrap">
+            <div class="threadcol">
+              <div class="crumb">‹ #marketing · sessions</div>
+              <div class="msg"><span class="msgav">m</span><div class="msgb"><div class="who">maple <small>marketer · 2h</small></div><p>Seven drafts are on the task with per-network previews. Deliverables: <code>posts-week-aug17.md</code> and the seven card images. Ready for your accept.</p></div></div>
+            </div>
+          </div>
+        </div>
+        <div class="fpgrip" data-fpgrip><span class="fpgripbar"></span><span class="fpgripout">284px</span></div>
+        <aside class="filepane">
+          <div class="fphd"><b>Workbench</b><span class="fpwt">#1058 · no repo</span><button class="fpx"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg></button></div>
+          <div class="navsec" style="padding:0 10px 7px 8px">Artifacts · 5</div>
+          <div class="fpfind"><div><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg> Find artifacts… <kbd>⌘P</kbd></div></div>
+          <div class="fplist">
+            <button class="ftfile on"><span class="ftdot"></span>posts-week-aug17.md<span class="fpkind">markdown</span></button>
+            <button class="ftfile"><span class="ftdot"></span>card-01.png<span class="fpkind">image</span></button>
+            <button class="ftfile"><span class="ftdot"></span>card-02.png<span class="fpkind">image</span></button>
+            <button class="ftfile"><span class="ftdot"></span>card-03.png<span class="fpkind">image</span></button>
+            <button class="ftfile"><span class="ftdot"></span>result.md<span class="fpkind">markdown</span></button>
+          </div>
+          <div style="padding:10px 10px 2px; font-size:11px; color:var(--dim); line-height:1.6; border-top:1px solid var(--border); margin:8px 4px 0">A doorway, never a viewer — a click opens a file <b style="color:var(--muted)">tab</b>.</div>
+        </aside>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="stopp" style="margin-top:22px"><b>Face ③ — no session open</b> (the landing, or standing on a destination). The panel does not go blank and it does not show the last thread's tree: it offers the active project's repos. This is the entire remaining job of the deleted Editor tab, done by the panel that already owns a tree. Beside it, the two alternates, at header scale so you can read them in place.</div>
+<div class="themes">
+  <div class="theme" data-theme="dark">
+    <h2>face ③ · the repos list</h2>
+    <div style="display:flex; justify-content:center; padding:6px 0 2px">
+      <aside class="filepane" style="width:288px; background:var(--win); border-radius:12px; padding:8px 4px">
+        <div class="fphd"><b>Workbench</b><span class="fpwt">flowe-ai</span><button class="fpx"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg></button></div>
+        <div class="navsec" style="padding:0 10px 7px 8px">Repos in this project</div>
+        <div class="fplist">
+          <button class="ftfile on"><span class="ftdot"></span>flowe-web<span class="fpkind">⎇ main</span></button>
+          <button class="ftfile"><span class="ftdot"></span>flowe-mobile<span class="fpkind">⎇ main</span></button>
+          <button class="ftfile"><span class="ftdot"></span>flowe-api<span class="fpkind">⎇ dev</span></button>
+        </div>
+        <div style="padding:9px 10px 2px; font-size:11px; color:var(--dim); line-height:1.6; border-top:1px solid var(--border); margin:8px 4px 0">Or <b style="color:var(--muted)">open a folder…</b> — the last thing the Editor tab could do that this could not.</div>
+      </aside>
+    </div>
+  </div>
+  <div class="theme" data-theme="cream-oak">
+    <h2>the name — three candidates, in place</h2>
+    <div class="namegrid">
+      <div class="namecard top">
+        <div class="hdr"><b>Workbench</b> <span class="tag">recommended</span></div>
+        <div class="fphd" style="padding:4px 4px 8px"><b>Workbench</b><span class="fpwt">⎇ nm-1057</span></div>
+        <div class="fpseg"><button class="on">Code</button><button>Artifacts</button></div>
+        <div class="why">The surface that holds what you are <b>making</b> and what you have <b>made</b> — a true parent of both faces, and it survives a third. Fits the product's spatial voice (porch · spine · berth · shelf · stage · sheet). <b>Risk:</b> VS Code calls its whole window the workbench — an internal term users rarely say out loud.</div>
+      </div>
+      <div class="namecard">
+        <div class="hdr"><b>Materials</b></div>
+        <div class="fphd" style="padding:4px 4px 8px"><b>Materials</b><span class="fpwt">⎇ nm-1057</span></div>
+        <div class="fpseg"><button class="on">Code</button><button>Artifacts</button></div>
+        <div class="why">The most <b>legible</b> of the three — nobody has to be told what "materials" contains, and it collides with nothing in the repo or the industry. Softer and less spatial than the rest of the chrome vocabulary, and three syllables in a tooltip.</div>
+      </div>
+      <div class="namecard">
+        <div class="hdr"><b>Bench</b></div>
+        <div class="fphd" style="padding:4px 4px 8px"><b>Bench</b><span class="fpwt">⎇ nm-1057</span></div>
+        <div class="fpseg"><button class="on">Code</button><button>Artifacts</button></div>
+        <div class="why">Same idea, one syllable, best in a tooltip. <b>Ruled out:</b> this repo already has <span class="kbd">packages/bench</span> and a <span class="kbd">/model-benchmarks</span> surface — "the bench" and "the bench(marks)" in one workspace is a daily cost for the person who reads both.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════ SPEC ══════════════════ -->
+<div class="stophd"><span class="stopno">Stop 5</span>Anatomy &amp; motion — the spec the build is gated on</div>
+<div class="specgrid">
+  <div class="spec">
+    <h3>The bell</h3>
+    <ul>
+      <li>Seat: first child of <span class="k">.wtright</span>, before the crew clusters. <b>Never gated</b> — the clusters keep their <span class="k">convOn &amp;&amp; !(openTaskId||openThreadId)</span> gate; the bell has none.</li>
+      <li>Count: <span class="k">askIds.size</span> — the same derivation the tree's dots read. One signal, never a second.</li>
+      <li>Badge: <span class="k">--link</span> fill + <span class="k">--bg</span> ink + a 2px <span class="k">--bg</span> halo (the notification treatment Home's badge had). Informational counts stay <span class="k">--panel3</span>.</li>
+      <li>Popover: 432px, <span class="k">--overlay</span> + <span class="k">--card-border</span> + <span class="k">--shadow-pop</span>, <span class="k">--r-lg</span>. List max-height <span class="k">min(344px, 46vh)</span>. Rise <span class="k">--dur-enter</span>; exit <span class="k">--dur-exit</span>.</li>
+      <li>Rows are the existing <span class="k">nyrow</span>/<span class="k">frow</span> markup, unchanged — including the ✕ dismiss and the <span class="k">leaving</span>/<span class="k">gone</span> settle. Click = navigate + close.</li>
+      <li>Empty: the <span class="k">CaughtUpPeek</span> lockup at popover scale, plus <i>All clear — 3 building · 1 in review.</i></li>
+      <li><b>Boot peek:</b> once per launch, if the count &gt; 0, the popover opens itself for 4s and closes on the first keypress, click or send. Under <span class="k">prefers-reduced-motion</span> it appears without the rise. Never repeats within a session.</li>
+    </ul>
+  </div>
+  <div class="spec">
+    <h3>The nav foot &amp; the face</h3>
+    <ul>
+      <li><span class="k">.navfoot</span>: 38px, <span class="k">margin: 6px 8px 0</span>, <span class="k">--r-lg</span>, transparent at rest → <span class="k">--card</span> + hairline + <span class="k">--shadow-card</span> on hover (elevated stratum, docs/33 §3).</li>
+      <li>Tile 24px <span class="k">--r-sm</span> on <span class="k">--panel3</span>: <b>pulse ring</b> while any agent works anywhere; <b>unread dot</b> (<span class="k">--link</span>, 2px <span class="k">--win</span> halo) when a room has moved unseen. They coexist — picking one drops a signal exactly when the workspace is busiest.</li>
+      <li>Reveal: <b>140ms hover intent</b> to arm, the whole column is the hover region (a diagonal reach must not dismiss), click <b>pins</b>, Esc / click-away closes, <span class="k">⌘⇧P</span> toggles.</li>
+      <li>The face is unchanged <span class="k">ProjectsFace</span> — both faces stay mounted in one grid cell, no scrim, no shadow, <b>0px layout shift</b>.</li>
+      <li>New: <b>Footprint carries its ring</b> (<span class="k">conic-gradient</span> at <span class="k">--frac</span>, 15px) — Home's corner gauge, beside the door it belongs to.</li>
+      <li>Retired: <span class="k">.prail</span>, <span class="k">--projrail-w</span>, <span class="k">.prunfold</span>, <span class="k">RAIL_SHADED</span>. While folded, <span class="k">.ftfold</span> wears the unread dot.</li>
+    </ul>
+  </div>
+  <div class="spec">
+    <h3>The landing</h3>
+    <ul>
+      <li><span class="k">view:'dashboard'</span> and <span class="k">view:'newchat'</span> collapse into one. <span class="k">HomeView</span> retires; <span class="k">NewChatStage</span> gains the eyebrow and the greeting — nothing else. The stage stays <b>greeting · composer · pills</b>.</li>
+      <li>Headline: one display line — <i>Good afternoon, geo. What's next in</i> <b>project</b><i>?</i> — the project token stays the switcher (<span class="k">--fital</span> italic, <span class="k">--link</span>, dotted underline). <span class="k">text-wrap: balance</span>.</li>
+      <li><b>No destination controls on the landing.</b> Tasks is deprecating; the other three are in the band one column left. The one number a landing needs is the bell's, and it is already on the chrome above it.</li>
+      <li><b>Retired with Home:</b> <span class="k">HomeView</span>, <span class="k">useHomeScope</span>, <span class="k">useHomeFlight</span>, <span class="k">homedismiss</span> (moves to the popover), the <span class="k">.railscope</span> pills and <span class="k">nm:homescope</span> — see open question ①.</li>
+    </ul>
+  </div>
+  <div class="spec">
+    <h3>The Workbench</h3>
+    <ul>
+      <li>Frame-level: a sibling of <span class="k">.navpanel</span> and <span class="k">.main</span>, outside the sheet. <span class="k">--nm-panew</span>, machine-local <span class="k">nm:panew</span>, clamp <b>220–460</b>, default <b>284</b>.</li>
+      <li>Grip: the nav-grip idiom, third seam — invisible at rest, 3px pill on hover, <span class="k">--ring</span> + live px readout while dragging, <span class="k">data-dragging</span> kills the width transition, double-click resets, ←/→ nudge 12px.</li>
+      <li>Header: <b>Workbench</b> + scope chip (<span class="k">⎇ nm-1057</span> / <span class="k">#1058 · no repo</span> / the repo name) + ✕. A <b>Code | Artifacts</b> segment ONLY when both exist — a one-tab strip is a lie, so face ② and face ③ render a quiet count line instead.</li>
+      <li>Still a doorway: a click opens a file <b>tab</b> under the existing reuse rule. It never renders a file inside itself.</li>
+      <li>Under <b>1100px</b> the pane takes the sheet as a drawer (the split-stage solo rule). It stacks <i>outside</i> <span class="k">.mkrail</span>: sheet | rail | grip | pane.</li>
+      <li>Three faces, chosen by context, never by a setting: <b>①</b> session + repo → Code · Artifacts. <b>②</b> session, no repo → Artifacts only. <b>③</b> no session → the active project's repos, pick one to browse.</li>
+      <li>Deleted: <span class="k">EditorView</span>'s own tree + code pane (the <span class="k">'file'</span> kind opened with no path), the <span class="k">▯</span> tab-strip toggle, the <span class="k">Code</span> row in the views menu, and the word <i>Editor</i>.</li>
+    </ul>
+  </div>
+  <div class="spec">
+    <h3>The Shortcuts band &amp; the Scheduled fold</h3>
+    <ul>
+      <li>Band after: <b>Whiteboards · Scheduled · Files</b>. Home leaves for the bell; Tasks just leaves. <span class="k">'board'</span> stays a live view key reachable from the views menu and ⌘K until the board is deprecated — nothing in this round touches the task ENTITY, so the bell's queue, the task panel, the phase spectrum and the FSM are all unaffected by that deprecation.</li>
+      <li><b>Scheduled</b> is a label rename of Automations — <span class="k">view</span> keys, ids, routes and docs keep <span class="k">automations</span>/<span class="k">calendar</span> (the Board → Tasks precedent).</li>
+      <li><span class="k">.navparent</span> is now a <b>fold, not a link</b>: click toggles, never navigates. State persists per machine in <span class="k">nm:navSec</span> beside Shortcuts / Projects / Recents. Default expanded. The route never opens or closes it.</li>
+      <li>Children: <b>no glyphs</b>, indented to 30 + 12px off a <span class="k">--border2</span> hairline, label + count only. The hairline brightens to <span class="k">--ring</span> for the span of the active child (<span class="k">.navsub.on::before</span>).</li>
+      <li><b>One fill in the band at a time</b> — the active child. The parent's signal is different in kind: label + glyph tint to <span class="k">--text</span> (<span class="k">.navparent.ingroup</span>). The old "section marker" pseudo-selection is deleted.</li>
+      <li><b>Folded carries the sum</b> (docs/33 §8's fold rule): the parent shows <span class="k">routines + calendar</span> as one mono count, so folding never hides a number.</li>
+      <li>Chevron: rotates −90° folded, <span class="k">--dur-fast</span>. The row is one control — the whole row toggles, not just the chevron (the projects-head ruling, 2026-08-07).</li>
+    </ul>
+  </div>
+  <div class="spec">
+    <h3>Motion (all ≤150ms blocking, docs/33 §7)</h3>
+    <ul>
+      <li>Bell popover: rise 6px + fade, <span class="k">--dur-enter</span> / <span class="k">--ease</span>; exit <span class="k">--dur-exit</span> / <span class="k">--ease-exit</span>.</li>
+      <li>Workspace face: the existing cross — both faces mounted, opacity + 4px lift, <span class="k">--dur-enter</span>, staggered rows capped at 7 beats.</li>
+      <li>Pane open/close: width animates <span class="k">--dur-enter</span>; drag does not animate.</li>
+      <li>Boot peek: rise in, hold 4s, exit. Reduced motion → no rise, no auto-close animation.</li>
+      <li>Destination tiles: hover lift only. No entrance stagger — the landing must feel instant, not choreographed.</li>
+    </ul>
+  </div>
+  <div class="spec">
+    <h3>What does <i>not</i> change</h3>
+    <ul>
+      <li>The projects tree, its chips, its live rows, ⌘Y, ⌘K, the composer, the task panel, the thread rail, the peek column.</li>
+      <li>Every derivation: <span class="k">askIds</span>, <span class="k">historyRows</span>, <span class="k">openRuns</span>, <span class="k">actionableByHuman</span>, <span class="k">journeyFor</span>. This round moves <b>containers</b>, never data.</li>
+      <li>Top-dock mode keeps its own strip and its <span class="k">NavWorkspaceCard</span>; it has no spine to remove and no side column to put a foot in. It gets the bell, the Workbench and the Scheduled rename, and nothing else.</li>
+      <li>Mobile is untouched.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="stophd">Alternatives considered</div>
+<table class="alts">
+  <tr><th style="width:16%">Ask</th><th style="width:26%">Option</th><th>Why / why not</th></tr>
+  <tr><td rowspan="3"><b>The queue</b></td><td>Bell in the <b>frame top</b>, beside the utilities</td><td class="no">The one row that is chrome in every view — a real candidate. Rejected: the frame top is <i>ambient machine state</i> (editor, browser, terminal, processes, sync); the queue is <i>people asking you things</i>, and it belongs beside the faces of the people asking. Also, you said next to the crew.</td></tr>
+  <tr><td class="pick">Bell leading the strip's right rail ✓</td><td class="pick">Beside the crew clusters, on every surface, and the rail is already <i>one flex row with a fixed order</i> — the fix that stopped these controls colliding in the first place. Adding a tenant there is free.</td></tr>
+  <tr><td>Keep Home as a screen, add a bell too</td><td class="no">Two doors to one queue, and the screen is still three-quarters duplicate. This is the outcome the round exists to avoid.</td></tr>
+  <tr><td rowspan="2"><b>Recent + In flight</b></td><td class="pick">Recent dies; In flight becomes the popover's second section ✓</td><td class="pick">Recent already renders in the tree and ⌘Y from the same derivation. In flight is one glance and belongs with the queue — you ask "what needs me / what's moving" in one motion.</td></tr>
+  <tr><td>Keep both on a slimmed Home</td><td class="no">Keeps a screen alive for content that has two other homes; the nav band would have to keep a Home row to reach it.</td></tr>
+  <tr><td rowspan="2"><b>Tasks</b></td><td class="pick">Drops off the band and lands nowhere ✓</td><td class="pick">The board is deprecating. Moving it to the landing would build a door onto a room that is coming down, and every landing control is a control someone has to unlearn later. The views menu and ⌘K carry it out.</td></tr>
+  <tr><td>A summary row on the landing (round 2's proposal)</td><td class="no">Would have given the landing a real board glance — the thing Home's <i>In flight</i> used to do. Dead on the deprecation: it is chrome with an expiry date, and its numbers would be the last thing anyone trusts once the surface behind them goes.</td></tr>
+  <tr><td rowspan="3"><b>The Scheduled submenu</b></td><td class="pick">Parent folds, children navigate — state owned by the human ✓</td><td class="pick">Keeps the 2026-08-13 nesting ruling, keeps the name, and both surfaces are one click from anywhere. The parent stops being a second door to its own default child.</td></tr>
+  <tr><td>Flatten: Routines and Calendar as two peer rows</td><td class="no">Simplest possible, and it works — but "Scheduled" disappears as a concept from the nav, and the band grows back to four rows. Worth taking if the fold ever feels like ceremony.</td></tr>
+  <tr><td>A lens segment inside Scheduled's ScopeBar</td><td class="no">What I proposed when the band was going away. With the band staying, this is a second door to a surface the nav already reaches — the exact thing the ruling forbids.</td></tr>
+  <tr><td rowspan="3"><b>The two Files</b></td><td class="pick">Left nav = <b>Files</b> (workspace documents) · frame top = <b>Workbench</b> (this session's code + artifacts) ✓</td><td class="pick">Kills the third tree too: the old Editor tab rendered its own copy of the same file tree in the main area. One noun each, one tree each.</td></tr>
+  <tr><td>Rename the nav one to <b>Documents</b></td><td class="no">Cleaner English, but "Files" is the word people reach for when they mean the library, and the destination was renamed six days ago. Only needed if Workbench is rejected.</td></tr>
+  <tr><td>Merge both into one surface</td><td class="no">Cloud documents (ACL'd by room, cross-machine) and this machine's disk are different trust boundaries. Merging them would put a worktree path in a surface an agent reads.</td></tr>
+  <tr><td rowspan="2"><b>The pane</b></td><td class="pick">Frame-level, right edge, resizable ✓</td><td class="pick">Symmetric with the nav, which is why the frame-top toggle is the right toggle. Leaves <span style="font-family:monospace">.mkrail</span> untouched inside the sheet — different edge, so docs/33's one-panel rule holds.</td></tr>
+  <tr><td>Sheet-level, resizable, where it is today</td><td class="no">Smaller diff, but then a sheet-level panel is toggled from a frame-level control, and it competes with the thread rail for the same edge inside the same container.</td></tr>
+</table>
+
+<div class="stophd">Open questions — your call before I build</div>
+<div class="qs">
+  <div class="q">
+    <h3>① The scope pills die with Home. Do you want them in the bell?</h3>
+    You put <span class="kbd">All projects</span> / <span class="kbd">All channels</span> on the strip's sticky rail six days ago, specifically so a filter could not scroll away unseen. With Home gone they have nothing to narrow — the destinations all carry their own <b>ScopeBar</b>. <b class="rec">Recommendation: retire them.</b> A notification tray with two filters on it is exactly the chrome this round is deleting, and the queue is small by construction (it is only the things holding a gate). If you want narrowing back, the cheapest honest version is a project filter in the popover header that appears <i>only</i> above ~12 rows.
+  </div>
+  <div class="q">
+    <h3>② Resolved — but one call left inside it: does the parent stay a link?</h3>
+    You kept the band, so Scheduled nests in the nav exactly as the 2026-08-13 ruling intended and the ScopeBar-lens idea is dead. The one thing still open: I made the parent a <b>pure fold</b> (click toggles, never navigates), because a parent that opens its own default child is two doors to one surface. The cost is that a <i>collapsed</i> Scheduled needs two clicks to reach anything. <b class="rec">Recommendation: keep it a pure fold</b> — it is expanded by default, so the cost only lands on someone who chose to collapse it. The alternative is parent-click = expand-and-go-to-last-child, which is convenient and slightly magic.
+  </div>
+  <div class="q">
+    <h3>③ Workbench, Materials, or Bench?</h3>
+    All three are parents of <i>code</i> and <i>artifacts</i>, which is the only hard requirement. <b class="rec">Recommendation: Workbench</b> — it belongs to the vocabulary the product already speaks, and it is the one word that still fits the day the panel grows a third face. <b>Materials</b> is the safe pick if legibility beats voice; <b>Bench</b> is the best tooltip word and is ruled out only by <span class="kbd">packages/bench</span>. Rendered at header scale above — say each one out loud, that is usually what decides it. Whatever wins, the glyph stays <span class="kbd">IconCode</span> until it earns a better one.
+  </div>
+  <div class="q">
+    <h3>④ Where does a returning user see "what happened while I was away"?</h3>
+    Today Home answers it in one screenful. After this round the answer is: the bell's count, the tree's Today rows, and ⌘Y. <b class="rec">Recommendation: the boot peek</b> (spec above) — the popover shows itself once per launch when the count is non-zero, so the landing can never hide eight waiting decisions behind a composer. If that feels too eager, the fallback is a one-line <i>8 need you · 4 in flight</i> under the greeting that opens the popover — but that is a second door, so I would rather spend the motion than the control.
+  </div>
+  <div class="q">
+    <h3>⑤ Sequencing — one release or two?</h3>
+    Stops 2 and 4 are structural and independent (the spine and the panel touch nothing the other touches). Stops 1 and 3 are one change: the band cannot lose Home until the bell exists, Dropping Tasks from the band is now independent of both — it is a deletion, not a move. <b class="rec">Recommendation: two slices.</b> <b>Slice A</b> = stop 2 + stop 4 + the Scheduled fold + dropping the Tasks row (frame geometry and nav — visible, low risk, no derivation moves). <b>Slice B</b> = stop 1, the landing merge, which is where the real product judgement is and deserves its own release to live with.
+  </div>
+</div>
+
+<div class="stophd">What this writes into docs/33</div>
+<div class="stopp">
+  <b>§2 (frame model):</b> the spine clause is replaced — the panel still collapses to zero, and the fold control is the frame-top pin alone, which is where §2 always said it belonged. The frame gains a <b>right</b> edge tenant (the Workbench), so the model reads: chrome top · nav left · sheet centre · pane right.
+  <b>§8:</b> a new idiom, <b>the workspace foot</b> (the two-face reveal's trigger, hover-intent + pin); a new idiom, <b>the Workbench</b> (a contextual frame-level panel whose faces are chosen by what you are standing in, never by a setting); the grip clause grows its third seam; the "one panel at that edge" clause is amended to say <i>which</i> edge — sheet-level (<span class="kbd">.mkrail</span>) and frame-level (the Workbench) are different edges and may coexist.
+  The <b>2026-08-13 nesting clause is rewritten, not reversed</b>: the disclosure is still the navigation, but it is owned by the human (<span class="kbd">nm:navSec</span>) rather than by the route, the parent is a fold rather than a link to its own child, the children drop their glyphs, the parent's "section marker" is replaced by a tint, and a folded parent carries its children's summed count.
+  A new clause on <b>notification vs. destination</b>: a count that means <i>someone is waiting on you</i> lives on chrome and opens a popover; a count that means <i>how much is in there</i> lives on the thing it counts.
+  And the 2026-08-13 nesting ruling gets its amendment or its exception, depending on question ②.
+  <b>docs/32</b> (Home &amp; Feed) is retired as a surface doc and folded into docs/35; <b>docs/35</b> §5 gains the landing.
+</div>
+
+<script>
+// bell popover + views menu — click to toggle, click away or Esc to close
+document.querySelectorAll('[data-rail]').forEach((rail) => {
+  const bell = rail.querySelector('[data-bell]');
+  const menu = rail.querySelector('[data-menu]');
+  if (bell) bell.addEventListener('click', (e) => { e.stopPropagation(); rail.classList.remove('menuon'); rail.classList.toggle('popon'); bell.classList.toggle('on', rail.classList.contains('popon')); });
+  if (menu) menu.addEventListener('click', (e) => { e.stopPropagation(); rail.classList.remove('popon'); rail.classList.toggle('menuon'); });
+});
+document.addEventListener('click', () => document.querySelectorAll('[data-rail]').forEach((r) => { r.classList.remove('popon','menuon'); const b = r.querySelector('[data-bell]'); if (b) b.classList.remove('on'); }));
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') document.querySelectorAll('[data-rail]').forEach((r) => { r.classList.remove('popon','menuon'); const b = r.querySelector('[data-bell]'); if (b) b.classList.remove('on'); }); });
+
+// the Scheduled fold — the parent toggles, never navigates; the children stay put
+document.querySelectorAll('.navparent').forEach((p) => {
+  const subs = p.nextElementSibling && p.nextElementSibling.classList.contains('navsubs') ? p.nextElementSibling : null;
+  p.addEventListener('click', () => {
+    const folded = p.classList.toggle('folded');
+    if (subs) subs.style.display = folded ? 'none' : '';
+    // a fold must not cost information: folded, the parent carries the children's sum
+    let n = p.querySelector('.pn');
+    if (folded && !n && subs) {
+      const sum = [...subs.querySelectorAll('.badge')].reduce((t, b) => t + (parseInt(b.textContent, 10) || 0), 0);
+      if (sum) { n = document.createElement('span'); n.className = 'pn'; n.textContent = String(sum); p.insertBefore(n, p.querySelector('.pchev')); }
+    } else if (!folded && n) n.remove();
+  });
+  if (p.classList.contains('folded') && subs) subs.style.display = 'none';
+});
+
+// the stop-2 shells carry the face's markup; every other shell gets a clone of it, so the foot
+// is live everywhere on this page rather than only where the panel is the subject
+(() => {
+  const src = document.querySelector('.wsface .pfhd')?.parentElement;
+  if (!src) return;
+  document.querySelectorAll('.wsface').forEach((f) => { if (!f.children.length) f.innerHTML = src.innerHTML; });
+})();
+
+// the workspace face — 140ms hover intent on the foot, the whole column keeps it, click pins
+document.querySelectorAll('[data-face]').forEach((nav) => {
+  const foot = nav.querySelector('.navfoot');
+  if (!foot || !nav.querySelector('.wsface .pfhd')) return;
+  let armed = null, pinned = nav.classList.contains('faceon');
+  const open = () => nav.classList.add('faceon');
+  const close = () => { if (!pinned) nav.classList.remove('faceon'); };
+  foot.addEventListener('mouseenter', () => { armed = setTimeout(open, 140); });
+  foot.addEventListener('mouseleave', () => { if (armed) clearTimeout(armed); });
+  nav.addEventListener('mouseleave', () => { if (armed) clearTimeout(armed); close(); });
+  foot.addEventListener('click', (e) => { e.stopPropagation(); pinned = !pinned; if (pinned) open(); else nav.classList.remove('faceon'); });
+});
+
+// the Workbench's grip
+document.querySelectorAll('[data-grip]').forEach((shell) => {
+  const grip = shell.querySelector('[data-fpgrip]');
+  const pane = shell.querySelector('.filepane');
+  const out = shell.querySelector('.fpgripout');
+  if (!grip || !pane) return;
+  let w = 284;
+  grip.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    const x0 = e.clientX, w0 = w;
+    shell.classList.add('dragging');
+    grip.setPointerCapture(e.pointerId);
+    const move = (ev) => { w = Math.max(220, Math.min(460, w0 - (ev.clientX - x0))); pane.style.setProperty('--panew', w + 'px'); if (out) out.textContent = Math.round(w) + 'px'; };
+    const up = () => { shell.classList.remove('dragging'); grip.removeEventListener('pointermove', move); grip.removeEventListener('pointerup', up); };
+    grip.addEventListener('pointermove', move);
+    grip.addEventListener('pointerup', up);
+    grip.addEventListener('pointercancel', up);
+  });
+  grip.addEventListener('dblclick', () => { w = 284; pane.style.setProperty('--panew', '284px'); if (out) out.textContent = '284px'; });
+});
+</script>
+</div>
+</body>
+</html>

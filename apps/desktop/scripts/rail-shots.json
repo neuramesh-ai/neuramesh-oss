@@ -1,0 +1,72 @@
+[
+  {
+    "name": "rail1-home-dark",
+    "settle": 2200,
+    "query": {
+      "theme": "dark"
+    }
+  },
+  {
+    "name": "rail2-home-cream",
+    "settle": 2200,
+    "query": {
+      "theme": "cream-oak"
+    }
+  },
+  {
+    "name": "rail3-scoped-dark",
+    "settle": 2200,
+    "query": {
+      "theme": "dark",
+      "navscope": "p-acme"
+    }
+  },
+  {
+    "name": "rail4-scoped-cream",
+    "settle": 2200,
+    "query": {
+      "theme": "cream-oak",
+      "navscope": "p-acme"
+    }
+  },
+  {
+    "name": "rail5-task-dark",
+    "settle": 2600,
+    "query": {
+      "theme": "dark",
+      "openTask": "1032"
+    }
+  },
+  {
+    "name": "rail6-task-cream",
+    "settle": 2600,
+    "query": {
+      "theme": "cream-oak",
+      "openTask": "1032"
+    }
+  },
+  {
+    "name": "rail7-hover-dark",
+    "settle": 2200,
+    "query": {
+      "theme": "dark"
+    },
+    "js": "(() => { const w=[...document.querySelectorAll('.navhistwrap')][2]; if(!w) return; w.dispatchEvent(new MouseEvent('mouseover',{bubbles:true,relatedTarget:document.body})); return new Promise(r=>setTimeout(r,800)); })()"
+  },
+  {
+    "name": "rail8-hover-cream",
+    "settle": 2200,
+    "query": {
+      "theme": "cream-oak"
+    },
+    "js": "(() => { const w=[...document.querySelectorAll('.navhistwrap')][2]; if(!w) return; w.dispatchEvent(new MouseEvent('mouseover',{bubbles:true,relatedTarget:document.body})); return new Promise(r=>setTimeout(r,800)); })()"
+  },
+  {
+    "name": "rail9-menu-dark",
+    "settle": 2200,
+    "query": {
+      "theme": "dark"
+    },
+    "js": "(() => { const w=[...document.querySelectorAll('.navhistwrap.acts')][0]; if(!w) return; w.dispatchEvent(new MouseEvent('mouseover',{bubbles:true,relatedTarget:document.body})); const b=w.querySelector('.navhistbtn[aria-haspopup]'); b && b.click(); return new Promise(r=>setTimeout(r,500)); })()"
+  }
+]

@@ -1,0 +1,8 @@
+[
+  { "name": "upgrade-reason-dark", "query": { "theme": "dark", "planlimit": "1" }, "settle": 1400 },
+  { "name": "upgrade-reason-cream", "query": { "theme": "cream-oak", "planlimit": "1" }, "settle": 1400 },
+  { "name": "billing-cloud-dark", "query": { "theme": "dark", "plan": "cloud", "click": "Workspace settings,Billing" }, "settle": 2000 },
+  { "name": "billing-cloud-cream", "query": { "theme": "cream-oak", "plan": "cloud", "click": "Workspace settings,Billing" }, "settle": 2000 },
+  { "name": "billing-free-dark", "query": { "theme": "dark", "click": "Workspace settings,Billing" }, "settle": 2000 },
+  { "name": "members-cloud-cream", "query": { "theme": "cream-oak", "plan": "cloud", "click": "Workspace settings,Members" }, "settle": 2000 }
+]

@@ -1,0 +1,90 @@
+# NeuraMesh local stack. Three containers on your machine: Postgres, PowerSync, and the NeuraMesh
+# control API. The desktop app renders this file into ~/.neuramesh/local/, writes .env beside
+# it, and runs `docker compose pull`, `up -d`, and `stop`. You can also run it yourself, see
+# docs/local-mode.md.
+#
+# Your data lives in ${NM_LOCAL_DIR}/pgdata. Back up that folder like any other folder.
+# Never run `docker compose down -v` here. The app never does.
+name: neuramesh-local
+
+services:
+  pg:
+    image: pgvector/pgvector:pg16
+    # logical replication is what PowerSync reads
+    command: ["postgres", "-c", "wal_level=logical"]
+    environment:
+      POSTGRES_PASSWORD: nm
+      POSTGRES_DB: nm
+    volumes:
+      - ${NM_LOCAL_DIR:?set NM_LOCAL_DIR to the folder that holds this stack}/pgdata:/var/lib/postgresql/data
+    # Postgres is not published. Only the two containers on this network reach it.
+    healthcheck:
+      # -h 127.0.0.1 forces TCP. The image runs a temporary socket-only server while it initializes,
+      # and a socket check reports healthy before the real server is up.
+      test: ["CMD-SHELL", "psql -h 127.0.0.1 -U postgres -d nm -tAc 'select 1' >/dev/null"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+    restart: unless-stopped
+
+  control-api:
+    image: ${NM_IMAGE:-ghcr.io/neuramesh-ai/neuramesh-control-api}:${NM_IMAGE_TAG:?set NM_IMAGE_TAG to the app version, for example 0.133.0}
+    depends_on:
+      pg:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://postgres:nm@pg:5432/nm
+      NM_LOCAL: "1"
+      # the sha256 hex of your nmh_ bearer. The secret itself stays in the app's keychain.
+      NM_LOCAL_HUMAN_TOKEN_HASH: ${NM_LOCAL_HUMAN_TOKEN_HASH:?set NM_LOCAL_HUMAN_TOKEN_HASH to the sha256 hex of the nmh_ bearer}
+      # the HS256 key the control API signs sync tokens with, and PowerSync checks them with
+      NM_SYNC_KEY: ${NM_SYNC_KEY:?set NM_SYNC_KEY to 32 random bytes, base64url}
+      NM_POWERSYNC_URL: http://127.0.0.1:${NM_POWERSYNC_PORT:-58081}
+      NM_POWERSYNC_CONFIG_DIR: /powersync-config
+      NM_ALLOW_ACTOR_HEADER: "0"
+      FLEET_AUTOPROVISION: "off"
+      PUSH_ENABLED: "0"
+      NM_MAIL_DRY_RUN: "1"
+    volumes:
+      # the image writes PowerSync's config here at boot, and PowerSync reads it from the same folder
+      - ${NM_LOCAL_DIR}/powersync:/powersync-config
+    ports:
+      - "127.0.0.1:${NM_API_PORT:-8788}:8787"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8787/healthz').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 3s
+      timeout: 3s
+      start_period: 40s
+      retries: 40
+    restart: unless-stopped
+
+  powersync:
+    image: journeyapps/powersync-service:1.26
+    command: ["start", "-r", "unified"]
+    depends_on:
+      # the control API migrates the schema and writes this config first
+      control-api:
+        condition: service_healthy
+    volumes:
+      - ${NM_LOCAL_DIR}/powersync:/config:ro
+    environment:
+      POWERSYNC_CONFIG_PATH: /config/powersync.yaml
+      # powersync.yaml reads these. PowerSync substitutes PS_ names only, and every one must be set.
+      PS_NM_SYNC_KID: nm-local
+      PS_NM_SYNC_KEY: ${NM_SYNC_KEY}
+      PS_NM_AUDIENCE: powersync-local
+      # the second audience slot. No Clerk on the local stack, so it repeats the local one.
+      PS_NM_CLOUD_AUDIENCE: powersync-local
+      PS_NM_ADMIN_TOKEN: ${NM_ADMIN_TOKEN:?set NM_ADMIN_TOKEN to a random string}
+      # a remote key set, read only when a token names a key this file does not hold. The control
+      # API serves its own, so nothing leaves the machine.
+      PS_NM_JWKS_URI: http://control-api:8787/v1/sync-jwks
+      PS_NM_MACHINE_JWK_N: ""
+    ports:
+      - "127.0.0.1:${NM_POWERSYNC_PORT:-58081}:8080"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:8080/probes/liveness').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 3s
+      timeout: 2s
+      retries: 40
+    restart: unless-stopped

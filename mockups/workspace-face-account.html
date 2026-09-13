@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>One workspace column — folding the account popup into the projects face</title>
+<style>
+[data-theme] { --font:'Geist Variable',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; --fmono:'Geist Mono Variable',ui-monospace,'SF Mono',Menlo,monospace; --fdisp:'Source Serif 4','Iowan Old Style',Georgia,serif; --ease:cubic-bezier(.2,.8,.2,1); --dur-fast:120ms; }
+/* verbatim from apps/desktop/src/renderer/src/tokens.css */
+[data-theme='dark'] {
+  --win:#0d0d0d; --bg:#141414; --panel:#191919; --panel2:#212121; --panel3:#2b2b2b;
+  --border:#272727; --border2:#383838; --card:#1e1e1e; --card-border:#2c2c2c; --overlay:#222222;
+  --text:#eaeaea; --body:#b6b6b6; --muted:#898989; --dim:#676767; --ring:#525252;
+  --accent:#eaeaea; --link:#d19a72; --orch:#9793d2; --hover-bg:rgba(234,234,234,.07);
+  --prog:#8ba0c0; --done:#77ac8d; --warn:#c9a15e; --shadow:rgba(0,0,0,.62);
+  --sel-bg:rgba(234,234,234,.10); --danger:#c88b7c;
+}
+[data-theme='cream-oak'] {
+  --win:#f0e5d3; --bg:#fbf8f4; --panel:#fbf8f4; --panel2:#f6eee1; --panel3:#efe1cd;
+  --border:#e6dbca; --border2:#d3c2a8; --card:#ffffff; --card-border:#eadfce; --overlay:#ffffff;
+  --text:#2a1c13; --body:#574838; --muted:#97846c; --dim:#b5a289; --ring:#b08a5e;
+  --accent:#834a2b; --link:#9c5730; --orch:#6a63bc; --hover-bg:rgba(42,28,19,.05);
+  --prog:#4f80c4; --done:#0f9d63; --warn:#a06a1f; --shadow:rgba(70,42,18,.16);
+  --sel-bg:rgba(131,74,43,.08); --danger:#b0483a;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#131210; font-family:'Geist Variable',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; }
+.page { max-width:1680px; margin:0 auto; padding:32px 24px 80px; }
+.pagehead { color:#eaeaea; margin-bottom:6px; }
+.pagehead h1 { font-family:'Source Serif 4',Georgia,serif; font-size:24px; font-weight:640; letter-spacing:-.012em; }
+.pagehead p { color:#898989; font-size:13px; line-height:1.65; margin-top:9px; max-width:100ch; }
+.pagehead b { color:#b6b6b6; font-weight:600; }
+.warn { color:#c8a06a; font-weight:600; } .ok { color:#8fbf9f; font-weight:600; } .no { color:#c8846a; font-weight:600; }
+.stophd { color:#eaeaea; font-size:15.5px; font-weight:660; margin:48px 0 4px; font-family:'Source Serif 4',Georgia,serif; }
+.stopno { font:700 10px 'Geist Mono Variable',ui-monospace,monospace; letter-spacing:.12em; color:#6f6f6f; text-transform:uppercase; margin-right:8px; }
+.stopp { color:#898989; font-size:12.5px; line-height:1.64; max-width:104ch; margin-bottom:16px; }
+.stopp b { color:#b6b6b6; } .stopp code { font:600 11.5px 'Geist Mono Variable',ui-monospace,monospace; color:#c8a06a; }
+.themes { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+@media (max-width:1340px){ .themes { grid-template-columns:1fr; } }
+.theme { background:var(--win); border:1px solid var(--border2); border-radius:16px; padding:16px; color:var(--text); }
+.theme > h2 { font-size:10.5px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--dim); margin:0 2px 12px; }
+.row { display:flex; gap:18px; align-items:flex-start; flex-wrap:wrap; }
+
+/* ── the shell fragment: spine + face ───────────────────────────── */
+.frag { display:flex; background:var(--win); border-radius:14px; overflow:hidden; border:1px solid var(--border); }
+.spine { width:34px; min-width:34px; background:var(--win); border-right:1px solid var(--border); display:flex; flex-direction:column; align-items:center; padding:10px 0; gap:9px; }
+.spdot { width:22px; height:22px; border-radius:7px; background:var(--panel3); display:grid; place-items:center; font:700 10px var(--fmono); color:var(--muted); }
+.spdot.on { background:var(--card); border:1px solid var(--card-border); color:var(--text); }
+.spproj { writing-mode:vertical-rl; font:700 8.5px var(--fmono); letter-spacing:.14em; color:var(--dim); margin-top:4px; }
+.spgrow { margin-top:auto; }
+.spdot.acct { background:var(--panel2); border:1px solid var(--border2); color:var(--body); }
+.spdot.acct.hot { background:var(--card); color:var(--text); }
+/* the face is 266px — the real panel width */
+.face { width:266px; min-width:266px; background:var(--bg); display:flex; flex-direction:column; min-height:520px; }
+.pfhd { display:flex; align-items:center; gap:10px; padding:12px 12px 10px; }
+.pfhdav { width:30px; height:30px; border-radius:9px; background:var(--panel3); display:grid; place-items:center; font-size:13px; font-weight:640; flex:none; }
+.pfhdt { min-width:0; line-height:1.15; } .pfhdt b { font-size:13px; font-weight:660; display:block; } .pfhdt small { font-size:10px; color:var(--dim); }
+.pfesc { margin-left:auto; font:600 9px var(--fmono); color:var(--dim); border:1px solid var(--border2); border-radius:5px; padding:2px 5px; }
+.pfhome, .pfrow, .pfnew, .fitem { display:flex; align-items:center; gap:10px; width:calc(100% - 16px); margin:1px 8px; padding:7px 9px; border-radius:8px; border:none; background:none; color:var(--body); font:inherit; font-size:12.5px; text-align:left; cursor:pointer; }
+.pfhome.on, .pfrow.on { background:var(--panel3); color:var(--text); font-weight:620; }
+.pfico, .fico { width:14px; text-align:center; color:var(--dim); flex:none; font-size:12px; }
+.pfrow .rt { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.pfrow .cnt, .pfhome .cnt { margin-left:auto; font:640 10px var(--fmono); background:var(--panel3); border-radius:9px; padding:2px 7px; color:var(--muted); }
+.pfgear { margin-left:auto; color:var(--dim); font-size:11px; }
+.pflive { width:6px; height:6px; border-radius:50%; background:var(--prog); }
+.pfsep { height:1px; background:var(--border); margin:9px 12px; }
+.navsecthd { padding:10px 14px 4px; font:700 9.5px var(--fmono); letter-spacing:.1em; text-transform:uppercase; color:var(--dim); }
+.navsectcnt { color:var(--muted); font-weight:600; margin-left:5px; }
+.pffoot { margin-top:auto; padding:10px 14px; border-top:1px solid var(--border); font-size:11px; color:var(--dim); display:flex; align-items:center; gap:8px; }
+.pffoot .k { margin-left:auto; font:600 9.5px var(--fmono); border:1px solid var(--border2); border-radius:5px; padding:2px 5px; }
+.grow { flex:1; }
+.emptyhint { flex:1; display:grid; place-items:center; color:var(--dim); font-size:11px; font-style:italic; opacity:.6; padding:0 18px; text-align:center; line-height:1.6; }
+
+/* plan strip */
+.planstrip { display:flex; align-items:center; gap:10px; margin:4px 8px 2px; padding:8px 9px; border-radius:9px; background:var(--panel2); border:1px solid var(--border); cursor:pointer; }
+.planstrip .fico { color:var(--muted); }
+.planbody { min-width:0; line-height:1.2; } .planbody b { font-size:12px; font-weight:640; display:block; } .planbody span { font-size:10.5px; color:var(--muted); }
+.planupg { margin-left:auto; font:700 8.5px var(--fmono); letter-spacing:.08em; text-transform:uppercase; color:var(--accent); border:1px solid var(--ring); border-radius:6px; padding:3px 7px; }
+.planstrip.cloud { background:none; border-color:transparent; } .planstrip.cloud .planupg { display:none; }
+
+/* the account footer */
+.acctfoot { border-top:1px solid var(--border); margin-top:auto; }
+.acctrow { display:flex; align-items:center; gap:10px; width:100%; padding:9px 12px; background:none; border:none; color:var(--body); font:inherit; cursor:pointer; text-align:left; }
+.acctrow:hover { background:var(--hover-bg); }
+.acctav { width:26px; height:26px; border-radius:8px; background:var(--panel3); display:grid; place-items:center; font-size:11px; font-weight:640; flex:none; color:var(--text); }
+.acctid { min-width:0; line-height:1.2; } .acctid b { font-size:12px; font-weight:620; display:block; color:var(--text); }
+.acctid span { font-size:10px; color:var(--dim); display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:150px; }
+.acctcar { margin-left:auto; color:var(--dim); font-size:10px; }
+.fitem.danger { color:var(--danger); }
+.prefrow { display:flex; align-items:center; gap:8px; padding:8px 12px 10px; }
+.prefbtn { display:flex; align-items:center; gap:7px; padding:5px 9px; border-radius:8px; background:var(--panel2); border:1px solid var(--border); color:var(--body); font-size:11.5px; }
+.dockseg { margin-left:auto; display:flex; gap:2px; padding:2px; background:var(--panel2); border:1px solid var(--border); border-radius:8px; }
+.dockbtn { width:22px; height:18px; border-radius:5px; display:grid; place-items:center; color:var(--dim); font-size:9px; }
+.dockbtn.on { background:var(--card); color:var(--text); box-shadow:0 1px 2px var(--shadow); }
+
+/* the old popup, for the before shot */
+.popup { width:274px; background:var(--overlay); border:1px solid var(--border2); border-radius:13px; box-shadow:0 20px 55px -14px var(--shadow); padding:7px; align-self:flex-start; }
+.accthead { display:flex; align-items:center; gap:10px; padding:8px 8px 10px; }
+.acctsect { padding:9px 10px 3px; font:700 9.5px var(--fmono); letter-spacing:.1em; text-transform:uppercase; color:var(--dim); }
+.popup .fitem { width:100%; margin:0; }
+.dupemark { outline:2px dashed color-mix(in srgb, var(--warn) 60%, transparent); outline-offset:2px; border-radius:9px; }
+
+/* annotations + tables */
+.callouts { display:flex; flex-wrap:wrap; gap:8px 20px; margin-top:13px; }
+.co { font-size:11.5px; color:#898989; line-height:1.55; max-width:46ch; }
+.co b { color:#b6b6b6; }
+.co .n { display:inline-grid; place-items:center; width:16px; height:16px; border-radius:50%; background:#2b2b2b; color:#c8a06a; font:700 10px monospace; margin-right:6px; }
+.alts { width:100%; border-collapse:collapse; font-size:12.5px; color:#b6b6b6; }
+.alts th { text-align:left; font:700 10px 'Geist Mono Variable',monospace; letter-spacing:.09em; text-transform:uppercase; color:#6f6f6f; padding:8px 12px; border-bottom:1px solid #2c2c2c; }
+.alts td { padding:10px 12px; border-bottom:1px solid #222; vertical-align:top; line-height:1.55; }
+.alts td:first-child { white-space:nowrap; font-weight:640; color:#eaeaea; }
+.alts .pick { color:#8fbf9f; font-weight:700; }
+.panels { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
+@media (max-width:1100px){ .panels { grid-template-columns:1fr; } }
+.pnl { background:#171717; border:1px solid #2a2a2a; border-radius:13px; padding:14px 15px; }
+.pnl h4 { font-size:12px; font-weight:700; color:#eaeaea; margin-bottom:8px; }
+.pnl p { font-size:12px; line-height:1.6; color:#909090; } .pnl p + p { margin-top:8px; } .pnl b { color:#c4c4c4; }
+.tag { display:inline-block; font:700 9px 'Geist Mono Variable',monospace; letter-spacing:.1em; text-transform:uppercase; padding:3px 8px; border-radius:7px; margin-bottom:9px; }
+.tag.no { background:#3a231c; color:#d99a7c; } .tag.yes { background:#20362a; color:#8fbf9f; } .tag.ask { background:#3a3320; color:#d0b06a; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<div class="pagehead">
+  <h1>One workspace column</h1>
+  <p><b>The ask (George, 2026-08-04):</b> fold the account popup's items into the workspace face that slides in to switch projects — there is a lot of empty space at the bottom, and it may be a better home for them. Then delete the popup.</p>
+  <p><b>Worth doing, and the reason is stronger than the empty space.</b> The face already opens with an identity header — avatar + <i>Copper Atelier · workspace</i>. The popup opens with <b>another</b> identity header — avatar + owner + email. Two panels, both anchored on the same avatar, on the same spine, ~40px apart, each answering "where am I / who am I" about the same workspace. That is the duplication; the empty space is just what makes the fix free.</p>
+  <p><b>The placement that proves it:</b> <i>"Local · Free — 1 of 3 projects"</i> is a statement <b>about the projects list</b>. In the popup it floats above a Workspace section with no projects in sight. In the face it sits directly under the projects it counts — and it explains, in place, why <code>＋ New project</code> sometimes opens an upgrade modal.</p>
+  <p><b>The hazard that shapes the design:</b> <span class="warn">the face opens on HOVER.</span> The popup is click-only today, so <code>Sign out</code> has never been something you could reveal by drifting your pointer at the left edge. A flat dump of every item into a hover panel changes that. Hence zoning, not stacking — see Stop 3.</p>
+</div>
+
+<!-- ══════════ STOP 1 ══════════ -->
+<div class="stophd"><span class="stopno">Stop 1</span>Today — two headers, one spine, 40px apart</div>
+<div class="stopp">Both surfaces open off the same rail. The face fills its top third and then stops; the popup carries a second identity block, a plan strip about projects it cannot show, and two sections of workspace nouns. Dashed outline marks what is said twice.</div>
+<div class="themes">
+  <div class="theme" data-theme="dark">
+    <h2>Graphite · the face, as it is</h2>
+    <div class="frag">
+      <div class="spine"><div class="spdot on">C</div><div class="spproj">DEFAULT</div><div class="spdot acct spgrow">G</div></div>
+      <div class="face">
+        <div class="pfhd dupemark"><span class="pfhdav">C</span><span class="pfhdt"><b>Copper Atelier</b><small>workspace</small></span><span class="pfesc">esc</span></div>
+        <button class="pfhome"><span class="pfico">⌂</span><span>Home</span><span class="cnt">1</span></button>
+        <div class="pfsep"></div>
+        <div class="navsecthd">Projects <span class="navsectcnt">1</span></div>
+        <button class="pfrow on"><span class="pfico">▤</span><span class="rt">default</span><span class="pfgear">⚙</span></button>
+        <div class="pfsep"></div>
+        <button class="pfnew"><span class="pfico">＋</span> New project</button>
+        <button class="pfnew"><span class="pfico">⊞</span> All projects</button>
+        <div class="emptyhint">— roughly 300px of nothing —</div>
+        <div class="pffoot">Click the rail to pin <span class="k">⌘⇧P</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="theme" data-theme="dark">
+    <h2>Graphite · the popup, as it is</h2>
+    <div class="popup">
+      <div class="accthead dupemark"><span class="acctav">G</span><div class="acctid"><b>owner</b><span>george@acme.dev</span></div></div>
+      <div class="planstrip"><span class="fico">⌂</span><div class="planbody"><b>Local · Free</b><span>1 of 3 projects</span></div><span class="planupg">Upgrade</span></div>
+      <div class="acctsect">Workspace</div>
+      <button class="fitem"><span class="fico">⚉</span> Agents &amp; machines</button>
+      <button class="fitem"><span class="fico">◎</span> Retro</button>
+      <button class="fitem"><span class="fico">⚙</span> Workspace settings</button>
+      <div class="acctsect">You</div>
+      <button class="fitem"><span class="fico">☺</span> Your profile</button>
+      <button class="fitem"><span class="fico">✦</span> Replay the walkthrough</button>
+      <button class="fitem danger"><span class="fico">⇤</span> Sign out</button>
+      <div class="prefrow">
+        <span class="prefbtn">◐ Theme</span>
+        <span class="dockseg"><span class="dockbtn on">▮</span><span class="dockbtn">▬</span><span class="dockbtn">▯</span></span>
+      </div>
+    </div>
+    <div class="callouts">
+      <div class="co"><span class="n">1</span><b>The plan strip is orphaned.</b> It counts projects, in a panel with no projects in it.</div>
+      <div class="co"><span class="n">2</span><b>“Workspace” is a section here</b> and the whole subject of the panel next door.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ STOP 2 ══════════ -->
+<div class="stophd"><span class="stopno">Stop 2</span>Direction B — the zoned face, at rest <span style="color:#8fbf9f;font-size:12px;font-weight:600">◂ recommended</span></div>
+<div class="stopp">Four zones, top to bottom, in the order you reach for them: <b>switch</b> (untouched — it is the panel's job and it stays instant), <b>the plan strip</b> under the projects it counts, <b>workspace</b> nouns filling the dead space honestly, and an <b>account footer</b> anchored at the bottom, opposite the avatar in the spine that opens it. At rest the footer is one row: who you are. Nothing destructive is on screen.</div>
+<div class="themes">
+  <div class="theme" data-theme="dark">
+    <h2>Graphite · at rest</h2>
+    <div class="frag">
+      <div class="spine"><div class="spdot on">C</div><div class="spproj">DEFAULT</div><div class="spdot acct spgrow">G</div></div>
+      <div class="face">
+        <div class="pfhd"><span class="pfhdav">C</span><span class="pfhdt"><b>Copper Atelier</b><small>workspace</small></span><span class="pfesc">esc</span></div>
+        <button class="pfhome"><span class="pfico">⌂</span><span>Home</span><span class="cnt">1</span></button>
+        <div class="pfsep"></div>
+        <div class="navsecthd">Projects <span class="navsectcnt">1</span></div>
+        <button class="pfrow on"><span class="pfico">▤</span><span class="rt">default</span><span class="pfgear">⚙</span></button>
+        <button class="pfnew"><span class="pfico">＋</span> New project</button>
+        <button class="pfnew"><span class="pfico">⊞</span> All projects</button>
+        <div class="planstrip"><span class="fico">⌂</span><div class="planbody"><b>Local · Free</b><span>1 of 3 projects</span></div><span class="planupg">Upgrade</span></div>
+        <div class="pfsep"></div>
+        <div class="navsecthd">Workspace</div>
+        <button class="fitem"><span class="fico">⚉</span> Agents &amp; machines</button>
+        <button class="fitem"><span class="fico">◎</span> Retro</button>
+        <button class="fitem"><span class="fico">⚙</span> Settings</button>
+        <div class="grow"></div>
+        <div class="acctfoot">
+          <button class="acctrow"><span class="acctav">G</span><div class="acctid"><b>owner</b><span>george@acme.dev</span></div><span class="acctcar">⌃</span></button>
+        </div>
+        <div class="pffoot">Click the rail to pin <span class="k">⌘⇧P</span></div>
+      </div>
+    </div>
+    <div class="callouts">
+      <div class="co"><span class="n">3</span><b>The plan strip moved under the list it counts</b> — and now sits one row from <i>＋ New project</i>, which is the button its cap actually gates.</div>
+      <div class="co"><span class="n">4</span><b>Nothing destructive at rest.</b> The footer is identity only; Sign out is one deliberate click away, which a hover-opened panel needs.</div>
+    </div>
+  </div>
+  <div class="theme" data-theme="cream-oak">
+    <h2>Cream Oak · at rest</h2>
+    <div class="frag">
+      <div class="spine"><div class="spdot on">C</div><div class="spproj">DEFAULT</div><div class="spdot acct spgrow">G</div></div>
+      <div class="face">
+        <div class="pfhd"><span class="pfhdav">C</span><span class="pfhdt"><b>Copper Atelier</b><small>workspace</small></span><span class="pfesc">esc</span></div>
+        <button class="pfhome"><span class="pfico">⌂</span><span>Home</span><span class="cnt">1</span></button>
+        <div class="pfsep"></div>
+        <div class="navsecthd">Projects <span class="navsectcnt">3</span></div>
+        <button class="pfrow on"><span class="pfico">▤</span><span class="rt">default</span><span class="pfgear">⚙</span></button>
+        <button class="pfrow"><span class="pfico">▤</span><span class="rt">flowe-ai</span><span class="pflive"></span></button>
+        <button class="pfrow"><span class="pfico">▤</span><span class="rt">acme-yoga</span></button>
+        <button class="pfnew"><span class="pfico">＋</span> New project</button>
+        <button class="pfnew"><span class="pfico">⊞</span> All projects</button>
+        <div class="planstrip"><span class="fico">⌂</span><div class="planbody"><b>Local · Free</b><span>3 of 3 projects</span></div><span class="planupg">Upgrade</span></div>
+        <div class="pfsep"></div>
+        <div class="navsecthd">Workspace</div>
+        <button class="fitem"><span class="fico">⚉</span> Agents &amp; machines</button>
+        <button class="fitem"><span class="fico">◎</span> Retro</button>
+        <button class="fitem"><span class="fico">⚙</span> Settings</button>
+        <div class="grow"></div>
+        <div class="acctfoot">
+          <button class="acctrow"><span class="acctav">G</span><div class="acctid"><b>owner</b><span>george@acme.dev</span></div><span class="acctcar">⌃</span></button>
+        </div>
+        <div class="pffoot">Pinned open <span class="k">⌘⇧P</span></div>
+      </div>
+    </div>
+    <div class="callouts">
+      <div class="co"><span class="n">5</span><b>At the cap, the strip earns itself.</b> <i>3 of 3 projects</i> sits right where you just tried to add a fourth — the upgrade modal stops being a surprise.</div>
+      <div class="co"><span class="n">6</span><b>The empty space was never the point,</b> but a full roster shows the layout still breathes: the footer is pinned, the list scrolls.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ STOP 3 ══════════ -->
+<div class="stophd"><span class="stopno">Stop 3</span>The account footer, expanded — one click, in place</div>
+<div class="stopp">Clicking the identity row (or the avatar in the spine, which is the same door) lifts the personal items in place. No second surface, no popover, no new plane — the panel it grows inside is the one you already opened. <b>Theme</b> and the dock segment ride the bottom row: they are preferences, not destinations, so they stay a control strip rather than becoming list rows.</div>
+<div class="themes">
+  <div class="theme" data-theme="dark">
+    <h2>Graphite · expanded</h2>
+    <div class="frag">
+      <div class="spine"><div class="spdot on">C</div><div class="spproj">DEFAULT</div><div class="spdot acct hot spgrow">G</div></div>
+      <div class="face">
+        <div class="pfhd"><span class="pfhdav">C</span><span class="pfhdt"><b>Copper Atelier</b><small>workspace</small></span><span class="pfesc">esc</span></div>
+        <button class="pfhome"><span class="pfico">⌂</span><span>Home</span><span class="cnt">1</span></button>
+        <div class="pfsep"></div>
+        <div class="navsecthd">Projects <span class="navsectcnt">1</span></div>
+        <button class="pfrow on"><span class="pfico">▤</span><span class="rt">default</span><span class="pfgear">⚙</span></button>
+        <button class="pfnew"><span class="pfico">＋</span> New project</button>
+        <button class="pfnew"><span class="pfico">⊞</span> All projects</button>
+        <div class="planstrip"><span class="fico">⌂</span><div class="planbody"><b>Local · Free</b><span>1 of 3 projects</span></div><span class="planupg">Upgrade</span></div>
+        <div class="pfsep"></div>
+        <div class="navsecthd">Workspace</div>
+        <button class="fitem"><span class="fico">⚉</span> Agents &amp; machines</button>
+        <button class="fitem"><span class="fico">◎</span> Retro</button>
+        <button class="fitem"><span class="fico">⚙</span> Settings</button>
+        <div class="grow"></div>
+        <div class="acctfoot">
+          <button class="acctrow" style="background:var(--hover-bg)"><span class="acctav">G</span><div class="acctid"><b>owner</b><span>george@acme.dev</span></div><span class="acctcar">⌄</span></button>
+          <button class="fitem"><span class="fico">☺</span> Your profile</button>
+          <button class="fitem"><span class="fico">✦</span> Replay the walkthrough</button>
+          <button class="fitem danger"><span class="fico">⇤</span> Sign out</button>
+          <div class="prefrow">
+            <span class="prefbtn">◐ Theme</span>
+            <span class="dockseg"><span class="dockbtn on">▮</span><span class="dockbtn">▬</span><span class="dockbtn">▯</span></span>
+          </div>
+        </div>
+        <div class="pffoot">Click the rail to pin <span class="k">⌘⇧P</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="theme" data-theme="cream-oak">
+    <h2>Cream Oak · expanded</h2>
+    <div class="frag">
+      <div class="spine"><div class="spdot on">C</div><div class="spproj">DEFAULT</div><div class="spdot acct hot spgrow">G</div></div>
+      <div class="face">
+        <div class="pfhd"><span class="pfhdav">C</span><span class="pfhdt"><b>Copper Atelier</b><small>workspace</small></span><span class="pfesc">esc</span></div>
+        <button class="pfhome"><span class="pfico">⌂</span><span>Home</span><span class="cnt">1</span></button>
+        <div class="pfsep"></div>
+        <div class="navsecthd">Projects <span class="navsectcnt">1</span></div>
+        <button class="pfrow on"><span class="pfico">▤</span><span class="rt">default</span><span class="pfgear">⚙</span></button>
+        <button class="pfnew"><span class="pfico">＋</span> New project</button>
+        <button class="pfnew"><span class="pfico">⊞</span> All projects</button>
+        <div class="planstrip"><span class="fico">⌂</span><div class="planbody"><b>Local · Free</b><span>1 of 3 projects</span></div><span class="planupg">Upgrade</span></div>
+        <div class="pfsep"></div>
+        <div class="navsecthd">Workspace</div>
+        <button class="fitem"><span class="fico">⚉</span> Agents &amp; machines</button>
+        <button class="fitem"><span class="fico">◎</span> Retro</button>
+        <button class="fitem"><span class="fico">⚙</span> Settings</button>
+        <div class="grow"></div>
+        <div class="acctfoot">
+          <button class="acctrow" style="background:var(--hover-bg)"><span class="acctav">G</span><div class="acctid"><b>owner</b><span>george@acme.dev</span></div><span class="acctcar">⌄</span></button>
+          <button class="fitem"><span class="fico">☺</span> Your profile</button>
+          <button class="fitem"><span class="fico">✦</span> Replay the walkthrough</button>
+          <button class="fitem danger"><span class="fico">⇤</span> Sign out</button>
+          <div class="prefrow">
+            <span class="prefbtn">◐ Theme</span>
+            <span class="dockseg"><span class="dockbtn on">▮</span><span class="dockbtn">▬</span><span class="dockbtn">▯</span></span>
+          </div>
+        </div>
+        <div class="pffoot">Click the rail to pin <span class="k">⌘⇧P</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="callouts" style="max-width:none">
+  <div class="co"><span class="n">7</span><b>The spine avatar keeps its job, and loses its surface.</b> Clicking <code>G</code> opens the FACE with the footer already expanded — one destination, two doors, instead of two panels off one rail.</div>
+  <div class="co"><span class="n">8</span><b>Two avatars stop competing.</b> The head wears the WORKSPACE mark, the footer wears YOU. Today both are avatars 40px apart and the head's is passed as <code>selfInitial</code> — a person-shaped prop rendering a workspace initial.</div>
+  <div class="co"><span class="n">9</span><b>Esc still closes the whole thing.</b> The expander is state inside a panel that already has a dismiss; it does not add a second thing to escape from.</div>
+</div>
+
+<!-- ══════════ STOP 4 ══════════ -->
+<div class="stophd"><span class="stopno">Stop 4</span>Three directions, and why B</div>
+<div class="themes" style="grid-template-columns:1fr">
+  <div class="theme" data-theme="dark" style="background:#171717;border-color:#2a2a2a">
+    <table class="alts">
+      <tr><th>direction</th><th>shape</th><th>verdict</th></tr>
+      <tr>
+        <td>A · flat stack</td>
+        <td>every popup item laid into the face as sections — plan, Workspace, You, prefs — all visible at rest</td>
+        <td><span class="no">Rejected</span> — puts <b>Sign out</b> on a panel that opens on hover, and turns a switcher you glance at into a menu you read. The switch job is the panel's reason to exist and it would be sharing the frame with seven settings rows.</td>
+      </tr>
+      <tr>
+        <td class="pick">B · zoned face</td>
+        <td>switch stays on top and untouched · plan strip under the projects it counts · workspace nouns in the dead space · account footer at the bottom, expanding in place</td>
+        <td><span class="pick">Recommended</span> — kills the popup, keeps the switcher instant, puts each item where its subject already is, and keeps destructive actions behind a click. The empty space gets filled by the things that were homeless, not by everything.</td>
+      </tr>
+      <tr>
+        <td>C · split by axis</td>
+        <td>workspace items into the face; personal items (profile, theme, sign out) stay in a much smaller avatar popup</td>
+        <td><span class="ok">Viable fallback</span> — strictly better than today and less work than B, but it does not achieve the ask: the popup survives, so the second identity header and the second plane both survive with it.</td>
+      </tr>
+    </table>
+  </div>
+</div>
+
+<!-- ══════════ STOP 5 ══════════ -->
+<div class="stophd"><span class="stopno">Stop 5</span>What to decide before this is built</div>
+<div class="panels">
+  <div class="pnl"><span class="tag ask">decide</span><h4>Does hover still open it?</h4><p>B is safe on a hover panel because nothing destructive shows at rest. But if the footer becomes a place you go often, hover-opening a panel with your email in it may start to feel exposed on a shared screen.</p><p><b>Cheapest answer:</b> leave hover as it is, and watch whether you ever reach for the footer <i>without</i> having clicked the rail first.</p></div>
+  <div class="pnl"><span class="tag ask">decide</span><h4>Settings vs Workspace settings</h4><p>The face's header already says <i>workspace</i>, so the row can read <b>Settings</b> rather than <b>Workspace settings</b> — the panel supplies the noun. Shown that way in the mockups.</p><p>Against: <code>⌘K</code> and the tour both name it "Workspace settings", and a renamed row is a renamed thing to search for.</p></div>
+  <div class="pnl"><span class="tag yes">no change</span><h4>Agents &amp; Retro keep their homes</h4><p>Both are workspace-wide pages reached from the account menu today and from <code>⌘K</code>. Moving them into the face changes the door, not the destination — no routing work, no new surface.</p><p>The nav's own destinations (Home · Board · Automations · Library) stay project-scoped and untouched. Different axis, different column.</p></div>
+</div>
+</div>
+</body>
+</html>

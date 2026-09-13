@@ -1,0 +1,495 @@
+<!doctype html>
+<html data-theme="cream-oak">
+<head>
+<meta charset="utf-8">
+<title>The run card sheds its box — three directions + the missing sheen</title>
+<style>
+/* Tokens lifted verbatim from apps/desktop/src/renderer/src/tokens.css — cream oak + graphite dark. */
+[data-theme='cream-oak'] {
+  --win:#f0e5d3; --bg:#fbf8f4; --panel:#fbf8f4; --panel2:#f6eee1; --panel3:#efe1cd;
+  --border:#e6dbca; --border2:#d3c2a8;
+  --text:#2a1c13; --body:#574838; --muted:#97846c; --dim:#b5a289;
+  --link:#9c5730; --accent:#834a2b;
+  --prog:#4f80c4; --done:#0f9d63; --blocked:#7d7f86;
+  --role-orch:#6a63bc; --role-tone:14%;
+  --card:#fff; --card-border:#eadfce;
+  --hover-bg:color-mix(in srgb, var(--text) 5%, transparent);
+  --sel-bg:color-mix(in srgb, var(--accent) 8%, transparent);
+  --hover-border:color-mix(in srgb, var(--text) 10%, var(--border2));
+}
+[data-theme='dark'] {
+  --win:#0d0d0d; --bg:#141414; --panel:#191919; --panel2:#212121; --panel3:#2b2b2b;
+  --border:#272727; --border2:#383838;
+  --text:#eaeaea; --body:#b6b6b6; --muted:#898989; --dim:#676767;
+  --link:#d19a72; --accent:var(--text);
+  --prog:#8ba0c0; --done:#77ac8d; --blocked:#9ca0a8;
+  --role-orch:#9793d2; --role-tone:17%;
+  --card:#1e1e1e; --card-border:#2c2c2c;
+  --hover-bg:color-mix(in srgb, var(--text) 7%, transparent);
+  --sel-bg:color-mix(in srgb, var(--text) 10%, transparent);
+  --hover-border:#404040;
+}
+:root{
+  --fbody:'Geist Variable',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --fmono:'Geist Mono Variable',ui-monospace,'SF Mono',Menlo,monospace;
+  --fdisp:'Source Serif 4 Variable',Georgia,serif;
+  --r-sm:6px; --r-md:8px; --r-full:999px;
+  --dur-fast:.12s; --ease:cubic-bezier(.2,.8,.2,1);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--fbody);background:var(--win);color:var(--text);
+  -webkit-font-smoothing:antialiased;padding:26px 20px 70px}
+.wrap{max-width:1440px;margin:0 auto}
+
+/* ── page chrome (mockup only, not product) ─────────────────────────────── */
+h1{font-family:var(--fdisp);font-size:27px;font-weight:600;letter-spacing:-.01em;margin-bottom:6px}
+.lede{color:var(--body);font-size:13.5px;line-height:1.6;max-width:70ch;margin-bottom:22px}
+.lede b{color:var(--text);font-weight:650}
+.toolbar{display:flex;gap:8px;align-items:center;margin-bottom:26px;flex-wrap:wrap}
+.tbtn{padding:6px 13px;border-radius:var(--r-full);border:1px solid var(--border2);
+  background:transparent;color:var(--body);font:600 12px var(--fbody);cursor:pointer;
+  transition:background var(--dur-fast) var(--ease),color var(--dur-fast) var(--ease)}
+.tbtn:hover{background:var(--hover-bg)}
+.tbtn[aria-pressed=true]{background:var(--text);color:var(--win);border-color:var(--text)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;align-items:start}
+.opt{border:1px solid var(--border);border-radius:14px;background:var(--panel);overflow:hidden}
+.opt.pick{border-color:var(--text)}
+.opthead{display:flex;align-items:baseline;gap:9px;padding:13px 16px 0}
+.optname{font:650 13px var(--fbody);color:var(--text)}
+.opttag{font:600 9.5px var(--fmono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);
+  border:1px solid var(--border2);border-radius:var(--r-full);padding:1.5px 7px}
+.opt.pick .opttag{color:var(--text);border-color:var(--text)}
+.optwhy{padding:6px 16px 0;font-size:11.5px;line-height:1.55;color:var(--muted)}
+.optwhy b{color:var(--body);font-weight:600}
+.stage{margin:14px 0 0;padding:12px 8px 16px;background:var(--bg);border-top:1px solid var(--border)}
+.cost{padding:10px 16px 13px;font:600 10.5px var(--fmono);color:var(--dim);border-top:1px solid var(--border)}
+
+/* ── the transcript: exactly the product's .msg rhythm ──────────────────── */
+.msg{display:flex;gap:11px;padding:7px 10px;border-radius:9px;position:relative}
+.msg .av{width:26px;height:26px;min-width:26px;border-radius:var(--r-sm);display:grid;place-items:center;
+  font-weight:800;font-size:11px;color:var(--body);background:var(--panel3);
+  box-shadow:inset 0 0 0 1px var(--border2)}
+.msg .body{min-width:0;flex:1}
+.msg .head{display:flex;align-items:center;gap:8px}
+.msg .head b{font-size:12.5px}
+.msg .time{font-size:10.5px;color:var(--dim)}
+.msg p{color:var(--body);font-size:13px;line-height:1.55;margin-top:2px}
+.msg.human{flex-direction:row-reverse}
+.msg.human .body{flex:0 1 auto;max-width:82%;background:var(--hover-bg);border-radius:12px;padding:7px 12px 8px}
+.msg.human .head{justify-content:flex-end}
+.rolechip{font:700 8.5px var(--fmono);letter-spacing:.05em;text-transform:uppercase;
+  color:var(--role-orch);background:color-mix(in srgb,var(--role-orch) var(--role-tone),transparent);
+  border-radius:var(--r-sm);padding:1.5px 5px}
+
+/* ── the run card: SHARED anatomy, the chrome is what varies ────────────── */
+.runcard{margin-top:4px;max-width:560px;animation:nm-fadein .18s ease}
+.runhead{display:flex;align-items:center;gap:9px;width:100%;padding:0;background:none;border:0;
+  font:inherit;color:inherit;text-align:left;cursor:pointer}
+.runtitle{font-size:12.5px;font-weight:650;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.runmeta{margin-left:auto;display:inline-flex;align-items:center;gap:8px;flex:none}
+.runclock{font:600 10.5px var(--fmono);color:var(--dim);font-variant-numeric:tabular-nums}
+.chip{font:700 8.5px var(--fmono);letter-spacing:.05em;text-transform:uppercase;border-radius:var(--r-sm);padding:2px 6px}
+.c-run-running{background:color-mix(in srgb,var(--prog) 16%,transparent);color:var(--prog)}
+.rring{--frac:0%;flex:none;width:15px;height:15px;border-radius:50%;
+  background:conic-gradient(var(--text) var(--frac),var(--panel3) 0);
+  -webkit-mask:radial-gradient(circle at 50% 50%,transparent 4.2px,#000 4.7px);
+  mask:radial-gradient(circle at 50% 50%,transparent 4.2px,#000 4.7px);
+  animation:nm-ringpulse 1.8s ease-in-out infinite}
+.runlegs{display:flex;flex-direction:column;gap:1px;margin-top:8px}
+.leg{display:flex;align-items:center;gap:8px;min-width:0;padding:4px 7px;border-radius:7px}
+.leg.sub{margin-left:18px}
+.legmark{flex:none;width:13px;display:grid;place-items:center;color:var(--done)}
+.legdot{width:6px;height:6px;border-radius:99px;background:var(--text);animation:nm-pulse 1.4s ease-in-out infinite}
+.legname{flex:0 1 auto;min-width:8.5em;font-size:11.5px;color:var(--body);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.leg.on .legname{color:var(--text);font-weight:600}
+.legverb{flex:1 1 0;min-width:0;font-size:11px;color:var(--muted);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.legnum{margin-left:auto;flex:none;font:600 10px var(--fmono);color:var(--dim);font-variant-numeric:tabular-nums}
+.runroll{display:flex;align-items:center;gap:6px;margin-top:7px;flex-wrap:wrap}
+.rollchip{font:600 10px var(--fmono);color:var(--muted);padding:2.5px 7px;border-radius:var(--r-full);
+  background:color-mix(in srgb,var(--text) 6%,transparent)}
+.runfoot{display:flex;align-items:center;gap:8px;margin-top:8px}
+.runbtn{display:inline-flex;align-items:center;padding:3.5px 10px 4px;border-radius:var(--r-md);
+  border:1px solid var(--border);background:transparent;color:var(--muted);font:600 11px var(--fbody);
+  cursor:pointer;transition:color var(--dur-fast) var(--ease),border-color var(--dur-fast) var(--ease)}
+.runbtn:hover{color:var(--text);border-color:var(--hover-border)}
+.runnote{margin-left:auto;font-size:10.5px;color:var(--dim)}
+
+/* THE SHEEN — .liveact-txt's gradient, now reaching the live rows.
+   Today it is declared for `.legverb.shine` only, and the row that says what is
+   happening RIGHT NOW is a `.legname`, which never had it. */
+.shine{color:var(--muted);
+  background:linear-gradient(100deg,var(--muted) 0%,var(--muted) 38%,var(--text) 50%,var(--muted) 62%,var(--muted) 100%);
+  background-size:220% 100%;-webkit-background-clip:text;background-clip:text;
+  -webkit-text-fill-color:transparent;animation:liveact-shine 2.3s linear infinite}
+.leg.on .legname.shine{font-weight:600}
+@keyframes liveact-shine{from{background-position:130% 0}to{background-position:-30% 0}}
+@keyframes nm-ringpulse{0%,100%{opacity:.55}50%{opacity:1}}
+@keyframes nm-pulse{50%{opacity:.45}}
+@keyframes nm-fadein{from{opacity:0}}
+@media (prefers-reduced-motion:reduce){
+  .rring,.legdot{animation:none}
+  .shine{animation:none;background:none;-webkit-text-fill-color:currentColor;color:var(--body)}
+}
+
+/* ── the four chrome treatments ─────────────────────────────────────────── */
+/* 0 · TODAY — an elevated white card with an inner hairline above the foot */
+.v-today .runcard{border:1px solid var(--card-border);background:var(--card);
+  border-radius:12px;padding:9px 11px 8px}
+.v-today .runfoot{padding-top:7px;border-top:1px solid var(--border)}
+.v-today .leg.on{background:var(--sel-bg)}
+
+/* A · BARE — the .liveact ruling carried to the twin. No well, no hairline.
+   Structure is spacing + indent; the sheen is the only thing that says "alive". */
+.v-bare .runcard{padding:2px 0 3px}
+.v-bare .leg{padding-left:0}
+.v-bare .runfoot{margin-top:9px}
+
+/* B · SPINE — bare, plus one hairline as the tree's own indent guide.
+   The rule belongs to the FAN-OUT, not to the card. */
+.v-spine .runcard{padding:2px 0 3px}
+.v-spine .runlegs{padding-left:11px;border-left:1px solid var(--border);margin-left:1px}
+.v-spine .runfoot{margin-top:9px}
+
+/* C · WHISPER — no border, no hairline, one 3% wash so the tree still reads
+   as a single object while it runs. The wash FADES OUT when the run settles. */
+.v-whisper .runcard{border:0;border-radius:11px;padding:8px 10px;
+  background:color-mix(in srgb,var(--text) 3.5%,transparent)}
+.v-whisper .runfoot{margin-top:9px}
+
+/* ── ROUND 2: reaching a subagent's activity ────────────────────────────── */
+/* The leg row becomes a button. At rest it is byte-identical to today's row —
+   the affordance appears only on hover, so the resting card gains nothing. */
+.legbtn{width:100%;background:none;border:0;font:inherit;color:inherit;text-align:left;cursor:pointer}
+.legpeek{flex:none;margin-left:6px;font:600 9.5px var(--fmono);color:var(--dim);
+  opacity:0;transition:opacity var(--dur-fast) var(--ease)}
+.leg:hover .legpeek{opacity:1}
+.leg:hover .legname{color:var(--text)}
+
+/* S2 · UNFOLD — a compact strip inside the card, under the row it belongs to. */
+.legact{margin:2px 0 6px 27px;display:flex;flex-direction:column;gap:1px;
+  animation:nm-fadein .16s ease}
+.actrow{display:flex;align-items:baseline;gap:7px;padding:1.5px 0;min-width:0}
+.actv{flex:none;font:600 9.5px var(--fmono);letter-spacing:.03em;color:var(--dim);width:5.4em}
+.acta{flex:1 1 0;min-width:0;font-size:10.5px;color:var(--muted);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.acto{flex:none;font-size:9.5px}
+.o-ok{color:var(--done)} .o-warn{color:#c08a3e} .o-err{color:var(--blocked)}
+.actmore{align-self:flex-start;margin-top:3px;padding:1.5px 8px 2px;border-radius:var(--r-full);
+  border:1px solid var(--border);background:transparent;color:var(--muted);
+  font:600 9.5px var(--fmono);cursor:pointer;
+  transition:color var(--dur-fast) var(--ease),border-color var(--dur-fast) var(--ease)}
+.actmore:hover{color:var(--text);border-color:var(--hover-border)}
+
+/* S3 · LANE — the existing modal grows a second chip row for the legs. */
+.fakemodal{border:1px solid var(--border2);border-radius:12px;background:var(--card);
+  box-shadow:0 8px 26px -8px var(--shadow-x,rgba(0,0,0,.18));overflow:hidden}
+.fmhead{padding:11px 13px 0}
+.fmtitle{font:650 12.5px var(--fbody);color:var(--text)}
+.fmsub{font-size:10px;color:var(--dim);margin-top:2px}
+.runpicker{display:flex;gap:5px;padding:9px 13px 0;flex-wrap:wrap}
+.runchip{font:600 9.5px var(--fmono);padding:2.5px 8px;border-radius:var(--r-full);
+  border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer}
+.runchip.on{border-color:var(--text);color:var(--text)}
+.legpicker{display:flex;gap:5px;padding:6px 13px 0;flex-wrap:wrap;align-items:center}
+.legpicker::before{content:'legs';font:600 9px var(--fmono);letter-spacing:.08em;
+  text-transform:uppercase;color:var(--dim);margin-right:2px}
+.legchip{font:600 9.5px var(--fmono);padding:2.5px 8px;border-radius:var(--r-full);
+  border:1px dashed var(--border2);background:transparent;color:var(--muted);cursor:pointer}
+.legchip.on{border-style:solid;border-color:var(--text);color:var(--text)}
+.fmlog{margin-top:9px;padding:9px 13px 12px;border-top:1px solid var(--border);
+  display:flex;flex-direction:column;gap:1px}
+
+/* ── the settled-state strip ────────────────────────────────────────────── */
+.settledrow{margin-top:22px;padding:16px;border:1px solid var(--border);border-radius:14px;background:var(--panel)}
+.settledrow h2{font-family:var(--fdisp);font-size:16px;font-weight:600;margin-bottom:4px}
+.settledrow p{font-size:12px;color:var(--muted);line-height:1.55;max-width:78ch;margin-bottom:12px}
+.settled .rring{animation:none;background:conic-gradient(var(--done) 100%,var(--panel3) 0)}
+.settled .runcard{opacity:1}
+.v-whisper.settled .runcard{background:none}
+.foot{margin-top:26px;font-size:11.5px;color:var(--dim);line-height:1.6}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>The run card sheds its box</h1>
+<p class="lede">
+  On <b>2026-08-01</b> the ghost pill lost its well, hairline and blur — <i>“live activity is TEXT, not a
+  component… the box goes and the animation stays: the sheen IS the affordance that something is alive.”</i>
+  The run card is that pill’s <b>synced twin</b> and never got the same pass: it is still an elevated white
+  card with a second hairline inside it. Three directions below, all four cards showing the same live run.
+  <br><br>
+  Every option also carries the <b>motion fix</b>, which is a real defect and not a matter of taste:
+  <code>.legverb.shine</code> exists, but the row that says what is happening <i>right now</i> renders into
+  <code>.legname</code> — so on a card whose legs have all finished, <b>nothing on screen moves</b> except a
+  15px ring at 55% opacity. That is the “no glassy animation” you saw.
+</p>
+
+<div class="toolbar">
+  <button class="tbtn" id="theme" aria-pressed="false">◐ graphite dark</button>
+  <button class="tbtn" id="motion" aria-pressed="false">↯ reduced motion</button>
+  <span style="font-size:11.5px;color:var(--muted);margin-left:4px">watch the sheen sweep “synthesizing the report” and “language &amp; messaging trends”</span>
+</div>
+
+<div class="grid" id="grid"></div>
+
+<div class="settledrow">
+  <h2>And when it settles</h2>
+  <p>
+    The chrome question is really two questions — a run is <b>live</b> for minutes and <b>a receipt</b>
+    forever. A settled card folds itself away, so whatever chrome you choose is what the thread carries
+    permanently. Bare and Spine leave a quiet receipt; Whisper drops its wash on settle so it goes bare too.
+  </p>
+  <div class="grid" id="grid2"></div>
+</div>
+
+<div class="settledrow" style="margin-top:34px">
+  <h2>Round 2 — getting at a subagent’s work</h2>
+  <p style="max-width:80ch">
+    Today a leg row is <b>not clickable at all</b>, and the card’s one <b>Activity</b> button opens the
+    <i>orchestrator’s</i> panel. Worse, underneath: <code>orchSpawnFor</code> hands every leg the
+    <b>parent’s</b> log function, so all five subagents write their tool calls under rex’s
+    <code>agent_id</code> and rex’s <code>run_id</code> — one flat, unattributed stream. You cannot tell
+    which subagent read what, because the data was never split.
+    <br><br>
+    The daemon fix is small: mint a leg-scoped logger so each leg writes under its own seat and its own
+    run id. <code>nm.agentLogs({ runId })</code> already accepts a bare run id, so the read path needs
+    nothing new. That leaves the surface question — three ways to open it, all shown on the <b>Bare</b> card.
+  </p>
+  <div class="grid" id="grid3"></div>
+</div>
+
+<p class="foot">
+  Rendered with <code>tokens.css</code> values verbatim · both themes · reduced-motion honoured.
+  Trap check: no cream creep (nothing falls back to <code>--panel2/3</code>), no border-swap hover
+  (<code>.runbtn</code> keeps its own), no new hairline (Bare removes one, Spine relocates one, Whisper
+  removes both), no raw native controls, and the peek affordance is hover-only so the resting card is
+  unchanged.
+</p>
+
+</div>
+<script>
+const CARD = (v) => `
+<div class="msg ${v}">
+  <span class="av">R</span>
+  <div class="body">
+    <div class="head"><b>rex</b><span class="rolechip">orchestrator</span><span class="time">now</span></div>
+    <div class="runcard">
+      <button type="button" class="runhead">
+        <span class="rring" style="--frac:83%"></span>
+        <span class="runtitle">Competitor Social Media Report</span>
+        <span class="runmeta"><span class="chip c-run-running">running</span><span class="runclock">4:57</span></span>
+      </button>
+      <div class="runlegs">
+        <div class="leg on">
+          <span class="legmark"><span class="legdot"></span></span>
+          <span class="legname shine">synthesizing the report</span>
+          <span class="legnum">5/6</span>
+        </div>
+        <div class="leg sub"><span class="legmark"></span><span class="legname">Competitor X activity</span><span class="legverb">Based on my research, here’s what I found —</span></div>
+        <div class="leg sub"><span class="legmark"></span><span class="legname">Content &amp; format patterns</span><span class="legverb">Here’s what the evidence actually shows —</span></div>
+        <div class="leg sub"><span class="legmark"></span><span class="legname">Key competitors</span><span class="legverb">Here’s what I actually found — with caveats</span></div>
+        <div class="leg sub on"><span class="legmark"><span class="legdot"></span></span><span class="legname">Language &amp; messaging trends</span><span class="legverb shine">reading 4 of 9 sources</span></div>
+        <div class="leg sub"><span class="legmark"></span><span class="legname">Market signals to watch</span><span class="legverb">Here are 5 concrete signals to watch —</span></div>
+      </div>
+      <div class="runroll"><span class="rollchip">5 subagents</span></div>
+      <div class="runfoot">
+        <button type="button" class="runbtn">view full activity</button>
+        <span class="runnote">the report posts here when it lands</span>
+      </div>
+    </div>
+  </div>
+</div>`;
+
+const SETTLED = (v) => `
+<div class="msg ${v} settled">
+  <span class="av">R</span>
+  <div class="body">
+    <div class="head"><b>rex</b><span class="rolechip">orchestrator</span><span class="time">12m ago</span></div>
+    <div class="runcard">
+      <button type="button" class="runhead">
+        <span class="rring settled" style="--frac:100%"></span>
+        <span class="runtitle">Competitor Social Media Report</span>
+        <span class="runmeta"><span class="runclock">6:12</span></span>
+      </button>
+      <div class="runroll"><span class="rollchip">5 subagents</span><span class="rollchip">6 steps</span></div>
+    </div>
+  </div>
+</div>`;
+
+/* ── Round 2 · the three ways in ────────────────────────────────────────── */
+const ACT = [
+  ['WebSearch', 'flowe ai competitors positioning', 'ok'],
+  ['Read',      'brand-guidelines.md', 'ok'],
+  ['WebFetch',  'flowe.app/pricing', 'ok'],
+  ['WebSearch', 'focus timer apps 2026 launches', 'ok'],
+  ['WebFetch',  'x.com/search?q=flowe', 'warn'],
+];
+const ACTROWS = (n) => ACT.slice(0, n).map(([v, a, o]) => `
+  <div class="actrow"><span class="actv">${v}</span><span class="acta">${a}</span>
+  <span class="acto o-${o === 'ok' ? 'ok' : o === 'warn' ? 'warn' : 'err'}">${o === 'ok' ? '✓' : o === 'warn' ? '⚠' : '✕'}</span></div>`).join('');
+
+// a run card whose 4th leg is expanded/hovered, rendered bare
+const LEG = (i, name, verb, live, extra = '') => `
+  <div class="leg sub${live ? ' on' : ''}">
+    <button type="button" class="legbtn" style="display:flex;align-items:center;gap:8px;min-width:0">
+      <span class="legmark">${live ? '<span class="legdot"></span>' : ''}</span>
+      <span class="legname">${name}</span>
+      <span class="legverb${live ? ' shine' : ''}">${verb}</span>
+      <span class="legpeek">${extra || '12 steps ›'}</span>
+    </button>
+  </div>`;
+
+const CARD2 = (body) => `
+<div class="msg v-bare">
+  <span class="av">R</span>
+  <div class="body">
+    <div class="head"><b>rex</b><span class="rolechip">orchestrator</span><span class="time">now</span></div>
+    <div class="runcard">
+      <button type="button" class="runhead">
+        <span class="rring" style="--frac:83%"></span>
+        <span class="runtitle">Competitor Social Media Report</span>
+        <span class="runmeta"><span class="chip c-run-running">running</span><span class="runclock">4:57</span></span>
+      </button>
+      <div class="runlegs">
+        <div class="leg on"><span class="legmark"><span class="legdot"></span></span><span class="legname shine">synthesizing the report</span><span class="legnum">5/6</span></div>
+        ${body}
+      </div>
+      <div class="runroll"><span class="rollchip">5 subagents</span></div>
+      <div class="runfoot"><button type="button" class="runbtn">view full activity</button>
+        <span class="runnote">the report posts here when it lands</span></div>
+    </div>
+  </div>
+</div>`;
+
+// the 3rd row is drawn mid-HOVER so the affordance is visible in a still; at rest
+// every row is byte-identical to today's (.legpeek is opacity:0)
+const S_PEEK = CARD2(
+  LEG(1, 'Competitor X activity', 'Based on my research —', false, '9 steps ›') +
+  LEG(2, 'Content &amp; format patterns', 'Here’s what the evidence —', false, '14 steps ›') +
+  `<div class="leg sub" style="background:var(--hover-bg);border-radius:7px">
+     <button type="button" class="legbtn" style="display:flex;align-items:center;gap:8px;min-width:0">
+       <span class="legmark"></span>
+       <span class="legname" style="color:var(--text)">Key competitors</span>
+       <span class="legverb">Here’s what I actually found —</span>
+       <span class="legpeek" style="opacity:1">11 steps ›</span>
+     </button>
+   </div>` +
+  LEG(4, 'Language &amp; messaging', 'reading 4 of 9 sources', true, '7 steps ›') +
+  LEG(5, 'Market signals to watch', 'Here are 5 concrete signals —', false, '10 steps ›'));
+
+const S_UNFOLD = CARD2(
+  LEG(1, 'Competitor X activity', 'Based on my research —', false, '9 steps ›') +
+  LEG(2, 'Content &amp; format patterns', 'Here’s what the evidence —', false, '14 steps ›') +
+  `<div class="leg sub on" style="background:var(--sel-bg);border-radius:7px">
+     <button type="button" class="legbtn" style="display:flex;align-items:center;gap:8px;min-width:0">
+       <span class="legmark"><span class="legdot"></span></span>
+       <span class="legname">Language &amp; messaging</span>
+       <span class="legverb shine">reading 4 of 9 sources</span>
+       <span class="legpeek" style="opacity:1">▾ 7 steps</span>
+     </button>
+   </div>
+   <div class="legact">${ACTROWS(5)}
+     <button type="button" class="actmore">view subagent activity ›</button>
+   </div>` +
+  LEG(5, 'Market signals to watch', 'Here are 5 concrete signals —', false, '10 steps ›'));
+
+const S_LANE = `
+<div class="fakemodal">
+  <div class="fmhead">
+    <div class="fmtitle">@rex · activity</div>
+    <div class="fmsub">● LIVE one run at a time — wakes · tool calls · results. Local only, kept 7 days.</div>
+  </div>
+  <div class="runpicker">
+    <button class="runchip on">● now #marketing</button>
+    <button class="runchip">08:03 PM #marketing</button>
+    <button class="runchip">07:53 PM #build</button>
+  </div>
+  <div class="legpicker">
+    <button class="legchip">rex</button>
+    <button class="legchip">competitor X</button>
+    <button class="legchip">formats</button>
+    <button class="legchip on">● language</button>
+    <button class="legchip">signals</button>
+  </div>
+  <div class="fmlog">${ACTROWS(5)}</div>
+</div>`;
+
+const SUBS = [
+  { name:'S1 · Peek', tag:'lightest', pick:false, body:S_PEEK,
+    why:'The leg row becomes a button. At rest it is <b>byte-identical</b> to today — a step count appears only on <b>hover</b>, and clicking opens the shipped activity modal scoped to that leg. Nothing added to the resting card; one click to full detail.',
+    cost:'leg row → button · 2 CSS rules · reuses the modal' },
+  { name:'S2 · Unfold (recommended)', tag:'in place', pick:true, body:S_UNFOLD,
+    why:'S1’s hover affordance, but the click <b>unfolds a strip inside the card</b> — last five tool calls, mono, dim, with outcome glyphs. You never leave the thread to see what a subagent is doing. <b>“view subagent activity ›”</b> escalates to the modal <i>filtered to that leg</i>; the card’s own <b>“view full activity”</b> stays the way to see everything at once.',
+    cost:'S1 + one strip component + a per-leg fetch' },
+  { name:'S3 · Lane', tag:'one surface', pick:false, body:S_LANE,
+    why:'The existing modal grows a <b>second chip row</b> under the run picker — one chip per leg. Familiar, and it holds arbitrary depth without touching the card. But it is a <b>modal over the thread</b>: obtrusive by construction, and it hides the fan-out you were already looking at.',
+    cost:'no card change · one chip row + a runId prop' },
+];
+
+const OPTS = [
+  { v:'v-today', name:'0 · Today', tag:'shipped', pick:false,
+    why:'An elevated white card (<b>--card</b> = <b>#ffffff</b> in cream oak) with <b>--card-border</b>, plus a second hairline above the foot. Two rules and a well around six rows of plain text, sitting in a transcript made of plain messages.',
+    cost:'0 lines · this is the baseline' },
+  { v:'v-bare', name:'A · Bare', tag:'✓ chosen', pick:true,
+    why:'The <b>2026-08-01 ruling</b>, carried to the twin. Background, border, radius and the foot hairline all go. Indentation carries the tree; the sheen carries life. Same call that was already made — and held — one surface over.',
+    cost:'~4 CSS declarations deleted · no JSX change' },
+  { v:'v-spine', name:'B · Spine', tag:'tree-first', pick:false,
+    why:'Bare, but the fan-out keeps <b>one</b> hairline as its indent guide. Reads best at depth 2–3 where a bare tree can lose its spine. Note the tension with <b>trap 9c</b> — rails where a conversation lives are off-contract; a tree guide is arguably a different thing, and that is a call to make deliberately.',
+    cost:'~4 deleted, 1 rule relocated' },
+  { v:'v-whisper', name:'C · Whisper', tag:'safest', pick:false,
+    why:'No border and no hairline, but a <b>3.5% wash</b> so the run still reads as one object while it is alive — and the wash <b>drops on settle</b>. Hedges <b>trap 1</b> (“if it hosts controls, it is elevated”) without the white card.',
+    cost:'~3 deleted, 1 wash added, 1 settle rule' },
+];
+
+const TICK_SVG = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+
+function render() {
+  document.getElementById('grid').innerHTML = OPTS.map((o) => `
+    <div class="opt${o.pick ? ' pick' : ''}">
+      <div class="opthead"><span class="optname">${o.name}</span><span class="opttag">${o.tag}</span></div>
+      <div class="optwhy">${o.why}</div>
+      <div class="stage">${CARD(o.v)}</div>
+      <div class="cost">${o.cost}</div>
+    </div>`).join('');
+  document.getElementById('grid2').innerHTML = OPTS.map((o) => `
+    <div class="opt${o.pick ? ' pick' : ''}">
+      <div class="opthead"><span class="optname">${o.name}</span></div>
+      <div class="stage">${SETTLED(o.v)}</div>
+    </div>`).join('');
+  document.getElementById('grid3').innerHTML = SUBS.map((s) => `
+    <div class="opt${s.pick ? ' pick' : ''}">
+      <div class="opthead"><span class="optname">${s.name}</span><span class="opttag">${s.tag}</span></div>
+      <div class="optwhy">${s.why}</div>
+      <div class="stage">${s.body}</div>
+      <div class="cost">${s.cost}</div>
+    </div>`).join('');
+  document.querySelectorAll('.legmark').forEach((m) => { if (!m.querySelector('.legdot')) m.innerHTML = TICK_SVG; });
+}
+
+const themeBtn = document.getElementById('theme');
+themeBtn.addEventListener('click', () => {
+  const dark = document.documentElement.dataset.theme === 'dark';
+  document.documentElement.dataset.theme = dark ? 'cream-oak' : 'dark';
+  themeBtn.setAttribute('aria-pressed', String(!dark));
+  themeBtn.textContent = dark ? '◐ graphite dark' : '◑ cream oak';
+});
+const motionBtn = document.getElementById('motion');
+motionBtn.addEventListener('click', () => {
+  const on = motionBtn.getAttribute('aria-pressed') === 'true';
+  motionBtn.setAttribute('aria-pressed', String(!on));
+  document.querySelectorAll('.shine,.rring,.legdot').forEach((el) => {
+    el.style.animation = on ? '' : 'none';
+    if (el.classList.contains('shine')) {
+      el.style.background = on ? '' : 'none';
+      el.style.webkitTextFillColor = on ? '' : 'currentColor';
+      el.style.color = on ? '' : 'var(--body)';
+    }
+  });
+});
+render();
+</script>
+</body>
+</html>

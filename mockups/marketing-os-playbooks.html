@@ -1,0 +1,864 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Marketing playbooks — the marketing-os round · round 2</title>
+<style>
+/* Tokens copied verbatim from apps/desktop/src/renderer/src/tokens.css (Graphite dark :42-68,
+   Cream Oak :114-131). Geometry copied from the REAL classes this round touches —
+   .navitem (tokens.css:1290-1297), .topbar (:1810-1812), .brief (:5115-5152), .srow (:5007-5010),
+   .unitcard (:7148-7158), .rollchip (:4066-4067), .schedrecs (:865+), the elevated ScopeBar
+   ruling (docs/33 §8, 2026-08-13). New surfaces (the Marketing OS destination, project marketing
+   cards, the growth desk, ReportCard, nmplays card) compose §8 idioms only. --viz-score is
+   PROPOSED (placeholder hue = --viz-berths; six-checks validation before landing, docs/33 §4).
+   Judge this as the app, not as a sketch.
+   ROUND 2 (2026-08-20, George): room home screens are hidden — the shell is New-chat-as-home +
+   destinations. The round-1 room-home growth desk and catalog popover are RETIRED; both moved
+   into a "Marketing OS" workspace destination under SHORTCUTS (scenes 01–02).
+   Plan: docs/design/marketing-os-2026-08/plan.md */
+:root, [data-theme='dark'] {
+  --win:#0d0d0d; --bg:#141414; --panel:#191919; --panel2:#212121; --panel3:#2b2b2b;
+  --border:#272727; --border2:#383838;
+  --text:#eaeaea; --body:#b6b6b6; --muted:#898989; --dim:#676767;
+  --link:#d19a72; --accent:var(--text); --accent-ink:#101010; --accent-soft:var(--panel3); --overlay:#222222;
+  --btn:#232323; --btn-fg:#efefef; --btn-hover:#2f2f2f;
+  --brand:#834a2b; --brand-ink:#fff7ee;
+  --green:#77ac8d; --warn:#c9a15e; --violet:#a89ccf; --orch:#9793d2;
+  --todo:#949494; --prog:#8ba0c0; --review:#a89ccf; --done:#77ac8d; --plan:#7fa5ab; --planrev:#a89ccf; --backlog:#8f9aa6;
+  --role-mkt:#c98f8f; --role-design:#cc8fb9; --role-orch:#9793d2; --role-rev:#7ba1c4;
+  --card:#1e1e1e; --card-border:#2c2c2c;
+  --shadow:rgba(0,0,0,0.62); --code:#0a0a0a; --codeink:#e8e8e8;
+  --shadow-sheet:inset 0 1px 0 rgba(255,255,255,.05), 0 12px 30px -6px rgba(0,0,0,.5);
+  --shadow-card:0 1px 2px rgba(0,0,0,.25); --shadow-lift:0 8px 20px -8px rgba(0,0,0,.55);
+  --shadow-pop:0 20px 55px -14px rgba(0,0,0,.65);
+  --ring:#525252; --focus-glow:color-mix(in srgb, var(--accent) 22%, transparent);
+  --hover-border:#404040; --hover-bg:color-mix(in srgb, var(--text) 7%, transparent);
+  --sel-bg:color-mix(in srgb, var(--text) 10%, transparent);
+  --tabon-bg:var(--panel3); --tabon-shadow:none;
+  --viz-score:#5b93d8;
+}
+[data-theme='cream-oak'] {
+  --win:#f0e5d3; --bg:#fbf8f4; --panel:#fbf8f4; --panel2:#f6eee1; --panel3:#efe1cd;
+  --border:#e6dbca; --border2:#d3c2a8;
+  --text:#2a1c13; --body:#574838; --muted:#97846c; --dim:#b5a289;
+  --link:#9c5730; --accent:#834a2b; --accent-ink:#fff7ee; --accent-soft:#f1e3d2; --overlay:#ffffff;
+  --btn:#f8f2e8; --btn-fg:#43301f; --btn-hover:#efe4d2;
+  --brand:#834a2b; --brand-ink:#fff7ee;
+  --green:#2f9e6b; --warn:#a06a1f; --violet:#7d6cc4; --orch:#6a63bc;
+  --todo:#7d8590; --prog:#4f80c4; --review:#6d5ce0; --done:#0f9d63; --plan:#2c7d88; --planrev:#7d56b8; --backlog:#5d6b7a;
+  --role-mkt:#b04f55; --role-design:#b0498f; --role-orch:#6a63bc; --role-rev:#4f7bb0;
+  --card:#ffffff; --card-border:#eadfce;
+  --shadow:rgba(70,42,18,0.16); --code:#2b2018; --codeink:#f3e6d8;
+  --shadow-sheet:0 8px 26px -8px rgba(70,42,18,.16), 0 1px 2px rgba(70,42,18,.05);
+  --shadow-card:0 1px 2px rgba(70,42,18,.05); --shadow-lift:0 8px 20px -8px rgba(70,42,18,.20);
+  --shadow-pop:0 20px 55px -14px rgba(70,42,18,.30);
+  --ring:color-mix(in srgb, var(--accent) 42%, var(--border2)); --focus-glow:color-mix(in srgb, var(--accent) 9%, transparent);
+  --hover-border:color-mix(in srgb, var(--text) 10%, var(--border2)); --hover-bg:color-mix(in srgb, var(--text) 5%, transparent);
+  --sel-bg:color-mix(in srgb, var(--accent) 8%, transparent);
+  --tabon-bg:var(--card); --tabon-shadow:var(--shadow-card);
+  --viz-score:#2f6fc2;
+}
+
+/* radius + motion + type ramp (tokens.css:10-22) */
+:root { --r-xs:6px; --r-sm:8px; --r-md:10px; --r-lg:14px; --r-xl:18px; --r-full:999px;
+  --dur-fast:.12s; --dur:.15s; --dur-enter:.22s; --ease:cubic-bezier(.22,1,.36,1);
+  --fdisp:'Source Serif 4', Georgia, 'Times New Roman', serif;
+  --fmono:ui-monospace, Menlo, 'SF Mono', monospace; }
+
+* { box-sizing:border-box; }
+body { margin:0; background:var(--win); color:var(--text);
+  font:400 13.5px/1.5 'Geist', -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  -webkit-font-smoothing:antialiased; }
+.mono { font-family:var(--fmono); }
+
+/* ── page chrome (not the app) ─────────────────────────────────────────────── */
+header.doc { position:sticky; top:0; z-index:60; display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+  padding:13px 22px; background:var(--win); border-bottom:1px solid var(--border); }
+header.doc h1 { font-weight:600; font-size:15px; margin:0; letter-spacing:-.012em; }
+header.doc .sub { color:var(--muted); font-size:12.5px; }
+.spacer { flex:1; }
+button.ctl { font:inherit; font-size:12.5px; color:var(--btn-fg); background:var(--btn);
+  border:1px solid var(--border2); border-radius:var(--r-full); padding:6px 14px; cursor:pointer; }
+button.ctl:hover { background:var(--btn-hover); }
+main { padding:24px 22px 90px; max-width:1340px; margin:0 auto; }
+section { margin-bottom:54px; scroll-margin-top:70px; }
+h2 { font-weight:600; font-size:13px; margin:0 0 5px; letter-spacing:.02em; text-transform:uppercase; color:var(--muted); }
+h2 .n { color:var(--dim); margin-right:8px; font-family:var(--fmono); font-size:11.5px; }
+.why { color:var(--body); font-size:13px; line-height:1.6; margin:0 0 18px; max-width:92ch; }
+.why + .why { margin-top:-10px; }
+.why b { color:var(--text); font-weight:600; }
+.why code, .ic { font:500 11.5px var(--fmono); background:var(--panel2);
+  border:1px solid var(--border); border-radius:5px; padding:1px 5px; color:var(--body); }
+.pane { background:var(--bg); border:1px solid var(--border); border-radius:var(--r-lg);
+  box-shadow:var(--shadow-sheet); overflow:hidden; }
+.panehead { display:flex; align-items:center; gap:9px; padding:9px 14px; border-bottom:1px solid var(--border);
+  background:var(--panel); font-size:12.5px; font-weight:600; }
+.panehead .k { font:650 9.5px var(--fmono); letter-spacing:.11em; text-transform:uppercase; color:var(--dim); }
+.panebody { padding:20px 22px 24px; }
+.cols2 { display:grid; grid-template-columns:1fr 1fr; gap:18px; align-items:start; }
+@media (max-width:1080px){ .cols2 { grid-template-columns:1fr; } }
+.notes { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:6px 26px; margin-top:14px; padding:0 4px; }
+.note { display:flex; gap:9px; font-size:12px; color:var(--body); align-items:baseline; }
+.note b { color:var(--text); font-weight:620; }
+.note .dot { width:6px; height:6px; border-radius:99px; flex:none; position:relative; top:-1px; background:var(--green); }
+.note.warn .dot { background:var(--dim); }
+
+/* ── the app's own idioms, geometry from tokens.css ─────────────────────────── */
+.col860 { max-width:860px; margin:0 auto; }   /* --col — the reading column */
+
+/* ════ the shell: nav column + destination sheet (scene 01–02) ════
+   Nav geometry = the real .navitem (:1290-1297); items sit NAKED on the frame (--win). */
+.appframe { display:grid; grid-template-columns:236px 1fr; min-height:0; }
+.mnav { background:var(--win); padding:14px 12px 16px; border-right:1px solid var(--border); }
+.newchat { display:flex; align-items:center; gap:9px; width:100%; height:38px; padding:0 13px;
+  background:var(--accent); color:var(--accent-ink); border:0; border-radius:var(--r-full);
+  font:600 13px inherit; font-family:inherit; cursor:pointer; margin-bottom:16px; }
+.newchat .kbd { margin-left:auto; font:600 9.5px var(--fmono); opacity:.7; }
+.navk { font:650 9.5px var(--fmono); letter-spacing:.13em; text-transform:uppercase; color:var(--dim); margin:12px 9px 5px; }
+.navitem { display:flex; align-items:center; gap:11px; width:100%; padding:7px 9px; border-radius:8px;
+  border:none; background:none; color:var(--muted); font:500 13px inherit; font-family:inherit;
+  text-align:left; cursor:pointer; position:relative; }
+.navitem:hover { background:var(--hover-bg); color:var(--text); }
+.navitem.on { background:var(--card); color:var(--text); font-weight:600;
+  box-shadow:var(--shadow-card), inset 0 0 0 1px var(--card-border); }
+[data-theme='dark'] .navitem.on { background:var(--panel3); box-shadow:none; }
+.navitem .g { flex:none; width:16px; text-align:center; font-size:12px; color:var(--dim); }
+.navitem.on .g { color:var(--muted); }
+.navitem .chev { margin-left:auto; color:var(--dim); font-size:10px; }
+.navbadge { margin-left:auto; min-width:18px; padding:1px 6px; border-radius:var(--r-full);
+  background:var(--panel3); color:var(--muted); font:700 9.5px var(--fmono); text-align:center; }
+.navscope { display:flex; align-items:center; gap:7px; margin:14px 6px 6px; }
+.navscope .chipx { font:550 11px inherit; color:var(--muted); border:1px solid var(--border2);
+  border-radius:var(--r-full); padding:3px 11px; }
+.navscope .mag { margin-left:auto; color:var(--dim); font-size:11px; }
+.navrow { display:flex; flex-direction:column; gap:1px; padding:6px 9px; border-radius:8px; }
+.navrow b { font:550 12px inherit; color:var(--body); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.navrow span { font:500 10px var(--fmono); color:var(--dim); }
+
+/* the destination header (.topbar, :1810-1812) + the elevated ScopeBar (docs/33 §8) */
+.topbar { height:52px; display:flex; align-items:center; gap:10px; padding:0 20px;
+  font:640 17.5px var(--fdisp); letter-spacing:-.012em; }
+.topbar .desc { color:var(--dim); font:500 12px inherit; font-family:inherit; border-left:1px solid var(--border); padding-left:10px; }
+.topbar .actions { margin-left:auto; font:600 12px inherit; color:var(--muted); cursor:pointer; }
+.topbar .actions:hover { color:var(--text); }
+.scopebar { display:flex; align-items:center; gap:8px; padding:0 20px 4px; }
+.wfsearch { flex:1; max-width:340px; display:flex; align-items:center; gap:8px; height:32px; padding:0 12px;
+  background:var(--card); border:1px solid var(--card-border); border-radius:var(--r-full);
+  box-shadow:var(--shadow-card); color:var(--dim); font-size:12.5px; }
+.scopepill { display:inline-flex; align-items:center; gap:6px; height:32px; padding:0 13px;
+  background:var(--card); border:1px solid var(--card-border); border-radius:var(--r-full);
+  box-shadow:var(--shadow-card); color:var(--muted); font:550 12px inherit; font-family:inherit; cursor:pointer; }
+.scopepill:hover { box-shadow:var(--shadow-lift); }
+.scopepill.set { background:var(--accent-soft); color:var(--text); }
+.scopepill .x { color:var(--dim); font-size:10px; margin-left:2px; }
+.pgk { font:650 9.5px var(--fmono); letter-spacing:.12em; text-transform:uppercase; color:var(--dim);
+  display:flex; align-items:baseline; gap:8px; margin:18px 0 8px; }
+.pgk .all { margin-left:auto; font:600 11px inherit; font-family:inherit; letter-spacing:0; text-transform:none;
+  color:var(--muted); cursor:pointer; }
+.pgk .all:hover { color:var(--text); }
+
+/* the attention bar, collapsed (the failure-alerts round's real recipe) */
+.attbar { display:flex; align-items:center; gap:9px; width:100%; text-align:left;
+  background:var(--panel2); border:1px solid var(--border); border-left:3px solid var(--warn);
+  border-radius:var(--r-md); padding:7px 12px 7px 11px; cursor:pointer;
+  font-family:inherit; font-size:12.5px; box-shadow:var(--shadow-card); margin-bottom:2px; }
+.attbar b { font-weight:640; color:var(--text); }
+.attbar .sum { flex:1; min-width:0; color:var(--body); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.attbar .chev { color:var(--muted); }
+
+/* ════ NEW · the project marketing card — the destination's unscoped desk ════ */
+.mkcards { display:grid; grid-template-columns:repeat(auto-fit,minmax(238px,1fr)); gap:12px; }
+.mkcard { display:flex; flex-direction:column; gap:9px; background:var(--card); border:1px solid var(--card-border);
+  border-radius:var(--r-lg); box-shadow:var(--shadow-card); padding:13px 15px 12px; cursor:pointer;
+  font-family:inherit; text-align:left; color:var(--text); }
+.mkcard:hover { transform:translateY(-1px); box-shadow:var(--shadow-lift); }
+.mkchd2 { display:flex; align-items:center; gap:9px; }
+.mklogo { flex:none; width:26px; height:26px; border-radius:8px; background:var(--panel2);
+  border:1px solid var(--border); display:grid; place-items:center; font:700 10px var(--fmono); color:var(--muted); }
+.mkchd2 b { font:620 13.5px inherit; }
+.mkscore { display:flex; align-items:center; gap:8px; }
+.mkscore .gdial { width:26px; height:26px; }
+.mkscore .gdial::after { inset:4px; }
+.mkscore b { font:640 15px var(--fdisp); }
+.mkscore .delta { font:600 10.5px var(--fmono); color:var(--green); }
+.mkscore .delta.due { color:var(--warn); }
+.mkfacts { font:500 10.5px var(--fmono); color:var(--dim); }
+.mkcta { font:600 12px inherit; color:var(--link); }
+.mkcard.quiet .mkscore b { color:var(--muted); font-family:inherit; font-size:12.5px; font-weight:550; }
+
+/* room head + tab strip (:4262-4270) */
+.roomhead { padding:20px 18px 0; }
+.roomtitle { display:flex; align-items:center; gap:10px; }
+.roomtitle b { font:640 19px/1.2 var(--fdisp); letter-spacing:-.012em; }
+.crew { display:flex; margin-left:auto; }
+.crew i { width:22px; height:22px; border-radius:7px; border:1.5px solid var(--bg); margin-left:-5px;
+  display:grid; place-items:center; font:700 9px var(--fmono); color:var(--accent-ink); }
+.crew i.mkt { background:var(--role-mkt); } .crew i.orch { background:var(--role-orch); } .crew i.des { background:var(--role-design); }
+.roomtabbar { display:inline-flex; gap:2px; margin:10px 0 12px; background:var(--panel2); border-radius:var(--r-full); padding:3px; }
+.roomtab { display:inline-flex; align-items:center; gap:6px; border:0; background:none; color:var(--muted);
+  font:550 12.5px inherit; font-family:inherit; padding:6px 15px; border-radius:var(--r-full); cursor:pointer; }
+.roomtab.on { color:var(--text); font-weight:600; background:var(--tabon-bg); box-shadow:var(--tabon-shadow); }
+
+/* the room brief (:5115-5131) */
+.brief { display:flex; align-items:flex-start; gap:10px; min-width:0; padding:9px 13px;
+  border:1px solid var(--card-border); border-radius:11px; background:var(--card); box-shadow:var(--shadow-card); }
+.brief .k { flex:none; font:700 9.5px var(--fmono); letter-spacing:.09em; text-transform:uppercase; color:var(--dim); }
+.briefbody { flex:1; min-width:0; color:var(--body); font-size:12px; line-height:1.5;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.briefwhen { flex:none; font:500 10px var(--fmono); color:var(--dim); }
+
+/* ════ NEW · the growth-desk strip — one quiet row inside --col ════
+   Score chip = elevated card (it opens the trend); pills = the ghost suggestion-pill
+   recipe (docs/33 §6); the catalog door is a text control. No well, no second card
+   stack — structure from spacing (trap 9b). */
+.gdesk { display:flex; align-items:center; gap:8px; margin:12px 0 4px; min-width:0; flex-wrap:wrap; }
+.gscore { display:inline-flex; align-items:center; gap:8px; padding:5px 11px 5px 6px;
+  background:var(--card); border:1px solid var(--card-border); border-radius:var(--r-full);
+  box-shadow:var(--shadow-card); cursor:pointer; font-family:inherit; color:var(--text); }
+.gscore:hover { transform:translateY(-1px); box-shadow:var(--shadow-lift); }
+.gdial { position:relative; width:22px; height:22px; border-radius:50%;
+  background:conic-gradient(var(--viz-score) calc(var(--frac,0)*1turn), color-mix(in srgb, var(--text) 14%, transparent) 0); }
+.gdial::after { content:''; position:absolute; inset:3.5px; border-radius:50%; background:var(--card); }
+.gscore b { font:640 12.5px inherit; }
+.gscore .delta { font:600 10.5px var(--fmono); color:var(--green); }
+.gscore .delta.down { color:var(--warn); }
+.gpill { display:inline-flex; align-items:center; gap:6px; padding:6px 13px; border-radius:var(--r-full);
+  border:1px solid var(--border2); background:none; color:var(--muted); font:550 12px inherit;
+  font-family:inherit; cursor:pointer; }
+.gpill:hover { color:var(--text); border-color:var(--hover-border); background:var(--hover-bg); }
+.gpill .g { font-size:11px; color:var(--dim); }
+.gmore { margin-left:auto; display:inline-flex; align-items:center; gap:4px; border:0; background:none;
+  color:var(--muted); font:600 12px inherit; font-family:inherit; cursor:pointer; padding:4px 6px; border-radius:var(--r-sm); }
+.gmore:hover { color:var(--text); background:var(--hover-bg); }
+
+/* session rows (:5007-5010) + day heads */
+.dayhead { font:600 9.5px var(--fmono); letter-spacing:.12em; text-transform:uppercase; color:var(--dim); margin:16px 4px 4px; }
+.srow { display:flex; align-items:center; gap:11px; width:100%; min-width:0; padding:9px 12px;
+  border:1px solid transparent; border-radius:11px; background:none; color:var(--text);
+  font-family:inherit; text-align:left; cursor:pointer; }
+.srow:hover { background:var(--card); border-color:var(--card-border); }
+.sdial { flex:none; width:18px; height:18px; border-radius:50%;
+  background:conic-gradient(var(--sc,var(--prog)) calc(var(--frac,0)*1turn), color-mix(in srgb, var(--text) 13%, transparent) 0); position:relative; }
+.sdial::after { content:''; position:absolute; inset:3px; border-radius:50%; background:var(--bg); }
+.srow:hover .sdial::after { background:var(--card); }
+.schat { flex:none; width:18px; height:18px; border-radius:6px; border:1.5px solid var(--dim); opacity:.7; }
+.sbody { flex:1; min-width:0; }
+.stitle { font-weight:600; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ssnip { font-size:11.5px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:1px; }
+.smeta { flex:none; display:flex; align-items:center; gap:8px; }
+.schip { font:600 10px var(--fmono); color:var(--muted); border:1px solid var(--border2); border-radius:var(--r-full); padding:2px 8px; }
+.schip.rev { color:var(--review); border-color:color-mix(in srgb, var(--review) 45%, transparent); }
+.schip.plan { color:var(--planrev); border-color:color-mix(in srgb, var(--planrev) 45%, transparent); }
+.swhen { font:500 10.5px var(--fmono); color:var(--dim); }
+
+/* ════ NEW · the playbook catalog — an anchored, veil-less popover ════ */
+.pbpop { width:440px; background:var(--overlay); border:1px solid var(--border2); border-radius:var(--r-lg);
+  box-shadow:var(--shadow-pop); overflow:hidden; }
+.pbhead { display:flex; align-items:baseline; gap:8px; padding:12px 15px 9px; }
+.pbhead b { font:640 14.5px var(--fdisp); letter-spacing:-.008em; }
+.pbhead span { font-size:11px; color:var(--muted); }
+.pbgroup { font:650 9.5px var(--fmono); letter-spacing:.12em; text-transform:uppercase; color:var(--dim);
+  padding:10px 15px 4px; }
+.pbrow { display:flex; align-items:center; gap:11px; width:100%; padding:8px 15px; border:0; background:none;
+  font-family:inherit; text-align:left; cursor:pointer; color:var(--text); }
+.pbrow:hover { background:var(--hover-bg); }
+.pbg { flex:none; width:28px; height:28px; border-radius:var(--r-sm); background:var(--panel2);
+  display:grid; place-items:center; font-size:13px; color:var(--muted); }
+.pbtxt { flex:1; min-width:0; }
+.pbtxt b { display:block; font-size:12.5px; font-weight:600; }
+.pbtxt span { display:block; font-size:11px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.pbmeta { flex:none; display:flex; align-items:center; gap:7px; }
+.pbscore { display:inline-flex; align-items:center; gap:5px; font:640 11px var(--fmono); color:var(--text); }
+.pbscore i { width:14px; height:14px; border-radius:50%; flex:none;
+  background:conic-gradient(var(--viz-score) calc(var(--frac,0)*1turn), color-mix(in srgb, var(--text) 14%, transparent) 0); position:relative; }
+.pbscore i::after { content:''; position:absolute; inset:2.5px; border-radius:50%; background:var(--overlay); }
+.pbwhen { font:500 10px var(--fmono); color:var(--dim); }
+.pbnever { font:500 10.5px var(--fmono); color:var(--dim); font-style:italic; }
+.pbarmed { font:600 9.5px var(--fmono); color:var(--muted); border:1px solid var(--border2); border-radius:var(--r-full); padding:2px 7px; }
+.pbfoot { padding:9px 15px 11px; border-top:1px solid var(--border); font-size:11px; color:var(--dim); }
+.pbfoot code { font:500 10.5px var(--fmono); color:var(--muted); }
+/* the same rows as an ON-PAGE section (scene 02) — no popover chrome, ground-matched dial holes */
+.pblist { max-width:640px; }
+.pblist .pbrow { padding-left:0; padding-right:0; border-radius:var(--r-md); }
+.pblist .pbgroup { padding-left:0; }
+.pblist .pbscore i::after { background:var(--bg); }
+.pblist .pbfoot { padding-left:0; padding-right:0; }
+
+/* thread messages (agents full-width, chat-authorship ruling) */
+.msg { display:flex; gap:10px; padding:6px 0; }
+.mavatar { flex:none; width:26px; height:26px; border-radius:8px; display:grid; place-items:center;
+  font:700 10px var(--fmono); color:var(--accent-ink); }
+.mavatar.you { background:var(--panel3); color:var(--text); border:1px solid var(--border2); }
+.mavatar.rex { background:var(--role-orch); } .mavatar.mkt { background:var(--role-mkt); }
+.mbody { flex:1; min-width:0; }
+.mname { font:600 11.5px inherit; margin-bottom:2px; }
+.mname .r { font:500 10px var(--fmono); color:var(--dim); margin-left:6px; }
+.mtext { font-size:13px; line-height:1.55; color:var(--body); }
+.mtext b { color:var(--text); }
+.humsg { margin-left:auto; max-width:78%; background:var(--panel2); border:1px solid var(--border);
+  border-radius:var(--r-lg); padding:9px 13px; font-size:13px; color:var(--text); }
+
+/* the unit card (:7148-7158) */
+.unitcard { display:flex; flex-direction:column; gap:8px; width:100%; max-width:520px; margin-top:8px;
+  background:var(--card); border:1px solid var(--card-border); border-radius:var(--r-lg);
+  box-shadow:var(--shadow-card); padding:12px 14px; cursor:pointer; font-family:inherit; text-align:left; color:var(--text); }
+.unitcard:hover { transform:translateY(-1px); box-shadow:var(--shadow-lift); }
+.uchd { display:flex; align-items:center; gap:8px; }
+.uck { font:650 9.5px var(--fmono); letter-spacing:.11em; text-transform:uppercase; color:var(--dim); }
+.ucstate { margin-left:auto; font:600 10px var(--fmono); color:var(--planrev);
+  border:1px solid color-mix(in srgb, var(--planrev) 45%, transparent); border-radius:var(--r-full); padding:2px 8px; }
+.uctitle { font:640 14px var(--fdisp); letter-spacing:-.008em; }
+.uclegs { display:flex; align-items:center; gap:5px; flex-wrap:wrap; font:500 10.5px var(--fmono); color:var(--muted); }
+.uclegs .leg { padding:2.5px 8px; border-radius:var(--r-full); border:1px solid var(--border2); }
+.uclegs .leg.dash { border-style:dashed; color:var(--dim); }
+.uclegs .arr { color:var(--dim); }
+.ucfoot { display:flex; align-items:center; gap:8px; font-size:11.5px; color:var(--muted); }
+.ucfoot .go { margin-left:auto; color:var(--link); font-weight:600; }
+
+/* run roll-up chips (:4066-4067) */
+.runroll { display:flex; align-items:center; gap:6px; margin:8px 0 2px; flex-wrap:wrap; }
+.rollchip { font:600 10px var(--fmono); color:var(--muted); padding:2.5px 7px; border-radius:var(--r-full);
+  background:color-mix(in srgb, var(--text) 6%, transparent); }
+.rollchip .ck { color:var(--green); margin-right:3px; }
+
+/* ════ NEW · the ReportCard — the ArticleCard idiom with a score ════ */
+.repcard { width:100%; max-width:560px; background:var(--card); border:1px solid var(--card-border);
+  border-radius:var(--r-lg); box-shadow:var(--shadow-card); overflow:hidden; margin-top:8px; }
+.rephd { display:flex; align-items:center; gap:8px; padding:11px 15px 0; }
+.repk { font:650 9.5px var(--fmono); letter-spacing:.11em; text-transform:uppercase; color:var(--dim); }
+.repdelta { margin-left:auto; font:600 10.5px var(--fmono); color:var(--green); }
+.repmain { display:flex; gap:15px; padding:10px 15px 12px; align-items:center; }
+.repdial { flex:none; width:64px; height:64px; border-radius:50%; position:relative;
+  background:conic-gradient(var(--viz-score) calc(var(--frac,0)*1turn), color-mix(in srgb, var(--text) 12%, transparent) 0); }
+.repdial::after { content:''; position:absolute; inset:6px; border-radius:50%; background:var(--card); }
+.repdial b { position:absolute; inset:0; display:grid; place-items:center; font:640 19px var(--fdisp); z-index:1; }
+.repdial span { position:absolute; left:0; right:0; bottom:9px; text-align:center; font:600 7.5px var(--fmono);
+  letter-spacing:.08em; color:var(--dim); z-index:1; }
+.reptxt { flex:1; min-width:0; }
+.reptitle { font:640 15.5px/1.25 var(--fdisp); letter-spacing:-.01em; }
+.repbasis { font-size:11px; color:var(--muted); margin-top:3px; }
+.repdims { padding:2px 15px 10px; display:grid; gap:5px; }
+.repdim { display:grid; grid-template-columns:104px 1fr 26px; align-items:center; gap:9px; }
+.repdim span { font-size:11px; color:var(--muted); white-space:nowrap; }
+.repbar { height:4px; border-radius:2px; background:color-mix(in srgb, var(--text) 9%, transparent); position:relative; }
+.repbar i { position:absolute; inset:0 auto 0 0; width:calc(var(--v)*1%); border-radius:2px; background:var(--viz-score); opacity:.85; }
+.repdim b { font:640 11px var(--fmono); color:var(--text); text-align:right; }
+.repfix { display:flex; gap:8px; padding:9px 15px; border-top:1px solid var(--border); font-size:12px; color:var(--body); }
+.repfix b { color:var(--text); }
+.repgaps { display:flex; gap:8px; padding:0 15px 11px; font-size:11px; color:var(--muted); align-items:baseline; }
+.repgaps .k { flex:none; font:650 8.5px var(--fmono); letter-spacing:.1em; text-transform:uppercase; color:var(--dim); }
+.repacts { display:flex; align-items:center; gap:8px; padding:10px 15px 13px; border-top:1px solid var(--border); }
+.btn { font-family:inherit; font-size:12px; font-weight:600; border-radius:var(--r-full);
+  padding:6px 15px; cursor:pointer; border:1px solid var(--border2); background:var(--btn); color:var(--btn-fg); }
+.btn:hover { background:var(--btn-hover); }
+.btn.primary { background:var(--accent); color:var(--accent-ink); border-color:transparent; }
+.btn.ghost { background:transparent; }
+.repacts .quiet { margin-left:auto; font:500 10px var(--fmono); color:var(--dim); }
+
+/* recs cards — nmsched (real: .schedrecs, tokens.css:865) + the new nmplays sibling */
+.schedrecs { margin:10px 0 2px; border:1px solid var(--border2); border-radius:var(--r-lg);
+  background:var(--panel2); padding:11px 13px; max-width:560px; }
+.srk { font:650 9.5px var(--fmono); letter-spacing:.11em; text-transform:uppercase; color:var(--dim); margin-bottom:7px; }
+.srrow { display:flex; align-items:center; gap:10px; padding:6px 2px; }
+.srrow + .srrow { border-top:1px solid var(--border); }
+.srtxt { flex:1; min-width:0; }
+.srtxt b { display:block; font-size:12.5px; font-weight:600; }
+.srtxt span { display:block; font-size:11px; color:var(--muted); }
+.srbtn { flex:none; font-family:inherit; font-size:11.5px; font-weight:600; color:var(--btn-fg);
+  background:var(--btn); border:1px solid var(--border2); border-radius:var(--r-full); padding:4px 12px; cursor:pointer; }
+.srbtn:hover { background:var(--btn-hover); }
+.docchips { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+.docchip { display:inline-flex; align-items:center; gap:6px; font:500 11.5px var(--fmono); color:var(--body);
+  background:var(--card); border:1px solid var(--card-border); border-radius:var(--r-md); padding:5px 10px; box-shadow:var(--shadow-card); }
+.docchip svg { color:var(--muted); }
+
+/* mini calendar (geometry from .mkcalgrid family, :446-495, simplified week) */
+.cal { border:1px solid var(--card-border); border-radius:var(--r-lg); overflow:hidden; background:var(--card); box-shadow:var(--shadow-card); }
+.calrow { display:grid; grid-template-columns:88px repeat(5,1fr); }
+.calrow + .calrow { border-top:1px solid var(--border); }
+.calhd { font:600 9.5px var(--fmono); letter-spacing:.08em; text-transform:uppercase; color:var(--dim);
+  padding:7px 10px; border-right:1px solid var(--border); }
+.calhd.day { text-align:center; border-right:0; }
+.callab { font:600 10.5px inherit; color:var(--muted); padding:9px 10px; border-right:1px solid var(--border); display:flex; align-items:center; gap:6px; }
+.calcell { min-height:44px; padding:5px; }
+.calchip { display:block; font:500 10px var(--fmono); border-radius:var(--r-sm); padding:3px 7px; margin-bottom:3px;
+  border:1px solid var(--border2); color:var(--body); background:var(--panel); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.calchip.run { border-style:dashed; color:var(--muted); background:none; }
+.calchip.sched { border-color:color-mix(in srgb, var(--prog) 45%, transparent); color:var(--prog); }
+
+@keyframes nm-rise { from { opacity:0; transform:translateY(7px); } to { opacity:1; transform:none; } }
+.rise { animation:nm-rise var(--dur-enter) var(--ease) both; }
+@media (prefers-reduced-motion: reduce){ * { animation:none !important; transition:none !important; } }
+</style>
+</head>
+<body>
+
+<header class="doc">
+  <h1>Marketing playbooks — the marketing-os round</h1>
+  <span class="sub">round 2 · docs/design/marketing-os-2026-08/plan.md · six scenes · 01–02 reworked: the Marketing OS destination</span>
+  <div class="spacer"></div>
+  <button class="ctl" onclick="flip()">Toggle theme (t)</button>
+</header>
+
+<main>
+
+<!-- ══════════════════════════ 00 ══════════════════════════ -->
+<section id="s0">
+  <h2><span class="n">00</span>What this round adds</h2>
+  <p class="why"><b>Today the HQ runs one flow:</b> setup → four brand docs → a strategy whose cadences you arm →
+    social drafts → approve → publish. <b>marketing-os catalogs the other thirteen surfaces</b> a working marketer
+    touches — scored site audits, GEO, competitor teardowns, hooks, email, launches, positioning, ASO — as pure-markdown
+    skills (MIT). This round vendors them as a second bundled pack and makes each flow a <b>playbook</b>: a data-registry
+    entry (<code class="ic">shared/playbooks.ts</code>, the SETUP_FLOWS idiom) that rex can list and launch
+    (<code class="ic">list_playbooks</code> / <code class="ic">run_playbook</code>), that runs as a plan-first unit or a
+    chat turn, and that lands a <b>scored report</b> whose score trends run over run. Zero new tables — skills, units,
+    schedules, artifacts and tags carry everything.</p>
+  <p class="why"><b>Round 2 — where it lives.</b> Room home screens are hidden now; the shell is New-chat-as-home plus
+    workspace destinations. So the marketing surface is a <b>destination: Marketing OS</b>, under SHORTCUTS beside
+    Whiteboards · Scheduled · Files — workspace-wide, narrowed by its own ScopeBar (search · project), exactly the
+    ruling that ungated the Calendar and Files (a surface gated behind one room is structurally unreachable; docs/33 §8).
+    Unscoped it is the marketing floor across every project; scoped it is one project's growth desk. The round-1
+    room-home strip and catalog popover are retired into it.</p>
+</section>
+
+<!-- ══════════════════════════ 01 ══════════════════════════ -->
+<section id="s1">
+  <h2><span class="n">01</span>The Marketing OS destination — the marketing floor, workspace-wide</h2>
+  <p class="why">A new SHORTCUTS destination beside Whiteboards · Scheduled · Files. Unscoped, it is <b>every project's
+    marketing at a glance</b>: the same AlertsBar Home mounts (reauth, failed posts — marketing's attention surface
+    belongs here too), a <b>project marketing card</b> per project (score + delta, armed cadences, next firing — or the
+    honest not-ready states), the playbook shelf, and the <b>marketing threads</b> — the one flat list, pre-narrowed to
+    marketing rooms, rows carrying the project tag the scope isn't supplying. Its ScopeBar narrows by search · project —
+    a visible, reversible choice, never an invisible default.</p>
+  <div class="pane">
+    <div class="panehead"><span class="k">DESTINATION · UNSCOPED — ALL PROJECTS</span></div>
+    <div class="appframe">
+      <div class="mnav">
+        <button class="newchat">＋ New chat <span class="kbd">⌘N</span></button>
+        <div class="navk">Shortcuts</div>
+        <button class="navitem"><span class="g">▱</span>Whiteboards</button>
+        <button class="navitem"><span class="g">⟳</span>Scheduled<span class="chev">›</span></button>
+        <button class="navitem"><span class="g">▤</span>Files</button>
+        <button class="navitem on"><span class="g">◍</span>Marketing OS<span class="navbadge">2</span></button>
+        <div class="navscope"><span class="chipx">All threads ·</span><span class="mag">⌕</span></div>
+        <div class="navrow"><b>1061 Audit @joinflowe X perform…</b><span>Flowe AI · #marketing</span></div>
+        <div class="navrow"><b>Daily X engagement</b><span>Flowe AI · #marketing</span></div>
+        <div class="navrow"><b>NeuraMesh project overview</b><span>NeuraMesh · #general</span></div>
+      </div>
+      <div style="background:var(--bg); min-width:0; padding-bottom:18px">
+        <div class="topbar">Marketing OS <span class="desc">playbooks · threads · every project's growth desk</span>
+          <span class="actions">Connections ›</span></div>
+        <div class="scopebar">
+          <div class="wfsearch">⌕&nbsp; Search marketing…</div>
+          <button class="scopepill">All projects ▾</button>
+        </div>
+        <div style="padding:8px 20px 0">
+          <button class="attbar"><b>2</b><span class="sum">X needs a reconnect (Flowe AI) · 1 post failed — LinkedIn, GADS INC</span><span class="chev">▾</span></button>
+          <div class="pgk">Projects</div>
+          <div class="mkcards">
+            <button class="mkcard">
+              <div class="mkchd2"><span class="mklogo">FL</span><b>Flowe AI</b></div>
+              <div class="mkscore"><span class="gdial" style="--frac:.72"></span><b>72</b><span class="delta">▲ +9</span></div>
+              <div class="mkfacts">3 cadences armed · next Mon 09:00 · GEO never run</div>
+            </button>
+            <button class="mkcard quiet">
+              <div class="mkchd2"><span class="mklogo">GA</span><b>GADS INC</b></div>
+              <div class="mkscore"><b>no baseline yet</b></div>
+              <div class="mkfacts">docs ✓ · 1 cadence armed · X connected</div>
+              <span class="mkcta">Run the baseline audit ›</span>
+            </button>
+            <button class="mkcard quiet">
+              <div class="mkchd2"><span class="mklogo">HN</span><b>Henosis</b></div>
+              <div class="mkscore"><b>marketing not set up</b></div>
+              <div class="mkfacts">setup · step 2 of 4 — Focus</div>
+              <span class="mkcta">Finish setup ›</span>
+            </button>
+          </div>
+          <div class="pgk">Playbooks <span class="all">all 10 ›</span></div>
+          <div style="max-width:640px">
+            <button class="pbrow" style="padding-left:0; padding-right:0"><span class="pbg">▤</span>
+              <span class="pbtxt"><b>Site &amp; funnel audit</b><span>six dimensions, weighted 0–100, fix-first list</span></span>
+              <span class="pbmeta"><span class="pbwhen">2 projects · pick on run</span></span>
+            </button>
+            <button class="pbrow" style="padding-left:0; padding-right:0"><span class="pbg">◎</span>
+              <span class="pbtxt"><b>AI search (GEO)</b><span>citability: who gets cited, rewrites, re-measure</span></span>
+              <span class="pbmeta"><span class="pbnever">never run anywhere</span></span>
+            </button>
+            <button class="pbrow" style="padding-left:0; padding-right:0"><span class="pbg">⌖</span>
+              <span class="pbtxt"><b>Competitor teardown</b><span>ads · pricing · jobs · reviews → the exposure map</span></span>
+              <span class="pbmeta"><span class="pbarmed">armed · flowe-ai</span></span>
+            </button>
+          </div>
+          <div class="pgk">Marketing threads</div>
+          <div class="dayhead" style="margin-top:6px">Today</div>
+          <button class="srow"><span class="sdial" style="--sc:var(--review); --frac:.78"></span>
+            <span class="sbody"><span class="stitle">Site &amp; funnel audit — joinflowe.com</span>
+              <span class="ssnip">plume · report drafted, review dispatched to scout</span></span>
+            <span class="smeta"><span class="swhen mono">flowe-ai · #marketing</span><span class="schip rev">in review</span><span class="swhen">1h</span></span>
+          </button>
+          <button class="srow"><span class="schat"></span>
+            <span class="sbody"><span class="stitle">Thursday's posts</span>
+              <span class="ssnip">you · approved b and c, asked for a softer hook on a</span></span>
+            <span class="smeta"><span class="swhen mono">gads-inc · #marketing</span><span class="swhen">3h</span></span>
+          </button>
+          <div class="dayhead">This week</div>
+          <button class="srow"><span class="sdial" style="--sc:var(--planrev); --frac:.15"></span>
+            <span class="sbody"><span class="stitle">Launch plan — companion app</span>
+              <span class="ssnip">rex · plan proposed: story, asset stack as subtasks, day-one voices</span></span>
+            <span class="smeta"><span class="swhen mono">flowe-ai · #marketing</span><span class="schip plan">plan review</span><span class="swhen">Mon</span></span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="notes">
+    <div class="note"><span class="dot"></span><div><b>The Calendar/Files ruling, applied again:</b> the surface is workspace-wide; narrowing happens on its own ScopeBar. A filter the human cannot see is a bug, not a default.</div></div>
+    <div class="note"><span class="dot"></span><div><b>The project card states are honest:</b> scored · no-baseline (CTA: run it) · not-set-up (CTA: the setup thread — the docs/39 task, resumable at its next step).</div></div>
+    <div class="note"><span class="dot"></span><div><b>Unscoped playbook rows carry no single score</b> — per-project state needs a project; a run from here asks which project first, then drafts the ask into that project's marketing room.</div></div>
+    <div class="note"><span class="dot"></span><div><b>Thread rows say what the scope doesn't</b> (docs/33): unscoped rows carry <code>project · #room</code>; scoping strips the project tag (scene 02).</div></div>
+    <div class="note warn"><span class="dot"></span><div><b>The nav badge is informational</b> (--panel3): live marketing runs, never asks — asks stay on the bell. Whether it earns even that is an open §7 call.</div></div>
+    <div class="note warn"><span class="dot"></span><div><b>Label open:</b> shown as「Marketing OS」per the ask; the nav's other nouns are single words (Whiteboards · Files), so「Marketing」is the §7 alternative.</div></div>
+  </div>
+</section>
+
+<!-- ══════════════════════════ 02 ══════════════════════════ -->
+<section id="s2">
+  <h2><span class="n">02</span>Scoped to one project — the growth desk, and the catalog with real state</h2>
+  <p class="why">Set the project chip and the floor becomes <b>one project's desk</b>: the score chip with its delta,
+    the suggested pills (never-run first, then overdue re-measures), then the full catalog — now every row carries
+    <b>this project's state</b>: last score + when, <i>never run</i>, or the armed cadence. Rows and pills are the same
+    door: they <b>draft a message, never run a command</b> — the New-chat stage opens for this project's marketing room
+    with the ask pre-written, and rex triages it like any composer send. Threads below narrow with the scope and drop
+    the project tag their rows no longer need.</p>
+  <div class="pane">
+    <div class="panehead"><span class="k">DESTINATION · SCOPED — FLOWE AI</span></div>
+    <div class="panebody" style="padding:0 20px 22px; background:var(--bg)">
+      <div class="scopebar" style="padding:14px 0 10px">
+        <div class="wfsearch">⌕&nbsp; Search marketing…</div>
+        <button class="scopepill set">Flowe AI <span class="x">✕</span></button>
+      </div>
+      <div class="gdesk" style="margin:2px 0 14px">
+        <button class="gscore"><span class="gdial" style="--frac:.72"></span><b>Site 72</b><span class="delta">▲ +9</span></button>
+        <button class="gpill"><span class="g">◎</span>Get cited by AI search</button>
+        <button class="gpill"><span class="g">⌖</span>Teardown: Linear</button>
+      </div>
+      <div class="pblist">
+        <div class="pbgroup" style="padding-left:0">Foundations</div>
+        <button class="pbrow"><span class="pbg">▤</span>
+          <span class="pbtxt"><b>Site &amp; funnel audit</b><span>six dimensions, weighted 0–100, fix-first list</span></span>
+          <span class="pbmeta"><span class="pbscore"><i style="--frac:.72"></i>72</span><span class="pbwhen">3d ago</span></span>
+        </button>
+        <button class="pbrow"><span class="pbg">◎</span>
+          <span class="pbtxt"><b>AI search (GEO)</b><span>citability: who gets cited, rewrites, re-measure</span></span>
+          <span class="pbmeta"><span class="pbnever">never run</span></span>
+        </button>
+        <button class="pbrow"><span class="pbg">⌖</span>
+          <span class="pbtxt"><b>Competitor teardown</b><span>ads · pricing · jobs · reviews → the exposure map</span></span>
+          <span class="pbmeta"><span class="pbarmed">armed · weekly</span></span>
+        </button>
+        <button class="pbrow"><span class="pbg">◈</span>
+          <span class="pbtxt"><b>Positioning &amp; offer</b><span>the six-clause statement, pasteability-tested</span></span>
+          <span class="pbmeta"><span class="pbnever">never run</span></span>
+        </button>
+        <div class="pbgroup">Content</div>
+        <button class="pbrow"><span class="pbg">✎</span>
+          <span class="pbtxt"><b>Copy lab</b><span>15–20 variants → panel-scored → de-slopped · in-thread</span></span>
+          <span class="pbmeta"><span class="pbwhen">yesterday</span></span>
+        </button>
+        <button class="pbrow"><span class="pbg">⚓</span>
+          <span class="pbtxt"><b>Hook batch</b><span>18-tactic matrix: visual · spoken · text · in-thread</span></span>
+          <span class="pbmeta"><span class="pbnever">never run</span></span>
+        </button>
+        <button class="pbrow"><span class="pbg">✉</span>
+          <span class="pbtxt"><b>Email sequence</b><span>welcome / nurture / launch — written in full, drafts only</span></span>
+          <span class="pbmeta"><span class="pbnever">never run</span></span>
+        </button>
+        <div class="pbgroup">Campaigns</div>
+        <button class="pbrow"><span class="pbg">➹</span>
+          <span class="pbtxt"><b>Launch plan</b><span>T-4wk → T+1wk, asset stack as subtasks, PH included</span></span>
+          <span class="pbmeta"><span class="pbwhen">Mon</span></span>
+        </button>
+        <button class="pbrow"><span class="pbg">◫</span>
+          <span class="pbtxt"><b>Ads creative audit</b><span>concept fatigue vs its five impostors · needs ads MCP</span></span>
+          <span class="pbmeta"><span class="pbnever">never run</span></span>
+        </button>
+        <button class="pbrow"><span class="pbg">▣</span>
+          <span class="pbtxt"><b>App store kit</b><span>ASO: which half is broken, metadata to the char</span></span>
+          <span class="pbmeta"><span class="pbnever">never run</span></span>
+        </button>
+        <div class="pbfoot">Heavy flows plan first — you approve before anything runs. Light ones answer in the thread. <code>analytics</code> and <code>slop-patterns</code> ride every flow.</div>
+      </div>
+      <div class="pgk">Marketing threads</div>
+      <button class="srow" style="max-width:640px"><span class="sdial" style="--sc:var(--review); --frac:.78"></span>
+        <span class="sbody"><span class="stitle">Site &amp; funnel audit — joinflowe.com</span>
+          <span class="ssnip">plume · report drafted, review dispatched to scout</span></span>
+        <span class="smeta"><span class="swhen mono">#marketing</span><span class="schip rev">in review</span><span class="swhen">1h</span></span>
+      </button>
+      <button class="srow" style="max-width:640px"><span class="schat"></span>
+        <span class="sbody"><span class="stitle">Daily X engagement</span>
+          <span class="ssnip">plume · five replies drafted for this morning's sweep</span></span>
+        <span class="smeta"><span class="swhen mono">#marketing</span><span class="swhen">2d</span></span>
+      </button>
+    </div>
+  </div>
+  <div class="notes">
+    <div class="note"><span class="dot"></span><div><b>State is derived, never stored:</b> score + when from <code>report</code>-tagged artifacts; armed cadence from schedules — the same join <code>list_playbooks</code> returns to rex, scoped the same way.</div></div>
+    <div class="note"><span class="dot"></span><div><b>The desk is the round-1 strip, re-homed</b> — score chip + suggested pills, unchanged anatomy; it lives here now because the room home no longer exists to carry it.</div></div>
+    <div class="note"><span class="dot"></span><div><b>Ungrounded playbooks say so</b> — ads names its MCP dependency in the row rather than failing later (the honesty spine, surfaced early).</div></div>
+    <div class="note warn"><span class="dot"></span><div><b>The catalog popover is retired</b> — the destination IS the catalog; one door per surface, no second entry point in the same view.</div></div>
+    <div class="note warn"><span class="dot"></span><div><b>Glyphs are geometric, not emoji</b> (trap 7 guards avatars; the catalog keeps the same restraint).</div></div>
+  </div>
+</section>
+
+<!-- ══════════════════════════ 03 ══════════════════════════ -->
+<section id="s3">
+  <h2><span class="n">03</span>The run — rex routes the ask; the plan gate stays the one consent</h2>
+  <p class="why">A vague ask matches a playbook. rex answers with the unit — <code class="ic">run_playbook</code> creates
+    it with the registry's templated plan (six dimension legs for the audit), born in <code class="ic">plan_review</code>,
+    anchored to this conversation. <b>Nothing runs until you approve the plan</b> (docs/41). After approval the legs fan
+    out with their skill slice + the staged brand docs, the finishing turn synthesizes — the module's own rule: never
+    delegate the synthesis — and the deliverable lands as a <b>ReportCard</b>.</p>
+  <div class="cols2">
+    <div class="pane">
+      <div class="panehead"><span class="k">THE ORIGIN THREAD · #marketing</span></div>
+      <div class="panebody">
+        <div class="msg" style="justify-content:flex-end"><div class="humsg">Why isn't the landing page converting? It reads generic to me.</div></div>
+        <div class="msg">
+          <span class="mavatar rex">RX</span>
+          <div class="mbody">
+            <div class="mname">rex <span class="r">orchestrator</span></div>
+            <div class="mtext">That's the <b>site &amp; funnel audit</b> — it scores joinflowe.com across six dimensions
+              against a written rubric and comes back with the fixes written out, not described. I've drafted the unit;
+              the plan names each dimension as its own leg. Nothing runs until you approve it.</div>
+            <button class="unitcard">
+              <div class="uchd"><span class="uck">Unit · site audit</span><span class="ucstate">plan review</span></div>
+              <div class="uctitle">Site &amp; funnel audit — joinflowe.com</div>
+              <div class="uclegs">
+                <span class="leg">plan ✓</span><span class="arr">→</span>
+                <span class="leg dash">messaging</span><span class="leg dash">conversion</span><span class="leg dash">search</span>
+                <span class="leg dash">competitive</span><span class="leg dash">trust</span><span class="leg dash">growth</span>
+                <span class="arr">→</span><span class="leg dash">report</span><span class="arr">→</span><span class="leg dash">review</span>
+              </div>
+              <div class="ucfoot"><span>plume · rubric v1.1 · basis: live site + pricing + top post</span><span class="go">Review plan ›</span></div>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="pane">
+      <div class="panehead"><span class="k">THE UNIT THREAD · AFTER APPROVAL</span></div>
+      <div class="panebody">
+        <div class="runroll">
+          <span class="rollchip"><span class="ck">✓</span>messaging 64</span>
+          <span class="rollchip"><span class="ck">✓</span>conversion 58</span>
+          <span class="rollchip"><span class="ck">✓</span>search 71</span>
+          <span class="rollchip"><span class="ck">✓</span>competitive 78</span>
+          <span class="rollchip"><span class="ck">✓</span>trust 82</span>
+          <span class="rollchip"><span class="ck">✓</span>growth 70</span>
+        </div>
+        <div class="msg">
+          <span class="mavatar mkt">PL</span>
+          <div class="mbody">
+            <div class="mname">plume <span class="r">marketer</span></div>
+            <div class="mtext">Weighted total <b>72</b>. The pattern: every conversion finding traces back to a headline
+              that never names who this is for. Three fixes are written out, replacement copy included — the pricing
+              page was gated, so that dimension carries its gap honestly.</div>
+            <div class="repcard">
+              <div class="rephd"><span class="repk">Report · site audit</span><span class="repdelta">▲ +9 vs Jul 20</span></div>
+              <div class="repmain">
+                <div class="repdial" style="--frac:.72"><b>72</b><span>/100</span></div>
+                <div class="reptxt">
+                  <div class="reptitle">Site &amp; funnel audit — joinflowe.com</div>
+                  <div class="repbasis">Aug 20 · basis: live site, pricing, top post · scores are heuristics, not measured performance</div>
+                </div>
+              </div>
+              <div class="repdims">
+                <div class="repdim"><span>Messaging</span><div class="repbar"><i style="--v:64"></i></div><b>64</b></div>
+                <div class="repdim"><span>Conversion</span><div class="repbar"><i style="--v:58"></i></div><b>58</b></div>
+                <div class="repdim"><span>Search</span><div class="repbar"><i style="--v:71"></i></div><b>71</b></div>
+                <div class="repdim"><span>Competitive</span><div class="repbar"><i style="--v:78"></i></div><b>78</b></div>
+                <div class="repdim"><span>Trust</span><div class="repbar"><i style="--v:82"></i></div><b>82</b></div>
+                <div class="repdim"><span>Growth</span><div class="repbar"><i style="--v:70"></i></div><b>70</b></div>
+              </div>
+              <div class="repfix"><b>Fix these first (3)</b><span>— headline names nobody · CTA asks twice · proof sits a fold below its claim</span></div>
+              <div class="repgaps"><span class="k">Couldn't determine</span><span>pricing-page conversion path (gated) · paid-traffic quality (no ads data attached)</span></div>
+              <div class="repacts">
+                <button class="btn primary">Open report</button>
+                <button class="btn">★ Save to Files</button>
+                <button class="btn ghost">Re-measure monthly</button>
+                <span class="quiet">‹report:a91f›</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="notes">
+    <div class="note"><span class="dot"></span><div><b>The unit card is the real <code>‹task:id›</code> card</b> (docs/41) with the templated legs visible — an anchored unit never earns a session row; the origin thread owns it.</div></div>
+    <div class="note"><span class="dot"></span><div><b>Legs = the module's own fan-out</b>, on machinery that exists: each leg gets its rubric slice + the staged brand docs (<code>.nm-evidence/brand/</code>), and <code>search_x</code> joins the leg registry this round.</div></div>
+    <div class="note"><span class="dot"></span><div><b>The shape contract is enforced:</b> the finishing guard refuses a report without <code>Score · Basis</code> and the gaps section — the way <code>looksLikeDoc</code> already refuses a title-less doc.</div></div>
+    <div class="note"><span class="dot"></span><div><b>Repo-backed rules untouched:</b> this is a scratch unit (report artifact), so review is the declared leg, accept stays human.</div></div>
+  </div>
+</section>
+
+<!-- ══════════════════════════ 04 ══════════════════════════ -->
+<section id="s4">
+  <h2><span class="n">04</span>The ReportCard contract — score, basis, gaps; then the trend</h2>
+  <p class="why">One card serves every scored playbook (audit, GEO, teardown, ASO). Anatomy: kicker · <b>the dial</b> ·
+    serif title · the <b>basis line</b> (what was actually accessed — the honesty spine on the card face) · dimension
+    bars · fix-first count · <b>the gaps line, never hidden</b> · actions. A re-run wears its delta; the first run wears
+    none. <code class="ic">Re-measure</code> arms the suggested cadence through the existing schedule gate — Free's 402
+    routes to the upgrade card, exactly like arming any routine.</p>
+  <div class="pane">
+    <div class="panehead"><span class="k">STATES · FIRST RUN → RE-RUN → UNGROUNDED</span></div>
+    <div class="panebody" style="display:flex; gap:18px; flex-wrap:wrap; align-items:flex-start; justify-content:center">
+      <div class="repcard" style="max-width:400px">
+        <div class="rephd"><span class="repk">Report · GEO</span></div>
+        <div class="repmain">
+          <div class="repdial" style="--frac:.44"><b>44</b><span>/100</span></div>
+          <div class="reptxt">
+            <div class="reptitle">AI-search citability — joinflowe.com</div>
+            <div class="repbasis">Aug 20 · basis: 8 target questions × 3 samples, on-page read</div>
+          </div>
+        </div>
+        <div class="repfix"><b>Binding constraint</b><span>— extractability: answers live mid-page, nothing lifts whole</span></div>
+        <div class="repgaps"><span class="k">Couldn't determine</span><span>AI-referral traffic (attribution immature — no number invented)</span></div>
+        <div class="repacts"><button class="btn primary">Open report</button><button class="btn ghost">Re-measure in 30d</button></div>
+      </div>
+      <div class="repcard" style="max-width:400px">
+        <div class="rephd"><span class="repk">Report · GEO</span><span class="repdelta">▲ +17 vs Aug 20</span></div>
+        <div class="repmain">
+          <div class="repdial" style="--frac:.61"><b>61</b><span>/100</span></div>
+          <div class="reptxt">
+            <div class="reptitle">AI-search citability — joinflowe.com</div>
+            <div class="repbasis">Sep 19 · re-measure · same 8 questions, same engines, dated</div>
+          </div>
+        </div>
+        <div class="repfix"><b>What moved</b><span>— cited on 3 of 8 questions (was 0); rewrites shipped on /docs</span></div>
+        <div class="repgaps"><span class="k">Couldn't determine</span><span>Perplexity sampling variance still wide at n=3</span></div>
+        <div class="repacts"><button class="btn primary">Open report</button><button class="btn ghost">Re-measure in 30d</button></div>
+      </div>
+    </div>
+  </div>
+  <div class="notes">
+    <div class="note"><span class="dot"></span><div><b>The delta compares like to like</b> — same playbook tag, same room; the derivation lives in <code>shared/reports.ts</code>, tested pure.</div></div>
+    <div class="note"><span class="dot"></span><div><b>The gaps line is part of the anatomy,</b> not an optional footer — a report that hides what it couldn't see never renders as a scorecard (the parser refuses it; it falls back to a plain doc card).</div></div>
+    <div class="note warn"><span class="dot"></span><div><b>Unscored deliverables keep their own shapes:</b> hook matrices and email sequences are docs/tables, not dials — a score chip on an unscored flow would be decoration.</div></div>
+  </div>
+</section>
+
+<!-- ══════════════════════════ 05 ══════════════════════════ -->
+<section id="s5">
+  <h2><span class="n">05</span>The score compounds — chip states, and cadence on the calendar it already owns</h2>
+  <p class="why">The score chip — on the project's marketing card, and on the scoped desk — has four honest states.
+    Armed playbooks are ordinary routines: the firing appears in
+    the calendar's automations lane (projected through the one <code class="ic">nextScheduleRun</code>), the run lands a
+    new report, the chip moves. GEO's「re-measure on date+30」is <code class="ic">cadence:'once'</code> — machinery that
+    shipped in the marketing round, pointed at a new customer.</p>
+  <div class="pane" style="margin-bottom:18px">
+    <div class="panehead"><span class="k">THE CHIP'S FOUR STATES</span></div>
+    <div class="panebody" style="display:flex; gap:12px; flex-wrap:wrap; align-items:center">
+      <button class="gpill"><span class="g">▤</span>Run your baseline audit</button>
+      <button class="gscore"><span class="gdial" style="--frac:.63"></span><b>Site 63</b></button>
+      <button class="gscore"><span class="gdial" style="--frac:.72"></span><b>Site 72</b><span class="delta">▲ +9</span></button>
+      <button class="gscore"><span class="gdial" style="--frac:.72"></span><b>Site 72</b><span class="delta down">re-measure due</span></button>
+    </div>
+  </div>
+  <div class="pane">
+    <div class="panehead"><span class="k">CALENDAR · WEEK · AUTOMATIONS LANE CARRIES THE PLAYBOOK FIRINGS</span></div>
+    <div class="panebody">
+      <div class="cal">
+        <div class="calrow">
+          <div class="calhd">lane</div>
+          <div class="calhd day">Mon 21</div><div class="calhd day">Tue 22</div><div class="calhd day">Wed 23</div><div class="calhd day">Thu 24</div><div class="calhd day">Fri 25</div>
+        </div>
+        <div class="calrow">
+          <div class="callab">⟳ automations</div>
+          <div class="calcell"><span class="calchip run">⟳ daily post drafts</span><span class="calchip run">⌖ teardown · weekly</span></div>
+          <div class="calcell"><span class="calchip run">⟳ daily post drafts</span></div>
+          <div class="calcell"><span class="calchip run">⟳ daily post drafts</span><span class="calchip run">◎ GEO re-measure</span></div>
+          <div class="calcell"><span class="calchip run">⟳ daily post drafts</span></div>
+          <div class="calcell"><span class="calchip run">⟳ daily post drafts</span></div>
+        </div>
+        <div class="calrow">
+          <div class="callab">𝕏 x</div>
+          <div class="calcell"><span class="calchip sched">09:00 pain post</span></div>
+          <div class="calcell"><span class="calchip sched">09:00 before/after thread</span></div>
+          <div class="calcell"></div>
+          <div class="calcell"><span class="calchip sched">09:00 BYOS angle</span></div>
+          <div class="calcell"></div>
+        </div>
+        <div class="calrow">
+          <div class="callab">in linkedin</div>
+          <div class="calcell"></div><div class="calcell"></div>
+          <div class="calcell"><span class="calchip sched">08:30 founder post</span></div>
+          <div class="calcell"></div><div class="calcell"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="notes">
+    <div class="note"><span class="dot"></span><div><b>No new lane, no new chip kind</b> — a playbook firing is a routine firing; the calendar changes by zero lines beyond the chips' titles.</div></div>
+    <div class="note"><span class="dot"></span><div><b>「re-measure due」is derived</b> from the report's own suggested cadence vs its age — the chip asks; arming still goes through the human + the Cloud gate.</div></div>
+  </div>
+</section>
+
+<!-- ══════════════════════════ 06 ══════════════════════════ -->
+<section id="s6">
+  <h2><span class="n">06</span>The bootstrap closes with teeth — recs get a sibling</h2>
+  <p class="why">The brand-foundation close today: four docs + the <code class="ic">nmsched</code> cadence recs. It gains
+    a sibling <code class="ic">nmplays</code> block — the first playbooks, <b>baseline audit leading</b>. The audit is
+    recommended, never auto-run: bootstrap cost stays flat and the plan gate stays the consent. Run › drafts the ask into
+    this thread — the same door as every pill.</p>
+  <div class="pane">
+    <div class="panehead"><span class="k">THE BOOTSTRAP THREAD · CLOSING MESSAGE</span></div>
+    <div class="panebody">
+      <div class="col860">
+        <div class="msg">
+          <span class="mavatar mkt">PL</span>
+          <div class="mbody">
+            <div class="mname">plume <span class="r">marketer</span></div>
+            <div class="mtext">That's the brand foundation — the four docs are in the <b>Library</b> tab and I'll write
+              from them, not from vibes. Arm what you like below. And now that the foundation exists, the highest-value
+              next move is a <b>baseline</b>: score the site once so every later change has a number to move.</div>
+            <div class="docchips">
+              <span class="docchip">◫ business-profile.md</span>
+              <span class="docchip">◫ brand-guidelines.md</span>
+              <span class="docchip">◫ market-research.md</span>
+              <span class="docchip">◫ social-strategy.md</span>
+            </div>
+            <div class="schedrecs">
+              <div class="srk">Suggested cadences · nmsched</div>
+              <div class="srrow"><div class="srtxt"><b>Daily post drafts</b><span>weekdays 09:00 · drafts to the calendar, you approve</span></div><button class="srbtn">+ Arm</button></div>
+              <div class="srrow"><div class="srtxt"><b>Weekly before/after thread</b><span>Tue 09:00 · the compounding-memory arc</span></div><button class="srbtn">+ Arm</button></div>
+            </div>
+            <div class="schedrecs">
+              <div class="srk">First playbooks · nmplays</div>
+              <div class="srrow"><div class="srtxt"><b>▤ Baseline site audit</b><span>six dimensions, scored — the number your work moves</span></div><button class="srbtn">Run ›</button></div>
+              <div class="srrow"><div class="srtxt"><b>◎ AI search (GEO)</b><span>who gets cited on your eight questions today</span></div><button class="srbtn">Run ›</button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="notes">
+    <div class="note"><span class="dot"></span><div><b>Same card recipe as <code>nmsched</code></b> (the SchedRecsCard idiom) — two sibling wells, one visual family, no new component language.</div></div>
+    <div class="note"><span class="dot"></span><div><b>Run › drafts the message</b>; rex triages → <code>run_playbook</code> → plan review. Free workspaces run one-shots free — the funnel's deep gate stays on arming cadences.</div></div>
+    <div class="note warn"><span class="dot"></span><div><b>The recs are model-extracted with a fallback,</b> like nmsched today: never more than three, audit always first when never-run.</div></div>
+  </div>
+</section>
+
+</main>
+
+<script>
+function flip(){
+  const d = document.documentElement.getAttribute('data-theme') === 'dark';
+  document.documentElement.setAttribute('data-theme', d ? 'cream-oak' : 'dark');
+}
+addEventListener('keydown', e => { if (e.key === 't' && !e.metaKey && !e.ctrlKey) flip(); });
+</script>
+</body>
+</html>

@@ -1,0 +1,42 @@
+[
+  {
+    "name": "hf1-today-empty",
+    "settle": 700,
+    "js": "(async () => { const w=(ms)=>new Promise(r=>setTimeout(r,ms)); document.querySelector('#mode button[data-mode=\"today\"]').click(); await w(150); document.querySelector('.step[data-step=\"empty\"]').click(); await w(350); })()"
+  },
+  {
+    "name": "hf2-prop-empty",
+    "settle": 700,
+    "js": "(async () => { const w=(ms)=>new Promise(r=>setTimeout(r,ms)); document.querySelector('#mode button[data-mode=\"prop\"]').click(); await w(150); document.querySelector('.step[data-step=\"empty\"]').click(); await w(350); })()"
+  },
+  {
+    "name": "hf3-today-first",
+    "settle": 700,
+    "js": "(async () => { const w=(ms)=>new Promise(r=>setTimeout(r,ms)); document.querySelector('#mode button[data-mode=\"today\"]').click(); await w(150); document.querySelector('.step[data-step=\"first\"]').click(); await w(350); })()"
+  },
+  {
+    "name": "hf4-prop-first",
+    "settle": 700,
+    "js": "(async () => { const w=(ms)=>new Promise(r=>setTimeout(r,ms)); document.querySelector('#mode button[data-mode=\"prop\"]').click(); await w(150); document.querySelector('.step[data-step=\"first\"]').click(); await w(350); })()"
+  },
+  {
+    "name": "hf5-today-dead",
+    "settle": 700,
+    "js": "(async () => { const w=(ms)=>new Promise(r=>setTimeout(r,ms)); document.querySelector('#mode button[data-mode=\"today\"]').click(); await w(150); document.querySelector('.step[data-step=\"dead\"]').click(); await w(350); })()"
+  },
+  {
+    "name": "hf6-prop-dead",
+    "settle": 700,
+    "js": "(async () => { const w=(ms)=>new Promise(r=>setTimeout(r,ms)); document.querySelector('#mode button[data-mode=\"prop\"]').click(); await w(150); document.querySelector('.step[data-step=\"dead\"]').click(); await w(350); })()"
+  },
+  {
+    "name": "hf7-prop-home",
+    "settle": 700,
+    "js": "(async () => { const w=(ms)=>new Promise(r=>setTimeout(r,ms)); document.querySelector('#mode button[data-mode=\"prop\"]').click(); await w(150); document.querySelector('.step[data-step=\"signin\"]').click(); await w(350); })()"
+  },
+  {
+    "name": "hf8-prop-working",
+    "settle": 700,
+    "js": "(async () => { const w=(ms)=>new Promise(r=>setTimeout(r,ms)); document.querySelector('#mode button[data-mode=\"prop\"]').click(); await w(150); document.querySelector('.step[data-step=\"working\"]').click(); await w(350); })()"
+  }
+]

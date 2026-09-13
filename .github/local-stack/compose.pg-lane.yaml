@@ -1,0 +1,20 @@
+# CI-only override for local-stack-smoke.yml, never used by the app: the SAME local stack, whose
+# Postgres starts with the pg lane's fixtures at the 0001 schema and is then migrated forward by
+# the image's own runner (MIGRATE_ADOPTION_BASELINE=0001_core.sql adopts 0001 and applies 0002
+# onward, publish migrations included), with the port published so the suite can reach it.
+#
+# Host paths are REPO-ROOT relative: compose resolves an override's relative paths against the
+# project directory, which defaults to the first -f file's folder — so every command that adds this
+# file passes `--project-directory .` from the repo root. Without it docker creates empty folders
+# under apps/desktop/resources/local, initdb skips a directory where it wanted a script, and the
+# suite runs against a database with no fixtures (found the first time, 2026-09-12).
+services:
+  pg:
+    volumes:
+      - ./supabase:/bootstrap/supabase:ro
+      - ./.github/local-stack/init-fixtures.sh:/docker-entrypoint-initdb.d/00-fixtures.sh:ro
+    ports:
+      - "127.0.0.1:55436:5432"
+  control-api:
+    environment:
+      MIGRATE_ADOPTION_BASELINE: 0001_core.sql

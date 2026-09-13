@@ -1,0 +1,21 @@
+-- 0103 — `seat`: which config a leg is RUNNING ON (docs/29 §4d, docs/harness/04).
+--
+-- Under orchestrator ownership a subagent inherits a seated specialist's configuration — @iris's
+-- model and her stored specialty brief — while still running AS the parent, because a subagent has
+-- no `agents` row and no board identity (docs/harness/04 I2). So `runs.agent_id` is the ORCHESTRATOR
+-- for every leg, and "who is doing this" is not recoverable from it: a roster lookup hands back
+-- rex's own role and model for all five legs of a fan-out.
+--
+-- That matters more than it used to. The assignee used to answer "who is doing this" from the board
+-- card; with rex owning every task, the card says rex and the answer moves here.
+--
+-- A denormalised STRING rather than a foreign key, deliberately: the seat is a historical fact about
+-- how this run was configured, not a live reference. If @iris is retired or re-modelled next month,
+-- the run that happened on her v1 seat should still read as it did — an FK would silently rewrite
+-- history, and a null-on-delete would erase it.
+--
+-- Format: `role·model` plus `·@name` when a specialist's config was inherited. Absent (null) on
+-- non-leg runs and on legs from before this shipped, which the UI renders as "no seat recorded"
+-- rather than inventing one.
+
+alter table runs add column if not exists seat text;

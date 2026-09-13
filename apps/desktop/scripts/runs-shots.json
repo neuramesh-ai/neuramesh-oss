@@ -1,0 +1,52 @@
+[
+  {
+    "name": "run1-card-live-dark",
+    "query": {
+      "theme": "dark",
+      "project": "p-flowe",
+      "openConvo": "general::Product research check-in"
+    },
+    "settle": 3200,
+    "js": "const b=document.querySelector('.convomsgs'); if(b) b.scrollTop=0;"
+  },
+  {
+    "name": "run1-card-live-cream",
+    "query": {
+      "theme": "cream-oak",
+      "project": "p-flowe",
+      "openConvo": "general::Product research check-in"
+    },
+    "settle": 3200,
+    "js": "const b=document.querySelector('.convomsgs'); if(b) b.scrollTop=0;"
+  },
+  {
+    "name": "run2-dock-scrolled-dark",
+    "query": {
+      "theme": "dark",
+      "project": "p-flowe",
+      "openConvo": "general::Product research check-in"
+    },
+    "settle": 3200,
+    "js": "(async () => { const b=document.querySelector('.convomsgs'); if(b){ b.scrollTop=b.scrollHeight; b.dispatchEvent(new Event('scroll')); } await new Promise(r=>setTimeout(r,1400)); })()"
+  },
+  {
+    "name": "run2-dock-scrolled-cream",
+    "query": {
+      "theme": "cream-oak",
+      "project": "p-flowe",
+      "openConvo": "general::Product research check-in"
+    },
+    "settle": 3200,
+    "js": "(async () => { const b=document.querySelector('.convomsgs'); if(b){ b.scrollTop=b.scrollHeight; b.dispatchEvent(new Event('scroll')); } await new Promise(r=>setTimeout(r,1400)); })()"
+  },
+  {
+    "name": "run3-settled-collapsed-dark",
+    "query": {
+      "theme": "dark",
+      "project": "p-flowe",
+      "openConvo": "general::Product research check-in"
+    },
+    "settle": 3200,
+    "js": "const b=document.querySelector('.convomsgs'); if(b) b.scrollTop=0; const h=document.querySelector('[data-run=\"run-flowe-prior\"] .runhead'); if(h) h.click();"
+  }
+]

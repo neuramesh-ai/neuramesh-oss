@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NeuraMesh · Download</title>
+<link rel="stylesheet" href="nm.css">
+<style>
+  .hero{position:relative;padding:48px 0 20px;overflow:hidden}
+  .dgrid{display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:start;position:relative;z-index:2}
+  @media(max-width:940px){.dgrid{grid-template-columns:1fr;gap:26px}}
+  .hero h1{font-size:clamp(34px,4.4vw,50px);letter-spacing:-.035em;line-height:1.04}
+  .hero h1 em{font-style:normal;color:var(--accent)}
+  .hero .lead{margin-top:14px;font-size:16.5px;max-width:46ch}
+
+  /* download card */
+  .dlcard{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:20px;margin-top:24px;
+    box-shadow:0 24px 50px -38px var(--shadow)}
+  .dlhead{display:flex;align-items:center;gap:13px}
+  .apple{width:46px;height:46px;border-radius:13px;background:var(--panel2);border:1px solid var(--border);display:grid;place-items:center;font-size:24px;flex:none}
+  .dlhead .info b{display:block;font-size:16px;color:var(--text);letter-spacing:-.01em}
+  .dlhead .info span{font-size:12.5px;color:var(--muted)}
+  .dlbtn{margin-top:16px}
+  .dlprog{margin-top:16px;display:none}
+  .dlprog.show{display:block}
+  .dlprog .lbl{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:7px}
+  .alts{margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;font-size:12px;color:var(--dim)}
+  .alts a{color:var(--muted);border-bottom:1px dashed var(--border2)}
+  .alts a:hover{color:var(--accent)}
+
+  /* setup-while-downloading wizard */
+  .wiz{background:var(--panel);border:1px solid var(--border);border-radius:16px;overflow:hidden;position:relative}
+  .wiz-top{padding:14px 18px;border-bottom:1px solid var(--border);background:var(--bg2)}
+  .wiz-top b{font-size:14px;color:var(--text)}
+  .wiz-top span{font-size:12.5px;color:var(--muted);display:block;margin-top:2px}
+  .wiz-body{padding:18px}
+  .wiz.locked .wiz-body{opacity:.32;filter:saturate(.45)}
+  .wiz.locked::after{content:"⏳ starts when your download begins";position:absolute;left:50%;top:56%;transform:translate(-50%,-50%);
+    background:var(--panel2);border:1px solid var(--border2);border-radius:99px;padding:8px 15px;color:var(--muted);
+    font-size:12.5px;font-weight:600;z-index:3;pointer-events:none;white-space:nowrap;box-shadow:0 10px 28px -14px var(--shadow)}
+  .wstep{padding:13px 0;border-bottom:1px solid var(--border);opacity:.5;transition:opacity var(--dur)}
+  .wstep:last-child{border-bottom:0}
+  .wstep.active,.wstep.done{opacity:1}
+  .wstep .wlbl{display:flex;align-items:center;gap:9px;font-size:13px;font-weight:600;color:var(--text)}
+  .wstep .wnum{width:22px;height:22px;border-radius:99px;border:1.5px solid var(--border2);display:grid;place-items:center;
+    font-size:11px;color:var(--muted);flex:none;transition:all var(--dur)}
+  .wstep.active .wnum{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+  .wstep.done .wnum{background:var(--build);border-color:var(--build);color:#fff}
+  .wstep .wcontent{margin:10px 0 0 31px;display:none}
+  .wstep.active .wcontent,.wstep.done .wcontent{display:block}
+  .slugprev{font-family:'Geist Mono',monospace;font-size:11.5px;color:var(--muted);margin-top:7px}
+  .slugprev b{color:var(--accent)}
+  .crew{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px}
+  .crewtile{display:flex;align-items:center;gap:9px;padding:9px 10px;border:1px solid var(--border);border-radius:11px;
+    cursor:pointer;background:var(--panel2);transition:border-color var(--dur-fast),background var(--dur-fast)}
+  .crewtile .who b{display:block;font-size:12.5px;color:var(--text)}
+  .crewtile .who span{font-size:10.5px;color:var(--muted)}
+  .crewtile .pick{margin-left:auto;width:18px;height:18px;border-radius:6px;border:1.5px solid var(--border2);display:grid;place-items:center;font-size:11px;color:transparent;flex:none}
+  .crewtile.on{border-color:color-mix(in srgb,var(--accent) 45%,var(--border))}
+  .crewtile.on .pick{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+  .crewtile.req{cursor:not-allowed;opacity:.9}
+  .wready{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--build);font-weight:600}
+
+  /* section scaffolding */
+  .sec{padding:60px 0;border-top:1px solid var(--border);position:relative}
+  .sec h2{font-size:30px;letter-spacing:-.03em;margin-bottom:8px}
+  .sec .sub{font-size:16px;color:var(--muted);max-width:60ch;margin-bottom:26px}
+
+  /* handoff rail */
+  .hrail{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+  @media(max-width:760px){.hrail{grid-template-columns:1fr 1fr}}
+  .hstage{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:16px;position:relative;
+    opacity:.5;transition:opacity var(--dur),border-color var(--dur),transform var(--dur)}
+  .hstage.on{opacity:1;border-color:color-mix(in srgb,var(--accent) 40%,var(--border))}
+  .hstage.done{opacity:1}
+  .hstage .hico{font-size:24px}
+  .hstage h4{font-size:14px;margin:8px 0 4px}
+  .hstage p{font-size:12px;color:var(--muted);line-height:1.45}
+  .hstage .tick{position:absolute;top:12px;right:12px;width:20px;height:20px;border-radius:99px;background:var(--build);
+    color:#fff;display:none;place-items:center;font-size:11px}
+  .hstage.done .tick{display:grid}
+  .handoff-cta{margin-top:20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  .countdown{font-family:'Geist Mono',monospace;font-size:14px;color:var(--accent);font-weight:700;display:none}
+  .countdown.show{display:inline}
+  .handshake{margin-top:16px;padding:12px 14px;border-radius:11px;border:1px dashed color-mix(in srgb,var(--accent) 45%,var(--border));
+    background:var(--accent-soft);font-size:12.5px;color:var(--text);display:none;align-items:center;gap:9px}
+  .handshake.show{display:flex;animation:nm-pop var(--dur-slow) var(--ease)}
+
+  /* trust diagram */
+  .trust{display:grid;grid-template-columns:1fr auto 1fr;gap:0;align-items:center}
+  @media(max-width:760px){.trust{grid-template-columns:1fr;gap:16px}}
+  .tnode{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:18px}
+  .tnode h4{font-size:15px;display:flex;align-items:center;gap:8px;margin-bottom:12px}
+  .titem{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--body);padding:7px 10px;border-radius:9px;
+    background:var(--panel2);border:1px solid var(--border);margin-bottom:7px;transition:all var(--dur)}
+  .titem .ti{font-size:14px}
+  .titem.glow{border-color:color-mix(in srgb,var(--accent) 55%,var(--border));background:var(--accent-soft)}
+  .tnode.local .titem.glowL{border-color:color-mix(in srgb,var(--build) 55%,var(--border));background:color-mix(in srgb,var(--build) 12%,transparent)}
+  .tpipe{width:140px;height:80px;position:relative;display:grid;place-items:center}
+  @media(max-width:760px){.tpipe{width:100%;height:60px;transform:rotate(90deg)}}
+  .tpipe .line{width:100%;height:2px;background:var(--border2);position:relative}
+  .tpipe .pkt{position:absolute;top:50%;width:9px;height:9px;border-radius:99px;background:var(--accent);
+    transform:translateY(-50%);box-shadow:0 0 8px var(--accent);animation:flow 2.2s linear infinite}
+  @keyframes flow{0%{left:-2%;opacity:0}10%{opacity:1}90%{opacity:1}100%{left:100%;opacity:0}}
+  .tpipe .pkt:nth-child(3){animation-delay:.7s}.tpipe .pkt:nth-child(4){animation-delay:1.4s}
+  .tpipe .dir{position:absolute;top:-18px;left:50%;transform:translateX(-50%);font-size:10px;font-weight:700;
+    color:var(--accent);text-transform:uppercase;letter-spacing:.06em;white-space:nowrap}
+  .tpipe .nin{position:absolute;bottom:-20px;left:50%;transform:translateX(-50%);font-size:10.5px;color:var(--dim);white-space:nowrap}
+  .ttoggles{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap}
+  .ttog{font-size:12px;font-weight:600;padding:6px 12px;border-radius:99px;border:1px solid var(--border2);
+    background:var(--panel2);color:var(--muted);cursor:pointer;transition:all var(--dur-fast)}
+  .ttog.on{background:var(--accent-soft);border-color:transparent;color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="grain"></div>
+<div class="confetti" id="confetti"></div>
+
+<nav class="nav">
+  <div class="wrap">
+    <div class="brand">
+      <svg class="mk" viewBox="0 0 28 28" fill="none"><rect width="28" height="28" rx="8" fill="var(--accent)"/>
+        <circle cx="9" cy="9" r="2.4" fill="var(--accent-ink)"/><circle cx="19" cy="9" r="2.4" fill="var(--accent-ink)"/>
+        <circle cx="14" cy="19" r="2.4" fill="var(--accent-ink)"/>
+        <path d="M9 9L19 9M9 9L14 19M19 9L14 19" stroke="var(--accent-ink)" stroke-width="1.5" opacity=".75"/></svg>
+      Neura<span style="color:var(--accent)">Mesh</span>
+    </div>
+    <div class="navlinks"><a href="01-landing.html">← Landing</a><a href="#handoff">Install handoff</a><a href="#trust">Local-first</a><a href="index.html">↑ All prototypes</a></div>
+    <div class="row gap10 mla">
+      <span class="badge">Wow 04–06</span>
+      <button class="themetog" id="tt" title="Toggle theme">◐</button>
+    </div>
+  </div>
+</nav>
+
+<!-- HERO + WOW 04: set up while it downloads -->
+<header class="hero">
+  <div class="weave-bg"><svg viewBox="0 0 1200 400" preserveAspectRatio="none">
+    <path class="weave-strand" d="M0 90 Q300 20 600 90 T1200 90"/>
+    <path class="weave-strand" d="M0 190 Q300 120 600 190 T1200 190" style="opacity:.12"/>
+    <path class="weave-strand" d="M0 290 Q300 220 600 290 T1200 290" style="opacity:.14"/>
+  </svg></div>
+  <div class="wrap dgrid">
+    <div>
+      <div class="eyebrow">NeuraMesh desktop</div>
+      <h1 style="margin-top:12px">Download for Mac.<br>Set up <em>while</em> it downloads.</h1>
+      <p class="lead">The ~90-second download isn't dead time. Name your workspace and pick your crew right here — so NeuraMesh opens already <em>yours</em>. Your agents run on your machine, with your keys.</p>
+
+      <div class="dlcard">
+        <div class="dlhead">
+          <div class="apple"></div>
+          <div class="info"><b>NeuraMesh for Mac</b><span id="archline">Apple Silicon · 94 MB · v0.4.3 · signed &amp; notarized</span></div>
+        </div>
+        <button class="btn primary lg block dlbtn" id="dlBtn">Download for Mac</button>
+        <div class="dlprog" id="dlProg">
+          <div class="lbl"><span id="dlState">Downloading…</span><span id="dlPct">0%</span></div>
+          <div class="bar"><i id="dlBar" style="width:0%"></i></div>
+        </div>
+        <div class="alts">
+          <a href="#">Intel Mac</a> · <span>Windows (soon)</span> · <span>Linux (soon)</span> · <a href="#">all versions</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- wizard -->
+    <div class="wiz locked" id="wiz">
+      <div class="wiz-top"><b>While it downloads…</b><span>Set up your workspace — it'll be waiting when the app opens.</span></div>
+      <div class="wiz-body">
+        <div class="wstep" data-step="1">
+          <div class="wlbl"><span class="wnum">1</span> Name your workspace</div>
+          <div class="wcontent">
+            <input class="input" id="wsName" placeholder="Acme Robotics" autocomplete="off">
+            <div class="slugprev">neuramesh.app/<b id="slug">acme-robotics</b></div>
+          </div>
+        </div>
+        <div class="wstep" data-step="2">
+          <div class="wlbl"><span class="wnum">2</span> Pick your crew</div>
+          <div class="wcontent">
+            <div class="crew" id="crew">
+              <div class="crewtile req on" data-role="orchestrator"><div class="av sm orch">🦊</div><div class="who"><b>rex</b><span>orchestrator · required</span></div><div class="pick">✓</div></div>
+              <div class="crewtile on" data-role="architect"><div class="av sm arch">🦅</div><div class="who"><b>atlas</b><span>architect</span></div><div class="pick">✓</div></div>
+              <div class="crewtile on" data-role="developer"><div class="av sm dev">🦉</div><div class="who"><b>patch</b><span>developer</span></div><div class="pick">✓</div></div>
+              <div class="crewtile on" data-role="reviewer"><div class="av sm rev">🐝</div><div class="who"><b>scout</b><span>reviewer</span></div><div class="pick">✓</div></div>
+            </div>
+          </div>
+        </div>
+        <div class="wstep" data-step="3">
+          <div class="wlbl"><span class="wnum">3</span> Ready</div>
+          <div class="wcontent">
+            <div class="wready">✓ <span id="readyTxt">Your workspace &amp; crew will be waiting when the app opens.</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- WOW 05: live install handoff -->
+  <section id="handoff" class="sec">
+    <div class="eyebrow">Wow 05 · no "did it work?" limbo</div>
+    <h2>The page walks you in.</h2>
+    <p class="sub">Most downloads dump you at a dead end. This one stays live — it senses the moment your app launches via the <span class="mono">neuramesh://</span> handshake, then hands you straight into your first fan-out.</p>
+    <div class="hrail" id="hrail">
+      <div class="hstage" data-h="1"><div class="tick">✓</div><div class="hico">⬇️</div><h4>Downloading</h4><p>94 MB · a few seconds on most connections.</p></div>
+      <div class="hstage" data-h="2"><div class="tick">✓</div><div class="hico">📦</div><h4>Drag to Applications</h4><p>The classic macOS drag. We'll wait.</p></div>
+      <div class="hstage" data-h="3"><div class="tick">✓</div><div class="hico">🚀</div><h4>Launch detected</h4><p>The app pings back — we know it's open.</p></div>
+      <div class="hstage" data-h="4"><div class="tick">✓</div><div class="hico">🎯</div><h4>You're in</h4><p>Straight to sign-in, then your first fan-out.</p></div>
+    </div>
+    <div class="handshake" id="handshake">🔗 <b>neuramesh://</b> handshake detected — your app is open. Bring it to the front?</div>
+    <div class="handoff-cta">
+      <button class="btn" id="hAdvance">▶︎ Simulate the install</button>
+      <span class="hint">first fan-out in <span class="countdown" id="cd">02:00</span></span>
+    </div>
+  </section>
+
+  <!-- WOW 06: trust shown not told -->
+  <section id="trust" class="sec">
+    <div class="eyebrow">Wow 06 · trust, shown not told</div>
+    <h2>Your code never leaves this machine.</h2>
+    <p class="sub">Not a promise in fine print — a fact you can see. The daemon dials <em>out</em>; nothing dials in. No open ports. Keys live in your keychain.</p>
+    <div class="ttoggles">
+      <button class="ttog on" id="togStays">🔒 What stays local</button>
+      <button class="ttog" id="togSyncs">☁️ What syncs</button>
+    </div>
+    <div class="trust">
+      <div class="tnode local">
+        <h4>💻 Your Mac</h4>
+        <div class="titem glowL"><span class="ti">📁</span> Your source code</div>
+        <div class="titem glowL"><span class="ti">🔑</span> Your model keys (keychain)</div>
+        <div class="titem glowL"><span class="ti">⚙️</span> The agents &amp; daemon</div>
+        <div class="titem glowL"><span class="ti">🖥️</span> Git &amp; <span class="mono">gh</span> credentials</div>
+      </div>
+      <div class="tpipe">
+        <div class="dir">outbound only →</div>
+        <div class="line"></div>
+        <div class="pkt"></div><div class="pkt"></div><div class="pkt"></div>
+        <div class="nin">✕ no inbound · no open ports</div>
+      </div>
+      <div class="tnode">
+        <h4>☁️ NeuraMesh Cloud</h4>
+        <div class="titem"><span class="ti">📋</span> Task &amp; board state</div>
+        <div class="titem"><span class="ti">💬</span> Channel messages</div>
+        <div class="titem"><span class="ti">🧩</span> Artifacts (diffs render here)</div>
+        <div class="titem"><span class="ti">👥</span> Who's online</div>
+      </div>
+    </div>
+  </section>
+
+  <div style="padding:30px 0 60px;text-align:center">
+    <a class="btn ghost" href="index.html">↑ Back to all prototypes</a>
+    <a class="btn primary" href="03-onboarding.html" style="margin-left:8px">Next: Meet your team →</a>
+  </div>
+</main>
+
+<script>
+  // theme
+  const tt=document.getElementById('tt');
+  const apply=t=>{document.documentElement.dataset.theme=t;tt.textContent=t==='cream'?'☀':'◐';try{sessionStorage.nmTheme=t}catch(e){}};
+  apply(sessionStorage.nmTheme||'dark');
+  tt.onclick=()=>apply(document.documentElement.dataset.theme==='cream'?'dark':'cream');
+
+  /* ---- Wow 04: download + set-up-while-downloading ---- */
+  const wiz=document.getElementById('wiz'), steps=[...wiz.querySelectorAll('.wstep')];
+  const dlBtn=document.getElementById('dlBtn'), dlProg=document.getElementById('dlProg'),
+        dlBar=document.getElementById('dlBar'), dlPct=document.getElementById('dlPct'), dlState=document.getElementById('dlState');
+  let downloading=false;
+  function activateStep(n){steps.forEach(s=>{const i=+s.dataset.step;
+    s.classList.toggle('active',i===n);s.classList.toggle('done',i<n);});}
+  function startDownload(){
+    if(downloading)return; downloading=true;
+    dlBtn.style.display='none'; dlProg.classList.add('show'); wiz.classList.remove('locked');
+    activateStep(1);
+    let p=0;
+    const iv=setInterval(()=>{
+      p=Math.min(100,p+ (p<70? 2.4 : 1.3));
+      dlBar.style.width=p+'%'; dlPct.textContent=Math.round(p)+'%';
+      if(p>=28 && steps[0].classList.contains('active')) activateStep(2);
+      if(p>=66 && !steps[1].classList.contains('done') && steps[1].classList.contains('active')) activateStep(3);
+      if(p>=100){clearInterval(iv); finishDownload();}
+    },70);
+  }
+  function finishDownload(){
+    dlState.textContent='Downloaded ✓'; dlPct.textContent='100%';
+    steps.forEach(s=>s.classList.add('done')); activateStep(4);
+    document.getElementById('readyTxt').innerHTML='Workspace <b style="color:var(--text)">'+(document.getElementById('slug').textContent||'your-team')+'</b> &amp; '+crewCount()+' agents ready. Open the installer to continue →';
+    // light the first handoff stage
+    setHandoff(1);
+  }
+  dlBtn.onclick=startDownload;
+
+  // workspace name → slug
+  const wsName=document.getElementById('wsName'), slug=document.getElementById('slug');
+  wsName.addEventListener('input',()=>{const s=wsName.value.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');slug.textContent=s||'your-team';});
+  // crew toggles
+  function crewCount(){return document.querySelectorAll('#crew .crewtile.on').length;}
+  document.querySelectorAll('#crew .crewtile').forEach(t=>{
+    if(t.classList.contains('req'))return;
+    t.onclick=()=>t.classList.toggle('on');
+  });
+
+  /* ---- Wow 05: live install handoff ---- */
+  const hstages=[...document.querySelectorAll('#hrail .hstage')];
+  let hcur=0, cdTimer=null;
+  function setHandoff(n){
+    hcur=n;
+    hstages.forEach(s=>{const i=+s.dataset.h; s.classList.toggle('on',i===n); s.classList.toggle('done',i<n);});
+  }
+  document.getElementById('hAdvance').onclick=()=>{
+    if(!downloading){startDownload(); return;}
+    let n=Math.min(4,(hcur||0)+1); setHandoff(n);
+    if(n===3){document.getElementById('handshake').classList.add('show');}
+    if(n===4){hstages.forEach(s=>s.classList.add('done')); startCountdown(); confetti();}
+  };
+  function startCountdown(){
+    const cd=document.getElementById('cd'); cd.classList.add('show');
+    let t=120; if(cdTimer)clearInterval(cdTimer);
+    cdTimer=setInterval(()=>{t--; const m=String(Math.floor(t/60)).padStart(2,'0'), s=String(t%60).padStart(2,'0');
+      cd.textContent=m+':'+s; if(t<=0){clearInterval(cdTimer); cd.textContent='go →';}},1000);
+  }
+
+  /* ---- Wow 06: trust toggles ---- */
+  const togStays=document.getElementById('togStays'), togSyncs=document.getElementById('togSyncs');
+  function trustMode(m){
+    togStays.classList.toggle('on',m==='stays'); togSyncs.classList.toggle('on',m==='syncs');
+    document.querySelectorAll('.tnode.local .titem').forEach(i=>i.classList.toggle('glowL',m==='stays'));
+    document.querySelectorAll('.tnode:not(.local) .titem').forEach(i=>i.classList.toggle('glow',m==='syncs'));
+  }
+  togStays.onclick=()=>trustMode('stays'); togSyncs.onclick=()=>trustMode('syncs');
+
+  function confetti(){const c=document.getElementById('confetti');const cols=['#ff7a52','#ec5a32','#54c08c','#a899f5','#7aa6e2','#f0b35a'];
+    for(let i=0;i<60;i++){const p=document.createElement('i');p.style.left=Math.random()*100+'vw';p.style.background=cols[i%cols.length];
+      p.style.animationDuration=(1.6+Math.random()*1.3)+'s';p.style.animationDelay=(Math.random()*.4)+'s';c.appendChild(p);setTimeout(()=>p.remove(),3300);}}
+</script>
+</body>
+</html>

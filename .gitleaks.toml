@@ -1,0 +1,17 @@
+# gitleaks config for scripts/public-scan.sh. The default rules apply. The allowlist below names
+# the places that hold FAKE secrets on purpose, each with its reason. Add an entry only with one.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "the secret scanner's own fixtures and shell variables, not values"
+paths = [
+  # the sandbox secret scanner's test: a fake GitHub PAT and a fake Stripe key the test must catch
+  '''apps/desktop/src/main/sandbox/secrets\.test\.ts$''',
+]
+regexes = [
+  # fleet-local.sh probes the issuer with a fake machine token, `Bearer nmm_probe`, to read the status code
+  '''^nmm_probe$''',
+  # a shell variable in a curl header (`-H "authorization: Bearer $FLEET_SECRET"`) is a name, not a value
+  '''Bearer \$\{?[A-Za-z_][A-Za-z0-9_]*''',
+]

@@ -1,0 +1,100 @@
+[
+  {
+    "name": "wait1-chat-thinking-dark",
+    "query": {
+      "theme": "dark",
+      "machineup": "1",
+      "openConvo": "dev::phase ring"
+    },
+    "settle": 3000,
+    "js": "(async () => { const cs = await window.nm.channels(); const dev = cs.find(c => c.slug === 'dev'); await window.nm.send(dev.id, 'give me ideas', { threadId: 'th-bare-chat' }); await new Promise(r => setTimeout(r, 250)); })()"
+  },
+  {
+    "name": "wait1-chat-thinking-cream",
+    "query": {
+      "theme": "cream-oak",
+      "machineup": "1",
+      "openConvo": "dev::phase ring"
+    },
+    "settle": 3000,
+    "js": "(async () => { const cs = await window.nm.channels(); const dev = cs.find(c => c.slug === 'dev'); await window.nm.send(dev.id, 'give me ideas', { threadId: 'th-bare-chat' }); await new Promise(r => setTimeout(r, 250)); })()"
+  },
+  {
+    "name": "wait2-chat-machine-waking-dark",
+    "query": {
+      "theme": "dark",
+      "openConvo": "dev::phase ring"
+    },
+    "settle": 3000,
+    "js": "(async () => { const cs = await window.nm.channels(); const dev = cs.find(c => c.slug === 'dev'); await window.nm.send(dev.id, 'give me ideas', { threadId: 'th-bare-chat' }); await new Promise(r => setTimeout(r, 250)); })()"
+  },
+  {
+    "name": "wait2-chat-machine-waking-cream",
+    "query": {
+      "theme": "cream-oak",
+      "openConvo": "dev::phase ring"
+    },
+    "settle": 3000,
+    "js": "(async () => { const cs = await window.nm.channels(); const dev = cs.find(c => c.slug === 'dev'); await window.nm.send(dev.id, 'give me ideas', { threadId: 'th-bare-chat' }); await new Promise(r => setTimeout(r, 250)); })()"
+  },
+  {
+    "name": "wait3-task-thinking-dark",
+    "query": {
+      "theme": "dark",
+      "machineup": "1",
+      "openTask": "1050"
+    },
+    "settle": 3200,
+    "js": "(async () => { window.__nmHumanSays('tk-1050', 'can the annual badge sit inside the toggle?'); await new Promise(r => setTimeout(r, 400)); const b = document.querySelector('.tmsgs'); if (b) b.scrollTop = b.scrollHeight; })()"
+  },
+  {
+    "name": "wait3-task-thinking-cream",
+    "query": {
+      "theme": "cream-oak",
+      "machineup": "1",
+      "openTask": "1050"
+    },
+    "settle": 3200,
+    "js": "(async () => { window.__nmHumanSays('tk-1050', 'can the annual badge sit inside the toggle?'); await new Promise(r => setTimeout(r, 400)); const b = document.querySelector('.tmsgs'); if (b) b.scrollTop = b.scrollHeight; })()"
+  },
+  {
+    "name": "wait4-task-settled-silent-dark",
+    "query": {
+      "theme": "dark",
+      "machineup": "1",
+      "openTask": "1032"
+    },
+    "settle": 3200,
+    "js": "(async () => { window.__nmHumanSays('tk-1032', 'thanks \u2014 reading it now'); await new Promise(r => setTimeout(r, 400)); const b = document.querySelector('.tmsgs'); if (b) b.scrollTop = b.scrollHeight; })()"
+  },
+  {
+    "name": "wait5-task-yields-to-run-card-dark",
+    "query": {
+      "theme": "dark",
+      "machineup": "1",
+      "openTask": "1046"
+    },
+    "settle": 3200,
+    "js": "(async () => { window.__nmHumanSays('tk-1046', 'can you also check the iPad split view?'); await new Promise(r => setTimeout(r, 400)); const b = document.querySelector('.tmsgs'); if (b) b.scrollTop = b.scrollHeight; })()"
+  },
+  {
+    "name": "wait6-chat-timeout-dark",
+    "query": {
+      "theme": "dark",
+      "machineup": "1",
+      "openConvo": "dev::drawer still traps"
+    },
+    "settle": 3000,
+    "js": "(async () => { window.__nmHumanSaysInConvo('th-drawer-replies', 'any luck reproducing it?', 150000); await new Promise(r => setTimeout(r, 400)); })()"
+  },
+  {
+    "name": "wait6-chat-timeout-cream",
+    "query": {
+      "theme": "cream-oak",
+      "machineup": "1",
+      "openConvo": "dev::drawer still traps"
+    },
+    "settle": 3000,
+    "js": "(async () => { window.__nmHumanSaysInConvo('th-drawer-replies', 'any luck reproducing it?', 150000); await new Promise(r => setTimeout(r, 400)); })()"
+  }
+]

@@ -1,0 +1,157 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@500;600&amp;display=swap">
+  <style>
+    .stage { --bg:#141414;--panel:#161616;--panel2:#1a1a1a;--panel3:#262626;--border:#262626;--border2:#3a3a3a;--text:#cbcbcb;--body:#a6a6a6;--muted:#848484;--dim:#6a6a6a;--link:#d19a72;--brand:#834a2b;--brand-ink:#fff7ee;--green:#77ac8d;--warn:#c9a15e;--done:#77ac8d;--overlay:#222222;--shadow:rgba(0,0,0,0.62);--card:#1e1e1e;--shadow-card:0 1px 2px rgba(0,0,0,.25);--hover-bg:color-mix(in srgb, #cbcbcb 7%, transparent);--hover-border:#404040;--sel-bg:color-mix(in srgb, #cbcbcb 10%, transparent);--btn:#232323;--btn-fg:#efefef;--boxbg:#1a1a1a; }
+    
+  body { margin: 0; }
+  a { color: var(--link); } a:hover { color: var(--text); }
+  .stage { --fbody: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; --fmono: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+    position: relative; box-sizing: border-box; background: var(--bg); color: var(--text); font: 13.5px/1.5 var(--fbody); -webkit-font-smoothing: antialiased;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0 22px 34px; overflow: hidden; }
+  .stage *, .stage *::before, .stage *::after { box-sizing: border-box; }
+  .stagecol { width: 640px; display: flex; flex-direction: column; position: relative; }
+  .stageeyebrow { font: 500 9.5px var(--fmono); letter-spacing: -.02em; text-transform: uppercase; color: var(--dim); margin-bottom: 9px; }
+  .stagehead { font-family: var(--fbody); font-size: 27px; font-weight: 500; letter-spacing: -.02em; line-height: 1.3; text-align: center; text-wrap: balance; margin: 0 0 24px; color: var(--text); }
+  .stageprojbtn { font-size: 29px; font-weight: 500; color: var(--link); padding: 0 2px; line-height: 1.1; border-bottom: 2px dotted color-mix(in srgb, var(--link) 45%, transparent); }
+  /* .hcomposer.cbox: the Home box, dark themes on --panel2, light on --card */
+  .hcomposer { position: relative; background: var(--boxbg); border: 1px solid var(--border); border-radius: 6px; padding: 13px 14px 11px; box-shadow: var(--shadow-card); }
+  .hcomposer.focus { border-color: var(--border2); }
+  .chint { display: flex; align-items: center; gap: 8px; margin: -13px -14px 10px; padding: 8px 14px; border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent); background: color-mix(in srgb, var(--panel2) 30%, transparent); border-radius: inherit; border-bottom-left-radius: 0; border-bottom-right-radius: 0; color: var(--muted); font-size: 11.5px; line-height: 1.5; }
+  .chintat { font-weight: 600; color: var(--text); border-bottom: 1px solid color-mix(in srgb, var(--text) 28%, transparent); }
+  .pav { display: inline-grid; place-items: center; flex: none; overflow: hidden; background: var(--panel3); }
+  .pav svg, .pav img { display: block; width: 100%; height: 100%; }
+  .ta { min-height: 40px; font-size: 13.5px; line-height: 1.5; color: var(--dim); }
+  .ta.draft { color: var(--text); }
+  .caret { display: inline-block; width: 1.5px; height: 15px; background: var(--text); vertical-align: -3px; margin-left: 1px; }
+  .hrow { display: flex; align-items: center; gap: 6px; margin-top: 8px; position: relative; }
+  .hchip { display: inline-flex; align-items: center; gap: 6px; padding: 3.5px 8px; border-radius: 6px; border: 1px solid transparent; color: var(--dim); font-size: 11.5px; font-weight: 600; white-space: nowrap; }
+  .hchip .h { color: var(--dim); font-weight: 600; } .hchip .cv { color: var(--dim); font-size: 9px; }
+  .cchip { display: inline-flex; align-items: center; gap: 5px; max-width: 190px; padding: 3.5px 8px; border-radius: 3px; border: 1px solid transparent; color: var(--dim); font-size: 11.5px; font-weight: 600; white-space: nowrap; }
+  .cchip .lbl { overflow: hidden; text-overflow: ellipsis; min-width: 0; } .cchip .car { font-size: 8px; color: var(--dim); flex: none; }
+  .cchip > svg { flex: none; opacity: .8; } .cchip .g { display: inline-grid; place-items: center; } .cchip .g svg { display: block; opacity: .85; }
+  .brainavs { display: inline-flex; align-items: center; margin-left: 2px; flex: none; } .brainavs > * { margin-left: -5px; border: 1.5px solid var(--card); border-radius: 3px; } .brainavs > *:first-child { margin-left: 0; }
+  .attachbtn { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 25px; border-radius: 6px; color: var(--dim); border: 1px solid transparent; }
+  .attachbtn svg { display: block; }
+  .rowsp { flex: 1; }
+  .hsend { flex: none; width: 32px; height: 32px; display: grid; place-items: center; border-radius: 3px; background: var(--panel3); color: var(--dim); border: 1px solid transparent; }
+  .hsend.on { background: var(--brand); color: var(--brand-ink); }
+  .hsend svg { display: block; }
+  /* ── NEW: the foot. The cap's material, mirrored at the bottom of the same card ── */
+  .cfoot { display: flex; align-items: center; gap: 8px; margin: 10px -14px -11px; padding: 8px 14px; min-height: 43px; border-top: 1px solid color-mix(in srgb, var(--border) 50%, transparent); background: color-mix(in srgb, var(--panel2) 30%, transparent); border-radius: inherit; border-top-left-radius: 0; border-top-right-radius: 0; }
+  .cfootpills { display: flex; align-items: center; gap: 5px; min-width: 0; }
+  .cfootpill { height: 26px; padding: 0 9px; border-radius: 3px; border: 1px solid var(--border2); background: none; color: var(--body); font: 500 11.5px var(--fbody); white-space: nowrap; display: inline-flex; align-items: center; gap: 7px; }
+  .cfootpill.idea { padding-left: 5px; }
+  .cfootapps { position: relative; display: flex; align-items: center; gap: 2px; margin-left: auto; flex: none; }
+  .cfootapp { position: relative; width: 24px; height: 24px; display: grid; place-items: center; border-radius: 3px; color: var(--dim); }
+  .cfootapp svg { display: block; }
+  .cfootapp.on { color: var(--body); }
+  .cfootapp.hover { background: var(--hover-bg); color: var(--text); }
+  .cfootapp.open { background: var(--sel-bg); color: var(--text); }
+  .cfootapp .dot { position: absolute; right: 2px; bottom: 2px; width: 5px; height: 5px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 1.5px var(--boxbg); }
+  .cfoot .cfootapp .dot { box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--panel2) 30%, var(--boxbg)); }
+  .ctray .cfootapp .dot { box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--panel3) 55%, var(--boxbg)); }
+  .cfootapp .dot.warn { background: var(--warn); }
+  /* the [data-tip] label, drawn open, flipped above like every composer tip */
+  .tip { position: absolute; bottom: calc(100% + 7px); left: 50%; transform: translateX(-50%); background: var(--overlay); color: var(--text); border: 1px solid var(--border2); border-radius: 6px; padding: 5px 10px; font: 500 11px/1.45 var(--fbody); letter-spacing: .004em; white-space: nowrap; box-shadow: 0 10px 28px -10px var(--shadow); z-index: 80; }
+  /* the composer's own popover recipe (.cprojpop.cmachpop), hung from the cluster's right edge */
+  .pop { position: absolute; bottom: calc(100% + 8px); right: 0; width: 292px; background: var(--overlay); border: 1px solid var(--border2); border-radius: 8px; padding: 7px; box-shadow: 0 18px 44px -14px var(--shadow); z-index: 421; text-align: left; }
+  .pophead { display: flex; align-items: center; gap: 8px; padding: 7px 9px 4px; font-size: 12.5px; font-weight: 600; color: var(--text); }
+  .pophead svg { display: block; color: var(--body); }
+  .cprojtag { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: -.02em; color: var(--dim); border: 1px solid var(--border2); border-radius: 3px; padding: 0 4px; flex: none; font-family: var(--fmono); }
+  .cprojtag.on { color: var(--done); border-color: color-mix(in srgb, var(--done) 40%, transparent); }
+  .pop p { margin: 0; padding: 2px 9px; font-size: 11px; color: var(--body); line-height: 1.5; }
+  .popact { display: flex; align-items: center; gap: 6px; padding: 7px 9px 4px; }
+  .btn { display: inline-flex; align-items: center; gap: 7px; padding: 5px 12px; border-radius: 3px; border: 1px solid var(--border2); background: var(--btn); color: var(--btn-fg); font-family: var(--fmono); font-size: 11.5px; font-weight: 500; letter-spacing: -.02em; text-transform: uppercase; position: relative; white-space: nowrap; }
+  .btn.primary { background: var(--brand); color: var(--brand-ink); border-color: transparent; }
+  .btn.primary::before { content: ""; position: absolute; inset: 0; border-radius: inherit; background: repeating-linear-gradient(135deg, rgba(255,255,255,.16) 0 1px, transparent 1px 7px); background-size: 9.9px 9.9px; pointer-events: none; }
+  .btn.primary > * { position: relative; }
+  .btn.ghost { background: transparent; color: var(--muted); border-color: var(--border); }
+  .popkick { font: 500 9.5px var(--fmono); letter-spacing: -.02em; text-transform: uppercase; color: var(--dim); padding: 6px 9px 3px; }
+  .cprojlist { display: flex; flex-direction: column; gap: 3px; }
+  .cprojitem { display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 9px; border-radius: 6px; font-size: 12.5px; color: var(--text); text-align: left; }
+  .cprojitem.hover { background: var(--hover-bg); }
+  .cprojglyph { width: 16px; display: inline-grid; place-items: center; color: var(--body); flex: none; } .cprojglyph svg { display: block; opacity: .85; }
+  .cmachsub { font: 500 10px var(--fmono); color: var(--dim); letter-spacing: -.02em; }
+  .cmachst { flex: none; margin-left: auto; width: 14px; text-align: center; font-size: 10px; line-height: 1; color: var(--dim); }
+  .cmachst.on { color: var(--done); } .cmachst.warn { color: var(--warn); }
+  .cmachfoot { padding: 6px 9px 4px; font-size: 10.5px; color: var(--dim); line-height: 1.4; }
+  /* ── B: the tray hung under the card ── */
+  .hcomposer.trayed { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+  .ctray { display: flex; align-items: center; gap: 8px; padding: 8px 14px; min-height: 43px; border: 1px solid var(--border); border-top: 0; border-radius: 0 0 6px 6px; background: color-mix(in srgb, var(--panel3) 55%, var(--boxbg)); }
+  /* ── C: the live read ── */
+  .ideathinking { display: inline-flex; align-items: center; gap: 7px; color: var(--dim); font-size: 11.5px; font-style: italic; padding-left: 2px; }
+  .ideadots { display: inline-flex; gap: 3px; } .ideadots i { width: 4px; height: 4px; border-radius: 50%; background: var(--dim); animation: nm-dot 1.05s cubic-bezier(.22,1,.36,1) infinite; }
+  .ideadots i:nth-child(2) { animation-delay: .15s; } .ideadots i:nth-child(3) { animation-delay: .3s; }
+  @keyframes nm-dot { 0%, 60%, 100% { opacity: .25; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-2px); } }
+  @media (prefers-reduced-motion: reduce) { .ideadots i { animation: none; opacity: .6; } }
+  /* ── the marks sheet ── */
+  .sheet { display: flex; flex-direction: column; gap: 4px; width: 100%; }
+  .sheethd, .sheetrow { display: grid; grid-template-columns: 150px 72px 72px 72px 1fr; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 6px; }
+  .sheethd { font: 500 9.5px var(--fmono); letter-spacing: -.02em; text-transform: uppercase; color: var(--dim); }
+  .sheetrow { background: var(--boxbg); border: 1px solid var(--border); }
+  .sheetrow b { font-size: 12.5px; font-weight: 600; color: var(--text); }
+  .sheetrow .cmachsub { white-space: nowrap; }
+  .cell { display: inline-grid; place-items: center; }
+
+  </style>
+</helmet>
+<div class="stage" style="width: 900px; height: 720px;">
+  <div class="stagecol" style="gap: 26px; padding-top: 14px;">
+  <div><div class="stageeyebrow">1 · at rest: one door, the marks</div>
+    <div class="hcomposer">
+      <div class="chint"><span class="pav" style="width:15px;height:15px;border-radius:4px"><svg viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" fill="#d19a72"/><circle cx="9" cy="10.5" r="1.4" fill="#3a2c22"/><circle cx="15" cy="10.5" r="1.4" fill="#3a2c22"/><path d="M9 15.5c1.6 1.4 4.4 1.4 6 0" fill="none" stroke="#3a2c22" stroke-width="1.6" stroke-linecap="round"/></svg></span><span>Mention <span class="chintat">@rex</span> or another teammate whenever you want their help.</span></div>
+      <div class="ta">Describe the work, or just ask. The orchestrator decides what becomes a task. @ mention · / skill · ⏎ send</div>
+      <div class="hrow">
+        <span class="hchip"><span class="h">#</span> marketing <span class="cv">⌄</span></span>
+        <span class="cchip"><span class="g"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9z"/></svg></span><span class="lbl">Cloud</span><span class="car">▾</span></span>
+        <span class="cchip"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4.5a3 3 0 0 0-3 3.1c-1.8.4-3.1 1.9-3.1 3.8a3.9 3.9 0 0 0 1.5 3.1 3.4 3.4 0 0 0 3.3 4.4c.4 0 .9-.1 1.3-.2.4.1.9.2 1.3.2a3.4 3.4 0 0 0 3.3-4.4 3.9 3.9 0 0 0 1.5-3.1c0-1.9-1.3-3.4-3.1-3.8a3 3 0 0 0-3-3.1z"/><path d="M12 4.5v15"/></svg><span class="lbl">Brain · NeuraMesh Starter</span><span class="brainavs"><span class="pav" style="width:14px;height:14px;border-radius:5px"><svg viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" fill="#d19a72"/><circle cx="9" cy="10.5" r="1.4" fill="#3a2c22"/><circle cx="15" cy="10.5" r="1.4" fill="#3a2c22"/><path d="M9 15.5c1.6 1.4 4.4 1.4 6 0" fill="none" stroke="#3a2c22" stroke-width="1.6" stroke-linecap="round"/></svg></span><span class="pav" style="width:14px;height:14px;border-radius:5px"><svg viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" fill="#cc8fb9"/><circle cx="9" cy="10.5" r="1.4" fill="#3a2c22"/><circle cx="15" cy="10.5" r="1.4" fill="#3a2c22"/><path d="M9 15.5c1.6 1.4 4.4 1.4 6 0" fill="none" stroke="#3a2c22" stroke-width="1.6" stroke-linecap="round"/></svg></span><span class="pav" style="width:14px;height:14px;border-radius:5px"><svg viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" fill="#7cb0bd"/><circle cx="9" cy="10.5" r="1.4" fill="#1a1a1a"/><circle cx="15" cy="10.5" r="1.4" fill="#1a1a1a"/><path d="M9 15.5c1.6 1.4 4.4 1.4 6 0" fill="none" stroke="#1a1a1a" stroke-width="1.6" stroke-linecap="round"/></svg></span></span><span class="car">▾</span></span>
+        <span class="attachbtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3.6"/><path d="M15.6 8.4v4.9a2.6 2.6 0 0 0 5.2 0V12a8.8 8.8 0 1 0-3.5 7"/></svg></span>
+        <span class="attachbtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></span>
+        <span class="rowsp"></span>
+        <span class="hsend"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></span>
+      </div>
+      <div class="cfoot"><div class="cfootpills"><span class="cfootpill idea"><span class="pav" style="width:16px;height:16px;border-radius:4px"><svg viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" fill="#d19a72"/><circle cx="9" cy="10.5" r="1.4" fill="#3a2c22"/><circle cx="15" cy="10.5" r="1.4" fill="#3a2c22"/><path d="M9 15.5c1.6 1.4 4.4 1.4 6 0" fill="none" stroke="#3a2c22" stroke-width="1.6" stroke-linecap="round"/></svg></span>Give me ideas</span></div><div class="cfootapps"><span class="cfootapp"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4l14 16"/><path d="M19 4l-4.9 5.6"/><path d="M9.9 14.4 5 20"/></svg></span><span class="cfootapp on"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="3"/><path d="M7.6 10.8V16.2"/><circle cx="7.6" cy="7.6" r="1" fill="currentColor" stroke="none"/><path d="M11.4 16.2v-5.4"/><path d="M11.4 13.2a2.6 2.6 0 0 1 5.2 0v3"/></svg><span class="dot"></span></span><span class="cfootapp on"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="4.5"/><circle cx="12" cy="12" r="3.6"/><circle cx="16.8" cy="7.2" r=".9" fill="currentColor" stroke="none"/></svg><span class="dot"></span></span><span class="cfootapp"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 4v10.2a3.3 3.3 0 1 1-3.3-3.3"/><path d="M13.5 4c.5 2.5 2.2 4.1 4.8 4.4"/></svg></span><span class="cfootapp"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg></span></div></div>
+    </div></div>
+  <div><div class="stageeyebrow">2 · rex reads the room</div>
+    <div class="hcomposer">
+      <div class="chint"><span class="pav" style="width:15px;height:15px;border-radius:4px"><svg viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" fill="#d19a72"/><circle cx="9" cy="10.5" r="1.4" fill="#3a2c22"/><circle cx="15" cy="10.5" r="1.4" fill="#3a2c22"/><path d="M9 15.5c1.6 1.4 4.4 1.4 6 0" fill="none" stroke="#3a2c22" stroke-width="1.6" stroke-linecap="round"/></svg></span><span>Mention <span class="chintat">@rex</span> or another teammate whenever you want their help.</span></div>
+      <div class="ta">Describe the work, or just ask. The orchestrator decides what becomes a task. @ mention · / skill · ⏎ send</div>
+      <div class="hrow">
+        <span class="hchip"><span class="h">#</span> marketing <span class="cv">⌄</span></span>
+        <span class="cchip"><span class="g"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9z"/></svg></span><span class="lbl">Cloud</span><span class="car">▾</span></span>
+        <span class="cchip"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4.5a3 3 0 0 0-3 3.1c-1.8.4-3.1 1.9-3.1 3.8a3.9 3.9 0 0 0 1.5 3.1 3.4 3.4 0 0 0 3.3 4.4c.4 0 .9-.1 1.3-.2.4.1.9.2 1.3.2a3.4 3.4 0 0 0 3.3-4.4 3.9 3.9 0 0 0 1.5-3.1c0-1.9-1.3-3.4-3.1-3.8a3 3 0 0 0-3-3.1z"/><path d="M12 4.5v15"/></svg><span class="lbl">Brain · NeuraMesh Starter</span><span class="brainavs"><span class="pav" style="width:14px;height:14px;border-radius:5px"><svg viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" fill="#d19a72"/><circle cx="9" cy="10.5" r="1.4" fill="#3a2c22"/><circle cx="15" cy="10.5" r="1.4" fill="#3a2c22"/><path d="M9 15.5c1.6 1.4 4.4 1.4 6 0" fill="none" stroke="#3a2c22" stroke-width="1.6" stroke-linecap="round"/></svg></span><span class="pav" style="width:14px;height:14px;border-radius:5px"><svg viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" fill="#cc8fb9"/><circle cx="9" cy="10.5" r="1.4" fill="#3a2c22"/><circle cx="15" cy="10.5" r="1.4" fill="#3a2c22"/><path d="M9 15.5c1.6 1.4 4.4 1.4 6 0" fill="none" stroke="#3a2c22" stroke-width="1.6" stroke-linecap="round"/></svg></span><span class="pav" style="width:14px;height:14px;border-radius:5px"><svg viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" fill="#7cb0bd"/><circle cx="9" cy="10.5" r="1.4" fill="#1a1a1a"/><circle cx="15" cy="10.5" r="1.4" fill="#1a1a1a"/><path d="M9 15.5c1.6 1.4 4.4 1.4 6 0" fill="none" stroke="#1a1a1a" stroke-width="1.6" stroke-linecap="round"/></svg></span></span><span class="car">▾</span></span>
+        <span class="attachbtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3.6"/><path d="M15.6 8.4v4.9a2.6 2.6 0 0 0 5.2 0V12a8.8 8.8 0 1 0-3.5 7"/></svg></span>
+        <span class="attachbtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></span>
+        <span class="rowsp"></span>
+        <span class="hsend"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></span>
+      </div>
+      <div class="cfoot"><div class="cfootpills"><span class="ideathinking"><span class="pav" style="width:15px;height:15px;border-radius:4px"><svg viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" fill="#d19a72"/><circle cx="9" cy="10.5" r="1.4" fill="#3a2c22"/><circle cx="15" cy="10.5" r="1.4" fill="#3a2c22"/><path d="M9 15.5c1.6 1.4 4.4 1.4 6 0" fill="none" stroke="#3a2c22" stroke-width="1.6" stroke-linecap="round"/></svg></span><span class="ideadots"><i></i><i></i><i></i></span>rex reads the room…</span></div><div class="cfootapps"><span class="cfootapp"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4l14 16"/><path d="M19 4l-4.9 5.6"/><path d="M9.9 14.4 5 20"/></svg></span><span class="cfootapp on"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="3"/><path d="M7.6 10.8V16.2"/><circle cx="7.6" cy="7.6" r="1" fill="currentColor" stroke="none"/><path d="M11.4 16.2v-5.4"/><path d="M11.4 13.2a2.6 2.6 0 0 1 5.2 0v3"/></svg><span class="dot"></span></span><span class="cfootapp on"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="4.5"/><circle cx="12" cy="12" r="3.6"/><circle cx="16.8" cy="7.2" r=".9" fill="currentColor" stroke="none"/></svg><span class="dot"></span></span><span class="cfootapp"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 4v10.2a3.3 3.3 0 1 1-3.3-3.3"/><path d="M13.5 4c.5 2.5 2.2 4.1 4.8 4.4"/></svg></span><span class="cfootapp"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg></span></div></div>
+    </div></div>
+  <div><div class="stageeyebrow">3 · room-grounded pills replace the door</div>
+    <div class="hcomposer">
+      <div class="chint"><span class="pav" style="width:15px;height:15px;border-radius:4px"><svg viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" fill="#d19a72"/><circle cx="9" cy="10.5" r="1.4" fill="#3a2c22"/><circle cx="15" cy="10.5" r="1.4" fill="#3a2c22"/><path d="M9 15.5c1.6 1.4 4.4 1.4 6 0" fill="none" stroke="#3a2c22" stroke-width="1.6" stroke-linecap="round"/></svg></span><span>Mention <span class="chintat">@rex</span> or another teammate whenever you want their help.</span></div>
+      <div class="ta">Describe the work, or just ask. The orchestrator decides what becomes a task. @ mention · / skill · ⏎ send</div>
+      <div class="hrow">
+        <span class="hchip"><span class="h">#</span> marketing <span class="cv">⌄</span></span>
+        <span class="cchip"><span class="g"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9z"/></svg></span><span class="lbl">Cloud</span><span class="car">▾</span></span>
+        <span class="cchip"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4.5a3 3 0 0 0-3 3.1c-1.8.4-3.1 1.9-3.1 3.8a3.9 3.9 0 0 0 1.5 3.1 3.4 3.4 0 0 0 3.3 4.4c.4 0 .9-.1 1.3-.2.4.1.9.2 1.3.2a3.4 3.4 0 0 0 3.3-4.4 3.9 3.9 0 0 0 1.5-3.1c0-1.9-1.3-3.4-3.1-3.8a3 3 0 0 0-3-3.1z"/><path d="M12 4.5v15"/></svg><span class="lbl">Brain · NeuraMesh Starter</span><span class="brainavs"><span class="pav" style="width:14px;height:14px;border-radius:5px"><svg viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" fill="#d19a72"/><circle cx="9" cy="10.5" r="1.4" fill="#3a2c22"/><circle cx="15" cy="10.5" r="1.4" fill="#3a2c22"/><path d="M9 15.5c1.6 1.4 4.4 1.4 6 0" fill="none" stroke="#3a2c22" stroke-width="1.6" stroke-linecap="round"/></svg></span><span class="pav" style="width:14px;height:14px;border-radius:5px"><svg viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" fill="#cc8fb9"/><circle cx="9" cy="10.5" r="1.4" fill="#3a2c22"/><circle cx="15" cy="10.5" r="1.4" fill="#3a2c22"/><path d="M9 15.5c1.6 1.4 4.4 1.4 6 0" fill="none" stroke="#3a2c22" stroke-width="1.6" stroke-linecap="round"/></svg></span><span class="pav" style="width:14px;height:14px;border-radius:5px"><svg viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" fill="#7cb0bd"/><circle cx="9" cy="10.5" r="1.4" fill="#1a1a1a"/><circle cx="15" cy="10.5" r="1.4" fill="#1a1a1a"/><path d="M9 15.5c1.6 1.4 4.4 1.4 6 0" fill="none" stroke="#1a1a1a" stroke-width="1.6" stroke-linecap="round"/></svg></span></span><span class="car">▾</span></span>
+        <span class="attachbtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3.6"/><path d="M15.6 8.4v4.9a2.6 2.6 0 0 0 5.2 0V12a8.8 8.8 0 1 0-3.5 7"/></svg></span>
+        <span class="attachbtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></span>
+        <span class="rowsp"></span>
+        <span class="hsend"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></span>
+      </div>
+      <div class="cfoot"><div class="cfootpills"><span class="cfootpill">Draft the v0.128 release post for LinkedIn</span><span class="cfootpill">Audit the marketing board for stuck items</span><span class="cfootpill">Plan next week’s posts</span></div><div class="cfootapps"><span class="cfootapp"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4l14 16"/><path d="M19 4l-4.9 5.6"/><path d="M9.9 14.4 5 20"/></svg></span><span class="cfootapp on"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="3"/><path d="M7.6 10.8V16.2"/><circle cx="7.6" cy="7.6" r="1" fill="currentColor" stroke="none"/><path d="M11.4 16.2v-5.4"/><path d="M11.4 13.2a2.6 2.6 0 0 1 5.2 0v3"/></svg><span class="dot"></span></span><span class="cfootapp on"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="4.5"/><circle cx="12" cy="12" r="3.6"/><circle cx="16.8" cy="7.2" r=".9" fill="currentColor" stroke="none"/></svg><span class="dot"></span></span><span class="cfootapp"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 4v10.2a3.3 3.3 0 1 1-3.3-3.3"/><path d="M13.5 4c.5 2.5 2.2 4.1 4.8 4.4"/></svg></span><span class="cfootapp"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg></span></div></div>
+    </div></div>
+</div>
+</div>
+</x-dc>
+</body>
+</html>

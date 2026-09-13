@@ -1,0 +1,912 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Design Studio — iterating on a design in place · R1</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/geist@5.2.5/wght.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/geist-mono@5.2.5/wght.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/source-serif-4@5.2.5/opsz-wght.css">
+<style>
+/* ════════════════════════════════════════════════════════════════════════════
+   THE DESIGN STUDIO — R1
+   Design review stops being a full-screen modal and becomes a right-docked,
+   resizable stage that sits BESIDE the thread, with a conversation lane and the
+   approve gate in reach. docs/14 (design stage) · docs/25 (panel zones) · docs/33.
+
+   Tokens lifted verbatim from apps/desktop/src/renderer/src/tokens.css.
+   Nothing here invents a colour.
+
+   ONE new idiom, declared (docs/33 §11.3):
+     THE SPLIT STAGE — a resizable peer column inside the task panel. Not the
+     "right-side inspector" docs/25 set aside: the thread KEEPS its own measure
+     (it is a centred 860px column in a ~1630px panel today, so the studio
+     spends slack, not thread). Under 1100px the studio takes the sheet, which
+     is exactly today's behaviour.
+
+   Everything else is BORROWED. R1 had a mode chip on the composer (Ask vs
+   Request changes) — killed in R2: it made the human classify their own
+   sentence, and it still burned one round per note. PlanReview already solved
+   this. Comments accumulate as editable pills, ONE button batches them into a
+   single revision, and it carries a count badge. The design round gets the same
+   model: you just talk, what you said that should change collects as a NOTE,
+   and one Redraw carries all of them.
+   ════════════════════════════════════════════════════════════════════════════ */
+:root {
+  --fdisp:'Source Serif 4 Variable',Georgia,'Times New Roman',serif;
+  --fbody:'Geist Variable',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --fmono:'Geist Mono Variable',ui-monospace,'SF Mono',Menlo,monospace;
+  --dur-fast:.12s; --dur:.15s; --dur-enter:.22s; --dur-exit:.13s;
+  --ease:cubic-bezier(.22,1,.36,1);
+  --r-xs:6px; --r-sm:8px; --r-md:10px; --r-lg:14px; --r-xl:18px; --r-full:999px;
+}
+[data-theme="dark"] {
+  --win:#0d0d0d; --band:#090909; --bg:#141414; --panel:#191919; --panel2:#212121; --panel3:#2b2b2b;
+  --border:#272727; --border2:#383838;
+  --text:#eaeaea; --body:#b6b6b6; --muted:#898989; --dim:#676767;
+  --link:#9cb1f0; --accent:#eaeaea; --accent-ink:#101010; --accent-soft:rgba(234,234,234,.13);
+  --brand:#834a2b; --brand-ink:#fff7ee;
+  --btn:#232323; --btn-fg:#efefef; --btn-hover:#2f2f2f;
+  --green:#77ac8d; --done:#77ac8d; --design:#cc8fb9; --designrev:#b78bd8; --plan:#7fa5ab;
+  --role-orch:#9793d2; --role-design:#cc8fb9; --role-arch:#a89ccf;
+  --card:#1e1e1e; --card-border:#2c2c2c; --code:#0a0a0a; --codeink:#e8e8e8; --overlay:#222;
+  --shadow-sheet:inset 0 1px 0 rgba(255,255,255,.05), 0 12px 30px -6px rgba(0,0,0,.5);
+  --shadow-card:0 1px 2px rgba(0,0,0,.25);
+  --shadow-lift:0 8px 20px -8px rgba(0,0,0,.55);
+  --shadow-pop:0 20px 55px -14px rgba(0,0,0,.65);
+  --ring:#525252; --hover-bg:rgba(234,234,234,.07); --sel-bg:rgba(234,234,234,.10);
+  --claude:#d9986c;
+}
+[data-theme="cream"] {
+  --win:#f0e5d3; --band:#e7d9c3; --bg:#fbf8f4; --panel:#fbf8f4; --panel2:#f6eee1; --panel3:#efe1cd;
+  --border:#e6dbca; --border2:#d3c2a8;
+  --text:#2a1c13; --body:#574838; --muted:#97846c; --dim:#b5a289;
+  --link:#9c5730; --accent:#834a2b; --accent-ink:#fff7ee; --accent-soft:rgba(131,74,43,.11);
+  --brand:#834a2b; --brand-ink:#fff7ee;
+  --btn:#f8f2e8; --btn-fg:#43301f; --btn-hover:#efe4d2;
+  --green:#2f9e6b; --done:#0f9d63; --design:#b0498f; --designrev:#8a3fc0; --plan:#2c7d88;
+  --role-orch:#6a63bc; --role-design:#b0498f; --role-arch:#7d6cc4;
+  --card:#ffffff; --card-border:#eadfce; --code:#2b2018; --codeink:#f3e6d8; --overlay:#ffffff;
+  --shadow-sheet:0 8px 26px -8px rgba(70,42,18,.16), 0 1px 2px rgba(70,42,18,.05);
+  --shadow-card:0 1px 2px rgba(70,42,18,.05);
+  --shadow-lift:0 8px 20px -8px rgba(70,42,18,.20);
+  --shadow-pop:0 20px 55px -14px rgba(70,42,18,.30);
+  --ring:rgba(131,74,43,.55); --hover-bg:rgba(53,36,22,.05); --sel-bg:rgba(131,74,43,.08);
+  --claude:#c9743a;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:var(--win); color:var(--text); font:14px/1.5 var(--fbody); -webkit-font-smoothing:antialiased; padding:34px 26px 90px; }
+svg { display:block; }
+button { font:inherit; color:inherit; background:none; border:none; cursor:pointer; }
+
+/* ── the mockup harness ─────────────────────────────────────────────────── */
+.page { max-width:1500px; margin:0 auto; }
+.kick { font:650 10px/1 var(--fmono); letter-spacing:.14em; text-transform:uppercase; color:var(--dim); }
+.phead { margin-bottom:30px; }
+.phead h1 { font:640 30px/1.15 var(--fdisp); letter-spacing:-.015em; margin:10px 0 8px; }
+.phead p { color:var(--body); max-width:800px; font-size:14.5px; }
+.phead p + p { margin-top:8px; }
+.phead em { font-style:normal; color:var(--text); font-weight:600; }
+
+.scene { margin:0 0 52px; }
+.scenehead { display:flex; align-items:baseline; gap:12px; margin-bottom:12px; flex-wrap:wrap; }
+.scenehead h2 { font:640 19px/1.2 var(--fdisp); letter-spacing:-.01em; }
+.scenehead span { color:var(--muted); font-size:12.5px; }
+
+.themetoggle { position:fixed; right:22px; bottom:22px; z-index:50; display:flex; gap:3px; padding:4px; border-radius:var(--r-full); background:var(--card); border:1px solid var(--card-border); box-shadow:var(--shadow-pop); }
+.themetoggle button { padding:7px 15px; border-radius:var(--r-full); font:650 11px/1 var(--fmono); letter-spacing:.06em; color:var(--muted); }
+.themetoggle button.on { background:var(--accent); color:var(--accent-ink); }
+
+/* ── shared app chrome ──────────────────────────────────────────────────── */
+.frame { border-radius:var(--r-xl); background:var(--win); padding:8px; box-shadow:var(--shadow-pop); }
+.sheet { border-radius:var(--r-xl); background:var(--bg); box-shadow:var(--shadow-sheet); overflow:hidden; }
+
+.thead { padding:13px 16px 0; }
+.theadtop { display:flex; align-items:center; gap:9px; }
+.tx { display:grid; place-items:center; width:23px; height:23px; border-radius:var(--r-xs); color:var(--muted); }
+.tx:hover { background:var(--hover-bg); color:var(--text); }
+.tnum { font:600 12px/1 var(--fmono); color:var(--muted); }
+.tstate { display:inline-flex; align-items:center; height:19px; padding:0 8px; border-radius:var(--r-full); font:650 9px/1 var(--fmono); letter-spacing:.09em; }
+.tstate.designrev { color:var(--designrev); background:color-mix(in srgb, var(--designrev) 15%, transparent); }
+.tstate.designing { color:var(--design); background:color-mix(in srgb, var(--design) 15%, transparent); }
+.tstate.planning { color:var(--plan); background:color-mix(in srgb, var(--plan) 15%, transparent); }
+.ttitle { font:640 19px/1.25 var(--fdisp); letter-spacing:-.01em; margin:9px 0 10px; }
+
+.spectrum { display:flex; gap:3px; margin-bottom:7px; }
+.spectrum i { height:3px; border-radius:2px; background:var(--border2); flex:1; }
+.spectrum i.on { background:var(--design); }
+.spectrum i.done { background:color-mix(in srgb, var(--done) 62%, transparent); }
+.spectrum i.dash { background:repeating-linear-gradient(90deg, var(--border2) 0 5px, transparent 5px 10px); }
+.tfacts { display:flex; gap:9px; align-items:center; flex-wrap:wrap; padding-bottom:11px; }
+.tleg { font:650 9.5px/1 var(--fmono); letter-spacing:.1em; color:var(--design); }
+.tok { display:inline-flex; align-items:center; gap:5px; height:20px; padding:0 8px; border-radius:var(--r-full); border:1px solid var(--border); color:var(--muted); font:600 10px/1 var(--fmono); }
+.tok:hover { border-color:var(--border2); color:var(--text); }
+
+.ttabs { display:flex; gap:2px; padding:0 14px; border-bottom:1px solid var(--border); }
+.ttab { padding:8px 11px 9px; font-size:12.5px; font-weight:550; color:var(--muted); border-bottom:2px solid transparent; margin-bottom:-1px; }
+.ttab.on { color:var(--text); border-bottom-color:var(--text); }
+
+/* ── thread ─────────────────────────────────────────────────────────────── */
+.tbody { display:flex; min-height:0; }
+.tcol { flex:1; min-width:0; display:flex; flex-direction:column; }
+/* the feed is bottom-pinned in the real app — newest message rests on the composer */
+.tmsgs { flex:1; min-width:0; padding:16px 20px 12px; display:flex; flex-direction:column; justify-content:flex-end; gap:15px; overflow:hidden; }
+.msg { display:flex; gap:10px; }
+.avg { flex:none; width:29px; height:29px; border-radius:9px; display:grid; place-items:center; font:700 11px/1 var(--fbody); }
+.avg.design { color:var(--role-design); background:color-mix(in srgb, var(--role-design) 17%, var(--panel2)); }
+.avg.orch { color:var(--role-orch); background:color-mix(in srgb, var(--role-orch) 17%, var(--panel2)); }
+.avg.you { color:var(--muted); background:var(--panel2); }
+.mbody { min-width:0; flex:1; }
+.mhead { display:flex; align-items:baseline; gap:7px; margin-bottom:3px; }
+.mhead b { font-size:12.5px; }
+.mrole { font:650 8.5px/1 var(--fmono); letter-spacing:.09em; padding:3px 5px; border-radius:4px; color:var(--muted); background:var(--panel2); }
+.mtime { font:10px/1 var(--fmono); color:var(--dim); }
+.mtext { color:var(--body); font-size:13.5px; line-height:1.55; }
+.mtext strong { color:var(--text); font-weight:620; }
+.ref { color:var(--link); text-decoration:none; border-bottom:1px solid color-mix(in srgb, var(--link) 34%, transparent); }
+
+/* ── the settled/approved contract card (replaces today's big handoff card) ── */
+.contract { margin-top:9px; border:1px solid var(--card-border); border-radius:var(--r-lg); background:var(--card); box-shadow:var(--shadow-card); overflow:hidden; }
+.contracthead { display:flex; align-items:center; gap:10px; padding:11px 12px 10px; }
+.contractseal { flex:none; width:27px; height:27px; border-radius:50%; display:grid; place-items:center; color:var(--done); background:color-mix(in srgb, var(--done) 15%, transparent); }
+.contractid { flex:1; min-width:0; }
+.contractid .kick { color:var(--done); letter-spacing:.13em; }
+.contractid strong { display:block; font:640 15px/1.25 var(--fdisp); margin-top:3px; }
+.linkbtn { flex:none; display:inline-flex; align-items:center; gap:5px; height:27px; padding:0 11px; border-radius:var(--r-full); border:1px solid var(--border2); color:var(--body); font-size:11.5px; font-weight:550; }
+.linkbtn:hover { border-color:var(--border2); background:var(--hover-bg); color:var(--text); box-shadow:var(--shadow-card); }
+.contractthumbs { display:flex; gap:8px; padding:0 12px 10px; }
+.cthumb { flex:1; min-width:0; border:1px solid var(--border); border-radius:var(--r-sm); overflow:hidden; background:var(--panel2); text-align:left; }
+.cthumb:hover { border-color:color-mix(in srgb, var(--done) 45%, var(--border2)); transform:translateY(-1px); box-shadow:var(--shadow-lift); }
+.cthumb .shot { height:74px; border-bottom:1px solid var(--border); overflow:hidden; }
+.cthumb .cap { padding:6px 8px 7px; font:600 10px/1.3 var(--fmono); color:var(--muted); }
+.contractfoot { padding:0 12px 11px; color:var(--dim); font-size:11px; }
+
+/* ── THE STUDIO ─────────────────────────────────────────────────────────── */
+.grip { flex:none; width:9px; cursor:col-resize; position:relative; }
+.grip::before { content:''; position:absolute; inset:0 4px; background:var(--border); }
+.grip::after { content:''; position:absolute; left:1px; right:1px; top:50%; height:38px; transform:translateY(-50%); border-radius:99px; background:color-mix(in srgb, var(--text) 26%, transparent); }
+.grip:hover::after { background:var(--design); }
+
+/* the task description rests at the top of the thread while it still matters (docs/25) */
+.tdesc { padding:2px 0 4px; }
+.tdesc .kick { margin-bottom:6px; }
+.tdesc p { color:var(--muted); font-size:12.5px; line-height:1.55; }
+
+.studio { flex:none; width:520px; display:flex; flex-direction:column; background:var(--panel); border-left:1px solid var(--border); }
+.stagehead { display:flex; align-items:center; gap:8px; padding:9px 11px; border-bottom:1px solid var(--border); }
+.round { display:inline-flex; align-items:center; height:20px; padding:0 8px; border-radius:var(--r-full); font:650 9px/1 var(--fmono); letter-spacing:.09em; color:var(--design); background:color-mix(in srgb, var(--design) 14%, transparent); }
+.dirtabs { display:flex; gap:2px; flex:1; min-width:0; }
+.dirtab { padding:5px 9px; border-radius:var(--r-xs); font:600 11px/1 var(--fbody); color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.dirtab.on { color:var(--text); background:var(--sel-bg); }
+.dirtab:hover:not(.on) { background:var(--hover-bg); color:var(--body); }
+.dirdiv { flex:none; align-self:center; width:1px; height:15px; margin:0 5px; background:var(--border2); }
+.dirtab.cmp.on { color:var(--design); background:color-mix(in srgb, var(--design) 12%, transparent); }
+.iconbtn { flex:none; display:grid; place-items:center; width:25px; height:25px; border-radius:var(--r-xs); color:var(--muted); }
+.iconbtn:hover { background:var(--hover-bg); color:var(--text); }
+.seg { display:flex; gap:2px; padding:2px; border-radius:var(--r-full); background:var(--panel2); }
+.seg button { width:23px; height:20px; display:grid; place-items:center; border-radius:var(--r-full); font-size:10px; color:var(--dim); }
+.seg button.on { background:var(--card); color:var(--text); box-shadow:var(--shadow-card); }
+
+.stage { flex:none; height:236px; background:var(--panel3); position:relative; overflow:hidden; }
+.stage .inner { position:absolute; inset:0; }
+/* a superseded round rests under a veil — NEVER opacity, which blends the design
+   with the page behind it and muddies whatever it is standing on */
+.stage.stale .inner::after { content:''; position:absolute; inset:0; background:color-mix(in srgb, var(--panel3) 62%, transparent); backdrop-filter:saturate(.55); }
+
+/* provenance — the one honest line about where this design lives */
+.prov { display:flex; align-items:center; gap:8px; padding:7px 11px; border-top:1px solid var(--border); border-bottom:1px solid var(--border); background:color-mix(in srgb, var(--panel2) 60%, transparent); }
+/* the ONE provider-aware element in the whole studio: which canvas drew this,
+   and whether there is anywhere external to go. Everything else is identical
+   for an Iris HTML round and a Claude Design round. */
+.provmark { flex:none; width:19px; height:19px; border-radius:5px; display:grid; place-items:center; font:750 10px/1 Georgia,serif; color:color-mix(in srgb, var(--claude) 84%, var(--text)); background:color-mix(in srgb, var(--claude) 18%, var(--panel3)); }
+.provmark.iris { color:var(--design); background:color-mix(in srgb, var(--design) 16%, var(--panel3)); }
+.provtext { flex:1; min-width:0; font:600 9.5px/1.35 var(--fmono); letter-spacing:.05em; color:var(--muted); text-transform:uppercase; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.provtext i { font-style:normal; color:var(--done); }
+.provtext u { text-decoration:none; color:var(--design); }
+.provlink { flex:none; display:inline-flex; align-items:center; gap:4px; font:600 10px/1 var(--fbody); color:var(--link); }
+.provlink:hover { text-decoration:underline; }
+.spin { flex:none; width:9px; height:9px; border:1.5px solid var(--border2); border-top-color:var(--design); border-radius:50%; animation:spin .8s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+
+/* the talk lane — a FILTER of the same thread, never a second one */
+.lane { flex:1; min-height:0; overflow:hidden; padding:11px 12px; display:flex; flex-direction:column; gap:11px; }
+.lanekick { display:flex; align-items:center; gap:8px; }
+.lanekick::after { content:''; flex:1; height:1px; background:var(--border); }
+.lmsg { display:flex; gap:8px; }
+.lmsg .avg { width:23px; height:23px; border-radius:7px; font-size:9.5px; }
+.lmsg .mhead b { font-size:11.5px; }
+.lmsg .mtext { font-size:12.5px; line-height:1.5; }
+.dots { display:inline-flex; gap:3px; padding:6px 0 2px; }
+.dots i { width:4px; height:4px; border-radius:50%; background:var(--dim); animation:dot 1.2s infinite; }
+.dots i:nth-child(2){ animation-delay:.16s } .dots i:nth-child(3){ animation-delay:.32s }
+@keyframes dot { 0%,60%,100%{opacity:.28; transform:translateY(0)} 30%{opacity:1; transform:translateY(-2px)} }
+
+/* a NOTE — something you said that should change. Editable/deletable pill, the
+   PlanReview .plPill recipe; the count on the Redraw button is its .cbadge. */
+.note-pill { margin-left:31px; display:flex; align-items:flex-start; gap:8px; padding:7px 9px; border:1px solid color-mix(in srgb, var(--design) 34%, var(--border)); border-left-width:2px; border-left-color:var(--design); border-radius:var(--r-sm); background:color-mix(in srgb, var(--design) 6%, var(--card)); }
+.note-pill .nb { flex:1; min-width:0; }
+/* kicker sits INLINE ahead of the note — a narrow lane can't spare a stacked
+   label, and the pair still reads as one sentence with a mono eyebrow */
+.note-pill .kick { display:inline; color:var(--design); margin-right:6px; }
+.note-pill .nt { display:inline; font-size:12px; line-height:1.5; color:var(--text); }
+.note-pill .na { flex:none; display:flex; gap:2px; }
+.note-pill .na button { display:grid; place-items:center; width:19px; height:19px; border-radius:5px; color:var(--dim); font-size:10px; }
+.note-pill .na button:hover { background:var(--hover-bg); color:var(--text); }
+.mark { display:inline-flex; align-items:center; gap:4px; margin-top:5px; height:21px; padding:0 8px; border-radius:var(--r-full); border:1px dashed var(--border2); color:var(--muted); font:600 10px/1 var(--fbody); }
+.mark:hover { border-style:solid; border-color:color-mix(in srgb, var(--design) 50%, var(--border2)); color:var(--design); }
+
+/* the composer — plain. No modes: every message just goes to Iris. */
+.comp { flex:none; margin:0 11px 10px; border:1px solid var(--card-border); border-radius:var(--r-lg); background:var(--card); box-shadow:var(--shadow-card); overflow:hidden; }
+.chint { display:flex; align-items:center; gap:7px; padding:6px 10px; background:var(--panel2); border-bottom:1px solid var(--border); }
+.chint .avg { width:19px; height:19px; border-radius:6px; font-size:8.5px; }
+.chint span { font-size:11px; color:var(--muted); }
+.comp.armed .chint span { color:var(--design); font-weight:600; }
+.cinput { padding:9px 11px 4px; font-size:12.5px; color:var(--dim); }
+.crow { display:flex; align-items:center; gap:6px; padding:4px 8px 8px 10px; }
+.cchip { display:inline-flex; align-items:center; gap:5px; height:24px; padding:0 9px; border-radius:var(--r-full); border:1px solid var(--border); color:var(--muted); font:600 10.5px/1 var(--fbody); }
+.cchip:hover { border-color:var(--border2); color:var(--text); }
+.cchip.on { color:var(--design); border-color:color-mix(in srgb, var(--design) 45%, var(--border2)); background:color-mix(in srgb, var(--design) 11%, transparent); }
+.cchip svg { opacity:.75; }
+.cspace { flex:1; }
+.send { flex:none; width:28px; height:28px; border-radius:50%; display:grid; place-items:center; background:var(--btn); color:var(--muted); }
+.send.hot { background:var(--design); color:var(--panel); }
+
+/* the gate — the human-only sign-off, always in reach, never a scroll away */
+.gate { flex:none; display:flex; align-items:center; gap:10px 12px; flex-wrap:wrap; padding:10px 12px 11px; border-top:1px solid var(--border); background:var(--panel2); }
+.gatecopy { flex:1 1 190px; min-width:0; }
+.gatecopy strong { display:block; font:640 13px/1.2 var(--fdisp); }
+.gatecopy span { font-size:10.5px; color:var(--muted); }
+.gateacts { flex:none; display:flex; gap:7px; align-items:center; }
+.pill { display:inline-flex; align-items:center; gap:6px; height:31px; padding:0 15px; border-radius:var(--r-full); font-size:12.5px; font-weight:600; }
+.pill.primary { background:var(--accent); color:var(--accent-ink); }
+.pill.primary:hover { box-shadow:var(--shadow-lift); transform:translateY(-1px); }
+.pill.ghost { border:1px solid var(--border2); color:var(--body); background:var(--card); }
+.pill.ghost:hover { background:var(--hover-bg); color:var(--text); box-shadow:var(--shadow-card); }
+.pill.ghost[disabled] { opacity:.42; }
+.cbadge { display:inline-grid; place-items:center; min-width:16px; height:16px; padding:0 4px; border-radius:99px; background:var(--design); color:var(--panel); font:700 9.5px/1 var(--fmono); }
+
+/* ── the inner "flowe" design being reviewed (a foreign design system —
+      deliberately NOT NeuraMesh tokens; it is content, not chrome) ───────── */
+.flowe { position:absolute; inset:0; background:#141210; color:#efe7dc; font:12px/1.5 var(--fbody); padding:16px 18px; overflow:hidden; }
+.flowe .fk { font:650 8px/1 var(--fmono); letter-spacing:.18em; color:#8a7a66; text-transform:uppercase; }
+.flowe h3 { font:600 19px/1.2 var(--fdisp); margin:9px 0 5px; color:#f6efe4; }
+.flowe p { font-size:10.5px; line-height:1.5; color:#9d9184; max-width:290px; }
+.floweada { display:flex; gap:13px; align-items:center; margin-top:14px; }
+.orb { flex:none; width:54px; height:54px; border-radius:19px; background:radial-gradient(circle at 34% 30%, #d9a15f, #a4653a 52%, #5b3f6d); position:relative; box-shadow:0 8px 22px -8px rgba(217,161,95,.5); }
+.orb::before, .orb::after { content:''; position:absolute; top:21px; width:6px; height:8px; border-radius:99px; background:#241a15; }
+.orb::before { left:14px; } .orb::after { right:14px; }
+.orbsm { width:32px; height:32px; border-radius:11px; }
+.orbsm::before, .orbsm::after { top:12px; width:4px; height:5px; }
+.orbsm::before { left:8px; } .orbsm::after { right:8px; }
+.orbxs { width:20px; height:20px; border-radius:7px; }
+.orbxs::before, .orbxs::after { top:7px; width:2.5px; height:3.5px; }
+.orbxs::before { left:5px; } .orbxs::after { right:5px; }
+.flowerow { display:flex; gap:8px; align-items:center; }
+.flowetag { font:600 8.5px/1 var(--fmono); letter-spacing:.05em; color:#8a7a66; border:1px solid #2e2822; border-radius:99px; padding:4px 7px; }
+.flowenav { margin-top:15px; display:flex; align-items:center; gap:8px; padding:7px 10px; border-radius:9px; background:#1c1916; border:1px solid #2a2520; }
+.flowenav b { font:600 12px/1 var(--fbody); color:#efe7dc; }
+.flowenav .sp { flex:1; }
+.flowenav em { font:600 7.5px/1 var(--fmono); letter-spacing:.12em; font-style:normal; color:#6f6558; }
+
+/* ── EXPANDED ─────────────────────────────────────────────────────────────
+   ⤢ does NOT go back to a full-screen modal — that is the bug we are fixing.
+   The studio takes the whole sheet and the SAME three parts rotate: stage
+   left (big), lane + composer + gate as a column on the right. The task feed
+   yields, the conversation never does. Esc / ⤢ returns to docked. */
+.exp { display:flex; min-height:0; }
+.expstage { flex:1; min-width:0; display:flex; flex-direction:column; }
+.expstage .stage { flex:1; height:auto; min-height:0; }
+.expside { flex:none; width:352px; display:flex; flex-direction:column; border-left:1px solid var(--border); background:var(--panel); }
+.expside .lane { padding:11px 12px; }
+/* compare: the one thing the extra room actually buys on a 2-direction round */
+.compare { position:absolute; inset:0; display:grid; grid-template-columns:1fr 1fr; gap:1px; background:var(--border); }
+.comppane { position:relative; overflow:hidden; background:var(--panel3); }
+.compcap { position:absolute; left:0; right:0; bottom:0; z-index:2; padding:5px 9px; background:color-mix(in srgb, var(--win) 76%, transparent); backdrop-filter:blur(8px); font:650 9px/1 var(--fmono); letter-spacing:.11em; text-transform:uppercase; color:var(--body); }
+
+/* scene — comment inbox */
+.inbox { border-top:1px solid var(--border); background:color-mix(in srgb, var(--design) 7%, var(--panel2)); padding:9px 11px; display:flex; align-items:center; gap:9px; }
+.inbox .n { flex:none; width:21px; height:21px; border-radius:50%; display:grid; place-items:center; font:700 10px/1 var(--fmono); color:var(--panel); background:var(--design); }
+.inbox .t { flex:1; min-width:0; font-size:11.5px; color:var(--body); }
+.inbox .t b { color:var(--text); font-weight:620; }
+
+.note { margin-top:11px; padding:11px 13px; border-left:2px solid var(--border2); color:var(--muted); font-size:12.5px; line-height:1.55; }
+.note b { color:var(--text); font-weight:620; }
+.note code { font:11.5px var(--fmono); color:var(--body); background:var(--panel2); padding:1px 5px; border-radius:4px; }
+
+.two { display:grid; grid-template-columns:1fr 1fr; gap:18px; align-items:start; }
+@media (max-width:1080px) { .two { grid-template-columns:1fr; } }
+.mini { border-radius:var(--r-lg); background:var(--panel); border:1px solid var(--border); overflow:hidden; }
+.minicap { padding:8px 12px; border-bottom:1px solid var(--border); background:var(--panel2); }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="phead">
+    <div class="kick">NeuraMesh · design round · R1</div>
+    <h1>The Design Studio</h1>
+    <p>Reviewing a design today means leaving the conversation: <em>DesignReview</em> is a <code>position:fixed; inset:0</code> overlay, so opening a mockup hides the thread, and its one-line feedback box <em>closes the overlay on send</em> and starts a five-minute round. There is nowhere to simply <em>ask</em>.</p>
+    <p>The studio docks the stage <em>beside</em> the thread instead — resizable, with the round's conversation under it and the human-only gate in reach. You <em>just talk</em>: the composer has no modes to pick. What you said that should change collects as a <em>note</em>, and one <em>Redraw</em> spends them all in a single round.</p>
+    <p class="kick" style="margin-top:14px">R2 — the mode chip is gone</p>
+    <p style="margin-top:6px">R1 put an <em>Ask</em> / <em>Request changes</em> toggle on the composer. It made you classify your own sentence before typing it, and it still burned one round per note. PlanReview already had the answer: accumulate, then spend once.</p>
+  </header>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <section class="scene">
+    <div class="scenehead">
+      <div class="kick">01</div>
+      <h2>Ready for review — the studio open</h2>
+      <span>thread keeps its measure · studio is a resizable peer, not an inspector</span>
+    </div>
+
+    <div class="frame"><div class="sheet">
+      <div class="thead">
+        <div class="theadtop">
+          <button class="tx"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7"/></svg></button>
+          <span class="tnum">#1034</span>
+          <span class="tstate designrev">DESIGN_REVIEW</span>
+        </div>
+        <div class="ttitle">flowe logo revamp to be character based as an ai wellness app</div>
+        <div class="spectrum"><i class="done"></i><i class="on"></i><i class="dash"></i><i class="dash"></i><i class="dash"></i></div>
+        <div class="tfacts">
+          <span class="tleg">DESIGN · IRIS</span>
+          <span class="tok">✓ reqs</span>
+          <span class="tok">artifacts 2</span>
+          <span class="tok">subtasks 0/0</span>
+        </div>
+      </div>
+      <div class="ttabs">
+        <span class="ttab on">Thread</span><span class="ttab">Review</span><span class="ttab">Diff</span><span class="ttab">Terminal</span>
+      </div>
+
+      <div class="tbody">
+        <!-- LEFT: the thread, still itself — feed + its own composer, no docked gate
+             (the studio owns the gate while it is open: docs/25 "exactly one") -->
+        <div class="tcol">
+        <div class="tmsgs">
+          <div class="tdesc">
+            <div class="kick">The ask</div>
+            <p>flowe's mark is a 5-petal botanical glyph — accurate to "flow" but it's a symbol, not someone you'd greet. Round 2 of the brief: the character should make people feel <b style="color:var(--body)">emotionally connected — relatable</b>, not just recognisable. Extend the existing oak-gold / dusk-purple system rather than introducing a new one.</p>
+          </div>
+          <div class="msg">
+            <div class="avg orch">R</div>
+            <div class="mbody">
+              <div class="mhead"><b>rex</b><span class="mrole">ORCHESTRATOR</span><span class="mtime">11:24</span></div>
+              <div class="mtext">Briefed and assigned to Iris. She'll reach out in this thread, then draft the character-based logo mockups for your approval. Once you hit <strong>Approve design</strong>, I'll route to the architect to plan the implementation work.</div>
+            </div>
+          </div>
+          <div class="msg">
+            <div class="avg design">I</div>
+            <div class="mbody">
+              <div class="mhead"><b>iris</b><span class="mrole">DESIGNER</span><span class="mtime">11:33</span></div>
+              <div class="mtext">🎨 Round 1 is up — two directions in <a class="ref" href="#">the studio</a>. Direction 01 builds the character from the orb flowe already uses; 02 drops the same mark into nav, app icon and the daily Brief so you can judge it in place. Nothing is planned or built until you approve.</div>
+            </div>
+          </div>
+          <div class="msg">
+            <div class="avg you">G</div>
+            <div class="mbody">
+              <div class="mhead"><b>geo (you)</b><span class="mtime">11:36</span></div>
+              <div class="mtext">Looking now.</div>
+            </div>
+          </div>
+          <div class="msg">
+            <div class="avg design">I</div>
+            <div class="mbody">
+              <div class="mhead"><b>iris</b><span class="mrole">DESIGNER</span><span class="mtime">11:37</span></div>
+              <div class="mtext">Take your time — ask me anything in the studio while you look. I kept both directions on the same type scale so they're comparable.</div>
+            </div>
+          </div>
+        </div>
+        <!-- the thread keeps its own composer; the gate is NOT docked here while the
+             studio is open — one gate, and the studio is holding it -->
+        <div class="comp" style="margin:0 20px 14px">
+          <div class="chint"><span class="avg you">G</span><span>Reply in #1034 thread — @ mention · / skill · ↵ send</span></div>
+          <div class="cinput">&nbsp;</div>
+          <div class="crow">
+            <span class="cchip">＠</span><span class="cchip">📎</span>
+            <span class="cspace"></span>
+            <span class="send"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 9.5v-7M3 5.5L6 2.5l3 3"/></svg></span>
+          </div>
+        </div>
+        </div>
+
+        <!-- the drag grip -->
+        <div class="grip" title="drag to resize"></div>
+
+        <!-- RIGHT: the studio -->
+        <aside class="studio">
+          <div class="stagehead">
+            <span class="round">ROUND 1</span>
+            <div class="dirtabs">
+              <span class="dirtab on">01 Character logo</span>
+              <span class="dirtab">02 In product</span>
+            </div>
+            <div class="seg"><button>☀</button><button class="on">☾</button></div>
+            <button class="iconbtn" title="expand"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M7 1.5h3.5V5M5 10.5H1.5V7"/></svg></button>
+            <button class="iconbtn" title="close"><svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7"/></svg></button>
+          </div>
+
+          <div class="stage"><div class="inner"><div class="flowe">
+            <div class="fk">flowe · brand mark</div>
+            <h3>Ada — a face for flowe</h3>
+            <p>A character-based mark built from the orb flowe already uses for its ambient AI. Warm, not cute; built on the existing oak-gold / dusk-purple system.</p>
+            <div class="floweada">
+              <div class="orb"></div>
+              <div class="orb orbsm"></div>
+              <div class="orb orbxs"></div>
+              <div class="flowerow" style="flex-direction:column; align-items:flex-start; gap:5px">
+                <span class="flowetag">Character-based</span>
+                <span class="flowetag">Light + dark</span>
+              </div>
+            </div>
+            <div class="flowenav">
+              <div class="orb orbxs"></div><b>flowe</b><span class="sp"></span>
+              <em>TODAY</em><em>PATTERNS</em><em>SETTINGS</em>
+            </div>
+          </div></div></div>
+
+          <div class="prov">
+            <span class="provmark">C</span>
+            <span class="provtext">Claude Design · <u>#1034 flowe logo revamp</u> · <i>synced 11:33</i> · 2 files</span>
+            <a class="provlink" href="#">Open the project <svg width="9" height="9" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3.5 1.5h5v5M8.5 1.5l-6 6"/></svg></a>
+          </div>
+
+          <div class="lane">
+            <div class="lanekick"><span class="kick">Round 1 · talk</span></div>
+            <div class="lmsg">
+              <div class="avg design">I</div>
+              <div class="mbody">
+                <div class="mhead"><b>iris</b><span class="mtime">11:33</span></div>
+                <div class="mtext">Two directions. I kept flowe's oak-gold rather than introducing a new hue — the 5-petal glyph is accurate but it's a symbol, not someone you'd greet.</div>
+              </div>
+            </div>
+            <div class="lmsg">
+              <div class="avg you">G</div>
+              <div class="mbody">
+                <div class="mhead"><b>geo (you)</b><span class="mtime">11:37</span></div>
+                <div class="mtext">Why the orb and not something more literal?</div>
+              </div>
+            </div>
+            <div class="lmsg">
+              <div class="avg design">I</div>
+              <div class="mbody">
+                <div class="mhead"><b>iris</b><span class="mtime">11:37</span></div>
+                <div class="mtext">It's the shape flowe already owns — the ambient AI uses it everywhere, so the mark inherits recognition instead of asking for it.</div>
+              </div>
+            </div>
+            <div class="lmsg">
+              <div class="avg you">G</div>
+              <div class="mbody">
+                <div class="mhead"><b>geo (you)</b><span class="mtime">11:41</span></div>
+                <div class="mtext">Fair. The eyes read cold though — warmer.</div>
+              </div>
+            </div>
+            <!-- Iris heard a change, not a question — it becomes a note, not a round -->
+            <div class="note-pill">
+              <span class="nb">
+                <span class="kick">Note for round 2</span>
+                <span class="nt">Warmer eyes — the current pair reads cold.</span>
+              </span>
+              <span class="na"><button title="edit">✎</button><button title="not a change">✕</button></span>
+            </div>
+            <div class="lmsg">
+              <div class="avg design">I</div>
+              <div class="mbody">
+                <div class="mhead"><b>iris</b><span class="mtime">11:41</span></div>
+                <div class="mtext">Noted. Keep going — I'll take them all in one pass.</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="comp">
+            <div class="chint"><span class="avg design">I</span><span>Talk to Iris about this round — ask, or say what should change</span></div>
+            <div class="cinput">and try the mark at 16px in the nav</div>
+            <div class="crow">
+              <span class="cchip">＠</span><span class="cchip">📎</span>
+              <span class="cspace"></span>
+              <span class="send"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 9.5v-7M3 5.5L6 2.5l3 3"/></svg></span>
+            </div>
+          </div>
+
+          <div class="gate">
+            <div class="gatecopy">
+              <strong>Approve this design?</strong>
+              <span>Yours alone. It becomes the build's contract.</span>
+            </div>
+            <div class="gateacts">
+              <button class="pill ghost"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9.5 5A4 4 0 1 0 9 8"/><path d="M9.8 1.8v3.4H6.4"/></svg>Redraw <span class="cbadge">2</span></button>
+              <button class="pill primary"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2.5 6.2l2.5 2.5 4.5-5"/></svg>Approve</button>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </div></div>
+
+    <div class="note"><b>Why this isn't the inspector docs/25 set aside.</b> That ruling was about a third column stealing width from a 380–420px thread. Here the thread is a centred <code>--col</code> 860px column inside a ~1630px panel — the studio spends the slack. Below ~1100px it takes the sheet instead (today's full-screen behaviour), so the thread is never starved. Width is dragged on the grip and remembered per machine.<br><br><b>Still exactly one gate.</b> While the studio is open it holds the design approval and the thread's dock stays empty; close the studio and the gate returns to the thread as it docks today. Two Approve buttons on one screen would be the bug.<br><br><b>Nothing you type moves state.</b> Every message is a thread message to Iris — she answers in the lane and tags the ones that are changes. The task sits in <code>design_review</code> with the gate armed until you press a button.</div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <section class="scene">
+    <div class="scenehead">
+      <div class="kick">02</div>
+      <h2>Expanded — the same three parts, rotated</h2>
+      <span>⤢ gives the design the sheet · the conversation never goes away</span>
+    </div>
+
+    <div class="frame"><div class="sheet">
+      <div class="thead" style="padding-bottom:0">
+        <div class="theadtop">
+          <button class="tx"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7"/></svg></button>
+          <span class="tnum">#1034</span>
+          <span class="tstate designrev">DESIGN_REVIEW</span>
+          <span class="tleg" style="margin-left:4px">DESIGN · IRIS</span>
+          <span style="flex:1"></span>
+          <span class="tok">Esc to collapse</span>
+        </div>
+      </div>
+
+      <div class="exp" style="height:520px">
+        <div class="expstage">
+          <div class="stagehead">
+            <span class="round">ROUND 1</span>
+            <!-- Compare is a MODE, not a fourth direction — it sits past a divider
+                 and deselects the single-direction tabs while it is on -->
+            <div class="dirtabs">
+              <span class="dirtab">01 Character logo</span>
+              <span class="dirtab">02 In product</span>
+              <span class="dirdiv" aria-hidden></span>
+              <span class="dirtab cmp on">⧉ Compare</span>
+            </div>
+            <div class="seg"><button>☀</button><button class="on">☾</button></div>
+            <button class="iconbtn" title="collapse"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M10.5 1.5L7.5 4.5M7.5 1.8v2.9h2.9M1.5 10.5l3-3M4.5 10.2V7.3H1.6"/></svg></button>
+          </div>
+          <div class="stage">
+            <div class="compare">
+              <div class="comppane"><div class="flowe">
+                <div class="fk">flowe · brand mark</div>
+                <h3>Ada — a face for flowe</h3>
+                <p>A character-based mark built from the orb flowe already uses for its ambient AI. Warm, not cute.</p>
+                <div class="floweada">
+                  <div class="orb"></div><div class="orb orbsm"></div><div class="orb orbxs"></div>
+                </div>
+                <div class="flowerow" style="margin-top:14px; gap:6px">
+                  <span class="flowetag">Character-based</span><span class="flowetag">Light + dark</span>
+                </div>
+                <div class="flowenav"><div class="orb orbxs"></div><b>flowe</b><span class="sp"></span><em>TODAY</em><em>PATTERNS</em></div>
+                <span class="compcap">01 Character logo system</span>
+              </div></div>
+              <div class="comppane"><div class="flowe">
+                <div class="fk">flowe · in product</div>
+                <h3>Ada, in the product</h3>
+                <p>The same mark dropped into the surfaces it will actually live on — nav, the daily Brief, the light-day empty state.</p>
+                <div class="flowenav" style="margin-top:14px"><div class="orb orbxs"></div><b>flowe</b><span class="sp"></span><em>TODAY</em><em>PATTERNS</em><em>SETTINGS</em></div>
+                <div class="flowenav" style="margin-top:8px; align-items:flex-start"><div class="orb orbsm"></div><span style="font-size:10px; color:#9d9184; line-height:1.4">Morning, Geo.<br>Three patterns settled overnight.</span></div>
+                <span class="compcap">02 In product applications</span>
+              </div></div>
+            </div>
+          </div>
+          <div class="prov">
+            <span class="provmark">C</span>
+            <span class="provtext">Claude Design · <u>#1034 flowe logo revamp</u> · <i>synced 11:33</i> · 2 files</span>
+            <a class="provlink" href="#">Open the project <svg width="9" height="9" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3.5 1.5h5v5M8.5 1.5l-6 6"/></svg></a>
+          </div>
+        </div>
+
+        <aside class="expside">
+          <div class="lane">
+            <div class="lanekick"><span class="kick">Round 1 · talk</span></div>
+            <div class="lmsg">
+              <div class="avg design">I</div>
+              <div class="mbody">
+                <div class="mhead"><b>iris</b><span class="mtime">11:33</span></div>
+                <div class="mtext">Two directions. I kept flowe's oak-gold rather than introducing a new hue.</div>
+              </div>
+            </div>
+            <div class="lmsg">
+              <div class="avg you">G</div>
+              <div class="mbody">
+                <div class="mhead"><b>geo (you)</b><span class="mtime">11:41</span></div>
+                <div class="mtext">Fair. The eyes read cold though — warmer.</div>
+              </div>
+            </div>
+            <div class="note-pill" style="margin-left:31px">
+              <span class="nb"><span class="kick">Note for round 2</span><span class="nt">Warmer eyes — the current pair reads cold.</span></span>
+              <span class="na"><button title="edit">✎</button><button title="not a change">✕</button></span>
+            </div>
+            <div class="note-pill" style="margin-left:31px">
+              <span class="nb"><span class="kick">Note for round 2</span><span class="nt">Try the mark at 16px in the nav.</span></span>
+              <span class="na"><button title="edit">✎</button><button title="not a change">✕</button></span>
+            </div>
+          </div>
+          <div class="comp">
+            <div class="chint"><span class="avg design">I</span><span>Talk to Iris — ask, or say what should change</span></div>
+            <div class="cinput">&nbsp;</div>
+            <div class="crow">
+              <span class="cchip">＠</span><span class="cchip">📎</span>
+              <span class="cspace"></span>
+              <span class="send"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 9.5v-7M3 5.5L6 2.5l3 3"/></svg></span>
+            </div>
+          </div>
+          <div class="gate">
+            <div class="gatecopy">
+              <strong>Approve this design?</strong>
+              <span>Yours alone. It becomes the build's contract.</span>
+            </div>
+            <div class="gateacts">
+              <button class="pill ghost"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9.5 5A4 4 0 1 0 9 8"/><path d="M9.8 1.8v3.4H6.4"/></svg>Redraw <span class="cbadge">2</span></button>
+              <button class="pill primary"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2.5 6.2l2.5 2.5 4.5-5"/></svg>Approve</button>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </div></div>
+
+    <div class="note"><b>⤢ is not a return to the modal.</b> The full-screen overlay is the thing this round exists to kill, so expanding hands the sheet to the <em>design</em>, not to a dead end: the stage grows, the lane/composer/gate become the right column, and you can still talk and approve without collapsing anything. The task feed is what yields — and the lane is that feed, filtered, so nothing is actually lost.<br><br><b>What the room buys:</b> ⧉ <b>Compare</b> — both directions side by side, which a 520px dock simply cannot do and which is the whole question on a 2-direction round. (Device-width presets are the obvious next thing the space affords; deliberately <em>not</em> in this round — see the plan.)</div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <section class="scene">
+    <div class="scenehead">
+      <div class="kick">03</div>
+      <h2>Either canvas — one studio</h2>
+      <span>the provenance strip is the only provider-aware pixel</span>
+    </div>
+
+    <div class="two">
+      <div class="mini">
+        <div class="minicap"><span class="kick">Iris HTML round</span></div>
+        <div style="padding:14px; background:var(--bg)">
+          <div class="studio" style="width:auto; border:1px solid var(--border); border-radius:var(--r-lg); overflow:hidden">
+            <div class="stagehead">
+              <span class="round">ROUND 1</span>
+              <div class="dirtabs"><span class="dirtab on">01 Character logo</span><span class="dirtab">02 In product</span></div>
+              <div class="seg"><button>☀</button><button class="on">☾</button></div>
+            </div>
+            <div class="stage" style="height:150px"><div class="inner"><div class="flowe">
+              <div class="fk">flowe · brand mark</div>
+              <h3>Ada — a face for flowe</h3>
+              <div class="floweada"><div class="orb"></div><div class="orb orbsm"></div><div class="orb orbxs"></div></div>
+            </div></div></div>
+            <div class="prov">
+              <span class="provmark iris"><svg width="11" height="11" viewBox="0 0 12 12" fill="currentColor"><path d="M6 0l1.5 3.5L11 5 7.5 6.5 6 10 4.5 6.5 1 5l3.5-1.5z"/></svg></span>
+              <span class="provtext">Iris draft · round 1 · 2 mockups · <i>studied from the repo's tokens</i></span>
+            </div>
+          </div>
+          <div class="note" style="margin-top:12px">No project, so <b>no external affordance</b> — the strip states where the design came from and stops. Stage, talk lane, notes, Redraw and Approve are byte-for-byte identical.</div>
+        </div>
+      </div>
+
+      <div class="mini">
+        <div class="minicap"><span class="kick">Claude Design round</span></div>
+        <div style="padding:14px; background:var(--bg)">
+          <div class="studio" style="width:auto; border:1px solid var(--border); border-radius:var(--r-lg); overflow:hidden">
+            <div class="stagehead">
+              <span class="round">ROUND 1</span>
+              <div class="dirtabs"><span class="dirtab on">01 Character logo</span><span class="dirtab">02 In product</span></div>
+              <div class="seg"><button>☀</button><button class="on">☾</button></div>
+            </div>
+            <div class="stage" style="height:150px"><div class="inner"><div class="flowe">
+              <div class="fk">flowe · brand mark</div>
+              <h3>Ada — a face for flowe</h3>
+              <div class="floweada"><div class="orb"></div><div class="orb orbsm"></div><div class="orb orbxs"></div></div>
+            </div></div></div>
+            <div class="prov">
+              <span class="provmark">C</span>
+              <span class="provtext">Claude Design · <u>#1034 flowe logo revamp</u> · <i>synced 11:33</i></span>
+              <a class="provlink" href="#">Open the project <svg width="9" height="9" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3.5 1.5h5v5M8.5 1.5l-6 6"/></svg></a>
+            </div>
+          </div>
+          <div class="note" style="margin-top:12px">Same studio, one line different — plus the comment inbox below when the canvas sends work back. The provider decides <b>provenance</b>, never the review surface.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="note"><b>The existing surfaces are already provider-agnostic — keep it that way.</b> <code>DesignHandoffCard</code> takes a <code>provider</code> prop and renders for the Iris route with its own copy and step names (<a class="ref" href="#">App.tsx:9680</a>); <code>DesignReview</code> treats <code>externalUrl</code> as optional. So the risk here isn't a gap to close, it's a regression to avoid: building the studio as a <em>Claude Design</em> surface when it is <b>the</b> design review surface. It replaces <code>DesignReview</code> for every round — Iris HTML is the default route and, per the log evidence, what actually runs on <em>both</em> today. <code>provider</code> chooses the strip and nothing else.</div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <section class="scene">
+    <div class="scenehead">
+      <div class="kick">04</div>
+      <h2>You just talk — the notes collect themselves</h2>
+      <span>no modes to pick · one redraw carries everything you said</span>
+    </div>
+
+    <div class="two">
+      <div class="mini">
+        <div class="minicap"><span class="kick">Saying it</span></div>
+        <div style="padding:14px">
+          <div class="lane" style="padding:0; gap:10px">
+            <div class="lmsg">
+              <div class="avg you">G</div>
+              <div class="mbody">
+                <div class="mhead"><b>geo (you)</b><span class="mtime">11:41</span></div>
+                <div class="mtext">Fair. The eyes read cold though — warmer.</div>
+                <button class="mark">＋ Make this a note</button>
+              </div>
+            </div>
+            <div class="note-pill" style="margin-left:0">
+              <span class="nb">
+                <span class="kick">Note for round 2</span>
+                <span class="nt">Warmer eyes — the current pair reads cold.</span>
+              </span>
+              <span class="na"><button title="edit">✎</button><button title="not a change">✕</button></span>
+            </div>
+          </div>
+          <div class="note" style="margin-top:12px">Iris tags it as she reads it — she is already replying, so nothing extra runs. Wrong call? <b>✕ un-notes it</b>, and you can promote any of your own messages yourself. Misclassification costs one click, so nobody has to classify up front.</div>
+        </div>
+      </div>
+
+      <div class="mini">
+        <div class="minicap"><span class="kick">Spending it</span></div>
+        <div style="padding:14px">
+          <div class="gate" style="border-top:none; border-radius:var(--r-lg)">
+            <div class="gatecopy">
+              <strong>Approve this design?</strong>
+              <span>Yours alone. It becomes the build's contract.</span>
+            </div>
+            <div class="gateacts">
+              <button class="pill ghost"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9.5 5A4 4 0 1 0 9 8"/><path d="M9.8 1.8v3.4H6.4"/></svg>Redraw <span class="cbadge">2</span></button>
+              <button class="pill primary"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2.5 6.2l2.5 2.5 4.5-5"/></svg>Approve</button>
+            </div>
+          </div>
+          <div class="note" style="margin-top:12px">The only thing that moves state is this button — <code>task.revise_design</code> carrying <b>all</b> the notes as one packet. Two notes is <b>one</b> round, not two. Empty count = disabled, so an idle gate offers exactly one action.<br><br>This is <code>PlanReview</code>'s shipped pair (Approve + Request&nbsp;changes with a <code>.cbadge</code> count, batched from <code>.plPill</code> comments), moved to the design round.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <section class="scene">
+    <div class="scenehead">
+      <div class="kick">05</div>
+      <h2>While Iris works — status you can read, provenance you can trust</h2>
+      <span>and the Claude Design comment inbox, flowing the other way</span>
+    </div>
+
+    <div class="two">
+      <div class="mini">
+        <div class="minicap"><span class="kick">Round 2 in flight</span></div>
+        <div style="padding:14px; background:var(--bg)">
+          <div class="studio" style="width:auto; border:1px solid var(--border); border-radius:var(--r-lg); overflow:hidden">
+            <div class="stagehead">
+              <span class="round" style="color:var(--design)">ROUND 2</span>
+              <div class="dirtabs"><span class="dirtab on">01 Character logo</span><span class="dirtab">02 In product</span></div>
+              <div class="seg"><button>☀</button><button class="on">☾</button></div>
+            </div>
+            <div class="stage stale" style="height:150px"><div class="inner"><div class="flowe">
+              <div class="fk">flowe · brand mark</div>
+              <h3>Ada — a face for flowe</h3>
+              <div class="floweada"><div class="orb"></div><div class="orb orbsm"></div><div class="orb orbxs"></div></div>
+            </div></div></div>
+            <div class="prov">
+              <span class="spin"></span>
+              <span class="provtext">Round 1 shown · <u>Iris is redrawing with your 2 notes</u> · ~2 min</span>
+            </div>
+            <div style="padding:11px 12px 13px">
+              <div class="kick" style="margin-bottom:7px">Beats</div>
+              <div class="lmsg" style="gap:7px; align-items:center">
+                <span class="spin"></span>
+                <span style="font-size:12px; color:var(--body)">Rework the mark from round 1 <span style="font:600 10px/1 var(--fmono); color:var(--dim)">1/2</span></span>
+              </div>
+            </div>
+          </div>
+          <div class="note" style="margin-top:12px"><b>Rework starts from round 1, not from zero.</b> Today the workdir is deleted and the repo re-cloned every round, and the prior HTML is never handed back — so "warmer eyes" costs a full ~5-minute redraw and drifts. Staging the previous round's artifacts into the workdir is the same fix <code>rework continuity</code> already shipped for scratch deliverables.</div>
+        </div>
+      </div>
+
+      <div class="mini">
+        <div class="minicap"><span class="kick">Edited in Claude Design → back here</span></div>
+        <div style="padding:14px; background:var(--bg)">
+          <div class="studio" style="width:auto; border:1px solid var(--border); border-radius:var(--r-lg); overflow:hidden">
+            <div class="stagehead">
+              <span class="round">ROUND 1</span>
+              <div class="dirtabs"><span class="dirtab on">01 Character logo</span></div>
+              <div class="seg"><button>☀</button><button class="on">☾</button></div>
+            </div>
+            <div class="stage" style="height:150px"><div class="inner"><div class="flowe">
+              <div class="fk">flowe · brand mark</div>
+              <h3>Ada — a face for flowe</h3>
+              <div class="floweada"><div class="orb"></div><div class="orb orbsm"></div><div class="orb orbxs"></div></div>
+            </div></div></div>
+            <div class="prov">
+              <span class="provmark">C</span>
+              <span class="provtext">Claude Design · <u>#1034 flowe logo revamp</u> · <i>synced 11:33</i></span>
+              <a class="provlink" href="#">Open the project <svg width="9" height="9" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3.5 1.5h5v5M8.5 1.5l-6 6"/></svg></a>
+            </div>
+            <div class="inbox">
+              <span class="n">2</span>
+              <span class="t"><b>2 comments</b> sent to Claude from the canvas — Iris is applying them, then re-syncing here.</span>
+            </div>
+          </div>
+          <div class="note" style="margin-top:12px"><b>The other direction of the loop.</b> The MCP already exposes <code>list_comments(queued_for_claude, changed_since)</code> and <code>ack_comments</code> — a purpose-built inbox. Pin, comment, hit <em>Send to Claude</em> on the canvas; the existing design sweep picks it up and wakes Iris. Costs one poll in a sweep that already runs.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <section class="scene">
+    <div class="scenehead">
+      <div class="kick">06</div>
+      <h2>Approved — the studio settles into the thread</h2>
+      <span>the big lifecycle card retires into a small, calm contract</span>
+    </div>
+
+    <div class="frame"><div class="sheet">
+      <div class="thead">
+        <div class="theadtop">
+          <button class="tx"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7"/></svg></button>
+          <span class="tnum">#1034</span>
+          <span class="tstate planning">PLANNING</span>
+        </div>
+        <div class="ttitle">flowe logo revamp to be character based as an ai wellness app</div>
+        <div class="spectrum"><i class="done"></i><i class="done"></i><i class="on"></i><i class="dash"></i><i class="dash"></i></div>
+        <div class="tfacts">
+          <span class="tleg" style="color:var(--plan)">PLAN · ATLAS</span>
+          <span class="tok">✓ reqs</span>
+          <span class="tok">artifacts 2</span>
+        </div>
+      </div>
+      <div class="ttabs"><span class="ttab on">Thread</span><span class="ttab">Review</span><span class="ttab">Diff</span><span class="ttab">Terminal</span></div>
+
+      <div class="tbody">
+        <div class="tmsgs" style="max-width:900px; margin:0 auto">
+          <div class="msg">
+            <div class="avg you">G</div>
+            <div class="mbody">
+              <div class="mhead"><b>geo (you)</b><span class="mtime">11:52</span></div>
+              <div class="mtext">Round 2 is it — approved.</div>
+              <div class="contract">
+                <div class="contracthead">
+                  <span class="contractseal"><svg width="13" height="13" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M2.5 6.2l2.5 2.5 4.5-5"/></svg></span>
+                  <div class="contractid">
+                    <div class="kick">Approved · round 2</div>
+                    <strong>Ada — a face for flowe</strong>
+                  </div>
+                  <button class="linkbtn">Review again <svg width="9" height="9" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3.5 1.5h5v5M8.5 1.5l-6 6"/></svg></button>
+                </div>
+                <div class="contractthumbs">
+                  <button class="cthumb">
+                    <span class="shot" style="display:block; position:relative"><span class="flowe" style="padding:9px 10px"><span class="fk">flowe · mark</span><div class="floweada" style="margin-top:8px"><div class="orb orbsm"></div><div class="orb orbxs"></div></div></span></span>
+                    <span class="cap" style="display:block">01 CHARACTER LOGO</span>
+                  </button>
+                  <button class="cthumb">
+                    <span class="shot" style="display:block; position:relative"><span class="flowe" style="padding:9px 10px"><span class="fk">flowe · in product</span><div class="flowenav" style="margin-top:8px"><div class="orb orbxs"></div><b style="font-size:10px">flowe</b><span class="sp"></span><em style="font-size:6.5px">TODAY</em></div></span></span>
+                    <span class="cap" style="display:block">02 IN PRODUCT</span>
+                  </button>
+                </div>
+                <div class="contractfoot">The visual contract for the build — atlas plans against it, patch builds to it, the reviewer gates on it.</div>
+              </div>
+            </div>
+          </div>
+          <div class="msg">
+            <div class="avg orch">R</div>
+            <div class="mbody">
+              <div class="mhead"><b>rex</b><span class="mrole">ORCHESTRATOR</span><span class="mtime">11:52</span></div>
+              <div class="mtext">Design approved and promoted to the #build library. Routing to <strong>@atlas</strong> to plan the icon exports and asset pipeline against round 2.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div></div>
+
+    <div class="note"><b>The exit.</b> The studio slides out on <code>--dur-exit</code> (.13s) and the thread re-centres; the card that stays is small, elevated-white, sealed in done-green, with both thumbnails still one click from a read-only studio. Today's card keeps its full 3-step lifecycle strip and 250px previews forever — status furniture for a decision already made.</div>
+  </section>
+
+</div>
+
+<div class="themetoggle">
+  <button class="on" data-t="dark">GRAPHITE</button>
+  <button data-t="cream">CREAM OAK</button>
+</div>
+
+<script>
+document.querySelectorAll('.themetoggle button').forEach(b => b.addEventListener('click', () => {
+  document.documentElement.setAttribute('data-theme', b.dataset.t);
+  document.querySelectorAll('.themetoggle button').forEach(x => x.classList.toggle('on', x === b));
+}));
+</script>
+</body>
+</html>

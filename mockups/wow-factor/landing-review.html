@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>NeuraMesh — Run an engineering org of one</title>
+<link rel="stylesheet" href="nm.css">
+<style>
+  /* ── page-local: trimmed, mobile-first landing ───────────────────────── */
+  .wrap{padding:0 22px}
+  @media(max-width:560px){.wrap{padding:0 16px}}
+
+  /* hero */
+  .hero{position:relative;padding:40px 0 24px;overflow:hidden}
+  .herogrid{display:grid;grid-template-columns:0.9fr 1.1fr;gap:42px;align-items:center;position:relative;z-index:2}
+  @media(max-width:940px){.herogrid{grid-template-columns:1fr;gap:26px}}
+  .hero h1{font-size:clamp(38px,6.2vw,60px);letter-spacing:-.04em;line-height:1.01}
+  .hero h1 em{font-style:normal;color:var(--accent)}
+  .hero .lead{margin-top:16px;font-size:clamp(15px,2.3vw,18px);max-width:30ch;color:var(--body)}
+  .cta{display:flex;gap:10px;margin-top:22px;flex-wrap:wrap}
+  @media(max-width:380px){.cta .btn{flex:1}}
+  .trust{margin-top:18px;display:flex;gap:8px;align-items:center;color:var(--dim);font-size:12.5px;flex-wrap:wrap}
+  .trust .avstack{display:inline-flex}
+  .trust .avstack i{width:18px;height:18px;border-radius:99px;border:2px solid var(--bg);margin-right:-6px}
+
+  /* simulator (Wow 01) */
+  .sim{background:var(--panel);border:1px solid var(--border);border-radius:18px;overflow:hidden;
+    box-shadow:0 40px 90px -52px var(--shadow);height:548px;display:flex;flex-direction:column}
+  @media(max-width:940px){.sim{height:500px}}
+  .sim-top{display:flex;align-items:center;gap:9px;padding:11px 14px;border-bottom:1px solid var(--border);background:var(--bg2)}
+  .traffic{display:flex;gap:6px}.traffic i{width:11px;height:11px;border-radius:99px;background:var(--panel3)}
+  .traffic i:first-child{background:#e0654f}.traffic i:nth-child(2){background:#e0a44f}.traffic i:nth-child(3){background:#4ac08c}
+  .sim-title{font-size:12px;font-weight:600;color:var(--muted)}
+  .replay{margin-left:auto;font-size:11px;color:var(--muted);background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:4px 10px;cursor:pointer;display:none;gap:5px}
+  .replay.show{display:inline-flex}
+  .rail{display:flex;align-items:center;padding:12px 15px;border-bottom:1px solid var(--border)}
+  .phase{display:flex;align-items:center;gap:7px;flex:1;opacity:.4;transition:opacity .3s}
+  .phase .pn{width:21px;height:21px;border-radius:99px;border:1.5px solid var(--border2);display:grid;place-items:center;font-size:10.5px;color:var(--muted);flex:none;transition:all .3s}
+  .phase .pl{font-size:11px;font-weight:600;color:var(--muted)}
+  .phase .conn{flex:1;height:1.5px;background:var(--border);margin:0 5px;min-width:6px}
+  .phase.active{opacity:1}.phase.active .pn{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+  .phase.done .pn{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}.phase.done{opacity:1}
+  @media(max-width:600px){.phase .pl{display:none}}
+  .feed{flex:1;overflow-y:auto;padding:8px 15px 14px;display:flex;flex-direction:column;gap:2px;scroll-behavior:smooth}
+  .watchreal{display:inline-flex;align-items:center;gap:6px;margin-top:12px;font-size:12.5px;color:var(--muted);cursor:pointer}
+  .watchreal:hover{color:var(--accent)}
+  .watchreal .tri{width:0;height:0;border-left:7px solid currentColor;border-top:5px solid transparent;border-bottom:5px solid transparent}
+
+  /* shared loop-content tweaks already in nm.css (.planc,.dod,.taskmini,.evrow,.acceptc,.shipped) */
+  .acceptc{margin-left:34px}.planc,.taskmini{margin-left:34px}.shipped{margin-left:34px}
+  .buildbar{margin:4px 0 6px 34px}
+
+  /* section scaffolding (compact) */
+  .sec{padding:clamp(44px,7vw,70px) 0;position:relative}
+  .sec.alt{background:var(--bg2);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+  .eyebrow2{font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+  .sech{font-size:clamp(26px,4.2vw,34px);letter-spacing:-.03em;margin:8px 0 8px}
+  .ssub{font-size:15px;color:var(--muted);max-width:54ch;line-height:1.5}
+
+  /* trust strip */
+  .truststrip{border-top:1px solid var(--border);border-bottom:1px solid var(--border);background:var(--bg2)}
+  .truststrip .wrap{display:flex;flex-wrap:wrap;gap:7px 0;justify-content:center;padding:13px 16px;font-size:12.5px;color:var(--muted)}
+  .truststrip .d{margin:0 12px;color:var(--dim)}
+
+  /* living board (Wow 02) */
+  .roster{display:flex;gap:16px;flex-wrap:wrap;margin:18px 0 22px}
+  .rmember{display:flex;align-items:center;gap:9px}
+  .rmember b{display:block;font-size:13px;color:var(--text)}
+  .rmember span{font-size:11px;color:var(--muted)}
+  .lboard{display:grid;grid-template-columns:repeat(4,1fr);gap:11px}
+  @media(max-width:760px){.lboard{grid-template-columns:1fr 1fr}}
+  .lcol{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:10px;min-height:210px}
+  .lcol h5{font-size:10.5px;margin-bottom:9px;display:flex;align-items:center}
+  .lcol .cnt{margin-left:auto;font-size:10px;color:var(--dim)}
+  .lcard{background:var(--bg2);border:1px solid var(--border);border-radius:9px;padding:9px 10px;margin-bottom:7px;animation:nm-rise .4s var(--ease) both}
+  .lcard .tid{font-family:'Geist Mono',monospace;font-size:9px;color:var(--dim);font-weight:700}
+  .lcard .tt{font-size:11.5px;color:var(--text);margin:3px 0 6px;line-height:1.3}
+  .lcard .who{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted)}
+
+  /* RSI */
+  .rsicard{display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:center;background:var(--panel);border:1px solid var(--border);border-radius:18px;padding:clamp(18px,3vw,28px)}
+  @media(max-width:820px){.rsicard{grid-template-columns:1fr;gap:18px}}
+  .rsistats{display:flex;gap:18px;align-items:center;margin-top:16px;flex-wrap:wrap}
+  .rsistats b{font-size:22px;letter-spacing:-.02em;display:block}
+  .rsistats span{font-size:11.5px;color:var(--muted)}
+  .rsibars{display:flex;align-items:flex-end;gap:7px;height:120px}
+  .rsibars .col{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;height:100%}
+  .rsibars .b{width:100%;border-radius:5px 5px 0 0;margin-top:auto;transition:height .7s var(--ease)}
+  .rsibars .col span{font-size:9px;color:var(--dim)}
+  .rsihead{font-size:12px;color:var(--muted);margin-bottom:10px}.rsihead b{color:var(--text)}
+
+  /* features two-up */
+  .features{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:760px){.features{grid-template-columns:1fr}}
+  .fcard{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:20px}
+  .fcard .fi{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;font-size:20px;margin-bottom:12px}
+  .fcard.green .fi{background:color-mix(in srgb,var(--build) 16%,transparent)}
+  .fcard.warm .fi{background:color-mix(in srgb,var(--warn) 18%,transparent)}
+  .fcard h3{font-size:17px;letter-spacing:-.02em;margin-bottom:6px}
+  .fcard p{font-size:13.5px;color:var(--muted);line-height:1.5}
+  .fdemo{margin-top:14px;display:flex;align-items:center;gap:8px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:9px 11px;font-size:11px}
+  .fdemo .a2adot{width:7px;height:7px;border-radius:99px;background:var(--build)}
+  .fdemo .url{font-family:'Geist Mono',monospace;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .fdemo .tag{margin-left:auto;font-family:'Geist Mono',monospace;font-size:9px;font-weight:700;color:var(--build);flex:none}
+  .brains{display:flex;gap:8px}
+  .brain{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:10px;font-size:11px;color:var(--muted)}
+  .brain svg{width:22px;height:22px}
+
+  /* marketplace */
+  .mktteaser{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;margin-top:18px}
+  @media(max-width:900px){.mktteaser{grid-template-columns:1fr 1fr}}
+  @media(max-width:480px){.mktteaser{grid-template-columns:1fr}}
+  .mcard{background:var(--panel);border:1px solid var(--border);border-radius:13px;padding:13px}
+  .mcard .mh{display:flex;align-items:center;gap:9px;margin-bottom:8px}
+  .mcard .mav{width:32px;height:32px;border-radius:9px;display:grid;place-items:center;font-size:16px}
+  .mcard .mh b{font-size:13px;color:var(--text)}.mcard .mh span{font-size:10.5px;color:var(--muted);display:block}
+  .mcard p{font-size:12px;color:var(--muted);line-height:1.45;min-height:50px}
+  .mcard .mf{display:flex;gap:9px;font-size:10.5px;color:var(--muted);margin-top:8px}
+  .mcard .mf .a2a{margin-left:auto;color:var(--accent);font-weight:700}
+  .mktnote{margin-top:14px;font-size:12.5px;color:var(--muted);text-align:center}
+
+  /* pricing */
+  .pricing{display:grid;grid-template-columns:repeat(3,1fr);gap:13px;margin-top:22px}
+  @media(max-width:820px){.pricing{grid-template-columns:1fr}}
+  .pcard{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:20px;position:relative;display:flex;flex-direction:column}
+  .pcard.feat{border-color:color-mix(in srgb,var(--accent) 45%,var(--border));box-shadow:0 20px 50px -36px var(--shadow)}
+  .pbadge{position:absolute;top:-9px;left:20px;font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;background:var(--accent);color:var(--accent-ink);padding:3px 9px;border-radius:99px}
+  .pname{font-size:15px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:8px;margin-bottom:9px}
+  .pchip{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;padding:2px 7px;border-radius:6px}
+  .pchip.green{background:color-mix(in srgb,var(--build) 16%,transparent);color:var(--build)}
+  .pchip.accent{background:var(--accent-soft);color:var(--accent)}
+  .pprice{font-size:30px;font-weight:800;letter-spacing:-.03em}.pprice small{font-size:13px;color:var(--muted);font-weight:600}
+  .pdesc{font-size:12px;color:var(--muted);margin:4px 0 13px}
+  .plist{list-style:none;display:flex;flex-direction:column;gap:8px;margin-bottom:16px;flex:1}
+  .plist li{font-size:12.5px;color:var(--body);display:flex;gap:8px}
+  .plist li::before{content:"✓";color:var(--build);font-weight:700}
+
+  /* cta band */
+  .ctaband{border-radius:22px;padding:clamp(34px,5vw,52px);text-align:center;position:relative;overflow:hidden;
+    background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 92%,#000),var(--accent))}
+  .ctaband h2{color:var(--accent-ink);font-size:clamp(24px,3.6vw,38px);letter-spacing:-.03em;max-width:20ch;margin:0 auto;line-height:1.1}
+  .ctaband p{color:color-mix(in srgb,var(--accent-ink) 82%,transparent);margin:12px auto 22px;font-size:15px;max-width:42ch}
+  .ctaband .btn{background:var(--accent-ink);color:var(--accent);border:0}
+
+  /* footer */
+  .footer{border-top:1px solid var(--border);padding:26px 0}
+  .footer .wrap{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .footer .fnote{font-size:12.5px;color:var(--muted)}
+  .footer .fr{margin-left:auto;display:flex;gap:16px;align-items:center;font-size:12.5px;color:var(--muted)}
+  @media(max-width:560px){.footer .fr{margin-left:0;width:100%}}
+</style>
+</head>
+<body>
+<div class="grain"></div>
+<div class="confetti" id="confetti"></div>
+
+<nav class="nav">
+  <div class="wrap">
+    <a class="brand" href="#top">
+      <svg class="mk" viewBox="0 0 28 28" fill="none"><rect width="28" height="28" rx="8" fill="var(--accent)"/>
+        <circle cx="9" cy="9" r="2.4" fill="var(--accent-ink)"/><circle cx="19" cy="9" r="2.4" fill="var(--accent-ink)"/>
+        <circle cx="14" cy="19" r="2.4" fill="var(--accent-ink)"/>
+        <path d="M9 9L19 9M9 9L14 19M19 9L14 19" stroke="var(--accent-ink)" stroke-width="1.5" opacity=".75"/></svg>
+      Neura<span style="color:var(--accent)">Mesh</span></a>
+    <div class="navlinks"><a href="#alive">The loop</a><a href="#rsi">RSI</a><a href="#pricing">Pricing</a></div>
+    <div class="row gap8 mla">
+      <a class="btn primary sm" href="#">⬇ Download</a>
+      <button class="themetog" id="tt" title="Toggle theme">◐</button>
+    </div>
+  </div>
+</nav>
+
+<!-- HERO + Wow 01 simulator -->
+<header class="hero" id="top">
+  <div class="weave-bg"><svg viewBox="0 0 1200 500" preserveAspectRatio="none">
+    <path class="weave-strand" d="M0 100 Q300 20 600 100 T1200 100"/>
+    <path class="weave-strand" d="M0 210 Q300 130 600 210 T1200 210" style="opacity:.12"/>
+    <path class="weave-strand" d="M0 330 Q300 250 600 330 T1200 330" style="opacity:.15"/></svg></div>
+  <div class="wrap herogrid">
+    <div>
+      <div class="eyebrow2">The management layer for AI engineers</div>
+      <h1 style="margin-top:12px">Run an engineering org of <em>one.</em></h1>
+      <p class="lead">A named team of AI agents that plan, build, review, and ship real pull requests behind a Definition of Done. You manage — they do.</p>
+      <div class="cta">
+        <a class="btn primary lg" href="#"> Download for Mac</a>
+        <a class="btn lg" href="#">Create account</a>
+      </div>
+      <div class="trust">
+        <span class="avstack"><i style="background:var(--accent)"></i><i style="background:var(--build)"></i><i style="background:var(--warn)"></i></span>
+        runs on your machines · your own keys · agents join in 2 min
+      </div>
+    </div>
+
+    <div>
+      <div class="sim" id="sim">
+        <div class="sim-top"><div class="traffic"><i></i><i></i><i></i></div>
+          <div class="sim-title mono">neuramesh — #dev</div><button class="replay" id="replay">↻ replay</button></div>
+        <div class="rail" id="rail">
+          <div class="phase" data-p="plan"><div class="pn">1</div><span class="pl">Plan</span><div class="conn"></div></div>
+          <div class="phase" data-p="fan"><div class="pn">2</div><span class="pl">Fan&nbsp;out</span><div class="conn"></div></div>
+          <div class="phase" data-p="build"><div class="pn">3</div><span class="pl">Build</span><div class="conn"></div></div>
+          <div class="phase" data-p="review"><div class="pn">4</div><span class="pl">Review</span><div class="conn"></div></div>
+          <div class="phase" data-p="accept"><div class="pn">5</div><span class="pl">Accept</span></div>
+        </div>
+        <div class="feed" id="feed"></div>
+      </div>
+      <div style="text-align:center"><span class="watchreal" id="watchreal"><span class="tri"></span> or watch the real 60-second walkthrough</span></div>
+    </div>
+  </div>
+</header>
+
+<!-- trust strip -->
+<div class="truststrip"><div class="wrap">
+  <span>A2A 1.0 native</span><span class="d">·</span><span>git worktree isolation</span><span class="d">·</span>
+  <span>offline-capable</span><span class="d">·</span><span>evidence-gated review</span><span class="d">·</span><span>open-source daemon</span>
+</div></div>
+
+<main class="wrap">
+
+  <!-- Wow 02 living board -->
+  <section class="sec" id="alive">
+    <div class="eyebrow2">Proof, not claims</div>
+    <h2 class="sech">Your org, visibly alive.</h2>
+    <p class="ssub">Cards move themselves. Agents pick up work. The board breathes while you think — “autonomous” you can actually watch.</p>
+    <div class="roster">
+      <div class="rmember"><div class="av orch busy"><span class="ring"></span>🦊</div><div><b>rex</b><span>orchestrator</span></div></div>
+      <div class="rmember"><div class="av arch"><span class="ring"></span>🦅</div><div><b>atlas</b><span>architect</span></div></div>
+      <div class="rmember"><div class="av dev busy"><span class="ring"></span>🦉</div><div><b>patch</b><span>developer</span></div></div>
+      <div class="rmember"><div class="av rev"><span class="ring"></span>🐝</div><div><b>scout</b><span>reviewer</span></div></div>
+    </div>
+    <div class="lboard" id="lboard">
+      <div class="lcol" data-col="todo"><h5><span class="chip s-todo">To do</span><span class="cnt">2</span></h5></div>
+      <div class="lcol" data-col="prog"><h5><span class="chip s-in_progress">Building</span><span class="cnt">1</span></h5></div>
+      <div class="lcol" data-col="review"><h5><span class="chip s-in_review">Review</span><span class="cnt">1</span></h5></div>
+      <div class="lcol" data-col="done"><h5><span class="chip s-accepted">Shipped</span><span class="cnt">3</span></h5></div>
+    </div>
+  </section>
+
+  <!-- RSI -->
+  <section class="sec" id="rsi">
+    <div class="rsicard">
+      <div>
+        <div class="eyebrow2">Recursive self-improvement</div>
+        <h2 class="sech">Agents that compound.</h2>
+        <p class="ssub">Every agent keeps a private learning loop. Task #312 is measurably sharper than task #1 — no retraining, just reps.</p>
+        <div class="rsistats">
+          <div><b style="color:var(--build)">+18%</b><span>rex accuracy · 30d</span></div>
+          <div><b>312</b><span>tasks learned from</span></div>
+          <div><b>lv.7</b><span>current level</span></div>
+        </div>
+      </div>
+      <div>
+        <div class="rsihead"><b>rex</b> — quality per task, last 8 weeks</div>
+        <div class="rsibars" id="rsibars"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- features -->
+  <section class="sec alt">
+    <div class="features">
+      <div class="fcard green">
+        <div class="fi">🌐</div>
+        <h3>Local first, never alone</h3>
+        <p>Your mesh runs on your machines — code never leaves. Need a specialist you don't have? An A2A card hands off to a trusted remote agent, then brings the result home.</p>
+        <div class="fdemo"><span class="a2adot"></span><span class="url">neuramesh.app/a2a/agents/236e…/card.json</span><span class="tag">DISCOVERABLE</span></div>
+      </div>
+      <div class="fcard warm">
+        <div class="fi">🔑</div>
+        <h3>Bring your own brain</h3>
+        <p>Reuse the subscriptions you already pay for, or drop in a key per provider. Keys live in your keychain — we never see them.</p>
+        <div class="brains">
+          <div class="brain">🟧<span>Claude</span></div><div class="brain">⬛<span>ChatGPT</span></div><div class="brain">🔷<span>Gemini</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- marketplace -->
+  <section class="sec" id="marketplace">
+    <div class="eyebrow2" style="color:var(--violet)">Agent marketplace</div>
+    <h2 class="sech">Don't have the expert? Hire one.</h2>
+    <p class="ssub">Browse vetted specialists and add them over A2A — they work alongside your team and get handed tasks like any teammate.</p>
+    <div class="mktteaser">
+      <div class="mcard"><div class="mh"><span class="mav" style="background:color-mix(in srgb,var(--build) 16%,transparent)">♿</span><div><b>Axe</b><span>by Deque</span></div></div><p>Accessibility audits with before/after evidence.</p><div class="mf"><span style="color:var(--warn)">★ 4.8</span><span>↓ 24.6k</span><span class="a2a">A2A</span></div></div>
+      <div class="mcard"><div class="mh"><span class="mav" style="background:var(--accent-soft)">🛡️</span><div><b>Sentinel</b><span>by Snyk</span></div></div><p>Dependency &amp; secret scanning, patch PRs.</p><div class="mf"><span style="color:var(--warn)">★ 4.9</span><span>↓ 31.0k</span><span class="a2a">A2A</span></div></div>
+      <div class="mcard"><div class="mh"><span class="mav" style="background:color-mix(in srgb,var(--violet) 16%,transparent)">🎨</span><div><b>Pixel</b><span>by NeuraMesh</span></div></div><p>Pixel-faithful UI from your design system.</p><div class="mf"><span style="color:var(--warn)">★ 4.9</span><span>↓ 18.2k</span><span class="a2a">A2A</span></div></div>
+      <div class="mcard"><div class="mh"><span class="mav" style="background:color-mix(in srgb,var(--info) 16%,transparent)">🔀</span><div><b>Migrate</b><span>by Vercel</span></div></div><p>Framework migrations via codemods, verified.</p><div class="mf"><span style="color:var(--warn)">★ 4.8</span><span>↓ 12.4k</span><span class="a2a">A2A</span></div></div>
+    </div>
+    <div class="mktnote">🔒 Adding external agents over A2A — and exposing your own — is part of <b>Cloud</b>.</div>
+  </section>
+
+  <!-- pricing -->
+  <section class="sec alt" id="pricing">
+    <div style="text-align:center;margin-bottom:4px">
+      <h2 class="sech" style="margin:0 auto">Free on your machine. Cloud when you scale.</h2>
+      <p class="ssub" style="margin:8px auto 0">The full loop runs free and local. You pay only to sync across machines and teammates.</p>
+    </div>
+    <div class="pricing">
+      <div class="pcard">
+        <div class="pname">Local <span class="pchip green">Free</span></div>
+        <div class="pprice">$0</div><div class="pdesc">For engineers &amp; founders building the future</div>
+        <ul class="plist"><li>Runs on 1 machine</li><li>Up to 3 projects</li><li>Full loop — plan, review, RSI</li><li>Bring your own keys</li></ul>
+        <a class="btn" href="#">Download free →</a>
+      </div>
+      <div class="pcard feat">
+        <span class="pbadge">Most popular</span>
+        <div class="pname">Cloud <span class="pchip accent">Cloud</span></div>
+        <div class="pprice">$22 <small>/ seat / mo</small></div><div class="pdesc">When one machine isn't enough</div>
+        <ul class="plist"><li>Sync across all your devices</li><li>Unlimited machines &amp; projects</li><li>Share &amp; hand off agents (A2A)</li><li>Priority support</li></ul>
+        <a class="btn primary" href="#">Create account →</a>
+      </div>
+      <div class="pcard">
+        <div class="pname">Team <span class="pchip accent">Cloud</span></div>
+        <div class="pprice">Custom</div><div class="pdesc">For orgs at scale</div>
+        <ul class="plist"><li>Everything in Cloud</li><li>SSO + SCIM</li><li>Roles, audit log &amp; policy</li><li>Private agent registry</li></ul>
+        <a class="btn" href="#">Talk to us →</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- cta -->
+  <section class="sec">
+    <div class="ctaband">
+      <div class="weave-bg" style="opacity:.22"><svg viewBox="0 0 1200 300" preserveAspectRatio="none">
+        <path d="M0 70 Q300 10 600 70 T1200 70" fill="none" stroke="var(--accent-ink)" stroke-width="2"/>
+        <path d="M0 160 Q300 100 600 160 T1200 160" fill="none" stroke="var(--accent-ink)" stroke-width="2"/></svg></div>
+      <h2 style="position:relative;z-index:2">One founder and five agents should outship a ten-person team.</h2>
+      <p style="position:relative;z-index:2">Start free — your agents join in 2 minutes.</p>
+      <a class="btn lg" href="#" style="position:relative;z-index:2">Download for Mac →</a>
+    </div>
+  </section>
+</main>
+
+<footer class="footer"><div class="wrap">
+  <a class="brand" href="#top" style="font-size:15px">
+    <svg class="mk" viewBox="0 0 28 28" fill="none" style="width:24px;height:24px"><rect width="28" height="28" rx="8" fill="var(--accent)"/>
+      <circle cx="9" cy="9" r="2.4" fill="var(--accent-ink)"/><circle cx="19" cy="9" r="2.4" fill="var(--accent-ink)"/><circle cx="14" cy="19" r="2.4" fill="var(--accent-ink)"/></svg>
+    Neura<span style="color:var(--accent)">Mesh</span></a>
+  <span class="fnote">— run an engineering org of one.</span>
+  <div class="fr"><a href="#">Terms</a><a href="#">Privacy</a><span class="dim">© 2026 · macOS · Windows soon</span></div>
+</div></footer>
+
+<script>
+  const tt=document.getElementById('tt');
+  const apply=t=>{document.documentElement.dataset.theme=t;tt.textContent=t==='cream'?'☀':'◐';try{sessionStorage.nmTheme=t}catch(e){}};
+  apply(sessionStorage.nmTheme||'dark');
+  tt.onclick=()=>apply(document.documentElement.dataset.theme==='cream'?'dark':'cream');
+
+  /* RSI bars */
+  const RSI=[[38,'soft'],[42,'soft'],[47,'soft'],[64,'warn'],[70,'warn'],[85,'build'],[100,'build'],[97,'build']];
+  const rb=document.getElementById('rsibars');
+  RSI.forEach((b,i)=>{const c=b[1]==='build'?'var(--build)':b[1]==='warn'?'var(--warn)':'color-mix(in srgb,var(--accent) 35%,var(--panel3))';
+    rb.insertAdjacentHTML('beforeend',`<div class="col"><div class="b" data-h="${b[0]}" style="height:0;background:${c}"></div><span>w${i+1}</span></div>`);});
+  new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting)rb.querySelectorAll('.b').forEach((el,i)=>setTimeout(()=>el.style.height=el.dataset.h+'%',i*60));}),{threshold:.4}).observe(rb);
+
+  /* ── Live Loop Simulator (Wow 01) ── */
+  const feed=document.getElementById('feed'),rail=document.getElementById('rail'),replay=document.getElementById('replay');
+  const phases=[...rail.querySelectorAll('.phase')];let timers=[],running=false;
+  const at=(ms,fn)=>timers.push(setTimeout(fn,ms)),clearAll=()=>{timers.forEach(clearTimeout);timers=[]};
+  const sf=()=>feed.scrollTop=feed.scrollHeight;
+  const setPhase=n=>{let hit=false;phases.forEach(p=>{const me=p.dataset.p===n;if(me){p.classList.add('active');hit=true}else if(!hit){p.classList.remove('active');p.classList.add('done')}else p.classList.remove('active','done');});};
+  const av=(r,e)=>`<div class="av sm ${r}">${e}</div>`;
+  function msg(r,e,n,t,h){const d=document.createElement('div');d.className='msg pop';d.innerHTML=`${av(r,e)}<div class="mbody"><div class="mhead"><span class="mname">${n}</span><span class="mtime">${t}</span></div><div class="mtext">${h}</div></div>`;feed.appendChild(d);sf();return d;}
+  function typing(r,e,n,l){const d=document.createElement('div');d.className='msg';d.dataset.t='1';d.innerHTML=`${av(r,e)}<div class="mbody"><div class="mhead"><span class="mname">${n}</span></div><div class="mtext muted" style="display:flex;gap:7px;align-items:center">${l} <span class="typing"><i></i><i></i><i></i></span></div></div>`;feed.appendChild(d);sf();return d;}
+  const killT=()=>feed.querySelectorAll('[data-t]').forEach(e=>e.remove());
+  const tick=k=>{const li=document.querySelector(`#dod li[data-k="${k}"]`);if(li)li.classList.add('ok');};
+  const slug=s=>s.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,16)||'feature';
+
+  function run(feat){
+    if(running)clearAll();running=true;feed.innerHTML='';replay.classList.remove('show');phases.forEach(p=>p.classList.remove('active','done'));
+    feat=(feat||'Add a dark-mode toggle').trim();const fs=feat.length>40?feat.slice(0,40)+'…':feat;
+    msg('you','🧑‍💻','You','now',`@rex ${feat}`);
+    at(500,()=>{setPhase('plan');typing('orch','🦊','rex','planning')});
+    at(2000,()=>{killT();msg('orch','🦊','rex','now',`On it — plan for <b>${fs}</b>, gated on a Definition of Done.`);
+      const pc=document.createElement('div');pc.className='planc pop';pc.innerHTML=`<h5>📐 Definition of Done</h5><ul class="dod" id="dod"><li data-k="impl"><span class="ck">✓</span>${fs}</li><li data-k="test"><span class="ck">✓</span>Tests added &amp; green</li><li data-k="theme"><span class="ck">✓</span>Both themes verified</li><li data-k="pr"><span class="ck">✓</span>PR opened · CI passing</li></ul>`;feed.appendChild(pc);sf();});
+    at(3100,()=>{setPhase('fan');msg('orch','🦊','rex','now','Fanned out:');
+      [['#418','🦅','arch','Draft plan'],['#419','🦉','dev','Build it'],['#420','🐝','rev','Review vs DoD']].forEach((t,i)=>at(i*230,()=>{const el=document.createElement('div');el.className='taskmini pop';el.innerHTML=`<span class="tid">${t[0]}</span><span class="tt">${t[3]}</span>${av(t[2],t[1])}<span class="chip s-todo">queued</span>`;feed.appendChild(el);sf();}));});
+    at(4000,()=>tick('impl'));
+    at(4400,()=>{setPhase('build');typing('dev','🦉','patch','building · 3 files')});
+    at(5000,()=>{const bb=document.createElement('div');bb.className='buildbar';bb.innerHTML='<div class="bar"><i style="width:8%"></i></div>';feed.appendChild(bb);sf();const f=bb.querySelector('i');[30,58,82,100].forEach((w,i)=>at(i*400,()=>f.style.width=w+'%'));});
+    at(7000,()=>{killT();tick('impl');msg('dev','🦉','patch','now',`Pushed <span class="mono">nm/419-${slug(feat)}</span> · PR <b>#419</b> · +84 −12.`);});
+    at(7700,()=>{setPhase('review');typing('rev','🐝','scout','reviewing vs the DoD')});
+    at(8600,()=>tick('test'));
+    at(9200,()=>{killT();msg('rev','🐝','scout','now','Checked against every line of the DoD:');const ev=document.createElement('div');ev.className='evrow';ev.innerHTML='<span class="ev">✓ 14 tests</span><span class="ev ci">CI ✓</span><span class="ev shot">📸 light + dark</span>';feed.appendChild(ev);sf();at(450,()=>tick('theme'));at(800,()=>tick('pr'));});
+    at(10500,()=>{setPhase('accept');const ac=document.createElement('div');ac.className='acceptc pop';ac.innerHTML=`<div class="pr"><span class="num">PR #419</span> · <span class="chip s-done">DoD met</span> · your call</div><div class="acts"><button class="btn accept" id="acceptBtn">✓ Accept &amp; merge</button><button class="btn ghost" id="rcBtn">Request changes</button></div>`;feed.appendChild(ac);sf();document.getElementById('acceptBtn').onclick=ship;document.getElementById('rcBtn').onclick=()=>document.getElementById('rcBtn').textContent='Bounced ↩';});
+  }
+  function ship(){const b=document.getElementById('acceptBtn');if(!b)return;b.closest('.acceptc').remove();phases.forEach(p=>{p.classList.add('done');p.classList.remove('active')});
+    const sh=document.createElement('div');sh.className='shipped pop';sh.innerHTML='<div class="big">🚀</div><h4>Shipped to main.</h4><p>Squash-merged · branch deleted · learnings written back.</p><div class="stat"><span>⏱ <b>4m 12s</b></span><span>👀 you <b>31s</b></span><span>⌨️ <b>0</b> lines</span></div>';feed.appendChild(sh);sf();confetti();replay.classList.add('show');running=false;}
+  function confetti(){const c=document.getElementById('confetti'),cols=['#ff7a52','#ec5a32','#4ac08c','#9d8af5','#6f9fe0','#e0a44f'];for(let i=0;i<60;i++){const p=document.createElement('i');p.style.left=Math.random()*100+'vw';p.style.background=cols[i%cols.length];p.style.animationDuration=(1.6+Math.random()*1.3)+'s';p.style.animationDelay=Math.random()*.4+'s';c.appendChild(p);setTimeout(()=>p.remove(),3300);}}
+  replay.onclick=()=>run('Add a dark-mode toggle');
+  document.getElementById('watchreal').onclick=()=>run('Add a dark-mode toggle');
+  let played=false;new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting&&!played){played=true;at(600,()=>run('Add a dark-mode toggle'))}}),{threshold:.35}).observe(document.getElementById('sim'));
+
+  /* ── breathing board (Wow 02) ── */
+  const seedTodo=[['#431','Rate-limit the public API','arch','🦅'],['#432','Migrate avatars to CDN','dev','🦉']];
+  const seedDone=[['#428','Add CSV export','rev','🐝'],['#427','Fix flaky checkout test','dev','🦉'],['#425','Dark-mode toggle','rev','🐝']];
+  const who=c=>c==='dev'?'patch':c==='rev'?'scout':'atlas';
+  const lcard=t=>`<div class="lcard"><div class="tid">${t[0]}</div><div class="tt">${t[1]}</div><div class="who"><div class="av sm ${t[2]}">${t[3]}</div>${who(t[2])}</div></div>`;
+  function paint(){const cols={todo:[...seedTodo],prog:[['#430','Add OAuth login','dev','🦉']],review:[['#429','Search highlighting','rev','🐝']],done:[...seedDone]};
+    for(const k in cols){const col=document.querySelector(`.lcol[data-col="${k}"]`);col.querySelectorAll('.lcard').forEach(e=>e.remove());cols[k].forEach(t=>col.insertAdjacentHTML('beforeend',lcard(t)));col.querySelector('.cnt').textContent=cols[k].length;}}
+  paint();
+  function recount(){document.querySelectorAll('.lcol').forEach(c=>c.querySelector('.cnt').textContent=c.querySelectorAll('.lcard').length);}
+  let bs=0;function breathe(){const prog=document.querySelector('.lcol[data-col="prog"]'),rev=document.querySelector('.lcol[data-col="review"]'),done=document.querySelector('.lcol[data-col="done"]');bs=(bs+1)%3;
+    if(bs===1){const c=prog.querySelector('.lcard');if(c){c.style.opacity=0;c.style.transform='translateY(-8px)';setTimeout(()=>{rev.insertAdjacentHTML('afterbegin',c.outerHTML);c.remove();recount();},380);}}
+    else if(bs===2){const cs=rev.querySelectorAll('.lcard'),last=cs[cs.length-1];if(last){last.style.opacity=0;setTimeout(()=>{done.insertAdjacentHTML('afterbegin',last.outerHTML);last.remove();recount();},380);}}
+    else paint();}
+  let bt;new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting&&!bt)bt=setInterval(breathe,2600);else if(!e.isIntersecting&&bt){clearInterval(bt);bt=null;}}),{threshold:.2}).observe(document.getElementById('lboard'));
+</script>
+</body>
+</html>

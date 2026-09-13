@@ -1,0 +1,823 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Whiteboards — the thinking surface, and the first thing agents can draw</title>
+<style>
+[data-theme] { --font:'Geist Variable',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; --fmono:'Geist Mono Variable',ui-monospace,'SF Mono',Menlo,monospace; --fdisp:'Source Serif 4','Iowan Old Style',Georgia,serif; --fhand:'Virgil','Chalkboard SE','Segoe Print','Comic Sans MS',cursive; --ease:cubic-bezier(.22,1,.36,1); --dur-fast:120ms; }
+/* verbatim from apps/desktop/src/renderer/src/tokens.css */
+[data-theme='dark'] {
+  --win:#0d0d0d; --bg:#141414; --panel:#191919; --panel2:#212121; --panel3:#2b2b2b;
+  --border:#272727; --border2:#383838; --card:#1b1b1b; --card-border:#2e2e2e;
+  --text:#eaeaea; --body:#b6b6b6; --muted:#898989; --dim:#676767; --ring:#585858;
+  --accent:#eaeaea; --accent-ink:#101010; --link:#d19a72; --hover-bg:rgba(234,234,234,.06);
+  --prog:#8ba0c0; --review:#a89ccf; --done:#77ac8d; --acc:#6fb0ab; --ship:#7cb0bd;
+  --design:#cc8fb9; --blocked:#9ca0a8; --closed:#727272; --shadow:rgba(0,0,0,.6);
+  --canvas:#121212; --cink:#d5d5d5; --cblue:#5c8bb0; --cgreen:#6fae85; --cyellow:#b09a55; --cfill-blue:rgba(92,139,176,.16); --cfill-green:rgba(111,174,133,.14); --cfill-yellow:rgba(176,154,85,.16);
+}
+[data-theme='cream-oak'] {
+  --win:#f0e5d3; --bg:#fbf8f4; --panel:#fbf8f4; --panel2:#f6eee1; --panel3:#efe1cd;
+  --border:#e6dbca; --border2:#d3c2a8; --card:#ffffff; --card-border:#eadfce;
+  --text:#2a1c13; --body:#574838; --muted:#97846c; --dim:#b5a289; --ring:#b08a5e;
+  --accent:#834a2b; --accent-ink:#fff7ee; --link:#9c5730; --hover-bg:rgba(42,28,19,.05);
+  --prog:#4f80c4; --review:#6d5ce0; --done:#0f9d63; --acc:#2f8f8a; --ship:#1f7f96;
+  --design:#b0498f; --blocked:#7d7f86; --closed:#897a60; --shadow:rgba(70,42,18,.22);
+  --canvas:#ffffff; --cink:#1e1e1e; --cblue:#1971c2; --cgreen:#2f9e44; --cyellow:#f08c00; --cfill-blue:rgba(165,216,255,.45); --cfill-green:rgba(178,242,187,.45); --cfill-yellow:rgba(255,236,153,.6);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#131210; font-family:'Geist Variable',-apple-system,sans-serif; }
+.page { max-width:1760px; margin:0 auto; padding:32px 24px 70px; }
+.pagehead { color:#eaeaea; margin-bottom:8px; }
+.pagehead h1 { font-family:'Source Serif 4',Georgia,serif; font-size:24px; font-weight:640; letter-spacing:-.012em; }
+.pagehead p { color:#898989; font-size:13px; line-height:1.62; margin-top:9px; max-width:104ch; }
+.pagehead b { color:#b6b6b6; } .pagehead .warn { color:#c8a06a; font-weight:600; } .pagehead .ok { color:#8fbf9f; font-weight:600; }
+.pagehead code { font:11.5px 'Geist Mono Variable',monospace; color:#c8a06a; }
+.stophd { color:#eaeaea; font-size:15.5px; font-weight:660; margin:44px 0 4px; font-family:'Source Serif 4',Georgia,serif; }
+.stopno { font:700 10px 'Geist Mono Variable',monospace; letter-spacing:.12em; color:#6f6f6f; text-transform:uppercase; margin-right:8px; }
+.stopp { color:#898989; font-size:12.5px; line-height:1.62; max-width:104ch; margin-bottom:16px; }
+.stopp b { color:#b6b6b6; } .stopp code { font:11.5px 'Geist Mono Variable',monospace; color:#c8a06a; }
+.themes { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+@media (max-width:1400px){ .themes { grid-template-columns:1fr; } }
+.theme { background:var(--win); border:1px solid var(--border2); border-radius:16px; padding:16px; color:var(--text); min-width:0; }
+.theme > h2 { font-size:10.5px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--dim); margin:0 2px 12px; }
+.callouts { display:flex; flex-wrap:wrap; gap:8px 18px; margin-top:12px; }
+.co { font-size:11.5px; color:#898989; line-height:1.55; max-width:46ch; }
+.co b { color:#b6b6b6; } .co code { font:10.5px 'Geist Mono Variable',monospace; color:#c8a06a; }
+.co .n { display:inline-grid; place-items:center; width:16px; height:16px; border-radius:50%; background:#2b2b2b; color:#c8a06a; font:700 10px monospace; margin-right:6px; }
+.mark { position:absolute; width:19px; height:19px; border-radius:50%; background:#c8a06a; color:#131210; font:700 11px monospace; display:grid; place-items:center; box-shadow:0 1px 4px rgba(0,0,0,.5); z-index:9; }
+.rel { position:relative; }
+
+/* ── the shell: spine + nav + main ── */
+.shell { display:flex; background:var(--win); border-radius:14px; padding:8px 8px 8px 0; min-height:640px; }
+.spine { width:30px; flex:none; display:flex; flex-direction:column; align-items:center; gap:9px; padding:11px 0 9px; color:var(--dim); }
+.sp-home { position:relative; width:24px; height:24px; border-radius:8px; display:grid; place-items:center; color:var(--body); font-size:11px; }
+.sp-home .pip { position:absolute; right:-4px; top:-4px; min-width:14px; height:14px; padding:0 3px; border-radius:99px; background:var(--accent); color:var(--accent-ink); font:700 8.5px var(--fmono); display:grid; place-items:center; border:1.5px solid var(--win); }
+.sp-rule { width:14px; height:1px; background:var(--border2); flex:none; }
+.sp-name { writing-mode:vertical-rl; text-orientation:mixed; font:700 9.5px var(--fmono); letter-spacing:.15em; text-transform:uppercase; color:var(--body); }
+.sp-live { width:5px; height:5px; border-radius:50%; background:var(--prog); flex:none; box-shadow:0 0 0 3px color-mix(in srgb,var(--prog) 20%,transparent); animation:pulse 1.8s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity:.34; } }
+.sp-dots { display:flex; flex-direction:column; align-items:center; gap:5px; margin-top:3px; }
+.sp-dot { width:4px; height:4px; border-radius:50%; background:var(--border2); }
+.sp-foot { margin-top:auto; display:flex; flex-direction:column; align-items:center; gap:9px; }
+.sp-av { width:22px; height:22px; border-radius:7px; background:linear-gradient(160deg,var(--panel3),var(--panel2)); border:1px solid var(--border2); display:grid; place-items:center; font:700 9.5px var(--font); color:var(--text); }
+
+.nav { width:212px; min-width:212px; display:flex; flex-direction:column; padding:6px 0 4px; }
+.scopehead { display:flex; align-items:center; gap:7px; margin:4px 10px 2px 2px; padding:7px 10px; border-radius:9px; font-size:12.5px; font-weight:640; color:var(--text); }
+.scopehead:hover { background:var(--hover-bg); }
+.scopehead .h { color:var(--dim); font-weight:600; } .scopehead .caret { margin-left:auto; color:var(--dim); font-size:9px; }
+.navnew { display:flex; align-items:stretch; margin:6px 10px 8px 2px; }
+.navnewchat { display:flex; align-items:center; gap:8px; flex:1; padding:7px 10px; border:1px solid var(--card-border); border-radius:9px 0 0 9px; background:var(--card); box-shadow:0 1px 2px var(--shadow); color:var(--text); font-size:12.5px; font-weight:620; }
+.navnewchat .k { margin-left:auto; font:600 9.5px var(--fmono); color:var(--dim); }
+.navnewcaret { flex:none; width:24px; border:1px solid var(--card-border); border-left:0; border-radius:0 9px 9px 0; background:var(--card); color:var(--muted); font-size:9px; display:grid; place-items:center; }
+.navitem { display:flex; align-items:center; gap:9px; margin:1px 10px 1px 2px; padding:6px 10px; border-radius:8px; font-size:12.5px; color:var(--body); border:1px solid transparent; }
+.navitem .ni { width:15px; text-align:center; opacity:.8; font-size:12px; }
+.navitem.on { background:var(--card); border-color:var(--card-border); color:var(--text); font-weight:620; box-shadow:0 1px 2px var(--shadow); }
+.navitem .badge { margin-left:auto; font:700 9.5px var(--fmono); color:var(--muted); }
+.navitem .badge.hot { background:var(--accent); color:var(--accent-ink); border-radius:9px; padding:1px 5px; }
+.navsec { padding:12px 14px 4px; font:700 9px var(--fmono); letter-spacing:.13em; text-transform:uppercase; color:var(--dim); }
+.hrow { display:flex; align-items:flex-start; gap:8px; padding:4px 9px; margin:1px 10px 1px 6px; border-radius:8px; }
+.hdot { flex:none; width:6px; height:6px; border-radius:50%; margin-top:5px; background:transparent; box-shadow:inset 0 0 0 1.5px var(--dim); }
+.hdot.prog { background:var(--prog); box-shadow:none; }
+.hrow .t { flex:1; min-width:0; font-size:12px; color:var(--body); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.hrow .w { flex:none; font:500 9.5px var(--fmono); color:var(--dim); }
+
+.main { flex:1; min-width:0; background:var(--panel); border-radius:13px; display:flex; flex-direction:column; overflow:hidden; position:relative; box-shadow:0 1px 8px -2px var(--shadow); }
+.tabstrip { display:flex; align-items:stretch; gap:2px; padding:6px 8px 0; border-bottom:1px solid var(--border); flex:none; }
+.wtab { display:flex; align-items:center; gap:7px; padding:7px 10px 8px; border-radius:9px 9px 0 0; font-size:12px; color:var(--muted); border:1px solid transparent; border-bottom:none; max-width:190px; min-width:0; }
+.wtab .ic { flex:none; opacity:.85; }
+.wtab .lbl { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+.wtab .x { flex:none; opacity:.45; font-size:10px; margin-left:2px; }
+.wtab .dirty { flex:none; width:7px; height:7px; border-radius:50%; background:var(--link); margin-left:2px; }
+.wtab.on { background:var(--panel); border-color:var(--border); color:var(--text); font-weight:620; box-shadow:0 1px 0 var(--panel); margin-bottom:-1px; }
+.wtab.conv { color:var(--text); } .wtab.conv .ic { color:var(--link); }
+.wtabadd { margin-left:4px; padding:7px 9px; border-radius:8px; color:var(--dim); font-size:13px; align-self:center; }
+.wtabright { margin-left:auto; display:flex; align-items:center; gap:4px; padding-right:2px; }
+.wtabico { width:26px; height:26px; display:grid; place-items:center; border-radius:7px; color:var(--dim); align-self:center; font-size:12px; }
+.body { flex:1; min-height:0; display:flex; position:relative; }
+.content { flex:1; min-width:0; display:flex; flex-direction:column; }
+
+/* whiteboard tab header — the file-header rhythm (38px, mono path, right controls) */
+.wbhead { display:flex; align-items:center; gap:9px; padding:8px 14px; border-bottom:1px solid var(--border); font:500 11px var(--fmono); color:var(--dim); }
+.wbhead .path { color:var(--muted); }
+.wbhead .ttl { color:var(--text); font-family:var(--font); font-size:12.5px; font-weight:640; }
+.wbchip { display:flex; align-items:center; gap:5px; border:1px solid var(--card-border); background:var(--card); border-radius:99px; padding:2.5px 9px; font:600 10.5px var(--font); color:var(--body); }
+.wbchip .h { color:var(--dim); }
+.wbsaved { margin-left:auto; font:500 10px var(--fmono); color:var(--dim); display:flex; align-items:center; gap:6px; }
+.wbsaved .dot { width:5px; height:5px; border-radius:50%; background:var(--done); }
+.wbshare { display:flex; align-items:center; gap:6px; border:1px solid var(--card-border); background:var(--card); border-radius:99px; padding:4px 12px; font:620 11px var(--font); color:var(--text); box-shadow:0 1px 2px var(--shadow); }
+.wbshare .a { color:var(--link); }
+
+/* the canvas + excalidraw chrome */
+.canvas { flex:1; position:relative; background:var(--canvas); overflow:hidden; }
+.exisl { position:absolute; display:flex; align-items:center; gap:2px; background:var(--card); border:1px solid var(--card-border); border-radius:9px; box-shadow:0 4px 14px -6px var(--shadow); padding:3px; z-index:3; }
+[data-theme='cream-oak'] .exisl { background:#ffffff; border-color:#e9e4da; }
+[data-theme='dark'] .exisl { background:#1e1e1e; border-color:#2e2e2e; }
+.exisl .t { width:24px; height:24px; display:grid; place-items:center; border-radius:6px; font-size:11px; color:var(--muted); }
+.exisl .t.on { background:color-mix(in srgb, var(--cblue) 22%, transparent); color:var(--text); }
+.extools { top:10px; left:50%; transform:translateX(-50%); }
+.exmenu { top:10px; left:10px; } .exzoom { bottom:10px; left:10px; } .exhelp { bottom:10px; right:10px; }
+.exzoom .z { padding:0 7px; font:600 10.5px var(--fmono); color:var(--muted); }
+.canvas svg.scene { position:absolute; inset:0; width:100%; height:100%; }
+.hand { font-family:var(--fhand); }
+
+/* thread / messages */
+.msgs { flex:1; padding:16px 18px; display:flex; flex-direction:column; gap:13px; overflow:hidden; }
+.msg { display:flex; gap:10px; }
+.mav { width:26px; height:26px; border-radius:8px; background:var(--panel3); flex:none; display:grid; place-items:center; font-size:11px; }
+.mhead { font-size:12px; display:flex; gap:7px; align-items:baseline; }
+.mhead b { font-weight:660; } .mhead .role { font:640 8px var(--fmono); letter-spacing:.06em; text-transform:uppercase; color:var(--muted); background:var(--panel2); padding:1.5px 5px; border-radius:5px; }
+.mhead .ago { color:var(--dim); font-size:10px; }
+.mtext { font-size:12.5px; line-height:1.6; color:var(--body); margin-top:2px; max-width:66ch; }
+.me { background:var(--panel2); border-radius:11px; padding:9px 12px; margin-left:auto; max-width:66%; font-size:12.5px; color:var(--body); }
+.compose { margin:8px 14px 12px; border:1px solid var(--card-border); background:var(--card); border-radius:12px; padding:10px 12px; font-size:12.5px; color:var(--dim); }
+
+/* the whiteboard card — the deliverable-card idiom with a snapshot ground */
+.wbcard { margin-top:8px; width:min(430px,92%); border:1px solid var(--card-border); background:var(--card); border-radius:12px; overflow:hidden; box-shadow:0 2px 8px -4px var(--shadow); }
+.wbcard:hover { transform:translateY(-1px); }
+.wbsnap { position:relative; background:var(--canvas); border-bottom:1px solid var(--border); height:150px; }
+.wbsnap svg { position:absolute; inset:0; width:100%; height:100%; }
+.wbmeta { display:flex; align-items:center; gap:8px; padding:8px 11px; }
+.wbmeta .ic { color:var(--link); font-size:12px; }
+.wbmeta b { font-size:12px; font-weight:640; }
+.wbmeta .kind { font:640 8px var(--fmono); letter-spacing:.06em; text-transform:uppercase; color:var(--muted); background:var(--panel2); padding:1.5px 5px; border-radius:5px; }
+.wbmeta .by { font:500 10px var(--fmono); color:var(--dim); }
+.wbmeta .open { margin-left:auto; font:620 11px var(--font); color:var(--link); white-space:nowrap; }
+
+/* library grid */
+.libwrap { flex:1; padding:16px 20px; overflow:hidden; }
+.libhead { display:flex; align-items:baseline; gap:10px; margin-bottom:4px; }
+.libhead h3 { font-family:var(--fdisp); font-size:19px; font-weight:640; }
+.libhead .sub { font-size:11.5px; color:var(--muted); }
+.libnew { margin-left:auto; display:flex; align-items:center; gap:6px; border:1px solid var(--card-border); background:var(--card); border-radius:99px; padding:5px 13px; font:620 11.5px var(--font); color:var(--text); box-shadow:0 1px 2px var(--shadow); }
+.daysec { padding:14px 0 6px; font:700 9px var(--fmono); letter-spacing:.13em; text-transform:uppercase; color:var(--dim); }
+.libgrid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+.wbtile { border:1px solid var(--card-border); background:var(--card); border-radius:12px; overflow:hidden; box-shadow:0 2px 8px -4px var(--shadow); }
+.wbtile .snap { position:relative; height:110px; background:var(--canvas); border-bottom:1px solid var(--border); }
+.wbtile .snap svg { position:absolute; inset:0; width:100%; height:100%; }
+.wbtile .m { display:flex; align-items:center; gap:7px; padding:7px 10px; font-size:11.5px; }
+.wbtile .m b { font-weight:630; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.wbtile .m .rm { font:600 9.5px var(--fmono); color:var(--dim); }
+.wbtile .m .w { font:500 9.5px var(--fmono); color:var(--dim); }
+.wbtile.ghost { border-style:dashed; border-color:var(--border2); background:transparent; box-shadow:none; display:grid; place-items:center; min-height:150px; color:var(--muted); font-size:12px; }
+.wbtile.ghost .plus { display:block; text-align:center; font-size:16px; margin-bottom:5px; color:var(--dim); }
+
+/* + flyout */
+.flyout { position:absolute; top:42px; left:150px; width:236px; background:var(--card); border:1px solid var(--card-border); border-radius:11px; box-shadow:0 20px 46px -18px var(--shadow); padding:5px; z-index:6; }
+.flyrow { display:flex; align-items:center; gap:10px; padding:7px 9px; border-radius:8px; font-size:12px; color:var(--text); }
+.flyrow.on { background:var(--hover-bg); }
+.flyrow .fic { width:22px; height:22px; border-radius:6px; background:var(--panel2); display:grid; place-items:center; flex:none; color:var(--muted); font-size:11px; }
+.flyrow small { display:block; font-size:10px; color:var(--dim); margin-top:1px; }
+.flysep { border-top:1px solid var(--border); margin:4px 6px; }
+.flyhint { padding:6px 9px 3px; font:700 9px var(--fmono); letter-spacing:.09em; text-transform:uppercase; color:var(--dim); }
+
+/* plan cards */
+.phase { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-top:14px; }
+@media (max-width:1100px){ .phase { grid-template-columns:repeat(2,1fr); } }
+.pcard { background:#1b1b1b; border:1px solid #2c2c2c; border-radius:11px; padding:12px 13px; }
+.pcard h4 { color:#eaeaea; font-size:12px; font-weight:660; margin-bottom:3px; }
+.pcard .n { font:700 9px monospace; letter-spacing:.1em; color:#c8a06a; text-transform:uppercase; }
+.pcard p { font-size:11px; color:#898989; line-height:1.55; margin-top:5px; }
+.pcard p code { font:10px monospace; color:#c8a06a; }
+.pcard .ship { font-size:10.5px; color:#8fbf9f; margin-top:6px; display:block; }
+.inv { width:100%; border-collapse:collapse; font-size:12.5px; color:#b6b6b6; }
+.inv th { text-align:left; font:700 9.5px monospace; letter-spacing:.1em; text-transform:uppercase; color:#6f6f6f; padding:9px 12px; border-bottom:1px solid #2c2c2c; }
+.inv td { padding:10px 12px; border-bottom:1px solid #222; vertical-align:top; line-height:1.5; }
+.inv td:first-child { color:#eaeaea; font-weight:620; white-space:nowrap; }
+.inv code { font:10.5px monospace; color:#c8a06a; }
+.inv .kill { color:#c8846a; font-weight:600; } .inv .keep { color:#8fbf9f; font-weight:600; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<div class="pagehead">
+  <h1>Whiteboards — the thinking surface, and the first thing agents can draw</h1>
+  <p><b>The ask (George, 2026-08-05):</b> integrate Excalidraw. Humans quickly draft ideas or mockups and capture them into a chat as artifacts; agents generate whiteboard assets too (Excalidraw converts mermaid and element JSON into editable scenes); a left-nav item next to Board — or rename Board to <b>Tasks</b> — plus a <b>New whiteboard</b> entry in the workspace ＋ flyout; boards open in tabs, render as preview cards in threads, and can be edited or reviewed.</p>
+  <p><b>Verdict: yes — and the 08-03 hold is answered.</b> The channel-scope round held Whiteboard (its Stop 6) because no job was named: <i>"without an agent contract it's a drawing app inside a collaboration platform."</i> This ask names the job twice over. <b>Job 1 — think before there's a task:</b> sketch in a chat-mode thread, the room's agents read it, and docs/34's escalation valve turns the conversation into work in place. <b>Job 2 — agents finally draw:</b> the repo has <span class="warn">zero diagram surface today</span> (not one mermaid reference anywhere) — plans, reviews and architecture discussions are prose-only. Both jobs run the litmus: sketches brief the design gate, architecture diagrams land in plan reviews, and visual evidence reaches review threads.</p>
+  <p><b>The guard from Stop 6 stands:</b> a whiteboard is <b>not</b> a fourth home for design rounds. The Design Studio keeps `approve_design` and the visual contract; whiteboards are the pre-task sketch and the diagram — different noun, and the plan below enforces the boundary rather than promising it.</p>
+  <p><b>The engine is right.</b> <code>@excalidraw/excalidraw@0.18.1</code>: MIT, React 19 peer (ours), a controlled component in the renderer; a scene is plain JSON, so a board syncs like any other row — PowerSync gives offline reads and queued writes for free. <code>@excalidraw/mermaid-to-excalidraw@2.2.2</code> turns flowchart/sequence/class mermaid into <i>editable elements</i> (other types arrive as an image), and <code>convertToExcalidrawElements()</code> accepts a simple element skeleton — two generation paths that fit an LLM's hands. <code>exportToSvg</code> makes the snapshot every card renders. Assets self-host via <code>window.EXCALIDRAW_ASSET_PATH</code>: <b>no CDN, no excalidraw.com call, ever</b> — scene bytes live in our Postgres and nowhere else.</p>
+</div>
+
+<!-- ══════════ STOP 1 ══════════ -->
+<div class="stophd"><span class="stopno">Stop 1</span>Where it lives — a destination beside Tasks, scoped like everything else</div>
+<div class="stopp">The left column's destinations are one data-driven list (Home · Board · Automations · Library). <b>Whiteboards slots in beside Board, and Board's label becomes Tasks</b> — label only: the FSM, the docs and every internal id keep <code>board</code>. The scope knob at the column's head does to Whiteboards exactly what it does to Tasks and Automations: <b>All channels</b> = every board in the project, <b>#room</b> = that room's boards. The destination is a library of snapshot tiles — day-grouped like the session list, each tile a static SVG snapshot (never a live canvas), because a grid of running Excalidraw instances is how a 60fps budget dies.</div>
+<div class="themes">
+  <div class="theme rel" data-theme="cream-oak">
+    <h2>The nav — Whiteboards beside Tasks · cream oak</h2>
+    <div class="shell" style="min-height:560px">
+      <div class="spine">
+        <div class="sp-home">⌂<span class="pip">3</span></div>
+        <div class="sp-rule"></div>
+        <div class="sp-live"></div>
+        <div class="sp-name">neuramesh</div>
+        <div class="sp-dots"><div class="sp-dot"></div><div class="sp-dot"></div></div>
+        <div class="sp-foot"><div style="font-size:9px">›</div><div class="sp-av">G</div></div>
+      </div>
+      <div class="nav">
+        <div class="scopehead"><span class="h">#</span> All channels <span class="caret">▾</span></div>
+        <div class="navnew"><div class="navnewchat">＋ New chat <span class="k">⌘N</span></div><div class="navnewcaret">▾</div></div>
+        <div class="navitem"><span class="ni">⌂</span> Home <span class="badge hot">3</span></div>
+        <div class="navitem"><span class="ni">▦</span> Tasks <span class="badge">4</span></div>
+        <div class="navitem on"><span class="ni">⊞</span> Whiteboards</div>
+        <div class="navitem"><span class="ni">↻</span> Automations <span class="badge">2</span></div>
+        <div class="navitem"><span class="ni">▤</span> Library</div>
+        <div class="navsec">Recents</div>
+        <div class="hrow"><div class="hdot prog"></div><div class="t">1051 needs-you queue empties on…</div><div class="w">2h</div></div>
+        <div class="hrow"><div class="hdot"></div><div class="t">brainstorm: onboarding email arc</div><div class="w">4h</div></div>
+        <div class="hrow"><div class="hdot"></div><div class="t">1048 spine dots cap at eight</div><div class="w">1d</div></div>
+      </div>
+      <div class="main">
+        <div class="tabstrip">
+          <div class="wtab conv on"><span class="ic">◈</span><span class="lbl">Whiteboards</span></div>
+          <div class="wtabadd">＋</div>
+          <div class="wtabright"><span class="wtabico">◫</span><span class="wtabico">▤</span></div>
+        </div>
+        <div class="body"><div class="content">
+          <div class="libwrap">
+            <div class="libhead"><h3>Whiteboards</h3><span class="sub">every board in neuramesh</span><div class="libnew">＋ New whiteboard</div></div>
+            <div class="daysec">Today</div>
+            <div class="libgrid">
+              <div class="wbtile">
+                <div class="snap"><svg viewBox="0 0 300 110">
+                  <g class="hand" font-size="8" fill="var(--cink)">
+                    <rect x="18" y="30" width="62" height="26" rx="4" fill="var(--cfill-blue)" stroke="var(--cblue)" stroke-width="1.4" transform="rotate(-.5 49 43)"/>
+                    <text x="30" y="46">capture</text>
+                    <rect x="122" y="18" width="62" height="26" rx="4" fill="none" stroke="var(--cink)" stroke-width="1.4" transform="rotate(.4 153 31)"/>
+                    <text x="134" y="34">daemon</text>
+                    <rect x="122" y="62" width="62" height="26" rx="4" fill="none" stroke="var(--cink)" stroke-width="1.4"/>
+                    <text x="130" y="78">control-api</text>
+                    <rect x="226" y="40" width="58" height="26" rx="13" fill="var(--cfill-green)" stroke="var(--cgreen)" stroke-width="1.4" transform="rotate(-.6 255 53)"/>
+                    <text x="238" y="56">postgres</text>
+                    <path d="M81 41 Q100 36 120 30" fill="none" stroke="var(--cink)" stroke-width="1.3"/><path d="M114 27 l7 3 -6 4" fill="none" stroke="var(--cink)" stroke-width="1.3"/>
+                    <path d="M81 47 Q100 56 120 72" fill="none" stroke="var(--cink)" stroke-width="1.3"/><path d="M114 68 l7 4 -7 2" fill="none" stroke="var(--cink)" stroke-width="1.3"/>
+                    <path d="M185 74 Q205 68 224 56" fill="none" stroke="var(--cink)" stroke-width="1.3"/><path d="M218 54 l7 1 -4 6" fill="none" stroke="var(--cink)" stroke-width="1.3"/>
+                  </g>
+                </svg></div>
+                <div class="m"><b>wake pipeline</b><span class="rm">#dev</span><span class="w">2h</span></div>
+              </div>
+              <div class="wbtile">
+                <div class="snap"><svg viewBox="0 0 300 110">
+                  <g class="hand" font-size="8" fill="var(--cink)">
+                    <rect x="30" y="14" width="110" height="82" rx="5" fill="none" stroke="var(--cink)" stroke-width="1.4" transform="rotate(-.3 85 55)"/>
+                    <rect x="40" y="24" width="90" height="10" rx="3" fill="var(--cfill-yellow)" stroke="var(--cyellow)" stroke-width="1.2"/>
+                    <rect x="40" y="42" width="42" height="44" rx="3" fill="none" stroke="var(--cink)" stroke-width="1.2"/>
+                    <rect x="88" y="42" width="42" height="20" rx="3" fill="var(--cfill-blue)" stroke="var(--cblue)" stroke-width="1.2"/>
+                    <rect x="88" y="68" width="42" height="18" rx="3" fill="none" stroke="var(--cink)" stroke-width="1.2"/>
+                    <text x="168" y="34" font-size="9">queue card?</text>
+                    <path d="M164 38 Q150 44 134 50" fill="none" stroke="var(--cink)" stroke-width="1.2"/><path d="M140 46 l-7 4 7 3" fill="none" stroke="var(--cink)" stroke-width="1.2"/>
+                    <text x="164" y="72" font-size="8" opacity=".75">reply box stays put</text>
+                  </g>
+                </svg></div>
+                <div class="m"><b>needs-you sketch</b><span class="rm">#design</span><span class="w">4h</span></div>
+              </div>
+              <div class="wbtile ghost"><div><span class="plus">⊞</span>New whiteboard</div></div>
+            </div>
+            <div class="daysec">This week</div>
+            <div class="libgrid">
+              <div class="wbtile">
+                <div class="snap"><svg viewBox="0 0 300 110">
+                  <g class="hand" font-size="8" fill="var(--cink)">
+                    <ellipse cx="60" cy="55" rx="34" ry="20" fill="none" stroke="var(--cink)" stroke-width="1.4"/>
+                    <text x="42" y="58">wake</text>
+                    <rect x="130" y="20" width="60" height="24" rx="4" fill="var(--cfill-blue)" stroke="var(--cblue)" stroke-width="1.3"/><text x="142" y="35">triage</text>
+                    <rect x="130" y="66" width="60" height="24" rx="4" fill="none" stroke="var(--cink)" stroke-width="1.3"/><text x="140" y="81">defer</text>
+                    <rect x="226" y="42" width="56" height="24" rx="4" fill="var(--cfill-green)" stroke="var(--cgreen)" stroke-width="1.3"/><text x="238" y="57">offer</text>
+                    <path d="M95 48 Q110 40 128 32" fill="none" stroke="var(--cink)" stroke-width="1.2"/>
+                    <path d="M95 62 Q110 70 128 78" fill="none" stroke="var(--cink)" stroke-width="1.2"/>
+                    <path d="M191 32 Q210 36 224 48" fill="none" stroke="var(--cink)" stroke-width="1.2"/>
+                  </g>
+                </svg></div>
+                <div class="m"><b>triage flow · sol</b><span class="rm">#dev</span><span class="w">2d</span></div>
+              </div>
+            </div>
+          </div>
+        </div></div>
+      </div>
+    </div>
+    <div class="mark" style="top:184px; left:206px">1</div>
+    <div class="mark" style="top:152px; left:162px">2</div>
+    <div class="mark" style="top:44px; left:196px">3</div>
+    <div class="mark" style="top:250px; right:330px">4</div>
+  </div>
+
+  <div class="theme rel" data-theme="dark">
+    <h2>Scoped to a room · empty state · graphite</h2>
+    <div class="shell" style="min-height:560px">
+      <div class="spine">
+        <div class="sp-home">⌂</div>
+        <div class="sp-rule"></div>
+        <div class="sp-name">neuramesh</div>
+        <div class="sp-dots"><div class="sp-dot"></div><div class="sp-dot"></div></div>
+        <div class="sp-foot"><div style="font-size:9px">›</div><div class="sp-av">G</div></div>
+      </div>
+      <div class="nav">
+        <div class="scopehead"><span class="h">#</span> research <span class="caret">▾</span></div>
+        <div class="navnew"><div class="navnewchat">＋ New chat <span class="k">⌘N</span></div><div class="navnewcaret">▾</div></div>
+        <div class="navitem"><span class="ni">⌂</span> Home</div>
+        <div class="navitem"><span class="ni">▦</span> Tasks <span class="badge">1</span></div>
+        <div class="navitem on"><span class="ni">⊞</span> Whiteboards</div>
+        <div class="navitem"><span class="ni">↻</span> Automations</div>
+        <div class="navitem"><span class="ni">▤</span> Library</div>
+        <div class="navsec">Recents</div>
+        <div class="hrow"><div class="hdot"></div><div class="t">competitor pricing sweep</div><div class="w">1d</div></div>
+      </div>
+      <div class="main">
+        <div class="tabstrip">
+          <div class="wtab conv on"><span class="ic">◈</span><span class="lbl">Whiteboards · #research</span></div>
+          <div class="wtabadd">＋</div>
+          <div class="wtabright"><span class="wtabico">◫</span><span class="wtabico">▤</span></div>
+        </div>
+        <div class="body"><div class="content">
+          <div class="libwrap">
+            <div class="libhead"><h3>Whiteboards</h3><span class="sub">in #research</span><div class="libnew">＋ New whiteboard</div></div>
+            <div style="display:grid; place-items:center; height:380px">
+              <div style="text-align:center; max-width:40ch">
+                <div style="font-family:var(--fdisp); font-size:16.5px; font-weight:640; color:var(--text)">Nothing sketched here yet.</div>
+                <div style="font-size:12px; color:var(--muted); margin-top:7px; line-height:1.6">Draw the first one — or ask an agent for a diagram in any #research chat and it lands here.</div>
+                <div class="libnew" style="display:inline-flex; margin:14px auto 0">＋ New whiteboard</div>
+              </div>
+            </div>
+          </div>
+        </div></div>
+      </div>
+    </div>
+    <div class="mark" style="top:44px; left:188px">5</div>
+  </div>
+</div>
+<div class="callouts">
+  <div class="co"><span class="n">1</span><b>One tuple in one list.</b> The destinations are data-driven (<code>dest</code>, App.tsx) — Whiteboards is one row copied from Board's shape, plus its three mirrors: the top-dock list, the ⌘K palette, and the room-views burger. The four lists must not disagree.</div>
+  <div class="co"><span class="n">2</span><b>Board → Tasks, label only.</b> The word "Board" sitting one row above "Whiteboards" makes two unrelated surfaces read as siblings. The FSM, docs and ids keep <code>board</code>; the string changes in the four lists plus the tour copy.</div>
+  <div class="co"><span class="n">3</span><b>The scope knob already solves scoping.</b> All channels = the project's boards; #room = that room's. A whiteboard is filed to a channel exactly like an artifact: <b>agent</b> access follows channel registration (server-checked); human visibility rides the workspace stream, the artifacts posture — channel-granular sync rules are the same refine-later both share.</div>
+  <div class="co"><span class="n">4</span><b>Tiles are snapshots.</b> Each tile renders the stored SVG snapshot — no live canvases in lists. No badge on the nav row: a count of boards is inventory, not attention.</div>
+  <div class="co"><span class="n">5</span><b>The empty state teaches the second door:</b> agents can draw one into this room's chat. Serif line + one action, per the idiom.</div>
+</div>
+
+<!-- ══════════ STOP 2 ══════════ -->
+<div class="stophd"><span class="stopno">Stop 2</span>The tab — a sixth workspace-tab kind, and the canvas is the canvas</div>
+<div class="stopp">A whiteboard opens as a workspace tab (<code>kind:'whiteboard'</code>) — peer of file, terminal, browser and review, reusing every invariant the strip already enforces: keyed by board id so one board is one tab, dirty dot where the ✕ lives, survives relaunch. The header keeps the file-header's 38px mono rhythm: title, the <code>#room</code> chip that names its filing, saved state, and <b>Share to chat</b>. Inside the pane, Excalidraw wears its own chrome — same ruling as xterm in terminal tabs: <b>the canvas is the canvas</b>. We pass it our light/dark, self-host its fonts, and disable its collab/share/export-to-cloud UI. We do not restyle its islands into the token system.</div>
+<div class="themes">
+  <div class="theme rel" data-theme="cream-oak">
+    <h2>Drawing an architecture · cream oak</h2>
+    <div class="shell" style="min-height:600px">
+      <div class="spine">
+        <div class="sp-home">⌂<span class="pip">3</span></div>
+        <div class="sp-rule"></div>
+        <div class="sp-live"></div>
+        <div class="sp-name">neuramesh</div>
+        <div class="sp-dots"><div class="sp-dot"></div><div class="sp-dot"></div></div>
+        <div class="sp-foot"><div style="font-size:9px">›</div><div class="sp-av">G</div></div>
+      </div>
+      <div class="nav">
+        <div class="scopehead"><span class="h">#</span> dev <span class="caret">▾</span></div>
+        <div class="navnew"><div class="navnewchat">＋ New chat <span class="k">⌘N</span></div><div class="navnewcaret">▾</div></div>
+        <div class="navitem"><span class="ni">⌂</span> Home</div>
+        <div class="navitem"><span class="ni">▦</span> Tasks <span class="badge">2</span></div>
+        <div class="navitem"><span class="ni">⊞</span> Whiteboards</div>
+        <div class="navitem"><span class="ni">↻</span> Automations</div>
+        <div class="navitem"><span class="ni">▤</span> Library</div>
+        <div class="navsec">Recents</div>
+        <div class="hrow"><div class="hdot prog"></div><div class="t">1051 needs-you queue empties…</div><div class="w">2h</div></div>
+        <div class="hrow"><div class="hdot"></div><div class="t">sync watch drops replies</div><div class="w">5h</div></div>
+      </div>
+      <div class="main">
+        <div class="tabstrip">
+          <div class="wtab conv"><span class="ic">◈</span><span class="lbl">#dev · conversations</span></div>
+          <div class="wtab on"><span class="ic">⊞</span><span class="lbl">offline sync map</span><span class="dirty"></span></div>
+          <div class="wtab"><span class="ic">▸</span><span class="lbl">nm-1051</span><span class="x">✕</span></div>
+          <div class="wtabadd">＋</div>
+          <div class="wtabright"><span class="wtabico">◫</span><span class="wtabico">▤</span></div>
+        </div>
+        <div class="body"><div class="content">
+          <div class="wbhead">
+            <span class="path">whiteboard /</span> <span class="ttl">offline sync map</span>
+            <span class="wbchip"><span class="h">#</span>dev</span>
+            <span class="wbsaved"><span class="dot" style="background:var(--warn,#c9a15e)"></span> editing · saved 12s ago</span>
+            <span class="wbshare"><span class="a">↗</span> Share to chat</span>
+          </div>
+          <div class="canvas">
+            <div class="exisl exmenu"><span class="t">☰</span></div>
+            <div class="exisl extools">
+              <span class="t">▣</span><span class="t on">▭</span><span class="t">◇</span><span class="t">◯</span><span class="t">→</span><span class="t">∿</span><span class="t">A</span><span class="t">🖼</span>
+            </div>
+            <div class="exisl exzoom"><span class="t">−</span><span class="z">100%</span><span class="t">＋</span></div>
+            <div class="exisl exhelp"><span class="t">?</span></div>
+            <svg class="scene" viewBox="0 0 760 520">
+              <g class="hand" fill="var(--cink)" font-size="13">
+                <rect x="60" y="80" width="130" height="52" rx="6" fill="var(--cfill-blue)" stroke="var(--cblue)" stroke-width="1.7" transform="rotate(-.4 125 106)"/>
+                <text x="83" y="110">desktop app</text>
+                <rect x="60" y="300" width="130" height="52" rx="6" fill="none" stroke="var(--cink)" stroke-width="1.7" transform="rotate(.3 125 326)"/>
+                <text x="76" y="330">agent daemon</text>
+                <rect x="330" y="185" width="150" height="54" rx="6" fill="none" stroke="var(--cink)" stroke-width="1.7" transform="rotate(-.2 405 212)"/>
+                <text x="352" y="216">control-api</text>
+                <ellipse cx="640" cy="130" rx="76" ry="34" fill="var(--cfill-green)" stroke="var(--cgreen)" stroke-width="1.7"/>
+                <text x="605" y="136">postgres</text>
+                <ellipse cx="640" cy="300" rx="76" ry="34" fill="none" stroke="var(--cink)" stroke-width="1.7"/>
+                <text x="598" y="306">powersync</text>
+                <path d="M192 118 Q260 140 326 196" fill="none" stroke="var(--cink)" stroke-width="1.5"/><path d="M318 190 l10 6 -11 3" fill="none" stroke="var(--cink)" stroke-width="1.5"/>
+                <path d="M192 316 Q260 292 326 232" fill="none" stroke="var(--cink)" stroke-width="1.5"/><path d="M318 238 l10 -6 -3 10" fill="none" stroke="var(--cink)" stroke-width="1.5"/>
+                <path d="M482 196 Q540 168 562 148" fill="none" stroke="var(--cink)" stroke-width="1.5"/><path d="M554 152 l10 -5 -3 10" fill="none" stroke="var(--cink)" stroke-width="1.5"/>
+                <path d="M640 166 L640 264" fill="none" stroke="var(--cgreen)" stroke-width="1.5" stroke-dasharray="7 6"/><path d="M634 256 l6 10 6 -10" fill="none" stroke="var(--cgreen)" stroke-width="1.5"/>
+                <path d="M566 288 Q380 260 196 112 M196 112 l4 11 M196 112 l11 -1" fill="none" stroke="var(--cblue)" stroke-width="1.5" stroke-dasharray="7 6"/>
+                <text x="250" y="152" font-size="11" fill="var(--cblue)" transform="rotate(-14 250 152)">sync (offline queue)</text>
+                <text x="512" y="256" font-size="11">commands</text>
+                <rect x="300" y="380" width="168" height="84" rx="4" fill="var(--cfill-yellow)" stroke="var(--cyellow)" stroke-width="1.6" transform="rotate(-1 384 422)"/>
+                <text x="318" y="410" font-size="12">phone wedge bug —</text>
+                <text x="318" y="430" font-size="12">retry needs idempotency</text>
+                <text x="318" y="450" font-size="12">key on /v1/messages ✱</text>
+                <path d="M120 132 C 110 200, 112 236, 121 296" fill="none" stroke="var(--cink)" stroke-width="1.5"/><path d="M115 288 l6 10 6 -10" fill="none" stroke="var(--cink)" stroke-width="1.5"/>
+                <text x="42" y="222" font-size="11" transform="rotate(-90 48 222)">spawns</text>
+              </g>
+            </svg>
+          </div>
+        </div></div>
+      </div>
+    </div>
+    <div class="mark" style="top:52px; left:392px">6</div>
+    <div class="mark" style="top:100px; right:36px">7</div>
+    <div class="mark" style="top:102px; right:262px">8</div>
+    <div class="mark" style="bottom:70px; left:330px">9</div>
+  </div>
+
+  <div class="theme rel" data-theme="dark">
+    <h2>The same surface in graphite — canvas follows the app's theme</h2>
+    <div class="shell" style="min-height:600px">
+      <div class="spine">
+        <div class="sp-home">⌂</div>
+        <div class="sp-rule"></div>
+        <div class="sp-live"></div>
+        <div class="sp-name">neuramesh</div>
+        <div class="sp-dots"><div class="sp-dot"></div></div>
+        <div class="sp-foot"><div style="font-size:9px">›</div><div class="sp-av">G</div></div>
+      </div>
+      <div class="nav">
+        <div class="scopehead"><span class="h">#</span> design <span class="caret">▾</span></div>
+        <div class="navnew"><div class="navnewchat">＋ New chat <span class="k">⌘N</span></div><div class="navnewcaret">▾</div></div>
+        <div class="navitem"><span class="ni">⌂</span> Home</div>
+        <div class="navitem"><span class="ni">▦</span> Tasks</div>
+        <div class="navitem"><span class="ni">⊞</span> Whiteboards</div>
+        <div class="navitem"><span class="ni">↻</span> Automations</div>
+        <div class="navitem"><span class="ni">▤</span> Library</div>
+        <div class="navsec">Recents</div>
+        <div class="hrow"><div class="hdot"></div><div class="t">nav head promises the column</div><div class="w">3h</div></div>
+      </div>
+      <div class="main">
+        <div class="tabstrip">
+          <div class="wtab conv"><span class="ic">◈</span><span class="lbl">#design · conversations</span></div>
+          <div class="wtab on"><span class="ic">⊞</span><span class="lbl">composer rework sketch</span><span class="x">✕</span></div>
+          <div class="wtabadd">＋</div>
+          <div class="wtabright"><span class="wtabico">◫</span><span class="wtabico">▤</span></div>
+        </div>
+        <div class="body"><div class="content">
+          <div class="wbhead">
+            <span class="path">whiteboard /</span> <span class="ttl">composer rework sketch</span>
+            <span class="wbchip"><span class="h">#</span>design</span>
+            <span class="wbsaved"><span class="dot"></span> saved · synced</span>
+            <span class="wbshare"><span class="a">↗</span> Share to chat</span>
+          </div>
+          <div class="canvas">
+            <div class="exisl exmenu"><span class="t">☰</span></div>
+            <div class="exisl extools">
+              <span class="t">▣</span><span class="t">▭</span><span class="t">◇</span><span class="t">◯</span><span class="t on">→</span><span class="t">∿</span><span class="t">A</span><span class="t">🖼</span>
+            </div>
+            <div class="exisl exzoom"><span class="t">−</span><span class="z">80%</span><span class="t">＋</span></div>
+            <div class="exisl exhelp"><span class="t">?</span></div>
+            <svg class="scene" viewBox="0 0 760 520">
+              <g class="hand" fill="var(--cink)" font-size="12">
+                <rect x="150" y="60" width="440" height="330" rx="8" fill="none" stroke="var(--cink)" stroke-width="1.7" transform="rotate(-.2 370 225)"/>
+                <rect x="176" y="88" width="388" height="46" rx="6" fill="var(--cfill-yellow)" stroke="var(--cyellow)" stroke-width="1.5"/>
+                <text x="196" y="116">chint cap — avatar + one line of guidance</text>
+                <rect x="176" y="150" width="388" height="130" rx="6" fill="none" stroke="var(--cink)" stroke-width="1.5" stroke-dasharray="8 6"/>
+                <text x="196" y="182" opacity=".7">textarea…</text>
+                <rect x="176" y="298" width="90" height="30" rx="15" fill="var(--cfill-blue)" stroke="var(--cblue)" stroke-width="1.5"/>
+                <text x="192" y="317">#channel</text>
+                <rect x="276" y="298" width="76" height="30" rx="15" fill="none" stroke="var(--cink)" stroke-width="1.5"/>
+                <text x="292" y="317">attach</text>
+                <circle cx="536" cy="313" r="17" fill="var(--cfill-green)" stroke="var(--cgreen)" stroke-width="1.6"/>
+                <text x="530" y="319">↑</text>
+                <path d="M600 313 Q650 310 672 290" fill="none" stroke="var(--cink)" stroke-width="1.4"/>
+                <text x="620" y="268" font-size="11">send is a circle,</text>
+                <text x="620" y="284" font-size="11">always</text>
+                <path d="M120 110 Q140 104 172 108" fill="none" stroke="var(--cyellow)" stroke-width="1.4"/><path d="M164 104 l9 4 -8 5" fill="none" stroke="var(--cyellow)" stroke-width="1.4"/>
+                <text x="34" y="100" font-size="11" fill="var(--cyellow)">warm well,</text>
+                <text x="34" y="116" font-size="11" fill="var(--cyellow)">never a card</text>
+                <text x="176" y="440" font-size="13">every composer in the product is this one idiom ✱</text>
+              </g>
+            </svg>
+          </div>
+        </div></div>
+      </div>
+    </div>
+    <div class="mark" style="top:176px; right:148px">10</div>
+    <div class="mark" style="top:344px; left:300px">11</div>
+  </div>
+</div>
+<div class="callouts">
+  <div class="co"><span class="n">6</span><b>Sixth tab kind.</b> <code>wtabs.ts</code> grows <code>'whiteboard'</code>: reuse keys on the board id (one board = one tab), the dirty dot replaces the ✕ mid-edit (the universal contract), and serialize/revive learn the kind so boards survive relaunch — identity in its own field, because tabs carrying <code>artifactId</code> are deliberately never persisted.</div>
+  <div class="co"><span class="n">7</span><b>Share to chat is the capture moment</b> — it posts a snapshot card into a session you pick (defaults to the room the board is filed in). The board stays live; the card is the doorway back to it.</div>
+  <div class="co"><span class="n">8</span><b>The #room chip names the filing.</b> A board created under a room scope files there; under All channels it takes your most recent room and the chip is where you move it. One decision, visible, undoable — the auto-file philosophy.</div>
+  <div class="co"><span class="n">9</span><b>Autosave, then reconcile.</b> Debounced save (~1.5s idle) writes scene + a fresh SVG snapshot behind a revision guard. Clean tab + a remote edit = the canvas refreshes live (viewers watch a board change). Dirty tab + a remote edit = a conflict toast, take theirs or keep yours. Last-write-wins v1; live co-editing is named phase-2 work, not pretended.</div>
+  <div class="co"><span class="n">10</span><b>Theme, not tokens.</b> Excalidraw gets <code>theme: dark|light</code> from the app theme and keeps its own island chrome — the xterm precedent. Its fonts ship in the app bundle (<code>EXCALIDRAW_ASSET_PATH</code>); collab, share links and cloud export are disabled via <code>UIOptions</code>.</div>
+  <div class="co"><span class="n">11</span><b>Job 1, worked example:</b> a rough composer sketch made to brief the design gate — it becomes a designer's <i>input</i>, never the approved round itself.</div>
+</div>
+
+<!-- ══════════ STOP 3 ══════════ -->
+<div class="stophd"><span class="stopno">Stop 3</span>The thread card — humans capture, agents draw</div>
+<div class="stopp">One card, two directions. A human shares a sketch into a chat; an agent answers a request with a diagram it generated. Either way the transcript record is a <b>snapshot card</b> — the deliverable-card idiom with a canvas-ground image, kind-tagged, click-through to the tab. Agent generation goes through one new tool, <code>create_whiteboard</code>, registered everywhere a turn gets tools — the bus catalogue, the chat turn's registry and the worker's (they are deliberately separate; adding to one is not adding to the others): the agent submits mermaid or an element skeleton, <b>both as strings</b> — the lowest common schema every runtime speaks; the server validates, files the board, posts the card. The daemon never renders — mermaid needs a DOM, so <b>the desktop materializes the scene on first render</b> (idempotent, one winner), and every later mount reads the stored snapshot.</div>
+<div class="themes">
+  <div class="theme rel" data-theme="cream-oak">
+    <h2>A human captures a sketch into chat · cream oak</h2>
+    <div class="shell" style="min-height:580px">
+      <div class="spine">
+        <div class="sp-home">⌂<span class="pip">3</span></div>
+        <div class="sp-rule"></div>
+        <div class="sp-name">neuramesh</div>
+        <div class="sp-dots"><div class="sp-dot"></div></div>
+        <div class="sp-foot"><div style="font-size:9px">›</div><div class="sp-av">G</div></div>
+      </div>
+      <div class="nav">
+        <div class="scopehead"><span class="h">#</span> design <span class="caret">▾</span></div>
+        <div class="navnew"><div class="navnewchat">＋ New chat <span class="k">⌘N</span></div><div class="navnewcaret">▾</div></div>
+        <div class="navitem"><span class="ni">⌂</span> Home</div>
+        <div class="navitem"><span class="ni">▦</span> Tasks</div>
+        <div class="navitem"><span class="ni">⊞</span> Whiteboards</div>
+        <div class="navitem"><span class="ni">↻</span> Automations</div>
+        <div class="navitem"><span class="ni">▤</span> Library</div>
+        <div class="navsec">Recents</div>
+        <div class="hrow"><div class="hdot"></div><div class="t">composer rework thoughts</div><div class="w">now</div></div>
+      </div>
+      <div class="main">
+        <div class="tabstrip">
+          <div class="wtab conv on"><span class="ic">◈</span><span class="lbl">composer rework thoughts</span></div>
+          <div class="wtab"><span class="ic">⊞</span><span class="lbl">composer rework sketch</span><span class="x">✕</span></div>
+          <div class="wtabadd">＋</div>
+          <div class="wtabright"><span class="wtabico">◫</span><span class="wtabico">▤</span></div>
+        </div>
+        <div class="body"><div class="content">
+          <div class="msgs">
+            <div class="me">before I file anything — here's roughly what I mean about the composer's third row</div>
+            <div class="msg"><div class="mav" style="font:700 10px var(--font)">G</div><div>
+              <div class="mhead"><b>george</b><span class="ago">just now</span></div>
+              <div class="wbcard">
+                <div class="wbsnap"><svg viewBox="0 0 430 150">
+                  <g class="hand" font-size="9" fill="var(--cink)">
+                    <rect x="90" y="16" width="250" height="118" rx="6" fill="none" stroke="var(--cink)" stroke-width="1.5" transform="rotate(-.3 215 75)"/>
+                    <rect x="104" y="28" width="222" height="22" rx="4" fill="var(--cfill-yellow)" stroke="var(--cyellow)" stroke-width="1.2"/>
+                    <text x="114" y="43">chint cap</text>
+                    <rect x="104" y="56" width="222" height="40" rx="4" fill="none" stroke="var(--cink)" stroke-width="1.2" stroke-dasharray="6 5"/>
+                    <rect x="104" y="102" width="52" height="18" rx="9" fill="var(--cfill-blue)" stroke="var(--cblue)" stroke-width="1.2"/>
+                    <text x="112" y="114">#chan</text>
+                    <circle cx="312" cy="111" r="10" fill="var(--cfill-green)" stroke="var(--cgreen)" stroke-width="1.3"/>
+                    <text x="308" y="115">↑</text>
+                  </g>
+                </svg></div>
+                <div class="wbmeta"><span class="ic">⊞</span><b>composer rework sketch</b><span class="kind">whiteboard</span><span class="by">#design · just now</span><span class="open">Open ›</span></div>
+              </div>
+            </div></div>
+            <div class="msg"><div class="mav">🪷</div><div>
+              <div class="mhead"><b>iris</b><span class="role">designer</span><span class="ago">now</span></div>
+              <div class="mtext">Read it. The chip row folding into the cap is the interesting part — the docs/33 composer contract keeps chips on their own line, so this would be a design-system amendment, not just a component change. Want me to take this sketch as the brief for a proper round?</div>
+            </div></div>
+          </div>
+          <div class="compose">Reply — Tasks off · @ mention · ↵ send</div>
+        </div></div>
+      </div>
+    </div>
+    <div class="mark" style="top:206px; left:366px">12</div>
+    <div class="mark" style="top:556px; left:398px">13</div>
+  </div>
+
+  <div class="theme rel" data-theme="dark">
+    <h2>An agent draws on request · graphite</h2>
+    <div class="shell" style="min-height:580px">
+      <div class="spine">
+        <div class="sp-home">⌂</div>
+        <div class="sp-rule"></div>
+        <div class="sp-live"></div>
+        <div class="sp-name">neuramesh</div>
+        <div class="sp-dots"><div class="sp-dot"></div></div>
+        <div class="sp-foot"><div style="font-size:9px">›</div><div class="sp-av">G</div></div>
+      </div>
+      <div class="nav">
+        <div class="scopehead"><span class="h">#</span> dev <span class="caret">▾</span></div>
+        <div class="navnew"><div class="navnewchat">＋ New chat <span class="k">⌘N</span></div><div class="navnewcaret">▾</div></div>
+        <div class="navitem"><span class="ni">⌂</span> Home</div>
+        <div class="navitem"><span class="ni">▦</span> Tasks <span class="badge">2</span></div>
+        <div class="navitem"><span class="ni">⊞</span> Whiteboards</div>
+        <div class="navitem"><span class="ni">↻</span> Automations</div>
+        <div class="navitem"><span class="ni">▤</span> Library</div>
+        <div class="navsec">Recents</div>
+        <div class="hrow"><div class="hdot prog"></div><div class="t">how does a wake become a run?</div><div class="w">now</div></div>
+      </div>
+      <div class="main">
+        <div class="tabstrip">
+          <div class="wtab conv on"><span class="ic">◈</span><span class="lbl">how does a wake become a run?</span></div>
+          <div class="wtabadd">＋</div>
+          <div class="wtabright"><span class="wtabico">◫</span><span class="wtabico">▤</span></div>
+        </div>
+        <div class="body"><div class="content">
+          <div class="msgs">
+            <div class="me">sol — sketch the wake → triage → run pipeline as a flowchart I can edit. boxes for the dedupe and the watermark bits</div>
+            <div class="msg"><div class="mav">☀️</div><div>
+              <div class="mhead"><b>sol</b><span class="role">developer</span><span class="ago">40s</span></div>
+              <div class="mtext">Drew it from <span style="font-family:var(--fmono); font-size:11px; color:var(--link)">wake.ts</span> and the docs/16 flow — every box is a real shape, so drag things around and I'll re-read it if you share it back.</div>
+              <div class="wbcard">
+                <div class="wbsnap"><svg viewBox="0 0 430 150">
+                  <g class="hand" font-size="8.5" fill="var(--cink)">
+                    <ellipse cx="52" cy="74" rx="30" ry="17" fill="none" stroke="var(--cink)" stroke-width="1.3"/>
+                    <text x="38" y="78">wake</text>
+                    <rect x="112" y="56" width="70" height="34" rx="4" fill="var(--cfill-blue)" stroke="var(--cblue)" stroke-width="1.3"/>
+                    <text x="122" y="70">dedupe</text><text x="120" y="82" font-size="7" opacity=".7">0060 index</text>
+                    <polygon points="238,52 288,74 238,96 188,74" fill="none" stroke="var(--cink)" stroke-width="1.3" transform="rotate(.4 238 74)"/>
+                    <text x="218" y="78">triage?</text>
+                    <rect x="322" y="24" width="82" height="30" rx="4" fill="var(--cfill-green)" stroke="var(--cgreen)" stroke-width="1.3"/>
+                    <text x="336" y="43">offer task</text>
+                    <rect x="322" y="96" width="82" height="30" rx="4" fill="none" stroke="var(--cink)" stroke-width="1.3"/>
+                    <text x="330" y="115">defer + mark</text>
+                    <path d="M83 74 L110 74" stroke="var(--cink)" stroke-width="1.2" fill="none"/><path d="M104 70 l7 4 -7 4" stroke="var(--cink)" stroke-width="1.2" fill="none"/>
+                    <path d="M183 74 L187 74" stroke="var(--cink)" stroke-width="1.2" fill="none"/>
+                    <path d="M270 60 Q296 44 318 40" stroke="var(--cink)" stroke-width="1.2" fill="none"/><path d="M311 36 l8 3 -7 5" stroke="var(--cink)" stroke-width="1.2" fill="none"/>
+                    <path d="M270 88 Q296 104 318 110" stroke="var(--cink)" stroke-width="1.2" fill="none"/><path d="M312 105 l7 5 -8 3" stroke="var(--cink)" stroke-width="1.2" fill="none"/>
+                    <text x="292" y="34" font-size="7.5" opacity=".8">yes</text>
+                    <text x="292" y="122" font-size="7.5" opacity=".8">no</text>
+                  </g>
+                </svg></div>
+                <div class="wbmeta"><span class="ic">⊞</span><b>wake pipeline</b><span class="kind">whiteboard</span><span class="by">sol · from mermaid</span><span class="open">Open ›</span></div>
+              </div>
+            </div></div>
+          </div>
+          <div class="compose">Reply — Tasks off · @ mention · ↵ send</div>
+        </div></div>
+      </div>
+    </div>
+    <div class="mark" style="top:262px; left:330px">14</div>
+    <div class="mark" style="top:436px; left:610px">15</div>
+  </div>
+</div>
+<div class="callouts">
+  <div class="co"><span class="n">12</span><b>The card is the transcript record</b> — deliverable-card anatomy with a canvas-ground snapshot: name · <code>WHITEBOARD</code> kind tag · filing + age · Open. Click opens the tab; the card itself never hosts a live canvas.</div>
+  <div class="co"><span class="n">13</span><b>Chat stays chat.</b> Born in a Tasks-off thread, nothing touches the board FSM — and the sketch is how a conversation gets escalated <i>with its thinking attached</i>.</div>
+  <div class="co"><span class="n">14</span><b>One tool, two dialects.</b> <code>create_whiteboard(title, mermaid | elements)</code> — mermaid for flow/sequence/class (arrives editable; other mermaid kinds arrive as an image and the tool description says so), element skeleton for precise architecture layouts. Server-validated, size-capped, filed to the thread's channel.</div>
+  <div class="co"><span class="n">15</span><b>Materialize on first render.</b> The daemon stores source; the first desktop to render converts (mermaid → elements → scene + snapshot) and persists it behind a <code>scene IS NULL</code> guard — idempotent, races resolve to one winner, and phones/other machines get the snapshot thereafter.</div>
+</div>
+
+<!-- ══════════ STOP 4 ══════════ -->
+<div class="stophd"><span class="stopno">Stop 4</span>The ＋ flyout, and diagrams as task evidence</div>
+<div class="stopp">The ＋ flyout is the one creation door for the content area — <b>New whiteboard</b> joins Create, beside New markdown. And in task mode the same <code>create_whiteboard</code> tool files the board to the task's channel and drops the card into the task thread: an architecture diagram becomes reviewable evidence next to the diff, and a Definition of Done can require one.</div>
+<div class="themes">
+  <div class="theme rel" data-theme="cream-oak">
+    <h2>＋ → Create → New whiteboard · cream oak</h2>
+    <div class="shell" style="min-height:480px">
+      <div class="spine">
+        <div class="sp-home">⌂<span class="pip">3</span></div>
+        <div class="sp-rule"></div>
+        <div class="sp-name">neuramesh</div>
+        <div class="sp-dots"><div class="sp-dot"></div></div>
+        <div class="sp-foot"><div style="font-size:9px">›</div><div class="sp-av">G</div></div>
+      </div>
+      <div class="nav">
+        <div class="scopehead"><span class="h">#</span> dev <span class="caret">▾</span></div>
+        <div class="navnew"><div class="navnewchat">＋ New chat <span class="k">⌘N</span></div><div class="navnewcaret">▾</div></div>
+        <div class="navitem"><span class="ni">⌂</span> Home</div>
+        <div class="navitem"><span class="ni">▦</span> Tasks <span class="badge">2</span></div>
+        <div class="navitem"><span class="ni">⊞</span> Whiteboards</div>
+        <div class="navitem"><span class="ni">↻</span> Automations</div>
+        <div class="navitem"><span class="ni">▤</span> Library</div>
+      </div>
+      <div class="main">
+        <div class="tabstrip">
+          <div class="wtab conv on"><span class="ic">◈</span><span class="lbl">#dev · conversations</span></div>
+          <div class="wtabadd" style="background:var(--hover-bg); color:var(--text)">＋</div>
+          <div class="wtabright"><span class="wtabico">◫</span><span class="wtabico">▤</span></div>
+        </div>
+        <div class="body"><div class="content">
+          <div class="msgs" style="opacity:.32">
+            <div class="me">the sync watch drops replies when the room switches mid-run</div>
+          </div>
+        </div></div>
+        <div class="flyout">
+          <div class="flyhint">Open in this area</div>
+          <div class="flyrow"><span class="fic">⌕</span><div>Open a file…<small>from a worktree · ⌘P</small></div></div>
+          <div class="flyrow"><span class="fic">▸</span><div>Terminal</div></div>
+          <div class="flyrow"><span class="fic">◍</span><div>Browser</div></div>
+          <div class="flysep"></div>
+          <div class="flyhint">Create</div>
+          <div class="flyrow"><span class="fic">✎</span><div>New markdown</div></div>
+          <div class="flyrow on"><span class="fic">⊞</span><div>New whiteboard<small>files to #dev · sketch, then share</small></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="mark" style="top:300px; left:388px">16</div>
+  </div>
+
+  <div class="theme rel" data-theme="dark">
+    <h2>A diagram in a task thread — evidence beside the diff · graphite</h2>
+    <div class="shell" style="min-height:480px">
+      <div class="spine">
+        <div class="sp-home">⌂</div>
+        <div class="sp-rule"></div>
+        <div class="sp-live"></div>
+        <div class="sp-name">neuramesh</div>
+        <div class="sp-dots"><div class="sp-dot"></div></div>
+        <div class="sp-foot"><div style="font-size:9px">›</div><div class="sp-av">G</div></div>
+      </div>
+      <div class="nav">
+        <div class="scopehead"><span class="h">#</span> dev <span class="caret">▾</span></div>
+        <div class="navnew"><div class="navnewchat">＋ New chat <span class="k">⌘N</span></div><div class="navnewcaret">▾</div></div>
+        <div class="navitem"><span class="ni">⌂</span> Home</div>
+        <div class="navitem"><span class="ni">▦</span> Tasks <span class="badge">2</span></div>
+        <div class="navitem"><span class="ni">⊞</span> Whiteboards</div>
+        <div class="navitem"><span class="ni">↻</span> Automations</div>
+        <div class="navitem"><span class="ni">▤</span> Library</div>
+        <div class="navsec">Recents</div>
+        <div class="hrow"><div class="hdot prog"></div><div class="t">1051 needs-you queue empties…</div><div class="w">2h</div></div>
+      </div>
+      <div class="main">
+        <div class="tabstrip">
+          <div class="wtab conv on"><span class="ic">◈</span><span class="lbl">#1051 · sync watch drops replies</span></div>
+          <div class="wtab"><span class="ic">◉</span><span class="lbl">plan-v2.md</span><span class="x">✕</span></div>
+          <div class="wtabadd">＋</div>
+          <div class="wtabright"><span class="wtabico">◫</span><span class="wtabico">▤</span></div>
+        </div>
+        <div class="body"><div class="content">
+          <div class="msgs">
+            <div class="msg"><div class="mav">🏛️</div><div>
+              <div class="mhead"><b>atlas</b><span class="role">architect</span><span class="ago">6m</span></div>
+              <div class="mtext">Plan v2 is up. The race lives between the watch's re-entry and the room switch — the state map below is the contract the fix has to hold; it's in the plan's Definition of Done as the review reference.</div>
+              <div class="wbcard">
+                <div class="wbsnap"><svg viewBox="0 0 430 150">
+                  <g class="hand" font-size="8.5" fill="var(--cink)">
+                    <rect x="28" y="58" width="76" height="32" rx="16" fill="none" stroke="var(--cink)" stroke-width="1.3"/>
+                    <text x="46" y="78">idle</text>
+                    <rect x="150" y="20" width="86" height="32" rx="4" fill="var(--cfill-blue)" stroke="var(--cblue)" stroke-width="1.3"/>
+                    <text x="162" y="40">watching</text>
+                    <rect x="150" y="98" width="86" height="32" rx="4" fill="none" stroke="var(--cink)" stroke-width="1.3" transform="rotate(-.5 193 114)"/>
+                    <text x="158" y="118">switching</text>
+                    <rect x="308" y="58" width="94" height="32" rx="4" fill="var(--cfill-green)" stroke="var(--cgreen)" stroke-width="1.3"/>
+                    <text x="320" y="78">re-entered</text>
+                    <path d="M106 68 Q126 52 148 40" stroke="var(--cink)" stroke-width="1.2" fill="none"/><path d="M141 37 l8 2 -6 6" stroke="var(--cink)" stroke-width="1.2" fill="none"/>
+                    <path d="M193 54 L193 96" stroke="var(--cyellow)" stroke-width="1.3" fill="none" stroke-dasharray="5 4"/><path d="M188 89 l5 8 5 -8" stroke="var(--cyellow)" stroke-width="1.3" fill="none"/>
+                    <path d="M238 112 Q280 104 306 82" stroke="var(--cink)" stroke-width="1.2" fill="none"/><path d="M299 82 l8 -2 -3 8" stroke="var(--cink)" stroke-width="1.2" fill="none"/>
+                    <text x="240" y="66" font-size="7.5" fill="var(--cyellow)">⚠ replies dropped here</text>
+                  </g>
+                </svg></div>
+                <div class="wbmeta"><span class="ic">⊞</span><b>watch re-entry states</b><span class="kind">whiteboard</span><span class="by">atlas · #1051</span><span class="open">Open ›</span></div>
+              </div>
+            </div></div>
+            <div class="msg"><div class="mav" style="font:700 10px var(--font)">G</div><div>
+              <div class="mhead"><b>george</b><span class="ago">now</span></div>
+              <div class="mtext">the switching → re-entered edge is the one I couldn't see in prose. approving the plan.</div>
+            </div></div>
+          </div>
+          <div class="compose">Reply in #1051 · ↵ send</div>
+        </div></div>
+      </div>
+    </div>
+    <div class="mark" style="top:224px; left:318px">17</div>
+  </div>
+</div>
+<div class="callouts">
+  <div class="co"><span class="n">16</span><b>George's second ask, verbatim:</b> a whiteboard born from the ＋ flyout, filed to the scope's room, open in a tab before the flyout closes. The small print names the filing so it is never a surprise.</div>
+  <div class="co"><span class="n">17</span><b>Task mode:</b> the worker registry gets the same tool, so an architect or developer attaches the state map beside the plan — a diagram in the review record, not a lost screenshot. Boards referenced by a plan travel with the task's artifacts.</div>
+</div>
+
+<!-- ══════════ STOP 5 ══════════ -->
+<div class="stophd"><span class="stopno">Stop 5</span>The build — four slices, each shippable</div>
+<div class="stopp">Ordered so each slice is useful alone. New pure logic lands in a sibling module (<code>whiteboards.ts</code> beside <code>wtabs.ts</code>), tested from <code>src/main/*.test.ts</code>; App.tsx gains mounts, not logic. The table is a new synced table — the full checklist (migration · publication · sync rules · deploy notes), with the scene as jsonb per the <code>ship_plan</code> precedent.</div>
+<div class="phase">
+  <div class="pcard">
+    <span class="n">Slice 1</span>
+    <h4>The surface</h4>
+    <p><code>whiteboards</code> table (id · workspace · channel · title · <code>scene</code> jsonb · <code>source</code> · <code>snapshot_svg</code> · rev · by/at · archived) + <code>whiteboard.create/update/archive</code> commands (tenant-authz'd, rev-guarded, size-capped) + the one new piece of sync machinery: an <code>uploadData</code> branch (PUT/PATCH → rev-guarded LWW endpoint) — today only messages and attachments upload, so board edits are the first client-written synced rows beyond them. The <code>'whiteboard'</code> tab kind, lazy-loaded Excalidraw, autosave + snapshot export, ＋ flyout entry.</p>
+    <span class="ship">Ships: a human draws, it syncs, it survives relaunch.</span>
+  </div>
+  <div class="pcard">
+    <span class="n">Slice 2</span>
+    <h4>The destination</h4>
+    <p>Whiteboards nav destination (the <code>dest</code> tuple + its three mirrors), snapshot-tile library grouped by day, scope-knob filtering, empty state, Board → <b>Tasks</b> label rename + tour copy. Open tile → tab.</p>
+    <span class="ship">Ships: George's nav ask, both labels settled.</span>
+  </div>
+  <div class="pcard">
+    <span class="n">Slice 3</span>
+    <h4>Capture to chat</h4>
+    <p><b>Share to chat</b> posts a message whose marker the card renderer parses (the doc-drop pattern: a testable parser module, dispatched at <i>both</i> thread call sites); the body leads with a plain-text label line so mobile and old surfaces degrade readably. The card reads the board's synced snapshot — no duplicate bytes.</p>
+    <span class="ship">Ships: sketches reach threads; reviews gain diagrams.</span>
+  </div>
+  <div class="pcard">
+    <span class="n">Slice 4</span>
+    <h4>The agent's hand</h4>
+    <p><code>create_whiteboard</code> in the chat + worker registries (mermaid | element skeleton), server validation + filing + card post, desktop materialize-on-first-render behind the <code>scene IS NULL</code> guard, prompt guidance ("flowchart/sequence/class arrive editable").</p>
+    <span class="ship">Ships: "sol, sketch the pipeline" works.</span>
+  </div>
+</div>
+<div class="stopp" style="margin-top:18px">
+  <b>Invariants (enforced, not prompted):</b> a whiteboard is filed to a channel; <b>agent</b> reads and writes are registration-checked server-side (human visibility is workspace-wide, the artifacts posture) · <code>whiteboard.update</code> carries a rev; a stale write returns <code>WHITEBOARD_STALE</code> and the client reconciles — no silent clobber · the new upload branch is explicit about PUT/PATCH and covered by tests — a local write that would be silently ACKed-and-dropped is the failure class it exists to prevent · scene ≤ 512KB, snapshot ≤ 150KB, embedded image files stripped at save v1 (<code>WHITEBOARD_TOO_LARGE</code> otherwise) · agents may update only boards they created; human boards are read-only to agents, server-side · a board in a chat-mode thread can never touch the task FSM (it is content, not state) · the Design Studio contract is untouched — <code>approve_design</code> never accepts a whiteboard, and the designer's rounds remain the visual contract · no network egress: Excalidraw assets ship in the bundle, and collab/share/cloud-export UI is compiled out via <code>UIOptions</code>.<br/><br/>
+  <b>Budgets (measured in the PR):</b> Excalidraw is a lazy chunk — cold start unchanged (verify bundle) · first-ever board open ≤1.5s with a rising skeleton; every later open &lt;100ms (the view-switch budget) · autosave off the interaction path; snapshot export &lt;150ms on typical scenes · library tiles are static SVG — 60fps scroll · a shared card adds one <code>&lt;img&gt;</code> to a thread, no live canvas ever mounts in a list.<br/><br/>
+  <b>Deploy notes (the v0.5.0 lesson):</b> new synced table ⇒ migration auto-applies, but the PR must call out the sync-rules deploy and the run's <code>Deploy sync rules → success</code> <i>step</i> (the check's ✓ lies when secrets are unset).<br/><br/>
+  <b>Phase 2, named so v1 stays small:</b> live co-editing (self-hosted excalidraw-room or CRDT — LWW + live refresh covers the solo-and-turn-taking reality first) · versioned board rounds entering the review overlay with a verdict bar · images-in-scenes via the attachment path · mobile: snapshot in threads v1, read-only viewer later · board→backlog promotion ("circle it, park it") — the true "think with an agent" endgame · templates and a mermaid-paste door in the editor.<br/><br/>
+  <b>Open questions for this review:</b> ① Board → <b>Tasks</b> — confirm the rename (my recommendation: yes; "Board · Whiteboards" adjacent is a collision) ② under <b>All channels</b>, New whiteboard files to your most recent room with the chip as the mover — acceptable, or should the flyout ask? ③ should agents be allowed to <i>update</i> their own boards in v1 (my draft says yes, creator-only), or create-only until the etiquette proves out? ④ does Share to chat also file an SVG into the channel artifact library, or is the Whiteboards destination the only shelf in v1 (my draft: destination only — one home per noun)?
+</div>
+
+</div>
+</body>
+</html>

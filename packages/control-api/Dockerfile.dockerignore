@@ -1,0 +1,25 @@
+# Build context for packages/control-api/Dockerfile (repo root). BuildKit reads THIS file, not the
+# root .dockerignore, when the build names this Dockerfile — the root one serves the machine image
+# and excludes supabase/ and dev/, which the control-api image carries.
+*
+!package.json
+!pnpm-lock.yaml
+!pnpm-workspace.yaml
+!tsconfig.base.json
+!patches/**
+!packages/shared/**
+!packages/control-api/**
+!supabase/migrations/**
+!supabase/validate/auth-shim.sql
+!dev/stack/init/98-storage.sql
+!dev/stack/init/99-publication.sql
+!dev/stack/powersync/powersync.yaml
+!dev/stack/powersync/sync-config.yaml
+# never the installed trees, the bundles, or the tests
+**/node_modules
+**/dist
+packages/control-api/index.js
+packages/control-api/api
+packages/control-api/test
+packages/control-api/.fastembed-cache
+packages/**/*.test.ts

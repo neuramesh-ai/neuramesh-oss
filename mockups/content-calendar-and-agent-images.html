@@ -1,0 +1,1081 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Agents that can draw · a calendar you can reach — round 1</title>
+<style>
+/* Tokens copied verbatim from apps/desktop/src/renderer/src/tokens.css (Graphite dark :49-75,
+   Cream Oak :122-138). Geometry copied from the REAL classes this round touches —
+   .mkpostcard/.mkpchd/.mkpcbrief/.mkpcsetup/.mkpcfoot/.mkico (tokens.css:520-548, 795),
+   .mkcalgrid/.mkchd/.mkplab/.mkcell/.mkcalitem (:453-472), .scopebar/.scopepill (:6504-6521),
+   .roomtabbar/.roomtab (:4057-4065), .routinerow (:6111-6153), .routineroom (:6131).
+   Judge this as the app, not as a sketch. */
+:root, [data-theme='dark'] {
+  --win:#0d0d0d; --bg:#141414; --panel:#191919; --panel2:#212121; --panel3:#2b2b2b;
+  --border:#272727; --border2:#383838;
+  --text:#eaeaea; --body:#b6b6b6; --muted:#898989; --dim:#676767;
+  --link:#d19a72; --accent:var(--text); --accent-ink:#101010; --accent-soft:var(--panel3); --overlay:#222222;
+  --btn:#232323; --btn-fg:#efefef; --btn-hover:#2f2f2f;
+  --brand:#834a2b; --brand-ink:#fff7ee;
+  --green:#77ac8d; --warn:#c9a15e; --violet:#a89ccf; --orch:#9793d2;
+  --todo:#949494; --prog:#8ba0c0; --review:#a89ccf; --done:#77ac8d; --blocked:#9ca0a8; --backlog:#8f9aa6;
+  --role-mkt:#c98f8f; --role-design:#cc8fb9; --role-orch:#9793d2;
+  --card:#1e1e1e; --card-border:#2c2c2c;
+  --shadow:rgba(0,0,0,0.62); --code:#0a0a0a; --codeink:#e8e8e8;
+  --shadow-sheet:inset 0 1px 0 rgba(255,255,255,.05), 0 12px 30px -6px rgba(0,0,0,.5);
+  --shadow-card:0 1px 2px rgba(0,0,0,.25); --shadow-lift:0 8px 20px -8px rgba(0,0,0,.55);
+  --shadow-pop:0 20px 55px -14px rgba(0,0,0,.65);
+  --ring:#525252; --focus-glow:color-mix(in srgb, var(--accent) 22%, transparent);
+  --hover-border:#404040; --hover-bg:color-mix(in srgb, var(--text) 7%, transparent);
+  --sel-bg:color-mix(in srgb, var(--text) 10%, transparent);
+  --tabon-bg:var(--panel3); --tabon-shadow:none;
+}
+[data-theme='cream-oak'] {
+  --win:#f0e5d3; --bg:#fbf8f4; --panel:#fbf8f4; --panel2:#f6eee1; --panel3:#efe1cd;
+  --border:#e6dbca; --border2:#d3c2a8;
+  --text:#2a1c13; --body:#574838; --muted:#97846c; --dim:#b5a289;
+  --link:#9c5730; --accent:#834a2b; --accent-ink:#fff7ee; --accent-soft:#f1e3d2; --overlay:#ffffff;
+  --btn:#f8f2e8; --btn-fg:#43301f; --btn-hover:#efe4d2;
+  --brand:#834a2b; --brand-ink:#fff7ee;
+  --green:#2f9e6b; --warn:#a06a1f; --violet:#7d6cc4; --orch:#6a63bc;
+  --todo:#7d8590; --prog:#4f80c4; --review:#6d5ce0; --done:#0f9d63; --blocked:#7d7f86; --backlog:#5d6b7a;
+  --role-mkt:#b04f55; --role-design:#b0498f; --role-orch:#6a63bc;
+  --card:#ffffff; --card-border:#eadfce;
+  --shadow:rgba(70,42,18,0.16); --code:#2b2018; --codeink:#f3e6d8;
+  --shadow-sheet:0 8px 26px -8px rgba(70,42,18,.16), 0 1px 2px rgba(70,42,18,.05);
+  --shadow-card:0 1px 2px rgba(70,42,18,.05); --shadow-lift:0 8px 20px -8px rgba(70,42,18,.20);
+  --shadow-pop:0 20px 55px -14px rgba(70,42,18,.30);
+  --ring:color-mix(in srgb, var(--accent) 42%, var(--border2)); --focus-glow:color-mix(in srgb, var(--accent) 9%, transparent);
+  --hover-border:color-mix(in srgb, var(--text) 10%, var(--border2)); --hover-bg:color-mix(in srgb, var(--text) 5%, transparent);
+  --sel-bg:color-mix(in srgb, var(--accent) 8%, transparent);
+  --tabon-bg:var(--card); --tabon-shadow:var(--shadow-card);
+}
+
+/* radius + motion ramp (tokens.css:19-22) */
+:root { --r-xs:6px; --r-sm:8px; --r-md:10px; --r-lg:14px; --r-xl:18px; --r-full:999px;
+  --dur-fast:.12s; --dur:.15s; --ease:cubic-bezier(.22,1,.36,1); }
+
+* { box-sizing:border-box; }
+body { margin:0; background:var(--win); color:var(--text);
+  font:400 13.5px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased; }
+.mono { font-family:ui-monospace,Menlo,"SF Mono",monospace; }
+
+/* ── page chrome (not the app) ─────────────────────────────────────────────── */
+header { position:sticky; top:0; z-index:60; display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+  padding:13px 22px; background:var(--win); border-bottom:1px solid var(--border); }
+header h1 { font-weight:600; font-size:15px; margin:0; letter-spacing:-.012em; }
+header .sub { color:var(--muted); font-size:12.5px; }
+.spacer { flex:1; }
+button.ctl { font:inherit; font-size:12.5px; color:var(--btn-fg); background:var(--btn);
+  border:1px solid var(--border2); border-radius:var(--r-full); padding:6px 14px; cursor:pointer; }
+button.ctl:hover { background:var(--btn-hover); }
+main { padding:24px 22px 90px; max-width:1340px; margin:0 auto; }
+section { margin-bottom:52px; scroll-margin-top:70px; }
+h2 { font-weight:600; font-size:13px; margin:0 0 5px; letter-spacing:.02em; text-transform:uppercase; color:var(--muted); }
+h2 .n { color:var(--dim); margin-right:8px; font-family:ui-monospace,Menlo,monospace; font-size:11.5px; }
+.why { color:var(--body); font-size:13px; line-height:1.6; margin:0 0 18px; max-width:88ch; }
+.why + .why { margin-top:-10px; }
+.why b { color:var(--text); font-weight:600; }
+.why code, .ic { font:500 11.5px ui-monospace,Menlo,monospace; background:var(--panel2);
+  border:1px solid var(--border); border-radius:5px; padding:1px 5px; color:var(--body); }
+
+.pane { background:var(--bg); border:1px solid var(--border); border-radius:var(--r-lg);
+  box-shadow:var(--shadow-sheet); overflow:hidden; }
+.panehead { display:flex; align-items:center; gap:9px; padding:9px 14px; border-bottom:1px solid var(--border);
+  background:var(--panel); font-size:12.5px; font-weight:600; }
+.panehead .k { font:650 9.5px ui-monospace,Menlo,monospace; letter-spacing:.11em; text-transform:uppercase; color:var(--dim); }
+.panebody { padding:18px; }
+.cols2 { display:grid; grid-template-columns:1fr 1fr; gap:18px; align-items:start; }
+.cols3 { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; align-items:start; }
+@media (max-width:1120px){ .cols2,.cols3{ grid-template-columns:1fr; } }
+
+.tag { font-weight:700; font-size:9.5px; line-height:1; letter-spacing:.08em; text-transform:uppercase;
+  padding:4px 7px; border-radius:5px; flex:none; font-family:ui-monospace,Menlo,monospace; }
+.tag.now { color:var(--muted); background:var(--panel3); }
+.tag.new { color:var(--violet); background:color-mix(in srgb,var(--violet) 16%,transparent); }
+.tag.bug { color:var(--warn); background:color-mix(in srgb,var(--warn) 15%,transparent); }
+.tag.ok { color:var(--green); background:color-mix(in srgb,var(--green) 15%,transparent); }
+.tag.rec { color:var(--brand); background:color-mix(in srgb,var(--brand) 17%,transparent); }
+
+.note { margin-top:12px; padding:11px 13px; border-left:2px solid var(--border2); color:var(--muted);
+  font-size:12px; line-height:1.6; max-width:82ch; }
+.note b { color:var(--body); }
+
+/* ── the app frame ─────────────────────────────────────────────────────────── */
+.app { display:flex; background:var(--win); height:var(--apph,620px); }
+.spine { width:30px; flex:none; background:var(--win); border-right:1px solid var(--border);
+  display:flex; flex-direction:column; align-items:center; padding-top:10px; gap:9px; }
+.spinemark { width:22px; height:22px; border-radius:7px; background:var(--brand); color:var(--brand-ink);
+  display:grid; place-items:center; font:700 11px ui-monospace,Menlo,monospace; }
+.spinedot { width:22px; height:22px; border-radius:7px; background:var(--panel2); border:1px solid var(--border);
+  display:grid; place-items:center; font:600 9px ui-monospace,Menlo,monospace; color:var(--dim); }
+.nav { width:222px; flex:none; background:var(--win); border-right:1px solid var(--border);
+  padding:12px 10px; overflow:hidden; }
+.navnew { display:flex; align-items:center; gap:8px; height:34px; padding:0 11px; border-radius:var(--r-md);
+  background:var(--panel2); border:1px solid var(--border); font-size:12.5px; font-weight:600; color:var(--body); margin-bottom:14px; }
+.navnew .kb { margin-left:auto; font:600 9.5px ui-monospace,Menlo,monospace; color:var(--dim); }
+.navhd { font:650 9.5px ui-monospace,Menlo,monospace; letter-spacing:.11em; text-transform:uppercase;
+  color:var(--dim); padding:0 8px; margin:0 0 6px; }
+.navitem { display:flex; align-items:center; gap:9px; height:30px; padding:0 9px; border-radius:var(--r-sm);
+  font-size:12.5px; color:var(--body); cursor:default; }
+.navitem:hover { background:var(--hover-bg); color:var(--text); }
+.navitem.on { background:var(--sel-bg); color:var(--text); font-weight:600; }
+.navitem .ico { width:15px; display:grid; place-items:center; color:var(--muted); flex:none; }
+.navitem.on .ico { color:var(--text); }
+.navitem .n { margin-left:auto; font:700 9.5px ui-monospace,Menlo,monospace; color:var(--muted);
+  background:var(--panel3); border-radius:var(--r-full); min-width:16px; height:16px; padding:0 4px;
+  display:grid; place-items:center; }
+/* the nested child — the ONLY new nav geometry this round proposes */
+.navitem.sub { height:27px; margin-left:23px; padding-left:10px; font-size:12px;
+  border-left:1px solid var(--border); border-radius:0 var(--r-sm) var(--r-sm) 0; }
+.navitem.sub.on { border-left-color:var(--ring); }
+.navitem.fresh { position:relative; }
+.navitem.fresh::after { content:'NEW'; margin-left:auto; font:700 8px ui-monospace,Menlo,monospace;
+  letter-spacing:.08em; color:var(--violet); background:color-mix(in srgb,var(--violet) 15%,transparent);
+  border-radius:4px; padding:2px 4px; }
+
+.main { flex:1; min-width:0; background:var(--bg); border-radius:var(--r-lg) 0 0 0;
+  display:flex; flex-direction:column; overflow:hidden; }
+.tabstrip { display:flex; align-items:center; gap:2px; height:33px; padding:0 8px; flex:none;
+  background:var(--win); border-bottom:1px solid var(--border); }
+.wtab { display:inline-flex; align-items:center; gap:7px; height:25px; padding:0 12px; border-radius:var(--r-sm) var(--r-sm) 0 0;
+  font-size:11.5px; color:var(--dim); }
+.wtab.on { background:var(--bg); color:var(--text); font-weight:600; }
+.topbar { display:flex; align-items:center; gap:10px; height:44px; padding:0 18px; flex:none; }
+.topbar .ttl { font:640 17.5px var(--fdisp,Georgia,serif); letter-spacing:-.012em; }
+.crumb { font-size:12px; color:var(--muted); display:flex; align-items:center; gap:6px; }
+.crumb .sep { color:var(--dim); }
+
+/* room-tab strip idiom (tokens.css:4057) — reused as the DESTINATION strip */
+.roomtabbar { display:inline-flex; gap:2px; margin:2px 18px 10px; background:var(--panel2);
+  border-radius:var(--r-full); padding:3px; align-self:flex-start; }
+.roomtab { display:inline-flex; align-items:center; gap:6px; border:0; background:none; color:var(--muted);
+  font:550 12.5px inherit; padding:6px 15px; border-radius:var(--r-full); cursor:pointer;
+  transition:color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease); }
+.roomtab:hover { color:var(--text); }
+.roomtab.on { color:var(--text); font-weight:600; background:var(--tabon-bg); box-shadow:var(--tabon-shadow); }
+.roomtabn { min-width:16px; height:16px; padding:0 4px; border-radius:var(--r-full); background:var(--panel3);
+  color:var(--muted); font:700 9.5px ui-monospace,Menlo,monospace; display:grid; place-items:center; }
+.roomtab.on .roomtabn { background:var(--sel-bg); color:var(--text); }
+
+/* scope bar (tokens.css:6504) */
+.scopebar { display:flex; align-items:center; gap:10px; padding:8px 18px 2px; flex:none; }
+.scopesearch { flex:1; min-width:0; height:42px; border-radius:var(--r-lg); background:var(--panel2);
+  border:1px solid var(--border); display:flex; align-items:center; gap:9px; padding:0 15px;
+  font-size:13.5px; color:var(--dim); white-space:nowrap; overflow:hidden; }
+.cchip { display:inline-flex; align-items:center; gap:8px; min-height:42px; max-width:240px; padding:0 16px;
+  border-radius:var(--r-lg); border:1px solid var(--border); background:var(--panel2); color:var(--muted);
+  font-size:13.5px; font-weight:600; white-space:nowrap; cursor:pointer; }
+.cchip:hover { color:var(--text); border-color:var(--hover-border); }
+.cchip .car { font-size:10px; opacity:.7; }
+.cchip.setfilter { background:var(--accent-soft); border-color:var(--border2); color:var(--text); font-weight:620; }
+.scoperight { display:flex; align-items:center; gap:8px; flex:none; }
+.scoperight .btn { min-height:42px; padding:0 18px; border-radius:var(--r-lg); font-size:13.5px; font-weight:600; }
+
+.btn { display:inline-flex; align-items:center; justify-content:center; gap:6px; font:inherit; font-size:12.5px;
+  font-weight:590; color:var(--btn-fg); background:var(--btn); border:1px solid var(--border2);
+  border-radius:var(--r-sm); padding:6px 12px; cursor:pointer; }
+.btn:hover { background:var(--btn-hover); }
+.btn.sm { font-size:11.5px; padding:4px 10px; }
+.btn.prime { background:var(--accent); color:var(--accent-ink); border-color:transparent; }
+
+/* the week/month lens — reuses .mkviewchips (tokens.css:446) */
+.viewchips { display:flex; gap:3px; }
+.viewchips button { font-size:11px; font-weight:600; color:var(--muted); background:none;
+  border:1px solid transparent; border-radius:7px; padding:5px 11px; cursor:pointer; }
+.viewchips button:hover { color:var(--text); }
+.viewchips button.on { background:var(--sel-bg); color:var(--text); border-color:var(--border2); }
+
+/* ── calendar (tokens.css:453-472) ─────────────────────────────────────────── */
+.mkcalwrap { flex:1; min-height:0; overflow-y:auto; padding:12px 18px 18px; }
+.mkcalhead { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+.mkcalnav { display:flex; gap:3px; }
+.mkcalnav button { width:22px; height:22px; border:1px solid var(--border); background:transparent;
+  color:var(--muted); border-radius:6px; cursor:pointer; font-size:11px; display:grid; place-items:center; }
+.mkcalnav button:hover { border-color:var(--ring); color:var(--text); }
+.mkcalrange { font:630 15px var(--fdisp,Georgia,serif); letter-spacing:-.008em; }
+.mkcalgrid { display:grid; grid-template-columns:96px repeat(7,1fr); border:1px solid var(--card-border);
+  border-radius:var(--r-lg); overflow:hidden; background:var(--card); box-shadow:var(--shadow-card); }
+.mkchd { min-width:0; padding:8px; font:650 9.5px ui-monospace,Menlo,monospace; color:var(--muted);
+  text-transform:uppercase; letter-spacing:.12em; border-bottom:1px solid color-mix(in srgb,var(--border) 60%,transparent);
+  text-align:center; }
+.mkchd .dnum { font:700 12px ui-monospace,Menlo,monospace; color:var(--muted); letter-spacing:0; margin-left:3px; }
+.mkchd.today, .mkchd.today .dnum { color:var(--text); }
+.mkplab { padding:10px; font-size:12px; font-weight:600; color:var(--body); display:flex; align-items:center; gap:7px;
+  border-bottom:1px solid color-mix(in srgb,var(--border) 55%,transparent); }
+.mkplab .g { width:17px; height:17px; border-radius:5px; display:grid; place-items:center; font-size:9.5px;
+  background:var(--panel3); border:1px solid var(--border2); color:var(--body); flex:none; }
+.mkcell { min-width:0; border-bottom:1px solid color-mix(in srgb,var(--border) 50%,transparent);
+  border-left:1px solid color-mix(in srgb,var(--border) 50%,transparent); padding:4px; min-height:52px;
+  display:flex; flex-direction:column; gap:3px; }
+.mkcell.today { background:var(--hover-bg); }
+.mkcalitem { font-size:9.5px; font-weight:600; line-height:1.3; border-radius:6px; padding:3px 6px; cursor:pointer;
+  overflow:hidden; text-align:left; max-width:100%; display:block; }
+.mkcalitem .t { font:700 8.5px ui-monospace,Menlo,monospace; opacity:.8; margin-right:4px; }
+/* the room a post belongs to, at All scope — the .routineroom idiom from this very destination */
+.mkcalitem .rm { font:600 8px ui-monospace,Menlo,monospace; color:var(--dim); margin-left:4px; opacity:.85; }
+.mkcalitem .bd { display:block; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+.mkcalitem.draft { color:var(--muted); border:1px dashed var(--border2); background:none; }
+.mkcalitem.scheduled { color:var(--body); border:1px solid color-mix(in srgb,var(--prog) 40%,transparent);
+  background:color-mix(in srgb,var(--prog) 8%,transparent); }
+.mkcalitem.published { color:var(--done); border:1px solid color-mix(in srgb,var(--done) 34%,transparent);
+  background:color-mix(in srgb,var(--done) 9%,transparent); }
+.mkcalitem.failed { color:var(--blocked); border:1px solid color-mix(in srgb,var(--blocked) 40%,transparent);
+  background:color-mix(in srgb,var(--blocked) 8%,transparent); }
+.mkcalitem:hover { border-color:var(--ring); }
+.mkcalitem .im { display:inline-block; width:7px; height:7px; border-radius:2px; background:var(--muted);
+  opacity:.55; margin-right:4px; vertical-align:-1px; }
+
+/* the unscheduled rail — NEW. A draft with no slot is not "happening on its creation day". */
+.unsched { display:flex; align-items:flex-start; gap:11px; padding:10px 12px; margin-bottom:10px;
+  border:1px dashed var(--border2); border-radius:var(--r-lg); background:color-mix(in srgb,var(--text) 3%,transparent); }
+.unschedk { flex:none; display:flex; flex-direction:column; gap:2px; padding-right:11px; border-right:1px solid var(--border);
+  min-width:118px; }
+.unschedk b { font-size:11.5px; font-weight:620; color:var(--text); }
+.unschedk span { font:600 10px ui-monospace,Menlo,monospace; color:var(--dim); }
+.unschedlist { display:flex; flex-wrap:wrap; gap:5px; min-width:0; }
+.uchip { display:inline-flex; align-items:center; gap:6px; max-width:230px; padding:4px 9px; border-radius:var(--r-full);
+  border:1px dashed var(--border2); background:var(--card); color:var(--muted); font-size:10.5px; font-weight:600; cursor:pointer; }
+.uchip:hover { color:var(--text); border-color:var(--ring); }
+.uchip .g { font-size:9px; opacity:.8; }
+.uchip .bd { overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+.uchip .rm { font:600 8.5px ui-monospace,Menlo,monospace; color:var(--dim); }
+
+/* month glance */
+.mgrid { display:grid; grid-template-columns:repeat(7,1fr); border:1px solid var(--card-border);
+  border-radius:var(--r-lg); overflow:hidden; background:var(--card); box-shadow:var(--shadow-card); }
+.mcell { min-height:74px; padding:5px 6px; border-bottom:1px solid color-mix(in srgb,var(--border) 50%,transparent);
+  border-left:1px solid color-mix(in srgb,var(--border) 50%,transparent); display:flex; flex-direction:column; gap:3px; }
+.mcell .dn { font:700 10px ui-monospace,Menlo,monospace; color:var(--dim); }
+.mcell.today .dn { color:var(--text); }
+.mcell.dim { background:color-mix(in srgb,var(--text) 2%,transparent); }
+.mdot { display:flex; gap:3px; flex-wrap:wrap; }
+.mdot i { width:6px; height:6px; border-radius:2px; display:block; }
+.mdot i.d { background:var(--border2); } .mdot i.s { background:var(--prog); }
+.mdot i.p { background:var(--done); } .mdot i.f { background:var(--blocked); }
+.mmini { font-size:9px; font-weight:600; color:var(--muted); overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+
+/* ── post card (tokens.css:520-548) ────────────────────────────────────────── */
+.mkpostcard { border:1px solid var(--card-border); background:var(--card); border-radius:var(--r-lg); overflow:hidden; }
+.mkpchd { display:flex; align-items:center; gap:8px; padding:7px 11px; border-bottom:1px solid var(--border); }
+.mkpcnet { display:inline-flex; align-items:center; gap:6px; font:700 10px ui-monospace,Menlo,monospace;
+  letter-spacing:.04em; text-transform:uppercase; color:var(--muted); }
+.mkpcg { width:17px; height:17px; border-radius:5px; display:grid; place-items:center; font-size:10px;
+  background:var(--panel3); border:1px solid var(--border2); color:var(--body); }
+.mkpcid { font:700 10px ui-monospace,Menlo,monospace; color:var(--dim); border:1px solid var(--border2);
+  border-radius:5px; padding:1.5px 6px; }
+.chip { display:inline-flex; align-items:center; gap:5px; font:650 9.5px ui-monospace,Menlo,monospace;
+  letter-spacing:.08em; padding:3px 9px; border-radius:var(--r-full); text-transform:uppercase; white-space:nowrap;
+  margin-left:auto; }
+.chip.mk-draft { background:color-mix(in srgb,var(--muted) 14%,transparent); color:var(--muted); }
+.chip.mk-scheduled { background:color-mix(in srgb,var(--prog) 16%,transparent); color:var(--prog); }
+.chip.mk-published { background:color-mix(in srgb,var(--done) 16%,transparent); color:var(--done); }
+.mkpv { padding:11px 12px; }
+.mkpvhead { display:flex; align-items:center; gap:8px; margin-bottom:8px; font-size:13px; }
+.mkpvav { width:30px; height:30px; border-radius:50%; background:var(--panel3); border:1px solid var(--border2);
+  display:inline-flex; align-items:center; justify-content:center; font-weight:700; font-size:13px; flex:none; }
+.mkpvhandle { color:var(--muted); font-size:12px; }
+.mkpvtext { font-size:12.5px; line-height:1.5; white-space:pre-wrap; color:var(--text); }
+.mkpcimg { display:block; width:100%; height:132px; object-fit:cover; margin-top:10px; border:1px solid var(--border);
+  border-radius:var(--r-md); background:var(--panel2); }
+.mkpcbrief { display:flex; align-items:flex-start; gap:6px; padding:7px 11px; border-top:1px dashed var(--border2);
+  font-size:11px; line-height:1.45; color:var(--muted); background:color-mix(in srgb,var(--text) 3%,transparent); }
+.mkpcbriefk { color:var(--text); opacity:.72; }
+.mkpcsetup { display:flex; flex-direction:column; align-items:flex-start; gap:7px; padding:9px 11px;
+  border-top:1px solid var(--border); font-size:11.5px; line-height:1.5; color:var(--muted);
+  background:color-mix(in srgb,var(--warn) 6%,transparent); }
+.mkpcsetup b { color:var(--text); }
+.mkpcimggen { background:none; border-top:1px dashed var(--border2); }
+.mkpcimgerr { background:color-mix(in srgb,var(--blocked) 8%,transparent); }
+.mkpcfoot { display:flex; align-items:center; gap:10px; padding:7px 11px; border-top:1px solid var(--border); }
+.mkpccc { font:600 10px ui-monospace,Menlo,monospace; color:var(--dim); }
+.mkpcwhen { font:600 10px ui-monospace,Menlo,monospace; color:var(--prog); }
+.mkpcactions { margin-left:auto; display:flex; align-items:center; gap:6px; }
+.mkico { display:inline-flex; align-items:center; justify-content:center; min-width:20px; height:20px; padding:0 3px;
+  border:1px solid transparent; border-radius:var(--r-sm); background:none; color:var(--dim); cursor:pointer; font-size:10px; }
+.mkico:hover { color:var(--text); background:var(--hover-bg); border-color:var(--border); }
+.mkico.hot { color:var(--body); border-color:var(--border); background:var(--hover-bg); }
+/* the drawing state — a quiet shimmer on the image itself, not a spinner in a banner */
+.drawing { position:relative; overflow:hidden; }
+.drawing::after { content:''; position:absolute; inset:0; border-radius:var(--r-md);
+  background:linear-gradient(100deg, transparent 20%, color-mix(in srgb,var(--text) 9%,transparent) 50%, transparent 80%);
+  animation:sweep 1.5s linear infinite; }
+@keyframes sweep { from{transform:translateX(-100%);} to{transform:translateX(100%);} }
+.imgskel { display:grid; place-items:center; height:132px; margin-top:10px; border:1px dashed var(--border2);
+  border-radius:var(--r-md); background:var(--panel2); color:var(--dim); font:600 10.5px ui-monospace,Menlo,monospace;
+  letter-spacing:.06em; text-transform:uppercase; }
+
+/* ── thread transcript ─────────────────────────────────────────────────────── */
+.thread { display:flex; flex-direction:column; gap:12px; padding:16px 18px; }
+.msg { display:flex; gap:10px; align-items:flex-start; }
+.av { width:26px; height:26px; border-radius:8px; flex:none; display:grid; place-items:center;
+  font:700 10px ui-monospace,Menlo,monospace; background:var(--panel3); border:1px solid var(--border2); color:var(--body); }
+.av.orch { background:color-mix(in srgb,var(--role-orch) 17%,transparent); border-color:color-mix(in srgb,var(--role-orch) 40%,transparent); color:var(--role-orch); }
+.av.me { background:var(--panel2); }
+.mbody { min-width:0; flex:1; }
+.mhead { display:flex; align-items:baseline; gap:8px; margin-bottom:3px; }
+.mhead b { font-size:12.5px; font-weight:640; }
+.mrole { font:700 8.5px ui-monospace,Menlo,monospace; letter-spacing:.08em; text-transform:uppercase;
+  color:var(--role-orch); background:color-mix(in srgb,var(--role-orch) 14%,transparent); border-radius:4px; padding:2px 5px; }
+.mtime { font:500 10.5px ui-monospace,Menlo,monospace; color:var(--dim); }
+.mtext { font-size:13px; line-height:1.55; color:var(--body); }
+.mtext.mine { background:var(--panel2); border:1px solid var(--border); border-radius:var(--r-md);
+  padding:8px 11px; display:inline-block; color:var(--text); }
+.dead { color:var(--muted); }
+.dead em { color:var(--warn); font-style:normal; }
+.toolline { display:inline-flex; align-items:center; gap:7px; margin-top:7px; padding:4px 9px; border-radius:var(--r-full);
+  border:1px solid var(--border); background:var(--panel2); font:600 10.5px ui-monospace,Menlo,monospace; color:var(--muted); }
+.toolline .dot { width:6px; height:6px; border-radius:50%; background:var(--green); flex:none; }
+
+/* ── side-by-side verdict table ────────────────────────────────────────────── */
+table.cmp { width:100%; border-collapse:collapse; font-size:12.5px; }
+table.cmp th, table.cmp td { text-align:left; padding:9px 12px; border-bottom:1px solid var(--border); vertical-align:top; }
+table.cmp th { font:650 9.5px ui-monospace,Menlo,monospace; letter-spacing:.11em; text-transform:uppercase;
+  color:var(--dim); background:var(--panel2); }
+table.cmp td:first-child { color:var(--body); font-weight:590; width:30%; }
+table.cmp td { color:var(--muted); line-height:1.55; }
+table.cmp tr:last-child td { border-bottom:none; }
+table.cmp b { color:var(--text); font-weight:600; }
+
+.legend { display:flex; flex-wrap:wrap; gap:14px; margin-top:11px; font-size:11px; color:var(--muted); }
+.legend span { display:inline-flex; align-items:center; gap:6px; }
+.legend i { width:12px; height:9px; border-radius:3px; display:block; }
+.legend i.d { border:1px dashed var(--border2); }
+.legend i.s { border:1px solid color-mix(in srgb,var(--prog) 40%,transparent); background:color-mix(in srgb,var(--prog) 8%,transparent); }
+.legend i.p { border:1px solid color-mix(in srgb,var(--done) 34%,transparent); background:color-mix(in srgb,var(--done) 9%,transparent); }
+.legend i.f { border:1px solid color-mix(in srgb,var(--blocked) 40%,transparent); background:color-mix(in srgb,var(--blocked) 8%,transparent); }
+
+.empty { display:flex; flex-direction:column; align-items:flex-start; gap:7px; padding:22px 20px;
+  border:1px dashed var(--border2); border-radius:12px; max-width:62ch; margin:14px 18px; }
+.empty b { font-size:13px; font-weight:640; color:var(--text); }
+.empty span { font-size:12px; line-height:1.55; color:var(--muted); }
+.routineshint { padding:2px 18px 10px; font-size:11.5px; color:var(--muted); }
+
+/* routines rows, for the sibling tab */
+.routinegrid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; padding:4px 18px 18px; align-items:start; }
+.routinerow { display:grid; grid-template-columns:auto 1fr auto; column-gap:12px; padding:13px 14px 11px;
+  background:var(--card); border:1px solid var(--card-border); border-radius:var(--r-lg); box-shadow:var(--shadow-card); }
+.routineico { grid-row:1/3; width:30px; height:30px; border-radius:9px; background:var(--panel2);
+  display:grid; place-items:center; color:var(--muted); position:relative; font-size:13px; }
+.routineico::after { content:''; position:absolute; inset:-3px; border-radius:12px;
+  border:1.5px solid color-mix(in srgb,var(--muted) 48%,transparent); }
+.routinetitle { grid-column:2; font-size:13px; font-weight:620; line-height:1.35; }
+.routineroom { margin-left:8px; padding:1.5px 6px; border-radius:6px; background:var(--panel2);
+  font:600 10px ui-monospace,Menlo,monospace; color:var(--muted); }
+.routinesched { grid-column:3; grid-row:1; text-align:right; white-space:nowrap; }
+.routinecad { font-size:11.5px; font-weight:590; color:var(--text); }
+.routinenext { display:block; font:500 10.5px ui-monospace,Menlo,monospace; color:var(--dim); margin-top:2px; }
+.routineprompt { grid-column:2/4; font-size:11.5px; line-height:1.5; color:var(--muted); margin-top:5px; }
+
+.jump { position:fixed; right:16px; bottom:16px; z-index:70; display:flex; flex-direction:column; gap:5px;
+  background:var(--overlay); border:1px solid var(--border2); border-radius:var(--r-md); padding:7px;
+  box-shadow:var(--shadow-pop); }
+.jump a { font:600 10.5px ui-monospace,Menlo,monospace; color:var(--muted); text-decoration:none; padding:3px 7px; border-radius:5px; }
+.jump a:hover { color:var(--text); background:var(--hover-bg); }
+@media (max-width:900px){ .jump{ display:none; } }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Agents that can draw · a calendar you can reach</h1>
+  <span class="sub">design round 1 · 2026-08-13 · two findings, one destination change</span>
+  <span class="spacer"></span>
+  <button class="ctl" id="theme">Cream Oak ☀</button>
+</header>
+
+<div style="max-width:1340px; margin:18px auto -18px; padding:0 22px">
+  <div style="border:1px solid var(--border2); border-left:3px solid var(--brand); border-radius:var(--r-lg);
+    padding:13px 16px; background:var(--panel); font-size:12.5px; line-height:1.65; color:var(--body)">
+    <b style="color:var(--text)">Reviewed and BUILT — with two changes to what is drawn below.</b>
+    George picked option B (scene 03) and then corrected it twice, in the order it happened:
+    <br>· <b>No tab strip.</b> The nav disclosure already IS the navigation, so a strip inside the main
+    section was a second door to the same two surfaces — the exact rule docs/33 §8 states. Scenes 03–06
+    still draw it; the shipped surface has only the nested nav rows.
+    <br>· <b>The calendar carries automations too</b>, not just social content — so it became the time
+    view of everything scheduled, in two lanes, with firings projected through the shared
+    <code>nextScheduleRun</code>. Scene 04's grid shows the platform lanes only.
+    <br>What shipped is recorded in
+    <code>docs/design/agent-images-and-calendar-2026-08/plan.md</code>.
+  </div>
+</div>
+
+<nav class="jump">
+  <a href="#s0">00 · what broke</a>
+  <a href="#s1">01 · card states</a>
+  <a href="#s2">02 · rex draws</a>
+  <a href="#s3">03 · where it lives</a>
+  <a href="#s4">04 · the calendar</a>
+  <a href="#s5">05 · month</a>
+  <a href="#s6">06 · empty</a>
+</nav>
+
+<main>
+
+<!-- ══════════════════════════════════════════════════════════════════════════ -->
+<section id="s0">
+  <h2><span class="n">00</span>What actually broke</h2>
+  <p class="why">Two separate failures, neither of which is the one it looks like from the outside. Both are
+  <b>missing seams, not missing features</b> — the machinery to do the thing already exists and runs; nothing is
+  wired to it from where you are standing.</p>
+
+  <div class="cols2">
+    <div class="pane">
+      <div class="panehead"><span class="k">finding 1</span> Rex cannot draw — it has no hand <span class="spacer"></span><span class="tag bug">tool gap</span></div>
+      <div class="panebody">
+        <p class="why" style="margin-bottom:12px">The drawing function already exists, is already channel-scoped, and already
+        needs no model turn: <code>generateDraftImage()</code> in <code>agents.ts:7221</code>. It resolves the designer's
+        image key, reads the brand tokens, calls <code>generateBrandImage</code>, and writes the result onto the card.</p>
+        <p class="why" style="margin-bottom:12px">The <b>only</b> way to reach it is the invisible marker
+        <code>‹gen-image:id›</code> — which only the card's own button emits. Rex's tool registry
+        (<code>buildOrchestratorTools</code>, <code>agents.ts:7524</code>) carries <code>draft_posts</code>,
+        <code>revise_posts</code>, <code>schedule_posts</code>, <code>unschedule_posts</code> — and no image tool.
+        Neither does the chat registry. Neither does the shared harness catalogue.</p>
+        <p class="why" style="margin:0">So when you ask rex for a picture, it is telling the literal truth: the only
+        thing it can point at is your button. <b>A prompt rule would not fix this</b> — the tool inventory is the
+        enforcement, and there is nothing in it to call.</p>
+        <div class="note"><b>Second-order:</b> <code>revise_posts</code> accepts an <code>imageBrief</code> and writes it
+        to the card — then draws nothing. The one place "change the picture" naturally lands is also the one place
+        that silently only writes text.</div>
+      </div>
+    </div>
+
+    <div class="pane">
+      <div class="panehead"><span class="k">finding 2</span> The button did not disappear — it never covers this case <span class="spacer"></span><span class="tag bug">gate gap</span></div>
+      <div class="panebody">
+        <p class="why" style="margin-bottom:12px">One predicate decides every image control on a post card
+        (<code>App.tsx:9174</code>):</p>
+        <div style="background:var(--code); color:var(--codeink); border-radius:var(--r-sm); padding:10px 12px;
+          font:500 11.5px ui-monospace,Menlo,monospace; line-height:1.6; margin-bottom:12px; overflow-x:auto;">
+          const wantsImage = !media?.thumb &amp;&amp; !media?.image_url<br>&nbsp;&nbsp;&amp;&amp; !!media?.brief &amp;&amp; !superseded;
+        </div>
+        <p class="why" style="margin-bottom:12px">Read the first clause. <b>Once a card has a picture, every image
+        control is gone</b> — Generate, Try again, the "no model connected" prompt, all of it. There has never been a
+        redraw affordance. Git confirms nothing was removed: the button's only two commits added it and then added a
+        second surface for it.</p>
+        <p class="why" style="margin:0">And a third silent state: while <code>imageReady</code> is still
+        <code>undefined</code> (the credential lookup is in flight, or it rejected) the card renders <b>no image
+        row at all</b> — not the button, not the connect prompt, not an explanation.</p>
+        <div class="note"><b>Same bug class as the Files <code>promoted = 1</code> filter:</b> a predicate that makes a
+        real thing structurally unreachable, and reads as absence rather than as a rule.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="pane" style="margin-top:18px">
+    <div class="panehead"><span class="k">finding 3</span> The content calendar is gated on a room's kind <span class="spacer"></span><span class="tag bug">reachability</span></div>
+    <div class="panebody" style="padding-bottom:14px">
+      <p class="why" style="margin:0">The calendar exists and works. It is reachable only as a tab inside a room that is
+      <code>kind = 'marketing'</code> <b>and</b> has finished its setup flow (<code>room-tabs.ts:40-50</code>). Its query
+      is channel-scoped: <code>nm.contentItems(channelId)</code>. So there is no way to ask "what is my workspace
+      publishing this week" — and if you are standing anywhere but that one room, the surface does not exist.
+      Meanwhile every other destination went workspace-wide with a visible scope bar on 2026-08-07. The calendar is the
+      one that was left behind.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════ -->
+<section id="s1">
+  <h2><span class="n">01</span>The post card — every image state, including the three that render nothing today</h2>
+  <p class="why">The card already owns the reason ("the reason lives ON the card now"). The change is to make that true
+  for <b>all five</b> states rather than the three that happen before a picture exists. The redraw is a quiet icon in
+  the existing <code>.mkpcactions</code> row beside Reply — not a fourth banner under a picture that already looks fine.</p>
+
+  <div class="cols3">
+    <!-- 1 -->
+    <div class="pane">
+      <div class="panehead"><span class="k">a</span> brief, no image, key present <span class="spacer"></span><span class="tag now">ships today</span></div>
+      <div class="panebody" style="background:var(--bg)">
+        <div class="mkpostcard">
+          <div class="mkpchd"><span class="mkpcnet"><span class="mkpcg">𝕏</span>X</span>
+            <span class="mkpcid">draft e</span><span class="chip mk-draft">draft</span></div>
+          <div class="mkpv">
+            <div class="mkpvhead"><span class="mkpvav">M</span><b>marketing</b><span class="mkpvhandle">· draft</span></div>
+            <div class="mkpvtext">every agent that ships code here opens a PR. no exceptions, no direct commits.
+
+the review gate is the same for all of them.</div>
+          </div>
+          <div class="mkpcbrief"><span>▨</span><span><span class="mkpcbriefk">needs image</span> — a quiet terminal window with a green check, warm desk light, oak tones</span></div>
+          <div class="mkpcsetup mkpcimggen"><button class="btn sm">Generate image</button></div>
+          <div class="mkpcfoot"><span class="mkpccc">148/280</span>
+            <span class="mkpcactions"><button class="mkico">↩</button><button class="btn sm">Review · schedule ↗</button></span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2 -->
+    <div class="pane">
+      <div class="panehead"><span class="k">b</span> drawing <span class="spacer"></span><span class="tag new">changed</span></div>
+      <div class="panebody" style="background:var(--bg)">
+        <div class="mkpostcard">
+          <div class="mkpchd"><span class="mkpcnet"><span class="mkpcg">𝕏</span>X</span>
+            <span class="mkpcid">draft e</span><span class="chip mk-draft">draft</span></div>
+          <div class="mkpv">
+            <div class="mkpvhead"><span class="mkpvav">M</span><b>marketing</b><span class="mkpvhandle">· draft</span></div>
+            <div class="mkpvtext">every agent that ships code here opens a PR. no exceptions, no direct commits.
+
+the review gate is the same for all of them.</div>
+            <div class="imgskel drawing">drawing…</div>
+          </div>
+          <div class="mkpcbrief"><span>▨</span><span><span class="mkpcbriefk">needs image</span> — a quiet terminal window with a green check, warm desk light, oak tones</span></div>
+          <div class="mkpcfoot"><span class="mkpccc">148/280</span>
+            <span class="mkpcactions"><button class="mkico">↩</button><button class="btn sm">Review · schedule ↗</button></span></div>
+        </div>
+        <div class="note" style="margin:12px 0 0"><b>Moved.</b> The pending state was a disabled button reading
+        "Drawing…" in a banner. It belongs where the picture will appear — the card shows you the shape of what is
+        coming, and the row below stops being a control that argues with itself.</div>
+      </div>
+    </div>
+
+    <!-- 3 -->
+    <div class="pane">
+      <div class="panehead"><span class="k">c</span> failed <span class="spacer"></span><span class="tag now">ships today</span></div>
+      <div class="panebody" style="background:var(--bg)">
+        <div class="mkpostcard">
+          <div class="mkpchd"><span class="mkpcnet"><span class="mkpcg">𝕏</span>X</span>
+            <span class="mkpcid">draft e</span><span class="chip mk-draft">draft</span></div>
+          <div class="mkpv">
+            <div class="mkpvhead"><span class="mkpvav">M</span><b>marketing</b><span class="mkpvhandle">· draft</span></div>
+            <div class="mkpvtext">every agent that ships code here opens a PR. no exceptions, no direct commits.</div>
+          </div>
+          <div class="mkpcbrief"><span>▨</span><span><span class="mkpcbriefk">needs image</span> — a quiet terminal window with a green check</span></div>
+          <div class="mkpcsetup mkpcimgerr"><span><b>Image didn't generate.</b> the model returned a content-policy refusal</span>
+            <button class="btn sm">Try again</button></div>
+          <div class="mkpcfoot"><span class="mkpccc">96/280</span>
+            <span class="mkpcactions"><button class="mkico">↩</button><button class="btn sm">Review · schedule ↗</button></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="cols3" style="margin-top:16px">
+    <!-- 4 -->
+    <div class="pane">
+      <div class="panehead"><span class="k">d</span> has an image <span class="spacer"></span><span class="tag new">renders nothing today</span></div>
+      <div class="panebody" style="background:var(--bg)">
+        <div class="mkpostcard">
+          <div class="mkpchd"><span class="mkpcnet"><span class="mkpcg">𝕏</span>X</span>
+            <span class="mkpcid">draft a · v4</span><span class="chip mk-draft">draft</span></div>
+          <div class="mkpv">
+            <div class="mkpvhead"><span class="mkpvav">M</span><b>marketing</b><span class="mkpvhandle">· draft</span></div>
+            <div class="mkpvtext">you correct an agent. it nods. next task, same mistake.
+
+in neuramesh, a correction becomes a lesson.</div>
+            <svg class="mkpcimg" viewBox="0 0 320 132" preserveAspectRatio="xMidYMid slice" role="img" aria-label="generated image">
+              <defs><linearGradient id="g1" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#241d18"/><stop offset="1" stop-color="#100d0b"/></linearGradient>
+                <radialGradient id="g2" cx=".5" cy=".42" r=".55">
+                <stop offset="0" stop-color="#c98a4e" stop-opacity=".38"/><stop offset="1" stop-color="#c98a4e" stop-opacity="0"/></radialGradient></defs>
+              <rect width="320" height="132" fill="url(#g1)"/><rect width="320" height="132" fill="url(#g2)"/>
+              <rect x="126" y="18" width="68" height="15" rx="2" fill="#e6ddd0" opacity=".82"/>
+              <rect x="126" y="38" width="68" height="15" rx="2" fill="#e6ddd0" opacity=".7"/>
+              <rect x="126" y="58" width="68" height="15" rx="2" fill="#e6ddd0" opacity=".58"/>
+              <circle cx="160" cy="97" r="15" fill="none" stroke="#c98a4e" stroke-width="1.2" opacity=".8"/>
+              <circle cx="160" cy="97" r="4" fill="#c98a4e"/>
+              <path d="M0 132 Q40 104 78 132Z" fill="#0a0807"/><path d="M96 132 Q126 100 156 132Z" fill="#0a0807"/>
+              <path d="M172 132 Q202 102 232 132Z" fill="#0a0807"/><path d="M248 132 Q282 104 320 132Z" fill="#0a0807"/>
+            </svg>
+          </div>
+          <div class="mkpcbrief"><span>▨</span><span><span class="mkpcbriefk">image brief</span> — a team at a dark table, a glowing mesh between them, warm lamp</span></div>
+          <div class="mkpcfoot"><span class="mkpccc">231/280</span>
+            <span class="mkpcactions">
+              <button class="mkico" title="Request changes on this draft">↩</button>
+              <button class="mkico hot" title="Redraw this image from its brief">◳</button>
+              <button class="btn sm">Review · schedule ↗</button></span></div>
+        </div>
+        <div class="note" style="margin:12px 0 0"><b>The fix you asked for.</b> One quiet icon, same family as Reply,
+        enabled whenever the card carries a brief and is neither published nor a superseded version. It calls the same
+        <code>generateDraftImage</code> the Generate button calls — the brief is the redraw instruction, so no new
+        machinery. The brief row also stops hiding once a picture exists: you can read what was asked for.</div>
+      </div>
+    </div>
+
+    <!-- 5 -->
+    <div class="pane">
+      <div class="panehead"><span class="k">e</span> no image model connected <span class="spacer"></span><span class="tag now">ships today</span></div>
+      <div class="panebody" style="background:var(--bg)">
+        <div class="mkpostcard">
+          <div class="mkpchd"><span class="mkpcnet"><span class="mkpcg">in</span>LinkedIn</span>
+            <span class="mkpcid">#1048·c</span><span class="chip mk-draft">draft</span></div>
+          <div class="mkpv">
+            <div class="mkpvhead"><span class="mkpvav">M</span><b>marketing</b><span class="mkpvhandle">· draft</span></div>
+            <div class="mkpvtext">the review gate does not care who wrote the code.</div>
+          </div>
+          <div class="mkpcbrief"><span>▨</span><span><span class="mkpcbriefk">needs image</span> — two review columns, one human one agent, same gate</span></div>
+          <div class="mkpcsetup"><span><b>No image model connected.</b> Your designer wrote the art direction but has
+            nothing to draw with — a subscription login carries no API key.</span>
+            <button class="btn sm">Connect an image model →</button></div>
+          <div class="mkpcfoot"><span class="mkpccc">54</span>
+            <span class="mkpcactions"><button class="mkico">↩</button><button class="btn sm">Review · schedule ↗</button></span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 6 -->
+    <div class="pane">
+      <div class="panehead"><span class="k">f</span> credentials still resolving <span class="spacer"></span><span class="tag new">renders nothing today</span></div>
+      <div class="panebody" style="background:var(--bg)">
+        <div class="mkpostcard">
+          <div class="mkpchd"><span class="mkpcnet"><span class="mkpcg">𝕏</span>X</span>
+            <span class="mkpcid">draft f</span><span class="chip mk-draft">draft</span></div>
+          <div class="mkpv">
+            <div class="mkpvhead"><span class="mkpvav">M</span><b>marketing</b><span class="mkpvhandle">· draft</span></div>
+            <div class="mkpvtext">one correction. every agent after it knows.</div>
+          </div>
+          <div class="mkpcbrief"><span>▨</span><span><span class="mkpcbriefk">needs image</span> — a lesson card pinned above a workbench</span></div>
+          <div class="mkpcsetup mkpcimggen"><button class="btn sm" disabled style="opacity:.55; cursor:default">Generate image</button></div>
+          <div class="mkpcfoot"><span class="mkpccc">44/280</span>
+            <span class="mkpcactions"><button class="mkico">↩</button><button class="btn sm">Review · schedule ↗</button></span></div>
+        </div>
+        <div class="note" style="margin:12px 0 0"><b>Renders nothing today.</b> <code>imageReady</code> starts
+        <code>undefined</code> and every branch tests <code>=== true</code> or <code>=== false</code>, so an in-flight or
+        rejected credential lookup produces a card with no image row — indistinguishable from a card that never wanted
+        one. A disabled button is the honest placeholder: the control exists, it is not ready yet.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════ -->
+<section id="s2">
+  <h2><span class="n">02</span>Asking rex for a picture</h2>
+  <p class="why">The card affordance is the human's path. The tool is the agent's. Both call the same function.
+  This is what changes in the thread — and note that the second one is not "rex talks better", it is
+  <b>rex has something to call</b>.</p>
+
+  <div class="cols2">
+    <div class="pane">
+      <div class="panehead"><span class="k">today</span> the nod <span class="spacer"></span><span class="tag bug">live 2026-08-13</span></div>
+      <div class="thread">
+        <div class="msg"><span class="av me">G</span><div class="mbody">
+          <div class="mhead"><b>george</b><span class="mtime">04:12 PM</span></div>
+          <div class="mtext mine">Generate the image for draft d.</div></div></div>
+        <div class="msg"><span class="av orch">R</span><div class="mbody">
+          <div class="mhead"><b>rex</b><span class="mrole">orchestrator</span><span class="mtime">04:12 PM</span></div>
+          <div class="mtext dead">Draft d has an image brief on it. <em>Hit the Generate image button on the card and
+          I'll pick it up from there</em> — nothing publishes until you approve.</div></div></div>
+        <div class="msg"><span class="av me">G</span><div class="mbody">
+          <div class="mhead"><b>george</b><span class="mtime">04:13 PM</span></div>
+          <div class="mtext mine">there's no generate on the card anymore, we need to regenerate it</div></div></div>
+      </div>
+      <div class="panebody" style="border-top:1px solid var(--border); padding-top:14px">
+        <p class="why" style="margin:0">Both statements are true at once. Rex genuinely has no other move, and the card
+        genuinely has no button — because it already has a picture. Neither of them is confused; the seam is.</p>
+      </div>
+    </div>
+
+    <div class="pane">
+      <div class="panehead"><span class="k">proposed</span> the hand <span class="spacer"></span><span class="tag new">new tool</span></div>
+      <div class="thread">
+        <div class="msg"><span class="av me">G</span><div class="mbody">
+          <div class="mhead"><b>george</b><span class="mtime">04:12 PM</span></div>
+          <div class="mtext mine">Regenerate the image for draft d — warmer, fewer people.</div></div></div>
+        <div class="msg"><span class="av orch">R</span><div class="mbody">
+          <div class="mhead"><b>rex</b><span class="mrole">orchestrator</span><span class="mtime">04:12 PM</span></div>
+          <div class="mtext">Rewrote d's brief to a warmer two-person scene and redrew it — it's on the card now.
+          Nothing publishes until you approve.</div>
+          <span class="toolline"><span class="dot"></span>revise_posts · d → imageBrief</span>
+          <span class="toolline"><span class="dot"></span>generate_image · d · gpt-image-2 · 6.4s</span>
+        </div></div>
+      </div>
+      <div class="panebody" style="border-top:1px solid var(--border); padding-top:14px">
+        <table class="cmp">
+          <tr><td>New tool</td><td><b><code>generate_image({ letters })</code></b> on the orchestrator registry and the
+            chat registry. Resolves cards through the existing <code>draftsForAnchor</code> (thread <i>or</i> task), calls
+            <code>generateDraftImage</code> per card. No LLM turn inside it, no new provider code, no new command.</td></tr>
+          <tr><td>Fixed tool</td><td><code>revise_posts</code> with an <code>imageBrief</code> now <b>draws</b>, exactly as
+            <code>reviseContentDrafts</code> already does at <code>agents.ts:7332</code>. Today the tool path writes the
+            brief and silently skips the drawing — that asymmetry is the bug.</td></tr>
+          <tr><td>Who else gets it</td><td>Every registry that carries <code>draft_posts</code> — so the marketer answering
+            in a thread and rex both have it. The designer's key still does the drawing and the marketer still reviews the
+            result; that ladder is untouched.</td></tr>
+          <tr><td>Not doing</td><td>No image tool in the shared harness catalogue (a coding worker has no drafts to draw
+            for), and no new subagent — <code>generateDraftImage</code> needs no model turn, so spawning one to call it
+            would be pure latency.</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════ -->
+<section id="s3">
+  <h2><span class="n">03</span>Where the calendar lives — two options</h2>
+  <p class="why">Whichever we pick, the load-bearing fix is the same: <b>the calendar stops being gated on a room's kind</b>
+  and becomes workspace-wide with a visible scope bar, like every other destination since 2026-08-07. The room tab stays
+  where it is — exactly as Tasks is both a room tab and a workspace destination. The open question is only the nav slot.</p>
+
+  <div class="cols2">
+    <!-- OPTION A -->
+    <div class="pane">
+      <div class="panehead"><span class="k">option a</span> Its own destination <span class="spacer"></span><span class="tag now">6th slot</span></div>
+      <div class="app" style="--apph:376px">
+        <div class="spine"><div class="spinemark">N</div><div class="spinedot">g</div></div>
+        <div class="nav">
+          <div class="navnew">＋ New chat <span class="kb">⌘N</span></div>
+          <div class="navhd">Shortcuts</div>
+          <div class="navitem"><span class="ico">⌂</span>Home<span class="n">2</span></div>
+          <div class="navitem"><span class="ico">▦</span>Tasks<span class="n">12</span></div>
+          <div class="navitem"><span class="ico">◨</span>Whiteboards</div>
+          <div class="navitem"><span class="ico">⟳</span>Automations<span class="n">1</span></div>
+          <div class="navitem on fresh"><span class="ico">▤</span>Calendar</div>
+          <div class="navitem"><span class="ico">▤</span>Files</div>
+        </div>
+        <div class="main">
+          <div class="tabstrip"><span class="wtab">▢ Week of X post drafts</span><span class="wtab on">▤ Calendar</span></div>
+          <div class="topbar"><span class="ttl">Content calendar</span></div>
+          <div class="scopebar">
+            <div class="scopesearch">⌕ Search drafts &amp; posts</div>
+            <div class="cchip">All projects <span class="car">▾</span></div>
+            <div class="cchip">All rooms <span class="car">▾</span></div>
+          </div>
+          <div style="padding:16px 18px; color:var(--muted); font-size:12px; line-height:1.6">…the week grid, scene 04.</div>
+        </div>
+      </div>
+      <div class="panebody" style="border-top:1px solid var(--border)">
+        <table class="cmp">
+          <tr><td>For</td><td>One click, no disclosure. The calendar is a <b>planning</b> surface, not a queue —
+            its most important rows are the drafts with <i>no</i> slot yet, which is not an automation-shaped idea.</td></tr>
+          <tr><td>Against</td><td>Spends the 6th nav slot on a surface that is <b>permanently empty in a
+            repo-only workspace</b>. Every other destination means something to every workspace; this one would not.</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- OPTION B -->
+    <div class="pane" style="outline:1px solid color-mix(in srgb,var(--brand) 45%,transparent); outline-offset:-1px">
+      <div class="panehead"><span class="k">option b</span> Nested under Automations <span class="spacer"></span><span class="tag rec">recommended</span></div>
+      <div class="app" style="--apph:376px">
+        <div class="spine"><div class="spinemark">N</div><div class="spinedot">g</div></div>
+        <div class="nav">
+          <div class="navnew">＋ New chat <span class="kb">⌘N</span></div>
+          <div class="navhd">Shortcuts</div>
+          <div class="navitem"><span class="ico">⌂</span>Home<span class="n">2</span></div>
+          <div class="navitem"><span class="ico">▦</span>Tasks<span class="n">12</span></div>
+          <div class="navitem"><span class="ico">◨</span>Whiteboards</div>
+          <div class="navitem on"><span class="ico">⟳</span>Automations<span class="n">1</span></div>
+          <div class="navitem sub"><span class="ico">⟲</span>Routines<span class="n">1</span></div>
+          <div class="navitem sub on fresh"><span class="ico">▤</span>Calendar</div>
+          <div class="navitem"><span class="ico">▤</span>Files</div>
+        </div>
+        <div class="main">
+          <div class="tabstrip"><span class="wtab">▢ Week of X post drafts</span><span class="wtab on">⟳ Automations</span></div>
+          <div class="topbar"><span class="crumb">Automations <span class="sep">›</span></span><span class="ttl">Content calendar</span></div>
+          <div class="roomtabbar">
+            <button class="roomtab">Routines <span class="roomtabn">1</span></button>
+            <button class="roomtab on">Calendar <span class="roomtabn">9</span></button>
+          </div>
+          <div class="scopebar">
+            <div class="scopesearch">⌕ Search drafts &amp; posts</div>
+            <div class="cchip">All projects <span class="car">▾</span></div>
+            <div class="cchip">All rooms <span class="car">▾</span></div>
+          </div>
+          <div style="padding:10px 18px; color:var(--muted); font-size:12px; line-height:1.6">…the week grid, scene 04.</div>
+        </div>
+      </div>
+      <div class="panebody" style="border-top:1px solid var(--border)">
+        <table class="cmp">
+          <tr><td>For</td><td>Both halves answer <b>one question</b>: what fires while I'm not looking. Both need the
+            identical scope bar, which Automations already has. Automations already owns a swapped creation verb in the
+            nav, so a destination owning its own sub-structure is not a new idea here.</td></tr>
+          <tr><td>The naming wrinkle</td><td>"Automations › Automations" is redundant, so the inner tab reverts to its
+            original name — <b>Routines · Calendar</b>. The nav label stays <code>Automations</code> (renaming the
+            destination is churn across 4 registration sites and the docs). The topbar carries a crumb so you always know
+            which half you are in.</td></tr>
+          <tr><td>Cost</td><td>Introduces the <b>first tabbed destination</b> in the product. docs/33:274-281 currently
+            says <code>.roomtabbar</code> is the only tab strip that exists — that ruling has to be amended in the same
+            PR, and the strip reuses that exact class rather than inventing a second one.</td></tr>
+          <tr><td>Nav</td><td>The two children show only while Automations is the active destination — the shortcuts band
+            stays five rows tall at rest.</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="note" style="max-width:none"><b>My call: B.</b> Not because the surfaces are similar to look at — they are
+  not — but because a content calendar is not universally meaningful and a top-level slot asserts that it is. Nesting
+  keeps the promise that every row in Shortcuts means something in every workspace, while making the calendar reachable
+  from anywhere for the workspaces where it does. If you would rather spend the slot, A is one tuple and no docs/33
+  amendment, and everything in scene 04 is identical either way.</div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════ -->
+<section id="s4">
+  <h2><span class="n">04</span>The calendar itself — workspace-wide, week lens</h2>
+  <p class="why">Same grid geometry as the room tab today (<code>.mkcalgrid</code>, platform rows × 7 days), with three
+  changes that the workspace scope forces: an <b>unscheduled rail</b>, a <b>room tag</b> on each chip at All scope, and an
+  <b>image dot</b> so you can see at a glance which posts still have no picture.</p>
+
+  <div class="pane">
+    <div class="panehead"><span class="k">option b · calendar tab</span> gads inc · all projects <span class="spacer"></span><span class="tag new">new surface</span></div>
+    <div class="app" style="--apph:706px">
+      <div class="spine"><div class="spinemark">N</div><div class="spinedot">g</div></div>
+      <div class="nav">
+        <div class="navnew">＋ New chat <span class="kb">⌘N</span></div>
+        <div class="navhd">Shortcuts</div>
+        <div class="navitem"><span class="ico">⌂</span>Home<span class="n">2</span></div>
+        <div class="navitem"><span class="ico">▦</span>Tasks<span class="n">12</span></div>
+        <div class="navitem"><span class="ico">◨</span>Whiteboards</div>
+        <div class="navitem on"><span class="ico">⟳</span>Automations<span class="n">1</span></div>
+        <div class="navitem sub"><span class="ico">⟲</span>Routines<span class="n">1</span></div>
+        <div class="navitem sub on"><span class="ico">▤</span>Calendar<span class="n">9</span></div>
+        <div class="navitem"><span class="ico">▤</span>Files</div>
+        <div class="navhd" style="margin-top:16px">Projects</div>
+        <div class="navitem"><span class="ico">◕</span>Neuramesh</div>
+        <div class="navitem" style="padding-left:26px; font-size:12px; color:var(--muted)"># marketing</div>
+        <div class="navitem" style="padding-left:26px; font-size:12px; color:var(--muted)"># build</div>
+      </div>
+      <div class="main">
+        <div class="tabstrip"><span class="wtab">▢ Week of X post drafts</span><span class="wtab on">⟳ Automations</span></div>
+        <div class="topbar"><span class="crumb">Automations <span class="sep">›</span></span><span class="ttl">Content calendar</span></div>
+        <div class="roomtabbar">
+          <button class="roomtab">Routines <span class="roomtabn">1</span></button>
+          <button class="roomtab on">Calendar <span class="roomtabn">9</span></button>
+        </div>
+        <div class="scopebar">
+          <div class="scopesearch">⌕ Search drafts &amp; posts</div>
+          <div class="cchip">All projects <span class="car">▾</span></div>
+          <div class="cchip">All rooms <span class="car">▾</span></div>
+          <span class="scoperight">
+            <span class="viewchips"><button class="on">Week</button><button>Month</button></span>
+          </span>
+        </div>
+        <div class="mkcalwrap">
+          <div class="mkcalhead">
+            <div class="mkcalnav"><button>‹</button><button>›</button></div>
+            <span class="mkcalrange">Aug 10 – 16</span>
+            <button class="btn sm">Today</button>
+            <span class="spacer" style="flex:1"></span>
+            <span style="font:600 10.5px ui-monospace,Menlo,monospace; color:var(--dim)">4 scheduled · 2 published · 1 failed</span>
+          </div>
+
+          <!-- the unscheduled rail -->
+          <div class="unsched">
+            <div class="unschedk">
+              <b>Needs a slot</b>
+              <span>4 drafts · 1 no image</span>
+            </div>
+            <div class="unschedlist">
+              <button class="uchip"><span class="g">𝕏</span><span class="bd">you correct an agent. it nods…</span><span class="rm">#marketing</span></button>
+              <button class="uchip"><span class="g">𝕏</span><span class="bd">every agent that ships code opens a PR</span><span class="rm">#marketing</span></button>
+              <button class="uchip" style="border-color:color-mix(in srgb,var(--warn) 45%,transparent)"><span class="g">in</span><span class="bd">the review gate does not care who wrote it</span><span class="rm">#marketing</span></button>
+              <button class="uchip"><span class="g">◐</span><span class="bd">worktrees are cache, not home</span><span class="rm">#launch</span></button>
+            </div>
+          </div>
+
+          <div class="mkcalgrid">
+            <div class="mkchd"></div>
+            <div class="mkchd">Mon<span class="dnum">10</span></div>
+            <div class="mkchd">Tue<span class="dnum">11</span></div>
+            <div class="mkchd today">Wed<span class="dnum">12</span></div>
+            <div class="mkchd">Thu<span class="dnum">13</span></div>
+            <div class="mkchd">Fri<span class="dnum">14</span></div>
+            <div class="mkchd">Sat<span class="dnum">15</span></div>
+            <div class="mkchd">Sun<span class="dnum">16</span></div>
+
+            <div class="mkplab"><span class="g">𝕏</span>X</div>
+            <div class="mkcell"><button class="mkcalitem published"><span class="t">09:00</span><span class="bd">local compute, cloud truth<span class="rm">#mkt</span></span></button></div>
+            <div class="mkcell"><button class="mkcalitem published"><span class="t">17:12</span><span class="bd">honest question for anyone running…<span class="rm">#mkt</span></span></button></div>
+            <div class="mkcell today"><button class="mkcalitem scheduled"><span class="t">11:30</span><span class="bd"><span class="im"></span>a correction becomes a lesson<span class="rm">#mkt</span></span></button></div>
+            <div class="mkcell"><button class="mkcalitem scheduled"><span class="t">17:12</span><span class="bd"><span class="im"></span>where does the correction go?<span class="rm">#mkt</span></span></button></div>
+            <div class="mkcell"><button class="mkcalitem draft"><span class="t">—</span><span class="bd">PR flow, no exceptions<span class="rm">#mkt</span></span></button></div>
+            <div class="mkcell"></div>
+            <div class="mkcell"></div>
+
+            <div class="mkplab"><span class="g">in</span>LinkedIn</div>
+            <div class="mkcell"></div>
+            <div class="mkcell"><button class="mkcalitem failed"><span class="t">08:00</span><span class="bd">the review gate is the same<span class="rm">#mkt</span></span></button></div>
+            <div class="mkcell today"></div>
+            <div class="mkcell"><button class="mkcalitem scheduled"><span class="t">08:30</span><span class="bd">worktrees are cache, not home<span class="rm">#launch</span></span></button></div>
+            <div class="mkcell"></div>
+            <div class="mkcell"></div>
+            <div class="mkcell"></div>
+
+            <div class="mkplab"><span class="g">◐</span>Instagram</div>
+            <div class="mkcell"></div>
+            <div class="mkcell"></div>
+            <div class="mkcell today"></div>
+            <div class="mkcell"></div>
+            <div class="mkcell"><button class="mkcalitem scheduled"><span class="t">12:00</span><span class="bd"><span class="im"></span>the loop, in one frame<span class="rm">#launch</span></span></button></div>
+            <div class="mkcell"></div>
+            <div class="mkcell"></div>
+
+            <div class="mkplab"><span class="g">♪</span>TikTok</div>
+            <div class="mkcell"></div><div class="mkcell"></div><div class="mkcell today"></div>
+            <div class="mkcell"></div><div class="mkcell"></div><div class="mkcell"></div><div class="mkcell"></div>
+
+            <div class="mkplab"><span class="g">✉</span>Email</div>
+            <div class="mkcell"></div><div class="mkcell"></div><div class="mkcell today"></div>
+            <div class="mkcell"></div>
+            <div class="mkcell"><button class="mkcalitem draft"><span class="t">—</span><span class="bd">week 2 digest<span class="rm">#launch</span></span></button></div>
+            <div class="mkcell"></div><div class="mkcell"></div>
+          </div>
+
+          <div class="legend">
+            <span><i class="d"></i>draft — no slot yet</span>
+            <span><i class="s"></i>scheduled</span>
+            <span><i class="p"></i>published</span>
+            <span><i class="f"></i>failed</span>
+            <span><i style="background:var(--muted); opacity:.55; border-radius:2px; width:7px; height:7px"></i>still has no image</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="cols2" style="margin-top:18px">
+    <div class="pane">
+      <div class="panehead"><span class="k">the three changes</span> and why each one is forced</div>
+      <div class="panebody" style="padding:0">
+        <table class="cmp">
+          <tr><td>Unscheduled rail</td><td>Today an unscheduled draft is drawn on <b>the day it was created</b>
+            (<code>scheduled_at ?? created_at</code>, <code>App.tsx:9387</code>) — a calendar cell that asserts something
+            will happen then, when nothing will. Drafts with no slot get their own rail above the grid, which doubles as
+            the marketing half of the needs-you queue: <i>your agents wrote these and they are going nowhere.</i></td></tr>
+          <tr><td>Room tag on a chip</td><td>At All scope a chip has no other way to say which room it belongs to — and
+            the room is the ACL boundary and the connector's owner. Reuses <code>.routineroom</code>, the tag the
+            sibling tab already puts on a row at All scope, and hides itself when a single room is selected.</td></tr>
+          <tr><td>Image dot</td><td>The one thing you cannot see from a text chip is whether it will publish naked.
+            A 7px square before the body means <i>brief written, no picture yet</i>. It is what makes finding 1 and
+            finding 3 the same round.</td></tr>
+          <tr><td>Kept</td><td>Platform rows, Monday start, the week window, the click-to-preview modal with
+            approve/unschedule/delete. The grid is right; it was just unreachable.</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="pane">
+      <div class="panehead"><span class="k">sibling tab</span> Routines, unchanged</div>
+      <div style="padding-top:8px">
+        <div class="roomtabbar" style="margin:8px 18px 6px">
+          <button class="roomtab on">Routines <span class="roomtabn">1</span></button>
+          <button class="roomtab">Calendar <span class="roomtabn">9</span></button>
+        </div>
+        <div class="routineshint">Each run fires its prompt into a room and starts its own conversation.</div>
+        <div class="routinegrid" style="grid-template-columns:minmax(0,1fr)">
+          <div class="routinerow">
+            <span class="routineico">⟳</span>
+            <span class="routinetitle">Daily marketing digest<span class="routineroom">#marketing</span></span>
+            <span class="routinesched"><span class="routinecad">Daily · 09:00</span><span class="routinenext">next in 3h</span></span>
+            <span class="routineprompt">Summarise yesterday's published posts, their engagement, and what is queued for today.</span>
+          </div>
+        </div>
+        <div class="note" style="margin:2px 18px 16px"><b>Nothing about this tab changes.</b> It keeps its rows, its
+        scope bar and its ＋ New automation verb — the calendar arrives beside it, it does not land on top of it.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════ -->
+<section id="s5">
+  <h2><span class="n">05</span>Month lens — the planning read</h2>
+  <p class="why">Week answers "what goes out this week". Month answers "where are the holes" — the actual editorial
+  question, and the reason a calendar beats a list. Same data, one chip per day collapsed to state dots plus the first
+  headline. Reached from the <code>Week · Month</code> pair in the scope bar's right slot, the
+  <code>.mkviewchips</code> idiom the marketing topbar already uses.</p>
+
+  <div class="pane">
+    <div class="panehead"><span class="k">calendar tab · month</span> August 2026 <span class="spacer"></span>
+      <span style="font:600 10.5px ui-monospace,Menlo,monospace; color:var(--dim)">18 posts · 6 days empty</span></div>
+    <div style="padding:16px 18px 20px; background:var(--bg)">
+      <div class="mkcalhead">
+        <div class="mkcalnav"><button>‹</button><button>›</button></div>
+        <span class="mkcalrange">August 2026</span>
+        <button class="btn sm">Today</button>
+        <span style="flex:1"></span>
+        <span class="viewchips"><button>Week</button><button class="on">Month</button></span>
+      </div>
+      <div class="mgrid">
+        <div class="mkchd">Mon</div><div class="mkchd">Tue</div><div class="mkchd">Wed</div><div class="mkchd">Thu</div>
+        <div class="mkchd">Fri</div><div class="mkchd">Sat</div><div class="mkchd">Sun</div>
+
+        <div class="mcell dim"><span class="dn">27</span></div>
+        <div class="mcell dim"><span class="dn">28</span></div>
+        <div class="mcell dim"><span class="dn">29</span></div>
+        <div class="mcell dim"><span class="dn">30</span></div>
+        <div class="mcell dim"><span class="dn">31</span></div>
+        <div class="mcell"><span class="dn">1</span><span class="mdot"><i class="p"></i></span><span class="mmini">launch note</span></div>
+        <div class="mcell"><span class="dn">2</span></div>
+
+        <div class="mcell"><span class="dn">3</span><span class="mdot"><i class="p"></i><i class="p"></i></span><span class="mmini">two shipped</span></div>
+        <div class="mcell"><span class="dn">4</span><span class="mdot"><i class="p"></i></span><span class="mmini">agents own PRs</span></div>
+        <div class="mcell"><span class="dn">5</span></div>
+        <div class="mcell"><span class="dn">6</span><span class="mdot"><i class="p"></i></span><span class="mmini">whiteboards</span></div>
+        <div class="mcell"><span class="dn">7</span><span class="mdot"><i class="p"></i></span><span class="mmini">files, renamed</span></div>
+        <div class="mcell"><span class="dn">8</span></div>
+        <div class="mcell"><span class="dn">9</span></div>
+
+        <div class="mcell"><span class="dn">10</span><span class="mdot"><i class="p"></i></span><span class="mmini">local compute</span></div>
+        <div class="mcell"><span class="dn">11</span><span class="mdot"><i class="p"></i><i class="f"></i></span><span class="mmini">honest question…</span></div>
+        <div class="mcell today"><span class="dn">12</span><span class="mdot"><i class="s"></i></span><span class="mmini">a correction becomes…</span></div>
+        <div class="mcell"><span class="dn">13</span><span class="mdot"><i class="s"></i><i class="s"></i></span><span class="mmini">two queued</span></div>
+        <div class="mcell"><span class="dn">14</span><span class="mdot"><i class="s"></i><i class="d"></i><i class="d"></i></span><span class="mmini">+2 unslotted</span></div>
+        <div class="mcell"><span class="dn">15</span></div>
+        <div class="mcell"><span class="dn">16</span></div>
+
+        <div class="mcell"><span class="dn">17</span></div>
+        <div class="mcell"><span class="dn">18</span></div>
+        <div class="mcell"><span class="dn">19</span></div>
+        <div class="mcell"><span class="dn">20</span></div>
+        <div class="mcell"><span class="dn">21</span></div>
+        <div class="mcell"><span class="dn">22</span></div>
+        <div class="mcell"><span class="dn">23</span></div>
+      </div>
+      <div class="note" style="margin-top:12px"><b>The hole is the point.</b> Aug 15 → 23 is empty, and no list view
+      would have told you that. This is also the surface where "ask rex for next week's drafts" becomes an obvious
+      move rather than a thing you remember to do.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════ -->
+<section id="s6">
+  <h2><span class="n">06</span>The workspace with no marketing room</h2>
+  <p class="why">The reason the calendar was gated in the first place: it is meaningless in a repo-only workspace.
+  Gating made it invisible where it <i>was</i> meaningful too. An empty state costs one screen and never lies about
+  where the surface is.</p>
+
+  <div class="pane" style="max-width:760px">
+    <div class="panehead"><span class="k">calendar tab</span> a workspace with no content yet</div>
+    <div style="background:var(--bg); padding-bottom:18px">
+      <div class="roomtabbar" style="margin:12px 18px 8px">
+        <button class="roomtab">Routines <span class="roomtabn">3</span></button>
+        <button class="roomtab on">Calendar</button>
+      </div>
+      <div class="scopebar">
+        <div class="scopesearch">⌕ Search drafts &amp; posts</div>
+        <div class="cchip">All projects <span class="car">▾</span></div>
+        <div class="cchip">All rooms <span class="car">▾</span></div>
+      </div>
+      <div class="empty">
+        <b>Nothing is queued to publish.</b>
+        <span>Drafted posts appear here the moment an agent hands one over — in a marketing room, or in any
+        conversation where you asked for one. Approve a draft and give it a slot, and it lands on this grid.</span>
+        <button class="btn" style="margin-top:4px">Set up a marketing room →</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="note" style="max-width:none; margin-top:18px"><b>What this round does not touch:</b> the publish
+  connectors, the approve-then-schedule gate (still human, still <code>content.approve</code>), the marketing room's own
+  Calendar tab, and the designer→marketer review ladder inside image generation. The drawing engine, the brand-token
+  prompt and the one-redraw review all stay exactly as they are — this round only gives agents a handle on them, and
+  gives you somewhere to stand where you can see the week.</div>
+</section>
+
+</main>
+
+<script>
+  const t = document.getElementById('theme');
+  t.addEventListener('click', () => {
+    const dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    document.documentElement.setAttribute('data-theme', dark ? 'cream-oak' : 'dark');
+    t.textContent = dark ? 'Graphite ☾' : 'Cream Oak ☀';
+  });
+</script>
+</body>
+</html>

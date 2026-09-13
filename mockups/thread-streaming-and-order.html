@@ -1,0 +1,427 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Thread: ordering, live log, and arrival — round 1</title>
+<style>
+/* Tokens copied from apps/desktop/src/renderer/src/tokens.css (graphite dark + Paper light).
+   Real values, not approximations — this has to be judged as the app, not as a sketch. */
+:root, [data-theme='dark'] {
+  --win:#0d0d0d; --bg:#141414; --panel:#191919; --panel2:#212121; --panel3:#2b2b2b;
+  --border:#272727; --border2:#383838;
+  --text:#eaeaea; --body:#b6b6b6; --muted:#898989; --dim:#676767;
+  --link:#d19a72; --accent:var(--text); --accent-ink:#101010; --accent-soft:var(--panel3);
+  --orch:#9793d2; --brand:#834a2b; --brand-ink:#fff7ee;
+  --btn:#232323; --btn-fg:#efefef; --btn-hover:#2f2f2f;
+  --green:#77ac8d; --warn:#c08a3e; --violet:#a89ccf; --violet-soft:#1c1936;
+  --role-orch:#9793d2; --role-design:#c76ba8;
+  --card:#191919; --card-border:#272727;
+  --code:#0f0f0f; --codeink:#e6e6e6;
+  --shadow-sheet:0 8px 26px -8px rgba(0,0,0,.55), 0 1px 2px rgba(0,0,0,.4);
+  --designrev:#8a3fc0;
+}
+[data-theme='light'] {
+  --win:#e9e5db; --bg:#fcfbf8; --panel:#fcfbf8; --panel2:#f4f1ea; --panel3:#ebe7dd;
+  --border:#e2ded4; --border2:#cec5b7;
+  --text:#2f2a24; --body:#524c43; --muted:#837d72; --dim:#a09889;
+  --link:#8f4f2a; --accent:var(--text); --accent-ink:#ffffff; --accent-soft:var(--panel3);
+  --orch:#635fc0; --brand:#834a2b; --brand-ink:#fff7ee;
+  --btn:#f1eee6; --btn-fg:#2f2a24; --btn-hover:#e6e2d6;
+  --green:#2f9e6b; --warn:#a9762a; --violet:#7d6cc4; --violet-soft:#eee9fd;
+  --role-orch:#635fc0; --role-design:#b0498f;
+  --card:#ffffff; --card-border:#e2ded4;
+  --code:#16130f; --codeink:#f0e9df;
+  --shadow-sheet:0 8px 26px -8px rgba(70,58,44,.15), 0 1px 2px rgba(70,58,44,.05);
+  --designrev:#8a3fc0;
+}
+* { box-sizing: border-box; }
+body {
+  margin:0; background:var(--win); color:var(--text);
+  font:400 13.5px/1.55 ui-sans-serif, -apple-system, "Segoe UI", system-ui, sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+.serif { font-family:"Source Serif 4", "Iowan Old Style", Georgia, serif; }
+
+/* ── page chrome ─────────────────────────────────────────────────────────── */
+header {
+  position:sticky; top:0; z-index:20; display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+  padding:14px 22px; background:var(--win); border-bottom:1px solid var(--border);
+}
+h1 { font:600 15px/1.3 inherit; margin:0; letter-spacing:-.01em; }
+.sub { color:var(--muted); font-size:12.5px; }
+.spacer { flex:1; }
+button.ctl {
+  font:inherit; font-size:12.5px; color:var(--btn-fg); background:var(--btn);
+  border:1px solid var(--border2); border-radius:999px; padding:6px 14px; cursor:pointer;
+  transition:background .12s ease;
+}
+button.ctl:hover { background:var(--btn-hover); }
+button.ctl.primary { background:var(--accent); color:var(--accent-ink); border-color:transparent; font-weight:550; }
+
+main { padding:22px; max-width:1360px; margin:0 auto; }
+section { margin-bottom:34px; }
+h2 { font:600 13px/1.4 inherit; margin:0 0 4px; letter-spacing:.02em; text-transform:uppercase; color:var(--muted); }
+.why { color:var(--body); font-size:13px; margin:0 0 14px; max-width:78ch; }
+.why b { color:var(--text); font-weight:600; }
+
+.cols { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+@media (max-width:1080px) { .cols { grid-template-columns:1fr; } }
+
+/* ── the thread surface ──────────────────────────────────────────────────── */
+.pane { background:var(--bg); border:1px solid var(--border); border-radius:14px; overflow:hidden; box-shadow:var(--shadow-sheet); }
+.panehead { display:flex; align-items:center; gap:9px; padding:10px 14px; border-bottom:1px solid var(--border); background:var(--panel); }
+.tag { font:600 10px/1 inherit; letter-spacing:.07em; text-transform:uppercase; padding:4px 7px; border-radius:5px; }
+.tag.bad { color:var(--warn); background:color-mix(in srgb, var(--warn) 15%, transparent); }
+.tag.good { color:var(--green); background:color-mix(in srgb, var(--green) 15%, transparent); }
+.panehead .nm { font-weight:600; font-size:12.5px; }
+.thread { padding:14px 16px 16px; height:560px; overflow-y:auto; scroll-behavior:smooth; }
+.thread::-webkit-scrollbar { width:8px; }
+.thread::-webkit-scrollbar-thumb { background:var(--border2); border-radius:4px; }
+
+/* message row */
+.msg { display:flex; gap:10px; padding:9px 0; }
+.av { width:26px; height:26px; border-radius:7px; flex:none; display:grid; place-items:center; font-size:13px; background:var(--panel2); border:1px solid var(--border); }
+.av.rex { background:color-mix(in srgb, var(--role-orch) 22%, var(--panel2)); }
+.av.iris { background:color-mix(in srgb, var(--role-design) 22%, var(--panel2)); }
+.mbody { min-width:0; flex:1; }
+.mhead { display:flex; align-items:center; gap:7px; margin-bottom:2px; }
+.who { font-weight:600; font-size:12.5px; }
+.role { font:600 8.5px/1 inherit; letter-spacing:.08em; padding:3px 5px; border-radius:4px; text-transform:uppercase; }
+.role.orch { color:var(--role-orch); background:color-mix(in srgb, var(--role-orch) 16%, transparent); }
+.role.design { color:var(--role-design); background:color-mix(in srgb, var(--role-design) 16%, transparent); }
+.ts { color:var(--dim); font-size:11px; }
+.mtext { color:var(--body); font-size:13.2px; }
+.mtext .ref { color:var(--link); text-decoration:none; border-bottom:1px solid color-mix(in srgb, var(--link) 35%, transparent); }
+.mtext strong { color:var(--text); font-weight:600; }
+
+/* ── TODAY: the single-line run card ─────────────────────────────────────── */
+.runcard { margin-top:4px; max-width:560px; padding:2px 0 3px; }
+.runtitle { display:flex; align-items:center; gap:8px; font-size:12.5px; }
+.runtitle .t { font-weight:550; }
+.pill { font:600 9px/1 inherit; letter-spacing:.08em; padding:4px 6px; border-radius:4px; background:var(--panel3); color:var(--muted); text-transform:uppercase; }
+.leg { display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--body); padding:4px 0; }
+.legdot { box-sizing:border-box; width:11px; height:11px; border-radius:50%; flex:none;
+  border:1.6px solid color-mix(in srgb, var(--text) 22%, transparent); border-top-color:var(--text);
+  animation:spin .62s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+.viewfull { margin-top:6px; font:inherit; font-size:12px; color:var(--text); background:var(--btn);
+  border:1px solid var(--border2); border-radius:999px; padding:5px 12px; cursor:pointer; }
+
+/* ── PROPOSED: the inline activity stream ────────────────────────────────── */
+.actstream { margin-top:6px; border-left:1.5px solid var(--border2); padding-left:12px; margin-left:3px; }
+.agroup { margin:2px 0 8px; }
+.agh { display:flex; align-items:center; gap:7px; font-size:12px; color:var(--text); cursor:pointer; user-select:none; padding:3px 0; }
+.agh .car { color:var(--dim); font-size:9px; width:9px; transition:transform .14s ease; display:inline-block; }
+.agroup.open .agh .car { transform:rotate(90deg); }
+.agh .gname { font-weight:550; }
+.agh .gmeta { color:var(--dim); font-size:11px; margin-left:auto; font-variant-numeric:tabular-nums; }
+.arows { display:none; padding:2px 0 2px 16px; }
+.agroup.open .arows { display:block; }
+.arow { display:flex; align-items:baseline; gap:8px; font-size:11.8px; color:var(--muted); padding:2.5px 0;
+  font-family:ui-monospace, SFMono-Regular, Menlo, monospace; }
+.arow .v { color:var(--body); font-weight:550; font-family:inherit; }
+.arow .a { color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.arow .ok { margin-left:auto; color:var(--green); font-size:10px; }
+.arow.warnrow .ok { color:var(--warn); }
+.narr { font-size:12.6px; color:var(--body); padding:4px 0 5px; }
+
+/* the tail placeholder — pulsing, always last */
+.tail { display:flex; align-items:center; gap:10px; padding:12px 13px; margin-top:8px;
+  border:1px solid var(--border); border-radius:11px; background:var(--panel);
+  animation:tailin .2s ease both; }
+@keyframes tailin { from { opacity:0; transform:translateY(4px); } }
+.tailcanvas { width:44px; height:30px; border-radius:7px; flex:none; position:relative;
+  background:linear-gradient(135deg, color-mix(in srgb, var(--role-design) 16%, var(--panel2)), var(--panel2)); overflow:hidden; }
+.tailcanvas i { position:absolute; width:5px; height:5px; border-radius:50%; background:var(--role-design); opacity:.75;
+  top:50%; margin-top:-2.5px; animation:bob 1.15s ease-in-out infinite; }
+.tailcanvas i:nth-child(1) { left:9px; animation-delay:0s; }
+.tailcanvas i:nth-child(2) { left:19px; animation-delay:.14s; }
+.tailcanvas i:nth-child(3) { left:29px; animation-delay:.28s; }
+@keyframes bob { 0%,100% { transform:translateY(0); opacity:.45; } 50% { transform:translateY(-5px); opacity:1; } }
+.tailtxt { font-size:12.6px; color:var(--body); }
+.tailtxt b { display:block; color:var(--text); font-weight:600; font-size:12.8px; margin-bottom:1px; }
+.tailtxt .shim { background:linear-gradient(90deg, var(--muted) 20%, var(--text) 50%, var(--muted) 80%);
+  background-size:200% 100%; -webkit-background-clip:text; background-clip:text; color:transparent;
+  animation:shim 1.9s linear infinite; }
+@keyframes shim { to { background-position:-200% 0; } }
+
+/* the finished design card — lands at the tail */
+.dcard { margin-top:9px; border:1px solid var(--card-border); border-radius:12px; background:var(--card); padding:13px; animation:tailin .22s ease both; }
+.dchead { display:flex; align-items:center; gap:9px; margin-bottom:11px; }
+.dchead .t { font-weight:600; font-size:12.8px; }
+.dchead .s { color:var(--muted); font-size:11.6px; }
+.dcsync { margin-left:auto; font:600 9.5px/1 inherit; letter-spacing:.05em; text-transform:uppercase;
+  color:var(--green); background:color-mix(in srgb, var(--green) 14%, transparent); padding:5px 8px; border-radius:999px; }
+.shots { display:grid; grid-template-columns:repeat(3,1fr); gap:9px; }
+.shot { border:1px solid var(--border); border-radius:9px; overflow:hidden; background:var(--panel2); cursor:pointer; transition:border-color .12s ease, transform .12s ease; }
+.shot:hover { border-color:var(--border2); transform:translateY(-1px); }
+.shotimg { height:74px; background:
+   linear-gradient(var(--panel3) 0 0) 8px 10px/34px 5px no-repeat,
+   linear-gradient(var(--border2) 0 0) 8px 22px/54px 4px no-repeat,
+   linear-gradient(var(--border2) 0 0) 8px 30px/44px 4px no-repeat,
+   linear-gradient(var(--text) 0 0) 8px 44px/38px 9px no-repeat,
+   var(--panel);
+  opacity:.85; }
+.shotcap { padding:7px 8px; font-size:11.2px; color:var(--body); border-top:1px solid var(--border); }
+.shotcap b { display:block; color:var(--text); font-weight:600; font-size:11.6px; }
+
+/* gate docked above composer */
+.gate { display:flex; align-items:center; gap:9px; margin-top:12px; padding:9px 11px; border-radius:999px;
+  background:var(--panel); border:1px solid var(--border2); }
+.human { font:600 9px/1 inherit; letter-spacing:.08em; text-transform:uppercase; color:var(--designrev);
+  background:color-mix(in srgb, var(--designrev) 16%, transparent); padding:5px 7px; border-radius:5px; }
+.gate .g { font-size:12.4px; color:var(--body); }
+.gate .g b { color:var(--text); }
+.gbtn { margin-left:auto; font:inherit; font-size:12px; font-weight:550; padding:6px 13px; border-radius:999px; cursor:pointer;
+  background:var(--accent); color:var(--accent-ink); border:none; }
+.gbtn.sec { background:var(--btn); color:var(--btn-fg); border:1px solid var(--border2); font-weight:400; }
+
+/* arrival animation */
+.reveal { animation:rise .26s cubic-bezier(.2,.7,.3,1) both; }
+@keyframes rise { from { opacity:0; transform:translateY(6px); } }
+.typing::after { content:'▍'; color:var(--muted); animation:blink 1s steps(2) infinite; margin-left:1px; }
+@keyframes blink { 50% { opacity:0; } }
+
+/* options */
+.opts { display:grid; grid-template-columns:repeat(auto-fit, minmax(280px,1fr)); gap:12px; }
+.opt { border:1px solid var(--border); border-radius:12px; padding:14px; background:var(--panel); }
+.opt h3 { font:600 12.5px/1.35 inherit; margin:0 0 5px; }
+.opt p { margin:0; color:var(--body); font-size:12.4px; }
+.rec { display:inline-block; font:600 9px/1 inherit; letter-spacing:.06em; text-transform:uppercase;
+  color:var(--green); background:color-mix(in srgb, var(--green) 14%, transparent); padding:4px 6px; border-radius:4px; margin-left:6px; vertical-align:2px; }
+.note { color:var(--muted); font-size:12.2px; margin-top:10px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1 class="serif">Thread: ordering, live log, and arrival</h1>
+  <span class="sub">round 1 · #build</span>
+  <span class="spacer"></span>
+  <button class="ctl" id="theme">Paper light</button>
+  <button class="ctl primary" id="replay">▶ Replay the sequence</button>
+</header>
+
+<main>
+
+<section>
+  <h2>1 · Where the design card sits</h2>
+  <p class="why">
+    Today the card is anchored to <b>lifecycleAt</b> — the moment the round <i>started</i> — so it is pinned to the
+    beginning and every later message sorts underneath it. That is the bug you saw: it stayed behind while messages
+    piled up after it. Agreed fix: <b>the card does not render at all while the round is drafting</b> — the live
+    activity already says work is happening, and nothing can jump. When the mockups land the card appears, and while
+    the decision is yours it is <b>pinned to the tail</b>, because chronological placement buries it under the
+    owner's own announcements. Once you decide, it settles back into its place in the history.
+  </p>
+  <div class="cols">
+    <div class="pane">
+      <div class="panehead"><span class="tag bad">Today</span><span class="nm">card pinned to the start of the round</span></div>
+      <div class="thread" id="todayThread"></div>
+    </div>
+    <div class="pane">
+      <div class="panehead"><span class="tag good">Proposed</span><span class="nm">nothing until ready · then pinned last</span></div>
+      <div class="thread" id="propThread"></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>2 · What progress looks like · 3 · How messages arrive</h2>
+  <p class="why">
+    The proposed column above is also the answer to both: the grouped, expandable activity — the same rows the
+    <b>@rex · activity</b> panel already renders — streams directly into the thread instead of hiding behind
+    <i>view full activity</i>, and every line arrives with a short rise rather than popping in. Two genuine choices:
+  </p>
+  <div class="opts">
+    <div class="opt">
+      <h3>When a run finishes, the log…<span class="rec">Recommended</span></h3>
+      <p><b>Collapses to one summary line</b> — “34 steps · 3 files · 2 commands” — still expandable. A finished
+      thread stays readable; a month-old task doesn’t open as a wall of tool calls.</p>
+    </div>
+    <div class="opt">
+      <h3>…or stays fully expanded</h3>
+      <p>Everything remains on screen forever. Maximum transparency, but scrollback grows fast and the
+      human-readable messages get buried between tool rows.</p>
+    </div>
+    <div class="opt">
+      <h3>Message arrival<span class="rec">Recommended</span></h3>
+      <p><b>Progressive reveal, ~260ms.</b> Real token streaming where the daemon streams it; a short rise for
+      messages that arrive already-complete over sync. Reads continuous, never fakes slowness.</p>
+    </div>
+    <div class="opt">
+      <h3>…or true per-character typing</h3>
+      <p>Characters typed out at a fixed rate. Looks alive, but it delays reading text that is already here — and
+      a synced message from another machine would be pretending to be live.</p>
+    </div>
+  </div>
+  <p class="note">Both columns above render in graphite dark and Paper light — toggle the header button to check.</p>
+</section>
+
+</main>
+
+<script>
+// ── the same conversation, played into both columns ───────────────────────
+const today = document.getElementById('todayThread');
+const prop  = document.getElementById('propThread');
+
+const el = (html) => { const d = document.createElement('div'); d.innerHTML = html.trim(); return d.firstElementChild; };
+const msg = (who, role, roleCls, ts, text, av, avCls) => `
+  <div class="msg reveal">
+    <div class="av ${avCls}">${av}</div>
+    <div class="mbody">
+      <div class="mhead"><span class="who">${who}</span><span class="role ${roleCls}">${role}</span><span class="ts">${ts}</span></div>
+      <div class="mtext">${text}</div>
+    </div>
+  </div>`;
+
+const ACT = [
+  { g:'Reading the design system', meta:'6 steps', rows:[
+    ['Read','tokens.css — graphite + Paper token blocks'],
+    ['Read','docs/33-design-system.md § frame model'],
+    ['Grep','--role-design across the renderer'],
+  ]},
+  { g:'Drafting direction A — Focused', meta:'12 steps', rows:[
+    ['Wrote','empty-projects-a-focused.html'],
+    ['Screenshot','a-focused-light.png (46KB)'],
+    ['Screenshot','a-focused-dark.png (44KB)'],
+  ]},
+  { g:'Drafting direction B — Starter paths', meta:'11 steps', rows:[
+    ['Wrote','empty-projects-b-starter-paths.html'],
+    ['Ran','sed data-theme swap for the dark shot', true],
+    ['Screenshot','b-starter-light.png (51KB)'],
+  ]},
+];
+
+function buildToday() {
+  today.innerHTML = '';
+  today.appendChild(el(msg('rex','Orchestrator','orch','03:36 PM',
+    'Taking <a class="ref">#1021</a> — I’ll bring designers in and post the directions here for your approval.','🦊','rex')));
+  // the card, anchored at the START of the round — everything below sorts under it
+  today.appendChild(el(`
+    <div class="msg">
+      <div class="av iris">🎨</div>
+      <div class="mbody">
+        <div class="dcard" style="margin-top:2px">
+          <div class="dchead"><div><div class="t">rex is drafting the mockups</div>
+            <div class="s">rex will share each reviewable direction here as soon as the round is ready.</div></div>
+            <span class="dcsync" style="color:var(--muted);background:var(--panel3)">Auto-sync on</span></div>
+          <div class="shots">
+            <div class="shot"><div class="shotimg" style="opacity:.25"></div><div class="shotcap"><b>Brief ready</b>step 1</div></div>
+            <div class="shot"><div class="shotimg" style="opacity:.25"></div><div class="shotcap"><b>Drafting</b>step 2</div></div>
+            <div class="shot"><div class="shotimg" style="opacity:.25"></div><div class="shotcap"><b>Ready for review</b>step 3</div></div>
+          </div>
+        </div>
+      </div>
+    </div>`));
+  today.appendChild(el(msg('iris','Designer','design','03:38 PM',
+    'iris here — I’ve picked up <a class="ref">#1021</a> and I’m studying the existing design system before drafting mockups.','🎨','iris')));
+  today.appendChild(el(`
+    <div class="msg"><div class="av rex">🦊</div><div class="mbody">
+      <div class="mhead"><span class="who">rex</span><span class="role orch">Orchestrator</span><span class="ts">now</span></div>
+      <div class="runcard">
+        <div class="runtitle"><span class="t">#1021 Redesign Projects list empty state</span><span class="pill">Running</span><span class="ts">2:20</span></div>
+        <div class="leg"><span class="legdot"></span><span>taking stock</span></div>
+        <button class="viewfull">view full activity</button>
+      </div></div></div>`));
+  today.appendChild(el(msg('rex','Orchestrator','orch','03:44 PM',
+    'The design mockups for <a class="ref">#1021</a> are ready for your review.','🦊','rex')));
+  today.scrollTop = today.scrollHeight;
+}
+
+// ── the proposed column plays as a timed sequence ─────────────────────────
+let timers = [];
+const at = (ms, fn) => timers.push(setTimeout(fn, ms));
+const tailUp = () => { prop.scrollTop = prop.scrollHeight; };   // nothing to re-anchor: no placeholder exists
+
+function buildProposed() {
+  timers.forEach(clearTimeout); timers = [];
+  prop.innerHTML = '';
+
+  prop.appendChild(el(msg('rex','Orchestrator','orch','03:36 PM',
+    'Taking <a class="ref">#1021</a> — I’ll bring designers in and post the directions here for your approval.','🦊','rex')));
+
+  // the live activity stream, in-thread
+  const streamRow = el(`
+    <div class="msg"><div class="av rex">🦊</div><div class="mbody">
+      <div class="mhead"><span class="who">rex</span><span class="role orch">Orchestrator</span><span class="ts">now</span></div>
+      <div class="actstream" id="stream"></div>
+    </div></div>`);
+  prop.appendChild(streamRow);
+  const stream = streamRow.querySelector('#stream');
+
+
+  let t = 300;
+  ACT.forEach((grp, gi) => {
+    at(t, () => {
+      const g = el(`<div class="agroup open reveal">
+          <div class="agh"><span class="car">▶</span><span class="gname">${grp.g}</span><span class="gmeta">${grp.meta}</span></div>
+          <div class="arows"></div></div>`);
+      g.querySelector('.agh').onclick = () => g.classList.toggle('open');
+      stream.appendChild(g); tailUp();
+      let rt = 260;
+      // when THIS turn's steps are done it folds to its heading — the landmark stays, the wall doesn't
+      at(t + 260 + grp.rows.length * 240 + 420, () => { g.classList.remove('open'); tailUp(); });
+      grp.rows.forEach((r) => {
+        at(t + rt, () => {
+          g.querySelector('.arows').appendChild(el(
+            `<div class="arow reveal ${r[2] ? 'warnrow' : ''}"><span class="v">${r[0]}</span><span class="a">${r[1]}</span><span class="ok">${r[2] ? '⚠' : '✓'}</span></div>`));
+          tailUp();
+        });
+        rt += 240;
+      });
+      // a human-readable line between groups — the narration, not just tool rows
+      if (gi === 1) at(t + rt + 120, () => {
+        stream.appendChild(el(`<div class="narr reveal">Direction A is close to the canonical concept but is missing the “Start from a template” secondary link — adding it before I draw B.</div>`));
+        tailUp();
+      });
+    });
+    t += 1250;
+  });
+
+  // a message arriving MID-RUN: it lands above the tail, pushing it down
+  at(t + 200, () => {
+    prop.appendChild(el(msg('iris','Designer','design','03:38 PM',
+      'Direction C kept exceeding the render budget — I’m holding it out of this round rather than shipping a broken frame.','🎨','iris')));
+    tailUp();
+  });
+
+  // the round lands: tail is replaced by the preview card, still last
+  at(t + 1500, () => {
+    prop.appendChild(el(msg('rex','Orchestrator','orch','03:44 PM',
+      'Two directions are posted and the task is in <strong>design review</strong> — the mockups are below.','🦊','rex')));
+    prop.appendChild(el(`
+      <div class="msg"><div class="av iris">🎨</div><div class="mbody">
+        <div class="dcard">
+          <div class="dchead"><div><div class="t">2 designs ready for review</div>
+            <div class="s">rex shared the latest mockups here. Open any direction to review it full-size.</div></div>
+            <span class="dcsync">✓ Synced</span></div>
+          <div class="shots">
+            <div class="shot"><div class="shotimg"></div><div class="shotcap"><b>A — Focused</b>Round 1 · synced snapshot</div></div>
+            <div class="shot"><div class="shotimg"></div><div class="shotcap"><b>B — Starter paths</b>Round 1 · synced snapshot</div></div>
+            <div class="shot" style="opacity:.45"><div class="shotimg"></div><div class="shotcap"><b>C — held back</b>exceeded render budget</div></div>
+          </div>
+        </div>
+      </div></div>`));
+    prop.appendChild(el(`
+      <div class="gate reveal">
+        <span class="human">Human only</span>
+        <span class="g">Your call on <b>the design</b></span>
+        <button class="gbtn">✓ Approve design</button>
+        <button class="gbtn sec">Revise</button>
+      </div>`));
+    prop.scrollTop = prop.scrollHeight;
+  });
+}
+
+document.getElementById('replay').onclick = () => { buildToday(); buildProposed(); };
+document.getElementById('theme').onclick = (e) => {
+  const dark = document.documentElement.dataset.theme === 'dark';
+  document.documentElement.dataset.theme = dark ? 'light' : 'dark';
+  e.target.textContent = dark ? 'Graphite dark' : 'Paper light';
+};
+buildToday(); buildProposed();
+</script>
+</body>
+</html>

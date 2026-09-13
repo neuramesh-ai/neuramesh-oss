@@ -1,0 +1,44 @@
+{
+  "cli": {
+    "version": ">= 12.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "channel": "development"
+    },
+    "preview": {
+      "distribution": "internal",
+      "channel": "preview",
+      "node": "22.11.0",
+      "ios": { "simulator": false, "image": "macos-tahoe-26.4-xcode-26.4" },
+      "env": {
+        "COREPACK_INTEGRITY_KEYS": "0",
+        "NPM_CONFIG_IGNORE_SCRIPTS": "true",
+        "EXPO_PUBLIC_NM_API": "https://api.neuramesh.app",
+        "EXPO_PUBLIC_NM_POWERSYNC": "https://6a2b06ebdeeddd0df6040a26.powersync.journeyapps.com"
+      }
+    },
+    "production": {
+      "channel": "production",
+      "autoIncrement": true,
+      "node": "22.11.0",
+      "ios": { "image": "macos-tahoe-26.4-xcode-26.4" },
+      "env": {
+        "COREPACK_INTEGRITY_KEYS": "0",
+        "NPM_CONFIG_IGNORE_SCRIPTS": "true",
+        "EXPO_PUBLIC_NM_API": "https://api.neuramesh.app",
+        "EXPO_PUBLIC_NM_POWERSYNC": "https://6a2b06ebdeeddd0df6040a26.powersync.journeyapps.com"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "ascAppId": "6787487455"
+      }
+    }
+  }
+}

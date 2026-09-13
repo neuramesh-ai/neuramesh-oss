@@ -1,0 +1,5 @@
+[
+  { "name": "fix1-code-folders-dark", "settle": 2600, "query": { "theme": "dark", "navmode": "code" } },
+  { "name": "fix2-newchat-menu-dark", "settle": 2400, "query": { "theme": "dark" }, "js": "(() => { const b=document.querySelector('.navnewcaret'); b && b.click(); return new Promise(r=>setTimeout(r,500)); })()" },
+  { "name": "fix3-folder-menu-cream", "settle": 2400, "query": { "theme": "cream-oak" }, "js": "(() => { const w=[...document.querySelectorAll('.navgrp .navhistwrap')][0]; if(!w) return; w.dispatchEvent(new MouseEvent('mouseover',{bubbles:true,relatedTarget:document.body})); const b=w.querySelector('.navhistbtn[aria-haspopup]'); b && b.click(); return new Promise(r=>setTimeout(r,500)); })()" }
+]

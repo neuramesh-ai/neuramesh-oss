@@ -1,0 +1,44 @@
+node_modules/
+dist/
+out/
+# never commit stray absolute-path trees (a 2026-07-30 incident committed a scratchpad
+# and a macOS $TMPDIR from another worktree under these roots)
+private/
+var/
+# spike runtime output (SQLite db + wal/shm)
+packages/sync-spike/.data/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+.neuramesh/worktrees/
+coverage/
+# generated embedding-model cache (fastembed downloads it on first use; never commit)
+.fastembed-cache/
+# evidence screenshots are kept local, not shipped
+docs/evidence/
+
+# control-api Vercel build output (esbuild bundles src/vercel.ts here)
+packages/control-api/api/index.js.map
+
+# electron-builder packaged output (dmg/zip/blockmap/latest-mac.yml — these are
+# published to the releases repo by CI, never committed to the source tree)
+apps/desktop/release/
+
+# DMG background rendered at build time by scripts/dmg-render.cjs (clean base art
+# + the per-build version/arch pill) — derived from the committed base PNGs
+apps/desktop/build/.generated/
+
+# Agent working files + rendered email previews (`pnpm mail:preview`). Derived output —
+# regenerate with the script, never review it in a diff.
+.nm-evidence/
+.vercel
+# eslint --cache scratch
+.eslintcache
+
+# the dev machine-issuer keypair (scripts/fleet-local.sh generates it; never committed)
+dev/stack/secrets/
+
+# scripts/public-scan.sh: the founder-specific patterns (handles, exact infra ids). Never committed.
+.public-scan.local

@@ -1,0 +1,9 @@
+# cluster-scoped statics: the fleet's home namespace + RBAC. the fleet Deployment itself
+# ships at P2 (until then the operator runs from a trusted host).
+# nm-relay HAS landed (2026-08-30) and lives in overlays/gke — relay-deployment.yaml and
+# relay-gateway.yaml, not here, because it is GKE-specific (Gateway API + a managed cert).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespace.yaml
+  - fleet-rbac.yaml

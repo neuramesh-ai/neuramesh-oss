@@ -1,0 +1,317 @@
+{
+  "pages": [
+    {
+      "id": "app",
+      "name": "The app"
+    },
+    {
+      "id": "onboarding",
+      "name": "Onboarding"
+    }
+  ],
+  "artboards": [
+    {
+      "file": "SignIn.dc.html",
+      "title": "1 · Welcome — start free or sign in",
+      "x": 0,
+      "y": 0,
+      "w": 900,
+      "h": 944,
+      "page": "app"
+    },
+    {
+      "file": "Arrival.dc.html",
+      "title": "2 · Arrival — your cloud machine",
+      "x": 980,
+      "y": 0,
+      "w": 900,
+      "h": 944,
+      "page": "app"
+    },
+    {
+      "file": "Main.dc.html",
+      "title": "3 · Home",
+      "x": 1960,
+      "y": 0,
+      "w": 900,
+      "h": 944,
+      "page": "app"
+    },
+    {
+      "file": "NewChat.dc.html",
+      "title": "4 · New chat — the machine chip",
+      "x": 0,
+      "y": 1100,
+      "w": 900,
+      "h": 944,
+      "page": "app"
+    },
+    {
+      "file": "Thread.dc.html",
+      "title": "5 · A thread",
+      "x": 980,
+      "y": 1100,
+      "w": 900,
+      "h": 944,
+      "page": "app"
+    },
+    {
+      "file": "History.dc.html",
+      "title": "6 · History — search every thread",
+      "x": 1960,
+      "y": 1100,
+      "w": 900,
+      "h": 944,
+      "page": "app"
+    },
+    {
+      "file": "Code.dc.html",
+      "title": "7 · Code — the list of Code threads",
+      "x": 0,
+      "y": 2200,
+      "w": 900,
+      "h": 944,
+      "page": "app"
+    },
+    {
+      "file": "CodeThread.dc.html",
+      "title": "8 · A Code thread",
+      "x": 980,
+      "y": 2200,
+      "w": 900,
+      "h": 944,
+      "page": "app"
+    },
+    {
+      "file": "NewCode.dc.html",
+      "title": "9 · New Code session",
+      "x": 1960,
+      "y": 2200,
+      "w": 900,
+      "h": 944,
+      "page": "app"
+    },
+    {
+      "file": "Routines.dc.html",
+      "title": "10 · Routines",
+      "x": 0,
+      "y": 3300,
+      "w": 900,
+      "h": 944,
+      "page": "app"
+    },
+    {
+      "file": "RoutineThread.dc.html",
+      "title": "11 · Tracking a routine’s run",
+      "x": 980,
+      "y": 3300,
+      "w": 900,
+      "h": 944,
+      "page": "app"
+    },
+    {
+      "file": "Calendar.dc.html",
+      "title": "12 · Calendar",
+      "x": 1960,
+      "y": 3300,
+      "w": 900,
+      "h": 944,
+      "page": "app"
+    },
+    {
+      "file": "Compute.dc.html",
+      "title": "13 · Compute",
+      "x": 0,
+      "y": 4400,
+      "w": 900,
+      "h": 944,
+      "page": "app"
+    },
+    {
+      "file": "Notifications.dc.html",
+      "title": "14 · Notifications & deep links",
+      "x": 980,
+      "y": 4400,
+      "w": 900,
+      "h": 944,
+      "page": "app"
+    },
+    {
+      "file": "Vocabulary.dc.html",
+      "title": "0 · Vocabulary",
+      "x": 1960,
+      "y": 4400,
+      "w": 900,
+      "h": 944,
+      "page": "app"
+    },
+    {
+      "file": "Account.dc.html",
+      "title": "O1 · Create your account",
+      "x": 0,
+      "y": 0,
+      "w": 900,
+      "h": 944,
+      "page": "onboarding"
+    },
+    {
+      "file": "Workspace.dc.html",
+      "title": "O2 · Step 1 of 5 — Workspace",
+      "x": 980,
+      "y": 0,
+      "w": 900,
+      "h": 944,
+      "page": "onboarding"
+    },
+    {
+      "file": "Machine.dc.html",
+      "title": "O3 · Step 2 of 5 — Machine",
+      "x": 1960,
+      "y": 0,
+      "w": 900,
+      "h": 944,
+      "page": "onboarding"
+    },
+    {
+      "file": "Brain.dc.html",
+      "title": "O4 · Step 3 of 5 — Keys",
+      "x": 0,
+      "y": 1100,
+      "w": 900,
+      "h": 944,
+      "page": "onboarding"
+    },
+    {
+      "file": "Team.dc.html",
+      "title": "O5 · Step 4 of 5 — Team",
+      "x": 980,
+      "y": 1100,
+      "w": 900,
+      "h": 944,
+      "page": "onboarding"
+    },
+    {
+      "file": "Launch.dc.html",
+      "title": "O6 · Step 5 of 5 — Launch",
+      "x": 1960,
+      "y": 1100,
+      "w": 900,
+      "h": 944,
+      "page": "onboarding"
+    },
+    {
+      "file": "FirstReply.dc.html",
+      "title": "O7 · The first reply, on your cloud machine",
+      "x": 0,
+      "y": 2200,
+      "w": 900,
+      "h": 944,
+      "page": "onboarding"
+    },
+    {
+      "file": "Setup.dc.html",
+      "title": "O8 · After the first exchange — setup, kindly",
+      "x": 980,
+      "y": 2200,
+      "w": 900,
+      "h": 944,
+      "page": "onboarding"
+    },
+    {
+      "file": "Invited.dc.html",
+      "title": "O9 · First run with an invitation",
+      "x": 1960,
+      "y": 2200,
+      "w": 900,
+      "h": 944,
+      "page": "onboarding"
+    },
+    {
+      "file": "Joined.dc.html",
+      "title": "O10 · Joined a Team workspace — your own machine",
+      "x": 0,
+      "y": 3300,
+      "w": 900,
+      "h": 944,
+      "page": "onboarding"
+    }
+  ],
+  "annotations": [
+    {
+      "id": "row-1",
+      "x": 0,
+      "y": -118,
+      "w": 1500,
+      "text": "ROW 1 · Sign in → your cloud machine → Home. The head is the frame at phone scale: workspace ▾ · the cloud-machine pill (state colour) · the credit ring · search · you. Home = needs-you + the sessions list. New chat is the FAB.",
+      "page": "app"
+    },
+    {
+      "id": "row-2",
+      "x": 0,
+      "y": 982,
+      "w": 1500,
+      "text": "ROW 2 · Composing, reading, finding. The composer keeps the desktop’s three knobs (room · brain · machine). A phone-born session prefers the cloud (threadOrigin ‘web’ unless the ladder needs to tell phones apart). History is the everything-lens.",
+      "page": "app"
+    },
+    {
+      "id": "row-3",
+      "x": 0,
+      "y": 2082,
+      "w": 1500,
+      "text": "ROW 3 · Code on the cloud machine over the relay. The list needs a synced Code-session record (today sessions are desktop-local) — the gate-2 decision. A Code thread is conversation first, evidence a segment away.",
+      "page": "app"
+    },
+    {
+      "id": "row-4",
+      "x": 0,
+      "y": 3182,
+      "w": 1500,
+      "text": "ROW 4 · Routines · Calendar nest under one head. A routine’s run is a session (the clock glyph) — tracking one is opening its thread.",
+      "page": "app"
+    },
+    {
+      "id": "row-5",
+      "x": 0,
+      "y": 4282,
+      "w": 1500,
+      "text": "ROW 5 · Compute is reached from the head’s pill. Push gains three kinds (question · Code approval · routine finished); every tap deep-links. The vocabulary sheet is what the reviewer gates on.",
+      "page": "app"
+    },
+    {
+      "id": "ob-row-1",
+      "x": 0,
+      "y": -118,
+      "w": 1500,
+      "text": "ONBOARDING · ROW 1 · Sign-up on the phone: the same Clerk page the desktop hands off to, in Safari, returning here. Then the browser wizard’s order — Workspace first (Continue mints the id the machine is provisioned against), the Machine beat never blocks.",
+      "page": "onboarding"
+    },
+    {
+      "id": "ob-row-2",
+      "x": 0,
+      "y": 982,
+      "w": 1500,
+      "text": "ONBOARDING · ROW 2 · Keys is never a gate (the starter door: 500 credits), the crew is named and brained on the house brain, Launch registers the crew on the CLOUD machine.",
+      "page": "onboarding"
+    },
+    {
+      "id": "ob-row-3",
+      "x": 0,
+      "y": 2082,
+      "w": 1500,
+      "text": "ONBOARDING · ROW 3 · The first reply lands on your cloud machine; setup follows it as a pinned card (no “mobile app” item — you are holding it).",
+      "page": "onboarding"
+    },
+    {
+      "id": "ob-row-4",
+      "x": 0,
+      "y": 3182,
+      "w": 1500,
+      "text": "ONBOARDING · ROW 4 · An invited newcomer joins before any wizard; on Team the join provisions their own machine and the join moment names it.",
+      "page": "onboarding"
+    }
+  ],
+  "launch": {
+    "view": "canvas",
+    "page": "onboarding"
+  }
+}

@@ -1,0 +1,497 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sessions — one spine for chats, tasks, and rooms</title>
+<style>
+[data-theme] { --font:'Geist Variable',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; --fmono:'Geist Mono Variable',ui-monospace,'SF Mono',Menlo,monospace; --fdisp:'Source Serif 4','Iowan Old Style',Georgia,serif; --ease:cubic-bezier(.2,.8,.2,1); --dur-fast:120ms; }
+/* verbatim from apps/desktop/src/renderer/src/tokens.css */
+[data-theme='dark'] {
+  --win:#0d0d0d; --bg:#141414; --panel:#191919; --panel2:#212121; --panel3:#2b2b2b;
+  --border:#272727; --border2:#383838; --card:#1b1b1b; --card-border:#2e2e2e;
+  --text:#eaeaea; --body:#b6b6b6; --muted:#898989; --dim:#676767; --ring:#585858;
+  --accent:#eaeaea; --link:#d19a72; --hover-bg:rgba(234,234,234,.06);
+  --prog:#8ba0c0; --review:#a89ccf; --done:#77ac8d; --acc:#6fb0ab; --ship:#7cb0bd;
+  --blocked:#9ca0a8; --closed:#727272; --shadow:rgba(0,0,0,.6);
+}
+[data-theme='cream-oak'] {
+  --win:#f0e5d3; --bg:#fbf8f4; --panel:#fbf8f4; --panel2:#f6eee1; --panel3:#efe1cd;
+  --border:#e6dbca; --border2:#d3c2a8; --card:#ffffff; --card-border:#eadfce;
+  --text:#2a1c13; --body:#574838; --muted:#97846c; --dim:#b5a289; --ring:#b08a5e;
+  --accent:#834a2b; --link:#9c5730; --hover-bg:rgba(42,28,19,.05);
+  --prog:#4f80c4; --review:#6d5ce0; --done:#0f9d63; --acc:#2f8f8a; --ship:#1f7f96;
+  --blocked:#7d7f86; --closed:#897a60; --shadow:rgba(70,42,18,.22);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#131210; font-family:'Geist Variable',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; }
+.page { max-width:1660px; margin:0 auto; padding:32px 24px 70px; }
+.pagehead { color:#eaeaea; margin-bottom:8px; }
+.pagehead h1 { font-family:'Source Serif 4',Georgia,serif; font-size:23px; font-weight:640; letter-spacing:-.012em; }
+.pagehead p { color:#898989; font-size:13px; line-height:1.62; margin-top:8px; max-width:96ch; }
+.pagehead b { color:#b6b6b6; font-weight:600; }
+.pagehead .warn { color:#c8a06a; font-weight:600; }
+.pagehead .ok { color:#8fbf9f; font-weight:600; }
+.stophd { color:#eaeaea; font-size:15px; font-weight:660; margin:44px 0 4px; font-family:'Source Serif 4',Georgia,serif; }
+.stopno { font:700 10px 'Geist Mono Variable',ui-monospace,monospace; letter-spacing:.12em; color:#6f6f6f; text-transform:uppercase; margin-right:8px; }
+.stopp { color:#898989; font-size:12.5px; line-height:1.62; max-width:102ch; margin-bottom:16px; }
+.stopp b { color:#b6b6b6; } .stopp .warn { color:#c8a06a; font-weight:600; } .stopp .ok { color:#8fbf9f; font-weight:600; }
+.themes { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+@media (max-width:1300px){ .themes { grid-template-columns:1fr; } }
+.theme { background:var(--win); border:1px solid var(--border2); border-radius:16px; padding:16px; color:var(--text); }
+.theme > h2 { font-size:10.5px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--dim); margin:0 2px 12px; }
+
+/* ── the map diagram ─────────────────────────────────────────────── */
+.map { display:grid; grid-template-columns:1fr 46px 1fr; gap:14px; align-items:stretch; }
+.mapcol { background:var(--panel); border:1px solid var(--border); border-radius:13px; padding:14px; }
+.mapcol h3 { font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); margin-bottom:10px; }
+.mapbox { border:1px solid var(--card-border); background:var(--card); border-radius:10px; padding:9px 11px; margin-bottom:8px; }
+.mapbox b { font-size:12.5px; display:block; }
+.mapbox span { font-size:11px; color:var(--muted); line-height:1.5; display:block; margin-top:2px; }
+.mapbox.dead { opacity:.55; border-style:dashed; }
+.mapbox.dead b { text-decoration:line-through; text-decoration-thickness:1px; }
+.maparrow { display:grid; place-items:center; color:var(--dim); font-size:22px; }
+.maplane { border-left:3px solid var(--border2); padding-left:10px; margin:10px 0 2px; font-size:11px; color:var(--dim); font-style:italic; line-height:1.55; }
+
+/* ── shell primitives (266px nav is the real width) ──────────────── */
+.shell { display:flex; gap:0; background:var(--win); border-radius:14px; overflow:hidden; border:1px solid var(--border); min-height:640px; }
+.nav { width:236px; min-width:236px; background:var(--bg); border-right:1px solid var(--border); display:flex; flex-direction:column; padding-bottom:10px; }
+.wsrow { display:flex; align-items:center; gap:10px; padding:12px 12px 10px; }
+.wsav { width:30px; height:30px; border-radius:9px; background:var(--panel3); display:grid; place-items:center; font-size:13px; }
+.wsname { font-size:13px; font-weight:660; line-height:1.15; }
+.wsorg { font-size:10px; color:var(--dim); }
+.newchat { margin:4px 10px 8px; padding:9px 12px; border:1px solid var(--card-border); background:var(--card); border-radius:10px;
+  font-size:12.5px; font-weight:640; display:flex; align-items:center; gap:8px; box-shadow:0 1px 2px var(--shadow); }
+.newchat .plus { font-size:14px; color:var(--muted); }
+.navitem { display:flex; align-items:center; gap:9px; margin:1px 8px; padding:7px 10px; border-radius:8px; font-size:12.5px; color:var(--body); }
+.navitem.on { background:var(--card); border:1px solid var(--card-border); color:var(--text); font-weight:620; }
+.navitem .badge { margin-left:auto; font:640 10px var(--fmono); background:var(--panel3); border-radius:9px; padding:2px 7px; color:var(--muted); }
+.navsec { display:flex; align-items:center; gap:7px; padding:12px 14px 4px; font:700 9.5px var(--fmono); letter-spacing:.1em; text-transform:uppercase; color:var(--dim); }
+.navsec .n { color:var(--muted); font-weight:600; } .navsec .r { margin-left:auto; font-size:12px; }
+.chan { display:flex; align-items:center; gap:8px; margin:1px 8px; padding:6px 10px 6px 18px; border-radius:8px; font-size:12.5px; color:var(--body); }
+.chan.on { background:var(--card); border:1px solid var(--card-border); color:var(--text); font-weight:620; }
+.chan .h { color:var(--dim); } .chan .n { margin-left:auto; font:600 10px var(--fmono); color:var(--dim); }
+.sess { display:flex; align-items:center; gap:8px; margin:1px 8px; padding:5px 10px 5px 18px; border-radius:8px; font-size:12px; color:var(--body); min-width:0; }
+.sess .t { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.sess .when { margin-left:auto; font:500 10px var(--fmono); color:var(--dim); flex:none; }
+.sdot { width:7px; height:7px; border-radius:50%; border:1.5px solid var(--dim); flex:none; }
+.sdot.chat { border-color:var(--dim); }
+.sdot.live { background:var(--prog); border-color:var(--prog); box-shadow:0 0 0 3px color-mix(in srgb, var(--prog) 22%, transparent); }
+.sdot.review { background:var(--review); border-color:var(--review); }
+.sdot.done { background:var(--done); border-color:var(--done); }
+
+/* main surface */
+.main { flex:1; min-width:0; display:flex; flex-direction:column; background:var(--panel); }
+.mainhead { padding:13px 18px 0; }
+.crumb { font-size:11px; color:var(--dim); margin-bottom:3px; }
+.roomrow { display:flex; align-items:center; gap:10px; }
+.roomname { font-family:var(--fdisp); font-size:19px; font-weight:640; letter-spacing:-.01em; }
+.roomtopic { font-size:11.5px; color:var(--muted); margin-top:2px; }
+.crew { margin-left:auto; display:flex; align-items:center; }
+.crew .av { width:24px; height:24px; border-radius:8px; background:var(--panel3); border:2px solid var(--panel); margin-left:-7px; display:grid; place-items:center; font-size:11px; }
+.crew .more { margin-left:6px; font:600 10.5px var(--fmono); color:var(--dim); }
+.tabbar { display:flex; gap:2px; margin-top:12px; }
+.tab { padding:7px 13px; font-size:12px; font-weight:620; color:var(--muted); border-bottom:2px solid transparent; }
+.tab.on { color:var(--text); border-color:var(--accent); }
+.brief { margin:12px 18px 0; border:1px solid var(--card-border); background:var(--card); border-radius:11px; padding:9px 13px; display:flex; gap:10px; align-items:baseline; font-size:12px; color:var(--body); }
+.brief .k { font:700 9.5px var(--fmono); letter-spacing:.09em; color:var(--dim); text-transform:uppercase; flex:none; }
+.brief .exp { margin-left:auto; color:var(--dim); font-size:11px; flex:none; }
+.slist { flex:1; padding:10px 12px; overflow:hidden; }
+.sgroup { font:700 9.5px var(--fmono); letter-spacing:.1em; text-transform:uppercase; color:var(--dim); padding:10px 8px 5px; }
+.srow { display:flex; align-items:center; gap:11px; padding:10px 12px; border-radius:11px; border:1px solid transparent; min-width:0; }
+.srow.on, .srow:hover { background:var(--card); border-color:var(--card-border); }
+.srow .body { min-width:0; flex:1; }
+.srow .t { font-size:13px; font-weight:620; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.srow .snip { font-size:11.5px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:1.5px; }
+.srow .meta { flex:none; text-align:right; }
+.srow .when { font:500 10.5px var(--fmono); color:var(--dim); }
+.srow .roomtag { font:600 10px var(--fmono); color:var(--muted); background:var(--panel2); border-radius:7px; padding:2px 7px; margin-top:3px; display:inline-block; }
+.tring { width:18px; height:18px; border-radius:50%; flex:none; background:conic-gradient(var(--prog) var(--frac,40%), color-mix(in srgb, var(--dim) 32%, transparent) 0); position:relative; }
+.tring::after { content:''; position:absolute; inset:3px; border-radius:50%; background:var(--panel); }
+.srow.on .tring::after, .srow:hover .tring::after { background:var(--card); }
+.tring.r { background:conic-gradient(var(--review) var(--frac,80%), color-mix(in srgb, var(--dim) 32%, transparent) 0); }
+.tring.d { background:conic-gradient(var(--done) 100%, var(--done) 0); }
+.chatglyph { width:18px; height:18px; flex:none; border-radius:6px; border:1.5px solid var(--dim); display:grid; place-items:center; font-size:9px; color:var(--dim); }
+.statechip { font:640 9.5px var(--fmono); letter-spacing:.05em; text-transform:uppercase; border-radius:7px; padding:2.5px 7px; flex:none; }
+.statechip.prog { color:var(--prog); background:color-mix(in srgb, var(--prog) 13%, transparent); }
+.statechip.review { color:var(--review); background:color-mix(in srgb, var(--review) 13%, transparent); }
+.statechip.chat { color:var(--muted); background:var(--panel2); }
+
+/* composer */
+.compose { margin:10px 14px 14px; border:1px solid var(--card-border); background:var(--card); border-radius:13px; box-shadow:0 1px 3px var(--shadow); }
+.chips { display:flex; align-items:center; gap:7px; padding:9px 12px 0; }
+.chip { display:inline-flex; align-items:center; gap:6px; font:620 11px var(--fmono); color:var(--body); border:1px solid var(--card-border); border-radius:var(--r-full,99px); padding:4px 10px; background:var(--panel); }
+.chip .h { color:var(--dim); } .chip .car { color:var(--dim); font-size:9px; }
+.chip.tog { color:var(--done); border-color:color-mix(in srgb, var(--done) 40%, transparent); }
+.chip.tog.off { color:var(--muted); border-color:var(--card-border); }
+.chip.auto { color:var(--link); border-style:dashed; }
+.cinput { padding:11px 14px 12px; font-size:13.5px; color:var(--dim); }
+.cfoot { display:flex; align-items:center; gap:10px; padding:0 12px 11px; color:var(--dim); font-size:12px; }
+.csend { margin-left:auto; width:30px; height:30px; border-radius:50%; background:var(--panel3); display:grid; place-items:center; font-size:13px; color:var(--muted); }
+
+/* conversation */
+.msgs { flex:1; padding:16px 22px 6px; display:flex; flex-direction:column; gap:14px; overflow:hidden; }
+.msg { display:flex; gap:11px; }
+.mav { width:28px; height:28px; border-radius:9px; background:var(--panel3); flex:none; display:grid; place-items:center; font-size:12px; }
+.mbody { min-width:0; flex:1; }
+.mhead { display:flex; align-items:baseline; gap:8px; font-size:12.5px; }
+.mhead b { font-weight:660; } .mhead .role { font:640 8.5px var(--fmono); letter-spacing:.07em; text-transform:uppercase; color:var(--muted); background:var(--panel2); padding:2px 6px; border-radius:6px; }
+.mhead .tm { color:var(--dim); font-size:10.5px; }
+.mtext { font-size:13px; line-height:1.62; color:var(--body); margin-top:3px; max-width:78ch; }
+.mtext b { color:var(--text); font-weight:620; }
+.me { background:var(--panel2); border-radius:13px; padding:10px 14px; margin-left:auto; max-width:70%; font-size:13px; line-height:1.6; color:var(--body); }
+.taskpills { display:flex; gap:8px; margin-top:9px; flex-wrap:wrap; }
+.taskpill { display:inline-flex; align-items:center; gap:8px; border:1px solid var(--card-border); background:var(--card); border-radius:10px; padding:7px 11px; font-size:12px; font-weight:620; box-shadow:0 1px 2px var(--shadow); }
+.taskpill .num { font:640 10.5px var(--fmono); color:var(--muted); }
+.valve { margin:2px 22px 10px; display:flex; align-items:center; gap:8px; font-size:11px; color:var(--dim); }
+.valve .vbtn { border:1px dashed var(--border2); border-radius:8px; padding:4px 9px; font-weight:620; color:var(--muted); }
+
+/* annotations */
+.callouts { display:flex; flex-wrap:wrap; gap:8px 18px; margin-top:12px; }
+.co { font-size:11.5px; color:#898989; line-height:1.55; max-width:44ch; }
+.co b { color:#b6b6b6; } .co .n { display:inline-grid; place-items:center; width:16px; height:16px; border-radius:50%; background:#2b2b2b; color:#c8a06a; font:700 10px monospace; margin-right:6px; }
+.mark { position:absolute; width:18px; height:18px; border-radius:50%; background:#c8a06a; color:#131210; font:700 11px monospace; display:grid; place-items:center; box-shadow:0 1px 4px rgba(0,0,0,.5); z-index:3; }
+.rel { position:relative; }
+
+/* alternatives table */
+.alts { width:100%; border-collapse:collapse; font-size:12.5px; color:#b6b6b6; }
+.alts th { text-align:left; font:700 10px monospace; letter-spacing:.09em; text-transform:uppercase; color:#6f6f6f; padding:8px 12px; border-bottom:1px solid #2c2c2c; }
+.alts td { padding:10px 12px; border-bottom:1px solid #222; vertical-align:top; line-height:1.55; }
+.alts td:first-child { white-space:nowrap; font-weight:640; color:#eaeaea; }
+.alts .pick { color:#8fbf9f; font-weight:700; }
+.alts .no { color:#c8846a; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<div class="pagehead">
+  <h1>Sessions — one spine for chats, tasks, and rooms</h1>
+  <p><b>The report:</b> a Home send opens a chat with rex that feels <span class="warn">disconnected from the channel and its messages</span>. The mechanics agree with the feeling: the send lands in a real room, but the room's primary surface is a <b>feed</b> that shows only the conversation's <i>root</i> — every reply lives in a sheet floating over it. Close the sheet and the room looks dead while the conversation thrives. Meanwhile history lives in a third place (the Recents rail). Three planes, one conversation.</p>
+  <p><b>The research:</b> Claude desktop (Apr 2026 redesign) and the Codex app converged on the same shape — <b>a sidebar of sessions grouped by project</b>; the container carries the crew/config/context; one session = one full surface; sessions self-archive when their work merges; <b>no feed anywhere</b>. NeuraMesh's data model is <i>already</i> session-shaped (threads with a frozen mode, thread-per-task). Only the shell isn't.</p>
+  <p><b>The proposal:</b> keep channels — they are the crew, the skills, the board, the ACL, the work-type category — but make them <b>folders of sessions instead of feeds</b>. A session is a chat or a task; the same row appears in Home, in its room, and in Recents because it is the same thing. <span class="ok">No schema change.</span> The feed retires; its two real jobs (digest, announcements) survive as a pinned room brief and as ordinary sessions.</p>
+</div>
+
+<!-- ══════════ STOP 1 · the map ══════════ -->
+<div class="stophd"><span class="stopno">Stop 1</span>Today's three planes → one spine</div>
+<div class="stopp">Trace the exact reported scenario through each model. Today: the send roots in a feed you never look at, replies vanish into a sheet, and history is a third surface. Proposed: the send <b>is</b> a session; the room <b>is</b> its sessions; Home and Recents are the same rows, wider.</div>
+<div class="themes">
+  <div class="theme" data-theme="cream-oak">
+    <h2>Today — where one Home send ends up</h2>
+    <div class="map">
+      <div class="mapcol">
+        <h3>You act</h3>
+        <div class="mapbox"><b>Home composer</b><span>"hey @rex, what's the status…" → chip picks #dev (easy to miss)</span></div>
+        <div class="maplane">one send, three surfaces inherit it —</div>
+      </div>
+      <div class="maparrow">→</div>
+      <div class="mapcol">
+        <h3>It lands in</h3>
+        <div class="mapbox"><b>#dev feed</b><span>shows the ROOT only + "3 replies". rex's answers never appear here — the room reads as dead.</span></div>
+        <div class="mapbox"><b>Thread sheet</b><span>the real conversation, floating OVER the feed. Close it: gone from view.</span></div>
+        <div class="mapbox"><b>Recents rail</b><span>the history row — a third lens on the same thing.</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="theme" data-theme="dark">
+    <h2>Proposed — the same send, one spine</h2>
+    <div class="map">
+      <div class="mapcol">
+        <h3>You act</h3>
+        <div class="mapbox"><b>Composer (anywhere)</b><span>two visible knobs: WHERE (#dev ▾) and WHAT (Tasks ⏻ / Chat). Send.</span></div>
+        <div class="maplane">one send, one session — seen through three filters of the same list</div>
+      </div>
+      <div class="maparrow">→</div>
+      <div class="mapcol">
+        <h3>It is</h3>
+        <div class="mapbox"><b>A session</b><span>opens as the main surface (no sheet). The whole conversation lives here, forever findable.</span></div>
+        <div class="mapbox"><b>One row, three filters</b><span>#dev = this room's sessions · Home = every room's · Recents = the same, resting in the nav.</span></div>
+        <div class="mapbox dead"><b>The feed</b><span>retired. Digest → pinned room brief. Announcements → ordinary sessions.</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ STOP 2 · Home ══════════ -->
+<div class="stophd"><span class="stopno">Stop 2</span>Home — the workspace's session list</div>
+<div class="stopp">Home keeps its v0.68 jobs — needs-you queue on top, composer docked — and its list becomes <b>every session across rooms</b>, chats and tasks interleaved, newest first. A task row is a session with a state (the docs/25 dial); a chat row is a session without one. The composer's chips make routing impossible to miss: <b>where</b> it goes and <b>what it becomes</b>.</div>
+<div class="themes">
+  <div class="theme rel" data-theme="cream-oak">
+    <h2>Home · cream oak</h2>
+    <div class="shell">
+      <div class="nav">
+        <div class="wsrow"><div class="wsav">A</div><div><div class="wsname">v0-9-release</div><div class="wsorg">Acme Robotics</div></div></div>
+        <div class="newchat"><span class="plus">+</span> New chat <span style="margin-left:auto;font:600 10px var(--fmono);color:var(--dim)">⌘N</span></div>
+        <div class="navitem on">⌂ Home <span class="badge">6</span></div>
+        <div class="navsec">Channels <span class="n">4</span><span class="r">+</span></div>
+        <div class="chan"><span class="h">#</span> general <span class="n">12</span></div>
+        <div class="chan"><span class="h">#</span> dev <span class="n">31</span></div>
+        <div class="chan"><span class="h">#</span> research <span class="n">8</span></div>
+        <div class="chan"><span class="h">◃</span> marketing <span class="n">19</span></div>
+        <div class="navsec">Recents <span class="n">16</span><span class="r">⌕</span></div>
+        <div class="sess"><span class="sdot live"></span><span class="t">1046 iOS Safari focus-trap release</span><span class="when">2m</span></div>
+        <div class="sess"><span class="sdot chat"></span><span class="t">the drawer still traps focus on iP…</span><span class="when">4m</span></div>
+        <div class="sess"><span class="sdot review"></span><span class="t">1042 Mobile nav: drawer + focus</span><span class="when">5h</span></div>
+        <div class="sess"><span class="sdot chat"></span><span class="t">Sprint priorities — quick sync</span><span class="when">2d</span></div>
+      </div>
+      <div class="main">
+        <div class="mainhead" style="padding-bottom:8px">
+          <div class="roomrow"><div><div class="roomname">Tuesday. 2 need you.</div><div class="roomtopic">6 in flight · 3 rooms active · patch is mid-run on #1046</div></div></div>
+        </div>
+        <div class="brief" style="border-color:color-mix(in srgb, var(--link) 35%, transparent)"><span class="k">Needs you</span> <b style="font-weight:640">#1050 plan review</b> · rex asks where the pricing tiers land — 2 cards <span class="exp">open queue ›</span></div>
+        <div class="slist">
+          <div class="sgroup">Today</div>
+          <div class="srow on"><span class="tring" style="--frac:40%"></span><div class="body"><div class="t">#1046 · iOS Safari focus-trap release</div><div class="snip">patch · returning focus to the trigger · 2/5</div></div><div class="meta"><span class="statechip prog">build</span><div><span class="roomtag">#dev</span></div></div></div>
+          <div class="srow"><span class="chatglyph">◦◦</span><div class="body"><div class="t">the drawer still traps focus on iPad</div><div class="snip">you → rex · "narrowed it to the inert backdrop — filing a follow-up"</div></div><div class="meta"><span class="statechip chat">chat</span><div><span class="roomtag">#dev</span></div></div></div>
+          <div class="srow"><span class="tring r" style="--frac:80%"></span><div class="body"><div class="t">#1042 · Mobile nav: drawer + focus order</div><div class="snip">scout reviewing · round 2 · PR #1042</div></div><div class="meta"><span class="statechip review">review</span><div><span class="roomtag">#dev</span></div></div></div>
+          <div class="sgroup">Yesterday</div>
+          <div class="srow"><span class="chatglyph">◦◦</span><div class="body"><div class="t">Competitive scan: focus apps</div><div class="snip">rex · report posted · 3 angles · spawned #1050 #1051</div></div><div class="meta"><span class="statechip chat">chat</span><div><span class="roomtag">#research</span></div></div></div>
+          <div class="srow"><span class="tring" style="--frac:20%"></span><div class="body"><div class="t">#1051 · Docs landing hero — visual refresh</div><div class="snip">iris designing · round 1 mockups in thread</div></div><div class="meta"><span class="statechip prog">design</span><div><span class="roomtag">marketing</span></div></div></div>
+        </div>
+        <div class="compose">
+          <div class="chips"><span class="chip"><span class="h">#</span> dev <span class="car">▾</span></span><span class="chip tog">Tasks · on</span><span style="margin-left:auto;font-size:10.5px;color:var(--dim)">rex picks it up in #dev</span></div>
+          <div class="cinput">Describe the work — or just ask. @ mention · / skill · ⏎ send</div>
+          <div class="cfoot"><span>@</span><span>✂</span><span class="csend">↑</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="mark" style="top:200px; left:24px">1</div>
+    <div class="mark" style="top:388px; right:36px">2</div>
+    <div class="mark" style="bottom:106px; left:290px">3</div>
+  </div>
+  <div class="theme" data-theme="dark">
+    <h2>Home · graphite dark</h2>
+    <div class="shell">
+      <div class="nav">
+        <div class="wsrow"><div class="wsav">A</div><div><div class="wsname">v0-9-release</div><div class="wsorg">Acme Robotics</div></div></div>
+        <div class="newchat"><span class="plus">+</span> New chat <span style="margin-left:auto;font:600 10px var(--fmono);color:var(--dim)">⌘N</span></div>
+        <div class="navitem on">⌂ Home <span class="badge">6</span></div>
+        <div class="navsec">Channels <span class="n">4</span><span class="r">+</span></div>
+        <div class="chan"><span class="h">#</span> general <span class="n">12</span></div>
+        <div class="chan"><span class="h">#</span> dev <span class="n">31</span></div>
+        <div class="chan"><span class="h">#</span> research <span class="n">8</span></div>
+        <div class="chan"><span class="h">◃</span> marketing <span class="n">19</span></div>
+        <div class="navsec">Recents <span class="n">16</span><span class="r">⌕</span></div>
+        <div class="sess"><span class="sdot live"></span><span class="t">1046 iOS Safari focus-trap release</span><span class="when">2m</span></div>
+        <div class="sess"><span class="sdot chat"></span><span class="t">the drawer still traps focus on iP…</span><span class="when">4m</span></div>
+        <div class="sess"><span class="sdot review"></span><span class="t">1042 Mobile nav: drawer + focus</span><span class="when">5h</span></div>
+        <div class="sess"><span class="sdot chat"></span><span class="t">Sprint priorities — quick sync</span><span class="when">2d</span></div>
+      </div>
+      <div class="main">
+        <div class="mainhead" style="padding-bottom:8px">
+          <div class="roomrow"><div><div class="roomname">Tuesday. 2 need you.</div><div class="roomtopic">6 in flight · 3 rooms active · patch is mid-run on #1046</div></div></div>
+        </div>
+        <div class="brief" style="border-color:color-mix(in srgb, var(--link) 35%, transparent)"><span class="k">Needs you</span> <b style="font-weight:640">#1050 plan review</b> · rex asks where the pricing tiers land — 2 cards <span class="exp">open queue ›</span></div>
+        <div class="slist">
+          <div class="sgroup">Today</div>
+          <div class="srow on"><span class="tring" style="--frac:40%"></span><div class="body"><div class="t">#1046 · iOS Safari focus-trap release</div><div class="snip">patch · returning focus to the trigger · 2/5</div></div><div class="meta"><span class="statechip prog">build</span><div><span class="roomtag">#dev</span></div></div></div>
+          <div class="srow"><span class="chatglyph">◦◦</span><div class="body"><div class="t">the drawer still traps focus on iPad</div><div class="snip">you → rex · "narrowed it to the inert backdrop — filing a follow-up"</div></div><div class="meta"><span class="statechip chat">chat</span><div><span class="roomtag">#dev</span></div></div></div>
+          <div class="srow"><span class="tring r" style="--frac:80%"></span><div class="body"><div class="t">#1042 · Mobile nav: drawer + focus order</div><div class="snip">scout reviewing · round 2 · PR #1042</div></div><div class="meta"><span class="statechip review">review</span><div><span class="roomtag">#dev</span></div></div></div>
+          <div class="sgroup">Yesterday</div>
+          <div class="srow"><span class="chatglyph">◦◦</span><div class="body"><div class="t">Competitive scan: focus apps</div><div class="snip">rex · report posted · 3 angles · spawned #1050 #1051</div></div><div class="meta"><span class="statechip chat">chat</span><div><span class="roomtag">#research</span></div></div></div>
+          <div class="srow"><span class="tring" style="--frac:20%"></span><div class="body"><div class="t">#1051 · Docs landing hero — visual refresh</div><div class="snip">iris designing · round 1 mockups in thread</div></div><div class="meta"><span class="statechip prog">design</span><div><span class="roomtag">marketing</span></div></div></div>
+        </div>
+        <div class="compose">
+          <div class="chips"><span class="chip"><span class="h">#</span> dev <span class="car">▾</span></span><span class="chip tog">Tasks · on</span><span style="margin-left:auto;font-size:10.5px;color:var(--dim)">rex picks it up in #dev</span></div>
+          <div class="cinput">Describe the work — or just ask. @ mention · / skill · ⏎ send</div>
+          <div class="cfoot"><span>@</span><span>✂</span><span class="csend">↑</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="callouts">
+  <div class="co"><span class="n">1</span><b>New chat is the first verb</b> — Claude/Codex muscle memory. It opens a blank session; the chips choose the room + mode before or after you type.</div>
+  <div class="co"><span class="n">2</span><b>Chats and tasks are one list.</b> A task is a session with a state dial (docs/25); a chat is one without. The chat that spawned #1050/#1051 sits beside them — lineage visible, nothing disconnected.</div>
+  <div class="co"><span class="n">3</span><b>Routing is legible:</b> the room chip + the docs/34 Tasks toggle sit where your eyes are, and the hint names who picks it up. No more silent #general.</div>
+</div>
+
+<!-- ══════════ STOP 3 · the room ══════════ -->
+<div class="stophd"><span class="stopno">Stop 3</span>A room is a folder of sessions — not a feed</div>
+<div class="stopp">Click #research: its <b>conversation list</b>, scoped to this room, same rows as Home. The crew lives top-right (v0.69 clusters, unchanged), the Board stays a tab (docs/32 shape), marketing keeps Calendar/Library. The orchestrator's digest — the feed's one real tenant — becomes a <b>pinned brief</b>: one line, expandable, replyable (replying roots a session at it, the docs/31 machinery unchanged). <span class="warn">The Home-born chat from Stop 2 is right here at the top of its room</span> — the disconnect is structurally impossible.</div>
+<div class="themes">
+  <div class="theme rel" data-theme="cream-oak">
+    <h2>#research · cream oak</h2>
+    <div class="shell">
+      <div class="nav">
+        <div class="wsrow"><div class="wsav">A</div><div><div class="wsname">v0-9-release</div><div class="wsorg">Acme Robotics</div></div></div>
+        <div class="newchat"><span class="plus">+</span> New chat <span style="margin-left:auto;font:600 10px var(--fmono);color:var(--dim)">⌘N</span></div>
+        <div class="navitem">⌂ Home <span class="badge">6</span></div>
+        <div class="navsec">Channels <span class="n">4</span><span class="r">+</span></div>
+        <div class="chan"><span class="h">#</span> general <span class="n">12</span></div>
+        <div class="chan"><span class="h">#</span> dev <span class="n">31</span></div>
+        <div class="chan on"><span class="h">#</span> research <span class="n">8</span></div>
+        <div class="chan"><span class="h">◃</span> marketing <span class="n">19</span></div>
+        <div class="navsec">Recents <span class="n">16</span><span class="r">⌕</span></div>
+        <div class="sess"><span class="sdot live"></span><span class="t">1046 iOS Safari focus-trap release</span><span class="when">2m</span></div>
+        <div class="sess"><span class="sdot chat"></span><span class="t">Competitive scan: focus apps</span><span class="when">1d</span></div>
+        <div class="sess"><span class="sdot chat"></span><span class="t">1032 Research Flowe: feature gaps</span><span class="when">15h</span></div>
+      </div>
+      <div class="main">
+        <div class="mainhead">
+          <div class="crumb">v0-9-release ▸</div>
+          <div class="roomrow"><div><div class="roomname"># research</div><div class="roomtopic">market + user research · rex triages here</div></div>
+            <div class="crew"><div class="av">🦉</div><div class="av">🔎</div><div class="av">🦭</div><span class="more">+2 · 1 human</span></div>
+          </div>
+          <div class="tabbar"><span class="tab on">Conversations</span><span class="tab">Board · 4</span></div>
+        </div>
+        <div class="brief"><span class="k">Room brief</span> yesterday: 2 scans landed · #1032 waiting on your accept · backlog +1 <span class="exp">history ⌘Y ›</span></div>
+        <div class="slist">
+          <div class="sgroup">Today</div>
+          <div class="srow"><span class="chatglyph">◦◦</span><div class="body"><div class="t">Competitive scan: focus apps</div><div class="snip">rex · report posted · spawned #1050 #1051</div></div><div class="meta"><span class="statechip chat">chat</span><div><span class="when">4m</span></div></div></div>
+          <div class="srow"><span class="tring r" style="--frac:90%"></span><div class="body"><div class="t">#1032 · Research Flowe: feature gaps vs top-5</div><div class="snip">done · report + matrix attached · awaiting accept</div></div><div class="meta"><span class="statechip review">accept?</span><div><span class="when">15h</span></div></div></div>
+          <div class="sgroup">This week</div>
+          <div class="srow"><span class="chatglyph">◦◦</span><div class="body"><div class="t">Pricing sensitivity — quick take</div><div class="snip">you → rex · "annual is out per the strategy call"</div></div><div class="meta"><span class="statechip chat">chat</span><div><span class="when">2d</span></div></div></div>
+          <div class="srow"><span class="tring d"></span><div class="body"><div class="t">#1019 · Churn-signal interview synthesis</div><div class="snip">accepted · lessons recorded</div></div><div class="meta"><span class="statechip chat" style="color:var(--done)">done</span><div><span class="when">6d</span></div></div></div>
+        </div>
+        <div class="compose">
+          <div class="chips"><span class="chip"><span class="h">#</span> research</span><span class="chip tog off">Tasks · off</span><span style="margin-left:auto;font-size:10.5px;color:var(--dim)">chat — rex answers in-thread</span></div>
+          <div class="cinput">Ask #research — @ mention · / skill · ⏎ send</div>
+          <div class="cfoot"><span>@</span><span>✂</span><span class="csend">↑</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="mark" style="top:118px; right:34px">4</div>
+    <div class="mark" style="top:196px; left:288px">5</div>
+    <div class="mark" style="top:262px; left:270px">6</div>
+  </div>
+  <div class="theme" data-theme="dark">
+    <h2>#research · graphite dark</h2>
+    <div class="shell">
+      <div class="nav">
+        <div class="wsrow"><div class="wsav">A</div><div><div class="wsname">v0-9-release</div><div class="wsorg">Acme Robotics</div></div></div>
+        <div class="newchat"><span class="plus">+</span> New chat <span style="margin-left:auto;font:600 10px var(--fmono);color:var(--dim)">⌘N</span></div>
+        <div class="navitem">⌂ Home <span class="badge">6</span></div>
+        <div class="navsec">Channels <span class="n">4</span><span class="r">+</span></div>
+        <div class="chan"><span class="h">#</span> general <span class="n">12</span></div>
+        <div class="chan"><span class="h">#</span> dev <span class="n">31</span></div>
+        <div class="chan on"><span class="h">#</span> research <span class="n">8</span></div>
+        <div class="chan"><span class="h">◃</span> marketing <span class="n">19</span></div>
+        <div class="navsec">Recents <span class="n">16</span><span class="r">⌕</span></div>
+        <div class="sess"><span class="sdot live"></span><span class="t">1046 iOS Safari focus-trap release</span><span class="when">2m</span></div>
+        <div class="sess"><span class="sdot chat"></span><span class="t">Competitive scan: focus apps</span><span class="when">1d</span></div>
+        <div class="sess"><span class="sdot chat"></span><span class="t">1032 Research Flowe: feature gaps</span><span class="when">15h</span></div>
+      </div>
+      <div class="main">
+        <div class="mainhead">
+          <div class="crumb">v0-9-release ▸</div>
+          <div class="roomrow"><div><div class="roomname"># research</div><div class="roomtopic">market + user research · rex triages here</div></div>
+            <div class="crew"><div class="av">🦉</div><div class="av">🔎</div><div class="av">🦭</div><span class="more">+2 · 1 human</span></div>
+          </div>
+          <div class="tabbar"><span class="tab on">Conversations</span><span class="tab">Board · 4</span></div>
+        </div>
+        <div class="brief"><span class="k">Room brief</span> yesterday: 2 scans landed · #1032 waiting on your accept · backlog +1 <span class="exp">history ⌘Y ›</span></div>
+        <div class="slist">
+          <div class="sgroup">Today</div>
+          <div class="srow"><span class="chatglyph">◦◦</span><div class="body"><div class="t">Competitive scan: focus apps</div><div class="snip">rex · report posted · spawned #1050 #1051</div></div><div class="meta"><span class="statechip chat">chat</span><div><span class="when">4m</span></div></div></div>
+          <div class="srow"><span class="tring r" style="--frac:90%"></span><div class="body"><div class="t">#1032 · Research Flowe: feature gaps vs top-5</div><div class="snip">done · report + matrix attached · awaiting accept</div></div><div class="meta"><span class="statechip review">accept?</span><div><span class="when">15h</span></div></div></div>
+          <div class="sgroup">This week</div>
+          <div class="srow"><span class="chatglyph">◦◦</span><div class="body"><div class="t">Pricing sensitivity — quick take</div><div class="snip">you → rex · "annual is out per the strategy call"</div></div><div class="meta"><span class="statechip chat">chat</span><div><span class="when">2d</span></div></div></div>
+          <div class="srow"><span class="tring d"></span><div class="body"><div class="t">#1019 · Churn-signal interview synthesis</div><div class="snip">accepted · lessons recorded</div></div><div class="meta"><span class="statechip chat" style="color:var(--done)">done</span><div><span class="when">6d</span></div></div></div>
+        </div>
+        <div class="compose">
+          <div class="chips"><span class="chip"><span class="h">#</span> research</span><span class="chip tog off">Tasks · off</span><span style="margin-left:auto;font-size:10.5px;color:var(--dim)">chat — rex answers in-thread</span></div>
+          <div class="cinput">Ask #research — @ mention · / skill · ⏎ send</div>
+          <div class="cfoot"><span>@</span><span>✂</span><span class="csend">↑</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="callouts">
+  <div class="co"><span class="n">4</span><b>The crew stays a room concept</b> — avatars top-right open the v0.69.1 overlays. The channel keeps being the ACL + staffing + skills boundary; it just stops being a message stream.</div>
+  <div class="co"><span class="n">5</span><b>The digest's new home:</b> a pinned one-line brief, expandable, replyable. The feed's only regular tenant, kept without keeping the plane it lived on.</div>
+  <div class="co"><span class="n">6</span><b>The board is one tab away</b> and unchanged — kanban stays the work lens; sessions are the talk lens; a task appears in both because it is both.</div>
+</div>
+
+<!-- ══════════ STOP 4 · the session ══════════ -->
+<div class="stophd"><span class="stopno">Stop 4</span>A session takes the whole surface — and work spins out of it in place</div>
+<div class="stopp">Opening a session replaces the list (Back returns) — <b>no sheet over a feed</b>, the Claude-desktop reading posture. This is the reported scenario continued: a chat with rex where real work emerges. rex files tasks mid-conversation (the orchestrator path, unchanged) and they render as <b>task pills</b> — each one a session in this same room, one click away, each showing its live dial. The docs/34 valve stays: a human can flip a chat into work in place.</div>
+<div class="themes">
+  <div class="theme rel" data-theme="cream-oak">
+    <h2>Chat session · task fan-out · cream oak</h2>
+    <div class="shell" style="min-height:560px">
+      <div class="main" style="border-left:none">
+        <div class="mainhead">
+          <div class="crumb">‹ #research · conversations</div>
+          <div class="roomrow"><div><div class="roomname">Competitive scan: focus apps</div><div class="roomtopic">chat · you + rex · born from Home, lives in #research</div></div>
+            <div class="crew"><span class="statechip chat">chat</span></div>
+          </div>
+        </div>
+        <div class="msgs">
+          <div class="me">hey @rex — before we touch pricing, what are Flowe-class apps doing on onboarding and tiers?</div>
+          <div class="msg"><div class="mav">🦉</div><div class="mbody">
+            <div class="mhead"><b>rex</b><span class="role">orchestrator</span><span class="tm">4:12 PM</span></div>
+            <div class="mtext">Ran 3 angles (report attached): onboarding is universally checklist-first, tiers cluster at $9/$19, and two competitors gate focus-analytics behind annual. Two things are worth building — filing them so they don't die in this chat:</div>
+            <div class="taskpills">
+              <span class="taskpill"><span class="tring" style="--frac:20%;width:15px;height:15px"></span><span class="num">#1050</span> Pricing page refresh — tier table</span>
+              <span class="taskpill"><span class="tring" style="--frac:10%;width:15px;height:15px"></span><span class="num">#1051</span> Docs landing hero — visual refresh</span>
+            </div>
+            <div class="mtext" style="margin-top:9px">Both are on this room's board — iris takes #1051 through design first (docs/14). I'll digest progress into the room brief.</div>
+          </div></div>
+          <div class="me">good — keep the tier table out of marketing until #1050 clears review</div>
+        </div>
+        <div class="valve"><span>a conversation that became work:</span><span class="vbtn">⇧ make this a task</span><span>docs/34 set_mode — human-only, in place</span></div>
+        <div class="compose" style="margin-top:0">
+          <div class="chips"><span class="chip"><span class="h">#</span> research</span><span class="chip tog off">Tasks · off</span></div>
+          <div class="cinput">Reply — @ mention · / skill · ⏎ send</div>
+          <div class="cfoot"><span>@</span><span>✂</span><span class="csend">↑</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="mark" style="top:288px; left:430px">7</div>
+    <div class="mark" style="bottom:130px; left:210px">8</div>
+  </div>
+  <div class="theme" data-theme="dark">
+    <h2>Task session · same shell · graphite dark</h2>
+    <div class="shell" style="min-height:560px">
+      <div class="main" style="border-left:none">
+        <div class="mainhead">
+          <div class="crumb">‹ #dev · conversations</div>
+          <div class="roomrow"><div><div class="roomname">#1046 · iOS Safari focus-trap release</div><div class="roomtopic">task · patch · PR #1046 · reqs ✓ · subtasks 1/2</div></div>
+            <div class="crew"><span class="tring" style="--frac:40%"></span><span class="statechip prog">build · 2/5</span></div>
+          </div>
+        </div>
+        <div class="msgs">
+          <div class="me">Drawer opens but focus gets trapped on iOS Safari — can't Esc out. @rex can someone take this?</div>
+          <div class="msg"><div class="mav">🐝</div><div class="mbody">
+            <div class="mhead"><b>patch</b><span class="role">developer</span><span class="tm">now</span></div>
+            <div class="mtext" style="border:1px solid var(--card-border); background:var(--card); border-radius:11px; padding:10px 13px;"><b>#1046 · running</b> · returning focus to the trigger · 2/5 — the report posts here when it lands <span style="color:var(--dim)">· Activity ›</span></div>
+          </div></div>
+          <div class="msg"><div class="mav">🔎</div><div class="mbody">
+            <div class="mhead"><b>scout</b><span class="role">reviewer</span><span class="tm">5:56 PM</span></div>
+            <div class="mtext">Auto-review of <b>#1042</b>: consistent with the DoD, CI ok. Approved — your accept merges the PR.</div>
+          </div></div>
+        </div>
+        <div class="compose" style="margin-top:auto">
+          <div class="chips"><span class="chip"><span class="h">#</span> dev</span><span class="chip" style="border-style:dashed">gate: accept? · docks here when held</span></div>
+          <div class="cinput">Reply in #1046 — @ mention · / skill · ⏎ send</div>
+          <div class="cfoot"><span>@</span><span>✂</span><span class="csend">↑</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="callouts">
+  <div class="co"><span class="n">7</span><b>Task pills are the fan-out made visible.</b> The chat that caused the work links to the work; the work's rows sit in the same list. Today this lineage exists only in rex's prose.</div>
+  <div class="co"><span class="n">8</span><b>The escalation valve survives</b> exactly as docs/34 built it — chat → work in place, human-only. And the task session on the right is today's docs/25 panel wearing the same header as every other session: one anatomy everywhere.</div>
+</div>
+
+<!-- ══════════ STOP 5 · alternatives ══════════ -->
+<div class="stophd"><span class="stopno">Stop 5</span>Alternatives considered, impact, and what this is not</div>
+<div class="stopp">Three directions were on the table. <b>B is the recommendation</b> — it is the comparators' shape with channels doing what only channels do here: crew, skills, ACL, board, category.</div>
+<table class="alts">
+  <tr><th>Direction</th><th>Shape</th><th>Verdict</th></tr>
+  <tr><td>A · Sessions-only</td><td>One flat list; channels become pure labels/filters, no room surface at all.</td><td class="no">Rejected — the crew, board, brief, and ACL need a face. A label can't hold a kanban or a roster.</td></tr>
+  <tr><td>B · Channels as folders</td><td>Rooms keep identity (crew · board · brief · skills) but open to their <b>session list</b>. Home/Recents = the same rows, unscoped. The feed retires.</td><td class="pick">Recommended — mocked above. Claude-desktop's projects⇢chats, mapped onto rooms.</td></tr>
+  <tr><td>C · Threads-inline feed</td><td>Keep the feed, render replies inline (docs/20 everywhere).</td><td class="no">Rejected — keeps two planes and revives the docs/32 mode error the last redesign spent a release killing.</td></tr>
+</table>
+<div class="stopp" style="margin-top:16px">
+  <b>What retires:</b> the feed as a surface · the thread sheet-over-feed · docs/20 threads-off (absorbed — the room already shows its threads) · the "message #channel" composer ambiguity.<br/>
+  <b>What is untouched:</b> the schema (threads + mode + root_message_id + thread-per-task already model sessions — this is a shell change) · the board FSM and every gate · docs/34 chat/tasks toggle · orchestrator task creation + digests (rehomed to the brief) · v0.69 Recents + crew clusters · needs-you queue · ⌘K/⌘Y.<br/>
+  <b>Open questions for the review:</b> ① does the room brief replace the daily digest message, or summarize it? ② announcements — pinned session or brief line? ③ does Recents stay in the nav once rooms are lists too, or collapse into Home?
+</div>
+
+</div>
+</body>
+</html>

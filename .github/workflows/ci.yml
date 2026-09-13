@@ -1,0 +1,132 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A newer push to the same branch supersedes an in-flight run.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: typecheck · test · build
+    runs-on: ubuntu-latest
+
+    # The control-api integration test (loop.pg.test.ts) runs against the real schema +
+    # triggers. Same image as the dev stack so pgvector + behaviour match.
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_PASSWORD: nm
+          POSTGRES_DB: nm
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d nm"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      DATABASE_URL: postgresql://postgres:nm@localhost:5432/nm
+      # CI only typechecks, tests and bundles — it never launches Electron, so skip the
+      # ~100MB binary download. Native runtimes are externalised by the bundler, not run here.
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+      # FLEET_AUTOPROVISION defaults ON since the credits round: workspace.create mints the
+      # workspace's cloud runner so the first message never pays a cold start. CI has no fleet,
+      # and on the free plan that provisioned runner IS the owner's one machine — so a test doing
+      # create-then-machine.register got MACHINE_LIMIT (402), and the undefined ids that followed
+      # surfaced as 401s and UNDEFINED_VALUE three suites away. Off here, exactly as
+      # scripts/test-pg.sh sets it for the same reason.
+      # QUOTED deliberately: unquoted `off` is a YAML 1.1 boolean, would reach the process as
+      # "false", and the guard reads `!== 'off'` — so it would silently keep provisioning.
+      FLEET_AUTOPROVISION: "off"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.8.1
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install Linux Code sandbox
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bubblewrap
+          # Ubuntu 24.04's AppArmor default blocks unprivileged user namespaces. The disposable
+          # runner executes tests as `runner` (production workspace containers execute as root),
+          # so enable the namespace Bubblewrap needs before exercising the real sandbox boundary.
+          if sysctl -n kernel.apparmor_restrict_unprivileged_userns >/dev/null 2>&1; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm -r typecheck
+
+      # The size gate (docs/design/modularization-2026-08/plan.md §2): max-lines 250 for new
+      # files, a shrink-only per-file ratchet for today's offenders, unused-vars, hooks rules.
+      # The self-test proves the gate can still fail before trusting its pass.
+      - name: Lint (ratchet self-test + eslint)
+        run: node scripts/lint-ratchet.mjs --self-test && pnpm lint
+
+      # A person in two workspaces has BOTH sets of rows in the one replica (the sync rules are
+      # plural), so an unscoped query silently mixes them. --self-test runs first and fails the
+      # job if the checker can no longer catch a planted bad query.
+      - name: Audit workspace scoping of replica queries
+        run: node scripts/audit-workspace-scope.mjs --self-test
+
+      - name: Bootstrap the test database (auth shim + schema + fixtures + publication)
+        run: ./scripts/ci-db-bootstrap.sh
+
+      - name: Test (unit + control-api pg integration)
+        run: pnpm -r test
+        env:
+          # The bare x-nm-actor lane is CLOSED by default (review F1, source-release round): the
+          # suites speak through it, so the gate opens here and in the package's own test script.
+          NM_ALLOW_ACTOR_HEADER: "1"
+
+      - name: Build (bundles)
+        run: pnpm -r build
+
+  # The public-repo gate (U4, docs/design/oss-release-2026-09/implementation-plan.md): gitleaks on
+  # the tracked files and the history, the identifier greps, and the tracked-evidence check. A hit
+  # fails the job. The founder-specific patterns ride the optional PUBLIC_SCAN_LOCAL secret, so the
+  # tree never prints them. gitleaks is pinned with its release checksum: no unpinned binary in CI.
+  public-scan:
+    name: public-scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # the history pass reads every commit
+
+      - name: Install gitleaks
+        run: |
+          curl -sSL -o gitleaks.tgz https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz
+          echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  gitleaks.tgz" | sha256sum -c -
+          tar -xzf gitleaks.tgz gitleaks
+          sudo mv gitleaks /usr/local/bin/gitleaks
+          rm gitleaks.tgz
+
+      - name: Private patterns (from the optional secret)
+        env:
+          PUBLIC_SCAN_LOCAL: ${{ secrets.PUBLIC_SCAN_LOCAL }}
+        run: |
+          if [ -n "$PUBLIC_SCAN_LOCAL" ]; then printf '%s\n' "$PUBLIC_SCAN_LOCAL" > .public-scan.local; fi
+
+      - name: Scan
+        run: bash scripts/public-scan.sh

@@ -1,0 +1,941 @@
+<title>Waking the Machine</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,300..600;1,8..60,300..500&family=Geist:wght@300..600&family=Geist+Mono:wght@300..500&display=swap">
+<style>
+/* Tokens lifted from apps/desktop/src/renderer/src/tokens.css — this mockup must be judged
+   in the product's real palette, not a mockup palette. Light = cream-oak, dark = graphite. */
+:root{
+  --win:#f0e5d3; --bg:#fbf8f4; --panel:#fbf8f4; --panel2:#f6eee1; --panel3:#efe1cd;
+  --card:#fff; --border:#e6dbca; --border2:#d3c2a8;
+  --text:#2a1c13; --body:#574838; --muted:#97846c; --dim:#b5a289;
+  --brand:#834a2b; --green:#2f9e6b; --warnc:#9a6b1f;
+  --fdisp:'Source Serif 4',Georgia,'Times New Roman',serif;
+  --fbody:'Geist',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --fmono:'Geist Mono',ui-monospace,'SF Mono',Menlo,monospace;
+  --dur:.15s; --dur-enter:.22s; --ease:cubic-bezier(.22,1,.36,1);
+  --r-sm:8px; --r-md:10px; --r-lg:14px; --r-xl:18px; --r-full:999px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --win:#0d0d0d; --bg:#141414; --panel:#191919; --panel2:#212121; --panel3:#2b2b2b;
+  --card:#1e1e1e; --border:#272727; --border2:#383838;
+  --text:#eaeaea; --body:#b6b6b6; --muted:#898989; --dim:#676767;
+  --brand:#c07d51; --green:#77ac8d; --warnc:#c9a227;
+}}
+:root[data-theme="dark"]{
+  --win:#0d0d0d; --bg:#141414; --panel:#191919; --panel2:#212121; --panel3:#2b2b2b;
+  --card:#1e1e1e; --border:#272727; --border2:#383838;
+  --text:#eaeaea; --body:#b6b6b6; --muted:#898989; --dim:#676767;
+  --brand:#c07d51; --green:#77ac8d; --warnc:#c9a227;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--win);color:var(--text);font-family:var(--fbody);font-weight:350;
+     -webkit-font-smoothing:antialiased;line-height:1.55}
+.wrap{max-width:1080px;margin:0 auto;padding:48px 28px 96px}
+h1{font-family:var(--fdisp);font-weight:400;font-size:clamp(30px,4.4vw,44px);line-height:1.14;
+   margin:0 0 10px;letter-spacing:-.015em;text-wrap:balance}
+h2{font-family:var(--fdisp);font-weight:400;font-size:24px;margin:0 0 6px;letter-spacing:-.01em}
+p{margin:0 0 14px;color:var(--body);max-width:66ch}
+.lede{font-size:17px;color:var(--body);max-width:64ch}
+.eyebrow{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);
+         font-weight:500;margin:0 0 14px}
+.rule{height:1px;background:var(--border);margin:44px 0 34px;border:0}
+.head{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;flex-wrap:wrap}
+.tog{display:flex;gap:2px;background:var(--panel2);border:1px solid var(--border);
+     border-radius:var(--r-full);padding:3px}
+.tog button{font:inherit;font-size:12px;color:var(--muted);background:none;border:0;
+     padding:5px 13px;border-radius:var(--r-full);cursor:pointer}
+.tog button[aria-pressed="true"]{background:var(--card);color:var(--text);
+     box-shadow:0 1px 2px rgba(0,0,0,.10)}
+.tog button:focus-visible{outline:2px solid var(--brand);outline-offset:1px}
+
+/* ---- the app frame the boot happens inside ---- */
+.app{border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;background:var(--bg);
+     box-shadow:0 1px 2px rgba(0,0,0,.05);position:relative}
+.appbar{display:flex;align-items:center;gap:9px;padding:9px 13px;background:var(--panel);
+        border-bottom:1px solid var(--border);font-size:12px;color:var(--muted)}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--border2)}
+.appbody{display:flex;min-height:330px}
+.rail{width:168px;border-right:1px solid var(--border);background:var(--panel);padding:11px 9px;
+      display:flex;flex-direction:column;gap:2px;flex-shrink:0}
+.rail i{font-style:normal;font-size:12.5px;color:var(--muted);padding:6px 9px;border-radius:var(--r-sm)}
+.rail i.on{background:var(--panel3);color:var(--text)}
+.pane{flex:1;position:relative;display:flex;flex-direction:column;min-width:0}
+.tabs{display:flex;gap:2px;padding:7px 9px 0;border-bottom:1px solid var(--border);background:var(--panel)}
+.tab{font-size:12px;padding:6px 12px;border-radius:var(--r-sm) var(--r-sm) 0 0;color:var(--muted)}
+.tab.on{background:var(--bg);color:var(--text);border:1px solid var(--border);border-bottom-color:var(--bg);
+        margin-bottom:-1px}
+.term{flex:1;font-family:var(--fmono);font-size:12.5px;color:var(--body);padding:16px;white-space:pre-wrap}
+
+/* ---- the boot surface ---- */
+.boot{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
+      justify-content:center;gap:0;background:var(--bg);z-index:3;
+      transition:opacity .5s var(--ease),transform .5s var(--ease)}
+.boot.gone{opacity:0;transform:scale(1.012);pointer-events:none}
+.boot.full{position:fixed;inset:0;background:color-mix(in srgb,var(--win) 92%,transparent);
+           backdrop-filter:blur(7px)}
+.orbwrap{width:64px;height:64px;display:grid;place-items:center;margin-bottom:24px}
+#orb{width:64px;height:64px;transition:opacity .4s var(--ease)}
+.boot.done #orb{opacity:0}
+@keyframes breathe{0%,100%{transform:scale(1);opacity:.85}50%{transform:scale(1.34);opacity:1}}
+.boot h3{font-family:var(--fdisp);font-weight:400;font-size:23px;margin:0 0 5px;letter-spacing:-.01em}
+.sub{font-size:13px;color:var(--muted);margin:0 0 24px}
+.sub b{color:var(--body);font-weight:400;font-variant-numeric:tabular-nums}
+
+/* the stage ledger — a record of what HAPPENED, never a bar that is secretly a timer */
+.stages{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1px;
+        width:min(360px,86%);font-size:12.5px}
+/* ONE STATE AT A TIME (default). The heading carries the state, so the ledger is hidden —
+   showing three rows where two are instant made the reader parse a list to learn one fact. */
+.boot.solo .stages{display:none}
+.boot.solo h3{transition:opacity .3s var(--ease)}
+.boot.solo h3.swap{opacity:0}
+.stages li{display:grid;grid-template-columns:16px 1fr auto;align-items:center;gap:10px;
+           padding:7px 11px;border-radius:var(--r-sm);color:var(--dim)}
+.stages li.now{background:var(--panel2);color:var(--text)}
+.stages li.was{color:var(--muted)}
+.mark{width:16px;height:16px;display:grid;place-items:center}
+.mark s{width:5px;height:5px;border-radius:50%;background:currentColor;opacity:.4;text-decoration:none}
+.stages li.now .mark s{background:var(--brand);opacity:1;animation:breathe 1.5s var(--ease) infinite}
+.stages li.was .mark s{background:var(--green);opacity:1;width:6px;height:6px}
+.t{font-family:var(--fmono);font-size:11px;color:var(--dim);font-variant-numeric:tabular-nums}
+.escape{margin-top:24px;display:flex;gap:9px;align-items:center}
+.btn{font:inherit;font-size:12.5px;padding:7px 15px;border-radius:var(--r-full);cursor:pointer;
+     border:1px solid var(--border2);background:var(--card);color:var(--text)}
+.btn.ghost{background:none;border-color:transparent;color:var(--muted)}
+.btn:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+.queued{font-size:12px;color:var(--muted);display:flex;gap:7px;align-items:center;margin-top:18px}
+.queued s{width:5px;height:5px;border-radius:50%;background:var(--green);text-decoration:none}
+
+.grid{display:grid;gap:20px;grid-template-columns:repeat(auto-fit,minmax(272px,1fr));margin:22px 0 0}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--r-md);padding:17px 19px}
+.card h4{margin:0 0 7px;font-size:13.5px;font-weight:500;color:var(--text)}
+.card p{font-size:13px;margin:0;color:var(--body)}
+.pill{display:inline-block;font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;
+      padding:3px 9px;border-radius:var(--r-full);border:1px solid var(--border2);color:var(--muted);
+      margin-bottom:9px}
+.pill.rec{border-color:var(--green);color:var(--green)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+.scroll{overflow-x:auto}
+th{text-align:left;font-weight:500;font-size:11px;letter-spacing:.09em;text-transform:uppercase;
+   color:var(--muted);padding:0 12px 9px 0;border-bottom:1px solid var(--border)}
+td{padding:10px 12px 10px 0;border-bottom:1px solid var(--border);color:var(--body);vertical-align:top}
+td b{color:var(--text);font-weight:500}
+td.n{font-family:var(--fmono);font-variant-numeric:tabular-nums;color:var(--text);white-space:nowrap}
+.warn{border-left:2px solid var(--warnc);padding:2px 0 2px 15px;margin:20px 0;color:var(--body)}
+.warn b{color:var(--text);font-weight:500}
+.ctl{display:flex;gap:9px;align-items:center;margin:0 0 16px;flex-wrap:wrap}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div class="wrap">
+  <div class="head">
+    <div>
+      <p class="eyebrow">Design round · machine auto-wake</p>
+      <h1>Waking the machine</h1>
+      <p class="lede">A cloud machine takes about two minutes to come up. Today the terminal says
+        “start it yourself” and exits. This is what it should do instead.</p>
+    </div>
+    <div class="tog" role="group" aria-label="Theme">
+      <button type="button" data-t="light" aria-pressed="false">Cream oak</button>
+      <button type="button" data-t="dark" aria-pressed="false">Graphite</button>
+    </div>
+  </div>
+
+  <hr class="rule">
+
+  <p class="eyebrow">Variant A · recommended</p>
+  <h2>The boot takes over the surface you asked from</h2>
+  <p>You clicked Terminal, so the terminal pane becomes the boot. The rest of the app stays
+    live — you can keep reading the thread while it comes up, and the status cluster keeps a
+    small light on so you can wander off and come back.</p>
+
+  <div class="ctl">
+    <button class="btn" id="play">Play the boot</button>
+    <button class="btn ghost" id="mode">Show as full screen</button>
+    <button class="btn ghost" id="solo">Show all stages</button>
+    <span class="t" id="hint">146s compressed to 12s · real measured stages</span>
+  </div>
+
+  <div class="app" id="app">
+    <div class="appbar"><span class="dot"></span> neuramesh · default · New chat</div>
+    <div class="appbody">
+      <div class="rail"><i>Whiteboards</i><i>Routines</i><i>Files</i><i class="on">New chat</i></div>
+      <div class="pane">
+        <div class="tabs"><span class="tab">Chat</span><span class="tab on">Terminal</span></div>
+        <div class="term" id="term">nm ~ % </div>
+
+        <div class="boot" id="boot">
+          <div class="orbwrap"><canvas id="orb" width="64" height="64" aria-hidden="true"></canvas></div>
+          <h3 id="btitle">Starting your cloud machine</h3>
+          <p class="sub">Usually about <b>2 minutes</b> · <b id="elapsed">0:00</b> elapsed</p>
+          <ul class="stages" id="stages">
+            <li data-s="0"><span class="mark"><s></s></span><span>Starting your cloud machine</span></li>
+            <li data-s="1"><span class="mark"><s></s></span><span>Connecting</span></li>
+          </ul>
+          <div class="queued" id="queued"><s></s> Your terminal opens the moment it’s ready.</div>
+          <div class="escape">
+            <button class="btn ghost" id="back">Back to chat</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <span class="pill">Honest by construction</span>
+      <h4>One state, and no progress bar</h4>
+      <p>The line changes when something actually changed. A bar would be a timer wearing a
+        progress bar’s clothes, and it lies the moment a boot runs slow — which is exactly when
+        someone is looking at it.</p>
+    </div>
+    <div class="card">
+      <span class="pill">Never traps</span>
+      <h4>Leaving does not cancel</h4>
+      <p>Back to chat keeps the machine coming up and the terminal queued. The wait is the
+        machine’s, not yours.</p>
+    </div>
+    <div class="card">
+      <span class="pill">Reuses the vocabulary</span>
+      <h4>The same orb, one stage earlier</h4>
+      <p>This is the orb the thread already shows while an agent works — the same promise, before
+        there is an agent to make it. Not a second spinner to learn.</p>
+    </div>
+  </div>
+
+  <hr class="rule">
+
+  <p class="eyebrow">Two states, because only two are distinguishable</p>
+  <h2>What got cut, and why</h2>
+  <p>An earlier draft named five stages — finding hardware, attaching the disk, pulling the
+    image. They were real, measured from an actual cold start, and they were the wrong thing to
+    show: nobody waiting on a terminal wants a tour of the storage driver.</p>
+  <p>Naming them was also a promise we could not keep. The app can see that a machine was
+    <em>asked for</em> and that it came <em>online</em>; the middle is opaque without new
+    reporting from the fleet. <b>Plain language removed a backend dependency</b> rather than
+    just softening the copy.</p>
+  <p>Showing one state at a time then cut one more. “Starting” was the instant
+    <code>desired_replicas → 1</code> write — under a second, so as a solo state it flashed and
+    vanished, and next to “Initializing” it drew a distinction that is ours, not the reader’s.
+    What is left is what a person can actually tell apart: <b>the machine is coming up</b>, then
+    <b>we are attaching to it</b>.</p>
+  <div class="warn">
+    <b>The cost of one state: the first one lasts about two minutes.</b> With the ledger gone,
+    the only moving things are the orb and the elapsed counter — so a slow boot can read as a
+    stuck one. That is the trade for calm, and it is the reason the elapsed time is on screen at
+    all rather than tucked away. If it feels frozen in practice, the answer is a quieter second
+    line after ~45s, not a fake bar.
+  </div>
+
+  <hr class="rule">
+
+  <p class="eyebrow">Variant B · for comparison</p>
+  <h2>Full screen, and why it is the second choice</h2>
+  <p>Press <b>Show as full screen</b> above to see it. It is more cinematic, and it costs more
+    than it looks: it blocks the whole app for two minutes over a request that was scoped to one
+    pane. Someone who opens a terminal while reading a thread loses the thread.</p>
+  <p>Full screen earns its place in one case — first-run, where there is nothing else to do yet
+    and the boot <em>is</em> the product’s first impression. Elsewhere, pane-scoped keeps the
+    moment without taking the room.</p>
+
+  <hr class="rule">
+
+  <p class="eyebrow">What this does not solve</p>
+  <h2>The wait itself</h2>
+  <p>Every pixel here is managing a 146-second cold start. Warm capacity takes that to roughly
+    15 seconds, at which point this screen is a flicker rather than an experience — and the
+    anticipatory-wake question stops being a cost calculation. <b>The best version of this design
+    is one nobody looks at for long.</b></p>
+</div>
+
+<script>
+/* thinking-orbs v0.2.0 canvas painters — MIT, (c) 2026 Jakub Antalik.
+   The REACT component is stripped; MODE_DRAWS is a pure (ctx,size,t,dark,opts) painter,
+   which is what lets this standalone mockup render the PRODUCT orb rather than a lookalike. */
+(function(){
+function H(o, n, s) {
+  return o + (n - o) * s;
+}
+function ct(o) {
+  return o - Math.floor(o);
+}
+function V(o, n) {
+  const s = Math.floor(o), a = Math.floor(n);
+  let t = o - s, e = n - a;
+  t = t * t * (3 - 2 * t), e = e * e * (3 - 2 * e);
+  const c = B(s, a), r = B(s + 1, a), l = B(s, a + 1), v = B(s + 1, a + 1);
+  return c + (r - c) * t + (l - c) * e + (c - r - l + v) * t * e;
+}
+function B(o, n) {
+  const s = Math.sin(o * 12.9898 + n * 78.233) * 43758.5453;
+  return s - Math.floor(s);
+}
+function tt(o, n) {
+  const s = Math.PI * (3 - Math.sqrt(5)), a = 1 - 2 * (o + 0.5) / n, t = Math.sqrt(1 - a * a), e = o * s;
+  return [t * Math.cos(e), a, t * Math.sin(e)];
+}
+function Mt(o, n) {
+  return Math.atan2(Math.sin(o - n), Math.cos(o - n));
+}
+function $(o, n, s, a, t) {
+  const e = Math.sin(n), c = Math.cos(n), r = Math.sin(o), l = Math.cos(o);
+  return (v, b, x) => {
+    const g = v * l + x * r, u = -v * r + x * l, h = b * c - u * e, R = b * e + u * c;
+    return [s + g * t, a - h * t, R];
+  };
+}
+function q(o, n, s, a = 0.3) {
+  n.sort((t, e) => t.z - e.z);
+  for (const t of n) {
+    const e = t.a ?? 1;
+    if (e < 0.02) continue;
+    const c = Math.min(1, Math.max(0, t.white)), r = Math.round((s ? 1 - c : c) * 255);
+    o.fillStyle = `rgba(${r},${r},${r},${e})`, o.beginPath(), o.arc(t.x, t.y, Math.max(a, t.r), 0, Math.PI * 2), o.fill();
+  }
+}
+function dt(o, n, s) {
+  for (const a of n) {
+    const t = a.a ?? 1;
+    if (t < 0.02) continue;
+    const e = Math.min(1, Math.max(0, a.white)), c = Math.round((s ? 1 - e : e) * 255);
+    o.strokeStyle = `rgba(${c},${c},${c},${t})`, o.lineWidth = a.w, o.beginPath(), o.moveTo(a.x1, a.y1), o.lineTo(a.x2, a.y2), o.stroke();
+  }
+}
+function _(o, n) {
+  return (o / 300) ** n;
+}
+const pt = (o, n, s, a, t) => {
+  const e = n / 2, c = n / 2, r = n / 2 * 0.76, l = $(s * 0.4, 0.3, e, c, 1), v = _(n, t.rsPow ?? 0.6), b = [], x = t.ghostN ?? 150;
+  for (let h = 0; h < x; h++) {
+    const R = tt(h, x), [k, D, i] = l(R[0] * r, R[1] * r, R[2] * r), d = (i / r + 1) / 2;
+    b.push({ x: k, y: D, z: i, r: 0.8 * v, white: 0.78, a: 0.1 + 0.22 * d });
+  }
+  const g = t.strandN ?? 52, u = t.turns ?? 3;
+  for (let h = 0; h < 3; h++) {
+    const R = h / 3 * 2 * Math.PI;
+    for (let k = 0; k < g; k++) {
+      const D = (ct(k / g + s * 0.045) * 2 - 1) * 0.96, i = Math.sqrt(Math.max(0, 1 - D * D)), d = Math.min(1, (1 - Math.abs(D)) / 0.1), y = D * Math.PI * u + R, p = 1 + 0.075 * Math.sin(D * Math.PI * u * 2 + R * 2 + s * 0.8), f = i * r * p, [P, m, w] = l(Math.cos(y) * f, D * r * p, Math.sin(y) * f), M = (w / r + 1) / 2;
+      b.push({
+        x: P,
+        y: m,
+        z: w,
+        r: ((t.rBase ?? 1.2) + (t.rDepth ?? 1.8) * M) * v,
+        white: 0.55 - 0.45 * M,
+        a: d * (0.45 + 0.55 * M)
+      });
+    }
+  }
+  q(o, b, a, t.rMin);
+};
+function ft(o, n, s, a) {
+  const t = 2 * n * s + a, e = o % t, c = new Array(n).fill(0);
+  let r = -1;
+  if (e < 2 * n * s) {
+    const l = Math.floor(e / s), v = (e - l * s) / s, x = 1 - (1 - Math.min(1, v / 0.7)) ** 3;
+    if (l < n) {
+      for (let g = 0; g < l; g++) c[g] = 1;
+      c[l] = x, r = l;
+    } else {
+      const g = 2 * n - 1 - l;
+      for (let u = 0; u < g; u++) c[u] = 1;
+      c[g] = 1 - x, r = g;
+    }
+  }
+  return { amount: c, active: r };
+}
+function gt(o, n, s) {
+  let [a, t, e] = o, c = !1;
+  for (let r = 0; r < n.length; r++) {
+    if (s.amount[r] <= 0) continue;
+    const l = n[r], v = l.axis === 0 ? a : l.axis === 1 ? t : e;
+    if (v < l.lo || v >= l.hi) continue;
+    r === s.active && (c = !0);
+    const b = l.ang * s.amount[r], x = Math.cos(b), g = Math.sin(b);
+    if (l.axis === 0) {
+      const u = t * x - e * g;
+      e = t * g + e * x, t = u;
+    } else if (l.axis === 1) {
+      const u = a * x + e * g;
+      e = -a * g + e * x, a = u;
+    } else {
+      const u = a * x - t * g;
+      t = a * g + t * x, a = u;
+    }
+  }
+  return [a, t, e, c];
+}
+function mt(o) {
+  const n = [];
+  for (let s = 0; s < o; s++) {
+    const a = Math.min(2, Math.floor(B(s, 2.3) * 3)), t = -1 + 0.5 * Math.min(3, Math.floor(B(s, 5.9) * 4)), e = B(s, 7.7) < 0.5 ? 1 : -1;
+    n.push({ axis: a, lo: t, hi: t + 0.5, ang: e * Math.PI / 2 });
+  }
+  return n;
+}
+const bt = (o, n, s, a, t) => {
+  const c = n / 2, r = n / 2, l = n / 2 * 0.82, v = 0.4 + 0.06 * Math.sin(s * 0.35), b = $(s * 0.5, v, c, r, l), x = s * (0.5 + (1.7 - 0.5) * (t.scanMul ?? 1)), g = _(n, t.rsPow ?? 0.6), u = t.dimBase ?? 1, h = [], R = t.latRings ?? 17, k = t.lonDensity ?? 44;
+  for (let D = 0; D <= R; D++) {
+    const i = -Math.PI / 2 + D / R * Math.PI, d = Math.cos(i), y = Math.sin(i), p = Math.max(1, Math.round(Math.abs(d) * k));
+    for (let f = 0; f < p; f++) {
+      const P = f / p * 2 * Math.PI, [m, w, M] = b(d * Math.cos(P), y, d * Math.sin(P)), S = (M + 1) / 2, N = Mt(P + s * 0.5, x), E = Math.exp(-(N * N) / 0.18) * Math.max(0, M);
+      h.push({
+        x: m,
+        y: w,
+        z: M,
+        r: ((t.rBase ?? 0.6) + (t.rDepth ?? 1.7) * S + (t.rBoost ?? 1) * E) * g,
+        white: (t.inkFar ?? 0.62) - (t.inkSpan ?? 0.54) * S,
+        // dimBase < 1 fades un-scanned dots so the meridian reads clearly
+        a: u + (1 - u) * Math.min(1, E)
+      });
+    }
+  }
+  q(o, h, a, t.rMin);
+}, yt = (o, n, s, a, t) => {
+  const e = n / 2, c = n / 2, r = n / 2 * 0.82, l = $(s * 0.55, 0.35 + 0.1 * Math.sin(s * 0.9), e, c, r), v = _(n, t.rsPow ?? 0.6), b = t.moveCount ?? 14, x = mt(b), g = ft(s, b, 0.42, 1.2), u = [], h = t.latRings ?? 15, R = t.lonDensity ?? 40;
+  for (let k = 0; k <= h; k++) {
+    const D = -Math.PI / 2 + k / h * Math.PI, i = Math.cos(D), d = Math.sin(D), y = Math.max(1, Math.round(Math.abs(i) * R));
+    for (let p = 0; p < y; p++) {
+      const f = p / y * 2 * Math.PI, [P, m, w, M] = gt([i * Math.cos(f), d, i * Math.sin(f)], x, g), [S, N, E] = l(P, m, w), I = (E + 1) / 2;
+      u.push({
+        x: S,
+        y: N,
+        z: E,
+        r: ((t.rBase ?? 0.6) + (t.rDepth ?? 1.7) * I + (M ? t.rActive ?? 0.3 : 0)) * v,
+        white: (t.inkFar ?? 0.62) - (t.inkSpan ?? 0.54) * I - (M ? 0.14 : 0)
+      });
+    }
+  }
+  q(o, u, a, t.rMin);
+}, xt = (o, n, s, a, t) => {
+  const e = n / 2, c = n / 2, r = n / 2 * 0.874, l = $(s * 0.18, 0.38, e, c, 1), v = _(n, t.rsPow ?? 0.6), b = [], x = t.rings ?? 15, g = t.lonDensity ?? 40;
+  for (let u = 0; u <= x; u++) {
+    const h = -Math.PI / 2 + u / x * Math.PI, R = Math.cos(h), k = Math.sin(h), D = 0.62 * Math.sin(s * 2.1 - u * 0.52) + 0.38 * Math.sin(s * 1.27 + u * 0.83), i = r * (0.88 + 0.105 * D), d = Math.max(1, Math.round(Math.abs(R) * g));
+    for (let y = 0; y < d; y++) {
+      const p = y / d * 2 * Math.PI, [f, P, m] = l(R * Math.cos(p) * i, k * i, R * Math.sin(p) * i), w = (m / r + 1) / 2, M = Math.max(0, D);
+      b.push({
+        x: f,
+        y: P,
+        z: m,
+        r: ((t.rBase ?? 0.6) + (t.rDepth ?? 1.7) * w) * (1 + 0.4 * M) * v,
+        white: 0.66 - 0.56 * w - 0.1 * M
+      });
+    }
+  }
+  q(o, b, a, t.rMin);
+};
+function wt(o) {
+  return o * o * (3 - 2 * o);
+}
+function at(o) {
+  const n = o.length, s = [];
+  let a = 0;
+  for (let t = 0; t < n; t++) {
+    const e = o[t], c = o[(t + 1) % n], r = Math.hypot(c[0] - e[0], c[1] - e[1]);
+    s.push(r), a += r;
+  }
+  return (t) => {
+    let e = t * a, c = 0;
+    for (; e > s[c] && c < n - 1; )
+      e -= s[c], c++;
+    const r = o[c], l = o[(c + 1) % n], v = s[c] ? Math.min(1, e / s[c]) : 0;
+    return [r[0] + (l[0] - r[0]) * v, r[1] + (l[1] - r[1]) * v];
+  };
+}
+const vt = (o) => {
+  const n = -Math.PI / 2 + o * 2 * Math.PI;
+  return [Math.cos(n) * 0.24, Math.sin(n) * 0.24];
+}, Rt = at([
+  [0, -0.26],
+  [0.24, 0.16],
+  [-0.24, 0.16]
+]), Pt = at([
+  [0, -0.2],
+  [0.2, -0.2],
+  [0.2, 0.2],
+  [-0.2, 0.2],
+  [-0.2, -0.2]
+]), Q = [vt, Rt, Pt];
+function Dt(o) {
+  return Math.max(6, Math.round(34 * o));
+}
+const X = 1.4, rt = 0.9, J = X + rt, kt = (o, n, s, a, t) => {
+  const e = Q.length, c = s % (J * e), r = Math.floor(c / J), l = c - r * J, v = l > X ? wt((l - X) / rt) : 0, b = t.spread ?? 1, x = Q[r], g = Q[(r + 1) % e], u = 160, h = [];
+  for (let m = 0; m < u; m++) {
+    const w = m / u, M = x(w), S = g(w);
+    h.push([(M[0] + (S[0] - M[0]) * v) * b, (M[1] + (S[1] - M[1]) * v) * b]);
+  }
+  const R = [];
+  let k = 0;
+  for (let m = 0; m < u; m++) {
+    const w = h[m], M = h[(m + 1) % u], S = Math.hypot(M[0] - w[0], M[1] - w[1]);
+    R.push(S), k += S;
+  }
+  const D = Dt(t.iconD ?? 1), i = (t.rDot ?? 0.021) * 1.35 * b, d = 1 + 0.02 * Math.sin(l * 3.1), y = [], p = n / 2;
+  let f = 0, P = 0;
+  for (let m = 0; m < D; m++) {
+    const w = m / D * k;
+    for (; P + R[f] < w && f < u - 1; )
+      P += R[f], f++;
+    const M = h[f], S = h[(f + 1) % u], N = R[f] ? Math.min(1, (w - P) / R[f]) : 0, E = (M[0] + (S[0] - M[0]) * N) * d, I = (M[1] + (S[1] - M[1]) * N) * d;
+    y.push({
+      x: p + E * n,
+      y: p + I * n,
+      z: 0,
+      r: Math.max(0.35, i * n),
+      white: 0.1
+    });
+  }
+  q(o, y, a, t.rMin);
+}, St = (o, n, s, a, t) => {
+  const e = n / 2, c = n / 2, r = n / 2 * 0.82, l = $(s * 0.12, 0.3, e, c, 1), v = _(n, t.rsPow ?? 0.6), b = [], x = t.orbitN ?? 12, g = t.ghostN ?? 40, u = t.particles ?? 3;
+  for (let h = 0; h < x; h++) {
+    const R = B(h, 1.7), k = B(h, 5.2), D = B(h, 8.9), i = r * (0.45 + 0.52 * R), d = R * 2 * Math.PI, y = Math.acos(2 * k - 1), p = Math.sin(y) * Math.cos(d), f = Math.cos(y), P = Math.sin(y) * Math.sin(d);
+    let m = -f, w = p;
+    const M = 0, S = Math.max(1e-6, Math.sqrt(m * m + w * w));
+    m /= S, w /= S;
+    const N = f * M - P * w, E = P * m - p * M, I = p * w - f * m, O = (0.25 + 0.55 * D) * (D > 0.5 ? 1 : -1);
+    for (let A = 0; A < g; A++) {
+      const L = A / g * 2 * Math.PI, [z, C, F] = l(
+        (m * Math.cos(L) + N * Math.sin(L)) * i,
+        (w * Math.cos(L) + E * Math.sin(L)) * i,
+        (M * Math.cos(L) + I * Math.sin(L)) * i
+      ), T = (F / i + 1) / 2;
+      b.push({
+        x: z,
+        y: C,
+        z: F,
+        r: (t.ghostR ?? 0.9) * v,
+        white: 0.72,
+        a: (t.ghostA ?? 0.5) * (0.4 + 0.6 * T)
+      });
+    }
+    for (let A = 0; A < u; A++) {
+      const L = s * O + A / u * 2 * Math.PI + k * 6, [z, C, F] = l(
+        (m * Math.cos(L) + N * Math.sin(L)) * i,
+        (w * Math.cos(L) + E * Math.sin(L)) * i,
+        (M * Math.cos(L) + I * Math.sin(L)) * i
+      ), T = (F / i + 1) / 2;
+      b.push({
+        x: z,
+        y: C,
+        z: F,
+        r: ((t.partR ?? 1.2) + (t.partRDepth ?? 1.6) * T) * v,
+        white: 0.3 - 0.22 * T
+      });
+    }
+  }
+  q(o, b, a, t.rMin);
+}, st = (o, n, s, a, t) => {
+  const e = n / 2, c = n / 2, r = n / 2 * 0.78, l = t.spin ?? 1, v = 0.3, b = $(s * 0.1 * l, v, e, c, 1), x = _(n, t.rsPow ?? 0.6), g = [], u = t.ghostN ?? 150;
+  for (let I = 0; I < u; I++) {
+    const O = tt(I, u), [A, L, z] = b(O[0] * r, O[1] * r, O[2] * r), C = (z / r + 1) / 2;
+    g.push({ x: A, y: L, z, r: 0.8 * x, white: 0.78, a: 0.1 + 0.22 * C });
+  }
+  const h = s * 0.24 * l, R = t.faceOn ? -v : 0.55 + 0.3 * Math.sin(s * 0.18) * l, k = Math.cos(h), D = 0, i = Math.sin(h), d = -i * Math.sin(R), y = Math.cos(R), p = k * Math.sin(R), f = D * p - i * y, P = i * d - k * p, m = k * y - D * d, w = 0.23 * (t.wobMul ?? 1), M = t.faceOn ? r / (1 + 0.85 * w) : r, S = t.lanes ?? 5, N = t.segs ?? 88, E = Math.max(1, Math.round(S * (t.bandMul ?? 1)));
+  for (let I = 0; I < E; I++) {
+    const O = (I - (E - 1) / 2) * 0.075, A = Math.abs(I - (E - 1) / 2) / Math.max(1, (E - 1) / 2);
+    for (let L = 0; L < N; L++) {
+      const z = L / N * 2 * Math.PI, C = (0.16 * Math.sin(z * 3 - s * 1.7 + I * 0.22) + 0.07 * Math.sin(z * 5 + s * 1.1)) * (t.wobMul ?? 1), F = t.faceOn ? 1 + C : 1, T = t.faceOn ? O : O + C, W = k * Math.cos(z) + d * Math.sin(z) + f * T, j = D * Math.cos(z) + y * Math.sin(z) + P * T, Y = i * Math.cos(z) + p * Math.sin(z) + m * T, K = Math.sqrt(W * W + j * j + Y * Y), U = M * F, [it, ht, nt] = b(W / K * U, j / K * U, Y / K * U), G = (nt / r + 1) / 2;
+      g.push({
+        x: it,
+        y: ht,
+        z: nt,
+        r: ((t.rBase ?? 1.1) + (t.rDepth ?? 1.7) * G) * (1 - 0.25 * A) * x,
+        white: 0.52 - 0.44 * G + 0.18 * A,
+        a: 0.4 + 0.6 * G
+      });
+    }
+  }
+  q(o, g, a, t.rMin);
+}, It = (o, n, s, a, t) => {
+  const e = n / 2, c = n / 2, r = n / 2 * 0.8 * (t.spread ?? 1), l = $(s * 0.12, 0.32, e, c, r), v = _(n, t.rsPow ?? 0.6), b = t.nodeN ?? 30, x = t.thr ?? 0.72, g = t.nodeR ?? 1.4, u = t.nodeRDepth ?? 1.8, h = [];
+  for (let i = 0; i < b; i++) {
+    const d = tt(i, b), y = d[0] + 0.3 * (V(i * 0.31 + 9, s * 0.24) - 0.5) * 2, p = d[1] + 0.3 * (V(i * 0.53 + 27, s * 0.21) - 0.5) * 2, f = d[2] + 0.3 * (V(i * 0.77 + 55, s * 0.27) - 0.5) * 2, P = Math.sqrt(y * y + p * p + f * f);
+    h.push([y / P, p / P, f / P]);
+  }
+  const R = [], k = [];
+  for (let i = 0; i < b; i++)
+    for (let d = i + 1; d < b; d++) {
+      const y = h[i][0] - h[d][0], p = h[i][1] - h[d][1], f = h[i][2] - h[d][2], P = Math.sqrt(y * y + p * p + f * f);
+      if (P >= x) continue;
+      const [m, w, M] = l(h[i][0], h[i][1], h[i][2]), [S, N, E] = l(h[d][0], h[d][1], h[d][2]), I = ((M + E) / 2 + 1) / 2;
+      R.push({
+        x1: m,
+        y1: w,
+        x2: S,
+        y2: N,
+        white: 0.42,
+        a: (1 - P / x) * (0.3 + 0.55 * I),
+        w: Math.max(0.6, (t.lineW ?? 0.8) * v)
+      });
+    }
+  for (let i = 0; i < b; i++) {
+    const [d, y, p] = l(h[i][0], h[i][1], h[i][2]), f = (p + 1) / 2, P = 1 + 0.25 * Math.sin(s * 1.4 + i * 2.7);
+    k.push({
+      x: d,
+      y,
+      z: p,
+      r: (g + u * f) * P * v,
+      white: 0.55 - 0.45 * f
+    });
+  }
+  const D = t.signals ?? 5;
+  for (let i = 0; i < D; i++) {
+    const d = Math.floor(s * 0.55 + i * 7.31), y = Math.floor(B(d, i * 3.1 + 1.7) * b), p = Math.floor(B(d, i * 5.7 + 4.2) * b);
+    if (y === p) continue;
+    const f = ct(s * 0.55 + i * 7.31), P = H(h[y][0], h[p][0], f), m = H(h[y][1], h[p][1], f), w = H(h[y][2], h[p][2], f), M = Math.max(1e-6, Math.sqrt(P * P + m * m + w * w)), [S, N, E] = l(P / M, m / M, w / M), I = (E + 1) / 2;
+    k.push({
+      x: S,
+      y: N,
+      z: E,
+      r: (g * 1.5 + u * I) * v,
+      white: 0.05,
+      a: 0.5 + 0.5 * I
+    });
+  }
+  dt(o, R, a), q(o, k, a, t.rMin);
+}, Nt = {
+  orbits: St,
+  globe: bt,
+  rubik: yt,
+  wave: xt,
+  web: It,
+  braid: pt,
+  ribbon: st,
+  // ring shares ribbon's painter — the `faceOn` profile flag switches it
+  ring: st,
+  morph: kt
+}, Et = [
+  ["latRings", "lonDensity"],
+  ["rings", "lonDensity"],
+  ["lanes", "segs"]
+], Lt = ["orbitN", "ghostN", "nodeN", "strandN", "signals"], zt = ["iconD"], At = [
+  "rBase",
+  "rDepth",
+  "rActive",
+  "rDot",
+  "ghostR",
+  "partR",
+  "partRDepth",
+  "nodeR",
+  "nodeRDepth"
+];
+function Bt(o, n) {
+  const s = { ...o }, a = /* @__PURE__ */ new Set(), t = Math.sqrt(n);
+  for (const [e, c] of Et) {
+    const r = s[e], l = s[c];
+    r != null && l != null && !a.has(e) && !a.has(c) && (s[e] = Math.max(2, Math.round(r * t)), s[c] = Math.max(2, Math.round(l * t)), a.add(e), a.add(c));
+  }
+  for (const e of Lt) {
+    const c = s[e];
+    c != null && c !== 0 && !a.has(e) && (s[e] = Math.max(1, Math.round(c * n)));
+  }
+  for (const e of zt) {
+    const c = s[e];
+    c != null && (s[e] = Math.max(0.02, c * n));
+  }
+  return s;
+}
+function Ot(o, n) {
+  const s = { ...o };
+  for (const a of At) {
+    const t = s[a];
+    t != null && (s[a] = t * n);
+  }
+  return s.rSizeMul = (s.rSizeMul ?? 1) * n, s;
+}
+const Ct = {
+  globe: {
+    latRings: 17,
+    lonDensity: 44,
+    rBase: 0.6,
+    rDepth: 1.7,
+    rBoost: 1,
+    inkFar: 0.62,
+    inkSpan: 0.54,
+    rsPow: 0.6,
+    rMin: 0.3
+  },
+  orbits: {
+    orbitN: 12,
+    ghostN: 40,
+    ghostR: 0.9,
+    ghostA: 0.5,
+    particles: 3,
+    partR: 1.2,
+    partRDepth: 1.6,
+    rsPow: 0.6,
+    rMin: 0.3
+  },
+  rubik: {
+    latRings: 15,
+    lonDensity: 40,
+    moveCount: 14,
+    rBase: 0.6,
+    rDepth: 1.7,
+    rActive: 0.3,
+    inkFar: 0.62,
+    inkSpan: 0.54,
+    rsPow: 0.6,
+    rMin: 0.3
+  },
+  wave: {
+    rings: 15,
+    lonDensity: 40,
+    rBase: 0.6,
+    rDepth: 1.7,
+    rsPow: 0.6,
+    rMin: 0.3
+  },
+  web: {
+    nodeN: 30,
+    thr: 0.72,
+    signals: 5,
+    nodeR: 1.4,
+    nodeRDepth: 1.8,
+    lineW: 0.8,
+    rsPow: 0.6,
+    rMin: 0.3
+  },
+  braid: {
+    strandN: 52,
+    turns: 3,
+    ghostN: 150,
+    rBase: 1.2,
+    rDepth: 1.8,
+    rsPow: 0.6,
+    rMin: 0.3
+  },
+  ribbon: {
+    lanes: 5,
+    segs: 88,
+    ghostN: 150,
+    rBase: 1.1,
+    rDepth: 1.7,
+    rsPow: 0.6,
+    rMin: 0.3
+  },
+  // ring shares ribbon's painter; faceOn cancels the camera tilt and moves
+  // the undulation onto the radius, and there is no ghost sphere behind it
+  ring: {
+    lanes: 5,
+    segs: 88,
+    ghostN: 0,
+    faceOn: 1,
+    rBase: 1.1,
+    rDepth: 1.7,
+    rsPow: 0.6,
+    rMin: 0.3
+  },
+  morph: {
+    rDot: 0.021,
+    iconD: 1,
+    rMin: 0.25
+  }
+}, Tt = {
+  working: "orbits",
+  searching: "globe",
+  solving: "rubik",
+  listening: "wave",
+  connecting: "web",
+  weaving: "braid",
+  composing: "ribbon",
+  breathing: "ring",
+  shaping: "morph"
+}, qt = {
+  orbits: {
+    64: { speed: 1.885, count: 1, size: 1 },
+    20: { speed: 3.9, count: 0.238, size: 2.4 }
+  },
+  globe: {
+    64: { speed: 2.015, count: 0.42, size: 1.15, extra: { scanMul: 4.08, dimBase: 0.45 } },
+    20: { speed: 2.665, count: 0.105, size: 1.75, extra: { scanMul: 4.335, dimBase: 0.45 } }
+  },
+  rubik: {
+    64: { speed: 1.82, count: 0.35, size: 1.05 },
+    20: { speed: 1.95, count: 0.088, size: 1.9 }
+  },
+  wave: {
+    64: { speed: 4.388, count: 0.341, size: 1 },
+    20: { speed: 3.998, count: 0.105, size: 1.6 }
+  },
+  web: {
+    64: { speed: 3.315, count: 1.35, size: 0.95 },
+    20: { speed: 6.63, count: 0.25, size: 1.52 }
+  },
+  braid: {
+    64: { speed: 1.625, count: 0.5, size: 1 },
+    20: { speed: 2.75, count: 0.1125, size: 1.36 }
+  },
+  ribbon: {
+    64: { speed: 2.34, count: 0.25, size: 0.85, extra: { spin: 0, bandMul: 3.9, wobMul: 1 } },
+    20: { speed: 3.12, count: 0.051, size: 1.073, extra: { spin: 0, bandMul: 4.94, wobMul: 1 } }
+  },
+  ring: {
+    64: { speed: 3.24, count: 0.25, size: 0.956, extra: { spin: 0, bandMul: 3.627, wobMul: 0.368 } },
+    20: { speed: 3.78, count: 0.028, size: 1.622, extra: { spin: 0, bandMul: 3.968, wobMul: 0.565 } }
+  },
+  morph: {
+    64: { speed: 2.405, count: 0.702, size: 0.395, extra: { spread: 1.45 } },
+    20: { speed: 2.08, count: 0.53, size: 1.011, extra: { spread: 1.45 } }
+  }
+}, ot = /* @__PURE__ */ new Map();
+function Ft(o, n) {
+  const s = `${o}-${n}`, a = ot.get(s);
+  if (a) return a;
+  const t = Tt[o], e = qt[t][n];
+  let c = { ...Ct[t] };
+  e.count !== 1 && (c = Bt(c, e.count)), e.size !== 1 && (c = Ot(c, e.size)), e.extra && (c = { ...c, ...e.extra });
+  const r = { mode: t, speed: e.speed, opts: c };
+  return ot.set(s, r), r;
+}
+function $t(o) {
+  let n = o;
+  for (; n; ) {
+    const s = n.getAttribute("data-theme");
+    if (s === "dark") return !0;
+    if (s === "light") return !1;
+    if (n.classList.contains("dark")) return !0;
+    if (n.classList.contains("light")) return !1;
+    n = n.parentElement;
+  }
+  return null;
+}
+function _t() {
+  return typeof matchMedia > "u" || matchMedia("(prefers-color-scheme: dark)").matches;
+}
+function Wt(o, n) {
+  const [s, a] = et(!0);
+  return Z(() => {
+    if (o === "dark") {
+      a(!0);
+      return;
+    }
+    if (o === "light") {
+      a(!1);
+      return;
+    }
+    const t = () => {
+      const l = $t(n.current);
+      a(l ?? _t());
+    };
+    t();
+    const e = typeof matchMedia < "u" ? matchMedia("(prefers-color-scheme: dark)") : null, c = () => t();
+    e == null || e.addEventListener("change", c);
+    let r = null;
+    return typeof MutationObserver < "u" && n.current && (r = new MutationObserver(t), r.observe(document.documentElement, {
+      attributes: !0,
+      attributeFilter: ["class", "data-theme"],
+      subtree: !0
+    })), () => {
+      e == null || e.removeEventListener("change", c), r == null || r.disconnect();
+    };
+  }, [o, n]), s;
+}
+function jt() {
+  const [o, n] = et(!1);
+  return Z(() => {
+    if (typeof matchMedia > "u") return;
+    const s = matchMedia("(prefers-reduced-motion: reduce)");
+    n(s.matches);
+    const a = (t) => n(t.matches);
+    return s.addEventListener("change", a), () => s.removeEventListener("change", a);
+  }, []), o;
+}
+const Yt = {
+  working: "Working…",
+  searching: "Searching…",
+  solving: "Solving…",
+  listening: "Listening…",
+  connecting: "Connecting…",
+  weaving: "Weaving…",
+  composing: "Composing…",
+  breathing: "Thinking…",
+  shaping: "Shaping…"
+};
+window.NM_ORB={MODE_DRAWS:Nt,STATE_TO_MODE:Tt,resolvePreset:Ft};
+})();
+</script>
+<script>
+(function(){
+  var root=document.documentElement, app=document.getElementById('app'),
+      boot=document.getElementById('boot'), stages=document.getElementById('stages'),
+      elapsed=document.getElementById('elapsed'), title=document.getElementById('btitle'),
+      term=document.getElementById('term'), queued=document.getElementById('queued');
+  // THE PRODUCT'S OWN ORB. thinking-orbs ships MODE_DRAWS as a pure canvas painter, so the
+  // mockup renders the same 'connecting' constellation the thread already shows — a lookalike
+  // would have made this round a review of my drawing rather than of the real thing.
+  var O=window.NM_ORB, cv=document.getElementById('orb'), c2=cv.getContext('2d'),
+      preset=O.resolvePreset('connecting',64), dpr=Math.min(2,window.devicePixelRatio||1), orbRaf=0;
+  cv.width=64*dpr; cv.height=64*dpr; c2.scale(dpr,dpr);
+  function isDark(){var t=root.getAttribute('data-theme');
+    return t==='dark' || (!t && matchMedia('(prefers-color-scheme:dark)').matches);}
+  function paint(ts){ c2.clearRect(0,0,64,64);
+    O.MODE_DRAWS[preset.mode](c2,64,ts/1000*preset.speed,isDark(),preset.opts);
+    orbRaf=requestAnimationFrame(paint); }
+  if(!matchMedia('(prefers-reduced-motion:reduce)').matches) orbRaf=requestAnimationFrame(paint);
+  else { c2.clearRect(0,0,64,64); O.MODE_DRAWS[preset.mode](c2,64,0,isDark(),preset.opts); }
+
+  document.querySelectorAll('.tog button').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      root.setAttribute('data-theme',btn.dataset.t);
+      document.querySelectorAll('.tog button').forEach(function(o){
+        o.setAttribute('aria-pressed', String(o===btn));});
+    });
+  });
+
+  // real measured proportions (69 / 68 / 5 / 1 of 146s), compressed to 12s
+  var SEQ=[{s:0,at:0,label:'Starting your cloud machine'},
+            {s:1,at:11400,label:'Connecting'}],
+      TOTAL=12200, timers=[], t0=0, raf=0;
+  function setLabel(text){
+    if(!boot.classList.contains('solo')){ title.textContent=text; return; }
+    title.classList.add('swap');
+    setTimeout(function(){ title.textContent=text; title.classList.remove('swap'); },300);
+  }
+  function reset(){
+    timers.forEach(clearTimeout); timers=[]; cancelAnimationFrame(raf);
+    boot.classList.remove('gone','done'); queued.style.display='';
+    title.textContent=SEQ[0].label; title.classList.remove('swap'); elapsed.textContent='0:00';
+    term.textContent='nm ~ % ';
+    stages.querySelectorAll('li').forEach(function(li){li.className='';
+      li.querySelector('.t').textContent='';});
+  }
+  function tick(){
+    var ms=Date.now()-t0, real=Math.min(146,Math.round(ms/TOTAL*146));
+    elapsed.textContent=Math.floor(real/60)+':'+String(real%60).padStart(2,'0');
+    if(ms<TOTAL+300) raf=requestAnimationFrame(tick);
+  }
+  function play(){
+    reset(); t0=Date.now(); raf=requestAnimationFrame(tick);
+    SEQ.forEach(function(step,i){
+      timers.push(setTimeout(function(){
+        if(i>0) setLabel(step.label);
+        stages.querySelectorAll('li').forEach(function(li){
+          var n=+li.dataset.s;
+          li.className = n<step.s ? 'was' : (n===step.s ? 'now' : '');
+        });
+      },step.at));
+    });
+    timers.push(setTimeout(function(){
+      stages.querySelectorAll('li').forEach(function(li){li.className='was';});
+      boot.classList.add('done'); setLabel('Ready'); queued.style.display='none';
+      term.textContent='nm ~ % claude --version\n2.1.233 (Claude Code)\nnm ~ % ';
+    },TOTAL));
+    timers.push(setTimeout(function(){boot.classList.add('gone');},TOTAL+700));
+  }
+  boot.classList.add('solo');
+  document.getElementById('solo').addEventListener('click',function(){
+    var solo=boot.classList.toggle('solo');
+    this.textContent = solo ? 'Show all stages' : 'Show one at a time';
+    play();
+  });
+  document.getElementById('play').addEventListener('click',play);
+  document.getElementById('back').addEventListener('click',function(){boot.classList.add('gone');});
+  document.getElementById('mode').addEventListener('click',function(){
+    var full=boot.classList.toggle('full');
+    this.textContent=full?'Show as pane':'Show as full screen';
+    if(boot.classList.contains('gone')) play(); 
+  });
+  play();
+})();
+</script>

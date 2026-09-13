@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>NeuraMesh</title>
+    <!-- The Porch mark, the same asset the marketing site serves (apps/web/public/favicon.svg) —
+         copied rather than re-drawn so the tab and the landing page can never diverge. SVG first
+         for modern browsers; the 32px PNG is the fallback for the ones that ignore it. -->
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/icon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <!-- the browser paints its own chrome behind the app; graphite, so a light-mode browser does
+         not flash white around a dark shell -->
+    <meta name="theme-color" content="#141414" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./main.tsx"></script>
+  </body>
+</html>

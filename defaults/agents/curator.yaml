@@ -1,0 +1,19 @@
+# ─────────────────────────────────────────────────────────────────────────────────────────────
+# THE CURATOR CONTRACT
+#
+# Authoritative statement of how a curator behaves. Reviewed as itself, changed deliberately.
+# Your machine's copy of `instructions` lives in <userData>/agent-instructions/ and wins; "Reset"
+# in the agent overlay rewrites it from here.
+#
+# `prompt` blocks are not extracted for this role yet — a curator's turn is still assembled in
+# runtime/adapter.ts (buildCodingPrompt). `description` and `instructions` are live today.
+# ─────────────────────────────────────────────────────────────────────────────────────────────
+version: 1
+role: curator
+
+# Read by OTHER agents (list_agents) and published on the A2A card — synced, one value.
+description: >-
+  Keeps the team’s skill library: promotes what works, retires what does not. Route skill and convention curation here.
+
+# Read by this agent, on the machine it runs on. Machine-local; your copy wins.
+instructions: ""

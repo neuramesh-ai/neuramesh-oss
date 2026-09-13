@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Starter brain, credits, and the setup tracker · round 2</title>
+<style>
+/* tokens verbatim from apps/desktop/src/renderer/src/tokens.css (Graphite dark + Paper light).
+   the round this designs: a user with NO subscription and NO api key finishes onboarding and
+   gets a real first reply on a platform-provided brain, metered by credits; connecting their
+   own brain becomes a tracked item they complete afterwards. companion to
+   docs/design/cloud-first-2026-08/starter-brain-and-credits.md. judge as the app. */
+:root, [data-theme='dark'] {
+  --win:#0d0d0d; --bg:#141414; --panel:#191919; --panel2:#212121; --panel3:#2b2b2b;
+  --border:#272727; --border2:#383838;
+  --text:#eaeaea; --body:#b6b6b6; --muted:#898989; --dim:#676767;
+  --link:#d19a72; --accent:var(--text); --accent-ink:#101010;
+  --btn:#232323; --btn-fg:#efefef; --btn-hover:#2f2f2f;
+  --green:#77ac8d; --warn:#c9a15e; --violet:#a89ccf; --orch:#9793d2;
+  --brand:#834a2b; --brand-ink:#fff7ee;
+  --card:#1e1e1e; --card-border:#2c2c2c;
+  --shadow-sheet:inset 0 1px 0 rgba(255,255,255,.05), 0 12px 30px -6px rgba(0,0,0,.5);
+  --hover-bg:color-mix(in srgb, var(--text) 7%, transparent);
+}
+[data-theme='light'] {
+  --win:#e9e5db; --bg:#fcfbf8; --panel:#fcfbf8; --panel2:#f4f1ea; --panel3:#ebe7dd;
+  --border:#e2ded4; --border2:#cec5b7;
+  --text:#2f2a24; --body:#524c43; --muted:#837d72; --dim:#a09889;
+  --link:#8f4f2a; --accent:var(--text); --accent-ink:#ffffff;
+  --btn:#f1eee6; --btn-fg:#2f2a24; --btn-hover:#e6e2d6;
+  --green:#2f9e6b; --warn:#a9762a; --violet:#7d6cc4; --orch:#635fc0;
+  --brand:#834a2b; --brand-ink:#fff7ee;
+  --card:#ffffff; --card-border:#e2ded4;
+  --shadow-sheet:0 8px 26px -8px rgba(70,58,44,.15), 0 1px 2px rgba(70,58,44,.05);
+  --hover-bg:color-mix(in srgb, var(--text) 6%, transparent);
+}
+
+* { box-sizing:border-box; }
+body { margin:0; background:var(--win); color:var(--text);
+  font:400 13.5px/1.55 ui-sans-serif,-apple-system,"Segoe UI",system-ui,sans-serif; -webkit-font-smoothing:antialiased; }
+.serif { font-family:'Source Serif 4',Georgia,'Times New Roman',serif; }
+code, .mono { font:500 11.5px ui-monospace,Menlo,monospace; }
+
+header.page { position:sticky; top:0; z-index:30; display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+  padding:14px 22px; background:var(--win); border-bottom:1px solid var(--border); }
+h1 { font-weight:600; font-size:15px; margin:0; letter-spacing:-.01em; }
+.sub { color:var(--muted); font-size:12.5px; max-width:96ch; }
+.spacer { flex:1; }
+button.ctl { font:inherit; font-size:12.5px; color:var(--btn-fg); background:var(--btn);
+  border:1px solid var(--border2); border-radius:999px; padding:6px 14px; cursor:pointer; }
+
+main { padding:22px; max-width:1180px; margin:0 auto; }
+section { margin-bottom:46px; }
+h2 { font-weight:600; font-size:13px; margin:0 0 4px; letter-spacing:.02em; text-transform:uppercase; color:var(--muted); }
+.note { color:var(--body); font-size:12.5px; max-width:78ch; margin:0 0 14px; }
+.note b { color:var(--text); font-weight:600; }
+.tag { display:inline-block; font:500 10.5px ui-monospace,Menlo,monospace; color:var(--warn);
+  border:1px solid color-mix(in srgb, var(--warn) 40%, transparent); border-radius:999px; padding:2px 9px; margin-left:8px; vertical-align:2px; }
+.tag.ok { color:var(--green); border-color:color-mix(in srgb, var(--green) 40%, transparent); }
+
+.screen { background:var(--win); border:1px solid var(--border2); border-radius:16px; overflow:hidden;
+  box-shadow:var(--shadow-sheet); margin:14px 0; }
+.chrome { display:flex; align-items:center; gap:10px; padding:9px 14px; border-bottom:1px solid var(--border); }
+.dots span { display:inline-block; width:9px; height:9px; border-radius:50%; background:var(--panel3); margin-right:5px; }
+.addr { font:500 11px ui-monospace,Menlo,monospace; color:var(--muted); background:var(--panel2);
+  border:1px solid var(--border); border-radius:999px; padding:3px 12px; }
+.mark { display:inline-flex; align-items:center; gap:8px; }
+.porch { width:20px; height:20px; border-radius:6px; background:var(--brand); position:relative; }
+.porch::after { content:""; position:absolute; inset:5px 5px 4px; border-radius:3px 3px 0 0; background:var(--brand-ink); opacity:.92; }
+.word { font-weight:650; letter-spacing:-.02em; font-size:14px; }
+
+/* wizard chrome (matches the shipped step ring) */
+.obtop { display:flex; align-items:center; justify-content:space-between; padding:12px 18px; border-bottom:1px solid var(--border); }
+.ring { position:relative; width:38px; height:38px; display:grid; place-items:center; font-size:11.5px; font-weight:650; }
+.ring svg { position:absolute; inset:0; transform:rotate(-90deg); }
+.ring circle { fill:none; stroke-width:2.5; }
+.rtrack { stroke:var(--panel3); } .rarc { stroke:var(--brand); stroke-dasharray:103.7; stroke-linecap:round; }
+.ring i { font-style:normal; font-size:9px; color:var(--dim); }
+.obbody { padding:24px 36px 28px; max-width:600px; margin:0 auto; }
+.eyebrow { font-size:11px; color:var(--dim); text-transform:uppercase; letter-spacing:.08em; margin-bottom:8px; }
+.obtitle { font-size:25px; font-weight:600; margin:0 0 8px; letter-spacing:-.01em; }
+.obsub { color:var(--body); font-size:13px; margin:0 0 18px; }
+.btn { font:inherit; border-radius:10px; padding:9px 17px; border:1px solid var(--border2);
+  background:var(--btn); color:var(--btn-fg); font-size:13.5px; cursor:pointer; }
+.btn.primary { background:var(--text); color:var(--accent-ink); border-color:transparent; font-weight:600; }
+.btn.ghost { background:transparent; border-color:transparent; color:var(--link); }
+.obnav { display:flex; gap:10px; align-items:center; margin-top:18px; }
+.grow { flex:1; }
+
+/* provider rows */
+.prow { display:flex; align-items:center; gap:12px; background:var(--panel); border:1px solid var(--border2);
+  border-radius:12px; padding:11px 13px; margin-bottom:8px; }
+.prow .ico { width:26px; height:26px; border-radius:8px; background:var(--panel2); display:grid; place-items:center; font-size:13px; }
+.prow b { font-size:13px; } .prow .sm { display:block; color:var(--muted); font-size:11.5px; }
+.prow .modes { margin-left:auto; display:flex; gap:6px; }
+.mode { font-size:11.5px; color:var(--body); border:1px solid var(--border2); border-radius:8px; padding:4px 10px; background:var(--panel2); }
+.mode.on { background:var(--text); color:var(--accent-ink); border-color:transparent; font-weight:600; }
+
+/* the skip lane — the round's whole point */
+.skip { margin-top:14px; background:color-mix(in srgb, var(--brand) 9%, transparent);
+  border:1px solid color-mix(in srgb, var(--brand) 38%, transparent); border-radius:12px; padding:13px 15px; }
+.skip b { font-size:13px; }
+.skip .sm { color:var(--body); font-size:12px; display:block; margin-top:3px; }
+.skip .row { display:flex; align-items:center; gap:12px; margin-top:10px; }
+.pricetag { font:500 11px ui-monospace,Menlo,monospace; color:var(--muted); }
+
+/* thread */
+.sheet { background:var(--bg); margin:8px; border-radius:12px; box-shadow:var(--shadow-sheet); padding:14px 0; }
+.tcol { width:min(620px,92%); margin:0 auto; display:flex; flex-direction:column; gap:12px; }
+.msg { display:flex; gap:10px; }
+.av { width:26px; height:26px; border-radius:8px; background:var(--panel3); flex:none; display:grid; place-items:center; font-size:13px; }
+.av.orch { background:color-mix(in srgb, var(--orch) 22%, var(--panel3)); }
+.mbody { font-size:13.5px; line-height:1.6; }
+.mmeta { font-size:11px; color:var(--dim); margin-top:3px; }
+.mmeta .on { color:var(--link); }
+.mmeta .cost { color:var(--muted); }
+
+/* the meters — three named lines, never one blended number */
+.meters { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; width:min(700px,94%); margin:12px auto 0; }
+@media (max-width:820px){ .meters{grid-template-columns:1fr;} }
+.meter { background:var(--panel); border:1px solid var(--border2); border-radius:12px; padding:11px 13px; }
+.meter .k { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; }
+.meter .v { font-size:15px; font-weight:600; margin:3px 0 2px; }
+.meter .v small { font-size:11.5px; font-weight:400; color:var(--muted); }
+.meter .bar { height:5px; border-radius:99px; background:var(--panel3); overflow:hidden; margin-top:7px; }
+.meter .fill { height:100%; border-radius:99px; background:var(--green); }
+.meter .fill.warn { background:var(--warn); }
+.meter .soon { color:var(--dim); font-size:11px; margin-top:6px; }
+
+/* the nav's bottom bar, as shipped: workspace tile · name · account avatar. the credit ring
+   joins it as a THIRD element, left of the avatar — the balance belongs beside the person it
+   is spent by, not inside them. */
+.rail { width:236px; background:var(--panel); border:1px solid var(--border2); border-radius:12px; padding:8px; }
+.railtop { height:118px; padding:6px 8px; color:var(--dim); font-size:12px; }
+.railtop div { padding:5px 7px; border-radius:7px; }
+.railtop div.on { background:var(--hover-bg); color:var(--text); }
+.wsfoot { display:flex; align-items:center; gap:8px; padding:7px 8px; border-top:1px solid var(--border); margin-top:6px; }
+.wstile { width:22px; height:22px; border-radius:7px; background:var(--panel3); display:grid; place-items:center;
+  font-size:11px; font-weight:650; flex:none; }
+.wsname { font-size:12.5px; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.credring { position:relative; width:22px; height:22px; flex:none; }
+.credring svg { position:absolute; inset:0; transform:rotate(-90deg); }
+.credring circle { fill:none; stroke-width:3; }
+.ctrack { stroke:var(--panel3); }
+.carc { stroke:var(--green); stroke-dasharray:56.5; stroke-linecap:round; }
+.carc.low { stroke:var(--warn); }
+.wsacct { width:22px; height:22px; border-radius:50%; background:var(--panel3); display:grid; place-items:center;
+  font-size:10.5px; font-weight:650; flex:none; }
+.credpop { width:250px; background:var(--card); border:1px solid var(--card-border); border-radius:12px;
+  box-shadow:var(--shadow-sheet); padding:12px 13px; }
+.credpop .big { font-size:20px; font-weight:600; }
+.credpop .big small { font-size:12px; font-weight:400; color:var(--muted); }
+.credpop .ln { display:flex; align-items:center; gap:8px; font-size:12px; color:var(--body); margin-top:9px; }
+.credpop .ln span:last-child { margin-left:auto; color:var(--muted); font:500 11px ui-monospace,Menlo,monospace; }
+.credpop .foot { margin-top:11px; padding-top:9px; border-top:1px solid var(--border); font-size:11.5px; color:var(--dim); }
+
+/* the tracker — two placements, drawn so the fork is decidable */
+.trackcard { width:290px; background:var(--card); border:1px solid var(--card-border); border-radius:13px;
+  box-shadow:var(--shadow-sheet); overflow:hidden; }
+.trackcard .hd { display:flex; align-items:center; gap:9px; padding:10px 13px; border-bottom:1px solid var(--border); }
+.trackcard .hd b { font-size:12.5px; } .trackcard .hd .ct { margin-left:auto; font:500 11px ui-monospace,Menlo,monospace; color:var(--muted); }
+.ti { display:flex; align-items:center; gap:9px; padding:9px 13px; border-bottom:1px solid var(--border); font-size:12.5px; }
+.ti:last-child { border-bottom:0; }
+.ti .box { width:15px; height:15px; border-radius:5px; border:1.5px solid var(--border2); flex:none; }
+.ti.done .box { background:var(--green); border-color:transparent; position:relative; }
+.ti.done .box::after { content:"✓"; position:absolute; inset:0; display:grid; place-items:center; font-size:10px; color:var(--accent-ink); }
+.ti.done { color:var(--muted); text-decoration:line-through; text-decoration-color:var(--border2); }
+.ti .go { margin-left:auto; color:var(--link); font-size:11.5px; }
+.floatwrap { position:relative; height:330px; background:var(--bg); border-radius:12px; margin:8px; overflow:hidden; }
+.floatwrap .ghost { padding:16px 20px; color:var(--dim); font-size:12.5px; }
+.floatwrap .anchored { position:absolute; right:16px; bottom:16px; }
+.pill { display:inline-flex; align-items:center; gap:8px; background:var(--card); border:1px solid var(--card-border);
+  border-radius:999px; padding:8px 14px; box-shadow:var(--shadow-sheet); font-size:12.5px; }
+.pill .ring2 { width:16px; height:16px; border-radius:50%; background:conic-gradient(var(--green) 40%, var(--panel3) 0); }
+
+.two { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+@media (max-width:900px){ .two{grid-template-columns:1fr;} }
+.ann { border-left:3px solid var(--brand); background:var(--panel); border-radius:0 10px 10px 0;
+  padding:10px 14px; margin:10px 0 0; font-size:12.5px; color:var(--body); max-width:84ch; }
+.ann b { color:var(--text); }
+.q { background:var(--panel); border:1px solid var(--border2); border-radius:12px; padding:14px 16px; margin-top:10px; }
+.q b { color:var(--text); }
+.q ol { margin:8px 0 0; padding-left:20px; color:var(--body); font-size:12.5px; }
+.q li { margin-bottom:7px; }
+</style>
+</head>
+<body>
+<header class="page">
+  <div class="mark"><span class="porch"></span><span class="word">neuramesh</span></div>
+  <div>
+    <h1>Starter brain, credits, and the setup tracker</h1>
+    <div class="sub">round 2 · companion to docs/design/cloud-first-2026-08/starter-brain-and-credits.md · the flow for a user with NO subscription and NO API key: finish onboarding, get a real first reply, connect your own brain afterwards</div>
+  </div>
+  <div class="spacer"></div>
+  <button class="ctl" onclick="const h=document.documentElement;h.dataset.theme=h.dataset.theme==='dark'?'light':'dark'">theme</button>
+</header>
+<main>
+
+<section>
+  <h2>The change in one line <span class="tag">Keys stops being a wall</span></h2>
+  <p class="note">Today the browser wizard cannot be finished without a subscription or an API key — the Keys step gates Continue. This round makes it <b>skippable</b>: a user with neither still reaches a real first reply, on a platform-provided brain we meter with <b>credits</b>. Connecting their own brain doesn't disappear; it becomes the first item in a <b>setup tracker</b> they finish afterwards. The three screens below are the whole flow.</p>
+</section>
+
+<section>
+  <h2>1 · Keys — a third door, priced out loud <span class="tag ok">the gate opens</span></h2>
+  <div class="screen">
+    <div class="chrome"><span class="dots"><span></span><span></span><span></span></span><span class="addr">hq.neuramesh.app</span></div>
+    <div class="obtop">
+      <div class="mark"><span class="porch"></span><span class="word">neuramesh</span></div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <span class="ring"><svg viewBox="0 0 40 40" width="38" height="38" aria-hidden="true"><circle class="rtrack" cx="20" cy="20" r="16.5"></circle><circle class="rarc" cx="20" cy="20" r="16.5" style="stroke-dashoffset:62.2"></circle></svg>3<i>/5</i></span>
+        <span style="color:var(--muted);font-size:12.5px">Keys</span>
+      </div>
+    </div>
+    <div class="obbody">
+      <div class="eyebrow">Step 3 of 5</div>
+      <div class="obtitle serif">Bring your own brain</div>
+      <p class="obsub">Reuse the subscriptions you already pay for — you sign in on your cloud machine after launch, through its own terminal, so neuramesh never handles your vendor login. Or drop in an API key now.</p>
+
+      <div class="prow"><span class="ico">◆</span><div><b>Claude</b><span class="sm">sign in on your machine after launch</span></div><div class="modes"><span class="mode">Subscription</span><span class="mode">API key</span></div></div>
+      <div class="prow"><span class="ico">●</span><div><b>ChatGPT</b><span class="sm">sign in here — opens ChatGPT's own device flow</span></div><div class="modes"><span class="mode">Sign in</span><span class="mode">API key</span></div></div>
+      <div class="prow"><span class="ico">✦</span><div><b>Gemini</b><span class="sm">API key or Vertex</span></div><div class="modes"><span class="mode">API key</span></div></div>
+
+      <div class="skip">
+        <b>Or start now — your agents are ready.</b>
+        <span class="sm">Every workspace comes with credits to run on. Connect your own brain whenever you like.</span>
+        <div class="row">
+          <button class="btn primary">Start with 500 credits →</button>
+        </div>
+      </div>
+
+      <div class="obnav"><button class="btn">← Back</button><span class="grow"></span><button class="btn">Continue →</button></div>
+    </div>
+  </div>
+  <div class="ann"><b>The skip is a door, not an escape hatch</b> — two lines, styled as the one warm object on the step: an offer, not a consolation. <b>No per-reply pricing</b> (George, r2): a number nobody can act on at that moment is noise, and quoting a per-message rate makes a free product feel like a taxi meter. The balance is the honest unit — you have 500 credits, and the rail shows them draining. Note ChatGPT's row: its device flow is browser-completable, so that one really says "sign in here" — Claude's cannot, and says so. <b>Continue stays enabled either way</b>: choosing Starter is a choice, not a failure to configure.</div>
+</section>
+
+<section>
+  <h2>2 · The first reply — the house brain, named and priced <span class="tag">&lt; 60 s from signup</span></h2>
+  <div class="screen">
+    <div class="chrome"><span class="dots"><span></span><span></span><span></span></span><span class="addr">hq.neuramesh.app/nimbus-foundry</span></div>
+    <div class="sheet">
+      <div class="tcol">
+        <div class="msg"><div class="av">G</div><div><div class="mbody">What can this workspace do?</div><div class="mmeta">you · just now</div></div></div>
+        <div class="msg"><div class="av orch">🦊</div><div>
+          <div class="mbody">Quite a lot — and I'll show you rather than list features. You have four rooms, a board, and five teammates. Give me a repo or an idea and I'll plan it into tasks they can build, review and ship.</div>
+          <div class="mmeta">rex · <span class="on">on your cloud machine ☁</span> · replied in 4s</div>
+        </div></div>
+      </div>
+      <div class="meters">
+        <div class="meter"><div class="k">Brain</div><div class="v">498 <small>of 500 credits</small></div><div class="bar"><div class="fill" style="width:4%"></div></div><div class="soon">≈ 249 more replies · refills monthly</div></div>
+        <div class="meter"><div class="k">Machine</div><div class="v">23 <small>of 60 min today</small></div><div class="bar"><div class="fill" style="width:38%"></div></div><div class="soon">resets at midnight UTC</div></div>
+        <div class="meter"><div class="k">Storage</div><div class="v">1.2 <small>of 10 GiB</small></div><div class="bar"><div class="fill" style="width:12%"></div></div><div class="soon">counts toward credits later</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="ann"><b>The reply says where it ran, not what it cost.</b> Attribution ("on your cloud machine") is the promise being kept; a price tag on every message is a bill arriving in the middle of a conversation. The three named lines below stay — Brain, Machine and Storage are the three real costs and each is acted on differently (connect a brain, let the machine idle, prune a berth) — but they live in the <b>usage view you click into</b>, not in the thread. The always-visible surface is the rail, station 3. <b>At the limit, replies queue with an honest line — never a hard wall mid-conversation.</b></div>
+</section>
+
+<section>
+  <h2>3 · The credit tracker — in the rail, beside the person spending them <span class="tag ok">always visible</span></h2>
+  <p class="note">The balance needs one ambient home, not a panel you remember to open. It joins the nav's bottom bar — <b>workspace tile · name · account avatar</b> as shipped — with the ring sitting <b>left of the avatar</b>: the balance belongs beside the person spending it, never drawn inside them. It depletes visibly, turns warm below a fifth, and opens the detail on click. No number in the resting state; a ring you can read at a glance is the whole point.</p>
+  <div class="two">
+    <div>
+      <div class="screen" style="margin-top:0"><div class="chrome"><span class="dots"><span></span><span></span><span></span></span><span class="addr">resting · 412 of 500</span></div>
+        <div style="padding:14px; display:flex; justify-content:center">
+          <div class="rail">
+            <div class="railtop"><div>Home</div><div class="on"># general</div><div># build</div><div># marketing</div></div>
+            <div class="wsfoot">
+              <span class="wstile">N</span><span class="wsname">Nimbus Foundry</span>
+              <span class="credring" title="412 of 500 credits">
+                <svg viewBox="0 0 22 22"><circle class="ctrack" cx="11" cy="11" r="9"></circle><circle class="carc" cx="11" cy="11" r="9" style="stroke-dashoffset:9.6"></circle></svg>
+              </span>
+              <span class="wsacct">G</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="screen" style="margin-top:0"><div class="chrome"><span class="dots"><span></span><span></span><span></span></span><span class="addr">low · 63 left, and clicked</span></div>
+        <div style="padding:14px; display:flex; justify-content:center; gap:12px; align-items:flex-start">
+          <div class="rail" style="width:190px">
+            <div class="railtop" style="height:118px"><div>Home</div><div class="on"># general</div><div># build</div></div>
+            <div class="wsfoot">
+              <span class="wstile">N</span><span class="wsname">Nimbus…</span>
+              <span class="credring" title="63 of 500 credits">
+                <svg viewBox="0 0 22 22"><circle class="ctrack" cx="11" cy="11" r="9"></circle><circle class="carc low" cx="11" cy="11" r="9" style="stroke-dashoffset:49.4"></circle></svg>
+              </span>
+              <span class="wsacct">G</span>
+            </div>
+          </div>
+          <div class="credpop">
+            <div class="big">63 <small>credits left</small></div>
+            <div class="ln"><span>Brain</span><span>437 used</span></div>
+            <div class="ln"><span>Machine</span><span>23 / 60 min today</span></div>
+            <div class="ln"><span>Storage</span><span>1.2 GiB</span></div>
+            <div class="foot">Refills to 500 on 1 Sep · connect your own brain and agents stop drawing credits</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="ann"><b>Why a ring and not a number.</b> A number in the rail asks to be read; a ring asks only to be glanced at, and depletion is a shape before it is a figure. The three named lines survive — Brain, Machine, Storage, each acted on differently — but they live <b>one click in</b>, where someone who wants the breakdown goes looking. The popover's last line is the one that matters: <b>connecting your own brain stops the drain entirely</b>, which turns the meter into a reason rather than a threat. <b>Placement note:</b> the shipped bar is the workspace's, not the person's — adding a third element keeps its meaning honest only because the ring is the WORKSPACE's balance, which is exactly what credits are scoped to.</div>
+</section>
+
+<section>
+  <h2>4 · The setup tracker — the fork worth deciding <span class="tag">two placements drawn</span></h2>
+  <p class="note">Connecting a brain doesn't vanish when it's skipped; it becomes item one of a short list the user finishes at their own pace. The list is <b>derived, never stored</b> — from synced rows plus the usage read — so every client agrees without a checklist table to keep honest. The open question is where it lives. George asked for bottom-right; the approved onboarding round draws an in-page card row after the first reply. Both are below.</p>
+  <div class="two">
+    <div>
+      <div class="screen" style="margin-top:0">
+        <div class="chrome"><span class="dots"><span></span><span></span><span></span></span><span class="addr">A · floating, bottom-right</span></div>
+        <div class="floatwrap">
+          <div class="ghost">the room, unchanged behind it…</div>
+          <div class="anchored">
+            <div class="trackcard">
+              <div class="hd"><span class="ring2"></span><b>Finish setting up</b><span class="ct">2/5</span></div>
+              <div class="ti"><span class="box"></span> Connect a brain <span class="go">Connect →</span></div>
+              <div class="ti"><span class="box"></span> Invite your team <span class="go">Invite →</span></div>
+              <div class="ti"><span class="box"></span> Connect GitHub <span class="go">Connect →</span></div>
+              <div class="ti done"><span class="box"></span> Cloud machine</div>
+              <div class="ti done"><span class="box"></span> Send your first message</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="ann" style="max-width:none"><b>A — follows you.</b> Always reachable, survives navigation, collapses to the pill. Cost: the shell has <b>no universal bottom-right slot</b> today (the bottom dock retired; only top-dock nav mode keeps one), so this mints a new floating idiom that docs/33 would have to adopt — and floating cards are exactly what that document is careful about.</div>
+    </div>
+    <div>
+      <div class="screen" style="margin-top:0">
+        <div class="chrome"><span class="dots"><span></span><span></span><span></span></span><span class="addr">B · in the room, after the first reply</span></div>
+        <div class="floatwrap" style="height:330px">
+          <div class="ghost">…the thread continues above</div>
+          <div style="padding:0 16px">
+            <div class="trackcard" style="width:auto">
+              <div class="hd"><span class="ring2"></span><b>Finish setting up</b><span class="ct">2/5</span></div>
+              <div class="ti"><span class="box"></span> Connect a brain — Starter is running your agents until you do <span class="go">Connect →</span></div>
+              <div class="ti"><span class="box"></span> Invite your team <span class="go">Invite →</span></div>
+              <div class="ti done"><span class="box"></span> Cloud machine · provisioned</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="ann" style="max-width:none"><b>B — sits where the work is.</b> Uses the existing card idiom, no new floating layer, and reads in the flow of the conversation the user just started. Cost: it scrolls away, so a user who ignores it once may never see it again — which is precisely the failure a tracker exists to prevent.</div>
+    </div>
+  </div>
+  <div class="ann"><b>Recommendation: B now, A when it earns it.</b> Ship the in-room card, which needs no new design-system idiom and lands with the round; add the floating pill only if telemetry shows people abandoning the list. The pill is easy to add later and hard to remove once people expect it — and a floating element that survives every screen is a claim on the whole shell, which docs/33 should approve deliberately rather than inherit from a checklist.</div>
+</section>
+
+<section>
+  <h2>5 · Decisions this round needs</h2>
+  <div class="q">
+    <b>Mine to recommend — say no and I'll change them:</b>
+    <ol>
+      <li><b>Metered proxy, not a shipped key.</b> The starter model is called from control-api, never from the machine. It's the only version where the cap is a server invariant instead of a client promise — and the current plan's "resolve through <span class="mono">/v1/credentials/resolve</span>" would put our key on every machine, unmetered.</li>
+      <li><b>Credits, shown as credits with dollars beside them.</b> 1 credit = $0.01. Internally micro-dollars so three meters share one integer unit.</li>
+      <li><b>Three separate meters</b> — Brain, Machine, Storage — never one blended score.</li>
+      <li><b>Starter brain runs the orchestrator only</b>, not the whole crew; worker agents wait for a real brain. A cheap model triaging is fine; a cheap model writing your code is a bad first impression.</li>
+      <li><b>Tracker placement B</b> (in-room card) this round; the floating pill only if it's earned.</li>
+    </ol>
+  </div>
+  <div class="q">
+    <b>Yours to settle:</b>
+    <ol>
+      <li><b>Grant size.</b> Recommended: <b>500 credits ($5) at signup, refilling monthly, no rollover</b> ≈ 250 replies. Model spend for a free user is well under $1/month — <b>the machine is the expensive part (~$10–15)</b>, so the grant should be sized against machine cost, not model cost.</li>
+      <li><b>Which Flash.</b> <span class="mono">gemini-1.5-flash</span> is shut down, not deprecated. Recommended <span class="mono">gemini-3.5-flash-lite</span> at minimal thinking ($0.30/$2.50 per 1M) over <span class="mono">2.5-flash-lite</span> ($0.10/$0.40) — 4× the cost per reply but far better tool-calling, and a model that mis-calls tools re-sends ~12k tokens per failed round.</li>
+      <li><b>The Anthropic thread.</b> Two questions now need written answers, and they take weeks: does the relay transporting an authorization code still satisfy the hosted-binary rail, and is the Agent SDK lane approved for us. Worth opening before GA, not at it.</li>
+      <li><b>The Google OAuth exposure</b> (unrelated to this round, found en route): the shipped desktop drives <span class="mono">agy</span> under a user's consumer Google login, which is the shape Antigravity's terms name as a breach and enforce with bans. Retiring that lane to API-key/Vertex matches what we already decided for cloud machines.</li>
+    </ol>
+  </div>
+</section>
+
+</main>
+</body>
+</html>

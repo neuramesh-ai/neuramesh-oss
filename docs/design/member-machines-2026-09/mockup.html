@@ -1,0 +1,530 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Per-member cloud machines — the surfaces · design round</title>
+<style>
+/* Tokens copied from apps/desktop/src/renderer/src/tokens.css (Graphite dark + Paper light).
+   Geometry copied from the REAL classes this round touches — .cmprow/.cmpdot/.cmphead/.cmprt,
+   .cmpmstate (tokens.css 2195-2198), .shrow/.shsw (the 0119 round), .machcard/.machmeta,
+   .locked, the setup card. Base lifted from mockups/compute-sharing.html so the two rounds read
+   as one system. Judge this as the app, not as a sketch. */
+:root, [data-theme='dark'] {
+  --win:#0d0d0d; --bg:#141414; --panel:#191919; --panel2:#212121; --panel3:#2b2b2b;
+  --border:#272727; --border2:#383838;
+  --text:#eaeaea; --body:#b6b6b6; --muted:#898989; --dim:#676767;
+  --link:#d19a72; --accent:var(--text); --accent-ink:#101010; --overlay:#222222;
+  --btn:#232323; --btn-fg:#efefef; --btn-hover:#2f2f2f;
+  --green:#77ac8d; --warn:#c9a15e; --violet:#a89ccf; --orch:#9793d2; --blocked:#9ca0a8;
+  --brand:#834a2b; --brand-ink:#fff7ee;
+  --card:#1e1e1e; --card-border:#2c2c2c;
+  --shadow:rgba(0,0,0,0.62);
+  --shadow-sheet:inset 0 1px 0 rgba(255,255,255,.05), 0 12px 30px -6px rgba(0,0,0,.5);
+  --hover-bg:color-mix(in srgb, var(--text) 7%, transparent);
+  --sel-bg:color-mix(in srgb, var(--text) 10%, transparent);
+  --hover-border:#404040; --ring:#525252;
+}
+[data-theme='light'] {
+  --win:#e9e5db; --bg:#fcfbf8; --panel:#fcfbf8; --panel2:#f4f1ea; --panel3:#ebe7dd;
+  --border:#e2ded4; --border2:#cec5b7;
+  --text:#2f2a24; --body:#524c43; --muted:#837d72; --dim:#a09889;
+  --link:#8f4f2a; --accent:var(--text); --accent-ink:#ffffff; --overlay:#ffffff;
+  --btn:#f1eee6; --btn-fg:#2f2a24; --btn-hover:#e6e2d6;
+  --green:#2f9e6b; --warn:#a9762a; --violet:#7d6cc4; --orch:#635fc0; --blocked:#7c7f88;
+  --brand:#834a2b; --brand-ink:#fff7ee;
+  --card:#ffffff; --card-border:#e2ded4;
+  --shadow:rgba(70,58,44,0.14);
+  --shadow-sheet:0 8px 26px -8px rgba(70,58,44,.15), 0 1px 2px rgba(70,58,44,.05);
+  --hover-bg:color-mix(in srgb, var(--text) 6%, transparent);
+  --sel-bg:color-mix(in srgb, var(--text) 8%, transparent);
+  --hover-border:color-mix(in srgb, var(--text) 12%, var(--border2));
+  --ring:color-mix(in srgb, var(--accent) 40%, var(--border2));
+}
+* { box-sizing:border-box; }
+body { margin:0; background:var(--win); color:var(--text);
+  font:400 13.5px/1.55 ui-sans-serif,-apple-system,"Segoe UI",system-ui,sans-serif; -webkit-font-smoothing:antialiased; }
+code, .mono { font:500 11.5px ui-monospace,Menlo,monospace; }
+header { position:sticky; top:0; z-index:30; display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+  padding:14px 22px; background:var(--win); border-bottom:1px solid var(--border); }
+h1 { font-weight:600; font-size:15px; line-height:1.3; margin:0; letter-spacing:-.01em; }
+.sub { color:var(--muted); font-size:12.5px; }
+.spacer { flex:1; }
+button.ctl { font:inherit; font-size:12.5px; color:var(--btn-fg); background:var(--btn);
+  border:1px solid var(--border2); border-radius:999px; padding:6px 14px; cursor:pointer; }
+main { padding:22px; max-width:1300px; margin:0 auto; }
+section { margin-bottom:44px; }
+h2 { font-weight:600; font-size:13px; line-height:1.4; margin:0 0 4px; letter-spacing:.02em; text-transform:uppercase; color:var(--muted); }
+h2 .n { color:var(--dim); margin-right:7px; font-family:ui-monospace,Menlo,monospace; font-size:11.5px; }
+.why { color:var(--body); font-size:13px; margin:0 0 16px; max-width:88ch; }
+.why b { color:var(--text); font-weight:600; }
+.cols { display:grid; grid-template-columns:1fr 1fr; gap:18px; align-items:start; }
+.cols3 { display:grid; grid-template-columns:repeat(auto-fit,minmax(310px,1fr)); gap:18px; align-items:start; }
+@media (max-width:1100px){ .cols{ grid-template-columns:1fr; } }
+.pane { background:var(--bg); border:1px solid var(--border); border-radius:14px; box-shadow:var(--shadow-sheet); overflow:hidden; }
+.panehead { display:flex; align-items:center; gap:9px; padding:10px 14px; border-bottom:1px solid var(--border); background:var(--panel); font-size:12.5px; font-weight:600; }
+.panebody { padding:18px; display:flex; justify-content:center;
+  background:linear-gradient(0deg, color-mix(in srgb, var(--win) 55%, transparent), color-mix(in srgb, var(--win) 55%, transparent)); }
+.panebody > div { width:100%; max-width:560px; }
+.tag { font-weight:600; font-size:10px; line-height:1; letter-spacing:.07em; text-transform:uppercase; padding:4px 7px; border-radius:5px; flex:none; }
+.tag.good { color:var(--green); background:color-mix(in srgb,var(--green) 15%,transparent); }
+.tag.mut { color:var(--muted); background:var(--panel3); }
+.tag.warn { color:var(--warn); background:color-mix(in srgb,var(--warn) 15%,transparent); }
+.tag.new { color:var(--violet); background:color-mix(in srgb,var(--violet) 16%,transparent); }
+
+/* real app classes */
+.wshint { color:var(--muted); font-size:12.5px; line-height:1.5; margin:2px 0 10px; }
+.sect { font:600 10.5px ui-monospace,Menlo,monospace; letter-spacing:.08em; text-transform:uppercase; color:var(--dim); padding:12px 0 6px; }
+.cmprow { display:flex; align-items:flex-start; gap:11px; padding:10px 12px; border:1px solid var(--border); border-radius:10px; background:var(--panel); margin-bottom:7px; }
+.cmprow.notmine { opacity:.62; }
+.cmpdot { flex:none; width:7px; height:7px; border-radius:50%; background:var(--dim); margin-top:6px; }
+.cmpdot.on { background:var(--green); box-shadow:0 0 0 3px color-mix(in srgb, var(--green) 18%, transparent); }
+.cmpdot.wake { background:var(--body); box-shadow:0 0 0 3px color-mix(in srgb, var(--body) 14%, transparent); }
+.cmpbody { flex:1; min-width:0; }
+.cmphead { display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; }
+.cmphead b { font-size:12.5px; font-weight:620; }
+.cmpowner { font-size:11.5px; color:var(--muted); }
+.cmphere { font:600 9px ui-monospace,Menlo,monospace; letter-spacing:.05em; text-transform:uppercase; color:var(--green); background:color-mix(in srgb,var(--green) 14%,transparent); border-radius:4px; padding:3px 5px; }
+.cmpshared { font:600 9px ui-monospace,Menlo,monospace; letter-spacing:.05em; text-transform:uppercase; color:var(--violet); background:color-mix(in srgb,var(--violet) 15%,transparent); border-radius:4px; padding:3px 5px; }
+.machnoshare { font:600 9px ui-monospace,Menlo,monospace; letter-spacing:.05em; text-transform:uppercase; color:var(--dim); background:var(--panel3); border-radius:4px; padding:3px 5px; }
+.cmpkind { font:600 9px ui-monospace,Menlo,monospace; letter-spacing:.05em; text-transform:uppercase; color:var(--muted); background:var(--panel3); border-radius:4px; padding:3px 5px; }
+.cmpmeta { display:flex; flex-wrap:wrap; gap:5px; margin-top:5px; align-items:center; }
+.cmprt { font:500 10.5px ui-monospace,Menlo,monospace; color:var(--muted); background:var(--panel3); border-radius:4px; padding:2px 6px; }
+.cmprt.none { color:var(--dim); background:transparent; padding-left:0; }
+.cmpnote { font-size:11px; color:var(--dim); }
+.cmpstate { flex:none; font-size:11.5px; align-self:center; text-align:right; }
+.cmpmstate { font:600 11.5px inherit; text-transform:capitalize; color:var(--muted); }
+.cmpmstate.online { color:var(--green); }
+.cmpmstate.capped, .cmpmstate.unreachable, .cmpmstate.stopped, .cmpmstate.no_credits { color:var(--warn); }
+.cmpmstate.waking { color:var(--body); }
+.cmpwhy { font-size:11.5px; color:var(--muted); margin-top:6px; }
+.mfacts { display:flex; flex-wrap:wrap; gap:5px 12px; margin-top:5px; font:500 10.5px ui-monospace,Menlo,monospace; color:var(--dim); }
+.capacts { display:flex; gap:6px; margin-top:8px; flex-wrap:wrap; }
+.btn { display:inline-flex; align-items:center; gap:7px; padding:8px 16px; border-radius:999px; border:1px solid var(--border); background:var(--btn); color:var(--btn-fg); font-size:13px; font-weight:600; cursor:pointer; white-space:nowrap; }
+.btn.primary { background:var(--accent); color:var(--accent-ink); border-color:transparent; }
+.btn.ghost { background:transparent; }
+.btn.sm { padding:5px 11px; font-size:11.5px; }
+.btn.danger { color:var(--warn); }
+.locked { display:flex; align-items:center; gap:10px; padding:10px 12px; border:1px dashed var(--border2); border-radius:10px; color:var(--muted); font-size:12.4px; background:var(--panel2); }
+.locked b { color:var(--text); font-weight:600; }
+
+/* the sharing switches (0119 real classes) */
+.shrow { display:grid; grid-template-columns:1fr auto auto 1fr; align-items:center; gap:10px; padding:8px 11px; border:1px solid var(--border); border-radius:9px; background:var(--panel2); margin-bottom:6px; font-size:12px; }
+.shwho b { font-weight:600; }
+.shsub { display:block; font-size:11px; color:var(--dim); }
+.shsw { width:32px; height:18px; border-radius:999px; background:var(--panel3); border:1px solid var(--border2); position:relative; padding:0; cursor:pointer; }
+.shsw::after { content:''; position:absolute; top:2px; left:2px; width:12px; height:12px; border-radius:50%; background:var(--dim); transition:all .15s; }
+.shsw.on { background:color-mix(in srgb,var(--green) 30%,transparent); border-color:color-mix(in srgb,var(--green) 45%,transparent); }
+.shsw.on::after { left:16px; background:var(--green); }
+.shlbl { font:600 10px ui-monospace,Menlo,monospace; letter-spacing:.05em; text-transform:uppercase; color:var(--dim); }
+.shthem { text-align:right; font-size:11.5px; }
+.shyes { color:var(--green); font-weight:600; }
+.shno { color:var(--dim); }
+.shareline { display:flex; align-items:flex-start; gap:10px; padding:10px 12px; border:1px solid var(--border); border-radius:10px; background:var(--panel2); margin:6px 0 10px; }
+.sharetxt { flex:1; min-width:0; font-size:12.4px; }
+.sharetxt b { font-weight:600; }
+.sharesub { display:block; color:var(--dim); font-size:11px; margin-top:2px; }
+
+/* machine cards (Agents & Machines) */
+.fleetrow { display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:10px; }
+.machcard { border:1px solid var(--border); border-radius:12px; background:var(--panel); padding:11px 13px; }
+.machcard.notmine { opacity:.6; }
+.machname { display:flex; align-items:center; gap:7px; font-size:12.8px; font-weight:620; flex-wrap:wrap; }
+.chip { font:600 9px ui-monospace,Menlo,monospace; letter-spacing:.04em; padding:3px 6px; border-radius:5px; text-transform:uppercase; }
+.chip.c-done { color:var(--green); background:color-mix(in srgb,var(--green) 14%,transparent); }
+.chip.c-closed { color:var(--dim); background:var(--panel3); }
+.chip.c-wake { color:var(--body); background:var(--panel3); }
+.chip.c-warn { color:var(--warn); background:color-mix(in srgb,var(--warn) 14%,transparent); }
+.machmeta { color:var(--muted); font-size:11.8px; margin-top:6px; display:flex; align-items:center; gap:5px; flex-wrap:wrap; }
+.machmeta b { color:var(--body); }
+.machmeta.sub { color:var(--dim); font-size:11px; margin-top:3px; }
+.machrun { margin-top:6px; padding-top:6px; border-top:1px dashed var(--border); font-size:11px; color:var(--dim); }
+
+/* terminal picker + setup card */
+.termbar { display:flex; align-items:center; gap:8px; padding:7px 10px; border:1px solid var(--border); border-radius:10px 10px 0 0; background:var(--panel); font-size:12px; }
+.termbar .ttl { font-weight:600; }
+.pick { display:inline-flex; align-items:center; gap:6px; padding:4px 9px; border:1px solid var(--border2); border-radius:999px; background:var(--panel2); font-size:11.5px; cursor:pointer; }
+.pick .car { color:var(--dim); font-size:10px; }
+.termbody { border:1px solid var(--border); border-top:0; border-radius:0 0 10px 10px; background:#0b0b0b; color:#d6d6d6; padding:12px 14px; font:500 12px/1.6 ui-monospace,Menlo,monospace; min-height:120px; }
+[data-theme='light'] .termbody { background:#1d1a16; }
+.termbody .p { color:#8fb8a0; }
+.termbody .dim { color:#7a7a7a; }
+.menu { margin-top:6px; width:260px; background:var(--overlay); border:1px solid var(--border); border-radius:10px; box-shadow:var(--shadow-sheet); padding:5px; font-size:12px; }
+.menu div { display:flex; justify-content:space-between; gap:10px; padding:7px 9px; border-radius:7px; }
+.menu div.sel { background:var(--sel-bg); }
+.menu .r { color:var(--dim); font-size:11px; }
+.menu div.off { color:var(--dim); }
+.setupcard { border:1px solid var(--border); border-radius:12px; background:var(--panel); padding:12px 14px; display:grid; grid-template-columns:auto 1fr auto; gap:12px; align-items:center; }
+.setupcard .k { font:600 10px ui-monospace,Menlo,monospace; letter-spacing:.05em; text-transform:uppercase; color:var(--dim); }
+.setupcard .l { font-weight:600; font-size:13px; }
+.setupcard .d { color:var(--muted); font-size:12px; margin-top:2px; }
+.setupcard .dot { width:9px; height:9px; border-radius:50%; border:1.5px solid var(--border2); }
+.setupcard .dot.done { background:var(--green); border-color:var(--green); }
+
+/* state vocabulary strip */
+.states { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:10px; }
+.state { border:1px solid var(--border); border-radius:10px; background:var(--panel); padding:10px 12px; font-size:12px; }
+.state .nm { display:flex; align-items:center; gap:7px; font-weight:600; margin-bottom:4px; }
+.state .rs { color:var(--muted); font-size:11.5px; }
+.state .ac { margin-top:6px; font:500 10.5px ui-monospace,Menlo,monospace; color:var(--dim); }
+
+/* two-kinds table */
+table.kinds { border-collapse:collapse; width:100%; max-width:900px; font-size:12.5px; }
+table.kinds th, table.kinds td { text-align:left; padding:7px 10px; border-bottom:1px solid var(--border); vertical-align:top; }
+table.kinds th { font:600 10.5px ui-monospace,Menlo,monospace; letter-spacing:.06em; text-transform:uppercase; color:var(--dim); }
+table.kinds td:first-child { color:var(--muted); }
+.ladder { counter-reset:l; max-width:760px; margin:0; padding:0; list-style:none; }
+.ladder li { counter-increment:l; display:flex; gap:12px; padding:9px 0; border-bottom:1px dashed var(--border); font-size:12.8px; color:var(--body); }
+.ladder li::before { content:counter(l); flex:none; width:20px; height:20px; border-radius:50%; background:var(--panel3);
+  font:600 10.5px/20px ui-monospace,Menlo,monospace; text-align:center; color:var(--muted); }
+.ladder b { color:var(--text); }
+.ladder li.new { border-bottom-color:color-mix(in srgb,var(--violet) 40%,transparent); }
+.ladder li.new::before { background:color-mix(in srgb,var(--violet) 20%,transparent); color:var(--violet); }
+footer { color:var(--dim); font-size:11.5px; padding:8px 22px 26px; max-width:1300px; margin:0 auto; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Per-member cloud machines — the surfaces</h1>
+  <span class="sub">design round · 2026-09-03 · Individual: your one machine. Team: a machine for every member.</span>
+  <span class="spacer"></span>
+  <button class="ctl" onclick="const r=document.documentElement; r.dataset.theme = r.dataset.theme==='dark'?'light':'dark'">Toggle theme</button>
+</header>
+<main>
+
+<section>
+  <h2><span class="n">00</span>Two plans, never confused</h2>
+  <p class="why"><b>Individual</b> is one person: one cloud machine (the runner), your subscriptions signed in on it, one seat.
+    <b>Team</b> is where a second human begins — and where every member gets a machine of their own. The ids stay
+    <code>free</code> / <code>cloud</code>; the words change on every surface, and every upgrade screen names the plan you are on
+    and the one you are offered. The invitation is the door: on Individual it is refused with Team named, on Team the first one
+    quietly makes the runner yours and mints a fresh one.</p>
+  <div class="cols">
+    <div class="pane">
+      <div class="panehead">Pricing <span class="tag mut">two cards, nothing invented</span></div>
+      <div class="panebody"><div style="max-width:640px">
+        <div class="cols" style="gap:12px">
+          <div class="machcard">
+            <div class="machname">Individual <span class="chip c-done">$0</span></div>
+            <div class="machmeta sub">one person · one cloud machine · your subscriptions on it</div>
+            <div class="machrun">500 credits a month · 3 projects · your Mac joins too</div>
+            <div class="capacts"><button class="btn sm primary">Start free in your browser</button></div>
+          </div>
+          <div class="machcard">
+            <div class="machname">Team <span class="chip c-wake">$22 / seat / mo</span></div>
+            <div class="machmeta sub">a cloud machine for every member · shared by default · unlimited seats &amp; projects</div>
+            <div class="machrun">1,500 credits a seat each month · 50 GB per machine · priority support</div>
+            <div class="capacts"><button class="btn sm">Start with Team</button></div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+    <div class="pane">
+      <div class="panehead">Invite a teammate <span class="tag warn">on Individual</span></div>
+      <div class="panebody"><div>
+        <div class="sect">Invite a teammate</div>
+        <div class="locked" style="display:block">
+          <b>Individual workspaces are for one person.</b>
+          <div class="wshint" style="margin:6px 0 0">Upgrade to Team to invite teammates — each gets a cloud machine of their own, and your machine stays yours.</div>
+          <div class="capacts"><button class="btn sm primary">Upgrade to Team — $22 / seat / mo</button><button class="btn sm ghost">Not now</button></div>
+        </div>
+        <p class="wshint">The same sentence the server returns (<code>PLAN_LIMIT</code>), so the panel and the refusal can never disagree.</p>
+      </div></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2><span class="n">00a</span>The rule on Team — two kinds of machine, one grant</h2>
+  <p class="why">A workspace has <b>one runner</b> (BYOK keys at spawn, the starter brain, no logins — everyone may shell into it)
+    and <b>one machine per member</b> (their vendor logins on its volume — only they may shell into it). A member machine is
+    <b>born asleep</b>: a row and a StatefulSet at zero replicas, no pod, no disk, $0. It wakes when its owner needs it, when a
+    message from its owner arrives, or when the routing ladder needs a subscription only it holds. <b>Sharing is the existing
+    grant</b> (0119): shared with the whole workspace by default, one switch to stop.</p>
+  <table class="kinds">
+    <tr><th></th><th>Your machine</th><th>Workspace runner</th></tr>
+    <tr><td>credentials</td><td>your logins — <code>claude setup-token</code>, <code>codex login</code>, <code>gh auth login</code> — on <code>/nm/home</code></td><td>API keys resolved at spawn · the starter brain via the metered proxy · never a login</td></tr>
+    <tr><td>born</td><td>asleep · no PVC until the first wake</td><td>awake — the first message needs it</td></tr>
+    <tr><td>terminal</td><td><b>you only</b> (the relay refuses everyone else)</td><td>any member</td></tr>
+    <tr><td>serves</td><td>your requests; teammates' when you lend it (default: everyone)</td><td>key-based and starter work for everyone</td></tr>
+    <tr><td>dies</td><td>when you leave or are removed — disk and logins with it</td><td>with the workspace</td></tr>
+  </table>
+  <div class="sect" style="margin-top:14px">The ladder gains one rung, at the bottom</div>
+  <ol class="ladder">
+    <li><b>incapable → never.</b> <span class="g">unchanged</span></li>
+    <li><b>designated</b> (continuity · your pick · your default) <span class="g">unchanged</span></li>
+    <li><b>origin</b> — my owner asked → claim <span class="g">unchanged</span></li>
+    <li><b>consent</b> — not lent to the asker → stay out <span class="g">unchanged</span></li>
+    <li><b>failover</b> — no origin machine can serve → claim <span class="g">unchanged</span></li>
+    <li class="new"><b>wake a sleeper</b> — nobody awake can serve, but a lent cloud machine that <em>published</em> the runtime is asleep → ask the fleet to wake it, wait inside the boot grace, then let it claim. <span class="g">new — this is what makes a 3 a.m. routine on a Claude subscription run at all</span></li>
+  </ol>
+</section>
+
+<section>
+  <h2><span class="n">01</span>Settings → Compute — one row on Individual, machines regroup by role on Team</h2>
+  <div class="pane" style="margin-bottom:18px">
+    <div class="panehead">Compute <span class="tag good">Individual</span><span class="tag mut">george · solo</span></div>
+    <div class="panebody"><div>
+      <div class="sect">Your machine</div>
+      <div class="cmprow">
+        <span class="cmpdot on"></span>
+        <div class="cmpbody">
+          <div class="cmphead"><b>your machine</b><span class="cmphere">yours</span><span class="cmpkind">subscriptions · keys · starter brain</span></div>
+          <div class="cmpmeta"><span class="cmprt">claude-code</span><span class="cmprt">house brain</span></div>
+          <div class="cmpwhy">Awake and serving your agents. Sign into your subscriptions from its terminal.</div>
+          <div class="mfacts"><span>up 2h 15m</span><span>seen just now</span><span>10 GB · sleeps after 48h idle</span></div>
+          <div class="capacts"><button class="btn ghost sm">Open terminal</button></div>
+        </div>
+        <span class="cmpstate"><span class="cmpmstate online">online</span></span>
+      </div>
+      <p class="wshint">One person, one machine — no runner-versus-yours to explain. Team adds a machine per member and keeps this one as yours.</p>
+    </div></div>
+  </div>
+  <p class="why">On Team the panel lists machines flat today and treats <code>kind === 'runner'</code> as the only cloud row. Now each cloud row
+    wears its <b>state</b> (the same <code>machineState()</code> every surface uses) and its <b>facts</b>; yours carries the actions
+    only you can take. The left pane is a member who has a machine; the right pane is one who joined before this round, in a
+    workspace that is out of credits.</p>
+  <div class="cols">
+    <div class="pane">
+      <div class="panehead">Compute <span class="tag good">has a machine</span><span class="tag mut">george · gads-inc</span></div>
+      <div class="panebody"><div>
+        <div class="sect">Workspace runner</div>
+        <div class="cmprow">
+          <span class="cmpdot on"></span>
+          <div class="cmpbody">
+            <div class="cmphead"><b>runner</b><span class="cmpkind">shared · keys &amp; starter</span></div>
+            <div class="cmpmeta"><span class="cmprt">house brain</span><span class="cmprt">codex · workspace key</span></div>
+            <div class="cmpwhy">Awake and serving your agents.</div>
+            <div class="mfacts"><span>up 2h 15m</span><span>seen just now</span><span>worked 4 mins ago</span><span>sleeps after 48h idle</span></div>
+            <div class="capacts"><button class="btn ghost sm">Open terminal</button></div>
+          </div>
+          <span class="cmpstate"><span class="cmpmstate online">online</span></span>
+        </div>
+
+        <div class="sect">Your machine</div>
+        <div class="cmprow">
+          <span class="cmpdot"></span>
+          <div class="cmpbody">
+            <div class="cmphead"><b>george&rsquo;s machine</b><span class="cmphere">yours</span><span class="cmpkind">your logins live here</span></div>
+            <div class="cmpmeta"><span class="cmprt">claude-code</span><span class="cmprt">gh</span></div>
+            <div class="cmpwhy">Asleep until someone needs it. A message from you wakes it.</div>
+            <div class="mfacts"><span>seen 3 hours ago</span><span>worked 40 mins ago</span><span>10 GB · sleeps after 48h idle</span></div>
+            <div class="capacts"><button class="btn ghost sm">Wake now</button><button class="btn ghost sm">Open terminal</button><button class="btn ghost sm danger">Remove</button></div>
+          </div>
+          <span class="cmpstate"><span class="cmpmstate">asleep</span></span>
+        </div>
+        <p class="wshint">Sign into your subscriptions from its terminal. Nothing on it is ever seen by NeuraMesh or a teammate.</p>
+
+        <div class="sect">Teammates&rsquo; machines</div>
+        <div class="cmprow">
+          <span class="cmpdot wake"></span>
+          <div class="cmpbody">
+            <div class="cmphead"><b>geo&rsquo;s machine</b><span class="cmpowner">geo</span><span class="cmpshared">shared with you</span></div>
+            <div class="cmpmeta"><span class="cmprt">codex</span></div>
+            <div class="cmpwhy">Starting up. Agents pick their work back up automatically.</div>
+          </div>
+          <span class="cmpstate"><span class="cmpmstate waking">waking</span></span>
+        </div>
+        <div class="cmprow notmine">
+          <span class="cmpdot"></span>
+          <div class="cmpbody">
+            <div class="cmphead"><b>ada&rsquo;s machine</b><span class="cmpowner">ada</span><span class="machnoshare">not shared</span></div>
+            <div class="cmpmeta"><span class="cmprt">claude-code</span></div>
+          </div>
+          <span class="cmpstate"><span class="cmpmstate">asleep</span></span>
+        </div>
+        <p class="wshint">A teammate&rsquo;s machine wakes for you only when they lend it — waking it runs your work on their subscription, which is what lending means.</p>
+      </div></div>
+    </div>
+
+    <div class="pane">
+      <div class="panehead">Compute <span class="tag warn">no machine · out of credits</span><span class="tag mut">ada · acme</span></div>
+      <div class="panebody"><div>
+        <div class="sect">Workspace runner</div>
+        <div class="cmprow">
+          <span class="cmpdot"></span>
+          <div class="cmpbody">
+            <div class="cmphead"><b>runner</b><span class="cmpkind">shared · keys &amp; starter</span></div>
+            <div class="cmpwhy">Out of credits, so this machine cannot start. Top up and it wakes on the next message.</div>
+            <div class="capacts"><button class="btn primary sm">Add credits</button></div>
+          </div>
+          <span class="cmpstate"><span class="cmpmstate no_credits">out of credits</span></span>
+        </div>
+
+        <div class="sect">Your machine</div>
+        <div class="locked">
+          <span><b>You don&rsquo;t have a cloud machine here yet.</b> One is provisioned for each member while the workspace has credits — it holds your logins, and only you can open its terminal.</span>
+          <button class="btn sm" disabled title="the workspace is out of credits">Add my cloud machine</button>
+        </div>
+        <p class="wshint">Until then your requests run on a teammate&rsquo;s machine, under that teammate&rsquo;s subscription — when one is lent to you.</p>
+
+        <div class="sect">Teammates&rsquo; machines</div>
+        <div class="cmprow">
+          <span class="cmpdot on"></span>
+          <div class="cmpbody">
+            <div class="cmphead"><b>george&rsquo;s machine</b><span class="cmpowner">george</span><span class="cmpshared">shared with you</span></div>
+            <div class="cmpmeta"><span class="cmprt">claude-code</span><span class="cmprt">gh</span></div>
+            <div class="cmpwhy">Awake and serving your agents.</div>
+          </div>
+          <span class="cmpstate"><span class="cmpmstate online">online</span></span>
+        </div>
+      </div></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2><span class="n">02</span>Sharing — one master switch above the per-member ones</h2>
+  <p class="why">The grant already exists per member (<code>compute.shares</code>, <code>'*'</code> = everyone, on since 0119). What George asked
+    for is the workspace-level answer: <b>is my compute shared with this workspace, yes or no</b>. The master switch writes
+    <code>['*']</code> or <code>[]</code> through the same <code>member.share_compute</code> path; the per-member switches below it keep the
+    fine grain and show the intent, never a recomputed set.</p>
+  <div class="cols">
+    <div class="pane">
+      <div class="panehead">Sharing <span class="tag good">default</span></div>
+      <div class="panebody"><div>
+        <div class="sect">Sharing</div>
+        <div class="shareline">
+          <button class="shsw on" role="switch" aria-checked="true"></button>
+          <span class="sharetxt"><b>Share my compute with the workspace</b>
+            <span class="sharesub">Teammates&rsquo; requests, tasks and routines may run on your machines, on your subscriptions. On for everyone by default.</span></span>
+        </div>
+        <div class="shrow"><span class="shwho"><b>geo</b><span class="shsub">1 machine</span></span><button class="shsw on" role="switch" aria-checked="true"></button><span class="shlbl">you lend</span><span class="shthem"><span class="shyes">they lend</span></span></div>
+        <div class="shrow"><span class="shwho"><b>ada</b><span class="shsub">no machine yet</span></span><button class="shsw on" role="switch" aria-checked="true"></button><span class="shlbl">you lend</span><span class="shthem"><span class="shno">they don&rsquo;t</span></span></div>
+      </div></div>
+    </div>
+    <div class="pane">
+      <div class="panehead">Sharing <span class="tag warn">switched off</span></div>
+      <div class="panebody"><div>
+        <div class="sect">Sharing</div>
+        <div class="shareline">
+          <button class="shsw" role="switch" aria-checked="false"></button>
+          <span class="sharetxt"><b>Share my compute with the workspace</b>
+            <span class="sharesub">Off: only your own requests run on your machines. Existing threads finish where their files are — the confirm said so and offered to move them.</span></span>
+        </div>
+        <div class="shrow"><span class="shwho"><b>geo</b><span class="shsub">1 machine</span></span><button class="shsw" role="switch" aria-checked="false"></button><span class="shlbl">you lend</span><span class="shthem"><span class="shyes">they lend</span></span></div>
+        <div class="shrow"><span class="shwho"><b>ada</b><span class="shsub">no machine yet</span></span><button class="shsw" role="switch" aria-checked="false"></button><span class="shlbl">you lend</span><span class="shthem"><span class="shno">they don&rsquo;t</span></span></div>
+        <p class="wshint">Flipping one member back on turns the master switch to <em>some</em> — the grant is per member underneath, and the panel never pretends otherwise.</p>
+      </div></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2><span class="n">03</span>Agents &amp; Machines — every cloud card wears its state</h2>
+  <p class="why">The card said <em>online / offline</em> from the heartbeat alone, which reads a sleeping cloud machine as broken. Cloud cards
+    now take the derived state (asleep · waking · online · out of credits), from <b>one</b> <code>useCompute</code> map keyed by machine id —
+    <code>machines[0]</code> dies in both places it lives.</p>
+  <div class="pane"><div class="panebody"><div style="max-width:1000px">
+    <div class="fleetrow">
+      <div class="machcard">
+        <div class="machname">⌂ runner <span class="chip c-done">online</span><span class="cmpkind">runner</span></div>
+        <div class="machmeta">serves <b>7 of 9</b> agents <span class="cmprt">house brain</span><span class="cmprt">codex</span></div>
+        <div class="machmeta sub">workspace · daemon 0.121.0 · linux · up 2h 15m</div>
+        <div class="machrun">rex working</div>
+      </div>
+      <div class="machcard">
+        <div class="machname">⌂ george&rsquo;s machine <span class="chip c-closed">asleep</span><span class="cmphere">yours</span></div>
+        <div class="machmeta">serves <b>4 of 9</b> agents <span class="cmprt">claude-code</span><span class="cmprt">gh</span></div>
+        <div class="machmeta sub">george · daemon 0.121.0 · linux · seen 3 hours ago</div>
+        <div class="machrun">wakes on your next message, or the ladder&rsquo;s</div>
+      </div>
+      <div class="machcard">
+        <div class="machname">⌂ geo&rsquo;s machine <span class="chip c-wake">waking</span><span class="cmpshared">shared</span></div>
+        <div class="machmeta">serves <b>3 of 9</b> agents <span class="cmprt">codex</span></div>
+        <div class="machmeta sub">geo · daemon 0.121.0 · linux · starting 40s ago</div>
+        <div class="machrun">agents pick their work back up automatically</div>
+      </div>
+      <div class="machcard notmine">
+        <div class="machname">⌂ ada&rsquo;s machine <span class="chip c-closed">asleep</span><span class="machnoshare">not shared</span></div>
+        <div class="machmeta">serves <b>4 of 9</b> agents <span class="cmprt">claude-code</span></div>
+        <div class="machmeta sub">ada · daemon 0.121.0 · linux · seen yesterday</div>
+      </div>
+      <div class="machcard">
+        <div class="machname">⌂ canmac <span class="chip c-done">online</span><span class="cmphere">yours</span></div>
+        <div class="machmeta">serves <b>9 of 9</b> agents <span class="cmprt">claude-code</span><span class="cmprt">codex</span><span class="cmprt">gemini</span></div>
+        <div class="machmeta sub">george · daemon 0.121.0 · darwin</div>
+        <div class="machrun">standing by</div>
+      </div>
+    </div>
+  </div></div></div>
+</section>
+
+<section>
+  <h2><span class="n">04</span>The terminal — a machine picker, and only your machines are in it</h2>
+  <p class="why">The browser terminal attached to <code>machines[0]</code>. Now it opens on <b>your machine</b> when you have one (that is where
+    logins go) and the picker offers the runner beside it. A teammate&rsquo;s machine is not in the list: the relay refuses it, so the
+    picker does too — a control that refuses is worse than one that is not there.</p>
+  <div class="cols">
+    <div class="pane">
+      <div class="panehead">Terminal <span class="tag new">picker</span></div>
+      <div class="panebody"><div>
+        <div class="termbar"><span class="ttl">Terminal</span><span class="pick">⌂ george&rsquo;s machine <span class="car">▾</span></span><span class="spacer"></span><span class="cmpmstate online">online</span></div>
+        <div class="termbody"><span class="p">george@member-2f1c</span>:<span class="dim">~</span>$ claude setup-token<br><span class="dim">Opening https://claude.ai/oauth/authorize?… — paste the code below.</span><br>Paste code here if prompted &gt; <span class="dim">▍</span></div>
+        <div class="menu">
+          <div class="sel"><span>⌂ george&rsquo;s machine</span><span class="r">yours · online</span></div>
+          <div><span>⌂ runner</span><span class="r">workspace · online</span></div>
+          <div class="off"><span>⌂ geo&rsquo;s machine</span><span class="r">not yours — not offered</span></div>
+        </div>
+        <p class="wshint" style="margin-top:8px">The greyed row is illustrative only: the shipped menu lists two entries. Shown here to say what is deliberately absent.</p>
+      </div></div>
+    </div>
+    <div class="pane">
+      <div class="panehead">Terminal <span class="tag warn">no machine of your own</span></div>
+      <div class="panebody"><div>
+        <div class="termbar"><span class="ttl">Terminal</span><span class="pick">⌂ runner <span class="car">▾</span></span><span class="spacer"></span><span class="cmpmstate online">online</span></div>
+        <div class="termbody"><span class="dim">This is the workspace runner. Your own logins should go on your machine — add one from Settings → Compute once the workspace has credits.</span><br><span class="p">ada@runner</span>:<span class="dim">~</span>$ <span class="dim">▍</span></div>
+      </div></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2><span class="n">05</span>The setup card and the join line</h2>
+  <p class="why"><b>Bring your subscription</b> already exists (the cloud-first onboarding round). Its action now does the whole thing: provision your
+    machine if you have none, wake it, open the terminal <b>on it</b>. On join, the compute-intro card learns one sentence.</p>
+  <div class="cols">
+    <div class="pane">
+      <div class="panehead">Setup cards <span class="tag mut">after the first reply</span></div>
+      <div class="panebody"><div>
+        <div class="setupcard" style="margin-bottom:8px"><span class="dot done"></span><span><span class="l">Cloud machine</span><div class="d">Provisioned and awake. Yours, free to start.</div></span><span class="k">done</span></div>
+        <div class="setupcard" style="margin-bottom:8px"><span class="dot"></span><span><span class="l">Bring your subscription</span><div class="d">Sign into Claude on <b>your machine</b> — the terminal opens right here. Usage stays on your plan; the runner never holds a login.</div></span><button class="btn sm primary">Open terminal</button></div>
+        <div class="setupcard"><span class="dot"></span><span><span class="l">Invite your team</span><div class="d">Each member gets their own machine, and decides whether to share it.</div></span><button class="btn sm">Invite</button></div>
+      </div></div>
+    </div>
+    <div class="pane">
+      <div class="panehead">First run after joining <span class="tag mut">compute-intro card</span></div>
+      <div class="panebody"><div>
+        <div class="locked" style="display:block">
+          <b>Welcome to gads-inc.</b>
+          <div class="wshint" style="margin:6px 0 0">You have your own cloud machine here — it is asleep until you need it, and it is where your subscriptions go.
+            Your requests run on it by default; george and geo lend you theirs too. Your machine is <b>shared with the workspace</b> unless you switch that off.</div>
+          <div class="capacts"><button class="btn sm primary">Sign in on my machine</button><button class="btn sm ghost">Keep as is</button></div>
+        </div>
+      </div></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2><span class="n">06</span>The state vocabulary — one derivation, six words</h2>
+  <p class="why">All from <code>machineState()</code>, unchanged; two rows are new to member machines.</p>
+  <div class="states">
+    <div class="state"><div class="nm"><span class="cmpdot"></span>asleep</div><div class="rs">Asleep until someone needs it. A message from you wakes it.</div><div class="ac">Wake now · Open terminal (wakes first)</div></div>
+    <div class="state"><div class="nm"><span class="cmpdot wake"></span>waking</div><div class="rs">Starting up. Agents pick their work back up automatically.</div><div class="ac">no actions — a second wake resets nothing useful</div></div>
+    <div class="state"><div class="nm"><span class="cmpdot on"></span>online</div><div class="rs">Awake and serving your agents.</div><div class="ac">Open terminal · Remove</div></div>
+    <div class="state"><div class="nm"><span class="cmpdot"></span><span class="cmpmstate no_credits">out of credits</span></div><div class="rs">Out of credits, so this machine cannot start. Top up and it wakes on the next message.</div><div class="ac">Add credits</div></div>
+    <div class="state"><div class="nm"><span class="cmpdot"></span><span class="cmpmstate unreachable">unreachable</span></div><div class="rs">It should be running and is not answering. Try waking it again.</div><div class="ac">Wake now</div></div>
+    <div class="state"><div class="nm"><span class="cmpdot"></span><span class="cmpmstate stopped">none yet</span></div><div class="rs">You don&rsquo;t have a cloud machine here yet. One is provisioned while the workspace has credits.</div><div class="ac">Add my cloud machine</div></div>
+  </div>
+</section>
+
+</main>
+<footer>Design round for <a href="plan.md">plan.md</a> — per-member cloud machines, 2026-09-03. Both themes via the toggle; classes mirror the app so this can be judged as the app.</footer>
+<script>
+  // ?theme=light|dark — so a capture can name the theme instead of clicking for it
+  const want = new URLSearchParams(location.search).get('theme');
+  if (want === 'light' || want === 'dark') document.documentElement.dataset.theme = want;
+</script>
+</body>
+</html>

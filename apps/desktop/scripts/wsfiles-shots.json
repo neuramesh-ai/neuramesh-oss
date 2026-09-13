@@ -1,0 +1,25 @@
+[
+  { "name": "wf1-root-dark", "settle": 1600, "query": { "theme": "dark" },
+    "js": "(() => { const nav=[...document.querySelectorAll('button')].find(b=>(b.textContent||'').trim()==='Files'); nav && nav.click(); return new Promise(r=>setTimeout(r,600)); })()" },
+
+  { "name": "wf2-root-cream", "settle": 1600, "query": { "theme": "cream-oak" },
+    "js": "(() => { const nav=[...document.querySelectorAll('button')].find(b=>(b.textContent||'').trim()==='Files'); nav && nav.click(); return new Promise(r=>setTimeout(r,600)); })()" },
+
+  { "name": "wf3-project-dark", "settle": 1600, "query": { "theme": "dark" },
+    "js": "(() => { const nav=[...document.querySelectorAll('button')].find(b=>(b.textContent||'').trim()==='Files'); nav && nav.click(); return new Promise(r=>setTimeout(()=>{ const f=[...document.querySelectorAll('.wfolder')].find(x=>(x.getAttribute('title')||'').indexOf('v0.9')===0); f && f.click(); setTimeout(r,600); },600)); })()" },
+
+  { "name": "wf4-project-cream", "settle": 1600, "query": { "theme": "cream-oak" },
+    "js": "(() => { const nav=[...document.querySelectorAll('button')].find(b=>(b.textContent||'').trim()==='Files'); nav && nav.click(); return new Promise(r=>setTimeout(()=>{ const f=[...document.querySelectorAll('.wfolder')].find(x=>(x.getAttribute('title')||'').indexOf('v0.9')===0); f && f.click(); setTimeout(r,600); },600)); })()" },
+
+  { "name": "wf5-documents-chip-dark", "settle": 1600, "query": { "theme": "dark" },
+    "js": "(() => { const nav=[...document.querySelectorAll('button')].find(b=>(b.textContent||'').trim()==='Files'); nav && nav.click(); return new Promise(r=>setTimeout(()=>{ const f=[...document.querySelectorAll('.wfolder')].find(x=>(x.getAttribute('title')||'').indexOf('v0.9')===0); f && f.click(); setTimeout(()=>{ const d=[...document.querySelectorAll('.wfchips button')].find(b=>(b.textContent||'').indexOf('Documents')===0); d && d.click(); setTimeout(r,400); },600); },600)); })()" },
+
+  { "name": "wf6-upload-rooms-cream", "settle": 1600, "query": { "theme": "cream-oak" },
+    "js": "(() => { const nav=[...document.querySelectorAll('button')].find(b=>(b.textContent||'').trim()==='Files'); nav && nav.click(); return new Promise(r=>setTimeout(()=>{ const f=[...document.querySelectorAll('.wfolder')].find(x=>(x.getAttribute('title')||'').indexOf('v0.9')===0); f && f.click(); setTimeout(()=>{ const u=document.querySelector('.wfupload'); u && u.click(); setTimeout(r,500); },600); },600)); })()" },
+
+  { "name": "wf7-ghost-no-chip-dark", "settle": 2600, "query": { "theme": "dark", "stream": "thinking" },
+    "js": "(() => { const hit=[...document.querySelectorAll('.frow')].find(x=>/sketch the pipeline/.test(x.textContent||'')); hit && hit.click(); return new Promise(r=>setTimeout(r,2200)); })()" },
+
+  { "name": "wf8-ghost-no-chip-cream", "settle": 2600, "query": { "theme": "cream-oak", "stream": "thinking" },
+    "js": "(() => { const hit=[...document.querySelectorAll('.frow')].find(x=>/sketch the pipeline/.test(x.textContent||'')); hit && hit.click(); return new Promise(r=>setTimeout(r,2200)); })()" }
+]

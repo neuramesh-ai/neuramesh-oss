@@ -1,0 +1,9 @@
+# the prd stack — the only stack. project: neuramesh-prd, region: us-east4 (Ashburn,
+# same metro as Supabase/PowerSync/Vercel us-east-1 — research.md §7).
+# gcp:* configure the provider; the project-namespaced twins feed interpolation.
+config:
+  gcp:project: neuramesh-prd
+  gcp:region: us-east4
+  neuramesh-infra:project: neuramesh-prd
+  neuramesh-infra:region: us-east4
+  neuramesh-infra:githubRepo: alonge-dev/neuramesh

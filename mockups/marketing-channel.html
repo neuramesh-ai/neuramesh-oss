@@ -1,0 +1,683 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Marketing channel — rooms get a trade</title>
+<style>
+/* ── doc chrome (house mockup style, per projects-page.html) ── */
+:root {
+  --fdisp: 'Geist Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --fbody: 'Geist Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --fmono: 'Geist Mono Variable', ui-monospace, 'SF Mono', Menlo, monospace;
+  --dur-fast: .12s; --dur: .18s; --ease: cubic-bezier(.21,.61,.35,1);
+  --r-xs: 4px; --r-sm: 6px; --r-md: 8px; --r-lg: 11px; --r-xl: 14px; --r-full: 999px;
+  --st-bg: #131313; --st-card: #191919; --st-line: #262626; --st-line2: #333;
+  --st-ink: #e8e8e8; --st-body: #b5b5b5; --st-mut: #8d8d8d; --st-dim: #676767; --st-link: #9cb1f0;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: var(--st-bg); color: var(--st-ink); font: 14px/1.6 var(--fbody); -webkit-font-smoothing: antialiased; }
+.doc { max-width: 1400px; margin: 0 auto; padding: 52px 28px 90px; }
+.eyebrow { font: 700 10.5px var(--fmono); letter-spacing: .14em; text-transform: uppercase; color: var(--st-mut); }
+h1 { font: 650 27px/1.2 var(--fdisp); letter-spacing: -.015em; margin: 10px 0 14px; text-wrap: balance; }
+.lede { max-width: 82ch; color: var(--st-body); font-size: 13.5px; }
+.lede b { color: var(--st-ink); font-weight: 620; }
+.docmeta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+.docmeta span { font: 600 10.5px var(--fmono); color: var(--st-mut); border: 1px solid var(--st-line2); border-radius: 999px; padding: 3px 10px; }
+.docmeta span.rec { color: var(--st-link); border-color: color-mix(in srgb, var(--st-link) 45%, transparent); }
+section { margin-top: 64px; }
+.shead { display: flex; align-items: baseline; gap: 12px; border-bottom: 1px solid var(--st-line); padding-bottom: 10px; margin-bottom: 18px; }
+.snum { font: 700 11px var(--fmono); color: var(--st-link); letter-spacing: .08em; }
+.shead h2 { font: 640 17px var(--fdisp); letter-spacing: -.01em; }
+.shead .why { margin-left: auto; font-size: 12px; color: var(--st-mut); text-align: right; max-width: 52ch; }
+.duo { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
+@media (max-width: 1080px) { .duo { grid-template-columns: 1fr; } }
+.stack { display: grid; gap: 14px; }
+.vh { font: 700 10.5px var(--fmono); letter-spacing: .1em; text-transform: uppercase; color: var(--st-mut); margin: 0 2px 10px; }
+.frame { border: 1px solid var(--st-line); border-radius: 16px; background: var(--st-card); padding: 22px; overflow-x: auto; }
+.notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 6px 26px; margin-top: 14px; padding: 0 4px; }
+.note { display: flex; gap: 9px; font-size: 12px; color: var(--st-body); align-items: baseline; }
+.note b { color: var(--st-ink); font-weight: 620; }
+.note code { font: 600 11px var(--fmono); color: var(--st-mut); }
+.note .dot { width: 6px; height: 6px; border-radius: 99px; flex: none; position: relative; top: -1px; background: #77ac8d; }
+.note.warn .dot { background: #676767; }
+a { color: var(--st-link); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+/* ── the app's real tokens, scoped per frame (verbatim from tokens.css: dark + cream-oak) ── */
+.T { font: 13px/1.5 var(--fbody); color: var(--text); }
+.T-dark {
+  --win: #141414; --bg: #1d1d1d; --panel: #222222; --panel2: #282828; --panel3: #323232;
+  --border: #2c2c2c; --border2: #3a3a3a;
+  --text: #e6e6e6; --body: #b9b9b9; --muted: #8f8f8f; --dim: #6b6b6b;
+  --link: #9cb1f0; --accent: var(--text); --accent-ink: #141414;
+  --btn: #313131; --btn-fg: #ebebeb; --btn-hover: #3c3c3c;
+  --green: #77ac8d; --todo: #949494; --prog: #8ba0c0; --review: #a89ccf; --done: #77ac8d; --backlog: #8f9aa6;
+  --shadow: rgba(0,0,0,0.5); --card: #232323; --card-border: #313131;
+  --ring: #575757; --hover-border: #464646;
+  --hover-bg: color-mix(in srgb, var(--text) 6%, transparent);
+  --sel-bg: color-mix(in srgb, var(--text) 9%, transparent); --sel-mark: var(--body);
+  --role-orch: #9793d2; --role-dev: #77ac8d; --role-rev: #7ba1c4; --role-tone: 16%;
+  /* PROPOSED: the marketer hue joins the role ramp — dusty rose, distinct from
+     --role-design's magenta-pink and the anthropic provider mark */
+  --role-mkt: #c98f8f;
+}
+.T-oak {
+  --win: #efe6d7; --bg: #f7efe2; --panel: #fffaf2; --panel2: #f4e7d6; --panel3: #ecdcc5;
+  --border: #ecdfcd; --border2: #dbc6ad;
+  --text: #352a20; --body: #5c5040; --muted: #8a7969; --dim: #a8967f;
+  --link: #5348c0; --accent: var(--text); --accent-ink: #ffffff;
+  --btn: #efe6d7; --btn-fg: #352a20; --btn-hover: #e6d9c4;
+  --green: #2f9e6b; --todo: #7d8590; --prog: #4f80c4; --review: #6d5ce0; --done: #0f9d63; --backlog: #5d6b7a;
+  --shadow: rgba(80,50,25,0.16); --card: #fbf4e9; --card-border: #ecdfcd;
+  --ring: color-mix(in srgb, var(--accent) 55%, var(--border2));
+  --hover-border: color-mix(in srgb, var(--text) 20%, var(--border2));
+  --hover-bg: color-mix(in srgb, var(--text) 5%, transparent);
+  --sel-bg: color-mix(in srgb, var(--text) 7%, transparent); --sel-mark: var(--body);
+  --role-orch: #6a63bc; --role-dev: #3f9268; --role-rev: #4f7bb0; --role-tone: 14%;
+  --role-mkt: #b04f55;
+}
+.T.frame { background: var(--win); border-color: var(--st-line); }
+
+/* ── shell (navpanel per the app / projects-page mockup) ── */
+.shell { display: flex; background: var(--win); gap: 8px; border-radius: 12px; min-width: 0; }
+.navpanel { width: 218px; min-width: 218px; background: var(--panel2); border: 1px solid var(--border); border-radius: var(--r-xl); display: flex; flex-direction: column; overflow: hidden; }
+.navhead { display: flex; align-items: center; gap: 9px; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+.navbadge { width: 30px; height: 30px; border-radius: var(--r-lg); background: linear-gradient(160deg, var(--panel3), var(--panel2)); font-weight: 700; font-size: 13px; display: grid; place-items: center; border: 1px solid var(--border2); }
+.navhead .wsname { font-size: 12.5px; font-weight: 650; }
+.navhead .wsplan { font: 600 9.5px var(--fmono); color: var(--dim); }
+.navsect { padding: 12px 14px 5px; font-size: 10px; font-weight: 700; letter-spacing: .7px; color: var(--dim); text-transform: uppercase; display: flex; align-items: center; }
+.navsect .chanadd { margin-left: auto; width: 16px; height: 16px; display: grid; place-items: center; border: 1px solid var(--border2); border-radius: 5px; background: none; color: var(--muted); font-size: 11px; line-height: 1; cursor: pointer; }
+.chan { display: flex; align-items: center; gap: 8px; padding: 5.5px 9px; margin: 0 8px; border-radius: 8px; color: var(--muted); font-size: 12.5px; cursor: pointer; }
+.chan .hash { color: var(--dim); font-weight: 600; }
+.chan.on { background: var(--sel-bg); color: var(--text); font-weight: 600; }
+.chan .kglyph { margin-left: auto; color: var(--dim); display: grid; place-items: center; }
+.chan.on .kglyph { color: var(--muted); }
+.chan .lock { margin-left: auto; color: var(--dim); font-size: 10px; }
+.navfoot { margin-top: auto; border-top: 1px solid var(--border); padding: 9px 12px; display: flex; align-items: center; gap: 8px; color: var(--dim); font-size: 11px; }
+.main { flex: 1; min-width: 0; background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-xl); display: flex; flex-direction: column; overflow: hidden; }
+.topbar { display: flex; align-items: center; gap: 10px; padding: 9px 14px; border-bottom: 1px solid var(--border); }
+.topbar .chname { font-size: 13px; font-weight: 650; }
+.topbar .chtopic { font-size: 11.5px; color: var(--dim); }
+.topbar .gear { margin-left: auto; color: var(--dim); }
+/* PROPOSED: marketing rooms swap the chat/board toggle for surface chips */
+.viewchips { display: flex; gap: 4px; margin-left: 14px; }
+.viewchip { font-size: 11px; font-weight: 600; color: var(--muted); border: 1px solid transparent; border-radius: 7px; padding: 3px 9px; cursor: pointer; }
+.viewchip.on { background: var(--sel-bg); color: var(--text); border-color: var(--border2); }
+.feed { padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+.daychip { align-self: center; font-size: 10px; font-weight: 700; letter-spacing: .05em; color: var(--dim); border: 1px solid var(--border); border-radius: 999px; padding: 2px 10px; }
+
+/* ── chat idiom (real .msg/.pav/.rolechip/.chip) ── */
+.msg { display: flex; gap: 11px; padding: 4px 6px; }
+.pav { width: 26px; height: 26px; min-width: 26px; border-radius: 8px; display: grid; place-items: center; font-size: 14px; background: color-mix(in srgb, var(--rc) var(--role-tone), transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--rc) 32%, var(--border2)); }
+.pav .pavg { font-style: normal; filter: grayscale(1); }
+.msg .body { min-width: 0; flex: 1; }
+.msg .head { display: flex; align-items: center; gap: 8px; }
+.msg .head b { font-size: 12.5px; }
+.rolechip { font-size: 8px; font-weight: 800; letter-spacing: .5px; text-transform: uppercase; padding: 1.5px 5px; border-radius: 4px; background: color-mix(in srgb, var(--muted) 16%, transparent); color: color-mix(in srgb, var(--rc) 80%, var(--muted)); }
+.time { font-size: 10.5px; color: var(--dim); }
+.msg p { color: var(--body); font-size: 12.5px; line-height: 1.5; margin-top: 2px; overflow-wrap: anywhere; }
+.msg p b { color: var(--text); font-weight: 600; }
+.beatline { display: flex; align-items: center; gap: 7px; margin-top: 5px; font-size: 11px; color: var(--dim); }
+.beatline .bdot { width: 5px; height: 5px; border-radius: 99px; background: color-mix(in srgb, var(--rc, var(--muted)) 70%, var(--muted)); }
+.beatline .bdone { color: var(--muted); }
+.chip { display: inline-flex; align-items: center; gap: 5px; font-size: 9px; font-weight: 800; letter-spacing: .5px; padding: 2px 7px; border-radius: 5px; text-transform: uppercase; white-space: nowrap; }
+.c-prog { background: color-mix(in srgb, var(--prog) 16%, transparent); color: var(--prog); }
+.c-done { background: color-mix(in srgb, var(--done) 16%, transparent); color: var(--done); }
+.c-dim { background: color-mix(in srgb, var(--muted) 14%, transparent); color: var(--muted); }
+
+/* artifact file card (the thread deliverable idiom) */
+.artcard { border: 1px solid var(--card-border); background: var(--card); border-radius: var(--r-md); margin-top: 7px; max-width: 560px; overflow: hidden; }
+.artcard .ahead { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-bottom: 1px solid var(--border); }
+.artcard .ahead .fico { color: var(--muted); display: grid; place-items: center; }
+.artcard .ahead b { font: 600 11.5px var(--fmono); }
+.artcard .ahead .akind { font-size: 10px; color: var(--dim); }
+.artcard .ahead .astate { margin-left: auto; }
+.artcard .abody { padding: 10px 12px 12px; }
+.artcard .abody h4 { font-size: 12.5px; margin-bottom: 4px; }
+.artcard .abody p, .artcard .abody li { font-size: 11.5px; color: var(--body); line-height: 1.55; }
+.artcard .abody ul { padding-left: 16px; margin-top: 4px; }
+.artcard.generating .ahead { border-bottom-style: dashed; }
+.artcard .afoot { display: flex; gap: 8px; padding: 6px 10px; border-top: 1px solid var(--border); }
+.artcard .afoot button { font-size: 10.5px; color: var(--muted); background: none; border: none; cursor: pointer; }
+
+/* gate / setup / plan cards (qcard family) */
+.qcard { border: 1px solid var(--card-border); background: var(--card); border-radius: var(--r-lg); padding: 13px 14px; max-width: 560px; }
+.qcard .qhead { font-size: 13px; font-weight: 700; }
+.qcard .qsub { font-size: 11.5px; color: var(--muted); margin-top: 2px; line-height: 1.5; }
+.steps { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
+.step .slabel { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--dim); margin-bottom: 6px; display: flex; gap: 6px; align-items: center; }
+.step .slabel .sn { width: 14px; height: 14px; border-radius: 99px; border: 1px solid var(--border2); display: grid; place-items: center; font: 700 8.5px var(--fmono); color: var(--muted); }
+.urlrow { display: flex; align-items: center; gap: 8px; border: 1px solid var(--border2); background: var(--panel2); border-radius: 8px; padding: 7px 10px; }
+.urlrow .plogo { width: 18px; height: 18px; border-radius: 5px; background: var(--panel3); border: 1px solid var(--border2); display: grid; place-items: center; font-size: 9px; font-weight: 800; }
+.urlrow input { flex: 1; background: none; border: none; color: var(--text); font: 500 12.5px var(--fbody); outline: none; }
+.urlrow .from { font-size: 10px; color: var(--dim); }
+.focusrow { display: flex; flex-wrap: wrap; gap: 6px; }
+.fchip { font-size: 11.5px; font-weight: 600; color: var(--muted); border: 1px solid var(--border2); background: var(--panel2); border-radius: 999px; padding: 4px 11px; cursor: pointer; }
+.fchip.on { color: var(--text); border-color: color-mix(in srgb, var(--text) 35%, var(--border2)); background: var(--sel-bg); }
+.connrow { display: flex; align-items: center; gap: 9px; border: 1px solid var(--border); background: var(--panel2); border-radius: 8px; padding: 7px 10px; margin-top: 6px; }
+.connrow:first-of-type { margin-top: 0; }
+.connrow .cico { width: 22px; height: 22px; border-radius: 6px; background: var(--panel3); border: 1px solid var(--border2); display: grid; place-items: center; font-size: 11px; font-weight: 800; color: var(--body); }
+.connrow .cname { font-size: 12px; font-weight: 600; }
+.connrow .cwho { font: 500 10.5px var(--fmono); color: var(--dim); }
+.connrow .cbtn { margin-left: auto; font-size: 11px; font-weight: 600; color: var(--body); border: 1px solid var(--border2); background: var(--btn); border-radius: 7px; padding: 3.5px 10px; cursor: pointer; }
+.connrow .cok { margin-left: auto; font-size: 10.5px; font-weight: 700; color: var(--done); }
+.connrow .csoon { margin-left: auto; font-size: 10px; color: var(--dim); }
+.cardfoot { display: flex; align-items: center; gap: 10px; margin-top: 13px; }
+.btnp { font-size: 12px; font-weight: 650; color: var(--accent-ink); background: var(--accent); border: none; border-radius: 8px; padding: 6.5px 13px; cursor: pointer; }
+.btng { font-size: 11.5px; font-weight: 600; color: var(--muted); background: none; border: none; cursor: pointer; }
+.gatefoot { display: flex; align-items: center; gap: 10px; border-top: 1px solid var(--border); margin-top: 12px; padding-top: 11px; }
+.gatefoot .gtxt { font-size: 11px; color: var(--muted); line-height: 1.45; }
+.gatefoot .gtxt b { color: var(--text); }
+
+/* plan card + schedule pills */
+.planrow { display: flex; align-items: flex-start; gap: 9px; border-top: 1px solid var(--border); padding: 9px 2px; }
+.planrow:first-of-type { border-top: none; }
+.planrow .ptxt { flex: 1; font-size: 12px; color: var(--body); line-height: 1.45; }
+.planrow .ptxt b { color: var(--text); font-weight: 600; }
+.schedpill { display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 700; color: var(--body); border: 1px solid var(--border2); background: var(--panel2); border-radius: 999px; padding: 3px 10px; cursor: pointer; white-space: nowrap; }
+.schedpill:hover { border-color: var(--hover-border); }
+.schedpill.armed { color: var(--done); border-color: color-mix(in srgb, var(--done) 40%, var(--border2)); background: color-mix(in srgb, var(--done) 8%, transparent); }
+.whenpop { border: 1px solid var(--border2); background: var(--panel); border-radius: var(--r-md); box-shadow: 0 12px 28px -14px var(--shadow); padding: 10px 11px; width: 240px; margin-top: 6px; }
+.whenpop .wlabel { font-size: 9.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--dim); margin-bottom: 5px; }
+.wopts { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 8px; }
+.wopt { font-size: 10.5px; font-weight: 600; color: var(--muted); border: 1px solid var(--border2); border-radius: 6px; padding: 2.5px 8px; cursor: pointer; }
+.wopt.on { color: var(--text); background: var(--sel-bg); }
+.wrow { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--body); margin-bottom: 8px; }
+.wrow .wtime { font: 600 11px var(--fmono); border: 1px solid var(--border2); border-radius: 6px; padding: 2px 7px; }
+.wfoot { display: flex; justify-content: space-between; align-items: center; }
+.wnote { font-size: 9.5px; color: var(--dim); max-width: 130px; line-height: 1.4; }
+
+/* ── HQ rail ── */
+.hqwrap { display: flex; gap: 10px; padding: 12px; }
+.hqmain { flex: 1; min-width: 0; }
+.hqrail { width: 208px; min-width: 208px; display: flex; flex-direction: column; gap: 10px; }
+.railcard { border: 1px solid var(--border); background: var(--panel); border-radius: var(--r-lg); padding: 10px 11px; }
+.railcard .rhead { display: flex; align-items: baseline; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--dim); margin-bottom: 8px; }
+.railcard .rhead .rall { margin-left: auto; font-size: 9.5px; color: var(--muted); letter-spacing: 0; text-transform: none; font-weight: 600; cursor: pointer; }
+.uprow { display: flex; align-items: center; gap: 8px; padding: 5px 0; }
+.uprow .upav { width: 20px; height: 20px; min-width: 20px; border-radius: 6px; font-size: 11px; display: grid; place-items: center; background: color-mix(in srgb, var(--rc) var(--role-tone), transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--rc) 30%, var(--border2)); }
+.uprow .upav i { font-style: normal; filter: grayscale(1); }
+.uprow .upt { flex: 1; min-width: 0; }
+.uprow .upt b { display: block; font-size: 11px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.uprow .upt span { font-size: 9.5px; color: var(--dim); }
+.uprow .upin { font: 700 9.5px var(--fmono); color: var(--muted); white-space: nowrap; }
+.librow { display: flex; align-items: center; gap: 7px; padding: 4.5px 0; font-size: 11px; color: var(--body); }
+.librow .fico { color: var(--dim); display: grid; place-items: center; }
+.librow b { font: 600 10.5px var(--fmono); color: var(--body); }
+.librow .ldate { margin-left: auto; font-size: 9px; color: var(--dim); }
+.connmini { display: flex; align-items: center; gap: 7px; padding: 4px 0; font-size: 11px; color: var(--body); }
+.connmini .cdot { width: 6px; height: 6px; border-radius: 99px; background: var(--done); }
+.connmini .cdot.off { background: var(--dim); }
+.connmini .cme { margin-left: auto; font: 500 9.5px var(--fmono); color: var(--dim); }
+
+/* ── calendar ── */
+.calwrap { padding: 12px; }
+.calhead { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.calhead .crange { font-size: 12.5px; font-weight: 650; }
+.calhead .cnav { display: flex; gap: 3px; }
+.calhead .cnav button { width: 20px; height: 20px; border: 1px solid var(--border2); background: var(--panel2); color: var(--muted); border-radius: 6px; cursor: pointer; font-size: 10px; display: grid; place-items: center; }
+.calhead .ctoggle { margin-left: auto; display: flex; gap: 3px; border: 1px solid var(--border2); border-radius: 8px; padding: 2px; }
+.calhead .ctoggle button { font-size: 10.5px; font-weight: 600; color: var(--muted); background: none; border: none; border-radius: 6px; padding: 2.5px 9px; cursor: pointer; }
+.calhead .ctoggle button.on { background: var(--sel-bg); color: var(--text); }
+.calgrid { display: grid; grid-template-columns: 84px repeat(7, 1fr); border: 1px solid var(--border); border-radius: var(--r-lg); overflow: hidden; background: var(--panel); }
+.calgrid .chd { padding: 7px 8px; font-size: 10px; font-weight: 700; color: var(--dim); text-transform: uppercase; letter-spacing: .05em; border-bottom: 1px solid var(--border); text-align: center; }
+.calgrid .chd .dnum { display: block; font: 700 13px var(--fmono); color: var(--muted); letter-spacing: 0; }
+.calgrid .chd.today { color: var(--text); }
+.calgrid .chd.today .dnum { color: var(--text); }
+.calgrid .prow { display: contents; }
+.calgrid .plab { padding: 10px 10px; font-size: 10.5px; font-weight: 700; color: var(--muted); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 7px; }
+.calgrid .plab .pmark { width: 16px; height: 16px; border-radius: 5px; border: 1px solid var(--border2); background: var(--panel2); display: grid; place-items: center; font-size: 8.5px; font-weight: 800; color: var(--body); }
+.calgrid .cell { border-bottom: 1px solid var(--border); border-left: 1px solid var(--border); padding: 5px; min-height: 46px; }
+.calgrid .cell.today { background: var(--hover-bg); }
+.calitem { font-size: 9.5px; font-weight: 600; line-height: 1.3; border-radius: 6px; padding: 3px 6px; margin-bottom: 3px; cursor: pointer; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.calitem.draft { color: var(--muted); border: 1px dashed var(--border2); background: none; }
+.calitem.sched { color: var(--body); border: 1px solid var(--border2); background: var(--panel2); }
+.calitem.pub { color: var(--done); border: 1px solid color-mix(in srgb, var(--done) 34%, transparent); background: color-mix(in srgb, var(--done) 9%, transparent); }
+.calitem .t { font: 700 8.5px var(--fmono); opacity: .8; margin-right: 4px; }
+/* post preview popover */
+.postpop { border: 1px solid var(--border2); background: var(--panel); border-radius: var(--r-lg); box-shadow: 0 16px 34px -16px var(--shadow); width: 300px; padding: 11px 12px; }
+.postpop .pphead { display: flex; align-items: center; gap: 7px; margin-bottom: 8px; }
+.postpop .pphead b { font-size: 11px; }
+.postpop .ppx { margin-left: auto; color: var(--dim); font-size: 11px; cursor: pointer; }
+.tweet { border: 1px solid var(--border); background: var(--panel2); border-radius: 10px; padding: 9px 11px; }
+.tweet .twhead { display: flex; align-items: center; gap: 7px; }
+.tweet .twav { width: 20px; height: 20px; border-radius: 99px; background: var(--panel3); border: 1px solid var(--border2); display: grid; place-items: center; font-size: 9px; font-weight: 800; }
+.tweet .twhead b { font-size: 11px; }
+.tweet .twhead span { font: 500 10px var(--fmono); color: var(--dim); }
+.tweet p { font-size: 11.5px; color: var(--body); line-height: 1.5; margin-top: 5px; }
+.postpop .pprow { display: flex; align-items: center; gap: 7px; margin-top: 9px; font-size: 10.5px; color: var(--muted); }
+.postpop .pprow .when { font: 600 10px var(--fmono); border: 1px solid var(--border2); border-radius: 6px; padding: 2px 7px; }
+.postpop .ppfoot { display: flex; gap: 7px; margin-top: 10px; }
+.postpop .ppfoot .go { flex: 1; text-align: center; font-size: 11px; font-weight: 650; color: var(--accent-ink); background: var(--accent); border-radius: 7px; padding: 5px 0; cursor: pointer; }
+.postpop .ppfoot .alt { font-size: 11px; font-weight: 600; color: var(--muted); background: none; border: 1px solid var(--border2); border-radius: 7px; padding: 5px 10px; cursor: pointer; }
+
+/* ── library ── */
+.libwrap { padding: 12px; }
+.libbar { display: flex; align-items: center; gap: 6px; margin-bottom: 11px; }
+.crumb { font-size: 11px; color: var(--dim); }
+.crumb b { color: var(--body); font-weight: 600; }
+.folderchips { display: flex; gap: 5px; margin-left: 12px; }
+.folderchip { font-size: 10.5px; font-weight: 600; color: var(--muted); border: 1px solid var(--border2); border-radius: 999px; padding: 3px 10px; cursor: pointer; }
+.folderchip.on { color: var(--text); background: var(--sel-bg); }
+.libgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(138px, 1fr)); gap: 9px; }
+.libtile { border: 1px solid var(--border); background: var(--panel); border-radius: var(--r-lg); overflow: hidden; cursor: pointer; }
+.libtile .lthumb { height: 78px; display: grid; place-items: center; background: var(--panel2); border-bottom: 1px solid var(--border); color: var(--dim); position: relative; }
+.libtile .lthumb.img-a { background: linear-gradient(135deg, color-mix(in srgb, var(--text) 14%, var(--panel2)), var(--panel2)); }
+.libtile .lthumb.img-b { background: radial-gradient(120px 70px at 30% 30%, color-mix(in srgb, var(--text) 18%, var(--panel2)), var(--panel2)); }
+.libtile .dur { position: absolute; right: 6px; bottom: 6px; font: 700 8.5px var(--fmono); color: var(--text); background: color-mix(in srgb, var(--win) 72%, transparent); border-radius: 4px; padding: 1px 5px; }
+.libtile .lmeta { padding: 7px 9px 8px; }
+.libtile .lmeta b { display: block; font: 600 10.5px var(--fmono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.libtile .lmeta span { font-size: 9.5px; color: var(--dim); }
+.libtile.add { border-style: dashed; display: grid; place-items: center; min-height: 128px; color: var(--dim); font-size: 11px; }
+
+/* settings row (kind picker) */
+.setrow { display: flex; align-items: center; gap: 10px; border: 1px solid var(--border); background: var(--panel); border-radius: var(--r-lg); padding: 10px 12px; max-width: 420px; }
+.setrow .stxt b { display: block; font-size: 12px; }
+.setrow .stxt span { font-size: 10.5px; color: var(--muted); line-height: 1.4; display: block; max-width: 26ch; }
+.seg { margin-left: auto; display: flex; gap: 3px; border: 1px solid var(--border2); border-radius: 8px; padding: 2px; }
+.seg button { font-size: 11px; font-weight: 600; color: var(--muted); background: none; border: none; border-radius: 6px; padding: 3px 10px; cursor: pointer; }
+.seg button.on { background: var(--sel-bg); color: var(--text); }
+
+/* PROPOSED: one-time upgrade prompt for existing slug-'marketing' build rooms (UpgradeModal idiom) */
+.upmodal { width: 330px; border: 1px solid var(--border2); background: var(--overlay, var(--panel)); border-radius: var(--r-xl); box-shadow: 0 18px 44px -16px var(--shadow); padding: 16px 17px 14px; }
+.upmodal .uglyph { width: 34px; height: 34px; border-radius: 10px; border: 1px solid var(--border2); background: var(--panel2); display: grid; place-items: center; margin-bottom: 10px; color: var(--body); }
+.upmodal h3 { font-size: 14px; letter-spacing: -.01em; }
+.upmodal p { font-size: 11.5px; color: var(--muted); line-height: 1.55; margin-top: 5px; }
+.upmodal p b { color: var(--body); font-weight: 600; }
+.upmodal .ufoot { display: flex; align-items: center; gap: 10px; margin-top: 13px; }
+.upmodal .ukeep { font-size: 9.5px; color: var(--dim); margin-top: 10px; }
+
+/* hero (locked/empty state) */
+.hero { max-width: 500px; margin: 26px auto; text-align: left; border: 1px solid var(--card-border); background: var(--card); border-radius: var(--r-xl); padding: 18px 20px; }
+.hero .hglyph { width: 34px; height: 34px; border-radius: 10px; border: 1px solid var(--border2); background: var(--panel2); display: grid; place-items: center; margin-bottom: 10px; }
+.hero h3 { font-size: 15px; letter-spacing: -.01em; }
+.hero .hsub { font-size: 12px; color: var(--muted); line-height: 1.55; margin-top: 4px; }
+.hero ul.promise { margin: 10px 0 0 2px; list-style: none; display: flex; flex-direction: column; gap: 5px; }
+.hero ul.promise li { display: flex; gap: 8px; font-size: 12px; color: var(--body); align-items: baseline; }
+.hero ul.promise li::before { content: '→'; color: var(--dim); font-size: 11px; }
+</style>
+</head>
+<body>
+<div class="doc">
+
+<div class="eyebrow">NeuraMesh · design proposal · 2026-07-20</div>
+<h1>The marketing channel — rooms get a trade</h1>
+<p class="lede">
+Channels have always been <b>function rooms</b> (docs/06: <code>#dev</code>, <code>#marketing</code>, <code>#research</code> — and a #marketing agent can never receive engineering work). This proposal makes the function real: a channel carries a <b>kind</b>, and the kind picks the room's interface and toolbelt. <code>kind='build'</code> is today's product, untouched — the seeded <code>#dev</code> room is renamed <b>#build</b> for new workspaces. <code>kind='marketing'</code> turns the room into a growth HQ: a setup card, a crew that studies your product and writes the brand docs, a strategy you arm with one tap, a content calendar, and a library. Two rules the design encodes: <b>a kind is a lens plus a toolbelt, never a new silo</b> — same rooms, same channel ACL, same task FSM underneath; and <b>agents draft, humans publish</b> — nothing leaves the building without an explicit approve or a policy you set yourself.
+</p>
+<div class="docmeta">
+  <span class="rec">channels.kind — one nullable column, no PowerSync redeploy</span>
+  <span>marketing HQ = Cloud (PLAN_LIMIT → upgrade modal)</span>
+  <span>schedules + content_items + connectors</span>
+  <span>library = the phase-2 artifact library, pulled forward</span>
+  <span>zero new ACL axes</span>
+</div>
+
+<!-- ════════ SCENE 1 ════════ -->
+<section>
+  <div class="shead"><span class="snum">01</span><h2>The room wears its trade — and the door is the upsell</h2>
+    <span class="why">Free plan, marketing room opened. Looking is free; acting is Cloud. The gate is a card in the room, enforced at the command (<code>PLAN_LIMIT</code> 402), never a dead-end.</span></div>
+  <div class="duo" data-dup>
+    <div class="T T-dark frame">
+      <div class="shell">
+        <div class="navpanel">
+          <div class="navhead"><div class="navbadge">N</div><div><div class="wsname">neuramesh</div><div class="wsplan">FREE · local</div></div></div>
+          <div class="navsect">Channels <button class="chanadd">+</button></div>
+          <div class="chan"><span class="hash">#</span> general</div>
+          <div class="chan"><span class="hash">#</span> build
+            <span class="kglyph" title="build room"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m14.7 6.3 3 3L7 20H4v-3L14.7 6.3z"/><path d="m13 8 3 3"/></svg></span></div>
+          <div class="chan"><span class="hash">#</span> research</div>
+          <div class="chan on"><span class="hash">#</span> marketing
+            <span class="kglyph" title="marketing HQ"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M3 11v3l9 4V7l-9 4z"/><path d="M12 8.5c4-1 7-2.5 7-2.5v12s-3-1.5-7-2.5"/></svg></span></div>
+          <div class="navfoot">george · m-georges-mbp</div>
+        </div>
+        <div class="main">
+          <div class="topbar"><span class="chname"># marketing</span><span class="chtopic">Story &amp; growth</span><span class="gear">⚙</span></div>
+          <div class="hero">
+            <div class="hglyph"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11v3l9 4V7l-9 4z"/><path d="M12 8.5c4-1 7-2.5 7-2.5v12s-3-1.5-7-2.5"/></svg></div>
+            <h3>This room is ready to go to work</h3>
+            <div class="hsub">Point it at your product and the marketing crew takes it from there — the same loop your build rooms run, aimed at growth.</div>
+            <ul class="promise">
+              <li>The crew studies your site and writes the brand docs — profile, guidelines, research, strategy</li>
+              <li>A starter plan you arm with one tap; drafts land on a content calendar</li>
+              <li>Connect X, Instagram, LinkedIn — <b>you approve everything that publishes</b></li>
+              <li>One library for every doc, image and clip the crew produces</li>
+            </ul>
+            <div class="gatefoot">
+              <div class="gtxt"><b>Free to start, on every plan.</b> Setup, the brand docs and your strategy are on the house — Cloud unlocks the arming.</div>
+              <button class="btnp" style="white-space:nowrap">Set up the crew →</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:14px; display:flex; gap:16px; flex-wrap:wrap; align-items:flex-start">
+        <div>
+          <div class="vh" style="margin-bottom:8px">Existing #marketing rooms · one-time prompt on next open</div>
+          <div class="upmodal">
+            <div class="uglyph"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11v3l9 4V7l-9 4z"/><path d="M12 8.5c4-1 7-2.5 7-2.5v12s-3-1.5-7-2.5"/></svg></div>
+            <h3>Meet the Marketing HQ</h3>
+            <p>This room can now run the marketing crew — brand docs, a content calendar, a library. <b>Everything already here stays</b>: messages, tasks, history.</p>
+            <div class="ufoot"><button class="btnp">Turn into Marketing HQ →</button><button class="btng">Not now</button></div>
+            <div class="ukeep">Shown once per room · also available any time in channel settings</div>
+          </div>
+        </div>
+        <div>
+          <div class="vh" style="margin-bottom:8px">Channel settings · the kind row (human-only, the durable path)</div>
+          <div class="setrow">
+            <div class="stxt"><b>Kind</b><span>What this room is for. Build rooms run the board; marketing rooms run the HQ.</span></div>
+            <div class="seg"><button>Build</button><button class="on">Marketing</button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="notes">
+    <div class="note"><span class="dot"></span><div><b>One column.</b> <code>channels.kind text default 'build'</code> — the <code>thread_mode</code> seam cloned (0064): both client schemas + parity test, <code>channel.set_kind</code> beside <code>set_thread_mode</code>. The <code>select *</code> sync rule means no PowerSync redeploy.</div></div>
+    <div class="note"><span class="dot"></span><div><b>Seeds + migration.</b> New workspaces seed <code>#build</code> (today's <code>#dev</code>, renamed) and <code>#marketing</code> born <code>kind='marketing'</code>. Existing slug-<code>marketing</code> rooms get the <b>one-time upgrade modal on next open</b> (George, review round 1): confirm runs <code>channel.set_kind</code> — free on every plan — and rex posts the setup card; the DB is never backfilled. Conversion first, paywall second: free users land on the locked hero, which is the sell.</div></div>
+    <div class="note"><span class="dot"></span><div><b>The gate is server-truth, and it sits deep</b> (review round 2): setup, connectors, the bootstrap docs and the strategy are FREE — <code>schedule.*</code> and <code>content.*</code> guard on <code>workspaces.plan</code> and 402 at the <b>arm moment</b> (scene 04). By then the crew has built <i>their</i> brand; the sell is a demo they already own.</div></div>
+    <div class="note warn"><span class="dot"></span><div><b>Sidebar glyphs</b> mark kinds quietly (build wrench, marketing megaphone) — monochrome, muted, no color noise in the nav.</div></div>
+  </div>
+</section>
+
+<!-- ════════ SCENE 2 ════════ -->
+<section>
+  <div class="shead"><span class="snum">02</span><h2>Setup is a message, not a modal</h2>
+    <span class="why">First open on Cloud. The setup card posts into the room like the welcome flow — auditable, resumable, re-runnable. Website prefills from the project's identity.</span></div>
+  <div class="duo" data-dup>
+    <div class="T T-dark frame">
+      <div class="feed" style="max-width:640px">
+        <div class="daychip">Monday, July 20</div>
+        <div class="msg" style="--rc: var(--role-orch)">
+          <div class="pav"><i class="pavg">🦊</i></div>
+          <div class="body">
+            <div class="head"><b>rex</b><span class="rolechip">orchestrator</span><span class="time">09:41</span></div>
+            <p>Welcome to the marketing HQ. Three things and the crew gets to work.</p>
+            <div class="qcard">
+              <div class="qhead">Set up the marketing crew</div>
+              <div class="qsub">Point the room at your product. You can change any of this later — the card stays in the room.</div>
+              <div class="steps">
+                <div class="step">
+                  <div class="slabel"><span class="sn">1</span> Product</div>
+                  <div class="urlrow"><span class="plogo">N</span><input value="neuramesh.app" readonly><span class="from">from project</span></div>
+                </div>
+                <div class="step">
+                  <div class="slabel"><span class="sn">2</span> Focus</div>
+                  <div class="focusrow">
+                    <span class="fchip on">Social</span><span class="fchip on">Content</span><span class="fchip">SEO</span><span class="fchip">Email</span><span class="fchip">Paid ads</span>
+                  </div>
+                </div>
+                <div class="step">
+                  <div class="slabel"><span class="sn">3</span> Connectors</div>
+                  <div class="connrow"><span class="cico">𝕏</span><div><div class="cname">X (Twitter)</div><div class="cwho">@_neuramesh</div></div><span class="cok">✓ connected</span></div>
+                  <div class="connrow"><span class="cico">IG</span><div><div class="cname">Instagram</div></div><button class="cbtn">Connect</button></div>
+                  <div class="connrow"><span class="cico">in</span><div><div class="cname">LinkedIn</div></div><button class="cbtn">Connect</button></div>
+                  <div class="connrow"><span class="cico">GA</span><div><div class="cname">Google Analytics</div></div><span class="csoon">soon</span></div>
+                </div>
+              </div>
+              <div class="cardfoot"><button class="btnp">Put the crew to work →</button><button class="btng">Skip for now</button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="notes">
+    <div class="note"><span class="dot"></span><div><b>Prefill from what we know.</b> <code>projects.website</code> / <code>logo_url</code> already exist (auto-detected locally) — the URL row is confirmation, not typing.</div></div>
+    <div class="note"><span class="dot"></span><div><b>Connectors are workspace assets.</b> New <code>connectors</code> table (provider, handle, status, scopes — synced) + tokens in a <b>non-synced</b> server-side table (the <code>custom_model_packs</code> precedent). OAuth completes on <code>api.neuramesh.app</code> in the external browser — the billing-checkout pattern; the app re-reads on focus.</div></div>
+    <div class="note"><span class="dot"></span><div><b>Deviation, written down.</b> BYOK doctrine keeps <i>code + model keys</i> local. Social tokens are held server-side (encrypted, never synced, never sent to any client or daemon) because scheduled publishing must survive your laptop lid. Flagged as a decision to confirm (plan §7.1).</div></div>
+    <div class="note"><span class="dot"></span><div><b>One command.</b> <code>marketing.setup</code> (paid-gated, human-only) writes the profile onto the channel and fans out the bootstrap task — scene 03.</div></div>
+  </div>
+</section>
+
+<!-- ════════ SCENE 3 ════════ -->
+<section>
+  <div class="shead"><span class="snum">03</span><h2>The crew builds your brand brain — as a real task</h2>
+    <span class="why">Bootstrap = a board task the marketer claims. Beats tick, docs land as artifacts, the rail fills in. Evidence-gated like everything else.</span></div>
+  <div class="duo" data-dup>
+    <div class="T T-dark frame">
+      <div class="hqwrap">
+        <div class="hqmain">
+          <div class="msg" style="--rc: var(--role-mkt)">
+            <div class="pav"><i class="pavg">🦚</i></div>
+            <div class="body">
+              <div class="head"><b>plume</b><span class="rolechip">marketer</span><span class="chip c-prog">in progress</span><span class="time">09:44</span></div>
+              <p>Clean brand, warm palette, zero posts on @_neuramesh — the story writes itself. Saving the core files, then the landscape.</p>
+              <div class="beatline"><span class="bdot"></span><span class="bdone">read neuramesh.app · pulled @_neuramesh</span><span>·</span><span>writing brand docs — beat 3/6</span></div>
+              <div class="artcard">
+                <div class="ahead"><span class="fico"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></span><b>business-profile.md</b><span class="akind">doc</span><span class="astate chip c-done">saved</span></div>
+                <div class="abody">
+                  <h4>NeuraMesh · Business profile</h4>
+                  <p>An AI agent orchestration platform for software teams. Replaces disposable, context-free subagents with a persistent, named team that retains lessons across tasks.</p>
+                  <ul><li><b>Core prop:</b> "Subagents forget everything. Your team shouldn't."</li><li><b>BYOS</b> — Claude, OpenAI, Gemini; no token markup · local-first</li></ul>
+                </div>
+                <div class="afoot"><button>Open</button><button>Copy</button><button>→ Library</button></div>
+              </div>
+              <div class="artcard generating">
+                <div class="ahead"><span class="fico"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></span><b>brand-guidelines.md</b><span class="akind">doc</span><span class="astate chip c-dim">generating…</span></div>
+                <div class="abody">
+                  <h4>NeuraMesh · Brand guidelines</h4>
+                  <p><b>Mood:</b> warm, understated, analog-meets-digital. Intentionally different from the cold blues of AI tools. Voice: dry, confident, developer-native — "→" as a recurring motif…</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="hqrail">
+          <div class="railcard">
+            <div class="rhead">Upcoming <span class="rall">view all</span></div>
+            <div class="uprow" style="--rc: var(--role-mkt)"><span class="upav"><i>🦚</i></span><div class="upt"><b>Finish brand docs</b><span>bootstrap · task #1204</span></div><span class="upin">now</span></div>
+            <div class="uprow" style="--rc: var(--role-mkt)"><span class="upav"><i>🦚</i></span><div class="upt"><b>Weekly content refresh</b><span>Mon 09:00 · drafts</span></div><span class="upin">6d</span></div>
+          </div>
+          <div class="railcard">
+            <div class="rhead">Library · brand</div>
+            <div class="librow"><span class="fico">▤</span><b>business-profile.md</b><span class="ldate">now</span></div>
+            <div class="librow"><span class="fico">▤</span><b>brand-guidelines.md</b><span class="ldate">…</span></div>
+            <div class="librow" style="opacity:.55"><span class="fico">▤</span><b>market-research.md</b><span class="ldate">queued</span></div>
+            <div class="librow" style="opacity:.55"><span class="fico">▤</span><b>social-strategy.md</b><span class="ldate">queued</span></div>
+          </div>
+          <div class="railcard">
+            <div class="rhead">Connectors</div>
+            <div class="connmini"><span class="cdot"></span>X (Twitter)<span class="cme">@_neuramesh</span></div>
+            <div class="connmini"><span class="cdot off"></span>Instagram<span class="cme">—</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="notes">
+    <div class="note"><span class="dot"></span><div><b>The loop is untouched.</b> Setup auto-creates "Build the brand foundation" (<code>task_kind: research</code>), plume claims it, beats tick (docs/17), docs are <code>kind='doc'</code> artifacts that auto-promote to the room library on accept — the design-stage promote pattern. Review runs per channel policy; auto-accept is fine here.</div></div>
+    <div class="note"><span class="dot"></span><div><b>plume 🦚, role <code>marketer</code></b> — seeded at marketing setup the way bosun seeds with the ship gate (boot-backfilled, retire-aware). Specialists later ride the existing add-before-hire ladder with a stored <code>brief</code>. Role hue joins the ramp: <code>--role-mkt</code> (dark <code>#c98f8f</code> · oak <code>#b04f55</code> — kept distinct from the designer's pink and the anthropic provider mark).</div></div>
+    <div class="note"><span class="dot"></span><div><b>The rail is the HQ's memory.</b> Upcoming = <code>schedules</code> rows; Library = promoted artifacts tagged <code>brand</code>; Connectors = synced status rows (never tokens).</div></div>
+    <div class="note warn"><span class="dot"></span><div><b>Web reading is the worker's own runtime</b> (Claude/Gemini/Codex web tools) — no new fetch infra in v1; the mini-browser stays a human surface.</div></div>
+  </div>
+</section>
+
+<!-- ════════ SCENE 4 ════════ -->
+<section>
+  <div class="shead"><span class="snum">04</span><h2>The strategy proposes; you arm it</h2>
+    <span class="why">The plan card is the scheduling hook: every item carries a + pill. Arming schedules the <i>drafting</i>. Publishing stays a human gate, always.</span></div>
+  <div class="duo" data-dup>
+    <div class="T T-dark frame">
+      <div class="feed" style="max-width:640px">
+        <div class="msg" style="--rc: var(--role-mkt)">
+          <div class="pav"><i class="pavg">🦚</i></div>
+          <div class="body">
+            <div class="head"><b>plume</b><span class="rolechip">marketer</span><span class="time">10:02</span></div>
+            <p>Strategy's in the library. The short version: own the <b>"stateless agents are broken"</b> narrative before someone else does. Here's the starter plan — arm what you like.</p>
+            <div class="qcard" style="max-width:560px">
+              <div class="qhead">Starter plan — 4 moves</div>
+              <div class="qsub">+ schedules the drafting run. Drafts land on the calendar; nothing publishes without your approve.</div>
+              <div style="margin-top:8px">
+                <div class="planrow"><div class="ptxt"><b>Post 21 times over 3 weeks</b> to build @_neuramesh from zero — daily drafts from the narrative pillars.</div><span class="schedpill armed">✓ weekdays 09:00</span></div>
+                <div class="planrow"><div class="ptxt"><b>5 competitor-contrast posts</b> vs Cursor, Devin, Claude Code — one per weekday next week.</div><span class="schedpill">+ Schedule</span></div>
+                <div class="planrow"><div class="ptxt"><b>Launch thread</b> — the "built with itself" story in 8 tweets.</div><span class="schedpill">+ Schedule</span></div>
+                <div class="planrow"><div class="ptxt"><b>3×/week reply strategy</b> to own three hashtag conversations.</div><span class="schedpill">+ Schedule</span></div>
+              </div>
+            </div>
+            <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-start">
+              <div>
+                <div class="vh" style="margin:10px 2px 6px">Cloud · the when-picker</div>
+                <div class="whenpop">
+                  <div class="wlabel">When should plume draft?</div>
+                  <div class="wopts"><span class="wopt">Once</span><span class="wopt">Daily</span><span class="wopt on">Weekdays</span><span class="wopt">Weekly</span></div>
+                  <div class="wrow">at <span class="wtime">09:00</span> · starts <b>Mon Jul 21</b></div>
+                  <div class="wfoot"><span class="wnote">Drafts only — you approve before anything posts.</span><button class="btnp" style="font-size:11px;padding:5px 11px">Arm schedule</button></div>
+                </div>
+              </div>
+              <div>
+                <div class="vh" style="margin:10px 2px 6px">Free · the same tap opens the gate</div>
+                <div class="whenpop" style="width:264px">
+                  <div class="wlabel">Unlock the full crew</div>
+                  <div style="font-size:11.5px; color:var(--body); line-height:1.5; margin-bottom:8px">Your strategy is ready — Cloud puts it to work:</div>
+                  <ul style="list-style:none; display:flex; flex-direction:column; gap:4px; margin:0 0 10px">
+                    <li style="display:flex; gap:7px; font-size:11px; color:var(--body)"><span style="color:var(--dim)">→</span>Content schedules + the content calendar</li>
+                    <li style="display:flex; gap:7px; font-size:11px; color:var(--body)"><span style="color:var(--dim)">→</span>Brand-optimized assets — images, UGC clips</li>
+                    <li style="display:flex; gap:7px; font-size:11px; color:var(--body)"><span style="color:var(--dim)">→</span>Weekly competitor research, on its own</li>
+                    <li style="display:flex; gap:7px; font-size:11px; color:var(--body)"><span style="color:var(--dim)">→</span>The full marketing crew, drafting while you sleep</li>
+                  </ul>
+                  <div class="wfoot"><span class="wnote">$22/mo · everything free stays free</span><button class="btnp" style="font-size:11px;padding:5px 11px">Upgrade →</button></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="notes">
+    <div class="note"><span class="dot"></span><div><b>The pill is the hire-card pattern, not a hidden verb.</b> A tap opens the when-picker; <b>Arm schedule</b> posts a visible confirm into the thread and writes one <code>schedules</code> row. Agents can <i>propose</i> schedules (a card), only humans arm ones that touch the outside world. <b>On Free the same tap opens the full-powers gate</b> — this is THE upgrade moment (server-enforced: <code>schedule.create</code> → <code>PLAN_LIMIT</code>).</div></div>
+    <div class="note"><span class="dot"></span><div><b><code>schedules</code> is generic from day one</b> — workspace-scoped, channel-anchored: <code>cadence (once|cron)</code>, <code>next_run_at</code>, <code>agent_id</code>, <code>payload</code> (prompt/skill), <code>run_count</code>. Build rooms get it later for free ("nightly triage sweep") — the calendar UI just ships in marketing first.</div></div>
+    <div class="note"><span class="dot"></span><div><b>Execution is the daemon's new minute-tick</b> beside the 15-min sweep. Claiming a due run = an atomic <code>run_count</code> advance — counter, not timestamp (the ship-stage lesson), so two machines never double-fire.</div></div>
+    <div class="note warn"><span class="dot"></span><div><b>Laptop closed = run missed</b> — surfaced as <code>missed</code> on the row and flagged by the stall watchdog, never silent. A cloud runner is the phase-2 answer.</div></div>
+  </div>
+</section>
+
+<!-- ════════ SCENE 5 ════════ -->
+<section>
+  <div class="shead"><span class="snum">05</span><h2>The calendar is the room's second surface</h2>
+    <span class="why">Marketing rooms swap the chat/board toggle for Feed · Calendar · Library. Platform rows × days; drafts are dashed, scheduled are solid, published are green with the receipt.</span></div>
+  <div class="stack" data-dup>
+    <div class="T T-dark frame">
+      <div class="main" style="border-radius: var(--r-xl)">
+        <div class="topbar"><span class="chname"># marketing</span>
+          <div class="viewchips"><span class="viewchip">Feed</span><span class="viewchip on">Calendar</span><span class="viewchip">Library</span></div>
+          <span class="gear">⚙</span></div>
+        <div class="calwrap">
+          <div class="calhead">
+            <div class="cnav"><button>‹</button><button>›</button></div>
+            <span class="crange">Jul 20 – 26, 2026</span>
+            <div class="ctoggle"><button class="on">Week</button><button>Month</button></div>
+          </div>
+          <div class="calgrid">
+            <div class="chd" style="border-left:none"></div>
+            <div class="chd today">Mon <span class="dnum">20</span></div><div class="chd">Tue <span class="dnum">21</span></div><div class="chd">Wed <span class="dnum">22</span></div><div class="chd">Thu <span class="dnum">23</span></div><div class="chd">Fri <span class="dnum">24</span></div><div class="chd">Sat <span class="dnum">25</span></div><div class="chd">Sun <span class="dnum">26</span></div>
+            <div class="prow">
+              <div class="plab"><span class="pmark">𝕏</span> X</div>
+              <div class="cell today"><div class="calitem pub"><span class="t">09:00</span>✓ same review comment, 5th time…</div></div>
+              <div class="cell"><div class="calitem sched"><span class="t">09:00</span>stateless agents are broken by design</div></div>
+              <div class="cell"><div class="calitem sched"><span class="t">09:00</span>week 1 vs week 4 — screenshots</div></div>
+              <div class="cell"><div class="calitem draft"><span class="t">—</span>vs Cursor: single-session context</div></div>
+              <div class="cell"><div class="calitem draft"><span class="t">—</span>BYOS: you already have the team</div></div>
+              <div class="cell"></div><div class="cell"></div>
+            </div>
+            <div class="prow">
+              <div class="plab"><span class="pmark">IG</span> Instagram</div>
+              <div class="cell today"></div><div class="cell"></div>
+              <div class="cell"><div class="calitem draft"><span class="t">—</span>meet plume — crew intro card</div></div>
+              <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+            </div>
+            <div class="prow">
+              <div class="plab"><span class="pmark">in</span> LinkedIn</div>
+              <div class="cell today"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+              <div class="cell"><div class="calitem sched"><span class="t">11:00</span>why we built our own agent org</div></div>
+              <div class="cell"></div><div class="cell"></div>
+            </div>
+          </div>
+          <div style="display:flex; gap:14px; margin-top:12px; align-items:flex-start">
+            <div class="postpop">
+              <div class="pphead"><b>X post</b><span class="chip c-done">published</span><span class="ppx">✕</span></div>
+              <div class="tweet">
+                <div class="twhead"><span class="twav">N</span><b>neuramesh</b><span>@_neuramesh</span></div>
+                <p>I've corrected the same bug 5 times this month. Different AI. Same mistake. Subagents forget everything — your team shouldn't.</p>
+              </div>
+              <div class="pprow"><span class="when">Mon Jul 20 · 09:00</span><span>drafted by plume · approved by george</span></div>
+              <div class="ppfoot"><span class="go">View on X ↗</span><button class="alt">Thread</button></div>
+            </div>
+            <div style="font-size:11px; color:var(--muted); max-width:300px; line-height:1.55; padding-top:4px">
+              Click any chip → this preview. Scheduled chips get <b>Approve · Edit · Unschedule</b>; published chips carry the receipt (<code>external_url</code>, who drafted, who approved) — the audit trail is the calendar.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="notes">
+    <div class="note"><span class="dot"></span><div><b><code>content_items</code></b> — platform, body, media (artifact refs), <code>status draft→scheduled→published|failed</code>, <code>scheduled_at</code>, <code>external_url</code>, <code>schedule_id</code>, approve audit. Synced; chips are content items, never tasks.</div></div>
+    <div class="note"><span class="dot"></span><div><b>Approve is the accept gate wearing a calendar.</b> <code>content.approve</code> is HUMAN_ONLY (like <code>approve_design</code> / <code>approve_ship_plan</code>); an explicit per-channel auto-publish policy is the paved escape hatch, mirroring <code>acceptance_policy</code>.</div></div>
+    <div class="note"><span class="dot"></span><div><b>Publishing runs server-side</b> (control-api cron; tokens never leave the server) — due + approved → post → write <code>external_url</code> → green chip. Posts fire on time with the laptop closed; failures land a 🔴 thread alert (the ship-verify idiom), never a silent drop.</div></div>
+    <div class="note warn"><span class="dot"></span><div><b>Surface chips replace the chat/board toggle only in marketing rooms</b> — one <code>kind</code> branch at the App.tsx view switch; build rooms render exactly today's tree.</div></div>
+  </div>
+</section>
+
+<!-- ════════ SCENE 6 ════════ -->
+<section>
+  <div class="shead"><span class="snum">06</span><h2>The library is where the work lives</h2>
+    <span class="why">Docs, images, clips, drafts — one foldered surface per room, aggregated per project. This is the phase-2 workspace library, pulled forward on the artifacts table we already have.</span></div>
+  <div class="duo" data-dup>
+    <div class="T T-dark frame">
+      <div class="main" style="border-radius: var(--r-xl)">
+        <div class="topbar"><span class="chname"># marketing</span>
+          <div class="viewchips"><span class="viewchip">Feed</span><span class="viewchip">Calendar</span><span class="viewchip on">Library</span></div>
+          <span class="gear">⚙</span></div>
+        <div class="libwrap">
+          <div class="libbar">
+            <span class="crumb">NeuraMesh ▸ <b># marketing</b></span>
+            <div class="folderchips"><span class="folderchip on">All</span><span class="folderchip">Brand</span><span class="folderchip">Docs</span><span class="folderchip">Drafts</span><span class="folderchip">Images</span><span class="folderchip">Video</span></div>
+          </div>
+          <div class="libgrid">
+            <div class="libtile"><div class="lthumb"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></div><div class="lmeta"><b>brand-guidelines.md</b><span>brand · Jul 20</span></div></div>
+            <div class="libtile"><div class="lthumb"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></div><div class="lmeta"><b>social-strategy.md</b><span>brand · Jul 20</span></div></div>
+            <div class="libtile"><div class="lthumb img-a"></div><div class="lmeta"><b>og-card-a.png</b><span>images · Jul 20</span></div></div>
+            <div class="libtile"><div class="lthumb img-b"><span class="dur">0:08</span></div><div class="lmeta"><b>ugc-intro.mp4</b><span>video · Jul 21</span></div></div>
+            <div class="libtile"><div class="lthumb"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></div><div class="lmeta"><b>twitter-2026-07-21.md</b><span>drafts · Jul 20</span></div></div>
+            <div class="libtile add">＋ Add files</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="notes">
+    <div class="note"><span class="dot"></span><div><b>No new storage system.</b> Docs/drafts ride <code>artifacts.inline_content</code> exactly as deliverables do today; folders = <code>artifacts.tags</code> (column exists — starts syncing). The rail's "Library" and this surface are the same rows.</div></div>
+    <div class="note"><span class="dot"></span><div><b>Big media rides the attachments pattern:</b> full bytes on the machine (<code>userData</code> dir, <code>nm-attachment://</code>), synced thumbnail inline, plan-gated size caps from <code>entitlements.ts</code>. Cloud copy (Supabase Storage / GCS) is the documented phase-2 offload — and a natural Cloud upsell: your media on every device.</div></div>
+    <div class="note"><span class="dot"></span><div><b>ACL unchanged:</b> the library is the channel's artifact library, worn as a first-class surface. The project-level view aggregates its channels' libraries — same rows, wider lens.</div></div>
+    <div class="note warn"><span class="dot"></span><div><b><code>.nm-evidence/</code> stays what it is</b> — throwaway working files, git-excluded. The library is the <i>published</i> home.</div></div>
+  </div>
+</section>
+
+<!-- ════════ FOOTER ════════ -->
+<section>
+  <div class="shead"><span class="snum">07</span><h2>What it takes</h2>
+    <span class="why">Full plan with slices, migrations and open questions: <code>docs/design/marketing-channel-2026-07/plan.md</code></span></div>
+  <div class="notes" style="margin-top:0">
+    <div class="note"><span class="dot"></span><div><b>Schema:</b> <code>channels.kind</code> · <code>connectors</code> (+ non-synced token vault) · <code>schedules</code> · <code>content_items</code> · sync <code>artifacts.tags</code>. Each synced table: id + publication migration + sync rule + both client schemas (parity test).</div></div>
+    <div class="note"><span class="dot"></span><div><b>Commands:</b> <code>channel.set_kind</code> · <code>marketing.setup</code> · <code>connector.connect/disconnect</code> · <code>schedule.create/pause/delete</code> · <code>content.approve/unschedule</code> (HUMAN_ONLY where it touches the world; paid-gated at the door).</div></div>
+    <div class="note"><span class="dot"></span><div><b>Daemon:</b> minute-tick scheduler + publish watch + <code>marketer</code> role prompt/tools + plume seed/backfill; stall watchdog learns <code>missed</code> schedules.</div></div>
+    <div class="note"><span class="dot"></span><div><b>Desktop:</b> kind branch at the view switch · setup card · HQ rail · calendar · library surface · settings Kind row · upgrade-gate card. Mobile v1: read the calendar + approve drafts from the phone (the Mission-Control needs-you idiom).</div></div>
+  </div>
+</section>
+
+</div>
+<script>
+/* Clone each data-dup scene's dark frame into a cream-oak twin, with theme labels. */
+document.querySelectorAll('[data-dup]').forEach(w => {
+  const dark = w.querySelector('.T-dark');
+  const mk = (el, label) => { const d = document.createElement('div'); const h = document.createElement('div');
+    h.className = 'vh'; h.textContent = label; d.appendChild(h); d.appendChild(el); return d; };
+  const oak = dark.cloneNode(true); oak.classList.replace('T-dark', 'T-oak');
+  const darkWrap = mk(dark.cloneNode(true), 'Claude-warm dark'); const oakWrap = mk(oak, 'Cream-oak light');
+  dark.replaceWith(darkWrap); w.appendChild(oakWrap);
+});
+</script>
+</body>
+</html>

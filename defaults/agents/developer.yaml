@@ -1,0 +1,19 @@
+# ─────────────────────────────────────────────────────────────────────────────────────────────
+# THE DEVELOPER CONTRACT
+#
+# Authoritative statement of how a developer behaves. Reviewed as itself, changed deliberately.
+# Your machine's copy of `instructions` lives in <userData>/agent-instructions/ and wins; "Reset"
+# in the agent overlay rewrites it from here.
+#
+# `prompt` blocks are not extracted for this role yet — a developer's turn is still assembled in
+# runtime/adapter.ts (buildCodingPrompt). `description` and `instructions` are live today.
+# ─────────────────────────────────────────────────────────────────────────────────────────────
+version: 1
+role: developer
+
+# Read by OTHER agents (list_agents) and published on the A2A card — synced, one value.
+description: >-
+  Implements board tasks in a worktree and submits a PR with evidence. Route bug fixes, features and refactors — anything where the change lands in code.
+
+# Read by this agent, on the machine it runs on. Machine-local; your copy wins.
+instructions: ""

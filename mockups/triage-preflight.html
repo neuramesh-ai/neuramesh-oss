@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en" data-theme="cream-oak">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Triage resolves dependencies before it delegates</title>
+<style>
+/* Tokens copied verbatim from apps/desktop/src/renderer/src/tokens.css (Graphite dark, Cream Oak).
+   Geometry mirrors the REAL classes this round composes — .nextcard/.nrow (the next-steps card,
+   tokens.css §nextcard), .npager, .qcard/.qopt (the in-thread option idiom), .repcard (the
+   report card), the .nbtn card-surface buttons the founder standardized in round 6a. The ONE
+   new idiom is the reply row's quoted-target block — judged here. Judge this as the app.
+   Plan: docs/design/reply-radar-2026-08/plan.md */
+:root, [data-theme='dark'] {
+  --win:#0d0d0d; --bg:#141414; --panel:#191919; --panel2:#212121; --panel3:#2b2b2b;
+  --border:#272727; --border2:#383838;
+  --text:#eaeaea; --body:#b6b6b6; --muted:#898989; --dim:#676767;
+  --link:#d19a72; --accent:var(--text);
+  --btn:#232323; --btn-fg:#efefef; --btn-hover:#2f2f2f;
+  --green:#77ac8d; --warn:#c9a15e; --violet:#a89ccf;
+  --prog:#8ba0c0; --done:#77ac8d; --plan:#7fa5ab;
+  --role-mkt:#c98f8f; --role-orch:#9793d2;
+  --card:#1e1e1e; --card-border:#2c2c2c;
+  --code:#0a0a0a; --codeink:#e8e8e8;
+  --shadow-card:0 1px 2px rgba(0,0,0,.25);
+  --ring:#525252; --hover-bg:color-mix(in srgb, var(--text) 7%, transparent);
+  --hover-border:#404040;
+}
+[data-theme='cream-oak'] {
+  --win:#f0e5d3; --bg:#fbf8f4; --panel:#fbf8f4; --panel2:#f6eee1; --panel3:#efe1cd;
+  --border:#e6dbca; --border2:#d3c2a8;
+  --text:#2a1c13; --body:#574838; --muted:#97846c; --dim:#b5a289;
+  --link:#9c5730; --accent:#834a2b;
+  --btn:#f8f2e8; --btn-fg:#43301f; --btn-hover:#efe4d2;
+  --green:#2f9e6b; --warn:#a06a1f; --violet:#7d6cc4;
+  --prog:#4f80c4; --done:#0f9d63; --plan:#2c7d88;
+  --role-mkt:#b04f55; --role-orch:#6a63bc;
+  --card:#ffffff; --card-border:#eadfce;
+  --code:#2b2018; --codeink:#f3e6d8;
+  --shadow-card:0 1px 2px rgba(70,42,18,.05);
+  --ring:color-mix(in srgb, var(--accent) 42%, var(--border2));
+  --hover-bg:color-mix(in srgb, var(--text) 5%, transparent);
+  --hover-border:color-mix(in srgb, var(--text) 10%, var(--border2));
+}
+* { box-sizing:border-box; margin:0; }
+:root { --fbody:'Avenir Next','Segoe UI',system-ui,sans-serif; --fmono:'SF Mono',ui-monospace,Menlo,monospace;
+  --fserif:'Iowan Old Style','Palatino Linotype',Georgia,serif;
+  --r-xs:4px; --r-md:8px; --r-lg:11px; --r-full:999px;
+  --dur-fast:.12s; --dur-enter:.16s; --ease:cubic-bezier(.3,.7,.4,1); }
+body { background:var(--win); color:var(--text); font:14px/1.5 var(--fbody); padding:0 0 90px; }
+header.doc { position:sticky; top:0; z-index:9; display:flex; align-items:center; gap:14px;
+  background:color-mix(in srgb, var(--win) 88%, transparent); backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--border); padding:14px 26px; }
+header.doc h1 { font:700 16px var(--fserif); }
+header.doc .sub { font:11.5px var(--fmono); color:var(--muted); }
+header.doc .spacer { flex:1; }
+.ctl { background:var(--btn); color:var(--btn-fg); border:1px solid var(--border2); border-radius:var(--r-full);
+  padding:6px 14px; font:600 12px var(--fbody); cursor:pointer; }
+.ctl:hover { background:var(--btn-hover); }
+main { max-width:980px; margin:0 auto; padding:10px 26px; }
+section { margin:44px 0; }
+h2 { font:700 20px var(--fserif); margin:0 0 4px; display:flex; align-items:baseline; gap:10px; }
+h2 .n { font:700 11px var(--fmono); color:var(--muted); }
+p.why { color:var(--body); font-size:13.5px; max-width:74ch; margin:8px 0 16px; }
+p.why b { color:var(--text); }
+code.ic { font:600 11.5px var(--fmono); background:var(--panel2); border:1px solid var(--border);
+  border-radius:var(--r-xs); padding:1px 5px; color:var(--body); }
+.note { display:flex; gap:9px; align-items:flex-start; max-width:74ch; margin:10px 0; font-size:12.5px; color:var(--body); }
+.note .dot { flex:none; width:6px; height:6px; border-radius:50%; background:var(--accent); margin-top:6px; }
+.note b { color:var(--text); }
+.stage { background:var(--bg); border:1px solid var(--border); border-radius:14px; padding:22px 26px;
+  box-shadow:var(--shadow-card); max-width:760px; }
+.msg { display:flex; gap:11px; padding:7px 0; }
+.avatar { flex:none; width:30px; height:30px; border-radius:8px; background:var(--panel3);
+  border:1px solid var(--border2); display:flex; align-items:center; justify-content:center; font-size:15px; }
+.mbody { flex:1; min-width:0; background:var(--panel); border:1px solid var(--border); border-radius:var(--r-lg); padding:10px 14px; }
+.mhead { display:flex; align-items:center; gap:7px; margin-bottom:3px; }
+.mhead b { font-size:12.5px; }
+/* ── the dependency card (the ONE new idiom this round) ─────────────────── */
+.needcard { margin:8px 0 2px; border:1px solid var(--card-border); border-radius:var(--r-lg);
+  background:var(--card); padding:11px 13px; box-shadow:var(--shadow-card); max-width:560px; }
+.ndhead { display:flex; align-items:center; gap:8px; font:700 10px var(--fmono); letter-spacing:.08em;
+  color:var(--warn); text-transform:uppercase; }
+.ndtitle { font-size:13px; font-weight:640; margin:6px 0 2px; }
+.ndwhy { font-size:12px; color:var(--body); line-height:1.55; margin-bottom:9px; }
+.ndopt { display:flex; align-items:flex-start; gap:10px; width:100%; text-align:left; border:1px solid var(--border);
+  background:var(--card); border-radius:var(--r-md); padding:9px 12px; margin-bottom:6px; cursor:pointer; }
+.ndopt:hover { border-color:var(--border2); background:var(--hover-bg); }
+.ndopt .g { flex:none; width:20px; height:20px; display:grid; place-items:center; font-size:11px;
+  border:1px solid var(--border2); border-radius:6px; color:var(--muted); }
+.ndopt b { display:block; font-size:12.5px; }
+.ndopt span { display:block; font-size:11.5px; color:var(--muted); margin-top:1px; }
+.ndopt.primary { border-color:var(--border2); }
+.ndfoot { font-size:11px; color:var(--dim); margin-top:2px; }
+.xrow { display:flex; align-items:center; gap:8px; padding:7px 0; border-top:1px solid var(--border); font-size:12.5px; }
+.xrow:first-of-type { border-top:none; }
+.xrow .k { flex:none; width:74px; font:11px var(--fmono); color:var(--muted); }
+.xrow .v { flex:1; color:var(--body); }
+.bad { color:var(--warn); }
+.good { color:var(--green); }
+.wasis { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.wasis > div { border:1px solid var(--border); border-radius:var(--r-lg); padding:12px 14px; background:var(--panel); }
+.wasis h4 { font:700 10px var(--fmono); letter-spacing:.08em; text-transform:uppercase; margin-bottom:7px; }
+.wasis .was h4 { color:var(--warn); }
+.wasis .is h4 { color:var(--green); }
+.wasis ol { margin:0; padding-left:17px; font-size:12px; color:var(--body); line-height:1.65; }
+.wasis code { font:11px var(--fmono); background:var(--panel2); border:1px solid var(--border); border-radius:3px; padding:0 4px; }
+</style>
+</head>
+<body>
+<header class="doc">
+  <h1>Triage before staffing</h1>
+  <span class="sub">dependencies resolved at triage · the worker knows its connectors · docs/design/triage-preflight-2026-08</span>
+  <span class="spacer"></span>
+  <button class="ctl" onclick="const r=document.documentElement; r.dataset.theme = r.dataset.theme==='dark'?'cream-oak':'dark'">Theme</button>
+</header>
+<main>
+
+<section>
+  <h2><span class="n">01</span>What the live run did</h2>
+  <p class="why">One root cause under all three symptoms: <b>the work was staffed before anyone asked
+    whether it was possible.</b> The missing connector surfaced at the END — as four tasks asking the
+    human to go fix the thing that should have been the first question.</p>
+  <div class="wasis">
+    <div class="was">
+      <h4>What happened</h4>
+      <ol>
+        <li>rex creates the unit, hands it to plume</li>
+        <li>plume has no <code>search_x</code> (leg-only) and no connector context</li>
+        <li>no output contract for a <code>research</code> unit → the coding flow writes
+          <code>reply_radar/radar.py</code>, tests, a blocked <code>draft_replies.json</code></li>
+        <li>next steps offer the plumbing as work: <i>"Enable a readable X connector"</i>,
+          <i>"Run the saved search terms"</i>, <i>"Create measured_candidates.json"</i></li>
+      </ol>
+    </div>
+    <div class="is">
+      <h4>What happens now</h4>
+      <ol>
+        <li>triage resolves the ask's declared <code>needs</code> FIRST</li>
+        <li>nothing connected ⇒ <b>no task is created</b> — the dependency card goes up instead</li>
+        <li>one click connects, or runs web-only with the honesty label carried through</li>
+        <li>the run's own plumbing never appears as a next step again</li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2><span class="n">02</span>The dependency card — the first thing you see, not the last</h2>
+  <p class="why">Enforced, not prompted: <code class="ic">run_playbook</code> refuses to create the unit
+    while a hard need is unmet and returns this card, the way <code class="ic">MAKE_IT_A_SUBTASK</code>
+    and <code class="ic">CHAT_THREAD</code> refuse. rex cannot talk past it — and the card is never a
+    dead end, because every line is an action.</p>
+  <div class="stage" style="max-width:640px;">
+    <div class="msg"><span class="avatar">🦊</span><div class="mbody">
+      <div class="mhead"><b>rex</b><span class="rolechip">ORCHESTRATOR</span><span class="mwhen">06:21 PM</span></div>
+      <div class="mtext">Before I staff this — the radar reads real conversations, and this room has nothing to read with:</div>
+      <div class="needcard">
+        <div class="ndhead">⚠ Can't run yet — Reply radar needs a connected account</div>
+        <div class="ndtitle">Nothing is connected in #marketing</div>
+        <div class="ndwhy">The radar ranks conversations by real reach, through your own account's view.
+          Without a connection it can still find public posts — but nothing it reports will be measured.</div>
+        <button class="ndopt primary"><span class="g">𝕏</span><span><b>Connect X (Twitter)</b><span>one minute in the browser · real impressions, and your agents' X research rides the same connection</span></span></button>
+        <button class="ndopt"><span class="g">in</span><span><b>Connect LinkedIn</b><span>public conversations only for now — LinkedIn has no read API, so rows stay unmeasured</span></span></button>
+        <button class="ndopt"><span class="g">◍</span><span><b>Run on public web only</b><span>targets and drafts now, every row marked <i>reach not measured</i> — the report says what it couldn't establish</span></span></button>
+        <button class="ndopt"><span class="g">·</span><span><b>Not now</b><span>nothing is created; ask again whenever</span></span></button>
+        <div class="ndfoot">No task, no subtask and no offer exist until this is answered.</div>
+      </div>
+    </div></div>
+  </div>
+  <div class="note"><span class="dot"></span><div><b>Why a card, not prose:</b> the answer has to ARM
+    something — "Connect X" is a navigation, "web-only" is a run with a flag. Prose gives the human
+    neither, which is exactly how the live run ended up with four tasks nobody wanted.</div></div>
+</section>
+
+<section>
+  <h2><span class="n">03</span>The worker knows what it's connected to</h2>
+  <p class="why">Two gaps closed. <b>Context:</b> a CONNECTIONS block stages into the workspace beside
+    the brand docs — what is live, what it grants, and the tool that reads it. <b>Capability:</b>
+    <code class="ic">search_x</code> moves from <code class="ic">['leg']</code> to
+    <code class="ic">['leg','work']</code>, so a research unit reads conversations instead of writing
+    software that would read them later.</p>
+  <div class="stage" style="max-width:600px;">
+    <div style="font:700 10px var(--fmono); letter-spacing:.08em; color:var(--muted); text-transform:uppercase; margin-bottom:8px;">staged into the workspace · connections.md</div>
+    <div class="xrow"><span class="k">X (Twitter)</span><span class="v good">connected as @joinflowe — read + publish · <code style="font:11px var(--fmono)">search_x</code> reads it</span></div>
+    <div class="xrow"><span class="k">LinkedIn</span><span class="v">connected — publish only (no read API); public conversations via web research, unmeasured</span></div>
+    <div class="xrow"><span class="k">Instagram</span><span class="v bad">not connected</span></div>
+    <div class="xrow"><span class="k">PostHog</span><span class="v bad">not connected — no site analytics available to this run</span></div>
+    <div class="xrow"><span class="k">Images</span><span class="v bad">no image key — <code style="font:11px var(--fmono)">imageBrief</code> will fail; say so rather than promising a picture</span></div>
+  </div>
+  <div class="note"><span class="dot"></span><div><b>And a research unit stops writing code:</b>
+    <code class="ic">RESEARCH_OUTPUT_CONTRACT</code> joins the content one — <i>"your deliverable is the
+    document plus the cards your tools post, never software; do not build a pipeline that would produce
+    the answer later — produce the answer."</i></div></div>
+</section>
+
+<section>
+  <h2><span class="n">04</span>Next steps are outcomes, never the run's plumbing</h2>
+  <p class="why">The distill gains one exclusion and one bias. A step that exists only to make the run
+    work is a <b>dependency</b>, not a next step.</p>
+  <div class="wasis">
+    <div class="was">
+      <h4>Dropped — plumbing</h4>
+      <ol>
+        <li>Enable a readable X connector</li>
+        <li>Run the saved X search terms through search_x</li>
+        <li>Create measured_candidates.json from real X results</li>
+        <li>Generate draft replies from measured candidates</li>
+      </ol>
+    </div>
+    <div class="is">
+      <h4>Kept — outcomes</h4>
+      <ol>
+        <li><b>routine</b> · weekday reply radar, 09:00</li>
+        <li><b>research</b> · why NSDR content outperforms sleep content</li>
+        <li><b>task</b> · rewrite the homepage hero around owned-site growth</li>
+      </ol>
+    </div>
+  </div>
+  <div class="note"><span class="dot"></span><div><b>The bias, stated:</b> recurring work ⇒ routine ·
+    an open question ⇒ research · a change to the product, site or copy ⇒ task. Tasks are the
+    byproduct, not the default — and the run's own steps are never either.</div></div>
+</section>
+
+</main>
+</body>
+</html>

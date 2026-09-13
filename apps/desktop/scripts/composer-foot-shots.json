@@ -1,0 +1,81 @@
+[
+  {
+    "name": "foot1-home-dark",
+    "settle": 2400,
+    "query": {
+      "theme": "dark"
+    }
+  },
+  {
+    "name": "foot2-home-cream",
+    "settle": 2400,
+    "query": {
+      "theme": "cream-oak"
+    }
+  },
+  {
+    "name": "foot3-home-light",
+    "settle": 2400,
+    "query": {
+      "theme": "light"
+    }
+  },
+  {
+    "name": "foot4-connect-instagram-dark",
+    "settle": 2400,
+    "query": {
+      "theme": "dark"
+    },
+    "js": "(() => { const b = document.querySelector('.cfootapp[aria-label^=\"Connect Instagram\"]'); if (b) b.click(); return new Promise(r => setTimeout(r, 600)); })()"
+  },
+  {
+    "name": "foot5-connected-linkedin-cream",
+    "settle": 2400,
+    "query": {
+      "theme": "cream-oak"
+    },
+    "js": "(() => { const b = document.querySelector('.cfootapp[aria-label^=\"LinkedIn\"]'); if (b) b.click(); return new Promise(r => setTimeout(r, 600)); })()"
+  },
+  {
+    "name": "foot6-all-dark",
+    "settle": 2400,
+    "query": {
+      "theme": "dark"
+    },
+    "js": "(() => { const b = document.querySelector('.cfootapp[aria-label$=\"more connections\"]'); if (b) b.click(); return new Promise(r => setTimeout(r, 600)); })()"
+  },
+  {
+    "name": "foot7-all-posthog-light",
+    "settle": 2400,
+    "query": {
+      "theme": "light"
+    },
+    "js": "(() => { const b = document.querySelector('.cfootapp[aria-label$=\"more connections\"]'); if (b) b.click(); return new Promise(r => setTimeout(() => { const row = Array.from(document.querySelectorAll('.connpop .cprojitem')).find(x => (x.textContent || '').includes('PostHog')); if (row) row.click(); setTimeout(r, 600); }, 400)); })()"
+  },
+  {
+    "name": "foot8-typing-dark",
+    "settle": 2400,
+    "query": {
+      "theme": "dark"
+    },
+    "js": "(() => { const ta = document.querySelector('.stagebox textarea'); if (!ta) return; Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(ta, 'Draft three LinkedIn posts about the v0.128 release and schedule them for next week.'); ta.dispatchEvent(new Event('input', { bubbles: true })); ta.focus(); return new Promise(r => setTimeout(r, 500)); })()"
+  },
+  {
+    "name": "foot9-thread-focus-dark",
+    "settle": 2800,
+    "query": {
+      "theme": "dark",
+      "openTask": "1046",
+      "draft": "Looks good. Merge it."
+    }
+  },
+  {
+    "name": "foot10-thread-focus-cream",
+    "settle": 2800,
+    "query": {
+      "theme": "cream-oak",
+      "openTask": "1046",
+      "draft": "Looks good. Merge it."
+    }
+  }
+]

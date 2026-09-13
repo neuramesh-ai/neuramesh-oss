@@ -1,0 +1,474 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Onboarding, cloud-first — landing to first reply · round 4</title>
+<style>
+/* tokens copied from apps/desktop/src/renderer/src/tokens.css (Graphite dark + Paper light).
+   round 3 rebuilds every station FROM THE SHIPPED SCREENS (George: r2 ignored the existing
+   flow): the real deck hero (apps/web/src/hero.tsx), the real Clerk sign-in (views/Login.tsx),
+   the real 5-step wizard (views/Onboarding.tsx — Machine · Keys · Workspace · Team · Launch,
+   step ring and all), the real starter crew (DEFAULT_TEAM), the real launch reveal. cloud
+   changes are DELTAS on those screens, not a parallel flow. free users get a cloud machine at
+   signup (George, 2026-08-27); limits are backend-enforced and shown kindly. judge as the app. */
+:root, [data-theme='dark'] {
+  --win:#0d0d0d; --bg:#141414; --panel:#191919; --panel2:#212121; --panel3:#2b2b2b;
+  --border:#272727; --border2:#383838;
+  --text:#eaeaea; --body:#b6b6b6; --muted:#898989; --dim:#676767;
+  --link:#d19a72; --accent:var(--text); --accent-ink:#101010; --overlay:#222222;
+  --btn:#232323; --btn-fg:#efefef; --btn-hover:#2f2f2f;
+  --green:#77ac8d; --warn:#c9a15e; --violet:#a89ccf; --orch:#9793d2;
+  --brand:#834a2b; --brand-ink:#fff7ee;
+  --card:#1e1e1e; --card-border:#2c2c2c;
+  --shadow:rgba(0,0,0,0.62);
+  --shadow-sheet:inset 0 1px 0 rgba(255,255,255,.05), 0 12px 30px -6px rgba(0,0,0,.5);
+  --hover-bg:color-mix(in srgb, var(--text) 7%, transparent);
+  --ring:#525252;
+}
+[data-theme='light'] {
+  --win:#e9e5db; --bg:#fcfbf8; --panel:#fcfbf8; --panel2:#f4f1ea; --panel3:#ebe7dd;
+  --border:#e2ded4; --border2:#cec5b7;
+  --text:#2f2a24; --body:#524c43; --muted:#837d72; --dim:#a09889;
+  --link:#8f4f2a; --accent:var(--text); --accent-ink:#ffffff; --overlay:#ffffff;
+  --btn:#f1eee6; --btn-fg:#2f2a24; --btn-hover:#e6e2d6;
+  --green:#2f9e6b; --warn:#a9762a; --violet:#7d6cc4; --orch:#635fc0;
+  --brand:#834a2b; --brand-ink:#fff7ee;
+  --card:#ffffff; --card-border:#e2ded4;
+  --shadow:rgba(70,58,44,0.14);
+  --shadow-sheet:0 8px 26px -8px rgba(70,58,44,.15), 0 1px 2px rgba(70,58,44,.05);
+  --hover-bg:color-mix(in srgb, var(--text) 6%, transparent);
+  --ring:color-mix(in srgb, var(--accent) 40%, var(--border2));
+}
+
+* { box-sizing:border-box; }
+body { margin:0; background:var(--win); color:var(--text);
+  font:400 13.5px/1.55 ui-sans-serif,-apple-system,"Segoe UI",system-ui,sans-serif; -webkit-font-smoothing:antialiased; }
+.serif { font-family:'Source Serif 4',Georgia,'Times New Roman',serif; }
+code, .mono { font:500 11.5px ui-monospace,Menlo,monospace; }
+
+header.page { position:sticky; top:0; z-index:30; display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+  padding:14px 22px; background:var(--win); border-bottom:1px solid var(--border); }
+h1 { font-weight:600; font-size:15px; margin:0; letter-spacing:-.01em; }
+.sub { color:var(--muted); font-size:12.5px; }
+.spacer { flex:1; }
+button.ctl { font:inherit; font-size:12.5px; color:var(--btn-fg); background:var(--btn);
+  border:1px solid var(--border2); border-radius:999px; padding:6px 14px; cursor:pointer; }
+button.ctl:hover { background:var(--btn-hover); }
+
+main { padding:22px; max-width:1180px; margin:0 auto; }
+section { margin-bottom:48px; }
+h2 { font-weight:600; font-size:13px; margin:0 0 4px; letter-spacing:.02em; text-transform:uppercase; color:var(--muted); }
+.note { color:var(--body); font-size:12.5px; max-width:76ch; margin:0 0 14px; }
+.note b { color:var(--text); font-weight:600; }
+.budget { display:inline-block; font:500 10.5px ui-monospace,Menlo,monospace; color:var(--warn);
+  border:1px solid color-mix(in srgb, var(--warn) 40%, transparent); border-radius:999px; padding:2px 9px; margin-left:8px; vertical-align:2px; }
+
+/* the funnel strip */
+.strip { display:grid; grid-template-columns:repeat(6,1fr); gap:8px; margin:14px 0 6px; }
+.stop { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:10px 12px; }
+.stop .t { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; }
+.stop .n { font-size:12.5px; color:var(--text); font-weight:600; margin-top:2px; }
+.stop .b { font:500 10.5px ui-monospace,Menlo,monospace; color:var(--warn); margin-top:4px; }
+@media (max-width:900px){ .strip{grid-template-columns:repeat(2,1fr);} }
+
+/* screens */
+.screen { background:var(--win); border:1px solid var(--border2); border-radius:16px; overflow:hidden;
+  box-shadow:var(--shadow-sheet); margin:14px 0; }
+.chrome { display:flex; align-items:center; gap:10px; padding:9px 14px; border-bottom:1px solid var(--border); background:var(--win); }
+.dots span { display:inline-block; width:9px; height:9px; border-radius:50%; background:var(--panel3); margin-right:5px; }
+.addr { font:500 11px ui-monospace,Menlo,monospace; color:var(--muted); background:var(--panel2);
+  border:1px solid var(--border); border-radius:999px; padding:3px 12px; }
+.sheet { background:var(--bg); margin:8px; border-radius:12px; box-shadow:var(--shadow-sheet); }
+
+/* brand */
+.mark { display:inline-flex; align-items:center; gap:8px; }
+.porch { width:20px; height:20px; border-radius:6px; background:var(--brand); position:relative; }
+.porch::after { content:""; position:absolute; inset:5px 5px 4px; border-radius:3px 3px 0 0; background:var(--brand-ink); opacity:.92; }
+.word { font-weight:650; letter-spacing:-.02em; font-size:14px; color:var(--text); }
+
+/* landing — the REAL deck hero (hero.tsx): eyebrow · h1 with grad second line · lead · creed · cta */
+.land { padding:46px 40px 44px; text-align:center; }
+.eyebrow { font-size:11.5px; color:var(--dim); letter-spacing:.14em; text-transform:uppercase; margin-bottom:16px; }
+.land h3 { font-size:42px; line-height:1.1; margin:0 0 12px; font-weight:600; letter-spacing:-.015em; }
+.land h3 .grad { background:linear-gradient(92deg, var(--text), var(--link)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+.lead { color:var(--body); font-size:16px; margin:0 auto 10px; max-width:54ch; }
+.lead b { color:var(--text); font-weight:600; }
+.creed { color:var(--muted); font-size:12.5px; margin:0 0 24px; }
+.creed i { font-style:normal; color:var(--dim); margin:0 8px; }
+.creed .delta { color:var(--link); font-weight:600; }
+/* the announcement pill (round 2, kept): topmost object, the page's one warm element */
+.announce { display:inline-flex; align-items:center; gap:10px; font-size:13.5px; font-weight:600; color:var(--text);
+  background:color-mix(in srgb, var(--brand) 12%, transparent);
+  border:1px solid color-mix(in srgb, var(--brand) 45%, transparent);
+  border-radius:999px; padding:8px 18px; margin-bottom:20px;
+  box-shadow:0 1px 10px color-mix(in srgb, var(--brand) 18%, transparent); }
+.announce .dot { width:8px; height:8px; border-radius:50%; background:var(--green);
+  box-shadow:0 0 0 3px color-mix(in srgb, var(--green) 22%, transparent); animation:adot 2.2s ease-in-out infinite; }
+@keyframes adot { 50% { box-shadow:0 0 0 6px color-mix(in srgb, var(--green) 10%, transparent); } }
+.announce .arrow { color:var(--link); font-weight:400; }
+.cta { display:flex; gap:10px; justify-content:center; }
+.btn { font:inherit; border-radius:10px; padding:11px 20px; border:1px solid var(--border2);
+  background:var(--btn); color:var(--btn-fg); font-size:14px; cursor:pointer; }
+.btn.primary { background:var(--text); color:var(--accent-ink); border-color:transparent; font-weight:600; }
+.finep { color:var(--dim); font-size:11.5px; margin-top:14px; }
+
+/* auth card */
+.centerstage { display:flex; align-items:center; justify-content:center; padding:44px 20px; }
+.authcard { width:360px; background:var(--panel); border:1px solid var(--border2); border-radius:14px; padding:22px; text-align:center; box-shadow:var(--shadow-sheet); }
+.authcard h4 { margin:10px 0 4px; font-size:18px; font-weight:600; }
+.authcard .p { color:var(--body); font-size:12.5px; margin:0 0 16px; }
+.field { text-align:left; margin:10px 0; }
+.field label { display:block; font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:4px; }
+.field input { width:100%; font:inherit; color:var(--text); background:var(--bg); border:1px solid var(--border2); border-radius:9px; padding:9px 12px; }
+.btn.block { width:100%; margin-top:8px; }
+.oauth { display:flex; gap:8px; }
+.oauth .btn { flex:1; font-size:12.5px; padding:9px 0; }
+
+/* the wizard chrome — the REAL onboarding topbar: wordmark + step ring (oak arc + spinning
+   dashed halo + n/5) + step name. 103.7 = 2π·16.5, the arc circumference (Onboarding.tsx). */
+.obtop { display:flex; align-items:center; justify-content:space-between; padding:12px 18px; border-bottom:1px solid var(--border); }
+.obprog { display:flex; align-items:center; gap:10px; }
+.obring { position:relative; width:40px; height:40px; display:grid; place-items:center; }
+.obring svg { position:absolute; inset:0; transform:rotate(-90deg); }
+.obring circle { fill:none; stroke-width:2.5; }
+.obtrack { stroke:var(--panel3); }
+.obspin { stroke:var(--border2); stroke-dasharray:3 6; animation:obspin 14s linear infinite; transform-origin:center; }
+.obarc { stroke:var(--brand); stroke-dasharray:103.7; stroke-dashoffset:calc(103.7 * (1 - var(--p, .2))); stroke-linecap:round; }
+@keyframes obspin { to { transform:rotate(1turn); } }
+.obring b { font-size:12px; font-weight:650; } .obring i { font-style:normal; font-size:9.5px; color:var(--dim); }
+.obname { font-size:12.5px; color:var(--muted); }
+.obbody { padding:26px 40px 30px; max-width:560px; margin:0 auto; }
+.obeyebrow { font-size:11px; color:var(--dim); text-transform:uppercase; letter-spacing:.08em; margin-bottom:8px; }
+.obtitle { font-size:26px; font-weight:600; margin:0 0 8px; letter-spacing:-.01em; }
+.obsub { color:var(--body); font-size:13px; margin:0 0 18px; }
+.obhint { color:var(--dim); font-size:11.5px; margin-top:10px; }
+.obnav { display:flex; gap:10px; margin-top:20px; }
+.obnav .grow { flex:1; }
+
+/* the machine card — the REAL obmachine anatomy (icon · name+status · dot), cloud states on it */
+.obmachine { display:flex; align-items:center; gap:12px; background:var(--panel); border:1px solid var(--border2); border-radius:12px; padding:14px 16px; }
+.obmachine .ico { width:34px; height:34px; border-radius:9px; background:var(--panel2); display:grid; place-items:center; font-size:16px; }
+.obmachine b { display:block; font-size:13.5px; }
+.obmachine span.st { display:block; color:var(--muted); font-size:11.5px; margin-top:1px; }
+.obmachine .right { margin-left:auto; }
+
+/* the machine dial (round 1 object, kept — the one state language everywhere) */
+.mdial { display:inline-flex; align-items:center; gap:8px; font-size:12px; color:var(--body);
+  border:1px solid var(--border2); background:var(--panel2); border-radius:999px; padding:4px 12px 4px 6px; }
+.orb { width:14px; height:14px; border-radius:50%; position:relative; }
+.orb.prov { background:conic-gradient(var(--warn) 32%, var(--panel3) 0); animation:spin 2.4s linear infinite; }
+.orb.wake { background:var(--warn); box-shadow:0 0 0 3px color-mix(in srgb, var(--warn) 22%, transparent); animation:halo 1.6s ease-in-out infinite; }
+.orb.awake { background:var(--green); box-shadow:0 0 0 3px color-mix(in srgb, var(--green) 20%, transparent); }
+.orb.idle { background:var(--panel3); border:2px solid var(--green); }
+@keyframes spin { to { transform:rotate(1turn); } }
+@keyframes halo { 50% { box-shadow:0 0 0 6px color-mix(in srgb, var(--warn) 10%, transparent); } }
+@media (prefers-reduced-motion:reduce){ .orb,.announce .dot,.obspin{animation:none !important;} }
+
+/* wizard steps 3–4 shown as a strip of mini screens */
+.ministrip { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+@media (max-width:900px){ .ministrip{grid-template-columns:1fr;} }
+.mini { background:var(--win); border:1px solid var(--border2); border-radius:12px; overflow:hidden; box-shadow:var(--shadow-sheet); }
+.mini .cap { font-size:10.5px; color:var(--dim); text-transform:uppercase; letter-spacing:.07em; padding:8px 12px 0; }
+.mini .body { padding:10px 12px 14px; }
+.mini h5 { margin:2px 0 8px; font-size:14.5px; font-weight:600; }
+.prov { display:flex; align-items:center; gap:9px; background:var(--panel); border:1px solid var(--border2); border-radius:10px; padding:8px 10px; margin-bottom:6px; font-size:12px; }
+.prov .nm { font-weight:600; }
+.prov .md { margin-left:auto; font-size:10.5px; color:var(--muted); border:1px solid var(--border2); border-radius:999px; padding:2px 8px; }
+.prov .md.on { color:var(--green); border-color:color-mix(in srgb, var(--green) 45%, transparent); }
+.prov .md.cloud { color:var(--link); border-color:color-mix(in srgb, var(--link) 40%, transparent); }
+.slugrow { display:flex; align-items:center; font:500 11.5px ui-monospace,Menlo,monospace; color:var(--muted);
+  background:var(--bg); border:1px solid var(--border2); border-radius:9px; padding:8px 10px; margin-top:6px; }
+.slugrow b { color:var(--text); font-weight:600; }
+.crewgrid { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
+.crewtile { text-align:center; background:var(--panel); border:1px solid var(--border2); border-radius:10px; padding:8px 4px; }
+.crewtile .em { font-size:17px; }
+.crewtile .nm { font-size:11.5px; font-weight:600; margin-top:2px; }
+.crewtile .rl { font-size:9.5px; color:var(--dim); text-transform:uppercase; letter-spacing:.05em; }
+
+/* launch reveal — the REAL step 5 anatomy: title with accent name · crew row · stats */
+.launch { text-align:center; padding:30px 30px 26px; }
+.launch h4 { font-size:24px; margin:0 0 18px; font-weight:600; }
+.launch h4 .nm { color:var(--link); }
+.assem { display:flex; justify-content:center; gap:16px; margin-bottom:16px; flex-wrap:wrap; }
+.member { width:66px; }
+.member .av { position:relative; width:48px; height:48px; margin:0 auto; border-radius:14px; background:var(--panel3); display:grid; place-items:center; font-size:20px; }
+.member .av i { position:absolute; right:-2px; bottom:-2px; width:10px; height:10px; border-radius:50%; background:var(--green); border:2px solid var(--bg); }
+.member .nm { font-size:11.5px; font-weight:600; margin-top:5px; }
+.member .rl { font-size:9.5px; color:var(--dim); text-transform:uppercase; letter-spacing:.04em; }
+.stats { display:flex; justify-content:center; gap:20px; color:var(--muted); font-size:12px; margin-bottom:18px; }
+.stats b { color:var(--text); }
+
+/* thread */
+.threadwrap { padding:16px 0; display:flex; flex-direction:column; }
+.threadcol { width:min(640px, 92%); margin:0 auto; flex:1; display:flex; flex-direction:column; gap:12px; }
+.msg { display:flex; gap:10px; }
+.avatar { width:26px; height:26px; border-radius:8px; background:var(--panel3); flex:none; display:grid; place-items:center; font-size:12px; }
+.avatar.orch { background:color-mix(in srgb, var(--orch) 22%, var(--panel3)); }
+.mbody { font-size:13.5px; color:var(--text); line-height:1.6; }
+.mmeta { font-size:11px; color:var(--dim); margin-top:3px; }
+.mmeta .oncloud { color:var(--link); }
+.typing span { display:inline-block; width:5px; height:5px; border-radius:50%; background:var(--muted); margin-right:3px; animation:tp 1.1s ease-in-out infinite; }
+.typing span:nth-child(2){ animation-delay:.15s; } .typing span:nth-child(3){ animation-delay:.3s; }
+@keyframes tp { 40% { transform:translateY(-3px); opacity:1; } }
+.composer { width:min(640px,92%); margin:12px auto 14px; background:var(--panel); border:1px solid var(--border2); border-radius:14px; padding:10px 12px; }
+.composer .in { color:var(--text); font-size:13.5px; padding:2px 2px 10px; }
+.cstrip { display:flex; align-items:center; gap:8px; border-top:1px solid var(--border); padding-top:8px; }
+.send { margin-left:auto; width:28px; height:28px; border-radius:9px; background:var(--text); color:var(--accent-ink); display:grid; place-items:center; font-size:13px; }
+
+/* setup cards + meter */
+.cards { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; width:min(760px,94%); margin:6px auto; }
+@media (max-width:900px){ .cards{grid-template-columns:repeat(2,1fr);} }
+.scard { background:var(--card); border:1px solid var(--card-border); border-radius:12px; padding:12px; }
+.scard .ic { font-size:16px; }
+.scard .t { font-size:12.5px; font-weight:600; color:var(--text); margin:6px 0 3px; }
+.scard .d { font-size:11.5px; color:var(--muted); line-height:1.45; }
+.scard.done { opacity:.62; }
+.scard.done .t::after { content:" ✓"; color:var(--green); }
+.meter { width:min(760px,94%); margin:10px auto 4px; background:var(--panel); border:1px solid var(--border2); border-radius:12px; padding:12px 14px; display:flex; align-items:center; gap:14px; }
+.meter .bar { flex:1; height:6px; border-radius:99px; background:var(--panel3); overflow:hidden; }
+.meter .fill { width:38%; height:100%; background:var(--green); border-radius:99px; }
+.meter .lbl { font-size:12px; color:var(--body); }
+.meter .up { font-size:12px; color:var(--link); white-space:nowrap; }
+
+/* annotations */
+.ann { border-left:3px solid var(--brand); background:var(--panel); border-radius:0 10px 10px 0;
+  padding:10px 14px; margin:10px 0 0; font-size:12.5px; color:var(--body); max-width:82ch; }
+.ann b { color:var(--text); }
+</style>
+</head>
+<body>
+<header class="page">
+  <div class="mark"><span class="porch"></span><span class="word">neuramesh</span></div>
+  <div>
+    <h1>Onboarding, cloud-first — landing to first reply</h1>
+    <div class="sub">round 4 · the W5 design gate (docs/design/cloud-first-2026-08/plan.md) · built from the SHIPPED screens: hero.tsx · Login.tsx · Onboarding.tsx (the 5-step wizard) · r4: provisioning starts at Workspace-submit — the id exists there (George)</div>
+  </div>
+  <div class="spacer"></div>
+  <button class="ctl" onclick="const h=document.documentElement;h.dataset.theme=h.dataset.theme==='dark'?'light':'dark'">theme</button>
+</header>
+<main>
+
+<section>
+  <h2>The funnel at a glance <span class="budget">Launch → first reply &lt; 60 s p95 · sign-in → Launch = 4 clicks on defaults</span></h2>
+  <p class="note">The flow is the app's <b>existing</b> flow: the deck landing, Clerk sign-in, then the real five-step wizard, ending in "Meet @rex — start your first fan-out". The one structural change (r4, George's correction): <b>the browser wizard runs Workspace first</b> — its Continue mints the workspace id, and the id is the machine's precondition, so <b>provisioning starts at that submit</b>. The Machine step follows as a watch-it-come-up beat that never blocks; Keys gains a <b>works-after-launch</b> lane; Launch counts a cloud machine. Order: <b>Workspace · Machine · Keys · Team · Launch</b> (the desktop wizard keeps its shipped order — there, "this Mac" is the precondition for Keys detection). Every step ships default-filled, so the fast path is four clicks.</p>
+  <div class="strip">
+    <div class="stop"><div class="t">t ≈ 0s</div><div class="n">Landing (the deck)</div><div class="b">Open in browser</div></div>
+    <div class="stop"><div class="t">t ≈ 15s</div><div class="n">Sign in (Clerk)</div><div class="b">no card · 2 fields</div></div>
+    <div class="stop"><div class="t">wizard 1–2/5</div><div class="n">Workspace → Machine</div><div class="b">born at Continue</div></div>
+    <div class="stop"><div class="t">wizard 3–4/5</div><div class="n">Keys · Team</div><div class="b">unchanged + 1 delta</div></div>
+    <div class="stop"><div class="t">wizard 5/5</div><div class="n">Launch → fan-out</div><div class="b">reply on their machine</div></div>
+    <div class="stop"><div class="t">after</div><div class="n">Setup cards + meter</div><div class="b">limits, kindly</div></div>
+  </div>
+</section>
+
+<section>
+  <h2>1 · Landing — the shipped deck hero, with the offer above it</h2>
+  <p class="note">This is <b>hero.tsx verbatim</b> — eyebrow, headline, lead, creed — with three deltas: the round-2 <b>announcement pill</b> leads the page, <b>Open NeuraMesh</b> becomes the primary CTA (Download for Mac demotes to secondary), and the creed's last word changes: <b>"completely local" → "local or cloud — your choice"</b> (the old claim would contradict the pill two lines above it).</p>
+  <div class="screen">
+    <div class="chrome"><span class="dots"><span></span><span></span><span></span></span><span class="addr">neuramesh.app</span></div>
+    <div class="land">
+      <div class="announce"><span class="dot"></span> Free cloud machine with every new workspace <span class="arrow">→</span></div>
+      <div class="eyebrow">The AI multiplayer orchestration layer</div>
+      <h3 class="serif">Humans, AI agents, projects.<br/><span class="grad">One workspace.</span></h3>
+      <p class="lead">For <b>founders and AI engineers</b> building the future.</p>
+      <p class="creed">bring your own subscriptions<i>·</i>bring your team<i>·</i><span class="delta">local or cloud — your choice</span></p>
+      <div class="cta">
+        <button class="btn primary">Open NeuraMesh →</button>
+        <button class="btn"> Download for Mac</button>
+      </div>
+      <div class="finep">No credit card. Your agents keep working when your laptop is closed.</div>
+    </div>
+  </div>
+  <div class="ann"><b>What round 2 got wrong, fixed:</b> r2 invented a hero ("Your people. Your agents. Your projects.") — the shipped deck says <b>"Humans, AI agents, projects. / One workspace."</b> with its eyebrow and creed, and the deck's later stops (rooms, crew, digest) stay exactly as they are. The pill sits above the eyebrow as the page's one warm object; the creed edit is the only line of shipped copy this round changes, and it's flagged as a decision below.</div>
+</section>
+
+<section>
+  <h2>2 · Sign in — the same Clerk the desktop hands off to <span class="budget">no card · 2 fields</span></h2>
+  <div class="screen">
+    <div class="chrome"><span class="dots"><span></span><span></span><span></span></span><span class="addr">hq.neuramesh.app</span></div>
+    <div class="centerstage">
+      <div class="authcard">
+        <div class="mark" style="justify-content:center"><span class="porch"></span><span class="word">neuramesh</span></div>
+        <h4 class="serif">Sign in</h4>
+        <p class="p">Your workspace and its free cloud machine come with your account.</p>
+        <div class="oauth"><button class="btn">Continue with Google</button><button class="btn">GitHub</button></div>
+        <div class="field"><label>email</label><input placeholder="you@company.com" /></div>
+        <button class="btn primary block">Continue →</button>
+      </div>
+    </div>
+  </div>
+  <div class="ann"><b>Same auth, new home.</b> The desktop's Login.tsx already hands off to Clerk OAuth in the system browser — in the cloud flow the browser IS the app, so this card is that same Clerk flow with the desktop-window framing dropped. <b>No machine is born here</b> (r4): a machine's precondition is its workspace id, and sign-in only makes an account. The card's promise stays true — the machine comes with the workspace, one step ahead.</div>
+</section>
+
+<section>
+  <h2>3 · The wizard, steps 1–2: Workspace, then its machine <span class="budget">provisioning starts at Continue</span></h2>
+  <p class="note">Step 1 is the shipped <b>Create your workspace</b> screen, promoted to the front of the browser wizard: its Continue mints the workspace id — <b>the machine's precondition</b> — so the runner row is written at that click (the <span class="mono">FLEET_AUTOPROVISION</span> hook, landed with #333). Step 2 is the Machine screen as a <b>watch-it-come-up beat</b>: the dial vocabulary — <span class="mdial"><span class="orb prov"></span> provisioning</span> <span class="mdial"><span class="orb wake"></span> waking</span> <span class="mdial"><span class="orb awake"></span> awake</span> <span class="mdial"><span class="orb idle"></span> idle</span> — is fixed here for every future surface, and <b>Continue never blocks on it</b>.</p>
+  <div class="screen">
+    <div class="chrome"><span class="dots"><span></span><span></span><span></span></span><span class="addr">hq.neuramesh.app/welcome</span></div>
+    <div class="obtop">
+      <div class="mark"><span class="porch"></span><span class="word">neuramesh</span></div>
+      <div class="obprog">
+        <span class="obring" style="--p:.2">
+          <svg viewBox="0 0 40 40" width="40" height="40" aria-hidden="true">
+            <circle class="obtrack" cx="20" cy="20" r="16.5"></circle>
+            <circle class="obspin" cx="20" cy="20" r="16.5"></circle>
+            <circle class="obarc" cx="20" cy="20" r="16.5"></circle>
+          </svg>
+          <b>1<i>/5</i></b>
+        </span>
+        <span class="obname">Workspace</span>
+      </div>
+    </div>
+    <div class="obbody">
+      <div class="obeyebrow">Step 1 of 5</div>
+      <div class="obtitle serif">Create your workspace</div>
+      <p class="obsub">Name it and pick its address — your workspace's free cloud machine is born the moment you continue.</p>
+      <div class="field" style="margin:0 0 8px"><input value="Gads Inc" /></div>
+      <div class="slugrow">neuramesh.app/&nbsp;<b>gads-inc</b></div>
+      <div class="obhint">seeds #general #build #research #marketing · pack: <b style="color:var(--text)">balanced</b> (recommended)</div>
+      <div class="obnav"><span class="grow"></span><button class="btn primary">Continue →</button></div>
+    </div>
+  </div>
+  <div class="screen">
+    <div class="chrome"><span class="dots"><span></span><span></span><span></span></span><span class="addr">hq.neuramesh.app/welcome</span></div>
+    <div class="obtop">
+      <div class="mark"><span class="porch"></span><span class="word">neuramesh</span></div>
+      <div class="obprog">
+        <span class="obring" style="--p:.4">
+          <svg viewBox="0 0 40 40" width="40" height="40" aria-hidden="true">
+            <circle class="obtrack" cx="20" cy="20" r="16.5"></circle>
+            <circle class="obspin" cx="20" cy="20" r="16.5"></circle>
+            <circle class="obarc" cx="20" cy="20" r="16.5"></circle>
+          </svg>
+          <b>2<i>/5</i></b>
+        </span>
+        <span class="obname">Machine</span>
+      </div>
+    </div>
+    <div class="obbody">
+      <div class="obeyebrow">Step 2 of 5</div>
+      <div class="obtitle serif">Your machine is starting</div>
+      <p class="obsub"><b>gads-inc</b> just got its cloud machine — born from the workspace you named a second ago, free to start. Your agents run there, even when this tab is closed. A Mac can join later as home base.</p>
+      <div class="obmachine">
+        <span class="ico">☁</span>
+        <div><b>gads-inc · workspace-machine</b><span class="st">provisioning · private namespace ws-gads-inc · us-east4</span></div>
+        <span class="right mdial"><span class="orb prov"></span> provisioning</span>
+      </div>
+      <div class="obhint">outbound-only · gVisor-sandboxed · your code and keys never leave it</div>
+      <div class="obnav"><span class="grow"></span><button class="btn primary">Continue →</button></div>
+    </div>
+  </div>
+  <div class="ann"><b>Why this order (r4, George):</b> provisioning can't precede the workspace — the id it's keyed to doesn't exist yet. So the browser wizard reorders to <b>Workspace · Machine · Keys · Team · Launch</b>, while the desktop keeps its shipped order (there, "this Mac" must connect first because Keys detection probes it). Build note: today <span class="mono">nm.onboard</span> creates the workspace at Launch; the browser flow moves workspace creation to this Continue so the autoprovision hook fires with the Keys + Team steps as head start — warm wake is a measured 7 s, so the dial usually reads <b>awake</b> before Launch. The Launch step absorbs any residue; no spinner-wall exists.</div>
+</section>
+
+<section>
+  <h2>4 · The wizard, steps 3–4: Keys · Team — unchanged, one delta</h2>
+  <p class="note">These are the shipped screens (provider cards with detection · the starter crew). The <b>one cloud delta lives in Keys</b>: a subscription can't be detected from a browser tab, so its mode reads <b>"sign in on your machine after launch"</b> — the terminal opens right in the thread later (nm-relay). API keys work immediately, exactly as today. Free users pass this step on <b>Starter compute</b> — the "curated free pack" the shipped hint already promises. By now the machine from step 2 is usually <b>awake</b>; the dial rides quietly in the wizard chrome.</p>
+  <div class="ministrip" style="grid-template-columns:repeat(2,1fr)">
+    <div class="mini">
+      <div class="cap">3 / 5 · Keys — "Bring your own brain"</div>
+      <div class="body">
+        <h5 class="serif">Bring your own brain</h5>
+        <div class="prov"><span>◆</span><span class="nm">Claude</span><span class="md cloud">sign in after launch</span></div>
+        <div class="prov"><span>●</span><span class="nm">OpenAI</span><span class="md on">API key ✓</span></div>
+        <div class="prov"><span>✦</span><span class="nm">Gemini</span><span class="md">not now</span></div>
+        <div class="obhint">or continue on Starter compute — the free pack, metered</div>
+      </div>
+    </div>
+    <div class="mini">
+      <div class="cap">4 / 5 · Team — "Your starting team"</div>
+      <div class="body">
+        <div class="crewgrid">
+          <div class="crewtile"><div class="em">🦊</div><div class="nm">rex</div><div class="rl">orchestrator</div></div>
+          <div class="crewtile"><div class="em">🦋</div><div class="nm">iris</div><div class="rl">designer</div></div>
+          <div class="crewtile"><div class="em">🦫</div><div class="nm">atlas</div><div class="rl">architect</div></div>
+          <div class="crewtile"><div class="em">🦉</div><div class="nm">patch</div><div class="rl">developer</div></div>
+          <div class="crewtile"><div class="em">🐝</div><div class="nm">scout</div><div class="rl">reviewer</div></div>
+          <div class="crewtile"><div class="em">🦭</div><div class="nm">bosun</div><div class="rl">shipper</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="ann"><b>Truth gate, kept:</b> the crew is DEFAULT_TEAM exactly — the web deck already enforces "no invented personas" against it, and this mockup obeys the same rule. The Keys gate today requires ≥1 provider; the free-machine offer needs the Starter-compute lane to satisfy it (the shipped hint text — "a curated free pack is coming soon" — becomes real here). That lane is a decision below, not a fait accompli.</div>
+</section>
+
+<section>
+  <h2>5 · Launch — the real reveal, then the first fan-out <span class="budget">reply on their machine &lt; 60 s from Launch</span></h2>
+  <div class="screen">
+    <div class="chrome"><span class="dots"><span></span><span></span><span></span></span><span class="addr">hq.neuramesh.app/welcome</span></div>
+    <div class="launch">
+      <h4 class="serif"><span class="nm">Gads Inc</span> is live.</h4>
+      <div class="assem">
+        <div class="member"><span class="av">🦊<i></i></span><div class="nm">rex</div><div class="rl">orchestrator</div></div>
+        <div class="member"><span class="av">🦋<i></i></span><div class="nm">iris</div><div class="rl">designer</div></div>
+        <div class="member"><span class="av">🦫<i></i></span><div class="nm">atlas</div><div class="rl">architect</div></div>
+        <div class="member"><span class="av">🦉<i></i></span><div class="nm">patch</div><div class="rl">developer</div></div>
+        <div class="member"><span class="av">🐝<i></i></span><div class="nm">scout</div><div class="rl">reviewer</div></div>
+        <div class="member"><span class="av">🦭<i></i></span><div class="nm">bosun</div><div class="rl">shipper</div></div>
+      </div>
+      <div class="stats"><span><b>6</b> agents</span><span><b>1</b> cloud machine online</span><span><b>4</b> channels</span></div>
+      <button class="btn primary">Meet @rex — start your first fan-out →</button>
+    </div>
+  </div>
+  <div class="screen">
+    <div class="chrome"><span class="dots"><span></span><span></span><span></span></span><span class="addr">hq.neuramesh.app</span></div>
+    <div class="sheet">
+      <div class="threadwrap">
+        <div class="threadcol" style="padding:14px 0 4px">
+          <div class="msg"><div class="avatar">G</div><div><div class="mbody">What can this workspace do?</div><div class="mmeta">you · just now</div></div></div>
+          <div class="msg"><div class="avatar orch">🦊</div><div>
+            <div class="mbody">Quite a lot — and I'll show you rather than list features. You have three rooms, a board, and five teammates. Give me a repo or an idea and I'll plan it into tasks they can build, review, and ship. Or just keep asking.</div>
+            <div class="mmeta">rex · <span class="oncloud">on your cloud machine ☁</span> · replied in 4s</div>
+          </div></div>
+          <div class="msg"><div class="avatar orch">🦊</div><div class="mbody typing"><span></span><span></span><span></span></div></div>
+        </div>
+        <div class="composer">
+          <div class="in" style="color:var(--dim)">Message #general…</div>
+          <div class="cstrip"><span class="mdial"><span class="orb awake"></span> your machine · awake</span><span class="send">↑</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="ann"><b>The reveal is the shipped step 5</b> — accent-colored name, assembling crew with presence dots, the stats row (its middle stat now says <b>cloud</b> machine), the exact "Meet @rex — start your first fan-out →" CTA. The thread that follows is where the landing promise lands: <b>"on your cloud machine ☁ · replied in 4s"</b> on the first few replies, then the attribution retires to run details. The dial from the Machine step reappears in the composer strip — one object, one vocabulary, end to end.</div>
+</section>
+
+<section>
+  <h2>6 · After the first exchange — progressive setup, limits said kindly</h2>
+  <p class="note">Setup never blocks the first reply; it follows it. The free meter is <b>visible before it matters</b>, phrased as what you have, not what you lack. Enforcement is server-side (plan guards); this surface only ever tells the truth about it.</p>
+  <div class="screen">
+    <div class="chrome"><span class="dots"><span></span><span></span><span></span></span><span class="addr">hq.neuramesh.app</span></div>
+    <div class="sheet" style="padding:16px 0 14px">
+      <div class="cards">
+        <div class="scard done"><div class="ic">☁</div><div class="t">Cloud machine</div><div class="d">Provisioned and awake. Yours, free to start.</div></div>
+        <div class="scard"><div class="ic">🔑</div><div class="t">Bring your subscription</div><div class="d">Sign into Claude on your machine — the terminal opens right here. Usage stays on your plan.</div></div>
+        <div class="scard"><div class="ic">🤝</div><div class="t">Invite your team</div><div class="d">Each member can get their own machine.</div></div>
+        <div class="scard"><div class="ic">⌘</div><div class="t">Desktop app</div><div class="d">Optional. Your Mac joins as home base; everything here works in the browser.</div></div>
+      </div>
+      <div class="meter">
+        <span class="lbl"><b style="color:var(--text)">Starter compute</b> · 23 min used of 60 today</span>
+        <div class="bar"><div class="fill"></div></div>
+        <span class="up">Cloud · $22/seat →</span>
+      </div>
+    </div>
+  </div>
+  <div class="ann"><b>Order of the cards is the strategy:</b> the machine is shown already-done (a gift received, not a chore), the subscription card leads the asks — it completes the Keys step's "sign in after launch" promise through the in-thread terminal (nm-relay) — and desktop is deliberately last, reframed as "your Mac joins as home base" (the wizard's own words). The meter's upgrade link goes to pricing with zero guilt-copy; at the limit, replies queue with the same honest line, never a hard wall mid-conversation.</div>
+</section>
+
+<section>
+  <h2>Decisions — ALL SEVEN APPROVED by George, 2026-08-28</h2>
+  <p class="note" style="color:var(--green)">This round is the locked visual contract for W5. The list below stands as approved; revisions reopen the gate.</p>
+  <p class="note">
+    1 · <b>The machine dial vocabulary</b> (provisioning / waking / awake / idle) as the one state language everywhere.<br/>
+    2 · <b>The free offer framing</b>: "Free cloud machine with every new workspace" as the announcement pill above the shipped hero (round 2's move, kept in round 3).<br/>
+    3 · <b>The attribution moment</b>: "on your cloud machine ☁ · replied in Ns" on early replies, retiring afterward.<br/>
+    4 · <b>The browser wizard reorders</b> (r4): Workspace · Machine · Keys · Team · Launch — provisioning starts at Workspace-submit, where the id exists; the Machine step is a non-blocking watch-it-come-up beat; the desktop wizard keeps its shipped order. Build note: workspace creation moves from Launch (<span class="mono">nm.onboard</span>) to the Workspace step's Continue in the browser flow.<br/>
+    5 · <b>The Keys delta + Starter compute</b>: subscription mode becomes "sign in on your machine after launch" (in-thread terminal), and free users pass the Keys gate on the metered Starter pack — making the shipped hint ("a curated free pack is coming soon") real.<br/>
+    6 · <b>The creed edit</b>: "completely local" → "local or cloud — your choice" — the only line of shipped landing copy this round touches.<br/>
+    7 · <b>Setup follows the first reply</b>, never precedes it; the subscription card leads the asks.
+  </p>
+</section>
+
+</main>
+</body>
+</html>

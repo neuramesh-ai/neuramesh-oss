@@ -1,0 +1,783 @@
+<!doctype html>
+<html lang="en" data-theme="cream">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chat mode — the Tasks toggle · R1</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/geist@5.2.5/wght.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/geist-mono@5.2.5/wght.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/source-serif-4@5.2.5/opsz-wght.css">
+<style>
+/* ════════════════════════════════════════════════════════════════════════════
+   Chat mode — the Tasks toggle on the composer. R1.
+
+   Tokens lifted verbatim from apps/desktop/src/renderer/src/tokens.css via
+   mockups/cabinet-revamp.html (docs/33 §4). Nothing here invents a colour.
+
+   The ONE new idiom: a composer chip that TOGGLES rather than opens a picker.
+   Pressed wears the accent wash — docs/33 §3's deliberate exception ("selected
+   state may wear --accent-soft"). Everything else on screen already ships.
+   ════════════════════════════════════════════════════════════════════════════ */
+:root {
+  --fdisp:'Source Serif 4 Variable',Georgia,'Times New Roman',serif;
+  --fbody:'Geist Variable',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --fmono:'Geist Mono Variable',ui-monospace,'SF Mono',Menlo,monospace;
+  --dur-fast:.12s; --dur:.15s; --dur-enter:.22s; --dur-exit:.13s;
+  --ease:cubic-bezier(.22,1,.36,1);
+  --r-xs:6px; --r-sm:8px; --r-md:10px; --r-lg:14px; --r-xl:18px; --r-full:999px;
+  --col:720px;
+}
+[data-theme="cream"] {
+  --win:#f0e5d3; --band:#e7d9c3;
+  --bg:#fbf8f4; --sheet:#fbf8f4;
+  --panel2:#f6eee1; --panel3:#efe1cd;
+  --border:#e6dbca; --border2:#d3c2a8; --framedge:#e0d1b7;
+  --text:#2a1c13; --body:#574838; --muted:#97846c; --dim:#b5a289;
+  --link:#9c5730;
+  --accent:#834a2b; --accent-ink:#fff7ee; --accent-soft:rgba(131,74,43,.11);
+  --btn:#f8f2e8; --btn-fg:#43301f;
+  --green:#2f9e6b; --todo:#7d8590; --prog:#4f80c4; --review:#6d5ce0; --done:#0f9d63;
+  --design:#b0498f; --designrev:#8a3fc0; --plan:#2c7d88;
+  --role-orch:#6a63bc; --role-arch:#7d6cc4; --role-dev:#3f9268; --role-rev:#4f7bb0; --role-design:#b0498f;
+  --shadow-sheet:0 8px 26px -8px rgba(70,42,18,.16), 0 1px 2px rgba(70,42,18,.05);
+  --shadow-card:0 1px 2px rgba(70,42,18,.05);
+  --shadow-lift:0 8px 20px -8px rgba(70,42,18,.20);
+  --shadow-pop:0 20px 55px -14px rgba(70,42,18,.30);
+  --overlay:#ffffff; --card:#ffffff; --card-border:#eadfce;
+  --scrim:rgba(53,36,22,.32);
+  --ring:color-mix(in srgb,var(--accent) 55%,var(--border2));
+  --hover-bg:rgba(53,36,22,.05); --sel-bg:rgba(131,74,43,.08);
+}
+[data-theme="dark"] {
+  --win:#0d0d0d; --band:#090909;
+  --bg:#141414; --sheet:#191919;
+  --panel2:#212121; --panel3:#2b2b2b;
+  --border:#272727; --border2:#383838; --framedge:#1b1b1b;
+  --text:#eaeaea; --body:#b6b6b6; --muted:#898989; --dim:#676767;
+  --link:#9cb1f0;
+  --accent:#eaeaea; --accent-ink:#101010; --accent-soft:rgba(234,234,234,.13);
+  --btn:#232323; --btn-fg:#efefef;
+  --green:#77ac8d; --todo:#949494; --prog:#8ba0c0; --review:#a89ccf; --done:#77ac8d;
+  --design:#cc8fb9; --designrev:#b78bd8; --plan:#7fa5ab;
+  --role-orch:#9793d2; --role-arch:#a89ccf; --role-dev:#77ac8d; --role-rev:#7ba1c4; --role-design:#cc8fb9;
+  --shadow-sheet:inset 0 1px 0 rgba(255,255,255,.05), 0 12px 30px -6px rgba(0,0,0,.5);
+  --shadow-card:0 1px 2px rgba(0,0,0,.25);
+  --shadow-lift:0 8px 20px -8px rgba(0,0,0,.55);
+  --shadow-pop:0 20px 55px -14px rgba(0,0,0,.65);
+  --overlay:#222; --card:#1e1e1e; --card-border:#2c2c2c;
+  --scrim:rgba(0,0,0,.5);
+  --ring:#525252;
+  --hover-bg:rgba(255,255,255,.06); --sel-bg:rgba(255,255,255,.09);
+}
+[data-theme="light"] {
+  --win:#e9e5db; --band:#ded9cc;
+  --bg:#fcfbf8; --sheet:#fcfbf8;
+  --panel2:#f4f1ea; --panel3:#ebe7dd;
+  --border:#e2ded4; --border2:#cec5b7; --framedge:#dbd5c7;
+  --text:#2f2a24; --body:#524c43; --muted:#837d72; --dim:#a09889;
+  --link:#4a5ec9;
+  --accent:#2f2a24; --accent-ink:#ffffff; --accent-soft:rgba(47,42,36,.10);
+  --btn:#f1eee6; --btn-fg:#2f2a24;
+  --green:#2f9e6b; --todo:#7d8590; --prog:#4f80c4; --review:#6d5ce0; --done:#2f9e6b;
+  --design:#b0498f; --designrev:#8a3fc0; --plan:#2c7d88;
+  --role-orch:#635fc0; --role-arch:#7d6cc4; --role-dev:#3f9268; --role-rev:#4f7bb0; --role-design:#b0498f;
+  --shadow-sheet:0 8px 26px -8px rgba(70,58,44,.15), 0 1px 2px rgba(70,58,44,.05);
+  --shadow-card:0 1px 2px rgba(70,58,44,.05);
+  --shadow-lift:0 8px 20px -8px rgba(70,58,44,.18);
+  --shadow-pop:0 20px 55px -14px rgba(70,58,44,.26);
+  --overlay:#ffffff; --card:#ffffff; --card-border:#e2ded4;
+  --scrim:rgba(47,42,36,.30);
+  --ring:color-mix(in srgb,var(--accent) 55%,var(--border2));
+  --hover-bg:rgba(47,42,36,.05); --sel-bg:rgba(47,42,36,.07);
+}
+[data-theme="soft-dark"] {
+  --win:#1d1d1d; --band:#181818;
+  --bg:#262626; --sheet:#2a2a2a;
+  --panel2:#313131; --panel3:#3b3b3b;
+  --border:#363636; --border2:#454545; --framedge:#292929;
+  --text:#ececec; --body:#c2c2c2; --muted:#979797; --dim:#737373;
+  --link:#a6baf2;
+  --accent:#ececec; --accent-ink:#141414; --accent-soft:rgba(236,236,236,.13);
+  --btn:#383838; --btn-fg:#f0f0f0;
+  --green:#7fb495; --todo:#9c9c9c; --prog:#94aacb; --review:#aaa0d2; --done:#7fb495;
+  --design:#cf99c1; --designrev:#bd96da; --plan:#86adb3;
+  --role-orch:#a29ed9; --role-arch:#aaa0d2; --role-dev:#7fb495; --role-rev:#86aacc; --role-design:#cf99c1;
+  --shadow-sheet:inset 0 1px 0 rgba(255,255,255,.04), 0 12px 30px -6px rgba(0,0,0,.42);
+  --shadow-card:0 1px 2px rgba(0,0,0,.2);
+  --shadow-lift:0 8px 20px -8px rgba(0,0,0,.45);
+  --shadow-pop:0 20px 55px -14px rgba(0,0,0,.55);
+  --overlay:#333; --card:#2e2e2e; --card-border:#3a3a3a;
+  --scrim:rgba(0,0,0,.42);
+  --ring:#5e5e5e;
+  --hover-bg:rgba(255,255,255,.05); --sel-bg:rgba(255,255,255,.08);
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+button { font:inherit; color:inherit; background:none; border:0; cursor:pointer; }
+body { background:#0e0e0e; color:#e6e6e6; font-family:var(--fbody); -webkit-font-smoothing:antialiased; }
+.page { max-width:1520px; margin:0 auto; padding:26px 22px 64px; }
+.pagehead h1 { font:640 22px/1.25 var(--fdisp); letter-spacing:-.012em; color:#f2f2f2; }
+.pagehead .sub { color:#8f8f8f; font-size:13px; line-height:1.65; margin-top:9px; max-width:104ch; }
+.pagehead .sub b { color:#c3c3c3; font-weight:600; }
+.pagehead .sub code { font-family:var(--fmono); font-size:11.5px; background:rgba(255,255,255,.07); border-radius:4px; padding:1px 5px; color:#c3c3c3; }
+.bar { display:flex; gap:10px; align-items:center; margin:18px 0 16px; flex-wrap:wrap; }
+.seg { display:inline-flex; border:1px solid #333; border-radius:10px; overflow:hidden; }
+.seg button { color:#9a9a9a; font:600 11.5px var(--fbody); padding:7px 13px; }
+.seg button.on { background:#2c2c2c; color:#fff; }
+.barhint { font-size:11.5px; color:#787878; }
+.stage { display:grid; grid-template-columns:230px 1fr; gap:18px; align-items:start; }
+@media (max-width:1120px){ .stage { grid-template-columns:1fr; } }
+
+/* step rail */
+.steps { display:flex; flex-direction:column; gap:3px; position:sticky; top:18px; }
+.steprail-k { font:700 9.5px var(--fmono); letter-spacing:.1em; text-transform:uppercase; color:#5f5f5f; padding:0 10px 8px; }
+.step { display:flex; gap:11px; align-items:flex-start; text-align:left; border:1px solid transparent; border-radius:11px; padding:9px 10px; color:#9a9a9a; transition:background var(--dur-fast) var(--ease); }
+.step:hover { background:#171717; }
+.step.on { background:#1e1e1e; border-color:#3a3a3a; color:#ededed; }
+.step .n { flex:none; width:19px; height:19px; border-radius:99px; display:grid; place-items:center; font:700 10px var(--fmono); background:#2b2b2b; color:#b6b6b6; }
+.step.on .n { background:#ededed; color:#111; }
+.step .t { display:block; font-size:12.5px; font-weight:600; line-height:1.35; }
+.step .d { display:block; font-size:10.5px; color:#6f6f6f; margin-top:3px; line-height:1.45; }
+
+/* ── the app frame (docs/33 §2: frame owns chrome, sheet owns content) ── */
+.frame { border:1px solid #2b2b2b; border-radius:15px; overflow:hidden; background:var(--win); }
+.app { display:flex; flex-direction:column; height:690px; background:var(--win); color:var(--text); font-size:14px; }
+.topbar { flex:none; height:44px; display:flex; align-items:center; gap:11px; padding:0 14px; border-bottom:1px solid var(--framedge); }
+.wordmark { font:640 14px var(--fdisp); letter-spacing:-.01em; }
+.crumb { font-size:11.5px; color:var(--muted); }
+.crumb b { color:var(--body); font-weight:600; }
+.searchpill { margin-left:auto; display:flex; align-items:center; gap:7px; height:27px; padding:0 11px; border-radius:var(--r-full); border:1px solid var(--border2); color:var(--dim); font-size:11.5px; background:color-mix(in srgb,var(--card) 45%,transparent); }
+.framebody { flex:1; min-height:0; display:grid; grid-template-columns:196px 1fr; }
+.nav { display:flex; flex-direction:column; padding:12px 9px; gap:2px; min-height:0; }
+.navk { font:700 9px var(--fmono); letter-spacing:.11em; text-transform:uppercase; color:var(--dim); padding:11px 9px 5px; }
+.navitem { display:flex; align-items:center; gap:8px; padding:6px 9px; border-radius:9px; font-size:12.5px; color:var(--body); text-align:left; }
+.navitem:hover { background:var(--hover-bg); }
+.navitem.on { background:var(--sel-bg); color:var(--text); font-weight:600; }
+.navitem .h { color:var(--dim); }
+.navitem .cnt { margin-left:auto; font:700 9px var(--fmono); color:var(--muted); }
+.navagent { display:flex; align-items:center; gap:8px; padding:5px 9px; border-radius:9px; font-size:12px; color:var(--body); text-align:left; }
+.navagent:hover { background:var(--hover-bg); }
+.navagent .who { display:flex; flex-direction:column; min-width:0; }
+.navagent b { font-weight:600; font-size:12px; }
+.navagent .st { font-size:10px; color:var(--dim); }
+
+/* the sheet */
+.sheetwrap { padding:0 12px 12px 0; min-height:0; display:flex; }
+.sheet { flex:1; min-width:0; background:var(--bg); border:1px solid var(--border); border-radius:16px; box-shadow:var(--shadow-sheet); display:flex; flex-direction:column; overflow:hidden; position:relative; }
+.sheethead { flex:none; display:flex; align-items:center; gap:9px; padding:13px 20px 0; }
+.sheethead h2 { font:640 19px/1.25 var(--fdisp); letter-spacing:-.012em; }
+.sheethead .desc { font-size:11.5px; color:var(--muted); }
+.scroll { flex:1; min-height:0; overflow:auto; padding:12px 20px 4px; }
+.colwrap { max-width:var(--col); margin:0 auto; }
+.scroll::-webkit-scrollbar { width:9px; }
+.scroll::-webkit-scrollbar-thumb { background:color-mix(in srgb,var(--text) 15%,transparent); border-radius:9px; border:3px solid transparent; background-clip:padding-box; }
+
+/* home bits */
+.hgreet { font:640 24px/1.25 var(--fdisp); letter-spacing:-.014em; margin:6px 0 3px; }
+.hgreet .lede { display:block; font:400 13px/1.6 var(--fbody); color:var(--muted); margin-top:6px; }
+.sechead { display:flex; align-items:center; gap:8px; margin:20px 0 9px; }
+.sechead h3 { font:700 9.5px var(--fmono); letter-spacing:.11em; text-transform:uppercase; color:var(--dim); }
+.sechead .n { font:700 9.5px var(--fmono); color:var(--muted); }
+.mcqcard { background:var(--card); border:1px solid var(--card-border); border-radius:var(--r-lg); padding:12px 14px; margin-bottom:8px; box-shadow:var(--shadow-card); transition:transform var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease); }
+.mcqcard:hover { transform:translateY(-1px); box-shadow:var(--shadow-lift); }
+.mcqtop { display:flex; align-items:center; gap:7px; margin-bottom:6px; }
+.mcqid { font:600 10.5px var(--fmono); color:var(--muted); }
+.mcqbadges { margin-left:auto; font-size:10.5px; color:var(--dim); }
+.mcqtitle { font-size:13.5px; font-weight:600; }
+.mcqmeta { font-size:11.5px; color:var(--muted); margin-top:4px; }
+.chip { display:inline-flex; align-items:center; height:18px; padding:0 8px; border-radius:var(--r-full); font:600 10px var(--fbody); color:var(--c,var(--muted)); background:color-mix(in srgb,var(--c,var(--muted)) 14%,transparent); }
+.kindchip { font:600 9.5px var(--fmono); letter-spacing:.04em; text-transform:uppercase; color:var(--dim); border:1px solid var(--border); border-radius:var(--r-full); padding:1px 7px; }
+.frowline { display:flex; align-items:center; gap:9px; width:100%; padding:7px 9px; border-radius:var(--r-md); font-size:12.5px; color:var(--body); text-align:left; }
+.frowline:hover { background:var(--hover-bg); }
+.frowline .what { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.frowline b { color:var(--text); font-weight:600; }
+.frowline .roomtag { margin-left:auto; font-size:10.5px; color:var(--dim); flex:none; }
+.frowline time { font-size:10.5px; color:var(--dim); flex:none; width:34px; text-align:right; }
+
+/* ══ THE COMPOSER — one idiom everywhere (docs/33 §8) ══ */
+.composer { flex:none; padding:6px 20px 14px; }
+.cbox { max-width:var(--col); margin:0 auto; background:var(--card); border:1px solid var(--border); border-radius:var(--r-xl); box-shadow:var(--shadow-card); transition:border-color var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease); }
+[data-theme="dark"] .cbox, [data-theme="soft-dark"] .cbox { background:var(--panel2); }
+.cbox:focus-within { border-color:var(--ring); box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 9%,transparent), var(--shadow-lift); }
+.chint { display:flex; align-items:center; gap:7px; font-size:11px; color:var(--muted); padding:9px 16px 0; line-height:1.5; }
+.chint .pav { width:15px; height:15px; border-radius:4px; }
+.chintat { color:var(--link); font-weight:600; }
+.cbox textarea { width:100%; background:none; border:none; outline:none; resize:none; color:var(--text); font:14px/1.5 var(--fbody); padding:8px 18px 4px; height:44px; }
+.cbox textarea::placeholder { color:var(--dim); }
+.crow { display:flex; align-items:center; gap:6px; padding:4px 10px 10px 12px; }
+.ctool { width:30px; height:30px; border-radius:var(--r-full); display:grid; place-items:center; color:var(--muted); font-size:13px; transition:background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
+.ctool:hover { background:var(--hover-bg); color:var(--text); }
+.cchip { display:inline-flex; align-items:center; gap:6px; height:29px; padding:0 12px; border-radius:var(--r-full); border:1px solid var(--border); font-size:12px; font-weight:550; color:var(--body); transition:border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
+.cchip:hover { border-color:var(--border2); background:var(--hover-bg); color:var(--text); }
+.cchip .cc { color:var(--dim); font-size:9px; }
+.csend { margin-left:auto; width:38px; height:38px; border-radius:50%; background:var(--accent); color:var(--accent-ink); display:grid; place-items:center; transition:transform var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease); }
+.csend:hover { box-shadow:var(--shadow-lift); transform:translateY(-1px); }
+.csend:active { transform:scale(.94); }
+.csend svg { display:block; }
+
+/* ══ THE ONE NEW IDIOM: a composer chip that TOGGLES ══
+   Pressed = accent wash (docs/33 §3's stated exception for selected state).
+   Unpressed = the ordinary quiet chip, so "off" never shouts.
+   The dot is the state made non-colour-dependent (filled / hollow). */
+.taskschip { position:relative; }
+.taskschip .dot { width:7px; height:7px; border-radius:50%; border:1.5px solid currentColor; background:transparent; transition:background var(--dur-fast) var(--ease); }
+.taskschip[aria-pressed="true"] { background:var(--accent-soft); border-color:color-mix(in srgb,var(--accent) 34%,transparent); color:var(--accent); font-weight:650; }
+[data-theme="dark"] .taskschip[aria-pressed="true"], [data-theme="soft-dark"] .taskschip[aria-pressed="true"] { color:var(--text); }
+.taskschip[aria-pressed="true"] .dot { background:currentColor; }
+.taskschip[aria-pressed="false"] { color:var(--muted); }
+.taskschip.flash { animation:chipflash .5s var(--ease); }
+@keyframes chipflash { 0%{ box-shadow:0 0 0 0 color-mix(in srgb,var(--accent) 40%,transparent); } 100%{ box-shadow:0 0 0 9px transparent; } }
+
+/* ══ the conversation sheet ══ */
+.convo { position:absolute; inset:0; background:var(--bg); display:flex; flex-direction:column; border-radius:16px; overflow:hidden; animation:rise var(--dur-enter) var(--ease) both; }
+@keyframes rise { from { opacity:0; transform:translateY(7px); } to { opacity:1; transform:none; } }
+.thead { flex:none; display:flex; align-items:center; gap:9px; padding:12px 18px; border-bottom:1px solid var(--border); }
+.thead .x { width:24px; height:24px; border-radius:7px; color:var(--dim); display:grid; place-items:center; font-size:13px; }
+.thead .x:hover { background:var(--hover-bg); color:var(--text); }
+.convotitle { font-size:13.5px; font-weight:650; }
+.theadact { margin-left:auto; display:flex; align-items:center; gap:8px; font-size:11px; color:var(--dim); }
+/* the thread's mode, read-only in the header — the composer is where you change it */
+.modechip { display:inline-flex; align-items:center; gap:5px; height:20px; padding:0 9px; border-radius:var(--r-full); font:600 10.5px var(--fbody); border:1px solid var(--border); color:var(--muted); }
+.modechip.chat { background:var(--accent-soft); border-color:color-mix(in srgb,var(--accent) 26%,transparent); color:var(--accent); }
+[data-theme="dark"] .modechip.chat, [data-theme="soft-dark"] .modechip.chat { color:var(--text); }
+.tmsgs { flex:1; min-height:0; overflow:auto; padding:16px 18px 6px; }
+.tmsgs::-webkit-scrollbar { width:9px; }
+.tmsgs::-webkit-scrollbar-thumb { background:color-mix(in srgb,var(--text) 15%,transparent); border-radius:9px; border:3px solid transparent; background-clip:padding-box; }
+.msg { display:flex; gap:10px; max-width:var(--col); margin:0 auto 16px; animation:rise var(--dur-enter) var(--ease) both; }
+.msg .pav { width:28px; height:28px; border-radius:9px; flex:none; }
+.msg .av { width:28px; height:28px; border-radius:9px; flex:none; background:var(--panel3); color:var(--text); display:grid; place-items:center; font:650 11px var(--fbody); }
+.msg .body { min-width:0; flex:1; }
+.msg .head { display:flex; align-items:center; gap:7px; margin-bottom:3px; }
+.msg .head b { font-size:12.5px; font-weight:650; }
+.msg .head .time { font-size:10.5px; color:var(--dim); }
+.rolechip { font:600 9px var(--fmono); letter-spacing:.04em; text-transform:uppercase; color:var(--tone); border:1px solid color-mix(in srgb,var(--tone) 34%,transparent); background:color-mix(in srgb,var(--tone) 11%,transparent); border-radius:var(--r-full); padding:1px 6px; }
+.mdt { font-size:13.5px; line-height:1.62; color:var(--body); }
+.mdt p { margin:0 0 9px; }
+.mdt p:last-child { margin-bottom:0; }
+.mdt strong { color:var(--text); font-weight:640; }
+.mdt ul { margin:0 0 9px; padding-left:17px; }
+.mdt li { margin-bottom:4px; }
+.mdt code { font-family:var(--fmono); font-size:12px; background:var(--panel2); border-radius:4px; padding:1px 5px; color:var(--text); }
+.mdt a { color:var(--link); text-decoration:none; border-bottom:1px solid color-mix(in srgb,var(--link) 34%,transparent); }
+.src { font-size:11px; color:var(--dim); }
+
+/* suggestion pills (ghost recipe, docs/33 §8) */
+.sugrow { display:flex; gap:7px; flex-wrap:wrap; margin-top:10px; }
+.sug { font-size:12px; color:var(--body); border:1px solid var(--border); border-radius:var(--r-full); padding:5.5px 13px; transition:transform var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease); }
+.sug:hover { border-color:var(--border2); color:var(--text); background:var(--hover-bg); transform:translateY(-1px); }
+
+/* the live ghost */
+.ghost { display:flex; gap:10px; max-width:var(--col); margin:0 auto 16px; align-items:center; }
+.ghosttext { font-size:12.5px; color:var(--muted); }
+.tdots { display:inline-flex; gap:3px; margin-left:6px; }
+.tdots i { width:4px; height:4px; border-radius:50%; background:var(--muted); animation:tdot 1.2s ease-in-out infinite; }
+.tdots i:nth-child(2){ animation-delay:.15s; } .tdots i:nth-child(3){ animation-delay:.3s; }
+@keyframes tdot { 0%,60%,100%{ opacity:.28; transform:translateY(0);} 30%{ opacity:1; transform:translateY(-2px);} }
+@media (prefers-reduced-motion:reduce){ .tdots i, .msg, .convo { animation:none !important; } }
+
+/* run card (docs/29) — work that outlives the reply, rendered in the transcript */
+.runcard { max-width:var(--col); margin:0 auto 16px; background:var(--card); border:1px solid var(--card-border); border-radius:var(--r-lg); padding:11px 13px; box-shadow:var(--shadow-card); }
+.runtop { display:flex; align-items:center; gap:8px; font-size:12.5px; }
+.runtop b { font-weight:650; }
+.runtop .el { margin-left:auto; font:600 10.5px var(--fmono); color:var(--dim); }
+.rring { width:11px; height:11px; border-radius:50%; border:2px solid color-mix(in srgb,var(--prog) 40%,transparent); border-top-color:var(--prog); animation:spin 1s linear infinite; flex:none; }
+@keyframes spin { to { transform:rotate(360deg); } }
+.runstep { font-size:11.5px; color:var(--muted); margin-top:5px; padding-left:19px; }
+.runlegs { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; padding-left:19px; }
+.leg { font:600 10.5px var(--fbody); color:var(--muted); border:1px solid var(--border); border-radius:var(--r-full); padding:2px 9px; }
+.leg.done { color:var(--done); border-color:color-mix(in srgb,var(--done) 32%,transparent); }
+
+/* the inline deliverable card (docs/30 — the file renders where it lands) */
+.docdrop { margin-top:9px; border:1px solid var(--card-border); border-radius:var(--r-lg); overflow:hidden; background:var(--card); box-shadow:var(--shadow-card); }
+.dochead { display:flex; align-items:center; gap:8px; padding:9px 12px; border-bottom:1px solid var(--border); font-size:12px; }
+.dochead b { font-weight:650; }
+.dochead code { font-family:var(--fmono); font-size:11px; color:var(--muted); }
+.docopen { margin-left:auto; font:600 11px var(--fbody); color:var(--body); border:1px solid var(--border); border-radius:var(--r-full); padding:3px 11px; }
+.docopen:hover { background:var(--hover-bg); color:var(--text); border-color:var(--border2); }
+.doccard { max-height:186px; overflow:auto; padding:12px 14px; position:relative; }
+.doccard::-webkit-scrollbar { width:8px; }
+.doccard::-webkit-scrollbar-thumb { background:color-mix(in srgb,var(--text) 14%,transparent); border-radius:8px; border:2.5px solid transparent; background-clip:padding-box; }
+.docfade { height:22px; margin-top:-22px; position:relative; background:linear-gradient(to bottom,transparent,var(--card)); pointer-events:none; }
+.doc h4 { font:640 15px/1.35 var(--fdisp); margin-bottom:7px; }
+.doc h5 { font:700 9.5px var(--fmono); letter-spacing:.1em; text-transform:uppercase; color:var(--dim); margin:11px 0 5px; }
+.doc p, .doc li { font-size:12.5px; line-height:1.6; color:var(--body); }
+.doc ul { padding-left:16px; margin-bottom:8px; }
+.doc table { width:100%; border-collapse:collapse; font-size:12px; margin-bottom:8px; }
+.doc th { text-align:left; font:700 9.5px var(--fmono); letter-spacing:.06em; text-transform:uppercase; color:var(--dim); padding:4px 8px 4px 0; border-bottom:1px solid var(--border); }
+.doc td { padding:5px 8px 5px 0; border-bottom:1px solid var(--border); color:var(--body); }
+
+/* the system line — a mode flip is a fact in the record, not a chat message */
+.sysline { max-width:var(--col); margin:0 auto 16px; display:flex; align-items:center; gap:9px; font-size:11.5px; color:var(--muted); }
+.sysline::before, .sysline::after { content:""; height:1px; flex:1; background:var(--border); }
+.sysline b { color:var(--body); font-weight:600; }
+
+/* the permission card (the existing gate, reused verbatim) */
+.permcard { max-width:var(--col); margin:0 auto 16px; background:var(--card); border:1px solid color-mix(in srgb,var(--designrev) 30%,var(--card-border)); border-radius:var(--r-lg); padding:12px 14px; box-shadow:var(--shadow-card); }
+.permtop { display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:600; }
+.permwhy { font-size:12px; color:var(--muted); margin:6px 0 8px; line-height:1.55; }
+.permcmd { font-family:var(--fmono); font-size:11.5px; background:var(--panel2); border:1px solid var(--border); border-radius:var(--r-sm); padding:7px 9px; color:var(--text); overflow-x:auto; white-space:pre; }
+.permacts { display:flex; gap:7px; margin-top:9px; }
+.b { display:inline-flex; align-items:center; justify-content:center; border-radius:var(--r-full); font-weight:600; transition:transform var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease); }
+.b-sm { height:27px; padding:0 14px; font-size:11.5px; }
+.b-primary { background:var(--accent); color:var(--accent-ink); }
+.b-primary:hover { box-shadow:var(--shadow-lift); transform:translateY(-1px); }
+.b-ghost { border:1px solid var(--border); color:var(--body); }
+.b-ghost:hover { border-color:var(--border2); background:var(--hover-bg); color:var(--text); }
+
+/* the annotation under the frame */
+.note { margin-top:14px; border:1px solid #2a2a2a; border-radius:13px; background:#151515; padding:15px 17px; }
+.note h4 { font:640 14px var(--fdisp); color:#ededed; margin-bottom:7px; }
+.note p { font-size:12.5px; line-height:1.7; color:#9d9d9d; }
+.note p + p { margin-top:8px; }
+.note b { color:#d2d2d2; font-weight:600; }
+.note code { font-family:var(--fmono); font-size:11.5px; background:rgba(255,255,255,.07); border-radius:4px; padding:1px 5px; color:#c9c9c9; }
+.note .rule { display:flex; gap:9px; margin-top:11px; padding-top:11px; border-top:1px solid #262626; font-size:12px; color:#8c8c8c; }
+.note .rule .k { font:700 9px var(--fmono); letter-spacing:.09em; text-transform:uppercase; color:#6a6a6a; flex:none; width:74px; padding-top:2px; }
+
+/* the fence panel (step 7) */
+.fence { display:grid; grid-template-columns:1fr 1fr; gap:12px; max-width:var(--col); margin:0 auto; }
+@media (max-width:820px){ .fence { grid-template-columns:1fr; } }
+.fcard { background:var(--card); border:1px solid var(--card-border); border-radius:var(--r-lg); padding:13px 15px; box-shadow:var(--shadow-card); }
+.fcard h4 { font:640 14px var(--fdisp); margin-bottom:3px; }
+.fcard .fsub { font-size:11px; color:var(--dim); margin-bottom:9px; }
+.fcard ul { list-style:none; }
+.fcard li { font-size:12.5px; color:var(--body); line-height:1.55; padding:4px 0 4px 20px; position:relative; }
+.fcard li::before { position:absolute; left:0; top:4px; font-size:11px; }
+.fcard.can li::before { content:"✓"; color:var(--done); }
+.fcard.cant li::before { content:"✕"; color:var(--dim); }
+.pav { display:inline-grid; place-items:center; overflow:hidden; background:var(--panel3); flex:none; }
+.pav img { width:100%; height:100%; display:block; }
+.pav.letter { color:var(--text); font-weight:650; font-size:11px; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="pagehead">
+    <h1>Chat mode — the <em>Tasks</em> toggle on the composer</h1>
+    <p class="sub">
+      One chip on the Home composer decides what your message <b>becomes</b>. <b>Tasks on</b> (today, byte for byte) — the
+      orchestrator triages it into board work: <code>#1042</code>, a designer, a plan, a review, your accept. <b>Tasks off</b> —
+      the same agent just <b>answers you</b>, in the thread, with real tools: it searches the web while you wait, reads the repo,
+      writes files that render inline, and runs code in a throwaway workspace. Tag a teammate and they answer the same way.
+      The mode is stored on the <b>thread</b>, so a conversation stays what it was — and a chat that turns out to be real work
+      flips to Tasks in place, never re-typed.
+    </p>
+  </div>
+
+  <div class="bar">
+    <div class="seg" id="themeSeg">
+      <button data-theme-set="cream" class="on">Cream Oak</button>
+      <button data-theme-set="dark">Graphite</button>
+      <button data-theme-set="light">Light</button>
+      <button data-theme-set="soft-dark">Soft dark</button>
+    </div>
+    <span class="barhint">Every step renders in all four themes — a surface that only works in one is a bug (docs/33 §9.9).</span>
+  </div>
+
+  <div class="stage">
+    <div>
+      <div class="steprail-k">The flow</div>
+      <div class="steps" id="steps">
+        <button class="step on" data-step="1"><span class="n">1</span><span><span class="t">Tasks on</span><span class="d">Today's Home, plus one chip</span></span></button>
+        <button class="step" data-step="2"><span class="n">2</span><span><span class="t">Tasks off</span><span class="d">The composer says what it will do</span></span></button>
+        <button class="step" data-step="3"><span class="n">3</span><span><span class="t">It just answers</span><span class="d">Live research inside the reply</span></span></button>
+        <button class="step" data-step="4"><span class="n">4</span><span><span class="t">A file lands</span><span class="d">Written, then rendered in the thread</span></span></button>
+        <button class="step" data-step="5"><span class="n">5</span><span><span class="t">Tag a teammate</span><span class="d">@patch answers here too</span></span></button>
+        <button class="step" data-step="6"><span class="n">6</span><span><span class="t">Escalate</span><span class="d">Flip Tasks on — it becomes work</span></span></button>
+        <button class="step" data-step="7"><span class="n">7</span><span><span class="t">The fence</span><span class="d">What it can and cannot do</span></span></button>
+      </div>
+    </div>
+
+    <div>
+      <div class="frame">
+        <div class="app">
+          <header class="topbar">
+            <span class="wordmark">neuramesh</span>
+            <span class="crumb">▦ <b>neuramesh</b></span>
+            <span class="searchpill">⌕ Search · ⌘K</span>
+          </header>
+          <div class="framebody">
+            <nav class="nav">
+              <button class="navitem on" id="navHome">⌂ Home <span class="cnt">3</span></button>
+              <button class="navitem">▤ Tasks</button>
+              <div class="navk">Channels</div>
+              <button class="navitem"><span class="h">#</span> product</button>
+              <button class="navitem"><span class="h">#</span> engineering</button>
+              <button class="navitem"><span class="h">#</span> marketing-hq</button>
+              <div class="navk">Agents</div>
+              <button class="navagent"><span class="pav" data-seed="rex" style="width:22px;height:22px;border-radius:7px"></span><span class="who"><b>rex</b><span class="st" id="rexStatus">watching the room</span></span></button>
+              <button class="navagent"><span class="pav" data-seed="patch" style="width:22px;height:22px;border-radius:7px"></span><span class="who"><b>patch</b><span class="st">idle</span></span></button>
+              <button class="navagent"><span class="pav" data-seed="iris" style="width:22px;height:22px;border-radius:7px"></span><span class="who"><b>iris</b><span class="st">idle</span></span></button>
+            </nav>
+
+            <div class="sheetwrap">
+              <div class="sheet">
+                <!-- ── HOME ── -->
+                <div id="homeView" style="display:flex;flex-direction:column;min-height:0;flex:1">
+                  <div class="scroll">
+                    <div class="colwrap">
+                      <div class="hgreet">Good afternoon, George.
+                        <span class="lede">Three things want you. Everything else is moving.</span>
+                      </div>
+
+                      <div class="sechead"><h3>Needs you</h3><span class="n">3</span></div>
+                      <div class="mcqcard">
+                        <div class="mcqtop"><span class="chip" style="--c:var(--done)">done</span><span class="kindchip">feature</span><span class="mcqid">#204</span><span class="mcqbadges">#product · neuramesh</span></div>
+                        <div class="mcqtitle">Library previews, one reading column</div>
+                        <div class="mcqmeta">review passed · DoD attached · PR #204 · 6 artifacts</div>
+                      </div>
+                      <div class="mcqcard">
+                        <div class="mcqtop"><span class="chip" style="--c:var(--designrev)">design review</span><span class="kindchip">design</span><span class="mcqid">#207</span><span class="mcqbadges">#product · neuramesh</span></div>
+                        <div class="mcqtitle">Onboarding — the second run</div>
+                        <div class="mcqmeta">iris proposed 3 mockups · your approval is the visual contract</div>
+                      </div>
+
+                      <div class="sechead"><h3>In flight</h3><span class="n">3</span></div>
+                      <button class="frowline"><span class="rring"></span><span class="what"><b>Cabinet-grade UI revamp</b> · patch · 3 of 5</span><span class="roomtag">#product</span><time>24m</time></button>
+                      <button class="frowline"><span class="chip" style="--c:var(--review)">in review</span><span class="what"><b>#204 · Library previews</b> · gem is reading the diff</span><span class="roomtag">#product</span><time>8m</time></button>
+                      <button class="frowline" id="flightChat" style="display:none"><span class="chip" style="--c:var(--prog)">chat</span><span class="what"><b>Agent-collab competitors</b> · rex is replying…</span><span class="roomtag">#product</span><time>1m</time></button>
+                    </div>
+                  </div>
+
+                  <div class="composer">
+                    <div class="cbox">
+                      <div class="chint" id="chint">
+                        <span class="pav" data-seed="rex"></span>
+                        <span id="chintText"><button class="chintat">@rex</button> triages it — user-facing work is designed first, then your crew builds and reviews it.</span>
+                      </div>
+                      <textarea id="homeInput" placeholder="Describe the work — the team takes it from there. @ mention · / skill · ⏎ send"></textarea>
+                      <div class="crow">
+                        <button class="cchip"># product <span class="cc">⌄</span></button>
+                        <button class="cchip">🧠 Flagship <span class="cc">⌄</span></button>
+                        <button class="cchip taskschip" id="tasksChip" aria-pressed="true" title="Tasks on — this becomes board work"><span class="dot"></span> Tasks</button>
+                        <button class="ctool" title="Mention a teammate · @">@</button>
+                        <button class="ctool" title="Attach images or files">📎</button>
+                        <button class="csend" id="homeSend" title="Send · ↵"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- ── THE CONVERSATION SHEET ── -->
+                <div class="convo" id="convoView" style="display:none">
+                  <div class="thead">
+                    <button class="x" id="convoClose">✕</button>
+                    <span class="convotitle" id="convoTitle">Agent-collab competitors</span>
+                    <div class="theadact">
+                      <span class="modechip chat" id="modeChip"><span class="dot" style="width:6px;height:6px;border-radius:50%;background:currentColor"></span> Chat</span>
+                      <span># product</span>
+                    </div>
+                  </div>
+                  <div class="tmsgs" id="tmsgs"></div>
+                  <div class="composer" style="padding:2px 18px 14px">
+                    <div class="cbox">
+                      <textarea id="convoInput" placeholder="Reply — @ mention · / skill · ↵ send"></textarea>
+                      <div class="crow">
+                        <button class="cchip taskschip" id="convoTasksChip" aria-pressed="false" title="Tasks off — rex answers you here"><span class="dot"></span> Tasks</button>
+                        <button class="ctool" title="Mention a teammate · @">@</button>
+                        <button class="ctool" title="Attach images or files">📎</button>
+                        <button class="csend" id="convoSend" title="Send · ↵"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- ── THE FENCE (step 7) ── -->
+                <div id="fenceView" style="display:none;flex:1;min-height:0;overflow:auto;padding:18px 20px">
+                  <div class="colwrap">
+                    <div class="hgreet" style="font-size:20px">What a chat agent may do
+                      <span class="lede">Enforced by the tool registry and the server — not by asking the model nicely (doctrine §4).</span>
+                    </div>
+                    <div class="fence" style="margin-top:16px">
+                      <div class="fcard can">
+                        <h4>It can</h4>
+                        <div class="fsub">the same fence a research run already runs under</div>
+                        <ul>
+                          <li>Search and read the web, live, inside the reply</li>
+                          <li>Read a bound repo — <code>Read</code> · <code>Glob</code> · <code>Grep</code></li>
+                          <li>Write files in a per-conversation scratch workspace</li>
+                          <li>Run commands there — policy-gated, one card per ask</li>
+                          <li>Recall this workspace's memory and load team skills</li>
+                          <li>Start deep research that outlives the reply and posts back here</li>
+                        </ul>
+                      </div>
+                      <div class="fcard cant">
+                        <h4>It cannot</h4>
+                        <div class="fsub">these tools are absent from the registry, not discouraged</div>
+                        <ul>
+                          <li>Create, offer, plan, design or route a task</li>
+                          <li>Park a backlog item or promote one</li>
+                          <li>Hire an agent or create a project</li>
+                          <li>Touch your repo's working tree, or git anything</li>
+                          <li>Read credential stores or NeuraMesh's own store (kernel jail)</li>
+                          <li>Put a question card in your needs-you queue — it just asks</li>
+                        </ul>
+                      </div>
+                    </div>
+
+                    <div class="sechead" style="max-width:var(--col);margin-left:auto;margin-right:auto"><h3>When it wants the shell</h3></div>
+                    <div class="permcard">
+                      <div class="permtop"><span class="pav" data-seed="rex" style="width:20px;height:20px;border-radius:6px"></span> rex wants to run a command in this chat</div>
+                      <div class="permwhy">I want to count how many of the 340 rows have a null <code>closed_at</code>, so the churn number in your one-pager is measured rather than estimated.</div>
+                      <div class="permcmd">python3 -c "import csv,sys; …" churn-export.csv</div>
+                      <div class="permacts"><button class="b b-sm b-primary">Approve</button><button class="b b-sm b-ghost">Deny</button></div>
+                    </div>
+                    <p style="max-width:var(--col);margin:10px auto 0;font-size:12px;color:var(--muted);line-height:1.6">
+                      The same permission engine that gates a worker mid-task — same policy rows, same fail-closed default, same
+                      card. Only the context line changes: <b>“in this chat”</b> where a board task says <b>“in #1042”</b>.
+                    </p>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="note" id="note"></div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+/* DiceBear Thumbs — the real avatar system (docs/33 §8) */
+const $ = (s, r=document) => r.querySelector(s);
+const $$ = (s, r=document) => [...r.querySelectorAll(s)];
+try {
+  const [{ createAvatar }, thumbs] = await Promise.all([
+    import('https://cdn.jsdelivr.net/npm/@dicebear/core@9/+esm'),
+    import('https://cdn.jsdelivr.net/npm/@dicebear/thumbs@9/+esm'),
+  ]);
+  const cache = new Map();
+  const uri = s => { if (!cache.has(s)) cache.set(s, createAvatar(thumbs, { seed: s }).toDataUri()); return cache.get(s); };
+  const paint = (root=document) => $$('.pav[data-seed]', root).forEach(el => { if (el.firstChild) return; const img = new Image(); img.src = uri(el.dataset.seed.toLowerCase()); el.appendChild(img); });
+  paint(); window.paintAvatars = paint;
+} catch {
+  const paint = (root=document) => $$('.pav[data-seed]', root).forEach(el => { if (el.firstChild || el.classList.contains('letter')) return; el.classList.add('letter'); el.textContent = el.dataset.seed[0].toUpperCase(); });
+  paint(); window.paintAvatars = paint;
+}
+window.__nm = { $, $$ };
+</script>
+
+<script>
+/* module scripts are deferred, so this classic one runs FIRST — same guard cabinet-revamp uses */
+const { $, $$ } = window.__nm ?? { $: (s, r=document) => r.querySelector(s), $$: (s, r=document) => [...r.querySelectorAll(s)] };
+
+/* ── theme ── */
+$$('#themeSeg button').forEach(b => b.onclick = () => {
+  $$('#themeSeg button').forEach(x => x.classList.toggle('on', x === b));
+  document.body.parentElement.dataset.theme = b.dataset.themeSet;
+});
+
+/* ── the transcript, per step ── */
+const HUMAN = (t, time='now') => `
+  <div class="msg"><span class="av">G</span><div class="body">
+    <div class="head"><b>George</b><span class="time">${time}</span></div>
+    <div class="mdt">${t}</div></div></div>`;
+
+const AGENT = (who, role, tone, body, time='now') => `
+  <div class="msg"><span class="pav" data-seed="${who}"></span><div class="body">
+    <div class="head"><b>${who}</b><span class="rolechip" style="--tone:var(${tone})">${role}</span><span class="time">${time}</span></div>
+    <div class="mdt">${body}</div></div></div>`;
+
+const GHOST = (who, text) => `
+  <div class="ghost"><span class="pav" data-seed="${who}" style="width:28px;height:28px;border-radius:9px"></span>
+    <span class="ghosttext">${text}<span class="tdots"><i></i><i></i><i></i></span></span></div>`;
+
+const SUGS = (...s) => `<div class="sugrow">${s.map(x => `<button class="sug">${x}</button>`).join('')}</div>`;
+
+const ANSWER = `
+  <p>Four are actually competing for the same job, and they split cleanly by <strong>what the agent is allowed to touch</strong>:</p>
+  <ul>
+    <li><strong>Devin</strong> — one agent, its own cloud VM. Strong at long autonomous runs, weak where a human wants to steer mid-task. No team model.</li>
+    <li><strong>Factory</strong> — “droids” with a review step. Closest to our loop, but review is a droid reviewing a droid; the human gate is optional.</li>
+    <li><strong>Cursor / background agents</strong> — an editor that grew agents, so everything is per-file and per-developer. No shared board, no roster.</li>
+    <li><strong>OpenHands</strong> — open source, self-hosted, very capable, and entirely unopinionated about process.</li>
+  </ul>
+  <p>The gap none of them fill: <strong>enforcement</strong>. Every one of them asks the model to follow a process. None of them make an illegal transition impossible. That is the thing you can't copy in a weekend.</p>
+  <p class="src">Read: devin.ai · factory.ai · cursor.com/blog · github.com/All-Hands-AI · 2 comparison threads on HN</p>`;
+
+const TEARDOWN_DOC = `
+  <div class="doc">
+    <h4>Agent-collaboration landscape — where NeuraMesh actually differs</h4>
+    <p>Four products compete for the same job. They split by what the agent is allowed to touch, and none of them enforce process in code.</p>
+    <h5>The field</h5>
+    <table>
+      <tr><th>Product</th><th>Shape</th><th>Human gate</th></tr>
+      <tr><td>Devin</td><td>single agent, cloud VM</td><td>none</td></tr>
+      <tr><td>Factory</td><td>droids + review</td><td>optional</td></tr>
+      <tr><td>Cursor</td><td>editor-native, per-dev</td><td>implicit</td></tr>
+      <tr><td>OpenHands</td><td>OSS, self-hosted</td><td>none</td></tr>
+    </table>
+    <h5>The gap</h5>
+    <p>All four <em>ask</em> the model to follow a process. Our FSM makes an illegal transition impossible — double-claims, self-review and artifact-less submits are rejected by the server, not discouraged by a prompt.</p>
+    <h5>What to say</h5>
+    <ul><li>Lead with the team, not the agent.</li><li>Show the gate, not the autonomy.</li><li>“Your people. Your agents. Your projects.”</li></ul>
+  </div>`;
+
+const STEPS = {
+  1: {
+    view: 'home', tasks: true, flight: false,
+    note: {
+      h: 'One chip. Pressed, nothing changes.',
+      p: [
+        `Home as it ships today, plus a <b>Tasks</b> chip on the composer's chip row — the same row that already holds <code>#room</code>, the brain pill, @ and attach. It inherits the composer; it does not rebuild it (docs/33 §8).`,
+        `Pressed is the default and it is <b>sticky per machine</b>: the choice you made last is the choice you get. First run is on, so nothing anyone relies on changes without them asking for it.`,
+      ],
+      rules: [['Pressed', 'accent wash + filled dot — docs/33 §3\'s stated exception for selected state, so "engaged" reads without relying on colour alone'], ['State', '<code>threads.mode</code> — frozen at the thread\'s birth, so a conversation stays what it was']],
+    },
+  },
+  2: {
+    view: 'home', tasks: false, flight: false,
+    note: {
+      h: 'Off — and the composer says so, three ways.',
+      p: [
+        `The chip goes quiet, the cap line rewrites, and the placeholder rewrites. All three move together <b>on purpose</b>: docs/32 §1 records exactly one product failure here — two composers that looked identical and did different things, and a founder who typed into the wrong one and got silence.`,
+        `So the rule this inherits: <b>a composer must name its consequence.</b> "Describe the work — the team takes it from there" and "Ask anything — @rex answers here" are the two sentences that make the mode unmissable before you press ⏎.`,
+      ],
+      rules: [['Cap', '<code>@rex answers you here. Nothing reaches the board.</code>'], ['Placeholder', '<code>Ask anything — @rex answers here.</code>'], ['Never', 'a silent mode. If the chip is the only signal, we shipped the docs/32 bug again']],
+    },
+  },
+  3: {
+    view: 'convo', tasks: false, flight: true,
+    msgs: [
+      HUMAN(`Who else is building agent-collaboration for engineering teams, and where do they actually differ from us?`, '2:41 pm'),
+      GHOST('rex', 'searching the web · reading factory.ai'),
+      AGENT('rex', 'orchestrator', '--role-orch', ANSWER + SUGS('Write this up as a one-pager', 'Which one is closest to us?', 'What would they say about us?'), '2:41 pm'),
+    ],
+    note: {
+      h: 'It answers. It does not file anything.',
+      p: [
+        `No <code>#10xx</code>, no triage digest, no "handed to iris". The turn ran <b>WebSearch and WebFetch inside the reply</b> — which the board turn genuinely cannot do today: its tool registry is board tools only, which is why it has to promise a background run for anything it can't answer from memory.`,
+        `The reply streams into the same live bubble the room already paints, and lands as an ordinary thread message. The suggestion pills are the existing <code>nms</code> row — chat is exactly where one-tap follow-ups belong.`,
+      ],
+      rules: [['Enforced', 'the chat turn is built from a <b>different tool registry</b> — <code>create_task</code> is not absent by instruction, it is absent'], ['Belt', 'the server rejects <code>task.create</code> naming a chat thread — <code>CHAT_THREAD</code> — so no stale client can route around it'], ['Home', 'the conversation shows in <b>In flight</b> as a <code>chat</code> row, exactly like today'], ['Compressed', 'the ghost above the reply is the <b>live moment</b> — in the app it clears the instant the message lands. Both are drawn here so one frame tells the whole beat']],
+    },
+  },
+  4: {
+    view: 'convo', tasks: false, flight: true,
+    msgs: [
+      HUMAN(`Write that up as a one-pager I can send the team.`, '2:44 pm'),
+      GHOST('rex', 'writing competitor-teardown.md'),
+      AGENT('rex', 'orchestrator', '--role-orch',
+        `<p>Done — <code>competitor-teardown.md</code>, one page, positioning at the end.</p>
+         <div class="docdrop">
+           <div class="dochead"><span aria-hidden="true">📄</span><b>Competitor teardown</b><code>competitor-teardown.md</code><button class="docopen">Open</button></div>
+           <div class="doccard">${TEARDOWN_DOC}</div><div class="docfade"></div>
+         </div>` + SUGS('Add pricing for each', 'Make it shorter', 'Turn this into a task'), '2:45 pm'),
+    ],
+    note: {
+      h: 'The file renders where it lands.',
+      p: [
+        `The agent wrote a real file in a <b>per-conversation scratch workspace</b> that persists across turns — so "make it shorter" edits <i>that</i> file rather than writing a second one. After the turn, new files are swept into the channel Library and named in the thread.`,
+        `Zero new rendering: this is the docs/30 inline-deliverable card and the doc-drop shape the marketing bootstrap already posts. The filename linkifies, the canvas is a bounded window that scrolls internally, and <b>Open</b> is the existing reader overlay.`,
+      ],
+      rules: [['Workspace', '<code>~/.neuramesh/chats/nm-&lt;thread&gt;</code> — jailed by the same kernel sandbox worker runs use'], ['Delivery', '<code>artifact.create</code> on the channel + a doc-drop message — both already exist'], ['Cap', '6 files per turn, text and images; binaries stay local (same rule as scratch tasks)'], ['Progress', 'a minute-long turn narrates through the <b>existing ghost</b>, backed by the synced wake run — not a new card. <code>start_deep_work</code> still exists for research that outlives the reply']],
+    },
+  },
+  5: {
+    view: 'convo', tasks: false, flight: true,
+    msgs: [
+      HUMAN(`@patch what would it take for us to build the diff viewer ourselves instead of leaning on the artifact render?`, '2:52 pm'),
+      AGENT('patch', 'developer', '--role-dev',
+        `<p>Cheaper than it looks, because the hard half is already done. <code>previewType()</code> classifies a file into <code>image · html · diff · markdown · raw</code>, and three surfaces already agree on it — the drawer, the inline card and the Library.</p>
+         <p>So a real viewer is: a parser for unified diff into hunks (a day), a virtualised two-column renderer (two days, and it must hold 60fps on a 4k-line diff), and comment anchoring by line — which is the actual risk, since a comment has to survive a force-push.</p>
+         <p>I'd rather not guess at the anchoring; that's the part I'd want written down before anyone builds it.</p>` + SUGS('What breaks on a force-push?', 'Make this a task', 'Show me previewType'), '2:53 pm'),
+    ],
+    note: {
+      h: 'Chat mode belongs to the thread, so everyone in it is in chat.',
+      p: [
+        `Tag a teammate and they answer <b>here, in the same shape</b> — a developer's read, grounded in the actual repo, with the part they don't want to guess at named out loud. No hand-off, no "open a task for that".`,
+        `This is the fix for a real dead end: today a tagged teammate replies from the board's chat prompt — three sentences, "work moves through the board", go see the orchestrator. Correct on a board. Useless in a conversation.`,
+      ],
+      rules: [['Rule', 'the mode is on the <b>thread</b> — any agent woken in a chat thread runs the chat turn, orchestrator or not'], ['Default', 'no @mention → the <b>last agent who spoke here</b> answers, then the room\'s orchestrator. Continuity, like every chat app'], ['Unchanged', 'an agent that isn\'t in this room still can\'t see the thread — the ACL is the ACL']],
+    },
+  },
+  6: {
+    view: 'convo', tasks: true, flight: true,
+    msgs: [
+      AGENT('patch', 'developer', '--role-dev', `<p>…comment anchoring by line is the actual risk, since a comment has to survive a force-push.</p>`, '2:53 pm'),
+      `<div class="sysline"><span>Tasks <b>on</b> — your next message goes to the board</span></div>`,
+      HUMAN(`Right — let's build it. Start with the anchoring question.`, '2:58 pm'),
+      AGENT('rex', 'orchestrator', '--role-orch',
+        `<p><strong>#1042</strong> created from this conversation and handed to <strong>atlas</strong> to plan — the anchoring strategy is the open question, so it gets a plan before anyone builds. patch's read is in the task's description.</p>
+         <p>This thread is #1042's thread now; everything above stays.</p>`, '2:58 pm'),
+    ],
+    note: {
+      h: 'Chat is never a dead end.',
+      p: [
+        `Flipping the chip inside the thread is the escalation valve. It posts nothing and re-runs nothing — it writes <code>threads.mode</code> and drops one system line so the record shows exactly where the conversation became work.`,
+        `The next message triages normally, and because a task born from a conversation already links its thread (<code>threads.task_id</code>), the surface <b>upgrades in place</b>: same sheet, same scrollback, now with a board card, a plan gate and your accept on the end of it.`,
+      ],
+      rules: [['Command', '<code>thread.set_mode</code> — <b>human only</b>. An agent can never move its own conversation onto the board'], ['Both ways', 'Tasks → chat works too: stop routing, keep talking. The task, if one exists, is untouched'], ['Record', 'the flip is a system line in the transcript, not a silent state change']],
+    },
+  },
+  7: {
+    view: 'fence', tasks: false, flight: true,
+    note: {
+      h: 'The fence is code, not a paragraph in a prompt.',
+      p: [
+        `You picked the <b>scratch sandbox</b> tier: the agent gets real file writes and real command execution — but only inside a per-conversation workspace, under the kernel jail that already wraps worker runs (credential stores and NeuraMesh's own store denied at the OS), with every shell call passing the existing policy gate.`,
+        `Two independent stops keep a chat off the board: the chat turn is <b>built from a different tool registry</b> (there is no <code>create_task</code> to call), and the server rejects a <code>task.create</code> that names a chat thread. Prompt discipline is not one of the two.`,
+      ],
+      rules: [['Reused', 'fsjail · seatbelt · egress · the policy gate · the permission card — all existing, none forked'], ['New', 'one thread column, one command, one turn function, one composer chip'], ['Non-goals', 'the room feed composer keeps today\'s behaviour · mobile has no chat threads yet · no binary file generation']],
+    },
+  },
+};
+
+let cur = 1;
+function render(n) {
+  cur = n;
+  const s = STEPS[n];
+  $$('#steps .step').forEach(b => b.classList.toggle('on', +b.dataset.step === n));
+
+  $('#homeView').style.display = s.view === 'home' ? 'flex' : 'none';
+  $('#convoView').style.display = s.view === 'convo' ? 'flex' : 'none';
+  $('#fenceView').style.display = s.view === 'fence' ? 'block' : 'none';
+  $('#flightChat').style.display = s.flight ? 'flex' : 'none';
+  $('#rexStatus').textContent = s.view === 'convo' ? 'replying in a chat' : 'watching the room';
+
+  setTasks($('#tasksChip'), s.tasks);
+  setTasks($('#convoTasksChip'), s.tasks);
+  $('#modeChip').className = 'modechip' + (s.tasks ? '' : ' chat');
+  $('#modeChip').lastChild.textContent = s.tasks ? ' Tasks' : ' Chat';
+  $('#convoTitle').textContent = s.tasks && n === 6 ? '#1042 · Diff viewer — comment anchoring' : 'Agent-collab competitors';
+
+  if (s.msgs) { $('#tmsgs').innerHTML = s.msgs.join(''); window.paintAvatars?.($('#tmsgs')); $('#tmsgs').scrollTop = 1e6; }
+
+  const nt = s.note;
+  $('#note').innerHTML =
+    `<h4>${nt.h}</h4>${nt.p.map(p => `<p>${p}</p>`).join('')}` +
+    (nt.rules ?? []).map(([k, v]) => `<div class="rule"><span class="k">${k}</span><span>${v}</span></div>`).join('');
+}
+
+/* the composer copy IS the design — it moves with the chip */
+function setTasks(chip, on) {
+  chip.setAttribute('aria-pressed', String(!!on));
+  chip.title = on ? 'Tasks on — this becomes board work' : 'Tasks off — rex answers you here';
+  if (chip.id !== 'tasksChip') return;
+  $('#homeInput').placeholder = on
+    ? 'Describe the work — the team takes it from there. @ mention · / skill · ⏎ send'
+    : 'Ask anything — @rex answers here. @ mention · / skill · ⏎ send';
+  $('#chintText').innerHTML = on
+    ? '<button class="chintat">@rex</button> triages it — user-facing work is designed first, then your crew builds and reviews it.'
+    : '<button class="chintat">@rex</button> answers you here. Nothing reaches the board.';
+}
+
+/* clicking the chip itself walks the story, so the toggle is felt, not just read */
+$('#tasksChip').onclick = () => { const on = $('#tasksChip').getAttribute('aria-pressed') === 'true'; render(on ? 2 : 1); $('#tasksChip').classList.add('flash'); setTimeout(() => $('#tasksChip').classList.remove('flash'), 500); };
+$('#convoTasksChip').onclick = () => render(cur === 6 ? 5 : 6);
+$('#homeSend').onclick = () => render(3);
+$('#convoSend').onclick = () => render(Math.min(cur + 1, 6));
+$('#convoClose').onclick = () => render(cur >= 6 ? 1 : 2);
+$$('#steps .step').forEach(b => b.onclick = () => render(+b.dataset.step));
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight') render(Math.min(cur + 1, 7));
+  if (e.key === 'ArrowLeft') render(Math.max(cur - 1, 1));
+});
+
+render(1);
+</script>
+</body>
+</html>

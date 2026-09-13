@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Recents rows — branch, live state, and how much to say</title>
+<style>
+[data-theme] { --font:'Geist Variable',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; --fmono:'Geist Mono Variable',ui-monospace,'SF Mono',Menlo,monospace; --fdisp:'Source Serif 4','Iowan Old Style',Georgia,serif; --ease:cubic-bezier(.2,.8,.2,1); --dur-fast:120ms; }
+/* verbatim from apps/desktop/src/renderer/src/tokens.css */
+[data-theme='dark'] {
+  --win:#0d0d0d; --bg:#141414; --panel:#191919; --panel2:#212121; --panel3:#2b2b2b;
+  --border:#272727; --border2:#383838; --card:#1b1b1b; --card-border:#2e2e2e;
+  --text:#eaeaea; --body:#b6b6b6; --muted:#898989; --dim:#676767; --ring:#585858;
+  --accent:#eaeaea; --link:#d19a72; --hover-bg:rgba(234,234,234,.06);
+  --prog:#8ba0c0; --review:#a89ccf; --done:#77ac8d; --acc:#6fb0ab; --ship:#7cb0bd;
+  --blocked:#9ca0a8; --closed:#727272; --shadow:rgba(0,0,0,.6);
+}
+[data-theme='cream-oak'] {
+  --win:#f0e5d3; --bg:#fbf8f4; --panel:#fbf8f4; --panel2:#f6eee1; --panel3:#efe1cd;
+  --border:#e6dbca; --border2:#d3c2a8; --card:#ffffff; --card-border:#eadfce;
+  --text:#2a1c13; --body:#574838; --muted:#97846c; --dim:#b5a289; --ring:#b08a5e;
+  --accent:#834a2b; --link:#9c5730; --hover-bg:rgba(42,28,19,.05);
+  --prog:#4f80c4; --review:#6d5ce0; --done:#0f9d63; --acc:#2f8f8a; --ship:#1f7f96;
+  --blocked:#7d7f86; --closed:#897a60; --shadow:rgba(70,42,18,.22);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#131210; font-family:'Geist Variable',-apple-system,sans-serif; }
+.page { max-width:1660px; margin:0 auto; padding:32px 24px 70px; }
+.pagehead { color:#eaeaea; margin-bottom:8px; }
+.pagehead h1 { font-family:'Source Serif 4',Georgia,serif; font-size:23px; font-weight:640; letter-spacing:-.012em; }
+.pagehead p { color:#898989; font-size:13px; line-height:1.62; margin-top:8px; max-width:96ch; }
+.pagehead b { color:#b6b6b6; }
+.stophd { color:#eaeaea; font-size:15px; font-weight:660; margin:42px 0 4px; font-family:'Source Serif 4',Georgia,serif; }
+.stopno { font:700 10px 'Geist Mono Variable',monospace; letter-spacing:.12em; color:#6f6f6f; text-transform:uppercase; margin-right:8px; }
+.stopp { color:#898989; font-size:12.5px; line-height:1.62; max-width:102ch; margin-bottom:16px; }
+.stopp b { color:#b6b6b6; }
+.themes { display:grid; grid-template-columns:repeat(3, 1fr); gap:18px; }
+@media (max-width:1400px){ .themes { grid-template-columns:1fr 1fr; } }
+.theme { background:var(--win); border:1px solid var(--border2); border-radius:16px; padding:16px; color:var(--text); }
+.theme > h2 { font-size:10.5px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--dim); margin:0 2px 12px; }
+.theme > h2 .pick { color:var(--done); }
+.callouts { display:flex; flex-wrap:wrap; gap:8px 18px; margin-top:12px; }
+.co { font-size:11.5px; color:#898989; line-height:1.55; max-width:46ch; }
+.co b { color:#b6b6b6; } .co .n { display:inline-grid; place-items:center; width:16px; height:16px; border-radius:50%; background:#2b2b2b; color:#c8a06a; font:700 10px monospace; margin-right:6px; }
+
+/* ── the rail, at its REAL width (236px content column) ── */
+.rail { width:236px; background:var(--bg); border:1px solid var(--border); border-radius:12px; padding:8px 0 10px; }
+.rsec { display:flex; align-items:center; gap:7px; padding:6px 14px 6px; font:700 9.5px var(--fmono); letter-spacing:.1em; text-transform:uppercase; color:var(--dim); }
+.rsec .n { color:var(--muted); font-weight:600; }
+.row { display:flex; align-items:flex-start; gap:8px; padding:5px 9px 5px 18px; margin:1px 8px; border-radius:8px; min-width:0; }
+.row:hover { background:var(--hover-bg); }
+.rdot { width:7px; height:7px; border-radius:50%; border:1.5px solid var(--dim); flex:none; margin-top:5px; }
+.rdot.f { border:none; }
+.rdot.prog { background:var(--prog); } .rdot.review { background:var(--review); } .rdot.done { background:var(--done); } .rdot.blocked { background:var(--blocked); } .rdot.closed { background:var(--closed); }
+.rdot.live { background:var(--prog); box-shadow:0 0 0 3px color-mix(in srgb, var(--prog) 22%, transparent); }
+.rbody { min-width:0; flex:1; }
+.rline1 { display:flex; align-items:baseline; gap:6px; min-width:0; }
+.rnum { font:640 11px var(--fmono); color:var(--muted); flex:none; }
+.rtitle { font-size:12.5px; color:var(--body); font-weight:560; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+.rwhen { margin-left:auto; font:500 10px var(--fmono); color:var(--dim); flex:none; }
+.rbranch { display:flex; align-items:center; gap:5px; font:500 10px var(--fmono); color:var(--dim); margin-top:1.5px; min-width:0; }
+.rbranch .g { flex:none; opacity:.8; }
+.rbranch span { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; direction:rtl; text-align:left; }
+.rlive { display:flex; align-items:center; gap:6px; font-size:10.5px; color:var(--body); margin-top:2px; min-width:0; }
+.rlive .ind { width:5px; height:5px; border-radius:50%; background:var(--prog); flex:none; animation:pulse 1.6s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity:.35; } }
+.rlive .verb { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; font-style:italic; }
+.rlive .frac { flex:none; font:600 9.5px var(--fmono); color:var(--muted); }
+.rchev { flex:none; margin-left:2px; color:var(--dim); font-size:8px; margin-top:6px; transition:transform var(--dur-fast) var(--ease); }
+.row.open .rchev { transform:rotate(90deg); }
+.ract { margin:0 8px 2px 40px; padding-left:9px; border-left:1.5px solid var(--border2); }
+.ractrow { display:flex; align-items:center; gap:7px; padding:2.5px 0; font-size:10.5px; color:var(--muted); min-width:0; }
+.ractrow .av { width:14px; height:14px; border-radius:5px; background:var(--panel3); flex:none; display:grid; place-items:center; font-size:8px; }
+.ractrow .v { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+.ractrow .t { margin-left:auto; flex:none; font:500 9.5px var(--fmono); color:var(--dim); }
+.ractrow .ok { color:var(--done); flex:none; font-size:9px; }
+.ractrow .liveind { width:5px; height:5px; border-radius:50%; background:var(--prog); flex:none; animation:pulse 1.6s ease-in-out infinite; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<div class="pagehead">
+  <h1>Recents rows — branch, live state, and how much to say</h1>
+  <p><b>The ask (2026-07-30):</b> a task row should carry its worktree/branch on a second line, and a live view of what is happening in the thread — clean and more informative. Reference: the Codex sidebar's task rows (branch subtitle + expandable per-agent activity).</p>
+  <p><b>The constraint:</b> the rail is 236px. Branches are long (<code style="color:#b6b6b6">nm/1009-copy-sweep-acme-marketing-…</code>) — they truncate from the LEFT (tail-biased: the slug end is the identifying half). A freebie fix that ships with any variant: rail titles currently render raw markdown (<b>⏱ **Routine — Thread-birth ch…</b>) — titles get stripped to plain text.</p>
+</div>
+
+<div class="stophd"><span class="stopno">The three variants</span>One rail, three densities</div>
+<div class="stopp">All three share the anatomy: state dot (pulse = live run) · number · title · time, then a <b>mono branch line with the ⎇ glyph</b> on repo-backed tasks. They differ in how the LIVE state shows.</div>
+
+<div class="themes">
+  <div class="theme" data-theme="cream-oak">
+    <h2>A · Quiet two-line — live verb replaces branch</h2>
+    <div class="rail">
+      <div class="rsec">Recents <span class="n">6</span></div>
+      <div class="row">
+        <span class="rdot f live"></span>
+        <div class="rbody">
+          <div class="rline1"><span class="rnum">1046</span><span class="rtitle">iOS Safari focus-trap release</span><span class="rwhen">2m</span></div>
+          <div class="rlive"><span class="ind"></span><span class="verb">patch · returning focus to the trigger</span><span class="frac">2/5</span></div>
+        </div>
+      </div>
+      <div class="row">
+        <span class="rdot f review"></span>
+        <div class="rbody">
+          <div class="rline1"><span class="rnum">1042</span><span class="rtitle">Mobile nav: drawer + focus</span><span class="rwhen">5h</span></div>
+          <div class="rbranch"><svg class="g" width="9" height="11" viewBox="0 0 9 11" fill="none" stroke="currentColor"><circle cx="2" cy="2" r="1.4"/><circle cx="2" cy="9" r="1.4"/><circle cx="7" cy="5.5" r="1.4"/><path d="M2 3.4v4.2M3.4 2.6 5.7 4.7"/></svg><span>nm/1042-mobile-nav-drawer-focus</span></div>
+        </div>
+      </div>
+      <div class="row">
+        <span class="rdot f blocked"></span>
+        <div class="rbody">
+          <div class="rline1"><span class="rnum">1009</span><span class="rtitle">Copy sweep — acme/marketing…</span><span class="rwhen">37m</span></div>
+          <div class="rbranch"><svg class="g" width="9" height="11" viewBox="0 0 9 11" fill="none" stroke="currentColor"><circle cx="2" cy="2" r="1.4"/><circle cx="2" cy="9" r="1.4"/><circle cx="7" cy="5.5" r="1.4"/><path d="M2 3.4v4.2M3.4 2.6 5.7 4.7"/></svg><span>nm/1009-copy-sweep-acme-marketing-site</span></div>
+        </div>
+      </div>
+      <div class="row">
+        <span class="rdot"></span>
+        <div class="rbody">
+          <div class="rline1"><span class="rtitle">⏱ Routine — Thread-birth check</span><span class="rwhen">26m</span></div>
+        </div>
+      </div>
+      <div class="row">
+        <span class="rdot f closed"></span>
+        <div class="rbody">
+          <div class="rline1"><span class="rnum">1004</span><span class="rtitle">Validation: provider choice…</span><span class="rwhen">6d</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="callouts">
+      <div class="co"><span class="n">1</span><b>One live line, ranked:</b> a running task shows the actor + step + fraction where the branch would sit — the branch is stable truth, the run is now-truth, and now wins the slot. At rest the branch returns.</div>
+      <div class="co"><span class="n">2</span><b>Chats and closed tasks stay one line.</b> Density only where there is something to say.</div>
+    </div>
+  </div>
+
+  <div class="theme" data-theme="dark">
+    <h2 class=""><span class="pick">B · Two-line + expandable activity — recommended</span></h2>
+    <div class="rail">
+      <div class="rsec">Recents <span class="n">6</span></div>
+      <div class="row open">
+        <span class="rdot f live"></span>
+        <div class="rbody">
+          <div class="rline1"><span class="rnum">1046</span><span class="rtitle">iOS Safari focus-trap release</span><span class="rwhen">2m</span></div>
+          <div class="rbranch"><svg class="g" width="9" height="11" viewBox="0 0 9 11" fill="none" stroke="currentColor"><circle cx="2" cy="2" r="1.4"/><circle cx="2" cy="9" r="1.4"/><circle cx="7" cy="5.5" r="1.4"/><path d="M2 3.4v4.2M3.4 2.6 5.7 4.7"/></svg><span>nm/1046-ios-safari-focus-trap</span></div>
+        </div>
+        <span class="rchev">▶</span>
+      </div>
+      <div class="ract">
+        <div class="ractrow"><span class="liveind"></span><span class="av">🐝</span><span class="v">patch · returning focus to the trigger</span><span class="t">2/5</span></div>
+        <div class="ractrow"><span class="ok">✓</span><span class="av">🔎</span><span class="v">scout · review round 1 passed</span><span class="t">4h</span></div>
+        <div class="ractrow"><span class="ok">✓</span><span class="av">🎨</span><span class="v">iris · design approved</span><span class="t">9h</span></div>
+      </div>
+      <div class="row">
+        <span class="rdot f review"></span>
+        <div class="rbody">
+          <div class="rline1"><span class="rnum">1042</span><span class="rtitle">Mobile nav: drawer + focus</span><span class="rwhen">5h</span></div>
+          <div class="rbranch"><svg class="g" width="9" height="11" viewBox="0 0 9 11" fill="none" stroke="currentColor"><circle cx="2" cy="2" r="1.4"/><circle cx="2" cy="9" r="1.4"/><circle cx="7" cy="5.5" r="1.4"/><path d="M2 3.4v4.2M3.4 2.6 5.7 4.7"/></svg><span>nm/1042-mobile-nav-drawer-focus</span></div>
+        </div>
+        <span class="rchev">▶</span>
+      </div>
+      <div class="row">
+        <span class="rdot"></span>
+        <div class="rbody">
+          <div class="rline1"><span class="rtitle">⏱ Routine — Thread-birth check</span><span class="rwhen">26m</span></div>
+        </div>
+      </div>
+      <div class="row">
+        <span class="rdot f closed"></span>
+        <div class="rbody">
+          <div class="rline1"><span class="rnum">1003</span><span class="rtitle">Build Acme Robotics lead-…</span><span class="rwhen">6d</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="callouts">
+      <div class="co"><span class="n">3</span><b>Rest = variant A exactly.</b> The chevron appears only on rows with a journey to show; click expands the last few beats — live actor first with the pulse, finished legs with ✓ and their times. The Codex shape, in the house voice.</div>
+      <div class="co"><span class="n">4</span><b>Derived, not stored:</b> the expanded lines come from the run (live step) + beats/journey (finished legs) already synced — no new watch, no new table.</div>
+    </div>
+  </div>
+
+  <div class="theme" data-theme="cream-oak">
+    <h2>C · Live card — running tasks become raised blocks</h2>
+    <div class="rail">
+      <div class="rsec">Recents <span class="n">6</span></div>
+      <div style="margin:2px 8px; padding:8px 10px; border:1px solid var(--card-border); border-radius:10px; background:var(--card); box-shadow:0 1px 2px var(--shadow);">
+        <div class="rline1"><span class="rnum">1046</span><span class="rtitle" style="font-weight:620; color:var(--text)">iOS Safari focus-trap release</span><span class="rwhen">2m</span></div>
+        <div class="rbranch"><svg class="g" width="9" height="11" viewBox="0 0 9 11" fill="none" stroke="currentColor"><circle cx="2" cy="2" r="1.4"/><circle cx="2" cy="9" r="1.4"/><circle cx="7" cy="5.5" r="1.4"/><path d="M2 3.4v4.2M3.4 2.6 5.7 4.7"/></svg><span>nm/1046-ios-safari-focus-trap</span></div>
+        <div class="rlive" style="margin-top:4px"><span class="ind"></span><span class="verb">patch · returning focus to the trigger</span><span class="frac">2/5</span></div>
+      </div>
+      <div class="row">
+        <span class="rdot f review"></span>
+        <div class="rbody">
+          <div class="rline1"><span class="rnum">1042</span><span class="rtitle">Mobile nav: drawer + focus</span><span class="rwhen">5h</span></div>
+          <div class="rbranch"><svg class="g" width="9" height="11" viewBox="0 0 9 11" fill="none" stroke="currentColor"><circle cx="2" cy="2" r="1.4"/><circle cx="2" cy="9" r="1.4"/><circle cx="7" cy="5.5" r="1.4"/><path d="M2 3.4v4.2M3.4 2.6 5.7 4.7"/></svg><span>nm/1042-mobile-nav-drawer-focus</span></div>
+        </div>
+      </div>
+      <div class="row">
+        <span class="rdot"></span>
+        <div class="rbody">
+          <div class="rline1"><span class="rtitle">⏱ Routine — Thread-birth check</span><span class="rwhen">26m</span></div>
+        </div>
+      </div>
+      <div class="row">
+        <span class="rdot f closed"></span>
+        <div class="rbody">
+          <div class="rline1"><span class="rnum">1004</span><span class="rtitle">Validation: provider choice…</span><span class="rwhen">6d</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="callouts">
+      <div class="co"><span class="n">5</span><b>Maximum glance, most weight.</b> A live task lifts onto a card; everything else stays a quiet row. Beautiful with one run — with three concurrent runs the rail becomes a stack of cards and Recents stops being a list.</div>
+    </div>
+  </div>
+</div>
+
+<div class="stophd"><span class="stopno">Recommendation</span>B — A's resting calm, the Codex expand only where there is a story</div>
+<div class="stopp">
+  <b>Why B:</b> rest is exactly A (two lines max, live verb outranks branch for the second line — now-truth over stable-truth), and the expand answers "who did what, when" without leaving the rail — the reference's best idea, scoped to rows that have a journey. C is striking but degrades with concurrency.<br/><br/>
+  <b>Change surface (no new machinery):</b> historyRows already carries the task — add `branch` passthrough · the live verb reads the same openRuns watch the pulse dot uses · expanded beats come from the synced beats/journey rows · title-markdown strip in threadTitle's rail render (the freebie) · CSS on the navhistrow anatomy · docs/33 idiom note.<br/><br/>
+  <b>Open questions:</b> ① branch truncation — tail-biased RTL ellipsis (mocked) or middle-ellipsis? ② does the expand persist per-row or auto-collapse when another opens (proposal: one open at a time, the docs/17 tracker rule)? ③ should chats with a live run also show the verb line (proposal: yes — same rule, no branch line).
+</div>
+
+</div>
+</body>
+</html>

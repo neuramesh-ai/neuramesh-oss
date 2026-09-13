@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Routines as rows — a list of standing behaviours, not a wall of cards</title>
+<style>
+[data-theme] { --fbody:'Geist Variable',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; --fmono:'Geist Mono Variable',ui-monospace,'SF Mono',Menlo,monospace; --fdisp:'Source Serif 4','Iowan Old Style',Georgia,serif; --ease:cubic-bezier(.22,1,.36,1); --dur-fast:.12s; --dur:.15s; --dur-enter:.22s; --dur-exit:.13s; }
+/* verbatim from apps/desktop/src/renderer/src/tokens.css */
+[data-theme='dark'] {
+  --win:#0d0d0d; --bg:#141414; --panel:#191919; --panel2:#212121; --panel3:#2b2b2b;
+  --border:#272727; --border2:#383838; --card:#1e1e1e; --card-border:#2c2c2c;
+  --text:#eaeaea; --body:#b6b6b6; --muted:#898989; --dim:#676767; --ring:#525252;
+  --accent:#eaeaea; --accent-ink:#101010; --accent-soft:#2b2b2b; --link:#d19a72;
+  --hover-bg:rgba(234,234,234,.07); --sel-bg:rgba(234,234,234,.10);
+  --prog:#8ba0c0; --done:#77ac8d; --warn:#c9a15e; --closed:#727272;
+  --shadow-card:0 1px 2px rgba(0,0,0,.25); --shadow-lift:0 8px 20px -8px rgba(0,0,0,.55); --shadow-pop:0 20px 55px -14px rgba(0,0,0,.65);
+  --shadow-sheet:inset 0 1px 0 rgba(255,255,255,.05), 0 12px 30px -6px rgba(0,0,0,.5);
+  --overlay:#222222;
+}
+[data-theme='cream-oak'] {
+  --win:#f0e5d3; --bg:#fbf8f4; --panel:#fbf8f4; --panel2:#f6eee1; --panel3:#efe1cd;
+  --border:#e6dbca; --border2:#d3c2a8; --card:#ffffff; --card-border:#eadfce;
+  --text:#2a1c13; --body:#574838; --muted:#97846c; --dim:#b5a289; --ring:#b08a5e;
+  --accent:#834a2b; --accent-ink:#fff7ee; --accent-soft:#f1e3d2; --link:#9c5730;
+  --hover-bg:rgba(42,28,19,.05); --sel-bg:rgba(131,74,43,.08);
+  --prog:#4f80c4; --done:#0f9d63; --warn:#a9762a; --closed:#8a847a;
+  --shadow-card:0 1px 2px rgba(70,42,18,.05); --shadow-lift:0 8px 20px -8px rgba(70,42,18,.20); --shadow-pop:0 20px 55px -14px rgba(70,42,18,.30);
+  --shadow-sheet:0 8px 26px -8px rgba(70,42,18,.16), 0 1px 2px rgba(70,42,18,.05);
+  --overlay:#ffffff;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body { background:#131210; }
+body { font-family:'Geist Variable',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; -webkit-font-smoothing:antialiased; }
+.page { max-width:1500px; margin:0 auto; padding:34px 26px 90px; }
+.pagehead { color:#eaeaea; margin-bottom:10px; max-width:112ch; }
+.pagehead h1 { font-family:'Source Serif 4',Georgia,serif; font-size:24px; font-weight:640; letter-spacing:-.012em; text-wrap:balance; }
+.pagehead p { color:#8f8b84; font-size:13px; line-height:1.68; margin-top:9px; }
+.pagehead b { color:#c2beb6; font-weight:600; }
+.pagehead .ok { color:#8fbf9f; font-weight:600; }
+.stophd { color:#eaeaea; font-size:16px; font-weight:660; margin:50px 0 4px; font-family:'Source Serif 4',Georgia,serif; }
+.stopno { font:700 10px 'Geist Mono Variable',ui-monospace,monospace; letter-spacing:.12em; color:#6f6b64; text-transform:uppercase; margin-right:8px; }
+.stopp { color:#8f8b84; font-size:12.5px; line-height:1.68; max-width:108ch; margin-bottom:16px; }
+.stopp b { color:#c2beb6; font-weight:600; }
+.stopp .ok { color:#8fbf9f; font-weight:600; }
+.stopp .warn { color:#c8a06a; font-weight:600; }
+.kbd { font:600 10px 'Geist Mono Variable',ui-monospace,monospace; border:1px solid #3a3733; border-radius:5px; padding:1px 5px; color:#a29d95; }
+.themes { display:grid; grid-template-columns:1fr; gap:20px; }
+.theme { background:var(--win); border:1px solid #333029; border-radius:16px; padding:14px; color:var(--text); font-family:var(--fbody); overflow:hidden; }
+.theme > h2 { font-size:10.5px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--dim); margin:0 2px 11px; font-family:var(--fmono); }
+
+/* ══ the sheet, at destination scale ══ */
+.sheet { background:var(--bg); border:1px solid var(--border); border-radius:14px; box-shadow:var(--shadow-sheet); overflow:hidden; }
+.topbar { display:flex; align-items:baseline; gap:12px; padding:15px 20px 4px; font-family:var(--fdisp); font-size:18px; font-weight:640; }
+.topbar .desc { font-family:var(--fbody); font-size:12px; font-weight:400; color:var(--muted); }
+.scopebar { display:flex; align-items:center; gap:8px; padding:12px 20px 8px; }
+.scopefind { flex:1; display:flex; align-items:center; gap:8px; height:34px; padding:0 12px; border-radius:999px; border:1px solid var(--card-border); background:var(--card); color:var(--dim); font-size:12.5px; box-shadow:var(--shadow-card); }
+.cchip { display:inline-flex; align-items:center; gap:6px; height:34px; padding:0 13px; border-radius:999px; border:1px solid var(--border2); background:none; color:var(--body); font:560 12px var(--fbody); cursor:pointer; }
+.cchip:hover { background:var(--hover-bg); color:var(--text); }
+.cchip .car { color:var(--dim); font-size:9px; }
+.btn { height:34px; padding:0 14px; border-radius:999px; border:1px solid var(--border2); background:none; color:var(--body); font:600 12px var(--fbody); cursor:pointer; }
+.btn:hover { background:var(--hover-bg); color:var(--text); }
+.btn.sm { height:26px; padding:0 11px; font-size:11.5px; }
+
+/* ══ ✦ THE ROW — the bell popover's anatomy, at destination scale ══ */
+.rlist { padding:0 12px 18px; }
+.rsect { display:flex; align-items:center; gap:9px; padding:14px 8px 5px; font:650 9px var(--fmono); letter-spacing:.14em; text-transform:uppercase; color:var(--dim); }
+.rsect .rule { flex:1; height:1px; background:var(--border); }
+.rrow { position:relative; display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:11px; cursor:pointer; min-width:0;
+  border:1px solid transparent; transition:background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease); }
+.rrow:hover { background:var(--card); border-color:var(--card-border); box-shadow:var(--shadow-card); }
+[data-theme='dark'] .rrow:hover { background:var(--panel2); border-color:transparent; box-shadow:none; }
+/* the cadence chip is the row's leading glyph — it says WHEN, which is the one thing every
+   routine differs by, and it reads at a glance down the column */
+.rcad { flex:none; min-width:96px; display:inline-flex; align-items:center; gap:6px; font:640 9.5px var(--fmono); letter-spacing:.05em; text-transform:uppercase; color:var(--prog); background:color-mix(in srgb, var(--prog) 13%, transparent); border-radius:7px; padding:3px 8px; }
+.rrow.paused .rcad { color:var(--closed); background:color-mix(in srgb, var(--closed) 14%, transparent); }
+.rtext { flex:1; min-width:0; display:flex; align-items:baseline; gap:9px; }
+.rtitle { font-size:13px; font-weight:600; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:none; max-width:44%; }
+.rrow.paused .rtitle { color:var(--muted); }
+.rprompt { flex:1; min-width:0; font-size:12px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.rroom { flex:none; font:600 10px var(--fmono); color:var(--dim); }
+.rmeta { flex:none; display:flex; align-items:baseline; gap:12px; font:500 10.5px var(--fmono); color:var(--dim); transition:opacity var(--dur-fast) var(--ease); }
+.rnext { color:var(--muted); }
+.rnext.due { color:var(--warn); font-weight:700; }
+.rpausedtag { font:650 9px var(--fmono); letter-spacing:.1em; text-transform:uppercase; color:var(--closed); }
+/* THE ANIMATION: the ledger steps aside and the verbs rise in its place. One object moving, not
+   two fading past each other — and nothing reflows, because both live in the same fixed slot. */
+.rtico { display:grid; place-items:center; width:26px; height:26px; flex:none; border:1px solid transparent; border-radius:8px; background:none; color:var(--muted); cursor:pointer; transition:background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
+.rtico:hover { background:var(--hover-bg); color:var(--text); }
+.ract { position:absolute; right:12px; top:50%; transform:translateY(calc(-50% + 4px)); display:flex; gap:6px; opacity:0; pointer-events:none;
+  transition:opacity var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease); }
+.rrow:hover .ract { opacity:1; transform:translateY(-50%); pointer-events:auto; }
+.rrow:hover .rmeta { opacity:0; }
+.rgo { flex:none; color:var(--dim); font-size:13px; transition:transform var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
+.rrow:hover .rgo { color:var(--muted); transform:translateX(2px); }
+.rrow:hover .rgo { opacity:0; }
+@media (prefers-reduced-motion: reduce) { .rrow, .ract, .rmeta, .rgo { transition:none; } }
+
+/* the empty state */
+.rempty { padding:38px 20px 44px; text-align:center; }
+.rempty b { display:block; font-family:var(--fdisp); font-size:16px; font-weight:640; margin-bottom:5px; }
+.rempty span { display:block; font-size:12.5px; color:var(--muted); max-width:46ch; margin:0 auto 14px; line-height:1.6; }
+
+/* the "was" strip */
+.wasgrid { display:grid; grid-template-columns:1fr 1fr; gap:14px; padding:6px 12px 16px; }
+.wascard { border:1px solid var(--border); border-radius:13px; padding:13px 15px; background:var(--card); box-shadow:var(--shadow-card); }
+.wascard.p { opacity:.55; border-style:dashed; background:none; box-shadow:none; }
+.washd { display:flex; align-items:center; gap:9px; margin-bottom:8px; }
+.wasico { width:26px; height:26px; border-radius:8px; border:1px solid var(--border2); display:grid; place-items:center; color:var(--muted); flex:none; }
+.wast { font-size:13px; font-weight:640; }
+.wasroom { font:600 10px var(--fmono); color:var(--dim); }
+.wassch { margin-left:auto; text-align:right; font:500 10.5px var(--fmono); color:var(--dim); }
+.wasp { font-size:12px; color:var(--muted); line-height:1.55; padding-bottom:11px; border-bottom:1px solid var(--border); }
+.wasfoot { display:flex; align-items:center; gap:8px; padding-top:10px; font:500 10.5px var(--fmono); color:var(--dim); }
+.wasfoot .acts { margin-left:auto; display:flex; gap:6px; }
+
+.specgrid { display:grid; grid-template-columns:repeat(auto-fit, minmax(330px, 1fr)); gap:14px; }
+.spec { background:#1a1815; border:1px solid #2c2923; border-radius:13px; padding:16px 17px; color:#b6b1a9; font-size:12.5px; line-height:1.66; }
+.spec h3 { color:#e6e2da; font-size:13px; font-weight:660; margin-bottom:8px; font-family:'Source Serif 4',Georgia,serif; }
+.spec b { color:#d8d3ca; font-weight:600; }
+.spec .k { font:600 10.5px 'Geist Mono Variable',ui-monospace,monospace; color:#d8b98e; }
+.spec ul { list-style:none; }
+.spec li { padding:3px 0 3px 16px; position:relative; }
+.spec li::before { content:'·'; position:absolute; left:4px; color:#6f6b64; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<div class="pagehead">
+  <h1>Routines as rows — a list of standing behaviours, not a wall of cards</h1>
+  <p><b>A card is for one thing you look at; a list is for many things you scan.</b> Two routines fill a 1500px screen with two half-empty cards and a hectare of nothing under them — and the thing you actually came to read (<i>what runs, when, and is it still armed</i>) is spread across three zones of each card instead of down three columns you can compare. Rows fix the scan: the cadence lines up, the titles line up, the next-fire lines up, and twenty routines read as fast as two.</p>
+  <p>The anatomy is the <b>bell popover's</b>, at destination scale — same row rhythm, same hover, same section rule — so the two lists in the product are one idiom rather than two. <span class="ok">Hover a row.</span></p>
+</div>
+
+<div class="stophd"><span class="stopno">Stop 1</span>The list — cadence · title · prompt · when, in four scannable columns</div>
+<div class="stopp">
+  Every routine's differences sit on <b>vertical axes you can compare</b>: the cadence chip at a fixed 96px so <span class="kbd">WEEKDAYS · 09:00</span> and <span class="kbd">FRIS · 15:00</span> stack, the title at a capped width so the prompts start on the same column, and the countdown right-aligned. The prompt gets <b>one line</b>, not two: on this surface it is the identifying detail, not the content — the full text is one click away in the editor, and a routine you cannot identify from one line has a title problem, not a layout problem.
+  <b>Paused rows stay in the list</b>, dimmed with their cadence chip going grey, rather than in a second visual class — a paused routine is the one you are most likely to be looking for.
+</div>
+<div class="themes">
+  <div class="theme" data-theme="dark">
+    <h2>graphite · the destination</h2>
+    <div class="sheet">
+      <div class="topbar">Scheduled · Routines <span class="desc">every schedule in the workspace — filter by project or room</span></div>
+      <div class="scopebar">
+        <span class="scopefind">⌕ Search automations</span>
+        <button class="cchip">All projects <span class="car">▾</span></button>
+        <button class="cchip"># All rooms <span class="car">▾</span></button>
+        <button class="btn">＋ New automation</button>
+      </div>
+      <div class="rlist">
+        <div class="rrow">
+          <span class="rcad">Weekdays · 09:00</span>
+          <span class="rtext"><span class="rtitle">Morning dependency audit</span><span class="rprompt">Check our top 20 dependencies for new CVEs and majors; file anything urgent.</span><span class="rroom">#dev</span></span>
+          <span class="rmeta"><span class="rnext due">next in 57m</span><span>5 runs</span></span>
+          <span class="rgo">›</span>
+          <span class="ract"><button class="rtico" title="Pause"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M9 5v14"/><path d="M15 5v14"/></svg></button><button class="rtico" title="Remove"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button></span>
+        </div>
+        <div class="rrow">
+          <span class="rcad">Mondays · 08:30</span>
+          <span class="rtext"><span class="rtitle">Weekly retro prep</span><span class="rprompt">Summarise last week's accepted tasks and draft three retro prompts.</span><span class="rroom">#general</span></span>
+          <span class="rmeta"><span class="rnext">next Mon 08:30</span><span>18 runs</span></span>
+          <span class="rgo">›</span>
+          <span class="ract"><button class="rtico" title="Pause"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M9 5v14"/><path d="M15 5v14"/></svg></button><button class="rtico" title="Remove"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button></span>
+        </div>
+        <div class="rrow">
+          <span class="rcad">Daily · 18:00</span>
+          <span class="rtext"><span class="rtitle">End-of-day digest</span><span class="rprompt">What moved today, what is waiting on a human, what is stuck.</span><span class="rroom">#general</span></span>
+          <span class="rmeta"><span class="rnext">next in 6h</span><span>41 runs</span></span>
+          <span class="rgo">›</span>
+          <span class="ract"><button class="rtico" title="Pause"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M9 5v14"/><path d="M15 5v14"/></svg></button><button class="rtico" title="Remove"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button></span>
+        </div>
+        <div class="rrow paused">
+          <span class="rcad">Fris · 15:00</span>
+          <span class="rtext"><span class="rtitle">Friday flaky-test sweep</span><span class="rprompt">Scan the week of CI runs for flaky tests and open one task per confirmed flake.</span><span class="rroom">#dev</span></span>
+          <span class="rmeta"><span class="rpausedtag">paused</span><span>12 runs</span></span>
+          <span class="rgo">›</span>
+          <span class="ract"><button class="rtico" title="Resume"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M7 4.5v15l12-7.5z"/></svg></button><button class="rtico" title="Remove"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button></span>
+        </div>
+        <div class="rrow">
+          <span class="rcad">Once · 11:00</span>
+          <span class="rtext"><span class="rtitle">Post the v0.9 launch thread</span><span class="rprompt">Draft the launch thread from the release notes and hold it for approval.</span><span class="rroom">#marketing</span></span>
+          <span class="rmeta"><span class="rnext">next Thu 11:00</span><span>not run yet</span></span>
+          <span class="rgo">›</span>
+          <span class="ract"><button class="rtico" title="Pause"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M9 5v14"/><path d="M15 5v14"/></svg></button><button class="rtico" title="Remove"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="theme" data-theme="cream-oak">
+    <h2>cream oak · the same list</h2>
+    <div class="sheet">
+      <div class="topbar">Scheduled · Routines <span class="desc">every schedule in the workspace — filter by project or room</span></div>
+      <div class="scopebar">
+        <span class="scopefind">⌕ Search automations</span>
+        <button class="cchip">All projects <span class="car">▾</span></button>
+        <button class="cchip"># All rooms <span class="car">▾</span></button>
+        <button class="btn">＋ New automation</button>
+      </div>
+      <div class="rlist">
+        <div class="rrow">
+          <span class="rcad">Weekdays · 09:00</span>
+          <span class="rtext"><span class="rtitle">Morning dependency audit</span><span class="rprompt">Check our top 20 dependencies for new CVEs and majors; file anything urgent.</span><span class="rroom">#dev</span></span>
+          <span class="rmeta"><span class="rnext due">next in 57m</span><span>5 runs</span></span>
+          <span class="rgo">›</span>
+          <span class="ract"><button class="rtico" title="Pause"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M9 5v14"/><path d="M15 5v14"/></svg></button><button class="rtico" title="Remove"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button></span>
+        </div>
+        <div class="rrow">
+          <span class="rcad">Mondays · 08:30</span>
+          <span class="rtext"><span class="rtitle">Weekly retro prep</span><span class="rprompt">Summarise last week's accepted tasks and draft three retro prompts.</span><span class="rroom">#general</span></span>
+          <span class="rmeta"><span class="rnext">next Mon 08:30</span><span>18 runs</span></span>
+          <span class="rgo">›</span>
+          <span class="ract"><button class="rtico" title="Pause"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M9 5v14"/><path d="M15 5v14"/></svg></button><button class="rtico" title="Remove"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button></span>
+        </div>
+        <div class="rrow paused">
+          <span class="rcad">Fris · 15:00</span>
+          <span class="rtext"><span class="rtitle">Friday flaky-test sweep</span><span class="rprompt">Scan the week of CI runs for flaky tests and open one task per confirmed flake.</span><span class="rroom">#dev</span></span>
+          <span class="rmeta"><span class="rpausedtag">paused</span><span>12 runs</span></span>
+          <span class="rgo">›</span>
+          <span class="ract"><button class="rtico" title="Resume"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M7 4.5v15l12-7.5z"/></svg></button><button class="rtico" title="Remove"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="stophd"><span class="stopno">Stop 2</span>What the cards were spending, and on what</div>
+<div class="stopp">
+  Same two routines, as they render today. Each card is <b>three stacked zones</b> — head, prompt, footer — separated by a rule, in a two-up grid. Nothing here is badly drawn; it is simply the wrong container: a card says <i>look at this one thing</i>, and a schedule inventory is a thing you <b>scan</b>. The cost lands in three places: the cadence and the countdown sit at the card's right edge, so they never line up between cards; the prompt is given two lines of a paragraph it does not need; and the two verbs sit in permanent view on every card, which is how a list of five becomes ten buttons you are not using.
+</div>
+<div class="themes">
+  <div class="theme" data-theme="dark">
+    <h2>graphite · today</h2>
+    <div class="sheet">
+      <div class="wasgrid">
+        <div class="wascard">
+          <div class="washd">
+            <span class="wasico"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M17 2.5l4 4-4 4"/><path d="M3 11.5v-2a3 3 0 0 1 3-3h15"/><path d="M7 21.5l-4-4 4-4"/><path d="M21 12.5v2a3 3 0 0 1-3 3H3"/></svg></span>
+            <span class="wast">Morning dependency audit</span><span class="wasroom">#dev</span>
+            <span class="wassch">Weekdays · 09:00<br><span style="color:var(--warn)">next in 57m</span></span>
+          </div>
+          <div class="wasp">Check our top 20 dependencies for new CVEs and majors; file anything urgent.</div>
+          <div class="wasfoot">5 runs so far <span class="acts"><button class="rtico" title="Pause"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M9 5v14"/><path d="M15 5v14"/></svg></button><button class="rtico" title="Remove"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button></span></div>
+        </div>
+        <div class="wascard p">
+          <div class="washd">
+            <span class="wasico"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M17 2.5l4 4-4 4"/><path d="M3 11.5v-2a3 3 0 0 1 3-3h15"/><path d="M7 21.5l-4-4 4-4"/><path d="M21 12.5v2a3 3 0 0 1-3 3H3"/></svg></span>
+            <span class="wast">Friday flaky-test sweep</span><span class="wasroom">#dev</span>
+            <span class="wassch">Fris · 15:00<br>PAUSED</span>
+          </div>
+          <div class="wasp">Scan the week of CI runs for flaky tests and open one task per confirmed flake.</div>
+          <div class="wasfoot">12 runs so far <span class="acts"><button class="rtico" title="Resume"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M7 4.5v15l12-7.5z"/></svg></button><button class="rtico" title="Remove"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="stophd"><span class="stopno">Stop 3</span>The spec</div>
+<div class="specgrid">
+  <div class="spec">
+    <h3>The row</h3>
+    <ul>
+      <li>One line, 40px, <span class="k">--r-lg</span>. Four slots on fixed axes: <b>cadence chip</b> (96px min) · <b>title</b> (max 44%) + <b>prompt</b> (flex, one line, ellipsis) + <b>#room</b> · <b>meta</b> (next · runs).</li>
+      <li>The cadence chip is the leading glyph — it says WHEN, the one thing every routine differs by, and it is what you scan the column for. It wears <span class="k">--prog</span>; a paused row's goes <span class="k">--closed</span>.</li>
+      <li><b>Due soon</b> (under 2h) turns the countdown <span class="k">--warn</span> and bold, unchanged from today — it is the one urgency this surface has.</li>
+      <li>Paused rows stay <b>in the list</b>, dimmed, sorted after the active ones. A paused routine is the one you are most likely hunting for; a second section would hide it.</li>
+      <li>The whole row opens the editor, as the card did. <span class="k">role="button"</span>, Enter, and the same title tooltip.</li>
+    </ul>
+  </div>
+  <div class="spec">
+    <h3>The hover (the bell's, at destination scale)</h3>
+    <ul>
+      <li>Rest: transparent on the sheet. Hover: <b>lifts onto the card surface</b> — <span class="k">--card</span> + hairline + <span class="k">--shadow-card</span> in light, <span class="k">--panel2</span> flat in the darks (a shadow on near-black is invisible; the ground step is the signal there).</li>
+      <li>The verbs are <b>icons</b>, not word pills (George, 2026-08-16): two labelled pills per row put ~14 characters of chrome on every line of a list you scan, saying the same two words all the way down. Same 26px measure and wash as the task header's <span class="k">.navpin</span>; the <span class="k">data-tip</span> bubble carries the word on approach and <span class="k">aria-label</span> carries it always. Armed, Remove goes danger with a ring — a two-step confirm carried by colour alone would be no confirm at all, so the tooltip and the label both say what the second click does.</li>
+      <li><b>The ledger steps aside and the verbs rise in its place</b> — Pause/Resume and Remove occupy the same fixed slot the meta does, so the row never reflows and the list never jitters under the pointer. One object moving, not two fading past each other.</li>
+      <li>The <span class="k">›</span> fades as the verbs arrive: it promises "this opens", and while your pointer is on Remove that promise is wrong.</li>
+      <li>All of it <span class="k">--dur-fast</span> / <span class="k">--ease</span>, and all of it off under <span class="k">prefers-reduced-motion</span> — the verbs then simply show on hover.</li>
+    </ul>
+  </div>
+  <div class="spec">
+    <h3>What does not change</h3>
+    <ul>
+      <li>The ScopeBar, the ＋ New automation button, the two-step Remove (<i>sure?</i>), the 5s poll, the editor modal, <span class="k">nextRunLabel</span>, the counts the nav badge reads.</li>
+      <li><b>The hint line is gone</b> (George): "each run fires its prompt into a room" explained what every row now shows one line below it — cadence, #room — and as a bare child of the view it never lined up with the scope bar's inset. Alignment was the symptom; redundancy was the reason.</li>
+      <li>The empty state keeps its serif line and its button — an empty destination is the one place a page should still speak.</li>
+      <li><b>Calendar is untouched.</b> It is the time view; this is the inventory. Rows here make the difference between them sharper, not blurrier.</li>
+    </ul>
+  </div>
+</div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,636 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Project scope in the nav — where the switcher lives and what it promises</title>
+<style>
+/* tokens verbatim from apps/desktop/src/renderer/src/tokens.css (graphite dark · paper light) */
+[data-theme] {
+  --fdisp:'Source Serif 4 Variable','Source Serif 4',Georgia,serif;
+  --font:'Geist Variable',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --fmono:'Geist Mono Variable',ui-monospace,'SF Mono',Menlo,monospace;
+  --dur-fast:.12s; --ease:cubic-bezier(.22,1,.36,1);
+  --r-xs:6px; --r-sm:8px; --r-md:10px; --r-lg:14px; --r-xl:18px; --r-full:999px;
+}
+[data-theme='dark'] {
+  --win:#0d0d0d; --bg:#141414; --panel:#191919; --panel2:#212121; --panel3:#2b2b2b;
+  --border:#272727; --border2:#383838;
+  --text:#eaeaea; --body:#b6b6b6; --muted:#898989; --dim:#676767;
+  --link:#d19a72; --accent:var(--text); --accent-ink:#101010; --brand:#834a2b; --brand-ink:#fff7ee;
+  --todo:#949494; --prog:#8ba0c0; --review:#a89ccf; --done:#77ac8d; --acc:#6fb0ab; --ship:#7cb0bd;
+  --closed:#727272; --blocked:#9ca0a8; --design:#cc8fb9;
+  --shadow:rgba(0,0,0,.62); --overlay:#222222; --card:#1e1e1e; --card-border:#2c2c2c;
+  --shadow-card:0 1px 2px rgba(0,0,0,.25); --shadow-lift:0 8px 20px -8px rgba(0,0,0,.55); --shadow-pop:0 20px 55px -14px rgba(0,0,0,.65);
+  --ring:#525252; --hover-border:#404040;
+  --hover-bg:color-mix(in srgb,var(--text) 7%,transparent); --sel-bg:color-mix(in srgb,var(--text) 10%,transparent);
+}
+[data-theme='light'] {
+  --win:#e9e5db; --bg:#fcfbf8; --panel:#fcfbf8; --panel2:#f4f1ea; --panel3:#ebe7dd;
+  --border:#e2ded4; --border2:#cec5b7;
+  --text:#2f2a24; --body:#524c43; --muted:#837d72; --dim:#a09889;
+  --link:#8f4f2a; --accent:var(--text); --accent-ink:#ffffff; --brand:#834a2b; --brand-ink:#fff7ee;
+  --todo:#7d8590; --prog:#4f80c4; --review:#6d5ce0; --done:#2f9e6b; --acc:#2f8f8a; --ship:#1f7f96;
+  --closed:#8a847a; --blocked:#7c7f88; --design:#b0498f;
+  --shadow:rgba(70,58,44,.14); --overlay:#ffffff; --card:#ffffff; --card-border:#e2ded4;
+  --shadow-card:0 1px 2px rgba(70,58,44,.05); --shadow-lift:0 8px 20px -8px rgba(70,58,44,.18); --shadow-pop:0 20px 55px -14px rgba(70,58,44,.26);
+  --ring:color-mix(in srgb,var(--accent) 40%,var(--border2)); --hover-border:color-mix(in srgb,var(--text) 12%,var(--border2));
+  --hover-bg:color-mix(in srgb,var(--text) 6%,transparent); --sel-bg:color-mix(in srgb,var(--text) 8%,transparent);
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#131210; font-family:'Geist Variable',-apple-system,sans-serif; -webkit-font-smoothing:antialiased; }
+.page { max-width:1700px; margin:0 auto; padding:34px 24px 90px; }
+.pagehead { color:#eaeaea; margin-bottom:6px; }
+.pagehead h1 { font-family:'Source Serif 4',Georgia,serif; font-size:24px; font-weight:640; letter-spacing:-.012em; }
+.pagehead p { color:#898989; font-size:13px; line-height:1.64; margin-top:9px; max-width:100ch; }
+.pagehead b { color:#b6b6b6; } .pagehead code { font-family:'Geist Mono Variable',monospace; font-size:12px; color:#b6b6b6; }
+.stophd { color:#eaeaea; font-size:15.5px; font-weight:660; margin:46px 0 4px; font-family:'Source Serif 4',Georgia,serif; }
+.stopno { font:700 10px 'Geist Mono Variable',monospace; letter-spacing:.12em; color:#6f6f6f; text-transform:uppercase; margin-right:9px; }
+.stopp { color:#898989; font-size:12.5px; line-height:1.64; max-width:104ch; margin-bottom:18px; }
+.stopp b { color:#b6b6b6; } .stopp code { font-family:'Geist Mono Variable',monospace; font-size:11.5px; color:#b6b6b6; }
+
+.themes { display:grid; grid-template-columns:repeat(3,1fr); gap:18px; align-items:start; }
+.duo { display:grid; grid-template-columns:1fr 1fr; gap:18px; align-items:start; }
+@media (max-width:1420px){ .themes { grid-template-columns:1fr 1fr; } }
+.theme { background:var(--win); border:1px solid var(--border2); border-radius:16px; padding:16px; color:var(--text); }
+.theme > h2 { font-size:10.5px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--dim); margin:0 2px 12px; }
+.theme > h2 .pick { color:var(--done); }
+.theme > h2 .thm { float:right; opacity:.7; letter-spacing:.06em; }
+.callouts { display:flex; flex-direction:column; gap:7px; margin-top:13px; }
+.co { font-size:11.5px; color:#8f8f8f; line-height:1.56; }
+.theme .co { color:var(--muted); }
+.co b { color:var(--body); }
+.co .n { display:inline-grid; place-items:center; width:16px; height:16px; border-radius:50%; background:var(--panel3); color:var(--link); font:700 10px 'Geist Mono Variable',monospace; margin-right:6px; vertical-align:-3px; }
+
+/* ── the rail at its REAL 266px ─────────────────────────────────────────────── */
+.rail { width:266px; background:var(--bg); border:1px solid var(--border); border-radius:12px; padding:0 0 10px; display:flex; flex-direction:column; }
+.navhead { display:flex; align-items:center; gap:8px; padding:9px 11px; }
+.navhead-main { flex:1; min-width:0; display:flex; align-items:center; gap:10px; text-align:left; padding:5px 7px; margin:-3px -5px; border-radius:11px; color:var(--text); }
+.navbadge { position:relative; overflow:hidden; width:38px; height:38px; border-radius:var(--r-lg); background:linear-gradient(160deg,var(--panel3),var(--panel2)); color:var(--text); font-weight:700; font-size:16px; display:grid; place-items:center; flex:none; border:1px solid var(--border2); box-shadow:0 2px 8px -4px var(--shadow); }
+.navbadge.sm { width:26px; height:26px; border-radius:9px; font-size:11px; }
+.navbadge.xs { width:20px; height:20px; border-radius:7px; font-size:9px; }
+.wsproj { flex:1; min-width:0; display:flex; align-items:center; gap:6px; }
+.wsswitch-txt { flex:1; min-width:0; }
+.wsswitch-txt b { display:block; font-weight:700; font-size:14.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.wsswitch-txt small { display:block; font-weight:500; font-size:11px; color:var(--dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.wscaret { flex:none; color:var(--muted); display:inline-flex; }
+
+.navnew { display:flex; align-items:stretch; }
+.navnewchat { display:flex; align-items:center; gap:8px; width:calc(100% - 40px); margin:4px 0 6px 8px; padding:7px 10px; border:1px solid var(--card-border); border-radius:var(--r-md) 0 0 var(--r-md); background:var(--card); box-shadow:var(--shadow-card); color:var(--text); font-size:12.5px; font-weight:620; }
+.nncplus { flex:none; font-size:12px; color:var(--muted); }
+.navhomelbl { flex:1; }
+.nnck { flex:none; font:600 10px var(--fmono); color:var(--dim); }
+.navnewcaret { flex:none; width:26px; margin:4px 8px 6px 0; border:1px solid var(--card-border); border-left:0; border-radius:0 10px 10px 0; background:var(--card); color:var(--muted); font-size:9px; display:grid; place-items:center; }
+
+.navhome { display:flex; align-items:center; gap:9px; width:calc(100% - 16px); margin:2px 8px 4px; padding:7px 10px; border:1px solid transparent; border-radius:9px; color:var(--body); font:600 12.5px var(--font); }
+.navhome.on { background:var(--panel3); color:var(--text); }
+[data-theme='light'] .navhome.on { background:var(--card); border-color:var(--card-border); box-shadow:var(--shadow-card); }
+.navhome svg { flex:none; color:var(--muted); }
+.navhome.on svg { color:var(--text); }
+.navhomecount { flex:none; font:700 10px var(--fmono); color:var(--accent-ink); background:var(--accent); border-radius:99px; padding:1px 7px; }
+
+.navband { padding:10px 0 6px; }
+.navsecthd { display:flex; align-items:center; justify-content:space-between; padding-right:11px; }
+.navsecttoggle { flex:1; min-width:0; display:flex; align-items:center; gap:7px; padding:2px 14px 6px; font:650 9.5px var(--fmono); letter-spacing:.15em; text-transform:uppercase; color:var(--muted); }
+.navchev { display:inline-flex; flex:none; color:var(--muted); opacity:.65; }
+.navsectcnt { font:800 9px var(--fmono); color:var(--dim); opacity:.75; letter-spacing:0; }
+.chanadd { display:grid; place-items:center; width:18px; height:18px; border-radius:5px; color:var(--dim); font-size:15px; line-height:1; opacity:.55; }
+.chan { position:relative; display:flex; align-items:center; gap:8px; padding:6px 9px; margin:0 8px 0 14px; border-radius:var(--r-md); color:var(--body); font-size:13px; }
+.chan.on { background:var(--panel3); color:var(--text); font-weight:600; }
+[data-theme='light'] .chan.on { background:var(--card); box-shadow:var(--shadow-card), inset 0 0 0 1px var(--card-border); }
+.chan .h { color:var(--dim); font-weight:600; }
+.chan .lbl { flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+.navhistlist { padding:0 8px 4px 14px; }
+.navhistrow { display:flex; align-items:flex-start; gap:8px; width:100%; margin:1px 0; padding:5px 9px; border:1px solid transparent; border-radius:8px; }
+.navhistrow.raised { background:var(--card); border-color:var(--card-border); box-shadow:var(--shadow-card); }
+.navhistdot { flex:none; width:6px; height:6px; border-radius:50%; background:currentColor; margin-top:5px; }
+.navhistdot.thread { background:transparent; box-shadow:inset 0 0 0 1.5px var(--dim); }
+.navhistdot.c-prog { color:var(--prog); } .navhistdot.c-review { color:var(--review); } .navhistdot.c-done { color:var(--done); }
+.navhistdot.c-ship { color:var(--ship); } .navhistdot.c-blocked { color:var(--blocked); } .navhistdot.c-closed { color:var(--closed); }
+.navhistdot.live { box-shadow:0 0 0 3px color-mix(in srgb,currentColor 24%,transparent); }
+.navhistbody { flex:1; min-width:0; display:flex; flex-direction:column; gap:1.5px; }
+.navhistline1 { display:flex; align-items:baseline; gap:6px; min-width:0; }
+.navhistnum { flex:none; font:700 10.5px var(--fmono); color:var(--muted); }
+.navhisttitle { flex:1; min-width:0; font-size:12.5px; color:var(--body); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.navhistchan { flex:none; max-width:74px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font:600 9.5px var(--fmono); color:var(--dim); }
+.navhistwhen { flex:none; font:500 10px var(--fmono); color:var(--dim); }
+.navhistbranch { display:flex; align-items:center; gap:5px; font:500 10px var(--fmono); color:var(--dim); min-width:0; }
+.navhistbranch span { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; direction:rtl; text-align:left; }
+.navhistlive { display:flex; align-items:center; gap:6px; font-size:10.5px; color:var(--body); min-width:0; }
+.navhistlive .ind { width:5px; height:5px; border-radius:50%; background:var(--prog); flex:none; animation:pulse 1.6s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity:.34; } }
+.navhistlive .verb { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; font-style:italic; }
+.navhistmore { display:flex; align-items:center; margin:3px 8px 0 14px; padding:6px 9px; border-radius:8px; color:var(--muted); font-size:11.5px; }
+.navhistmore .k { margin-left:auto; font:600 9.5px var(--fmono); color:var(--dim); border:1px solid var(--border2); border-radius:4px; padding:1px 5px; }
+.navfoot { margin-top:auto; display:flex; align-items:center; gap:9px; padding:9px 14px 2px; color:var(--body); font-size:12px; border-top:1px solid var(--border); }
+
+/* ── A · the scope line ───────────────────────────────────────────────────── */
+.scopeline { display:flex; align-items:center; gap:9px; margin:8px 8px 2px; padding:7px 9px; border-radius:var(--r-md); border:1px solid var(--border2); background:color-mix(in srgb,var(--panel2) 60%,transparent); }
+.scopeline .lbl { flex:1; min-width:0; }
+.scopeline .lbl b { display:block; font-size:13px; font-weight:660; color:var(--text); }
+.scopeline .lbl small { display:block; font:600 8.5px var(--fmono); letter-spacing:.13em; text-transform:uppercase; color:var(--dim); margin-top:1px; }
+.scopeline .car { color:var(--muted); display:inline-flex; }
+.wsline { display:flex; align-items:center; gap:8px; padding:1px 16px 7px; font:650 9.5px var(--fmono); letter-spacing:.15em; text-transform:uppercase; color:var(--dim); }
+.wsline .rule { flex:1; height:1px; background:var(--border); }
+
+/* ── B · the project strip ────────────────────────────────────────────────── */
+.striprow { display:flex; gap:0; }
+.pstrip { width:52px; flex:none; background:var(--win); border:1px solid var(--border); border-right:0; border-radius:12px 0 0 12px; padding:10px 0; display:flex; flex-direction:column; align-items:center; gap:6px; }
+.ptile { position:relative; width:34px; height:34px; border-radius:11px; display:grid; place-items:center; background:linear-gradient(160deg,var(--panel3),var(--panel2)); border:1px solid var(--border2); color:var(--muted); font:700 12px var(--font); overflow:hidden; }
+.ptile img { width:100%; height:100%; object-fit:contain; padding:4px; }
+.ptile.on { border-color:var(--ring); box-shadow:0 0 0 2px color-mix(in srgb,var(--text) 16%,transparent); color:var(--text); }
+.ptile.on::before { content:''; position:absolute; left:-11px; top:7px; bottom:7px; width:3px; border-radius:0 3px 3px 0; background:var(--text); }
+.ptile .pdot { position:absolute; right:-1px; top:-1px; width:8px; height:8px; border-radius:50%; background:var(--prog); border:2px solid var(--win); }
+.pstrip .psep { width:22px; height:1px; background:var(--border2); margin:3px 0; }
+.pstrip .padd { color:var(--dim); font-size:16px; width:34px; height:34px; display:grid; place-items:center; border-radius:11px; border:1px dashed var(--border2); }
+.striprow .rail { border-radius:0 12px 12px 0; }
+
+/* ── C · the scope pill on the surface ────────────────────────────────────── */
+.surf { background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:14px 16px 16px; }
+.surfhd { display:flex; align-items:center; gap:10px; padding-bottom:12px; }
+.surfhd h3 { font-family:var(--fdisp); font-size:19px; font-weight:640; color:var(--text); letter-spacing:-.01em; }
+.scopepill { display:inline-flex; align-items:center; gap:6px; padding:4px 10px 4px 6px; border-radius:var(--r-full); border:1px solid var(--border2); background:color-mix(in srgb,var(--panel2) 70%,transparent); color:var(--body); font-size:11.5px; font-weight:620; }
+.scopepill .car { color:var(--dim); font-size:8px; }
+.scopepill.ws { border-style:dashed; color:var(--muted); }
+.hsect { display:flex; align-items:center; gap:8px; font:650 9.5px var(--fmono); letter-spacing:.15em; text-transform:uppercase; color:var(--muted); margin:14px 0 8px; }
+.hsect .n { font:800 9px var(--fmono); color:var(--dim); }
+.hsect .tag { margin-left:auto; text-transform:none; letter-spacing:0; font:600 10px var(--font); color:var(--dim); border:1px dashed var(--border2); border-radius:var(--r-full); padding:2px 9px; }
+.frow { display:flex; align-items:center; gap:9px; padding:8px 10px; border-radius:var(--r-md); border:1px solid transparent; color:var(--body); font-size:12.5px; }
+.frow + .frow { border-top:1px solid var(--border); border-radius:0; }
+.fstate { flex:none; font:700 8.5px var(--fmono); letter-spacing:.1em; text-transform:uppercase; padding:2px 7px; border-radius:var(--r-full); background:var(--panel3); color:var(--muted); }
+.frow .ft { flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.frow .fm { flex:none; font:600 10px var(--fmono); color:var(--dim); }
+.pbadge { flex:none; display:inline-flex; align-items:center; gap:4px; font:600 9.5px var(--fmono); color:var(--muted); background:var(--panel3); border-radius:var(--r-full); padding:2px 7px 2px 3px; }
+
+/* ── the ⌘Y overlay ───────────────────────────────────────────────────────── */
+.ovl { background:var(--overlay); border:1px solid var(--border2); border-radius:14px; box-shadow:var(--shadow-pop); overflow:hidden; }
+.ovlhd { display:flex; align-items:center; gap:10px; padding:11px 14px; border-bottom:1px solid var(--border); color:var(--dim); }
+.ovlhd .q { flex:1; font-size:13px; color:var(--dim); }
+.seg { display:inline-flex; padding:2px; border-radius:var(--r-full); background:var(--panel2); border:1px solid var(--border); }
+.seg button { padding:3px 10px; border-radius:var(--r-full); font:620 10.5px var(--font); color:var(--muted); background:none; border:none; }
+.seg button.on { background:var(--card); color:var(--text); box-shadow:var(--shadow-card); }
+[data-theme='dark'] .seg button.on { background:var(--panel3); box-shadow:none; }
+.ovlrow { display:flex; align-items:center; gap:10px; padding:9px 14px; color:var(--body); font-size:12.5px; }
+.ovlrow + .ovlrow { border-top:1px solid var(--border); }
+.ovlrow .ot { flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+/* ── the composer chip row ────────────────────────────────────────────────── */
+.cbox { background:var(--panel); border:1px solid var(--border2); border-radius:var(--r-lg); padding:12px 14px 9px; box-shadow:var(--shadow-lift); }
+.cph { color:var(--dim); font-size:13px; padding-bottom:14px; }
+.cfoot { display:flex; align-items:center; gap:8px; }
+.cchip { display:inline-flex; align-items:center; gap:5px; max-width:190px; padding:4px 11px; border-radius:var(--r-full); border:1px solid var(--border); color:var(--muted); font-size:11px; font-weight:600; white-space:nowrap; }
+.cchip .lbl { overflow:hidden; text-overflow:ellipsis; }
+.cchip .car { font-size:8px; color:var(--dim); flex:none; }
+.cchip svg { flex:none; opacity:.8; }
+.cchip .plogo { width:14px; height:14px; border-radius:4px; flex:none; display:grid; place-items:center; overflow:hidden; background:var(--panel3); border:1px solid var(--border2); color:var(--muted); font:700 8px var(--font); }
+.cchip .plogo img { width:100%; height:100%; object-fit:contain; padding:1px; }
+.csend { margin-left:auto; width:26px; height:26px; border-radius:50%; border:1px solid var(--border2); display:grid; place-items:center; color:var(--dim); font-size:11px; }
+.tick { color:var(--done); } .cross { color:var(--blocked); }
+.leak { color:var(--design); font-weight:640; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<div class="pagehead">
+  <h1>Project scope in the nav — where the switcher lives, and what it promises</h1>
+  <p><b>The bug, and what it exposed (2026-08-01).</b> Switching projects left the Recents rail, the ⌘Y overlay and Home's <i>In flight</i> showing the project you had just left — a <code>neuramesh</code> card reading <i>“5 rooms · 0 open · no activity yet”</i> above a Home listing 23 threads and a shipping task that all belonged to <code>flowe-ai</code>. Those lists are now scoped to the active project (fixed in code, tested). <b>What the fix exposed is a design question:</b> Home's needs-you queue is deliberately workspace-wide — <a style="color:var(--link)">docs/12 §6</a>, the one written deviation in <a style="color:var(--link)">docs/06</a> — because a blocked agent in <i>any</i> project needs you regardless of which one you left selected.</p>
+  <p>So the rail now carries <b>two scopes under one heading</b>. The project name sits at the very top, above everything, which promises that everything below it is that project — and one row, <code>Home</code>, is not. George: <i>“our design of having the project switcher top left might be misaligned as it makes it seem everything showing is for the active project… where else can we add it as a visible item/filter to make it clearer?”</i></p>
+  <p><b>The brief.</b> ① Make the scope contract legible without deleting the deviation. ② Give the switcher a visible, always-reachable home. ③ Recents rows need to say where they live without a badge doing all the work. ④ The composer's project chip should wear the project's own icon.</p>
+</div>
+
+<div class="stophd"><span class="stopno">The problem, drawn</span>One heading, two scopes</div>
+<div class="stopp">Today's rail, unchanged, with the scope of each block marked. Everything in <b style="color:var(--done)">green</b> is the active project. The <b style="color:var(--design)">one row in pink</b> counts across every project — and it sits under the project's name like everything else.</div>
+
+<div class="themes">
+  <div class="theme" data-theme="dark">
+    <h2>Today <span class="thm">graphite</span></h2>
+    <div class="rail">
+      <div class="navhead">
+        <div class="navhead-main">
+          <span class="navbadge">N</span>
+          <span class="wsproj"><span class="wsswitch-txt"><b>neuramesh</b><small>GADS INC</small></span>
+            <span class="wscaret"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.6"/></svg></span>
+          </span>
+        </div>
+      </div>
+      <div class="navnew">
+        <div class="navnewchat"><span class="nncplus">＋</span><span class="navhomelbl">New chat</span><span class="nnck">⌘N</span></div>
+        <div class="navnewcaret">▾</div>
+      </div>
+      <div class="navhome on"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg><span class="navhomelbl">Home</span><span class="navhomecount">3</span></div>
+      <div class="navband">
+        <div class="navsecthd"><div class="navsecttoggle"><span class="navchev"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg></span>Channels <span class="navsectcnt">5</span></div><span class="chanadd">+</span></div>
+        <div class="chan on"><span class="h">#</span><span class="lbl">build</span></div>
+        <div class="chan"><span class="h">#</span><span class="lbl">dev</span></div>
+        <div class="chan"><span class="h">#</span><span class="lbl">marketing</span></div>
+      </div>
+      <div class="navband">
+        <div class="navsecthd"><div class="navsecttoggle"><span class="navchev"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg></span>Recents <span class="navsectcnt">6</span></div><span class="chanadd" style="font-size:12px">⌕</span></div>
+        <div class="navhistlist">
+          <div class="navhistrow"><span class="navhistdot c-prog live"></span><div class="navhistbody"><div class="navhistline1"><span class="navhistnum">1046</span><span class="navhisttitle">Focus-trap release</span><span class="navhistchan">#build</span><span class="navhistwhen">2m</span></div></div></div>
+          <div class="navhistrow"><span class="navhistdot thread"></span><div class="navhistbody"><div class="navhistline1"><span class="navhisttitle">Competitor social media report</span><span class="navhistchan">#marketing</span><span class="navhistwhen">12m</span></div></div></div>
+          <div class="navhistrow"><span class="navhistdot c-review"></span><div class="navhistbody"><div class="navhistline1"><span class="navhistnum">1042</span><span class="navhisttitle">Mobile nav drawer</span><span class="navhistchan">#dev</span><span class="navhistwhen">5h</span></div></div></div>
+        </div>
+        <div class="navhistmore">See all 6 <span class="k">⌘Y</span></div>
+      </div>
+      <div class="navfoot"><span class="navbadge sm">G</span> geo · Cloud</div>
+    </div>
+    <div class="callouts">
+      <div class="co"><span class="n">1</span><b>The head promises project scope</b> — 38px badge, the project slug in 14.5px bold, the workspace demoted to the subtitle. It is the largest object in the rail.</div>
+      <div class="co"><span class="n">2</span><b class="leak">Home's 3 is workspace-wide</b> and sits 60px under that promise. Two of those three can live in a project you cannot see from here.</div>
+      <div class="co"><span class="n">3</span><b>Channels · Recents are the project</b> — and correctly so, after the fix. Nothing in the rail says which of the three blocks is which.</div>
+    </div>
+  </div>
+
+  <div class="theme" data-theme="light">
+    <h2>Today <span class="thm">paper</span></h2>
+    <div class="rail">
+      <div class="navhead">
+        <div class="navhead-main">
+          <span class="navbadge">N</span>
+          <span class="wsproj"><span class="wsswitch-txt"><b>neuramesh</b><small>GADS INC</small></span>
+            <span class="wscaret"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.6"/></svg></span>
+          </span>
+        </div>
+      </div>
+      <div class="navnew">
+        <div class="navnewchat"><span class="nncplus">＋</span><span class="navhomelbl">New chat</span><span class="nnck">⌘N</span></div>
+        <div class="navnewcaret">▾</div>
+      </div>
+      <div class="navhome on"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg><span class="navhomelbl">Home</span><span class="navhomecount">3</span></div>
+      <div class="navband">
+        <div class="navsecthd"><div class="navsecttoggle"><span class="navchev"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg></span>Channels <span class="navsectcnt">5</span></div><span class="chanadd">+</span></div>
+        <div class="chan on"><span class="h">#</span><span class="lbl">build</span></div>
+        <div class="chan"><span class="h">#</span><span class="lbl">dev</span></div>
+        <div class="chan"><span class="h">#</span><span class="lbl">marketing</span></div>
+      </div>
+      <div class="navband">
+        <div class="navsecthd"><div class="navsecttoggle"><span class="navchev"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg></span>Recents <span class="navsectcnt">6</span></div><span class="chanadd" style="font-size:12px">⌕</span></div>
+        <div class="navhistlist">
+          <div class="navhistrow"><span class="navhistdot c-prog live"></span><div class="navhistbody"><div class="navhistline1"><span class="navhistnum">1046</span><span class="navhisttitle">Focus-trap release</span><span class="navhistchan">#build</span><span class="navhistwhen">2m</span></div></div></div>
+          <div class="navhistrow"><span class="navhistdot thread"></span><div class="navhistbody"><div class="navhistline1"><span class="navhisttitle">Competitor social media report</span><span class="navhistchan">#marketing</span><span class="navhistwhen">12m</span></div></div></div>
+          <div class="navhistrow"><span class="navhistdot c-review"></span><div class="navhistbody"><div class="navhistline1"><span class="navhistnum">1042</span><span class="navhisttitle">Mobile nav drawer</span><span class="navhistchan">#dev</span><span class="navhistwhen">5h</span></div></div></div>
+        </div>
+        <div class="navhistmore">See all 6 <span class="k">⌘Y</span></div>
+      </div>
+      <div class="navfoot"><span class="navbadge sm">G</span> geo · Cloud</div>
+    </div>
+    <div class="callouts">
+      <div class="co"><span class="n">4</span><b>Same reading in paper.</b> The head is the heaviest object in both themes — scope legibility cannot be a dark-mode-only trick.</div>
+      <div class="co"><span class="n">5</span><b>The row that broke the promise is gone</b> from Recents after the fix: no more <code>#marketing</code> row belonging to a project whose card says “no activity yet”. The <i>heading</i> question survives it.</div>
+    </div>
+  </div>
+
+  <div class="theme" data-theme="dark">
+    <h2>The three questions each direction must answer</h2>
+    <div style="padding:4px 2px">
+      <div class="hsect" style="margin-top:2px">Q1 · Scope</div>
+      <div class="co" style="color:var(--muted)">Standing anywhere in the app, can you tell <b>without clicking</b> which lists are this project and which span the workspace?</div>
+      <div class="hsect">Q2 · Reach</div>
+      <div class="co" style="color:var(--muted)">Is the switcher <b>visible and one click away</b> from every surface — not only from the rail head, and not only via ⌘K?</div>
+      <div class="hsect">Q3 · Cost</div>
+      <div class="co" style="color:var(--muted)">What does it take from the <b>266px rail</b> and from the frame — and does it survive 12 projects as well as 3?</div>
+      <div class="hsect">Non-goals</div>
+      <div class="co" style="color:var(--muted)">Not reversing docs/12 §6 · not a second creation verb · not a per-surface preference the user has to maintain.</div>
+    </div>
+  </div>
+</div>
+
+<div class="stophd"><span class="stopno">Direction A</span>The scope line — the rail's vertical order <i>is</i> the contract</div>
+<div class="stopp">The workspace owns the top; the project owns a line of its own, and everything under that line belongs to it. Home lifts above the line, where its workspace-wide count is simply true. The project line is a <b>real in-place switcher</b> (it is a dropdown today only in the composer; the head is a link to the Projects page), so the switcher gains reach without gaining a new home. <b>Cost:</b> one 38px row, and the project stops being the first thing you read.</div>
+
+<div class="themes">
+  <div class="theme" data-theme="dark">
+    <h2>A · closed <span class="thm">graphite</span></h2>
+    <div class="rail">
+      <div class="navhead" style="padding-bottom:4px">
+        <div class="navhead-main" style="gap:9px">
+          <span class="navbadge sm">G</span>
+          <span class="wsproj"><span class="wsswitch-txt"><b style="font-size:13px">GADS INC</b></span></span>
+        </div>
+      </div>
+      <div class="navhome on" style="margin-top:0"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg><span class="navhomelbl">Home</span><span class="navhomecount">3</span></div>
+      <div class="wsline">Everything that needs you<span class="rule"></span></div>
+      <div class="scopeline">
+        <span class="navbadge sm">N</span>
+        <span class="lbl"><b>neuramesh</b><small>Project</small></span>
+        <span class="car"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg></span>
+      </div>
+      <div class="navnew" style="margin-top:2px">
+        <div class="navnewchat"><span class="nncplus">＋</span><span class="navhomelbl">New chat</span><span class="nnck">⌘N</span></div>
+        <div class="navnewcaret">▾</div>
+      </div>
+      <div class="navband" style="padding-top:2px">
+        <div class="navsecthd"><div class="navsecttoggle"><span class="navchev"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg></span>Channels <span class="navsectcnt">5</span></div><span class="chanadd">+</span></div>
+        <div class="chan on"><span class="h">#</span><span class="lbl">build</span></div>
+        <div class="chan"><span class="h">#</span><span class="lbl">dev</span></div>
+        <div class="chan"><span class="h">#</span><span class="lbl">marketing</span></div>
+      </div>
+      <div class="navband">
+        <div class="navsecthd"><div class="navsecttoggle"><span class="navchev"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg></span>Recents <span class="navsectcnt">6</span></div><span class="chanadd" style="font-size:12px">⌕</span></div>
+        <div class="navhistlist">
+          <div class="navhistrow raised"><span class="navhistdot c-prog live"></span><div class="navhistbody"><div class="navhistline1"><span class="navhistnum">1046</span><span class="navhisttitle">Focus-trap release</span><span class="navhistchan">#build</span><span class="navhistwhen">2m</span></div><div class="navhistlive"><span class="ind"></span><span class="verb">patch · returning focus</span></div></div></div>
+          <div class="navhistrow"><span class="navhistdot thread"></span><div class="navhistbody"><div class="navhistline1"><span class="navhisttitle">Competitor social report</span><span class="navhistchan">#marketing</span><span class="navhistwhen">12m</span></div></div></div>
+          <div class="navhistrow"><span class="navhistdot c-review"></span><div class="navhistbody"><div class="navhistline1"><span class="navhistnum">1042</span><span class="navhisttitle">Mobile nav drawer</span><span class="navhistchan">#dev</span><span class="navhistwhen">5h</span></div></div></div>
+        </div>
+        <div class="navhistmore">See all 6 <span class="k">⌘Y</span></div>
+      </div>
+      <div class="navfoot"><span class="navbadge sm">G</span> geo · Cloud</div>
+    </div>
+    <div class="callouts">
+      <div class="co"><span class="n">6</span><b>Above the rule: the workspace.</b> Home's count belongs to it and is finally sitting under a heading that is true.</div>
+      <div class="co"><span class="n">7</span><b>Below the scope line: the project.</b> New chat, Channels, Recents — every one of them scoped, all of them visibly downstream of the thing that scopes them.</div>
+      <div class="co"><span class="n">8</span><b>Nothing new to learn:</b> no tags, no legend, no per-list marker. The order carries it.</div>
+    </div>
+  </div>
+
+  <div class="theme" data-theme="light">
+    <h2>A · open — the switcher, in place <span class="thm">paper</span></h2>
+    <div class="rail" style="position:relative">
+      <div class="navhead" style="padding-bottom:4px">
+        <div class="navhead-main" style="gap:9px">
+          <span class="navbadge sm">G</span>
+          <span class="wsproj"><span class="wsswitch-txt"><b style="font-size:13px">GADS INC</b></span></span>
+        </div>
+      </div>
+      <div class="navhome"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg><span class="navhomelbl">Home</span><span class="navhomecount">3</span></div>
+      <div class="wsline">Everything that needs you<span class="rule"></span></div>
+      <div class="scopeline" style="border-color:var(--ring); background:var(--sel-bg)">
+        <span class="navbadge sm">N</span>
+        <span class="lbl"><b>neuramesh</b><small>Project</small></span>
+        <span class="car" style="transform:rotate(180deg)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg></span>
+      </div>
+      <div class="ovl" style="margin:4px 8px 0">
+        <div class="ovlrow" style="background:var(--sel-bg)"><span class="navbadge xs">N</span><span class="ot"><b style="font-weight:640">neuramesh</b> <span style="color:var(--dim)">· 5 rooms</span></span><span class="tick">✓</span></div>
+        <div class="ovlrow"><span class="navbadge xs">F</span><span class="ot"><b style="font-weight:640">flowe-ai</b> <span style="color:var(--dim)">· 6 open</span></span><span class="navhistdot c-prog live" style="margin:0"></span></div>
+        <div class="ovlrow"><span class="navbadge xs">D</span><span class="ot"><b style="font-weight:640">default</b> <span style="color:var(--dim)">· 4 rooms</span></span><span class="fstate">default</span></div>
+        <div class="ovlrow" style="color:var(--muted); font-size:12px">＋ New project</div>
+      </div>
+      <div class="navband" style="padding-top:8px; opacity:.4">
+        <div class="navsecthd"><div class="navsecttoggle">Channels <span class="navsectcnt">5</span></div></div>
+        <div class="chan"><span class="h">#</span><span class="lbl">build</span></div>
+        <div class="chan"><span class="h">#</span><span class="lbl">dev</span></div>
+      </div>
+      <div class="navfoot"><span class="navbadge sm">G</span> geo · Cloud</div>
+    </div>
+    <div class="callouts">
+      <div class="co"><span class="n">9</span><b>The switcher becomes the switcher.</b> Today the head navigates to the Projects page — a full surface swap to change a filter. Here it drops in place, and the Projects page stays what it is: the management surface.</div>
+      <div class="co"><span class="n">10</span><b>A live dot per project</b> = an agent is working there right now (the same <code>openRuns</code> watch the Recents pulse reads). It is the honest reason to look at another project without reversing docs/12 §6.</div>
+    </div>
+  </div>
+
+  <div class="theme" data-theme="dark">
+    <h2>A · folded rail <span class="thm">graphite</span></h2>
+    <div style="display:flex; gap:14px">
+      <div style="width:56px; flex:none; background:var(--bg); border:1px solid var(--border); border-radius:12px; padding:9px 0; display:flex; flex-direction:column; align-items:center; gap:9px">
+        <span class="navbadge sm">G</span>
+        <span style="position:relative; width:32px; height:32px; border-radius:10px; display:grid; place-items:center; background:var(--panel3); color:var(--text)">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg>
+          <span style="position:absolute; right:-3px; top:-3px; min-width:15px; height:15px; border-radius:99px; background:var(--accent); color:var(--accent-ink); font:700 9px var(--fmono); display:grid; place-items:center; padding:0 3px">3</span>
+        </span>
+        <span style="width:22px; height:1px; background:var(--border2)"></span>
+        <span class="navbadge sm" style="border-color:var(--ring); box-shadow:0 0 0 2px color-mix(in srgb,var(--text) 15%,transparent)">N</span>
+        <span style="width:30px; height:30px; border-radius:9px; display:grid; place-items:center; color:var(--dim)">#</span>
+        <span style="width:30px; height:30px; border-radius:9px; display:grid; place-items:center; color:var(--dim)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8.6"/><path d="M12 7.5V12l3 2"/></svg></span>
+      </div>
+      <div style="flex:1; padding-top:6px">
+        <div class="co" style="color:var(--muted)">Folded (⌘\), the rule survives as a <b>separator</b>: workspace glyphs above, the project tile and its lists below. The project tile keeps its ring, so even at 56px you can see which world you are in — which today's folded rail cannot say at all.</div>
+      </div>
+    </div>
+    <div class="callouts">
+      <div class="co"><span class="n">11</span><b>Degrades well.</b> The contract is a divider, and a divider survives every width the rail has.</div>
+      <div class="co"><span class="n">12</span><b>Risk:</b> the project name is no longer the first thing you read at 14.5px. For a solo founder with 3 projects that is fine; for someone living in one project all day it is a small daily loss of “where am I”.</div>
+    </div>
+  </div>
+</div>
+
+<div class="stophd"><span class="stopno">Direction B</span>The project strip — scope becomes spatial</div>
+<div class="stopp">A 52px strip of project tiles at the far left, always visible, always one click. The rail beside it <b>is that project</b>, top to bottom — so the rail needs no scope marking at all, and the head goes back to being the workspace. The workspace-wide destinations (Home, and later the workspace library) live in the strip's own footer, outside any project. This is the Slack/Linear/Discord idiom, which is an argument for it (no one has to learn it) and against it (it is the most borrowed shape in the deck). <b>Cost:</b> 52px of frame, permanently, and a structural element the app does not have today.</div>
+
+<div class="duo">
+  <div class="theme" data-theme="dark">
+    <h2>B · strip + rail <span class="thm">graphite</span></h2>
+    <div class="striprow">
+      <div class="pstrip">
+        <span class="ptile on">N</span>
+        <span class="ptile">F<span class="pdot"></span></span>
+        <span class="ptile">D</span>
+        <span class="padd">＋</span>
+        <span style="flex:1"></span>
+        <span class="psep"></span>
+        <span style="position:relative; width:34px; height:34px; border-radius:11px; display:grid; place-items:center; color:var(--body)">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg>
+          <span style="position:absolute; right:0; top:0; min-width:15px; height:15px; border-radius:99px; background:var(--accent); color:var(--accent-ink); font:700 9px var(--fmono); display:grid; place-items:center; padding:0 3px">3</span>
+        </span>
+        <span class="navbadge sm">G</span>
+      </div>
+      <div class="rail" style="border-left:1px solid var(--border)">
+        <div class="navhead">
+          <div class="navhead-main">
+            <span class="navbadge">N</span>
+            <span class="wsproj"><span class="wsswitch-txt"><b>neuramesh</b><small>GADS INC · project</small></span></span>
+          </div>
+        </div>
+        <div class="navnew">
+          <div class="navnewchat"><span class="nncplus">＋</span><span class="navhomelbl">New chat</span><span class="nnck">⌘N</span></div>
+          <div class="navnewcaret">▾</div>
+        </div>
+        <div class="navband" style="padding-top:4px">
+          <div class="navsecthd"><div class="navsecttoggle"><span class="navchev"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg></span>Channels <span class="navsectcnt">5</span></div><span class="chanadd">+</span></div>
+          <div class="chan on"><span class="h">#</span><span class="lbl">build</span></div>
+          <div class="chan"><span class="h">#</span><span class="lbl">dev</span></div>
+          <div class="chan"><span class="h">#</span><span class="lbl">marketing</span></div>
+        </div>
+        <div class="navband">
+          <div class="navsecthd"><div class="navsecttoggle"><span class="navchev"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg></span>Recents <span class="navsectcnt">6</span></div><span class="chanadd" style="font-size:12px">⌕</span></div>
+          <div class="navhistlist">
+            <div class="navhistrow raised"><span class="navhistdot c-prog live"></span><div class="navhistbody"><div class="navhistline1"><span class="navhistnum">1046</span><span class="navhisttitle">Focus-trap release</span><span class="navhistchan">#build</span><span class="navhistwhen">2m</span></div><div class="navhistlive"><span class="ind"></span><span class="verb">patch · returning focus</span></div></div></div>
+            <div class="navhistrow"><span class="navhistdot thread"></span><div class="navhistbody"><div class="navhistline1"><span class="navhisttitle">Competitor social report</span><span class="navhistchan">#marketing</span><span class="navhistwhen">12m</span></div></div></div>
+            <div class="navhistrow"><span class="navhistdot c-review"></span><div class="navhistbody"><div class="navhistline1"><span class="navhistnum">1042</span><span class="navhisttitle">Mobile nav drawer</span><span class="navhistchan">#dev</span><span class="navhistwhen">5h</span></div></div></div>
+          </div>
+          <div class="navhistmore">See all 6 <span class="k">⌘Y</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="callouts">
+      <div class="co"><span class="n">13</span><b>The rail is unambiguous because it is inside a project.</b> No divider, no tag, no re-ordering: the strip is the frame the rail sits in.</div>
+      <div class="co"><span class="n">14</span><b>Home moves out of the project</b> into the strip footer, beside the account tile — a workspace destination in the workspace column. That, not a label, is what makes its count read as workspace-wide.</div>
+      <div class="co"><span class="n">15</span><b>A pulse dot on <code>flowe-ai</code></b> says an agent is working over there. Ambient cross-project awareness with no cross-project list.</div>
+    </div>
+  </div>
+
+  <div class="theme" data-theme="light">
+    <h2>B · at 12 projects <span class="thm">paper</span></h2>
+    <div class="striprow">
+      <div class="pstrip">
+        <span class="ptile on">N</span>
+        <span class="ptile">F<span class="pdot"></span></span>
+        <span class="ptile">D</span>
+        <span class="ptile">A</span>
+        <span class="ptile">P</span>
+        <span class="ptile">R</span>
+        <span class="ptile" style="color:var(--dim); font-size:10px">+6</span>
+        <span style="flex:1"></span>
+        <span class="psep"></span>
+        <span style="position:relative; width:34px; height:34px; border-radius:11px; display:grid; place-items:center; color:var(--body)">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg>
+          <span style="position:absolute; right:0; top:0; min-width:15px; height:15px; border-radius:99px; background:var(--accent); color:var(--accent-ink); font:700 9px var(--fmono); display:grid; place-items:center; padding:0 3px">3</span>
+        </span>
+        <span class="navbadge sm">G</span>
+      </div>
+      <div class="rail" style="border-left:1px solid var(--border)">
+        <div class="navhead">
+          <div class="navhead-main">
+            <span class="navbadge">N</span>
+            <span class="wsproj"><span class="wsswitch-txt"><b>neuramesh</b><small>GADS INC · project</small></span></span>
+          </div>
+        </div>
+        <div class="navnew">
+          <div class="navnewchat"><span class="nncplus">＋</span><span class="navhomelbl">New chat</span><span class="nnck">⌘N</span></div>
+          <div class="navnewcaret">▾</div>
+        </div>
+        <div class="navband" style="padding-top:4px">
+          <div class="navsecthd"><div class="navsecttoggle">Channels <span class="navsectcnt">5</span></div><span class="chanadd">+</span></div>
+          <div class="chan on"><span class="h">#</span><span class="lbl">build</span></div>
+          <div class="chan"><span class="h">#</span><span class="lbl">dev</span></div>
+        </div>
+        <div class="navband">
+          <div class="navsecthd"><div class="navsecttoggle">Recents <span class="navsectcnt">6</span></div><span class="chanadd" style="font-size:12px">⌕</span></div>
+          <div class="navhistlist">
+            <div class="navhistrow"><span class="navhistdot c-prog live"></span><div class="navhistbody"><div class="navhistline1"><span class="navhistnum">1046</span><span class="navhisttitle">Focus-trap release</span><span class="navhistchan">#build</span><span class="navhistwhen">2m</span></div></div></div>
+            <div class="navhistrow"><span class="navhistdot thread"></span><div class="navhistbody"><div class="navhistline1"><span class="navhisttitle">Competitor social report</span><span class="navhistchan">#marketing</span><span class="navhistwhen">12m</span></div></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="callouts">
+      <div class="co"><span class="n">16</span><b>Where it strains.</b> Six tiles fit; beyond that it needs a <code>+6</code> overflow, and a project you cannot see in the strip is worse off than it is today (the head at least held a full name). Letter tiles also collide fast — <code>default</code> and <code>dev-tools</code> are both <b>D</b> — unless every project has a detected logo.</div>
+      <div class="co"><span class="n">17</span><b>The honest question:</b> does a workspace with three projects and one human deserve a permanent 52px column? The strip earns its width at ten projects, not at three.</div>
+    </div>
+  </div>
+</div>
+
+<div class="stophd"><span class="stopno">Direction C</span>The scope pill — the switcher rides the content it scopes</div>
+<div class="stopp">Leave the rail alone. Put the switcher on the <b>surface header</b>, attached to the list it governs — Home, the room, the ⌘Y overlay — the way the composer chip is attached to where a message will land. Scope stops being a property of the chrome and becomes a property of the list, which is what it actually is. The workspace-wide queue then says so <b>in the same vocabulary</b>: a dashed pill reading <i>All projects</i>, not a footnote.</div>
+
+<div class="duo">
+  <div class="theme" data-theme="light">
+    <h2>C · Home <span class="thm">paper</span></h2>
+    <div class="surf">
+      <div class="surfhd">
+        <h3>Home</h3>
+        <span class="scopepill"><span class="navbadge xs">N</span> neuramesh <span class="car">▾</span></span>
+        <span style="margin-left:auto; color:var(--dim); font-size:11.5px">everything that needs you</span>
+      </div>
+      <div class="hsect">Needs you <span class="n">3</span><span class="tag">across all projects</span></div>
+      <div class="frow"><span class="fstate" style="color:var(--done)">ready</span><span class="ft">#1051 · Ship the release notes generator</span><span class="pbadge"><span class="navbadge xs">F</span>flowe-ai</span><span class="fm">2h</span></div>
+      <div class="frow"><span class="fstate" style="color:var(--blocked)">blocked</span><span class="ft">#1044 · Instagram token refresh keeps 401-ing</span><span class="pbadge"><span class="navbadge xs">F</span>flowe-ai</span><span class="fm">6h</span></div>
+      <div class="frow"><span class="fstate" style="color:var(--design)">design</span><span class="ft">#1049 · Onboarding empty states</span><span class="fm">1d</span></div>
+      <div class="hsect">In flight <span class="n">2</span><span class="tag" style="border-style:solid; color:var(--muted)">neuramesh</span></div>
+      <div class="frow"><span class="fstate" style="color:var(--prog)">building</span><span class="ft">#1046 · Focus-trap release</span><span class="fm">2m</span></div>
+      <div class="frow"><span class="fstate">chat</span><span class="ft">Competitor social media report</span><span class="fm">12m</span></div>
+    </div>
+    <div class="callouts">
+      <div class="co"><span class="n">18</span><b>Two tags, one grammar.</b> <i>across all projects</i> (dashed = wider than the pill) and <i>neuramesh</i> (solid = exactly the pill). The deviation stops being invisible and starts being a legend you read once.</div>
+      <div class="co"><span class="n">19</span><b>The project badges earn their place</b> — they are the <i>only</i> thing that makes the workspace-wide queue navigable, and today they render on a page nothing else says is workspace-wide.</div>
+      <div class="co"><span class="n">20</span><b>The pill is the switcher</b>, so the answer to “where else can we put it” is: on every surface that has a scope, in the place your eye already goes — the title row.</div>
+    </div>
+  </div>
+
+  <div class="theme" data-theme="dark">
+    <h2>C · the ⌘Y overlay keeps the everything-lens <span class="thm">graphite</span></h2>
+    <div class="ovl">
+      <div class="ovlhd">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg>
+        <span class="q">Search threads…</span>
+        <span class="seg"><button class="on">neuramesh</button><button>All projects</button></span>
+      </div>
+      <div class="ovlrow"><span class="navhistdot c-prog live" style="margin:0"></span><span class="ot">#1046 · Focus-trap release</span><span class="navhistchan">#build</span><span class="navhistwhen">2m</span></div>
+      <div class="ovlrow"><span class="navhistdot thread" style="margin:0"></span><span class="ot">Competitor social media report</span><span class="navhistchan">#marketing</span><span class="navhistwhen">12m</span></div>
+      <div class="ovlrow"><span class="navhistdot c-review" style="margin:0"></span><span class="ot">#1042 · Mobile nav: drawer + focus</span><span class="navhistchan">#dev</span><span class="navhistwhen">5h</span></div>
+      <div class="ovlrow" style="opacity:.45"><span class="navhistdot c-ship" style="margin:0"></span><span class="ot">#1034 · flowe logo revamp — character-based</span><span class="pbadge"><span class="navbadge xs">F</span>flowe-ai</span><span class="navhistwhen">3d</span></div>
+    </div>
+    <div class="callouts">
+      <div class="co"><span class="n">21</span><b>docs/32 §12 says the overlay is the everything-lens</b> and “keeps the product's only search field”. Scoping the rail without scoping this would have quietly deleted cross-project search — so the toggle is not a nicety, it is what makes the rail's narrowing safe.</div>
+      <div class="co"><span class="n">22</span><b>Off-project results wear the project badge</b> and sit dimmed until the toggle flips. One list, two scopes, no second surface.</div>
+      <div class="co"><span class="n">23</span><b>This section ships in every direction.</b> A · B · C all narrow the rail; all three need this valve. It is the one piece below that is not a choice.</div>
+    </div>
+  </div>
+</div>
+
+<div class="stophd"><span class="stopno">Everywhere</span>The composer chip wears the project's own icon</div>
+<div class="stopp">The chip's dropdown already renders each project's detected logo (<code>ProjLogo</code>, App.tsx:9224) — the chip itself still shows the generic <code>IconProject</code> outline. So the one place the project is named while you type is the one place its identity is missing. The <b>same tile</b> the switcher, the Projects cards and the rail badge use, at 14px.</div>
+
+<div class="duo">
+  <div class="theme" data-theme="dark">
+    <h2>Before → after <span class="thm">graphite</span></h2>
+    <div class="cbox" style="margin-bottom:14px">
+      <div class="cph">Describe the work — or just ask. The orchestrator decides what becomes a task.</div>
+      <div class="cfoot">
+        <span class="cchip"><span style="color:var(--dim); font-weight:700">#</span><span class="lbl">build</span><span class="car">▾</span></span>
+        <span class="cchip"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M8 9h8"/><path d="M8 13h5"/></svg><span class="lbl">neuramesh</span><span class="car">▾</span></span>
+        <span class="cchip"><span class="lbl">Brain · Balanced</span><span class="car">▾</span></span>
+        <span class="csend">↑</span>
+      </div>
+      <div class="co" style="margin-top:9px"><span class="cross">✗</span> <b>today</b> — a generic outline. Two projects side by side are typographically identical.</div>
+    </div>
+    <div class="cbox">
+      <div class="cph">Describe the work — or just ask. The orchestrator decides what becomes a task.</div>
+      <div class="cfoot">
+        <span class="cchip"><span style="color:var(--dim); font-weight:700">#</span><span class="lbl">build</span><span class="car">▾</span></span>
+        <span class="cchip" style="color:var(--text); border-color:var(--border2)"><span class="plogo">N</span><span class="lbl">neuramesh</span><span class="car">▾</span></span>
+        <span class="cchip"><span class="lbl">Brain · Balanced</span><span class="car">▾</span></span>
+        <span class="csend">↑</span>
+      </div>
+      <div class="co" style="margin-top:9px"><span class="tick">✓</span> <b>after</b> — the project's tile (detected logo, letter fallback), 14px, same radius ladder as the rail badge.</div>
+    </div>
+    <div class="callouts">
+      <div class="co"><span class="n">24</span><b>No new component.</b> <code>ProjLogo</code> already exists and is already used in this chip's own dropdown — this is the chip catching up with its menu.</div>
+      <div class="co"><span class="n">25</span><b>Fallback is the letter tile</b>, never a broken image: same <code>onError</code> path as <code>.navbadgelogo</code>.</div>
+    </div>
+  </div>
+
+  <div class="theme" data-theme="light">
+    <h2>…and the same tile, everywhere it names a project <span class="thm">paper</span></h2>
+    <div style="display:flex; flex-direction:column; gap:12px">
+      <div>
+        <div class="hsect" style="margin-top:0">Rail head · 38px</div>
+        <div style="display:flex; align-items:center; gap:10px"><span class="navbadge">N</span><span class="wsswitch-txt"><b>neuramesh</b><small>GADS INC</small></span></div>
+      </div>
+      <div>
+        <div class="hsect">Scope pill · 20px</div>
+        <span class="scopepill"><span class="navbadge xs">N</span> neuramesh <span class="car">▾</span></span>
+        <span class="scopepill ws" style="margin-left:6px">All projects <span class="car">▾</span></span>
+      </div>
+      <div>
+        <div class="hsect">Composer chip · 14px</div>
+        <span class="cchip" style="color:var(--text); border-color:var(--border2)"><span class="plogo">N</span><span class="lbl">neuramesh</span><span class="car">▾</span></span>
+        <span class="cchip" style="margin-left:6px"><span class="plogo">F</span><span class="lbl">flowe-ai</span><span class="car">▾</span></span>
+      </div>
+      <div>
+        <div class="hsect">Off-project badge · 16px</div>
+        <span class="pbadge" style="font-size:10px"><span class="navbadge xs">F</span>flowe-ai</span>
+      </div>
+    </div>
+    <div class="callouts">
+      <div class="co"><span class="n">26</span><b>One object at four sizes</b> — 38 · 20 · 14 · 16px, one radius ladder (14 / 7 / 4 / 7). A project should be recognisable by its mark before you have read its name, in the rail and in the chip alike.</div>
+      <div class="co"><span class="n">27</span><b>This is the answer to “will a badge fix Recents?”</b> — on its own, no. A badge is only legible if the mark it carries is the same mark you already know from the rail. The tile makes the badge work; the tile alone is not the fix.</div>
+    </div>
+  </div>
+</div>
+
+<div class="stophd"><span class="stopno">Recommendation</span>A now · C's overlay toggle and the chip icon with it · B parked until projects outgrow the head</div>
+<div class="stopp">
+  <b>Ship A + the overlay toggle + the chip tile.</b> A answers Q1 with the cheapest possible material — vertical order — and answers Q2 by turning the head into a real in-place switcher instead of a link to a page (a full surface swap to change a filter is the thing worth deleting here). The ⌘Y toggle is not optional in any direction: narrowing the rail without it would silently remove cross-project search, which docs/32 §12 explicitly keeps.<br/><br/>
+  <b>Why not B yet.</b> The strip is the strongest answer to Q2 and the weakest to Q3: 52px of permanent frame, letter-tile collisions without logos, and an overflow at seven projects. It earns its width in a workspace with ten projects and several humans — worth building the day that is true, and it composes with A rather than replacing it (the strip <i>is</i> the scope line, rotated).<br/><br/>
+  <b>Why not C alone.</b> C is genuinely good and I would take its two tags into A: the pill answers “what scopes this list” exactly where you are looking. But as the <i>only</i> move it leaves the rail head still promising project scope over a workspace-wide Home row — it explains the exception rather than resolving it.<br/><br/>
+  <b>Change surface.</b> <code>App.tsx</code> nav block: head splits into a workspace row + <code>Home</code> + a rule + the new <code>.scopeline</code> dropdown (reusing the composer chip's popover markup, so the menu is one component at two sizes) · <code>ProjectChip</code> gains <code>ProjLogo</code> in the chip body (the dropdown already has it) · <code>HistoryOverlay</code> gains the segmented scope control and an unscoped row set behind it · <code>tokens.css</code>: <code>.scopeline</code> / <code>.wsline</code> / <code>.seg</code> / <code>.pbadge</code> · <b>docs/33</b> gets the scope-marking idiom (solid pill = this project, dashed = wider) and <b>docs/06 §v1 + docs/12 §6</b> get the amendment that the deviation is now <i>stated in the UI</i> rather than only in the doc. No schema, no sync rules, no migration — every list involved is already client-derived.<br/><br/>
+  <b>Open questions.</b> ① Does <code>Home</code> above the rule keep the word “Home”, or become “Needs you” now that its scope is explicit? ② Should the project dropdown list a project's live-run dot (mocked) or its open-task count, when both will not fit? ③ When you open an off-project result from the ⌘Y overlay, do we switch the active project or open it in place (docs/12 §6's build-time correction says <i>in place</i> — worth re-confirming now that the rail narrows around you)?
+</div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,1038 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NeuraMesh — Product Mockup</title>
+<style>
+/* ───────── themes ───────── */
+/* v0.8 — Supabase-derived tokens (packages/ui themes: bg 0 0% 7.1%, sidebar 9%,
+   surfaces 12-16%, borders 18-27%, brand 153.1° 60.2% 52.7% = #3ECF8E) */
+:root, [data-theme="dark"]{
+  --bg:#121212; --panel:#171717; --panel2:#1f1f1f; --panel3:#292929;
+  --border:#2e2e2e; --border2:#3a3a3a;
+  --text:#fafafa; --body:#d6d6d6; --muted:#a0a0a0; --dim:#707070;
+  --teal:#3ECF8E; --accent:#3ECF8E; --orch:#e09b3d;
+  --btn:#3ECF8E; --btn-fg:#0c1f15; --btn-hover:#4cd699;
+  --todo:#d9a23c; --prog:#6b97d8; --review:#9b8af5; --done:#3ECF8E; --acc:#22d3ee; --closed:#8d8d8d; --blocked:#e5634d;
+  --shadow:0 4px 18px rgba(0,0,0,.4); --shadow-lg:0 24px 80px rgba(0,0,0,.6);
+  --shotbg:linear-gradient(160deg,#262626,#1a1a1a); --shotbar:linear-gradient(180deg,#333333,#262626);
+  --overlay:#1f1f1f;
+  --dur-fast:.12s; --dur:.18s; --ease:cubic-bezier(.21,.61,.35,1);
+}
+[data-theme="light"]{
+  --bg:#fcfcfc; --panel:#ffffff; --panel2:#f7f7f7; --panel3:#ededed;
+  --border:#e3e3e3; --border2:#d0d0d0;
+  --text:#171717; --body:#3d3d3d; --muted:#616161; --dim:#8f8f8f;
+  --teal:#0a7d51; --accent:#0a7d51; --orch:#b3690e;
+  --btn:#3ECF8E; --btn-fg:#0c1f15; --btn-hover:#2eb87b;
+  --todo:#a87714; --prog:#3a6fc0; --review:#6d5ce0; --done:#0f9d63; --acc:#0891b2; --closed:#8c8c8c; --blocked:#c2402a;
+  --shadow:0 4px 16px rgba(0,0,0,.08); --shadow-lg:0 24px 70px rgba(0,0,0,.16);
+  --shotbg:linear-gradient(160deg,#ececec,#dedede); --shotbar:linear-gradient(180deg,#ffffff,#efefef);
+  --overlay:#ffffff;
+  --dur-fast:.12s; --dur:.18s; --ease:cubic-bezier(.21,.61,.35,1);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font:13.5px/1.5 -apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;-webkit-font-smoothing:antialiased;height:100vh;overflow:hidden;transition:background .2s}
+::selection{background:color-mix(in srgb,var(--accent) 30%,transparent)}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+input,textarea,select{font:inherit;color:var(--text)}
+.hide{display:none!important}
+.mono{font-family:ui-monospace,'SF Mono',Menlo,monospace}
+
+/* ───────── mock control bar ───────── */
+.mockbar{height:44px;display:flex;align-items:center;gap:8px;padding:0 14px;background:var(--bg);border-bottom:1px solid var(--border);z-index:50}
+.logo{display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px;margin-right:8px}
+.logo small{color:var(--dim);font-weight:500;font-size:10.5px}
+.pills{display:flex;gap:3px;background:var(--bg);border:1px solid var(--border);border-radius:9px;padding:3px;overflow-x:auto}
+.pill{padding:4px 10px;border-radius:6px;color:var(--muted);font-size:12px;font-weight:500;white-space:nowrap}
+.pill:hover{color:var(--text)}
+.pill.on{background:var(--panel3);color:var(--text)}
+.mockbar .right{margin-left:auto;display:flex;align-items:center;gap:9px;font-size:11.5px;color:var(--muted)}
+.tbtn{width:28px;height:28px;border:1px solid var(--border);border-radius:8px;background:var(--panel2);font-size:13px;display:grid;place-items:center}
+.tbtn:hover{border-color:var(--accent)}
+.synced{display:flex;align-items:center;gap:6px;padding:4px 10px;border:1px solid var(--border);border-radius:99px;background:var(--panel2)}
+.dot{width:7px;height:7px;border-radius:99px;background:var(--done)}
+kbd{font:600 10.5px ui-monospace,Menlo,monospace;background:var(--panel3);border:1px solid var(--border2);border-radius:4px;padding:1.5px 5px;color:var(--muted)}
+
+/* ───────── frame ───────── */
+.frame{display:flex;height:calc(100vh - 44px);min-height:0}
+/* sidebar: open + pinned by default; « collapses to a 64px rail with hover-peek */
+.sidebarwrap{width:232px;min-width:232px;position:relative;z-index:45;transition:width var(--dur) var(--ease),min-width var(--dur) var(--ease)}
+.sidebar{position:absolute;top:0;bottom:0;left:0;width:232px;background:var(--bg);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden;transition:width var(--dur) var(--ease),box-shadow var(--dur) var(--ease)}
+.sidebarwrap.collapsed{width:64px;min-width:64px}
+.sidebarwrap.collapsed .sidebar{width:64px}
+.sidebarwrap.collapsed:hover .sidebar,.sidebarwrap.collapsed:focus-within .sidebar{width:232px;box-shadow:var(--shadow-lg);border-right-color:var(--border2)}
+.sidebar .lbl{opacity:1;white-space:nowrap;transition:opacity var(--dur-fast) var(--ease)}
+.sidebarwrap.collapsed:not(:hover):not(:focus-within) .lbl{opacity:0}
+.navpin{margin-left:auto;color:var(--dim);font-size:13px;padding:2px 6px;border-radius:6px;cursor:pointer}
+.navpin:hover{background:var(--panel2);color:var(--text)}
+.nav a .lbl,.chan .lbl,.arow .lbl{display:flex;align-items:center;gap:8px;flex:1;min-width:0}
+.ws{display:flex;align-items:center;gap:9px;padding:13px 14px;border-bottom:1px solid var(--border)}
+.wsbadge{width:26px;height:26px;border-radius:7px;background:var(--btn);display:grid;place-items:center;font-weight:800;font-size:12px;color:var(--btn-fg)}
+.ws b{font-size:13px}.ws span{display:block;font-size:10.5px;color:var(--dim)}
+.nav{padding:10px 8px 4px}
+.nav a{display:flex;align-items:center;gap:9px;padding:5.5px 9px;border-radius:7px;color:var(--muted);font-weight:500;cursor:pointer;font-size:12.5px}
+.nav a:hover{background:var(--panel2);color:var(--text)}
+.nav .ic{width:15px;text-align:center;opacity:.85}
+.sect{padding:14px 16px 5px;font-size:10.5px;font-weight:700;letter-spacing:.7px;color:var(--dim);text-transform:uppercase;display:flex;align-items:center}
+.sect .plus{margin-left:auto;cursor:pointer}
+.chan{display:flex;align-items:center;gap:8px;padding:4.5px 9px;margin:0 8px;border-radius:7px;color:var(--muted);cursor:pointer;font-size:12.5px}
+.chan:hover{background:var(--panel2);color:var(--text)}
+.chan.on{background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--text);font-weight:600}
+.chan .h{color:var(--dim);font-weight:600}
+.chan .unread{margin-left:auto;background:var(--accent);color:#fff;font-size:9.5px;font-weight:700;border-radius:99px;padding:1px 6px}
+.arow{display:flex;align-items:center;gap:8px;padding:4px 9px;margin:0 8px;border-radius:7px;color:var(--muted);cursor:pointer;font-size:12.5px}
+.arow:hover{background:var(--panel2)}
+.presence{width:7px;height:7px;border-radius:99px;background:var(--done)}
+.presence.off{background:transparent;border:1.5px solid var(--dim)}
+.me{margin-top:auto;border-top:1px solid var(--border);padding:11px 14px;display:flex;align-items:center;gap:9px;font-size:12.5px}
+.me .sub{font-size:10.5px;color:var(--dim)}
+
+/* avatars */
+.av{width:26px;height:26px;min-width:26px;border-radius:7px;display:grid;place-items:center;font-weight:800;font-size:10.5px;color:#26251f}
+.av.sm{width:19px;height:19px;min-width:19px;border-radius:6px;font-size:8.5px}
+.av.lg{width:36px;height:36px;min-width:36px;border-radius:10px;font-size:13px}
+.av-g{background:#cfc8b4}.av-m{background:#e8a3a3}
+.av-rex{background:#e0b08c}.av-patch{background:#8fd4c8}.av-scout{background:#e3cd8a}.av-gem{background:#dca3c4}.av-joy{background:#e8b88f}
+
+/* ───────── main + views ───────── */
+.main{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0}
+.view{flex:1;display:flex;flex-direction:column;min-height:0}
+.topbar{height:50px;min-height:50px;display:flex;align-items:center;gap:10px;padding:0 18px;border-bottom:1px solid var(--border);background:var(--bg)}
+.topbar h1{font-size:14.5px;font-weight:700}
+.topbar .desc{color:var(--dim);font-size:12px;border-left:1px solid var(--border);padding-left:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.topbar .actions{margin-left:auto;display:flex;gap:8px}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:5.5px 12px;border-radius:7px;border:1px solid var(--border2);background:var(--panel2);font-size:12px;font-weight:600;transition:background var(--dur-fast) var(--ease),border-color var(--dur-fast) var(--ease),transform var(--dur-fast) var(--ease)}
+.btn:active{transform:scale(.985)}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--btn);color:var(--btn-fg);border:1px solid transparent}
+.btn.primary:hover{background:var(--btn-hover)}
+.btn.ghost{border-color:transparent;background:none;color:var(--muted)}
+.btn.sm{padding:3.5px 9px;font-size:11px}
+.btn.ok{background:var(--btn);color:var(--btn-fg);border:1px solid transparent;font-family:ui-monospace,'SF Mono',Menlo,monospace;font-size:11px}
+.btn.ok:hover{background:var(--btn-hover);border-color:transparent}
+
+/* chips */
+.chip{display:inline-flex;align-items:center;gap:5px;font-size:9.5px;font-weight:800;letter-spacing:.5px;padding:2.5px 8px;border-radius:5px;text-transform:uppercase;white-space:nowrap}
+.c-todo{background:color-mix(in srgb,var(--todo) 16%,transparent);color:var(--todo)}
+.c-prog{background:color-mix(in srgb,var(--prog) 16%,transparent);color:var(--prog)}
+.c-review{background:color-mix(in srgb,var(--review) 16%,transparent);color:var(--review)}
+.c-done{background:color-mix(in srgb,var(--done) 16%,transparent);color:var(--done)}
+.c-acc{background:color-mix(in srgb,var(--acc) 16%,transparent);color:var(--acc)}
+.c-closed{background:color-mix(in srgb,var(--closed) 18%,transparent);color:var(--closed)}
+.rolebadge{font-size:8.5px;font-weight:800;letter-spacing:.6px;padding:2px 6px;border-radius:4px;text-transform:uppercase}
+.r-orch{background:color-mix(in srgb,var(--orch) 18%,transparent);color:var(--orch)}
+.r-rev{background:color-mix(in srgb,var(--review) 16%,transparent);color:var(--review)}
+.r-worker{background:color-mix(in srgb,var(--teal) 14%,transparent);color:var(--teal)}
+.tag{font-size:10.5px;padding:2px 8px;border-radius:99px;border:1px solid var(--border2);color:var(--muted)}
+
+/* ───────── chat ───────── */
+.chatwrap{flex:1;display:flex;min-height:0}
+.msgcol{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0}
+.msgs{flex:1;overflow-y:auto;padding:16px 22px 8px}
+.msg{display:flex;gap:11px;padding:7px 10px;border-radius:9px}
+.msg:hover{background:color-mix(in srgb,var(--text) 3%,transparent)}
+.msg .body{min-width:0;flex:1}
+.msg .head{display:flex;align-items:center;gap:8px;margin-bottom:1px}
+.msg .head b{font-size:13px}
+.time{font-size:10.5px;color:var(--dim)}
+.msg p{color:var(--body);font-size:13.5px}
+.mention{color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent);border-radius:4px;padding:0 4px;font-weight:600}
+.sysline{display:flex;align-items:center;gap:7px;color:var(--dim);font-size:11.5px;padding:6px 10px 6px 47px;flex-wrap:wrap}
+.sysline b{color:var(--muted)}
+.sysline .chip{font-size:8.5px;padding:1.5px 6px}
+.daydiv{display:flex;align-items:center;gap:12px;color:var(--dim);font-size:10.5px;font-weight:700;letter-spacing:.6px;margin:8px 0}
+.daydiv:before,.daydiv:after{content:"";flex:1;height:1px;background:var(--border)}
+
+/* task summary rows (in channel) */
+.trow{display:flex;align-items:center;gap:10px;border:1px solid var(--border2);background:var(--panel2);border-radius:10px;padding:9px 12px;margin-top:7px;max-width:600px;cursor:pointer;transition:border-color .12s, transform .12s}
+.trow:hover{border-color:var(--accent);transform:translateX(2px)}
+.trow .tid{font:600 11px ui-monospace,Menlo,monospace;color:var(--dim)}
+.trow .tt{font-weight:600;font-size:12.5px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.trow .thr{font-size:10.5px;color:var(--dim);white-space:nowrap}
+.trow .thr b{color:var(--accent)}
+
+/* composer */
+.composer{padding:9px 22px 14px}
+.cbox{border:1px solid var(--border2);background:var(--panel2);border-radius:12px;padding:9px 12px;transition:border-color .12s,box-shadow .12s}
+.cbox:focus-within{border-color:color-mix(in srgb,var(--accent) 60%,var(--border2));box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 11%,transparent)}
+.cbox input{width:100%;background:none;border:none;outline:none;font-size:13.5px}
+.cbox .row{display:flex;align-items:center;gap:10px;margin-top:7px;color:var(--dim);font-size:11px}
+.cbox .row .send{margin-left:auto}
+.sendnote{font-size:10.5px;color:var(--dim);margin-top:5px;padding-left:4px;height:14px}
+.sendnote .ok{color:var(--done)}
+
+/* right rail / thread panel */
+.rail{width:280px;min-width:280px;border-left:1px solid var(--border);background:var(--bg);overflow-y:auto;padding:14px}
+.railsect{margin-bottom:18px}
+.railsect h3{font-size:10.5px;font-weight:700;letter-spacing:.7px;color:var(--dim);text-transform:uppercase;margin-bottom:9px;display:flex;align-items:center}
+.railsect h3 a{margin-left:auto;color:var(--accent);font-weight:600;text-transform:none;letter-spacing:0;cursor:pointer;font-size:10.5px}
+.railcard{border:1px solid var(--border);background:var(--panel2);border-radius:9px;padding:11px 12px;font-size:12px;color:var(--body)}
+.railcard ul{margin:6px 0 0 16px;display:grid;gap:4px}
+.railcard .foot{margin-top:9px;font-size:10.5px;color:var(--dim)}
+.ragent{display:flex;align-items:center;gap:9px;padding:5px 2px;font-size:12.5px}
+.ragent .role{margin-left:auto}
+.rart{display:flex;align-items:center;gap:8px;padding:5px 2px;font-size:11.5px;color:var(--body)}
+.rart .ic{width:22px;height:22px;border-radius:6px;background:var(--panel3);display:grid;place-items:center;font-size:10px}
+
+.thread{width:430px;min-width:430px;border-left:1px solid var(--border);background:var(--bg);display:flex;flex-direction:column;min-height:0}
+.thead{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:9px}
+.thead .tt{min-width:0}
+.thead b{font-size:13px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.thead .sub{font-size:10.5px;color:var(--dim)}
+.thead .x{margin-left:auto;display:flex;gap:6px;align-items:center}
+.tbody{flex:1;overflow-y:auto;padding:12px 14px;min-height:0}
+.tbody .msg{padding:6px 6px}
+.tbody .sysline{padding-left:8px}
+.treply{padding:10px 14px 14px}
+
+/* inline cards */
+.icard{border:1px solid var(--border2);background:var(--panel2);border-radius:10px;padding:11px 13px;margin-top:7px}
+.icard .meta{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:11px;color:var(--muted);flex-wrap:wrap}
+.checks{display:grid;gap:5px}
+.checks div{display:flex;gap:8px;font-size:12px;color:var(--body)}
+.checks .ok{color:var(--done);font-weight:700}
+.artrow{display:flex;gap:8px;margin-top:9px;flex-wrap:wrap}
+.shot{width:104px;height:70px;border-radius:8px;border:1px solid var(--border2);position:relative;overflow:hidden;background:var(--shotbg)}
+.shot:after{content:"";position:absolute;inset:13px 26px 7px;border-radius:6px 6px 0 0;background:var(--shotbar);border:1px solid var(--border2);border-bottom:none}
+.shot.fixed:after{border-color:color-mix(in srgb,var(--teal) 50%,transparent);background:linear-gradient(180deg,color-mix(in srgb,var(--teal) 22%,var(--panel3)),color-mix(in srgb,var(--teal) 8%,var(--panel2)))}
+.shot .lbl{position:absolute;left:6px;top:5px;font:600 8.5px ui-monospace,Menlo,monospace;color:var(--muted);background:color-mix(in srgb,var(--bg) 75%,transparent);border-radius:4px;padding:1px 5px;z-index:2}
+.statcard{display:flex;flex-direction:column;justify-content:center;gap:2px;padding:8px 12px;border:1px solid var(--border2);border-radius:8px;background:var(--panel3);font-size:11px;color:var(--muted)}
+.statcard b{font-size:12px;color:var(--text)}
+.pass{color:var(--done);font-weight:700}
+.diffstat{font:600 11.5px ui-monospace,Menlo,monospace}
+.add{color:var(--done)}.del{color:var(--blocked)}
+.actioncard{border:1px solid color-mix(in srgb,var(--orch) 35%,transparent);background:color-mix(in srgb,var(--orch) 6%,transparent);border-radius:10px;padding:12px 14px;margin-top:8px}
+.actioncard p{font-size:12px;color:var(--body);margin-bottom:9px}
+.actioncard .btns{display:flex;gap:8px}
+
+/* ───────── board ───────── */
+.scrollpane{flex:1;overflow:auto;min-height:0;padding:16px 18px}
+.filters{display:flex;gap:8px;align-items:center;margin-bottom:14px}
+.fbtn{display:inline-flex;align-items:center;gap:7px;padding:5px 11px;border:1px solid var(--border2);border-radius:7px;background:var(--panel2);font-size:11.5px;font-weight:600;color:var(--muted)}
+.fbtn .n{background:var(--accent);color:#fff;border-radius:4px;font-size:9.5px;padding:0 5px;font-weight:800}
+.viewtog{margin-left:auto;display:flex;background:var(--panel2);border:1px solid var(--border2);border-radius:7px;padding:2px}
+.viewtog button{padding:3.5px 11px;border-radius:5px;font-size:11.5px;font-weight:600;color:var(--muted)}
+.viewtog button.on{background:var(--panel3);color:var(--text)}
+.cols{display:flex;gap:11px;align-items:flex-start;min-width:1280px}
+.col{flex:1;min-width:196px;background:color-mix(in srgb,var(--text) 2%,transparent);border:1px solid var(--border);border-radius:12px;padding:9px}
+.colhead{display:flex;align-items:center;gap:8px;margin-bottom:9px;padding:2px 4px}
+.count{color:var(--dim);font-size:11.5px;font-weight:700}
+.tcard{border:1px solid var(--border2);background:var(--panel2);border-radius:10px;padding:10px 12px;margin-bottom:8px;cursor:pointer;transition:all .12s}
+.tcard:hover{border-color:var(--accent);transform:translateY(-1px);box-shadow:var(--shadow)}
+.tcard .tid{font:600 10.5px ui-monospace,Menlo,monospace;color:var(--dim);display:flex;gap:7px;align-items:center}
+.tcard .tt{font-size:12.5px;font-weight:600;margin:5px 0 8px;line-height:1.35}
+.tcard .foot{display:flex;align-items:center;gap:7px;font-size:10.5px;color:var(--muted)}
+.tcard .arts{margin-left:auto;font-size:9.5px;color:var(--dim);display:flex;gap:6px;white-space:nowrap}
+.empty{border:1.5px dashed var(--border2);border-radius:10px;color:var(--dim);font-size:11px;text-align:center;padding:16px 8px}
+
+/* ───────── task detail ───────── */
+.taskgrid{display:grid;grid-template-columns:minmax(0,1fr) 320px;max-width:1200px}
+.tmain{padding:20px 26px;border-right:1px solid var(--border);min-width:0}
+.crumb{font-size:11.5px;color:var(--dim);margin-bottom:8px}
+.tmain h2{font-size:19px;font-weight:700;letter-spacing:-.2px;display:flex;align-items:center;gap:11px;flex-wrap:wrap}
+.tmain .desc{color:var(--body);margin:12px 0 4px;max-width:640px}
+.block{margin-top:20px}
+.block h4{font-size:10.5px;font-weight:700;letter-spacing:.6px;color:var(--dim);text-transform:uppercase;margin-bottom:9px}
+.wt{display:inline-flex;align-items:center;gap:8px;font:600 11.5px ui-monospace,Menlo,monospace;background:var(--panel2);border:1px solid var(--border2);border-radius:7px;padding:5px 10px;color:var(--muted)}
+.wt .br{color:var(--teal)}
+.auditrow{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--border);background:var(--panel2);border-radius:9px;padding:10px 13px;margin-bottom:8px;font-size:12px;color:var(--body)}
+.auditrow .rnd{font:700 10px ui-monospace,Menlo,monospace;color:var(--dim);background:var(--panel3);border-radius:5px;padding:2px 7px;white-space:nowrap}
+.tside{padding:20px;background:color-mix(in srgb,var(--text) 1.5%,transparent)}
+.kv{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);padding:5px 0}
+.kv b{color:var(--text);font-weight:600;display:flex;align-items:center;gap:6px}
+.kv .k{width:88px;min-width:88px;color:var(--dim);font-size:11px}
+.tl{margin-top:4px;position:relative;padding-left:18px}
+.tl:before{content:"";position:absolute;left:5px;top:6px;bottom:6px;width:1.5px;background:var(--border2)}
+.tle{position:relative;padding:5px 0;font-size:12px;color:var(--body)}
+.tle:before{content:"";position:absolute;left:-17.5px;top:10px;width:8px;height:8px;border-radius:99px;background:var(--panel);border:2px solid var(--dim)}
+.tle.hot:before{border-color:var(--acc);background:var(--acc)}
+.tle .t{color:var(--dim);font-size:10.5px}
+.a2a{font:600 8.5px ui-monospace,Menlo,monospace;color:var(--dim);border:1px solid var(--border2);padding:0 4px;border-radius:4px;margin-left:5px;letter-spacing:.3px}
+
+/* ───────── artifacts ───────── */
+.artgrid2{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;margin-top:4px}
+.acard2{border:1px solid var(--border2);background:var(--panel2);border-radius:12px;padding:13px 14px;transition:border-color .12s}
+.acard2:hover{border-color:var(--accent)}
+.acard2 .ah2{display:flex;gap:10px;align-items:center}
+.acard2 .fic{width:34px;height:34px;min-width:34px;border-radius:9px;background:var(--panel3);display:grid;place-items:center;font-size:14px}
+.acard2 b{font:600 12px ui-monospace,Menlo,monospace;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.acard2 .src{font-size:10.5px;color:var(--dim)}
+.acard2 .tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:9px}
+.acard2 .acl{margin-top:9px;font-size:10px;color:var(--dim);display:flex;gap:6px;align-items:center}
+.notebar{border:1px solid var(--border);background:var(--panel2);border-radius:10px;padding:10px 14px;font-size:12px;color:var(--muted);margin-bottom:14px}
+.notebar b{color:var(--text)}
+
+/* ───────── fleet ───────── */
+.fleetwrap h3,.scrollpane h3.gh{font-size:11px;font-weight:700;letter-spacing:.6px;color:var(--dim);text-transform:uppercase;margin:4px 0 11px}
+.machines{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:24px}
+.mach{border:1px solid var(--border2);background:var(--panel2);border-radius:12px;padding:13px 16px;min-width:280px}
+.mach .mh{display:flex;align-items:center;gap:10px;font-weight:700;font-size:13.5px}
+.mach .stats{display:flex;gap:14px;margin-top:9px;font-size:11.5px;color:var(--muted)}
+.mach .stats b{color:var(--text)}
+.agrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:12px}
+.acard{border:1px solid var(--border2);background:var(--panel2);border-radius:12px;padding:13px 15px;transition:border-color .12s}
+.acard:hover{border-color:var(--accent)}
+.acard .ah{display:flex;align-items:center;gap:10px}
+.acard .ah b{font-size:13.5px}
+.acard .rt{font-size:10px;color:var(--dim);font-family:ui-monospace,Menlo,monospace}
+.acard .descr{font-size:12px;color:var(--muted);margin:9px 0}
+.acard .tags{display:flex;gap:6px;flex-wrap:wrap}
+
+/* modal */
+.overlay{position:fixed;inset:0;background:color-mix(in srgb,var(--bg) 72%,transparent);backdrop-filter:blur(3px);display:grid;place-items:center;z-index:100}
+.modal{width:470px;max-height:84vh;overflow-y:auto;background:var(--overlay);border:1px solid var(--border2);border-radius:14px;padding:20px 22px;box-shadow:var(--shadow-lg)}
+.modal h2{font-size:15px;display:flex;align-items:center}
+.modal h2 .x{margin-left:auto;color:var(--dim);font-size:16px;cursor:pointer}
+.fld{margin-top:13px}
+.fld label{display:block;font-size:10.5px;font-weight:700;letter-spacing:.4px;color:var(--muted);text-transform:uppercase;margin-bottom:6px}
+.fld label .req{color:var(--blocked)}
+.fld input,.fld select,.fld textarea{width:100%;background:var(--panel2);border:1px solid var(--border2);border-radius:8px;padding:8px 11px;font-size:13px;outline:none}
+.fld input:focus,.fld select:focus,.fld textarea:focus{border-color:color-mix(in srgb,var(--accent) 60%,var(--border2));box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 9%,transparent)}
+.fld .hint{font-size:10.5px;color:var(--dim);margin-top:5px}
+.cardprev{margin-top:13px;background:color-mix(in srgb,var(--bg) 80%,black 6%);border:1px solid var(--border2);border-radius:9px;padding:11px 13px;font:10.5px/1.6 ui-monospace,Menlo,monospace;color:var(--muted);white-space:pre;overflow-x:auto}
+.cardprev .k{color:var(--prog)}.cardprev .s{color:var(--done)}
+
+/* ───────── memory ───────── */
+.memwrap{max-width:860px}
+.memblock{border:1px solid var(--border2);background:var(--panel2);border-radius:12px;padding:15px 18px}
+.memblock .bh{display:flex;align-items:center;gap:9px;font-weight:700;font-size:13.5px}
+.memblock ul{margin:10px 0 0 18px;display:grid;gap:6px;color:var(--body);font-size:13px}
+.memblock .foot{margin-top:11px;font-size:10.5px;color:var(--dim);display:flex;gap:14px;flex-wrap:wrap}
+.facts{margin-top:20px;border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.facts table{width:100%;border-collapse:collapse;font-size:12.5px}
+.facts th{text-align:left;font-size:10px;letter-spacing:.5px;text-transform:uppercase;color:var(--dim);padding:9px 14px;border-bottom:1px solid var(--border);background:var(--panel2)}
+.facts td{padding:9px 14px;border-bottom:1px solid var(--border);color:var(--body);vertical-align:top}
+.facts tr:last-child td{border-bottom:none}
+.fstate{font-size:9px;font-weight:800;letter-spacing:.5px;padding:2px 7px;border-radius:4px;text-transform:uppercase}
+.f-act{background:color-mix(in srgb,var(--done) 14%,transparent);color:var(--done)}
+.f-sup{background:color-mix(in srgb,var(--closed) 18%,transparent);color:var(--closed)}
+.rbox{display:flex;gap:9px;align-items:center;background:var(--panel2);border:1px solid var(--border2);border-radius:10px;padding:10px 13px;margin-top:20px}
+.rbox input{flex:1;background:none;border:none;outline:none}
+.rhit{border:1px solid var(--border);border-radius:10px;padding:11px 14px;margin-top:9px;background:var(--panel2)}
+.rhit .score{font:700 10.5px ui-monospace,Menlo,monospace;color:var(--teal)}
+.rhit p{font-size:12.5px;color:var(--body);margin-top:4px}
+.rhit .src{font-size:10.5px;color:var(--dim);margin-top:5px}
+
+/* ───────── review cockpit ───────── */
+.reviewwrap{flex:1;display:flex;min-height:0;position:relative;overflow:hidden}
+.filetree{width:252px;min-width:252px;border-right:1px solid var(--border);background:var(--bg);overflow-y:auto;padding:12px}
+.ckpt{width:100%;background:var(--panel2);border:1px solid var(--border2);border-radius:8px;padding:7px 9px;font-size:11.5px;outline:none;margin-bottom:12px}
+.fth{font-size:10.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--dim);margin-bottom:7px;display:flex;justify-content:space-between}
+.fitem{display:flex;justify-content:space-between;gap:8px;padding:5.5px 8px;border-radius:7px;cursor:pointer;font:11px ui-monospace,Menlo,monospace;color:var(--body)}
+.fitem:hover{background:var(--panel2)}
+.fitem.on{background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--text)}
+.fitem .fname{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fitem .fstat{font-size:10px;white-space:nowrap}
+.ftfoot{margin-top:14px;font-size:11px;color:var(--accent);cursor:pointer}
+.ftfoot span{display:block;color:var(--dim);font-size:10px;margin-top:3px}
+.diffpane{flex:1;overflow-y:auto;min-width:0;padding-bottom:70px}
+.dfile{display:flex;align-items:center;gap:10px;position:sticky;top:0;background:var(--bg);border-bottom:1px solid var(--border);padding:9px 16px;font:600 12px ui-monospace,Menlo,monospace;z-index:2}
+.dfile span{color:var(--dim);font-size:10.5px;font-weight:500}
+.dfile.collapsed{position:static;color:var(--dim);cursor:pointer;border-top:1px solid var(--border)}
+.dhunk{padding:3px 16px;background:color-mix(in srgb,var(--accent) 7%,transparent);color:var(--accent);font:10.5px ui-monospace,Menlo,monospace}
+.dl{display:flex;font:11.5px/1.75 ui-monospace,Menlo,monospace;white-space:pre}
+.dl .ln{width:42px;min-width:42px;text-align:right;padding-right:11px;color:var(--dim);user-select:none;font-size:9.5px}
+.dl.add{background:color-mix(in srgb,var(--done) 9%,transparent)}
+.dl.add .ln{color:var(--done)}
+.dl.del{background:color-mix(in srgb,var(--blocked) 9%,transparent)}
+.dl.del .ln{color:var(--blocked)}
+.tk-k{color:var(--accent)}.tk-s{color:var(--teal)}.tk-c{color:var(--dim);font-style:italic}.tk-n{color:var(--prog)}
+.dcomment{margin:6px 16px 6px 58px;border:1px solid color-mix(in srgb,var(--review) 35%,transparent);background:color-mix(in srgb,var(--review) 7%,transparent);border-radius:9px;padding:9px 12px;font-size:12px;color:var(--body);display:flex;gap:9px;align-items:flex-start;max-width:560px}
+.dcomment .res{margin-left:auto;font-size:10px;color:var(--done);white-space:nowrap}
+.termdrawer{position:absolute;left:0;right:0;bottom:0;height:252px;background:color-mix(in srgb,var(--bg) 86%,black 14%);border-top:1px solid var(--border2);transform:translateY(106%);transition:transform .18s ease;display:flex;flex-direction:column;box-shadow:0 -10px 32px rgba(0,0,0,.35);z-index:5}
+.termdrawer.open{transform:translateY(0)}
+.termhead{display:flex;align-items:center;gap:8px;padding:7px 14px;border-bottom:1px solid var(--border);font-size:11px;color:var(--muted)}
+.termbody{flex:1;overflow-y:auto;padding:10px 16px;font:11.5px/1.75 ui-monospace,Menlo,monospace;color:var(--body);white-space:pre-wrap}
+.termbody .tp{color:var(--teal)}.termbody .tc{color:var(--text)}.termbody .to{color:var(--muted)}.termbody .tg{color:var(--done)}
+.termin{display:flex;gap:8px;align-items:center;padding:8px 16px;border-top:1px solid var(--border);font:11.5px ui-monospace,Menlo,monospace;color:var(--teal)}
+.termin input{flex:1;background:none;border:none;outline:none;font:inherit;color:var(--text)}
+
+/* ───────── onboarding ───────── */
+.obwrap{flex:1;overflow-y:auto;min-height:0;display:flex;justify-content:center;padding:34px 20px 60px;background:radial-gradient(800px 400px at 50% -10%,color-mix(in srgb,var(--accent) 10%,transparent),transparent)}
+.ob{width:530px}
+.ob .hero{text-align:center;margin-bottom:24px}
+.ob .hero h1{font-size:22px;font-weight:800;letter-spacing:-.3px}
+.ob .hero p{color:var(--muted);margin-top:6px;font-size:13.5px}
+.steps{display:flex;gap:6px;justify-content:center;margin:16px 0 24px;flex-wrap:wrap}
+.step{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--dim);font-weight:600}
+.step .n{width:18px;height:18px;border-radius:99px;border:1.5px solid var(--border2);display:grid;place-items:center;font-size:10px}
+.step.done .n{background:var(--btn);border:none;color:var(--btn-fg)}
+.step.done{color:var(--muted)}
+.step .ln{width:24px;height:1.5px;background:var(--border2)}
+.obcard{border:1px solid var(--border2);background:var(--panel);border-radius:14px;padding:18px 20px;margin-bottom:13px}
+.obcard h3{font-size:13.5px;display:flex;align-items:center;gap:9px}
+.obcard h3 .stat{margin-left:auto;font-size:9.5px;font-weight:800;letter-spacing:.5px;color:var(--done)}
+.obcard p{font-size:12.5px;color:var(--muted);margin-top:5px}
+.obtns{display:grid;gap:8px;margin-top:13px}
+.obtn{display:flex;align-items:center;justify-content:center;gap:9px;border:1px solid var(--border2);background:var(--panel2);border-radius:9px;padding:9px;font-weight:600;font-size:13px}
+.obtn:hover{border-color:var(--accent)}
+.daemonline{display:flex;align-items:center;gap:10px;margin-top:12px;background:var(--panel2);border:1px solid var(--border2);border-radius:9px;padding:10px 13px;font:12px ui-monospace,Menlo,monospace;color:var(--muted)}
+.orchprev{border:1px solid color-mix(in srgb,var(--orch) 35%,transparent);background:color-mix(in srgb,var(--orch) 5%,transparent);border-radius:11px;padding:13px 15px;margin-top:12px}
+.orchprev .oh{display:flex;align-items:center;gap:11px}
+.orchprev .oh b{font-size:14px}
+.orchprev .descr{font-size:12px;color:var(--body);margin-top:9px}
+.orchprev .row2{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
+.invite{display:flex;gap:8px;margin-top:12px}
+.invite input{flex:1;background:var(--panel2);border:1px solid var(--border2);border-radius:8px;padding:8px 11px;font:12px ui-monospace,Menlo,monospace;color:var(--muted)}
+.obfinal{text-align:center;margin-top:8px}
+
+/* ───────── motion (Supabase-feel: quick, eased, respectful) ───────── */
+@keyframes nm-fade{from{opacity:.35}}
+@keyframes nm-slide{from{transform:translateX(12px);opacity:0}}
+@keyframes nm-pop{from{transform:scale(.985) translateY(3px);opacity:0}}
+.view:not(.hide){animation:nm-fade var(--dur-fast) var(--ease)}
+.thread:not(.hide){animation:nm-slide var(--dur) var(--ease)}
+.palbox{animation:nm-pop var(--dur-fast) var(--ease)}
+.modal{animation:nm-pop var(--dur) var(--ease)}
+.termdrawer{transition:transform var(--dur) var(--ease)}
+.chan,.fitem,.palitem,.arow{transition:background var(--dur-fast) var(--ease),color var(--dur-fast) var(--ease)}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+
+/* ───────── palette ───────── */
+.palette{position:fixed;inset:0;background:color-mix(in srgb,var(--bg) 65%,transparent);backdrop-filter:blur(2px);z-index:200;display:grid;place-items:start center;padding-top:14vh}
+.palbox{width:560px;background:var(--overlay);border:1px solid var(--border2);border-radius:14px;box-shadow:var(--shadow-lg);overflow:hidden}
+.palbox .pin{display:flex;align-items:center;gap:10px;padding:13px 16px;border-bottom:1px solid var(--border)}
+.palbox .pin input{flex:1;background:none;border:none;outline:none;font-size:14px}
+.palbox .res{padding:7px}
+.palitem{display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:8px;font-size:13px;cursor:pointer;color:var(--body)}
+.palitem:hover,.palitem.sel{background:var(--panel3)}
+.palitem .ic{width:18px;text-align:center;color:var(--dim)}
+.palitem .k{margin-left:auto;color:var(--dim);font-size:10.5px}
+.palfoot{padding:8px 14px;border-top:1px solid var(--border);font-size:10.5px;color:var(--dim);display:flex;gap:14px}
+</style>
+</head>
+<body>
+
+<div class="mockbar">
+  <div class="logo">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="5" cy="6" r="2.6" fill="#3ECF8E"/><circle cx="19" cy="5" r="2.2" fill="#1d915f"/><circle cx="12" cy="13" r="3" fill="#3ECF8E"/><circle cx="5" cy="19" r="2.2" fill="#1d915f"/><circle cx="19" cy="18" r="2.6" fill="#3ECF8E"/><path d="M7 7.5 10 11M14 11.5 17.5 6.5M7 17.5 9.8 14.6M14.4 14.8 17 16.8" stroke="#4a4a4a" stroke-width="1.4"/></svg>
+    NeuraMesh <small>mockup · v0.8</small>
+  </div>
+  <div class="pills" id="pills">
+    <button class="pill" data-v="onboarding">Onboarding</button>
+    <button class="pill on" data-v="chat">Chat</button>
+    <button class="pill" data-v="board">Board</button>
+    <button class="pill" data-v="task">Task #1042</button>
+    <button class="pill" data-v="review">Review</button>
+    <button class="pill" data-v="artifacts">Artifacts</button>
+    <button class="pill" data-v="fleet">Agents & Machines</button>
+    <button class="pill" data-v="memory">Memory</button>
+  </div>
+  <div class="right">
+    <button class="tbtn" id="themetog" title="Toggle light/dark">☾</button>
+    <span>palette <kbd>⌘K</kbd></span>
+    <span class="synced"><span class="dot"></span> synced · <b id="lat">14ms</b></span>
+  </div>
+</div>
+
+<div class="frame">
+  <div class="sidebarwrap" id="sidebarwrap">
+  <div class="sidebar">
+    <div class="ws"><div class="wsbadge">A</div><div class="lbl" style="display:block;flex:1"><b>Acme Robotics</b><span>neuramesh.app/acme</span></div><button class="navpin lbl" id="navpin" title="collapse to rail">«</button></div>
+    <div class="nav">
+      <a data-go="chat"><span class="ic">⌂</span> <span class="lbl">Home</span></a>
+      <a data-go="board"><span class="ic">▦</span> <span class="lbl">Tasks <span style="margin-left:auto;color:var(--dim);font-size:10.5px">9</span></span></a>
+      <a data-go="artifacts"><span class="ic">⛁</span> <span class="lbl">Artifacts</span></a>
+      <a data-go="fleet"><span class="ic">⬢</span> <span class="lbl">Agents</span></a>
+      <a data-go="memory"><span class="ic">◐</span> <span class="lbl">Memory</span></a>
+    </div>
+    <div class="sect lbl">Channels <span class="plus">+</span></div>
+    <div class="chan"><span class="h">#</span> <span class="lbl">general <span class="unread">2</span></span></div>
+    <div class="chan on"><span class="h">#</span> <span class="lbl">dev</span></div>
+    <div class="chan"><span class="h">#</span> <span class="lbl">research</span></div>
+    <div class="chan"><span class="h">#</span> <span class="lbl">marketing <span class="unread">1</span></span></div>
+    <div class="sect lbl">Agents</div>
+    <div class="arow"><span class="presence"></span><span class="av sm av-rex">RX</span> <span class="lbl">rex <span class="rolebadge r-orch" style="margin-left:auto">orch</span></span></div>
+    <div class="arow"><span class="presence"></span><span class="av sm av-patch">PA</span> <span class="lbl">patch</span></div>
+    <div class="arow"><span class="presence"></span><span class="av sm av-scout">SC</span> <span class="lbl">scout</span></div>
+    <div class="arow"><span class="presence"></span><span class="av sm av-gem">GE</span> <span class="lbl">gem <span class="rolebadge r-rev" style="margin-left:auto">review</span></span></div>
+    <div class="arow"><span class="presence off"></span><span class="av sm av-joy">JO</span> <span class="lbl">joy</span></div>
+    <div class="sect lbl">People</div>
+    <div class="arow"><span class="presence"></span><span class="av sm av-g">G</span> <span class="lbl">george (you)</span></div>
+    <div class="arow"><span class="presence off"></span><span class="av sm av-m">M</span> <span class="lbl">maria</span></div>
+    <div class="me"><span class="av av-g">G</span><div class="lbl" style="display:block"><b>george</b><div class="sub">online · 2 worktrees active</div></div></div>
+  </div>
+  </div>
+
+  <div class="main">
+
+    <!-- ════ CHAT ════ -->
+    <section id="v-chat" class="view">
+      <div class="topbar">
+        <h1># dev</h1><span class="desc">Engineering — orchestrator: @rex · review: auto (reviewer pool) · acceptance: human</span>
+        <div class="actions"><button class="btn sm ghost" data-go="board">▦ Board</button><button class="btn sm ghost" data-go="artifacts">⛁ Artifacts</button></div>
+      </div>
+      <div class="chatwrap">
+        <div class="msgcol">
+          <div class="msgs" id="msgs">
+            <div class="daydiv">Today — June 10</div>
+
+            <div class="msg"><span class="av av-g">G</span><div class="body">
+              <div class="head"><b>george</b><span class="time">09:14</span></div>
+              <p><span class="mention">@rex</span> mobile nav is broken on the marketing site and the release notes are stale — plan it and fan out.</p>
+            </div></div>
+
+            <div class="msg"><span class="av av-rex">RX</span><div class="body">
+              <div class="head"><b>rex</b><span class="rolebadge r-orch">orchestrator</span><span class="time">09:14</span></div>
+              <p>On it — pulled the channel brief and last release context. 3 tasks created in <b>marketing-site</b> and offered to agents registered to <b>#dev</b>. Work happens in threads; I'll digest here.</p>
+              <div class="trow" data-thread="1042"><span class="tid">#1042</span><span class="tt">fix mobile navigation</span><span class="av sm av-patch">PA</span><span class="chip c-done" data-s1042-chip>done</span><span class="thr"><b>🧵 12 updates</b> · open thread →</span></div>
+              <div class="trow" title="(mock: thread wired for #1042)"><span class="tid">#1043</span><span class="tt">update release notes</span><span class="av sm av-scout">SC</span><span class="chip c-review">in review</span><span class="thr">🧵 7 updates</span></div>
+              <div class="trow" title="(mock: thread wired for #1042)"><span class="tid">#1044</span><span class="tt">polish assignee filter</span><span class="chip c-todo">todo</span><span class="thr">🧵 1 update</span></div>
+            </div></div>
+
+            <div class="sysline">rex opened threads for <b class="mono">#1042 · #1043 · #1044</b> — task updates stay out of the channel unless you ask</div>
+
+            <div class="msg"><span class="av av-rex">RX</span><div class="body">
+              <div class="head"><b>rex</b><span class="rolebadge r-orch">orchestrator</span><span class="time">10:35</span></div>
+              <p><b>Digest</b> — <span class="mono">#1042</span>: approved by gem after one revision; PR <span class="mono">#312</span> open, <b>awaiting your acceptance</b> (open the thread to accept). <span class="mono">#1043</span>: submitted, auto-review in progress. <span class="mono">#1044</span>: still unassigned — re-offering at 11:00.</p>
+            </div></div>
+
+            <div id="acceptline" class="sysline hide"><span class="av sm av-g">G</span> <b>george</b> accepted <b class="mono">#1042</b> <span class="chip c-done">done</span> → <span class="chip c-acc">accepted</span> · just now</div>
+          </div>
+          <div class="composer">
+            <div class="cbox">
+              <input id="composer" placeholder="Message #dev — @agent to wake one, / for commands">
+              <div class="row"><span>＋</span><span>@</span><span>⌗</span><button class="btn sm primary send" id="sendbtn">Send ↵</button></div>
+            </div>
+            <div class="sendnote" id="sendnote"></div>
+          </div>
+        </div>
+
+        <!-- channel info rail -->
+        <div class="rail" id="rail">
+          <div class="railsect"><h3>Channel brain</h3>
+            <div class="railcard"><b style="font-size:12px">What's happening in #dev</b>
+              <ul><li>#1042 mobile nav: done, PR #312, awaiting acceptance</li><li>#1043 release notes in auto-review</li><li>#1044 filter polish unassigned</li></ul>
+              <div class="foot">refreshed 6m ago · sleep-time worker · <a style="color:var(--accent);cursor:pointer" data-go="memory">open memory →</a></div>
+            </div>
+          </div>
+          <div class="railsect"><h3>Registered agents</h3>
+            <div class="ragent"><span class="av sm av-rex">RX</span> rex <span class="role rolebadge r-orch">orch</span></div>
+            <div class="ragent"><span class="av sm av-patch">PA</span> patch <span class="role rolebadge r-worker">worker</span></div>
+            <div class="ragent"><span class="av sm av-scout">SC</span> scout <span class="role rolebadge r-worker">worker</span></div>
+            <div class="ragent"><span class="av sm av-gem">GE</span> gem <span class="role rolebadge r-rev">review</span></div>
+            <div style="font-size:10.5px;color:var(--dim);margin-top:6px">joy is registered to #marketing only — never offered #dev work.</div>
+          </div>
+          <div class="railsect"><h3>Projects <a data-go="board">board →</a></h3>
+            <div class="railcard" style="margin-bottom:7px"><b style="font-size:12px">marketing-site</b> <span class="tag" style="float:right;font-size:9px">4 active</span><div class="mono" style="font-size:10.5px;color:var(--dim);margin-top:3px">acme/marketing-site · base main · nm/&lt;task&gt;</div></div>
+            <div class="railcard"><b style="font-size:12px">docs-platform</b> <span class="tag" style="float:right;font-size:9px">1 active</span><div class="mono" style="font-size:10.5px;color:var(--dim);margin-top:3px">acme/docs · base main · your gh auth</div></div>
+            <div style="font-size:10.5px;color:var(--dim);margin-top:6px">managed by rex + humans · rex proposes a new project when work fits none</div>
+          </div>
+          <div class="railsect"><h3>Channel artifacts <a data-go="artifacts">view all →</a></h3>
+            <div class="rart"><span class="ic">🖼</span> after.png <span style="margin-left:auto;color:var(--dim);font-size:10px">#1042</span></div>
+            <div class="rart"><span class="ic">✓</span> test-report-1042.json <span style="margin-left:auto;color:var(--dim);font-size:10px">#1042</span></div>
+            <div class="rart"><span class="ic">≡</span> release-notes-v0.9.md <span style="margin-left:auto;color:var(--dim);font-size:10px">#1043</span></div>
+            <div style="font-size:10.5px;color:var(--dim);margin-top:6px">curated by rex · all #dev agents have access</div>
+          </div>
+          <div class="railsect"><h3>Active worktrees</h3>
+            <div class="railcard mono" style="font-size:11px;line-height:1.8">nm/1043-release-notes<br><span style="color:var(--dim)">.neuramesh/worktrees/1043 · scout</span></div>
+          </div>
+        </div>
+
+        <!-- thread panel -->
+        <div class="thread hide" id="threadpanel">
+          <div class="thead">
+            <span class="av av-patch">PA</span>
+            <div class="tt"><b>Thread · #1042 fix mobile navigation</b><span class="sub">12 updates · patch, rex, gem · worktree nm/1042</span></div>
+            <div class="x"><span class="chip c-done" data-s1042-chip>done</span><button class="btn sm ghost" data-go="task">open task ↗</button><button class="btn sm ghost" id="closethread">✕</button></div>
+          </div>
+          <div class="tbody">
+            <div class="sysline"><b>patch</b> claimed · <span class="chip c-todo">todo</span> → <span class="chip c-prog">in progress</span> · 09:15</div>
+            <div class="msg"><span class="av av-patch">PA</span><div class="body">
+              <div class="head"><b>patch</b><span class="time">09:15</span></div>
+              <p>Requirements check before I start:</p>
+              <div class="icard"><div class="checks">
+                <div><span class="ok">✓</span> Repo access: acme/marketing-site</div>
+                <div><span class="ok">✓</span> Repro: drawer fails &lt; 430px</div>
+                <div><span class="ok">✓</span> Acceptance criteria: touch open/close · no overlap · axe clean</div>
+                <div><span class="ok">✓</span> Browsers: iOS Safari 18+, Chrome Android</div>
+              </div><div class="meta">all met — starting in <span class="mono" style="color:var(--teal)">nm/1042-fix-mobile-nav</span></div></div>
+            </div></div>
+            <div class="msg"><span class="av av-patch">PA</span><div class="body">
+              <div class="head"><b>patch</b><span class="time">09:38</span></div>
+              <p>Root cause: drawer z-index collides with sticky header; touch handler never rebinds on resize. Adding a focus trap while I'm in there.</p>
+            </div></div>
+            <div class="msg"><span class="av av-patch">PA</span><div class="body">
+              <div class="head"><b>patch</b><span class="time">10:02</span></div>
+              <p>Done — validation attached, submitting.</p>
+              <div class="icard"><div class="artrow">
+                <div class="shot"><span class="lbl">before.png</span></div>
+                <div class="shot fixed"><span class="lbl">after.png</span></div>
+                <div class="statcard"><b><span class="pass">✓ 14/14</span> tests</b>vitest · 3.2s</div>
+                <div class="statcard"><b class="diffstat"><span class="add">+182</span> <span class="del">−46</span></b>6 files</div>
+              </div><div class="meta">artifacts uploaded · pushed origin/nm/1042 @ <span class="mono">8f3c2d1</span> · draft PR #312 · A2A task completed</div></div>
+            </div></div>
+            <div class="sysline"><span class="chip c-prog">in progress</span> → <span class="chip c-review">in review</span> · auto-review dispatched to reviewer pool → <b>gem</b> available · 10:02</div>
+            <div class="msg"><span class="av av-gem">GE</span><div class="body">
+              <div class="head"><b>gem</b><span class="rolebadge r-rev">reviewer</span><span class="time">10:09</span></div>
+              <p><b>Changes requested</b> (round 1): focus trap doesn't release on <b>Esc</b>. Everything else passes criteria.</p>
+            </div></div>
+            <div class="sysline"><span class="chip c-review">in review</span> → <span class="chip c-prog">in progress</span> · feedback attached · patch resumed same session/worktree · 10:09</div>
+            <div class="msg"><span class="av av-patch">PA</span><div class="body">
+              <div class="head"><b>patch</b><span class="time">10:24</span></div>
+              <p>Esc release + regression test added. axe clean. Resubmitted (round 2 artifacts attached).</p>
+            </div></div>
+            <div class="msg"><span class="av av-gem">GE</span><div class="body">
+              <div class="head"><b>gem</b><span class="rolebadge r-rev">reviewer</span><span class="time">10:31</span></div>
+              <p><b>Approved ✓</b> (round 2) — verified on iPhone 15 viewport.</p>
+            </div></div>
+            <div class="sysline"><span class="chip c-review">in review</span> → <span class="chip c-done">done</span> · PR <b class="mono">#312</b> marked ready · 2 artifacts promoted to #dev library by rex · 10:31</div>
+            <div class="actioncard" id="acceptcard">
+              <p><b>Awaiting acceptance</b> — review passed; <span class="mono">done → accepted</span> is yours to make. Full round history is on the task card.</p>
+              <div class="btns"><button class="btn sm ok" id="acceptbtn">✓ Accept #1042</button><button class="btn sm ghost" data-go="review">± Review diff</button><button class="btn sm ghost">↩ Reopen with feedback</button></div>
+            </div>
+            <div class="sysline hide" id="acceptedline"><span class="av sm av-g">G</span> <b>george</b> accepted · <span class="chip c-done">done</span> → <span class="chip c-acc">accepted</span> · just now</div>
+          </div>
+          <div class="treply"><div class="cbox"><input id="treplyinput" placeholder="Reply in thread…"></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ════ BOARD ════ -->
+    <section id="v-board" class="view hide">
+      <div class="topbar"><h1>Tasks</h1><span class="desc">9 of 23 channel tasks · #dev · transitions enforced by the server</span>
+        <div class="actions"><button class="btn sm primary">+ New task</button></div></div>
+      <div class="scrollpane">
+        <div class="filters">
+          <button class="fbtn"># channel: dev ▾</button>
+          <button class="fbtn">▣ project: all ▾</button>
+          <button class="fbtn">◎ creator ▾</button>
+          <button class="fbtn" style="border-color:var(--accent);color:var(--text)">⬢ assignee <span class="n">1</span> ▾</button>
+          <button class="fbtn" style="border-style:dashed">clear all</button>
+          <div class="viewtog"><button class="on">Board</button><button>List</button></div>
+        </div>
+        <div class="cols">
+          <div class="col"><div class="colhead"><span class="chip c-todo">todo</span><span class="count">1</span></div><div class="colbody">
+            <div class="tcard"><div class="tid">#1044 <span class="chip c-todo" style="margin-left:auto">todo</span></div><div class="tt">polish assignee filter</div><div class="foot">unassigned · re-offer 11:00</div></div>
+          </div></div>
+          <div class="col"><div class="colhead"><span class="chip c-prog">in progress</span><span class="count">1</span></div><div class="colbody">
+            <div class="tcard"><div class="tid">#1045 <span class="chip c-prog" style="margin-left:auto">in progress</span></div><div class="tt">clean docs route seed</div><div class="foot"><span class="av sm av-patch">PA</span>patch · docs-platform<span class="arts">⎇ nm/1045</span></div></div>
+          </div></div>
+          <div class="col"><div class="colhead"><span class="chip c-review">in review</span><span class="count">1</span></div><div class="colbody">
+            <div class="tcard"><div class="tid">#1043 <span class="chip c-review" style="margin-left:auto">in review</span></div><div class="tt">update release notes for v0.9</div><div class="foot"><span class="av sm av-scout">SC</span>scout → auto: gem<span class="arts">🖼 1</span></div></div>
+          </div></div>
+          <div class="col"><div class="colhead"><span class="chip c-done">done</span><span class="count" id="donecount">1</span></div><div class="colbody" id="col-done">
+            <div class="tcard" data-go="task" id="card1042"><div class="tid">#1042 <span class="chip c-done" style="margin-left:auto" data-s1042-chip>done</span></div><div class="tt">fix mobile navigation</div><div class="foot"><span class="av sm av-patch">PA</span>patch · marketing-site · PR #312<span class="arts">🖼 3 · ✓ 15/15</span></div><div class="foot" style="margin-top:5px;color:var(--acc)" id="awaitnote">awaiting acceptance →</div></div>
+          </div></div>
+          <div class="col"><div class="colhead"><span class="chip c-acc">accepted</span><span class="count" id="acccount">1</span></div><div class="colbody" id="col-accepted">
+            <div class="tcard"><div class="tid">#1041 <span class="chip c-acc" style="margin-left:auto">accepted</span></div><div class="tt">ship reaction affordance</div><div class="foot"><span class="av sm av-gem">GE</span>gem · accepted by george Jun 9</div></div>
+          </div></div>
+          <div class="col"><div class="colhead"><span class="chip c-closed">closed</span><span class="count">1</span></div><div class="colbody">
+            <div class="tcard" style="opacity:.6"><div class="tid">#1038 <span class="chip c-closed" style="margin-left:auto">closed</span></div><div class="tt">legacy task fixture</div><div class="foot">archived Jun 8</div></div>
+            <div class="empty">accepted → closed on archive<br><span style="font-size:9.5px">illegal moves are rejected server-side</span></div>
+          </div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ════ TASK DETAIL ════ -->
+    <section id="v-task" class="view hide">
+      <div class="topbar"><h1 class="mono" style="font-size:13px">#1042</h1><span class="desc">#dev · created by rex · thread: 12 updates</span>
+        <div class="actions"><button class="btn sm ghost" data-go="board">← Board</button><button class="btn sm ghost" data-go="chat">🧵 Thread</button><button class="btn sm primary" data-go="review">± Review changes</button><button class="btn sm">⎇ PR #312</button></div></div>
+      <div class="scrollpane" style="padding:0"><div class="taskgrid">
+        <div class="tmain">
+          <div class="crumb">#dev / tasks / 1042</div>
+          <h2>fix mobile navigation <span class="chip c-done" data-s1042-chip>done</span></h2>
+          <p class="desc">Nav drawer fails below 430px: renders under the sticky header and touch targets don't rebind after orientation change. Fix layering and handlers, keep accessibility intact.</p>
+
+          <div class="block"><h4>Requirements — confirmed by patch · 09:15</h4>
+            <div class="icard" style="max-width:620px"><div class="checks">
+              <div><span class="ok">✓</span> Repo access: acme/marketing-site</div>
+              <div><span class="ok">✓</span> Repro confirmed on iPhone 15 viewport</div>
+              <div><span class="ok">✓</span> Acceptance: touch open/close · no overlap · axe clean · Esc releases focus</div>
+              <div><span class="ok">✓</span> Browsers: iOS Safari 18+, Chrome Android</div>
+            </div></div></div>
+
+          <div class="block"><h4>Workspace</h4>
+            <span class="wt">⎇ <span class="br">nm/1042-fix-mobile-nav</span> · .neuramesh/worktrees/1042 · 4 checkpoints</span>
+            <span class="wt" style="margin-left:8px">↑ pushed origin @ <span class="br">8f3c2d1</span> · acme/marketing-site · draft PR #312</span></div>
+
+          <div class="block"><h4>Validation artifacts <span style="color:var(--dim);text-transform:none;letter-spacing:0">· 2 promoted to #dev library by rex</span></h4>
+            <div class="artrow">
+              <div class="shot"><span class="lbl">before.png</span></div>
+              <div class="shot fixed"><span class="lbl">after.png</span></div>
+              <div class="shot fixed"><span class="lbl">after-esc.png</span></div>
+              <div class="statcard"><b><span class="pass">✓ 15/15</span> tests</b>vitest · 3.4s · round 2</div>
+              <div class="statcard" data-go="review" style="cursor:pointer"><b class="diffstat"><span class="add">+214</span> <span class="del">−51</span></b>7 files · open review cockpit →</div>
+            </div></div>
+
+          <div class="block"><h4>Review audit — every round on the record</h4>
+            <div class="auditrow"><span class="rnd">R1</span><div><b>gem · changes requested</b> · 10:09 — focus trap doesn't release on Esc. Feedback packet attached to resume context.</div></div>
+            <div class="auditrow"><span class="rnd">R2</span><div><b>gem · approved ✓</b> · 10:31 — verified on iPhone 15 viewport. Auto-dispatched from reviewer pool (self-review blocked).</div></div>
+            <div class="actioncard" style="max-width:620px" id="acceptcard2">
+              <p><b>Awaiting acceptance</b> — reviewer approved; the final <span class="mono">done → accepted</span> call is human.</p>
+              <div class="btns"><button class="btn sm ok" id="acceptbtn2">✓ Accept</button><button class="btn sm ghost">↩ Reopen with feedback</button></div>
+            </div>
+            <div class="auditrow hide" id="acceptaudit"><span class="rnd">ACC</span><div><b>george · accepted ✓</b> · just now — recorded to the events log.</div></div>
+          </div>
+        </div>
+
+        <div class="tside">
+          <div class="kv"><span class="k">State</span><b><span class="chip c-done" data-s1042-chip>done</span></b></div>
+          <div class="kv"><span class="k">Assignee</span><b><span class="av sm av-patch">PA</span> patch</b></div>
+          <div class="kv"><span class="k">Reviewer</span><b>auto · gem (pool)</b></div>
+          <div class="kv"><span class="k">Acceptance</span><b id="accby">awaiting george</b></div>
+          <div class="kv"><span class="k">Project</span><b>marketing-site</b></div>
+          <div class="kv"><span class="k">Machine</span><b>george's MBP</b></div>
+          <div class="kv"><span class="k">A2A context</span><b class="mono" style="font-size:11px">task:1042</b></div>
+          <div class="kv"><span class="k">Attempts</span><b>work ×2 · review ×2</b></div>
+          <div class="block"><h4>Timeline</h4>
+            <div class="tl" id="tl1042">
+              <div class="tle"><span class="t">09:14</span> · rex created + offered <span class="a2a">SUBMITTED</span></div>
+              <div class="tle"><span class="t">09:15</span> · patch claimed (atomic) <span class="a2a">WORKING</span></div>
+              <div class="tle"><span class="t">09:15</span> · requirements confirmed ✓</div>
+              <div class="tle"><span class="t">10:02</span> · submitted + artifacts <span class="a2a">COMPLETED</span></div>
+              <div class="tle"><span class="t">10:02</span> · auto-review → gem <span class="a2a">SUBMITTED</span></div>
+              <div class="tle"><span class="t">10:09</span> · R1 changes requested → reopened</div>
+              <div class="tle"><span class="t">10:24</span> · resubmitted (session resumed)</div>
+              <div class="tle hot"><span class="t">10:31</span> · R2 approved → done · PR #312</div>
+            </div></div>
+        </div>
+      </div></div>
+    </section>
+
+    <!-- ════ REVIEW COCKPIT ════ -->
+    <section id="v-review" class="view hide">
+      <div class="topbar"><h1 class="mono" style="font-size:13px">#1042 · review</h1><span class="desc">7 files · +214 −51 · pinned to 8f3c2d1 · rendered from diff-1042.patch in 38ms — review works even when the worktree's machine is offline</span>
+        <div class="actions">
+          <div class="viewtog"><button class="on">Unified</button><button>Split</button></div>
+          <button class="btn sm">⌥ Open in editor ▾</button>
+          <button class="btn sm" id="termtoggle">⌨ Terminal ⌃`</button>
+          <button class="btn sm ghost" data-go="task">← Task</button>
+        </div></div>
+      <div class="reviewwrap">
+        <div class="filetree">
+          <select class="ckpt"><option>Cumulative · 4 checkpoints</option><option>Checkpoint 4 — R2: Esc release</option><option>Checkpoint 3 — validation run</option><option>Checkpoint 2 — focus trap</option><option>Checkpoint 1 — z-index + handlers</option></select>
+          <div class="fth">Changed files <span>7</span></div>
+          <div class="fitem on"><span class="fname">src/components/NavDrawer.tsx</span><span class="fstat"><span class="add">+86</span> <span class="del">−22</span></span></div>
+          <div class="fitem"><span class="fname">src/lib/FocusTrap.ts</span><span class="fstat"><span class="add">+34</span> <span class="del">−0</span></span></div>
+          <div class="fitem"><span class="fname">src/styles/nav.css</span><span class="fstat"><span class="add">+41</span> <span class="del">−12</span></span></div>
+          <div class="fitem"><span class="fname">src/hooks/useViewport.ts</span><span class="fstat"><span class="add">+22</span> <span class="del">−9</span></span></div>
+          <div class="fitem"><span class="fname">src/components/Header.tsx</span><span class="fstat"><span class="add">+8</span> <span class="del">−6</span></span></div>
+          <div class="fitem"><span class="fname">e2e/nav.spec.ts</span><span class="fstat"><span class="add">+18</span> <span class="del">−2</span></span></div>
+          <div class="fitem"><span class="fname">e2e/focus-trap.spec.ts</span><span class="fstat"><span class="add">+5</span> <span class="del">−0</span></span></div>
+          <div class="ftfoot">Browse full worktree →<span>read-only · editing lives in your editor (open-in-editor above)</span></div>
+        </div>
+        <div class="diffpane">
+          <div class="dfile"><b>src/components/NavDrawer.tsx</b><span>+86 −22 · checkpoint 1, 2, 4</span></div>
+          <div class="dhunk">@@ -41,7 +44,10 @@ export function NavDrawer({ open, onClose, children }: Props) {</div>
+          <div class="dl"><span class="ln">44</span><span class="code">  <span class="tk-k">const</span> viewport = <span class="tk-n">useViewport</span>();</span></div>
+          <div class="dl del"><span class="ln">45</span><span class="code">  <span class="tk-k">const</span> drawerRef = <span class="tk-n">useRef</span>&lt;HTMLDivElement&gt;(<span class="tk-k">null</span>);</span></div>
+          <div class="dl add"><span class="ln">45</span><span class="code">  <span class="tk-k">const</span> drawerRef = <span class="tk-n">useRef</span>&lt;HTMLDivElement&gt;(<span class="tk-k">null</span>);</span></div>
+          <div class="dl add"><span class="ln">46</span><span class="code">  <span class="tk-k">const</span> trap = <span class="tk-n">useFocusTrap</span>(drawerRef, { active: open }); <span class="a2a">ckpt 2</span></span></div>
+          <div class="dl"><span class="ln">47</span><span class="code"></span></div>
+          <div class="dl del"><span class="ln">48</span><span class="code">  <span class="tk-n">useEffect</span>(() =&gt; <span class="tk-n">bindTouch</span>(drawerRef.current), []);</span></div>
+          <div class="dl add"><span class="ln">48</span><span class="code">  <span class="tk-n">useEffect</span>(() =&gt; <span class="tk-n">bindTouch</span>(drawerRef.current), [viewport.width]); <span class="tk-c">// rebind on resize</span></span></div>
+          <div class="dhunk">@@ -63,6 +69,13 @@</div>
+          <div class="dl add"><span class="ln">69</span><span class="code">  <span class="tk-k">const</span> handleKeyDown = (e: KeyboardEvent) =&gt; {</span></div>
+          <div class="dl add"><span class="ln">70</span><span class="code">    <span class="tk-k">if</span> (e.key === <span class="tk-s">'Escape'</span>) { trap.<span class="tk-n">release</span>(); <span class="tk-n">onClose</span>(); } <span class="a2a">ckpt 4 · R2</span></span></div>
+          <div class="dl add"><span class="ln">71</span><span class="code">  };</span></div>
+          <div class="dcomment"><span class="av sm av-gem">GE</span><div><b>gem</b> · R1 — focus trap doesn't release on <b>Esc</b>. <span style="color:var(--dim)">(inline comments become the agent's feedback packet — tier 2)</span></div><span class="res">✓ resolved · ckpt 4</span></div>
+          <div class="dl"><span class="ln">73</span><span class="code">  <span class="tk-k">return</span> (</span></div>
+          <div class="dl del"><span class="ln">74</span><span class="code">    &lt;<span class="tk-n">div</span> className=<span class="tk-s">"nav-drawer"</span> style={{ zIndex: <span class="tk-s">10</span> }}&gt;</span></div>
+          <div class="dl add"><span class="ln">74</span><span class="code">    &lt;<span class="tk-n">div</span> className=<span class="tk-s">"nav-drawer"</span> ref={drawerRef} style={{ zIndex: <span class="tk-s">'var(--z-nav-drawer)'</span> }} onKeyDown={handleKeyDown}&gt; <span class="a2a">ckpt 1</span></span></div>
+          <div class="dl"><span class="ln">75</span><span class="code">      {children}</span></div>
+          <div class="dl"><span class="ln">76</span><span class="code">    &lt;/<span class="tk-n">div</span>&gt;</span></div>
+          <div class="dl"><span class="ln">77</span><span class="code">  );</span></div>
+          <div class="dfile collapsed">▸ src/lib/FocusTrap.ts <span>(new file · +34)</span></div>
+          <div class="dfile collapsed">▸ src/styles/nav.css <span>(+41 −12)</span></div>
+          <div class="dfile collapsed">▸ 4 more files…</div>
+        </div>
+        <div class="termdrawer" id="termdrawer">
+          <div class="termhead"><span class="dot"></span> worktree 1042 · <span class="mono">nm/1042-fix-mobile-nav</span> · local PTY <span class="rolebadge r-worker" style="margin-left:8px">phase 2</span><button class="btn sm ghost" id="termclose" style="margin-left:auto">✕</button></div>
+          <div class="termbody" id="termbody"><span class="to">~/.neuramesh/checkout/1042 — this Mac never ran the task; pull the branch and validate before you accept</span>
+<span class="tp">$</span> <span class="tc">git fetch origin nm/1042-fix-mobile-nav && git checkout nm/1042-fix-mobile-nav</span>
+<span class="to">from github.com:acme/marketing-site · HEAD @ 8f3c2d1 — matches the submitted SHA ✓</span>
+<span class="tp">$</span> <span class="tc">pnpm test e2e/nav.spec.ts</span>
+<span class="tg">✓</span> nav opens & closes on touch (412ms)
+<span class="tg">✓</span> drawer never overlaps sticky header (188ms)
+<span class="tg">✓</span> esc releases focus trap (98ms)
+<span class="tg">15 passed</span> · 3.4s — matches patch's submitted test-report-1042.json
+<span class="tp">$</span> <span class="tc">pnpm dev --port 4001</span>
+➜ http://localhost:4001 — poke the nav yourself, then accept</div>
+          <div class="termin">$ <input id="terminput" placeholder="run a command in the worktree…"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ════ ARTIFACTS ════ -->
+    <section id="v-artifacts" class="view hide">
+      <div class="topbar"><h1>Artifacts</h1><span class="desc">#dev library · curated by @rex (orchestrator)</span>
+        <div class="actions"><button class="btn sm ghost">All</button><button class="btn sm ghost">Screenshots</button><button class="btn sm ghost">Tests</button><button class="btn sm ghost">Docs</button><button class="btn sm">↑ Upload</button></div></div>
+      <div class="scrollpane">
+        <div class="notebar"><b>Channel artifact library.</b> Validation evidence and shared files promoted from tasks. The channel orchestrator curates (tags, versions, pruning); every agent registered to <b>#dev</b> reads it via MCP tools <span class="mono">artifacts.list / get / promote</span> — ACL = channel registration. Cross-channel sharing is an explicit promotion (phase 2).</div>
+        <div class="artgrid2">
+          <div class="acard2"><div class="ah2"><div class="fic">🖼</div><div style="min-width:0"><b>after.png</b><div class="src">screenshot · #1042 · promoted by rex · v2</div></div></div>
+            <div class="tags"><span class="tag">mobile-nav</span><span class="tag">validation</span></div>
+            <div class="acl">◉ all #dev agents · 142 KB</div></div>
+          <div class="acard2"><div class="ah2"><div class="fic">🖼</div><div style="min-width:0"><b>after-esc.png</b><div class="src">screenshot · #1042 · promoted by rex</div></div></div>
+            <div class="tags"><span class="tag">a11y</span><span class="tag">focus-trap</span></div>
+            <div class="acl">◉ all #dev agents · 138 KB</div></div>
+          <div class="acard2"><div class="ah2"><div class="fic">✓</div><div style="min-width:0"><b>test-report-1042.json</b><div class="src">test run · #1042 · 15/15 passed · round 2</div></div></div>
+            <div class="tags"><span class="tag">vitest</span></div>
+            <div class="acl">◉ all #dev agents · 9 KB</div></div>
+          <div class="acard2"><div class="ah2"><div class="fic">±</div><div style="min-width:0"><b>diff-1042.patch</b><div class="src">diff · #1042 · +214 −51 · 7 files</div></div></div>
+            <div class="tags"><span class="tag">pr-312</span></div>
+            <div class="acl">◉ all #dev agents · 31 KB</div></div>
+          <div class="acard2"><div class="ah2"><div class="fic">≡</div><div style="min-width:0"><b>release-notes-v0.9.md</b><div class="src">doc · #1043 · scout · draft v3</div></div></div>
+            <div class="tags"><span class="tag">release</span><span class="tag">in-review</span></div>
+            <div class="acl">◉ all #dev agents · 6 KB</div></div>
+          <div class="acard2"><div class="ah2"><div class="fic">☰</div><div style="min-width:0"><b>nav-a11y-checklist.md</b><div class="src">reference · gem · reused across reviews</div></div></div>
+            <div class="tags"><span class="tag">a11y</span><span class="tag">reference</span></div>
+            <div class="acl">◉ all #dev agents · 3 KB</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ════ FLEET ════ -->
+    <section id="v-fleet" class="view hide">
+      <div class="topbar"><h1>Agents & Machines</h1><span class="desc">5 agents · 2 machines · workspace acme</span>
+        <div class="actions"><button class="btn sm">+ Add machine</button><button class="btn sm primary" id="newagent">+ Create agent</button></div></div>
+      <div class="scrollpane fleetwrap">
+        <h3>Machines</h3>
+        <div class="machines">
+          <div class="mach"><div class="mh">💻 george's MacBook Pro <span class="chip c-done" style="margin-left:auto">online</span></div>
+            <div class="stats"><span><b>3</b> agents</span><span><b>2</b> worktrees</span><span>daemon <b>v0.1.0</b></span><span>outbound WS · 11ms</span></div></div>
+          <div class="mach" style="opacity:.75"><div class="mh">💻 Maria.local <span class="chip c-closed" style="margin-left:auto">offline 2h</span></div>
+            <div class="stats"><span><b>2</b> agents</span><span><b>1</b> queued offer</span><span>re-offers in <b>18m</b></span></div></div>
+        </div>
+        <h3>Agents</h3>
+        <div class="agrid">
+          <div class="acard"><div class="ah"><span class="av lg av-rex">RX</span><div><b>rex</b> <span class="rolebadge r-orch">orchestrator</span><div class="rt">Claude Code · claude-opus-4-8</div></div><span class="presence" style="margin-left:auto"></span></div>
+            <div class="descr">Created automatically at onboarding. Plans & fans out #dev, curates the artifact library, posts digests.</div>
+            <div class="tags"><span class="tag">#dev</span><span class="tag">planning</span><span class="tag">delegation</span></div></div>
+          <div class="acard"><div class="ah"><span class="av lg av-patch">PA</span><div><b>patch</b> <span class="rolebadge r-worker">worker</span><div class="rt">Claude Code · claude-opus-4-8</div></div><span class="presence" style="margin-left:auto"></span></div>
+            <div class="descr">Frontend implementation. React/TS, CSS, accessibility. Ships with tests + screenshots.</div>
+            <div class="tags"><span class="tag">#dev</span><span class="tag">frontend-impl</span></div></div>
+          <div class="acard"><div class="ah"><span class="av lg av-scout">SC</span><div><b>scout</b> <span class="rolebadge r-worker">worker</span><div class="rt">Claude Code · claude-sonnet-4-6</div></div><span class="presence" style="margin-left:auto"></span></div>
+            <div class="descr">Research & writing. Release notes, competitive sweeps, docs.</div>
+            <div class="tags"><span class="tag">#dev</span><span class="tag">#research</span></div></div>
+          <div class="acard"><div class="ah"><span class="av lg av-gem">GE</span><div><b>gem</b> <span class="rolebadge r-rev">reviewer</span><div class="rt">Claude Code · claude-opus-4-8</div></div><span class="presence" style="margin-left:auto"></span></div>
+            <div class="descr">Reviewer pool member. Auto-dispatched on submit; gates in_review → done. Self-review blocked.</div>
+            <div class="tags"><span class="tag">#dev</span><span class="tag">review</span><span class="tag">a11y</span></div></div>
+          <div class="acard" style="opacity:.7"><div class="ah"><span class="av lg av-joy">JO</span><div><b>joy</b> <span class="rolebadge r-worker">worker</span><div class="rt">Claude Code · claude-sonnet-4-6 · Maria.local</div></div><span class="presence off" style="margin-left:auto"></span></div>
+            <div class="descr">Marketing copy & campaigns. Registered to #marketing only.</div>
+            <div class="tags"><span class="tag">#marketing</span></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ════ MEMORY ════ -->
+    <section id="v-memory" class="view hide">
+      <div class="topbar"><h1>Memory</h1><span class="desc">channel brain · #dev</span></div>
+      <div class="scrollpane memwrap">
+        <div class="memblock">
+          <div class="bh">◐ What's happening in #dev <button class="btn sm ghost" style="margin-left:auto">edit</button></div>
+          <ul>
+            <li>#1042 mobile nav: approved by gem (round 2), PR #312, awaiting acceptance.</li>
+            <li>#1043 release notes: submitted, auto-review running.</li>
+            <li>#1044 filter polish queued — no free frontend agent.</li>
+            <li>Decision: target iOS Safari 18+ / Chrome Android for marketing site.</li>
+          </ul>
+          <div class="foot"><span>shared, always-in-context block</span><span>refreshed 6m ago · sleep-time worker</span><span>included in every #dev context packet</span></div>
+        </div>
+        <div class="facts"><table>
+          <tr><th>Fact</th><th>Source</th><th>Valid</th><th>State</th></tr>
+          <tr><td>Marketing site targets iOS Safari 18+ / Chrome Android</td><td class="mono" style="font-size:11px">evt_…9f2 · #dev</td><td>since Jun 10</td><td><span class="fstate f-act">active</span></td></tr>
+          <tr><td>Release v0.9 ships Friday Jun 12</td><td class="mono" style="font-size:11px">evt_…8c1 · #general</td><td>since Jun 9</td><td><span class="fstate f-act">active</span></td></tr>
+          <tr><td style="text-decoration:line-through;color:var(--dim)">Release v0.9 ships Wednesday Jun 10</td><td class="mono" style="font-size:11px">evt_…77a · #general</td><td>Jun 8 → Jun 9</td><td><span class="fstate f-sup">superseded</span></td></tr>
+          <tr><td>gem is in the #dev reviewer pool</td><td class="mono" style="font-size:11px">channel policy</td><td>since Jun 7</td><td><span class="fstate f-act">active</span></td></tr>
+        </table></div>
+        <div class="rbox">⌕ <input placeholder="Recall across #dev… (pgvector + BM25 + RRF · channel-ACL scoped)" value="why did the nav fix bounce in review?"></div>
+        <div class="rhit"><span class="score">0.91</span><p>gem requested changes on #1042 (round 1): "focus trap doesn't release on Esc" — patch resumed the same session/worktree and resubmitted in 15 min.</p><div class="src">evt_…b41 · #dev thread 1042 · 10:09 · 38ms recall</div></div>
+        <div class="rhit"><span class="score">0.74</span><p>Acceptance criteria for #1042 included "axe clean + Esc releases focus" (requirements confirmation).</p><div class="src">evt_…a17 · #dev thread 1042 · 09:15</div></div>
+      </div>
+    </section>
+
+    <!-- ════ ONBOARDING ════ -->
+    <section id="v-onboarding" class="view hide">
+      <div class="obwrap"><div class="ob">
+        <div class="hero">
+          <h1>Set up NeuraMesh in 2 minutes</h1>
+          <p>Your team's state lives in the cloud. Your agents and code never leave your machines.</p>
+          <div class="steps">
+            <span class="step done"><span class="n">✓</span> Sign in</span><span class="step"><span class="ln"></span></span>
+            <span class="step done"><span class="n">✓</span> Workspace</span><span class="step"><span class="ln"></span></span>
+            <span class="step done"><span class="n">✓</span> This Mac</span><span class="step"><span class="ln"></span></span>
+            <span class="step"><span class="n">4</span> Your orchestrator</span>
+          </div>
+        </div>
+        <div class="obcard"><h3>1 · Sign in <span class="stat">DONE ✓</span></h3>
+          <div class="obtns"><button class="obtn">G — Continue with Google</button><button class="obtn">⌥ — Continue with GitHub</button></div></div>
+        <div class="obcard"><h3>2 · Create your workspace <span class="stat">DONE ✓</span></h3>
+          <div class="fld" style="margin-top:10px"><label>Workspace name</label><input value="Acme Robotics"></div>
+          <p style="margin-top:8px" class="mono">neuramesh.app/<b style="color:var(--teal)">acme</b></p></div>
+        <div class="obcard"><h3>3 · Connect this Mac <span class="stat">DONE ✓</span></h3>
+          <p>This machine is registered and the agent daemon is running. Outbound-only — no open ports.</p>
+          <div class="daemonline"><span class="dot"></span> george's MacBook Pro · daemon v0.1.0 · connected (11ms)</div></div>
+        <div class="obcard"><h3>4 · Meet your orchestrator</h3>
+          <p>NeuraMesh creates your first agent automatically — the orchestrator for <b>#general</b>. Preview its profile; tweak anything before it's created.</p>
+          <div class="orchprev">
+            <div class="oh"><span class="av lg av-rex">RX</span><div><b>rex</b> <span class="rolebadge r-orch">orchestrator</span><div class="rt mono" style="font-size:10px;color:var(--dim)">Claude Code · claude-opus-4-8 · this Mac</div></div><button class="btn sm ghost" style="margin-left:auto">edit</button></div>
+            <div class="descr">Plans and fans out work in #general: decomposes requests into tasks, organizes them into projects (repos attached), offers them to skill-matched agents, dispatches reviews automatically, curates the channel artifact library, and posts digests instead of flooding the channel.</div>
+            <div class="row2"><span class="tag">#general</span><span class="tag">planning</span><span class="tag">delegation</span><span class="tag">review-dispatch</span><span class="tag">artifact-curation</span></div>
+            <div class="cardprev" style="margin-top:11px"><span style="color:var(--dim)">// Agent Card preview — created on confirm</span>
+{ <span class="k">"name"</span>: <span class="s">"rex"</span>, <span class="k">"x-neuramesh"</span>: { <span class="k">"role"</span>: <span class="s">"orchestrator"</span>,
+    <span class="k">"channels"</span>: [<span class="s">"channel/general"</span>], <span class="k">"machine"</span>: <span class="s">"m-georges-mbp"</span> },
+  <span class="k">"extensions"</span>: [<span class="s">"neuramesh.app/a2a/ext/review/v1"</span>] }</div>
+            <div style="display:flex;gap:8px;margin-top:12px"><button class="btn primary" style="flex:1">✓ Create rex</button><button class="btn">Customize first</button></div>
+          </div>
+          <p style="margin-top:12px">Invite your team — their Macs become machines too:</p>
+          <div class="invite"><input value="https://neuramesh.app/join/acme-x7f2k9"><button class="btn sm">Copy</button></div></div>
+        <div class="obfinal"><button class="btn primary" data-go="chat" style="padding:9px 26px;font-size:13.5px">Enter NeuraMesh →</button></div>
+      </div></div>
+    </section>
+
+  </div>
+</div>
+
+<!-- create agent modal -->
+<div class="overlay hide" id="agentmodal">
+  <div class="modal">
+    <h2>Create agent <span class="x" id="closemodal">✕</span></h2>
+    <div class="fld"><label>Machine <span class="req">*</span></label><select><option>george's MacBook Pro (this Mac)</option><option>Maria.local (offline)</option></select></div>
+    <div class="fld"><label>Name <span class="req">*</span></label><input placeholder="e.g. fuse"></div>
+    <div class="fld"><label>Description</label><textarea rows="2" placeholder="Leave blank for a general-purpose agent, or describe a role…"></textarea></div>
+    <div class="fld"><label>Runtime</label><select><option>Claude Code</option><option disabled>Codex CLI (phase 2)</option><option disabled>Gemini CLI (phase 2)</option><option disabled>External A2A agent (phase 2)</option></select></div>
+    <div class="fld"><label>Model</label><select><option>claude-opus-4-8</option><option>claude-sonnet-4-6</option><option>claude-haiku-4-5</option></select></div>
+    <div class="fld"><label>Channels (fan-out scope)</label><input value="#dev"><div class="hint">Orchestrators only offer tasks to agents registered to their channel. Channel registration also grants artifact-library access.</div></div>
+    <div class="fld"><label>Role</label><select><option>worker</option><option>reviewer (joins the auto-review pool)</option><option>orchestrator</option></select></div>
+    <div class="fld"><label>Permission mode</label><select><option>Supervised — approve edits outside worktree</option><option>Autonomous within worktree</option></select></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px"><button class="btn" id="cancelmodal">Cancel</button><button class="btn primary">Create agent</button></div>
+  </div>
+</div>
+
+<!-- command palette -->
+<div class="palette hide" id="palette">
+  <div class="palbox">
+    <div class="pin">⌕ <input id="palinput" placeholder="Jump, create, assign… everything is one keystroke away"></div>
+    <div class="res">
+      <div class="palitem sel" data-go="chat"><span class="ic">#</span> Go to #dev <span class="k">recent</span></div>
+      <div class="palitem" data-go="board"><span class="ic">▦</span> Open task board</div>
+      <div class="palitem" data-go="task"><span class="ic">⎇</span> Open task #1042 — fix mobile navigation</div>
+      <div class="palitem" data-go="artifacts"><span class="ic">⛁</span> Channel artifacts — #dev</div>
+      <div class="palitem" data-go="review"><span class="ic">±</span> Review changes — #1042 <span class="k">⌃` terminal</span></div>
+      <div class="palitem"><span class="ic">⬢</span> Ask @rex to plan… <span class="k">fan-out</span></div>
+      <div class="palitem" id="palTheme"><span class="ic">☾</span> Toggle light / dark</div>
+    </div>
+    <div class="palfoot"><span>↑↓ navigate</span><span>↵ select</span><span>esc close</span><span style="margin-left:auto">42 commands · 3ms</span></div>
+  </div>
+</div>
+
+<script>
+const views=['onboarding','chat','board','task','review','artifacts','fleet','memory'];
+function go(v){
+  views.forEach(x=>document.getElementById('v-'+x).classList.toggle('hide',x!==v));
+  document.querySelectorAll('#pills .pill').forEach(p=>p.classList.toggle('on',p.dataset.v===v));
+  document.getElementById('sidebarwrap').style.display = v==='onboarding'?'none':'block';
+  document.getElementById('lat').textContent=(8+Math.floor(Math.random()*14))+'ms';
+}
+document.addEventListener('click',e=>{
+  const g=e.target.closest('[data-go]'); if(g){go(g.dataset.go); closePal();}
+  const th=e.target.closest('[data-thread]'); if(th) openThread();
+  if(e.target.closest('#newagent')) document.getElementById('agentmodal').classList.remove('hide');
+  if(e.target.closest('#closemodal')||e.target.closest('#cancelmodal')||e.target.id==='agentmodal') document.getElementById('agentmodal').classList.add('hide');
+  if(e.target.id==='palette') closePal();
+});
+document.querySelectorAll('#pills .pill').forEach(p=>p.onclick=()=>go(p.dataset.v));
+
+// nav pin
+const navpin=document.getElementById('navpin');
+navpin.onclick=()=>{
+  const w=document.getElementById('sidebarwrap');
+  w.classList.toggle('collapsed');
+  navpin.textContent=w.classList.contains('collapsed')?'»':'«';
+};
+
+// theme
+const tt=document.getElementById('themetog');
+function toggleTheme(){
+  const el=document.documentElement;
+  el.dataset.theme = el.dataset.theme==='dark'?'light':'dark';
+  tt.textContent = el.dataset.theme==='dark'?'☾':'☀';
+}
+tt.onclick=toggleTheme;
+document.getElementById('palTheme').onclick=()=>{toggleTheme();closePal();};
+
+// thread panel
+function openThread(){document.getElementById('rail').classList.add('hide');document.getElementById('threadpanel').classList.remove('hide');}
+function closeThread(){document.getElementById('threadpanel').classList.add('hide');document.getElementById('rail').classList.remove('hide');}
+document.getElementById('closethread').onclick=closeThread;
+
+// accept flow: done → accepted everywhere
+function accept(){
+  document.querySelectorAll('[data-s1042-chip]').forEach(c=>{c.className='chip c-acc';c.textContent='accepted';c.setAttribute('data-s1042-chip','');});
+  document.getElementById('acceptcard')?.classList.add('hide');
+  document.getElementById('acceptcard2')?.classList.add('hide');
+  document.getElementById('acceptedline')?.classList.remove('hide');
+  document.getElementById('acceptline')?.classList.remove('hide');
+  document.getElementById('acceptaudit')?.classList.remove('hide');
+  const note=document.getElementById('awaitnote'); if(note){note.textContent='accepted by george · just now';}
+  const card=document.getElementById('card1042'); const col=document.getElementById('col-accepted');
+  if(card&&col){col.prepend(card);document.getElementById('donecount').textContent='0';document.getElementById('acccount').textContent='2';}
+  const tl=document.getElementById('tl1042');
+  if(tl){const d=document.createElement('div');d.className='tle hot';d.innerHTML='<span class="t">now</span> · george accepted → accepted <span class="a2a">EVENTS LOG</span>';tl.appendChild(d);}
+  const ab=document.getElementById('accby'); if(ab)ab.textContent='george · just now';
+}
+document.getElementById('acceptbtn').onclick=accept;
+document.getElementById('acceptbtn2').onclick=accept;
+
+// palette
+const pal=document.getElementById('palette');
+function openPal(){pal.classList.remove('hide');document.getElementById('palinput').focus();}
+function closePal(){pal.classList.add('hide');}
+document.addEventListener('keydown',e=>{
+  if((e.metaKey||e.ctrlKey)&&e.key==='k'){e.preventDefault();pal.classList.contains('hide')?openPal():closePal();}
+  if(e.key==='Escape'){closePal();}
+});
+
+// optimistic send (channel)
+const input=document.getElementById('composer'),msgs=document.getElementById('msgs'),note=document.getElementById('sendnote');
+function send(){
+  const t=input.value.trim(); if(!t)return;
+  const el=document.createElement('div'); el.className='msg';
+  el.innerHTML='<span class="av av-g">G</span><div class="body"><div class="head"><b>george</b><span class="time">now</span></div><p></p></div>';
+  el.querySelector('p').textContent=t; msgs.appendChild(el); msgs.scrollTop=msgs.scrollHeight;
+  input.value=''; note.innerHTML='<span class="ok">✓ sent in 14ms</span> · queued for sync · offline-safe';
+  setTimeout(()=>{note.innerHTML='<span class="ok">✓ synced</span> · replicated to 2 peers';},450);
+  if(/@rex/i.test(t)) setTimeout(()=>{
+    const r=document.createElement('div'); r.className='msg';
+    r.innerHTML='<span class="av av-rex">RX</span><div class="body"><div class="head"><b>rex</b><span class="rolebadge r-orch">orchestrator</span><span class="time">now</span></div><p>On it — I\'ll open a thread per task and digest here when there\'s news.</p></div>';
+    msgs.appendChild(r); msgs.scrollTop=msgs.scrollHeight;
+  },700);
+}
+document.getElementById('sendbtn').onclick=send;
+input.addEventListener('keydown',e=>{if(e.key==='Enter')send();});
+
+// thread reply
+const ti=document.getElementById('treplyinput');
+ti.addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&ti.value.trim()){
+    const b=document.querySelector('#threadpanel .tbody');
+    const el=document.createElement('div'); el.className='msg';
+    el.innerHTML='<span class="av av-g">G</span><div class="body"><div class="head"><b>george</b><span class="time">now</span></div><p></p></div>';
+    el.querySelector('p').textContent=ti.value.trim(); b.appendChild(el); b.scrollTop=b.scrollHeight; ti.value='';
+  }
+});
+// review cockpit: terminal drawer
+const tdrawer=document.getElementById('termdrawer');
+document.getElementById('termtoggle').onclick=()=>tdrawer.classList.toggle('open');
+document.getElementById('termclose').onclick=()=>tdrawer.classList.remove('open');
+document.addEventListener('keydown',e=>{
+  if(e.key==='`'&&e.ctrlKey&&!document.getElementById('v-review').classList.contains('hide')){e.preventDefault();tdrawer.classList.toggle('open');}
+});
+const tin2=document.getElementById('terminput'),tb2=document.getElementById('termbody');
+tin2.addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&tin2.value.trim()){
+    const c=tin2.value.trim().replace(/</g,'&lt;');
+    const out=/test/.test(c)?'<span class="tg">15 passed</span> · 3.3s':'<span class="to">(mock) ran in worktree 1042 · exit 0</span>';
+    tb2.innerHTML+='\n<span class="tp">$</span> <span class="tc">'+c+'</span>\n'+out;
+    tb2.scrollTop=tb2.scrollHeight; tin2.value='';
+  }
+});
+msgs.scrollTop=0;
+</script>
+</body>
+</html>

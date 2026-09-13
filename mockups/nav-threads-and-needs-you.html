@@ -1,0 +1,555 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Every door lands on the conversation — projects become the tree, needs-you becomes rows</title>
+<style>
+[data-theme] { --font:'Geist Variable',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; --fmono:'Geist Mono Variable',ui-monospace,'SF Mono',Menlo,monospace; --fdisp:'Source Serif 4','Iowan Old Style',Georgia,serif; --ease:cubic-bezier(.22,1,.36,1); }
+/* verbatim from apps/desktop/src/renderer/src/tokens.css */
+[data-theme='dark'] {
+  --win:#0d0d0d; --bg:#141414; --panel:#191919; --panel2:#212121; --panel3:#2b2b2b;
+  --border:#272727; --border2:#383838; --card:#1b1b1b; --card-border:#2e2e2e;
+  --text:#eaeaea; --body:#b6b6b6; --muted:#898989; --dim:#676767; --ring:#585858;
+  --accent:#eaeaea; --accent-ink:#101010; --link:#d19a72; --hover-bg:rgba(234,234,234,.06);
+  --sel-bg:rgba(234,234,234,.09);
+  --prog:#8ba0c0; --review:#a89ccf; --done:#77ac8d; --acc:#6fb0ab; --ship:#7cb0bd;
+  --design:#cc8fb9; --violet:#a89ccf; --violet-soft:rgba(168,156,207,.16);
+  --blocked:#9ca0a8; --closed:#727272; --shadow:rgba(0,0,0,.6);
+}
+[data-theme='cream-oak'] {
+  --win:#f0e5d3; --bg:#fbf8f4; --panel:#fbf8f4; --panel2:#f6eee1; --panel3:#efe1cd;
+  --border:#e6dbca; --border2:#d3c2a8; --card:#ffffff; --card-border:#eadfce;
+  --text:#2a1c13; --body:#574838; --muted:#97846c; --dim:#b5a289; --ring:#b08a5e;
+  --accent:#834a2b; --accent-ink:#fff7ee; --link:#9c5730; --hover-bg:rgba(42,28,19,.05);
+  --sel-bg:rgba(42,28,19,.08);
+  --prog:#4f80c4; --review:#6d5ce0; --done:#0f9d63; --acc:#2f8f8a; --ship:#1f7f96;
+  --design:#b0498f; --violet:#6d5ce0; --violet-soft:rgba(109,92,224,.12);
+  --blocked:#7d7f86; --closed:#897a60; --shadow:rgba(70,42,18,.22);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#131210; font-family:'Geist Variable',-apple-system,sans-serif; }
+.page { max-width:1760px; margin:0 auto; padding:32px 24px 70px; }
+.pagehead { color:#eaeaea; margin-bottom:8px; }
+.pagehead h1 { font-family:'Source Serif 4',Georgia,serif; font-size:24px; font-weight:640; letter-spacing:-.012em; }
+.pagehead p { color:#898989; font-size:13px; line-height:1.62; margin-top:9px; max-width:104ch; }
+.pagehead b { color:#b6b6b6; } .pagehead .warn { color:#c8a06a; font-weight:600; } .pagehead .ok { color:#8fbf9f; font-weight:600; }
+.pagehead code { font:11.5px 'Geist Mono Variable',monospace; color:#c8a06a; }
+.stophd { color:#eaeaea; font-size:15.5px; font-weight:660; margin:44px 0 4px; font-family:'Source Serif 4',Georgia,serif; }
+.stopno { font:700 10px 'Geist Mono Variable',monospace; letter-spacing:.12em; color:#6f6f6f; text-transform:uppercase; margin-right:8px; }
+.stopp { color:#898989; font-size:12.5px; line-height:1.62; max-width:104ch; margin-bottom:16px; }
+.stopp b { color:#b6b6b6; } .stopp code { font:11.5px 'Geist Mono Variable',monospace; color:#c8a06a; }
+.stopp .no { color:#c8846a; font-weight:600; }
+.themes { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+@media (max-width:1400px){ .themes { grid-template-columns:1fr; } }
+.theme { background:var(--win); border:1px solid var(--border2); border-radius:16px; padding:16px; color:var(--text); min-width:0; }
+.theme > h2 { font-size:10.5px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--dim); margin:0 2px 12px; }
+.callouts { display:flex; flex-wrap:wrap; gap:8px 18px; margin-top:12px; }
+.co { font-size:11.5px; color:#898989; line-height:1.55; max-width:46ch; }
+.co b { color:#b6b6b6; } .co code { font:10.5px 'Geist Mono Variable',monospace; color:#c8a06a; }
+.co .n { display:inline-grid; place-items:center; width:16px; height:16px; border-radius:50%; background:#2b2b2b; color:#c8a06a; font:700 10px monospace; margin-right:6px; }
+.mark { position:absolute; width:19px; height:19px; border-radius:50%; background:#c8a06a; color:#131210; font:700 11px monospace; display:grid; place-items:center; box-shadow:0 1px 4px rgba(0,0,0,.5); z-index:9; }
+.rel { position:relative; }
+
+/* ── shell ── */
+.shell { display:flex; background:var(--win); border-radius:14px; padding:8px 8px 8px 0; min-height:600px; }
+.spine { width:30px; flex:none; display:flex; flex-direction:column; align-items:center; gap:9px; padding:11px 0 9px; color:var(--dim); }
+.sp-rule { width:14px; height:1px; background:var(--border2); flex:none; }
+.sp-name { writing-mode:vertical-rl; text-orientation:mixed; font:700 9.5px var(--fmono); letter-spacing:.15em; text-transform:uppercase; color:var(--body); }
+.sp-live { width:5px; height:5px; border-radius:50%; background:var(--prog); flex:none; box-shadow:0 0 0 3px color-mix(in srgb,var(--prog) 20%,transparent); }
+.sp-dots { display:flex; flex-direction:column; align-items:center; gap:5px; margin-top:3px; }
+.sp-dot { width:4px; height:4px; border-radius:50%; background:var(--border2); }
+.sp-foot { margin-top:auto; display:flex; flex-direction:column; align-items:center; gap:9px; }
+.sp-gear { font-size:10px; color:var(--dim); }
+.sp-av { width:22px; height:22px; border-radius:7px; background:linear-gradient(160deg,var(--panel3),var(--panel2)); border:1px solid var(--border2); display:grid; place-items:center; font:700 9.5px var(--font); color:var(--text); }
+
+.nav { width:230px; min-width:230px; display:flex; flex-direction:column; padding:6px 0 4px; }
+.scopehead { display:flex; align-items:center; gap:7px; margin:4px 10px 2px 2px; padding:7px 10px; border-radius:9px; font-size:12.5px; font-weight:640; color:var(--text); }
+.scopehead .h { color:var(--dim); font-weight:600; } .scopehead .caret { margin-left:auto; color:var(--dim); font-size:9px; }
+.navnew { display:flex; align-items:stretch; margin:6px 10px 8px 2px; }
+.navnewchat { display:flex; align-items:center; gap:8px; flex:1; padding:7px 10px; border:1px solid transparent; border-radius:9px 0 0 9px; background:var(--accent); box-shadow:0 1px 2px var(--shadow); color:var(--accent-ink); font-size:12.5px; font-weight:640; }
+.navnewchat .k { margin-left:auto; font:600 9.5px var(--fmono); color:var(--accent-ink); opacity:.6; }
+.navnewcaret { flex:none; width:24px; border:1px solid transparent; border-left:1px solid color-mix(in srgb, var(--accent-ink) 26%, transparent); border-radius:0 9px 9px 0; background:var(--accent); color:var(--accent-ink); font-size:9px; display:grid; place-items:center; }
+.navitem { display:flex; align-items:center; gap:9px; margin:1px 10px 1px 2px; padding:6px 10px; border-radius:8px; font-size:12.5px; color:var(--body); border:1px solid transparent; }
+.navitem .ni { width:15px; text-align:center; opacity:.8; font-size:12px; }
+.navitem.on { background:var(--card); border-color:var(--card-border); color:var(--text); font-weight:620; box-shadow:0 1px 2px var(--shadow); }
+.navitem .badge { margin-left:auto; font:700 9.5px var(--fmono); color:var(--muted); }
+
+/* projects tree */
+.projsec { padding:12px 14px 4px; font:700 9px var(--fmono); letter-spacing:.13em; text-transform:uppercase; color:var(--dim); display:flex; align-items:center; gap:6px; }
+.projsec .find { margin-left:auto; opacity:.7; font-size:10px; }
+.projhead { display:flex; align-items:center; gap:6px; margin:2px 10px 0 6px; padding:4px 6px; border-radius:7px; font:640 11.5px var(--font); color:var(--body); }
+.projhead:hover { background:var(--hover-bg); }
+.projhead .chev { flex:none; width:10px; font-size:8px; color:var(--dim); transition:transform .12s var(--ease); }
+.projhead.open .chev { transform:rotate(90deg); }
+.projhead .pnm { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.projhead .live { width:5px; height:5px; border-radius:50%; background:var(--prog); flex:none; }
+.projhead .npip { flex:none; min-width:15px; height:15px; padding:0 4px; border-radius:99px; background:var(--accent); color:var(--accent-ink); font:700 9px var(--fmono); display:grid; place-items:center; }
+.projhead .padd, .projhead .pfilter { flex:none; width:17px; height:17px; display:grid; place-items:center; border-radius:5px; color:var(--dim); opacity:0; }
+.projhead .padd { font-size:11px; }
+.projhead .pfilter { font:700 10px var(--fmono); }
+.projhead:hover .padd, .projhead:hover .pfilter, .projhead .padd.showing, .projhead .pfilter.showing { opacity:1; }
+.projhead .padd:hover, .projhead .pfilter:hover { background:var(--sel-bg); color:var(--text); }
+.chanpop { position:absolute; width:200px; background:var(--card); border:1px solid var(--card-border); border-radius:11px; box-shadow:0 20px 46px -18px var(--shadow); padding:5px; z-index:8; }
+.chanpop .cphint { padding:5px 9px 3px; font:700 8.5px var(--fmono); letter-spacing:.09em; text-transform:uppercase; color:var(--dim); }
+.chanpop .cprow { display:flex; align-items:center; gap:8px; padding:5px 9px; border-radius:7px; font-size:12px; color:var(--text); }
+.chanpop .cprow:hover { background:var(--hover-bg); }
+.chanpop .cprow .ck { flex:none; width:13px; height:13px; border-radius:4px; border:1.5px solid var(--border2); display:grid; place-items:center; font-size:8px; }
+.chanpop .cprow .ck.on { background:var(--accent); border-color:var(--accent); color:var(--accent-ink); }
+.chanpop .cprow .h { color:var(--dim); font:600 11px var(--fmono); }
+.chanpop .cpsep { border-top:1px solid var(--border); margin:4px 6px; }
+.chanpop .cpnew { display:flex; align-items:center; gap:8px; padding:5px 9px; font:620 11.5px var(--font); color:var(--link); }
+.threadrow { display:flex; align-items:flex-start; gap:7px; padding:4px 8px 4px 9px; margin:1px 10px 1px 20px; border:1px solid transparent; border-radius:8px; }
+.threadrow:hover { background:var(--hover-bg); }
+.threadrow.on { background:var(--card); border-color:var(--card-border); box-shadow:0 1px 2px var(--shadow); }
+.tdot { flex:none; width:6px; height:6px; border-radius:50%; margin-top:5.5px; background:transparent; box-shadow:inset 0 0 0 1.5px var(--dim); }
+.tdot.task { background:currentColor; box-shadow:none; }
+.tdot.prog { color:var(--prog); } .tdot.review { color:var(--review); } .tdot.done { color:var(--done); }
+.tdot.pulse { box-shadow:0 0 0 3px color-mix(in srgb,currentColor 24%,transparent); }
+.tbody { flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; }
+.tl1 { display:flex; align-items:baseline; gap:6px; min-width:0; }
+.tnum { flex:none; font:700 10px var(--fmono); color:var(--muted); }
+.ttitle { flex:1; min-width:0; font-size:12px; color:var(--body); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.threadrow.on .ttitle { color:var(--text); font-weight:600; }
+.twhen { flex:none; font:500 9.5px var(--fmono); color:var(--dim); }
+.tl2 { display:flex; align-items:center; gap:6px; font:500 9.5px var(--fmono); color:var(--dim); min-width:0; }
+.tl2 .br { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.tdot.ask { box-shadow:0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent); animation:askpulse 1.8s ease-in-out infinite; }
+.tdot.ask.chat { background:var(--accent); box-shadow:0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent); }
+@keyframes askpulse { 50% { box-shadow:0 0 0 1.5px color-mix(in srgb, var(--accent) 14%, transparent); } }
+.pask { width:6px; height:6px; border-radius:50%; background:var(--accent); flex:none; box-shadow:0 0 0 2.5px color-mix(in srgb, var(--accent) 24%, transparent); }
+.tmore { margin:1px 10px 4px 27px; font:600 10.5px var(--font); color:var(--dim); padding:2px 8px; }
+
+.main { flex:1; min-width:0; background:var(--panel); border-radius:13px; display:flex; flex-direction:column; overflow:hidden; position:relative; box-shadow:0 1px 8px -2px var(--shadow); }
+.tabstrip { display:flex; align-items:stretch; gap:2px; padding:6px 8px 0; border-bottom:1px solid var(--border); flex:none; }
+.wtab { display:flex; align-items:center; gap:7px; padding:7px 10px 8px; border-radius:9px 9px 0 0; font-size:12px; color:var(--muted); border:1px solid transparent; border-bottom:none; max-width:190px; min-width:0; }
+.wtab .ic { flex:none; opacity:.85; }
+.wtab .lbl { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+.wtab .x { flex:none; opacity:.45; font-size:10px; margin-left:2px; }
+.wtab.on { background:var(--panel); border-color:var(--border); color:var(--text); font-weight:620; box-shadow:0 1px 0 var(--panel); margin-bottom:-1px; }
+.wtab.conv { color:var(--text); } .wtab.conv .ic { color:var(--link); }
+.wtabadd { margin-left:4px; padding:7px 9px; border-radius:8px; color:var(--dim); font-size:13px; align-self:center; }
+.wtabright { margin-left:auto; display:flex; align-items:center; gap:4px; padding-right:2px; }
+.wtabico { width:26px; height:26px; display:grid; place-items:center; border-radius:7px; color:var(--dim); align-self:center; font-size:12px; }
+
+/* chat home */
+.homewrap { flex:1; padding:18px 26px; overflow:hidden; display:flex; flex-direction:column; }
+.homekick { font:700 9px var(--fmono); letter-spacing:.13em; text-transform:uppercase; color:var(--dim); }
+.homegreet { font-family:var(--fdisp); font-size:22px; font-weight:640; margin-top:3px; }
+.homesub { font-size:11.5px; color:var(--muted); margin-top:3px; }
+.hsect { display:flex; align-items:center; gap:7px; font:640 12.5px var(--font); color:var(--text); margin:18px 0 6px; }
+.hsect .n { font:700 9.5px var(--fmono); background:var(--panel2); color:var(--muted); border-radius:9px; padding:1px 6px; }
+.nyrow { display:flex; align-items:center; gap:9px; padding:7px 10px; border:1px solid var(--card-border); background:var(--card); border-radius:10px; margin-bottom:6px; box-shadow:0 1px 2px var(--shadow); }
+.nyrow:hover { transform:translateY(-1px); box-shadow:0 4px 10px -4px var(--shadow); }
+.nykind { flex:none; font:640 8px var(--fmono); letter-spacing:.06em; text-transform:uppercase; padding:2px 6px; border-radius:5px; }
+.nykind.decision { color:var(--violet); background:var(--violet-soft); }
+.nykind.gate { color:var(--review); background:color-mix(in srgb, var(--review) 14%, transparent); }
+.nytext { flex:1; min-width:0; font-size:12px; color:var(--body); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.nytext b { color:var(--text); font-weight:620; }
+.nymeta { flex:none; font:500 10px var(--fmono); color:var(--dim); }
+.nygo { flex:none; color:var(--dim); font-size:11px; }
+.nyx { flex:none; color:var(--dim); font-size:10px; opacity:0; }
+.nyrow:hover .nyx { opacity:.7; }
+.inflight { display:flex; align-items:center; gap:8px; font-size:11.5px; color:var(--muted); padding:4px 2px; }
+.inflight .ind { width:5px; height:5px; border-radius:50%; background:var(--prog); }
+.inflight .verb { font-style:italic; }
+.composer { margin-top:auto; border:1px solid var(--card-border); background:var(--card); border-radius:13px; padding:11px 13px; box-shadow:0 2px 8px -4px var(--shadow); }
+.composer.focused { box-shadow:0 0 0 2px color-mix(in srgb, var(--ring) 42%, transparent), 0 2px 8px -4px var(--shadow); }
+.composer .ph { font-size:12.5px; color:var(--dim); }
+.composer .crow { display:flex; align-items:center; gap:8px; margin-top:10px; }
+.cchip { display:inline-flex; align-items:center; gap:5px; border:1px solid var(--card-border); background:var(--card); border-radius:99px; padding:2.5px 9px; font:600 10.5px var(--font); color:var(--body); }
+.cchip .h { color:var(--dim); }
+.wbattachpill { display:inline-flex; align-items:center; gap:6px; max-width:200px; padding:3px 8px; border:1px solid var(--card-border); background:var(--card); border-radius:99px; font:620 11px var(--font); color:var(--text); }
+.wbattachpill .wic { color:var(--link); font-size:11px; }
+.wbattachpill .t { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.wbattachpill .x { color:var(--dim); font-size:10px; }
+.csend { margin-left:auto; width:30px; height:30px; border-radius:50%; background:var(--accent); color:var(--accent-ink); display:grid; place-items:center; font-size:13px; }
+.cursor { display:inline-block; width:1.5px; height:13px; background:var(--text); vertical-align:-2px; animation:blink 1.1s steps(1) infinite; }
+@keyframes blink { 50% { opacity:0; } }
+
+/* thread view (stop 3 right) */
+.msgs { flex:1; padding:16px 18px; display:flex; flex-direction:column; gap:13px; overflow:hidden; }
+.msg { display:flex; gap:10px; }
+.mav { width:26px; height:26px; border-radius:8px; background:var(--panel3); flex:none; display:grid; place-items:center; font-size:11px; }
+.mhead { font-size:12px; display:flex; gap:7px; align-items:baseline; }
+.mhead b { font-weight:660; } .mhead .role { font:640 8px var(--fmono); letter-spacing:.06em; text-transform:uppercase; color:var(--muted); background:var(--panel2); padding:1.5px 5px; border-radius:5px; }
+.mhead .ago { color:var(--dim); font-size:10px; }
+.mtext { font-size:12.5px; line-height:1.6; color:var(--body); margin-top:2px; max-width:66ch; }
+.dcard { margin-top:8px; width:min(430px,94%); border:1px solid var(--card-border); background:var(--card); border-radius:12px; padding:11px 13px; box-shadow:0 2px 8px -4px var(--shadow); }
+.dchead { display:flex; align-items:center; gap:7px; margin-bottom:8px; }
+.dctitle { font-size:12.5px; font-weight:640; }
+.dcopt { display:flex; align-items:center; gap:8px; border:1px solid var(--card-border); border-radius:9px; padding:6px 10px; font-size:12px; color:var(--body); margin-bottom:5px; }
+.dcopt .k { font:700 9.5px var(--fmono); color:var(--muted); width:14px; }
+.dcown { display:flex; gap:7px; margin-top:7px; }
+.dcown .in { flex:1; border:1px solid var(--card-border); border-radius:9px; padding:6px 10px; font-size:11.5px; color:var(--dim); }
+.dcown .go { border-radius:99px; background:var(--accent); color:var(--accent-ink); font:620 11px var(--font); padding:6px 13px; }
+.crumb { display:flex; align-items:center; gap:8px; padding:9px 14px 0; font:600 10.5px var(--fmono); color:var(--muted); }
+.crumb b { color:var(--text); font-family:var(--font); font-size:12.5px; }
+
+/* plan cards */
+.phase { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-top:14px; }
+@media (max-width:1100px){ .phase { grid-template-columns:repeat(2,1fr); } }
+.pcard { background:#1b1b1b; border:1px solid #2c2c2c; border-radius:11px; padding:12px 13px; }
+.pcard h4 { color:#eaeaea; font-size:12px; font-weight:660; margin-bottom:3px; }
+.pcard .n { font:700 9px monospace; letter-spacing:.1em; color:#c8a06a; text-transform:uppercase; }
+.pcard p { font-size:11px; color:#898989; line-height:1.55; margin-top:5px; }
+.pcard p code { font:10px monospace; color:#c8a06a; }
+.pcard .ship { font-size:10.5px; color:#8fbf9f; margin-top:6px; display:block; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<div class="pagehead">
+  <h1>Every door lands on the conversation — projects become the tree, needs-you becomes rows</h1>
+  <p><b>The ask (George, 2026-08-07, from live v0.86 use):</b> ① Share to chat from the Whiteboards destination re-opens the destination instead of a chat with the staged pill. ② Home / New chat clicked while a whiteboard tab is active appear to do nothing. ③ Recents should read like T3 Code's list — project, thread title, worktree + task id — and the consensus pattern: <b>collapsible project groups</b> in the left nav, each with a ＋ to start a chat in that project. ④ Retire the Home nav item (New chat IS the door, opening the chat home with the composer focused); attention counts move onto the thread rows themselves; the spine sheds its Home too. ⑤ Needs-you cards on the home shrink to clickable rows (the In-flight / Claude-desktop idiom) — answering happens in the thread.</p>
+  <p><b>Verdict on ①+②: one missing invariant, not two bugs.</b> Nav doors (<code>openWorkspaceHome</code>, <code>newChat</code>, the destination tuples) mutate nav state but never activate tab 0 — so with a whiteboard tab active the surface changes <i>invisibly underneath</i>. Share does activate tab 0, but tab 0 renders whatever <code>view</code> is current — still <code>whiteboards</code>, a surface with no composer, so the staged pill has nowhere to appear. The fix is one function every door calls: <b>land on the conversation tab, show a composer surface, focus it.</b></p>
+  <p><b>Round 2 (George, same day):</b> ⑥ per-thread attention is <b>color, not numerals</b> — the row's own dial pulses in the accent (a chat row's hollow dot fills), and a collapsed group shows one accent dot; there is at most one ask per thread, so a count said nothing a color doesn't. ⑦ <b>New chat inside a thread inherits its context</b> — the chip arrives pre-set to that thread's project + channel, composer focused. ⑧ <b>The `All channels` head is retired</b>: channels become a per-project <code>#</code> filter on each group header (select which channels feed the group's rows, or create one in that project — the tune-menu shape). Destinations scope to the active project; the composer's own #channel chip is untouched.</p>
+  <p><b>Verdict on ③–⑤: yes — and it composes from idioms we already have.</b> Task rows already carry their <code>⎇ branch</code> second line (the recents-rows ruling); grouping nests them under project headers so the project reads as the <b>group label</b>, not a per-row prefix. The needs-you queue already derives from one source (<code>needsyou.ts</code>) — the same truth simply renders as row-pips in the tree and compact rows on the home, and the full decision card keeps living where it always did: <b>in the thread</b>, which is where answers belong.</p>
+</div>
+
+<!-- ══════════ STOP 1 ══════════ -->
+<div class="stophd"><span class="stopno">Stop 1</span>One invariant: a door to a conversation activates the conversation</div>
+<div class="stopp"><code>goConversation(surface)</code> — set the nav state, <b>activate tab 0</b>, and (when the surface has a composer) focus it. Every door calls it: New chat, the destination rows, Share to chat, deep links, the peek. <b>Share to chat</b> becomes: stage the pill → if a thread is open, land in it; otherwise land on the <b>chat home</b> — composer focused, pill visible beside the paperclip. The board's tab stays open in the strip; you are one ⌘-number from the canvas.</div>
+<div class="themes">
+  <div class="theme rel" data-theme="cream-oak">
+    <h2>After Share to chat — landed on the chat home, pill staged, composer focused · cream oak</h2>
+    <div class="shell" style="min-height:560px">
+      <div class="spine">
+        <div class="sp-live"></div>
+        <div class="sp-name">gads inc</div>
+        <div class="sp-dots"><div class="sp-dot"></div><div class="sp-dot"></div></div>
+        <div class="sp-foot"><div class="sp-gear">⚙</div><div class="sp-av">G</div></div>
+      </div>
+      <div class="nav">
+        <div class="navnew"><div class="navnewchat">＋ New chat <span class="k">⌘N</span></div><div class="navnewcaret">▾</div></div>
+        <div class="navitem"><span class="ni">▦</span> Tasks <span class="badge">9</span></div>
+        <div class="navitem"><span class="ni">⊞</span> Whiteboards</div>
+        <div class="navitem"><span class="ni">↻</span> Automations</div>
+        <div class="navitem"><span class="ni">▤</span> Library</div>
+        <div class="projsec">Projects <span class="find">⌕</span></div>
+        <div class="projhead open"><span class="chev">▶</span><span class="pnm">gads-site</span><span class="live"></span><span class="pask"></span><span class="pfilter">#</span><span class="padd">＋</span></div>
+        <div class="threadrow"><div class="tdot task prog ask"></div><div class="tbody"><div class="tl1"><span class="tnum">1055</span><span class="ttitle">Contact Us page redesign</span><span class="twhen">20h</span></div><div class="tl2"><span class="br">⎇ nm-1055-contact-us-page</span></div></div></div>
+        <div class="threadrow"><div class="tdot"></div><div class="tbody"><div class="tl1"><span class="ttitle">Rex, what tasks do we have open?</span><span class="twhen">21h</span></div></div></div>
+        <div class="projhead"><span class="chev">▶</span><span class="pnm">marketing</span><span class="pask"></span><span class="pfilter">#</span><span class="padd">＋</span></div>
+        <div class="projhead"><span class="chev">▶</span><span class="pnm">flowe-ai</span><span class="pfilter">#</span><span class="padd">＋</span></div>
+      </div>
+      <div class="main">
+        <div class="tabstrip">
+          <div class="wtab conv on"><span class="ic">◈</span><span class="lbl">New chat</span></div>
+          <div class="wtab"><span class="ic">⊞</span><span class="lbl">launch funnel sketch</span><span class="x">✕</span></div>
+          <div class="wtabadd">＋</div>
+          <div class="wtabright"><span class="wtabico">◫</span><span class="wtabico">▤</span></div>
+        </div>
+        <div class="homewrap">
+          <div class="homekick">Thursday · GADS INC</div>
+          <div class="homegreet">Good afternoon, George.</div>
+          <div class="homesub">6 passed review this week · 2 things need you</div>
+          <div class="hsect">Needs you <span class="n">2</span></div>
+          <div class="nyrow"><span class="nykind decision">decision</span><span class="nytext"><b>rex asks:</b> Accept &amp; close #1044 — write messaging-framework.md to the library?</span><span class="nymeta">#marketing · 1d</span><span class="nyx">✕</span><span class="nygo">›</span></div>
+          <div class="nyrow"><span class="nykind decision">decision</span><span class="nytext"><b>rex asks:</b> Add @iris to #general? — designer needed for #1055 mockups</span><span class="nymeta">#general · 21h</span><span class="nyx">✕</span><span class="nygo">›</span></div>
+          <div class="hsect" style="margin-top:14px">In flight</div>
+          <div class="inflight"><span class="ind"></span><b>patch</b>&nbsp;<span class="verb">building the contact form · 2/5</span>&nbsp;· #1055</div>
+          <div class="composer focused">
+            <div class="ph"><span class="cursor"></span> here's the funnel I sketched — thoughts before I file it?</div>
+            <div class="crow">
+              <span class="cchip"><span class="h">#</span>general</span>
+              <span class="wbattachpill"><span class="wic">⊞</span><span class="t">launch funnel sketch</span><span class="x">✕</span></span>
+              <span style="color:var(--dim); font-size:12px">🖇</span>
+              <span class="csend">↑</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="mark" style="top:96px; left:420px">1</div>
+    <div class="mark" style="top:512px; left:600px">2</div>
+    <div class="mark" style="top:96px; right:150px">3</div>
+  </div>
+
+  <div class="theme rel" data-theme="dark">
+    <h2>The contract, stated once · graphite</h2>
+    <div style="padding:6px 4px 2px">
+      <div style="font-family:var(--fdisp); font-size:15px; font-weight:640; margin-bottom:10px">goConversation(surface) — the one door</div>
+      <div style="display:flex; flex-direction:column; gap:8px; font-size:12px; color:var(--body); max-width:64ch">
+        <div style="display:flex; gap:9px"><span style="font:700 10px var(--fmono); color:var(--link); flex:none; width:100px">sets state</span><span>nav / view / scope — exactly what each door sets today, unchanged.</span></div>
+        <div style="display:flex; gap:9px"><span style="font:700 10px var(--fmono); color:var(--link); flex:none; width:100px">activates tab 0</span><span>the conversation tab fronts — a whiteboard, file or terminal tab never hides the navigation you just performed. The tab you left stays open in the strip.</span></div>
+        <div style="display:flex; gap:9px"><span style="font:700 10px var(--fmono); color:var(--link); flex:none; width:100px">focuses composer</span><span>when the landing surface has one (chat home, thread). New chat = <code>goConversation(home)</code> + focus — and when a thread is open, the chip arrives pre-set to <b>its</b> project + channel (round 2, ⑦). A destination row (Tasks, Whiteboards) = <code>goConversation(destination)</code> — no composer, no focus.</span></div>
+      </div>
+      <div style="border-top:1px solid var(--border); margin:14px 0 12px"></div>
+      <div style="font:700 9.5px var(--fmono); letter-spacing:.1em; text-transform:uppercase; color:var(--dim); margin-bottom:8px">Share to chat, before → after</div>
+      <div style="display:flex; flex-direction:column; gap:7px; font-size:12px; color:var(--body); max-width:66ch">
+        <div><span class="no" style="font-weight:600; color:#c8846a">today</span> — stage pill → activate tab 0 → tab 0 still renders <code>view='whiteboards'</code> → the destination again; the pill exists but no composer shows it. Reads as "it did nothing."</div>
+        <div><span style="font-weight:600; color:#8fbf9f">after</span> — stage pill → <code>goConversation(open thread ?? chat home)</code> → composer focused, pill beside the paperclip → type, send: one message carries your words + the board card.</div>
+      </div>
+      <div style="border-top:1px solid var(--border); margin:14px 0 12px"></div>
+      <div style="font:700 9.5px var(--fmono); letter-spacing:.1em; text-transform:uppercase; color:var(--dim); margin-bottom:8px">Doors that adopt it</div>
+      <div style="font-size:12px; color:var(--body); max-width:66ch; line-height:1.7">＋ New chat · every project-group ＋ · thread rows · Share to chat · the peek's click-through · notification deep links · ⌘1. Destination rows call the same function minus focus. <b>No door mutates nav state without deciding which tab fronts</b> — that's the whole bug class, retired.</div>
+    </div>
+    <div class="mark" style="top:96px; left:20px">4</div>
+  </div>
+</div>
+<div class="callouts">
+  <div class="co"><span class="n">1</span><b>Landed, visibly.</b> Share switched to tab 0, tab 0 shows the chat home, and the board's tab is still open one click away. Nothing happened invisibly.</div>
+  <div class="co"><span class="n">2</span><b>The pill has a home now</b> — the focused composer, cursor blinking, #channel chip beside it. Type and send; the card rides your words.</div>
+  <div class="co"><span class="n">3</span><b>Open thread wins.</b> If a conversation was already open, Share lands there instead of the home — the pill follows the composer either way (it's global staging).</div>
+  <div class="co"><span class="n">4</span><b>One function, greppable.</b> Slice 1 is small and ships alone: every door funnels through <code>goConversation</code>, and a lint-style test asserts no `setNav`/`setView` call site outside it touches tabs.</div>
+</div>
+
+<!-- ══════════ STOP 2 ══════════ -->
+<div class="stophd"><span class="stopno">Stop 2</span>The nav: projects become the tree, New chat becomes the door</div>
+<div class="stopp">The left column, top to bottom: <b>＋ New chat</b> (the one door; Home the nav item is retired — the chat home is what New chat opens), the four destinations, then <b>PROJECTS</b>: one collapsible group per project, newest-active first. A group header is the project label — chevron · name · live pulse · an <b>accent dot</b> when any of its threads holds an ask · two hover controls: <code>#</code> (the project's channel filter — select or create) and ＋ (a chat in that project). Rows inside are the T3 anatomy on our own idiom: state dial · <span style="font-family:var(--fmono); font-size:11px">#task</span> number when it's a task · title · age, and tasks keep their <code>⎇ branch</code> mono second line. A thread holding an ask says so with its own dial: the state dot pulses in the accent (a chat row's hollow dot fills) — color where the answer lives, no numerals. The spine sheds Home too: it keeps the project dots (fast switch + the active-project scope for destinations), settings, and the account tile.</div>
+<div class="themes">
+  <div class="theme rel" data-theme="cream-oak">
+    <h2>Expanded — the asks pulse on their own rows · cream oak</h2>
+    <div class="shell" style="min-height:620px">
+      <div class="spine">
+        <div class="sp-live"></div>
+        <div class="sp-name">gads inc</div>
+        <div class="sp-dots"><div class="sp-dot"></div><div class="sp-dot"></div><div class="sp-dot"></div></div>
+        <div class="sp-foot"><div class="sp-gear">⚙</div><div class="sp-av">G</div></div>
+      </div>
+      <div class="nav">
+        <div class="navnew"><div class="navnewchat">＋ New chat <span class="k">⌘N</span></div><div class="navnewcaret">▾</div></div>
+        <div class="navitem"><span class="ni">▦</span> Tasks <span class="badge">9</span></div>
+        <div class="navitem"><span class="ni">⊞</span> Whiteboards</div>
+        <div class="navitem"><span class="ni">↻</span> Automations</div>
+        <div class="navitem"><span class="ni">▤</span> Library</div>
+        <div class="projsec">Projects <span class="find">⌕</span></div>
+        <div class="projhead open"><span class="chev">▶</span><span class="pnm">gads-site</span><span class="live"></span><span class="pask"></span><span class="pfilter">#</span><span class="padd">＋</span></div>
+        <div class="threadrow on"><div class="tdot task prog ask"></div><div class="tbody"><div class="tl1"><span class="tnum">1055</span><span class="ttitle">Contact Us page redesign</span><span class="twhen">20h</span></div><div class="tl2"><span class="br">⎇ nm-1055-contact-us-page</span></div></div></div>
+        <div class="threadrow"><div class="tdot task review ask"></div><div class="tbody"><div class="tl1"><span class="tnum">1044</span><span class="ttitle">Messaging framework doc</span><span class="twhen">1d</span></div><div class="tl2"><span class="br">⎇ nm-1044-messaging-framework</span></div></div></div>
+        <div class="threadrow"><div class="tdot"></div><div class="tbody"><div class="tl1"><span class="ttitle">Rex, what tasks do we have open?</span><span class="twhen">21h</span></div></div></div>
+        <div class="tmore">6 more ›</div>
+        <div class="projhead open"><span class="chev">▶</span><span class="pnm">marketing</span><span class="pfilter">#</span><span class="padd">＋</span></div>
+        <div class="threadrow"><div class="tdot task done"></div><div class="tbody"><div class="tl1"><span class="tnum">1048</span><span class="ttitle">Week-1 X posts</span><span class="twhen">1d</span></div><div class="tl2"><span class="br">⎇ nm-1048-week1-x-posts</span></div></div></div>
+        <div class="threadrow"><div class="tdot"></div><div class="tbody"><div class="tl1"><span class="ttitle">Research SEO keywords</span><span class="twhen">1d</span></div></div></div>
+        <div class="projhead"><span class="chev">▶</span><span class="pnm">flowe-ai</span><span class="pfilter">#</span><span class="padd">＋</span></div>
+      </div>
+      <div class="main">
+        <div class="tabstrip">
+          <div class="wtab conv on"><span class="ic">◈</span><span class="lbl">#1055 · Contact Us page redesign</span></div>
+          <div class="wtabadd">＋</div>
+          <div class="wtabright"><span class="wtabico">◫</span><span class="wtabico">▤</span></div>
+        </div>
+        <div class="homewrap" style="opacity:.35">
+          <div class="homekick">#1055 · task thread</div>
+          <div class="homegreet" style="font-size:16px">the thread you clicked, front and center</div>
+        </div>
+      </div>
+    </div>
+    <div class="mark" style="top:72px; left:190px">5</div>
+    <div class="mark" style="top:262px; left:170px">6</div>
+    <div class="mark" style="top:308px; left:64px">7</div>
+    <div class="mark" style="top:388px; left:152px">8</div>
+  </div>
+
+  <div class="theme rel" data-theme="dark">
+    <h2>Collapsed groups show one accent dot · the # filter open · graphite</h2>
+    <div class="shell" style="min-height:620px">
+      <div class="spine">
+        <div class="sp-live"></div>
+        <div class="sp-name">gads inc</div>
+        <div class="sp-dots"><div class="sp-dot"></div><div class="sp-dot"></div></div>
+        <div class="sp-foot"><div class="sp-gear">⚙</div><div class="sp-av">G</div></div>
+      </div>
+      <div class="nav">
+        <div class="navnew"><div class="navnewchat">＋ New chat <span class="k">⌘N</span></div><div class="navnewcaret">▾</div></div>
+        <div class="navitem"><span class="ni">▦</span> Tasks <span class="badge">9</span></div>
+        <div class="navitem"><span class="ni">⊞</span> Whiteboards</div>
+        <div class="navitem"><span class="ni">↻</span> Automations</div>
+        <div class="navitem"><span class="ni">▤</span> Library</div>
+        <div class="projsec">Projects <span class="find">⌕</span></div>
+        <div class="projhead"><span class="chev">▶</span><span class="pnm">gads-site</span><span class="live"></span><span class="pask"></span><span class="pfilter">#</span><span class="padd">＋</span></div>
+        <div class="projhead open" style="background:var(--hover-bg)"><span class="chev">▶</span><span class="pnm">marketing</span><span class="pask"></span><span class="pfilter showing">#</span><span class="padd showing" style="background:var(--sel-bg); color:var(--text)">＋</span></div>
+        <div class="threadrow"><div class="tdot task review ask"></div><div class="tbody"><div class="tl1"><span class="tnum">1044</span><span class="ttitle">Messaging framework doc</span><span class="twhen">1d</span></div><div class="tl2"><span class="br">⎇ nm-1044-messaging-framework</span></div></div></div>
+        <div class="threadrow"><div class="tdot task done"></div><div class="tbody"><div class="tl1"><span class="tnum">1042</span><span class="ttitle">Create brand guide</span><span class="twhen">1d</span></div><div class="tl2"><span class="br">⎇ nm-1042-brand-guide</span></div></div></div>
+        <div class="threadrow"><div class="tdot"></div><div class="tbody"><div class="tl1"><span class="ttitle">Draft &amp; schedule launch posts</span><span class="twhen">2d</span></div></div></div>
+        <div class="tmore">4 more ›</div>
+        <div class="projhead"><span class="chev">▶</span><span class="pnm">flowe-ai</span><span class="pfilter">#</span><span class="padd">＋</span></div>
+        <div class="chanpop" style="left:196px; top:352px">
+          <div class="cphint">marketing · channels</div>
+          <div class="cprow"><span class="ck on">✓</span><span class="h">#</span>marketing</div>
+          <div class="cprow"><span class="ck on">✓</span><span class="h">#</span>content</div>
+          <div class="cprow"><span class="ck">&nbsp;</span><span class="h">#</span>seo</div>
+          <div class="cpsep"></div>
+          <div class="cpnew">＋ New channel…</div>
+        </div>
+      </div>
+      <div class="main">
+        <div class="tabstrip">
+          <div class="wtab conv on"><span class="ic">◈</span><span class="lbl">New chat · marketing</span></div>
+          <div class="wtabadd">＋</div>
+          <div class="wtabright"><span class="wtabico">◫</span><span class="wtabico">▤</span></div>
+        </div>
+        <div class="homewrap">
+          <div class="homekick">Thursday · GADS INC</div>
+          <div class="homegreet">Good afternoon, George.</div>
+          <div class="homesub">a chat started from marketing's ＋ files there by default</div>
+          <div class="composer focused" style="margin-top:auto">
+            <div class="ph"><span class="cursor"></span> Describe the work — or just ask. The orchestrator decides what becomes a task.</div>
+            <div class="crow">
+              <span class="cchip" style="border-color:var(--ring)"><span class="h">#</span>marketing</span>
+              <span style="color:var(--dim); font-size:12px">🖇</span>
+              <span class="csend">↑</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="mark" style="top:246px; left:242px">9</div>
+    <div class="mark" style="top:330px; left:268px">10</div>
+    <div class="mark" style="bottom:74px; left:392px">11</div>
+  </div>
+</div>
+<div class="callouts">
+  <div class="co"><span class="n">5</span><b>Home is gone; nothing is lost.</b> New chat opens the same surface Home did, composer focused. The needs-you count stopped being a nav badge and became pips on the rows that actually hold the ask.</div>
+  <div class="co"><span class="n">6</span><b>The group IS the project label</b> — rows don't repeat it (T3 repeats per-row because its list is flat; ours nests). Group order: the active project first, then by newest activity. Collapse state is machine-local, like the theme and the fold.</div>
+  <div class="co"><span class="n">7</span><b>Task rows keep the recents anatomy</b>: state dial (the docs/25 ring hue), <code>#number</code>, title, age — and the <code>⎇ branch</code> mono second line the rail already earned. A live run still lifts the row and pulses the dial.</div>
+  <div class="co"><span class="n">8</span><b>Depth stays capped</b> — 3 rows per group at rest, <code>n more ›</code> expands in place, ⌘Y remains the full history. A tree with every thread ever is a scroll, not a nav.</div>
+  <div class="co"><span class="n">9</span><b>A collapsed group can't hide an ask</b> — one accent dot beside the name (same <code>needsyou.ts</code> truth, no second count anywhere). Expand and the pulsing rows say exactly where.</div>
+  <div class="co"><span class="n">10</span><b>Two hover controls, two jobs</b>: <code>#</code> opens the project's channel menu — check the channels that feed this group's rows, or <code>＋ New channel…</code> right there (the head's old dropdown, re-homed where it belongs); ＋ starts a chat filed to that project. One decision each, visible, undoable.</div>
+  <div class="co"><span class="n">11</span><b>The chip carries the ＋'s intent</b> — ringed for a beat so you see what the ＋ chose. Rex still triages the send exactly as docs/34 §14 froze it.</div>
+</div>
+
+<!-- ══════════ STOP 3 ══════════ -->
+<div class="stophd"><span class="stopno">Stop 3</span>Needs-you: rows on the home, cards in the thread</div>
+<div class="stopp">The chat home's needs-you section stops being a stack of full decision cards (options, free-text answer, three buttons — tall, and a second answering surface). It becomes <b>compact rows</b>, the Claude-desktop idiom your screenshot shows and the same anatomy as In flight: kind chip · one-line summary · #room + age · chevron. <b>Click = open the thread</b>, where the full card — options, type-your-own, everything — already renders and stays the one answering surface. Dismiss survives as a quiet hover ✕ on the row. The queue math doesn't change: same <code>needsyou.ts</code>, same drain-on-your-reply.</div>
+<div class="themes">
+  <div class="theme rel" data-theme="cream-oak">
+    <h2>The home — a queue of doors, not a form · cream oak</h2>
+    <div class="shell" style="min-height:540px">
+      <div class="spine">
+        <div class="sp-live"></div>
+        <div class="sp-name">gads inc</div>
+        <div class="sp-dots"><div class="sp-dot"></div><div class="sp-dot"></div></div>
+        <div class="sp-foot"><div class="sp-gear">⚙</div><div class="sp-av">G</div></div>
+      </div>
+      <div class="nav">
+        <div class="navnew"><div class="navnewchat">＋ New chat <span class="k">⌘N</span></div><div class="navnewcaret">▾</div></div>
+        <div class="navitem"><span class="ni">▦</span> Tasks <span class="badge">9</span></div>
+        <div class="navitem"><span class="ni">⊞</span> Whiteboards</div>
+        <div class="navitem"><span class="ni">↻</span> Automations</div>
+        <div class="navitem"><span class="ni">▤</span> Library</div>
+        <div class="projsec">Projects <span class="find">⌕</span></div>
+        <div class="projhead open"><span class="chev">▶</span><span class="pnm">gads-site</span><span class="pask"></span><span class="pfilter">#</span><span class="padd">＋</span></div>
+        <div class="threadrow"><div class="tdot ask chat"></div><div class="tbody"><div class="tl1"><span class="ttitle">Add @iris to #general?</span><span class="twhen">21h</span></div></div></div>
+        <div class="projhead"><span class="chev">▶</span><span class="pnm">marketing</span><span class="pask"></span><span class="pfilter">#</span><span class="padd">＋</span></div>
+      </div>
+      <div class="main">
+        <div class="tabstrip">
+          <div class="wtab conv on"><span class="ic">◈</span><span class="lbl">New chat</span></div>
+          <div class="wtabadd">＋</div>
+          <div class="wtabright"><span class="wtabico">◫</span><span class="wtabico">▤</span></div>
+        </div>
+        <div class="homewrap">
+          <div class="homekick">Thursday · GADS INC</div>
+          <div class="homegreet">Good afternoon, George.</div>
+          <div class="homesub">6 passed review this week · 2 things need you</div>
+          <div class="hsect">Needs you <span class="n">2</span></div>
+          <div class="nyrow"><span class="nykind decision">decision</span><span class="nytext"><b>rex asks:</b> Accept &amp; close #1044 — write messaging-framework.md to the library?</span><span class="nymeta">#marketing · 1d</span><span class="nyx">✕</span><span class="nygo">›</span></div>
+          <div class="nyrow"><span class="nykind decision">decision</span><span class="nytext"><b>rex asks:</b> Add @iris to #general? — designer needed for #1055 mockups</span><span class="nymeta">#general · 21h</span><span class="nyx">✕</span><span class="nygo">›</span></div>
+          <div class="hsect" style="margin-top:12px">In flight</div>
+          <div class="inflight"><span class="ind"></span><b>patch</b>&nbsp;<span class="verb">building the contact form · 2/5</span>&nbsp;· #1055</div>
+          <div class="inflight"><span class="ind"></span><b>plume</b>&nbsp;<span class="verb">drafting week-2 posts · 1/3</span>&nbsp;· #1048</div>
+          <div class="composer"><div class="ph">Describe the work — or just ask. @ mention · / skill · ↵ send</div>
+            <div class="crow"><span class="cchip"><span class="h">#</span>general</span><span style="color:var(--dim); font-size:12px">🖇</span><span class="csend">↑</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="mark" style="top:200px; left:420px">12</div>
+    <div class="mark" style="top:200px; right:100px">13</div>
+  </div>
+
+  <div class="theme rel" data-theme="dark">
+    <h2>Click-through — the thread answers, exactly as it already does · graphite</h2>
+    <div class="shell" style="min-height:540px">
+      <div class="spine">
+        <div class="sp-live"></div>
+        <div class="sp-name">gads inc</div>
+        <div class="sp-dots"><div class="sp-dot"></div><div class="sp-dot"></div></div>
+        <div class="sp-foot"><div class="sp-gear">⚙</div><div class="sp-av">G</div></div>
+      </div>
+      <div class="nav">
+        <div class="navnew"><div class="navnewchat">＋ New chat <span class="k">⌘N</span></div><div class="navnewcaret">▾</div></div>
+        <div class="navitem"><span class="ni">▦</span> Tasks <span class="badge">9</span></div>
+        <div class="navitem"><span class="ni">⊞</span> Whiteboards</div>
+        <div class="navitem"><span class="ni">↻</span> Automations</div>
+        <div class="navitem"><span class="ni">▤</span> Library</div>
+        <div class="projsec">Projects <span class="find">⌕</span></div>
+        <div class="projhead open"><span class="chev">▶</span><span class="pnm">gads-site</span><span class="pfilter">#</span><span class="padd">＋</span></div>
+        <div class="threadrow on"><div class="tdot ask chat"></div><div class="tbody"><div class="tl1"><span class="ttitle">Add @iris to #general?</span><span class="twhen">21h</span></div></div></div>
+      </div>
+      <div class="main">
+        <div class="tabstrip">
+          <div class="wtab conv on"><span class="ic">◈</span><span class="lbl">Add @iris to #general?</span></div>
+          <div class="wtabadd">＋</div>
+          <div class="wtabright"><span class="wtabico">◫</span><span class="wtabico">▤</span></div>
+        </div>
+        <div class="crumb">‹ #general · conversations <b style="margin-left:6px">Add @iris to #general?</b></div>
+        <div class="msgs">
+          <div class="msg"><div class="mav">🦊</div><div>
+            <div class="mhead"><b>rex</b><span class="role">orchestrator</span><span class="ago">21h</span></div>
+            <div class="mtext">#1055's design leg needs mockups and there's no designer registered in #general. iris is on the workspace — add her to this room?</div>
+            <div class="dcard">
+              <div class="dchead"><span class="nykind decision">decision</span><span class="dctitle">Add @iris to #general?</span></div>
+              <div class="dcopt"><span class="k">1</span>Add @iris — designer isn't in this channel yet</div>
+              <div class="dcopt"><span class="k">2</span>Not now</div>
+              <div class="dcown"><span class="in">Type your own answer…</span><span class="go">Answer</span></div>
+            </div>
+          </div></div>
+        </div>
+        <div class="composer" style="margin:0 14px 12px"><div class="ph">Reply — @ mention · ↵ send</div></div>
+      </div>
+    </div>
+    <div class="mark" style="top:262px; left:560px">14</div>
+    <div class="mark" style="top:146px; left:236px">15</div>
+  </div>
+</div>
+<div class="callouts">
+  <div class="co"><span class="n">12</span><b>A row is a door, not a form.</b> One line tells you who asks and what for; the answer happens where the context lives. The two-card stack that filled the home becomes ~64px.</div>
+  <div class="co"><span class="n">13</span><b>Dismiss survives as the hover ✕</b> — same semantics as the card's Dismiss today. Answering, as always, is the thread's job; the row never grows buttons.</div>
+  <div class="co"><span class="n">14</span><b>Nothing new in the thread</b> — the full decision card (options, free-text, Answer) already renders here and already drains the queue on your reply. This stop deletes a duplicate answering surface; it builds nothing.</div>
+  <div class="co"><span class="n">15</span><b>The row's pulse and the home's row are the same fact</b> — both read <code>needsyou.ts</code>; answering in the thread clears both at once. A count that can't disagree with the page it opens.</div>
+</div>
+
+<!-- ══════════ STOP 4 ══════════ -->
+<div class="stophd"><span class="stopno">Stop 4</span>The build — four slices, each shippable</div>
+<div class="phase">
+  <div class="pcard">
+    <span class="n">Slice 1 · the invariant</span>
+    <h4>goConversation everywhere</h4>
+    <p>One pure helper + every door adopts it (New chat, dest rows, Share, peek, deep links, ⌘1). Share targets <code>open thread ?? chat home</code> + composer focus. Fixes both live bugs; touches no layout.</p>
+    <span class="ship">Ships: Share lands where the pill is; nav never acts invisibly.</span>
+  </div>
+  <div class="pcard">
+    <span class="n">Slice 2 · needs-you rows</span>
+    <h4>Queue of doors</h4>
+    <p>The home's decision cards become <code>.nyrow</code>s (kind chip · summary · meta · hover ✕); click = <code>goConversation(thread)</code>. Thread-side cards untouched. Same <code>needsyou.ts</code> derivation.</p>
+    <span class="ship">Ships: the home reads at a glance; one answering surface.</span>
+  </div>
+  <div class="pcard">
+    <span class="n">Slice 3 · the tree</span>
+    <h4>Projects in the nav</h4>
+    <p>Recents → project groups: header (chevron · name · live · ask-dot · hover <code>#</code> filter + ＋), rows nested (dial · #num · title · age · ⎇ branch line) with accent-pulse asks, 3-per-group + <code>n more ›</code>, collapse + channel-filter persisted machine-local.</p>
+    <span class="ship">Ships: George's T3 ask — project context without the spine glance.</span>
+  </div>
+  <div class="pcard">
+    <span class="n">Slice 4 · retire Home</span>
+    <h4>New chat is the door</h4>
+    <p>Home leaves the destinations and the spine; the `All channels` head retires (channel create/select moves into the <code>#</code> filters); New chat opens the chat home focused, inheriting an open thread's project + channel. Mirrors updated: ⌘K, views burger, tour copy, crumb, <code>TOUR_STEPS</code>.</p>
+    <span class="ship">Ships: one door, counts live on threads, spine = workspace items.</span>
+  </div>
+</div>
+<div class="stopp" style="margin-top:18px">
+  <b>Invariants (enforced, not prompted):</b> no door mutates nav state without deciding the fronting tab — every door calls <code>goConversation</code> and a test greps the call sites · the tree, the group pips and the home rows all read <b>one</b> <code>needsyou.ts</code> derivation — a second count is a defect by construction · collapse state and group order are machine-local preferences (the fold/theme precedent), never synced · the per-project ＋ only pre-scopes the chip — filing stays visible and changeable, rex still triages (docs/34 §14 unchanged) · the thread-side decision card and its drain semantics are untouched.<br/><br/>
+  <b>Budgets:</b> nav re-render on a pip change &lt;16ms (rows are capped at 3/group + expanders — no virtualization needed) · <code>goConversation</code> is a view switch: &lt;100ms · collapse/expand ≤150ms with the house ease.<br/><br/>
+  <b>Deploy notes:</b> renderer-only — no schema, no sync rules, no migrations. Desktop release only.<br/><br/>
+  <b>Settled in round 2:</b> attention is color (row pulse / group dot), New chat inherits an open thread's context, the head dies and channels live in the per-project <code>#</code> filter.<br/>
+  <b>Still open:</b> ① group order — active project pinned first, then newest activity (my draft), or strictly by activity? ② non-active projects start collapsed on first run, except a group holding an ask (my draft: yes)? ③ with the head gone, the destination pages (Tasks, Whiteboards…) scope to the whole active project — fine, or do they need their own channel filter chip (my draft: whole project; the pages already have local lenses)? ④ any aggregate signal anywhere, or color-on-rows only (my draft: rows only)?
+</div>
+
+</div>
+</body>
+</html>

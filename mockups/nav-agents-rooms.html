@@ -1,0 +1,756 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Left nav · add-agents overlay · new-room intro — mockups</title>
+<style>
+/* ── Real tokens, lifted from apps/desktop/src/renderer/src/tokens.css (Quiet Graphite v1.0) ── */
+[data-theme] {
+  --font:'Geist Variable',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --fmono:'Geist Mono Variable',ui-monospace,'SF Mono',Menlo,monospace;
+  --dur-fast:.12s; --dur:.18s; --ease:cubic-bezier(.21,.61,.35,1);
+  --r-xs:4px; --r-sm:6px; --r-md:8px; --r-lg:11px; --r-xl:14px; --r-full:999px;
+}
+[data-theme='dark'] {
+  --win:var(--panel2); --bg:#101010; --panel:#161616; --panel2:#1c1c1c; --panel3:#272727;
+  --border:#252525; --border2:#333333;
+  --text:#eaeaea; --body:#b6b6b6; --muted:#898989; --dim:#676767;
+  --link:#9cb1f0; --accent:var(--text); --accent-ink:#101010;
+  --btn:#232323; --btn-fg:#efefef; --btn-hover:#2e2e2e;
+  --green:#77ac8d; --violet:#a89ccf;
+  --role-orch:#9793d2; --role-arch:#a89ccf; --role-dev:#77ac8d; --role-rev:#7ba1c4;
+  --role-design:#cc8fb9; --role-cur:#6fb0ab; --role-ship:#7cb0bd; --role-mkt:#c98f8f; --role-tone:17%;
+  --shadow:rgba(0,0,0,.62); --overlay:#202020; --card:#1a1a1a; --card-border:#2a2a2a;
+  --ring:#525252; --hover-border:#404040;
+  --hover-bg:color-mix(in srgb, var(--text) 7%, transparent);
+  --sel-bg:color-mix(in srgb, var(--text) 10%, transparent); --sel-mark:var(--body);
+}
+[data-theme='light'] {
+  --win:var(--panel2); --bg:#f4f2ec; --panel:#fffefc; --panel2:#f8f6f1; --panel3:#efece5;
+  --border:#e2ded4; --border2:#cec5b7;
+  --text:#2f2a24; --body:#524c43; --muted:#837d72; --dim:#a09889;
+  --link:#4a5ec9; --accent:var(--text); --accent-ink:#fff;
+  --btn:#efece4; --btn-fg:#2f2a24; --btn-hover:#e5e1d7;
+  --green:#2f9e6b; --violet:#7d6cc4;
+  --role-orch:#635fc0; --role-arch:#7d6cc4; --role-dev:#3f9268; --role-rev:#4f7bb0;
+  --role-design:#b0498f; --role-cur:#2f8f8a; --role-ship:#1f7f96; --role-mkt:#a85a5a; --role-tone:14%;
+  --shadow:rgba(70,58,44,.14); --overlay:#fff; --card:#fcfbf8; --card-border:#e2ded4;
+  --ring:color-mix(in srgb, var(--accent) 55%, var(--border2));
+  --hover-border:color-mix(in srgb, var(--text) 22%, var(--border2));
+  --hover-bg:color-mix(in srgb, var(--text) 6%, transparent);
+  --sel-bg:color-mix(in srgb, var(--text) 8%, transparent); --sel-mark:var(--body);
+}
+
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0c0c0c;font-family:'Geist Variable',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased}
+.page{max-width:1560px;margin:0 auto;padding:34px 26px 80px}
+.pagehead{color:#eaeaea;margin-bottom:8px}
+.pagehead h1{font-size:20px;font-weight:650;letter-spacing:-.012em}
+.pagehead p{color:#898989;font-size:13px;line-height:1.6;margin-top:7px;max-width:96ch}
+.pagehead p b{color:#b6b6b6;font-weight:600}
+code{font-family:'Geist Mono Variable',ui-monospace,'SF Mono',Menlo,monospace;font-size:.92em;color:#b6b6b6}
+
+.part{margin-top:44px}
+.parthd{border-top:1px solid #242424;padding-top:20px;margin-bottom:16px;color:#eaeaea}
+.parthd h2{font-size:16px;font-weight:650;letter-spacing:-.01em;display:flex;align-items:baseline;gap:10px}
+.parthd h2 .n{font:800 10px/1 'Geist Mono Variable',monospace;letter-spacing:.1em;color:#676767;border:1px solid #2c2c2c;padding:5px 6px;border-radius:5px}
+.parthd p{color:#898989;font-size:12.5px;line-height:1.6;margin-top:8px;max-width:96ch}
+.parthd p b{color:#b6b6b6;font-weight:600}
+
+.stage{background:var(--bg);border:1px solid var(--border2);border-radius:16px;padding:18px 16px 22px;color:var(--text)}
+.stage>h3{font-size:10px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--dim);margin:0 4px 14px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+@media(max-width:1180px){.two{grid-template-columns:1fr}}
+/* part 01 stacks its two themes so all four rails sit in one comparable row */
+.stack{display:flex;flex-direction:column;gap:18px}
+
+/* rail comparison grid */
+.rails{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap}
+.railwrap{flex:0 0 258px}
+.railcap{font-size:11px;font-weight:700;color:var(--text);margin:0 0 3px 2px;display:flex;align-items:center;gap:7px}
+.railcap .tag{font:800 8px/1 'Geist Mono Variable',monospace;letter-spacing:.09em;text-transform:uppercase;padding:3.5px 5px;border-radius:4px;background:color-mix(in srgb,var(--muted) 16%,transparent);color:var(--muted)}
+.railcap .tag.rec{background:color-mix(in srgb,var(--green) 18%,transparent);color:var(--green)}
+.railcap .tag.now{background:color-mix(in srgb,var(--text) 8%,transparent);color:var(--dim)}
+.railsub{font-size:10.5px;color:var(--muted);line-height:1.5;margin:0 0 9px 2px;min-height:31px}
+
+/* ── the rail itself (mirrors .navpanel) ── */
+.rail{width:258px;background:var(--panel2);border:1px solid var(--border);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;height:534px}
+.navhead{display:flex;align-items:center;gap:8px;padding:9px 11px;border-bottom:1px solid var(--border);flex:none}
+.navhead-main{flex:1;min-width:0;display:flex;align-items:center;gap:10px;background:none;border:none;padding:5px 7px;margin:-3px -5px;border-radius:11px;color:var(--text)}
+.navbadge{width:34px;height:34px;border-radius:var(--r-lg);background:linear-gradient(160deg,var(--panel3),var(--panel2));font-weight:700;font-size:15px;display:grid;place-items:center;flex:none;border:1px solid var(--border2)}
+.navbadge .dot{width:15px;height:15px;border-radius:99px;background:#d98b2b;box-shadow:inset 0 0 0 3px #2b1c0c}
+.wsproj{flex:1;min-width:0}
+.wsproj b{display:block;font-weight:700;font-size:14px;letter-spacing:-.01em}
+.wsproj small{display:block;font-weight:500;font-size:10.5px;color:var(--dim);margin-top:1px}
+.wscaret{color:var(--dim);flex:none}
+.navscroll{flex:1;min-height:0;overflow:hidden;padding:2px 0 12px;display:flex;flex-direction:column;
+  /* content taller than the rail fades out rather than cutting mid-row — the shipped scroll cue */
+  -webkit-mask-image:linear-gradient(#000 calc(100% - 34px),transparent);mask-image:linear-gradient(#000 calc(100% - 34px),transparent)}
+.navfoot{display:flex;align-items:center;gap:8px;padding:8px;border-top:1px solid var(--border);flex:none}
+.navuser{display:flex;align-items:center;gap:9px;width:100%;padding:6px 8px;border:1px solid var(--border2);border-radius:11px;background:var(--panel3)}
+.navuserav{width:24px;height:24px;border-radius:7px;background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--accent);display:grid;place-items:center;font-weight:800;font-size:11px;flex:none}
+.navuser b{font-size:12.5px;font-weight:600}
+.navuser small{font-size:11px;color:var(--muted)}
+
+/* current (boxed) treatment */
+.navgroup{margin:6px 8px 5px;padding:3px 4px 5px;border:1px solid var(--border);border-radius:12px}
+.navsecthd{display:flex;align-items:center;justify-content:space-between;padding-right:11px}
+.navsecttoggle{flex:1;display:flex;align-items:center;gap:7px;padding:13px 16px 6px;border:none;background:none;font:700 10.5px var(--font);letter-spacing:.7px;text-transform:uppercase;color:var(--dim)}
+.navgroup .navsecttoggle{padding:8px 10px 6px}
+.navchev{display:inline-flex;color:var(--muted);opacity:.65}
+.chanadd{display:grid;place-items:center;width:18px;height:18px;border:none;border-radius:5px;background:none;color:var(--dim);font-size:15px;line-height:1}
+
+.chan{position:relative;display:flex;align-items:center;gap:8px;padding:4.5px 9px;margin:0 8px;border-radius:7px;color:var(--muted);font-size:12.5px}
+.navgroup .chan{margin-left:2px;margin-right:2px}
+.chan.on{background:var(--sel-bg);color:var(--text);font-weight:600}
+.chan.on::before{content:'';position:absolute;left:2px;top:6px;bottom:6px;width:2px;border-radius:2px;background:var(--sel-mark)}
+.chan .h{color:var(--dim);font-weight:600}
+.chan .lbl{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chan .changear{color:var(--dim);opacity:0;display:inline-flex}
+.chan.on .changear{opacity:1}
+.presence{width:7px;height:7px;border-radius:99px;background:var(--green);display:inline-block;flex:none}
+.presence.off{background:var(--dim)}
+
+/* agent rows */
+.navagent{display:flex;align-items:center;gap:9px;padding:6px 10px;margin:0 2px;border-radius:9px}
+.navabody{min-width:0;flex:1;display:flex;flex-direction:column;gap:1px}
+.navaname{display:flex;align-items:center;gap:6px;min-width:0}
+.navaname b{font-size:12.5px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.navstatus{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.navstatus.busy{color:var(--text);font-weight:600}
+.navaddbtn{margin-left:auto;width:22px;height:22px;flex:none;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:14px;line-height:18px;padding:0}
+.rolechip{font-size:6.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;padding:1.5px 4.5px;border-radius:var(--r-xs);background:color-mix(in srgb,var(--muted) 16%,transparent);color:var(--muted);flex:none}
+.rolechip[data-role=orchestrator]{color:color-mix(in srgb,var(--role-orch) 80%,var(--muted))}
+.rolechip[data-role=architect]{color:color-mix(in srgb,var(--role-arch) 80%,var(--muted))}
+.rolechip[data-role=developer]{color:color-mix(in srgb,var(--role-dev) 80%,var(--muted))}
+.rolechip[data-role=reviewer]{color:color-mix(in srgb,var(--role-rev) 80%,var(--muted))}
+.rolechip[data-role=designer]{color:color-mix(in srgb,var(--role-design) 80%,var(--muted))}
+.rolechip[data-role=curator]{color:color-mix(in srgb,var(--role-cur) 80%,var(--muted))}
+.rolechip[data-role=shipper]{color:color-mix(in srgb,var(--role-ship) 80%,var(--muted))}
+.rolechip[data-role=marketer]{color:color-mix(in srgb,var(--role-mkt) 80%,var(--muted))}
+.rolechip[data-role=worker]{color:var(--muted)}
+
+/* avatar stand-in — production uses DiceBear Thumbs (AgentAvatar) */
+.pav{display:inline-grid;place-items:center;flex:none;position:relative;border-radius:8px;font-weight:800;font-size:11px;color:#fff;letter-spacing:-.02em}
+.pav::after{content:'';position:absolute;inset:0;border-radius:inherit;box-shadow:inset 0 0 0 1px color-mix(in srgb,#000 22%,transparent)}
+.pav[data-r=orchestrator]{background:var(--role-orch)} .pav[data-r=architect]{background:var(--role-arch)}
+.pav[data-r=developer]{background:var(--role-dev)} .pav[data-r=reviewer]{background:var(--role-rev)}
+.pav[data-r=designer]{background:var(--role-design)} .pav[data-r=curator]{background:var(--role-cur)}
+.pav[data-r=shipper]{background:var(--role-ship)} .pav[data-r=marketer]{background:var(--role-mkt)}
+.pav[data-r=worker]{background:var(--muted)}
+.pav.s28{width:28px;height:28px} .pav.s24{width:24px;height:24px;border-radius:7px;font-size:10px}
+.pav.s22{width:22px;height:22px;border-radius:6px;font-size:9.5px} .pav.s30{width:30px;height:30px;border-radius:9px;font-size:12px}
+.pav.s26{width:26px;height:26px;border-radius:7px;font-size:10.5px}
+.pav.dimmed{opacity:.42;filter:grayscale(1)}
+
+/* ── A · flat rail ── */
+.fsec{margin-top:14px}
+.fsec:first-child{margin-top:6px}
+.fsechd{display:flex;align-items:center;justify-content:space-between;padding:0 12px 5px 14px}
+.fsechd .t{font:700 10px var(--font);letter-spacing:.09em;text-transform:uppercase;color:var(--dim)}
+.fsechd .acts{display:flex;align-items:center;gap:2px;opacity:.55}
+.fsechd .acts button{display:grid;place-items:center;width:19px;height:19px;border:none;border-radius:5px;background:none;color:var(--dim);font-size:14px;line-height:1}
+.frow{position:relative;display:flex;align-items:center;gap:9px;padding:5px 10px;margin:0 8px;border-radius:7px;color:var(--muted);font-size:12.5px;min-height:29px}
+.frow.on{background:var(--sel-bg);color:var(--text);font-weight:600}
+.frow.on::before{content:'';position:absolute;left:2px;top:6px;bottom:6px;width:2px;border-radius:2px;background:var(--sel-mark)}
+.frow .h{color:var(--dim);font-weight:600;width:11px;text-align:center;flex:none}
+.frow .lbl{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.frow .lbl b{font-weight:600;color:var(--text);font-size:12.5px}
+.frow.mut .lbl b{color:var(--muted);font-weight:500}
+.frow .say{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:96px;flex:none}
+.frow .say.busy{color:var(--body);font-weight:600}
+.frow .plus{margin-left:auto;width:19px;height:19px;flex:none;border-radius:5px;border:none;background:none;color:var(--dim);font-size:14px;line-height:1;display:grid;place-items:center}
+.frow .plus.solid{border:1px solid var(--border2);background:var(--panel3);color:var(--body)}
+.wdot{width:6px;height:6px;border-radius:99px;flex:none;background:var(--role-dev);box-shadow:0 0 0 3px color-mix(in srgb,var(--role-dev) 22%,transparent)}
+.wdot.rev{background:var(--role-arch);box-shadow:0 0 0 3px color-mix(in srgb,var(--role-arch) 22%,transparent)}
+
+/* ── B · ruled bands ── */
+.bsec{margin-top:0;padding-top:11px;border-top:1px solid var(--border)}
+.bsec:first-child{border-top:none;padding-top:5px}
+.bsechd{display:flex;align-items:center;justify-content:space-between;padding:0 12px 6px 14px}
+.bsechd .t{font:700 10px var(--font);letter-spacing:.09em;text-transform:uppercase;color:var(--dim);display:flex;align-items:center;gap:6px}
+.bsechd .cnt{font:800 9px var(--fmono);color:var(--dim);opacity:.75}
+.bsechd button{width:19px;height:19px;border:none;border-radius:5px;background:none;color:var(--dim);font-size:14px;display:grid;place-items:center}
+
+/* ── C · working-first roster ── */
+.wall{display:flex;flex-wrap:wrap;gap:5px;padding:3px 14px 2px}
+.wall .pav{cursor:pointer}
+.wallmore{width:26px;height:26px;border-radius:7px;border:1px dashed var(--border2);color:var(--dim);font:700 9.5px var(--fmono);display:grid;place-items:center;background:none}
+.walllbl{padding:8px 14px 0;font-size:10.5px;color:var(--dim)}
+.walllbl b{color:var(--muted);font-weight:600}
+
+/* ── overlay ── */
+.scrimwrap{position:relative;border-radius:14px;overflow:hidden;background:var(--panel2);border:1px solid var(--border);padding:26px 18px;display:flex;justify-content:center;
+  background-image:linear-gradient(color-mix(in srgb,var(--win) 60%,transparent),color-mix(in srgb,var(--win) 60%,transparent)),repeating-linear-gradient(135deg,var(--panel2) 0 14px,var(--panel) 14px 28px)}
+.ovl{width:100%;max-width:498px;display:flex;flex-direction:column;background:var(--overlay);border:1px solid var(--border2);border-radius:var(--r-xl);box-shadow:0 24px 70px -28px var(--shadow);overflow:hidden}
+.ovlhd{display:flex;align-items:center;gap:9px;padding:13px 15px 12px;border-bottom:1px solid var(--border)}
+.ovlhd b{font-size:14px;font-weight:700}
+.chanpill{display:inline-flex;align-items:center;gap:3px;font:600 11px var(--font);color:var(--body);background:var(--panel3);border:1px solid var(--border);padding:3px 8px 3px 6px;border-radius:99px}
+.chanpill .h{color:var(--dim);font-weight:700}
+.ovlx{margin-left:auto;width:26px;height:26px;display:grid;place-items:center;border-radius:7px;border:1px solid var(--border);background:none;color:var(--muted);font-size:14px}
+.ovlsearch{display:flex;align-items:center;gap:8px;margin:12px 14px 2px;padding:8px 11px;background:var(--panel2);border:1px solid var(--border2);border-radius:10px;color:var(--muted);font-size:13px}
+.ovlsearch .cur{color:var(--text)}
+.ovlsearch .caret{width:1.5px;height:14px;background:var(--text);opacity:.75;margin-left:-3px}
+.ovlfilters{display:flex;flex-wrap:wrap;gap:6px;padding:10px 14px 4px}
+.fchip{font-size:11px;font-weight:600;color:var(--muted);background:var(--panel2);border:1px solid var(--border);padding:4px 9px;border-radius:99px;white-space:nowrap}
+.fchip.on{color:var(--text);background:var(--panel3);border-color:var(--border2)}
+.fchip .n{font:800 9.5px var(--fmono);opacity:.7;margin-left:4px}
+.ovllist{padding:6px 8px 8px;display:flex;flex-direction:column;gap:1px;max-height:352px;overflow:hidden}
+.ovlgrp{font:700 9.5px var(--font);letter-spacing:.09em;text-transform:uppercase;color:var(--dim);padding:9px 10px 5px}
+.orow{display:flex;align-items:center;gap:11px;padding:7px 10px;border-radius:10px}
+.orow.hov{background:var(--hover-bg)}
+.orow.inch{opacity:.66}
+.obody{min-width:0;flex:1;display:flex;flex-direction:column;gap:2px}
+.oname{display:flex;align-items:center;gap:7px;min-width:0}
+.oname b{font-size:13px;font-weight:600;color:var(--text)}
+.ostat{font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.oadd{flex:none;display:inline-flex;align-items:center;gap:4px;font:700 11px var(--font);color:var(--body);background:var(--panel3);border:1px solid var(--border2);padding:4.5px 10px 4.5px 8px;border-radius:99px}
+.oadd.hot{background:var(--btn-fg);border-color:var(--btn-fg);color:var(--accent-ink)}
+.oin{flex:none;font:600 11px var(--font);color:var(--dim);display:inline-flex;align-items:center;gap:5px}
+.oin .x{color:var(--muted);border:1px solid var(--border);border-radius:99px;padding:3px 8px;font-weight:600}
+.ovlfoot{border-top:1px solid var(--border);padding:8px;display:flex;flex-direction:column;gap:2px;background:color-mix(in srgb,var(--panel2) 55%,transparent)}
+.ovlfoot button{display:flex;align-items:center;gap:10px;width:100%;padding:8px 10px;border:none;border-radius:9px;background:none;color:var(--body);font:600 12.5px var(--font);text-align:left}
+.ovlfoot button .ic{width:26px;height:26px;flex:none;border-radius:8px;border:1px dashed var(--border2);display:grid;place-items:center;color:var(--muted);font-size:14px}
+.ovlfoot button small{margin-left:auto;font-size:11px;font-weight:500;color:var(--dim)}
+.ovlempty{padding:26px 16px 20px;text-align:center}
+.ovlempty p{font-size:12.5px;color:var(--muted);line-height:1.6}
+.ovlempty p b{color:var(--text)}
+.ovlempty .mk{margin-top:12px;display:inline-flex;align-items:center;gap:7px;font:700 12px var(--font);color:var(--accent-ink);background:var(--btn-fg);border:none;padding:8px 14px;border-radius:9px}
+
+/* ── channel intro ── */
+.room{background:var(--win);border:1px solid var(--border);border-radius:14px;overflow:hidden;display:flex;flex-direction:column;height:100%}
+.roomhd{display:flex;align-items:center;gap:10px;padding:11px 15px;border-bottom:1px solid var(--border)}
+.roomhd b{font-size:14.5px;font-weight:700}
+.roomhd .h{color:var(--dim);font-weight:700}
+.roomhd .sp{margin-left:auto;display:flex;gap:6px}
+.roomhd .sp span{width:28px;height:26px;border-radius:8px;border:1px solid var(--border);display:grid;place-items:center;color:var(--muted);font-size:12px}
+.feed{padding:20px 22px 14px;flex:1;min-height:0;overflow:hidden}
+.hero{margin-bottom:18px}
+.herotile{width:52px;height:52px;border-radius:14px;background:var(--panel3);border:1px solid var(--border2);display:grid;place-items:center;font-size:22px;font-weight:700;color:var(--muted);margin-bottom:12px}
+.hero h4{font-size:22px;font-weight:700;letter-spacing:-.02em;color:var(--text)}
+.hero .sub{font-size:13px;color:var(--muted);line-height:1.65;margin-top:6px;max-width:60ch}
+.hero .sub .lnk{color:var(--body);border-bottom:1px dashed var(--border2)}
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:18px 0 6px}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 13px 13px;display:flex;flex-direction:column;gap:9px;min-height:118px}
+.card.hov{border-color:var(--hover-border);background:var(--card)}
+.card .ic{width:34px;height:34px;border-radius:10px;background:var(--panel3);display:grid;place-items:center;color:var(--body)}
+.card .grow{flex:1}
+.card b{font-size:12.5px;font-weight:650;color:var(--text);display:block}
+.card small{font-size:11px;color:var(--muted);line-height:1.5;display:block;margin-top:3px}
+.card .cnt{display:inline-flex;align-items:center}
+.card .cnt .pav{margin-left:-6px;box-shadow:0 0 0 2px var(--panel)}
+.card .cnt .pav:first-child{margin-left:0}
+.daydiv{display:flex;align-items:center;gap:12px;margin:20px 0 10px}
+.daydiv::before,.daydiv::after{content:'';height:1px;background:var(--border);flex:1}
+.daydiv span{font:700 10.5px var(--font);color:var(--dim);letter-spacing:.02em;border:1px solid var(--border);padding:3px 10px;border-radius:99px}
+.trail{display:flex;flex-direction:column;gap:1px}
+.trow{display:flex;align-items:center;gap:10px;padding:4px 8px;border-radius:7px;font-size:12px;color:var(--muted);line-height:1.5}
+.trow .tic{width:18px;flex:none;display:grid;place-items:center;color:var(--dim)}
+.trow .tt{flex:1;min-width:0}
+.trow b{color:var(--body);font-weight:600}
+.trow .avs{display:inline-flex;vertical-align:-5px;margin:0 3px}
+.trow .avs .pav{margin-left:-5px;box-shadow:0 0 0 1.5px var(--win)}
+.trow .avs .pav:first-child{margin-left:0}
+.trow .ts{font-size:10.5px;color:var(--dim);flex:none;opacity:0}
+.trow.hov{background:var(--hover-bg)}
+.trow.hov .ts{opacity:1}
+.msg{display:flex;gap:11px;padding:7px 8px;margin-top:4px}
+.msg .mb{min-width:0}
+.msg .mh{display:flex;align-items:baseline;gap:7px}
+.msg .mh b{font-size:12.5px;font-weight:650;color:var(--text)}
+.msg .mh small{font-size:10.5px;color:var(--dim)}
+.msg .mt{font-size:12.5px;color:var(--body);line-height:1.6;margin-top:2px}
+.composer{margin:0 16px 14px;border:1px solid var(--border2);border-radius:12px;background:var(--panel);padding:10px 12px;color:var(--dim);font-size:12.5px}
+
+.note{display:flex;gap:8px;align-items:flex-start;margin:11px 6px 0;font-size:11.5px;color:var(--muted);line-height:1.6;max-width:78ch}
+.note .dot{width:6px;height:6px;border-radius:99px;margin-top:5px;flex:none;background:var(--green)}
+.note.warn .dot{background:var(--muted)}
+.note b{color:var(--body);font-weight:600}
+.legend{display:flex;flex-wrap:wrap;gap:8px;margin:14px 4px 0}
+.legend .k{font-size:11px;color:var(--muted);background:var(--panel2);border:1px solid var(--border);padding:5px 10px;border-radius:8px}
+.legend .k b{color:var(--body);font-weight:600}
+.statebar{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+.state{flex:1;min-width:236px;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px}
+.state .sh{font:800 9.5px var(--font);letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin-bottom:9px}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="pagehead">
+    <h1>Left nav · add-agents overlay · new-room intro</h1>
+    <p>Three asks, one surface. Built on the live tokens (<code>tokens.css</code> Quiet Graphite / Paper) and the live markup — <code>.navgroup</code>, <code>.chan</code>, <code>.navagent</code>, <code>.rosterovl</code> — so each direction is a diff against real code, not a fresh design. <b>Dark left, light right</b>, every scene. Avatars stand in for the production DiceBear Thumbs tiles.</p>
+  </div>
+
+  <!-- ══════════════════════════ PART 1 ══════════════════════════ -->
+  <div class="part">
+    <div class="parthd">
+      <h2><span class="n">01</span> The rail — kill the boxes</h2>
+      <p><b>What's wrong today:</b> each section (<code>Channels</code> / <code>People</code> / <code>Agents</code>) is wrapped in its own <code>.navgroup</code> — a 1px border at 12px radius. Three outlined cards stack inside a panel that is <i>already</i> a card, so nothing reads as more important than anything else, and the double inset (<code>.navgroup</code> margin 8px + <code>.chan</code> margin 2px) makes rows in different sections sit on different left edges. On top of that, every agent is a two-line row and most of them say <b>"standing by"</b> — eight rows of identical non-news eat ~350px of a 534px rail.</p>
+      <p><b>The three directions below share one fix</b> (boxes out, one left edge, one hover-reveal <code>+</code>) and differ on how much the roster costs you.</p>
+    </div>
+
+    <div class="stack">
+      <!-- DARK -->
+      <div class="stage" data-theme="dark">
+        <h3>Graphite · dark</h3>
+        <div class="rails">
+
+          <!-- TODAY -->
+          <div class="railwrap">
+            <div class="railcap">Today <span class="tag now">shipped</span></div>
+            <div class="railsub">Three outlined cards; agents run 2 lines each and the list overflows at 10.</div>
+            <div class="rail">
+              <div class="navhead"><div class="navhead-main"><span class="navbadge"><span class="dot"></span></span><span class="wsproj"><b>flowe-ai</b><small>GADS INC</small></span><span class="wscaret">▦</span></div></div>
+              <div class="navscroll">
+                <div class="navgroup">
+                  <div class="navsecthd"><button class="navsecttoggle"><span class="navchev">⌄</span>Channels</button><button class="chanadd">+</button></div>
+                  <div class="chan on"><span class="h">#</span><span class="lbl">build</span><span class="changear">⚙</span></div>
+                  <div class="chan"><span class="h">#</span><span class="lbl">general</span></div>
+                  <div class="chan"><span class="h">#</span><span class="lbl">marketing</span></div>
+                  <div class="chan"><span class="h">#</span><span class="lbl">research</span></div>
+                </div>
+                <div class="navgroup">
+                  <div class="navsecthd"><button class="navsecttoggle"><span class="navchev">⌄</span>People</button><button class="chanadd">+</button></div>
+                  <div class="chan"><span class="presence"></span><span class="lbl">geo <span style="color:var(--dim)">(you)</span></span></div>
+                </div>
+                <div class="navgroup">
+                  <div class="navsecthd"><button class="navsecttoggle"><span class="navchev">⌄</span>Agents</button><button class="chanadd">+</button></div>
+                  <div class="navagent"><span class="pav s28" data-r="architect">a</span><div class="navabody"><span class="navaname"><b>atlas</b><span class="rolechip" data-role="architect">architect</span></span><span class="navstatus">standing by</span></div></div>
+                  <div class="navagent"><span class="pav s28" data-r="shipper">b</span><div class="navabody"><span class="navaname"><b>bosun</b><span class="rolechip" data-role="shipper">shipper</span></span><span class="navstatus">standing by</span></div></div>
+                  <div class="navagent" style="opacity:.6"><span class="pav s28" data-r="curator">c</span><div class="navabody"><span class="navaname"><b>curator</b><span class="rolechip" data-role="curator">curator</span></span><span class="navstatus">not in #build</span></div><button class="navaddbtn">+</button></div>
+                  <div class="navagent"><span class="pav s28" data-r="designer">i</span><div class="navabody"><span class="navaname"><b>iris</b><span class="rolechip" data-role="designer">designer</span></span><span class="navstatus">standing by</span></div></div>
+                  <div class="navagent" style="opacity:.6"><span class="pav s28" data-r="worker">m</span><div class="navabody"><span class="navaname"><b>market-analyst</b><span class="rolechip" data-role="worker">worker</span></span><span class="navstatus">not in #build</span></div><button class="navaddbtn">+</button></div>
+                </div>
+              </div>
+              <div class="navfoot"><div class="navuser"><span class="navuserav">G</span><span><b>geo</b> <small>· Cloud</small></span></div></div>
+            </div>
+          </div>
+
+          <!-- A -->
+          <div class="railwrap">
+            <div class="railcap">A · Quiet <span class="tag rec">recommended</span></div>
+            <div class="railsub">No containers. One left edge. Agents drop to one line — status text only when there IS status.</div>
+            <div class="rail">
+              <div class="navhead"><div class="navhead-main"><span class="navbadge"><span class="dot"></span></span><span class="wsproj"><b>flowe-ai</b><small>GADS INC</small></span><span class="wscaret">▦</span></div></div>
+              <div class="navscroll">
+                <div class="fsec">
+                  <div class="fsechd"><span class="t">Channels</span><span class="acts"><button>+</button></span></div>
+                  <div class="frow on"><span class="h">#</span><span class="lbl"><b>build</b></span><span class="plus">⚙</span></div>
+                  <div class="frow"><span class="h">#</span><span class="lbl">general</span></div>
+                  <div class="frow"><span class="h">◁</span><span class="lbl">marketing</span></div>
+                  <div class="frow"><span class="h">#</span><span class="lbl">research</span></div>
+                </div>
+                <div class="fsec">
+                  <div class="fsechd"><span class="t">People</span><span class="acts"><button>+</button></span></div>
+                  <div class="frow"><span class="h"><span class="presence"></span></span><span class="lbl">geo <span style="color:var(--dim)">(you)</span></span></div>
+                </div>
+                <div class="fsec">
+                  <div class="fsechd"><span class="t">Agents</span><span class="acts"><button>+</button></span></div>
+                  <div class="frow"><span class="pav s22" data-r="architect">a</span><span class="lbl"><b>atlas</b></span></div>
+                  <div class="frow"><span class="pav s22" data-r="shipper">b</span><span class="lbl"><b>bosun</b></span></div>
+                  <div class="frow mut"><span class="pav s22 dimmed" data-r="curator">c</span><span class="lbl"><b>curator</b></span><span class="plus solid">+</span></div>
+                  <div class="frow"><span class="pav s22" data-r="designer">i</span><span class="lbl"><b>iris</b></span></div>
+                  <div class="frow mut"><span class="pav s22 dimmed" data-r="worker">m</span><span class="lbl"><b>market-analyst</b></span><span class="plus solid">+</span></div>
+                  <div class="frow"><span class="pav s22" data-r="developer">p</span><span class="lbl"><b>patch</b></span><span class="wdot"></span><span class="say busy">reviewing #218</span></div>
+                  <div class="frow mut"><span class="pav s22 dimmed" data-r="marketer">p</span><span class="lbl"><b>plume</b></span><span class="plus solid">+</span></div>
+                  <div class="frow"><span class="pav s22" data-r="orchestrator">r</span><span class="lbl"><b>rex</b></span><span class="wdot rev"></span><span class="say busy">triaging</span></div>
+                </div>
+              </div>
+              <div class="navfoot"><div class="navuser"><span class="navuserav">G</span><span><b>geo</b> <small>· Cloud</small></span></div></div>
+            </div>
+          </div>
+
+          <!-- B -->
+          <div class="railwrap">
+            <div class="railcap">B · Ruled</div>
+            <div class="railsub">Boxes → hairline bands. Keeps the 2-line agent row where status earns the space; headers carry a count.</div>
+            <div class="rail">
+              <div class="navhead"><div class="navhead-main"><span class="navbadge"><span class="dot"></span></span><span class="wsproj"><b>flowe-ai</b><small>GADS INC</small></span><span class="wscaret">▦</span></div></div>
+              <div class="navscroll">
+                <div class="bsec">
+                  <div class="bsechd"><span class="t">Channels <span class="cnt">4</span></span><button>+</button></div>
+                  <div class="frow on"><span class="h">#</span><span class="lbl"><b>build</b></span><span class="plus">⚙</span></div>
+                  <div class="frow"><span class="h">#</span><span class="lbl">general</span></div>
+                  <div class="frow"><span class="h">◁</span><span class="lbl">marketing</span></div>
+                  <div class="frow"><span class="h">#</span><span class="lbl">research</span></div>
+                </div>
+                <div class="bsec">
+                  <div class="bsechd"><span class="t">People <span class="cnt">1</span></span><button>+</button></div>
+                  <div class="frow"><span class="h"><span class="presence"></span></span><span class="lbl">geo <span style="color:var(--dim)">(you)</span></span></div>
+                </div>
+                <div class="bsec">
+                  <div class="bsechd"><span class="t">Agents <span class="cnt">8</span></span><button>+</button></div>
+                  <div class="navagent"><span class="pav s26" data-r="developer">p</span><div class="navabody"><span class="navaname"><b>patch</b><span class="rolechip" data-role="developer">developer</span></span><span class="navstatus busy">reviewing #218</span></div></div>
+                  <div class="navagent"><span class="pav s26" data-r="orchestrator">r</span><div class="navabody"><span class="navaname"><b>rex</b><span class="rolechip" data-role="orchestrator">orchestrator</span></span><span class="navstatus busy">triaging the room</span></div></div>
+                  <div class="navagent"><span class="pav s26" data-r="architect">a</span><div class="navabody"><span class="navaname"><b>atlas</b><span class="rolechip" data-role="architect">architect</span></span><span class="navstatus">standing by</span></div></div>
+                  <div class="navagent"><span class="pav s26" data-r="shipper">b</span><div class="navabody"><span class="navaname"><b>bosun</b><span class="rolechip" data-role="shipper">shipper</span></span><span class="navstatus">standing by</span></div></div>
+                  <div class="navagent" style="opacity:.6"><span class="pav s26 dimmed" data-r="curator">c</span><div class="navabody"><span class="navaname"><b>curator</b><span class="rolechip" data-role="curator">curator</span></span><span class="navstatus">not in #build</span></div><button class="navaddbtn">+</button></div>
+                </div>
+              </div>
+              <div class="navfoot"><div class="navuser"><span class="navuserav">G</span><span><b>geo</b> <small>· Cloud</small></span></div></div>
+            </div>
+          </div>
+
+          <!-- C -->
+          <div class="railwrap">
+            <div class="railcap">C · Working-first</div>
+            <div class="railsub">Rows for whoever is <i>doing</i> something; everyone else collapses to a tappable wall. The rail stops being a directory.</div>
+            <div class="rail">
+              <div class="navhead"><div class="navhead-main"><span class="navbadge"><span class="dot"></span></span><span class="wsproj"><b>flowe-ai</b><small>GADS INC</small></span><span class="wscaret">▦</span></div></div>
+              <div class="navscroll">
+                <div class="fsec">
+                  <div class="fsechd"><span class="t">Channels</span><span class="acts"><button>+</button></span></div>
+                  <div class="frow on"><span class="h">#</span><span class="lbl"><b>build</b></span><span class="plus">⚙</span></div>
+                  <div class="frow"><span class="h">#</span><span class="lbl">general</span></div>
+                  <div class="frow"><span class="h">◁</span><span class="lbl">marketing</span></div>
+                  <div class="frow"><span class="h">#</span><span class="lbl">research</span></div>
+                </div>
+                <div class="fsec">
+                  <div class="fsechd"><span class="t">People</span><span class="acts"><button>+</button></span></div>
+                  <div class="frow"><span class="h"><span class="presence"></span></span><span class="lbl">geo <span style="color:var(--dim)">(you)</span></span></div>
+                </div>
+                <div class="fsec">
+                  <div class="fsechd"><span class="t">Working now</span><span class="acts"><button>+</button></span></div>
+                  <div class="frow"><span class="pav s22" data-r="developer">p</span><span class="lbl"><b>patch</b></span><span class="wdot"></span><span class="say busy">#218</span></div>
+                  <div class="frow"><span class="pav s22" data-r="orchestrator">r</span><span class="lbl"><b>rex</b></span><span class="wdot rev"></span><span class="say busy">triaging</span></div>
+                  <div class="walllbl" style="padding-top:12px"><b>6 more</b> in this workspace</div>
+                  <div class="wall">
+                    <span class="pav s26" data-r="architect">a</span>
+                    <span class="pav s26" data-r="shipper">b</span>
+                    <span class="pav s26" data-r="designer">i</span>
+                    <span class="pav s26 dimmed" data-r="curator">c</span>
+                    <span class="pav s26 dimmed" data-r="worker">m</span>
+                    <span class="pav s26 dimmed" data-r="marketer">p</span>
+                    <button class="wallmore">+</button>
+                  </div>
+                  <div class="walllbl" style="padding-top:9px">Faded = not in <b>#build</b></div>
+                </div>
+              </div>
+              <div class="navfoot"><div class="navuser"><span class="navuserav">G</span><span><b>geo</b> <small>· Cloud</small></span></div></div>
+            </div>
+          </div>
+
+        </div>
+        <div class="note"><span class="dot"></span><span><b>Height reclaimed by A:</b> the agent block goes from ~44px × 8 rows + 3 card frames (≈ 390px) to ~29px × 8 (≈ 232px). That's a whole extra section visible without scrolling.</span></div>
+        <div class="note warn"><span class="dot"></span><span><b>What A gives up:</b> the role chip leaves the rail (colour on the avatar carries it) and "standing by" is silence rather than text. Hover still shows both in the tooltip, and the overlay in <b>02</b> is the full directory.</span></div>
+      </div>
+
+      <!-- LIGHT -->
+      <div class="stage" data-theme="light">
+        <h3>Paper · light</h3>
+        <div class="rails">
+          <div class="railwrap">
+            <div class="railcap">Today <span class="tag now">shipped</span></div>
+            <div class="railsub">On paper the three borders are louder still — light surfaces lift, so every outline reads as a seam.</div>
+            <div class="rail">
+              <div class="navhead"><div class="navhead-main"><span class="navbadge"><span class="dot"></span></span><span class="wsproj"><b>flowe-ai</b><small>GADS INC</small></span><span class="wscaret">▦</span></div></div>
+              <div class="navscroll">
+                <div class="navgroup">
+                  <div class="navsecthd"><button class="navsecttoggle"><span class="navchev">⌄</span>Channels</button><button class="chanadd">+</button></div>
+                  <div class="chan on"><span class="h">#</span><span class="lbl">build</span><span class="changear">⚙</span></div>
+                  <div class="chan"><span class="h">#</span><span class="lbl">general</span></div>
+                  <div class="chan"><span class="h">#</span><span class="lbl">marketing</span></div>
+                  <div class="chan"><span class="h">#</span><span class="lbl">research</span></div>
+                </div>
+                <div class="navgroup">
+                  <div class="navsecthd"><button class="navsecttoggle"><span class="navchev">⌄</span>People</button><button class="chanadd">+</button></div>
+                  <div class="chan"><span class="presence"></span><span class="lbl">geo <span style="color:var(--dim)">(you)</span></span></div>
+                </div>
+                <div class="navgroup">
+                  <div class="navsecthd"><button class="navsecttoggle"><span class="navchev">⌄</span>Agents</button><button class="chanadd">+</button></div>
+                  <div class="navagent"><span class="pav s28" data-r="architect">a</span><div class="navabody"><span class="navaname"><b>atlas</b><span class="rolechip" data-role="architect">architect</span></span><span class="navstatus">standing by</span></div></div>
+                  <div class="navagent"><span class="pav s28" data-r="shipper">b</span><div class="navabody"><span class="navaname"><b>bosun</b><span class="rolechip" data-role="shipper">shipper</span></span><span class="navstatus">standing by</span></div></div>
+                  <div class="navagent" style="opacity:.6"><span class="pav s28" data-r="curator">c</span><div class="navabody"><span class="navaname"><b>curator</b><span class="rolechip" data-role="curator">curator</span></span><span class="navstatus">not in #build</span></div><button class="navaddbtn">+</button></div>
+                  <div class="navagent"><span class="pav s28" data-r="designer">i</span><div class="navabody"><span class="navaname"><b>iris</b><span class="rolechip" data-role="designer">designer</span></span><span class="navstatus">standing by</span></div></div>
+                  <div class="navagent" style="opacity:.6"><span class="pav s28" data-r="worker">m</span><div class="navabody"><span class="navaname"><b>market-analyst</b><span class="rolechip" data-role="worker">worker</span></span><span class="navstatus">not in #build</span></div><button class="navaddbtn">+</button></div>
+                </div>
+              </div>
+              <div class="navfoot"><div class="navuser"><span class="navuserav">G</span><span><b>geo</b> <small>· Cloud</small></span></div></div>
+            </div>
+          </div>
+
+          <div class="railwrap">
+            <div class="railcap">A · Quiet <span class="tag rec">recommended</span></div>
+            <div class="railsub">Whitespace does the grouping. Nothing competes with the selected room.</div>
+            <div class="rail">
+              <div class="navhead"><div class="navhead-main"><span class="navbadge"><span class="dot"></span></span><span class="wsproj"><b>flowe-ai</b><small>GADS INC</small></span><span class="wscaret">▦</span></div></div>
+              <div class="navscroll">
+                <div class="fsec">
+                  <div class="fsechd"><span class="t">Channels</span><span class="acts"><button>+</button></span></div>
+                  <div class="frow on"><span class="h">#</span><span class="lbl"><b>build</b></span><span class="plus">⚙</span></div>
+                  <div class="frow"><span class="h">#</span><span class="lbl">general</span></div>
+                  <div class="frow"><span class="h">◁</span><span class="lbl">marketing</span></div>
+                  <div class="frow"><span class="h">#</span><span class="lbl">research</span></div>
+                </div>
+                <div class="fsec">
+                  <div class="fsechd"><span class="t">People</span><span class="acts"><button>+</button></span></div>
+                  <div class="frow"><span class="h"><span class="presence"></span></span><span class="lbl">geo <span style="color:var(--dim)">(you)</span></span></div>
+                </div>
+                <div class="fsec">
+                  <div class="fsechd"><span class="t">Agents</span><span class="acts"><button>+</button></span></div>
+                  <div class="frow"><span class="pav s22" data-r="architect">a</span><span class="lbl"><b>atlas</b></span></div>
+                  <div class="frow"><span class="pav s22" data-r="shipper">b</span><span class="lbl"><b>bosun</b></span></div>
+                  <div class="frow mut"><span class="pav s22 dimmed" data-r="curator">c</span><span class="lbl"><b>curator</b></span><span class="plus solid">+</span></div>
+                  <div class="frow"><span class="pav s22" data-r="designer">i</span><span class="lbl"><b>iris</b></span></div>
+                  <div class="frow mut"><span class="pav s22 dimmed" data-r="worker">m</span><span class="lbl"><b>market-analyst</b></span><span class="plus solid">+</span></div>
+                  <div class="frow"><span class="pav s22" data-r="developer">p</span><span class="lbl"><b>patch</b></span><span class="wdot"></span><span class="say busy">reviewing #218</span></div>
+                  <div class="frow mut"><span class="pav s22 dimmed" data-r="marketer">p</span><span class="lbl"><b>plume</b></span><span class="plus solid">+</span></div>
+                  <div class="frow"><span class="pav s22" data-r="orchestrator">r</span><span class="lbl"><b>rex</b></span><span class="wdot rev"></span><span class="say busy">triaging</span></div>
+                </div>
+              </div>
+              <div class="navfoot"><div class="navuser"><span class="navuserav">G</span><span><b>geo</b> <small>· Cloud</small></span></div></div>
+            </div>
+          </div>
+
+          <div class="railwrap">
+            <div class="railcap">B · Ruled</div>
+            <div class="railsub">Hairlines instead of frames — structure without a box.</div>
+            <div class="rail">
+              <div class="navhead"><div class="navhead-main"><span class="navbadge"><span class="dot"></span></span><span class="wsproj"><b>flowe-ai</b><small>GADS INC</small></span><span class="wscaret">▦</span></div></div>
+              <div class="navscroll">
+                <div class="bsec">
+                  <div class="bsechd"><span class="t">Channels <span class="cnt">4</span></span><button>+</button></div>
+                  <div class="frow on"><span class="h">#</span><span class="lbl"><b>build</b></span><span class="plus">⚙</span></div>
+                  <div class="frow"><span class="h">#</span><span class="lbl">general</span></div>
+                  <div class="frow"><span class="h">◁</span><span class="lbl">marketing</span></div>
+                  <div class="frow"><span class="h">#</span><span class="lbl">research</span></div>
+                </div>
+                <div class="bsec">
+                  <div class="bsechd"><span class="t">People <span class="cnt">1</span></span><button>+</button></div>
+                  <div class="frow"><span class="h"><span class="presence"></span></span><span class="lbl">geo <span style="color:var(--dim)">(you)</span></span></div>
+                </div>
+                <div class="bsec">
+                  <div class="bsechd"><span class="t">Agents <span class="cnt">8</span></span><button>+</button></div>
+                  <div class="navagent"><span class="pav s26" data-r="developer">p</span><div class="navabody"><span class="navaname"><b>patch</b><span class="rolechip" data-role="developer">developer</span></span><span class="navstatus busy">reviewing #218</span></div></div>
+                  <div class="navagent"><span class="pav s26" data-r="orchestrator">r</span><div class="navabody"><span class="navaname"><b>rex</b><span class="rolechip" data-role="orchestrator">orchestrator</span></span><span class="navstatus busy">triaging the room</span></div></div>
+                  <div class="navagent"><span class="pav s26" data-r="architect">a</span><div class="navabody"><span class="navaname"><b>atlas</b><span class="rolechip" data-role="architect">architect</span></span><span class="navstatus">standing by</span></div></div>
+                  <div class="navagent"><span class="pav s26" data-r="shipper">b</span><div class="navabody"><span class="navaname"><b>bosun</b><span class="rolechip" data-role="shipper">shipper</span></span><span class="navstatus">standing by</span></div></div>
+                  <div class="navagent" style="opacity:.6"><span class="pav s26 dimmed" data-r="curator">c</span><div class="navabody"><span class="navaname"><b>curator</b><span class="rolechip" data-role="curator">curator</span></span><span class="navstatus">not in #build</span></div><button class="navaddbtn">+</button></div>
+                </div>
+              </div>
+              <div class="navfoot"><div class="navuser"><span class="navuserav">G</span><span><b>geo</b> <small>· Cloud</small></span></div></div>
+            </div>
+          </div>
+
+          <div class="railwrap">
+            <div class="railcap">C · Working-first</div>
+            <div class="railsub">The rail answers "who's busy?", the overlay answers "who exists?".</div>
+            <div class="rail">
+              <div class="navhead"><div class="navhead-main"><span class="navbadge"><span class="dot"></span></span><span class="wsproj"><b>flowe-ai</b><small>GADS INC</small></span><span class="wscaret">▦</span></div></div>
+              <div class="navscroll">
+                <div class="fsec">
+                  <div class="fsechd"><span class="t">Channels</span><span class="acts"><button>+</button></span></div>
+                  <div class="frow on"><span class="h">#</span><span class="lbl"><b>build</b></span><span class="plus">⚙</span></div>
+                  <div class="frow"><span class="h">#</span><span class="lbl">general</span></div>
+                  <div class="frow"><span class="h">◁</span><span class="lbl">marketing</span></div>
+                  <div class="frow"><span class="h">#</span><span class="lbl">research</span></div>
+                </div>
+                <div class="fsec">
+                  <div class="fsechd"><span class="t">People</span><span class="acts"><button>+</button></span></div>
+                  <div class="frow"><span class="h"><span class="presence"></span></span><span class="lbl">geo <span style="color:var(--dim)">(you)</span></span></div>
+                </div>
+                <div class="fsec">
+                  <div class="fsechd"><span class="t">Working now</span><span class="acts"><button>+</button></span></div>
+                  <div class="frow"><span class="pav s22" data-r="developer">p</span><span class="lbl"><b>patch</b></span><span class="wdot"></span><span class="say busy">#218</span></div>
+                  <div class="frow"><span class="pav s22" data-r="orchestrator">r</span><span class="lbl"><b>rex</b></span><span class="wdot rev"></span><span class="say busy">triaging</span></div>
+                  <div class="walllbl" style="padding-top:12px"><b>6 more</b> in this workspace</div>
+                  <div class="wall">
+                    <span class="pav s26" data-r="architect">a</span>
+                    <span class="pav s26" data-r="shipper">b</span>
+                    <span class="pav s26" data-r="designer">i</span>
+                    <span class="pav s26 dimmed" data-r="curator">c</span>
+                    <span class="pav s26 dimmed" data-r="worker">m</span>
+                    <span class="pav s26 dimmed" data-r="marketer">p</span>
+                    <button class="wallmore">+</button>
+                  </div>
+                  <div class="walllbl" style="padding-top:9px">Faded = not in <b>#build</b></div>
+                </div>
+              </div>
+              <div class="navfoot"><div class="navuser"><span class="navuserav">G</span><span><b>geo</b> <small>· Cloud</small></span></div></div>
+            </div>
+          </div>
+        </div>
+        <div class="note"><span class="dot"></span><span><b>Rules all three share:</b> section headers are 10px/700 caps at <code>--dim</code>; every row sits on the same 8px inset; the <code>+</code> is <code>--dim</code> at 55% and goes solid on section hover or keyboard focus; collapse survives (the chevron fades in where the caps label sits).</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════ PART 2 ══════════════════════════ -->
+  <div class="part">
+    <div class="parthd">
+      <h2><span class="n">02</span> The Agents <code>+</code> — an add-to-room overlay, not a create form</h2>
+      <p>Today <code>App.tsx:12950</code> wires the Agents <code>+</code> straight to <code>setCreateOpen(true)</code> — the full hire flow. That's the rarest action on the cheapest affordance: <b>adding an existing agent to this room</b> is the common one, and it's currently buried as a hover <code>+</code> that only appears on agents who happen to be visible in the rail.</p>
+      <p><b>The swap:</b> <code>+</code> opens a picker scoped to the current channel — search, filters, one-click add — with <i>create</i> parked in the footer where a rarer, heavier action belongs. Both commands already exist server-side (<code>channel.add_agent</code> / <code>channel.remove_agent</code>, <code>handler.ts:1275</code>), and the shell can extend the shipped <code>RosterOverlay</code> (<code>App.tsx:11443</code>) rather than being a new component.</p>
+    </div>
+
+    <div class="two">
+      <div class="stage" data-theme="dark">
+        <h3>Graphite · dark — default</h3>
+        <div class="scrimwrap">
+          <div class="ovl">
+            <div class="ovlhd"><b>Add agents</b><span class="chanpill"><span class="h">#</span>build</span><span style="font:800 10px var(--fmono);color:var(--dim)">8 in workspace</span><button class="ovlx">✕</button></div>
+            <div class="ovlsearch"><span>⌕</span><span style="color:var(--dim)">Search by name, role, or specialty</span></div>
+            <div class="ovlfilters">
+              <span class="fchip on">Not in #build<span class="n">3</span></span>
+              <span class="fchip">In #build<span class="n">5</span></span>
+              <span class="fchip">All<span class="n">8</span></span>
+              <span class="fchip">developer</span>
+              <span class="fchip">designer</span>
+              <span class="fchip">marketer</span>
+            </div>
+            <div class="ovllist">
+              <div class="ovlgrp">Not in this room</div>
+              <div class="orow hov"><span class="pav s30" data-r="curator">c</span><div class="obody"><span class="oname"><b>curator</b><span class="rolechip" data-role="curator">curator</span></span><span class="ostat">keeps the channel library tidy</span></div><span class="oadd hot">+ Add</span></div>
+              <div class="orow"><span class="pav s30" data-r="worker">m</span><div class="obody"><span class="oname"><b>market-analyst</b><span class="rolechip" data-role="worker">worker</span></span><span class="ostat">competitor + pricing research</span></div><span class="oadd">+ Add</span></div>
+              <div class="orow"><span class="pav s30" data-r="marketer">p</span><div class="obody"><span class="oname"><b>plume</b><span class="rolechip" data-role="marketer">marketer</span></span><span class="ostat">drafts + schedules social posts</span></div><span class="oadd">+ Add</span></div>
+              <div class="ovlgrp">Already here</div>
+              <div class="orow inch"><span class="pav s30" data-r="developer">p</span><div class="obody"><span class="oname"><b>patch</b><span class="rolechip" data-role="developer">developer</span></span><span class="ostat">reviewing #218 · claimed 6m ago</span></div><span class="oin">✓ In room</span></div>
+              <div class="orow inch"><span class="pav s30" data-r="architect">a</span><div class="obody"><span class="oname"><b>atlas</b><span class="rolechip" data-role="architect">architect</span></span><span class="ostat">standing by</span></div><span class="oin">✓ In room</span></div>
+              <div class="orow inch hov"><span class="pav s30" data-r="designer">i</span><div class="obody"><span class="oname"><b>iris</b><span class="rolechip" data-role="designer">designer</span></span><span class="ostat">standing by</span></div><span class="oin"><span class="x">Remove</span></span></div>
+            </div>
+            <div class="ovlfoot">
+              <button><span class="ic">+</span>Create a new agent<small>hire for this room</small></button>
+              <button><span class="ic">⇄</span>Connect a remote agent<small>another machine</small></button>
+            </div>
+          </div>
+        </div>
+        <div class="note"><span class="dot"></span><span><b>Sort is the design.</b> Actionable rows first (<i>Not in this room</i>), already-members below and dimmed — so the list opens on exactly what the <code>+</code> promised. Hovering a member swaps <code>✓ In room</code> for <code>Remove</code>, which is the missing half of the current UI.</span></div>
+        <div class="note warn"><span class="dot"></span><span><b>Guardrails to keep:</b> <code>orchestrator</code> and <code>curator</code> are never hireable (docs/06), and retired agents must stay filtered — every new agent-selection query has to carry <code>retired_at is null</code>.</span></div>
+      </div>
+
+      <div class="stage" data-theme="light">
+        <h3>Paper · light — searching</h3>
+        <div class="scrimwrap">
+          <div class="ovl">
+            <div class="ovlhd"><b>Add agents</b><span class="chanpill"><span class="h">#</span>build</span><span style="font:800 10px var(--fmono);color:var(--dim)">2 matches</span><button class="ovlx">✕</button></div>
+            <div class="ovlsearch"><span>⌕</span><span class="cur">mark</span><span class="caret"></span></div>
+            <div class="ovlfilters">
+              <span class="fchip on">Not in #build<span class="n">1</span></span>
+              <span class="fchip">In #build<span class="n">1</span></span>
+              <span class="fchip">All<span class="n">2</span></span>
+            </div>
+            <div class="ovllist">
+              <div class="ovlgrp">Not in this room</div>
+              <div class="orow hov"><span class="pav s30" data-r="worker">m</span><div class="obody"><span class="oname"><b><span style="background:color-mix(in srgb,var(--role-rev) 26%,transparent);border-radius:3px">mark</span>et-analyst</b><span class="rolechip" data-role="worker">worker</span></span><span class="ostat">competitor + pricing research</span></div><span class="oadd hot">+ Add</span></div>
+              <div class="ovlgrp">Already here</div>
+              <div class="orow inch"><span class="pav s30" data-r="marketer">p</span><div class="obody"><span class="oname"><b>plume</b><span class="rolechip" data-role="marketer"><span style="background:color-mix(in srgb,var(--role-rev) 26%,transparent);border-radius:2px">mark</span>eter</span></span><span class="ostat">matched on role · standing by</span></div><span class="oin">✓ In room</span></div>
+            </div>
+            <div class="ovlfoot">
+              <button><span class="ic">+</span>Create a new agent<small>hire for this room</small></button>
+              <button><span class="ic">⇄</span>Connect a remote agent<small>another machine</small></button>
+            </div>
+          </div>
+        </div>
+        <div class="note"><span class="dot"></span><span>Search spans <b>name · role · brief</b> (the stored specialty from <code>agents.brief</code>), so "someone who does pricing" finds market-analyst without knowing the name. Matches highlight in both fields.</span></div>
+
+        <div class="statebar">
+          <div class="state">
+            <div class="sh">Empty result → create, prefilled</div>
+            <div class="ovlempty">
+              <p>No agent matches <b>"kube"</b>.<br />Nobody in this workspace does infra yet.</p>
+              <button class="mk">+ Hire an agent called “kube”</button>
+            </div>
+          </div>
+          <div class="state">
+            <div class="sh">After add — inline, no reload</div>
+            <div class="orow" style="padding:7px 4px"><span class="pav s30" data-r="curator">c</span><div class="obody"><span class="oname"><b>curator</b><span class="rolechip" data-role="curator">curator</span></span><span class="ostat" style="color:var(--green);font-weight:600">✓ added to #build</span></div><span class="oin">✓ In room</span></div>
+            <div class="note" style="margin-left:0"><span class="dot"></span><span>Row re-sorts into <i>Already here</i> on the next open — never mid-click, or the list jumps under the cursor.</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════ PART 3 ══════════════════════════ -->
+  <div class="part">
+    <div class="parthd">
+      <h2><span class="n">03</span> A new room — cards to staff it, a papertrail to explain it</h2>
+      <p>Today a fresh channel renders one grey line: <code>No messages in #build yet — say something.</code> (<code>App.tsx:13889</code>). It's a dead end — the room has no agents, no repo, and no way to get either without going back to the rail.</p>
+      <p><b>The intro block</b> sits at the top of the feed (it <i>is</i> the beginning of the scroll, so it never covers messages): hero → setup cards → papertrail → first message. Cards fade out per-card as their job is done, so a working room keeps only the hero and the trail.</p>
+    </div>
+
+    <div class="two">
+      <div class="stage" data-theme="dark">
+        <h3>Graphite · dark — a room on day one</h3>
+        <div class="room" style="height:auto">
+          <div class="roomhd"><span class="h">#</span><b>build</b><span class="sp"><span>⌂</span><span>▤</span></span></div>
+          <div class="feed">
+            <div class="hero">
+              <div class="herotile">#</div>
+              <h4>#build</h4>
+              <p class="sub">This is the beginning of <b>#build</b>, in the <b>flowe-ai</b> project. <span class="lnk">Add a topic</span> so agents know what this room is for.</p>
+            </div>
+            <div class="cards">
+              <div class="card hov">
+                <span class="ic">⌬</span>
+                <div class="grow"><b>Add agents</b><small>Bring the crew that'll do the work here.</small></div>
+                <span class="cnt"><span class="pav s22" data-r="architect">a</span><span class="pav s22" data-r="developer">p</span><span class="pav s22" data-r="designer">i</span></span>
+              </div>
+              <div class="card">
+                <span class="ic">☺</span>
+                <div class="grow"><b>Add people</b><small>Invite teammates into the workspace.</small></div>
+                <small style="color:var(--dim)">1 seat used of 3</small>
+              </div>
+              <div class="card">
+                <span class="ic">⑂</span>
+                <div class="grow"><b>Attach a repo</b><small>Point this room at the code it ships.</small></div>
+                <small style="color:var(--dim)">no repo yet</small>
+              </div>
+            </div>
+            <div class="daydiv"><span>Tuesday, July 21</span></div>
+            <div class="trail">
+              <div class="trow hov"><span class="tic">#</span><span class="tt"><b>geo</b> created this channel</span><span class="ts">1:06 PM</span></div>
+              <div class="trow"><span class="tic">⌬</span><span class="tt"><b>geo</b> added <span class="avs"><span class="pav s22" data-r="orchestrator">r</span><span class="pav s22" data-r="architect">a</span><span class="pav s22" data-r="developer">p</span></span> <b>rex</b>, <b>atlas</b> and <b>3 others</b></span><span class="ts">1:08 PM</span></div>
+              <div class="trow"><span class="tic">⑂</span><span class="tt"><b>geo</b> attached the repo <b>neuramesh</b></span><span class="ts">1:09 PM</span></div>
+            </div>
+            <div class="msg">
+              <span class="pav s30" data-r="orchestrator">r</span>
+              <div class="mb"><div class="mh"><b>rex</b><span class="rolechip" data-role="orchestrator">orchestrator</span><small>1:09 PM</small></div><div class="mt">Room's staffed. Park an idea or hand me a task and I'll triage it.</div></div>
+            </div>
+          </div>
+          <div class="composer">Message #build</div>
+        </div>
+        <div class="legend">
+          <span class="k"><b>Card → </b>opens the 02 overlay</span>
+          <span class="k"><b>Card → </b><code>InviteTeammate</code></span>
+          <span class="k"><b>Card → </b><code>AddRepoModal</code></span>
+        </div>
+        <div class="note"><span class="dot"></span><span><b>Cards are kind-aware.</b> A marketing HQ swaps <i>Attach a repo</i> for <i>Set the brand voice</i>; a room that already has agents drops card one. Never show a card whose job is done — that's how an empty state stops being a nag.</span></div>
+      </div>
+
+      <div class="stage" data-theme="light">
+        <h3>Paper · light — the same room, three weeks in</h3>
+        <div class="room" style="height:auto">
+          <div class="roomhd"><span class="h">#</span><b>build</b><span class="sp"><span>⌂</span><span>▤</span></span></div>
+          <div class="feed">
+            <div class="hero">
+              <div class="herotile">#</div>
+              <h4>#build</h4>
+              <p class="sub">This is the beginning of <b>#build</b>, in the <b>flowe-ai</b> project. <span style="color:var(--body)">Where the product actually gets made.</span></p>
+            </div>
+            <div class="daydiv"><span>Tuesday, July 21</span></div>
+            <div class="trail">
+              <div class="trow"><span class="tic">#</span><span class="tt"><b>geo</b> created this channel</span><span class="ts">1:06 PM</span></div>
+              <div class="trow hov"><span class="tic">⌬</span><span class="tt"><b>geo</b> added <span class="avs"><span class="pav s22" data-r="orchestrator">r</span><span class="pav s22" data-r="architect">a</span><span class="pav s22" data-r="developer">p</span></span> <b>rex</b>, <b>atlas</b> and <b>3 others</b></span><span class="ts">1:08 PM</span></div>
+              <div class="trow"><span class="tic">⑂</span><span class="tt"><b>geo</b> attached the repo <b>neuramesh</b></span><span class="ts">1:09 PM</span></div>
+              <div class="trow"><span class="tic">✎</span><span class="tt"><b>rex</b> set the topic to “Where the product actually gets made”</span><span class="ts">1:14 PM</span></div>
+              <div class="trow"><span class="tic">⌬</span><span class="tt"><b>geo</b> hired <span class="avs"><span class="pav s22" data-r="shipper">b</span></span> <b>bosun</b> as shipper</span><span class="ts">Jul 22</span></div>
+            </div>
+            <div class="msg">
+              <span class="pav s30" data-r="orchestrator">r</span>
+              <div class="mb"><div class="mh"><b>rex</b><span class="rolechip" data-role="orchestrator">orchestrator</span><small>Jul 22</small></div><div class="mt">Daily digest — 3 accepted, 1 in review, 0 blocked.</div></div>
+            </div>
+          </div>
+          <div class="composer">Message #build</div>
+        </div>
+        <div class="note"><span class="dot"></span><span><b>The trail keeps growing.</b> Membership changes, repo attach, topic edits, hires — all of them land here rather than as chat messages, so the room's history reads without polluting the transcript the orchestrator summarises.</span></div>
+        <div class="note warn"><span class="dot"></span><span><b>Plumbing this needs (flagging, not solving):</b> the events already exist server-side with full attribution — <code>channel.created</code> (<code>handler.ts:918</code>), <code>agent.channels_synced</code> (<code>handler.ts:1275</code>) — but the <code>events</code> table is <b>not in the PowerSync rules</b> (<code>dev/stack/powersync/sync-config.yaml</code>), so the client can't read it yet. Two ways: sync a channel-scoped slice of <code>events</code>, or derive an actor-less v1 from what already syncs (<code>channels.created_at</code> + <code>agent_channels.created_at</code>) and add names when the slice lands. Also worth checking: not every write path fills <code>events.channel_id</code>.</span></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

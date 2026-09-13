@@ -1,0 +1,7 @@
+[
+  { "name": "grp1-dark", "settle": 2400, "query": { "theme": "dark" } },
+  { "name": "grp2-cream", "settle": 2400, "query": { "theme": "cream-oak" } },
+  { "name": "grp3-folder-hover-dark", "settle": 2400, "query": { "theme": "dark" }, "js": "(() => { const w=[...document.querySelectorAll('.navgrp .navhistwrap')][0]; if(!w) return; w.dispatchEvent(new MouseEvent('mouseover',{bubbles:true,relatedTarget:document.body})); return new Promise(r=>setTimeout(r,800)); })()" },
+  { "name": "grp4-folded-cream", "settle": 2400, "query": { "theme": "cream-oak" }, "js": "(() => { const b=[...document.querySelectorAll('.navgrprow')][1]; b && b.click(); return new Promise(r=>setTimeout(r,500)); })()" },
+  { "name": "grp5-folder-menu-dark", "settle": 2400, "query": { "theme": "dark" }, "js": "(() => { const w=[...document.querySelectorAll('.navgrp .navhistwrap')][0]; if(!w) return; w.dispatchEvent(new MouseEvent('mouseover',{bubbles:true,relatedTarget:document.body})); const b=w.querySelector('.navhistbtn[aria-haspopup]'); b && b.click(); return new Promise(r=>setTimeout(r,500)); })()" }
+]

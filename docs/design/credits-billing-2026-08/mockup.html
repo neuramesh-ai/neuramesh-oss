@@ -1,0 +1,340 @@
+<title>One Meter, Three Draws</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,300..600;1,8..60,300..500&family=Geist:wght@300..600&family=Geist+Mono:wght@300..500&display=swap">
+<style>
+/* Tokens from apps/desktop/src/renderer/src/tokens.css — judged in the product's palette. */
+:root{
+  --win:#f0e5d3; --bg:#fbf8f4; --panel:#fbf8f4; --panel2:#f6eee1; --panel3:#efe1cd;
+  --card:#fff; --border:#e6dbca; --border2:#d3c2a8;
+  --text:#2a1c13; --body:#574838; --muted:#97846c; --dim:#b5a289;
+  --brand:#834a2b; --green:#2f9e6b; --warnc:#9a6b1f; --link:#9c5730;
+  --viz1:#8ba0c0; --viz2:#a3b18a; --viz3:#c9a15e;
+  --fdisp:'Source Serif 4',Georgia,serif; --fbody:'Geist',-apple-system,sans-serif;
+  --fmono:'Geist Mono',ui-monospace,monospace;
+  --ease:cubic-bezier(.22,1,.36,1);
+  --r-sm:8px; --r-md:10px; --r-lg:14px; --r-full:999px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --win:#0d0d0d; --bg:#141414; --panel:#191919; --panel2:#212121; --panel3:#2b2b2b;
+  --card:#1e1e1e; --border:#272727; --border2:#383838;
+  --text:#eaeaea; --body:#b6b6b6; --muted:#898989; --dim:#676767;
+  --brand:#c07d51; --green:#77ac8d; --warnc:#c9a227; --link:#d19a72;
+  --viz1:#8ba0c0; --viz2:#a3b18a; --viz3:#c9a15e;
+}}
+:root[data-theme="dark"]{
+  --win:#0d0d0d; --bg:#141414; --panel:#191919; --panel2:#212121; --panel3:#2b2b2b;
+  --card:#1e1e1e; --border:#272727; --border2:#383838;
+  --text:#eaeaea; --body:#b6b6b6; --muted:#898989; --dim:#676767;
+  --brand:#c07d51; --green:#77ac8d; --warnc:#c9a227; --link:#d19a72;
+  --viz1:#8ba0c0; --viz2:#a3b18a; --viz3:#c9a15e;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--win);color:var(--text);font-family:var(--fbody);font-weight:350;line-height:1.55;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1100px;margin:0 auto;padding:46px 28px 100px}
+h1{font-family:var(--fdisp);font-weight:400;font-size:clamp(30px,4.4vw,44px);letter-spacing:-.015em;line-height:1.12;margin:0 0 10px;text-wrap:balance}
+h2{font-family:var(--fdisp);font-weight:400;font-size:23px;letter-spacing:-.01em;margin:0 0 6px}
+p{color:var(--body);margin:0 0 14px;max-width:68ch}
+.eyebrow{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:500;margin:0 0 13px}
+.rule{height:1px;background:var(--border);border:0;margin:46px 0 34px}
+.head{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;flex-wrap:wrap}
+.tog{display:flex;gap:2px;background:var(--panel2);border:1px solid var(--border);border-radius:var(--r-full);padding:3px}
+.tog button{font:inherit;font-size:12px;color:var(--muted);background:none;border:0;padding:5px 13px;border-radius:var(--r-full);cursor:pointer}
+.tog button[aria-pressed="true"]{background:var(--card);color:var(--text);box-shadow:0 1px 2px rgba(0,0,0,.1)}
+.tog button:focus-visible{outline:2px solid var(--brand);outline-offset:1px}
+
+/* ── the dashboard frame ── */
+.dash{border:1px solid var(--border);border-radius:var(--r-lg);background:var(--bg);overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.05)}
+.dashbar{display:flex;align-items:baseline;gap:10px;padding:15px 20px;border-bottom:1px solid var(--border);background:var(--panel)}
+.dashbar b{font-family:var(--fdisp);font-weight:400;font-size:17px}
+.dashbar span{font-size:12px;color:var(--muted)}
+.dashgrid{display:grid;grid-template-columns:290px 1fr;gap:0}
+@media(max-width:760px){.dashgrid{grid-template-columns:1fr}}
+
+/* balance column */
+.balcol{padding:24px;border-right:1px solid var(--border);display:flex;flex-direction:column;gap:14px}
+@media(max-width:760px){.balcol{border-right:0;border-bottom:1px solid var(--border)}}
+.balarc{position:relative;width:168px;height:168px;margin:4px auto 2px}
+.balarc svg{transform:rotate(-90deg)}
+.balnum{position:absolute;inset:0;display:grid;place-items:center;text-align:center}
+.balnum b{font:400 34px/1 var(--fdisp);display:block;font-variant-numeric:tabular-nums}
+.balnum small{font-size:11px;color:var(--muted);letter-spacing:.05em;text-transform:uppercase}
+.balsplit{font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:5px}
+.balsplit div{display:flex;justify-content:space-between}
+.balsplit b{color:var(--body);font-weight:400;font-variant-numeric:tabular-nums}
+.balsplit .keeps{color:var(--green)}
+.btn{font:inherit;font-size:12.5px;padding:8px 15px;border-radius:var(--r-full);cursor:pointer;border:1px solid var(--border2);background:var(--card);color:var(--text)}
+.btn.primary{background:var(--brand);border-color:var(--brand);color:#fff7ee}
+.btn:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+.balnote{font-size:11.5px;color:var(--dim);text-align:center}
+
+/* meters column */
+.metcol{padding:24px;display:flex;flex-direction:column;gap:18px;min-width:0}
+.meter{display:grid;grid-template-columns:130px 1fr auto;gap:14px;align-items:center}
+.meter .nm{font-size:13px;color:var(--text)}
+.meter .nm small{display:block;font-size:11px;color:var(--muted)}
+.mtrack{height:8px;border-radius:var(--r-full);background:var(--panel3);overflow:hidden}
+.mfill{height:100%;border-radius:var(--r-full)}
+.meter .val{font:400 12px var(--fmono);color:var(--body);font-variant-numeric:tabular-nums;white-space:nowrap}
+.free{font-size:11.5px;color:var(--green)}
+
+/* burn chart */
+.burn{margin-top:4px}
+.burnh{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
+.burnh span{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.burnh em{font-style:normal;font-size:11.5px;color:var(--dim)}
+.bars{display:flex;gap:4px;align-items:flex-end;height:64px}
+.bar{flex:1;display:flex;flex-direction:column;justify-content:flex-end;gap:1px;min-width:0}
+.bar i{display:block;border-radius:2px 2px 0 0}
+.bar .b1{background:var(--viz1)}.bar .b2{background:var(--viz2)}.bar .b3{background:var(--viz3)}
+.legend{display:flex;gap:16px;margin-top:9px;font-size:11.5px;color:var(--muted)}
+.legend s{width:8px;height:8px;border-radius:2px;display:inline-block;margin-right:5px;text-decoration:none;vertical-align:-1px}
+
+/* ledger */
+.ledger{border-top:1px solid var(--border);padding:16px 20px}
+.ledger table{width:100%;border-collapse:collapse;font-size:12.5px}
+.ledger td{padding:7px 0;border-bottom:1px solid var(--border);color:var(--body)}
+.ledger td:last-child{text-align:right;font-family:var(--fmono);font-variant-numeric:tabular-nums;white-space:nowrap}
+.ledger .cr{color:var(--green)}
+.ledger .k{color:var(--muted);font-size:11.5px}
+
+.grid3{display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));margin-top:20px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--r-md);padding:18px 20px}
+.card h4{margin:0 0 7px;font-size:13.5px;font-weight:500}
+.card p{font-size:13px;margin:0}
+.pill{display:inline-block;font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;padding:3px 9px;border-radius:var(--r-full);border:1px solid var(--border2);color:var(--muted);margin-bottom:9px}
+.pill.rec{border-color:var(--green);color:var(--green)}
+
+/* packs */
+.packs{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));margin-top:18px}
+.pack{background:var(--card);border:1px solid var(--border);border-radius:var(--r-md);padding:20px;text-align:center;position:relative}
+.pack.hot{border-color:var(--brand)}
+.pack .tag{position:absolute;top:-9px;left:50%;transform:translateX(-50%);font-size:10px;letter-spacing:.08em;text-transform:uppercase;background:var(--brand);color:#fff7ee;padding:2px 10px;border-radius:var(--r-full)}
+.pack b{font:400 30px/1.1 var(--fdisp);display:block}
+.pack small{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.pack .pr{font-size:15px;color:var(--body);margin:10px 0 14px}
+.packnote{font-size:12px;color:var(--muted);margin-top:12px}
+.packnote b{color:var(--green);font-weight:400}
+
+/* plans */
+.plans{display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));margin-top:18px}
+.plan{background:var(--card);border:1px solid var(--border);border-radius:var(--r-lg);padding:22px}
+.plan.cloud{border-color:var(--brand)}
+.plan h3{font:400 20px var(--fdisp);margin:0}
+.plan .price{font:400 27px var(--fdisp);margin:8px 0 2px}
+.plan .price small{font-size:12px;color:var(--muted);font-family:var(--fbody)}
+.plan ul{list-style:none;margin:14px 0 0;padding:0;font-size:13px;color:var(--body);display:flex;flex-direction:column;gap:8px}
+.plan li b{color:var(--text);font-weight:500}
+.plan li::before{content:'·';color:var(--brand);margin-right:8px}
+
+/* the zero-credits gate */
+.gate{border:1px solid var(--border);border-radius:var(--r-lg);background:var(--bg);padding:34px 26px;text-align:center;max-width:520px;margin:18px auto 0}
+.gate h3{font:400 22px var(--fdisp);margin:0 0 6px}
+.gate p{margin:0 auto 16px;font-size:13.5px;max-width:42ch}
+.gatemeter{width:min(320px,90%);margin:0 auto 18px}
+.gatemeter .mtrack{height:6px}
+.gatemeter .caplabel{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted);margin-top:6px}
+.gateacts{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.gatefine{font-size:11.5px;color:var(--dim);margin-top:14px}
+.warncall{border-left:2px solid var(--warnc);padding:2px 0 2px 15px;margin:20px 0;color:var(--body);max-width:70ch}
+.warncall b{color:var(--text);font-weight:500}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div class="wrap">
+  <div class="head">
+    <div>
+      <p class="eyebrow">Design round · credits billing</p>
+      <h1>One meter, three draws</h1>
+      <p>Brain, machine, and storage spend from a single credit pool. The machine bills for
+        minutes it <em>worked</em>, never minutes it existed. This page is the visual contract
+        for the dashboard, the packs, and the only gate a funded user should never see.</p>
+    </div>
+    <div class="tog" role="group" aria-label="Theme">
+      <button type="button" data-t="light" aria-pressed="false">Cream oak</button>
+      <button type="button" data-t="dark" aria-pressed="false">Graphite</button>
+    </div>
+  </div>
+
+  <hr class="rule">
+
+  <p class="eyebrow">Station 1 · the utilization dashboard</p>
+  <h2>Credits, for the workspace</h2>
+  <p>A destination page (scope: workspace — credits are the workspace&rsquo;s, so it never lives
+    inside a room). The arc is the month; the meters are where it went; the ledger is why.</p>
+
+  <div class="dash">
+    <div class="dashbar"><b>Credits</b><span>Acme Robotics · resets Oct 1</span></div>
+    <div class="dashgrid">
+      <div class="balcol">
+        <div class="balarc">
+          <svg width="168" height="168" viewBox="0 0 168 168" aria-label="317 of 500 monthly credits remaining">
+            <circle cx="84" cy="84" r="74" fill="none" stroke="var(--panel3)" stroke-width="11"/>
+            <circle cx="84" cy="84" r="74" fill="none" stroke="var(--brand)" stroke-width="11"
+              stroke-linecap="round" stroke-dasharray="465" stroke-dashoffset="170"/>
+          </svg>
+          <div class="balnum"><div><b>317</b><small>credits left</small></div></div>
+        </div>
+        <div class="balsplit">
+          <div><span>Monthly grant</span><b>217 of 500</b></div>
+          <div><span class="keeps">Purchased · never expires</span><b class="keeps">100</b></div>
+        </div>
+        <button class="btn primary" type="button">Buy credits</button>
+        <div class="balnote">Grant spends first, so what you bought keeps.</div>
+      </div>
+
+      <div class="metcol">
+        <div class="meter">
+          <div class="nm">Brain<small>starter model tokens</small></div>
+          <div class="mtrack"><div class="mfill" style="width:38%;background:var(--viz1)"></div></div>
+          <div class="val">96 cr · 2.1M tokens</div>
+        </div>
+        <div class="meter">
+          <div class="nm">Machine<small>active minutes only</small></div>
+          <div class="mtrack"><div class="mfill" style="width:29%;background:var(--viz2)"></div></div>
+          <div class="val">74 cr · 12.3h worked</div>
+        </div>
+        <div class="meter">
+          <div class="nm">Standby<small>machine idle, on</small></div>
+          <div class="mtrack"><div class="mfill" style="width:0%"></div></div>
+          <div class="val"><span class="free">free · 41h</span></div>
+        </div>
+        <div class="meter">
+          <div class="nm">Storage<small>over the 10 GB included</small></div>
+          <div class="mtrack"><div class="mfill" style="width:5%;background:var(--viz3)"></div></div>
+          <div class="val">13 cr · 8.6 GB-mo over</div>
+        </div>
+
+        <div class="burn">
+          <div class="burnh"><span>Daily burn · September</span><em>hover a bar in the real thing; this is a still</em></div>
+          <div class="bars" id="bars" aria-label="daily credit burn, stacked by meter"></div>
+          <div class="legend">
+            <span><s style="background:var(--viz1)"></s>Brain</span>
+            <span><s style="background:var(--viz2)"></s>Machine</span>
+            <span><s style="background:var(--viz3)"></s>Storage</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ledger">
+      <table aria-label="recent charges">
+        <tr><td>Today 14:22 <span class="k">· orchestrator turn · 11.8k in / 940 out</span></td><td>−0.61 cr</td></tr>
+        <tr><td>Today 14:10 <span class="k">· machine · task #1141 build, 34 active min</span></td><td>−3.40 cr</td></tr>
+        <tr><td>Today 09:00 <span class="k">· storage · 8.6 GB over quota, daily</span></td><td>−0.43 cr</td></tr>
+        <tr><td>Sep 12 <span class="k">· pack purchase · 500 credits</span></td><td class="cr">+500 cr</td></tr>
+        <tr><td>Sep 1 <span class="k">· monthly grant</span></td><td class="cr">+500 cr</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><span class="pill rec">The fix</span><h4>Active minutes, not uptime</h4>
+      <p>41 idle hours billed nothing. Under the old meter those same hours were the bill. A
+        machine that exists costs you nothing; a machine that works costs 1 credit per 10 minutes.</p></div>
+    <div class="card"><span class="pill">Honest by construction</span><h4>The ledger names every charge</h4>
+      <p>Each row says what ran and what it measured — tokens, active minutes, GB-days. No row
+        ever says &ldquo;1 query&rdquo;, because queries were never equal.</p></div>
+    <div class="card"><span class="pill">One pool</span><h4>Two balances, one number</h4>
+      <p>The grant resets monthly; what you buy never expires. Grant spends first so purchases
+        keep. The arc shows the sum — the split is one glance below it.</p></div>
+  </div>
+
+  <hr class="rule">
+
+  <p class="eyebrow">Station 2 · buying credits — no upgrade required</p>
+  <h2>Top up, stay on free</h2>
+  <p>Free workspaces buy credits without touching their plan. Stripe one-time checkout; the
+    grant lands the moment the webhook does.</p>
+  <div class="packs">
+    <div class="pack"><b>500</b><small>credits</small><div class="pr">$5</div><button class="btn" type="button">Buy</button></div>
+    <div class="pack hot"><span class="tag">Most bought</span><b>1,100</b><small>credits</small><div class="pr">$10</div><button class="btn primary" type="button">Buy</button></div>
+    <div class="pack"><b>3,000</b><small>credits</small><div class="pr">$25</div><button class="btn" type="button">Buy</button></div>
+  </div>
+  <p class="packnote"><b>Purchased credits never expire</b> and are spent after your monthly
+    grant — buying early never wastes a credit. <em>(Open question for this round: flat 1¢
+    everywhere instead of pack bonuses — flatter is more honest, bonuses convert better.)</em></p>
+
+  <hr class="rule">
+
+  <p class="eyebrow">Station 3 · the plans, restated in credits</p>
+  <h2>Free is a budget, Cloud is an allocation</h2>
+  <div class="plans">
+    <div class="plan">
+      <h3>Free</h3>
+      <div class="price">$0 <small>forever</small></div>
+      <ul>
+        <li><b>500 credits</b> every month</li>
+        <li>Cloud machine <b>provisioned on day one</b></li>
+        <li>Stops only after <b>48 idle hours</b> — wakes on your next message</li>
+        <li>10 GB storage included</li>
+        <li>Buy more credits anytime — no upgrade needed</li>
+      </ul>
+    </div>
+    <div class="plan cloud">
+      <h3>Cloud</h3>
+      <div class="price">$22 <small>per seat / month</small></div>
+      <ul>
+        <li><b>1,500 credits per seat</b> every month</li>
+        <li>Everything in Free</li>
+        <li>50 GB storage included</li>
+        <li>Priority machine capacity</li>
+        <li><em>(1,500 is the founder pricing lever — see plan.md §3.5)</em></li>
+      </ul>
+    </div>
+  </div>
+  <p style="margin-top:14px">What 500 credits is, in this workspace&rsquo;s terms: about
+    <b>820 orchestrator turns</b>, or <b>83 hours of active machine work</b>, or any mix.
+    Bring your own subscription and the brain draw disappears — credits then stretch across
+    machine and storage alone.</p>
+
+  <hr class="rule">
+
+  <p class="eyebrow">Station 4 · the only gate</p>
+  <h2>Out of credits — and nothing else ever stops you</h2>
+  <p>While a workspace has credits, machine downtime is never felt: it wakes on demand and
+    parks silently. The <em>only</em> stop is the balance reaching zero — running work drains
+    first, nothing is killed mid-flight.</p>
+  <div class="gate">
+    <h3>This workspace is out of credits</h3>
+    <p>Your agents finished what they were doing and the machine is parked. Everything you made
+      is safe. Add credits and work resumes exactly where it stopped.</p>
+    <div class="gatemeter">
+      <div class="mtrack"><div class="mfill" style="width:100%;background:var(--warnc)"></div></div>
+      <div class="caplabel"><span>0 of 500 monthly credits</span><span>resets Oct 1</span></div>
+    </div>
+    <div class="gateacts">
+      <button class="btn primary" type="button">Buy credits</button>
+      <button class="btn" type="button">See where they went</button>
+    </div>
+    <div class="gatefine">On the free grant only? Your 500 credits return Oct 1 and the machine
+      wakes itself.</div>
+  </div>
+
+  <div class="warncall">
+    <b>What this replaces:</b> the 60-minute daily machine cap, uptime metering, and the
+    30-minute idle stop. A free workspace that thinks for four hours straight now just spends
+    24 credits — instead of hitting a wall at lunch having &ldquo;used&rdquo; an hour of mostly
+    idle time.
+  </div>
+</div>
+
+<script>
+(function(){
+  var root=document.documentElement;
+  document.querySelectorAll('.tog button').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      root.setAttribute('data-theme',btn.dataset.t);
+      document.querySelectorAll('.tog button').forEach(function(o){o.setAttribute('aria-pressed',String(o===btn));});
+    });
+  });
+  // a plausible September: mixed days, a heavy build mid-month, quiet weekends
+  var days=[[2,1,0],[3,2,0],[1,0,0],[0,0,0],[4,3,1],[6,2,1],[3,5,1],[2,2,0],[0,0,0],[1,1,0],
+            [5,9,1],[7,12,1],[4,6,1],[2,3,0],[0,0,0],[3,2,1],[2,4,1],[1,1,0],[0,0,0],[2,2,0]];
+  var bars=document.getElementById('bars'), max=20;
+  days.forEach(function(d){
+    var el=document.createElement('div');el.className='bar';
+    [['b3',d[2]],['b2',d[1]],['b1',d[0]]].forEach(function(s){
+      var i=document.createElement('i');i.className=s[0];i.style.height=(s[1]/max*60)+'px';el.appendChild(i);});
+    bars.appendChild(el);
+  });
+})();
+</script>

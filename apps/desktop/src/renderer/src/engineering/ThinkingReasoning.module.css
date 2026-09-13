@@ -1,0 +1,170 @@
+/*
+ * NeuraMesh token adaptation of AI CSS' MIT-licensed Thinking + Reasoning component.
+ * Source structure and interaction: https://www.aicss.dev/components/thinking-reasoning
+ */
+.tr {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 100%;
+  margin: 2px 0 13px;
+  font-family: var(--fbody);
+  animation: tr-block-in 240ms cubic-bezier(.23, 1, .32, 1) both;
+}
+
+@keyframes tr-block-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.trHeader {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  min-height: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--dim);
+  cursor: default;
+  font: inherit;
+  text-align: left;
+}
+
+.trHeader.isClickable {
+  cursor: pointer;
+}
+
+.trHeader.isClickable:active {
+  transform: scale(.97);
+}
+
+.trHeader:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+  border-radius: var(--r-xs);
+}
+
+.trLabel {
+  color: var(--dim);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 18px;
+  letter-spacing: -.005em;
+}
+
+.trVerb {
+  color: var(--muted);
+}
+
+.trChevron {
+  color: var(--dim);
+  transform: rotate(180deg);
+  transition: color 160ms var(--ease), transform 220ms cubic-bezier(.23, 1, .32, 1);
+}
+
+.trHeader[aria-expanded='true'] .trChevron {
+  transform: rotate(0deg);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .trHeader.isClickable:hover .trChevron,
+  .trHeader.isClickable:hover .trVerb {
+    color: var(--text);
+  }
+}
+
+.trCollapsible {
+  display: grid;
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transition: grid-template-rows 240ms cubic-bezier(.23, 1, .32, 1), opacity 160ms var(--ease);
+}
+
+.trCollapsible.isCollapsed {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.trInner {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.trViewport {
+  margin-top: 6px;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 425;
+  line-height: 1.55;
+  letter-spacing: -.005em;
+  transition: height 240ms cubic-bezier(.23, 1, .32, 1);
+}
+
+.trViewport.isScroll {
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.trViewport.isScroll::-webkit-scrollbar {
+  display: none;
+}
+
+.trStream {
+  display: flow-root;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  transition: transform 240ms cubic-bezier(.23, 1, .32, 1);
+  will-change: transform;
+}
+
+.trStream :global(.md) {
+  color: inherit;
+  font-size: inherit;
+}
+
+.trStream :global(.md p + p),
+.trStream :global(.md p + ul),
+.trStream :global(.md p + ol) {
+  margin-top: 6px;
+}
+
+.trShimmer {
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  background: linear-gradient(
+    90deg,
+    var(--muted) 0%,
+    var(--muted) 30%,
+    color-mix(in srgb, var(--muted) 42%, transparent) 45%,
+    color-mix(in srgb, var(--muted) 42%, transparent) 55%,
+    var(--muted) 70%,
+    var(--muted) 100%
+  );
+  background-size: 300% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  animation: tr-shine 2.25s cubic-bezier(.25, .1, .25, 1) infinite;
+}
+
+@keyframes tr-shine {
+  0%, 18% { background-position: 100% 0; }
+  82%, 100% { background-position: 0% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tr,
+  .trShimmer {
+    animation: none;
+  }
+
+  .trChevron,
+  .trCollapsible,
+  .trViewport,
+  .trStream {
+    transition: none;
+  }
+}

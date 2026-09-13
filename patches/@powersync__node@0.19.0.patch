@@ -1,0 +1,16 @@
+diff --git a/lib/db/SqliteWorker.js b/lib/db/SqliteWorker.js
+index ce0215b28a445e7a381c7f90972f7bd88df1f376..ab5b9ef1bb4be7dffc4e198d433c20bcdbdbc6bd 100644
+--- a/lib/db/SqliteWorker.js
++++ b/lib/db/SqliteWorker.js
+@@ -60,7 +60,10 @@ export function startPowerSyncWorker(options) {
+     const resolvedOptions = {
+         extensionPath() {
+             const extensionFilename = getPowerSyncExtensionFilename();
+-            const resolved = url.fileURLToPath(new URL(`../${extensionFilename}`, import.meta.url));
++            let resolved = url.fileURLToPath(new URL(`../${extensionFilename}`, import.meta.url));
++            // Electron: SQLite's load_extension uses raw dlopen, which cannot read inside an asar
++            // archive. electron-builder unpacks native libs to app.asar.unpacked — resolve there.
++            resolved = resolved.replace(/app\.asar([\/\\])/, 'app.asar.unpacked$1');
+             return resolved;
+         },
+         async loadBetterSqlite3() {

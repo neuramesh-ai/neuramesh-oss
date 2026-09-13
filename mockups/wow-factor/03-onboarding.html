@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NeuraMesh · Meet your team</title>
+<link rel="stylesheet" href="nm.css">
+<style>
+  body{min-height:100vh;display:flex;flex-direction:column}
+  .obtop{display:flex;align-items:center;gap:14px;padding:16px 22px;border-bottom:1px solid var(--border)}
+  .obtop .brand{font-size:15px}
+  .stepdots{display:flex;gap:7px;margin-left:auto}
+  .stepdots i{width:7px;height:7px;border-radius:99px;background:var(--panel3);transition:all var(--dur)}
+  .stepdots i.on{background:var(--accent);width:20px}
+  .stepdots i.done{background:var(--build)}
+  .stage{flex:1;display:grid;place-items:center;padding:30px 22px;position:relative;overflow:hidden}
+  .panelw{width:100%;max-width:680px;position:relative;z-index:2}
+  .step{display:none;animation:nm-rise .4s var(--ease) both}
+  .step.on{display:block}
+  .eyebrow.c{display:block;margin-bottom:10px}
+  .step h1{font-size:32px;letter-spacing:-.03em;line-height:1.08}
+  .step h1 em{font-style:normal;color:var(--accent)}
+  .step .sub{font-size:16px;color:var(--muted);margin-top:10px;line-height:1.55}
+  .obactions{display:flex;align-items:center;gap:12px;margin-top:28px}
+  .obskip{margin-left:auto;font-size:12.5px;color:var(--dim);cursor:pointer}
+  .obskip:hover{color:var(--muted)}
+
+  /* step 1 — workspace */
+  .wsfield{margin-top:24px}
+  .slugbig{font-family:'Geist Mono',monospace;font-size:13px;color:var(--muted);margin-top:10px}
+  .slugbig b{color:var(--accent)}
+
+  /* step 2 — meet crew (cinematic) */
+  .meet{min-height:300px;display:flex;flex-direction:column;justify-content:center}
+  .speaker{display:flex;gap:18px;align-items:flex-start;min-height:120px}
+  .speaker .who{flex:1}
+  .speaker .nm{display:flex;align-items:center;gap:10px}
+  .speaker .nm b{font-size:22px;color:var(--text);letter-spacing:-.02em}
+  .speaker .rolechip{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;padding:3px 9px;border-radius:99px}
+  .speaker .line{font-size:17px;color:var(--body);line-height:1.5;margin-top:12px;min-height:52px}
+  .crewdots{display:flex;gap:9px;justify-content:center;margin-top:26px}
+  .crewdots .cd{width:42px;height:42px;border-radius:13px;display:grid;place-items:center;font-size:21px;
+    background:var(--panel2);border:1px solid var(--border);opacity:.4;transform:scale(.92);transition:all var(--dur)}
+  .crewdots .cd.seen{opacity:1;transform:scale(1)}
+  .crewdots .cd.cur{opacity:1;transform:scale(1.08);border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow)}
+
+  /* crew roster (editable) */
+  .roster{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:24px}
+  @media(max-width:620px){.roster{grid-template-columns:1fr}}
+  .rcard{display:flex;gap:11px;align-items:center;background:var(--panel);border:1px solid var(--border);border-radius:13px;padding:12px}
+  .rcard .who b{font-size:14px;color:var(--text);display:block}
+  .rcard .who span{font-size:11px;color:var(--muted)}
+  .rcard select{margin-top:5px;background:var(--panel2);border:1px solid var(--border);border-radius:7px;
+    color:var(--body);font-family:'Geist Mono',monospace;font-size:10.5px;padding:2px 5px;outline:none}
+
+  /* step 3 — connect mac */
+  .machine{display:flex;align-items:center;gap:16px;background:var(--panel);border:1px solid var(--border);
+    border-radius:16px;padding:20px;margin-top:24px}
+  .machine .mico{width:54px;height:54px;border-radius:15px;background:var(--panel2);border:1px solid var(--border);display:grid;place-items:center;font-size:28px;flex:none}
+  .machine .minfo b{font-size:16px;color:var(--text);display:flex;align-items:center;gap:9px}
+  .machine .minfo span{font-size:12.5px;color:var(--muted);display:block;margin-top:3px}
+  .mstatus{font-size:12px;font-weight:700;padding:4px 10px;border-radius:99px;margin-left:auto;
+    background:var(--panel2);color:var(--dim);transition:all var(--dur)}
+  .mstatus.online{background:color-mix(in srgb,var(--build) 16%,transparent);color:var(--build)}
+
+  /* step 4 — keys */
+  .keys{margin-top:22px;display:flex;flex-direction:column;gap:11px}
+  .keyrow .field-lbl{display:flex;align-items:center;gap:7px}
+  .keynote{margin-top:14px;font-size:12.5px;color:var(--muted);display:flex;gap:8px;align-items:center;
+    background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:10px 12px}
+
+  /* step 5 — assembled */
+  .assembled{text-align:center}
+  .lineup{display:flex;gap:12px;justify-content:center;margin:26px 0}
+  .lineup .member{text-align:center;animation:nm-rise .5s var(--ease) both}
+  .lineup .member .av{margin:0 auto 8px}
+  .lineup .member b{font-size:13px;color:var(--text);display:block}
+  .lineup .member span{font-size:10.5px;color:var(--muted)}
+  .statline{display:inline-flex;gap:16px;font-size:13px;color:var(--body);margin-bottom:6px}
+  .statline b{color:var(--text)}
+</style>
+</head>
+<body>
+<div class="grain"></div>
+<div class="confetti" id="confetti"></div>
+
+<div class="obtop">
+  <div class="brand">
+    <svg class="mk" viewBox="0 0 28 28" fill="none" style="width:26px;height:26px"><rect width="28" height="28" rx="8" fill="var(--accent)"/>
+      <circle cx="9" cy="9" r="2.4" fill="var(--accent-ink)"/><circle cx="19" cy="9" r="2.4" fill="var(--accent-ink)"/>
+      <circle cx="14" cy="19" r="2.4" fill="var(--accent-ink)"/>
+      <path d="M9 9L19 9M9 9L14 19M19 9L14 19" stroke="var(--accent-ink)" stroke-width="1.5" opacity=".75"/></svg>
+    Neura<span style="color:var(--accent)">Mesh</span>
+  </div>
+  <div class="stepdots" id="dots"><i class="on"></i><i></i><i></i><i></i><i></i></div>
+  <button class="themetog" id="tt" title="Toggle theme" style="margin-left:14px">◐</button>
+</div>
+
+<div class="stage">
+  <div class="weave-bg"><svg viewBox="0 0 1200 600" preserveAspectRatio="none">
+    <path class="weave-strand" d="M0 150 Q300 60 600 150 T1200 150"/>
+    <path class="weave-strand" d="M0 300 Q300 210 600 300 T1200 300" style="opacity:.1"/>
+    <path class="weave-strand" d="M0 450 Q300 360 600 450 T1200 450" style="opacity:.13"/>
+  </svg></div>
+  <div class="panelw">
+
+    <!-- STEP 1 — workspace -->
+    <section class="step on" data-s="0">
+      <span class="eyebrow c">Signed in ✓ · let's set up</span>
+      <h1>First, name your <em>workspace</em>.</h1>
+      <p class="sub">This is your team's home. Your agents and code stay on your machines — only the team's shared state lives in the cloud.</p>
+      <div class="wsfield">
+        <label class="field-lbl">Workspace name</label>
+        <input class="input" id="wsName" placeholder="Acme Robotics" autocomplete="off" style="font-size:17px;padding:13px 15px">
+        <div class="slugbig">neuramesh.app/<b id="slug">acme-robotics</b> · channels: #general #dev #research</div>
+      </div>
+      <div class="obactions">
+        <button class="btn primary lg" data-next>Next: meet your crew →</button>
+        <span class="obskip" data-skip>skip setup</span>
+      </div>
+    </section>
+
+    <!-- STEP 2 — meet crew -->
+    <section class="step" data-s="1">
+      <span class="eyebrow c">Your starting team</span>
+      <h1>Meet your <em>crew</em>.</h1>
+      <div class="meet" id="meet">
+        <div class="speaker" id="speaker">
+          <div class="av xl" id="spAv">🦊</div>
+          <div class="who">
+            <div class="nm"><b id="spName">rex</b><span class="rolechip" id="spRole">orchestrator</span></div>
+            <div class="line" id="spLine"></div>
+          </div>
+        </div>
+        <div class="crewdots" id="crewdots"></div>
+      </div>
+      <!-- editable roster appears after intros -->
+      <div id="rosterWrap" style="display:none">
+        <p class="sub" style="margin-top:0">These four are your starting team. Tweak names &amp; models now — or anytime.</p>
+        <div class="roster" id="roster"></div>
+      </div>
+      <div class="obactions">
+        <button class="btn ghost" id="introSkip">skip intros ⏭</button>
+        <button class="btn primary lg" data-next id="crewNext" style="display:none">Next: connect this Mac →</button>
+      </div>
+    </section>
+
+    <!-- STEP 3 — connect mac -->
+    <section class="step" data-s="2">
+      <span class="eyebrow c">Home base</span>
+      <h1>Connect <em>this Mac</em>.</h1>
+      <p class="sub">Your daemon runs here — outbound-only, no open ports. It registers the moment you continue, and your agents wake up on it.</p>
+      <div class="machine">
+        <div class="mico">💻</div>
+        <div class="minfo">
+          <b>rex's MacBook Pro <span class="dot off" id="macDot"></span></b>
+          <span id="macStatus">daemon ready · outbound-only · macOS 14.5 · Apple Silicon</span>
+        </div>
+        <span class="mstatus" id="macPill">connecting…</span>
+      </div>
+      <div class="obactions">
+        <button class="btn primary lg" data-next>Looks good →</button>
+        <span class="obskip" data-skip>skip setup</span>
+      </div>
+    </section>
+
+    <!-- STEP 4 — keys -->
+    <section class="step" data-s="3">
+      <span class="eyebrow c">Bring your own brain</span>
+      <h1>Your keys, your <em>keychain</em>.</h1>
+      <p class="sub">Reuse the subscriptions you already pay for, or drop in a key per provider. Add one now or skip — agents fall back to your host login.</p>
+      <div class="keys">
+        <div class="keyrow"><label class="field-lbl">🟧 Anthropic <span class="dim">· powers rex &amp; atlas</span></label><input class="input mono" placeholder="sk-ant-…" type="password"></div>
+        <div class="keyrow"><label class="field-lbl">⬛ OpenAI <span class="dim">· powers scout</span></label><input class="input mono" placeholder="sk-…" type="password"></div>
+        <div class="keyrow"><label class="field-lbl">🔵 Google <span class="dim">· optional</span></label><input class="input mono" placeholder="OAuth — no key needed" type="password"></div>
+      </div>
+      <div class="keynote">🔑 Stored in your macOS keychain. NeuraMesh never sees them — no resale, no markup.</div>
+      <div class="obactions">
+        <button class="btn primary lg" data-next>Assemble the team →</button>
+        <span class="obskip" data-skip>I'll add keys later</span>
+      </div>
+    </section>
+
+    <!-- STEP 5 — assembled -->
+    <section class="step" data-s="4">
+      <div class="assembled">
+        <span class="eyebrow c" style="text-align:center">Team assembled</span>
+        <h1 style="text-align:center"><em id="wsTitle">Acme Robotics</em> is live.</h1>
+        <div class="lineup" id="lineup"></div>
+        <div class="statline"><span><b>4</b> agents</span><span><b>1</b> machine online</span><span><b>3</b> channels</span></div>
+        <p class="sub" style="margin:6px auto 0;max-width:46ch">Rex is ready. Hand him your first ask and watch the loop run — no editor required.</p>
+        <div style="margin-top:26px;display:flex;gap:10px;justify-content:center">
+          <a class="btn primary lg" href="04-first-fanout.html" id="firstFanout">Meet @rex — start your first fan-out →</a>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<script>
+  // theme
+  const tt=document.getElementById('tt');
+  const apply=t=>{document.documentElement.dataset.theme=t;tt.textContent=t==='cream'?'☀':'◐';try{sessionStorage.nmTheme=t}catch(e){}};
+  apply(sessionStorage.nmTheme||'dark');
+  tt.onclick=()=>apply(document.documentElement.dataset.theme==='cream'?'dark':'cream');
+
+  const CREW=[
+    {name:'rex',emoji:'🦊',role:'orchestrator',cls:'orch',rc:'--r-orch',model:'claude-opus-4-8',
+     line:"I turn your asks into shipped work — I plan it, fan it out, and keep everyone honest to the Definition of Done."},
+    {name:'atlas',emoji:'🦅',role:'architect',cls:'arch',rc:'--r-arch',model:'claude-opus-4-8',
+     line:"I draft the implementation plan before a single line gets written. Measure twice, cut once."},
+    {name:'patch',emoji:'🦉',role:'developer',cls:'dev',rc:'--r-dev',model:'claude-sonnet-4-6',
+     line:"I claim tasks and build them — real branches, real pull requests. Never just vibes."},
+    {name:'scout',emoji:'🐝',role:'reviewer',cls:'rev',rc:'--r-rev',model:'gpt-5.5',
+     line:"Nothing ships until I've checked it against the bar. Evidence, or it didn't happen."},
+  ];
+  const MODELS=['claude-opus-4-8','claude-sonnet-4-6','gpt-5.5','antigravity (agy)'];
+
+  // step controller
+  const steps=[...document.querySelectorAll('.step')], dots=[...document.querySelectorAll('#dots i')];
+  let cur=0, crewPlayed=false;
+  function goto(n){
+    cur=Math.max(0,Math.min(steps.length-1,n));
+    steps.forEach((s,i)=>s.classList.toggle('on',i===cur));
+    dots.forEach((d,i)=>{d.classList.toggle('on',i===cur);d.classList.toggle('done',i<cur);});
+    if(cur===1&&!crewPlayed){playCrew();}
+    if(cur===2){connectMac();}
+    if(cur===4){assemble();}
+  }
+  document.querySelectorAll('[data-next]').forEach(b=>b.onclick=()=>goto(cur+1));
+  document.querySelectorAll('[data-skip]').forEach(b=>b.onclick=()=>goto(4));
+
+  // workspace slug
+  const wsName=document.getElementById('wsName'), slug=document.getElementById('slug');
+  function slugify(s){return s.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');}
+  wsName.addEventListener('input',()=>{slug.textContent=slugify(wsName.value)||'your-team';
+    document.getElementById('wsTitle').textContent=wsName.value||'Your workspace';});
+
+  // crew dots
+  const crewdots=document.getElementById('crewdots');
+  CREW.forEach((c,i)=>{const d=document.createElement('div');d.className='cd';d.id='cd'+i;d.textContent=c.emoji;crewdots.appendChild(d);});
+
+  let crewTimers=[];
+  function playCrew(){
+    crewPlayed=true;
+    const spAv=document.getElementById('spAv'),spName=document.getElementById('spName'),
+          spRole=document.getElementById('spRole'),spLine=document.getElementById('spLine');
+    let i=0;
+    function show(idx){
+      const c=CREW[idx];
+      spAv.textContent=c.emoji; spAv.className='av xl '+c.cls;
+      spName.textContent=c.name;
+      spRole.textContent=c.role;
+      spRole.style.background='color-mix(in srgb,var('+c.rc+') 16%,transparent)';
+      spRole.style.color='var('+c.rc+')';
+      document.querySelectorAll('.cd').forEach((d,k)=>{d.classList.toggle('cur',k===idx);d.classList.toggle('seen',k<=idx);});
+      typeLine(spLine,c.line);
+    }
+    show(0);
+    for(let k=1;k<CREW.length;k++){crewTimers.push(setTimeout(()=>show(k),k*2400));}
+    crewTimers.push(setTimeout(revealRoster,CREW.length*2400));
+  }
+  function typeLine(el,text){
+    el.textContent=''; let i=0;
+    const iv=setInterval(()=>{el.textContent=text.slice(0,++i);if(i>=text.length)clearInterval(iv);},16);
+    el._iv&&clearInterval(el._iv); el._iv=iv;
+  }
+  function revealRoster(){
+    document.getElementById('meet').style.display='none';
+    const rw=document.getElementById('rosterWrap');rw.style.display='block';rw.classList.add('rise');
+    const r=document.getElementById('roster');r.innerHTML='';
+    CREW.forEach(c=>{
+      const opts=MODELS.map(m=>`<option ${m===c.model?'selected':''}>${m}</option>`).join('');
+      r.insertAdjacentHTML('beforeend',
+        `<div class="rcard"><div class="av ${c.cls}">${c.emoji}</div><div class="who"><b>${c.name}</b><span>${c.role}</span><br><select>${opts}</select></div></div>`);
+    });
+    document.getElementById('crewNext').style.display='inline-flex';
+    document.getElementById('introSkip').style.display='none';
+  }
+  document.getElementById('introSkip').onclick=()=>{crewTimers.forEach(clearTimeout);crewTimers=[];revealRoster();};
+
+  // connect mac
+  let macDone=false;
+  function connectMac(){
+    if(macDone)return; macDone=true;
+    const dot=document.getElementById('macDot'),pill=document.getElementById('macPill');
+    setTimeout(()=>{dot.classList.remove('off');dot.classList.add('on');pill.textContent='● online';pill.classList.add('online');
+      document.getElementById('macStatus').textContent='registered ✓ · daemon v0.4.3 · outbound-only · Apple Silicon';},1100);
+  }
+
+  // assemble
+  let assembled=false;
+  function assemble(){
+    if(assembled)return; assembled=true;
+    const lu=document.getElementById('lineup');lu.innerHTML='';
+    CREW.forEach((c,i)=>{
+      const m=document.createElement('div');m.className='member';m.style.animationDelay=(i*.12)+'s';
+      m.innerHTML=`<div class="av lg ${c.cls}">${c.emoji}<span class="dot on" style="position:absolute;bottom:-2px;right:-2px"></span></div><b>${c.name}</b><span>${c.role}</span>`;
+      lu.appendChild(m);
+    });
+    setTimeout(confetti,300);
+  }
+
+  function confetti(){const c=document.getElementById('confetti');const cols=['#ff7a52','#ec5a32','#54c08c','#a899f5','#7aa6e2','#f0b35a'];
+    for(let i=0;i<70;i++){const p=document.createElement('i');p.style.left=Math.random()*100+'vw';p.style.background=cols[i%cols.length];
+      p.style.animationDuration=(1.6+Math.random()*1.4)+'s';p.style.animationDelay=(Math.random()*.4)+'s';c.appendChild(p);setTimeout(()=>p.remove(),3400);}}
+</script>
+</body>
+</html>

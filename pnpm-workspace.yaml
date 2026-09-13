@@ -1,0 +1,17 @@
+packages:
+  - packages/*
+  - apps/*
+
+onlyBuiltDependencies:
+  - electron
+  - esbuild
+  - better-sqlite3
+  - '@powersync/node'
+  - onnxruntime-node
+  - node-pty
+
+patchedDependencies:
+  '@powersync/node@0.19.0': patches/@powersync__node@0.19.0.patch
+
+overrides:
+  '@types/react': 19.2.17

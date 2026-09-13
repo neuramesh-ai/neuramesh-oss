@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NeuraMesh · Wow-Factor Journey</title>
+<link rel="stylesheet" href="nm.css">
+<style>
+  .hero{position:relative;padding:90px 0 40px;overflow:hidden}
+  .hero h1{font-size:clamp(38px,6vw,68px);letter-spacing:-.04em;line-height:1.02;max-width:14ch}
+  .hero h1 em{font-style:normal;color:var(--accent)}
+  .hero .lead{font-size:20px;max-width:60ch;margin-top:18px}
+  .ethos{display:flex;gap:8px;flex-wrap:wrap;margin-top:26px}
+  .ethos .pill{font-size:12.5px}
+  .thesis{display:grid;grid-template-columns:1.3fr 1fr;gap:18px;margin-top:34px}
+  @media(max-width:900px){.thesis{grid-template-columns:1fr}}
+  .thesis .card h3{font-size:16px;margin-bottom:8px}
+  .swatchrow{display:flex;gap:6px;margin-top:12px}
+  .sw{width:30px;height:30px;border-radius:8px;border:1px solid var(--border)}
+  .stage{margin-top:14px}
+  .stage-head{display:flex;align-items:center;gap:12px;margin:38px 0 16px}
+  .stage-num{width:34px;height:34px;border-radius:10px;background:var(--accent-soft);color:var(--accent);
+    display:grid;place-items:center;font-weight:800;font-size:15px;flex:none}
+  .stage-head h2{font-size:24px;letter-spacing:-.03em}
+  .stage-head .line{flex:1;height:1px;background:var(--border)}
+  .gallery{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  @media(max-width:900px){.gallery{grid-template-columns:1fr}}
+  .gcard{display:flex;flex-direction:column;gap:0;background:var(--panel);border:1px solid var(--border);
+    border-radius:16px;overflow:hidden;text-decoration:none;transition:border-color var(--dur),transform var(--dur),box-shadow var(--dur)}
+  .gcard:hover{border-color:color-mix(in srgb,var(--accent) 45%,var(--border));transform:translateY(-3px);
+    box-shadow:0 24px 50px -34px var(--shadow)}
+  .gcard .thumb{height:118px;position:relative;overflow:hidden;border-bottom:1px solid var(--border);
+    display:grid;place-items:center;background:
+      radial-gradient(120% 90% at 80% 0%,color-mix(in srgb,var(--accent) 16%,transparent),transparent 60%),var(--bg2)}
+  .gcard .thumb .big{font-size:42px;filter:saturate(1.1)}
+  .gcard .meta{padding:15px 16px 17px}
+  .gcard .wowno{font-family:'Geist Mono',monospace;font-size:10.5px;font-weight:700;color:var(--accent);letter-spacing:.06em}
+  .gcard h4{font-size:15.5px;margin:5px 0 6px;letter-spacing:-.02em}
+  .gcard p{font-size:12.8px;color:var(--muted);line-height:1.5}
+  .gcard .tag{position:absolute;top:10px;right:10px;font-size:9.5px;font-weight:800;text-transform:uppercase;
+    letter-spacing:.08em;padding:3px 8px;border-radius:99px}
+  .tag.live{background:color-mix(in srgb,var(--ok) 20%,transparent);color:var(--ok)}
+  .tag.next{background:var(--panel3);color:var(--muted)}
+  .toc{position:fixed;right:18px;bottom:18px;z-index:50}
+  .footnote{margin:60px 0 30px;padding-top:24px;border-top:1px solid var(--border);color:var(--dim);font-size:12.5px}
+</style>
+</head>
+<body>
+<div class="grain"></div>
+
+<nav class="nav">
+  <div class="wrap">
+    <div class="brand">
+      <svg class="mk" viewBox="0 0 28 28" fill="none"><rect width="28" height="28" rx="8" fill="var(--accent)"/>
+        <circle cx="9" cy="9" r="2.4" fill="var(--accent-ink)"/><circle cx="19" cy="9" r="2.4" fill="var(--accent-ink)"/>
+        <circle cx="14" cy="19" r="2.4" fill="var(--accent-ink)"/>
+        <path d="M9 9L19 9M9 9L14 19M19 9L14 19" stroke="var(--accent-ink)" stroke-width="1.5" opacity=".75"/></svg>
+      Neura<span style="color:var(--accent)">Mesh</span>
+    </div>
+    <div class="navlinks">
+      <a href="#thesis">Thesis</a><a href="#land">Land</a><a href="#download">Download</a>
+      <a href="#first">First run</a><a href="#daily">Daily</a>
+    </div>
+    <div class="row gap10 mla">
+      <span class="badge">prototype suite</span>
+      <button class="themetog" id="tt" title="Toggle theme">◐</button>
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="weave-bg"><svg viewBox="0 0 1200 400" preserveAspectRatio="none">
+    <path class="weave-strand" d="M0 80 Q300 10 600 80 T1200 80"/>
+    <path class="weave-strand" d="M0 150 Q300 80 600 150 T1200 150" style="opacity:.12"/>
+    <path class="weave-strand" d="M0 220 Q300 150 600 220 T1200 220" style="opacity:.16"/>
+    <path class="weave-strand" d="M0 300 Q300 230 600 300 T1200 300" style="opacity:.1"/>
+  </svg></div>
+  <div class="wrap" style="position:relative;z-index:2">
+    <div class="eyebrow">Launch · wow-factor exploration</div>
+    <h1 style="margin-top:14px">Make NeuraMesh the app developers <em>love</em>, not just use.</h1>
+    <p class="lead">A clickable map of the moments that turn a download into devotion — across the whole journey, in your real Ember&nbsp;Weave design language. Every card below opens a working prototype. Toggle the theme; both must be beautiful.</p>
+    <div class="ethos">
+      <span class="pill">⚡ Speed is respect</span>
+      <span class="pill">🔬 Evidence is trust</span>
+      <span class="pill">🛡️ Enforcement is kindness</span>
+      <span class="pill">✨ Delight is the moat</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- THESIS -->
+  <section id="thesis" class="stage">
+    <div class="thesis">
+      <div class="card">
+        <h3>The thesis</h3>
+        <p class="body" style="font-size:14.5px">NeuraMesh isn't a coding tool — it's the first app where you <strong style="color:var(--text)">manage a team instead of typing code</strong>. The wow has to come from feeling like a powerful engineering leader commanding a living crew: fast, evidence-gated, and alive. Raw Claude Code is single-threaded and lonely. NeuraMesh should feel like a <em style="color:var(--accent);font-style:normal">mission control for your org of one</em>.</p>
+        <p class="body" style="font-size:14.5px;margin-top:10px">The love is won in two places most teams neglect: the <strong style="color:var(--text)">first 2 minutes</strong> (does the magic land before doubt creeps in?) and the <strong style="color:var(--text)">10,000th minute</strong> (is checking your mesh the best part of the morning?).</p>
+      </div>
+      <div class="card" style="border-color:color-mix(in srgb,var(--accent) 30%,var(--border))">
+        <h3>✅ The palette is already unified</h3>
+        <p class="body" style="font-size:14px">Verified in <span class="mono">tokens.css</span>: the website <em>and</em> all four app themes are <strong style="color:var(--text)">Ember Weave</strong> — ember <span class="mono" style="color:var(--accent)">#ff7a52</span> on warm-black, <span class="mono" style="color:var(--accent)">#ec5a32</span> on cream. Color cohesion is done.</p>
+        <p class="body" style="font-size:14px;margin-top:8px">So the real opportunity is <strong style="color:var(--text)">experiential</strong> continuity: the same loop animation, motion, and personas you meet here flow straight into the app's empty states and loading — one <em>feeling</em>, not just one color.</p>
+        <div class="swatchrow">
+          <div class="sw" style="background:#ff7a52" title="ember · dark #ff7a52"></div>
+          <div class="sw" style="background:#ec5a32" title="ember · light #ec5a32"></div>
+          <div class="sw" style="background:#161210" title="warm-black #161210"></div>
+          <div class="sw" style="background:#fbf3e8" title="cream #fbf3e8"></div>
+          <div class="sw" style="background:#54c08c" title="done #54c08c"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- STAGE 1: LAND -->
+  <section id="land" class="stage">
+    <div class="stage-head"><div class="stage-num">1</div><h2>Land</h2><span class="muted small">the website — earn the click in 8 seconds</span><div class="line"></div></div>
+    <div class="gallery">
+      <a class="gcard" href="01-landing.html">
+        <div class="thumb"><span class="tag live">live</span><span class="big">🎮</span></div>
+        <div class="meta"><div class="wowno">WOW 01</div><h4>Live Loop Simulator</h4>
+          <p>Type a feature request in the hero and watch a real mesh plan → fan out → build → review → ship it — before you ever download. The whole product, playable.</p></div>
+      </a>
+      <a class="gcard" href="01-landing.html#living">
+        <div class="thumb"><span class="tag live">live</span><span class="big">🫀</span></div>
+        <div class="meta"><div class="wowno">WOW 02</div><h4>The org that breathes</h4>
+          <p>Agents pick up tasks, cards slide across the board, PRs merge — a living visualization that proves "autonomous" instead of claiming it.</p></div>
+      </a>
+      <a class="gcard" href="01-landing.html#cohesion">
+        <div class="thumb"><span class="tag live">live</span><span class="big">🧵</span></div>
+        <div class="meta"><div class="wowno">WOW 03</div><h4>One continuous thread</h4>
+          <p>The palette's already unified — so this is experiential: the same loop, motion, and personas carry from first scroll into the app's empty states and loading.</p></div>
+      </a>
+    </div>
+  </section>
+
+  <!-- STAGE 2: DOWNLOAD -->
+  <section id="download" class="stage">
+    <div class="stage-head"><div class="stage-num">2</div><h2>Download</h2><span class="muted small">turn dead install time into momentum</span><div class="line"></div></div>
+    <div class="gallery">
+      <a class="gcard" href="02-download.html">
+        <div class="thumb"><span class="tag live">live</span><span class="big">⏳</span></div>
+        <div class="meta"><div class="wowno">WOW 04</div><h4>Set up while it downloads</h4>
+          <p>The ~90s download isn't dead time — name your workspace and pick your crew in the browser, so the app opens already yours.</p></div>
+      </a>
+      <a class="gcard" href="02-download.html#handoff">
+        <div class="thumb"><span class="tag live">live</span><span class="big">📡</span></div>
+        <div class="meta"><div class="wowno">WOW 05</div><h4>Live install handoff</h4>
+          <p>The page senses the moment you launch the app and transitions itself — no "did it work?" limbo. A countdown to your first fan-out.</p></div>
+      </a>
+      <a class="gcard" href="02-download.html#trust">
+        <div class="thumb"><span class="tag live">live</span><span class="big">🔐</span></div>
+        <div class="meta"><div class="wowno">WOW 06</div><h4>Trust, shown not told</h4>
+          <p>"Code never leaves your machine" rendered as a live diagram of outbound-only daemons + keychain keys — proof at the exact moment of doubt.</p></div>
+      </a>
+    </div>
+  </section>
+
+  <!-- STAGE 3: FIRST RUN -->
+  <section id="first" class="stage">
+    <div class="stage-head"><div class="stage-num">3</div><h2>First run</h2><span class="muted small">the 2-minute magic moment</span><div class="line"></div></div>
+    <div class="gallery">
+      <a class="gcard" href="03-onboarding.html">
+        <div class="thumb"><span class="tag live">live</span><span class="big">🦊</span></div>
+        <div class="meta"><div class="wowno">WOW 07</div><h4>Meet your team</h4>
+          <p>Replace the 5-field form with hiring a crew. Rex, Atlas, Patch &amp; Scout introduce themselves with personality. You're assembling a team, not filling a database.</p></div>
+      </a>
+      <a class="gcard" href="04-first-fanout.html">
+        <div class="thumb"><span class="tag live">live</span><span class="big">🎆</span></div>
+        <div class="meta"><div class="wowno">WOW 08</div><h4>Your first fan-out</h4>
+          <p>A guided real loop on a sandbox repo — plan, fan-out, review, Accept — so the magic lands in 2 minutes with zero risk. The aha before the keys.</p></div>
+      </a>
+      <a class="gcard" href="04-first-fanout.html#connect">
+        <div class="thumb"><span class="tag live">live</span><span class="big">💻</span></div>
+        <div class="meta"><div class="wowno">WOW 09</div><h4>Machine comes alive</h4>
+          <p>"Connecting this Mac…" resolves into a satisfying presence-dot-goes-green moment. Your home base just joined the mesh.</p></div>
+      </a>
+    </div>
+  </section>
+
+  <!-- STAGE 4: DAILY -->
+  <section id="daily" class="stage">
+    <div class="stage-head"><div class="stage-num">4</div><h2>Daily</h2><span class="muted small">where #1-loved is won</span><div class="line"></div></div>
+    <div class="gallery">
+      <a class="gcard" href="05-mission-control.html">
+        <div class="thumb"><span class="tag live">live</span><span class="big">🛰️</span></div>
+        <div class="meta"><div class="wowno">WOW 10</div><h4>Mission Control</h4>
+          <p>The morning dashboard you actually want to open: who's working on what, what needs you, what shipped overnight, throughput climbing.</p></div>
+      </a>
+      <a class="gcard" href="06-review-cockpit.html">
+        <div class="thumb"><span class="tag live">live</span><span class="big">🔬</span></div>
+        <div class="meta"><div class="wowno">WOW 11</div><h4>Evidence-first review</h4>
+          <p>Review 5 PRs in 5 minutes. Screenshots &amp; test results front-and-center, keyboard-driven, Definition-of-Done as a live checklist. Accept on <span class="kbd">⏎</span>.</p></div>
+      </a>
+      <a class="gcard" href="07-living-board.html">
+        <div class="thumb"><span class="tag live">live</span><span class="big">🌊</span></div>
+        <div class="meta"><div class="wowno">WOW 12</div><h4>The living board</h4>
+          <p>Cards move themselves as agents work — todo → building → review → done, in real time. Presence, streaming, the org visibly alive.</p></div>
+      </a>
+      <a class="gcard" href="08-decision-inbox.html">
+        <div class="thumb"><span class="tag live">live</span><span class="big">🗳️</span></div>
+        <div class="meta"><div class="wowno">WOW 13</div><h4>Decision inbox</h4>
+          <p>Agents ask crisp multiple-choice questions; you unblock five of them in seconds. Human-in-the-loop without being on-the-hook.</p></div>
+      </a>
+      <a class="gcard" href="09-rsi-retro.html">
+        <div class="thumb"><span class="tag live">live</span><span class="big">📈</span></div>
+        <div class="meta"><div class="wowno">WOW 14</div><h4>Compounding, felt</h4>
+          <p>"Rex leveled up." A weekly retro of what your org shipped &amp; learned. The dopamine of agents that get measurably sharper.</p></div>
+      </a>
+      <a class="gcard" href="05-mission-control.html#cmdk">
+        <div class="thumb"><span class="tag live">live</span><span class="big">⌘</span></div>
+        <div class="meta"><div class="wowno">WOW 15</div><h4>⌘K everything</h4>
+          <p>Fan out a task, jump to a thread, accept a PR — without lifting your hands. Power-user speed as a love language.</p></div>
+      </a>
+    </div>
+  </section>
+
+  <div class="footnote">
+    Prototypes are standalone HTML in <span class="mono">wow-prototypes/</span> · built in your Ember&nbsp;Weave system (Geist + ember-on-warm) · both themes verified · this is exploration, not production code. “live” = clickable now · “building” = landing in this loop.
+  </div>
+</main>
+
+<script>
+  // theme toggle — persists per session
+  const tt=document.getElementById('tt');
+  const apply=t=>{document.documentElement.dataset.theme=t;tt.textContent=t==='cream'?'☀':'◐';try{sessionStorage.nmTheme=t}catch(e){}};
+  apply(sessionStorage.nmTheme||'dark');
+  tt.onclick=()=>apply(document.documentElement.dataset.theme==='cream'?'dark':'cream');
+
+  // guard: cards still being built show a friendly toast instead of a 404
+  const BUILT=new Set(['','index.html','01-landing.html','02-download.html','03-onboarding.html','04-first-fanout.html','05-mission-control.html','06-review-cockpit.html','07-living-board.html','08-decision-inbox.html','09-rsi-retro.html']);
+  function toast(msg){let t=document.getElementById('nmtoast');
+    if(!t){t=document.createElement('div');t.id='nmtoast';
+      t.style.cssText='position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);background:var(--panel);border:1px solid var(--border2);color:var(--text);padding:11px 16px;border-radius:12px;font-size:13px;font-weight:600;box-shadow:0 16px 40px -20px var(--shadow);z-index:120;opacity:0;transition:opacity .2s var(--ease),transform .2s var(--ease);display:flex;gap:8px;align-items:center';
+      document.body.appendChild(t);}
+    t.innerHTML=msg;requestAnimationFrame(()=>{t.style.opacity='1';t.style.transform='translateX(-50%) translateY(0)';});
+    clearTimeout(t._h);t._h=setTimeout(()=>{t.style.opacity='0';t.style.transform='translateX(-50%) translateY(20px)';},2800);}
+  document.querySelectorAll('a.gcard').forEach(a=>a.addEventListener('click',e=>{
+    const file=(a.getAttribute('href')||'').split('#')[0];
+    if(!BUILT.has(file)){e.preventDefault();toast('🛠️ Building this one in the loop — check back soon.');}
+  }));
+</script>
+</body>
+</html>

@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>The projects rail — the fold idiom, turned into the work axis</title>
+<style>
+/* tokens verbatim from apps/desktop/src/renderer/src/tokens.css (graphite dark · paper light) */
+[data-theme] {
+  --fdisp:'Source Serif 4 Variable','Source Serif 4',Georgia,serif;
+  --font:'Geist Variable',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --fmono:'Geist Mono Variable',ui-monospace,'SF Mono',Menlo,monospace;
+  --dur-fast:.12s; --dur:.15s; --dur-enter:.22s; --ease:cubic-bezier(.22,1,.36,1);
+  --r-xs:6px; --r-sm:8px; --r-md:10px; --r-lg:14px; --r-xl:18px; --r-full:999px;
+  --navfold-w:26px; --projrail-w:30px;   /* today's fold strip · the proposed projects rail */
+}
+[data-theme='dark'] {
+  --win:#0d0d0d; --bg:#141414; --panel:#191919; --panel2:#212121; --panel3:#2b2b2b;
+  --border:#272727; --border2:#383838;
+  --text:#eaeaea; --body:#b6b6b6; --muted:#898989; --dim:#676767;
+  --link:#d19a72; --accent:var(--text); --accent-ink:#101010; --brand:#834a2b;
+  --prog:#8ba0c0; --review:#a89ccf; --done:#77ac8d; --ship:#7cb0bd; --blocked:#9ca0a8; --design:#cc8fb9; --closed:#727272;
+  --shadow:rgba(0,0,0,.62); --overlay:#222222; --card:#1e1e1e; --card-border:#2c2c2c;
+  --shadow-card:0 1px 2px rgba(0,0,0,.25); --shadow-lift:0 8px 20px -8px rgba(0,0,0,.55); --shadow-pop:0 20px 55px -14px rgba(0,0,0,.65);
+  --ring:#525252; --hover-border:#404040;
+  --hover-bg:color-mix(in srgb,var(--text) 7%,transparent); --sel-bg:color-mix(in srgb,var(--text) 10%,transparent);
+}
+[data-theme='light'] {
+  --win:#e9e5db; --bg:#fcfbf8; --panel:#fcfbf8; --panel2:#f4f1ea; --panel3:#ebe7dd;
+  --border:#e2ded4; --border2:#cec5b7;
+  --text:#2f2a24; --body:#524c43; --muted:#837d72; --dim:#a09889;
+  --link:#8f4f2a; --accent:var(--text); --accent-ink:#ffffff; --brand:#834a2b;
+  --prog:#4f80c4; --review:#6d5ce0; --done:#2f9e6b; --ship:#1f7f96; --blocked:#7c7f88; --design:#b0498f; --closed:#8a847a;
+  --shadow:rgba(70,58,44,.14); --overlay:#ffffff; --card:#ffffff; --card-border:#e2ded4;
+  --shadow-card:0 1px 2px rgba(70,58,44,.05); --shadow-lift:0 8px 20px -8px rgba(70,58,44,.18); --shadow-pop:0 20px 55px -14px rgba(70,58,44,.26);
+  --ring:color-mix(in srgb,var(--accent) 40%,var(--border2)); --hover-border:color-mix(in srgb,var(--text) 12%,var(--border2));
+  --hover-bg:color-mix(in srgb,var(--text) 6%,transparent); --sel-bg:color-mix(in srgb,var(--text) 8%,transparent);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#131210; font-family:'Geist Variable',-apple-system,sans-serif; -webkit-font-smoothing:antialiased; }
+.page { max-width:1720px; margin:0 auto; padding:34px 24px 90px; }
+.pagehead { color:#eaeaea; }
+.pagehead h1 { font-family:'Source Serif 4',Georgia,serif; font-size:24px; font-weight:640; letter-spacing:-.012em; }
+.pagehead p { color:#898989; font-size:13px; line-height:1.64; margin-top:9px; max-width:102ch; }
+.pagehead b { color:#b6b6b6; } .pagehead code { font-family:'Geist Mono Variable',monospace; font-size:12px; color:#b6b6b6; }
+.stophd { color:#eaeaea; font-size:15.5px; font-weight:660; margin:46px 0 4px; font-family:'Source Serif 4',Georgia,serif; }
+.stopno { font:700 10px 'Geist Mono Variable',monospace; letter-spacing:.12em; color:#6f6f6f; text-transform:uppercase; margin-right:9px; }
+.stopp { color:#898989; font-size:12.5px; line-height:1.64; max-width:106ch; margin-bottom:18px; }
+.stopp b { color:#b6b6b6; } .stopp code { font-family:'Geist Mono Variable',monospace; font-size:11.5px; color:#b6b6b6; }
+.themes { display:grid; grid-template-columns:repeat(3,1fr); gap:18px; align-items:start; }
+.duo { display:grid; grid-template-columns:1fr 1fr; gap:18px; align-items:start; }
+@media (max-width:1440px){ .themes { grid-template-columns:1fr 1fr; } }
+.theme { background:var(--win); border:1px solid var(--border2); border-radius:16px; padding:15px; color:var(--text); }
+.theme > h2 { font-size:10.5px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--dim); margin:0 2px 11px; }
+.theme > h2 .pick { color:var(--done); } .theme > h2 .thm { float:right; opacity:.7; letter-spacing:.06em; }
+.callouts { display:flex; flex-direction:column; gap:7px; margin-top:12px; }
+.co { font-size:11.5px; color:var(--muted); line-height:1.56; } .co b { color:var(--body); }
+.co code { font-family:var(--fmono); font-size:10.5px; color:var(--body); }
+.co .n { display:inline-grid; place-items:center; width:16px; height:16px; border-radius:50%; background:var(--panel3); color:var(--link); font:700 10px var(--fmono); margin-right:6px; vertical-align:-3px; }
+
+/* ── the app frame (docs/33): --win is the window ground; panels float on it ───────────── */
+.frame { position:relative; display:flex; height:420px; background:var(--win); border-radius:12px; overflow:hidden; border:1px solid var(--border); }
+.frame.tall { height:456px; }
+
+/* ── THE PROJECTS RAIL — mirrors .navfoldtab: transparent, 26–30px, vertical mono ──────── */
+.prail { position:relative; z-index:3; width:var(--projrail-w); flex:none; display:flex; flex-direction:column; align-items:center; gap:9px; padding:11px 0 9px; background:transparent; color:var(--dim); }
+.prail.hot { background:var(--hover-bg); }
+.pr-home { position:relative; width:24px; height:24px; border-radius:8px; display:grid; place-items:center; color:var(--body); }
+.pr-home.on { background:var(--panel3); color:var(--text); }
+[data-theme='light'] .pr-home.on { background:var(--card); box-shadow:var(--shadow-card); }
+.pr-home .pip { position:absolute; right:-4px; top:-4px; min-width:14px; height:14px; padding:0 3px; border-radius:99px; background:var(--accent); color:var(--accent-ink); font:700 8.5px var(--fmono); display:grid; place-items:center; border:1.5px solid var(--win); }
+.pr-rule { width:14px; height:1px; background:var(--border2); flex:none; }
+/* the active project's mark + its name, vertical — the .navfoldn idiom, carrying identity */
+.pr-tile { position:relative; width:22px; height:22px; border-radius:7px; display:grid; place-items:center; overflow:hidden; flex:none;
+  background:linear-gradient(160deg,var(--panel3),var(--panel2)); border:1px solid var(--border2); color:var(--muted); font:700 9.5px var(--font); }
+.pr-tile.on { color:var(--text); border-color:var(--ring); box-shadow:0 0 0 2px color-mix(in srgb,var(--text) 13%,transparent); }
+.pr-name { writing-mode:vertical-rl; text-orientation:mixed; font:700 9px var(--fmono); letter-spacing:.14em; text-transform:uppercase; color:var(--dim); }
+.prail.hot .pr-name { color:var(--body); }
+/* the "there is more here" hint: one quiet dot per other project, pulsing where an agent works */
+.pr-dots { display:flex; flex-direction:column; align-items:center; gap:5px; margin-top:2px; }
+.pr-dot { width:4px; height:4px; border-radius:50%; background:var(--border2); }
+.pr-dot.live { background:var(--prog); box-shadow:0 0 0 2.5px color-mix(in srgb,var(--prog) 22%,transparent); animation:pulse 1.8s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity:.35; } }
+.pr-foot { margin-top:auto; display:flex; flex-direction:column; align-items:center; gap:9px; }
+.pr-chev { color:var(--dim); display:grid; place-items:center; width:22px; height:22px; }
+.pr-chev svg { transform:rotate(-90deg); display:block; }
+
+/* ── the reveal: an OVERLAY on the nav, never a push ───────────────────────────────────── */
+.reveal { position:absolute; left:var(--projrail-w); top:0; bottom:0; z-index:4; background:var(--overlay); border-right:1px solid var(--border2); box-shadow:var(--shadow-pop); display:flex; flex-direction:column; padding:9px 0; }
+.reveal.tiles { width:52px; align-items:center; gap:7px; }
+.reveal.named { width:216px; padding:9px 8px; gap:2px; }
+.rv-hd { font:650 9.5px var(--fmono); letter-spacing:.15em; text-transform:uppercase; color:var(--muted); padding:6px 8px 5px; }
+.rv-row { display:flex; align-items:center; gap:9px; padding:6px 8px; border-radius:var(--r-md); color:var(--body); font-size:12.5px; }
+.rv-row.on { background:var(--sel-bg); color:var(--text); font-weight:620; }
+.rv-row .rt { flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.rv-row .rsub { font:600 9.5px var(--fmono); color:var(--dim); flex:none; }
+.rv-row .rck { color:var(--done); font-size:11px; flex:none; }
+.rv-sep { height:1px; background:var(--border); margin:6px 8px; }
+.rv-tile { position:relative; width:34px; height:34px; border-radius:11px; display:grid; place-items:center; overflow:hidden; flex:none;
+  background:linear-gradient(160deg,var(--panel3),var(--panel2)); border:1px solid var(--border2); color:var(--muted); font:700 12px var(--font); }
+.rv-tile.sm { width:22px; height:22px; border-radius:7px; font-size:9.5px; }
+.rv-tile.on { color:var(--text); border-color:var(--ring); box-shadow:0 0 0 2px color-mix(in srgb,var(--text) 15%,transparent); }
+.rv-tile .live { position:absolute; right:-2px; top:-2px; width:8px; height:8px; border-radius:50%; background:var(--prog); border:2px solid var(--overlay); }
+.rv-lbl { position:absolute; left:56px; padding:4px 9px; border-radius:var(--r-full); background:var(--overlay); border:1px solid var(--border2); box-shadow:var(--shadow-lift); font-size:11.5px; color:var(--text); white-space:nowrap; }
+.rv-new { display:flex; align-items:center; gap:9px; padding:6px 8px; border-radius:var(--r-md); color:var(--muted); font-size:12px; }
+.rv-pin { margin-top:auto; display:flex; align-items:center; gap:7px; padding:7px 8px 2px; color:var(--dim); font-size:10.5px; border-top:1px solid var(--border); }
+.rv-pin .k { font:600 9.5px var(--fmono); border:1px solid var(--border2); border-radius:4px; padding:1px 5px; }
+
+/* ── the nav, at its real 266px (scaled inside the frame) ──────────────────────────────── */
+.nav { width:266px; flex:none; background:transparent; display:flex; flex-direction:column; padding-bottom:8px; }
+.nav.dim { opacity:.34; }
+.navhead { display:flex; align-items:center; gap:9px; padding:10px 11px 6px; }
+.navbadge { position:relative; overflow:hidden; width:32px; height:32px; border-radius:11px; background:linear-gradient(160deg,var(--panel3),var(--panel2)); color:var(--text); font-weight:700; font-size:13px; display:grid; place-items:center; flex:none; border:1px solid var(--border2); }
+.navbadge.sm { width:24px; height:24px; border-radius:8px; font-size:10px; }
+.wstxt b { display:block; font-weight:700; font-size:13.5px; }
+.wstxt small { display:block; font-weight:500; font-size:10.5px; color:var(--dim); }
+.navnew { display:flex; align-items:stretch; }
+.navnewchat { display:flex; align-items:center; gap:8px; width:calc(100% - 40px); margin:4px 0 6px 8px; padding:7px 10px; border:1px solid var(--card-border); border-radius:var(--r-md) 0 0 var(--r-md); background:var(--card); box-shadow:var(--shadow-card); color:var(--text); font-size:12.5px; font-weight:620; }
+.nncplus { flex:none; font-size:12px; color:var(--muted); } .navlbl { flex:1; } .nnck { flex:none; font:600 10px var(--fmono); color:var(--dim); }
+.navnewcaret { flex:none; width:26px; margin:4px 8px 6px 0; border:1px solid var(--card-border); border-left:0; border-radius:0 10px 10px 0; background:var(--card); color:var(--muted); font-size:9px; display:grid; place-items:center; }
+.navband { padding:8px 0 4px; }
+.navsecttoggle { display:flex; align-items:center; gap:7px; padding:2px 14px 6px; font:650 9.5px var(--fmono); letter-spacing:.15em; text-transform:uppercase; color:var(--muted); }
+.navsectcnt { font:800 9px var(--fmono); color:var(--dim); opacity:.75; letter-spacing:0; }
+.chan { display:flex; align-items:center; gap:8px; padding:5px 9px; margin:0 8px 0 14px; border-radius:var(--r-md); color:var(--body); font-size:12.5px; }
+.chan.on { background:var(--panel3); color:var(--text); font-weight:600; }
+[data-theme='light'] .chan.on { background:var(--card); box-shadow:var(--shadow-card), inset 0 0 0 1px var(--card-border); }
+.chan .h { color:var(--dim); font-weight:600; }
+.hrow { display:flex; align-items:flex-start; gap:8px; padding:4px 9px; margin:1px 8px 1px 14px; border:1px solid transparent; border-radius:8px; }
+.hrow.raised { background:var(--card); border-color:var(--card-border); box-shadow:var(--shadow-card); }
+.hdot { flex:none; width:6px; height:6px; border-radius:50%; background:currentColor; margin-top:5px; }
+.hdot.thread { background:transparent; box-shadow:inset 0 0 0 1.5px var(--dim); }
+.hdot.prog { color:var(--prog); } .hdot.review { color:var(--review); } .hdot.ship { color:var(--ship); }
+.hdot.live { box-shadow:0 0 0 3px color-mix(in srgb,currentColor 24%,transparent); }
+.hbody { flex:1; min-width:0; display:flex; flex-direction:column; gap:1.5px; }
+.hl1 { display:flex; align-items:baseline; gap:6px; min-width:0; }
+.hnum { flex:none; font:700 10.5px var(--fmono); color:var(--muted); }
+.htitle { flex:1; min-width:0; font-size:12.5px; color:var(--body); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.hchan { flex:none; font:600 9.5px var(--fmono); color:var(--dim); }
+.hwhen { flex:none; font:500 10px var(--fmono); color:var(--dim); }
+.hlive { display:flex; align-items:center; gap:6px; font-size:10.5px; color:var(--body); }
+.hlive .ind { width:5px; height:5px; border-radius:50%; background:var(--prog); animation:pulse 1.6s ease-in-out infinite; }
+.hlive .verb { font-style:italic; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.navfoot { margin-top:auto; display:flex; align-items:center; gap:9px; padding:8px 14px 0; color:var(--body); font-size:11.5px; border-top:1px solid var(--border); }
+
+/* ── the content stub ─────────────────────────────────────────────────────────────────── */
+.content { flex:1; min-width:0; margin:8px 8px 8px 0; border-radius:var(--r-lg); background:var(--panel); border:1px solid var(--border); padding:14px 16px; }
+.ctitle { font-family:var(--fdisp); font-size:17px; font-weight:640; color:var(--text); letter-spacing:-.01em; }
+.csub { font-size:11.5px; color:var(--dim); margin-top:3px; }
+.cline { height:8px; border-radius:99px; background:var(--panel2); margin-top:13px; }
+.cline.s { width:62%; } .cline.m { width:84%; } .cline.l { width:73%; }
+
+/* ── timing diagram ───────────────────────────────────────────────────────────────────── */
+.tl { display:flex; flex-direction:column; gap:9px; padding:2px; }
+.tlrow { display:flex; align-items:center; gap:10px; font-size:11.5px; color:var(--muted); }
+.tlbar { flex:none; width:190px; height:9px; border-radius:99px; background:var(--panel2); position:relative; overflow:hidden; }
+.tlbar i { position:absolute; top:0; bottom:0; border-radius:99px; }
+.tlk { flex:none; font:600 9.5px var(--fmono); color:var(--dim); width:52px; }
+.ok { color:var(--done); } .no { color:var(--design); }
+.kbd { font:600 9.5px var(--fmono); color:var(--body); border:1px solid var(--border2); border-radius:4px; padding:1px 5px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<div class="pagehead">
+  <h1>The projects rail — the fold idiom, turned into the work axis</h1>
+  <p><b>George's shape (2026-08-01, round 2):</b> <i>“a slice of B but better designed… right now we have a nice transparent vertical bar when the left nav is collapsed; can we do something similar on the leftmost rail but for the projects; vertical text shows with the active project name. On hover of the rail it reveals the project icons showing active and others, and clicking one switches the channels, recents/history. Home can be there as well, styled separately.”</i></p>
+  <p><b>Why this is better than my B.</b> B added a 52px column that was always open and always paying for itself in width. This one <b>costs 30px</b> and borrows a mechanic the app already ships: <code>.navfoldtab</code> — transparent strip, <code>writing-mode: vertical-rl</code> mono, hover lifts it (<code>tokens.css:758–770</code>). It is not a new structural element; it is the fold idiom pointed at a different noun.</p>
+  <p><b>And it quietly settles round 1.</b> Direction A's argument was that the rail's <i>vertical order</i> should be the scope contract — workspace above the rule, project below it. This rail is that same contract <b>rotated into its own column</b>: Home and the account sit in the strip (workspace), the whole 266px nav beside it is the project. A and B were not alternatives; this is their intersection, and it is smaller than either.</p>
+</div>
+
+<div class="stophd"><span class="stopno">At rest</span>30px, transparent, and it says where you are</div>
+<div class="stopp">The strip carries four things and nothing else: <b>Home</b> with its needs-you count (workspace scope, styled as a filled tile — the only filled object in the strip), a hairline <b>rule</b>, the <b>active project</b> as a ringed tile with its name in vertical mono, and one <b>quiet dot per other project</b> — which is both the "there is more here" affordance and where a live agent elsewhere shows up. The account tile closes it. Everything to the right of the rule belongs to the named project; nothing to the left of it does.</div>
+
+<div class="duo">
+  <div class="theme" data-theme="dark">
+    <h2>Rest <span class="thm">graphite</span></h2>
+    <div class="frame">
+      <div class="prail">
+        <span class="pr-home"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg><span class="pip">3</span></span>
+        <span class="pr-rule"></span>
+        <span class="pr-tile on">N</span>
+        <span class="pr-name">neuramesh</span>
+        <span class="pr-dots"><span class="pr-dot live"></span><span class="pr-dot"></span></span>
+        <span class="pr-foot"><span class="navbadge sm">G</span></span>
+      </div>
+      <div class="nav">
+        <div class="navhead"><span class="navbadge">G</span><span class="wstxt"><b>GADS INC</b><small>workspace</small></span></div>
+        <div class="navnew"><div class="navnewchat"><span class="nncplus">＋</span><span class="navlbl">New chat</span><span class="nnck">⌘N</span></div><div class="navnewcaret">▾</div></div>
+        <div class="navband">
+          <div class="navsecttoggle">Channels <span class="navsectcnt">5</span></div>
+          <div class="chan on"><span class="h">#</span>build</div>
+          <div class="chan"><span class="h">#</span>dev</div>
+          <div class="chan"><span class="h">#</span>marketing</div>
+        </div>
+        <div class="navband">
+          <div class="navsecttoggle">Recents <span class="navsectcnt">6</span></div>
+          <div class="hrow raised"><span class="hdot prog live"></span><div class="hbody"><div class="hl1"><span class="hnum">1046</span><span class="htitle">Focus-trap release</span><span class="hchan">#build</span><span class="hwhen">2m</span></div><div class="hlive"><span class="ind"></span><span class="verb">patch · returning focus</span></div></div></div>
+          <div class="hrow"><span class="hdot thread"></span><div class="hbody"><div class="hl1"><span class="htitle">Competitor social report</span><span class="hchan">#marketing</span><span class="hwhen">12m</span></div></div></div>
+          <div class="hrow"><span class="hdot review"></span><div class="hbody"><div class="hl1"><span class="hnum">1042</span><span class="htitle">Mobile nav drawer</span><span class="hchan">#dev</span><span class="hwhen">5h</span></div></div></div>
+        </div>
+        <div class="navfoot"><span class="navbadge sm">G</span> geo · Cloud</div>
+      </div>
+      <div class="content">
+        <div class="ctitle">#build</div>
+        <div class="csub">neuramesh · 6 conversations</div>
+        <div class="cline m"></div><div class="cline s"></div><div class="cline l"></div><div class="cline s"></div>
+      </div>
+    </div>
+    <div class="callouts">
+      <div class="co"><span class="n">1</span><b>The nav head goes back to the workspace.</b> The false promise in round 1 was structural: the project's name sat above <i>everything</i>, including a workspace-wide Home. Move the project into its own column and the head is free to be what it is — <code>GADS INC</code>.</div>
+      <div class="co"><span class="n">2</span><b>Home is the only filled tile</b> in a strip of outlines, and it sits above the rule. Its count is workspace-wide and now sits in the workspace column — no tag, no footnote, no docs/12 §6 asterisk on screen.</div>
+      <div class="co"><span class="n">3</span><b>The pulsing dot is the whole cross-project story.</b> An agent is working in <code>flowe-ai</code>; you can see that without a single cross-project row in any list. Ambient awareness, zero leak.</div>
+    </div>
+  </div>
+
+  <div class="theme" data-theme="light">
+    <h2>Rest <span class="thm">paper</span></h2>
+    <div class="frame">
+      <div class="prail">
+        <span class="pr-home"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg><span class="pip">3</span></span>
+        <span class="pr-rule"></span>
+        <span class="pr-tile on">N</span>
+        <span class="pr-name">neuramesh</span>
+        <span class="pr-dots"><span class="pr-dot live"></span><span class="pr-dot"></span></span>
+        <span class="pr-foot"><span class="navbadge sm">G</span></span>
+      </div>
+      <div class="nav">
+        <div class="navhead"><span class="navbadge">G</span><span class="wstxt"><b>GADS INC</b><small>workspace</small></span></div>
+        <div class="navnew"><div class="navnewchat"><span class="nncplus">＋</span><span class="navlbl">New chat</span><span class="nnck">⌘N</span></div><div class="navnewcaret">▾</div></div>
+        <div class="navband">
+          <div class="navsecttoggle">Channels <span class="navsectcnt">5</span></div>
+          <div class="chan on"><span class="h">#</span>build</div>
+          <div class="chan"><span class="h">#</span>dev</div>
+          <div class="chan"><span class="h">#</span>marketing</div>
+        </div>
+        <div class="navband">
+          <div class="navsecttoggle">Recents <span class="navsectcnt">6</span></div>
+          <div class="hrow raised"><span class="hdot prog live"></span><div class="hbody"><div class="hl1"><span class="hnum">1046</span><span class="htitle">Focus-trap release</span><span class="hchan">#build</span><span class="hwhen">2m</span></div><div class="hlive"><span class="ind"></span><span class="verb">patch · returning focus</span></div></div></div>
+          <div class="hrow"><span class="hdot thread"></span><div class="hbody"><div class="hl1"><span class="htitle">Competitor social report</span><span class="hchan">#marketing</span><span class="hwhen">12m</span></div></div></div>
+          <div class="hrow"><span class="hdot review"></span><div class="hbody"><div class="hl1"><span class="hnum">1042</span><span class="htitle">Mobile nav drawer</span><span class="hchan">#dev</span><span class="hwhen">5h</span></div></div></div>
+        </div>
+        <div class="navfoot"><span class="navbadge sm">G</span> geo · Cloud</div>
+      </div>
+      <div class="content">
+        <div class="ctitle">#build</div>
+        <div class="csub">neuramesh · 6 conversations</div>
+        <div class="cline m"></div><div class="cline s"></div><div class="cline l"></div><div class="cline s"></div>
+      </div>
+    </div>
+    <div class="callouts">
+      <div class="co"><span class="n">4</span><b>Transparent means transparent.</b> The strip paints no background of its own — <code>--win</code> shows through, exactly as <code>.navpanel</code> does today. In paper that matters more than in graphite: a filled 30px column here would read as a second chrome edge.</div>
+      <div class="co"><span class="n">5</span><b>30px, not 26px.</b> The fold tab is 26 and carries a 13px chevron. This strip carries a 22px tile with a 2px ring, which needs 26 + margins. 30 is the smallest width the ring survives at — measured, not picked.</div>
+    </div>
+  </div>
+</div>
+
+<div class="stophd"><span class="stopno">The reveal</span>Three readings of “it reveals the project icons”</div>
+<div class="stopp">All three <b>overlay the nav — they never push it</b>. A 30px strip along the window edge is crossed by accident constantly; a reveal that reflows the app would make every stray mouse move a layout shift. They also all open on a <b>140ms intent delay</b> and close on a <b>240ms grace</b>, and all three can be <b>pinned by clicking the strip</b> so hover is a shortcut, never the only door.</div>
+
+<div class="themes">
+  <div class="theme" data-theme="dark">
+    <h2>R1 · Tiles — literally the ask <span class="thm">graphite</span></h2>
+    <div class="frame">
+      <div class="prail hot">
+        <span class="pr-home"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg><span class="pip">3</span></span>
+        <span class="pr-rule"></span>
+        <span class="pr-tile on">N</span>
+        <span class="pr-name">neuramesh</span>
+        <span class="pr-foot"><span class="navbadge sm">G</span></span>
+      </div>
+      <div class="reveal tiles">
+        <span class="rv-tile on">N</span>
+        <span class="rv-tile">F<span class="live"></span></span>
+        <span class="rv-tile">D</span>
+        <span class="rv-tile" style="border-style:dashed; color:var(--dim); font-size:15px">＋</span>
+      </div>
+      <div class="nav dim" style="margin-left:52px">
+        <div class="navhead"><span class="navbadge">G</span><span class="wstxt"><b>GADS INC</b><small>workspace</small></span></div>
+        <div class="navband">
+          <div class="navsecttoggle">Channels <span class="navsectcnt">5</span></div>
+          <div class="chan on"><span class="h">#</span>build</div>
+          <div class="chan"><span class="h">#</span>dev</div>
+        </div>
+      </div>
+      <div class="content"><div class="ctitle">#build</div><div class="csub">neuramesh</div><div class="cline m"></div><div class="cline s"></div></div>
+    </div>
+    <div class="callouts">
+      <div class="co"><span class="n">6</span><b>Cheapest and fastest</b> — 52px, one motion, and the tiles are big enough (34px) to be real click targets.</div>
+      <div class="co"><span class="n">7</span><b>Where it fails:</b> a project without a detected logo is a letter, and letters collide — in this very workspace <code>default</code> and a future <code>dev-tools</code> are both <b>D</b>. You would be picking a project by guessing.</div>
+    </div>
+  </div>
+
+  <div class="theme" data-theme="dark">
+    <h2>R2 · <span class="pick">Named — the rail simply opens wider</span> <span class="thm">graphite</span></h2>
+    <div class="frame">
+      <div class="prail hot">
+        <span class="pr-home"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg><span class="pip">3</span></span>
+        <span class="pr-rule"></span>
+        <span class="pr-tile on">N</span>
+        <span class="pr-name">neuramesh</span>
+        <span class="pr-foot"><span class="navbadge sm">G</span></span>
+      </div>
+      <div class="reveal named">
+        <div class="rv-row"><span class="rv-tile sm" style="background:none; border:none; color:var(--body)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg></span><span class="rt">Home</span><span class="rsub" style="color:var(--accent-ink); background:var(--accent); border-radius:99px; padding:1px 6px">3</span></div>
+        <div class="rv-sep"></div>
+        <div class="rv-hd" style="padding-top:0">Projects</div>
+        <div class="rv-row on"><span class="rv-tile sm on">N</span><span class="rt">neuramesh</span><span class="rck">✓</span></div>
+        <div class="rv-row"><span class="rv-tile sm">F<span class="live" style="width:7px;height:7px;border-width:1.5px"></span></span><span class="rt">flowe-ai</span><span class="rsub">6 open</span></div>
+        <div class="rv-row"><span class="rv-tile sm">D</span><span class="rt">default</span><span class="rsub">default</span></div>
+        <div class="rv-sep"></div>
+        <div class="rv-new">＋ New project</div>
+        <div class="rv-new"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.6"/></svg> All projects</div>
+        <div class="rv-pin">Click the strip to pin <span class="k" style="margin-left:auto">⌘⇧P</span></div>
+      </div>
+      <div class="nav dim" style="margin-left:216px">
+        <div class="navhead"><span class="navbadge">G</span><span class="wstxt"><b>GADS INC</b><small>workspace</small></span></div>
+        <div class="navband"><div class="navsecttoggle">Channels <span class="navsectcnt">5</span></div><div class="chan on"><span class="h">#</span>build</div></div>
+      </div>
+      <div class="content"><div class="ctitle">#build</div><div class="csub">neuramesh</div><div class="cline m"></div><div class="cline s"></div></div>
+    </div>
+    <div class="callouts">
+      <div class="co"><span class="n">8</span><b>Same mechanic, wider open state.</b> This is still “the rail reveals itself” — 30 → 216px — so there is one idiom, not a strip plus a popover.</div>
+      <div class="co"><span class="n">9</span><b>Names solve the collision</b>, and there is room for the two facts that make the choice: a live dot and the open count. <code>Home</code> repeats here in full so the reveal is a complete workspace menu, not a fragment.</div>
+      <div class="co"><span class="n">10</span><b>The Projects page keeps its job.</b> <code>All projects</code> at the foot goes there — the rail switches, the page manages (create · rename · archive · move channels). Neither one grows into the other.</div>
+    </div>
+  </div>
+
+  <div class="theme" data-theme="light">
+    <h2>R3 · Tiles + a name on tile-hover <span class="thm">paper</span></h2>
+    <div class="frame">
+      <div class="prail hot">
+        <span class="pr-home"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg><span class="pip">3</span></span>
+        <span class="pr-rule"></span>
+        <span class="pr-tile on">N</span>
+        <span class="pr-name">neuramesh</span>
+        <span class="pr-foot"><span class="navbadge sm">G</span></span>
+      </div>
+      <div class="reveal tiles">
+        <span class="rv-tile on">N</span>
+        <span class="rv-tile" style="border-color:var(--ring)">F<span class="live"></span></span>
+        <span class="rv-lbl" style="top:56px">flowe-ai · 6 open</span>
+        <span class="rv-tile">D</span>
+        <span class="rv-tile" style="border-style:dashed; color:var(--dim); font-size:15px">＋</span>
+      </div>
+      <div class="nav dim" style="margin-left:52px">
+        <div class="navhead"><span class="navbadge">G</span><span class="wstxt"><b>GADS INC</b><small>workspace</small></span></div>
+        <div class="navband"><div class="navsecttoggle">Channels <span class="navsectcnt">5</span></div><div class="chan on"><span class="h">#</span>build</div></div>
+      </div>
+      <div class="content"><div class="ctitle">#build</div><div class="csub">neuramesh</div><div class="cline m"></div><div class="cline s"></div></div>
+    </div>
+    <div class="callouts">
+      <div class="co"><span class="n">11</span><b>R1's width with R2's certainty</b> — but it costs a <b>second hover level</b> on a strip you are already hovering by intent. Two nested hover states 30px from the window edge is where this stops feeling solid.</div>
+      <div class="co"><span class="n">12</span><b>Worth keeping as a detail, not a direction:</b> R2's rows can carry this same label treatment when a project name truncates.</div>
+    </div>
+  </div>
+</div>
+
+<div class="stophd"><span class="stopno">The consolidation</span>Folding the nav leaves <i>one</i> strip, not two</div>
+<div class="stopp">Today ⌘\ collapses the nav to a 26px tab at the window edge. If the projects rail also lives there, folding would stack two strips — 56px of chrome saying two different things. Instead the <b>projects rail absorbs the fold tab</b>: the “show the sidebar” chevron moves into its footer, and the two vitals the fold currently carries (<code>N live</code>, the unread dot) are already what the rail's dots say. One strip at every width — which is the promise <code>tokens.css:754</code> makes out loud (<i>“one fold idiom, not two”</i>) and would otherwise have quietly broken.</div>
+
+<div class="duo">
+  <div class="theme" data-theme="dark">
+    <h2>Nav folded · ⌘\ <span class="thm">graphite</span></h2>
+    <div class="frame" style="height:300px">
+      <div class="prail">
+        <span class="pr-home"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg><span class="pip">3</span></span>
+        <span class="pr-rule"></span>
+        <span class="pr-tile on">N</span>
+        <span class="pr-name">neuramesh</span>
+        <span class="pr-dots"><span class="pr-dot live"></span><span class="pr-dot"></span></span>
+        <span class="pr-foot">
+          <span class="pr-name" style="color:var(--dim)">2 live</span>
+          <span class="pr-chev" title="Show the sidebar — ⌘\"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9l6 6 6-6"/></svg></span>
+          <span class="navbadge sm">G</span>
+        </span>
+      </div>
+      <div class="content" style="margin-left:0"><div class="ctitle">#build</div><div class="csub">neuramesh · 6 conversations</div><div class="cline m"></div><div class="cline s"></div><div class="cline l"></div><div class="cline s"></div><div class="cline m"></div></div>
+    </div>
+    <div class="callouts">
+      <div class="co"><span class="n">13</span><b>30px total, and it still says where you are.</b> Today's folded rail cannot name the project at all — you fold the nav and lose the one fact that scopes everything on screen.</div>
+      <div class="co"><span class="n">14</span><b>The reveal still works folded</b>, which makes this the fastest project switch in the app: hover the edge, click a name. No unfolding, no page.</div>
+    </div>
+  </div>
+
+  <div class="theme" data-theme="light">
+    <h2>The mechanics that make hover safe <span class="thm">paper</span></h2>
+    <div class="tl">
+      <div class="tlrow"><span class="tlk">open</span><div class="tlbar"><i style="left:0;width:44%;background:var(--panel3)"></i><i style="left:44%;width:56%;background:var(--done)"></i></div><span><b style="color:var(--body)">140ms</b> intent — crossing the strip on the way somewhere else opens nothing</span></div>
+      <div class="tlrow"><span class="tlk">close</span><div class="tlbar"><i style="left:0;width:70%;background:var(--done)"></i><i style="left:70%;width:30%;background:var(--panel3)"></i></div><span><b style="color:var(--body)">240ms</b> grace — a diagonal move to a project row does not dismiss it under the cursor</span></div>
+      <div class="tlrow"><span class="tlk">width</span><div class="tlbar"><i style="left:0;width:100%;background:var(--panel3)"></i></div><span><b style="color:var(--body)">150ms</b> ease — inside the ≤150ms motion budget (CLAUDE.md #2)</span></div>
+      <div class="tlrow"><span class="tlk">layout</span><div class="tlbar"><i style="left:0;width:100%;background:var(--done)"></i></div><span><b class="ok">0px</b> shift — the reveal is <code>position:absolute</code> over the nav; the app never reflows</span></div>
+    </div>
+    <div class="callouts">
+      <div class="co"><span class="n">15</span><b>Hover is a shortcut, never the only door.</b> Click the strip pins it open (persisted per machine, like <code>nm:navFolded</code>); <span class="kbd">⌘⇧P</span> opens it from the keyboard; <span class="kbd">↑↓</span> + <span class="kbd">⏎</span> pick; <span class="kbd">Esc</span> closes. ⌘K keeps its <code>Switch to …</code> commands unchanged.</div>
+      <div class="co"><span class="n">16</span><b>The one honest risk.</b> This strip sits where macOS puts the traffic lights and where a full-screen window puts the menu-bar hot corner. The intent delay is what keeps it from firing on a mis-aimed mouse — and it is the thing to check first on the preview harness, not in a mockup.</div>
+      <div class="co"><span class="n">17</span><b><code>prefers-reduced-motion</code>:</b> no width animation, no pulse on the dots — the reveal snaps and the live dot becomes a static ring.</div>
+    </div>
+  </div>
+</div>
+
+<div class="stophd"><span class="stopno">Recommendation</span>The rail at 30px · R2's named reveal · the fold absorbed</div>
+<div class="stopp">
+  <b>Build it.</b> The idea is stronger than either round-1 direction it descends from, and it is cheaper: it reuses the fold's own vocabulary (transparent strip, vertical mono, hover lift), it deletes the false promise at the nav head rather than annotating it, and it makes the project visible at <i>every</i> rail width including folded — which today's nav cannot do at all.<br/><br/>
+  <b>R2 over R1</b> for one concrete reason: two of this workspace's three projects would render as bare letters, and <code>default</code> collides with the first <code>dev-*</code> project anyone makes. R1's 52px saves 164px of overlay that costs nothing (it floats over the nav) and buys nothing you can act on. Keep R1's tile size — 34px — as R2's row glyph budget so the two stay one component if we ever want the dense mode.<br/><br/>
+  <b>Change surface.</b> <code>App.tsx</code>: a new <code>ProjectRail</code> beside <code>&lt;nav className="navpanel"&gt;</code> (it owns Home, the active-project tile + vertical name, the other-project dots, the account tile and — when folded — the unfold chevron) · <code>navhead</code> drops the project and becomes the workspace · <code>navhome</code> leaves the nav · <code>navfoldtab</code> merges into the rail · <code>ProjectChip</code> still switches from the composer (unchanged, plus round 1's project icon). <code>tokens.css</code>: <code>--projrail-w</code>, <code>.prail*</code>, <code>.reveal*</code>, and <code>--navfold-w</code> retires. <b>docs/33</b> gets the strip-and-reveal idiom; <b>docs/06 §v1 / docs/12 §6</b> get the note that the deviation is now expressed spatially — Home lives outside the project column. No schema, no sync rules, no migration: the data side already landed today.<br/><br/>
+  <b>Sequencing.</b> Slice 1 = the rail at rest + the nav head change (visible, self-contained, no hover risk). Slice 2 = the R2 reveal with its timings, checked on the preview harness against the ≤150ms budget. Slice 3 = the fold absorption. Round 1's ⌘Y <b>All projects</b> toggle and the composer chip icon ride slice 1 — they are independent of this shape and still required.<br/><br/>
+  <b>Open questions.</b> ① Does the strip show a dot per other project (mocked) or a single dot meaning “work is happening elsewhere”? Dots stop scaling around eight projects. ② Vertical name at 9px mono renders <code>NEURAMESH</code> in <b>60px</b> (measured in this page) — so a name is roughly 6.7px of rail per character. Do long ones truncate (<code>ACME-MARKET…</code>) or drop to the tile alone? ③ Does clicking the active project's own tile do nothing, or open the Projects page for it? ④ Right-docked nav (<code>navPos: 'right'</code>) — does the rail follow to the right edge, or is it always the leftmost column?
+</div>
+
+</div>
+</body>
+</html>

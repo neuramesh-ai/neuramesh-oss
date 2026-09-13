@@ -1,0 +1,96 @@
+[
+  {
+    "name": "fr1-task-card-dark",
+    "settle": 2600,
+    "query": {
+      "theme": "dark",
+      "openTask": "1032",
+      "wtpane": "1"
+    }
+  },
+  {
+    "name": "fr2-task-card-cream",
+    "settle": 2600,
+    "query": {
+      "theme": "cream-oak",
+      "openTask": "1032",
+      "wtpane": "1"
+    }
+  },
+  {
+    "name": "fr3-task-dock-dark",
+    "settle": 2800,
+    "query": {
+      "theme": "dark",
+      "openTask": "1032",
+      "wtpane": "1",
+      "wtabs": "md,file",
+      "dock": "1"
+    }
+  },
+  {
+    "name": "fr4-task-dock-cream",
+    "settle": 2800,
+    "query": {
+      "theme": "cream-oak",
+      "openTask": "1032",
+      "wtpane": "1",
+      "wtabs": "md,file",
+      "dock": "1"
+    }
+  },
+  {
+    "name": "fr5-dock-plus-dark",
+    "settle": 2800,
+    "query": {
+      "theme": "dark",
+      "openTask": "1032",
+      "wtabs": "md",
+      "dock": "1"
+    },
+    "js": "document.querySelector('.sidedock .wtadd')?.click()"
+  },
+  {
+    "name": "fr6-task-nocard-dark",
+    "settle": 2600,
+    "query": {
+      "theme": "dark",
+      "openTask": "1032"
+    }
+  },
+  {
+    "name": "fr7-home-dark",
+    "settle": 2400,
+    "query": {
+      "theme": "dark"
+    }
+  },
+  {
+    "name": "fr8-home-dock-empty-cream",
+    "settle": 2400,
+    "query": {
+      "theme": "cream-oak",
+      "dock": "1"
+    }
+  },
+  {
+    "name": "fr9-card-files-dark",
+    "settle": 2600,
+    "query": {
+      "theme": "dark",
+      "openTask": "1032",
+      "wtpane": "1"
+    },
+    "js": "document.querySelector('.wbfilestg')?.click()"
+  },
+  {
+    "name": "fr10-card-files-cream",
+    "settle": 2600,
+    "query": {
+      "theme": "cream-oak",
+      "openTask": "1032",
+      "wtpane": "1"
+    },
+    "js": "document.querySelector('.wbfilestg')?.click()"
+  }
+]

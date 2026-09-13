@@ -1,0 +1,1312 @@
+{
+  "meta": {
+    "version": "v1.1",
+    "status": "measured",
+    "generatedAt": "2026-09-09",
+    "suiteSha": "aafab559",
+    "runsPerTask": 5,
+    "judges": {
+      "anthropic": "claude-opus-5",
+      "openai": "gpt-5.6-sol",
+      "gemini": "gemini-3.8-flash"
+    },
+    "judgeSpendUsd": 0.65,
+    "settings": {
+      "anthropic": "default effort (high), adaptive thinking on the models that have it, no sampling parameters",
+      "openai": "default reasoning effort (medium), no sampling parameters",
+      "gemini": "default thinking level (medium), no sampling parameters"
+    },
+    "skipped": [],
+    "disclaimer": "Measured on private, held-out NeuraMesh tasks pinned to a fixed commit."
+  },
+  "providers": {
+    "anthropic": {
+      "label": "Anthropic",
+      "mark": "claude"
+    },
+    "openai": {
+      "label": "OpenAI",
+      "mark": "openai"
+    },
+    "gemini": {
+      "label": "Google",
+      "mark": "gemini"
+    }
+  },
+  "models": [
+    {
+      "id": "gpt-6-astra",
+      "label": "GPT-6 Astra",
+      "provider": "openai",
+      "runtime": "codex",
+      "pricing": {
+        "inPer1M": 10,
+        "outPer1M": 50
+      }
+    },
+    {
+      "id": "gemini-3.5-flash-lite",
+      "label": "Gemini 3.5 Flash-Lite",
+      "provider": "gemini",
+      "runtime": "gemini",
+      "pricing": {
+        "inPer1M": 0.3,
+        "outPer1M": 2.5
+      }
+    },
+    {
+      "id": "claude-fable-5-1",
+      "label": "Claude Fable 5.1",
+      "provider": "anthropic",
+      "runtime": "claude-code",
+      "pricing": {
+        "inPer1M": 10,
+        "outPer1M": 50
+      }
+    },
+    {
+      "id": "gemini-3.1-pro-preview",
+      "label": "Gemini 3.1 Pro",
+      "provider": "gemini",
+      "runtime": "gemini",
+      "pricing": {
+        "inPer1M": 2,
+        "outPer1M": 12
+      }
+    },
+    {
+      "id": "claude-haiku-4-5",
+      "label": "Claude Haiku 4.5",
+      "provider": "anthropic",
+      "runtime": "claude-code",
+      "pricing": {
+        "inPer1M": 1,
+        "outPer1M": 5
+      }
+    },
+    {
+      "id": "claude-opus-5",
+      "label": "Claude Opus 5",
+      "provider": "anthropic",
+      "runtime": "claude-code",
+      "pricing": {
+        "inPer1M": 5,
+        "outPer1M": 25
+      }
+    },
+    {
+      "id": "gemini-3.8-flash",
+      "label": "Gemini 3.8 Flash",
+      "provider": "gemini",
+      "runtime": "gemini",
+      "pricing": {
+        "inPer1M": 0.75,
+        "outPer1M": 3.75
+      }
+    },
+    {
+      "id": "gemini-3.5-flash",
+      "label": "Gemini 3.5 Flash",
+      "provider": "gemini",
+      "runtime": "gemini",
+      "pricing": {
+        "inPer1M": 1.5,
+        "outPer1M": 9
+      }
+    },
+    {
+      "id": "gemini-3.1-flash-lite",
+      "label": "Gemini 3.1 Flash-Lite",
+      "provider": "gemini",
+      "runtime": "gemini",
+      "pricing": {
+        "inPer1M": 0.25,
+        "outPer1M": 1.5
+      }
+    },
+    {
+      "id": "gpt-5.6-sol",
+      "label": "GPT-5.6 Sol",
+      "provider": "openai",
+      "runtime": "codex",
+      "pricing": {
+        "inPer1M": 4,
+        "outPer1M": 20
+      }
+    },
+    {
+      "id": "claude-sonnet-5",
+      "label": "Claude Sonnet 5",
+      "provider": "anthropic",
+      "runtime": "claude-code",
+      "pricing": {
+        "inPer1M": 2,
+        "outPer1M": 10
+      }
+    },
+    {
+      "id": "gpt-5.6-terra",
+      "label": "GPT-5.6 Terra",
+      "provider": "openai",
+      "runtime": "codex",
+      "pricing": {
+        "inPer1M": 2,
+        "outPer1M": 12
+      }
+    },
+    {
+      "id": "gpt-5.4-mini",
+      "label": "GPT-5.4 mini",
+      "provider": "openai",
+      "runtime": "codex",
+      "pricing": {
+        "inPer1M": 0.75,
+        "outPer1M": 4.5
+      }
+    }
+  ],
+  "roles": [
+    {
+      "id": "reviewer",
+      "label": "Code review",
+      "blurb": "Judge a diff against its Definition of Done. Approve clean work. Request changes on planted defects and Definition of Done violations. The score is F1 with request-changes as the positive class.",
+      "grader": "objective",
+      "metricLabel": "F1",
+      "primaryFmt": "ratio",
+      "leaderboard": [
+        {
+          "model": "gpt-6-astra",
+          "quality": 100,
+          "ci": [
+            93,
+            100
+          ],
+          "primary": 1,
+          "costUsd": 0.0083,
+          "latencyMs": 3007,
+          "runs": 5,
+          "falseApprove": 0,
+          "tokensIn": 479,
+          "tokensOut": 71
+        },
+        {
+          "model": "gemini-3.5-flash-lite",
+          "quality": 100,
+          "ci": [
+            93,
+            100
+          ],
+          "primary": 1,
+          "costUsd": 0.0002,
+          "latencyMs": 712,
+          "runs": 5,
+          "falseApprove": 0,
+          "tokensIn": 459,
+          "tokensOut": 40
+        },
+        {
+          "model": "claude-fable-5-1",
+          "quality": 98,
+          "ci": [
+            90,
+            100
+          ],
+          "primary": 0.98,
+          "costUsd": 0.0149,
+          "latencyMs": 5316,
+          "runs": 5,
+          "falseApprove": 0,
+          "tokensIn": 346,
+          "tokensOut": 228
+        },
+        {
+          "model": "gemini-3.1-pro-preview",
+          "quality": 96,
+          "ci": [
+            87,
+            99
+          ],
+          "primary": 0.97,
+          "costUsd": 0.007,
+          "latencyMs": 6022,
+          "runs": 5,
+          "falseApprove": 0,
+          "tokensIn": 459,
+          "tokensOut": 511
+        },
+        {
+          "model": "claude-haiku-4-5",
+          "quality": 94,
+          "ci": [
+            84,
+            98
+          ],
+          "primary": 0.95,
+          "costUsd": 0.001,
+          "latencyMs": 1950,
+          "runs": 5,
+          "falseApprove": 0.07,
+          "tokensIn": 671,
+          "tokensOut": 71
+        },
+        {
+          "model": "claude-opus-5",
+          "quality": 90,
+          "ci": [
+            79,
+            96
+          ],
+          "primary": 0.92,
+          "costUsd": 0.0068,
+          "latencyMs": 3575,
+          "runs": 5,
+          "falseApprove": 0,
+          "tokensIn": 344,
+          "tokensOut": 205
+        },
+        {
+          "model": "gemini-3.8-flash",
+          "quality": 90,
+          "ci": [
+            79,
+            96
+          ],
+          "primary": 0.92,
+          "costUsd": 0.0021,
+          "latencyMs": 2528,
+          "runs": 5,
+          "falseApprove": 0,
+          "tokensIn": 459,
+          "tokensOut": 467
+        },
+        {
+          "model": "gemini-3.5-flash",
+          "quality": 90,
+          "ci": [
+            79,
+            96
+          ],
+          "primary": 0.92,
+          "costUsd": 0.0052,
+          "latencyMs": 2014,
+          "runs": 5,
+          "falseApprove": 0,
+          "tokensIn": 459,
+          "tokensOut": 500
+        },
+        {
+          "model": "gemini-3.1-flash-lite",
+          "quality": 90,
+          "ci": [
+            79,
+            96
+          ],
+          "primary": 0.92,
+          "costUsd": 0.0002,
+          "latencyMs": 749,
+          "runs": 5,
+          "falseApprove": 0,
+          "tokensIn": 459,
+          "tokensOut": 40
+        },
+        {
+          "model": "gpt-5.6-sol",
+          "quality": 86,
+          "ci": [
+            74,
+            93
+          ],
+          "primary": 0.9,
+          "costUsd": 0.0045,
+          "latencyMs": 2678,
+          "runs": 5,
+          "falseApprove": 0,
+          "tokensIn": 479,
+          "tokensOut": 131
+        },
+        {
+          "model": "claude-sonnet-5",
+          "quality": 84,
+          "ci": [
+            71,
+            92
+          ],
+          "primary": 0.88,
+          "costUsd": 0.0046,
+          "latencyMs": 3534,
+          "runs": 5,
+          "falseApprove": 0.03,
+          "tokensIn": 944,
+          "tokensOut": 271
+        },
+        {
+          "model": "gpt-5.6-terra",
+          "quality": 80,
+          "ci": [
+            67,
+            89
+          ],
+          "primary": 0.83,
+          "costUsd": 0.002,
+          "latencyMs": 1793,
+          "runs": 5,
+          "falseApprove": 0.17,
+          "tokensIn": 479,
+          "tokensOut": 85
+        },
+        {
+          "model": "gpt-5.4-mini",
+          "quality": 76,
+          "ci": [
+            63,
+            86
+          ],
+          "primary": 0.81,
+          "costUsd": 0.0006,
+          "latencyMs": 800,
+          "runs": 5,
+          "falseApprove": 0.17,
+          "tokensIn": 479,
+          "tokensOut": 60
+        }
+      ],
+      "winner": "gpt-6-astra",
+      "winnerNote": "GPT-6 Astra leads on quality and holds up on value.",
+      "perFamily": {
+        "openai": "gpt-6-astra",
+        "gemini": "gemini-3.5-flash-lite",
+        "anthropic": "claude-fable-5-1"
+      },
+      "extraMetric": {
+        "key": "falseApprove",
+        "label": "False-approve"
+      }
+    },
+    {
+      "id": "developer",
+      "label": "Coding",
+      "blurb": "Implement a real feature or bug fix in a repository. Hidden tests and a well-formed-edit check decide the result. This is the developer role core job.",
+      "grader": "objective",
+      "metricLabel": "Pass rate",
+      "primaryFmt": "pct",
+      "leaderboard": [
+        {
+          "model": "claude-sonnet-5",
+          "quality": 100,
+          "ci": [
+            87,
+            100
+          ],
+          "primary": 1,
+          "costUsd": 0.0191,
+          "latencyMs": 11794,
+          "runs": 5,
+          "tokensIn": 1052,
+          "tokensOut": 1698
+        },
+        {
+          "model": "claude-opus-5",
+          "quality": 100,
+          "ci": [
+            87,
+            100
+          ],
+          "primary": 1,
+          "costUsd": 0.098,
+          "latencyMs": 36017,
+          "runs": 5,
+          "tokensIn": 1052,
+          "tokensOut": 3710
+        },
+        {
+          "model": "claude-fable-5-1",
+          "quality": 100,
+          "ci": [
+            87,
+            100
+          ],
+          "primary": 1,
+          "costUsd": 0.0869,
+          "latencyMs": 19987,
+          "runs": 5,
+          "tokensIn": 1054,
+          "tokensOut": 1527
+        },
+        {
+          "model": "gpt-6-astra",
+          "quality": 100,
+          "ci": [
+            87,
+            100
+          ],
+          "primary": 1,
+          "costUsd": 0.0843,
+          "latencyMs": 28455,
+          "runs": 5,
+          "tokensIn": 694,
+          "tokensOut": 1548
+        },
+        {
+          "model": "gpt-5.6-sol",
+          "quality": 100,
+          "ci": [
+            87,
+            100
+          ],
+          "primary": 1,
+          "costUsd": 0.022,
+          "latencyMs": 16862,
+          "runs": 5,
+          "tokensIn": 694,
+          "tokensOut": 960
+        },
+        {
+          "model": "gpt-5.6-terra",
+          "quality": 100,
+          "ci": [
+            87,
+            100
+          ],
+          "primary": 1,
+          "costUsd": 0.0134,
+          "latencyMs": 14640,
+          "runs": 5,
+          "tokensIn": 694,
+          "tokensOut": 999
+        },
+        {
+          "model": "gemini-3.1-pro-preview",
+          "quality": 100,
+          "ci": [
+            87,
+            100
+          ],
+          "primary": 1,
+          "costUsd": 0.0715,
+          "latencyMs": 47775,
+          "runs": 5,
+          "tokensIn": 722,
+          "tokensOut": 5842
+        },
+        {
+          "model": "gemini-3.5-flash-lite",
+          "quality": 100,
+          "ci": [
+            87,
+            100
+          ],
+          "primary": 1,
+          "costUsd": 0.0023,
+          "latencyMs": 1736,
+          "runs": 5,
+          "tokensIn": 722,
+          "tokensOut": 833
+        },
+        {
+          "model": "gemini-3.1-flash-lite",
+          "quality": 92,
+          "ci": [
+            75,
+            98
+          ],
+          "primary": 0.92,
+          "costUsd": 0.0011,
+          "latencyMs": 2487,
+          "runs": 5,
+          "tokensIn": 722,
+          "tokensOut": 591
+        },
+        {
+          "model": "gemini-3.5-flash",
+          "quality": 84,
+          "ci": [
+            65,
+            94
+          ],
+          "primary": 0.84,
+          "costUsd": 0.0524,
+          "latencyMs": 18675,
+          "runs": 5,
+          "tokensIn": 722,
+          "tokensOut": 5700
+        },
+        {
+          "model": "claude-haiku-4-5",
+          "quality": 80,
+          "ci": [
+            61,
+            91
+          ],
+          "primary": 0.8,
+          "costUsd": 0.04,
+          "latencyMs": 52171,
+          "runs": 5,
+          "tokensIn": 754,
+          "tokensOut": 7856
+        },
+        {
+          "model": "gpt-5.4-mini",
+          "quality": 56,
+          "ci": [
+            37,
+            73
+          ],
+          "primary": 0.56,
+          "costUsd": 0.0017,
+          "latencyMs": 1506,
+          "runs": 5,
+          "tokensIn": 694,
+          "tokensOut": 268
+        },
+        {
+          "model": "gemini-3.8-flash",
+          "quality": 48,
+          "ci": [
+            30,
+            67
+          ],
+          "primary": 0.48,
+          "costUsd": 0.0142,
+          "latencyMs": 28328,
+          "runs": 5,
+          "emptyAnswers": 13,
+          "tokensIn": 350,
+          "tokensOut": 3704
+        }
+      ],
+      "winner": "gpt-5.6-terra",
+      "winnerNote": "Claude Sonnet 5 and GPT-5.6 Terra tie on quality (100). GPT-5.6 Terra wins on value, for the same result at a fraction of the cost.",
+      "perFamily": {
+        "anthropic": "claude-sonnet-5",
+        "openai": "gpt-6-astra",
+        "gemini": "gemini-3.1-pro-preview"
+      }
+    },
+    {
+      "id": "research",
+      "label": "Research",
+      "blurb": "Answer a grounded question from the provided sources only. Cite correctly and never invent a fact. A cross-family judge ensemble scores the answer 0 to 100 on an expert rubric.",
+      "grader": "judge",
+      "metricLabel": "Rubric",
+      "primaryFmt": "score",
+      "leaderboard": [
+        {
+          "model": "claude-fable-5-1",
+          "quality": 99,
+          "ci": [
+            97,
+            100
+          ],
+          "primary": 98.89,
+          "costUsd": 0.036,
+          "latencyMs": 14236,
+          "runs": 2,
+          "tokensIn": 402,
+          "tokensOut": 640
+        },
+        {
+          "model": "gemini-3.1-pro-preview",
+          "quality": 98,
+          "ci": [
+            95,
+            100
+          ],
+          "primary": 97.78,
+          "costUsd": 0.0126,
+          "latencyMs": 10304,
+          "runs": 2,
+          "tokensIn": 269,
+          "tokensOut": 1006
+        },
+        {
+          "model": "gpt-6-astra",
+          "quality": 97,
+          "ci": [
+            93,
+            100
+          ],
+          "primary": 96.67,
+          "costUsd": 0.0103,
+          "latencyMs": 5097,
+          "runs": 2,
+          "tokensIn": 265,
+          "tokensOut": 152
+        },
+        {
+          "model": "gpt-5.6-terra",
+          "quality": 97,
+          "ci": [
+            94,
+            99
+          ],
+          "primary": 96.67,
+          "costUsd": 0.0019,
+          "latencyMs": 2453,
+          "runs": 2,
+          "tokensIn": 265,
+          "tokensOut": 115
+        },
+        {
+          "model": "gemini-3.8-flash",
+          "quality": 97,
+          "ci": [
+            94,
+            100
+          ],
+          "primary": 96.67,
+          "costUsd": 0.0031,
+          "latencyMs": 4083,
+          "runs": 2,
+          "tokensIn": 269,
+          "tokensOut": 773
+        },
+        {
+          "model": "gemini-3.5-flash",
+          "quality": 97,
+          "ci": [
+            94,
+            99
+          ],
+          "primary": 96.67,
+          "costUsd": 0.0112,
+          "latencyMs": 5185,
+          "runs": 2,
+          "tokensIn": 269,
+          "tokensOut": 1195
+        },
+        {
+          "model": "gpt-5.4-mini",
+          "quality": 96,
+          "ci": [
+            93,
+            99
+          ],
+          "primary": 96.11,
+          "costUsd": 0.0007,
+          "latencyMs": 1075,
+          "runs": 2,
+          "tokensIn": 265,
+          "tokensOut": 113
+        },
+        {
+          "model": "gpt-5.6-sol",
+          "quality": 96,
+          "ci": [
+            92,
+            99
+          ],
+          "primary": 95.56,
+          "costUsd": 0.0047,
+          "latencyMs": 6335,
+          "runs": 2,
+          "tokensIn": 265,
+          "tokensOut": 180
+        },
+        {
+          "model": "claude-sonnet-5",
+          "quality": 95,
+          "ci": [
+            91,
+            99
+          ],
+          "primary": 95,
+          "costUsd": 0.0061,
+          "latencyMs": 7002,
+          "runs": 2,
+          "tokensIn": 400,
+          "tokensOut": 527
+        },
+        {
+          "model": "claude-opus-5",
+          "quality": 94,
+          "ci": [
+            92,
+            97
+          ],
+          "primary": 94.44,
+          "costUsd": 0.0216,
+          "latencyMs": 10761,
+          "runs": 2,
+          "tokensIn": 400,
+          "tokensOut": 785
+        },
+        {
+          "model": "gemini-3.1-flash-lite",
+          "quality": 94,
+          "ci": [
+            92,
+            97
+          ],
+          "primary": 94.44,
+          "costUsd": 0.0002,
+          "latencyMs": 1124,
+          "runs": 2,
+          "tokensIn": 269,
+          "tokensOut": 120
+        },
+        {
+          "model": "claude-haiku-4-5",
+          "quality": 94,
+          "ci": [
+            89,
+            98
+          ],
+          "primary": 93.89,
+          "costUsd": 0.0016,
+          "latencyMs": 3272,
+          "runs": 2,
+          "tokensIn": 290,
+          "tokensOut": 259
+        },
+        {
+          "model": "gemini-3.5-flash-lite",
+          "quality": 93,
+          "ci": [
+            89,
+            97
+          ],
+          "primary": 92.78,
+          "costUsd": 0.0004,
+          "latencyMs": 955,
+          "runs": 2,
+          "tokensIn": 269,
+          "tokensOut": 119
+        }
+      ],
+      "winner": "gpt-5.6-terra",
+      "winnerNote": "Claude Fable 5.1 leads on raw score. Within the confidence intervals GPT-5.6 Terra is statistically level, so value decides it at a fraction of the cost.",
+      "perFamily": {
+        "anthropic": "claude-fable-5-1",
+        "gemini": "gemini-3.1-pro-preview",
+        "openai": "gpt-6-astra"
+      }
+    },
+    {
+      "id": "architect",
+      "label": "Planning",
+      "blurb": "Turn a feature request into a buildable implementation plan with a testable Definition of Done. A cross-family judge ensemble scores the plan 0 to 100.",
+      "grader": "judge",
+      "metricLabel": "Rubric",
+      "primaryFmt": "score",
+      "leaderboard": [
+        {
+          "model": "gpt-6-astra",
+          "quality": 98,
+          "ci": [
+            95,
+            100
+          ],
+          "primary": 97.78,
+          "costUsd": 0.1065,
+          "latencyMs": 54033,
+          "runs": 2,
+          "tokensIn": 164,
+          "tokensOut": 2098
+        },
+        {
+          "model": "gpt-5.4-mini",
+          "quality": 97,
+          "ci": [
+            93,
+            100
+          ],
+          "primary": 96.67,
+          "costUsd": 0.0086,
+          "latencyMs": 14708,
+          "runs": 2,
+          "tokensIn": 164,
+          "tokensOut": 1891
+        },
+        {
+          "model": "claude-sonnet-5",
+          "quality": 88,
+          "ci": [
+            84,
+            91
+          ],
+          "primary": 87.78,
+          "costUsd": 0.0534,
+          "latencyMs": 45109,
+          "runs": 2,
+          "tokensIn": 255,
+          "tokensOut": 5294
+        },
+        {
+          "model": "gemini-3.8-flash",
+          "quality": 87,
+          "ci": [
+            84,
+            90
+          ],
+          "primary": 87.22,
+          "costUsd": 0.013,
+          "latencyMs": 14976,
+          "runs": 2,
+          "tokensIn": 159,
+          "tokensOut": 3424
+        },
+        {
+          "model": "gemini-3.1-pro-preview",
+          "quality": 84,
+          "ci": [
+            79,
+            89
+          ],
+          "primary": 83.89,
+          "costUsd": 0.0342,
+          "latencyMs": 31922,
+          "runs": 2,
+          "tokensIn": 159,
+          "tokensOut": 2822
+        },
+        {
+          "model": "gemini-3.5-flash-lite",
+          "quality": 80,
+          "ci": [
+            74,
+            86
+          ],
+          "primary": 80,
+          "costUsd": 0.0047,
+          "latencyMs": 6853,
+          "runs": 2,
+          "tokensIn": 159,
+          "tokensOut": 1849
+        },
+        {
+          "model": "claude-fable-5-1",
+          "quality": 78,
+          "ci": [
+            66,
+            90
+          ],
+          "primary": 78.33,
+          "costUsd": 0.4112,
+          "latencyMs": 111433,
+          "runs": 2,
+          "tokensIn": 257,
+          "tokensOut": 8172
+        },
+        {
+          "model": "gemini-3.1-flash-lite",
+          "quality": 73,
+          "ci": [
+            68,
+            78
+          ],
+          "primary": 73.33,
+          "costUsd": 0.0014,
+          "latencyMs": 4508,
+          "runs": 2,
+          "tokensIn": 159,
+          "tokensOut": 924
+        },
+        {
+          "model": "gpt-5.6-sol",
+          "quality": 73,
+          "ci": [
+            63,
+            82
+          ],
+          "primary": 72.78,
+          "costUsd": 0.0885,
+          "latencyMs": 87278,
+          "runs": 2,
+          "tokensIn": 164,
+          "tokensOut": 4392
+        },
+        {
+          "model": "gemini-3.5-flash",
+          "quality": 65,
+          "ci": [
+            50,
+            80
+          ],
+          "primary": 65,
+          "costUsd": 0.0365,
+          "latencyMs": 20539,
+          "runs": 2,
+          "tokensIn": 159,
+          "tokensOut": 4027
+        },
+        {
+          "model": "claude-opus-5",
+          "quality": 60,
+          "ci": [
+            56,
+            64
+          ],
+          "primary": 60,
+          "costUsd": 0.2692,
+          "latencyMs": 142259,
+          "runs": 2,
+          "tokensIn": 255,
+          "tokensOut": 10718
+        },
+        {
+          "model": "gpt-5.6-terra",
+          "quality": 59,
+          "ci": [
+            53,
+            65
+          ],
+          "primary": 58.89,
+          "costUsd": 0.0514,
+          "latencyMs": 71443,
+          "runs": 2,
+          "tokensIn": 164,
+          "tokensOut": 4253
+        },
+        {
+          "model": "claude-haiku-4-5",
+          "quality": 56,
+          "ci": [
+            37,
+            74
+          ],
+          "primary": 55.56,
+          "costUsd": 0.0187,
+          "latencyMs": 33710,
+          "runs": 2,
+          "tokensIn": 172,
+          "tokensOut": 3698
+        }
+      ],
+      "winner": "gpt-6-astra",
+      "winnerNote": "GPT-6 Astra wins with a clear margin. Its confidence interval sits above the runner-up.",
+      "perFamily": {
+        "openai": "gpt-6-astra",
+        "anthropic": "claude-sonnet-5",
+        "gemini": "gemini-3.8-flash"
+      }
+    },
+    {
+      "id": "orchestrator",
+      "label": "Orchestration",
+      "blurb": "Break a request into the right board tasks, roles and dependencies. The score is 60% structural correctness (valid roles, a Definition of Done on every task, acyclic dependencies) and 40% a cross-family judge ensemble.",
+      "grader": "hybrid",
+      "metricLabel": "Score",
+      "primaryFmt": "score",
+      "leaderboard": [
+        {
+          "model": "gpt-5.6-sol",
+          "quality": 98,
+          "ci": [
+            96,
+            100
+          ],
+          "primary": 98,
+          "costUsd": 0.0136,
+          "latencyMs": 7868,
+          "runs": 2,
+          "tokensIn": 500,
+          "tokensOut": 580
+        },
+        {
+          "model": "gpt-5.4-mini",
+          "quality": 98,
+          "ci": [
+            97,
+            99
+          ],
+          "primary": 97.89,
+          "costUsd": 0.0015,
+          "latencyMs": 2033,
+          "runs": 2,
+          "tokensIn": 500,
+          "tokensOut": 245
+        },
+        {
+          "model": "claude-opus-5",
+          "quality": 98,
+          "ci": [
+            95,
+            100
+          ],
+          "primary": 97.67,
+          "costUsd": 0.0306,
+          "latencyMs": 13939,
+          "runs": 2,
+          "tokensIn": 94,
+          "tokensOut": 1205
+        },
+        {
+          "model": "gpt-5.6-terra",
+          "quality": 98,
+          "ci": [
+            96,
+            99
+          ],
+          "primary": 97.56,
+          "costUsd": 0.0046,
+          "latencyMs": 5653,
+          "runs": 2,
+          "tokensIn": 500,
+          "tokensOut": 298
+        },
+        {
+          "model": "claude-haiku-4-5",
+          "quality": 97,
+          "ci": [
+            96,
+            98
+          ],
+          "primary": 97.11,
+          "costUsd": 0.0026,
+          "latencyMs": 4078,
+          "runs": 2,
+          "tokensIn": 798,
+          "tokensOut": 365
+        },
+        {
+          "model": "claude-fable-5-1",
+          "quality": 97,
+          "ci": [
+            95,
+            99
+          ],
+          "primary": 97,
+          "costUsd": 0.0514,
+          "latencyMs": 13399,
+          "runs": 2,
+          "tokensIn": 96,
+          "tokensOut": 1008
+        },
+        {
+          "model": "gemini-3.8-flash",
+          "quality": 96,
+          "ci": [
+            95,
+            97
+          ],
+          "primary": 95.89,
+          "costUsd": 0.0039,
+          "latencyMs": 5367,
+          "runs": 2,
+          "tokensIn": 393,
+          "tokensOut": 972
+        },
+        {
+          "model": "claude-sonnet-5",
+          "quality": 95,
+          "ci": [
+            91,
+            100
+          ],
+          "primary": 95.44,
+          "costUsd": 0.0135,
+          "latencyMs": 7721,
+          "runs": 2,
+          "tokensIn": 1054,
+          "tokensOut": 1136
+        },
+        {
+          "model": "gpt-6-astra",
+          "quality": 95,
+          "ci": [
+            92,
+            99
+          ],
+          "primary": 95.44,
+          "costUsd": 0.0238,
+          "latencyMs": 9058,
+          "runs": 2,
+          "tokensIn": 500,
+          "tokensOut": 376
+        },
+        {
+          "model": "gemini-3.1-pro-preview",
+          "quality": 94,
+          "ci": [
+            92,
+            96
+          ],
+          "primary": 93.89,
+          "costUsd": 0.0145,
+          "latencyMs": 11454,
+          "runs": 2,
+          "tokensIn": 393,
+          "tokensOut": 1139
+        },
+        {
+          "model": "gemini-3.1-flash-lite",
+          "quality": 94,
+          "ci": [
+            92,
+            95
+          ],
+          "primary": 93.67,
+          "costUsd": 0.0005,
+          "latencyMs": 1638,
+          "runs": 2,
+          "tokensIn": 393,
+          "tokensOut": 286
+        },
+        {
+          "model": "gemini-3.5-flash",
+          "quality": 94,
+          "ci": [
+            92,
+            95
+          ],
+          "primary": 93.67,
+          "costUsd": 0.0121,
+          "latencyMs": 4858,
+          "runs": 2,
+          "tokensIn": 393,
+          "tokensOut": 1281
+        },
+        {
+          "model": "gemini-3.5-flash-lite",
+          "quality": 92,
+          "ci": [
+            88,
+            95
+          ],
+          "primary": 91.67,
+          "costUsd": 0.0007,
+          "latencyMs": 1307,
+          "runs": 2,
+          "tokensIn": 393,
+          "tokensOut": 249
+        }
+      ],
+      "winner": "claude-haiku-4-5",
+      "winnerNote": "GPT-5.6 Sol leads on raw score. Within the confidence intervals Claude Haiku 4.5 is statistically level, so value decides it at a fraction of the cost.",
+      "perFamily": {
+        "openai": "gpt-5.6-sol",
+        "anthropic": "claude-opus-5",
+        "gemini": "gemini-3.8-flash"
+      }
+    }
+  ],
+  "packs": [
+    {
+      "id": "ultracode",
+      "label": "Ultracode",
+      "tagline": "Best-in-market brain per role, mixing providers",
+      "roles": {
+        "orchestrator": "gpt-5.6-sol",
+        "architect": "gpt-6-astra",
+        "developer": "claude-sonnet-5",
+        "worker": "claude-sonnet-5",
+        "reviewer": "gpt-6-astra",
+        "designer": "claude-opus-5",
+        "shipper": "claude-fable-5-1",
+        "sales": "claude-sonnet-5",
+        "curator": "claude-haiku-4-5",
+        "marketer": "claude-opus-5"
+      }
+    },
+    {
+      "id": "balanced",
+      "label": "Balanced",
+      "tagline": "Cost + performance across providers",
+      "roles": {
+        "orchestrator": "claude-sonnet-5",
+        "architect": "gemini-3.8-flash",
+        "developer": "claude-sonnet-5",
+        "worker": "claude-sonnet-5",
+        "reviewer": "gemini-3.8-flash",
+        "designer": "claude-sonnet-5",
+        "shipper": "claude-sonnet-5",
+        "sales": "claude-haiku-4-5",
+        "curator": "claude-haiku-4-5",
+        "marketer": "claude-sonnet-5"
+      }
+    },
+    {
+      "id": "fast",
+      "label": "Fast",
+      "tagline": "Fastest full-strength brain per role, mixing providers",
+      "roles": {
+        "orchestrator": "gemini-3.8-flash",
+        "architect": "gemini-3.8-flash",
+        "developer": "claude-sonnet-5",
+        "worker": "claude-sonnet-5",
+        "reviewer": "gemini-3.8-flash",
+        "designer": "claude-sonnet-5",
+        "shipper": "claude-sonnet-5",
+        "sales": "claude-haiku-4-5",
+        "curator": "claude-haiku-4-5",
+        "marketer": "claude-sonnet-5"
+      }
+    },
+    {
+      "id": "claude-core",
+      "label": "Claude Core",
+      "tagline": "Best per role on Anthropic",
+      "roles": {
+        "orchestrator": "claude-sonnet-5",
+        "architect": "claude-fable-5-1",
+        "developer": "claude-sonnet-5",
+        "worker": "claude-sonnet-5",
+        "reviewer": "claude-fable-5-1",
+        "designer": "claude-sonnet-5",
+        "shipper": "claude-opus-5",
+        "sales": "claude-sonnet-5",
+        "curator": "claude-haiku-4-5",
+        "marketer": "claude-sonnet-5"
+      }
+    },
+    {
+      "id": "openai-core",
+      "label": "OpenAI Core",
+      "tagline": "Best per role on OpenAI",
+      "roles": {
+        "orchestrator": "gpt-5.6-sol",
+        "architect": "gpt-6-astra",
+        "developer": "gpt-5.6-terra",
+        "worker": "gpt-5.6-terra",
+        "reviewer": "gpt-6-astra",
+        "designer": "gpt-5.6-sol",
+        "shipper": "gpt-5.6-sol",
+        "sales": "gpt-5.4-mini",
+        "curator": "gpt-5.4-mini",
+        "marketer": "gpt-5.6-sol"
+      }
+    },
+    {
+      "id": "gemini-core",
+      "label": "Gemini Core",
+      "tagline": "Best per role on Gemini",
+      "roles": {
+        "orchestrator": "gemini-3.8-flash",
+        "architect": "gemini-3.8-flash",
+        "developer": "gemini-3.1-pro-preview",
+        "worker": "gemini-3.1-pro-preview",
+        "reviewer": "gemini-3.1-pro-preview",
+        "designer": "gemini-3.8-flash",
+        "shipper": "gemini-3.1-pro-preview",
+        "sales": "gemini-3.1-flash-lite",
+        "curator": "gemini-3.1-flash-lite",
+        "marketer": "gemini-3.8-flash"
+      }
+    },
+    {
+      "id": "starter",
+      "label": "NeuraMesh Starter",
+      "tagline": "Runs on us — no provider to connect",
+      "roles": {
+        "orchestrator": "gemini-3.5-flash-lite",
+        "architect": "gemini-3.5-flash-lite",
+        "developer": "gemini-3.5-flash-lite",
+        "worker": "gemini-3.5-flash-lite",
+        "reviewer": "gemini-3.5-flash-lite",
+        "designer": "gemini-3.5-flash-lite",
+        "shipper": "gemini-3.5-flash-lite",
+        "sales": "gemini-3.5-flash-lite",
+        "curator": "gemini-3.5-flash-lite",
+        "marketer": "gemini-3.5-flash-lite"
+      }
+    }
+  ],
+  "methodology": {
+    "contamination": "Every task is private and held out. The grading tests stay hidden from the model. Public benchmarks leak into training data. A 2026 analysis found that about a third of solved SWE-bench tasks had memorized solutions. Private tasks are the only real defense. The coding fixtures today are hard but classic, so we are replacing them with tasks derived from this repository's own work.",
+    "objective": "Two roles grade on hard evidence alone. Coding is scored by hidden fail-to-pass tests and a well-formed-edit check, the same gate the real submit flow enforces. Review is scored against a known verdict on a set that carries planted logic bugs, Definition of Done violations, and an ugly-but-correct trap that must be approved.",
+    "variance": "Each task runs many times. We report the mean with a Wilson 95% confidence interval, drawn as the whisker on every bar. One run is noise. The interval is the signal.",
+    "value": "Quality is only half of the decision. Every model also carries a measured cost per task and a wall-clock time, so the leaderboard doubles as a cost and quality map. Move the sliders on the scatter to weight quality, cost and speed your own way.",
+    "judge": "Research, planning and orchestration are scored by a judge ensemble, kept honest by construction. Judging is cross-family only, so a model is never graded by its own family. Two judges score every answer on an anchored 0 to 3 expert rubric through forced structured output. A judge that returns no scores is dropped instead of counted as zeros. Orchestration blends this with objective structural checks. It is the eval version of the server rule that nobody reviews their own work.",
+    "refusals": "A model that declines a task on policy grounds scores zero for that sample. We never re-run a declined task on a different model, because that would publish one model result under another model name. The refusal count rides each row."
+  }
+}

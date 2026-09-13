@@ -1,0 +1,100 @@
+{
+  "artboards": [
+    {
+      "file": "Main.dc.html",
+      "x": 0,
+      "y": 0,
+      "w": 300,
+      "h": 780,
+      "title": "A · Recents · the kicker is the switch"
+    },
+    {
+      "file": "ProjectsView.dc.html",
+      "x": 380,
+      "y": 0,
+      "w": 300,
+      "h": 780,
+      "title": "A · Projects · the same head"
+    },
+    {
+      "file": "CreamOak.dc.html",
+      "x": 760,
+      "y": 0,
+      "w": 300,
+      "h": 780,
+      "title": "A · Recents · cream oak"
+    },
+    {
+      "file": "RecentsScoped.dc.html",
+      "x": 1140,
+      "y": 0,
+      "w": 300,
+      "h": 780,
+      "title": "A2 · Recents with the scope row"
+    },
+    {
+      "file": "GlyphToggle.dc.html",
+      "x": 0,
+      "y": 940,
+      "w": 300,
+      "h": 780,
+      "title": "B · Two glyphs at the head"
+    },
+    {
+      "file": "BothAtOnce.dc.html",
+      "x": 380,
+      "y": 940,
+      "w": 300,
+      "h": 780,
+      "title": "C · Both at once"
+    },
+    {
+      "file": "Segment.dc.html",
+      "x": 760,
+      "y": 940,
+      "w": 300,
+      "h": 780,
+      "title": "D · A second segment"
+    }
+  ],
+  "annotations": [
+    {
+      "id": "note-a",
+      "x": 0,
+      "y": -170,
+      "w": 1100,
+      "text": "A · THE KICKER IS THE SWITCH (leading)\nThe band head reads two words, RECENTS · PROJECTS. The active word wears the text ink and carries the count. The other word is dim and is the door: one click swaps the list, remembered per machine like the theme. Recents is one flat list, newest first, the same one-line row (glyph · title · status word). Projects is the folders exactly as today. No new chrome, the rail keeps its ⌘Y magnifier and, in Projects, its fold-all chevron."
+    },
+    {
+      "id": "note-a2",
+      "x": 1140,
+      "y": -110,
+      "w": 420,
+      "text": "A2 · Recents with the scope row from the flat round: All threads ▾ · All rooms ▾. Settled rows carry the project in the trailing slot, since the list no longer says it. An ask keeps its pulse and a live word keeps its badge."
+    },
+    {
+      "id": "note-b",
+      "x": 0,
+      "y": 780,
+      "w": 340,
+      "text": "B · TWO GLYPHS\nThe kicker stays THREADS. A two-glyph toggle (list · folders) sits before the magnifier. One click, but the state is an icon, and a filled glyph beside the magnifier is one more mark on a head that was quiet."
+    },
+    {
+      "id": "note-c",
+      "x": 380,
+      "y": 780,
+      "w": 340,
+      "text": "C · BOTH AT ONCE\nClaude’s shape: a PROJECTS › door row that unfolds the folders in place, then RECENTS flat under it. No toggle, the disclosure is the preference. Tradeoff: two lists on one rail, and the folders push Recents down when open."
+    },
+    {
+      "id": "note-d",
+      "x": 760,
+      "y": 780,
+      "w": 340,
+      "text": "D · A SECOND SEGMENT\nRecents | Projects under Chat | Code. The clearest state, and two stacked segmented controls on a 266px rail is the most chrome of the four."
+    }
+  ],
+  "launch": {
+    "view": "canvas"
+  }
+}

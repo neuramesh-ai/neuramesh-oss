@@ -1,0 +1,758 @@
+<!doctype html>
+<html lang="en" data-theme="graphite">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Neuramesh — Engineering OS concept</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --win: #0d0d0d;
+      --bg: #141414;
+      --panel: #191919;
+      --panel-2: #212121;
+      --panel-3: #2b2b2b;
+      --elevated: #252525;
+      --text: #eaeaea;
+      --body: #b6b6b6;
+      --muted: #898989;
+      --dim: #676767;
+      --faint: #4d4d4d;
+      --line: rgba(255,255,255,.085);
+      --line-strong: rgba(255,255,255,.14);
+      --link: #d19a72;
+      --accent: #77ac8d;
+      --accent-rgb: 119,172,141;
+      --danger: #d97878;
+      --warn: #d5ad72;
+      --blue: #77a9c7;
+      --violet: #a996c8;
+      --shadow: 0 18px 60px rgba(0,0,0,.34);
+      --sans: "Geist", "Inter", ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --mono: "Geist Mono", "SFMono-Regular", Consolas, monospace;
+      --serif: "Source Serif 4", Georgia, serif;
+    }
+
+    html[data-theme="cream"] {
+      color-scheme: light;
+      --win: #f0e5d3;
+      --bg: #fbf8f4;
+      --panel: #fbf8f4;
+      --panel-2: #f6eee1;
+      --panel-3: #efe1cd;
+      --elevated: #fffdf9;
+      --text: #2a1c13;
+      --body: #574838;
+      --muted: #97846c;
+      --dim: #b5a289;
+      --faint: #c7b79f;
+      --line: rgba(70,43,24,.11);
+      --line-strong: rgba(70,43,24,.19);
+      --link: #9c5730;
+      --accent: #834a2b;
+      --accent-rgb: 131,74,43;
+      --danger: #a84e49;
+      --warn: #9d6b2d;
+      --blue: #4f7890;
+      --violet: #77628c;
+      --shadow: 0 18px 60px rgba(87,55,27,.14);
+    }
+
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+    body { background: var(--win); color: var(--text); font-family: var(--sans); font-size: 13px; }
+    button, input, textarea { font: inherit; color: inherit; }
+    button { border: 0; }
+
+    .app {
+      width: 100vw;
+      height: 100vh;
+      display: grid;
+      grid-template-rows: 43px minmax(0, 1fr);
+      background: var(--win);
+    }
+
+    .framebar {
+      display: grid;
+      grid-template-columns: 250px 1fr auto;
+      align-items: center;
+      border-bottom: 1px solid var(--line);
+      color: var(--muted);
+      letter-spacing: .01em;
+      user-select: none;
+    }
+    .brand {
+      height: 100%;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 14px;
+      border-right: 1px solid var(--line);
+      color: var(--body);
+      font-weight: 590;
+    }
+    .mark {
+      width: 22px; height: 22px; border-radius: 7px;
+      border: 1px solid var(--line-strong);
+      display: grid; place-items: center;
+      color: var(--accent);
+      background: var(--panel-2);
+      font-family: var(--serif);
+      font-style: italic;
+      font-size: 15px;
+    }
+    .frame-title { padding-left: 16px; font-size: 12px; }
+    .frame-actions { display: flex; align-items: center; gap: 7px; padding-right: 12px; }
+    .scene-switch, .theme-switch {
+      display: flex; align-items: center; gap: 2px;
+      padding: 3px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 9px;
+    }
+    .scene-switch button, .theme-switch button {
+      background: transparent;
+      padding: 6px 9px;
+      border-radius: 6px;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 11px;
+    }
+    .scene-switch button.active, .theme-switch button.active {
+      background: var(--panel-3);
+      color: var(--text);
+      box-shadow: 0 1px 0 rgba(255,255,255,.04) inset;
+    }
+
+    .body { min-height: 0; display: grid; grid-template-columns: 250px minmax(0, 1fr); }
+    .rail {
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--line);
+      background: var(--win);
+      padding: 10px 9px 9px;
+    }
+    .new-chat {
+      display: flex; align-items: center; justify-content: space-between;
+      height: 36px; padding: 0 10px; border-radius: 8px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      color: var(--body);
+      margin-bottom: 14px;
+    }
+    .plus { font-size: 18px; line-height: 1; color: var(--muted); }
+    .section-label {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 9px 5px;
+      color: var(--dim); font-size: 10px; font-weight: 650; letter-spacing: .09em; text-transform: uppercase;
+    }
+    .nav-list { display: grid; gap: 2px; }
+    .nav-item {
+      height: 33px; padding: 0 9px;
+      display: flex; align-items: center; gap: 10px;
+      color: var(--muted); border-radius: 7px;
+    }
+    .nav-item.active {
+      color: var(--text);
+      background: var(--panel-2);
+      box-shadow: inset 2px 0 0 var(--accent);
+    }
+    .nav-item .icon { width: 15px; text-align: center; color: var(--dim); font-size: 14px; }
+    .nav-item.active .icon { color: var(--accent); }
+    .nav-item .count { margin-left: auto; font-family: var(--mono); font-size: 10px; color: var(--dim); }
+    .sessions { margin-top: 19px; min-height: 0; display: flex; flex-direction: column; }
+    .session-list { display: grid; gap: 3px; overflow: hidden; }
+    .session-row {
+      display: grid; grid-template-columns: 7px minmax(0,1fr) auto; gap: 8px; align-items: center;
+      padding: 8px 9px; border-radius: 7px; color: var(--muted);
+    }
+    .session-row.selected { background: var(--panel); color: var(--body); }
+    .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--dim); }
+    .dot.live { background: var(--accent); box-shadow: 0 0 0 3px rgba(var(--accent-rgb),.12); }
+    .dot.wait { background: var(--warn); }
+    .session-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .session-time { font: 10px var(--mono); color: var(--dim); }
+    .rail-foot {
+      margin-top: auto; border-top: 1px solid var(--line); padding: 10px 5px 0;
+      display: flex; align-items: center; gap: 9px; color: var(--muted);
+    }
+    .avatar { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 8px; background: var(--panel-3); color: var(--body); font-size: 10px; }
+    .rail-foot span:last-child { margin-left: auto; color: var(--dim); }
+
+    .sheet { min-width: 0; min-height: 0; background: var(--bg); position: relative; }
+    .scene { display: none; width: 100%; height: 100%; min-height: 0; }
+    .scene.active { display: flex; }
+
+    /* Home */
+    .home { flex-direction: column; overflow: auto; }
+    .home-top {
+      position: sticky; top: 0; z-index: 3;
+      height: 54px; flex: 0 0 54px;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 24px; border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--bg) 92%, transparent);
+      backdrop-filter: blur(12px);
+    }
+    .crumbs { display: flex; align-items: center; gap: 7px; color: var(--muted); }
+    .crumbs strong { color: var(--text); font-weight: 600; }
+    .scope-pill { border: 1px solid var(--line); border-radius: 7px; padding: 5px 8px; background: var(--panel); }
+    .primary {
+      display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px;
+      border-radius: 7px; background: var(--text); color: var(--bg); font-weight: 650; cursor: pointer;
+    }
+    .home-content { width: min(1120px, calc(100% - 56px)); margin: 0 auto; padding: 54px 0 64px; }
+    .eyebrow { color: var(--accent); font-size: 10px; font-weight: 750; letter-spacing: .11em; text-transform: uppercase; }
+    .hero { display: flex; justify-content: space-between; align-items: end; gap: 28px; margin-bottom: 40px; }
+    .hero h1 { font: 500 clamp(34px, 4vw, 54px)/1 var(--serif); letter-spacing: -.035em; margin: 10px 0 13px; }
+    .hero p { color: var(--muted); max-width: 650px; font-size: 14px; line-height: 1.6; margin: 0; }
+    .health {
+      flex: 0 0 258px; padding: 14px 15px; border: 1px solid var(--line); border-radius: 11px; background: var(--panel);
+    }
+    .health-head { display: flex; justify-content: space-between; margin-bottom: 11px; color: var(--body); }
+    .health-head span:last-child { color: var(--accent); }
+    .health-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 5px; }
+    .health-grid div { padding: 8px 5px; background: var(--panel-2); border-radius: 6px; text-align: center; }
+    .health-grid b { display: block; font: 600 15px var(--mono); }
+    .health-grid span { display: block; color: var(--dim); font-size: 9px; margin-top: 3px; }
+    .block { margin-top: 30px; }
+    .block-title { display: flex; justify-content: space-between; align-items: center; margin-bottom: 11px; }
+    .block-title h2 { font-size: 13px; margin: 0; font-weight: 640; }
+    .block-title span { color: var(--dim); font-size: 11px; }
+    .repo-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 11px; }
+    .repo-card {
+      min-width: 0; padding: 17px; border: 1px solid var(--line); border-radius: 11px; background: var(--panel);
+      transition: transform .18s ease, border-color .18s ease;
+    }
+    .repo-card:hover { transform: translateY(-2px); border-color: var(--line-strong); }
+    .repo-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .repo-name { font-weight: 650; }
+    .machine { display: flex; gap: 6px; align-items: center; color: var(--muted); font-size: 10px; }
+    .machine i { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+    .repo-card p { color: var(--muted); line-height: 1.45; min-height: 38px; margin: 12px 0 15px; }
+    .repo-meta { display: flex; flex-wrap: wrap; gap: 6px; }
+    .tag { padding: 4px 6px; border-radius: 5px; background: var(--panel-2); color: var(--muted); font: 10px var(--mono); }
+    .activity {
+      border: 1px solid var(--line); border-radius: 11px; overflow: hidden; background: var(--panel);
+    }
+    .activity-row {
+      display: grid; grid-template-columns: 28px minmax(0,1.4fr) minmax(110px,.6fr) 110px 78px; gap: 12px; align-items: center;
+      min-height: 55px; padding: 0 14px; border-bottom: 1px solid var(--line);
+    }
+    .activity-row:last-child { border-bottom: 0; }
+    .activity-row:hover { background: var(--panel-2); }
+    .activity-icon { width: 25px; height: 25px; border-radius: 7px; background: var(--panel-3); display: grid; place-items: center; color: var(--accent); }
+    .activity-name strong { display: block; font-size: 12px; font-weight: 590; }
+    .activity-name span, .activity-repo { color: var(--muted); font-size: 11px; margin-top: 3px; }
+    .status { justify-self: start; display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 10px; }
+    .status::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+    .status.waiting::before { background: var(--warn); }
+    .activity-time { color: var(--dim); font: 10px var(--mono); text-align: right; }
+
+    /* Active engineering workspace */
+    .work { flex-direction: column; min-width: 0; min-height: 0; }
+    .contextbar {
+      height: 45px; flex: 0 0 45px; display: flex; align-items: center; gap: 7px;
+      padding: 0 12px; border-bottom: 1px solid var(--line); background: var(--panel);
+    }
+    .context-title { font-weight: 620; margin-right: 4px; }
+    .context-chip { display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 8px; border: 1px solid var(--line); border-radius: 6px; color: var(--muted); background: var(--bg); font-size: 10px; }
+    .context-chip .online { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+    .context-spacer { flex: 1; }
+    .mode-switch { display: flex; gap: 2px; padding: 2px; border-radius: 7px; background: var(--bg); border: 1px solid var(--line); }
+    .mode-switch span { padding: 4px 7px; border-radius: 5px; font-size: 10px; color: var(--dim); }
+    .mode-switch .active { color: var(--text); background: var(--panel-3); }
+    .cost { color: var(--muted); font: 10px var(--mono); padding: 0 5px; }
+    .work-main { flex: 1; min-height: 0; min-width: 0; display: grid; grid-template-columns: 382px minmax(0,1fr); }
+    .agent-pane { min-height: 0; display: flex; flex-direction: column; background: var(--panel); border-right: 1px solid var(--line); }
+    .agent-head { height: 45px; flex: 0 0 45px; display: flex; align-items: center; padding: 0 11px; border-bottom: 1px solid var(--line); }
+    .agent-head strong { font-size: 12px; }
+    .engine-chip { margin-left: 8px; padding: 3px 6px; border-radius: 5px; background: rgba(var(--accent-rgb),.1); color: var(--accent); font: 9px var(--mono); }
+    .agent-head-actions { margin-left: auto; display: flex; gap: 4px; }
+    .icon-btn { width: 28px; height: 28px; border-radius: 6px; display: grid; place-items: center; background: transparent; color: var(--muted); font-size: 15px; }
+    .icon-btn:hover { background: var(--panel-2); }
+    .transcript { flex: 1; min-height: 0; overflow: auto; padding: 14px 13px 18px; }
+    .message { margin-bottom: 16px; }
+    .message-label { display: flex; align-items: center; gap: 7px; color: var(--dim); font-size: 9px; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 6px; }
+    .message p { margin: 0; color: var(--body); line-height: 1.5; font-size: 12px; }
+    .user-bubble { background: var(--panel-2); border: 1px solid var(--line); border-radius: 9px 9px 3px 9px; padding: 10px 11px; }
+    .thinking { color: var(--muted); display: flex; align-items: center; gap: 7px; margin: 4px 0 12px; font-size: 11px; }
+    .pulse { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 4px rgba(var(--accent-rgb),.1); }
+    .tool-card, .plan-card, .approval-card {
+      border: 1px solid var(--line); border-radius: 9px; overflow: hidden; background: var(--bg); margin-bottom: 10px;
+    }
+    .tool-head { min-height: 35px; display: flex; align-items: center; gap: 8px; padding: 0 10px; color: var(--body); }
+    .tool-head .tool-icon { color: var(--accent); }
+    .tool-head .tool-meta { margin-left: auto; color: var(--dim); font: 9px var(--mono); }
+    .tool-body { padding: 0 10px 9px 28px; color: var(--muted); line-height: 1.55; font: 10px var(--mono); }
+    .plan-card { border-color: rgba(var(--accent-rgb),.35); background: rgba(var(--accent-rgb),.055); }
+    .plan-card .plan-top { padding: 10px 11px 8px; border-bottom: 1px solid rgba(var(--accent-rgb),.18); }
+    .plan-kicker { color: var(--accent); font-size: 9px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
+    .plan-title { font-weight: 630; margin-top: 4px; }
+    .plan-list { display: grid; gap: 7px; padding: 10px 11px; }
+    .plan-step { display: grid; grid-template-columns: 16px 1fr; gap: 7px; color: var(--body); font-size: 11px; line-height: 1.35; }
+    .step-check { width: 15px; height: 15px; display: grid; place-items: center; border-radius: 50%; background: rgba(var(--accent-rgb),.14); color: var(--accent); font-size: 9px; }
+    .checkpoint { display: flex; align-items: center; gap: 8px; padding: 8px 9px; border: 1px dashed var(--line-strong); border-radius: 8px; color: var(--muted); font-size: 10px; }
+    .checkpoint span:last-child { margin-left: auto; color: var(--dim); font-family: var(--mono); }
+    .composer { flex: 0 0 auto; padding: 9px 10px 10px; border-top: 1px solid var(--line); background: var(--panel); }
+    .auto-bar { min-height: 35px; display: flex; align-items: center; gap: 7px; padding: 0 9px; border: 1px solid var(--line); border-bottom: 0; border-radius: 8px 8px 0 0; background: var(--bg); color: var(--muted); font-size: 10px; }
+    .auto-bar strong { color: var(--body); font-weight: 590; }
+    .auto-bar .scope { margin-left: auto; color: var(--dim); }
+    .auto-drawer { border: 1px solid var(--line-strong); border-bottom: 0; border-radius: 9px 9px 0 0; overflow: hidden; background: var(--bg); }
+    .auto-drawer .auto-bar { border: 0; border-radius: 0; border-bottom: 1px solid var(--line); }
+    .permission-list { display: grid; gap: 0; padding: 6px 8px 8px; }
+    .permission-row { min-height: 28px; display: grid; grid-template-columns: 18px 18px 1fr auto; align-items: center; color: var(--muted); font-size: 10px; }
+    .check { width: 13px; height: 13px; display: grid; place-items: center; border: 1px solid var(--line-strong); border-radius: 3px; color: transparent; }
+    .check.on { color: var(--win); background: var(--accent); border-color: var(--accent); }
+    .permission-icon { color: var(--dim); }
+    .permission-row small { color: var(--dim); font-size: 9px; }
+    .permission-note { padding: 0 8px 8px 44px; color: var(--dim); font-size: 9px; }
+    .composer-box { border: 1px solid var(--line-strong); border-radius: 10px; background: var(--bg); box-shadow: 0 7px 18px rgba(0,0,0,.08); }
+    .auto-bar + .composer-box, .auto-drawer + .composer-box { border-radius: 0 0 10px 10px; }
+    .composer-box textarea { display: block; resize: none; width: 100%; height: 58px; border: 0; outline: 0; padding: 10px 11px 2px; background: transparent; color: var(--body); }
+    .composer-box textarea::placeholder { color: var(--dim); }
+    .composer-foot { height: 34px; display: flex; align-items: center; gap: 8px; padding: 0 7px 5px; color: var(--dim); font-size: 10px; }
+    .model { display: flex; align-items: center; gap: 5px; color: var(--muted); }
+    .composer-mode { display: flex; gap: 2px; padding: 2px; margin-left: auto; border: 1px solid var(--line); border-radius: 7px; background: var(--panel); }
+    .composer-mode span { padding: 3px 7px; border-radius: 5px; color: var(--dim); font-weight: 600; }
+    .composer-mode .plan-active { background: color-mix(in srgb, var(--warn) 18%, var(--panel)); color: var(--warn); }
+    .composer-mode .act-active { background: rgba(var(--accent-rgb),.15); color: var(--accent); }
+    .send { margin-left: auto; width: 25px; height: 25px; border-radius: 7px; background: var(--text); color: var(--bg); display: grid; place-items: center; }
+
+    .plan-ready { margin-top: 10px; display: flex; align-items: center; gap: 8px; }
+    .plan-ready button { height: 30px; padding: 0 11px; border-radius: 6px; background: var(--warn); color: var(--win); font-weight: 650; }
+    .plan-ready span { color: var(--dim); font-size: 9px; }
+    .empty-changes { height: 100%; display: grid; place-items: center; padding: 24px; color: var(--muted); text-align: center; }
+    .empty-changes strong { display: block; color: var(--body); font: 600 14px var(--sans); margin-bottom: 7px; }
+    .empty-changes p { max-width: 420px; line-height: 1.55; margin: 0; font-size: 11px; }
+    .guardrail-grid { width: min(610px, 80%); display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; margin-top: 18px; }
+    .guardrail { padding: 11px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); text-align: left; }
+    .guardrail b { display: block; color: var(--body); font-size: 10px; margin-bottom: 4px; }
+    .guardrail span { color: var(--dim); font-size: 9px; }
+
+    .code-pane { min-width: 0; min-height: 0; display: flex; flex-direction: column; background: var(--bg); }
+    .tabs { height: 38px; flex: 0 0 38px; display: flex; align-items: end; border-bottom: 1px solid var(--line); background: var(--panel); overflow: hidden; }
+    .file-tab { height: 37px; display: flex; align-items: center; gap: 7px; padding: 0 12px; border-right: 1px solid var(--line); color: var(--muted); white-space: nowrap; font-size: 11px; }
+    .file-tab.active { color: var(--text); background: var(--bg); border-top: 1px solid var(--accent); }
+    .file-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--warn); }
+    .file-dot.added { background: var(--accent); }
+    .code-body { flex: 1; min-height: 0; min-width: 0; display: grid; grid-template-columns: 196px minmax(0,1fr); }
+    .changes { min-height: 0; border-right: 1px solid var(--line); background: var(--panel); padding-top: 8px; }
+    .changes-head { display: flex; align-items: center; justify-content: space-between; padding: 7px 11px; color: var(--dim); font-size: 9px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+    .change-group { margin-bottom: 7px; }
+    .change-group-title { padding: 5px 11px; color: var(--dim); font-size: 10px; }
+    .change-file { min-height: 31px; padding: 6px 8px 6px 13px; display: grid; grid-template-columns: 16px minmax(0,1fr) auto; gap: 5px; align-items: center; color: var(--muted); font-size: 10px; }
+    .change-file.active { background: var(--panel-2); color: var(--body); box-shadow: inset 2px 0 0 var(--accent); }
+    .change-file .state { font: 600 9px var(--mono); color: var(--warn); }
+    .change-file .state.a { color: var(--accent); }
+    .change-file .delta { font: 9px var(--mono); color: var(--dim); }
+    .file-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .tree-drawer { margin: 13px 9px 0; padding-top: 10px; border-top: 1px solid var(--line); color: var(--dim); font-size: 10px; }
+    .tree-row { padding: 5px; }
+    .editor { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+    .editor-toolbar { height: 38px; flex: 0 0 38px; display: flex; align-items: center; padding: 0 10px; border-bottom: 1px solid var(--line); color: var(--muted); }
+    .path { font: 10px var(--mono); }
+    .toolbar-spacer { flex: 1; }
+    .segmented { display: flex; background: var(--panel); border: 1px solid var(--line); padding: 2px; border-radius: 6px; }
+    .segmented span { padding: 3px 7px; font-size: 9px; border-radius: 4px; color: var(--dim); }
+    .segmented .active { background: var(--panel-3); color: var(--body); }
+    .code-scroll { flex: 1; min-height: 0; overflow: auto; position: relative; font: 11px/1.66 var(--mono); padding: 9px 0 44px; }
+    .code-row { min-height: 19px; display: grid; grid-template-columns: 42px 42px minmax(500px,1fr); white-space: pre; }
+    .code-row .old, .code-row .new { text-align: right; padding-right: 10px; color: var(--faint); user-select: none; }
+    .code-row .src { padding: 0 16px; }
+    .code-row.add { background: rgba(var(--accent-rgb),.11); box-shadow: inset 3px 0 0 rgba(var(--accent-rgb),.5); }
+    .code-row.del { background: color-mix(in srgb, var(--danger) 11%, transparent); box-shadow: inset 3px 0 0 color-mix(in srgb, var(--danger) 55%, transparent); }
+    .code-row.context:hover { background: var(--panel); }
+    .kw { color: var(--violet); }
+    .fn { color: var(--blue); }
+    .str { color: var(--link); }
+    .com { color: var(--dim); font-style: italic; }
+    .type { color: var(--warn); }
+    .minimap { position: absolute; right: 7px; top: 8px; width: 55px; opacity: .35; display: grid; gap: 2px; pointer-events: none; }
+    .minimap i { height: 2px; background: var(--muted); border-radius: 1px; }
+    .minimap i.a { background: var(--accent); }
+    .reviewbar { height: 47px; flex: 0 0 47px; display: flex; align-items: center; gap: 10px; padding: 0 11px; border-top: 1px solid var(--line); background: var(--panel); }
+    .review-summary { color: var(--body); font-size: 11px; }
+    .review-summary span { color: var(--dim); font-family: var(--mono); margin-left: 6px; }
+    .reviewbar .spacer { flex: 1; }
+    .secondary { height: 29px; padding: 0 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--muted); }
+    .accept { height: 29px; padding: 0 11px; border-radius: 6px; background: var(--accent); color: var(--win); font-weight: 650; }
+
+    /* Permission state */
+    .approval-card { border-color: color-mix(in srgb, var(--warn) 45%, var(--line)); background: color-mix(in srgb, var(--warn) 5%, var(--bg)); }
+    .approval-top { padding: 10px 11px; border-bottom: 1px solid var(--line); }
+    .approval-top .plan-kicker { color: var(--warn); }
+    .approval-command { margin-top: 8px; padding: 8px; border-radius: 6px; background: var(--win); color: var(--body); font: 10px/1.5 var(--mono); overflow: hidden; }
+    .approval-note { padding: 8px 11px; color: var(--muted); font-size: 10px; line-height: 1.45; }
+    .approval-actions { display: grid; grid-template-columns: .7fr 1fr 1.35fr; gap: 6px; padding: 0 8px 8px; }
+    .approval-actions button { height: 29px; border-radius: 6px; background: var(--panel-2); color: var(--muted); }
+    .approval-actions .allow { background: var(--accent); color: var(--win); }
+    .policy-line { padding: 8px 10px; border-radius: 7px; background: var(--panel-2); color: var(--muted); font-size: 10px; margin-bottom: 10px; }
+    .policy-line b { color: var(--body); font-weight: 600; }
+    .comment-pin { position: absolute; left: 74px; top: 232px; width: 22px; height: 22px; border-radius: 50%; background: var(--warn); color: var(--win); display: grid; place-items: center; box-shadow: 0 0 0 4px color-mix(in srgb, var(--warn) 14%, transparent); font: 700 10px var(--sans); }
+
+    @media (max-width: 1100px) {
+      .body { grid-template-columns: 210px minmax(0,1fr); }
+      .framebar { grid-template-columns: 210px 1fr auto; }
+      .repo-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+      .work-main { grid-template-columns: 340px minmax(0,1fr); }
+      .code-body { grid-template-columns: 165px minmax(0,1fr); }
+      .frame-title { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="framebar">
+      <div class="brand"><span class="mark">n</span><span>neuramesh</span></div>
+      <div class="frame-title">Engineering OS · product concept</div>
+      <div class="frame-actions">
+        <div class="scene-switch" aria-label="Mockup scene">
+          <button data-scene="home">Home</button>
+          <button data-scene="plan">Plan controls</button>
+          <button data-scene="build">Build session</button>
+          <button data-scene="review">Permission + review</button>
+        </div>
+        <div class="theme-switch" aria-label="Theme">
+          <button data-theme="graphite">Graphite</button>
+          <button data-theme="cream">Cream Oak</button>
+        </div>
+      </div>
+    </header>
+
+    <div class="body">
+      <aside class="rail">
+        <button class="new-chat"><span>New chat</span><span class="plus">＋</span></button>
+        <div class="section-label"><span>Shortcuts</span><span>···</span></div>
+        <nav class="nav-list">
+          <div class="nav-item"><span class="icon">◇</span><span>Whiteboards</span></div>
+          <div class="nav-item"><span class="icon">◴</span><span>Scheduled</span><span class="count">3</span></div>
+          <div class="nav-item"><span class="icon">⌑</span><span>Files</span></div>
+          <div class="nav-item active"><span class="icon">⌘</span><span>Engineering OS</span><span class="count">4</span></div>
+          <div class="nav-item"><span class="icon">◫</span><span>Marketing OS</span></div>
+        </nav>
+        <div class="sessions">
+          <div class="section-label"><span>Engineering sessions</span><span>＋</span></div>
+          <div class="session-list">
+            <div class="session-row selected"><span class="dot live"></span><span class="session-name">Engineering home + session shell</span><span class="session-time">now</span></div>
+            <div class="session-row"><span class="dot wait"></span><span class="session-name">Fix relay reconnect semantics</span><span class="session-time">12m</span></div>
+            <div class="session-row"><span class="dot"></span><span class="session-name">Review machine policy audit</span><span class="session-time">1h</span></div>
+            <div class="session-row"><span class="dot"></span><span class="session-name">PowerSync web parity</span><span class="session-time">Tue</span></div>
+          </div>
+        </div>
+        <div class="rail-foot"><span class="avatar">AR</span><span>Andru</span><span>⌄</span></div>
+      </aside>
+
+      <section class="sheet">
+        <section class="scene home" data-scene-panel="home">
+          <div class="home-top">
+            <div class="crumbs"><strong>Engineering OS</strong><span>/</span><span class="scope-pill">All projects ⌄</span></div>
+            <button class="primary" data-open-build><span>＋</span><span>New coding session</span></button>
+          </div>
+          <div class="home-content">
+            <div class="hero">
+              <div>
+                <div class="eyebrow">Engineering workspace</div>
+                <h1>Build with your agents.<br/>Stay in control.</h1>
+                <p>Start work on any connected repository, continue live coding sessions, and review every change from plan to pull request—on the web or desktop.</p>
+              </div>
+              <aside class="health">
+                <div class="health-head"><span>Workspace ready</span><span>All systems healthy</span></div>
+                <div class="health-grid"><div><b>3</b><span>machines</span></div><div><b>7</b><span>repos</span></div><div><b>4</b><span>active</span></div></div>
+              </aside>
+            </div>
+
+            <section class="block">
+              <div class="block-title"><h2>Start from a repository</h2><span>Manage connections →</span></div>
+              <div class="repo-grid">
+                <article class="repo-card">
+                  <div class="repo-head"><span class="repo-name">neuramesh</span><span class="machine"><i></i> cloud-dev-01</span></div>
+                  <p>Collaboration infrastructure for human and AI engineering teams.</p>
+                  <div class="repo-meta"><span class="tag">main</span><span class="tag">TypeScript</span><span class="tag">3 active</span></div>
+                </article>
+                <article class="repo-card">
+                  <div class="repo-head"><span class="repo-name">flowe-app</span><span class="machine"><i></i> macbook-pro</span></div>
+                  <p>Personal and team wellbeing platform across web and mobile.</p>
+                  <div class="repo-meta"><span class="tag">develop</span><span class="tag">Next.js</span><span class="tag">1 waiting</span></div>
+                </article>
+                <article class="repo-card">
+                  <div class="repo-head"><span class="repo-name">agent-runtime</span><span class="machine"><i></i> cloud-gpu-02</span></div>
+                  <p>Runtime adapters, policy gates, orchestration, and evaluation.</p>
+                  <div class="repo-meta"><span class="tag">main</span><span class="tag">Python</span><span class="tag">idle</span></div>
+                </article>
+              </div>
+            </section>
+
+            <section class="block">
+              <div class="block-title"><h2>Continue building</h2><span>4 open sessions</span></div>
+              <div class="activity">
+                <div class="activity-row" data-open-build>
+                  <span class="activity-icon">⌘</span><span class="activity-name"><strong>Engineering home + session shell</strong><span>Agent is editing 3 files · 1 checkpoint</span></span><span class="activity-repo">neuramesh / nm-1184</span><span class="status">Building</span><span class="activity-time">now</span>
+                </div>
+                <div class="activity-row">
+                  <span class="activity-icon">!</span><span class="activity-name"><strong>Fix relay reconnect semantics</strong><span>Needs permission to run integration tests</span></span><span class="activity-repo">neuramesh / nm-1179</span><span class="status waiting">Waiting</span><span class="activity-time">12m</span>
+                </div>
+                <div class="activity-row">
+                  <span class="activity-icon">✓</span><span class="activity-name"><strong>Review machine policy audit</strong><span>Changes ready for your review</span></span><span class="activity-repo">agent-runtime / ar-224</span><span class="status waiting">Review</span><span class="activity-time">1h</span>
+                </div>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section class="scene work" data-scene-panel="plan">
+          <div class="contextbar">
+            <span class="context-title">Design permission-safe coding sessions</span>
+            <span class="context-chip">⌘ neuramesh</span>
+            <span class="context-chip">⑂ main · read only</span>
+            <span class="context-chip"><i class="online"></i> cloud-dev-01</span>
+            <span class="context-spacer"></span>
+            <span class="context-chip">Policy · Standard</span>
+            <span class="cost">Plan $0.74</span>
+          </div>
+          <div class="work-main">
+            <aside class="agent-pane">
+              <div class="agent-head"><strong>Coding agent</strong><span class="engine-chip">CLINE CORE</span><div class="agent-head-actions"><button class="icon-btn">＋</button><button class="icon-btn">↻</button><button class="icon-btn">···</button></div></div>
+              <div class="transcript">
+                <div class="message"><div class="message-label">You · 9:06 PM</div><div class="user-bubble"><p>Plan the Engineering session controls. Keep permissions per conversation and make the machine boundary explicit.</p></div></div>
+                <div class="tool-card"><div class="tool-head"><span class="tool-icon">⌕</span><span>Read session and policy code</span><span class="tool-meta">11 files</span></div><div class="tool-body">runtime/adapter.ts<br/>policygate.ts<br/>harness.ts<br/>worktree-manager.ts</div></div>
+                <div class="plan-card">
+                  <div class="plan-top"><div class="plan-kicker">Work Plan ready</div><div class="plan-title">Add Cline-style controls with Neuramesh authority</div></div>
+                  <div class="plan-list">
+                    <div class="plan-step"><span class="step-check">1</span><span>Add backend-owned coding turn state</span></div>
+                    <div class="plan-step"><span class="step-check">2</span><span>Scope mode, model, and permissions to this session</span></div>
+                    <div class="plan-step"><span class="step-check">3</span><span>Intersect session choices with machine policy</span></div>
+                    <div class="plan-step"><span class="step-check">4</span><span>Render complete proposed diffs before approval</span></div>
+                  </div>
+                </div>
+                <div class="plan-ready"><button>Switch to Act &amp; start</button><span>Records Work Plan approval · creates worktree</span></div>
+              </div>
+              <div class="composer">
+                <div class="auto-drawer">
+                  <div class="auto-bar"><strong>Auto-approve</strong><span>⌃</span><span class="scope">This session ⌄</span></div>
+                  <div class="permission-list">
+                    <div class="permission-row"><span class="check on">✓</span><span class="permission-icon">⌕</span><span>Read files</span><small>within repository</small></div>
+                    <div class="permission-row"><span class="check"></span><span class="permission-icon">✎</span><span>Edit files</span><small>blocked in Plan</small></div>
+                    <div class="permission-row"><span class="check"></span><span class="permission-icon">⌘</span><span>Execute commands</span><small>classified</small></div>
+                    <div class="permission-row"><span class="check"></span><span class="permission-icon">◎</span><span>Fetch web content</span><small>ask</small></div>
+                    <div class="permission-row"><span class="check"></span><span class="permission-icon">▤</span><span>Use MCP servers</span><small>classified</small></div>
+                  </div>
+                  <div class="permission-note">Effective access also respects repository policy and the machine sandbox.</div>
+                </div>
+                <div class="composer-box">
+                  <textarea placeholder="Refine the plan or add context…"></textarea>
+                  <div class="composer-foot"><span>＠</span><span>＋</span><span class="model">◈ Claude Sonnet 4.5 ⌄</span><span class="composer-mode"><span class="plan-active">Plan</span><span>Act</span></span><button class="send">↑</button></div>
+                </div>
+              </div>
+            </aside>
+            <section class="code-pane">
+              <div class="tabs"><div class="file-tab active">Session capability preview</div></div>
+              <div class="empty-changes">
+                <div><strong>Plan can inspect, but cannot change the worktree.</strong><p>The selected model can read and search this repository. File edits, state-changing commands, and unclassified MCP tools are blocked at the machine even if the model requests them.</p><div class="guardrail-grid"><div class="guardrail"><b>Mode ceiling</b><span>Plan · read/search/investigate</span></div><div class="guardrail"><b>Scope</b><span>This session · no defaults changed</span></div><div class="guardrail"><b>Repository</b><span>main · no worktree yet</span></div><div class="guardrail"><b>Machine policy</b><span>Standard · deny unknown tools</span></div></div></div>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section class="scene work" data-scene-panel="build">
+          <div class="contextbar">
+            <span class="context-title">Engineering home + session shell</span>
+            <span class="context-chip">⌘ neuramesh</span>
+            <span class="context-chip">⑂ nm/1184-engineering-home</span>
+            <span class="context-chip"><i class="online"></i> cloud-dev-01</span>
+            <span class="context-spacer"></span>
+            <span class="context-chip">Policy · Standard</span>
+            <span class="cost">$2.48</span>
+          </div>
+          <div class="work-main">
+            <aside class="agent-pane">
+              <div class="agent-head"><strong>Coding agent</strong><span class="engine-chip">CLINE CORE</span><div class="agent-head-actions"><button class="icon-btn">＋</button><button class="icon-btn">↻</button><button class="icon-btn">···</button></div></div>
+              <div class="transcript">
+                <div class="message">
+                  <div class="message-label">You · 8:42 PM</div>
+                  <div class="user-bubble"><p>Add Engineering OS to the workspace navigation. Keep it native to our shell, with the agent and composer left and a review-first editor right.</p></div>
+                </div>
+                <div class="thinking"><span class="pulse"></span><span>Building · editing the session shell</span></div>
+                <div class="tool-card">
+                  <div class="tool-head"><span class="tool-icon">⌕</span><span>Inspected the workspace shell</span><span class="tool-meta">14 files</span></div>
+                  <div class="tool-body">NavDestBand.tsx<br/>Workbench.tsx<br/>tokens.css<br/>MarketingOS.tsx</div>
+                </div>
+                <div class="plan-card">
+                  <div class="plan-top"><div class="plan-kicker">Approved plan</div><div class="plan-title">Add a focused Engineering workspace</div></div>
+                  <div class="plan-list">
+                    <div class="plan-step"><span class="step-check">✓</span><span>Add a workspace destination and route</span></div>
+                    <div class="plan-step"><span class="step-check">✓</span><span>Bind coding sessions to existing threads</span></div>
+                    <div class="plan-step"><span class="step-check">2</span><span>Compose agent, changed files, and editor</span></div>
+                    <div class="plan-step"><span class="step-check">3</span><span>Verify both themes and narrow layout</span></div>
+                  </div>
+                </div>
+                <div class="tool-card">
+                  <div class="tool-head"><span class="tool-icon">⌘</span><span>Editing EngineeringOS.tsx</span><span class="tool-meta">+118 −4</span></div>
+                  <div class="tool-body">Creating the active-session shell and context bar. Reusing current tokens and Workbench primitives.</div>
+                </div>
+                <div class="checkpoint"><span>◉</span><span>Checkpoint before session shell</span><span>cp-03</span></div>
+              </div>
+              <div class="composer">
+                <div class="auto-bar"><strong>Auto-approve: Read, Edit</strong><span>⌄</span><span class="scope">This session</span></div>
+                <div class="composer-box">
+                  <textarea placeholder="Ask for a change, add context, or @mention a file…"></textarea>
+                  <div class="composer-foot"><span>＠</span><span>＋</span><span class="model">◈ Claude Sonnet 4.5 ⌄</span><span class="composer-mode"><span>Plan</span><span class="act-active">Act</span></span><button class="send">↑</button></div>
+                </div>
+              </div>
+            </aside>
+
+            <section class="code-pane">
+              <div class="tabs"><div class="file-tab active"><span class="file-dot added"></span>EngineeringOS.tsx <span>×</span></div><div class="file-tab"><span class="file-dot"></span>NavDestBand.tsx <span>×</span></div><div class="file-tab">tokens.css <span>×</span></div></div>
+              <div class="code-body">
+                <aside class="changes">
+                  <div class="changes-head"><span>Changes</span><span>3</span></div>
+                  <div class="change-group">
+                    <div class="change-group-title">apps/desktop/src/renderer</div>
+                    <div class="change-file active"><span class="state a">A</span><span class="file-name">EngineeringOS.tsx</span><span class="delta">+118</span></div>
+                    <div class="change-file"><span class="state">M</span><span class="file-name">NavDestBand.tsx</span><span class="delta">+8 −2</span></div>
+                    <div class="change-file"><span class="state">M</span><span class="file-name">tokens.css</span><span class="delta">+12</span></div>
+                  </div>
+                  <div class="tree-drawer"><div class="tree-row">› Workbench files</div><div class="tree-row">› Artifacts</div><div class="tree-row">› Terminal evidence</div></div>
+                </aside>
+                <section class="editor">
+                  <div class="editor-toolbar"><span class="path">src/views/EngineeringOS.tsx</span><span class="toolbar-spacer"></span><span class="segmented"><span>Source</span><span class="active">Diff</span></span></div>
+                  <div class="code-scroll">
+                    <div class="code-row context"><span class="old"></span><span class="new">1</span><span class="src"><span class="kw">import</span> { useMemo, useState } <span class="kw">from</span> <span class="str">"react"</span>;</span></div>
+                    <div class="code-row context"><span class="old"></span><span class="new">2</span><span class="src"><span class="kw">import</span> { Code2, GitBranch, Plus } <span class="kw">from</span> <span class="str">"lucide-react"</span>;</span></div>
+                    <div class="code-row context"><span class="old"></span><span class="new">3</span><span class="src"><span class="kw">import</span> { useWorkspace } <span class="kw">from</span> <span class="str">"../hooks/useWorkspace"</span>;</span></div>
+                    <div class="code-row context"><span class="old"></span><span class="new">4</span><span class="src"></span></div>
+                    <div class="code-row add"><span class="old"></span><span class="new">5</span><span class="src"><span class="kw">type</span> <span class="type">EngineeringSession</span> = {</span></div>
+                    <div class="code-row add"><span class="old"></span><span class="new">6</span><span class="src">  id: <span class="type">string</span>;</span></div>
+                    <div class="code-row add"><span class="old"></span><span class="new">7</span><span class="src">  threadId: <span class="type">string</span>;</span></div>
+                    <div class="code-row add"><span class="old"></span><span class="new">8</span><span class="src">  machineId: <span class="type">string</span>;</span></div>
+                    <div class="code-row add"><span class="old"></span><span class="new">9</span><span class="src">  mode: <span class="str">"plan"</span> | <span class="str">"act"</span>;</span></div>
+                    <div class="code-row add"><span class="old"></span><span class="new">10</span><span class="src">};</span></div>
+                    <div class="code-row context"><span class="old"></span><span class="new">11</span><span class="src"></span></div>
+                    <div class="code-row add"><span class="old"></span><span class="new">12</span><span class="src"><span class="kw">export function</span> <span class="fn">EngineeringOS</span>() {</span></div>
+                    <div class="code-row add"><span class="old"></span><span class="new">13</span><span class="src">  <span class="kw">const</span> { project, machine } = <span class="fn">useWorkspace</span>();</span></div>
+                    <div class="code-row add"><span class="old"></span><span class="new">14</span><span class="src">  <span class="kw">const</span> [session, setSession] = <span class="fn">useState</span>&lt;<span class="type">EngineeringSession</span>&gt;();</span></div>
+                    <div class="code-row add"><span class="old"></span><span class="new">15</span><span class="src"></span></div>
+                    <div class="code-row add"><span class="old"></span><span class="new">16</span><span class="src">  <span class="kw">if</span> (!session) <span class="kw">return</span> &lt;<span class="fn">EngineeringHome</span> /&gt;;</span></div>
+                    <div class="code-row add"><span class="old"></span><span class="new">17</span><span class="src"></span></div>
+                    <div class="code-row add"><span class="old"></span><span class="new">18</span><span class="src">  <span class="kw">return</span> (</span></div>
+                    <div class="code-row add"><span class="old"></span><span class="new">19</span><span class="src">    &lt;<span class="fn">EngineeringWorkspace</span></span></div>
+                    <div class="code-row add"><span class="old"></span><span class="new">20</span><span class="src">      session={session}</span></div>
+                    <div class="code-row add"><span class="old"></span><span class="new">21</span><span class="src">      project={project}</span></div>
+                    <div class="code-row add"><span class="old"></span><span class="new">22</span><span class="src">      machine={machine}</span></div>
+                    <div class="code-row add"><span class="old"></span><span class="new">23</span><span class="src">    /&gt;</span></div>
+                    <div class="code-row add"><span class="old"></span><span class="new">24</span><span class="src">  );</span></div>
+                    <div class="code-row add"><span class="old"></span><span class="new">25</span><span class="src">}</span></div>
+                    <div class="minimap"><i style="width:81%"></i><i class="a" style="width:92%"></i><i class="a" style="width:74%"></i><i style="width:60%"></i><i class="a" style="width:87%"></i><i class="a" style="width:94%"></i><i class="a" style="width:69%"></i><i style="width:76%"></i><i class="a" style="width:89%"></i><i style="width:65%"></i><i class="a" style="width:91%"></i><i class="a" style="width:72%"></i></div>
+                  </div>
+                  <div class="reviewbar"><span class="review-summary">3 changed files <span>+138 −2</span></span><span class="spacer"></span><button class="secondary">Revert checkpoint</button><button class="secondary">Ask for changes</button><button class="accept">Review changes</button></div>
+                </section>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section class="scene work" data-scene-panel="review">
+          <div class="contextbar">
+            <span class="context-title">Fix relay reconnect semantics</span>
+            <span class="context-chip">⌘ neuramesh</span>
+            <span class="context-chip">⑂ nm/1179-relay-resume</span>
+            <span class="context-chip"><i class="online"></i> cloud-dev-01</span>
+            <span class="context-spacer"></span>
+            <span class="context-chip">Policy · Standard</span>
+            <span class="cost">$1.16</span>
+          </div>
+          <div class="work-main">
+            <aside class="agent-pane">
+              <div class="agent-head"><strong>Coding agent</strong><span class="engine-chip">CLINE CORE</span><div class="agent-head-actions"><button class="icon-btn">＋</button><button class="icon-btn">↻</button><button class="icon-btn">···</button></div></div>
+              <div class="transcript">
+                <div class="message"><div class="message-label">You · 8:51 PM</div><div class="user-bubble"><p>Implement cursor-based resume and prove a second browser cannot race an approval.</p></div></div>
+                <div class="tool-card"><div class="tool-head"><span class="tool-icon">✓</span><span>Changed relay session state</span><span class="tool-meta">2 files</span></div><div class="tool-body">Added monotonic event cursor and approval-leader lease validation.</div></div>
+                <div class="approval-card">
+                  <div class="approval-top"><div class="plan-kicker">Permission required</div><div class="plan-title">Run the relay integration suite</div><div class="approval-command">pnpm test:run relay-resume.test.ts<br/>approval-leader.test.ts</div></div>
+                  <div class="approval-note">Runs an allow-listed test command in this worktree. No network access requested.</div>
+                  <div class="approval-actions"><button>Deny</button><button class="allow">Allow once</button><button class="allow">Allow for this session</button></div>
+                </div>
+                <div class="policy-line"><b>Machine policy:</b> test commands can be remembered for this repository after a successful run.</div>
+                <div class="checkpoint"><span>◉</span><span>Before relay integration tests</span><span>cp-05</span></div>
+              </div>
+              <div class="composer"><div class="auto-bar"><strong>Auto-approve: Read, Edit</strong><span>⌄</span><span class="scope">This session</span></div><div class="composer-box"><textarea placeholder="Add guidance while the agent waits…"></textarea><div class="composer-foot"><span>＠</span><span>＋</span><span class="model">◈ Claude Sonnet 4.5 ⌄</span><span class="composer-mode"><span>Plan</span><span class="act-active">Act</span></span><button class="send">↑</button></div></div></div>
+            </aside>
+
+            <section class="code-pane">
+              <div class="tabs"><div class="file-tab active"><span class="file-dot"></span>session-resume.ts <span>×</span></div><div class="file-tab"><span class="file-dot added"></span>approval-leader.test.ts <span>×</span></div></div>
+              <div class="code-body">
+                <aside class="changes">
+                  <div class="changes-head"><span>Changes</span><span>2</span></div>
+                  <div class="change-group"><div class="change-group-title">packages/relay/src</div><div class="change-file active"><span class="state">M</span><span class="file-name">session-resume.ts</span><span class="delta">+28 −7</span></div><div class="change-file"><span class="state a">A</span><span class="file-name">approval-leader.test.ts</span><span class="delta">+91</span></div></div>
+                  <div class="tree-drawer"><div class="tree-row">› Workbench files</div><div class="tree-row">› Artifacts</div><div class="tree-row">› Terminal evidence</div></div>
+                </aside>
+                <section class="editor">
+                  <div class="editor-toolbar"><span class="path">packages/relay/src/session-resume.ts</span><span class="toolbar-spacer"></span><span class="segmented"><span>Source</span><span class="active">Diff</span></span></div>
+                  <div class="code-scroll">
+                    <div class="code-row context"><span class="old">41</span><span class="new">41</span><span class="src"><span class="kw">export async function</span> <span class="fn">attachSession</span>(request: <span class="type">AttachRequest</span>) {</span></div>
+                    <div class="code-row del"><span class="old">42</span><span class="new"></span><span class="src">  <span class="kw">const</span> events = <span class="kw">await</span> store.<span class="fn">allEvents</span>(request.sessionId);</span></div>
+                    <div class="code-row add"><span class="old"></span><span class="new">42</span><span class="src">  <span class="kw">const</span> cursor = request.afterCursor ?? <span class="str">"0"</span>;</span></div>
+                    <div class="code-row add"><span class="old"></span><span class="new">43</span><span class="src">  <span class="kw">const</span> events = <span class="kw">await</span> store.<span class="fn">eventsAfter</span>(request.sessionId, cursor);</span></div>
+                    <div class="code-row context"><span class="old">43</span><span class="new">44</span><span class="src"></span></div>
+                    <div class="code-row add"><span class="old"></span><span class="new">45</span><span class="src">  <span class="kw">const</span> lease = <span class="kw">await</span> approvals.<span class="fn">acquireLeader</span>({</span></div>
+                    <div class="code-row add"><span class="old"></span><span class="new">46</span><span class="src">    sessionId: request.sessionId,</span></div>
+                    <div class="code-row add"><span class="old"></span><span class="new">47</span><span class="src">    clientId: request.clientId,</span></div>
+                    <div class="code-row add"><span class="old"></span><span class="new">48</span><span class="src">    ttlMs: <span class="type">15_000</span>,</span></div>
+                    <div class="code-row add"><span class="old"></span><span class="new">49</span><span class="src">  });</span></div>
+                    <div class="code-row context"><span class="old">44</span><span class="new">50</span><span class="src"></span></div>
+                    <div class="code-row context"><span class="old">45</span><span class="new">51</span><span class="src">  <span class="kw">return</span> {</span></div>
+                    <div class="code-row context"><span class="old">46</span><span class="new">52</span><span class="src">    events,</span></div>
+                    <div class="code-row add"><span class="old"></span><span class="new">53</span><span class="src">    approvalLeader: lease.owner === request.clientId,</span></div>
+                    <div class="code-row add"><span class="old"></span><span class="new">54</span><span class="src">    nextCursor: events.at(-1)?.cursor ?? cursor,</span></div>
+                    <div class="code-row context"><span class="old">47</span><span class="new">55</span><span class="src">  };</span></div>
+                    <div class="code-row context"><span class="old">48</span><span class="new">56</span><span class="src">}</span></div>
+                    <div class="comment-pin">1</div>
+                    <div class="minimap"><i style="width:82%"></i><i style="width:61%"></i><i class="a" style="width:93%"></i><i class="a" style="width:79%"></i><i style="width:66%"></i><i class="a" style="width:91%"></i><i class="a" style="width:73%"></i><i class="a" style="width:88%"></i></div>
+                  </div>
+                  <div class="reviewbar"><span class="review-summary">2 changed files <span>+119 −7 · 1 comment</span></span><span class="spacer"></span><button class="secondary">Revert file</button><button class="secondary">Ask for changes</button><button class="accept">Accept changes</button></div>
+                </section>
+              </div>
+            </section>
+          </div>
+        </section>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    const params = new URLSearchParams(location.search);
+    let scene = params.get('scene') || 'home';
+    let theme = params.get('theme') || 'graphite';
+
+    function render() {
+      document.documentElement.dataset.theme = theme;
+      document.querySelectorAll('[data-scene-panel]').forEach((panel) => {
+        panel.classList.toggle('active', panel.dataset.scenePanel === scene);
+      });
+      document.querySelectorAll('[data-scene]').forEach((button) => {
+        button.classList.toggle('active', button.dataset.scene === scene);
+      });
+      document.querySelectorAll('[data-theme]').forEach((button) => {
+        button.classList.toggle('active', button.dataset.theme === theme);
+      });
+      const next = new URL(location.href);
+      next.searchParams.set('scene', scene);
+      next.searchParams.set('theme', theme);
+      history.replaceState(null, '', next);
+    }
+
+    document.querySelectorAll('[data-scene]').forEach((button) => button.addEventListener('click', () => {
+      scene = button.dataset.scene;
+      render();
+    }));
+    document.querySelectorAll('[data-theme]').forEach((button) => button.addEventListener('click', () => {
+      theme = button.dataset.theme;
+      render();
+    }));
+    document.querySelectorAll('[data-open-build]').forEach((button) => button.addEventListener('click', () => {
+      scene = 'build';
+      render();
+    }));
+    render();
+  </script>
+</body>
+</html>

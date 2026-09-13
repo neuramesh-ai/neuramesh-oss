@@ -1,0 +1,542 @@
+<!doctype html>
+<html lang="en" data-theme="cream">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Home watermark — the quiet-state signature · R1</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/geist@5.2.5/wght.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/geist-mono@5.2.5/wght.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/source-serif-4@5.2.5/opsz-wght.css">
+<style>
+/* ════════════════════════════════════════════════════════════════════════════
+   Home watermark — R1. Six treatments for the band above the Home composer.
+
+   Reference: OpenCode's home screen — an enormous, near-invisible wordmark
+   sitting directly on top of the composer, clipped where the two meet.
+
+   The thing that makes it work THERE: their home is EMPTY, so the mark fills
+   dead space and points the eye at the one control. Ours is not empty — it
+   carries needs-you and in-flight. So the treatment is designed as a
+   QUIET-STATE signature: full ink when nothing needs you, receding as the
+   queue fills. Both states are switchable below.
+
+   Tokens verbatim from tokens.css via mockups/cabinet-revamp.html (docs/33 §4).
+   ════════════════════════════════════════════════════════════════════════════ */
+:root {
+  --fdisp:'Source Serif 4 Variable',Georgia,'Times New Roman',serif;
+  --fbody:'Geist Variable',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --fmono:'Geist Mono Variable',ui-monospace,'SF Mono',Menlo,monospace;
+  --dur-fast:.12s; --dur:.15s; --dur-enter:.22s;
+  --ease:cubic-bezier(.22,1,.36,1);
+  --r-sm:8px; --r-md:10px; --r-lg:14px; --r-xl:18px; --r-full:999px;
+  --col:720px;
+  /* the two knobs the board exposes */
+  --wm-ink:.055;
+  --wm-scale:1;
+}
+[data-theme="cream"] {
+  --win:#f0e5d3; --band:#e7d9c3; --bg:#fbf8f4;
+  --panel2:#f6eee1; --panel3:#efe1cd;
+  --border:#e6dbca; --border2:#d3c2a8; --framedge:#e0d1b7;
+  --text:#2a1c13; --body:#574838; --muted:#97846c; --dim:#b5a289;
+  --link:#9c5730; --accent:#834a2b; --accent-ink:#fff7ee; --accent-soft:rgba(131,74,43,.11);
+  --done:#0f9d63; --prog:#4f80c4; --review:#6d5ce0; --designrev:#8a3fc0;
+  --shadow-sheet:0 8px 26px -8px rgba(70,42,18,.16), 0 1px 2px rgba(70,42,18,.05);
+  --shadow-card:0 1px 2px rgba(70,42,18,.05);
+  --shadow-lift:0 8px 20px -8px rgba(70,42,18,.20);
+  --card:#ffffff; --card-border:#eadfce;
+  --ring:color-mix(in srgb,var(--accent) 55%,var(--border2));
+  --hover-bg:rgba(53,36,22,.05); --sel-bg:rgba(131,74,43,.08);
+  /* the watermark's ink. Cream is the ONE theme where warmth may enter the mark:
+     the oak is the brand. Dark stays achromatic (founder ruling, v0.47.1). */
+  --wm-ink-color:#834a2b;
+}
+[data-theme="dark"] {
+  --win:#0d0d0d; --band:#090909; --bg:#141414;
+  --panel2:#212121; --panel3:#2b2b2b;
+  --border:#272727; --border2:#383838; --framedge:#1b1b1b;
+  --text:#eaeaea; --body:#b6b6b6; --muted:#898989; --dim:#676767;
+  --link:#9cb1f0; --accent:#eaeaea; --accent-ink:#101010; --accent-soft:rgba(234,234,234,.13);
+  --done:#77ac8d; --prog:#8ba0c0; --review:#a89ccf; --designrev:#b78bd8;
+  --shadow-sheet:inset 0 1px 0 rgba(255,255,255,.05), 0 12px 30px -6px rgba(0,0,0,.5);
+  --shadow-card:0 1px 2px rgba(0,0,0,.25);
+  --shadow-lift:0 8px 20px -8px rgba(0,0,0,.55);
+  --card:#1e1e1e; --card-border:#2c2c2c;
+  --ring:#525252; --hover-bg:rgba(255,255,255,.06); --sel-bg:rgba(255,255,255,.09);
+  --wm-ink-color:#ffffff;
+}
+[data-theme="light"] {
+  --win:#e9e5db; --band:#ded9cc; --bg:#fcfbf8;
+  --panel2:#f4f1ea; --panel3:#ebe7dd;
+  --border:#e2ded4; --border2:#cec5b7; --framedge:#dbd5c7;
+  --text:#2f2a24; --body:#524c43; --muted:#837d72; --dim:#a09889;
+  --link:#4a5ec9; --accent:#2f2a24; --accent-ink:#ffffff; --accent-soft:rgba(47,42,36,.10);
+  --done:#2f9e6b; --prog:#4f80c4; --review:#6d5ce0; --designrev:#8a3fc0;
+  --shadow-sheet:0 8px 26px -8px rgba(70,58,44,.15), 0 1px 2px rgba(70,58,44,.05);
+  --shadow-card:0 1px 2px rgba(70,58,44,.05);
+  --shadow-lift:0 8px 20px -8px rgba(70,58,44,.18);
+  --card:#ffffff; --card-border:#e2ded4;
+  --ring:color-mix(in srgb,var(--accent) 55%,var(--border2));
+  --hover-bg:rgba(47,42,36,.05); --sel-bg:rgba(47,42,36,.07);
+  --wm-ink-color:#2f2a24;
+}
+[data-theme="soft-dark"] {
+  --win:#1d1d1d; --band:#181818; --bg:#262626;
+  --panel2:#313131; --panel3:#3b3b3b;
+  --border:#363636; --border2:#454545; --framedge:#292929;
+  --text:#ececec; --body:#c2c2c2; --muted:#979797; --dim:#737373;
+  --link:#a6baf2; --accent:#ececec; --accent-ink:#141414; --accent-soft:rgba(236,236,236,.13);
+  --done:#7fb495; --prog:#94aacb; --review:#aaa0d2; --designrev:#bd96da;
+  --shadow-sheet:inset 0 1px 0 rgba(255,255,255,.04), 0 12px 30px -6px rgba(0,0,0,.42);
+  --shadow-card:0 1px 2px rgba(0,0,0,.2);
+  --shadow-lift:0 8px 20px -8px rgba(0,0,0,.45);
+  --card:#2e2e2e; --card-border:#3a3a3a;
+  --ring:#5e5e5e; --hover-bg:rgba(255,255,255,.05); --sel-bg:rgba(255,255,255,.08);
+  --wm-ink-color:#ffffff;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+button { font:inherit; color:inherit; background:none; border:0; cursor:pointer; }
+body { background:#0e0e0e; color:#e6e6e6; font-family:var(--fbody); -webkit-font-smoothing:antialiased; }
+.page { max-width:1560px; margin:0 auto; padding:26px 22px 70px; }
+h1 { font:640 22px/1.25 var(--fdisp); letter-spacing:-.012em; color:#f2f2f2; }
+.sub { color:#8f8f8f; font-size:13px; line-height:1.65; margin-top:9px; max-width:106ch; }
+.sub b { color:#c3c3c3; font-weight:600; }
+.sub code { font-family:var(--fmono); font-size:11.5px; background:rgba(255,255,255,.07); border-radius:4px; padding:1px 5px; color:#c3c3c3; }
+
+.bars { display:flex; flex-wrap:wrap; gap:10px 16px; align-items:center; margin:18px 0 14px; }
+.ctl { display:flex; align-items:center; gap:8px; }
+.ctlk { font:700 9px var(--fmono); letter-spacing:.1em; text-transform:uppercase; color:#6a6a6a; }
+.seg { display:inline-flex; border:1px solid #333; border-radius:10px; overflow:hidden; }
+.seg button { color:#9a9a9a; font:600 11.5px var(--fbody); padding:7px 12px; }
+.seg button.on { background:#2c2c2c; color:#fff; }
+input[type=range] { -webkit-appearance:none; width:126px; height:3px; background:#333; border-radius:9px; }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:13px; height:13px; border-radius:50%; background:#e0e0e0; cursor:pointer; }
+.val { font:600 10.5px var(--fmono); color:#8a8a8a; width:38px; }
+
+.stage { display:grid; grid-template-columns:1fr 300px; gap:18px; align-items:start; }
+@media (max-width:1160px){ .stage { grid-template-columns:1fr; } }
+
+/* ── app frame ── */
+.frame { border:1px solid #2b2b2b; border-radius:15px; overflow:hidden; background:var(--win); }
+.app { display:flex; flex-direction:column; height:680px; background:var(--win); color:var(--text); font-size:14px; }
+.topbar { flex:none; height:44px; display:flex; align-items:center; gap:11px; padding:0 14px; border-bottom:1px solid var(--framedge); }
+.wordmark { display:inline-flex; align-items:center; gap:7px; font:700 14px var(--fdisp); letter-spacing:-.025em; }
+.wordmark .ac { color:var(--accent); }
+.crumb { font-size:11.5px; color:var(--muted); }
+.searchpill { margin-left:auto; display:flex; align-items:center; gap:7px; height:27px; padding:0 11px; border-radius:var(--r-full); border:1px solid var(--border2); color:var(--dim); font-size:11.5px; }
+.framebody { flex:1; min-height:0; display:grid; grid-template-columns:196px 1fr; }
+.nav { display:flex; flex-direction:column; padding:12px 9px; gap:2px; }
+.navk { font:700 9px var(--fmono); letter-spacing:.11em; text-transform:uppercase; color:var(--dim); padding:11px 9px 5px; }
+.navitem { display:flex; align-items:center; gap:8px; padding:6px 9px; border-radius:9px; font-size:12.5px; color:var(--body); text-align:left; }
+.navitem.on { background:var(--sel-bg); color:var(--text); font-weight:600; }
+.navitem .h { color:var(--dim); }
+.navitem .cnt { margin-left:auto; font:700 9px var(--fmono); color:var(--muted); }
+.sheetwrap { padding:0 12px 12px 0; min-height:0; display:flex; }
+.sheet { flex:1; min-width:0; background:var(--bg); border:1px solid var(--border); border-radius:16px; box-shadow:var(--shadow-sheet); overflow:hidden; }
+
+/* ══ HOME — .hwrap = scrolling .hcol + docked .hcomposer (the real shape) ══ */
+.hwrap { height:100%; display:flex; flex-direction:column; align-items:center; padding:0 22px; position:relative; }
+.hcol { width:100%; max-width:var(--col); flex:1; min-height:0; overflow-y:auto; display:flex; flex-direction:column; padding-top:18px; scrollbar-width:none; position:relative; z-index:1; }
+.hcol::-webkit-scrollbar { width:0; }
+.hcomposer { width:100%; max-width:var(--col); margin:0 0 14px; flex:none; position:relative; z-index:2;
+  background:var(--card); border:1px solid var(--border); border-radius:var(--r-xl); padding:13px 14px 11px; box-shadow:var(--shadow-card); }
+[data-theme="dark"] .hcomposer, [data-theme="soft-dark"] .hcomposer { background:var(--panel2); }
+
+/* ══ THE WATERMARK LAYER ══
+   Anchored to the composer's top edge and clipped there, so the mark SINKS
+   BEHIND the composer instead of floating above it — the detail that makes the
+   OpenCode version read as designed rather than placed. Bleeds past the reading
+   column and is clipped by the sheet: cropping is what turns a logo into texture.
+
+   The layer's bottom sits BELOW the composer's top edge by SINK, so the last band
+   of the mark is painted over by the composer (z-index 2) rather than merely
+   ending — that overlap is the whole effect. --wm-bottom is measured from the live
+   composer, because its height changes with the cap line and the chip row. */
+.wm { position:absolute; left:0; right:0; bottom:var(--wm-bottom,150px); height:236px; overflow:hidden;
+  display:flex; align-items:flex-end; justify-content:center; pointer-events:none; user-select:none; z-index:0;
+  transition:opacity var(--dur-enter) var(--ease); }
+.wm > * { transform:scale(var(--wm-scale)); transform-origin:center bottom; }
+.wm-serif { font-family:var(--fdisp); font-weight:640; font-size:158px; letter-spacing:-.035em; line-height:.82;
+  color:var(--wm-ink-color); opacity:var(--wm-ink); white-space:nowrap; }
+.wm-mono { font-family:var(--fmono); font-weight:700; font-size:112px; letter-spacing:-.055em; line-height:.9;
+  color:var(--wm-ink-color); opacity:var(--wm-ink); white-space:nowrap; }
+.wm-mono .thin { font-weight:300; }
+.wm-mark { opacity:var(--wm-ink); color:var(--wm-ink-color); }
+.wm-mark svg { display:block; width:300px; height:300px; }
+.wm-lockup { display:flex; align-items:center; gap:26px; opacity:var(--wm-ink); color:var(--wm-ink-color); }
+.wm-lockup svg { display:block; width:150px; height:150px; flex:none; }
+.wm-lockup .lw { font-family:var(--fdisp); font-weight:700; font-size:124px; letter-spacing:-.04em; line-height:.85; white-space:nowrap; }
+.wm-mesh { opacity:calc(var(--wm-ink) * 1.5); color:var(--wm-ink-color); }
+.wm-mesh svg { display:block; width:820px; height:250px; }
+/* the "quiet" content state gets full ink; a busy queue pulls it back to a whisper */
+.hwrap[data-busy="1"] .wm { opacity:.34; }
+
+/* home content */
+.hgreetblk { margin-bottom:18px; }
+.hkick { font:700 9.5px var(--fmono); letter-spacing:.11em; text-transform:uppercase; color:var(--dim); }
+.hgreet { font-family:var(--fdisp); font-size:25px; font-weight:640; letter-spacing:-.015em; line-height:1.2; margin-top:6px; }
+.hlede { font-size:13px; line-height:1.6; color:var(--muted); margin-top:7px; }
+.sechead { display:flex; align-items:center; gap:8px; margin:18px 0 9px; }
+.sechead h3 { font:700 9.5px var(--fmono); letter-spacing:.11em; text-transform:uppercase; color:var(--dim); }
+.sechead .n { font:700 9.5px var(--fmono); color:var(--muted); }
+.mcqcard { background:var(--card); border:1px solid var(--card-border); border-radius:var(--r-lg); padding:12px 14px; margin-bottom:8px; box-shadow:var(--shadow-card); }
+.mcqtop { display:flex; align-items:center; gap:7px; margin-bottom:6px; }
+.mcqid { font:600 10.5px var(--fmono); color:var(--muted); }
+.mcqbadges { margin-left:auto; font-size:10.5px; color:var(--dim); }
+.mcqtitle { font-size:13.5px; font-weight:600; }
+.mcqmeta { font-size:11.5px; color:var(--muted); margin-top:4px; }
+.chip { display:inline-flex; align-items:center; height:18px; padding:0 8px; border-radius:var(--r-full); font:600 10px var(--fbody); color:var(--c,var(--muted)); background:color-mix(in srgb,var(--c,var(--muted)) 14%,transparent); }
+.kindchip { font:600 9.5px var(--fmono); letter-spacing:.04em; text-transform:uppercase; color:var(--dim); border:1px solid var(--border); border-radius:var(--r-full); padding:1px 7px; }
+.frowline { display:flex; align-items:center; gap:9px; width:100%; padding:7px 9px; border-radius:var(--r-md); font-size:12.5px; color:var(--body); text-align:left; }
+.frowline b { color:var(--text); font-weight:600; }
+.frowline .roomtag { margin-left:auto; font-size:10.5px; color:var(--dim); }
+.frowline time { font-size:10.5px; color:var(--dim); width:34px; text-align:right; }
+.rring { width:11px; height:11px; border-radius:50%; border:2px solid color-mix(in srgb,var(--prog) 40%,transparent); border-top-color:var(--prog); animation:spin 1s linear infinite; flex:none; }
+@keyframes spin { to { transform:rotate(360deg); } }
+/* the quiet state's own line — a clear queue is an achievement, not a void */
+.hquiet { flex:1; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; gap:7px; padding-bottom:40px; }
+.hquiet .q1 { font-family:var(--fdisp); font-size:19px; font-weight:640; letter-spacing:-.012em; }
+.hquiet .q2 { font-size:12.5px; color:var(--muted); }
+
+/* composer */
+.chint { display:flex; align-items:center; gap:7px; font-size:11px; color:var(--muted); margin:-13px -14px 10px; padding:8px 14px; background:var(--panel2); border-bottom:1px solid var(--border); border-radius:var(--r-xl) var(--r-xl) 0 0; }
+.chint .pav { width:15px; height:15px; border-radius:4px; }
+.chintat { color:var(--link); font-weight:600; }
+.hcomposer textarea { width:100%; background:none; border:none; outline:none; resize:none; color:var(--text); font:14px/1.5 var(--fbody); min-height:40px; }
+.hcomposer textarea::placeholder { color:var(--dim); }
+.hrow { display:flex; align-items:center; gap:6px; margin-top:8px; }
+.hchip { display:inline-flex; align-items:center; gap:6px; height:27px; padding:0 10px; border-radius:var(--r-full); border:1px solid transparent; color:var(--dim); font-size:11.5px; }
+.hchip:hover { color:var(--text); background:var(--hover-bg); border-color:var(--border2); }
+.hchip .cc { font-size:9px; }
+.hsend { margin-left:auto; width:34px; height:34px; border-radius:50%; background:var(--accent); color:var(--accent-ink); display:grid; place-items:center; }
+.pav { display:inline-grid; place-items:center; overflow:hidden; background:var(--panel3); flex:none; }
+.pav img { width:100%; height:100%; display:block; }
+
+/* ── the notes rail ── */
+.rail { position:sticky; top:18px; display:flex; flex-direction:column; gap:12px; }
+.note { border:1px solid #2a2a2a; border-radius:13px; background:#151515; padding:15px 16px; }
+.note h4 { font:640 14px var(--fdisp); color:#ededed; margin-bottom:7px; }
+.note p { font-size:12.5px; line-height:1.68; color:#9d9d9d; }
+.note p + p { margin-top:8px; }
+.note b { color:#d2d2d2; font-weight:600; }
+.note code { font-family:var(--fmono); font-size:11.5px; background:rgba(255,255,255,.07); border-radius:4px; padding:1px 5px; color:#c9c9c9; }
+.verdict { display:inline-flex; align-items:center; gap:6px; font:700 9px var(--fmono); letter-spacing:.09em; text-transform:uppercase; border-radius:99px; padding:3px 9px; margin-bottom:9px; }
+.verdict.rec { color:#7fd0a4; background:rgba(127,208,164,.13); }
+.verdict.ok { color:#9fb6dd; background:rgba(159,182,221,.13); }
+.verdict.no { color:#c99a9a; background:rgba(201,154,154,.13); }
+.mini { border-top:1px solid #262626; margin-top:11px; padding-top:11px; }
+.mini .k { font:700 9px var(--fmono); letter-spacing:.09em; text-transform:uppercase; color:#6a6a6a; }
+.mini p { margin-top:5px; font-size:12px; }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>Home watermark — the quiet-state signature</h1>
+  <p class="sub">
+    OpenCode's wordmark works because <b>their home is empty</b>: an enormous near-invisible mark fills the dead space and
+    points the eye at the one control. <b>Ours is not empty</b> — Home carries needs-you and in-flight, and docs/33 §1 is explicit
+    that chrome stays out of the content's way. So the treatment is built as a <b>quiet-state signature</b>: it lives in the band
+    directly above the composer, sinks <em>behind</em> it (clipped, never floating), bleeds past the reading column — and pulls
+    back to a third of its ink the moment the queue has something in it. Switch <code>Content</code> below to see both states.
+  </p>
+
+  <div class="bars">
+    <div class="ctl"><span class="ctlk">Treatment</span>
+      <div class="seg" id="varSeg">
+        <button data-var="serif" class="on">Serif</button>
+        <button data-var="mono">Mono</button>
+        <button data-var="mark">Mark</button>
+        <button data-var="lockup">Lockup</button>
+        <button data-var="mesh">Mesh</button>
+        <button data-var="none">None</button>
+      </div>
+    </div>
+    <div class="ctl"><span class="ctlk">Content</span>
+      <div class="seg" id="busySeg"><button data-busy="0" class="on">Quiet</button><button data-busy="1">Busy</button></div>
+    </div>
+    <div class="ctl"><span class="ctlk">Theme</span>
+      <div class="seg" id="themeSeg">
+        <button data-theme-set="cream" class="on">Cream Oak</button>
+        <button data-theme-set="dark">Graphite</button>
+        <button data-theme-set="light">Light</button>
+        <button data-theme-set="soft-dark">Soft dark</button>
+      </div>
+    </div>
+    <div class="ctl"><span class="ctlk">Ink</span><input type="range" id="inkR" min="1" max="16" step="0.5" value="5.5"><span class="val" id="inkV">5.5%</span></div>
+    <div class="ctl"><span class="ctlk">Scale</span><input type="range" id="scaleR" min="60" max="150" step="2" value="100"><span class="val" id="scaleV">100%</span></div>
+  </div>
+
+  <div class="stage">
+    <div class="frame">
+      <div class="app">
+        <header class="topbar">
+          <span class="wordmark">
+            <svg width="19" height="19" viewBox="0 0 48 48" fill="none" aria-hidden>
+              <path d="M8 10 c12 0 16 28 32 28" stroke="var(--accent)" stroke-width="2.7" stroke-linecap="round"/>
+              <path d="M8 38 c12 0 16 -28 32 -28" stroke="var(--text)" stroke-width="2.7" stroke-linecap="round"/>
+              <circle cx="24" cy="24" r="2.9" fill="var(--accent)"/>
+            </svg>
+            Neura<span class="ac">Mesh</span>
+          </span>
+          <span class="crumb">▦ neuramesh</span>
+          <span class="searchpill">⌕ Search · ⌘K</span>
+        </header>
+        <div class="framebody">
+          <nav class="nav">
+            <button class="navitem on">⌂ Home <span class="cnt" id="navCnt">0</span></button>
+            <button class="navitem">▤ Tasks</button>
+            <div class="navk">Channels</div>
+            <button class="navitem"><span class="h">#</span> product</button>
+            <button class="navitem"><span class="h">#</span> engineering</button>
+            <button class="navitem"><span class="h">#</span> marketing-hq</button>
+          </nav>
+          <div class="sheetwrap">
+            <div class="sheet">
+              <div class="hwrap" id="hwrap" data-busy="0">
+
+                <!-- ══ the watermark layer — behind the column, clipped by the composer ══ -->
+                <div class="wm" id="wm"></div>
+
+                <div class="hcol" id="hcol"></div>
+
+                <div class="hcomposer">
+                  <div class="chint"><span class="pav" data-seed="rex"></span><span><button class="chintat">@rex</button> triages it — user-facing work is designed first, then your crew builds and reviews it.</span></div>
+                  <textarea placeholder="Describe the work — the team takes it from there. @ mention · / skill · ⏎ send"></textarea>
+                  <div class="hrow">
+                    <button class="hchip"># product <span class="cc">⌄</span></button>
+                    <button class="hchip">▦ neuramesh</button>
+                    <button class="hchip">🧠 Flagship <span class="cc">⌄</span></button>
+                    <button class="hchip">@</button>
+                    <button class="hchip">📎</button>
+                    <button class="hsend"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="rail">
+      <div class="note" id="note"></div>
+      <div class="note">
+        <h4>The rules this obeys</h4>
+        <div class="mini" style="border:0;margin:0;padding:0">
+          <span class="k">Clipped, not floating</span>
+          <p>The mark's bottom is cut by the composer's top edge. Floating it above reads as a stray logo; sinking it behind reads as a surface.</p>
+        </div>
+        <div class="mini"><span class="k">Cropped horizontally</span>
+          <p>It bleeds past the 720px reading column and the sheet clips it. Cropping is what turns a logo into texture.</p></div>
+        <div class="mini"><span class="k">Ink is derived</span>
+          <p><code>opacity = base × (1 − min(1, items/4))</code>, floored at ~a third. An empty queue is the only time it's at full strength — the emptier your day, the more the brand shows.</p></div>
+        <div class="mini"><span class="k">Dark stays achromatic</span>
+          <p>Cream may carry the oak; graphite and soft-dark use plain white ink at low alpha. No warmth migrates into dark (founder ruling, v0.47.1).</p></div>
+        <div class="mini"><span class="k">Never a second display moment</span>
+          <p>Home already speaks in serif at the greeting. Whatever lands here must not read as a competing headline — which is the whole case for keeping it under ~6% ink.</p></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+const $ = (s, r=document) => r.querySelector(s);
+const $$ = (s, r=document) => [...r.querySelectorAll(s)];
+try {
+  const [{ createAvatar }, thumbs] = await Promise.all([
+    import('https://cdn.jsdelivr.net/npm/@dicebear/core@9/+esm'),
+    import('https://cdn.jsdelivr.net/npm/@dicebear/thumbs@9/+esm'),
+  ]);
+  $$('.pav[data-seed]').forEach(el => { const img = new Image(); img.src = createAvatar(thumbs, { seed: el.dataset.seed }).toDataUri(); el.appendChild(img); });
+} catch {}
+window.__nm = { $, $$ };
+</script>
+
+<script>
+const { $, $$ } = window.__nm ?? { $: (s,r=document)=>r.querySelector(s), $$: (s,r=document)=>[...r.querySelectorAll(s)] };
+
+/* the ember mark, scaled up — two strands crossing at a node (App.tsx EmberMark) */
+const MARK = (sw) => `
+  <svg viewBox="0 0 48 48" fill="none" aria-hidden>
+    <path d="M8 10 c12 0 16 28 32 28" stroke="currentColor" stroke-width="${sw}" stroke-linecap="round"/>
+    <path d="M8 38 c12 0 16 -28 32 -28" stroke="currentColor" stroke-width="${sw}" stroke-linecap="round"/>
+    <circle cx="24" cy="24" r="2.9" fill="currentColor"/>
+  </svg>`;
+
+/* the mesh: the ember mark's crossing-strand idea, repeated into a lattice */
+const MESH = (() => {
+  const nodes = [], strands = [];
+  const cols = 9, rows = 3;
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+    const x = 40 + c * 92, y = 55 + r * 72 + (c % 2 ? 22 : 0);
+    nodes.push(`<circle cx="${x}" cy="${y}" r="3.4" fill="currentColor"/>`);
+    if (c < cols - 1) {
+      const nx = 40 + (c + 1) * 92, ny = 55 + r * 72 + ((c + 1) % 2 ? 22 : 0);
+      strands.push(`<path d="M${x} ${y} C${x + 46} ${y} ${nx - 46} ${ny} ${nx} ${ny}" stroke="currentColor" stroke-width="2.4" fill="none" stroke-linecap="round"/>`);
+      if (r < rows - 1) {
+        const dy = 55 + (r + 1) * 72 + ((c + 1) % 2 ? 22 : 0);
+        strands.push(`<path d="M${x} ${y} C${x + 46} ${y} ${nx - 46} ${dy} ${nx} ${dy}" stroke="currentColor" stroke-width="2.4" fill="none" stroke-linecap="round"/>`);
+      }
+    }
+  }
+  return `<svg viewBox="0 0 820 250" fill="none" aria-hidden>${strands.join('')}${nodes.join('')}</svg>`;
+})();
+
+const VARIANTS = {
+  serif: {
+    html: `<div class="wm-serif">neuramesh</div>`,
+    note: {
+      v: ['rec', 'Recommended'],
+      h: 'Serif — the signature, enormous',
+      p: [`Source Serif 4 at display weight, the same face the greeting and every gate card already speak in (docs/33 §5). At this size the serif is what stops the surface reading like a terminal — which is precisely the difference between us and the tool this idea came from.`,
+          `Lowercase, tight tracking, set wide enough that the <b>h</b> is cut by the sheet's right edge. It inherits the type ramp instead of importing a new family, so it costs the system nothing.`],
+      k: 'The risk',
+      kp: 'Serif at 158px can tip into "magazine" if the ink creeps. Above ~7% it starts competing with the greeting; that is the number to hold the line on.',
+    },
+  },
+  mono: {
+    html: `<div class="wm-mono">neura<span class="thin">mesh</span></div>`,
+    note: {
+      v: ['ok', 'Closest to the reference'],
+      h: 'Mono — the blocky one',
+      p: [`Geist Mono at 700, negative tracking so the letters nearly touch. This is the honest translation of OpenCode's pixel face into our own type — chunky, technical, square counters.`,
+          `The weight split (<code>neura</code> bold, <code>mesh</code> light) puts the brand's own two-part reading into the texture without needing colour, which matters because dark can't carry the oak.`],
+      k: 'The risk',
+      kp: 'It speaks the reference\'s language — terminal. Cream Oak spent a whole revamp NOT being a terminal, so this is the variant most likely to feel borrowed.',
+    },
+  },
+  mark: {
+    html: `<div class="wm-mark">${MARK(2.4)}</div>`,
+    note: {
+      v: ['ok', 'Quietest'],
+      h: 'Mark — the two strands, huge',
+      p: [`The ember mark alone at 300px, its node sitting just above the composer's centre. Wordless, so it never competes with the greeting for the role of "the sentence on this screen".`,
+          `It also scales to a place a wordmark cannot: this is the one treatment that would still work behind a <em>project</em> home, where the name on screen should be the project's, not ours.`],
+      k: 'The risk',
+      kp: 'A lone symbol at low ink can read as an artefact — a smudge, a failed image. It needs either more ink than the wordmarks or a crisper stroke to stay legible as intent.',
+    },
+  },
+  lockup: {
+    html: `<div class="wm-lockup">${MARK(2.6)}<span class="lw">neuramesh</span></div>`,
+    note: {
+      v: ['no', 'Not recommended'],
+      h: 'Lockup — mark + wordmark',
+      p: [`The real brand lockup, blown up. It is the most "correct" brand answer and the worst screen: a legible logo at low opacity reads as a <b>watermark on a document</b> — the visual language of a trial version or an unpaid invoice.`,
+          `Included so the option is rejected knowingly rather than skipped.`],
+      k: 'Why it fails',
+      kp: 'Texture works when it is too big to parse as a logo. A lockup is legible by design, so it never crosses into texture.',
+    },
+  },
+  mesh: {
+    html: `<div class="wm-mesh">${MESH}</div>`,
+    note: {
+      v: ['ok', 'The distinctive one'],
+      h: 'Mesh — the mark made literal',
+      p: [`The ember mark's crossing-strand idea repeated into a lattice: nodes and the weave between them, which is the product's actual claim — people and agents on one fabric.`,
+          `It is the only variant nobody could mistake for another company's home screen, and the only one that reads as a <em>place</em> rather than a signature.`],
+      k: 'The risk',
+      kp: 'Node-graph wallpaper is the single most exhausted visual in AI products. It survives only if it stays this sparse and this faint; one step louder and it is a stock background.',
+    },
+  },
+  none: {
+    html: ``,
+    note: {
+      v: ['ok', 'The control'],
+      h: 'None — today',
+      p: [`Home as it ships. Worth flipping to often: the honest question is not "which watermark" but "is the screen better with one at all".`,
+          `On the <b>Busy</b> state the answer is close to no — the band above the composer is doing work already. On <b>Quiet</b> it is a clear yes: right now that band is simply empty.`],
+      k: 'Which is the argument',
+      kp: 'for making ink a function of how full Home is, rather than a constant. One number, and both states get the version they want.',
+    },
+  },
+};
+
+const QUIET = `
+  <div class="hgreetblk">
+    <div class="hkick">Wednesday · 4:12 pm</div>
+    <div class="hgreet">Good afternoon, George.</div>
+  </div>
+  <div class="hquiet">
+    <div class="q1">Nothing needs you.</div>
+    <div class="q2">Two agents are working. You'll hear when there's something to accept.</div>
+  </div>`;
+
+const BUSY = `
+  <div class="hgreetblk">
+    <div class="hkick">Wednesday · 4:12 pm</div>
+    <div class="hgreet">Good afternoon, George.</div>
+    <div class="hlede">Three things want you. Everything else is moving.</div>
+  </div>
+  <div class="sechead"><h3>Needs you</h3><span class="n">3</span></div>
+  <div class="mcqcard">
+    <div class="mcqtop"><span class="chip" style="--c:var(--done)">done</span><span class="kindchip">feature</span><span class="mcqid">#204</span><span class="mcqbadges">#product · neuramesh</span></div>
+    <div class="mcqtitle">Library previews, one reading column</div>
+    <div class="mcqmeta">review passed · DoD attached · PR #204 · 6 artifacts</div>
+  </div>
+  <div class="mcqcard">
+    <div class="mcqtop"><span class="chip" style="--c:var(--designrev)">design review</span><span class="kindchip">design</span><span class="mcqid">#207</span><span class="mcqbadges">#product · neuramesh</span></div>
+    <div class="mcqtitle">Onboarding — the second run</div>
+    <div class="mcqmeta">iris proposed 3 mockups · your approval is the visual contract</div>
+  </div>
+  <div class="mcqcard">
+    <div class="mcqtop"><span class="chip" style="--c:var(--review)">ship review</span><span class="kindchip">feature</span><span class="mcqid">#203</span><span class="mcqbadges">#engineering · neuramesh</span></div>
+    <div class="mcqtitle">Home &amp; Feed — the feed is the room</div>
+    <div class="mcqmeta">release plan awaiting your approval · PR #203</div>
+  </div>
+  <div class="sechead"><h3>In flight</h3><span class="n">2</span></div>
+  <div class="frowline"><span class="rring"></span><span><b>Cabinet-grade UI revamp</b> · patch · 3 of 5</span><span class="roomtag">#product</span><time>24m</time></div>
+  <div class="frowline"><span class="chip" style="--c:var(--review)">in review</span><span><b>#204 · Library previews</b> · gem is reading the diff</span><span class="roomtag">#product</span><time>8m</time></div>`;
+
+let variant = 'serif', busy = 0;
+
+/* how far the mark sinks behind the composer's top edge — the clipped band */
+const SINK = 30;
+function anchor() {
+  const c = $('.hcomposer');
+  if (!c) return;
+  // composer height + its 14px bottom margin, minus the overlap we want painted over
+  document.documentElement.style.setProperty('--wm-bottom', `${c.offsetHeight + 14 - SINK}px`);
+}
+
+function render() {
+  $('#wm').innerHTML = VARIANTS[variant].html;
+  $('#hcol').innerHTML = busy ? BUSY : QUIET;
+  $('#hwrap').dataset.busy = String(busy);
+  $('#navCnt').textContent = busy ? '3' : '0';
+  anchor();
+
+  const n = VARIANTS[variant].note;
+  $('#note').innerHTML =
+    `<span class="verdict ${n.v[0]}">${n.v[1]}</span><h4>${n.h}</h4>` +
+    n.p.map(p => `<p>${p}</p>`).join('') +
+    `<div class="mini"><span class="k">${n.k}</span><p>${n.kp}</p></div>`;
+}
+
+$$('#varSeg button').forEach(b => b.onclick = () => {
+  $$('#varSeg button').forEach(x => x.classList.toggle('on', x === b));
+  variant = b.dataset.var; render();
+});
+$$('#busySeg button').forEach(b => b.onclick = () => {
+  $$('#busySeg button').forEach(x => x.classList.toggle('on', x === b));
+  busy = +b.dataset.busy; render();
+});
+$$('#themeSeg button').forEach(b => b.onclick = () => {
+  $$('#themeSeg button').forEach(x => x.classList.toggle('on', x === b));
+  document.documentElement.dataset.theme = b.dataset.themeSet;
+});
+$('#inkR').oninput = e => {
+  document.documentElement.style.setProperty('--wm-ink', String(+e.target.value / 100));
+  $('#inkV').textContent = (+e.target.value).toFixed(1) + '%';
+};
+$('#scaleR').oninput = e => {
+  document.documentElement.style.setProperty('--wm-scale', String(+e.target.value / 100));
+  $('#scaleV').textContent = e.target.value + '%';
+};
+
+render();
+window.addEventListener('resize', anchor);
+</script>
+</body>
+</html>

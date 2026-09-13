@@ -1,0 +1,25 @@
+[
+  { "name": "sb1-tasks-dark", "settle": 1700, "query": { "theme": "dark" },
+    "js": "(() => { const b=[...document.querySelectorAll('button')].find(x=>/^Tasks/.test((x.textContent||'').trim())); b && b.click(); return new Promise(r=>setTimeout(r,700)); })()" },
+
+  { "name": "sb2-tasks-cream", "settle": 1700, "query": { "theme": "cream-oak" },
+    "js": "(() => { const b=[...document.querySelectorAll('button')].find(x=>/^Tasks/.test((x.textContent||'').trim())); b && b.click(); return new Promise(r=>setTimeout(r,700)); })()" },
+
+  { "name": "sb3-automations-dark", "settle": 1700, "query": { "theme": "dark" },
+    "js": "(() => { const b=[...document.querySelectorAll('button')].find(x=>/^Automations/.test((x.textContent||'').trim())); b && b.click(); return new Promise(r=>setTimeout(r,700)); })()" },
+
+  { "name": "sb4-automations-cream", "settle": 1700, "query": { "theme": "cream-oak" },
+    "js": "(() => { const b=[...document.querySelectorAll('button')].find(x=>/^Automations/.test((x.textContent||'').trim())); b && b.click(); return new Promise(r=>setTimeout(r,700)); })()" },
+
+  { "name": "sb5-whiteboards-dark", "settle": 1700, "query": { "theme": "dark" },
+    "js": "(() => { const b=[...document.querySelectorAll('button')].find(x=>/^Whiteboards/.test((x.textContent||'').trim())); b && b.click(); return new Promise(r=>setTimeout(r,700)); })()" },
+
+  { "name": "sb6-skills-cream", "settle": 2000, "query": { "theme": "cream-oak" },
+    "js": "(() => { const v=[...document.querySelectorAll('button')].find(x=>(x.getAttribute('aria-label')||x.getAttribute('title')||'')==='Views'); v && v.click(); return new Promise(r=>setTimeout(()=>{ const mi=[...document.querySelectorAll('[role=\"menuitem\"]')].find(x=>(x.textContent||'').trim()==='Skills'); mi && mi.click(); setTimeout(r,700); },350)); })()" },
+
+  { "name": "sb7-memory-dark", "settle": 2000, "query": { "theme": "dark" },
+    "js": "(() => { const v=[...document.querySelectorAll('button')].find(x=>(x.getAttribute('aria-label')||x.getAttribute('title')||'')==='Views'); v && v.click(); return new Promise(r=>setTimeout(()=>{ const mi=[...document.querySelectorAll('[role=\"menuitem\"]')].find(x=>(x.textContent||'').trim()==='Memory'); mi && mi.click(); setTimeout(r,700); },350)); })()" },
+
+  { "name": "sb8-project-filter-open-dark", "settle": 1900, "query": { "theme": "dark" },
+    "js": "(() => { const b=[...document.querySelectorAll('button')].find(x=>/^Tasks/.test((x.textContent||'').trim())); b && b.click(); return new Promise(r=>setTimeout(()=>{ const p=document.querySelector('.scopepill .cchip'); p && p.click(); setTimeout(r,450); },700)); })()" }
+]

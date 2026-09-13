@@ -1,0 +1,527 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Shared compute — consent, visibility, attribution · round 2</title>
+<style>
+/* Tokens copied from apps/desktop/src/renderer/src/tokens.css (Graphite dark + Paper light).
+   Geometry copied from the REAL classes this round touches — .cmprow/.cmpdot/.cmphead/.cmprt
+   (1490-1505), .cmppick/.cmpdef/.agplacerow (the 0118 round), .kvline (3196), .machcard/.machmeta,
+   .agentcard, .wsrow (2995), .thismachine (5640). Judge this as the app, not as a sketch. */
+:root, [data-theme='dark'] {
+  --win:#0d0d0d; --bg:#141414; --panel:#191919; --panel2:#212121; --panel3:#2b2b2b;
+  --border:#272727; --border2:#383838;
+  --text:#eaeaea; --body:#b6b6b6; --muted:#898989; --dim:#676767;
+  --link:#d19a72; --accent:var(--text); --accent-ink:#101010; --overlay:#222222;
+  --btn:#232323; --btn-fg:#efefef; --btn-hover:#2f2f2f;
+  --green:#77ac8d; --warn:#c9a15e; --violet:#a89ccf; --orch:#9793d2; --blocked:#9ca0a8;
+  --brand:#834a2b; --brand-ink:#fff7ee;
+  --card:#1e1e1e; --card-border:#2c2c2c;
+  --shadow:rgba(0,0,0,0.62);
+  --shadow-sheet:inset 0 1px 0 rgba(255,255,255,.05), 0 12px 30px -6px rgba(0,0,0,.5);
+  --hover-bg:color-mix(in srgb, var(--text) 7%, transparent);
+  --sel-bg:color-mix(in srgb, var(--text) 10%, transparent);
+  --hover-border:#404040; --ring:#525252;
+}
+[data-theme='light'] {
+  --win:#e9e5db; --bg:#fcfbf8; --panel:#fcfbf8; --panel2:#f4f1ea; --panel3:#ebe7dd;
+  --border:#e2ded4; --border2:#cec5b7;
+  --text:#2f2a24; --body:#524c43; --muted:#837d72; --dim:#a09889;
+  --link:#8f4f2a; --accent:var(--text); --accent-ink:#ffffff; --overlay:#ffffff;
+  --btn:#f1eee6; --btn-fg:#2f2a24; --btn-hover:#e6e2d6;
+  --green:#2f9e6b; --warn:#a9762a; --violet:#7d6cc4; --orch:#635fc0; --blocked:#7c7f88;
+  --brand:#834a2b; --brand-ink:#fff7ee;
+  --card:#ffffff; --card-border:#e2ded4;
+  --shadow:rgba(70,58,44,0.14);
+  --shadow-sheet:0 8px 26px -8px rgba(70,58,44,.15), 0 1px 2px rgba(70,58,44,.05);
+  --hover-bg:color-mix(in srgb, var(--text) 6%, transparent);
+  --sel-bg:color-mix(in srgb, var(--text) 8%, transparent);
+  --hover-border:color-mix(in srgb, var(--text) 12%, var(--border2));
+  --ring:color-mix(in srgb, var(--accent) 40%, var(--border2));
+}
+* { box-sizing:border-box; }
+body { margin:0; background:var(--win); color:var(--text);
+  font:400 13.5px/1.55 ui-sans-serif,-apple-system,"Segoe UI",system-ui,sans-serif; -webkit-font-smoothing:antialiased; }
+code, .mono { font:500 11.5px ui-monospace,Menlo,monospace; }
+header { position:sticky; top:0; z-index:30; display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+  padding:14px 22px; background:var(--win); border-bottom:1px solid var(--border); }
+h1 { font-weight:600; font-size:15px; line-height:1.3; margin:0; letter-spacing:-.01em; }
+.sub { color:var(--muted); font-size:12.5px; }
+.spacer { flex:1; }
+button.ctl { font:inherit; font-size:12.5px; color:var(--btn-fg); background:var(--btn);
+  border:1px solid var(--border2); border-radius:999px; padding:6px 14px; cursor:pointer; }
+main { padding:22px; max-width:1300px; margin:0 auto; }
+section { margin-bottom:44px; }
+h2 { font-weight:600; font-size:13px; line-height:1.4; margin:0 0 4px; letter-spacing:.02em; text-transform:uppercase; color:var(--muted); }
+h2 .n { color:var(--dim); margin-right:7px; font-family:ui-monospace,Menlo,monospace; font-size:11.5px; }
+.why { color:var(--body); font-size:13px; margin:0 0 16px; max-width:88ch; }
+.why b { color:var(--text); font-weight:600; }
+.cols { display:grid; grid-template-columns:1fr 1fr; gap:18px; align-items:start; }
+.cols3 { display:grid; grid-template-columns:repeat(auto-fit,minmax(310px,1fr)); gap:18px; align-items:start; }
+@media (max-width:1100px){ .cols{ grid-template-columns:1fr; } }
+.pane { background:var(--bg); border:1px solid var(--border); border-radius:14px; box-shadow:var(--shadow-sheet); overflow:hidden; }
+.panehead { display:flex; align-items:center; gap:9px; padding:10px 14px; border-bottom:1px solid var(--border); background:var(--panel); font-size:12.5px; font-weight:600; }
+.panebody { padding:18px; display:flex; justify-content:center;
+  background:linear-gradient(0deg, color-mix(in srgb, var(--win) 55%, transparent), color-mix(in srgb, var(--win) 55%, transparent)); }
+.tag { font-weight:600; font-size:10px; line-height:1; letter-spacing:.07em; text-transform:uppercase; padding:4px 7px; border-radius:5px; flex:none; }
+.tag.good { color:var(--green); background:color-mix(in srgb,var(--green) 15%,transparent); }
+.tag.mut { color:var(--muted); background:var(--panel3); }
+.tag.warn { color:var(--warn); background:color-mix(in srgb,var(--warn) 15%,transparent); }
+.tag.new { color:var(--violet); background:color-mix(in srgb,var(--violet) 16%,transparent); }
+
+/* real app classes */
+.wshint { color:var(--muted); font-size:12.5px; line-height:1.5; margin:2px 0 10px; }
+.sect { font:600 10.5px ui-monospace,Menlo,monospace; letter-spacing:.08em; text-transform:uppercase; color:var(--dim); padding:12px 0 6px; }
+.cmprow { display:flex; align-items:flex-start; gap:11px; padding:10px 12px; border:1px solid var(--border); border-radius:10px; background:var(--panel); margin-bottom:7px; }
+.cmprow.dim { opacity:.62; }
+.cmpdot { flex:none; width:7px; height:7px; border-radius:50%; background:var(--dim); margin-top:6px; }
+.cmpdot.on { background:var(--green); box-shadow:0 0 0 3px color-mix(in srgb, var(--green) 18%, transparent); }
+.cmpbody { flex:1; min-width:0; }
+.cmphead { display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; }
+.cmphead b { font-size:12.5px; font-weight:620; }
+.cmpowner { font-size:11.5px; color:var(--muted); }
+.cmphere { font:600 9px ui-monospace,Menlo,monospace; letter-spacing:.05em; text-transform:uppercase; color:var(--green); background:color-mix(in srgb,var(--green) 14%,transparent); border-radius:4px; padding:3px 5px; }
+.cmpshared { font:600 9px ui-monospace,Menlo,monospace; letter-spacing:.05em; text-transform:uppercase; color:var(--violet); background:color-mix(in srgb,var(--violet) 15%,transparent); border-radius:4px; padding:3px 5px; }
+.cmpmeta { display:flex; flex-wrap:wrap; gap:5px; margin-top:5px; align-items:center; }
+.cmprt { font:500 10.5px ui-monospace,Menlo,monospace; color:var(--muted); background:var(--panel3); border-radius:4px; padding:2px 6px; }
+.cmpnote { font-size:11px; color:var(--dim); }
+.cmpstate { flex:none; font-size:11.5px; align-self:center; text-align:right; }
+.cmpbusy { color:var(--green); }
+.cmpidle { color:var(--muted); }
+.cmpoff { color:var(--dim); }
+
+/* running-now list inside a machine card */
+.mrun { display:flex; align-items:center; gap:7px; margin-top:6px; padding-top:6px; border-top:1px dashed var(--border); flex-wrap:wrap; }
+.mrunav { flex:none; width:18px; height:18px; border-radius:6px; background:linear-gradient(135deg,#d99e66,#b06f3c); }
+.mrunav.b { background:linear-gradient(135deg,#6d9db8,#4e7d98); }
+.mrunname { font-size:11.5px; font-weight:600; }
+.mrunverb { font-size:11px; color:var(--muted); }
+
+.btn { display:inline-flex; align-items:center; gap:7px; padding:8px 16px; border-radius:999px; border:1px solid var(--border); background:var(--btn); color:var(--btn-fg); font-size:13px; font-weight:600; cursor:pointer; white-space:nowrap; }
+.btn.primary { background:var(--accent); color:var(--accent-ink); border-color:transparent; }
+.btn.sm { padding:5px 11px; font-size:11.5px; }
+.fld label { display:block; font:600 10.5px ui-monospace,Menlo,monospace; letter-spacing:.06em; text-transform:uppercase; color:var(--dim); margin-bottom:5px; }
+.fld input { width:100%; padding:8px 11px; border-radius:9px; border:1px solid var(--border2); background:var(--panel2); color:var(--text); font:inherit; font-size:12.8px; }
+.modalbox { width:470px; max-width:100%; background:var(--overlay); border:1px solid var(--border); border-radius:14px; box-shadow:var(--shadow-sheet); padding:18px 20px 16px; }
+.modaltitle { font-weight:600; font-size:16.5px; line-height:1.3; font-family:"Source Serif 4","Iowan Old Style",Georgia,serif; margin:0 0 10px; }
+
+/* the consent switch */
+.shareline { display:flex; align-items:flex-start; gap:10px; padding:10px 12px; border:1px solid var(--border); border-radius:10px; background:var(--panel2); margin-top:10px; }
+.sw { flex:none; width:32px; height:18px; border-radius:999px; background:var(--panel3); border:1px solid var(--border2); position:relative; margin-top:1px; }
+.sw::after { content:''; position:absolute; top:2px; left:2px; width:12px; height:12px; border-radius:50%; background:var(--dim); transition:all .15s; }
+.sw.on { background:color-mix(in srgb,var(--green) 30%,transparent); border-color:color-mix(in srgb,var(--green) 45%,transparent); }
+.sw.on::after { left:16px; background:var(--green); }
+.sharetxt { flex:1; min-width:0; font-size:12.4px; }
+.sharetxt b { font-weight:600; }
+.sharesub { display:block; color:var(--dim); font-size:11px; margin-top:2px; }
+
+/* member rows */
+.wsrow { display:grid; grid-template-columns:1fr auto; align-items:center; gap:10px; padding:9px 11px; border:1px solid var(--border); border-radius:9px; background:var(--panel2); margin-bottom:6px; }
+.wsrowname { font-size:13px; font-weight:600; }
+.wsrowsub { display:block; font-size:11px; color:var(--dim); margin-top:2px; }
+.shpair { display:flex; align-items:center; gap:14px; }
+.shcell { display:flex; align-items:center; gap:7px; font-size:11.5px; color:var(--muted); }
+.shcell .lbl { color:var(--dim); font-size:10.5px; font-family:ui-monospace,Menlo,monospace; letter-spacing:.05em; text-transform:uppercase; }
+.shyes { color:var(--green); font-weight:600; }
+.shno { color:var(--dim); }
+
+/* machine + agent cards (Agents & Machines) */
+.machcard { border:1px solid var(--border); border-radius:12px; background:var(--panel); padding:11px 13px; }
+.machcard.dim { opacity:.6; }
+.machname { display:flex; align-items:center; gap:7px; font-size:12.8px; font-weight:620; flex-wrap:wrap; }
+.chip { font:600 9px ui-monospace,Menlo,monospace; letter-spacing:.04em; padding:3px 6px; border-radius:5px; text-transform:uppercase; }
+.chip.on { color:var(--green); background:color-mix(in srgb,var(--green) 14%,transparent); }
+.chip.off { color:var(--dim); background:var(--panel3); }
+.machmeta { color:var(--muted); font-size:11.8px; margin-top:6px; display:flex; align-items:center; gap:5px; flex-wrap:wrap; }
+.machmeta b { color:var(--body); }
+.machmeta.sub { color:var(--dim); font-size:11px; margin-top:3px; }
+.agentcard { border:1px solid var(--border); border-radius:12px; background:var(--panel); padding:12px 13px; }
+.agenthead { display:flex; align-items:center; gap:10px; }
+.agav { flex:none; width:32px; height:32px; border-radius:9px; background:linear-gradient(135deg,#d99e66,#b06f3c); }
+.agav.b { background:linear-gradient(135deg,#6d9db8,#4e7d98); }
+.agav.c { background:linear-gradient(135deg,#8fae8b,#5f8560); }
+.agentname { font-size:13px; font-weight:640; display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.rolechip { font:600 8.5px ui-monospace,Menlo,monospace; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); background:var(--panel3); border-radius:4px; padding:3px 5px; }
+.agentmodel { font:500 10.5px ui-monospace,Menlo,monospace; color:var(--dim); margin-top:2px; }
+/* THE NEW LINE — where this agent runs */
+.agmach { display:flex; align-items:center; gap:6px; margin-top:8px; padding-top:8px; border-top:1px solid var(--border); font-size:11.5px; color:var(--muted); flex-wrap:wrap; }
+.agmach .m { font:500 10.5px ui-monospace,Menlo,monospace; color:var(--text); background:var(--panel3); border-radius:5px; padding:2px 6px; }
+.agmach .live { color:var(--green); font-weight:600; }
+.agmach .warn { color:var(--warn); }
+.chchip { font:500 10px ui-monospace,Menlo,monospace; color:var(--muted); background:var(--panel3); border-radius:4px; padding:2px 6px; }
+.kvline { display:flex; justify-content:space-between; gap:10px; font-size:12px; color:var(--muted); padding:5px 0; border-bottom:1px solid var(--border); }
+.kvline b { color:var(--text); font-weight:600; text-align:right; }
+.kvline b .m { font:500 10.5px ui-monospace,Menlo,monospace; background:var(--panel3); border-radius:5px; padding:2px 6px; }
+.ladder { counter-reset:l; max-width:700px; margin:0; padding:0; list-style:none; }
+.ladder li { counter-increment:l; display:flex; gap:12px; padding:9px 0; border-bottom:1px dashed var(--border); font-size:12.8px; color:var(--body); }
+.ladder li::before { content:counter(l); flex:none; width:20px; height:20px; border-radius:50%; background:var(--panel3);
+  font:600 10.5px/20px ui-monospace,Menlo,monospace; text-align:center; color:var(--muted); }
+.ladder b { color:var(--text); }
+.ladder .g { color:var(--dim); }
+.ladder li.gate { border-bottom-color:color-mix(in srgb,var(--violet) 40%,transparent); }
+.ladder li.gate::before { background:color-mix(in srgb,var(--violet) 20%,transparent); color:var(--violet); }
+.flow { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:0 0 16px; font-size:11.5px; color:var(--dim); }
+.flow span.s { padding:5px 10px; border:1px solid var(--border); border-radius:999px; background:var(--panel); color:var(--body); }
+.flow span.s.on { border-color:color-mix(in srgb,var(--violet) 50%,transparent); color:var(--text); }
+footer { color:var(--dim); font-size:11.5px; padding:8px 22px 26px; max-width:1300px; margin:0 auto; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Shared compute — consent, visibility, attribution</h1>
+  <span class="sub">round 2 · a machine is lent, not taken</span>
+  <span class="spacer"></span>
+  <button class="ctl" onclick="const r=document.documentElement; r.dataset.theme = r.dataset.theme==='dark'?'light':'dark'">Toggle theme</button>
+</header>
+<main>
+
+<section>
+  <h2><span class="n">00</span>The rule — a grant, and the ladder that reads it</h2>
+  <p class="why">Today (shipped in 0118) any member can point their requests at anyone&rsquo;s machine, and failover
+    can recruit any capable machine — <b>both without asking the person whose subscription pays</b>. This round
+    makes lending explicit: <b>the machine&rsquo;s owner grants a member access</b>, and every rung below rung 1 can
+    only choose among machines granted to the person the work came from.</p>
+  <ol class="ladder">
+    <li><div><b>Capability</b> — a machine that can&rsquo;t serve the runtime never claims. <span class="g">Unchanged.</span></div></li>
+    <li><div><b>The conversation&rsquo;s machine</b> — an existing thread keeps the machine holding its files.
+      <span class="g">Deliberately NOT gated on the grant: the work already ran there and the files already exist.
+      Follow-ups keep working even after a grant is revoked (§07 says so out loud, and offers the stop).</span></div></li>
+    <li class="gate"><div><b>Your per-agent choice</b> — <b>only machines granted to you</b> are offerable.</div></li>
+    <li class="gate"><div><b>Your default machine</b> — same gate.</div></li>
+    <li><div><b>Origin affinity</b> — your own machine. <span class="g">Never needs a grant; it is yours.</span></div></li>
+    <li class="gate"><div><b>Failover</b> — after the grace window, among <b>granted machines only</b>. An ungranted
+      machine stays out even when it is the only one awake.</div></li>
+  </ol>
+  <p class="why" style="margin-top:14px"><b>Migration matters here.</b> Every existing workspace has been sharing
+    implicitly since 0114 — so the migration backfills a grant between every current member pair. Consent applies to
+    what happens <b>next</b>; nobody&rsquo;s working setup breaks on deploy.</p>
+</section>
+
+<section>
+  <h2><span class="n">01</span>The whole flow</h2>
+  <div class="flow">
+    <span class="s on">01 invite · share toggle</span>→<span class="s on">02 accept</span>→<span class="s on">03 first run · 3 states</span>
+    →<span class="s on">04 members · both directions</span>→<span class="s on">05 compute settings</span>
+    →<span class="s on">06 agents &amp; machines</span>→<span class="s on">07 agent detail</span>→<span class="s on">08 revoke</span>
+  </div>
+</section>
+
+<section>
+  <h2><span class="n">02</span>Invite — the grant starts where the relationship does</h2>
+  <p class="why">The inviter is already deciding &ldquo;I am bringing this person in&rdquo;; that is the honest moment to
+    ask whether they are also lending their machine. One switch, and it names the consequence in the same breath.</p>
+  <div class="cols">
+    <div class="pane">
+      <div class="panehead">Settings → Members · Invite <span class="tag new">+ switch</span></div>
+      <div class="panebody">
+        <div class="modalbox">
+          <div class="fld"><label>Email</label><input value="sam@acme.dev" readonly /></div>
+          <div class="shareline">
+            <span class="sw on" aria-hidden></span>
+            <span class="sharetxt"><b>Share my compute with sam</b>
+              <span class="sharesub">sam&rsquo;s agent requests may run on your machines, on your subscription.
+                Without this, sam needs a machine of their own.</span></span>
+          </div>
+          <div style="display:flex; gap:9px; margin-top:14px">
+            <button class="btn primary" style="flex:1; justify-content:center">Send invitation</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="pane">
+      <div class="panehead">The invitee accepts — unchanged (0113)</div>
+      <div class="panebody">
+        <div class="modalbox" style="width:420px">
+          <p class="modaltitle">Acme Robotics invited you</p>
+          <p class="wshint">You&rsquo;ll keep your own workspace — switch between them any time.</p>
+          <div class="cmprow"><span class="cmpdot on"></span><div class="cmpbody">
+            <div class="cmphead"><b>Acme Robotics</b><span class="cmpowner">from george</span></div>
+            <div class="cmpmeta"><span class="cmpnote">9 agents · 4 rooms · george shares their compute</span></div>
+          </div></div>
+          <div style="display:flex; gap:9px; margin-top:12px">
+            <button class="btn primary">Join</button><button class="btn">Decline</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2><span class="n">03</span>First run after joining — the card knows which of three worlds you are in</h2>
+  <p class="why">Same card, three honest states. The third is the one that exists <i>because</i> of consent, and it must
+    never be a dead end — it carries the ask.</p>
+  <div class="cols3">
+    <div class="pane">
+      <div class="panehead">A · you have a capable machine <span class="tag good">pick</span></div>
+      <div class="panebody">
+        <div class="modalbox" style="width:100%">
+          <p class="modaltitle">Where should your agents run?</p>
+          <p class="wshint">Acme&rsquo;s agents run on members&rsquo; machines — each request on that member&rsquo;s subscription.</p>
+          <div class="cmprow" style="border-color:var(--ring); background:var(--sel-bg)"><span class="cmpdot on"></span><div class="cmpbody">
+            <div class="cmphead"><b>sam-mbp</b><span class="cmpowner">yours</span><span class="cmphere">this machine</span></div>
+            <div class="cmpmeta"><span class="cmprt">claude-code</span><span class="cmpnote">serves 7 of 9</span></div>
+          </div></div>
+          <div class="cmprow"><span class="cmpdot on"></span><div class="cmpbody">
+            <div class="cmphead"><b>george&rsquo;s MacBook Pro</b><span class="cmpowner">george</span><span class="cmpshared">shared with you</span></div>
+            <div class="cmpmeta"><span class="cmprt">claude-code</span><span class="cmprt">codex</span><span class="cmpnote">serves 9 of 9</span></div>
+          </div></div>
+          <div style="display:flex; gap:9px; margin-top:12px"><button class="btn primary" style="flex:1; justify-content:center">Use this machine</button><button class="btn">Skip</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="pane">
+      <div class="panehead">B · no machine of yours, but lent one <span class="tag mut">informs</span></div>
+      <div class="panebody">
+        <div class="modalbox" style="width:100%">
+          <p class="modaltitle">Your agents run on george&rsquo;s machine</p>
+          <p class="wshint">You have no machine serving this workspace yet, so george lent you theirs — your requests
+            run there, on their subscription.</p>
+          <div class="cmprow"><span class="cmpdot on"></span><div class="cmpbody">
+            <div class="cmphead"><b>george&rsquo;s MacBook Pro</b><span class="cmpowner">george</span><span class="cmpshared">shared with you</span></div>
+            <div class="cmpmeta"><span class="cmprt">claude-code</span><span class="cmprt">codex</span><span class="cmpnote">serves 9 of 9</span></div>
+          </div></div>
+          <div style="display:flex; gap:9px; margin-top:12px"><button class="btn primary" style="flex:1; justify-content:center">Got it</button></div>
+          <p class="cmpnote" style="margin-top:10px">Sign in to Claude on this Mac to run them here instead.</p>
+        </div>
+      </div>
+    </div>
+    <div class="pane">
+      <div class="panehead">C · no machine, no grant <span class="tag warn">the ask</span></div>
+      <div class="panebody">
+        <div class="modalbox" style="width:100%">
+          <p class="modaltitle">No compute available yet</p>
+          <p class="wshint">Agents need a machine to run on. Nobody has shared one with you, and this Mac has no
+            Claude, Codex or Gemini sign-in.</p>
+          <div class="cmprow dim"><span class="cmpdot"></span><div class="cmpbody">
+            <div class="cmphead"><b>george&rsquo;s MacBook Pro</b><span class="cmpowner">george</span></div>
+            <div class="cmpmeta"><span class="cmpnote">not shared with you</span></div>
+          </div>
+          <span class="cmpstate"><button class="btn sm">Ask</button></span></div>
+          <div style="display:flex; gap:9px; margin-top:12px">
+            <button class="btn primary" style="flex:1; justify-content:center">Request access from george</button>
+          </div>
+          <p class="cmpnote" style="margin-top:10px">Or sign in to a provider on this Mac to serve your own.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2><span class="n">04</span>Members — sharing is two directions, and both are visible</h2>
+  <p class="why">One row per member, two facts: what <b>you</b> lend them (a switch — yours to flip) and what
+    <b>they</b> lend you (a status — theirs). Never one collapsed into the other; that ambiguity is how people end up
+    surprised by a bill.</p>
+  <div class="pane">
+    <div class="panehead">Settings → Members <span class="tag new">+ sharing</span></div>
+    <div class="panebody"><div style="width:100%; max-width:640px">
+      <div class="wsrow">
+        <span><span class="wsrowname">george</span><span class="wsrowsub">owner · 1 machine · claude-code, codex</span></span>
+        <span class="shpair">
+          <span class="shcell"><span class="lbl">you lend</span><span class="sw on" aria-hidden></span></span>
+          <span class="shcell"><span class="lbl">they lend</span><span class="shyes">yes</span></span>
+        </span>
+      </div>
+      <div class="wsrow">
+        <span><span class="wsrowname">Maria Gonzalez</span><span class="wsrowsub">member · no machine</span></span>
+        <span class="shpair">
+          <span class="shcell"><span class="lbl">you lend</span><span class="sw" aria-hidden></span></span>
+          <span class="shcell"><span class="lbl">they lend</span><span class="shno">no machine</span></span>
+        </span>
+      </div>
+      <div class="wsrow">
+        <span><span class="wsrowname">sam</span><span class="wsrowsub">admin · 2 machines · claude-code</span></span>
+        <span class="shpair">
+          <span class="shcell"><span class="lbl">you lend</span><span class="sw on" aria-hidden></span></span>
+          <span class="shcell"><span class="lbl">they lend</span><span class="shno">no · <button class="btn sm">Ask</button></span></span>
+        </span>
+      </div>
+    </div></div>
+  </div>
+</section>
+
+<section>
+  <h2><span class="n">05</span>Settings → Compute — your prefs, and what you may actually reach</h2>
+  <p class="why">The 0118 panel, now grant-aware. <b>Machines available to you</b> is the new heading — yours plus
+    what others lend you. An ungranted machine still appears, dimmed, with the ask: hiding it would make the
+    workspace look smaller than it is and leave no route to more compute.</p>
+  <div class="cols">
+    <div class="pane">
+      <div class="panehead">Compute · availability</div>
+      <div class="panebody"><div style="width:100%">
+        <div class="sect">Machines available to you</div>
+        <div class="cmprow"><span class="cmpdot on"></span><div class="cmpbody">
+          <div class="cmphead"><b>sam-mbp</b><span class="cmpowner">you</span><span class="cmphere">this machine</span></div>
+          <div class="cmpmeta"><span class="cmprt">claude-code</span><span class="cmpnote">serves 7 of 9</span></div>
+        </div><span class="cmpstate"><span class="cmpidle">standing by</span></span></div>
+        <div class="cmprow"><span class="cmpdot on"></span><div class="cmpbody">
+          <div class="cmphead"><b>george&rsquo;s MacBook Pro</b><span class="cmpowner">george</span><span class="cmpshared">shared with you</span></div>
+          <div class="cmpmeta"><span class="cmprt">claude-code</span><span class="cmprt">codex</span><span class="cmpnote">serves 9 of 9</span></div>
+          <div class="mrun"><span class="mrunav"></span><span class="mrunname">rex</span><span class="mrunverb">triaging #1056</span>
+            <span class="mrunav b"></span><span class="mrunname">patch</span><span class="mrunverb">writing the focus trap</span></div>
+        </div><span class="cmpstate"><span class="cmpbusy">2 working</span></span></div>
+        <div class="sect">Not shared with you</div>
+        <div class="cmprow dim"><span class="cmpdot on"></span><div class="cmpbody">
+          <div class="cmphead"><b>studio-linux</b><span class="cmpowner">maria</span></div>
+          <div class="cmpmeta"><span class="cmprt">gemini</span><span class="cmpnote">would serve gem &amp; scout</span></div>
+        </div><span class="cmpstate"><button class="btn sm">Ask maria</button></span></div>
+      </div></div>
+    </div>
+    <div class="pane">
+      <div class="panehead">Compute · your routing <span class="tag mut">gated to available</span></div>
+      <div class="panebody"><div style="width:100%">
+        <div class="sect">Compute</div>
+        <div style="display:flex; align-items:center; gap:10px; padding:9px 12px; border:1px solid var(--border); border-radius:10px; background:var(--panel2)">
+          <span style="flex:1; font-size:12.8px; font-weight:600">Your requests run on</span>
+          <span class="cmprt" style="font-size:11.5px; padding:6px 10px">⌂ sam-mbp · this machine ⌄</span>
+        </div>
+        <p class="wshint">New conversations only — existing threads stay with their files.</p>
+        <div class="sect">Agent placement</div>
+        <div style="border:1px solid var(--border); border-radius:10px; background:var(--panel); overflow:hidden">
+          <div style="display:grid; grid-template-columns:1fr auto auto; gap:10px; align-items:center; padding:8px 10px; border-bottom:1px solid var(--border); font-size:12.5px">
+            <span style="display:flex; align-items:center; gap:8px; font-weight:600"><span class="agav" style="width:20px;height:20px;border-radius:6px"></span>rex</span>
+            <span class="cmprt">Claude</span>
+            <span style="display:flex; align-items:center; gap:7px"><span class="cmprt" style="color:var(--text)">sam-mbp</span><span class="cmpnote">your machine</span></span>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr auto auto; gap:10px; align-items:center; padding:8px 10px; border-bottom:1px solid var(--border); font-size:12.5px">
+            <span style="display:flex; align-items:center; gap:8px; font-weight:600"><span class="agav c" style="width:20px;height:20px;border-radius:6px"></span>scout</span>
+            <span class="cmprt">Codex</span>
+            <span style="display:flex; align-items:center; gap:7px"><span class="cmprt" style="color:var(--text)">george&rsquo;s MacBook Pro</span><span class="cmpnote">lent to you</span></span>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr auto auto; gap:10px; align-items:center; padding:8px 10px; font-size:12.5px">
+            <span style="display:flex; align-items:center; gap:8px; font-weight:600"><span class="agav b" style="width:20px;height:20px;border-radius:6px"></span>gem</span>
+            <span class="cmprt">Gemini</span>
+            <span style="display:flex; align-items:center; gap:7px"><span class="cmprt">—</span><span class="cmpnote" style="color:var(--warn)">no granted machine serves gemini</span></span>
+          </div>
+        </div>
+      </div></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2><span class="n">06</span>Agents &amp; Machines — the compute view</h2>
+  <p class="why">This page already lists machines and agents; it becomes the place you answer &ldquo;what can I reach, and
+    what is running where&rdquo;. Machine cards group by availability and name what is running on them <i>right now</i>.
+    <b>Every agent card gains a machine line</b> — live agents say where they are working, idle ones say where your
+    next request would go.</p>
+  <div class="pane">
+    <div class="panehead">Agents &amp; Machines <span class="tag new">grouped + agent machine line</span></div>
+    <div class="panebody"><div style="width:100%">
+      <div class="sect">Your machines</div>
+      <div class="cols3" style="margin-bottom:14px">
+        <div class="machcard">
+          <div class="machname">🖥 sam-mbp <span class="chip on">online</span><span class="cmphere">this machine</span></div>
+          <div class="machmeta">serves <b>7 of 9</b> agents<span class="cmprt">claude-code</span></div>
+          <div class="machmeta sub">you · daemon 0.97.0 · darwin</div>
+          <div class="mrun"><span class="cmpidle" style="font-size:11.5px">standing by</span></div>
+        </div>
+      </div>
+      <div class="sect">Shared with you</div>
+      <div class="cols3" style="margin-bottom:14px">
+        <div class="machcard">
+          <div class="machname">🖥 george&rsquo;s MacBook Pro <span class="chip on">online</span><span class="cmpshared">shared</span></div>
+          <div class="machmeta">serves <b>9 of 9</b> agents<span class="cmprt">claude-code</span><span class="cmprt">codex</span></div>
+          <div class="machmeta sub">george · daemon 0.97.0 · darwin</div>
+          <div class="mrun"><span class="mrunav"></span><span class="mrunname">rex</span><span class="mrunverb">triaging #1056</span>
+            <span class="mrunav b"></span><span class="mrunname">patch</span><span class="mrunverb">2/5</span></div>
+        </div>
+      </div>
+      <div class="sect">Not shared with you</div>
+      <div class="cols3">
+        <div class="machcard dim">
+          <div class="machname">🖥 studio-linux <span class="chip on">online</span></div>
+          <div class="machmeta">would serve <b>2 of 9</b><span class="cmprt">gemini</span></div>
+          <div class="machmeta sub">maria · daemon 0.97.0 · linux</div>
+          <div class="mrun"><button class="btn sm">Ask maria to share</button></div>
+        </div>
+      </div>
+
+      <div class="sect" style="padding-top:20px">Agents</div>
+      <div class="cols3">
+        <div class="agentcard">
+          <div class="agenthead"><span class="agav"></span><div style="min-width:0">
+            <div class="agentname">rex <span class="rolechip">orchestrator</span></div>
+            <div class="agentmodel">Claude · claude-fable-5</div>
+          </div></div>
+          <div class="agmach">⌂ <span class="live">working on</span> <span class="m">george&rsquo;s MacBook Pro</span></div>
+        </div>
+        <div class="agentcard">
+          <div class="agenthead"><span class="agav b"></span><div style="min-width:0">
+            <div class="agentname">patch <span class="rolechip">developer</span></div>
+            <div class="agentmodel">Claude · claude-sonnet-5</div>
+          </div></div>
+          <div class="agmach">⌂ your requests → <span class="m">sam-mbp</span></div>
+        </div>
+        <div class="agentcard">
+          <div class="agenthead"><span class="agav c"></span><div style="min-width:0">
+            <div class="agentname">gem <span class="rolechip">developer</span></div>
+            <div class="agentmodel">Gemini · gemini-3.5-flash</div>
+          </div></div>
+          <div class="agmach">⌂ <span class="warn">no machine you can reach serves gemini</span></div>
+        </div>
+      </div>
+    </div></div>
+  </div>
+</section>
+
+<section>
+  <h2><span class="n">07</span>Agent detail — the same two facts, spelled out</h2>
+  <p class="why">The overview column gains two rows beside <code>role</code>. <b>Runs on</b> is live truth (whose
+    machine is holding its run this second); <b>your requests</b> is the routing answer for <i>you</i>, which is a
+    different question and often a different machine.</p>
+  <div class="cols">
+    <div class="pane">
+      <div class="panehead">Agent details · overview <span class="tag new">+ 2 rows</span></div>
+      <div class="panebody"><div style="width:100%; max-width:420px">
+        <div class="kvline"><span>role</span><b>orchestrator</b></div>
+        <div class="kvline"><span>runtime</span><b>Claude · claude-fable-5</b></div>
+        <div class="kvline"><span>runs on</span><b><span class="m">george&rsquo;s MacBook Pro</span></b></div>
+        <div class="kvline"><span>your requests</span><b><span class="m">sam-mbp</span></b></div>
+        <div class="kvline"><span>registered</span><b style="color:var(--dim); font-weight:400">george&rsquo;s MacBook Pro</b></div>
+      </div></div>
+    </div>
+    <div class="pane">
+      <div class="panehead">…and when the two disagree, it says why</div>
+      <div class="panebody"><div style="width:100%; max-width:420px">
+        <div class="kvline"><span>role</span><b>reviewer</b></div>
+        <div class="kvline"><span>runtime</span><b>Codex · gpt-5.6-sol</b></div>
+        <div class="kvline"><span>runs on</span><b style="color:var(--dim); font-weight:400">idle</b></div>
+        <div class="kvline"><span>your requests</span><b><span class="m">george&rsquo;s MacBook Pro</span></b></div>
+        <div class="kvline" style="border-bottom:0"><span></span><b style="color:var(--dim); font-weight:400; font-size:11px">lent to you — yours has no codex sign-in</b></div>
+      </div></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2><span class="n">08</span>Revoking — say what actually stops, and offer the rest</h2>
+  <p class="why">Turning the switch off stops <b>new</b> conversations immediately. Threads already living on your
+    machine keep running there, because rung 1 is continuity and their files are on your disk. That is a real
+    loophole if it goes unsaid — so the confirm says it, counts it, and gives you the second lever.</p>
+  <div class="panebody" style="border:1px solid var(--border); border-radius:14px">
+    <div class="modalbox">
+      <p class="modaltitle">Stop sharing with sam?</p>
+      <p class="wshint">New conversations sam starts will no longer run on your machines.</p>
+      <div class="cmprow"><span class="cmpdot on"></span><div class="cmpbody">
+        <div class="cmphead"><b>3 existing threads</b></div>
+        <div class="cmpmeta"><span class="cmpnote">keep running here — their files and worktrees are on this Mac</span></div>
+      </div></div>
+      <div class="shareline">
+        <span class="sw" aria-hidden></span>
+        <span class="sharetxt"><b>Move those to sam too</b>
+          <span class="sharesub">They restart on sam&rsquo;s machine and lose local state — uncommitted work in those worktrees stays here.</span></span>
+      </div>
+      <div style="display:flex; gap:9px; margin-top:14px">
+        <button class="btn primary" style="flex:1; justify-content:center">Stop sharing</button><button class="btn">Cancel</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+<footer>Machines, agents and members follow the harness roster (george · sam · maria). Fonts approximate the app&rsquo;s Geist; serif is the app&rsquo;s Source Serif ramp.</footer>
+</body>
+</html>

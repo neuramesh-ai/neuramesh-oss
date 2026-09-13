@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Thread-owned work — units in the conversation, journeys declared</title>
+<style>
+[data-theme] { --fdisp:'Source Serif 4','Iowan Old Style',Georgia,serif; --fbody:'Geist Variable','Geist',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; --fmono:'Geist Mono Variable','Geist Mono',ui-monospace,'SF Mono',Menlo,monospace; --ease:cubic-bezier(.22,1,.36,1); --r-lg:14px; --r-full:999px; }
+/* verbatim from apps/desktop/src/renderer/src/tokens.css (2026-08-17) */
+[data-theme='dark'] {
+  --win:#0d0d0d; --bg:#141414; --panel:#191919; --panel2:#212121; --panel3:#2b2b2b;
+  --border:#272727; --border2:#383838;
+  --text:#eaeaea; --body:#b6b6b6; --muted:#898989; --dim:#676767;
+  --link:#d19a72; --accent:var(--text); --accent-ink:#101010;
+  --card:#1e1e1e; --card-border:#2c2c2c; --overlay:#222222;
+  --todo:#949494; --prog:#8ba0c0; --review:#a89ccf; --done:#77ac8d; --acc:#6fb0ab; --ship:#7cb0bd; --closed:#727272; --blocked:#9ca0a8; --warn:#c9a15e; --plan:#7fa5ab; --design:#cc8fb9; --backlog:#8f9aa6;
+  --role-orch:#9793d2; --role-arch:#a89ccf; --role-dev:#77ac8d; --role-rev:#7ba1c4; --role-design:#cc8fb9; --role-ship:#7cb0bd;
+  --ring:#525252; --hover-bg:color-mix(in srgb, var(--text) 7%, transparent);
+  --shadow:rgba(0,0,0,.62); --shadow-card:0 1px 2px rgba(0,0,0,.25); --shadow-pop:0 20px 55px -14px rgba(0,0,0,.65);
+}
+[data-theme='cream-oak'] {
+  --win:#f0e5d3; --bg:#fbf8f4; --panel:#fbf8f4; --panel2:#f6eee1; --panel3:#efe1cd;
+  --border:#e6dbca; --border2:#d3c2a8;
+  --text:#2a1c13; --body:#574838; --muted:#97846c; --dim:#b5a289;
+  --link:#9c5730; --accent:#834a2b; --accent-ink:#fff7ee;
+  --card:#ffffff; --card-border:#eadfce; --overlay:#ffffff;
+  --todo:#7d8590; --prog:#4f80c4; --review:#6d5ce0; --done:#0f9d63; --acc:#2f8f8a; --ship:#1f7f96; --closed:#897a60; --blocked:#7d7f86; --warn:#a06a1f; --plan:#2c7d88; --design:#b0498f; --backlog:#5d6b7a;
+  --role-orch:#6a63bc; --role-arch:#7d6cc4; --role-dev:#3f9268; --role-rev:#4f7bb0; --role-design:#b0498f; --role-ship:#1f7f96;
+  --ring:color-mix(in srgb, var(--accent) 42%, var(--border2)); --hover-bg:color-mix(in srgb, var(--text) 5%, transparent);
+  --shadow:rgba(70,42,18,.16); --shadow-card:0 1px 2px rgba(70,42,18,.05); --shadow-pop:0 20px 55px -14px rgba(70,42,18,.30);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#131210; font-family:'Geist Variable','Geist',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; }
+.page { max-width:1660px; margin:0 auto; padding:32px 24px 80px; }
+.pagehead { color:#eaeaea; margin-bottom:6px; }
+.pagehead h1 { font-family:'Source Serif 4',Georgia,serif; font-size:23px; font-weight:640; letter-spacing:-.012em; }
+.pagehead p { color:#898989; font-size:13px; line-height:1.62; margin-top:8px; max-width:100ch; }
+.pagehead b { color:#b6b6b6; font-weight:600; }
+.stophd { color:#eaeaea; font-size:15px; font-weight:660; margin:46px 0 4px; font-family:'Source Serif 4',Georgia,serif; }
+.stopno { font:700 10px 'Geist Mono','Geist Mono Variable',ui-monospace,monospace; letter-spacing:.12em; color:#6f6f6f; text-transform:uppercase; margin-right:8px; }
+.stopp { color:#898989; font-size:12.5px; line-height:1.62; max-width:104ch; margin-bottom:16px; }
+.stopp b { color:#b6b6b6; }
+.themes { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+@media (max-width:1340px){ .themes { grid-template-columns:1fr; } }
+.theme { background:var(--win); border:1px solid var(--border2); border-radius:16px; padding:16px; color:var(--text); font-family:var(--fbody); }
+.theme > h2 { font:700 10.5px var(--fmono); letter-spacing:.09em; text-transform:uppercase; color:var(--dim); margin:0 2px 12px; }
+
+/* ── shared app primitives ─────────────────────────────────────── */
+.sheet { background:var(--bg); border:1px solid var(--border); border-radius:14px; overflow:hidden; }
+.shead { display:flex; align-items:center; gap:10px; padding:11px 16px; border-bottom:1px solid var(--border); }
+.crumb { font-size:12px; color:var(--muted); }
+.crumb b { color:var(--body); font-weight:600; }
+.sname { font-weight:640; font-size:13.5px; letter-spacing:-.01em; }
+.chip { font:650 9.5px var(--fmono); letter-spacing:.08em; padding:3px 9px; border-radius:var(--r-full); text-transform:uppercase; }
+.c-chat { background:var(--panel3); color:var(--muted); border:1px solid var(--border2); }
+.c-prog { background:color-mix(in srgb, var(--prog) 16%, transparent); color:var(--prog); }
+.c-acc { background:color-mix(in srgb, var(--acc) 16%, transparent); color:var(--acc); }
+.c-review { background:color-mix(in srgb, var(--review) 16%, transparent); color:var(--review); }
+.c-todo { background:color-mix(in srgb, var(--todo) 16%, transparent); color:var(--todo); }
+.c-done { background:color-mix(in srgb, var(--done) 16%, transparent); color:var(--done); }
+.mright { margin-left:auto; display:flex; align-items:center; gap:8px; }
+.tbody { padding:14px 18px 16px; display:flex; flex-direction:column; gap:2px; }
+.msg { padding:7px 10px; border-radius:9px; display:flex; gap:10px; }
+.mav { width:22px; height:22px; border-radius:50%; flex:none; display:grid; place-items:center; font:700 9.5px var(--fmono); margin-top:1px; }
+.mav.h { background:var(--panel3); color:var(--body); }
+.mav.a { background:color-mix(in srgb, var(--role-orch) 17%, transparent); color:var(--role-orch); }
+.mav.d { background:color-mix(in srgb, var(--role-dev) 17%, transparent); color:var(--role-dev); }
+.mwho { font-size:11px; color:var(--muted); font-weight:620; margin-bottom:2px; }
+.mtx { font-size:13px; color:var(--body); line-height:1.58; }
+.mtx .ref { color:var(--link); font-family:var(--fmono); font-weight:700; font-size:12px; border-bottom:1px dotted color-mix(in srgb, var(--link) 55%, transparent); }
+.sysline { text-align:center; font:600 10px var(--fmono); letter-spacing:.08em; color:var(--dim); text-transform:uppercase; padding:8px 0 2px; }
+
+/* ── the unit card ─────────────────────────────────────────────── */
+.ucard { border:1px solid var(--card-border); background:var(--card); border-radius:var(--r-lg); padding:11px 13px; box-shadow:var(--shadow-card); margin:7px 0 3px; max-width:520px; cursor:pointer; transition:transform .15s var(--ease), box-shadow .15s var(--ease); }
+.ucard:hover { transform:translateY(-1px); box-shadow:0 8px 20px -8px var(--shadow); }
+.ucard.open { border-color:var(--ring); }
+.uhead { display:flex; align-items:center; gap:9px; }
+.uid { font:700 11.5px var(--fmono); color:var(--link); }
+.uti { font-weight:630; font-size:13px; letter-spacing:-.008em; flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.spec { display:flex; gap:2.5px; height:4px; margin-top:9px; }
+.seg { flex:1; border-radius:2px; background:color-mix(in srgb, var(--segc) 15%, transparent); }
+.segdone { background:var(--segc); }
+.seglive { background:color-mix(in srgb, var(--segc) 20%, transparent); position:relative; overflow:hidden; }
+.segfill { position:absolute; inset:0; width:43%; border-radius:2px; background:var(--segc); }
+.seggap { background:transparent; border:1.5px dashed color-mix(in srgb, var(--blocked) 55%, transparent); }
+.uline { display:flex; align-items:center; gap:7px; margin-top:8px; font-size:11.5px; color:var(--muted); }
+.uline .aav { width:15px; height:15px; border-radius:50%; display:grid; place-items:center; font:700 8px var(--fmono); }
+.uline .sep { color:var(--dim); }
+.settled { }
+.settled .uti { color:var(--body); }
+
+/* ── stop 2: peek stage ────────────────────────────────────────── */
+.pstage { display:flex; gap:0; background:var(--bg); border:1px solid var(--border); border-radius:14px; overflow:hidden; min-height:430px; }
+.pcol { flex:1; min-width:0; border-right:none; display:flex; flex-direction:column; }
+.pgrip { width:7px; flex:none; background:var(--win); border-left:1px solid var(--border); border-right:1px solid var(--border); cursor:col-resize; }
+.ppeek { width:345px; flex:none; background:var(--card); display:flex; flex-direction:column; box-shadow:-6px 0 18px -14px var(--shadow); }
+.pkhead { display:flex; align-items:center; gap:8px; padding:10px 12px; border-bottom:1px solid var(--card-border); }
+.pkfull { font-size:11.5px; color:var(--muted); font-weight:620; cursor:pointer; }
+.pkfull:hover { color:var(--body); }
+.pkx { margin-left:auto; color:var(--dim); font-size:13px; cursor:pointer; }
+.pkid { font:700 11.5px var(--fmono); color:var(--body); }
+.dial { width:19px; height:19px; border-radius:50%; flex:none; position:relative; }
+.dial::after { content:''; position:absolute; inset:0; border-radius:50%; background:conic-gradient(var(--prog) 0 38%, color-mix(in srgb, var(--prog) 24%, transparent) 38% 100%); -webkit-mask:radial-gradient(closest-side, transparent 6px, #000 6.6px); mask:radial-gradient(closest-side, transparent 6px, #000 6.6px); }
+.dialn { font:700 10.5px var(--fmono); color:var(--muted); font-variant-numeric:tabular-nums; }
+.pkbody { padding:12px 14px; display:flex; flex-direction:column; gap:10px; flex:1; }
+.pkti { font-family:var(--fdisp); font-size:16px; font-weight:640; letter-spacing:-.012em; line-height:1.3; }
+.pkfacts { display:flex; align-items:center; gap:7px; font-size:11.5px; color:var(--muted); }
+.bdot { width:6px; height:6px; border-radius:50%; background:var(--prog); animation:breathe 2.6s ease-in-out infinite; }
+@keyframes breathe { 50% { opacity:.35; } }
+.pkmsg { font-size:12.5px; color:var(--body); line-height:1.55; padding:8px 10px; border-radius:9px; background:var(--panel2); }
+.pkmsg b { font-weight:640; }
+.artchip { display:inline-flex; align-items:center; gap:6px; font:600 10.5px var(--fmono); color:var(--muted); border:1px solid var(--border2); border-radius:7px; padding:3px 8px; margin-top:6px; }
+.pkcomp { margin-top:auto; border:1px solid var(--card-border); background:var(--bg); border-radius:12px; padding:8px 11px; font-size:12px; color:var(--dim); display:flex; align-items:center; justify-content:space-between; }
+.sendo { width:20px; height:20px; border-radius:50%; background:var(--accent); color:var(--accent-ink); display:grid; place-items:center; font-size:11px; }
+.compo { border:1px solid var(--card-border); background:var(--card); border-radius:14px; padding:10px 13px; font-size:12.5px; color:var(--dim); display:flex; align-items:center; justify-content:space-between; margin:10px 16px 14px; }
+
+/* ── stop 3: offer card + popover ──────────────────────────────── */
+.duo { display:grid; grid-template-columns:1fr 1fr; gap:14px; align-items:start; }
+@media (max-width:760px){ .duo { grid-template-columns:1fr; } }
+.ocard { border:1px solid var(--card-border); background:var(--card); border-radius:var(--r-lg); padding:13px 15px; box-shadow:var(--shadow-card); }
+.oeyebrow { font:700 9.5px var(--fmono); letter-spacing:.1em; text-transform:uppercase; color:var(--dim); margin-bottom:7px; }
+.oti { font-family:var(--fdisp); font-size:15.5px; font-weight:640; letter-spacing:-.012em; }
+.odesc { font-size:12.5px; color:var(--muted); line-height:1.55; margin-top:5px; }
+.jrow { display:flex; flex-wrap:wrap; gap:6px; margin-top:11px; }
+.jleg { display:inline-flex; align-items:center; gap:6px; font:650 9.5px var(--fmono); letter-spacing:.07em; text-transform:uppercase; padding:4px 9px; border-radius:var(--r-full); background:color-mix(in srgb, var(--c) 16%, transparent); color:var(--c); }
+.jleg .x { opacity:.55; cursor:pointer; font-size:10px; }
+.jleg .x:hover { opacity:1; }
+.jleg.add { background:transparent; border:1.5px dashed var(--border2); color:var(--dim); cursor:pointer; }
+.jleg.add:hover { color:var(--muted); border-color:var(--ring); }
+.jnote { font-size:11px; color:var(--dim); margin-top:9px; line-height:1.5; }
+.obtns { display:flex; gap:8px; margin-top:12px; flex-wrap:wrap; }
+.btn { font-size:12px; font-weight:620; padding:7px 14px; border-radius:var(--r-full); cursor:pointer; }
+.btn.pri { background:var(--accent); color:var(--accent-ink); }
+.btn.sec { background:var(--card); color:var(--body); border:1px solid var(--border2); }
+.btn.ghost { background:transparent; color:var(--muted); border:1px solid var(--border); }
+.pop { background:var(--overlay); border:1px solid var(--border2); border-radius:10px; padding:11px 13px; box-shadow:var(--shadow-pop); max-width:300px; }
+.pophead { font:700 9.5px var(--fmono); letter-spacing:.1em; text-transform:uppercase; color:var(--dim); margin-bottom:8px; display:flex; justify-content:space-between; }
+.poprow { display:flex; align-items:center; gap:8px; font-size:12px; padding:3.5px 0; }
+.pdot { width:7px; height:7px; border-radius:50%; flex:none; }
+.poprow .lg { width:52px; color:var(--body); font-weight:620; }
+.poprow .who { color:var(--muted); font-size:11.5px; }
+.popfoot { font-size:10.5px; color:var(--dim); font-style:italic; margin-top:8px; border-top:1px solid var(--border); padding-top:7px; }
+
+/* ── stop 4: session list + ledger ─────────────────────────────── */
+.sgroup { font:700 9.5px var(--fmono); letter-spacing:.1em; text-transform:uppercase; color:var(--dim); margin:12px 4px 6px; }
+.srow { display:flex; align-items:center; gap:11px; padding:9px 12px; border:1px solid transparent; border-radius:11px; cursor:pointer; }
+.srow:hover { background:var(--card); border-color:var(--card-border); }
+.sglyph { width:18px; height:18px; border-radius:6px; border:1.5px solid var(--dim); flex:none; }
+.sbody { flex:1; min-width:0; }
+.st { font-size:13px; font-weight:620; letter-spacing:-.008em; display:flex; align-items:center; gap:8px; }
+.ssnip { font-size:11.5px; color:var(--muted); margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.tally { display:inline-flex; align-items:center; gap:4px; font:650 9.5px var(--fmono); color:var(--muted); background:var(--panel2); border:1px solid var(--border); border-radius:var(--r-full); padding:2px 7px; }
+.tally .on { color:var(--prog); }
+.tally .ok { color:var(--done); }
+.swhen { font:600 10.5px var(--fmono); color:var(--dim); flex:none; }
+.lrow { display:flex; align-items:center; gap:9px; padding:8px 11px; border:1px solid transparent; border-radius:10px; }
+.lrow:hover { background:var(--card); border-color:var(--card-border); }
+.lid { font:700 11px var(--fmono); color:var(--link); flex:none; }
+.lti { font-size:12.5px; font-weight:600; flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.lorigin { font-size:11px; color:var(--dim); flex:none; }
+.lorigin b { color:var(--muted); font-weight:600; }
+.panelbox { background:var(--bg); border:1px solid var(--border); border-radius:14px; padding:12px 14px; }
+.panelbox > h3 { font:700 10px var(--fmono); letter-spacing:.1em; text-transform:uppercase; color:var(--muted); margin:2px 2px 4px; }
+.cap { font-size:11px; color:var(--dim); font-style:italic; margin-top:10px; line-height:1.55; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="pagehead">
+    <h1>Thread-owned work — units in the conversation, journeys declared</h1>
+    <p><b>The ruling this round proposes:</b> a conversation owns the work it causes. Filing work posts a
+    <b>unit card</b> into the thread (a lens on the synced task row, never a copy); clicking it opens the
+    existing <b>peek</b>; task threads stop being session rows. The journey is <b>declared at triage</b> from
+    the closed leg vocabulary — design · plan · build · review · ship — with server floors: <b>accept is
+    always the human's</b>, and repo-backed work can never declare review away. One entity: the subtask
+    species dissolves into "a unit with a lean journey". Tokens verbatim from tokens.css, 2026-08-17.</p>
+  </div>
+
+  <!-- ─────────────────────────── STOP 1 ─────────────────────────── -->
+  <div class="stophd" id="stop1"><span class="stopno">Stop 1</span>A conversation that grew work</div>
+  <p class="stopp">One ask, two pieces of work, <b>one thread</b>. rex answers in prose, then plants two unit
+  cards — each a real synced message carrying <b>‹task:id›</b>, rendered from the live task row. The Safari
+  bug declared a lean journey (build → review → accept — no design leg); the redesign declared four legs.
+  The settled card stays as the durable record that <b>this conversation caused that work</b>. Today the only
+  trace is rex's prose and a <b>#N</b> linkify; the schema's 1:1 <b>threads.task_id</b> makes a second task
+  structurally homeless — this stop is why <b>tasks.origin_thread_id</b> inverts it.</p>
+  <div class="themes">
+    <div class="theme" data-theme="dark"><h2>Graphite dark</h2><div class="scene">
+      <div class="sheet">
+        <div class="shead"><span class="crumb">‹ <b>#product</b> · conversations</span><span class="sname">Pricing page rework</span><span class="mright"><span class="chip c-chat">chat</span></span></div>
+        <div class="tbody">
+          <div class="msg"><div class="mav h">G</div><div><div class="mwho">george · 10:41</div><div class="mtx">The pricing page needs a rework — the tiers read like a spreadsheet. And while we're in there, the FAQ accordion is broken on Safari.</div></div></div>
+          <div class="msg"><div class="mav a">✳</div><div style="flex:1;min-width:0"><div class="mwho">rex · orchestrator · 10:41</div><div class="mtx">Two distinct pieces of work in there. The accordion is a bug — patch can take it straight to build. The tier redesign is user-facing with no agreed look, so it starts at design. Filing both here.</div>
+            <div class="ucard settled">
+              <div class="uhead"><span class="uid">#1054</span><span class="uti">FAQ accordion loses focus on Safari</span><span class="chip c-acc">accepted</span></div>
+              <div class="spec"><span class="seg segdone" style="--segc:var(--prog)"></span><span class="seg segdone" style="--segc:var(--review)"></span><span class="seg segdone" style="--segc:var(--acc)"></span></div>
+              <div class="uline"><span class="aav" style="background:color-mix(in srgb,var(--role-dev) 17%,transparent);color:var(--role-dev)">p</span>patch<span class="sep">·</span>accepted yesterday<span class="sep">·</span>PR #291 merged</div>
+            </div>
+            <div class="ucard">
+              <div class="uhead"><span class="uid">#1057</span><span class="uti">Pricing tiers redesign</span><span class="chip c-prog">build</span></div>
+              <div class="spec"><span class="seg segdone" style="--segc:var(--design)"></span><span class="seg seglive" style="--segc:var(--prog)"><span class="segfill" style="--segc:var(--prog)"></span></span><span class="seg" style="--segc:var(--review)"></span><span class="seg" style="--segc:var(--acc)"></span></div>
+              <div class="uline"><span class="aav" style="background:color-mix(in srgb,var(--role-dev) 17%,transparent);color:var(--role-dev)">p</span>patch<span class="sep">·</span>restyling tier cards<span class="sep">·</span>beats 2/5</div>
+            </div>
+          </div></div>
+          <div class="msg"><div class="mav h">G</div><div><div class="mwho">george · 12:06</div><div class="mtx">Card hover shadow feels heavy on the middle tier.</div></div></div>
+          <div class="msg"><div class="mav a">✳</div><div><div class="mwho">rex · orchestrator · 12:06</div><div class="mtx">Passed to patch on <span class="ref">#1057</span> — it's in the build notes.</div></div></div>
+        </div>
+        <div class="compo"><span>Reply — @ mention · / skill · ↵ send</span><span class="sendo">↑</span></div>
+      </div>
+      <div class="cap">The card is elevated (<b>--card</b> + hairline + resting shadow — the stratum for what you click); the journey is the 4px whisper in the app's own state tones; the settled card keeps its place in the story. Conversation continues around the work.</div>
+    </div></div>
+    <div class="theme" data-theme="cream-oak"><h2>Cream oak</h2><div class="scene"></div></div>
+  </div>
+
+  <!-- ─────────────────────────── STOP 2 ─────────────────────────── -->
+  <div class="stophd" id="stop2"><span class="stopno">Stop 2</span>Click = peek, not a navigation</div>
+  <p class="stopp">Clicking a unit card docks the <b>existing peek</b> (docs/25 §1b — the task panel narrowed,
+  not a new component) beside the conversation. <b>Open full ›</b> still hands the sheet over; ✕ returns to
+  just the thread. The unit's transcript rides <b>messages.task_id</b> — no thread row is minted. Nothing on
+  this stop is new UI beyond the card; that is the point.</p>
+  <div class="themes">
+    <div class="theme" data-theme="dark"><h2>Graphite dark</h2><div class="scene">
+      <div class="pstage">
+        <div class="pcol">
+          <div class="shead"><span class="crumb">‹ <b>#product</b></span><span class="sname">Pricing page rework</span><span class="mright"><span class="chip c-chat">chat</span></span></div>
+          <div class="tbody">
+            <div class="msg"><div class="mav a">✳</div><div style="flex:1;min-width:0"><div class="mwho">rex · orchestrator</div><div class="mtx">…the tier redesign starts at design. Filing both here.</div>
+              <div class="ucard open">
+                <div class="uhead"><span class="uid">#1057</span><span class="uti">Pricing tiers redesign</span><span class="chip c-prog">build</span></div>
+                <div class="spec"><span class="seg segdone" style="--segc:var(--design)"></span><span class="seg seglive" style="--segc:var(--prog)"><span class="segfill" style="--segc:var(--prog)"></span></span><span class="seg" style="--segc:var(--review)"></span><span class="seg" style="--segc:var(--acc)"></span></div>
+                <div class="uline"><span class="aav" style="background:color-mix(in srgb,var(--role-dev) 17%,transparent);color:var(--role-dev)">p</span>patch<span class="sep">·</span>restyling tier cards<span class="sep">·</span>beats 2/5</div>
+              </div>
+            </div></div>
+            <div class="msg"><div class="mav h">G</div><div><div class="mwho">george</div><div class="mtx">Card hover shadow feels heavy on the middle tier.</div></div></div>
+          </div>
+          <div class="compo"><span>Reply — @ mention · ↵ send</span><span class="sendo">↑</span></div>
+        </div>
+        <div class="pgrip"></div>
+        <div class="ppeek">
+          <div class="pkhead"><span class="pkfull">Open full ›</span><span class="pkid">#1057</span><span class="chip c-prog">build</span><span class="dial"></span><span class="dialn">2/4</span><span class="pkx">✕</span></div>
+          <div class="pkbody">
+            <div class="pkti">Pricing tiers redesign</div>
+            <div class="pkfacts"><span class="bdot"></span>patch · build · beats 2/5 · from <b style="color:var(--muted)">‹Pricing page rework›</b></div>
+            <div class="pkmsg"><b>iris</b> — Design round 2 approved. Mockup pinned as the visual contract; three tier cards, oak accent on the middle one.</div>
+            <div class="pkmsg"><b>patch</b> — Tier cards restyled to the round-2 contract. Moving to the compare table next.<div><span class="artchip">▤ tier-cards-after.png</span></div></div>
+            <div class="pkcomp"><span>Reply to #1057…</span><span class="sendo">↑</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="cap">The peek is an elevated card resting beside the sheet — same as the shipped column (grip resize, ≤1100px takes the whole sheet). Its header keeps the dial, state chip and <b>Open full ›</b>; the origin crumb names the owning conversation.</div>
+    </div></div>
+    <div class="theme" data-theme="cream-oak"><h2>Cream oak</h2><div class="scene"></div></div>
+  </div>
+
+  <!-- ─────────────────────────── STOP 3 ─────────────────────────── -->
+  <div class="stophd" id="stop3"><span class="stopno">Stop 3</span>The journey is declared, not templated</div>
+  <p class="stopp">Triage declares the legs on the offer itself — before anyone claims. Optional legs carry ✕;
+  a removed leg returns as a dashed <b>＋ add</b>; the floors have no ✕ at all: <b>review is required the moment
+  work is repo-backed</b>, and <b>accept is always yours</b> — absence of the control is the enforcement, the
+  server refuses the rest. The ring's popover stops saying <i>derived from routing + staffing</i> and starts
+  telling the truth: <b>declared at triage · staffed live</b>.</p>
+  <div class="themes">
+    <div class="theme" data-theme="dark"><h2>Graphite dark</h2><div class="scene">
+      <div class="duo">
+        <div class="ocard">
+          <div class="oeyebrow">rex proposes · #product</div>
+          <div class="oti">Pricing tiers redesign</div>
+          <div class="odesc">User-facing, no agreed look — starts at design. Repo-backed (nm-web), so review is floored; ship rides the project gate.</div>
+          <div class="jrow">
+            <span class="jleg" style="--c:var(--design)">design<span class="x">✕</span></span>
+            <span class="jleg add">＋ plan</span>
+            <span class="jleg" style="--c:var(--prog)">build</span>
+            <span class="jleg" style="--c:var(--review)">review</span>
+            <span class="jleg" style="--c:var(--acc)">accept · you</span>
+          </div>
+          <div class="jnote">design is optional here — remove it and iris stands down. build · review · accept have no ✕: repo-backed work cannot declare review away, and accept never leaves the human. Order is causal; the vocabulary is closed.</div>
+          <div class="obtns"><span class="btn pri">✓ Create — offer design to iris</span><span class="btn sec">Edit journey</span><span class="btn ghost">Not now</span></div>
+        </div>
+        <div>
+          <div class="pop">
+            <div class="pophead"><span>◔ 2/4</span><span>phase 2 of 4</span></div>
+            <div class="poprow"><span class="pdot" style="background:var(--design)"></span><span class="lg">Design</span><span class="who">iris · done</span></div>
+            <div class="poprow"><span class="pdot" style="background:var(--prog)"></span><span class="lg">Build</span><span class="who">patch · 43% by beats</span></div>
+            <div class="poprow"><span class="pdot" style="background:var(--review)"></span><span class="lg">Review</span><span class="who">scout · up next</span></div>
+            <div class="poprow"><span class="pdot" style="background:var(--acc)"></span><span class="lg">Accept</span><span class="who">you · up next</span></div>
+            <div class="popfoot">declared at triage · staffed live</div>
+          </div>
+          <div class="cap" style="max-width:300px">The same ring, the same rows — a 4-leg journey simply has four. A lean research unit reads <b>Work · Accept</b> and nothing else; an unstaffed leg keeps its dashed hollow in the blocked tone.</div>
+        </div>
+      </div>
+    </div></div>
+    <div class="theme" data-theme="cream-oak"><h2>Cream oak</h2><div class="scene"></div></div>
+  </div>
+
+  <!-- ─────────────────────────── STOP 4 ─────────────────────────── -->
+  <div class="stophd" id="stop4"><span class="stopno">Stop 4</span>The shell after — sessions are conversations only</div>
+  <p class="stopp">The room's list (and the nav Recents, and ⌘Y — one derivation, three renderers) drops task
+  rows entirely: <b>a session is a conversation</b>, and a conversation that owns work wears a quiet tally.
+  The Tasks destination stays the cross-room ledger, grouped by the spine — and every unit names the
+  conversation it belongs to. Nothing is lost; it is all reachable through where it happened.</p>
+  <div class="themes">
+    <div class="theme" data-theme="dark"><h2>Graphite dark</h2><div class="scene">
+      <div class="duo">
+        <div class="panelbox">
+          <h3>#product · conversations</h3>
+          <div class="sgroup">Today</div>
+          <div class="srow"><span class="sglyph"></span><div class="sbody"><div class="st">Pricing page rework <span class="tally"><span class="on">1 ◔</span><span class="ok">1 ✓</span></span></div><div class="ssnip">rex → you · "passed to patch on #1057"</div></div><span class="swhen">12:06</span></div>
+          <div class="srow"><span class="sglyph"></span><div class="sbody"><div class="st">Berth sweep tuning <span class="tally"><span class="on">1 ◔</span></span></div><div class="ssnip">scout · verifying the donor CoW path on 14.4</div></div><span class="swhen">09:52</span></div>
+          <div class="srow"><span class="sglyph"></span><div class="sbody"><div class="st">Landing hero copy</div><div class="ssnip">you → rex · "hold the serif for the second line"</div></div><span class="swhen">08:15</span></div>
+          <div class="sgroup">Yesterday</div>
+          <div class="srow"><span class="sglyph"></span><div class="sbody"><div class="st">Auth boot identity <span class="tally"><span class="ok">2 ✓</span></span></div><div class="ssnip">rex · both fixes accepted — cards in the thread</div></div><span class="swhen">wed</span></div>
+        </div>
+        <div class="panelbox">
+          <h3>Tasks · the ledger (workspace)</h3>
+          <div class="sgroup">Needs you</div>
+          <div class="lrow"><span class="lid">#1055</span><span class="lti">Berth chart tokens</span><span class="lorigin">in <b>‹Berth sweep›</b></span><span class="chip c-done">done</span></div>
+          <div class="sgroup">In motion</div>
+          <div class="lrow"><span class="lid">#1057</span><span class="lti">Pricing tiers redesign</span><span class="lorigin">in <b>‹Pricing rework›</b></span><span class="chip c-prog">build</span></div>
+          <div class="lrow"><span class="lid">#1058</span><span class="lti">Compare-table keys</span><span class="lorigin">child of <b>#1057</b></span><span class="chip c-todo">todo</span></div>
+          <div class="sgroup">Settled</div>
+          <div class="lrow"><span class="lid">#1054</span><span class="lti">FAQ accordion fix</span><span class="lorigin">in <b>‹Pricing rework›</b></span><span class="chip c-acc">accepted</span></div>
+        </div>
+      </div>
+      <div class="cap">Rows keep the shipped .srow anatomy; the tally is mono at the chip scale (◔ active · ✓ settled). In the ledger, <b>child of #1057</b> shows work-within-work riding its parent — it settles into the parent's accept, never its own queue entry.</div>
+    </div></div>
+    <div class="theme" data-theme="cream-oak"><h2>Cream oak</h2><div class="scene"></div></div>
+  </div>
+</div>
+<script>
+  document.querySelectorAll('.themes').forEach(t => {
+    const src = t.querySelector('[data-theme="dark"] .scene');
+    const dst = t.querySelector('[data-theme="cream-oak"] .scene');
+    if (src && dst && !dst.children.length) dst.innerHTML = src.innerHTML;
+  });
+</script>
+</body>
+</html>

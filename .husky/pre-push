@@ -1,0 +1,68 @@
+# THE BUNDLE TRAVELS WITH THE COMMIT THAT CHANGED IT.
+#
+# packages/control-api/index.js is the esbuild bundle Vercel deploys verbatim, generated from
+# control-api/src + @neuramesh/shared. A push that leaves it stale is caught by the `control-api
+# bundle` job, which regenerates it and commits it back to the PR — and THAT is the thing this hook
+# exists to prevent. The commit is authored by github-actions[bot], this repo holds bot-authored
+# workflow runs for approval, so the PR's head moves to a commit whose CI never runs. On #456
+# (2026-09-06) `gh pr checks` showed four green Vercel checks while `typecheck · test · build` was
+# simply absent, and landing needed a human to approve the run by hand. A green-looking PR that
+# never ran its tests is the worst shape a gate can take.
+#
+# So the bundle is rebuilt HERE, before anything leaves the machine. In sync, which is the common
+# case, the push costs one esbuild run of about 40ms. Stale, and the push stops and names the two
+# commands, so the regenerated file lands in a commit YOU authored and no bot commit ever exists.
+#
+# IT BLOCKS ONLY ON EVIDENCE. A bundler that cannot run (a fresh worktree with no node_modules)
+# proves nothing about the bundle, so that warns and lets the push through, and CI stays the
+# backstop. Only a rebuild that actually CHANGES index.js stops a push.
+# WORKTREES SHARE ONE core.hooksPath. husky's shim resolves a hook against the directory above
+# core.hooksPath, which is the PRIMARY clone — never the worktree you are standing in — and it
+# exits 0 when the file is not there. So this hook is inert in every worktree until the primary
+# clone holds a commit that carries it, exactly like .husky/pre-commit today. Nothing to configure:
+# it starts working once this lands on main and the primary clone has pulled.
+BUNDLE=packages/control-api/index.js
+WATCHED="packages/control-api/src packages/shared/src packages/control-api/package.json"
+ZERO=0000000000000000000000000000000000000000
+
+# git feeds a pre-push hook one line per ref: <local ref> <local sha> <remote ref> <remote sha>.
+# Only the commits this push actually carries matter, so a branch that touches neither source tree
+# never pays for the check.
+needed=
+while read -r _localref localsha _remoteref remotesha; do
+  [ "$localsha" = "$ZERO" ] && continue                      # a branch delete carries no commits
+  if [ "$remotesha" = "$ZERO" ]; then                        # a new branch: measure from main
+    base=$(git merge-base "$localsha" origin/main 2>/dev/null) || base=
+  else
+    base=$remotesha
+  fi
+  [ -z "$base" ] && { needed=1; break; }                     # cannot read the range: check anyway
+  if [ -n "$(git diff --name-only "$base" "$localsha" -- $WATCHED)" ]; then
+    needed=1
+    break
+  fi
+done
+
+[ -z "$needed" ] && exit 0
+
+if ! pnpm --filter @neuramesh/control-api build:vercel >/dev/null 2>&1; then
+  echo "pre-push: could not rebuild $BUNDLE, so it was not checked."
+  echo "pre-push: run 'pnpm install' if this repeats. CI still regenerates it."
+  exit 0
+fi
+
+git diff --quiet -- "$BUNDLE" && exit 0
+
+echo
+echo "  $BUNDLE is stale, and this push changes what generates it."
+echo
+echo "  It is rebuilt already. Take it with your change:"
+echo
+echo "      git add $BUNDLE"
+echo "      git commit --amend --no-edit --no-verify   # or a commit of its own"
+echo
+echo "  Push it yourself and CI runs on your commit. Leave it, and the bundle bot"
+echo "  commits it for you, which moves the PR head to a commit whose workflow runs"
+echo "  wait for a human to approve them."
+echo
+exit 1

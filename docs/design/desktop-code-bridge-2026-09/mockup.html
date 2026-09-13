@@ -1,0 +1,339 @@
+<title>Code on Your Machine</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300..700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400..700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400..600&display=swap">
+<style>
+/* ────────────────────────────────────────────────────────────────────────────
+   Code on your machine — design contract, 2026-09-04 (docs/design/desktop-code-bridge-2026-09/plan.md).
+   Tokens copied from apps/desktop/src/renderer/src/tokens.css (all four themes, the rail-ink ramp);
+   geometry from the REAL classes this round touches: .cbox/.row (the composer's control row),
+   .cchip (3284), .cprojpop/.cprojitem (3291–3298, the ProjectChip popover), .cmprow (the Compute
+   panel's machine rows), .engmodebar/.engcontextchips (the Code composer). Judge it as the app.
+   ──────────────────────────────────────────────────────────────────────────── */
+:root {
+  --pg-win:#f0e5d3; --pg-bg:#fbf8f4; --pg-panel2:#f6eee1; --pg-card:#ffffff; --pg-border:#e6dbca; --pg-border2:#d3c2a8;
+  --pg-text:#3a2c22; --pg-body:#5b4c3d; --pg-muted:#8b7861; --pg-dim:#a99680; --pg-link:#9c5730;
+  --fdisp:'Source Serif 4', Georgia, serif; --fbody:'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --fmono:'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace; --ease:cubic-bezier(.22,1,.36,1);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --pg-win:#0d0d0d; --pg-bg:#141414; --pg-panel2:#212121; --pg-card:#1e1e1e; --pg-border:#272727; --pg-border2:#383838;
+    --pg-text:#cbcbcb; --pg-body:#a6a6a6; --pg-muted:#848484; --pg-dim:#6a6a6a; --pg-link:#d19a72;
+  }
+}
+:root[data-theme="dark"] {
+  --pg-win:#0d0d0d; --pg-bg:#141414; --pg-panel2:#212121; --pg-card:#1e1e1e; --pg-border:#272727; --pg-border2:#383838;
+  --pg-text:#cbcbcb; --pg-body:#a6a6a6; --pg-muted:#848484; --pg-dim:#6a6a6a; --pg-link:#d19a72;
+}
+* { box-sizing:border-box; }
+body { margin:0; background:var(--pg-bg); color:var(--pg-body); font:14px/1.55 var(--fbody); -webkit-font-smoothing:antialiased; }
+.wrap { max-width:1180px; margin:0 auto; padding:28px 28px 80px; }
+h1 { font:640 30px/1.1 var(--fdisp); letter-spacing:-.012em; color:var(--pg-text); margin:0 0 6px; text-wrap:balance; }
+h2 { font:640 21px/1.2 var(--fdisp); letter-spacing:-.01em; color:var(--pg-text); margin:0 0 4px; text-wrap:balance; }
+.lede { max-width:64ch; margin:0 0 18px; color:var(--pg-body); }
+.kick { font:650 9.5px var(--fmono); letter-spacing:.15em; text-transform:uppercase; color:var(--pg-dim); }
+section { margin-top:54px; }
+.sechd { display:flex; align-items:baseline; gap:14px; margin-bottom:14px; }
+.sechd .kick { min-width:44px; }
+.note { max-width:70ch; color:var(--pg-body); font-size:13.5px; }
+.note b { color:var(--pg-text); font-weight:600; }
+.note code, .tbl code { font:12px var(--fmono); color:var(--pg-text); background:var(--pg-panel2); padding:1px 5px; border-radius:5px; }
+.bar { position:sticky; top:0; z-index:5; display:flex; flex-wrap:wrap; gap:18px; align-items:center; padding:10px 0; margin:0 0 6px; background:color-mix(in srgb, var(--pg-bg) 88%, transparent); backdrop-filter:blur(10px); border-bottom:1px solid var(--pg-border); }
+.grp { display:flex; align-items:center; gap:6px; }
+.grp .kick { margin-right:4px; }
+.sw { font:550 12px var(--fbody); color:var(--pg-muted); background:none; border:1px solid transparent; border-radius:999px; padding:4px 10px; cursor:pointer; transition:color .13s var(--ease), background .13s var(--ease); }
+.sw:hover { color:var(--pg-text); background:color-mix(in srgb, var(--pg-text) 6%, transparent); }
+.sw.on { color:var(--pg-text); background:var(--pg-card); border-color:var(--pg-border); }
+.sw:focus-visible { outline:none; box-shadow:0 0 0 2px var(--pg-border2); }
+.cmp { display:grid; gap:22px; align-items:start; }
+.cmp.c2 { grid-template-columns:repeat(2, minmax(0, 1fr)); }
+.cmp.c1 { grid-template-columns:1fr; }
+@media (max-width:900px) { .cmp.c2 { grid-template-columns:1fr; } }
+.col > .kick { display:block; margin-bottom:8px; }
+.col .cap { font-size:12.5px; color:var(--pg-muted); margin-top:10px; max-width:46ch; }
+.col .cap b { color:var(--pg-text); font-weight:600; }
+
+/* ─── the app's theme token sets, applied per STAGE (the rail-ink ramp is the ink) ─────────── */
+.stage { position:relative; border-radius:14px; overflow:hidden; border:1px solid var(--pg-border); font-family:var(--fbody); }
+.stage.t-dark, .stage.t-soft { color-scheme:dark; }
+.stage.t-dark { --win:#0d0d0d; --bg:#141414; --panel:#191919; --panel2:#212121; --panel3:#2b2b2b; --border:#272727; --border2:#383838; --card:#1e1e1e; --card-border:#2c2c2c;
+  --text:#cbcbcb; --body:#a6a6a6; --muted:#848484; --dim:#6a6a6a; --link:#d19a72; --accent:var(--text); --accent-ink:#101010;
+  --ring:#525252; --hover-bg:color-mix(in srgb, var(--text) 7%, transparent); --sel-bg:color-mix(in srgb, var(--text) 10%, transparent);
+  --shadow-card:0 1px 2px rgba(0,0,0,.25); --shadow-pop:0 18px 44px -14px rgba(0,0,0,.6); --btn:#232323; --btn-fg:#efefef; --done:#77ac8d; --prog:#8ba0c0; --warn:#c9a15e; --blocked:#9ca0a8; }
+.stage.t-light { --win:#e9e5db; --bg:#fcfbf8; --panel:#fcfbf8; --panel2:#f4f1ea; --panel3:#ebe7dd; --border:#e2ded4; --border2:#cec5b7; --card:#ffffff; --card-border:#e2ded4;
+  --text:#3a3632; --body:#57524a; --muted:#7a746a; --dim:#98918a; --link:#8f4f2a; --accent:var(--text); --accent-ink:#ffffff;
+  --ring:color-mix(in srgb, var(--accent) 40%, var(--border2)); --hover-bg:color-mix(in srgb, var(--text) 6%, transparent); --sel-bg:color-mix(in srgb, var(--text) 8%, transparent);
+  --shadow-card:0 1px 2px rgba(70,58,44,.05); --shadow-pop:0 18px 44px -14px rgba(60,50,40,.28); --btn:#f1eee6; --btn-fg:#3a3632; --done:#2f9e6b; --prog:#4f80c4; --warn:#a9762a; --blocked:#7c7f88; }
+.stage.t-soft { --win:#1d1d1d; --bg:#262626; --panel:#2a2a2a; --panel2:#313131; --panel3:#3b3b3b; --border:#363636; --border2:#454545; --card:#2f2f2f; --card-border:#3d3d3d;
+  --text:#d2d2d2; --body:#b0b0b0; --muted:#8f8f8f; --dim:#747474; --link:#d3a07a; --accent:var(--text); --accent-ink:#141414;
+  --ring:#5f5f5f; --hover-bg:color-mix(in srgb, var(--text) 6%, transparent); --sel-bg:color-mix(in srgb, var(--text) 9%, transparent);
+  --shadow-card:0 1px 2px rgba(0,0,0,.22); --shadow-pop:0 18px 44px -14px rgba(0,0,0,.55); --btn:#343434; --btn-fg:#efefef; --done:#77ac8d; --prog:#8ba0c0; --warn:#c9a15e; --blocked:#9ca0a8; }
+.stage.t-cream { --win:#f0e5d3; --bg:#fbf8f4; --panel:#fbf8f4; --panel2:#f6eee1; --panel3:#efe1cd; --border:#e6dbca; --border2:#d3c2a8; --card:#ffffff; --card-border:#eadfce;
+  --text:#3a2c22; --body:#5b4c3d; --muted:#8b7861; --dim:#a99680; --link:#9c5730; --accent:#834a2b; --accent-ink:#fff7ee;
+  --ring:color-mix(in srgb, var(--accent) 42%, var(--border2)); --hover-bg:color-mix(in srgb, var(--text) 5%, transparent); --sel-bg:color-mix(in srgb, var(--accent) 8%, transparent);
+  --shadow-card:0 1px 2px rgba(70,42,18,.05); --shadow-pop:0 18px 44px -14px rgba(70,42,18,.25); --btn:#f3ebdf; --btn-fg:#3a2c22; --done:#2f9e6b; --prog:#4f80c4; --warn:#a06a1f; --blocked:#7c7f88; }
+
+/* ─── the sheet and the composer (docs/35 §4.2: the box, its control row) ─────────────────── */
+.sheet { background:var(--panel); padding:26px 28px 22px; min-height:230px; }
+.sheet.tall { padding-top:262px; }
+.sheet .greet { font:640 19px/1.2 var(--fdisp); color:var(--text); margin:0 0 14px; }
+.cbox { background:var(--card); border:1px solid var(--card-border); border-radius:14px; box-shadow:var(--shadow-card); padding:12px 14px 10px; position:relative; }
+.cbox .ta { min-height:44px; color:var(--dim); font-size:13px; line-height:1.5; }
+.row { display:flex; align-items:center; gap:6px; margin-top:12px; position:relative; }
+.cchips { position:relative; display:flex; align-items:center; gap:5px; min-width:0; }
+.cchip { display:inline-flex; align-items:center; gap:5px; max-width:190px; padding:4px 11px; border-radius:999px; border:1px solid var(--border); background:transparent; color:var(--muted); font-size:11px; font-weight:600; white-space:nowrap; }
+.cchip .h { color:var(--dim); font-weight:500; }
+.cchip .car { font-size:9px; color:var(--dim); }
+.cchip.open { color:var(--text); border-color:var(--ring); background:var(--sel-bg); }
+.cchip .g { font-size:11px; }
+.cdiv { width:1px; height:16px; background:var(--border); margin:0 3px; }
+.ib { width:26px; height:26px; display:grid; place-items:center; color:var(--muted); font-size:13px; }
+.send { margin-left:auto; width:30px; height:30px; border-radius:50%; background:var(--btn); color:var(--btn-fg); display:grid; place-items:center; font-size:14px; border:1px solid var(--border2); }
+.stage.t-cream .send { background:var(--accent); color:var(--accent-ink); border-color:transparent; }
+/* the popover — the ProjectChip's exactly */
+.cprojpop { position:absolute; bottom:calc(100% + 8px); left:0; width:292px; background:var(--card); border:1px solid var(--border2); border-radius:13px; padding:7px; box-shadow:var(--shadow-pop); z-index:4; }
+.cprojhint { font:650 9px var(--fmono); letter-spacing:.12em; text-transform:uppercase; color:var(--dim); padding:6px 9px 4px; }
+.cprojitem { display:flex; align-items:center; gap:9px; width:100%; padding:7px 9px; border-radius:8px; text-align:left; color:var(--body); font-size:12px; }
+.cprojitem.on { background:var(--sel-bg); }
+.cprojitem.off { opacity:.55; }
+.cprojitem .g { width:18px; text-align:center; color:var(--muted); font-size:13px; }
+.cprojitem .t { flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; }
+.cprojitem .t b { color:var(--text); font-weight:600; font-size:12px; }
+.cprojitem .t span { font-size:10.5px; color:var(--dim); }
+.cprojitem .dot { width:6px; height:6px; border-radius:50%; background:var(--dim); flex:none; }
+.cprojitem .dot.on { background:var(--done); }
+.cprojitem .dot.zz { background:var(--warn); }
+.cprojitem .ck { color:var(--text); font-size:12px; }
+.cprojtag { font:600 9px var(--fmono); color:var(--muted); background:var(--panel2); border-radius:5px; padding:2px 5px; }
+.cprojsep { border-top:1px solid var(--border); margin:5px 6px; }
+.cprojfoot { padding:6px 9px 4px; font-size:10.5px; color:var(--dim); line-height:1.4; }
+.cprojfoot b { color:var(--muted); font-weight:600; }
+
+/* the Code composer's chip rows */
+.eng { background:var(--card); border-radius:12px; padding:12px 12px 10px; margin:18px 28px 22px; box-shadow:var(--shadow-card); }
+.eng .ta { min-height:40px; color:var(--dim); font-size:13px; }
+.engbar { display:flex; align-items:center; gap:6px; margin-top:10px; }
+.engbar.top { margin-top:8px; }
+.engbar.top .send { margin-left:auto; }
+.engctx { flex-wrap:wrap; }
+.seg { display:inline-flex; background:var(--panel2); border:1px solid var(--border2); border-radius:8px; padding:2px; }
+.seg span { padding:4px 12px; border-radius:6px; font-size:11.5px; color:var(--muted); font-weight:600; }
+.seg span.on { background:var(--card); color:var(--text); box-shadow:var(--shadow-card); }
+.engctx { display:flex; align-items:center; gap:6px; margin-left:8px; position:relative; }
+
+/* the Compute panel rows (.cmprow) */
+.cmp-panel { background:var(--panel); padding:22px 26px 20px; }
+.cmp-panel h3 { font:640 15px var(--fdisp); color:var(--text); margin:0 0 10px; }
+.cmprow { display:flex; align-items:flex-start; gap:10px; padding:10px 8px; border-top:1px solid var(--border); }
+.cmprow:first-of-type { border-top:0; }
+.cmpdot { width:8px; height:8px; border-radius:50%; background:var(--dim); margin-top:6px; flex:none; }
+.cmpdot.on { background:var(--done); }
+.cmpbody { flex:1; min-width:0; }
+.cmphead { display:flex; align-items:center; gap:8px; font-size:12.5px; }
+.cmphead b { color:var(--text); font-weight:600; }
+.cmpkind { font:600 9.5px var(--fmono); letter-spacing:.06em; text-transform:uppercase; color:var(--muted); background:var(--panel2); border-radius:5px; padding:2px 6px; }
+.cmpowner { color:var(--dim); font-size:11.5px; }
+.cmpmeta { display:flex; gap:6px; margin-top:5px; }
+.cmprt { font:500 10.5px var(--fmono); color:var(--muted); border:1px solid var(--border); border-radius:6px; padding:2px 6px; }
+.cmpstate { font-size:11px; color:var(--muted); white-space:nowrap; margin-top:3px; }
+.cmpstate.zz { color:var(--warn); }
+.cmpsetting { margin-top:16px; border:1px solid var(--border); border-radius:12px; padding:12px 14px; background:var(--card); }
+.cmpsetting .k { font:650 9.5px var(--fmono); letter-spacing:.12em; text-transform:uppercase; color:var(--dim); display:flex; align-items:center; gap:8px; }
+.cmpsetting .k i { font-style:normal; font:600 9px var(--fmono); letter-spacing:.06em; color:var(--muted); background:var(--panel2); border-radius:5px; padding:2px 6px; }
+.cmpsetting .q { color:var(--text); font-size:13px; margin:6px 0 8px; }
+.radios { display:flex; gap:14px; font-size:12.5px; color:var(--body); }
+.radios span::before { content:''; display:inline-block; width:12px; height:12px; border-radius:50%; border:1.5px solid var(--border2); margin-right:7px; vertical-align:-1px; }
+.radios span.on::before { border-color:var(--text); box-shadow:inset 0 0 0 3px var(--card); background:var(--text); }
+.radios small { display:block; margin-left:19px; color:var(--dim); font-size:10.5px; }
+
+/* the rule table */
+.tbl { width:100%; border-collapse:collapse; font-size:13px; }
+.tbl th { text-align:left; font:650 9.5px var(--fmono); letter-spacing:.12em; text-transform:uppercase; color:var(--pg-dim); padding:8px 10px; border-bottom:1px solid var(--pg-border); }
+.tbl td { padding:9px 10px; border-bottom:1px solid var(--pg-border); vertical-align:top; color:var(--pg-body); }
+.tbl td b { color:var(--pg-text); font-weight:600; }
+.dec { border-left:2px solid var(--pg-border2); padding:2px 0 2px 14px; margin-top:14px; max-width:78ch; }
+.dec b { color:var(--pg-text); }
+</style>
+
+<div class="wrap">
+  <div class="bar">
+    <div class="grp"><span class="kick">theme</span>
+      <button class="sw" data-v="t-dark">Graphite</button><button class="sw" data-v="t-light">Paper</button><button class="sw" data-v="t-soft">Soft dark</button><button class="sw" data-v="t-cream">Cream oak</button>
+    </div>
+  </div>
+
+  <span class="kick">design contract · 2026-09-04 · with plan.md beside it</span>
+  <h1>Code on your machine</h1>
+  <p class="lede">The desktop app is a workspace machine, and it becomes a Code host. Where a session runs is a choice you can see: the composer says which machine will answer and lets you pick another; a desktop-only default sends sessions you start on this Mac to this Mac; sessions born on the web or from a routine prefer the cloud. One rule, three surfaces.</p>
+
+  <!-- ───────────────────────── 1 · the machine chip in New chat ───────────────────────── -->
+  <section id="chip">
+    <div class="sechd"><span class="kick">1</span><h2>The machine chip — the composer's third knob</h2></div>
+    <p class="note">Beside the room chip and the brain pill: <b>where this session will run</b>, said in the same chip idiom, with the reason in its popover. It designates the <b>session</b>; per-agent choices stay in the Compute panel. The list is the Compute panel's rows, one line each — glyph · name · owner · state — with <b>Auto</b> first and the default marked. A machine that cannot run the work is listed with its reason and cannot be picked.</p>
+    <div class="cmp c2" style="margin-top:16px">
+      <div class="col"><span class="kick">now</span>
+        <div class="stage t-cream" data-fixed="1">
+          <div class="sheet">
+            <p class="greet">Good afternoon, George. What's next in v0.9-release?</p>
+            <div class="cbox">
+              <div class="ta">Describe the work — or just ask. The orchestrator decides what becomes a task. @ mention · / skill · ↵ send</div>
+              <div class="row">
+                <span class="cchip"><span class="h">#</span> general <span class="car">▾</span></span>
+                <span class="cdiv"></span>
+                <span class="cchip"><span class="g">◎</span> Brain · Balanced <span class="car">▾</span></span>
+                <span class="ib">@</span><span class="ib">⎘</span>
+                <span class="send">↑</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="cap">The composer knows the room and the brain. Where the answer will be computed is nowhere on the surface; the Compute panel knows, three clicks away.</p>
+      </div>
+      <div class="col"><span class="kick">proposed · chip open</span>
+        <div class="stage t-cream">
+          <div class="sheet tall">
+            <p class="greet">Good afternoon, George. What's next in v0.9-release?</p>
+            <div class="cbox">
+              <div class="ta">Describe the work — or just ask. The orchestrator decides what becomes a task. @ mention · / skill · ↵ send</div>
+              <div class="row">
+                <span class="cchip"><span class="h">#</span> general <span class="car">▾</span></span>
+                <span class="cdiv"></span>
+                <span class="cchips">
+                  <span class="cchip open"><span class="g">⌂</span> This Mac <span class="car">▾</span></span>
+                  <div class="cprojpop">
+                    <div class="cprojhint">Run this session on</div>
+                    <div class="cprojitem"><span class="g">◇</span><span class="t"><b>Auto</b><span>the cloud machine when it is awake, else this Mac</span></span></div>
+                    <div class="cprojsep"></div>
+                    <div class="cprojitem on"><span class="g">⌂</span><span class="dot on"></span><span class="t"><b>This Mac</b><span>george-mac · standing by</span></span><span class="cprojtag">default</span><span class="ck">✓</span></div>
+                    <div class="cprojitem"><span class="g">☁</span><span class="dot zz"></span><span class="t"><b>Cloud</b><span>runner · asleep · wakes on send</span></span></div>
+                    <div class="cprojitem off"><span class="g">⌂</span><span class="dot"></span><span class="t"><b>mate-mac</b><span>Mate · shared with you · offline</span></span></div>
+                    <div class="cprojsep"></div>
+                    <div class="cprojfoot"><b>Sessions you start on this Mac run here.</b> Change the default in Compute.</div>
+                  </div>
+                </span>
+                <span class="cchip"><span class="g">◎</span> Brain · Balanced <span class="car">▾</span></span>
+                <span class="ib">@</span><span class="ib">⎘</span>
+                <span class="send">↑</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="cap"><b>⌂ This Mac</b> because the desktop-only default says so; the popover says why, offers the others with their state, and names where the default lives. Picking <b>Cloud</b> here designates this one session; the default is untouched.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ───────────────────────── 2 · the Code composer ───────────────────────── -->
+  <section id="code">
+    <div class="sechd"><span class="kick">2</span><h2>The same chip in Code — it names the host to dial</h2></div>
+    <p class="note">In Code the chip is not a preference the ladder honours later; it is <b>the machine the engineering channel opens to</b>. <b>This Mac</b> means the app's own engineering host, in process, no relay in the path; a cloud or member machine means the relay lane. The project and model chips stay where they are; the machine chip closes the row.</p>
+    <div class="cmp c2" style="margin-top:16px">
+      <div class="col"><span class="kick">proposed · this Mac</span>
+        <div class="stage t-dark">
+          <div class="eng">
+            <div class="ta">Describe what to build, or what to investigate…</div>
+            <div class="engbar top">
+              <span class="cchip"><span class="g">⚙</span> Prefer auto: Read <span class="car">▾</span></span>
+              <span class="send">↑</span>
+            </div>
+            <div class="engbar">
+              <span class="seg"><span>Plan</span><span class="on">Act</span></span>
+              <span class="engctx">
+                <span class="cchip"><span class="g">▣</span> v0.9-release <span class="car">▾</span></span>
+                <span class="cchip"><span class="g">✦</span> Claude Opus <span class="car">▾</span></span>
+                <span class="cchip"><span class="g">⌂</span> This Mac <span class="car">▾</span></span>
+              </span>
+            </div>
+          </div>
+        </div>
+        <p class="cap">The repo is checked out on this Mac: the worktree for the thread sits beside it, the brain is the workspace's key or the starter brain, and nothing leaves the laptop but model calls.</p>
+      </div>
+      <div class="col"><span class="kick">proposed · cloud</span>
+        <div class="stage t-dark">
+          <div class="eng">
+            <div class="ta">Describe what to build, or what to investigate…</div>
+            <div class="engbar top">
+              <span class="cchip"><span class="g">⚙</span> Ask before every action <span class="car">▾</span></span>
+              <span class="send">↑</span>
+            </div>
+            <div class="engbar">
+              <span class="seg"><span class="on">Plan</span><span>Act</span></span>
+              <span class="engctx">
+                <span class="cchip"><span class="g">▣</span> v0.9-release <span class="car">▾</span></span>
+                <span class="cchip"><span class="g">✦</span> Claude Opus <span class="car">▾</span></span>
+                <span class="cchip"><span class="g">☁</span> Cloud · waking <span class="car">▾</span></span>
+              </span>
+            </div>
+          </div>
+        </div>
+        <p class="cap">The relay lane, exactly as the browser dials it. The chip carries the machine's state while it wakes, the way the pill does, so a first send is never a silent wait.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ───────────────────────── 3 · the Compute panel ───────────────────────── -->
+  <section id="compute">
+    <div class="sechd"><span class="kick">3</span><h2>Compute — the default, and rows that say their kind</h2></div>
+    <p class="note">One new row, drawn <b>only by the desktop client</b>: sessions you start on this Mac run on This Mac or Auto. It lives in the member's compute prefs beside the per-agent choices, so it syncs like they do and never appears on the web. And every machine row states its kind — <b>this Mac · cloud · member machine · shared with you</b> — so "Cloud machine: awake" can no longer describe a laptop, which is what the dev stack's pill is doing today.</p>
+    <div class="cmp c1" style="margin-top:16px">
+      <div class="col"><span class="kick">proposed</span>
+        <div class="stage t-cream">
+          <div class="cmp-panel">
+            <h3>Machines</h3>
+            <div class="cmprow"><span class="cmpdot on"></span><div class="cmpbody"><div class="cmphead"><b>george-mac</b><span class="cmpkind">this Mac</span><span class="cmpowner">George</span></div><div class="cmpmeta"><span class="cmprt">claude</span><span class="cmprt">codex</span><span class="cmprt">code host</span></div></div><span class="cmpstate">standing by</span></div>
+            <div class="cmprow"><span class="cmpdot"></span><div class="cmpbody"><div class="cmphead"><b>runner</b><span class="cmpkind">cloud</span><span class="cmpowner">workspace</span></div><div class="cmpmeta"><span class="cmprt">claude</span><span class="cmprt">code host</span></div></div><span class="cmpstate zz">asleep · a message wakes it</span></div>
+            <div class="cmprow"><span class="cmpdot"></span><div class="cmpbody"><div class="cmphead"><b>mate-mac</b><span class="cmpkind">member machine</span><span class="cmpowner">Mate · shared with you</span></div><div class="cmpmeta"><span class="cmprt">claude</span></div></div><span class="cmpstate">offline</span></div>
+            <div class="cmpsetting">
+              <div class="k">Sessions you start on this Mac <i>desktop only</i></div>
+              <div class="q">Run them on</div>
+              <div class="radios">
+                <span class="on">This Mac<small>your keys, your files, no relay in the path</small></span>
+                <span>Auto<small>the cloud machine when it is awake, else this Mac</small></span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="cap">The row is the default the chip reads; the chip is the override for one session. Sessions born on the web or from a routine never read this row: they prefer the cloud when it is awake.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ───────────────────────── 4 · the rule ───────────────────────── -->
+  <section id="rule">
+    <div class="sechd"><span class="kick">4</span><h2>Where a session runs — the rule the ladder enforces</h2></div>
+    <p class="note">A session runs on the machine it was <b>designated</b> to, else on the machine of its <b>origin</b>. Continuity outranks both: a thread that already ran somewhere keeps running there. The designation is a column, the rule is shared pure code with tests, the claim is a lease — nothing here is a prompt.</p>
+    <table class="tbl" style="margin-top:14px">
+      <tr><th>session started from</th><th>designated by</th><th>default, nothing picked</th><th>if the chosen machine is asleep</th></tr>
+      <tr><td><b>the desktop app</b></td><td>the machine chip</td><td>the member's <b>desktop sessions</b> setting: This Mac, or Auto (cloud when awake, else this Mac)</td><td>a cloud machine is woken; a laptop is waited for one grace window, then the next capable machine steps in</td></tr>
+      <tr><td><b>the browser</b></td><td>the machine chip</td><td><b>a cloud machine when one is awake</b> (the member's, else the runner); else the member's own machine; else a granted peer</td><td>same</td></tr>
+      <tr><td><b>a routine</b></td><td>—</td><td><b>cloud when available</b> (the routine wake already raises the runner); else whichever capable machine is awake</td><td>the runner is raised ten minutes ahead of the slot</td></tr>
+    </table>
+    <div class="dec"><b>D9 · The rule above.</b> It extends the shared-compute ladder rather than replacing it: a new <code>designated</code> rung reads the thread's own machine before the prior run's, and a new <code>origin</code> rung applies the defaults. Per-agent choices and consent grants are untouched.</div>
+    <div class="dec"><b>D10 · The chip designates the session, never the agent.</b> Per-agent placement stays in Compute. A chip that could pin an agent would be a second copy of that panel in every composer.</div>
+    <div class="dec"><b>D11 · The desktop-only default is per member, and the app hosts Code as the signed-in member.</b> A laptop is one person's; the setting lives in their compute prefs. Hosting needs no machine token because the app runs the session for its own user. Letting other clients reach this Mac through the relay is a later entry in the same list, and it would say so until it lands.</div>
+  </section>
+</div>
+
+<script>
+(function () {
+  var stages = Array.prototype.slice.call(document.querySelectorAll('.stage'));
+  var themes = ['t-dark','t-light','t-soft','t-cream'];
+  var theme = null;
+  try { theme = JSON.parse(localStorage.getItem('nm-code-machine-round') || 'null'); } catch (e) {}
+  var q = new URLSearchParams(location.search).get('theme');
+  if (q === 'dark') theme = 't-dark'; if (q === 'cream-oak') theme = 't-cream'; if (q === 'light') theme = 't-light'; if (q === 'soft-dark') theme = 't-soft';
+  if (!theme) {
+    var root = document.documentElement.getAttribute('data-theme');
+    var dark = root === 'dark' || (!root && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    theme = dark ? 't-dark' : 't-cream';
+  }
+  function apply() {
+    stages.forEach(function (s) { themes.forEach(function (c) { s.classList.remove(c); }); s.classList.add(theme); });
+    document.querySelectorAll('.sw').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-v') === theme); });
+    try { localStorage.setItem('nm-code-machine-round', JSON.stringify(theme)); } catch (e) {}
+  }
+  document.querySelectorAll('.sw').forEach(function (b) { b.addEventListener('click', function () { theme = b.getAttribute('data-v'); apply(); }); });
+  apply();
+})();
+</script>

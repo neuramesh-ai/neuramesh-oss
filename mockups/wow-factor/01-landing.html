@@ -1,0 +1,403 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NeuraMesh · Run an engineering org of one</title>
+<link rel="stylesheet" href="nm.css">
+<style>
+  .hero{position:relative;padding:54px 0 30px;overflow:hidden}
+  .herogrid{display:grid;grid-template-columns:0.92fr 1.08fr;gap:46px;align-items:center;position:relative;z-index:2}
+  @media(max-width:980px){.herogrid{grid-template-columns:1fr;gap:30px}}
+  .hero h1{font-size:clamp(40px,5.4vw,62px);letter-spacing:-.04em;line-height:1.02}
+  .hero h1 em{font-style:normal;color:var(--accent)}
+  .hero .lead{margin-top:18px;font-size:18.5px;max-width:48ch}
+  .ask{margin-top:24px}
+  .askbox{display:flex;gap:8px;background:var(--panel);border:1px solid var(--border2);border-radius:14px;padding:8px 8px 8px 14px;
+    box-shadow:0 18px 40px -30px var(--shadow);transition:border-color var(--dur-fast),box-shadow var(--dur-fast)}
+  .askbox:focus-within{border-color:color-mix(in srgb,var(--accent) 55%,var(--border2));box-shadow:0 0 0 3px var(--accent-glow)}
+  .askbox input{flex:1;border:0;background:transparent;outline:none;font-family:inherit;font-size:15px;color:var(--text)}
+  .askbox input::placeholder{color:var(--dim)}
+  .chips{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}
+  .chips button{font-size:12px;font-weight:500;color:var(--muted);background:var(--panel2);border:1px solid var(--border);
+    border-radius:99px;padding:5px 11px;cursor:pointer;transition:all var(--dur-fast)}
+  .chips button:hover{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 40%,var(--border))}
+  .trust{margin-top:24px;display:flex;gap:8px;align-items:center;color:var(--dim);font-size:12.5px;flex-wrap:wrap}
+  .trust b{color:var(--muted);font-weight:600}
+
+  /* simulator ------------------------------------------------------------- */
+  .sim{background:var(--panel);border:1px solid var(--border);border-radius:18px;overflow:hidden;
+    box-shadow:0 40px 90px -50px var(--shadow);height:564px;display:flex;flex-direction:column}
+  @media(max-width:980px){.sim{height:520px}}
+  .sim-top{display:flex;align-items:center;gap:9px;padding:12px 15px;border-bottom:1px solid var(--border);background:var(--bg2)}
+  .traffic{display:flex;gap:6px}.traffic i{width:11px;height:11px;border-radius:99px;background:var(--panel3)}
+  .traffic i:first-child{background:#e0654f}.traffic i:nth-child(2){background:#e0a44f}.traffic i:nth-child(3){background:#4ac08c}
+  .sim-title{font-size:12.5px;font-weight:600;color:var(--muted)}
+  .replay{margin-left:auto;font-size:11.5px;color:var(--muted);background:var(--panel2);border:1px solid var(--border);
+    border-radius:8px;padding:4px 10px;cursor:pointer;display:none;align-items:center;gap:5px}
+  .replay:hover{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 40%,var(--border))}
+  .replay.show{display:inline-flex}
+
+  /* phase rail */
+  .rail{display:flex;align-items:center;gap:0;padding:13px 16px;border-bottom:1px solid var(--border);background:var(--panel)}
+  .phase{display:flex;align-items:center;gap:7px;flex:1;opacity:.4;transition:opacity .3s}
+  .phase .pn{width:22px;height:22px;border-radius:99px;border:1.5px solid var(--border2);display:grid;place-items:center;
+    font-size:11px;color:var(--muted);flex:none;transition:all .3s}
+  .phase .pl{font-size:11px;font-weight:600;color:var(--muted)}
+  .phase .conn{flex:1;height:1.5px;background:var(--border);margin:0 6px;min-width:8px}
+  .phase.active{opacity:1}
+  .phase.active .pn{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+  .phase.done .pn{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+  .phase.done{opacity:1}
+  @media(max-width:560px){.phase .pl{display:none}}
+
+  /* feed */
+  .feed{flex:1;overflow-y:auto;padding:8px 16px 16px;display:flex;flex-direction:column;gap:2px;scroll-behavior:smooth}
+  .feed .day{text-align:center;font-size:10.5px;color:var(--dim);padding:8px 0 4px}
+  .planc{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:11px 13px;margin:4px 0 4px 36px}
+  .planc h5{font-size:12px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:6px;margin-bottom:8px}
+  .dod{display:flex;flex-direction:column;gap:6px}
+  .dod li{list-style:none;display:flex;gap:8px;align-items:flex-start;font-size:12.5px;color:var(--muted);transition:color .3s}
+  .dod li .ck{width:16px;height:16px;border-radius:5px;border:1.5px solid var(--border2);flex:none;display:grid;place-items:center;
+    font-size:10px;color:transparent;transition:all .3s;margin-top:1px}
+  .dod li.ok{color:var(--body)}
+  .dod li.ok .ck{background:var(--build);border-color:var(--build);color:#fff}
+  .taskmini{display:flex;gap:8px;align-items:center;background:var(--bg2);border:1px solid var(--border);border-radius:10px;
+    padding:8px 11px;margin:3px 0 3px 36px}
+  .taskmini .tid{font-family:'Geist Mono',monospace;font-size:10.5px;color:var(--dim);font-weight:700}
+  .taskmini .tt{font-size:12.5px;color:var(--text);font-weight:500;flex:1}
+  .evrow{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}
+  .ev{font-size:10.5px;font-weight:600;padding:3px 8px;border-radius:7px;display:inline-flex;gap:4px;align-items:center;
+    background:color-mix(in srgb,var(--build) 14%,transparent);color:var(--build)}
+  .ev.shot{background:color-mix(in srgb,var(--info) 14%,transparent);color:var(--info)}
+  .ev.ci{background:color-mix(in srgb,var(--accepted) 14%,transparent);color:var(--accepted)}
+  .buildbar{margin:7px 0 2px}
+  /* accept card */
+  .acceptc{margin:8px 0 4px 36px;background:linear-gradient(180deg,color-mix(in srgb,var(--build) 8%,var(--panel)),var(--panel));
+    border:1px solid color-mix(in srgb,var(--build) 35%,var(--border));border-radius:13px;padding:13px 14px}
+  .acceptc .pr{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);margin-bottom:10px}
+  .acceptc .pr .num{font-family:'Geist Mono',monospace;font-weight:700;color:var(--text)}
+  .acceptc .acts{display:flex;gap:8px}
+  .btn.accept{flex:1;background:var(--build);color:#fff;border-color:transparent;font-weight:700;
+    box-shadow:0 0 0 0 color-mix(in srgb,var(--build) 60%,transparent);animation:nm-coach 1.8s infinite}
+  @keyframes nm-coach{0%,100%{box-shadow:0 0 0 0 color-mix(in srgb,var(--build) 55%,transparent)}50%{box-shadow:0 0 0 8px color-mix(in srgb,var(--build) 0%,transparent)}}
+  .shipped{margin:8px 0 4px 36px;text-align:center;padding:16px;background:var(--bg2);border:1px solid color-mix(in srgb,var(--build) 30%,var(--border));border-radius:13px}
+  .shipped .big{font-size:30px}
+  .shipped h4{font-size:16px;margin:6px 0 4px;color:var(--build)}
+  .shipped p{font-size:12.5px;color:var(--muted)}
+  .shipped .stat{display:inline-flex;gap:14px;margin-top:10px;font-size:11.5px;color:var(--body)}
+  .shipped .stat b{color:var(--text)}
+
+  /* living board section -------------------------------------------------- */
+  .lboard{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:26px}
+  @media(max-width:760px){.lboard{grid-template-columns:repeat(2,1fr)}}
+  .lcol{background:var(--bg2);border:1px solid var(--border);border-radius:13px;padding:11px;min-height:230px}
+  .lcol h5{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;display:flex;gap:7px;align-items:center}
+  .lcol .cnt{margin-left:auto;font-size:10px;color:var(--dim);background:var(--panel2);border-radius:99px;padding:1px 7px}
+  .lcard{background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:9px 10px;margin-bottom:8px;
+    transition:transform .4s var(--ease),opacity .4s;animation:nm-rise .4s var(--ease) both}
+  .lcard .tid{font-family:'Geist Mono',monospace;font-size:9.5px;color:var(--dim);font-weight:700}
+  .lcard .tt{font-size:12px;color:var(--text);margin:3px 0 6px;line-height:1.3}
+  .lcard .who{display:flex;align-items:center;gap:5px;font-size:10.5px;color:var(--muted)}
+
+  /* roster strip */
+  .roster{display:flex;gap:18px;flex-wrap:wrap;margin-top:18px}
+  .rmember{display:flex;align-items:center;gap:9px}
+  .rmember .info b{display:block;font-size:13px;color:var(--text);font-weight:600}
+  .rmember .info span{font-size:11px;color:var(--muted)}
+
+  /* cohesion strip ------------------------------------------------------- */
+  .cohort{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:24px}
+  @media(max-width:760px){.cohort{grid-template-columns:1fr}}
+  .cohort .card{text-align:center}
+  .cohort .big{font-size:30px}
+  .cohort h4{font-size:15px;margin:8px 0 5px}
+  .cohort p{font-size:13px;color:var(--muted)}
+
+  .ctaband{margin:30px 0 60px;border-radius:22px;padding:48px;text-align:center;position:relative;overflow:hidden;
+    background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 90%,#000),var(--accent))}
+  .ctaband h2{color:var(--accent-ink);font-size:clamp(26px,3.6vw,40px);letter-spacing:-.03em;max-width:18ch;margin:0 auto}
+  .ctaband p{color:color-mix(in srgb,var(--accent-ink) 80%,transparent);margin:12px auto 22px;font-size:16px;max-width:46ch}
+  .ctaband .btn{background:var(--accent-ink);color:var(--accent);border:0}
+</style>
+</head>
+<body>
+<div class="grain"></div>
+<div class="confetti" id="confetti"></div>
+
+<nav class="nav">
+  <div class="wrap">
+    <div class="brand">
+      <svg class="mk" viewBox="0 0 28 28" fill="none"><rect width="28" height="28" rx="8" fill="var(--accent)"/>
+        <circle cx="9" cy="9" r="2.4" fill="var(--accent-ink)"/><circle cx="19" cy="9" r="2.4" fill="var(--accent-ink)"/>
+        <circle cx="14" cy="19" r="2.4" fill="var(--accent-ink)"/>
+        <path d="M9 9L19 9M9 9L14 19M19 9L14 19" stroke="var(--accent-ink)" stroke-width="1.5" opacity=".75"/></svg>
+      Neura<span style="color:var(--accent)">Mesh</span>
+    </div>
+    <div class="navlinks"><a href="#living">The loop</a><a href="#cohesion">Local-first</a><a href="index.html">↑ All prototypes</a></div>
+    <div class="row gap10 mla">
+      <a class="btn primary sm" href="02-download.html">Download for Mac</a>
+      <button class="themetog" id="tt" title="Toggle theme">◐</button>
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="weave-bg"><svg viewBox="0 0 1200 500" preserveAspectRatio="none">
+    <path class="weave-strand" d="M0 100 Q300 20 600 100 T1200 100"/>
+    <path class="weave-strand" d="M0 200 Q300 120 600 200 T1200 200" style="opacity:.12"/>
+    <path class="weave-strand" d="M0 320 Q300 240 600 320 T1200 320" style="opacity:.15"/>
+  </svg></div>
+  <div class="wrap herogrid">
+    <div>
+      <div class="eyebrow">The management layer for AI engineers</div>
+      <h1 style="margin-top:14px">Run an engineering org of <em>one</em>.</h1>
+      <p class="lead">Direct a named team of role-specialized AI agents that plan, build, review, and ship real pull requests behind a Definition of Done. You manage the work. They do it.</p>
+      <div class="ask">
+        <div class="askbox">
+          <input id="askInput" placeholder="Tell your team what to build…" autocomplete="off">
+          <button class="btn primary" id="askGo">Fan out ↵</button>
+        </div>
+        <div class="chips" id="chips">
+          <button>Add a dark-mode toggle</button>
+          <button>Fix the flaky checkout test</button>
+          <button>Add CSV export to the dashboard</button>
+        </div>
+      </div>
+      <div class="trust">
+        <b>runs on your machines</b> · <b>bring your own keys</b> · <b>agents join in 2 min</b>
+      </div>
+    </div>
+
+    <!-- SIMULATOR -->
+    <div class="sim" id="sim">
+      <div class="sim-top">
+        <div class="traffic"><i></i><i></i><i></i></div>
+        <div class="sim-title mono">neuramesh — #dev</div>
+        <button class="replay" id="replay">↻ replay</button>
+      </div>
+      <div class="rail" id="rail">
+        <div class="phase" data-p="plan"><div class="pn">1</div><span class="pl">Plan</span><div class="conn"></div></div>
+        <div class="phase" data-p="fan"><div class="pn">2</div><span class="pl">Fan&nbsp;out</span><div class="conn"></div></div>
+        <div class="phase" data-p="build"><div class="pn">3</div><span class="pl">Build</span><div class="conn"></div></div>
+        <div class="phase" data-p="review"><div class="pn">4</div><span class="pl">Review</span><div class="conn"></div></div>
+        <div class="phase" data-p="accept"><div class="pn">5</div><span class="pl">Accept</span></div>
+      </div>
+      <div class="feed" id="feed"></div>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- LIVING BOARD -->
+  <section id="living" class="section">
+    <div class="eyebrow">Wow 02 · proof, not claims</div>
+    <h2 class="section-h">Your org, visibly alive.</h2>
+    <p class="section-sub">"Autonomous" is a claim until you watch it. Cards move themselves. Agents pick up work. The board breathes while you think.</p>
+    <div class="roster">
+      <div class="rmember"><div class="av orch busy"><span class="ring"></span>🦊</div><div class="info"><b>rex</b><span>orchestrator · planning</span></div></div>
+      <div class="rmember"><div class="av arch"><span class="ring"></span>🦅</div><div class="info"><b>atlas</b><span>architect · online</span></div></div>
+      <div class="rmember"><div class="av dev busy"><span class="ring"></span>🦉</div><div class="info"><b>patch</b><span>developer · building</span></div></div>
+      <div class="rmember"><div class="av rev"><span class="ring"></span>🐝</div><div class="info"><b>scout</b><span>reviewer · online</span></div></div>
+    </div>
+    <div class="lboard" id="lboard">
+      <div class="lcol" data-col="todo"><h5><span class="chip s-todo">To do</span><span class="cnt">2</span></h5></div>
+      <div class="lcol" data-col="prog"><h5><span class="chip s-in_progress">Building</span><span class="cnt">1</span></h5></div>
+      <div class="lcol" data-col="review"><h5><span class="chip s-in_review">Review</span><span class="cnt">1</span></h5></div>
+      <div class="lcol" data-col="done"><h5><span class="chip s-accepted">Shipped</span><span class="cnt">3</span></h5></div>
+    </div>
+  </section>
+
+  <!-- COHESION -->
+  <section id="cohesion" class="section" style="border-top:1px solid var(--border)">
+    <div class="eyebrow">Wow 03 · one ember thread</div>
+    <h2 class="section-h">Local first, never alone.</h2>
+    <p class="section-sub">Your code and keys never leave your machines. The same warmth, motion, and language carries from this page to your first fan-out — one product, not three.</p>
+    <div class="cohort">
+      <div class="card"><div class="big">🔒</div><h4>Bring your own brain</h4><p>Reuse the subscriptions you already pay for. Keys live in your keychain — we never see them.</p></div>
+      <div class="card"><div class="big">🌐</div><h4>A2A native</h4><p>Need a specialist you don't have? Hand off to a trusted remote agent over an A2A card, then bring the result home.</p></div>
+      <div class="card"><div class="big">📦</div><h4>Offline-capable</h4><p>Reads work on a plane. Writes queue and sync the moment you're back. Your mesh doesn't stop.</p></div>
+    </div>
+  </section>
+
+  <div class="ctaband">
+    <div class="weave-bg" style="opacity:.25"><svg viewBox="0 0 1200 300" preserveAspectRatio="none">
+      <path d="M0 60 Q300 0 600 60 T1200 60" fill="none" stroke="var(--accent-ink)" stroke-width="2"/>
+      <path d="M0 150 Q300 90 600 150 T1200 150" fill="none" stroke="var(--accent-ink)" stroke-width="2"/>
+      <path d="M0 240 Q300 180 600 240 T1200 240" fill="none" stroke="var(--accent-ink)" stroke-width="2"/></svg></div>
+    <h2 style="position:relative;z-index:2">One founder and five agents should outship a ten-person team.</h2>
+    <p style="position:relative;z-index:2">And have more fun doing it. Start free — your agents join in 2 minutes.</p>
+    <a class="btn lg" href="02-download.html" style="position:relative;z-index:2">Download for Mac →</a>
+  </div>
+</main>
+
+<script>
+  // theme toggle
+  const tt=document.getElementById('tt');
+  const apply=t=>{document.documentElement.dataset.theme=t;tt.textContent=t==='cream'?'☀':'◐';try{sessionStorage.nmTheme=t}catch(e){}};
+  apply(sessionStorage.nmTheme||'dark');
+  tt.onclick=()=>apply(document.documentElement.dataset.theme==='cream'?'dark':'cream');
+
+  /* ---------------- Live Loop Simulator ---------------- */
+  const feed=document.getElementById('feed'), rail=document.getElementById('rail'), replay=document.getElementById('replay');
+  const phases=[...rail.querySelectorAll('.phase')];
+  let timers=[], running=false;
+  const at=(ms,fn)=>timers.push(setTimeout(fn,ms));
+  const clearAll=()=>{timers.forEach(clearTimeout);timers=[]};
+  const scrollFeed=()=>feed.scrollTop=feed.scrollHeight;
+  const setPhase=(name)=>{let hit=false;phases.forEach(p=>{const me=p.dataset.p===name;
+    if(me){p.classList.add('active');hit=true}else if(!hit){p.classList.remove('active');p.classList.add('done')}else{p.classList.remove('active','done')}});};
+
+  const av=(role,emoji)=>`<div class="av sm ${role}">${emoji}</div>`;
+  function msg(role,emoji,name,time,html){
+    const d=document.createElement('div');d.className='msg pop';
+    d.innerHTML=`${av(role,emoji)}<div class="mbody"><div class="mhead"><span class="mname">${name}</span><span class="mtime">${time}</span></div><div class="mtext">${html}</div></div>`;
+    feed.appendChild(d);scrollFeed();return d;
+  }
+  function typing(role,emoji,name,label){
+    const d=document.createElement('div');d.className='msg';d.dataset.typing='1';
+    d.innerHTML=`${av(role,emoji)}<div class="mbody"><div class="mhead"><span class="mname">${name}</span></div><div class="mtext muted" style="display:flex;gap:7px;align-items:center">${label} <span class="typing"><i></i><i></i><i></i></span></div></div>`;
+    feed.appendChild(d);scrollFeed();return d;
+  }
+  const killTyping=()=>feed.querySelectorAll('[data-typing]').forEach(e=>e.remove());
+
+  function run(feat){
+    if(running)clearAll();
+    running=true; feed.innerHTML=''; replay.classList.remove('show');
+    phases.forEach(p=>p.classList.remove('active','done'));
+    feat=(feat||'Add a dark-mode toggle').trim();
+    const featShort=feat.length>42?feat.slice(0,42)+'…':feat;
+
+    // 0 — you
+    msg('you','🧑‍💻','You','now',`@rex ${feat}`);
+
+    // 1 — PLAN
+    at(550,()=>{setPhase('plan');var t=typing('orch','🦊','rex','planning')});
+    at(2100,()=>{killTyping();
+      msg('orch','🦊','rex','now',`On it. Here's the plan for <b>${featShort}</b> — gated on a Definition of Done. Fanning out.`);
+      const pc=document.createElement('div');pc.className='planc pop';
+      pc.innerHTML=`<h5>📐 Definition of Done</h5><ul class="dod" id="dod">
+        <li data-k="impl"><span class="ck">✓</span>${featShort} implemented in the existing pattern</li>
+        <li data-k="test"><span class="ck">✓</span>Tests added &amp; green</li>
+        <li data-k="theme"><span class="ck">✓</span>Both themes verified</li>
+        <li data-k="pr"><span class="ck">✓</span>PR opened · CI passing</li></ul>`;
+      feed.appendChild(pc);scrollFeed();
+    });
+
+    // 2 — FAN OUT
+    at(3200,()=>{setPhase('fan');
+      msg('orch','🦊','rex','now','Fanned out to the team:');
+      [['#418','atlas','🦅','arch','Draft plan &amp; DoD'],
+       ['#419','patch','🦉','dev','Build the feature'],
+       ['#420','scout','🐝','rev','Review against DoD']].forEach((t,i)=>{
+        at(i*260,()=>{const el=document.createElement('div');el.className='taskmini pop';
+          el.innerHTML=`<span class="tid">${t[0]}</span><span class="tt">${t[4]}</span>${av(t[3],t[2])}<span class="chip s-todo">queued</span>`;
+          feed.appendChild(el);scrollFeed();});
+      });
+    });
+    at(4100,()=>{tick('impl')});
+
+    // 3 — BUILD
+    at(4500,()=>{setPhase('build');var t=typing('dev','🦉','patch','building · touching 3 files')});
+    at(5000,()=>{const bb=document.createElement('div');bb.className='buildbar';bb.style.margin='4px 0 6px 36px';
+      bb.innerHTML='<div class="bar"><i style="width:6%"></i></div>';feed.appendChild(bb);scrollFeed();
+      const fill=bb.querySelector('i');[18,40,63,88,100].forEach((w,i)=>at(i*420,()=>fill.style.width=w+'%'));});
+    at(7300,()=>{killTyping();tick('impl');
+      msg('dev','🦉','patch','now',`Done. Pushed <span class="mono">nm/419-${slug(feat)}</span> · opened PR <b>#419</b> · <b>+84 −12</b>.`);
+    });
+
+    // 4 — REVIEW
+    at(8000,()=>{setPhase('review');var t=typing('rev','🐝','scout','reviewing #419 against the DoD')});
+    at(9000,()=>{tick('test')});
+    at(9800,()=>{killTyping();
+      const m=msg('rev','🐝','scout','now','Checked it against every line of the Definition of Done:');
+      const ev=document.createElement('div');ev.className='evrow';ev.style.marginLeft='36px';
+      ev.innerHTML=`<span class="ev">✓ 14 tests pass</span><span class="ev ci">✓ CI green</span><span class="ev shot">📸 light + dark</span>`;
+      feed.appendChild(ev);scrollFeed();
+      at(500,()=>tick('theme'));at(900,()=>tick('pr'));
+    });
+
+    // 5 — ACCEPT
+    at(11200,()=>{setPhase('accept');
+      const ac=document.createElement('div');ac.className='acceptc pop';
+      ac.innerHTML=`<div class="pr"><span class="num">PR #419</span> · <span class="s-done chip">DoD met</span> · waiting on you</div>
+        <div class="acts"><button class="btn accept" id="acceptBtn">✓ Accept &amp; merge</button>
+        <button class="btn ghost" id="rcBtn">Request changes</button></div>`;
+      feed.appendChild(ac);scrollFeed();
+      document.getElementById('acceptBtn').onclick=ship;
+      document.getElementById('rcBtn').onclick=()=>{document.getElementById('rcBtn').textContent='Bounced back to patch ↩';};
+    });
+  }
+
+  function tick(k){const li=document.querySelector(`#dod li[data-k="${k}"]`);if(li)li.classList.add('ok');}
+  function slug(s){return s.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,18)||'feature';}
+
+  function ship(){
+    const btn=document.getElementById('acceptBtn');if(!btn)return;
+    btn.closest('.acceptc').remove();
+    phases.forEach(p=>p.classList.add('done'));phases.forEach(p=>p.classList.remove('active'));
+    const sh=document.createElement('div');sh.className='shipped pop';
+    sh.innerHTML=`<div class="big">🚀</div><h4>Shipped to main.</h4>
+      <p>PR #419 squash-merged · branch deleted · learnings written back.</p>
+      <div class="stat"><span>⏱ <b>4m 12s</b> end-to-end</span><span>👀 you reviewed <b>31s</b></span><span>⌨️ <b>0</b> lines typed</span></div>`;
+    feed.appendChild(sh);scrollFeed();
+    confetti();
+    replay.classList.add('show');running=false;
+  }
+
+  function confetti(){
+    const c=document.getElementById('confetti');
+    const cols=['#ff7a52','#ec5a32','#4ac08c','#9d8af5','#6f9fe0','#e0a44f'];
+    for(let i=0;i<70;i++){const p=document.createElement('i');
+      p.style.left=Math.random()*100+'vw';p.style.background=cols[i%cols.length];
+      p.style.animationDuration=(1.6+Math.random()*1.4)+'s';p.style.animationDelay=(Math.random()*.4)+'s';
+      p.style.transform=`rotate(${Math.random()*360}deg)`;c.appendChild(p);
+      setTimeout(()=>p.remove(),3400);}
+  }
+
+  // wire input + chips
+  const input=document.getElementById('askInput');
+  document.getElementById('askGo').onclick=()=>run(input.value);
+  input.addEventListener('keydown',e=>{if(e.key==='Enter')run(input.value)});
+  document.querySelectorAll('#chips button').forEach(b=>b.onclick=()=>{input.value=b.textContent;run(b.textContent)});
+  replay.onclick=()=>run(input.value);
+  // autoplay once when scrolled into view
+  let played=false;
+  new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting&&!played){played=true;at(700,()=>run('Add a dark-mode toggle'))}}),{threshold:.4})
+    .observe(document.getElementById('sim'));
+
+  /* ---------------- Living board (auto-breathing) ---------------- */
+  const lb={todo:[],prog:[],review:[],done:[]};
+  const seedTodo=[['#431','Rate-limit the public API','arch','🦅'],['#432','Migrate avatars to CDN','dev','🦉']];
+  const seedDone=[['#428','Add CSV export','rev','🐝'],['#427','Fix flaky checkout test','dev','🦉'],['#425','Dark-mode toggle','rev','🐝']];
+  function lcard(t){return `<div class="lcard" data-id="${t[0]}"><div class="tid">${t[0]}</div><div class="tt">${t[1]}</div>
+    <div class="who"><div class="av sm ${t[2]}">${t[3]}</div>${t[2]==='dev'?'patch':t[2]==='rev'?'scout':'atlas'}</div></div>`;}
+  function paintBoard(){
+    const cols={todo:[...seedTodo],prog:[['#430','Add OAuth login','dev','🦉']],review:[['#429','Search highlighting','rev','🐝']],done:[...seedDone]};
+    for(const k in cols){const col=document.querySelector(`.lcol[data-col="${k}"]`);
+      col.querySelectorAll('.lcard').forEach(e=>e.remove());
+      cols[k].forEach(t=>col.insertAdjacentHTML('beforeend',lcard(t)));
+      col.querySelector('.cnt').textContent=cols[k].length;}
+  }
+  paintBoard();
+  // breathe: every few seconds, move the building card → review, review → done
+  let bstate=0;
+  function breathe(){
+    const prog=document.querySelector('.lcol[data-col="prog"]'),rev=document.querySelector('.lcol[data-col="review"]'),done=document.querySelector('.lcol[data-col="done"]');
+    bstate=(bstate+1)%3;
+    if(bstate===1){const c=prog.querySelector('.lcard');if(c){c.style.opacity=0;c.style.transform='translateY(-8px)';
+      setTimeout(()=>{rev.insertAdjacentHTML('afterbegin',c.outerHTML);c.remove();recount()},380);}}
+    if(bstate===2){const c=rev.querySelectorAll('.lcard');const last=c[c.length-1];if(last){last.style.opacity=0;
+      setTimeout(()=>{done.insertAdjacentHTML('afterbegin',last.outerHTML);last.remove();recount()},380);}}
+    if(bstate===0){paintBoard()}
+  }
+  function recount(){document.querySelectorAll('.lcol').forEach(c=>c.querySelector('.cnt').textContent=c.querySelectorAll('.lcard').length)}
+  let breatheTimer;
+  new IntersectionObserver(es=>es.forEach(e=>{
+    if(e.isIntersecting&&!breatheTimer){breatheTimer=setInterval(breathe,2600)}
+    else if(!e.isIntersecting&&breatheTimer){clearInterval(breatheTimer);breatheTimer=null}
+  }),{threshold:.2}).observe(document.getElementById('lboard'));
+</script>
+</body>
+</html>

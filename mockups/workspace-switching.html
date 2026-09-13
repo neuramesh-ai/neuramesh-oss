@@ -1,0 +1,709 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Workspace switching &amp; invitations — round 1</title>
+<style>
+/* Tokens copied from apps/desktop/src/renderer/src/tokens.css (Graphite dark + Paper light).
+   Geometry copied from the REAL classes this round touches — .acctmenu/.accthead/.acctplan/
+   .acctsect/.acctitem (tokens.css:1285-1305), .navhead-main/.wsswitch-txt (:1041,:188-194),
+   .navitem, .srow. Judge this as the app, not as a sketch. */
+:root, [data-theme='dark'] {
+  --win:#0d0d0d; --bg:#141414; --panel:#191919; --panel2:#212121; --panel3:#2b2b2b;
+  --border:#272727; --border2:#383838;
+  --text:#eaeaea; --body:#b6b6b6; --muted:#898989; --dim:#676767;
+  --link:#d19a72; --accent:var(--text); --accent-ink:#101010; --overlay:#222222;
+  --btn:#232323; --btn-fg:#efefef; --btn-hover:#2f2f2f;
+  --green:#77ac8d; --warn:#c9a15e; --violet:#a89ccf; --orch:#9793d2; --blocked:#9ca0a8;
+  --brand:#834a2b; --brand-ink:#fff7ee;
+  --card:#1e1e1e; --card-border:#2c2c2c;
+  --shadow:rgba(0,0,0,0.62);
+  --shadow-sheet:inset 0 1px 0 rgba(255,255,255,.05), 0 12px 30px -6px rgba(0,0,0,.5);
+  --hover-bg:color-mix(in srgb, var(--text) 7%, transparent);
+  --sel-bg:color-mix(in srgb, var(--text) 10%, transparent);
+  --hover-border:#404040; --ring:#525252;
+}
+[data-theme='light'] {
+  --win:#e9e5db; --bg:#fcfbf8; --panel:#fcfbf8; --panel2:#f4f1ea; --panel3:#ebe7dd;
+  --border:#e2ded4; --border2:#cec5b7;
+  --text:#2f2a24; --body:#524c43; --muted:#837d72; --dim:#a09889;
+  --link:#8f4f2a; --accent:var(--text); --accent-ink:#ffffff; --overlay:#ffffff;
+  --btn:#f1eee6; --btn-fg:#2f2a24; --btn-hover:#e6e2d6;
+  --green:#2f9e6b; --warn:#a9762a; --violet:#7d6cc4; --orch:#635fc0; --blocked:#7c7f88;
+  --brand:#834a2b; --brand-ink:#fff7ee;
+  --card:#ffffff; --card-border:#e2ded4;
+  --shadow:rgba(70,58,44,0.14);
+  --shadow-sheet:0 8px 26px -8px rgba(70,58,44,.15), 0 1px 2px rgba(70,58,44,.05);
+  --hover-bg:color-mix(in srgb, var(--text) 6%, transparent);
+  --sel-bg:color-mix(in srgb, var(--text) 8%, transparent);
+  --hover-border:color-mix(in srgb, var(--text) 12%, var(--border2));
+  --ring:color-mix(in srgb, var(--accent) 40%, var(--border2));
+}
+
+* { box-sizing:border-box; }
+body { margin:0; background:var(--win); color:var(--text);
+  font:400 13.5px/1.55 ui-sans-serif,-apple-system,"Segoe UI",system-ui,sans-serif; -webkit-font-smoothing:antialiased; }
+.serif { font-family:"Source Serif 4","Iowan Old Style",Georgia,serif; }
+code, .mono { font:500 11.5px ui-monospace,Menlo,monospace; }
+
+header { position:sticky; top:0; z-index:30; display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+  padding:14px 22px; background:var(--win); border-bottom:1px solid var(--border); }
+h1 { font:600 15px/1.3 inherit; margin:0; letter-spacing:-.01em; }
+.sub { color:var(--muted); font-size:12.5px; }
+.spacer { flex:1; }
+button.ctl { font:inherit; font-size:12.5px; color:var(--btn-fg); background:var(--btn);
+  border:1px solid var(--border2); border-radius:999px; padding:6px 14px; cursor:pointer; }
+button.ctl:hover { background:var(--btn-hover); }
+
+main { padding:22px; max-width:1280px; margin:0 auto; }
+section { margin-bottom:40px; }
+h2 { font:600 13px/1.4 inherit; margin:0 0 4px; letter-spacing:.02em; text-transform:uppercase; color:var(--muted); }
+h2 .n { color:var(--dim); margin-right:7px; font-family:ui-monospace,Menlo,monospace; font-size:11.5px; }
+.why { color:var(--body); font-size:13px; margin:0 0 16px; max-width:84ch; }
+.why b { color:var(--text); font-weight:600; }
+.why + .why { margin-top:-8px; }
+.cols { display:grid; grid-template-columns:1fr 1fr; gap:18px; align-items:start; }
+.cols3 { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:18px; align-items:start; }
+@media (max-width:1080px){ .cols{ grid-template-columns:1fr; } }
+
+.pane { background:var(--bg); border:1px solid var(--border); border-radius:14px; box-shadow:var(--shadow-sheet); overflow:hidden; }
+.panehead { display:flex; align-items:center; gap:9px; padding:10px 14px; border-bottom:1px solid var(--border); background:var(--panel); font-size:12.5px; font-weight:600; }
+.panebody { padding:16px; display:flex; justify-content:center; background:
+  linear-gradient(0deg, color-mix(in srgb, var(--win) 55%, transparent), color-mix(in srgb, var(--win) 55%, transparent)); }
+.tag { font:600 10px/1 inherit; letter-spacing:.07em; text-transform:uppercase; padding:4px 7px; border-radius:5px; flex:none; }
+.tag.good { color:var(--green); background:color-mix(in srgb,var(--green) 15%,transparent); }
+.tag.mut { color:var(--muted); background:var(--panel3); }
+.tag.warn { color:var(--warn); background:color-mix(in srgb,var(--warn) 15%,transparent); }
+.tag.new { color:var(--violet); background:color-mix(in srgb,var(--violet) 16%,transparent); }
+
+/* ── the account menu — REAL geometry (tokens.css:1285) ─────────────────────── */
+.acctmenu { width:250px; background:var(--overlay); border:1px solid var(--border2); border-radius:14px;
+  box-shadow:0 24px 56px -18px var(--shadow); padding:6px; text-align:left; }
+.accthead { display:flex; align-items:center; gap:10px; padding:9px 10px 11px; }
+.acctav { width:38px; height:38px; border-radius:11px; background:var(--accent); color:var(--accent-ink);
+  display:grid; place-items:center; font-weight:700; font-size:16px; flex:none; }
+.acctid { min-width:0; display:flex; flex-direction:column; gap:1px; }
+.acctid b { font-size:14px; font-weight:700; }
+.acctid span { font-size:11.5px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.acctplan { display:flex; align-items:center; gap:10px; width:100%; background:color-mix(in srgb,var(--accent) 6%,transparent);
+  border:1px solid color-mix(in srgb,var(--accent) 20%,var(--border)); border-radius:10px; padding:9px 11px;
+  cursor:pointer; margin-bottom:5px; font:inherit; }
+.acctplanbody { flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; text-align:left; }
+.acctplanbody b { font-size:12.5px; color:var(--text); }
+.acctplanbody span { font-size:11px; color:var(--muted); }
+.acctplanico { flex:none; color:var(--body); display:inline-flex; }
+.acctsect { font:700 9.5px ui-monospace,Menlo,monospace; letter-spacing:.08em; text-transform:uppercase;
+  color:var(--dim); padding:8px 11px 3px; display:flex; align-items:center; gap:6px; }
+.acctitem { display:flex; align-items:center; gap:10px; width:100%; background:none; border:none; border-radius:9px;
+  padding:9px 11px; font-size:13px; color:var(--text); cursor:pointer; font-family:inherit; text-align:left; }
+.acctitem:hover { background:var(--hover-bg); }
+.acctitem.danger { color:var(--blocked); }
+.acctico { width:16px; display:inline-flex; align-items:center; justify-content:center; flex:none; color:var(--muted); }
+.acctfoot { display:flex; align-items:center; gap:8px; margin-top:5px; padding:8px 4px 2px; border-top:1px solid var(--border); }
+
+/* ── NEW: the workspace rows inside the account menu ────────────────────────── */
+.wsrow { display:flex; align-items:center; gap:10px; width:100%; background:none; border:1px solid transparent;
+  border-radius:9px; padding:7px 9px; font:inherit; color:var(--text); cursor:pointer; text-align:left;
+  transition:background .12s ease, border-color .12s ease; }
+.wsrow:hover { background:var(--hover-bg); }
+.wsrow.on { background:var(--sel-bg); }
+/* the workspace's face: initial tile, same ramp as .acctav but control-sized */
+.wstile { width:24px; height:24px; border-radius:7px; flex:none; display:grid; place-items:center;
+  font:700 11px inherit; background:var(--panel3); color:var(--body); }
+.wsrow.on .wstile { background:var(--accent); color:var(--accent-ink); }
+.wsbody { flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; }
+.wsbody b { font-size:12.5px; font-weight:620; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.wsbody span { font-size:10.5px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.wscheck { flex:none; color:var(--text); display:inline-flex; }
+/* the one honest signal in the list: where this machine's agents actually are */
+.wshere { flex:none; font:600 9px ui-monospace,Menlo,monospace; letter-spacing:.05em; text-transform:uppercase;
+  color:var(--green); background:color-mix(in srgb,var(--green) 14%,transparent); border-radius:4px; padding:3px 5px; }
+.wsdot { flex:none; width:6px; height:6px; border-radius:50%; background:var(--violet); }
+
+/* ── the nav head shortcut (top dock) ──────────────────────────────────────── */
+.navhead { display:flex; align-items:center; gap:8px; padding:9px 11px; background:var(--win);
+  border:1px solid var(--border); border-radius:12px; width:270px; }
+.navhead-main { flex:1; min-width:0; display:flex; align-items:center; gap:10px; text-align:left; background:none;
+  border:none; padding:5px 7px; margin:-3px -5px; border-radius:11px; cursor:pointer; color:var(--text); }
+.navhead-main:hover { background:var(--hover-bg); }
+.navbadge { width:26px; height:26px; border-radius:8px; flex:none; display:grid; place-items:center;
+  background:var(--panel3); color:var(--body); font:700 12px inherit; }
+.wsproj { flex:1; min-width:0; display:flex; align-items:center; gap:6px; }
+.wsswitch-txt { flex:1; min-width:0; }
+.wsswitch-txt b { display:block; font-weight:700; font-size:14.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.wsswitch-txt small { display:block; font-weight:500; font-size:11px; color:var(--dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.wsswitch-txt small.link { color:var(--muted); text-decoration:underline; text-decoration-color:var(--border2); text-underline-offset:2px; }
+.wscaret { flex:none; color:var(--muted); font-size:14px; font-weight:700; line-height:1; }
+
+/* ── cards (the invitation, the switch sheet) ───────────────────────────────── */
+.card { background:var(--card); border:1px solid var(--card-border); border-radius:14px; padding:16px 17px;
+  box-shadow:var(--shadow-sheet); width:100%; max-width:520px; }
+.cardhd { display:flex; align-items:flex-start; gap:12px; margin-bottom:12px; }
+.cardhd .wstile { width:38px; height:38px; border-radius:11px; font-size:16px; }
+.cardttl { flex:1; min-width:0; }
+.cardttl b { display:block; font:600 15px/1.35 "Source Serif 4",Georgia,serif; letter-spacing:-.005em; }
+.cardttl span { display:block; font-size:12.5px; color:var(--muted); margin-top:2px; }
+.cardfacts { display:flex; flex-wrap:wrap; gap:6px; margin:0 0 13px; }
+.tok { display:inline-flex; align-items:center; gap:5px; font:500 11px ui-monospace,Menlo,monospace;
+  color:var(--muted); background:var(--panel2); border:1px solid var(--border); border-radius:999px; padding:4px 9px; }
+.tok b { color:var(--body); font-weight:600; }
+.cardbody { font-size:12.8px; color:var(--body); margin:0 0 14px; }
+.cardbody b { color:var(--text); font-weight:600; }
+.cardacts { display:flex; align-items:center; gap:8px; }
+.btn { font:inherit; font-size:12.5px; font-weight:550; border-radius:999px; padding:7px 15px; cursor:pointer;
+  border:1px solid var(--border2); background:var(--btn); color:var(--btn-fg); }
+.btn:hover { background:var(--btn-hover); }
+.btn.primary { background:var(--accent); color:var(--accent-ink); border-color:transparent; }
+.btn.ghost { background:none; border-color:transparent; color:var(--muted); }
+.btn.ghost:hover { background:var(--hover-bg); color:var(--text); }
+.btn.danger { color:var(--warn); border-color:color-mix(in srgb,var(--warn) 35%,var(--border2)); background:none; }
+.btn.danger:hover { background:color-mix(in srgb,var(--warn) 10%,transparent); }
+.cardnote { font-size:11.5px; color:var(--dim); margin-left:auto; }
+
+/* the consequence strip — the honest bit of the switch sheet */
+.conseq { border:1px solid var(--border); border-radius:11px; background:var(--panel); padding:0; margin:0 0 14px; overflow:hidden; }
+.conseqrow { display:flex; align-items:flex-start; gap:10px; padding:10px 12px; font-size:12.4px; color:var(--body); }
+.conseqrow + .conseqrow { border-top:1px solid var(--border); }
+.conseqrow b { color:var(--text); font-weight:600; }
+.cico { flex:none; width:17px; height:17px; display:grid; place-items:center; color:var(--muted); margin-top:1px; }
+.cico.warn { color:var(--warn); }
+.cico.ok { color:var(--green); }
+
+/* ── Home, for placing the invitation card in context ───────────────────────── */
+.home { width:100%; max-width:560px; }
+.homehd { font:600 19px/1.3 "Source Serif 4",Georgia,serif; margin:0 0 3px; }
+.homesub { font-size:12.5px; color:var(--muted); margin:0 0 15px; }
+.qrow { display:flex; align-items:center; gap:11px; padding:9px 12px; border:1px solid transparent; border-radius:11px; }
+.qrow:hover { background:var(--card); border-color:var(--card-border); }
+.qdial { flex:none; width:18px; height:18px; border-radius:50%;
+  background:conic-gradient(var(--orch) 30%, color-mix(in srgb,var(--dim) 30%,transparent) 0);
+  -webkit-mask:radial-gradient(circle, transparent 55%, #000 57%); mask:radial-gradient(circle, transparent 55%, #000 57%); }
+.qbody { flex:1; min-width:0; display:flex; flex-direction:column; gap:1.5px; }
+.qt { font-size:13px; font-weight:620; letter-spacing:-.005em; }
+.qs { font-size:11.5px; color:var(--muted); }
+.qwhen { font:500 10.5px ui-monospace,Menlo,monospace; color:var(--dim); flex:none; }
+
+/* ── first run (onboarding pre-emption) ────────────────────────────────────── */
+.firstrun { width:100%; max-width:560px; text-align:center; padding:26px 20px 22px; }
+.firstrun .mark { font:600 15px "Bricolage Grotesque",ui-sans-serif,sans-serif; color:var(--brand); margin-bottom:22px; letter-spacing:-.01em; }
+.firstrun h3 { font:600 22px/1.28 "Source Serif 4",Georgia,serif; margin:0 0 7px; letter-spacing:-.01em; }
+.firstrun p { font-size:13px; color:var(--body); margin:0 auto 20px; max-width:44ch; }
+.invtile { display:flex; align-items:center; gap:12px; text-align:left; border:1px solid var(--border2);
+  border-radius:13px; background:var(--panel); padding:13px 14px; margin:0 0 16px; }
+.invtile .wstile { width:36px; height:36px; border-radius:10px; font-size:15px; }
+.orsep { display:flex; align-items:center; gap:10px; color:var(--dim); font-size:11px; margin:16px 0 12px; }
+.orsep::before, .orsep::after { content:''; flex:1; height:1px; background:var(--border); }
+
+/* ── settings (Members tab) ────────────────────────────────────────────────── */
+.setwrap { border:1px solid var(--border); border-radius:14px; background:var(--bg); overflow:hidden; box-shadow:var(--shadow-sheet); width:100%; }
+.setnav { display:flex; gap:2px; padding:8px; border-bottom:1px solid var(--border); background:var(--panel); flex-wrap:wrap; }
+.setnav button { font:inherit; font-size:12.5px; color:var(--muted); background:none; border:none; padding:6px 11px; border-radius:8px; cursor:pointer; }
+.setnav button.on { background:var(--panel3); color:var(--text); font-weight:600; }
+.setbody { padding:16px 18px 18px; }
+.sect { font:600 12px inherit; color:var(--text); padding:6px 0 5px; }
+.sect.sp { padding-top:16px; }
+.wshint { font-size:12px; color:var(--muted); margin:0 0 11px; }
+.mrow { display:flex; align-items:center; gap:11px; padding:9px 11px; border:1px solid var(--border);
+  border-radius:11px; background:var(--panel); margin-bottom:7px; }
+.mav { width:26px; height:26px; border-radius:8px; flex:none; display:grid; place-items:center;
+  background:var(--panel3); color:var(--body); font:700 11px inherit; }
+.mbody { flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; }
+.mbody b { font-size:12.5px; font-weight:620; }
+.mbody span { font-size:11px; color:var(--muted); }
+.mrole { font:600 9.5px ui-monospace,Menlo,monospace; letter-spacing:.06em; text-transform:uppercase;
+  color:var(--muted); background:var(--panel3); border-radius:5px; padding:4px 7px; flex:none; }
+.mrow.pending { background:none; border-style:dashed; }
+.mrow.pending .mav { background:none; border:1px dashed var(--border2); color:var(--dim); }
+.btn.sm { font-size:11.5px; padding:5px 11px; }
+.dangerzone { border:1px solid color-mix(in srgb,var(--warn) 28%,var(--border)); border-radius:12px;
+  padding:13px 14px; margin-top:16px; background:color-mix(in srgb,var(--warn) 5%,transparent); }
+.dangerzone b { display:block; font-size:12.5px; margin-bottom:3px; }
+.dangerzone p { margin:0 0 11px; font-size:12px; color:var(--body); }
+.locked { display:flex; align-items:flex-start; gap:9px; font-size:12px; color:var(--muted);
+  border:1px dashed var(--border2); border-radius:10px; padding:10px 12px; }
+
+/* ── the enforcement table ─────────────────────────────────────────────────── */
+table { width:100%; border-collapse:collapse; font-size:12.5px; }
+th { text-align:left; font:700 9.5px ui-monospace,Menlo,monospace; letter-spacing:.07em; text-transform:uppercase;
+  color:var(--dim); padding:0 12px 8px; border-bottom:1px solid var(--border); }
+td { padding:10px 12px; border-bottom:1px solid var(--border); color:var(--body); vertical-align:top; }
+td b { color:var(--text); font-weight:600; }
+td code { color:var(--body); background:var(--panel2); border:1px solid var(--border); border-radius:5px; padding:1px 5px; }
+tr:last-child td { border-bottom:none; }
+.where { font:600 9.5px ui-monospace,Menlo,monospace; letter-spacing:.05em; text-transform:uppercase;
+  border-radius:5px; padding:4px 7px; white-space:nowrap; }
+.where.db { color:var(--green); background:color-mix(in srgb,var(--green) 14%,transparent); }
+.where.srv { color:var(--violet); background:color-mix(in srgb,var(--violet) 15%,transparent); }
+.where.ui { color:var(--muted); background:var(--panel3); }
+
+.note { color:var(--muted); font-size:12.2px; margin-top:12px; max-width:84ch; }
+.note b { color:var(--text); font-weight:600; }
+.opts { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:12px; }
+.opt { border:1px solid var(--border); border-radius:12px; padding:14px; background:var(--panel); }
+.opt.picked { border-color:color-mix(in srgb,var(--green) 40%,var(--border2)); background:color-mix(in srgb,var(--green) 5%,transparent); }
+.opt h3 { font:600 12.5px/1.35 inherit; margin:0 0 5px; display:flex; align-items:center; gap:7px; }
+.opt p { margin:0; color:var(--body); font-size:12.4px; }
+.rec { font:600 9px/1 inherit; letter-spacing:.06em; text-transform:uppercase; color:var(--green);
+  background:color-mix(in srgb,var(--green) 14%,transparent); padding:4px 6px; border-radius:4px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Workspace switching &amp; invitations</h1>
+  <span class="sub">round 1 · design gate for the multi-workspace fix</span>
+  <span class="spacer"></span>
+  <button class="ctl" onclick="document.documentElement.dataset.theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'">Toggle theme</button>
+</header>
+
+<main>
+
+<section>
+  <h2><span class="n">00</span>What this round decides</h2>
+  <p class="why">Today a person can belong to two workspaces and the desktop shows only one — the <b>oldest</b>,
+    picked by <code>resolved[0]</code>. If the workspace you were invited to happens to be older than your own, the
+    app switches into it on next boot and <b>wipes your local replica</b> on the way. There is no switcher, no way to
+    leave, and an invitation that lands while you are already signed in is never claimed at all.</p>
+  <p class="why">Three surfaces have to exist before that can be fixed: somewhere to <b>see and switch</b> workspaces,
+    an <b>invitation you accept or decline</b> rather than one that silently joins you, and a way to <b>leave</b>.
+    Everything below is drawn from the app's own tokens and control geometry.</p>
+</section>
+
+<!-- ───────────────────────────────────────────────────────────────────────── -->
+<section>
+  <h2><span class="n">01</span>Where the switcher lives</h2>
+  <p class="why">The nav dock moves — left, top, or right — and in a side dock the project name lives on the spine,
+    not in a header. The <b>account menu is the only surface present in all three positions</b>, and it already holds
+    the identity ladder this belongs to: who you are → what you pay → which workspace you are standing in. The
+    workspace is an account-level fact, so it goes there.</p>
+
+  <div class="cols">
+    <div class="pane">
+      <div class="panehead">Account menu · one workspace <span class="spacer"></span><span class="tag mut">today</span></div>
+      <div class="panebody">
+        <div class="acctmenu">
+          <div class="accthead">
+            <span class="acctav">G</span>
+            <div class="acctid"><b>george</b><span>george@acme.dev</span></div>
+          </div>
+          <button class="acctplan">
+            <span class="acctplanico">☁</span>
+            <div class="acctplanbody"><b>Cloud · Synced</b><span>unlimited projects &amp; machines</span></div>
+          </button>
+          <div class="acctsect">Workspace</div>
+          <button class="acctitem"><span class="acctico">◇</span> Agents &amp; machines</button>
+          <button class="acctitem"><span class="acctico">◷</span> Retro</button>
+          <button class="acctitem"><span class="acctico">⚙</span> Workspace settings</button>
+          <div class="acctsect">You</div>
+          <button class="acctitem"><span class="acctico">○</span> Your profile</button>
+          <button class="acctitem danger"><span class="acctico">→</span> Sign out</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="pane">
+      <div class="panehead">Account menu · two workspaces <span class="spacer"></span><span class="tag new">proposed</span></div>
+      <div class="panebody">
+        <div class="acctmenu">
+          <div class="accthead">
+            <span class="acctav">G</span>
+            <div class="acctid"><b>george</b><span>george@acme.dev</span></div>
+          </div>
+          <button class="acctplan">
+            <span class="acctplanico">☁</span>
+            <div class="acctplanbody"><b>Cloud · Synced</b><span>unlimited projects &amp; machines</span></div>
+          </button>
+
+          <div class="acctsect">Workspaces</div>
+          <button class="wsrow on">
+            <span class="wstile">A</span>
+            <span class="wsbody"><b>Acme Robotics</b><span>4 projects · 7 agents</span></span>
+            <span class="wshere">here</span>
+          </button>
+          <button class="wsrow">
+            <span class="wstile">N</span>
+            <span class="wsbody"><b>Northwind</b><span>member · 2 projects</span></span>
+          </button>
+          <button class="acctitem"><span class="acctico">＋</span> New workspace</button>
+
+          <div class="acctsect">Workspace</div>
+          <button class="acctitem"><span class="acctico">◇</span> Agents &amp; machines</button>
+          <button class="acctitem"><span class="acctico">⚙</span> Workspace settings</button>
+          <div class="acctsect">You</div>
+          <button class="acctitem"><span class="acctico">○</span> Your profile</button>
+          <button class="acctitem danger"><span class="acctico">→</span> Sign out</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="note"><b>The <span class="mono">here</span> pill is the load-bearing detail.</b> Your machine registers to
+    exactly one workspace (<code>machines.workspace_id</code>), so its agents are online in one place at a time. The
+    pill says where they are. It is not decoration — without it, "why is bosun offline in Acme?" has no answer on
+    screen.</p>
+  <p class="note">With <b>one</b> workspace the section collapses to nothing: no Workspaces heading, no rows, no
+    "New workspace". The menu is byte-for-byte what it is today. A switcher nobody needs should not be visible.</p>
+
+  <div class="opts" style="margin-top:18px">
+    <div class="opt picked">
+      <h3>Account menu <span class="rec">chosen</span></h3>
+      <p>Present in every dock position. Identity → plan → workspace is already the ladder here. Costs one new
+        section and two row styles.</p>
+    </div>
+    <div class="opt">
+      <h3>Nav head subline</h3>
+      <p>The header already prints the workspace name under the project (<code>.wsswitch-txt small</code>). Making it
+        a control is cheap — but it only exists in the <b>top</b> dock, so it cannot be the only home. Kept as a
+        shortcut, below.</p>
+    </div>
+    <div class="opt">
+      <h3>A spine strip, Slack-style</h3>
+      <p>Rejected. The spine (<code>--projrail-w: 30px</code>) is the <b>projects</b> axis, and v0.88.0 deliberately
+        stopped it being a second switcher. Putting workspaces there re-opens the confusion that commit closed.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ───────────────────────────────────────────────────────────────────────── -->
+<section>
+  <h2><span class="n">02</span>The shortcut (top dock only)</h2>
+  <p class="why">In the top dock the workspace name is already sitting under the project slug, doing nothing.
+    It becomes a second click target into the same menu — the name is the affordance, so the underline is the whole
+    change. No new chrome.</p>
+  <div class="cols">
+    <div class="pane">
+      <div class="panehead">Today <span class="spacer"></span><span class="tag mut">static text</span></div>
+      <div class="panebody">
+        <div class="navhead">
+          <button class="navhead-main">
+            <span class="navbadge">A</span>
+            <span class="wsproj">
+              <span class="wsswitch-txt"><b>neuramesh</b><small>Acme Robotics</small></span>
+              <span class="wscaret">⊞</span>
+            </span>
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="pane">
+      <div class="panehead">Proposed <span class="spacer"></span><span class="tag new">the name is a control</span></div>
+      <div class="panebody">
+        <div class="navhead">
+          <button class="navhead-main">
+            <span class="navbadge">A</span>
+            <span class="wsproj">
+              <span class="wsswitch-txt"><b>neuramesh</b><small class="link">Acme Robotics ⌄</small></span>
+              <span class="wscaret">⊞</span>
+            </span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ───────────────────────────────────────────────────────────────────────── -->
+<section>
+  <h2><span class="n">03</span>Switching restarts the app — so it says so</h2>
+  <p class="why"><code>WS</code> is a single global read in 113 places, and the agent host is a one-per-process
+    singleton with no teardown. Switching workspaces re-registers the machine, re-resolves credentials and policies,
+    and rebinds every query — which is a relaunch, the same path sign-out already takes. That is a <b>2-second cost
+    the user should be told about, not surprised by</b>. The replica is not wiped: both workspaces already stream
+    into it, so the resync is instant.</p>
+
+  <div class="cols">
+    <div class="pane">
+      <div class="panehead">Nothing running <span class="spacer"></span><span class="tag good">clean</span></div>
+      <div class="panebody">
+        <div class="card">
+          <div class="cardhd">
+            <span class="wstile">N</span>
+            <div class="cardttl"><b>Switch to Northwind</b><span>NeuraMesh restarts — about 2 seconds</span></div>
+          </div>
+          <div class="conseq">
+            <div class="conseqrow"><span class="cico ok">✓</span><span>Your work is already synced. Nothing is downloaded again.</span></div>
+            <div class="conseqrow"><span class="cico">◇</span><span>This machine's agents move to <b>Northwind</b>. Acme's agents show offline until you switch back.</span></div>
+          </div>
+          <div class="cardacts">
+            <button class="btn primary">Switch &amp; restart</button>
+            <button class="btn ghost">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pane">
+      <div class="panehead">Agents mid-flight <span class="spacer"></span><span class="tag warn">holds a warning</span></div>
+      <div class="panebody">
+        <div class="card">
+          <div class="cardhd">
+            <span class="wstile">N</span>
+            <div class="cardttl"><b>Switch to Northwind</b><span>NeuraMesh restarts — about 2 seconds</span></div>
+          </div>
+          <div class="conseq">
+            <div class="conseqrow"><span class="cico warn">▲</span><span><b>2 agents are working right now.</b> patch is on <b>#412 subtask panel</b>, scout is reviewing <b>#409</b>. Restarting stops both — their tasks stay claimed and re-run when you come back.</span></div>
+            <div class="conseqrow"><span class="cico">◇</span><span>This machine's agents move to <b>Northwind</b>. Acme's agents show offline until you switch back.</span></div>
+          </div>
+          <div class="cardacts">
+            <button class="btn primary">Switch anyway</button>
+            <button class="btn ghost">Cancel</button>
+            <span class="cardnote">⌘⏎</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="note">The warning is <b>derived, not written</b> — it reads the live <code>runs</code> rows the rail
+    already watches, so it cannot claim "2 agents" when there are none. With zero live runs the row is absent, not
+    zeroed.</p>
+</section>
+
+<!-- ───────────────────────────────────────────────────────────────────────── -->
+<section>
+  <h2><span class="n">04</span>An invitation you answer</h2>
+  <p class="why">Signing in stops joining you to anything. A pending invite for your verified address becomes a card
+    on <b>Home</b>, above the needs-you queue, because it needs you and it is not a task. Join writes the membership;
+    Decline closes the invite and frees the address for a re-invite.</p>
+
+  <div class="cols">
+    <div class="pane">
+      <div class="panehead">Home · invited <span class="spacer"></span><span class="tag new">proposed</span></div>
+      <div class="panebody">
+        <div class="home">
+          <h3 class="homehd">Good evening, george</h3>
+          <p class="homesub">2 things need you · 7 agents standing by</p>
+
+          <div class="card" style="max-width:none;margin-bottom:14px">
+            <div class="cardhd">
+              <span class="wstile">N</span>
+              <div class="cardttl"><b>Maya invited you to Northwind</b><span>maya@northwind.co · 3 days ago</span></div>
+            </div>
+            <div class="cardfacts">
+              <span class="tok">joining as <b>member</b></span>
+              <span class="tok"><b>6</b> teammates</span>
+              <span class="tok">expires in <b>11 days</b></span>
+            </div>
+            <p class="cardbody">You'll keep <b>Acme Robotics</b> — joining adds a workspace, it doesn't replace one.
+              Switch between them from your account menu.</p>
+            <div class="cardacts">
+              <button class="btn primary">Join Northwind</button>
+              <button class="btn ghost">Decline</button>
+            </div>
+          </div>
+
+          <div class="qrow">
+            <span class="qdial"></span>
+            <span class="qbody"><span class="qt">#412 · Subtask panel add box</span><span class="qs">scout approved — waiting on your accept</span></span>
+            <span class="qwhen">14m</span>
+          </div>
+          <div class="qrow">
+            <span class="qdial"></span>
+            <span class="qbody"><span class="qt">#409 · Ship plan v2</span><span class="qs">bosun needs the release plan approved</span></span>
+            <span class="qwhen">1h</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pane">
+      <div class="panehead">Joined <span class="spacer"></span><span class="tag good">the card resolves in place</span></div>
+      <div class="panebody">
+        <div class="home">
+          <h3 class="homehd">Good evening, george</h3>
+          <p class="homesub">2 things need you · 7 agents standing by</p>
+
+          <div class="card" style="max-width:none;margin-bottom:14px">
+            <div class="cardhd">
+              <span class="wstile">N</span>
+              <div class="cardttl"><b>You joined Northwind</b><span>you're a member — it's in your account menu</span></div>
+            </div>
+            <p class="cardbody">Switching restarts NeuraMesh and moves this machine's agents over.
+              <b>Acme keeps running</b> — you can come back any time.</p>
+            <div class="cardacts">
+              <button class="btn">Switch to Northwind</button>
+              <button class="btn ghost">Stay here</button>
+            </div>
+          </div>
+
+          <div class="qrow">
+            <span class="qdial"></span>
+            <span class="qbody"><span class="qt">#412 · Subtask panel add box</span><span class="qs">scout approved — waiting on your accept</span></span>
+            <span class="qwhen">14m</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="note">Two cards, not one flow: <b>joining and switching are separate acts</b>. Joining is free and
+    instant; switching costs a restart. Fusing them would make every invitation a forced context swap.</p>
+</section>
+
+<!-- ───────────────────────────────────────────────────────────────────────── -->
+<section>
+  <h2><span class="n">05</span>First run with an invitation — the trap</h2>
+  <p class="why">This is the state that breaks if we get it wrong. Once signing in no longer auto-joins, an invited
+    <b>new</b> user arrives with zero memberships — and today zero memberships means
+    <code>needsOnboarding = true</code>, so the wizard cheerfully walks them into creating <b>their own second
+    workspace</b> instead of joining the one they were invited to. Boot has to check for a pending invite
+    <b>before</b> it decides onboarding.</p>
+
+  <div class="cols">
+    <div class="pane">
+      <div class="panehead">Invited, no account yet <span class="spacer"></span><span class="tag new">pre-empts the wizard</span></div>
+      <div class="panebody">
+        <div class="firstrun">
+          <div class="mark">neuramesh</div>
+          <h3>Maya is expecting you</h3>
+          <p>You were invited to a workspace that already has a team and a board running.</p>
+          <div class="invtile">
+            <span class="wstile">N</span>
+            <span class="wsbody"><b>Northwind</b><span>maya@northwind.co · 6 teammates · joining as member</span></span>
+          </div>
+          <button class="btn primary" style="width:100%;padding:9px">Join Northwind</button>
+          <div class="orsep">or</div>
+          <button class="btn" style="width:100%;padding:9px">Set up my own workspace</button>
+          <p style="font-size:11.5px;color:var(--dim);margin:14px 0 0">You can do both — joining now doesn't stop you starting your own later.</p>
+        </div>
+      </div>
+    </div>
+    <div class="pane">
+      <div class="panehead">No invitation <span class="spacer"></span><span class="tag mut">unchanged</span></div>
+      <div class="panebody">
+        <div class="firstrun">
+          <div class="mark">neuramesh</div>
+          <h3>Let's set up your workspace</h3>
+          <p>Name it, connect a machine, and meet the crew. Two minutes.</p>
+          <button class="btn primary" style="width:100%;padding:9px">Get started</button>
+          <p style="font-size:11.5px;color:var(--dim);margin:16px 0 0">Machine → Keys → Workspace → Team → Launch</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ───────────────────────────────────────────────────────────────────────── -->
+<section>
+  <h2><span class="n">06</span>Members: invite, decline, remove, leave</h2>
+  <p class="why">The Members tab grows the states the new commands make real. A declined invite is not an error —
+    it frees the address, so re-inviting is a normal act. And <b>Leave workspace</b> finally exists, which is what
+    makes the two long-standing dead-end messages true: workspace deletion and account deletion both tell you to
+    leave first, and until now there was no way to.</p>
+
+  <div class="cols">
+    <div class="pane">
+      <div class="panehead">Workspace settings › Members</div>
+      <div class="panebody" style="padding:0">
+        <div class="setwrap" style="border:none;border-radius:0;box-shadow:none">
+          <div class="setnav">
+            <button>General</button><button class="on">Members</button><button>Brains</button><button>Policies</button><button>Billing</button>
+          </div>
+          <div class="setbody">
+            <div class="sect">Members · 3 of 3</div>
+            <div class="mrow">
+              <span class="mav">G</span>
+              <span class="mbody"><b>george</b><span>george@acme.dev</span></span>
+              <span class="mrole">owner</span>
+            </div>
+            <div class="mrow">
+              <span class="mav">S</span>
+              <span class="mbody"><b>sam</b><span>sam@acme.dev</span></span>
+              <span class="mrole">admin</span>
+              <button class="btn sm">Remove</button>
+            </div>
+            <div class="mrow pending">
+              <span class="mav">?</span>
+              <span class="mbody"><b>dana@acme.dev</b><span>invited 2 days ago · expires in 12 days</span></span>
+              <span class="mrole">member</span>
+              <button class="btn sm">Revoke</button>
+            </div>
+
+            <div class="sect sp">Invite a teammate</div>
+            <p class="wshint">Free workspaces include 3 members. Pending invitations count toward the cap.</p>
+            <div class="locked">
+              <span>▲</span>
+              <span>This workspace is full. <b>Revoke a pending invitation</b> or upgrade to Cloud to add more.</span>
+            </div>
+
+            <div class="dangerzone">
+              <b>Leave Acme Robotics</b>
+              <p>You'll lose access to its projects, rooms and board. Agents you registered keep running for the team.</p>
+              <button class="btn danger sm">Leave workspace</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pane">
+      <div class="panehead">States this round adds</div>
+      <div class="panebody" style="display:block;padding:16px">
+        <div class="sect">Invitation declined</div>
+        <div class="mrow pending" style="margin-bottom:12px">
+          <span class="mav">✕</span>
+          <span class="mbody"><b>dana@acme.dev</b><span>declined yesterday · you can invite again</span></span>
+          <button class="btn sm">Invite again</button>
+        </div>
+
+        <div class="sect">Owner tries to leave</div>
+        <div class="locked" style="margin-bottom:12px">
+          <span>▲</span>
+          <span>You own this workspace. <b>Make someone else the owner</b> first, or delete the workspace if you're
+            the last one here.</span>
+        </div>
+
+        <div class="sect">Last member, wants their account gone</div>
+        <div class="locked">
+          <span>◇</span>
+          <span>You're in <b>2 workspaces</b>. Leave or delete each one, then your account can be deleted.
+            <br><span style="color:var(--dim)">Northwind · member — Leave</span>
+            <br><span style="color:var(--dim)">Acme Robotics · owner — Delete</span></span>
+        </div>
+
+        <p class="note" style="margin-top:16px">These three replace error strings that currently name actions the
+          product does not have. <b>The message stops lying because the action starts existing</b>, not because the
+          copy got softer.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ───────────────────────────────────────────────────────────────────────── -->
+<section>
+  <h2><span class="n">07</span>What is enforced, and where</h2>
+  <p class="why">Per the doctrine: invariants live in the schema and the server, never in the UI's good manners.
+    The screens above are the <b>only</b> way to reach these, but none of them are what makes them true.</p>
+  <div class="pane">
+    <div class="panebody" style="display:block;padding:14px 6px">
+      <table>
+        <thead><tr><th style="width:34%">Rule</th><th style="width:16%">Enforced in</th><th>How</th></tr></thead>
+        <tbody>
+          <tr><td><b>An invite grants nothing until accepted</b></td><td><span class="where srv">server</span></td>
+            <td>Sign-in stops writing <code>workspace_members</code>. Membership only from <code>workspace.accept_invite</code>.</td></tr>
+          <tr><td><b>You can only accept your own invite</b></td><td><span class="where srv">server</span></td>
+            <td>Accept re-reads the caller's verified email from Clerk. The invite id alone is never sufficient.</td></tr>
+          <tr><td><b>One live invite per address per workspace</b></td><td><span class="where db">schema</span></td>
+            <td>The partial unique index on <code>(workspace_id, lower(email)) where status='pending'</code> — already there. A decline frees the slot by leaving that predicate.</td></tr>
+          <tr><td><b>A free workspace never exceeds 3 seats</b></td><td><span class="where srv">server</span></td>
+            <td>Counted at invite <em>and</em> re-counted at accept — an invite can sit for 14 days while the room fills.</td></tr>
+          <tr><td><b>The owner can't leave</b></td><td><span class="where srv">server</span></td>
+            <td><code>workspace.leave</code> rejects the owner; transfer or delete instead.</td></tr>
+          <tr><td><b>Switching never destroys local data</b></td><td><span class="where ui">client</span></td>
+            <td><code>shouldWipeReplica</code> takes the membership set and refuses to wipe a workspace you still belong to. Pure function, unit-tested.</td></tr>
+          <tr><td><b>Boot never moves you silently</b></td><td><span class="where ui">client</span></td>
+            <td><code>pickBootWorkspace</code> prefers your last workspace while you're still a member; <code>[0]</code> is the fallback, not the rule.</td></tr>
+          <tr><td><b>One workspace's rows never appear in another</b></td><td><span class="where ui">client</span></td>
+            <td>Every replica query filters on workspace. Audited by a script that must catch a known-bad query before it is trusted.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <p class="note">One thing this round deliberately does <b>not</b> fix: a machine still belongs to one workspace at a
+    time, so your agents are only online where you're standing. Multi-workspace agent hosting is a separate,
+    much larger change — the <span class="mono">here</span> pill and the switch sheet exist to make the current
+    limit legible rather than to hide it.</p>
+</section>
+
+</main>
+</body>
+</html>

@@ -1,0 +1,88 @@
+# THE PUBLIC WSS ENDPOINT for nm-relay — the browser's only way in.
+#
+# This is the cluster's FIRST load balancer: before it there was no Gateway, Ingress or
+# LoadBalancer Service anywhere in nm-fleet, because nothing needed to be reachable from
+# outside. Machines dial out, the operator dials out, and control-api lives on Vercel. A
+# browser terminal is the first thing that must be dialled IN to.
+#
+# COSTS MONEY. A global external Application Load Balancer bills a base forwarding-rule
+# charge (~$18/month) plus traffic, whether or not anyone opens a terminal. That is the
+# price of the endpoint existing, and it is worth naming here rather than discovering it
+# on an invoice.
+#
+# TLS IS CERTIFICATE MANAGER, NOT A SECRET. The cert is Google-managed and validated by DNS
+# authorization, so no private key is ever in the repo or the cluster. Provisioned out of
+# band (see rollout.md): dns-authorization -> certificate -> map -> map entry, referenced
+# here by the annotation. The cert stays PROVISIONING until the _acme-challenge CNAME
+# resolves, and the Gateway serves 404s rather than anything dangerous in the meantime.
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: nm-relay
+  namespace: nm-system
+  annotations:
+    # the Google-managed cert map; TLS terminates at the load balancer
+    networking.gke.io/certmap: nm-relay-certmap
+spec:
+  gatewayClassName: gke-l7-global-external-managed
+  addresses:
+    # the reserved static IP the DNS A record points at. NAMED, not literal: a literal here
+    # would silently provision a NEW ephemeral address if the reservation were ever recreated,
+    # and DNS would keep pointing at the old one.
+    - type: NamedAddress
+      value: nm-relay-ip
+  listeners:
+    # HTTPS only. There is no :80 listener on purpose — a plaintext lane for a socket that
+    # carries a live Clerk session token and a person's shell is not worth the convenience of
+    # a redirect, and every client of this endpoint is one we write.
+    - name: https
+      protocol: HTTPS
+      port: 443
+      # certificateRefs is deliberately absent: the certmap annotation supplies the cert, and
+      # naming both makes GKE prefer the ref and silently ignore the managed one.
+      allowedRoutes:
+        namespaces: { from: Same }
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: nm-relay
+  namespace: nm-system
+spec:
+  parentRefs:
+    - name: nm-relay
+  hostnames:
+    - relay.neuramesh.app
+  rules:
+    # one rule, everything: the relay serves exactly /healthz and the websocket upgrade, and
+    # a path-splitting rule here would only be a second place for that to drift.
+    - backendRefs:
+        - name: nm-relay
+          port: 80
+---
+# THE LOAD BALANCER RUNS ITS OWN HEALTH CHECK, AND IT IS NOT THE KUBELET'S.
+#
+# Without this, GKE gives the backend service a default check against `/` — which the relay
+# correctly 404s, because the only things it serves are /healthz and a websocket upgrade. The
+# result is a pod that reads 1/1 Running with a passing readinessProbe while the load balancer
+# calls the backend UNHEALTHY and answers every request with
+# `503 unconditional drop overload`. Two health checks, one of them invisible from kubectl.
+#
+# Observed exactly that on first provision, which is the only reason this file knows.
+apiVersion: networking.gke.io/v1
+kind: HealthCheckPolicy
+metadata:
+  name: nm-relay
+  namespace: nm-system
+spec:
+  targetRef:
+    group: ""
+    kind: Service
+    name: nm-relay
+  default:
+    config:
+      type: HTTP
+      httpHealthCheck:
+        # the same endpoint the readinessProbe uses, so the two checks cannot disagree
+        requestPath: /healthz
+        portSpecification: USE_SERVING_PORT

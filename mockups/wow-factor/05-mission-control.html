@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NeuraMesh · Mission Control</title>
+<link rel="stylesheet" href="nm.css">
+<style>
+  .dash{flex:1;overflow-y:auto;padding:24px 28px 60px}
+  .greet h2{font-size:25px;letter-spacing:-.03em}
+  .greet p{font-size:14.5px;color:var(--muted);margin-top:5px}
+  .greet p b{color:var(--text)}
+  .away{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:20px 0 26px}
+  .awaycard{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:15px 17px;position:relative;overflow:hidden}
+  .awaycard .n{font-size:32px;font-weight:800;letter-spacing:-.03em;line-height:1}
+  .awaycard .l{font-size:12.5px;color:var(--muted);margin-top:6px}
+  .awaycard.act{border-color:color-mix(in srgb,var(--accent) 35%,var(--border))}
+  .awaycard.act .n{color:var(--accent)}
+  .awaycard.warn .n{color:var(--blocked)}
+  .awaycard.ok .n{color:var(--build)}
+  .dashcols{display:grid;grid-template-columns:1.35fr 1fr;gap:16px}
+  @media(max-width:1000px){.dashcols{grid-template-columns:1fr}.away{grid-template-columns:1fr 1fr}}
+  .pnl{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:16px 18px}
+  .pnl-h{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:800;letter-spacing:-.01em;color:var(--text);margin-bottom:13px}
+  .pnl-h .c{margin-left:auto;font-size:11px;font-weight:700;color:var(--muted);background:var(--panel2);border-radius:99px;padding:2px 9px}
+
+  .qcard{display:flex;gap:12px;align-items:flex-start;padding:13px;border:1px solid var(--border);border-radius:12px;margin-bottom:10px;
+    background:var(--bg2);transition:opacity .3s,transform .3s}
+  .qcard.go{opacity:0;transform:translateX(40px)}
+  .qcard .qicon{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;font-size:17px;flex:none;background:var(--panel2);border:1px solid var(--border)}
+  .qcard .qmain{flex:1;min-width:0}
+  .qtype{font-size:9px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;padding:2px 7px;border-radius:6px}
+  .qt-pr{background:color-mix(in srgb,var(--build) 16%,transparent);color:var(--build)}
+  .qt-blocked{background:color-mix(in srgb,var(--blocked) 16%,transparent);color:var(--blocked)}
+  .qt-plan{background:color-mix(in srgb,var(--plan) 16%,transparent);color:var(--plan)}
+  .qcard .qtitle{font-size:13.5px;font-weight:600;color:var(--text);margin:6px 0 3px}
+  .qcard .qmeta{font-size:11.5px;color:var(--muted);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .qcard .qacts{display:flex;gap:7px;margin-top:11px}
+
+  .agentrow{display:flex;gap:11px;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)}
+  .agentrow:last-child{border-bottom:0}
+  .agentrow .ainfo{flex:1;min-width:0}
+  .agentrow .aname{font-size:13px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:7px}
+  .agentrow .adoing{font-size:11.5px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .agentrow .abar{width:74px;flex:none}
+
+  .thru{display:flex;align-items:flex-end;gap:18px;margin-bottom:8px}
+  .thru .big{font-size:34px;font-weight:800;letter-spacing:-.03em;line-height:1}
+  .thru .big small{font-size:13px;color:var(--muted);font-weight:600}
+  .levelup{display:flex;align-items:center;gap:10px;background:var(--accent-soft);border:1px solid color-mix(in srgb,var(--accent) 30%,var(--border));
+    border-radius:11px;padding:10px 12px;margin-top:12px;font-size:12.5px;color:var(--text)}
+  .levelup .lv{font-weight:800;color:var(--accent)}
+
+  .kbtn{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);background:var(--panel2);
+    border:1px solid var(--border2);border-radius:9px;padding:5px 10px;cursor:pointer}
+  .kbtn:hover{border-color:color-mix(in srgb,var(--accent) 45%,var(--border2));color:var(--text)}
+
+  /* ⌘K palette */
+  .cmdk{position:fixed;inset:0;z-index:100;display:none;justify-content:center;align-items:flex-start;padding-top:13vh;
+    background:color-mix(in srgb,var(--bg) 60%,transparent);backdrop-filter:blur(4px)}
+  .cmdk.open{display:flex;animation:nm-fadein var(--dur-fast)}
+  .palette{width:560px;max-width:92vw;background:var(--panel);border:1px solid var(--border2);border-radius:16px;overflow:hidden;
+    box-shadow:0 40px 90px -30px var(--shadow);animation:nm-pop var(--dur) var(--ease)}
+  .palette .pin{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border)}
+  .palette .pin input{flex:1;border:0;background:transparent;outline:none;font-family:inherit;font-size:16px;color:var(--text)}
+  .palette .plist{max-height:340px;overflow-y:auto;padding:7px}
+  .pitem{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:10px;cursor:pointer}
+  .pitem.sel,.pitem:hover{background:var(--accent-soft)}
+  .pitem .pico{width:28px;height:28px;border-radius:8px;background:var(--panel2);border:1px solid var(--border);display:grid;place-items:center;font-size:14px;flex:none}
+  .pitem .pl{flex:1}
+  .pitem .pl b{font-size:13.5px;color:var(--text);font-weight:600;display:block}
+  .pitem .pl span{font-size:11.5px;color:var(--muted)}
+  .pitem .pk{font-size:10px;color:var(--dim);font-family:'Geist Mono',monospace}
+  .pgroup{font-size:9.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);padding:9px 12px 4px}
+</style>
+</head>
+<body>
+<div class="confetti" id="confetti"></div>
+
+<div class="app">
+  <aside class="side">
+    <div class="ws"><div class="wsav">AR</div><div class="wsinfo"><b>default</b><span>Acme Robotics</span></div><span class="caret">▾</span></div>
+    <div class="navlist">
+      <div class="navitem on"><span class="ni">⌂</span> Home</div>
+      <div class="navitem"><span class="ni">▦</span> Tasks <span class="nb">9</span></div>
+      <div class="navitem"><span class="ni">⛁</span> Artifacts</div>
+      <div class="navitem"><span class="ni">◉</span> Agents</div>
+      <div class="navitem"><span class="ni">☰</span> Activity</div>
+    </div>
+    <div class="sidehead">Channels</div>
+    <div class="sideitem"><span class="hash">#</span><span class="lbl">general</span></div>
+    <div class="sideitem"><span class="hash">#</span><span class="lbl">dev</span><span class="unread"></span></div>
+    <div class="sideitem"><span class="hash">#</span><span class="lbl">research</span></div>
+    <div class="sidehead">Agents</div>
+    <div class="sideitem"><div class="av sm orch">🦊</div><span class="lbl">rex</span><span class="dot busy"></span></div>
+    <div class="sideitem"><div class="av sm arch">🦅</div><span class="lbl">atlas</span><span class="dot on"></span></div>
+    <div class="sideitem"><div class="av sm dev">🦉</div><span class="lbl">patch</span><span class="dot busy"></span></div>
+    <div class="sideitem"><div class="av sm rev">🐝</div><span class="lbl">scout</span><span class="dot busy"></span></div>
+    <div class="selfcard"><div class="av sm you">🧑‍💻</div><div class="nm-self"><b>You</b><span>online</span></div>
+      <button class="themetog" id="tt" title="Toggle theme" style="margin-left:auto;width:30px;height:30px">◐</button></div>
+  </aside>
+
+  <main class="main">
+    <div class="chhead">
+      <span class="ct">🛰️ Mission Control</span>
+      <span class="ctopic">Thursday · 9:02 AM</span>
+      <span class="sync" style="margin-left:auto"><span class="dot on"></span> synced</span>
+      <button class="kbtn" id="kbtn" style="margin-left:12px">Quick actions <span class="kbd">⌘K</span></button>
+    </div>
+
+    <div class="dash">
+      <div class="greet">
+        <h2>Good morning. Your org didn't sleep.</h2>
+        <p>While you were away: <b>7 tasks shipped</b>, <b>3 PRs are ready for you</b>, and <b>1 agent needs a decision</b>.</p>
+      </div>
+
+      <div class="away">
+        <div class="awaycard ok"><div class="n" id="nShipped">7</div><div class="l">shipped overnight</div></div>
+        <div class="awaycard act"><div class="n" id="nReview">3</div><div class="l">PRs ready for you</div></div>
+        <div class="awaycard warn"><div class="n">1</div><div class="l">needs a decision</div></div>
+      </div>
+
+      <div class="dashcols">
+        <!-- NEEDS YOU -->
+        <div class="pnl">
+          <div class="pnl-h">⚡ Needs you <span class="c" id="needCount">4 items</span></div>
+          <div id="queue">
+            <div class="qcard" data-kind="pr">
+              <div class="qicon">🦉</div>
+              <div class="qmain">
+                <span class="qtype qt-pr">PR ready</span>
+                <div class="qtitle">#418 · Add OAuth login (Google + GitHub)</div>
+                <div class="qmeta">scout approved · DoD met · CI ✓ · <span class="mono">+184 −22</span></div>
+                <div class="qacts"><button class="btn primary sm" data-accept>✓ Accept &amp; merge</button><button class="btn ghost sm">Review</button></div>
+              </div>
+            </div>
+            <div class="qcard" data-kind="blocked">
+              <div class="qicon">⛔</div>
+              <div class="qmain">
+                <span class="qtype qt-blocked">Decision</span>
+                <div class="qtitle">patch is blocked on #420 — Stripe vs. Lemon Squeezy?</div>
+                <div class="qmeta">blocked 12m · waiting on you</div>
+                <div class="qacts"><button class="btn primary sm" data-answer>Answer →</button><button class="btn ghost sm">Open thread</button></div>
+              </div>
+            </div>
+            <div class="qcard" data-kind="plan">
+              <div class="qicon">🦅</div>
+              <div class="qmain">
+                <span class="qtype qt-plan">Plan</span>
+                <div class="qtitle">#431 · atlas drafted a plan — rate-limit the public API</div>
+                <div class="qmeta">3 steps · Definition of Done attached</div>
+                <div class="qacts"><button class="btn primary sm" data-accept>Approve plan</button><button class="btn ghost sm">Review plan</button></div>
+              </div>
+            </div>
+            <div class="qcard" data-kind="pr">
+              <div class="qicon">🐝</div>
+              <div class="qmain">
+                <span class="qtype qt-pr">PR ready</span>
+                <div class="qtitle">#412 · Migrate avatars to the CDN</div>
+                <div class="qmeta">scout approved · DoD met · CI ✓ · <span class="mono">+63 −140</span></div>
+                <div class="qacts"><button class="btn primary sm" data-accept>✓ Accept &amp; merge</button><button class="btn ghost sm">Review</button></div>
+              </div>
+            </div>
+          </div>
+          <div id="allclear" style="display:none;text-align:center;padding:24px;color:var(--build)">
+            <div style="font-size:30px">✅</div><div style="font-weight:700;margin-top:6px">Inbox zero. Your org is unblocked.</div>
+            <div class="small muted" style="margin-top:3px">Everything's flowing. Go get a coffee.</div>
+          </div>
+        </div>
+
+        <!-- IN FLIGHT + THROUGHPUT -->
+        <div class="col gap16">
+          <div class="pnl">
+            <div class="pnl-h">🔴 In flight <span class="c">live</span></div>
+            <div class="agentrow"><div class="av sm orch">🦊</div><div class="ainfo"><div class="aname">rex <span class="dot busy"></span></div><div class="adoing">planning #432 · search highlighting</div></div></div>
+            <div class="agentrow"><div class="av sm dev">🦉</div><div class="ainfo"><div class="aname">patch <span class="dot busy"></span></div><div class="adoing" id="patchDoing">building #419 · OAuth callback</div></div><div class="abar"><div class="bar"><i id="patchBar" style="width:40%"></i></div></div></div>
+            <div class="agentrow"><div class="av sm rev">🐝</div><div class="ainfo"><div class="aname">scout <span class="dot busy"></span></div><div class="adoing" id="scoutDoing">reviewing #421 · CSV export</div></div><div class="abar"><div class="bar"><i id="scoutBar" style="width:68%"></i></div></div></div>
+            <div class="agentrow"><div class="av sm arch">🦅</div><div class="ainfo"><div class="aname">atlas <span class="dot on"></span></div><div class="adoing">idle · waiting for the next plan</div></div></div>
+          </div>
+
+          <div class="pnl">
+            <div class="pnl-h">📈 Throughput</div>
+            <div class="thru">
+              <div class="big" id="thruN">23 <small>shipped this week</small></div>
+            </div>
+            <div class="spark" id="spark"></div>
+            <div class="small muted" style="margin-top:8px">↗ <b style="color:var(--build)">18% faster</b> than last week · avg 4m 06s per task</div>
+            <div class="levelup">⭐ <div><b>rex</b> reached <span class="lv">lv.7</span> — task #312 was measurably sharper than #1.</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ⌘K palette -->
+<div class="cmdk" id="cmdk">
+  <div class="palette">
+    <div class="pin"><span style="color:var(--dim)">⌘</span><input id="pInput" placeholder="Fan out a task, jump to a channel, accept a PR…" autocomplete="off"><span class="kbd">esc</span></div>
+    <div class="plist" id="plist"></div>
+  </div>
+</div>
+
+<script>
+  const tt=document.getElementById('tt');
+  const apply=t=>{document.documentElement.dataset.theme=t;tt.textContent=t==='cream'?'☀':'◐';try{sessionStorage.nmTheme=t}catch(e){}};
+  apply(sessionStorage.nmTheme||'dark');
+  tt.onclick=()=>apply(document.documentElement.dataset.theme==='cream'?'dark':'cream');
+
+  // sparkline
+  const spark=document.getElementById('spark');
+  [30,42,38,55,60,72,68,90].forEach((h,i)=>{const b=document.createElement('i');b.style.height=h+'%';
+    if(i>=6)b.style.background='var(--build)';else if(i>=4)b.style.background='var(--accent)';spark.appendChild(b);});
+
+  // needs-you accept
+  let nReview=3, shipped=7;
+  function refreshQueue(){
+    const left=document.querySelectorAll('#queue .qcard').length;
+    document.getElementById('needCount').textContent=left+' item'+(left===1?'':'s');
+    if(left===0)document.getElementById('allclear').style.display='block';
+  }
+  document.querySelectorAll('[data-accept]').forEach(b=>b.onclick=()=>{
+    const card=b.closest('.qcard');card.classList.add('go');
+    if(card.dataset.kind==='pr'){shipped++;document.getElementById('nShipped').textContent=shipped;
+      nReview--;document.getElementById('nReview').textContent=Math.max(0,nReview);}
+    miniConfetti();
+    setTimeout(()=>{card.remove();refreshQueue();},320);
+  });
+  document.querySelectorAll('[data-answer]').forEach(b=>b.onclick=()=>{location.href='08-decision-inbox.html';});
+
+  // in-flight live ticks
+  setInterval(()=>{['patchBar','scoutBar'].forEach(id=>{const el=document.getElementById(id);
+    let w=parseFloat(el.style.width); w+=Math.random()*7; if(w>=100){w=8;}el.style.width=w+'%';});},1400);
+
+  /* ⌘K palette */
+  const CMDS=[
+    {g:'Create',ico:'🦊',b:'Fan out a new task',s:'rex plans & assigns it',k:'F'},
+    {g:'Create',ico:'➕',b:'New channel',s:'spin up a room',k:'C'},
+    {g:'Needs you',ico:'✓',b:'Accept all clear PRs (3)',s:'all DoD-met & CI-green',k:'⏎'},
+    {g:'Needs you',ico:'⛔',b:'Answer patch — Stripe vs Lemon Squeezy',s:'unblock #420',k:''},
+    {g:'Jump to',ico:'#',b:'Go to #dev',s:'1 unread',k:''},
+    {g:'Jump to',ico:'🦉',b:'patch — building #419',s:'open agent',k:''},
+    {g:'Jump to',ico:'🛰️',b:'Mission Control',s:'this view',k:''},
+    {g:'View',ico:'🌊',b:'Open the board',s:'all tasks, all channels',k:'B'},
+    {g:'View',ico:'📈',b:'Weekly retro',s:'what your org shipped & learned',k:''},
+  ];
+  const cmdk=document.getElementById('cmdk'), pInput=document.getElementById('pInput'), plist=document.getElementById('plist');
+  let sel=0, filtered=CMDS;
+  function renderPalette(q=''){
+    filtered=CMDS.filter(c=>(c.b+c.s+c.g).toLowerCase().includes(q.toLowerCase()));
+    let html='', lastG='';
+    filtered.forEach((c,i)=>{if(c.g!==lastG){html+=`<div class="pgroup">${c.g}</div>`;lastG=c.g;}
+      html+=`<div class="pitem ${i===sel?'sel':''}" data-i="${i}"><div class="pico">${c.ico}</div><div class="pl"><b>${c.b}</b><span>${c.s}</span></div>${c.k?`<span class="pk">${c.k}</span>`:''}</div>`;});
+    plist.innerHTML=html||'<div class="pgroup">No matches</div>';
+    plist.querySelectorAll('.pitem').forEach(el=>{el.onclick=()=>exec(+el.dataset.i);el.onmouseenter=()=>{sel=+el.dataset.i;mark();};});
+  }
+  function mark(){plist.querySelectorAll('.pitem').forEach(el=>el.classList.toggle('sel',+el.dataset.i===sel));}
+  function openK(){cmdk.classList.add('open');pInput.value='';sel=0;renderPalette();setTimeout(()=>pInput.focus(),30);}
+  function closeK(){cmdk.classList.remove('open');}
+  function exec(i){const c=filtered[i];closeK();
+    if(c&&/board/i.test(c.b))location.href='07-living-board.html';
+    else if(c&&/retro/i.test(c.b))location.href='09-rsi-retro.html';
+    else if(c&&/Answer|Accept all/i.test(c.b))location.href='08-decision-inbox.html';
+    else if(c&&/#dev|fan out/i.test(c.b))location.href='04-first-fanout.html';
+    else miniConfetti();}
+  document.getElementById('kbtn').onclick=openK;
+  pInput&&pInput.addEventListener('input',e=>{sel=0;renderPalette(e.target.value);});
+  document.addEventListener('keydown',e=>{
+    if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();cmdk.classList.contains('open')?closeK():openK();return;}
+    if(!cmdk.classList.contains('open'))return;
+    if(e.key==='Escape')closeK();
+    if(e.key==='ArrowDown'){e.preventDefault();sel=Math.min(filtered.length-1,sel+1);mark();}
+    if(e.key==='ArrowUp'){e.preventDefault();sel=Math.max(0,sel-1);mark();}
+    if(e.key==='Enter'){e.preventDefault();exec(sel);}
+  });
+  cmdk.addEventListener('click',e=>{if(e.target===cmdk)closeK();});
+
+  function miniConfetti(){const c=document.getElementById('confetti');const cols=['#ff7a52','#ec5a32','#54c08c','#a899f5','#7aa6e2'];
+    for(let i=0;i<34;i++){const p=document.createElement('i');p.style.left=(40+Math.random()*40)+'vw';p.style.background=cols[i%cols.length];
+      p.style.animationDuration=(1.4+Math.random()*1.1)+'s';c.appendChild(p);setTimeout(()=>p.remove(),2700);}}
+</script>
+</body>
+</html>

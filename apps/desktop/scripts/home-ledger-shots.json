@@ -1,0 +1,87 @@
+[
+  {
+    "name": "ledger1-home-dark",
+    "settle": 2600,
+    "query": {
+      "theme": "dark"
+    }
+  },
+  {
+    "name": "ledger2-home-cream",
+    "settle": 2600,
+    "query": {
+      "theme": "cream-oak"
+    }
+  },
+  {
+    "name": "ledger3-home-light",
+    "settle": 2600,
+    "query": {
+      "theme": "light"
+    }
+  },
+  {
+    "name": "ledger4-needs-you-dark",
+    "settle": 2600,
+    "query": {
+      "theme": "dark"
+    },
+    "js": "(() => { const b = Array.from(document.querySelectorAll('.ledgerfilt button')).find(x => /needs you/.test(x.textContent || '')); if (b) b.click(); return new Promise(r => setTimeout(r, 500)); })()"
+  },
+  {
+    "name": "ledger5-settle-focus-cream",
+    "settle": 2600,
+    "query": {
+      "theme": "cream-oak"
+    },
+    "js": "(() => { const b = document.querySelector('.ledger .histwrap.stl .histrow'); if (b) b.focus(); return new Promise(r => setTimeout(r, 400)); })()"
+  },
+  {
+    "name": "ledger6-project-menu-dark",
+    "settle": 2600,
+    "query": {
+      "theme": "dark"
+    },
+    "js": "(() => { const b = document.querySelector('.ledgerfilt .scopepill .cchip'); if (b) b.click(); return new Promise(r => setTimeout(r, 500)); })()"
+  },
+  {
+    "name": "ledger7-overlay-dark",
+    "settle": 2600,
+    "query": {
+      "theme": "dark"
+    },
+    "js": "(() => { const b = document.querySelector('.navhistfind'); if (b) b.click(); return new Promise(r => setTimeout(r, 700)); })()"
+  },
+  {
+    "name": "ledger8-typing-dark",
+    "settle": 2600,
+    "query": {
+      "theme": "dark"
+    },
+    "js": "(() => { const ta = document.querySelector('.stagebox textarea'); if (!ta) return; Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(ta, 'Draft three LinkedIn posts about the v0.128 release and schedule them for next week.'); ta.dispatchEvent(new Event('input', { bubbles: true })); ta.focus(); return new Promise(r => setTimeout(r, 500)); })()"
+  },
+  {
+    "name": "ledger9-show-more-dark",
+    "settle": 2600,
+    "query": {
+      "theme": "dark"
+    },
+    "js": "(() => { const w = document.querySelector('.stagewrap'); if (w) w.scrollTop = w.scrollHeight; return new Promise(r => setTimeout(r, 400)); })()"
+  },
+  {
+    "name": "ledger10-shown-more-cream",
+    "settle": 2600,
+    "query": {
+      "theme": "cream-oak"
+    },
+    "js": "(() => { const b = document.querySelector('.ledgermore'); if (b) b.click(); return new Promise(r => setTimeout(() => { const w = document.querySelector('.stagewrap'); if (w) w.scrollTop = w.scrollHeight; setTimeout(r, 400); }, 300)); })()"
+  },
+  {
+    "name": "ledger11-mention-dark",
+    "settle": 2600,
+    "query": {
+      "theme": "dark"
+    },
+    "js": "(() => { const ta = document.querySelector('.stagebox textarea'); if (!ta) return; ta.focus(); Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(ta, '@'); ta.setSelectionRange(1, 1); ta.dispatchEvent(new Event('input', { bubbles: true })); return new Promise(r => setTimeout(r, 500)); })()"
+  }
+]

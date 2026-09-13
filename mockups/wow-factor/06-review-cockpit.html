@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NeuraMesh · Review Cockpit</title>
+<link rel="stylesheet" href="nm.css">
+<style>
+  .cockpit{display:grid;grid-template-columns:1fr 332px;flex:1;overflow:hidden}
+  @media(max-width:1000px){.cockpit{grid-template-columns:1fr}}
+  .revmain{overflow-y:auto;padding:18px 22px;border-right:1px solid var(--border)}
+  .revrail{overflow-y:auto;padding:18px;background:var(--bg2)}
+
+  .tabs{display:flex;gap:4px;margin-bottom:16px;border-bottom:1px solid var(--border)}
+  .tab{padding:8px 13px;font-size:12.5px;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+  .tab.on{color:var(--accent);border-bottom-color:var(--accent)}
+  .tab .b{font-size:9.5px;background:var(--panel3);color:var(--muted);border-radius:99px;padding:0 6px;margin-left:5px}
+  .tabpane{display:none;animation:nm-fadein var(--dur-fast)}
+  .tabpane.on{display:block}
+
+  .esec{margin-bottom:20px}
+  .esec-h{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--dim);margin-bottom:10px;display:flex;align-items:center;gap:7px}
+  .shots{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .shot{border:1px solid var(--border);border-radius:11px;overflow:hidden;background:var(--panel)}
+  .shotcap{font-size:11px;color:var(--muted);padding:7px 10px;border-top:1px solid var(--border);display:flex;align-items:center;gap:6px}
+  .shotcap .badge-new{font-size:9px;font-weight:800;color:var(--build);background:color-mix(in srgb,var(--build) 16%,transparent);padding:1px 6px;border-radius:5px}
+  .shotview{height:138px;display:grid;place-items:center;padding:14px;background:var(--bg2)}
+  /* mock: login card */
+  .mocklogin{width:150px;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:11px;text-align:center}
+  .mocklogin .ml-t{font-size:10px;font-weight:700;color:var(--text);margin-bottom:8px}
+  .mocklogin .ml-f{height:9px;background:var(--panel3);border-radius:4px;margin-bottom:5px}
+  .mocklogin .ml-btn{height:13px;border-radius:5px;margin-top:6px;font-size:7px;display:grid;place-items:center;color:var(--accent-ink)}
+  .mocklogin .g{background:#e0654f}.mocklogin .gh{background:#2c2620;color:#fff}
+  /* mock: table+export */
+  .mocktbl{width:160px}
+  .mocktbl .tr{display:flex;gap:4px;margin-bottom:4px}
+  .mocktbl .td{height:8px;background:var(--panel3);border-radius:3px;flex:1}
+  .mocktbl .exp{margin-top:8px;height:15px;border-radius:6px;background:var(--accent);color:var(--accent-ink);font-size:8px;display:grid;place-items:center;font-weight:700}
+  /* mock: perf bars */
+  .mockperf{width:160px}
+  .mockperf .pr{display:flex;align-items:center;gap:7px;margin-bottom:8px;font-size:9px;color:var(--muted)}
+  .mockperf .pbar{height:11px;border-radius:4px}
+  .test{font-family:'Geist Mono',monospace;font-size:11.5px;background:var(--code,#0f0b09);border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--codeink,#f3e6d8);line-height:1.7}
+  .test .pass{color:var(--build)}.test .dim{color:var(--dim)}
+  .cirow{display:flex;align-items:center;gap:9px;padding:8px 11px;border:1px solid var(--border);border-radius:9px;margin-bottom:7px;background:var(--panel);font-size:12.5px}
+  .cirow .ok{color:var(--build);font-weight:700}
+
+  /* diff */
+  .ftree{display:flex;flex-direction:column;gap:2px;margin-bottom:14px}
+  .frow{display:flex;align-items:center;gap:8px;font-size:12px;font-family:'Geist Mono',monospace;padding:5px 8px;border-radius:7px;cursor:pointer;color:var(--body)}
+  .frow:hover,.frow.on{background:var(--panel2)}
+  .frow .add{color:var(--build);font-size:10.5px}.frow .del{color:var(--blocked);font-size:10.5px}
+  .diff{font-family:'Geist Mono',monospace;font-size:12px;border:1px solid var(--border);border-radius:10px;overflow:hidden}
+  .diff .dl{padding:2px 12px;white-space:pre-wrap}
+  .diff .h{background:color-mix(in srgb,var(--info) 12%,transparent);color:var(--info)}
+  .diff .a{background:color-mix(in srgb,var(--build) 11%,transparent);color:var(--build)}
+  .diff .d{background:color-mix(in srgb,var(--blocked) 11%,transparent);color:var(--blocked)}
+  .diff .c{color:var(--muted)}
+
+  /* rail */
+  .prtitle{font-size:16px;font-weight:700;color:var(--text);letter-spacing:-.02em;line-height:1.25}
+  .prmeta{font-size:12px;color:var(--muted);margin:7px 0 16px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+  .raildod{list-style:none;display:flex;flex-direction:column;gap:9px;margin:6px 0 18px}
+  .raildod li{display:flex;gap:9px;align-items:flex-start;font-size:12.5px;color:var(--body)}
+  .raildod li .ck{width:17px;height:17px;border-radius:5px;background:var(--build);color:#fff;display:grid;place-items:center;font-size:11px;flex:none;margin-top:1px}
+  .raildod li a{color:var(--accent);font-size:11px;margin-left:auto;white-space:nowrap}
+  .dock{position:sticky;bottom:0;background:var(--bg2);padding-top:12px;border-top:1px solid var(--border)}
+  .dock .btn{width:100%;margin-bottom:8px;justify-content:space-between}
+  .dock .btn .kbd{background:transparent;border:0;color:inherit;opacity:.7}
+  .approvedby{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:7px;margin-bottom:14px;background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:8px 11px}
+
+  .stepper{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted)}
+  .stepper .pips{display:flex;gap:4px}
+  .stepper .pip{width:18px;height:5px;border-radius:99px;background:var(--panel3)}
+  .stepper .pip.on{background:var(--accent)}.stepper .pip.done{background:var(--build)}
+  .khint{font-size:11px;color:var(--dim);display:flex;gap:10px;align-items:center}
+
+  .donescreen{flex:1;display:grid;place-items:center;text-align:center;padding:40px}
+  .donescreen .big{font-size:44px}
+  .donescreen h2{font-size:24px;margin:10px 0 6px}
+  .revslide{transition:transform .3s var(--ease),opacity .3s}
+  .revslide.out{transform:translateX(-30px);opacity:0}
+</style>
+</head>
+<body>
+<div class="confetti" id="confetti"></div>
+
+<div class="app">
+  <aside class="side">
+    <div class="ws"><div class="wsav">AR</div><div class="wsinfo"><b>default</b><span>Acme Robotics</span></div><span class="caret">▾</span></div>
+    <div class="navlist">
+      <div class="navitem"><span class="ni">⌂</span> Home</div>
+      <div class="navitem on"><span class="ni">▦</span> Review <span class="nb" id="qLeft">3</span></div>
+      <div class="navitem"><span class="ni">⛁</span> Artifacts</div>
+      <div class="navitem"><span class="ni">◉</span> Agents</div>
+      <div class="navitem"><span class="ni">☰</span> Activity</div>
+    </div>
+    <div class="sidehead">Review queue</div>
+    <div id="qside"></div>
+    <div class="selfcard"><div class="av sm you">🧑‍💻</div><div class="nm-self"><b>You</b><span>reviewer</span></div>
+      <button class="themetog" id="tt" title="Toggle theme" style="margin-left:auto;width:30px;height:30px">◐</button></div>
+  </aside>
+
+  <main class="main">
+    <div class="chhead">
+      <span class="ct">🔬 Review</span>
+      <span class="stepper" style="margin-left:6px"><span id="stepTxt">PR 1 of 3</span><span class="pips" id="pips"></span></span>
+      <span class="khint" style="margin-left:auto"><span><span class="kbd">⏎</span> accept</span><span><span class="kbd">R</span> changes</span><span><span class="kbd">→</span> skip</span></span>
+    </div>
+    <div id="cockpitWrap" style="display:flex;flex:1;overflow:hidden"></div>
+  </main>
+</div>
+
+<script>
+  const tt=document.getElementById('tt');
+  const apply=t=>{document.documentElement.dataset.theme=t;tt.textContent=t==='cream'?'☀':'◐';try{sessionStorage.nmTheme=t}catch(e){}};
+  apply(sessionStorage.nmTheme||'dark');
+  tt.onclick=()=>apply(document.documentElement.dataset.theme==='cream'?'dark':'cream');
+
+  // mock screenshot renderers
+  const MOCK={
+    'before-login':`<div class="mocklogin"><div class="ml-t">Sign in</div><div class="ml-f"></div><div class="ml-f"></div><div class="ml-btn" style="background:var(--panel3);color:var(--muted)">Sign in</div></div>`,
+    'after-login':`<div class="mocklogin"><div class="ml-t">Sign in</div><div class="ml-btn g">Continue with Google</div><div class="ml-btn gh">Continue with GitHub</div><div class="ml-f" style="margin-top:8px"></div><div class="ml-f"></div></div>`,
+    'csv':`<div class="mocktbl"><div class="tr"><div class="td"></div><div class="td"></div><div class="td"></div></div><div class="tr"><div class="td"></div><div class="td"></div><div class="td"></div></div><div class="tr"><div class="td"></div><div class="td"></div><div class="td"></div></div><div class="exp">⬇ Export CSV</div></div>`,
+    'cdn-before':`<div class="mockperf"><div class="pr">load 240ms<div class="pbar" style="width:120px;background:var(--blocked)"></div></div><div class="pr">LCP 1.8s<div class="pbar" style="width:96px;background:var(--warn)"></div></div></div>`,
+    'cdn-after':`<div class="mockperf"><div class="pr">load 38ms<div class="pbar" style="width:24px;background:var(--build)"></div></div><div class="pr">LCP 0.9s<div class="pbar" style="width:48px;background:var(--build)"></div></div></div>`,
+  };
+
+  const PRS=[
+    {id:418,title:'Add OAuth login (Google + GitHub)',author:'patch',emoji:'🦉',cls:'dev',add:184,del:22,
+      files:[['src/auth/oauth.ts',96,4],['src/auth/providers.ts',61,2],['src/auth/oauth.test.ts',27,0]],
+      shots:[['before-login','Login · before','before'],['after-login','Login · after','after']],
+      tests:[['14 passing','passes'],['oauth › exchanges code for token','ok'],['oauth › stores token in keychain','ok'],['providers › google + github registered','ok']],
+      ci:[['build','42s'],['lint','8s'],['e2e (12)','1m04s']],
+      dod:[['Google + GitHub OAuth flow works','see shot'],['Tokens stored in keychain','see test'],['Tests added & green','14 ✓'],['Both themes verified','see shot'],['PR opened · CI passing','see CI']]},
+    {id:412,title:'Migrate avatars to the CDN',author:'scout',emoji:'🐝',cls:'rev',add:63,del:140,
+      files:[['src/avatars/cdn.ts',48,12],['src/avatars/local.ts',0,128],['src/avatars/cdn.test.ts',15,0]],
+      shots:[['cdn-before','Avatar load · before','before'],['cdn-after','Avatar load · after','after']],
+      tests:[['9 passing','passes'],['cdn › serves from edge','ok'],['cdn › falls back on miss','ok']],
+      ci:[['build','39s'],['lint','7s'],['lighthouse','+22 perf']],
+      dod:[['Avatars served from CDN','see shot'],['6× faster first paint','see perf'],['Fallback on cache miss','see test'],['Tests added & green','9 ✓'],['PR opened · CI passing','see CI']]},
+    {id:421,title:'Add CSV export to the dashboard',author:'patch',emoji:'🦉',cls:'dev',add:74,del:6,
+      files:[['src/dash/export.ts',58,2],['src/dash/export.test.ts',16,4]],
+      shots:[['csv','Dashboard · export button','after']],
+      tests:[['7 passing','passes'],['export › streams large sets','ok'],['export › escapes commas','ok']],
+      ci:[['build','40s'],['lint','7s'],['e2e (4)','38s']],
+      dod:[['Export button on dashboard','see shot'],['Streams without OOM','see test'],['RFC-4180 escaping','see test'],['Tests added & green','7 ✓'],['PR opened · CI passing','see CI']]},
+  ];
+
+  let idx=0, accepted=0;
+  const wrap=document.getElementById('cockpitWrap');
+
+  // sidebar queue + pips
+  function paintSide(){
+    const qs=document.getElementById('qside');qs.innerHTML='';
+    PRS.forEach((p,i)=>{const el=document.createElement('div');el.className='sideitem'+(i===idx?' on':'');
+      el.innerHTML=`<div class="av sm ${p.cls}">${p.emoji}</div><span class="lbl">#${p.id} ${p.title.split('(')[0].trim()}</span>${i<idx?'<span class="dot on"></span>':''}`;
+      el.onclick=()=>{idx=i;render();};qs.appendChild(el);});
+    document.getElementById('qLeft').textContent=Math.max(0,PRS.length-idx);
+    const pips=document.getElementById('pips');pips.innerHTML='';
+    PRS.forEach((p,i)=>{const d=document.createElement('span');d.className='pip'+(i===idx?' on':i<idx?' done':'');pips.appendChild(d);});
+    document.getElementById('stepTxt').textContent=idx<PRS.length?`PR ${idx+1} of ${PRS.length}`:'all reviewed';
+  }
+
+  function render(){
+    paintSide();
+    if(idx>=PRS.length){return done();}
+    const p=PRS[idx];
+    const shots=p.shots.map(s=>`<div class="shot"><div class="shotview">${MOCK[s[0]]}</div><div class="shotcap">${s[2]==='after'?'<span class="badge-new">NEW</span>':''}${s[1]}</div></div>`).join('');
+    const tests=p.tests.map((t,i)=>i===0?`<div><span class="pass">✓ ${t[0]}</span></div>`:`<div><span class="pass">✓</span> <span class="dim">${t[0]}</span></div>`).join('');
+    const ci=p.ci.map(c=>`<div class="cirow"><span class="ok">✓</span> ${c[0]} <span class="dim mono" style="margin-left:auto;font-size:11px;color:var(--dim)">${c[1]}</span></div>`).join('');
+    const ftree=p.files.map((f,i)=>`<div class="frow${i===0?' on':''}">📄 ${f[0]} <span style="margin-left:auto"></span><span class="add">+${f[1]}</span><span class="del">−${f[2]}</span></div>`).join('');
+    const dod=p.dod.map(d=>`<li><span class="ck">✓</span><span>${d[0]}</span><a href="#" onclick="return false">${d[1]} ↗</a></li>`).join('');
+
+    wrap.innerHTML=`<div class="cockpit revslide" id="slide">
+      <div class="revmain">
+        <div class="tabs">
+          <div class="tab on" data-tab="ev">🔬 Evidence</div>
+          <div class="tab" data-tab="diff">📝 Diff <span class="b">${p.files.length}</span></div>
+        </div>
+        <div class="tabpane on" data-pane="ev">
+          <div class="esec"><div class="esec-h">📸 Screenshots — both themes verified</div><div class="shots">${shots}</div></div>
+          <div class="esec"><div class="esec-h">🧪 Tests</div><div class="test">${tests}</div></div>
+          <div class="esec"><div class="esec-h">⚙️ CI checks <span style="color:var(--build)">· all green</span></div>${ci}</div>
+        </div>
+        <div class="tabpane" data-pane="diff">
+          <div class="ftree">${ftree}</div>
+          <div class="diff">
+            <div class="dl h">@@ ${p.files[0][0]} @@</div>
+            <div class="dl c"> export async function handler(req){</div>
+            <div class="dl d">-  return signInWithPassword(req)</div>
+            <div class="dl a">+  const provider = req.query.provider</div>
+            <div class="dl a">+  if (provider) return oauth(provider, req)</div>
+            <div class="dl a">+  return signInWithPassword(req)</div>
+            <div class="dl c"> }</div>
+          </div>
+        </div>
+      </div>
+      <div class="revrail">
+        <div class="prtitle">#${p.id} · ${p.title}</div>
+        <div class="prmeta">${p.author} ${p.emoji} · <span class="mono">+${p.add} −${p.del}</span> · <span class="chip s-in_review">in review</span></div>
+        <div class="approvedby"><span style="color:var(--build)">✓</span> scout approved against the Definition of Done — you have final say.</div>
+        <div class="esec-h">Definition of Done</div>
+        <ul class="raildod">${dod}</ul>
+        <div class="dock">
+          <button class="btn accept" id="acc">✓ Accept &amp; merge <span class="kbd">⏎</span></button>
+          <button class="btn ghost" id="rc">Request changes <span class="kbd">R</span></button>
+          <button class="btn ghost" id="sk" style="border:0">Skip for now <span class="kbd">→</span></button>
+        </div>
+      </div>
+    </div>`;
+    // tab switching
+    wrap.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
+      wrap.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===t));
+      wrap.querySelectorAll('.tabpane').forEach(pn=>pn.classList.toggle('on',pn.dataset.pane===t.dataset.tab));});
+    wrap.querySelectorAll('.frow').forEach(f=>f.onclick=()=>{wrap.querySelectorAll('.frow').forEach(x=>x.classList.remove('on'));f.classList.add('on');});
+    document.getElementById('acc').onclick=accept;
+    document.getElementById('rc').onclick=()=>{const b=document.getElementById('rc');b.textContent='Bounced back ↩';b.classList.add('primary');setTimeout(next,500);};
+    document.getElementById('sk').onclick=next;
+  }
+
+  function accept(){accepted++;miniConfetti();const s=document.getElementById('slide');if(s)s.classList.add('out');setTimeout(()=>{idx++;render();},300);}
+  function next(){const s=document.getElementById('slide');if(s)s.classList.add('out');setTimeout(()=>{idx++;render();},300);}
+
+  function done(){
+    document.getElementById('pips')&&(document.getElementById('stepTxt').textContent='all reviewed');
+    wrap.innerHTML=`<div class="donescreen"><div><div class="big">⚡️</div>
+      <h2>Queue cleared — ${accepted} PR${accepted===1?'':'s'} merged.</h2>
+      <p class="muted">Reviewed ${PRS.length} in <b style="color:var(--text)">4m 50s</b> · evidence-first, never opened an editor.</p>
+      <div style="margin-top:20px"><a class="btn primary" href="05-mission-control.html">↩ Back to Mission Control</a></div></div></div>`;
+    confetti();
+  }
+
+  document.addEventListener('keydown',e=>{
+    if(idx>=PRS.length)return;
+    if(e.key==='Enter'){e.preventDefault();accept();}
+    else if(e.key.toLowerCase()==='r'){e.preventDefault();document.getElementById('rc')?.click();}
+    else if(e.key==='ArrowRight'){e.preventDefault();next();}
+    else if(e.key.toLowerCase()==='d'){wrap.querySelector('.tab[data-tab="diff"]')?.click();}
+    else if(e.key.toLowerCase()==='e'){wrap.querySelector('.tab[data-tab="ev"]')?.click();}
+  });
+
+  function miniConfetti(){const c=document.getElementById('confetti');const cols=['#ff7a52','#ec5a32','#54c08c','#a899f5','#7aa6e2'];
+    for(let i=0;i<30;i++){const p=document.createElement('i');p.style.left=(35+Math.random()*45)+'vw';p.style.background=cols[i%cols.length];
+      p.style.animationDuration=(1.3+Math.random())+'s';c.appendChild(p);setTimeout(()=>p.remove(),2500);}}
+  function confetti(){const c=document.getElementById('confetti');const cols=['#ff7a52','#ec5a32','#54c08c','#a899f5','#7aa6e2','#f0b35a'];
+    for(let i=0;i<70;i++){const p=document.createElement('i');p.style.left=Math.random()*100+'vw';p.style.background=cols[i%cols.length];
+      p.style.animationDuration=(1.6+Math.random()*1.4)+'s';c.appendChild(p);setTimeout(()=>p.remove(),3400);}}
+
+  render();
+</script>
+</body>
+</html>

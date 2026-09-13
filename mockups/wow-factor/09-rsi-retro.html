@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NeuraMesh · Weekly Retro</title>
+<link rel="stylesheet" href="nm.css">
+<style>
+  .retro{flex:1;overflow-y:auto;padding:24px 28px 60px}
+  .rhero{display:flex;align-items:flex-end;gap:16px;margin-bottom:4px}
+  .rhero h2{font-size:25px;letter-spacing:-.03em}
+  .rhero .span{font-size:13px;color:var(--muted);margin-bottom:3px}
+  .rsum{font-size:14.5px;color:var(--body);margin:6px 0 22px}
+  .rsum b{color:var(--text)}
+  .rstats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:26px}
+  @media(max-width:1000px){.rstats{grid-template-columns:1fr 1fr}}
+  .rstat{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:15px 17px}
+  .rstat .n{font-size:30px;font-weight:800;letter-spacing:-.03em;line-height:1}
+  .rstat .n.up{color:var(--build)}.rstat .n.accent{color:var(--accent)}
+  .rstat .l{font-size:12px;color:var(--muted);margin-top:6px}
+
+  .sech{font-size:14px;font-weight:800;letter-spacing:-.01em;color:var(--text);margin:8px 0 13px;display:flex;align-items:center;gap:8px}
+  .growth{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:28px}
+  @media(max-width:1000px){.growth{grid-template-columns:1fr 1fr}}
+  .gcard{background:var(--panel);border:1px solid var(--border);border-radius:15px;padding:15px;position:relative;overflow:hidden}
+  .gcard.up{border-color:color-mix(in srgb,var(--accent) 38%,var(--border))}
+  .gcard .ghead{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+  .glvl{margin-left:auto;font-family:'Geist Mono',monospace;font-size:11px;font-weight:700;color:var(--muted);
+    background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:3px 8px}
+  .gcard.up .glvl{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 40%,var(--border));background:var(--accent-soft)}
+  .leveled{position:absolute;top:0;right:0;font-size:8.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;
+    color:var(--accent-ink);background:var(--accent);padding:3px 9px;border-bottom-left-radius:10px;animation:nm-levelup 2.4s var(--ease) infinite}
+  .gimprove{font-size:22px;font-weight:800;color:var(--build);letter-spacing:-.02em}
+  .gimprove small{font-size:11px;color:var(--muted);font-weight:600}
+  .gspark{margin:10px 0 8px}
+  .gxp{font-size:10.5px;color:var(--dim);margin-bottom:4px;display:flex;justify-content:space-between}
+  .glearned{font-size:11.5px;color:var(--muted);line-height:1.45;margin-top:9px;padding-top:9px;border-top:1px solid var(--border)}
+  .glearned b{color:var(--body)}
+
+  /* big compounding chart */
+  .qpanel{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:18px 20px;margin-bottom:28px}
+  .qtop{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+  .qtop .qt{font-size:13.5px;font-weight:700;color:var(--text)}
+  .qbig{display:flex;align-items:flex-end;gap:14px;margin:4px 0 14px}
+  .qbig .qn{font-size:40px;font-weight:800;letter-spacing:-.03em;line-height:1;color:var(--accent)}
+  .qbig .qd{font-size:12.5px;color:var(--build);font-weight:600;margin-bottom:7px}
+  .qchart{display:flex;align-items:flex-end;gap:10px;height:150px;padding-top:8px}
+  .qbar{flex:1;border-radius:6px 6px 0 0;background:var(--panel3);position:relative;height:0;transition:height .8s var(--ease),background .3s;cursor:pointer}
+  .qbar.cur{box-shadow:0 0 0 2px var(--accent)}
+  .qbar .qv{position:absolute;top:-18px;left:50%;transform:translateX(-50%);font-size:9.5px;color:var(--muted);opacity:0;transition:opacity .2s;white-space:nowrap}
+  .qbar:hover .qv,.qbar.cur .qv{opacity:1}
+  .qaxis{display:flex;gap:10px;margin-top:7px}
+  .qaxis span{flex:1;text-align:center;font-size:9.5px;color:var(--dim)}
+  .qscrub{margin-top:16px}
+  .qscrub input{width:100%;accent-color:var(--accent)}
+  .qscrub .lbl{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:5px}
+
+  /* learnings */
+  .learns{display:flex;flex-direction:column;gap:9px}
+  .learn{display:flex;gap:11px;align-items:flex-start;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px 14px}
+  .learn .li{font-size:16px;flex:none}
+  .learn .lt{flex:1;font-size:13px;color:var(--body);line-height:1.45}
+  .learn .lt b{color:var(--text)}
+  .learn .lsrc{font-family:'Geist Mono',monospace;font-size:10px;color:var(--dim);background:var(--panel2);border-radius:6px;padding:2px 7px;flex:none}
+  .learn .lscope{font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.04em}
+</style>
+</head>
+<body>
+<div class="confetti" id="confetti"></div>
+
+<div class="app">
+  <aside class="side">
+    <div class="ws"><div class="wsav">AR</div><div class="wsinfo"><b>default</b><span>Acme Robotics</span></div><span class="caret">▾</span></div>
+    <div class="navlist">
+      <div class="navitem"><span class="ni">⌂</span> Home</div>
+      <div class="navitem"><span class="ni">▦</span> Tasks <span class="nb">9</span></div>
+      <div class="navitem"><span class="ni">⛁</span> Artifacts</div>
+      <div class="navitem"><span class="ni">◉</span> Agents</div>
+      <div class="navitem on"><span class="ni">📈</span> Retro</div>
+    </div>
+    <div class="sidehead">Agents</div>
+    <div class="sideitem"><div class="av sm orch">🦊</div><span class="lbl">rex</span><span class="dot busy"></span></div>
+    <div class="sideitem"><div class="av sm arch">🦅</div><span class="lbl">atlas</span><span class="dot on"></span></div>
+    <div class="sideitem"><div class="av sm dev">🦉</div><span class="lbl">patch</span><span class="dot busy"></span></div>
+    <div class="sideitem"><div class="av sm rev">🐝</div><span class="lbl">scout</span><span class="dot on"></span></div>
+    <div class="selfcard"><div class="av sm you">🧑‍💻</div><div class="nm-self"><b>You</b><span>online</span></div>
+      <button class="themetog" id="tt" title="Toggle theme" style="margin-left:auto;width:30px;height:30px">◐</button></div>
+  </aside>
+
+  <main class="main">
+    <div class="chhead"><span class="ct">📈 Weekly Retro</span><span class="ctopic">Jun 23 – 27 · Acme Robotics</span>
+      <button class="kbtn" id="replay" style="margin-left:auto;background:var(--panel2);border:1px solid var(--border2);border-radius:9px;padding:5px 11px;font-size:12px;cursor:pointer;color:var(--body)">↻ replay growth</button></div>
+
+    <div class="retro">
+      <div class="rhero"><h2>Your org got measurably smarter this week.</h2></div>
+      <p class="rsum">No retraining — just reps. <b>2 agents leveled up</b>, quality is up across the board, and your team wrote <b>14 durable learnings</b> back to memory.</p>
+
+      <div class="rstats">
+        <div class="rstat"><div class="n up">47</div><div class="l">tasks shipped this week</div></div>
+        <div class="rstat"><div class="n accent">+18%</div><div class="l">faster than last week</div></div>
+        <div class="rstat"><div class="n">4m 06s</div><div class="l">avg time per task</div></div>
+        <div class="rstat"><div class="n accent">2 ↑</div><div class="l">agents leveled up</div></div>
+      </div>
+
+      <div class="sech">🏅 Agents leveled up</div>
+      <div class="growth" id="growth"></div>
+
+      <div class="sech">📊 The compounding curve</div>
+      <div class="qpanel">
+        <div class="qtop"><div class="av sm orch">🦊</div><span class="qt">rex — quality per task</span><span class="dim small" style="margin-left:auto">last 8 weeks</span></div>
+        <div class="qbig"><div class="qn" id="qn">0.94</div><div class="qd" id="qd">▲ from 0.61 at task #1 — same model, just reps</div></div>
+        <div class="qchart" id="qchart"></div>
+        <div class="qaxis" id="qaxis"></div>
+        <div class="qscrub">
+          <input type="range" id="scrub" min="1" max="312" value="312">
+          <div class="lbl"><span>task #1</span><span id="scrubVal">drag to scrub — task #312 · 0.94</span><span>#312</span></div>
+        </div>
+      </div>
+
+      <div class="sech">🧠 Learnings distilled into memory this week</div>
+      <div class="learns" id="learns"></div>
+    </div>
+  </main>
+</div>
+
+<script>
+  const tt=document.getElementById('tt');
+  const apply=t=>{document.documentElement.dataset.theme=t;tt.textContent=t==='cream'?'☀':'◐';try{sessionStorage.nmTheme=t}catch(e){}};
+  apply(sessionStorage.nmTheme||'dark');
+  tt.onclick=()=>apply(document.documentElement.dataset.theme==='cream'?'dark':'cream');
+
+  const AGENTS=[
+    {name:'rex',emoji:'🦊',cls:'orch',lvl:7,up:true,xp:72,improve:18,metric:'planning accuracy',spark:[55,58,62,66,71,79,86,94],
+     learned:'Front-load the Definition of Done — fewer review bounces.'},
+    {name:'patch',emoji:'🦉',cls:'dev',lvl:6,up:true,xp:58,improve:14,metric:'first-try PR pass',spark:[48,53,57,61,66,71,77,83],
+     learned:'Verify both themes before submit — every UI task.'},
+    {name:'atlas',emoji:'🦅',cls:'arch',lvl:5,up:false,xp:40,improve:11,metric:'plan completeness',spark:[50,52,55,58,61,64,68,72],
+     learned:'Name the edge cases up front; patch stops guessing.'},
+    {name:'scout',emoji:'🐝',cls:'rev',lvl:4,up:false,xp:30,improve:9,metric:'caught before merge',spark:[44,46,49,52,55,58,61,66],
+     learned:'Check CI status before reading the diff.'},
+  ];
+  const LEARNINGS=[
+    ['🔑','#dev','All secrets live in the keychain — never the database.','#418'],
+    ['🧪','reviewer','Gate on CI green before checking the Definition of Done.','#412'],
+    ['🎨','patch','Both themes must be verified before every UI submit.','#431'],
+    ['🔀','#dev','Squash-merge on accept; code never reaches main by direct commit.','#420'],
+    ['🗺️','atlas','Name edge cases in the plan so the developer stops guessing.','#431'],
+  ];
+
+  // growth cards
+  const g=document.getElementById('growth');
+  AGENTS.forEach(a=>{
+    const spark=a.spark.map(h=>`<i style="height:${h}%;${h>=78?'background:var(--build)':h>=64?'background:var(--accent)':''}"></i>`).join('');
+    g.insertAdjacentHTML('beforeend',`<div class="gcard ${a.up?'up':''}">
+      ${a.up?'<span class="leveled">↑ leveled up</span>':''}
+      <div class="ghead"><div class="av ${a.cls}">${a.emoji}</div><div><b style="font-size:14px;color:var(--text)">${a.name}</b></div><span class="glvl">lv.${a.lvl}</span></div>
+      <div class="gimprove">+${a.improve}% <small>${a.metric}</small></div>
+      <div class="gspark spark">${spark}</div>
+      <div class="gxp"><span>XP to lv.${a.lvl+1}</span><span>${a.xp}%</span></div>
+      <div class="bar"><i style="width:${a.xp}%"></i></div>
+      <div class="glearned">🧠 <b>learned:</b> ${a.learned}</div>
+    </div>`);
+  });
+
+  // big chart (rex)
+  const rex=AGENTS[0], qchart=document.getElementById('qchart'), qaxis=document.getElementById('qaxis');
+  const weeks=['w1','w2','w3','w4','w5','w6','w7','w8'];
+  rex.spark.forEach((v,i)=>{
+    const col=v>=82?'var(--build)':v>=66?'var(--accent)':'color-mix(in srgb,var(--accent) 35%,var(--panel3))';
+    qchart.insertAdjacentHTML('beforeend',`<div class="qbar" data-i="${i}" data-v="${v}" style="background:${col}"><span class="qv">0.${v}</span></div>`);
+    qaxis.insertAdjacentHTML('beforeend',`<span>${weeks[i]}</span>`);
+  });
+  function animateBars(){document.querySelectorAll('.qbar').forEach((b,i)=>{b.style.height='0';
+    setTimeout(()=>b.style.height=b.dataset.v+'%',i*70+50);});}
+  document.querySelectorAll('.qbar').forEach(b=>b.onclick=()=>{
+    document.querySelectorAll('.qbar').forEach(x=>x.classList.remove('cur'));b.classList.add('cur');
+    document.getElementById('qn').textContent='0.'+b.dataset.v;});
+
+  // scrubber: task# -> quality along the curve
+  const scrub=document.getElementById('scrub'), qn=document.getElementById('qn'), scrubVal=document.getElementById('scrubVal');
+  scrub.addEventListener('input',()=>{
+    const n=+scrub.value; const pos=(n-1)/311*7; const lo=Math.floor(pos), hi=Math.min(7,lo+1), f=pos-lo;
+    const q=Math.round(rex.spark[lo]+(rex.spark[hi]-rex.spark[lo])*f);
+    qn.textContent='0.'+q; scrubVal.textContent=`task #${n} · 0.${q}`;
+    document.querySelectorAll('.qbar').forEach((x,i)=>x.classList.toggle('cur',i===Math.round(pos)));
+  });
+
+  // learnings
+  const l=document.getElementById('learns');
+  LEARNINGS.forEach(x=>l.insertAdjacentHTML('beforeend',
+    `<div class="learn"><span class="li">${x[0]}</span><div class="lt"><span class="lscope">${x[1]}</span> · ${x[2]}</div><span class="lsrc">${x[3]}</span></div>`));
+
+  document.getElementById('replay').onclick=animateBars;
+  setTimeout(animateBars,200);
+  setTimeout(confetti,700);
+  function confetti(){const c=document.getElementById('confetti');const cols=['#ff7a52','#ec5a32','#54c08c','#a899f5','#7aa6e2','#f0b35a'];
+    for(let i=0;i<60;i++){const p=document.createElement('i');p.style.left=Math.random()*100+'vw';p.style.background=cols[i%cols.length];
+      p.style.animationDuration=(1.6+Math.random()*1.4)+'s';p.style.animationDelay=(Math.random()*.4)+'s';c.appendChild(p);setTimeout(()=>p.remove(),3400);}}
+</script>
+</body>
+</html>

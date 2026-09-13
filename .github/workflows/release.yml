@@ -1,0 +1,104 @@
+name: Release Desktop
+
+# Tag a version (vX.Y.Z) and this builds, signs, notarizes and publishes the macOS
+# app to the SEPARATE PUBLIC releases repo (alonge-dev/neuramesh-desktop-releases) —
+# the main repo is private, so it can't serve public downloads or the updater feed.
+# electron-updater on the installed app reads latest-mac.yml from that repo's latest
+# release; the marketing site's Download screen reads its assets via the GitHub API.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Tag or SHA to build'
+        required: true
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: ${{ matrix.label }}
+    if: github.repository == 'alonge-dev/neuramesh'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      # A single Apple Silicon runner builds BOTH arches: electron-builder honors the
+      # package.json mac.target arch ["arm64","x64"], rebuilding better-sqlite3 / node-pty
+      # for each from prebuilt binaries (buildFromSource=false). The separate macos-13 (Intel)
+      # leg was dropped — GitHub's hosted Intel runners are scarce/contended, so it sat queued
+      # for hours while arm64 had already produced AND published the x64 assets (redundant).
+      # Re-add an `x64` matrix entry if you ever want native Intel compilation + an Intel smoke test.
+      matrix:
+        include:
+          - os: macos-14
+            arch: arm64
+            label: macOS · build + publish (arm64 + x64)
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref || github.ref }}
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.8.1
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      # GitHub's macOS runners ship Python 3.12, which removed distutils — and
+      # node-gyp needs it to rebuild the native modules (node-pty, better-sqlite3)
+      # against Electron's ABI. Pin 3.11 (still ships distutils) so the rebuild
+      # in electron-builder succeeds; without this the package step dies in ~30s.
+      - name: Install Python 3.11 (node-gyp needs distutils)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Bake the cloud config into the main bundle (publishable values only — see
+      # electron.vite.config.ts). The bake guard FAILS the build if NM_POWERSYNC or
+      # CLERK_PUBLISHABLE_KEY is missing, so a release can never ship pointing at
+      # localhost or without a Clerk key. NM_API defaults to https://api.neuramesh.app.
+      - name: Build bundles (bake cloud config)
+        run: pnpm --filter @neuramesh/desktop exec electron-vite build
+        env:
+          NM_DIST: '1'
+          NM_API: ${{ vars.NM_API }}
+          NM_POWERSYNC: ${{ vars.NM_POWERSYNC }}
+          CLERK_PUBLISHABLE_KEY: ${{ vars.CLERK_PUBLISHABLE_KEY }}
+
+      # Package → sign (Developer ID) → notarize → staple → publish to the releases
+      # repo. Signing/notarization run only because the Apple secrets are present;
+      # absent them electron-builder would skip both (that's the local-dev path).
+      - name: Package · sign · notarize · publish
+        run: pnpm --filter @neuramesh/desktop exec electron-builder --mac --${{ matrix.arch }} --publish always
+        env:
+          # PAT with `repo` scope on alonge-dev/neuramesh-desktop-releases (the default
+          # GITHUB_TOKEN only reaches THIS repo, which is the wrong, private one).
+          GH_TOKEN: ${{ secrets.RELEASES_REPO_TOKEN }}
+          # Developer ID Application certificate: base64 .p12.
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          # Notarization (Developer-ID distribution — no provisioning profile needed).
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      # Release guard: the just-built app must resolve AND spawn its bundled native `claude` CLI in
+      # the real packaged runtime — the spawn-ENOTDIR class of bug (v0.5.0 had it; v0.5.1 shipped a
+      # silent no-op "fix"). arm64 only — the runner can execute its own-arch binary. The draft is
+      # uploaded by the step above but only goes live via the manual Publish workflow, so a red here
+      # means: do NOT publish this draft.
+      - name: Smoke-test the packaged native CLI (guards spawn-ENOTDIR)
+        if: matrix.arch == 'arm64'
+        run: ./apps/desktop/release/mac-${{ matrix.arch }}/NeuraMesh.app/Contents/MacOS/NeuraMesh --smoke-cli

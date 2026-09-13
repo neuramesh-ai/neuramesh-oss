@@ -1,0 +1,12 @@
+[
+  { "name": "greys-chat-dark", "query": { "theme": "dark" }, "settle": 1700 },
+  { "name": "greys-board-dark", "query": { "theme": "dark", "click": "Board" }, "settle": 1800 },
+  { "name": "greys-chat-softdark", "query": { "theme": "soft-dark" }, "settle": 1700 },
+  { "name": "greys-chat-cream", "query": { "theme": "cream-oak" }, "settle": 1700 },
+  { "name": "update-ready-dark", "query": { "theme": "dark", "update": "ready" }, "settle": 1800 },
+  { "name": "update-ready-cream", "query": { "theme": "cream-oak", "update": "ready" }, "settle": 1800 },
+  { "name": "update-available-dark", "query": { "theme": "dark", "update": "available" }, "settle": 1800 },
+  { "name": "update-downloading-dark", "query": { "theme": "dark", "update": "downloading" }, "settle": 1800 },
+  { "name": "update-error-dark", "query": { "theme": "dark", "update": "error" }, "settle": 1800 },
+  { "name": "update-ready-top-dark", "query": { "theme": "dark", "update": "ready", "navpos": "top" }, "settle": 1800 }
+]

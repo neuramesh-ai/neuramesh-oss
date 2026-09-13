@@ -1,0 +1,467 @@
+<!doctype html>
+<html data-theme="dark">
+<head>
+<meta charset="utf-8">
+<title>The orchestrator owns the flow — three task shapes, and what has to change</title>
+<style>
+[data-theme='cream-oak']{
+  --win:#f0e5d3;--bg:#fbf8f4;--panel:#fbf8f4;--panel2:#f6eee1;--panel3:#efe1cd;
+  --border:#e6dbca;--border2:#d3c2a8;
+  --text:#2a1c13;--body:#574838;--muted:#97846c;--dim:#b5a289;
+  --link:#9c5730;--accent:#834a2b;
+  --prog:#4f80c4;--done:#0f9d63;--blocked:#7d7f86;--review:#6d5ce0;--design:#b0498f;--plan:#2c7d88;
+  --role-orch:#6a63bc;--role-tone:14%;
+  --card:#fff;--card-border:#eadfce;
+  --hover-bg:color-mix(in srgb,var(--text) 5%,transparent);
+  --sel-bg:color-mix(in srgb,var(--accent) 8%,transparent);
+  --hover-border:color-mix(in srgb,var(--text) 10%,var(--border2));
+}
+[data-theme='dark']{
+  --win:#0d0d0d;--bg:#141414;--panel:#191919;--panel2:#212121;--panel3:#2b2b2b;
+  --border:#272727;--border2:#383838;
+  --text:#eaeaea;--body:#b6b6b6;--muted:#898989;--dim:#676767;
+  --link:#d19a72;--accent:var(--text);
+  --prog:#8ba0c0;--done:#77ac8d;--blocked:#9ca0a8;--review:#a89ccf;--design:#cc8fb9;--plan:#7fa5ab;
+  --role-orch:#9793d2;--role-tone:17%;
+  --card:#1e1e1e;--card-border:#2c2c2c;
+  --hover-bg:color-mix(in srgb,var(--text) 7%,transparent);
+  --sel-bg:color-mix(in srgb,var(--text) 10%,transparent);
+  --hover-border:#404040;
+}
+:root{
+  --fbody:'Geist Variable',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --fmono:'Geist Mono Variable',ui-monospace,'SF Mono',Menlo,monospace;
+  --fdisp:'Source Serif 4 Variable',Georgia,serif;
+  --r-sm:6px;--r-md:8px;--r-full:999px;--dur-fast:.12s;--ease:cubic-bezier(.2,.8,.2,1);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--fbody);background:var(--win);color:var(--text);-webkit-font-smoothing:antialiased;padding:26px 20px 80px}
+.wrap{max-width:1500px;margin:0 auto}
+h1{font-family:var(--fdisp);font-size:29px;font-weight:600;letter-spacing:-.01em;margin-bottom:6px}
+h2{font-family:var(--fdisp);font-size:19px;font-weight:600;margin:34px 0 4px}
+h3{font-size:13px;font-weight:650;margin:0 0 6px}
+.lede{color:var(--body);font-size:13.5px;line-height:1.65;max-width:82ch;margin-bottom:10px}
+.lede b{color:var(--text);font-weight:650}
+.toolbar{display:flex;gap:8px;align-items:center;margin:18px 0 8px;flex-wrap:wrap}
+.tbtn{padding:6px 13px;border-radius:var(--r-full);border:1px solid var(--border2);background:transparent;
+  color:var(--body);font:600 12px var(--fbody);cursor:pointer}
+.tbtn[aria-pressed=true]{background:var(--text);color:var(--win);border-color:var(--text)}
+
+/* ── the before/after ── */
+.ba{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:14px}
+.bax{border:1px solid var(--border);border-radius:14px;background:var(--panel);padding:15px 17px}
+.bax.now{opacity:.86}
+.bax.next{border-color:var(--text)}
+.bah{display:flex;align-items:baseline;gap:9px;margin-bottom:9px}
+.batag{font:600 9.5px var(--fmono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);
+  border:1px solid var(--border2);border-radius:var(--r-full);padding:1.5px 7px}
+.bax.next .batag{color:var(--text);border-color:var(--text)}
+.chain{display:flex;flex-wrap:wrap;align-items:center;gap:5px;margin:8px 0 10px}
+.node{font:600 10.5px var(--fmono);padding:3px 9px;border-radius:var(--r-full);border:1px solid var(--border2);color:var(--body)}
+.node.orch{color:var(--role-orch);border-color:color-mix(in srgb,var(--role-orch) 45%,transparent);
+  background:color-mix(in srgb,var(--role-orch) var(--role-tone),transparent)}
+.node.human{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 45%,transparent)}
+.node.leg{border-style:dashed;color:var(--muted)}
+.arrow{color:var(--dim);font-size:11px}
+.note{font-size:11.5px;color:var(--muted);line-height:1.6}
+.note b{color:var(--body);font-weight:600}
+
+/* ── flows ── */
+.flows{display:grid;grid-template-columns:repeat(auto-fit,minmax(400px,1fr));gap:16px;align-items:start;margin-top:14px}
+.flow{border:1px solid var(--border);border-radius:14px;background:var(--panel);overflow:hidden}
+.flowh{padding:14px 17px 0}
+.flown{font:650 14px var(--fbody)}
+.flowd{font-size:11.5px;color:var(--muted);margin-top:3px;line-height:1.55}
+.steps{padding:12px 17px 16px;display:flex;flex-direction:column}
+.step{display:grid;grid-template-columns:26px 1fr;gap:10px;padding:7px 0}
+.rail{position:relative;display:flex;justify-content:center}
+.rail::before{content:'';position:absolute;top:16px;bottom:-14px;width:1px;background:var(--border2)}
+.step:last-child .rail::before{display:none}
+.pip{position:relative;z-index:1;width:16px;height:16px;border-radius:50%;display:grid;place-items:center;
+  font:700 8.5px var(--fmono);background:var(--panel3);color:var(--body);border:1px solid var(--border2)}
+.pip.orch{background:color-mix(in srgb,var(--role-orch) 22%,var(--panel));color:var(--role-orch);border-color:color-mix(in srgb,var(--role-orch) 50%,transparent)}
+.pip.gate{background:color-mix(in srgb,var(--accent) 22%,var(--panel));color:var(--accent);border-color:var(--accent)}
+.pip.legp{background:transparent;border-style:dashed}
+.sbody{min-width:0;padding-top:1px}
+.stitle{font-size:12.5px;font-weight:600;line-height:1.45}
+.stitle .who{font:600 9.5px var(--fmono);letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin-right:6px}
+.stitle .who.o{color:var(--role-orch)}
+.stitle .who.h{color:var(--accent)}
+.sdesc{font-size:11.5px;color:var(--muted);line-height:1.55;margin-top:3px}
+.sdesc code{font:600 10.5px var(--fmono);color:var(--body)}
+.fan{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}
+.fanx{font:600 9.5px var(--fmono);padding:2px 7px;border-radius:var(--r-full);border:1px dashed var(--border2);color:var(--muted)}
+.gatebar{margin-top:6px;padding:5px 9px;border-radius:var(--r-md);font-size:11px;line-height:1.5;
+  background:color-mix(in srgb,var(--accent) 10%,transparent);color:var(--body)}
+.gatebar b{color:var(--accent)}
+.flowfoot{padding:11px 17px 14px;border-top:1px solid var(--border);font:600 10.5px var(--fmono);color:var(--dim)}
+
+/* ── constraints ── */
+.cons{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;margin-top:14px}
+.con{border:1px solid var(--border);border-left:2px solid var(--blocked);border-radius:12px;background:var(--panel);padding:13px 15px}
+.con.hard{border-left-color:var(--accent)}
+.conh{font:600 9.5px var(--fmono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:5px}
+.con.hard .conh{color:var(--accent)}
+.cont{font-size:12.5px;font-weight:600;line-height:1.45;margin-bottom:5px}
+.conb{font-size:11.5px;color:var(--muted);line-height:1.6}
+.conb code{font:600 10.5px var(--fmono);color:var(--body)}
+
+/* ── the card ── */
+.stage{background:var(--bg);border:1px solid var(--border);border-radius:14px;padding:14px 10px}
+.msg{display:flex;gap:11px;padding:7px 10px}
+.av{width:26px;height:26px;min-width:26px;border-radius:var(--r-sm);display:grid;place-items:center;
+  font-weight:800;font-size:11px;color:var(--body);background:var(--panel3);box-shadow:inset 0 0 0 1px var(--border2)}
+.mb{min-width:0;flex:1}
+.mh{display:flex;align-items:center;gap:8px}
+.mh b{font-size:12.5px}
+.time{font-size:10.5px;color:var(--dim)}
+.rolechip{font:700 8.5px var(--fmono);letter-spacing:.05em;text-transform:uppercase;color:var(--role-orch);
+  background:color-mix(in srgb,var(--role-orch) var(--role-tone),transparent);border-radius:var(--r-sm);padding:1.5px 5px}
+.runcard{margin-top:4px;max-width:600px;padding:2px 0 3px}
+.runhead{display:flex;align-items:center;gap:9px;width:100%;background:none;border:0;text-align:left}
+.runtitle{font-size:12.5px;font-weight:650;color:var(--text)}
+.runmeta{margin-left:auto;display:inline-flex;align-items:center;gap:8px}
+.chip{font:700 8.5px var(--fmono);letter-spacing:.05em;text-transform:uppercase;border-radius:var(--r-sm);padding:2px 6px;
+  background:color-mix(in srgb,var(--prog) 16%,transparent);color:var(--prog)}
+.runclock{font:600 10.5px var(--fmono);color:var(--dim)}
+.rring{--frac:0%;flex:none;width:15px;height:15px;border-radius:50%;
+  background:conic-gradient(var(--text) var(--frac),var(--panel3) 0);
+  -webkit-mask:radial-gradient(circle at 50% 50%,transparent 4.2px,#000 4.7px);
+  mask:radial-gradient(circle at 50% 50%,transparent 4.2px,#000 4.7px)}
+.runlegs{display:flex;flex-direction:column;gap:1px;margin-top:8px}
+.leg{display:flex;align-items:center;gap:8px;padding:4px 7px 4px 0;border-radius:7px}
+.leg.sub{margin-left:18px}
+.legmark{flex:none;width:13px;display:grid;place-items:center;color:var(--accent)}
+.legname{font-size:11.5px;color:var(--body);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.leg.on .legname{color:var(--text);font-weight:600}
+.legverb{flex:1 1 0;min-width:0;font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* the seat: which agent's config this leg inherited, and on what model. It replaces the assignee
+   name that used to live on the board card — "who is doing this" moved here. */
+.legseat{flex:none;display:inline-flex;align-items:center;gap:5px;font:600 9.5px var(--fmono);color:var(--dim)}
+.seatmark{width:13px;height:13px;border-radius:var(--r-sm);display:grid;place-items:center;
+  font:700 8px var(--fmono);color:var(--body);background:var(--panel3);box-shadow:inset 0 0 0 1px var(--border2)}
+/* a role default, because nothing in the room specialised in this — stated, not implied */
+.seatmark.fallback{background:transparent;color:var(--dim);box-shadow:inset 0 0 0 1px var(--border2);
+  border:1px dashed var(--border2)}
+.runroll{display:flex;gap:6px;margin-top:7px;flex-wrap:wrap}
+.rollchip{font:600 10px var(--fmono);color:var(--muted);padding:2.5px 7px;border-radius:var(--r-full);
+  background:color-mix(in srgb,var(--text) 6%,transparent)}
+.shine{color:var(--muted);
+  background:linear-gradient(100deg,var(--muted) 0%,var(--muted) 38%,var(--text) 50%,var(--muted) 62%,var(--muted) 100%);
+  background-size:220% 100%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  animation:shine 2.3s linear infinite}
+@keyframes shine{from{background-position:130% 0}to{background-position:-30% 0}}
+
+/* ── indicator options (bug 2) ── */
+.inds{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;margin-top:14px}
+.ind{border:1px solid var(--border);border-radius:12px;background:var(--panel);padding:14px 15px}
+.ind.pick{border-color:var(--text)}
+.indh{display:flex;align-items:baseline;gap:8px;margin-bottom:9px}
+.indn{font:650 12.5px var(--fbody)}
+.indrow{display:flex;align-items:center;gap:9px;padding:8px 0 10px}
+.indl{font-size:11.5px;color:var(--body)}
+.indb{font-size:11px;color:var(--muted);line-height:1.55}
+
+/* A · today: opacity pulse */
+.i-pulse{width:6px;height:6px;border-radius:99px;background:var(--text);animation:o-pulse 1.4s ease-in-out infinite}
+@keyframes o-pulse{50%{opacity:.45}}
+/* B · typing dots */
+.i-type{display:inline-flex;gap:3px;align-items:center}
+.i-type i{width:4px;height:4px;border-radius:99px;background:var(--text);animation:o-type 1s ease-in-out infinite}
+.i-type i:nth-child(2){animation-delay:.16s}
+.i-type i:nth-child(3){animation-delay:.32s}
+@keyframes o-type{0%,60%,100%{opacity:.28;transform:translateY(0)}30%{opacity:1;transform:translateY(-2.5px)}}
+/* C · orbit */
+.i-orbit{width:13px;height:13px;border-radius:50%;border:1.6px solid color-mix(in srgb,var(--text) 22%,transparent);
+  border-top-color:var(--text);animation:o-spin .62s linear infinite}
+@keyframes o-spin{to{transform:rotate(360deg)}}
+/* D · comet — a dot that laps a ring */
+.i-comet{position:relative;width:13px;height:13px}
+.i-comet::before{content:'';position:absolute;inset:0;border-radius:50%;
+  background:conic-gradient(from 0turn,transparent 0 62%,var(--text) 92%,transparent 100%);
+  -webkit-mask:radial-gradient(circle at 50% 50%,transparent 3.6px,#000 4.3px);
+  mask:radial-gradient(circle at 50% 50%,transparent 3.6px,#000 4.3px);
+  animation:o-spin .78s linear infinite}
+@media (prefers-reduced-motion:reduce){
+  .i-pulse,.i-type i,.i-orbit,.i-comet::before,.shine{animation:none}
+  .shine{background:none;-webkit-text-fill-color:currentColor;color:var(--body)}
+}
+.foot{margin-top:30px;font-size:11.5px;color:var(--dim);line-height:1.65;max-width:96ch}
+table{border-collapse:collapse;width:100%;margin-top:10px;font-size:12px}
+th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--border);vertical-align:top}
+th{font:600 9.5px var(--fmono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+td{color:var(--body);line-height:1.55}
+td code{font:600 10.5px var(--fmono);color:var(--text)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>The orchestrator owns the flow</h1>
+<p class="lede">
+  Today rex is a <b>router</b>: it creates a task, hands it to a seated agent, and steps out — the board FSM
+  and the daemon watches carry it from there. The proposal is that rex becomes the <b>general contractor</b>:
+  it holds the task for its whole life, spawns subagents per phase from the seated agents as seat templates,
+  reviews what comes back, and faces the human at every gate.
+  <br><br>
+  Three things below are worth confirming before any code: <b>the shape of each flow</b>, <b>the four
+  constraints</b> that decide what is actually buildable, and <b>which parts of today's model survive</b>.
+</p>
+
+<div class="toolbar">
+  <button class="tbtn" id="theme" aria-pressed="true">◑ cream oak</button>
+  <span style="font-size:11.5px;color:var(--muted)">every colour and idiom below is from the shipped tokens</span>
+</div>
+
+<h2>What changes</h2>
+<div class="ba">
+  <div class="bax now">
+    <div class="bah"><span class="batag">today</span><h3>rex routes, then leaves</h3></div>
+    <div class="chain">
+      <span class="node human">human asks</span><span class="arrow">→</span>
+      <span class="node orch">rex triages</span><span class="arrow">→</span>
+      <span class="node">offer_task</span><span class="arrow">→</span>
+      <span class="node">market-analyst claims</span><span class="arrow">→</span>
+      <span class="node">submits</span><span class="arrow">→</span>
+      <span class="node">reviewer</span><span class="arrow">→</span>
+      <span class="node human">accept</span>
+    </div>
+    <p class="note">
+      Rex's own turn ends at <b>offer_task</b>. Everything after is the FSM plus watches. The observed
+      symptom: the worker claims and starts <i>before</i> rex's digest posts, so the thread reads
+      backwards — <b>the ordering bug is this architecture leaking into the transcript</b>, not a sort bug.
+    </p>
+  </div>
+  <div class="bax next">
+    <div class="bah"><span class="batag">proposed</span><h3>rex owns, and answers for it</h3></div>
+    <div class="chain">
+      <span class="node human">human asks</span><span class="arrow">→</span>
+      <span class="node orch">rex owns #N</span><span class="arrow">→</span>
+      <span class="node leg">spawns legs</span><span class="arrow">→</span>
+      <span class="node orch">rex reviews</span><span class="arrow">→</span>
+      <span class="node human">gate</span><span class="arrow">↻</span>
+      <span class="node orch">rex continues</span><span class="arrow">→</span>
+      <span class="node">seated reviewer</span><span class="arrow">→</span>
+      <span class="node human">accept</span>
+    </div>
+    <p class="note">
+      Rex is <code>assignee_id</code> for the task's whole life. Each phase is subagents it spawns and owns.
+      The <b>↻</b> is the load-bearing detail: a human gate <b>ends rex's turn</b> and re-wakes it later —
+      which is why the brain shipped in v0.75.0 is the precondition for any of this.
+    </p>
+  </div>
+</div>
+
+<h2>The four constraints</h2>
+<p class="lede">Two are hard limits that the design must bend around. Two are consequences to accept deliberately.</p>
+<div class="cons">
+  <div class="con hard">
+    <div class="conh">hard · server-enforced</div>
+    <div class="cont">Rex cannot review its own work</div>
+    <div class="conb">
+      <code>SELF_REVIEW_BLOCKED</code> fires when the approver is the assignee, and a subagent has
+      <b>no board identity at all</b> — so it cannot approve either. Review therefore stays a <b>seated
+      reviewer that is not rex</b>. This is doctrine §4 working as intended, and the plan must not
+      "solve" it.
+    </div>
+  </div>
+  <div class="con hard">
+    <div class="conh">hard · physics</div>
+    <div class="cont">A subagent lives inside one turn</div>
+    <div class="conb">
+      <code>sliceBudget</code> carves a child's budget from the parent's <i>remainder</i>, so a leg cannot
+      outlive the turn that spawned it. A build spans days and several human gates. <b>Ownership is durable;
+      execution is per-turn.</b> Rex is re-woken at each gate and reads its subject brain to continue.
+    </div>
+  </div>
+  <div class="con">
+    <div class="conh">consequence</div>
+    <div class="cont">Budgets have to grow</div>
+    <div class="conb">
+      A <code>triage</code> turn is <b>4 min / 24k</b>. Spawning three designers from inside it is not
+      affordable — each child takes half the remainder. An owning turn needs its own kind and budget, or
+      the first fan-out starves the second.
+    </div>
+  </div>
+  <div class="con">
+    <div class="conh">consequence</div>
+    <div class="cont">Every board card says "rex"</div>
+    <div class="conb">
+      The assignee stops being the answer to <i>who is doing this</i>. The phase spectrum and the subagent
+      tree carry it instead — which is why the leg rows became clickable first. Worth confirming you want
+      the board to read this way.
+    </div>
+  </div>
+</div>
+
+<h2>Three task shapes</h2>
+<p class="lede">
+  The same ownership model, at three very different sizes. <span style="color:var(--accent)">●</span> is a
+  human gate; <span style="color:var(--role-orch)">●</span> is rex acting; a dashed pip is a subagent rex spawned and owns.
+</p>
+<div class="flows" id="flows"></div>
+
+<h2>What rex's card looks like while it owns</h2>
+<p class="lede">
+  One card, rex's own, for the whole task — the tree underneath is what it spawned. Each leg names its
+  <b>seat</b> (role · model), because "who is doing this" moved from the board card to here.
+</p>
+<div class="stage" id="cardstage"></div>
+
+<h2>The working indicator</h2>
+<p class="lede">
+  Today a running leg gets a 6px dot fading between 100% and 45% opacity over 1.4s — slow enough to read as
+  idle. Four candidates, all monochrome so the card's "shape carries state" rule holds.
+</p>
+<div class="inds" id="inds"></div>
+
+<h2>What survives from today</h2>
+<table>
+  <tr><th>Stays</th><th>Why</th></tr>
+  <tr><td><b>Seated role agents</b> (designer, architect, developer, marketer)</td><td>They become the <b>seat templates</b> a subagent inherits — model, tools, brief, skills. Rex resolves a seat by <b>specialism first</b>: if someone in the room is specialised in what the leg needs, the leg runs on their config and the card says <code>@iris · opus</code>. If nothing matches, it falls back to a plain role default and <b>says so</b> — a hollow glyph rather than a borrowed name, because implying a specialist that does not exist is the worse failure. They also remain offerable for work that wants a durable owner.</td></tr>
+  <tr><td><b>The seated reviewer</b></td><td>Hard constraint above. An independent check is the point, and it is the one role that must not be rex's own subagent.</td></tr>
+  <tr><td><b>The board FSM and its gates</b></td><td>Unchanged. <code>approve_design</code>, <code>approve_ship_plan</code> and <code>accept</code> stay HUMAN_ONLY; rex owning the row does not soften any of them.</td></tr>
+  <tr><td><b>Subtasks</b></td><td>Still the way companion work rides a parent. A spawned leg is <i>not</i> a subtask — it is execution, not a board entity.</td></tr>
+  <tr><td><b>Delegation, as an option</b></td><td>Long repo-backed builds with a worktree and a PR still suit a durable seated owner. Rex should be able to choose it — the change is that owning becomes the <b>default</b>, not that delegation is deleted.</td></tr>
+</table>
+
+<p class="foot">
+  <b>Three defects this also settles.</b>
+  The <b>ordering bug</b> dissolves — with no hand-off there is no claim message racing rex's digest (and for
+  any delegated path, rex's digest posts before the offer command rather than after).
+  The <b>boring dot</b> is the indicator round above.
+  The <b>stale spinner after submit</b> is separate and real: beats declared but never advanced are left
+  running when the task moves to <code>in_review</code>, so step 5 of 7 spins forever. That wants settling at
+  the phase transition, not at the end of a turn that may already have died.
+</p>
+
+</div>
+<script>
+const TICK = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+
+/**
+ * The seat a leg is running on: WHOSE config it inherited, the role, and the model.
+ *
+ * `from` is the seated agent whose specialty matched — that is the thing worth showing, because it
+ * answers "why is this leg any good at this". When nothing in the room matches, the leg falls back to
+ * a role default and says so (a hollow glyph), rather than implying a specialist that does not exist.
+ */
+const seat = (from, role, model, glyph) => `
+  <span class="legseat" title="${from ? `inherits @${from}’s seat` : 'no specialist in this room — role default'}">
+    <span class="seatmark${from ? '' : ' fallback'}">${glyph}</span>${from ? `@${from}` : role} · ${model}
+  </span>`;
+
+const FLOWS = [
+  {
+    name: 'A simple ask',
+    desc: '“what’s in the backlog?” · “what did we decide about pricing?” — no deliverable, no board row.',
+    cost: 'one triage turn · no task created',
+    steps: [
+      { who: 'human', cls: 'h', pip: '', pipCls: 'gate', t: 'Asks in the room', d: 'Nothing is filed. This path must stay cheap — it is the majority of messages.' },
+      { who: 'rex', cls: 'o', pip: '1', pipCls: 'orch', t: 'Answers from its own tools', d: '<code>list_workspace</code> → <code>list_library</code> → <code>recall</code>, then replies in the thread. Unchanged by any of this.' },
+    ],
+  },
+  {
+    name: 'Research',
+    desc: '“research AI voice meditation mechanics” — one deliverable, no code, no design taste to settle.',
+    cost: 'one owning turn · 5 legs in parallel · one human gate',
+    steps: [
+      { who: 'rex', cls: 'o', pip: '1', pipCls: 'orch', t: 'Triage + requirements', d: 'Clarifies scope with <code>nmq</code> cards if anything is ambiguous. Reads the room library first, so the brief names the real product.' },
+      { who: 'rex', cls: 'o', pip: '2', pipCls: 'orch', t: 'Creates #N and takes it', d: '<code>assignee_id = rex</code>. The board card says rex from here on.' },
+      { who: 'legs', cls: '', pip: '', pipCls: 'legp', t: 'Fans out the angles', d: 'Five researcher legs in parallel, each seated on the researcher template, each with its own run row and activity.', fan: ['competitors', 'voice tech', 'reviews', 'clinical', 'gaps'] },
+      { who: 'rex', cls: 'o', pip: '3', pipCls: 'orch', t: 'Reads, reconciles, writes', d: 'Their findings land in the subject brain as notes + result envelopes. Rex synthesises rather than concatenating — it owns the report.' },
+      { who: 'human', cls: 'h', pip: '', pipCls: 'gate', t: 'Accept', d: '', gate: 'The only gate. Research has no design taste and no code to review — a seated reviewer here would be ceremony.' },
+    ],
+  },
+  {
+    name: 'Build / dev',
+    desc: '“design and build the landing page” — the multi-gate one, and the reason ownership has to be durable.',
+    cost: 'four owning turns, one per gate · a seated reviewer at the end',
+    steps: [
+      { who: 'rex', cls: 'o', pip: '1', pipCls: 'orch', t: 'Triage → #N, owned by rex', d: 'Requirements as cards. Decides the route: this one is user-facing, so it starts in design.' },
+      { who: 'legs', cls: '', pip: '', pipCls: 'legp', t: 'Spawns 3 designers', d: 'Each inherits the channel designer’s seat. Rex first decides HTML mockups vs a Claude Design project — and asks if that is the human’s call.', fan: ['direction A', 'direction B', 'direction C'] },
+      { who: 'rex', cls: 'o', pip: '2', pipCls: 'orch', t: 'Presents the round', d: 'Posts the three mockups itself. <b>Turn ends here.</b>' },
+      { who: 'human', cls: 'h', pip: '', pipCls: 'gate', t: 'approve_design', d: '', gate: '<b>HUMAN_ONLY.</b> Approval re-wakes rex, which reads the brain to remember what it established.' },
+      { who: 'legs', cls: '', pip: '', pipCls: 'legp', t: 'Spawns an architect', d: 'Plans against the approved mockup as the visual contract.', fan: ['implementation plan'] },
+      { who: 'human', cls: 'h', pip: '', pipCls: 'gate', t: 'approve plan', d: '', gate: 'Rex posts the plan, turn ends, approval re-wakes it again.' },
+      { who: 'legs', cls: '', pip: '', pipCls: 'legp', t: 'Spawns developers', d: 'In a worktree, against the approved plan. Rex validates before anything is submitted.', fan: ['build', 'tests'] },
+      { who: 'rex', cls: 'o', pip: '3', pipCls: 'orch', t: 'Submits — PR + artifacts', d: 'Rex answers for the submission because rex owns the row.' },
+      { who: 'seat', cls: '', pip: '4', pipCls: '', t: 'A seated reviewer, not rex', d: 'The one hand-off that must survive: the server refuses an assignee reviewing itself, and a subagent has no identity to review with. Adversarial by construction.' },
+      { who: 'rex', cls: 'o', pip: '5', pipCls: 'orch', t: 'Owns the rework loop', d: 'Changes requested come back to <b>rex</b>, not to a worker. It judges the feedback: act on it (spawn a fixer), push back with reasoning, or escalate.', gate: 'If it genuinely needs a human — a trade-off only you can settle — rex raises an <code>nmq</code> card rather than guessing. Loop repeats until the reviewer approves.' },
+      { who: 'human', cls: 'h', pip: '', pipCls: 'gate', t: 'Accept → merge', d: '', gate: 'Unchanged. Squash-merge on accept.' },
+    ],
+  },
+];
+
+const INDS = [
+  { n: 'A · Pulse', tag: 'today', pick: false, html: '<span class="i-pulse"></span>',
+    b: 'A 6px dot at 1.4s between 100% and 45%. At that speed and that little contrast it reads as a status light, not as work happening.' },
+  { n: 'B · Typing', tag: 'familiar', pick: false, html: '<span class="i-type"><i></i><i></i><i></i></span>',
+    b: 'The chat idiom, and instantly legible as "something is composing". Three dots is wide for a 13px leading column, and it says <i>talking</i> more than <i>working</i>.' },
+  { n: 'C · Orbit', tag: 'recommended', pick: true, html: '<span class="i-orbit"></span>',
+    b: 'A 0.62s arc — fast enough to read as effort. Same 13px box as the ✓ it replaces, so rows do not shift when a leg settles. Already the ghost’s spinner idiom.' },
+  { n: 'D · Comet', tag: 'showiest', pick: false, html: '<span class="i-comet"></span>',
+    b: 'A gradient tail lapping the ring. Prettiest at 0.78s, and it matches the progress ring’s geometry — but it is a second ring idiom on a card that already has one.' },
+];
+
+const step = (s) => `
+  <div class="step">
+    <div class="rail"><span class="pip ${s.pipCls}">${s.pip || ''}</span></div>
+    <div class="sbody">
+      <div class="stitle"><span class="who ${s.cls}">${s.who}</span>${s.t}</div>
+      ${s.d ? `<div class="sdesc">${s.d}</div>` : ''}
+      ${s.fan ? `<div class="fan">${s.fan.map((f) => `<span class="fanx">${f}</span>`).join('')}</div>` : ''}
+      ${s.gate ? `<div class="gatebar">${s.gate}</div>` : ''}
+    </div>
+  </div>`;
+
+document.getElementById('flows').innerHTML = FLOWS.map((f) => `
+  <div class="flow">
+    <div class="flowh"><div class="flown">${f.name}</div><div class="flowd">${f.desc}</div></div>
+    <div class="steps">${f.steps.map(step).join('')}</div>
+    <div class="flowfoot">${f.cost}</div>
+  </div>`).join('');
+
+document.getElementById('inds').innerHTML = INDS.map((i) => `
+  <div class="ind${i.pick ? ' pick' : ''}">
+    <div class="indh"><span class="indn">${i.n}</span><span class="batag">${i.tag}</span></div>
+    <div class="indrow">${i.html}<span class="indl">researching competitors</span></div>
+    <div class="indb">${i.b}</div>
+  </div>`).join('');
+
+document.getElementById('cardstage').innerHTML = `
+<div class="msg">
+  <span class="av">R</span>
+  <div class="mb">
+    <div class="mh"><b>rex</b><span class="rolechip">orchestrator</span><span class="time">now</span></div>
+    <div class="runcard">
+      <button class="runhead">
+        <span class="rring" style="--frac:58%"></span>
+        <span class="runtitle">#1041 Landing page — design round</span>
+        <span class="runmeta"><span class="chip">designing</span><span class="runclock">3:12</span></span>
+      </button>
+      <div class="runlegs">
+        <div class="leg on">
+          <span class="legmark"><span class="i-orbit"></span></span>
+          <span class="legname shine">drawing three directions</span>
+          <span class="legseat">2/3</span>
+        </div>
+        <div class="leg sub"><span class="legmark">${TICK}</span><span class="legname">direction A — editorial</span><span class="legverb">4 sections · type-led hero</span>${seat('iris', 'designer', 'opus', 'A')}</div>
+        <div class="leg sub"><span class="legmark">${TICK}</span><span class="legname">direction B — product-led</span><span class="legverb">screenshot hero, 3 proof rows</span>${seat('iris', 'designer', 'opus', 'A')}</div>
+        <div class="leg sub on"><span class="legmark"><span class="i-orbit"></span></span><span class="legname">direction C — minimal</span><span class="legverb shine">reading tokens.css</span>${seat(null, 'designer', 'sonnet', 'A')}</div>
+      </div>
+      <div class="runroll"><span class="rollchip">3 subagents</span><span class="rollchip">design · round 1</span></div>
+    </div>
+  </div>
+</div>`;
+
+const t = document.getElementById('theme');
+t.addEventListener('click', () => {
+  const dark = document.documentElement.dataset.theme === 'dark';
+  document.documentElement.dataset.theme = dark ? 'cream-oak' : 'dark';
+  t.setAttribute('aria-pressed', String(dark));
+  t.textContent = dark ? '◐ graphite dark' : '◑ cream oak';
+});
+</script>
+</body>
+</html>

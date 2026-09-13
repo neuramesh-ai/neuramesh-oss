@@ -1,0 +1,132 @@
+{
+  "artboards": [
+    {
+      "file": "Main.dc.html",
+      "x": 0,
+      "y": 0,
+      "w": 900,
+      "h": 600,
+      "title": "A · The foot · graphite"
+    },
+    {
+      "file": "Paper.dc.html",
+      "x": 980,
+      "y": 0,
+      "w": 900,
+      "h": 600,
+      "title": "A · The foot · paper"
+    },
+    {
+      "file": "CreamOak.dc.html",
+      "x": 1960,
+      "y": 0,
+      "w": 900,
+      "h": 600,
+      "title": "A · The foot · cream oak"
+    },
+    {
+      "file": "ConnectX.dc.html",
+      "x": 0,
+      "y": 760,
+      "w": 900,
+      "h": 600,
+      "title": "State · not connected → connect"
+    },
+    {
+      "file": "ConnectedLinkedIn.dc.html",
+      "x": 980,
+      "y": 760,
+      "w": 900,
+      "h": 600,
+      "title": "State · connected"
+    },
+    {
+      "file": "AllConnections.dc.html",
+      "x": 1960,
+      "y": 760,
+      "w": 900,
+      "h": 600,
+      "title": "State · ⋯ every connection"
+    },
+    {
+      "file": "Hover.dc.html",
+      "x": 0,
+      "y": 1520,
+      "w": 900,
+      "h": 600,
+      "title": "State · hover tip"
+    },
+    {
+      "file": "Typing.dc.html",
+      "x": 980,
+      "y": 1520,
+      "w": 900,
+      "h": 600,
+      "title": "State · a draft in the box"
+    },
+    {
+      "file": "Tray.dc.html",
+      "x": 1960,
+      "y": 1520,
+      "w": 900,
+      "h": 600,
+      "title": "B · The tray"
+    },
+    {
+      "file": "LiveIdeas.dc.html",
+      "x": 0,
+      "y": 2280,
+      "w": 900,
+      "h": 720,
+      "title": "C · Live ideas"
+    },
+    {
+      "file": "Marks.dc.html",
+      "x": 980,
+      "y": 2280,
+      "w": 660,
+      "h": 560,
+      "title": "The marks"
+    }
+  ],
+  "annotations": [
+    {
+      "id": "note-a",
+      "x": 0,
+      "y": -140,
+      "w": 760,
+      "text": "A · THE FOOT (leading)\nA third zone on the composer card: the cap's material mirrored at the bottom. Suggestion pills sit left, the connector marks right. One card, one border, one focus ring. Same recipe in graphite, paper and cream oak."
+    },
+    {
+      "id": "note-states",
+      "x": 0,
+      "y": 620,
+      "w": 760,
+      "text": "STATES\nA mark is a door. Not connected: the connect step opens in the composer's own popover recipe. Connected: the handle and Disconnect. The ⋯ lists every connector as icon · name · state, the machine-chip row idiom."
+    },
+    {
+      "id": "note-row3",
+      "x": 0,
+      "y": 1380,
+      "w": 760,
+      "text": "HOVER · TYPING · B\nThe tooltip carries the word. With a draft in the box the pills leave, the marks stay and the foot keeps its height.\nB · The tray hangs the strip under the card as its own well. Tradeoff: a second edge, and the focus ring stops at the card."
+    },
+    {
+      "id": "note-c",
+      "x": 0,
+      "y": 2140,
+      "w": 760,
+      "text": "C · LIVE IDEAS (optional, more scope)\nOne door pill. rex reads the room (the launcher's ideas call already exists) and room-grounded pills replace it. Tradeoff: a live read takes seconds and needs a brain. The static three stay as the fallback."
+    },
+    {
+      "id": "note-marks",
+      "x": 980,
+      "y": 2140,
+      "w": 760,
+      "text": "THE MARKS\nSimplified geometry in one stroke weight, currentColor, like the provider marks. Not connected = dim. Connected = body ink + green dot. Needs reauth = amber dot. Fixed order, never sorted by state."
+    }
+  ],
+  "launch": {
+    "view": "canvas"
+  }
+}

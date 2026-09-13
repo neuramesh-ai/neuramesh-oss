@@ -1,0 +1,646 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<title>Workspace Files — design round 1</title>
+<style>
+/* ─────────────────────────────────────────────────────────────────────────────
+   Tokens copied verbatim from apps/desktop/src/renderer/src/tokens.css
+   (Graphite dark + Cream Oak light). Nothing here invents a colour.
+   ───────────────────────────────────────────────────────────────────────────── */
+:root {
+  --fdisp: 'Source Serif 4', Georgia, 'Times New Roman', serif;
+  --fbody: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --fmono: ui-monospace, 'SF Mono', Menlo, monospace;
+  --dur-fast: .12s; --dur: .15s; --dur-enter: .22s; --dur-exit: .13s;
+  --ease: cubic-bezier(.22,1,.36,1);
+  --r-xs: 6px; --r-sm: 8px; --r-md: 10px; --r-lg: 14px; --r-xl: 18px; --r-full: 999px;
+  --sheet-r: 16px;
+}
+:root, [data-theme='dark'] {
+  --win: #0d0d0d; --bg: #141414; --panel: #191919; --panel2: #212121; --panel3: #2b2b2b;
+  --border: #272727; --border2: #383838;
+  --text: #eaeaea; --body: #b6b6b6; --muted: #898989; --dim: #676767;
+  --link: #d19a72; --accent: var(--text); --accent-ink: #101010; --accent-soft: var(--panel3);
+  --brand: #834a2b; --brand-ink: #fff7ee;
+  --btn: #232323; --btn-fg: #efefef; --btn-hover: #2f2f2f;
+  --green: #77ac8d; --violet: #a89ccf; --warn: #c9a15e;
+  --role-orch: #9793d2; --role-design: #cc8fb9; --role-mkt: #c98f8f; --role-dev: #77ac8d; --role-cur: #6fb0ab;
+  --shadow: rgba(0,0,0,0.62); --overlay: #222222;
+  --card: #1e1e1e; --card-border: #2c2c2c;
+  --shadow-card: 0 1px 2px rgba(0,0,0,.25); --shadow-lift: 0 8px 20px -8px rgba(0,0,0,.55); --shadow-pop: 0 20px 55px -14px rgba(0,0,0,.65);
+  --ring: #525252; --hover-bg: color-mix(in srgb, var(--text) 7%, transparent); --sel-bg: color-mix(in srgb, var(--text) 10%, transparent);
+}
+[data-theme='cream-oak'] {
+  --win: #f0e5d3; --bg: #fbf8f4; --panel: #fbf8f4; --panel2: #f6eee1; --panel3: #efe1cd;
+  --border: #e6dbca; --border2: #d3c2a8;
+  --text: #2a1c13; --body: #574838; --muted: #97846c; --dim: #b5a289;
+  --link: #9c5730; --accent: #834a2b; --accent-ink: #fff7ee; --accent-soft: #f1e3d2;
+  --brand: #834a2b; --brand-ink: #fff7ee;
+  --btn: #f8f2e8; --btn-fg: #43301f; --btn-hover: #efe4d2;
+  --green: #2f9e6b; --violet: #7d6cc4; --warn: #a06a1f;
+  --role-orch: #6a63bc; --role-design: #b0498f; --role-mkt: #b04f55; --role-dev: #3f9268; --role-cur: #2f8f8a;
+  --shadow: rgba(70,42,18,0.16); --overlay: #ffffff;
+  --card: #ffffff; --card-border: #eadfce;
+  --shadow-card: 0 1px 2px rgba(70,42,18,.05); --shadow-lift: 0 8px 20px -8px rgba(70,42,18,.20); --shadow-pop: 0 20px 55px -14px rgba(70,42,18,.30);
+  --ring: color-mix(in srgb, var(--accent) 42%, var(--border2)); --hover-bg: color-mix(in srgb, var(--text) 5%, transparent); --sel-bg: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: var(--win); color: var(--text); font-family: var(--fbody); font-size: 14px; -webkit-font-smoothing: antialiased; padding: 0 0 80px; }
+
+/* ── page chrome (the mockup's own, not the product's) ───────────────────── */
+.pg { max-width: 1180px; margin: 0 auto; padding: 30px 26px 0; }
+.pghd { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; padding-bottom: 20px; border-bottom: 1px solid var(--border); margin-bottom: 34px; }
+.pgt { font-family: var(--fdisp); font-size: 30px; font-weight: 640; letter-spacing: -.015em; line-height: 1.1; }
+.pgs { color: var(--muted); font-size: 13px; margin-top: 6px; max-width: 620px; line-height: 1.5; }
+.kick { font-family: var(--fmono); font-size: 10px; letter-spacing: .13em; text-transform: uppercase; color: var(--dim); }
+.themetog { display: flex; gap: 3px; padding: 3px; background: var(--panel2); border: 1px solid var(--border); border-radius: var(--r-full); flex: none; }
+.themetog button { font: inherit; font-size: 12px; font-weight: 600; padding: 6px 15px; border-radius: var(--r-full); border: 0; background: none; color: var(--muted); cursor: pointer; transition: background var(--dur) var(--ease), color var(--dur) var(--ease); }
+.themetog button[aria-pressed='true'] { background: var(--card); color: var(--text); box-shadow: var(--shadow-card); }
+
+.scene { margin-bottom: 52px; }
+.scenehd { display: flex; align-items: baseline; gap: 12px; margin-bottom: 4px; }
+.scenen { font-family: var(--fdisp); font-size: 19px; font-weight: 640; letter-spacing: -.01em; }
+.scenetag { font-family: var(--fmono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--accent-ink); background: var(--accent); padding: 3px 8px; border-radius: var(--r-full); font-weight: 600; }
+[data-theme='dark'] .scenetag { background: var(--panel3); color: var(--body); }
+.scenetag.rec { background: var(--green); color: #0b1710; }
+.scened { color: var(--muted); font-size: 13px; line-height: 1.55; max-width: 760px; margin-bottom: 16px; }
+.scened b { color: var(--body); font-weight: 600; }
+
+/* ── the app sheet: what the main surface actually looks like ────────────── */
+.sheet { background: var(--bg); border: 1px solid var(--border); border-radius: var(--sheet-r); overflow: hidden; box-shadow: var(--shadow-lift); }
+.sheet.tall { min-height: 520px; }
+
+/* SubPage header — mono kicker over a serif title, one control cluster right */
+.sphd { display: flex; align-items: flex-start; gap: 14px; padding: 20px 22px 16px; border-bottom: 1px solid var(--border); }
+.sphdl { flex: 1; min-width: 0; }
+.sptitle { font-family: var(--fdisp); font-size: 23px; font-weight: 640; letter-spacing: -.012em; line-height: 1.15; display: flex; align-items: center; gap: 9px; }
+.spsub { color: var(--muted); font-size: 12.5px; margin-top: 4px; }
+.spacts { display: flex; align-items: center; gap: 8px; flex: none; }
+
+/* pills — primary = accent fill, ghost = transparent + hairline */
+.pill { display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 12.5px; font-weight: 600; padding: 7px 15px; border-radius: var(--r-full); cursor: pointer; transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease); white-space: nowrap; }
+.pill.primary { background: var(--accent); color: var(--accent-ink); border: 1px solid var(--accent); }
+.pill.primary:hover { box-shadow: var(--shadow-card); }
+.pill.ghost { background: transparent; color: var(--body); border: 1px solid var(--border2); }
+.pill.ghost:hover { background: var(--hover-bg); }
+.seg { display: flex; gap: 2px; padding: 2px; background: var(--panel2); border: 1px solid var(--border); border-radius: var(--r-full); }
+.seg button { font: inherit; font-size: 12px; font-weight: 600; padding: 5px 12px; border-radius: var(--r-full); border: 0; background: none; color: var(--muted); cursor: pointer; display: inline-flex; align-items: center; gap: 5px; }
+.seg button[aria-pressed='true'] { background: var(--card); color: var(--text); box-shadow: var(--shadow-card); }
+
+/* the search that spans the workspace — one field, always visible */
+.wfsearch { display: flex; align-items: center; gap: 9px; margin: 0 22px; padding: 9px 14px; background: var(--panel2); border: 1px solid var(--border); border-radius: var(--r-full); color: var(--muted); font-size: 13px; }
+.wfsearch svg { flex: none; opacity: .75; }
+.wfsearch .cue { margin-left: auto; font-family: var(--fmono); font-size: 10.5px; color: var(--dim); border: 1px solid var(--border2); border-radius: var(--r-xs); padding: 2px 6px; }
+
+.wfbody { padding: 18px 22px 24px; }
+
+/* ── DIRECTION A · the folder grid ───────────────────────────────────────── */
+.wfgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(232px, 1fr)); gap: 14px; }
+.wfolder { position: relative; text-align: left; font: inherit; color: inherit; border: 1px solid var(--card-border); background: var(--card); border-radius: var(--r-lg); padding: 15px 16px 13px; cursor: pointer; box-shadow: var(--shadow-card); transition: border-color var(--dur) var(--ease), transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease); display: flex; flex-direction: column; gap: 11px; }
+/* The folder tab — a silhouette, not a blue icon (the product is achromatic in dark).
+   It overlaps 2px INTO the card so its own --card fill covers the card's top border:
+   one continuous outline, never two hairlines meeting (trap 9b). */
+.wfolder::before { content: ''; position: absolute; left: 17px; top: -9px; width: 56px; height: 11px; background: var(--card); border: 1px solid var(--card-border); border-bottom: none; border-radius: 7px 7px 0 0; }
+.wfolder:hover { transform: translateY(-2px); box-shadow: var(--shadow-lift); border-color: var(--border2); }
+.wfolder:hover::before { border-color: var(--border2); }
+.wftop { display: flex; align-items: center; gap: 10px; }
+.wfmark { width: 30px; height: 30px; border-radius: var(--r-md); flex: none; display: grid; place-items: center; font-weight: 700; font-size: 13px; background: var(--panel3); color: var(--body); border: 1px solid var(--card-border); overflow: hidden; }
+.wfmark.brandy { background: var(--brand); color: var(--brand-ink); border-color: transparent; }
+.wfname { font-weight: 650; font-size: 14.5px; letter-spacing: -.005em; }
+.wfcount { margin-left: auto; font-family: var(--fmono); font-size: 10.5px; color: var(--dim); letter-spacing: .04em; }
+.wfrooms { display: flex; flex-wrap: wrap; gap: 5px; }
+.wfroom { font-family: var(--fmono); font-size: 10.5px; color: var(--muted); background: var(--panel2); border: 1px solid var(--border); border-radius: var(--r-full); padding: 2.5px 8px; }
+.wffoot { display: flex; align-items: center; gap: 7px; padding-top: 10px; border-top: 1px solid var(--border); }
+.wfwhen { font-size: 11.5px; color: var(--dim); margin-left: auto; }
+/* the ACCESS row — the invisible rule, made visible. ACL = channel registration. */
+.wfacl { display: flex; align-items: center; gap: 5px; }
+.wfav { width: 19px; height: 19px; border-radius: 6px; border: 1.5px solid var(--card); display: grid; place-items: center; font-size: 9px; font-weight: 700; color: #fff; margin-left: -6px; }
+.wfav:first-child { margin-left: 0; }
+.wfacll { font-size: 11px; color: var(--muted); margin-left: 3px; }
+.wfnew { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; border: 1.5px dashed var(--border2); background: none; border-radius: var(--r-lg); padding: 20px 16px; min-height: 138px; cursor: pointer; color: var(--muted); font-family: inherit; font-size: 12.5px; font-weight: 550; }
+.wfnew:hover { border-color: var(--ring); color: var(--body); }
+
+/* ── DIRECTION A · inside a folder ───────────────────────────────────────── */
+.crumb { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--muted); }
+.crumb a { color: var(--link); text-decoration: none; cursor: pointer; }
+.crumb a:hover { text-decoration: underline; }
+.crumb b { color: var(--text); font-weight: 650; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+.chips button { font: inherit; font-size: 12px; font-weight: 600; padding: 5px 13px; border-radius: var(--r-full); border: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; }
+.chips button[aria-selected='true'] { background: var(--sel-bg); color: var(--text); border-color: var(--border2); }
+.chips .n { font-family: var(--fmono); font-size: 10px; opacity: .7; margin-left: 4px; }
+
+.ftable { border: 1px solid var(--card-border); border-radius: var(--r-lg); background: var(--card); overflow: hidden; box-shadow: var(--shadow-card); }
+/* the name column is the only elastic one and it may shrink to nothing before any meta
+   column crushes — meta cells never wrap, so a row is always exactly one line tall */
+.fthd, .ftr { display: grid; grid-template-columns: 30px minmax(0, 1fr) 74px 78px 118px 92px 34px; align-items: center; gap: 10px; padding: 0 14px; }
+.fthd { height: 34px; border-bottom: 1px solid var(--border); background: var(--panel2); }
+.fthd span { font-family: var(--fmono); font-size: 9.5px; letter-spacing: .11em; text-transform: uppercase; color: var(--dim); }
+.ftr { height: 46px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background var(--dur-fast) var(--ease); }
+.ftr:last-child { border-bottom: 0; }
+.ftr:hover { background: var(--hover-bg); }
+.fic { width: 26px; height: 26px; border-radius: var(--r-sm); background: var(--panel2); border: 1px solid var(--border); display: grid; place-items: center; color: var(--muted); }
+/* a BLOCK, not a flex row: the star and the badge are inline children, so one ellipsis
+   governs the whole line. As a flex row the name overran the TYPE chip at narrow widths. */
+.fnm { font-weight: 550; font-size: 13.5px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ftype { font-family: var(--fmono); font-size: 9.5px; letter-spacing: .09em; color: var(--muted); background: var(--panel2); border: 1px solid var(--border); border-radius: var(--r-xs); padding: 2.5px 6px; justify-self: start; }
+.fmeta { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.froom { font-family: var(--fmono); font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fmore { color: var(--dim); justify-self: end; }
+/* the star: curation is now a marker, not a gate */
+.fstar { color: var(--warn); font-size: 11px; }
+.fnew { display: inline-flex; align-items: center; gap: 4px; font-family: var(--fmono); font-size: 9px; letter-spacing: .08em; text-transform: uppercase; color: var(--green); border: 1px solid color-mix(in srgb, var(--green) 40%, transparent); border-radius: var(--r-full); padding: 1.5px 6px; }
+
+/* the drop veil */
+.dropz { margin-top: 14px; border: 1.5px dashed var(--border2); border-radius: var(--r-lg); padding: 18px; text-align: center; color: var(--muted); font-size: 12.5px; }
+.dropz b { color: var(--body); font-weight: 600; }
+
+/* ── DIRECTION B · one folded table ──────────────────────────────────────── */
+.grouphd { display: flex; align-items: center; gap: 10px; padding: 11px 14px; background: var(--panel2); border-bottom: 1px solid var(--border); cursor: pointer; }
+.grouphd:first-child { border-top: 0; }
+.grouphd .chev { color: var(--dim); transition: transform var(--dur) var(--ease); }
+.grouphd.closed .chev { transform: rotate(-90deg); }
+.grouphd b { font-weight: 650; font-size: 13.5px; }
+.grouphd .n { font-family: var(--fmono); font-size: 10.5px; color: var(--dim); margin-left: auto; }
+
+/* ── DIRECTION C · finder ────────────────────────────────────────────────── */
+.finder { display: grid; grid-template-columns: 214px 1fr; min-height: 400px; }
+.ftree { border-right: 1px solid var(--border); padding: 12px 10px; background: var(--panel); }
+.trow { display: flex; align-items: center; gap: 8px; padding: 6px 9px; border-radius: var(--r-sm); font-size: 13px; color: var(--body); cursor: pointer; }
+.trow:hover { background: var(--hover-bg); }
+.trow.on { background: var(--sel-bg); color: var(--text); font-weight: 600; }
+.trow.sub { padding-left: 26px; font-size: 12.5px; color: var(--muted); }
+.trow .n { margin-left: auto; font-family: var(--fmono); font-size: 10px; color: var(--dim); }
+.fpane { padding: 14px 16px; }
+
+/* ── SCENE 5 · the composer chip ─────────────────────────────────────────── */
+.cmp { background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 14px; }
+.ghost { display: flex; gap: 10px; margin-bottom: 12px; }
+.gav { width: 26px; height: 26px; border-radius: 8px; flex: none; background: var(--role-orch); color: #fff; display: grid; place-items: center; font-size: 11px; font-weight: 700; }
+.gbody { flex: 1; min-width: 0; }
+.ghead { display: flex; align-items: baseline; gap: 8px; }
+.ghead b { font-size: 13.5px; }
+.grole { font-family: var(--fmono); font-size: 9px; letter-spacing: .1em; text-transform: uppercase; color: var(--role-orch); background: color-mix(in srgb, var(--role-orch) 17%, transparent); border-radius: var(--r-xs); padding: 2px 6px; font-weight: 600; }
+.gtime { font-size: 11px; color: var(--dim); }
+.gelapsed { font-size: 12px; color: var(--muted); margin: 4px 0 6px; }
+.grow { display: flex; align-items: center; gap: 8px; border: 1px solid var(--border); background: var(--panel2); border-radius: var(--r-md); padding: 7px 11px; }
+.gorb { width: 13px; height: 13px; border-radius: 50%; border: 2px dotted var(--muted); flex: none; }
+.gtxt { font-size: 12.5px; color: var(--body); flex: 1; }
+.gact { font-size: 12px; color: var(--link); cursor: pointer; }
+.typist { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); padding: 5px 10px; border-radius: var(--r-full); border: 1px solid var(--border); background: var(--panel2); }
+.typist .av { width: 16px; height: 16px; border-radius: 5px; background: var(--role-orch); }
+.cue2 { color: var(--link); }
+.cbox { border: 1px solid var(--border); background: var(--panel2); border-radius: var(--r-lg); padding: 11px 13px; color: var(--dim); font-size: 13px; margin-top: 9px; }
+.strike { position: relative; }
+.strike::after { content: ''; position: absolute; inset: 50% -6px auto; height: 1.5px; background: color-mix(in srgb, var(--warn) 70%, transparent); }
+.badnote, .goodnote { font-size: 11.5px; font-family: var(--fmono); letter-spacing: .06em; text-transform: uppercase; margin-bottom: 8px; }
+.badnote { color: var(--warn); }
+.goodnote { color: var(--green); }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 860px) { .two, .finder { grid-template-columns: 1fr; } }
+
+/* ── notes ───────────────────────────────────────────────────────────────── */
+.note { margin-top: 14px; border-left: 2px solid var(--border2); padding: 2px 0 2px 14px; color: var(--muted); font-size: 12.5px; line-height: 1.6; }
+.note b { color: var(--body); font-weight: 600; }
+.note code { font-family: var(--fmono); font-size: 11.5px; background: var(--panel2); border: 1px solid var(--border); border-radius: var(--r-xs); padding: 1px 5px; color: var(--body); }
+ul.note { list-style: none; padding-left: 14px; }
+ul.note li { margin-bottom: 5px; }
+ul.note li::before { content: '→ '; color: var(--dim); }
+</style>
+</head>
+<body>
+<div class="pg">
+
+  <div class="pghd">
+    <div>
+      <div class="kick">NeuraMesh · design round 1 · 2026-08-07</div>
+      <h1 class="pgt" style="margin-top:8px">Library → Workspace Files</h1>
+      <p class="pgs">Three directions for the files destination, plus the fix for the two live defects: brand docs that exist but never reach the Library, and a thinking chip that says what the ghost above it already said.</p>
+    </div>
+    <div class="themetog">
+      <button aria-pressed="true" onclick="setTheme('dark',this)">Graphite</button>
+      <button aria-pressed="false" onclick="setTheme('cream-oak',this)">Cream Oak</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <section class="scene">
+    <div class="scenehd"><span class="scenen">A · The Shelf</span><span class="scenetag rec">recommended</span></div>
+    <p class="scened">Root is <b>every project, always</b> — no active-project scoping, which is what makes files feel missing today. A folder is the project itself: its own mark, its rooms, and the crew that can read it. One level down is the file list. <b>Two levels, never three.</b></p>
+
+    <div class="sheet">
+      <div class="sphd">
+        <div class="sphdl">
+          <div class="kick">WORKSPACE</div>
+          <div class="sptitle" style="margin-top:5px">Files</div>
+          <div class="spsub">Everything the team and its agents have written, uploaded or approved — 4 projects · 38 files</div>
+        </div>
+        <div class="spacts">
+          <div class="seg">
+            <button aria-pressed="true" title="Folders">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.5L10 3.5H4a2 2 0 0 0-2 2V18a2 2 0 0 0 2 2z"/></svg>
+            </button>
+            <button aria-pressed="false" title="All files">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+            </button>
+          </div>
+          <button class="pill primary">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+            Upload
+          </button>
+        </div>
+      </div>
+
+      <div style="height:14px"></div>
+      <div class="wfsearch">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        Search every file in the workspace — name, body, project
+        <span class="cue">⌘⇧F</span>
+      </div>
+
+      <div class="wfbody">
+        <div class="wfgrid">
+          <div class="wfolder">
+            <div class="wftop">
+              <span class="wfmark brandy">N</span>
+              <span class="wfname">Neuramesh</span>
+              <span class="wfcount">19</span>
+            </div>
+            <div class="wfrooms"><span class="wfroom">#marketing</span><span class="wfroom">#general</span><span class="wfroom">#build</span></div>
+            <div class="wffoot">
+              <span class="wfacl">
+                <span class="wfav" style="background:var(--role-orch)">R</span>
+                <span class="wfav" style="background:var(--role-mkt)">P</span>
+                <span class="wfav" style="background:var(--role-design)">I</span>
+                <span class="wfacll">3 can read</span>
+              </span>
+              <span class="wfwhen">2h ago</span>
+            </div>
+          </div>
+
+          <div class="wfolder">
+            <div class="wftop">
+              <span class="wfmark">A</span>
+              <span class="wfname">Acme Growth</span>
+              <span class="wfcount">11</span>
+            </div>
+            <div class="wfrooms"><span class="wfroom">#growth</span><span class="wfroom">#content</span></div>
+            <div class="wffoot">
+              <span class="wfacl">
+                <span class="wfav" style="background:var(--role-mkt)">P</span>
+                <span class="wfav" style="background:var(--role-cur)">C</span>
+                <span class="wfacll">2 can read</span>
+              </span>
+              <span class="wfwhen">Aug 3</span>
+            </div>
+          </div>
+
+          <div class="wfolder">
+            <div class="wftop">
+              <span class="wfmark">K</span>
+              <span class="wfname">Kinshi</span>
+              <span class="wfcount">8</span>
+            </div>
+            <div class="wfrooms"><span class="wfroom">#general</span></div>
+            <div class="wffoot">
+              <span class="wfacl">
+                <span class="wfav" style="background:var(--role-dev)">B</span>
+                <span class="wfacll">1 can read</span>
+              </span>
+              <span class="wfwhen">Jul 29</span>
+            </div>
+          </div>
+
+          <button class="wfnew">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            Drop files here, or upload
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <ul class="note">
+      <li>The folder <b>is the project</b> — it wears the project's own auto-detected logo, not a generic blue icon. Achromatic in Graphite; the mark is the only warm object.</li>
+      <li>The <b>access row</b> puts the ACL on the surface: those avatars are the agents registered to that project's rooms. Today that rule is real but invisible, so "can rex read this?" is unanswerable from the UI.</li>
+      <li>Folder tab + peeking sheet edges are pure CSS on <code>--card</code> — a folder silhouette that costs no colour and survives both themes.</li>
+    </ul>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <section class="scene">
+    <div class="scenehd"><span class="scenen">A · inside a project</span><span class="scenetag">one level down</span></div>
+    <p class="scened">Breadcrumb back to root, kind chips instead of nested folders (the <code style="font-family:var(--fmono);font-size:12px">folderchips</code> idiom already shipped in the marketing library), and the file table the reference screenshots ask for — typed, sized, dated, and tagged with the room that owns it.</p>
+
+    <div class="sheet">
+      <div class="sphd">
+        <div class="sphdl">
+          <div class="crumb"><a>Workspace Files</a> <span style="color:var(--dim)">/</span> <b>Neuramesh</b></div>
+          <div class="sptitle" style="margin-top:6px"><span class="wfmark brandy" style="width:26px;height:26px;font-size:12px">N</span> Neuramesh</div>
+          <div class="spsub">19 files across #marketing, #general, #build · readable by rex, plume, iris</div>
+        </div>
+        <div class="spacts">
+          <button class="pill ghost">Sort: Recent</button>
+          <button class="pill primary">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+            Upload
+          </button>
+        </div>
+      </div>
+
+      <div style="height:14px"></div>
+      <div class="wfsearch">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        Search in Neuramesh
+        <span class="cue">⌘⇧F</span>
+      </div>
+
+      <div class="wfbody">
+        <div class="chips">
+          <button aria-selected="true">All <span class="n">19</span></button>
+          <button aria-selected="false">Docs <span class="n">9</span></button>
+          <button aria-selected="false">Design <span class="n">4</span></button>
+          <button aria-selected="false">Media <span class="n">5</span></button>
+          <button aria-selected="false">Data <span class="n">1</span></button>
+        </div>
+
+        <div class="ftable">
+          <div class="fthd">
+            <span></span><span>Name</span><span>Type</span><span>Size</span><span>Room</span><span>Modified</span><span></span>
+          </div>
+
+          <div class="ftr">
+            <span class="fic"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></span>
+            <span class="fnm">brand-guidelines.md <span class="fstar" title="curated onto the shelf">★</span></span>
+            <span class="ftype">DOC</span>
+            <span class="fmeta">1.2 KB</span>
+            <span class="froom">#marketing</span>
+            <span class="fmeta">11:00 PM</span>
+            <span class="fmore">⋯</span>
+          </div>
+
+          <div class="ftr">
+            <span class="fic"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></span>
+            <span class="fnm">business-profile.md</span>
+            <span class="ftype">DOC</span>
+            <span class="fmeta">1.03 KB</span>
+            <span class="froom">#marketing</span>
+            <span class="fmeta">10:29 PM</span>
+            <span class="fmore">⋯</span>
+          </div>
+
+          <div class="ftr">
+            <span class="fic"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></span>
+            <span class="fnm">market-research.md</span>
+            <span class="ftype">DOC</span>
+            <span class="fmeta">1.78 KB</span>
+            <span class="froom">#marketing</span>
+            <span class="fmeta">10:44 PM</span>
+            <span class="fmore">⋯</span>
+          </div>
+
+          <div class="ftr">
+            <span class="fic"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></span>
+            <span class="fnm">social-strategy.md</span>
+            <span class="ftype">DOC</span>
+            <span class="fmeta">2.25 KB</span>
+            <span class="froom">#marketing</span>
+            <span class="fmeta">10:48 PM</span>
+            <span class="fmore">⋯</span>
+          </div>
+
+          <div class="ftr">
+            <span class="fic" style="color:var(--role-design)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg></span>
+            <span class="fnm">task-panel-v3-round2.html</span>
+            <span class="ftype">DESIGN</span>
+            <span class="fmeta">44 KB</span>
+            <span class="froom">#build</span>
+            <span class="fmeta">Aug 5</span>
+            <span class="fmore">⋯</span>
+          </div>
+
+          <div class="ftr">
+            <span class="fic"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg></span>
+            <span class="fnm">porch-hero-r4.png <span class="fnew">uploaded</span></span>
+            <span class="ftype">PNG</span>
+            <span class="fmeta">318 KB</span>
+            <span class="froom">#general</span>
+            <span class="fmeta">Aug 6</span>
+            <span class="fmore">⋯</span>
+          </div>
+
+          <div class="ftr">
+            <span class="fic"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></span>
+            <span class="fnm">week1-x-content-schedule.md <span class="fstar" title="curated onto the shelf">★</span></span>
+            <span class="ftype">DOC</span>
+            <span class="fmeta">3.4 KB</span>
+            <span class="froom">#marketing</span>
+            <span class="fmeta">Aug 3</span>
+            <span class="fmore">⋯</span>
+          </div>
+        </div>
+
+        <div class="dropz"><b>Drop files to add them to Neuramesh</b> — they land in the room you pick, and every agent registered there can read them immediately.</div>
+      </div>
+    </div>
+
+    <ul class="note">
+      <li><b>The ★ stops being a gate and becomes a marker.</b> Today the Library only shows <code>promoted = 1</code>, which is why seven brand docs are invisible. Here every file shows; the star means "the human curated this onto the shelf", and a <em>Shelf</em> chip filters to just those.</li>
+      <li><b>Room, not project, is the column</b> — because the room is the ACL. A file's project is derived from its room, exactly like a task's.</li>
+      <li>Row click opens the same reader overlay that already renders docs, diffs, mockups and images (<code>previewType</code>, docs/30). No new viewer.</li>
+    </ul>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <section class="scene">
+    <div class="scenehd"><span class="scenen">B · One folded table</span><span class="scenetag">no navigation</span></div>
+    <p class="scened">Same data, zero clicks to reach anything: one table, grouped by project with collapsible headers. Better when the workspace holds tens of files rather than hundreds — and search is instant because you are already looking at everything.</p>
+
+    <div class="sheet">
+      <div class="sphd">
+        <div class="sphdl">
+          <div class="kick">WORKSPACE</div>
+          <div class="sptitle" style="margin-top:5px">Files</div>
+          <div class="spsub">38 files · 4 projects</div>
+        </div>
+        <div class="spacts">
+          <button class="pill ghost">Group: Project</button>
+          <button class="pill primary">Upload</button>
+        </div>
+      </div>
+
+      <div style="height:14px"></div>
+      <div class="wfsearch">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        Filter 38 files…
+        <span class="cue">⌘⇧F</span>
+      </div>
+
+      <div class="wfbody">
+        <div class="ftable">
+          <div class="grouphd">
+            <span class="chev">▾</span>
+            <span class="wfmark brandy" style="width:22px;height:22px;font-size:11px">N</span>
+            <b>Neuramesh</b>
+            <span class="n">19 files · 2h ago</span>
+          </div>
+          <div class="ftr">
+            <span class="fic"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></span>
+            <span class="fnm">brand-guidelines.md <span class="fstar">★</span></span>
+            <span class="ftype">DOC</span><span class="fmeta">1.2 KB</span><span class="froom">#marketing</span><span class="fmeta">11:00 PM</span><span class="fmore">⋯</span>
+          </div>
+          <div class="ftr">
+            <span class="fic"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></span>
+            <span class="fnm">social-strategy.md</span>
+            <span class="ftype">DOC</span><span class="fmeta">2.25 KB</span><span class="froom">#marketing</span><span class="fmeta">10:48 PM</span><span class="fmore">⋯</span>
+          </div>
+          <div class="ftr">
+            <span class="fic" style="color:var(--role-design)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg></span>
+            <span class="fnm">task-panel-v3-round2.html</span>
+            <span class="ftype">DESIGN</span><span class="fmeta">44 KB</span><span class="froom">#build</span><span class="fmeta">Aug 5</span><span class="fmore">⋯</span>
+          </div>
+
+          <div class="grouphd closed" style="border-top:1px solid var(--border)">
+            <span class="chev">▾</span>
+            <span class="wfmark" style="width:22px;height:22px;font-size:11px">A</span>
+            <b>Acme Growth</b>
+            <span class="n">11 files · Aug 3</span>
+          </div>
+          <div class="grouphd closed" style="border-top:1px solid var(--border)">
+            <span class="chev">▾</span>
+            <span class="wfmark" style="width:22px;height:22px;font-size:11px">K</span>
+            <b>Kinshi</b>
+            <span class="n">8 files · Jul 29</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="note"><b>Trade-off:</b> the fastest surface to <em>read</em>, the weakest to <em>upload into</em> — there is no folder to drop onto, so an upload has to ask "which project, which room" in a dialog. That is the reason A is the recommendation.</div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <section class="scene">
+    <div class="scenehd"><span class="scenen">C · Finder</span><span class="scenetag">tree + pane</span></div>
+    <p class="scened">A real file manager: the full <b>workspace → project → room</b> tree on the left, files on the right. Scales furthest and makes the ACL boundary literally structural — but it puts a third column into a shell that already carries the spine and the nav tree.</p>
+
+    <div class="sheet">
+      <div class="sphd">
+        <div class="sphdl">
+          <div class="kick">WORKSPACE</div>
+          <div class="sptitle" style="margin-top:5px">Files</div>
+        </div>
+        <div class="spacts"><button class="pill primary">Upload</button></div>
+      </div>
+      <div class="finder">
+        <div class="ftree">
+          <div class="trow on">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.5L10 3.5H4a2 2 0 0 0-2 2V18a2 2 0 0 0 2 2z"/></svg>
+            Neuramesh <span class="n">19</span>
+          </div>
+          <div class="trow sub">#marketing <span class="n">9</span></div>
+          <div class="trow sub">#general <span class="n">6</span></div>
+          <div class="trow sub">#build <span class="n">4</span></div>
+          <div class="trow">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.5L10 3.5H4a2 2 0 0 0-2 2V18a2 2 0 0 0 2 2z"/></svg>
+            Acme Growth <span class="n">11</span>
+          </div>
+          <div class="trow">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.5L10 3.5H4a2 2 0 0 0-2 2V18a2 2 0 0 0 2 2z"/></svg>
+            Kinshi <span class="n">8</span>
+          </div>
+        </div>
+        <div class="fpane">
+          <div class="chips">
+            <button aria-selected="true">All <span class="n">19</span></button>
+            <button aria-selected="false">Docs <span class="n">9</span></button>
+            <button aria-selected="false">Design <span class="n">4</span></button>
+            <button aria-selected="false">Media <span class="n">5</span></button>
+          </div>
+          <div class="ftable">
+            <div class="ftr">
+              <span class="fic"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></span>
+              <span class="fnm">brand-guidelines.md <span class="fstar">★</span></span>
+              <span class="ftype">DOC</span><span class="fmeta">1.2 KB</span><span class="froom">#marketing</span><span class="fmeta">11:00 PM</span><span class="fmore">⋯</span>
+            </div>
+            <div class="ftr">
+              <span class="fic"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></span>
+              <span class="fnm">business-profile.md</span>
+              <span class="ftype">DOC</span><span class="fmeta">1.03 KB</span><span class="froom">#marketing</span><span class="fmeta">10:29 PM</span><span class="fmore">⋯</span>
+            </div>
+            <div class="ftr">
+              <span class="fic"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></span>
+              <span class="fnm">market-research.md</span>
+              <span class="ftype">DOC</span><span class="fmeta">1.78 KB</span><span class="froom">#marketing</span><span class="fmeta">10:44 PM</span><span class="fmore">⋯</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="note"><b>Trade-off:</b> strongest information architecture, worst fit for the shell. Worth revisiting only if a workspace routinely holds hundreds of files.</div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <section class="scene">
+    <div class="scenehd"><span class="scenen">The thinking chip</span><span class="scenetag">defect</span></div>
+    <p class="scened">In a chat thread the ghost card and the composer chip resolve to the <b>same agent by the same condition</b> — so the room says "rex is thinking" twice and offers two doors to one activity log. The task panel already yields to the ghost; the channel composer never learned to.</p>
+
+    <div class="two">
+      <div>
+        <div class="badnote">Today</div>
+        <div class="cmp">
+          <div class="ghost">
+            <span class="gav">R</span>
+            <div class="gbody">
+              <div class="ghead"><b>rex</b><span class="grole">orchestrator</span><span class="gtime">now</span></div>
+              <div class="gelapsed">Working for 67s</div>
+              <div class="grow">
+                <span class="gorb"></span>
+                <span class="gtxt">read_library_doc week-1-x-posts.md</span>
+                <span class="gact">activity ›</span>
+              </div>
+            </div>
+          </div>
+          <div class="strike"><span class="typist"><span class="av"></span> rex is thinking <span class="cue2">view activity ›</span></span></div>
+          <div class="cbox">Reply — @ mention · / skill · ↵ send</div>
+        </div>
+      </div>
+
+      <div>
+        <div class="goodnote">Proposed</div>
+        <div class="cmp">
+          <div class="ghost">
+            <span class="gav">R</span>
+            <div class="gbody">
+              <div class="ghead"><b>rex</b><span class="grole">orchestrator</span><span class="gtime">now</span></div>
+              <div class="gelapsed">Working for 67s</div>
+              <div class="grow">
+                <span class="gorb"></span>
+                <span class="gtxt">read_library_doc week-1-x-posts.md</span>
+                <span class="gact">activity ›</span>
+              </div>
+            </div>
+          </div>
+          <div class="cbox" style="margin-top:0">Reply — @ mention · / skill · ↵ send</div>
+        </div>
+        <div class="note" style="margin-top:12px">The composer sits <b>directly under the live card</b>. Identity, state, elapsed time and the activity door all still show — once.</div>
+      </div>
+    </div>
+
+    <ul class="note">
+      <li><b>Keep the chip where it is the only signal:</b> an agent <code>working</code> a claimed board task elsewhere never mints a ghost in this room. The rule is <em>chip only when no ghost and no run card names that agent</em> — the same precedence the task panel already encodes (<code>card › ghost › chip</code>).</li>
+    </ul>
+  </section>
+
+</div>
+
+<script>
+function setTheme(t, btn) {
+  document.documentElement.setAttribute('data-theme', t);
+  document.querySelectorAll('.themetog button').forEach((b) => b.setAttribute('aria-pressed', String(b === btn)));
+}
+</script>
+</body>
+</html>

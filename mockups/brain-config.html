@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Brain config — see every role's agent, switch any role's model</title>
+<style>
+[data-theme] { --font:'Geist Variable',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; --fmono:'Geist Mono Variable',ui-monospace,'SF Mono',Menlo,monospace; --fdisp:'Source Serif 4','Iowan Old Style',Georgia,serif; --ease:cubic-bezier(.2,.8,.2,1); --dur-fast:120ms; }
+/* verbatim from apps/desktop/src/renderer/src/tokens.css */
+[data-theme='dark'] {
+  --win:#0d0d0d; --bg:#141414; --panel:#191919; --panel2:#212121; --panel3:#2b2b2b;
+  --border:#272727; --border2:#383838; --card:#1b1b1b; --card-border:#2e2e2e;
+  --text:#eaeaea; --body:#b6b6b6; --muted:#898989; --dim:#676767; --ring:#585858;
+  --accent:#eaeaea; --link:#d19a72; --hover-bg:rgba(234,234,234,.06);
+  --prog:#8ba0c0; --review:#a89ccf; --done:#77ac8d; --acc:#6fb0ab; --ship:#7cb0bd;
+  --blocked:#9ca0a8; --closed:#727272; --shadow:rgba(0,0,0,.6);
+}
+[data-theme='cream-oak'] {
+  --win:#f0e5d3; --bg:#fbf8f4; --panel:#fbf8f4; --panel2:#f6eee1; --panel3:#efe1cd;
+  --border:#e6dbca; --border2:#d3c2a8; --card:#ffffff; --card-border:#eadfce;
+  --text:#2a1c13; --body:#574838; --muted:#97846c; --dim:#b5a289; --ring:#b08a5e;
+  --accent:#834a2b; --link:#9c5730; --hover-bg:rgba(42,28,19,.05);
+  --prog:#4f80c4; --review:#6d5ce0; --done:#0f9d63; --acc:#2f8f8a; --ship:#1f7f96;
+  --blocked:#7d7f86; --closed:#897a60; --shadow:rgba(70,42,18,.22);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#131210; font-family:'Geist Variable',-apple-system,sans-serif; }
+.page { max-width:1660px; margin:0 auto; padding:32px 24px 70px; }
+.pagehead { color:#eaeaea; margin-bottom:8px; }
+.pagehead h1 { font-family:'Source Serif 4',Georgia,serif; font-size:23px; font-weight:640; letter-spacing:-.012em; }
+.pagehead p { color:#898989; font-size:13px; line-height:1.62; margin-top:8px; max-width:96ch; }
+.pagehead b { color:#b6b6b6; }
+.stophd { color:#eaeaea; font-size:15px; font-weight:660; margin:42px 0 4px; font-family:'Source Serif 4',Georgia,serif; }
+.stopno { font:700 10px 'Geist Mono Variable',monospace; letter-spacing:.12em; color:#6f6f6f; text-transform:uppercase; margin-right:8px; }
+.stopp { color:#898989; font-size:12.5px; line-height:1.62; max-width:102ch; margin-bottom:16px; }
+.stopp b { color:#b6b6b6; }
+.themes { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+@media (max-width:1300px){ .themes { grid-template-columns:1fr; } }
+.theme { background:var(--win); border:1px solid var(--border2); border-radius:16px; padding:18px; color:var(--text); }
+.theme > h2 { font-size:10.5px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--dim); margin:0 2px 12px; }
+.callouts { display:flex; flex-wrap:wrap; gap:8px 18px; margin-top:12px; }
+.co { font-size:11.5px; color:#898989; line-height:1.55; max-width:46ch; }
+.co b { color:#b6b6b6; } .co .n { display:inline-grid; place-items:center; width:16px; height:16px; border-radius:50%; background:#2b2b2b; color:#c8a06a; font:700 10px monospace; margin-right:6px; }
+
+/* ── composer + pill ── */
+.compose { border:1px solid var(--card-border); background:var(--card); border-radius:13px; box-shadow:0 1px 3px var(--shadow); max-width:760px; }
+.cinput { padding:12px 14px; font-size:13.5px; color:var(--dim); }
+.cfoot { display:flex; align-items:center; gap:8px; padding:0 12px 11px; }
+.chip { display:inline-flex; align-items:center; gap:6px; font:620 11px var(--fmono); color:var(--body); border:1px solid var(--card-border); border-radius:99px; padding:4px 10px; background:var(--panel); }
+.chip .h { color:var(--dim); } .chip .car { color:var(--dim); font-size:9px; }
+.chip.brain { position:relative; }
+.chip.brain .bавatars { display:flex; margin-left:2px; }
+.chip.brain .bav { width:14px; height:14px; border-radius:5px; background:var(--panel3); border:1.5px solid var(--card); margin-left:-5px; display:grid; place-items:center; font-size:8px; }
+.chip.override { color:var(--link); border-color:color-mix(in srgb, var(--link) 40%, transparent); }
+.csend { margin-left:auto; width:28px; height:28px; border-radius:50%; background:var(--panel3); display:grid; place-items:center; color:var(--muted); font-size:12px; }
+.hovercard { margin-top:8px; max-width:300px; border:1px solid var(--card-border); background:var(--card); border-radius:11px; box-shadow:0 4px 14px var(--shadow); padding:10px 12px; }
+.hoverrow { display:flex; align-items:center; gap:8px; padding:3.5px 0; font-size:11.5px; }
+.hoverrow .role { font:640 9px var(--fmono); letter-spacing:.07em; text-transform:uppercase; color:var(--muted); width:86px; flex:none; }
+.hoverrow .av { width:16px; height:16px; border-radius:5px; background:var(--panel3); display:grid; place-items:center; font-size:9px; flex:none; }
+.hoverrow b { font-weight:620; font-size:11.5px; }
+.hoverrow .model { margin-left:auto; font:600 10px var(--fmono); color:var(--dim); }
+.hoverhint { font-size:10px; color:var(--dim); margin-top:7px; padding-top:7px; border-top:1px solid var(--border); }
+
+/* ── the overlay ── */
+.ovl { border:1px solid var(--card-border); background:var(--card); border-radius:15px; box-shadow:0 14px 40px var(--shadow); max-width:640px; overflow:hidden; }
+.ovlhead { padding:14px 16px 12px; border-bottom:1px solid var(--border); }
+.ovlname { font-family:var(--fdisp); font-size:16px; font-weight:640; }
+.ovlsub { font-size:11px; color:var(--muted); margin-top:2px; }
+.scope { display:flex; gap:2px; background:var(--panel2); border-radius:9px; padding:3px; margin-top:11px; width:max-content; }
+.scope button { border:0; background:none; font:620 11px var(--font); color:var(--muted); padding:5px 12px; border-radius:7px; }
+.scope button.on { background:var(--card); color:var(--text); box-shadow:0 1px 2px var(--shadow); }
+.scopehint { font-size:10.5px; color:var(--dim); margin-top:7px; }
+.rolerows { padding:6px 8px 10px; }
+.rr { display:flex; align-items:center; gap:10px; padding:9px 10px; border-radius:10px; }
+.rr:hover { background:var(--hover-bg); }
+.rr .role { font:640 9.5px var(--fmono); letter-spacing:.08em; text-transform:uppercase; color:var(--muted); width:100px; flex:none; }
+.rr .av { width:24px; height:24px; border-radius:8px; background:var(--panel3); display:grid; place-items:center; font-size:12px; flex:none; }
+.rr .who { min-width:0; }
+.rr .who b { font-size:12.5px; font-weight:620; display:block; }
+.rr .who span { font-size:10px; color:var(--dim); }
+.modelchip { margin-left:auto; display:inline-flex; align-items:center; gap:6px; font:620 10.5px var(--fmono); color:var(--body); border:1px solid var(--card-border); background:var(--panel); border-radius:8px; padding:4.5px 9px; flex:none; }
+.modelchip .car { color:var(--dim); font-size:8px; }
+.modelchip.changed { color:var(--link); border-color:color-mix(in srgb, var(--link) 45%, transparent); }
+.rr.retitled { background:color-mix(in srgb, var(--link) 6%, transparent); }
+.ovlfoot { display:flex; align-items:center; gap:10px; padding:11px 16px; border-top:1px solid var(--border); font-size:11px; color:var(--dim); }
+.ovlfoot .btn { margin-left:auto; border:1px solid var(--card-border); background:var(--panel); border-radius:9px; font:620 12px var(--font); color:var(--text); padding:7px 14px; }
+.ovlfoot .btn.primary { background:var(--accent); color:var(--win); border-color:transparent; }
+
+/* model picker */
+.picker { border:1px solid var(--card-border); background:var(--card); border-radius:12px; box-shadow:0 10px 30px var(--shadow); width:280px; padding:7px; }
+.pkgroup { font:700 9px var(--fmono); letter-spacing:.1em; text-transform:uppercase; color:var(--dim); padding:7px 9px 3px; }
+.pk { display:flex; align-items:center; gap:8px; padding:7px 9px; border-radius:8px; font-size:12px; }
+.pk:hover { background:var(--hover-bg); }
+.pk.on { background:var(--panel2); font-weight:620; }
+.pk .tick { margin-left:auto; color:var(--done); font-size:11px; }
+.pk .meta { margin-left:auto; font:600 9.5px var(--fmono); color:var(--dim); }
+.pkfoot { font-size:10px; color:var(--dim); padding:7px 9px 4px; border-top:1px solid var(--border); margin-top:4px; }
+.duo { display:flex; gap:16px; align-items:flex-start; flex-wrap:wrap; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<div class="pagehead">
+  <h1>Brain config — see every role's agent, switch any role's model</h1>
+  <p><b>The ask (2026-07-30):</b> from the composer pill, see the agents running each role; in the overlay, switch the model behind any role — applying to <b>this conversation</b> or <b>project-wide</b>. Today the pill names the pack ("Brain · Balanced") and nothing else; finding out that patch runs fable-5 means leaving the conversation, and there is no per-conversation override at all.</p>
+  <p><b>What this builds on:</b> models are already materialized per agent (<b>agents.model</b>, v0.44.0) with precedence pin › project pack › workspace pack, resolved at run time. This design adds one narrow layer on top — a <b>thread-scoped override</b> — and one new surface: the roles table inside the existing pill popup. Packs, the brain builder, and re-seating stay exactly as they are.</p>
+</div>
+
+<!-- ══════════ STOP 1 · the pill ══════════ -->
+<div class="stophd"><span class="stopno">Stop 1</span>The pill says who, not just which pack</div>
+<div class="stopp">Rest: unchanged size, but the pack name gains the crew — tiny stacked avatars of the agents actually seated in this room. Hover: the full cast, role by role, each with its live model. A conversation carrying an override wears the warm ink (the docs/33 link hue) so a non-default brain is never silent.</div>
+<div class="themes">
+  <div class="theme" data-theme="cream-oak">
+    <h2>Composer · rest + hover · cream oak</h2>
+    <div class="compose">
+      <div class="cinput">Reply in #1063 thread — @ mention · / skill · ⏎ send</div>
+      <div class="cfoot">
+        <span class="chip"><span class="h">#</span> general</span>
+        <span class="chip brain">◍ Brain · Balanced
+          <span class="bавatars"><span class="bav">🦉</span><span class="bav">🐝</span><span class="bav">🔎</span></span>
+          <span class="car">▾</span></span>
+        <span class="csend">↑</span>
+      </div>
+    </div>
+    <div class="hovercard">
+      <div class="hoverrow"><span class="role">orchestr.</span><span class="av">🦉</span><b>rex</b><span class="model">fable-5</span></div>
+      <div class="hoverrow"><span class="role">developer</span><span class="av">🐝</span><b>patch</b><span class="model">fable-5</span></div>
+      <div class="hoverrow"><span class="role">reviewer</span><span class="av">🔎</span><b>scout</b><span class="model">opus-5</span></div>
+      <div class="hoverrow"><span class="role">designer</span><span class="av">🎨</span><b>iris</b><span class="model">fable-5</span></div>
+      <div class="hoverrow"><span class="role">shipper</span><span class="av">🦭</span><b>bosun</b><span class="model">sonnet-5</span></div>
+      <div class="hoverhint">click to switch a role's model — this thread or project-wide</div>
+    </div>
+  </div>
+  <div class="theme" data-theme="dark">
+    <h2>Composer · a thread carrying an override · graphite</h2>
+    <div class="compose">
+      <div class="cinput">Reply in #1063 thread — @ mention · / skill · ⏎ send</div>
+      <div class="cfoot">
+        <span class="chip"><span class="h">#</span> general</span>
+        <span class="chip brain override">◍ Brain · Balanced · <b>2 changed here</b>
+          <span class="bавatars"><span class="bav">🦉</span><span class="bav">🐝</span><span class="bav">🔎</span></span>
+          <span class="car">▾</span></span>
+        <span class="csend">↑</span>
+      </div>
+    </div>
+    <div class="callouts" style="margin-top:14px">
+      <div class="co"><span class="n">1</span><b>The pill is honest at rest.</b> Pack name + the seated crew's avatars; an override turns it warm and counts itself ("2 changed here"). No override, no noise.</div>
+      <div class="co"><span class="n">2</span><b>Hover = the cast list.</b> Role → agent → live model (agents.model, the materialized truth — never the pack's intent). One glance answers "who am I actually talking to."</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ STOP 2 · the overlay ══════════ -->
+<div class="stophd"><span class="stopno">Stop 2</span>The overlay — roles first, scope explicit, one picker</div>
+<div class="stopp">Click the pill: the existing brain popup gains a <b>Roles</b> view as its front page (packs and the builder stay one tab behind). Every role in this room, its agent, its model chip. Click a chip → the model picker (the same catalog the packs draw from, grouped by provider, disabled models named). The <b>scope control</b> is the contract: This conversation (default when opened from a thread) or Project-wide. Nothing applies until Apply.</div>
+<div class="themes">
+  <div class="theme" data-theme="cream-oak">
+    <h2>Roles view · scope = this conversation · cream oak</h2>
+    <div class="ovl">
+      <div class="ovlhead">
+        <div class="ovlname">Brain — #1063 · Pricing comparison table</div>
+        <div class="ovlsub">pack: Balanced · v0-9-release · models resolve pin › thread › project › workspace</div>
+        <div class="scope"><button class="on">This conversation</button><button>Project-wide</button></div>
+        <div class="scopehint">changes ride only this thread's future turns — the project keeps Balanced</div>
+      </div>
+      <div class="rolerows">
+        <div class="rr"><span class="role">orchestrator</span><span class="av">🦉</span><div class="who"><b>rex</b><span>triages every send here</span></div><span class="modelchip">fable-5 <span class="car">▾</span></span></div>
+        <div class="rr retitled"><span class="role">developer</span><span class="av">🐝</span><div class="who"><b>patch</b><span>assignee of #1063</span></div><span class="modelchip changed">opus-5 <span class="car">▾</span></span></div>
+        <div class="rr"><span class="role">reviewer</span><span class="av">🔎</span><div class="who"><b>scout</b><span>gates on the DoD</span></div><span class="modelchip">opus-5 <span class="car">▾</span></span></div>
+        <div class="rr"><span class="role">designer</span><span class="av">🎨</span><div class="who"><b>iris</b><span>mockups, docs/14</span></div><span class="modelchip">fable-5 <span class="car">▾</span></span></div>
+        <div class="rr"><span class="role">shipper</span><span class="av">🦭</span><div class="who"><b>bosun</b><span>release plans, docs/23</span></div><span class="modelchip">sonnet-5 <span class="car">▾</span></span></div>
+      </div>
+      <div class="ovlfoot"><span>1 change · developer → opus-5, this thread only</span><button class="btn">Reset</button><button class="btn primary">Apply</button></div>
+    </div>
+  </div>
+  <div class="theme" data-theme="dark">
+    <h2>The picker · project-wide scope · graphite</h2>
+    <div class="duo">
+      <div class="ovl" style="max-width:360px">
+        <div class="ovlhead">
+          <div class="ovlname">Brain — v0-9-release</div>
+          <div class="ovlsub">pack: Balanced · applies to every room in the project</div>
+          <div class="scope"><button>This conversation</button><button class="on">Project-wide</button></div>
+          <div class="scopehint">re-materializes agents.model for this project's crew (the v0.44 seam) — takes effect on each agent's next turn</div>
+        </div>
+        <div class="rolerows">
+          <div class="rr"><span class="role">developer</span><span class="av">🐝</span><div class="who"><b>patch</b></div><span class="modelchip changed">gpt-5.2-codex <span class="car">▾</span></span></div>
+          <div class="rr"><span class="role">reviewer</span><span class="av">🔎</span><div class="who"><b>scout</b></div><span class="modelchip">opus-5 <span class="car">▾</span></span></div>
+        </div>
+        <div class="ovlfoot"><span>1 change · project-wide</span><button class="btn primary">Apply</button></div>
+      </div>
+      <div class="picker">
+        <div class="pkgroup">Anthropic</div>
+        <div class="pk on">fable-5 <span class="tick">✓ current</span></div>
+        <div class="pk">opus-5 <span class="meta">deep</span></div>
+        <div class="pk">sonnet-5 <span class="meta">fast</span></div>
+        <div class="pkgroup">OpenAI</div>
+        <div class="pk">gpt-5.2-codex <span class="meta">code</span></div>
+        <div class="pkgroup">Google</div>
+        <div class="pk">gemini-3.5-pro <span class="meta">no key · connect ›</span></div>
+        <div class="pkfoot">the same catalog packs draw from — a keyless provider says so instead of failing later (founder rule: no mini/lite working seats)</div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="callouts">
+  <div class="co"><span class="n">3</span><b>Scope is a segmented control, not a checkbox</b> — the two blast radii read as places, and the hint under it says the consequence in a sentence before anything applies.</div>
+  <div class="co"><span class="n">4</span><b>This-conversation = a thread override layer:</b> resolution becomes pin › <b>thread</b> › project › workspace, resolved at wake time like everything else. Stored on the thread, cleared with one Reset, dies with the thread.</div>
+  <div class="co"><span class="n">5</span><b>Project-wide reuses the v0.44 materialization seam</b> (resolvePackRoles → agents.model) — no new plumbing, and the change lands on each agent's next turn, never mid-run.</div>
+  <div class="co"><span class="n">6</span><b>Agents stay put; models move.</b> Swapping WHO holds a role (re-staffing) remains the add/hire ladder and re-seat cards — this overlay changes what a seat runs, not who sits in it.</div>
+</div>
+
+<!-- ══════════ STOP 3 · guardrails ══════════ -->
+<div class="stophd"><span class="stopno">Stop 3</span>Guardrails + change surface (for the review)</div>
+<div class="stopp">
+  <b>Enforced, not prompted:</b> the thread override is a server-validated column (models must exist in the catalog + have a connected provider — the picker greys the rest); HUMAN_ONLY to write. Mid-run turns finish on the model they started with; the override applies at the next wake — a running run never hot-swaps.<br/><br/>
+  <b>Change surface:</b> `threads.brain_override` (jsonb role→model, nullable — synced, small) · `thread.set_brain` command (HUMAN_ONLY) · resolution seam gains the thread layer at the ONE place models resolve (`resolvePackRoles` call site in the daemon) · the pill + overlay in App.tsx · docs/10 §15 amendment.<br/><br/>
+  <b>Open questions:</b> ① does a thread override survive the task moving rooms (task follows its channel — proposal: yes, it is the THREAD's) ② should the override also cover the orchestrator, or only working seats (proposal: all roles — rex answering in a thread is exactly when you might want a heavier brain) ③ per-role RESET vs whole-override reset (proposal: whole — one Reset, no partial states to reason about).
+</div>
+
+</div>
+</body>
+</html>

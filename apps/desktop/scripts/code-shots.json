@@ -1,0 +1,6 @@
+[
+  { "name": "code1-chat-dark", "settle": 2400, "query": { "theme": "dark" } },
+  { "name": "code2-code-dark", "settle": 2800, "query": { "theme": "dark", "navmode": "code" } },
+  { "name": "code3-code-cream", "settle": 2800, "query": { "theme": "cream-oak", "navmode": "code" } },
+  { "name": "code4-code-scoped-dark", "settle": 2800, "query": { "theme": "dark", "navmode": "code", "navscope": "p-acme" } }
+]

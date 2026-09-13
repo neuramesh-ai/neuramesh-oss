@@ -1,0 +1,641 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Home &amp; Feed — clickable prototype</title>
+<style>
+[data-theme] {
+  --font:'Geist Variable',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --fmono:'Geist Mono Variable',ui-monospace,'SF Mono',Menlo,monospace;
+  --dur-fast:.12s; --dur:.18s; --ease:cubic-bezier(.21,.61,.35,1);
+  --r-xs:4px; --r-sm:6px; --r-md:8px; --r-lg:11px; --r-xl:14px; --r-full:999px;
+}
+[data-theme='dark'] {
+  --win:#1c1c1c; --bg:#101010; --panel:#161616; --panel2:#1c1c1c; --panel3:#272727;
+  --border:#252525; --border2:#333333;
+  --text:#eaeaea; --body:#b6b6b6; --muted:#898989; --dim:#676767;
+  --accent:var(--text); --link:#9cb1f0; --btn:#232323; --btn-fg:#efefef;
+  --green:#77ac8d; --prog:#8ba0c0; --review:#a89ccf; --done:#77ac8d; --blocked:#9ca0a8;
+  --role-orch:#9793d2; --role-dev:#77ac8d; --role-rev:#7ba1c4; --role-cur:#6fb0ab; --role-tone:17%;
+  --card:#1a1a1a; --card-border:#2a2a2a; --code:#0a0a0a; --codeink:#e8e8e8; --overlay:#202020;
+  --ring:#525252; --hover-border:#404040;
+  --hover-bg:color-mix(in srgb,var(--text) 7%,transparent); --sel-bg:color-mix(in srgb,var(--text) 10%,transparent);
+  --shadow:rgba(0,0,0,.62);
+}
+[data-theme='cream-oak'] {
+  --win:#f4e7d6; --bg:#f7efe2; --panel:#fffaf2; --panel2:#f4e7d6; --panel3:#ecdcc5;
+  --border:#ecdfcd; --border2:#dbc6ad;
+  --text:#352a20; --body:#5c5040; --muted:#8a7969; --dim:#a8967f;
+  --accent:var(--text); --link:#5348c0; --btn:#efe6d7; --btn-fg:#352a20;
+  --green:#2f9e6b; --prog:#4f80c4; --review:#6d5ce0; --done:#0f9d63; --blocked:#7d7f86;
+  --role-orch:#6a63bc; --role-dev:#3f9268; --role-rev:#4f7bb0; --role-cur:#2f8f8a; --role-tone:14%;
+  --card:#fbf4e9; --card-border:#ecdfcd; --code:#2b2018; --codeink:#f3e6d8; --overlay:var(--panel);
+  --ring:color-mix(in srgb,var(--accent) 55%,var(--border2)); --hover-border:color-mix(in srgb,var(--text) 20%,var(--border2));
+  --hover-bg:color-mix(in srgb,var(--text) 5%,transparent); --sel-bg:color-mix(in srgb,var(--text) 7%,transparent);
+  --shadow:rgba(80,50,25,.16);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#0b0b0b; color:#eaeaea; font-family:'Geist Variable',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; }
+.wrap { max-width:1560px; margin:0 auto; padding:24px 22px 60px; }
+h1 { font-size:19px; font-weight:650; letter-spacing:-.01em; }
+.sub { color:#8f8f8f; font-size:13px; line-height:1.6; margin-top:8px; max-width:96ch; }
+.sub b { color:#b9b9b9; font-weight:600; }
+.sub code { font-family:'Geist Mono Variable',ui-monospace,Menlo,monospace; font-size:11px; background:rgba(255,255,255,.06); border-radius:4px; padding:1px 5px; color:#b9b9b9; }
+.controls { display:flex; gap:10px; align-items:center; margin:16px 0 14px; flex-wrap:wrap; }
+.seg { display:inline-flex; border:1px solid #333; border-radius:9px; overflow:hidden; }
+.seg button { background:#191919; color:#9a9a9a; border:0; font:600 12px var(--font,inherit); padding:7px 14px; cursor:pointer; }
+.seg button.on { background:#2b2b2b; color:#fff; }
+.hint { font-size:11.5px; color:#7a7a7a; }
+.stage { display:grid; grid-template-columns:212px 1fr; gap:16px; align-items:start; }
+@media (max-width:1080px){ .stage { grid-template-columns:1fr; } }
+/* step rail */
+.steps { display:flex; flex-direction:column; gap:4px; position:sticky; top:16px; }
+.step { display:flex; gap:10px; align-items:flex-start; text-align:left; background:none; border:1px solid transparent; border-radius:10px; padding:8px 10px; cursor:pointer; color:#9a9a9a; }
+.step:hover { background:#161616; }
+.step.on { background:#1c1c1c; border-color:#3a3a3a; color:#eaeaea; }
+.step .n { flex:none; width:19px; height:19px; border-radius:99px; display:grid; place-items:center; font:700 10px var(--fmono); background:#2a2a2a; color:#b6b6b6; }
+.step.on .n { background:#e8e8e8; color:#111; }
+.step .t { display:block; font-size:12px; font-weight:600; line-height:1.35; }
+.step .d { display:block; font-size:10.5px; color:#6f6f6f; margin-top:2px; line-height:1.4; }
+/* app frame */
+.frame { border:1px solid #2a2a2a; border-radius:14px; overflow:hidden; background:var(--bg); }
+.app { display:grid; grid-template-columns:212px 1fr; min-height:560px; background:var(--bg); color:var(--text); }
+.side { background:var(--panel); border-right:1px solid var(--border); padding:12px 0; display:flex; flex-direction:column; }
+.ws { display:flex; align-items:center; gap:9px; padding:2px 12px 12px; }
+.wsdot { width:24px; height:24px; border-radius:7px; background:linear-gradient(140deg,#e0a060,#8a5a2a); flex:none; }
+.wsname { font-size:12.5px; font-weight:650; }
+.wsorg { font-size:10px; color:var(--dim); }
+.navsec { font-size:9.5px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--dim); padding:10px 14px 5px; display:flex; justify-content:space-between; }
+.navitem { display:flex; align-items:center; gap:8px; margin:1px 8px; padding:6px 9px; border-radius:8px; font-size:12.5px; color:var(--body); cursor:pointer; border:0; background:none; width:calc(100% - 16px); text-align:left; }
+.navitem:hover { background:var(--panel3); }
+.navitem.on { background:var(--sel-bg); color:var(--text); font-weight:600; }
+.navitem .h { color:var(--dim); }
+.navitem .badge { margin-left:auto; font:700 9px var(--fmono); background:var(--panel3); color:var(--muted); border-radius:99px; padding:1px 6px; }
+.main { display:flex; flex-direction:column; min-width:0; }
+.top { height:46px; display:flex; align-items:center; gap:10px; padding:0 16px; border-bottom:1px solid var(--border); }
+.top .rname { font-weight:700; font-size:14px; }
+.top .topic { font-size:11.5px; color:var(--dim); border-left:1px solid var(--border); padding-left:10px; }
+.top .right { margin-left:auto; display:flex; gap:4px; }
+.iconbtn { width:26px; height:26px; border-radius:7px; border:1px solid transparent; background:none; color:var(--dim); cursor:pointer; display:grid; place-items:center; font-size:12px; }
+.iconbtn:hover { background:var(--panel3); color:var(--text); }
+.iconbtn.on { background:var(--sel-bg); color:var(--text); }
+.roomtabs { display:inline-flex; gap:2px; margin-left:2px; }
+/* labeled segment (proposed) */
+.segtab { display:inline-flex; gap:2px; background:var(--panel2); border:1px solid var(--border); border-radius:8px; padding:2px; margin-left:4px; }
+.segtab button { border:0; background:none; color:var(--muted); font:600 11px var(--font); padding:3px 10px; border-radius:6px; cursor:pointer; }
+.segtab button.on { background:var(--panel3); color:var(--text); }
+.body { flex:1; overflow:auto; padding:16px 18px; min-height:0; }
+.compose { border-top:1px solid var(--border); padding:10px 16px 14px; }
+.cbox { border:1px solid var(--border2); background:var(--panel2); border-radius:12px; padding:9px 12px; cursor:text; }
+.cph { font-size:13px; color:var(--dim); }
+.crow { display:flex; align-items:center; gap:8px; margin-top:8px; }
+.chip { font-size:10.5px; color:var(--muted); background:var(--panel); border:1px solid var(--border); border-radius:7px; padding:3px 8px; }
+.send { margin-left:auto; width:32px; height:26px; border-radius:7px; background:var(--btn); color:var(--btn-fg); display:grid; place-items:center; border:1px solid var(--border2); font-size:13px; }
+/* messages */
+.msg { display:flex; gap:10px; padding:7px 0; }
+.pav { width:25px; height:25px; min-width:25px; border-radius:7px; display:grid; place-items:center; background:color-mix(in srgb,var(--rc) var(--role-tone),transparent); box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--rc) 32%,var(--border2)); color:color-mix(in srgb,var(--rc) 62%,var(--text)); }
+.pav svg { width:16px; height:16px; }
+.av { width:25px; height:25px; min-width:25px; border-radius:var(--r-sm); display:grid; place-items:center; font-weight:800; font-size:10.5px; color:var(--body); background:var(--panel3); box-shadow:inset 0 0 0 1px var(--border2); }
+.mhead { display:flex; align-items:center; gap:7px; }
+.mhead b { font-size:12px; }
+.rolechip { font-size:7.5px; font-weight:800; letter-spacing:.5px; text-transform:uppercase; padding:1.5px 5px; border-radius:4px; background:color-mix(in srgb,var(--muted) 16%,transparent); color:color-mix(in srgb,var(--rc) 80%,var(--muted)); }
+.time { font-size:10px; color:var(--dim); }
+.mbody { min-width:0; flex:1; }
+.mbody p { font-size:12.5px; color:var(--body); line-height:1.55; margin-top:2px; }
+.msg.mine { flex-direction:row-reverse; }
+.msg.mine .mbody { flex:0 1 auto; max-width:78%; background:var(--panel2); border-radius:12px; padding:7px 11px 8px; }
+.msg.mine .mhead { justify-content:flex-end; }
+/* intro block */
+.introh { width:44px; height:44px; border-radius:12px; background:var(--panel3); display:grid; place-items:center; font-size:19px; color:var(--muted); margin-bottom:10px; }
+.introt { font-size:19px; font-weight:700; letter-spacing:-.01em; }
+.introd { font-size:12.5px; color:var(--muted); margin-top:5px; line-height:1.55; max-width:62ch; }
+.introacts { display:flex; gap:9px; margin-top:14px; flex-wrap:wrap; }
+.introcard { border:1px solid var(--border); background:var(--panel); border-radius:11px; padding:11px 13px; min-width:190px; cursor:pointer; text-align:left; }
+.introcard:hover { border-color:var(--hover-border); }
+.introcard b { font-size:12.5px; display:block; }
+.introcard span { font-size:11px; color:var(--muted); display:block; margin-top:3px; }
+/* needs-you */
+.nyhead { font-size:9.5px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--dim); margin:2px 0 8px; }
+.nycard { border:1px solid var(--border); background:var(--panel); border-radius:11px; padding:11px 13px; margin-bottom:8px; }
+.nyrow { display:flex; align-items:center; gap:8px; }
+.nytitle { font-size:12.5px; font-weight:600; }
+.pill { font-size:8.5px; font-weight:800; letter-spacing:.5px; text-transform:uppercase; padding:2px 7px; border-radius:5px; }
+.p-done { background:color-mix(in srgb,var(--done) 16%,transparent); color:var(--done); }
+.p-review { background:color-mix(in srgb,var(--review) 16%,transparent); color:var(--review); }
+.p-run { background:color-mix(in srgb,var(--prog) 16%,transparent); color:var(--prog); }
+.nysub { font-size:11px; color:var(--muted); margin-top:4px; }
+.nyacts { display:flex; gap:6px; margin-top:9px; }
+.btn { font:600 11px var(--font); padding:4px 11px; border-radius:7px; border:1px solid var(--border2); background:var(--panel2); color:var(--body); cursor:pointer; }
+.btn.primary { background:var(--btn); color:var(--btn-fg); }
+.btn:hover { border-color:var(--hover-border); color:var(--text); }
+.greet { font-size:22px; font-weight:700; letter-spacing:-.015em; }
+.greetd { font-size:12.5px; color:var(--muted); margin-top:5px; max-width:60ch; line-height:1.55; }
+.daychip { font-size:9.5px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--dim); }
+/* live pill */
+.liveact { display:inline-flex; align-items:center; gap:8px; padding:5px 11px; border-radius:11px; background:color-mix(in srgb,var(--panel2) 66%,transparent); border:1px solid var(--border); margin-top:3px; }
+.spin { width:12px; height:12px; border-radius:50%; border:1.6px solid var(--border2); border-top-color:var(--text); animation:sp .8s linear infinite; }
+@keyframes sp { to { transform:rotate(360deg); } }
+.shine { font-size:12px; font-weight:550; color:var(--muted);
+  background:linear-gradient(100deg,var(--muted) 0%,var(--muted) 38%,var(--text) 50%,var(--muted) 62%,var(--muted) 100%);
+  background-size:220% 100%; -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
+  animation:sh 2.3s linear infinite; }
+@keyframes sh { from { background-position:130% 0; } to { background-position:-30% 0; } }
+.stepn { font:600 10px var(--fmono); color:var(--dim); }
+/* run card */
+.runcard { border:1px solid var(--card-border); background:var(--card); border-radius:11px; padding:9px 11px; margin-top:7px; max-width:520px; }
+.runhead { display:flex; align-items:center; gap:8px; }
+.ring { width:14px; height:14px; border-radius:50%; background:conic-gradient(var(--text) var(--f,40%),var(--panel3) 0);
+  -webkit-mask:radial-gradient(circle at 50% 50%,transparent 4px,#000 4.5px); mask:radial-gradient(circle at 50% 50%,transparent 4px,#000 4.5px); }
+.runtitle { font-size:12px; font-weight:650; }
+.runmeta { margin-left:auto; font:600 10px var(--fmono); color:var(--dim); }
+.leg { display:flex; align-items:center; gap:8px; padding:3px 6px; border-radius:6px; font-size:11px; color:var(--body); }
+.leg.on { background:var(--sel-bg); color:var(--text); font-weight:600; }
+.dot { width:5px; height:5px; border-radius:99px; background:var(--text); }
+.tick { color:var(--done); font-size:10px; }
+/* failure state */
+.deadend { display:flex; align-items:center; gap:9px; padding:8px 11px; border:1px dashed var(--border2); border-radius:10px; margin-top:6px; font-size:11.5px; color:var(--muted); max-width:520px; }
+.deadend b { color:var(--body); }
+/* notes under the frame */
+.why { margin-top:14px; display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+@media (max-width:1080px){ .why { grid-template-columns:1fr; } }
+.wcard { border:1px solid #262626; background:#141414; border-radius:12px; padding:12px 14px; }
+.wcard h4 { font-size:11px; font-weight:700; letter-spacing:.07em; text-transform:uppercase; color:#7a7a7a; margin-bottom:7px; }
+.wcard p { font-size:12px; color:#a8a8a8; line-height:1.6; }
+.wcard p + p { margin-top:7px; }
+.wcard b { color:#dcdcdc; font-weight:600; }
+.wcard code { font-family:var(--fmono); font-size:10.5px; background:rgba(255,255,255,.06); border-radius:4px; padding:1px 4px; }
+.bad { color:#c98f8f; } .good { color:#77ac8d; }
+.tag { display:inline-block; font:700 9px var(--fmono); letter-spacing:.06em; text-transform:uppercase; padding:2px 7px; border-radius:5px; margin-bottom:8px; }
+.tag.today { background:rgba(201,143,143,.16); color:#c98f8f; }
+.tag.prop { background:rgba(119,172,141,.16); color:#77ac8d; }
+.click { outline:1px dashed color-mix(in srgb,var(--link) 50%,transparent); outline-offset:2px; }
+/* hover action bar on a message */
+.mact { display:inline-flex; align-items:center; gap:2px; background:var(--panel); border:1px solid var(--border2); border-radius:8px; padding:2px 5px; box-shadow:0 6px 16px -8px var(--shadow); }
+.mact button { width:24px; height:22px; border:0; background:none; color:var(--dim); border-radius:6px; cursor:pointer; font-size:11px; }
+.mact button.hot { background:var(--sel-bg); color:var(--text); }
+.mact .ago { font-size:10px; color:var(--dim); margin-right:4px; }
+/* replies footer (slack-style) */
+.replies { display:inline-flex; align-items:center; gap:6px; margin-top:6px; font-size:11px; color:var(--link); cursor:pointer; }
+.replies .avs { display:inline-flex; }
+.replies .avs span { width:15px; height:15px; border-radius:5px; background:var(--panel3); box-shadow:0 0 0 1.5px var(--panel); margin-left:-4px; }
+.replies .avs span:first-child { margin-left:0; }
+/* reply pill in the composer */
+.rpill { display:flex; align-items:center; gap:8px; padding:5px 9px; margin-bottom:7px; border-left:2px solid var(--link); background:var(--hover-bg); border-radius:0 7px 7px 0; }
+.rpill .who { font-size:10.5px; font-weight:700; color:var(--body); }
+.rpill .txt { font-size:11px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.rpill .x { margin-left:auto; color:var(--dim); font-size:11px; cursor:pointer; }
+/* thread sheet root message */
+.rootmsg { border:1px solid var(--border); background:var(--panel); border-radius:10px; padding:9px 11px; margin-bottom:10px; }
+.rootlbl { font-size:9px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--dim); margin-bottom:5px; }
+/* calendar + library minis */
+.calgrid { display:grid; grid-template-columns:repeat(7,1fr); gap:5px; margin-top:10px; }
+.calcell { border:1px solid var(--border); border-radius:7px; min-height:52px; padding:5px 6px; font-size:9.5px; color:var(--dim); background:var(--panel); }
+.calcell b { display:block; font-size:9px; color:var(--muted); margin-bottom:3px; }
+.calpost { background:color-mix(in srgb,var(--prog) 20%,transparent); color:var(--text); border-radius:4px; padding:2px 4px; font-size:9px; margin-top:2px; }
+.libgrid { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+.libcard { width:120px; border:1px solid var(--border); border-radius:9px; overflow:hidden; background:var(--panel); }
+.libthumb { height:52px; background:var(--panel2); display:grid; place-items:center; font:700 8px var(--fmono); letter-spacing:.07em; text-transform:uppercase; color:var(--dim); }
+.libname { padding:4px 7px; font:500 9.5px var(--fmono); color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+/* inline thread traffic (threads off) */
+.tref { display:inline-flex; align-items:center; gap:5px; font:600 9.5px var(--fmono); background:var(--panel2); border:1px solid var(--border); border-radius:99px; padding:1px 8px; color:var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Home &amp; Feed — a clickable prototype</h1>
+  <p class="sub">Today a room has <b>two surfaces with two composers that look identical and do different things</b>: Home's says
+  <i>“Describe the work — the team takes it from there”</i> and starts work; Feed's says <i>“Message #channel”</i> and posts a message.
+  Home is the default, so a new room opens on a dashboard rather than its conversation — and <code>openRoom</code> also force-opens the
+  history panel, so arriving can present three surfaces at once. That is the mode error behind “I typed in the feed and nothing happened”.
+  <br><br><b>The proposal: the feed is the room, Home is the workspace.</b> Kill the duplicate per-room Home and the per-room landing pin (<code>roomLandingGet/Set</code>) with it; keep genuine alternate views like marketing's Calendar and Library. Click the ten steps to walk both versions.</p>
+
+  <div class="controls">
+    <div class="seg" id="mode">
+      <button data-mode="today" class="on">Today</button>
+      <button data-mode="prop">Proposed</button>
+    </div>
+    <div class="seg" id="theme">
+      <button data-theme-set="dark" class="on">Dark</button>
+      <button data-theme-set="cream-oak">Cream-oak</button>
+    </div>
+    <span class="hint" id="hint">Dashed outlines are clickable.</span>
+  </div>
+
+  <div class="stage">
+    <div class="steps" id="steps"></div>
+    <div>
+      <div class="frame"><div class="app" data-theme="dark" id="app"></div></div>
+      <div class="why" id="why"></div>
+    </div>
+  </div>
+</div>
+<script>
+const face = (role) => `<span class="pav" style="--rc:var(--role-${role})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="9" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="15" cy="10" r="1.1" fill="currentColor" stroke="none"/><path d="M8.6 14.4c1 1.2 2.1 1.8 3.4 1.8s2.4-.6 3.4-1.8"/></svg></span>`;
+
+const STEPS = [
+  { id:'signin', t:'Signing in', d:'The first thing you ever see' },
+  { id:'newchan', t:'New channel', d:'Naming a room' },
+  { id:'empty', t:'Empty room', d:'Where you land, what you do' },
+  { id:'first', t:'First message', d:'The composer you actually use' },
+  { id:'working', t:'Agent working', d:'Status while it runs' },
+  { id:'dead', t:'When it produces nothing', d:'The bug you hit' },
+  { id:'delivered', t:'Delivered', d:'The payoff in place' },
+  { id:'reply', t:'Reply → thread', d:'Slack-style, from the feed' },
+  { id:'marketing', t:'Marketing room', d:'Where extra surfaces are real' },
+  { id:'threadsoff', t:'Threads off', d:'The feed carries everything' },
+];
+
+let mode = 'today', step = 'signin', theme = 'dark';
+
+const side = (active, opts = {}) => `
+  <div class="side">
+    <div class="ws"><span class="wsdot"></span><span><span class="wsname">flowe-ai</span><br><span class="wsorg">GADS INC</span></span></div>
+    ${mode === 'prop' ? `<button class="navitem ${active === 'home' ? 'on' : ''} ${opts.homeClick ? 'click' : ''}" ${opts.homeClick ? `data-go="${opts.homeClick}"` : ''}><span class="h">⌂</span> Home ${opts.needs ? `<span class="badge">${opts.needs}</span>` : ''}</button>` : ''}
+    <div class="navsec">Channels <span>+</span></div>
+    ${['build','flowe-agent-sessions','general','research'].map((c) => `
+      <button class="navitem ${active === c ? 'on' : ''}"><span class="h">#</span> ${c}</button>`).join('')}
+    <div class="navsec">Agents 1</div>
+    <div class="navitem">${face('orch')} <span><b style="font-size:12px">rex</b><br><span style="font-size:10.5px;color:var(--dim)">${opts.rex ?? 'standing by'}</span></span></div>
+  </div>`;
+
+const topbar = (name, topic, tab, opts = {}) => `
+  <div class="top">
+    <span class="rname"># ${name}</span>
+    ${mode === 'today'
+      ? `<span class="roomtabs">
+           <button class="iconbtn ${tab === 'home' ? 'on' : ''}" title="Home">⌂</button>
+           <button class="iconbtn ${tab === 'feed' ? 'on' : ''}" title="Feed">▤</button>
+         </span>`
+      : ''}
+    <span class="topic">${topic}</span>
+    <span class="right">
+      <button class="iconbtn" title="History">◔</button>
+      <button class="iconbtn" title="Settings">≡</button>
+    </span>
+  </div>`;
+
+const composer = (ph, opts = {}) => `
+  <div class="compose">
+    <div class="cbox ${opts.click ? 'click' : ''}" ${opts.click ? `data-go="${opts.click}"` : ''}>
+      <div class="cph">${ph}</div>
+      <div class="crow">${(opts.chips ?? []).map((c) => `<span class="chip">${c}</span>`).join('')}<span class="send">↵</span></div>
+    </div>
+  </div>`;
+
+const SCREENS = {
+  signin: () => mode === 'today' ? `
+    ${side('general')}
+    <div class="main">
+      ${topbar('general', 'Team-wide — announcements &amp; intros', 'home')}
+      <div class="body">
+        <div class="daychip">Saturday · Jul 25</div>
+        <div class="greet" style="margin-top:6px">Good evening, George.</div>
+        <div class="greetd">Describe the work below — the orchestrator plans it, your crew builds and reviews it, and it lands back here for your accept.</div>
+        <div style="margin-top:14px" class="nyhead">Needs you 2</div>
+        <div class="nycard"><div class="nyrow"><span class="pill p-done">done</span><span class="nytitle">Mobile nav: drawer + focus management</span></div>
+          <div class="nysub">review passed · PR #1042 · in #build</div></div>
+      </div>
+      ${composer('Describe the work — the team takes it from there. @ mention · / skill · ⏎ send', { chips:['# general','flowe-ai','Brain · OpenAI Core'] })}
+    </div>` : `
+    ${side('home', { needs: 2, homeClick: 'signin' })}
+    <div class="main">
+      <div class="top"><span class="rname">Home</span><span class="topic">flowe-ai · everything that needs you</span>
+        <span class="right"><button class="iconbtn" title="Search">⌕</button><button class="iconbtn" title="Settings">≡</button></span></div>
+      <div class="body">
+        <div class="daychip">Saturday · Jul 25</div>
+        <div class="greet" style="margin-top:6px">Good evening, George.</div>
+        <div class="greetd">Two things are waiting on you. Everything else is running.</div>
+        <div style="margin-top:16px" class="nyhead">Needs you 2</div>
+        <div class="nycard"><div class="nyrow"><span class="pill p-done">done</span><span class="nytitle">Mobile nav: drawer + focus management</span><span style="margin-left:auto;font-size:10.5px;color:var(--dim)"># build</span></div>
+          <div class="nysub">review passed · PR #1042</div>
+          <div class="nyacts"><button class="btn primary">Accept &amp; merge</button><button class="btn">Review</button></div></div>
+        <div class="nycard"><div class="nyrow"><span class="pill p-review">design review</span><span class="nytitle">Pricing page refresh — tiers + annual toggle</span><span style="margin-left:auto;font-size:10.5px;color:var(--dim)"># build</span></div>
+          <div class="nysub">iris proposed 2 mockups</div>
+          <div class="nyacts"><button class="btn primary">Open design</button></div></div>
+        <div style="margin-top:16px" class="nyhead">In flight 1</div>
+        <div class="nycard"><div class="nyrow"><span class="ring" style="--f:46%"></span><span class="nytitle">Research: how to improve Flowe</span><span style="margin-left:auto;font-size:10.5px;color:var(--dim)"># research</span></div>
+          <div class="nysub">rex · 4 of 9 · 2m</div></div>
+        <div style="margin-top:18px" class="nyhead">Rooms</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          ${['build','flowe-agent-sessions','general','research'].map((c)=>`<button class="introcard" style="min-width:auto"><b># ${c}</b></button>`).join('')}
+        </div>
+      </div>
+      ${composer('Start something — pick a room, describe the work. ⏎ send', { chips:['# build ▾','flowe-ai'] })}
+    </div>`,
+
+  newchan: () => `
+    ${side(mode === 'prop' ? 'home' : 'general', { needs: mode === 'prop' ? 2 : 0 })}
+    <div class="main">
+      <div class="top"><span class="rname">New channel</span><span class="topic">in flowe-ai</span></div>
+      <div class="body">
+        <div style="max-width:420px">
+          <div class="introt" style="font-size:16px">Name the room</div>
+          <div class="introd">A channel is a room your crew works in. Agents you add here can see its work.</div>
+          <div style="margin-top:14px" class="cbox"><div style="font-size:13px;color:var(--text)"># flowe-agent-sessions</div></div>
+          <div style="margin-top:8px" class="cbox"><div class="cph">What's this room for? (optional)</div></div>
+          <div style="margin-top:12px;display:flex;gap:8px">
+            <button class="btn primary click" data-go="empty">Create channel</button>
+            <button class="btn">Cancel</button>
+          </div>
+          ${mode === 'prop' ? `<div style="margin-top:14px;font-size:11.5px;color:var(--muted);line-height:1.55">rex joins every new room automatically. You can add more agents once you're in.</div>` : ''}
+        </div>
+      </div>
+    </div>`,
+
+  empty: () => mode === 'today' ? `
+    ${side('flowe-agent-sessions')}
+    <div class="main">
+      ${topbar('flowe-agent-sessions','improve flowe agent sessions','home')}
+      <div class="body">
+        <div class="introh">#</div>
+        <div class="introt">#flowe-agent-sessions</div>
+        <div class="introd">This is the beginning of <b>#flowe-agent-sessions</b>, in the <b>flowe-ai</b> project.</div>
+        <div class="introacts">
+          <button class="introcard"><b>Add agents</b><span>Bring the crew that'll do the work here.</span></button>
+          <button class="introcard"><b>Add people</b><span>Bring teammates into this room.</span></button>
+        </div>
+        <div style="margin-top:18px;font-size:11px;color:var(--dim)">You created this channel · rex joined · You joined</div>
+      </div>
+      ${composer('Describe the work — the team takes it from there. @ mention · / skill · ⏎ send', { chips:['# flowe-agent-sessions','Brain · OpenAI Core','Threads · On'], click:'first' })}
+    </div>` : `
+    ${side('flowe-agent-sessions', { needs: 2, homeClick: 'signin' })}
+    <div class="main">
+      ${topbar('flowe-agent-sessions','improve flowe agent sessions','feed')}
+      <div class="body">
+        <div class="introh">#</div>
+        <div class="introt">#flowe-agent-sessions</div>
+        <div class="introd">The beginning of this room. <b>rex</b> is here and reads everything you post — say what you want done and he'll route it.</div>
+        <div class="introacts">
+          <button class="introcard"><b>Add agents</b><span>A designer, a developer, a reviewer…</span></button>
+          <button class="introcard"><b>Add people</b><span>Bring teammates in.</span></button>
+        </div>
+      </div>
+      ${composer('Message #flowe-agent-sessions — @ mention · / skill · ⏎ send', { chips:['Brain · OpenAI Core'], click:'first' })}
+    </div>`,
+
+  first: () => {
+    const msg = `<div class="msg mine"><span class="av">G</span><div class="mbody"><div class="mhead"><b>geo (you)</b><span class="time">08:34 PM</span></div>
+      <p>this channel is for improving the flowe agent sessions one protocol at a time starting with the nsdr protocols — can we do a review of all nsdr protocols on flowe right now @rex</p></div></div>`;
+    return mode === 'today' ? `
+    ${side('flowe-agent-sessions', { rex:'thinking' })}
+    <div class="main">
+      ${topbar('flowe-agent-sessions','improve flowe agent sessions','home')}
+      <div class="body">
+        <div style="font-size:11px;color:var(--dim);margin-bottom:8px">Home · your message opened a thread sheet over the room</div>
+        ${msg}
+        <div style="margin-top:10px;padding:9px 11px;border:1px dashed var(--border2);border-radius:10px;font-size:11.5px;color:var(--muted)">
+          A separate <b>thread sheet</b> covers the room. The feed you were looking at is now behind it.
+        </div>
+      </div>
+      <div class="compose"><div style="font-size:11px;color:var(--dim);padding:0 2px 7px">rex is typing · view activity ›</div>
+        <div class="cbox"><div class="cph">Reply — @ mention · / skill · ⏎ send</div></div></div>
+    </div>` : `
+    ${side('flowe-agent-sessions', { needs:2, rex:'thinking', homeClick:'signin' })}
+    <div class="main">
+      ${topbar('flowe-agent-sessions','improve flowe agent sessions','feed')}
+      <div class="body">${msg}
+        <div class="msg">${face('orch')}<div class="mbody"><div class="mhead"><b>rex</b><span class="rolechip" style="--rc:var(--role-orch)">orchestrator</span><span class="time">now</span></div>
+          <div class="liveact"><span class="spin"></span><span class="shine">reading the session protocols</span><span class="stepn">4s</span></div></div></div>
+      </div>
+      ${composer('Message #flowe-agent-sessions — @ mention · / skill · ⏎ send', { click:'working' })}
+    </div>`;
+  },
+
+  working: () => `
+    ${side('flowe-agent-sessions', { needs: mode==='prop'?2:0, rex:'researching · 2/6', homeClick: mode==='prop'?'signin':null })}
+    <div class="main">
+      ${topbar('flowe-agent-sessions','improve flowe agent sessions', mode==='today'?'home':'feed')}
+      <div class="body">
+        <div class="msg mine"><span class="av">G</span><div class="mbody"><div class="mhead"><b>geo (you)</b><span class="time">08:34 PM</span></div>
+          <p>…can we do a review of all nsdr protocols on flowe right now @rex</p></div></div>
+        <div class="msg">${face('orch')}<div class="mbody"><div class="mhead"><b>rex</b><span class="rolechip" style="--rc:var(--role-orch)">orchestrator</span><span class="time">now</span></div>
+          <p>On it — six angles across the protocol set. It's running below; the report lands here when it's done.</p>
+          <div class="runcard">
+            <div class="runhead"><span class="ring" style="--f:42%"></span><span class="runtitle">Review: NSDR protocols on Flowe</span><span class="runmeta">2:14</span></div>
+            <div style="margin-top:7px">
+              <div class="leg"><span class="tick">✓</span> session types inventory <span style="margin-left:auto;font:600 9.5px var(--fmono);color:var(--dim)">7 found</span></div>
+              <div class="leg on"><span class="dot"></span> agent flow per session <span class="shine" style="font-size:10.5px">reading flow-nsdr-core.ts</span></div>
+              <div class="leg"><span class="dot"></span> drop-off points</div>
+            </div>
+          </div></div></div>
+      </div>
+      ${composer(mode==='today' ? 'Reply — @ mention · / skill · ⏎ send' : 'Message #flowe-agent-sessions — @ mention · / skill · ⏎ send', { click:'delivered' })}
+    </div>`,
+
+  dead: () => `
+    ${side('flowe-agent-sessions', { needs: mode==='prop'?2:0, rex: mode==='today'?'standing by':'stood down', homeClick: mode==='prop'?'signin':null })}
+    <div class="main">
+      ${topbar('flowe-agent-sessions','improve flowe agent sessions', mode==='today'?'home':'feed')}
+      <div class="body">
+        <div class="msg mine"><span class="av">G</span><div class="mbody"><div class="mhead"><b>geo (you)</b><span class="time">08:34 PM</span></div>
+          <p>…can we do a review of all nsdr protocols on flowe right now @rex</p></div></div>
+        ${mode === 'today' ? `
+        <div style="margin-top:14px;padding:11px 13px;border:1px dashed var(--border2);border-radius:10px;max-width:520px">
+          <div style="font-size:12px;color:var(--body)"><b class="bad">Nothing.</b> The typing dot ran for a while, then stopped. No message, no error, no trace in the room.</div>
+          <div style="font-size:11px;color:var(--dim);margin-top:6px">rex's turn ran tools (it created the thread) but returned <b>no closing text</b> — an empty turn is treated as “nothing to say” and swallowed. The rail says <b>standing by</b>.</div>
+        </div>` : `
+        <div class="msg">${face('orch')}<div class="mbody"><div class="mhead"><b>rex</b><span class="rolechip" style="--rc:var(--role-orch)">orchestrator</span><span class="time">08:36 PM</span></div>
+          <div class="deadend"><span style="font-size:13px">⚠</span><span><b>rex finished without replying.</b> It ran 6 steps and produced no message — that's a fault, not silence. <span style="color:var(--link);cursor:pointer">View activity ›</span> · <span style="color:var(--link);cursor:pointer">Retry</span></span></div>
+        </div></div>`}
+      </div>
+      ${composer(mode==='today' ? 'Reply — @ mention · / skill · ⏎ send' : 'Message #flowe-agent-sessions — @ mention · / skill · ⏎ send')}
+    </div>`,
+
+  reply: () => {
+    const src = `<div class="msg">${face('orch')}<div class="mbody"><div class="mhead"><b>rex</b><span class="rolechip" style="--rc:var(--role-orch)">orchestrator</span><span class="time">08:41 PM</span>
+        <span style="margin-left:auto"><span class="mact"><span class="ago">08:41</span><button class="hot" title="Reply">↩</button><button title="Copy">⧉</button><button title="Pin">⚲</button></span></span></div>
+      <p>Done — 7 session types, the agent flow behind each, and where people drop out. Full write-up attached.</p>
+      ${mode === 'prop' ? `<div class="replies"><span class="avs"><span></span><span></span></span> 2 replies · last 1m ago</div>` : ''}
+    </div></div>`;
+    return mode === 'today' ? `
+    ${side('flowe-agent-sessions')}
+    <div class="main">
+      ${topbar('flowe-agent-sessions','improve flowe agent sessions','feed')}
+      <div class="body">${src}
+        <div class="msg mine"><span class="av">G</span><div class="mbody"><div class="mhead"><b>geo (you)</b><span class="time">08:44 PM</span></div>
+          <p>@rex can you break out the cue step for the 3 that diverge?</p></div></div>
+        <div style="margin-top:10px;padding:9px 11px;border:1px dashed var(--border2);border-radius:10px;font-size:11.5px;color:var(--muted);max-width:540px">
+          Reply on a room message only <b>prefills “@rex ”</b>. No thread is created — your follow-up lands flat in the feed, and in a busy room it is separated from what it answers.
+        </div>
+      </div>
+      <div class="compose"><div class="cbox"><div class="cph">@rex </div>
+        <div class="crow"><span class="send">↵</span></div></div></div>
+    </div>` : `
+    ${side('flowe-agent-sessions', { needs:2, homeClick:'signin' })}
+    <div class="main">
+      ${topbar('flowe-agent-sessions','improve flowe agent sessions','feed')}
+      <div class="body">${src}
+        <div style="margin-top:12px;padding:10px 12px;border:1px solid var(--border);border-radius:11px;background:var(--panel);max-width:560px">
+          <div class="rootlbl">The thread that opened</div>
+          <div class="rootmsg"><div class="rootlbl">Replying to rex · 08:41 PM</div>
+            <div style="font-size:11.5px;color:var(--body)">Done — 7 session types, the agent flow behind each, and where people drop out…</div></div>
+          <div class="msg mine" style="padding-top:0"><span class="av">G</span><div class="mbody"><div class="mhead"><b>geo (you)</b><span class="time">08:44 PM</span></div>
+            <p>can you break out the cue step for the 3 that diverge?</p></div></div>
+          <div class="cbox" style="margin-top:8px">
+            <div class="rpill"><span class="who">rex</span><span class="txt">Done — 7 session types, the agent flow behind each…</span><span class="x">✕</span></div>
+            <div class="cph">Reply — @ mention · / skill · ⏎ send</div>
+            <div class="crow"><span class="send">↵</span></div>
+          </div>
+        </div>
+      </div>
+      ${composer('Message #flowe-agent-sessions — @ mention · / skill · ⏎ send')}
+    </div>`;
+  },
+
+  marketing: () => mode === 'today' ? `
+    ${side('marketing')}
+    <div class="main">
+      <div class="top"><span class="rname"># marketing</span>
+        <span class="roomtabs">
+          <button class="iconbtn on" title="Home">⌂</button><button class="iconbtn" title="Feed">▤</button>
+          <button class="iconbtn" title="Calendar">▦</button><button class="iconbtn" title="Library">▣</button>
+        </span>
+        <span class="topic">growth HQ</span>
+        <span class="right"><button class="iconbtn">◔</button><button class="iconbtn">≡</button></span></div>
+      <div class="body">
+        <div class="daychip">Saturday · Jul 25</div>
+        <div class="greet" style="margin-top:6px">Good evening, George.</div>
+        <div class="greetd">Describe the work below — the orchestrator plans it…</div>
+        <div style="margin-top:14px;padding:9px 11px;border:1px dashed var(--border2);border-radius:10px;font-size:11.5px;color:var(--muted);max-width:540px">
+          <b>Four unlabeled icons</b>, and the first one is this generic Home — the same <code>HomeView</code> every other room mounts, just scoped here. Calendar and Library, the two surfaces that only exist in a marketing room, are the two you cannot identify.
+        </div>
+      </div>
+      ${composer('Describe the work — the team takes it from there.', { chips:['# marketing'] })}
+    </div>` : `
+    ${side('marketing', { needs:2, homeClick:'signin' })}
+    <div class="main">
+      <div class="top"><span class="rname"># marketing</span>
+        <span class="segtab"><button class="on">Feed</button><button>Calendar</button><button>Library</button></span>
+        <span class="topic">growth HQ</span>
+        <span class="right"><button class="iconbtn">◔</button><button class="iconbtn">≡</button></span></div>
+      <div class="body">
+        <div class="msg mine"><span class="av">G</span><div class="mbody"><div class="mhead"><b>geo (you)</b><span class="time">4:02 PM</span></div>
+          <p>3 posts for the NSDR launch — X, LinkedIn, IG. Ship Monday 9am.</p></div></div>
+        <div class="msg">${face('mkt')}<div class="mbody"><div class="mhead"><b>marketer</b><span class="rolechip" style="--rc:var(--role-mkt)">marketer</span><span class="time">4:05 PM</span></div>
+          <p>3 drafts up for your approve — nothing publishes until you say so.</p></div></div>
+        <div style="margin-top:6px" class="nyhead">Calendar · this week</div>
+        <div class="calgrid">
+          ${['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((d,i)=>`<div class="calcell"><b>${d}</b>${i===0?'<div class="calpost">9:00 X</div><div class="calpost">9:00 LI</div>':i===2?'<div class="calpost">2:00 IG</div>':''}</div>`).join('')}
+        </div>
+        <div style="margin-top:14px" class="nyhead">Library</div>
+        <div class="libgrid">
+          ${[['md','brand-voice.md'],['png','launch-hero.png'],['md','tone-guide.md']].map(([k,n])=>`<div class="libcard"><div class="libthumb">${k}</div><div class="libname">${n}</div></div>`).join('')}
+        </div>
+      </div>
+      ${composer('Message #marketing — @ mention · / skill · ⏎ send')}
+    </div>`,
+
+  threadsoff: () => `
+    ${side('build', { needs: mode==='prop'?2:0, homeClick: mode==='prop'?'signin':null })}
+    <div class="main">
+      <div class="top"><span class="rname"># build</span>
+        ${mode==='today' ? `<span class="roomtabs"><button class="iconbtn" title="Home">⌂</button><button class="iconbtn on" title="Feed">▤</button></span>` : ''}
+        <span class="topic">threads · off</span>
+        <span class="right"><button class="iconbtn">◔</button><button class="iconbtn">≡</button></span></div>
+      <div class="body">
+        <div class="msg mine"><span class="av">G</span><div class="mbody"><div class="mhead"><b>geo (you)</b><span class="time">10:02 AM</span></div>
+          <p>the drawer still traps focus on iPad</p></div></div>
+        <div class="msg">${face('orch')}<div class="mbody"><div class="mhead"><b>rex</b><span class="rolechip" style="--rc:var(--role-orch)">orchestrator</span><span class="time">10:03 AM</span><span class="tref" style="margin-left:6px">#1042</span></div>
+          <p>Filed and offered to patch — bug, repro attached.</p></div></div>
+        <div class="msg">${face('dev')}<div class="mbody"><div class="mhead"><b>patch</b><span class="rolechip" style="--rc:var(--role-dev)">developer</span><span class="time">10:31 AM</span><span class="tref" style="margin-left:6px">#1042</span></div>
+          <p>Fixed — backdrop is inert while the drawer is open. PR #1042 up.</p></div></div>
+        <div style="margin-top:12px;padding:9px 11px;border:1px ${mode==='prop'?'solid var(--border)':'dashed var(--border2)'};border-radius:10px;font-size:11.5px;color:var(--muted);max-width:560px">
+          ${mode==='prop'
+            ? `A threads-off room already <b>is</b> the proposal: every message, including task traffic, in one feed with a <span class="tref">#1042</span> pill for provenance. Nothing is hidden behind a second surface — this is the shape the default should lean toward.`
+            : `Threads-off already widens the feed to carry task traffic inline (docs/20) — yet the room still opens on <b>Home</b>, a dashboard in front of the feed that was designed to hold everything.`}
+        </div>
+      </div>
+      ${composer(mode==='today' ? 'Message #build — @ mention · / skill · ⏎ send' : 'Message #build — @ mention · / skill · ⏎ send')}
+    </div>`,
+
+  delivered: () => `
+    ${side('flowe-agent-sessions', { needs: mode==='prop'?3:0, rex:'standing by', homeClick: mode==='prop'?'signin':null })}
+    <div class="main">
+      ${topbar('flowe-agent-sessions','improve flowe agent sessions', mode==='today'?'home':'feed')}
+      <div class="body">
+        <div class="msg">${face('orch')}<div class="mbody"><div class="mhead"><b>rex</b><span class="rolechip" style="--rc:var(--role-orch)">orchestrator</span><span class="time">08:41 PM</span></div>
+          <p>Done — 7 session types, the agent flow behind each, and where people drop out. Full write-up attached.</p>
+          <div style="margin-top:8px;border:1px solid var(--card-border);background:var(--card);border-radius:11px;overflow:hidden;max-width:420px">
+            <div style="display:flex;gap:8px;align-items:center;padding:7px 10px;border-bottom:1px solid var(--border)">
+              <span style="font:700 8px var(--fmono);letter-spacing:.07em;text-transform:uppercase;color:var(--dim);border:1px solid var(--border2);border-radius:4px;padding:2px 5px">md</span>
+              <span style="font:600 11px var(--fmono)">NSDR_PROTOCOL_REVIEW.md</span>
+              <span style="margin-left:auto;font:500 10px var(--fmono);color:var(--dim)">2,140 w</span></div>
+            <div style="padding:9px 12px;font-size:11px;line-height:1.6;color:var(--body);max-height:96px;overflow:hidden">
+              <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:5px">NSDR protocols on Flowe</div>
+              Seven session types ship today. Four share one agent flow; three diverge only at the cue step…</div>
+          </div></div></div>
+        ${mode === 'prop' ? `<div style="margin-top:12px;padding:9px 11px;border:1px solid var(--border);border-radius:10px;background:var(--panel);font-size:11.5px;color:var(--muted);max-width:520px">
+          This landed in the room's <b>feed</b>, where you were already looking — and it's now item 3 in <b>Home → Needs you</b>, because it wants your accept.</div>` : ''}
+      </div>
+      ${composer(mode==='today' ? 'Reply — @ mention · / skill · ⏎ send' : 'Message #flowe-agent-sessions — @ mention · / skill · ⏎ send')}
+    </div>`,
+};
+
+const WHY = {
+  signin: {
+    today: ['Home is a <b>per-room tab</b>, so “Good evening” greets you inside <code>#general</code> specifically. The needs-you queue is scoped to that one room — work waiting in <code>#build</code> is invisible until you go there.', 'The composer here <b>starts work</b>. It looks exactly like the feed composer, which posts a message.'],
+    prop: ['Home becomes the <b>workspace landing</b> — one place, everything that needs you, across every room, with the room named on each card. That is what a founder actually opens the app for.', 'It is a nav item with a count, not a tab you must dismiss to reach a conversation.'],
+  },
+  newchan: {
+    today: ['Creation is fine. What follows is the problem.'],
+    prop: ['Same flow, plus one sentence setting the expectation that <b>rex is already in the room and reads what you post</b> — so the first message has an obvious purpose.'],
+  },
+  empty: {
+    today: ['A brand-new room opens on <b>Home</b>: two cards and a composer that says “Describe the work”. The conversation surface is one unlabeled icon away, and <code>openRoom</code> also force-opens the history panel — up to three surfaces on arrival.', 'Nothing on this screen says where a message will land.'],
+    prop: ['You land in the <b>feed</b>, because that is what a room is. The intro block and the two add-cards live <i>in</i> the feed, so they scroll away naturally once real conversation starts.', 'One composer. It posts to the room. Always.'],
+  },
+  first: {
+    today: ['This is the mode error you hit: the Home composer <b>opened a thread sheet</b> that covers the room. Your message is now in a sheet, not in the feed you were looking at.', 'Typing the same words in Feed instead does something different — and neither surface tells you which one you are on.'],
+    prop: ['The message lands in the feed and <b>rex answers in place</b>, in the row where the reply will appear. No sheet, no surface change, no lost context.', 'Threads still exist — but they open <i>from</i> a message, when work actually needs its own room.'],
+  },
+  working: {
+    today: ['Status lives above the composer as “rex is typing”, detached from the message it belongs to. When it stops you cannot tell finished from failed.'],
+    prop: ['The live status is the reply row itself, and long work shows its steps (docs/29 runs). The rail agrees: <b>researching · 2/6</b>, never “standing by” while it works.'],
+  },
+  dead: {
+    today: ['<b class="bad">The bug.</b> <code>ORCH_EMPTY_TURN</code> is the empty string, and <code>isStandDown(&quot;&quot;)</code> returns true — so a turn that <i>ran tools</i> but produced no closing text is treated as “nothing to say” and swallowed. You are left with a dot that stops.', 'Your Home attempt created the thread, which proves the tools ran. The silence came after.'],
+    prop: ['A turn that <b>did things</b> and produced no text is a <b>fault</b>, and says so where you are looking — with the activity trail and a retry. Silence is only legal when nothing happened at all.'],
+  },
+  reply: {
+    today: ['<code>startReply</code> only builds a real reply context when the message belongs to a <b>task</b> (the “replying in #1042” chip). On a plain room message it does <code>setDraft(&quot;@name &quot;)</code> and nothing else — <b class="bad">no thread, no link back</b>. Your answer and the thing it answers drift apart as the room fills.'],
+    prop: ['Reply on a room message <b>opens a thread rooted at that message</b>, Slack-style: the source stays in the feed and grows a <b>“2 replies”</b> footer, the sheet pins the root at top, and the composer carries the message as a pill you can dismiss.', 'A message already in a thread keeps today\'s behaviour — the composer just arms with the pill. Same affordance, one meaning.', 'Costs one nullable column: <code>threads.root_message_id</code>. Everything else already exists.'],
+  },
+  marketing: {
+    today: ['Four <b>unlabeled</b> icons. The first is the generic per-room Home — the same <code>HomeView</code> component every other room mounts. Calendar and Library, the only two surfaces that genuinely exist <i>because</i> this is a marketing room, are indistinguishable from it.'],
+    prop: ['Home goes (it was the duplicate); <b>Calendar and Library stay</b>, because they are real alternate views of this room\'s data, not a second landing. With only real surfaces left, labelling them as text costs nothing and removes the guessing.', 'This is the sharper rule: <b>kill the duplicate, keep genuine alternate views.</b> “One surface per room” was too blunt.'],
+  },
+  threadsoff: {
+    today: ['<code>thread_mode=&quot;off&quot;</code> already widens the feed to carry task traffic inline (docs/20) — and the room <i>still</i> opens on Home, a dashboard placed in front of the feed that was just told to hold everything.'],
+    prop: ['This mode is the strongest evidence for the change: NeuraMesh <b>already ships</b> a room shape where the feed is everything. The default just stops fighting it.', 'Threads-on rooms keep the sheet — so the honest promise is <b>the feed is the room\'s home, a thread is a deliberate zoom-in</b>, not “one surface, always”.'],
+  },
+  delivered: {
+    today: ['The deliverable lands in whichever surface you happen to be on, and the accept lives on a different screen again.'],
+    prop: ['It lands in the feed you were already reading, renders inline (docs/30), and simultaneously appears in Home → Needs you — <b>one item, two places, one truth</b>.'],
+  },
+};
+
+function render() {
+  document.getElementById('app').setAttribute('data-theme', theme);
+  document.getElementById('app').innerHTML = SCREENS[step]();
+  document.getElementById('steps').innerHTML = STEPS.map((s, i) => `
+    <button class="step ${s.id === step ? 'on' : ''}" data-step="${s.id}">
+      <span class="n">${i + 1}</span><span><span class="t">${s.t}</span><span class="d">${s.d}</span></span>
+    </button>`).join('');
+  const w = WHY[step];
+  document.getElementById('why').innerHTML = `
+    <div class="wcard"><span class="tag today">Today</span>${w.today.map((p) => `<p>${p}</p>`).join('')}</div>
+    <div class="wcard"><span class="tag prop">Proposed</span>${w.prop.map((p) => `<p>${p}</p>`).join('')}</div>`;
+  document.querySelectorAll('#mode button').forEach((b) => b.classList.toggle('on', b.dataset.mode === mode));
+  document.querySelectorAll('#theme button').forEach((b) => b.classList.toggle('on', b.dataset.themeSet === theme));
+}
+document.addEventListener('click', (e) => {
+  const st = e.target.closest('[data-step]'); if (st) { step = st.dataset.step; return render(); }
+  const go = e.target.closest('[data-go]'); if (go) { step = go.dataset.go; return render(); }
+  const m = e.target.closest('#mode button'); if (m) { mode = m.dataset.mode; return render(); }
+  const t = e.target.closest('#theme button'); if (t) { theme = t.dataset.themeSet; return render(); }
+});
+render();
+</script>
+</body>
+</html>

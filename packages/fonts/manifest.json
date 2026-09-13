@@ -1,0 +1,44 @@
+{
+  "family": "NeuraMesh Sans",
+  "upstream": {
+    "repo": "vercel/geist-font",
+    "commit": "10dc7658f13c38a474cde201bb09a4617267545b",
+    "path": "fonts/Geist/variable/Geist[wght].ttf",
+    "sha256": "73894e0448cae90a92b6c2f8732b7bb9acb7b94c418bff559dad4a18e1de9659",
+    "version": "1.800"
+  },
+  "files": {
+    "neuramesh-sans-cyrillic-ext-wght-normal.woff2": {
+      "bytes": 7360,
+      "sha256": "f28d3027d6b4da21fe6c95d13de1d7d607a92b9e87cf4e7bed287f29ff3fa1c1"
+    },
+    "neuramesh-sans-cyrillic-wght-normal.woff2": {
+      "bytes": 15588,
+      "sha256": "29ec72080250f3c8e942dbd01a93a18f437108d4678af3e4be2e6e78cca3c79e"
+    },
+    "neuramesh-sans-vietnamese-wght-normal.woff2": {
+      "bytes": 9988,
+      "sha256": "19de6aad4370c04a510c6daa9ad64c9ba691f0fe135df445f0ecff46d9f57803"
+    },
+    "neuramesh-sans-latin-ext-wght-normal.woff2": {
+      "bytes": 17636,
+      "sha256": "ec2e470ac2b05cbfdf2bed23589c59d5bf4c0b45e4ca91e0478a27a79973bc25"
+    },
+    "neuramesh-sans-latin-wght-normal.woff2": {
+      "bytes": 32984,
+      "sha256": "3f3c67dceb71ca0ead39b42f78b0575f67422afb45bf4fe931b3672a5f30537c"
+    },
+    "NeuraMeshSans-Regular.ttf": {
+      "bytes": 90836,
+      "sha256": "3772100e625e6bd5f8ca0bef6ae4551310de512c5738eef50eb71d1b09c452c6"
+    },
+    "NeuraMeshSans-Medium.ttf": {
+      "bytes": 90880,
+      "sha256": "c761ecdd14e6bd29b8072c294195ec0b2c77e18f8485f787a323aec218dcd121"
+    },
+    "NeuraMeshSans-SemiBold.ttf": {
+      "bytes": 90952,
+      "sha256": "3845a01494df121beff770766aef7a6c496149b4df352e196a8761af707aa3af"
+    }
+  }
+}

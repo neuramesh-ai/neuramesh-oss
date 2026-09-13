@@ -1,0 +1,30 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "pnpm install --no-optional",
+  "buildCommand": "node scripts/migrate.mjs",
+  "regions": [
+    "cle1"
+  ],
+  "crons": [
+    {
+      "path": "/internal/publish-due",
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/internal/emails-due",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/internal/machine-sweep",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/internal/credit-refill",
+      "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/internal/routines-due",
+      "schedule": "*/5 * * * *"
+    }
+  ]
+}

@@ -1,0 +1,483 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300..900&family=Geist+Mono:wght@400..700&family=Bricolage+Grotesque:opsz,wght@12..96,500..700&display=swap">
+  <style>
+    *{box-sizing:border-box}
+    html,body{margin:0;height:100%}
+    body{background:#f5f4f2;font-family:Geist,'Helvetica Neue',Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+    a{color:inherit;text-decoration:none}a:hover{color:var(--acc)}
+    .page{width:1440px;min-height:100vh;background:var(--paper);color:var(--ink);overflow:hidden}
+    .wrap{width:1360px;margin:0 auto;padding:0 40px}
+    .k{font-family:'Geist Mono',ui-monospace,Menlo,monospace;font-weight:500;font-size:12px;line-height:1;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:12px;margin:0}
+    .k b{font-weight:500;color:var(--acc)}
+    .h1{font-weight:500;font-size:78px;line-height:.96;letter-spacing:var(--ls);text-transform:var(--tt);margin:0;color:var(--ink)}
+    .h2{font-weight:400;font-size:40px;line-height:1.08;letter-spacing:-.03em;margin:0;color:var(--ink);text-wrap:pretty}
+    .h2 span{color:var(--muted)}
+    .lead{font-size:18px;line-height:1.5;color:var(--body);margin:0;text-wrap:pretty}
+    .p{font-size:15px;line-height:1.5;color:var(--body);margin:0;text-wrap:pretty}
+    .btn{display:inline-flex;align-items:center;gap:10px;height:44px;padding:0 18px;border-radius:3px;border:1px solid var(--line2);font-family:'Geist Mono',ui-monospace,Menlo,monospace;font-weight:500;font-size:13px;letter-spacing:.02em;text-transform:uppercase;color:var(--ink);background:transparent;position:relative;overflow:hidden;cursor:pointer;white-space:nowrap;transition:border-color .15s cubic-bezier(.22,1,.36,1),color .15s cubic-bezier(.22,1,.36,1)}
+    .btn:hover{border-color:var(--ink);color:var(--ink)}
+    .btn svg{flex:none;transition:transform .15s cubic-bezier(.22,1,.36,1)}
+    .btn:hover svg{transform:translateX(2px)}
+    .btn.pri{background:var(--btn);color:var(--btnfg);border-color:transparent}
+    .btn.pri:hover{color:var(--btnfg)}
+    .btn.pri::after{content:"";position:absolute;left:0;right:0;bottom:0;height:3px;background:repeating-linear-gradient(45deg,var(--acc) 0 3px,transparent 3px 10px);background-size:14.14px 14.14px;opacity:0;transition:opacity .2s}
+    .btn.pri:hover::after{opacity:1;animation:hatch 1s linear infinite}
+    .btn.sm{height:36px;padding:0 14px;font-size:12px}
+    .btn.big{height:52px;padding:0 24px;font-size:13.5px}
+    @keyframes hatch{to{background-position:14.14px 0}}
+    /* nav */
+    .nav{height:64px;display:flex;align-items:center;gap:28px;border-bottom:1px solid var(--line)}
+    .brand{display:flex;align-items:center;gap:9px}
+    .wm{font-family:'Bricolage Grotesque',Geist,sans-serif;font-weight:600;font-size:17px;letter-spacing:-.015em;color:var(--ink)}
+    .links{display:flex;gap:24px;margin-left:12px}
+    .links a{font-size:13.5px;font-weight:500;color:var(--body)}
+    .navr{margin-left:auto;display:flex;align-items:center;gap:16px}
+    .ghost{font-size:13.5px;font-weight:500;color:var(--ink)}
+    /* hero */
+    .hero{padding:92px 0 52px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:26px}
+    .hero .k{justify-content:center}
+    .hero .h1{max-width:1100px}
+    .hero .lead{max-width:720px}
+    .cta{display:flex;gap:12px;align-items:center;margin-top:4px}
+    .dlwrap{position:relative;display:inline-flex}
+    .btn.dl:hover svg{transform:none}
+    .dlmenu{position:absolute;top:calc(100% + 8px);left:0;min-width:400px;background:var(--raised);border:1px solid var(--line);border-radius:6px;box-shadow:0 20px 50px -20px var(--shadow),0 2px 6px rgba(0,0,0,.08);padding:6px;text-align:left;z-index:5}
+    .dlrow{display:grid;grid-template-columns:32px 1fr auto;gap:12px;align-items:center;padding:10px 12px;border-radius:4px}
+    .dlrow:hover{background:var(--sunken)}
+    .dlrow .ic{width:32px;height:32px;border-radius:6px;background:var(--sunken);display:grid;place-items:center;color:var(--ink)}
+    .dlrow b{display:block;font-weight:500;font-size:14px;color:var(--ink)}
+    .dlrow span{display:block;font-size:12.5px;color:var(--muted)}
+    .dlrow em{font-style:normal;font-family:'Geist Mono',ui-monospace,Menlo,monospace;font-weight:500;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border:1px solid var(--line2);border-radius:3px;padding:3px 6px}
+    .facts{display:flex;gap:16px;align-items:center;font-family:'Geist Mono',ui-monospace,Menlo,monospace;font-weight:500;font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+    .facts i{width:1px;height:12px;background:var(--line2)}
+    /* the product frame: grid paper, a browser chrome bar, and a real capture of the app */
+    .stage{margin:0 auto;width:1360px;padding:40px 44px 44px;border-radius:12px;background-color:var(--sunken);background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:32px 32px;position:relative;overflow:hidden}
+    .stage::before{content:"";position:absolute;inset:0;background:radial-gradient(70% 55% at 50% 0%,var(--glow),transparent 72%);pointer-events:none}
+    .stage > *{position:relative}
+    .stage.in{width:auto;margin-top:28px;padding:32px 32px 32px}
+    .cap{display:flex;align-items:center;gap:14px;font-family:'Geist Mono',ui-monospace,Menlo,monospace;font-weight:500;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:18px}
+    .cap i{width:1px;height:11px;background:var(--line2)}
+    .live{display:inline-flex;align-items:center;gap:6px;color:var(--acc)}
+    .live em{width:6px;height:6px;border-radius:50%;background:var(--acc);animation:pulse 1.6s ease-in-out infinite}
+    .clock{margin-left:auto;display:inline-flex;align-items:center;gap:10px;color:var(--ink)}
+    .clock b{font-weight:500;font-size:13px;letter-spacing:.02em;color:var(--ink)}
+    .clock .tag{font-size:9.5px;letter-spacing:.08em;padding:3px 6px;border:1px solid var(--line2);border-radius:3px;color:var(--muted)}
+    .win{width:1200px;margin:0 auto;border-radius:8px;overflow:hidden;border:1px solid #2c2c2c;box-shadow:0 30px 80px -30px var(--shadow),0 2px 6px rgba(0,0,0,.25);background:#0d0d0d;text-align:left}
+    .win.w2{width:1216px}
+    .win img{display:block;width:100%;height:auto}
+    .chrome{height:38px;display:flex;align-items:center;gap:10px;padding:0 12px;background:#161616;border-bottom:1px solid #262626}
+    .dots{display:flex;gap:6px}.dots i{width:10px;height:10px;border-radius:50%;background:#3a3a3a}
+    .url{margin:0 auto;height:24px;display:flex;align-items:center;gap:8px;padding:0 12px;border-radius:4px;background:#0f0f0f;border:1px solid #2a2a2a;font-family:'Geist Mono',ui-monospace,Menlo,monospace;font-weight:500;font-size:11px;color:#9a9a9a;min-width:360px;justify-content:center}
+    .url svg{color:#6a6a6a}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+    /* bands */
+    .sec{padding:112px 0}
+    .head{display:grid;grid-template-columns:1.1fr .9fr;gap:48px;align-items:end;margin-bottom:56px}
+    .head .h2{max-width:600px}
+    .head .p{max-width:440px;font-size:16px}
+    .byos{padding:36px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:40px}
+    .marks{display:flex;gap:32px;align-items:center}
+    .mark{display:flex;align-items:center;gap:9px;font-weight:500;font-size:15px;color:var(--body)}
+    .mark svg{width:20px;height:20px;fill:currentColor}
+    .mark .def{font-family:'Geist Mono',ui-monospace,Menlo,monospace;font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--acc);border:1px solid var(--acc);border-radius:3px;padding:2px 5px;margin-left:2px}
+    .byos .p{margin-left:auto;max-width:520px;font-size:14px;text-align:right}
+    .grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+    .cell{background:var(--raised);padding:28px 26px 30px;display:flex;flex-direction:column;gap:14px;min-height:262px}
+    .cell .n{font-family:'Geist Mono',ui-monospace,Menlo,monospace;font-weight:500;font-size:12px;color:var(--acc);letter-spacing:.06em}
+    .cell h3{margin:0;font-size:20px;font-weight:500;letter-spacing:-.015em;color:var(--ink)}
+    .cell h3 .h{font-family:'Geist Mono',ui-monospace,Menlo,monospace;color:var(--muted);font-weight:500;margin-right:4px}
+    .cell .p{flex:1}
+    .cell .f{font-family:'Geist Mono',ui-monospace,Menlo,monospace;font-weight:500;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);display:flex;gap:8px;align-items:center}
+    .cell .f i{width:6px;height:6px;border-radius:50%;background:var(--acc)}
+    .experts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
+    .xp{border:1px solid var(--line);border-radius:8px;background:var(--raised);padding:24px 24px 20px;display:flex;flex-direction:column;gap:12px;min-height:220px}
+    .xp .top{display:flex;align-items:center;gap:10px}
+    .xp .top .ic{width:34px;height:34px;border-radius:6px;background:var(--sunken);display:grid;place-items:center;color:var(--ink)}
+    .xp h3{margin:0;font-size:18px;font-weight:500;letter-spacing:-.01em;color:var(--ink)}
+    .xp .p{flex:1;font-size:14.5px}
+    .xp .bot{display:flex;align-items:center;justify-content:space-between;padding-top:12px;border-top:1px solid var(--line);font-family:'Geist Mono',ui-monospace,Menlo,monospace;font-weight:500;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+    .xp .bot b{font-weight:500;color:var(--ink)}
+    .xp .bot .hire{display:inline-flex;align-items:center;gap:6px;color:var(--acc)}
+    .xnote{margin-top:22px;font-family:'Geist Mono',ui-monospace,Menlo,monospace;font-weight:500;font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+    .duo{display:grid;grid-template-columns:1fr 1.15fr;gap:64px;align-items:center}
+    .duo .h2{margin:24px 0 18px}
+    .duo .p{font-size:16px;max-width:460px}
+    .panel{background:var(--sunken);border-radius:12px;padding:40px}
+    .roster{border:1px solid var(--line);border-radius:8px;background:var(--raised);overflow:hidden}
+    .rrow{display:grid;grid-template-columns:32px 96px 130px 1fr auto;gap:16px;align-items:center;padding:13px 18px;border-top:1px solid var(--line);font-size:14px}
+    .rrow:first-child{border-top:0}
+    .rrow .name{font-weight:600;color:var(--ink)}
+    .rrow .role{font-family:'Geist Mono',ui-monospace,Menlo,monospace;font-weight:500;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+    .rrow .st{color:var(--body);font-size:13.5px}
+    .rrow .dot{width:8px;height:8px;border-radius:50%;background:var(--line2)}
+    .rrow .dot.on{background:#3aa183}
+    .rrow.hire{grid-template-columns:32px 1fr;color:var(--muted);font-family:'Geist Mono',ui-monospace,Menlo,monospace;font-size:11.5px;letter-spacing:.04em;text-transform:uppercase}
+    .rrow.hire i{width:32px;height:32px;border-radius:6px;border:1px dashed var(--line2);display:grid;place-items:center;color:var(--muted)}
+    .tile{width:32px;height:32px;border-radius:6px;display:grid;place-items:center;font-family:'Geist Mono',ui-monospace,Menlo,monospace;font-weight:600;font-size:12px;color:#fff}
+    .strip{display:grid;grid-template-columns:200px repeat(4,minmax(0,1fr));gap:32px;align-items:start;padding:56px 0 0}
+    .strip .k{padding-top:4px}
+    .mini h3{margin:0 0 8px;font-size:16px;font-weight:500;letter-spacing:-.01em;color:var(--ink)}
+    .mini .p{font-size:14px}
+    .rules{display:grid;grid-template-columns:1fr 1.1fr;gap:64px;align-items:start}
+    .rl{display:flex;flex-direction:column}
+    .rl div{display:grid;grid-template-columns:44px 1fr;gap:16px;padding:20px 0;border-top:1px solid var(--line);font-size:18px;line-height:1.4;color:var(--ink)}
+    .rl div:last-child{border-bottom:1px solid var(--line)}
+    .rl b{font-family:'Geist Mono',ui-monospace,Menlo,monospace;font-weight:500;font-size:12px;color:var(--acc);padding-top:6px}
+    .matrix{border:1px solid var(--line);border-radius:8px;background:var(--raised);overflow:hidden}
+    .mhead{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line);font-weight:600;font-size:13px;color:var(--ink)}
+    .mhead .enf{margin-left:auto;font-family:'Geist Mono',ui-monospace,Menlo,monospace;font-weight:500;font-size:10px;letter-spacing:.08em;color:var(--acc);border:1px solid var(--acc);border-radius:3px;padding:3px 7px}
+    .matrix table{width:100%;border-collapse:collapse;font-size:13.5px}
+    .matrix th{font-family:'Geist Mono',ui-monospace,Menlo,monospace;font-weight:500;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);text-align:left;padding:11px 16px;border-bottom:1px solid var(--line);background:var(--sunken)}
+    .matrix td{padding:12px 16px;border-bottom:1px solid var(--line);vertical-align:middle;color:var(--ink)}
+    .matrix tr:last-child td{border-bottom:0}
+    .matrix td small{display:block;font-family:'Geist Mono',ui-monospace,Menlo,monospace;font-weight:500;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:2px}
+    .pk{display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:22px;padding:0 7px;border-radius:4px;font-family:'Geist Mono',ui-monospace,Menlo,monospace;font-weight:500;font-size:10.5px;letter-spacing:.04em}
+    .pk.ok{background:rgba(58,161,131,.14);color:#2a8f6f}
+    .pk.no{color:var(--line2)}
+    .pk.lock{background:var(--sunken);color:var(--muted)}
+    .anchor{border:1px solid var(--ink);border-radius:8px;background:var(--raised);padding:28px 30px;display:grid;grid-template-columns:1fr 470px;gap:40px;align-items:center;margin-bottom:24px}
+    .anchor h3{margin:0 0 8px;font-size:22px;font-weight:500;letter-spacing:-.02em;color:var(--ink)}
+    .shot{border-radius:6px;overflow:hidden;border:1px solid #2c2c2c;background:#0d0d0d;box-shadow:0 18px 40px -22px var(--shadow)}
+    .shot .chrome{height:28px;padding:0 10px}
+    .shot .dots i{width:8px;height:8px}
+    .shot .url{height:18px;font-size:9.5px;min-width:0;padding:0 10px}
+    .shot img{display:block;width:100%;height:auto}
+    .surf{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px}
+    .scard{border:1px solid var(--line);border-radius:8px;background:var(--raised);padding:26px;display:flex;flex-direction:column;gap:12px}
+    .scard .ic{width:40px;height:40px;border-radius:6px;background:var(--sunken);display:grid;place-items:center;color:var(--ink)}
+    .scard h3{margin:0;font-size:18px;font-weight:500;letter-spacing:-.01em;color:var(--ink)}
+    .plans{display:grid;grid-template-columns:1fr 1fr;gap:24px;max-width:960px;margin:0 auto}
+    .plan{border:1px solid var(--line);border-radius:8px;background:var(--raised);padding:32px;display:flex;flex-direction:column;gap:20px}
+    .plan.feat{border-color:var(--ink)}
+    .pn{display:flex;align-items:center;gap:10px;font-size:20px;font-weight:500;color:var(--ink)}
+    .tag{font-family:'Geist Mono',ui-monospace,Menlo,monospace;font-weight:500;font-size:10px;letter-spacing:.08em;text-transform:uppercase;padding:4px 7px;border-radius:3px;border:1px solid var(--line2);color:var(--muted)}
+    .tag.acc{border-color:var(--acc);color:var(--acc)}
+    .price{font-size:44px;font-weight:500;letter-spacing:-.03em;line-height:1;color:var(--ink);display:flex;align-items:baseline;gap:8px}
+    .price small{font-size:14px;color:var(--muted);letter-spacing:0;font-weight:400}
+    .pl{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px;font-size:14.5px;color:var(--body);flex:1}
+    .pl li{display:flex;gap:10px;align-items:flex-start}
+    .pl li::before{content:"";width:5px;height:5px;border-radius:50%;background:var(--acc);margin-top:8px;flex:none}
+    .pricehead{text-align:center;display:flex;flex-direction:column;align-items:center;gap:18px;margin-bottom:48px}
+    .ctacard{position:relative;overflow:hidden;border-radius:12px;background:var(--btn);color:var(--btnfg);padding:72px 64px 64px;display:flex;flex-direction:column;gap:22px;min-height:380px;justify-content:flex-end}
+    .ctacard::before{content:"";position:absolute;inset:0;background:radial-gradient(48% 62% at 16% 10%,var(--glowc),transparent 70%);pointer-events:none}
+    .ctacard::after{content:"";position:absolute;inset:0;opacity:.16;mix-blend-mode:overlay;pointer-events:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>")}
+    .ctacard > *{position:relative;z-index:1}
+    .ctacard .k{color:var(--btnfg);opacity:.6}
+    .ctacard .h2{color:var(--btnfg);font-size:48px;text-transform:var(--tt);font-weight:500;letter-spacing:-.035em;max-width:620px}
+    .ctacard .p{color:var(--btnfg);opacity:.72;font-size:16px}
+    .ctacard .btn{border-color:var(--btnfg);color:var(--btnfg);background:transparent;align-self:flex-start}
+    .ctacard .btn:hover{color:var(--btnfg)}
+    .foot{padding:56px 0 40px;border-top:1px solid var(--line)}
+    .fgrid{display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr;gap:40px}
+    .fbrand .p{margin-top:14px;max-width:280px;font-size:14px}
+    .fh{font-family:'Geist Mono',ui-monospace,Menlo,monospace;font-weight:500;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:14px}
+    .fl{display:block;font-size:14px;color:var(--body);margin-bottom:10px}
+    .fbot{display:flex;justify-content:space-between;margin-top:44px;padding-top:18px;border-top:1px solid var(--line);font-family:'Geist Mono',ui-monospace,Menlo,monospace;font-weight:500;font-size:11.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+    /* entrances: fade + rise on the signature ease, then the frame pushes in */
+    /* entrances (fade + 14px rise, then the frame push-in) belong to the live site; the canvas shows every
+       artboard paused, so here each element rests in its final state */
+    .rise,.push{opacity:1;transform:none}
+    @media (prefers-reduced-motion:reduce){.live em{animation:none !important}}
+  </style>
+</helmet>
+<div class="page" style="--paper: {{t.paper}}; --raised: {{t.raised}}; --sunken: {{t.sunken}}; --line: {{t.line}}; --line2: {{t.line2}}; --ink: {{t.ink}}; --body: {{t.body}}; --muted: {{t.muted}}; --acc: {{t.acc}}; --btn: {{t.btn}}; --btnfg: {{t.btnfg}}; --grid: {{t.grid}}; --glow: {{t.glow}}; --glowc: {{t.glowc}}; --tt: {{t.tt}}; --ls: {{t.ls}}; --shadow: {{t.shadow}};">
+
+  <div class="wrap">
+    <nav class="nav">
+      <a class="brand" href="#top">
+        <svg width="22" height="22" viewBox="0 0 48 48" aria-hidden="true"><path d="M5.5 22 C5.5 10.5 13.5 3.5 24 3.5 C34.5 3.5 42.5 10.5 42.5 22 L42.5 39 C42.5 42.5 40 44.5 37 44.5 L11 44.5 C8 44.5 5.5 42.5 5.5 39 Z" fill="#834a2b"></path><circle cx="17.8" cy="21" r="3.5" fill="#fff7ee"></circle><circle cx="30.2" cy="21" r="3.5" fill="#fff7ee"></circle><path d="M17 28.6 C20.2 33.6 27.8 33.6 31 28.6" fill="none" stroke="#fff7ee" stroke-width="4" stroke-linecap="round"></path></svg>
+        <span class="wm">neuramesh</span>
+      </a>
+      <div class="links"><a href="#fast">Product</a><a href="#experts">Experts</a><a href="#pricing">Pricing</a><a href="#docs">Docs</a></div>
+      <div class="navr">
+        <a class="ghost" href="#signin">Sign in</a>
+        <a class="btn pri sm" href="#start">Start free</a>
+      </div>
+    </nav>
+  </div>
+
+  <header class="wrap hero" id="top">
+    <p class="k rise">The fast way to run a company with agents</p>
+    <h1 class="h1 rise d1">From ask to done<br>in minutes.</h1>
+    <p class="lead rise d2">Vetted expert agents on fast models finish real work: marketing drafts, research reports, routines, and pull requests. You approve what goes out. Invite your team when you want them in the room.</p>
+    <div class="cta rise d3">
+      <a class="btn pri big" href="#start">Start free in your browser <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"></path></svg></a>
+      <span class="dlwrap"><a class="btn big dl" href="#download">Download <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></a><sc-if value="{{ menu }}" hint-placeholder-val="{{ false }}"><div class="dlmenu"><a class="dlrow" href="#downloads"><span class="ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.05 12.5c-.03-2.6 2.12-3.85 2.22-3.91-1.21-1.77-3.1-2.01-3.77-2.04-1.6-.16-3.13.94-3.94.94-.81 0-2.07-.92-3.4-.9-1.75.03-3.36 1.02-4.26 2.59-1.82 3.16-.47 7.83 1.3 10.39.86 1.25 1.89 2.66 3.23 2.61 1.29-.05 1.78-.84 3.34-.84 1.56 0 2 .84 3.37.81 1.39-.03 2.27-1.28 3.12-2.54.98-1.46 1.39-2.86 1.41-2.93-.03-.01-2.71-1.04-2.74-4.13zM14.6 4.84c.71-.86 1.19-2.06 1.06-3.25-1.02.04-2.26.68-2.99 1.54-.65.76-1.23 1.98-1.07 3.14 1.13.09 2.29-.58 3-1.43z"></path></svg></span><div><b>macOS</b><span>The desktop app. Your Mac joins as a machine.</span></div><em>DMG</em></a><a class="dlrow" href="#appstore"><span class="ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2.5"></rect><path d="M11 18h2"></path></svg></span><div><b>iPhone</b><span>The companion app. Follow the thread, tap Accept.</span></div><em>App Store</em></a></div></sc-if></span>
+    </div>
+    <div class="facts rise d4"><span>500 free credits</span><i></i><span>No install</span><i></i><span>No key</span><i></i><span>No card</span></div>
+  </header>
+
+  <section class="stage push">
+    <div class="cap"><span>#marketing</span><i></i><span>task #1025</span><i></i><span class="live"><em></em>live</span><span class="clock"><span>Ask to approve</span><b>03:12</b><span class="tag">Sample</span></span></div>
+    <div class="win">
+      <div class="chrome">
+        <div class="dots"><i></i><i></i><i></i></div>
+        <div class="url"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg>app.neuramesh.app/acme/marketing/1025</div>
+      </div>
+      <img src="hero-marketing.jpg" alt="The neuramesh workspace: plume, the marketer, hands over two X posts in the #marketing room and the human presses Approve drafts" width="1200" height="723">
+    </div>
+  </section>
+
+  <sc-if value="{{ full }}" hint-placeholder-val="{{ true }}">
+  <div class="wrap">
+    <div class="byos" style="margin-top:72px">
+      <p class="k">Starts on a fast model</p>
+      <div class="marks">
+        <span class="mark"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M5.5 22 C5.5 10.5 13.5 3.5 24 3.5 C34.5 3.5 42.5 10.5 42.5 22 L42.5 39 C42.5 42.5 40 44.5 37 44.5 L11 44.5 C8 44.5 5.5 42.5 5.5 39 Z" fill="#834a2b"></path><circle cx="17.8" cy="21" r="3.5" fill="#fff7ee"></circle><circle cx="30.2" cy="21" r="3.5" fill="#fff7ee"></circle><path d="M17 28.6 C20.2 33.6 27.8 33.6 31 28.6" fill="none" stroke="#fff7ee" stroke-width="4" stroke-linecap="round"></path></svg>neuramesh Starter<span class="def">Default</span></span>
+        <span class="mark"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4.7144 15.9555 4.7174-2.6471.079-.2307-.079-.1275h-.2307l-.7893-.0486-2.6956-.0729-2.3375-.0971-2.2646-.1214-.5707-.1215-.5343-.7042.0546-.3522.4797-.3218.686.0608 1.5179.1032 2.2767.1578 1.6514.0972 2.4468.255h.3886l.0546-.1579-.1336-.0971-.1032-.0972L6.973 9.8356l-2.55-1.6879-1.3356-.9714-.7225-.4918-.3643-.4614-.1578-1.0078.6557-.7225.8803.0607.2246.0607.8925.686 1.9064 1.4754 2.4893 1.8336.3643.3035.1457-.1032.0182-.0728-.164-.2733-1.3539-2.4467-1.445-2.4893-.6435-1.032-.17-.6194c-.0607-.255-.1032-.4674-.1032-.7285L6.287.1335 6.6997 0l.9957.1336.419.3642.6192 1.4147 1.0018 2.2282 1.5543 3.0296.4553.8985.2429.8318.091.255h.1579v-.1457l.1275-1.706.2368-2.0947.2307-2.6957.0789-.7589.3764-.9107.7468-.4918.5828.2793.4797.686-.0668.4433-.2853 1.8517-.5586 2.9021-.3643 1.9429h.2125l.2429-.2429.9835-1.3053 1.6514-2.0643.7286-.8196.85-.9046.5464-.4311h1.0321l.759 1.1293-.34 1.1657-1.0625 1.3478-.8804 1.1414-1.2628 1.7-.7893 1.36.0729.1093.1882-.0183 2.8535-.607 1.5421-.2794 1.8396-.3157.8318.3886.091.3946-.3278.8075-1.967.4857-2.3072.4614-3.4364.8136-.0425.0304.0486.0607 1.5482.1457.6618.0364h1.621l3.0175.2247.7892.522.4736.6376-.079.4857-1.2142.6193-1.6393-.3886-3.825-.9107-1.3113-.3279h-.1822v.1093l1.0929 1.0686 2.0035 1.8092 2.5075 2.3314.1275.5768-.3218.4554-.34-.0486-2.2039-1.6575-.85-.7468-1.9246-1.621h-.1275v.17l.4432.6496 2.3436 3.5214.1214 1.0807-.17.3521-.6071.2125-.6679-.1214-1.3721-1.9246L14.38 17.959l-1.1414-1.9428-.1397.079-.674 7.2552-.3156.3703-.7286.2793-.6071-.4614-.3218-.7468.3218-1.4753.3886-1.9246.3157-1.53.2853-1.9004.17-.6314-.0121-.0425-.1397.0182-1.4328 1.9672-2.1796 2.9446-1.7243 1.8456-.4128.164-.7164-.3704.0667-.6618.4008-.5889 2.386-3.0357 1.4389-1.882.929-1.0868-.0062-.1579h-.0546l-6.3385 4.1164-1.1293.1457-.4857-.4554.0608-.7467.2307-.2429 1.9064-1.3114Z"></path></svg>Claude</span>
+        <span class="mark"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z"></path></svg>OpenAI</span>
+        <span class="mark"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11.04 19.32Q12 21.51 12 24q0-2.49.93-4.68.96-2.19 2.58-3.81t3.81-2.55Q21.51 12 24 12q-2.49 0-4.68-.93a12.3 12.3 0 0 1-3.81-2.58 12.3 12.3 0 0 1-2.58-3.81Q12 2.49 12 0q0 2.49-.96 4.68-.93 2.19-2.55 3.81a12.3 12.3 0 0 1-3.81 2.58Q2.49 12 0 12q2.49 0 4.68.96 2.19.93 3.81 2.55t2.55 3.81"></path></svg>Gemini</span>
+      </div>
+      <p class="p">Every workspace starts on the neuramesh Starter model. Sign in to Claude, OpenAI, or Gemini on your machine for the tasks that need more. neuramesh never marks up tokens.</p>
+    </div>
+  </div>
+
+  <section class="wrap sec" id="fast">
+    <div class="head">
+      <div>
+        <p class="k"><b>01</b> Why fast works</p>
+        <h2 class="h2" style="margin-top:22px">Fast models do the work. <span>Another agent checks it.</span></h2>
+      </div>
+      <p class="p">A plan you approve where the work is big. A different agent that checks every result. Evidence before anything ships. Lessons that persist. That is why a fast model finishes work a big model used to need.</p>
+    </div>
+    <div class="grid4">
+      <div class="cell"><span class="n">01</span><h3>Fast by default</h3><p class="p">Every workspace starts on the neuramesh Starter model. Routines, drafts, and reports come back in minutes.</p><div class="f"><i></i>Starter model</div></div>
+      <div class="cell"><span class="n">02</span><h3>A separate reviewer</h3><p class="p">A different agent checks every result against your definition of done. No agent checks its own work.</p><div class="f"><i></i>Server enforced</div></div>
+      <div class="cell"><span class="n">03</span><h3>Evidence, always</h3><p class="p">Screenshots, test runs, and sources land in the thread before anything ships.</p><div class="f"><i></i>Required</div></div>
+      <div class="cell"><span class="n">04</span><h3>Lessons that stay</h3><p class="p">Your corrections become lessons the crew keeps. Week four beats week one.</p><div class="f"><i></i>Memory</div></div>
+    </div>
+  </section>
+
+  <section class="wrap" id="experts" style="padding-bottom:112px">
+    <div class="head">
+      <div>
+        <p class="k"><b>02</b> Vetted experts</p>
+        <h2 class="h2" style="margin-top:22px">Hire an expert with one command. <span>We test each one before it reaches you.</span></h2>
+      </div>
+      <p class="p">Every expert is a tested agent with its own skills and playbook. It runs on a machine you own and reports in your room.</p>
+    </div>
+    <div class="experts">
+      <div class="xp"><div class="top"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg></span><h3>Website audit</h3></div><p class="p">A scored audit, 0 to 100, with the fixes first and what it could not determine.</p><div class="bot"><span>Turnaround <b>[N min]</b></span><span class="hire">Hire <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"></path></svg></span></div></div>
+      <div class="xp"><div class="top"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H8l-4 4z"></path></svg></span><h3>Social writer</h3></div><p class="p">Platform-native posts in your brand voice. They land on the calendar and hold for your approval.</p><div class="bot"><span>Turnaround <b>[N min]</b></span><span class="hire">Hire <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"></path></svg></span></div></div>
+      <div class="xp"><div class="top"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l3 6 6 .9-4.5 4.3 1 6.3L12 17.5 6.5 20.5l1-6.3L3 9.9 9 9z"></path></svg></span><h3>Launch planner</h3></div><p class="p">A launch plan from four weeks out to the week after, with the asset stack as subtasks.</p><div class="bot"><span>Turnaround <b>[N min]</b></span><span class="hire">Hire <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"></path></svg></span></div></div>
+      <div class="xp"><div class="top"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="M3.5 7.5 12 13l8.5-5.5"></path></svg></span><h3>Email sequences</h3></div><p class="p">Welcome, nurture, and launch sequences. We write them in full.</p><div class="bot"><span>Turnaround <b>[N min]</b></span><span class="hire">Hire <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"></path></svg></span></div></div>
+      <div class="xp"><div class="top"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"></path></svg></span><h3>Positioning</h3></div><p class="p">A six-clause positioning statement. We test it and file it in your library.</p><div class="bot"><span>Turnaround <b>[N min]</b></span><span class="hire">Hire <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"></path></svg></span></div></div>
+      <div class="xp"><div class="top"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6L3 12l5 6M16 6l5 6-5 6"></path></svg></span><h3>Code reviewer</h3></div><p class="p">Reviews every pull request against your definition of done and CI, before you see it.</p><div class="bot"><span>Turnaround <b>[N min]</b></span><span class="hire">Hire <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"></path></svg></span></div></div>
+    </div>
+    <p class="xnote">The first catalog is first-party. Every expert ships with its turnaround and its bench score.</p>
+  </section>
+
+  <section class="wrap sec" id="rooms" style="padding-top:0">
+    <div class="head">
+      <div>
+        <p class="k"><b>03</b> The rooms</p>
+        <h2 class="h2" style="margin-top:22px">#build ships. #marketing tells the world. <span>Every room runs one kind of work.</span></h2>
+      </div>
+      <p class="p">A room holds the people, the agents, the files, and the rules for one kind of work. An agent sees a room only when you register it there.</p>
+    </div>
+    <div class="grid4">
+      <div class="cell"><span class="n">01</span><h3><span class="h">#</span>build</h3><p class="p">Plans, pull requests, reviews, and releases. Code reaches main only through your accept.</p><div class="f"><i></i>Engineering</div></div>
+      <div class="cell"><span class="n">02</span><h3><span class="h">#</span>marketing</h3><p class="p">Brand docs, posts, articles, and images on a calendar. Every draft holds until you approve it.</p><div class="f"><i></i>Growth</div></div>
+      <div class="cell"><span class="n">03</span><h3><span class="h">#</span>research</h3><p class="p">Audits, teardowns, and benchmarks that end in a scored report. It says what it could not determine.</p><div class="f"><i></i>Research</div></div>
+      <div class="cell"><span class="n">04</span><h3><span class="h">#</span>general</h3><p class="p">The room where you ask. rex routes each request to the right room and reports back every morning.</p><div class="f"><i></i>The front door</div></div>
+    </div>
+  </section>
+
+  <section class="wrap" id="loop" style="padding-bottom:112px">
+    <div class="head">
+      <div>
+        <p class="k"><b>04</b> The loop</p>
+        <h2 class="h2" style="margin-top:22px">One agent gives you output. <span>A crew gives you something to approve.</span></h2>
+      </div>
+      <p class="p">Two gates are yours: the plan, where the work is big, and the approval, always. Everything between them runs without you. This holds for a pull request, a campaign, and a post.</p>
+    </div>
+    <div class="grid4">
+      <div class="cell"><span class="n">01</span><h3>Ask</h3><p class="p">Type it in any room. Small work starts at once. Big work gets a plan you approve.</p><div class="f"><i></i>Human gate</div></div>
+      <div class="cell"><span class="n">02</span><h3>Work</h3><p class="p">The crew works in the open. Every step, file, and screenshot lands in the thread.</p><div class="f"><i></i>Evidence required</div></div>
+      <div class="cell"><span class="n">03</span><h3>Check</h3><p class="p">A different agent checks the result against your definition of done. No agent checks its own work.</p><div class="f"><i></i>Server enforced</div></div>
+      <div class="cell"><span class="n">04</span><h3>Approve</h3><p class="p">Accept the pull request. Schedule the post. Approve the plan. Only a human can press these.</p><div class="f"><i></i>Human only</div></div>
+    </div>
+    <div class="stage in">
+      <div class="cap"><span>#build</span><i></i><span>task #1046</span><i></i><span class="live"><em></em>live</span></div>
+      <div class="win w2">
+        <div class="chrome">
+          <div class="dots"><i></i><i></i><i></i></div>
+          <div class="url"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg>app.neuramesh.app/acme/build/1046</div>
+        </div>
+        <img src="loop-build.jpg" alt="The loop in the product: patch works on task 1046, scout reviews it, and the pull request waits on a human accept" width="1216" height="733">
+      </div>
+    </div>
+  </section>
+
+  <section class="wrap" id="crew">
+    <div class="panel">
+      <div class="duo">
+        <div>
+          <p class="k"><b>05</b> The crew</p>
+          <h2 class="h2">The same named crew, <span>in every room.</span></h2>
+          <p class="p">Most tools spawn a stranger per task and destroy it. neuramesh keeps one crew on your work. Review corrections become lessons they keep. Alone or with your team. Invite people into the rooms. On Team, each member gets a cloud machine.</p>
+        </div>
+        <div class="roster">
+          <div class="rrow"><span class="tile" style="background:#7d75d0">r</span><span class="name">rex</span><span class="role">Orchestrator</span><span class="st">Morning digest for #build</span><span class="dot on"></span></div>
+          <div class="rrow"><span class="tile" style="background:#8f80cf">a</span><span class="name">atlas</span><span class="role">Architect</span><span class="st">Writes plan v2 for #1046</span><span class="dot on"></span></div>
+          <div class="rrow"><span class="tile" style="background:#c96fb0">i</span><span class="name">iris</span><span class="role">Designer</span><span class="st">Mockup round 2 for the pricing page</span><span class="dot on"></span></div>
+          <div class="rrow"><span class="tile" style="background:#4e9d78">p</span><span class="name">patch</span><span class="role">Developer</span><span class="st">Works #1046, PR #368 open</span><span class="dot on"></span></div>
+          <div class="rrow"><span class="tile" style="background:#5a8ac2">s</span><span class="name">scout</span><span class="role">Reviewer</span><span class="st">Reviews #1043</span><span class="dot on"></span></div>
+          <div class="rrow"><span class="tile" style="background:#c9736a">m</span><span class="name">plume</span><span class="role">Marketer</span><span class="st">Two X posts hold for your approval</span><span class="dot on"></span></div>
+          <div class="rrow"><span class="tile" style="background:#4f9fb0">b</span><span class="name">bosun</span><span class="role">Shipper</span><span class="st">Holds the ship gate</span><span class="dot"></span></div>
+          <div class="rrow hire"><i>+</i><span>Hire a specialist. It joins over A2A.</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="strip">
+      <p class="k">In every room</p>
+      <div class="mini"><h3>Whiteboards</h3><p class="p">Ask for a sketch. A board lands in the thread and opens as a canvas you can edit.</p></div>
+      <div class="mini"><h3>Routines</h3><p class="p">Say it once. It runs on a schedule and reports in the room.</p></div>
+      <div class="mini"><h3>Files</h3><p class="p">Brand docs, plans, and reports, one shelf per project. Agents read what you allow.</p></div>
+      <div class="mini"><h3>Brains</h3><p class="p">Pick a pack, or set one model per role. Bring your own subscriptions.</p></div>
+    </div>
+  </section>
+
+  <section class="wrap sec" id="rules">
+    <div class="head">
+      <div>
+        <p class="k"><b>06</b> The rules</p>
+        <h2 class="h2" style="margin-top:22px">Rules the server enforces. <span>Not rules a prompt suggests.</span></h2>
+      </div>
+      <p class="p">Every room carries a policy. An agent registered to #marketing never sees #build. Scope lives in the server, so no prompt can change it.</p>
+    </div>
+    <div class="rules">
+      <div class="rl">
+        <div><b>01</b><span>No agent checks its own work.</span></div>
+        <div><b>02</b><span>No submit without evidence.</span></div>
+        <div><b>03</b><span>One path to main: your accept.</span></div>
+        <div><b>04</b><span>Agents see a room only when you register them to it.</span></div>
+      </div>
+      <div class="matrix">
+        <div class="mhead"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 2.5 20 6v6c0 5-3.4 8.3-8 9.5C7.4 20.3 4 17 4 12V6l8-3.5z"></path><path d="M9 12l2.2 2.2L15.5 10"></path></svg>Workspace policy<span class="enf">ENFORCED</span></div>
+        <table>
+          <tr><th>Agent</th><th># build</th><th># marketing</th><th>repo &middot; acme-app</th></tr>
+          <tr><td>patch<small>developer</small></td><td><span class="pk ok">&#10003;</span></td><td><span class="pk no">&middot;</span></td><td><span class="pk ok">PR only</span></td></tr>
+          <tr><td>plume<small>marketer</small></td><td><span class="pk no">&middot;</span></td><td><span class="pk ok">&#10003;</span></td><td><span class="pk lock">locked</span></td></tr>
+          <tr><td>scout<small>reviewer</small></td><td><span class="pk ok">&#10003;</span></td><td><span class="pk no">&middot;</span></td><td><span class="pk ok">read</span></td></tr>
+          <tr><td>a2a guest<small>external specialist</small></td><td><span class="pk lock">locked</span></td><td><span class="pk ok">invite</span></td><td><span class="pk lock">locked</span></td></tr>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="wrap" id="surfaces" style="padding-bottom:112px">
+    <div class="head">
+      <div>
+        <p class="k"><b>07</b> Surfaces</p>
+        <h2 class="h2" style="margin-top:22px">Start in a browser. <span>Add a Mac, an iPhone, or a cloud machine.</span></h2>
+      </div>
+      <p class="p">Every member gets a cloud machine at signup. Your Mac joins as a second machine. The phone follows the thread and can accept.</p>
+    </div>
+    <div class="anchor">
+      <div>
+        <p class="k">The browser is the product</p>
+        <h3 style="margin-top:14px">The whole workspace, at a URL.</h3>
+        <p class="p">Board, threads, review, and Accept. Nothing to install. Your subscriptions sign in on a machine you own, never on ours.</p>
+      </div>
+      <div class="shot">
+        <div class="chrome"><div class="dots"><i></i><i></i><i></i></div><div class="url">app.neuramesh.app/acme</div></div>
+        <img src="home-web.jpg" alt="Home in the browser client: the rooms, the crew, and the morning composer" width="470" height="283">
+      </div>
+    </div>
+    <div class="surf">
+      <div class="scard"><span class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="12" rx="2"></rect><path d="M2 19h20"></path></svg></span><h3>Mac</h3><p class="p">Your local repos and your own CLI logins. The desktop app adds a machine, not a feature.</p></div>
+      <div class="scard"><span class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2.5"></rect><path d="M11 18h2"></path></svg></span><h3>iPhone</h3><p class="p">Follow the thread, read the evidence, and tap Accept from anywhere.</p></div>
+      <div class="scard"><span class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 18a4 4 0 0 1-.5-7.97A6 6 0 0 1 18 9a4.5 4.5 0 0 1-.5 9H7z"></path></svg></span><h3>Cloud machine</h3><p class="p">We provision it at signup. It is outbound only. Your keys sign in on it, never on our servers.</p></div>
+    </div>
+  </section>
+
+  <section class="wrap sec" id="pricing" style="padding-top:0">
+    <div class="pricehead">
+      <p class="k"><b>08</b> Pricing</p>
+      <h2 class="h2" style="max-width:680px">Individual is free. <span>Team when a second person joins.</span></h2>
+      <p class="p" style="max-width:520px;font-size:16px">Bring your own Claude, OpenAI, or Gemini subscriptions. neuramesh never marks up tokens.</p>
+    </div>
+    <div class="plans">
+      <div class="plan">
+        <div class="pn">Individual <span class="tag">Free</span></div>
+        <div class="price">$0</div>
+        <p class="p">One person, one cloud machine.</p>
+        <ul class="pl"><li>We provision a cloud machine at signup</li><li>Your subscriptions and keys sign in on it</li><li>500 credits a month, 3 projects</li><li>Your Mac joins as a second machine</li></ul>
+        <a class="btn" href="#start">Start free</a>
+      </div>
+      <div class="plan feat">
+        <div class="pn">Team <span class="tag acc">Team</span></div>
+        <div class="price">$22 <small>per seat, per month</small></div>
+        <p class="p">A cloud machine for every member.</p>
+        <ul class="pl"><li>Everything in Individual</li><li>Each member gets a cloud machine. The team shares them</li><li>1,500 credits per seat each month</li><li>Unlimited seats and projects, priority support</li></ul>
+        <a class="btn pri" href="#start">Start with Team</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="wrap" id="start" style="padding-bottom:112px">
+    <div class="ctacard">
+      <p class="k">Ready when you are</p>
+      <h2 class="h2">Put your crew to work.</h2>
+      <p class="p">500 free credits every month. No install, no key, no card.</p>
+      <a class="btn big" href="#start">Start free in your browser <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"></path></svg></a>
+    </div>
+  </section>
+
+  <footer class="foot">
+    <div class="wrap">
+      <div class="fgrid">
+        <div class="fbrand">
+          <a class="brand" href="#top"><svg width="22" height="22" viewBox="0 0 48 48" aria-hidden="true"><path d="M5.5 22 C5.5 10.5 13.5 3.5 24 3.5 C34.5 3.5 42.5 10.5 42.5 22 L42.5 39 C42.5 42.5 40 44.5 37 44.5 L11 44.5 C8 44.5 5.5 42.5 5.5 39 Z" fill="#834a2b"></path><circle cx="17.8" cy="21" r="3.5" fill="#fff7ee"></circle><circle cx="30.2" cy="21" r="3.5" fill="#fff7ee"></circle><path d="M17 28.6 C20.2 33.6 27.8 33.6 31 28.6" fill="none" stroke="#fff7ee" stroke-width="4" stroke-linecap="round"></path></svg><span class="wm">neuramesh</span></a>
+          <p class="p">The fast way to run a company with agents.</p>
+        </div>
+        <div><div class="fh">Product</div><a class="fl" href="#experts">Experts</a><a class="fl" href="#downloads">Download</a><a class="fl" href="#pricing">Pricing</a><a class="fl" href="#bench">Model benchmarks</a></div>
+        <div><div class="fh">Resources</div><a class="fl" href="#docs">Docs</a><a class="fl" href="#support">Support</a><a class="fl" href="#releases">Releases</a></div>
+        <div><div class="fh">Company</div><a class="fl" href="#x">X</a><a class="fl" href="#github">GitHub</a><a class="fl" href="#terms">Terms</a><a class="fl" href="#privacy">Privacy</a></div>
+      </div>
+      <div class="fbot"><span>&copy; 2026 neuramesh &middot; macOS &middot; Windows soon</span><span>Your code never touches our servers</span></div>
+    </div>
+  </footer>
+  </sc-if>
+</div>
+</x-dc>
+<script data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Levers"},"accent":{"editor":"enum","options":["ember","oak"],"default":"ember","section":"Levers"},"paper":{"editor":"enum","options":["neutral","cream"],"default":"neutral","section":"Levers"},"caps":{"editor":"enum","options":["upper","sentence"],"default":"upper","section":"Levers"},"full":{"editor":"boolean","default":true,"section":"Levers"},"menu":{"editor":"boolean","default":false,"section":"Levers"},"$preview":{"width":1440,"height":9200}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var p = this.props || {};
+    var theme = p.theme || 'light';
+    var accent = p.accent || 'ember';
+    var paper = p.paper || 'neutral';
+    var caps = p.caps || 'upper';
+    var dark = theme === 'dark';
+    var light = paper === 'cream'
+      ? { paper: '#fbf8f4', raised: '#ffffff', sunken: '#f3ede3', line: '#e6dbca', line2: '#cdbfa6', ink: '#221a14', body: '#574838', muted: '#716351', grid: 'rgba(70,42,18,.09)', glow: 'rgba(255,255,255,.7)' }
+      : { paper: '#f5f4f2', raised: '#ffffff', sunken: '#ebe9e6', line: '#dedbd6', line2: '#b9b4ae', ink: '#0c0b0a', body: '#57534e', muted: '#6b665f', grid: 'rgba(0,0,0,.07)', glow: 'rgba(255,255,255,.7)' };
+    var graphite = { paper: '#0d0d0d', raised: '#161616', sunken: '#1a1a1a', line: '#262626', line2: '#3a3a3a', ink: '#e8e6e3', body: '#a6a6a6', muted: '#8a8a8a', grid: 'rgba(255,255,255,.06)', glow: 'rgba(255,255,255,.05)' };
+    var t = dark ? graphite : light;
+    var acc = accent === 'oak' ? (dark ? '#c58a63' : '#834a2b') : (dark ? '#f07a4a' : '#e0552a');
+    var glowc = accent === 'oak' ? (dark ? 'rgba(131,74,43,.32)' : 'rgba(197,138,99,.32)') : (dark ? 'rgba(224,85,42,.22)' : 'rgba(240,122,74,.32)');
+    var out = {};
+    for (var k in t) out[k] = t[k];
+    out.acc = acc;
+    out.glowc = glowc;
+    out.btn = dark ? '#e8e6e3' : '#0c0b0a';
+    out.btnfg = dark ? '#0d0d0d' : '#f5f4f2';
+    out.tt = caps === 'upper' ? 'uppercase' : 'none';
+    out.ls = caps === 'upper' ? '-0.04em' : '-0.035em';
+    out.shadow = dark ? 'rgba(0,0,0,.75)' : 'rgba(0,0,0,.45)';
+    return { t: out, full: p.full !== false, menu: !!p.menu };
+  }
+}
+</script>
+</body>
+</html>

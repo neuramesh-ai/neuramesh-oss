@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Chat authorship — humans vs agents</title>
+<style>
+[data-theme] { --font:'Geist Variable',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; --fmono:'Geist Mono Variable',ui-monospace,'SF Mono',Menlo,monospace; }
+[data-theme='dark'] {
+  --bg:#1b1a18; --panel:#201f1c; --panel2:#272522; --panel3:#302e2b; --border:#2a2825; --border2:#383530;
+  --text:#d9d5ce; --body:#b7b4ac; --muted:#8f8a82; --dim:#6b675f;
+  --accent:#8fabd6; --accent-soft:#212a35; --role-orch:#9793d2; --role-dev:#77ac8d; --role-rev:#7ba1c4;
+  --hover-bg:color-mix(in srgb, var(--text) 6%, transparent); --shadow:rgba(0,0,0,.5); --done:#77ac8d;
+}
+[data-theme='cream-oak'] {
+  --bg:#f7efe2; --panel:#fffaf2; --panel2:#f4e7d6; --panel3:#ecdcc5; --border:#ecdfcd; --border2:#dbc6ad;
+  --text:#352a20; --body:#5c5040; --muted:#8a7969; --dim:#a8967f;
+  --accent:#5f6aa0; --accent-soft:#e7e6f2; --role-orch:#6a63bc; --role-dev:#3f9268; --role-rev:#4f7bb0;
+  --hover-bg:color-mix(in srgb, var(--text) 5%, transparent); --shadow:rgba(80,50,25,.16); --done:#0f9d63;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#131210; font-family:'Geist Variable',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; }
+.page { max-width:1500px; margin:0 auto; padding:34px 26px 60px; }
+.pagehead { color:#d9d5ce; margin-bottom:14px; }
+.pagehead h1 { font-size:19px; font-weight:650; letter-spacing:-.01em; }
+.pagehead p { color:#8f8a82; font-size:13px; line-height:1.55; margin-top:6px; max-width:80ch; }
+.themes { display:grid; grid-template-columns:1fr 1fr; gap:22px; }
+@media (max-width:1100px){ .themes { grid-template-columns:1fr; } }
+.theme { background:var(--bg); border:1px solid var(--border2); border-radius:16px; padding:20px 18px 24px; color:var(--text); }
+.theme > h2 { font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--dim); margin:0 4px 14px; }
+.scene > h3 { font-size:12.5px; font-weight:650; margin:20px 4px 4px; }
+.scene > .note { font-size:11.5px; color:var(--muted); line-height:1.55; margin:0 4px 10px; max-width:70ch; }
+
+/* ── faithful .msg chrome ── */
+.msgs { display:flex; flex-direction:column; gap:2px; background:var(--bg); border:1px solid var(--border); border-radius:12px; padding:14px 12px; }
+.msg { display:flex; gap:11px; padding:7px 10px; border-radius:9px; position:relative; }
+.av { width:26px; height:26px; min-width:26px; border-radius:6px; display:grid; place-items:center; font-weight:800; font-size:11px; color:var(--body); background:var(--panel3); box-shadow:inset 0 0 0 1px var(--border2); }
+.pav { width:26px; height:26px; min-width:26px; border-radius:8px; display:grid; place-items:center; font-size:14px; background:color-mix(in srgb, var(--rc) 16%, var(--panel)); box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--rc) 28%, transparent); }
+.body { min-width:0; flex:1; }
+.head { display:flex; align-items:center; gap:8px; }
+.head b { font-size:12.5px; }
+.rolechip { font-size:9px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; padding:1.5px 7px; border-radius:99px; color:var(--rc); background:color-mix(in srgb, var(--rc) 14%, transparent); }
+.time { font-size:10.5px; color:var(--dim); }
+.msg p { color:var(--body); font-size:13px; line-height:1.5; overflow-wrap:anywhere; margin-top:2px; }
+.digestchip { display:flex; align-items:center; gap:9px; margin-top:7px; padding:8px 11px; border:1px solid var(--border2); border-radius:10px; background:var(--panel); font-size:12px; color:var(--body); max-width:430px; }
+.digestchip .num { font-family:var(--fmono); font-weight:650; color:var(--text); font-size:11.5px; }
+.digestchip .st { font-size:9.5px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--role-rev); background:color-mix(in srgb, var(--role-rev) 13%, transparent); padding:1.5px 7px; border-radius:99px; }
+
+/* ── PROPOSED: human bubbles + own-message right alignment ── */
+.msg.human .body { flex:0 1 auto; max-width:min(560px, 82%); background:var(--hover-bg); border-radius:12px; padding:7px 12px 8px; }
+.msg.mine { flex-direction:row-reverse; }
+.msg.mine .body { background:color-mix(in srgb, var(--accent) 10%, transparent); }
+.msg.mine .head { justify-content:flex-end; }
+/* variant B: tint only (no realign) — shown in its own strip */
+.msg.b-human .body { flex:1; max-width:none; background:var(--hover-bg); border-radius:12px; padding:7px 12px 8px; }
+.msg.b-mine .body { background:color-mix(in srgb, var(--accent) 10%, transparent); }
+
+.sem { display:flex; gap:7px; align-items:flex-start; margin:9px 4px 0; font-size:11px; color:var(--muted); line-height:1.5; max-width:72ch; }
+.sem .dot { width:6px; height:6px; border-radius:99px; margin-top:4px; flex:none; background:var(--done); }
+.pick { font-size:10px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--done); margin:0 4px; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="pagehead">
+    <h1>Chat authorship — humans read differently from agents</h1>
+    <p>Agents are the room's workforce: their digests, cards, and reports stay full-width on the plain canvas.
+    Human messages become quiet bubbles — <b>your own</b> messages sit right-aligned with an accent-tinted bubble,
+    other people's stay left with a neutral tint. Alignment carries the "mine vs theirs" signal; the tint carries
+    "human vs agent". No layout change for anything an agent posts.</p>
+  </div>
+  <div class="themes">
+    <div class="theme" data-theme="dark"><h2>Claude-warm dark</h2></div>
+    <div class="theme" data-theme="cream-oak"><h2>Cream-oak light</h2></div>
+  </div>
+</div>
+<script>
+const scenes = `
+<div class="scene">
+  <h3>A — bubbles + own-right alignment</h3><span class="pick">✓ recommended</span>
+  <div class="note" style="margin-top:4px">Self = accent tint, right; other humans = neutral tint, left; agents = unchanged.</div>
+  <div class="msgs">
+    <div class="msg"><span class="pav" style="--rc:var(--role-orch)">🦊</span><div class="body">
+      <div class="head"><b>rex</b><span class="rolechip" style="--rc:var(--role-orch)">orchestrator</span><span class="time">09:41</span></div>
+      <p>On it. Decomposed into one task with acceptance criteria and fanned it out to patch:</p>
+      <div class="digestchip"><span class="num">#1046</span><span>Mobile nav: drawer + focus management</span><span class="st">in review</span></div>
+    </div></div>
+    <div class="msg human mine"><span class="av">G</span><div class="body">
+      <div class="head"><b>geo (you)</b><span class="time">09:42</span></div>
+      <p>@rex anything on the backlog?</p>
+    </div></div>
+    <div class="msg human"><span class="av">M</span><div class="body">
+      <div class="head"><b>maria</b><span class="time">09:43</span></div>
+      <p>fwiw the drawer bug also repros on iPad Safari — adding it to the thread.</p>
+    </div></div>
+    <div class="msg"><span class="pav" style="--rc:var(--role-orch)">🦊</span><div class="body">
+      <div class="head"><b>rex</b><span class="rolechip" style="--rc:var(--role-orch)">orchestrator</span><span class="time">09:44</span></div>
+      <p>Posted. Board is otherwise clean — <b>#1008</b> accepted, <b>#1009</b> flagged to close as a duplicate. Nothing else is stuck, unanswered, or awaiting routing.</p>
+    </div></div>
+    <div class="msg human mine"><span class="av">G</span><div class="body">
+      <div class="head"><b>geo (you)</b><span class="time">09:45</span></div>
+      <p>perfect — close it. and let's get the retro scheduled for friday morning, patch's focus-trap writeup should be the centerpiece</p>
+    </div></div>
+  </div>
+  <div class="sem"><span class="dot"></span><span>Scanning for "what did the humans decide" is now a glance at the tinted right edge. Agent digests keep their full width for cards and reports; the hover toolbar flips to the left on your own rows so it never covers the avatar.</span></div>
+</div>
+<div class="scene">
+  <h3>B — tint only, no realignment (calmer, Slack-like)</h3>
+  <div class="note" style="margin-top:4px">Same tints, everything stays left + full width. Quieter, but "mine" no longer pops at a glance.</div>
+  <div class="msgs">
+    <div class="msg"><span class="pav" style="--rc:var(--role-orch)">🦊</span><div class="body">
+      <div class="head"><b>rex</b><span class="rolechip" style="--rc:var(--role-orch)">orchestrator</span><span class="time">09:44</span></div>
+      <p>Posted. Board is otherwise clean.</p>
+    </div></div>
+    <div class="msg b-human b-mine"><span class="av">G</span><div class="body">
+      <div class="head"><b>geo (you)</b><span class="time">09:45</span></div>
+      <p>perfect — close it.</p>
+    </div></div>
+    <div class="msg b-human"><span class="av">M</span><div class="body">
+      <div class="head"><b>maria</b><span class="time">09:46</span></div>
+      <p>+1, and the iPad repro is in the thread.</p>
+    </div></div>
+  </div>
+</div>`;
+document.querySelectorAll('.theme').forEach((t) => t.insertAdjacentHTML('beforeend', scenes));
+</script>
+</body>
+</html>

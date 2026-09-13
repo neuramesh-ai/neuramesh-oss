@@ -1,0 +1,122 @@
+# applies the cluster-scoped statics + the operator Deployment to the prd cluster —
+# config-as-code for everything under infra/k8s/cluster. same loud-skip contract as
+# infra.yml. the one hand-applied object is the nm-fleet-secret (rollout.md runbook);
+# this workflow never touches secrets.
+name: fleet deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - infra/k8s/cluster/**
+      - .github/workflows/fleet-deploy.yml
+  workflow_dispatch:
+
+concurrency:
+  group: fleet-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  not-configured:
+    name: "SKIPPED — WIF not configured (see infra/README.md bootstrap)"
+    if: github.repository == 'alonge-dev/neuramesh' && vars.GCP_WIF_PROVIDER == ''
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "::warning::fleet-deploy pipeline is NOT running — GCP_WIF_PROVIDER repo variable is unset."
+
+  apply:
+    name: kubectl apply -k overlays/gke
+    if: github.repository == 'alonge-dev/neuramesh' && vars.GCP_WIF_PROVIDER != ''
+    runs-on: ubuntu-latest
+    # the pre-pull step below can provision a node and import an image, which is minutes
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to GCP (WIF, keyless)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOYER_SA }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+        with:
+          install_components: gke-gcloud-auth-plugin
+
+      - name: Apply cluster statics + operator
+        run: |
+          gcloud container clusters get-credentials nm-fleet --region us-east4 --project neuramesh-prd
+          # captured BEFORE the apply so the pre-pull step can tell a real image roll from an
+          # infra-only deploy and skip the node churn on the latter
+          echo "before=$(kubectl -n nm-system get deploy nm-fleet \
+            -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="FLEET_MACHINE_IMAGE")].value}' \
+            2>/dev/null)" >> "$GITHUB_ENV"
+          kubectl apply -k infra/k8s/cluster/overlays/gke
+          # the operator only converges once nm-fleet-secret exists (hand-applied; rollout.md)
+          if kubectl -n nm-system get secret nm-fleet-secret >/dev/null 2>&1; then
+            kubectl -n nm-system rollout status deploy/nm-fleet --timeout=300s
+          else
+            echo "::warning::nm-fleet-secret is not applied yet — the operator will CrashLoop until it exists (see rollout.md runbook)"
+          fi
+
+      # WARM THE IMAGE BEFORE A PERSON DOES (2026-08-29).
+      #
+      # GKE Image Streaming does not stream a tag it has not imported yet. The first pod to pull a
+      # NEW tag blocks on that regional import: measured 1m23s with ERROR_IMAGE_LAYERS_NOT_AVAILABLE
+      # in the events, against 4.1s for the very same image on a later node. So the cost is not
+      # "the image is big", it is "somebody has to be first" — and today that somebody is a user
+      # whose agent went quiet for an extra minute and a half after every fleet roll.
+      #
+      # This makes CI be first. The import is per-image and REGIONAL, so one pull anywhere in
+      # us-east4 warms it for every workspace; there is no need to touch each node, and no point
+      # pinning a zone, because Autopilot reclaims the empty node ~9s later and its local cache
+      # dies with it. Only the regional import survives, and the regional import is the slow part.
+      #
+      # runtimeClassName matches the workspace pod, so this also proves the pinned image actually
+      # STARTS under gVisor. NEVER FAILS THE DEPLOY: the image is already applied and serving by
+      # this point, so a pre-pull that cannot run is a slower first start, not a broken fleet.
+      - name: Pre-pull the machine image (warms the regional GCFS import)
+        run: |
+          after=$(kubectl -n nm-system get deploy nm-fleet \
+            -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="FLEET_MACHINE_IMAGE")].value}')
+          # an empty $before is a first-ever deploy: no prior image, so nothing to compare and
+          # everything to warm
+          if [ -n "$before" ] && [ "$after" = "$before" ]; then
+            echo "machine image unchanged ($after) — already imported, nothing to warm"; exit 0
+          fi
+          job="nm-prepull-$(echo "$after" | sed 's/.*://' | cut -c1-12)"
+          echo "warming $after as job/$job"
+          kubectl -n nm-system delete job "$job" --ignore-not-found
+          kubectl apply -f - <<EOF
+          apiVersion: batch/v1
+          kind: Job
+          metadata:
+            name: $job
+            namespace: nm-system
+          spec:
+            backoffLimit: 1
+            ttlSecondsAfterFinished: 120
+            activeDeadlineSeconds: 900
+            template:
+              spec:
+                restartPolicy: Never
+                runtimeClassName: gvisor
+                containers:
+                  - name: prepull
+                    image: $after
+                    command: ["/bin/true"]
+                    resources:
+                      requests: { cpu: 250m, memory: 512Mi }
+          EOF
+          if kubectl -n nm-system wait --for=condition=complete "job/$job" --timeout=900s; then
+            echo "image warmed — the next cold start streams instead of importing"
+          else
+            echo "::warning::pre-pull did not complete; the first workspace to use $after pays the import (~80s). The fleet itself is fine."
+            kubectl -n nm-system describe "job/$job" | tail -20 || true
+          fi
+          kubectl -n nm-system delete job "$job" --ignore-not-found

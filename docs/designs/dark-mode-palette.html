@@ -1,0 +1,644 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>NeuraMesh · palette study — Graphite + its light sibling</title>
+<style>
+/* ══════════════════════════════════════════════════════════════════════════════
+   MOCKUP CHROME — not app CSS. The frames below use the real tokens.css rules.
+   ══════════════════════════════════════════════════════════════════════════ */
+* { margin:0; padding:0; box-sizing:border-box; }
+:root {
+  --fbody: 'Geist Variable','Geist',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --fmono: 'Geist Mono Variable','Geist Mono',ui-monospace,'SF Mono',Menlo,monospace;
+  --dur-fast:.12s; --dur:.18s; --ease:cubic-bezier(.21,.61,.35,1);
+  --r-xs:4px; --r-sm:6px; --r-md:8px; --r-lg:11px; --r-xl:14px; --r-full:999px;
+  --shell-gap:8px;
+}
+body { background:#08080a; color:#c9c9cf; font:13px/1.5 var(--fbody); -webkit-font-smoothing:antialiased; padding:0 0 80px; }
+
+.page { max-width:1580px; margin:0 auto; padding:0 26px; }
+.masthead { padding:44px 0 8px; }
+.masthead h1 { font-size:26px; font-weight:650; letter-spacing:-.015em; color:#f2f2f4; }
+.masthead p { margin-top:9px; font-size:13.5px; color:#8b8b93; max-width:80ch; line-height:1.65; }
+.masthead b { color:#d9d9de; font-weight:600; }
+.masthead .meta { margin-top:14px; font:600 10px var(--fmono); letter-spacing:.13em; text-transform:uppercase; color:#5c5c66; }
+code { font:600 12px var(--fmono); color:#b9b9c2; }
+
+h2.sec { font-size:11px; font-weight:700; letter-spacing:.13em; text-transform:uppercase; color:#6a6a74; margin:52px 0 4px; }
+h2.sec + .lede { font-size:13px; color:#8b8b93; margin-bottom:20px; max-width:82ch; line-height:1.6; }
+
+/* the pairing board */
+.pairs { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin:22px 0 4px; }
+.pair { border:1px solid #1e1e24; border-radius:14px; padding:16px 17px; background:#0d0d11; }
+.pair .ph { display:flex; align-items:baseline; gap:9px; margin-bottom:11px; }
+.pair .ph b { font-size:13.5px; color:#f0f0f3; }
+.pair .ph span { font:700 9px var(--fmono); letter-spacing:.11em; text-transform:uppercase; color:#5c5c66; }
+.slot { display:flex; align-items:center; gap:12px; padding:10px 0; border-top:1px solid #17171c; }
+.slot:first-of-type { border-top:none; }
+.slot .chips { display:flex; gap:3px; flex:none; }
+.slot .chips i { width:17px; height:30px; display:block; border:1px solid rgba(255,255,255,.09); }
+.slot .chips i:first-child { border-radius:5px 0 0 5px; }
+.slot .chips i:last-child { border-radius:0 5px 5px 0; }
+.slot .tx { flex:1; min-width:0; }
+.slot .tx b { display:block; font-size:12.5px; color:#e6e6ea; }
+.slot .tx span { display:block; font-size:11.5px; color:#7c7c86; margin-top:1px; line-height:1.45; }
+
+/* sticky control rail */
+.rail { position:sticky; top:0; z-index:80; background:rgba(8,8,10,.93); backdrop-filter:blur(14px); border-bottom:1px solid #1a1a1f; margin:0 -26px; padding:11px 26px; display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
+.rail .lbl { font:700 9.5px var(--fmono); letter-spacing:.13em; text-transform:uppercase; color:#5c5c66; margin:0 2px 0 0; }
+.rail .div { width:1px; height:20px; background:#22222a; margin:0 7px; }
+.rail .sp { flex:1; }
+.opt { display:inline-flex; align-items:center; gap:7px; padding:6px 12px; border-radius:999px; border:1px solid #26262c; background:#111115; color:#9a9aa3; font:600 12px var(--fbody); cursor:pointer; transition:all .14s var(--ease); white-space:nowrap; }
+.opt:hover { color:#e8e8ea; border-color:#3a3a44; }
+.opt.on { color:#0a0a0c; background:#e9e9ec; border-color:#e9e9ec; }
+.opt .dot { width:11px; height:11px; border-radius:3px; border:1px solid rgba(255,255,255,.16); flex:none; }
+.opt.on .dot { border-color:rgba(0,0,0,.22); }
+.opt .star { font-size:10px; color:#7ec9a4; }
+.opt.on .star { color:#1c7d52; }
+
+/* frames */
+.frames { display:grid; gap:22px; margin-top:20px; }
+.frames.split { grid-template-columns:1fr 1fr; }
+.fwrap { min-width:0; }
+.fcap { display:flex; align-items:baseline; gap:10px; margin-bottom:9px; }
+.fcap b { font-size:13px; font-weight:650; color:#e6e6ea; }
+.fcap span { font:600 10px var(--fmono); letter-spacing:.09em; text-transform:uppercase; color:#5c5c66; }
+.fcap em { font-style:normal; font-size:11.5px; color:#7c7c86; margin-left:auto; }
+
+.win { border-radius:12px; overflow:hidden; border:1px solid #26262c; box-shadow:0 30px 70px -30px rgba(0,0,0,.9); }
+.wintitle { height:30px; display:flex; align-items:center; gap:8px; padding:0 12px; font-size:11.5px; }
+.lights { display:flex; gap:6px; }
+.lights i { width:11px; height:11px; border-radius:99px; display:block; }
+
+/* token table */
+.tbl { width:100%; border-collapse:collapse; font-size:12.5px; margin-top:6px; }
+.tbl th { text-align:left; font:700 9.5px var(--fmono); letter-spacing:.11em; text-transform:uppercase; color:#5c5c66; padding:0 12px 9px 0; border-bottom:1px solid #1e1e24; white-space:nowrap; }
+.tbl td { padding:8px 12px 8px 0; border-bottom:1px solid #141419; vertical-align:middle; }
+.tbl td.k { font:600 12px var(--fmono); color:#b6b6be; white-space:nowrap; }
+.tbl td.note { color:#7c7c86; font-size:12px; line-height:1.5; }
+.sw { display:inline-flex; align-items:center; gap:8px; font:600 11.5px var(--fmono); color:#9a9aa3; white-space:nowrap; }
+.sw i { width:22px; height:16px; border-radius:4px; border:1px solid rgba(255,255,255,.13); display:block; flex:none; }
+.arrow { color:#4e4e58; padding:0 2px; }
+tr.big td { background:linear-gradient(90deg,rgba(255,255,255,.035),transparent); }
+
+.callouts { display:grid; grid-template-columns:repeat(auto-fit,minmax(290px,1fr)); gap:14px; margin-top:18px; }
+.co { border:1px solid #1e1e24; border-radius:12px; padding:15px 16px; background:#0d0d11; }
+.co b { display:block; font-size:12.5px; color:#e6e6ea; margin-bottom:6px; }
+.co p { font-size:12.5px; color:#83838d; line-height:1.6; }
+.co code { font-size:11.5px; background:#17171d; padding:1px 5px; border-radius:4px; }
+.co em { font-style:normal; color:#a8a8b0; }
+
+.ramp { display:flex; border-radius:9px; overflow:hidden; border:1px solid #24242a; margin:10px 0 4px; }
+.ramp div { flex:1; height:54px; display:flex; align-items:flex-end; justify-content:center; padding-bottom:6px; font:600 9.5px var(--fmono); letter-spacing:.04em; }
+
+.pill { display:inline-block; font:700 9px var(--fmono); letter-spacing:.09em; text-transform:uppercase; padding:2px 7px; border-radius:4px; border:1px solid; }
+.pill.rec { color:#7ec9a4; border-color:rgba(126,201,164,.4); background:rgba(126,201,164,.09); }
+.pill.alt { color:#8b8b93; border-color:#2a2a32; }
+
+@media (max-width:1100px){ .frames.split, .pairs { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <div class="masthead">
+    <h1>The four themes, paired</h1>
+    <p><b>Graphite</b> is the pick for dark. This adds the other half of the question: the light side. Nothing about the dark change touches the light themes — they're separate blocks in <code>tokens.css</code>, so <b>Light</b> and <b>Cream&nbsp;Oak</b> ship exactly as they are today unless you also move them. But Graphite leaves Light without a partner: one family got crisper, the other didn't. <b>Paper</b> is Light run through the same derivation as Graphite — anchor the dominant plane, tighten the steps, let borders carry the edges — mirrored toward white instead of black.</p>
+    <div class="meta">Every frame is the real tokens.css rules · only the theme variable block changes</div>
+  </div>
+
+  <div class="pairs">
+    <div class="pair">
+      <div class="ph"><b>Dark family</b><span>one crisp · one soft</span></div>
+      <div class="slot">
+        <span class="chips"><i style="background:#101010"></i><i style="background:#161616"></i><i style="background:#1c1c1c"></i><i style="background:#272727"></i></span>
+        <span class="tx"><b>Graphite <span class="pill rec">new default</span></b><span>Near-black ground, tight ladder, borders do the separating.</span></span>
+      </div>
+      <div class="slot">
+        <span class="chips"><i style="background:#232323"></i><i style="background:#272727"></i><i style="background:#2e2e2e"></i><i style="background:#383838"></i></span>
+        <span class="tx"><b>Soft Dark <span class="pill alt">unchanged</span></b><span>The lifted, gentler dark. Finally distinct now that Graphite moved away from it.</span></span>
+      </div>
+    </div>
+    <div class="pair">
+      <div class="ph"><b>Light family</b><span>one crisp · one warm</span></div>
+      <div class="slot">
+        <span class="chips"><i style="background:#fffefc"></i><i style="background:#f8f6f1"></i><i style="background:#efece5"></i><i style="background:#e2ded4"></i></span>
+        <span class="tx"><b>Paper <span class="pill rec">proposed</span></b><span>Near-white ground, darker edges, crisper ink — Graphite's move mirrored.</span></span>
+      </div>
+      <div class="slot">
+        <span class="chips"><i style="background:#f7efe2"></i><i style="background:#fffaf2"></i><i style="background:#f4e7d6"></i><i style="background:#ecdcc5"></i></span>
+        <span class="tx"><b>Cream Oak <span class="pill alt">unchanged</span></b><span>The warm signature light. Stays the soft option, exactly as Soft Dark does.</span></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="rail">
+    <span class="lbl">Dark</span>
+    <button class="opt" data-theme="dark"><i class="dot" style="background:#282828"></i>Current dark</button>
+    <button class="opt on" data-theme="graphite"><i class="dot" style="background:#1c1c1c"></i>Graphite<span class="star">★</span></button>
+    <button class="opt" data-theme="ink"><i class="dot" style="background:#151515"></i>Ink</button>
+    <button class="opt" data-theme="void"><i class="dot" style="background:#0d0d0d"></i>Void</button>
+    <button class="opt" data-theme="soft-dark"><i class="dot" style="background:#2e2e2e"></i>Soft dark</button>
+    <span class="div"></span>
+    <span class="lbl">Light</span>
+    <button class="opt" data-theme="light"><i class="dot" style="background:#f0eee8"></i>Current light</button>
+    <button class="opt" data-theme="paper"><i class="dot" style="background:#f8f6f1"></i>Paper<span class="star">★</span></button>
+    <button class="opt" data-theme="cream-oak"><i class="dot" style="background:#f4e7d6"></i>Cream oak</button>
+    <span class="sp"></span>
+    <button class="opt" id="splitbtn">◧ Side by side vs current</button>
+  </div>
+
+  <h2 class="sec">Scene 1 — Home</h2>
+  <div class="lede">The screen from your screenshot: window backdrop, nav panel, the floating main well, the composer. <code>--panel2</code> covers roughly half the pixels, which is why it's the token that decides how a theme "reads".</div>
+  <div class="frames" id="frames1"></div>
+
+  <h2 class="sec">Scene 2 — Thread</h2>
+  <div class="lede">Where the dependent tokens live: a floating popover, a code block, status chips, role-tinted avatars, the accept button. Each was tuned against its theme's old ground.</div>
+  <div class="frames" id="frames2"></div>
+
+  <h2 class="sec">The surface ladders</h2>
+  <div class="lede">Both families make the same move in opposite directions: shift the whole ladder ~12 points away from mid, keep the step sizes, and widen the gap between the ground and its border so edges stay crisp on a flatter surface.</div>
+  <div id="ramps"></div>
+
+  <h2 class="sec">Token diff</h2>
+  <div class="lede">Shaded rows carry the change. Every FSM colour, role colour and link stays exactly as shipped in both families — only greys move.</div>
+  <div id="difftbls"></div>
+
+  <h2 class="sec">What breaks in each direction</h2>
+  <div class="callouts">
+    <div class="co"><b>Dark · code blocks invert</b><p><code>--code: #131313</code> was <em>darker</em> than every panel. At Graphite it lands <em>lighter</em> than <code>--panel2</code> and every code block becomes a glowing slab. Drops to <code>#0a0a0a</code>.</p></div>
+    <div class="co"><b>Dark · popovers lose their float</b><p><code>--overlay: var(--panel)</code> works because shadows read on grey. On a near-black ground <code>rgba(0,0,0,.5)</code> is invisible. Fix: <code>--overlay</code> becomes its own <em>lifted</em> surface — elevation from light, not shade.</p></div>
+    <div class="co"><b>Light · overlays are already fine</b><p>Worth being straight about this: a dark shadow reads perfectly well on light paper, so light has no elevation problem to fix. Paper's <code>--overlay: #ffffff</code> is a one-point crispness nudge, not a repair — the dark-side <code>--overlay</code> change is the load-bearing one.</p></div>
+    <div class="co"><b>Light · edges go mushy if borders follow</b><p>Brightening the ground without darkening the borders flattens every panel into the backdrop. Paper lifts the surfaces <em>and</em> pulls <code>--border2</code> down (<code>#d6cfc4</code> → <code>#cec5b7</code>), so edge contrast goes up, not down.</p></div>
+    <div class="co"><b>Both · tint washes drift</b><p><code>--green-soft</code> and <code>--violet-soft</code> were mixed against the old ground. Unchanged, they'd read too bright in dark and too dull in light. Both re-mix with the ladder.</p></div>
+    <div class="co"><b>Dark · the launch flash</b><p>Electron's <code>backgroundColor: '#121212'</code> is hardcoded in <code>main/index.ts</code> and never tracked the theme. It happens to be right for Graphite — worth pinning deliberately rather than by luck.</p></div>
+  </div>
+
+  <h2 class="sec">If you'd rather not touch light at all</h2>
+  <div class="lede" style="margin-bottom:0">Entirely reasonable — Light is not broken, and shipping Graphite alone is a smaller, lower-risk change. The cost is only that the two families stop rhyming: dark gets a crisp/soft pair, light keeps a warm/warmer one. Flip between <b style="color:#d9d9de">Graphite</b> and <b style="color:#d9d9de">Current light</b> above to judge whether that bothers you.</div>
+
+</div>
+
+<script>
+/* ══════════════════════════════════════════════════════════════════════════════
+   PALETTES — each is the exact [data-theme='…'] block that would land in
+   tokens.css (and mirror into client-core/src/tokens.ts).
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* functional colour is untouched by this study — three sets, one per existing family */
+const H_DARK = {
+  link:'#9cb1f0', green:'#77ac8d', violet:'#a89ccf',
+  todo:'#949494', prog:'#8ba0c0', review:'#a89ccf', done:'#77ac8d', acc:'#6fb0ab',
+  ship:'#7cb0bd', rel:'#74b19c', verif:'#6fb3a4', closed:'#727272', blocked:'#9ca0a8',
+  plan:'#7fa5ab', design:'#cc8fb9', backlog:'#8f9aa6',
+  roleOrch:'#9793d2', roleArch:'#a89ccf', roleDev:'#77ac8d', roleRev:'#7ba1c4',
+  roleDesign:'#cc8fb9', roleCur:'#6fb0ab', roleShip:'#7cb0bd', roleMkt:'#c98f8f',
+};
+const H_LIGHT = {
+  link:'#4a5ec9', green:'#2f9e6b', violet:'#7d6cc4',
+  todo:'#7d8590', prog:'#4f80c4', review:'#6d5ce0', done:'#2f9e6b', acc:'#2f8f8a',
+  ship:'#1f7f96', rel:'#22997d', verif:'#279183', closed:'#8a847a', blocked:'#7c7f88',
+  plan:'#2c7d88', design:'#b0498f', backlog:'#5d6b7a',
+  roleOrch:'#635fc0', roleArch:'#7d6cc4', roleDev:'#3f9268', roleRev:'#4f7bb0',
+  roleDesign:'#b0498f', roleCur:'#2f8f8a', roleShip:'#1f7f96', roleMkt:'#a85a5a',
+};
+const H_CREAM = { ...H_LIGHT, link:'#5348c0', done:'#0f9d63', closed:'#897a60', roleOrch:'#6a63bc', roleMkt:'#b04f55' };
+
+const P = {
+  /* ── dark family ── */
+  dark: {
+    label:'Current dark', group:'dark', hues:H_DARK, tone:'16%',
+    bg:'#1d1d1d', panel:'#222222', panel2:'#282828', panel3:'#323232',
+    border:'#2c2c2c', border2:'#3a3a3a',
+    text:'#e6e6e6', body:'#b9b9b9', muted:'#8f8f8f', dim:'#6b6b6b',
+    accentInk:'#141414', btn:'#313131', btnFg:'#ebebeb', btnHover:'#3c3c3c',
+    greenSoft:'#1e2a20', violetSoft:'#232035',
+    shadow:'rgba(0,0,0,0.5)', code:'#131313', codeink:'#e8e8e8', overlay:'#222222',
+    card:'#232323', cardBorder:'#313131',
+    ring:'#575757', hoverBorder:'#464646', hoverBg:'6%', selBg:'9%',
+  },
+  graphite: {
+    label:'Graphite', group:'dark', hues:H_DARK, tone:'17%', pick:true,
+    bg:'#101010', panel:'#161616', panel2:'#1c1c1c', panel3:'#272727',
+    border:'#252525', border2:'#333333',
+    text:'#eaeaea', body:'#b6b6b6', muted:'#898989', dim:'#676767',
+    accentInk:'#101010', btn:'#232323', btnFg:'#efefef', btnHover:'#2e2e2e',
+    greenSoft:'#16241a', violetSoft:'#1c1936',
+    shadow:'rgba(0,0,0,0.62)', code:'#0a0a0a', codeink:'#e8e8e8', overlay:'#202020',
+    card:'#1a1a1a', cardBorder:'#2a2a2a',
+    ring:'#525252', hoverBorder:'#404040', hoverBg:'7%', selBg:'10%',
+  },
+  ink: {
+    label:'Ink', group:'dark', hues:H_DARK, tone:'18%',
+    bg:'#0a0a0a', panel:'#101010', panel2:'#151515', panel3:'#202020',
+    border:'#1f1f1f', border2:'#2c2c2c',
+    text:'#ededed', body:'#b4b4b4', muted:'#868686', dim:'#636363',
+    accentInk:'#0a0a0a', btn:'#1e1e1e', btnFg:'#f0f0f0', btnHover:'#292929',
+    greenSoft:'#101c14', violetSoft:'#171432',
+    shadow:'rgba(0,0,0,0.72)', code:'#050505', codeink:'#e8e8e8', overlay:'#191919',
+    card:'#141414', cardBorder:'#252525',
+    ring:'#4d4d4d', hoverBorder:'#3b3b3b', hoverBg:'7%', selBg:'10%',
+  },
+  void: {
+    label:'Void', group:'dark', hues:H_DARK, tone:'19%',
+    bg:'#000000', panel:'#070707', panel2:'#0d0d0d', panel3:'#1a1a1a',
+    border:'#191919', border2:'#292929',
+    text:'#f0f0f0', body:'#b2b2b2', muted:'#848484', dim:'#606060',
+    accentInk:'#000000', btn:'#171717', btnFg:'#f2f2f2', btnHover:'#232323',
+    greenSoft:'#0b1810', violetSoft:'#12102c',
+    shadow:'rgba(0,0,0,0.85)', code:'#000000', codeink:'#ececec', overlay:'#141414',
+    card:'#0e0e0e', cardBorder:'#202020',
+    ring:'#494949', hoverBorder:'#383838', hoverBg:'8%', selBg:'11%',
+  },
+  'soft-dark': {
+    label:'Soft dark (unchanged)', group:'dark', hues:H_DARK, tone:'17%',
+    bg:'#232323', panel:'#272727', panel2:'#2e2e2e', panel3:'#383838',
+    border:'#313131', border2:'#414141',
+    text:'#ececec', body:'#c2c2c2', muted:'#979797', dim:'#737373',
+    accentInk:'#141414', btn:'#373737', btnFg:'#f0f0f0', btnHover:'#424242',
+    greenSoft:'#243026', violetSoft:'#282240',
+    shadow:'rgba(0,0,0,0.42)', code:'#171717', codeink:'#ededed', overlay:'#272727',
+    card:'#2b2b2b', cardBorder:'#383838',
+    ring:'#5f5f5f', hoverBorder:'#4c4c4c', hoverBg:'6%', selBg:'9%',
+  },
+
+  /* ── light family ── */
+  light: {
+    label:'Current light', group:'light', hues:H_LIGHT, tone:'13%',
+    bg:'#f4f2ed', panel:'#fbfaf7', panel2:'#f0eee8', panel3:'#e8e5df',
+    border:'#e7e2da', border2:'#d6cfc4',
+    text:'#38332d', body:'#585249', muted:'#8a847a', dim:'#a59e93',
+    accentInk:'#ffffff', btn:'#eae7e0', btnFg:'#38332d', btnHover:'#e0dcd3',
+    greenSoft:'#e2f0e7', violetSoft:'#ece7fc',
+    shadow:'rgba(80,60,40,0.16)', code:'#2b2018', codeink:'#f3e6d8', overlay:'#fbfaf7',
+    card:'#f5f3ef', cardBorder:'#e7e2da',
+    ring:'#a89f92', hoverBorder:'#b3aa9c', hoverBg:'5%', selBg:'7%',
+  },
+  paper: {
+    label:'Paper', group:'light', hues:H_LIGHT, tone:'14%', pick:true,
+    bg:'#f4f2ec', panel:'#fffefc', panel2:'#f8f6f1', panel3:'#efece5',
+    border:'#e2ded4', border2:'#cec5b7',
+    text:'#2f2a24', body:'#524c43', muted:'#837d72', dim:'#a09889',
+    accentInk:'#ffffff', btn:'#efece4', btnFg:'#2f2a24', btnHover:'#e5e1d7',
+    greenSoft:'#e4f2e9', violetSoft:'#eee9fd',
+    shadow:'rgba(70,58,44,0.14)', code:'#16130f', codeink:'#f0e9df', overlay:'#ffffff',
+    card:'#fcfbf8', cardBorder:'#e2ded4',
+    ring:'#9c9282', hoverBorder:'#a99f8f', hoverBg:'6%', selBg:'8%',
+  },
+  'cream-oak': {
+    label:'Cream oak (unchanged)', group:'light', hues:H_CREAM, tone:'14%',
+    bg:'#f7efe2', panel:'#fffaf2', panel2:'#f4e7d6', panel3:'#ecdcc5',
+    border:'#ecdfcd', border2:'#dbc6ad',
+    text:'#352a20', body:'#5c5040', muted:'#8a7969', dim:'#a8967f',
+    accentInk:'#ffffff', btn:'#efe6d7', btnFg:'#352a20', btnHover:'#e6d9c4',
+    greenSoft:'#e2f0e7', violetSoft:'#ece7fc',
+    shadow:'rgba(80,50,25,0.16)', code:'#2b2018', codeink:'#f3e6d8', overlay:'#fffaf2',
+    card:'#fbf4e9', cardBorder:'#ecdfcd',
+    ring:'#ab9a80', hoverBorder:'#b8a389', hoverBg:'5%', selBg:'7%',
+  },
+};
+
+const BASE = { dark: 'dark', light: 'light' };
+
+function vars(p) {
+  const H = p.hues;
+  return `
+    --win:${p.panel2}; --bg:${p.bg}; --panel:${p.panel}; --panel2:${p.panel2}; --panel3:${p.panel3};
+    --border:${p.border}; --border2:${p.border2};
+    --text:${p.text}; --body:${p.body}; --muted:${p.muted}; --dim:${p.dim};
+    --link:${H.link}; --accent:${p.text}; --accent-ink:${p.accentInk}; --accent-soft:${p.panel3};
+    --btn:${p.btn}; --btn-fg:${p.btnFg}; --btn-hover:${p.btnHover};
+    --green:${H.green}; --green-soft:${p.greenSoft}; --violet:${H.violet}; --violet-soft:${p.violetSoft};
+    --todo:${H.todo}; --prog:${H.prog}; --review:${H.review}; --done:${H.done}; --acc:${H.acc};
+    --ship:${H.ship}; --rel:${H.rel}; --verif:${H.verif}; --closed:${H.closed};
+    --blocked:${H.blocked}; --plan:${H.plan}; --design:${H.design}; --backlog:${H.backlog};
+    --role-orch:${H.roleOrch}; --role-arch:${H.roleArch}; --role-dev:${H.roleDev};
+    --role-rev:${H.roleRev}; --role-design:${H.roleDesign}; --role-cur:${H.roleCur};
+    --role-ship:${H.roleShip}; --role-mkt:${H.roleMkt}; --role-tone:${p.tone};
+    --shadow:${p.shadow}; --code:${p.code}; --codeink:${p.codeink}; --overlay:${p.overlay};
+    --card:${p.card}; --card-border:${p.cardBorder};
+    --ring:${p.ring}; --hover-border:${p.hoverBorder};
+    --hover-bg:color-mix(in srgb, ${p.text} ${p.hoverBg}, transparent);
+    --sel-bg:color-mix(in srgb, ${p.text} ${p.selBg}, transparent);
+    --sel-mark:${p.body};
+  `;
+}
+
+/* ── app CSS, lifted from apps/desktop/src/renderer/src/tokens.css ── */
+const APPCSS = `
+.app * { margin:0; padding:0; box-sizing:border-box; }
+.app { font:13px/1.5 var(--fbody); color:var(--text); }
+.app button { font:inherit; color:inherit; background:none; border:none; cursor:pointer; }
+
+.shell { display:flex; height:var(--sh,432px); background:var(--win); padding:var(--shell-gap); gap:var(--shell-gap); }
+.shellbody { flex:1; display:flex; gap:var(--shell-gap); min-width:0; min-height:0; position:relative; }
+.main { flex:1; display:flex; flex-direction:column; min-width:0; position:relative; background:var(--panel); border:1px solid var(--border); border-radius:var(--r-xl); box-shadow:0 8px 24px -20px var(--shadow); overflow:hidden; }
+
+.navpanel { width:228px; min-width:228px; background:var(--panel2); display:flex; flex-direction:column; min-height:0; }
+.navhead { position:relative; display:flex; align-items:center; gap:8px; padding:9px 11px; border-bottom:1px solid var(--border); }
+.navhead-main { flex:1; min-width:0; display:flex; align-items:center; gap:10px; text-align:left; padding:5px 7px; margin:-3px -5px; border-radius:11px; color:var(--text); }
+.navbadge { position:relative; width:34px; height:34px; border-radius:var(--r-lg); background:linear-gradient(160deg,var(--panel3),var(--panel2)); color:var(--text); font-weight:700; font-size:15px; display:grid; place-items:center; flex:none; border:1px solid var(--border2); box-shadow:0 2px 8px -4px var(--shadow); }
+.wsswitch-txt { flex:1; min-width:0; }
+.wsswitch-txt b { display:block; font-weight:700; font-size:13.5px; }
+.wsswitch-txt small { display:block; font-weight:500; font-size:10px; color:var(--dim); }
+.navgear { flex:none; width:26px; height:26px; display:grid; place-items:center; border:1px solid var(--border2); border-radius:8px; background:var(--panel2); color:var(--muted); font-size:13px; }
+.navscroll { flex:1; min-height:0; overflow:hidden; padding:2px 0 16px; display:flex; flex-direction:column; }
+.navsecttoggle { display:flex; align-items:center; gap:7px; padding:13px 16px 6px; font:700 10px var(--fbody); letter-spacing:.7px; text-transform:uppercase; color:var(--dim); }
+.navchev { display:inline-flex; color:var(--muted); opacity:.65; font-size:9px; }
+.chan { position:relative; display:flex; align-items:center; gap:8px; padding:4.5px 9px; margin:0 8px; border-radius:7px; color:var(--muted); font-size:12.5px; }
+.chan.on { background:var(--sel-bg); color:var(--text); font-weight:600; }
+.chan.on::before { content:''; position:absolute; left:2px; top:6px; bottom:6px; width:2px; border-radius:2px; background:var(--sel-mark); }
+.chan .h { color:var(--dim); font-weight:600; }
+.chan .lbl { flex:1; min-width:0; }
+.changear { margin-left:auto; color:var(--dim); opacity:.6; font-size:11px; }
+.chanadd { color:var(--dim); font-size:14px; line-height:1; margin-left:auto; padding-right:12px; }
+.dot { width:6px; height:6px; border-radius:99px; background:var(--done); flex:none; }
+
+.roomhead { display:flex; align-items:center; padding:14px 16px 10px; }
+.roomhead .rt { font-size:14.5px; font-weight:650; color:var(--text); }
+.roomtabs { display:flex; gap:6px; margin-left:8px; }
+.roomtabs button { width:30px; height:28px; display:grid; place-items:center; border-radius:var(--r-md); border:1px solid var(--border); background:color-mix(in srgb,var(--panel) 76%,transparent); color:var(--muted); }
+.roomtabs button.on { color:var(--text); background:var(--sel-bg); border-color:var(--border2); }
+.utilbar { display:flex; gap:6px; margin-left:auto; }
+.utilbtn { width:30px; height:28px; display:grid; place-items:center; border-radius:var(--r-md); border:1px solid var(--border); background:color-mix(in srgb,var(--panel) 76%,transparent); color:var(--muted); }
+
+.hwrap { flex:1; overflow:hidden; display:flex; justify-content:center; padding:0 24px; }
+.hcol { width:min(620px,100%); display:flex; flex-direction:column; justify-content:center; }
+.hgreetblk { margin-bottom:18px; }
+.heyebrow { font:600 10px var(--fmono); letter-spacing:.12em; text-transform:uppercase; color:var(--dim); }
+.hgreet { font-size:16px; font-weight:650; margin-top:6px; color:var(--text); }
+.hsub { font-size:12.5px; color:var(--muted); margin-top:4px; }
+.hsub b { color:var(--text); }
+.hcomposer { background:var(--panel2); border:1px solid var(--border2); border-radius:var(--r-lg); padding:13px 14px 11px; }
+.hcomposer .ph { font-size:13.5px; color:var(--dim); line-height:1.5; min-height:40px; }
+.hrow { display:flex; align-items:center; flex-wrap:wrap; gap:6px; margin-top:8px; }
+.hchip { display:inline-flex; align-items:center; gap:6px; padding:4px 9px; border-radius:var(--r-md); border:1px solid var(--border); background:var(--panel); color:var(--muted); font-size:11.5px; font-weight:600; }
+.hchip.chan2 { border-color:var(--border2); color:var(--text); }
+.hchip .cv { color:var(--dim); font-size:9px; }
+.hchip .h { color:var(--dim); font-weight:700; }
+.chiptag { font-size:8.5px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; color:var(--accent); border:1px solid var(--border2); border-radius:3px; padding:0 3px; }
+.hsend { width:32px; height:27px; display:grid; place-items:center; border-radius:var(--r-md); background:var(--btn); color:var(--btn-fg); border:1px solid var(--border2); font-size:13px; margin-left:auto; }
+.allclear { font-size:12px; color:var(--dim); margin-top:24px; }
+
+/* pinned to the bottom like the real feed, so the tail (accept row) never clips */
+.feed { flex:1; overflow:hidden; padding:8px 12px; display:flex; flex-direction:column; justify-content:flex-end; gap:2px; }
+.msg { display:flex; gap:11px; padding:7px 10px; border-radius:9px; position:relative; }
+.pav { display:inline-grid; place-items:center; flex:none; width:26px; height:26px; border-radius:var(--r-sm); font-size:12px; background:var(--panel3); box-shadow:inset 0 0 0 1px var(--border2); }
+.pav .pavg { font-style:normal; filter:grayscale(1); }
+.pav[data-role="orchestrator"] { background:color-mix(in srgb,var(--role-orch) var(--role-tone),transparent); box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--role-orch) 32%,var(--border2)); }
+.pav[data-role="developer"] { background:color-mix(in srgb,var(--role-dev) var(--role-tone),transparent); box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--role-dev) 32%,var(--border2)); }
+.pav[data-role="reviewer"] { background:color-mix(in srgb,var(--role-rev) var(--role-tone),transparent); box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--role-rev) 32%,var(--border2)); }
+.msg .body { min-width:0; flex:1; }
+.msg .head { display:flex; align-items:center; gap:8px; }
+.msg .head b { font-size:12.5px; color:var(--text); }
+.msg .time { font-size:10.5px; color:var(--dim); }
+.msg p { color:var(--body); font-size:13px; }
+.msg.mine { flex-direction:row-reverse; }
+.msg.mine .body { flex:0 1 auto; max-width:78%; background:var(--panel2); border-radius:12px; padding:7px 12px 8px; }
+.msg.mine .head { justify-content:flex-end; }
+.chip { display:inline-flex; align-items:center; gap:5px; font-size:9px; font-weight:800; letter-spacing:.5px; padding:2.5px 8px; border-radius:5px; text-transform:uppercase; }
+.chiprow { display:flex; gap:6px; flex-wrap:wrap; margin-top:7px; }
+.codeblk { background:var(--code); color:var(--codeink); border:1px solid var(--border); border-radius:var(--r-md); padding:9px 11px; font:12px/1.6 var(--fmono); margin-top:8px; }
+.codeblk .cm { color:color-mix(in srgb, var(--codeink) 45%, transparent); }
+.btnrow { display:flex; gap:7px; margin-top:10px; }
+.btn { display:inline-flex; align-items:center; gap:6px; padding:5.5px 12px; border-radius:7px; border:1px solid var(--border2); background:var(--panel2); font-size:12px; font-weight:600; color:var(--text); }
+.btn.accept { background:color-mix(in srgb,var(--done) 16%,transparent); color:var(--done); border-color:color-mix(in srgb,var(--done) 38%,var(--border2)); }
+.btn.ghost { background:transparent; color:var(--muted); border-color:var(--border); }
+.valcard { display:flex; align-items:center; gap:12px; border:1px solid var(--border2); background:var(--panel2); border-radius:11px; padding:11px 13px; margin-top:10px; }
+.valcard .valtitle { font-weight:700; font-size:12.5px; color:var(--text); }
+.valcard .valdesc { color:var(--dim); font-size:11.5px; margin-top:2px; }
+
+/* floating popover — the elevation test */
+.pop { position:absolute; right:14px; bottom:58px; width:196px; background:var(--overlay); border:1px solid var(--border2); border-radius:11px; box-shadow:0 18px 44px -16px var(--shadow); padding:5px; z-index:9; }
+.pop .ph2 { font:700 9.5px var(--fmono); letter-spacing:.1em; text-transform:uppercase; color:var(--dim); padding:7px 9px 5px; }
+.pop button { display:flex; align-items:center; gap:8px; width:100%; border-radius:7px; padding:7px 9px; font-size:12.5px; color:var(--text); text-align:left; }
+.pop button.on { background:var(--sel-bg); font-weight:600; }
+.pop .h { color:var(--dim); font-weight:700; }
+
+.composer { padding:9px 14px 12px; }
+.cbox { border:1px solid var(--border2); background:var(--panel2); border-radius:12px; padding:9px 12px; }
+.cbox .ph { font-size:13.5px; color:var(--dim); }
+.cchip { display:inline-flex; align-items:center; gap:5px; padding:3.5px 9px; border-radius:var(--r-md); border:1px solid var(--border2); background:var(--panel2); color:var(--muted); font-size:11px; font-weight:600; }
+.cfoot { display:flex; align-items:center; gap:8px; margin-top:6px; padding:0 3px; }
+.sendsq { margin-left:auto; width:34px; height:28px; display:grid; place-items:center; border-radius:7px; background:var(--btn); color:var(--btn-fg); border:1px solid var(--border2); font-size:14px; }
+`;
+document.head.appendChild(Object.assign(document.createElement('style'), { textContent: APPCSS }));
+
+/* ── scene markup ── */
+const SVG = {
+  home:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/></svg>',
+  chat:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>',
+  cal:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>',
+  book:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V2H6.5A2.5 2.5 0 0 0 4 4.5z"/></svg>',
+  clock:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+  burger:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>',
+  clip:'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.4 11.05 12.25 20.2a5.5 5.5 0 0 1-7.78-7.78l9.19-9.18a3.67 3.67 0 0 1 5.18 5.18l-9.2 9.19a1.83 1.83 0 0 1-2.59-2.59l8.49-8.48"/></svg>',
+  grid:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>',
+};
+
+const NAV = `
+<div class="navpanel">
+  <div class="navhead">
+    <div class="navhead-main">
+      <div class="navbadge">G</div>
+      <div class="wsswitch-txt"><b>flowe-ai</b><small>Acme Robotics</small></div>
+    </div>
+    <div class="navgear">${SVG.grid}</div>
+  </div>
+  <div class="navscroll">
+    <div class="navsecttoggle"><span class="navchev">▾</span>Channels<span class="chanadd">+</span></div>
+    <div class="chan"><span class="h">#</span><span class="lbl">build</span></div>
+    <div class="chan"><span class="h">#</span><span class="lbl">general</span></div>
+    <div class="chan on"><span class="h">◁</span><span class="lbl">marketing</span><span class="changear">⚙</span></div>
+    <div class="chan"><span class="h">#</span><span class="lbl">research</span></div>
+    <div class="navsecttoggle"><span class="navchev">▾</span>People<span class="chanadd">+</span></div>
+    <div class="chan"><span class="dot"></span><span class="lbl">geo <span style="color:var(--dim)">(you)</span></span></div>
+  </div>
+</div>`;
+
+function roomhead(active) {
+  return `<div class="roomhead">
+    <span class="rt"># marketing</span>
+    <div class="roomtabs">
+      <button class="${active==='home'?'on':''}">${SVG.home}</button>
+      <button class="${active==='chat'?'on':''}">${SVG.chat}</button>
+      <button>${SVG.cal}</button>
+      <button>${SVG.book}</button>
+    </div>
+    <div class="utilbar"><div class="utilbtn">${SVG.clock}</div><div class="utilbtn">${SVG.burger}</div></div>
+  </div>`;
+}
+
+const SCENE_HOME = `
+<div class="app"><div class="shell"><div class="shellbody">
+  ${NAV}
+  <div class="main">
+    ${roomhead('home')}
+    <div class="hwrap"><div class="hcol">
+      <div class="hgreetblk">
+        <div class="heyebrow">Thursday · Jul 23</div>
+        <div class="hgreet">Good afternoon, geo.</div>
+        <div class="hsub">All quiet — <b>1</b> in flight, nothing needs you.</div>
+      </div>
+      <div class="hcomposer">
+        <div class="ph">Describe the work — the team takes it from there. @ mention · / skill · ↵ send</div>
+        <div class="hrow">
+          <div class="hchip chan2"><span class="h">#</span>marketing<span class="cv">▾</span></div>
+          <div class="hchip">${SVG.grid} flowe-ai</div>
+          <div class="hchip">⌁ Brain · Balanced <span class="chiptag">Project</span><span class="cv">▾</span></div>
+          <div class="hchip">${SVG.clip}</div>
+          <div class="hsend">↵</div>
+        </div>
+      </div>
+      <div class="allclear">All clear — nothing needs you. 0 building · 1 in review.</div>
+    </div></div>
+  </div>
+</div></div></div>`;
+
+const SCENE_THREAD = `
+<div class="app"><div class="shell" style="--sh:566px"><div class="shellbody">
+  ${NAV}
+  <div class="main">
+    ${roomhead('chat')}
+    <div class="feed">
+      <div class="msg mine">
+        <div class="pav"><i class="pavg">🙂</i></div>
+        <div class="body"><div class="head"><b>geo</b><span class="time">4:12 PM</span></div>
+        <p>Ship the palette once the reviewer signs off.</p></div>
+      </div>
+      <div class="msg">
+        <div class="pav" data-role="orchestrator"><i class="pavg">🦉</i></div>
+        <div class="body"><div class="head"><b>rex</b><span class="time">4:12 PM</span></div>
+        <p>Routed to <span style="color:var(--link)">#134 · graphite + paper</span>.</p>
+        <div class="chiprow">
+          <span class="chip" style="background:color-mix(in srgb,var(--plan) 16%,transparent);color:var(--plan)">Planning</span>
+          <span class="chip" style="background:color-mix(in srgb,var(--prog) 16%,transparent);color:var(--prog)">In progress</span>
+          <span class="chip" style="background:color-mix(in srgb,var(--review) 16%,transparent);color:var(--review)">In review</span>
+        </div></div>
+      </div>
+      <div class="msg">
+        <div class="pav" data-role="developer"><i class="pavg">🔧</i></div>
+        <div class="body"><div class="head"><b>mox</b><span class="time">4:31 PM</span></div>
+        <div class="codeblk"><span class="cm">/* graphite */</span> --bg: #101010;<br>--panel: #161616; --panel2: #1c1c1c;</div>
+        </div>
+      </div>
+      <div class="msg">
+        <div class="pav" data-role="reviewer"><i class="pavg">🔎</i></div>
+        <div class="body"><div class="head"><b>vera</b><span class="time">4:48 PM</span></div>
+        <div class="valcard"><span style="font-size:16px">◧</span><div style="flex:1"><div class="valtitle">Review cockpit</div><div class="valdesc">6 files · +52 −48 · CI passing</div></div><span class="btn ghost">Open</span></div>
+        <div class="btnrow"><span class="btn accept">✓ Accept</span><span class="btn ghost">Request changes</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="pop">
+      <div class="ph2">Brain</div>
+      <button class="on"><span class="h">⌁</span>Balanced</button>
+      <button><span class="h">⌁</span>Fast</button>
+      <button><span class="h">⌁</span>Flagship</button>
+    </div>
+    <div class="composer"><div class="cbox">
+      <div class="ph">Reply in thread…</div>
+      <div class="cfoot"><span class="cchip">⌁ Brain · Balanced ▾</span><span class="cchip">${SVG.clip}</span><span class="sendsq">↵</span></div>
+    </div></div>
+  </div>
+</div></div></div>`;
+
+/* ── render ── */
+function frame(key, scene, capNote) {
+  const p = P[key];
+  const lightWin = p.group === 'light';
+  return `<div class="fwrap">
+    <div class="fcap"><b>${p.label}</b><span>panel2 ${p.panel2}</span>${capNote?`<em>${capNote}</em>`:''}</div>
+    <div class="win" style="${vars(p)}">
+      <div class="wintitle" style="background:var(--win);color:var(--muted);border-bottom:1px solid var(--border)">
+        <span class="lights"><i style="background:${lightWin?'#c9c2b6':'#3d3d3d'}"></i><i style="background:${lightWin?'#c9c2b6':'#3d3d3d'}"></i><i style="background:${lightWin?'#c9c2b6':'#3d3d3d'}"></i></span>
+        <span style="margin-left:6px">NeuraMesh · many agents, one mesh</span>
+      </div>
+      ${scene}
+    </div>
+  </div>`;
+}
+
+let current = 'graphite';
+let split = false;
+
+function render() {
+  const f1 = document.getElementById('frames1');
+  const f2 = document.getElementById('frames2');
+  const base = BASE[P[current].group];
+  const show = split && current !== base ? [base, current] : [current];
+  // Home compares side by side; the thread frame needs the full window width for the
+  // feed to breathe (and for the popover to sit where it really does), so it stacks.
+  f1.className = 'frames' + (show.length > 1 ? ' split' : '');
+  f1.innerHTML = show.map((k, i) => frame(k, SCENE_HOME, show.length > 1 ? (i === 0 ? 'today' : 'proposed') : '')).join('');
+  f2.className = 'frames';
+  f2.innerHTML = show.map((k, i) => frame(k, SCENE_THREAD, show.length > 1 ? (i === 0 ? 'today' : 'proposed') : '')).join('');
+  document.querySelectorAll('.opt[data-theme]').forEach(b => b.classList.toggle('on', b.dataset.theme === current));
+  document.getElementById('splitbtn').classList.toggle('on', split);
+}
+
+document.querySelectorAll('.opt[data-theme]').forEach(b => b.onclick = () => { current = b.dataset.theme; render(); });
+document.getElementById('splitbtn').onclick = () => { split = !split; render(); };
+
+/* ── surface ramps ── */
+const RAMP_KEYS = ['bg','panel','panel2','panel3','border','border2'];
+function rampRow(k, tag) {
+  const p = P[k], light = p.group === 'light';
+  return `<div style="margin-bottom:15px">
+    <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:2px">
+      <b style="font-size:12.5px;color:#e6e6ea">${p.label}</b>
+      <span style="font:600 10px var(--fmono);letter-spacing:.09em;text-transform:uppercase;color:#5c5c66">${tag}</span>
+    </div>
+    <div class="ramp">${RAMP_KEYS.map(t => `<div style="background:${p[t]};color:${light?'#8f887c':'#6e6e6e'}">${p[t]}</div>`).join('')}</div>
+    <div style="display:flex;font:600 9.5px var(--fmono);letter-spacing:.06em;color:#5c5c66;text-transform:uppercase">${RAMP_KEYS.map(t => `<div style="flex:1;text-align:center">${t}</div>`).join('')}</div>
+  </div>`;
+}
+document.getElementById('ramps').innerHTML =
+  `<div style="display:grid;grid-template-columns:1fr;gap:0">
+     <div style="font:700 9.5px var(--fmono);letter-spacing:.13em;text-transform:uppercase;color:#5c5c66;margin:4px 0 10px">Dark family</div>
+     ${rampRow('dark','baseline')}${rampRow('graphite','the pick')}${rampRow('soft-dark','no change')}
+     <div style="font:700 9.5px var(--fmono);letter-spacing:.13em;text-transform:uppercase;color:#5c5c66;margin:18px 0 10px">Light family</div>
+     ${rampRow('light','baseline')}${rampRow('paper','proposed')}${rampRow('cream-oak','no change')}
+   </div>`;
+
+/* ── diff tables ── */
+const ROWS = [
+  ['--bg','bg','body ground behind the shell',1],
+  ['--panel','panel','the floating main well — chat, home, board',1],
+  ['--panel2','panel2','window backdrop + nav panel + composer box — the dominant plane',1],
+  ['--panel3','panel3','hover, avatars, raised rows',1],
+  ['--border','border','panel edges, row rules',1],
+  ['--border2','border2','control edges, chip edges',1],
+  ['--text','text','primary ink',0],
+  ['--body','body','paragraph ink',0],
+  ['--muted','muted','secondary ink',0],
+  ['--dim','dim','placeholder / label ink',0],
+  ['--btn','btn','button fill',0],
+  ['--btn-hover','btnHover','button hover fill',0],
+  ['--card','card','task cards',0],
+  ['--card-border','cardBorder','task card edge',0],
+  ['--ring','ring','focus + open-control ring',0],
+  ['--hover-border','hoverBorder','hover edge',0],
+  ['--code','code','code block ground',1],
+  ['--overlay','overlay','popovers + menus — its own plane, no longer var(--panel)',1],
+  ['--green-soft','greenSoft','success wash, re-mixed against the new ground',1],
+  ['--violet-soft','violetSoft','review wash, re-mixed against the new ground',1],
+  ['--shadow','shadow','elevation — borders now carry most edges',1],
+];
+function diffTable(fromKey, toKey) {
+  const A = P[fromKey], B = P[toKey];
+  const chip = v => `<span class="sw"><i style="background:${v};${v.startsWith('rgba')?'border-color:rgba(255,255,255,.2)':''}"></i>${v}</span>`;
+  return `<h3 style="font:650 13px var(--fbody);color:#e6e6ea;margin:26px 0 2px">${A.label} → ${B.label}</h3>
+  <table class="tbl"><tr><th>Token</th><th>${A.label}</th><th></th><th>${B.label}</th><th>What it paints</th></tr>` +
+  ROWS.map(([css, key, note, big]) =>
+    `<tr class="${big?'big':''}"><td class="k">${css}</td><td>${chip(A[key])}</td><td class="arrow">→</td><td>${chip(B[key])}</td><td class="note">${note}</td></tr>`
+  ).join('') + `</table>`;
+}
+document.getElementById('difftbls').innerHTML = diffTable('dark','graphite') + diffTable('light','paper');
+
+render();
+</script>
+</body>
+</html>

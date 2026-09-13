@@ -1,0 +1,319 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "credits-preview",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--dir",
+        "apps/desktop",
+        "exec",
+        "vite",
+        "--config",
+        "vite.preview.config.mjs",
+        "--port",
+        "5210",
+        "--strictPort"
+      ],
+      "port": 5210
+    },
+    {
+      "name": "web",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--filter",
+        "@neuramesh/web",
+        "dev",
+        "--port",
+        "5177",
+        "--strictPort"
+      ],
+      "port": 5177
+    },
+    {
+      "name": "browser-client",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--dir",
+        "apps/desktop",
+        "exec",
+        "vite",
+        "--config",
+        "vite.web.config.mts",
+        "--port",
+        "5202",
+        "--strictPort"
+      ],
+      "port": 5202
+    },
+    {
+      "name": "desktop-preview",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--dir",
+        "apps/desktop",
+        "exec",
+        "vite",
+        "--config",
+        "vite.preview.config.mjs",
+        "--port",
+        "5199",
+        "--strictPort"
+      ],
+      "port": 5199
+    },
+    {
+      "name": "desktop-mkos",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "NM_USERDATA=~/.neuramesh-mkos",
+        "NM_MACHINE_NAME=mkos-live",
+        "PORT=9233",
+        "NM_API_PORT=8789",
+        "bash",
+        "scripts/dev-app-cdp.sh"
+      ],
+      "port": 9233
+    },
+    {
+      "name": "daemon-a",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "NM_USERDATA=~/.neuramesh-compute-a",
+        "NM_MACHINE_NAME=compute-a",
+        "PORT=9231",
+        "NM_API_PORT=8795",
+        "NM_AGENT_MODE=echo",
+        "bash",
+        "scripts/dev-app-cdp.sh"
+      ],
+      "port": 9231
+    },
+    {
+      "name": "daemon-b",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "NM_USERDATA=~/.neuramesh-compute-b",
+        "NM_MACHINE_NAME=compute-b",
+        "NM_DEV_USER=dfd4a796-a4b3-4b37-adf3-98ee44df5771",
+        "PORT=9232",
+        "NM_API_PORT=8795",
+        "NM_AGENT_MODE=echo",
+        "bash",
+        "scripts/dev-app-cdp.sh"
+      ],
+      "port": 9232
+    },
+    {
+      "name": "desktop-live-ws",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "NM_USERDATA=~/.neuramesh-dev-wsswitch",
+        "PORT=9228",
+        "NM_API_PORT=8795",
+        "NM_AGENT_MODE=echo",
+        "bash",
+        "scripts/dev-app-cdp.sh"
+      ],
+      "port": 9228
+    },
+    {
+      "name": "desktop-preview-ws",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--dir",
+        "apps/desktop",
+        "exec",
+        "vite",
+        "--config",
+        "vite.preview.config.mjs",
+        "--port",
+        "5201",
+        "--strictPort"
+      ],
+      "port": 5201
+    },
+    {
+      "name": "mockups",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "5180",
+        "--directory",
+        "mockups"
+      ],
+      "port": 5180
+    },
+    {
+      "name": "evidence",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "EVIDENCE_HOST_ONLY=1",
+        "node",
+        "scripts/capture-revamp-evidence.mjs"
+      ],
+      "port": 5183
+    },
+    {
+      "name": "mail-preview",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "5181",
+        "--directory",
+        "packages/shared/.nm-evidence/email"
+      ],
+      "port": 5181
+    },
+    {
+      "name": "desktop-live",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "scripts/dev-app-cdp.sh"
+      ],
+      "port": 9223
+    },
+    {
+      "name": "desktop-live-wb",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "NM_USERDATA=~/.neuramesh-dev-wb",
+        "PORT=9226",
+        "NM_API_PORT=8791",
+        "bash",
+        "scripts/dev-app-cdp.sh"
+      ],
+      "port": 9226
+    },
+    {
+      "name": "desktop-live-viewer",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "NM_USERDATA=~/.neuramesh-dev-viewer",
+        "PORT=9225",
+        "NM_AGENT_MODE=echo",
+        "bash",
+        "scripts/dev-app-cdp.sh"
+      ],
+      "port": 9225
+    },
+    {
+      "name": "desktop-onboard",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "NM_USERDATA=~/.neuramesh-onboard-demo",
+        "PORT=9224",
+        "NM_FORCE_ONBOARDING=1",
+        "bash",
+        "scripts/dev-app-cdp.sh"
+      ],
+      "port": 9224
+    },
+    {
+      "name": "desktop-brain",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "NM_USERDATA=~/.neuramesh-dev-brain",
+        "PORT=9226",
+        "NM_API_PORT=8790",
+        "NM_AGENT_MODE=echo",
+        "bash",
+        "scripts/dev-app-cdp.sh"
+      ],
+      "port": 9226
+    },
+    {
+      "name": "desktop-planfirst",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "NM_USERDATA=~/.neuramesh-planfirst",
+        "PORT=9223",
+        "NM_API_PORT=8789",
+        "bash",
+        "scripts/dev-app-cdp.sh"
+      ],
+      "port": 9223
+    },
+    {
+      "name": "control-api-dev",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "cd packages/control-api && DATABASE_URL=postgresql://postgres:nm@127.0.0.1:55435/nm PORT=8787 FLEET_SECRET=local-dev-fleet-secret CRON_SECRET=local-cron NM_ALLOW_DEV_TOKENS=1 NM_ALLOW_ACTOR_HEADER=1 FLEET_AUTOPROVISION=on FLEET_JWT_PRIVATE_KEY=\"$(cat ../../dev/stack/secrets/fleet-jwt-dev.pem)\" pnpm exec tsx src/server.ts"
+      ],
+      "port": 8787
+    },
+    {
+      "name": "browser-client-rw",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "VITE_NM_DEV_USER=00000000-0000-0000-0000-000000000001 NM_DEV_API_TARGET=http://127.0.0.1:8787 VITE_NM_POWERSYNC_URL=http://127.0.0.1:58081 pnpm --dir apps/desktop exec vite --config vite.web.config.mts --port \"${PORT:-5210}\" --strictPort"
+      ],
+      "autoPort": true
+    },
+    {
+      "name": "desktop-live-rail",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "NM_USERDATA=~/.neuramesh-dev-railink",
+        "PORT=9234",
+        "NM_API_PORT=8787",
+        "NM_AGENT_MODE=echo",
+        "bash",
+        "scripts/dev-app-cdp.sh"
+      ],
+      "port": 9234
+    },
+    {
+      "name": "mobile-cloud-mockup",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "5299",
+        "--directory",
+        "docs/design/mobile-cloud-2026-09"
+      ],
+      "port": 5299
+    },
+    {
+      "name": "mobile-metro",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "cd apps/mobile && pnpm exec expo start --dev-client --clear --port 8081"
+      ],
+      "port": 8081
+    },
+    {
+      "name": "engineering-harness",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "NM_NODE_BIN=~/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "NM_ENGINEERING_DETERMINISTIC=1",
+        "NM_ENGINEERING_API_PORT=8796",
+        "NM_ENGINEERING_RELAY_PORT=8795",
+        "NM_ENGINEERING_MODEL_PORT=8794",
+        "NM_WEB_PORT=5205",
+        "bash",
+        "scripts/dev-web-engineering.sh"
+      ],
+      "port": 5205
+    },
+    {
+      "name": "design-canvas",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "5240",
+        "--directory",
+        "docs/design"
+      ],
+      "port": 5240
+    }
+  ]
+}

@@ -1,0 +1,55 @@
+# SINGLE SOURCE OF TRUTH for the PowerSync sync rules — consumed by BOTH:
+#   - the dev stack (mounted into the powersync container; reload with `pnpm sync:dev-reload`), and
+#   - prod, deployed to the Cloud instance by .github/workflows/powersync-sync-rules.yml when this
+#     file changes on main (no more hand-editing the dashboard).
+# Edit here only. `select *` means additive nullable columns flow without a redeploy; this is still
+# the place to add/remove a synced table or restrict columns. Validate a change: `pnpm sync:dev-validate`.
+config:
+  edition: 3
+
+# Rows sync only to workspace members (auth.user_id() = JWT sub).
+# Channel-granular ACL (channel_members / agent_channels) refines this later.
+streams:
+  workspace:
+    auto_subscribe: true
+    with:
+      # Map the JWT sub (Clerk user id, or the dev/legacy uuid-as-text) → our internal
+      # uuid via nm_users, then to the user's workspaces. Lets PowerSync validate the
+      # auth provider's own token (sub stays theirs) while scoping by our stable uuid.
+      my_workspaces: select wm.workspace_id from workspace_members wm join nm_users u on u.id = wm.user_id where u.clerk_user_id = auth.user_id()
+    queries:
+      - select * from channels where workspace_id in (select workspace_id from my_workspaces)
+      - select * from projects where workspace_id in (select workspace_id from my_workspaces)
+      - select id, workspace_id, channel_id, task_id, thread_id, author_kind, author_id, body, created_at, pinned from messages where workspace_id in (select workspace_id from my_workspaces)
+      - select * from threads where workspace_id in (select workspace_id from my_workspaces)
+      - select * from tasks where workspace_id in (select workspace_id from my_workspaces)
+      - select * from machines where workspace_id in (select workspace_id from my_workspaces)
+      - select * from agents where workspace_id in (select workspace_id from my_workspaces)
+      - select * from agent_channels where agent_id in (select id from agents where workspace_id in (select workspace_id from my_workspaces))
+      - select * from repos where workspace_id in (select workspace_id from my_workspaces)
+      # 0106/0107 — the repo→project link. Without it the replica cannot tell whose checkout a
+      # repo is, so `channel-meta` returned every repo in the workspace and the ＋ menu offered
+      # to open files from another project. Scoped through repos, which is already workspace-scoped.
+      - select * from project_repos where repo_id in (select id from repos where workspace_id in (select workspace_id from my_workspaces))
+      - select * from artifacts where workspace_id in (select workspace_id from my_workspaces)
+      - select * from beats where workspace_id in (select workspace_id from my_workspaces)
+      - select * from runs where workspace_id in (select workspace_id from my_workspaces)
+      - select * from decisions where workspace_id in (select workspace_id from my_workspaces)
+      - select * from policies where workspace_id in (select workspace_id from my_workspaces)
+      - select * from memory_blocks where workspace_id in (select workspace_id from my_workspaces)
+      - select * from skills where workspace_id in (select workspace_id from my_workspaces)
+      - select * from skill_packs where workspace_id in (select workspace_id from my_workspaces)
+      - select * from schedules where workspace_id in (select workspace_id from my_workspaces)
+      - select * from content_items where workspace_id in (select workspace_id from my_workspaces)
+      - select * from connectors where workspace_id in (select workspace_id from my_workspaces)
+      - select * from workspace_members where workspace_id in (select workspace_id from my_workspaces)
+      # channel_members (0094) is a ROSTER — which humans the rail lists per room. Scoped by
+      # channel like agent_channels, NOT a visibility gate: the queries above still sync the
+      # whole workspace, exactly as before.
+      - select * from channel_members where channel_id in (select id from channels where workspace_id in (select workspace_id from my_workspaces))
+      # whiteboards (0111, docs/38) — Excalidraw scenes; workspace stream like artifacts (the
+      # channel is the AGENT ACL boundary, enforced server-side; channel-granular sync refines later)
+      - select * from whiteboards where workspace_id in (select workspace_id from my_workspaces)
+      # code_sessions (0135, mobile-cloud round) — one row per engineering session, so every client
+      # can list Code work; the machine's transcript stays the execution authority
+      - select * from code_sessions where workspace_id in (select workspace_id from my_workspaces)

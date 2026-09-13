@@ -1,0 +1,90 @@
+name: Publish Desktop Release
+
+# Manually flip a DRAFT release in the public releases repo (alonge-dev/neuramesh-desktop-releases)
+# to published + latest, so electron-updater starts serving it to installed apps. release.yml builds
+# the draft when you push a vX.Y.Z tag; THIS is the human "ship it" switch.
+#
+# Run it: Actions tab → "Publish Desktop Release" → Run workflow. Leave `tag` blank to publish the
+# newest draft, or name one (e.g. v0.5.0). Use `dry_run` to validate without shipping.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to publish, e.g. v0.5.0 (blank = newest draft)"
+        required: false
+        type: string
+      latest:
+        description: "Mark as latest (electron-updater serves the latest release)"
+        required: false
+        type: boolean
+        default: true
+      dry_run:
+        description: "Preview only — validate the draft but don't publish"
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: publish-release
+  cancel-in-progress: false
+
+# Everything writes to the SEPARATE releases repo via RELEASES_REPO_TOKEN, so this job needs no
+# permissions on the main repo's own token.
+permissions: {}
+
+jobs:
+  publish:
+    name: publish draft → latest
+    if: github.repository == 'alonge-dev/neuramesh'
+    runs-on: ubuntu-latest
+    env:
+      RELEASES_REPO: alonge-dev/neuramesh-desktop-releases
+      # PAT with `repo` scope on the releases repo (same secret release.yml publishes with).
+      GH_TOKEN: ${{ secrets.RELEASES_REPO_TOKEN }}
+    steps:
+      - name: Resolve the draft
+        id: resolve
+        run: |
+          set -euo pipefail
+          TAG="${{ inputs.tag }}"
+          if [ -z "$TAG" ]; then
+            TAG=$(gh api "repos/$RELEASES_REPO/releases" \
+              --jq '[.[] | select(.draft)] | sort_by(.created_at) | last | .tag_name // empty')
+            [ -n "$TAG" ] || { echo "::error::no draft releases found in $RELEASES_REPO"; exit 1; }
+            echo "Resolved newest draft → $TAG"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Validate it's a complete draft
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.resolve.outputs.tag }}"
+          JSON=$(gh release view "$TAG" --repo "$RELEASES_REPO" --json isDraft,assets,url)
+          DRAFT=$(jq -r '.isDraft' <<<"$JSON")
+          NAMES=$(jq -r '.assets[].name' <<<"$JSON")
+          echo "::group::$TAG assets (draft=$DRAFT)"; echo "$NAMES"; echo "::endgroup::"
+          [ "$DRAFT" = "true" ]                  || { echo "::error::$TAG is already published"; exit 1; }
+          grep -qx 'latest-mac.yml' <<<"$NAMES"  || { echo "::error::missing latest-mac.yml — incomplete draft, refusing to publish"; exit 1; }
+          grep -q '\.dmg$' <<<"$NAMES"           || { echo "::error::no .dmg asset — incomplete draft, refusing to publish"; exit 1; }
+
+      - name: Publish
+        if: ${{ !inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.resolve.outputs.tag }}"
+          ARGS=(--draft=false)
+          [ "${{ inputs.latest }}" = "true" ] && ARGS+=(--latest)
+          gh release edit "$TAG" --repo "$RELEASES_REPO" "${ARGS[@]}"
+          URL=$(gh release view "$TAG" --repo "$RELEASES_REPO" --json url --jq .url)
+          echo "✅ Published $TAG → $URL"
+          {
+            echo "### ✅ Published \`$TAG\`"
+            echo "[$URL]($URL) — latest=${{ inputs.latest }}. Installed apps will auto-update on next launch."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Dry run
+        if: ${{ inputs.dry_run }}
+        run: |
+          TAG="${{ steps.resolve.outputs.tag }}"
+          echo "🔎 Dry run: \`$TAG\` is a valid draft and would be published (latest=${{ inputs.latest }}). Re-run with dry_run=false to ship." \
+            | tee -a "$GITHUB_STEP_SUMMARY"

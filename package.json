@@ -1,0 +1,42 @@
+{
+  "name": "neuramesh",
+  "private": true,
+  "license": "Elastic-2.0",
+  "version": "0.132.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "packageManager": "pnpm@10.8.1",
+  "scripts": {
+    "typecheck": "pnpm -r typecheck",
+    "lint": "eslint . --cache",
+    "lint:ratchet": "node scripts/lint-ratchet.mjs",
+    "test": "pnpm -r test",
+    "check": "pnpm typecheck && pnpm lint && pnpm test",
+    "db:validate": "bash scripts/validate-db.sh",
+    "test:pg": "bash scripts/test-pg.sh",
+    "cloud:e2e": "node packages/control-api/scripts/cloud-e2e.mjs",
+    "e2e": "bash scripts/dev-e2e.sh",
+    "app": "bash scripts/cloud-app.sh",
+    "app:local": "bash scripts/dev-app.sh",
+    "web:engineering": "bash scripts/dev-web-engineering.sh",
+    "db:dev-migrate": "bash scripts/dev-migrate.sh",
+    "db:cloud-migrate": "bash scripts/cloud-migrate.sh",
+    "sync:dev-validate": "bash scripts/dev-sync-validate.sh",
+    "sync:dev-reload": "bash scripts/dev-sync-reload.sh",
+    "prepare": "husky",
+    "mail:preview": "pnpm --filter @neuramesh/shared mail:preview",
+    "fleet:pin": "node scripts/pin-machine-image.mjs"
+  },
+  "devDependencies": {
+    "eslint": "^10.8.1",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "husky": "^9.1.7",
+    "typescript-eslint": "^8.67.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "@powersync/common": "1.57.3"
+    }
+  }
+}

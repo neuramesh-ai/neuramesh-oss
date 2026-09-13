@@ -1,0 +1,328 @@
+<!doctype html>
+<html data-theme="cream-oak">
+<head>
+<meta charset="utf-8">
+<title>Review in a tab — one surface for every artifact that needs a verdict</title>
+<style>
+/* Tokens lifted from apps/desktop/src/renderer/src/tokens.css — graphite dark + cream oak. */
+[data-theme='cream-oak'] {
+  --win:#f0e5d3; --bg:#fbf8f4; --panel:#fbf8f4; --panel2:#f6eee1; --panel3:#efe1cd;
+  --border:#e6dbca; --border2:#d3c2a8;
+  --text:#2a1c13; --body:#574838; --muted:#97846c; --dim:#b5a289;
+  --link:#9c5730; --accent:#834a2b; --accent-ink:#fff7ee; --accent-soft:#f1e3d2; --orch:#6a63bc;
+  --btn:#f8f2e8; --btn-fg:#43301f; --btn-hover:#efe4d2;
+  --green:#2f9e6b; --green-soft:#e3f0e8; --violet:#7d6cc4; --violet-soft:#ece7fc;
+  --review:#6d5ce0; --done:#0f9d63; --ship:#1f7f96; --plan:#2c7d88; --planrev:#7d56b8;
+  --shadow:rgba(70,42,18,0.16); --code:#2b2018; --codeink:#f3e6d8; --overlay:#fff;
+  --card:#fff; --card-border:#eadfce;
+  --shadow-sheet:0 8px 26px -8px rgba(70,42,18,.16),0 1px 2px rgba(70,42,18,.05);
+  --shadow-pop:0 20px 55px -14px rgba(70,42,18,.30);
+  --hover-bg:color-mix(in srgb, var(--text) 5%, transparent);
+  --sel-bg:color-mix(in srgb, var(--accent) 8%, transparent);
+}
+[data-theme='dark'] {
+  --win:#0d0d0d; --bg:#141414; --panel:#191919; --panel2:#212121; --panel3:#2b2b2b;
+  --border:#272727; --border2:#383838;
+  --text:#eaeaea; --body:#b6b6b6; --muted:#898989; --dim:#676767;
+  --link:#d19a72; --accent:var(--text); --accent-ink:#101010; --accent-soft:var(--panel3); --orch:#9793d2;
+  --btn:#232323; --btn-fg:#efefef; --btn-hover:#2f2f2f;
+  --green:#77ac8d; --green-soft:#16241a; --violet:#a89ccf; --violet-soft:#1c1936;
+  --review:#a89ccf; --done:#77ac8d; --ship:#7cb0bd; --plan:#7fa5ab; --planrev:#a89ccf;
+  --shadow:rgba(0,0,0,0.62); --code:#0a0a0a; --codeink:#e8e8e8; --overlay:#222;
+  --card:#1c1c1c; --card-border:#2e2e2e;
+  --shadow-sheet:0 8px 26px -8px rgba(0,0,0,.5),0 1px 2px rgba(0,0,0,.3);
+  --shadow-pop:0 20px 55px -14px rgba(0,0,0,.7);
+  --hover-bg:color-mix(in srgb, var(--text) 6%, transparent);
+  --sel-bg:color-mix(in srgb, var(--text) 8%, transparent);
+}
+:root{
+  --fdisp:'Source Serif 4 Variable',Georgia,serif;
+  --fbody:'Geist Variable',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --fmono:'Geist Mono Variable',ui-monospace,'SF Mono',Menlo,monospace;
+  --r-xs:6px; --r-sm:8px; --r-lg:13px; --dur:.15s; --ease:cubic-bezier(.22,1,.36,1);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--win);color:var(--body);font:14px/1.6 var(--fbody);padding:34px 26px 70px}
+.page{max-width:1180px;margin:0 auto}
+h1{font:700 27px/1.25 var(--fdisp);color:var(--text);letter-spacing:-.01em;margin-bottom:8px}
+.sub{color:var(--muted);font-size:13.5px;max-width:76ch;margin-bottom:6px}
+h2{font:640 12px var(--fmono);letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin:34px 0 11px}
+.note{background:var(--panel2);border:1px solid var(--border);border-radius:var(--r-lg);padding:13px 16px;font-size:13px;color:var(--body);margin:14px 0 4px}
+.note b{color:var(--text)}
+.note code{font:11.5px var(--fmono);background:var(--panel3);padding:1px 5px;border-radius:4px}
+
+/* ── the app frame ── */
+.app{background:var(--win);border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow-sheet);overflow:hidden;display:flex;height:610px}
+.rail{width:186px;flex:none;background:var(--win);border-right:1px solid var(--border);padding:12px 10px;font-size:12.5px}
+.railrow{display:flex;align-items:center;gap:8px;padding:6px 9px;border-radius:var(--r-sm);color:var(--muted)}
+.railrow.on{background:var(--panel);color:var(--text);font-weight:600}
+.railsec{font:640 9.5px var(--fmono);letter-spacing:.09em;text-transform:uppercase;color:var(--dim);padding:14px 9px 5px}
+.main{flex:1;min-width:0;background:var(--panel);display:flex;flex-direction:column;position:relative}
+
+/* ── tab strip (shipped shell, v0.71.0) ── */
+.strip{flex:none;display:flex;align-items:stretch;gap:2px;padding:6px 8px 0;border-bottom:1px solid var(--border);position:relative;z-index:3}
+.tab{display:inline-flex;align-items:center;gap:7px;max-width:220px;padding:7px 9px 8px;border:1px solid transparent;border-bottom:none;border-radius:9px 9px 0 0;color:var(--muted);font-size:12px;white-space:nowrap;cursor:pointer}
+.tab.on{background:var(--panel);border-color:var(--border);color:var(--text);font-weight:620;margin-bottom:-1px}
+.tab .ic{opacity:.75;font-size:11px}
+.tab .x{opacity:.45;font-size:12px;margin-left:2px}
+.tabadd{display:grid;place-items:center;width:26px;color:var(--dim);font-size:15px}
+
+/* ── the review tab body ── */
+.body{flex:1;min-height:0;display:flex;flex-direction:column;position:relative;overflow:hidden}
+.rhead{flex:none;display:flex;align-items:center;gap:9px;min-height:38px;padding:7px 14px;border-bottom:1px solid var(--border);font:500 11px var(--fmono);color:var(--dim)}
+.rkind{display:inline-flex;align-items:center;gap:5px;padding:2px 7px;border-radius:999px;font:640 9.5px var(--fmono);letter-spacing:.05em;text-transform:uppercase}
+.rkind.plan{background:color-mix(in srgb,var(--plan) 16%,transparent);color:var(--plan)}
+.rkind.ship{background:color-mix(in srgb,var(--ship) 16%,transparent);color:var(--ship)}
+.rkind.design{background:color-mix(in srgb,var(--planrev) 16%,transparent);color:var(--planrev)}
+.rname{font-family:var(--fbody);font-size:12px;font-weight:640;color:var(--text)}
+.rver{color:var(--muted)}
+.rlatest{padding:1px 6px;border-radius:999px;background:var(--green-soft);color:var(--green);font:640 9px var(--fmono);letter-spacing:.06em}
+.rseg{margin-left:auto;display:flex;gap:1px;background:var(--panel2);border-radius:var(--r-sm);padding:2px}
+.rseg button{border:none;background:none;color:var(--muted);font:inherit;font-size:11px;padding:3px 9px;border-radius:6px;cursor:pointer}
+.rseg button.on{background:var(--panel);color:var(--text);font-weight:620;box-shadow:0 1px 2px rgba(0,0,0,.06)}
+.doc{flex:1;min-height:0;overflow:auto;padding:22px 30px 96px;scrollbar-width:none}
+.doc::-webkit-scrollbar{display:none}
+.doc h1{font:700 24px/1.3 var(--fdisp);color:var(--text);margin:2px 0 10px}
+.doc h2{font:700 17px var(--fbody);color:var(--text);letter-spacing:-.006em;text-transform:none;margin:26px 0 9px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+.doc p{margin:0 0 10px;color:var(--body);font-size:13.5px}
+.doc strong{color:var(--text)}
+.doc code{font:12px var(--fmono);background:var(--panel2);padding:1px 5px;border-radius:4px;color:var(--text)}
+.doc ol,.doc ul{margin:0 0 10px 20px}
+.doc li{margin-bottom:5px;font-size:13.5px}
+.cb{background:var(--panel2);border:1px solid var(--border);border-radius:var(--r-sm);margin:0 0 12px;overflow:hidden}
+.cbh{display:flex;align-items:center;padding:5px 10px;border-bottom:1px solid var(--border);font:11px var(--fmono);color:var(--dim)}
+.cb pre{padding:9px 12px;font:11.5px/1.7 var(--fmono);overflow-x:auto;color:var(--text)}
+.tk-k{color:var(--review)} .tk-s{color:var(--done)} .tk-c{color:var(--dim);font-style:italic} .tk-n{color:var(--ship)}
+
+/* a hovered block offers a comment; a commented block keeps a rail */
+.blk{position:relative;border-radius:var(--r-sm);padding:5px 8px;margin:0 -8px}
+.blk.hov{background:var(--hover-bg)}
+.blk.hov .cbtn{opacity:1}
+.cbtn{position:absolute;top:4px;right:-2px;opacity:0;display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border:1px solid var(--border2);border-radius:999px;background:var(--card);color:var(--muted);font-size:10.5px;cursor:pointer;transition:opacity var(--dur) var(--ease)}
+.blk.has{border-left:2px solid var(--link);background:color-mix(in srgb,var(--link) 5%,transparent)}
+.mark{background:var(--sel-bg);border-bottom:1.5px solid var(--link);border-radius:2px}
+.cnote{margin:7px 0 3px;padding:8px 11px;background:var(--card);border:1px solid var(--card-border);border-radius:var(--r-sm);font-size:12.5px;color:var(--body)}
+.cnote b{color:var(--text);font-size:11.5px}
+.cnote .who{display:flex;align-items:center;gap:6px;margin-bottom:3px}
+.av{width:17px;height:17px;border-radius:5px;background:var(--accent-soft);display:grid;place-items:center;font:700 9px var(--fmono);color:var(--text)}
+
+/* ── the verdict bar: floating, bottom centre ── */
+.verdict{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);display:flex;align-items:center;gap:8px;padding:8px 9px 8px 15px;background:var(--card);border:1px solid var(--card-border);border-radius:999px;box-shadow:var(--shadow-pop);z-index:5;white-space:nowrap}
+.vlbl{font-size:12.5px;color:var(--body)}
+.vlbl b{color:var(--text)}
+.vcount{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:var(--link);color:var(--accent-ink);font:700 10.5px var(--fmono);margin-left:1px}
+[data-theme='dark'] .vcount{color:#111}
+.btn{border:1px solid var(--border2);border-radius:999px;background:var(--btn);color:var(--btn-fg);font:600 12px var(--fbody);padding:6px 13px;cursor:pointer}
+.btn.go{background:var(--green-soft);border-color:color-mix(in srgb,var(--green) 40%,transparent);color:var(--green)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.ghost{background:none;border-color:transparent;color:var(--muted);padding:6px 9px}
+.vsep{width:1px;height:20px;background:var(--border)}
+.gate{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;font:640 10px var(--fmono);letter-spacing:.05em;text-transform:uppercase}
+.gate.human{background:var(--violet-soft);color:var(--violet)}
+
+/* pane + peek, unchanged from the shipped shell */
+.peek{position:absolute;right:16px;bottom:16px;display:flex;align-items:center;gap:4px;padding:5px 5px 5px 11px;background:var(--card);border:1px solid var(--card-border);border-radius:var(--r-lg);box-shadow:var(--shadow-pop);font-size:12px;color:var(--text);z-index:6}
+.kbd{font:10px var(--fmono);color:var(--dim);border:1px solid var(--border);border-radius:4px;padding:0 4px;margin-left:5px}
+
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.cap{font-size:12px;color:var(--muted);margin:9px 2px 0}
+.cap b{color:var(--text)}
+.smallapp{height:430px}
+.smallapp .doc{padding:18px 22px 86px}
+.smallapp .rail{display:none}
+</style>
+</head>
+<body>
+<div class="page">
+
+<h1>Review in a tab — one surface for every artifact that needs a verdict</h1>
+<p class="sub">The plan review is a full-screen overlay today: it takes the whole window, hides the room, and exists only for implementation plans. v0.71.0 made the content area <b>tabbed</b>, and a review is content. This round moves it into a tab and — the part that matters — makes it a <b>type, not a component per kind</b>: an implementation plan, a release plan, a design round and whatever comes next are the same tab wearing different data.</p>
+
+<div class="note">
+  <b>The claim to test in these frames.</b> A review tab is <code>{ artifact, gate, verdict[] }</code>. The <i>artifact</i> supplies the bytes and the language. The <i>gate</i> says who may decide and what the decision is called. The <i>verdict</i> options are the buttons. Nothing below is drawn per kind — the two frames differ only in the data bound to them, which is the whole proposal.
+</div>
+
+<h2>1 · An implementation plan, mid-review · cream oak</h2>
+<div class="app">
+  <div class="rail">
+    <div class="railrow">＋&nbsp; New chat</div>
+    <div class="railrow on">⌂&nbsp; Home</div>
+    <div class="railsec">Channels</div>
+    <div class="railrow"># build</div>
+    <div class="railrow"># general</div>
+    <div class="railsec">Recents</div>
+    <div class="railrow">1005 Design and build…</div>
+    <div class="railrow">1009 Copy sweep —…</div>
+  </div>
+  <div class="main">
+    <div class="strip">
+      <div class="tab"><span class="ic">▭</span>#1005 · Design and build Ac…</div>
+      <div class="tab on"><span class="ic">◪</span>implementation-plan-v3.md<span class="x">✕</span></div>
+      <div class="tab"><span class="ic">▤</span>wtabs.ts</div>
+      <div class="tabadd">＋</div>
+    </div>
+    <div class="body">
+      <div class="rhead">
+        <span class="rkind plan">◪ plan review</span>
+        <span class="rname">implementation-plan-v3.md</span>
+        <span class="rver">· v3</span>
+        <span class="rlatest">latest</span>
+        <span class="rseg">
+          <button class="on">Preview</button><button>Source</button><button>Diff&nbsp;v2</button>
+        </span>
+      </div>
+      <div class="doc">
+        <h1>Acme Robotics landing page — demo-lead focused</h1>
+        <p>Deliver the landing experience as a <strong>build-only implementation</strong> that reproduces the two approved mockups, then wires the hero CTA to a working lead-capture backend.</p>
+
+        <h2>Steps (ordered)</h2>
+        <div class="blk has">
+          <p><strong>1. Confirm repo &amp; baseline (atlas).</strong> Resolve <code>acme/marketing-site</code> to a concrete repo and path, confirm the real default branch, and establish a <span class="mark">green baseline before touching anything</span>.</p>
+          <div class="cnote">
+            <div class="who"><span class="av">G</span><b>you</b> · just now</div>
+            The repo does not exist yet — say what happens when it is missing rather than assuming a clone.
+          </div>
+        </div>
+        <div class="blk hov">
+          <p><strong>2. Design handoff (iris).</strong> Import the approved mockups and produce a token set for both themes, responsive breakpoints, and per-component specs.</p>
+          <button class="cbtn">💬 comment</button>
+        </div>
+        <div class="blk">
+          <p><strong>3. Scaffold both routes to match (atlas).</strong> Implement <code>/</code> and <code>/book-a-demo</code> from those tokens, carrying placeholder copy through verbatim.</p>
+          <div class="cb">
+            <div class="cbh">bash</div>
+            <pre><span class="tk-c"># baseline must be green before any change</span>
+npm ci &amp;&amp; npm run build &amp;&amp; npm run lint &amp;&amp; npm test</pre>
+          </div>
+        </div>
+        <div class="blk">
+          <p><strong>4. Build the lead-capture backend (atlas).</strong> The demo form is the conversion surface: validation both sides, a defined destination, spam protection, and matching success/error states.</p>
+        </div>
+      </div>
+
+      <div class="verdict">
+        <span class="vlbl">Your call on <b>the plan</b><span class="vcount">2</span></span>
+        <span class="vsep"></span>
+        <button class="btn go">✓ Approve</button>
+        <button class="btn pri">Request changes</button>
+        <button class="btn ghost">✕</button>
+      </div>
+    </div>
+  </div>
+</div>
+<p class="cap"><b>What changed.</b> The room is still there — rail, strip, the conversation one tab away. The verdict bar floats bottom-centre over the document instead of occupying a header, so the artifact gets the full width and the decision travels with you as you scroll. The count is the batch: two comments, one revision request, exactly as the overlay batches today.</p>
+
+<h2>2 · The same tab, bound to a release plan · graphite</h2>
+<div class="app smallapp" data-theme="dark">
+  <div class="main">
+    <div class="strip">
+      <div class="tab"><span class="ic">▭</span>#1034 · Ship v0.71.0</div>
+      <div class="tab on"><span class="ic">◪</span>ship-plan-v2.md<span class="x">✕</span></div>
+      <div class="tabadd">＋</div>
+    </div>
+    <div class="body">
+      <div class="rhead">
+        <span class="rkind ship">⚓ release plan</span>
+        <span class="rname">ship-plan-v2.md</span>
+        <span class="rver">· v2</span>
+        <span class="rlatest">latest</span>
+        <span class="rseg"><button class="on">Preview</button><button>Source</button><button>Diff&nbsp;v1</button></span>
+      </div>
+      <div class="doc">
+        <h1>Release v0.71.0 — workspace tabs</h1>
+        <p>Backend is already live on the merge commit. This plan covers the desktop tag and the one manual step it carries.</p>
+        <h2>Checklist</h2>
+        <ul>
+          <li><strong>bosun</strong> — verify post-merge CI on the merge commit</li>
+          <li><strong>you</strong> — publish the signed draft to latest</li>
+          <li><strong>bosun</strong> — confirm the updater feed serves the new version</li>
+        </ul>
+        <div class="blk hov">
+          <p><strong>Deploy notes.</strong> No migration, no PowerSync re-snapshot. <span class="mark">The desktop draft must be published by a human</span> after the backend deploy is confirmed.</p>
+          <button class="cbtn">💬 comment</button>
+        </div>
+      </div>
+      <div class="verdict">
+        <span class="gate human">human only</span>
+        <span class="vlbl">Your call on <b>the release</b></span>
+        <span class="vsep"></span>
+        <button class="btn go">✓ Approve release plan</button>
+        <button class="btn pri">Request changes</button>
+        <button class="btn ghost">✕</button>
+      </div>
+    </div>
+  </div>
+</div>
+<p class="cap"><b>Same component, different data.</b> The kind chip, the verdict label, the button wording and the <span style="color:var(--violet)">human-only</span> badge all come from the gate on the record — <code>approve_ship_plan</code> is HUMAN_ONLY in the FSM, so the tab says so rather than relying on the reviewer knowing. A design round would bind the same way and read <b>design review · Approve design</b>.</p>
+
+<h2>3 · Two states worth deciding now</h2>
+<div class="grid2">
+  <div>
+    <div class="app smallapp" style="height:250px">
+      <div class="main">
+        <div class="strip">
+          <div class="tab"><span class="ic">▭</span>#1005</div>
+          <div class="tab on"><span class="ic">◪</span>implementation-plan-v2.md<span class="x">✕</span></div>
+        </div>
+        <div class="body">
+          <div class="rhead">
+            <span class="rkind plan">◪ plan review</span>
+            <span class="rname">implementation-plan-v2.md</span><span class="rver">· v2</span>
+            <span class="rseg"><button class="on">Preview</button><button>Source</button></span>
+          </div>
+          <div class="doc" style="padding-bottom:20px">
+            <p style="color:var(--muted);font-size:12.5px">A superseded round opens read-only: v3 is the one under review.</p>
+            <h2 style="margin-top:12px">Steps (ordered)</h2>
+            <p>1. Confirm repo &amp; baseline…</p>
+          </div>
+          <div class="verdict" style="bottom:14px">
+            <span class="vlbl" style="color:var(--muted)">Settled — <b>revised into v3</b></span>
+            <span class="vsep"></span>
+            <button class="btn ghost" style="color:var(--link)">Open v3 →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="cap"><b>A settled round still opens.</b> No approve buttons, no comment affordances — the record of what was decided, with a door to the live round. This is what stops a stale link becoming a second live gate.</p>
+  </div>
+  <div>
+    <div class="app smallapp" style="height:250px" data-theme="dark">
+      <div class="main">
+        <div class="strip">
+          <div class="tab"><span class="ic">▭</span>#1009</div>
+          <div class="tab on"><span class="ic">◪</span>implementation-plan-v1.md<span class="x">✕</span></div>
+        </div>
+        <div class="body">
+          <div class="rhead">
+            <span class="rkind design">◪ design review</span>
+            <span class="rname">design-round-v1.html</span><span class="rver">· v1</span><span class="rlatest">latest</span>
+            <span class="rseg"><button>Preview</button><button class="on">Rendered</button><button>Source</button></span>
+          </div>
+          <div class="doc" style="padding-bottom:20px;display:grid;place-items:center">
+            <div style="width:78%;height:104px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--panel2);display:grid;place-items:center;color:var(--dim);font-size:11.5px">the mockup, rendered in place</div>
+          </div>
+          <div class="verdict" style="bottom:14px">
+            <span class="gate human">human only</span>
+            <span class="vlbl">Your call</span>
+            <span class="vsep"></span>
+            <button class="btn go">✓ Approve design</button>
+            <button class="btn pri">Revise</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="cap"><b>A non-markdown artifact.</b> The mode segment is the artifact's, not the reviewer's: a design round renders, a plan previews, a diff diffs. Same tab, same verdict bar, same gate — which is the test of whether this really is one type.</p>
+  </div>
+</div>
+
+<div class="note" style="margin-top:30px">
+  <b>Open questions — answer these and I build it.</b>
+  ① <b>Does approving close the tab?</b> Proposal: yes, and it drops you back on the conversation where the verdict was announced — the tab existed for a decision that no longer needs making.
+  ② <b>Can two review tabs be open at once?</b> Proposal: yes, they are ordinary tabs; the reuse rule already means one artifact is one tab, so you cannot open the same plan twice.
+  ③ <b>Does the old overlay stay for anything?</b> Proposal: no — it is deleted in the same PR. Two doors to one review is the duplication that made the dock worth retiring.
+  ④ <b>Where do comments live while unsent?</b> Proposal: on the tab, so switching away and back keeps a half-written batch — losing review comments to a tab switch would be the worst possible first impression of this change.
+</div>
+
+</div>
+</body>
+</html>

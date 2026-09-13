@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<title>Brain pill — composer chip + workspace brain popup (mockup)</title>
+<style>
+/* ── Real app tokens (tokens.css, monochrome v0.27.3) — dark · light · cream-oak ── */
+:root {
+  --fbody: 'Geist Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --fmono: 'Geist Mono Variable', ui-monospace, 'SF Mono', Menlo, monospace;
+  --dur-fast: .12s; --dur: .18s; --ease: cubic-bezier(.21,.61,.35,1);
+}
+:root, [data-theme='dark'] {
+  --win:#131210; --bg:#1b1a18; --panel:#201f1c; --panel2:#272522; --panel3:#302e2b;
+  --border:#2a2825; --border2:#383530;
+  --text:#d9d5ce; --body:#b7b4ac; --muted:#8f8a82; --dim:#6b675f;
+  --accent:var(--text); --accent-ink:#12171f; --accent-soft:var(--panel3);
+  --green:#77ac8d;
+  --shadow:rgba(0,0,0,0.5); --overlay:var(--panel);
+  --ring:#57544c; --hover-border:#46443d; --sel-bg:color-mix(in srgb, var(--text) 9%, transparent);
+  --role-orch:#9793d2; --role-arch:#a89ccf; --role-dev:#77ac8d; --role-rev:#7ba1c4; --role-design:#cc8fb9; --role-cur:#6fb0ab;
+  --prov-anthropic:#d97757; --prov-openai:#b7b4ac; --prov-gemini:#9793d2;
+}
+[data-theme='light'] {
+  --win:#e6e3dd; --bg:#f4f2ed; --panel:#fbfaf7; --panel2:#f0eee8; --panel3:#e8e5df;
+  --border:#e7e2da; --border2:#d6cfc4;
+  --text:#38332d; --body:#585249; --muted:#8a847a; --dim:#a59e93;
+  --accent:var(--text); --accent-ink:#ffffff; --accent-soft:var(--panel3);
+  --green:#2f9e6b;
+  --shadow:rgba(80,60,40,0.16); --overlay:var(--panel);
+  --ring:color-mix(in srgb, var(--accent) 55%, var(--border2)); --hover-border:color-mix(in srgb, var(--text) 22%, var(--border2)); --sel-bg:color-mix(in srgb, var(--text) 7%, transparent);
+  --role-orch:#635fc0; --role-arch:#7d6cc4; --role-dev:#3f9268; --role-rev:#4f7bb0; --role-design:#b0498f; --role-cur:#2f8f8a;
+  --prov-anthropic:#c96442; --prov-openai:#585249; --prov-gemini:#635fc0;
+}
+[data-theme='cream-oak'] {
+  --win:#efe6d7; --bg:#f7efe2; --panel:#fffaf2; --panel2:#f4e7d6; --panel3:#ecdcc5;
+  --border:#ecdfcd; --border2:#dbc6ad;
+  --text:#352a20; --body:#5c5040; --muted:#8a7969; --dim:#a8967f;
+  --accent:var(--text); --accent-ink:#ffffff; --accent-soft:var(--panel3);
+  --green:#2f9e6b;
+  --shadow:rgba(80,50,25,0.16); --overlay:var(--panel);
+  --ring:color-mix(in srgb, var(--accent) 55%, var(--border2)); --hover-border:color-mix(in srgb, var(--text) 20%, var(--border2)); --sel-bg:color-mix(in srgb, var(--text) 7%, transparent);
+  --role-orch:#6a63bc; --role-arch:#7d6cc4; --role-dev:#3f9268; --role-rev:#4f7bb0; --role-design:#b0498f; --role-cur:#2f8f8a;
+  --prov-anthropic:#c96442; --prov-openai:#5c5040; --prov-gemini:#6a63bc;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:var(--win); color:var(--text); font:13px/1.5 var(--fbody); -webkit-font-smoothing:antialiased; padding:34px 40px 80px; }
+button { font:inherit; color:inherit; background:none; border:none; cursor:pointer; }
+
+/* mockup scaffolding */
+.mkhead { display:flex; align-items:baseline; justify-content:space-between; max-width:1060px; margin:0 auto 6px; }
+.mkhead h1 { font-size:17px; font-weight:700; }
+.mkhead p { font-size:11.5px; color:var(--muted); margin-top:2px; }
+.themes { display:flex; gap:4px; background:var(--panel2); border:1px solid var(--border2); border-radius:999px; padding:3px; }
+.themes button { font-size:10.5px; font-weight:700; padding:4px 11px; border-radius:999px; color:var(--muted); }
+.themes button.on { background:var(--accent); color:var(--accent-ink); }
+.sect { max-width:1060px; margin:34px auto 0; }
+.sect > h2 { font-size:12px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--muted); }
+.sect > .why { font-size:11.5px; color:var(--dim); margin:3px 0 13px; max-width:720px; line-height:1.55; }
+.frame { background:var(--bg); border:1px solid var(--border); border-radius:16px; padding:22px; box-shadow:0 1px 3px -1px var(--shadow); }
+.reco { display:inline-block; font-size:9px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--green); border:1px solid color-mix(in srgb, var(--green) 40%, transparent); border-radius:999px; padding:2px 8px; margin-left:8px; vertical-align:2px; }
+.cap { font-size:10.5px; color:var(--dim); margin-top:10px; line-height:1.5; }
+.cap b { color:var(--muted); }
+
+/* ── composer replica (real classes/metrics: .composer .cfoot .cchip) ── */
+.composer { background:var(--panel); border:1px solid var(--border2); border-radius:14px; padding:11px 13px 9px; }
+.composer .ph { color:var(--dim); font-size:13px; padding:2px 2px 26px; }
+.composer .crow { display:flex; align-items:center; justify-content:space-between; }
+.clip { color:var(--muted); font-size:14px; }
+.sendbtn { background:var(--panel3); border:1px solid var(--border2); border-radius:9px; color:var(--muted); font-size:12px; padding:5px 12px; }
+.cfoot { display:flex; align-items:center; gap:8px; margin-top:9px; padding:0 3px; }
+.cchips { position:relative; display:flex; align-items:center; gap:5px; }
+.cchip { display:inline-flex; align-items:center; gap:5px; max-width:190px; padding:3.5px 9px; border-radius:999px; border:1px solid var(--border2); background:var(--panel2); color:var(--muted); font-size:11px; font-weight:600; white-space:nowrap; transition:color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease); }
+.cchip:hover { color:var(--text); border-color:var(--hover-border); }
+.cchip.open { color:var(--text); border-color:var(--ring); background:var(--sel-bg); }
+.cchip .car { font-size:8px; color:var(--dim); }
+.cchip .ldot { width:5px; height:5px; border-radius:99px; background:var(--muted); }
+.cchip svg { flex:none; opacity:.8; }
+.sendnote { flex:1; text-align:right; font-size:10.5px; color:var(--dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+/* provider glyphs (stand-ins for ProviderLogo) */
+.pg { width:12px; height:12px; border-radius:4px; display:inline-grid; place-items:center; font-size:8.5px; font-weight:800; flex:none; }
+.pg.anthropic { color:var(--prov-anthropic); }
+.pg.openai { color:var(--prov-openai); }
+.pg.gemini { color:var(--prov-gemini); }
+
+/* ── the brain popup — VARIANT A: split pane (list ⇢ roster) ── */
+.brainpop { position:relative; width:560px; background:var(--overlay); border:1px solid var(--border2); border-radius:13px; box-shadow:0 18px 44px -14px var(--shadow); overflow:hidden; }
+.bphead { display:flex; align-items:baseline; justify-content:space-between; padding:12px 14px 9px; border-bottom:1px solid var(--border); }
+.bphead b { font-size:12.5px; }
+.bphead span { font-size:10.5px; color:var(--dim); }
+.bpbody { display:flex; min-height:298px; }
+.bplist { width:188px; flex:none; border-right:1px solid var(--border); padding:8px 7px; display:flex; flex-direction:column; gap:2px; }
+.bplbl { font-size:9px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--dim); padding:6px 8px 3px; }
+.bpitem { display:flex; align-items:center; gap:7px; text-align:left; padding:6.5px 9px; border-radius:8px; font-size:11.5px; font-weight:600; color:var(--body); border:1px solid transparent; }
+.bpitem:hover { background:var(--sel-bg); color:var(--text); }
+.bpitem.sel { background:var(--sel-bg); border-color:var(--border2); color:var(--text); }
+.bpitem .nm { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.bpitem .on { font-size:9px; font-weight:700; color:var(--green); }
+.bpitem .lock { font-size:9px; color:var(--dim); }
+.bpnew { margin-top:auto; display:flex; align-items:center; gap:7px; padding:7px 9px; border-radius:8px; border:1px dashed var(--border2); color:var(--muted); font-size:11px; font-weight:600; }
+.bpnew:hover { color:var(--text); border-color:var(--hover-border); background:var(--sel-bg); }
+.bpdetail { flex:1; padding:13px 15px 12px; display:flex; flex-direction:column; }
+.bpdtop { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.bpdname { font-size:13.5px; font-weight:700; }
+.bpdtag { font-size:10.5px; color:var(--dim); margin-top:1px; }
+.bpbadge { font-size:9px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; padding:3px 8px; border-radius:999px; color:var(--muted); background:var(--panel3); flex:none; }
+.bpbadge.on { color:var(--accent-ink); background:var(--accent); }
+.bproster { display:flex; flex-direction:column; gap:5.5px; margin-top:12px; }
+.bprow { display:flex; align-items:center; gap:7px; font-size:11px; color:var(--body); }
+.bprole { color:var(--muted); min-width:76px; display:inline-flex; align-items:center; gap:6px; }
+.roledot { width:6px; height:6px; border-radius:99px; flex:none; }
+.bparrow { color:var(--dim); }
+.bpmodel { color:var(--text); font-weight:600; }
+.bpsupport { margin-top:9px; padding-top:8px; border-top:1px dashed var(--border); display:flex; gap:14px; font-size:10px; color:var(--dim); }
+.bpsupport b { color:var(--muted); font-weight:600; }
+.bpfoot { margin-top:auto; padding-top:11px; display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.bpneeds { font-size:10px; color:var(--dim); line-height:1.4; }
+.bpneeds .ok { color:var(--green); }
+.bpapply { background:var(--accent); color:var(--accent-ink); font-size:11px; font-weight:700; padding:6.5px 15px; border-radius:8px; }
+.bpapply.ghost { background:var(--panel3); color:var(--muted); cursor:default; }
+.bpconnect { border:1px solid var(--border2); color:var(--text); font-size:10.5px; font-weight:700; padding:6px 12px; border-radius:8px; }
+.bpconnect:hover { border-color:var(--hover-border); background:var(--sel-bg); }
+.bpeditrow { display:flex; gap:8px; }
+.bpmini { font-size:10px; font-weight:600; color:var(--dim); padding:4px 8px; border-radius:6px; border:1px solid transparent; }
+.bpmini:hover { color:var(--text); border-color:var(--border2); background:var(--sel-bg); }
+
+/* ── VARIANT B: single-column stacked rows ── */
+.bstack { width:380px; background:var(--overlay); border:1px solid var(--border2); border-radius:13px; box-shadow:0 18px 44px -14px var(--shadow); padding:7px; }
+.bsrow { border-radius:9px; padding:8px 10px; display:flex; flex-direction:column; gap:2px; border:1px solid transparent; }
+.bsrow:hover { background:var(--sel-bg); }
+.bsrow.sel { background:var(--sel-bg); border-color:var(--border2); }
+.bsr1 { display:flex; align-items:center; gap:8px; }
+.bsr1 b { font-size:12px; flex:1; }
+.bsglyphs { display:flex; gap:2px; }
+.bsr2 { font-size:10px; color:var(--dim); }
+.bsroster { margin-top:7px; padding-top:7px; border-top:1px dashed var(--border); }
+
+/* ── custom brain builder (modal) ── */
+.builder { width:520px; background:var(--overlay); border:1px solid var(--border2); border-radius:14px; box-shadow:0 24px 60px -18px var(--shadow); }
+.bldhead { padding:15px 17px 0; }
+.bldhead b { font-size:14px; }
+.bldhead p { font-size:11px; color:var(--dim); margin-top:2px; line-height:1.5; }
+.bldbody { padding:13px 17px 15px; display:flex; flex-direction:column; gap:12px; }
+.bldname { display:flex; align-items:center; gap:10px; }
+.bldname label { font-size:11px; color:var(--muted); font-weight:600; min-width:76px; }
+.bldname input { flex:1; background:var(--panel2); border:1px solid var(--border2); border-radius:9px; padding:8px 11px; font:12.5px var(--fbody); color:var(--text); outline:none; }
+.bldname input:focus { border-color:var(--ring); }
+.bldroles { display:flex; flex-direction:column; gap:6px; }
+.bldrow { display:flex; align-items:center; gap:10px; }
+.bldrole { font-size:11px; color:var(--muted); font-weight:600; min-width:76px; display:inline-flex; align-items:center; gap:6px; }
+.bldsel { flex:1; display:flex; align-items:center; gap:7px; background:var(--panel2); border:1px solid var(--border2); border-radius:9px; padding:6.5px 10px; font-size:11.5px; font-weight:600; color:var(--text); }
+.bldsel .car { margin-left:auto; font-size:8px; color:var(--dim); }
+.bldsel:hover { border-color:var(--hover-border); }
+.bldsub { font-size:9.5px; color:var(--dim); margin:2px 0 0 86px; }
+.blddiv { border-top:1px dashed var(--border); margin:2px 0; }
+.bldneeds { display:flex; align-items:center; gap:8px; font-size:10.5px; color:var(--dim); background:var(--panel2); border:1px solid var(--border); border-radius:9px; padding:8px 11px; line-height:1.45; }
+.bldneeds .ok { color:var(--green); font-weight:700; }
+.bldfoot { display:flex; align-items:center; gap:8px; padding:0 17px 16px; }
+.bldfoot .sp { flex:1; }
+.btn { font-size:11.5px; font-weight:700; padding:7px 14px; border-radius:8px; border:1px solid var(--border2); color:var(--body); }
+.btn:hover { border-color:var(--hover-border); background:var(--sel-bg); }
+.btn.primary { background:var(--accent); color:var(--accent-ink); border-color:transparent; }
+.btn.danger { color:#c25454; border-color:transparent; }
+.btn.danger:hover { border-color:color-mix(in srgb, #c25454 40%, transparent); background:color-mix(in srgb, #c25454 8%, transparent); }
+
+/* ── settings card replica (.packcard) with the new rows ── */
+.packgrid2 { display:grid; grid-template-columns:1fr 1fr; gap:9px; max-width:640px; }
+.packcard { text-align:left; display:flex; flex-direction:column; gap:6px; padding:12px 13px; border-radius:11px; background:var(--panel2); border:1px solid var(--border2); }
+.packcard.on { border-color:var(--accent); background:var(--accent-soft); }
+.packcardtop { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.packname { font-size:13px; font-weight:700; }
+.packbadge { font-size:9px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; padding:3px 7px; border-radius:999px; color:var(--muted); background:var(--panel3); }
+.packbadge.on { color:var(--accent-ink); background:var(--accent); }
+.packtag { font-size:10.5px; color:var(--dim); }
+.packroster { display:flex; flex-direction:column; gap:4px; margin-top:3px; }
+.packrolerow { display:flex; align-items:center; gap:6px; font-size:10.5px; color:var(--body); }
+.packrolename { color:var(--muted); min-width:70px; }
+.packarrow { color:var(--dim); }
+.packmodelname { color:var(--text); font-weight:600; }
+.packsupport { margin-top:5px; padding-top:6px; border-top:1px dashed var(--border); font-size:9.5px; color:var(--dim); }
+.packcardacts { display:flex; gap:6px; margin-top:4px; }
+.split { display:flex; gap:26px; flex-wrap:wrap; align-items:flex-start; }
+</style>
+</head>
+<body>
+<div class="mkhead">
+  <div>
+    <h1>Brain — composer pill + workspace brain popup</h1>
+    <p>Studied from tokens.css (monochrome v0.27.3) · chip metrics from .cchip · popup idiom from .cprojpop/.modepop · cards from .packcard</p>
+  </div>
+  <div class="themes">
+    <button class="on" onclick="setTheme('dark', this)">Dark</button>
+    <button onclick="setTheme('light', this)">Light</button>
+    <button onclick="setTheme('cream-oak', this)">Cream Oak</button>
+  </div>
+</div>
+
+<!-- ─────────────────── 1 · the pill ─────────────────── -->
+<div class="sect">
+  <h2>1 · The pill — .cfoot row, between project and threads</h2>
+  <p class="why">Same .cchip species as its neighbours: icon + label + caret, 11px/600, 999px radius. Label = <b>Brain · &lt;active pack name&gt;</b>; when no pack manages the workspace it reads <b>Brain · Manual</b> (each agent keeps its own brain). Workspace-scoped — the same pill in every room.</p>
+  <div class="frame">
+    <div class="composer">
+      <div class="ph">Message #dev — @ mention · / skill · ↵ send</div>
+      <div class="crow"><span class="clip">⎘</span><span class="sendbtn">↵</span></div>
+    </div>
+    <div class="cfoot">
+      <span class="cchips"><span class="cchip"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span class="lbl">flowe-ai</span><span class="car">▾</span></span></span>
+      <span class="cchips"><span class="cchip open"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 4a3.2 3.2 0 0 0-3.2 3.2c-1.9.4-3.3 2-3.3 4a4 4 0 0 0 1.6 3.2A3.6 3.6 0 0 0 10.6 20c.5 0 1-.1 1.4-.3.4.2.9.3 1.4.3a3.6 3.6 0 0 0 3.5-5.6A4 4 0 0 0 18.5 11c0-2-1.4-3.6-3.3-4A3.2 3.2 0 0 0 12 4z"/><path d="M12 4v16"/></svg><span class="lbl">Brain · Ultracode</span><span class="car">▾</span></span></span>
+      <span class="cchips"><span class="cchip"><span class="ldot"></span><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 6h16M4 12h10M4 18h7"/></svg><span class="lbl">Threads · Off</span><span class="car">▾</span></span></span>
+      <span class="sendnote">⌘K commands · drop files to attach</span>
+    </div>
+    <p class="cap"><b>States:</b> rest = muted like its neighbours · hover = text + hover-border · open = ring + sel-bg (shown). No live-dot — the pill is informational, not a mode warning.</p>
+  </div>
+</div>
+
+<!-- ─────────────────── 2 · variant A ─────────────────── -->
+<div class="sect">
+  <h2>2 · The popup — Variant A · split pane<span class="reco">Recommended</span></h2>
+  <p class="why">Anchored above the pill like .cprojpop. Left rail = every brain (curated packs, then your custom brains, then “New custom brain”); right pane = the full role→model roster of whichever brain you’re on, with the provider gate and one Apply button. Height stays fixed no matter how many brains exist — browsing rosters never scrolls the popup.</p>
+  <div class="frame">
+    <div class="brainpop">
+      <div class="bphead"><b>Team brains</b><span>one brain per role · applies to the whole workspace</span></div>
+      <div class="bpbody">
+        <div class="bplist">
+          <span class="bplbl">Curated</span>
+          <button class="bpitem"><span class="nm">Ultracode</span><span class="on">✓ Active</span></button>
+          <button class="bpitem sel"><span class="nm">Balanced</span></button>
+          <button class="bpitem"><span class="nm">Claude Core</span></button>
+          <button class="bpitem"><span class="nm">OpenAI Core</span><span class="lock">🔒</span></button>
+          <button class="bpitem"><span class="nm">Gemini Core</span></button>
+          <span class="bplbl">Yours</span>
+          <button class="bpitem"><span class="nm">Weekend budget</span></button>
+          <button class="bpnew">＋ New custom brain</button>
+        </div>
+        <div class="bpdetail">
+          <div class="bpdtop">
+            <div><div class="bpdname">Balanced</div><div class="bpdtag">Cost + performance across providers</div></div>
+            <span class="bpbadge">Curated</span>
+          </div>
+          <div class="bproster">
+            <span class="bprow"><span class="bprole"><span class="roledot" style="background:var(--role-orch)"></span>orchestrator</span><span class="pg anthropic">✳</span><span class="bpmodel">Claude Sonnet 4.6</span></span>
+            <span class="bprow"><span class="bprole"><span class="roledot" style="background:var(--role-arch)"></span>architect</span><span class="pg anthropic">✳</span><span class="bpmodel">Claude Opus 4.8</span></span>
+            <span class="bprow"><span class="bprole"><span class="roledot" style="background:var(--role-dev)"></span>developer</span><span class="pg anthropic">✳</span><span class="bpmodel">Claude Sonnet 5</span></span>
+            <span class="bprow"><span class="bprole"><span class="roledot" style="background:var(--role-rev)"></span>reviewer</span><span class="pg gemini">✦</span><span class="bpmodel">Gemini 3.5 Flash</span></span>
+            <span class="bprow"><span class="bprole"><span class="roledot" style="background:var(--role-design)"></span>designer</span><span class="pg anthropic">✳</span><span class="bpmodel">Claude Sonnet 5</span></span>
+          </div>
+          <div class="bpsupport"><span><b>sales</b> → Claude Haiku 4.5</span><span><b>curator</b> → Claude Haiku 4.5</span></div>
+          <div class="bpfoot">
+            <span class="bpneeds">Needs Anthropic + Google — <span class="ok">both connected ✓</span></span>
+            <button class="bpapply">Apply Balanced</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="cap"><b>Detail-pane states:</b> active brain → badge “✓ Active”, button becomes muted “Active”. Locked (provider missing) → needs-line reads “Needs OpenAI — not connected”, button becomes <b>Connect OpenAI →</b> (jumps to Settings → Providers). A custom brain adds Edit / Delete minis beside Apply. Applying re-points every pack-managed agent; hand-pinned agents stay.</p>
+  </div>
+</div>
+
+<!-- ─────────────────── 3 · variant B ─────────────────── -->
+<div class="sect">
+  <h2>3 · The popup — Variant B · stacked rows (not chosen)</h2>
+  <p class="why">One column, roster expands in place under the selected brain. Simpler, but 6+ brains × expanded rosters makes it tall and scrolly, and comparing two brains means expand/collapse churn. Kept for the record.</p>
+  <div class="frame">
+    <div class="bstack">
+      <div class="bsrow"><div class="bsr1"><b>Ultracode</b><span class="bsglyphs"><span class="pg anthropic">✳</span><span class="pg gemini">✦</span></span><span class="bpbadge on">✓ Active</span></div><div class="bsr2">Best-in-market brain per role — mixes providers</div></div>
+      <div class="bsrow sel">
+        <div class="bsr1"><b>Balanced</b><span class="bsglyphs"><span class="pg anthropic">✳</span><span class="pg gemini">✦</span></span><span class="bpbadge">Apply</span></div>
+        <div class="bsr2">Cost + performance across providers</div>
+        <div class="bsroster">
+          <div class="bproster">
+            <span class="bprow"><span class="bprole"><span class="roledot" style="background:var(--role-orch)"></span>orchestrator</span><span class="bpmodel">Claude Sonnet 4.6</span></span>
+            <span class="bprow"><span class="bprole"><span class="roledot" style="background:var(--role-dev)"></span>developer</span><span class="bpmodel">Claude Sonnet 5</span></span>
+            <span class="bprow"><span class="bprole"><span class="roledot" style="background:var(--role-design)"></span>designer</span><span class="bpmodel">Claude Sonnet 5</span></span>
+          </div>
+        </div>
+      </div>
+      <div class="bsrow"><div class="bsr1"><b>Claude Core</b><span class="bsglyphs"><span class="pg anthropic">✳</span></span></div><div class="bsr2">Best per role on Anthropic</div></div>
+      <div class="bsrow"><div class="bsr1"><b>Weekend budget</b><span class="bsglyphs"><span class="pg anthropic">✳</span><span class="pg gemini">✦</span></span></div><div class="bsr2">Custom · yours</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ─────────────────── 4 · builder ─────────────────── -->
+<div class="sect">
+  <h2>4 · Custom brain builder — modal from “＋ New custom brain” (and Edit)</h2>
+  <p class="why">Name it, pick a model per role, activate. Rows pre-fill from the active brain so you start from something sane and tweak. The provider gate is computed live from the picks: Save always works; “Save &amp; activate” locks until every provider the picks need is connected. worker mirrors developer automatically (legacy alias). Same modal edits an existing custom brain (adds Delete).</p>
+  <div class="frame">
+    <div class="builder">
+      <div class="bldhead"><b>New custom brain</b><p>A model per role, workspace-wide. Starts from your active brain — change any seat.</p></div>
+      <div class="bldbody">
+        <div class="bldname"><label>Name</label><input value="Weekend budget" /></div>
+        <div class="blddiv"></div>
+        <div class="bldroles">
+          <div class="bldrow"><span class="bldrole"><span class="roledot" style="background:var(--role-orch)"></span>orchestrator</span><span class="bldsel"><span class="pg anthropic">✳</span>Anthropic · Claude Sonnet 4.6<span class="car">▾</span></span></div>
+          <div class="bldrow"><span class="bldrole"><span class="roledot" style="background:var(--role-arch)"></span>architect</span><span class="bldsel"><span class="pg anthropic">✳</span>Anthropic · Claude Opus 4.8<span class="car">▾</span></span></div>
+          <div class="bldrow"><span class="bldrole"><span class="roledot" style="background:var(--role-dev)"></span>developer</span><span class="bldsel"><span class="pg anthropic">✳</span>Anthropic · Claude Haiku 4.5<span class="car">▾</span></span></div>
+          <div class="bldsub">worker (legacy alias) follows developer</div>
+          <div class="bldrow"><span class="bldrole"><span class="roledot" style="background:var(--role-rev)"></span>reviewer</span><span class="bldsel"><span class="pg gemini">✦</span>Google · Gemini 3.5 Flash<span class="car">▾</span></span></div>
+          <div class="bldrow"><span class="bldrole"><span class="roledot" style="background:var(--role-design)"></span>designer</span><span class="bldsel"><span class="pg anthropic">✳</span>Anthropic · Claude Sonnet 5<span class="car">▾</span></span></div>
+          <div class="bldrow"><span class="bldrole"><span class="roledot" style="background:var(--role-cur)"></span>sales</span><span class="bldsel"><span class="pg gemini">✦</span>Google · Gemini 3.1 Flash-Lite<span class="car">▾</span></span></div>
+          <div class="bldrow"><span class="bldrole"><span class="roledot" style="background:var(--role-cur)"></span>curator</span><span class="bldsel"><span class="pg gemini">✦</span>Google · Gemini 3.1 Flash-Lite<span class="car">▾</span></span></div>
+        </div>
+        <div class="bldneeds">These picks need <b>&nbsp;Anthropic + Google&nbsp;</b> — <span class="ok">both connected ✓</span></div>
+      </div>
+      <div class="bldfoot"><button class="btn danger">Delete</button><span class="sp"></span><button class="btn">Cancel</button><button class="btn">Save</button><button class="btn primary">Save &amp; activate</button></div>
+    </div>
+    <p class="cap"><b>Gate example:</b> pick GPT-5.5 for reviewer with no OpenAI key → needs-strip flips to “needs OpenAI — not connected · Connect →”, “Save &amp; activate” disables (Save stays). Duplicate name → inline “a brain with that name already exists”.</p>
+  </div>
+</div>
+
+<!-- ─────────────────── 5 · settings cards ─────────────────── -->
+<div class="sect">
+  <h2>5 · Settings → Brains — designer seated + support row + custom cards</h2>
+  <p class="why">The existing .packcard grid gains the missing <b>designer</b> row, a muted support line (sales · curator — the full truth, quietly), and your custom brains as first-class cards with Edit/Delete. “New custom brain” is a dashed card at the end of the grid. Same builder modal as the popup.</p>
+  <div class="frame">
+    <div class="packgrid2">
+      <div class="packcard on">
+        <div class="packcardtop"><span class="packname">Ultracode</span><span class="packbadge on">✓ Active</span></div>
+        <div class="packtag">Best-in-market brain per role — mixes providers</div>
+        <div class="packroster">
+          <span class="packrolerow"><span class="pg anthropic">✳</span><span class="packrolename">orchestrator</span><span class="packarrow">→</span><span class="packmodelname">Claude Opus 4.8</span></span>
+          <span class="packrolerow"><span class="pg anthropic">✳</span><span class="packrolename">architect</span><span class="packarrow">→</span><span class="packmodelname">Claude Opus 4.8</span></span>
+          <span class="packrolerow"><span class="pg anthropic">✳</span><span class="packrolename">developer</span><span class="packarrow">→</span><span class="packmodelname">Claude Opus 4.8</span></span>
+          <span class="packrolerow"><span class="pg gemini">✦</span><span class="packrolename">reviewer</span><span class="packarrow">→</span><span class="packmodelname">Gemini 3.5 Flash</span></span>
+          <span class="packrolerow"><span class="pg anthropic">✳</span><span class="packrolename">designer</span><span class="packarrow">→</span><span class="packmodelname">Claude Opus 4.8</span></span>
+        </div>
+        <div class="packsupport">support · sales → Claude Sonnet 4.6 · curator → Claude Haiku 4.5</div>
+      </div>
+      <div class="packcard">
+        <div class="packcardtop"><span class="packname">Weekend budget</span><span class="packbadge">Apply</span></div>
+        <div class="packtag">Custom · yours</div>
+        <div class="packroster">
+          <span class="packrolerow"><span class="pg anthropic">✳</span><span class="packrolename">orchestrator</span><span class="packarrow">→</span><span class="packmodelname">Claude Sonnet 4.6</span></span>
+          <span class="packrolerow"><span class="pg anthropic">✳</span><span class="packrolename">architect</span><span class="packarrow">→</span><span class="packmodelname">Claude Opus 4.8</span></span>
+          <span class="packrolerow"><span class="pg anthropic">✳</span><span class="packrolename">developer</span><span class="packarrow">→</span><span class="packmodelname">Claude Haiku 4.5</span></span>
+          <span class="packrolerow"><span class="pg gemini">✦</span><span class="packrolename">reviewer</span><span class="packarrow">→</span><span class="packmodelname">Gemini 3.5 Flash</span></span>
+          <span class="packrolerow"><span class="pg anthropic">✳</span><span class="packrolename">designer</span><span class="packarrow">→</span><span class="packmodelname">Claude Sonnet 5</span></span>
+        </div>
+        <div class="packsupport">support · sales → Gemini 3.1 Flash-Lite · curator → Gemini 3.1 Flash-Lite</div>
+        <div class="packcardacts"><button class="bpmini">Edit</button><button class="bpmini">Delete</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function setTheme(t, btn) {
+  document.documentElement.dataset.theme = t;
+  document.querySelectorAll('.themes button').forEach(b => b.classList.toggle('on', b === btn));
+}
+</script>
+</body>
+</html>

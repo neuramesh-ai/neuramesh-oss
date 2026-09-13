@@ -1,0 +1,458 @@
+<!doctype html>
+<html data-theme="cream-oak">
+<head>
+<meta charset="utf-8">
+<title>The harness, made visible — recursive run trees, one narrator, parked work</title>
+<style>
+/* Tokens lifted from apps/desktop/src/renderer/src/tokens.css — cream oak + graphite dark. */
+[data-theme='cream-oak'] {
+  --win:#f0e5d3; --bg:#fbf8f4; --panel:#fbf8f4; --panel2:#f6eee1; --panel3:#efe1cd;
+  --border:#e6dbca; --border2:#d3c2a8;
+  --text:#2a1c13; --body:#574838; --muted:#97846c; --dim:#b5a289;
+  --link:#9c5730; --accent:#834a2b; --accent-ink:#fff7ee; --accent-soft:#f1e3d2; --orch:#6a63bc;
+  --btn:#f8f2e8; --btn-fg:#43301f; --btn-hover:#efe4d2;
+  --green:#2f9e6b; --green-soft:#e3f0e8; --violet:#7d6cc4; --violet-soft:#ece7fc;
+  --prog:#4f80c4; --done:#0f9d63; --blocked:#7d7f86; --review:#6d5ce0; --plan:#2c7d88;
+  --role-orch:#6a63bc; --role-design:#b0498f; --role-rev:#4f7bb0; --role-dev:#3f9268; --role-tone:14%;
+  --shadow:rgba(70,42,18,0.16); --code:#2b2018; --codeink:#f3e6d8; --overlay:#fff;
+  --card:#fff; --card-border:#eadfce;
+  --shadow-card:0 1px 2px rgba(70,42,18,.05);
+  --shadow-sheet:0 8px 26px -8px rgba(70,42,18,.16),0 1px 2px rgba(70,42,18,.05);
+  --shadow-pop:0 20px 55px -14px rgba(70,42,18,.30);
+  --hover-bg:color-mix(in srgb, var(--text) 5%, transparent);
+  --sel-bg:color-mix(in srgb, var(--accent) 8%, transparent);
+}
+[data-theme='dark'] {
+  --win:#0d0d0d; --bg:#141414; --panel:#191919; --panel2:#212121; --panel3:#2b2b2b;
+  --border:#272727; --border2:#383838;
+  --text:#eaeaea; --body:#b6b6b6; --muted:#898989; --dim:#676767;
+  --link:#d19a72; --accent:var(--text); --accent-ink:#101010; --accent-soft:var(--panel3); --orch:#9793d2;
+  --btn:#232323; --btn-fg:#efefef; --btn-hover:#2f2f2f;
+  --green:#77ac8d; --green-soft:#16241a; --violet:#a89ccf; --violet-soft:#1c1936;
+  --prog:#8ba0c0; --done:#77ac8d; --blocked:#9ca0a8; --review:#a89ccf; --plan:#7fa5ab;
+  --role-orch:#9793d2; --role-design:#cc8fb9; --role-rev:#7ba1c4; --role-dev:#77ac8d; --role-tone:17%;
+  --shadow:rgba(0,0,0,0.62); --code:#0a0a0a; --codeink:#e8e8e8; --overlay:#222;
+  --card:#1e1e1e; --card-border:#2c2c2c;
+  --shadow-card:0 1px 2px rgba(0,0,0,.25);
+  --shadow-sheet:inset 0 1px 0 rgba(255,255,255,.05),0 12px 30px -6px rgba(0,0,0,.5);
+  --shadow-pop:0 20px 55px -14px rgba(0,0,0,.65);
+  --hover-bg:color-mix(in srgb, var(--text) 7%, transparent);
+  --sel-bg:color-mix(in srgb, var(--text) 10%, transparent);
+}
+:root{
+  --fdisp:'Source Serif 4 Variable',Georgia,serif;
+  --fbody:'Geist Variable',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --fmono:'Geist Mono Variable',ui-monospace,'SF Mono',Menlo,monospace;
+  --r-xs:6px; --r-sm:8px; --r-md:10px; --r-lg:13px; --r-xl:18px; --r-full:999px;
+  --dur-fast:.12s; --dur:.15s; --dur-enter:.22s; --ease:cubic-bezier(.22,1,.36,1);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--win);color:var(--body);font:14px/1.6 var(--fbody);padding:34px 26px 80px}
+.page{max-width:1180px;margin:0 auto}
+h1{font:700 27px/1.25 var(--fdisp);color:var(--text);letter-spacing:-.01em;margin-bottom:8px}
+.sub{color:var(--muted);font-size:13.5px;max-width:78ch;margin-bottom:4px}
+h2{font:640 12px var(--fmono);letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin:36px 0 12px}
+h3{font:640 10.5px var(--fmono);letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin:0 0 9px}
+.note{background:var(--panel2);border:1px solid var(--border);border-radius:var(--r-lg);padding:13px 16px;font-size:13px;color:var(--body);margin:14px 0 4px}
+.note b{color:var(--text)}
+.note.rule{border-left:2px solid var(--accent)}
+code{font:12px var(--fmono);background:color-mix(in srgb,var(--text) 7%,transparent);padding:1px 5px;border-radius:5px;color:var(--text)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
+@media (max-width:900px){.row2{grid-template-columns:1fr}}
+
+/* the sheet a scene sits on — the frame model: --win frame, --bg sheet */
+.sheet{background:var(--bg);border:1px solid var(--card-border);border-radius:var(--r-xl);box-shadow:var(--shadow-sheet);padding:16px 18px}
+.thread{max-width:600px}
+
+/* ── message + run card: lifted verbatim from tokens.css §Runs ─────────────────── */
+.msg{display:flex;gap:10px;padding:7px 0}
+.av{flex:none;width:26px;height:26px;border-radius:8px;background:var(--panel3);display:grid;place-items:center;font:650 11px var(--fmono);color:var(--body)}
+.msg .body{min-width:0;flex:1}
+.head{display:flex;align-items:center;gap:7px;margin-bottom:1px}
+.head b{font-size:12.5px;color:var(--text)}
+.time{font-size:10.5px;color:var(--dim)}
+.rolechip{font:650 9px var(--fmono);letter-spacing:.06em;text-transform:uppercase;padding:2px 6px;border-radius:var(--r-full)}
+.rolechip[data-role=orchestrator]{background:color-mix(in srgb,var(--role-orch) var(--role-tone),transparent);color:var(--role-orch)}
+.rolechip[data-role=designer]{background:color-mix(in srgb,var(--role-design) var(--role-tone),transparent);color:var(--role-design)}
+.rolechip[data-role=reviewer]{background:color-mix(in srgb,var(--role-rev) var(--role-tone),transparent);color:var(--role-rev)}
+.rolechip[data-role=developer]{background:color-mix(in srgb,var(--role-dev) var(--role-tone),transparent);color:var(--role-dev)}
+
+.runcard{margin-top:4px;max-width:560px;border:1px solid var(--card-border);background:var(--card);border-radius:12px;padding:9px 11px 8px;box-shadow:var(--shadow-card)}
+.runhead{display:flex;align-items:center;gap:9px;width:100%;padding:0;background:none;border:0;font:inherit;color:inherit;text-align:left;cursor:pointer}
+.runtitle{font-size:12.5px;font-weight:650;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.runmeta{margin-left:auto;display:inline-flex;align-items:center;gap:8px;flex:none}
+.runclock{font:600 10.5px var(--fmono);color:var(--dim);font-variant-numeric:tabular-nums}
+.chip{display:inline-flex;align-items:center;gap:5px;font:650 9.5px var(--fmono);letter-spacing:.08em;padding:3px 9px;border-radius:var(--r-full);text-transform:uppercase;white-space:nowrap}
+.chip.c-run-running{background:color-mix(in srgb,var(--prog) 16%,transparent);color:var(--prog)}
+.chip.c-run-done{background:color-mix(in srgb,var(--done) 16%,transparent);color:var(--done)}
+.chip.c-run-parked{background:color-mix(in srgb,var(--text) 9%,transparent);color:var(--muted)}
+.chip.c-run-failed{background:color-mix(in srgb,var(--blocked) 16%,transparent);color:var(--blocked)}
+.rring{--frac:0%;flex:none;width:15px;height:15px;border-radius:50%;
+  background:conic-gradient(var(--text) var(--frac),var(--panel3) 0);
+  -webkit-mask:radial-gradient(circle at 50% 50%,transparent 4.2px,#000 4.7px);
+  mask:radial-gradient(circle at 50% 50%,transparent 4.2px,#000 4.7px);
+  animation:nm-ringpulse 1.8s ease-in-out infinite}
+.rring.settled{animation:none;background:conic-gradient(var(--done) 100%,var(--panel3) 0)}
+/* NEW — a parked ring HOLDS its fraction and stops breathing: still open, not working */
+.rring.parked{animation:none}
+@keyframes nm-ringpulse{0%,100%{opacity:1}50%{opacity:.62}}
+
+.runlegs{display:flex;flex-direction:column;gap:1px;margin-top:8px}
+.leg{display:flex;align-items:center;gap:8px;min-width:0;padding:4px 7px;border-radius:7px;animation:nm-fadein .18s ease}
+.leg.on{background:var(--sel-bg)}
+.leg.on.sub{background:none}
+/* depth is the indent — the existing .sub rule, now applied per level */
+.leg.d1{margin-left:18px}.leg.d2{margin-left:36px}.leg.d3{margin-left:54px}
+.legmark{flex:none;width:13px;display:grid;place-items:center;color:var(--done)}
+.legdot{width:6px;height:6px;border-radius:99px;background:var(--text);animation:nm-pulse 1.4s ease-in-out infinite}
+.legstop{width:8px;height:8px;border-radius:99px;border:1.5px solid var(--blocked)}
+/* NEW — the parked mark is a PAUSE BAR PAIR. Shape carries state; the hue stays out of it,
+   which is the runs/beats stance ("pulse / check / bar" was already the vocabulary). */
+.legpark{display:flex;gap:2px}
+.legpark i{display:block;width:2px;height:8px;border-radius:1px;background:var(--muted)}
+.legname{font-size:11.5px;color:var(--body);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.leg.on .legname{color:var(--text);font-weight:600}
+.leg.stopped .legname,.leg.parked .legname{color:var(--muted)}
+.legverb{min-width:0;font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.legverb.shine{background:linear-gradient(90deg,var(--muted) 0 40%,var(--text) 50%,var(--muted) 60% 100%);background-size:220% 100%;
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;animation:shine 2.4s linear infinite}
+@keyframes shine{from{background-position:130% 0}to{background-position:-30% 0}}
+.legnum{margin-left:auto;flex:none;font:600 10px var(--fmono);color:var(--dim);font-variant-numeric:tabular-nums}
+/* NEW — a leg's seat: role + model, mono dim. Answers "which subagent is this, on what". */
+.legseat{flex:none;font:600 9.5px var(--fmono);color:var(--dim);letter-spacing:.03em}
+.runfoot{display:flex;align-items:center;gap:8px;margin-top:8px;padding-top:7px;border-top:1px solid var(--border)}
+.runbtn{display:inline-flex;align-items:center;padding:3.5px 10px 4px;border-radius:var(--r-md);border:1px solid var(--border);background:transparent;color:var(--muted);font:600 11px var(--fbody);cursor:pointer;transition:color var(--dur-fast) var(--ease),border-color var(--dur-fast) var(--ease)}
+.runbtn:hover{color:var(--text);border-color:var(--border2)}
+.runnote{margin-left:auto;font-size:10.5px;color:var(--dim)}
+/* NEW — the subtree roll-up, so a collapsed card still says what it is doing */
+.runroll{display:flex;align-items:center;gap:7px;margin-top:7px;flex-wrap:wrap}
+.rollchip{font:600 10px var(--fmono);color:var(--muted);background:color-mix(in srgb,var(--text) 6%,transparent);padding:2.5px 7px;border-radius:var(--r-full)}
+@keyframes nm-pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.45;transform:scale(.82)}}
+@keyframes nm-fadein{from{opacity:0}to{opacity:1}}
+@keyframes nm-rise{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
+
+/* ── the ghost bubble (emitStream) + the dock line ───────────────────────────── */
+.ghost{display:flex;gap:10px;padding:7px 0;opacity:.96}
+.gbody{font-size:13.5px;color:var(--body);max-width:520px}
+.gdots{display:inline-flex;gap:3px;vertical-align:middle;margin-left:4px}
+.gdots i{width:4px;height:4px;border-radius:99px;background:var(--muted);animation:nm-pulse 1.2s ease-in-out infinite}
+.gdots i:nth-child(2){animation-delay:.18s}.gdots i:nth-child(3){animation-delay:.36s}
+.composer{margin-top:10px;background:var(--card);border:1px solid var(--card-border);border-radius:var(--r-lg);box-shadow:var(--shadow-card);padding:10px 12px;color:var(--dim);font-size:13px}
+.dockline{display:flex;align-items:center;gap:8px;padding:5px 4px 7px;font-size:11.5px;min-width:0}
+.dockline .rring{width:12px;height:12px;-webkit-mask:radial-gradient(circle at 50% 50%,transparent 3.2px,#000 3.7px);mask:radial-gradient(circle at 50% 50%,transparent 3.2px,#000 3.7px)}
+.dockwho{font-weight:650;color:var(--text);flex:none}
+.dockpath{font:600 10px var(--fmono);color:var(--dim);flex:none}
+.docknum{margin-left:auto;font:600 10px var(--fmono);color:var(--dim);flex:none}
+
+/* ── permission card (nmq) ──────────────────────────────────────────────────── */
+.qcard{max-width:520px;margin-top:4px;background:var(--card);border:1px solid var(--card-border);border-radius:var(--r-lg);box-shadow:var(--shadow-card);padding:12px 14px}
+.qtitle{font:640 15px/1.35 var(--fdisp);color:var(--text);margin-bottom:3px}
+.qwhy{font-size:12.5px;color:var(--muted);margin-bottom:9px}
+.qprov{display:flex;align-items:center;gap:6px;font:600 10px var(--fmono);color:var(--dim);margin-bottom:9px;flex-wrap:wrap}
+.qprov .arrow{color:var(--border2)}
+.qcode{font:11.5px var(--fmono);background:var(--code);color:var(--codeink);padding:8px 10px;border-radius:var(--r-sm);margin-bottom:10px;overflow-x:auto;white-space:pre}
+.qbtns{display:flex;gap:8px}
+.btn{border:0;cursor:pointer;font:650 12px var(--fbody);padding:7px 16px;border-radius:var(--r-full)}
+.btn.primary{background:var(--accent);color:var(--accent-ink)}
+.btn.ghost{background:transparent;color:var(--body);border:1px solid var(--border2)}
+.risk{font:650 9px var(--fmono);letter-spacing:.06em;text-transform:uppercase;padding:2px 6px;border-radius:var(--r-full);background:color-mix(in srgb,var(--blocked) 16%,transparent);color:var(--blocked)}
+
+/* ── beats tracker ──────────────────────────────────────────────────────────── */
+.beats{max-width:420px;background:var(--card);border:1px solid var(--card-border);border-radius:var(--r-lg);padding:10px 12px;box-shadow:var(--shadow-card)}
+.beatrow{display:flex;align-items:center;gap:8px;padding:3px 0;font-size:11.5px}
+.beatrow .m{flex:none;width:12px;display:grid;place-items:center;color:var(--done)}
+.beatrow.on{color:var(--text);font-weight:600}
+.beatrow.todo{color:var(--dim)}
+.empty{font:640 13px/1.5 var(--fdisp);color:var(--muted);padding:14px 4px;text-align:center}
+
+/* ── the brain / move-machine flow ──────────────────────────────────────────── */
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+@media (max-width:900px){.steps{grid-template-columns:1fr 1fr}}
+.step{background:var(--card);border:1px solid var(--card-border);border-radius:var(--r-lg);padding:12px;box-shadow:var(--shadow-card)}
+.kick{font:650 9px var(--fmono);letter-spacing:.09em;text-transform:uppercase;color:var(--dim);margin-bottom:6px}
+.step b{display:block;font:640 14px/1.3 var(--fdisp);color:var(--text);margin-bottom:4px}
+.step p{font-size:12px;color:var(--muted);line-height:1.5}
+.tierbox{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.tier{display:flex;align-items:center;gap:9px;background:var(--card);border:1px solid var(--card-border);border-radius:var(--r-md);padding:8px 11px;font-size:12px}
+.tier .t{font:650 9.5px var(--fmono);letter-spacing:.06em;padding:2px 7px;border-radius:var(--r-full);flex:none}
+.tier.a .t{background:color-mix(in srgb,var(--done) 16%,transparent);color:var(--done)}
+.tier.b .t{background:color-mix(in srgb,var(--prog) 16%,transparent);color:var(--prog)}
+.tier.c .t{background:color-mix(in srgb,var(--blocked) 16%,transparent);color:var(--blocked)}
+.tier em{color:var(--muted);font-style:normal;margin-left:auto;font:600 10px var(--fmono);flex:none}
+
+/* ── the wrong-way panel ────────────────────────────────────────────────────── */
+.bad{border:1px dashed color-mix(in srgb,var(--blocked) 55%,transparent);border-radius:var(--r-lg);padding:12px;background:color-mix(in srgb,var(--blocked) 6%,transparent)}
+.tag{font:650 9.5px var(--fmono);letter-spacing:.07em;text-transform:uppercase;padding:2px 7px;border-radius:var(--r-full);margin-bottom:8px;display:inline-block}
+.tag.no{background:color-mix(in srgb,var(--blocked) 18%,transparent);color:var(--blocked)}
+.tag.yes{background:color-mix(in srgb,var(--done) 16%,transparent);color:var(--done)}
+.good{border:1px solid var(--card-border);border-radius:var(--r-lg);padding:12px;background:var(--bg)}
+
+/* controls */
+.bar{display:flex;gap:8px;align-items:center;margin:18px 0 2px;flex-wrap:wrap}
+.tbtn{background:var(--card);border:1px solid var(--border2);color:var(--body);font:650 11.5px var(--fbody);padding:6px 13px;border-radius:var(--r-full);cursor:pointer}
+.tbtn[aria-pressed=true]{background:var(--accent);color:var(--accent-ink);border-color:transparent}
+.stepnote{font:600 10.5px var(--fmono);color:var(--dim)}
+@media (prefers-reduced-motion:reduce){
+  .legdot,.rring,.gdots i{animation:none}
+  .legverb.shine{animation:none;background:none;-webkit-text-fill-color:currentColor;color:var(--body)}
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+<h1>The harness, made visible</h1>
+<p class="sub">What lands on screen when the harness ships: a run tree that nests as deep as the work goes, <b>one</b> narrator for a whole subtree, a parked state for work that waits, permission cards that say which subagent asked, and a brain you can carry to a new machine. Every token here is lifted from <code>tokens.css</code>; every idiom is an existing one, extended.</p>
+
+<div class="note rule"><b>The one rule this round exists to settle.</b> A turn tree can have twelve agents in it. Twelve narrators is not a feature, it is the regression docs/26 spent a release deleting. So: <b>the parent's run card is the single narrator for its whole subtree</b> — a subagent never mints its own ghost bubble and never its own card. It is a row inside its parent, indented by depth.</p></div>
+
+<!-- ════════════════ 1 ════════════════ -->
+<h2>1 · The run tree, three levels deep · cream oak</h2>
+<p class="sub">Rex fans out three designers; one of them fans out two of its own. The card is the same <code>.runcard</code> that ships today — what is new is that <code>runTrees()</code> recurses, each level takes the existing <code>.leg.sub</code> indent, and every leg names its seat.</p>
+
+<div class="sheet thread">
+  <div class="msg">
+    <span class="av" style="background:color-mix(in srgb,var(--role-orch) 22%,transparent);color:var(--role-orch)">RX</span>
+    <div class="body">
+      <div class="head"><b>rex</b><span class="rolechip" data-role="orchestrator">orchestrator</span><span class="time">now</span></div>
+      <div class="runcard">
+        <button type="button" class="runhead">
+          <span class="rring" style="--frac:46%"></span>
+          <span class="runtitle">three directions for the settings screen</span>
+          <span class="runmeta"><span class="chip c-run-running">running</span><span class="runclock">4:12</span></span>
+        </button>
+        <div class="runlegs">
+          <div class="leg on"><span class="legmark"><span class="legdot"></span></span><span class="legname">fanning out · 3 designers, 2 reviewers</span><span class="legnum">3/7</span></div>
+
+          <div class="leg d1 done"><span class="legmark">✓</span><span class="legname">direction A — progressive disclosure</span><span class="legseat">designer · opus</span><span class="legverb">3 mockups</span></div>
+
+          <div class="leg d1 on sub"><span class="legmark"><span class="legdot"></span></span><span class="legname">direction B — one long page</span><span class="legseat">designer · opus</span><span class="legverb shine">fanned out 2</span></div>
+          <div class="leg d2 done"><span class="legmark">✓</span><span class="legname">token audit for the long form</span><span class="legseat">designer · haiku</span></div>
+          <div class="leg d2 on sub"><span class="legmark"><span class="legdot"></span></span><span class="legname">empty + error states</span><span class="legseat">designer · haiku</span><span class="legverb shine">writing states.html</span></div>
+
+          <div class="leg d1 on sub"><span class="legmark"><span class="legdot"></span></span><span class="legname">direction C — split by audience</span><span class="legseat">designer · sonnet</span><span class="legverb shine">studying tokens.css</span></div>
+
+          <div class="leg d1 stopped"><span class="legmark"><span class="legstop"></span></span><span class="legname">accessibility pass</span><span class="legseat">reviewer · sonnet</span><span class="legverb">budget exhausted</span></div>
+        </div>
+        <div class="runroll">
+          <span class="rollchip">3 designers</span><span class="rollchip">2 reviewers</span><span class="rollchip">depth 3</span><span class="rollchip">1 failed</span>
+        </div>
+        <div class="runfoot">
+          <button type="button" class="runbtn">Activity</button>
+          <span class="runnote">rex reports here when the tree settles</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="note"><b>Four component changes, all small.</b> <code>RunTree</code> becomes <code>{ run, legs: RunTree[] }</code> instead of a flat array, and <code>runTrees()</code> recurses (today a grandchild is <em>orphaned</em>, not flattened — its parent is filtered out of the root list, so it renders nowhere). <code>.leg.sub</code> becomes <code>.leg.d1/.d2/.d3</code>. Two new elements: <code>.legseat</code> (role · model) and <code>.runroll</code> (the subtree roll-up, so a <em>collapsed</em> card still states its shape). The existing rule that a fanned-out row drops its fill — <code>.leg.on.sub{background:none}</code> — is what keeps a deep tree from reading as stripes, and it already anticipated this.</div>
+
+<!-- ════════════════ 2 ════════════════ -->
+<h2>2 · The same tree, collapsed past depth 2 · graphite</h2>
+<p class="sub">Depth is unbounded, attention is not. Past the second level a parent shows a count instead of its children, and clicking it expands that branch alone.</p>
+
+<div class="sheet thread" data-theme="dark">
+  <div class="msg">
+    <span class="av" style="background:color-mix(in srgb,var(--role-orch) 22%,transparent);color:var(--role-orch)">RX</span>
+    <div class="body">
+      <div class="head"><b>rex</b><span class="rolechip" data-role="orchestrator">orchestrator</span><span class="time">now</span></div>
+      <div class="runcard">
+        <button type="button" class="runhead">
+          <span class="rring" style="--frac:46%"></span>
+          <span class="runtitle">three directions for the settings screen</span>
+          <span class="runmeta"><span class="chip c-run-running">running</span><span class="runclock">4:12</span></span>
+        </button>
+        <div class="runlegs">
+          <div class="leg on"><span class="legmark"><span class="legdot"></span></span><span class="legname">fanning out · 3 designers, 2 reviewers</span><span class="legnum">3/7</span></div>
+          <div class="leg d1 done"><span class="legmark">✓</span><span class="legname">direction A — progressive disclosure</span><span class="legseat">designer · opus</span><span class="legverb">3 mockups</span></div>
+          <div class="leg d1 on sub"><span class="legmark"><span class="legdot"></span></span><span class="legname">direction B — one long page</span><span class="legseat">designer · opus</span><span class="legverb shine">2 below · 1 running</span><span class="legnum">▸</span></div>
+          <div class="leg d1 on sub"><span class="legmark"><span class="legdot"></span></span><span class="legname">direction C — split by audience</span><span class="legseat">designer · sonnet</span><span class="legverb shine">studying tokens.css</span></div>
+          <div class="leg d1 stopped"><span class="legmark"><span class="legstop"></span></span><span class="legname">accessibility pass</span><span class="legseat">reviewer · sonnet</span><span class="legverb">budget exhausted</span></div>
+        </div>
+        <div class="runroll"><span class="rollchip">3 designers</span><span class="rollchip">2 reviewers</span><span class="rollchip">depth 3</span><span class="rollchip">1 failed</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════ 3 ════════════════ -->
+<h2>3 · Event streaming — who is allowed to narrate</h2>
+<p class="sub">The harness streams four kinds of event: text deltas, tool intents, run/beat progress, and settle. With a tree, the question is not <em>what</em> streams but <em>where it lands</em>.</p>
+
+<div class="row2">
+  <div class="bad">
+    <span class="tag no">✗ what we must not build</span>
+    <div class="ghost"><span class="av">RX</span><div class="gbody">Let me start on the settings screen<span class="gdots"><i></i><i></i><i></i></span></div></div>
+    <div class="ghost"><span class="av">D1</span><div class="gbody">I'll take progressive disclosure<span class="gdots"><i></i><i></i><i></i></span></div></div>
+    <div class="ghost"><span class="av">D2</span><div class="gbody">Reading tokens.css now<span class="gdots"><i></i><i></i><i></i></span></div></div>
+    <div class="ghost"><span class="av">D3</span><div class="gbody">Auditing the long form<span class="gdots"><i></i><i></i><i></i></span></div></div>
+    <p style="font-size:12px;color:var(--muted);margin-top:8px">Every subagent gets a bubble. Four narrators for one piece of work, three of which the human never asked for and cannot act on. At depth 3 with twelve legs this is unreadable — and it is exactly the duplicate-narrator defect docs/26 deleted.</p>
+  </div>
+  <div class="good">
+    <span class="tag yes">✓ the rule</span>
+    <div class="msg" style="padding-top:0">
+      <span class="av" style="background:color-mix(in srgb,var(--role-orch) 22%,transparent);color:var(--role-orch)">RX</span>
+      <div class="body">
+        <div class="head"><b>rex</b><span class="time">now</span></div>
+        <div class="runcard" style="max-width:none">
+          <button type="button" class="runhead"><span class="rring" style="--frac:46%"></span><span class="runtitle">three directions for the settings screen</span><span class="runmeta"><span class="runclock">4:12</span></span></button>
+          <div class="runlegs">
+            <div class="leg on"><span class="legmark"><span class="legdot"></span></span><span class="legname">fanning out</span><span class="legnum">3/7</span></div>
+            <div class="leg d1 on sub"><span class="legmark"><span class="legdot"></span></span><span class="legname">direction C</span><span class="legverb shine">studying tokens.css</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p style="font-size:12px;color:var(--muted);margin-top:8px">One card. A subagent's text deltas update <b>its leg's verb line</b> and nothing else. Only the level-1 agent's own output streams as a ghost, because only it produces the human-facing reply.</p>
+  </div>
+</div>
+
+<div class="note"><b>Where each event goes, exhaustively.</b> A <code>text delta</code> from a subagent → its leg's <code>.legverb</code>, never a bubble. A delta from the <b>level-1 agent</b> → the ghost bubble, as today. A <code>tool intent</code> → the activity log; only an <code>ask</code> surfaces, as a card (§5). <code>progress</code> → the leg row and the beats tracker. <code>settle</code> → the leg's mark, then the parent's summary. Nothing else reaches the thread, and there is deliberately no fifth surface.</div>
+
+<h3 style="margin-top:22px">The dock line, when the card has scrolled away</h3>
+<p class="sub">One line in the ticker slot above the composer — the existing <code>RunDock</code>, which already stands down while its card is on screen. With a tree it shows the <b>deepest active leaf</b> plus its path, so a scrolled-away tree still says something true rather than something stale.</p>
+
+<div class="sheet thread">
+  <div class="dockline">
+    <span class="rring" style="--frac:46%"></span>
+    <span class="dockwho">rex</span>
+    <span class="dockpath">direction B › empty + error states</span>
+    <span class="legverb shine" style="font-size:11.5px">writing states.html</span>
+    <span class="docknum">3/7</span>
+  </div>
+  <div class="composer">Message #product…</div>
+</div>
+
+<!-- ════════════════ 4 ════════════════ -->
+<h2>4 · Parked — work that waits, and costs nothing while it does</h2>
+<p class="sub">A new <b>non-terminal</b> run state. It keeps its ring, so a parked run still reads as alive; the ring <em>holds</em> its fraction instead of breathing, which is the difference between waiting and working.</p>
+
+<div class="row2">
+  <div class="sheet thread">
+    <div class="msg">
+      <span class="av" style="background:color-mix(in srgb,var(--role-dev) 22%,transparent);color:var(--role-dev)">PT</span>
+      <div class="body">
+        <div class="head"><b>patch</b><span class="rolechip" data-role="developer">developer</span><span class="time">6m</span></div>
+        <div class="runcard">
+          <button type="button" class="runhead">
+            <span class="rring parked" style="--frac:78%"></span>
+            <span class="runtitle">#1046 — fix the mobile nav</span>
+            <span class="runmeta"><span class="chip c-run-parked">parked</span><span class="runclock">18:40</span></span>
+          </button>
+          <div class="runlegs">
+            <div class="leg done"><span class="legmark">✓</span><span class="legname">branch pushed · PR #231 opened</span></div>
+            <div class="leg parked"><span class="legmark"><span class="legpark"><i></i><i></i></span></span><span class="legname">waiting on CI</span><span class="legverb">resumes on the check</span><span class="legnum">4/5</span></div>
+          </div>
+          <div class="runfoot"><button type="button" class="runbtn">Activity</button><span class="runnote">no tokens spent while parked</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div>
+    <div class="note" style="margin-top:0"><b>Why it needs a shape, not a colour.</b> The runs card is monochrome by design — <em>"SHAPE carries state (pulse / check / bar), the hue stays out of it."</em> Bar was already in that vocabulary, so parked is a <b>pause-bar pair</b>: unmistakable against the pulsing dot (running), the check (done) and the hollow ring (stopped), with no new hue.</div>
+    <div class="note"><b>The prompt paragraph that gets deleted.</b> Today's worker prompt tells the model <em>"nothing you start survives it… no scheduled check-in that calls you back."</em> When park ships, that stops being true and comes out. This card is what replaces it on screen.</div>
+    <div class="note"><b>Where it already fits.</b> <code>isRunOpen</code> stays true for parked, so the rail's live row, the run dock, and the phase ring all keep painting it without a change. Only <code>RunMark</code> gains a branch and <code>RUN_STATES</code> gains a member.</div>
+  </div>
+</div>
+
+<!-- ════════════════ 5 ════════════════ -->
+<h2>5 · Permission cards, now with provenance · graphite</h2>
+<p class="sub">The gate reaches every runtime and every depth — so for the first time a card can be raised by something that is not a teammate. It has to say what, and whose.</p>
+
+<div class="sheet" data-theme="dark" style="max-width:620px">
+  <div class="msg">
+    <span class="av" style="background:color-mix(in srgb,var(--role-orch) 22%,transparent);color:var(--role-orch)">RX</span>
+    <div class="body">
+      <div class="head"><b>rex</b><span class="time">now</span></div>
+      <div class="qcard">
+        <div class="qtitle">rex wants to run a shell command in #1046</div>
+        <div class="qwhy">I need to install the design-token linter before I can check the three rounds against tokens.css.</div>
+        <div class="qprov">
+          <span>rex</span><span class="arrow">›</span><span>direction b</span><span class="arrow">›</span><span>token audit</span>
+          <span class="risk">high · shell.exec</span>
+        </div>
+        <div class="qcode">pnpm add -D @nm/token-lint</div>
+        <div class="qbtns"><button class="btn primary">Approve</button><button class="btn ghost">Deny</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="note"><b>One new line, and it is load-bearing.</b> <code>.qprov</code> is the turn path — the level-1 agent, then each subagent down to the one that asked. The card still says <b>rex</b> in its title, because rex is the actor and the one accountable; the path says which part of rex's tree wants it. Approving grants <em>that call</em>, never the branch. The card body is unchanged otherwise: the agent's own stated intent, the full command in a code block, the risk tier from <code>policyGateOutcome</code>.</div>
+
+<!-- ════════════════ 6 ════════════════ -->
+<h2>6 · Beats, on runtimes that never had them</h2>
+<p class="sub">No new component — a tracker that was structurally empty for two thirds of the fleet now fills, because beats become a bus tool instead of a magic string the model had to remember to print.</p>
+
+<div class="row2">
+  <div>
+    <span class="tag no">✗ today · a codex-seated worker</span>
+    <div class="beats" style="margin-top:8px"><div class="empty">No steps declared</div></div>
+    <p style="font-size:12px;color:var(--muted);margin-top:8px">The agent is working. It cannot say so: <code>declare_beats</code> is a Claude-only tool, and the fallback is asking the model to echo <code>NM_BEAT_DONE</code> into stdout.</p>
+  </div>
+  <div>
+    <span class="tag yes">✓ after P0 · the same worker</span>
+    <div class="beats" style="margin-top:8px">
+      <div class="beatrow"><span class="m">✓</span><span>read the failing spec</span></div>
+      <div class="beatrow"><span class="m">✓</span><span>reproduce on iOS 17</span></div>
+      <div class="beatrow on"><span class="m"><span class="legdot"></span></span><span>patch the nav height</span></div>
+      <div class="beatrow todo"><span class="m">·</span><span>run the suite</span></div>
+      <div class="beatrow todo"><span class="m">·</span><span>push + open the PR</span></div>
+    </div>
+    <p style="font-size:12px;color:var(--muted);margin-top:8px">Identical to a Claude-seated worker, because availability is now a property of the turn rather than the seat.</p>
+  </div>
+</div>
+
+<!-- ════════════════ 7 ════════════════ -->
+<h2>7 · Move to a new machine — the one genuinely new surface</h2>
+<p class="sub">Everything above extends a component that exists. This is the exception: a settings flow for exporting a brain, restoring it, and adopting the agents onto the new machine.</p>
+
+<div class="steps">
+  <div class="step"><div class="kick">step 1 · old machine</div><b>Export</b><p>Tier A — your agents' ledgers, notes and produced files — as one encrypted archive. A passphrase is required; there is no plain export.</p></div>
+  <div class="step"><div class="kick">step 2 · new machine</div><b>Import</b><p>Unpack into <code>~/.neuramesh</code>. Refuses to land on an existing brain unless you say <em>merge</em> or <em>replace</em>.</p></div>
+  <div class="step"><div class="kick">step 3</div><b>Sign in</b><p>Projects, conversations, tasks and artifacts arrive from sync — they were never in the archive, because they were never only local.</p></div>
+  <div class="step"><div class="kick">step 4</div><b>Adopt agents</b><p>Re-point this workspace's hosted agents at this machine. Explicit and confirmed — two machines legitimately share a workspace.</p></div>
+</div>
+
+<div class="tierbox">
+  <div class="tier a"><span class="t">TIER A</span><span>Ledgers · notes · produced files · attachments · settings</span><em>in the archive</em></div>
+  <div class="tier b"><span class="t">TIER B</span><span>The replica and the activity log</span><em>optional · rebuildable</em></div>
+  <div class="tier c"><span class="t">TIER C</span><span>Worktrees · clones · sessions · keychain credentials · CLI logins</span><em>never travels</em></div>
+</div>
+
+<div class="note"><b>Two sentences of copy that carry the whole security model.</b> On the export screen: <em>"Your model keys and sign-in stay on this machine. You'll sign in again on the new one."</em> On the adopt screen: <em>"rex, patch and iris are hosted on <b>MacBook Pro (old)</b>. Move them here?"</em> — naming the machine that still owns them, because silently stealing agents from a running machine is the worse failure.</div>
+
+<h2>8 · Every component this round touches</h2>
+<div class="tierbox">
+  <div class="tier"><span class="t" style="background:color-mix(in srgb,var(--done) 16%,transparent);color:var(--done)">EXTEND</span><span><code>RunCard</code> · <code>runTrees()</code> · <code>RunMark</code> — recursion, <code>.legseat</code>, <code>.runroll</code>, the parked branch</span><em>App.tsx:1938–2024</em></div>
+  <div class="tier"><span class="t" style="background:color-mix(in srgb,var(--done) 16%,transparent);color:var(--done)">EXTEND</span><span><code>RunDock</code> — deepest active leaf + path</span><em>App.tsx:2034</em></div>
+  <div class="tier"><span class="t" style="background:color-mix(in srgb,var(--done) 16%,transparent);color:var(--done)">EXTEND</span><span>Permission card — the <code>.qprov</code> turn path</span><em>policygate.ts</em></div>
+  <div class="tier"><span class="t" style="background:color-mix(in srgb,var(--prog) 16%,transparent);color:var(--prog)">TOKENS</span><span><code>.rring.parked</code> · <code>.legpark</code> · <code>.leg.d1–d3</code> · <code>.legseat</code> · <code>.runroll</code> · <code>.chip.c-run-parked</code></span><em>tokens.css §Runs</em></div>
+  <div class="tier"><span class="t" style="background:color-mix(in srgb,var(--prog) 16%,transparent);color:var(--prog)">TYPES</span><span><code>RUN_STATES += 'parked'</code> (not terminal) · <code>RunTree.legs: RunTree[]</code></span><em>shared/runs.ts</em></div>
+  <div class="tier"><span class="t" style="background:color-mix(in srgb,var(--blocked) 16%,transparent);color:var(--blocked)">NEW</span><span>Move-to-a-new-machine flow — export · import · adopt</span><em>Settings</em></div>
+  <div class="tier"><span class="t" style="background:color-mix(in srgb,var(--text) 8%,transparent);color:var(--muted)">UNCHANGED</span><span>Beats tracker · phase ring · rail rows · board cards · tab strip · the thread</span><em>fill in by themselves</em></div>
+</div>
+
+<div class="note rule" style="margin-top:26px"><b>What this round is asking for.</b> Sign-off on the narrator rule (§3) and the parked shape (§4) before P0 starts, since both are contracts the implementation will be gated against. The recursion (§1–2) and the provenance line (§5) follow from decisions already made. §7 is the only new surface and can slip to P2 without blocking anything.</div>
+
+<div class="bar">
+  <button class="tbtn" id="tt" aria-pressed="false">Flip every scene to graphite</button>
+  <span class="stepnote">both themes are required evidence — docs/33 §9.9</span>
+</div>
+
+</div>
+<script>
+// The only interactivity: flip the page + every nested scene, so both themes can be reviewed
+// without two files. Scenes that are deliberately pinned to one theme are marked data-pin.
+document.getElementById('tt').addEventListener('click', (e) => {
+  const on = e.currentTarget.getAttribute('aria-pressed') === 'true';
+  const next = on ? 'cream-oak' : 'dark';
+  e.currentTarget.setAttribute('aria-pressed', String(!on));
+  e.currentTarget.textContent = on ? 'Flip every scene to graphite' : 'Flip every scene to cream oak';
+  document.documentElement.setAttribute('data-theme', next);
+  document.querySelectorAll('[data-theme]:not(html)').forEach((el) => el.setAttribute('data-theme', next));
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Rex suggestion pills — the reply predicts your next move</title>
+<style>
+/* ── Real tokens (tokens.css v1.0, Quiet Graphite current) — dark + cream-oak ── */
+[data-theme] {
+  --font: 'Geist Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --fmono: 'Geist Mono Variable', ui-monospace, 'SF Mono', Menlo, monospace;
+  --dur-fast: .12s; --ease: cubic-bezier(.21,.61,.35,1);
+  --r-sm: 6px; --r-md: 8px; --r-full: 999px;
+}
+[data-theme='dark'] {
+  --win:#141414; --bg:#1d1d1d; --panel:#222222; --panel2:#282828; --panel3:#323232;
+  --border:#2c2c2c; --border2:#3a3a3a;
+  --text:#e6e6e6; --body:#b9b9b9; --muted:#8f8f8f; --dim:#6b6b6b;
+  --accent:var(--text); --link:#9cb1f0;
+  --btn:#313131; --btn-fg:#ebebeb;
+  --prog:#8ba0c0; --review:#a89ccf; --done:#77ac8d; --backlog:#8f9aa6;
+  --role-orch:#9793d2; --role-dev:#77ac8d; --role-rev:#7ba1c4; --role-tone:16%;
+  --card:#232323; --card-border:#313131; --code:#131313; --codeink:#e8e8e8;
+  --ring:#575757; --focus-glow:color-mix(in srgb, var(--accent) 22%, transparent);
+  --hover-bg:color-mix(in srgb, var(--text) 6%, transparent); --sel-bg:color-mix(in srgb, var(--text) 9%, transparent);
+  --hover-border:#464646; --overlay:var(--panel); --shadow:rgba(0,0,0,.5);
+}
+[data-theme='cream-oak'] {
+  --win:#efe6d7; --bg:#f7efe2; --panel:#fffaf2; --panel2:#f4e7d6; --panel3:#ecdcc5;
+  --border:#ecdfcd; --border2:#dbc6ad;
+  --text:#352a20; --body:#5c5040; --muted:#8a7969; --dim:#a8967f;
+  --accent:var(--text); --link:#5348c0;
+  --btn:#efe6d7; --btn-fg:#352a20;
+  --prog:#4f80c4; --review:#6d5ce0; --done:#0f9d63; --backlog:#5d6b7a;
+  --role-orch:#6a63bc; --role-dev:#3f9268; --role-rev:#4f7bb0; --role-tone:14%;
+  --card:#fbf4e9; --card-border:#ecdfcd; --code:#2b2018; --codeink:#f3e6d8;
+  --ring:color-mix(in srgb, var(--accent) 55%, var(--border2)); --focus-glow:color-mix(in srgb, var(--accent) 16%, transparent);
+  --hover-bg:color-mix(in srgb, var(--text) 5%, transparent); --sel-bg:color-mix(in srgb, var(--text) 7%, transparent);
+  --hover-border:color-mix(in srgb, var(--text) 20%, var(--border2)); --overlay:var(--panel); --shadow:rgba(80,50,25,.16);
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#141414; font-family:'Geist Variable',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; }
+.page { max-width:1500px; margin:0 auto; padding:34px 26px 60px; }
+.pagehead { color:#e6e6e6; margin-bottom:14px; }
+.pagehead h1 { font-size:19px; font-weight:650; letter-spacing:-.01em; }
+.pagehead p { color:#8f8f8f; font-size:13px; line-height:1.55; margin-top:6px; max-width:86ch; }
+.pagehead .rule { color:#b9b9b9; }
+.themes { display:grid; grid-template-columns:1fr 1fr; gap:22px; }
+@media (max-width:1100px){ .themes { grid-template-columns:1fr; } }
+.theme { background:var(--bg); border:1px solid var(--border2); border-radius:16px; padding:20px 18px 24px; color:var(--text); }
+.theme > h2 { font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--dim); margin:0 4px 14px; }
+.scene { margin-top:24px; }
+.scene > h3 { font-size:12.5px; font-weight:650; margin:0 4px 4px; }
+.scene > .note { font-size:11.5px; color:var(--muted); line-height:1.55; margin:0 4px 10px; max-width:72ch; }
+.scene .note b { color:var(--body); font-weight:600; }
+.cap { font-size:10px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--dim); margin:14px 4px 6px; }
+.sem { display:flex; gap:7px; align-items:flex-start; margin:9px 4px 0; font-size:11px; color:var(--muted); line-height:1.5; max-width:72ch; }
+.sem .dot { width:6px; height:6px; border-radius:99px; margin-top:4px; flex:none; background:var(--done); }
+.sem.warn .dot { background:var(--dim); }
+.sem b { color:var(--body); font-weight:600; }
+.sem code, .note code { font-family:var(--fmono); font-size:10.5px; color:var(--body); background:var(--hover-bg); border-radius:4px; padding:1px 4px; }
+
+/* ── faithful chat chrome (tokens.css current: .msgs/.msg/.pav/.msg.mine = panel2) ── */
+.msgs { display:flex; flex-direction:column; gap:2px; background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:14px 12px; }
+.msg { display:flex; gap:11px; padding:7px 10px; border-radius:9px; position:relative; }
+.av { width:26px; height:26px; min-width:26px; border-radius:var(--r-sm); display:grid; place-items:center; font-weight:800; font-size:11px; color:var(--body); background:var(--panel3); box-shadow:inset 0 0 0 1px var(--border2); }
+.pav { width:26px; height:26px; min-width:26px; border-radius:8px; display:grid; place-items:center; font-size:14px; background:color-mix(in srgb, var(--rc) var(--role-tone), transparent); box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--rc) 32%, var(--border2)); }
+.pav .pavg { font-style:normal; filter:grayscale(1); }
+.msg .body { min-width:0; flex:1; }
+.msg .head { display:flex; align-items:center; gap:8px; }
+.msg .head b { font-size:12.5px; }
+.rolechip { font-size:8px; font-weight:800; letter-spacing:.5px; text-transform:uppercase; padding:1.5px 5px; border-radius:4px; background:color-mix(in srgb, var(--muted) 16%, transparent); color:color-mix(in srgb, var(--rc) 80%, var(--muted)); }
+.time { font-size:10.5px; color:var(--dim); }
+.msg p { color:var(--body); font-size:13px; line-height:1.5; overflow-wrap:anywhere; margin-top:2px; }
+.msg p b { color:var(--text); font-weight:600; }
+.msg p .taskref { color:var(--link); cursor:pointer; }
+.msg.human .body { flex:0 1 auto; max-width:min(560px, 82%); background:var(--hover-bg); border-radius:12px; padding:7px 12px 8px; }
+.msg.mine { flex-direction:row-reverse; }
+.msg.mine .body { background:var(--panel2); }
+.msg.mine .head { justify-content:flex-end; }
+.typingline { display:flex; align-items:center; gap:8px; padding:4px 10px 2px 47px; color:var(--dim); font-size:11px; }
+.typingline .tdots i { display:inline-block; width:4px; height:4px; border-radius:99px; background:var(--dim); margin-right:3px; animation:tp 1.2s infinite; }
+.typingline .tdots i:nth-child(2){ animation-delay:.2s } .typingline .tdots i:nth-child(3){ animation-delay:.4s }
+@keyframes tp { 0%,60%,100%{opacity:.35} 30%{opacity:1} }
+
+/* task state chips (the real .chip ramp) */
+.chip { display:inline-flex; align-items:center; gap:5px; font-size:9.5px; font-weight:800; letter-spacing:.5px; padding:2.5px 8px; border-radius:5px; text-transform:uppercase; white-space:nowrap; }
+.c-in_progress { background:color-mix(in srgb, var(--prog) 16%, transparent); color:var(--prog); }
+.c-in_review { background:color-mix(in srgb, var(--review) 16%, transparent); color:var(--review); }
+.c-backlog { background:color-mix(in srgb, var(--backlog) 16%, transparent); color:var(--backlog); }
+
+/* nmq question card (real .qcard/.qopt — shown for the suppression rule) */
+.qcard { border:1px solid var(--card-border); background:var(--card); border-radius:var(--r-md); padding:10px 12px; margin:6px 0; max-width:480px; }
+.qcard .qhead { font-size:12.5px; font-weight:700; margin-bottom:8px; }
+.qopt { display:flex; flex-direction:column; align-items:flex-start; gap:1px; width:100%; text-align:left; border:1px solid var(--border2); background:var(--panel2); border-radius:8px; padding:7px 10px; margin-bottom:6px; font-size:12px; cursor:pointer; transition:border-color var(--dur-fast) var(--ease); }
+.qopt:hover { border-color:var(--hover-border); }
+.qopt span { color:var(--dim); font-size:11px; }
+
+/* ── PROPOSED: the suggestion row (.sugrow/.sug) — rides INSIDE the reply's .body, after <Md>.
+   Pills wear the composer-chip frame (.cchip DNA: --r-md corners, --panel2 fill) — --r-full is
+   reserved for circular things in this interface. ── */
+.sugrow { display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin-top:14px; }
+.sug { position:relative; display:inline-flex; align-items:center; gap:6px; padding:3.5px 10px 4px; border-radius:var(--r-md); border:1px solid var(--border2); background:var(--panel2); color:var(--muted); font:600 11px var(--font); cursor:pointer; white-space:nowrap; transition:color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease); }
+.sug:hover, .sug.hov { color:var(--text); border-color:var(--hover-border); }
+.sug.on { color:var(--text); border-color:var(--ring); background:var(--sel-bg); }
+.sug.off { opacity:.45; }
+.sugx { display:inline-flex; align-items:center; color:var(--dim); padding:2px 5px; border-radius:6px; cursor:pointer; font-size:10px; opacity:.55; transition:opacity var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
+.sugrow:hover .sugx { opacity:1; }
+.sugx:hover { color:var(--text); background:var(--hover-bg); }
+.sugtip { position:absolute; bottom:calc(100% + 7px); left:50%; transform:translateX(-50%); background:var(--overlay); border:1px solid var(--border2); border-radius:6px; padding:3px 8px; font-size:10.5px; font-weight:600; color:var(--body); white-space:nowrap; box-shadow:0 8px 20px -8px var(--shadow); z-index:4; }
+
+/* ── faithful composer chrome (current .cbox = panel2 bg, .cchip = r-md) ── */
+.cwrap { position:relative; max-width:640px; margin-top:10px; }
+.cbox { position:relative; border:1px solid var(--border2); background:var(--panel2); border-radius:12px; padding:9px 12px; transition:border-color var(--dur-fast) var(--ease); }
+.cbox.focus { border-color:var(--ring); }
+.cline { font-size:13.5px; line-height:1.5; color:var(--text); white-space:pre-wrap; word-break:break-word; min-height:20px; }
+.cline .ph { color:var(--dim); }
+.caret::after { content:''; display:inline-block; width:1px; height:15px; background:var(--text); vertical-align:-2px; margin-left:1px; animation:blink 1.1s steps(1) infinite; }
+@keyframes blink { 50% { opacity:0; } }
+.crow { display:flex; align-items:center; gap:10px; margin-top:7px; color:var(--dim); font-size:11px; }
+.clip { width:16px; height:16px; opacity:.75; }
+.send { margin-left:auto; width:36px; height:30px; border-radius:8px; background:var(--btn); color:var(--btn-fg); display:grid; place-items:center; font-size:15px; border:1px solid var(--border2); }
+.tickerline { display:flex; align-items:center; gap:7px; margin-top:7px; padding:0 3px; color:var(--dim); font-size:10.5px; }
+.tickerline .bdot { width:6px; height:6px; border-radius:99px; background:var(--prog); animation:tp 1.6s infinite; }
+.tickerline b { color:var(--muted); font-weight:600; }
+
+/* wire-contract code block (real .codeblock treatment, condensed) */
+.wire { border:1px solid var(--border2); border-radius:10px; overflow:hidden; max-width:640px; }
+.wirehead { display:flex; align-items:center; justify-content:space-between; padding:5px 11px; background:var(--panel2); border-bottom:1px solid var(--border); font:600 10px var(--fmono); letter-spacing:.06em; text-transform:uppercase; color:var(--dim); }
+.wire pre { font:11.5px/1.65 var(--fmono); background:var(--code); color:var(--codeink); padding:10px 12px; overflow-x:auto; white-space:pre; }
+.wire pre .dm { opacity:.45; }
+.wire pre .hl { color:var(--codeink); font-weight:700; }
+
+/* rules table (threads-mode .vars DNA) */
+.vars { display:grid; gap:8px; margin-top:10px; }
+.var { display:grid; grid-template-columns:150px 1fr; gap:12px; align-items:center; border:1px solid var(--border); background:var(--panel); border-radius:10px; padding:10px 12px; }
+.var .tag { font-size:10px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--dim); line-height:1.5; }
+.var .tag b { display:block; color:var(--body); font-size:11px; letter-spacing:.02em; text-transform:none; }
+.var .demo { min-width:0; }
+.var .demo p { color:var(--body); font-size:12.5px; line-height:1.5; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="pagehead">
+    <h1>Rex suggestion pills — the reply predicts your next move</h1>
+    <p><span class="rule">The rule the design encodes:</span> <b style="color:#b9b9b9">a pill is a pre-drafted message, never a hidden command.</b>
+    Rex ends a chat or thread reply with 2–4 short follow-ups written in <i>your</i> voice; they render as quiet pills under his newest reply,
+    and clicking one simply <b style="color:#b9b9b9">sends that text as your message</b> through the exact send path you'd have typed it into —
+    same wake, same thread, same audit trail. The moment anything of yours lands after, the pills are gone. Zero schema, zero PowerSync,
+    zero new commands: a fenced <code>nms</code> block in the message body (the <code>nmq</code> twin), parsed and stripped at render.</p>
+  </div>
+  <div class="themes">
+    <div class="theme" data-theme="dark"><h2>Claude-warm dark</h2></div>
+    <div class="theme" data-theme="cream-oak"><h2>Cream-oak light</h2></div>
+  </div>
+</div>
+<script>
+const clip = `<svg class="clip" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M21 12.5l-8.5 8.5a6 6 0 01-8.5-8.5L12.5 4a4 4 0 015.7 5.7L10 18a2 2 0 01-3-3l7.5-7.5"/></svg>`;
+const pav = (emoji, role) => `<span class="pav" style="--rc:var(--role-${role})"><span class="pavg">${emoji}</span></span>`;
+const sug = (label, cls, tip) => `<button class="sug ${cls||''}">${tip ? `<span class="sugtip">${tip}</span>` : ''}${label}</button>`;
+
+const scenes = `
+<div class="scene">
+  <h3>1 · Anatomy — the reply's last line is a fork in the road</h3>
+  <div class="note">A convo thread (the v0.40 shell — but the same row renders in channel feeds and task threads).
+  Rex's answer names the situation; the pills are the <b>three things you'd most plausibly say next</b>, in your words,
+  each one Rex can act on. They belong to the message — inside <code>.msg &gt; .body</code>, after the markdown — never docked, never floating.</div>
+  <div class="msgs">
+    <div class="msg human mine"><span class="av">G</span><div class="body">
+      <div class="head"><b>geo (you)</b><span class="time">09:41</span></div>
+      <p>what's the story on maria's iPad repro?</p>
+    </div></div>
+    <div class="msg">${pav('🦊','orch')}<div class="body">
+      <div class="head"><b>rex</b><span class="rolechip" style="--rc:var(--role-orch)">orchestrator</span><span class="time">09:41</span></div>
+      <p>Still unassigned — <span class="taskref">#1052</span> needs someone with the repro hardware context, and patch is deep in <span class="taskref">#1046</span> until review clears. Nothing else in <b>#mobile</b> can take it today.</p>
+      <div class="sugrow">
+        ${sug('Offer it to patch anyway')}
+        ${sug('Park it in the backlog')}
+        ${sug('Who else could take it?')}
+        <span class="sugx">✕</span>
+      </div>
+    </div></div>
+  </div>
+  <div class="sem"><span class="dot"></span><span><b>Born in the same turn.</b> The pills ride the tail of Rex's own reply (a fenced <code>nms</code> block) — no second model call, no added latency, and they're grounded in exactly what he just said.</span></div>
+  <div class="sem"><span class="dot"></span><span><b>Voice rules the prompt enforces:</b> your first person, ≤ ~6 words, 2–4 of them, each an ask Rex can actually act on — never a UI verb ("open the cockpit") and never a gate verb ("accept"). Trivial acks get no block at all.</span></div>
+  <div class="sem"><span class="dot"></span><span><b>Freshness rule (derived, not stored):</b> pills render only on Rex's newest message with <b>no later human message</b> in that scope. History never grows stale buttons; agent chatter after doesn't kill them, your reply does. The ✕ is a local dismiss for this one row.</span></div>
+</div>
+
+<div class="scene">
+  <h3>2 · The interaction — hover says what it does, a click is a send</h3>
+  <div class="note">No new verbs to learn: the pill previews as a send (tooltip), commits like a send, and the row retires the way
+  question cards do — because your message now exists after it. <b>⌥-click drops the text into the composer instead</b>, for the
+  times the suggestion is 90% right.</div>
+  <div class="cap">A — hover: the affordance warms, the tip is honest</div>
+  <div class="msgs" style="overflow:visible">
+    <div class="msg">${pav('🦊','orch')}<div class="body">
+      <div class="head"><b>rex</b><span class="rolechip" style="--rc:var(--role-orch)">orchestrator</span><span class="time">09:41</span></div>
+      <p>Still unassigned — <span class="taskref">#1052</span> needs someone with the repro hardware context, and patch is deep in <span class="taskref">#1046</span> until review clears.</p>
+      <div class="sugrow">
+        ${sug('Offer it to patch anyway')}
+        ${sug('Park it in the backlog','hov','Sends to rex · ⌥ to edit first')}
+        ${sug('Who else could take it?')}
+      </div>
+    </div></div>
+  </div>
+  <div class="cap">B — the beat after the click: your words, on the record, pills gone</div>
+  <div class="msgs">
+    <div class="msg">${pav('🦊','orch')}<div class="body">
+      <div class="head"><b>rex</b><span class="rolechip" style="--rc:var(--role-orch)">orchestrator</span><span class="time">09:41</span></div>
+      <p>Still unassigned — <span class="taskref">#1052</span> needs someone with the repro hardware context, and patch is deep in <span class="taskref">#1046</span> until review clears.</p>
+    </div></div>
+    <div class="msg human mine"><span class="av">G</span><div class="body">
+      <div class="head"><b>geo (you)</b><span class="time">09:42</span></div>
+      <p>Park it in the backlog</p>
+    </div></div>
+    <div class="typingline"><span class="tdots"><i></i><i></i><i></i></span> rex is on it</div>
+  </div>
+  <div class="cap">C — the loop compounds: the confirmation offers the next step</div>
+  <div class="msgs">
+    <div class="msg">${pav('🦊','orch')}<div class="body">
+      <div class="head"><b>rex</b><span class="rolechip" style="--rc:var(--role-orch)">orchestrator</span><span class="time">09:42</span></div>
+      <p>Parked — <span class="taskref">#1052</span> is in the backlog <span class="chip c-backlog">backlog</span> with maria's repro steps attached. It stays editable there; promote it whenever you want it live.</p>
+      <div class="sugrow">
+        ${sug('Promote it once #1046 lands')}
+        ${sug('Show me the backlog')}
+      </div>
+    </div></div>
+  </div>
+  <div class="sem"><span class="dot"></span><span><b>The click is a plain send</b> through the surface's existing seam (<code>nm.send</code> / <code>nm.sendThread</code>) — Rex wakes exactly as if you'd typed it; the stall watchdog, decisions, digests all see a normal human message. Nothing bypasses the record.</span></div>
+  <div class="sem"><span class="dot"></span><span><b>No layout tricks:</b> the row appears with the committed message (never on the streaming bubble), so the feed's bottom-pin handles the height; on click the channel path sets <code>forceScroll</code> exactly like answering a question card.</span></div>
+  <div class="sem warn"><span class="dot"></span><span><b>Honest failure:</b> if a runtime never emits the block, nothing renders — the feature degrades to today's chat, not to broken chrome.</span></div>
+</div>
+
+<div class="scene">
+  <h3>3 · In a task thread — zone-legal, gate-respectful</h3>
+  <div class="note">Inside the task panel the pills obey the docs/25 zone contract by construction: they're part of the message,
+  so they live in the <b>thread zone</b>. The gate dock above the composer stays the one decision surface — <b>while a gate card
+  is docked, pill rows yield</b> (suppressed), and no pill ever duplicates a gate verb.</div>
+  <div class="msgs">
+    <div class="msg">${pav('🐝','rev')}<div class="body">
+      <div class="head"><b>scout</b><span class="rolechip" style="--rc:var(--role-rev)">reviewer</span><span class="time">10:39</span></div>
+      <p>Two blocking notes on <span class="taskref">#1046</span>: focus return breaks when the drawer closes from a route change, and <b>prefers-reduced-motion</b> still animates opacity. Repro steps are on the PR.</p>
+    </div></div>
+    <div class="msg">${pav('🦊','orch')}<div class="body">
+      <div class="head"><b>rex</b><span class="rolechip" style="--rc:var(--role-orch)">orchestrator</span><span class="time">10:40</span></div>
+      <p>Bounced to patch with scout's notes — round 2 is queued <span class="chip c-in_progress">in progress</span>. The reduced-motion item is small; it can ride this round or become its own subtask.</p>
+      <div class="sugrow">
+        ${sug('Fold it into this round')}
+        ${sug('Split it into a subtask')}
+        ${sug("Show me scout's full notes")}
+      </div>
+    </div></div>
+  </div>
+  <div class="cwrap">
+    <div class="cbox"><div class="cline"><span class="ph">Message this thread — @ to mention, / for skills</span></div>
+      <div class="crow">${clip}<span class="send">↵</span></div></div>
+    <div class="tickerline"><span class="bdot"></span><b>BUILD · patch</b> · fixing focus return on route change · 2/5</div>
+  </div>
+  <div class="sem"><span class="dot"></span><span><b>Working state shown:</b> beats ticker under the composer, no gate docked → pills allowed. In <code>done</code>/<code>plan_review</code>/<code>ship_review</code> the gate card owns the decision and the row stands down — one decision surface at a time.</span></div>
+  <div class="sem"><span class="dot"></span><span>Every sample above is a <b>message Rex can act on</b> (he has the tools: subtask creation, review relay, thread recall) — pills never pretend to be buttons for things only the UI can do.</span></div>
+</div>
+
+<div class="scene">
+  <h3>4 · When pills don't render — the discipline is the feature</h3>
+  <div class="note">Prediction earns trust by knowing when to shut up. Four rules, all derived client-side — no state anywhere:</div>
+  <div class="vars">
+    <div class="var"><div class="tag"><b>An nmq card is present</b>the card IS the affordance</div>
+      <div class="demo"><div class="qcard" style="margin:0"><div class="qhead">Fan out the iPad repro to patch now, or hold for #1046?</div>
+        <button class="qopt">Fan it out now<span>patch juggles both rounds</span></button>
+        <button class="qopt" style="margin-bottom:0">Hold until #1046 clears<span>review lands first, repro next</span></button>
+      </div></div></div>
+    <div class="var"><div class="tag"><b>You already replied</b>history never grows buttons</div>
+      <div class="demo"><p>Older Rex messages render exactly as today — the block strips out, no pills. Freshness is derived from "is there a later human message", the same trick question-flows use for answered-state.</p></div></div>
+    <div class="var"><div class="tag"><b>Still streaming</b>committed messages only</div>
+      <div class="demo"><p>The live bubble never grows pills (and the parser tolerates a half-finished fence). The row appears when the synced row lands — one paint, no flash.</p></div></div>
+    <div class="var"><div class="tag"><b>Nothing worth suggesting</b>silence beats filler</div>
+      <div class="demo"><p>"Done — filed." gets no block. The prompt says <i>only when a natural next move exists</i>; the client also caps at 4 and drops any pill that just echoes your last message.</p></div></div>
+  </div>
+</div>
+
+<div class="scene">
+  <h3>5 · The wire — one fenced block, the nmq twin, nothing new anywhere else</h3>
+  <div class="note">Rex's raw reply tail as it lands in <code>messages.body</code>. The renderer strips it everywhere and mounts
+  pills only where the freshness rule says so. Agents reading the thread see a few bytes of JSON; mobile strips it with the same
+  regex (pills there are a fast follow).</div>
+  <div class="wire">
+    <div class="wirehead"><span>messages.body — tail of rex's reply</span><span>nms</span></div>
+    <pre><span class="dm">…patch is deep in #1046 until review clears. Nothing else in #mobile can take it today.</span>
+
+<span class="hl">\`\`\`nms</span>
+["Offer it to patch anyway", "Park it in the backlog", "Who else could take it?"]
+<span class="hl">\`\`\`</span></pre>
+  </div>
+  <div class="sem"><span class="dot"></span><span><b>Zero schema, zero PowerSync, zero server work.</b> The block is transport-in-content, exactly like <code>nmq</code> — the parser lands beside <code>parseQuestions</code> in <code>packages/shared/cards.ts</code> so desktop and mobile share one regex; server extraction (<code>app.ts:343</code>) matches only <code>nmq</code>, so no spurious decision rows, and <code>preview()</code> already strips every fence from notifications.</span></div>
+  <div class="sem"><span class="dot"></span><span><b>Runtime-universal:</b> it's plain text, so it works on every runtime Rex can run on — Claude, Codex, agy — and a runtime that ignores the instruction degrades to no pills, never to breakage.</span></div>
+  <div class="sem warn"><span class="dot"></span><span><b>Guardrails at parse time:</b> JSON array of strings only · cap 4 · each ≤ 48 chars · dedupe · anything malformed strips silently. The prompt asks nicely; the parser enforces.</span></div>
+</div>`;
+
+document.querySelectorAll('.theme').forEach((t) => t.insertAdjacentHTML('beforeend', scenes));
+</script>
+</body>
+</html>

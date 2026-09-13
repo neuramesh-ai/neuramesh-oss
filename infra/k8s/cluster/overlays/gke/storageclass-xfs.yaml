@@ -1,0 +1,37 @@
+# machine data volumes: pd-balanced formatted XFS so donor hydration is a reflink clone
+# (cp --reflink=always; CoW-or-skip). P0 verifies the driver's mkfs emits reflink=1 and
+# that FICLONE passes through gVisor — if either fails, donors degrade to skip by design.
+#
+# DELIBERATELY REGIONAL: NO allowedTopologies (decided 2026-08-29). Leaving this open means
+# WaitForFirstConsumer puts each PV in whatever zone the scheduler picks, so the fleet's volumes
+# scatter across us-east4-a/-b/-c. That was measured and it is a real cost, but the cost is paid
+# by a feature we have not bought yet, and the alternative charges availability for it:
+#
+#   pinning one zone   a single warm balloon pod would cover every new workspace (~$26/mo), BUT
+#                      new workspaces could no longer fall to another zone when that one is short
+#                      or down. Existing workspaces were never protected from their own zone's
+#                      outage — a pd-balanced disk is zonal — so the new exposure is workspace
+#                      CREATION, which is exactly the moment a new user is watching.
+#   staying regional   warm capacity has to cover three zones instead of one (~$79/mo) to
+#                      guarantee a hit, or accept a partial hit rate.
+#
+# George's call, and the right one: a durability property is not the thing to trade for a
+# scheduling optimisation we have not committed to. If warm capacity is ever bought, buy three
+# balloons or accept the hit rate — do not narrow this.
+#
+# NOTE FOR WHOEVER REVISITS THIS. allowedTopologies IS mutable on a live StorageClass (upstream
+# ValidateStorageClassUpdate forbids parameters, provisioner, reclaimPolicy and volumeBindingMode,
+# and not this), verified by server dry-run against prd. The key must be `topology.gke.io/zone`,
+# which is what pd.csi.storage.gke.io registers in CSINode. A wrong key does not warn — it fails
+# every new workspace PVC. And existing PVs keep their zone regardless: this only shapes new ones.
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: nm-xfs
+provisioner: pd.csi.storage.gke.io
+parameters:
+  type: pd-balanced
+  csi.storage.k8s.io/fstype: xfs
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+reclaimPolicy: Delete

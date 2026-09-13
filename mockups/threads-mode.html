@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Threads mode — per-channel toggle</title>
+<style>
+/* ── Real Ember Weave tokens (tokens.css v1.0, Quiet Graphite) — dark + cream-oak ── */
+[data-theme] {
+  --font: 'Geist Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --fmono: 'Geist Mono Variable', ui-monospace, 'SF Mono', Menlo, monospace;
+  --dur-fast: .12s; --ease: cubic-bezier(.21,.61,.35,1);
+}
+[data-theme='dark'] {
+  --win:#131210; --bg:#1b1a18; --panel:#201f1c; --panel2:#272522; --panel3:#302e2b;
+  --border:#2a2825; --border2:#383530;
+  --text:#d9d5ce; --body:#b7b4ac; --muted:#8f8a82; --dim:#6b675f;
+  --accent:#8fabd6; --accent-soft:#212a35; --btn:#302d29; --btn-fg:#e2dfd8;
+  --prog:#8ba0c0; --review:#a89ccf; --done:#77ac8d;
+  --role-orch:#9793d2; --role-dev:#77ac8d; --role-rev:#7ba1c4; --role-tone:16%;
+  --card:#211f1d; --card-border:#302d29;
+  --ring:#57544c; --focus-glow:color-mix(in srgb, var(--accent) 22%, transparent);
+  --hover-bg:color-mix(in srgb, var(--text) 6%, transparent); --sel-bg:color-mix(in srgb, var(--text) 9%, transparent);
+  --hover-border:#46443d; --overlay:var(--panel); --shadow:rgba(0,0,0,.5);
+}
+[data-theme='cream-oak'] {
+  --win:#efe6d7; --bg:#f7efe2; --panel:#fffaf2; --panel2:#f4e7d6; --panel3:#ecdcc5;
+  --border:#ecdfcd; --border2:#dbc6ad;
+  --text:#352a20; --body:#5c5040; --muted:#8a7969; --dim:#a8967f;
+  --accent:#5f6aa0; --accent-soft:#e7e6f2; --btn:#efe6d7; --btn-fg:#352a20;
+  --prog:#4f80c4; --review:#6d5ce0; --done:#0f9d63;
+  --role-orch:#6a63bc; --role-dev:#3f9268; --role-rev:#4f7bb0; --role-tone:14%;
+  --card:#fbf4e9; --card-border:#ecdfcd;
+  --ring:color-mix(in srgb, var(--accent) 55%, var(--border2)); --focus-glow:color-mix(in srgb, var(--accent) 16%, transparent);
+  --hover-bg:color-mix(in srgb, var(--text) 5%, transparent); --sel-bg:color-mix(in srgb, var(--text) 7%, transparent);
+  --hover-border:color-mix(in srgb, var(--text) 20%, var(--border2)); --overlay:var(--panel); --shadow:rgba(80,50,25,.16);
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#131210; font-family:'Geist Variable',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; }
+.page { max-width:1500px; margin:0 auto; padding:34px 26px 60px; }
+.pagehead { color:#d9d5ce; margin-bottom:14px; }
+.pagehead h1 { font-size:19px; font-weight:650; letter-spacing:-.01em; }
+.pagehead p { color:#8f8a82; font-size:13px; line-height:1.55; margin-top:6px; max-width:84ch; }
+.pagehead .rule { color:#b7b4ac; }
+.themes { display:grid; grid-template-columns:1fr 1fr; gap:22px; }
+@media (max-width:1100px){ .themes { grid-template-columns:1fr; } }
+.theme { background:var(--bg); border:1px solid var(--border2); border-radius:16px; padding:20px 18px 24px; color:var(--text); }
+.theme > h2 { font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--dim); margin:0 4px 14px; }
+.scene { margin-top:24px; }
+.scene > h3 { font-size:12.5px; font-weight:650; margin:0 4px 4px; }
+.scene > .note { font-size:11.5px; color:var(--muted); line-height:1.55; margin:0 4px 10px; max-width:70ch; }
+.scene .note b { color:var(--body); font-weight:600; }
+.cap { font-size:10px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--dim); margin:14px 4px 6px; }
+.sem { display:flex; gap:7px; align-items:flex-start; margin:9px 4px 0; font-size:11px; color:var(--muted); line-height:1.5; max-width:70ch; }
+.sem .dot { width:6px; height:6px; border-radius:99px; margin-top:4px; flex:none; background:var(--done); }
+.sem.warn .dot { background:var(--dim); }
+.sem b { color:var(--body); font-weight:600; }
+.sem code, .note code { font-family:var(--fmono); font-size:10.5px; color:var(--body); background:var(--hover-bg); border-radius:4px; padding:1px 4px; }
+
+/* ── faithful chat chrome (.msgs / .msg / authorship bubbles from tokens.css) ── */
+.msgs { display:flex; flex-direction:column; gap:2px; background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:14px 12px; }
+.msg { display:flex; gap:11px; padding:7px 10px; border-radius:9px; position:relative; }
+.av { width:26px; height:26px; min-width:26px; border-radius:6px; display:grid; place-items:center; font-weight:800; font-size:11px; color:var(--body); background:var(--panel3); box-shadow:inset 0 0 0 1px var(--border2); }
+.pav { width:26px; height:26px; min-width:26px; border-radius:8px; display:grid; place-items:center; font-size:14px; background:color-mix(in srgb, var(--rc) var(--role-tone), var(--panel)); box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--rc) 28%, transparent); }
+.msg .body { min-width:0; flex:1; }
+.msg .head { display:flex; align-items:center; gap:8px; }
+.msg .head b { font-size:12.5px; }
+.rolechip { font-size:9px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; padding:1.5px 7px; border-radius:99px; color:var(--rc); background:color-mix(in srgb, var(--rc) 14%, transparent); }
+.time { font-size:10.5px; color:var(--dim); }
+.msg p { color:var(--body); font-size:13px; line-height:1.5; overflow-wrap:anywhere; margin-top:2px; }
+.msg p b { color:var(--text); font-weight:600; }
+.msg.human .body { flex:0 1 auto; max-width:min(560px, 82%); background:var(--hover-bg); border-radius:12px; padding:7px 12px 8px; }
+.msg.mine { flex-direction:row-reverse; }
+.msg.mine .body { background:color-mix(in srgb, var(--accent) 10%, transparent); }
+.msg.mine .head { justify-content:flex-end; }
+
+/* hover toolbar (.msgactions from tokens.css) — shown revealed in the mockup, + the NEW reply slot */
+.msgactions { position:absolute; top:2px; right:8px; display:flex; align-items:center; gap:2px; background:var(--panel); border:1px solid var(--border2); border-radius:8px; padding:2px 5px 2px 9px; box-shadow:0 6px 16px -8px var(--shadow); z-index:3; }
+.msgago { font-size:10.5px; color:var(--dim); margin-right:5px; white-space:nowrap; }
+.msgact { position:relative; display:inline-flex; align-items:center; justify-content:center; width:27px; height:24px; border:1px solid transparent; border-radius:7px; background:transparent; color:var(--dim); cursor:pointer; }
+.msgact:hover, .msgact.hov { background:var(--hover-bg); color:var(--text); border-color:var(--hover-border); }
+.msgact svg { display:block; }
+.acttip { position:absolute; top:calc(100% + 7px); right:-4px; background:var(--overlay); border:1px solid var(--border2); border-radius:6px; padding:3px 8px; font-size:10.5px; font-weight:600; color:var(--body); white-space:nowrap; box-shadow:0 8px 20px -8px var(--shadow); z-index:4; }
+
+/* bare-name addressing token (mentions.ts styling — italic + dotted, role colour) */
+.bare { font-style:italic; color:var(--role-orch); text-decoration:underline dotted color-mix(in srgb, var(--role-orch) 55%, transparent); text-underline-offset:3px; text-decoration-thickness:1px; }
+
+/* task state chips (the real .chip ramp) */
+.chip { display:inline-flex; align-items:center; gap:5px; font-size:9.5px; font-weight:800; letter-spacing:.5px; padding:2.5px 8px; border-radius:5px; text-transform:uppercase; white-space:nowrap; }
+.c-in_progress { background:color-mix(in srgb, var(--prog) 16%, transparent); color:var(--prog); }
+.c-in_review { background:color-mix(in srgb, var(--review) 16%, transparent); color:var(--review); }
+.c-done { background:color-mix(in srgb, var(--done) 16%, transparent); color:var(--done); }
+
+/* digest debut card (today's ON-mode channel surface) */
+.digestrow { display:flex; flex-direction:column; gap:6px; margin-top:8px; }
+.digestchip { display:flex; align-items:center; gap:10px; width:100%; max-width:480px; border:1px solid var(--card-border); background:var(--card); border-radius:8px; padding:9px 12px; cursor:pointer; }
+.digestchip:hover { border-color:var(--hover-border); }
+.digestchip .num { font-family:var(--fmono); font-weight:650; color:var(--text); font-size:11.5px; }
+.digestchip .chiptitle { flex:1; min-width:0; font-size:12.5px; font-weight:600; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+/* ── PROPOSED: task reference header on inline thread replies (threads off) ── */
+.tref { display:inline-flex; align-items:center; gap:6px; margin-bottom:5px; max-width:100%; }
+.tref .glyph { color:var(--dim); font-size:10px; flex:none; }
+.trefpill { display:inline-flex; align-items:center; gap:7px; min-width:0; padding:2.5px 9px 2.5px 8px; border-radius:999px; border:1px solid var(--card-border); background:var(--card); cursor:pointer; transition:border-color var(--dur-fast) var(--ease); }
+.trefpill:hover { border-color:var(--hover-border); }
+.trefpill .num { font-family:var(--fmono); font-weight:650; font-size:10.5px; color:var(--text); flex:none; }
+.trefpill .t { font-size:11px; font-weight:600; color:var(--muted); max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.trefpill .chip { font-size:8.5px; padding:1.5px 6px; }
+/* quote header for late root replies (needs reply_to synced — follow-up) */
+.qref { display:flex; align-items:baseline; gap:6px; margin-bottom:4px; font-size:11px; color:var(--dim); max-width:100%; }
+.qref .glyph { font-size:10px; flex:none; }
+.qref .q { font-style:italic; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+.qref .who { font-weight:600; color:var(--muted); flex:none; }
+
+/* mode-flip divider (client-rendered from the settings change) */
+.modediv { display:flex; align-items:center; gap:10px; margin:6px 2px; color:var(--dim); font-size:10.5px; font-weight:600; letter-spacing:.02em; white-space:nowrap; }
+.modediv::before, .modediv::after { content:''; flex:1; height:1px; background:var(--border); }
+
+/* ── faithful composer chrome (.cbox / .cfoot / .cchip) + the new bits ── */
+.cwrap { position:relative; max-width:640px; }
+.cbox { position:relative; border:1px solid var(--border2); background:var(--panel); border-radius:12px; padding:9px 12px; }
+.cbox.focus { border-color:var(--ring); box-shadow:0 0 0 3px var(--focus-glow); }
+.cline { font-size:13.5px; line-height:1.5; color:var(--text); white-space:pre-wrap; word-break:break-word; min-height:20px; }
+.cline .ph { color:var(--dim); }
+.caret::after { content:''; display:inline-block; width:1px; height:15px; background:var(--text); vertical-align:-2px; margin-left:1px; animation:blink 1.1s steps(1) infinite; }
+@keyframes blink { 50% { opacity:0; } }
+.crow { display:flex; align-items:center; gap:10px; margin-top:7px; color:var(--dim); font-size:11px; }
+.clip { width:16px; height:16px; opacity:.75; }
+.send { margin-left:auto; width:36px; height:30px; border-radius:8px; background:var(--btn); color:var(--btn-fg); display:grid; place-items:center; font-size:15px; border:1px solid var(--border2); }
+.cfoot { display:flex; align-items:center; gap:8px; margin-top:6px; padding:0 3px; }
+.cchip { display:inline-flex; align-items:center; gap:5px; max-width:220px; padding:3.5px 9px; border-radius:999px; border:1px solid var(--border2); background:var(--panel2); color:var(--muted); font-size:11px; font-weight:600; cursor:pointer; white-space:nowrap; transition:color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease); }
+.cchip:hover { color:var(--text); border-color:var(--hover-border); }
+.cchip svg { flex:none; opacity:.8; }
+.cchip .car { font-size:8px; color:var(--dim); flex:none; }
+.cchip.live { color:var(--text); border-color:var(--ring); background:var(--sel-bg); }
+.cchip.live .ldot { width:5px; height:5px; border-radius:99px; background:var(--accent); flex:none; }
+
+/* reply-in-thread context chip (rides above the input like the skill chip) */
+.rctx { display:flex; align-items:center; gap:6px; margin-bottom:7px; }
+.rctxchip { display:inline-flex; align-items:center; gap:6px; font-size:11px; font-weight:600; padding:2.5px 9px; border-radius:999px; background:color-mix(in srgb, var(--accent) 13%, transparent); border:1px solid color-mix(in srgb, var(--accent) 32%, transparent); color:color-mix(in srgb, var(--accent) 75%, var(--text)); white-space:nowrap; }
+.rctxchip .num { font-family:var(--fmono); font-weight:650; font-size:10.5px; }
+.rctxx { display:inline-flex; align-items:center; color:var(--dim); padding:2px 4px; border-radius:6px; cursor:pointer; font-size:11px; }
+.rctxx:hover { color:var(--text); background:var(--panel3); }
+
+/* mode picker popover (cprojpop DNA, anchored to the chip) */
+.modepop { position:relative; margin:8px 0 0 2px; width:300px; background:var(--overlay); border:1px solid var(--border2); border-radius:12px; padding:5px; box-shadow:0 18px 44px -14px var(--shadow); }
+.modeopt { display:flex; align-items:flex-start; gap:9px; padding:8px 9px; border-radius:8px; cursor:pointer; }
+.modeopt:hover { background:var(--panel3); }
+.modeopt.on { background:var(--sel-bg); }
+.modeopt .ck { flex:none; width:14px; color:var(--accent); font-size:12px; text-align:center; margin-top:1px; }
+.modeopt .tx { min-width:0; }
+.modeopt .tx b { display:block; font-size:12.5px; font-weight:600; color:var(--text); }
+.modeopt .tx span { display:block; font-size:11px; color:var(--muted); line-height:1.45; margin-top:1px; }
+.modefoot { border-top:1px solid var(--border); margin-top:3px; padding:7px 9px 4px; font-size:10.5px; color:var(--dim); }
+
+/* channel-settings parity row (segmented control = navdockseg DNA) */
+.setpanel { max-width:480px; border:1px solid var(--border2); background:var(--panel); border-radius:12px; padding:12px 14px; }
+.setrow { display:flex; align-items:center; gap:12px; }
+.setrow .tx { flex:1; min-width:0; }
+.setrow .tx b { display:block; font-size:12.5px; font-weight:600; }
+.setrow .tx span { display:block; font-size:11px; color:var(--muted); margin-top:1px; }
+.seg { display:inline-flex; background:var(--panel2); border:1px solid var(--border2); border-radius:9px; padding:2px; gap:2px; flex:none; }
+.seg button { padding:4px 12px; border:none; background:none; color:var(--muted); border-radius:7px; cursor:pointer; font:600 11.5px var(--font); }
+.seg button.on { background:var(--sel-bg); color:var(--text); }
+
+/* variant table (anatomy) */
+.vars { display:grid; gap:8px; margin-top:10px; }
+.var { display:grid; grid-template-columns:130px 1fr; gap:12px; align-items:center; border:1px solid var(--border); background:var(--panel); border-radius:10px; padding:10px 12px; }
+.var .tag { font-size:10px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--dim); line-height:1.5; }
+.var .tag b { display:block; color:var(--body); font-size:11px; letter-spacing:.02em; text-transform:none; }
+.var.pick { border-color:color-mix(in srgb, var(--done) 45%, var(--border2)); }
+.var.pick .tag b::after { content:' ✓ ships v1'; color:var(--done); font-weight:700; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="pagehead">
+    <h1>Threads mode — a per-channel toggle: focused room or live feed</h1>
+    <p><span class="rule">The rule the design encodes:</span> <b style="color:#b7b4ac">Off never moves a message — it widens the room's lens.</b>
+    The task thread stays the canonical record (cockpit, review gates, beats, watchdog all hang off <code>task_id</code>);
+    turning threads <b style="color:#b7b4ac">off</b> makes the channel feed <i>include</i> thread traffic inline — every agent reply tagged with its task —
+    and lets the composer answer into a thread without leaving the room. Quick back-and-forth with rex or any agent needs no task in either mode:
+    that's already how channel-root wakes behave. Flip the toggle back and nothing was lost, because nothing was rerouted.</p>
+  </div>
+  <div class="themes">
+    <div class="theme" data-theme="dark"><h2>Claude-warm dark</h2></div>
+    <div class="theme" data-theme="cream-oak"><h2>Cream-oak light</h2></div>
+  </div>
+</div>
+<script>
+const threadglyph = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 5h16M4 12h9M4 19h16"/><circle cx="17.5" cy="12" r="2.4" fill="currentColor" stroke="none"/></svg>`;
+const projglyph = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7l3-3h5l2 2h8v13H3z"/></svg>`;
+const clip = `<svg class="clip" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M21 12.5l-8.5 8.5a6 6 0 01-8.5-8.5L12.5 4a4 4 0 015.7 5.7L10 18a2 2 0 01-3-3l7.5-7.5"/></svg>`;
+const pav = (emoji, role) => `<span class="pav" style="--rc:var(--role-${role})">${emoji}</span>`;
+const tref = (num, title, st, stCls) => `<div class="tref"><span class="glyph">↩</span><span class="trefpill"><span class="num">#${num}</span><span class="t">${title}</span><span class="chip ${stCls}">${st}</span></span></div>`;
+const iReply = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 15l-5-5 5-5"/><path d="M4 10h9a7 7 0 017 7v2"/></svg>`;
+const iCopy = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 012-2h9"/></svg>`;
+const iPin = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16v6"/><path d="M8 3h8l-1 6 3 4H6l3-4z"/></svg>`;
+const actions = (tip) => `<div class="msgactions"><span class="msgago">2m</span><button class="msgact hov">${tip ? `<span class="acttip">${tip}</span>` : ''}${iReply}</button><button class="msgact">${iCopy}</button><button class="msgact">${iPin}</button></div>`;
+
+const scenes = `
+<div class="scene">
+  <h3>1 · The control — a chip in the composer's context row</h3>
+  <div class="note">It sits in <code>.cfoot</code> beside the project chip — exactly "right underneath the input". Neutral when
+  <b>on</b> (the default the doctrine ships with); when <b>off</b> the chip holds the lit treatment so a glance at the composer
+  tells you the room is in live-feed mode.</div>
+  <div class="cap">Threads · on — the shipped default</div>
+  <div class="cwrap">
+    <div class="cbox"><div class="cline"><span class="ph">Message #mobile — @ to mention, / for skills</span></div>
+      <div class="crow">${clip}<span class="send">↵</span></div></div>
+    <div class="cfoot">
+      <span class="cchip">${projglyph}<span class="lbl">Companion app</span><span class="car">▾</span></span>
+      <span class="cchip">${threadglyph}<span class="lbl">Threads · On</span><span class="car">▾</span></span>
+    </div>
+  </div>
+  <div class="cap">Threads · off — chip lit; picker open</div>
+  <div class="cwrap">
+    <div class="cbox"><div class="cline"><span class="ph">Message #mobile — @ to mention, / for skills</span></div>
+      <div class="crow">${clip}<span class="send">↵</span></div></div>
+    <div class="cfoot">
+      <span class="cchip">${projglyph}<span class="lbl">Companion app</span><span class="car">▾</span></span>
+      <span class="cchip live"><span class="ldot"></span>${threadglyph}<span class="lbl">Threads · Off</span><span class="car">▾</span></span>
+    </div>
+    <div class="modepop">
+      <div class="modeopt"><span class="ck"></span><div class="tx"><b>On — focused</b><span>Task replies stay in their threads; the room reads as digests. Right for busy rooms at fan-out scale.</span></div></div>
+      <div class="modeopt on"><span class="ck">✓</span><div class="tx"><b>Off — live feed</b><span>Agent replies land right here, tagged with their task. Sweep digests hush — they'd be echoes.</span></div></div>
+      <div class="modefoot">Room-wide — saved to <b>#mobile</b> for everyone. Flip it anytime; threads are never deleted, only surfaced.</div>
+    </div>
+  </div>
+  <div class="sem"><span class="dot"></span><span>One synced column (<code>channels.thread_mode</code>) — the channels sync rule is <code>select *</code>, so no PowerSync redeploy; just the client-core / desktop schema mirror + parity test.</span></div>
+</div>
+
+<div class="scene">
+  <h3>2 · Threads on — today's room, unchanged</h3>
+  <div class="note">The channel stays a quiet surface: your ask, rex's answer, and a debut card per task. Detail lives behind the card, in the thread.</div>
+  <div class="msgs">
+    <div class="msg human mine"><span class="av">G</span><div class="body">
+      <div class="head"><b>geo (you)</b><span class="time">09:41</span></div>
+      <p>can we get the mobile drawer accessible before the release?</p>
+    </div></div>
+    <div class="msg">${pav('🦊','orch')}<div class="body">
+      <div class="head"><b>rex</b><span class="rolechip" style="--rc:var(--role-orch)">orchestrator</span><span class="time">09:42</span></div>
+      <p>Filed and fanned out — patch has it:</p>
+      <div class="digestrow"><span class="digestchip"><span class="num">#1046</span><span class="chiptitle">Mobile nav: drawer + focus management</span><span class="chip c-in_progress">in progress</span></span></div>
+    </div></div>
+  </div>
+  <div class="sem"><span class="dot"></span><span>This stays the default. Thread-per-task exists to keep channels readable at fan-out scale (docs/03 §5) — the toggle is a per-room opt-out, not a new default.</span></div>
+</div>
+
+<div class="scene">
+  <h3>3 · Threads off — the room becomes the live feed</h3>
+  <div class="note">Same data, wider lens: the feed is <code>channel_id = ?</code> instead of <code>… and task_id is null</code>.
+  Thread replies appear chronologically, each under a <b>task reference pill</b> (click → opens the thread panel / cockpit as today).
+  Quick questions get quick answers — no task, no ceremony.</div>
+  <div class="msgs">
+    <div class="modediv">geo turned threads off — agent task replies now post inline</div>
+    <div class="msg human mine"><span class="av">G</span><div class="body">
+      <div class="head"><b>geo (you)</b><span class="time">10:02</span></div>
+      <p>rex what's left before we can ship the mobile nav work?</p>
+    </div></div>
+    <div class="msg">${pav('🦊','orch')}<div class="body">
+      <div class="head"><b>rex</b><span class="rolechip" style="--rc:var(--role-orch)">orchestrator</span><span class="time">10:02</span></div>
+      <p>Two things: <b>#1046</b> is mid-review with scout, and maria's iPad repro is still unassigned. No blockers on the release itself.</p>
+    </div></div>
+    <div class="msg">${pav('🦫','dev')}<div class="body">
+      ${tref('1046','Mobile nav: drawer + focus management','in progress','c-in_progress')}
+      <div class="head"><b>patch</b><span class="rolechip" style="--rc:var(--role-dev)">developer</span><span class="time">10:14</span></div>
+      <p>Focus trap is in — the drawer returns focus to its trigger on close. Reduced-motion path next, then I'll submit.</p>
+    </div></div>
+    <div class="msg">${pav('🦫','dev')}<div class="body">
+      ${tref('1046','Mobile nav: drawer + focus management','in review','c-in_review')}
+      <div class="head"><b>patch</b><span class="rolechip" style="--rc:var(--role-dev)">developer</span><span class="time">10:31</span></div>
+      <p>Submitted: 4 files, +182 −40 · before/after capture + clean axe audit in the artifacts · PR <b>#204</b> is up.</p>
+    </div></div>
+    <div class="msg">${pav('🐝','rev')}<div class="body">
+      ${tref('1046','Mobile nav: drawer + focus management','in review','c-in_review')}
+      <div class="head"><b>scout</b><span class="rolechip" style="--rc:var(--role-rev)">reviewer</span><span class="time">10:39</span></div>
+      <p>Two blocking notes: focus return breaks when the drawer closes from a route change, and <b>prefers-reduced-motion</b> still animates opacity. Repro steps are on the PR.</p>
+    </div></div>
+  </div>
+  <div class="sem"><span class="dot"></span><span><b>Nothing moved.</b> Every reply above still lives in thread #1046 — the cockpit, review gate, beats and stall watchdog see exactly what they saw before. The feed just stopped hiding it.</span></div>
+  <div class="sem"><span class="dot"></span><span>The quick Q&amp;A at the top needs no task in <b>either</b> mode — rex already wakes on every human channel message and answers pure conversation without filing work (<code>NO_REPLY</code> discipline). Off-mode just makes the room feel like that's the point.</span></div>
+  <div class="sem warn"><span class="dot"></span><span>Volume guard: beats live in their own table (never messages), so the feed gains only substantive replies. Long agent messages clamp to ~12 lines with a "show more" — same treatment as threads.</span></div>
+</div>
+
+<div class="scene">
+  <h3>4 · Reply — hover any message, land in the right place</h3>
+  <div class="note">The existing hover toolbar (relative time · copy · pin) gains <b>reply as its first slot</b>, on every message.
+  Its target is context-sensitive: on a task-tagged reply it aims the composer at <b>that thread</b>; on a plain channel message it
+  <b>addresses the author</b>. Clicking a task pill keeps opening the thread panel — the reply icon is the "answer from here" gesture.</div>
+  <div class="cap">A — reply on an inline task message → thread context chip</div>
+  <div class="msgs" style="overflow:visible">
+    <div class="msg" style="background:var(--hover-bg)">${pav('🐝','rev')}<div class="body">
+      ${tref('1046','Mobile nav: drawer + focus management','in review','c-in_review')}
+      <div class="head"><b>scout</b><span class="rolechip" style="--rc:var(--role-rev)">reviewer</span><span class="time">10:39</span></div>
+      <p>Two blocking notes: focus return breaks when the drawer closes from a route change, and <b>prefers-reduced-motion</b> still animates opacity. Repro steps are on the PR.</p>
+      ${actions('Reply in #1046')}
+    </div></div>
+  </div>
+  <div class="cwrap" style="margin-top:8px">
+    <div class="cbox focus">
+      <div class="rctx"><span class="rctxchip">↩ replying in <span class="num">#1046</span> · to scout</span><span class="rctxx">×</span></div>
+      <div class="cline">route-change case first — repro is opening a task link from inside the drawer<span class="caret"></span></div>
+      <div class="crow">${clip}<span class="send">↵</span></div>
+    </div>
+    <div class="cfoot">
+      <span class="cchip">${projglyph}<span class="lbl">Companion app</span><span class="car">▾</span></span>
+      <span class="cchip live"><span class="ldot"></span>${threadglyph}<span class="lbl">Threads · Off</span><span class="car">▾</span></span>
+    </div>
+  </div>
+  <div class="sem"><span class="dot"></span><span>It posts <b>into #1046's thread</b> — which the live feed shows inline anyway. So the stall watchdog still sees human feedback <b>in the thread</b> where it looks for it. Plain sends (no chip) go to the channel root exactly as today; × or Esc clears the context.</span></div>
+  <div class="cap">B — reply on a plain channel message → addresses the author</div>
+  <div class="msgs" style="overflow:visible">
+    <div class="msg" style="background:var(--hover-bg)">${pav('🦊','orch')}<div class="body">
+      <div class="head"><b>rex</b><span class="rolechip" style="--rc:var(--role-orch)">orchestrator</span><span class="time">10:02</span></div>
+      <p>Two things: <b>#1046</b> is mid-review with scout, and maria's iPad repro is still unassigned. No blockers on the release itself.</p>
+      ${actions('Reply to rex')}
+    </div></div>
+  </div>
+  <div class="cwrap" style="margin-top:8px">
+    <div class="cbox focus">
+      <div class="cline"><span class="bare">rex</span> <span class="caret"></span></div>
+      <div class="crow">${clip}<span class="send">↵</span></div>
+    </div>
+  </div>
+  <div class="sem"><span class="dot"></span><span>v1 costs nothing: it prefills the <b>bare-name address</b>, which already summons the author (mentions.ts) — and the reply lands adjacent in a quiet room. When <code>reply_to</code> joins the sync rule (scene 5, flavor B), this upgrades to a pinned quote header on the agent's answer.</span></div>
+  <div class="sem warn"><span class="dot"></span><span>Works on human messages too (prefills their handle), and in threads-<b>on</b> rooms — where A applies inside the thread panel and B in the channel. Nothing about the icon is off-mode-only.</span></div>
+</div>
+
+<div class="scene">
+  <h3>5 · Reference anatomy — two flavors, one ships first</h3>
+  <div class="note">The reference the user asked for ("to the message they are responding to, or task") splits into two cases:</div>
+  <div class="vars">
+    <div class="var pick"><div class="tag"><b>A · task pill</b>thread replies surfacing inline</div>
+      <div>${tref('1046','Mobile nav: drawer + focus management','in review','c-in_review')}</div></div>
+    <div class="var"><div class="tag"><b>B · quote header</b>root replies that land late</div>
+      <div><div class="qref"><span class="glyph">↩</span><span class="who">geo:</span><span class="q">“what's left before we can ship the mobile nav work?”</span></div></div></div>
+  </div>
+  <div class="sem"><span class="dot"></span><span><b>A costs nothing:</b> every synced message already carries <code>task_id</code>; title + state come from the synced tasks table. <b>B needs <code>reply_to</code> added to the messages sync rule</b> (explicit column list → PowerSync deploy note + client mirrors) — worth it, but a follow-up, and only shown when other messages intervened between trigger and reply.</span></div>
+</div>
+
+<div class="scene">
+  <h3>6 · Second surface — the room's settings gear</h3>
+  <div class="note">Same setting, slower path: the channel settings modal gets a row (beside rename / topic / delete). The composer chip is the fast path.</div>
+  <div class="setpanel">
+    <div class="setrow">
+      <div class="tx"><b>Threads</b><span>Where agent task replies land in this room</span></div>
+      <div class="seg"><button class="on">On · threads</button><button>Off · live feed</button></div>
+    </div>
+  </div>
+  <div class="sem warn"><span class="dot"></span><span>Room-wide and synced, like rename — not per-person. The room should read the same for everyone in it, and the orchestrator's digest behavior is room-level anyway.</span></div>
+</div>`;
+
+document.querySelectorAll('.theme').forEach((t) => t.insertAdjacentHTML('beforeend', scenes));
+</script>
+</body>
+</html>

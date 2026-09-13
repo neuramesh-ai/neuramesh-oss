@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NeuraMesh · Decision Inbox</title>
+<link rel="stylesheet" href="nm.css">
+<style>
+  .ibwrap{flex:1;overflow-y:auto;padding:22px 24px 60px}
+  .ibhead{max-width:720px;margin:0 auto 18px}
+  .ibhead h2{font-size:23px;letter-spacing:-.03em}
+  .ibhead p{font-size:14px;color:var(--muted);margin-top:5px}
+  .blockedstrip{display:flex;align-items:center;gap:10px;margin-top:14px;flex-wrap:wrap}
+  .blockedstrip .ba{position:relative}
+  .blockedstrip .ba .dot{position:absolute;bottom:-2px;right:-2px}
+  .blockedstrip .lblk{font-size:12px;color:var(--muted)}
+
+  .inbox{max-width:720px;margin:0 auto;display:flex;flex-direction:column;gap:12px}
+  .dcard{background:var(--panel);border:1px solid var(--border);border-radius:15px;padding:16px 17px;transition:all .25s var(--ease)}
+  .dcard.focused{border-color:color-mix(in srgb,var(--accent) 45%,var(--border));box-shadow:0 0 0 3px var(--accent-glow)}
+  .dcard.answered{opacity:.62;padding:12px 15px}
+  .dtop{display:flex;align-items:center;gap:10px;margin-bottom:11px}
+  .dtop .dwho b{font-size:13.5px;color:var(--text);font-weight:600}
+  .dtop .dwho span{font-size:11.5px;color:var(--muted)}
+  .dtop .dmeta{margin-left:auto;display:flex;align-items:center;gap:8px}
+  .blocked-t{font-size:10.5px;font-weight:700;color:var(--blocked);background:color-mix(in srgb,var(--blocked) 14%,transparent);padding:2px 8px;border-radius:99px}
+  .dq{font-size:16px;font-weight:600;color:var(--text);line-height:1.35;margin-bottom:5px}
+  .dctx{font-size:12.5px;color:var(--muted);line-height:1.5;margin-bottom:13px}
+  .dopts{display:flex;flex-direction:column;gap:8px}
+  .dopt{display:flex;align-items:center;gap:11px;text-align:left;width:100%;background:var(--panel2);border:1px solid var(--border2);
+    border-radius:11px;padding:11px 13px;cursor:pointer;transition:all var(--dur-fast);font-family:inherit}
+  .dopt:hover{border-color:color-mix(in srgb,var(--accent) 55%,var(--border2));background:var(--accent-soft);transform:translateX(2px)}
+  .dopt .num{width:22px;height:22px;border-radius:7px;background:var(--panel3);color:var(--muted);display:grid;place-items:center;
+    font-size:11px;font-weight:700;flex:none}
+  .dopt:hover .num{background:var(--accent);color:var(--accent-ink)}
+  .dopt .ol{flex:1}
+  .dopt .ol b{font-size:13.5px;color:var(--text);font-weight:600;display:block}
+  .dopt .ol span{font-size:11.5px;color:var(--muted)}
+  .dopt .rec{font-size:9px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--accent);
+    background:var(--accent-soft);padding:2px 7px;border-radius:6px;flex:none}
+  .dhint{font-size:11px;color:var(--dim);margin-top:11px;display:flex;align-items:center;gap:7px}
+  .answeredline{display:flex;align-items:center;gap:9px;font-size:13px;color:var(--body)}
+  .answeredline .ck{width:20px;height:20px;border-radius:6px;background:var(--build);color:#fff;display:grid;place-items:center;font-size:11px;flex:none}
+  .answeredline b{color:var(--text)}
+  .answeredline .resumed{margin-left:auto;font-size:11px;color:var(--build)}
+
+  .ibdone{max-width:720px;margin:30px auto 0;text-align:center;padding:36px;background:var(--bg2);border:1px solid color-mix(in srgb,var(--build) 30%,var(--border));border-radius:18px;display:none}
+  .ibdone.show{display:block;animation:nm-pop var(--dur-slow) var(--ease)}
+  .ibdone .big{font-size:42px}
+  .ibdone h2{font-size:24px;margin:8px 0 6px}
+  .ibdone .stat{display:inline-flex;gap:16px;margin-top:12px;font-size:13px;color:var(--body)}
+  .ibdone .stat b{color:var(--text)}
+</style>
+</head>
+<body>
+<div class="confetti" id="confetti"></div>
+
+<div class="app">
+  <aside class="side">
+    <div class="ws"><div class="wsav">AR</div><div class="wsinfo"><b>default</b><span>Acme Robotics</span></div><span class="caret">▾</span></div>
+    <div class="navlist">
+      <div class="navitem"><span class="ni">⌂</span> Home</div>
+      <div class="navitem"><span class="ni">▦</span> Tasks <span class="nb">9</span></div>
+      <div class="navitem on"><span class="ni">🗳️</span> Decisions <span class="nb" id="navCount">5</span></div>
+      <div class="navitem"><span class="ni">⛁</span> Artifacts</div>
+      <div class="navitem"><span class="ni">☰</span> Activity</div>
+    </div>
+    <div class="sidehead">Agents</div>
+    <div class="sideitem"><div class="av sm orch">🦊</div><span class="lbl">rex</span><span class="dot busy" id="ag-rex"></span></div>
+    <div class="sideitem"><div class="av sm arch">🦅</div><span class="lbl">atlas</span><span class="dot" id="ag-atlas" style="background:var(--blocked)"></span></div>
+    <div class="sideitem"><div class="av sm dev">🦉</div><span class="lbl">patch</span><span class="dot" id="ag-patch" style="background:var(--blocked)"></span></div>
+    <div class="sideitem"><div class="av sm rev">🐝</div><span class="lbl">scout</span><span class="dot" id="ag-scout" style="background:var(--blocked)"></span></div>
+    <div class="selfcard"><div class="av sm you">🧑‍💻</div><div class="nm-self"><b>You</b><span>the tiebreaker</span></div>
+      <button class="themetog" id="tt" title="Toggle theme" style="margin-left:auto;width:30px;height:30px">◐</button></div>
+  </aside>
+
+  <main class="main">
+    <div class="chhead"><span class="ct">🗳️ Decisions</span><span class="ctopic">your call unblocks the org</span>
+      <span class="khint" style="margin-left:auto;font-size:11px;color:var(--dim)"><span class="kbd">1</span>–<span class="kbd">3</span> to answer the top card</span></div>
+    <div class="ibwrap">
+      <div class="ibhead">
+        <h2>5 decisions are waiting on you.</h2>
+        <p>Your agents did everything they could without you. Answer these and they're back to work — you're the tiebreaker, not the typist.</p>
+        <div class="blockedstrip" id="blockedStrip"></div>
+      </div>
+      <div class="inbox" id="inbox"></div>
+      <div class="ibdone" id="ibdone">
+        <div class="big">⚡️</div>
+        <h2>Inbox zero — your org is unblocked.</h2>
+        <p class="muted">Every agent is back to work. That's the job: clear the path, then get out of the way.</p>
+        <div class="stat"><span>🗳️ <b id="dCount">5</b> decisions</span><span>⏱ <b>41s</b></span><span>🤖 <b>4</b> agents resumed</span></div>
+        <div style="margin-top:20px"><a class="btn primary" href="05-mission-control.html">↩ Back to Mission Control</a></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+  const tt=document.getElementById('tt');
+  const apply=t=>{document.documentElement.dataset.theme=t;tt.textContent=t==='cream'?'☀':'◐';try{sessionStorage.nmTheme=t}catch(e){}};
+  apply(sessionStorage.nmTheme||'dark');
+  tt.onclick=()=>apply(document.documentElement.dataset.theme==='cream'?'dark':'cream');
+
+  const D=[
+    {agent:'patch',emoji:'🦉',cls:'dev',task:'#420',role:'developer',blocked:'12m',
+     q:'Which billing provider should I wire up?',
+     ctx:"I've scaffolded the provider abstraction — I just need your pick before I build the webhooks.",
+     opts:[['Stripe','most integrations · you already have keys',1],['Lemon Squeezy','merchant-of-record · handles tax for you',0],['Park it for now',"I'll hold #420",0]]},
+    {agent:'atlas',emoji:'🦅',cls:'arch',task:'#431',role:'architect',blocked:'4m',
+     q:'Rate-limit by API key or by IP?',
+     ctx:'It changes the plan I\'m drafting. Key is fairer behind shared NATs.',
+     opts:[['By API key','fairer · per-tenant quotas',1],['By IP','simpler · blunter',0],['Both','key first, IP fallback',0]]},
+    {agent:'scout',emoji:'🐝',cls:'rev',task:'#418',role:'reviewer',blocked:'2m',
+     q:'Store OAuth refresh tokens in the keychain or an encrypted DB?',
+     ctx:'patch used the keychain. I want your call before I approve the PR.',
+     opts:[['Keychain','local-first · matches our doctrine',1],['Encrypted DB','syncs across machines',0]]},
+    {agent:'rex',emoji:'🦊',cls:'orch',task:'#440',role:'orchestrator',blocked:'1m',
+     q:'This analytics work looks like its own initiative — create an "Analytics" project?',
+     ctx:"I never create projects without your say-so.",
+     opts:[['Yes, create it','new project + #analytics channel',1],['No','keep it inside #dev',0]]},
+    {agent:'patch',emoji:'🦉',cls:'dev',task:'#422',role:'developer',blocked:'30s',
+     q:'Include archived rows in the CSV export by default?',
+     ctx:'Quick one — it just sets the default query.',
+     opts:[['No','active rows only',1],['Yes','export everything',0],['Add a toggle','let the user choose',0]]},
+  ];
+
+  let answered=0, focusIdx=0;
+  const inbox=document.getElementById('inbox');
+  // blocked strip
+  const bs=document.getElementById('blockedStrip');
+  const blockedAgents=[...new Set(D.map(d=>d.agent))];
+  bs.innerHTML=`<span class="lblk"><b style="color:var(--blocked)">${blockedAgents.length} agents</b> blocked:</span>`+
+    blockedAgents.map(a=>{const d=D.find(x=>x.agent===a);return `<div class="ba" title="${a}"><div class="av sm ${d.cls}">${d.emoji}</div><span class="dot" style="background:var(--blocked)"></span></div>`;}).join('');
+
+  function render(){
+    inbox.innerHTML='';
+    D.forEach((d,i)=>{
+      const el=document.createElement('div');el.className='dcard'+(d.done?' answered':(i===focusIdx?' focused':''));el.dataset.i=i;
+      if(d.done){
+        el.innerHTML=`<div class="answeredline"><span class="ck">✓</span><div><b>${d.agent}</b> · ${d.q.replace(/\?$/,'')} → <b>${d.choice}</b></div><span class="resumed">${d.agent} resumed ${d.task} ↗</span></div>`;
+      }else{
+        const opts=d.opts.map((o,oi)=>`<button class="dopt" data-o="${oi}"><span class="num">${oi+1}</span><span class="ol"><b>${o[0]}</b><span>${o[1]}</span></span>${o[2]?'<span class="rec">recommended</span>':''}</button>`).join('');
+        el.innerHTML=`<div class="dtop"><div class="av ${d.cls}">${d.emoji}</div><div class="dwho"><b>${d.agent}</b> <span>· ${d.role} · ${d.task}</span></div>
+          <div class="dmeta"><span class="blocked-t">⛔ blocked ${d.blocked}</span></div></div>
+          <div class="dq">${d.q}</div><div class="dctx">${d.ctx}</div><div class="dopts">${opts}</div>
+          ${i===focusIdx?'<div class="dhint">⌨️ press <span class="kbd">1</span>–<span class="kbd">'+d.opts.length+'</span> to answer fast</div>':''}`;
+      }
+      inbox.appendChild(el);
+    });
+    inbox.querySelectorAll('.dcard:not(.answered) .dopt').forEach(b=>{
+      b.onclick=()=>answer(+b.closest('.dcard').dataset.i,+b.dataset.o);});
+    document.getElementById('navCount').textContent=D.length-answered;
+  }
+
+  function answer(i,oi){
+    const d=D[i];if(d.done)return;
+    d.done=true;d.choice=d.opts[oi][0];answered++;
+    // unblock the agent
+    const dot=document.getElementById('ag-'+d.agent);if(dot){dot.style.background='';dot.className='dot busy';}
+    // refocus next unanswered
+    const next=D.findIndex(x=>!x.done);focusIdx=next<0?-1:next;
+    pulse();render();
+    if(answered>=D.length){setTimeout(finish,300);}
+  }
+
+  function finish(){inbox.style.display='none';document.getElementById('dCount').textContent=D.length;
+    document.getElementById('ibdone').classList.add('show');confetti();
+    // all agents busy now
+    ['atlas','patch','scout'].forEach(a=>{const dot=document.getElementById('ag-'+a);if(dot){dot.style.background='';dot.className='dot busy';}});}
+
+  document.addEventListener('keydown',e=>{
+    if(focusIdx<0)return;const d=D[focusIdx];if(!d||d.done)return;
+    const n=parseInt(e.key,10);
+    if(n>=1&&n<=d.opts.length){e.preventDefault();answer(focusIdx,n-1);}
+  });
+
+  function pulse(){const c=document.getElementById('confetti');const cols=['#54c08c','#ff7a52','#a899f5'];
+    for(let i=0;i<12;i++){const p=document.createElement('i');p.style.left=(42+Math.random()*16)+'vw';p.style.background=cols[i%cols.length];
+      p.style.animationDuration=(1.1+Math.random()*.8)+'s';c.appendChild(p);setTimeout(()=>p.remove(),2000);}}
+  function confetti(){const c=document.getElementById('confetti');const cols=['#ff7a52','#ec5a32','#54c08c','#a899f5','#7aa6e2','#f0b35a'];
+    for(let i=0;i<70;i++){const p=document.createElement('i');p.style.left=Math.random()*100+'vw';p.style.background=cols[i%cols.length];
+      p.style.animationDuration=(1.6+Math.random()*1.4)+'s';c.appendChild(p);setTimeout(()=>p.remove(),3400);}}
+
+  render();
+</script>
+</body>
+</html>

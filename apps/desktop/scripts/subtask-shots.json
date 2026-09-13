@@ -1,0 +1,7 @@
+[
+  { "name": "sub1-board-dark", "query": { "theme": "dark", "click": "Board" }, "settle": 2600 },
+  { "name": "sub1-board-cream", "query": { "theme": "cream-oak", "click": "Board" }, "settle": 2600 },
+  { "name": "sub2-panel-dark", "query": { "theme": "dark", "openTask": "1046", "tab": "thread" }, "settle": 2600 },
+  { "name": "sub2-panel-cream", "query": { "theme": "cream-oak", "openTask": "1046", "tab": "thread" }, "settle": 2600 },
+  { "name": "sub3-shipreview-dark", "query": { "theme": "dark", "openTask": "1052", "tab": "thread" }, "settle": 2600 }
+]

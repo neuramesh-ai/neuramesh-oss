@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>The brain picker, compact — three directions</title>
+<style>
+[data-theme] { --fbody:'Geist Variable',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; --fmono:'Geist Mono Variable',ui-monospace,'SF Mono',Menlo,monospace; --fdisp:'Source Serif 4','Iowan Old Style',Georgia,serif; --ease:cubic-bezier(.22,1,.36,1); --dur-fast:.12s; --dur-enter:.22s; }
+[data-theme='dark'] {
+  --win:#0d0d0d; --bg:#141414; --panel:#191919; --panel2:#212121; --panel3:#2b2b2b;
+  --border:#272727; --border2:#383838; --card:#1e1e1e; --card-border:#2c2c2c;
+  --text:#eaeaea; --body:#b6b6b6; --muted:#898989; --dim:#676767; --ring:#525252;
+  --accent:#eaeaea; --accent-ink:#101010; --accent-soft:#2b2b2b; --link:#d19a72;
+  --hover-bg:rgba(234,234,234,.07); --sel-bg:rgba(234,234,234,.10); --overlay:#222222;
+  --shadow-card:0 1px 2px rgba(0,0,0,.25); --shadow-pop:0 20px 55px -14px rgba(0,0,0,.65);
+}
+[data-theme='cream-oak'] {
+  --win:#f0e5d3; --bg:#fbf8f4; --panel:#fbf8f4; --panel2:#f6eee1; --panel3:#efe1cd;
+  --border:#e6dbca; --border2:#d3c2a8; --card:#ffffff; --card-border:#eadfce;
+  --text:#2a1c13; --body:#574838; --muted:#97846c; --dim:#b5a289; --ring:#b08a5e;
+  --accent:#834a2b; --accent-ink:#fff7ee; --accent-soft:#f1e3d2; --link:#9c5730;
+  --hover-bg:rgba(42,28,19,.05); --sel-bg:rgba(131,74,43,.08); --overlay:#ffffff;
+  --shadow-card:0 1px 2px rgba(70,42,18,.05); --shadow-pop:0 20px 55px -14px rgba(70,42,18,.30);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body { background:#131210; }
+body { font-family:'Geist Variable',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; -webkit-font-smoothing:antialiased; }
+.page { max-width:1480px; margin:0 auto; padding:34px 26px 80px; }
+.pagehead { color:#eaeaea; margin-bottom:10px; max-width:106ch; }
+.pagehead h1 { font-family:'Source Serif 4',Georgia,serif; font-size:23px; font-weight:640; letter-spacing:-.012em; }
+.pagehead p { color:#8f8b84; font-size:13px; line-height:1.66; margin-top:9px; }
+.pagehead b { color:#c2beb6; font-weight:600; }
+.pagehead .ok { color:#8fbf9f; font-weight:600; }
+.stophd { color:#eaeaea; font-size:16px; font-weight:660; margin:46px 0 4px; font-family:'Source Serif 4',Georgia,serif; }
+.stopno { font:700 10px 'Geist Mono Variable',ui-monospace,monospace; letter-spacing:.12em; color:#6f6b64; text-transform:uppercase; margin-right:8px; }
+.stopp { color:#8f8b84; font-size:12.5px; line-height:1.66; max-width:104ch; margin-bottom:16px; }
+.stopp b { color:#c2beb6; font-weight:600; }
+.stopp .kbd { font:600 10px 'Geist Mono Variable',ui-monospace,monospace; border:1px solid #3a3733; border-radius:5px; padding:1px 5px; color:#a29d95; }
+.themes { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+@media (max-width:1100px){ .themes { grid-template-columns:1fr; } }
+.theme { background:var(--win); border:1px solid #333029; border-radius:16px; padding:14px; color:var(--text); font-family:var(--fbody); overflow:hidden; }
+.theme > h2 { font-size:10.5px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--dim); margin:0 2px 11px; font-family:var(--fmono); }
+.legend { color:#8f8b84; font-size:12px; line-height:1.7; max-width:104ch; margin:12px 2px 0; }
+.legend b { color:#c2beb6; font-weight:600; }
+.legend .pin { display:inline-grid; place-items:center; width:16px; height:16px; border-radius:50%; background:#2a2723; color:#d8b98e; font:700 9.5px 'Geist Mono Variable',ui-monospace,monospace; margin-right:6px; }
+table.alts { width:100%; border-collapse:collapse; color:#b6b1a9; font-size:12.5px; margin-top:14px; }
+.alts th { text-align:left; font:650 10px 'Geist Mono Variable',ui-monospace,monospace; letter-spacing:.1em; text-transform:uppercase; color:#6f6b64; padding:8px 12px; border-bottom:1px solid #2c2923; }
+.alts td { padding:10px 12px; border-bottom:1px solid #211f1b; vertical-align:top; line-height:1.6; }
+.alts td b { color:#d8d3ca; font-weight:620; }
+.alts .pick { color:#8fbf9f; font-weight:650; }
+.alts .no { color:#6f6b64; }
+
+/* ── the stage floor the demo stands on ── */
+.floor { position:relative; background:var(--bg); border:1px solid var(--border); border-radius:13px; min-height:460px; display:flex; align-items:flex-end; justify-content:center; padding:18px; overflow:hidden; }
+.composer { width:min(560px,100%); background:var(--card); border:1px solid var(--card-border); border-radius:15px; box-shadow:var(--shadow-card); }
+.ctext { padding:14px 15px 8px; font-size:13px; color:var(--dim); min-height:46px; }
+.crow { display:flex; align-items:center; gap:6px; padding:8px 10px 10px; }
+.cchip { display:inline-flex; align-items:center; gap:5px; height:26px; padding:0 10px; border-radius:999px; border:1px solid transparent; color:var(--body); font:560 11.5px var(--fbody); cursor:pointer; background:none; }
+.cchip:hover { border-color:var(--border); background:var(--hover-bg); }
+.cchip i { font-style:normal; color:var(--dim); font-weight:600; }
+.brainavs { display:flex; }
+.brainavs span { width:14px; height:14px; border-radius:5px; background:var(--panel3); border:1px solid var(--card); margin-left:-5px; display:grid; place-items:center; font:700 7px var(--fbody); color:var(--body); }
+.brainavs span:first-child { margin-left:0; }
+.send { margin-left:auto; width:30px; height:30px; border-radius:50%; border:none; background:var(--accent); color:var(--accent-ink); font-size:14px; display:grid; place-items:center; }
+
+/* ── Direction A: the drill card ── */
+.bpop { position:absolute; bottom:64px; width:288px; background:var(--overlay); border:1px solid var(--card-border); border-radius:13px; box-shadow:var(--shadow-pop); overflow:hidden; animation:rise var(--dur-enter) var(--ease); }
+@keyframes rise { from { opacity:0; transform:translateY(7px); } }
+.bphd { display:flex; align-items:baseline; gap:7px; padding:11px 13px 2px; }
+.bphd b { font-size:12.5px; font-weight:650; }
+.bphd .sc { font:600 9.5px var(--fmono); color:var(--dim); letter-spacing:.04em; }
+/* ONE fixed height across every level — the docs/10 §15 contract, kept at the smaller scale */
+.bpbody { height:236px; overflow-y:auto; padding:6px; scrollbar-width:none; position:relative; }
+.bpbody::-webkit-scrollbar { width:0; }
+.bplevel { display:none; }
+.bpop[data-level="root"] .bplevel.root, .bpop[data-level="roles"] .bplevel.roles,
+.bpop[data-level="model"] .bplevel.model, .bpop[data-level="pack"] .bplevel.pack { display:block; animation:rise .18s var(--ease); }
+.bpseg { display:flex; gap:3px; background:var(--panel2); border-radius:9px; padding:3px; margin:7px 7px 4px; }
+.bpseg button { flex:1; height:24px; border:none; border-radius:7px; background:none; color:var(--muted); font:600 10.5px var(--fbody); cursor:pointer; }
+.bpseg button.on { background:var(--card); color:var(--text); box-shadow:var(--shadow-card); }
+.bpwhy { font-size:10px; color:var(--dim); line-height:1.5; padding:2px 10px 8px; }
+.bprow { display:flex; align-items:center; gap:9px; width:100%; padding:9px 10px; border:none; border-radius:9px; background:none; color:var(--text); font:560 12px var(--fbody); cursor:pointer; text-align:left; }
+.bprow:hover { background:var(--hover-bg); }
+.bprow .k { font:650 8.5px var(--fmono); letter-spacing:.1em; text-transform:uppercase; color:var(--dim); width:44px; flex:none; }
+.bprow .v { flex:1; min-width:0; display:flex; align-items:center; gap:6px; overflow:hidden; }
+.bprow .car { color:var(--dim); font-size:11px; flex:none; }
+.bprow .modeltok { margin-left:auto; font:600 9.5px var(--fmono); color:var(--muted); border:1px solid var(--border); border-radius:6px; padding:2px 7px; white-space:nowrap; }
+.bpback { display:flex; align-items:center; gap:7px; width:100%; padding:8px 10px; border:none; background:none; color:var(--muted); font:650 10px var(--fmono); letter-spacing:.08em; text-transform:uppercase; cursor:pointer; border-radius:8px; text-align:left; }
+.bpback:hover { background:var(--hover-bg); color:var(--text); }
+.av { width:18px; height:18px; border-radius:6px; background:var(--panel3); display:grid; place-items:center; font:700 8px var(--fbody); color:var(--body); flex:none; }
+.bpfoot { display:flex; align-items:center; gap:8px; padding:9px 11px; border-top:1px solid var(--border); }
+.bpfoot small { font-size:9.5px; color:var(--dim); flex:1; line-height:1.4; }
+.bpapply { height:26px; padding:0 13px; border-radius:999px; border:none; background:var(--accent); color:var(--accent-ink); font:620 11px var(--fbody); cursor:pointer; }
+.bpcheck { margin-left:auto; color:var(--muted); font-size:11px; }
+.bpsub { font-size:10px; color:var(--dim); display:block; margin-top:1px; }
+
+/* Direction B/C statics */
+.minimenu { position:absolute; bottom:64px; width:224px; background:var(--overlay); border:1px solid var(--card-border); border-radius:12px; box-shadow:var(--shadow-pop); padding:6px; }
+.bigmodal { position:absolute; inset:24px 40px; background:var(--overlay); border:1px solid var(--card-border); border-radius:14px; box-shadow:var(--shadow-pop); opacity:.45; display:grid; place-items:center; font-size:11px; color:var(--muted); }
+.cpop { position:absolute; bottom:64px; width:320px; background:var(--overlay); border:1px solid var(--card-border); border-radius:13px; box-shadow:var(--shadow-pop); padding:8px; }
+.crole { display:flex; align-items:center; gap:8px; padding:7px 8px; border-radius:8px; font-size:11.5px; }
+.crole .modeltok { margin-left:auto; font:600 9px var(--fmono); color:var(--muted); border:1px solid var(--border); border-radius:6px; padding:2px 6px; }
+.note { position:absolute; top:10px; left:12px; right:12px; font:600 9.5px var(--fmono); letter-spacing:.06em; color:var(--dim); text-transform:uppercase; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<div class="pagehead">
+  <h1>The brain picker, compact — the popup learns its own interior lesson</h1>
+  <p><b>The problem</b> (live, on the stage): the Roles popup opens ~590px wide with a fixed 372px body — sized for a roles TABLE — over a surface whose whole point is quiet. Most opens are a glance ("what am I on?") or a one-flip (scope, pack); the table is the rare deep edit, yet it pays its full footprint every time.</p>
+  <p><b>The insight is already in the component's own doc</b> (docs/10 §15): inside the popup, the model picker <b>takes over the body</b> with a <b>‹ back row</b>, because a dropdown can't live in a scroller — "one surface, one scroller, one Escape; Escape unwinds exactly one layer." Direction A promotes that exact law one level up: the popup opens SMALL, and Roles / Pack are drill rows into the same fixed-height body. <span class="ok">The drill card below is live — click the brain pill, drill in, back out.</span></p>
+</div>
+
+<!-- ══════ Direction A ══════ -->
+<div class="stophd"><span class="stopno">Direction A · recommended</span>The drill card — 288px, pill-anchored, every level one height</div>
+<div class="stopp">
+  Opens directly <b>above the pill</b> (the chippop family). <b>Level 0 is the answer to "what am I on?"</b>: the scope segment, one consequence line, then two drill rows — <b>ROLES</b> (crew avatars + count) and <b>PACK</b> (current pack by name). Drilling <b>swaps the body</b> (fixed 236px — the §15 no-resize-under-the-cursor contract, kept at the small scale); <span class="kbd">‹ back</span> unwinds one level, <span class="kbd">Esc</span> unwinds one layer, scrim closes. Apply stays in the footer at every level, so a drilled change is still one confirmed act.
+</div>
+<div class="themes">
+  <div class="theme" data-theme="cream-oak" data-src="a1">
+    <h2>Cream Oak — click the pill</h2>
+    <div class="floor">
+      <div class="bpop" data-level="root" hidden>
+        <div class="bphd"><b>Brain · flowe-ai</b><span class="sc">MANUAL · PIN › THREAD › PROJECT › WS</span></div>
+        <div class="bpbody">
+          <div class="bplevel root">
+            <div class="bpseg"><button class="on" type="button">New conversation</button><button type="button">Project-wide</button></div>
+            <div class="bpwhy">Your next message starts a conversation with this brain, and it sticks for the ones after.</div>
+            <button class="bprow" data-go="roles"><span class="k">Roles</span><span class="v"><span class="brainavs"><span>rx</span><span>pl</span></span> 2 seats</span><span class="car">▸</span></button>
+            <button class="bprow" data-go="pack"><span class="k">Pack</span><span class="v">Balanced</span><span class="car">▸</span></button>
+          </div>
+          <div class="bplevel roles">
+            <button class="bpback" data-go="root">‹ Roles</button>
+            <button class="bprow" data-go="model"><span class="av">rx</span><span class="v">rex<span class="bpsub">orchestrator</span></span><span class="modeltok">Opus 4.8</span><span class="car">▸</span></button>
+            <button class="bprow" data-go="model"><span class="av">pl</span><span class="v">plume<span class="bpsub">marketer</span></span><span class="modeltok">Opus 4.8</span><span class="car">▸</span></button>
+          </div>
+          <div class="bplevel model">
+            <button class="bpback" data-go="roles">‹ rex · orchestrator</button>
+            <button class="bprow"><span class="v">Claude Fable 5</span></button>
+            <button class="bprow"><span class="v">Claude Opus 4.8</span><span class="bpcheck">✓</span></button>
+            <button class="bprow"><span class="v">Claude Sonnet 5</span></button>
+            <button class="bprow"><span class="v">GPT-5.2</span></button>
+          </div>
+          <div class="bplevel pack">
+            <button class="bpback" data-go="root">‹ Pack</button>
+            <button class="bprow"><span class="v">Balanced</span><span class="bpcheck">✓</span></button>
+            <button class="bprow"><span class="v">Flagship</span></button>
+            <button class="bprow"><span class="v">Fast</span></button>
+            <button class="bprow"><span class="v">Custom…</span></button>
+          </div>
+        </div>
+        <div class="bpfoot"><small>New conversations follow the project brain</small><button class="bpapply" type="button">Apply</button></div>
+      </div>
+      <div class="composer">
+        <div class="ctext">Describe the work — or just ask…</div>
+        <div class="crow">
+          <button class="cchip"><i>#</i> marketing ⌄</button>
+          <button class="cchip bpill"><span class="brainavs"><span>rx</span><span>pl</span></span> Brain · Manual ⌄</button>
+          <button class="send">↑</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="theme" data-theme="dark" data-clone="a1"><h2>Graphite — click the pill</h2></div>
+</div>
+<div class="legend">
+  <span class="pin">1</span><b>288px, not 590</b> — the width of its widest row (a role + model tok), no tabs, no table. Anchored on the pill, growing upward from it.<br/>
+  <span class="pin">2</span><b>Level 0 is a summary you can act on</b> — scope flip + the two drill rows answer the common opens without a single drill; the crew avatars keep the "who's seated" glance the pill promises.<br/>
+  <span class="pin">3</span><b>One body height at every level</b> (fixed 236px, scrolls inside, no bar) — the §15 no-resize contract; Packs stopped being a TAB (two tabs over one subject was the anti-pattern the task panel already retired) and became a drill row.<br/>
+  <span class="pin">4</span><b>Back unwinds one level, Esc one layer, the pill is never recolored</b> — all three are standing rulings, untouched.
+</div>
+
+<!-- ══════ Direction B ══════ -->
+<div class="stophd"><span class="stopno">Direction B</span>The scope-first mini + a deep modal for the table</div>
+<div class="stopp">A ~224px chip menu with only the two things most opens want — the scope flip and the pack — plus a <b>Configure roles…</b> row that opens the full existing popup as a proper modal. Smallest possible resting footprint; the cost is a second surface (menu → modal) and the roles table keeps its current size somewhere.</div>
+<div class="themes">
+  <div class="theme" data-theme="cream-oak" data-src="b1">
+    <h2>Cream Oak — static</h2>
+    <div class="floor">
+      <div class="note">the mini menu… and the modal it escalates to (ghosted)</div>
+      <div class="bigmodal">the CURRENT popup, reframed as a modal — only when "Configure roles…" is asked for</div>
+      <div class="minimenu">
+        <div class="bpseg"><button class="on" type="button">New conversation</button><button type="button">Project-wide</button></div>
+        <button class="bprow"><span class="k">Pack</span><span class="v">Balanced</span><span class="car">▸</span></button>
+        <button class="bprow"><span class="v">Configure roles…</span><span class="car">▸</span></button>
+      </div>
+      <div class="composer">
+        <div class="ctext">Describe the work — or just ask…</div>
+        <div class="crow">
+          <button class="cchip"><i>#</i> marketing ⌄</button>
+          <button class="cchip"><span class="brainavs"><span>rx</span><span>pl</span></span> Brain · Manual ⌄</button>
+          <button class="send">↑</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="theme" data-theme="dark" data-clone="b1"><h2>Graphite — static</h2></div>
+</div>
+
+<!-- ══════ Direction C ══════ -->
+<div class="stophd"><span class="stopno">Direction C</span>Same shape, compressed — 320px, roles as one-liners</div>
+<div class="stopp">Keep today's structure (tabs, body, footer) but halve the width: roles become avatar + name + model-tok one-liners, the explainer prose drops to one line. Least change; still a table floating over the stage, still two tabs over one subject, and it gets tall again the day a room seats five roles.</div>
+<div class="themes">
+  <div class="theme" data-theme="cream-oak" data-src="c1">
+    <h2>Cream Oak — static</h2>
+    <div class="floor">
+      <div class="cpop">
+        <div class="bpseg"><button class="on" type="button">Roles</button><button type="button">Packs</button></div>
+        <div class="bpwhy">Next message starts on this brain; sticks after.</div>
+        <div class="crole"><span class="av">rx</span> rex <span class="modeltok">Opus 4.8 ⌄</span></div>
+        <div class="crole"><span class="av">pl</span> plume <span class="modeltok">Opus 4.8 ⌄</span></div>
+        <div class="bpfoot"><small>New conversations follow the project brain</small><button class="bpapply" type="button">Apply</button></div>
+      </div>
+      <div class="composer">
+        <div class="ctext">Describe the work — or just ask…</div>
+        <div class="crow">
+          <button class="cchip"><i>#</i> marketing ⌄</button>
+          <button class="cchip"><span class="brainavs"><span>rx</span><span>pl</span></span> Brain · Manual ⌄</button>
+          <button class="send">↑</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="theme" data-theme="dark" data-clone="c1"><h2>Graphite — static</h2></div>
+</div>
+
+<table class="alts">
+  <tr><th>Direction</th><th>Footprint</th><th>Why · why not</th></tr>
+  <tr><td><b>A · the drill card</b> <span class="pick">recommended</span></td><td>288 × ~330</td><td>Promotes the popup's OWN documented interior law (take over the body + ‹ back) one level up; kills the tabs (a drill row does Packs' job); every settled ruling holds (fixed height per surface, Esc unwinds one, pill never recolored). One surface, three depths.</td></tr>
+  <tr><td><b>B · mini + modal</b></td><td>224 × ~150 (then a modal)</td><td class="no">Smallest rest state, but it makes the roles table a SECOND surface — a menu that escalates to a modal is two doors for one subject, and the big table survives unshrunk behind the first click.</td></tr>
+  <tr><td><b>C · compressed</b></td><td>320 × ~300</td><td class="no">Least change, but it keeps the two-tabs-over-one-subject shape the task panel already retired, and it regrows with every seated role — compression, not structure.</td></tr>
+</table>
+
+<div class="stopp" style="margin-top:26px"><b>If A is approved:</b> it lands as a rework of the one `BrainChip` popup (docs/10 §15 updated in the same PR), inheriting the existing state and Apply plumbing — the levels are render-only. The pill, the roles data, `resolvePackRoles`, and the scope semantics don't change.</div>
+
+</div>
+<script>
+document.querySelectorAll('[data-clone]').forEach((t) => {
+  const src = document.querySelector(`[data-src="${t.dataset.clone}"]`);
+  if (src) { const inner = src.cloneNode(true); inner.querySelectorAll('h2').forEach(h=>h.remove()); t.append(...inner.children); }
+});
+document.addEventListener('click', (e) => {
+  const pill = e.target.closest('.bpill');
+  const go = e.target.closest('[data-go]');
+  const pop = e.target.closest('.bpop');
+  if (pill) {
+    const p = pill.closest('.floor').querySelector('.bpop');
+    p.hidden = !p.hidden; p.dataset.level = 'root';
+    return;
+  }
+  if (go && pop) { pop.dataset.level = go.dataset.go; return; }
+  if (!pop) document.querySelectorAll('.bpop').forEach((p) => { p.hidden = true; });
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  document.querySelectorAll('.bpop:not([hidden])').forEach((p) => {
+    const l = p.dataset.level;
+    if (l === 'model') p.dataset.level = 'roles';
+    else if (l === 'roles' || l === 'pack') p.dataset.level = 'root';
+    else p.hidden = true;
+  });
+});
+</script>
+</body>
+</html>

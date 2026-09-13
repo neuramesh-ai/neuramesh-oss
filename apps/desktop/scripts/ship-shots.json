@@ -1,0 +1,8 @@
+[
+  { "name": "ship1-review-dark", "query": { "theme": "dark", "openTask": "1052", "tab": "thread" }, "settle": 2400 },
+  { "name": "ship1-review-cream", "query": { "theme": "cream-oak", "openTask": "1052", "tab": "thread" }, "settle": 2400 },
+  { "name": "ship2-releasing-dark", "query": { "theme": "dark", "openTask": "1053", "tab": "thread" }, "settle": 2400 },
+  { "name": "ship2-releasing-cream", "query": { "theme": "cream-oak", "openTask": "1053", "tab": "thread" }, "settle": 2400 },
+  { "name": "ship3-board-dark", "query": { "theme": "dark", "click": "Board" }, "settle": 2400 },
+  { "name": "ship4-mission-dark", "query": { "theme": "dark", "click": "Mission Control" }, "settle": 2400 }
+]

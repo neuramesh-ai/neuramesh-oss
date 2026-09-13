@@ -1,0 +1,8 @@
+[
+  { "name": "board-backlog-dark", "query": { "theme": "dark", "click": "Board" }, "settle": 1600 },
+  { "name": "board-backlog-cream", "query": { "theme": "cream-oak", "click": "Board" }, "settle": 1600 },
+  { "name": "backlog-item-dark", "query": { "theme": "dark", "click": "Board", "clicktext": "#1055" }, "settle": 2000 },
+  { "name": "backlog-item-cream", "query": { "theme": "cream-oak", "click": "Board", "clicktext": "#1055" }, "settle": 2000 },
+  { "name": "backlog-edit-dark", "query": { "theme": "dark", "click": "Board", "clicktext": "#1055,✎ Edit" }, "settle": 2200 },
+  { "name": "backlog-edit-cream", "query": { "theme": "cream-oak", "click": "Board", "clicktext": "#1055,✎ Edit" }, "settle": 2200 }
+]

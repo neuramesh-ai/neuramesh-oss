@@ -1,0 +1,54 @@
+# ONE PowerSync config for the dev stack and the local stack (docs/local-mode.md). Everything that
+# differs between the two arrives as PS_* env: PowerSync substitutes only names that start with
+# PS_, and an unset one is a hard error at boot, so each compose file supplies every value.
+#   dev/stack/docker-compose.yaml            — the committed dev values, as compose defaults
+#   apps/desktop/resources/local/docker-compose.yaml — the desktop's NM_* env, mapped
+# packages/control-api/test/powersync-yaml.test.ts holds the two in step with this file.
+telemetry:
+  disable_telemetry_sharing: true
+
+replication:
+  connections:
+    - type: postgresql
+      uri: postgresql://postgres:nm@pg:5432/nm
+      sslmode: disable
+
+storage:
+  type: postgresql
+  uri: postgresql://powersync_storage:nm_storage@pg:5432/powersync_storage
+  sslmode: disable
+
+port: 8080
+
+sync_config:
+  path: /config/sync-config.yaml
+
+client_auth:
+  jwks:
+    keys:
+      # the HS256 key the control-api signs sync tokens with: the committed dev key under kid
+      # nm-dev (apps/desktop/src/main/token.ts, control-api devtoken.ts), or the per-install
+      # NM_SYNC_KEY under kid nm-local (control-api local-auth.ts)
+      - kty: 'oct'
+        alg: 'HS256'
+        kid: !env PS_NM_SYNC_KID
+        k: !env PS_NM_SYNC_KEY
+      # the machine issuer's public key (fleet-local.sh generates it; empty when no fleet runs)
+      - kty: 'RSA'
+        alg: 'RS256'
+        use: 'sig'
+        kid: 'nm-machine-1'
+        e: 'AQAB'
+        n: !env PS_NM_MACHINE_JWK_N
+  # A remote JWKS, fetched lazily when a token names a kid the keys above do not hold. The dev
+  # stack points at Clerk's (NM_AUTH=clerk validates against Clerk's own RS256 keys). The local
+  # stack points at its control-api's /v1/sync-jwks, so nothing leaves the machine.
+  jwks_uri: !env PS_NM_JWKS_URI
+  # the HS256 token's audience (powersync-dev | powersync-local), the Clerk "powersync" template
+  # token's (aud = a PowerSync instance URL, set PS_NM_CLOUD_AUDIENCE in dev/stack/.env to test the
+  # Clerk lane against the dev stack), and the machine token's ('powersync')
+  audience: [!env PS_NM_AUDIENCE, !env PS_NM_CLOUD_AUDIENCE, 'powersync']
+
+api:
+  tokens:
+    - !env PS_NM_ADMIN_TOKEN

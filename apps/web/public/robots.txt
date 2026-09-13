@@ -1,0 +1,12 @@
+# www.neuramesh.app
+# The pages under Disallow are transactional (billing returns, invitations, sign-in hand-offs).
+# They also carry noindex (src/seo.ts). Everything else, including AI crawlers, is welcome.
+
+User-agent: *
+Allow: /
+Disallow: /billing/
+Disallow: /welcome
+Disallow: /join
+Disallow: /desktop-signin
+
+Sitemap: https://www.neuramesh.app/sitemap.xml

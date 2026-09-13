@@ -1,0 +1,56 @@
+[
+  {
+    "name": "ia1-room-lands-feed",
+    "settle": 3000,
+    "query": {
+      "theme": "dark",
+      "channel": "dev"
+    },
+    "js": "(async () => { const w=(ms)=>new Promise(r=>setTimeout(r,ms)); await w(800); })()"
+  },
+  {
+    "name": "ia2-workspace-home",
+    "settle": 3000,
+    "query": {
+      "theme": "dark",
+      "channel": "dev"
+    },
+    "js": "(async () => { const w=(ms)=>new Promise(r=>setTimeout(r,ms)); const h=document.querySelector('.navhome'); if(h) h.click(); await w(1200); })()"
+  },
+  {
+    "name": "ia3-workspace-home-cream",
+    "settle": 3000,
+    "query": {
+      "theme": "cream-oak",
+      "channel": "dev"
+    },
+    "js": "(async () => { const w=(ms)=>new Promise(r=>setTimeout(r,ms)); const h=document.querySelector('.navhome'); if(h) h.click(); await w(1200); })()"
+  },
+  {
+    "name": "ia4-marketing-segs",
+    "settle": 3000,
+    "query": {
+      "theme": "dark",
+      "channel": "marketing"
+    },
+    "js": "(async () => { const w=(ms)=>new Promise(r=>setTimeout(r,ms)); await w(1200); })()"
+  },
+  {
+    "name": "ia5-home-inflight",
+    "settle": 3000,
+    "query": {
+      "theme": "dark",
+      "channel": "dev"
+    },
+    "js": "(async () => { const w=(ms)=>new Promise(r=>setTimeout(r,ms)); const h=document.querySelector('.navhome'); if(h) h.click(); await w(1200); const c=document.querySelector('.hcol'); if(c) c.scrollTop=c.scrollHeight; await w(500); })()"
+  },
+  {
+    "name": "ia6-home-chanpicker",
+    "settle": 3000,
+    "query": {
+      "theme": "dark",
+      "channel": "dev"
+    },
+    "js": "(async () => { const w=(ms)=>new Promise(r=>setTimeout(r,ms)); const h=document.querySelector('.navhome'); if(h) h.click(); await w(1200); const chip=[...document.querySelectorAll('.hcomposer button, .hrow button')].find(b=>/^#\\s/.test((b.textContent||'').trim())); if(chip) chip.click(); await w(600); })()"
+  }
+]

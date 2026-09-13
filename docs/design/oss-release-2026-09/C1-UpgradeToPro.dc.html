@@ -1,0 +1,257 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;450;500;600&amp;family=Geist+Mono:wght@500;600&amp;family=Bricolage+Grotesque:wght@600&amp;display=swap">
+  <style>
+    .frame { --win:#0d0d0d;--bg:#141414;--panel:#161616;--panel2:#1a1a1a;--panel3:#262626;--border:#262626;--border2:#3a3a3a;--card-border:#2c2c2c;--card:#1e1e1e;--text:#cbcbcb;--body:#a6a6a6;--muted:#848484;--dim:#6a6a6a;--link:#d19a72;--brand:#834a2b;--brand-ink:#fff7ee;--green:#77ac8d;--warn:#c9a15e;--prog:#8ba0c0;--accent:#cbcbcb;--done:#77ac8d;--planrev:#a89ccf;--overlay:#222222;--shadow:rgba(0,0,0,0.62);--hover-bg:color-mix(in srgb, #cbcbcb 7%, transparent);--sel-bg:color-mix(in srgb, #cbcbcb 10%, transparent);--ring:#525252;--shadow-card:0 1px 2px rgba(0,0,0,.25);--shadow-sheet:0 1px 2px rgba(0,0,0,.35), 0 12px 32px -12px rgba(0,0,0,.6);--shadow-pop:0 20px 55px -14px rgba(0,0,0,.65);--boxbg:#1a1a1a;--veil:color-mix(in srgb, #0d0d0d 62%, transparent);--r-xs:3px;--r-sm:4px;--r-md:6px;--r-lg:8px; }
+    
+  body { margin: 0; }
+  a { color: var(--link); text-decoration: none; }
+  .frame { --fbody: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; --fmono: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace; --fbrand: 'Bricolage Grotesque', var(--fbody);
+    position: relative; box-sizing: border-box; background: var(--win); color: var(--text); font: 14px/1.5 var(--fbody); -webkit-font-smoothing: antialiased; overflow: hidden; display: flex; flex-direction: column; }
+  .frame *, .frame *::before, .frame *::after { box-sizing: border-box; }
+  .frame.row { flex-direction: row; }
+  .lbl { position: absolute; left: 12px; bottom: 8px; font: 500 10px var(--fmono); letter-spacing: -.02em; text-transform: uppercase; color: var(--dim); z-index: 5; }
+  /* ── the frame top: mark · wordmark · fold pin · search pill · the ambient utilities · the sync mark ── */
+  .ftop { flex: none; display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 12px 0 14px; }
+  .mark { width: 16px; height: 16px; display: inline-grid; place-items: center; color: var(--brand); }
+  .wordmark { font: 600 14px var(--fbrand); letter-spacing: -.015em; color: var(--text); }
+  .ftico { width: 24px; height: 24px; display: grid; place-items: center; color: var(--muted); border-radius: var(--r-xs); }
+  .ftgrow { flex: 1; }
+  .searchpill { display: inline-flex; align-items: center; gap: 8px; height: 26px; padding: 0 10px; border-radius: var(--r-xs); border: 1px solid var(--border2); color: var(--dim); font-size: 12.5px; min-width: 260px; }
+  .searchpill .kbd { margin-left: auto; font: 500 10px var(--fmono); color: var(--dim); }
+  .livepill { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px; border-radius: var(--r-xs); color: var(--muted); font: 500 10px var(--fmono); letter-spacing: -.02em; text-transform: uppercase; }
+  .livepill .ld { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+  .procs { font: 500 10px var(--fmono); color: var(--dim); }
+  .body2 { flex: 1; min-height: 0; display: flex; }
+  /* ── the rail (nav-recents recipes at the 14px step) ── */
+  .nav { width: 320px; flex: none; display: flex; flex-direction: column; padding: 4px 0 0; height: 100%; }
+  .sheet { flex: 1; min-width: 0; margin: 2px 8px 8px 4px; background: var(--bg); border-radius: var(--r-lg); box-shadow: var(--shadow-sheet); position: relative; overflow: hidden; }
+  .navseg { display: flex; margin: 6px 8px 2px; padding: 3px; background: var(--panel2); border-radius: var(--r-xs); }
+  .navseg span { flex: 1; text-align: center; font: 500 13px var(--fbody); color: var(--muted); padding: 5px 0; border-radius: var(--r-xs); }
+  .navseg span.on { background: var(--panel3); color: var(--text); }
+  .navnew { display: flex; align-items: center; gap: 4px; padding: 6px 8px 12px; }
+  .navnew .row { display: flex; align-items: center; gap: 11px; flex: 1; height: 32px; padding: 0 9px; border-radius: var(--r-md); color: var(--body); font-size: 14px; font-weight: 500; }
+  .navnew .row svg { color: var(--muted); } .navnew .kbd { margin-left: auto; font: 500 10px var(--fmono); color: var(--dim); }
+  .navnew .caret { width: 26px; height: 26px; display: grid; place-items: center; color: var(--muted); }
+  .navsect { padding: 12px 16px 4px; font: 500 10px var(--fmono); letter-spacing: -.02em; color: var(--muted); text-transform: uppercase; display: flex; align-items: center; gap: 6px; }
+  .navsect .chev { color: var(--dim); display: inline-grid; }
+  .navitem { display: flex; align-items: center; gap: 11px; margin: 0 8px; width: calc(100% - 16px); height: 32px; padding: 0 9px; border-radius: var(--r-md); color: var(--body); font-size: 14px; font-weight: 500; }
+  .navitem svg { color: var(--muted); flex: none; }
+  .navitem .navlabel { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .navitem.sub { padding-left: 44px; height: 28px; font-size: 13px; }
+  .navitembadge { font: 600 10px var(--fmono); color: var(--muted); background: var(--panel3); border-radius: 999px; padding: 1px 7px; }
+  .navitem .chev { color: var(--dim); }
+  .navlist { flex: 1; min-height: 0; overflow: hidden; }
+  .navgrphd { display: flex; align-items: center; gap: 7px; padding: 12px 8px 4px 12px; min-width: 0; }
+  .navprojchev { width: 18px; height: 18px; display: grid; place-items: center; color: var(--dim); }
+  .navgrphdlbl { font: 500 10px var(--fmono); letter-spacing: -.02em; text-transform: uppercase; color: var(--dim); }
+  .navgrphdlbl.on { color: var(--text); }
+  .navgrphdsep { font: 500 10px var(--fmono); color: var(--dim); opacity: .6; }
+  .navgrphdcnt { font: 600 10px var(--fmono); color: var(--dim); opacity: .8; }
+  .navscopegrow { flex: 1; }
+  .navhistfind { width: 22px; height: 22px; display: grid; place-items: center; color: var(--muted); opacity: .5; border-radius: var(--r-sm); }
+  /* the connection bands: the .navsect voice, a kicker over the rows it holds, only when two connections exist */
+  .navband { display: flex; align-items: center; gap: 6px; padding: 10px 12px 2px 12px; font: 500 10px var(--fmono); letter-spacing: -.02em; text-transform: uppercase; color: var(--muted); }
+  .navband .chev { width: 14px; height: 14px; display: inline-grid; place-items: center; color: var(--dim); } .navband .chev.c { transform: rotate(-90deg); }
+  .navband .cnt { font-weight: 600; color: var(--dim); opacity: .8; }
+  .navband .grow { flex: 1; }
+  .navband .pulse { width: 6px; height: 6px; border-radius: 50%; background: var(--prog); box-shadow: 0 0 0 3px color-mix(in srgb, var(--prog) 22%, transparent); }
+  .navgrp { margin-top: 2px; }
+  .navgrprow { display: flex; align-items: center; gap: 9px; width: calc(100% - 16px); margin: 1px 8px; height: 28px; padding: 0 9px 0 10px; border-radius: var(--r-md); color: var(--body); }
+  .navgrprow .navhistglyph { color: var(--dim); }
+  .navgrpname { flex: 1; min-width: 0; font-size: 13px; font-weight: 400; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .navhisttrail { display: inline-flex; align-items: center; gap: 6px; flex: none; }
+  .navhistfact { font: 500 10px var(--fmono); color: var(--dim); }
+  .navgrpchev { display: inline-grid; color: var(--dim); } .navgrpchev.c { transform: rotate(-90deg); }
+  .navhistask { width: 6px; height: 6px; border-radius: 50%; background: var(--warn); box-shadow: 0 0 0 3px color-mix(in srgb, var(--warn) 26%, transparent); }
+  .navhistrow { display: flex; align-items: center; gap: 9px; width: calc(100% - 16px); margin: 1px 8px; height: 30px; padding: 0 9px 0 10px; border-radius: var(--r-md); color: var(--body); }
+  .navhistrow.in { padding-left: 32px; }
+  .navhistrow.on { background: var(--card); box-shadow: var(--shadow-card); }
+  .navhistglyph { flex: none; width: 14px; height: 14px; display: grid; place-items: center; color: var(--dim); }
+  .navhistglyph .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .navhisttitle { flex: 1; min-width: 0; font-size: 14px; font-weight: 450; color: var(--body); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .navhistrow.on .navhisttitle { color: var(--text); font-weight: 500; }
+  .navhisttitle b { font: 500 11px var(--fmono); color: var(--dim); margin-right: 5px; }
+  .navhiststat { font: 500 9.5px var(--fmono); letter-spacing: -.01em; white-space: nowrap; padding: 2px 5px; border-radius: var(--r-xs); border: 1px solid transparent; flex: none; }
+  .st-settled { background: var(--panel3); color: var(--muted); border-color: var(--border2); }
+  .st-ip { background: color-mix(in srgb, var(--prog) 16%, transparent); color: var(--prog); }
+  .st-ny { background: color-mix(in srgb, var(--warn) 16%, transparent); color: var(--warn); }
+  .navgrpmore { display: block; margin: 1px 8px 4px; padding: 0 9px 0 32px; height: 26px; font: 500 12.5px var(--fbody); color: var(--dim); line-height: 26px; }
+  .navgrpmore.flat { padding-left: 19px; }
+  /* the foot: tile · name · the connection glyph · caret · (credit ring only on a cloud connection) · avatar */
+  .navfoot { display: flex; align-items: center; gap: 8px; margin: 4px 8px 6px; padding: 5px 6px; margin-top: auto; border-radius: var(--r-md); border: 1px solid transparent; position: relative; }
+  .navfoot.open { background: var(--card); border-color: var(--card-border); box-shadow: var(--shadow-card); }
+  .wstile { width: 24px; height: 24px; border-radius: var(--r-sm); background: var(--panel3); border: 1px solid var(--border2); display: grid; place-items: center; font: 600 11px var(--fmono); color: var(--body); position: relative; flex: none; }
+  .wstile i { position: absolute; top: -3px; right: -3px; width: 7px; height: 7px; border-radius: 50%; background: var(--warn); border: 1.5px solid var(--win); }
+  .wsname { font-size: 12.5px; font-weight: 600; color: var(--body); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .wsconn { display: inline-grid; place-items: center; color: var(--dim); }
+  .credring { width: 22px; height: 22px; flex: none; }
+  .avatar { width: 22px; height: 22px; border-radius: var(--r-xs); background: var(--panel3); border: 1px solid var(--border2); display: grid; place-items: center; font: 600 10px var(--fmono); color: var(--body); flex: none; }
+  /* the foot's menu: the popover recipe, anchored above the foot */
+  .wsmenu { position: absolute; left: 0; right: 0; bottom: calc(100% + 6px); background: var(--card); border: 1px solid var(--card-border); border-radius: var(--r-md); box-shadow: var(--shadow-pop); padding: 6px; }
+  .wsmenu .k { padding: 8px 8px 3px; font: 500 10px var(--fmono); letter-spacing: -.02em; text-transform: uppercase; color: var(--dim); display: flex; align-items: center; gap: 6px; }
+  .wsmenu .k .pulse { width: 6px; height: 6px; border-radius: 50%; background: var(--prog); }
+  .wsrow { display: flex; align-items: center; gap: 9px; height: 30px; padding: 0 8px; border-radius: var(--r-sm); color: var(--body); font-size: 13.5px; }
+  .wsrow.on { background: var(--sel-bg); color: var(--text); }
+  .wsrow .wstile { width: 18px; height: 18px; font-size: 9px; }
+  .wsrow .sub { margin-left: auto; font: 500 10px var(--fmono); color: var(--dim); }
+  .wsrow svg { color: var(--muted); }
+  .wsmenu hr { border: 0; border-top: 1px solid var(--border); margin: 6px 4px; }
+  /* ── the elevated stratum ── */
+  .card { background: var(--card); border: 1px solid var(--card-border); border-radius: var(--r-lg); box-shadow: var(--shadow-card); }
+  .eyebrow { font: 500 10px var(--fmono); letter-spacing: -.02em; text-transform: uppercase; color: var(--dim); }
+  .h1 { margin: 0; font-size: 20px; font-weight: 500; letter-spacing: -.02em; line-height: 1.25; color: var(--text); }
+  .h2 { margin: 0; font-size: 16px; font-weight: 500; letter-spacing: -.02em; line-height: 1.3; color: var(--text); }
+  .p { margin: 0; font-size: 14px; line-height: 1.5; color: var(--body); }
+  .p.dim { color: var(--muted); }
+  .mono { font: 500 11px var(--fmono); letter-spacing: -.02em; color: var(--dim); }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 34px; padding: 0 14px; border-radius: var(--r-xs); border: 1px solid var(--border2); background: transparent; color: var(--body); font: 500 11px var(--fmono); letter-spacing: -.02em; text-transform: uppercase; white-space: nowrap; position: relative; overflow: hidden; }
+  .btn.sec { background: var(--card); }
+  .btn.primary { background: var(--brand); border-color: var(--brand); color: var(--brand-ink); }
+  .btn.primary::after { content: ''; position: absolute; inset: 0; background: repeating-linear-gradient(135deg, transparent 0 6px, color-mix(in srgb, var(--brand-ink) 7%, transparent) 6px 7px); }
+  .btn.sm { height: 28px; padding: 0 10px; font-size: 10px; }
+  .btn.quiet { border-color: transparent; color: var(--muted); }
+  .actions { display: flex; align-items: center; gap: 8px; }
+  .actions .grow { flex: 1; }
+  .kbdhint { font: 500 10px var(--fmono); color: var(--dim); }
+  /* first-run card, centred on the frame */
+  .center { flex: 1; display: grid; place-items: center; padding: 24px; }
+  .setup { width: 460px; padding: 26px 26px 20px; display: flex; flex-direction: column; gap: 14px; }
+  .setup .h1 { margin-top: 2px; }
+  .engrow { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r-md); }
+  .engrow .nm { font-size: 14px; font-weight: 500; color: var(--text); min-width: 118px; }
+  .engrow .fact { font-size: 12.5px; color: var(--muted); flex: 1; }
+  .engrow .go { font: 500 11px var(--fmono); letter-spacing: -.02em; text-transform: uppercase; color: var(--link); }
+  .engrow.on { border-color: var(--border2); background: var(--sel-bg); }
+  .radio { flex: none; width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid var(--border2); }
+  .radio.on { border-color: var(--accent); background: radial-gradient(circle, var(--accent) 42%, transparent 48%); }
+  .engtag { font: 500 9.5px var(--fmono); letter-spacing: -.02em; text-transform: uppercase; color: var(--muted); }
+  .facts { display: grid; grid-template-columns: 110px 1fr; row-gap: 0; }
+  .facts .k { font-size: 13.5px; color: var(--muted); padding: 7px 0; border-top: 1px solid var(--border); }
+  .facts .v { font-size: 13.5px; color: var(--body); padding: 7px 0; border-top: 1px solid var(--border); display: flex; align-items: center; gap: 8px; }
+  .facts .v .ok { font: 500 9.5px var(--fmono); letter-spacing: -.02em; text-transform: uppercase; color: var(--green); }
+  .prow { display: grid; grid-template-columns: 1fr auto; row-gap: 6px; column-gap: 12px; align-items: center; padding: 8px 0; }
+  .prow .nm { font-size: 14px; color: var(--body); display: flex; align-items: center; gap: 8px; }
+  .prow .nm svg { color: var(--green); }
+  .prow .sz { font: 500 11px var(--fmono); color: var(--dim); }
+  .prow .bar { grid-column: 1 / -1; height: 4px; border-radius: 999px; background: var(--panel3); overflow: hidden; }
+  .prow .bar i { display: block; height: 100%; background: var(--body); border-radius: 999px; }
+  .srow { display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 4px; border-bottom: 1px solid var(--border); }
+  .srow:last-child { border-bottom: 0; }
+  .srow .nm { font-size: 14px; color: var(--body); flex: 1; }
+  .srow .st { font: 500 10px var(--fmono); letter-spacing: -.02em; text-transform: uppercase; color: var(--dim); display: inline-flex; align-items: center; gap: 6px; }
+  .srow .st.ok { color: var(--green); }
+  .srow .st .wait { width: 6px; height: 6px; border-radius: 50%; background: var(--warn); box-shadow: 0 0 0 3px color-mix(in srgb, var(--warn) 22%, transparent); }
+  .setupfoot { display: flex; align-items: center; gap: 8px; margin-top: 2px; padding-top: 12px; border-top: 1px solid var(--border); }
+  /* ── Home stage (home-threads recipe, trimmed) ── */
+  .stage { width: 760px; margin: 0 auto; padding-top: 54px; display: flex; flex-direction: column; }
+  .stagehead { font-size: 29px; font-weight: 500; letter-spacing: -.03em; line-height: 1.25; text-align: center; margin: 0 0 22px; color: var(--text); text-wrap: balance; }
+  .stagehead .q { color: var(--muted); }
+  .hcomposer { position: relative; background: var(--boxbg); border: 1px solid var(--border); border-radius: var(--r-md); padding: 13px 14px 11px; box-shadow: var(--shadow-card); }
+  .chint { display: flex; align-items: center; gap: 8px; margin: -13px -14px 10px; padding: 8px 14px; border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent); background: color-mix(in srgb, var(--panel2) 30%, transparent); border-radius: inherit; border-bottom-left-radius: 0; border-bottom-right-radius: 0; color: var(--muted); font-size: 12px; }
+  .chintat { font-weight: 600; color: var(--text); }
+  .pav { width: 16px; height: 16px; border-radius: var(--r-xs); background: var(--panel3); flex: none; }
+  .ta { min-height: 40px; font-size: 14px; line-height: 1.5; color: var(--dim); }
+  .hrow { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+  .cchip { display: inline-flex; align-items: center; gap: 5px; padding: 3.5px 8px; border-radius: var(--r-xs); border: 1px solid transparent; color: var(--dim); font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .cchip .car { font-size: 8px; } .cchip svg { opacity: .85; }
+  .brainavs { display: inline-flex; margin-left: 2px; } .brainavs .pav { width: 14px; height: 14px; margin-left: -5px; border: 1.5px solid var(--card); } .brainavs .pav:first-child { margin-left: 0; }
+  .hsend { flex: none; width: 32px; height: 32px; display: grid; place-items: center; border-radius: var(--r-xs); background: var(--panel3); color: var(--dim); margin-left: auto; }
+  .sgroup { display: flex; align-items: center; gap: 8px; font: 600 10px var(--fmono); letter-spacing: -.02em; text-transform: uppercase; color: var(--dim); padding: 22px 12px 5px; }
+  .sgroup .rule { flex: 1; height: 1px; background: var(--border); }
+  .histrow { display: flex; align-items: center; gap: 11px; padding: 9px 11px; border-radius: var(--r-md); color: var(--text); }
+  .histico { flex: none; width: 30px; height: 30px; border-radius: var(--r-sm); display: grid; place-items: center; background: var(--card); border: 1px solid var(--card-border); color: var(--muted); }
+  .histbody { flex: 1; min-width: 0; }
+  .histtitle { font-size: 14px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .histsnip { font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+  .histwhen { flex: none; font-size: 11px; color: var(--dim); display: inline-flex; align-items: center; gap: 8px; }
+  .chip { display: inline-flex; align-items: center; font: 500 10px var(--fmono); letter-spacing: -.02em; padding: 3px 7px; border-radius: var(--r-xs); text-transform: uppercase; white-space: nowrap; }
+  /* ── the veil and the upgrade sheet (.upmodal recipe) ── */
+  .veil { position: absolute; inset: 0; background: var(--veil); backdrop-filter: blur(14px); display: grid; place-items: center; }
+  .upmodal { width: 620px; background: var(--overlay); border: 1px solid var(--card-border); border-radius: var(--r-lg); box-shadow: var(--shadow-pop); padding: 24px 26px 18px; position: relative; display: flex; flex-direction: column; gap: 12px; }
+  .upx { position: absolute; top: 10px; right: 10px; width: 26px; height: 26px; display: grid; place-items: center; color: var(--muted); }
+  .upgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 6px; }
+  .upcard { background: var(--card); border: 1px solid var(--card-border); border-radius: var(--r-lg); padding: 16px 16px 14px; display: flex; flex-direction: column; gap: 10px; }
+  .upcard.rec { border-color: var(--border2); }
+  .uphead { display: flex; align-items: center; gap: 10px; }
+  .upico { width: 30px; height: 30px; border-radius: var(--r-sm); background: var(--panel2); display: grid; place-items: center; color: var(--body); flex: none; }
+  .upname { font-size: 15px; font-weight: 500; color: var(--text); display: flex; align-items: center; gap: 8px; }
+  .uptag { font: 500 10px var(--fmono); letter-spacing: -.02em; text-transform: uppercase; color: var(--dim); }
+  .uprec { font: 500 9.5px var(--fmono); letter-spacing: -.02em; text-transform: uppercase; color: var(--brand); background: color-mix(in srgb, var(--brand) 12%, transparent); padding: 2px 6px; border-radius: var(--r-xs); }
+  .upprice { font-size: 22px; font-weight: 500; letter-spacing: -.02em; color: var(--text); }
+  .upprice small { font-size: 12px; font-weight: 400; color: var(--muted); letter-spacing: 0; margin-left: 4px; }
+  .uplist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  .uplist li { display: flex; gap: 8px; font-size: 13px; color: var(--body); line-height: 1.4; }
+  .uplist li::before { content: ''; flex: none; width: 5px; height: 5px; margin-top: 7px; border-radius: 50%; background: var(--dim); }
+  .upfoot { display: flex; align-items: center; gap: 8px; padding-top: 12px; border-top: 1px solid var(--border); }
+  .orbph { width: 44px; height: 44px; border-radius: 50%; border: 2px dotted var(--muted); margin: 6px auto 4px; }
+  /* ── settings ── */
+  .topbar { display: flex; align-items: baseline; gap: 12px; padding: 22px 28px 12px; }
+  .topbar h1 { margin: 0; font-size: 22px; font-weight: 500; letter-spacing: -.02em; color: var(--text); }
+  .setcol { width: 680px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; padding-bottom: 24px; }
+  .setcard { padding: 14px 16px; display: flex; flex-direction: column; gap: 2px; }
+  .sethead { display: flex; align-items: center; gap: 10px; padding-bottom: 10px; }
+  .sethead .ico { width: 28px; height: 28px; border-radius: var(--r-sm); background: var(--panel2); display: grid; place-items: center; color: var(--body); }
+  .sethead .nm { font-size: 15px; font-weight: 500; color: var(--text); }
+  .sethead .st { font: 500 10px var(--fmono); letter-spacing: -.02em; text-transform: uppercase; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; margin-left: 6px; }
+  .sethead .st .d { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+  .sethead .grow { flex: 1; }
+  .krow { display: flex; align-items: center; gap: 12px; min-height: 34px; padding: 0 2px; border-top: 1px solid var(--border); font-size: 13.5px; }
+  .krow .k { width: 96px; color: var(--muted); flex: none; }
+  .krow .v { color: var(--body); flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; }
+  .krow .v code { font: 500 12px var(--fmono); color: var(--body); }
+  .krow .v .tag { font: 500 9.5px var(--fmono); letter-spacing: -.02em; text-transform: uppercase; color: var(--green); }
+  .krow .v .lnk { font: 500 11px var(--fmono); letter-spacing: -.02em; text-transform: uppercase; color: var(--link); }
+  .krow .sub { font-size: 12px; color: var(--muted); }
+  .tog { width: 30px; height: 18px; border-radius: 999px; background: var(--panel3); border: 1px solid var(--border2); position: relative; flex: none; }
+  .tog i { position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--card); box-shadow: var(--shadow-card); }
+  .tog.on { background: var(--accent); border-color: var(--accent); } .tog.on i { left: 14px; }
+  .field { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+  .input { flex: 1; height: 34px; padding: 0 10px; border-radius: var(--r-xs); border: 1px solid var(--border2); background: var(--card); color: var(--dim); font-size: 13.5px; display: flex; align-items: center; }
+  /* ── the hosted shell ── */
+  .thhead { display: flex; align-items: center; gap: 10px; padding: 14px 28px 10px; }
+  .crumb { font: 500 10px var(--fmono); letter-spacing: -.02em; text-transform: uppercase; color: var(--dim); }
+  .thtitle { font-size: 15px; font-weight: 500; color: var(--text); }
+  .thcol { width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; padding-top: 10px; }
+  .msg { display: flex; gap: 12px; }
+  .msg .pav { width: 26px; height: 26px; border-radius: var(--r-sm); margin-top: 2px; }
+  .msg .who { font-size: 12.5px; color: var(--muted); margin-bottom: 2px; } .msg .who b { color: var(--text); font-weight: 500; }
+  .msg .txt { font-size: 14px; line-height: 1.55; color: var(--body); }
+  .msg.me { justify-content: flex-end; }
+  .msg.me .bub { max-width: 70%; background: var(--card); border: 1px solid var(--card-border); border-radius: var(--r-lg); padding: 9px 13px; font-size: 14px; line-height: 1.55; color: var(--text); }
+  .gate { margin-top: auto; padding: 18px 20px 14px; display: flex; flex-direction: column; gap: 10px; }
+  .gate .h2 { font-size: 17px; }
+  .gatefoot { margin-top: 4px; padding-top: 10px; border-top: 1px solid var(--border); }
+
+  </style>
+</helmet>
+<div class="frame" style="width: 1180px; height: 760px;">
+  <div class="ftop"><span class="mark"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 21V11a8 8 0 0 1 16 0v10"/><path d="M8 21v-9a4 4 0 0 1 8 0v9"/></svg></span><span class="wordmark">neuramesh</span><span class="ftico"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 17v5"/><path d="M9 3h6l-1 6 3 3H7l3-3z"/></svg></span><span class="ftgrow"></span><span class="searchpill"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg> Search <span class="kbd">⌘K</span></span><span class="ftgrow"></span><span class="ftico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h10M4 18h7"/></svg></span><span class="ftico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg></span><span class="ftico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 8 5 4-5 4"/><path d="M12 17h7"/></svg></span><span class="procs">2 processes</span><span class="livepill"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 0 1-15.3 6.4"/><path d="M3 12a9 9 0 0 1 15.3-6.4"/><path d="M18 3v3.6h-3.6"/><path d="M6 21v-3.6h3.6"/></svg> local</span></div><div class="body2"><div class="nav">
+  <div class="navseg"><span class="on">Chat</span><span class="">Code</span></div>
+  <div class="navnew"><span class="row"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-6"/><path d="M18.4 3.6a2 2 0 0 1 2.8 2.8L13 14.6l-3.8.9.9-3.8z"/></svg>New chat<span class="kbd">⌘N</span></span><span class="caret"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span></div>
+  <div class="navsect"><span class="chev"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span>Shortcuts</div>
+  <div class="navitem"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9h13v-9"/></svg><span class="navlabel">Home</span></div>
+  <div class="navitem"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 14.5 3.2-4.2 2.6 3 3.9-5.3"/></svg><span class="navlabel">Whiteboards</span></div>
+  <div class="navitem"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 2.5l4 4-4 4"/><path d="M3 11.5v-2a3 3 0 0 1 3-3h15"/><path d="M7 21.5l-4-4 4-4"/><path d="M21 12.5v2a3 3 0 0 1-3 3H3"/></svg><span class="navlabel">Scheduled</span><span class="chev"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span></div>
+  <div class="navitem"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><span class="navlabel">Files</span></div>
+  <div class="navitem"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 17l6-6-6-6"/><path d="M13 19h7"/></svg><span class="navlabel">Code</span></div><div class="navgrphd"><span class="navprojchev"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span><span class="navgrphdlbl">Recents</span><span class="navgrphdsep">·</span><span class="navgrphdlbl on">Projects</span><span class="navgrphdcnt">34</span><span class="navscopegrow"></span><span class="navhistfind"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg></span></div><div class="navlist"><div class="navgrp"><div class="navgrprow"><span class="navhistglyph"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v1"/><path d="M3 19v-8h16.4a1 1 0 0 1 .96 1.28l-1.7 6a1 1 0 0 1-.96.72H5a2 2 0 0 1-2-2z"/></svg></span><span class="navgrpname">Neuramesh</span><span class="navhisttrail"><span class="navgrpchev"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span></span></div><div class="navgrprows"><div class="navhistrow in on"><span class="navhistglyph"><span class="dot" style="color: var(--prog)"></span></span><span class="navhisttitle">Ship the pricing page</span><span class="navhiststat st-ip">in progress</span></div><div class="navhistrow in"><span class="navhistglyph"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="6.5"/></svg></span><span class="navhisttitle"><b>1062</b>Local mode: first-run states</span><span class="navhistask"></span></div><div class="navhistrow in"><span class="navhistglyph"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3.2 2"/></svg></span><span class="navhisttitle">Routine · morning research sweep</span><span class="navhiststat st-settled">settled</span></div><div class="navgrpmore">Show 14 more</div></div></div><div class="navgrp"><div class="navgrprow"><span class="navhistglyph"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v1"/><path d="M3 19v-8h16.4a1 1 0 0 1 .96 1.28l-1.7 6a1 1 0 0 1-.96.72H5a2 2 0 0 1-2-2z"/></svg></span><span class="navgrpname">Default</span><span class="navhisttrail"><span class="navgrpchev"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span></span></div><div class="navgrprows"><div class="navhistrow in"><span class="navhistglyph"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span><span class="navhisttitle">Give me ideas</span><span class="navhiststat st-settled">settled</span></div><div class="navhistrow in"><span class="navhistglyph"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span><span class="navhisttitle">Agent Interoperability Map</span><span class="navhiststat st-settled">settled</span></div></div></div><div class="navgrp"><div class="navgrprow"><span class="navhistglyph"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg></span><span class="navgrpname">AI Demos</span><span class="navhisttrail"><span class="navhistfact">9</span><span class="navgrpchev c"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span></span></div></div></div><div class="navfoot"><span class="wstile">G<i></i></span><span class="wsname">GADS INC</span><span class="wsconn"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="11" rx="1.5"/><path d="M2 19h20"/></svg></span><span class="navhistglyph"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span><span class="avatar">D</span></div></div><div class="sheet"><div class="stage"><h2 class="stagehead">Good evening, Dana. <span class="q">What do we build?</span></h2><div class="hcomposer"><div class="chint"><span class="pav"></span><span class="chintat">rex</span> · Ask anything, or describe the work.</div><div class="ta">Message #general…</div><div class="hrow"><span class="cchip"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 9h14M5 15h14M10 3 8 21M16 3l-2 18"/></svg> general <span class="car">▾</span></span><span class="cchip"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="11" rx="1.5"/><path d="M2 19h20"/></svg> This Mac <span class="car">▾</span></span><span class="cchip"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4.5a3 3 0 0 0-3 3.1c-1.8.4-3.1 1.9-3.1 3.8a3.9 3.9 0 0 0 1.5 3.1 3.4 3.4 0 0 0 3.3 4.4c.4 0 .9-.1 1.3-.2.4.1.9.2 1.3.2a3.4 3.4 0 0 0 3.3-4.4 3.9 3.9 0 0 0 1.5-3.1c0-1.9-1.3-3.4-3.1-3.8a3 3 0 0 0-3-3.1z"/><path d="M12 4.5v15"/></svg><span class="brainavs"><span class="pav"></span><span class="pav"></span></span> Brain <span class="car">▾</span></span><span class="cchip"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></span><span class="hsend"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></span></div></div>
+<div class="sgroup">Recent<span class="rule"></span></div>
+<div class="histrow"><span class="histico"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span><span class="histbody"><div class="histtitle">Ship the pricing page</div><div class="histsnip">rex · The Free card leads with the download. Pro says what the cloud adds.</div></span><span class="histwhen"><span class="chip st-ip">in progress</span>2m</span></div>
+<div class="histrow"><span class="histico"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="6.5"/></svg></span><span class="histbody"><div class="histtitle">Local mode: first-run states</div><div class="histsnip">iris · Round 1 has six states. The download shows no clock.</div></span><span class="histwhen"><span class="chip st-ny">needs you</span>1h</span></div>
+<div class="histrow"><span class="histico"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span><span class="histbody"><div class="histtitle">Give me ideas</div><div class="histsnip">rex · Three directions for the week, ranked by what ships first.</div></span><span class="histwhen"><span class="chip st-settled">settled</span>Yesterday</span></div>
+</div></div></div><div class="veil"><div class="upmodal"><span class="upx"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></span><span class="eyebrow">Free is your Mac</span><h1 class="h1">Pro is the cloud</h1><p class="p">Free runs the whole product on this Mac. Pro adds the cloud around it. Nothing is taken away.</p>
+<div class="upgrid"><div class="upcard"><div class="uphead"><span class="upico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="11" rx="1.5"/><path d="M2 19h20"/></svg></span><div><div class="upname">Free</div><div class="uptag">Your plan</div></div></div><div class="upprice">$0<small>forever</small></div><ul class="uplist"><li>Every room, agent, and task on this Mac</li><li>Your subscriptions and keys</li><li>No limits on projects, agents, or tasks</li><li>Nothing leaves this Mac</li></ul></div>
+<div class="upcard rec"><div class="uphead"><span class="upico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9z"/></svg></span><div><div class="upname">Pro <span class="uprec">Recommended</span></div><div class="uptag">The hosted cloud</div></div></div><div class="upprice">$22<small>per seat, per month</small></div><ul class="uplist"><li>A cloud machine for every member</li><li>Invites and seats</li><li>Sync across devices, browser, and phone</li><li>Routines while your laptop is closed</li><li>Connectors that publish</li></ul></div></div>
+<div class="upfoot"><span class="btn primary">Get Pro</span><span class="btn">Not now</span><span class="actions grow"></span><span class="mono">Opens neuramesh.app · your local workspaces stay on this Mac</span></div></div></div>
+  
+</div>
+</x-dc>
+</body>
+</html>

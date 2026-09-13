@@ -1,0 +1,4 @@
+# Block the commit unless the whole workspace typechecks and every test passes.
+# Mirrors CI's gate. loop.pg.test.ts auto-skips without DATABASE_URL, so this stays
+# fast and infra-free locally; CI runs it against a Postgres service.
+pnpm check

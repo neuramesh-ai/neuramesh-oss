@@ -1,0 +1,84 @@
+name: control-api bundle
+
+# Keeps packages/control-api/index.js (the esbuild bundle Vercel deploys verbatim) in lockstep
+# with its sources. index.js is generated from src/vercel.ts + @neuramesh/shared, so any PR that
+# touches those can leave the committed bundle stale — prod would then silently run old code
+# (the drift behind #17/#34). On such a PR this rebuilds the bundle and, if it changed, commits
+# it back so the regenerated diff is in the PR for review.
+#
+# THIS IS THE BACKSTOP, NOT THE FIRST LINE. `.husky/pre-push` rebuilds the bundle before a push
+# leaves the machine, so in the normal case this job finds it already in sync and commits nothing.
+# That matters because the commit below is authored by github-actions[bot], and this repo holds
+# bot-authored workflow runs for approval: the PR's head then moves to a commit whose CI never
+# runs, and `gh pr checks` reads green on the Vercel statuses alone (#456, 2026-09-06).
+on:
+  pull_request:
+    paths:
+      - 'packages/control-api/src/**'
+      - 'packages/shared/src/**'
+      - 'packages/control-api/package.json'
+
+concurrency:
+  group: capi-bundle-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  regen:
+    name: regenerate index.js
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Check out the PR branch itself (not the merge ref) so a regenerated bundle can be
+          # committed straight back onto it.
+          ref: ${{ github.head_ref }}
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.8.1
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+
+      - name: Rebuild the Vercel bundle
+        run: pnpm --filter @neuramesh/control-api build:vercel
+
+      - name: Commit the regenerated bundle (or fail on a fork)
+        env:
+          SAME_REPO: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+        run: |
+          if git diff --quiet -- packages/control-api/index.js; then
+            echo "index.js is already in sync with src ✔"
+            exit 0
+          fi
+          echo "index.js is stale — regenerated:"
+          git --no-pager diff --stat -- packages/control-api/index.js
+          if [ "$SAME_REPO" = "true" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add packages/control-api/index.js
+            # --no-verify: the pre-commit hook runs `pnpm check` over the whole tree, and three
+            # desktop tests need Bubblewrap this runner does not have, so the commit failed and the
+            # bundle stayed stale on every PR touching shared or control-api src (#444, #448, #449
+            # on 2026-09-06 — the #17/#34 drift, back). The PR's own `typecheck · test · build` job
+            # already covers the tree, and this commit only ever carries one generated file.
+            git commit --no-verify -m "chore(control-api): regenerate index.js bundle"
+            git push origin "HEAD:${{ github.head_ref }}"
+            echo "Committed the regenerated bundle back to the PR for review."
+          else
+            # Forks: GITHUB_TOKEN can't push to the PR branch, so fail loudly with the fix.
+            echo "::error::index.js is out of date. Run 'pnpm --filter @neuramesh/control-api build:vercel' and commit it."
+            exit 1
+          fi

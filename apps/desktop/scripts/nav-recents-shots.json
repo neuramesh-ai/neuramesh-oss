@@ -1,0 +1,8 @@
+[
+  { "name": "rail1-projects-dark", "settle": 2600, "query": { "theme": "dark" } },
+  { "name": "rail2-recents-dark", "settle": 2600, "query": { "theme": "dark", "navview": "recents" } },
+  { "name": "rail3-recents-cream", "settle": 2600, "query": { "theme": "cream-oak", "navview": "recents" } },
+  { "name": "rail4-projects-cream", "settle": 2600, "query": { "theme": "cream-oak" } },
+  { "name": "rail5-recents-more-dark", "settle": 2600, "query": { "theme": "dark", "navview": "recents" },
+    "js": "(() => { const b = document.querySelector('.navgrpmore.flat'); if (b) b.click(); return new Promise(r => setTimeout(() => { const l = document.querySelector('.navhistlist'); if (l) l.scrollTop = l.scrollHeight; setTimeout(r, 400); }, 300)); })()" }
+]

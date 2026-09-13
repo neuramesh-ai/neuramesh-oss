@@ -1,0 +1,125 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Routine cards — design round</title>
+<style>
+  /* Values lifted from packages/client-core/src/tokens.ts (DARK, CREAM_OAK) — not invented. */
+  .t{--bg:#141414;--panel:#191919;--panel2:#212121;--text:#eaeaea;--muted:#898989;--dim:#676767;
+     --line:#2a2a2a;--ring:#3a3a3a;--brand:#834a2b;--warn:#b3864a;
+     --fsans:'Geist Variable',-apple-system,system-ui,sans-serif;
+     --fmono:'Geist Mono Variable',ui-monospace,'SF Mono',Menlo,monospace}
+  .t.oak{--bg:#fbf8f4;--panel:#fbf8f4;--panel2:#f6eee1;--text:#2a1c13;--muted:#97846c;--dim:#b5a289;
+     --line:#e6dbc9;--ring:#d9c9b0;--brand:#834a2b;--warn:#9a6b34}
+  *{box-sizing:border-box;margin:0}
+  body{background:#0d0d0d;font-family:var(--fsans,system-ui);padding:26px;display:flex;flex-direction:column;gap:26px}
+  .t{background:var(--bg);color:var(--text);padding:20px 22px;border-radius:14px;font-family:var(--fsans)}
+  .lbl{font:600 10.5px var(--fmono);letter-spacing:.09em;text-transform:uppercase;color:var(--dim);margin-bottom:11px}
+  h3{font-size:13.5px;font-weight:620;margin:20px 0 9px;color:var(--muted)}
+  h3:first-of-type{margin-top:0}
+  .hint{font-size:12px;color:var(--muted);line-height:1.55;max-width:68ch;margin-bottom:13px}
+
+  /* ── TODAY: one flex row, five zones competing ─────────────────────────── */
+  .old{display:flex;align-items:center;gap:12px;width:100%;padding:11px 13px;
+       background:var(--panel);border:1px solid var(--line);border-radius:12px;text-align:left}
+  .oico{flex:none;width:30px;height:30px;border-radius:9px;background:var(--panel2);display:grid;place-items:center;color:var(--muted)}
+  .obody{flex:1;min-width:0}
+  .otitle{display:block;font-size:13px;font-weight:620}
+  .osnip{display:block;font-size:11.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:1.5px}
+  .ometa{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:3px}
+  .chip{font:600 9.5px var(--fmono);letter-spacing:.06em;text-transform:uppercase;padding:2.5px 6px;
+        border:1px solid var(--ring);border-radius:5px;color:var(--muted)}
+  .owhen{font:500 10.5px var(--fmono);color:var(--dim)}
+  .acts{flex:none;display:flex;gap:6px}
+  .btn{font:500 11.5px var(--fsans);padding:4px 9px;background:transparent;color:var(--muted);
+       border:1px solid var(--ring);border-radius:7px;cursor:pointer}
+  .btn:hover{color:var(--text);border-color:var(--muted)}
+
+  /* ── PROPOSED: identity line · the prompt gets room · a quiet ledger ────── */
+  .rt{display:grid;grid-template-columns:auto 1fr auto;grid-template-rows:auto auto auto;
+      column-gap:12px;row-gap:0;padding:13px 14px 11px;background:var(--panel);
+      border:1px solid var(--line);border-radius:12px;transition:border-color .12s}
+  .rt:hover{border-color:var(--ring)}
+  .rt.paused{opacity:.62}
+  /* the repeat glyph carries state, so no ACTIVE badge is needed on every row */
+  .rtico{grid-row:1/3;width:30px;height:30px;border-radius:9px;background:var(--panel2);
+         display:grid;place-items:center;color:var(--muted);position:relative}
+  .rtico::after{content:'';position:absolute;inset:-3px;border-radius:12px;
+                border:1.5px solid color-mix(in srgb,var(--brand) 52%,transparent)}
+  .paused .rtico::after{border-color:var(--ring);border-style:dashed}
+  .rttitle{grid-column:2;font-size:13px;font-weight:620;line-height:1.35}
+  /* the schedule as DISCRETE facts, not one mono run-on string */
+  .rtsched{grid-column:3;grid-row:1;text-align:right;white-space:nowrap}
+  .rtcad{font:590 11.5px var(--fsans);color:var(--text)}
+  .rtnext{display:block;font:500 10.5px var(--fmono);color:var(--dim);margin-top:2px}
+  .rtnext.due{color:var(--warn)}
+  /* what the routine actually ASKS — two lines, readable measure */
+  .rtprompt{grid-column:2/4;font-size:11.5px;line-height:1.5;color:var(--muted);margin-top:5px;
+            max-width:78ch;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .rtfoot{grid-column:2/4;display:flex;align-items:center;justify-content:space-between;
+          gap:12px;margin-top:9px;padding-top:8px;border-top:1px solid var(--line)}
+  .rtledger{font:500 10.5px var(--fmono);color:var(--dim)}
+  .rtledger b{color:var(--muted);font-weight:600}
+  .rtacts{display:flex;gap:6px;opacity:.5;transition:opacity .12s}
+  .rt:hover .rtacts,.rt:focus-within .rtacts{opacity:1}
+  .pausedtag{font:600 9.5px var(--fmono);letter-spacing:.06em;text-transform:uppercase;color:var(--dim)}
+</style>
+
+<div class="t">
+  <div class="lbl">Graphite dark</div>
+
+  <h3>Today</h3>
+  <div class="old">
+    <span class="oico">⟳</span>
+    <span class="obody">
+      <span class="otitle">X/Reddit daily light-touch presence</span>
+      <span class="osnip">Draft one genuine X or Reddit contribution for the NSDR/productivity/mental-wellness crowd (r/NSDR, r/productivity, Huberman-adjacent …</span>
+    </span>
+    <span class="ometa"><span class="chip">active</span><span class="owhen">daily · 17:00 · next in 6h</span></span>
+    <span class="acts"><button class="btn">Pause</button><button class="btn">Remove</button></span>
+  </div>
+
+  <h3>Proposed</h3>
+  <div class="rt">
+    <span class="rtico">⟳</span>
+    <span class="rttitle">X/Reddit daily light-touch presence</span>
+    <span class="rtsched"><span class="rtcad">Daily 17:00</span><span class="rtnext due">next in 6h</span></span>
+    <span class="rtprompt">Draft one genuine X or Reddit contribution for the NSDR/productivity/mental-wellness crowd (r/NSDR, r/productivity, Huberman-adjacent subs). Lead with the physiology, never the product.</span>
+    <span class="rtfoot">
+      <span class="rtledger"><b>5 runs</b> · last yesterday 17:00</span>
+      <span class="rtacts"><button class="btn">Pause</button><button class="btn">Remove</button></span>
+    </span>
+  </div>
+  <div class="rt paused">
+    <span class="rtico">⟳</span>
+    <span class="rttitle">Weekly competitor sweep</span>
+    <span class="rtsched"><span class="rtcad">Mondays 09:00</span><span class="pausedtag">paused</span></span>
+    <span class="rtprompt">Check what Calm, Headspace and Balance shipped this week and summarise anything that touches our positioning.</span>
+    <span class="rtfoot">
+      <span class="rtledger"><b>12 runs</b> · last Mon 09:00</span>
+      <span class="rtacts"><button class="btn">Resume</button><button class="btn">Remove</button></span>
+    </span>
+  </div>
+</div>
+
+<div class="t oak">
+  <div class="lbl">Cream oak light</div>
+  <div class="rt">
+    <span class="rtico">⟳</span>
+    <span class="rttitle">X/Reddit daily light-touch presence</span>
+    <span class="rtsched"><span class="rtcad">Daily 17:00</span><span class="rtnext due">next in 6h</span></span>
+    <span class="rtprompt">Draft one genuine X or Reddit contribution for the NSDR/productivity/mental-wellness crowd (r/NSDR, r/productivity, Huberman-adjacent subs). Lead with the physiology, never the product.</span>
+    <span class="rtfoot">
+      <span class="rtledger"><b>5 runs</b> · last yesterday 17:00</span>
+      <span class="rtacts"><button class="btn">Pause</button><button class="btn">Remove</button></span>
+    </span>
+  </div>
+  <div class="rt paused">
+    <span class="rtico">⟳</span>
+    <span class="rttitle">Weekly competitor sweep</span>
+    <span class="rtsched"><span class="rtcad">Mondays 09:00</span><span class="pausedtag">paused</span></span>
+    <span class="rtprompt">Check what Calm, Headspace and Balance shipped this week and summarise anything that touches our positioning.</span>
+    <span class="rtfoot">
+      <span class="rtledger"><b>12 runs</b> · last Mon 09:00</span>
+      <span class="rtacts"><button class="btn">Resume</button><button class="btn">Remove</button></span>
+    </span>
+  </div>
+</div>

@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NeuraMesh — Architecture Explorer</title>
+<style>
+:root{
+  --bg:#121212; --panel:#171717; --panel2:#1f1f1f; --panel3:#292929;
+  --border:#2e2e2e; --border2:#3a3a3a; --text:#fafafa; --muted:#a0a0a0; --dim:#707070;
+  --teal:#3ECF8E; --violet:#8b7cf0; --amber:#db8e00; --green:#3ECF8E; --red:#e5634d; --blue:#6b97d8;
+  --grad:linear-gradient(135deg,#3ECF8E,#1d915f); --mono:ui-monospace,'SF Mono',Menlo,monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font:14px/1.55 -apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+.hide{display:none!important}
+header{position:sticky;top:0;z-index:40;background:rgba(18,18,18,.88);backdrop-filter:blur(10px);border-bottom:1px solid var(--border)}
+.hwrap{max-width:1180px;margin:0 auto;padding:0 24px;height:56px;display:flex;align-items:center;gap:14px}
+.logo{display:flex;align-items:center;gap:9px;font-weight:800;font-size:14px}
+.tabs{display:flex;gap:3px;margin-left:10px;background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:3px;overflow-x:auto}
+.tab{padding:5px 13px;border-radius:6px;color:var(--muted);font-size:12.5px;font-weight:600;white-space:nowrap}
+.tab:hover{color:var(--text)}
+.tab.on{background:var(--panel3);color:var(--text)}
+main{max-width:1180px;margin:0 auto;padding:30px 24px 90px}
+h1{font-size:24px;font-weight:800;letter-spacing:-.4px}
+h2{font-size:17px;font-weight:700;margin:34px 0 12px;letter-spacing:-.2px}
+h2 .sub{font-size:12px;color:var(--dim);font-weight:500;margin-left:10px}
+p.lead{color:var(--muted);max-width:780px;margin-top:8px;font-size:14.5px}
+.pillrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.kpill{font-size:11.5px;font-weight:600;color:var(--muted);border:1px solid var(--border2);border-radius:99px;padding:4px 12px;background:var(--panel)}
+.kpill b{color:var(--teal)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+@media(max-width:860px){.grid2,.grid3{grid-template-columns:1fr}}
+.card{border:1px solid var(--border);background:var(--panel);border-radius:13px;padding:17px 19px}
+.card h3{font-size:13.5px;font-weight:700;display:flex;align-items:center;gap:8px}
+.card p{font-size:13px;color:var(--muted);margin-top:7px}
+.card ul{margin:8px 0 0 17px;color:var(--muted);font-size:13px;display:grid;gap:5px}
+.badge{font-size:9.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;border-radius:5px;padding:2.5px 8px}
+.b-rec{background:rgba(62,207,142,.14);color:var(--teal)}
+.b-warn{background:rgba(245,158,11,.14);color:var(--amber)}
+.b-no{background:rgba(239,68,68,.13);color:#f87171}
+.b-info{background:rgba(124,108,240,.15);color:#a5b4fc}
+.diagram{border:1px solid var(--border);background:radial-gradient(700px 300px at 50% 0%,rgba(124,108,240,.06),transparent),var(--panel);border-radius:14px;padding:14px;margin-top:14px;overflow-x:auto}
+svg{display:block;margin:0 auto}
+svg .grp{fill:rgba(255,255,255,.015);stroke:#2e2e2e;stroke-dasharray:5 4;rx:14}
+svg .grpl{fill:#707070;font:700 10px var(--mono);letter-spacing:.8px;text-transform:uppercase}
+svg .box{fill:#1f1f1f;stroke:#3a3a3a;rx:8}
+svg .box.hot{stroke:#7c6cf0}
+svg .box.teal{stroke:#3ECF8E}
+svg .bl{fill:#fafafa;font:600 11.5px -apple-system,sans-serif}
+svg .bs{fill:#9a9a9a;font:500 9.5px -apple-system,sans-serif}
+svg .arrow{stroke:#4a5color;stroke-width:1.5;fill:none;marker-end:url(#m)}
+svg .arr{stroke:#4a4a4a;stroke-width:1.5;fill:none;marker-end:url(#m)}
+svg .arr.hot{stroke:#7c6cf0}
+svg .arr.teal{stroke:#3ECF8E}
+svg .arr.dash{stroke-dasharray:5 4}
+svg .al{fill:#9a9a9a;font:600 9.5px var(--mono)}
+svg .st{rx:9;fill:#1f1f1f;stroke-width:1.6}
+svg .stl{font:700 11px -apple-system,sans-serif}
+table{width:100%;border-collapse:collapse;font-size:13px;margin-top:14px;border:1px solid var(--border);border-radius:12px;overflow:hidden}
+th{background:var(--panel2);text-align:left;font-size:10.5px;letter-spacing:.6px;text-transform:uppercase;color:var(--dim);padding:10px 13px;border-bottom:1px solid var(--border)}
+td{padding:10px 13px;border-bottom:1px solid var(--border);color:#c4c4c4;vertical-align:top}
+tr:last-child td{border-bottom:none}
+td b{color:var(--text)}
+.win{color:var(--teal);font-weight:700}
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:14px}
+@media(max-width:860px){.steps{grid-template-columns:repeat(2,1fr)}}
+.stepc{border:1px solid var(--border);background:var(--panel);border-radius:12px;padding:13px 14px;position:relative}
+.stepc .n{position:absolute;top:-9px;left:12px;background:#3ECF8E;color:#0c1f15;font-size:10px;font-weight:800;border-radius:99px;padding:2px 9px}
+.stepc b{font-size:12.5px;display:block;margin-top:4px}
+.stepc span{font-size:11.5px;color:var(--muted);display:block;margin-top:4px}
+.code{background:#161616;border:1px solid var(--border2);border-radius:10px;padding:13px 16px;font:11.5px/1.7 var(--mono);color:#a0a0a0;overflow-x:auto;margin-top:12px;white-space:pre}
+.code .k{color:#7dd3fc}.code .s{color:#86efac}.code .c{color:#707070}
+.verdict{border:1px solid rgba(62,207,142,.35);background:linear-gradient(180deg,rgba(62,207,142,.07),rgba(124,108,240,.05));border-radius:14px;padding:18px 20px;margin-top:18px}
+.verdict h3{font-size:14px;display:flex;gap:9px;align-items:center}
+.verdict p{color:#c4c4c4;font-size:13.5px;margin-top:7px;max-width:840px}
+.wk{display:flex;gap:14px;border:1px solid var(--border);background:var(--panel);border-radius:12px;padding:13px 16px;margin-top:10px;align-items:flex-start}
+.wk .wn{min-width:46px;height:46px;border-radius:10px;background:var(--panel3);border:1px solid var(--border2);display:grid;place-items:center;font:800 13px var(--mono);color:var(--teal)}
+.wk b{font-size:13px}
+.wk p{font-size:12.5px;color:var(--muted);margin-top:3px}
+.statrow{display:flex;gap:12px;flex-wrap:wrap;margin-top:14px}
+.stat{flex:1;min-width:180px;border:1px solid var(--border);background:var(--panel);border-radius:12px;padding:14px 16px}
+.stat .v{font-size:19px;font-weight:800;letter-spacing:-.4px}
+.stat .v small{font-size:11px;color:var(--dim);font-weight:600}
+.stat .l{font-size:11px;color:var(--dim);margin-top:3px;text-transform:uppercase;letter-spacing:.5px;font-weight:700}
+</style>
+</head>
+<body>
+<header><div class="hwrap">
+  <div class="logo"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="5" cy="6" r="2.6" fill="#3ECF8E"/><circle cx="19" cy="5" r="2.2" fill="#1d915f"/><circle cx="12" cy="13" r="3" fill="#1d915f"/><circle cx="5" cy="19" r="2.2" fill="#1d915f"/><circle cx="19" cy="18" r="2.6" fill="#3ECF8E"/><path d="M7 7.5 10 11M14 11.5 17.5 6.5M7 17.5 9.8 14.6M14.4 14.8 17 16.8" stroke="#4a4a4a" stroke-width="1.4"/></svg> NeuraMesh · Architecture Explorer</div>
+  <div class="tabs" id="tabs">
+    <button class="tab on" data-t="overview">Overview</button>
+    <button class="tab" data-t="opta">Option A · Managed Rails</button>
+    <button class="tab" data-t="optb">Option B · Own Rails</button>
+    <button class="tab" data-t="optc">Option C · Event-Sourced</button>
+    <button class="tab" data-t="compare">Compare</button>
+    <button class="tab" data-t="protocol">Protocol</button>
+    <button class="tab" data-t="plan">6-Week Plan</button>
+  </div>
+</div></header>
+<main>
+
+<!-- ═══════════ OVERVIEW ═══════════ -->
+<section id="t-overview">
+  <h1>One loop, three ways to build it</h1>
+  <p class="lead">NeuraMesh is a desktop-first, Slack-style workspace where a per-channel <b>orchestrator agent</b> fans tasks onto an enforced board, workers execute in <b>git worktrees on users' own machines</b>, validation artifacts are attached structurally, and <b>review loops</b> gate completion. Cloud holds true state; compute and code stay local. Agent-to-agent contract: <b>A2A 1.0</b>.</p>
+  <div class="pillrow">
+    <span class="kpill">SaaS · multi-team</span><span class="kpill">macOS first</span><span class="kpill">Claude Code first <b>+ adapter seam</b></span><span class="kpill">Offline-capable <b>day one</b></span><span class="kpill">A2A 1.0 · Agent Cards</span><span class="kpill">Solo + agents · <b>~6 weeks</b></span>
+  </div>
+
+  <h2>The differentiated loop <span class="sub">what the alpha must prove — nobody else has it (Slock: no orchestrator/git · T3 Code: no team)</span></h2>
+  <div class="steps">
+    <div class="stepc"><span class="n">1 · plan</span><b>@rex decomposes</b><span>Human asks the channel orchestrator; it pulls the channel brain + recall, writes tasks to the board.</span></div>
+    <div class="stepc"><span class="n">2 · fan out</span><b>Offer → claim</b><span>Tasks offered to skill-matched agents registered to this channel. Claims are atomic — server-enforced, not AI manners.</span></div>
+    <div class="stepc"><span class="n">3 · gate</span><b>Requirements confirmed</b><span>Worker posts a requirements checklist before executing; unmet → blocked with structured questions.</span></div>
+    <div class="stepc"><span class="n">4 · execute</span><b>Isolated worktree</b><span>One git worktree + one Agent SDK session per task on the owner's machine. Checkpoint per turn.</span></div>
+    <div class="stepc"><span class="n">5 · validate</span><b>Artifacts required</b><span>Screenshots, test runs, diff stats attached as A2A Artifacts. Submit is rejected without evidence.</span></div>
+    <div class="stepc"><span class="n">6 · review</span><b>Auto-review gates done</b><span>Submit auto-dispatches to the channel's reviewer pool; criteria unmet → bounced with structured feedback, session resumes in the same worktree. Every round audited.</span></div>
+    <div class="stepc"><span class="n">7 · accept</span><b>Human signs off</b><span>After done, the final call is human: done → accepted. 1-click PR via gh; board, threads, and timeline stay in sync for the team.</span></div>
+    <div class="stepc"><span class="n">8 · remember</span><b>Brain updates</b><span>Sleep-time worker refreshes the channel summary block; facts reconciled with bitemporal validity.</span></div>
+  </div>
+
+  <h2>System context <span class="sub">identical across all three options</span></h2>
+  <div class="diagram">
+  <svg width="1080" height="430" viewBox="0 0 1080 430">
+    <defs><marker id="m" markerWidth="9" markerHeight="9" refX="7" refY="3.5" orient="auto"><path d="M0 0 L7 3.5 L0 7 Z" fill="#4a4a4a"/></marker></defs>
+    <rect class="grp" x="16" y="20" width="350" height="390" rx="14"/>
+    <text class="grpl" x="32" y="44">George's Mac — NeuraMesh.app</text>
+    <rect class="box" x="36" y="60" width="310" height="44"/><text class="bl" x="50" y="79">Renderer — React UI</text><text class="bs" x="50" y="93">chat · board · fleet · memory · ⌘K</text>
+    <rect class="box teal" x="36" y="116" width="310" height="44"/><text class="bl" x="50" y="135">Main — local replica (SQLite) + sync</text><text class="bs" x="50" y="149">reads &lt;5ms · optimistic writes · offline queue</text>
+    <rect class="box hot" x="36" y="172" width="310" height="58"/><text class="bl" x="50" y="191">AgentHost (isolated process)</text><text class="bs" x="50" y="205">Claude Agent SDK · in-process MCP tools · hooks</text><text class="bs" x="50" y="218">canUseTool → approval UI · node-pty</text>
+    <rect class="box" x="36" y="244" width="148" height="40"/><text class="bl" x="48" y="262">worktree 1042</text><text class="bs" x="48" y="276">nm/1042-fix-nav</text>
+    <rect class="box" x="198" y="244" width="148" height="40"/><text class="bl" x="210" y="262">worktree 1043</text><text class="bs" x="210" y="276">nm/1043-notes</text>
+    <path class="arr" d="M120 230 L100 244"/><path class="arr" d="M260 230 L274 244"/>
+    <rect class="box" x="36" y="304" width="310" height="40"/><text class="bl" x="50" y="322">Repos + keys stay local</text><text class="bs" x="50" y="336">BYOK in keychain · outbound-only connections</text>
+
+    <rect class="grp" x="430" y="20" width="330" height="390" rx="14"/>
+    <text class="grpl" x="446" y="44">NeuraMesh Cloud — true state</text>
+    <rect class="box" x="450" y="60" width="290" height="40"/><text class="bl" x="464" y="78">Auth + workspaces</text><text class="bs" x="464" y="92">magic link · OAuth · invite links</text>
+    <rect class="box teal" x="450" y="112" width="290" height="44"/><text class="bl" x="464" y="131">Postgres + pgvector</text><text class="bs" x="464" y="145">messages · tasks · events (append-only) · cards · memory</text>
+    <rect class="box hot" x="450" y="168" width="290" height="56"/><text class="bl" x="464" y="187">Control API — enforced FSM</text><text class="bs" x="464" y="201">atomic claims · role-gated transitions · artifacts req'd</text><text class="bs" x="464" y="214">every command appends an event</text>
+    <rect class="box hot" x="450" y="236" width="290" height="44"/><text class="bl" x="464" y="255">A2A gateway + Agent Card registry</text><text class="bs" x="464" y="269">routes tasks to daemons · phase 2: external agents</text>
+    <rect class="box" x="450" y="292" width="140" height="40"/><text class="bl" x="462" y="310">Sync service</text><text class="bs" x="462" y="324">per-channel buckets</text>
+    <rect class="box" x="600" y="292" width="140" height="40"/><text class="bl" x="612" y="310">Object storage</text><text class="bs" x="612" y="324">artifacts · screenshots</text>
+    <rect class="box" x="450" y="344" width="290" height="40"/><text class="bl" x="464" y="362">Sleep-time workers</text><text class="bs" x="464" y="376">channel summaries · fact reconcile · embeddings</text>
+
+    <rect class="grp" x="824" y="20" width="240" height="240" rx="14"/>
+    <text class="grpl" x="840" y="44">Maria's Mac</text>
+    <rect class="box" x="840" y="60" width="208" height="44"/><text class="bl" x="852" y="79">NeuraMesh.app / daemon</text><text class="bs" x="852" y="93">agents: joy, fuse</text>
+    <rect class="box" x="840" y="116" width="208" height="40"/><text class="bl" x="852" y="134">local replica</text><text class="bs" x="852" y="148">same offline story</text>
+    <rect class="box" x="840" y="168" width="208" height="40"/><text class="bl" x="852" y="186">worktrees</text><text class="bs" x="852" y="200">on her repos, her keys</text>
+    <text class="bs" x="840" y="238">offline? offers queue · orchestrator re-offers</text>
+
+    <rect class="grp" x="824" y="290" width="240" height="120" rx="14"/>
+    <text class="grpl" x="840" y="314">Phase 2 — anywhere</text>
+    <rect class="box" x="840" y="328" width="208" height="56" stroke-dasharray="5 4"/><text class="bl" x="852" y="348">External A2A agent</text><text class="bs" x="852" y="362">discovered via its Agent Card at</text><text class="bs" x="852" y="375">/.well-known/a2a/agent-card.json</text>
+
+    <path class="arr teal" d="M346 138 L450 134"/><text class="al" x="362" y="126">sync · offline-capable</text>
+    <path class="arr" d="M346 192 C400 192 400 192 450 192"/><text class="al" x="364" y="184">commands</text>
+    <path class="arr hot" d="M346 216 C410 230 410 252 450 256"/><text class="al" x="360" y="244">WS · A2A offers</text>
+    <path class="arr teal" d="M824 82 L740 130"/><text class="al" x="748" y="96">sync</text>
+    <path class="arr hot" d="M824 100 L740 256"/><text class="al" x="752" y="206">WS · A2A</text>
+    <path class="arr hot dash" d="M840 356 L740 268"/><text class="al" x="744" y="320">A2A · JSON-RPC/HTTP</text>
+    <path class="arr" d="M346 326 C420 360 430 312 450 312" opacity=".7"/><text class="al" x="364" y="348">upload artifacts</text>
+  </svg>
+  </div>
+
+  <h2>Where competitors sit <span class="sub">full teardown in docs/01-product-review.md</span></h2>
+  <div class="grid3">
+    <div class="card"><h3>Slock <span class="badge b-warn">closest</span></h3><p>Web-only, closed source. Has the board + machine-bound agents + multiplayer — but <b>zero git story, no orchestrator</b> (agents self-claim), no offline. We steal: daemon onboarding, enforced transitions, claim protocol, agent inbox, held-draft.</p></div>
+    <div class="card"><h3>T3 Code <span class="badge b-info">engineering</span></h3><p>MIT, 12.5k★. Worktrees, checkpoints, per-turn diffs, event-sourced core — but <b>single-user, no team layer</b>, and its CLI wrapping added ~3x latency. We steal the git mechanics; we beat it with cloud team state + thin runtime I/O.</p></div>
+    <div class="card"><h3>OpenAgents <span class="badge b-info">protocol</span></h3><p>Apache/MIT. Best-in-class protocol concepts (event envelope, addressing, presence) — but no board, no worktrees, web-first, bus factor ~1–2. <b>Borrow concepts, don't build on it.</b></p></div>
+  </div>
+</section>
+
+<!-- ═══════════ OPTION A ═══════════ -->
+<section id="t-opta" class="hide">
+  <h1>Option A — Managed Rails <span class="badge b-rec" style="vertical-align:6px">chosen ✓ 2026-06-10</span></h1>
+  <p class="lead">Buy the undifferentiated infrastructure (sync, auth, storage); spend all six weeks on the loop. <b>Electron + PowerSync + Supabase + Hono control plane + Claude Agent SDK.</b></p>
+  <div class="diagram">
+  <svg width="1080" height="380" viewBox="0 0 1080 380">
+    <defs><marker id="m2" markerWidth="9" markerHeight="9" refX="7" refY="3.5" orient="auto"><path d="M0 0 L7 3.5 L0 7 Z" fill="#4a4a4a"/></marker></defs>
+    <rect class="grp" x="16" y="20" width="380" height="340" rx="14"/>
+    <text class="grpl" x="32" y="44">Desktop — Electron (signed + notarized)</text>
+    <rect class="box" x="36" y="58" width="340" height="42"/><text class="bl" x="50" y="77">Renderer · React 19 + Vite</text><text class="bs" x="50" y="91">reads from local SQLite via PowerSync reactive queries</text>
+    <rect class="box teal" x="36" y="112" width="340" height="56"/><text class="bl" x="50" y="131">Main · PowerSync Node SDK → SQLite replica</text><text class="bs" x="50" y="145">sync rules = per-channel buckets · offline write queue</text><text class="bs" x="50" y="158">⚠ SDK beta-labeled → week-1 go/no-go spike</text>
+    <rect class="box hot" x="36" y="180" width="340" height="56"/><text class="bl" x="50" y="199">AgentHost · utilityProcess</text><text class="bs" x="50" y="213">Claude Agent SDK · one query() per task · cwd = worktree</text><text class="bs" x="50" y="226">in-process MCP: board/chat/memory/artifact tools</text>
+    <rect class="box" x="36" y="248" width="164" height="40"/><text class="bl" x="48" y="266">node-pty panes</text><text class="bs" x="48" y="280">terminal access</text>
+    <rect class="box" x="212" y="248" width="164" height="40"/><text class="bl" x="224" y="266">worktree mgr</text><text class="bs" x="224" y="280">add/checkpoint/clean</text>
+    <rect class="box" x="36" y="300" width="340" height="40"/><text class="bl" x="50" y="318">electron-updater · crash isolation</text><text class="bs" x="50" y="332">agent crash never takes down the UI</text>
+
+    <rect class="grp" x="460" y="20" width="300" height="340" rx="14"/>
+    <text class="grpl" x="476" y="44">Managed services</text>
+    <rect class="box teal" x="480" y="58" width="260" height="56"/><text class="bl" x="494" y="77">PowerSync Cloud</text><text class="bs" x="494" y="91">Postgres → SQLite partial replication</text><text class="bs" x="494" y="104">offline writes OOTB · SOC 2</text>
+    <rect class="box teal" x="480" y="126" width="260" height="70"/><text class="bl" x="494" y="145">Supabase</text><text class="bs" x="494" y="159">Postgres + pgvector (memory spine)</text><text class="bs" x="494" y="172">Auth: magic link · GitHub · Google</text><text class="bs" x="494" y="185">Storage: artifacts, screenshots</text>
+    <rect class="box" x="480" y="208" width="260" height="40"/><text class="bl" x="494" y="226">PostHog · Sentry</text><text class="bs" x="494" y="240">telemetry · crash reporting</text>
+    <text class="bs" x="480" y="276">2 core vendors · first-class</text><text class="bs" x="480" y="290">PowerSync ↔ Supabase integration</text><text class="bs" x="480" y="304">(JWT verified natively)</text>
+
+    <rect class="grp" x="824" y="20" width="240" height="340" rx="14"/>
+    <text class="grpl" x="840" y="44">Our control plane — Fly.io</text>
+    <rect class="box hot" x="840" y="58" width="208" height="64"/><text class="bl" x="852" y="77">Hono control API</text><text class="bs" x="852" y="91">enforced FSM · atomic claims</text><text class="bs" x="852" y="104">PowerSync upload endpoint</text>
+    <rect class="box hot" x="840" y="134" width="208" height="52"/><text class="bl" x="852" y="153">A2A gateway</text><text class="bs" x="852" y="167">card registry · task routing</text><text class="bs" x="852" y="179">daemon WS broker</text>
+    <rect class="box" x="840" y="198" width="208" height="52"/><text class="bl" x="852" y="217">pg-boss workers</text><text class="bs" x="852" y="231">summaries · reconcile · embed</text>
+    <rect class="box" x="840" y="262" width="208" height="40"/><text class="bl" x="852" y="280">events (append-only)</text><text class="bs" x="852" y="294">timeline · audit · Option-C seed</text>
+    <text class="bs" x="840" y="330">TypeScript end-to-end:</text><text class="bs" x="840" y="344">shared types client ↔ API ↔ SDK</text>
+
+    <path class="arr teal" d="M376 138 L480 88"/><text class="al" x="396" y="108">sync</text>
+    <path class="arr" d="M376 208 C600 320 760 90 840 86" opacity=".85"/><text class="al" x="560" y="252">commands · writes</text>
+    <path class="arr hot" d="M376 226 C640 350 780 164 840 160"/><text class="al" x="600" y="296">WS · A2A offers/results</text>
+    <path class="arr" d="M740 160 L840 130" opacity=".6"/><text class="al" x="758" y="138">SQL</text>
+  </svg>
+  </div>
+  <div class="grid2" style="margin-top:14px">
+    <div class="card"><h3>Why it wins the 6-week race</h3><ul>
+      <li>Offline reads <b>and writes</b> out of the box (upload queue) — your hardest requirement, bought not built</li>
+      <li>Per-channel partial sync = a sync-rules config file, not code</li>
+      <li>Supabase gives Postgres + pgvector + auth + artifact storage in one console</li>
+      <li>All product effort goes to the loop: orchestrator, claims, worktrees, review</li></ul></div>
+    <div class="card"><h3>Eyes-open risks</h3><ul>
+      <li><span class="badge b-warn">beta</span> PowerSync Node SDK in Electron main — verified in their own Electron guide, but week-1 spike is the go/no-go</li>
+      <li>Vendor pricing at scale ($49 → $599/mo tiers; self-host Open Edition exists — verify license)</li>
+      <li>Supabase Auth is basic — orgs/invites are our own tables (fine)</li>
+      <li>Exit path is real: → Option B swaps sync+auth only; schema, API, UI, agent layer unchanged</li></ul></div>
+  </div>
+  <div class="verdict"><h3>⏱ Time to full-loop alpha: ~6 weeks <span class="badge b-rec">build this</span></h3><p>Engineered so Option B is a swap (keep reads/writes behind a thin db facade) and Option C's event log exists from day one (append-only events table).</p></div>
+</section>
+
+<!-- ═══════════ OPTION B ═══════════ -->
+<section id="t-optb" class="hide">
+  <h1>Option B — Own Rails <span class="badge b-info" style="vertical-align:6px">the migration target</span></h1>
+  <p class="lead">Same product, vendor-free data plane: <b>ElectricSQL (Apache-2.0) read-path + TanStack DB optimistic writes through our own API + Better Auth + Neon/Fly Postgres.</b> What Option A migrates toward when revenue justifies owning ops.</p>
+  <div class="diagram">
+  <svg width="1080" height="350" viewBox="0 0 1080 350">
+    <rect class="grp" x="16" y="20" width="380" height="310" rx="14"/>
+    <text class="grpl" x="32" y="44">Desktop — Electron (unchanged from A)</text>
+    <rect class="box" x="36" y="58" width="340" height="42"/><text class="bl" x="50" y="77">Renderer · React + TanStack DB live queries</text><text class="bs" x="50" y="91">differential dataflow · instant local reads</text>
+    <rect class="box teal" x="36" y="112" width="340" height="64"/><text class="bl" x="50" y="131">Main · Electric shapes → local store (SQLite/PGlite)</text><text class="bs" x="50" y="145">shape per channel = partial replication</text><text class="bs" x="50" y="158">writes: optimistic mutation + outbox → our API</text>
+    <rect class="box hot" x="36" y="188" width="340" height="56"/><text class="bl" x="50" y="207">AgentHost · utilityProcess (identical to A)</text><text class="bs" x="50" y="221">Claude Agent SDK · worktrees · MCP tools · pty</text>
+    <rect class="box" x="36" y="256" width="340" height="40"/><text class="bl" x="50" y="274">⚠ we own offline outbox semantics</text><text class="bs" x="50" y="288">retry · dedupe · conflict policy · the subtle-bug budget</text>
+
+    <rect class="grp" x="460" y="20" width="604" height="310" rx="14"/>
+    <text class="grpl" x="476" y="44">Our cloud — all Apache-2.0 / owned</text>
+    <rect class="box teal" x="480" y="58" width="270" height="56"/><text class="bl" x="494" y="77">Electric sync service</text><text class="bs" x="494" y="91">self-host on Fly, or Electric Cloud ~$1/M writes</text><text class="bs" x="494" y="104">read fan-out proven to 1M clients</text>
+    <rect class="box hot" x="480" y="126" width="270" height="64"/><text class="bl" x="494" y="145">Hono API — owns the entire write path</text><text class="bs" x="494" y="159">FSM + claims + permissions in one place</text><text class="bs" x="494" y="172">A2A gateway · daemon WS broker</text>
+    <rect class="box" x="480" y="202" width="270" height="44"/><text class="bl" x="494" y="221">Better Auth (own tables)</text><text class="bs" x="494" y="235">no auth vendor · full control</text>
+    <rect class="box teal" x="770" y="58" width="270" height="56"/><text class="bl" x="784" y="77">Neon / Fly Postgres + pgvector</text><text class="bs" x="784" y="91">logical replication feeds Electric</text>
+    <rect class="box" x="770" y="126" width="270" height="44"/><text class="bl" x="784" y="145">S3 / R2 artifacts</text><text class="bs" x="784" y="159">cheapest object storage</text>
+    <rect class="box" x="770" y="182" width="270" height="44"/><text class="bl" x="784" y="201">pg-boss workers + events table</text><text class="bs" x="784" y="215">same memory spine + audit as A</text>
+    <text class="bs" x="480" y="282">No vendor in the hot path · cleanest unit economics · cleanest SOC2 story</text><text class="bs" x="480" y="298">Cost: you assemble what PowerSync gives free (+2–3 weeks realistic)</text>
+
+    <path class="arr teal" d="M376 138 L480 90"/><text class="al" x="396" y="106">shapes (HTTP)</text>
+    <path class="arr" d="M376 160 L480 156"/><text class="al" x="398" y="150">writes</text>
+    <path class="arr hot" d="M376 216 C430 250 440 164 480 160" opacity=".9"/><text class="al" x="400" y="244">WS · A2A</text>
+    <path class="arr" d="M750 86 L770 86"/><path class="arr" d="M750 152 L770 148"/>
+  </svg>
+  </div>
+  <div class="verdict" style="border-color:rgba(124,108,240,.35)"><h3>⏱ Time to full-loop alpha: ~8–9 weeks <span class="badge b-info">migrate here later</span></h3><p>Pick B now only if the week-1 PowerSync spike fails, or if zero-lock-in is non-negotiable from day one. Otherwise it's the planned destination: A → B swaps the sync engine and auth; Postgres schema, control API, A2A gateway, agent layer, and UI carry over untouched.</p></div>
+</section>
+
+<!-- ═══════════ OPTION C ═══════════ -->
+<section id="t-optc" class="hide">
+  <h1>Option C — Event-Sourced Maximalist <span class="badge b-no" style="vertical-align:6px">not the 6-week pick</span></h1>
+  <p class="lead">Own protocol end-to-end: commands → immutable event log → projections, per-channel event streams replicated to local SQLite over our own WS protocol. Optional <b>Tauri v2 + Rust</b> shell. The T3-Code-validated core, plus cloud multi-tenancy. The ceiling — and the longest road.</p>
+  <div class="diagram">
+  <svg width="1080" height="330" viewBox="0 0 1080 330">
+    <rect class="grp" x="16" y="20" width="400" height="290" rx="14"/>
+    <text class="grpl" x="32" y="44">Desktop — Tauri v2 (Rust core) or Electron</text>
+    <rect class="box" x="36" y="58" width="360" height="42"/><text class="bl" x="50" y="77">WebView UI (3–15MB installer, 20–100MB RAM)</text><text class="bs" x="50" y="91">⚠ WebKitGTK pain on Linux · multi-webview unstable</text>
+    <rect class="box teal" x="36" y="112" width="360" height="56"/><text class="bl" x="50" y="131">Rust core: event replicator → SQLite projections</text><text class="bs" x="50" y="145">replay-on-reconnect · offline = native property</text><text class="bs" x="50" y="158">portable-pty · process supervision in Rust</text>
+    <rect class="box hot" x="36" y="180" width="360" height="56"/><text class="bl" x="50" y="199">Agent runtime as compiled Node sidecar</text><text class="bs" x="50" y="213">Claude Agent SDK needs a JS runtime → bundle it anyway</text><text class="bs" x="50" y="226">⚠ sidecar lifecycle (orphans, signals) is DIY in Tauri</text>
+    <rect class="box" x="36" y="248" width="360" height="40"/><text class="bl" x="50" y="266">or: ACP adapters (claude-agent-acp, codex-acp)</text><text class="bs" x="50" y="280">agent-agnostic from day one · loses SDK-only features</text>
+
+    <rect class="grp" x="480" y="20" width="584" height="290" rx="14"/>
+    <text class="grpl" x="496" y="44">Our cloud — the event log IS the product</text>
+    <rect class="box hot" x="500" y="58" width="260" height="64"/><text class="bl" x="514" y="77">Command API (Rust Axum / Elixir Phoenix)</text><text class="bs" x="514" y="91">validate → append event → project</text><text class="bs" x="514" y="104">FSM = command validation, natively</text>
+    <rect class="box teal" x="500" y="134" width="260" height="56"/><text class="bl" x="514" y="153">Immutable event log (Postgres)</text><text class="bs" x="514" y="167">audit · replay · time-travel · compliance</text><text class="bs" x="514" y="180">= A2A streaming, protocol-native</text>
+    <rect class="box" x="500" y="202" width="260" height="44"/><text class="bl" x="514" y="221">Projections: board · chat · presence</text><text class="bs" x="514" y="235">rebuildable read models</text>
+    <rect class="box" x="780" y="58" width="264" height="56"/><text class="bl" x="794" y="77">WS fan-out per channel stream</text><text class="bs" x="794" y="91">Phoenix: millions of subs per box</text>
+    <rect class="box" x="780" y="126" width="264" height="44"/><text class="bl" x="794" y="145">A2A gateway + cards</text><text class="bs" x="794" y="159">best long-term protocol fit</text>
+    <rect class="box" x="780" y="182" width="264" height="44"/><text class="bl" x="794" y="201">workers + memory spine</text><text class="bs" x="794" y="215">same pgvector recipe</text>
+    <text class="bs" x="500" y="276">You build a sync engine + process supervisor before the product.</text><text class="bs" x="500" y="292">Strongest "fastest platform" claim · slowest first release by far.</text>
+
+    <path class="arr teal" d="M396 140 C440 140 450 162 500 162"/><text class="al" x="414" y="132">event streams</text>
+    <path class="arr" d="M396 86 C600 0 700 60 780 76" opacity=".8"/><text class="al" x="560" y="34">commands</text>
+    <path class="arr hot" d="M396 208 C460 260 720 152 780 148"/><text class="al" x="540" y="232">A2A</text>
+  </svg>
+  </div>
+  <div class="verdict" style="border-color:rgba(239,68,68,.3)"><h3>⏱ Time to full-loop alpha: ~12–16 weeks solo <span class="badge b-no">defer</span></h3><p>Steal its soul today instead: A/B append every accepted command to an immutable <b>events</b> table (task timeline + audit log). When scale or enterprise demands it, that table grows up into this architecture without a rewrite of the product surface.</p></div>
+</section>
+
+<!-- ═══════════ COMPARE ═══════════ -->
+<section id="t-compare" class="hide">
+  <h1>Comparison</h1>
+  <p class="lead">All three share Electron-or-shell + Claude Agent SDK agent layer, Postgres truth, A2A contracts, the enforced FSM, and the memory spine. They differ on who builds the sync plumbing and when you pay for control.</p>
+  <table>
+    <tr><th style="width:190px">Axis</th><th>A — Managed Rails</th><th>B — Own Rails</th><th>C — Event-Sourced Max</th></tr>
+    <tr><td><b>Time to full-loop alpha</b> (solo + agents)</td><td class="win">~6 weeks</td><td>~8–9 weeks</td><td>~12–16 weeks</td></tr>
+    <tr><td>Offline depth</td><td class="win">Reads + writes out of the box</td><td>Reads OOTB; writes = our outbox</td><td>Native (log replay)</td></tr>
+    <tr><td>Perceived speed</td><td>Excellent — local-replica reads</td><td>Excellent</td><td class="win">Best ceiling</td></tr>
+    <tr><td>License / lock-in</td><td>PowerSync svc + Supabase (moderate; exit = B)</td><td class="win">None — Apache-2.0 / owned</td><td class="win">None</td></tr>
+    <tr><td>Ops burden (solo founder)</td><td class="win">Lowest</td><td>Medium</td><td>Highest</td></tr>
+    <tr><td>Infra cost: alpha → ~100 teams</td><td>~$0–100 → ~$700–1,000/mo</td><td class="win">~$20–50 → ~$300–600/mo</td><td>≈ B + your time</td></tr>
+    <tr><td>FSM / permission enforcement</td><td>Control API (clean)</td><td class="win">Control API owns all writes (cleanest)</td><td class="win">Native — commands are the FSM</td></tr>
+    <tr><td>A2A / phase-2 external agents</td><td>Good — gateway</td><td>Good — gateway</td><td class="win">Best — protocol-native streaming</td></tr>
+    <tr><td>Biggest risk</td><td>PowerSync Node SDK beta · vendor pricing</td><td>Sync-write subtleties on you · +weeks</td><td>Timeline blowout · Tauri sidecar friction</td></tr>
+    <tr><td>Migration path</td><td>→ B: swap sync + auth only</td><td>→ C: absorb event log gradually</td><td>terminal state</td></tr>
+  </table>
+  <div class="verdict"><h3>Decision (founder-accepted 2026-06-10): build A · keep B a swap away · seed C's event log from day one</h3><p>A wins the only race that matters — proving the unoccupied loop (orchestrator → claim → worktree → artifacts → review) before Slock grows a git story or an orchestrator. The de-risk move: a week-1 spike of PowerSync's replica + offline queue + reconnect inside Electron main is the go/no-go; the fallback (Electric + TanStack DB) costs ~2–3 weeks, decided before anything is built on top.</p></div>
+  <h2>Operating modes <span class="sub">how teams actually use it — all three options support all modes</span></h2>
+  <div class="grid3">
+    <div class="card"><h3>Manual <span class="badge b-info">day 1 trust</span></h3><p>Humans create and assign tasks; agents execute and validate; humans review. The board is still enforced. This is how teams build trust in week one.</p></div>
+    <div class="card"><h3>Orchestrated <span class="badge b-rec">the product</span></h3><p>@mention the channel orchestrator: it decomposes, writes tasks, offers to skill-matched registered agents, dispatches reviews, posts digests. Humans approve merges.</p></div>
+    <div class="card"><h3>Autonomous <span class="badge b-warn">phase 2</span></h3><p>Standing goals + scheduled routines; cloud-hosted orchestrator keeps loops running while laptops sleep; budgets + policy gates bound the blast radius.</p></div>
+  </div>
+</section>
+
+<!-- ═══════════ PROTOCOL ═══════════ -->
+<section id="t-protocol" class="hide">
+  <h1>Protocol — the enforced loop</h1>
+  <p class="lead">Board states are the product surface; <b>A2A 1.0</b> tasks are the wire. The server — never prompts — enforces transitions, atomic claims, and artifact-gated submission.</p>
+
+  <h2>Task state machine <span class="sub">server-enforced · adds blocked + accepted (human sign-off) to Slock's proven set</span></h2>
+  <div class="diagram">
+  <svg width="1060" height="250" viewBox="0 0 1060 250">
+    <defs><marker id="m3" markerWidth="9" markerHeight="9" refX="7" refY="3.5" orient="auto"><path d="M0 0 L7 3.5 L0 7 Z" fill="#4a4a4a"/></marker></defs>
+    <rect class="st" x="20" y="80" width="100" height="46" stroke="#f59e0b"/><text class="stl" x="50" y="107" fill="#f59e0b">todo</text>
+    <rect class="st" x="180" y="80" width="140" height="46" stroke="#3b82f6"/><text class="stl" x="208" y="107" fill="#60a5fa">in progress</text>
+    <rect class="st" x="380" y="80" width="130" height="46" stroke="#8b5cf6"/><text class="stl" x="412" y="107" fill="#a78bfa">in review</text>
+    <rect class="st" x="570" y="80" width="100" height="46" stroke="#22c55e"/><text class="stl" x="600" y="107" fill="#4ade80">done</text>
+    <rect class="st" x="730" y="80" width="130" height="46" stroke="#22d3ee"/><text class="stl" x="758" y="107" fill="#22d3ee">accepted</text>
+    <rect class="st" x="920" y="80" width="110" height="46" stroke="#64748b"/><text class="stl" x="948" y="107" fill="#94a3b8">closed</text>
+    <rect class="st" x="230" y="185" width="130" height="42" stroke="#ef4444"/><text class="stl" x="263" y="211" fill="#f87171">blocked</text>
+    <path class="arr" d="M120 96 L180 96"/><text class="al" x="112" y="88">claim · atomic</text>
+    <path class="arr" d="M320 96 L380 96"/><text class="al" x="296" y="88">submit · artifacts + push</text>
+    <path class="arr" d="M510 96 L570 96"/><text class="al" x="478" y="88">approve · auto pool</text>
+    <path class="arr" d="M670 96 L730 96"/><text class="al" x="650" y="88">accept · human</text>
+    <path class="arr" d="M860 96 L920 96"/><text class="al" x="864" y="88">archive</text>
+    <path class="arr hot" d="M420 126 C380 162 330 132 314 116"/><text class="al" x="398" y="168">criteria unmet → feedback → resume</text>
+    <path class="arr" d="M250 126 L267 185"/><text class="al" x="138" y="164">input required</text>
+    <path class="arr" d="M320 185 L303 126"/>
+    <path class="arr dash" d="M70 126 C70 240 900 240 965 126" opacity=".55"/><text class="al" x="460" y="236">cancel (orchestrator / human)</text>
+  </svg>
+  </div>
+
+  <h2>A2A 1.0 mapping <span class="sub">verified against spec v1.0.0 · Linux Foundation</span></h2>
+  <div class="grid2">
+    <div class="card"><h3>Design rule</h3><p><b>A board task is the product entity; each execution attempt is an A2A task.</b> Work attempt, review pass, and rework are separate A2A tasks sharing <span style="font-family:var(--mono)">contextId = task:1042</span>, linked via <span style="font-family:var(--mono)">referenceTaskIds</span>. Spec-exact (A2A has no "in_review" state) while the board tells the human story. Validation evidence = A2A <b>Artifacts</b> (Parts: url/data/text). Review loop declared as an A2A <b>extension</b> in Agent Cards. Review is dispatched <b>automatically</b> to the channel's reviewer pool (self-review blocked); after approval, <b>done → accepted</b> is a human sign-off recorded in the events log — channels may configure auto-accept for low-risk work. For repo-backed tasks, submit also requires the task branch <b>pushed to the remote</b> (review pinned to the submitted SHA) — acceptance becomes machine-independent, and phase-2 remote agents inherit the same contract with zero protocol change.</p></div>
+    <div class="card"><h3>State map</h3><table style="margin-top:6px;font-size:12px">
+      <tr><th>Board</th><th>A2A wire</th></tr>
+      <tr><td>todo (offered)</td><td style="font-family:var(--mono)">SUBMITTED</td></tr>
+      <tr><td>in progress</td><td style="font-family:var(--mono)">WORKING</td></tr>
+      <tr><td>blocked</td><td style="font-family:var(--mono)">INPUT_REQUIRED / AUTH_REQUIRED</td></tr>
+      <tr><td>submit → in review</td><td style="font-family:var(--mono)">COMPLETED + Artifacts → new review task</td></tr>
+      <tr><td>done (review approved)</td><td style="font-family:var(--mono)">review task COMPLETED (verdict: approve)</td></tr>
+      <tr><td>accepted (human sign-off)</td><td style="font-family:var(--mono)">board-only event · no A2A state</td></tr>
+      <tr><td>agent declines</td><td style="font-family:var(--mono)">REJECTED</td></tr>
+      <tr><td>cancel / failure</td><td style="font-family:var(--mono)">CANCELED / FAILED</td></tr>
+    </table></div>
+  </div>
+
+  <h2>Agent Card <span class="sub">registry-held in v1 · served at /.well-known/a2a/agent-card.json in phase 2</span></h2>
+  <div class="code"><span class="c">// channel scoping: the #dev orchestrator only matches agents whose cards register channel/dev</span>
+{ <span class="k">"name"</span>: <span class="s">"patch"</span>,
+  <span class="k">"description"</span>: <span class="s">"Frontend implementation agent. React/TS, CSS, a11y."</span>,
+  <span class="k">"skills"</span>: [{ <span class="k">"id"</span>: <span class="s">"frontend-impl"</span>, <span class="k">"inputModes"</span>: [<span class="s">"text"</span>], <span class="k">"outputModes"</span>: [<span class="s">"text"</span>,<span class="s">"image/png"</span>,<span class="s">"application/json"</span>] }],
+  <span class="k">"capabilities"</span>: { <span class="k">"streaming"</span>: true, <span class="k">"pushNotifications"</span>: false },
+  <span class="k">"securitySchemes"</span>: { <span class="k">"bearer"</span>: { <span class="k">"type"</span>: <span class="s">"http"</span>, <span class="k">"scheme"</span>: <span class="s">"bearer"</span> } },
+  <span class="k">"extensions"</span>: [<span class="s">"https://neuramesh.app/a2a/ext/review/v1"</span>],
+  <span class="k">"x-neuramesh"</span>: { <span class="k">"machine"</span>: <span class="s">"machine:m-georges-mbp"</span>, <span class="k">"runtime"</span>: <span class="s">"claude-code"</span>,
+                    <span class="k">"channels"</span>: [<span class="s">"channel/dev"</span>], <span class="k">"repos"</span>: [<span class="s">"github.com/acme/app"</span>], <span class="k">"role"</span>: <span class="s">"worker"</span> } }</div>
+
+  <div class="grid3" style="margin-top:14px">
+    <div class="card"><h3>AX mechanics <span class="badge b-info">from Slock</span></h3><ul><li><b>Agent Inbox</b> — pull, not push: agents query mentions/offers/reviews and choose what enters context</li><li><b>Held Draft</b> — sends carry a room-version; if the channel moved, the send is held with a diff: revise / send / stay silent</li><li>@mention-gated wakes — no chatter storms</li></ul></div>
+    <div class="card"><h3>Memory spine <span class="badge b-info">own pgvector</span></h3><ul><li>Per-channel <b>summary blocks</b> — shared, editable, always in context (Letta pattern)</li><li><b>extract → reconcile</b> fact writes: ADD/UPDATE/DELETE/NOOP (mem0 pattern)</li><li><b>Bitemporal validity</b> — facts superseded, never overwritten (Graphiti)</li><li>HNSW + BM25 + RRF recall, channel-ACL-scoped (gbrain recipe) · &lt;200ms budget</li></ul></div>
+    <div class="card"><h3>Security <span class="badge b-rec">trust wedge</span></h3><ul><li>Daemons connect <b>outbound-only</b> — no open ports; code never transits unless attached</li><li>Machine-owner grants: repos × channels × permission mode per agent</li><li><b>BYOK</b> — inference keys in the local keychain, never platform-held</li><li>Append-only events = audit log · recommend open-sourcing the daemon</li></ul></div>
+    <div class="card"><h3>Artifact library <span class="badge b-info">per channel</span></h3><ul><li>Validation evidence + shared files promoted from tasks into a <b>channel library</b></li><li><b>Orchestrator curates</b>: tags, versions, content-hash dedupe, pruning</li><li>ACL = channel registration · agents read via MCP <span style="font-family:var(--mono)">artifacts.list / get / promote</span></li><li>A2A Artifact objects end-to-end · cross-channel sharing = explicit promotion (phase 2)</li></ul></div>
+    <div class="card"><h3>Threads <span class="badge b-info">channel hygiene</span></h3><ul><li><b>Thread-per-task</b>: claims, requirement checks, progress, validation, review rounds live in the task's thread</li><li>Main channel gets orchestrator <b>digests</b> + clickable task summaries only</li><li>Keeps channels readable at fan-out scale; full detail one click away</li></ul></div>
+  </div>
+</section>
+
+<!-- ═══════════ PLAN ═══════════ -->
+<section id="t-plan" class="hide">
+  <h1>Six weeks to the loop</h1>
+  <p class="lead">Solo + agents, Option A. The contract: everything on the loop ships, everything off the loop is cut (threads, reactions, search, DMs, SSO, billing, Windows, multi-runtime, external A2A — all phase 2+).</p>
+  <div class="wk"><div class="wn">W1</div><div><b>Foundations + de-risk</b><p>Monorepo · Supabase schema + RLS (workspaces, channels, messages, tasks, events, agents, machines, artifacts) · auth · Electron boots, signed + notarized CI · <b>PowerSync spike in Electron main = go/no-go</b>.</p></div></div>
+  <div class="wk"><div class="wn">W2</div><div><b>Chat core, offline-capable</b><p>Channels · optimistic sends · per-channel sync buckets · presence · @mention autocomplete · machine registration · ⌘K skeleton.</p></div></div>
+  <div class="wk"><div class="wn">W3</div><div><b>Agents live in channels</b><p>AgentHost utilityProcess + Claude Agent SDK · create-agent flow (card, model, channels, repo grants) · in-process MCP tools · @mention wakes · streamed replies · inbox + held-draft · thread-per-task + digest model.</p></div></div>
+  <div class="wk"><div class="wn">W4</div><div><b>Board + worktrees</b><p>Kanban UI (incl. accepted column) · Control API FSM + atomic claims + acceptance gate · task timeline + review audit · review cockpit v0 (artifact-rendered diff viewer + task file tree, read-only) · worktree manager (add / checkpoint / clean, branch nm/&lt;id&gt;) · artifact uploads + channel library registry · project entity (channel-scoped, auto default) + repo linking + board project filter · push-before-review gate (SHA-pinned) · draft PR at first submit.</p></div></div>
+  <div class="wk"><div class="wn">W5</div><div><b>The loop</b><p>Orchestrator decompose → offer → claim · requirements gate incl. orchestrator project + repo resolution · <b>auto reviewer-pool dispatch</b> · criteria-unmet → feedback → session resume → resubmit · human acceptance · memory v0 (summary block + recall + context packets) · A2A-shaped objects throughout.</p></div></div>
+  <div class="wk"><div class="wn">W6</div><div><b>Onboarding + polish + alpha</b><p>2-minute onboarding (orchestrator auto-created with profile preview) · light/dark themes · perf pass (cold start &lt;2s · 60fps lists · &lt;10% agent overhead vs raw CLI as a release gate) · quotas · telemetry · llms.txt · private alpha with 2–3 teams.</p></div></div>
+
+  <h2>Alpha success criteria</h2>
+  <div class="grid3">
+    <div class="card"><h3>The loop, daily</h3><p>A 3-person team + 5 agents runs orchestrator fan-out → claim → requirements → worktree → artifacts → auto-review bounce → done → accepted → PR, every day for a week.</p></div>
+    <div class="card"><h3>Feels instant</h3><p>Send → render &lt;50ms · channel switch &lt;100ms · cold start &lt;2s · agent wall-clock overhead vs raw Claude Code &lt;10% (T3's 3x is the anti-benchmark).</p></div>
+    <div class="card"><h3>Survives a plane</h3><p>Kill the app mid-task, reopen offline: full history readable, writes queue, agent sessions resume on reconnect.</p></div>
+  </div>
+
+  <h2>Costs</h2>
+  <div class="statrow">
+    <div class="stat"><div class="v">$0–100<small>/mo</small></div><div class="l">alpha infra (Supabase + PowerSync + Fly)</div></div>
+    <div class="stat"><div class="v">$200–600<small>/mo</small></div><div class="l">your BYOK inference while dogfooding</div></div>
+    <div class="stat"><div class="v">~$700–1k<small>/mo</small></div><div class="l">infra at ~100 teams (B cuts this ~half)</div></div>
+    <div class="stat"><div class="v">$20–25<small>/seat</small></div><div class="l">Team plan target · BYOK keeps margins clean</div></div>
+  </div>
+
+  <h2>Top risks</h2>
+  <table>
+    <tr><th>Risk</th><th>Mitigation</th></tr>
+    <tr><td>PowerSync Node SDK (beta) misbehaves in Electron</td><td>Week-1 spike is the go/no-go · fallback Electric+TanStack (+2–3 wks) decided before building on top</td></tr>
+    <tr><td>Slock ships an orchestrator or git story</td><td>Speed to a Show HN demo of the loop · A2A standards posture + desktop-fast lane they can't copy quickly</td></tr>
+    <tr><td>Solo timeline slips</td><td>Cut list is contractual · loop &gt; polish · weeks 2–3 parallelize across agents</td></tr>
+    <tr><td>Agent quality variance breaks demos</td><td>Requirements gate + review loop are the product answer · curate alpha repos</td></tr>
+    <tr><td>Anthropic dependence</td><td>Adapter seam + A2A make runtimes additive · BYOK isolates billing</td></tr>
+  </table>
+</section>
+
+</main>
+<script>
+document.querySelectorAll('#tabs .tab').forEach(t=>t.onclick=()=>{
+  document.querySelectorAll('#tabs .tab').forEach(x=>x.classList.toggle('on',x===t));
+  document.querySelectorAll('main > section').forEach(s=>s.classList.toggle('hide',s.id!=='t-'+t.dataset.t));
+  window.scrollTo({top:0});
+});
+</script>
+</body>
+</html>

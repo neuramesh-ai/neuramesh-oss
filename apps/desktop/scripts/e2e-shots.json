@@ -1,0 +1,62 @@
+[
+  {
+    "name": "e2e01-home-landing",
+    "settle": 3000,
+    "query": { "theme": "dark", "channel": "dev" },
+    "js": "(async()=>{const w=m=>new Promise(r=>setTimeout(r,m));document.querySelector('.navhome')?.click();await w(1400);})()"
+  },
+  {
+    "name": "e2e02-home-composer-picker",
+    "settle": 3000,
+    "query": { "theme": "dark", "channel": "dev" },
+    "js": "(async()=>{const w=m=>new Promise(r=>setTimeout(r,m));document.querySelector('.navhome')?.click();await w(1200);document.querySelector('.hchip.chan')?.click();await w(500);})()"
+  },
+  {
+    "name": "e2e03-home-targets-research",
+    "settle": 3000,
+    "query": { "theme": "dark", "channel": "dev" },
+    "js": "(async()=>{const w=m=>new Promise(r=>setTimeout(r,m));document.querySelector('.navhome')?.click();await w(1200);document.querySelector('.hchip.chan')?.click();await w(400);const o=[...document.querySelectorAll('button')].find(b=>/research/.test(b.textContent||'')&&b.className!=='hchip chan');o&&o.click();await w(600);const t=document.querySelector('.hcomposer textarea');if(t){t.focus();}await w(300);})()"
+  },
+  {
+    "name": "e2e04-room-feed-reply-footers",
+    "settle": 3200,
+    "query": { "theme": "dark", "channel": "dev" },
+    "js": "(async()=>{const w=m=>new Promise(r=>setTimeout(r,m));await w(1200);const f=document.querySelector('.replyfoot');f&&f.scrollIntoView({block:'center'});await w(500);})()"
+  },
+  {
+    "name": "e2e05-message-hover-actions",
+    "settle": 3200,
+    "query": { "theme": "dark", "channel": "dev" },
+    "js": "(async()=>{const w=m=>new Promise(r=>setTimeout(r,m));await w(1200);const f=document.querySelector('.replyfoot');f&&f.scrollIntoView({block:'center'});await w(400);const row=f&&f.closest('.msg');const s=document.createElement('style');s.textContent='.msg.nmhover .msgactions{display:flex!important}';document.head.appendChild(s);row&&row.classList.add('nmhover');await w(600);})()"
+  },
+  {
+    "name": "e2e06-reply-pill-in-composer",
+    "settle": 3200,
+    "query": { "theme": "dark", "channel": "dev" },
+    "js": "(async()=>{const w=m=>new Promise(r=>setTimeout(r,m));await w(1300);const b=[...document.querySelectorAll('.msgact')].find(x=>/^Reply/.test(x.getAttribute('title')||''));b&&b.click();await w(800);})()"
+  },
+  {
+    "name": "e2e07-thread-from-footer",
+    "settle": 3200,
+    "query": { "theme": "dark", "channel": "dev" },
+    "js": "(async()=>{const w=m=>new Promise(r=>setTimeout(r,m));await w(1300);document.querySelector('.replyfoot')?.click();await w(1400);})()"
+  },
+  {
+    "name": "e2e08-home-landing-cream",
+    "settle": 3000,
+    "query": { "theme": "cream-oak", "channel": "dev" },
+    "js": "(async()=>{const w=m=>new Promise(r=>setTimeout(r,m));document.querySelector('.navhome')?.click();await w(1400);})()"
+  },
+  {
+    "name": "e2e09-room-feed-cream",
+    "settle": 3200,
+    "query": { "theme": "cream-oak", "channel": "dev" },
+    "js": "(async()=>{const w=m=>new Promise(r=>setTimeout(r,m));await w(1200);const f=document.querySelector('.replyfoot');f&&f.scrollIntoView({block:'center'});await w(500);})()"
+  },
+  {
+    "name": "e2e10-thread-cream",
+    "settle": 3200,
+    "query": { "theme": "cream-oak", "channel": "dev" },
+    "js": "(async()=>{const w=m=>new Promise(r=>setTimeout(r,m));await w(1300);document.querySelector('.replyfoot')?.click();await w(1400);})()"
+  }
+]

@@ -1,0 +1,24 @@
+{
+  "workspaces": [
+    {
+      "id": "smoke",
+      "plan": "cloud",
+      "quotaCpu": "4",
+      "quotaMemory": "8Gi",
+      "quotaPvcCount": "4",
+      "machines": [
+        {
+          "id": "probe",
+          "kind": "member",
+          "ownerUserId": "u-smoke",
+          "replicas": 1,
+          "cpu": "250m",
+          "memory": "1Gi",
+          "cpuLimit": "1",
+          "memoryLimit": "2Gi",
+          "disk": "10Gi"
+        }
+      ]
+    }
+  ]
+}

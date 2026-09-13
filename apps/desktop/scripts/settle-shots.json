@@ -1,0 +1,84 @@
+[
+  {
+    "name": "settle1-rail-dark",
+    "settle": 2600,
+    "query": {
+      "theme": "dark"
+    },
+    "js": "document.querySelectorAll('.navhistwrap').forEach((w)=>{const t=w.querySelector('.navhisttitle');if(t&&/Mobile nav/.test(t.textContent||'')){const a=w.querySelector('.navhistact');if(a)a.style.display='inline-flex';const tr=w.querySelector('.navhisttrail');if(tr)tr.style.visibility='hidden';w.querySelector('.navhistrow')?.style.setProperty('background','var(--hover-bg)');}});"
+  },
+  {
+    "name": "settle2-rail-light",
+    "settle": 2600,
+    "query": {
+      "theme": "light"
+    },
+    "js": "document.querySelectorAll('.navhistwrap').forEach((w)=>{const t=w.querySelector('.navhisttitle');if(t&&/Mobile nav/.test(t.textContent||'')){const a=w.querySelector('.navhistact');if(a)a.style.display='inline-flex';const tr=w.querySelector('.navhisttrail');if(tr)tr.style.visibility='hidden';w.querySelector('.navhistrow')?.style.setProperty('background','var(--hover-bg)');}});"
+  },
+  {
+    "name": "settle3-settled-row-dark",
+    "settle": 2600,
+    "query": {
+      "theme": "dark"
+    },
+    "js": "document.querySelectorAll('.navhistwrap').forEach((w)=>{const t=w.querySelector('.navhisttitle');if(t&&/Token audit/.test(t.textContent||'')){const a=w.querySelector('.navhistact');if(a)a.style.display='inline-flex';const tr=w.querySelector('.navhisttrail');if(tr)tr.style.visibility='hidden';w.querySelector('.navhistrow')?.style.setProperty('background','var(--hover-bg)');}});"
+  },
+  {
+    "name": "settle4-settled-row-light",
+    "settle": 2600,
+    "query": {
+      "theme": "light"
+    },
+    "js": "document.querySelectorAll('.navhistwrap').forEach((w)=>{const t=w.querySelector('.navhisttitle');if(t&&/Token audit/.test(t.textContent||'')){const a=w.querySelector('.navhistact');if(a)a.style.display='inline-flex';const tr=w.querySelector('.navhisttrail');if(tr)tr.style.visibility='hidden';w.querySelector('.navhistrow')?.style.setProperty('background','var(--hover-bg)');}});"
+  },
+  {
+    "name": "settle5-menu-dark",
+    "settle": 2600,
+    "query": {
+      "theme": "dark"
+    },
+    "js": "const w=[...document.querySelectorAll('.navhistwrap')].find((x)=>/Mobile nav/.test(x.querySelector('.navhisttitle')?.textContent||''));const b=w?.querySelectorAll('.navhistbtn');b?.[b.length-1]?.click();"
+  },
+  {
+    "name": "settle6-undo-toast-dark",
+    "settle": 2600,
+    "query": {
+      "theme": "dark"
+    },
+    "js": "(() => { const w=[...document.querySelectorAll('.navhistwrap')].find((x)=>/Mobile nav/.test(x.querySelector('.navhisttitle')?.textContent||'')); w?.querySelector('.nhsettle')?.click(); return new Promise((r)=>setTimeout(r, 600)); })()"
+  },
+  {
+    "name": "settle7-undo-toast-light",
+    "settle": 2600,
+    "query": {
+      "theme": "light"
+    },
+    "js": "(() => { const w=[...document.querySelectorAll('.navhistwrap')].find((x)=>/Mobile nav/.test(x.querySelector('.navhisttitle')?.textContent||'')); w?.querySelector('.nhsettle')?.click(); return new Promise((r)=>setTimeout(r, 600)); })()"
+  },
+  {
+    "name": "settle8-thread-head-dark",
+    "settle": 2800,
+    "query": {
+      "theme": "dark",
+      "openTask": "1042",
+      "tab": "thread"
+    }
+  },
+  {
+    "name": "settle9-thread-head-light",
+    "settle": 2800,
+    "query": {
+      "theme": "light",
+      "openTask": "1042",
+      "tab": "thread"
+    }
+  },
+  {
+    "name": "settle10-convo-head-dark",
+    "settle": 2800,
+    "query": {
+      "theme": "dark",
+      "openConvo": "general::Token audit"
+    }
+  }
+]

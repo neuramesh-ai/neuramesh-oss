@@ -1,0 +1,65 @@
+services:
+  pg:
+    image: pgvector/pgvector:pg16
+    command: ["postgres", "-c", "wal_level=logical"]
+    environment:
+      POSTGRES_PASSWORD: nm
+      POSTGRES_DB: nm
+    volumes:
+      # Fresh-DB bootstrap. The whole migrations + init tree is mounted and 00-bootstrap.sh applies
+      # EVERY migration in order (auto-discovered) plus the storage DB + publication, recording
+      # schema_migrations so the dev DB matches prod tracking. Replaces the old hand-listed mounts,
+      # which rotted at 0042 — a fresh `docker compose up` now always lands on the latest schema.
+      - ../../supabase:/bootstrap/supabase:ro
+      - ./init:/bootstrap/init:ro
+      - ./init/00-bootstrap.sh:/docker-entrypoint-initdb.d/00-bootstrap.sh:ro
+    ports:
+      - "127.0.0.1:55435:5432"
+    healthcheck:
+      # -h 127.0.0.1 forces TCP. During docker-entrypoint-initdb.d the image runs a
+      # TEMPORARY socket-only server, so a socket psql reported healthy while
+      # 00-bootstrap.sh was still applying the migration tree — compose released
+      # powersync early, and powersync v1.22 exits 150 on its first failed query
+      # instead of retrying (the old "restart powersync after boot" recipe step).
+      # TCP answers only once the REAL server is up, which is after init completes.
+      test: ["CMD-SHELL", "psql -h 127.0.0.1 -U postgres -d nm -tAc 'select 1' >/dev/null"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+
+  powersync:
+    image: journeyapps/powersync-service:latest
+    command: ["start", "-r", "unified"]
+    # belt to the healthcheck fix above: the unpinned :latest has already changed
+    # startup behaviour once (fatal-on-first-query); a transient boot loss should
+    # retry, not strand the stack half-up
+    restart: on-failure
+    depends_on:
+      pg:
+        condition: service_healthy
+    volumes:
+      - ./powersync:/config
+    environment:
+      POWERSYNC_CONFIG_PATH: /config/powersync.yaml
+      # powersync.yaml is shared with the LOCAL stack and reads its values from PS_* env; the
+      # committed dev values live here as defaults (PowerSync errors on an unset !env name).
+      PS_NM_SYNC_KID: ${PS_NM_SYNC_KID:-nm-dev}
+      PS_NM_SYNC_KEY: ${PS_NM_SYNC_KEY:-TkVVUkFNRVNILVNQSUtFLUtFWS0wMDEtTkVVUkFNRVNILVNQSUtFLUtFWS0wMDE}
+      PS_NM_AUDIENCE: ${PS_NM_AUDIENCE:-powersync-dev}
+      PS_NM_CLOUD_AUDIENCE: ${PS_NM_CLOUD_AUDIENCE:-powersync}
+      PS_NM_ADMIN_TOKEN: ${PS_NM_ADMIN_TOKEN:-nm-dev-admin-token}
+      PS_NM_JWKS_URI: ${PS_NM_JWKS_URI:-https://secure-hedgehog-28.clerk.accounts.dev/.well-known/jwks.json}
+      PS_NM_MACHINE_JWK_N: ${PS_NM_MACHINE_JWK_N:-}
+    ports:
+      - "127.0.0.1:58081:8080"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:8080/probes/liveness').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))",
+        ]
+      interval: 3s
+      timeout: 2s
+      retries: 40

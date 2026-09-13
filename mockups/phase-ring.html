@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Phase ring — the task panel's journey, wound into a dial</title>
+<style>
+[data-theme] { --font:'Geist Variable',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; --fmono:'Geist Mono Variable',ui-monospace,'SF Mono',Menlo,monospace; --fdisp:'Source Serif 4','Iowan Old Style',Georgia,serif; --ease:cubic-bezier(.2,.8,.2,1); --dur-fast:120ms; }
+/* graphite dark — verbatim from apps/desktop/src/renderer/src/tokens.css */
+[data-theme='dark'] {
+  --win:#0d0d0d; --bg:#141414; --panel:#191919; --panel2:#212121; --panel3:#2b2b2b;
+  --border:#272727; --border2:#383838;
+  --text:#eaeaea; --body:#b6b6b6; --muted:#898989; --dim:#676767; --ring:#585858;
+  --prog:#8ba0c0; --review:#a89ccf; --done:#77ac8d; --acc:#6fb0ab; --ship:#7cb0bd;
+  --blocked:#9ca0a8; --plan:#7fa5ab; --design:#cc8fb9;
+  --shadow:rgba(0,0,0,.6);
+}
+/* cream oak — same file, same values */
+[data-theme='cream-oak'] {
+  --win:#f0e5d3; --bg:#fbf8f4; --panel:#fbf8f4; --panel2:#f6eee1; --panel3:#efe1cd;
+  --border:#e6dbca; --border2:#d3c2a8;
+  --text:#2a1c13; --body:#574838; --muted:#97846c; --dim:#b5a289; --ring:#b08a5e;
+  --prog:#4f80c4; --review:#6d5ce0; --done:#0f9d63; --acc:#2f8f8a; --ship:#1f7f96;
+  --blocked:#7d7f86; --plan:#2c7d88; --design:#b0498f;
+  --shadow:rgba(70,42,18,.22);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#131210; font-family:'Geist Variable',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; }
+.page { max-width:1560px; margin:0 auto; padding:34px 26px 70px; }
+.pagehead { color:#eaeaea; margin-bottom:20px; }
+.pagehead h1 { font-family:'Source Serif 4',Georgia,serif; font-size:23px; font-weight:640; letter-spacing:-.012em; }
+.pagehead p { color:#898989; font-size:13px; line-height:1.6; margin-top:8px; max-width:86ch; }
+.pagehead p + p { margin-top:6px; }
+.pagehead b { color:#b6b6b6; font-weight:600; }
+.themes { display:grid; grid-template-columns:1fr 1fr; gap:22px; margin-top:24px; }
+@media (max-width:1180px){ .themes { grid-template-columns:1fr; } }
+.theme { background:var(--win); border:1px solid var(--border2); border-radius:16px; padding:18px 16px 22px; color:var(--text); }
+.theme > h2 { font-size:10.5px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--dim); margin:0 4px 14px; }
+.cap { font-size:11.5px; color:var(--muted); line-height:1.55; margin:16px 4px 8px; }
+.cap b { color:var(--body); font-weight:650; }
+
+/* ── the panel header, faithful to .phead ── */
+.panel { background:var(--panel); border:1px solid var(--border); border-radius:14px; overflow:hidden; }
+.panel + .panel { margin-top:12px; }
+.idrow { display:flex; align-items:center; gap:8px; padding:11px 16px 0; }
+.tid { font:700 10.5px var(--fmono); color:var(--dim); letter-spacing:.4px; }
+.chip { font:700 9px var(--fmono); letter-spacing:.7px; text-transform:uppercase; padding:2.5px 7px; border-radius:5px;
+  color:var(--sc); background:color-mix(in srgb, var(--sc) 14%, transparent); box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--sc) 26%, transparent); }
+.phead { padding:0 16px 10px; border-bottom:1px solid var(--border); }
+.pheadtitle { display:flex; align-items:flex-start; gap:14px; font-family:var(--fdisp); font-size:18px; font-weight:640; letter-spacing:-.012em; padding-top:7px; line-height:1.3; }
+.pheadname { flex:1; min-width:0; }
+.facts { display:flex; align-items:center; gap:6px; flex-wrap:wrap; padding-top:9px; }
+.specnow { font-size:9px; font-weight:800; letter-spacing:.7px; text-transform:uppercase; color:var(--segc, var(--prog)); }
+.tok { font:600 10.5px var(--fmono); color:var(--muted); background:none; border:1px solid var(--border2); border-radius:999px; padding:2.5px 9px; }
+
+/* ── the ring ── */
+.pring { position:relative; flex:none; display:inline-flex; align-items:center; gap:5px; padding:2px 4px 2px 2px; border-radius:999px; }
+.pringsvg { flex:none; width:19px; height:19px; transform:rotate(-90deg); overflow:visible; }
+.pseg { stroke:color-mix(in srgb, var(--segc) 24%, transparent); stroke-width:3.2; stroke-linecap:round; }
+.pseg.p-done { stroke:var(--segc); }
+.pseg.p-live { stroke:color-mix(in srgb, var(--segc) 26%, transparent); }
+.pseg.p-gap { stroke:color-mix(in srgb, var(--blocked) 60%, transparent); stroke-width:2; stroke-dasharray:1.6 2.8 !important; stroke-dashoffset:0 !important; }
+.psegfill { stroke:var(--segc); stroke-width:3.2; stroke-linecap:round; }
+.pringn { font:700 10.5px var(--fmono); color:var(--dim); font-variant-numeric:tabular-nums; letter-spacing:.2px; }
+.pringn b { font-weight:700; color:var(--segc, var(--body)); }
+@media (prefers-reduced-motion: no-preference) {
+  .live .psegfill { animation:pring-breathe 2.6s var(--ease) infinite; }
+  @keyframes pring-breathe { 0%,100% { opacity:1; } 50% { opacity:.48; } }
+}
+/* the tooltip, pinned open here so a still frame carries the hover state */
+.pringtip { position:absolute; top:calc(100% + 7px); left:-4px; z-index:6; min-width:208px; padding:8px 10px 7px;
+  background:var(--panel); border:1px solid var(--border2); border-radius:10px; box-shadow:0 14px 34px -16px var(--shadow); text-align:left; }
+.pringtiph { font:700 9px var(--fmono); letter-spacing:.7px; text-transform:uppercase; color:var(--muted); padding-bottom:5px; margin-bottom:4px; border-bottom:1px solid var(--border); }
+.pringrow { display:flex; align-items:center; gap:7px; padding:2px 0; font:500 10.5px var(--fmono); color:var(--dim); white-space:nowrap; }
+.pringdot { flex:none; width:6px; height:6px; border-radius:50%; background:color-mix(in srgb, var(--segc) 26%, transparent); }
+.r-done .pringdot, .r-live .pringdot { background:var(--segc); }
+.r-gap .pringdot { background:transparent; border:1.5px dashed var(--segc); width:7px; height:7px; }
+.pringlab { color:var(--body); font-weight:650; }
+.r-live .pringlab { color:var(--text); }
+.pringwho { margin-left:auto; padding-left:12px; color:var(--dim); }
+.r-gap .pringwho { color:var(--blocked); }
+.pringfoot { margin-top:5px; padding-top:4px; border-top:1px solid var(--border); font:500 9px var(--fmono); color:var(--dim); }
+.tipbox { padding-bottom:150px; }
+
+/* the OLD ribbon, for the side-by-side that motivates the change */
+.spec-old { display:flex; gap:3px; height:7px; margin-top:10px; }
+.spec-old span { flex:1; border-radius:4px; background:color-mix(in srgb, var(--segc) 15%, transparent); }
+.spec-old span.d { background:var(--segc); }
+.spec-old span.l { background:linear-gradient(to right, var(--segc) 63%, color-mix(in srgb, var(--segc) 20%, transparent) 63%); }
+.oldfoot { display:flex; align-items:center; gap:8px; margin-top:7px; }
+.oldfoot .d2 { margin-left:auto; font:500 9.5px var(--fmono); color:var(--dim); }
+
+/* the board card's 4px whisper — unchanged, shown so the review can confirm it stays */
+.tcard { background:var(--panel2); border:1px solid var(--border); border-radius:10px; padding:10px 11px 11px; }
+.tcard .t { font-size:12.5px; font-weight:600; margin-top:6px; color:var(--text); }
+.spec-card { display:flex; gap:2.5px; height:4px; margin-top:8px; }
+.spec-card span { flex:1; border-radius:4px; background:color-mix(in srgb, var(--segc) 15%, transparent); }
+.spec-card span.d { background:var(--segc); }
+.spec-card span.l { background:linear-gradient(to right, var(--segc) 63%, color-mix(in srgb, var(--segc) 20%, transparent) 63%); }
+.spec-card span.g { background:transparent; border:1.5px dashed color-mix(in srgb, var(--blocked) 55%, transparent); }
+.row { display:flex; gap:12px; align-items:flex-start; }
+.row > * { flex:1; }
+
+/* ── §4 placement study (2026-07-29 review round) ── */
+.thead { display:flex; align-items:center; gap:8px; padding:12px 16px 0; }
+.theadact { margin-left:auto; display:flex; align-items:center; gap:2px; }
+.pin { width:26px; height:26px; display:grid; place-items:center; border-radius:7px; color:var(--dim); }
+.pin svg { display:block; }
+.pt-center .pheadtitle { display:block; }
+.pt-center .pring { margin:8px auto 0; }
+.pt-chip .pheadtitle { display:block; }
+.study { display:grid; gap:12px; }
+.tagline { display:flex; align-items:baseline; gap:8px; margin:16px 4px 6px; }
+.tagline .n { font:700 9px var(--fmono); letter-spacing:.7px; text-transform:uppercase; color:var(--dim); }
+.tagline .h { font-size:12.5px; font-weight:650; color:var(--text); }
+.verdict { font-size:11.5px; color:var(--muted); line-height:1.55; margin:0 4px 8px; }
+.verdict b { color:var(--body); font-weight:650; }
+.verdict .no { color:var(--blocked); font-weight:650; }
+.verdict .yes { color:var(--done); font-weight:650; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="pagehead">
+    <h1>Phase ring — the task panel's journey, wound into a dial</h1>
+    <p>The panel header carried the phase spectrum as a full-width ribbon of coloured bars (docs/24 §2). At that scale it
+      spent the widest line on the screen to say one thing — <b>you are on leg 3 of 5</b> — and said it in a language you
+      had to hover to read, directly under the task's own title. This replaces the <b>panel</b> variant with a 30px ring
+      at the title's right edge: one dotted arc per leg, the position in the middle, the whole journey on hover.</p>
+    <p>Nothing about the data changes. Same derived legs (<b>journeyFor</b>, pure + unit-tested), same state tokens, same
+      rules: done solid · live filled by the working agent's beats and breathing · the road ahead ghosted in its own hue ·
+      an unstaffed leg a dashed hollow in the blocked tone. The board card's 4px whisper is untouched.</p>
+  </div>
+
+  <div class="themes">
+    <div class="theme" data-theme="dark"><h2>Graphite dark</h2>
+      <div class="cap">1 · <b>Before → after</b>, the same task. The ribbon owned the header; the ring gives it back to the title.</div>
+      <div class="panel">
+        <div class="idrow"><span class="tid">#1046</span><span class="chip" style="--sc:var(--prog)">in progress</span></div>
+        <div class="phead">
+          <div class="pheadtitle"><span class="pheadname">iOS Safari focus-trap release</span></div>
+          <div class="spec-old"><span class="l" style="--segc:var(--prog)"></span><span style="--segc:var(--review)"></span><span style="--segc:var(--ship)"></span><span style="--segc:var(--acc)"></span></div>
+          <div class="oldfoot"><span class="specnow" style="--segc:var(--prog)">BUILD · PATCH</span><span class="d2">hover a segment · derived from routing + staffing</span></div>
+          <div class="facts"><span class="tok">✓ reqs</span><span class="tok">subtasks 1/2</span><span class="tok">PR #1046</span><span class="tok">rounds 2</span></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="idrow"><span class="tid">#1046</span><span class="chip" style="--sc:var(--prog)">in progress</span></div>
+        <div class="phead">
+          <div class="pheadtitle">
+            <span class="pheadname">iOS Safari focus-trap release</span>
+            <div class="pring live">
+              <svg viewBox="0 0 32 32" class="pringsvg">
+                <g style="--segc:var(--prog)"><circle class="pseg p-live" cx="16" cy="16" r="13" fill="none" stroke-dasharray="16.42 81.68" stroke-dashoffset="-2"></circle><circle class="psegfill" cx="16" cy="16" r="13" fill="none" stroke-dasharray="10.34 81.68" stroke-dashoffset="-2"></circle></g>
+                <g style="--segc:var(--review)"><circle class="pseg p-todo" cx="16" cy="16" r="13" fill="none" stroke-dasharray="16.42 81.68" stroke-dashoffset="-22.42"></circle></g>
+                <g style="--segc:var(--ship)"><circle class="pseg p-todo" cx="16" cy="16" r="13" fill="none" stroke-dasharray="16.42 81.68" stroke-dashoffset="-42.84"></circle></g>
+                <g style="--segc:var(--acc)"><circle class="pseg p-todo" cx="16" cy="16" r="13" fill="none" stroke-dasharray="16.42 81.68" stroke-dashoffset="-63.26"></circle></g>
+              </svg>
+              <span class="pringn" style="--segc:var(--prog)"><b>1</b>/4</span>
+            </div>
+          </div>
+          <div class="facts"><span class="specnow" style="--segc:var(--prog)">BUILD · PATCH</span><span class="tok">✓ reqs</span><span class="tok">subtasks 1/2</span><span class="tok">PR #1046</span><span class="tok">rounds 2</span></div>
+        </div>
+      </div>
+
+      <div class="cap">2 · <b>Hover</b> — the whole journey, per leg: who owns it, how far the live one is by beats, and any staffing gap named in place.</div>
+      <div class="panel tipbox">
+        <div class="idrow"><span class="tid">#1050</span><span class="chip" style="--sc:var(--design)">design review</span></div>
+        <div class="phead">
+          <div class="pheadtitle">
+            <span class="pheadname">Pricing page refresh — tiers + annual toggle</span>
+            <div class="pring live">
+              <svg viewBox="0 0 32 32" class="pringsvg">
+                <g style="--segc:var(--design)"><circle class="pseg p-live" cx="16" cy="16" r="13" fill="none" stroke-dasharray="12.34 81.68" stroke-dashoffset="-2"></circle><circle class="psegfill" cx="16" cy="16" r="13" fill="none" stroke-dasharray="6.17 81.68" stroke-dashoffset="-2"></circle></g>
+                <g style="--segc:var(--plan)"><circle class="pseg p-todo" cx="16" cy="16" r="13" fill="none" stroke-dasharray="12.34 81.68" stroke-dashoffset="-18.34"></circle></g>
+                <g style="--segc:var(--prog)"><circle class="pseg p-todo" cx="16" cy="16" r="13" fill="none" stroke-dasharray="12.34 81.68" stroke-dashoffset="-34.67"></circle></g>
+                <g style="--segc:var(--review)"><circle class="pseg p-todo" cx="16" cy="16" r="13" fill="none" stroke-dasharray="12.34 81.68" stroke-dashoffset="-51.01"></circle></g>
+                <g style="--segc:var(--acc)"><circle class="pseg p-gap" cx="16" cy="16" r="13" fill="none" stroke-dasharray="12.34 81.68" stroke-dashoffset="-67.34"></circle></g>
+              </svg>
+              <span class="pringn" style="--segc:var(--design)"><b>1</b>/5</span>
+              <div class="pringtip">
+                <div class="pringtiph">Phase 1 of 5 · design</div>
+                <div class="pringrow r-live" style="--segc:var(--design)"><span class="pringdot"></span><span class="pringlab">Design</span><span class="pringwho">iris · 50% by beats</span></div>
+                <div class="pringrow r-todo" style="--segc:var(--plan)"><span class="pringdot"></span><span class="pringlab">Plan</span><span class="pringwho">atlas · up next</span></div>
+                <div class="pringrow r-todo" style="--segc:var(--prog)"><span class="pringdot"></span><span class="pringlab">Build</span><span class="pringwho">patch · up next</span></div>
+                <div class="pringrow r-todo" style="--segc:var(--review)"><span class="pringdot"></span><span class="pringlab">Review</span><span class="pringwho">scout · up next</span></div>
+                <div class="pringrow r-gap" style="--segc:var(--blocked)"><span class="pringdot"></span><span class="pringlab">Ship</span><span class="pringwho">no shipper in this room</span></div>
+                <div class="pringfoot">derived from routing + staffing</div>
+              </div>
+            </div>
+          </div>
+          <div class="facts"><span class="specnow" style="--segc:var(--design)">DESIGN · IRIS</span><span class="tok">✓ reqs</span><span class="tok">artifacts 2</span></div>
+        </div>
+      </div>
+
+      <div class="cap">3 · <b>Late journey</b> (3/4, shipping) and <b>the board card's 4px whisper</b> — unchanged, shown so review can confirm it stays.</div>
+      <div class="row">
+        <div class="panel">
+          <div class="idrow"><span class="tid">#1052</span><span class="chip" style="--sc:var(--ship)">shipping</span></div>
+          <div class="phead">
+            <div class="pheadtitle">
+              <span class="pheadname">Auto-update card</span>
+              <div class="pring live">
+                <svg viewBox="0 0 32 32" class="pringsvg">
+                  <g style="--segc:var(--prog)"><circle class="pseg p-done" cx="16" cy="16" r="13" fill="none" stroke-dasharray="16.42 81.68" stroke-dashoffset="-2"></circle></g>
+                  <g style="--segc:var(--review)"><circle class="pseg p-done" cx="16" cy="16" r="13" fill="none" stroke-dasharray="16.42 81.68" stroke-dashoffset="-22.42"></circle></g>
+                  <g style="--segc:var(--ship)"><circle class="pseg p-live" cx="16" cy="16" r="13" fill="none" stroke-dasharray="16.42 81.68" stroke-dashoffset="-42.84"></circle><circle class="psegfill" cx="16" cy="16" r="13" fill="none" stroke-dasharray="7.4 81.68" stroke-dashoffset="-42.84"></circle></g>
+                  <g style="--segc:var(--acc)"><circle class="pseg p-todo" cx="16" cy="16" r="13" fill="none" stroke-dasharray="16.42 81.68" stroke-dashoffset="-63.26"></circle></g>
+                </svg>
+                <span class="pringn" style="--segc:var(--ship)"><b>3</b>/4</span>
+              </div>
+            </div>
+            <div class="facts"><span class="specnow" style="--segc:var(--ship)">SHIP · BOSUN</span><span class="tok">PR #1052</span></div>
+          </div>
+        </div>
+        <div class="tcard">
+          <span class="chip" style="--sc:var(--prog)">in progress</span>
+          <div class="t">#1046 · iOS Safari focus-trap release</div>
+          <div class="spec-card"><span class="l" style="--segc:var(--prog)"></span><span style="--segc:var(--review)"></span><span class="g"></span><span style="--segc:var(--acc)"></span></div>
+        </div>
+      </div>
+
+      <div class="tagline"><span class="n">§4</span><span class="h">Placement study — where does the dial live?</span></div>
+      <div class="study">
+        <div class="verdict"><b>A · trailing the title</b> (the first draft). Fixed anchor, doesn't move when the title wraps or the panel resizes; trailing edge is the idiom for "this row's state". <span class="no">Cost:</span> it sits in the pin column, one row below three round glyphs — it can read as a fourth pin.</div>
+        <div class="panel"><div class="thead"><span class="tid">#1052</span><span class="chip" style="--sc:var(--ship)">shipping</span><span class="chip" style="--sc:var(--acc)">feature</span><div class="theadact">
+              <div class="pin"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></div>
+              <div class="pin"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9l3 3-3 3M13 15h4"/></svg></div>
+              <div class="pin"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></div>
+            </div></div><div class="phead"><div class="pheadtitle"><span class="pheadname">Auto-update card with a bottom-left dock and updater telemetry</span><div class="pring live"><svg viewBox="0 0 32 32" class="pringsvg">
+                <g style="--segc:var(--prog)"><circle class="pseg p-done" cx="16" cy="16" r="13" fill="none" stroke-dasharray="16.42 81.68" stroke-dashoffset="-2"></circle></g>
+                <g style="--segc:var(--review)"><circle class="pseg p-done" cx="16" cy="16" r="13" fill="none" stroke-dasharray="16.42 81.68" stroke-dashoffset="-22.42"></circle></g>
+                <g style="--segc:var(--ship)"><circle class="pseg p-live" cx="16" cy="16" r="13" fill="none" stroke-dasharray="16.42 81.68" stroke-dashoffset="-42.84"></circle><circle class="psegfill" cx="16" cy="16" r="13" fill="none" stroke-dasharray="7.4 81.68" stroke-dashoffset="-42.84"></circle></g>
+                <g style="--segc:var(--acc)"><circle class="pseg p-todo" cx="16" cy="16" r="13" fill="none" stroke-dasharray="16.42 81.68" stroke-dashoffset="-63.26"></circle></g>
+              </svg><span class="pringn" style="--segc:var(--ship)"><b>3</b>/4</span></div></div><div class="facts"><span class="specnow" style="--segc:var(--ship)">SHIP · BOSUN</span><span class="tok">✓ reqs</span><span class="tok">artifacts 2</span><span class="tok">PR #1052</span></div></div></div>
+        <div class="verdict"><b>B · centred in the header</b>. Clears the pin column. <span class="no">Cost:</span> nothing anchors it — the eye goes title → jump to centre → back left for the facts row, and "centre" is computed, so it drifts with panel width and with a two-line title. A status object you look for should not move.</div>
+        <div class="panel pt-center"><div class="thead"><span class="tid">#1052</span><span class="chip" style="--sc:var(--ship)">shipping</span><span class="chip" style="--sc:var(--acc)">feature</span><div class="theadact">
+              <div class="pin"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></div>
+              <div class="pin"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9l3 3-3 3M13 15h4"/></svg></div>
+              <div class="pin"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></div>
+            </div></div><div class="phead"><div class="pheadtitle"><span class="pheadname">Auto-update card with a bottom-left dock and updater telemetry</span></div><div class="pring live"><svg viewBox="0 0 32 32" class="pringsvg">
+                <g style="--segc:var(--prog)"><circle class="pseg p-done" cx="16" cy="16" r="13" fill="none" stroke-dasharray="16.42 81.68" stroke-dashoffset="-2"></circle></g>
+                <g style="--segc:var(--review)"><circle class="pseg p-done" cx="16" cy="16" r="13" fill="none" stroke-dasharray="16.42 81.68" stroke-dashoffset="-22.42"></circle></g>
+                <g style="--segc:var(--ship)"><circle class="pseg p-live" cx="16" cy="16" r="13" fill="none" stroke-dasharray="16.42 81.68" stroke-dashoffset="-42.84"></circle><circle class="psegfill" cx="16" cy="16" r="13" fill="none" stroke-dasharray="7.4 81.68" stroke-dashoffset="-42.84"></circle></g>
+                <g style="--segc:var(--acc)"><circle class="pseg p-todo" cx="16" cy="16" r="13" fill="none" stroke-dasharray="16.42 81.68" stroke-dashoffset="-63.26"></circle></g>
+              </svg><span class="pringn" style="--segc:var(--ship)"><b>3</b>/4</span></div><div class="facts"><span class="specnow" style="--segc:var(--ship)">SHIP · BOSUN</span><span class="tok">✓ reqs</span><span class="tok">artifacts 2</span><span class="tok">PR #1052</span></div></div></div>
+        <div class="verdict"><b>C · beside the state chip</b>. The chip says where you are in the FSM; the ring says where you are in the journey — the same fact at two resolutions, so they sit together. Left-anchored, stable, out of both the pin column and the title. <span class="yes">Cost:</span> it has to shrink to 26px to keep the id row's height, which pushes <code>3/4</code> to 8px.</div>
+        <div class="panel pt-chip"><div class="thead"><span class="tid">#1052</span><span class="chip" style="--sc:var(--ship)">shipping</span><span class="chip" style="--sc:var(--acc)">feature</span><div class="pring live"><svg viewBox="0 0 32 32" class="pringsvg">
+                <g style="--segc:var(--prog)"><circle class="pseg p-done" cx="16" cy="16" r="13" fill="none" stroke-dasharray="16.42 81.68" stroke-dashoffset="-2"></circle></g>
+                <g style="--segc:var(--review)"><circle class="pseg p-done" cx="16" cy="16" r="13" fill="none" stroke-dasharray="16.42 81.68" stroke-dashoffset="-22.42"></circle></g>
+                <g style="--segc:var(--ship)"><circle class="pseg p-live" cx="16" cy="16" r="13" fill="none" stroke-dasharray="16.42 81.68" stroke-dashoffset="-42.84"></circle><circle class="psegfill" cx="16" cy="16" r="13" fill="none" stroke-dasharray="7.4 81.68" stroke-dashoffset="-42.84"></circle></g>
+                <g style="--segc:var(--acc)"><circle class="pseg p-todo" cx="16" cy="16" r="13" fill="none" stroke-dasharray="16.42 81.68" stroke-dashoffset="-63.26"></circle></g>
+              </svg><span class="pringn" style="--segc:var(--ship)"><b>3</b>/4</span></div><div class="theadact">
+              <div class="pin"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></div>
+              <div class="pin"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9l3 3-3 3M13 15h4"/></svg></div>
+              <div class="pin"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></div>
+            </div></div><div class="phead"><div class="pheadtitle"><span class="pheadname">Auto-update card with a bottom-left dock and updater telemetry</span></div><div class="facts"><span class="specnow" style="--segc:var(--ship)">SHIP · BOSUN</span><span class="tok">✓ reqs</span><span class="tok">artifacts 2</span><span class="tok">PR #1052</span></div></div></div>
+      </div>
+    </div>
+
+    <div class="theme" data-theme="cream-oak"><h2>Cream oak</h2>
+      <div class="cap">1 · <b>Before → after</b>, the same task. The ribbon owned the header; the ring gives it back to the title.</div>
+      <div class="panel">
+        <div class="idrow"><span class="tid">#1046</span><span class="chip" style="--sc:var(--prog)">in progress</span></div>
+        <div class="phead">
+          <div class="pheadtitle"><span class="pheadname">iOS Safari focus-trap release</span></div>
+          <div class="spec-old"><span class="l" style="--segc:var(--prog)"></span><span style="--segc:var(--review)"></span><span style="--segc:var(--ship)"></span><span style="--segc:var(--acc)"></span></div>
+          <div class="oldfoot"><span class="specnow" style="--segc:var(--prog)">BUILD · PATCH</span><span class="d2">hover a segment · derived from routing + staffing</span></div>
+          <div class="facts"><span class="tok">✓ reqs</span><span class="tok">subtasks 1/2</span><span class="tok">PR #1046</span><span class="tok">rounds 2</span></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="idrow"><span class="tid">#1046</span><span class="chip" style="--sc:var(--prog)">in progress</span></div>
+        <div class="phead">
+          <div class="pheadtitle">
+            <span class="pheadname">iOS Safari focus-trap release</span>
+            <div class="pring live">
+              <svg viewBox="0 0 32 32" class="pringsvg">
+                <g style="--segc:var(--prog)"><circle class="pseg p-live" cx="16" cy="16" r="13" fill="none" stroke-dasharray="16.42 81.68" stroke-dashoffset="-2"></circle><circle class="psegfill" cx="16" cy="16" r="13" fill="none" stroke-dasharray="10.34 81.68" stroke-dashoffset="-2"></circle></g>
+                <g style="--segc:var(--review)"><circle class="pseg p-todo" cx="16" cy="16" r="13" fill="none" stroke-dasharray="16.42 81.68" stroke-dashoffset="-22.42"></circle></g>
+                <g style="--segc:var(--ship)"><circle class="pseg p-todo" cx="16" cy="16" r="13" fill="none" stroke-dasharray="16.42 81.68" stroke-dashoffset="-42.84"></circle></g>
+                <g style="--segc:var(--acc)"><circle class="pseg p-todo" cx="16" cy="16" r="13" fill="none" stroke-dasharray="16.42 81.68" stroke-dashoffset="-63.26"></circle></g>
+              </svg>
+              <span class="pringn" style="--segc:var(--prog)"><b>1</b>/4</span>
+            </div>
+          </div>
+          <div class="facts"><span class="specnow" style="--segc:var(--prog)">BUILD · PATCH</span><span class="tok">✓ reqs</span><span class="tok">subtasks 1/2</span><span class="tok">PR #1046</span><span class="tok">rounds 2</span></div>
+        </div>
+      </div>
+
+      <div class="cap">2 · <b>Hover</b> — the whole journey, per leg: who owns it, how far the live one is by beats, and any staffing gap named in place.</div>
+      <div class="panel tipbox">
+        <div class="idrow"><span class="tid">#1050</span><span class="chip" style="--sc:var(--design)">design review</span></div>
+        <div class="phead">
+          <div class="pheadtitle">
+            <span class="pheadname">Pricing page refresh — tiers + annual toggle</span>
+            <div class="pring live">
+              <svg viewBox="0 0 32 32" class="pringsvg">
+                <g style="--segc:var(--design)"><circle class="pseg p-live" cx="16" cy="16" r="13" fill="none" stroke-dasharray="12.34 81.68" stroke-dashoffset="-2"></circle><circle class="psegfill" cx="16" cy="16" r="13" fill="none" stroke-dasharray="6.17 81.68" stroke-dashoffset="-2"></circle></g>
+                <g style="--segc:var(--plan)"><circle class="pseg p-todo" cx="16" cy="16" r="13" fill="none" stroke-dasharray="12.34 81.68" stroke-dashoffset="-18.34"></circle></g>
+                <g style="--segc:var(--prog)"><circle class="pseg p-todo" cx="16" cy="16" r="13" fill="none" stroke-dasharray="12.34 81.68" stroke-dashoffset="-34.67"></circle></g>
+                <g style="--segc:var(--review)"><circle class="pseg p-todo" cx="16" cy="16" r="13" fill="none" stroke-dasharray="12.34 81.68" stroke-dashoffset="-51.01"></circle></g>
+                <g style="--segc:var(--acc)"><circle class="pseg p-gap" cx="16" cy="16" r="13" fill="none" stroke-dasharray="12.34 81.68" stroke-dashoffset="-67.34"></circle></g>
+              </svg>
+              <span class="pringn" style="--segc:var(--design)"><b>1</b>/5</span>
+              <div class="pringtip">
+                <div class="pringtiph">Phase 1 of 5 · design</div>
+                <div class="pringrow r-live" style="--segc:var(--design)"><span class="pringdot"></span><span class="pringlab">Design</span><span class="pringwho">iris · 50% by beats</span></div>
+                <div class="pringrow r-todo" style="--segc:var(--plan)"><span class="pringdot"></span><span class="pringlab">Plan</span><span class="pringwho">atlas · up next</span></div>
+                <div class="pringrow r-todo" style="--segc:var(--prog)"><span class="pringdot"></span><span class="pringlab">Build</span><span class="pringwho">patch · up next</span></div>
+                <div class="pringrow r-todo" style="--segc:var(--review)"><span class="pringdot"></span><span class="pringlab">Review</span><span class="pringwho">scout · up next</span></div>
+                <div class="pringrow r-gap" style="--segc:var(--blocked)"><span class="pringdot"></span><span class="pringlab">Ship</span><span class="pringwho">no shipper in this room</span></div>
+                <div class="pringfoot">derived from routing + staffing</div>
+              </div>
+            </div>
+          </div>
+          <div class="facts"><span class="specnow" style="--segc:var(--design)">DESIGN · IRIS</span><span class="tok">✓ reqs</span><span class="tok">artifacts 2</span></div>
+        </div>
+      </div>
+
+      <div class="cap">3 · <b>Late journey</b> (3/4, shipping) and <b>the board card's 4px whisper</b> — unchanged, shown so review can confirm it stays.</div>
+      <div class="row">
+        <div class="panel">
+          <div class="idrow"><span class="tid">#1052</span><span class="chip" style="--sc:var(--ship)">shipping</span></div>
+          <div class="phead">
+            <div class="pheadtitle">
+              <span class="pheadname">Auto-update card</span>
+              <div class="pring live">
+                <svg viewBox="0 0 32 32" class="pringsvg">
+                  <g style="--segc:var(--prog)"><circle class="pseg p-done" cx="16" cy="16" r="13" fill="none" stroke-dasharray="16.42 81.68" stroke-dashoffset="-2"></circle></g>
+                  <g style="--segc:var(--review)"><circle class="pseg p-done" cx="16" cy="16" r="13" fill="none" stroke-dasharray="16.42 81.68" stroke-dashoffset="-22.42"></circle></g>
+                  <g style="--segc:var(--ship)"><circle class="pseg p-live" cx="16" cy="16" r="13" fill="none" stroke-dasharray="16.42 81.68" stroke-dashoffset="-42.84"></circle><circle class="psegfill" cx="16" cy="16" r="13" fill="none" stroke-dasharray="7.4 81.68" stroke-dashoffset="-42.84"></circle></g>
+                  <g style="--segc:var(--acc)"><circle class="pseg p-todo" cx="16" cy="16" r="13" fill="none" stroke-dasharray="16.42 81.68" stroke-dashoffset="-63.26"></circle></g>
+                </svg>
+                <span class="pringn" style="--segc:var(--ship)"><b>3</b>/4</span>
+              </div>
+            </div>
+            <div class="facts"><span class="specnow" style="--segc:var(--ship)">SHIP · BOSUN</span><span class="tok">PR #1052</span></div>
+          </div>
+        </div>
+        <div class="tcard">
+          <span class="chip" style="--sc:var(--prog)">in progress</span>
+          <div class="t">#1046 · iOS Safari focus-trap release</div>
+          <div class="spec-card"><span class="l" style="--segc:var(--prog)"></span><span style="--segc:var(--review)"></span><span class="g"></span><span style="--segc:var(--acc)"></span></div>
+        </div>
+      </div>
+
+      <div class="tagline"><span class="n">§4</span><span class="h">Placement study — where does the dial live?</span></div>
+      <div class="study">
+        <div class="verdict"><b>A · trailing the title</b> (the first draft). Fixed anchor, doesn't move when the title wraps or the panel resizes; trailing edge is the idiom for "this row's state". <span class="no">Cost:</span> it sits in the pin column, one row below three round glyphs — it can read as a fourth pin.</div>
+        <div class="panel"><div class="thead"><span class="tid">#1052</span><span class="chip" style="--sc:var(--ship)">shipping</span><span class="chip" style="--sc:var(--acc)">feature</span><div class="theadact">
+              <div class="pin"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></div>
+              <div class="pin"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9l3 3-3 3M13 15h4"/></svg></div>
+              <div class="pin"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></div>
+            </div></div><div class="phead"><div class="pheadtitle"><span class="pheadname">Auto-update card with a bottom-left dock and updater telemetry</span><div class="pring live"><svg viewBox="0 0 32 32" class="pringsvg">
+                <g style="--segc:var(--prog)"><circle class="pseg p-done" cx="16" cy="16" r="13" fill="none" stroke-dasharray="16.42 81.68" stroke-dashoffset="-2"></circle></g>
+                <g style="--segc:var(--review)"><circle class="pseg p-done" cx="16" cy="16" r="13" fill="none" stroke-dasharray="16.42 81.68" stroke-dashoffset="-22.42"></circle></g>
+                <g style="--segc:var(--ship)"><circle class="pseg p-live" cx="16" cy="16" r="13" fill="none" stroke-dasharray="16.42 81.68" stroke-dashoffset="-42.84"></circle><circle class="psegfill" cx="16" cy="16" r="13" fill="none" stroke-dasharray="7.4 81.68" stroke-dashoffset="-42.84"></circle></g>
+                <g style="--segc:var(--acc)"><circle class="pseg p-todo" cx="16" cy="16" r="13" fill="none" stroke-dasharray="16.42 81.68" stroke-dashoffset="-63.26"></circle></g>
+              </svg><span class="pringn" style="--segc:var(--ship)"><b>3</b>/4</span></div></div><div class="facts"><span class="specnow" style="--segc:var(--ship)">SHIP · BOSUN</span><span class="tok">✓ reqs</span><span class="tok">artifacts 2</span><span class="tok">PR #1052</span></div></div></div>
+        <div class="verdict"><b>B · centred in the header</b>. Clears the pin column. <span class="no">Cost:</span> nothing anchors it — the eye goes title → jump to centre → back left for the facts row, and "centre" is computed, so it drifts with panel width and with a two-line title. A status object you look for should not move.</div>
+        <div class="panel pt-center"><div class="thead"><span class="tid">#1052</span><span class="chip" style="--sc:var(--ship)">shipping</span><span class="chip" style="--sc:var(--acc)">feature</span><div class="theadact">
+              <div class="pin"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></div>
+              <div class="pin"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9l3 3-3 3M13 15h4"/></svg></div>
+              <div class="pin"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></div>
+            </div></div><div class="phead"><div class="pheadtitle"><span class="pheadname">Auto-update card with a bottom-left dock and updater telemetry</span></div><div class="pring live"><svg viewBox="0 0 32 32" class="pringsvg">
+                <g style="--segc:var(--prog)"><circle class="pseg p-done" cx="16" cy="16" r="13" fill="none" stroke-dasharray="16.42 81.68" stroke-dashoffset="-2"></circle></g>
+                <g style="--segc:var(--review)"><circle class="pseg p-done" cx="16" cy="16" r="13" fill="none" stroke-dasharray="16.42 81.68" stroke-dashoffset="-22.42"></circle></g>
+                <g style="--segc:var(--ship)"><circle class="pseg p-live" cx="16" cy="16" r="13" fill="none" stroke-dasharray="16.42 81.68" stroke-dashoffset="-42.84"></circle><circle class="psegfill" cx="16" cy="16" r="13" fill="none" stroke-dasharray="7.4 81.68" stroke-dashoffset="-42.84"></circle></g>
+                <g style="--segc:var(--acc)"><circle class="pseg p-todo" cx="16" cy="16" r="13" fill="none" stroke-dasharray="16.42 81.68" stroke-dashoffset="-63.26"></circle></g>
+              </svg><span class="pringn" style="--segc:var(--ship)"><b>3</b>/4</span></div><div class="facts"><span class="specnow" style="--segc:var(--ship)">SHIP · BOSUN</span><span class="tok">✓ reqs</span><span class="tok">artifacts 2</span><span class="tok">PR #1052</span></div></div></div>
+        <div class="verdict"><b>C · beside the state chip</b>. The chip says where you are in the FSM; the ring says where you are in the journey — the same fact at two resolutions, so they sit together. Left-anchored, stable, out of both the pin column and the title. <span class="yes">Cost:</span> it has to shrink to 26px to keep the id row's height, which pushes <code>3/4</code> to 8px.</div>
+        <div class="panel pt-chip"><div class="thead"><span class="tid">#1052</span><span class="chip" style="--sc:var(--ship)">shipping</span><span class="chip" style="--sc:var(--acc)">feature</span><div class="pring live"><svg viewBox="0 0 32 32" class="pringsvg">
+                <g style="--segc:var(--prog)"><circle class="pseg p-done" cx="16" cy="16" r="13" fill="none" stroke-dasharray="16.42 81.68" stroke-dashoffset="-2"></circle></g>
+                <g style="--segc:var(--review)"><circle class="pseg p-done" cx="16" cy="16" r="13" fill="none" stroke-dasharray="16.42 81.68" stroke-dashoffset="-22.42"></circle></g>
+                <g style="--segc:var(--ship)"><circle class="pseg p-live" cx="16" cy="16" r="13" fill="none" stroke-dasharray="16.42 81.68" stroke-dashoffset="-42.84"></circle><circle class="psegfill" cx="16" cy="16" r="13" fill="none" stroke-dasharray="7.4 81.68" stroke-dashoffset="-42.84"></circle></g>
+                <g style="--segc:var(--acc)"><circle class="pseg p-todo" cx="16" cy="16" r="13" fill="none" stroke-dasharray="16.42 81.68" stroke-dashoffset="-63.26"></circle></g>
+              </svg><span class="pringn" style="--segc:var(--ship)"><b>3</b>/4</span></div><div class="theadact">
+              <div class="pin"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></div>
+              <div class="pin"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9l3 3-3 3M13 15h4"/></svg></div>
+              <div class="pin"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></div>
+            </div></div><div class="phead"><div class="pheadtitle"><span class="pheadname">Auto-update card with a bottom-left dock and updater telemetry</span></div><div class="facts"><span class="specnow" style="--segc:var(--ship)">SHIP · BOSUN</span><span class="tok">✓ reqs</span><span class="tok">artifacts 2</span><span class="tok">PR #1052</span></div></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

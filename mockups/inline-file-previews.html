@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Inline file previews — the deliverable renders where it lands</title>
+<style>
+/* ── Real tokens (tokens.css v1.0, Quiet Graphite current) — dark + cream-oak ── */
+[data-theme] {
+  --font:'Geist Variable',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --fmono:'Geist Mono Variable',ui-monospace,'SF Mono',Menlo,monospace;
+  --dur-fast:.12s; --dur:.18s; --ease:cubic-bezier(.21,.61,.35,1);
+  --r-xs:4px; --r-sm:6px; --r-md:8px; --r-lg:11px; --r-xl:14px; --r-full:999px;
+}
+[data-theme='dark'] {
+  --win:var(--panel2); --bg:#101010; --panel:#161616; --panel2:#1c1c1c; --panel3:#272727;
+  --border:#252525; --border2:#333333;
+  --text:#eaeaea; --body:#b6b6b6; --muted:#898989; --dim:#676767;
+  --accent:var(--text); --link:#9cb1f0;
+  --btn:#232323; --btn-fg:#efefef;
+  --green:#77ac8d; --prog:#8ba0c0; --review:#a89ccf; --done:#77ac8d; --blocked:#9ca0a8; --design:#cc8fb9;
+  --role-orch:#9793d2; --role-dev:#77ac8d; --role-rev:#7ba1c4; --role-cur:#6fb0ab; --role-mkt:#c98f8f; --role-tone:17%;
+  --card:#1a1a1a; --card-border:#2a2a2a; --code:#0a0a0a; --codeink:#e8e8e8; --overlay:#202020;
+  --ring:#525252; --hover-border:#404040;
+  --hover-bg:color-mix(in srgb, var(--text) 7%, transparent); --sel-bg:color-mix(in srgb, var(--text) 10%, transparent);
+  --shadow:rgba(0,0,0,.62); --add:#77ac8d; --del:#c98f8f;
+}
+[data-theme='cream-oak'] {
+  --win:var(--panel2); --bg:#f7efe2; --panel:#fffaf2; --panel2:#f4e7d6; --panel3:#ecdcc5;
+  --border:#ecdfcd; --border2:#dbc6ad;
+  --text:#352a20; --body:#5c5040; --muted:#8a7969; --dim:#a8967f;
+  --accent:var(--text); --link:#5348c0;
+  --btn:#efe6d7; --btn-fg:#352a20;
+  --green:#2f9e6b; --prog:#4f80c4; --review:#6d5ce0; --done:#0f9d63; --blocked:#7d7f86; --design:#b0498f;
+  --role-orch:#6a63bc; --role-dev:#3f9268; --role-rev:#4f7bb0; --role-cur:#2f8f8a; --role-mkt:#b04f55; --role-tone:14%;
+  --card:#fbf4e9; --card-border:#ecdfcd; --code:#2b2018; --codeink:#f3e6d8; --overlay:var(--panel);
+  --ring:color-mix(in srgb, var(--accent) 55%, var(--border2)); --hover-border:color-mix(in srgb, var(--text) 20%, var(--border2));
+  --hover-bg:color-mix(in srgb, var(--text) 5%, transparent); --sel-bg:color-mix(in srgb, var(--text) 7%, transparent);
+  --shadow:rgba(80,50,25,.16); --add:#2f9e6b; --del:#b04f55;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#101010; font-family:'Geist Variable',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; }
+.page { max-width:1560px; margin:0 auto; padding:34px 26px 70px; }
+.pagehead { color:#eaeaea; margin-bottom:16px; }
+.pagehead h1 { font-size:19px; font-weight:650; letter-spacing:-.01em; }
+.pagehead p { color:#898989; font-size:13px; line-height:1.6; margin-top:8px; max-width:94ch; }
+.pagehead .rule { color:#b6b6b6; }
+.pagehead b { color:#b6b6b6; font-weight:600; }
+.pagehead code { font-family:'Geist Mono Variable',ui-monospace,Menlo,monospace; font-size:11px; color:#b6b6b6; background:rgba(255,255,255,.06); border-radius:4px; padding:1px 5px; }
+.themes { display:grid; grid-template-columns:1fr 1fr; gap:22px; }
+@media (max-width:1180px){ .themes { grid-template-columns:1fr; } }
+.theme { background:var(--bg); border:1px solid var(--border2); border-radius:16px; padding:20px 18px 24px; color:var(--text); }
+.theme > h2 { font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--dim); margin:0 4px 14px; }
+.scene { margin-top:26px; }
+.scene > h3 { font-size:12.5px; font-weight:650; margin:0 4px 4px; }
+.scene > .note { font-size:11.5px; color:var(--muted); line-height:1.55; margin:0 4px 10px; max-width:76ch; }
+.scene .note b { color:var(--body); font-weight:600; }
+.cap { font-size:10px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--dim); margin:14px 4px 6px; }
+.sem { display:flex; gap:7px; align-items:flex-start; margin:9px 4px 0; font-size:11px; color:var(--muted); line-height:1.55; max-width:78ch; }
+.sem .dot { width:6px; height:6px; border-radius:99px; margin-top:4px; flex:none; background:var(--done); }
+.sem.warn .dot { background:var(--blocked); }
+.sem.bad .dot { background:var(--role-mkt); }
+.sem b { color:var(--body); font-weight:600; }
+.sem code, .note code, .var code { font-family:var(--fmono); font-size:10.5px; color:var(--body); background:var(--hover-bg); border-radius:4px; padding:1px 4px; }
+.pick { display:inline-flex; align-items:center; font-size:9.5px; font-weight:800; letter-spacing:.6px; text-transform:uppercase; padding:2px 7px; border-radius:5px; margin-left:8px; vertical-align:2px;
+  background:color-mix(in srgb, var(--done) 16%, transparent); color:var(--done); }
+.pick.alt { background:color-mix(in srgb, var(--muted) 16%, transparent); color:var(--muted); }
+
+/* ── faithful chat chrome ── */
+.msgs { display:flex; flex-direction:column; gap:2px; background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:14px 12px; }
+.msg { display:flex; gap:11px; padding:7px 10px; border-radius:9px; position:relative; }
+.av { width:26px; height:26px; min-width:26px; border-radius:var(--r-sm); display:grid; place-items:center; font-weight:800; font-size:11px; color:var(--body); background:var(--panel3); box-shadow:inset 0 0 0 1px var(--border2); }
+.pav { width:26px; height:26px; min-width:26px; border-radius:8px; display:grid; place-items:center; background:color-mix(in srgb, var(--rc) var(--role-tone), transparent); box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--rc) 32%, var(--border2)); color:color-mix(in srgb, var(--rc) 62%, var(--text)); }
+.pav svg { width:17px; height:17px; display:block; }
+.msg .body { min-width:0; flex:1; }
+.msg .head { display:flex; align-items:center; gap:8px; }
+.msg .head b { font-size:12.5px; }
+.rolechip { font-size:8px; font-weight:800; letter-spacing:.5px; text-transform:uppercase; padding:1.5px 5px; border-radius:4px; background:color-mix(in srgb, var(--muted) 16%, transparent); color:color-mix(in srgb, var(--rc) 80%, var(--muted)); }
+.time { font-size:10.5px; color:var(--dim); }
+.msg p { color:var(--body); font-size:13px; line-height:1.5; margin-top:2px; }
+.msg p b { color:var(--text); font-weight:600; }
+.msg ul { margin:6px 0 0 17px; color:var(--body); font-size:12.5px; line-height:1.6; }
+.msg.human .body { flex:0 1 auto; max-width:min(560px,82%); background:var(--hover-bg); border-radius:12px; padding:7px 12px 8px; }
+.msg.mine { flex-direction:row-reverse; }
+.msg.mine .body { background:var(--panel2); }
+.msg.mine .head { justify-content:flex-end; }
+
+/* today's artifact strip (existing .artstrip/.artthumb) */
+.artstrip { display:flex; gap:8px; overflow-x:auto; padding:2px 0 6px; }
+.artthumb { flex:none; width:96px; border:1px solid var(--border); background:var(--panel); border-radius:var(--r-md); padding:0; overflow:hidden; cursor:pointer; text-align:left; }
+.artthumbkind { display:grid; place-items:center; height:52px; font:700 8.5px var(--fmono); letter-spacing:.08em; text-transform:uppercase; color:var(--dim); background:var(--panel2); }
+.artthumbname { display:block; padding:4px 6px; font:500 9.5px var(--fmono); color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+/* ══ PROPOSED: the inline file card ═══════════════════════════════════════════════════════
+   Same DNA as the marketing draft card (a deliverable rendered where it lands) but MUCH
+   smaller: the canvas is a bounded, scrollable window onto the file, not the whole file. */
+.filecards { display:flex; flex-direction:column; gap:7px; margin-top:9px; max-width:560px; }
+.filecard { border:1px solid var(--card-border); background:var(--card); border-radius:var(--r-lg); overflow:hidden; }
+.filehead { display:flex; align-items:center; gap:8px; width:100%; padding:7px 10px; background:none; border:0; border-bottom:1px solid var(--border); font:inherit; color:inherit; text-align:left; cursor:pointer; }
+.filekind { flex:none; font:700 8px var(--fmono); letter-spacing:.07em; text-transform:uppercase; color:var(--dim); border:1px solid var(--border2); border-radius:var(--r-xs); padding:2px 5px; }
+.filename { font:600 11.5px var(--fmono); color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.filemeta { margin-left:auto; flex:none; font:500 10px var(--fmono); color:var(--dim); }
+.fileopen { flex:none; font-size:10.5px; font-weight:600; color:var(--muted); opacity:0; transition:opacity var(--dur-fast) var(--ease); }
+.filecard:hover .fileopen { opacity:1; }
+.filecard:hover { border-color:var(--hover-border); }
+/* THE CANVAS: bounded + scrollable, with a fade so it reads as a window, never as truncation */
+.filecanvas { position:relative; max-height:196px; overflow-y:auto; padding:9px 12px 14px; }
+.filecanvas.short { max-height:132px; }
+.filecanvas::after { content:''; position:sticky; bottom:-14px; left:0; display:block; height:26px; margin:0 -12px -14px;
+  background:linear-gradient(to bottom, transparent, var(--card)); pointer-events:none; }
+.filecanvas.none::after { display:none; }
+/* markdown inside the canvas — the .plBody .md ramp, one step down */
+.fmd { font-size:11.5px; line-height:1.62; color:var(--body); }
+.fmd h1 { font-size:14px; font-weight:700; letter-spacing:-.01em; margin:0 0 6px; color:var(--text); }
+.fmd h2 { font-size:12px; font-weight:700; margin:13px 0 5px; padding-bottom:4px; border-bottom:1px solid var(--border); color:var(--text); }
+.fmd h3 { font-size:11.5px; font-weight:700; margin:10px 0 3px; color:var(--text); }
+.fmd p { margin:0 0 7px; }
+.fmd ul { margin:0 0 7px 15px; }
+.fmd li { margin:0 0 3px; }
+.fmd strong { color:var(--text); font-weight:650; }
+.fmd table { width:100%; border-collapse:collapse; margin:2px 0 8px; font-size:10.5px; }
+.fmd th, .fmd td { border:1px solid var(--border); padding:3px 6px; text-align:left; }
+.fmd th { background:var(--panel2); color:var(--text); font-weight:650; }
+.fmd code { font:500 10.5px var(--fmono); background:var(--hover-bg); border-radius:3px; padding:1px 4px; }
+/* image — contained, never taller than the canvas it sits in */
+.fimg { display:block; width:100%; max-height:116px; object-fit:contain; border-radius:var(--r-sm); }
+.fimgwrap { padding:8px; display:grid; place-items:center; }
+/* diff */
+.fdiff { font:11px/1.6 var(--fmono); background:var(--code); color:var(--codeink); padding:8px 10px; white-space:pre; overflow-x:auto; }
+.fdiff .a { color:var(--add); } .fdiff .d { color:var(--del); } .fdiff .h { color:var(--muted); }
+/* html → sandboxed thumbnail (the .libdsgthumb idiom): the page itself, shrunk to a window */
+.fhtml { height:132px; background:#141414; display:grid; place-items:center; overflow:hidden; padding:14px; }
+.fhtmlinner { width:100%; max-width:300px; border:1px solid #3a3a3a; border-radius:9px; padding:13px 15px; background:#1b1b1b; color:#ededed; }
+.fhtmlinner .ht { font-size:13px; font-weight:650; letter-spacing:-.01em; }
+.fhtmlinner .hs { font-size:10.5px; color:#9a9a9a; margin-top:4px; }
+.fhtmlinner .hr { display:flex; gap:5px; margin-top:10px; }
+.fhtmlinner .hr i { display:block; height:5px; border-radius:99px; background:#3a3a3a; flex:1; }
+.fhtmlinner .hr i:first-child { background:#77ac8d; flex:2; }
+/* data (csv/json) → a small table, not raw text */
+.fdata { font:10.5px/1.55 var(--fmono); }
+.fdata table { width:100%; border-collapse:collapse; }
+.fdata th, .fdata td { border-bottom:1px solid var(--border); padding:3px 7px; text-align:left; white-space:nowrap; }
+.fdata th { color:var(--dim); font-weight:600; font-size:9.5px; letter-spacing:.05em; text-transform:uppercase; }
+.fdata td { color:var(--body); }
+/* raw/code */
+.fraw { font:10.5px/1.62 var(--fmono); color:var(--codeink); background:var(--code); padding:8px 10px; white-space:pre; overflow-x:auto; }
+/* superseded (an earlier attempt's file) */
+.filecard.old { opacity:.5; }
+.filecard.old .filehead { border-bottom-color:transparent; }
+.oldtag { flex:none; font:700 8px var(--fmono); letter-spacing:.06em; text-transform:uppercase; color:var(--dim); }
+/* the collapsed overflow row when a submit drops many files */
+.filemore { display:flex; align-items:center; gap:7px; padding:6px 10px; border:1px dashed var(--border2); border-radius:var(--r-md); background:none; color:var(--muted); font:600 11px var(--font); cursor:pointer; }
+.filemore:hover { color:var(--text); border-color:var(--hover-border); }
+
+/* the linkified filename in prose */
+.fileref { color:var(--link); cursor:pointer; font-family:var(--fmono); font-size:12px; border-bottom:1px solid color-mix(in srgb, var(--link) 35%, transparent); }
+.fileref .fx { font-size:9px; opacity:.7; margin-left:2px; }
+
+/* rules grid + wire block */
+.vars { display:grid; gap:8px; margin-top:10px; }
+.var { display:grid; grid-template-columns:172px 1fr; gap:12px; align-items:center; border:1px solid var(--border); background:var(--panel); border-radius:10px; padding:10px 12px; }
+.var .tag { font-size:10px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--dim); line-height:1.5; }
+.var .tag b { display:block; color:var(--body); font-size:11px; letter-spacing:.02em; text-transform:none; }
+.var .demo p { color:var(--body); font-size:12px; line-height:1.55; }
+.wire { border:1px solid var(--border2); border-radius:10px; overflow:hidden; max-width:640px; }
+.wirehead { display:flex; align-items:center; justify-content:space-between; padding:5px 11px; background:var(--panel2); border-bottom:1px solid var(--border); font:600 10px var(--fmono); letter-spacing:.06em; text-transform:uppercase; color:var(--dim); }
+.wire pre { font:11.5px/1.65 var(--fmono); background:var(--code); color:var(--codeink); padding:10px 12px; overflow-x:auto; white-space:pre; }
+.wire pre .dm { opacity:.45; } .wire pre .hl { color:var(--codeink); font-weight:700; }
+.flag { display:flex; align-items:center; gap:8px; padding:8px 10px; border-radius:9px; border:1px solid var(--border2); background:var(--panel2); font-size:11.5px; color:var(--body); margin:8px 4px 0; max-width:640px; }
+.flag b { color:var(--text); }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="pagehead">
+    <h1>Inline file previews — the deliverable renders where it lands</h1>
+    <p><span class="rule">Today the payoff of a whole task is a sentence:</span> <b>“Delivered 1 file: FLOWE_RESEARCH_REPORT.md — attached for review.”</b>
+    3,270 words and 16 citations sit one drawer-click away, the filename is dead text, and the artifacts strip shows three identical-looking
+    <code>MARKDOWN</code> tiles — two of which are <code>result.md</code> duplicates of messages you already read. The thread tells you a file exists;
+    it never shows you the file.</p>
+    <p><span class="rule">The fix rides three things that already exist:</span> <code>previewType()</code> already classifies a file by name+kind+content,
+    <code>Md</code> already rewrites <code>#1032</code> into a real link, and <code>.mkdoccard</code> is already a bounded scrollable doc canvas.
+    Point them at attached artifacts and the deliverable renders <b>in the transcript</b>, typed, small, and scrollable — while staying exactly as
+    attached as it is now. <b>Automatic by default</b> (files on the message get cards, no agent action); an <code>nmf</code> fence when an agent
+    wants to show a file <i>mid-run</i> or choose what gets a canvas.</p>
+  </div>
+  <div class="themes">
+    <div class="theme" data-theme="dark"><h2>Claude-warm dark</h2></div>
+    <div class="theme" data-theme="cream-oak"><h2>Cream-oak light</h2></div>
+  </div>
+</div>
+<script>
+const face = (role) => `<span class="pav" style="--rc:var(--role-${role})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="9" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="15" cy="10" r="1.1" fill="currentColor" stroke="none"/><path d="M8.6 14.4c1 1.2 2.1 1.8 3.4 1.8s2.4-.6 3.4-1.8"/></svg></span>`;
+
+const REPORT = `<h1>Flowe — feature gaps, UX/onboarding, and retention</h1>
+<p>Outside-in analysis of 8 competitors against Flowe's shipped feature set. Every quantitative claim is inline-cited to a fetched source; third-party estimates are flagged as such.</p>
+<h2>1 · Competitive set</h2>
+<table><tr><th>Product</th><th>Positioning</th><th>Retention signal</th></tr>
+<tr><td>Calm</td><td>Sleep-led calm</td><td>Streaks + masterclasses</td></tr>
+<tr><td>Headspace</td><td>Guided courses</td><td>Streak Freeze −21% churn</td></tr>
+<tr><td>Endel</td><td>Ambient, context-adaptive</td><td>No streaks — session depth</td></tr></table>
+<h2>2 · Top 5 feature gaps</h2>
+<ul><li><strong>No progress/streak tracking</strong> — a live user review already asks for this <code>[3]</code></li>
+<li><strong>No reminder/notification system</strong> — ~3× retention lift across the set <code>[7]</code></li>
+<li><strong>Thin onboarding personalization</strong> — only 8.4% complete 30-day onboarding <code>[9]</code></li>
+<li><strong>No community/social layer</strong></li>
+<li><strong>No biometric/wearable integration</strong> — plus a flagged platform gap (no Android)</li></ul>
+<h2>3 · UX &amp; onboarding</h2>
+<p>Category drop-off is brutal: <strong>77% churn in 3 days</strong>, and account-gating costs ~56% abandonment <code>[11]</code>. A 3-way benchmark of Flowe vs Headspace / Calm / Balance follows, with four concrete changes.</p>`;
+
+const scenes = `
+<div class="scene">
+  <h3>0 · Today — the thread tells you a file exists</h3>
+  <div class="note">Verbatim from #1032. The filename is plain text; the payload is behind the drawer; and two of the three
+  artifacts are <code>result.md</code> — the agent's own summary, which you already read as the message.</div>
+  <div class="artstrip">
+    <span class="artthumb"><span class="artthumbkind">markdown</span><span class="artthumbname">FLOWE_RESEARCH_…</span></span>
+    <span class="artthumb"><span class="artthumbkind">markdown</span><span class="artthumbname">result.md</span></span>
+    <span class="artthumb"><span class="artthumbkind">markdown</span><span class="artthumbname">result.md</span></span>
+  </div>
+  <div class="msgs" style="margin-top:8px">
+    <div class="msg">${face('cur')}<div class="body">
+      <div class="head"><b>market-analyst</b><span class="rolechip" style="--rc:var(--role-cur)">worker</span><span class="time">06:33 PM</span></div>
+      <p>Delivered 1 file: FLOWE_RESEARCH_REPORT.md — attached for review.</p>
+      <p><b>Deliverable:</b> FLOWE_RESEARCH_REPORT.md (single, consolidated file — ~3,270 words, 16 sourced citations, 8 major sections) in the workspace root.</p>
+    </div></div>
+  </div>
+  <div class="sem bad"><span class="dot"></span><span><b>The filename is dead text.</b> <code>Md</code> linkifies <code>#1032</code> but nothing else — so the one noun the whole task produced is the only thing you can't click.</span></div>
+  <div class="sem bad"><span class="dot"></span><span><b>Two artifacts are echoes.</b> <code>task.submit</code> always attaches <code>result.md</code> = the summary text, which is byte-for-byte the message above it. Preview it and the thread says everything twice.</span></div>
+</div>
+
+<div class="scene">
+  <h3>1 · The card — a window onto the file, not the file<span class="pick">recommended</span></h3>
+  <div class="note">Same idea as a marketing draft card (the deliverable rendered where it lands) at a quarter the size. Header = kind ·
+  name · weight; body = a <b>bounded scrollable canvas</b> with a fade, so it reads as a window rather than a truncation. Click anywhere
+  in the header to open the full reader overlay that already exists.</div>
+  <div class="msgs">
+    <div class="msg">${face('cur')}<div class="body">
+      <div class="head"><b>market-analyst</b><span class="rolechip" style="--rc:var(--role-cur)">worker</span><span class="time">06:33 PM</span></div>
+      <p>Delivered <span class="fileref">FLOWE_RESEARCH_REPORT.md<span class="fx">↗</span></span> — 8 competitors surveyed, top 5 feature gaps, and a Now/Next/Later roadmap. Every stat is source-linked.</p>
+      <div class="filecards">
+        <div class="filecard">
+          <button class="filehead"><span class="filekind">md</span><span class="filename">FLOWE_RESEARCH_REPORT.md</span><span class="fileopen">Open ↗</span><span class="filemeta">3,270 w · 18 KB</span></button>
+          <div class="filecanvas"><div class="fmd">${REPORT}</div></div>
+        </div>
+      </div>
+    </div></div>
+  </div>
+  <div class="sem"><span class="dot"></span><span><b>Zone-legal by construction</b> (docs/25): the cards are part of the message, like a post card or a design mockup — not a new dock, not a drawer, and they stay in the transcript forever.</span></div>
+  <div class="sem"><span class="dot"></span><span><b>Nothing changes about artifacts.</b> The file is attached exactly as today — Review tab, artifacts drawer, library promotion, cross-machine. The card is a second <i>view</i> of the same row, never a second copy.</span></div>
+  <div class="sem"><span class="dot"></span><span><b>The canvas is capped at ~196px</b> and scrolls internally, so a 3,270-word report can never push the composer off screen or break the feed's bottom-pin.</span></div>
+</div>
+
+<div class="scene">
+  <h3>2 · Typed rendering — <code>previewType()</code> already knows what a file is</h3>
+  <div class="note">The classifier the artifacts drawer uses (<code>image · html · diff · markdown · raw</code>) picks the body. Two additions
+  earn their place: <b>data</b> (csv/json → a small table, because raw JSON in a 196px window is unreadable) and a real
+  <b>code</b> body for source files.</div>
+  <div class="filecards" style="max-width:100%">
+    <div class="filecard">
+      <button class="filehead"><span class="filekind">png</span><span class="filename">onboarding-benchmark.png</span><span class="fileopen">Open ↗</span><span class="filemeta">1284×812</span></button>
+      <div class="filecanvas short none fimgwrap"><svg class="fimg" viewBox="0 0 480 120" xmlns="http://www.w3.org/2000/svg"><rect width="480" height="120" fill="var(--panel2)"/><rect x="18" y="76" width="60" height="30" fill="var(--prog)" opacity=".8"/><rect x="94" y="52" width="60" height="54" fill="var(--prog)" opacity=".8"/><rect x="170" y="34" width="60" height="72" fill="var(--done)"/><rect x="246" y="66" width="60" height="40" fill="var(--prog)" opacity=".8"/><rect x="322" y="88" width="60" height="18" fill="var(--prog)" opacity=".8"/><text x="18" y="26" fill="var(--text)" font-size="13" font-family="sans-serif">30-day onboarding completion</text></svg></div>
+    </div>
+    <div class="filecard">
+      <button class="filehead"><span class="filekind">diff</span><span class="filename">nm-1046.diff</span><span class="fileopen">Open ↗</span><span class="filemeta">+42 −7 · 3 files</span></button>
+      <div class="filecanvas short none"><div class="fdiff"><span class="h">@@ -18,6 +18,9 @@ export function runFraction(</span>
+<span class="a">+  if (!isRunOpen(run.state)) return 1;</span>
+<span class="a">+  if (run.total &lt;= 0) return 0.08;</span>
+   return Math.max(0.08, Math.min(0.97, run.done / run.total));
+<span class="d">-  return run.done / run.total;</span></div></div>
+    </div>
+    <div class="filecard">
+      <button class="filehead"><span class="filekind">html</span><span class="filename">mockup-round2.html</span><span class="fileopen">Open ↗</span><span class="filemeta">self-contained</span></button>
+      <div class="filecanvas short none"><div class="fhtml"><div class="fhtmlinner"><div class="ht">Session recap</div><div class="hs">Three breaths, then the first cue.</div><div class="hr"><i></i><i></i><i></i></div></div></div></div>
+    </div>
+    <div class="filecard">
+      <button class="filehead"><span class="filekind">csv</span><span class="filename">competitor-matrix.csv</span><span class="fileopen">Open ↗</span><span class="filemeta">9 rows × 6 cols</span></button>
+      <div class="filecanvas short"><div class="fdata"><table>
+        <tr><th>product</th><th>streaks</th><th>notifs</th><th>d15</th></tr>
+        <tr><td>Calm</td><td>yes</td><td>yes</td><td>4.1%</td></tr>
+        <tr><td>Headspace</td><td>yes</td><td>yes</td><td>3.9%</td></tr>
+        <tr><td>Endel</td><td>no</td><td>yes</td><td>5.2%</td></tr>
+        <tr><td>Flowe</td><td>no</td><td>no</td><td>—</td></tr></table></div></div>
+    </div>
+  </div>
+  <div class="sem"><span class="dot"></span><span><b>One classifier, two surfaces.</b> The drawer thumbnail and the inline card read the SAME <code>previewType()</code> — a new type lights up both, and they can never disagree about what a file is.</span></div>
+  <div class="sem warn"><span class="dot"></span><span><b>HTML renders in a sandboxed <code>iframe</code></b> (<code>sandbox=""</code>, the existing <code>.libdsgthumb</code> treatment) — an agent-authored page never gets script, network, or storage in the thread.</span></div>
+</div>
+
+<div class="scene">
+  <h3>3 · Many files, and the same file twice</h3>
+  <div class="note">A submit can drop a dozen files, and a <b>rework attaches a second copy under the same name</b> (#1032 shipped two
+  <code>result.md</code>). The card row has to survive both without becoming the page.</div>
+  <div class="cap">A — the deliverable leads; the rest collapse to one row</div>
+  <div class="msgs">
+    <div class="msg">${face('dev')}<div class="body">
+      <div class="head"><b>patch</b><span class="rolechip" style="--rc:var(--role-dev)">developer</span><span class="time">11:04 AM</span></div>
+      <p>Delivered <span class="fileref">runs-audit.md<span class="fx">↗</span></span> plus the raw pulls it was built from.</p>
+      <div class="filecards">
+        <div class="filecard">
+          <button class="filehead"><span class="filekind">md</span><span class="filename">runs-audit.md</span><span class="fileopen">Open ↗</span><span class="filemeta">910 w · 6 KB</span></button>
+          <div class="filecanvas short"><div class="fmd"><h1>Runs audit</h1><p>Every open run older than the 30-minute stale window, grouped by host. Two hosts account for 9 of 11.</p><h2>Findings</h2><ul><li><strong>host-2 leaks legs</strong> — 6 legs with a settled parent</li><li>One <code>work</code> run open 4h with no step movement</li></ul></div></div>
+        </div>
+        <button class="filemore">＋ 4 more files — competitors.csv, pulls.json, notes.md, scratch.txt</button>
+      </div>
+    </div></div>
+  </div>
+  <div class="cap">B — a rework's file supersedes the earlier one (the marketing revision idiom)</div>
+  <div class="msgs">
+    <div class="msg">${face('cur')}<div class="body">
+      <div class="head"><b>market-analyst</b><span class="rolechip" style="--rc:var(--role-cur)">worker</span><span class="time">06:33 PM</span></div>
+      <p>Resumed and delivered the synthesis: <span class="fileref">FLOWE_RESEARCH_REPORT.md<span class="fx">↗</span></span></p>
+      <div class="filecards">
+        <div class="filecard old"><button class="filehead"><span class="filekind">md</span><span class="filename">result.md</span><span class="oldtag">attempt 1</span><span class="filemeta">superseded</span></button></div>
+        <div class="filecard">
+          <button class="filehead"><span class="filekind">md</span><span class="filename">FLOWE_RESEARCH_REPORT.md</span><span class="fileopen">Open ↗</span><span class="filemeta">3,270 w · 18 KB</span></button>
+          <div class="filecanvas short"><div class="fmd">${REPORT}</div></div>
+        </div>
+      </div>
+    </div></div>
+  </div>
+  <div class="sem"><span class="dot"></span><span><b>Budget, stated:</b> at most <b>3</b> cards render; the rest fold into one row you can open. Files over ~256 KB show the header only — the canvas would be a scroll trap, not a preview.</span></div>
+  <div class="sem"><span class="dot"></span><span><b>Same name, later attempt ⇒ superseded</b> — dimmed, collapsed, kept (the <code>media.history</code> idiom that already handles revised post drafts). History stays readable; the newest is the one with a canvas.</span></div>
+</div>
+
+<div class="scene">
+  <h3>4 · The filename becomes a link — everywhere, for free</h3>
+  <div class="note">Exactly the mechanism that turns <code>#1032</code> into a task pill: inside <code>Md</code>, a filename that matches an
+  artifact on this task is rewritten to <code>nm:file/&lt;id&gt;</code> and intercepted on click. It works on <b>every message, retroactively</b>,
+  including ones written before this ships.</div>
+  <div class="msgs">
+    <div class="msg">${face('rev')}<div class="body">
+      <div class="head"><b>scout</b><span class="rolechip" style="--rc:var(--role-rev)">reviewer</span><span class="time">06:41 PM</span></div>
+      <p>Checked <span class="fileref">FLOWE_RESEARCH_REPORT.md<span class="fx">↗</span></span> against the Definition of Done. Section 9's citations resolve, and the “no first-party usage data” caveat is stated in the report rather than buried — approving. The <span class="fileref">competitor-matrix.csv<span class="fx">↗</span></span> backs the gap table row-for-row.</p>
+    </div></div>
+  </div>
+  <div class="wire" style="margin-top:10px">
+    <div class="wirehead"><span>Md — the rewrite already there, one line wider</span><span>renderer</span></div>
+    <pre><span class="dm">// today</span>
+seg.replace(/#(\\d{4})\\b/g, (m, d) =&gt; taskRef(+d) ? \`[#\${d}](nm:task/\${d})\` : m)
+
+<span class="dm">// proposed — the SAME shape, matched against this task's attached files</span>
+<span class="hl">seg.replace(FILE_RE, (m) =&gt; fileRef(m) ? \`[\${m}](nm:file/\${fileRef(m).id})\` : m)</span>
+<span class="dm">//   FILE_RE = /\\b[\\w.-]+\\.(md|csv|json|ya?ml|html?|png|jpe?g|svg|diff|patch|txt|ts|tsx|js|py|sql)\\b/g</span>
+<span class="dm">//   fileRef = name → the artifact row, or null. No match ⇒ untouched text, exactly as now.</span></pre>
+  </div>
+  <div class="sem"><span class="dot"></span><span><b>Never invents a link.</b> A filename with no matching artifact stays plain text — so prose about <code>package.json</code> in a repo doesn't sprout dead links.</span></div>
+</div>
+
+<div class="scene">
+  <h3>5 · How an agent gets a preview — two paths, one of them free</h3>
+  <div class="note">The floor is <b>automatic</b>: files attached to a message get cards, so every existing worker earns previews with no prompt
+  change and no new tool to misuse (non-negotiable #4 — enforced, not prompted). The <code>nmf</code> fence exists for the case automation
+  can't cover: showing a file <b>mid-run</b>, before submit.</div>
+  <div class="vars">
+    <div class="var"><div class="tag"><b>Automatic</b>the default</div>
+      <div class="demo"><p><code>task.submit</code> / <code>finish_subtask</code> stamp <code>artifacts.message_id</code> onto the deliverable message they post. The renderer shows a card per attached file. <b>Zero agent action; works retroactively on nothing, forward on everything.</b></p></div></div>
+    <div class="var"><div class="tag"><b>nmf fence</b>mid-run, explicit</div>
+      <div class="demo"><p>An agent that wants to show progress writes a fenced block naming files in its workspace — the <code>nmq</code>/<code>nms</code> twin, transport-in-content, zero schema. Used when there is no submit yet: <i>“here's the outline before I write the body.”</i></p></div></div>
+    <div class="var"><div class="tag"><b>Prompt line</b>one sentence</div>
+      <div class="demo"><p><code>buildCodingPrompt</code>: “When you produce a file the human should see, name it in your summary — it renders inline automatically. To show a file mid-run, emit an <code>nmf</code> block.” Nothing to remember at submit time.</p></div></div>
+    <div class="var"><div class="tag"><b>Never previewed</b>the echo rule</div>
+      <div class="demo"><p><code>result.md</code> whose content equals the message body is skipped — it IS the message. This one rule is what stops #1032's three-artifact strip from becoming three redundant cards.</p></div></div>
+  </div>
+  <div class="wire" style="margin-top:10px">
+    <div class="wirehead"><span>messages.body — an agent showing work mid-run</span><span>nmf</span></div>
+    <pre><span class="dm">Outline's done — 8 sections, sources pinned. Writing the body next.</span>
+
+<span class="hl">\`\`\`nmf</span>
+["OUTLINE.md", "sources.csv"]
+<span class="hl">\`\`\`</span></pre>
+  </div>
+  <div class="sem"><span class="dot"></span><span><b>Degrades to today.</b> A runtime that never emits <code>nmf</code> still gets automatic cards at submit; a file that no longer exists renders nothing at all. No broken chrome, ever.</span></div>
+  <div class="sem warn"><span class="dot"></span><span><b>The one backend change</b> is stamping <code>message_id</code> on submit-attached artifacts (the column already exists for chat attachments). Everything else is renderer-side.</span></div>
+</div>`;
+
+document.querySelectorAll('.theme').forEach((t) => t.insertAdjacentHTML('beforeend', scenes));
+</script>
+</body>
+</html>

@@ -1,0 +1,488 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>NeuraMesh — design polish round · 2026-07-28</title>
+<style>
+/* ─────────────────────────────────────────────────────────────
+   The four REAL theme blocks, values copied verbatim from
+   apps/desktop/src/renderer/src/tokens.css (v0.65.0).
+   Only the tokens this study needs.
+   ───────────────────────────────────────────────────────────── */
+:root, [data-theme='dark'] {
+  --win: #0d0d0d; --band: #090909; --bg: #141414; --panel: #191919; --panel2: #212121; --panel3: #2b2b2b;
+  --border: #272727; --border2: #383838;
+  --text: #eaeaea; --body: #b6b6b6; --muted: #898989; --dim: #676767;
+  --link: #9cb1f0;              /* ← today: imported blue */
+  --link-new: #d19a72;          /* ← proposed: oak, lifted for graphite */
+  --accent: var(--text); --accent-ink: #101010; --accent-soft: var(--panel3);
+  --brand: #834a2b;
+  --card: #1e1e1e; --card-border: #2c2c2c; --overlay: #222222;
+  --design: #cc8fb9; --green: #77ac8d;
+  --shadow: rgba(0,0,0,0.62);
+  --shadow-card: 0 1px 2px rgba(0,0,0,.25);
+  --shadow-lift: 0 8px 20px -8px rgba(0,0,0,.55);
+  --shadow-sheet: inset 0 1px 0 rgba(255,255,255,.05), 0 12px 30px -6px rgba(0,0,0,.5);
+  --hover-bg: color-mix(in srgb, var(--text) 7%, transparent);
+  --sel-bg: color-mix(in srgb, var(--text) 10%, transparent);
+}
+[data-theme='light'] {
+  --win: #e9e5db; --band: #ded9cc; --bg: #fcfbf8; --panel: #fcfbf8; --panel2: #f4f1ea; --panel3: #ebe7dd;
+  --border: #e2ded4; --border2: #cec5b7;
+  --text: #2f2a24; --body: #524c43; --muted: #837d72; --dim: #a09889;
+  --link: #4a5ec9; --link-new: #8f4f2a;
+  --accent: var(--text); --accent-ink: #ffffff; --accent-soft: var(--panel3);
+  --brand: #834a2b;
+  --card: #ffffff; --card-border: #e2ded4; --overlay: #ffffff;
+  --design: #b0498f; --green: #2f9e6b;
+  --shadow: rgba(70,58,44,0.14);
+  --shadow-card: 0 1px 2px rgba(70,58,44,.05);
+  --shadow-lift: 0 8px 20px -8px rgba(70,58,44,.18);
+  --shadow-sheet: 0 8px 26px -8px rgba(70,58,44,.15), 0 1px 2px rgba(70,58,44,.05);
+  --hover-bg: color-mix(in srgb, var(--text) 6%, transparent);
+  --sel-bg: color-mix(in srgb, var(--text) 8%, transparent);
+}
+[data-theme='soft-dark'] {
+  --win: #1d1d1d; --band: #181818; --bg: #262626; --panel: #2a2a2a; --panel2: #313131; --panel3: #3b3b3b;
+  --border: #363636; --border2: #454545;
+  --text: #ececec; --body: #c2c2c2; --muted: #979797; --dim: #737373;
+  --link: #a6baf2; --link-new: #d3a07a;
+  --accent: var(--text); --accent-ink: #141414; --accent-soft: var(--panel3);
+  --brand: #834a2b;
+  --card: #2f2f2f; --card-border: #3d3d3d; --overlay: #333333;
+  --design: #cf99c1; --green: #7fb495;
+  --shadow: rgba(0,0,0,0.42);
+  --shadow-card: 0 1px 2px rgba(0,0,0,.22);
+  --shadow-lift: 0 8px 20px -8px rgba(0,0,0,.45);
+  --shadow-sheet: inset 0 1px 0 rgba(255,255,255,.04), 0 12px 30px -6px rgba(0,0,0,.4);
+  --hover-bg: color-mix(in srgb, var(--text) 6%, transparent);
+  --sel-bg: color-mix(in srgb, var(--text) 9%, transparent);
+}
+[data-theme='cream-oak'] {
+  --win: #f0e5d3; --band: #e7d9c3; --bg: #fbf8f4; --panel: #fbf8f4; --panel2: #f6eee1; --panel3: #efe1cd;
+  --border: #e6dbca; --border2: #d3c2a8;
+  --text: #2a1c13; --body: #574838; --muted: #97846c; --dim: #b5a289;
+  --link: #9c5730; --link-new: #9c5730;   /* already correct — the reference */
+  --accent: #834a2b; --accent-ink: #fff7ee; --accent-soft: #f1e3d2;
+  --brand: #834a2b;
+  --card: #ffffff; --card-border: #eadfce; --overlay: #ffffff;
+  --design: #b0498f; --green: #0f9d63;
+  --shadow: rgba(70,42,18,0.16);
+  --shadow-card: 0 1px 2px rgba(70,42,18,.05);
+  --shadow-lift: 0 8px 20px -8px rgba(70,42,18,.20);
+  --shadow-sheet: 0 8px 26px -8px rgba(70,42,18,.16), 0 1px 2px rgba(70,42,18,.05);
+  --hover-bg: color-mix(in srgb, var(--text) 5%, transparent);
+  --sel-bg: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --fdisp: 'Source Serif 4', 'Source Serif Pro', Georgia, serif;
+  --font: -apple-system, 'Geist', 'Inter', system-ui, sans-serif;
+  --fmono: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --ease: cubic-bezier(.22, 1, .36, 1);
+  --r-xs: 6px; --r-sm: 9px; --r-md: 11px; --r-lg: 13px; --r-xl: 18px; --r-full: 999px;
+}
+body {
+  background: var(--win); color: var(--text); font: 14px/1.55 var(--font);
+  -webkit-font-smoothing: antialiased; padding: 0 0 90px;
+  transition: background .3s var(--ease), color .3s var(--ease);
+}
+.wrap { max-width: 1180px; margin: 0 auto; padding: 0 30px; }
+
+/* page chrome */
+.top { position: sticky; top: 0; z-index: 20; background: color-mix(in srgb, var(--win) 88%, transparent); backdrop-filter: blur(14px) saturate(1.05); border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent); }
+.topin { max-width: 1180px; margin: 0 auto; padding: 15px 30px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.tt { font: 640 19px/1.2 var(--fdisp); letter-spacing: -.012em; }
+.tt em { font-style: normal; color: var(--brand); }
+.tsub { color: var(--muted); font-size: 12px; }
+.themes { margin-left: auto; display: flex; gap: 5px; padding: 3px; border-radius: var(--r-full); background: var(--panel2); }
+.themes button { padding: 6px 13px; border: none; border-radius: var(--r-full); background: none; color: var(--muted); font: 600 11.5px var(--font); cursor: pointer; transition: all .18s var(--ease); }
+.themes button:hover { color: var(--text); }
+.themes button.on { background: var(--card); color: var(--text); box-shadow: var(--shadow-card); }
+
+.hero { padding: 40px 0 8px; }
+.hero h1 { font: 640 34px/1.15 var(--fdisp); letter-spacing: -.02em; max-width: 21ch; }
+.hero p { margin-top: 12px; color: var(--body); font-size: 14.5px; max-width: 68ch; }
+
+/* section scaffolding */
+.sect { margin-top: 46px; }
+.kick { font: 650 10px/1 var(--fmono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.sect h2 { margin-top: 9px; font: 640 23px/1.2 var(--fdisp); letter-spacing: -.014em; }
+.sect .lede { margin-top: 8px; color: var(--body); font-size: 13.5px; max-width: 76ch; }
+.sect .lede code { font: 500 12.5px var(--fmono); color: var(--text); background: var(--panel2); padding: 1px 5px; border-radius: 5px; }
+
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 20px; }
+@media (max-width: 900px) { .pair { grid-template-columns: 1fr; } }
+.pane { border-radius: var(--r-lg); overflow: hidden; background: var(--card); border: 1px solid var(--card-border); box-shadow: var(--shadow-card); }
+.panehead { display: flex; align-items: center; gap: 8px; padding: 9px 13px; border-bottom: 1px solid var(--border); }
+.tag { font: 650 9.5px/1 var(--fmono); letter-spacing: .09em; text-transform: uppercase; padding: 4px 8px; border-radius: var(--r-full); }
+.tag.bad { color: #c2544f; background: color-mix(in srgb, #c2544f 13%, transparent); }
+.tag.good { color: var(--green); background: color-mix(in srgb, var(--green) 15%, transparent); }
+.panehead span { color: var(--muted); font-size: 11.5px; }
+.panebody { padding: 16px; }
+
+/* callout notes */
+.note { margin-top: 14px; padding: 11px 14px; border-radius: var(--r-md); background: var(--panel2); color: var(--body); font-size: 12.5px; line-height: 1.55; }
+.note b { color: var(--text); }
+.note code { font: 500 12px var(--fmono); color: var(--text); }
+
+/* ── 1 · frame + dock mini-app ── */
+.mini { border-radius: 12px; overflow: hidden; background: var(--win); padding: 9px 7px 0; height: 218px; display: flex; flex-direction: column; }
+.minitop { display: flex; align-items: center; gap: 6px; padding: 0 5px 9px; }
+.minidot { width: 8px; height: 8px; border-radius: 50%; background: var(--border2); }
+.minibody { flex: 1; display: flex; gap: 4px; min-height: 0; }
+.mininav { width: 108px; display: flex; flex-direction: column; gap: 3px; padding: 4px 2px; }
+.mininav i { height: 15px; border-radius: 5px; background: color-mix(in srgb, var(--text) 8%, transparent); font-style: normal; }
+.mininav i.on { background: color-mix(in srgb, var(--text) 15%, transparent); }
+.minisheet { flex: 1; background: var(--panel); border-radius: 12px 12px 0 0; box-shadow: var(--shadow-sheet); }
+.minidock { height: 26px; display: flex; align-items: center; gap: 7px; padding: 0 12px; }
+.minidock.before { background: var(--band); }
+.minidock.after { background: transparent; }
+.minidock u { width: 11px; height: 11px; border-radius: 3px; background: color-mix(in srgb, var(--text) 20%, transparent); text-decoration: none; }
+.minidock .sync { margin-left: auto; font: 600 9px var(--fmono); color: var(--muted); }
+
+/* ── design studio column ── */
+.studio { width: 100%; background: var(--panel); border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; height: 400px; position: relative; }
+.studio.before { border-left: 1px solid var(--border); }
+.sgripline { position: absolute; left: 5px; top: 0; bottom: 0; width: 1px; background: var(--border); }
+.dhead { flex: none; display: flex; align-items: center; gap: 7px; padding: 8px 10px; }
+.dhead.before { border-bottom: 1px solid var(--border); }
+.dround { flex: none; display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: var(--r-full); color: var(--design); background: color-mix(in srgb, var(--design) 14%, transparent); font: 650 9px/1 var(--fmono); letter-spacing: .09em; }
+.ddir { flex: none; padding: 5px 9px; border: none; border-radius: var(--r-xs); background: none; color: var(--muted); font: 600 11px/1 var(--font); white-space: nowrap; }
+.ddir.on { color: var(--text); background: var(--sel-bg); }
+.ddirdiv { flex: none; width: 1px; height: 15px; margin: 0 5px; background: var(--border2); }
+.dseg { flex: none; display: flex; gap: 2px; padding: 2px; border-radius: var(--r-full); background: var(--panel2); margin-left: auto; }
+.dseg u { width: 21px; height: 18px; border-radius: var(--r-full); text-decoration: none; }
+.dseg u.on { background: var(--card); box-shadow: var(--shadow-card); }
+.dstage { flex: 1 1 128px; min-height: 100px; background: var(--panel2); display: grid; place-items: center; color: var(--dim); font: 600 10.5px var(--fmono); letter-spacing: .06em; }
+.dprov { flex: none; display: flex; align-items: center; gap: 8px; padding: 8px 11px; font: 650 8.5px/1 var(--fmono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.dprov.before { border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); background: color-mix(in srgb, var(--panel2) 58%, transparent); }
+.dprov.after { background: none; color: var(--dim); }
+.dprov .lnk { margin-left: auto; color: var(--link); text-transform: none; font: 600 10.5px var(--font); letter-spacing: 0; }
+.dlane { flex: 1 1 92px; padding: 11px 12px; display: flex; flex-direction: column; gap: 9px; min-height: 0; position: relative; }
+.dlanekick { display: flex; align-items: center; gap: 8px; font: 650 8.5px/1 var(--fmono); letter-spacing: .09em; text-transform: uppercase; color: var(--dim); }
+.dlanekick.before::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+.dlmsg { display: flex; gap: 8px; }
+.dlav { width: 19px; height: 19px; border-radius: 5px; background: color-mix(in srgb, var(--design) 30%, var(--panel2)); flex: none; }
+.dltext { color: var(--body); font-size: 12px; line-height: 1.5; }
+.dchint { flex: none; padding: 7px 12px; background: var(--panel2); color: var(--muted); font-size: 10.5px; }
+.dchint.before { border-bottom: 1px solid var(--border); }
+.dchint.after { background: none; }
+.dcomp { flex: none; padding: 8px 12px 10px; }
+.dcompbox { border-radius: var(--r-md); background: var(--card); border: 1px solid var(--card-border); box-shadow: var(--shadow-card); padding: 9px 11px; color: var(--dim); font-size: 11.5px; }
+.dgate { flex: none; display: flex; align-items: center; gap: 12px; padding: 10px 12px 11px; }
+.dgate.before { border-top: 1px solid var(--border); background: var(--panel2); }
+.dgate.after { background: var(--panel); box-shadow: 0 -10px 22px -20px var(--shadow); }
+.dgatecopy { flex: 1; min-width: 0; }
+.dgatecopy strong { display: block; font: 640 13px/1.2 var(--fdisp); }
+.dgatecopy span { color: var(--muted); font-size: 10.5px; }
+.gbtn { flex: none; padding: 6px 12px; border-radius: var(--r-full); font: 600 11.5px var(--font); border: 1px solid var(--card-border); background: var(--card); color: var(--text); }
+.gbtn.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+
+/* hairline counters */
+.hcount { display: flex; align-items: center; gap: 9px; margin-top: 12px; font-size: 12px; color: var(--muted); }
+.hpip { display: inline-flex; align-items: center; justify-content: center; min-width: 26px; height: 22px; padding: 0 8px; border-radius: var(--r-full); font: 700 11.5px var(--fmono); }
+.hpip.bad { color: #c2544f; background: color-mix(in srgb, #c2544f 13%, transparent); }
+.hpip.good { color: var(--green); background: color-mix(in srgb, var(--green) 15%, transparent); }
+
+/* ── 3 · thread edge with rail ── */
+.tedge { position: relative; height: 240px; border-radius: 10px; overflow: hidden; background: var(--panel); padding: 16px 18px; display: flex; flex-direction: column; gap: 11px; }
+.trow { display: flex; gap: 9px; }
+.tav { width: 22px; height: 22px; border-radius: 6px; background: color-mix(in srgb, var(--text) 12%, transparent); flex: none; }
+.tbody { flex: 1; }
+.tname { font: 700 11.5px var(--font); }
+.tline { margin-top: 3px; height: 8px; border-radius: 4px; background: color-mix(in srgb, var(--text) 8%, transparent); }
+.tline.s { width: 62%; }
+.tline.m { width: 84%; margin-top: 5px; }
+.railfake { position: absolute; right: 3px; top: 50%; transform: translateY(-50%); width: 12px; height: 46%; display: flex; flex-direction: column; justify-content: space-between; }
+.railfake i { display: block; height: 3px; border-radius: 2px; background: var(--text); opacity: .2; margin-left: auto; width: 34%; }
+.railfake i.lit { opacity: .62; }
+.sbfake { position: absolute; right: 17px; top: 20px; bottom: 20px; width: 9px; }
+.sbfake i { position: absolute; top: 22%; height: 34%; left: 1px; right: 1px; border-radius: 5px; background: color-mix(in srgb, var(--text) 14%, transparent); }
+
+/* ── 5 · links ── */
+.linkdemo { padding: 15px 17px; border-radius: var(--r-md); background: var(--panel); font-size: 13px; line-height: 1.75; color: var(--body); }
+.taskref { font-family: var(--fmono); font-size: .92em; font-weight: 700; border-bottom: 1px dotted; }
+.fileref { font: 500 12px var(--fmono); border-bottom: 1px solid; }
+.mdlink { text-decoration: underline; text-underline-offset: 2px; }
+.old .taskref, .old .fileref, .old .mdlink { color: var(--link); border-bottom-color: color-mix(in srgb, var(--link) 45%, transparent); text-decoration-color: color-mix(in srgb, var(--link) 40%, transparent); }
+.new .taskref, .new .fileref, .new .mdlink { color: var(--link-new); border-bottom-color: color-mix(in srgb, var(--link-new) 45%, transparent); text-decoration-color: color-mix(in srgb, var(--link-new) 40%, transparent); }
+.altb .taskref, .altb .fileref, .altb .mdlink { color: var(--text); border-bottom-color: color-mix(in srgb, var(--text) 40%, transparent); text-decoration-color: color-mix(in srgb, var(--text) 38%, transparent); }
+.swatches { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+.sw { flex: 1 1 128px; padding: 11px 12px; border-radius: var(--r-sm); background: var(--panel); border: 1px solid var(--border); }
+.swchip { height: 26px; border-radius: 6px; }
+.swname { margin-top: 8px; font: 650 9.5px/1 var(--fmono); letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+.swhex { margin-top: 3px; font: 500 11px var(--fmono); color: var(--body); }
+
+/* verdict table */
+.tbl { width: 100%; margin-top: 18px; border-collapse: collapse; font-size: 12.5px; }
+.tbl th { text-align: left; padding: 9px 11px; font: 650 9.5px/1 var(--fmono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--border); }
+.tbl td { padding: 10px 11px; border-bottom: 1px solid var(--border); color: var(--body); vertical-align: top; }
+.tbl td b { color: var(--text); }
+.tbl code { font: 500 11.5px var(--fmono); color: var(--text); }
+.tbl tr:last-child td { border-bottom: none; }
+</style>
+</head>
+<body data-theme="cream-oak">
+
+<div class="top"><div class="topin">
+  <div>
+    <div class="tt">Design polish — <em>five cleanups</em></div>
+    <div class="tsub">against v0.65.0 · proposal for review</div>
+  </div>
+  <div class="themes">
+    <button data-t="cream-oak" class="on">Cream Oak</button>
+    <button data-t="light">Paper</button>
+    <button data-t="dark">Graphite</button>
+    <button data-t="soft-dark">Soft dark</button>
+  </div>
+</div></div>
+
+<div class="wrap">
+
+<div class="hero">
+  <h1>Fewer lines, one frame, and links that belong to the theme.</h1>
+  <p>Five issues, each traced to a specific rule in <code>tokens.css</code>. Every panel below is built from the app's real tokens — switch themes in the header to check the fix holds in all four. Nothing here is implemented yet; this is the round to approve.</p>
+</div>
+
+<!-- ═══ 1 ═══ -->
+<div class="sect">
+  <div class="kick">Issue 1 · the frame</div>
+  <h2>The dock stops being its own strip</h2>
+  <p class="lede">The shell paints <code>--win</code>; the dock paints <code>--band</code> — a second, darker value used by exactly one rule in the whole stylesheet (<code>.dockbar</code>). That seam is why the bottom reads as a separate component from the nav above it. The fix: the dock goes transparent and lets the frame show through, so nav + dock are one continuous surface.</p>
+  <div class="pair">
+    <div class="pane">
+      <div class="panehead"><span class="tag bad">Today</span><span>dock on <code>--band</code> — a visible horizontal seam</span></div>
+      <div class="panebody">
+        <div class="mini">
+          <div class="minitop"><span class="minidot"></span><span class="minidot"></span><span class="minidot"></span></div>
+          <div class="minibody">
+            <div class="mininav"><i class="on"></i><i></i><i></i><i></i><i></i><i></i></div>
+            <div class="minisheet"></div>
+          </div>
+          <div class="minidock before"><u></u><u></u><u></u><u></u><span class="sync">SYNCED</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="pane">
+      <div class="panehead"><span class="tag good">Proposed</span><span>dock transparent — the frame is one surface</span></div>
+      <div class="panebody">
+        <div class="mini">
+          <div class="minitop"><span class="minidot"></span><span class="minidot"></span><span class="minidot"></span></div>
+          <div class="minibody">
+            <div class="mininav"><i class="on"></i><i></i><i></i><i></i><i></i><i></i></div>
+            <div class="minisheet"></div>
+          </div>
+          <div class="minidock after"><u></u><u></u><u></u><u></u><span class="sync">SYNCED</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="note"><b>One-line change.</b> <code>.dockbar { background: transparent }</code> — the shell already paints <code>--win</code> behind it. <code>--band</code> becomes unused; it gets retired from all four theme blocks and from the docs/33 token table (it is not in client-core, so there is no mobile mirror to update).</div>
+</div>
+
+<!-- ═══ 2 + 3 ═══ -->
+<div class="sect">
+  <div class="kick">Issue 2 + 3 · the design studio</div>
+  <h2>Eight hairlines become two</h2>
+  <p class="lede">A 520px column currently carries eight separate rules: the grip line <em>and</em> the panel's own left border (a double line 4px apart), the header's underline, the provenance strip's <em>two</em> borders, the "ROUND · TALK" trailing rule, the composer cap's underline, and the gate's top border. Structure should come from spacing and material, not from drawing a line at every boundary.</p>
+  <div class="pair">
+    <div class="pane">
+      <div class="panehead"><span class="tag bad">Today</span><span>8 hairlines · rail · scrollbar</span></div>
+      <div class="panebody" style="padding:12px">
+        <div class="studio before">
+          <span class="sgripline"></span>
+          <div class="dhead before">
+            <span class="dround">ROUND 2</span>
+            <button class="ddir">01 Character Logo</button>
+            <button class="ddir on">02 In Product</button>
+            <span class="ddirdiv"></span>
+            <span class="dseg"><u class="on"></u><u></u></span>
+          </div>
+          <div class="dstage">MOCKUP STAGE</div>
+          <div class="dprov before">ROUND 1 SHOWN · IRIS IS REDRAWING<span class="lnk">Open the project ↗</span></div>
+          <div class="dlane">
+            <div class="dlanekick before">Round 2 · Talk</div>
+            <div class="dlmsg"><span class="dlav"></span><span class="dltext">Round 2 leans into the character being relatable rather than just recognizable.</span></div>
+            <div class="railfake"><i></i><i></i><i class="lit"></i><i class="lit"></i><i class="lit"></i><i></i><i></i><i></i></div>
+          </div>
+          <div class="dchint before">iris · designer</div>
+          <div class="dcomp"><div class="dcompbox">Reply to iris…</div></div>
+          <div class="dgate before">
+            <div class="dgatecopy"><strong>Approve this design?</strong><span>Yours alone. It becomes the build's contract.</span></div>
+            <button class="gbtn">↻ Redraw</button><button class="gbtn primary">✓ Approve</button>
+          </div>
+        </div>
+        <div class="hcount"><span class="hpip bad">8</span> hairlines + a rail + a scrollbar</div>
+      </div>
+    </div>
+    <div class="pane">
+      <div class="panehead"><span class="tag good">Proposed</span><span>2 hairlines · no rail · no bar</span></div>
+      <div class="panebody" style="padding:12px">
+        <div class="studio before">
+          <div class="dhead before">
+            <span class="dround">ROUND 2</span>
+            <button class="ddir">01 Character Logo</button>
+            <button class="ddir on">02 In Product</button>
+            <span class="dseg"><u class="on"></u><u></u></span>
+          </div>
+          <div class="dstage">MOCKUP STAGE</div>
+          <div class="dprov after">ROUND 1 SHOWN · IRIS IS REDRAWING<span class="lnk">Open the project ↗</span></div>
+          <div class="dlane">
+            <div class="dlanekick">Round 2 · Talk</div>
+            <div class="dlmsg"><span class="dlav"></span><span class="dltext">Round 2 leans into the character being relatable rather than just recognizable.</span></div>
+          </div>
+          <div class="dchint after">iris · designer</div>
+          <div class="dcomp"><div class="dcompbox">Reply to iris…</div></div>
+          <div class="dgate after">
+            <div class="dgatecopy"><strong>Approve this design?</strong><span>Yours alone. It becomes the build's contract.</span></div>
+            <button class="gbtn">↻ Redraw</button><button class="gbtn primary">✓ Approve</button>
+          </div>
+        </div>
+        <div class="hcount"><span class="hpip good">2</span> the panel's left edge + the header's underline</div>
+      </div>
+    </div>
+  </div>
+  <div class="note"><b>What goes:</b> the duplicate grip line (keep the panel border, the grip stays draggable but invisible until hover) · both of the provenance strip's borders and its tint — it becomes a quiet caption · the "ROUND · TALK" trailing rule · the composer cap's underline and warm fill · the gate's top border. <b>What stays:</b> the panel's left edge (it separates two documents) and the header's underline (it separates chrome from content). Markdown headings inside the lane also get an explicit rule so a designer's <code>##</code> never inherits another surface's underlined-heading style, and a bare <code>---</code> gets the 1px hairline instead of Chromium's 2px grooved default.</div>
+</div>
+
+<!-- ═══ 3b ═══ -->
+<div class="sect">
+  <div class="kick">Issue 3 · the thread edge</div>
+  <h2>The rail and the gutter leave the task thread</h2>
+  <p class="lede">The tick rail was designed for the channel feed, where a long day of history benefits from a scrub handle. A task thread is a single conversation you read top to bottom — the rail and the 9px scrollbar are chrome it can't spend, and they sit exactly where the thread meets the design panel, which is what made that edge look busy.</p>
+  <div class="pair">
+    <div class="pane">
+      <div class="panehead"><span class="tag bad">Today</span><span>tick rail + native gutter at the thread's right edge</span></div>
+      <div class="panebody" style="padding:12px">
+        <div class="tedge">
+          <div class="trow"><span class="tav"></span><span class="tbody"><span class="tname">iris · designer</span><span class="tline m"></span><span class="tline s"></span></span></div>
+          <div class="trow"><span class="tav"></span><span class="tbody"><span class="tname">geo (you)</span><span class="tline m"></span></span></div>
+          <div class="trow"><span class="tav"></span><span class="tbody"><span class="tname">iris · designer</span><span class="tline m"></span><span class="tline s"></span></span></div>
+          <div class="sbfake"><i></i></div>
+          <div class="railfake"><i></i><i></i><i class="lit"></i><i class="lit"></i><i class="lit"></i><i></i><i></i><i></i></div>
+        </div>
+      </div>
+    </div>
+    <div class="pane">
+      <div class="panehead"><span class="tag good">Proposed</span><span>clean edge — the thread just scrolls</span></div>
+      <div class="panebody" style="padding:12px">
+        <div class="tedge">
+          <div class="trow"><span class="tav"></span><span class="tbody"><span class="tname">iris · designer</span><span class="tline m"></span><span class="tline s"></span></span></div>
+          <div class="trow"><span class="tav"></span><span class="tbody"><span class="tname">geo (you)</span><span class="tline m"></span></span></div>
+          <div class="trow"><span class="tav"></span><span class="tbody"><span class="tname">iris · designer</span><span class="tline m"></span><span class="tline s"></span></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="note"><b>Scope:</b> drop <code>&lt;BarRail&gt;</code> from the task thread and from the studio lane, and hide the native gutter on both (the studio lane already hides its own — the thread will match). <b>The channel feed keeps its rail</b>, which is what it was built for. Scrolling itself is untouched: wheel, trackpad, keyboard and the existing auto-scroll all behave exactly as they do now.</div>
+</div>
+
+<!-- ═══ 4 ═══ -->
+<div class="sect">
+  <div class="kick">Issue 4 · the approve gate</div>
+  <h2>The gate sits on the standard ground</h2>
+  <p class="lede">The gate is painted <code>--panel2</code>, the warm-well token reserved for passive containers — avatar mounts, empty states, composer caps. A row holding the single most consequential button in the product is not a passive container. It moves to <code>--panel</code>, the close-to-white ground, and separates from the lane with a soft ledge shadow instead of a hairline.</p>
+  <div class="pair">
+    <div class="pane">
+      <div class="panehead"><span class="tag bad">Today</span><span><code>background: var(--panel2)</code> + border-top</span></div>
+      <div class="panebody" style="padding:12px">
+        <div style="border-radius:10px;overflow:hidden;background:var(--panel)">
+          <div style="height:74px;background:var(--panel)"></div>
+          <div class="dgate before">
+            <div class="dgatecopy"><strong>Approve this design?</strong><span>Yours alone. It becomes the build's contract.</span></div>
+            <button class="gbtn">↻ Redraw</button><button class="gbtn primary">✓ Approve</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="pane">
+      <div class="panehead"><span class="tag good">Proposed</span><span><code>background: var(--panel)</code> + ledge shadow</span></div>
+      <div class="panebody" style="padding:12px">
+        <div style="border-radius:10px;overflow:hidden;background:var(--panel)">
+          <div style="height:74px;background:var(--panel)"></div>
+          <div class="dgate after">
+            <div class="dgatecopy"><strong>Approve this design?</strong><span>Yours alone. It becomes the build's contract.</span></div>
+            <button class="gbtn">↻ Redraw</button><button class="gbtn primary">✓ Approve</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="note">The composer cap directly above it (<code>.dchint</code>) loses its warm fill for the same reason, so the whole foot of the panel reads as one continuous ground with the buttons floating on it.</div>
+</div>
+
+<!-- ═══ 5 ═══ -->
+<div class="sect">
+  <div class="kick">Issue 5 · link ink</div>
+  <h2>Links stop being blue</h2>
+  <p class="lede">One token drives every link in the product — task refs, file refs, PR links, markdown links (<code>--link</code>). Cream Oak already sets it to oak. The other three themes inherit a blue that predates the revamp and belongs to no palette: <code>#4a5ec9</code> on Paper, <code>#9cb1f0</code> on Graphite, <code>#a6baf2</code> on Soft dark. The proposal takes each theme's own brand oak and tunes it for that ground.</p>
+  <div class="pair">
+    <div class="pane">
+      <div class="panehead"><span class="tag bad">Today</span><span>imported blue in three of four themes</span></div>
+      <div class="panebody">
+        <div class="linkdemo old">
+          iris picked up <span class="taskref">#1034</span> in Claude Design. The round is materialized as <span class="fileref">design-v2-01-character.html</span> — <span class="mdlink">open the editable project</span> to keep editing, and the PR is <span class="taskref">#212</span>.
+        </div>
+      </div>
+    </div>
+    <div class="pane">
+      <div class="panehead"><span class="tag good">Proposed</span><span>the theme's own oak</span></div>
+      <div class="panebody">
+        <div class="linkdemo new">
+          iris picked up <span class="taskref">#1034</span> in Claude Design. The round is materialized as <span class="fileref">design-v2-01-character.html</span> — <span class="mdlink">open the editable project</span> to keep editing, and the PR is <span class="taskref">#212</span>.
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="swatches">
+    <div class="sw"><div class="swchip" style="background:#9c5730"></div><div class="swname">Cream Oak</div><div class="swhex">#9c5730 · unchanged</div></div>
+    <div class="sw"><div class="swchip" style="background:#8f4f2a"></div><div class="swname">Paper</div><div class="swhex">#4a5ec9 → #8f4f2a</div></div>
+    <div class="sw"><div class="swchip" style="background:#d19a72"></div><div class="swname">Graphite</div><div class="swhex">#9cb1f0 → #d19a72</div></div>
+    <div class="sw"><div class="swchip" style="background:#d3a07a"></div><div class="swname">Soft dark</div><div class="swhex">#a6baf2 → #d3a07a</div></div>
+  </div>
+  <div class="note"><b>A decision for you on the dark themes.</b> Doctrine says dark stays achromatic — but it already carries one deliberate exception: the Porch mark keeps its oak on graphite, "the one warm object here." Option A (above) extends that exception to link ink, lifted for contrast on near-black. Option B keeps dark strictly achromatic and lets links be text plus an underline:
+  <div class="linkdemo altb" style="margin-top:11px">iris picked up <span class="taskref">#1034</span> in Claude Design. The round is materialized as <span class="fileref">design-v2-01-character.html</span> — <span class="mdlink">open the editable project</span>.</div>
+  <div style="margin-top:9px">My recommendation is <b>Option A</b>: task refs are scanned, not read, and Option B costs that scannability in the two themes where most work happens. Switch to Graphite in the header to compare them directly.</div>
+  </div>
+</div>
+
+<!-- ═══ summary ═══ -->
+<div class="sect">
+  <div class="kick">The change list</div>
+  <h2>What actually gets edited</h2>
+  <table class="tbl">
+    <tr><th style="width:14%">Issue</th><th style="width:44%">Change</th><th>Where</th></tr>
+    <tr><td><b>1 · dock</b></td><td>Dock paints the frame, not a band; <code>--band</code> retired from four theme blocks + the docs/33 token table.</td><td><code>tokens.css</code> <code>.dockbar</code> + theme blocks · <code>docs/33</code></td></tr>
+    <tr><td><b>2 · lines</b></td><td>Six hairlines removed from the studio, two kept. Lane markdown gets explicit heading + <code>hr</code> rules.</td><td><code>tokens.css</code> <code>.sgrip</code> <code>.dprov</code> <code>.dlanekick</code> <code>.dchint</code> <code>.dgate</code> <code>.dltext</code></td></tr>
+    <tr><td><b>3 · rail</b></td><td><code>BarRail</code> dropped from the task thread and the studio lane; both gutters hidden. Channel feed keeps its rail.</td><td><code>App.tsx</code> 2 mounts · <code>tokens.css</code> <code>.tmsgs</code></td></tr>
+    <tr><td><b>4 · gate</b></td><td>Gate and composer cap move from <code>--panel2</code> to <code>--panel</code>; hairline becomes a ledge shadow.</td><td><code>tokens.css</code> <code>.dgate</code> <code>.dchint</code></td></tr>
+    <tr><td><b>5 · links</b></td><td><code>--link</code> retuned in three themes; mirrored in client-core so the parity test passes; docs/33 records the ruling.</td><td><code>tokens.css</code> · <code>client-core/tokens.ts</code> · <code>docs/33</code></td></tr>
+  </table>
+  <div class="note" style="margin-top:20px"><b>Nothing structural moves.</b> No component is rebuilt, no layout reflows, no behaviour changes — this is a pass over color and hairline decisions in one stylesheet plus two JSX mount points. Verification: both themes in the live app, on a real design-review task, with the studio open.</div>
+</div>
+
+</div>
+
+<script>
+  const btns = [...document.querySelectorAll('.themes button')];
+  const apply = (t) => {
+    if (!btns.some((b) => b.dataset.t === t)) return;
+    btns.forEach((x) => x.classList.toggle('on', x.dataset.t === t));
+    document.body.dataset.theme = t;
+  };
+  btns.forEach((b) => b.addEventListener('click', () => { apply(b.dataset.t); location.hash = b.dataset.t; }));
+  apply(location.hash.slice(1) || 'cream-oak');
+  addEventListener('hashchange', () => apply(location.hash.slice(1)));
+  // ?only=N isolates one section (1-indexed) so a top-anchored screenshot can frame it
+  const only = new URLSearchParams(location.search).get('only');
+  if (only) {
+    document.querySelector('.hero').style.display = 'none';
+    [...document.querySelectorAll('.sect')].forEach((s, i) => {
+      if (i !== Number(only) - 1) s.style.display = 'none'; else s.style.marginTop = '26px';
+    });
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>History in the left nav — three ways</title>
+<style>
+[data-theme] { --font:'Geist Variable',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; --fmono:'Geist Mono Variable',ui-monospace,'SF Mono',Menlo,monospace; --fdisp:'Source Serif 4','Iowan Old Style',Georgia,serif; --ease:cubic-bezier(.2,.8,.2,1); --dur-fast:120ms; }
+/* verbatim from apps/desktop/src/renderer/src/tokens.css */
+[data-theme='dark'] {
+  --win:#0d0d0d; --bg:#141414; --panel:#191919; --panel2:#212121; --panel3:#2b2b2b;
+  --border:#272727; --border2:#383838; --card:#1b1b1b; --card-border:#2e2e2e;
+  --text:#eaeaea; --body:#b6b6b6; --muted:#898989; --dim:#676767; --ring:#585858;
+  --accent:#eaeaea; --link:#d19a72; --hover-bg:rgba(234,234,234,.06);
+  --prog:#8ba0c0; --review:#a89ccf; --done:#77ac8d; --acc:#6fb0ab; --ship:#7cb0bd;
+  --blocked:#9ca0a8; --closed:#727272; --shadow:rgba(0,0,0,.6);
+}
+[data-theme='cream-oak'] {
+  --win:#f0e5d3; --bg:#fbf8f4; --panel:#fbf8f4; --panel2:#f6eee1; --panel3:#efe1cd;
+  --border:#e6dbca; --border2:#d3c2a8; --card:#ffffff; --card-border:#eadfce;
+  --text:#2a1c13; --body:#574838; --muted:#97846c; --dim:#b5a289; --ring:#b08a5e;
+  --accent:#834a2b; --link:#9c5730; --hover-bg:rgba(42,28,19,.05);
+  --prog:#4f80c4; --review:#6d5ce0; --done:#0f9d63; --acc:#2f8f8a; --ship:#1f7f96;
+  --blocked:#7d7f86; --closed:#897a60; --shadow:rgba(70,42,18,.22);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#131210; font-family:'Geist Variable',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; }
+.page { max-width:1660px; margin:0 auto; padding:32px 24px 70px; }
+.pagehead { color:#eaeaea; margin-bottom:6px; }
+.pagehead h1 { font-family:'Source Serif 4',Georgia,serif; font-size:23px; font-weight:640; letter-spacing:-.012em; }
+.pagehead p { color:#898989; font-size:13px; line-height:1.6; margin-top:8px; max-width:92ch; }
+.pagehead p + p { margin-top:6px; }
+.pagehead b { color:#b6b6b6; font-weight:600; }
+.pagehead .warn { color:#c8a06a; font-weight:600; }
+.pagehead .ok { color:#8fbf9f; font-weight:600; }
+.rulehd { color:#eaeaea; font-size:14px; font-weight:660; margin:30px 0 4px; }
+.rulep { color:#898989; font-size:12.5px; line-height:1.6; max-width:96ch; margin-bottom:14px; }
+.rulep b { color:#b6b6b6; }
+.themes { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+@media (max-width:1240px){ .themes { grid-template-columns:1fr; } }
+.theme { background:var(--win); border:1px solid var(--border2); border-radius:16px; padding:16px; color:var(--text); }
+.theme > h2 { font-size:10.5px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--dim); margin:0 2px 12px; }
+.pair { display:flex; gap:14px; align-items:flex-start; }
+
+/* ── the REAL left nav: 266px, from tokens.css .navpanel ── */
+.navpanel { width:266px; min-width:266px; height:620px; background:var(--bg); border:1px solid var(--border); border-radius:14px;
+  display:flex; flex-direction:column; min-height:0; overflow:hidden; }
+.wsswitch { display:flex; align-items:center; gap:11px; padding:13px 12px; border-bottom:1px solid var(--border); }
+.wsav { width:34px; height:34px; border-radius:10px; background:var(--panel3); display:grid; place-items:center; font-size:15px; }
+.wsname { font-size:14px; font-weight:660; line-height:1.2; }
+.wsorg { font-size:10.5px; color:var(--dim); letter-spacing:.02em; }
+.navscroll { flex:1; min-height:0; overflow:hidden; display:flex; flex-direction:column; }
+.navhome { display:flex; align-items:center; gap:10px; margin:8px; padding:8px 10px; border-radius:9px; font-size:13.5px; font-weight:600; }
+.navsec { display:flex; align-items:center; gap:7px; padding:8px 14px 4px; font:700 9.5px var(--fmono); letter-spacing:.1em; text-transform:uppercase; color:var(--dim); }
+.navsec .n { color:var(--muted); font-weight:600; }
+.navsec .plus { margin-left:auto; color:var(--dim); font-size:13px; }
+.chan { display:flex; align-items:center; gap:8px; margin:1px 8px; padding:6px 10px; border-radius:8px; font-size:13px; color:var(--body); }
+.chan.on { background:var(--card); border:1px solid var(--card-border); color:var(--text); font-weight:620; }
+.chan .h { color:var(--dim); }
+.chan .dot { margin-left:auto; width:6px; height:6px; border-radius:50%; background:var(--link); }
+.agentrow { display:flex; align-items:center; gap:9px; margin:1px 8px; padding:5px 10px; border-radius:8px; }
+.agentav { width:26px; height:26px; border-radius:7px; background:var(--panel3); flex:none; }
+.agentnm { font-size:12.5px; font-weight:600; }
+.agentst { font-size:10.5px; color:var(--dim); }
+.navfoot { flex:none; margin:8px; padding:9px 11px; border:1px solid var(--border); border-radius:11px; display:flex; align-items:center; gap:9px; font-size:12.5px; }
+.navfoot .fav { width:24px; height:24px; border-radius:7px; background:var(--panel3); }
+.empty { flex:1; }
+
+/* ── A · the History surface as it exists today, dropped into 266px ── */
+.nhist { flex:1; min-height:0; display:flex; flex-direction:column; border-top:1px solid var(--border); margin-top:6px; }
+.nhistsearch { flex:none; margin:9px 8px 6px; position:relative; }
+.nhistsearch input { width:100%; height:32px; background:var(--card); border:1px solid var(--card-border); border-radius:999px;
+  padding:0 12px 0 30px; font:450 12px var(--font); color:var(--text); outline:none; }
+.nhistsearch input::placeholder { color:var(--dim); }
+.nhistsearch .mag { position:absolute; left:11px; top:8px; color:var(--dim); font-size:12px; }
+.nhistlist { flex:1; min-height:0; overflow:hidden; padding:0 8px 8px; }
+
+/* A: today's row form, unchanged — 30px icon, title, PREVIEW line, chip, time */
+.hrowA { display:flex; align-items:center; gap:11px; padding:10px 11px; border-radius:10px; }
+.hicoA { flex:none; width:30px; height:30px; border-radius:8px; background:var(--card); border:1px solid var(--card-border); display:grid; place-items:center; color:var(--muted); font-size:11px; }
+.hbodyA { flex:1; min-width:0; }
+.htitleA { font-size:13.5px; font-weight:620; display:flex; gap:7px; align-items:center; min-width:0; }
+.htitleA > span:first-child { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.hprevA { font-size:11.5px; color:var(--dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-top:2px; }
+.htimeA { flex:none; font:500 10.5px var(--fmono); color:var(--dim); }
+.chip { flex:none; font:700 8.5px var(--fmono); letter-spacing:.6px; text-transform:uppercase; padding:2px 6px; border-radius:5px;
+  color:var(--sc); background:color-mix(in srgb, var(--sc) 14%, transparent); box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--sc) 26%, transparent); }
+
+/* B: a row form DESIGNED for 266px — one line, state as a dot, time right */
+.hrowB { display:flex; align-items:center; gap:8px; margin:1px 0; padding:6px 9px; border-radius:8px; }
+.hrowB.on { background:var(--card); border:1px solid var(--card-border); }
+.hdot { flex:none; width:6px; height:6px; border-radius:50%; background:var(--sc, var(--dim)); }
+.hdot.thread { background:transparent; box-shadow:inset 0 0 0 1.5px var(--dim); }
+.hnum { flex:none; font:700 10.5px var(--fmono); color:var(--muted); }
+.htitleB { flex:1; min-width:0; font-size:12.5px; color:var(--body); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.hrowB.on .htitleB { color:var(--text); font-weight:600; }
+.htimeB { flex:none; font:500 10px var(--fmono); color:var(--dim); }
+.hgrp { padding:10px 9px 3px; font:700 9px var(--fmono); letter-spacing:.09em; text-transform:uppercase; color:var(--dim); }
+.hchan { flex:none; font:600 10px var(--fmono); color:var(--dim); }
+
+/* ── C · the search overlay (⌘K's sibling) ── */
+.shell { flex:1; min-width:0; height:620px; background:var(--panel); border:1px solid var(--border); border-radius:14px; position:relative; overflow:hidden; }
+.shellhd { display:flex; align-items:center; gap:12px; padding:14px 16px; border-bottom:1px solid var(--border); }
+.shelltitle { font-size:14px; font-weight:660; }
+.shellsub { font-size:11.5px; color:var(--dim); }
+.msgs { padding:16px; display:flex; flex-direction:column; gap:13px; }
+.msg { display:flex; gap:10px; }
+.msgav { width:26px; height:26px; border-radius:7px; background:var(--panel3); flex:none; }
+.msgnm { font-size:12px; font-weight:640; }
+.msgtx { font-size:12.5px; color:var(--body); line-height:1.5; margin-top:2px; }
+.scrim { position:absolute; inset:0; background:color-mix(in srgb, var(--win) 62%, transparent); backdrop-filter:blur(2px); }
+.ovl { position:absolute; left:50%; top:34px; transform:translateX(-50%); width:min(560px, calc(100% - 48px));
+  background:var(--panel); border:1px solid var(--border2); border-radius:14px; box-shadow:0 28px 64px -20px var(--shadow); overflow:hidden; }
+.ovlsearch { display:flex; align-items:center; gap:11px; padding:13px 15px; border-bottom:1px solid var(--border); }
+.ovlsearch .mag { color:var(--dim); }
+.ovlsearch input { flex:1; background:none; border:none; outline:none; font:450 14px var(--font); color:var(--text); }
+.ovlsearch input::placeholder { color:var(--dim); }
+.ovlcount { font:600 11px var(--fmono); color:var(--dim); }
+.ovllist { padding:6px; max-height:420px; overflow:hidden; }
+.ovlfoot { display:flex; gap:14px; padding:8px 15px; border-top:1px solid var(--border); font:500 10px var(--fmono); color:var(--dim); }
+kbd { font:600 9.5px var(--fmono); border:1px solid var(--border2); border-radius:4px; padding:1px 5px; color:var(--muted); }
+
+.verdict { font-size:11.5px; line-height:1.6; color:var(--muted); margin:10px 2px 0; max-width:64ch; }
+.verdict b { color:var(--body); font-weight:650; }
+.verdict .no { color:var(--blocked); font-weight:650; }
+.verdict .yes { color:var(--done); font-weight:650; }
+.measure { display:inline-block; font:600 10px var(--fmono); color:var(--dim); border:1px dashed var(--border2); border-radius:5px; padding:1px 6px; margin-left:6px; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="pagehead">
+    <h1>History in the left nav — three ways, at the real 266px</h1>
+    <p>The proposal: move each room's <b>History</b> out of its tab and into the left nav under Agents, search at the
+      top, following the active channel — and on Home, spanning every channel. The need behind it is real: today
+      History <b>costs you the conversation</b> (it is a tab, so opening it replaces the Feed), and the rail below
+      Agents is often empty.</p>
+    <p>The constraint that decides it: <b>.navpanel is 266px</b>, and after padding + the 30px row icon a title has
+      about <b>190px</b> — roughly <span class="warn">24 characters</span>. Every variant below is drawn at that exact
+      width with real threads from #build, so the truncation is honest rather than argued.</p>
+  </div>
+
+  <div class="rulehd">A · The History surface as it is, dropped into the nav</div>
+  <div class="rulep">Faithful port: today's <b>.histrow</b> — 30px icon, title, preview line, state chip, timestamp — at 266px.
+    Shown with People and Agents <b>collapsed</b> (the best case, and the state in the report) and <b>expanded</b> (six agents
+    with status lines, the state you work in).</div>
+  <div class="themes">
+    <div class="theme" data-theme="dark"><h2>Graphite dark · A · agents collapsed vs expanded</h2>
+      <div class="pair">
+        <!-- collapsed -->
+        <div class="navpanel">
+          <div class="wsswitch"><div class="wsav">◐</div><div><div class="wsname">flowe-ai</div><div class="wsorg">GADS INC</div></div></div>
+          <div class="navscroll">
+            <div class="navhome">⌂ Home</div>
+            <div class="navsec">Channels <span class="n">5</span><span class="plus">+</span></div>
+            <div class="chan on"><span class="h">#</span> build</div>
+            <div class="chan"><span class="h">#</span> flowe-agent-sessions<span class="dot"></span></div>
+            <div class="chan"><span class="h">#</span> general</div>
+            <div class="chan"><span class="h">◁</span> marketing</div>
+            <div class="chan"><span class="h">#</span> research</div>
+            <div class="navsec">› People <span class="n">1</span><span class="plus">+</span></div>
+            <div class="navsec">› Agents <span class="n">6</span><span class="plus">+</span></div>
+            <div class="nhist">
+              <div class="nhistsearch"><span class="mag">⌕</span><input placeholder="Search #build threads…" /></div>
+              <div class="nhistlist">
+                <div class="hrowA"><div class="hicoA">▤</div><div class="hbodyA"><div class="htitleA"><span>#1034 · flowe logo rev…</span><span class="chip" style="--sc:var(--blocked)">blk</span></div><div class="hprevA">#build</div></div><span class="htimeA">8m</span></div>
+                <div class="hrowA"><div class="hicoA">💬</div><div class="hbodyA"><div class="htitleA"><span>Flowe product resea…</span></div><div class="hprevA">Running now — 3 phase…</div></div><span class="htimeA">4d</span></div>
+                <div class="hrowA"><div class="hicoA">▤</div><div class="hbodyA"><div class="htitleA"><span>#1020 · Add updater t…</span><span class="chip" style="--sc:var(--acc)">acc</span></div><div class="hprevA">The auto-update pipel…</div></div><span class="htimeA">Jul 19</span></div>
+                <div class="hrowA"><div class="hicoA">💬</div><div class="hbodyA"><div class="htitleA"><span>Updater telemetry ro…</span></div><div class="hprevA">#1020 promoted from b…</div></div><span class="htimeA">Jul 18</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="navfoot"><div class="fav"></div><div>geo <span style="color:var(--dim)">· Cloud</span></div></div>
+        </div>
+        <!-- expanded -->
+        <div class="navpanel">
+          <div class="wsswitch"><div class="wsav">◐</div><div><div class="wsname">flowe-ai</div><div class="wsorg">GADS INC</div></div></div>
+          <div class="navscroll">
+            <div class="navhome">⌂ Home</div>
+            <div class="navsec">Channels <span class="n">5</span><span class="plus">+</span></div>
+            <div class="chan on"><span class="h">#</span> build</div>
+            <div class="chan"><span class="h">#</span> flowe-agent-sessions<span class="dot"></span></div>
+            <div class="chan"><span class="h">#</span> general</div>
+            <div class="chan"><span class="h">◁</span> marketing</div>
+            <div class="chan"><span class="h">#</span> research</div>
+            <div class="navsec">People <span class="n">1</span><span class="plus">+</span></div>
+            <div class="agentrow"><div class="agentav"></div><div><div class="agentnm">geo</div><div class="agentst">you</div></div></div>
+            <div class="navsec">Agents <span class="n">6</span><span class="plus">+</span></div>
+            <div class="agentrow"><div class="agentav"></div><div><div class="agentnm">atlas</div><div class="agentst">standing by</div></div></div>
+            <div class="agentrow"><div class="agentav"></div><div><div class="agentnm">bosun</div><div class="agentst">standing by</div></div></div>
+            <div class="agentrow"><div class="agentav"></div><div><div class="agentnm">iris</div><div class="agentst">standing by</div></div></div>
+            <div class="agentrow"><div class="agentav"></div><div><div class="agentnm">patch</div><div class="agentst">working #1034</div></div></div>
+            <div class="nhist">
+              <div class="nhistsearch"><span class="mag">⌕</span><input placeholder="Search #build threads…" /></div>
+              <div class="nhistlist">
+                <div class="hrowA"><div class="hicoA">▤</div><div class="hbodyA"><div class="htitleA"><span>#1034 · flowe logo rev…</span></div><div class="hprevA">#build</div></div><span class="htimeA">8m</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="navfoot"><div class="fav"></div><div>geo <span style="color:var(--dim)">· Cloud</span></div></div>
+        </div>
+      </div>
+      <div class="verdict"><span class="no">The cost, measured:</span> the title truncates at ~24 chars, so
+        <b>“#1034 · flowe logo rev…”</b> — the scannable part of every row is gone, and the preview line under it is
+        narrower still. With agents expanded there is room for <b>one</b> row. The rail also stops being navigation and
+        becomes a second scrolling content column.</div>
+    </div>
+
+    <div class="theme" data-theme="cream-oak"><h2>Cream oak · A · agents collapsed vs expanded</h2>
+      <div class="pair">
+        <div class="navpanel">
+          <div class="wsswitch"><div class="wsav">◐</div><div><div class="wsname">flowe-ai</div><div class="wsorg">GADS INC</div></div></div>
+          <div class="navscroll">
+            <div class="navhome">⌂ Home</div>
+            <div class="navsec">Channels <span class="n">5</span><span class="plus">+</span></div>
+            <div class="chan on"><span class="h">#</span> build</div>
+            <div class="chan"><span class="h">#</span> flowe-agent-sessions<span class="dot"></span></div>
+            <div class="chan"><span class="h">#</span> general</div>
+            <div class="chan"><span class="h">◁</span> marketing</div>
+            <div class="chan"><span class="h">#</span> research</div>
+            <div class="navsec">› People <span class="n">1</span><span class="plus">+</span></div>
+            <div class="navsec">› Agents <span class="n">6</span><span class="plus">+</span></div>
+            <div class="nhist">
+              <div class="nhistsearch"><span class="mag">⌕</span><input placeholder="Search #build threads…" /></div>
+              <div class="nhistlist">
+                <div class="hrowA"><div class="hicoA">▤</div><div class="hbodyA"><div class="htitleA"><span>#1034 · flowe logo rev…</span><span class="chip" style="--sc:var(--blocked)">blk</span></div><div class="hprevA">#build</div></div><span class="htimeA">8m</span></div>
+                <div class="hrowA"><div class="hicoA">💬</div><div class="hbodyA"><div class="htitleA"><span>Flowe product resea…</span></div><div class="hprevA">Running now — 3 phase…</div></div><span class="htimeA">4d</span></div>
+                <div class="hrowA"><div class="hicoA">▤</div><div class="hbodyA"><div class="htitleA"><span>#1020 · Add updater t…</span><span class="chip" style="--sc:var(--acc)">acc</span></div><div class="hprevA">The auto-update pipel…</div></div><span class="htimeA">Jul 19</span></div>
+                <div class="hrowA"><div class="hicoA">💬</div><div class="hbodyA"><div class="htitleA"><span>Updater telemetry ro…</span></div><div class="hprevA">#1020 promoted from b…</div></div><span class="htimeA">Jul 18</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="navfoot"><div class="fav"></div><div>geo <span style="color:var(--dim)">· Cloud</span></div></div>
+        </div>
+        <div class="navpanel">
+          <div class="wsswitch"><div class="wsav">◐</div><div><div class="wsname">flowe-ai</div><div class="wsorg">GADS INC</div></div></div>
+          <div class="navscroll">
+            <div class="navhome">⌂ Home</div>
+            <div class="navsec">Channels <span class="n">5</span><span class="plus">+</span></div>
+            <div class="chan on"><span class="h">#</span> build</div>
+            <div class="chan"><span class="h">#</span> flowe-agent-sessions<span class="dot"></span></div>
+            <div class="chan"><span class="h">#</span> general</div>
+            <div class="chan"><span class="h">◁</span> marketing</div>
+            <div class="chan"><span class="h">#</span> research</div>
+            <div class="navsec">People <span class="n">1</span><span class="plus">+</span></div>
+            <div class="agentrow"><div class="agentav"></div><div><div class="agentnm">geo</div><div class="agentst">you</div></div></div>
+            <div class="navsec">Agents <span class="n">6</span><span class="plus">+</span></div>
+            <div class="agentrow"><div class="agentav"></div><div><div class="agentnm">atlas</div><div class="agentst">standing by</div></div></div>
+            <div class="agentrow"><div class="agentav"></div><div><div class="agentnm">bosun</div><div class="agentst">standing by</div></div></div>
+            <div class="agentrow"><div class="agentav"></div><div><div class="agentnm">iris</div><div class="agentst">standing by</div></div></div>
+            <div class="agentrow"><div class="agentav"></div><div><div class="agentnm">patch</div><div class="agentst">working #1034</div></div></div>
+            <div class="nhist">
+              <div class="nhistsearch"><span class="mag">⌕</span><input placeholder="Search #build threads…" /></div>
+              <div class="nhistlist">
+                <div class="hrowA"><div class="hicoA">▤</div><div class="hbodyA"><div class="htitleA"><span>#1034 · flowe logo rev…</span></div><div class="hprevA">#build</div></div><span class="htimeA">8m</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="navfoot"><div class="fav"></div><div>geo <span style="color:var(--dim)">· Cloud</span></div></div>
+        </div>
+      </div>
+      <div class="verdict"><span class="no">Same in both themes.</span> The width is the problem, not the palette.</div>
+    </div>
+  </div>
+
+  <div class="rulehd">B · The same placement, with a row designed FOR 266px</div>
+  <div class="rulep">If the rail is the home, the row has to change: <b>one line</b>, no icon tile, no preview, state as a
+    coloured dot, time right-aligned. That buys back ~60px and doubles the row count. Left = a room (follows the active
+    channel). Right = <b>Home</b>, where it spans every channel and groups by room.</div>
+  <div class="themes">
+    <div class="theme" data-theme="dark"><h2>Graphite dark · B · room vs Home</h2>
+      <div class="pair">
+        <div class="navpanel">
+          <div class="wsswitch"><div class="wsav">◐</div><div><div class="wsname">flowe-ai</div><div class="wsorg">GADS INC</div></div></div>
+          <div class="navscroll">
+            <div class="navhome">⌂ Home</div>
+            <div class="navsec">Channels <span class="n">5</span><span class="plus">+</span></div>
+            <div class="chan on"><span class="h">#</span> build</div>
+            <div class="chan"><span class="h">#</span> flowe-agent-sessions<span class="dot"></span></div>
+            <div class="chan"><span class="h">#</span> general</div>
+            <div class="chan"><span class="h">◁</span> marketing</div>
+            <div class="chan"><span class="h">#</span> research</div>
+            <div class="navsec">› People <span class="n">1</span> <span class="plus">+</span></div>
+            <div class="navsec">› Agents <span class="n">6</span> <span class="plus">+</span></div>
+            <div class="nhist">
+              <div class="nhistsearch"><span class="mag">⌕</span><input placeholder="Search #build · 25 threads" /></div>
+              <div class="nhistlist">
+                <div class="hrowB on"><span class="hdot" style="--sc:var(--blocked)"></span><span class="hnum">1034</span><span class="htitleB">flowe logo revamp</span><span class="htimeB">8m</span></div>
+                <div class="hrowB"><span class="hdot thread"></span><span class="htitleB">Flowe product research</span><span class="htimeB">4d</span></div>
+                <div class="hrowB"><span class="hdot" style="--sc:var(--acc)"></span><span class="hnum">1020</span><span class="htitleB">Add updater telemetry</span><span class="htimeB">Jul 19</span></div>
+                <div class="hrowB"><span class="hdot thread"></span><span class="htitleB">Updater telemetry rollout</span><span class="htimeB">Jul 18</span></div>
+                <div class="hrowB"><span class="hdot" style="--sc:var(--acc)"></span><span class="hnum">1019</span><span class="htitleB">Legacy webview fallback</span><span class="htimeB">Jul 18</span></div>
+                <div class="hrowB"><span class="hdot thread"></span><span class="htitleB">Weekly ship &amp; backlog</span><span class="htimeB">Jul 18</span></div>
+                <div class="hrowB"><span class="hdot" style="--sc:var(--closed)"></span><span class="hnum">1022</span><span class="htitleB">Redesign the homepage</span><span class="htimeB">Jul 18</span></div>
+                <div class="hrowB"><span class="hdot thread"></span><span class="htitleB">Hey @rex whats in our…</span><span class="htimeB">Jul 18</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="navfoot"><div class="fav"></div><div>geo <span style="color:var(--dim)">· Cloud</span></div></div>
+        </div>
+        <div class="navpanel">
+          <div class="wsswitch"><div class="wsav">◐</div><div><div class="wsname">flowe-ai</div><div class="wsorg">GADS INC</div></div></div>
+          <div class="navscroll">
+            <div class="navhome" style="background:var(--card);border:1px solid var(--card-border)">⌂ Home <span style="margin-left:auto;font:600 10px var(--fmono);color:var(--dim)">5</span></div>
+            <div class="navsec">Channels <span class="n">5</span><span class="plus">+</span></div>
+            <div class="chan"><span class="h">#</span> build</div>
+            <div class="chan"><span class="h">#</span> flowe-agent-sessions<span class="dot"></span></div>
+            <div class="chan"><span class="h">#</span> general</div>
+            <div class="navsec">› People <span class="n">1</span> <span class="plus">+</span></div>
+            <div class="navsec">› Agents <span class="n">6</span> <span class="plus">+</span></div>
+            <div class="nhist">
+              <div class="nhistsearch"><span class="mag">⌕</span><input placeholder="Search all threads · 74" /></div>
+              <div class="nhistlist">
+                <div class="hgrp">#build</div>
+                <div class="hrowB"><span class="hdot" style="--sc:var(--blocked)"></span><span class="hnum">1034</span><span class="htitleB">flowe logo revamp</span><span class="htimeB">8m</span></div>
+                <div class="hrowB"><span class="hdot thread"></span><span class="htitleB">Flowe product research</span><span class="htimeB">4d</span></div>
+                <div class="hgrp">#marketing</div>
+                <div class="hrowB"><span class="hdot" style="--sc:var(--prog)"></span><span class="hnum">1028</span><span class="htitleB">Draft 4 X posts</span><span class="htimeB">4d</span></div>
+                <div class="hgrp">#research</div>
+                <div class="hrowB"><span class="hdot thread"></span><span class="htitleB">Competitor sweep</span><span class="htimeB">Jul 19</span></div>
+                <div class="hrowB"><span class="hdot" style="--sc:var(--acc)"></span><span class="hnum">1005</span><span class="htitleB">SEO analysis report</span><span class="htimeB">Jul 18</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="navfoot"><div class="fav"></div><div>geo <span style="color:var(--dim)">· Cloud</span></div></div>
+        </div>
+      </div>
+      <div class="verdict"><span class="yes">This works</span> as a <b>recent-threads jump list</b> — 8 rows instead of 4,
+        titles readable, and it follows the active channel. What it is <b>not</b> is History: no preview line, no state
+        label, no “25 threads” scanning. It is a shortcut, so the full History surface still has to exist somewhere.</div>
+    </div>
+
+    <div class="theme" data-theme="cream-oak"><h2>Cream oak · B · room vs Home</h2>
+      <div class="pair">
+        <div class="navpanel">
+          <div class="wsswitch"><div class="wsav">◐</div><div><div class="wsname">flowe-ai</div><div class="wsorg">GADS INC</div></div></div>
+          <div class="navscroll">
+            <div class="navhome">⌂ Home</div>
+            <div class="navsec">Channels <span class="n">5</span><span class="plus">+</span></div>
+            <div class="chan on"><span class="h">#</span> build</div>
+            <div class="chan"><span class="h">#</span> flowe-agent-sessions<span class="dot"></span></div>
+            <div class="chan"><span class="h">#</span> general</div>
+            <div class="chan"><span class="h">◁</span> marketing</div>
+            <div class="chan"><span class="h">#</span> research</div>
+            <div class="navsec">› People <span class="n">1</span> <span class="plus">+</span></div>
+            <div class="navsec">› Agents <span class="n">6</span> <span class="plus">+</span></div>
+            <div class="nhist">
+              <div class="nhistsearch"><span class="mag">⌕</span><input placeholder="Search #build · 25 threads" /></div>
+              <div class="nhistlist">
+                <div class="hrowB on"><span class="hdot" style="--sc:var(--blocked)"></span><span class="hnum">1034</span><span class="htitleB">flowe logo revamp</span><span class="htimeB">8m</span></div>
+                <div class="hrowB"><span class="hdot thread"></span><span class="htitleB">Flowe product research</span><span class="htimeB">4d</span></div>
+                <div class="hrowB"><span class="hdot" style="--sc:var(--acc)"></span><span class="hnum">1020</span><span class="htitleB">Add updater telemetry</span><span class="htimeB">Jul 19</span></div>
+                <div class="hrowB"><span class="hdot thread"></span><span class="htitleB">Updater telemetry rollout</span><span class="htimeB">Jul 18</span></div>
+                <div class="hrowB"><span class="hdot" style="--sc:var(--acc)"></span><span class="hnum">1019</span><span class="htitleB">Legacy webview fallback</span><span class="htimeB">Jul 18</span></div>
+                <div class="hrowB"><span class="hdot thread"></span><span class="htitleB">Weekly ship &amp; backlog</span><span class="htimeB">Jul 18</span></div>
+                <div class="hrowB"><span class="hdot" style="--sc:var(--closed)"></span><span class="hnum">1022</span><span class="htitleB">Redesign the homepage</span><span class="htimeB">Jul 18</span></div>
+                <div class="hrowB"><span class="hdot thread"></span><span class="htitleB">Hey @rex whats in our…</span><span class="htimeB">Jul 18</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="navfoot"><div class="fav"></div><div>geo <span style="color:var(--dim)">· Cloud</span></div></div>
+        </div>
+        <div class="navpanel">
+          <div class="wsswitch"><div class="wsav">◐</div><div><div class="wsname">flowe-ai</div><div class="wsorg">GADS INC</div></div></div>
+          <div class="navscroll">
+            <div class="navhome" style="background:var(--card);border:1px solid var(--card-border)">⌂ Home <span style="margin-left:auto;font:600 10px var(--fmono);color:var(--dim)">5</span></div>
+            <div class="navsec">Channels <span class="n">5</span><span class="plus">+</span></div>
+            <div class="chan"><span class="h">#</span> build</div>
+            <div class="chan"><span class="h">#</span> flowe-agent-sessions<span class="dot"></span></div>
+            <div class="chan"><span class="h">#</span> general</div>
+            <div class="navsec">› People <span class="n">1</span> <span class="plus">+</span></div>
+            <div class="navsec">› Agents <span class="n">6</span> <span class="plus">+</span></div>
+            <div class="nhist">
+              <div class="nhistsearch"><span class="mag">⌕</span><input placeholder="Search all threads · 74" /></div>
+              <div class="nhistlist">
+                <div class="hgrp">#build</div>
+                <div class="hrowB"><span class="hdot" style="--sc:var(--blocked)"></span><span class="hnum">1034</span><span class="htitleB">flowe logo revamp</span><span class="htimeB">8m</span></div>
+                <div class="hrowB"><span class="hdot thread"></span><span class="htitleB">Flowe product research</span><span class="htimeB">4d</span></div>
+                <div class="hgrp">#marketing</div>
+                <div class="hrowB"><span class="hdot" style="--sc:var(--prog)"></span><span class="hnum">1028</span><span class="htitleB">Draft 4 X posts</span><span class="htimeB">4d</span></div>
+                <div class="hgrp">#research</div>
+                <div class="hrowB"><span class="hdot thread"></span><span class="htitleB">Competitor sweep</span><span class="htimeB">Jul 19</span></div>
+                <div class="hrowB"><span class="hdot" style="--sc:var(--acc)"></span><span class="hnum">1005</span><span class="htitleB">SEO analysis report</span><span class="htimeB">Jul 18</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="navfoot"><div class="fav"></div><div>geo <span style="color:var(--dim)">· Cloud</span></div></div>
+        </div>
+      </div>
+      <div class="verdict"><span class="yes">Same read in cream.</span> The dot carries state, the number carries identity,
+        and the title finally fits.</div>
+    </div>
+  </div>
+
+  <div class="rulehd">C · Keep the width — History as a search overlay</div>
+  <div class="rulep">The other way to stop History costing you the conversation: don't move it, <b>float</b> it. Same
+    surface, full width, over whatever you were looking at — search-first, <kbd>Esc</kbd> closes, and from Home it spans
+    every channel. The app already promises <b>“⌘K anywhere · Esc closes anything”</b>, so this is the idiom it already has.</div>
+  <div class="themes">
+    <div class="theme" data-theme="dark"><h2>Graphite dark · C</h2>
+      <div class="shell">
+        <div class="shellhd"><div><div class="shelltitle"># build</div><div class="shellsub">offline-capable chat · live sync</div></div></div>
+        <div class="msgs">
+          <div class="msg"><div class="msgav"></div><div><div class="msgnm">patch</div><div class="msgtx">Rewrote the focus trap to release on Escape and restore focus to the trigger.</div></div></div>
+          <div class="msg"><div class="msgav"></div><div><div class="msgnm">rex</div><div class="msgtx">Routed #1034 to iris for a design round — nothing builds until you approve.</div></div></div>
+        </div>
+        <div class="scrim"></div>
+        <div class="ovl">
+          <div class="ovlsearch"><span class="mag">⌕</span><input placeholder="Search #build threads…" /><span class="ovlcount">25 threads</span></div>
+          <div class="ovllist">
+            <div class="hrowA" style="background:var(--hover-bg)"><div class="hicoA">▤</div><div class="hbodyA"><div class="htitleA"><span>#1034 · flowe logo revamp to be character based as an ai wellness app</span><span class="chip" style="--sc:var(--blocked)">blocked</span></div><div class="hprevA">#build</div></div><span class="htimeA">8 mins ago</span></div>
+            <div class="hrowA"><div class="hicoA">💬</div><div class="hbodyA"><div class="htitleA"><span>Flowe product research</span></div><div class="hprevA">Running now — 3 phases: read the codebase, 5 parallel searches…</div></div><span class="htimeA">4 days ago</span></div>
+            <div class="hrowA"><div class="hicoA">▤</div><div class="hbodyA"><div class="htitleA"><span>#1020 · Add updater telemetry: update success/failure observability</span><span class="chip" style="--sc:var(--acc)">accepted</span></div><div class="hprevA">The auto-update pipeline logs only via println!, invisible in a bundled app…</div></div><span class="htimeA">Jul 19</span></div>
+            <div class="hrowA"><div class="hicoA">💬</div><div class="hbodyA"><div class="htitleA"><span>Weekly ship &amp; backlog review</span></div><div class="hprevA">Promoted and routed. #1019 — legacy webview updater fallback…</div></div><span class="htimeA">Jul 18</span></div>
+          </div>
+          <div class="ovlfoot"><span><kbd>↑↓</kbd> move</span><span><kbd>⏎</kbd> open</span><span><kbd>esc</kbd> close</span><span style="margin-left:auto"><kbd>⌘Y</kbd> anywhere</span></div>
+        </div>
+      </div>
+      <div class="verdict"><span class="yes">Keeps everything the surface is good at</span> — the preview line, the state
+        label, the count — and costs the conversation <b>nothing</b>: it floats above it and Esc puts you back. From Home it
+        spans every channel with the room on each row. Cost: it is a mode, not something ambient in your periphery.</div>
+    </div>
+    <div class="theme" data-theme="cream-oak"><h2>Cream oak · C</h2>
+      <div class="shell">
+        <div class="shellhd"><div><div class="shelltitle"># build</div><div class="shellsub">offline-capable chat · live sync</div></div></div>
+        <div class="msgs">
+          <div class="msg"><div class="msgav"></div><div><div class="msgnm">patch</div><div class="msgtx">Rewrote the focus trap to release on Escape and restore focus to the trigger.</div></div></div>
+          <div class="msg"><div class="msgav"></div><div><div class="msgnm">rex</div><div class="msgtx">Routed #1034 to iris for a design round — nothing builds until you approve.</div></div></div>
+        </div>
+        <div class="scrim"></div>
+        <div class="ovl">
+          <div class="ovlsearch"><span class="mag">⌕</span><input placeholder="Search #build threads…" /><span class="ovlcount">25 threads</span></div>
+          <div class="ovllist">
+            <div class="hrowA" style="background:var(--hover-bg)"><div class="hicoA">▤</div><div class="hbodyA"><div class="htitleA"><span>#1034 · flowe logo revamp to be character based as an ai wellness app</span><span class="chip" style="--sc:var(--blocked)">blocked</span></div><div class="hprevA">#build</div></div><span class="htimeA">8 mins ago</span></div>
+            <div class="hrowA"><div class="hicoA">💬</div><div class="hbodyA"><div class="htitleA"><span>Flowe product research</span></div><div class="hprevA">Running now — 3 phases: read the codebase, 5 parallel searches…</div></div><span class="htimeA">4 days ago</span></div>
+            <div class="hrowA"><div class="hicoA">▤</div><div class="hbodyA"><div class="htitleA"><span>#1020 · Add updater telemetry: update success/failure observability</span><span class="chip" style="--sc:var(--acc)">accepted</span></div><div class="hprevA">The auto-update pipeline logs only via println!, invisible in a bundled app…</div></div><span class="htimeA">Jul 19</span></div>
+            <div class="hrowA"><div class="hicoA">💬</div><div class="hbodyA"><div class="htitleA"><span>Weekly ship &amp; backlog review</span></div><div class="hprevA">Promoted and routed. #1019 — legacy webview updater fallback…</div></div><span class="htimeA">Jul 18</span></div>
+          </div>
+          <div class="ovlfoot"><span><kbd>↑↓</kbd> move</span><span><kbd>⏎</kbd> open</span><span><kbd>esc</kbd> close</span><span style="margin-left:auto"><kbd>⌘Y</kbd> anywhere</span></div>
+        </div>
+      </div>
+      <div class="verdict"><span class="yes">Same in cream.</span> Nothing about the row had to shrink.</div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,616 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Workspace tabs — one content area, many kinds</title>
+<style>
+[data-theme] { --font:'Geist Variable',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; --fmono:'Geist Mono Variable',ui-monospace,'SF Mono',Menlo,monospace; --fdisp:'Source Serif 4','Iowan Old Style',Georgia,serif; --ease:cubic-bezier(.2,.8,.2,1); --dur-fast:120ms; }
+/* verbatim from apps/desktop/src/renderer/src/tokens.css */
+[data-theme='dark'] {
+  --win:#0d0d0d; --bg:#141414; --panel:#191919; --panel2:#212121; --panel3:#2b2b2b;
+  --border:#272727; --border2:#383838; --card:#1b1b1b; --card-border:#2e2e2e;
+  --text:#eaeaea; --body:#b6b6b6; --muted:#898989; --dim:#676767; --ring:#585858;
+  --accent:#eaeaea; --link:#d19a72; --hover-bg:rgba(234,234,234,.06);
+  --prog:#8ba0c0; --review:#a89ccf; --done:#77ac8d; --acc:#6fb0ab; --ship:#7cb0bd;
+  --blocked:#9ca0a8; --closed:#727272; --shadow:rgba(0,0,0,.6);
+}
+[data-theme='cream-oak'] {
+  --win:#f0e5d3; --bg:#fbf8f4; --panel:#fbf8f4; --panel2:#f6eee1; --panel3:#efe1cd;
+  --border:#e6dbca; --border2:#d3c2a8; --card:#ffffff; --card-border:#eadfce;
+  --text:#2a1c13; --body:#574838; --muted:#97846c; --dim:#b5a289; --ring:#b08a5e;
+  --accent:#834a2b; --link:#9c5730; --hover-bg:rgba(42,28,19,.05);
+  --prog:#4f80c4; --review:#6d5ce0; --done:#0f9d63; --acc:#2f8f8a; --ship:#1f7f96;
+  --blocked:#7d7f86; --closed:#897a60; --shadow:rgba(70,42,18,.22);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#131210; font-family:'Geist Variable',-apple-system,sans-serif; }
+.page { max-width:1720px; margin:0 auto; padding:32px 24px 70px; }
+.pagehead { color:#eaeaea; margin-bottom:8px; }
+.pagehead h1 { font-family:'Source Serif 4',Georgia,serif; font-size:24px; font-weight:640; letter-spacing:-.012em; }
+.pagehead p { color:#898989; font-size:13px; line-height:1.62; margin-top:9px; max-width:100ch; }
+.pagehead b { color:#b6b6b6; } .pagehead .warn { color:#c8a06a; font-weight:600; } .pagehead .ok { color:#8fbf9f; font-weight:600; }
+.stophd { color:#eaeaea; font-size:15.5px; font-weight:660; margin:44px 0 4px; font-family:'Source Serif 4',Georgia,serif; }
+.stopno { font:700 10px 'Geist Mono Variable',monospace; letter-spacing:.12em; color:#6f6f6f; text-transform:uppercase; margin-right:8px; }
+.stopp { color:#898989; font-size:12.5px; line-height:1.62; max-width:104ch; margin-bottom:16px; }
+.stopp b { color:#b6b6b6; } .stopp code { font:11.5px 'Geist Mono Variable',monospace; color:#c8a06a; }
+.themes { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+@media (max-width:1400px){ .themes { grid-template-columns:1fr; } }
+.theme { background:var(--win); border:1px solid var(--border2); border-radius:16px; padding:16px; color:var(--text); }
+.theme > h2 { font-size:10.5px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--dim); margin:0 2px 12px; }
+.callouts { display:flex; flex-wrap:wrap; gap:8px 18px; margin-top:12px; }
+.co { font-size:11.5px; color:#898989; line-height:1.55; max-width:44ch; }
+.co b { color:#b6b6b6; } .co .n { display:inline-grid; place-items:center; width:16px; height:16px; border-radius:50%; background:#2b2b2b; color:#c8a06a; font:700 10px monospace; margin-right:6px; }
+
+/* ── inventory table ── */
+.inv { width:100%; border-collapse:collapse; font-size:12.5px; color:#b6b6b6; }
+.inv th { text-align:left; font:700 9.5px monospace; letter-spacing:.1em; text-transform:uppercase; color:#6f6f6f; padding:9px 12px; border-bottom:1px solid #2c2c2c; }
+.inv td { padding:10px 12px; border-bottom:1px solid #222; vertical-align:top; line-height:1.5; }
+.inv td:first-child { color:#eaeaea; font-weight:620; white-space:nowrap; }
+.inv .kill { color:#c8846a; font-weight:600; } .inv .keep { color:#8fbf9f; font-weight:600; }
+
+/* ── the shell ── */
+.shell { display:flex; gap:4px; background:var(--win); border-radius:14px; padding:10px; min-height:660px; }
+.theme { min-width:0; }
+.nav { width:190px; min-width:190px; background:var(--bg); border-radius:11px; padding:8px 0; display:flex; flex-direction:column; gap:1px; }
+.navrow { display:flex; align-items:center; gap:8px; margin:0 8px; padding:6px 9px; border-radius:8px; font-size:12.5px; color:var(--body); }
+.navrow.on { background:var(--card); border:1px solid var(--card-border); color:var(--text); font-weight:620; }
+.navsec { padding:10px 14px 4px; font:700 9px var(--fmono); letter-spacing:.1em; text-transform:uppercase; color:var(--dim); }
+.newchat { margin:2px 8px 6px; padding:7px 10px; border:1px solid var(--card-border); background:var(--card); border-radius:9px; font-size:12px; font-weight:640; display:flex; align-items:center; gap:7px; }
+
+.main { flex:1; min-width:0; background:var(--panel); border-radius:13px; display:flex; flex-direction:column; overflow:hidden; position:relative; }
+/* the new tab strip */
+.tabstrip { display:flex; align-items:stretch; gap:2px; padding:6px 8px 0; border-bottom:1px solid var(--border); flex:none; }
+.wtab { display:flex; align-items:center; gap:7px; padding:7px 10px 8px; border-radius:9px 9px 0 0; font-size:12px; color:var(--muted); border:1px solid transparent; border-bottom:none; max-width:190px; min-width:0; }
+.wtab .ic { flex:none; opacity:.85; display:grid; place-items:center; }
+.wtab .lbl { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+.wtab .x { flex:none; opacity:.45; font-size:10px; margin-left:2px; }
+.wtab.on { background:var(--panel); border-color:var(--border); color:var(--text); font-weight:620; box-shadow:0 1px 0 var(--panel); margin-bottom:-1px; }
+.wtab.conv { color:var(--text); }
+.wtab.conv .ic { color:var(--link); }
+.wtab.dirty .lbl::after { content:' •'; color:var(--link); }
+.wtabadd { margin-left:4px; padding:7px 9px; border-radius:8px; color:var(--dim); font-size:13px; align-self:center; }
+.wtabright { margin-left:auto; display:flex; align-items:center; gap:4px; padding-right:2px; }
+.wtabico { width:26px; height:26px; display:grid; place-items:center; border-radius:7px; color:var(--dim); align-self:center; }
+.wtabico.on { background:var(--panel2); color:var(--text); }
+
+.body { flex:1; min-height:0; display:flex; position:relative; }
+.content { flex:1; min-width:0; display:flex; flex-direction:column; }
+
+/* conversation */
+.msgs { flex:1; padding:16px 18px; display:flex; flex-direction:column; gap:13px; }
+.msg { display:flex; gap:10px; }
+.mav { width:26px; height:26px; border-radius:8px; background:var(--panel3); flex:none; display:grid; place-items:center; font-size:11px; }
+.mhead { font-size:12px; display:flex; gap:7px; align-items:baseline; }
+.mhead b { font-weight:660; } .mhead .role { font:640 8px var(--fmono); letter-spacing:.06em; text-transform:uppercase; color:var(--muted); background:var(--panel2); padding:1.5px 5px; border-radius:5px; }
+.mtext { font-size:12.5px; line-height:1.6; color:var(--body); margin-top:2px; }
+.mtext .fref { border:1px solid var(--card-border); background:var(--card); border-radius:6px; padding:1px 6px; font:600 11px var(--fmono); color:var(--link); }
+.me { background:var(--panel2); border-radius:11px; padding:9px 12px; margin-left:auto; max-width:66%; font-size:12.5px; color:var(--body); }
+.compose { margin:8px 14px 12px; border:1px solid var(--card-border); background:var(--card); border-radius:12px; padding:10px 12px; font-size:12.5px; color:var(--dim); }
+
+/* editor tab */
+.edhead { display:flex; align-items:center; gap:9px; padding:8px 14px; border-bottom:1px solid var(--border); font:500 11px var(--fmono); color:var(--dim); }
+.edhead .path { color:var(--muted); }
+.edhead .seg { margin-left:auto; display:flex; gap:2px; background:var(--panel2); border-radius:8px; padding:2px; }
+.edhead .seg span { padding:3.5px 9px; border-radius:6px; font:620 10.5px var(--font); color:var(--muted); }
+.edhead .seg span.on { background:var(--card); color:var(--text); box-shadow:0 1px 2px var(--shadow); }
+.edbody { flex:1; padding:16px 22px; overflow:hidden; }
+.edbody h1 { font-family:var(--fdisp); font-size:21px; font-weight:640; margin-bottom:9px; }
+.edbody h2 { font-family:var(--fdisp); font-size:15.5px; font-weight:640; margin:16px 0 7px; }
+.edbody p { font-size:13px; line-height:1.68; color:var(--body); margin-bottom:9px; max-width:70ch; }
+.edbody li { font-size:13px; line-height:1.68; color:var(--body); margin-left:19px; margin-bottom:4px; }
+.edbody code { font:12px var(--fmono); background:var(--panel2); border-radius:4px; padding:1px 5px; color:var(--link); }
+.edbody .cb { background:var(--panel2); border:1px solid var(--border); border-radius:9px; padding:10px 13px; font:11.5px/1.65 var(--fmono); color:var(--body); margin:9px 0; }
+
+/* code editor */
+.code { flex:1; padding:12px 0; font:11.5px/1.75 var(--fmono); overflow:hidden; }
+.cline { display:flex; gap:14px; padding:0 14px; }
+.cline .ln { width:22px; text-align:right; color:var(--dim); flex:none; opacity:.7; }
+.cline .tx { color:var(--body); white-space:pre; }
+.k { color:var(--review); } .s { color:var(--done); } .c { color:var(--dim); font-style:italic; } .f { color:var(--prog); }
+
+/* terminal */
+.term { flex:1; background:#161310; margin:0; padding:13px 15px; font:11.5px/1.7 var(--fmono); color:#cfc4b6; }
+[data-theme='dark'] .term { background:#0f0f0f; }
+.term .pr { color:#8fbf9f; } .term .dim { color:#6f6459; }
+
+/* browser */
+.bchrome { display:flex; align-items:center; gap:8px; padding:7px 12px; border-bottom:1px solid var(--border); }
+.burl { flex:1; background:var(--panel2); border-radius:var(--r-full,99px); padding:5px 12px; font:11.5px var(--fmono); color:var(--muted); }
+.bview { flex:1; background:var(--card); margin:10px; border:1px solid var(--card-border); border-radius:10px; display:grid; place-items:center; color:var(--dim); font-size:12px; }
+
+/* ── getting back to the conversation: three candidates ── */
+.backfab { position:absolute; left:50%; bottom:16px; transform:translateX(-50%); display:flex; align-items:center; gap:7px;
+  padding:8px 15px; border-radius:99px; background:var(--card); border:1px solid var(--card-border);
+  box-shadow:0 10px 26px -10px var(--shadow); font-size:12px; font-weight:620; color:var(--text); z-index:5; white-space:nowrap; }
+.ghostfly { position:absolute; left:50%; bottom:62px; transform:translateX(-50%); width:min(400px,86%); padding:8px 12px;
+  border-radius:11px; background:var(--card); border:1px dashed var(--border2); display:flex; align-items:center; gap:8px;
+  font-size:11px; color:var(--muted); z-index:4; opacity:.75; }
+.ghostfly .tag { font:700 8px var(--fmono); letter-spacing:.08em; text-transform:uppercase; color:var(--link); flex:none; }
+.livedot { width:6px; height:6px; border-radius:50%; background:var(--prog); flex:none; box-shadow:0 0 0 3px color-mix(in srgb, var(--prog) 22%, transparent); }
+.wtab .cnt { flex:none; font:700 9px var(--fmono); background:var(--link); color:var(--win); border-radius:9px; padding:1px 5px; }
+.peek { position:absolute; right:12px; bottom:14px; width:min(320px,72%); padding:10px 12px; border-radius:12px;
+  background:var(--card); border:1px solid var(--card-border); box-shadow:0 14px 34px -14px var(--shadow); z-index:5; }
+.peekhd { display:flex; align-items:center; gap:7px; font-size:11.5px; }
+.peekhd b { font-weight:660; font-size:11.5px; } .peekhd .ago { color:var(--dim); font-size:10px; } .peekhd .x { margin-left:auto; color:var(--dim); font-size:10px; }
+.peekav { width:18px; height:18px; border-radius:6px; background:var(--panel3); display:grid; place-items:center; font-size:9px; flex:none; }
+.peekbody { font-size:11.5px; color:var(--body); line-height:1.5; margin-top:5px; }
+.peekact { margin-top:8px; font:620 11px var(--font); color:var(--link); display:flex; align-items:center; gap:6px; }
+.kbd { font:600 9.5px var(--fmono); border:1px solid var(--card-border); border-radius:5px; padding:1px 5px; color:var(--muted); background:var(--panel2); }
+
+/* the floating file pane */
+.fpane { position:absolute; top:8px; right:8px; bottom:8px; width:200px; background:var(--card); border:1px solid var(--card-border); border-radius:12px; box-shadow:0 18px 44px -18px var(--shadow); display:flex; flex-direction:column; overflow:hidden; z-index:4; }
+.fphead { display:flex; align-items:center; gap:7px; padding:9px 11px; border-bottom:1px solid var(--border); font-size:11.5px; font-weight:620; }
+.fphead .wt { margin-left:auto; font:500 9.5px var(--fmono); color:var(--dim); }
+.fpsearch { margin:7px 9px; padding:5px 9px; background:var(--panel2); border-radius:7px; font-size:11px; color:var(--dim); }
+.fplist { flex:1; padding:2px 6px 8px; overflow:hidden; }
+.fprow { display:flex; align-items:center; gap:7px; padding:4px 7px; border-radius:6px; font-size:11.5px; color:var(--body); }
+.fprow.on { background:var(--panel2); color:var(--text); font-weight:600; }
+.fprow.dir { color:var(--muted); }
+.fprow .ic { flex:none; opacity:.7; font-size:10px; width:12px; }
+.fprow.ind { padding-left:20px; }
+.fprow.ind2 { padding-left:32px; }
+.fprow .badge { margin-left:auto; font:600 9px var(--fmono); color:var(--done); }
+.fprow .badge.m { color:var(--link); }
+
+/* the + flyout */
+.flyout { position:absolute; top:42px; left:210px; width:230px; background:var(--card); border:1px solid var(--card-border); border-radius:11px; box-shadow:0 20px 46px -18px var(--shadow); padding:5px; z-index:6; }
+.flyrow { display:flex; align-items:center; gap:10px; padding:7px 9px; border-radius:8px; font-size:12px; color:var(--text); }
+.flyrow:hover, .flyrow.on { background:var(--hover-bg); }
+.flyrow .fic { width:22px; height:22px; border-radius:6px; background:var(--panel2); display:grid; place-items:center; flex:none; color:var(--muted); }
+.flyrow small { display:block; font-size:10px; color:var(--dim); margin-top:1px; }
+.flysep { border-top:1px solid var(--border); margin:4px 6px; }
+.flyhint { padding:6px 9px 3px; font:700 9px var(--fmono); letter-spacing:.09em; text-transform:uppercase; color:var(--dim); }
+
+.mark { position:absolute; width:19px; height:19px; border-radius:50%; background:#c8a06a; color:#131210; font:700 11px monospace; display:grid; place-items:center; box-shadow:0 1px 4px rgba(0,0,0,.5); z-index:9; }
+.rel { position:relative; }
+.phase { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-top:14px; }
+.pcard { background:#1b1b1b; border:1px solid #2c2c2c; border-radius:11px; padding:12px 13px; }
+.pcard h4 { color:#eaeaea; font-size:12px; font-weight:660; margin-bottom:3px; }
+.pcard .n { font:700 9px monospace; letter-spacing:.1em; color:#c8a06a; text-transform:uppercase; }
+.pcard p { font-size:11px; color:#898989; line-height:1.55; margin-top:5px; }
+.pcard .ship { font-size:10.5px; color:#8fbf9f; margin-top:6px; display:block; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<div class="pagehead">
+  <h1>Workspace tabs — one content area, many kinds</h1>
+  <p><b>The ask (2026-07-30):</b> the main content area becomes flexible and tabbed. The conversation is one tab; files, terminals, browsers and previews open as sibling tabs you can close. A floating, dismissable file pane on the right opens files into the main area. One unified surface instead of today's separate dock, artifact preview, doc overlay and studio.</p>
+  <p><b>The verdict: yes, and it is mostly consolidation rather than construction.</b> NeuraMesh already has tabs with per-tab kind + cwd + url + pty state — they live in the bottom dock. It already has a read-only artifact viewer with a file list and a Preview/Terminal toggle. It already renders md/html/images/diffs. What it does not have is <b>one place</b> for them: today the same file can appear in three different containers with three different chromes, and none of them can sit beside another.</p>
+  <p><b>The precedent is strong.</b> VS Code ships "terminal editors" — terminals opened in the editor area precisely so you "cycle through terminals the same way as open files"; Zed's dock keeps its contents and accepts <i>any</i> editor or tab. Both concluded that the container should not decide what may live in it. This proposal applies that to a conversation-first app: the conversation is simply the first tab.</p>
+</div>
+
+<!-- ══════════ STOP 1 ══════════ -->
+<div class="stophd"><span class="stopno">Stop 1</span>What exists today, and what each surface becomes</div>
+<div class="stopp">Every one of these renders content in the main area and none can coexist with another. The redesign keeps every capability — it changes where they live.</div>
+<table class="inv">
+  <tr><th>Surface today</th><th>Container</th><th>What it can't do</th><th>Becomes</th></tr>
+  <tr><td>Bottom dock (terminal · browser)</td><td>Slides up from the bottom, height-dragged, one at a time</td><td>Sit beside a file; be more than a strip; survive as a reading surface</td><td class="keep">Tabs — its tab model IS the new model, promoted upward</td></tr>
+  <tr><td>Artifact preview (sandboxed · read-only)</td><td>Full-surface overlay with its own file list + Preview/Terminal toggle</td><td>Stay open while you reply; open two artifacts; edit</td><td class="keep">A file tab (read-only variant) + the file pane</td></tr>
+  <tr><td>Doc overlay (plans, ship plans, briefs)</td><td>Modal over the thread</td><td>Be compared with anything; stay while you type</td><td class="keep">A file tab</td></tr>
+  <tr><td>Design studio (mockup rounds)</td><td>Side sheet inside the task panel</td><td>Open outside a task</td><td class="kill">Stays — it is a REVIEW surface with approve/redraw semantics (docs/14), not a viewer</td></tr>
+  <tr><td>Deliverable cards (inline)</td><td>In the transcript</td><td>—</td><td class="kill">Stays — the transcript record. Clicking one opens a tab</td></tr>
+</table>
+<div class="callouts">
+  <div class="co"><span class="n">!</span><b>The tell that this is right:</b> the artifact preview already grew a file list and a Preview/Terminal toggle — a private, task-scoped copy of the very thing being proposed. Two surfaces converging on the same shape is the signal to build it once.</div>
+</div>
+
+<div class="stophd" style="margin-top:34px"><span class="stopno">Stop 1b</span>What the code survey found — including one live defect</div>
+<div class="stopp">A full read of the renderer turned up four things that change this from "nice consolidation" to "fixes something broken".</div>
+<table class="inv">
+  <tr><th>Finding</th><th>Evidence</th><th>Why it matters here</th></tr>
+  <tr><td class="kill">A terminal opened from a task<br/>renders BEHIND the task</td><td><code>.sessionsurf</code> is <code>position:absolute; z-index:55</code> and a <b>sibling</b> of <code>.main</code>; the dock lives <b>inside</b> <code>.main</code> with no z-index. Only the fixed <code>.dockbar</code> (z56) survives.</td><td>The task header's terminal button opens a tab the open task immediately buries. <b>The current architecture cannot show a terminal beside a task at all</b> — which is precisely the posture this redesign is for.</td></tr>
+  <tr><td>Five renderers, one classifier</td><td><code>previewType()</code> returns 5 types; <b>five separate components</b> switch on it (deliverable card · artifact preview · library tile · marketing library · library page), "deliberately kept in sync".</td><td>One file type = five places to change. The tab model collapses them to one renderer with per-tab mode.</td></tr>
+  <tr><td>No PDF path exists</td><td>Zero matches for <code>pdf</code> in the renderer; a <code>.pdf</code> artifact falls through to <code>raw</code> and renders as <code>&lt;pre&gt;</code> bytes.</td><td>"Files of all supported types" is not true today. One renderer makes adding a type a one-place change.</td></tr>
+  <tr><td>The promised task file tree was never built</td><td>docs/04 lists "review cockpit v0 (diff viewer + task file tree)"; only the <b>folder</b>-bound <code>FsNode</code> tree inside the dock editor exists. The artifact list is flat.</td><td>The floating file pane IS that missing cockpit piece, finally scoped to a task's worktree/artifacts.</td></tr>
+  <tr><td>Dead code in the way</td><td><code>SliceOverlay</code> + <code>MarketingHomeSections</code> — a fourth container idiom, never mounted anywhere.</td><td>Delete during slice 1 rather than porting it.</td></tr>
+</table>
+<div class="callouts">
+  <div class="co"><span class="n">✓</span><b>Question ② is already answered by the code:</b> dock tabs are ONE flat global array in <code>localStorage['nm:dockTabs']</code>, shared across every project, room and task, surviving relaunch — while individual tabs bind to a worktree via <code>taskNumber</code>. That is the right model to keep: <b>global tab set, per-tab scope.</b></div>
+  <div class="co"><span class="n">✓</span><b>And a correction to this mockup:</b> today a dock tab is not one kind — a single tab <i>morphs</i> between terminal/editor/browser via a 3-way segment. The proposal fixes kind at open time (a terminal tab stays a terminal) because a tab you can accidentally turn into something else cannot be trusted to still be there.</div>
+</div>
+
+<!-- ══════════ STOP 2 ══════════ -->
+<div class="stophd"><span class="stopno">Stop 2</span>The strip: the conversation is tab one</div>
+<div class="stopp">The strip sits at the top of the content area. <b>Tab one is the conversation</b> — pinned, unclosable, always the room or session you are in; switching rooms replaces it, never spawns a second. Everything else is closable. The right end carries the file-pane toggle and the layout split. A dirty editor shows a dot instead of its ✕, the universal contract.</div>
+<div class="themes">
+  <div class="theme rel" data-theme="cream-oak">
+    <h2>Conversation tab active · cream oak</h2>
+    <div class="shell">
+      <div class="nav">
+        <div class="newchat">＋ New chat</div>
+        <div class="navrow">⌂ Home</div>
+        <div class="navsec">Channels</div>
+        <div class="navrow on"># build</div>
+        <div class="navrow"># general</div>
+        <div class="navsec">Recents</div>
+        <div class="navrow" style="font-size:11.5px">1046 iOS Safari focus…</div>
+      </div>
+      <div class="main">
+        <div class="tabstrip">
+          <div class="wtab conv on"><span class="ic">◈</span><span class="lbl">#1046 · iOS Safari focus-trap</span></div>
+          <div class="wtab"><span class="ic">📄</span><span class="lbl">drawer.tsx</span><span class="x">✕</span></div>
+          <div class="wtab"><span class="ic">▸</span><span class="lbl">nm-1046</span><span class="x">✕</span></div>
+          <div class="wtabadd">＋</div>
+          <div class="wtabright">
+            <span class="wtabico">◫</span><span class="wtabico on">▤</span>
+          </div>
+        </div>
+        <div class="body"><div class="content">
+          <div class="msgs">
+            <div class="me">the drawer still traps focus on iPad — can you look at the close path?</div>
+            <div class="msg"><div class="mav">🐝</div><div>
+              <div class="mhead"><b>patch</b><span class="role">developer</span></div>
+              <div class="mtext">Found it — the backdrop keeps focus when the drawer closes from a route change. Fix is in <span class="fref">drawer.tsx</span>; I opened it beside this so you can see the diff as I go.</div>
+            </div></div>
+          </div>
+          <div class="compose">Reply in #1046 — @ mention · / skill · ↵ send</div>
+        </div></div>
+      </div>
+    </div>
+    <div class="mark" style="top:52px; left:232px">1</div>
+    <div class="mark" style="top:52px; left:560px">2</div>
+    <div class="mark" style="top:52px; right:38px">3</div>
+  </div>
+
+  <div class="theme rel" data-theme="dark">
+    <h2>File tab active · the editor · graphite</h2>
+    <div class="shell">
+      <div class="nav">
+        <div class="newchat">＋ New chat</div>
+        <div class="navrow">⌂ Home</div>
+        <div class="navsec">Channels</div>
+        <div class="navrow on"># build</div>
+        <div class="navrow"># general</div>
+        <div class="navsec">Recents</div>
+        <div class="navrow" style="font-size:11.5px">1046 iOS Safari focus…</div>
+      </div>
+      <div class="main">
+        <div class="tabstrip">
+          <div class="wtab conv"><span class="ic">◈</span><span class="lbl">#1046 · iOS Safari focus-trap</span></div>
+          <div class="wtab on dirty"><span class="ic">📄</span><span class="lbl">drawer.tsx</span></div>
+          <div class="wtab"><span class="ic">▸</span><span class="lbl">nm-1046</span><span class="x">✕</span></div>
+          <div class="wtabadd">＋</div>
+          <div class="wtabright"><span class="wtabico">◫</span><span class="wtabico on">▤</span></div>
+        </div>
+        <div class="body"><div class="content">
+          <div class="edhead"><span class="path">nm-1046 / src / components /</span> <b style="color:var(--text);font-family:var(--font);font-size:12px">drawer.tsx</b>
+            <span class="seg"><span class="on">Edit</span><span>Preview</span><span>Diff</span></span>
+          </div>
+          <div class="code">
+            <div class="cline"><span class="ln">41</span><span class="tx"><span class="k">const</span> close = () =&gt; {</span></div>
+            <div class="cline"><span class="ln">42</span><span class="tx">  setOpen(<span class="k">false</span>);</span></div>
+            <div class="cline"><span class="ln">43</span><span class="tx">  <span class="c">// return focus to the trigger — iOS Safari keeps it on</span></span></div>
+            <div class="cline"><span class="ln">44</span><span class="tx">  <span class="c">// the backdrop when the close comes from a route change</span></span></div>
+            <div class="cline"><span class="ln">45</span><span class="tx">  triggerRef.current?.<span class="f">focus</span>({ preventScroll: <span class="k">true</span> });</span></div>
+            <div class="cline"><span class="ln">46</span><span class="tx">};</span></div>
+            <div class="cline"><span class="ln">47</span><span class="tx"></span></div>
+            <div class="cline"><span class="ln">48</span><span class="tx">useEffect(() =&gt; {</span></div>
+            <div class="cline"><span class="ln">49</span><span class="tx">  <span class="k">if</span> (!open) <span class="k">return</span>;</span></div>
+            <div class="cline"><span class="ln">50</span><span class="tx">  backdropRef.current?.setAttribute(<span class="s">'inert'</span>, <span class="s">''</span>);</span></div>
+            <div class="cline"><span class="ln">51</span><span class="tx">}, [open]);</span></div>
+          </div>
+        </div>
+        <div class="fpane">
+          <div class="fphead">Files <span class="wt">⎇ nm-1046</span></div>
+          <div class="fpsearch">⌕ Find files…</div>
+          <div class="fplist">
+            <div class="fprow dir"><span class="ic">▾</span> src</div>
+            <div class="fprow dir ind"><span class="ic">▾</span> components</div>
+            <div class="fprow on ind2"><span class="ic">📄</span> drawer.tsx <span class="badge m">M</span></div>
+            <div class="fprow ind2"><span class="ic">📄</span> nav.tsx</div>
+            <div class="fprow ind"><span class="ic">📄</span> app.tsx</div>
+            <div class="fprow dir"><span class="ic">▸</span> .nm-evidence</div>
+            <div class="fprow"><span class="ic">📄</span> README.md</div>
+            <div class="fprow"><span class="ic">📄</span> package.json</div>
+          </div>
+        </div>
+        </div>
+      </div>
+    </div>
+    <div class="mark" style="top:118px; right:270px">4</div>
+    <div class="mark" style="top:150px; right:36px">5</div>
+  </div>
+</div>
+<div class="callouts">
+  <div class="co"><span class="n">1</span><b>Tab one is the conversation</b>, pinned and unclosable — the app stays conversation-first by construction. Switching rooms replaces it; you never accumulate ten conversation tabs.</div>
+  <div class="co"><span class="n">2</span><b>Kinds are peers.</b> A file, a terminal, a browser and a preview are all just tabs with an icon. This is VS Code's terminal-editor conclusion, reached from the other direction.</div>
+  <div class="co"><span class="n">3</span><b>Two controls, right-aligned:</b> split (side-by-side, phase 2) and the file-pane toggle. Nothing else earns permanent chrome.</div>
+  <div class="co"><span class="n">4</span><b>The file pane floats and dismisses</b> — it is not a third column that permanently narrows the content. It knows its worktree (`⎇ nm-1046`), marks modified files, and a click opens the file as a tab.</div>
+  <div class="co"><span class="n">5</span><b>Edit · Preview · Diff is per-file</b>, not per-app: the same tab flips how it renders itself. A dirty tab shows a dot where the ✕ lives.</div>
+</div>
+
+<!-- ══════════ STOP 3 ══════════ -->
+<div class="stophd"><span class="stopno">Stop 3</span>＋ opens anything, and the kinds that are not files</div>
+<div class="stopp">The <code>+</code> flyout is the one creation door for the content area — the same shape the rail's New-chat caret already uses. Terminal and browser tabs inherit the dock's existing per-tab state (cwd, url, pty), so a terminal opened in a task's worktree stays scoped to it.</div>
+<div class="themes">
+  <div class="theme rel" data-theme="cream-oak">
+    <h2>The ＋ flyout · cream oak</h2>
+    <div class="shell" style="min-height:520px">
+      <div class="nav">
+        <div class="newchat">＋ New chat</div>
+        <div class="navrow">⌂ Home</div>
+        <div class="navsec">Channels</div>
+        <div class="navrow on"># build</div>
+      </div>
+      <div class="main">
+        <div class="tabstrip">
+          <div class="wtab conv on"><span class="ic">◈</span><span class="lbl">#1046 · iOS Safari focus-trap</span></div>
+          <div class="wtab"><span class="ic">📄</span><span class="lbl">drawer.tsx</span><span class="x">✕</span></div>
+          <div class="wtabadd" style="background:var(--hover-bg);color:var(--text)">＋</div>
+          <div class="wtabright"><span class="wtabico">◫</span><span class="wtabico">▤</span></div>
+        </div>
+        <div class="body"><div class="content">
+          <div class="msgs" style="opacity:.35">
+            <div class="me">the drawer still traps focus on iPad</div>
+          </div>
+        </div></div>
+        <div class="flyout">
+          <div class="flyhint">Open in this area</div>
+          <div class="flyrow"><span class="fic">⌕</span><div>Open a file…<small>from ⎇ nm-1046 · ⌘P</small></div></div>
+          <div class="flyrow on"><span class="fic">▸</span><div>Terminal<small>in the task's worktree</small></div></div>
+          <div class="flyrow"><span class="fic">◍</span><div>Browser<small>preview a URL or localhost</small></div></div>
+          <div class="flysep"></div>
+          <div class="flyhint">Create</div>
+          <div class="flyrow"><span class="fic">✎</span><div>New markdown<small>a note in this worktree</small></div></div>
+          <div class="flyrow"><span class="fic">◫</span><div>Split right<small>put the next tab beside this one</small></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="mark" style="top:52px; left:388px">6</div>
+  </div>
+
+  <div class="theme rel" data-theme="dark">
+    <h2>Terminal + browser as peer tabs · graphite</h2>
+    <div class="shell" style="min-height:520px">
+      <div class="nav">
+        <div class="newchat">＋ New chat</div>
+        <div class="navrow">⌂ Home</div>
+        <div class="navsec">Channels</div>
+        <div class="navrow on"># build</div>
+      </div>
+      <div class="main">
+        <div class="tabstrip">
+          <div class="wtab conv"><span class="ic">◈</span><span class="lbl">#1046 · iOS Safari</span></div>
+          <div class="wtab"><span class="ic">📄</span><span class="lbl">drawer.tsx</span><span class="x">✕</span></div>
+          <div class="wtab on"><span class="ic">▸</span><span class="lbl">nm-1046</span><span class="x">✕</span></div>
+          <div class="wtab"><span class="ic">◍</span><span class="lbl">localhost:5173</span><span class="x">✕</span></div>
+          <div class="wtabadd">＋</div>
+          <div class="wtabright"><span class="wtabico">◫</span><span class="wtabico">▤</span></div>
+        </div>
+        <div class="body"><div class="content">
+          <div class="edhead"><span class="path">task #1046 · worktree</span> <span style="margin-left:auto;font:500 10px var(--fmono);color:var(--dim)">~/.neuramesh/worktrees/nm-1046</span></div>
+          <div class="term">
+            <div><span class="pr">nm</span> nm-1046 % pnpm test drawer</div>
+            <div class="dim">&nbsp;</div>
+            <div class="dim">  ✓ releases focus on Escape</div>
+            <div class="dim">  ✓ restores focus to the trigger</div>
+            <div class="dim">  ✓ backdrop is inert while open</div>
+            <div class="dim">&nbsp;</div>
+            <div>  Tests  <span class="pr">15 passed</span> (15)</div>
+            <div class="dim">&nbsp;</div>
+            <div><span class="pr">nm</span> nm-1046 % <span style="opacity:.6">▍</span></div>
+          </div>
+        </div></div>
+      </div>
+    </div>
+    <div class="mark" style="top:52px; left:452px">7</div>
+  </div>
+</div>
+<div class="callouts">
+  <div class="co"><span class="n">6</span><b>One creation door.</b> Open a file · Terminal · Browser · New markdown · Split — the same caret idiom as the rail's New chat, so "+ means make something here" reads once, app-wide.</div>
+  <div class="co"><span class="n">7</span><b>Terminals keep their scope.</b> A terminal opened from a task lands in that task's worktree and says so in its header — today's dock behavior, inherited unchanged. The pty lives as long as the tab.</div>
+</div>
+
+<!-- ══════════ STOP 4 ══════════ -->
+<div class="stophd"><span class="stopno">Stop 4</span>Preview, artifacts, and the agent's own files</div>
+<div class="stopp">A markdown or HTML deliverable opens as a <b>Preview</b> tab with the reading typography the artifact viewer already has — and because it is a tab, it stays open while you keep talking. An agent's inline deliverable card is the doorway; the tab is where you read it. Read-only artifacts say so in their header rather than in a separate container.</div>
+<div class="themes">
+  <div class="theme rel" data-theme="cream-oak">
+    <h2>Artifact as a preview tab · cream oak</h2>
+    <div class="shell" style="min-height:560px">
+      <div class="nav">
+        <div class="newchat">＋ New chat</div>
+        <div class="navrow">⌂ Home</div>
+        <div class="navsec">Channels</div>
+        <div class="navrow on"># research</div>
+      </div>
+      <div class="main">
+        <div class="tabstrip">
+          <div class="wtab conv"><span class="ic">◈</span><span class="lbl">#1038 · Competitive analysis</span></div>
+          <div class="wtab on"><span class="ic">◉</span><span class="lbl">competitive-analysis.md</span><span class="x">✕</span></div>
+          <div class="wtab"><span class="ic">🖼</span><span class="lbl">2-matrix.png</span><span class="x">✕</span></div>
+          <div class="wtabadd">＋</div>
+          <div class="wtabright"><span class="wtabico">◫</span><span class="wtabico on">▤</span></div>
+        </div>
+        <div class="body"><div class="content">
+          <div class="edhead"><span class="path">#1038 artifacts /</span> <b style="color:var(--text);font-family:var(--font);font-size:12px">competitive-analysis.md</b>
+            <span style="font:600 9px var(--fmono);letter-spacing:.06em;color:var(--muted);background:var(--panel2);padding:2px 7px;border-radius:6px">READ-ONLY</span>
+            <span class="seg"><span>Source</span><span class="on">Preview</span></span>
+          </div>
+          <div class="edbody">
+            <h1>Competitive Analysis: AI Wellness Tools vs Flowe</h1>
+            <p><b>Prepared for:</b> Board task #1038. <b>Research date:</b> July 30, 2026. Figures are dated and sourced; re-verify before external publication.</p>
+            <h2>1. Executive summary</h2>
+            <p>The AI-adjacent wellness category splits into five clusters, all competing for the same subscription-fatigued consumer:</p>
+            <li><b>Meditation incumbents</b> — massive libraries, brand trust, now bolting on AI as a retention layer.</li>
+            <li><b>AI mental-health chatbots</b> — increasingly selling into employers rather than staying consumer.</li>
+            <li><b>AI journaling</b> — the closest analog to Flowe's structured-but-personalized mechanic.</li>
+          </div>
+        </div>
+        <div class="fpane">
+          <div class="fphead">Artifacts <span class="wt">#1038 · 5</span></div>
+          <div class="fplist">
+            <div class="fprow on"><span class="ic">◉</span> competitive-analysis.md</div>
+            <div class="fprow"><span class="ic">🖼</span> preview/1-summary.png</div>
+            <div class="fprow"><span class="ic">🖼</span> preview/2-matrix.png</div>
+            <div class="fprow"><span class="ic">🖼</span> preview/3-gaps.png</div>
+            <div class="fprow"><span class="ic">🖼</span> preview/4-recs.png</div>
+          </div>
+        </div>
+        </div>
+      </div>
+    </div>
+    <div class="mark" style="top:118px; left:640px">8</div>
+  </div>
+
+  <div class="theme rel" data-theme="dark">
+    <h2>Split: the conversation beside the work · graphite (phase 2)</h2>
+    <div class="shell" style="min-height:560px">
+      <div class="nav">
+        <div class="newchat">＋ New chat</div>
+        <div class="navrow">⌂ Home</div>
+        <div class="navsec">Channels</div>
+        <div class="navrow on"># build</div>
+      </div>
+      <div class="main">
+        <div class="tabstrip">
+          <div class="wtab conv on"><span class="ic">◈</span><span class="lbl">#1046</span></div>
+          <div class="wtabadd">＋</div>
+          <div style="width:1px;background:var(--border);margin:4px 6px 0"></div>
+          <div class="wtab on"><span class="ic">📄</span><span class="lbl">drawer.tsx</span><span class="x">✕</span></div>
+          <div class="wtab"><span class="ic">▸</span><span class="lbl">nm-1046</span><span class="x">✕</span></div>
+          <div class="wtabright"><span class="wtabico on">◫</span><span class="wtabico">▤</span></div>
+        </div>
+        <div class="body">
+          <div class="content" style="border-right:1px solid var(--border); max-width:44%">
+            <div class="msgs">
+              <div class="me" style="font-size:12px">can you see the focus bug in the close path?</div>
+              <div class="msg"><div class="mav">🐝</div><div>
+                <div class="mhead"><b>patch</b><span class="role">dev</span></div>
+                <div class="mtext" style="font-size:12px">Line 45 — the trigger refocus was missing. Watch the test run beside this.</div>
+              </div></div>
+            </div>
+            <div class="compose" style="font-size:11.5px">Reply in #1046 · ↵ send</div>
+          </div>
+          <div class="content">
+            <div class="edhead"><span class="path">nm-1046 / src / components /</span> <b style="color:var(--text);font-family:var(--font);font-size:12px">drawer.tsx</b></div>
+            <div class="code">
+              <div class="cline"><span class="ln">43</span><span class="tx"><span class="c">// return focus to the trigger</span></span></div>
+              <div class="cline"><span class="ln">44</span><span class="tx">triggerRef.current?.<span class="f">focus</span>({</span></div>
+              <div class="cline"><span class="ln">45</span><span class="tx">  preventScroll: <span class="k">true</span>,</span></div>
+              <div class="cline"><span class="ln">46</span><span class="tx">});</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="mark" style="top:52px; left:330px">9</div>
+  </div>
+</div>
+<div class="callouts">
+  <div class="co"><span class="n">8</span><b>The artifact viewer dissolves into the model it was imitating.</b> Its file list becomes the file pane (scoped to the task's artifacts), its Preview/Terminal toggle becomes the per-tab render mode, and READ-ONLY becomes a header token instead of a whole separate container.</div>
+  <div class="co"><span class="n">9</span><b>Split is phase 2</b>, and it is the reason the tab strip is worth building: a conversation on the left and the work on the right is the posture this product is for. One strip, two groups — the VS Code editor-group model, minus the parts nobody needs.</div>
+</div>
+
+
+<!-- ══════════ STOP 4b ══════════ -->
+<div class="stophd"><span class="stopno">Stop 4b</span>Getting back to the conversation — the ask, and what I would do instead</div>
+<div class="stopp">
+  <b>The proposal:</b> a floating <code>← back to conversation</code> button, bottom-centre, whenever you are on another tab. <b>My honest read: the navigation is already solved, and the button would be the third thing in this app doing a job one thing already does.</b> Tab one is pinned, never scrolls out, and is one click away at all times — a second affordance for the same act is exactly the duplication the last release spent itself removing (three surfaces all saying "patch is working"). And bottom-centre is <i>already occupied</i>: the capacity fly-up (docs/22) is <code>position:fixed; z-index:120; justify-content:center</code> and docks precisely there.<br/><br/>
+  <b>But the instinct behind it is right.</b> The real problem is not "how do I get back" — it is "<b>do I know I should?</b>" Deep in a file or a terminal, an agent can reply and you will not notice. That is an <i>awareness</i> problem wearing a navigation costume. So: put the signal on the tab that already exists, and let the notification be a notification.
+</div>
+<div class="themes">
+  <div class="theme rel" data-theme="cream-oak">
+    <h2>A · the floating back button, as asked</h2>
+    <div class="shell" style="min-height:420px">
+      <div class="nav"><div class="newchat">＋ New chat</div><div class="navrow">⌂ Home</div><div class="navsec">Channels</div><div class="navrow on"># build</div></div>
+      <div class="main">
+        <div class="tabstrip">
+          <div class="wtab conv"><span class="ic">◈</span><span class="lbl">#1046</span></div>
+          <div class="wtab on"><span class="ic">📄</span><span class="lbl">drawer.tsx</span><span class="x">✕</span></div>
+          <div class="wtabadd">＋</div>
+          <div class="wtabright"><span class="wtabico">◫</span><span class="wtabico">▤</span></div>
+        </div>
+        <div class="body"><div class="content">
+          <div class="code">
+            <div class="cline"><span class="ln">44</span><span class="tx">triggerRef.current?.<span class="f">focus</span>({</span></div>
+            <div class="cline"><span class="ln">45</span><span class="tx">  preventScroll: <span class="k">true</span>,</span></div>
+            <div class="cline"><span class="ln">46</span><span class="tx">});</span></div>
+          </div>
+          <div class="backfab">← Back to conversation</div>
+          <div class="ghostfly"><span class="tag">also here</span> the capacity fly-up docks bottom-centre (docs/22)</div>
+        </div></div>
+      </div>
+    </div>
+    <div class="mark" style="bottom:96px; left:50%">A</div>
+  </div>
+
+  <div class="theme rel" data-theme="dark">
+    <h2><span style="color:var(--done)">B + C · the live tab, and a peek when it matters — recommended</span></h2>
+    <div class="shell" style="min-height:420px">
+      <div class="nav"><div class="newchat">＋ New chat</div><div class="navrow">⌂ Home</div><div class="navsec">Channels</div><div class="navrow on"># build</div></div>
+      <div class="main">
+        <div class="tabstrip">
+          <div class="wtab conv"><span class="livedot"></span><span class="lbl">#1046</span><span class="cnt">2</span></div>
+          <div class="wtab on"><span class="ic">📄</span><span class="lbl">drawer.tsx</span><span class="x">✕</span></div>
+          <div class="wtabadd">＋</div>
+          <div class="wtabright"><span class="wtabico">◫</span><span class="wtabico">▤</span></div>
+        </div>
+        <div class="body"><div class="content">
+          <div class="code">
+            <div class="cline"><span class="ln">44</span><span class="tx">triggerRef.current?.<span class="f">focus</span>({</span></div>
+            <div class="cline"><span class="ln">45</span><span class="tx">  preventScroll: <span class="k">true</span>,</span></div>
+            <div class="cline"><span class="ln">46</span><span class="tx">});</span></div>
+          </div>
+          <div class="peek">
+            <div class="peekhd"><span class="peekav">🐝</span><b>patch</b><span class="ago">just now</span><span class="x">✕</span></div>
+            <div class="peekbody">Tests are green — 15/15. Want me to open the PR?</div>
+            <div class="peekact">Reply in #1046 <span class="kbd">⌘1</span></div>
+          </div>
+        </div></div>
+      </div>
+    </div>
+    <div class="mark" style="top:52px; left:236px">B</div>
+    <div class="mark" style="bottom:118px; right:60px">C</div>
+  </div>
+</div>
+<div class="callouts">
+  <div class="co"><span class="n">A</span><b>What it costs:</b> permanent chrome for an act that is already one click up and to the left, in the one screen position another surface already claims. It also implies the conversation is somewhere you "go back" to, when the whole point of the strip is that it never left.</div>
+  <div class="co"><span class="n">B</span><b>The tab carries the state.</b> A live run pulses on tab one (the Recents-row idiom, already built); unread agent messages show a count. Zero new chrome, and it answers the real question — <i>should</i> I go back — which a back button cannot.</div>
+  <div class="co"><span class="n">C</span><b>A peek, not a fly-up.</b> When an agent posts while you are on another tab, a dismissible card slides in <b>bottom-RIGHT</b> (leaving bottom-centre to the capacity card), shows the actual sentence, and clicks through. Auto-dismisses; never queues. This is the notification the back button was standing in for.</div>
+  <div class="co"><span class="n">⌘</span><b>And the free one: ⌘1.</b> Tab one by keyboard, ⌘2…⌘9 for the rest — the editor idiom every user of this class of app already has in their fingers. Costs no pixels at all.</div>
+</div>
+
+<!-- ══════════ STOP 5 ══════════ -->
+<div class="stophd"><span class="stopno">Stop 5</span>Implementation plan — four slices, each shippable</div>
+<div class="stopp">The order is chosen so each slice is useful alone and nothing is deleted before its replacement is proven. Everything below reuses machinery that exists: the dock's tab records (kind · cwd · url · pty), the artifact renderers, the file-read IPC the editor already uses, and the `runtimeFor`/worktree paths.</div>
+<div class="phase">
+  <div class="pcard">
+    <span class="n">Slice 1</span>
+    <h4>The strip + the model</h4>
+    <p>A pure <code>tabs.ts</code>: the tab record (id · kind · title · scope · dirty), open/close/activate/reorder, the conversation-tab invariant (always index 0, never closable), and the "reuse an open tab for the same file" rule. Unit-tested with no renderer.</p>
+    <span class="ship">Ships: the strip renders with the conversation tab only — invisible to users, provable in tests.</span>
+  </div>
+  <div class="pcard">
+    <span class="n">Slice 2</span>
+    <h4>Move the dock up</h4>
+    <p>Terminal and browser tabs render in the content area from the same records the dock uses; the dock becomes a launcher that opens tabs, then retires. The pty/webview lifetimes move with them.</p>
+    <span class="ship">Ships: terminals and browsers as real tabs; the bottom dock is gone.</span>
+  </div>
+  <div class="pcard">
+    <span class="n">Slice 3</span>
+    <h4>Files + the floating pane</h4>
+    <p>File tabs (Edit · Preview · Diff), the dismissable right pane over the worktree or the task's artifacts, ⌘P open-file, and the ＋ flyout. The artifact overlay and doc overlay start routing here.</p>
+    <span class="ship">Ships: the surface George drew — files open beside the conversation.</span>
+  </div>
+  <div class="pcard">
+    <span class="n">Slice 4</span>
+    <h4>Split + persistence</h4>
+    <p>Two tab groups side by side, per-session tab restore, and the retirement of the old overlays once nothing routes to them.</p>
+    <span class="ship">Ships: conversation-beside-work, and tabs that survive a restart.</span>
+  </div>
+</div>
+<div class="stopp" style="margin-top:18px">
+  <b>Invariants (enforced, not prompted):</b> the conversation tab cannot be closed or reordered out of slot 0 · a file tab is keyed by absolute path so one file is one tab · a read-only artifact tab cannot enter Edit mode (the tab record carries the capability, the UI never offers it) · closing a terminal tab kills its pty in the same action, so no orphan process outlives its tab · the code-surface boundary is unchanged — NeuraMesh reads, reviews and runs; edits stay the agent's job unless the human opens Edit deliberately.<br/><br/>
+  <b>Budgets:</b> tab switch &lt;100ms (docs/05 view-switch budget applies — the tab strip IS a view switch) · a file tab opens in &lt;150ms for files under 1MB · no tab may hold a pty or webview while hidden more than N minutes without saying so.<br/><br/>
+  <b>Open questions for this review:</b> ① does the conversation tab travel with the room (switch room → tab one becomes that room) or does each room remember its own tab set? <s style="color:#5f5f5f">② do tabs live per-session or one global set</s> — <b>answered by the code: global set, per-tab scope, exactly as the dock does it today.</b> ③ should the file pane default open on a task with a worktree, or always start dismissed? ④ <b>is Edit in scope for v1</b>, or Preview/Diff only until the docs/09 code-surface boundary is revisited? (My recommendation: Preview/Diff for v1 — it is the smaller, more defensible surface and it is what the review cockpit was always specified to be.)<br/><br/>
+  <b>Ruling wanted on Stop 4b too:</b> live-state-on-tab-one + a bottom-right peek (my recommendation), the floating back button as originally asked, or both.<br/><br/>
+  <b>Slice 1 gets one more job from the survey:</b> fix the z-order so the content area can host a terminal beside an open session — the defect above is the reason slice 2 is worth anything.
+</div>
+
+</div>
+</body>
+</html>

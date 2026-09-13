@@ -1,0 +1,7 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "rewrites": [
+    { "source": "/i/capture/", "destination": "https://us.i.posthog.com/capture/" },
+    { "source": "/((?!.*\\.).*)", "destination": "/index.html" }
+  ]
+}

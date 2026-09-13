@@ -1,0 +1,11 @@
+[
+  { "name": "rz1-working-dark", "query": { "theme": "dark", "openTask": "1046", "tab": "thread" }, "settle": 2800 },
+  { "name": "rz1-working-cream", "query": { "theme": "cream-oak", "openTask": "1046", "tab": "thread" }, "settle": 2800 },
+  { "name": "rz2-subdrawer-dark", "query": { "theme": "dark", "openTask": "1046", "tab": "thread" }, "settle": 2800, "js": "document.querySelectorAll('.facts .tok').forEach((t) => { if ((t.textContent || '').includes('subtasks')) t.click(); })" },
+  { "name": "rz2-subdrawer-cream", "query": { "theme": "cream-oak", "openTask": "1046", "tab": "thread" }, "settle": 2800, "js": "document.querySelectorAll('.facts .tok').forEach((t) => { if ((t.textContent || '').includes('subtasks')) t.click(); })" },
+  { "name": "rz3-ship-dark", "query": { "theme": "dark", "openTask": "1052", "tab": "thread" }, "settle": 2800 },
+  { "name": "rz3-ship-cream", "query": { "theme": "cream-oak", "openTask": "1052", "tab": "thread" }, "settle": 2800 },
+  { "name": "rz4-reqsdrawer-dark", "query": { "theme": "dark", "openTask": "1042", "tab": "thread" }, "settle": 2800, "js": "document.querySelectorAll('.facts .tok').forEach((t) => { if ((t.textContent || '').includes('reqs')) t.click(); })" },
+  { "name": "rz5-tickeropen-dark", "query": { "theme": "dark", "openTask": "1046", "tab": "thread" }, "settle": 2800, "js": "const h = document.querySelector('.beatshead'); if (h) h.click();" },
+  { "name": "rz6-artdrawer-dark", "query": { "theme": "dark", "openTask": "1046", "tab": "thread" }, "settle": 2800, "js": "document.querySelectorAll('.facts .tok').forEach((t) => { if ((t.textContent || '').includes('artifacts')) t.click(); })" }
+]

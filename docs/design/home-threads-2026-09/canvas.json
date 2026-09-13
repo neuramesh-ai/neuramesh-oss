@@ -1,0 +1,92 @@
+{
+  "artboards": [
+    {
+      "file": "Main.dc.html",
+      "x": 0,
+      "y": 0,
+      "w": 1040,
+      "h": 1100,
+      "title": "A · The ledger · graphite"
+    },
+    {
+      "file": "CreamOak.dc.html",
+      "x": 1120,
+      "y": 0,
+      "w": 1040,
+      "h": 1100,
+      "title": "A · The ledger · cream oak"
+    },
+    {
+      "file": "NeedsYouFilter.dc.html",
+      "x": 2240,
+      "y": 0,
+      "w": 1040,
+      "h": 760,
+      "title": "A · needs you filter + hover settle"
+    },
+    {
+      "file": "BellCard.dc.html",
+      "x": 0,
+      "y": 1260,
+      "w": 1040,
+      "h": 1180,
+      "title": "B · The bell’s card, then Recent"
+    },
+    {
+      "file": "TwoColumns.dc.html",
+      "x": 1120,
+      "y": 1260,
+      "w": 1240,
+      "h": 1100,
+      "title": "C · Two columns"
+    },
+    {
+      "file": "Quiet.dc.html",
+      "x": 2440,
+      "y": 1260,
+      "w": 1040,
+      "h": 1100,
+      "title": "D · Quiet"
+    }
+  ],
+  "annotations": [
+    {
+      "id": "note-a",
+      "x": 0,
+      "y": -180,
+      "w": 960,
+      "text": "A · THE LEDGER (leading)\nThe composer moves to the top and widens to the reading column (860px, the thread composer’s width). Under it, the ⌘Y overlay’s own filter chips and one list of the same rows: asks pinned first as a NEEDS YOU group, then RECENT (George, 2026-09-11: no day buckets). One row anatomy, one derivation. The bell keeps its count for every other screen."
+    },
+    {
+      "id": "note-a2",
+      "x": 2240,
+      "y": -150,
+      "w": 960,
+      "text": "The needs you chip narrows the list to the queue. Settle reveals on hover, as it does in ⌘Y. The project menu and the search sit at the row’s right end, the scope bar order."
+    },
+    {
+      "id": "note-b",
+      "x": 0,
+      "y": 1120,
+      "w": 960,
+      "text": "B · THE BELL’S CARD\nThe bell popover becomes a resident card under the composer, Recent below it with search and project only. Tradeoff: two row anatomies on one page, which the sessions shell removed on purpose."
+    },
+    {
+      "id": "note-c",
+      "x": 1120,
+      "y": 1120,
+      "w": 960,
+      "text": "C · TWO COLUMNS\nThe queue as a right column card, the way the Workbench sits beside a thread. Spends the wide window. Stacks under 1000px. Tradeoff: two columns on a landing, and the queue rows drawn a second way."
+    },
+    {
+      "id": "note-d",
+      "x": 2440,
+      "y": 1120,
+      "w": 960,
+      "text": "D · QUIET\nNo chips. Asks pinned, then Recent, and ⌘Y for everything else. Least chrome, no status or project narrowing on Home."
+    }
+  ],
+  "launch": {
+    "view": "canvas"
+  }
+}

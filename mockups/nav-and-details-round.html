@@ -1,0 +1,1034 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Three cuts — the orb in the rail, the nav that stops nesting, the details that leave the thread</title>
+<style>
+/* ══ house mockup scaffold (shell-simplification.html lineage) — the page commits to the studio
+   ground; the SHELLS carry both themes, which is the point of the page ══ */
+[data-theme] { --fbody:'Geist Variable',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; --fmono:'Geist Mono Variable',ui-monospace,'SF Mono',Menlo,monospace; --fdisp:'Source Serif 4','Iowan Old Style',Georgia,serif; --fital:'Instrument Serif',Georgia,serif; --ease:cubic-bezier(.22,1,.36,1); --dur-fast:.12s; --dur:.15s; --r-full:999px; }
+/* verbatim from apps/desktop/src/renderer/src/tokens.css */
+[data-theme='dark'] {
+  --win:#0d0d0d; --bg:#141414; --panel:#191919; --panel2:#212121; --panel3:#2b2b2b;
+  --border:#272727; --border2:#383838; --card:#1e1e1e; --card-border:#2c2c2c;
+  --text:#eaeaea; --body:#b6b6b6; --muted:#898989; --dim:#676767; --ring:#525252;
+  --accent:#eaeaea; --accent-ink:#101010; --accent-soft:#2b2b2b; --link:#d19a72;
+  --brand:#834a2b; --brand-ink:#fff7ee;
+  --hover-bg:rgba(234,234,234,.07); --sel-bg:rgba(234,234,234,.10);
+  --todo:#949494; --prog:#8ba0c0; --review:#a89ccf; --done:#77ac8d; --acc:#6fb0ab; --plan:#7fa5ab; --planrev:#a89ccf; --orch:#9793d2; --blocked:#9ca0a8; --warn:#c9a15e; --designrev:#b78bd8; --shiprev:#a89ccf;
+  --shadow-card:0 1px 2px rgba(0,0,0,.25); --shadow-lift:0 8px 20px -8px rgba(0,0,0,.55); --shadow-pop:0 20px 55px -14px rgba(0,0,0,.65);
+  --shadow-sheet:inset 0 1px 0 rgba(255,255,255,.05), 0 12px 30px -6px rgba(0,0,0,.5);
+  --overlay:#222222; --focus-glow:rgba(234,234,234,.22);
+}
+[data-theme='cream-oak'] {
+  --win:#f0e5d3; --bg:#fbf8f4; --panel:#fbf8f4; --panel2:#f6eee1; --panel3:#efe1cd;
+  --border:#e6dbca; --border2:#d3c2a8; --card:#ffffff; --card-border:#eadfce;
+  --text:#2a1c13; --body:#574838; --muted:#97846c; --dim:#b5a289; --ring:#b08a5e;
+  --accent:#834a2b; --accent-ink:#fff7ee; --accent-soft:#f1e3d2; --link:#9c5730;
+  --brand:#834a2b; --brand-ink:#fff7ee;
+  --hover-bg:rgba(42,28,19,.05); --sel-bg:rgba(131,74,43,.08);
+  --todo:#7d8590; --prog:#4f80c4; --review:#6d5ce0; --done:#0f9d63; --acc:#2f8f8a; --plan:#2c7d88; --planrev:#7d56b8; --orch:#6a63bc; --blocked:#7c7f88; --warn:#a9762a; --designrev:#8a3fc0; --shiprev:#6d5ce0;
+  --shadow-card:0 1px 2px rgba(70,42,18,.05); --shadow-lift:0 8px 20px -8px rgba(70,42,18,.20); --shadow-pop:0 20px 55px -14px rgba(70,42,18,.30);
+  --shadow-sheet:0 8px 26px -8px rgba(70,42,18,.16), 0 1px 2px rgba(70,42,18,.05);
+  --overlay:#ffffff; --focus-glow:rgba(131,74,43,.09);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body { background:#131210; }
+body { font-family:'Geist Variable',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; -webkit-font-smoothing:antialiased; }
+.page { max-width:1680px; margin:0 auto; padding:34px 26px 110px; }
+.pagehead { color:#eaeaea; margin-bottom:10px; max-width:112ch; }
+.pagehead h1 { font-family:'Source Serif 4',Georgia,serif; font-size:26px; font-weight:640; letter-spacing:-.012em; text-wrap:balance; }
+.pagehead p { color:#8f8b84; font-size:13px; line-height:1.66; margin-top:9px; }
+.pagehead b { color:#c2beb6; font-weight:600; }
+.pagehead .warn { color:#c8a06a; font-weight:600; }
+.pagehead .ok { color:#8fbf9f; font-weight:600; }
+.mono { font-family:'Geist Mono Variable',ui-monospace,monospace; font-size:.93em; }
+.stophd { color:#eaeaea; font-size:17px; font-weight:660; margin:56px 0 4px; font-family:'Source Serif 4',Georgia,serif; }
+.stopno { font:700 10px 'Geist Mono Variable',ui-monospace,monospace; letter-spacing:.12em; color:#6f6b64; text-transform:uppercase; margin-right:9px; }
+.stopp { color:#8f8b84; font-size:12.5px; line-height:1.7; max-width:110ch; margin-bottom:16px; }
+.stopp + .stopp { margin-top:-8px; }
+.stopp b { color:#c2beb6; font-weight:600; }
+.stopp .warn { color:#c8a06a; font-weight:600; }
+.stopp .ok { color:#8fbf9f; font-weight:600; }
+.stopp i { color:#a29d95; }
+.stopp code { font-family:'Geist Mono Variable',ui-monospace,monospace; font-size:11.5px; color:#a8a39a; }
+.kbd { font:600 10px 'Geist Mono Variable',ui-monospace,monospace; border:1px solid #3a3733; border-radius:5px; padding:1px 5px; color:#a29d95; white-space:nowrap; }
+.rec { display:inline-flex; align-items:center; gap:6px; font:700 9px 'Geist Mono Variable',ui-monospace,monospace; letter-spacing:.1em; text-transform:uppercase; color:#8fbf9f; border:1px solid #33513f; background:#16241c; border-radius:999px; padding:2px 8px; vertical-align:2px; margin-left:8px; }
+.alt { display:inline-flex; align-items:center; gap:6px; font:700 9px 'Geist Mono Variable',ui-monospace,monospace; letter-spacing:.1em; text-transform:uppercase; color:#8f8b84; border:1px solid #3a3733; border-radius:999px; padding:2px 8px; vertical-align:2px; margin-left:8px; }
+.ask { display:inline-flex; align-items:center; gap:6px; font:700 9px 'Geist Mono Variable',ui-monospace,monospace; letter-spacing:.1em; text-transform:uppercase; color:#c8a06a; border:1px solid #4a3c26; background:#241d13; border-radius:999px; padding:2px 8px; vertical-align:2px; margin-left:8px; }
+.themes { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+.themes.tall { grid-template-columns:1fr; }
+@media (max-width:1340px){ .themes { grid-template-columns:1fr; } }
+.theme { background:var(--win); border:1px solid #333029; border-radius:16px; padding:14px; color:var(--text); font-family:var(--fbody); overflow:hidden; position:relative; }
+.theme > h2 { font-size:10.5px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--dim); margin:0 2px 11px; font-family:var(--fmono); }
+.twoup { display:grid; grid-template-columns:1fr 1fr; gap:12px; align-items:start; }
+.cap { font:700 8.5px var(--fmono); letter-spacing:.11em; text-transform:uppercase; color:var(--dim); margin:0 0 7px 4px; display:flex; align-items:center; gap:7px; }
+.cap .x { color:#b9704f; }
+.cap .y { color:var(--done); }
+.tbl { width:100%; border-collapse:collapse; margin:14px 0 4px; font-size:12px; color:#8f8b84; max-width:120ch; }
+.tbl th { text-align:left; font:700 9px 'Geist Mono Variable',ui-monospace,monospace; letter-spacing:.1em; text-transform:uppercase; color:#6f6b64; padding:6px 12px 6px 0; border-bottom:1px solid #2c2a26; }
+.tbl td { padding:7px 12px 7px 0; border-bottom:1px solid #211f1c; vertical-align:top; line-height:1.55; }
+.tbl td b { color:#c2beb6; font-weight:600; }
+.tbl td .was { color:#6f6b64; }
+
+/* ══ the rail — reproduced from tokens.css (.navhist*, .navproj*, .navchan*) ══ */
+.rail { background:var(--win); border-radius:12px; padding:4px 0 8px; min-height:0; display:flex; flex-direction:column; font-family:var(--fbody); }
+.rail.boxed { outline:1px dashed color-mix(in srgb, var(--dim) 34%, transparent); outline-offset:3px; }
+.navsecthd { display:flex; align-items:center; justify-content:space-between; padding-right:11px; }
+.navsecttoggle { flex:1; min-width:0; display:flex; align-items:center; gap:7px; padding:11px 16px 6px; border:none; background:none; cursor:pointer; font:650 9.5px var(--fmono); letter-spacing:.15em; text-transform:uppercase; color:var(--muted); }
+.navchev { display:inline-flex; color:var(--dim); }
+.chanadd { width:22px; height:22px; display:grid; place-items:center; border:none; background:none; border-radius:6px; color:var(--dim); font:600 12px var(--fbody); cursor:pointer; opacity:.6; }
+.chanadd:hover { opacity:1; color:var(--text); background:var(--hover-bg); }
+.navhistlist { flex:1; min-height:0; overflow:hidden; padding:0 8px 4px 14px; }
+.navproj { margin-bottom:2px; }
+.navprojhead { display:flex; align-items:center; gap:2px; margin:2px 8px 0 6px; }
+.navprojchev { width:16px; height:16px; display:grid; place-items:center; border:0; background:none; color:var(--dim); cursor:pointer; }
+.navprojchev.c svg { transform:rotate(-90deg); }
+.navprojmain { display:flex; align-items:center; gap:6px; flex:1; min-width:0; padding:4px 6px; border:0; background:none; border-radius:7px; font:640 11.5px var(--fbody); color:var(--body); cursor:pointer; text-align:left; }
+.navprojmain.on { color:var(--text); }
+.navprojname { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.navprojlive { width:5px; height:5px; border-radius:50%; background:var(--prog); flex:none; box-shadow:0 0 0 3px color-mix(in srgb, var(--prog) 20%, transparent); animation:nm-pulse 1.8s ease-in-out infinite; }
+.navprojask { width:6px; height:6px; border-radius:50%; background:var(--accent); flex:none; box-shadow:0 0 0 2.5px color-mix(in srgb, var(--accent) 24%, transparent); }
+.navprojbtn { flex:none; width:18px; height:18px; display:grid; place-items:center; border:0; background:none; border-radius:5px; color:var(--dim); font:700 10.5px var(--fmono); opacity:.55; cursor:pointer; }
+.navprojmore { display:block; border:0; background:none; margin:1px 8px 3px 0; padding:2px 8px; font:620 10.5px var(--fbody); color:var(--dim); cursor:pointer; border-radius:6px; text-align:left; }
+.projlogo { display:inline-grid; place-items:center; overflow:hidden; flex:none; background:var(--panel3); border:1px solid var(--border2); color:var(--muted); font-weight:700; line-height:1; user-select:none; width:15px; height:15px; border-radius:5px; font-size:7px; }
+.projlogo.b { width:18px; height:18px; border-radius:5px; font-size:8px; }
+.navchanstrip { display:flex; flex-wrap:nowrap; gap:4px; padding:1px 10px 6px 27px; overflow:hidden; }
+.navchanchip { display:inline-flex; align-items:center; gap:3px; font:550 11px var(--fbody); color:var(--muted); background:var(--panel3); border:1px solid transparent; border-radius:var(--r-full); padding:2px 8px; cursor:pointer; flex:none; white-space:nowrap; }
+.navchanchip .h { color:var(--dim); font-weight:600; }
+.navchanchip.on { color:var(--text); background:color-mix(in srgb, var(--accent) 12%, transparent); border-color:color-mix(in srgb, var(--accent) 30%, transparent); }
+.navchanchip.morechip { color:var(--dim); background:none; border-color:transparent; }
+.navchanchip.add { margin-left:auto; background:none; color:var(--dim); border:1px dashed var(--border2); }
+.navchanask { width:4px; height:4px; border-radius:50%; background:var(--warn); flex:none; }
+.navhistwrap { position:relative; display:block; }
+.navproj .navhistwrap { margin-left:38px; }
+.navproj .navhistwrap::before { content:''; position:absolute; left:-14px; top:0; bottom:0; width:1px; background:var(--border); }
+.navproj .navhistwrap:first-of-type::before { top:3px; }
+.navhistrow { display:flex; align-items:flex-start; gap:8px; width:100%; margin:1px 0; padding:5px 9px; border:1px solid transparent; border-radius:8px; background:none; font-family:inherit; text-align:left; cursor:pointer; }
+.navhistrow:hover { background:var(--hover-bg); }
+.navhistrow.on { background:var(--card); border-color:var(--card-border); box-shadow:var(--shadow-card); }
+[data-theme='dark'] .navhistrow.on { background:var(--panel3); border-color:transparent; box-shadow:none; }
+.navhistrow.on .navhisttitle { color:var(--text); font-weight:600; }
+.navhistdot { flex:none; width:6px; height:6px; border-radius:50%; background:currentColor; margin-top:5px; }
+.navhistdot.thread { background:transparent; box-shadow:inset 0 0 0 1.5px var(--dim); }
+.navhistdot.live { animation:navdot-pulse 1.9s var(--ease) infinite; }
+@keyframes navdot-pulse { 0%{box-shadow:0 0 0 0 color-mix(in srgb, currentColor 55%, transparent);} 70%{box-shadow:0 0 0 5px color-mix(in srgb, currentColor 0%, transparent);} 100%{box-shadow:0 0 0 0 color-mix(in srgb, currentColor 0%, transparent);} }
+@keyframes nm-pulse { 50%{opacity:.45;} }
+.navhistbody { flex:1; min-width:0; display:flex; flex-direction:column; gap:1.5px; }
+.navhistchan { display:flex; align-items:center; gap:3px; font-size:10px; font-weight:650; letter-spacing:.02em; color:var(--dim); }
+.navhistchan .h { color:var(--muted); font-weight:600; }
+.navhistline1 { display:flex; align-items:baseline; gap:6px; min-width:0; }
+.navhistnum { flex:none; font:700 10.5px var(--fmono); color:var(--muted); }
+.navhisttitle { flex:1; min-width:0; font-size:12.5px; color:var(--body); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.navhistwhen { flex:none; font:500 10px var(--fmono); color:var(--dim); }
+.navhistbranch { display:flex; align-items:center; gap:5px; font:500 10px var(--fmono); color:var(--dim); min-width:0; }
+.navhistbranch span { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+.navhistlive { display:flex; align-items:center; gap:6px; font-size:10.5px; color:var(--body); min-width:0; }
+.nhlind { width:5px; height:5px; border-radius:50%; background:var(--prog); flex:none; animation:nhl-pulse 1.6s ease-in-out infinite; }
+@keyframes nhl-pulse { 50%{opacity:.35;} }
+.nhlverb { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; font-style:italic; }
+.nhlfrac { flex:none; font:600 9.5px var(--fmono); color:var(--muted); }
+/* state hues — .c-<state> supplies `color`, the dot inherits it via currentColor */
+.c-todo{color:var(--todo);} .c-in_progress{color:var(--prog);} .c-in_review{color:var(--review);} .c-done{color:var(--done);}
+.c-accepted{color:var(--acc);} .c-planning{color:var(--plan);} .c-plan_review{color:var(--planrev);} .c-blocked{color:var(--blocked);}
+.c-designing{color:var(--designrev);} .c-design_review{color:var(--designrev);} .c-closed{color:var(--dim);}
+
+/* ══ NEW — the orb gutter (proposed) ══ */
+.nhorb { flex:none; width:20px; height:20px; margin-top:1px; display:grid; place-items:center; border-radius:50%; position:relative; }
+.nhorb canvas { display:block; width:20px; height:20px; }
+.nhorb.ringed::after { content:''; position:absolute; inset:-2px; border-radius:50%; border:1.5px solid currentColor; opacity:.55; }
+.nhorb.tiny, .nhorb.tiny canvas { width:14px; height:14px; }
+
+/* ══ NEW — the scope row (proposed) ══ */
+.navscoperow { display:flex; align-items:center; gap:5px; padding:9px 11px 8px 14px; min-width:0; }
+/* the nav is 224–356px (nm:navw). Two SET chips + the magnifier overflow a 224px rail unless the
+   chips can shrink, and .navchanchip's lesson applies here too: a squeezed chip clips, never wraps.
+   The PROJECT chip yields first — its logo tile identifies it once the label is gone, and the room
+   is the more specific fact. Below ~200px of chip budget the project keeps the tile alone. */
+.navscoperow .cchip { min-width:0; flex:0 1 auto; }
+.navscoperow .cchip:first-child { flex-shrink:3; }
+.navscoperow .cchip .lbl { min-width:0; }
+.navscoperow .chanadd, .navscoperow .cchip .sfx, .navscoperow .cchip .car, .navscoperow .cchip .projlogo { flex:none; }
+.cchip { display:inline-flex; align-items:center; gap:5px; max-width:150px; padding:4px 10px; border-radius:var(--r-full); border:1px solid var(--border); background:transparent; color:var(--muted); font:600 11px var(--fbody); cursor:pointer; white-space:nowrap; }
+.cchip:hover { color:var(--text); border-color:var(--border2); background:var(--hover-bg); }
+.cchip.open { color:var(--text); border-color:var(--ring); background:var(--sel-bg); }
+.cchip.setfilter { background:var(--accent-soft); border-color:var(--border2); color:var(--text); font-weight:620; }
+.cchip .lbl { overflow:hidden; text-overflow:ellipsis; }
+.cchip .car { font-size:8px; color:var(--dim); flex:none; }
+.cchip .sfx { display:inline-grid; place-items:center; width:14px; height:14px; border-radius:var(--r-full); color:var(--dim); font-size:9px; }
+.cchip .h { color:var(--dim); font-weight:700; font-family:var(--fmono); }
+.navscoperow .grow { flex:1; }
+.navprojpop { position:absolute; width:236px; background:var(--card); border:1px solid var(--card-border); border-radius:13px; box-shadow:var(--shadow-pop); padding:6px; z-index:40; }
+.nppsec { padding:6px 9px 3px; font:700 8.5px var(--fmono); letter-spacing:.09em; text-transform:uppercase; color:var(--dim); }
+.nppitem { display:flex; align-items:center; gap:8px; width:100%; padding:6px 9px; border:0; background:none; border-radius:8px; font:500 12px var(--fbody); color:var(--text); cursor:pointer; text-align:left; }
+.nppitem:hover { background:var(--hover-bg); }
+.nppitem.on { background:var(--sel-bg); font-weight:620; }
+.nppitem .nppn { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.nppitem .nppct { font:600 9.5px var(--fmono); color:var(--dim); }
+.nppck { color:var(--accent); font-size:10px; }
+.nppsep { border-top:1px solid var(--border); margin:5px 6px; }
+.nppnew { display:flex; align-items:center; gap:8px; width:100%; padding:6px 9px; border:0; background:none; border-radius:8px; font:620 11.5px var(--fbody); color:var(--link); cursor:pointer; text-align:left; }
+.nppnew:hover { background:var(--hover-bg); }
+.nppmanage { display:flex; align-items:center; gap:8px; width:100%; padding:6px 9px; border:0; background:none; border-radius:8px; font:600 11.5px var(--fbody); color:var(--muted); cursor:pointer; text-align:left; }
+.nppmanage:hover { background:var(--hover-bg); color:var(--text); }
+/* the flat row's meta line — project · room · branch, adaptive to scope */
+.navhistmeta { display:flex; align-items:center; gap:5px; font-size:10px; font-weight:600; color:var(--dim); min-width:0; }
+.navhistmeta .pj { color:var(--muted); flex:none; max-width:88px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.navhistmeta .sep { color:var(--dim); opacity:.6; flex:none; }
+.navhistmeta .rm { font-family:var(--fmono); font-size:9.5px; flex:none; max-width:86px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.navhistmeta .br { font-family:var(--fmono); font-size:9.5px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:flex; align-items:center; gap:4px; }
+.navhistmeta .pjlogo { width:11px; height:11px; border-radius:3.5px; font-size:6px; }
+.newchat { display:flex; align-items:center; gap:8px; margin:6px 12px 4px 14px; padding:8px 11px; border-radius:10px; background:var(--card); border:1px solid var(--card-border); box-shadow:var(--shadow-card); color:var(--text); font:620 12px var(--fbody); cursor:pointer; }
+[data-theme='dark'] .newchat { background:var(--panel3); border-color:transparent; box-shadow:none; }
+.newchat .k { margin-left:auto; font:600 9.5px var(--fmono); color:var(--dim); border:1px solid var(--border2); border-radius:4px; padding:1px 5px; }
+
+/* ══ the full shell (stop ③) ══ */
+.shell { position:relative; display:flex; flex-direction:column; background:var(--win); border-radius:14px; min-height:520px; padding:0 10px 10px 0; overflow:hidden; }
+.shellrow { flex:1; display:flex; min-height:0; }
+.ftop { flex:none; display:flex; align-items:center; gap:8px; height:40px; padding:0 6px 0 13px; }
+.ftwm { font-weight:650; font-size:12.5px; letter-spacing:-.015em; }
+.ftcrumb { font-size:11.5px; color:var(--dim); display:flex; align-items:center; gap:6px; }
+.ftcrumb b { color:var(--body); font-weight:600; }
+.utilclu { display:flex; align-items:center; gap:1px; flex:none; margin-left:auto; }
+.utilico { width:27px; height:26px; border-radius:8px; display:grid; place-items:center; border:none; background:none; color:var(--dim); cursor:pointer; font-size:12px; }
+.utilico.on { background:var(--sel-bg); color:var(--text); box-shadow:inset 0 0 0 1px var(--border2); }
+.appnav { flex:none; width:236px; min-width:0; display:flex; flex-direction:column; padding:2px 0 6px; overflow:hidden; }
+.sheet { flex:1; min-width:0; display:flex; flex-direction:column; background:var(--bg); border-radius:18px; box-shadow:var(--shadow-sheet); overflow:hidden; }
+.thhead { flex:none; display:flex; align-items:center; gap:9px; padding:12px 14px 10px; border-bottom:1px solid var(--border); }
+.thtitle { font:640 14px var(--fdisp); color:var(--text); flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.navpin { width:26px; height:26px; border-radius:8px; display:grid; place-items:center; border:none; background:none; color:var(--dim); cursor:pointer; font-size:12px; flex:none; }
+.navpin.on { background:var(--sel-bg); color:var(--text); box-shadow:inset 0 0 0 1px var(--border2); }
+.thfacts { display:flex; align-items:center; gap:6px; padding:0 14px 10px; flex-wrap:wrap; }
+.tok { display:inline-flex; align-items:center; gap:5px; padding:2px 8px; border-radius:var(--r-full); border:1px solid var(--border); color:var(--muted); font:600 10.5px var(--fbody); background:none; cursor:pointer; }
+.tok:hover { color:var(--text); border-color:var(--border2); background:var(--hover-bg); }
+.tok.warm { color:var(--warn); border-color:color-mix(in srgb, var(--warn) 34%, transparent); }
+.thbody { flex:1; min-height:0; padding:12px 14px; display:flex; flex-direction:column; gap:10px; overflow:hidden; }
+.msg { display:flex; gap:9px; }
+.mav { width:22px; height:22px; border-radius:7px; flex:none; background:var(--panel3); border:1px solid var(--border2); display:grid; place-items:center; font:700 8px var(--fmono); color:var(--muted); }
+.mbody { flex:1; min-width:0; }
+.mwho { display:flex; align-items:baseline; gap:7px; margin-bottom:3px; }
+.mwho b { font:640 11.5px var(--fbody); color:var(--text); }
+.mrole { font:700 7.5px var(--fmono); letter-spacing:.09em; text-transform:uppercase; color:var(--dim); border:1px solid var(--border); border-radius:4px; padding:1px 4px; }
+.mwhen { font:500 9.5px var(--fmono); color:var(--dim); margin-left:auto; }
+.mtxt { font-size:12px; line-height:1.6; color:var(--body); }
+.mtxt .lk { color:var(--link); }
+.composer { flex:none; margin:0 14px 12px; padding:9px 11px; border-radius:12px; background:var(--card); border:1px solid var(--card-border); box-shadow:var(--shadow-card); color:var(--dim); font-size:11.5px; display:flex; align-items:center; gap:8px; }
+.composer .send { margin-left:auto; width:24px; height:24px; border-radius:50%; background:var(--accent); color:var(--accent-ink); display:grid; place-items:center; font-size:11px; }
+/* the in-sheet rail (today) */
+.mkrail { flex:none; width:186px; border-left:1px solid var(--border); padding:11px 11px 8px; display:flex; flex-direction:column; gap:6px; overflow:hidden; background:var(--bg); }
+.mkrailhead { font:700 8.5px var(--fmono); letter-spacing:.1em; text-transform:uppercase; color:var(--dim); display:flex; align-items:center; gap:6px; }
+.mkrailhead2 { margin-top:6px; }
+.mkrailrow { display:flex; align-items:center; gap:6px; width:100%; padding:5px 7px; border-radius:7px; border:1px solid var(--card-border); background:var(--card); color:var(--body); font-size:11px; text-align:left; cursor:pointer; }
+[data-theme='dark'] .mkrailrow { background:var(--panel3); border-color:transparent; }
+.mkrailrow b { font-weight:600; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.mkrailhint { font-size:10px; color:var(--dim); }
+.mkrailgen { display:flex; align-items:center; gap:6px; font-size:10.5px; color:var(--body); font-style:italic; }
+/* the workbench (frame right) */
+.workbench { flex:none; width:214px; display:flex; flex-direction:column; padding:2px 4px 6px 0; overflow:hidden; }
+.wbhead { display:flex; align-items:center; gap:7px; padding:8px 6px 7px 10px; }
+.wbname { font:650 11.5px var(--fbody); color:var(--text); }
+.wbwt { margin-left:auto; font:600 9.5px var(--fmono); color:var(--dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:96px; }
+.wbx { width:20px; height:20px; border-radius:6px; display:grid; place-items:center; border:none; background:none; color:var(--dim); cursor:pointer; font-size:11px; flex:none; }
+.wbseg { display:flex; gap:2px; margin:0 8px 8px 10px; padding:2px; border-radius:9px; background:var(--panel2); }
+.wbseg button { flex:1; padding:4px 6px; border:none; background:none; border-radius:7px; font:600 10.5px var(--fbody); color:var(--muted); cursor:pointer; }
+.wbseg button.on { background:var(--card); color:var(--text); box-shadow:var(--shadow-card); }
+[data-theme='dark'] .wbseg button.on { background:var(--panel3); box-shadow:none; }
+.wbslot { flex:1; min-height:0; padding:0 10px 6px; display:flex; flex-direction:column; gap:6px; overflow:hidden; }
+.wbdesc { font-size:11px; line-height:1.55; color:var(--body); max-height:66px; overflow:hidden; }
+.wbgrip { flex:none; width:5px; align-self:stretch; display:grid; place-items:center; }
+.wbgrip i { width:1px; height:34px; background:var(--border2); border-radius:1px; display:block; }
+.dashbox { border:1px dashed color-mix(in srgb, var(--warn) 45%, transparent); border-radius:10px; padding:6px; }
+.dashlbl { position:absolute; font:700 8px var(--fmono); letter-spacing:.08em; text-transform:uppercase; color:var(--warn); background:var(--win); padding:0 5px; transform:translate(8px,-13px); }
+.legend { display:flex; flex-wrap:wrap; gap:14px; margin:12px 2px 0; font:600 9.5px var(--fmono); letter-spacing:.06em; text-transform:uppercase; color:var(--dim); }
+.legend span { display:inline-flex; align-items:center; gap:6px; }
+.swatch { width:9px; height:9px; border-radius:50%; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<div class="pagehead">
+  <h1>Three cuts — the orb in the rail, the nav that stops nesting, the details that leave the thread</h1>
+  <p>Design round for George's three reports (2026-08-17), each one a place where a rule the app already
+  settled was applied on <b>some</b> of the surfaces it was written for. <b>①</b> A rail row with an agent
+  inside it draws a 5&nbsp;px pulsing dot — the pre-orb spinner — while every other live surface wears a
+  thinking orb. <b>②</b> The nav nests one collapsible header, one channel strip and one <span class="mono">n more ›</span>
+  per project, so four projects spend eight rows of chrome before the first thread. <b>③</b> A content
+  thread still renders the brand panel <i>inside</i> the sheet, three inches from the Workbench that was
+  built in the same round to hold exactly that.</p>
+  <p>Everything below is drawn from the real tokens (<span class="mono">tokens.css</span>, verbatim above)
+  and the real markup classes, in both shipping themes. <span class="ok">Recommendations are marked.</span>
+  <span class="warn">Deviations from an etched ruling are marked and named</span> — they need your call, not
+  my judgement.</p>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════════════════════ -->
+<div class="stophd"><span class="stopno">Stop ①</span>The live rail row wears the orb</div>
+<p class="stopp">
+  The orb already exists and already has a state map: <code>ui/Orb.tsx</code> wraps
+  <span class="mono">thinking-orbs</span>, and <code>orbStateFor(verb, cat, role)</code> — the table settled in
+  the <span class="mono">agent-stream-status</span> round — is what <b>RunCard</b>, <b>ThreadLiveBar</b>,
+  <b>AgentGhost</b>, <b>BellPopover</b> and the brand rail all read. The nav rail is the one live surface still
+  drawing the thing the orb replaced: a <code>5px --prog</code> dot on the verb line
+  (<code>.nhlind</code>) <i>plus</i> a pulsing halo on the state dot. Two pulses, and neither says what kind of
+  work is happening.
+</p>
+<p class="stopp">
+  Two ways to land it. <b>A</b> puts the orb in the row's glyph gutter — the liveness column becomes one object
+  instead of two; <b>B</b> swaps only the verb-line indicator and leaves the gutter alone.
+  The orbs below are the real animation (a vanilla port of the package, as in
+  <span class="mono">mockups/agent-stream-status</span>), not a drawing.
+</p>
+
+<div class="themes">
+  <div class="theme" data-theme="dark"><h2>Graphite · dark</h2>
+    <div class="twoup">
+      <div>
+        <div class="cap"><span class="x">▪</span> today</div>
+        <div class="rail boxed"><div class="navhistlist" style="padding-left:8px">
+          <span class="navhistwrap"><button class="navhistrow">
+            <span class="navhistdot c-in_progress live"></span>
+            <span class="navhistbody">
+              <span class="navhistchan"><span class="h">#</span>marketing</span>
+              <span class="navhistline1"><span class="navhistnum">1057</span><span class="navhisttitle">Fix X token refresh</span><span class="navhistwhen">now</span></span>
+              <span class="navhistbranch"><span>nm/1057-fix-x-token</span></span>
+              <span class="navhistlive"><span class="nhlind"></span><span class="nhlverb">plume · drafting</span><span class="nhlfrac">2/5</span></span>
+            </span>
+          </button></span>
+          <span class="navhistwrap"><button class="navhistrow">
+            <span class="navhistdot c-in_review"></span>
+            <span class="navhistbody">
+              <span class="navhistchan"><span class="h">#</span>build</span>
+              <span class="navhistline1"><span class="navhistnum">1052</span><span class="navhisttitle">Berth sweep budget</span><span class="navhistwhen">3d</span></span>
+              <span class="navhistbranch"><span>nm/1052-berth-sweep</span></span>
+            </span>
+          </button></span>
+        </div></div>
+        <p style="color:var(--dim);font-size:10.5px;margin:8px 4px 0;line-height:1.6">Two pulsing dots, one verb.
+        Nothing distinguishes <i>drafting</i> from <i>searching the web</i> from <i>fanning out three legs</i>.</p>
+      </div>
+      <div>
+        <div class="cap"><span class="y">▪</span> A · the orb takes the gutter <span class="rec">recommend</span></div>
+        <div class="rail boxed"><div class="navhistlist" style="padding-left:8px">
+          <span class="navhistwrap"><button class="navhistrow">
+            <span class="nhorb ringed c-in_progress"><canvas data-orb="ribbon" data-size="20" width="40" height="40"></canvas></span>
+            <span class="navhistbody">
+              <span class="navhistline1"><span class="navhistnum">1057</span><span class="navhisttitle">Fix X token refresh</span><span class="navhistwhen">now</span></span>
+              <span class="navhistlive"><span class="nhlverb">plume · drafting post B</span><span class="nhlfrac">2/5</span></span>
+            </span>
+          </button></span>
+          <span class="navhistwrap"><button class="navhistrow">
+            <span class="nhorb ringed c-in_progress"><canvas data-orb="globe" data-size="20" width="40" height="40"></canvas></span>
+            <span class="navhistbody">
+              <span class="navhistline1"><span class="navhistnum">1061</span><span class="navhisttitle">Competitor pricing sweep</span><span class="navhistwhen">now</span></span>
+              <span class="navhistlive"><span class="nhlverb">iris · searching the web</span></span>
+            </span>
+          </button></span>
+          <span class="navhistwrap"><button class="navhistrow">
+            <span class="nhorb ringed c-designing"><canvas data-orb="orbits" data-size="20" width="40" height="40"></canvas></span>
+            <span class="navhistbody">
+              <span class="navhistline1"><span class="navhistnum">1063</span><span class="navhisttitle">Calendar lane mockups</span><span class="navhistwhen">now</span></span>
+              <span class="navhistlive"><span class="nhlverb">nib · shaping round 2</span><span class="nhlfrac">1/3</span></span>
+            </span>
+          </button></span>
+          <span class="navhistwrap"><button class="navhistrow">
+            <span class="navhistdot c-in_review"></span>
+            <span class="navhistbody">
+              <span class="navhistline1"><span class="navhistnum">1052</span><span class="navhisttitle">Berth sweep budget</span><span class="navhistwhen">3d</span></span>
+              <span class="navhistmeta"><span class="rm"><span class="h">#</span>build</span><span class="sep">·</span><span class="br">⎇ nm-1052</span></span>
+            </span>
+          </button></span>
+        </div></div>
+        <p style="color:var(--dim);font-size:10.5px;margin:8px 4px 0;line-height:1.6">A quiet row keeps its 6&nbsp;px
+        state dot. A live row swaps it for the orb, and the <b>state hue survives as the orb's ring</b> — so the
+        gutter still says <i>in progress</i> vs <i>designing</i> at a glance.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="theme" data-theme="cream-oak"><h2>Cream Oak · light</h2>
+    <div class="twoup">
+      <div>
+        <div class="cap"><span class="x">▪</span> today</div>
+        <div class="rail boxed"><div class="navhistlist" style="padding-left:8px">
+          <span class="navhistwrap"><button class="navhistrow">
+            <span class="navhistdot c-in_progress live"></span>
+            <span class="navhistbody">
+              <span class="navhistchan"><span class="h">#</span>marketing</span>
+              <span class="navhistline1"><span class="navhistnum">1057</span><span class="navhisttitle">Fix X token refresh</span><span class="navhistwhen">now</span></span>
+              <span class="navhistbranch"><span>nm/1057-fix-x-token</span></span>
+              <span class="navhistlive"><span class="nhlind"></span><span class="nhlverb">plume · drafting</span><span class="nhlfrac">2/5</span></span>
+            </span>
+          </button></span>
+          <span class="navhistwrap"><button class="navhistrow">
+            <span class="navhistdot c-in_review"></span>
+            <span class="navhistbody">
+              <span class="navhistchan"><span class="h">#</span>build</span>
+              <span class="navhistline1"><span class="navhistnum">1052</span><span class="navhisttitle">Berth sweep budget</span><span class="navhistwhen">3d</span></span>
+              <span class="navhistbranch"><span>nm/1052-berth-sweep</span></span>
+            </span>
+          </button></span>
+        </div></div>
+      </div>
+      <div>
+        <div class="cap"><span class="y">▪</span> A · the orb takes the gutter <span class="rec">recommend</span></div>
+        <div class="rail boxed"><div class="navhistlist" style="padding-left:8px">
+          <span class="navhistwrap"><button class="navhistrow">
+            <span class="nhorb ringed c-in_progress"><canvas data-orb="ribbon" data-size="20" width="40" height="40"></canvas></span>
+            <span class="navhistbody">
+              <span class="navhistline1"><span class="navhistnum">1057</span><span class="navhisttitle">Fix X token refresh</span><span class="navhistwhen">now</span></span>
+              <span class="navhistlive"><span class="nhlverb">plume · drafting post B</span><span class="nhlfrac">2/5</span></span>
+            </span>
+          </button></span>
+          <span class="navhistwrap"><button class="navhistrow">
+            <span class="nhorb ringed c-in_progress"><canvas data-orb="globe" data-size="20" width="40" height="40"></canvas></span>
+            <span class="navhistbody">
+              <span class="navhistline1"><span class="navhistnum">1061</span><span class="navhisttitle">Competitor pricing sweep</span><span class="navhistwhen">now</span></span>
+              <span class="navhistlive"><span class="nhlverb">iris · searching the web</span></span>
+            </span>
+          </button></span>
+          <span class="navhistwrap"><button class="navhistrow">
+            <span class="nhorb ringed c-designing"><canvas data-orb="orbits" data-size="20" width="40" height="40"></canvas></span>
+            <span class="navhistbody">
+              <span class="navhistline1"><span class="navhistnum">1063</span><span class="navhisttitle">Calendar lane mockups</span><span class="navhistwhen">now</span></span>
+              <span class="navhistlive"><span class="nhlverb">nib · shaping round 2</span><span class="nhlfrac">1/3</span></span>
+            </span>
+          </button></span>
+          <span class="navhistwrap"><button class="navhistrow">
+            <span class="navhistdot c-in_review"></span>
+            <span class="navhistbody">
+              <span class="navhistline1"><span class="navhistnum">1052</span><span class="navhisttitle">Berth sweep budget</span><span class="navhistwhen">3d</span></span>
+              <span class="navhistmeta"><span class="rm"><span class="h">#</span>build</span><span class="sep">·</span><span class="br">⎇ nm-1052</span></span>
+            </span>
+          </button></span>
+        </div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="themes" style="margin-top:18px">
+  <div class="theme" data-theme="dark"><h2>Variant B · the orb rides the verb line <span class="alt">alternative</span></h2>
+    <div class="rail boxed" style="max-width:300px"><div class="navhistlist" style="padding-left:8px">
+      <span class="navhistwrap"><button class="navhistrow">
+        <span class="navhistdot c-in_progress live"></span>
+        <span class="navhistbody">
+          <span class="navhistchan"><span class="h">#</span>marketing</span>
+          <span class="navhistline1"><span class="navhistnum">1057</span><span class="navhisttitle">Fix X token refresh</span><span class="navhistwhen">now</span></span>
+          <span class="navhistbranch"><span>nm/1057-fix-x-token</span></span>
+          <span class="navhistlive"><span class="nhorb tiny"><canvas data-orb="ribbon" data-size="20" width="28" height="28"></canvas></span><span class="nhlverb">plume · drafting post B</span><span class="nhlfrac">2/5</span></span>
+        </span>
+      </button></span>
+    </div></div>
+    <p style="color:var(--dim);font-size:10.5px;margin:9px 4px 0;line-height:1.6">Cheapest change, keeps the state
+    dot untouched — but it puts a 14–20&nbsp;px object on a 10.5&nbsp;px line, keeps the row at four lines, and
+    leaves <b>two</b> liveness signals in one row: the halo still pulses in the gutter.</p>
+  </div>
+  <div class="theme" data-theme="cream-oak"><h2>What has to change in code</h2>
+    <table class="tbl" style="color:var(--body)">
+      <tr><td style="width:34%"><b>The rail passes a role</b></td><td><code>histLiveRuns</code> already resolves the agent to get its name — it drops <code>role</code>. Without it <code>orbStateFor</code> can never return <span class="mono">shaping</span>, so the designer's orb is unreachable from this surface. One field.</td></tr>
+      <tr><td><b>HistoryRail renders <span class="mono">&lt;Orb&gt;</span></b></td><td>Same import the four other live surfaces use. <code>.nhlind</code> and its keyframes retire.</td></tr>
+      <tr><td><b>The ring is a new idiom</b></td><td>A 1.5&nbsp;px <code>currentColor</code> ring on the orb mount, hue from the row's existing <code>.c-&lt;state&gt;</code> class. If it lands, it lands in <span class="mono">docs/33 §8</span> in the same PR.</td></tr>
+      <tr><td><b>Cost</b></td><td>One canvas <i>per live row only</i> — bounded by open runs (0–3 typical), the package pauses offscreen, reduced-motion paints a still frame. A rail at rest draws zero canvases.</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════════════════════ -->
+<div class="stophd"><span class="stopno">Stop ②</span>The nav stops nesting — one scope row, flat rows</div>
+<p class="stopp">
+  Today every project costs a header row, a channel strip, and an <span class="mono">n more ›</span> to show
+  three threads — and every thread row spends its first line on <span class="mono">#room</span>, repeated
+  straight down the column. Four projects = <b>eight rows of chrome and three separate cap decisions</b> before
+  the rail has said anything you came for.
+</p>
+<p class="stopp">
+  The move is not a new mechanism — it is <b>the app's own ScopeBar</b>, which every workspace destination
+  (Tasks · Whiteboards · Automations · Files · Skills · Activity) already wears since 2026-08-07:
+  <i>narrowing is a visible, reversible choice, never an invisible default.</i> The nav is the last surface
+  answering "what am I looking at?" its own way. The <span class="mono">PROJECTS</span> eyebrow becomes the
+  scope row; the rows go flat and recency-ordered; and <b>the row names what the scope doesn't</b> — the same
+  rule <code>SessionRow</code>'s <code>showRoom</code> already implements on Home.
+</p>
+
+<div class="themes tall">
+  <div class="theme" data-theme="dark"><h2>Graphite · today (nested) vs proposed (flat)</h2>
+    <div class="twoup" style="max-width:720px">
+      <div>
+        <div class="cap"><span class="x">▪</span> today — 20 rows to show 9 threads</div>
+        <div class="rail boxed">
+          <div class="navsecthd">
+            <button class="navsecttoggle"><span class="navchev">▾</span>Projects</button>
+            <button class="chanadd">⚙</button><button class="chanadd">＋</button><button class="chanadd">⌕</button>
+          </div>
+          <div class="navhistlist">
+            <div class="navproj">
+              <div class="navprojhead">
+                <button class="navprojchev">▾</button>
+                <button class="navprojmain on"><span class="projlogo">N</span><span class="navprojname">Neuramesh</span><span class="navprojlive"></span><span class="navprojask"></span></button>
+                <button class="navprojbtn">＋</button>
+              </div>
+              <div class="navchanstrip">
+                <button class="navchanchip"><span class="h">#</span>marketing<span class="navchanask"></span></button>
+                <button class="navchanchip"><span class="h">#</span>general</button>
+                <button class="navchanchip morechip">+2 more</button>
+                <button class="navchanchip add">＋</button>
+              </div>
+              <span class="navhistwrap"><button class="navhistrow on">
+                <span class="navhistdot c-in_progress live"></span>
+                <span class="navhistbody">
+                  <span class="navhistchan"><span class="h">#</span>marketing</span>
+                  <span class="navhistline1"><span class="navhisttitle">NeuraMesh project…</span><span class="navhistwhen">now</span></span>
+                  <span class="navhistlive"><span class="nhlind"></span><span class="nhlverb">rex · thinking</span></span>
+                </span></button></span>
+              <span class="navhistwrap"><button class="navhistrow">
+                <span class="navhistdot c-done"></span>
+                <span class="navhistbody">
+                  <span class="navhistchan"><span class="h">#</span>marketing</span>
+                  <span class="navhistline1"><span class="navhistnum">1047</span><span class="navhisttitle">Week of X tweet…</span><span class="navhistwhen">3d</span></span>
+                </span></button></span>
+              <span class="navhistwrap"><button class="navhistrow">
+                <span class="navhistdot c-closed"></span>
+                <span class="navhistbody">
+                  <span class="navhistchan"><span class="h">#</span>marketing</span>
+                  <span class="navhistline1"><span class="navhistnum">1045</span><span class="navhisttitle">Week of X post dr…</span><span class="navhistwhen">5d</span></span>
+                </span></button></span>
+              <button class="navprojmore" style="margin-left:38px">15 more ›</button>
+            </div>
+            <div class="navproj">
+              <div class="navprojhead">
+                <button class="navprojchev">▾</button>
+                <button class="navprojmain"><span class="projlogo">F</span><span class="navprojname">Flowe AI</span><span class="navprojask"></span></button>
+                <button class="navprojbtn">＋</button>
+              </div>
+              <div class="navchanstrip">
+                <button class="navchanchip"><span class="h">#</span>build</button>
+                <button class="navchanchip"><span class="h">#</span>marketing<span class="navchanask"></span></button>
+                <button class="navchanchip morechip">+3</button>
+                <button class="navchanchip add">＋</button>
+              </div>
+              <span class="navhistwrap"><button class="navhistrow">
+                <span class="navhistdot thread"></span>
+                <span class="navhistbody">
+                  <span class="navhistchan"><span class="h">#</span>marketing</span>
+                  <span class="navhistline1"><span class="navhisttitle">Daily X reply opp…</span><span class="navhistwhen">21h</span></span>
+                </span></button></span>
+              <span class="navhistwrap"><button class="navhistrow">
+                <span class="navhistdot c-todo"></span>
+                <span class="navhistbody">
+                  <span class="navhistchan"><span class="h">#</span>marketing</span>
+                  <span class="navhistline1"><span class="navhisttitle">Weekly X schedul…</span><span class="navhistwhen">2d</span></span>
+                </span></button></span>
+              <span class="navhistwrap"><button class="navhistrow">
+                <span class="navhistdot c-in_progress"></span>
+                <span class="navhistbody">
+                  <span class="navhistchan"><span class="h">#</span>marketing</span>
+                  <span class="navhistline1"><span class="navhistnum">1057</span><span class="navhisttitle">Fix X token a…</span><span class="navhistwhen">3d</span></span>
+                </span></button></span>
+              <button class="navprojmore" style="margin-left:38px">70 more ›</button>
+            </div>
+            <div class="navproj">
+              <div class="navprojhead">
+                <button class="navprojchev c">▸</button>
+                <button class="navprojmain"><span class="projlogo">A</span><span class="navprojname">AI Demos</span><span class="navprojask"></span></button>
+                <button class="navprojbtn">＋</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="cap"><span class="y">▪</span> proposed — 1 scope row, then threads <span class="rec">recommend</span></div>
+        <div class="rail boxed">
+          <button class="newchat">✎ New chat <span class="k">⌘N</span></button>
+          <div class="navscoperow">
+            <button class="cchip"><span class="lbl">All projects</span><span class="car">▾</span></button>
+            <span class="grow"></span>
+            <button class="chanadd">⌕</button>
+          </div>
+          <div class="navhistlist" style="padding-left:8px">
+            <span class="navhistwrap"><button class="navhistrow on">
+              <span class="nhorb ringed c-in_progress"><canvas data-orb="orbits" data-size="20" width="40" height="40"></canvas></span>
+              <span class="navhistbody">
+                <span class="navhistline1"><span class="navhisttitle">NeuraMesh project brief</span><span class="navhistwhen">now</span></span>
+                <span class="navhistlive"><span class="nhlverb">rex · thinking</span></span>
+              </span></button></span>
+            <span class="navhistwrap"><button class="navhistrow">
+              <span class="nhorb ringed c-in_progress"><canvas data-orb="globe" data-size="20" width="40" height="40"></canvas></span>
+              <span class="navhistbody">
+                <span class="navhistline1"><span class="navhistnum">1061</span><span class="navhisttitle">Competitor pricing sweep</span><span class="navhistwhen">now</span></span>
+                <span class="navhistlive"><span class="nhlverb">iris · searching the web</span></span>
+              </span></button></span>
+            <span class="navhistwrap"><button class="navhistrow">
+              <span class="navhistdot thread"></span>
+              <span class="navhistbody">
+                <span class="navhistline1"><span class="navhisttitle">Daily X reply opportunities</span><span class="navhistwhen">21h</span></span>
+                <span class="navhistmeta"><span class="projlogo pjlogo">F</span><span class="pj">Flowe AI</span><span class="sep">·</span><span class="rm"><span class="h">#</span>marketing</span></span>
+              </span></button></span>
+            <span class="navhistwrap"><button class="navhistrow">
+              <span class="navhistdot c-todo"></span>
+              <span class="navhistbody">
+                <span class="navhistline1"><span class="navhisttitle">Weekly X scheduling routine</span><span class="navhistwhen">2d</span></span>
+                <span class="navhistmeta"><span class="projlogo pjlogo">F</span><span class="pj">Flowe AI</span><span class="sep">·</span><span class="rm"><span class="h">#</span>marketing</span></span>
+              </span></button></span>
+            <span class="navhistwrap"><button class="navhistrow">
+              <span class="navhistdot c-done"></span>
+              <span class="navhistbody">
+                <span class="navhistline1"><span class="navhistnum">1047</span><span class="navhisttitle">Week of X tweet drafts</span><span class="navhistwhen">3d</span></span>
+                <span class="navhistmeta"><span class="projlogo pjlogo">N</span><span class="pj">Neuramesh</span><span class="sep">·</span><span class="rm"><span class="h">#</span>marketing</span><span class="sep">·</span><span class="br">⎇ nm-1047</span></span>
+              </span></button></span>
+            <span class="navhistwrap"><button class="navhistrow">
+              <span class="navhistdot c-in_progress"></span>
+              <span class="navhistbody">
+                <span class="navhistline1"><span class="navhistnum">1057</span><span class="navhisttitle">Fix X token auth refresh</span><span class="navhistwhen">3d</span></span>
+                <span class="navhistmeta"><span class="projlogo pjlogo">F</span><span class="pj">Flowe AI</span><span class="sep">·</span><span class="rm"><span class="h">#</span>marketing</span><span class="sep">·</span><span class="br">⎇ nm-1057</span></span>
+              </span></button></span>
+            <span class="navhistwrap"><button class="navhistrow">
+              <span class="navhistdot c-closed"></span>
+              <span class="navhistbody">
+                <span class="navhistline1"><span class="navhistnum">1045</span><span class="navhisttitle">Week of X post drafts</span><span class="navhistwhen">5d</span></span>
+                <span class="navhistmeta"><span class="projlogo pjlogo">N</span><span class="pj">Neuramesh</span><span class="sep">·</span><span class="rm"><span class="h">#</span>marketing</span></span>
+              </span></button></span>
+            <span class="navhistwrap"><button class="navhistrow">
+              <span class="navhistdot c-in_review"></span>
+              <span class="navhistbody">
+                <span class="navhistline1"><span class="navhistnum">1052</span><span class="navhisttitle">Berth sweep budget</span><span class="navhistwhen">5d</span></span>
+                <span class="navhistmeta"><span class="projlogo pjlogo">A</span><span class="pj">AI Demos</span><span class="sep">·</span><span class="rm"><span class="h">#</span>build</span><span class="sep">·</span><span class="br">⎇ nm-1052</span></span>
+              </span></button></span>
+            <span class="navhistwrap"><button class="navhistrow">
+              <span class="navhistdot thread"></span>
+              <span class="navhistbody">
+                <span class="navhistline1"><span class="navhisttitle">Onboarding copy pass</span><span class="navhistwhen">6d</span></span>
+                <span class="navhistmeta"><span class="projlogo pjlogo">A</span><span class="pj">AI Demos</span><span class="sep">·</span><span class="rm"><span class="h">#</span>general</span></span>
+              </span></button></span>
+            <button class="navhistmore" style="border:0;background:none;color:var(--dim);font:620 10.5px var(--fbody);padding:5px 9px;cursor:pointer;text-align:left">Everything else <span class="k" style="margin-left:8px;font:600 9.5px var(--fmono);border:1px solid var(--border2);border-radius:4px;padding:1px 5px">⌘Y</span></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="themes tall" style="margin-top:16px">
+  <div class="theme" data-theme="cream-oak"><h2>Cream Oak · the three scope states — the row says what the scope doesn't</h2>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;max-width:840px">
+      <div>
+        <div class="cap">All projects</div>
+        <div class="rail boxed">
+          <div class="navscoperow">
+            <button class="cchip"><span class="lbl">All projects</span><span class="car">▾</span></button>
+            <span class="grow"></span><button class="chanadd">⌕</button>
+          </div>
+          <div class="navhistlist" style="padding-left:8px">
+            <span class="navhistwrap"><button class="navhistrow">
+              <span class="navhistdot c-done"></span>
+              <span class="navhistbody">
+                <span class="navhistline1"><span class="navhistnum">1047</span><span class="navhisttitle">Week of X tweet drafts</span><span class="navhistwhen">3d</span></span>
+                <span class="navhistmeta"><span class="projlogo pjlogo">N</span><span class="pj">Neuramesh</span><span class="sep">·</span><span class="rm"><span class="h">#</span>marketing</span></span>
+              </span></button></span>
+            <span class="navhistwrap"><button class="navhistrow">
+              <span class="navhistdot c-in_progress"></span>
+              <span class="navhistbody">
+                <span class="navhistline1"><span class="navhistnum">1057</span><span class="navhisttitle">Fix X token auth refresh</span><span class="navhistwhen">3d</span></span>
+                <span class="navhistmeta"><span class="projlogo pjlogo">F</span><span class="pj">Flowe AI</span><span class="sep">·</span><span class="rm"><span class="h">#</span>marketing</span></span>
+              </span></button></span>
+          </div>
+        </div>
+        <p style="color:var(--dim);font-size:10px;margin:7px 4px;line-height:1.6">Project + room. Branch drops to
+        <span class="mono">⎇ nm-1057</span> or out — there is no width for it.</p>
+      </div>
+      <div>
+        <div class="cap">one project picked</div>
+        <div class="rail boxed">
+          <div class="navscoperow">
+            <button class="cchip setfilter"><span class="projlogo pjlogo">N</span><span class="lbl">Neuramesh</span><span class="sfx">✕</span></button>
+            <button class="cchip"><span class="lbl">All rooms</span><span class="car">▾</span></button>
+            <span class="grow"></span><button class="chanadd">⌕</button>
+          </div>
+          <div class="navchanstrip" style="padding-left:14px">
+            <button class="navchanchip"><span class="h">#</span>marketing<span class="navchanask"></span></button>
+            <button class="navchanchip"><span class="h">#</span>general</button>
+            <button class="navchanchip morechip">+2</button>
+            <button class="navchanchip add">＋</button>
+          </div>
+          <div class="navhistlist" style="padding-left:8px">
+            <span class="navhistwrap"><button class="navhistrow">
+              <span class="navhistdot c-done"></span>
+              <span class="navhistbody">
+                <span class="navhistline1"><span class="navhistnum">1047</span><span class="navhisttitle">Week of X tweet drafts</span><span class="navhistwhen">3d</span></span>
+                <span class="navhistmeta"><span class="rm"><span class="h">#</span>marketing</span><span class="sep">·</span><span class="br">⎇ nm/1047-week-of-x</span></span>
+              </span></button></span>
+            <span class="navhistwrap"><button class="navhistrow">
+              <span class="navhistdot c-in_review"></span>
+              <span class="navhistbody">
+                <span class="navhistline1"><span class="navhistnum">1052</span><span class="navhisttitle">Berth sweep budget</span><span class="navhistwhen">5d</span></span>
+                <span class="navhistmeta"><span class="rm"><span class="h">#</span>build</span><span class="sep">·</span><span class="br">⎇ nm/1052-berth-sweep</span></span>
+              </span></button></span>
+          </div>
+        </div>
+        <p style="color:var(--dim);font-size:10px;margin:7px 4px;line-height:1.6">The room strip returns —
+        <b>one</b> strip, the picked project's rooms, busiest first. The freed width goes to the full branch.</p>
+      </div>
+      <div>
+        <div class="cap">project + room</div>
+        <div class="rail boxed">
+          <div class="navscoperow">
+            <button class="cchip setfilter"><span class="projlogo pjlogo">N</span><span class="lbl">Neuramesh</span><span class="sfx">✕</span></button>
+            <button class="cchip setfilter"><span class="h">#</span><span class="lbl">marketing</span><span class="sfx">✕</span></button>
+            <span class="grow"></span><button class="chanadd">⌕</button>
+          </div>
+          <div class="navhistlist" style="padding-left:8px">
+            <span class="navhistwrap"><button class="navhistrow">
+              <span class="navhistdot c-done"></span>
+              <span class="navhistbody">
+                <span class="navhistline1"><span class="navhistnum">1047</span><span class="navhisttitle">Week of X tweet drafts</span><span class="navhistwhen">3d</span></span>
+                <span class="navhistmeta"><span class="br">⎇ nm/1047-week-of-x-tweets</span></span>
+              </span></button></span>
+            <span class="navhistwrap"><button class="navhistrow">
+              <span class="navhistdot thread"></span>
+              <span class="navhistbody">
+                <span class="navhistline1"><span class="navhisttitle">Brand voice check-in</span><span class="navhistwhen">4d</span></span>
+              </span></button></span>
+            <span class="navhistwrap"><button class="navhistrow">
+              <span class="navhistdot c-closed"></span>
+              <span class="navhistbody">
+                <span class="navhistline1"><span class="navhistnum">1045</span><span class="navhisttitle">Week of X post drafts</span><span class="navhistwhen">5d</span></span>
+                <span class="navhistmeta"><span class="br">⎇ nm/1045-week-of-x-posts</span></span>
+              </span></button></span>
+          </div>
+        </div>
+        <p style="color:var(--dim);font-size:10px;margin:7px 4px;line-height:1.6">Nothing is repeated: the scope row
+        says it once. A chat row with no branch is <b>one line</b>.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="stopp" style="margin-top:16px">
+  <b>The width budget, measured.</b> The nav resizes 224–356&nbsp;px (<span class="mono">nm:navw</span>), and two
+  <i>set</i> chips plus the magnifier do not fit 224&nbsp;px at natural width — the first cut of this page
+  overflowed by 32&nbsp;px. The chips shrink with ellipsis rather than wrap (<code>.navchanchip</code>'s own
+  2026-08-09 lesson: a squeezed chip must clip at the strip's edge, never turn a one-row strip 34&nbsp;px tall),
+  and <b>the project chip yields first</b> — its logo tile still identifies it once the label is gone, and the
+  room is the more specific fact. Verified at 224 · 236 · 260 · 356&nbsp;px: no clipping, one row, chip height
+  23–25&nbsp;px throughout.
+</p>
+
+<div class="themes" style="margin-top:16px">
+  <div class="theme" data-theme="dark"><h2>The project menu — where a quiet project lives now</h2>
+    <div style="position:relative;height:330px;padding:8px">
+      <div class="navscoperow" style="padding-left:4px">
+        <button class="cchip open"><span class="lbl">All projects</span><span class="car">▾</span></button>
+        <button class="cchip" style="opacity:.4"><span class="lbl">All rooms</span><span class="car">▾</span></button>
+      </div>
+      <div class="navprojpop" style="left:4px;top:44px">
+        <div class="nppsec">Scope the rail</div>
+        <button class="nppitem on"><span class="nppn">All projects</span><span class="nppct">96</span><span class="nppck">✓</span></button>
+        <div class="nppsep"></div>
+        <button class="nppitem"><span class="projlogo b">N</span><span class="nppn">Neuramesh</span><span class="navprojlive"></span><span class="navprojask"></span></button>
+        <button class="nppitem"><span class="projlogo b">F</span><span class="nppn">Flowe AI</span><span class="navprojask"></span></button>
+        <button class="nppitem"><span class="projlogo b">A</span><span class="nppn">AI Demos</span><span class="navprojask"></span></button>
+        <button class="nppitem"><span class="projlogo b">P</span><span class="nppn">Porch site</span><span class="nppct">—</span></button>
+        <div class="nppsep"></div>
+        <button class="nppnew">＋ New project…</button>
+        <button class="nppmanage">⚙ Manage projects…</button>
+      </div>
+    </div>
+    <p style="color:var(--dim);font-size:10.5px;margin:0 6px;line-height:1.6"><b style="color:var(--body)">The
+    2026-08-07 ruling survives</b> — “every project earns a group… a project that is merely quiet must still be
+    visible, clickable and creatable-in.” <i>Porch site</i> has no threads at all and is right there, wearing its
+    logo, one click from being the scope. Ask dots and the live pulse ride the menu rows, so a collapsed group can
+    still never hide an ask — and the chip itself carries a dot when any unshown project wants you.</p>
+  </div>
+  <div class="theme" data-theme="cream-oak"><h2>What each act costs — before / after</h2>
+    <table class="tbl" style="color:var(--body)">
+      <tr><th>Act</th><th>Today</th><th>Proposed</th></tr>
+      <tr><td><b>See a quiet project</b></td><td class="was">scroll to its header (2 rows of chrome, forever)</td><td>a row in the project menu, with its logo</td></tr>
+      <tr><td><b>Switch project</b></td><td class="was">click the header's name (not the chevron — two controls, one row)</td><td>pick it in the chip</td></tr>
+      <tr><td><b>Narrow to a room</b></td><td class="was">click a chip in <i>that project's</i> strip</td><td>the room chip, or the strip under it</td></tr>
+      <tr><td><b>New room</b></td><td class="was">the strip's ＋, per project</td><td>the strip's ＋ (unchanged), inside the picked project</td></tr>
+      <tr><td><b>New project</b></td><td class="was">＋ on the section head</td><td><span class="mono">＋ New project…</span> in the menu</td></tr>
+      <tr><td><b>Manage projects</b></td><td class="was">⚙ on the section head</td><td><span class="mono">Manage projects…</span> in the menu</td></tr>
+      <tr><td><b>See more of one project</b></td><td class="was"><span class="mono">n more ›</span> lifts 3→12, then ⌘Y</td><td>pick it; the whole rail is that project, then ⌘Y</td></tr>
+      <tr><td><b>Vertical cost at rest</b></td><td class="was">≈20 rows for 9 threads (4 projects)</td><td>1 scope row + 9 threads</td></tr>
+    </table>
+  </div>
+</div>
+
+<p class="stopp" style="margin-top:16px">
+  <span class="ask">needs your call</span> <b>The branch line compresses.</b> The 2026-07-30 ruling is that a task
+  keeps its <span class="mono">⎇ branch</span> line <i>always</i>. Flat rows have one meta line, so at
+  All-projects width the branch shows as its short worktree name (<span class="mono">⎇ nm-1057</span> — the same
+  form the Workbench header uses) and only expands to the full <span class="mono">nm/1057-fix-x-token-auth</span>
+  once the scope frees the width. Presence is preserved; the full name moves to the tooltip. Say the word and it
+  keeps its own line instead — it costs one line on every task row.
+</p>
+<p class="stopp">
+  <span class="ask">needs your call</span> <b>A live row's meta line yields to the verb.</b> Two lines, not three:
+  while a run is open the row shows <i>agent · step</i> where the project/room would be, and the meta returns when
+  the run closes. The alternative keeps both and the live row is three lines tall.
+</p>
+
+<!-- ══════════════════════════════════════════════════════════════════════════════════════════ -->
+<div class="stophd"><span class="stopno">Stop ③</span>The details panel leaves the thread</div>
+<p class="stopp">
+  The 2026-08-16 round already made this call — “two panels at the window's right edge is exactly the duplication
+  this round exists to remove” — and landed it on <b>one of the two thread kinds</b>. <code>TaskThread</code>
+  portals its sections into the Workbench when a slot exists. <code>ConvoThread</code> never portals: it mounts
+  <code>&lt;ThreadRail&gt;</code> inline, unconditionally. So a content conversation in a marketing room draws
+  <i>Brand docs · Upcoming · Connections</i> inside the sheet — the exact panel the Workbench was built to hold.
+  It is not a second decision; it is the first one, unfinished.
+</p>
+<p class="stopp">
+  The rule to finish it with is the one the Workbench already follows for <b>Code</b> and <b>Artifacts</b>:
+  <b>the face is scoped to whatever you are standing in.</b> A task → its description, requirements, Definition
+  of Done, artifacts, subtasks. A chat thread → its artifacts, plus the room's sections. A room home with nothing
+  open → the room's sections alone. One panel, one edge, one door (<span class="kbd">⌘P</span> and the thread
+  head's dock-right pin).
+</p>
+
+<div class="themes tall">
+  <div class="theme" data-theme="dark"><h2>Graphite · a content conversation — today</h2>
+    <div class="shell" style="min-height:430px">
+      <div class="ftop"><span class="ftwm">neuramesh</span><span class="ftcrumb">‹ <b>#marketing</b> · Brand voice check-in</span>
+        <span class="utilclu"><button class="utilico">▤</button><button class="utilico">▷</button><button class="utilico">▸</button><button class="utilico">▯</button></span></div>
+      <div class="shellrow">
+        <div class="appnav">
+          <div class="rail" style="background:none">
+            <button class="newchat">✎ New chat <span class="k">⌘N</span></button>
+            <div class="navsecthd"><button class="navsecttoggle"><span class="navchev">▾</span>Projects</button></div>
+            <div class="navhistlist"><div class="navproj">
+              <div class="navprojhead"><button class="navprojchev">▾</button><button class="navprojmain on"><span class="projlogo">N</span><span class="navprojname">Neuramesh</span></button></div>
+              <div class="navchanstrip"><button class="navchanchip on"><span class="h">#</span>marketing</button><button class="navchanchip"><span class="h">#</span>general</button></div>
+              <span class="navhistwrap"><button class="navhistrow on"><span class="navhistdot thread"></span><span class="navhistbody"><span class="navhistchan"><span class="h">#</span>marketing</span><span class="navhistline1"><span class="navhisttitle">Brand voice check-in</span><span class="navhistwhen">now</span></span></span></button></span>
+            </div></div>
+          </div>
+        </div>
+        <div class="sheet" style="flex-direction:row">
+          <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+            <div class="thhead"><span class="thtitle">Brand voice check-in</span><button class="navpin">▤</button><button class="navpin">⌾</button></div>
+            <div class="thbody">
+              <div class="msg"><span class="mav">G</span><div class="mbody"><div class="mwho"><b>george</b><span class="mwhen">11:02</span></div>
+                <div class="mtxt">does the launch thread still read like us? give me three lines you'd cut.</div></div></div>
+              <div class="msg"><span class="mav">P</span><div class="mbody"><div class="mwho"><b>plume</b><span class="mrole">marketer</span><span class="mwhen">11:03</span></div>
+                <div class="mtxt">Read <span class="lk">brand-voice.md</span> and the launch draft. Three cuts, in order of how much they cost us…</div></div></div>
+            </div>
+            <div class="composer">Ask anything — ↵ send <span class="send">↑</span></div>
+          </div>
+          <div class="mkrail" style="position:relative">
+            <span class="dashlbl">inside the sheet</span>
+            <div class="mkrailhead">Artifacts <span style="margin-left:auto;color:var(--dim)">2</span></div>
+            <button class="mkrailrow"><b>voice-notes.md</b></button>
+            <div class="mkrailhead mkrailhead2">Brand docs</div>
+            <button class="mkrailrow">📄 <b>brand-voice.md</b></button>
+            <button class="mkrailrow">📄 <b>guidelines.md</b></button>
+            <div class="mkrailgen"><span class="nhorb tiny"><canvas data-orb="ribbon" data-size="20" width="28" height="28"></canvas></span> writing tone.md…</div>
+            <div class="mkrailhead mkrailhead2">Upcoming</div>
+            <div class="mkrailhint">3 scheduled posts</div>
+            <div class="mkrailhead mkrailhead2">Connections</div>
+            <div class="mkrailhint">X · LinkedIn</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p style="color:var(--dim);font-size:10.5px;margin:10px 6px 0;line-height:1.65">The Workbench toggle
+    (<span class="mono">▯</span>, frame top) is <b>right there</b> and opening it would put a <i>second</i> panel
+    at this edge — the thread's rail, then a grip, then the Workbench showing <span class="mono">repos</span>,
+    because a chat thread does not count as session-scoped.</p>
+  </div>
+</div>
+
+<div class="themes tall" style="margin-top:16px">
+  <div class="theme" data-theme="cream-oak"><h2>Cream Oak · the same conversation — proposed</h2>
+    <div class="shell" style="min-height:430px">
+      <div class="ftop"><span class="ftwm">neuramesh</span><span class="ftcrumb">‹ <b>#marketing</b> · Brand voice check-in</span>
+        <span class="utilclu"><button class="utilico">▤</button><button class="utilico">▷</button><button class="utilico">▸</button><button class="utilico on">▯</button></span></div>
+      <div class="shellrow">
+        <div class="appnav">
+          <div class="rail" style="background:none">
+            <button class="newchat">✎ New chat <span class="k">⌘N</span></button>
+            <div class="navscoperow">
+              <button class="cchip setfilter"><span class="projlogo pjlogo">N</span><span class="lbl">Neuramesh</span><span class="sfx">✕</span></button>
+              <button class="cchip setfilter"><span class="h">#</span><span class="lbl">marketing</span><span class="sfx">✕</span></button>
+              <span class="grow"></span><button class="chanadd">⌕</button>
+            </div>
+            <div class="navhistlist" style="padding-left:8px">
+              <span class="navhistwrap"><button class="navhistrow on"><span class="navhistdot thread"></span><span class="navhistbody"><span class="navhistline1"><span class="navhisttitle">Brand voice check-in</span><span class="navhistwhen">now</span></span></span></button></span>
+              <span class="navhistwrap"><button class="navhistrow"><span class="navhistdot c-done"></span><span class="navhistbody"><span class="navhistline1"><span class="navhistnum">1047</span><span class="navhisttitle">Week of X tweet drafts</span><span class="navhistwhen">3d</span></span><span class="navhistmeta"><span class="br">⎇ nm/1047-week-of-x</span></span></span></button></span>
+              <span class="navhistwrap"><button class="navhistrow"><span class="navhistdot c-closed"></span><span class="navhistbody"><span class="navhistline1"><span class="navhistnum">1045</span><span class="navhisttitle">Week of X post drafts</span><span class="navhistwhen">5d</span></span><span class="navhistmeta"><span class="br">⎇ nm/1045-week-of-x</span></span></span></button></span>
+            </div>
+          </div>
+        </div>
+        <div class="sheet">
+          <div class="thhead"><span class="thtitle">Brand voice check-in</span><button class="navpin">▤</button><button class="navpin">⌾</button><button class="navpin on">▤</button></div>
+          <div class="thfacts">
+            <button class="tok">artifacts 2</button>
+            <button class="tok">brand docs 4</button>
+            <button class="tok">3 scheduled</button>
+          </div>
+          <div class="thbody">
+            <div class="msg"><span class="mav">G</span><div class="mbody"><div class="mwho"><b>george</b><span class="mwhen">11:02</span></div>
+              <div class="mtxt">does the launch thread still read like us? give me three lines you'd cut.</div></div></div>
+            <div class="msg"><span class="mav">P</span><div class="mbody"><div class="mwho"><b>plume</b><span class="mrole">marketer</span><span class="mwhen">11:03</span></div>
+              <div class="mtxt">Read <span class="lk">brand-voice.md</span> and the launch draft. Three cuts, in order of how much they cost us —<br>① “redefining collaboration” · ② the second CTA · ③ the em dash pile-up in para 4.</div></div></div>
+            <div class="msg"><span class="mav">G</span><div class="mbody"><div class="mwho"><b>george</b><span class="mwhen">11:05</span></div>
+              <div class="mtxt">take ① and ③. leave the CTA.</div></div></div>
+          </div>
+          <div class="composer">Ask anything — ↵ send <span class="send">↑</span></div>
+        </div>
+        <div class="wbgrip"><i></i></div>
+        <div class="workbench" style="position:relative">
+          <span class="dashlbl" style="transform:translate(6px,-2px)">on the frame</span>
+          <div class="wbhead"><b class="wbname">Workbench</b><span class="wbwt">#marketing</span><button class="wbx">✕</button></div>
+          <div class="wbseg"><button class="on">Details</button><button>Artifacts</button></div>
+          <div class="wbslot">
+            <div class="mkrailhead">This conversation</div>
+            <button class="mkrailrow">📄 <b>voice-notes.md</b></button>
+            <div class="mkrailhead mkrailhead2">Brand docs</div>
+            <button class="mkrailrow">📄 <b>brand-voice.md</b></button>
+            <button class="mkrailrow">📄 <b>guidelines.md</b></button>
+            <div class="mkrailgen"><span class="nhorb tiny"><canvas data-orb="ribbon" data-size="20" width="28" height="28"></canvas></span> writing tone.md…</div>
+            <div class="mkrailhead mkrailhead2">Upcoming</div>
+            <div class="mkrailhint">3 scheduled posts · next Mon 9:00</div>
+            <div class="mkrailhead mkrailhead2">Connections</div>
+            <div class="mkrailhint">X · LinkedIn</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p style="color:var(--dim);font-size:10.5px;margin:10px 6px 0;line-height:1.65">One panel, on the frame, at the
+    edge it was built for. The thread is a thread all the way to the sheet's right edge. <b>The facts line becomes
+    the door</b> — <span class="mono">artifacts 2 · brand docs 4 · 3 scheduled</span> opens the Workbench to
+    Details and scrolls to that section, so what the panel holds is <i>said out loud</i> even while it is closed.
+    That is the honest answer to the one real cost of this cut: with the Workbench shut, the details are
+    off-screen.</p>
+  </div>
+</div>
+
+<div class="themes" style="margin-top:18px">
+  <div class="theme" data-theme="dark"><h2>The Details face, scoped by context</h2>
+    <table class="tbl" style="color:var(--body)">
+      <tr><th>Standing in</th><th>Details shows</th><th>Today</th></tr>
+      <tr><td><b>a task</b></td><td>description · requirements · DoD · artifacts · subtasks <span style="color:var(--dim)">(+ brand sections in a marketing room)</span></td><td class="was">already right — when the Workbench is open</td></tr>
+      <tr><td><b>a chat thread</b></td><td>its artifacts + the room's sections</td><td class="was"><span style="color:var(--warn)">in-sheet rail, always</span></td></tr>
+      <tr><td><b>a room home</b></td><td>the room's sections alone</td><td class="was"><span style="color:var(--warn)"><code>BrandDocsRail</code>, a third mounting</span></td></tr>
+      <tr><td><b>nothing open</b></td><td>— <span style="color:var(--dim)">(no Details face; Repos, as today)</span></td><td class="was">unchanged</td></tr>
+    </table>
+  </div>
+  <div class="theme" data-theme="cream-oak"><h2>What retires, what changes</h2>
+    <table class="tbl" style="color:var(--body)">
+      <tr><td style="width:38%"><b><code>wbSessionScoped</code> counts a thread</b></td><td>Today it is <code>wtab?.root || wtabDoc || wtab?.readOnly || openTask || wbRoot</code> — an open <i>conversation</i> is not in that list, which is the whole bug. Add it, and <code>wscope</code> carries the thread + its channel.</td></tr>
+      <tr><td><b><code>'task'</code> face → <code>'details'</code></b></td><td>The label is already “Details”; only the type name still says task. A stale persisted <code>want</code> falls back safely — <code>workbenchState</code> honours it only if the context offers it.</td></tr>
+      <tr><td><b><code>.mkrail</code> retires from the sheet</b></td><td>With it: the hover-peek (<code>.mkrailpeekwrap</code> / <code>.mkrailtab</code> / the enter-leave timers), <code>BrandDocsRail</code>, and <code>nm:mkrail-collapsed</code>. <code>RailSections</code> — the shared body — stays exactly as it is.</td></tr>
+      <tr><td><b>The chat head gains the pin</b></td><td>The dock-right toggle <code>TaskThread</code> has; a conversation needs the same door.</td></tr>
+      <tr><td><b>docs to update</b></td><td><span class="mono">docs/25</span> (the zoned task panel — the rail is no longer in the sheet), <span class="mono">docs/33 §2</span> (the frame's right-edge tenant is now the only one), <span class="mono">docs/34</span> (chat mode's surfaces).</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════════════════════ -->
+<div class="stophd"><span class="stopno">Stop ④</span>The rulings this round touches — and how each one survives</div>
+<p class="stopp">Nothing here is a reversal by accident. Each prior ruling is named, with where its job goes.</p>
+<div class="themes tall">
+  <div class="theme" data-theme="cream-oak"><h2>Ledger</h2>
+    <table class="tbl" style="color:var(--body)">
+      <tr><th style="width:26%">Ruling</th><th style="width:30%">Why it exists</th><th>Where its job goes</th></tr>
+      <tr><td><b>Every project earns a group</b><br><span style="color:var(--dim)">2026-08-07</span></td><td class="was">a quiet project must stay visible, clickable, creatable-in — the spine's selector retired for this</td><td>the project menu lists every active project with its logo, ask dot and live pulse, plus <span class="mono">＋ New project</span>. Cheaper <i>and</i> more complete than a header per project.</td></tr>
+      <tr><td><b>The rooms are always visible</b><br><span style="color:var(--dim)">2026-08-09</span></td><td class="was">“an empty room you cannot see is a room you will never post in” — three of four default rooms went unused behind a hover-<span class="mono">#</span></td><td>the strip survives verbatim (<code>stripChannels</code> untouched) — <b>one</b> strip instead of N, under the picked project. It does not draw under All projects, where three <span class="mono">#marketing</span> chips from three projects could not mean anything.</td></tr>
+      <tr><td><b>Attention is colour, never a numeral</b><br><span style="color:var(--dim)">2026-08-07</span></td><td class="was">no counts anywhere in the tree</td><td>unchanged. Ask = the row's accent dot; a project holding one wears its dot in the menu, and the chip carries one when the ask is outside the current scope.</td></tr>
+      <tr><td><b>Asks pin into the cap</b><br><span style="color:var(--dim)">navtree.ts</span></td><td class="was">a cap must never hide a row that wants you</td><td>same rule, now once over the flat list instead of once per group. <code>navTree</code> keeps its tests; only the grouping step drops out.</td></tr>
+      <tr><td><b>Live is not a surface</b><br><span style="color:var(--dim)">2026-08-01</span></td><td class="was">the neutral card means <i>selected</i>; liveness must not borrow it</td><td>unchanged, and reinforced: the orb takes no ground at all. Selected stays <code>--card</code>; live stays a glyph + a verb.</td></tr>
+      <tr><td><b>A task keeps its ⎇ branch line</b><br><span style="color:var(--dim)">2026-07-30</span></td><td class="was">stable truth, always present, plain end-truncation</td><td><span style="color:var(--warn)">compressed, not deleted</span> — the branch joins the meta line as <span class="mono">⎇ nm-1057</span> and expands with the scope. <b>Your call.</b></td></tr>
+      <tr><td><b>One panel at that edge</b><br><span style="color:var(--dim)">docs/33 §2</span></td><td class="was">sheet-level and frame-level are different edges; a second panel on either is forbidden</td><td>finished: the sheet-level panel is gone, so the frame's Workbench is the only one. This is the ruling being <i>completed</i>, not bent.</td></tr>
+      <tr><td><b>The ⌘Y overlay stays</b><br><span style="color:var(--dim)">2026-08-10</span></td><td class="was">the rail is a jump list, not a search surface</td><td>unchanged — one magnifier on the scope row, one destination. The per-group <span class="mono">n more ›</span> disappears with the groups; the rail caps once and hands the rest to ⌘Y.</td></tr>
+    </table>
+  </div>
+</div>
+
+<div class="legend" data-theme="dark" style="border-top:1px solid #2c2a26;padding-top:16px;margin-top:34px">
+  <span><i class="swatch" style="background:var(--prog)"></i> in progress</span>
+  <span><i class="swatch" style="background:var(--review)"></i> in review</span>
+  <span><i class="swatch" style="background:var(--done)"></i> done</span>
+  <span><i class="swatch" style="background:var(--designrev)"></i> designing</span>
+  <span><i class="swatch" style="background:var(--accent)"></i> needs you</span>
+  <span style="color:#6f6b64">orbs = thinking-orbs (MIT, Jakub Antalik), vanilla port · ribbon = composing · globe = searching · orbits = working/shaping</span>
+</div>
+
+</div>
+
+<script>
+/* ── thinking-orbs: faithful vanilla port of core.ts + orbits/globe/ribbon (MIT, Jakub Antalik).
+      The shipped implementation imports the real npm package — this exists so the mockup is
+      reviewable self-contained. Adapted: dark-ness is read from each canvas's OWN [data-theme]
+      ancestor, because this page renders both themes at once. ── */
+const hashD = (a, b) => { const h = Math.sin(a * 12.9898 + b * 78.233) * 43758.5453; return h - Math.floor(h); };
+const fibDir = (i, n) => { const g = Math.PI * (3 - Math.sqrt(5)); const y = 1 - (2 * (i + .5)) / n; const r = Math.sqrt(1 - y * y); const a = i * g; return [r * Math.cos(a), y, r * Math.sin(a)]; };
+const makeProj = (yaw, tilt, cx, cy) => { const st = Math.sin(tilt), ct = Math.cos(tilt), sy = Math.sin(yaw), cw = Math.cos(yaw);
+  return (x, y, z) => { const x1 = x * cw + z * sy, z1 = -x * sy + z * cw, y1 = y * ct - z1 * st, z2 = y * st + z1 * ct; return [cx + x1, cy - y1, z2]; }; };
+const paint = (ctx, dots, dark, rMin = .3) => { dots.sort((a, b) => a.z - b.z);
+  for (const d of dots) { const al = d.a ?? 1; if (al < .02) continue; const w = Math.min(1, Math.max(0, d.white));
+    const g = Math.round((dark ? 1 - w : w) * 255); ctx.fillStyle = `rgba(${g},${g},${g},${al})`;
+    ctx.beginPath(); ctx.arc(d.x, d.y, Math.max(rMin, d.r), 0, Math.PI * 2); ctx.fill(); } };
+const rScale = (size, pow = .6) => (size / 300) ** pow;
+
+const MODES = {
+  orbits(ctx, size, t, dark, small) {
+    const cx = size / 2, R = cx * .82, pt = makeProj(t * .12, .3, cx, cx), rs = rScale(size) * (small ? 2.4 : 1);
+    const dots = [], orbitN = small ? 4 : 12, ghostN = small ? 12 : 40;
+    for (let orb = 0; orb < orbitN; orb++) {
+      const h1 = hashD(orb, 1.7), h2 = hashD(orb, 5.2), h3 = hashD(orb, 8.9);
+      const ro = R * (.45 + .52 * h1), th = h1 * 2 * Math.PI, phi = Math.acos(2 * h2 - 1);
+      const nx = Math.sin(phi) * Math.cos(th), ny = Math.cos(phi), nz = Math.sin(phi) * Math.sin(th);
+      let ux = -ny, uy = nx; const ul = Math.max(1e-6, Math.hypot(ux, uy)); ux /= ul; uy /= ul;
+      const vx = -nz * uy, vy = nz * ux, vz = nx * uy - ny * ux;
+      const speed = (.25 + .55 * h3) * (h3 > .5 ? 1 : -1) * (small ? 3.9 : 1.885);
+      for (let k = 0; k < ghostN; k++) { const a = (k / ghostN) * 2 * Math.PI;
+        const [px, py, z] = pt((ux * Math.cos(a) + vx * Math.sin(a)) * ro, (uy * Math.cos(a) + vy * Math.sin(a)) * ro, (vz * Math.sin(a)) * ro);
+        dots.push({ x: px, y: py, z, r: .9 * rs, white: .72, a: .5 * (.4 + .6 * ((z / ro + 1) / 2)) }); }
+      for (let m = 0; m < 3; m++) { const a = t * speed + (m / 3) * 2 * Math.PI + h2 * 6;
+        const [px, py, z] = pt((ux * Math.cos(a) + vx * Math.sin(a)) * ro, (uy * Math.cos(a) + vy * Math.sin(a)) * ro, (vz * Math.sin(a)) * ro);
+        const depth = (z / ro + 1) / 2; dots.push({ x: px, y: py, z, r: (1.2 + 1.6 * depth) * rs, white: .3 - .22 * depth }); }
+    }
+    paint(ctx, dots, dark);
+  },
+  globe(ctx, size, t, dark, small) {
+    const cx = size / 2, R = cx * .8, pt = makeProj(t * .14, .32, cx, cx), rs = rScale(size) * (small ? 1.75 : 1.15);
+    const N = small ? 40 : 170, scan = (t * (small ? 2.67 : 2.02) * .5) % (2 * Math.PI), dots = [];
+    for (let i = 0; i < N; i++) { const d = fibDir(i, N); const lon = Math.atan2(d[2], d[0]);
+      const dd = Math.atan2(Math.sin(lon - scan), Math.cos(lon - scan));
+      const lit = Math.max(0, 1 - Math.abs(dd) / .85);
+      const [px, py, z] = pt(d[0] * R, d[1] * R, d[2] * R); const depth = (z / R + 1) / 2;
+      dots.push({ x: px, y: py, z, r: (0.9 + 1.1 * lit) * rs, white: .78 - .5 * lit, a: (.45 + .55 * depth) * (.35 + .65 * Math.max(lit, .35)) }); }
+    paint(ctx, dots, dark);
+  },
+  ribbon(ctx, size, t, dark, small) {
+    const cx = size / 2, R = cx * .78, pt = makeProj(0, .3, cx, cx), rs = rScale(size) * (small ? 1.7 : 1);
+    const dots = [], ghostN = small ? 40 : 150, sp = small ? 3.2 : 2.2;
+    for (let i = 0; i < ghostN; i++) { const d = fibDir(i, ghostN); const [px, py, z] = pt(d[0] * R, d[1] * R, d[2] * R);
+      dots.push({ x: px, y: py, z, r: .8 * rs, white: .78, a: .1 + .22 * ((z / R + 1) / 2) }); }
+    const lanes = small ? 3 : 5, segs = small ? 26 : 60;
+    for (let l = 0; l < lanes; l++) { const off = (l - (lanes - 1) / 2) * .09;
+      for (let k = 0; k < segs; k++) { const a = (k / segs) * 2 * Math.PI;
+        const und = .16 * Math.sin(3 * a + t * sp) + off;
+        const x = Math.cos(a) * R * (1 - und * .12), y = Math.sin(a) * R * .32 + und * R, z = Math.sin(a) * R * .8;
+        const [px, py, pz] = pt(x, y, z); const depth = (pz / R + 1) / 2;
+        dots.push({ x: px, y: py, z: pz, r: (1 + 1.2 * depth) * rs, white: .32 - .2 * depth, a: .5 + .5 * depth }); } }
+    paint(ctx, dots, dark);
+  },
+};
+const orbEls = [...document.querySelectorAll('canvas[data-orb]')].map((c) => ({
+  c, ctx: c.getContext('2d'), dark: (c.closest('[data-theme]')?.dataset.theme ?? 'dark') !== 'cream-oak',
+}));
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+function orbFrame(now) {
+  const t = now / 1000;
+  for (const o of orbEls) { const size = o.c.width;
+    o.ctx.clearRect(0, 0, size, size);
+    MODES[o.c.dataset.orb](o.ctx, size, t, o.dark, o.c.dataset.size === '20'); }
+  if (!reduce) requestAnimationFrame(orbFrame);
+}
+requestAnimationFrame(orbFrame);
+</script>
+</body>
+</html>

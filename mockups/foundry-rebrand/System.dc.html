@@ -1,0 +1,233 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300..900&family=Geist+Mono:wght@400..700&family=Bricolage+Grotesque:opsz,wght@12..96,500..700&display=swap">
+  <style>
+    *{box-sizing:border-box}
+    html,body{margin:0;height:100%}
+    body{background:#f5f4f2;font-family:Geist,'Helvetica Neue',Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+    a{color:inherit;text-decoration:none}a:hover{color:#e0552a}
+    .page{--paper:#f5f4f2;--raised:#ffffff;--sunken:#ebe9e6;--line:#dedbd6;--line2:#b9b4ae;--ink:#0c0b0a;--body:#57534e;--muted:#6b665f;--acc:#e0552a;width:1440px;min-height:100vh;background:var(--paper);color:var(--ink);padding:56px 64px 72px;display:flex;flex-direction:column;gap:56px}
+    .k{font-family:'Geist Mono',ui-monospace,Menlo,monospace;font-weight:500;font-size:12px;line-height:1;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:0;display:flex;align-items:center;gap:12px}
+    .k b{font-weight:500;color:var(--acc)}
+    .h2{font-weight:400;font-size:40px;line-height:1.08;letter-spacing:-.03em;margin:0;color:var(--ink)}
+    .h2 span{color:var(--muted)}
+    .p{font-size:15px;line-height:1.5;color:var(--body);margin:0}
+    .top{display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:end}
+    .sec{display:grid;grid-template-columns:220px 1fr;gap:40px;padding-top:40px;border-top:1px solid var(--line)}
+    .sec .k{align-self:start}
+    .two{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+    .box{border:1px solid var(--line);border-radius:8px;background:var(--raised);padding:26px 28px;display:flex;flex-direction:column;gap:14px}
+    .box h4{margin:0;font-size:13px;font-weight:600;letter-spacing:-.005em;color:var(--ink);display:flex;align-items:center;gap:10px}
+    .box h4 i{width:6px;height:6px;border-radius:50%;background:var(--acc)}
+    .obs{display:grid;grid-template-columns:120px 1fr;gap:8px 16px;font-size:14px;line-height:1.45;color:var(--body)}
+    .obs em{font-style:normal;font-family:'Geist Mono',ui-monospace,Menlo,monospace;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding-top:3px}
+    .obs b{color:var(--ink);font-weight:500}
+    .type{display:flex;flex-direction:column;gap:22px}
+    .tr{display:grid;grid-template-columns:1fr 300px;gap:32px;align-items:baseline;padding:18px 0;border-bottom:1px solid var(--line)}
+    .tr:last-child{border-bottom:0}
+    .spec{font-family:'Geist Mono',ui-monospace,Menlo,monospace;font-weight:500;font-size:11.5px;letter-spacing:.04em;color:var(--muted);line-height:1.6}
+    .spec b{color:var(--ink);font-weight:500}
+    .h1{font-weight:500;font-size:78px;line-height:.96;letter-spacing:-.04em;text-transform:uppercase;margin:0;color:var(--ink)}
+    .h1s{font-weight:500;font-size:78px;line-height:.96;letter-spacing:-.035em;margin:0;color:var(--ink)}
+    .lead{font-size:18px;line-height:1.5;color:var(--body);margin:0}
+    .wm{font-family:'Bricolage Grotesque',Geist,sans-serif;font-weight:600;font-size:34px;letter-spacing:-.015em;color:var(--ink)}
+    .wmalt{font-family:Geist,sans-serif;font-weight:600;font-size:30px;letter-spacing:.02em;text-transform:uppercase;color:var(--ink)}
+    .brandrow{display:flex;align-items:center;gap:14px}
+    .btn{display:inline-flex;align-items:center;gap:10px;height:44px;padding:0 18px;border-radius:3px;border:1px solid var(--line2);font-family:'Geist Mono',ui-monospace,Menlo,monospace;font-weight:500;font-size:13px;letter-spacing:.02em;text-transform:uppercase;color:var(--ink);background:transparent;position:relative;overflow:hidden;white-space:nowrap}
+    .btn.pri{background:var(--ink);color:var(--paper);border-color:transparent}
+    .btn.pri::after{content:"";position:absolute;left:0;right:0;bottom:0;height:3px;background:repeating-linear-gradient(45deg,var(--acc) 0 3px,transparent 3px 10px);background-size:14.14px 14.14px;opacity:0;transition:opacity .2s}
+    .btn.pri:hover::after,.btn.pri.on::after{opacity:1;animation:hatch 1s linear infinite}
+    .btn.sm{height:36px;padding:0 14px;font-size:12px}
+    .btn.ghost{border-color:transparent}
+    .sw{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:12px}
+    .s{display:flex;flex-direction:column;gap:8px}
+    .s i{display:block;height:64px;border-radius:6px;border:1px solid rgba(0,0,0,.08)}
+    .s b{font-family:'Geist Mono',ui-monospace,Menlo,monospace;font-weight:500;font-size:10.5px;letter-spacing:.04em;color:var(--ink)}
+    .s span{font-family:'Geist Mono',ui-monospace,Menlo,monospace;font-size:10.5px;color:var(--muted)}
+    .darkstrip{background:#0d0d0d;border-radius:8px;padding:22px 24px;display:flex;flex-direction:column;gap:14px}
+    .darkstrip .k{color:#8a8a8a}
+    .darkstrip .s b{color:#e8e6e3}.darkstrip .s span{color:#8a8a8a}
+    .darkstrip .s i{border-color:rgba(255,255,255,.08)}
+    .shapes{display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap}
+    .r{width:96px;height:64px;border:1px solid var(--line2);background:var(--raised);display:grid;place-items:center;font-family:'Geist Mono',ui-monospace,Menlo,monospace;font-size:11px;color:var(--muted)}
+    .chip{height:24px;padding:0 9px;border-radius:4px;border:1px solid var(--line2);display:inline-flex;align-items:center;gap:6px;font-family:'Geist Mono',ui-monospace,Menlo,monospace;font-weight:500;font-size:11px;color:var(--body)}
+    .tag{font-family:'Geist Mono',ui-monospace,Menlo,monospace;font-weight:500;font-size:10px;letter-spacing:.08em;text-transform:uppercase;padding:4px 7px;border-radius:3px;border:1px solid var(--acc);color:var(--acc)}
+    .row{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+    table{width:100%;border-collapse:collapse;font-size:14px}
+    th{font-family:'Geist Mono',ui-monospace,Menlo,monospace;font-weight:500;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);text-align:left;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--sunken)}
+    td{padding:11px 14px;border-bottom:1px solid var(--line);color:var(--ink);vertical-align:top}
+    td.m{font-family:'Geist Mono',ui-monospace,Menlo,monospace;font-size:12px;color:var(--body)}
+    .tbl{border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--raised)}
+    .demo{border:1px solid var(--line);border-radius:8px;background:var(--sunken);padding:22px;display:flex;flex-direction:column;gap:12px;min-height:170px;justify-content:center}
+    .bar{height:10px;border-radius:3px;background:var(--ink)}
+    .bar.b1{width:70%}.bar.b2{width:52%}.bar.b3{width:38%}
+    @keyframes hatch{to{background-position:14.14px 0}}
+    .caret{display:inline-block;width:2px;height:16px;background:var(--ink);vertical-align:middle;animation:blink 1s steps(2) infinite}
+    @keyframes blink{50%{opacity:0}}
+    .live{display:inline-flex;align-items:center;gap:6px;color:var(--acc);font-family:'Geist Mono',ui-monospace,Menlo,monospace;font-size:11px;letter-spacing:.06em;text-transform:uppercase}
+    .live em{width:6px;height:6px;border-radius:50%;background:var(--acc);animation:pulse 1.6s ease-in-out infinite}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+    .grid{height:120px;border-radius:8px;background-color:var(--sunken);background-image:linear-gradient(rgba(0,0,0,.07) 1px,transparent 1px),linear-gradient(90deg,rgba(0,0,0,.07) 1px,transparent 1px);background-size:32px 32px;position:relative;overflow:hidden}
+    .grid::before{content:"";position:absolute;inset:0;background:radial-gradient(70% 55% at 50% 0%,rgba(255,255,255,.7),transparent 72%)}
+    .grain{height:120px;border-radius:8px;background:#0c0b0a;position:relative;overflow:hidden}
+    .grain::before{content:"";position:absolute;inset:0;background:radial-gradient(48% 62% at 16% 10%,rgba(240,122,74,.32),transparent 70%)}
+    .grain::after{content:"";position:absolute;inset:0;opacity:.16;mix-blend-mode:overlay;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>")}
+    @media (prefers-reduced-motion:reduce){.caret,.live em,.btn.pri.on::after{animation:none !important;opacity:1}}
+  </style>
+</helmet>
+<div class="page">
+  <div class="top">
+    <div>
+      <p class="k"><b>Foundry</b> System sheet <span>&middot;</span> round 1</p>
+      <h2 class="h2" style="margin-top:20px">What we studied, <span>and what we keep.</span></h2>
+    </div>
+    <p class="p" style="max-width:520px">The reference is factory.ai. We borrow its typographic system, its neutral ground, and its restraint. The Porch mark, the named crew, and the two themes stay ours.</p>
+  </div>
+
+  <div class="two">
+    <div class="box">
+      <h4><i></i>Observed at factory.ai</h4>
+      <div class="obs">
+        <em>Type</em><div><b>Geist</b> for everything. Display in <b>medium, uppercase, tight</b> (about -0.04em, leading 1.0). Section titles in regular weight, sentence case, -0.03em. <b>Geist Mono</b> uppercase for eyebrows and button labels.</div>
+        <em>Color</em><div>Warm-neutral greys: page #f5f5f5, raised #ffffff, sunken #ebebeb. Ink is near black, #020202. A neutral ramp from #d6d3d2 to #1f1d1c. <b>One orange accent</b>, #ef6f2e, used in small doses.</div>
+        <em>Shape</em><div>Controls at <b>3px</b>, panels at 6 to 12px, 1px borders in the neutral ramp. Primary buttons are dark fills with light labels. Large sunken panels frame a section.</div>
+        <em>Texture</em><div>A <b>grid-paper</b> panel under the product frame with a soft light vignette. Dark cards with <b>grain</b> and a warm glow in one corner.</div>
+        <em>Motion</em><div>Page and hero enter by <b>fade and rise</b> (6 to 14px, 0.32s, ease-out-quint). Product frames push in with a slow scale. Diagonal <b>stripes slide on hover</b>. A caret blinks. Chrome reveals in a stagger.</div>
+        <em>Layout</em><div>A 1440px column with 16px gutters on a 12-column grid. Wide product screenshots in dark chrome. A logo wall for proof. A dark closing card, then a dark footer.</div>
+      </div>
+    </div>
+    <div class="box">
+      <h4><i></i>The NeuraMesh answer</h4>
+      <div class="obs">
+        <em>Keep</em><div>Geist as the one voice, uppercase medium display, mono eyebrows and labels, 3px controls, hairlines, grid paper, the grain card, the fade-and-rise entrance, the hover stripes.</div>
+        <em>Ours</em><div>The <b>Porch mark</b>, oak on cream in every theme. The lowercase <b>neuramesh</b> wordmark. The named crew. Two themes, graphite and paper, both first class.</div>
+        <em>Retire</em><div>The serif display voice (Source Serif and the Instrument italic flourish). Pill buttons on the marketing site. The cream frame gutter. The intro veil.</div>
+        <em>Levers</em><div>Four open decisions ride as tweak chips on every page artboard: <b>theme</b>, <b>accent</b> (ember or oak), <b>paper</b> (neutral or cream), and <b>case</b> (uppercase or sentence).</div>
+        <em>Proof</em><div>No logo wall. We have no customers to show, so the proof strip is the true one: bring your own Claude, OpenAI, or Gemini.</div>
+        <em>Copy</em><div>ASD-STE100 throughout. No em dashes, no semicolons, active voice, one idea per sentence. The locked triad stays the headline.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <p class="k"><b>01</b> Type</p>
+    <div class="type">
+      <div class="tr"><h1 class="h1">Your people.</h1><div class="spec"><b>Display</b> Geist 500<br>78px / 0.96 / -0.04em<br>uppercase (lever: case)</div></div>
+      <div class="tr"><h1 class="h1s">Your people.</h1><div class="spec"><b>Display, sentence lever</b><br>78px / 0.96 / -0.035em</div></div>
+      <div class="tr"><h2 class="h2">One agent gives you output. <span>A team gives you something to approve.</span></h2><div class="spec"><b>Section title</b> Geist 400<br>40px / 1.08 / -0.03em<br>second clause in muted</div></div>
+      <div class="tr"><p class="lead">Named agents plan, build, review, and ship your work. You approve the plan and accept the result.</p><div class="spec"><b>Lead</b> Geist 400 · 18px / 1.5<br><b>Body</b> 15px / 1.5 · body ink</div></div>
+      <div class="tr"><div class="row"><span class="k"><b>01</b> The loop</span><span class="btn sm">Start free</span><span class="chip">PR #368</span></div><div class="spec"><b>Mono voice</b> Geist Mono 500<br>kicker 12px / .06em · button 13px / .02em<br>always uppercase</div></div>
+      <div class="tr"><div class="brandrow"><svg width="40" height="40" viewBox="0 0 48 48" aria-hidden="true"><path d="M6.5 22 C6.5 11 14 4.5 24 4.5 C34 4.5 41.5 11 41.5 22 L41.5 38.5 C41.5 41.8 39.3 43.5 36.5 43.5 L11.5 43.5 C8.7 43.5 6.5 41.8 6.5 38.5 Z" fill="#834a2b"></path><circle cx="18.4" cy="21.5" r="2.75" fill="#fff7ee"></circle><circle cx="29.6" cy="21.5" r="2.75" fill="#fff7ee"></circle><path d="M17.6 28.4 C20.3 32.8 27.7 32.8 30.4 28.4" fill="none" stroke="#fff7ee" stroke-width="2.9" stroke-linecap="round"></path></svg><span class="wm">neuramesh</span><span class="spec" style="margin:0 18px">or</span><span class="wmalt">neuramesh</span></div><div class="spec"><b>Wordmark, an open question</b><br>left: Bricolage Grotesque 600, lowercase (today)<br>right: Geist 600, uppercase, matches the display voice</div></div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <p class="k"><b>02</b> Color</p>
+    <div style="display:flex;flex-direction:column;gap:22px">
+      <div>
+        <p class="k" style="margin-bottom:12px">Paper, neutral lever (default)</p>
+        <div class="sw">
+          <div class="s"><i style="background:#f5f4f2"></i><b>paper</b><span>#f5f4f2</span></div>
+          <div class="s"><i style="background:#ffffff"></i><b>raised</b><span>#ffffff</span></div>
+          <div class="s"><i style="background:#ebe9e6"></i><b>sunken</b><span>#ebe9e6</span></div>
+          <div class="s"><i style="background:#dedbd6"></i><b>line</b><span>#dedbd6</span></div>
+          <div class="s"><i style="background:#b9b4ae"></i><b>line2</b><span>#b9b4ae</span></div>
+          <div class="s"><i style="background:#6b665f"></i><b>muted</b><span>#6b665f · 5.0:1</span></div>
+          <div class="s"><i style="background:#57534e"></i><b>body</b><span>#57534e · 7.1:1</span></div>
+          <div class="s"><i style="background:#0c0b0a"></i><b>ink</b><span>#0c0b0a</span></div>
+          <div class="s"><i style="background:#e0552a"></i><b>ember</b><span>#e0552a</span></div>
+          <div class="s"><i style="background:#834a2b"></i><b>oak</b><span>#834a2b</span></div>
+        </div>
+      </div>
+      <div>
+        <p class="k" style="margin-bottom:12px">Paper, cream lever (the current brand paper)</p>
+        <div class="sw">
+          <div class="s"><i style="background:#fbf8f4"></i><b>paper</b><span>#fbf8f4</span></div>
+          <div class="s"><i style="background:#ffffff"></i><b>raised</b><span>#ffffff</span></div>
+          <div class="s"><i style="background:#f3ede3"></i><b>sunken</b><span>#f3ede3</span></div>
+          <div class="s"><i style="background:#e6dbca"></i><b>line</b><span>#e6dbca</span></div>
+          <div class="s"><i style="background:#cdbfa6"></i><b>line2</b><span>#cdbfa6</span></div>
+          <div class="s"><i style="background:#716351"></i><b>muted</b><span>#716351</span></div>
+          <div class="s"><i style="background:#574838"></i><b>body</b><span>#574838</span></div>
+          <div class="s"><i style="background:#221a14"></i><b>ink</b><span>#221a14</span></div>
+          <div class="s"><i style="background:#834a2b"></i><b>oak</b><span>#834a2b</span></div>
+          <div class="s"><i style="background:#fff7ee"></i><b>brand ink</b><span>#fff7ee</span></div>
+        </div>
+      </div>
+      <div class="darkstrip">
+        <p class="k">Graphite (the app's own dark ladder, unchanged)</p>
+        <div class="sw">
+          <div class="s"><i style="background:#0d0d0d"></i><b>paper</b><span>#0d0d0d</span></div>
+          <div class="s"><i style="background:#161616"></i><b>raised</b><span>#161616</span></div>
+          <div class="s"><i style="background:#1a1a1a"></i><b>sunken</b><span>#1a1a1a</span></div>
+          <div class="s"><i style="background:#262626"></i><b>line</b><span>#262626</span></div>
+          <div class="s"><i style="background:#3a3a3a"></i><b>line2</b><span>#3a3a3a</span></div>
+          <div class="s"><i style="background:#8a8a8a"></i><b>muted</b><span>#8a8a8a</span></div>
+          <div class="s"><i style="background:#a6a6a6"></i><b>body</b><span>#a6a6a6</span></div>
+          <div class="s"><i style="background:#e8e6e3"></i><b>ink</b><span>#e8e6e3</span></div>
+          <div class="s"><i style="background:#f07a4a"></i><b>ember</b><span>#f07a4a</span></div>
+          <div class="s"><i style="background:#c58a63"></i><b>oak</b><span>#c58a63</span></div>
+        </div>
+      </div>
+      <p class="p" style="max-width:760px">The accent is for small things: a live dot, a numbered kicker, the stripes under a pressed button, a glow in the closing card. Primary buttons are ink, never the accent. The Porch mark keeps oak on cream in every theme. It never recolors with the accent, even when the accent is oak.</p>
+    </div>
+  </div>
+
+  <div class="sec">
+    <p class="k"><b>03</b> Shape and texture</p>
+    <div style="display:flex;flex-direction:column;gap:22px">
+      <div class="shapes">
+        <div class="r" style="border-radius:3px">3px controls</div>
+        <div class="r" style="border-radius:6px">6px cards</div>
+        <div class="r" style="border-radius:8px">8px frames</div>
+        <div class="r" style="border-radius:12px">12px panels</div>
+      </div>
+      <div class="row">
+        <span class="btn pri on">Start free in your browser</span>
+        <span class="btn">See pricing</span>
+        <span class="btn ghost">Sign in</span>
+        <span class="btn pri sm">Start free</span>
+        <span class="chip">CI <b style="color:#2a8f6f;font-weight:500">&#10003;</b></span>
+        <span class="tag">Team</span>
+        <span class="live"><em></em>live</span>
+      </div>
+      <div class="two">
+        <div class="grid"></div>
+        <div class="grain"></div>
+      </div>
+      <p class="p" style="max-width:760px">Grid paper under the product frame, 32px cells at 7% ink, with a light vignette at the top. The closing card is ink with grain at 16% and one warm glow. Elevation is a hairline plus a soft shadow, never a louder border.</p>
+    </div>
+  </div>
+
+  <div class="sec">
+    <p class="k"><b>04</b> Motion</p>
+    <div class="two" style="grid-template-columns:1.3fr .7fr">
+      <div class="tbl">
+        <table>
+          <tr><th>Moment</th><th>What moves</th><th>Time</th><th>Ease</th></tr>
+          <tr><td>Hero entrance</td><td>fade and a 14px rise, one element at a time</td><td class="m">0.7s, 80ms steps</td><td class="m">cubic-bezier(.22,1,.36,1)</td></tr>
+          <tr><td>Frame push-in</td><td>32px rise and scale 1.02 to 1, after the copy lands</td><td class="m">1.0s, 0.35s delay</td><td class="m">same ease</td></tr>
+          <tr><td>Section reveal</td><td>fade and rise on scroll, once per element</td><td class="m">0.6s</td><td class="m">same ease</td></tr>
+          <tr><td>Hover stripes</td><td>accent stripes slide under a primary button</td><td class="m">1s loop</td><td class="m">linear</td></tr>
+          <tr><td>Caret and live dot</td><td>one heartbeat per surface</td><td class="m">1s / 1.6s</td><td class="m">steps / ease-in-out</td></tr>
+          <tr><td>Any response to input</td><td>hover, press, focus, tab</td><td class="m">150ms or less</td><td class="m">same ease</td></tr>
+          <tr><td>Reduced motion</td><td>everything above stills. Content is visible by default.</td><td class="m">0</td><td class="m">none</td></tr>
+        </table>
+      </div>
+      <div class="demo">
+        <div class="bar b1"></div><div class="bar b2"></div><div class="bar b3"></div>
+        <div class="row" style="margin-top:8px"><span class="spec">Message #build</span><span class="caret"></span><span class="live" style="margin-left:auto"><em></em>live</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

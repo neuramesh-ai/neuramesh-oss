@@ -1,0 +1,58 @@
+[
+  {
+    "name": "bub1-task1032-dark",
+    "settle": 2600,
+    "query": {
+      "theme": "dark",
+      "openTask": "1032"
+    }
+  },
+  {
+    "name": "bub2-task1032-cream",
+    "settle": 2600,
+    "query": {
+      "theme": "cream-oak",
+      "openTask": "1032"
+    }
+  },
+  {
+    "name": "bub5-general-permission-dark",
+    "settle": 2600,
+    "query": {
+      "theme": "dark",
+      "channel": "general"
+    }
+  },
+  {
+    "name": "bub6-task1064-plan-cream",
+    "settle": 2600,
+    "query": {
+      "theme": "cream-oak",
+      "openTask": "1064"
+    }
+  },
+  {
+    "name": "bub3-convo-dark",
+    "settle": 2600,
+    "query": {
+      "theme": "dark",
+      "openConvo": "th-wb-sketch"
+    }
+  },
+  {
+    "name": "bub4-convo-cream",
+    "settle": 2600,
+    "query": {
+      "theme": "cream-oak",
+      "openConvo": "th-wb-sketch"
+    }
+  },
+  {
+    "name": "bub7-general-cream",
+    "settle": 2600,
+    "query": {
+      "theme": "cream-oak",
+      "channel": "general"
+    }
+  }
+]

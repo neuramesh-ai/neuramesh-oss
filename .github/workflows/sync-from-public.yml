@@ -1,0 +1,183 @@
+# The mirror. After the source-release cutover (docs/design/oss-release-2026-09/cutover.md)
+# development happens in neuramesh-ai/neuramesh-oss and THIS repository's main is a follower:
+# Vercel, Pulumi, and the fleet images deploy from it, so it must equal the public main and
+# carry nothing of its own.
+#
+# Three triggers, one job. The public repo dispatches `public-main-updated` on every push to its
+# main (notify-private.yml). The five-minute schedule is the fallback for a lost dispatch. A
+# manual run with force=true is the ONE forced update at cutover. After that the update is
+# fast-forward only: a commit on this main that the public main does not have means someone
+# pushed to the wrong repository, and the job fails naming both SHAs instead of choosing.
+#
+# NO SECRET IS NEEDED. The enterprise disables deploy keys and personal tokens cannot be made
+# from the CLI, so the push uses the job's own GITHUB_TOKEN (`contents: write`). A push made with
+# that token triggers no workflow on its own, and the deploy workflows on main would sit still,
+# so the job DISPATCHES them itself: `workflow_dispatch` is the one event a token may raise. It
+# picks the workflows by the paths the mirrored commits touched, the same paths their own `on:
+# push` filters name, and on the forced run it dispatches every one. Vercel deploys on the push
+# event itself, whoever made it. Tags ride along, new ones only, and a new `v*` tag dispatches the
+# release and image builds at that tag. PUBLIC_REPO_TOKEN (a fine-grained PAT, optional) reads
+# the public repo while it is still internal and writes the "mirrored at" comment on the PR.
+name: sync from public
+
+on:
+  repository_dispatch:
+    types: [public-main-updated]
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Replace main with the public main. The one cutover update only.'
+        type: boolean
+        default: false
+
+# Runs queue, never race: two pushes to main from two runs is the one thing a mirror must not do.
+concurrency:
+  group: sync-from-public
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  actions: write
+
+env:
+  PUBLIC_REPO: neuramesh-ai/neuramesh-oss
+
+jobs:
+  mirror:
+    name: mirror public main
+    # the tree is identical in both repositories, so the gate is the repository, not the file
+    if: github.repository == 'alonge-dev/neuramesh'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Public url
+        env:
+          PUBLIC_REPO_TOKEN: ${{ secrets.PUBLIC_REPO_TOKEN }}
+        run: |
+          # the public repository over https; the optional PAT speaks while it is still internal
+          if [ -n "$PUBLIC_REPO_TOKEN" ]; then
+            echo "::add-mask::$PUBLIC_REPO_TOKEN"
+            echo "PUBLIC_URL=https://x-access-token:$PUBLIC_REPO_TOKEN@github.com/$PUBLIC_REPO.git" >> "$GITHUB_ENV"
+          else
+            echo "PUBLIC_URL=https://github.com/$PUBLIC_REPO.git" >> "$GITHUB_ENV"
+          fi
+
+      - name: Fetch the public main
+        id: fetch
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          # the empty extraheader drops the checkout token, so the public url alone speaks
+          if git -c http.https://github.com/.extraheader= fetch --quiet "$PUBLIC_URL" '+refs/heads/main:refs/remotes/public/main'; then
+            echo "reachable=true" >> "$GITHUB_OUTPUT"
+          elif [ "$EVENT" = "schedule" ]; then
+            echo "public main is unreachable. Scheduled run, so nothing to do."
+            echo "reachable=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::could not fetch $PUBLIC_REPO main"
+            exit 1
+          fi
+
+      - name: Compare
+        id: cmp
+        if: steps.fetch.outputs.reachable == 'true'
+        env:
+          FORCE: ${{ inputs.force }}
+        run: |
+          ours=$(git rev-parse origin/main)
+          theirs=$(git rev-parse public/main)
+          echo "private main $ours"
+          echo "public  main $theirs"
+          echo "sha=$theirs" >> "$GITHUB_OUTPUT"
+          echo "was=$ours" >> "$GITHUB_OUTPUT"
+          if [ "$ours" = "$theirs" ]; then
+            echo "already mirrored, nothing to do"
+            echo "action=none" >> "$GITHUB_OUTPUT"
+          elif [ "$FORCE" = "true" ]; then
+            echo "action=force" >> "$GITHUB_OUTPUT"
+          elif git merge-base --is-ancestor "$ours" "$theirs"; then
+            echo "action=ff" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::the mirror has a commit the public repo does not: private main is $ours, public main is $theirs. Someone pushed to the private main. Resolve by hand (docs/design/oss-release-2026-09/cutover.md)."
+            exit 1
+          fi
+
+      - name: Push main
+        if: steps.cmp.outputs.action == 'ff' || steps.cmp.outputs.action == 'force'
+        env:
+          ACTION: ${{ steps.cmp.outputs.action }}
+        run: |
+          if [ "$ACTION" = "force" ]; then
+            git push --force origin public/main:refs/heads/main
+          else
+            git push origin public/main:refs/heads/main
+          fi
+          echo "main → $(git rev-parse --short public/main) ($ACTION)"
+
+      - name: Dispatch the deploy workflows the change asks for
+        if: steps.cmp.outputs.action == 'ff' || steps.cmp.outputs.action == 'force'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WAS: ${{ steps.cmp.outputs.was }}
+          SHA: ${{ steps.cmp.outputs.sha }}
+          ACTION: ${{ steps.cmp.outputs.action }}
+        run: |
+          # the same paths each workflow's own `on: push` names; a token push raises none of them
+          declare -A WANTS=(
+            [infra.yml]='^infra/pulumi/|^\.github/workflows/infra\.yml$'
+            [fleet-image.yml]='^infra/images/fleet/|^packages/fleet/|^infra/k8s/templates/|^pnpm-lock\.yaml$|^\.github/workflows/fleet-image\.yml$'
+            [machine-image.yml]='^infra/images/machine/|^apps/desktop/src/main/|^packages/shared/src/|^pnpm-lock\.yaml$|^\.github/workflows/machine-image\.yml$'
+            [relay-image.yml]='^infra/images/relay/|^packages/relay/|^pnpm-lock\.yaml$|^\.github/workflows/relay-image\.yml$'
+            [powersync-sync-rules.yml]='^dev/stack/powersync/sync-config\.yaml$|^\.github/workflows/powersync-sync-rules\.yml$'
+            [mobile.yml]='^apps/mobile/'
+            [control-api-image.yml]='^packages/control-api/|^packages/shared/|^supabase/migrations/|^supabase/validate/auth-shim\.sql$|^dev/stack/init/9[89]-.*\.sql$|^dev/stack/powersync/|^pnpm-lock\.yaml$|^\.github/workflows/control-api-image\.yml$'
+          )
+          if [ "$ACTION" = "force" ]; then changed="(everything: the forced run)"; else changed=$(git diff --name-only "$WAS" "$SHA"); fi
+          for wf in "${!WANTS[@]}"; do
+            if [ "$ACTION" = "force" ] || printf '%s\n' "$changed" | grep -Eq "${WANTS[$wf]}"; then
+              gh workflow run "$wf" --ref main && echo "dispatched $wf"
+            fi
+          done
+
+      - name: Comment on the mirrored public PR
+        if: steps.cmp.outputs.action == 'ff' || steps.cmp.outputs.action == 'force'
+        env:
+          GH_TOKEN: ${{ secrets.PUBLIC_REPO_TOKEN }}
+          SHA: ${{ steps.cmp.outputs.sha }}
+          MIRROR: ${{ github.repository }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "PUBLIC_REPO_TOKEN is unset: no comment."
+            exit 0
+          fi
+          pr=$(gh api "repos/$PUBLIC_REPO/commits/$SHA/pulls" --jq ".[] | select(.merge_commit_sha == \"$SHA\") | .number" | head -1)
+          if [ -z "$pr" ]; then
+            echo "no public PR has $SHA as its merge commit: no comment."
+            exit 0
+          fi
+          gh api -X POST "repos/$PUBLIC_REPO/issues/$pr/comments" \
+            -f body="Mirrored to $MIRROR at $SHA. Vercel and the fleet deploy from this SHA."
+          echo "commented on $PUBLIC_REPO#$pr"
+
+      - name: Mirror new tags
+        if: steps.fetch.outputs.reachable == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          before=$(git tag -l 'v*' | sort)
+          # no force on either side: a tag that MOVED in the public repo fails here, by hand only
+          git -c http.https://github.com/.extraheader= fetch --quiet "$PUBLIC_URL" 'refs/tags/*:refs/tags/*'
+          git push --quiet origin 'refs/tags/*:refs/tags/*'
+          echo "tags in step with $PUBLIC_REPO"
+          # a token push of a tag raises no workflow: a NEW v* tag dispatches the builds at that tag
+          for tag in $(comm -13 <(printf '%s\n' "$before") <(git tag -l 'v*' | sort)); do
+            gh workflow run release.yml --ref "$tag" && echo "dispatched release.yml at $tag"
+            gh workflow run control-api-image.yml --ref "$tag" && echo "dispatched control-api-image.yml at $tag"
+          done

@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="en" data-theme="cream-oak">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Reply radar — the engagement playbook + the reply-ops card</title>
+<style>
+/* Tokens copied verbatim from apps/desktop/src/renderer/src/tokens.css (Graphite dark, Cream Oak).
+   Geometry mirrors the REAL classes this round composes — .nextcard/.nrow (the next-steps card,
+   tokens.css §nextcard), .npager, .qcard/.qopt (the in-thread option idiom), .repcard (the
+   report card), the .nbtn card-surface buttons the founder standardized in round 6a. The ONE
+   new idiom is the reply row's quoted-target block — judged here. Judge this as the app.
+   Plan: docs/design/reply-radar-2026-08/plan.md */
+:root, [data-theme='dark'] {
+  --win:#0d0d0d; --bg:#141414; --panel:#191919; --panel2:#212121; --panel3:#2b2b2b;
+  --border:#272727; --border2:#383838;
+  --text:#eaeaea; --body:#b6b6b6; --muted:#898989; --dim:#676767;
+  --link:#d19a72; --accent:var(--text);
+  --btn:#232323; --btn-fg:#efefef; --btn-hover:#2f2f2f;
+  --green:#77ac8d; --warn:#c9a15e; --violet:#a89ccf;
+  --prog:#8ba0c0; --done:#77ac8d; --plan:#7fa5ab;
+  --role-mkt:#c98f8f; --role-orch:#9793d2;
+  --card:#1e1e1e; --card-border:#2c2c2c;
+  --code:#0a0a0a; --codeink:#e8e8e8;
+  --shadow-card:0 1px 2px rgba(0,0,0,.25);
+  --ring:#525252; --hover-bg:color-mix(in srgb, var(--text) 7%, transparent);
+  --hover-border:#404040;
+}
+[data-theme='cream-oak'] {
+  --win:#f0e5d3; --bg:#fbf8f4; --panel:#fbf8f4; --panel2:#f6eee1; --panel3:#efe1cd;
+  --border:#e6dbca; --border2:#d3c2a8;
+  --text:#2a1c13; --body:#574838; --muted:#97846c; --dim:#b5a289;
+  --link:#9c5730; --accent:#834a2b;
+  --btn:#f8f2e8; --btn-fg:#43301f; --btn-hover:#efe4d2;
+  --green:#2f9e6b; --warn:#a06a1f; --violet:#7d6cc4;
+  --prog:#4f80c4; --done:#0f9d63; --plan:#2c7d88;
+  --role-mkt:#b04f55; --role-orch:#6a63bc;
+  --card:#ffffff; --card-border:#eadfce;
+  --code:#2b2018; --codeink:#f3e6d8;
+  --shadow-card:0 1px 2px rgba(70,42,18,.05);
+  --ring:color-mix(in srgb, var(--accent) 42%, var(--border2));
+  --hover-bg:color-mix(in srgb, var(--text) 5%, transparent);
+  --hover-border:color-mix(in srgb, var(--text) 10%, var(--border2));
+}
+* { box-sizing:border-box; margin:0; }
+:root { --fbody:'Avenir Next','Segoe UI',system-ui,sans-serif; --fmono:'SF Mono',ui-monospace,Menlo,monospace;
+  --fserif:'Iowan Old Style','Palatino Linotype',Georgia,serif;
+  --r-xs:4px; --r-md:8px; --r-lg:11px; --r-full:999px;
+  --dur-fast:.12s; --dur-enter:.16s; --ease:cubic-bezier(.3,.7,.4,1); }
+body { background:var(--win); color:var(--text); font:14px/1.5 var(--fbody); padding:0 0 90px; }
+header.doc { position:sticky; top:0; z-index:9; display:flex; align-items:center; gap:14px;
+  background:color-mix(in srgb, var(--win) 88%, transparent); backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--border); padding:14px 26px; }
+header.doc h1 { font:700 16px var(--fserif); }
+header.doc .sub { font:11.5px var(--fmono); color:var(--muted); }
+header.doc .spacer { flex:1; }
+.ctl { background:var(--btn); color:var(--btn-fg); border:1px solid var(--border2); border-radius:var(--r-full);
+  padding:6px 14px; font:600 12px var(--fbody); cursor:pointer; }
+.ctl:hover { background:var(--btn-hover); }
+main { max-width:980px; margin:0 auto; padding:10px 26px; }
+section { margin:44px 0; }
+h2 { font:700 20px var(--fserif); margin:0 0 4px; display:flex; align-items:baseline; gap:10px; }
+h2 .n { font:700 11px var(--fmono); color:var(--muted); }
+p.why { color:var(--body); font-size:13.5px; max-width:74ch; margin:8px 0 16px; }
+p.why b { color:var(--text); }
+code.ic { font:600 11.5px var(--fmono); background:var(--panel2); border:1px solid var(--border);
+  border-radius:var(--r-xs); padding:1px 5px; color:var(--body); }
+.note { display:flex; gap:9px; align-items:flex-start; max-width:74ch; margin:10px 0; font-size:12.5px; color:var(--body); }
+.note .dot { flex:none; width:6px; height:6px; border-radius:50%; background:var(--accent); margin-top:6px; }
+.note b { color:var(--text); }
+.stage { background:var(--bg); border:1px solid var(--border); border-radius:14px; padding:22px 26px;
+  box-shadow:var(--shadow-card); max-width:760px; }
+.msg { display:flex; gap:11px; padding:7px 0; }
+.avatar { flex:none; width:30px; height:30px; border-radius:8px; background:var(--panel3);
+  border:1px solid var(--border2); display:flex; align-items:center; justify-content:center; font-size:15px; }
+.mbody { flex:1; min-width:0; background:var(--panel); border:1px solid var(--border); border-radius:var(--r-lg); padding:10px 14px; }
+.mhead { display:flex; align-items:center; gap:7px; margin-bottom:3px; }
+.mhead b { font-size:12.5px; }
+.rolechip { font:700 8.5px var(--fmono); letter-spacing:.06em; color:var(--role-orch);
+  border:1px solid color-mix(in srgb, var(--role-orch) 40%, transparent); border-radius:var(--r-full); padding:1.5px 6px; }
+.mwhen { font:10.5px var(--fmono); color:var(--dim); }
+.mtext { font-size:13px; color:var(--body); }
+
+/* ── the reply-ops card (the ONE new idiom) ─────────────────────────────── */
+.replycard { margin:8px 0 2px; border:1px solid var(--card-border); border-radius:var(--r-lg);
+  background:var(--card); padding:10px 12px; box-shadow:var(--shadow-card); }
+.rphead { font:700 10px var(--fmono); letter-spacing:.08em; color:var(--muted); text-transform:uppercase; }
+.rpsrc { font:11px var(--fmono); color:var(--dim); margin:2px 0 4px; }
+.rpsrc code { background:var(--panel2); border:1px solid var(--border); border-radius:var(--r-xs); padding:0 5px; color:var(--body); }
+.rpbase { font-size:11px; color:var(--muted); margin-bottom:4px; }
+.rprow { padding:9px 0 10px; border-top:1px solid var(--border); }
+.rprow.done { opacity:.55; }
+.rptop { display:flex; align-items:center; gap:8px; min-width:0; }
+.rank { flex:none; width:20px; height:20px; display:grid; place-items:center; font:700 10.5px var(--fmono);
+  color:var(--muted); border:1px solid var(--border2); border-radius:6px; background:var(--panel); }
+.rphandle { font:600 12.5px var(--fmono); color:var(--link); text-decoration:none; }
+.rpname { font-size:11.5px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.rpage { font:10.5px var(--fmono); color:var(--dim); margin-left:auto; flex:none; }
+.rpmetrics { display:flex; gap:10px; font:11px var(--fmono); color:var(--dim); margin:3px 0 0 28px; }
+.rpmetrics b { color:var(--text); font-weight:640; }
+.rptarget { margin:7px 0 0 28px; padding:2px 0 2px 10px; border-left:2px solid var(--border2);
+  font-size:12px; color:var(--body); line-height:1.5; cursor:pointer;
+  display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+.rptarget.open { display:block; -webkit-line-clamp:unset; }
+.rpdraft { display:flex; gap:7px; margin:8px 0 0 28px; font-size:12.5px; color:var(--text); line-height:1.55; }
+.rpdraft .arrow { flex:none; color:var(--dim); font-size:12px; padding-top:1px; }
+.rpwhy { margin:5px 0 0 28px; font-size:11px; color:var(--muted); }
+/* the drawn image (George, design review): drafted for DOWNLOAD — the human attaches it on X */
+.rpimg { display:flex; align-items:center; gap:10px; margin:8px 0 0 28px; }
+.rpthumb { position:relative; width:118px; height:66px; border-radius:var(--r-md); border:1px solid var(--border2);
+  background:linear-gradient(135deg, #d8b98a, #8a6a45 55%, #3d2c1c); overflow:hidden; flex:none; }
+.rpthumb .redraw { position:absolute; right:4px; bottom:4px; width:20px; height:20px; display:grid; place-items:center;
+  background:color-mix(in srgb, var(--card) 82%, transparent); border:1px solid var(--card-border); border-radius:6px;
+  font-size:10px; cursor:pointer; }
+.rpimgmeta { font-size:11px; color:var(--muted); line-height:1.5; }
+.rpimgmeta .nbtn { margin-top:5px; }
+.rpacts { display:flex; align-items:center; gap:7px; margin:9px 0 0 28px; }
+.rpchars { font:10.5px var(--fmono); color:var(--dim); margin-right:auto; }
+.nbtn { background:var(--card); color:var(--text); border:1px solid var(--border2); border-radius:var(--r-full);
+  padding:4px 12px; font:600 11.5px var(--fbody); cursor:pointer; white-space:nowrap; }
+.nbtn:hover { background:var(--hover-bg); border-color:var(--card-border); }
+.nbtn.q { color:var(--muted); border-color:var(--border); }
+.nok { font-size:11.5px; color:var(--green); }
+.rpdonehead { display:flex; align-items:center; gap:8px; font-size:12px; color:var(--muted); }
+.rpdonehead .nok { margin-left:auto; }
+.npager { display:flex; align-items:center; justify-content:center; gap:10px; padding-top:8px; margin-top:2px;
+  border-top:1px solid var(--border); font:500 10.5px var(--fmono); color:var(--dim); }
+.npager .nbtn { padding:2px 10px; }
+
+/* the next-steps + report bits scene 02 reuses (real classes) */
+.nextcard { margin:8px 0 2px; border:1px solid var(--card-border); border-radius:var(--r-lg); background:var(--card); padding:10px 12px; box-shadow:var(--shadow-card); }
+.nexthead { font:700 10px var(--fmono); letter-spacing:.08em; color:var(--muted); text-transform:uppercase; }
+.nextsrc { font:11px var(--fmono); color:var(--dim); margin:2px 0 4px; }
+.nextsrc code { background:var(--panel2); border:1px solid var(--border); border-radius:var(--r-xs); padding:0 5px; color:var(--body); }
+.nrow { display:flex; align-items:center; gap:10px; padding:8px 0; border-top:1px solid var(--border); }
+.nrow:first-of-type { border-top:none; }
+.nkind { flex:none; font:700 8.5px var(--fmono); letter-spacing:.06em; text-transform:uppercase; border:1px solid var(--border2); border-radius:var(--r-full); padding:2px 8px; color:var(--muted); }
+.nkind.routine { color:var(--plan); border-color:color-mix(in srgb, var(--plan) 45%, transparent); }
+.nkind.research { color:var(--violet); border-color:color-mix(in srgb, var(--violet) 45%, transparent); }
+.nmeta { flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; }
+.nmeta b { font-size:12.5px; }
+.nmeta > span { font-size:11px; color:var(--dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.repcard { display:flex; align-items:center; gap:11px; border:1px solid var(--card-border); background:var(--card); border-radius:var(--r-lg); padding:10px 13px; margin:8px 0; box-shadow:var(--shadow-card); }
+.repname { font:600 12px var(--fmono); }
+.repmeta { font-size:11px; color:var(--muted); }
+.qcard { border:1px solid var(--card-border); background:var(--card); border-radius:var(--r-lg); padding:10px 12px; margin:8px 0 2px; box-shadow:var(--shadow-card); }
+.qq { font-size:12.5px; font-weight:600; margin-bottom:7px; }
+.qopt { display:flex; flex-direction:column; align-items:flex-start; gap:1px; width:100%; text-align:left; border:1px solid var(--border); background:var(--card); border-radius:var(--r-md); padding:8px 12px; margin-bottom:6px; font-size:12px; cursor:pointer; }
+.qopt:hover { border-color:var(--border2); background:var(--hover-bg); }
+.qopt b { font-size:12.5px; }
+.qopt span { color:var(--muted); font-size:11.5px; }
+/* the Marketing OS catalog row (real .pbrow grammar) */
+.pbrow { display:flex; align-items:center; gap:11px; padding:8px 6px; border-radius:var(--r-md); }
+.pbrow:hover { background:var(--hover-bg); }
+.pbtxt { flex:1; min-width:0; }
+.pbtxt b { display:block; font-size:12.5px; font-weight:600; }
+.pbtxt span { display:block; font-size:11px; color:var(--muted); }
+.pbrun { font:600 11.5px var(--fbody); color:var(--btn-fg); background:var(--btn); border:1px solid var(--border2); border-radius:var(--r-full); padding:4px 13px; white-space:nowrap; }
+.pgk { font:700 10px var(--fmono); letter-spacing:.09em; color:var(--muted); text-transform:uppercase; margin:14px 0 4px; }
+</style>
+</head>
+<body>
+<header class="doc">
+  <h1>Reply radar</h1>
+  <span class="sub">the engagement routine becomes a playbook · replies get their own card · docs/design/reply-radar-2026-08</span>
+  <span class="spacer"></span>
+  <button class="ctl" onclick="const r=document.documentElement; r.dataset.theme = r.dataset.theme==='dark'?'cream-oak':'dark'">Theme</button>
+</header>
+<main>
+
+<section>
+  <h2><span class="n">01</span>The reply-ops card — target first, reply second, honest verbs</h2>
+  <p class="why">Today each drafted reply renders in the <b>standalone-post preview</b> (network chrome,
+    "Review · schedule") while the post it answers sits in a separate prose list — the reader joins the
+    two by letter. The new card puts the <b>target on the row</b>: rank, who, reach, the quoted post
+    (click to expand), then the draft with a <code class="ic">↳</code>. The verbs match reality:
+    you <b>open the post and reply by hand</b> — the card never pretends the connector can reply.</p>
+  <div class="stage">
+    <div class="msg"><span class="avatar">🦊</span><div class="mbody">
+      <div class="mhead"><b>rex</b><span class="rolechip">ORCHESTRATOR</span><span class="mwhen">06:34 PM</span></div>
+      <div class="mtext">Six conversations worth joining, ranked by reach and fit. Open one, post the reply, tick it off:</div>
+      <div class="replycard">
+        <div class="rphead">Reply opportunities — ranked by fit</div>
+        <div class="rpsrc">from <code>engage-report-2026-08-22.md</code> · 6 targets</div>
+        <div class="rpbase">Your recent posts reached 1–12 impressions. These conversations: 240–4,160.</div>
+
+        <div class="rprow" style="border-top:none;">
+          <div class="rptop">
+            <span class="rank">A</span>
+            <a class="rphandle" href="#">@austinxwalker</a>
+            <span class="rpname">Austin Walker</span>
+            <span class="rpage">14h</span>
+          </div>
+          <div class="rpmetrics"><span><b>4,164</b> impressions</span><span>58 likes</span><span>11 reposts</span><span>23 replies</span></div>
+          <div class="rptarget">Founders: what's your actual reset after a 6-hour deep work block? I keep doom-scrolling
+            and calling it a break, and I can feel it's worse than nothing. Genuinely asking — walks? naps? Something
+            that doesn't nuke the rest of the day?</div>
+          <div class="rpdraft"><span class="arrow">↳</span><span>Yes, with one caveat: after long desk work, the best
+            reset is usually rhythmic and low-stakes. Walk hard, lift light, breathe easy. It gives the brain a clear
+            signal that the work loop is over. What's your go-to reset?</span></div>
+          <div class="rpwhy">Reaches founders discussing recovery after long work sessions — Flowe's exact wedge.</div>
+          <div class="rpimg">
+            <span class="rpthumb"><span class="redraw" title="Redraw — new brief, drafts only">↻</span></span>
+            <span class="rpimgmeta">Warm gold key light on a walking figure, near-black ground — drawn for this reply.
+              <br /><button class="nbtn">⤓ Download image</button></span>
+          </div>
+          <div class="rpacts">
+            <span class="rpchars">218/280</span>
+            <button class="nbtn">Open post ↗</button>
+            <button class="nbtn">Copy reply</button>
+            <button class="nbtn q">Redraft ›</button>
+            <button class="nbtn q">✓ replied</button>
+          </div>
+        </div>
+
+        <div class="rprow">
+          <div class="rptop">
+            <span class="rank">B</span>
+            <a class="rphandle" href="#">@RafaelNasriX</a>
+            <span class="rpname">Rafael Nasri</span>
+            <span class="rpage">1d</span>
+          </div>
+          <div class="rpmetrics"><span><b>1,685</b> impressions</span><span>31 likes</span><span>4 reposts</span><span>9 replies</span></div>
+          <div class="rptarget open">NSDR is faster than sleep. 20 minutes of non-sleep deep rest beats a 90-minute nap
+            for getting back to work. The protocols are free on YouTube. Stop napping, start NSDR-ing.
+            <i style="color:var(--dim);font-style:normal;"> — expanded: click the quote to clamp it again</i></div>
+          <div class="rpdraft"><span class="arrow">↳</span><span>I'd be careful with "faster than sleep." NSDR can help
+            some people downshift arousal while awake, but sleep does broader repair work. Useful lane: a midday reset
+            when you can't nap or the mind won't settle. How are you using it?</span></div>
+          <div class="rpwhy">Adds careful evidence-based nuance to an NSDR claim — credibility play.</div>
+          <div class="rpacts">
+            <span class="rpchars">228/280</span>
+            <button class="nbtn">Open post ↗</button>
+            <span class="nok">✓ copied</span>
+            <button class="nbtn q">Redraft ›</button>
+            <button class="nbtn q">+ Image ›</button>
+            <button class="nbtn q">✓ replied</button>
+          </div>
+        </div>
+
+        <div class="rprow done">
+          <div class="rpdonehead">
+            <span class="rank">C</span>
+            <a class="rphandle" href="#">@dakroot</a>
+            <span class="rpname">546 impressions · replied 2h ago</span>
+            <span class="nok">✓ replied</span>
+          </div>
+        </div>
+
+        <div class="npager"><button class="nbtn">‹</button><span>1–3 of 6</span><button class="nbtn">›</button></div>
+      </div>
+    </div></div>
+  </div>
+  <div class="note"><span class="dot"></span><div><b>The anatomy, top to bottom:</b> rank chip · @handle
+    (opens X) · age · the metrics line with <b>impressions bold</b> (the ranking driver) · the target
+    post as a quoted block (3-line clamp, click to expand — the next-steps idiom) · the draft with ↳ ·
+    one line of why · verbs. <b>✓ replied</b> collapses the row to a done line, so the card becomes a
+    work-through list. Six-plus targets page at 5 — the pager already exists.</div></div>
+  <div class="note"><span class="dot"></span><div><b>Tools, not prompts:</b> <code class="ic">draft_replies</code>
+    posts this card (the <code class="ic">draft_posts</code> sibling — one <code class="ic">nmreply</code> fence,
+    both thread renderers); <code class="ic">revise_replies(letter, draft?, imageBrief?)</code> rewrites one
+    letter in place. Redraft › drops "Redraft reply B: …" into the composer.</div></div>
+  <div class="note"><span class="dot"></span><div><b>The image lane (row A vs row B):</b> a row without a
+    picture offers <b>+ Image ›</b> — the agent redrafts with an <code class="ic">imageBrief</code>, drawn by
+    the same <code class="ic">generateDraftImage</code> every draft picture rides (brand tokens appended,
+    drafts only). The file lands as a thread attachment; the row shows the thumb with
+    <b>⤓ Download image</b> — a real file save, because you attach it on X yourself. Once a picture
+    exists the verb becomes the small ↻ redraw on the thumb (the <code class="ic">wantsImage</code> lesson:
+    controls change form, never vanish). Never auto-published anywhere.</div></div>
+</section>
+
+<section>
+  <h2><span class="n">02</span>Run once, then the schedule proposes itself</h2>
+  <p class="why">The radar joins the catalog as a CONTENT playbook — picked from Marketing OS, run on the spot.
+    Its <code class="ic">remeasure</code> is weekdays, so after the first run the report's next-steps card
+    carries the <b>routine row pre-filled</b>: one +Arm and it runs every weekday. Run first, see the value,
+    then commit to the schedule — never the other way around.</p>
+  <div class="stage" style="max-width:640px;">
+    <div class="pgk">Content</div>
+    <div class="pbrow">
+      <span class="pbtxt"><b>Reply radar</b><span>high-reach conversations worth joining · targets ranked, replies drafted, you post them</span></span>
+      <span class="pbrun">Run for… ›</span>
+    </div>
+    <div style="height:14px"></div>
+    <div class="repcard">
+      <span style="font-size:16px;">📡</span>
+      <span style="flex:1;"><div class="repname">engage-report-2026-08-22.md</div>
+      <div class="repmeta">Reply radar — flowe.ai · 6 targets from 40 considered · method + baseline inside</div></span>
+      <button class="nbtn">Open</button>
+    </div>
+    <div class="nextcard">
+      <div class="nexthead">Next steps — arm what you like</div>
+      <div class="nextsrc">from <code>engage-report-2026-08-22.md</code> · 3 recommendations</div>
+      <div class="nrow">
+        <span class="nkind routine">routine</span>
+        <span class="nmeta"><b>Weekday reply radar</b><span>weekdays 09:00 · re-run the radar and draft fresh replies before your morning block</span></span>
+        <button class="nbtn">+ Arm</button>
+      </div>
+      <div class="nrow">
+        <span class="nkind research">research</span>
+        <span class="nmeta"><b>Why NSDR content outperforms sleep content</b><span>the B thread's engagement suggests a content angle worth a dig</span></span>
+        <button class="nbtn">Start ›</button>
+      </div>
+    </div>
+  </div>
+  <div class="note"><span class="dot"></span><div><b>No new machinery:</b> the routine row is the existing
+    next-steps distill reading the report's own recommendation; the report card's re-measure arm offers the
+    same schedule. George's hand-built routine becomes <code class="ic">shared/playbooks-registry.ts</code>
+    data — every workspace gets it.</div></div>
+</section>
+
+<section>
+  <h2><span class="n">03</span>The data question is the run's first move</h2>
+  <p class="why">Connected X → <code class="ic">search_x</code> over domain terms mined from the brand docs
+    (real impressions, the honesty rules already enforced). Not connected → the run does <b>not</b> guess:
+    it asks, with the two honest paths side by side.</p>
+  <div class="stage" style="max-width:600px;">
+    <div class="msg"><span class="avatar">🦊</span><div class="mbody">
+      <div class="mhead"><b>rex</b><span class="rolechip">ORCHESTRATOR</span><span class="mwhen">09:01 AM</span></div>
+      <div class="mtext">The radar reads real conversations from your connected X account — nothing is connected
+        in this room yet, so pick how to run it:</div>
+      <div class="qcard">
+        <div class="qq">How should the reply radar find conversations?</div>
+        <button class="qopt"><b>Connect X (Twitter)</b><span>one minute in the browser — the radar then ranks by real impressions, and replies come from your own account's view</span></button>
+        <button class="qopt"><b>Give it seeds instead</b><span>paste topics or handles to hunt via web search — honest label: engagement numbers unavailable without the connection</span></button>
+      </div>
+    </div></div>
+  </div>
+  <div class="note"><span class="dot"></span><div><b>The docs/39 lesson, applied:</b> absence explains itself.
+    The seeds path still runs (web search, no numbers, says so in the report); the Connect path deep-links
+    the Connections row this round put on the desk.</div></div>
+</section>
+
+</main>
+</body>
+</html>
