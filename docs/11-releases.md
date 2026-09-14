@@ -32,7 +32,7 @@ makes it enforceable per change.
 
 There is no version or tag — **merging to `main` is the release.** Vercel is wired to the repo: a preview Function per PR, production on merge.
 
-**Since the source-release cutover the private `main` is a mirror** ([cutover.md](design/oss-release-2026-09/cutover.md)). PRs land in `neuramesh-ai/neuramesh-oss`. [`sync-from-public.yml`](../.github/workflows/sync-from-public.yml) fast-forwards this `main` to the public one (a dispatch from the public repo first, a five-minute schedule as the fallback) and comments the deployed SHA on the public PR. Vercel, Pulumi, and the fleet images still deploy from here. Never push to this `main` by hand: the mirror then refuses to move and names both SHAs. Land a PR with `NM_PR_REPO=neuramesh-ai/neuramesh-oss scripts/pr-land.sh <pr>`.
+**Since the source release the public repository is a publish of this one** ([cutover.md](design/oss-release-2026-09/cutover.md)). This private `main` stays the source of truth. Every push to it runs [`publish-public.yml`](../.github/workflows/publish-public.yml), which scrubs the tree (`scripts/public-snapshot.sh`: the site, the bench suite, the audits) and commits it on top of `neuramesh-ai/neuramesh-oss` `main` on the rolling branch `publish`, as a pull request a human merges. A pull request in the public repository is ported here by a maintainer and reaches the public repository with the next publish. `scripts/pr-land.sh` takes `NM_PR_REPO` for landing in either repository.
 
 On the production deploy ([`vercel.json`](../packages/control-api/vercel.json) `buildCommand`):
 

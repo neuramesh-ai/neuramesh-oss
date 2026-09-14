@@ -10,6 +10,8 @@ Issues are welcome. Report a bug with the app version, the steps to reproduce it
 
 Open an issue before you write a feature. A small team maintains this repository. A pull request may wait, and it may not be reviewed. A fix for a bug with an open issue has the best chance.
 
+This repository is published from a private one that holds the hosted service too. A pull request that is accepted here is ported into that repository by a maintainer, and it reaches this repository with the next publish. Your commit message and your name travel with it.
+
 Match the code around your change. The doctrine the codebase follows is in [CLAUDE.md](CLAUDE.md) and [docs/05-engineering-philosophy.md](docs/05-engineering-philosophy.md). Every word a person reads follows ASD-STE100: short sentences, active voice, simple tenses, no em dashes, no semicolons.
 
 ## Run the checks

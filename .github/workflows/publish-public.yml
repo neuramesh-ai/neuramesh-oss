@@ -1,0 +1,64 @@
+# The publish (docs/design/oss-release-2026-09/cutover.md). THIS repository is the source of truth;
+# every push to main publishes its scrubbed tree as one commit on top of the public main of
+# neuramesh-ai/neuramesh-oss, on the rolling branch `publish`, and opens or updates the pull
+# request from it (scripts/public-snapshot.sh). Merging that pull request is a human act: nothing
+# lands on the public main on its own. A pull request a contributor opens in the public repository
+# is ported into this main by a maintainer and reaches the public repository with the next publish.
+#
+# PUBLIC_REPO_TOKEN is a fine-grained PAT on the public repository with Contents: read and write
+# and Pull requests: read and write. Unset, the job builds and scans the snapshot and says how to
+# push it by hand: the publish then happens from the founder's Mac with `bash scripts/public-snapshot.sh`.
+name: publish public
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: publish-public
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: publish the scrubbed tree
+    # the tree the public repository holds carries this file too; the gate is the repository
+    if: github.repository == 'alonge-dev/neuramesh'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install gitleaks
+        run: |
+          curl -sSL -o gitleaks.tgz https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz
+          echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  gitleaks.tgz" | sha256sum -c -
+          tar -xzf gitleaks.tgz gitleaks
+          sudo mv gitleaks /usr/local/bin/gitleaks
+          rm gitleaks.tgz
+
+      - name: Private patterns (from the optional secret)
+        env:
+          PUBLIC_SCAN_LOCAL: ${{ secrets.PUBLIC_SCAN_LOCAL }}
+        run: |
+          if [ -n "$PUBLIC_SCAN_LOCAL" ]; then printf '%s\n' "$PUBLIC_SCAN_LOCAL" > .public-scan.local; fi
+
+      - name: Snapshot, scan, and publish
+        env:
+          PUBLIC_REPO_TOKEN: ${{ secrets.PUBLIC_REPO_TOKEN }}
+          GIT_AUTHOR_NAME: neuramesh publish
+          GIT_AUTHOR_EMAIL: publish@neuramesh.app
+        run: |
+          if [ -z "$PUBLIC_REPO_TOKEN" ]; then
+            echo "::notice::PUBLIC_REPO_TOKEN is unset: the snapshot is built and scanned, not pushed. Publish from a Mac with scripts/public-snapshot.sh."
+            bash scripts/public-snapshot.sh "$RUNNER_TEMP/public"
+            exit 0
+          fi
+          echo "::add-mask::$PUBLIC_REPO_TOKEN"
+          GH_TOKEN="$PUBLIC_REPO_TOKEN" NM_PUBLIC_REMOTE="https://x-access-token:$PUBLIC_REPO_TOKEN@github.com/neuramesh-ai/neuramesh-oss.git" NM_PUBLISH_PUSH=1 \
+            bash scripts/public-snapshot.sh "$RUNNER_TEMP/public"

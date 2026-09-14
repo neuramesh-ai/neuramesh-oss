@@ -99,7 +99,6 @@ The second command starts the dev stack in Docker (Postgres and PowerSync), star
 
 ```
 apps/desktop           the Electron app, the browser client, and the preview harness
-apps/web               the site at neuramesh.app
 apps/mobile            the companion app for the phone (Pro)
 packages/control-api   the API (Hono) and the migrations
 packages/shared        the types, the FSM, the entitlements, the protocols every client speaks
