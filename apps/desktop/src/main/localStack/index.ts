@@ -7,6 +7,7 @@
 // The replica opened before any of this (sync/boot.ts), so a warm boot renders the shell from it
 // while the two waits show as the sync mark rather than a blocking card.
 import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { localPortsFor } from '../connections';
 import { join } from 'node:path';
 import type { Keychain } from '../keychain';
 import { PROJECT_NAME, PullProgress, SERVICES, composeCommand, composeImages, isHumanBearer, mintSecrets, parseEnv, planEnv, renderEnv, type StackEnv } from './compose';
@@ -142,7 +143,7 @@ export class LocalStack {
     this.bearer = bearer;
     const envPath = join(dir, '.env');
     const existing = parseEnv(existsSync(envPath) ? readFileSync(envPath, 'utf8') : null);
-    const plan = planEnv({ existing, version: this.d.version, dir, bearer });
+    const plan = planEnv({ existing, version: this.d.version, dir, bearer, ports: localPortsFor(process.env) });
     if (plan.changed) { writeFileSync(envPath, renderEnv(plan.env), { mode: 0o600 }); chmodSync(envPath, 0o600); }
     this.stackEnv = plan.env;
     this.d.log(`stack files at ${dir} firstRun=${plan.firstRun} tagChanged=${plan.tagChanged} tag=${plan.env.NM_IMAGE_TAG}`);

@@ -2,7 +2,7 @@
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/readme/first-run-dark.gif">
-  <img src="docs/readme/first-run-light.gif" alt="A new user's first run of the NeuraMesh desktop app: the local stack starts, the wizard connects a brain and names the workspace, the crew launches, and the shell opens on this Mac" width="960">
+  <img src="docs/readme/first-run-light.gif" alt="A new user's first run of the NeuraMesh desktop app: NeuraMesh starts on this Mac, the wizard connects a brain and names the workspace, the crew launches, the shell opens, and the first ask gets its answer" width="960">
 </picture>
 
 # NeuraMesh

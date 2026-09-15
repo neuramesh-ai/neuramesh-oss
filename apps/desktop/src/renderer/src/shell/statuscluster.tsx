@@ -38,7 +38,7 @@ export function StatusCluster({ live, connected, queuedWrites, syncedOnce, compu
   const syncTip = live
     ? 'Agents are working right now.'
     : local
-      ? (connected ? 'Local mode. Your data stays on this Mac.' : 'Local mode. The local stack starts. Please wait…')
+      ? (connected ? 'Local mode. Your data stays on this Mac.' : 'Local mode. NeuraMesh starts on this Mac. Please wait…')
     : connected
       ? queued
         ? `Synced to cloud. ${queuedWrites} write${queuedWrites === 1 ? '' : 's'} still uploading.`

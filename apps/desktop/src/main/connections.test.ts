@@ -10,8 +10,7 @@ import {
   localIsDormant,
   pickForeground,
   connections, makeConnection, parseConnectionsStore, planConnections, readConnectionsStore, resolveUrls,
-  statePathsFor, writeConnectionsStore, DEV_WS, LOCAL_PORTS, type ConnectionSpec,
-} from './connections';
+  statePathsFor, writeConnectionsStore, DEV_WS, LOCAL_PORTS, type ConnectionSpec, localPortsFor } from './connections';
 
 const BAKED = { apiUrl: 'https://api.neuramesh.app', powersyncUrl: 'https://ps.neuramesh.app', webUrl: 'https://neuramesh.app' };
 const spec = (id: string, over: Partial<ConnectionSpec> = {}): ConnectionSpec =>
@@ -178,4 +177,13 @@ test('localIsDormant: Local boots when it is the foreground or when this Mac ran
   assert.equal(localIsDormant('cloud', true), false);
   assert.equal(localIsDormant('cloud', false), true);
   assert.equal(localIsDormant(null, false), true);
+});
+
+test('the local stack\'s two ports move with NM_LOCAL_API_PORT and NM_LOCAL_POWERSYNC_PORT, and the local connection follows them', () => {
+  assert.deepEqual(localPortsFor({}), { api: 8788, powersync: 58081 });
+  assert.deepEqual(localPortsFor({ NM_LOCAL_API_PORT: '8795', NM_LOCAL_POWERSYNC_PORT: '58095' }), { api: 8795, powersync: 58095 });
+  assert.deepEqual(localPortsFor({ NM_LOCAL_API_PORT: 'nope', NM_LOCAL_POWERSYNC_PORT: '0' }), { api: 8788, powersync: 58081 });
+  const [local] = planConnections({ NM_LOCAL_API_PORT: '8795', NM_LOCAL_POWERSYNC_PORT: '58095' }, { clerkSignedIn: false, custom: [], baked: { apiUrl: 'https://api.example', powersyncUrl: 'https://ps.example', webUrl: 'https://web.example' } });
+  assert.equal(local!.apiUrl, 'http://127.0.0.1:8795');
+  assert.equal(local!.powersyncUrl, 'http://127.0.0.1:58095');
 });
