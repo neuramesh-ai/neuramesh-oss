@@ -320,7 +320,7 @@
       "runtimeExecutable": "bash",
       "runtimeArgs": [
         "-c",
-        "pnpm -C apps/desktop rebuild:native >/dev/null 2>&1; pnpm --filter @neuramesh/desktop build && cd apps/desktop && env -u NM_AUTH -u NM_API -u NM_POWERSYNC NM_USERDATA=\"$HOME/.neuramesh-firstrun\" NM_LOCAL_DIR=\"$HOME/.neuramesh-firstrun/local\" NM_LOCAL_API_PORT=8795 NM_LOCAL_POWERSYNC_PORT=58095 pnpm exec electron . --sync --remote-debugging-port=9234 2>&1 | tee \"$HOME/.neuramesh-firstrun-main.log\""
+        "pnpm -C apps/desktop rebuild:native >/dev/null 2>&1; pnpm --filter @neuramesh/desktop build && cd apps/desktop && env -u NM_AUTH -u NM_API -u NM_POWERSYNC NM_OFFSCREEN=1 NM_USERDATA=\"$HOME/.neuramesh-firstrun\" NM_LOCAL_DIR=\"$HOME/.neuramesh-firstrun/local\" NM_LOCAL_API_PORT=8795 NM_LOCAL_POWERSYNC_PORT=58095 pnpm exec electron . --sync --remote-debugging-port=9234 2>&1 | tee \"$HOME/.neuramesh-firstrun-main.log\""
       ],
       "port": 9234
     }

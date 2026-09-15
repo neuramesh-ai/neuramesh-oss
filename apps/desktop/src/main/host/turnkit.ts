@@ -37,12 +37,17 @@ export async function drainQuery(stream: AsyncIterable<any>, fallback: string, l
   // every superseded text block, because cards written in one are NOT narration — carryCards
   // rescues any ```nmq/```nms fence the final block dropped ("Waiting on those two", 2026-08-06)
   const earlier: string[] = [];
+  // text the model wrote in a message with NO tool call: substantive words, which the final-text
+  // rule would otherwise drop when a later tool call and its confirmation close the turn
+  const spoken: string[] = [];
   for await (const m of stream) {
     if (m.type === 'assistant' && m.message?.content) {
+      const standalone = !m.message.content.some((b: { type?: string }) => b.type === 'tool_use');
       for (const b of m.message.content) {
         if (b.type === 'text' && b.text?.trim()) {
           if (text) earlier.push(text);
           text = b.text;
+          if (standalone) spoken.push(b.text);
           onDelta?.(b.text);
           // NO_REPLY is addressed to US, not to a reader — the daemon drops the turn on it. Logged
           // as narration it rendered a bare "NO_REPLY" line in the activity feed under the tool
@@ -72,7 +77,7 @@ export async function drainQuery(stream: AsyncIterable<any>, fallback: string, l
         log?.({ kind: 'result', phase: 'success', summary: `completed${dur}`, detail: m.usage ?? null, tokens: toks });
         // m.result is the FINAL text block only — put back any card an earlier block posted
         if (text && text !== m.result) earlier.push(text);
-        return carryCards(m.result, earlier);
+        return carryCards(m.result, earlier, spoken.filter((t) => t !== m.result));
       }
       // non-success: surface WHY instead of swallowing to a bland fallback. Carry the SDK's own error
       // TEXT (m.result / m.error), not just the subtype, so the wall handler's classifyExecError can see
@@ -85,11 +90,11 @@ export async function drainQuery(stream: AsyncIterable<any>, fallback: string, l
       // REFUSAL — that fabricates a summary and hides the wall the failover flow needs. Any other
       // non-success (e.g. max_turns) keeps the prior partial-text salvage.
       const cls = classifyExecError(`${why} ${payload}`);
-      if (text && cls !== 'exhausted' && cls !== 'refusal') return carryCards(text, earlier);
+      if (text && cls !== 'exhausted' && cls !== 'refusal') return carryCards(text, earlier, spoken.filter((t) => t !== text));
       throw new Error(`SDK returned no result${why}${payload ? `: ${payload}` : why ? '' : ' (empty stream)'}`);
     }
   }
-  return text ? carryCards(text, earlier) : fallback;
+  return text ? carryCards(text, earlier, spoken.filter((t) => t !== text)) : fallback;
 }
 
 // Tool-less single-turn replies (chat, thread, memory block, fact extraction,

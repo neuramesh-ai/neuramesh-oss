@@ -192,6 +192,11 @@ function createWindow() {
   // Windows/Linux the BrowserWindow `icon` drives the window + taskbar.
   const icon = nativeImage.createFromPath(join(__dirname, '../renderer/icon.png'));
   if (process.platform === 'darwin' && !icon.isEmpty()) app.dock?.setIcon(icon);
+  // NM_OFFSCREEN=1 (dev, the recording harness): the renderer paints to a buffer and no window
+  // reaches the screen. A window on screen paints nothing once it is minimized or covered, and a
+  // first-run recording froze that way twice; offscreen, the debug port captures every frame
+  // whatever the desktop shows, and nobody watches a theme flip per frame.
+  const offscreen = !app.isPackaged && process.env['NM_OFFSCREEN'] === '1';
   const win = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -206,8 +211,10 @@ function createWindow() {
       sandbox: true,
       nodeIntegration: false,
       webviewTag: true, // dock mini-browser pane — guests are capped in web-contents-created above
+      ...(offscreen ? { offscreen: true, backgroundThrottling: false } : {}),
     },
   });
+  if (offscreen) { win.webContents.setFrameRate(15); console.log('offscreen=1 the window stays off screen, the debug port sees every frame'); }
 
   // Native right-click menu — Electron ships no default context menu, so without this, right-click
   // on chat text does nothing. Give copy on any selection (chat is freely selectable — nothing sets
@@ -219,7 +226,7 @@ function createWindow() {
 
   win.webContents.once('did-finish-load', () => {
     const coldstartMs = Date.now() - t0;
-    win.show();
+    if (!offscreen) win.show();
     console.log(`coldstart_ms=${coldstartMs} budget_ms=2000 ok=${coldstartMs < 2000}`);
     if (smoke) setTimeout(() => app.quit(), 150);
     if (shotDir) void import('./devshots').then((m) => m.captureShots(win, shotDir));
