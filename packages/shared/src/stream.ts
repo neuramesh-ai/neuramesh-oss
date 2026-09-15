@@ -83,8 +83,25 @@ export function visibleStream(text: string): { text: string; forming: FenceWork 
  * carry (same fence, or a revision asking the same question) is prepended, so the prose that
  * refers to "those two" sits under the two it means.
  */
-export function carryCards(finalText: string, earlierBlocks: string[]): string {
+/** A block the model wrote in a message that carried no tool call, long enough not to be a
+ *  "let me check the board" line: substantive words, never narration. */
+export const SPOKEN_MIN_CHARS = 120;
+
+export function carryCards(finalText: string, earlierBlocks: string[], spokenBlocks: string[] = []): string {
   const FENCE = /```nm[qs]\n?[\s\S]*?```/g;
+  // The mirror case (2026-09-15): the model writes its words, then closes with the pills fence as
+  // a block of its own. The final-text rule kept the fence and threw the words away, so a first
+  // run's "introduce yourself" came back as three pills and no prose. Words are never a card
+  // either: when the final block has no prose, the last earlier block that has some is the reply,
+  // and the final block's own cards ride under it.
+  const prose = (t: string): string => t.replace(FENCE, '').trim();
+  if (!prose(finalText)) {
+    const spoken = [...earlierBlocks].reverse().find((b) => prose(b));
+    if (spoken) {
+      const fences = finalText.match(FENCE) ?? [];
+      finalText = fences.length ? `${prose(spoken)}\n\n${fences.join('\n\n')}` : prose(spoken);
+    }
+  }
   const keyOf = (fence: string): string => {
     const body = fence.replace(/^```nm[qs]\n?/, '').replace(/```$/, '').trim();
     try {
@@ -102,6 +119,19 @@ export function carryCards(finalText: string, earlierBlocks: string[]): string {
       if (!have.has(k)) { have.add(k); missing.push(fence); }
     }
   }
-  if (!missing.length) return finalText;
-  return `${missing.join('\n\n')}\n\n${finalText}`;
+  // The second shape (2026-09-15): the model wrote its answer, then verified with a tool, then
+  // closed with the tool's one-line confirmation. The final block had prose, so the rule above
+  // kept "Confirmed: no open tasks on the board right now." and dropped the introduction it
+  // confirmed. Words the model wrote in a message with no tool call, long enough not to be a
+  // narration line, are part of the answer: they lead, in the order they were said, and the final
+  // block closes.
+  // A model on the CLI lane sometimes narrates a tool call as text, `set_thread_title({...})`, in
+  // the block that also opens its answer. The call itself went through the tool; the words stay out.
+  const NARRATED_CALL = /^\s*[a-z][a-z0-9_]*\(\{[\s\S]*?\}\)\s*/;
+  const said = spokenBlocks
+    .map((b) => prose(b).replace(NARRATED_CALL, '').trim())
+    .filter((t) => t.length >= SPOKEN_MIN_CHARS && !finalText.includes(t));
+  const lead = [...missing, ...said];
+  if (!lead.length) return finalText;
+  return `${lead.join('\n\n')}\n\n${finalText}`;
 }
