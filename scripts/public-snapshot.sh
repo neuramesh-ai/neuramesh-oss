@@ -16,29 +16,19 @@
 # main followed the public one byte for byte, died the day the site apps/web stayed private: two
 # trees that differ cannot mirror.)
 #
-# From a clean checkout of the current branch (a local clone of HEAD, so uncommitted work never
-# rides along) it removes what stays private:
-#
-#   apps/web                                          the site and the cloud web app (neuramesh.app)
-#   packages/bench/suite/**                          the held-out task set (docs/decisions.md D4)
-#   docs/evidence/**                                  screenshots with dev data
-#   docs/design/oss-release-2026-09/research-*.md     the four audits
-#   docs/design/oss-release-2026-09/review.md         the adversarial review
-#   private/  var/                                    scratch trees, if any came back
-#
-# WORKFLOWS ARE NOT REMOVED. The private-only workflows (infra, fleet, the images, release, sync
-# rules, mobile, the publish itself) gate every job on `github.repository == 'alonge-dev/neuramesh'`
-# and skip in the public repository, and this script REFUSES a snapshot where one of them is
-# ungated. The decision per workflow: cutover.md.
-#
-# Then it runs scripts/public-scan.sh on the result (with the founder's .public-scan.local when the
-# source checkout has one), fetches the public main, and commits the scrubbed tree on top of it.
-# With no public main yet (the first publish) it makes the orphan commit instead.
+# What stays private is ONE list, scripts/public-tree.sh (the desktop app and what it needs to run
+# ship; the site, the phone app, the cloud platform and its pipelines stay). From a clean clone of
+# HEAD (so uncommitted work never rides along) this script removes every path in PUBLIC_EXCLUDE and
+# every workflow not in PUBLIC_WORKFLOWS, one line each so the log is the evidence. Then it runs
+# scripts/public-scan.sh on the result (with the founder's .public-scan.local when the source
+# checkout has one), fetches the public main, and commits the scrubbed tree on top of it. With no
+# public main yet (the first publish) it makes the orphan commit instead.
 set -euo pipefail
 
 src=$(git rev-parse --show-toplevel)
 branch=$(git -C "$src" rev-parse --abbrev-ref HEAD)
 sha=$(git -C "$src" rev-parse --short HEAD)
+full=$(git -C "$src" rev-parse HEAD)
 out="${1:-$(mktemp -d)/neuramesh-oss}"
 public_remote="${NM_PUBLIC_REMOTE:-https://github.com/neuramesh-ai/neuramesh-oss.git}"
 
@@ -52,7 +42,9 @@ if [ -e "$out" ]; then
 fi
 
 echo "· clone $branch@$sha → $out"
-git clone --quiet --branch "$branch" --single-branch "$src" "$out"
+# by commit, not by branch name: a pull-request checkout in CI is a detached HEAD
+git clone --quiet --no-checkout "$src" "$out"
+git -C "$out" checkout -q --detach "$full"
 cd "$out"
 # the public remote speaks https. On a Mac the credential comes from `gh` (never from a helper
 # that prompts: a prompt with no terminal hangs forever); in CI it rides in NM_PUBLIC_REMOTE.
@@ -61,42 +53,31 @@ if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
   git config --add credential.helper '!gh auth git-credential'
 fi
 
-private=(
-  apps/web
-  packages/bench/suite
-  docs/evidence
-  private
-  var
-  docs/design/oss-release-2026-09/review.md
-)
-for f in docs/design/oss-release-2026-09/research-*.md; do
-  [ -e "$f" ] && private+=("$f")
-done
-for p in "${private[@]}"; do
-  if [ -e "$p" ] || git ls-files --error-unmatch "$p" >/dev/null 2>&1; then
-    git rm -r -q --cached --ignore-unmatch "$p"
-    rm -rf "$p"
-    echo "· removed $p"
-  fi
+. scripts/public-tree.sh
+
+# ── the private paths ────────────────────────────────────────────────────────────────────────
+for p in "${PUBLIC_EXCLUDE[@]}"; do
+  for f in $p; do # a glob entry expands here, a plain path is itself
+    if [ -e "$f" ] || git ls-files --error-unmatch "$f" >/dev/null 2>&1; then
+      git rm -r -q --cached --ignore-unmatch "$f"
+      rm -rf "$f"
+      echo "· removed $f"
+    fi
+  done
 done
 
-# ── workflows: the public repo RUNS these, the mirror gates the rest ─────────────────────────
-# One line per file, so the log is the evidence. A workflow that is neither listed here nor
-# gated on every job would run in the public repo against secrets and infra it does not have.
-public_workflows=(ci control-api-bundle control-api-image local-stack-smoke fleet-e2e)
-gate="github.repository == 'alonge-dev/neuramesh'"
+# ── workflows: only the public list ships ────────────────────────────────────────────────────
+# One line per file, so the log is the evidence. A workflow that is not listed would run in the
+# public repository against secrets and infra it does not have, so it is removed, never gated.
 echo "· workflows"
 for f in .github/workflows/*.yml; do
   name=$(basename "$f" .yml)
-  jobs=$(grep -c '^    runs-on:' "$f" || true)
-  gated=$(grep -c "^    if: $gate" "$f" || true)
-  if printf '%s\n' "${public_workflows[@]}" | grep -qx "$name"; then
-    printf '  %-24s public: runs in neuramesh-ai/neuramesh-oss (%s jobs)\n' "$name" "$jobs"
-  elif [ "$jobs" -gt 0 ] && [ "$gated" -eq "$jobs" ]; then
-    printf '  %-24s private: every job gated on the repository (%s/%s)\n' "$name" "$gated" "$jobs"
+  if printf '%s\n' "${PUBLIC_WORKFLOWS[@]}" | grep -qx "$name"; then
+    printf '  %-24s public: runs in neuramesh-ai/neuramesh-oss\n' "$name"
   else
-    echo "public-snapshot: $name is not in the public list and $gated of $jobs jobs carry the gate. Gate every job, or list it." >&2
-    exit 1
+    git rm -q --cached "$f"
+    rm -f "$f"
+    printf '  %-24s removed: a private pipeline\n' "$name"
   fi
 done
 
@@ -118,7 +99,8 @@ if git fetch -q public main 2>/dev/null; then
     exit 0
   fi
   git checkout -q -B publish FETCH_HEAD
-  git rm -r -q --cached . >/dev/null
+  # from the public main's index to the scrubbed tree: the files it drops leave the working tree too
+  # (an emptied index first would turn them untracked, and read-tree never touches untracked files)
   git read-tree -u --reset "$scrub"
   git -c user.name="${GIT_AUTHOR_NAME:-neuramesh publish}" -c user.email="${GIT_AUTHOR_EMAIL:-publish@neuramesh.app}" commit -q -m "Publish $branch@$sha"
   echo "· publish commit on top of public main $(git rev-parse --short FETCH_HEAD): $(git diff --shortstat FETCH_HEAD HEAD)"
@@ -131,7 +113,7 @@ fi
 
 title="Publish $branch@$sha"
 stat=$(git diff --shortstat FETCH_HEAD HEAD 2>/dev/null || echo "the first publish")
-body="The scrubbed tree of \`alonge-dev/neuramesh\` \`$branch\` at \`$sha\`, one commit on top of this repository's \`main\` ($stat). The private paths are listed in \`scripts/public-snapshot.sh\`. Merge it as it is: the tree is the whole publish."
+body="The scrubbed tree of \`alonge-dev/neuramesh\` \`$branch\` at \`$sha\`, one commit on top of this repository's \`main\` ($stat). What stays private is listed in \`scripts/public-tree.sh\`. Merge it as it is: the tree is the whole publish."
 if [ "${NM_PUBLISH_PUSH:-0}" = "1" ]; then
   git push -q --force public publish:refs/heads/publish
   echo "public-snapshot: pushed the publish branch to $public_remote"

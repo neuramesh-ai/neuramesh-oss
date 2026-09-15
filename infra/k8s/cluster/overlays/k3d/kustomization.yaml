@@ -1,7 +1,0 @@
-# local proving ground: k3s has no gVisor and no PD CSI, so machines run on the default
-# runtime + local-path storage — the operator's FLEET_RUNTIME_CLASS/FLEET_STORAGE_CLASS
-# stay empty and the #optional template lines vanish. logic identical, isolation not.
-apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
-resources:
-  - ../../base

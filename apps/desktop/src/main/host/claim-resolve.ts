@@ -72,7 +72,10 @@ const {
  } = ctx.guards;
 
 async function estimateFor(agent: HostedAgent, t: ExecTask, token: string | null, live: boolean, checklist: string[]): Promise<string> {
-  if (!live || !token) return '~1 min (echo stub)';
+  // No estimator to ask: the echo stub finishes in seconds, and a subscription-signed runtime carries no
+  // API token for the estimate call (the run itself is live). Plain words either way: a person reads this line.
+  if (!live) return '~1 min';
+  if (!token) return '~5 to 15 min';
   try {
     const raw = await withTimeout(
       runtimeFor(agent.runtime).streamTurn(
@@ -85,9 +88,9 @@ async function estimateFor(agent: HostedAgent, t: ExecTask, token: string | null
       'estimate timed out',
     );
     const m = raw.trim().split('\n')[0]!.slice(0, 24);
-    return /min|hour|hr|m\b/i.test(m) ? m : '~5–15 min';
+    return /min|hour|hr|m\b/i.test(m) ? m : '~5 to 15 min';
   } catch {
-    return '~5–15 min';
+    return '~5 to 15 min';
   }
 }
 

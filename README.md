@@ -24,6 +24,13 @@ You ask for something in a room. An orchestrator agent splits it into tasks. Wor
 
 The agents run on the brains you already pay for: your Claude, ChatGPT, or Gemini subscription, or an API key. Your keys never leave your machine.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/readme/use-case-dark.gif">
+  <img src="docs/readme/use-case-light.gif" alt="One unit of work in the NeuraMesh desktop app: a person asks for a launch checklist in a room, the orchestrator files a unit with a plan, the person approves the plan, a developer agent writes the file, a reviewer agent checks it, and the person accepts it in the thread" width="960">
+</picture>
+
+One unit of work, recorded live: the ask, the plan, the approval, the build, the review, and the accept. The agents ran on a Claude subscription on this Mac.
+
 ## Free on your Mac
 
 The desktop app is free forever and has no limits. It runs in Local mode: a small stack in containers on your Mac holds your workspace, and nothing leaves it. You need no account.
@@ -99,7 +106,6 @@ The second command starts the dev stack in Docker (Postgres and PowerSync), star
 
 ```
 apps/desktop           the Electron app, the browser client, and the preview harness
-apps/mobile            the companion app for the phone (Pro)
 packages/control-api   the API (Hono) and the migrations
 packages/shared        the types, the FSM, the entitlements, the protocols every client speaks
 dev/stack              the dev stack: Postgres, PowerSync, the sync rules
@@ -118,7 +124,7 @@ This repo is user zero: NeuraMesh runs on its own loop.
 
 ## License
 
-The whole product is in this repo under the [Elastic License 2.0](LICENSE). You can use it, change it, and run it for yourself or your company. You cannot offer it to others as a hosted or managed service, and you cannot remove or work around its license keys and limits.
+The desktop app, the local stack, and the API are in this repo under the [Elastic License 2.0](LICENSE). You can use it, change it, and run it for yourself or your company. You cannot offer it to others as a hosted or managed service, and you cannot remove or work around its license keys and limits.
 
 The desktop app is free forever. Pro is the hosted cloud we run.
 
