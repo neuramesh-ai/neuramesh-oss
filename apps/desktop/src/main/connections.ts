@@ -92,6 +92,18 @@ export function resolveUrls(kind: ConnectionKind, env: NodeJS.ProcessEnv, own: P
   };
 }
 
+/** The two loopback ports of the stack this app runs. `NM_LOCAL_API_PORT` and `NM_LOCAL_POWERSYNC_PORT`
+ *  move them, so Local mode can boot beside a dev stack that already holds 8788 and 58081 on the
+ *  same Mac (a recording, a second install). The stack's compose env and the connection's URLs read
+ *  this one function, so they cannot drift. Unset or not a port number means the defaults. */
+export function localPortsFor(env: NodeJS.ProcessEnv): { api: number; powersync: number } {
+  const port = (v: string | undefined, fallback: number): number => {
+    const n = Number(v?.trim());
+    return Number.isInteger(n) && n > 0 && n < 65536 ? n : fallback;
+  };
+  return { api: port(env['NM_LOCAL_API_PORT'], LOCAL_PORTS.api), powersync: port(env['NM_LOCAL_POWERSYNC_PORT'], LOCAL_PORTS.powersync) };
+}
+
 export const localUrls = (ports: { api: number; powersync: number } = LOCAL_PORTS): ConnectionUrls => ({
   apiUrl: `http://127.0.0.1:${ports.api}`,
   powersyncUrl: `http://127.0.0.1:${ports.powersync}`,
@@ -117,7 +129,7 @@ export function planConnections(env: NodeJS.ProcessEnv, facts: { clerkSignedIn: 
   const lane = env['NM_AUTH'];
   if (lane === 'dev') return [{ id: 'dev', kind: 'custom', authMode: 'dev', ...resolveUrls('custom', env, null, DEV_URLS) }];
   if (lane === 'supabase' || lane === 'clerk') return [{ id: 'cloud', kind: 'cloud', authMode: lane, ...resolveUrls('cloud', env, null, facts.baked) }];
-  const out: ConnectionSpec[] = [{ id: 'local', kind: 'local', authMode: 'local', ...resolveUrls('local', env, null, localUrls()) }];
+  const out: ConnectionSpec[] = [{ id: 'local', kind: 'local', authMode: 'local', ...resolveUrls('local', env, null, localUrls(localPortsFor(env))) }];
   if (facts.clerkSignedIn) out.push({ id: 'cloud', kind: 'cloud', authMode: 'clerk', ...resolveUrls('cloud', env, null, facts.baked) });
   for (const c of facts.custom) out.push({ id: `custom:${c.id}`, kind: 'custom', authMode: c.authMode ?? 'clerk', ...resolveUrls('custom', env, c, facts.baked) });
   return out;

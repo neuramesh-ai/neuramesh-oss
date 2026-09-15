@@ -112,21 +112,21 @@ export function LocalStackGate({ payload, onPick, onInstall, onRescan, onQuit }:
       break;
     case 'starting':
       card = (
-        <Card kicker="First run" title="The local stack starts" p="Please wait…" foot="Ports open on 127.0.0.1 only">
+        <Card kicker="First run" title="NeuraMesh starts on this Mac" p="Your workspace on this Mac runs in three containers. They start now. Please wait…" foot="Ports open on 127.0.0.1 only">
           <div>{s.services.map((sv) => <StatusRow key={sv.name} name={sv.name} ready={sv.ready} />)}</div>
         </Card>
       );
       break;
     case 'updating':
       card = (
-        <Card kicker="Update" title="Update in progress" p={`The local stack updates to ${s.version}. Please wait…`} foot="Your threads open when the update ends">
+        <Card kicker="Update" title="Update in progress" p={`NeuraMesh on this Mac updates to ${s.version}. Please wait…`} foot="Your threads open when the update ends">
           <div>{s.items.map((it) => <ProgressRow key={it.name} item={it} />)}</div>
         </Card>
       );
       break;
     case 'error':
       card = (
-        <Card kicker="Local mode" title="The local stack did not start" p={s.message}
+        <Card kicker="Local mode" title="NeuraMesh did not start on this Mac" p={s.message}
           actions={<><button type="button" className="btn primary" onClick={onRescan}>Try again</button><button type="button" className="btn quiet" onClick={onQuit}>Quit</button></>} />
       );
       break;
