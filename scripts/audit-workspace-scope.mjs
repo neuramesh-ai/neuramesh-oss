@@ -72,10 +72,14 @@ function findUnscoped(src) {
 }
 
 if (process.argv.includes('--self-test')) {
-  // one plant per dialect — a matcher that only understands desktop's would pass mobile blind
+  // one plant per dialect — a matcher that only understands desktop's would pass mobile blind.
+  // Both plants splice into the desktop file: the checker keys on the query's text, never on the
+  // file it sits in, and the phone app stays in the private repository (scripts/public-tree.sh),
+  // so the public tree has no mobile file to host a plant.
+  const host = 'apps/desktop/src/main/sync.ts';
   const plants = [
-    { file: 'apps/desktop/src/main/sync.ts', code: '\n  db.watch(`select id, title from threads where archived_at is null`, [], {}, {});\n' },
-    { file: 'apps/mobile/src/thread.tsx', code: "\n  useQuery<X>('select id, name from agents order by name');\n" },
+    { file: host, dialect: 'desktop', code: '\n  db.watch(`select id, title from threads where archived_at is null`, [], {}, {});\n' },
+    { file: host, dialect: 'mobile', code: "\n  useQuery<X>('select id, name from agents order by name');\n" },
   ];
   for (const p of plants) {
     const src = readFileSync(p.file, 'utf8');
@@ -86,7 +90,7 @@ if (process.argv.includes('--self-test')) {
     const at = src.search(HARNESS_FROM);
     const planted = at >= 0 ? src.slice(0, at) + p.code + src.slice(at) : src + p.code;
     if (!findUnscoped(planted).length) {
-      console.error(`SELF-TEST FAILED: the checker did not catch a planted unscoped query in ${p.file}.`);
+      console.error(`SELF-TEST FAILED: the checker did not catch a planted unscoped ${p.dialect} query in ${p.file}.`);
       console.error('The audit cannot be trusted — a matcher that matches nothing reports success.');
       process.exit(2);
     }

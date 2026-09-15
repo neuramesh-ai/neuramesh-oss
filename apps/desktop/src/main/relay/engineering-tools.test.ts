@@ -79,8 +79,10 @@ test('Linux Code shell enforces the real Bubblewrap boundary used by the machine
   }
 });
 
-test('the production machine image installs the mandatory Linux command sandbox', async () => {
-  const dockerfile = await readFile(new URL('../../../../../infra/images/machine/Dockerfile', import.meta.url), 'utf8');
+// infra/ stays in the private repository (scripts/public-tree.sh): the public tree holds no machine image.
+const machineDockerfile = new URL('../../../../../infra/images/machine/Dockerfile', import.meta.url);
+test('the production machine image installs the mandatory Linux command sandbox', { skip: !existsSync(machineDockerfile) && 'infra/ is not in this tree' }, async () => {
+  const dockerfile = await readFile(machineDockerfile, 'utf8');
   assert.match(dockerfile, /\bbubblewrap\b/);
 });
 
