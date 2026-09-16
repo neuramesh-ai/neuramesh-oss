@@ -23,6 +23,7 @@ PUBLIC_EXCLUDE=(
   docs/design/cloud-first-2026-08/rollout.md   # the live rollout log of the production project
   docs/design/oss-release-2026-09/cutover.md   # the publish runbook
   docs/design/oss-release-2026-09/review.md    # the adversarial review
+  docs/design/oss-release-2026-09/announcement.md  # the launch posts, until they are posted
   'docs/design/oss-release-2026-09/research-*.md'  # the four audits (a glob, expanded at use)
   private                                      # scratch trees, if any came back
   var
