@@ -423,6 +423,13 @@ function threadTitle(body) {
   return t.charAt(0).toUpperCase() + t.slice(1);
 }
 
+// ../shared/src/linear.ts
+function trimEndChars(s, set) {
+  let e = s.length;
+  while (e > 0 && set.includes(s[e - 1])) e--;
+  return e === s.length ? s : s.slice(0, e);
+}
+
 // ../shared/src/cards.ts
 function parseCard(body) {
   if (/```nmauth/.test(body)) return { kind: "nmauth" };
@@ -488,9 +495,9 @@ function parseQuestionBlock(src) {
   const raw = [];
   if (oi !== -1) {
     for (const line of lines.slice(oi + 1)) {
-      const m = /^\s*-\s+(.*\S)\s*$/.exec(line);
+      const m = /^\s*-\s+(\S.*)$/.exec(line.replace(/\r$/, ""));
       if (m) {
-        raw.push((m[1] ?? "").replace(/^["']|["']$/g, ""));
+        raw.push((m[1] ?? "").trim().replace(/^["']|["']$/g, ""));
         continue;
       }
       if (line.trim() && !/^\s/.test(line)) break;
@@ -512,7 +519,7 @@ function isLowRiskPermissionCard(body) {
   const q = parseQuestions(body)[0];
   return q?.kind === "permission" && q.risk !== "high";
 }
-var ANSWER_LINE = /^\*\*(.+?)\*\*\s*→\s*(.+)$/;
+var ANSWER_LINE = /^\*\*(.+?)\*\*[ \t]*→[ \t]*(\S.*)$/;
 function readAnswers(bodies) {
   const map = /* @__PURE__ */ new Map();
   for (const body of bodies) {
@@ -1277,7 +1284,7 @@ var TaskSchema = z5.object({
   updatedAt: z5.string().datetime()
 });
 function taskBranch(number, title) {
-  const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40);
+  const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40);
   return slug ? `nm/${number}-${slug}` : `nm/${number}`;
 }
 
@@ -2318,10 +2325,36 @@ function commRulesFrom(raw) {
   const custom = Array.isArray(r.custom) ? r.custom.filter((x) => typeof x === "string" && !!x.trim()).map((x) => x.trim().slice(0, COMM_RULE_CAPS.chars)).slice(0, COMM_RULE_CAPS.rules) : [];
   return { ste100: r.ste100 !== false, noEmdash: r.noEmdash !== false, custom };
 }
+var isBlank = (c) => /\s/.test(c);
+var isDash = (c) => c === "\u2014" || c === "\u2013";
+function dashPass(text, capitals) {
+  let out = "";
+  let from = 0;
+  let i = 0;
+  while (i < text.length) {
+    if (!isDash(text[i])) {
+      i++;
+      continue;
+    }
+    let end = i + 1;
+    while (end < text.length && isBlank(text[end])) end++;
+    const next = text[end];
+    if (capitals !== (next !== void 0 && next >= "A" && next <= "Z")) {
+      i++;
+      continue;
+    }
+    let start = i;
+    while (start > from && isBlank(text[start - 1])) start--;
+    out += text.slice(from, start) + (capitals ? ". " : ", ");
+    from = end;
+    i = end;
+  }
+  return out + text.slice(from);
+}
 function scrubEmdash(text) {
   const parts = text.split(/(```[\s\S]*?```|`[^`\n]*`)/);
   for (let i = 0; i < parts.length; i += 2) {
-    parts[i] = parts[i].replace(/\s*[—–]\s*(?=[A-Z])/g, ". ").replace(/\s*[—–]\s*/g, ", ");
+    parts[i] = dashPass(dashPass(parts[i], true), false);
   }
   return parts.join("");
 }
@@ -6030,7 +6063,7 @@ async function requireConfirmCard(store2, workspace, needle, what) {
   }
 }
 function parseRepoUrl(raw) {
-  const s = raw.trim().replace(/\.git$/, "").replace(/\/+$/, "");
+  const s = trimEndChars(raw.trim().replace(/\.git$/, ""), "/");
   const gh = /^(?:https?:\/\/)?github\.com\/([\w.-]+)\/([\w.-]+)$/.exec(s);
   if (gh) return { provider: "github", orgName: gh[1], name: gh[2], cloneUrl: `https://github.com/${gh[1]}/${gh[2]}.git` };
   const bare = /^([\w][\w.-]*)\/([\w][\w.-]*)$/.exec(s);
@@ -6038,7 +6071,7 @@ function parseRepoUrl(raw) {
   throw new DomainError("INVALID_INPUT", "paste a public GitHub repo URL, e.g. https://github.com/<org>/<repo>");
 }
 function slugify(name) {
-  return name.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "project";
+  return name.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "project";
 }
 function taskTarget(task) {
   return `task:${task.number}`;
@@ -6404,7 +6437,7 @@ function nextPlanVersion(existingNames) {
 }
 var implementationPlanName = (version) => `implementation-plan-v${version}.md`;
 function designMockupName(round, name) {
-  const slug = name.toLowerCase().replace(/\.html?$/, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "mockup";
+  const slug = name.toLowerCase().replace(/\.html?$/, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60) || "mockup";
   return `design-mockup-v${round}-${slug}.html`;
 }
 function payloadFor(cmd) {
@@ -7767,7 +7800,7 @@ async function repoCommands(store2, actor, cmd) {
       localPath = cmd.localPath;
       cloneUrl = null;
       orgName = "local";
-      name = cmd.name?.trim() || cmd.localPath.replace(/[/\\]+$/, "").split(/[/\\]/).pop() || "folder";
+      name = cmd.name?.trim() || trimEndChars(cmd.localPath, "/\\").split(/[/\\]/).pop() || "folder";
     } else if (cmd.url) {
       const parsed = parseRepoUrl(cmd.url);
       ({ provider, orgName, name, cloneUrl } = parsed);

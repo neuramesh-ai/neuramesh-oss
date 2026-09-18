@@ -15,7 +15,7 @@ export const CONTENT_PLATFORMS = ['x', 'instagram', 'linkedin', 'tiktok', 'email
 // post reading 410/280). Strip it here: the body must be only what goes on the wire, and the
 // image brief is kept separately so it can drive media later instead of being lost.
 const BRIEF_RE = /^\s*(?:image|visual|media|photo)\s+(?:brief|prompt|idea)\s*:\s*/i;
-const META_RE = /^\s*\(?\s*(?:draft only|character count|char count|word count|note to reviewer|holding for approval)\b/i;
+const META_RE = /^\s*(?:\(\s*)?(?:draft only|character count|char count|word count|note to reviewer|holding for approval)\b/i;
 
 function splitBody(raw: string): { body: string; imageBrief?: string } {
   const kept: string[] = [];

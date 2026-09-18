@@ -189,7 +189,7 @@ export function taskBranch(number: number, title: string): string {
   const slug = title
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
+    .replace(/^-|-$/g, '') // one dash at each end at most: the collapse leaves no run
     .slice(0, 40);
   return slug ? `nm/${number}-${slug}` : `nm/${number}`;
 }

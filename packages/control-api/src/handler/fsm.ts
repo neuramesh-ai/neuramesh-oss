@@ -538,7 +538,8 @@ export const implementationPlanName = (version: number): string => `implementati
 // design mockup artifact name: versioned by proposal round, slug-safe, .html
 // (the preview tier renders 'design' artifacts in the sandboxed iframe by kind).
 export function designMockupName(round: number, name: string): string {
-  const slug = name.toLowerCase().replace(/\.html?$/, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'mockup';
+  // one dash at each end at most: the collapse before it leaves no run (CodeQL, 2026-09-18)
+  const slug = name.toLowerCase().replace(/\.html?$/, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60) || 'mockup';
   return `design-mockup-v${round}-${slug}.html`;
 }
 

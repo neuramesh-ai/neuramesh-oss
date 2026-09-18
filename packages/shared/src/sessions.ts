@@ -317,8 +317,9 @@ export function roomBrief(messages: RoomMessage[], agentIds: Set<string>): RoomB
 export function briefPretty(body: string): string {
   let t = stripBriefFrame(body);
   t = t.replace(/^[-·]\s+/, ''); // the one-liner reads as a sentence, not a stray bullet
-  t = t.replace(/\s+[—–]\s+/g, ' · ');
-  t = t.replace(/\s+-\s+/g, ' · ');
+  // each match begins at the line start or a non-blank, so a run of blanks is scanned once (CodeQL, 2026-09-18)
+  t = t.replace(/(^|\S)\s+[—–]\s+/g, '$1 · ');
+  t = t.replace(/(^|\S)\s+-\s+/g, '$1 · ');
   t = t.replace(/\s{2,}/g, ' ');
   return t.trim();
 }

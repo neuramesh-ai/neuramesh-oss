@@ -5,6 +5,7 @@ import { MK_PLATFORMS } from '../thread/DeliveryStrip';
 import { cleanErr } from '../lib/text';
 import { createPortal } from 'react-dom';
 import { nm as nmBridge } from '../bridge/nm';
+import { openLink } from '../lib/links';
 import { type ContentItemRow } from '../bridge/rows-content';
 import { WhenPicker, localYmd } from './WhenPicker';
 import { ImageFloor } from './ImageFloor';
@@ -282,7 +283,7 @@ export function PostPreviewModal({ item, channelSlug, channelId, projectName, on
             {editable && dirty && item.status === 'draft' && <button className="btn sm" disabled={busy} onClick={() => void saveText()}>Save · keep draft</button>}
             {item.status === 'scheduled' && <button className="btn sm" disabled={busy} onClick={() => void unschedule()}>Unschedule</button>}
             {item.status === 'published' && item.external_url && (
-              <button className="btn primary sm" onClick={() => void nm?.openExternal(item.external_url!)}>View on {platformName} ↗</button>
+              <button className="btn primary sm" onClick={() => openLink(item.external_url!)}>View on {platformName} ↗</button>
             )}
             {editable && (killAsk
               ? <button className="btn sm mkdanger" disabled={busy} onClick={() => void del()}>Delete — sure?</button>

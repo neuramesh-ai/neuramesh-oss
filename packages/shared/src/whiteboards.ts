@@ -7,6 +7,8 @@
 // swap it for a snapshot card. No I/O, no Excalidraw import — the heavy library stays a lazy
 // renderer chunk; this is just the contract.
 
+import { trimLineEnds } from './linear';
+
 export const WB_TITLE_MAX = 200;
 export const WB_MERMAID_MAX = 100_000;
 /** the scene JSON text cap — a typical diagram is 5–50KB; embedded images are the thing this excludes */
@@ -88,7 +90,7 @@ export function parseWhiteboardRef(body: string | null | undefined): WhiteboardR
   if (!body) return null;
   const m = WB_REF_RE.exec(body);
   if (!m) return null;
-  const tidy = (s: string): string => s.replace(/[ \t]+$/gm, '').replace(/\n{3,}/g, '\n\n').trim();
+  const tidy = (s: string): string => trimLineEnds(s).replace(/\n{3,}/g, '\n\n').trim();
   const stripped = tidy(body.replace(WB_REF_RE, ''));
   return { id: m[1]!.toLowerCase(), body: stripped, prose: tidy(stripped.replace(WB_LABEL_RE, '')) };
 }

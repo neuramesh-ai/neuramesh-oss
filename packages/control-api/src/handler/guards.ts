@@ -1,7 +1,7 @@
 // Actor identity + capability guards — extracted from handler.ts (track C1).
 // Who an actor IS and what it may do, in one place: every command branch reads these
 // rather than restating the rule.
-import { formatAddress, type Actor, type ActorRef, type Task } from '@neuramesh/shared';
+import { formatAddress, trimEndChars, type Actor, type ActorRef, type Task } from '@neuramesh/shared';
 import { clerkPrimaryEmail } from '../clerk';
 import { DomainError } from '../errors';
 import type { Store } from '../store';
@@ -81,7 +81,7 @@ export async function requireConfirmCard(store: Store, workspace: string, needle
 // Accepts a full URL, a scheme-less github.com/<org>/<repo>, or an <org>/<repo>
 // shorthand — so the orchestrator can attach a repo the human named loosely.
 export function parseRepoUrl(raw: string): { provider: string; orgName: string; name: string; cloneUrl: string } {
-  const s = raw.trim().replace(/\.git$/, '').replace(/\/+$/, '');
+  const s = trimEndChars(raw.trim().replace(/\.git$/, ''), '/');
   const gh = /^(?:https?:\/\/)?github\.com\/([\w.-]+)\/([\w.-]+)$/.exec(s);
   if (gh) return { provider: 'github', orgName: gh[1]!, name: gh[2]!, cloneUrl: `https://github.com/${gh[1]}/${gh[2]}.git` };
   const bare = /^([\w][\w.-]*)\/([\w][\w.-]*)$/.exec(s); // bare <org>/<repo> → assume github
@@ -94,7 +94,8 @@ export function parseRepoUrl(raw: string): { provider: string; orgName: string; 
 // a project's display name → a base url-slug; the store resolves it to a
 // workspace-unique slug (appends -2, -3… on collision).
 export function slugify(name: string): string {
-  return name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'project';
+  // one dash at each end at most: the collapse before it leaves no run (CodeQL, 2026-09-18)
+  return name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'project';
 }
 
 export function taskTarget(task: Task): string {

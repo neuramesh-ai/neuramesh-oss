@@ -45,7 +45,7 @@ function section(md: string, headRe: RegExp): string | null {
  */
 export function reportFrom(name: string, markdown: string): ReportMeta | null {
   const md = markdown.trim();
-  const title = /^#\s+(.+)$/m.exec(md)?.[1]?.trim() ?? '';
+  const title = /^#[ \t]+(\S.*)$/m.exec(md)?.[1]?.trim() ?? '';
   if (!title) return null;
 
   const head = md.split('\n').slice(0, 5).join('\n');
@@ -95,9 +95,9 @@ export function reportFrom(name: string, markdown: string): ReportMeta | null {
 /** `‹report:artifactId›` — the wb/article marker anatomy, for host-posted reports. */
 export interface ReportRef { id: string; prose: string; }
 export function parseReportRef(body: string): ReportRef | null {
-  const m = /‹report:([^›\s]+)›/.exec(body);
+  const m = /‹report:([^‹›\s]+)›/.exec(body);
   if (!m) return null;
-  return { id: m[1]!, prose: body.replace(/‹report:[^›]*›/g, '').trim() };
+  return { id: m[1]!, prose: body.replace(/‹report:[^‹›]*›/g, '').trim() };
 }
 
 /** The card's basis line — one composer so every surface words it identically. */

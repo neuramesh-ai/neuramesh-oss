@@ -102,3 +102,44 @@ in the renderer cannot reach it** — which is exactly why the guard was put the
 
 The preview-harness `<iframe>` degradation and its `X-Frame-Options` caveat are unchanged, and so
 are `browse.test.ts` / `browser-guard.test.ts`.
+
+---
+
+## Amended 2026-09-17 — the link choice: a web link asks where it opens
+
+*Visual contract: [mockups/external-links.html](../mockups/external-links.html).*
+
+Before this round every web link left the app. A markdown link in a message, the reply radar's
+*Open post*, an article's sources and *View on X* all called `nm:open-external`, and a raw
+`target=_blank` anchor opened a **bare Electron window**, because the main window had no
+window-open handler. The browser tab already existed. Now a click puts one choice between the
+link and the browser.
+
+**What a click does.** A web link opens the **link choice**
+([ui/LinkChoice.tsx](../apps/desktop/src/renderer/src/ui/LinkChoice.tsx)), the app's popover
+recipe (docs/33 §2: it grows out of the press, over nothing, and folds back). The head is the
+host and the path. Two rows: **Open in neuramesh**, wearing the neuramesh mark (the browser tab
+beside the sheet, the same tab the ＋ flyout makes) and **Open in `<browser>`**, where the name and icon are the OS's
+answer for the `https:` handler (`nm:default-browser`, `app.getApplicationInfoForProtocol`,
+asked once per launch). ↵ takes the first row, ⌘↵ the second, the arrows move the highlight,
+Esc folds it back. **⌘-click or a middle click skips the choice** and opens the OS browser
+at once, the gesture every browser uses for a new tab.
+
+**One seam** ([lib/links.ts](../apps/desktop/src/renderer/src/lib/links.ts)): code calls
+`openLink(url)`, and a capture-phase click listener at the root (`watchLinks`) catches every
+`<a href="http…">` the app renders, so a card that forgets to opt in is still covered. The web
+client registers no chooser: it is a browser, and a new tab is the native answer there.
+
+**The floor is main-side, as the guest guard is** (doctrine #4,
+[main/links.ts](../apps/desktop/src/main/links.ts), policies in
+[browser-guard.ts](../apps/desktop/src/main/browser-guard.ts), unit-tested): the app's own
+window denies every popup and every navigation away from its own document, and hands a web or
+`mailto:` URL to the OS browser. A bare Electron window cannot appear again, whatever the
+renderer does.
+
+**Not intercepted, on purpose:** the browser pane's own ↗ (already a browser), the Connect and
+billing round-trips (they must land in the OS browser's own signed-in session), and
+`nm:open-html` (a rendered artifact opened at full fidelity outside the sandbox).
+
+**Deferred:** a stored preference (always here, always the OS browser). ⌘-click is the fast
+path until the choice has been lived with.

@@ -22,6 +22,7 @@ import { readAttachment } from './attachments';
 import { initAutoUpdate } from './update';
 import { claudeExecutablePath } from './runtime/adapter';
 import { allowedWebviewSrc, navPolicy, popupPolicy } from './browser-guard';
+import { guardMainWindow, registerLinkIpc } from './links';
 
 app.setName('NeuraMesh');
 
@@ -223,6 +224,9 @@ function createWindow() {
   win.webContents.on('context-menu', (_e, params) => {
     Menu.buildFromTemplate(contextMenuFor(params)).popup({ window: win });
   });
+  // the link floor (docs/21, the link choice): the app's own window never spawns a popup and
+  // never leaves its document; the web goes to the OS browser (main/links.ts)
+  guardMainWindow(win.webContents);
 
   win.webContents.once('did-finish-load', () => {
     const coldstartMs = Date.now() - t0;
@@ -286,6 +290,7 @@ app.whenReady().then(async () => {
     const user = mode === 'clerk' ? currentClerkUser() : mode === 'dev' ? { id: DEV_USER, email: 'dev@localhost' } : mode === 'local' ? { id: c.identity.actorId, email: c.identity.display || 'you@this-mac' } : currentUser();
     return { mode, user, connection: { id: c.id, kind: c.kind } };
   });
+  registerLinkIpc(); // nm:default-browser, the name + icon the link choice's second row wears
   ipcMain.handle('nm:open-external', async (_e, { url }: { url: string }) => {
     if (/^https?:\/\//.test(url)) {
       const { shell } = await import('electron');

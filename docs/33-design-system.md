@@ -916,6 +916,21 @@ real work — if it is decoration, drop it and keep the pill.
   `PlanReview`'s block comments → `revise_plan`, the Design Studio's notes → `revise_design`. The
   composer stays plain — a mode chip that makes the human classify their own sentence before typing
   it is the anti-pattern this replaced (design round 2026-07-28).
+- **The link choice** (2026-09-17, George; visual contract
+  [mockups/external-links.html](../mockups/external-links.html), [docs/21](21-mini-browser.md)) —
+  a click on a web link asks where the page opens: **Open in neuramesh** (the browser tab beside
+  the sheet) or **Open in `<browser>`**, the OS's own name and icon for its `https:` handler. It is a
+  `Popover` (`.popsurf.linkpop`, 264 wide): it grows out of the press, no veil, and folds back on
+  Esc or a click away. The head is the fact you decide on, host in mono then the path, dim, one
+  hairline under it. The rows wear the row-menu recipe (`.navrowmenu`: an icon, the words, no
+  sub-line) plus a kbd hint (`↵` · `⌘↵`), and **the highlight is the focus**: the first row at
+  open, the arrows move both, so the quiet ring would be a second mark and is not drawn. Row one
+  wears **the neuramesh mark** (`PorchMark`, 16px, solid: the app is the place, so its mark names
+  the row, George); row two the browser's icon at 16px/4px, or the external glyph when the OS
+  reports no handler. A pick unmounts
+  at once (the eye follows the page). ⌘-click and middle-click skip the surface, the new-tab gesture
+  every browser already taught. Every web link in the app goes through the one seam
+  (`lib/links.ts`); the web client, already a browser, never asks.
 - **Tooltips** — `data-tip` (never native `title`): inverted-ink bubble (96% text over `--bg`),
   8px radius, 180ms hover intent, pop shadow. Families that flip (dockbar, composer rows) mirror
   the entrance offset so the tip emerges *from its anchor*.

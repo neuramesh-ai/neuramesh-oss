@@ -42,6 +42,31 @@ export function withHouseStyle(system: string, block: string | null): string {
   return block ? `${system}\n\n${block}` : system;
 }
 
+const isBlank = (c: string): boolean => /\s/.test(c);
+const isDash = (c: string): boolean => c === '\u2014' || c === '\u2013';
+
+/** One pass of the scrub, by index: `\s*[—–]\s*` and the blanks around it become `. ` when the next
+ *  non-blank is a capital (`capitals`), or `, ` otherwise. What the two regexes did, in one scan, so a
+ *  run of blanks is read once and not once per blank (CodeQL js/polynomial-redos, 2026-09-18). */
+function dashPass(text: string, capitals: boolean): string {
+  let out = '';
+  let from = 0; // the first index the next match may start at
+  let i = 0;
+  while (i < text.length) {
+    if (!isDash(text[i]!)) { i++; continue; }
+    let end = i + 1;
+    while (end < text.length && isBlank(text[end]!)) end++;
+    const next = text[end];
+    if (capitals !== (next !== undefined && next >= 'A' && next <= 'Z')) { i++; continue; }
+    let start = i;
+    while (start > from && isBlank(text[start - 1]!)) start--;
+    out += text.slice(from, start) + (capitals ? '. ' : ', ');
+    from = end;
+    i = end;
+  }
+  return out + text.slice(from);
+}
+
 /** Fence-aware em-dash scrub for agent-authored prose (server-side teeth for the noEmdash
  *  rule). Replaces em/en dashes OUTSIDE ``` fences and `inline code`: " — " → ", ",
  *  a dash before a capital becomes ". ", bare dashes become ", ". Quoted material inside
@@ -49,9 +74,7 @@ export function withHouseStyle(system: string, block: string | null): string {
 export function scrubEmdash(text: string): string {
   const parts = text.split(/(```[\s\S]*?```|`[^`\n]*`)/);
   for (let i = 0; i < parts.length; i += 2) {
-    parts[i] = parts[i]!
-      .replace(/\s*[—–]\s*(?=[A-Z])/g, '. ')
-      .replace(/\s*[—–]\s*/g, ', ');
+    parts[i] = dashPass(dashPass(parts[i]!, true), false);
   }
   return parts.join('');
 }

@@ -19,7 +19,8 @@ export function failure(path: string, status: number, raw: string): ControlApiEr
   const json = parseJson(raw) as { error?: unknown; code?: string } | null;
   const code = json && typeof json.code === 'string' ? json.code : undefined;
   if (json && typeof json.error === 'string' && json.error) return new ControlApiError(json.error, status, code);
-  const said = raw.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200);
+  // a tag ends at the next '<' or '>': a run of '<' is not scanned once per '<' (CodeQL, 2026-09-18)
+  const said = raw.replace(/<[^<>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200);
   return new ControlApiError(said ? `${path} failed (${status}): ${said}` : `${path} failed (${status})`, status, code);
 }
 

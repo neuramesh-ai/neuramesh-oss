@@ -32,9 +32,12 @@ export function engineeringReasoningSeconds(
 
 /** Render only statuses the plan actually declared. Numbered steps are neutral/pending. */
 export function engineeringPlanItems(value: string): EngineeringPlanItem[] {
-  return value.split('\n').flatMap((line) => {
-    const checkbox = line.match(/^\s*[-*+]\s+\[([ xX~>-])\]\s+(.+?)\s*$/);
-    const numbered = line.match(/^\s*\d+[.)]\s+(.+?)\s*$/);
+  return value.split('\n').flatMap((raw) => {
+    // the item starts with a non-blank, so the blanks before it have one owner; the trailing
+    // blanks leave by trim below (CodeQL js/polynomial-redos, 2026-09-18)
+    const line = raw.replace(/\r$/, '');
+    const checkbox = line.match(/^\s*[-*+]\s+\[([ xX~>-])\]\s+(\S.*)$/);
+    const numbered = line.match(/^\s*\d+[.)]\s+(\S.*)$/);
     if (!checkbox && !numbered) return [];
     const marker = checkbox?.[1]?.toLowerCase();
     const text = (checkbox?.[2] ?? numbered?.[1] ?? '')
@@ -98,7 +101,8 @@ export function engineeringActivityPresentation(message: EngineeringMessage): En
   if (body.startsWith('Brain switched') || body.startsWith('Model switched')) return { kind: 'brain', title: 'Model changed', detail: runtimeDetail(body), status: 'info' };
   if (body.startsWith('Restored checkpoint')) return { kind: 'checkpoint', title: 'Restored checkpoint', detail: body.split(' · ').slice(1).join(' · '), status: 'success' };
 
-  const native = body.match(/^([a-z0-9_]+)(?:\s+)(completed|failed)(?:\s+·\s+([\s\S]+))?$/i);
+  // the detail starts with a non-blank, so the blanks after the dot have one owner (CodeQL, 2026-09-18)
+  const native = body.match(/^([a-z0-9_]+)(?:\s+)(completed|failed)(?:\s+·\s+(\S[\s\S]*))?$/i);
   if (native) {
     const copy = toolCopy(native[1]!);
     return {

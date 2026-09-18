@@ -8,6 +8,8 @@
 // becomes a SUBTASK when the anchor is a task, an origin-anchored unit when it is a
 // conversation; research posts its opener INTO the same thread.
 
+import { fencedBlock, stripFenced } from './linear';
+
 export type NextStepKind = 'task' | 'routine' | 'research';
 
 export interface NextStepItem {
@@ -83,10 +85,10 @@ export function nextStepsBlock(data: NmNext): string {
 }
 
 export function parseNextSteps(body: string): NmNext | null {
-  const m = /```nmnext\n([\s\S]*?)\n```/.exec(body);
+  const m = fencedBlock(body, 'nmnext');
   if (!m) return null;
   try {
-    const d = JSON.parse(m[1]!) as NmNext;
+    const d = JSON.parse(m.inner) as NmNext;
     if (!d || typeof d.report !== 'string' || typeof d.channel !== 'string' || !d.anchor) return null;
     const items = cleanNextItems(d.items);
     if (!items.length) return null;
@@ -95,5 +97,5 @@ export function parseNextSteps(body: string): NmNext | null {
 }
 
 export function stripNextSteps(body: string): string {
-  return body.replace(/```nmnext\n[\s\S]*?\n```/g, '').trim();
+  return stripFenced(body, 'nmnext').trim();
 }

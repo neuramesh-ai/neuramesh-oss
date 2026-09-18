@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>The link choice: a click on a web link asks where to open it</title>
+<style>
+[data-theme] { --font:'NeuraMesh Sans','Geist Variable',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; --fmono:'Geist Mono Variable',ui-monospace,'SF Mono',Menlo,monospace;
+  --ease:cubic-bezier(.22,1,.36,1); --dur-fast:.12s; --dur-enter:.22s; --dur-exit:.13s;
+  --r-xs:3px; --r-sm:4px; --r-md:6px; --r-lg:8px; --brand:#834a2b; --brand-ink:#fff7ee; }
+/* verbatim from apps/desktop/src/renderer/src/tokens.css (2026-09-17) */
+[data-theme='dark'] {
+  --win:#0d0d0d; --bg:#141414; --panel:#161616; --panel2:#1a1a1a; --panel3:#262626;
+  --border:#262626; --border2:#3a3a3a; --card:#1e1e1e; --card-border:#2c2c2c; --overlay:#222222;
+  --text:#cbcbcb; --body:#a6a6a6; --muted:#848484; --dim:#6a6a6a; --ring:#525252;
+  --accent:#cbcbcb; --link:#d19a72; --hover-bg:rgba(203,203,203,.07);
+  --btn:#232323; --btn-fg:#efefef; --btn-hover:#2f2f2f;
+  --shadow-pop:0 20px 55px -14px rgba(0,0,0,.65); --shadow-card:0 1px 2px rgba(0,0,0,.25);
+  --prog:#8ba0c0; --done:#77ac8d; --role-orch:#9793d2; --role-mkt:#c98f8f;
+}
+[data-theme='cream-oak'] {
+  --win:#f0e5d3; --bg:#fbf8f4; --panel:#fbf8f4; --panel2:#f6eee1; --panel3:#efe1cd;
+  --border:#e6dbca; --border2:#d3c2a8; --card:#ffffff; --card-border:#eadfce; --overlay:#ffffff;
+  --text:#3a2c22; --body:#5b4c3d; --muted:#8b7861; --dim:#a99680; --ring:#b08a5e;
+  --accent:#834a2b; --link:#9c5730; --hover-bg:rgba(58,44,34,.05);
+  --btn:#f8f2e8; --btn-fg:#43301f; --btn-hover:#efe4d2;
+  --shadow-pop:0 20px 55px -14px rgba(70,42,18,.30); --shadow-card:0 1px 2px rgba(70,42,18,.05);
+  --prog:#4f80c4; --done:#0f9d63; --role-orch:#6a63bc; --role-mkt:#b04f55;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#131210; font-family:'NeuraMesh Sans','Geist Variable',-apple-system,BlinkMacSystemFont,sans-serif; }
+.page { max-width:1500px; margin:0 auto; padding:32px 24px 70px; }
+.pagehead { color:#eaeaea; margin-bottom:8px; }
+.pagehead h1 { font-size:23px; font-weight:600; letter-spacing:-.012em; }
+.pagehead p { color:#898989; font-size:13px; line-height:1.62; margin-top:8px; max-width:96ch; }
+.pagehead b, .stopp b, .co b { color:#b6b6b6; }
+.stophd { color:#eaeaea; font-size:15px; font-weight:640; margin:42px 0 4px; }
+.stopno { font:700 10px 'Geist Mono Variable',ui-monospace,monospace; letter-spacing:.12em; color:#6f6f6f; text-transform:uppercase; margin-right:8px; }
+.stopp { color:#898989; font-size:12.5px; line-height:1.62; max-width:102ch; margin-bottom:16px; }
+.stopp code, .co code { font:500 11.5px 'Geist Mono Variable',ui-monospace,monospace; color:#c8c8c8; background:#1f1e1c; padding:1px 5px; border-radius:3px; }
+.themes { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+@media (max-width:1100px){ .themes { grid-template-columns:1fr; } }
+.theme { background:var(--win); border:1px solid var(--border2); border-radius:12px; padding:16px; color:var(--text); }
+.theme > h2 { font-size:10.5px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--dim); margin:0 2px 12px; }
+.callouts { display:flex; flex-wrap:wrap; gap:8px 18px; margin-top:12px; }
+.co { font-size:11.5px; color:#898989; line-height:1.55; max-width:52ch; }
+.co .n { display:inline-grid; place-items:center; width:16px; height:16px; border-radius:50%; background:#2b2b2b; color:#c8a06a; font:700 10px monospace; margin-right:6px; }
+.rules { list-style:none; display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:10px 22px; max-width:1100px; }
+.rules li { color:#898989; font-size:12.5px; line-height:1.55; }
+.rules li b { color:#b6b6b6; }
+.rules kbd { font:600 10px 'Geist Mono Variable',ui-monospace,monospace; color:#c8c8c8; border:1px solid #3a3a3a; border-radius:3px; padding:1px 6px; margin-right:6px; background:#1b1b1b; }
+
+/* ── the sheet excerpt: a thread, at the app's reading measure ── */
+.sheet { position:relative; overflow:hidden; background:var(--panel); border:1px solid var(--border); border-radius:8px; min-height:392px; }
+.thread { padding:18px 22px 14px; max-width:620px; }
+.msg { display:flex; gap:11px; padding:8px 0; }
+.av { flex:none; width:24px; height:24px; border-radius:6px; background:var(--panel3); display:grid; place-items:center; }
+.av svg { width:16px; height:16px; }
+.mhead { display:flex; align-items:baseline; gap:8px; margin-bottom:3px; }
+.mname { font-size:12.5px; font-weight:600; color:var(--text); }
+.mrole { font:600 8.5px var(--fmono); letter-spacing:.06em; text-transform:uppercase; color:var(--muted); padding:1px 5px; border-radius:3px; background:var(--panel3); }
+.mtime { font:500 10px var(--fmono); color:var(--dim); }
+.mbody { font-size:14px; line-height:1.55; color:var(--body); }
+.mbody a { color:var(--link); text-decoration:none; border-bottom:1px solid color-mix(in srgb, var(--link) 45%, transparent); cursor:pointer; }
+.mbody a:hover { border-bottom-color:var(--link); }
+/* a reply-radar row's action strip, reduced to the one control this page is about */
+.rpacts { display:flex; align-items:center; gap:6px; margin-top:8px; }
+.rpchars { font:500 10.5px var(--fmono); color:var(--dim); margin-right:4px; }
+.nbtn { height:26px; padding:0 10px; border:1px solid var(--border2); border-radius:3px; background:var(--btn); color:var(--btn-fg); font:500 11px var(--fmono); cursor:pointer; }
+.nbtn:hover { background:var(--btn-hover); }
+.nbtn.q { background:none; border-color:transparent; color:var(--muted); }
+.rptarget { margin-top:6px; padding:8px 10px; border-left:2px solid var(--border2); font-size:12.5px; line-height:1.5; color:var(--body); }
+
+/* ── THE LINK CHOICE ── the popover recipe (`.popsurf`): --overlay ground, --card-border hairline,
+   --shadow-pop, radius 8, grows out of the press with nm-grow-in and folds back with nm-grow-out. */
+.linkpop { position:absolute; width:264px; background:var(--overlay); border:1px solid var(--card-border); border-radius:var(--r-lg);
+  box-shadow:var(--shadow-pop); padding:5px; animation:nm-grow-in var(--dur-enter) var(--ease); z-index:3; }
+.linkpop.closing { animation:nm-grow-out var(--dur-exit) var(--ease) forwards; pointer-events:none; }
+@keyframes nm-grow-in { from { opacity:0; transform:scale(.94); } to { opacity:1; transform:scale(1); } }
+@keyframes nm-grow-out { from { opacity:1; transform:scale(1); } to { opacity:0; transform:scale(.96); } }
+@media (prefers-reduced-motion: reduce) { .linkpop { animation:none; } }
+/* the head is the fact: where the link goes. Host in the app's mono, path under it, dim. */
+.linkpophd { display:grid; grid-template-columns:16px 1fr; column-gap:8px; align-items:center; padding:6px 7px 8px; border-bottom:1px solid var(--border); margin-bottom:4px; }
+.linkpophd svg { width:14px; height:14px; color:var(--muted); }
+.linkpophost { font:600 11.5px var(--fmono); color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.linkpoppath { grid-column:2; font:500 10.5px var(--fmono); color:var(--dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:1px; }
+/* rows wear the one row-menu recipe (`.navrowmenu`): text with an icon, no sub-line, no card */
+.linkpoprow { display:flex; align-items:center; gap:9px; width:100%; height:32px; padding:0 8px; border:0; border-radius:var(--r-md);
+  background:none; font-family:var(--font); font-size:12.5px; color:var(--body); text-align:left; cursor:pointer; }
+.linkpoprow svg { width:14px; height:14px; color:var(--muted); flex:none; }
+/* the neuramesh mark (brand.tsx PorchMark, small cut) at 16px: the app is the place, so its mark names the row */
+.linkpoprow .pmark { width:16px; height:16px; }
+.linkpoprow img, .linkpoprow .appico { width:16px; height:16px; border-radius:4px; flex:none; }
+.linkpoprow span { flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.linkpoprow:hover, .linkpoprow.on { background:var(--hover-bg); color:var(--text); }
+.linkpoprow kbd { font:600 9.5px var(--fmono); color:var(--dim); border:1px solid var(--border2); border-radius:3px; padding:1px 5px; }
+/* the app icon, as the OS reports it (a rounded square at 16px). These are stand-ins. */
+.appico { display:inline-block; background:linear-gradient(135deg,#3b82f6,#06b6d4); }
+.appico.chrome { background:conic-gradient(#ea4335 0 33%, #fbbc04 0 66%, #34a853 0); position:relative; }
+.appico.chrome::after { content:''; position:absolute; inset:4px; border-radius:50%; background:#4285f4; box-shadow:0 0 0 1.5px #fff; }
+.appico.arc { background:linear-gradient(160deg,#ff6b8b,#fc7bff 55%,#7ba2ff); }
+
+/* ── the result frame: the sheet with the side dock unfolded beside it ── */
+.split { display:grid; grid-template-columns:1fr 1.15fr; gap:0; background:var(--panel); border:1px solid var(--border); border-radius:8px; overflow:hidden; min-height:300px; }
+.splitconvo { padding:14px 16px; border-right:1px solid var(--border); }
+.splitconvo .crumb { font:500 10.5px var(--fmono); color:var(--dim); margin-bottom:10px; }
+.splitconvo .crumb b { color:var(--muted); font-weight:500; }
+.splitconvo .line { height:8px; border-radius:4px; background:var(--panel3); margin:8px 0; }
+.splitconvo .line.w70 { width:70%; } .splitconvo .line.w40 { width:40%; } .splitconvo .line.w85 { width:85%; }
+.dock { display:flex; flex-direction:column; background:var(--bg); }
+.wtstrip { display:flex; align-items:center; gap:2px; padding:6px 8px 0; border-bottom:1px solid var(--border); }
+.wtab { display:flex; align-items:center; gap:7px; height:30px; padding:0 11px; font-size:11.5px; color:var(--muted); border:1px solid transparent; border-bottom:0; border-radius:6px 6px 0 0; }
+.wtab.on { background:var(--panel); border-color:var(--border); color:var(--text); margin-bottom:-1px; }
+.wtab svg { width:12px; height:12px; }
+.wtab .x { font:500 10px var(--fmono); color:var(--dim); margin-left:2px; }
+.wtplus { margin-left:2px; color:var(--dim); font-size:14px; padding:0 6px; }
+.bwbar { display:flex; align-items:center; gap:6px; padding:7px 10px; border-bottom:1px solid var(--border); background:var(--panel); }
+.bwbtn { width:24px; height:24px; display:grid; place-items:center; border-radius:4px; color:var(--muted); }
+.bwbtn svg { width:12px; height:12px; }
+.bwurl { flex:1; height:26px; display:flex; align-items:center; padding:0 10px; border:1px solid var(--border2); border-radius:6px; background:var(--panel2); font:500 11px var(--fmono); color:var(--body); }
+.bwurl b { color:var(--text); font-weight:600; }
+.bwpage { flex:1; min-height:190px; margin:14px; border-radius:6px; background:#fff; color:#24292f; padding:16px 18px; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; box-shadow:var(--shadow-card); }
+.bwpage h3 { font-size:15px; font-weight:600; margin-bottom:4px; }
+.bwpage .st { display:inline-block; font-size:11px; font-weight:600; padding:2px 8px; border-radius:99px; background:#8250df; color:#fff; margin-bottom:12px; }
+.bwpage .ln { height:8px; border-radius:4px; background:#eaeef2; margin:8px 0; } .bwpage .ln.w60 { width:60%; } .bwpage .ln.w80 { width:80%; }
+
+/* the row gallery, for the second row's identity */
+.gallery { display:grid; grid-template-columns:repeat(auto-fill, minmax(264px, 1fr)); gap:14px; }
+.gallery .linkpop { position:static; animation:none; width:auto; }
+.glabel { font:600 9.5px var(--fmono); letter-spacing:.08em; text-transform:uppercase; color:var(--dim); margin:0 0 8px 2px; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="pagehead">
+    <h1>The link choice: a click on a web link asks where to open it</h1>
+    <p>Today every web link in neuramesh leaves the app. A markdown link in a message, the reply radar's <b>Open post</b>, an article's sources and <b>View on X</b> all call the OS browser, and a raw anchor opens a bare Electron window because the main window has no popup guard. The app already has a real browser tab in the side dock. This round puts <b>one choice</b> between the click and the browser: open the page here, or in the browser you use. The popover is the app's popover recipe. It grows out of the press, over nothing, and folds back.</p>
+  </div>
+
+  <div class="stophd"><span class="stopno">Stop 1</span>A click asks. The head says where the link goes, and two rows say where it opens.</div>
+  <p class="stopp">The popover is the <code>Popover</code> primitive (<code>ui/Popover.tsx</code>, 264 wide), so it inherits the anchor recorded at the press, the frozen origin, the viewport clamp and the reduced-motion path. The head is the fact you decide on: the host in the app's mono, the path under it. The rows wear the one row-menu recipe. Row one wears the neuramesh mark: the app is the place, so its mark names the row. Row two wears the browser's own icon and name, as the OS reports them. <b>Click either link below to replay the motion.</b></p>
+  <div class="themes">
+    <div class="theme" data-theme="dark">
+      <h2>Graphite dark</h2>
+      <div class="sheet" id="sheet-dark">
+        <div class="thread">
+          <div class="msg">
+            <div class="av"><svg viewBox="0 0 24 24" fill="none" stroke="var(--role-orch)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></div>
+            <div>
+              <div class="mhead"><span class="mname">rex</span><span class="mrole">orchestrator</span><span class="mtime">07:18 PM</span></div>
+              <div class="mbody">Review passed. The change is on <a class="demo-link" data-host="github.com" data-path="/acme/site/pull/1052">PR #1052</a>, with CI green and the Deploy notes filled. Say "merge it" here and I apply the accept.</div>
+            </div>
+          </div>
+          <div class="msg">
+            <div class="av"><svg viewBox="0 0 24 24" fill="none" stroke="var(--role-mkt)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></div>
+            <div>
+              <div class="mhead"><span class="mname">iris</span><span class="mrole">marketer</span><span class="mtime">07:19 PM</span></div>
+              <div class="mbody">Reply D is ready.</div>
+              <div class="rptarget">You do not need GRPO or RL to set up continual learning. Distill learnings from trajectories into skill files, then inject the skill at runtime.</div>
+              <div class="rpacts"><span class="rpchars">211/280</span><button class="nbtn demo-link" data-host="x.com" data-path="/rjchint/status/1968214402317865432">Open post ↗</button><button class="nbtn">Copy reply</button><button class="nbtn q">Redraft ›</button></div>
+            </div>
+          </div>
+        </div>
+        <div class="linkpop" role="dialog" aria-label="Open link" style="left:236px; top:66px; transform-origin:0 0">
+          <div class="linkpophd">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a13.5 13.5 0 0 1 0 18 13.5 13.5 0 0 1 0-18z"/></svg>
+            <span class="linkpophost">github.com</span>
+            <span class="linkpoppath">/acme/site/pull/1052</span>
+          </div>
+          <button class="linkpoprow on"><svg class="pmark" viewBox="0 0 48 48" aria-hidden="true"><path d="M5.5 22 C5.5 10.5 13.5 3.5 24 3.5 C34.5 3.5 42.5 10.5 42.5 22 L42.5 39 C42.5 42.5 40 44.5 37 44.5 L11 44.5 C8 44.5 5.5 42.5 5.5 39 Z" fill="var(--brand)"/><circle cx="17.8" cy="21" r="3.5" fill="var(--brand-ink)"/><circle cx="30.2" cy="21" r="3.5" fill="var(--brand-ink)"/><path d="M17 28.6 C20.2 33.6 27.8 33.6 31 28.6" fill="none" stroke="var(--brand-ink)" stroke-width="4" stroke-linecap="round"/></svg><span>Open in neuramesh</span><kbd>↵</kbd></button>
+          <button class="linkpoprow"><i class="appico"></i><span>Open in Safari</span><kbd>⌘↵</kbd></button>
+        </div>
+      </div>
+    </div>
+    <div class="theme" data-theme="cream-oak">
+      <h2>Cream oak</h2>
+      <div class="sheet" id="sheet-cream">
+        <div class="thread">
+          <div class="msg">
+            <div class="av"><svg viewBox="0 0 24 24" fill="none" stroke="var(--role-orch)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></div>
+            <div>
+              <div class="mhead"><span class="mname">rex</span><span class="mrole">orchestrator</span><span class="mtime">07:18 PM</span></div>
+              <div class="mbody">Review passed. The change is on <a class="demo-link" data-host="github.com" data-path="/acme/site/pull/1052">PR #1052</a>, with CI green and the Deploy notes filled. Say "merge it" here and I apply the accept.</div>
+            </div>
+          </div>
+          <div class="msg">
+            <div class="av"><svg viewBox="0 0 24 24" fill="none" stroke="var(--role-mkt)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></div>
+            <div>
+              <div class="mhead"><span class="mname">iris</span><span class="mrole">marketer</span><span class="mtime">07:19 PM</span></div>
+              <div class="mbody">Reply D is ready.</div>
+              <div class="rptarget">You do not need GRPO or RL to set up continual learning. Distill learnings from trajectories into skill files, then inject the skill at runtime.</div>
+              <div class="rpacts"><span class="rpchars">211/280</span><button class="nbtn demo-link" data-host="x.com" data-path="/rjchint/status/1968214402317865432">Open post ↗</button><button class="nbtn">Copy reply</button><button class="nbtn q">Redraft ›</button></div>
+            </div>
+          </div>
+        </div>
+        <div class="linkpop" role="dialog" aria-label="Open link" style="left:150px; top:250px; transform-origin:0 0">
+          <div class="linkpophd">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a13.5 13.5 0 0 1 0 18 13.5 13.5 0 0 1 0-18z"/></svg>
+            <span class="linkpophost">x.com</span>
+            <span class="linkpoppath">/rjchint/status/1968214402317865432</span>
+          </div>
+          <button class="linkpoprow on"><svg class="pmark" viewBox="0 0 48 48" aria-hidden="true"><path d="M5.5 22 C5.5 10.5 13.5 3.5 24 3.5 C34.5 3.5 42.5 10.5 42.5 22 L42.5 39 C42.5 42.5 40 44.5 37 44.5 L11 44.5 C8 44.5 5.5 42.5 5.5 39 Z" fill="var(--brand)"/><circle cx="17.8" cy="21" r="3.5" fill="var(--brand-ink)"/><circle cx="30.2" cy="21" r="3.5" fill="var(--brand-ink)"/><path d="M17 28.6 C20.2 33.6 27.8 33.6 31 28.6" fill="none" stroke="var(--brand-ink)" stroke-width="4" stroke-linecap="round"/></svg><span>Open in neuramesh</span><kbd>↵</kbd></button>
+          <button class="linkpoprow"><i class="appico chrome"></i><span>Open in Google Chrome</span><kbd>⌘↵</kbd></button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="callouts">
+    <div class="co"><span class="n">1</span><b>One hairline</b>, between the fact and the actions. No title, no caption: the host names the decision.</div>
+    <div class="co"><span class="n">2</span><b>Row one is the neuramesh mark</b>: the page opens in the browser tab beside the sheet, which unfolds the dock.</div>
+    <div class="co"><span class="n">3</span><b>Row two is the OS's answer</b>: the icon and the name of the default browser, fetched once per launch. No handler reported means the row reads "Open in your browser" with the external glyph.</div>
+    <div class="co"><span class="n">4</span><b>The first row is highlighted at open</b>, so ↵ opens the page here. A pick unmounts the popover at once. Esc and a click away fold it back.</div>
+  </div>
+
+  <div class="stophd"><span class="stopno">Stop 2</span>The pick lands in the side dock, beside the thread you were reading.</div>
+  <p class="stopp">"Open in neuramesh" opens a browser tab (<code>openBrowserTab(url)</code>), the same tab the ＋ flyout makes, so the page gets the real Chromium guest with its own session, back and forward, and the ↗ to hand the page to the OS browser later. The dock unfolds itself when the tab comes to the front. Nothing new here, which is the point: the choice is the feature, the browser already existed.</p>
+  <div class="themes">
+    <div class="theme" data-theme="dark">
+      <h2>Graphite dark</h2>
+      <div class="split">
+        <div class="splitconvo">
+          <div class="crumb">‹ <b>#build · conversations</b> · Merge the reply radar</div>
+          <div class="line w85"></div><div class="line w70"></div><div class="line w40"></div>
+          <div class="line w85" style="margin-top:22px"></div><div class="line w70"></div>
+        </div>
+        <div class="dock">
+          <div class="wtstrip">
+            <div class="wtab on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/></svg>PR #1052 · acme/site<span class="x">×</span></div>
+            <div class="wtab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 17l6-5-6-5"/><path d="M12 19h8"/></svg>task #1052<span class="x">×</span></div>
+            <div class="wtplus">＋</div>
+          </div>
+          <div class="bwbar">
+            <div class="bwbtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg></div>
+            <div class="bwbtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></div>
+            <div class="bwurl"><b>github.com</b>/acme/site/pull/1052</div>
+            <div class="bwbtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></div>
+          </div>
+          <div class="bwpage"><h3>Reply radar ships its Open post with a choice #1052</h3><span class="st">Open</span><div class="ln w80"></div><div class="ln"></div><div class="ln w60"></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="theme" data-theme="cream-oak">
+      <h2>Cream oak</h2>
+      <div class="split">
+        <div class="splitconvo">
+          <div class="crumb">‹ <b>#marketing · conversations</b> · AI harness reply radar</div>
+          <div class="line w85"></div><div class="line w70"></div><div class="line w40"></div>
+          <div class="line w85" style="margin-top:22px"></div><div class="line w70"></div>
+        </div>
+        <div class="dock">
+          <div class="wtstrip">
+            <div class="wtab on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/></svg>rjchint on X<span class="x">×</span></div>
+            <div class="wtplus">＋</div>
+          </div>
+          <div class="bwbar">
+            <div class="bwbtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg></div>
+            <div class="bwbtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></div>
+            <div class="bwurl"><b>x.com</b>/rjchint/status/1968214402317865432</div>
+            <div class="bwbtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></div>
+          </div>
+          <div class="bwpage" style="background:#000;color:#e7e9ea"><h3 style="font-size:14px">arjun chintapalli <span style="color:#71767b;font-weight:400">@rjchint · Sep 16</span></h3><div class="ln w80" style="background:#2f3336"></div><div class="ln" style="background:#2f3336"></div><div class="ln w60" style="background:#2f3336"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="stophd"><span class="stopno">Stop 3</span>Keys, and the fast path for people who always want their browser.</div>
+  <p class="stopp">The popover never charges more than one keystroke. And a link click with ⌘ held skips the choice and opens the OS browser at once, the same gesture that opens a new tab in every browser. That is the fast path for this round. A stored preference (always here, always there) is a Settings row for a later round, once the choice has been lived with.</p>
+  <ul class="rules">
+    <li><kbd>↵</kbd><b>Open in neuramesh.</b> The first row is highlighted when the popover opens.</li>
+    <li><kbd>⌘↵</kbd><b>Open in the default browser</b>, from anywhere in the popover.</li>
+    <li><kbd>↑</kbd><kbd>↓</kbd><b>Move the highlight.</b> Tab cycles the same two rows.</li>
+    <li><kbd>Esc</kbd><b>Fold it back</b> into the link. A click away does the same.</li>
+    <li><kbd>⌘ click</kbd><b>Skip the choice.</b> The link opens in the OS browser with no popover. Middle click does the same.</li>
+    <li><kbd>right click</kbd><b>Copy Link</b> stays where it is, on the native context menu.</li>
+  </ul>
+
+  <div class="stophd" style="margin-top:34px"><span class="stopno">Stop 4</span>The second row is whatever the OS says the default browser is.</div>
+  <p class="stopp">Electron asks the OS for the handler of <code>https:</code> (<code>app.getApplicationInfoForProtocol</code>): a name and an icon on macOS and Windows, a name on Linux. The renderer asks once per launch and keeps the answer. The icon is drawn at 16px with a 4px radius, in the icon column the row-menu recipe already has.</p>
+  <div class="themes">
+    <div class="theme" data-theme="dark">
+      <h2>Graphite dark</h2>
+      <div class="gallery">
+        <div><div class="glabel">Safari</div><div class="linkpop"><button class="linkpoprow"><i class="appico"></i><span>Open in Safari</span><kbd>⌘↵</kbd></button></div></div>
+        <div><div class="glabel">Chrome</div><div class="linkpop"><button class="linkpoprow"><i class="appico chrome"></i><span>Open in Google Chrome</span><kbd>⌘↵</kbd></button></div></div>
+        <div><div class="glabel">Arc</div><div class="linkpop"><button class="linkpoprow"><i class="appico arc"></i><span>Open in Arc</span><kbd>⌘↵</kbd></button></div></div>
+        <div><div class="glabel">No handler reported</div><div class="linkpop"><button class="linkpoprow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg><span>Open in your browser</span><kbd>⌘↵</kbd></button></div></div>
+      </div>
+    </div>
+    <div class="theme" data-theme="cream-oak">
+      <h2>Cream oak</h2>
+      <div class="gallery">
+        <div><div class="glabel">Safari</div><div class="linkpop"><button class="linkpoprow"><i class="appico"></i><span>Open in Safari</span><kbd>⌘↵</kbd></button></div></div>
+        <div><div class="glabel">Chrome</div><div class="linkpop"><button class="linkpoprow"><i class="appico chrome"></i><span>Open in Google Chrome</span><kbd>⌘↵</kbd></button></div></div>
+        <div><div class="glabel">Arc</div><div class="linkpop"><button class="linkpoprow"><i class="appico arc"></i><span>Open in Arc</span><kbd>⌘↵</kbd></button></div></div>
+        <div><div class="glabel">No handler reported</div><div class="linkpop"><button class="linkpoprow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg><span>Open in your browser</span><kbd>⌘↵</kbd></button></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="stophd" style="margin-top:34px"><span class="stopno">Stop 5</span>Where the choice applies, and where it does not.</div>
+  <ul class="rules">
+    <li><b>Every web link in the sheet.</b> Markdown links in messages, plans and docs (<code>Md.tsx</code>), the article reader's sources, the reply radar's handle and Open post, View on X, the design studio's Open the project, the setup cards.</li>
+    <li><b>One seam, not one call site each.</b> A capture-phase click listener at the root catches every <code>&lt;a href="http…"&gt;</code> the app renders, so a card that forgets to opt in is still covered. Components that open a page by code call <code>openLink(url)</code>.</li>
+    <li><b>The floor is in main.</b> The main window gets a window-open handler and a navigation guard: a stray popup or a same-window navigation to the web hands the URL to the OS browser and is denied, so a bare Electron window can never appear again.</li>
+    <li><b>Not intercepted:</b> the browser pane's own ↗ button (already a browser), Connect and billing flows (they must land in the OS browser's own session), and the web client, which is already a browser and keeps a new tab.</li>
+    <li><b>Reduced motion:</b> the popover fades, as every popover does.</li>
+  </ul>
+</div>
+
+<script>
+// The demo: a click on a link replays the entrance from the press, the way `ui/Popover.tsx`
+// grows from `anchorPoint()`. A click away folds it back with the exit keyframes.
+(function () {
+  const GLOBE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a13.5 13.5 0 0 1 0 18 13.5 13.5 0 0 1 0-18z"/></svg>';
+  const DOCK = '<svg class="pmark" viewBox="0 0 48 48" aria-hidden="true"><path d="M5.5 22 C5.5 10.5 13.5 3.5 24 3.5 C34.5 3.5 42.5 10.5 42.5 22 L42.5 39 C42.5 42.5 40 44.5 37 44.5 L11 44.5 C8 44.5 5.5 42.5 5.5 39 Z" fill="var(--brand)"/><circle cx="17.8" cy="21" r="3.5" fill="var(--brand-ink)"/><circle cx="30.2" cy="21" r="3.5" fill="var(--brand-ink)"/><path d="M17 28.6 C20.2 33.6 27.8 33.6 31 28.6" fill="none" stroke="var(--brand-ink)" stroke-width="4" stroke-linecap="round"/></svg>';
+  document.querySelectorAll('.demo-link').forEach((a) => {
+    a.addEventListener('click', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      const sheet = a.closest('.sheet');
+      const old = sheet.querySelector('.linkpop'); if (old) old.remove();
+      const r = sheet.getBoundingClientRect();
+      const x = e.clientX - r.left, y = e.clientY - r.top;
+      const browser = sheet.id === 'sheet-dark' ? '<i class="appico"></i><span>Open in Safari</span>' : '<i class="appico chrome"></i><span>Open in Google Chrome</span>';
+      const pop = document.createElement('div');
+      pop.className = 'linkpop'; pop.setAttribute('role', 'dialog'); pop.setAttribute('aria-label', 'Open link');
+      const w = 264, left = Math.max(8, Math.min(x + 14, r.width - w - 8)), top = Math.max(8, Math.min(y + 12, r.height - 122));
+      pop.style.left = left + 'px'; pop.style.top = top + 'px'; pop.style.transformOrigin = (x - left) + 'px ' + (y - top) + 'px';
+      pop.innerHTML = '<div class="linkpophd">' + GLOBE + '<span class="linkpophost">' + a.dataset.host + '</span><span class="linkpoppath">' + a.dataset.path + '</span></div>'
+        + '<button class="linkpoprow on">' + DOCK + '<span>Open in neuramesh</span><kbd>↵</kbd></button>'
+        + '<button class="linkpoprow">' + browser + '<kbd>⌘↵</kbd></button>';
+      sheet.appendChild(pop);
+    });
+  });
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('.linkpop') || e.target.closest('.demo-link')) return;
+    document.querySelectorAll('.sheet .linkpop:not(.closing)').forEach((p) => { p.classList.add('closing'); p.addEventListener('animationend', () => p.remove(), { once: true }); });
+  });
+})();
+</script>
+</body>
+</html>

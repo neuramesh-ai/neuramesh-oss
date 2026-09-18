@@ -9,6 +9,7 @@
 // The sandbox (containment plan L1) is the complementary hard floor: it makes a `deny`
 // physically binding. This module decides the verdict; the runtime + sandbox enforce it.
 import { z } from 'zod';
+import { trimEndChars } from './linear';
 
 // ── Capabilities: the classes of action an agent takes ───────────────────────
 export const POLICY_CAPABILITIES = [
@@ -127,10 +128,10 @@ export function matchPathGlob(path: string, glob: string): boolean {
   return pathGlobToRe(glob).test(path);
 }
 export function canonicalPolicyHost(value: string): string | null {
-  const trimmed = value.trim().replace(/\.+$/, '');
+  const trimmed = trimEndChars(value.trim(), '.');
   if (!trimmed) return null;
   try {
-    const hostname = new URL(`http://${trimmed}`).hostname.toLowerCase().replace(/^\[|\]$/g, '').replace(/\.+$/, '');
+    const hostname = trimEndChars(new URL(`http://${trimmed}`).hostname.toLowerCase().replace(/^\[|\]$/g, ''), '.');
     return hostname || null;
   } catch { return null; }
 }
@@ -213,14 +214,15 @@ export function canTighten(parentVerdict: PolicyVerdict, childVerdict: PolicyVer
 // command. Reliable on the security-relevant buckets (destructive, pipe-to-shell); loose
 // on build/test. Normalizes whitespace and checks the leading verb + notable patterns.
 const DESTRUCTIVE_RE = [
-  /\brm\s+(?:[^|;&]*\s)?-{1,2}(?:[a-z]*[rf]|recursive|force)/i, // rm -rf, rm -r -f, rm -fr, rm --recursive/--force
+  // words and the blanks between them are disjoint, so a run of blanks is scanned once (CodeQL, 2026-09-18)
+  /\brm\s+(?:[^|;&\s]+\s+)*-{1,2}(?:[a-z]*[rf]|recursive|force)/i, // rm -rf, rm -r -f, rm -fr, rm --recursive/--force
   /\bgit\s+reset\s+--hard\b/i,
   /\bgit\s+clean\s+-[a-z]*f/i,
   /\bchmod\s+-R\b/i,
   /\bchown\s+-R\b/i,
   /\b(dd|mkfs|shred|fdisk)\b/i,
   /\bsudo\b/i,
-  /:\(\)\s*\{.*\}/, // fork bomb shape
+  /:\(\)\s*\{[^{}]*\}/, // fork bomb shape: the body stops at the next brace, so a run of openers is scanned once
   />\s*\/dev\/sd/i,
 ];
 const PIPE_TO_SHELL_RE = /\b(curl|wget|fetch)\b[^|]*\|\s*(sudo\s+)?(sh|bash|zsh|python|node|ruby|perl)\b/i;

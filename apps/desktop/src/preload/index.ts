@@ -772,9 +772,10 @@ contextBridge.exposeInMainWorld('nm', {
     };
   },
   bootstrap: () => ipcRenderer.invoke('nm:bootstrap'),
-  onboard: (input: { workspaceId?: string; name: string; slug: string; providers: Array<{ provider: string; mode: 'apikey' | 'subscription'; key: string }>; activeModelPack?: string; agents: Array<{ name: string; role: string; model: string; runtime?: string; emoji?: string; channels: string[] }> }) =>
-    ipcRenderer.invoke('nm:onboard', input),
+  onboard: (input: { workspaceId?: string; name: string; slug: string; providers: Array<{ provider: string; mode: 'apikey' | 'subscription'; key: string }>; activeModelPack?: string; agents: Array<{ name: string; role: string; model: string; runtime?: string; emoji?: string; channels: string[] }> }) => ipcRenderer.invoke('nm:onboard', input),
   openExternal: (url: string) => ipcRenderer.invoke('nm:open-external', { url }),
+  // the default browser's name + icon, for the link choice's second row (main/links.ts)
+  defaultBrowser: () => ipcRenderer.invoke('nm:default-browser'),
   openHtml: (name: string, content: string) => ipcRenderer.invoke('nm:open-html', { name, content }),
   authStatus: () => ipcRenderer.invoke('nm:auth-status'),
   login: (email: string, password: string) => ipcRenderer.invoke('nm:auth-login', { email, password }),

@@ -24,9 +24,9 @@ const HEX_RE = /#(?:[0-9a-f]{3}|[0-9a-f]{6})\b/i;
 function section(md: string, ...names: string[]): string {
   const lines = md.split('\n');
   for (let i = 0; i < lines.length; i++) {
-    const h = /^#{2,4}\s+(.+?)\s*$/.exec(lines[i] ?? '');
+    const h = /^#{2,4}[ \t]+(\S.*)$/.exec((lines[i] ?? '').replace(/\r$/, ''));
     if (!h) continue;
-    const title = (h[1] ?? '').toLowerCase();
+    const title = (h[1] ?? '').trim().toLowerCase();
     if (!names.some((n) => title.includes(n))) continue;
     const out: string[] = [];
     for (let j = i + 1; j < lines.length; j++) {
@@ -70,7 +70,9 @@ export function parseBrandGuidelines(md: string): BrandTokens {
     if (!HEX_RE.test(line)) continue;
     const cells = line.includes('|')
       ? line.split('|').map((c) => c.trim()).filter(Boolean)
-      : (/^\s*[-*+]?\s*([^:]{1,40}):\s*(.+)$/.exec(line) ?? []).slice(1).map((c) => c.trim());
+      // the key starts with a non-blank and the value with a non-blank, so the blanks around the
+      // bullet and the colon have one owner each (CodeQL js/polynomial-redos, 2026-09-18)
+      : (/^[ \t]*(?:[-*+][ \t]*)?([^:\s][^:]{0,39}):[ \t]*(\S.*)$/.exec(line) ?? []).slice(1).map((c) => c.trim());
     if (cells.length < 2) continue;
     const hexCell = cells.find((c) => HEX_RE.test(c));
     const roleCell = cells.find((c) => c !== hexCell && !HEX_RE.test(c));

@@ -7476,6 +7476,25 @@ button.dprovideropt:hover:not(:disabled), .dprovideropt.external:hover { border-
   .popsurf, .popsurf.centred { animation: nm-fadein var(--dur-fast) linear; }
   .popsurf.closing { animation: nm-fadeout var(--dur-fast) linear forwards; }
 }
+/* ── the link choice (2026-09-17; visual contract mockups/external-links.html) ─────────────
+   A click on a web link asks where the page opens: here (the browser tab beside the sheet) or in
+   the browser the OS uses. It is a `.popsurf` (the frame above is the shared one), 264 wide.
+   The head is the fact, host then path; the rows wear the `.navrowmenu` recipe with a kbd hint. */
+.popsurf.linkpop { padding: 5px; }
+.linkpophd { display: grid; grid-template-columns: 16px 1fr; column-gap: 8px; align-items: center; padding: 6px 7px 8px; border-bottom: 1px solid var(--border); margin-bottom: 4px; }
+.linkpophd > svg { color: var(--muted); }
+.linkpophost { font: 600 11.5px var(--fmono); color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.linkpoppath { grid-column: 2; font: 500 10.5px var(--fmono); color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+.linkpoprow { display: flex; align-items: center; gap: 9px; width: 100%; height: 32px; padding: 0 8px; border: 0; border-radius: var(--r-md);
+  background: none; font: inherit; font-size: 12.5px; color: var(--body); text-align: left; cursor: pointer; }
+.linkpoprow svg { color: var(--muted); flex: none; }
+/* the default browser's own icon, as the OS reports it */
+.linkpoprow img { width: 16px; height: 16px; border-radius: 4px; flex: none; }
+.linkpoprow > span { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* the highlight IS the focus (the arrows move both), so the quiet ring would be a second mark */
+.linkpoprow.on, .linkpoprow:hover { background: var(--hover-bg); color: var(--text); }
+.linkpoprow:focus-visible { outline: none; box-shadow: none; }
+.linkpoprow kbd { font: 600 9.5px var(--fmono); color: var(--dim); border: 1px solid var(--border2); border-radius: 3px; padding: 1px 5px; }
 /* the history overlay keeps its own body rules; the frame is the shared one now */
 .histovl { max-height: min(70vh, 620px); }
 .histovlhd { flex: none; display: flex; align-items: center; gap: 11px; padding: 14px 16px; border-bottom: 1px solid var(--border); }

@@ -58,7 +58,8 @@ export const randomWorkspaceName = (): string => `${WS_ADJ[Math.floor(Math.rando
 
 /** preview the slug the server derives from a name (the desktop's slugifyName; the server still resolves collisions) */
 export function workspaceSlug(name: string): string {
-  return name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
+  // one dash at each end at most: the collapse before it leaves no run (CodeQL, 2026-09-18)
+  return name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
 }
 
 export function initialWizard(input: { name: string; resumeWorkspaceId?: string | null }): WizardState {

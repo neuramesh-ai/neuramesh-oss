@@ -9,6 +9,7 @@
 // The rule this encodes: **resolve dependencies at triage, and let an unmet one STOP the
 // delegation.** Enforced where the unit is created, never as prompt etiquette — an orchestrator
 // that can talk past a gate is not a gate.
+import { fencedBlock, stripFenced } from './linear';
 import { REPLY_PLATFORMS, type ReplyPlatform } from './replyops';
 
 /** a declared dependency. `connector` is the only kind today; the shape leaves room for more. */
@@ -85,10 +86,10 @@ export function needBlock(data: NmNeed): string {
 }
 
 export function parseNeed(body: string): NmNeed | null {
-  const m = /```nmneed\n([\s\S]*?)\n```/.exec(body);
+  const m = fencedBlock(body, 'nmneed');
   if (!m) return null;
   try {
-    const d = JSON.parse(m[1]!) as NmNeed;
+    const d = JSON.parse(m.inner) as NmNeed;
     if (!d || typeof d.channel !== 'string' || typeof d.ask !== 'string') return null;
     const connect = (Array.isArray(d.connect) ? d.connect : []).filter((p): p is ReplyPlatform => (REPLY_PLATFORMS as readonly string[]).includes(p));
     if (!connect.length) return null;
@@ -100,7 +101,7 @@ export function parseNeed(body: string): NmNeed | null {
 }
 
 export function stripNeed(body: string): string {
-  return body.replace(/```nmneed\n[\s\S]*?\n```/g, '').trim();
+  return stripFenced(body, 'nmneed').trim();
 }
 
 /** the line a run puts in its own prompt: what it may read, and how each network is covered */

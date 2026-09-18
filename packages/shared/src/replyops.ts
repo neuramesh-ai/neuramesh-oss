@@ -13,6 +13,8 @@
 // mark replied. A drawn picture rides `imageArtifactId` (a real attachment, never base64 in
 // the fence) and is DOWNLOADED, never auto-published.
 
+import { fencedBlock, stripFenced } from './linear';
+
 /** every network the radar can surface a conversation from (2026-08-22, George: "any connectors
  *  that are ready, not just x"). What differs per network is the READ, not the card. */
 export const REPLY_PLATFORMS = ['x', 'linkedin', 'instagram', 'tiktok'] as const;
@@ -119,10 +121,10 @@ export function repliesBlock(data: NmReply): string {
 }
 
 export function parseReplies(body: string): NmReply | null {
-  const m = /```nmreply\n([\s\S]*?)\n```/.exec(body);
+  const m = fencedBlock(body, 'nmreply');
   if (!m) return null;
   try {
-    const d = JSON.parse(m[1]!) as NmReply;
+    const d = JSON.parse(m.inner) as NmReply;
     if (!d || typeof d.channel !== 'string') return null;
     const items = cleanReplies(d.items);
     if (!items.length) return null;
@@ -135,7 +137,7 @@ export function parseReplies(body: string): NmReply | null {
 }
 
 export function stripReplies(body: string): string {
-  return body.replace(/```nmreply\n[\s\S]*?\n```/g, '').trim();
+  return stripFenced(body, 'nmreply').trim();
 }
 
 /**

@@ -1,3 +1,4 @@
+import { firstSentence } from '../linear';
 import { engineeringModeHandoff, type EngineeringModeHandoff } from './handoff';
 import type { EngineeringMode } from './protocol';
 export type { EngineeringMode };
@@ -271,7 +272,7 @@ function finishVerification(session: EngineeringSession): EngineeringSession {
 export function submitEngineeringPrompt(session: EngineeringSession, prompt: string): EngineeringSession {
   const text = prompt.trim();
   if (!text || session.state === 'streaming' || session.state === 'awaiting_approval') return session;
-  const title = session.title === 'New Code task' || session.title === 'New engineering task' ? text.replace(/[.!?].*$/, '').slice(0, 64) || session.title : session.title;
+  const title = session.title === 'New Code task' || session.title === 'New engineering task' ? firstSentence(text).slice(0, 64) || session.title : session.title;
   const started: EngineeringSession = {
     ...session, title, state: 'streaming', activeActivity: { phase: 'thinking', startedAt: stamp() }, pendingModeHandoff: null, pendingApproval: null, proposedChanges: [],
     messages: [...session.messages, msg('user', text)], updatedAt: stamp(),

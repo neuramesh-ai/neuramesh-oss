@@ -10,6 +10,10 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# the jobs read the tree and write nothing: the token needs no more (CodeQL actions/missing-workflow-permissions, 2026-09-18)
+permissions:
+  contents: read
+
 jobs:
   check:
     name: typecheck · test · build

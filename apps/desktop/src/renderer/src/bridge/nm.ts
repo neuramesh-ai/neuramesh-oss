@@ -351,6 +351,8 @@ export interface NMBridge extends EngineeringNMBridge, TerminalNMBridge {
     agents: Array<{ name: string; role: string; model: string; runtime?: string; emoji?: string; channels: string[] }>;
   }): Promise<{ workspaceId: string; orchestrator: string }>;
   openExternal(url: string): Promise<void>;
+  /** the app the OS opens https links with (the link choice's second row); optional: the web client and older hosts have none */
+  defaultBrowser?(): Promise<{ name: string; icon: string | null } | null>;
   openHtml(name: string, content: string): Promise<void>;
   authStatus(): Promise<{ mode: AuthMode; user: { id: string; email: string } | null; connection?: Pick<ConnectionInfo, 'id' | 'kind'> }>;
   login(email: string, password: string): Promise<{ user: { id: string; email: string } }>;

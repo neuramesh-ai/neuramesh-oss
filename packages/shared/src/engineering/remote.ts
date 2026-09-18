@@ -1,4 +1,5 @@
 import type { EngineeringAttachment, EngineeringChange, EngineeringMessage, EngineeringSession, EngineeringTurnState, PermissionCategory } from './domain';
+import { firstSentence, lineHas } from '../linear';
 import { modelLabel } from '../model-labels';
 import { engineeringModeHandoff } from './handoff';
 import { engineeringSystemText } from './copy';
@@ -8,7 +9,7 @@ const message = (role: EngineeringMessage['role'], body: string, tone: Engineeri
   id: `remote-${Date.now().toString(36)}-${(++serial).toString(36)}`, role, body, tone, createdAt: stamp(),
 });
 const textValue = (value: unknown): string => typeof value === 'string' ? value : JSON.stringify(value, null, 2);
-const isPlanCeiling = (session: EngineeringSession, value: unknown): boolean => session.mode === 'plan' && /blocked by.*plan mode/i.test(textValue(value));
+const isPlanCeiling = (session: EngineeringSession, value: unknown): boolean => session.mode === 'plan' && lineHas(textValue(value).toLowerCase(), 'blocked by', 'plan mode');
 const terminalState = (reason: unknown): EngineeringTurnState => reason === 'completed' ? 'completed' : reason === 'error' ? 'error' : 'resumable';
 
 function lastMessageIndex(messages: EngineeringMessage[], role: EngineeringMessage['role'], streamingOnly = false): number {
@@ -91,9 +92,7 @@ function remoteChange(toolName: string, input: unknown): EngineeringChange[] {
 export function beginRemoteEngineeringPrompt(session: EngineeringSession, prompt: string, attachments: EngineeringAttachment[] = []): EngineeringSession {
   const text = prompt.trim();
   if (!text || session.state === 'streaming' || session.state === 'awaiting_approval') return session;
-  const title = session.title === 'New Code task' || session.title === 'New engineering task'
-    ? text.replace(/[.!?].*$/, '').slice(0, 64) || session.title
-    : session.title;
+  const title = session.title === 'New Code task' || session.title === 'New engineering task' ? firstSentence(text).slice(0, 64) || session.title : session.title;
   return {
     ...session, title, state: 'streaming', activeActivity: { phase: 'thinking', startedAt: stamp() }, pendingModeHandoff: null,
     messages: [...session.messages, { ...message('user', text), ...(attachments.length ? { attachments } : {}) }], updatedAt: stamp(),

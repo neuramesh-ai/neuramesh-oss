@@ -5,6 +5,7 @@
 // names). This renders the SAME markdown for both the birth plan and every revision, so the
 // thread's preview card, the full-tab view, and the review overlay all read one document.
 import { executionLegLabel } from './journey';
+import { trimLineEnds } from './linear';
 
 export interface PlanDocInput {
   number: number;
@@ -42,7 +43,7 @@ export function parsePlanRef(body: string | null | undefined): PlanRef | null {
   if (!body) return null;
   const m = PLAN_REF_RE.exec(body);
   if (!m) return null;
-  const prose = body.replace(PLAN_REF_RE, '').replace(/[ \t]+$/gm, '').replace(/\n{3,}/g, '\n\n').trim();
+  const prose = trimLineEnds(body.replace(PLAN_REF_RE, '')).replace(/\n{3,}/g, '\n\n').trim();
   return { version: Number(m[1]), prose };
 }
 
