@@ -1267,6 +1267,22 @@ real work — if it is decoration, drop it and keep the pill.
   The rail's compact twin (`.railscope .scopepill .cchip`) is insulated at (0,3,0) and deliberately
   stays a transparent `--border2` pill — it sits on the dock, not on a sheet of cards.
 
+- **A destination with two bodies gets ONE bar, and its words are subheadings** (the Marketing OS
+  desk round, 2026-09-17, George; visual contract
+  [docs/design/marketing-os-desk-2026-09](design/marketing-os-desk-2026-09/)). Marketing OS is one
+  page in reading order: the desk, the playbooks, the threads underneath as you scroll. Under the desk
+  sits one bar (`.mkbar`): the filter pills at the LEFT (the ⌘Y / Home ledger chips, `.histovlfilter`,
+  one recipe) and the section words at the RIGHT in the rail's kicker voice (`PLAYBOOKS · THREADS`,
+  the count on the lit word only, the rail's rule). A word is not a tab. A click scrolls the page so
+  the section's first group head lands under the bar (420 ms on `--ease`, the §7 hand-off), the
+  section's own pills take the left slot (the old set leaves in `--dur-exit`, the new one rises in
+  with `nm-rise`, one chip after another), and the bar sticks to the sheet's top with a hairline and
+  `--shadow-card` (elevation over outline). Scroll-spy lights the word on a manual scroll too, so a
+  click and a scroll end in the same state. Two controls stacked at the left of a row that has room
+  at the right read as waste (George, on round 2): the pills and the words share ONE line. The
+  "nests in the nav, never a tab strip" ruling above holds, because nothing here is a second surface,
+  only a second place on one page. The rules are pure (`views/mkosdesk.ts`, tested).
+
 - **Code is one conversation column beside one evidence pane** (2026-08-31, George — live web and
   desktop review). Do not add a permanent internal thread rail: the workspace rail already lists
   every task, while the Code column's history button and landing recents handle local switching.

@@ -1,8 +1,11 @@
 // Marketing OS home bits (the founder's production review, 2026-08-21): the per-card
 // connector strip, the Run-for picker that replaced the inert "pick a project" label, and
 // the small state renderers the desk shares. Split from MarketingOS.tsx (the line cap).
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { nm as nmBridge } from '../bridge/nm';
+import { ConnectorMark } from '../settings/connector-marks';
+import type { ConnectorId } from '../settings/connectors';
+import { IconAnchor, IconCompass, IconCrosshair, IconFlask, IconGauge, IconGlobe, IconMail, IconPhone, IconRadar, IconRocket, IconSpeaker } from '../ui/icons';
 import type { ConnectorRow } from '../bridge/rows-content';
 import type { Playbook } from '@neuramesh/shared';
 
@@ -52,14 +55,22 @@ export function useRoomConnectors(roomIds: string[]): Map<string, ConnectorRow[]
   return by;
 }
 
-const STRIP: Array<{ p: string; glyph: string; label: string }> = [
-  { p: 'x', glyph: '𝕏', label: 'X' },
-  { p: 'linkedin', glyph: 'in', label: 'LinkedIn' },
-  { p: 'instagram', glyph: '◫', label: 'Instagram' },
-  { p: 'tiktok', glyph: '♪', label: 'TikTok' },
+const STRIP: Array<{ p: ConnectorId; label: string }> = [
+  { p: 'x', label: 'X' },
+  { p: 'linkedin', label: 'LinkedIn' },
+  { p: 'instagram', label: 'Instagram' },
+  { p: 'tiktok', label: 'TikTok' },
 ];
+const STATE_WORD = { on: 'connected', warnc: 'reconnect needed', '': 'not connected' } as const;
 
-/** the card's one-glance connector row: publish networks + PostHog, live status dots */
+/** the catalog's glyphs — literal marks, one per playbook (ui/icons.tsx), so a row says its kind before its title is read */
+export const PLAYBOOK_GLYPH: Record<string, ReactNode> = {
+  audit: <IconGauge s={15} />, geo: <IconGlobe s={15} />, teardown: <IconCrosshair s={15} />, positioning: <IconCompass s={15} />,
+  engage: <IconRadar s={15} />, copylab: <IconFlask s={15} />, hooks: <IconAnchor s={15} />, email: <IconMail s={15} />,
+  launch: <IconRocket s={15} />, ads: <IconSpeaker s={15} />, appstore: <IconPhone s={15} />,
+};
+
+/** the tile's one-glance connector row: publish networks + PostHog as the composer foot's marks, live status dots */
 export function ConnStrip({ conns, marketing }: { conns: ConnectorRow[]; marketing?: string | null }) {
   const posthog = ((): boolean => {
     try { return !!(JSON.parse(marketing ?? '{}') as { mcp?: { posthog?: boolean } }).mcp?.posthog; } catch { return false; }
@@ -75,9 +86,9 @@ export function ConnStrip({ conns, marketing }: { conns: ConnectorRow[]; marketi
     <span className="mkconns">
       {STRIP.map((s) => {
         const st = stat(s.p);
-        return <span key={s.p} className={`mkc${st ? ` ${st}` : ''}`} title={`${s.label} — ${st === 'on' ? 'connected' : st === 'warnc' ? 'needs re-authorizing' : 'not connected'}`}>{s.glyph}</span>;
+        return <span key={s.p} className={`mkc${st ? ` ${st}` : ''}`} data-tip={`${s.label}: ${STATE_WORD[st]}`}><ConnectorMark id={s.p} s={13} /></span>;
       })}
-      <span className={`mkc${posthog ? ' on' : ''}`} title={`PostHog — ${posthog ? 'connected' : 'not connected'}`}>◔</span>
+      <span className={`mkc${posthog ? ' on' : ''}`} data-tip={`PostHog: ${posthog ? 'connected' : 'not connected'}`}><ConnectorMark id="posthog" s={13} /></span>
       <span className="mkconnlbl">{live ? `${live} live` : 'nothing connected'}{warn ? ` · ${warn} needs re-auth` : ''}</span>
     </span>
   );

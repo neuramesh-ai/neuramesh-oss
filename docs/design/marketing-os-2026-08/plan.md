@@ -197,6 +197,13 @@ worker-leg tool gap is real and this round's research legs are the reason to clo
      nothing inside it is a second lens on one subject, and the catalog popover died with
      the move (one door per surface). The nav badge, if any, is **informational**
      (`--panel3`, live marketing runs) — asks stay on the bell.
+   - ▸ **Amended 2026-09-17 (the desk round,
+     [docs/design/marketing-os-desk-2026-09](../marketing-os-desk-2026-09/plan.md)):** still ONE
+     surface, now with ONE bar under the desk: the filter pills at the left and the two section
+     words, `PLAYBOOKS · THREADS`, at the right. The words are subheadings that scroll the page to
+     the section, never tabs. The cards became tiles (one line when a project is picked), the catalog
+     rows rest on a fact and show the verb on hover, and the threads are the Home ledger's rows with
+     NEEDS YOU pinned first, then the day groups.
 
 8. **Cadence rides schedules untouched.** Arming a playbook = `schedule.create` whose routine
    payload names the playbook ask; the firing births a triaged thread (the existing routine

@@ -19,7 +19,7 @@ export const PLAYBOOKS: Playbook[] = [
   {
     id: 'audit',
     title: 'Site & funnel audit',
-    tagline: 'six dimensions, weighted 0–100, fix-first list',
+    tagline: 'six dimensions, weighted 0 to 100, with a fix-first list',
     group: 'foundations',
     skill: 'site-audit',
     engine: 'unit',
@@ -39,7 +39,7 @@ export const PLAYBOOKS: Playbook[] = [
   {
     id: 'geo',
     title: 'AI search (GEO)',
-    tagline: 'citability: who gets cited, rewrites, re-measure',
+    tagline: 'who gets cited, page rewrites, then a re-measure',
     group: 'foundations',
     skill: 'geo-citability',
     engine: 'unit',
@@ -58,7 +58,7 @@ export const PLAYBOOKS: Playbook[] = [
   {
     id: 'teardown',
     title: 'Competitor teardown',
-    tagline: 'ads · pricing · jobs · reviews → the exposure map',
+    tagline: 'ads, pricing, jobs, and reviews, then the exposure map',
     group: 'foundations',
     skill: 'competitor-teardown',
     engine: 'unit',
@@ -77,7 +77,7 @@ export const PLAYBOOKS: Playbook[] = [
   {
     id: 'positioning',
     title: 'Positioning & offer',
-    tagline: 'the six-clause statement, pasteability-tested',
+    tagline: 'the six-clause statement, tested for pasteability',
     group: 'foundations',
     skill: 'positioning-offer-pricing',
     engine: 'unit',
@@ -99,7 +99,7 @@ export const PLAYBOOKS: Playbook[] = [
     // card does not, and a row says which it was.
     id: 'engage',
     title: 'Reply radar',
-    tagline: 'high-reach conversations worth joining — targets ranked, replies drafted',
+    tagline: 'high-reach conversations worth a reply, ranked, with the replies drafted',
     group: 'content',
     skill: 'social-craft',
     engine: 'unit',
@@ -135,7 +135,7 @@ export const PLAYBOOKS: Playbook[] = [
   {
     id: 'copylab',
     title: 'Copy lab',
-    tagline: '15–20 variants → panel-scored → de-slopped · in-thread',
+    tagline: '15 to 20 variants, panel-scored, then de-slopped, in the thread',
     group: 'content',
     skill: 'copy-lab',
     engine: 'chat',
@@ -148,7 +148,7 @@ export const PLAYBOOKS: Playbook[] = [
   {
     id: 'hooks',
     title: 'Hook batch',
-    tagline: '18-tactic matrix: visual · spoken · text · in-thread',
+    tagline: 'the 18-tactic matrix: visual, spoken, and text, in the thread',
     group: 'content',
     skill: 'hook-engine',
     engine: 'chat',
@@ -161,7 +161,7 @@ export const PLAYBOOKS: Playbook[] = [
   {
     id: 'email',
     title: 'Email sequence',
-    tagline: 'welcome / nurture / launch — written in full, drafts only',
+    tagline: 'welcome, nurture, and launch, written in full, drafts only',
     group: 'content',
     skill: 'email-sequences',
     engine: 'chat',
@@ -174,7 +174,7 @@ export const PLAYBOOKS: Playbook[] = [
   {
     id: 'launch',
     title: 'Launch plan',
-    tagline: 'T-4wk → T+1wk, asset stack as subtasks, PH included',
+    tagline: 'T-4 weeks to T+1 week, the asset stack as subtasks, Product Hunt included',
     group: 'campaigns',
     skill: 'launch-playbook',
     engine: 'unit',
@@ -198,7 +198,7 @@ export const PLAYBOOKS: Playbook[] = [
   {
     id: 'ads',
     title: 'Ads creative audit',
-    tagline: 'concept fatigue vs its five impostors · needs ads MCP',
+    tagline: 'concept fatigue against its five impostors, needs the ads connector',
     group: 'campaigns',
     skill: 'paid-ads-audit',
     engine: 'unit',
@@ -217,7 +217,7 @@ export const PLAYBOOKS: Playbook[] = [
   {
     id: 'appstore',
     title: 'App store kit',
-    tagline: 'ASO: which half is broken, metadata to the char',
+    tagline: 'ASO: which half is broken, and the metadata to the character',
     group: 'campaigns',
     skill: 'app-store-kit',
     engine: 'unit',

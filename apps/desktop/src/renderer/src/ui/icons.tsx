@@ -162,3 +162,16 @@ export const IconMeta = ({ s }: { s?: number }) => <Svg s={s}><path d="M12 12c-1
 export const IconTikTokAds = ({ s }: { s?: number }) => <Svg s={s}><rect x="3.5" y="3.5" width="17" height="17" rx="3" /><path d="M13.2 7.5v6.3a2.3 2.3 0 1 1-2.3-2.3" /><path d="M13.2 7.5c.3 1.6 1.4 2.6 3 2.8" /></Svg>;
 /** the horizontal three dots — "and the rest", the overflow door (IconKebab is the vertical menu mark) */
 export const IconEllipsis = ({ s }: { s?: number }) => <svg width={s ?? 15} height={s ?? 15} viewBox="0 0 24 24" fill="currentColor" aria-hidden><circle cx="5" cy="12" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="19" cy="12" r="1.6" /></svg>;
+
+// ── The playbook glyphs (the Marketing OS desk round, 2026-09-17): literal marks, one per playbook, the
+// rail's "the glyph says the kind" rule applied to the catalog. Keyed in views/mkosbits.tsx PLAYBOOK_GLYPH.
+export const IconGauge = ({ s }: { s?: number }) => <Svg s={s}><path d="M12 14.5 16.2 9.3" /><path d="M4.5 16.5a8.5 8.5 0 1 1 15 0" /></Svg>;
+export const IconCrosshair = ({ s }: { s?: number }) => <Svg s={s}><circle cx="12" cy="12" r="7.5" /><path d="M12 2.5v4M12 17.5v4M2.5 12h4M17.5 12h4" /></Svg>;
+export const IconCompass = ({ s }: { s?: number }) => <Svg s={s}><circle cx="12" cy="12" r="9" /><path d="m15.5 8.5-2 5-5 2 2-5z" /></Svg>;
+export const IconRadar = ({ s }: { s?: number }) => <Svg s={s}><circle cx="12" cy="13" r="1.4" fill="currentColor" stroke="none" /><path d="M8.5 16.5a5 5 0 1 1 7 0" /><path d="M5.6 19.4a9 9 0 1 1 12.8 0" /></Svg>;
+export const IconFlask = ({ s }: { s?: number }) => <Svg s={s}><path d="M9 3h6" /><path d="M10 3v6L4.5 19a1.5 1.5 0 0 0 1.3 2.2h12.4a1.5 1.5 0 0 0 1.3-2.2L14 9V3" /><path d="M7 15h10" /></Svg>;
+export const IconAnchor = ({ s }: { s?: number }) => <Svg s={s}><circle cx="12" cy="5" r="2" /><path d="M12 7v14" /><path d="M5 13a7 7 0 0 0 14 0" /></Svg>;
+export const IconMail = ({ s }: { s?: number }) => <Svg s={s}><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></Svg>;
+export const IconRocket = ({ s }: { s?: number }) => <Svg s={s}><path d="M5 15c-1.5 1.5-2 5-2 5s3.5-.5 5-2" /><path d="M14 4c3-1 6-1 6-1s0 3-1 6c-2 4-6 7-8 8l-4-4c1-2 4-6 7-9z" /><circle cx="15" cy="9" r="1.5" /></Svg>;
+export const IconSpeaker = ({ s }: { s?: number }) => <Svg s={s}><path d="M3 11v2a2 2 0 0 0 2 2h1l4 4V5L6 9H5a2 2 0 0 0-2 2z" /><path d="M15 9a3 3 0 0 1 0 6" /><path d="M18 6a7 7 0 0 1 0 12" /></Svg>;
+export const IconPhone = ({ s }: { s?: number }) => <Svg s={s}><rect x="6" y="2.5" width="12" height="19" rx="2.5" /><path d="M11 18h2" /></Svg>;
