@@ -337,12 +337,16 @@ Models are already materialized per agent (`agents.model`, v0.44.0) and resolved
 `seatModel`. This adds **one layer** to that chain and nothing else:
 
 ```
-pin  >  thread  >  project  >  workspace
+thread  >  pin  >  project  >  workspace        (since 2026-09-17; was pin > thread)
 ```
 
-- **pin** — a human's `model_source='manual'`. A conversation may not move a pinned seat, and the
-  roles table disables that row and says why rather than pretending.
-- **thread** — `threads.brain_override`, jsonb `role → model`, nullable.
+- **thread** — `threads.brain_override`, jsonb `role → model`, nullable. It outranks a pin
+  (reversed 2026-09-17): a pin is the seat's default everywhere, the conversation's word is THIS
+  conversation's, and the live harness caught the old order running a routine on the human's
+  ChatGPT login while the thread said Starter, because the orchestrator was pinned. The roles table
+  says "set for this conversation · pinned by you" on such a seat, and Reset returns it to the pin.
+- **pin** — a human's `model_source='manual'`. It still beats every pack: a project or workspace
+  pack change never moves a pinned seat.
 - **project / workspace** — unchanged (`projects.model_pack`, the materialized `agents.model`).
 
 **An override is a list of exceptions, not a pack.** It names only the roles it changes and does
@@ -440,3 +444,131 @@ machine-local and never synced, like the theme and the nav fold.
   stays the add/hire ladder; this surface changes what a seat runs, not who sits in it.
 - **A model with no connected provider is greyed and says so**, rather than failing at run time —
   but the workspace-level "connect a provider" flow is unchanged and lives in Settings.
+
+### 15.7 Starter is the fallback brain (2026-09-17, replaces the 09-16 routine stamp)
+
+George, 2026-09-16: *"routines, when a workspace is on Pro, should always run: on the cloud, using
+the neuramesh Starter model, which is always available based on credits."* The first cut read that
+as a birth-time stamp: every routine's thread on Pro was born with the orchestrator on Starter.
+George, one day later: *"I didn't mean all routines should automatically run on starter; starter
+should be a fallback brain that's available, if credit allows, to run any workflow that other roles
+run if the configured brain is unavailable, usage expired, etc; the reason verbose to the user in
+the thread; the decision to switch auto for routines and scheduled items, manual, as is today, for
+everything else, where users click a button to switch the brain."* The stamp is gone. This is what
+stands.
+
+- **One door** (`apps/desktop/src/main/host/starterfallback.ts`). Every site that finds a seat
+  unable to run calls `starterFallback` instead of posting its own card: the chat and task wakes
+  (`host/wake.ts`), the claim and every role flow (`claimflow`, `flows`, `architect`, `designflow`,
+  `reviewflow`, `shipflow`), the wake ladder's "nobody can serve" point (`wakerouting.ts`) and the
+  claim ladder's (`claimflow.ts`). Unavailable means: the login expired or was never made
+  (`resolveToken` blocked, or no credential at all), no awake machine can serve the runtime and no
+  sleeper is worth waking, or the turn came back capped.
+- **The decision is the conversation's.** The door reads the thread that OWNS the turn: the thread
+  itself, a task's own thread, else the conversation that owns the unit (`tasks.origin_thread_id`).
+  A **routine's** conversation (`threads.schedule_id`) re-seats the failing ROLE on the house model
+  by itself: the move is written as the thread's brain override by the owner (`thread.set_brain`
+  stays HUMAN_ONLY, and the routine already speaks as the owner), the reason is posted, and the turn
+  continues on the new seat. A **human's** conversation gets the reason and the card; nothing moves
+  until they click. One role at a time: the seat that failed, never the whole cast.
+- **The reason is said, in full, where the person looks.** *"@rex cannot run on OpenAI / Codex here.
+  This machine has no OpenAI / Codex login. Your cloud machine has no OpenAI / Codex login either.
+  This routine continues on the NeuraMesh brain, on credits. Reset the brain in this
+  conversation to go back."* A human conversation's version ends *"Sign in to OpenAI / Codex again
+  on this machine, or run this conversation on the NeuraMesh brain, on credits."* followed
+  by the card. Out of credits, both say so and the card offers no switch (`/v1/usage` is asked
+  first; an unknown answer lets the proxy be the judge, since its 402 reads as a refusal).
+- **The button moves THIS conversation's seat** (`cards/AuthCard.tsx`, "Use NeuraMesh brain here · N"). The
+  card carries `why`, `starter` and `scope { threadId, role }`; the tap merges that one role into the
+  thread's override (`nm:thread-brain-role`, main-process merge from the replica), so a pinned seat
+  moves too (§15.1) and Reset returns it. After a reload the card reads the row (`nm:thread-brain`)
+  and shows the switch as done rather than inviting a second click. A card with no conversation
+  keeps the 09-08 behaviour: the workspace-wide Starter pack.
+- **A cap arrives after the turn ran**, and a second run for the same (agent, trigger) loses the
+  wake lease by construction (the runs index), so on a routine the reason is posted as the OWNER,
+  mentioning the agent: a fresh trigger, a fresh wake on the new seat. A human's conversation keeps
+  its failover card.
+- **An offered unit nobody can serve** used to sit unclaimed and silent until the stall watchdog
+  noticed. The claim door speaks for the member who opened the owning conversation (a unit the
+  orchestrator created has no human creator, its conversation does), claims a re-seated unit right
+  there, and looks at an offered one again every minute until the seat moves or a machine that can
+  serve it comes online. The offer watch fires on task rows, and neither the re-seat nor the click
+  touches one.
+- **Legs ride the parent's adapter** (`host/legs.ts`): a leg's seat is taken by role through the
+  same path a level-1 agent takes, then checked against the parent's runtime. A model of another
+  provider cannot ride, so the leg keeps the parent's model. Seen live before the rule: a parent on
+  Starter spawned a developer leg on the room's codex specialist, and the Google CLI was asked to
+  run a codex model.
+- **Live, 2026-09-17** (evidence in `docs/design/routine-handsoff-2026-09/evidence/live-*.png`): a
+  once-routine in a room whose orchestrator was pinned to a codex model, on a machine with no codex
+  login: born on the configured brain, the reason posted 400 ms after the opener, the seat moved,
+  the unit created on the metered proxy (credits 114 906 → 129 429). Its developer, pinned to the
+  same model: the claim door's reason in the unit's thread, the seat moved, the build leg on the
+  Starter worker lane, `onboarding.md` delivered in nine seconds, the unit done. A human message in
+  the same room: the reason and the card, nothing moved; the tap on "Use NeuraMesh brain here" moved the
+  seat, and the re-mention was answered on the proxy in twelve seconds.
+- **The notice that cannot be missed** (George, same evening: *"the message '@rex cannot run…' is
+  easily missed"*). Two things, both enforced. The server mints a **needs-you row** from an agent's
+  auth card, in the one choke point every card flows through (`POST /v1/messages`, beside the nmq
+  extraction), so the thread pill, the Home queue and the bell count it; it leaves the queue on the
+  person's next reply, as a prose-answered question does. A card that records a switch a routine
+  already made (`switched: true`, which the auto path now posts) mints nothing. And **a docked bar
+  above the composer** in both threads (`thread/BrainNotice.tsx`) reads ONE pure derivation
+  (`packages/shared brainnotice.ts`) over the newest auth card and the conversation's brain override:
+  `needs` wears the amber rule (nothing moved, the conversation waits on you), `switched` is quiet
+  (the seat runs on the NeuraMesh brain here, by a routine or by your tap). Expanded, it says what happened, what
+  to do, and carries the same card the transcript shows plus **Reset the brain here** on a switch.
+  It stands while the condition stands and leaves on its own. Artboard F, both themes.
+- Tests: `host/starterfallback.test.ts` (twelve cases against a replica-like fake whose `get` throws
+  on an empty result, as PowerSync's does: routine auto · human offer · anchored unit's owning
+  thread · out of credits · already moved · the cap re-ask · a seat already on Starter · the
+  conversation's origin · the closed door), `packages/control-api/test/thread-brain.test.ts` (a
+  routine is born with NO stamp on Pro or Free · an explicit opener override rides · the owner's
+  `thread.set_brain` records the fallback · birth-only).
+
+### 15.8 Starter for the whole thread — the worker lane (2026-09-16)
+
+George: *"build the starter worker lane too; ideally we should be able to switch the active brain
+config to starter at any point, which should reseat all the agents in that thread to use the starter
+agent config — that's the whole point."*
+
+- **The Starter worker lane** (`apps/desktop/src/main/runtime/starter.ts`). Until now the metered
+  proxy served one transport, the orchestrator's. Every worker-shaped turn — the execute loop, a
+  spawned leg, the designer's round, the reviewer's verdict, the architect's draft, a chat reply —
+  went through the Gemini adapter, which drives the `agy` CLI on the user's Google login, so a seat
+  on the house model failed on the runner and posted an auth card on a laptop. The lane runs the
+  SAME function-calling loop the orchestrator runs on the proxy (`geminiOrchestratorTurn`, now with
+  a worker turn cap and a Stop signal), over the SAME tool bus a Claude or Codex worker gets
+  (`toolsForTurn` → the loop's shape, no bridge), plus three file tools jailed to the workspace
+  (`write_file` · `read_file` · `list_files`, through the permission gate). **No shell**, and the
+  prompt says so: a Starter-seated worker writes the deliverable directly and names what it could not
+  run. Repo-backed work that needs git, a build or a test run keeps a runtime with a login.
+- **The routing rule is the adapter's** (`runtime/gemini.ts`, `isStarterSeat`): the house model with
+  no key of the user's own goes to the proxy — never the user's Google login, which agy would have
+  used silently with its own default model. The rule `geminiDispatch` applied to the orchestrator now
+  holds for `streamTurn`, `complete` and `runQuery`. The lane's coordinates (the API, the workspace,
+  the actor the daemon signs as) are set once at boot (`setStarterLane`), so the adapter's signatures
+  do not grow (docs/harness/06 R1).
+- **The seat is the opt-in to credits** (`runtime/authpolicy.ts`): a lapsed vendor login on the
+  user's own laptop no longer blocks a house-model seat. This REVERSES the 2026-09-08 ruling that
+  kept the block on a machine you own, and the test that pinned it says so with the date. The block
+  stands for every seat that is not the house model.
+- **The ladder judges the seat, not the base runtime** (`host/claimflow.ts`): a unit in a
+  conversation switched to Starter is servable by any awake machine, so the claim verdict runs on the
+  re-seated agent. The wake already did (seatFor precedes the gate).
+- **One brain per conversation, inherited.** `threadBrain({ taskId })` reads the task's own thread,
+  else the conversation that OWNS the unit (`tasks.origin_thread_id`, docs/41); a spawned leg is
+  seated under the same thread or task as its parent's turn (`resolveSeat` takes the scope, by the
+  leg's ROLE, then keeps the parent's model when the wanted one belongs to another provider, since
+  a leg rides the parent's adapter — §15.7). The renderer points an anchored unit's chip at that
+  owning thread. Switching the conversation therefore re-seats the unit's legs and its subagents on
+  their next turn; a turn already running finishes on the model it started with (§15.1, unchanged).
+- **The switch.** The Roles view gains **Use NeuraMesh brain here** (`brain/StarterHere.tsx`): every seat in
+  the cast, pinned ones included since 2026-09-17, moves to the Starter model in one apply, on the
+  thread (or the sticky draft before a thread exists). The per-seat picker lists the house model as enabled with "runs on us" — it needs
+  no provider connected. A pinned seat stays pinned and the roles list says so.
+- **Named limits.** No shell on the lane (a Starter-seated developer cannot run a build); the proxy
+  is non-streaming, so a chat reply on the lane arrives whole; chat mode's tool loop is still the
+  Claude runtime's — a Starter chat reply is conversational (docs/34 §6's honest degradation).
+- Tests: `runtime/starter.test.ts` (the seat rule, the workspace jail, the bus shape per kind, the
+  loud failure without a lane), `runtime/authpolicy.test.ts` (the reversal, dated).

@@ -61,3 +61,49 @@ export function startPlanRouteWatch(ctx: { db: WatchDb; post: HostCtx['post']; w
     },
   );
 }
+
+/**
+ * THE BUILD OFFER AFTER A HANDS-OFF DESIGN ROUND (2026-09-16). A routine-anchored plan-first unit
+ * whose design round the server auto-approved (planfollowup.ts) returns to `todo` with its plan
+ * approved and nobody to offer it: a human's round wakes the orchestrator with their approval
+ * click, a routine's cannot. Mechanical, like the design routing above — the room's worker is
+ * offered exactly as an approved plan is (offerPlanToWorker). Routine-scoped on purpose: the human
+ * path keeps the orchestrator's judgment about WHO builds. `artifacts.promoted` is the proof the
+ * round was approved (the approve promotes it in the same transaction), and the repo floor rides
+ * in the query — a repo-backed round is a human's to approve, so it never lands here.
+ */
+export function startRoutineBuildWatch(ctx: {
+  db: WatchDb;
+  workspace: string;
+  agents: Map<string, { id: string; role: string; channels: Set<string> }>;
+  offerPlanToWorker: (orch: never, t: never, ch: { id: string; slug: string; workspace_id: string }) => Promise<void>;
+}): void {
+  const { db, workspace, agents, offerPlanToWorker } = ctx;
+  const offered = new Set<string>();
+  db.watch(
+    `select t.id, t.number, t.title, t.description, t.channel_id, t.requirements from tasks t
+      where t.workspace_id = ? and t.state = 'todo' and t.plan_approved_at is not null
+        and t.offered_agent_id is null and t.assignee_id is null and t.parent_task_id is null and t.repo_id is null
+        and instr(coalesce(t.work_plan, ''), '"design"') > 0
+        and exists (select 1 from threads th where th.id = t.origin_thread_id and th.schedule_id is not null)
+        and exists (select 1 from artifacts a where a.task_id = t.id and a.kind = 'design' and a.promoted = 1)`,
+    [workspace],
+    {
+      onResult: (r) => {
+        for (const t of (r.rows?._array ?? []) as Array<{ id: string; number: number; title: string; description: string | null; channel_id: string; requirements: string | null }>) {
+          if (offered.has(t.id)) continue;
+          const orch = [...agents.values()].find((a) => a.role === 'orchestrator' && a.channels.has(t.channel_id));
+          if (!orch) continue; // not this host's room — the host with the orchestrator offers
+          offered.add(t.id);
+          void (async () => {
+            const [ch] = await db.getAll<{ id: string; slug: string; workspace_id: string }>('select id, slug, workspace_id from channels where id = ?', [t.channel_id]);
+            if (!ch) { offered.delete(t.id); return; }
+            await offerPlanToWorker(orch as never, t as never, ch);
+            console.log(`routine_build_offer task=${t.number} — the design round auto-approved, the build offered`);
+          })().catch((err) => { offered.delete(t.id); console.error(`routine_build_offer #${t.number} failed:`, err); });
+        }
+      },
+      onError: () => {},
+    },
+  );
+}

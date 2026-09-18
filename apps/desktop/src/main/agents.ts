@@ -6,7 +6,9 @@
 // because they run headless too.
 import { apiAuthHeaders } from './apiauth';
 import { electron } from './electronlazy';
-import { startPlanRouteWatch } from './host/planroute';
+import { startPlanRouteWatch, startRoutineBuildWatch } from './host/planroute';
+import { makeRoutineResume } from './host/routineresume';
+import { configureStarterFallback, setStarterLane } from './runtime/starter';
 
 // Desktop notification (local, the human's machine) — fired when a plan needs
 // the human's review. Best-effort: silently no-ops if unsupported.
@@ -762,6 +764,7 @@ export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId,
   }
   hostsStarted.add(hostKey);
   ideasHost = { db, apiUrl, ownerActorId }; // lend the launcher's ideas one-shot its handles
+  setStarterLane({ apiUrl, workspace, actorId: ownerActorId }); configureStarterFallback({ db, apiUrl, ownerActorId }); // the Starter lane + its fallback door (runtime/starter.ts, host/starterfallback.ts)
   // Containment L1: bring up the egress proxy once per daemon and route every agent's HTTP(S) traffic
   // through it (agentBaseEnv reads the URL setAgentProxy stores). v1 enforces the always-on metadata /
   // link-local floor for ALL agents — the SSRF credential-theft sink no legitimate egress needs.
@@ -1939,7 +1942,7 @@ export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId,
 
   // the sleeper rung (host/sleepers.ts): the claim and wake flows ask the fleet to wake a lent
   // cloud machine when nobody awake can serve — one memo for the whole host
-  const { requestSleeperWake } = makeSleeperWake({ peerMachines, post });
+  const { requestSleeperWake, nobodyServes } = makeSleeperWake({ peerMachines, post });
   // The role flows (host/flows.ts) — architect → designer → developer → reviewer → shipper,
   // plus claim/own/resume and the block machinery. They take the host services they call.
   const {
@@ -1951,7 +1954,7 @@ export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId,
     post, machineId, guards, db, apiUrl, workspace, ownerActorId, agents, brain, parkBook, execQueue, claimed,
     NO_RUN, openRun, narrate, declareBeats, advanceBeat, beatCursor, parkFor,
     alog, arun, brainNotes, brainNotesFor, brainResults, channelLessons, claimVerdict, discoverSkills,
-    handleExhaustion, legSummary, mineLessons, originOf, priorMachineFor, readOnlyStudy, requestSleeperWake,
+    handleExhaustion, legSummary, mineLessons, originOf, priorMachineFor, readOnlyStudy, requestSleeperWake, nobodyServes,
     orchestratorTurn: (...args: Parameters<typeof orchestratorTurn>) => orchestratorTurn(...args),
     seatFor, setStatus, sinceFirstSeen, spawnLegFor, taskRecallNote, whiteboardClosures, replyDraft, searchXFor,
   });
@@ -1997,7 +2000,9 @@ export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId,
   // never run these). It uses its normal tools + posts a channel message, or stands down (NO_REPLY).
   const SUMMARY_MARKER: Record<string, string> = { morning: '☀️ Morning status', midday: '🕑 Midday status', evening: '🌙 Evening status' };
   const sweepTranscript = async (ch: { id: string; slug: string }): Promise<string> => {
-    const recent = await db.getAll<{ author_kind: string; body: string }>(`select author_kind, body from messages where channel_id = ? and task_id is null order by created_at desc limit 18`, [ch.id]);
+    // a routine's thread is never the sweep's business (2026-09-16, #1093): its ask is answered by the
+    // thread wake or re-asked by the routine resume, and a sweep that saw it once filed it flat
+    const recent = await db.getAll<{ author_kind: string; body: string }>(`select author_kind, body from messages where channel_id = ? and task_id is null and (thread_id is null or thread_id not in (select id from threads where schedule_id is not null)) order by created_at desc limit 18`, [ch.id]);
     const open = await db.getAll<{ number: number; title: string; state: string; assignee: string | null }>(`select t.number, t.title, t.state, (select name from agents where id = t.assignee_id) as assignee from tasks t where t.channel_id = ? and t.state not in ('accepted','closed','backlog') order by t.number desc limit 30`, [ch.id]);
     // parked ideas ride along so summaries can carry the tally — they are NOT open work
     const [bl] = await db.getAll<{ n: number }>(`select count(*) as n from tasks where channel_id = ? and state = 'backlog'`, [ch.id]);
@@ -2011,10 +2016,14 @@ export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId,
 
   // The sweeps themselves live in orchsweeps.ts; the INTERVALS stay here, in the boot
   // sequence, for the same reason the berth sweep's do — when a sweep fires is a boot fact.
+  // the routine resume (host/routineresume.ts) rides the sweep tick; the post-design build offer for a
+  // hands-off unit is a watch (planroute.ts) — a thunk, so the flows above resolve at call time
+  const { resumeStrandedRoutines } = makeRoutineResume({ db, apiUrl, ownerActorId, post });
+  startRoutineBuildWatch({ db, workspace, agents, offerPlanToWorker: (o, t, ch) => offerPlanToWorker(o, t, ch) });
   const { runOrchestratorSweeps } = makeOrchSweeps({
     db, post, agents, claimed, guards, apiUrl, ownerActorId, startedAt, buildOrchestratorTools,
     SUMMARY_MARKER, sweepPeriod, summaryPostedToday,
-    channelMonitorSignals, sweepTranscript, dispatchOrchestrator, discoverSkills, arun,
+    channelMonitorSignals, sweepTranscript, dispatchOrchestrator, discoverSkills, arun, resumeStrandedRoutines,
   });
 
   // Route an orchestrator transport call to the agent's provider — shared by message turns AND the

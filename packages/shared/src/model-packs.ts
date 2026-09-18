@@ -236,7 +236,7 @@ export const PACKS: Record<string, ModelPack> = {
   // proxy is the only place the platform key exists, so it is the only place credit can be drawn.
   // A catalog entry has no notion of who pays and must not pretend to.
   starter: {
-    id: STARTER_PACK_ID, name: 'NeuraMesh Starter', tagline: 'Runs on us — no provider to connect',
+    id: STARTER_PACK_ID, name: 'NeuraMesh brain', tagline: 'Runs on NeuraMesh, on credits. No provider to connect.',
     platform: true,
     roles: {
       orchestrator: STARTER_MODEL, architect: STARTER_MODEL, developer: STARTER_MODEL, worker: STARTER_MODEL,
@@ -412,7 +412,8 @@ export function brainCast(input: {
       role, currentModel: a.model, modelSource: a.modelSource,
       projectPack: input.projectPack, custom: input.custom, threadOverride: override,
     });
-    out.push({ role, name: a.name, emoji: a.emoji ?? null, model, changed: !pinned && !!override?.[role] && model === override[role], pinned });
+    // a pinned seat the conversation moved is BOTH: pinned (its default) and changed (here)
+    out.push({ role, name: a.name, emoji: a.emoji ?? null, model, changed: !!override?.[role] && model === override[role], pinned });
   }
   return out.sort((x, y) => castRank(x.role) - castRank(y.role));
 }
@@ -428,13 +429,16 @@ export function brainCast(input: {
  * problem one level narrower, so it resolves in the same place.
  *
  * Precedence, most specific first:
- *   1. a human's manual pin (model_source='manual') — the most deliberate intent there is,
- *      and the UI already promises "Pinned · reset to pack default". A project pack must
- *      never quietly undo it, and neither may a thread.
- *   2. the THREAD's brain override, by role. It names exactly the roles it changes and does
+ *   1. the THREAD's brain override, by role. It names exactly the roles it changes and does
  *      **not** fall back to the developer seat the way a pack does: a pack is a complete
  *      opinion about every seat, an override is a list of exceptions, and spilling one role's
- *      exception onto another would be a change nobody asked for.
+ *      exception onto another would be a change nobody asked for. Above the pin since
+ *      2026-09-17 (docs/10 §15.1): the pin is the seat's default everywhere, the override is
+ *      this one conversation's word — a routine's Starter stamp on Pro, or "Use Starter here",
+ *      that a pinned orchestrator could ignore was found live to run on the human's vendor login.
+ *   2. a human's manual pin (model_source='manual') — the most deliberate STANDING intent there
+ *      is, and the UI already promises "Pinned · reset to pack default". A project pack must
+ *      never quietly undo it.
  *   3. the project's pack override, by role (unknown role → the developer seat, matching
  *      how the failover switch fills gaps).
  *   4. `currentModel` — the workspace pack's materialized value, or a legacy/unmanaged model.
@@ -450,9 +454,13 @@ export function seatModel(input: {
   custom?: readonly CustomModelPack[];
   threadOverride?: BrainOverride | null;
 }): string {
-  if ((input.modelSource ?? 'pack') === 'manual') return input.currentModel;
+  // the conversation's word beats the pin (2026-09-17, reversed from `pin > thread`): a pin is the
+  // seat's default everywhere, a thread override is THIS conversation's choice — and a routine on
+  // Pro or a "Use Starter here" that a pinned orchestrator could ignore was found live to run the
+  // routine on the human's vendor login instead of the metered lane (docs/10 §15.1)
   const override = parseBrainOverride(input.threadOverride)?.[input.role];
   if (override) return override;
+  if ((input.modelSource ?? 'pack') === 'manual') return input.currentModel;
   const roles = resolvePackRoles(input.projectPack, input.custom ?? []);
   if (!roles) return input.currentModel;
   return roles[input.role] ?? roles.developer ?? input.currentModel;

@@ -42,6 +42,9 @@ export interface StallCandidate {
   hostSeenAtMs: number | null;  // the responsible agent's machine heartbeat
   hasOpenDecision: boolean;     // an open nmq decision already parks the ball with the human
   liveLocal: boolean;           // a flow for this task is running on THIS host right now
+  /** plan_review only: the plan's approval stamp (a human's, or a hands-off birth) — an approved
+   *  plan is not "awaiting the human", it waits on its offer/claim like a todo (2026-09-16) */
+  planApprovedAtMs?: number | null;
 }
 
 export interface Stall {
@@ -121,7 +124,7 @@ function classify(c: StallCandidate, nowMs: number): Stall | null {
   const who = c.assignee ?? c.offered;
   const hostNote = hostOffline ? ` — @${who ?? 'the assignee'}'s host looks offline (last seen ${fmtAge(nowMs - (c.hostSeenAtMs ?? nowMs))} ago)` : '';
 
-  switch (c.state) {
+  switch (c.state === 'plan_review' && c.planApprovedAtMs ? 'todo' : c.state) {
     case 'design_review':
     case 'plan_review':
     case 'ship_review': {

@@ -1,10 +1,11 @@
 // The thread brain override (mockups/brain-config.html, docs/10 §15): a per-role model override
 // that rides ONE conversation.
 //
-// The whole feature is one new layer in an existing precedence chain — `pin > thread > project >
-// workspace` — so these tests are mostly about the layer NOT leaking: an override must never
-// outrank a human's manual pin, must never survive a role it does not name, and must never store
-// a model the server would refuse to run.
+// The whole feature is one new layer in an existing precedence chain — `thread > pin > project >
+// workspace` since 2026-09-17 (it was `pin > thread`; the live harness showed a pinned orchestrator
+// ignoring a routine's Starter seat and running on the human's vendor login) — so these tests are
+// mostly about the layer NOT leaking: an override must never survive a role it does not name, and
+// must never store a model the server would refuse to run.
 import { describe, it, expect } from 'vitest';
 import {
   brainCast,
@@ -107,8 +108,13 @@ describe('seatModel — the thread layer', () => {
     expect(seatModel({ ...base, threadOverride: { developer: OPUS } })).toBe(OPUS);
   });
 
-  it('a human PIN still outranks it — the override is a pack layer, not a pin (ruling: pin > thread)', () => {
-    expect(seatModel({ ...base, modelSource: 'manual', threadOverride: { developer: OPUS } })).toBe(SONNET);
+  it('the conversation outranks a human PIN (2026-09-17, reversed from pin > thread): the pin is the default, the thread is this conversation', () => {
+    // seen live: rex pinned to a codex model, a routine thread stamped Starter on Pro, and the
+    // routine answered on the ChatGPT login — the stamp was decorative. The pin still holds
+    // where the conversation says nothing.
+    expect(seatModel({ ...base, modelSource: 'manual', threadOverride: { developer: OPUS } })).toBe(OPUS);
+    expect(seatModel({ ...base, modelSource: 'manual', threadOverride: { reviewer: OPUS } })).toBe(SONNET);
+    expect(seatModel({ ...base, modelSource: 'manual', projectPack: 'openai-core' })).toBe(SONNET);
   });
 
   it('an override that does not name this role changes nothing', () => {
@@ -152,12 +158,18 @@ describe('brainCast — who holds each seat, and what each will run', () => {
     expect(cast.find((s) => s.name === 'scout')?.changed).toBe(false);
   });
 
-  it('a pinned seat is marked pinned and is NOT counted as changed — the override cannot move it', () => {
+  it('a pinned seat the conversation moved is BOTH pinned and changed — here it runs the override, Reset returns it to the pin', () => {
     const cast = brainCast({
       agents: [{ name: 'patch', role: 'developer', model: SONNET, modelSource: 'manual' }],
       threadOverride: { developer: OPUS },
     });
-    expect(cast[0]).toMatchObject({ name: 'patch', model: SONNET, pinned: true, changed: false });
+    expect(cast[0]).toMatchObject({ name: 'patch', model: OPUS, pinned: true, changed: true });
+    // and untouched where the conversation says nothing about its role
+    const idle = brainCast({
+      agents: [{ name: 'patch', role: 'developer', model: SONNET, modelSource: 'manual' }],
+      threadOverride: { reviewer: OPUS },
+    });
+    expect(idle[0]).toMatchObject({ name: 'patch', model: SONNET, pinned: true, changed: false });
   });
 
   it('one agent per role, and roles that nobody holds are simply absent', () => {

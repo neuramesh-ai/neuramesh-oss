@@ -1,6 +1,7 @@
 // The task thread (docs/25) — the conversation on a board task, its zoned panel, the gate
 // card above the composer and the design studio docked beside it.
 // Extracted from App.tsx (track A3).
+import { BrainNotice } from './BrainNotice';
 import { ThreadHead } from './ThreadHead';
 import { AgentAvatar } from '../components/AgentAvatar';
 import { AgentGhost } from './AgentGhost';
@@ -185,6 +186,14 @@ export function TaskThread({
   // subtasks, branch/PR, and the review loop.
   const [closing, setClosing] = useState(false);
   const [blocking, setBlocking] = useState(false);
+  // hands-off (2026-09-16): the unit's origin thread carries schedule_id when a routine opened it —
+  // the plan card's record then reads auto-approved · routine instead of a human's approved
+  const [routineBorn, setRoutineBorn] = useState(false);
+  useEffect(() => {
+    const origin = task.origin_thread_id;
+    if (!nm?.watchHistoryAll || !origin) { setRoutineBorn(false); return; }
+    return nm.watchHistoryAll((rows) => setRoutineBorn(rows.some((r) => r.id === origin && !!r.schedule_id)));
+  }, [task.origin_thread_id]);
   const [blockReason, setBlockReason] = useState('');
   const [threadLightbox, setThreadLightbox] = useState<AttachmentRow | null>(null);
   const [cfocus, setCfocus] = useState(0); // ⌥-click on a pill drops its text here to edit
@@ -666,7 +675,7 @@ export function TaskThread({
               answers={threadAnswers(m.id)} decisions={decisions}
               onAnswerPost={(txt) => void nm?.sendThread(task.id, channelId, txt)}
               taskRef={taskRef} onOpenTask={onOpenTask} onOpenWhiteboard={onOpenWhiteboard} onOpenDoc={onOpenDoc} onOpenArticle={onOpenArticle}
-              planCtx={{ task, onOpenPlan: (name?: string) => openPlan(name), onArmRevise: () => setComposerMode('revise_plan') }}
+              planCtx={{ task, handsOff: routineBorn, onOpenPlan: (name?: string) => openPlan(name), onArmRevise: () => setComposerMode('revise_plan') }}
               md={{
                 onOpenPlan: latestPlan || latestShipPlan ? (name?: string) => openPlan(name) : undefined,
                 designTaskId: task.id,
@@ -887,6 +896,9 @@ export function TaskThread({
         )}
       </div>
       </div>
+      {/* the brain notice leads the dock (docs/10 §15.7): a seat that cannot run is the thing no
+          gate below it can move past. It reads the OWNING conversation's brain, and Reset returns it. */}
+      <BrainNotice rows={rows} override={parseBrainOverride(threadBrain ?? null)} onReset={convoThreadId ? async () => { await nm?.threadSetBrain(convoThreadId, null); } : undefined} />
       {(typistsBar || blockingInput || gate) && (
         <div className="tdock" data-gate={gate ? '1' : undefined}>
           {typistsBar}

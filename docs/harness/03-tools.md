@@ -147,6 +147,7 @@ Otherwise a hook becomes a privilege-escalation path.
 | `claude-code` | in-process SDK tools | none added — the default path stays in-process |
 | `codex` | per-thread MCP config → the loopback bridge | one loopback call per tool call |
 | `gemini` | the existing stdio shim → the loopback bridge | one loopback call per tool call |
+| **the Starter lane** (the house model, no key of the user's own; `runtime/starter.ts`, 2026-09-16) | the SAME registry (`toolsForTurn`) handed straight to the proxy's function-calling loop — no bridge, no CLI — plus three workspace file tools | none added; the proxy is non-streaming |
 
 **The mechanism already exists and is proven.** `runtime/orchmcp.ts` exposes in-process tool closures to
 `agy` over a loopback HTTP endpoint guarded by a per-turn secret, with an inert-outside-a-turn stdio
@@ -338,3 +339,4 @@ question does not arise in a `leg`.
 |---|---|
 | 2026-07-31 | Created. Registry keyed by kind × role, the single call path, hook rules, per-runtime delivery via the generalised loopback bridge, and the T1/T2 double-enforcement pattern. |
 | 2026-08-02 | Status → shipped (v0.73.0). Field lesson worth the whole doc: a capability granted on the BUS can still be undelivered by a flow's own registry — `TOOL_KINDS.spawn` listed `triage` from day one while `buildOrchestratorTools` never delivered it, so the orchestrator could not fan out. Granting a tool means checking both layers; fixed in both, plus a triage procedure in the orchestrator prompt. |
+| 2026-09-16 | **The Starter worker lane** (docs/10 §15.8): a fourth delivery for the same registry — `toolsForTurn` driven directly by the metered proxy's function-calling loop (`runtime/starter.ts`), plus `write_file`/`read_file`/`list_files` jailed to the workspace and gated like a native Write/Read. No shell. The bus rules (kind × closure) are untouched; `busToolsForStarter` is a shape change only. |

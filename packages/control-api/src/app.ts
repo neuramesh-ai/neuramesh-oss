@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { CREDIT_PACKS, MAX_PACK_CREDITS, MIN_PACK_CREDITS, attachmentLimits, commRulesFrom, createEvent, DESIGN_PROVIDER_QUESTION, DESKTOP_AUTH_TTL_MS, formatAddress, parseCard, parseQuestions, readAnswers, RETRO_RANGES, scrubEmdash, usdForCredits, WB_SCENE_MAX, WB_SNAPSHOT_MAX, WB_TITLE_MAX, type Actor, type RetroRange } from '@neuramesh/shared';
+import { CREDIT_PACKS, MAX_PACK_CREDITS, MIN_PACK_CREDITS, attachmentLimits, authDecisionQuestion, commRulesFrom, createEvent, DESIGN_PROVIDER_QUESTION, DESKTOP_AUTH_TTL_MS, formatAddress, parseAuthCard, parseCard, parseQuestions, readAnswers, RETRO_RANGES, scrubEmdash, usdForCredits, WB_SCENE_MAX, WB_SNAPSHOT_MAX, WB_TITLE_MAX, type Actor, type RetroRange } from '@neuramesh/shared';
 import { Hono } from 'hono';
 import { cronRoutes } from './cron-routes';
 import { fleetRoutes } from './fleet';
@@ -607,6 +607,15 @@ export function createApp(store: Store, opts: { push?: PushService } = {}) {
       threadId: parsed.data.threadId ?? null,
       rootMessageId: parsed.data.rootMessageId ?? null,
       threadMode: parsed.data.threadMode ?? null,
+      // A ROUTINE RUNS ON THE STARTER BRAIN ON PRO (George, 2026-09-16; docs/10 §15.6): the thread a
+      // schedule opens is born with the orchestrator on the house model, so the run never waits on a
+      // Claude, Codex or Gemini login — credits serve it, which is one thing Pro buys. Server-stamped
+      // because the plan is server truth and the seat is read from this column on every machine.
+      // Free keeps the seat as configured; the local stack has no starter brain; an explicit override
+      // on the opener wins; a human pin still outranks it at the seat (docs/10 §15.1).
+      // a routine's thread is born on its CONFIGURED brain (2026-09-17, George: Starter is a fallback,
+      // not the routine default). The daemon decides at wake time, with the reason in the thread
+      // (apps/desktop host/starterfallback.ts); an explicit override on the opener still rides.
       brainOverride: parsed.data.brainOverride ?? null,
       scheduleId: parsed.data.scheduleId ?? null,
       // a routine's slot is its own origin, whichever daemon posts it
@@ -643,6 +652,13 @@ export function createApp(store: Store, opts: { push?: PushService } = {}) {
       options: q.options ?? [],
       allowOther: q.allowOther !== false,
     }));
+    // An AUTH card is a needs-you item too (George, 2026-09-17: "the message '@rex cannot run…' is
+    // easily missed"). The agent cannot run here and waits on the person, so it mints a decision
+    // row exactly as an nmq card does: the thread pill, the Home queue and the bell count it, and
+    // it leaves the queue the way a prose-answered question does, on the person's next reply.
+    // A card that RECORDS a switch a routine already made asks nothing, and mints nothing.
+    const auth = actor.kind === 'agent' && !inChatThread ? parseAuthCard(styledBody) : null;
+    if (auth && !auth.switched) decisions.push({ id: crypto.randomUUID(), question: authDecisionQuestion(auth), options: [], allowOther: true });
     try {
       // Mobile and older clients post the rendered `question → answer` reply
       // without calling decision.answer first. Resolve the design-provider card

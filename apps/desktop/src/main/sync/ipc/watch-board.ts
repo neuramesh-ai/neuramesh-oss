@@ -41,13 +41,19 @@ export const DECISIONS_ALL_SQL = `select d.id, d.channel_id, d.task_id, d.messag
               -- thread's job now, so every row must be able to reach its thread)
               (select m2.thread_id from messages m2 where m2.id = d.message_id) as thread_id,
               -- the newest human message in this card's OWN conversation (its task thread, else
-              -- the room it was asked in): a free-text card answered in prose is already handled,
-              -- so Home must stop asking (needsyou.ts — strict-choice cards are exempt there)
+              -- the THREAD it was asked in, else the room): a free-text card answered in prose is
+              -- already handled, so Home must stop asking (needsyou.ts — strict-choice cards are
+              -- exempt there). "The room" was the rule for every task-less card until 2026-09-17,
+              -- and it read a routine's opener in the same room as the answer to an auth card in
+              -- another conversation — the card's thread said needs you, the row said settled.
               -- …and a card hung on a SUBTASK counts the parent's thread as well, for the same
               -- reason the task watch above does: that is where the conversation is.
               (select max(m.created_at) from messages m
                 where m.author_kind = 'human'
-                  and (case when d.task_id is null then m.channel_id = d.channel_id and m.task_id is null
+                  and (case when d.task_id is null then
+                              case when (select m2.thread_id from messages m2 where m2.id = d.message_id) is null
+                                   then m.channel_id = d.channel_id and m.task_id is null
+                                   else m.thread_id = (select m2.thread_id from messages m2 where m2.id = d.message_id) end
                             else m.task_id = d.task_id
                                  or m.task_id = (select st.parent_task_id from tasks st where st.id = d.task_id)
                             end)) as human_replied_at,

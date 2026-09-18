@@ -196,9 +196,11 @@ async function reconcileBoard() {
   for (const t of planningRows) {
     dispatchPlanning(t);
   }
-  const reviewRows = await db.getAll<PlanTask>(`select id, number, title, description, channel_id, requirements from tasks where state = 'plan_review' and offered_agent_id is null`).catch(() => [] as PlanTask[]);
+  const reviewRows = await db.getAll<PlanTask & { plan_approved_at: string | null }>(`select id, number, title, description, channel_id, requirements, plan_approved_at from tasks where state = 'plan_review' and offered_agent_id is null`).catch(() => [] as Array<PlanTask & { plan_approved_at: string | null }>);
   for (const t of reviewRows) {
-    if (decided.has(t.id)) continue;
+    // an APPROVED plan (the human's stamp, or a hands-off birth) is past judgment — the live
+    // plan_review watch offers it; re-judging here asked a human for a verdict already given (#1093)
+    if (t.plan_approved_at || decided.has(t.id)) continue;
     const orch = [...agents.values()].find((a) => a.role === 'orchestrator' && a.channels.has(t.channel_id));
     if (!orch) continue;
     decided.add(t.id);

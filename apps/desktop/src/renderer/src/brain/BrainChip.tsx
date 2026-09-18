@@ -2,7 +2,7 @@
 // catalogue, the draft a builder keeps between mounts, the builder itself, and the chip
 // that opens it. Extracted from App.tsx (track A2).
 import { AgentAvatar } from '../components/AgentAvatar';
-import { CURRENT_MODELS, CUSTOM_PACK_ID, PACKS, PACK_ORDER, PACK_PREVIEW_ROLES, brainCast, brainOverrideCount, isPackActivatable, missingProvidersForRoles, packRequiredProviders, parseBrainOverride, resolvePackName, resolvePackRoles, rolesActivatable, type AgentRole, type BrainOverride, type CustomModelPack, type Provider } from '@neuramesh/shared';
+import { CURRENT_MODELS, CUSTOM_PACK_ID, STARTER_MODEL, PACKS, PACK_ORDER, PACK_PREVIEW_ROLES, brainCast, brainOverrideCount, isPackActivatable, missingProvidersForRoles, packRequiredProviders, parseBrainOverride, resolvePackName, resolvePackRoles, rolesActivatable, type AgentRole, type BrainOverride, type CustomModelPack, type Provider } from '@neuramesh/shared';
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { IconBrain } from '../ui/icons';
 
@@ -16,6 +16,7 @@ import { type CredRow } from '../bridge/rows-infra';
 import { BRAIN_PROVIDERS, PROVIDER_RUNTIME, ProviderLogo, ROLE_DOT } from './providers';
 import { readBrainDraft, writeBrainDraft } from './draft';
 import { BrainBuilder, BrainPopEsc } from './BrainBuilder';
+import { StarterHere } from './StarterHere';
 
 // Imported bindings lose control-flow narrowing inside closures, so re-bind (same as App.tsx).
 const nm = nmBridge;
@@ -251,13 +252,13 @@ export function BrainChip({ onConnect, project, onSetProjectPack, thread, castAg
                             <div className="brpkgroup">{p.name}</div>
                             {ids.map((id) => (
                               <button key={id} role="menuitem" className={`brpk${id === seat.model ? ' on' : ''}`}
-                                disabled={!connected}
-                                title={connected ? modelLabel(id) : `${p.name} is not connected. Connect it in Settings first.`}
+                                disabled={!connected && id !== STARTER_MODEL}
+                                title={connected || id === STARTER_MODEL ? modelLabel(id) : `${p.name} is not connected. Connect it in Settings first.`}
                                 onClick={() => pickModel(seat.role, id)}>
                                 {modelLabel(id)}
                                 {id === seat.model
                                   ? <span className="tick">✓ current</span>
-                                  : !connected ? <span className="meta">no key</span> : null}
+                                  : id === STARTER_MODEL ? <span className="meta">on credits</span> : !connected ? <span className="meta">no key</span> : null}
                               </button>
                             ))}
                           </Fragment>
@@ -274,16 +275,15 @@ export function BrainChip({ onConnect, project, onSetProjectPack, thread, castAg
                       <AgentAvatar name={s.name} size={18} radius={6} />
                       <span className="brwho">
                         <b>{s.name}</b>
-                        {/* stated, not coloured: a changed seat says so in words */}
-                        {s.pinned ? <span>pinned by you</span> : s.changed ? <span>set for this conversation</span> : null}
+                        {/* stated, not coloured: a changed seat says so in words. A pinned seat the
+                            conversation moved says both (2026-09-17): here it runs the override,
+                            and Reset returns it to the pin, not to a pack */}
+                        {s.changed ? <span>{s.pinned ? 'set here · pinned by you' : 'set for this conversation'}</span> : s.pinned ? <span>pinned by you</span> : null}
                       </span>
                       <button
                         className="brmodel"
-                        disabled={s.pinned}
                         aria-expanded={picking === s.role}
-                        title={s.pinned
-                          ? 'This seat is pinned by hand. A conversation cannot move it.'
-                          : thread ? `Switch the model ${s.name} runs in this conversation` : `Switch the model ${s.name} runs. New conversations start here.`}
+                        title={thread ? `Switch the model ${s.name} runs in this conversation` : `Switch the model ${s.name} runs. New conversations start here.`}
                         onClick={() => setPicking(picking === s.role ? null : s.role)}
                       >
                         {modelLabel(s.model)} <span className="car">▾</span>
@@ -301,6 +301,7 @@ export function BrainChip({ onConnect, project, onSetProjectPack, thread, castAg
                         ? `${liveCount} role${liveCount === 1 ? '' : 's'} set here`
                         : ''}
                   </span>
+                  <StarterHere cast={cast} disabled={busy} apply={async (o) => { if (!thread) writeBrainDraft(o); else await onSetThreadBrain?.(o); setDraft(o); setOpen(false); }} />
                   {(liveCount > 0 || draftCount > 0) && (
                     <button className="bpmini" disabled={busy} onClick={() => void resetThread()}
                       title="Clear every role at once. This conversation follows the project brain again.">Reset</button>

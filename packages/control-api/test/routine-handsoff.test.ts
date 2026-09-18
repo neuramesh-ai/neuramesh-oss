@@ -181,3 +181,55 @@ describe('the plan is a document at birth (every plan-first unit)', () => {
     expect(names).toContain('implementation-plan-v2.md');
   });
 });
+
+// The DESIGN gate (2026-09-16, founder report on #1093: a routine-born content unit declared a
+// design leg, so even an anchored, plan-approved unit would have parked at design_review — the
+// one human gate with no routine follow-up). A routine's design round auto-approves at the propose.
+describe('a routine-born unit is hands-off through the design gate too', () => {
+  const iris: Actor = { kind: 'agent', id: 'a-iris', role: 'designer' };
+  const DESIGN_PLAN = { legs: ['design', 'build'], subtasks: [], approach: 'Research the week, agree three image directions, then draft the seven posts to them.' };
+  const seatIris = () => cmd(george, { type: 'agent.register', workspace: 'ws_acme', machineId: 'm1', name: 'iris', role: 'designer', channels: ['dev'] });
+
+  it('the round auto-approves: todo (the plan-first fork), the round promoted, the routine-stamped event, one thread line', async () => {
+    await seatIris();
+    const threadId = await routineThread();
+    const r = await j(await cmd(rex, { type: 'task.create', ...base, title: 'Draft the X calendar', description: 'x', kind: 'content', plan: DESIGN_PLAN, originThread: threadId }));
+    expect(r.task.planApprovedAt).toBeTruthy();
+    expect((await cmd(rex, { type: 'task.request_design', taskId: r.task.id, designer: 'iris' })).status).toBe(200);
+    const p = await j(await cmd(iris, { type: 'task.propose_design', taskId: r.task.id, round: 1, mockups: [{ name: 'breath', html: '<b>a</b>' }, { name: 'desk', html: '<b>b</b>' }] }));
+    expect(p.task.state).toBe('todo');
+    expect(p.task.assignee).toBeNull();
+    const approved = p.events.find((e: any) => e.type === 'task.design_approved');
+    expect(approved.payload.routine).toBe(true);
+    expect(approved.payload.round).toBe(1);
+    expect(approved.source).toContain('machine');
+    const arts = await store.listArtifacts(r.task.id);
+    expect(arts.filter((a) => a.kind === 'design').every((a) => a.promoted)).toBe(true);
+    const line = store.messages.find((m) => m.taskId === r.task.id && m.body.includes('Design round 1 auto-approved'));
+    expect(line).toBeTruthy();
+    expect(line!.author.id).toBe('a-rex'); // the unit's creator speaks, the way the plan message does
+  });
+
+  it('a HUMAN conversation\'s design round still parks for the human', async () => {
+    await seatIris();
+    const threadId = crypto.randomUUID();
+    await send(george, { ...base, threadId, body: 'please make the calendar' });
+    const r = await j(await cmd(rex, { type: 'task.create', ...base, title: 'Human calendar', description: 'x', kind: 'content', plan: DESIGN_PLAN, originThread: threadId }));
+    expect((await cmd(george, { type: 'task.approve_plan', taskId: r.task.id })).status).toBe(200);
+    expect((await cmd(rex, { type: 'task.request_design', taskId: r.task.id, designer: 'iris' })).status).toBe(200);
+    const p = await j(await cmd(iris, { type: 'task.propose_design', taskId: r.task.id, round: 1, mockups: [{ name: 'a', html: '<b>a</b>' }] }));
+    expect(p.task.state).toBe('design_review');
+    expect(p.events.some((e: any) => e.type === 'task.design_approved')).toBe(false);
+  });
+
+  it('the repo floor holds: a repo-backed routine unit keeps the human design gate', async () => {
+    await seatIris();
+    const threadId = await routineThread();
+    const r = await j(await cmd(rex, { type: 'task.create', ...base, title: 'Repo design from a routine', description: 'x', kind: 'feature', plan: { ...DESIGN_PLAN, legs: ['design', 'build', 'review'] }, originThread: threadId, repo: { id: 'r1', baseRef: 'main' } }));
+    expect(r.task.planApprovedAt).toBeNull(); // the birth gate already holds for repo work
+    expect((await cmd(george, { type: 'task.approve_plan', taskId: r.task.id })).status).toBe(200);
+    expect((await cmd(rex, { type: 'task.request_design', taskId: r.task.id, designer: 'iris' })).status).toBe(200);
+    const p = await j(await cmd(iris, { type: 'task.propose_design', taskId: r.task.id, round: 1, mockups: [{ name: 'a', html: '<b>a</b>' }] }));
+    expect(p.task.state).toBe('design_review');
+  });
+});

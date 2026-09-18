@@ -65,7 +65,9 @@ async function threadBrain(scope: { threadId?: string | null; taskId?: string | 
   const row = scope.threadId
     ? await db.get<{ brain_override: string | null }>('select brain_override from threads where id = ?', [scope.threadId]).catch(() => null)
     : scope.taskId
-      ? await db.get<{ brain_override: string | null }>('select brain_override from threads where task_id = ?', [scope.taskId]).catch(() => null)
+      // a task's own thread, else the conversation that OWNS the unit (tasks.origin_thread_id, docs/41):
+      // switching that conversation to the Starter brain re-seats the unit's legs too (2026-09-16)
+      ? await db.get<{ brain_override: string | null }>('select brain_override from threads where task_id = ? union all select th.brain_override from tasks t join threads th on th.id = t.origin_thread_id where t.id = ? limit 1', [scope.taskId, scope.taskId]).catch(() => null)
       : null;
   return parseBrainOverride(row?.brain_override ?? null);
 }

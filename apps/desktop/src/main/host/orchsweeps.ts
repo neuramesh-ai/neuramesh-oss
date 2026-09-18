@@ -24,6 +24,7 @@ import type { HostedAgent, SkillRef } from '../agents';
 import type { LogFn } from '../agentlog';
 import type { HostGuards } from './guards';
 import type { makeOrchTools } from './orchtools';
+import type { makeRoutineResume } from './routineresume';
 
 export function makeOrchSweeps(ctx: {
   db: PowerSyncDatabase;
@@ -45,11 +46,13 @@ export function makeOrchSweeps(ctx: {
   dispatchOrchestrator: (agent: HostedAgent, args: OrchTransportArgs) => Promise<string>;
   discoverSkills: (channelId: string, workspaceId: string) => Promise<SkillRef[]>;
   arun: (agent: HostedAgent, t?: { id: string; number: number; channel_id?: string } | null, channelSlug?: string | null) => { log: LogFn; runId: string };
+  /** the routine resume (host/routineresume.ts) — deterministic, rides both cadences */
+  resumeStrandedRoutines: ReturnType<typeof makeRoutineResume>['resumeStrandedRoutines'];
 }) {
   const { db, post, agents, claimed, guards, apiUrl, ownerActorId, startedAt, buildOrchestratorTools,
           SUMMARY_MARKER, sweepPeriod,
           summaryPostedToday, channelMonitorSignals, sweepTranscript,
-          dispatchOrchestrator, discoverSkills, arun } = ctx;
+          dispatchOrchestrator, discoverSkills, arun, resumeStrandedRoutines } = ctx;
   const { firedStalls, sweptSummaries, monitorSince, designed, planned, reviewed } = guards;
 
   // The sweep's own cursor: only these three functions ever read or write it, so it lives here
@@ -58,11 +61,11 @@ export function makeOrchSweeps(ctx: {
 
   const gatherChannelStalls = async (ch: { id: string }): Promise<Array<{ stall: Stall; tail: string }>> => {
     const rows = await db.getAll<{
-      id: string; number: number; title: string; state: string; created_at: string | null; updated_at: string | null;
+      id: string; number: number; title: string; state: string; created_at: string | null; updated_at: string | null; plan_approved_at: string | null;
       assignee: string | null; offered: string | null; last_msg_at: string | null; last_human_msg_at: string | null;
       last_beat_at: string | null; last_run_at: string | null; open_runs: number; host_seen_at: string | null; open_decisions: number;
     }>(
-      `select t.id, t.number, t.title, t.state, t.created_at, t.updated_at,
+      `select t.id, t.number, t.title, t.state, t.created_at, t.updated_at, t.plan_approved_at,
          (select name from agents a where a.id = t.assignee_id) as assignee,
          (select name from agents a where a.id = t.offered_agent_id) as offered,
          (select max(m.created_at) from messages m where m.task_id = t.id) as last_msg_at,
@@ -87,6 +90,7 @@ export function makeOrchSweeps(ctx: {
       assignee: r.assignee, offered: r.offered,
       createdAtMs: ms(r.created_at) ?? nowMs,
       updatedAtMs: ms(r.updated_at) ?? ms(r.created_at) ?? nowMs,
+      planApprovedAtMs: ms(r.plan_approved_at),
       lastMsgAtMs: ms(r.last_msg_at), lastHumanMsgAtMs: ms(r.last_human_msg_at), lastBeatAtMs: ms(r.last_beat_at),
       lastRunAtMs: ms(r.last_run_at), runOpen: (r.open_runs ?? 0) > 0,
       hostSeenAtMs: ms(r.host_seen_at),
@@ -235,6 +239,9 @@ export function makeOrchSweeps(ctx: {
             if ((bc?.n ?? 0) > 0 && (await orchestratorSweep(orch, ch, { period }))) sweptSummaries.add(key);
           }
         }
+        // the routine resume (host/routineresume.ts): a routine's ask that died on no-compute is
+        // re-asked here, before either judgment turn could triage it flat — detection is code
+        await resumeStrandedRoutines(orch, ch).catch((err) => console.error(`routine_resume channel=${ch.slug} failed:`, err));
         // stall triage outranks the generic monitor for the tick: its context supersets the
         // monitor's (board + channel tail + the stall report with thread tails), so nothing
         // the monitor would have seen is lost — and it fires on QUIET channels too, which

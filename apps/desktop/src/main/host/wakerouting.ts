@@ -7,6 +7,7 @@
 //
 // sweepDeadLetters lives here rather than with the runner because it is the same question asked
 // late: these messages should have been answered and were not, so who answers them now?
+import { starterDoorOpen, starterFallback } from './starterfallback';
 import type { HostedAgent, ThreadTask } from '../agents';
 import { pickDeadLetters, type SweepCandidate } from '../chatsweep';
 import { HIRE_CONFIRM_RE } from '../hirecards';
@@ -23,9 +24,14 @@ import type { makeMarketing } from './marketing';
 import type { makeSchedules } from './schedules';
 import type { makeWake } from './wake';
 import { makeSleeperWake } from './sleepers';
+import { noComputeNotice, noComputeReasonOf, sleeperNotice } from '../computenotice';
+import { PROVIDER_LABEL, resolveToken } from '../agents';
+import { providerFor } from '../runtime/adapter';
 
 export function makeWakeRouting(ctx: {
   db: PowerSyncDatabase;
+  /** the credential probe behind the no-compute notice needs the API (2026-09-16) */
+  apiUrl: string;
   LEASE_LOST: ReturnType<typeof makeRuns>['LEASE_LOST'];
   SWEEP_LOOKBACK_MS: number;
   agents: Map<string, HostedAgent>;
@@ -48,7 +54,7 @@ export function makeWakeRouting(ctx: {
   wakeThread: ReturnType<typeof makeWake>['wakeThread'];
   saidNoCompute: HostGuards["saidNoCompute"];
 }) {
-  const { db, LEASE_LOST, SWEEP_LOOKBACK_MS, agents, claimVerdict, confirmAddAgent, confirmCreateAgent, confirmFailover, defaultResponder, execQueue, offerAddAgents, ownerActorId, peerMachines, post, priorMachineFor, processed, queueWake, runDueSchedules, runMarketingBootstrap, saidNoCompute, wakeThread } = ctx;
+  const { db, apiUrl, LEASE_LOST, SWEEP_LOOKBACK_MS, agents, claimVerdict, confirmAddAgent, confirmCreateAgent, confirmFailover, defaultResponder, execQueue, offerAddAgents, ownerActorId, peerMachines, post, priorMachineFor, processed, queueWake, runDueSchedules, runMarketingBootstrap, saidNoCompute, wakeThread } = ctx;
   const { requestSleeperWake } = makeSleeperWake({ peerMachines, post });
 
   /**
@@ -108,7 +114,7 @@ export function makeWakeRouting(ctx: {
                 await post('/v1/messages', { kind: 'agent', id: agent.id }, {
                   workspace: ch.workspace_id, channel: ch.id, replyTo: triggerMessageId,
                   ...(where.threadId ? { threadId: where.threadId } : {}), ...(where.taskId ? { taskId: where.taskId } : {}),
-                  body: `Waking ${whose} — it holds the ${agent.runtime} login this needs. Your message is answered once it is up, usually within a couple of minutes.`,
+                  body: sleeperNotice(whose, agent.runtime),
                 }).catch((e) => console.error('sleeper notice failed:', e));
               }
             }
@@ -120,15 +126,29 @@ export function makeWakeRouting(ctx: {
         // The ORIGIN's own machine is the one host guaranteed awake here, so it answers for the
         // workspace — and only when the ladder says NOBODY can, or a machine that merely wasn't
         // chosen would speak over the one about to work.
+        const peers = await peerMachines();
         if (originUserId && ownerActorId === originUserId && !saidNoCompute.has(triggerMessageId)
-            && nobodyCanServe(await peerMachines(), agent.runtime, originUserId, Date.now(), agent.model ?? null)) {
+            && nobodyCanServe(peers, agent.runtime, originUserId, Date.now(), agent.model ?? null)) {
           saidNoCompute.add(triggerMessageId);
           const ch = await db.get<{ id: string; workspace_id: string }>('select id, workspace_id from channels where id = ?', [where.channelId]).catch(() => null);
           if (ch) {
+            // the REASON, from this machine's own credential probe (2026-09-16): "no machine available"
+            // was true and useless — the login had expired that morning, and the card that said so sat
+            // in another thread. The cloud line says why the runner was no help either.
+            const reason = noComputeReasonOf(await resolveToken(apiUrl, ch.workspace_id, agent, ownerActorId).catch(() => null));
+            const cloudLacksLogin = peers.some((m) => (m.kind ?? 'local') !== 'local' && (m.kind === 'runner' || m.ownerUserId === originUserId) && !m.runtimes.includes(agent.runtime));
+            // the Starter door (host/starterfallback.ts): a routine's conversation re-seats on the house
+            // model, which any awake machine serves, and the ladder is asked again with that seat; a
+            // human's gets the reason and the card. The plain notice stays for a host with no door.
+            if (starterDoorOpen()) {
+              const next = await starterFallback(agent, { kind: 'nocompute', provider: providerFor(agent.runtime), reason, cloudLacksLogin }, { workspace: ch.workspace_id, channelId: ch.id, threadId: where.threadId, taskId: where.taskId, replyTo: triggerMessageId });
+              if (next) { agent = next; continue; }
+              return LEASE_LOST;
+            }
             await post('/v1/messages', { kind: 'agent', id: agent.id }, {
               workspace: ch.workspace_id, channel: ch.id, replyTo: triggerMessageId,
               ...(where.threadId ? { threadId: where.threadId } : {}), ...(where.taskId ? { taskId: where.taskId } : {}),
-              body: `I can't run this right now — no machine available to me can serve ${agent.runtime}. Sign in to a provider on this machine, or ask a teammate to lend you theirs in Settings → Compute → Sharing.`,
+              body: noComputeNotice({ label: PROVIDER_LABEL[providerFor(agent.runtime)], reason, cloudLacksLogin }),
             }).catch((e) => console.error('no-compute notice failed:', e));
           }
         }

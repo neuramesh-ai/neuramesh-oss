@@ -183,3 +183,14 @@ worktree and saying so in its header. Three consequences worth stating:
 Evidence owed with the build: the same twelve-state capture plus **a terminal tab rendered beside
 an open task in both themes** — the proof that the defect above is fixed, paired with a non-zero
 positive control so an empty selector cannot read as success.
+
+## 1c. The brain notice above the dock (2026-09-17)
+
+One surface sits ABOVE the gate slot in both threads, and it is not a gate card: the **brain notice**
+(`thread/BrainNotice.tsx`, docs/10 §15.7). It stands when the conversation's seat cannot run (amber:
+nothing moved, the conversation waits on you) or runs on the NeuraMesh brain here (quiet: a routine
+moved it, or you did), collapsed to one line with a chevron, expanding into what happened, what to
+do, and the same card the transcript shows. It derives from the newest auth card and the owning
+conversation's brain override, so it needs no state of its own and leaves on its own. The docs/25
+rule holds beneath it: exactly ONE gate card docks, and a seat that cannot run is the thing no gate
+below it can move past, which is why the notice leads.

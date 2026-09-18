@@ -79,8 +79,11 @@ contextBridge.exposeInMainWorld('nm', {
   threadSetMode: (threadId: string, mode: 'tasks' | 'chat'): Promise<unknown> =>
     ipcRenderer.invoke('nm:thread-set-mode', { threadId, mode }),
   // docs/10 §15 — set (or clear, with null) this conversation's per-role brain override
-  threadSetBrain: (threadId: string, override: Record<string, string> | null): Promise<unknown> =>
-    ipcRenderer.invoke('nm:thread-set-brain', { threadId, override }),
+  threadSetBrain: (threadId: string, override: Record<string, string> | null): Promise<unknown> => ipcRenderer.invoke('nm:thread-set-brain', { threadId, override }),
+  // one seat of one conversation → a model (the auth card's "Use Starter here", 2026-09-17); the
+  // main process merges it into the thread's override so the card never has to know the rest
+  threadBrainRole: (threadId: string, role: string, model: string): Promise<unknown> => ipcRenderer.invoke('nm:thread-brain-role', { threadId, role, model }),
+  threadBrain: (threadId: string): Promise<Record<string, string> | null> => ipcRenderer.invoke('nm:thread-brain', { threadId }),
   status: () => ipcRenderer.invoke('nm:status'),
   // stage attachment bytes locally (returns dims + a thumbnail); the row is written on send
   attachStage: (id: string, name: string, mime: string, bytes: ArrayBuffer): Promise<{ id: string; size: number; width: number | null; height: number | null; thumb: string | null }> =>

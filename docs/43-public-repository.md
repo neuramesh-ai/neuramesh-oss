@@ -41,22 +41,30 @@ Nobody develops in the public repository. Every push to the private `main` runs
 `scripts/public-snapshot.sh`:
 
 1. Clone the private repository at the pushed commit.
-2. Remove every path in `PUBLIC_EXCLUDE` and every workflow not in `PUBLIC_WORKFLOWS`.
+2. Remove every path in `PUBLIC_EXCLUDE` and every workflow not in `PUBLIC_WORKFLOWS`. Place the
+   public repository's own files from `.github/public`: its pull request template and the
+   workflow that enforces it, `pr-template.yml`.
 3. Scan the tree that ships with `scripts/public-scan.sh`: gitleaks, the generic patterns, and the
    private patterns the job receives from a secret. A hit fails the publish.
 4. Commit the tree as one commit on top of the public `main`, on the rolling branch `publish`,
    force-pushed.
-5. Open the pull request from `publish` to `main`, or update the one that is open.
+5. Open the pull request from `publish` to `main`, or update the one that is open. Its body has
+   the template's three sections. What & why: the version, and the commits the private `main`
+   landed in the tree that ships since the last publish, read from the newest `Publish main@<sha>`
+   commit in the public history. Evidence: the scan run, and where the tree moved, one row per
+   area. Deploy notes: the merge shape, and the tag a new version needs.
 
 Merging that pull request is a human act. Nothing lands on the public `main` on its own, and the
-public CI runs on the pull request first. Without the token, the job builds and scans the snapshot
+public CI runs on the pull request first. Merge it with a merge commit, never a squash: the
+`Publish main@<sha>` commit stays in the history as pushed, and the next publish reads the newest
+one to know where the last one ended. Without the token, the job builds and scans the snapshot
 and the publish happens from a maintainer's Mac with the same script.
 
 ```mermaid
 flowchart LR
   subgraph private["alonge-dev/neuramesh, private, the source of truth"]
     main["main"]
-    job["publish-public.yml<br/>remove the private paths, keep four workflows, scan"]
+    job["publish-public.yml<br/>remove the private paths, keep the public workflows, scan"]
     port["a maintainer ports the patch<br/>gh pr diff --patch, then git am"]
   end
   subgraph public["neuramesh-ai/neuramesh-oss, public"]
@@ -82,6 +90,12 @@ The port lands through the normal private pull request. `scripts/pr-land.sh` tak
 for landing in either repository. Once the publish that carries the change is merged, the
 maintainer closes the public pull request with a comment that names the commit. A public pull
 request that touches a private path cannot exist: the path is not in the tree.
+
+Every public pull request follows the template: What & why, Evidence, Deploy notes. The workflow
+`pr-template.yml` runs `scripts/pr-template-check.sh` on the body and fails the pull request when a
+section is missing or holds no words of its own (the template's comments do not count). It runs
+again when the body is edited, so the fix is a fix to the text. The private template has the same
+three sections, so a port carries them as they are.
 
 ## 4. One app, two connections
 

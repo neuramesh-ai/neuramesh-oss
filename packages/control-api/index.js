@@ -444,7 +444,7 @@ function cardNotification(body, where) {
   const line = q?.kind === "permission" ? preview(q.question) : preview(body);
   return { kind: card2.kind, title, body: line || "Open NeuraMesh to respond" };
 }
-var NMQ_BLOCK = /```nmq\s*\n([\s\S]*?)```/g;
+var NMQ_BLOCK = /```nmq[ \t]*\n([\s\S]*?)```/g;
 function normalizeOptions(raw) {
   if (!Array.isArray(raw)) return void 0;
   const out = [];
@@ -522,6 +522,38 @@ function readAnswers(bodies) {
     }
   }
   return map;
+}
+var NMAUTH_ONE = /```nmauth[ \t]*\n([\s\S]*?)```/;
+function authDecisionQuestion(card2) {
+  const who = card2.agent ? `@${card2.agent}` : "An agent";
+  const label = AUTH_LABEL[card2.provider] ?? card2.provider;
+  const why = card2.why ?? (card2.reason === "expired" ? `The ${label} login on this machine expired.` : `This machine has no ${label} login.`);
+  return `${who} cannot run here. ${why} Sign in again, or switch this conversation to the NeuraMesh brain, on credits.`.slice(0, 400);
+}
+var AUTH_LABEL = { anthropic: "Claude", openai: "OpenAI / Codex", gemini: "Gemini" };
+function parseAuthCard(body) {
+  const hit = NMAUTH_ONE.exec(body);
+  if (!hit?.[1]) return null;
+  try {
+    const o = JSON.parse(hit[1]);
+    const provider = typeof o["provider"] === "string" ? o["provider"] : "";
+    if (!provider) return null;
+    const reason = o["reason"];
+    const scope = o["scope"];
+    return {
+      provider,
+      ...reason === "expired" || reason === "unavailable" ? { reason } : {},
+      ...typeof o["agent"] === "string" ? { agent: o["agent"] } : {},
+      ...typeof o["taskNumber"] === "number" ? { taskNumber: o["taskNumber"] } : {},
+      // the fallback door's fields (2026-09-17): the reason, whether Starter can take it, the seat
+      ...typeof o["why"] === "string" ? { why: o["why"] } : {},
+      ...typeof o["starter"] === "boolean" ? { starter: o["starter"] } : {},
+      ...scope && typeof scope.threadId === "string" && typeof scope.role === "string" ? { scope: { threadId: scope.threadId, role: scope.role } } : {},
+      ...o["switched"] === true ? { switched: true } : {}
+    };
+  } catch {
+    return null;
+  }
 }
 
 // ../shared/src/sessions.ts
@@ -1450,8 +1482,8 @@ var PACKS = {
   // A catalog entry has no notion of who pays and must not pretend to.
   starter: {
     id: STARTER_PACK_ID,
-    name: "NeuraMesh Starter",
-    tagline: "Runs on us \u2014 no provider to connect",
+    name: "NeuraMesh brain",
+    tagline: "Runs on NeuraMesh, on credits. No provider to connect.",
     platform: true,
     roles: {
       orchestrator: STARTER_MODEL,
@@ -2820,11 +2852,11 @@ function renderDay7(v) {
 
 // ../shared/src/model-labels.ts
 var MODEL_LABELS = {
-  // the PACK is "NeuraMesh Starter"; the MODEL is a VERSION of it. spelling the brand out twice
-  // said "NeuraMesh > NeuraMesh Starter" and told the reader nothing about which brain they
-  // actually have — the short form keeps it ours while the version is the part that can move
-  // when the model behind it does (which is the whole reason we never name the vendor).
-  [STARTER_MODEL]: "NM Cloud Starter v1",
+  // the PACK is "NeuraMesh brain"; the MODEL is a VERSION of it. "Starter" alone told a person
+  // nothing (George, 2026-09-17: "the text starter in general — what's that?"), so the label
+  // leads with what it IS, the product's own brain, and keeps the tier as the version that can
+  // move when the model behind it does (which is the whole reason we never name the vendor).
+  [STARTER_MODEL]: "NeuraMesh brain (Starter v1)",
   "claude-fable-5-1": "Claude Fable 5.1",
   "claude-opus-5": "Claude Opus 5",
   "claude-sonnet-5": "Claude Sonnet 5",
@@ -6476,6 +6508,43 @@ async function routinePlanFollowup(store2, cmd, outcome) {
   const approved = await store2.mutate(outcome.task.id, async (t) => routinePlanApprove(t, scheduleId)).catch(() => null);
   return approved ? { ...approved, events: [...outcome.events, ...approved.events] } : outcome;
 }
+function routineDesignApprove(task, scheduleId, round) {
+  if (task.state !== "design_review") throw new DomainError("ILLEGAL_TRANSITION", `a routine design auto-approve fires from design_review, not ${task.state}`);
+  if (task.repo) throw new DomainError("NOT_PERMITTED", "repo-backed design rounds are approved by a human, routine or not");
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  const next = { ...task, state: task.workPlan ? "todo" : "planning", assignee: null, version: task.version + 1, updatedAt: now };
+  const event = createEvent({
+    type: "task.design_approved",
+    source: formatAddress({ kind: "machine", id: "routine" }),
+    target: taskTarget(task),
+    workspace: task.workspace,
+    payload: { routine: true, scheduleId, round }
+  });
+  return { task: next, events: [event], promoteLatestDesignRound: true };
+}
+async function routineDesignFollowup(store2, cmd, outcome) {
+  if (cmd.type !== "task.propose_design" || outcome.task.state !== "design_review" || outcome.task.repo || !outcome.task.originThreadId) return outcome;
+  const scheduleId = await store2.getThreadScheduleId(outcome.task.workspace, outcome.task.originThreadId).catch(() => null);
+  if (!scheduleId) return outcome;
+  const approved = await store2.mutate(outcome.task.id, async (t) => routineDesignApprove(t, scheduleId, cmd.round)).catch(() => null);
+  if (!approved) return outcome;
+  const task = approved.task;
+  await store2.postMessage(
+    {
+      id: crypto.randomUUID(),
+      workspace: task.workspace,
+      channel: task.channel,
+      taskId: task.id,
+      threadId: null,
+      author: { kind: task.creator.kind, id: task.creator.id },
+      body: `\u2713 Design round ${cmd.round} auto-approved \xB7 routine run. The round is the visual contract for the work. The build starts now.`,
+      createdAt: (/* @__PURE__ */ new Date()).toISOString()
+    },
+    createEvent({ type: "message.posted", source: formatAddress({ kind: "machine", id: "routine" }), target: taskTarget(task), workspace: task.workspace, payload: { preview: `design round ${cmd.round} auto-approved \u2014 #${task.number}` } })
+  ).catch(() => {
+  });
+  return { ...approved, events: [...outcome.events, ...approved.events] };
+}
 
 // src/handler/channel.ts
 async function channelCommands(store2, actor, cmd) {
@@ -8747,6 +8816,7 @@ async function executeCommand(store2, actor, cmd) {
   await planRevisionFollowup(store2, actor, cmd, outcome);
   outcome = await routineAcceptFollowup(store2, cmd, outcome);
   outcome = await routinePlanFollowup(store2, cmd, outcome);
+  outcome = await routineDesignFollowup(store2, cmd, outcome);
   if (outcome.task.state === "accepted" || outcome.task.state === "verifying") {
     await store2.settleBeats(outcome.task.id).catch((err) => console.error(`settle_beats ${outcome.task.id} failed:`, err));
   }
@@ -11381,6 +11451,15 @@ function createApp(store2, opts = {}) {
       threadId: parsed.data.threadId ?? null,
       rootMessageId: parsed.data.rootMessageId ?? null,
       threadMode: parsed.data.threadMode ?? null,
+      // A ROUTINE RUNS ON THE STARTER BRAIN ON PRO (George, 2026-09-16; docs/10 §15.6): the thread a
+      // schedule opens is born with the orchestrator on the house model, so the run never waits on a
+      // Claude, Codex or Gemini login — credits serve it, which is one thing Pro buys. Server-stamped
+      // because the plan is server truth and the seat is read from this column on every machine.
+      // Free keeps the seat as configured; the local stack has no starter brain; an explicit override
+      // on the opener wins; a human pin still outranks it at the seat (docs/10 §15.1).
+      // a routine's thread is born on its CONFIGURED brain (2026-09-17, George: Starter is a fallback,
+      // not the routine default). The daemon decides at wake time, with the reason in the thread
+      // (apps/desktop host/starterfallback.ts); an explicit override on the opener still rides.
       brainOverride: parsed.data.brainOverride ?? null,
       scheduleId: parsed.data.scheduleId ?? null,
       // a routine's slot is its own origin, whichever daemon posts it
@@ -11407,6 +11486,8 @@ function createApp(store2, opts = {}) {
       options: q.options ?? [],
       allowOther: q.allowOther !== false
     }));
+    const auth = actor.kind === "agent" && !inChatThread ? parseAuthCard(styledBody) : null;
+    if (auth && !auth.switched) decisions.push({ id: crypto.randomUUID(), question: authDecisionQuestion(auth), options: [], allowOther: true });
     try {
       if (actor.kind === "human" && msg.taskId) {
         for (const [question, answer] of readAnswers([msg.body])) {

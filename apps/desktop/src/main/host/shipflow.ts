@@ -1,7 +1,8 @@
 // THE SHIP FLOW (docs/23) — the shipper claiming a reviewer-approved PR task, studying the
 // change, and proposing a release plan. The claim IS the cross-machine dedupe.
 // Split out of host/flows.ts.
-import { authBlockedCard, projectPolicy, resolveToken, runtimeFor } from '../agents';
+import { starterFallback, unavailableOf } from './starterfallback';
+import { projectPolicy, resolveToken, runtimeFor } from '../agents';
 import type { ExecTask, HostedAgent, OfferedTask, SkillRef } from '../agents';
 
 
@@ -181,13 +182,19 @@ async function shipperFlow(agent: HostedAgent, t: ShipTask, opts: { resume: bool
         ],
       };
     } else {
-      const cred = await resolveToken(apiUrl, ch.workspace_id, agent, ownerActorId);
-      if (cred.blocked) {
-        await beats.fail();
-        await post('/v1/messages', actor, { workspace: ch.workspace_id, channel: ch.id, taskId: t.id, body: authBlockedCard(agent, cred.blocked, t.number) }).catch(() => {});
-        slog({ kind: 'lifecycle', phase: 'shipping', summary: `release planning held — ${cred.blocked.provider} subscription not usable`, level: 'warn' });
-        shipPrepped.delete(t.id); // a reconnect/resume re-enters
-        return;
+      let cred = await resolveToken(apiUrl, ch.workspace_id, agent, ownerActorId);
+      // the seat cannot run → the Starter door (host/starterfallback.ts): a routine's release plans on
+      // the Starter brain; a human's gets the reason and the card and the planning holds
+      const gap = cred.blocked ? unavailableOf(cred, agent.runtime) : null;
+      if (gap) {
+        const next = await starterFallback(agent, gap, { workspace: ch.workspace_id, channelId: ch.id, taskId: t.id, taskNumber: t.number });
+        if (!next) {
+          await beats.fail();
+          slog({ kind: 'lifecycle', phase: 'shipping', summary: `release planning held — ${gap.kind === 'login' ? `${gap.provider} login ${gap.reason}` : gap.kind}`, level: 'warn' });
+          shipPrepped.delete(t.id); // a reconnect/resume re-enters
+          return;
+        }
+        agent = next; cred = await resolveToken(apiUrl, ch.workspace_id, agent, ownerActorId);
       }
       setStatus(agent, 'thinking');
       try {

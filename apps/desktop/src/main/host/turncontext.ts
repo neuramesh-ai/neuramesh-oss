@@ -35,7 +35,7 @@ export function makeTurnContext(ctx: HostCtx & {
   ownerActorId: string;
   post: unknown;
   recordLegResult: (subject: SubjectRef, where: { channelId: string; taskId?: string | null }, leg: { role: string; label: string; turnId: string; out: string }) => void;
-  resolveSeat: (parent: HostedAgent, channelId: string, role: AgentRole) => Promise<Seat>;
+  resolveSeat: (parent: HostedAgent, channelId: string, role: AgentRole, scope?: { threadId?: string | null; taskId?: string | null }) => Promise<Seat>;
   seatLabel: ReturnType<typeof makeLookups>['seatLabel'];
   taskOf: ReturnType<typeof makeLookups>['taskOf'];
   workspace: string;
@@ -113,7 +113,7 @@ function orchSpawnFor(
       wallMs: remaining.wallMs - decision.budget.wallMs,
       contextTokens: remaining.contextTokens - decision.budget.contextTokens,
     };
-    const resolved = await resolveSeat(orch, ch.id, i.role as AgentRole);
+    const resolved = await resolveSeat(orch, ch.id, i.role as AgentRole, { threadId });
     const seated = resolved.agent;
     const run = await openRun(seated, { workspace: ch.workspace_id, channelId: ch.id, threadId }, {
       kind: 'leg', title: label, ...(parentRun.id ? { parentRunId: parentRun.id } : {}),

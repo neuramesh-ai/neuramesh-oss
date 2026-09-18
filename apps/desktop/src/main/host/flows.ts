@@ -13,7 +13,8 @@
 // module boundary — and it is the path by which code reaches a PR, with no end-to-end test
 // under it. The turn-inputs block above it moved out instead (host/workerturn.ts) precisely
 // because it crosses the boundary in one direction only.
-import { CONTENT_OUTPUT_CONTRACT, RESEARCH_OUTPUT_CONTRACT, EXEC_FAIL_BLOCK_AFTER, PROVIDER_LABEL, authBlockedCard, brandTokensFor, collectFiles, designerImageCred, generateBrandImage, imageDataUri, projectPolicy, resolveToken, runCoding, runtimeFor, stageApprovedDesigns, stageBrandContext, stageConnections, stageTaskAttachments, stoppedTasks, worktreeRun } from '../agents';
+import { starterFallback, unavailableOf, whyUnavailable } from './starterfallback';
+import { CONTENT_OUTPUT_CONTRACT, RESEARCH_OUTPUT_CONTRACT, EXEC_FAIL_BLOCK_AFTER, brandTokensFor, collectFiles, designerImageCred, generateBrandImage, imageDataUri, projectPolicy, resolveToken, runCoding, runtimeFor, stageApprovedDesigns, stageBrandContext, stageConnections, stageTaskAttachments, stoppedTasks, worktreeRun } from '../agents';
 import type { ExecTask, HostedAgent, OfferedTask, SkillRef } from '../agents';
 import { EVIDENCE_IMAGE_BUDGET, IMAGE_EXT, evidenceDropNote, planEvidenceBudget, sweepEvidenceImages } from '../evidence';
 import { approvedPlanNote } from './planinject';
@@ -103,7 +104,7 @@ export function makeFlows(ctx: HostCtx & {
   mineLessons: (reviewer: HostedAgent, t: { id: string; number: number; title: string }, ch: { id: string; slug: string; workspace_id: string }, token: string, live: boolean, log?: LogFn) => Promise<void>;
   orchestratorTurn: (agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, transcript: string, token: string, thread?: { id: string; number: number; title: string; state: string }, log?: LogFn, skills?: SkillRef[], attachments?: AgentAttachment[], convoThreadId?: string | null, run?: RunHandle, onDelta?: (t: string) => void) => Promise<string>;
   originOf: (t: OfferedTask) => string | null;
-  priorMachineFor: (threadId?: string | null, taskId?: string | null) => Promise<string | null>; requestSleeperWake: ReturnType<typeof import('./sleepers').makeSleeperWake>['requestSleeperWake'];
+  priorMachineFor: (threadId?: string | null, taskId?: string | null) => Promise<string | null>; requestSleeperWake: ReturnType<typeof import('./sleepers').makeSleeperWake>['requestSleeperWake']; nobodyServes: ReturnType<typeof import('./sleepers').makeSleeperWake>['nobodyServes'];
   readOnlyStudy: (agent: HostedAgent, dir: string, token: string, log?: LogFn) => ((system: string, user: string) => Promise<string>) | null;
   seatFor: (agent: HostedAgent, channelId: string, scope?: { threadId?: string | null; taskId?: string | null }) => Promise<HostedAgent>;
   setStatus: (agent: HostedAgent, status: 'online' | 'thinking' | 'working') => void;
@@ -237,7 +238,16 @@ async function executeFlow(agent: HostedAgent, t: ExecTask, ch: { id: string; sl
   };
   let coarsePlan: string[] = []; // non-Claude first-pass plan (empty for Claude / unparseable)
   try {
-    const cred = await resolveToken(apiUrl, ch.workspace_id, agent, ownerActorId);
+    let cred = await resolveToken(apiUrl, ch.workspace_id, agent, ownerActorId);
+    // the seat cannot run → the Starter door (host/starterfallback.ts): a routine's unit re-seats and
+    // runs on the Starter worker lane; a human's gets the reason and the card, and the task blocks
+    const gap = unavailableOf(cred, agent.runtime);
+    const next = gap ? await starterFallback(agent, gap, { workspace: ch.workspace_id, channelId: ch.id, taskId: t.id, taskNumber: t.number }, log) : agent;
+    if (!next) {
+      await post('/v1/commands', actor, { type: 'task.block', taskId: t.id, reason: `@${agent.name} cannot run here. ${whyUnavailable(gap!, agent.runtime)} Sign in again, or switch this conversation to the NeuraMesh brain, then re-offer #${t.number}.` });
+      log({ kind: 'exec', phase: 'error', summary: `blocked — ${whyUnavailable(gap!, agent.runtime)}`, level: 'error' }); return;
+    }
+    if (gap) { agent = next; cred = await resolveToken(apiUrl, ch.workspace_id, agent, ownerActorId); }
     const token = cred.token ?? ''; // apikey → the key; subscription → '' (providerEnv strips keys)
     const mode = process.env['NM_AGENT_MODE'] === 'echo' ? 'echo' : cred.authMode !== 'none' ? 'claude' : 'echo';
     const adapter = runtimeFor(agent.runtime); // selects the codex/gemini/anthropic runtime
@@ -257,17 +267,6 @@ async function executeFlow(agent: HostedAgent, t: ExecTask, ch: { id: string; sl
     // per-message cap (2026-08-18 audit: four FULL bodies rode into every rework prompt uncapped)
     const reworkNotes = [parkNote, reworkFb.some((m) => /changes requested/.test(m.body)) ? reworkFb.map((m) => m.body.length > 1_200 ? `${m.body.slice(0, 1_200)} […]` : m.body).reverse().join('\n') : ''].filter(Boolean).join('\n\n');
     if (reworkNotes) log({ kind: 'exec', phase: 'started', summary: "rework: addressing the reviewer's change-request directly (not a full redo)" });
-
-    // Preferred subscription is down + failover is Manual → post the reconnect/switch card and
-    // block the task, instead of silently billing a key (or, for Claude, faking an echo
-    // deliverable — the existing guard below only covers non-Claude runtimes).
-    if (cred.blocked && process.env['NM_AGENT_MODE'] !== 'echo') {
-      const reason = `${PROVIDER_LABEL[cred.blocked.provider]} subscription login is ${cred.blocked.reason} on the host — reconnect it, or switch @${agent.name} to API-key mode (or enable Auto failover with a key), then re-offer #${t.number}. Won't bill a key automatically.`;
-      await post('/v1/messages', actor, { workspace: ch.workspace_id, channel: ch.id, taskId: t.id, body: authBlockedCard(agent, cred.blocked, t.number) }).catch(() => {});
-      await post('/v1/commands', actor, { type: 'task.block', taskId: t.id, reason });
-      log({ kind: 'exec', phase: 'error', summary: `auth blocked — ${cred.blocked.provider} subscription not usable (failover manual)`, level: 'error' });
-      return;
-    }
 
     // An agent with NO resolvable credential would otherwise silently fall to the echo
     // STUB (a fake RESULT that looks like real work — the misleading-dogfooding bug).

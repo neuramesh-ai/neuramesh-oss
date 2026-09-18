@@ -1,5 +1,7 @@
-// The credential card an agent posts when its provider needs re-auth.
-import { STARTER_PACK_ID } from '@neuramesh/shared';
+// The credential card an agent posts when its seat cannot run: the reason, and the ways out. A
+// SWITCHED card (2026-09-17) records a move a routine already made: it asks nothing and offers the
+// reconnect only, with the way back said in words.
+import { STARTER_MODEL, STARTER_PACK_ID } from '@neuramesh/shared';
 import { useEffect, useState } from 'react';
 import { nm } from '../bridge/nm';
 import { openProviderSettings } from '../lib/toast';
@@ -12,14 +14,30 @@ export function AuthCard({ auth }: { auth: NmAuth }) {
   const [state, setState] = useState<'idle' | 'connecting' | 'connected' | 'failed'>('idle');
   // THE OPTION THE BLOCK WAS WITHHOLDING (George, 2026-09-08). The refusal exists so nothing spends
   // your money unasked, which makes an explicit tap the right way out of it rather than a reason to
-  // hide the exit. Switching the active pack leaves a VISIBLE trace (the brain pill, the picker),
-  // where a hidden failover flag would leave nobody able to explain the model months later.
-  const [credits, setCredits] = useState<number | null>(null);
+  // hide the exit. Since 2026-09-17 (Starter is the FALLBACK brain, docs/10 §15.7) the tap moves
+  // THIS conversation's failing seat when the card knows it (`scope`): visible in the brain chip,
+  // undone by Reset, and it moves a pinned seat too (thread > pin). A card with no conversation
+  // keeps switching the workspace-wide Starter pack, as it always did. The daemon says when the
+  // workspace is out of credits (`starter: false`), and then the button is not drawn at all.
+  // the button carries NO balance (George, 2026-09-17: "the credits in the button isn't clear if
+  // that's the credit they have left or what the thread will cost"): the balance lives in the
+  // nav's credit ring, the button says only how this seat is paid
   const [onCredits, setOnCredits] = useState(false);
-  useEffect(() => { void nm?.usage?.().then((u) => setCredits(u ? Math.max(0, u.credits.remaining) : null)).catch(() => {}); }, []);
+  // a switch that already happened (this tab, another machine, a reload) reads as done, never as a
+  // second invitation: the card asks the conversation's row rather than trusting its own memory
+  useEffect(() => {
+    if (!auth.scope || !nm?.threadBrain) return;
+    void nm.threadBrain(auth.scope.threadId).then((o) => { if (o?.[auth.scope!.role] === STARTER_MODEL) setOnCredits(true); }).catch(() => {});
+  }, [auth.scope]);
+  const switched = auth.switched === true;
+  const starterOffered = auth.starter !== false && !switched;
+  // the per-conversation switch needs BOTH the scope the daemon gave and a bridge that can merge it
+  // (the web bridge has no replica to merge from) — the label says what the tap will really do
+  const threadSwitch = !!(auth.scope && nm?.threadBrainRole);
   const runOnCredits = async () => {
     try {
-      await nm?.workspaceUpdate({ activeModelPack: STARTER_PACK_ID });
+      if (threadSwitch) await nm!.threadBrainRole!(auth.scope!.threadId, auth.scope!.role, STARTER_MODEL);
+      else await nm?.workspaceUpdate({ activeModelPack: STARTER_PACK_ID });
       setOnCredits(true);
     } catch { /* the card stays put; the other two routes still work */ }
   };
@@ -33,14 +51,19 @@ export function AuthCard({ auth }: { auth: NmAuth }) {
       setState('failed');
     }
   };
+  const who = auth.agent ? <b>@{auth.agent}</b> : 'the agent';
   return (
-    <div className="authcard">
+    <div className={`authcard${switched ? ' switched' : ''}`}>
       <div className="authcardhead">
         <span className="authdot" />
-        <b>{label} subscription {auth.reason === 'unavailable' ? 'login unavailable' : 'login expired'}</b>
+        <b>{switched ? 'Switched to the NeuraMesh brain here' : `${label} ${auth.reason === 'unavailable' ? 'login unavailable' : 'login expired'}`}</b>
       </div>
       <div className="authcardsub">
-        I will not fall back to an API key on my own, because that bills you. Reconnect your {label} login on this machine, run on NeuraMesh credits, or switch {label} to API-key mode.
+        {switched
+          ? <>{auth.why ? `${auth.why} ` : ''}This conversation runs {who} on the NeuraMesh brain, on credits. Sign in to {label} again on this machine, then reset the brain in this conversation to go back.</>
+          : auth.why
+            ? <>{auth.why} I do not fall back to an API key on my own, because that bills you.</>
+            : <>I will not fall back to an API key on my own, because that bills you. Reconnect your {label} login on this machine, run on NeuraMesh credits, or switch {label} to API-key mode.</>}
       </div>
       {cmd && state !== 'connected' && (
         <div className="authcmd">
@@ -55,19 +78,26 @@ export function AuthCard({ auth }: { auth: NmAuth }) {
           <span className="authcmdhint">or run it yourself in any terminal</span>
         </div>
       )}
-      {onCredits ? (
-        <div className="authcardok">✓ On NeuraMesh credits. Re-mention {auth.agent ? <b>@{auth.agent}</b> : 'the agent'} to retry.</div>
+      {onCredits && !switched ? (
+        <div className="authcardok">
+          {threadSwitch
+            ? <>✓ This conversation runs {who} on the NeuraMesh brain. Re-mention {who} to retry.</>
+            : <>✓ On NeuraMesh credits. Re-mention {who} to retry.</>}
+        </div>
       ) : state === 'connected' ? (
-        <div className="authcardok">✓ Reconnected — re-mention {auth.agent ? <b>@{auth.agent}</b> : 'the agent'} to retry.</div>
+        <div className="authcardok">✓ Reconnected. {switched ? 'Reset the brain in this conversation to go back.' : <>Re-mention {who} to retry.</>}</div>
       ) : (
         <div className="authcardfoot">
-          <button className="btn primary sm" onClick={() => void runOnCredits()}>
-            {credits === null ? 'Use NeuraMesh credits' : `Use NeuraMesh credits · ${credits.toLocaleString()}`}
-          </button>
-          <button className="btn sm" disabled={state === 'connecting'} onClick={() => void reconnect()}>
+          {starterOffered && (
+            <button className="btn primary sm" onClick={() => void runOnCredits()}
+              title={threadSwitch ? 'This conversation runs the seat on the NeuraMesh brain, on credits. Reset the brain in this conversation to go back.' : 'The workspace runs on the NeuraMesh brain, on credits.'}>
+              {threadSwitch ? 'Use NeuraMesh brain here (credits)' : 'Use NeuraMesh brain (credits)'}
+            </button>
+          )}
+          <button className={`btn sm${switched ? ' primary' : ''}`} disabled={state === 'connecting'} onClick={() => void reconnect()}>
             {state === 'connecting' ? 'Reconnecting…' : `Reconnect ${label}`}
           </button>
-          <button className="btn sm" onClick={() => openProviderSettings(auth.provider)}>Use an API key instead</button>
+          {!switched && <button className="btn sm" onClick={() => openProviderSettings(auth.provider)}>Use an API key instead</button>}
           {state === 'failed' && <span className="authcardfail">Sign-in didn’t complete — finish it in the window, or use a key.</span>}
         </div>
       )}

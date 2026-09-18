@@ -107,6 +107,11 @@ export function boardTools(tc: ToolCtx): OrchTool[] {
       const n = body.task?.number;
       const createdId = (body.task as { id?: string } | undefined)?.id;
       if (n && createdId) known.set(n, createdId); // the create→offer/route chain must not depend on sync latency
+      // a hands-off birth (routine thread / playbook): the server stamped the plan approved, so
+      // "awaits their review" would be a lie the model repeats verbatim (it did, on #1093)
+      if ((body.task as { planApprovedAt?: string | null } | undefined)?.planApprovedAt) {
+        return `#${n} created and born APPROVED — a hands-off run (journey: ${input.legs.join(' → ')} → accept). Its plan is approved by the routine, a declared design round is approved the moment it is proposed, the build is offered mechanically, and the human is notified when it finishes. Link #${n} in your reply and say it STARTED — never that a plan awaits review.`;
+      }
       return `#${n} created, born in PLAN REVIEW carrying your plan (journey: ${input.legs.join(' → ')} → accept). Its card is in this conversation; the human approves the plan in the task's thread — work is offered only after that, and you can never approve it yourself. Link #${n} in your reply and say the plan awaits their review.`;
     } },
     { name: 'post_thread', description: 'Post a message into a task\'s thread — intake questions, plan notes, scope confirmations. The thread is the task\'s conversation record.', schema: {

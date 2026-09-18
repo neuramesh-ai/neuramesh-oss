@@ -29,10 +29,17 @@ PUBLIC_EXCLUDE=(
   var
 )
 
+# What only the public repository carries, laid out under .github/public as it lands under .github/:
+# its pull request template (this repository's names Vercel and PowerSync, which a contributor
+# never touches) and the workflow that enforces that template. public-snapshot.sh moves the tree
+# into place, and a file placed replaces this repository's file of the same path.
+PUBLIC_OWN=.github/public
+
 # The workflows that run in the public repository. Every other .github/workflows/*.yml is removed
 # from the snapshot: it deploys, signs, or publishes with a secret or an identity only this
-# repository holds. A new workflow is private until it is named here.
-PUBLIC_WORKFLOWS=(ci control-api-bundle control-api-image local-stack-smoke)
+# repository holds. A new workflow is private until it is named here. pr-template arrives from
+# PUBLIC_OWN, so it exists in the public tree only.
+PUBLIC_WORKFLOWS=(ci control-api-bundle control-api-image local-stack-smoke pr-template)
 
 # The git pathspec that leaves all of the above out of `git grep` and `git ls-files`.
 public_exclude_pathspec() {

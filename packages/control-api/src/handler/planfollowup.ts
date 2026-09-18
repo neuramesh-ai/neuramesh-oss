@@ -106,3 +106,47 @@ export async function routinePlanFollowup(store: Store, cmd: Command, outcome: M
   const approved = await store.mutate(outcome.task.id, async (t) => routinePlanApprove(t, scheduleId)).catch(() => null);
   return approved ? { ...approved, events: [...outcome.events, ...approved.events] } : outcome;
 }
+
+/** Routines are hands-off through the DESIGN gate too (2026-09-16, founder report: #1093's plan
+ * declared a design leg, so even an anchored unit would have parked at design_review — approve_design
+ * is HUMAN_ONLY and, unlike the plan and the accept, had no routine follow-up). The approve_design
+ * fork by plan shape (plan-first → todo, legacy → planning), the round promoted to the library, the
+ * assignee cleared — sourced to the routine machine, floored like the rest: never repo-backed. */
+export function routineDesignApprove(task: Task, scheduleId: string, round: number): MutationResult {
+  if (task.state !== 'design_review') throw new DomainError('ILLEGAL_TRANSITION', `a routine design auto-approve fires from design_review, not ${task.state}`);
+  if (task.repo) throw new DomainError('NOT_PERMITTED', 'repo-backed design rounds are approved by a human, routine or not');
+  const now = new Date().toISOString();
+  const next: Task = { ...task, state: task.workPlan ? 'todo' : 'planning', assignee: null, version: task.version + 1, updatedAt: now };
+  const event = createEvent({
+    type: 'task.design_approved',
+    source: formatAddress({ kind: 'machine', id: 'routine' }),
+    target: taskTarget(task),
+    workspace: task.workspace,
+    payload: { routine: true, scheduleId, round },
+  });
+  return { task: next, events: [event], promoteLatestDesignRound: true };
+}
+
+/** A propose_design landing a repo-less, routine-anchored unit in design_review auto-approves
+ * server-side and says so in the thread (the plan message's idiom: a real message, authored by the
+ * unit's creator, fail-soft) — the human reads a run, never a gate. */
+export async function routineDesignFollowup(store: Store, cmd: Command, outcome: MutationResult): Promise<MutationResult> {
+  if (cmd.type !== 'task.propose_design' || outcome.task.state !== 'design_review' || outcome.task.repo || !outcome.task.originThreadId) return outcome;
+  const scheduleId = await store.getThreadScheduleId(outcome.task.workspace, outcome.task.originThreadId).catch(() => null);
+  if (!scheduleId) return outcome;
+  const approved = await store.mutate(outcome.task.id, async (t) => routineDesignApprove(t, scheduleId, cmd.round)).catch(() => null);
+  if (!approved) return outcome;
+  const task = approved.task;
+  await store
+    .postMessage(
+      {
+        id: crypto.randomUUID(), workspace: task.workspace, channel: task.channel, taskId: task.id, threadId: null,
+        author: { kind: task.creator.kind, id: task.creator.id },
+        body: `✓ Design round ${cmd.round} auto-approved · routine run. The round is the visual contract for the work. The build starts now.`,
+        createdAt: new Date().toISOString(),
+      },
+      createEvent({ type: 'message.posted', source: formatAddress({ kind: 'machine', id: 'routine' }), target: taskTarget(task), workspace: task.workspace, payload: { preview: `design round ${cmd.round} auto-approved — #${task.number}` } }),
+    )
+    .catch(() => {});
+  return { ...approved, events: [...outcome.events, ...approved.events] };
+}

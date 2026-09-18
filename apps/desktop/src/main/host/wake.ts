@@ -14,7 +14,8 @@
 // The value edge back to agents.ts. A cycle, and a deliberate one: host/flows.ts already
 // imports the same helpers the same way, and every use here is inside a function body, so the
 // bindings resolve at call time rather than at module init.
-import { SKILL_MARKER, authBlockedCard, echoTurn, emitStream, loadMessageAttachments, parseSkillMarker, resolveToken, runtimeFor } from '../agents';
+import { routineOwned, starterFallback, unavailableOf } from './starterfallback';
+import { SKILL_MARKER, echoTurn, emitStream, loadMessageAttachments, parseSkillMarker, resolveToken, runtimeFor } from '../agents';
 import { isLimitNotice } from '../execpolicy';
 import { assemble, assemblyLine, contextBudget, transcriptBlock } from '../harness/assemble';
 import { type RunHandle } from './runs';
@@ -95,11 +96,14 @@ export function makeWake(ctx: {
       wakeRun = await openWakeRun(agent, { workspace: ch.workspace_id, channelId: ch.id, taskId: t.id }, m.body, m.id);
       // another member's machine holds the lease — it is answering, so we generate nothing (0114)
       if (wakeRun.lost) return;
-      const cred = await resolveToken(apiUrl, ch.workspace_id, agent, ownerActorId);
-      if (cred.blocked && process.env['NM_AGENT_MODE'] !== 'echo') {
-        await post('/v1/messages', { kind: 'agent', id: agent.id }, { workspace: ch.workspace_id, channel: ch.id, taskId: t.id, body: authBlockedCard(agent, cred.blocked, t.number) }).catch(() => {});
-        console.log(`agent_thread_wake agent=${agent.name} task=${t.number} auth_blocked=${cred.blocked.provider}`);
-        return;
+      let cred = await resolveToken(apiUrl, ch.workspace_id, agent, ownerActorId);
+      // the seat cannot run → the Starter door (host/starterfallback.ts): a routine's unit re-seats
+      // and says why, a human's gets the reason and the card
+      const gap = unavailableOf(cred, agent.runtime);
+      if (gap) {
+        const next = await starterFallback(agent, gap, { workspace: ch.workspace_id, channelId: ch.id, taskId: t.id, taskNumber: t.number });
+        if (!next) { console.log(`agent_thread_wake agent=${agent.name} task=${t.number} unavailable=${gap.kind}`); return; }
+        agent = next; cred = await resolveToken(apiUrl, ch.workspace_id, agent, ownerActorId);
       }
       const token = cred.token ?? ''; // apikey → the key; subscription → '' (providerEnv strips keys)
       const mode = process.env['NM_AGENT_MODE'] === 'echo' ? 'echo' : cred.authMode !== 'none' ? 'claude' : 'echo';
@@ -154,6 +158,8 @@ export function makeWake(ctx: {
       // a cap that arrives as REPLY TEXT (subscription runtimes end the turn cleanly)
       // must raise the failover card, not be posted as if the agent said it
       if (isLimitNotice(reply)) {
+        // a routine's unit re-seats on the Starter brain and the owner's re-ask wakes it again; a human's keeps its failover card
+        if (await routineOwned({ taskId: t.id }) && await starterFallback(agent, { kind: 'capped', model: agent.model }, { workspace: ch.workspace_id, channelId: ch.id, taskId: t.id, taskNumber: t.number, replyTo: m.id })) return;
         console.warn(`agent_thread_wake agent=${agent.name} task=${t.number} capped — raising the failover card`);
         await post('/v1/messages', { kind: 'agent', id: agent.id }, {
           workspace: ch.workspace_id, channel: ch.id, taskId: t.id, replyTo: m.id,
@@ -217,18 +223,15 @@ export function makeWake(ctx: {
       wakeRun = await openWakeRun(agent, { workspace: ch.workspace_id, channelId: ch.id, threadId: m.thread_id ?? null }, m.body, m.id);
       // another member's machine holds the lease — it is answering, so we generate nothing (0114)
       if (wakeRun.lost) { emitChat('', true); return; }
-      const cred = await resolveToken(apiUrl, ch.workspace_id, agent, ownerActorId);
-      // Preferred subscription is down + failover is Manual → reply with an actionable auth card
-      // instead of silently billing a key or faking an echo reply. (Skipped in global echo dev.)
-      if (cred.blocked && process.env['NM_AGENT_MODE'] !== 'echo') {
-        emitChat('', true);
-        // the card must land where the human is looking: reply-to their message and ride
-        // its thread when the trigger came from a conversation sheet, exactly like a real
-        // reply does below. Otherwise it lands only in the feed and the open thread hangs.
-        await post('/v1/messages', { kind: 'agent', id: agent.id }, { workspace: ch.workspace_id, channel: ch.id, body: authBlockedCard(agent, cred.blocked), replyTo: m.id, ...(m.thread_id ? { threadId: m.thread_id } : {}) }).catch(() => {});
-        log({ kind: 'wake', phase: 'stood_down', summary: `auth blocked — ${cred.blocked.provider} subscription not usable (failover manual)` });
-        setStatus(agent, 'online');
-        return;
+      let cred = await resolveToken(apiUrl, ch.workspace_id, agent, ownerActorId);
+      // the seat cannot run → the Starter door (host/starterfallback.ts): a routine's conversation
+      // re-seats it and says why; a human's gets the reason and the card, as a reply to their
+      // message and in their thread, where they are looking. Nothing is billed unasked.
+      const gap = unavailableOf(cred, agent.runtime);
+      if (gap) {
+        const next = await starterFallback(agent, gap, { workspace: ch.workspace_id, channelId: ch.id, threadId: m.thread_id, replyTo: m.id }, log);
+        if (!next) { emitChat('', true); setStatus(agent, 'online'); return; }
+        agent = next; cred = await resolveToken(apiUrl, ch.workspace_id, agent, ownerActorId);
       }
       const token = cred.token ?? ''; // apikey → the key; subscription → '' (providerEnv strips keys)
       const mode = process.env['NM_AGENT_MODE'] === 'echo' ? 'echo' : cred.authMode !== 'none' ? 'claude' : 'echo';
@@ -366,6 +369,8 @@ export function makeWake(ctx: {
       // a cap that arrives as REPLY TEXT (subscription runtimes end the turn cleanly)
       // raises the failover card instead of being posted as the agent's own words
       if (isLimitNotice(reply)) {
+        // a routine's conversation re-seats on the Starter brain and the owner's re-ask wakes it again; a human's keeps its failover card
+        if (await routineOwned({ threadId: m.thread_id }) && await starterFallback(agent, { kind: 'capped', model: agent.model }, { workspace: ch.workspace_id, channelId: ch.id, threadId: m.thread_id, replyTo: m.id }, log)) return;
         console.warn(`agent_wake agent=${agent.name} capped — raising the failover card`);
         log({ kind: 'wake', phase: 'error', summary: `capped on ${foLabel(agent.model)} — raising the failover card`, level: 'warn' });
         await handleExhaustion(agent, null, ch);

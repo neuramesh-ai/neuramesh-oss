@@ -113,6 +113,10 @@ async function orchPlanDecision(orch: HostedAgent, t: PlanTask) {
   const actor = { kind: 'agent', id: orch.id, role: 'orchestrator' };
   const ch = await db.get<{ id: string; slug: string; workspace_id: string }>('select id, slug, workspace_id from channels where id = ?', [t.channel_id]).catch(() => null);
   if (!ch) { decided.delete(t.id); return; }
+  // the stamp outranks the judgment (2026-09-16, #1093): an approved plan — the human's, or a
+  // hands-off birth — is never routed back to a human; the watch's approved branch offers it
+  const [live] = await db.getAll<{ plan_approved_at: string | null }>('select plan_approved_at from tasks where id = ?', [t.id]).catch(() => [] as Array<{ plan_approved_at: string | null }>);
+  if (live?.plan_approved_at) { decided.delete(t.id); return; }
   const { log: olog } = arun(orch, { id: t.id, number: t.number, channel_id: t.channel_id }, ch.slug);
   const say = (body: string) => post('/v1/messages', actor, { workspace: ch.workspace_id, channel: ch.id, taskId: t.id, body });
   try {

@@ -323,6 +323,40 @@
         "pnpm -C apps/desktop rebuild:native >/dev/null 2>&1; pnpm --filter @neuramesh/desktop build && cd apps/desktop && env -u NM_AUTH -u NM_API -u NM_POWERSYNC NM_OFFSCREEN=1 NM_USERDATA=\"$HOME/.neuramesh-firstrun\" NM_LOCAL_DIR=\"$HOME/.neuramesh-firstrun/local\" NM_LOCAL_API_PORT=8795 NM_LOCAL_POWERSYNC_PORT=58095 pnpm exec electron . --sync --remote-debugging-port=9234 2>&1 | tee \"$HOME/.neuramesh-firstrun-main.log\""
       ],
       "port": 9234
+    },
+    {
+      "name": "design-static",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "4180",
+        "--directory",
+        "docs/design"
+      ],
+      "port": 4180
+    },
+    {
+      "name": "control-api-starter",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "cd packages/control-api && STARTER_GOOGLE_API_KEY=\"$(grep -E '^STARTER_GOOGLE_API_KEY=' ../../../../../.env | head -1 | cut -d= -f2- | tr -d '\"')\" DATABASE_URL=postgresql://postgres:nm@127.0.0.1:55435/nm PORT=8801 CRON_SECRET=local-cron NM_ALLOW_ACTOR_HEADER=1 pnpm exec tsx src/server.ts"
+      ],
+      "port": 8801
+    },
+    {
+      "name": "desktop-starter",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "NM_USERDATA=~/.neuramesh-starter",
+        "NM_MACHINE_NAME=starter-live",
+        "PORT=9237",
+        "NM_API_PORT=8801",
+        "bash",
+        "scripts/dev-app-cdp.sh"
+      ],
+      "port": 9237
     }
   ]
 }

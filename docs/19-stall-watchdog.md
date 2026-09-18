@@ -44,7 +44,7 @@ since-last-sweep — so the first tick after boot recovers anything that stalled
 | `unclaimed_offer` | `todo` offered (`offered_agent_id`) and never claimed | 20m |
 | `unrouted` | `todo` with no offer/route and a quiet thread | 1h |
 | `blocked_stale` | `blocked` and untouched | 2h |
-| `awaiting_human` | review gate simply waiting on the human sign-off | 4h design · 2h plan |
+| `awaiting_human` | review gate simply waiting on the human sign-off. A `plan_review` row whose plan is already APPROVED (the human's stamp, or a hands-off birth) is past this gate and classifies as a todo instead — `unclaimed_offer` / `unrouted` (2026-09-16, the #1093 class) | 4h design · 2h plan |
 | `stale_done` | approved, awaiting the human accept | 24h |
 
 - **Suppression:** an **open decision card** on the task parks every class (the ball is
@@ -129,6 +129,7 @@ now make that impossible-by-construction, not discouraged:
 | [apps/desktop/src/main/stall.ts](../apps/desktop/src/main/stall.ts) + [stall.test.ts](../apps/desktop/src/main/stall.test.ts) | **new** — pure classifier, thresholds, refire keys (14 tests) |
 | [apps/desktop/src/main/agents.ts](../apps/desktop/src/main/agents.ts) | `gatherChannelStalls` (replica scan + thread tails + fired-key memory), stall sweep kind + triage prompt, sweep-tick wiring, `revise_plan` orchestrator tool |
 | [docs/09-system-architecture.md](09-system-architecture.md) | watch table row |
+| [apps/desktop/src/main/host/routineresume.ts](../apps/desktop/src/main/host/routineresume.ts) + [routineresume.test.ts](../apps/desktop/src/main/host/routineresume.test.ts) | **the routine resume** (2026-09-16, [design/routine-handsoff-2026-09](design/routine-handsoff-2026-09/plan.md)): rides the same sweep tick, deterministic — a routine thread whose opener got no real answer (nothing after a 10-min grace, or only compute notices) and anchors no unit is re-asked as the owner, at most three times, never while a newer run of the routine exists. The monitor never sees a routine thread (`sweepTranscript` excludes them), so it can no longer file a routine's ask off-anchor |
 
 **Evidence (2026-07-08):** classifier validated against the real replica with the production
 SQL — quiet on a 40-minute-old fresh design round; `awaiting_human` on a simulated overnight;

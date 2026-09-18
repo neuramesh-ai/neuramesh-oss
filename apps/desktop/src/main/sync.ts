@@ -366,7 +366,7 @@ async function registerIpc({ agentLog, ptys, killTaskPtys }: { agentLog: AgentLo
   registerAgents({ db, ws });
   registerSkills({ db, ws, watchers });
   registerContent({ db, ws });
-  registerProjects({ ws });
+  registerProjects({ db, ws });
   registerSettings({ db, ws });
   registerLogs({ agentLog, watchers });
 

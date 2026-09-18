@@ -17,14 +17,16 @@ export function WTabIcon({ tab, s = 12 }: { tab: WTab; s?: number }) {
   return /\.(png|jpe?g|gif|webp|svg)$/i.test(tab.path ?? tab.title) ? <IconImage s={s} /> : <IconFile s={s} />;
 }
 
-/** THE SHEET'S HEAD ROW: what the tab strip left behind when the tabs moved to the side dock — a
- *  destination's own controls on the left (Code mode's workspace header) and the room's rail on
- *  the right (bell · crew · views). It keeps the strip's classes so the Code-mode grid override
- *  still lands, and it is ONE flex row, so nothing in it can overlap by construction. */
+/** THE SHEET'S HEAD: the room's rail (bell · crew · views) at the sheet's top-right corner, and in
+ *  Code mode the workspace header beside it on one row. With no context the head is BARE and floats
+ *  over the corner (the Cabinet round's `.utilbar` placement, restored 2026-09-18 after George saw
+ *  every title a whole row below the bell): the rows that own the sheet's first line — a
+ *  destination's `.topbar`, a session's `.thead` — start at the top and reserve the corner. With
+ *  context it stays ONE flex row, so the Code header and the rail cannot overlap by construction. */
 export function SheetHead({ context, aux }: { context?: React.ReactNode; aux?: React.ReactNode }) {
   return (
-    <div className="wtstrip sheethd">
-      {context ? <div className="wtcontext">{context}</div> : <div className="wtcontext sheethdsp" aria-hidden />}
+    <div className={`wtstrip sheethd${context ? '' : ' bare'}`}>
+      {context && <div className="wtcontext">{context}</div>}
       <div className="wtright">{aux}</div>
     </div>
   );

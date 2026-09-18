@@ -14,9 +14,11 @@ import { nm } from '../bridge/nm';
 import { Md } from '../md/Md';
 import type { TaskRow } from '../bridge/rows-board';
 
-export function PlanReviewCard({ version, task, onOpenPlan, onArmRevise }: {
+export function PlanReviewCard({ version, task, onOpenPlan, onArmRevise, handsOff = false }: {
   version: number;
   task: TaskRow;
+  /** a routine-born unit: the plan was approved by the routine, and the record says so */
+  handsOff?: boolean;
   onOpenPlan: (name?: string) => void;
   onArmRevise: () => void;
 }) {
@@ -36,7 +38,7 @@ export function PlanReviewCard({ version, task, onOpenPlan, onArmRevise }: {
   }
   // approved (by the human's pill here, or born approved on a routine) — the compact record
   if (sent || task.plan_approved_at || task.state !== 'plan_review') {
-    const how = task.state === 'plan_review' || task.plan_approved_at ? 'approved' : `moved on (${task.state})`;
+    const how = task.plan_approved_at && handsOff ? 'auto-approved · routine' : task.state === 'plan_review' || task.plan_approved_at ? 'approved' : `moved on (${task.state})`;
     return (
       <div className="focard sent">
         <span className="fotick">✓</span>

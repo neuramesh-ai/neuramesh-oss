@@ -187,7 +187,7 @@ export function makeOrchTurn(ctx: {
       ? await db.getAll<{ schedule_id: string | null }>('select schedule_id from threads where id = ?', [convoThreadId]).catch(() => [] as Array<{ schedule_id: string | null }>)
       : [];
     const routineContext = routineRow?.schedule_id
-      ? `\n\n[ROUTINE RUN — this conversation was opened by a scheduled automation, and it runs HANDS-OFF: any task you create here starts immediately (the plan is auto-approved, review still runs, and the human is notified when it finishes — they are NOT in the loop). Create the tracked work with a full plan and a pre-named owner, phrase your reply as "started", and never ask for approval or say you are waiting on review.]`
+      ? `\n\n[ROUTINE RUN — this conversation was opened by a scheduled automation, and it runs HANDS-OFF: any task you create here starts immediately (the plan is auto-approved, a declared design round is auto-approved the moment the designer proposes it, review still runs, and the human is notified when it finishes — they are NOT in the loop). Create the tracked work with a full plan and a pre-named owner, phrase your reply as "started", and never ask for approval or say you are waiting on review.]`
       : '';
 
     // THE CONTRACT, not a literal. defaults/agents/orchestrator.yaml is the authoritative

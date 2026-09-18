@@ -42,6 +42,7 @@ export * from './channels';
 export * from './filing';
 export * from './retro';
 export * from './cards';
+export * from './brainnotice';
 export * from './commands';
 export * from './policy';
 export * from './staffing';

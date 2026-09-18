@@ -15,7 +15,7 @@ import { Subtree, planSpawn } from '../harness/subagents';
 import { type Seat } from './lookups';
 import { withTimeout } from './turnkit';
 import { searchXText, type ApiGetFn } from './searchx';
-import { type AgentRole } from '@neuramesh/shared';
+import { runtimeForModel, type AgentRole } from '@neuramesh/shared';
 import { join } from 'node:path';
 import type { PowerSyncDatabase } from '@powersync/node';
 import type { Brain } from '../harness/brain';
@@ -76,7 +76,7 @@ export function makeLegs(ctx: {
       };
       // Seat the child by ROLE through the SAME path a level-1 agent uses (docs/10) — a role is model +
       // prompt configuration, never a permission tier, which is why this needs no new config surface.
-      const resolved = await resolveSeat(parent, where.channelId, i.role as AgentRole);
+      const resolved = await resolveSeat(parent, where.channelId, i.role as AgentRole, { taskId: where.taskId, threadId: where.threadId });
       const seated = resolved.agent;
       const runKey = `${task.id}:leg:${subtree.all().length}`;
       // The seat rides its own COLUMN now (0103) rather than squatting in `step`. It had to: `step`
@@ -193,8 +193,10 @@ export function makeLegs(ctx: {
     return `\n\n${lines.join(' ')}`;
   }
 
-  async function resolveSeat(parent: HostedAgent, channelId: string, role: AgentRole): Promise<Seat> {
-    const base = await seatFor(parent, channelId);
+  async function resolveSeat(parent: HostedAgent, channelId: string, role: AgentRole, scope?: { threadId?: string | null; taskId?: string | null }): Promise<Seat> {
+    // the conversation's brain reaches the leg (2026-09-16): a thread switched to the Starter brain
+    // re-seats the subagents it spawns, not only the agent that answered
+    const base = await seatFor(parent, channelId, scope);
     // a live, non-retired agent of this role registered to THIS channel — the room's own specialist
     const [specialist] = await db.getAll<{ id: string; name: string; model: string; brief: string | null; runtime: string | null }>(
       `select a.id, a.name, a.model, a.brief, a.runtime from agents a
@@ -203,16 +205,23 @@ export function makeLegs(ctx: {
         order by a.created_at limit 1`,
       [channelId, role, parent.id],
     ).catch(() => [] as Array<{ id: string; name: string; model: string; brief: string | null; runtime: string | null }>);
+    // the runtime stays the PARENT's: a leg is delivered through the parent's adapter, and swapping
+    // runtimes mid-turn is a different (and unbuilt) thing from swapping models. So a model of
+    // ANOTHER provider cannot ride the leg (2026-09-17, seen live: a parent on the Starter brain
+    // spawned a developer leg on the room's codex specialist, and the Google CLI was asked to run a
+    // codex model). The leg then keeps the parent's model, which is the one its adapter can serve.
+    const rideable = (model: string | null | undefined): string | null => (model && runtimeForModel(model) === base.runtime ? model : null);
     if (specialist?.model) {
+      // the conversation's word for THIS role rides too (docs/10 §15.1): the seat is taken through
+      // the same path a level-1 agent of that role takes, then checked against the parent's adapter
+      const wanted = await seatFor({ ...base, role, model: specialist.model, modelSource: null }, channelId, scope);
       return {
-        // the runtime stays the PARENT's: a leg is delivered through the parent's adapter, and
-        // swapping runtimes mid-turn is a different (and unbuilt) thing from swapping models
-        agent: { ...base, role, model: specialist.model, ...(specialist.brief ? { brief: specialist.brief } : {}) },
+        agent: { ...base, role, model: rideable(wanted.model) ?? base.model, ...(specialist.brief ? { brief: specialist.brief } : {}) },
         from: { id: specialist.id, name: specialist.name },
       };
     }
     const roles = await activePackRoles(await workspaceOf(channelId));
-    const model = roles?.[role];
+    const model = rideable(roles?.[role]);
     return { agent: model ? { ...base, role, model } : { ...base, role }, from: null };
   }
 
