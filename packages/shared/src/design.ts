@@ -1,3 +1,5 @@
+import { trimEndChars } from './linear';
+
 export const DESIGN_PROVIDERS = ['iris', 'claude-design'] as const;
 export type DesignProvider = (typeof DESIGN_PROVIDERS)[number];
 
@@ -65,7 +67,7 @@ export function claudeDesignUrlFromText(text: string | null | undefined): string
   const candidates = (text ?? '').match(/https:\/\/claude\.ai\/design(?:\/[A-Za-z0-9._~!$&'()*+,;=:@%/-]*)?(?:\?[A-Za-z0-9._~!$&'()*+,;=:@%/?-]*)?/g) ?? [];
   for (const raw of candidates) {
     try {
-      const url = new URL(raw.replace(/[),.;]+$/, ''));
+      const url = new URL(trimEndChars(raw, '),.;'));
       if (url.protocol === 'https:' && url.hostname === 'claude.ai' && CLAUDE_DESIGN_PROJECT_PATH.test(url.pathname)) return url.toString();
     } catch { /* malformed model output */ }
   }

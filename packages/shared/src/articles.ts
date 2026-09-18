@@ -14,9 +14,9 @@ export interface ArticleRef {
 
 /** `‹article:artifactId›` — one per message (the first wins), same anatomy as ‹wb:id›. */
 export function parseArticleRef(body: string): ArticleRef | null {
-  const m = /‹article:([^›\s]+)›/.exec(body);
+  const m = /‹article:([^‹›\s]+)›/.exec(body);
   if (!m) return null;
-  return { id: m[1]!, prose: body.replace(/‹article:[^›]*›/g, '').trim() };
+  return { id: m[1]!, prose: body.replace(/‹article:[^‹›]*›/g, '').trim() };
 }
 
 export interface ArticleMeta {
@@ -34,14 +34,16 @@ export interface ArticleMeta {
   images: number;
 }
 
-const IMG_RE = /!\[[^\]]*\]\(([^)\s]+)[^)]*\)/g;
+// the alt text stops at a bracket and the target at a parenthesis, so a run of openers is scanned
+// once, not once per opener (CodeQL js/polynomial-redos, 2026-09-18)
+const IMG_RE = /!\[[^[\]]*\]\(([^()\s]+)[^()]*\)/g;
 
 export function articleFrom(name: string, markdown: string): ArticleMeta {
   const md = markdown.trim();
-  const title = /^#\s+(.+)$/m.exec(md)?.[1]?.trim() ?? name.replace(/\.(md|markdown|txt)$/i, '');
+  const title = /^#[ \t]+(\S.*)$/m.exec(md)?.[1]?.trim() ?? name.replace(/\.(md|markdown|txt)$/i, '');
 
   // the dek: the first paragraph that is content — not a heading, list, image, code fence or table
-  const afterTitle = md.replace(/^#\s+.+$/m, '');
+  const afterTitle = md.replace(/^#[ \t]+\S.*$/m, '');
   let dek = '';
   let inFence = false;
   for (const block of afterTitle.split(/\n\s*\n/)) {
@@ -51,8 +53,8 @@ export function articleFrom(name: string, markdown: string): ArticleMeta {
     if (inFence) continue;
     if (/^(#{1,6}\s|[-*+]\s|\d+\.\s|!\[|\||>)/.test(b)) continue;
     dek = b.replace(/\s+/g, ' ')
-      .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
-      .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+      .replace(/!\[[^[\]]*\]\([^()]*\)/g, '')
+      .replace(/\[([^[\]]+)\]\([^()]*\)/g, '$1')
       .replace(/[*_`]/g, '')
       .trim();
     if (dek) break;
@@ -65,8 +67,8 @@ export function articleFrom(name: string, markdown: string): ArticleMeta {
   // inflate the honest count
   const prose = md
     .replace(/```[\s\S]*?```/g, ' ')
-    .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
-    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+    .replace(/!\[[^[\]]*\]\([^()]*\)/g, ' ')
+    .replace(/\[([^[\]]+)\]\([^()]*\)/g, '$1')
     .replace(/^#{1,6}\s+/gm, '');
   const words = (prose.match(/\S+/g) ?? []).length;
   const minutes = Math.max(1, Math.ceil(words / 200));

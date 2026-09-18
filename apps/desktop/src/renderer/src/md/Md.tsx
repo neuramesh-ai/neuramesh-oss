@@ -6,7 +6,7 @@ import { Children, useMemo } from 'react';
 import Markdown, { defaultUrlTransform, type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { parseQuestionBlock, stripSuggestions } from '@neuramesh/shared';
-import { nm } from '../bridge/nm';
+import { openLink } from '../lib/links';
 import { IconSkill } from '../ui/icons';
 import { parseNextSteps, type NmNext, parseReplies, type NmReply, parseNeed, type NmNeed } from '@neuramesh/shared';
 import { FILE_NAME_RE, HEX_COLOR, isHexColor, NMAUTH_BLOCK, NMPLAYS_BLOCK, NMQ_BLOCK, NMSCHED_BLOCK, type NmAuth, type NmPlays, type NmQuestion, type NmSched, type TaskRefInfo } from '../cards/parse';
@@ -147,7 +147,7 @@ export function Md({ text, onAnswer, onDismissCard, answers, onOpenPlan, taskRef
             e.preventDefault();
             if (href === 'nm:plan') onOpenPlan?.();
             else if (href?.startsWith('nm:plan/')) onOpenPlan?.(decodeURIComponent(href.slice('nm:plan/'.length)));
-            else if (href) void nm?.openExternal(href);
+            else if (href) openLink(href); // the link choice (lib/links.ts): here, or the OS browser
           }}
         >
           {children}

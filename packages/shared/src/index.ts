@@ -57,6 +57,7 @@ export * from './commrules';
 export * from './nextsteps';
 export * from './replyops';
 export * from './needs';
+export * from './linear';
 export * from './reports';
 export * from './review-reminder';
 export * from './schedule';

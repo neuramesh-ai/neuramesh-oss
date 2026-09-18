@@ -20,6 +20,7 @@ import {
 
 
   type Actor,
+  trimEndChars,
 
 
 
@@ -52,7 +53,7 @@ export async function repoCommands(store: Store, actor: Actor, cmd: Command): Pr
       localPath = cmd.localPath;
       cloneUrl = null;
       orgName = 'local';
-      name = cmd.name?.trim() || cmd.localPath.replace(/[/\\]+$/, '').split(/[/\\]/).pop() || 'folder';
+      name = cmd.name?.trim() || trimEndChars(cmd.localPath, '/\\').split(/[/\\]/).pop() || 'folder';
     } else if (cmd.url) {
       const parsed = parseRepoUrl(cmd.url);
       ({ provider, orgName, name, cloneUrl } = parsed);

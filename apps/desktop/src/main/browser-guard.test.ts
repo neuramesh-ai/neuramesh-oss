@@ -4,7 +4,7 @@
 // Run from apps/desktop: pnpm exec tsx --test src/main/browser-guard.test.ts
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { allowedWebviewSrc, navPolicy, popupPolicy, BROWSER_PARTITION } from './browser-guard';
+import { allowedWebviewSrc, mainNavPolicy, mainPopupPolicy, navPolicy, popupPolicy, BROWSER_PARTITION } from './browser-guard';
 
 test('allowedWebviewSrc: web + blank srcs attach, everything else is refused', () => {
   assert.equal(allowedWebviewSrc('https://example.com/'), true);
@@ -39,4 +39,27 @@ test('popupPolicy: web popups stay in the pane, mailto goes external, rest die',
 
 test('partition is the dedicated persistent mini-browser session', () => {
   assert.equal(BROWSER_PARTITION, 'persist:nm-browser');
+});
+
+test('mainPopupPolicy: the app window never keeps a popup; the web and mailto go to the OS browser', () => {
+  assert.equal(mainPopupPolicy('https://github.com/acme/site/pull/12'), 'external');
+  assert.equal(mainPopupPolicy('http://localhost:3000/'), 'external');
+  assert.equal(mainPopupPolicy('mailto:team@example.com'), 'external');
+  assert.equal(mainPopupPolicy('file:///etc/hosts'), 'deny');
+  assert.equal(mainPopupPolicy('javascript:alert(1)'), 'deny');
+  assert.equal(mainPopupPolicy(''), 'deny');
+});
+
+test('mainNavPolicy: the app keeps its own origin, hands the web to the OS browser, and is never replaced', () => {
+  const dev = 'http://localhost:5173/index.html';
+  const prod = 'file:///Applications/neuramesh.app/Contents/Resources/app.asar/out/renderer/index.html';
+  assert.equal(mainNavPolicy(dev, 'http://localhost:5173/index.html?reload=1'), 'allow'); // a dev reload
+  assert.equal(mainNavPolicy(dev, 'https://x.com/rjchint/status/1'), 'external');
+  assert.equal(mainNavPolicy(prod, 'https://github.com/acme/site'), 'external');
+  assert.equal(mainNavPolicy(prod, 'file:///Applications/neuramesh.app/Contents/Resources/app.asar/out/renderer/index.html'), 'allow');
+  assert.equal(mainNavPolicy(dev, 'file:///etc/hosts'), 'deny'); // a web-served app may never load a file
+  assert.equal(mainNavPolicy(prod, 'mailto:team@example.com'), 'external');
+  assert.equal(mainNavPolicy(prod, 'javascript:alert(1)'), 'deny');
+  assert.equal(mainNavPolicy(prod, 'about:blank'), 'deny');
+  assert.equal(mainNavPolicy(prod, 'not a url'), 'deny');
 });

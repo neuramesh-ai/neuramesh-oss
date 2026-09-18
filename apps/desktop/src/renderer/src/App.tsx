@@ -164,6 +164,7 @@ import { ComposerHint, NewChatStage, leadFor } from './views/NewChatStage';
 import { AddRemoteAgent } from './crew/AddRemoteAgent';
 import { HistoryOverlay } from './shell/HistoryOverlay';
 import { anchorPoint, watchAnchors } from './ui/anchor';
+import { LinkChoiceHost } from './ui/LinkChoice';
 import { clampNavW, NAV_W_DEFAULT, NAV_W_MAX, NAV_W_MIN, useLayoutPrefs } from './shell/useLayoutPrefs';
 import { useWorkspaceTabs } from './wtabs/useWorkspaceTabs';
 
@@ -4215,6 +4216,7 @@ export function App() {
       )}
       </div>
       {cmdkOpen && <CmdKPalette items={buildCmdkItems()} onClose={() => setCmdkOpen(false)} />}
+      <LinkChoiceHost openInApp={openBrowserTab} />
       {/* History expanded (v0.69) — shell level, so it floats over a room, the board or Home
           without any of them losing their place. Esc or the scrim puts you back. */}
       {histOpen && (

@@ -91,8 +91,7 @@ const LOCAL_STATES: Record<string, any> = {
   ready: { phase: 'ready', version: '0.132.0', engine: 'docker-desktop' },
 };
 const localStackFixture = (): any => {
-  const state = LOCAL_STATES[localstack ?? 'ready'] ?? LOCAL_STATES['ready'];
-  const about = state.items?.every((i: any) => i.total !== null) ? Math.round(state.items.reduce((n: number, i: any) => n + i.total, 0) / MB) : null;
+  const state = LOCAL_STATES[localstack ?? 'ready'] ?? LOCAL_STATES['ready'], about = state.items?.every((i: any) => i.total !== null) ? Math.round(state.items.reduce((n: number, i: any) => n + i.total, 0) / MB) : null;
   return { state, blocking: state.phase !== 'ready', aboutMb: about };
 };
 
@@ -103,6 +102,8 @@ const explicit: Record<string, any> = {
   workspaceCreate: async () => ({ workspaceId: MOCK_WS_ID }),
   // the mini-browser's open-external falls back to a real new tab in the harness
   openExternal: async (url: string) => { window.open(url, '_blank', 'noopener'); },
+  // the link choice's second row: a stand-in browser, with a stand-in icon so the img path renders
+  defaultBrowser: async () => ({ name: 'Safari', icon: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23e9f1fb'/%3E%3Ccircle cx='16' cy='16' r='11' fill='%23fff' stroke='%232f7bd9' stroke-width='2'/%3E%3Cpath d='M22 10 18 18l-8 4 4-8z' fill='%23e5453a'/%3E%3C/svg%3E" }),
   // …and after a swap onto the cloud connection (U3b) the shell stands in a Clerk account
   authStatus: async () => (screen === 'login' ? { mode: 'clerk', user: null } : localConn && mockForeground() === 'cloud' ? { mode: 'clerk', user: { id: 'u-george', email: 'george@acme.dev' }, connection: { id: 'cloud', kind: 'cloud' } } : localConn ? { mode: 'local', user: { id: 'u-george', email: 'you@this-mac' }, connection: { id: 'local', kind: 'local' } } : cloudConn ? { mode: 'clerk', user: { id: 'u-george', email: 'dana@vertex.dev' }, connection: { id: 'cloud', kind: 'cloud' } } : { mode: 'dev', user: { id: 'u-george', email: 'george@acme.dev' } }),
   // social sign-in opens the system browser and resolves on the loopback hand-off — the mock

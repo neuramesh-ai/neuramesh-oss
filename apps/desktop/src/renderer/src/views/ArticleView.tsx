@@ -6,6 +6,7 @@
 import Markdown, { defaultUrlTransform } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { nm as nmBridge } from '../bridge/nm';
+import { openLink } from '../lib/links';
 import { useArticle } from '../thread/ArticleCard';
 import { useMemo, useRef, useState } from 'react';
 import type { Components } from 'react-markdown';
@@ -59,7 +60,7 @@ export function ArticleView({ artifactId, name, content }: { artifactId: string;
   const components = useMemo<Components>(() => ({
     img: (p) => <Fig src={typeof p.src === 'string' ? p.src : undefined} alt={p.alt} />,
     // external links leave through the OS browser — the reading tab never navigates itself away
-    a: (p) => <a {...p} onClick={(e) => { e.preventDefault(); if (typeof p.href === 'string' && /^https?:/.test(p.href)) void nm?.openExternal(p.href); }} />,
+    a: (p) => <a {...p} onClick={(e) => { e.preventDefault(); if (typeof p.href === 'string') openLink(p.href); }} />,
   }), []);
   const saved = (row?.promoted ?? 0) > 0;
   const act = async (key: string, run: () => Promise<unknown>) => {

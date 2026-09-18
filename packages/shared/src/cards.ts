@@ -57,6 +57,7 @@ export function cardNotification(body: string, where: string): CardNotification 
 }
 
 import type { FailoverCardData } from './failover';
+import { trimLineEnds } from './linear';
 
 // Schedule-confirmation cards (marketing scheduling): the orchestrator proposes a schedule change
 // on a content task's posts, and the custom renderer draws it with per-post slots + one Confirm
@@ -135,7 +136,7 @@ export function parseTaskUnitRef(body: string | null | undefined): TaskUnitRef |
   if (!body) return null;
   const m = TASK_UNIT_RE.exec(body);
   if (!m) return null;
-  const prose = body.replace(TASK_UNIT_RE, '').replace(/[ \t]+$/gm, '').replace(/\n{3,}/g, '\n\n').trim();
+  const prose = trimLineEnds(body.replace(TASK_UNIT_RE, '')).replace(/\n{3,}/g, '\n\n').trim();
   return { id: m[1]!.toLowerCase(), prose };
 }
 
@@ -262,8 +263,10 @@ export function parseQuestionBlock(src: string): NmQuestion | null {
   const raw: string[] = [];
   if (oi !== -1) {
     for (const line of lines.slice(oi + 1)) {
-      const m = /^\s*-\s+(.*\S)\s*$/.exec(line);
-      if (m) { raw.push((m[1] ?? '').replace(/^["']|["']$/g, '')); continue; }
+      // the option starts with a non-blank, so the blanks after the dash have one owner; the
+      // trailing blanks (and a CR) leave by trim (CodeQL js/polynomial-redos, 2026-09-18)
+      const m = /^\s*-\s+(\S.*)$/.exec(line.replace(/\r$/, ''));
+      if (m) { raw.push((m[1] ?? '').trim().replace(/^["']|["']$/g, '')); continue; }
       if (line.trim() && !/^\s/.test(line)) break; // a new top-level key ends the list
     }
   }
@@ -341,7 +344,8 @@ export function stripSuggestions(body: string): string {
   return body.replace(NMS_BLOCK, '').replace(NMS_PARTIAL, '').trimEnd();
 }
 
-const ANSWER_LINE = /^\*\*(.+?)\*\*\s*→\s*(.+)$/;
+// the answer starts with a non-blank, so the blanks after the arrow have one owner (CodeQL, 2026-09-18)
+const ANSWER_LINE = /^\*\*(.+?)\*\*[ \t]*→[ \t]*(\S.*)$/;
 
 // Which questions the given human message bodies have already answered.
 export function readAnswers(bodies: string[]): Map<string, string> {

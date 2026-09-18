@@ -99,10 +99,14 @@ export class ReviewParseError extends Error {}
  */
 export function parseReviewVerdict(raw: string): { verdict: ReviewVerdict; reason: string } {
   // Prefer a complete JSON object (handles ```json fences — we match the braces, not the fence).
-  const obj = raw.match(/\{[\s\S]*\}/);
+  // the first brace to the last: what the greedy /\{[\s\S]*\}/ found, by index, so a text of many
+  // openers is scanned once (CodeQL js/polynomial-redos, 2026-09-18)
+  const open = raw.indexOf('{');
+  const close = raw.lastIndexOf('}');
+  const obj = open !== -1 && close > open ? raw.slice(open, close + 1) : null;
   if (obj) {
     try {
-      const j = JSON.parse(obj[0]) as { verdict?: unknown; reason?: unknown };
+      const j = JSON.parse(obj) as { verdict?: unknown; reason?: unknown };
       if (j.verdict === 'approve' || j.verdict === 'changes') {
         return { verdict: j.verdict, reason: typeof j.reason === 'string' ? j.reason.trim() : '' };
       }

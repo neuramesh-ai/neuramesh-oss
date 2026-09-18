@@ -18,7 +18,7 @@ export function slugifySkillName(raw: string): string {
       .trim()
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
+      .replace(/^-|-$/g, '') // one dash at each end at most: the collapse leaves no run
       .slice(0, 60) || 'skill'
   );
 }
@@ -33,10 +33,13 @@ export function parseSkillFile(relPath: string, content: string): ParsedSkill | 
   if (fm) {
     const front = fm[1] ?? '';
     body = (fm[2] ?? '').trim();
-    const nameM = front.match(/^\s*name:\s*["']?([^"'\n]+?)["']?\s*$/im);
-    const descM = front.match(/^\s*description:\s*["']?([^\n]+?)["']?\s*$/im);
-    if (nameM) name = nameM[1]!.trim();
-    if (descM) description = descM[1]!.trim();
+    // the value is the rest of the line; the quotes and the blanks leave afterwards, so the
+    // blanks after the colon have one owner (CodeQL js/polynomial-redos, 2026-09-18)
+    const unquote = (v: string): string => v.replace(/\r$/, '').trim().replace(/^(["'])(.*)\1$/, '$2').replace(/^["']|["']$/g, '').trim();
+    const nameM = front.match(/^[ \t]*name:[ \t]*(\S.*)$/im);
+    const descM = front.match(/^[ \t]*description:[ \t]*(\S.*)$/im);
+    if (nameM) name = unquote(nameM[1]!);
+    if (descM) description = unquote(descM[1]!);
   }
   if (!name) {
     const parts = relPath.split('/').filter((p) => p && p !== 'SKILL.md');

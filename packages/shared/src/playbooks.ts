@@ -14,6 +14,7 @@
 // creation; the renderer owns rendering. Adding a playbook is a data entry here plus its
 // skill in the marketing-os pack — nothing else.
 
+import { dotLines } from './linear';
 import { PLAYBOOKS } from './playbooks-registry';
 export * from './playbooks-registry';
 
@@ -193,9 +194,18 @@ export function playbookAsk(pb: Playbook, values: Record<string, string> = {}): 
  * ask sentence, so `state is derived, never stored` holds for schedules too.
  */
 export function playbookFromAsk(prompt: string | null | undefined): string | null {
-  const m = /run the (.+?) playbook/i.exec(prompt ?? '');
-  if (!m) return null;
-  const want = m[1]!.trim().toLowerCase();
+  // "run the <title> playbook" on one line, found by index: the first ask and the first
+  // "playbook" after it, so a prompt of many asks is scanned once (CodeQL, 2026-09-18)
+  let want: string | null = null;
+  for (const line of dotLines((prompt ?? '').toLowerCase())) {
+    const at = line.indexOf('run the ');
+    if (at === -1) continue;
+    const end = line.indexOf(' playbook', at + 'run the '.length + 1);
+    if (end === -1) continue;
+    want = line.slice(at + 'run the '.length, end).trim();
+    break;
+  }
+  if (want === null) return null;
   return PLAYBOOKS.find((p) => p.title.toLowerCase() === want)?.id ?? null;
 }
 

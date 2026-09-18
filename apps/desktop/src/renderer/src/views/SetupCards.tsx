@@ -27,7 +27,7 @@ import { useEffect, useState } from 'react';
 import { nm as nmBridge, type ConnectionKind } from '../bridge/nm';
 import { downloadsUrl } from '../weburl';
 import { setupItemsFor } from './setup-items';
-import { IS_WEB } from '../lib/platform';
+import { openLink } from '../lib/links';
 import { openProviderSettings, openWorkspaceMembers } from '../lib/toast';
 import type { MachineRow, MemberRow } from '../bridge/rows-crew';
 import type { CredRow } from '../bridge/rows-infra';
@@ -55,12 +55,9 @@ const APPSTORE_URL = 'https://apps.apple.com/app/id6787487455';
 /** the row's verb. the card form carried a sentence; a corner carries a word. */
 const VERB: Record<OnboardingItem['id'], string> = { machine: '', subscription: 'Connect', team: 'Invite', desktop: 'Get', mobile: 'Show QR' };
 
-/** desktop opens the OS browser; the web client is already in one, and `openExternal` is not
- *  wired there (it would resolve undefined and silently do nothing). */
-const openUrl = (url: string): void => {
-  if (IS_WEB) window.open(url, '_blank', 'noopener');
-  else void nm?.openExternal(url);
-};
+/** the link choice (lib/links.ts): the desktop asks here-or-the-OS-browser, the web client is
+ *  already a browser and opens a new tab */
+const openUrl = (url: string): void => openLink(url);
 
 /**
  * The signals, read live. `null` is the load-bearing value: it means THIS CLIENT CANNOT SEE THIS

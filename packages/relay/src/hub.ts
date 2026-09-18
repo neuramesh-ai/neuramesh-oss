@@ -273,7 +273,8 @@ export function createHub(opts: HubOptions): Hub {
   return {
     handleConnection(sock, req) {
       sock.on('error', (e) => log(`socket_error: ${e.message}`));
-      const bearer = /^Bearer\s+(.+)$/i.exec(req.headers.authorization ?? '')?.[1];
+      // the token has no whitespace, so the blanks and the token cannot trade characters (CodeQL, 2026-09-18)
+      const bearer = /^Bearer[ \t]+(\S+)$/i.exec(req.headers.authorization ?? '')?.[1];
       if (bearer?.startsWith('nmm_')) machineEdge(sock, bearer);
       else clientEdge(sock);
     },
