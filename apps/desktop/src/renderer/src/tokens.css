@@ -1845,49 +1845,87 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 .repacts { display: flex; align-items: center; gap: 6px; padding: 10px 14px 12px; border-top: 1px solid var(--border); flex-wrap: wrap; }
 .reparmed { font: 600 10px var(--fmono); color: var(--muted); border: 1px solid var(--border2); border-radius: var(--r-pill); padding: 3px 9px; }
 
-/* ── MARKETING OS — the destination (docs/design/marketing-os-2026-08 round 2). A LIST WANTS
-   A MEASURE (the routinesview ruling): one inner column so the scope bar, the cards, the
-   catalog and the threads share an edge. Cards are ELEVATED (they host clicks — trap 1);
-   the desk is one quiet row family, structure from spacing, never a well of wells. ── */
+/* ── MARKETING OS — the destination (docs/design/marketing-os-2026-08 round 2; the desk round,
+   docs/design/marketing-os-desk-2026-09, 2026-09-17). ONE page in today's order: the desk, the
+   playbooks, the threads underneath as you scroll, and ONE bar under the desk — the pills at the
+   left, the two section words at the right — that sticks while the page scrolls. A LIST WANTS A
+   MEASURE (the routinesview ruling): one inner column so the scope bar, the tiles, the bar, the
+   catalog and the threads share an edge. Tiles are ELEVATED (they host clicks — trap 1). ── */
 .mkosview { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 18px 40px; scrollbar-width: none; }
 .mkosview::-webkit-scrollbar { width: 0; height: 0; }
 .mkosview > * { max-width: 980px; margin-left: auto; margin-right: auto; }
 .mkosview > .scopebar { margin-bottom: 8px; }
 .pgk { display: flex; align-items: baseline; gap: 8px; font: 500 9.5px var(--fmono);
   letter-spacing: -.02em; text-transform: uppercase; color: var(--dim); margin: 18px auto 8px; }
-.mkcards { display: grid; grid-template-columns: repeat(auto-fill, minmax(238px, 1fr)); gap: 12px; }
-.mkcard { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; background: var(--card);
+/* the desk: one tile per project, three lines — identity and the score or the door, the facts, the marks */
+.mkdesk { display: grid; grid-template-columns: repeat(auto-fill, minmax(238px, 1fr)); gap: 10px; }
+.mkdeskline { display: flex; flex-direction: column; }
+.mktile { display: flex; flex-direction: column; align-items: stretch; gap: 5px; min-width: 0; background: var(--card);
   border: 1px solid var(--card-border); border-radius: var(--r-lg); box-shadow: var(--shadow-card);
-  padding: 13px 15px 12px; cursor: pointer; font-family: inherit; text-align: left; color: var(--text);
-  transition: transform var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease); }
-.mkcard:hover { transform: translateY(-1px); box-shadow: var(--shadow-lift); }
-.mkchd2 { display: flex; align-items: center; gap: 9px; min-width: 0; }
-.mkchd2 b { font: 500 13.5px var(--font); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.mkscore { display: flex; align-items: center; gap: 8px; }
+  padding: 9px 12px 8px; cursor: pointer; font-family: inherit; text-align: left; color: var(--text);
+  transition: transform var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease); }
+.mktile:hover { transform: translateY(-1px); box-shadow: var(--shadow-lift); }
+.mktile:focus-visible { outline: none; border-color: var(--ring); box-shadow: 0 0 0 3px var(--focus-glow); }
+.mkt1 { display: flex; align-items: center; gap: 9px; min-width: 0; min-height: 24px; }
+.mkt1 > b { flex: 1; min-width: 0; font: 500 14px var(--font); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mkscore { display: inline-flex; align-items: center; gap: 7px; flex: none; }
 .mkscore b { font: 500 15px var(--fdisp); }
-.mkscore.quiet b { color: var(--muted); font: 500 12.5px var(--font); }
 .gdial { position: relative; flex: none; display: inline-block; border-radius: 50%;
   background: conic-gradient(var(--viz-score) calc(var(--frac, 0) * 1turn), color-mix(in srgb, var(--text) 14%, transparent) 0); }
 .gdial::after { content: ''; position: absolute; inset: 3.5px; border-radius: 50%; background: var(--card); }
-.mkfacts { font: 500 10.5px var(--fmono); color: var(--dim); }
-.mkcta { font: 600 12px var(--font); color: var(--link); }
-/* the catalog as an on-page section list — rows are doors (they draft the ask) */
-.pblist { display: flex; flex-direction: column; }
-.pbgroup { font: 500 9.5px var(--fmono); letter-spacing: -.02em; text-transform: uppercase; color: var(--dim); padding: 10px 0 4px; }
-.mkconns { display: flex; align-items: center; gap: 7px; margin-top: 2px; padding-top: 8px; border-top: 1px solid var(--border); }
-.mkc { position: relative; width: 22px; height: 22px; border-radius: 6px; border: 1px solid var(--border); display: inline-flex; align-items: center; justify-content: center; font-size: 11px; color: var(--dim); background: var(--panel); }
-.mkc.on { color: var(--text); border-color: color-mix(in srgb, var(--green) 45%, var(--border)); }
-.mkc.warnc { color: var(--text); border-color: color-mix(in srgb, var(--warn) 55%, var(--border)); }
-.mkc.on::after, .mkc.warnc::after { content: ''; position: absolute; right: -2px; bottom: -2px; width: 7px; height: 7px; border-radius: 50%; border: 1.5px solid var(--card); background: var(--green); }
+.mkfacts { font: 500 10.5px var(--fmono); color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mkcta { font: 600 12px var(--font); color: var(--link); white-space: nowrap; flex: none; }
+.mkconns { display: flex; align-items: center; gap: 3px; padding-top: 6px; border-top: 1px solid var(--border); }
+/* the marks are the composer foot's (settings/connector-marks.tsx): monochrome geometry, --dim at rest,
+   --body with a green dot when connected, the warn dot when a grant needs a reconnect */
+.mkc { position: relative; width: 20px; height: 20px; border-radius: var(--r-xs); display: inline-flex; align-items: center; justify-content: center; color: var(--dim); flex: none; }
+.mkc svg { display: block; }
+.mkc.on, .mkc.warnc { color: var(--body); }
+.mkc.on::after, .mkc.warnc::after { content: ''; position: absolute; right: 1px; bottom: 1px; width: 5px; height: 5px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 1.5px var(--card); }
 .mkc.warnc::after { background: var(--warn); }
-.mkconnlbl { font: 11px var(--fmono); color: var(--dim); margin-left: auto; }
+.mkconnlbl { font: 500 10px var(--fmono); color: var(--dim); margin-left: auto; white-space: nowrap; }
+/* a project picked: the desk is one line, the same tile laid flat */
+.mktile.line { flex-direction: row; align-items: center; gap: 12px; min-height: 46px; padding: 0 12px; }
+.mktile.line .mkt1 { flex: none; }
+.mktile.line .mkt1 > b { flex: none; }
+.mktile.line .mkfacts { flex: 1; }
+.mktile.line .mkconns { padding: 0 0 0 12px; border-top: 0; border-left: 1px solid var(--border); }
+.mktile.line .mkconnlbl { margin-left: 6px; }
+/* THE BAR: the pills at the left, the section words at the right, one line. Sticky inside the scroller;
+   a hairline and the resting shadow arrive when it reaches the top (elevation over outline) */
+.mkbarsentinel { height: 1px; margin-top: 13px; }
+.mkbar { position: sticky; top: 0; z-index: 4; display: flex; align-items: center; gap: 12px; min-height: 42px; padding: 6px 0;
+  background: var(--bg); border-bottom: 1px solid transparent;
+  transition: border-color var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease); }
+.mkbar.stuck { border-bottom-color: var(--border); box-shadow: var(--shadow-card); }
+/* the chips: the ⌘Y / Home ledger recipe (.histovlfilter), no wrap and no padding of its own here. The
+   compound selector is load-bearing: .histovlfilter is declared LATER in this file (the ledgerfilt lesson) */
+.histovlfilter.mkchips { padding: 0; flex-wrap: nowrap; gap: 6px; min-width: 0; }
+.mkchipx { display: grid; min-width: 0; }
+.mkchipx > * { grid-area: 1 / 1; }
+/* the hand-off (docs/33 §7): the old set leaves in --dur-exit, the new one rises in with nm-rise, a chip
+   after another, timed to land as the scroll lands */
+.mkchips.enter > button { animation: nm-rise var(--dur-enter) var(--ease) both; animation-delay: calc(150ms + var(--i, 0) * 32ms); }
+.mkchips.leave { pointer-events: none; animation: mkchipout var(--dur-exit) var(--ease-exit) both; }
+@keyframes mkchipout { to { opacity: 0; transform: translateY(-4px); } }
+@media (prefers-reduced-motion: reduce) { .mkchips.enter > button { animation: none; } .mkchips.leave { display: none; } }
+.mkbarwords { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; flex: none; }
+.mkword { display: inline-flex; align-items: center; gap: 5px; border: 0; background: none; padding: 4px 2px; cursor: pointer;
+  font: 500 10.5px var(--fmono); letter-spacing: -.02em; text-transform: uppercase; color: var(--text); transition: color var(--dur) var(--ease); }
+.mkword b { font: 600 10px var(--fmono); color: var(--dim); opacity: .8; }
+.mkword.door { color: var(--dim); }
+.mkword.door:hover { color: var(--text); }
+.mkword:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--ring); border-radius: 2px; }
+.mkwordsep { font: 500 10px var(--fmono); color: var(--dim); opacity: .6; }
+/* the catalog as an on-page section list — rows are doors (they draft the ask) */
+.pblist { display: flex; flex-direction: column; padding-top: 2px; }
+.pbgroup { font: 500 9.5px var(--fmono); letter-spacing: -.02em; text-transform: uppercase; color: var(--dim); padding: 9px 6px 2px; }
 .conncard { background: var(--card); border: 1px solid var(--card-border); border-radius: var(--r-lg); padding: 8px 14px; box-shadow: var(--shadow-card); }
 /* the desk is wide where the room rail is 224px — two providers per line here, and an open
    panel's CTA hugs its label instead of stretching across the column */
 .conncard .mkconnlist { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px 26px; align-items: start; }
 .conncard .mkconnpanel .btn { align-self: flex-start; }
-.pbrun { font: 600 11.5px var(--fbody); color: var(--btn-fg); background: var(--btn); border: 1px solid var(--border2); border-radius: var(--r-pill); padding: 4px 13px; white-space: nowrap; }
-.pbrow:hover .pbrun { background: var(--btn-hover); }
+.pbrun { font: 600 11.5px var(--fbody); color: var(--btn-fg); background: var(--btn-hover); border: 1px solid var(--border2); border-radius: var(--r-pill); padding: 4px 13px; white-space: nowrap; }
 /* the Run-for picker: a veil-less menu anchored on its row (the popover-out-of-veil idiom) */
 .runforveil { position: fixed; inset: 0; z-index: 5; border: 0; background: none; cursor: default; }
 .runforpop { position: absolute; right: 6px; top: calc(100% - 6px); z-index: 6; width: 280px; background: var(--card); border: 1px solid var(--border2); border-radius: var(--r-lg); box-shadow: var(--shadow-pop); padding: 7px; text-align: left; }
@@ -1900,20 +1938,34 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 .runforrow.off .rst { color: var(--warn); }
 .mklogo2 { flex: none; width: 20px; height: 20px; border-radius: 6px; background: var(--panel3); display: inline-flex; align-items: center; justify-content: center; font: 600 10px var(--fbody); overflow: hidden; }
 .mklogo2 img { width: 100%; height: 100%; object-fit: cover; }
-.pbrow { position: relative; display: flex; align-items: center; gap: 11px; width: 100%; padding: 8px 6px; border: 0; background: none;
+.pbrow { position: relative; display: flex; align-items: center; gap: 11px; width: 100%; padding: 6px 8px; border: 0; background: none;
   border-radius: var(--r-md); font-family: inherit; text-align: left; cursor: pointer; color: var(--text);
   transition: background var(--dur-fast) var(--ease); }
-.pbrow:hover:not(:disabled) { background: var(--hover-bg); }
+.pbrow:hover:not(:disabled), .pbrow:focus-visible { background: var(--hover-bg); outline: none; }
 .pbrow:disabled { cursor: default; }
+.pbglyph { color: var(--muted); display: grid; place-items: center; width: 16px; flex: none; }
+.pbglyph svg { display: block; }
 .pbtxt { flex: 1; min-width: 0; }
-.pbtxt b { display: block; font-size: 12.5px; font-weight: 600; }
-.pbtxt span { display: block; font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pbtxt b { display: block; font-size: 13.5px; font-weight: 500; }
+.pbtxt span { display: block; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pbmeta { flex: none; display: flex; align-items: center; gap: 7px; }
+/* the trailing slot RESTS as a fact and shows the verb on hover or focus — eleven identical buttons at
+   rest read as a form, not a catalog */
+.pbfact { display: inline-flex; align-items: center; gap: 7px; }
+.pbrow .pbrun { display: none; }
+.pbrow:hover .pbrun, .pbrow:focus-visible .pbrun { display: inline-flex; }
+.pbrow:hover .pbfact, .pbrow:focus-visible .pbfact { display: none; }
 .pbscore { display: inline-flex; align-items: center; gap: 5px; font: 500 11px var(--fmono); color: var(--text); }
 .pbscore .pbwhen { font-style: normal; }
 .pbwhen { font: 500 10px var(--fmono); color: var(--dim); }
+.pbproj { font: 500 10px var(--fmono); color: var(--dim); font-style: normal; }
 .pbnever { font: 500 10.5px var(--fmono); color: var(--dim); font-style: italic; }
 .pbarmed { font: 600 9.5px var(--fmono); color: var(--muted); border: 1px solid var(--border2); border-radius: var(--r-pill); padding: 2px 7px; }
+/* the threads: tall enough that their head can always land under the bar; the first group head keeps
+   a beat of air so the boundary reads after the catalog's last row */
+.mkthreads { display: flex; flex-direction: column; min-height: calc(100% - 42px); scroll-margin-top: 42px; }
+.mkthreads .sgroup.first { padding-top: 20px; }
+.mkthreads .histwrap { display: block; }
 .mkosempty { padding: 14px 6px; font-size: 12.5px; color: var(--muted); }
 
 /* the nmplays card — the SchedRecsCard family's sibling (playbook recs from the bootstrap) */

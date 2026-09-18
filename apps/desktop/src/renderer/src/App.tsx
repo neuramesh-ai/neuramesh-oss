@@ -3659,9 +3659,9 @@ export function App() {
             any open session the moment this view mounts, so the door must leave it). */}
         {view === 'marketing' && (
           <>
-            <div className="topbar">Marketing OS<span className="desc">playbooks · threads · every project's growth desk</span></div>
+            <div className="topbar">Marketing OS<span className="desc">every project’s marketing, one desk</span></div>
             <MarketingOS projects={wsProjects} chans={chans} scope={scopeOf('marketing')} setScope={(x) => setScope('marketing', x)}
-              alerts={alerts} refreshAlerts={refreshAlerts} dismissAlert={dismissAlert} threads={histAll} tasks={tasksAll} messages={[]} liveIds={histLiveIds}
+              alerts={alerts} refreshAlerts={refreshAlerts} dismissAlert={dismissAlert} threads={histAll} tasks={tasksAll} messages={[]} marksOf={rowMarks}
               onOpenCalendar={() => { setNav('home'); setView('calendar'); }} onOpenRoutines={() => { setNav('home'); setView('automations'); }}
               onOpenSession={(r) => goConversation(() => { setNav('home'); setView('dashboard'); openSession(r); })}
               onOpenTask={(id) => goConversation(() => { setNav('home'); setView('dashboard'); setOpenTaskId(id); })} onAsk={openMarketingAsk} />

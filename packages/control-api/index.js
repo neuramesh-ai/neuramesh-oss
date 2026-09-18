@@ -2098,7 +2098,7 @@ var PLAYBOOKS = [
   {
     id: "audit",
     title: "Site & funnel audit",
-    tagline: "six dimensions, weighted 0\u2013100, fix-first list",
+    tagline: "six dimensions, weighted 0 to 100, with a fix-first list",
     group: "foundations",
     skill: "site-audit",
     engine: "unit",
@@ -2114,7 +2114,7 @@ var PLAYBOOKS = [
   {
     id: "geo",
     title: "AI search (GEO)",
-    tagline: "citability: who gets cited, rewrites, re-measure",
+    tagline: "who gets cited, page rewrites, then a re-measure",
     group: "foundations",
     skill: "geo-citability",
     engine: "unit",
@@ -2130,7 +2130,7 @@ var PLAYBOOKS = [
   {
     id: "teardown",
     title: "Competitor teardown",
-    tagline: "ads \xB7 pricing \xB7 jobs \xB7 reviews \u2192 the exposure map",
+    tagline: "ads, pricing, jobs, and reviews, then the exposure map",
     group: "foundations",
     skill: "competitor-teardown",
     engine: "unit",
@@ -2146,7 +2146,7 @@ var PLAYBOOKS = [
   {
     id: "positioning",
     title: "Positioning & offer",
-    tagline: "the six-clause statement, pasteability-tested",
+    tagline: "the six-clause statement, tested for pasteability",
     group: "foundations",
     skill: "positioning-offer-pricing",
     engine: "unit",
@@ -2165,7 +2165,7 @@ var PLAYBOOKS = [
     // card does not, and a row says which it was.
     id: "engage",
     title: "Reply radar",
-    tagline: "high-reach conversations worth joining \u2014 targets ranked, replies drafted",
+    tagline: "high-reach conversations worth a reply, ranked, with the replies drafted",
     group: "content",
     skill: "social-craft",
     engine: "unit",
@@ -2187,7 +2187,7 @@ var PLAYBOOKS = [
   {
     id: "copylab",
     title: "Copy lab",
-    tagline: "15\u201320 variants \u2192 panel-scored \u2192 de-slopped \xB7 in-thread",
+    tagline: "15 to 20 variants, panel-scored, then de-slopped, in the thread",
     group: "content",
     skill: "copy-lab",
     engine: "chat",
@@ -2200,7 +2200,7 @@ var PLAYBOOKS = [
   {
     id: "hooks",
     title: "Hook batch",
-    tagline: "18-tactic matrix: visual \xB7 spoken \xB7 text \xB7 in-thread",
+    tagline: "the 18-tactic matrix: visual, spoken, and text, in the thread",
     group: "content",
     skill: "hook-engine",
     engine: "chat",
@@ -2213,7 +2213,7 @@ var PLAYBOOKS = [
   {
     id: "email",
     title: "Email sequence",
-    tagline: "welcome / nurture / launch \u2014 written in full, drafts only",
+    tagline: "welcome, nurture, and launch, written in full, drafts only",
     group: "content",
     skill: "email-sequences",
     engine: "chat",
@@ -2226,7 +2226,7 @@ var PLAYBOOKS = [
   {
     id: "launch",
     title: "Launch plan",
-    tagline: "T-4wk \u2192 T+1wk, asset stack as subtasks, PH included",
+    tagline: "T-4 weeks to T+1 week, the asset stack as subtasks, Product Hunt included",
     group: "campaigns",
     skill: "launch-playbook",
     engine: "unit",
@@ -2247,7 +2247,7 @@ var PLAYBOOKS = [
   {
     id: "ads",
     title: "Ads creative audit",
-    tagline: "concept fatigue vs its five impostors \xB7 needs ads MCP",
+    tagline: "concept fatigue against its five impostors, needs the ads connector",
     group: "campaigns",
     skill: "paid-ads-audit",
     engine: "unit",
@@ -2263,7 +2263,7 @@ var PLAYBOOKS = [
   {
     id: "appstore",
     title: "App store kit",
-    tagline: "ASO: which half is broken, metadata to the char",
+    tagline: "ASO: which half is broken, and the metadata to the character",
     group: "campaigns",
     skill: "app-store-kit",
     engine: "unit",

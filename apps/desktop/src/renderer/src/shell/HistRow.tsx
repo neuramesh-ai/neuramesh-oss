@@ -14,11 +14,13 @@ import type { RowMarks } from './rowstatus';
 
 export type HistRowData = ReturnType<typeof historyRows<TaskAllRow>>[number];
 
-export function HistRow({ r, marks, grouped, delayMs, onOpen, onSettle, onArchive }: {
+export function HistRow({ r, marks, grouped, roomTag, delayMs, onOpen, onSettle, onArchive }: {
   r: HistRowData;
   marks: RowMarks;
   /** only worth naming the room when the list spans more than one */
   grouped: boolean;
+  /** what the room slot says when it shows — a list that spans projects needs `project · #room` */
+  roomTag?: string;
   /** the entrance stagger — a sweep down the list, capped by the caller */
   delayMs?: number;
   onOpen: (r: HistRowData) => void;
@@ -38,7 +40,7 @@ export function HistRow({ r, marks, grouped, delayMs, onOpen, onSettle, onArchiv
         </span>
         {/* scoped to one room, `#dev` on all sixteen rows is noise, not information */}
         {ask && <span className="histask" aria-label="A question waits in this thread" title="A question waits in this thread" />}
-        <span className="histwhen">{grouped && <span className="histchan">#{r.channelSlug}</span>}{timeAgo(r.when)}</span>
+        <span className="histwhen">{grouped && <span className="histchan">{roomTag ?? `#${r.channelSlug}`}</span>}{timeAgo(r.when)}</span>
       </button>
       {/* the row's one act — offered only when the stamp can move something (shared canSettle,
           2026-09-09): reading it off the WORD put `Bring back` on threads with no stamp to clear */}

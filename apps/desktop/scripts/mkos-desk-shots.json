@@ -1,0 +1,63 @@
+[
+  {
+    "name": "mkos1-desk-dark",
+    "settle": 2600,
+    "query": {
+      "theme": "dark",
+      "click": "Marketing OS"
+    }
+  },
+  {
+    "name": "mkos2-desk-cream",
+    "settle": 2600,
+    "query": {
+      "theme": "cream-oak",
+      "click": "Marketing OS"
+    }
+  },
+  {
+    "name": "mkos3-threads-dark",
+    "settle": 2600,
+    "query": {
+      "theme": "dark",
+      "click": "Marketing OS"
+    },
+    "js": "(() => { const b = Array.from(document.querySelectorAll('.mkword')).find((x) => /threads/i.test(x.textContent || '')); if (b) b.click(); return new Promise((r) => setTimeout(r, 900)); })()"
+  },
+  {
+    "name": "mkos4-handoff-midflight-dark",
+    "settle": 2600,
+    "query": {
+      "theme": "dark",
+      "click": "Marketing OS"
+    },
+    "js": "(() => { const b = Array.from(document.querySelectorAll('.mkword')).find((x) => /threads/i.test(x.textContent || '')); if (b) b.click(); return new Promise((r) => setTimeout(r, 0)); })()"
+  },
+  {
+    "name": "mkos5-threads-needsyou-cream",
+    "settle": 2600,
+    "query": {
+      "theme": "cream-oak",
+      "click": "Marketing OS"
+    },
+    "js": "(async () => { const w = Array.from(document.querySelectorAll('.mkword')).find((x) => /threads/i.test(x.textContent || '')); if (w) w.click(); await new Promise((r) => setTimeout(r, 900)); const c = Array.from(document.querySelectorAll('.mkbar .mkchips:not(.leave) > button')).find((x) => /needs you/i.test(x.textContent || '')); if (c) c.click(); await new Promise((r) => setTimeout(r, 500)); })()"
+  },
+  {
+    "name": "mkos6-scoped-dark",
+    "settle": 2600,
+    "query": {
+      "theme": "dark",
+      "click": "Marketing OS"
+    },
+    "js": "(async () => { const pill = document.querySelector('.mkosview .scopebar .scopepill .cchip'); if (pill) pill.click(); await new Promise((r) => setTimeout(r, 400)); const item = Array.from(document.querySelectorAll('.cprojitem')).find((x) => /release/i.test(x.textContent || '')); if (item) item.click(); await new Promise((r) => setTimeout(r, 900)); })()"
+  },
+  {
+    "name": "mkos7-row-focus-dark",
+    "settle": 2600,
+    "query": {
+      "theme": "dark",
+      "click": "Marketing OS"
+    },
+    "js": "(() => { const row = Array.from(document.querySelectorAll('.pbrow')).find((x) => /teardown/i.test(x.textContent || '')); if (row) row.focus(); return new Promise((r) => setTimeout(r, 400)); })()"
+  }
+]

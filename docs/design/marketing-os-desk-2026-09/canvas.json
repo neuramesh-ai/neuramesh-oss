@@ -1,0 +1,98 @@
+{
+  "artboards": [
+    {
+      "file": "Main.dc.html",
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 1000,
+      "title": "A · at rest · graphite"
+    },
+    {
+      "file": "Scrolled.dc.html",
+      "x": 1580,
+      "y": 0,
+      "w": 1440,
+      "h": 1000,
+      "title": "A · scrolled into threads · the bar stuck"
+    },
+    {
+      "file": "Motion.dc.html",
+      "x": 3160,
+      "y": 0,
+      "w": 1440,
+      "h": 1000,
+      "title": "A · the hand-off · three frames and the spec"
+    },
+    {
+      "file": "CreamOak.dc.html",
+      "x": 0,
+      "y": 1260,
+      "w": 1440,
+      "h": 1000,
+      "title": "A · at rest · cream oak"
+    },
+    {
+      "file": "Scoped.dc.html",
+      "x": 1580,
+      "y": 1260,
+      "w": 1440,
+      "h": 1000,
+      "title": "A · Neuramesh picked · Foundations chip on"
+    }
+  ],
+  "annotations": [
+    {
+      "id": "note-a",
+      "x": 0,
+      "y": -290,
+      "w": 4600,
+      "text": "A · ONE PAGE, ONE BAR (round 3, after George's second note)\nThe page is today's page again: the desk, then the playbooks, then the threads underneath as you scroll. ONE bar under the desk carries the pills at the LEFT and the two section words at the RIGHT, PLAYBOOKS 11 · THREADS, one line, nothing stacked, the count on the lit word only. The words are subheadings, not tabs: a click scrolls the page to that section on the signature ease and the section's own pills take the left slot. The bar sticks to the top of the sheet while you scroll, and the lit word follows the section under it, so a click and a manual scroll end in the same state. The pills are filters inside their section: the playbook groups on one, the thread statuses (the Home ledger's chips, one derivation with the bell) on the other. The project pill at the top keeps scoping the whole screen. \"All\" is the page itself: nothing narrows unless a pill is on. The desk strip, the catalog rows (glyph, fact at rest, verb on hover, today's Run-for picker) and the ledger rows are unchanged from round 2."
+    },
+    {
+      "id": "note-rest",
+      "x": 0,
+      "y": 1020,
+      "w": 1440,
+      "text": "A · AT REST. The bar sits in flow under the desk, ground on ground, no edge. PLAYBOOKS is lit because that section is under it. The whole catalog fits, and NEEDS YOU peeks at the bottom: the threads are one scroll away, exactly as today, now with a door to them."
+    },
+    {
+      "id": "note-scrolled",
+      "x": 1580,
+      "y": 1020,
+      "w": 1440,
+      "text": "A · SCROLLED INTO THREADS. The bar is stuck under the topbar with a hairline and the resting shadow. THREADS is lit, the status chips sit at the left, NEEDS YOU lands right under the bar, then the day groups. The desk and the catalog are above, and PLAYBOOKS is the door back up."
+    },
+    {
+      "id": "note-motion",
+      "x": 3160,
+      "y": 1020,
+      "w": 1440,
+      "text": "A · THE HAND-OFF (think experience). One gesture, 420 ms on the signature ease, the docs/33 §7 hand-off duration. The old chips leave in 130 ms, the new ones rise in with nm-rise, staggered, timed to land as the scroll lands. The lit word is colour only, 150 ms. The stuck edge fades in over 120 ms. Scroll-spy keeps the bar honest on a manual scroll. Reduced motion jumps."
+    },
+    {
+      "id": "note-cream",
+      "x": 0,
+      "y": 2280,
+      "w": 1440,
+      "text": "A · CREAM OAK. The same page in the signature light. The bar in flow is ground, the stuck bar is ground with a hairline. The chips and the tiles are the elevated stratum, nothing here is a warm well."
+    },
+    {
+      "id": "note-scoped",
+      "x": 1580,
+      "y": 2280,
+      "w": 1440,
+      "text": "A · SCOPED. Neuramesh picked: the desk is one line, the rows carry that project's state and the verb is Run ›, the Foundations chip narrows the catalog to four rows, and the threads below are Neuramesh's, with no project tag. The marks on the desk line are doors (the composer foot's rule), so the scoped Connections section retires."
+    },
+    {
+      "id": "note-decided",
+      "x": 3160,
+      "y": 1260,
+      "w": 1440,
+      "text": "DECIDED (George, 2026-09-17): the two-word version, and the count rides the lit word only. The three-word ALL alternate (version 3 of this canvas) retired. This version is the visual contract the build follows."
+    }
+  ],
+  "launch": {
+    "fit": "all"
+  }
+}
