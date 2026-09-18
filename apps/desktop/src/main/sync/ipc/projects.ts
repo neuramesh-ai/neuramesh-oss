@@ -3,12 +3,16 @@
 import { app } from 'electron';
 import { api, ensureMarketingSeedsRef } from '../../sync';
 import { ipcMain } from 'electron';
+import { parseBrainOverride } from '@neuramesh/shared';
+import type { PowerSyncDatabase } from '@powersync/node';
 
 export interface ProjectsDeps {
+  /** the replica, for the one handler that merges into a thread's current brain override */
+  db: () => PowerSyncDatabase;
   ws: () => string;
 }
 
-export function registerProjects({ ws }: ProjectsDeps): void {
+export function registerProjects({ db, ws }: ProjectsDeps): void {
 // project management (humans post as themselves); rows sync back so the
 // switcher + sidebar see changes immediately.
 ipcMain.handle('nm:project-create', async (_e, { name, description, slug, newChannels, website, logoUrl }: { name: string; description?: string; slug?: string; newChannels?: string[]; website?: string; logoUrl?: string }) =>
@@ -53,6 +57,20 @@ ipcMain.handle('nm:thread-update', async (_e, { threadId, title, description }: 
 // the actor is always the human.
 ipcMain.handle('nm:thread-set-brain', async (_e, { threadId, override }: { threadId: string; override: Record<string, string> | null }) =>
   api('/v1/commands', { type: 'thread.set_brain', workspace: ws(), threadId, override }));
+// one seat of one conversation → a model (the auth card's "Use Starter here", 2026-09-17). Merged
+// here from the replica's current override, so a card in a thread that already moved two other
+// seats does not reset them; the server still validates the whole map and keeps it HUMAN_ONLY.
+// the same row, read: the auth card asks whether its seat already moved, so a reload never shows a
+// button for a switch that already happened
+ipcMain.handle('nm:thread-brain', async (_e, { threadId }: { threadId: string }) => {
+  const row = await db().get<{ brain_override: string | null }>('select brain_override from threads where id = ?', [threadId]).catch(() => null);
+  return parseBrainOverride(row?.brain_override ?? null);
+});
+ipcMain.handle('nm:thread-brain-role', async (_e, { threadId, role, model }: { threadId: string; role: string; model: string }) => {
+  const row = await db().get<{ brain_override: string | null }>('select brain_override from threads where id = ?', [threadId]).catch(() => null);
+  const current = parseBrainOverride(row?.brain_override ?? null) ?? {};
+  return api('/v1/commands', { type: 'thread.set_brain', workspace: ws(), threadId, override: { ...current, [role]: model } });
+});
 ipcMain.handle('nm:channel-kind', async (_e, { channelId, kind }: { channelId: string; kind: 'build' | 'marketing' }) => {
   const out = await api('/v1/commands', { type: 'channel.set_kind', channel: channelId, kind });
   // the room just became an HQ — staff it now (pack + plume), not at the next reboot

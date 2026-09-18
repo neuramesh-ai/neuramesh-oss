@@ -191,7 +191,10 @@ export interface NmQuestion {
   proposal?: TaskProposalCardData;
 }
 
-const NMQ_BLOCK = /```nmq\s*\n([\s\S]*?)```/g;
+// `[ \t]*\n`, never `\s*\n`: \s also matches the newline, so the two fought over it and every fence
+// opener backtracked polynomially on a body of blank lines (CodeQL js/polynomial-redos, the public
+// PR #7, 2026-09-18). Same capture on real fences: trailing blanks after the word, then the line end.
+const NMQ_BLOCK = /```nmq[ \t]*\n([\s\S]*?)```/g;
 
 /**
  * Options, however the author wrote them. The type says `{label}`, but these blocks are authored
@@ -305,10 +308,10 @@ export function formatCardAnswer(pairs: Array<{ question: string; answer: string
 export const MAX_SUGGESTIONS = 4;
 export const MAX_SUGGESTION_CHARS = 48;
 
-const NMS_BLOCK = /```nms\s*\n([\s\S]*?)```/g;
+const NMS_BLOCK = /```nms[ \t]*\n([\s\S]*?)```/g;
 // a reply that is still streaming can end mid-fence — strip that too, so a partial
 // render never flashes the raw block as a code fence
-const NMS_PARTIAL = /```nms(?:\s*\n(?:(?!```)[\s\S])*)?$/;
+const NMS_PARTIAL = /```nms(?:[ \t]*\n(?:(?!```)[\s\S])*)?$/;
 
 // Extract the suggestions a message carries: strings only, trimmed, non-empty, length-capped,
 // deduped case-insensitively, at most MAX_SUGGESTIONS across all blocks.
@@ -363,9 +366,34 @@ export interface NmAuth {
   reason?: 'expired' | 'unavailable';
   agent?: string;
   taskNumber?: number;
+  /** the verbose reason the daemon found (2026-09-17, the Starter fallback door): shown as-is */
+  why?: string;
+  /** false when the workspace is out of credits — the card then offers no Starter switch */
+  starter?: boolean;
+  /** the conversation the switch moves, and which seat: the button re-seats THIS thread's role on
+   *  the Starter brain (docs/10 §15.1, thread > pin). Absent on a bare channel post, where the
+   *  button falls back to the workspace-wide Starter pack it always switched. */
+  scope?: { threadId: string; role: string };
+  /** true when the seat ALREADY moved to the Starter brain by itself (a routine's conversation): the
+   *  card records the switch and asks nothing — no decision row, no button, the reconnect only */
+  switched?: boolean;
 }
 
-const NMAUTH_ONE = /```nmauth\s*\n([\s\S]*?)```/;
+const NMAUTH_ONE = /```nmauth[ \t]*\n([\s\S]*?)```/;
+
+/** the fenced block the daemon posts — one serializer, so what the door writes is what parseAuthCard reads */
+export function authCardBlock(card: NmAuth): string {
+  return `\`\`\`nmauth\n${JSON.stringify(card)}\n\`\`\``;
+}
+
+/** the needs-you row an auth card mints (docs/12): what the person reads in the queue, the bell, the
+ *  thread pill. A question in form only — the answer is a reconnect or a switch, not a word. */
+export function authDecisionQuestion(card: NmAuth): string {
+  const who = card.agent ? `@${card.agent}` : 'An agent';
+  const label = AUTH_LABEL[card.provider] ?? card.provider;
+  const why = card.why ?? (card.reason === 'expired' ? `The ${label} login on this machine expired.` : `This machine has no ${label} login.`);
+  return `${who} cannot run here. ${why} Sign in again, or switch this conversation to the NeuraMesh brain, on credits.`.slice(0, 400);
+}
 
 export const AUTH_LABEL: Record<string, string> = { anthropic: 'Claude', openai: 'OpenAI / Codex', gemini: 'Gemini' };
 
@@ -382,11 +410,17 @@ export function parseAuthCard(body: string): NmAuth | null {
     const provider = typeof o['provider'] === 'string' ? o['provider'] : '';
     if (!provider) return null;
     const reason = o['reason'];
+    const scope = o['scope'] as { threadId?: unknown; role?: unknown } | undefined;
     return {
       provider,
       ...(reason === 'expired' || reason === 'unavailable' ? { reason } : {}),
       ...(typeof o['agent'] === 'string' ? { agent: o['agent'] } : {}),
       ...(typeof o['taskNumber'] === 'number' ? { taskNumber: o['taskNumber'] } : {}),
+      // the fallback door's fields (2026-09-17): the reason, whether Starter can take it, the seat
+      ...(typeof o['why'] === 'string' ? { why: o['why'] } : {}),
+      ...(typeof o['starter'] === 'boolean' ? { starter: o['starter'] } : {}),
+      ...(scope && typeof scope.threadId === 'string' && typeof scope.role === 'string' ? { scope: { threadId: scope.threadId, role: scope.role } } : {}),
+      ...(o['switched'] === true ? { switched: true } : {}),
     };
   } catch {
     return null;

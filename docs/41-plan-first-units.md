@@ -120,3 +120,41 @@ anchor it; (b) a verdict-less `done` task has no in-UI Accept (by design `done` 
 and the card is rex's to raise — but the needs-you row that says READY should carry the button
 it promises); (c) a human reply on a done task woke nobody visible — check the done-state reply
 pump.
+
+## 6. Hands-off units: routines through every gate (2026-09-16)
+
+A unit born from a routine's thread runs with nobody in the loop, and every gate on its journey
+has a server-side, routine-sourced release — never a prompt, never a client field the caller might
+forget. The round: [design/routine-handsoff-2026-09](design/routine-handsoff-2026-09/plan.md)
+(George's report on #1093, the replica-and-activity-log forensics, the artboards in both themes).
+
+| gate | the routine's release | where |
+|---|---|---|
+| plan | born approved (`plan_approved_at`, requirements confirmed, subtasks minted at create); a plan proposed later on a routine-anchored todo auto-approves at the propose | `handler/createtask.ts` · `planfollowup.ts` (`routinePlanFollowup`) |
+| design | a `propose_design` on a routine-anchored, repo-less unit auto-approves at the propose: the plan-first fork to `todo`, the round promoted to the library, one server-posted line in the thread (`✓ Design round N auto-approved · routine run`); the host's `startRoutineBuildWatch` (planroute.ts) then offers the build mechanically | `planfollowup.ts` (`routineDesignFollowup`) · `host/planroute.ts` |
+| accept | review's `done` auto-accepts, one "routine finished" push | `planfollowup.ts` (`routineAcceptFollowup`) · `push.ts` |
+| floors | never repo-backed (code merges on a human whatever opened the thread); a human conversation keeps every gate; playbook units keep their own contract (born approved, lean to the accept gate) | the same modules |
+
+**The anchor is what the server sees.** "Routine" is read from `tasks.origin_thread_id →
+threads.schedule_id`, so the unit must be created BY the conversation's wake (which binds
+`originThread`). Two things make that true by construction:
+
+- **The routine resume** (`host/routineresume.ts`, docs/19 §6): a routine thread whose opener got
+  no real answer (nothing after a 10-minute grace, or only compute notices — a notice is a reason
+  nobody answered, never an answer) and that anchors no unit is re-asked by the host, as the owner,
+  into the same thread (`Routine resumed · title`). A fresh human trigger rides the ordinary thread
+  wake. Bounded: three per thread (counted in the thread, so a restart cannot reset it), never
+  while a newer run of the same routine exists, only from the origin's machine holding a usable
+  credential.
+- **The monitor never sees a routine's thread** (`sweepTranscript`): the 15-minute self-check is
+  what filed #1093 flat — a sweep turn has no conversation to anchor, so its `create_task` carried
+  no `originThread` and the server could not see a routine. A routine thread has a deterministic
+  owner now (fire → wake → resume → unit), and "fell through" is the resume's job.
+
+**On Pro, the routine's orchestrator runs on the Starter brain** (2026-09-16, George: "routines should always run; on the cloud, on the neuramesh starter model, which is always available on credits and does not depend on a Claude, Codex or Gemini login — one benefit of Pro"). The server births the routine's thread with `brain_override = { orchestrator: STARTER_MODEL }` when `workspaces.plan` is Pro (docs/10 §15.6); the seat is read per wake, the house model is servable by any awake machine, and the origin rung sends a routine-born session to the cloud runner. The unit's build legs run wherever their seat is served — on the Starter worker lane when the conversation's brain is the house model (docs/10 §15.8), else on the runtime their seat needs.
+
+**Honesty follows the stamp.** The plan judgment (`orchPlanDecision`) never runs on an approved
+plan on any path; the design-review notify skips routine units; the `create_task` tool result says
+the unit *started*; the stall classifier treats an approved `plan_review` as a todo waiting on its
+offer; the plan card's compact record reads **auto-approved · routine** (the unit's origin thread
+carries `schedule_id`); the unit card reads *approved · awaiting its offer*.

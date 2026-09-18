@@ -8,6 +8,7 @@ import { apiAuthHeaders } from '../apiauth';
 import { drainQuery, claudeAgentPrompt } from './turnkit';
 import { claudePathOption, keyEnvFor, providerEnv, type AgentAttachment } from '../runtime/adapter';
 import { ORCH_EMPTY_TURN } from '../replypolicy';
+import { stripPseudoToolCalls } from './pseudocalls';
 import type { LogFn } from '../agentlog';
 import type { OrchTool } from './orchtools';
 
@@ -35,7 +36,7 @@ export async function geminiDispatch(
  *  answers with Google's own response body, so the caller's loop is unchanged. a 402 surfaces as
  *  a readable refusal rather than an empty turn — running out of credits is a thing to say, not
  *  a thing to fail silently at. */
-async function starterGenerate(a: { apiUrl: string; workspace: string; actorId: string; contents: any[]; config: any }): Promise<any> {
+export async function starterGenerate(a: { apiUrl: string; workspace: string; actorId: string; contents: any[]; config: any }): Promise<any> {
   const res = await fetch(`${a.apiUrl}/v1/starter/generate`, {
     method: 'POST',
     headers: await apiAuthHeaders(a.apiUrl, { kind: 'human', id: a.actorId }),
@@ -58,6 +59,8 @@ export async function geminiOrchestratorTurn(args: {
   model: string; token: string; systemPrompt: string; transcript: string; tools: OrchTool[]; log?: LogFn;
   /** the platform pays: route through control-api's metered proxy, never a local key */
   starter?: boolean; apiUrl?: string; workspace?: string; actorId?: string;
+  /** a WORKER on the lane (runtime/starter.ts) takes more rounds than a routing turn, and a human Stop must end it */
+  maxTurns?: number; abort?: AbortSignal;
 }): Promise<string> {
   const { GoogleGenAI, Type } = await import('@google/genai');
   // zod shape → a Gemini parameter Schema (the orchestrator tools use string/number/boolean/array/
@@ -103,7 +106,8 @@ export async function geminiOrchestratorTurn(args: {
   const config = { systemInstruction: args.systemPrompt, tools: [{ functionDeclarations }], temperature: 0.4 };
 
   let lastText = '';
-  for (let turn = 0; turn < 14; turn++) {
+  for (let turn = 0; turn < (args.maxTurns ?? 14); turn++) {
+    if (args.abort?.aborted) throw new Error('stopped by a human');
     const r: any = viaProxy
       ? await starterGenerate({ apiUrl: args.apiUrl ?? '', workspace: args.workspace ?? '', actorId: args.actorId ?? '', contents, config })
       : await ai!.models.generateContent({ model: args.model, contents, config });
@@ -112,7 +116,11 @@ export async function geminiOrchestratorTurn(args: {
     const calls = (r.functionCalls ?? (r.candidates?.[0]?.content?.parts ?? [])
       .map((p: any) => p?.functionCall).filter(Boolean)) as Array<{ name: string; args?: any; id?: string }>;
     if (!calls.length) {
-      lastText = (r.text ?? (r.candidates?.[0]?.content?.parts ?? []).map((p: any) => p?.text).filter(Boolean).join('') ?? '').trim();
+      const raw = (r.text ?? (r.candidates?.[0]?.content?.parts ?? []).map((p: any) => p?.text).filter(Boolean).join('') ?? '').trim();
+      // a call the model NARRATED instead of making never reaches the room (host/pseudocalls.ts)
+      const clean = stripPseudoToolCalls(raw, byName.keys());
+      if (clean.stripped) args.log?.({ kind: 'result', phase: 'warn', summary: `dropped ${clean.stripped} narrated tool call${clean.stripped === 1 ? '' : 's'} from the reply`, level: 'warn' });
+      lastText = clean.text;
       args.log?.({ kind: 'result', phase: 'success', summary: `replied · gemini (${args.model})` });
       return lastText || ORCH_EMPTY_TURN; // empty text → stand down, never a posted placeholder
     }
@@ -129,7 +137,7 @@ export async function geminiOrchestratorTurn(args: {
     }
     contents.push({ role: 'user', parts: responseParts });
   }
-  args.log?.({ kind: 'result', phase: 'error', summary: `gemini orchestration hit the 14-turn cap`, level: 'warn' });
+  args.log?.({ kind: 'result', phase: 'error', summary: `gemini orchestration hit the ${args.maxTurns ?? 14}-turn cap`, level: 'warn' });
   return lastText || ORCH_EMPTY_TURN; // exhausted with no channel text → stand down
 }
 

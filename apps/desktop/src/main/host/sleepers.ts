@@ -66,7 +66,12 @@ export function makeSleeperWake(deps: {
     return { machineId: best.machineId, ownerUserId: best.ownerUserId, asked: true };
   }
 
-  return { requestSleeperWake };
+  /** the ladder's own question, for a caller that must know before it speaks (the claim door, 2026-09-17) */
+  async function nobodyServes(a: Pick<SleeperAsk, 'runtime' | 'model' | 'originUserId'>): Promise<boolean> {
+    return nobodyCanServe(await deps.peerMachines(), a.runtime, a.originUserId, now(), a.model);
+  }
+
+  return { requestSleeperWake, nobodyServes };
 }
 
 /** test seam: forget every memo (the map is module-scoped on purpose) */

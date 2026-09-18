@@ -1,6 +1,7 @@
 // What hangs off a message — attachments, a whiteboard snapshot card, a dropped document.
 // Split out of thread/convo.tsx.
 
+import { BrainNotice } from './BrainNotice';
 import { AgentGhost } from './AgentGhost';
 import { WaitGhost } from './WaitGhost';
 import { useConvoPresence } from './convo-presence';
@@ -329,6 +330,9 @@ export function ConvoThread({ threadId, back, thread, channelId, channelSlug, ch
         {/* the ONE contextual gate above the composer (docs/25). It renders only when the
             workspace's machine is capped — the moment a message will not be answered and the
             person has no other way to find out. */}
+        {/* the brain notice (docs/10 §15.7): a seat that cannot run, or runs on Starter here, said
+            above the composer where a reply is typed — the card in the transcript scrolls away */}
+        <BrainNotice rows={rows} override={parseBrainOverride(thread?.brain_override ?? null)} onReset={async () => { await nm?.threadSetBrain(threadId, null); }} />
         <CapGate onUpgrade={onUpgradeReason} onSeeUsage={onSeeUsage} />
         {hostedGate ? <HostedGate /> : (
         <div

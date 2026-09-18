@@ -173,13 +173,15 @@ test('explicit apikey mode with NO key falls to the house model rather than dead
   assert.equal(r.authMode, 'starter');
 });
 
-test('on a machine you OWN a blocked subscription still BLOCKS the house model — not a silent downgrade', () => {
-  // the block exists so we never spend something the user did not opt into for this run. quietly
-  // switching them to platform credits would be exactly that, with our money instead of theirs.
-  // This holds where the login is genuinely reconnectable: the user's own laptop.
+test('on a machine you OWN a blocked subscription no longer blocks the HOUSE model — the seat is the opt-in (reversed 2026-09-16)', () => {
+  // Until 2026-09-16 this asserted a BLOCK: "quietly switching them to platform credits would be a
+  // silent downgrade". Reversed by George's ruling for the Starter worker lane — the Starter brain
+  // must never depend on a Claude, Codex or Gemini login, and a seat on the house model IS the
+  // choice to run on credits. A lapsed Gemini login on the laptop is a fact about agy, not about
+  // this seat. The block stands for every seat that is NOT the house model (the next case).
   const r = decide({ platformModel: true, storedAuthMode: 'subscription', subActive: false, loginPresent: true });
-  assert.equal(r.authMode, 'none');
-  assert.equal(r.source, 'subscription-blocked');
+  assert.equal(r.authMode, 'starter');
+  assert.equal(r.source, 'starter');
 });
 
 test('on a CLOUD machine the house model serves a blocked subscription — there is no login to reconnect', () => {
@@ -203,4 +205,11 @@ test("a cloud machine still prefers the user's own credential over house credits
   // cloud machine would not take over
   assert.equal(decide({ cloudMachine: true, platformModel: true, storedAuthMode: 'subscription', subActive: true }).authMode, 'subscription');
   assert.equal(decide({ cloudMachine: true, platformModel: true, storedAuthMode: 'subscription', subActive: false, autoFailover: true, storedToken: 'k' }).source, 'failover');
+});
+
+// …and the block still stands for a seat that is NOT the house model (2026-09-16): the no-silent-billing rule
+test('a lapsed subscription on a laptop still blocks a seat that is not the house model', () => {
+  const b = decide({ provider: 'gemini', loginPresent: true, subActive: false, platformModel: false, cloudMachine: false });
+  assert.equal(b.authMode, 'none');
+  assert.equal(b.blocked?.reason, 'expired');
 });

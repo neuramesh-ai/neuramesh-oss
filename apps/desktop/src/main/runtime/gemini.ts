@@ -14,6 +14,7 @@ import { openBusBridge, ensureAgyBus, userDataDir, beatsAdapter } from '../harne
 import { computeFsJail } from '../sandbox/fsjail';
 import { buildSeatbeltProfile, cleanupTempProfile, sandboxExecArgv, sandboxExecAvailable, writeTempProfile } from '../sandbox/seatbelt';
 import { ensureCli } from './cli';
+import { isStarterSeat, starterComplete, starterRunQuery } from './starter';
 
 // Run `agy --print` non-interactively. Auth = the machine's Google login (system keyring;
 // ANTIGRAVITY_API_KEY honored if set) — we never inject a GEMINI_API_KEY here (agy owns its auth).
@@ -92,6 +93,9 @@ function geminiContents(transcript: string, attachments?: AgentAttachment[]): st
 
 export const geminiAdapter: RuntimeAdapter = {
   async streamTurn(agent, channelSlug, transcript, token, log, onDelta, attachments) {
+    // THE STARTER LANE (runtime/starter.ts, 2026-09-16): the house model is served by the metered proxy,
+    // never by the user's Google login — the same rule geminiDispatch applies to the orchestrator
+    if (isStarterSeat(agent.model, token)) { const t = await starterComplete(chatSystemPrompt(agent.name, channelSlug, instructionsFor(agent)), transcript); onDelta?.(t); return t || '(no reply)'; }
     if (!token) return agyExec({ prompt: `${chatSystemPrompt(agent.name, channelSlug, agent.brief)}\n\n${transcript}`, log, onDelta });
     const { GoogleGenAI } = await import('@google/genai');
     const ai = new GoogleGenAI({ apiKey: token });
@@ -116,6 +120,7 @@ export const geminiAdapter: RuntimeAdapter = {
     }
   },
   async complete(system, user, token, model, maxTokens = 2000) {
+    if (isStarterSeat(model, token)) return starterComplete(system, user);
     if (!token) return agyExec({ prompt: `${system}\n\n${user}` });
     const { GoogleGenAI } = await import('@google/genai');
     const ai = new GoogleGenAI({ apiKey: token });
@@ -127,6 +132,8 @@ export const geminiAdapter: RuntimeAdapter = {
     return (r.text ?? '').trim();
   },
   async runQuery(agent, t, dir, token, channelBlock, repoBacked, ac, log, skills, proposeSkill?: ProposeSkillFn, reworkNotes?: string, attachmentsNote?: string, recordLesson?: RecordLessonFn, lessonsNote?: string, promptOverride?: PromptOverride, addBacklogItem?: AddBacklogItemFn, beats?: BeatsFn, _permissionGate?: PermissionGate, protectedPaths?: string[], opts?: TurnOpts) {
+    // the Starter lane: the same bus, direct, on the proxy — no agy, no login (runtime/starter.ts)
+    if (isStarterSeat(agent.model, token)) return starterRunQuery(agent, t, dir, channelBlock, repoBacked, ac, log, skills, proposeSkill, reworkNotes, attachmentsNote, recordLesson, lessonsNote, promptOverride, addBacklogItem, beats, _permissionGate, opts);
     void token; // workers authenticate through agy's own Google login, not a GEMINI_API_KEY
     // ── The tool bus (docs/harness/03) ─────────────────────────────────────────────────────────
     // agy used to receive these six tool closures and discard every one of them. Now they arrive as

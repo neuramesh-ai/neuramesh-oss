@@ -1,5 +1,6 @@
 // The architect's own flow — drafting an implementation plan. Split out of host/planflow.ts.
-import { PROVIDER_LABEL, authBlockedCard, openPlanningWorkspace, resolveToken, runtimeFor } from '../agents';
+import { starterFallback, unavailableOf, whyUnavailable } from './starterfallback';
+import { openPlanningWorkspace, resolveToken, runtimeFor } from '../agents';
 import type { ExecTask, HostedAgent, OfferedTask, SkillRef, PlanTask } from '../agents';
 import { type ClaimVerdict } from '@neuramesh/shared';
 import { architectBeatTitles } from '../beats';
@@ -78,15 +79,19 @@ async function architectFlow(arch: HostedAgent, t: PlanTask) {
   try {
     const ch = await db.get<{ id: string; slug: string; workspace_id: string }>('select id, slug, workspace_id from channels where id = ?', [t.channel_id]);
     chRef = ch;
-    const cred = await resolveToken(apiUrl, ch.workspace_id, arch, ownerActorId);
-    // Preferred subscription is down + failover is Manual → post the reconnect card and block,
-    // rather than fabricate a deterministic echo plan that looks like real architecture.
-    if (cred.blocked && process.env['NM_AGENT_MODE'] !== 'echo') {
-      const reason = `${PROVIDER_LABEL[cred.blocked.provider]} subscription login is ${cred.blocked.reason} on the host — reconnect it, or switch @${arch.name} to API-key mode (or enable Auto failover with a key), then re-plan #${t.number}. Won't bill a key automatically.`;
-      await post('/v1/messages', actor, { workspace: ch.workspace_id, channel: ch.id, taskId: t.id, body: authBlockedCard(arch, cred.blocked, t.number) }).catch(() => {});
-      await post('/v1/commands', actor, { type: 'task.block', taskId: t.id, reason }).catch((e) => console.error(`task_block #${t.number} failed:`, e));
-      setStatus(arch, 'online');
-      return;
+    let cred = await resolveToken(apiUrl, ch.workspace_id, arch, ownerActorId);
+    // the seat cannot run → the Starter door (host/starterfallback.ts): a routine's unit plans on the
+    // Starter brain; a human's gets the reason and the card, and the unit blocks until they act.
+    // Never a deterministic echo plan that looks like real architecture.
+    const gap = unavailableOf(cred, arch.runtime);
+    if (gap) {
+      const next = await starterFallback(arch, gap, { workspace: ch.workspace_id, channelId: ch.id, taskId: t.id, taskNumber: t.number });
+      if (!next) {
+        await post('/v1/commands', actor, { type: 'task.block', taskId: t.id, reason: `@${arch.name} cannot run here. ${whyUnavailable(gap, arch.runtime)} Sign in again, or switch this conversation to the NeuraMesh brain, then re-plan #${t.number}.` }).catch((e) => console.error(`task_block #${t.number} failed:`, e));
+        setStatus(arch, 'online');
+        return;
+      }
+      arch = next; cred = await resolveToken(apiUrl, ch.workspace_id, arch, ownerActorId);
     }
     const token = cred.token ?? ''; // apikey → the key; subscription → '' (providerEnv strips keys)
     const live = process.env['NM_AGENT_MODE'] !== 'echo' && cred.authMode !== 'none';

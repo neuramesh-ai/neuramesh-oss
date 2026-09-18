@@ -32,7 +32,7 @@ const MODEL_LABEL: Record<string, string> = {
   'gemini-3.8-flash': 'Gemini 3.8 Flash', 'gemini-3.5-flash': 'Gemini 3.5 Flash', 'gemini-3.1-pro-preview': 'Gemini 3.1 Pro', 'gemini-3.1-flash-lite': 'Gemini 3.1 Flash-Lite',
   // the house brain, in this table's short form — a failover card is read by a human, and the
   // mark beside it already says whose brain it is
-  [STARTER_MODEL]: 'NM Cloud Starter v1',
+  [STARTER_MODEL]: 'NeuraMesh brain (Starter v1)',
 };
 export const foLabel = (id: string): string => MODEL_LABEL[id] ?? id;
 
@@ -112,7 +112,11 @@ async function confirmAddAgent(orch: HostedAgent, channelId: string, agentName: 
  * the precedence lives in one tested place rather than in this call site.
  */
 async function seatFor(agent: HostedAgent, channelId: string, scope?: { threadId?: string | null; taskId?: string | null }): Promise<HostedAgent> {
-  if ((agent.modelSource ?? 'pack') === 'manual') return agent; // a human pin outranks any pack
+  // the conversation's override is read BEFORE the pin short-circuit (2026-09-17): a pinned
+  // orchestrator used to skip it, so a routine's Starter stamp on Pro never seated him and the
+  // routine ran on the human's vendor login — seen live in the harness. A pin still beats a pack.
+  const threadOverride = scope ? await threadBrain(scope) : null;
+  if ((agent.modelSource ?? 'pack') === 'manual' && !threadOverride) return agent;
   const row = await db.get<{ workspace_id: string; model_pack: string | null }>(
     `select c.workspace_id, p.model_pack from channels c
        left join projects p on p.id = c.project_id
@@ -120,7 +124,6 @@ async function seatFor(agent: HostedAgent, channelId: string, scope?: { threadId
     [channelId],
   ).catch(() => null);
   const pack = row?.model_pack ?? null;
-  const threadOverride = scope ? await threadBrain(scope) : null;
   // no project pack AND no thread override → the workspace materialization stands
   if (!pack && !threadOverride) return agent;
   const custom = pack && isCustomPackId(pack) ? await customPacksFor(row!.workspace_id) : [];

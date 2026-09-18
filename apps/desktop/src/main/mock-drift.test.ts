@@ -68,7 +68,7 @@ const UNMOCKED = new Set([
   'projectArchive', 'projectDelete', 'projectDetect', 'addPersonToChannel',
   'removeAgentFromChannel', 'removePersonFromChannel',
   // task/thread mutations the flow walkthrough performs through taskAction instead
-  'taskSetDod', 'taskUpdateDetails', 'threadArchive', 'threadUnarchive', 'threadSettle', 'threadUnsettle', 'threadUpdate', 'threadSetBrain',
+  'taskSetDod', 'taskUpdateDetails', 'threadArchive', 'threadUnarchive', 'threadSettle', 'threadUnsettle', 'threadUpdate', 'threadSetBrain', 'threadBrainRole', 'threadBrain',
   'shipItem', 'shipItemAdd', 'setupStep', 'scheduleUpdate', 'contentUpdate', 'contentDelete',
   'promoteArtifact', 'attachStage', 'attachDiscard', 'mediaPreview', 'openHtml',
   'ensureRuntimeCli', 'computeSharedThreads', 'retro',

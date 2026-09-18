@@ -216,3 +216,14 @@ test('the routine shortlist honours the sweep cap', () => {
   const many = Array.from({ length: 9 }, (_, i) => rcand({ id: `s-${i}` }));
   assert.equal(classifyRoutineStalls(many, NOW).length, MAX_STALLS_PER_SWEEP);
 });
+
+// --- an APPROVED plan is past the human gate (2026-09-16, the #1093 class) ---
+
+test('plan_review with the approval stamp is never awaiting_human — it is a todo waiting on its offer', () => {
+  const approved = cand({ state: 'plan_review', assignee: null, updatedAtMs: ago(3 * H), planApprovedAtMs: ago(3 * H) });
+  assert.equal(classifyStalls([approved], NOW)[0]?.cls, 'unrouted');
+  const offered = cand({ state: 'plan_review', assignee: null, offered: 'plume', updatedAtMs: ago(30 * MIN), planApprovedAtMs: ago(30 * MIN) });
+  assert.equal(classifyStalls([offered], NOW)[0]?.cls, 'unclaimed_offer');
+  const gated = cand({ state: 'plan_review', assignee: null, updatedAtMs: ago(3 * H), planApprovedAtMs: null });
+  assert.equal(classifyStalls([gated], NOW)[0]?.cls, 'awaiting_human');
+});

@@ -1,0 +1,127 @@
+{
+  "artboards": [
+    {
+      "file": "RoutineThread.dc.html",
+      "x": 0,
+      "y": 0,
+      "w": 1040,
+      "h": 760,
+      "title": "A · The routine’s thread · graphite"
+    },
+    {
+      "file": "RoutineThreadCream.dc.html",
+      "x": 1120,
+      "y": 0,
+      "w": 1040,
+      "h": 760,
+      "title": "A · The routine’s thread · cream oak"
+    },
+    {
+      "file": "UnitThread.dc.html",
+      "x": 0,
+      "y": 900,
+      "w": 1040,
+      "h": 860,
+      "title": "B · The unit’s thread · graphite"
+    },
+    {
+      "file": "UnitThreadCream.dc.html",
+      "x": 1120,
+      "y": 900,
+      "w": 1040,
+      "h": 860,
+      "title": "B · The unit’s thread · cream oak"
+    },
+    {
+      "file": "RoutinePro.dc.html",
+      "x": 0,
+      "y": 1900,
+      "w": 1040,
+      "h": 900,
+      "title": "C · The routine on Pro · graphite"
+    },
+    {
+      "file": "RoutineProCream.dc.html",
+      "x": 1120,
+      "y": 1900,
+      "w": 1040,
+      "h": 900,
+      "title": "C · The routine on Pro · cream oak"
+    },
+    {
+      "file": "Notice.dc.html",
+      "x": 0,
+      "y": 2940,
+      "w": 1040,
+      "h": 420,
+      "title": "D · The notice says why · graphite"
+    },
+    {
+      "file": "NoticeCream.dc.html",
+      "x": 1120,
+      "y": 2940,
+      "w": 1040,
+      "h": 420,
+      "title": "D · The notice says why · cream oak"
+    },
+    {
+      "file": "StarterHere.dc.html",
+      "x": 0,
+      "y": 3500,
+      "w": 1040,
+      "h": 900,
+      "title": "E · Use NeuraMesh brain here · before · graphite"
+    },
+    {
+      "file": "StarterHereAfter.dc.html",
+      "x": 1120,
+      "y": 3500,
+      "w": 1040,
+      "h": 900,
+      "title": "E · Use NeuraMesh brain here · after · graphite"
+    },
+    {
+      "file": "StarterHereCream.dc.html",
+      "x": 2240,
+      "y": 3500,
+      "w": 1040,
+      "h": 900,
+      "title": "E · Use NeuraMesh brain here · after · cream oak"
+    },
+    {
+      "file": "BrainNotice.dc.html",
+      "x": 0,
+      "y": 4540,
+      "w": 1040,
+      "h": 1180,
+      "title": "F · The brain notice · graphite"
+    },
+    {
+      "file": "BrainNoticeCream.dc.html",
+      "x": 1120,
+      "y": 4540,
+      "w": 1040,
+      "h": 1180,
+      "title": "F · The brain notice · cream oak"
+    }
+  ],
+  "annotations": [
+    {
+      "id": "note-a",
+      "x": 0,
+      "y": -150,
+      "w": 1000,
+      "text": "A · THE ROUTINE’S THREAD\nA compute notice is not an answer: the host re-asks as the owner once it holds a usable credential (bounded to three, never while a newer run exists). The re-ask is an ordinary human trigger, so the thread wake carries the conversation and the server births the unit approved."
+    },
+    {
+      "id": "note-b",
+      "x": 0,
+      "y": 760,
+      "w": 1000,
+      "text": "B · THE UNIT’S THREAD\nThe plan record says auto-approved · routine. The design round is approved by the routine too (server follow-up, one line in the thread), the build is offered mechanically, and the human reads a run."
+    }
+  ],
+  "launch": {
+    "view": "canvas"
+  }
+}

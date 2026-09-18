@@ -5,12 +5,15 @@
  * The workspace's balance needs ONE ambient home, not a panel you have to remember to open, so
  * it joins the nav's workspace foot as a third element, LEFT OF THE ACCOUNT AVATAR.
  *
- * Why a ring and not a number: a number in the rail asks to be read; a ring asks only to be
- * glanced at, and depletion is a shape before it is a figure. So the resting state carries NO
- * digits — the arc shortens, and warms below a fifth. The three named lines (Brain · Machine ·
- * Storage) survive one click in, where someone who wants the breakdown goes looking, and the
- * popover's last line is the one that matters: connecting your own brain stops the drain, which
- * turns the meter into a reason rather than a threat.
+ * A ring AND a number (George, 2026-09-17: "update the usage ring on the left nav to actually
+ * show the credits the user has left inside the ring"). The first cut carried no digits, on the
+ * argument that depletion is a shape before it is a figure; it stayed a shape nobody could read
+ * without a click, and the one place the number then appeared — the switch button in a thread —
+ * read as a price. So the balance rides INSIDE the ring now, compact (479 · 1.5k · 12k), and the
+ * arc keeps saying the same thing at a glance: it shortens, and warms below a fifth. The three
+ * named lines (Brain · Machine · Storage) survive one click in, where someone who wants the
+ * breakdown goes looking, and the popover's last line is the one that matters: connecting your
+ * own brain stops the drain, which turns the meter into a reason rather than a threat.
  *
  * NO PER-REPLY PRICING, anywhere on this surface (George, twice). A per-message rate makes a
  * free product feel like a taxi meter and is a number nobody can act on in the moment. The
@@ -30,12 +33,15 @@ import { createPortal } from 'react-dom';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { nextRefillOn } from '@neuramesh/shared';
 import { nm as nmBridge, type ConnectionKind, type WorkspaceUsage } from '../bridge/nm';
+import { fmtCredits } from './credits-format';
 
 // imported bindings lose control-flow narrowing inside closures, so re-bind (App.tsx's note)
 const nm = nmBridge;
 
-/** r=9 in a 22px box: the mockup's ring, and the circumference its dash array is cut from */
-const R = 9;
+/** r=12.5 in a 30px box (was r=9 in 22px): room for three digits inside, and the circumference
+ *  the arc's dash array is cut from */
+const R = 12.5;
+const C = 15;
 const CIRC = 2 * Math.PI * R;
 /** below a fifth remaining the arc turns warm — the one threshold the design names */
 const LOW = 0.2;
@@ -219,13 +225,15 @@ export function CreditRing({ workspace, onUpgrade, connection }: {
         title={label}
         aria-label={label}
       >
-        <svg viewBox="0 0 22 22" aria-hidden>
-          <circle className="credtrack" cx="11" cy="11" r={R} />
+        <svg viewBox="0 0 30 30" aria-hidden>
+          {/* the arc starts at twelve o'clock: the circles turn, the number does not */}
+          <circle className="credtrack" cx={C} cy={C} r={R} transform={`rotate(-90 ${C} ${C})`} />
           <circle
             className={`credarc${low ? ' low' : ''}`}
-            cx="11" cy="11" r={R}
+            cx={C} cy={C} r={R} transform={`rotate(-90 ${C} ${C})`}
             style={{ strokeDasharray: CIRC, strokeDashoffset: CIRC * (1 - frac) }}
           />
+          <text className="crednum" x={C} y={C} textAnchor="middle" dominantBaseline="central">{fmtCredits(left)}</text>
         </svg>
       </button>
       {open && createPortal(

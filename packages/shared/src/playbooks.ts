@@ -280,7 +280,8 @@ export function playbookRecsBlock(channel: string, plays: PlaybookRec[]): string
   return '```nmplays\n' + JSON.stringify({ channel, plays: plays.slice(0, 3) }) + '\n```';
 }
 
-const NMPLAYS_RE = /```nmplays\s*\n([\s\S]*?)```/;
+// `[ \t]*\n`, not `\s*\n`: the cards.ts fence rule (polynomial backtracking on blank lines)
+const NMPLAYS_RE = /```nmplays[ \t]*\n([\s\S]*?)```/;
 
 export function parsePlaybookRecs(body: string): PlaybookRecs | null {
   const m = NMPLAYS_RE.exec(body);

@@ -115,6 +115,10 @@ export interface NMBridge extends EngineeringNMBridge, TerminalNMBridge {
   threadUnsettle(threadId: string): Promise<unknown>;
   watchArchivedThreads(cb: (rows: ArchivedThreadRow[]) => void): () => void;
   threadSetBrain(threadId: string, override: Record<string, string> | null): Promise<unknown>;
+  /** one seat of one conversation → a model, merged into its override by the main process */
+  threadBrainRole?(threadId: string, role: string, model: string): Promise<unknown>;
+  /** the conversation's current override, so a card can tell a switch already happened */
+  threadBrain?(threadId: string): Promise<Record<string, string> | null>;
   watchThreads(channelId: string, cb: (rows: ThreadRow[]) => void): () => void;
   watchConvo(threadId: string, cb: (rows: MessageRow[]) => void): () => void;
   status(): Promise<{ connected: boolean; lastSyncedAt: string | null; queued?: number }>;

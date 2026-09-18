@@ -165,3 +165,50 @@ describe('the override belongs to the THREAD (ruling 5)', () => {
     expect(brainOf(a)).toEqual({ developer: OPUS });
   });
 });
+
+// A ROUTINE RUNS ON THE STARTER BRAIN ON PRO (George, 2026-09-16, docs/10 §15.6): the thread a
+// schedule opens is born with the orchestrator on the house model, server-stamped, so the run
+// never waits on a vendor login. Free keeps the seat as configured; an explicit override wins.
+describe('a routine thread is born on its CONFIGURED brain — Starter is the fallback, decided at wake (2026-09-17)', () => {
+  // The 2026-09-16 cut stamped every routine on Pro with { orchestrator: Starter } at birth. George,
+  // one day later: "I didn't mean all routines should automatically run on starter; starter should
+  // be a fallback brain … if the configured brain is unavailable, usage expired, etc; the reason
+  // verbose to the user in the thread; auto for routines, manual for everything else." The daemon
+  // owns that decision (apps/desktop host/starterfallback.ts): it is the only place that knows
+  // whether the seat can run. The server's job here shrank to the birth-time contract below.
+  const routineOpener = async (extra: Record<string, unknown> = {}): Promise<string> => {
+    const threadId = crypto.randomUUID();
+    await send(george, { ...base, threadId, scheduleId: crypto.randomUUID(), body: 'Routine · Weekly X calendar\n\ndraft the week', ...extra });
+    return threadId;
+  };
+
+  it('on Pro: NO stamp — the routine opens on the brain the workspace configured', async () => {
+    await store.setWorkspacePlan(base.workspace, { plan: 'cloud' });
+    const threadId = await routineOpener();
+    expect(brainOf(threadId) ?? null).toBeNull();
+  });
+
+  it('on Free: no stamp either', async () => {
+    const threadId = await routineOpener();
+    expect(brainOf(threadId) ?? null).toBeNull();
+  });
+
+  it('an explicit override on the opener still rides (the composer draft contract, §15.4b)', async () => {
+    await store.setWorkspacePlan(base.workspace, { plan: 'cloud' });
+    const threadId = await routineOpener({ brainOverride: { orchestrator: OPUS } });
+    expect(brainOf(threadId)).toEqual({ orchestrator: OPUS });
+  });
+
+  it('the fallback is recorded the way a human records a switch: the owner\'s thread.set_brain on the routine\'s thread', async () => {
+    const threadId = await routineOpener();
+    const r = await cmd(george, { ...base, type: 'thread.set_brain', threadId, override: { orchestrator: 'gemini-3.5-flash-lite' } });
+    expect(r.status).toBe(200);
+    expect(brainOf(threadId)).toEqual({ orchestrator: 'gemini-3.5-flash-lite' });
+  });
+
+  it('a later reply into the routine thread cannot move the seat (birth-only, like schedule_id)', async () => {
+    const threadId = await routineOpener({ brainOverride: { orchestrator: OPUS } });
+    await send(george, { ...base, threadId, body: 'also cover instagram', brainOverride: { orchestrator: 'gemini-3.5-flash-lite' } });
+    expect(brainOf(threadId)).toEqual({ orchestrator: OPUS });
+  });
+});

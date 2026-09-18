@@ -1,7 +1,8 @@
 // THE REVIEW FLOW — an independent reviewer gating on the PR's CI and the Definition of Done.
 // Approval hands to the shipper when the project is ship-gated; otherwise it stops at done and
 // waits for a human. Split out of host/flows.ts.
-import { authBlockedCard, projectPolicy, resolveToken, runtimeFor } from '../agents';
+import { starterFallback, unavailableOf } from './starterfallback';
+import { projectPolicy, resolveToken, runtimeFor } from '../agents';
 import type { ExecTask, HostedAgent, OfferedTask, SkillRef } from '../agents';
 
 import { shouldHoldReview } from '../runtime/honesty';
@@ -209,17 +210,21 @@ async function reviewFlow(agent: HostedAgent, t: { id: string; number: number; t
     }
 
     // SEMANTIC review (live): do the delivered artifacts satisfy every requirement?
-    const cred = await resolveToken(apiUrl, ch.workspace_id, agent, ownerActorId);
-    // Preferred subscription is down + failover is Manual → do NOT auto-approve (the semantic
-    // review below fails open to approve when not live — that would accept UNREVIEWED work).
-    // Post the reconnect card and hold the task in_review; it stays in `reviewed` so this
-    // doesn't re-fire each poll — a re-submit (or reconnect) re-triggers a real review.
-    if (cred.blocked && process.env['NM_AGENT_MODE'] !== 'echo') {
-      await beats.fail(); // review held (no usable subscription) — the DoD beat can't complete
-      await post('/v1/messages', actor, { workspace: ch.workspace_id, channel: ch.id, taskId: t.id, body: authBlockedCard(agent, cred.blocked, t.number) }).catch(() => {});
-      rlog({ kind: 'lifecycle', phase: 'reviewed', summary: `review held — ${cred.blocked.provider} subscription not usable (failover manual); not auto-approving` });
-      setStatus(agent, 'online');
-      return;
+    let cred = await resolveToken(apiUrl, ch.workspace_id, agent, ownerActorId);
+    // the seat cannot run → the Starter door (host/starterfallback.ts): a routine's unit is reviewed
+    // on the Starter brain; a human's gets the reason and the card and the task HOLDS in_review — the
+    // semantic review below fails open to approve when not live, which would accept UNREVIEWED work.
+    // It stays in `reviewed` so this doesn't re-fire each poll; a re-submit re-triggers a real review.
+    const gap = unavailableOf(cred, agent.runtime);
+    if (gap) {
+      const next = await starterFallback(agent, gap, { workspace: ch.workspace_id, channelId: ch.id, taskId: t.id, taskNumber: t.number });
+      if (!next) {
+        await beats.fail(); // review held (no usable seat) — the DoD beat can't complete
+        rlog({ kind: 'lifecycle', phase: 'reviewed', summary: `review held — ${gap.kind === 'login' ? `${gap.provider} login ${gap.reason}` : gap.kind}; not auto-approving` });
+        setStatus(agent, 'online');
+        return;
+      }
+      agent = next; cred = await resolveToken(apiUrl, ch.workspace_id, agent, ownerActorId);
     }
     // No resolvable credential for the reviewer, but there ARE acceptance criteria to check:
     // the semantic review below would be SKIPPED (live=false) and fall straight through to

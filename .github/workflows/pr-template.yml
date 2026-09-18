@@ -1,0 +1,32 @@
+# The pull request template, enforced (docs/43 §2): every section of .github/pull_request_template.md
+# must be in the body, with words of its own. Runs on every pull request in this repository, and
+# again when the body is edited, so the fix is a fix to the text. The publish pull request passes
+# it too: scripts/public-snapshot.sh composes its body from the same sections.
+#
+# In the private repository this file lives under .github/public, and the publish places it here
+# (scripts/public-snapshot.sh): the private repository's template is another one.
+name: pr template
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+permissions:
+  contents: read
+
+jobs:
+  body:
+    name: the template's sections, with words
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Self-test the check
+        run: bash scripts/pr-template-check.sh --self-test
+
+      - name: Check the body
+        env:
+          # the body rides in the environment, never in the script: it is text a stranger wrote
+          BODY: ${{ github.event.pull_request.body }}
+        run: printf '%s' "$BODY" | bash scripts/pr-template-check.sh .github/pull_request_template.md

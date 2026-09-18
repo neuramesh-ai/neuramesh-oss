@@ -1,19 +1,13 @@
-<!-- See docs/11-releases.md §4. Keep this honest — the Deploy notes are a contract with whoever ships this. -->
+<!-- This repository is published from a private one. A maintainer ports an accepted pull request, and it returns with the next publish (docs/43-public-repository.md). A check fails the pull request when a section below is missing or empty. -->
 
 ## What & why
 
-<!-- The change and the reason. Link the task/issue. -->
+<!-- The change and the reason. Link the issue. Open an issue before you write a feature (CONTRIBUTING.md). -->
 
 ## Evidence
 
-<!-- Done = code + tests green + artifacts. Paste test output / screenshots (both themes for UI) / perf numbers / a repro. "Works on my machine" is not evidence. -->
+<!-- Done = code + tests green + artifacts. Paste the test output, screenshots (both themes for UI), perf numbers, or a repro. "Works on my machine" is not evidence. -->
 
 ## Deploy notes
 
-<!-- Manual steps the operator must take on/after merge. Write "none" if fully automated. Don't delete the section — an empty one reads as "I forgot", not "nothing needed". -->
-
-- [ ] PowerSync: <deploy rules / re-snapshot to backfill / none>
-- [ ] Vercel env/secrets: <add VAR=… / none>
-- [ ] Migration: <auto-applies on deploy / manual backfill needed / none>
-- [ ] Desktop: <publish vX.Y.Z draft after backend is live / n/a>
-- [ ] Other: <Clerk/Stripe/DNS/one-off script / none>
+<!-- Manual steps for whoever ships this: a migration, a new setting, a data backfill. Write "none" when the change needs nothing. Keep the section: an empty one reads as "I forgot", not "nothing needed". -->

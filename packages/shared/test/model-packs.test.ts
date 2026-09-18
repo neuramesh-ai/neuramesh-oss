@@ -242,7 +242,7 @@ describe('starter pack (2026-08-28 — the house brain: the one pack that needs 
 
   it('resolves like any other builtin, so no caller needs to know it is special', () => {
     expect(resolvePackRoles(STARTER_PACK_ID, [])).toBe(PACKS[STARTER_PACK_ID]!.roles);
-    expect(resolvePackName(STARTER_PACK_ID, [])).toBe('NeuraMesh Starter');
+    expect(resolvePackName(STARTER_PACK_ID, [])).toBe('NeuraMesh brain');
     expect(isCustomPackId(STARTER_PACK_ID)).toBe(false); // a real builtin id, never a sentinel
     expect(seatModel({ role: 'developer', currentModel: 'claude-opus-4-8', projectPack: STARTER_PACK_ID })).toBe(STARTER_MODEL);
   });

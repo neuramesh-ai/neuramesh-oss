@@ -81,7 +81,9 @@ export function decideAuth(i: AuthInputs): AuthResolution {
     // downgrade. On a machine the user owns the block still stands — there the login is genuinely
     // reconnectable, and spending platform credits instead of telling them would be the silent
     // downgrade this rule exists to prevent.
-    return i.cloudMachine ? starterOr(i, blocked) : blocked;
+    // …and a seat on the HOUSE model is the same rescue on ANY machine (2026-09-16): choosing the
+    // Starter brain IS the opt-in to credits, so a lapsed Gemini login on a laptop blocks nothing.
+    return i.cloudMachine || i.platformModel ? starterOr(i, blocked) : blocked;
   }
 
   // No subscription intent at all → my key, the workspace's, or the env's, in that order.

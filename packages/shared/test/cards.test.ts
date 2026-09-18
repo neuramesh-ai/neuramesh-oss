@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cardNotification, cardTitle, formatCardAnswer, isLowRiskPermissionCard, MAX_SUGGESTIONS, parseAuthCard, parseCard, parseQuestions, parseSuggestions, preview, readAnswers, stripSuggestions } from '../src/cards';
+import { authCardBlock, authDecisionQuestion, cardNotification, cardTitle, formatCardAnswer, isLowRiskPermissionCard, MAX_SUGGESTIONS, parseAuthCard, parseCard, parseQuestions, parseSuggestions, preview, readAnswers, stripSuggestions } from '../src/cards';
 
 const NMQ = 'Which deploy target for the marketing site?\n\n```nmq\n{"options":["Vercel","Netlify"]}\n```';
 const NMAUTH = 'Your NeuraMesh session needs a reconnect.\n\n```nmauth\n{"nonce":"abc"}\n```';
@@ -267,6 +267,19 @@ describe('parseAuthCard', () => {
     expect(parseAuthCard(body('{"provider":"anthropic","reason":"expired","agent":"patch","taskNumber":1046}'))?.taskNumber).toBe(1046);
   });
 
+  it('carries the fallback door\'s fields, and round-trips through the one serializer (2026-09-17)', () => {
+    const card = { provider: 'openai', reason: 'unavailable' as const, agent: 'rex', why: 'This machine has no OpenAI / Codex login.', starter: true, scope: { threadId: 't-1', role: 'orchestrator' }, switched: true };
+    expect(parseAuthCard(authCardBlock(card))).toEqual(card);
+    // a malformed scope is dropped rather than trusted, and `switched` is only ever literally true
+    expect(parseAuthCard(body('{"provider":"openai","scope":{"threadId":"t"},"switched":"yes"}'))).toEqual({ provider: 'openai' });
+  });
+
+  it('mints the needs-you row\'s question from the card, naming who, why and the way out', () => {
+    expect(authDecisionQuestion({ provider: 'openai', agent: 'rex', why: 'This machine has no OpenAI / Codex login.' }))
+      .toBe('@rex cannot run here. This machine has no OpenAI / Codex login. Sign in again, or switch this conversation to the NeuraMesh brain, on credits.');
+    expect(authDecisionQuestion({ provider: 'anthropic', reason: 'expired' })).toMatch(/^An agent cannot run here\. The Claude login on this machine expired\./);
+  });
+
   it('is null without a block, so ordinary prose is never a card', () => {
     expect(parseAuthCard('no block here')).toBeNull();
   });
@@ -282,5 +295,26 @@ describe('parseAuthCard', () => {
 
   it('needs a provider — that is the one field the card cannot render without', () => {
     expect(parseAuthCard(body('{"reason":"expired"}'))).toBeNull();
+  });
+});
+
+describe('fence openers do not backtrack on blank lines (js/polynomial-redos)', () => {
+  // an opener followed by thousands of blank lines and NO closing fence: `\s*\n` made every parser
+  // re-scan the body from each whitespace position; `[ \t]*\n` scans it once
+  const flood = '\n '.repeat(20_000);
+  it('parseAuthCard returns fast on an unterminated fence', () => {
+    const t0 = performance.now();
+    expect(parseAuthCard('```nmauth\n' + flood)).toBeNull();
+    expect(performance.now() - t0).toBeLessThan(200);
+  });
+  it('the question and suggestion parsers too', () => {
+    const t0 = performance.now();
+    expect(parseQuestions('```nmq\n' + flood)).toEqual([]);
+    expect(parseSuggestions('```nms\n' + flood)).toEqual([]);
+    expect(performance.now() - t0).toBeLessThan(400);
+  });
+  it('a fence with trailing blanks after the word, or a blank line before the JSON, still parses', () => {
+    const card = parseAuthCard('```nmauth  \n\n{"provider":"anthropic","reason":"expired"}\n```');
+    expect(card?.provider).toBe('anthropic');
   });
 });

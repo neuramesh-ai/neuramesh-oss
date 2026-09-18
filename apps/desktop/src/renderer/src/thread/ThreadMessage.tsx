@@ -182,8 +182,8 @@ export function UnitCard({ id, onOpen }: { id: string; onOpen?: (taskId: string)
             ? <><Orb state="composing" label="working" /> {({ planning: 'planning it…', designing: 'designing it…', in_review: 'reviewing it…' } as Record<string, string>)[row.state] ?? 'working on it…'}</>
             : row.state === 'done'
               ? 'done — review the deliverable and accept'
-              : row.state === 'todo' && !row.assignee_id
-                ? 'approved — awaiting its offer'
+              : (row.state === 'todo' || row.state === 'plan_review') && !row.assignee_id
+                ? 'approved · awaiting its offer'
                 : row.state.replace('_', ' ')}
       </span>
     </button>
@@ -230,7 +230,7 @@ export function ThreadMessage({
   onOpenArticle?: (a: ArticleOpen) => void;
   /** the plan-review card's world (task threads only): the thread's own task + its doors —
    *  absent on conversations, where a ‹plan:vN› marker degrades to its readable line */
-  planCtx?: { task: TaskRow; onOpenPlan: (name?: string) => void; onArmRevise: () => void } | null;
+  planCtx?: { task: TaskRow; onOpenPlan: (name?: string) => void; onArmRevise: () => void; handsOff?: boolean } | null;
   /** the extra Md powers a task thread has and a conversation has no use for */
   md?: Partial<React.ComponentProps<typeof Md>>;
   /** null = this row is not the suggestion target, or the surface is suppressing them */
@@ -265,7 +265,7 @@ export function ThreadMessage({
   // thread-native card; without planCtx (a conversation) the readable line renders as prose
   const plan = drop || wb || unit || article || report || !planCtx ? null : parsePlanRef(m.body);
   // every marker shares one anatomy: surrounding prose stays prose, the marker becomes its card
-  const marker = plan && planCtx ? { prose: plan.prose, card: <PlanReviewCard version={plan.version} task={planCtx.task} onOpenPlan={planCtx.onOpenPlan} onArmRevise={planCtx.onArmRevise} /> }
+  const marker = plan && planCtx ? { prose: plan.prose, card: <PlanReviewCard version={plan.version} task={planCtx.task} onOpenPlan={planCtx.onOpenPlan} onArmRevise={planCtx.onArmRevise} handsOff={planCtx.handsOff} /> }
     : wb ? { prose: wb.prose, card: <WbCard id={wb.id} onOpen={onOpenWhiteboard} /> }
     : unit ? { prose: unit.prose, card: <UnitCard id={unit.id} onOpen={onOpenTask} /> }
     : article ? { prose: article.prose, card: <ArticleCard id={article.id} onOpen={onOpenArticle} /> }

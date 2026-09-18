@@ -1,0 +1,169 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>routine hands-off · cream</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@500;600&amp;display=swap">
+  <style>
+    .sheet { --bg:#fbf8f4;--panel:#fbf8f4;--panel2:#f6eee1;--panel3:#efe1cd;--border:#e6dbca;--border2:#d3c2a8;--card-border:#eadfce;--text:#3a2c22;--body:#5b4c3d;--muted:#8b7861;--dim:#a99680;--link:#9c5730;--brand:#834a2b;--brand-ink:#fff7ee;--green:#2f9e6b;--warn:#a06a1f;--prog:#4f80c4;--planrev:#7d56b8;--design:#b0498f;--review:#6d5ce0;--acc:#2f8f8a;--todo:#7d8590;--role-orch:#6a63bc;--role-design:#b0498f;--role-mkt:#b04f55;--card:#ffffff;--btn:#f8f2e8;--btn-fg:#43301f;--hover-bg:color-mix(in srgb, #3a2c22 5%, transparent); }
+    
+  body { margin: 0; }
+  .sheet { --fbody: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; --fmono: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+    position: relative; box-sizing: border-box; background: var(--bg); color: var(--text); font: 14px/1.5 var(--fbody); -webkit-font-smoothing: antialiased; overflow: hidden; }
+  .sheet *, .sheet *::before, .sheet *::after { box-sizing: border-box; }
+  /* the thread header: crumb · room · title · chips (ConvoThread / ThreadHead) */
+  .thead { display: flex; align-items: center; gap: 10px; padding: 14px 22px 12px; border-bottom: 1px solid var(--border); }
+  .scrumb { color: var(--muted); font-size: 12.5px; }
+  .crumb { color: var(--dim); font: 500 11px var(--fmono); letter-spacing: -.02em; display: inline-flex; align-items: center; gap: 6px; }
+  .crumb .proj { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); }
+  .crumb .logo { width: 12px; height: 12px; border-radius: 3px; background: var(--brand); display: inline-block; }
+  .ttl { font-weight: 500; font-size: 14px; color: var(--text); letter-spacing: -.005em; }
+  .num { font: 600 12px var(--fmono); color: var(--dim); }
+  .chip { display: inline-flex; align-items: center; gap: 5px; font: 500 10px var(--fmono); letter-spacing: -.02em; padding: 3px 7px; border-radius: 3px; text-transform: uppercase; white-space: nowrap; }
+  .c-plan_review { background: color-mix(in srgb, var(--planrev) 16%, transparent); color: var(--planrev); }
+  .c-in_progress { background: color-mix(in srgb, var(--prog) 16%, transparent); color: var(--prog); }
+  .c-kind { background: color-mix(in srgb, var(--role-mkt) 13%, transparent); color: var(--role-mkt); }
+  .routinechip { flex: none; display: inline-flex; align-items: center; gap: 4px; font: 600 9.5px var(--fmono); letter-spacing: -.02em; text-transform: uppercase; color: var(--muted); border: 1px solid var(--border2); border-radius: 3px; padding: 2.5px 8px; }
+  .dial { display: inline-flex; align-items: center; gap: 6px; color: var(--dim); font: 500 11px var(--fmono); }
+  .dial svg { display: block; }
+  .theadact { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+  .settle { border: 1px solid var(--border2); background: var(--card); color: var(--text); font: 600 9.5px var(--fmono); border-radius: 3px; padding: 3px 8px; text-transform: uppercase; }
+  .stack { padding: 8px 12px 20px; max-width: 860px; }
+  /* one message row, the shipped anatomy */
+  .msg { display: flex; gap: 11px; padding: 7px 10px; border-radius: 6px; position: relative; }
+  .msg .av { width: 26px; height: 26px; min-width: 26px; border-radius: 4px; display: grid; place-items: center; font-weight: 600; font-size: 11px; color: var(--body); background: var(--panel3); box-shadow: inset 0 0 0 1px var(--border2); }
+  .msg .pav { width: 26px; height: 26px; min-width: 26px; border-radius: 4px; display: grid; place-items: center; background: var(--panel3); box-shadow: inset 0 0 0 1px var(--border2); }
+  .msg .pav svg { display: block; }
+  .msg .body { min-width: 0; flex: 1; }
+  .msg .head { display: flex; align-items: center; gap: 8px; }
+  .msg .head b { font-size: 12.5px; font-weight: 600; }
+  .rolechip { font-size: 6.5px; font-weight: 600; letter-spacing: -.02em; text-transform: uppercase; padding: 1.5px 4.5px; border-radius: 3px; background: color-mix(in srgb, var(--muted) 16%, transparent); color: var(--muted); }
+  .rolechip.orch { color: color-mix(in srgb, var(--role-orch) 80%, var(--muted)); }
+  .rolechip.design { color: color-mix(in srgb, var(--role-design) 80%, var(--muted)); }
+  .rolechip.mkt { color: color-mix(in srgb, var(--role-mkt) 80%, var(--muted)); }
+  .msg .time { font-size: 10.5px; color: var(--dim); }
+  .msg p { color: var(--body); margin: 3px 0 0; overflow-wrap: anywhere; }
+  .msg p b, .msg p strong { color: var(--text); font-weight: 600; }
+  .msg p a { color: var(--link); text-decoration: none; }
+  .msg.human.mine .av { color: var(--brand-ink); background: var(--brand); box-shadow: none; }
+  .quiet p { color: var(--muted); }
+  /* the compact record (focard.sent) — the plan card once approved, the design round once approved */
+  .focard { border: 1px solid var(--card-border); background: var(--card); border-radius: 6px; padding: 12px 13px; margin: 6px 0; max-width: 520px; }
+  .focard.sent { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 7px; padding: 7px 12px; background: color-mix(in srgb, var(--text) 3%, transparent); border-color: var(--border); }
+  .focard.sent .fotick { color: var(--muted); font-weight: 600; } .focard.sent .foq { color: var(--muted); } .focard.sent .foa { font-weight: 600; }
+  .planopenlink { font: 500 11.5px var(--fmono); color: var(--link); margin-left: 4px; }
+  /* the unit card (thread-owned work): id · title · chip · dial, then the status line */
+  .unitcard { display: flex; flex-direction: column; gap: 5px; width: 100%; max-width: 520px; margin: 6px 0 2px; }
+  .uchead { display: flex; align-items: center; gap: 9px; min-width: 0; }
+  .ucid { font: 600 11.5px var(--fmono); color: var(--link); flex: none; }
+  .ucti { font-weight: 630; font-size: 13px; letter-spacing: -.008em; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
+  .ucline { display: flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--muted); }
+  .ring { display: inline-flex; gap: 2px; align-items: center; }
+  .ring i { display: block; width: 14px; height: 4px; border-radius: 2px; background: var(--border2); }
+  .ring i.on { background: var(--planrev); } .ring i.on.d { background: var(--design); } .ring i.on.b { background: var(--prog); } .ring i.on.a { background: var(--acc); }
+  .ring i.dash { background: repeating-linear-gradient(90deg, var(--border2) 0 3px, transparent 3px 5px); }
+  /* the thread composer, reduced to what the chip needs: box, hint row, the foot with the brain chip */
+  .cbox { position: relative; margin: 18px 10px 0; background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 12px 14px 10px; }
+  .cta { min-height: 34px; font-size: 13.5px; color: var(--dim); }
+  .cfoot { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+  .cchip { display: inline-flex; align-items: center; gap: 6px; padding: 3.5px 8px; border-radius: 3px; border: 1px solid var(--border2); color: var(--muted); font: 600 11.5px var(--fbody); white-space: nowrap; }
+  .cchip.brain { color: var(--text); background: var(--panel2); }
+  .cchip .n { font: 600 9.5px var(--fmono); color: var(--link); padding: 1px 5px; border-radius: 3px; background: color-mix(in srgb, var(--link) 14%, transparent); }
+  .csp { flex: 1; }
+  .csend { width: 32px; height: 32px; border-radius: 999px; background: var(--brand); color: var(--brand-ink); display: grid; place-items: center; font-size: 13px; }
+  .bpop { position: absolute; left: 118px; bottom: 132px; width: 340px; background: var(--card); border: 1px solid var(--border2); border-radius: 8px; padding: 10px 12px; box-shadow: 0 20px 55px -14px rgba(0,0,0,.45); }
+  .bpop .h { font: 600 9.5px var(--fmono); letter-spacing: -.02em; text-transform: uppercase; color: var(--dim); margin-bottom: 8px; display: flex; gap: 8px; }
+  .bpop .h b { color: var(--text); }
+  .brow { display: grid; grid-template-columns: 22px 78px 1fr; align-items: center; gap: 8px; padding: 5px 0; font-size: 12px; color: var(--body); }
+  .brow .rk { font: 600 9px var(--fmono); text-transform: uppercase; color: var(--dim); }
+  .brow .mv { color: var(--text); font-weight: 500; }
+  .brow .mv .why { color: var(--muted); font-weight: 400; font-size: 11px; margin-left: 6px; }
+  .brow .pav, .brow .av { width: 22px; height: 22px; min-width: 22px; font-size: 9px; }
+  .bfoot { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); font-size: 11px; color: var(--muted); }
+  /* the brain popup, Roles view — the shipped recipes at the 340px compression */
+  .bp2 { position: relative; width: 340px; background: var(--card); border: 1px solid var(--border2); border-radius: 8px; box-shadow: 0 18px 50px -14px rgba(0,0,0,.5); display: flex; flex-direction: column; }
+  .bp2 .tabs { display: flex; align-items: center; gap: 2px; padding: 7px 9px 0; }
+  .bp2 .tab { font: 500 12px var(--fbody); color: var(--muted); padding: 5px 12px; border-radius: 3px; }
+  .bp2 .tab.on { color: var(--text); background: var(--panel2); }
+  .bp2 .tabn { font: 600 10px var(--fmono); color: var(--dim); margin-left: 5px; }
+  .bp2 .tabnote { margin-left: auto; padding-right: 6px; font: 600 10px var(--fmono); color: var(--muted); }
+  .bp2 .head { padding: 8px 12px; border-bottom: 1px solid var(--border); }
+  .bp2 .scope { display: inline-flex; gap: 2px; background: var(--panel2); border-radius: 6px; padding: 3px; }
+  .bp2 .scope span { font: 500 10.5px var(--fbody); color: var(--muted); padding: 4px 10px; border-radius: 6px; }
+  .bp2 .scope span.on { background: var(--card); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.2); }
+  .bp2 .rows { padding: 6px 8px 8px; display: flex; flex-direction: column; }
+  .bp2 .row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px; }
+  .bp2 .role { font: 500 8.5px var(--fmono); letter-spacing: -.02em; text-transform: uppercase; color: var(--muted); width: 68px; flex: none; }
+  .bp2 .who { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
+  .bp2 .who b { font-size: 12px; font-weight: 500; color: var(--text); }
+  .bp2 .who span { font-size: 9.5px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bp2 .model { margin-left: auto; flex: none; display: inline-flex; align-items: center; gap: 5px; font: 500 10px var(--fmono); color: var(--body); border: 1px solid var(--card-border); background: var(--panel); border-radius: 6px; padding: 3px 7px; }
+  .bp2 .model .car { color: var(--dim); font-size: 8px; }
+  .bp2 .model.pinned { opacity: .55; }
+  .bp2 .pav, .bp2 .av { width: 18px; height: 18px; min-width: 18px; border-radius: 6px; font-size: 8px; }
+  .bp2 .foot { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-top: 1px solid var(--border); font-size: 11px; color: var(--muted); }
+  .bp2 .foot .sp { flex: 1; }
+  .bp2 .mini { font: 600 10px var(--fbody); color: var(--dim); padding: 4px 8px; border-radius: 6px; border: 1px solid var(--border2); }
+  .bp2 .mini.starter { color: var(--text); border-color: var(--border2); background: var(--panel2); }
+  .bp2 .apply { background: var(--brand); color: var(--brand-ink); font: 600 11px var(--fbody); padding: 6.5px 14px; border-radius: 6px; opacity: .6; }
+  .bp2 .apply.live { opacity: 1; }
+  /* the brain notice (F): the attention bar's anatomy docked above the composer — head, then rows */
+  .bnwrap { margin: 14px 10px 0; }
+  .bnbar { display: flex; align-items: center; gap: 9px; width: 100%; background: var(--panel2); border: 1px solid var(--border); border-left: 3px solid var(--warn); border-radius: 6px; padding: 7px 12px 7px 11px; font-size: 12.5px; }
+  .bnbar.switched, .bnpanel.switched { border-left-color: var(--muted); }
+  .bnbar .g { flex: none; width: 15px; height: 15px; color: var(--warn); } .bnbar.switched .g { color: var(--muted); }
+  .bnbar .g svg { display: block; width: 100%; height: 100%; }
+  .bnbar .t { flex: none; font-weight: 500; color: var(--text); }
+  .bnbar .s { flex: 1; min-width: 0; color: var(--body); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bnbar .c { flex: none; margin-left: auto; color: var(--muted); font-size: 9px; }
+  .bnpanel { margin: 14px 10px 0; background: var(--panel2); border: 1px solid var(--border); border-left: 3px solid var(--warn); border-radius: 6px; overflow: hidden; }
+  .bnpanel .bnbar { border: none; border-radius: 0; margin: 0; }
+  .bnrow { display: grid; grid-template-columns: 104px 1fr; gap: 10px; padding: 10px 14px 11px 13px; border-top: 1px solid var(--border); }
+  .bnk { font: 500 10.5px var(--fmono); letter-spacing: -.01em; text-transform: uppercase; color: var(--muted); padding-top: 2px; }
+  .bnv { font-size: 12px; line-height: 1.55; color: var(--body); }
+  .bnacts { display: flex; gap: 8px; align-items: flex-start; }
+  .authcard { border: 1px solid color-mix(in srgb, var(--warn) 40%, var(--border2)); background: var(--panel); border-radius: 8px; padding: 11px 13px; font-size: 12.5px; line-height: 1.5; flex: 1 1 360px; }
+  .authcard.switched { border-color: var(--border2); }
+  .authcard .h { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+  .authcard .h i { width: 7px; height: 7px; border-radius: 999px; background: var(--warn); display: inline-block; } .authcard.switched .h i { background: var(--muted); }
+  .authcard .sub { color: var(--dim); font-size: 11.5px; margin: 6px 0 10px; }
+  .authcard .cmd { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; font-size: 11px; color: var(--dim); }
+  .authcard .cmd code { font: 500 11.5px var(--fmono); background: var(--panel3); padding: 3px 8px; border-radius: 4px; color: var(--text); }
+  .authcard .foot { display: flex; flex-wrap: wrap; gap: 7px; }
+  .btn { display: inline-flex; align-items: center; font: 600 10.5px var(--fmono); text-transform: uppercase; letter-spacing: -.01em; padding: 6px 10px; border-radius: 3px; border: 1px solid var(--border2); background: var(--btn); color: var(--btn-fg); }
+  .btn.primary { background: var(--brand); color: var(--brand-ink); border-color: var(--brand); }
+  .lbl { margin: 18px 10px 0; font: 600 9.5px var(--fmono); letter-spacing: -.01em; text-transform: uppercase; color: var(--dim); }
+  /* the note under an artboard */
+  .note { position: absolute; left: 22px; right: 22px; bottom: 16px; color: var(--dim); font: 500 10.5px var(--fmono); letter-spacing: -.01em; }
+  .note b { color: var(--muted); font-weight: 600; }
+
+  </style>
+</head>
+<body>
+<div class="sheet" style="width: 1040px; height: 1180px;">
+  <div class="thead"><span class="scrumb">‹ Home</span><span class="crumb"><span class="proj"><span class="logo"></span>Default</span> › # build</span><span class="ttl">Room Status Check</span><span class="chip c-plan_review">needs you</span><div class="theadact"><span class="settle">Settle</span></div></div><div class="stack">
+  <div class="msg human mine"><span class="av">G</span><div class="body"><div class="head"><b>geo</b><span class="time">05:24 PM</span></div><p>@rex still there? One line on this room, please.</p></div></div>
+  <div class="msg"><span class="pav"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="10" rx="3" stroke="currentColor" stroke-width="1.3" opacity=".7"/><circle cx="6" cy="8" r="1.1" fill="currentColor" opacity=".8"/><circle cx="10" cy="8" r="1.1" fill="currentColor" opacity=".8"/></svg></span><div class="body"><div class="head"><b>rex</b><span class="rolechip orch">orchestrator</span><span class="time">05:24 PM</span></div><p>@rex cannot run on OpenAI / Codex here. This machine has no OpenAI / Codex login. Sign in to OpenAI / Codex again on this machine, or run this conversation on the NeuraMesh brain, on credits.</p></div></div>
+  <div class="lbl">Needs you · collapsed (the default)</div>
+  <div class="bnbar needs"><span class="g"><svg viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M7.5 1.8 14 13H1z" stroke-linejoin="round"/><path d="M7.5 6v3.4" stroke-linecap="round"/><circle cx="7.5" cy="11.1" r=".7" fill="currentColor" stroke="none"/></svg></span><span class="t">@rex cannot run here</span><span class="s">This machine has no OpenAI / Codex login.</span><span class="c">▼</span></div>
+  <div class="lbl">Needs you · expanded</div>
+  <div class="bnpanel"><div class="bnbar needs"><span class="g"><svg viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M7.5 1.8 14 13H1z" stroke-linejoin="round"/><path d="M7.5 6v3.4" stroke-linecap="round"/><circle cx="7.5" cy="11.1" r=".7" fill="currentColor" stroke="none"/></svg></span><span class="t">@rex cannot run here</span><span class="c">▲</span></div>
+    <div class="bnrow"><div class="bnk">What happened</div><div class="bnv">@rex cannot run on OpenAI / Codex here. This machine has no OpenAI / Codex login. Nothing moved, so this conversation waits.</div></div>
+    <div class="bnrow"><div class="bnk">What to do</div><div class="bnv">Sign in to OpenAI / Codex again on this machine, or run this conversation on the NeuraMesh brain, on credits.</div></div>
+    <div class="bnrow bnacts"><div class="authcard"><div class="h"><i></i>OpenAI / Codex login unavailable</div><div class="sub">This machine has no OpenAI / Codex login. I do not fall back to an API key on my own, because that bills you.</div><div class="cmd"><code>codex login</code><span>⧉</span><span>or run it yourself in any terminal</span></div><div class="foot"><span class="btn primary">Use NeuraMesh brain here (credits)</span><span class="btn">Reconnect OpenAI / Codex</span><span class="btn">Use an API key instead</span></div></div></div>
+  </div>
+  <div class="lbl">Switched · collapsed (a routine moved by itself, or you tapped)</div>
+  <div class="bnbar switched"><span class="g"><svg viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M7.5 1.8 14 13H1z" stroke-linejoin="round"/><path d="M7.5 6v3.4" stroke-linecap="round"/><circle cx="7.5" cy="11.1" r=".7" fill="currentColor" stroke="none"/></svg></span><span class="t">@rex runs on the NeuraMesh brain here</span><span class="s">This machine has no OpenAI / Codex login.</span><span class="c">▼</span></div>
+  <div class="lbl">Switched · expanded</div>
+  <div class="bnpanel switched"><div class="bnbar switched"><span class="g"><svg viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M7.5 1.8 14 13H1z" stroke-linejoin="round"/><path d="M7.5 6v3.4" stroke-linecap="round"/><circle cx="7.5" cy="11.1" r=".7" fill="currentColor" stroke="none"/></svg></span><span class="t">@rex runs on the NeuraMesh brain here</span><span class="c">▲</span></div>
+    <div class="bnrow"><div class="bnk">What happened</div><div class="bnv">@rex could not run on OpenAI / Codex here. This machine has no OpenAI / Codex login. This routine continued on the NeuraMesh brain, on credits.</div></div>
+    <div class="bnrow"><div class="bnk">What to do</div><div class="bnv">Sign in to OpenAI / Codex again on this machine, then reset the brain in this conversation to go back.</div></div>
+    <div class="bnrow bnacts"><div class="authcard switched"><div class="h"><i></i>Switched to the NeuraMesh brain here</div><div class="sub">This machine has no OpenAI / Codex login. This conversation runs <b>@rex</b> on the NeuraMesh brain, on credits. Sign in to OpenAI / Codex again on this machine, then reset the brain in this conversation to go back.</div><div class="cmd"><code>codex login</code><span>⧉</span><span>or run it yourself in any terminal</span></div><div class="foot"><span class="btn primary">Reconnect OpenAI / Codex</span></div></div><span class="btn">Reset the brain here</span></div>
+  </div>
+  <div class="cbox"><div class="cta">Reply in this thread · @ mention · / skill · ↵ send</div>
+    <div class="cfoot"><span class="cchip">@</span><span class="cchip"># build</span><span class="cchip brain">◉ Brain <span class="n">1 changed here</span></span><span class="csp"></span><span class="csend">↑</span></div></div>
+</div>
+<div class="note"><b>F · THE BRAIN NOTICE</b> · docked above the composer, the attention bar’s anatomy one conversation deep. It derives from the newest auth card and the thread’s brain override, so it stands while the condition stands and leaves on its own. The amber rule means nothing moved and the conversation waits on you; the quiet rule records a switch. The server mints a needs-you row from the offer, so the thread pill, Home and the bell count it. Theme: cream oak.</div>
+</div>
+</body>
+</html>

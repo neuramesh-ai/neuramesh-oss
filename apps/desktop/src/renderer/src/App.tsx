@@ -2077,9 +2077,9 @@ export function App() {
             // "I'm switching to this now" door, and the only one that changes what you are in
             onFull: () => { const id = peekTask2.id; closePeek(); setOpenTaskId(id); },
           }}
-          convoThreadId={chanThreads.find((t) => t.task_id === peekTask2.id)?.id ?? null}
+          convoThreadId={chanThreads.find((t) => t.task_id === peekTask2.id)?.id ?? peekTask2.origin_thread_id ?? null}
           convoThread={chanThreads.find((t) => t.task_id === peekTask2.id) ?? null}
-          threadBrain={chanThreads.find((t) => t.task_id === peekTask2.id)?.brain_override ?? null}
+          threadBrain={(chanThreads.find((t) => t.task_id === peekTask2.id) ?? chanThreads.find((t) => t.id === peekTask2.origin_thread_id))?.brain_override ?? null}
           brainProject={peekProject ? { id: peekProject.id, name: peekProject.name, pack: peekProject.model_pack ?? null } : null}
           crumbProject={peekProject ? { name: peekProject.name, logo_url: peekProject.logo_url } : null}
           onSetProjectPack={(packId) => setProjectPack(peekProject?.id ?? activeProject, packId)}
@@ -4051,9 +4051,9 @@ export function App() {
           // the header's toggle: opening it lands on Details, because that is what the button in
           // a TASK's action row promises — not whatever face you last left the panel on
 
-          convoThreadId={chanThreads.find((t) => t.task_id === openTask.id)?.id ?? null}
+          convoThreadId={chanThreads.find((t) => t.task_id === openTask.id)?.id ?? openTask.origin_thread_id ?? null}
           convoThread={chanThreads.find((t) => t.task_id === openTask.id) ?? null}
-          threadBrain={chanThreads.find((t) => t.task_id === openTask.id)?.brain_override ?? null}
+          threadBrain={(chanThreads.find((t) => t.task_id === openTask.id) ?? chanThreads.find((t) => t.id === openTask.origin_thread_id))?.brain_override ?? null}
           brainProject={(() => {
             // the TASK's project, not the active one — a task's project is its channel's (docs/06)
             const pid = tasksAll.find((x) => x.id === openTask.id)?.project_id ?? activeProject;

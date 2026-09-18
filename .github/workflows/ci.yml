@@ -89,6 +89,11 @@ jobs:
       - name: Audit workspace scoping of replica queries
         run: node scripts/audit-workspace-scope.mjs --self-test
 
+      # The public repository fails a pull request whose body skips a section of its template
+      # (.github/public, placed by the publish). The check's fixtures prove it here first.
+      - name: Self-test the pull request template check
+        run: bash scripts/pr-template-check.sh --self-test
+
       - name: Bootstrap the test database (auth shim + schema + fixtures + publication)
         run: ./scripts/ci-db-bootstrap.sh
 

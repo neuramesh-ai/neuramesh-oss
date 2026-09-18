@@ -96,6 +96,15 @@ harness can branch on honestly — and makes honest degradation visible instead 
 | Sandbox | our Seatbelt wrapper (L1b) | **native** `workspace-write` | our Seatbelt wrapper |
 | Tool transport | in-process | MCP loopback | MCP loopback (stdio shim) |
 
+### 4.0 The Starter lane is not a fourth runtime (2026-09-16)
+
+The house model (`STARTER_MODEL`) maps to the `gemini` runtime by family, and that adapter now ROUTES
+by seat: a house-model seat with no key of the user's own goes to the metered proxy
+(`runtime/starter.ts`) for `streamTurn`, `complete` and `runQuery` alike — never to `agy`, which
+would run the user's Google login on its own default model. No new `RuntimeName`, because nothing
+else in the matrix changes: seat resolution, credential resolution and the bus are the same. The
+lane's differences are honest limits, stated in the prompt: no shell, no streaming, in-process bus.
+
 ### 4.1 Two hard-won constraints that must not be "cleaned up"
 
 **`agy` argv must be exactly `--print <prompt>`.** Any additional flag leaks into the model's context and
@@ -193,3 +202,4 @@ child process by the L0 allowlist ([07](07-security.md)).
 |---|---|
 | 2026-07-31 | Created. Documents the shipped matrix and specifies the **narrowed** adapter contract (`invoke` + `capabilities`), moving tools, permissions, prompts, and interpretation out of adapters. Records the `agy` argv/stdin constraints and the codex no-double-sandbox decision. |
 | 2026-08-02 | `capabilities.gatesNativeTools` shipped (v0.73.0). Verified against the vendors: per-call policy over a runtime's own Read/Write/Bash is `claude-code` ONLY — `@openai/codex-sdk` exposes `approvalPolicy` as a policy string with no approval event, and agy admits no hook. The limit is declared in the capability matrix rather than implied away. |
+| 2026-09-16 | **The Starter worker lane** (docs/10 §15.8). The Gemini adapter routes a house-model seat with no user key to the metered proxy for every method; `geminiOrchestratorTurn` takes a worker turn cap and a Stop signal; the auth policy's platform-model rescue applies on any machine (the 2026-09-08 laptop block is reversed for the house model, test dated); the claim ladder judges the seat the turn will take. |

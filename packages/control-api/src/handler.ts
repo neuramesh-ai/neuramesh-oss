@@ -30,7 +30,7 @@ import { onInviteAccepted } from './onauth';
 import { type Store } from './store';
 import { actorAddress, verifiedEmailFor, taskTarget } from './handler/guards';
 import { SUBTASK_GATED, setDefinitionOfDone, checkShipItem, addShipItem, updateDetails, selectDesignProvider, confirmRequirements, approvePlan, transition, nextPlanVersion } from './handler/fsm';
-import { planRevisionFollowup, routineAcceptFollowup, routinePlanFollowup } from './handler/planfollowup';
+import { planRevisionFollowup, routineAcceptFollowup, routineDesignFollowup, routinePlanFollowup } from './handler/planfollowup';
 import { channelCommands } from './handler/channel';
 import { workspaceCommands } from './handler/workspace';
 import { accountCommands } from './handler/account';
@@ -400,6 +400,7 @@ export async function executeCommand(
   await planRevisionFollowup(store, actor, cmd, outcome);
   outcome = await routineAcceptFollowup(store, cmd, outcome);
   outcome = await routinePlanFollowup(store, cmd, outcome);
+  outcome = await routineDesignFollowup(store, cmd, outcome);
   // Beats backstop (docs/17): acceptance is the strongest "the work completed" signal —
   // any beat still pulsing settles done, whatever flow left it (a settle that raced its
   // own phase transition, a crashed run). Enforced here rather than prompted into flows;

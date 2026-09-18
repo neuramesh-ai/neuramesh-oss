@@ -1,7 +1,8 @@
 // THE DESIGN FLOW (docs/14) — the designer drawing a round, and the notify that tells the room
 // a round is waiting. approve_design is HUMAN-ONLY and lives on the server; nothing here can
 // approve anything. Split out of host/flows.ts.
-import { PROVIDER_LABEL, authBlockedCard, designRoundChanged, resolveToken, runtimeFor, stagePriorDesignRound } from '../agents';
+import { starterFallback, unavailableOf, whyUnavailable } from './starterfallback';
+import { designRoundChanged, resolveToken, runtimeFor, stagePriorDesignRound } from '../agents';
 import type { ExecTask, HostedAgent, OfferedTask, SkillRef, DesignTask } from '../agents';
 
 
@@ -115,13 +116,18 @@ async function designerFlow(designer: HostedAgent, t: DesignTask, designProvider
     if (designProvider === 'claude-design' && designer.runtime !== 'claude-code') {
       throw new Error(`Claude Design requires Iris to use a Claude model; @${designer.name} currently runs ${designer.runtime}. Switch the designer brain to Claude or use Iris quick mockups.`);
     }
-    const cred = await resolveToken(apiUrl, ch.workspace_id, designer, ownerActorId);
-    if (cred.blocked && process.env['NM_AGENT_MODE'] !== 'echo') {
-      const reason = `${PROVIDER_LABEL[cred.blocked.provider]} subscription login is ${cred.blocked.reason} on the host — reconnect it, or switch @${designer.name} to API-key mode (or enable Auto failover with a key), then re-route #${t.number} to design. Won't bill a key automatically.`;
-      await post('/v1/messages', actor, { workspace: ch.workspace_id, channel: ch.id, taskId: t.id, body: authBlockedCard(designer, cred.blocked, t.number) }).catch(() => {});
-      await post('/v1/commands', actor, { type: 'task.block', taskId: t.id, reason }).catch((e) => console.error(`task_block #${t.number} failed:`, e));
-      setStatus(designer, 'online');
-      return;
+    let cred = await resolveToken(apiUrl, ch.workspace_id, designer, ownerActorId);
+    // the seat cannot run → the Starter door (host/starterfallback.ts): a routine's unit designs on
+    // the Starter brain; a human's gets the reason and the card, and the unit blocks until they act
+    const gap = unavailableOf(cred, designer.runtime);
+    if (gap) {
+      const next = await starterFallback(designer, gap, { workspace: ch.workspace_id, channelId: ch.id, taskId: t.id, taskNumber: t.number });
+      if (!next) {
+        await post('/v1/commands', actor, { type: 'task.block', taskId: t.id, reason: `@${designer.name} cannot run here. ${whyUnavailable(gap, designer.runtime)} Sign in again, or switch this conversation to the NeuraMesh brain, then re-route #${t.number} to design.` }).catch((e) => console.error(`task_block #${t.number} failed:`, e));
+        setStatus(designer, 'online');
+        return;
+      }
+      designer = next; cred = await resolveToken(apiUrl, ch.workspace_id, designer, ownerActorId);
     }
     const token = cred.token ?? ''; // apikey → the key; subscription → '' (providerEnv strips keys)
     const live = process.env['NM_AGENT_MODE'] !== 'echo' && cred.authMode !== 'none';
