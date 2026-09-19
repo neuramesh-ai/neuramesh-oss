@@ -2,7 +2,7 @@
   "name": "neuramesh",
   "private": true,
   "license": "Elastic-2.0",
-  "version": "0.137.0",
+  "version": "0.137.1",
   "engines": {
     "node": ">=22"
   },
