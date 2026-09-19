@@ -159,7 +159,8 @@ export function SkillsView({ skills, packs, channelSlug, agents, members, selfId
               <span className="packname">{p.name}</span>
               {p.origin === 'bundled' && <span className="verchip">bundled</span>}
               {p.origin === 'imported' && p.status === 'ready' && <span className="verchip">imported</span>}
-              {p.version && p.status === 'ready' && <span className="verchip">{p.version.replace(/^bundled@/, '').slice(0, 10)}</span>}
+              {/* the chip shows the PIN; the +<digest> tail is re-seed machinery (seed/packversion.ts) */}
+              {p.version && p.status === 'ready' && <span className="verchip">{p.version.replace(/^bundled@/, '').replace(/\+[0-9a-f]{12}$/, '').slice(0, 10)}</span>}
               {p.status === 'importing' && <span className="packstat importing">importing…</span>}
               {p.status === 'error' && <span className="packstat error" title={p.error}>import failed</span>}
               <span className="packdesc">{p.description}</span>

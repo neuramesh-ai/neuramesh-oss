@@ -111,3 +111,31 @@ describe('canSettle — the row offers the act only when the stamp can move some
     expect(canSettle({ ...base, task: task('done', { updated_at: T2 }), settledAt: T1 })).toBe(true);
   });
 });
+
+describe('drafts waiting on the owned units (the release-drafts round, §4.5)', () => {
+  const drafts = { draftsWaiting: 4, draftsAt: T1 };
+  it('drafts nobody answered need you, and the row offers Settle', () => {
+    expect(threadStatus({ ...base, ...drafts, lastAuthorKind: 'agent', lastAt: T1 })).toBe('needs_you');
+    expect(canSettle({ ...base, ...drafts, lastAuthorKind: 'agent', lastAt: T1 })).toBe(true);
+  });
+  it('a human word after the newest draft hands the ball back: the agent owes the revision', () => {
+    expect(threadStatus({ ...base, ...drafts, lastAuthorKind: 'human', lastAt: T2 })).toBe('in_progress');
+    // …but a word BEFORE they landed (the ask itself) changes nothing
+    expect(threadStatus({ ...base, ...drafts, lastAuthorKind: 'human', lastAt: T0 })).toBe('needs_you');
+  });
+  it('a settle newer than the drafts hides them; an older one does not', () => {
+    expect(threadStatus({ ...base, ...drafts, lastAuthorKind: 'agent', lastAt: T1, settledAt: T2 })).toBe('settled');
+    expect(canSettle({ ...base, ...drafts, lastAuthorKind: 'agent', lastAt: T1, settledAt: T2 })).toBe(false);
+    expect(threadStatus({ ...base, ...drafts, lastAuthorKind: 'agent', lastAt: T1, settledAt: T0 })).toBe('needs_you');
+  });
+  it('an unknown moment is never hidden: drafts with no birth still need you', () => {
+    expect(threadStatus({ ...base, draftsWaiting: 1, draftsAt: null, lastAuthorKind: 'human', lastAt: T2 })).toBe('needs_you');
+  });
+  it('zero drafts change nothing', () => {
+    expect(threadStatus({ ...base, draftsWaiting: 0, draftsAt: T1, lastAuthorKind: 'agent', lastAt: T1 })).toBe('settled');
+  });
+  it('needsYouWhy names the drafts, after a card and before the gate', () => {
+    expect(needsYouWhy({ task: task('done'), card: null, draftsWaiting: 4 })).toBe('The drafts wait for your approval.');
+    expect(needsYouWhy({ task: task('done'), card: { question: 'Post at 9?' }, asker: 'rex', draftsWaiting: 4 })).toBe('rex asks: Post at 9?');
+  });
+});

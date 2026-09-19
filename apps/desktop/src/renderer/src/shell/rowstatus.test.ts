@@ -8,6 +8,7 @@ import type { HistoryThreadRow } from '../bridge/rows-rooms';
 
 const T0 = '2026-09-08T10:00:00.000Z';
 const T1 = '2026-09-08T10:05:00.000Z';
+const T2 = '2026-09-08T10:10:00.000Z';
 const task = (o: Partial<TaskAllRow> & { id: string; state: string }): TaskAllRow => ({
   number: 1, title: 't', description: null, kind: null, assignee_kind: null, assignee_id: null,
   offered_agent_id: null, requirements: null, requirements_confirmed: null, definition_of_done: null,
@@ -57,4 +58,27 @@ test('the settle act rides the marks — the row control and the word come from 
   assert.deepEqual(marks(row({ threadId: 'th2', task: null })), { status: 'settled', ask: false, settle: false });
   // a row with no thread (an engineering session) can never settle
   assert.equal(marks(row({ threadId: null, task: task({ id: 't1', state: 'done' }) })).settle, false);
+});
+
+test('drafted posts waiting on an owned content unit lift the conversation (release drafts §4.5)', () => {
+  // accepted on its own reads settled: it is the DRAFTS that lift the row
+  const unit = task({ id: 'u2', number: 1142, state: 'accepted', kind: 'content', origin_thread_id: 'th1' } as Partial<TaskAllRow> & { id: string; state: string });
+  const drafts = [
+    { task_id: 'u2', created_at: T0, status: 'draft' },
+    { task_id: 'u2', created_at: T1, status: 'draft' },
+    { task_id: 'u2', created_at: T1, status: 'scheduled' }, // approved already: not waiting
+    { task_id: 'elsewhere', created_at: T1, status: 'draft' }, // another unit's, not this conversation's
+    { task_id: null, created_at: T1, status: 'draft' }, // a thread-anchored draft rides its own thread
+  ];
+  const marks = makeRowMarks({ decisions: [], liveIds: new Set(), threads: [thread({ id: 'th1' }), thread({ id: 'th2' })], tasks: [unit], drafts });
+  assert.deepEqual(marks(row({ threadId: 'th1', task: null })), { status: 'needs_you', ask: false, settle: true });
+  assert.equal(marks(row({ threadId: 'th2', task: null })).status, 'settled');
+  // a request for changes after the newest draft hands the ball back to the agent
+  const spoke = makeRowMarks({ decisions: [], liveIds: new Set(), threads: [thread({ id: 'th1', last_author_kind: 'human', last_at: T2 })], tasks: [unit], drafts });
+  assert.equal(spoke(row({ threadId: 'th1', task: null })).status, 'in_progress');
+  // a settle newer than the drafts hides them
+  const settled = makeRowMarks({ decisions: [], liveIds: new Set(), threads: [thread({ id: 'th1', settled_at: T2 })], tasks: [unit], drafts });
+  assert.deepEqual(settled(row({ threadId: 'th1', task: null })), { status: 'settled', ask: false, settle: false });
+  // no drafts handed in (the callers that have none): the rule is inert
+  assert.equal(makeRowMarks({ decisions: [], liveIds: new Set(), threads: [thread({ id: 'th1' })], tasks: [unit] })(row({ threadId: 'th1', task: null })).status, 'settled');
 });

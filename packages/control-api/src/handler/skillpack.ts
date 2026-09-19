@@ -113,8 +113,8 @@ export async function skillpackCommands(store: Store, actor: Actor, cmd: Command
       workspace: cmd.workspace,
       payload: { channel: cmd.channel },
     });
-    const { added } = await store.seedDefaultPacks(cmd.workspace, cmd.channel, event, cmd.kind ?? 'build');
-    return { ok: true, added } as never;
+    const { added, refreshed } = await store.seedDefaultPacks(cmd.workspace, cmd.channel, event, cmd.kind ?? 'build');
+    return { ok: true, added, refreshed } as never;
   }
   return undefined;
 }

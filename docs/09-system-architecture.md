@@ -503,3 +503,17 @@ sign-in on a machine they own.
 **The web client's two credentials, and the one rule between them** (2026-09-05). A tab authenticates twice: `/v1` calls carry a Clerk bearer read **live** from clerk-js on every call, and PowerSync's credential is minted server-side from a Clerk **session id**. That id used to be read from a `localStorage` snapshot written at sign-in, and a snapshot outlives the session it names — Clerk sessions expire, are revoked, and are replaced when the same person signs in elsewhere. The tab then stayed signed in on the bearer lane while the mint answered `401` forever, roughly every six seconds, so sync died silently and nobody was told. **Both credentials now come from the live client** (`liveClerkSessionId`, `webnm-auth.ts`); the stored id survives only as the fallback for a build with no Clerk at all. The policy lives in `webnm-credentials.ts`, and it honours a distinction the server always made and the browser ignored: `/auth/clerk/token` returns **401 only after probing Clerk and finding the session genuinely dead**, and **503 `AUTH_UNAVAILABLE` for anything inconclusive** precisely so the client keeps retrying. Retry the 503s forever; land a 401 on the sign-in screen, the way the desktop already does. The desktop keeps its stored id and its sign-out, correctly: the stored id is the only Clerk artifact it holds, so it has nothing live to re-derive from.
 
 **Why the relay must exist**, in one line: machines never listen and Vercel cannot hold a stream, so both sides dial out to a rendezvous. The operational traps — one replica only, two health checks, a 30-second default WebSocket timeout, and bytes-not-strings — are in [docs/42](42-browser-terminal-and-relay.md), along with the reason the machine image now imports `machined` at build time.
+
+## The release routine's tick branch (2026-09-17, docs/44)
+
+A schedule whose payload carries `release` is a routine that watches a repository. In
+`runDueSchedules` the branch is decided BEFORE the claim, beside `isRoutine`: the preflight
+(`host/releasewatch.ts`) resolves the repository (the payload's id, else the room's project's
+primary), its GitHub remote, and this machine's `gh` login, and leaves the row due when any is
+missing (the attention bar says why after ten minutes). After the claim the fire reads releases,
+merged pull requests and tags through `gh`, hands them to the pure scan, drops a key that already
+heads a session of this schedule, and either opens one session with the digest (the owner's
+message, `scheduleId` on the thread, the `‹release:owner/repo@key›` marker at the end) or leaves a
+quiet ledger line. Then `schedule.set_cursor` moves the cursor, never before. `NM_GH_FAKE=1`
+answers the read from `NM_GH_FAKE_RELEASES` (or one canned release), so the echo lane proves the
+whole fire without GitHub.

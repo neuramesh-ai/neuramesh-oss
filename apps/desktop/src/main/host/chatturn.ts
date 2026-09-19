@@ -16,7 +16,7 @@ import { type WhiteboardToolClosures } from '../harness/toolbus';
 
 
 
-import { runtimeFor, xPublishConnectedFor, xResearchNote } from '../agents';
+import { runtimeFor, stageConnections, xPublishConnectedFor, xResearchNote } from '../agents';
 import type { HostedAgent, SkillRef } from '../agents';
 // `chatSystemPrompt` is already taken by the BOARD's chat prompt (runtime/adapter), which says
 // the opposite thing ("work moves through the board"), so this one is aliased, not shadowed.
@@ -80,7 +80,10 @@ async function chatTurn(args: {
     // the connected account is the read capability (search_x rides the nm registry below)
     const xConn = await xPublishConnectedFor(db, ch);
     return xResearchNote(xConn);
-  })();
+  })() + await stageConnections(db, ch.id).catch(() => '');
+  // ^ the room's connected accounts, the same note a content task gets: a marketer asked for
+  // creator scripts drafted TikTok for a room whose accounts were X and LinkedIn (live, 2026-09-18),
+  // because nothing in a chat turn said which networks this room can reach
 
   if (!canUseTools) {
     // Honest degradation (docs/34 §6): this runtime has no tool loop through our seam, so it

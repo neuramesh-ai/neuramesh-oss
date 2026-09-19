@@ -1,0 +1,181 @@
+{
+  "artboards": [
+    {
+      "file": "Setup.dc.html",
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 1000,
+      "title": "A · setup, step 5 of 5 · graphite"
+    },
+    {
+      "file": "Thread.dc.html",
+      "x": 1580,
+      "y": 0,
+      "w": 1440,
+      "h": 1000,
+      "title": "B · the release session · graphite"
+    },
+    {
+      "file": "ThreadCream.dc.html",
+      "x": 3160,
+      "y": 0,
+      "w": 1440,
+      "h": 1000,
+      "title": "B · the release session · cream oak"
+    },
+    {
+      "file": "Routines.dc.html",
+      "x": 0,
+      "y": 1260,
+      "w": 1440,
+      "h": 1000,
+      "title": "C · Automations › Routines · the ledger"
+    },
+    {
+      "file": "AnnounceForm.dc.html",
+      "x": 1580,
+      "y": 1260,
+      "w": 1440,
+      "h": 1000,
+      "title": "D1 · announce · a public repository · the form"
+    },
+    {
+      "file": "AnnouncePrivate.dc.html",
+      "x": 3160,
+      "y": 1260,
+      "w": 1440,
+      "h": 1000,
+      "title": "D2 · announce · a private repository · the grant"
+    },
+    {
+      "file": "AnnounceWait.dc.html",
+      "x": 0,
+      "y": 2520,
+      "w": 1440,
+      "h": 1000,
+      "title": "D3 · announce · the wait and the email"
+    },
+    {
+      "file": "Announce.dc.html",
+      "x": 1580,
+      "y": 2520,
+      "w": 1440,
+      "h": 1000,
+      "title": "D4 · announce · ready · paper"
+    },
+    {
+      "file": "AnnounceDark.dc.html",
+      "x": 3160,
+      "y": 2520,
+      "w": 1440,
+      "h": 1000,
+      "title": "D4 · announce · ready · graphite"
+    },
+    {
+      "file": "Architecture.dc.html",
+      "x": 0,
+      "y": 3780,
+      "w": 1440,
+      "h": 1000,
+      "title": "E · how it runs · two lanes"
+    },
+    {
+      "file": "Options.dc.html",
+      "x": 1580,
+      "y": 3780,
+      "w": 1440,
+      "h": 1000,
+      "title": "F · the options, reviewed"
+    }
+  ],
+  "annotations": [
+    {
+      "id": "note-top",
+      "x": 0,
+      "y": -300,
+      "w": 4600,
+      "text": "RELEASE DRAFTS · the repository is a marketing source (design round 1, 2026-09-17, revised the same evening with George's two notes on the public door)\nNeuraMesh watches a project's repository from the machine that already holds the gh login. Once a day the daemon's tick scans for releases and merged pull requests since the last check. A quiet window opens nothing. A window with candidates opens ONE session in the project's marketing room, titled by the release, with the digest as its first message. rex judges whether a feature shipped and which one, then starts the release announcement playbook: a unit born approved, worked by plume on the worker lane with the brand docs staged. The unit lands a release brief and one draft per connected account, and the session shows them as the same post cards the product already has. The human approves, schedules, or asks for changes on the card. Publishing stays human and rides the sealed connectors. The public door, neuramesh.app/announce, detects whether the repository is public or private (a private one is granted through the NeuraMesh GitHub App, read only, their pick of repositories), asks for a website and an email, runs the same drafting as a queued job on our server with the Starter brain, draws a release card on the site's palette, emails the link when the drafts are ready, and imports them into a workspace on sign in. No channel per release, no token stored on the platform."
+    },
+    {
+      "id": "note-a",
+      "x": 0,
+      "y": 1020,
+      "w": 1440,
+      "text": "A · SETUP, STEP 5 OF 5. The marketing wizard gains one optional step after Connect. The repository comes from the project (Change opens the attach flow). The accounts are the connected ones, read from the same rows the room's Connections list reads. Two switches: draft the latest release now (a one-shot, free on every plan, the demo you own), and watch the repository daily (a routine, so Team). Put the crew to work runs marketing.setup as today. It plants the one-shot beside the brand bootstrap, and the daily routine when the switch is on."
+    },
+    {
+      "id": "note-b",
+      "x": 1580,
+      "y": 1020,
+      "w": 1440,
+      "text": "B · THE RELEASE SESSION. A routine-born thread in #marketing, titled once by the agent from the feature. The first message is the fire's digest as the owner's message: the release, its notes, the merged pull requests. rex says what shipped and why it counts, and the unit card sits under it. plume's completion note carries the release brief card (the feature, the reasons, the audience, the assets, and what is not known) and the drafts row: X, LinkedIn, Instagram with the release card, TikTok as an inbox draft. The cards are the product's SocialPostCard from one derivation. The header wears needs you until the cards are answered. The composer already knows how to ask for changes on a card."
+    },
+    {
+      "id": "note-bc",
+      "x": 3160,
+      "y": 1020,
+      "w": 1440,
+      "text": "B · CREAM OAK. The same session in the signature light. The transcript is ground, the brief card and the post cards are the elevated stratum, the human's digest keeps its hairline bubble."
+    },
+    {
+      "id": "note-c",
+      "x": 0,
+      "y": 2280,
+      "w": 1440,
+      "text": "C · ROUTINES. The release routine is a routine like every other: pause, edit, remove, and a ledger. The ledger differs in one way: a quiet window is a row too, so the human can see the routine checked and found nothing. A window with fixes only reads as settled with Draft anyway, which posts the ask into the room and drafts that release once."
+    },
+    {
+      "id": "note-d1",
+      "x": 1580,
+      "y": 2280,
+      "w": 1440,
+      "text": "D1 · THE FORM. The paste is detected at once: public, and the latest release named under the input. Then two fields. The website, prefilled from the repository's homepage, is the brand read: the palette and the fonts from its CSS, the voice from its copy, the way the marketing bootstrap reads a site today. The email carries the link when the drafts are ready, and it bounds the spend: one draft set per release per email, caps per address. One button. The note says how long it takes and that the page can be closed."
+    },
+    {
+      "id": "note-d2",
+      "x": 3160,
+      "y": 2280,
+      "w": 1440,
+      "text": "D2 · A PRIVATE REPOSITORY. GitHub answers 404 to a stranger for a private repository and for a missing one, so the row says both. The grant card names exactly what the NeuraMesh GitHub App reads (releases, pull requests, README, CHANGELOG), what it never does, and how tokens work (minted per read, one hour, never stored, revocable on GitHub). The button opens GitHub's own install page, where the person picks the repositories. The callback re-runs the detect, and the form appears. The App's webhooks are the v1.5 hook for instant fires."
+    },
+    {
+      "id": "note-d3",
+      "x": 0,
+      "y": 3540,
+      "w": 1440,
+      "text": "D3 · THE WAIT AND THE EMAIL. After the button, the job is a queued row a minute cron works. The page shows the first-run card's status rows (docs/33 §8): the release, the site, the drafts, the release card, each READY or PLEASE WAIT, and the line that says the email is coming. The email follows docs/28: it opens on the scene (three drafts, the feature, the networks, the card), one button to the drafts, one line about sign in, and the honest closer for a stranger's address. The page updates itself while it is open, so nobody has to wait for the email."
+    },
+    {
+      "id": "note-d4",
+      "x": 1580,
+      "y": 3540,
+      "w": 1440,
+      "text": "D4 · READY. The result: the release, the verdict, the feature title, and three posts. Instagram carries the release card drawn on the site's palette, so every set has at least one image. Sign in to save and schedule imports the drafts into a workspace as the session in board B, and the website goes into the marketing profile so the room's brand docs start from it. The three doors at the foot are one endpoint: the app, the terminal, the CI."
+    },
+    {
+      "id": "note-d4d",
+      "x": 3160,
+      "y": 3540,
+      "w": 1440,
+      "text": "D4 · GRAPHITE. The site's dark twin, the same page."
+    },
+    {
+      "id": "note-e",
+      "x": 0,
+      "y": 4800,
+      "w": 1440,
+      "text": "E · HOW IT RUNS. Two lanes, one endpoint. In the app, the scan is code on the machine, the judgment is the agent's in the thread, the gate is the human's on the card, and the publish cron is the one server-side act. On the public door, the detect decides public or private, the App grant is the human's act, the form is the spend gate, a minute cron works the job (reads, one Starter turn, the release card), the email carries the link, and sign in hands the result to a workspace. The dashed line from the page back to the session is the point: the public page is the first mile of the same road."
+    },
+    {
+      "id": "note-f",
+      "x": 1580,
+      "y": 4800,
+      "w": 1440,
+      "text": "F · THE OPTIONS. Four decisions, the lit rows are the recommendation, and the strip at the foot names what this round changes from the rough draft."
+    }
+  ],
+  "launch": {
+    "fit": "all"
+  }
+}

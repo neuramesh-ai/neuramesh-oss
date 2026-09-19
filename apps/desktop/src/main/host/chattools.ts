@@ -13,7 +13,7 @@
 
 import { type WhiteboardToolClosures } from '../harness/toolbus';
 import { WB_CREATE_DESC, WB_LIST_DESC, WB_READ_DESC, WB_UPDATE_DESC } from '../harness/tooldesc';
-import { normalizeDraft } from '@neuramesh/shared';
+import { normalizeDraft, parseDraftRevisions } from '@neuramesh/shared';
 import { shareChatTools } from './chattools-share';
 import { playbookCatalogText } from './tools-playbooks';
 import { searchXText } from './searchx';
@@ -199,23 +199,24 @@ const nm = createSdkMcpServer({
     // the only honest answer was a file the human could not act on.
     tool(
       'draft_posts',
-      'Hand over drafted social posts as REVIEWABLE CARDS in this conversation — the platform-native preview the human approves, schedules, or asks you to change, right here. Use it for ANY "draft/write me posts / captions / a thread" ask. NEVER write a posts.json file and never paste the posts as markdown — a file gives them nothing to click and pasted prose gives them nothing to approve. `body` is ONLY the text that goes on the wire: no character count, no "(draft only)" footer, no image brief inside it — that text would publish verbatim. Put art direction in `imageBrief`, and only when the post should carry a visual.',
+      'Hand over drafted social posts as REVIEWABLE CARDS in this conversation — the platform-native preview the human approves, schedules, or asks you to change, right here. Use it for ANY "draft/write me posts / captions / a thread" ask. NEVER write a posts.json file and never paste the posts as markdown — a file gives them nothing to click and pasted prose gives them nothing to approve. `body` is ONLY the text that goes on the wire: no character count, no "(draft only)" footer, no image brief inside it — that text would publish verbatim. Put art direction in `imageBrief`, and only when the post should carry a visual. A VIDEO post (a UGC or creator script) puts the script in `script` and the caption that posts with the video in `body`. Draft for the platform the ask names, else for the connected accounts.',
       {
         posts: z.array(z.object({
-          platform: z.enum(['x', 'instagram', 'linkedin', 'tiktok', 'email']),
-          body: z.string().min(1).max(10_000).describe('the post text exactly as it would publish, within the network\'s limit'),
-          imageBrief: z.string().max(2000).optional().describe('art direction for this post\'s picture — omit for a text-only post'),
+          platform: z.enum(['x', 'instagram', 'linkedin', 'tiktok', 'email']).describe('the network: the one asked for, else a connected account'),
+          body: z.string().min(1).max(10_000).describe('the post text exactly as it would publish, within the network\'s limit. For a video post: the caption that posts with the video.'),
+          imageBrief: z.string().max(2000).optional().describe('art direction for this post\'s picture — omit for a text-only post. For a video post: the shot direction the film follows.'),
+          script: z.string().max(10_000).optional().describe('a VIDEO post only: the creator\'s script, timestamped beats ([0:00-0:03] direction, Spoken: "…"). The card folds it and can film its hook. Never inside body or imageBrief.'),
         })).min(1).max(20),
       },
       async (i) => {
-        const drafts = (i.posts as Array<{ platform: string; body: string; imageBrief?: string }>)
+        const drafts = (i.posts as Array<{ platform: string; body: string; imageBrief?: string; script?: string }>)
           .map((p) => normalizeDraft(p)).filter((p): p is NonNullable<typeof p> => !!p);
         if (!drafts.length) return text('none of those entries were usable posts — each needs a supported platform and a body that is more than working notes');
         let made = 0;
         for (const d of drafts) {
           const r = await post('/v1/commands', { kind: 'agent', id: agent.id }, {
             type: 'content.create', channel: ch.id, thread: threadId, platform: d.platform, body: d.body,
-            ...(d.imageBrief ? { imageBrief: d.imageBrief } : {}),
+            ...(d.imageBrief ? { imageBrief: d.imageBrief } : {}), ...(d.script ? { script: d.script } : {}),
           }).catch(() => null);
           if (r?.ok) made += 1;
         }
@@ -231,8 +232,9 @@ const nm = createSdkMcpServer({
       {
         revisions: z.array(z.object({
           letter: z.string().describe('the card letter to rewrite: a, b, c…'),
-          body: z.string().max(10_000).optional().describe('the replacement post text, in full'),
-          imageBrief: z.string().max(2000).optional(),
+          body: z.string().max(10_000).optional().describe('the replacement post text, in full (a video post: its caption)'),
+          imageBrief: z.string().max(2000).optional().describe('replacement art direction (a video post: its shot direction)'),
+          script: z.string().max(10_000).optional().describe('a video post: the replacement script, in full. The next Generate video films it.'),
         })).min(1).max(20),
       },
       async (i) => {
@@ -242,16 +244,18 @@ const nm = createSdkMcpServer({
         const done: string[] = [];
         const missed: string[] = [];
         const drew: string[] = [];
-        for (const r of i.revisions as Array<{ letter: string; body?: string; imageBrief?: string }>) {
+        for (const r of i.revisions as Array<{ letter: string; body?: string; imageBrief?: string; script?: string }>) {
           const target = byLetter.get(r.letter.trim().toLowerCase());
-          if (!target || target.status === 'published' || (!r.body && !r.imageBrief)) { missed.push(r.letter); continue; }
-          const cleaned = r.body ? normalizeDraft({ platform: target.platform, body: r.body }) : null;
-          if (r.body && !cleaned) { missed.push(r.letter); continue; }
+          // ONE cleaner for a revision (parseDraftRevisions, the posts-file path's): the caption
+          // stripped of notes, a script filed under a heading in the brief or the body lifted out
+          const [rev] = parseDraftRevisions(JSON.stringify([r]));
+          if (!target || target.status === 'published' || !rev) { missed.push(r.letter); continue; }
+          const { body, imageBrief: brief, script } = rev;
           const res = await post('/v1/commands', { kind: 'agent', id: agent.id }, {
             type: 'content.revise', item: target.id,
-            ...(cleaned ? { body: cleaned.body } : {}), ...(r.imageBrief ? { imageBrief: r.imageBrief } : {}),
+            ...(body ? { body } : {}), ...(brief ? { imageBrief: brief } : {}), ...(script ? { script } : {}),
           }).catch(() => null);
-          if (res?.ok) { done.push(target.letter); if (r.imageBrief) drew.push(target.letter); } else missed.push(r.letter);
+          if (res?.ok) { done.push(target.letter); if (brief) drew.push(target.letter); } else missed.push(r.letter);
         }
         if (!done.length) return text(`nothing was revised (${missed.join(', ') || 'no matching cards'}) — say so rather than pasting the new copy into your reply`);
         // new art direction ⇒ a new picture, same as the orchestrator path (see there for why)

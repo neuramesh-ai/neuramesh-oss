@@ -11,6 +11,6 @@
  * `‹gen-image:ci-c3›` into a conversation: exactly the two-surfaces-one-behaviour drift that
  * having two thread components keeps producing.
  */
-export const MARKER_RE = /‹(?:revised|cards|gen-image):[^›]+›/g;
+export const MARKER_RE = /‹(?:revised|cards|gen-image|gen-video|release):[^›]+›/g;
 
 export const stripMarkers = (body: string): string => body.replace(MARKER_RE, '').trim();

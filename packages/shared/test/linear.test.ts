@@ -8,7 +8,7 @@ import { articleFrom, parseArticleRef } from '../src/articles';
 import { parseQuestions, parseTaskUnitRef, readAnswers } from '../src/cards';
 import { scrubEmdash } from '../src/commrules';
 import { engineeringPlanItems } from '../src/engineering/activity';
-import { dotLines, fencedBlock, firstSentence, lineHas, stripFenced, trimEndChars, trimLineEnds, trimStartChars } from '../src/linear';
+import { dotLines, fencedBlock, firstSentence, lineHas, stripFenced, trimEndChars, trimLineEnds, trimStartChars, markerSpans, stripMarkers } from '../src/linear';
 import { parseNeed, stripNeed } from '../src/needs';
 import { playbookFromAsk } from '../src/playbooks';
 import { canonicalPolicyHost, classifyShellCommand } from '../src/policy';
@@ -127,8 +127,14 @@ describe('what the rewrites changed on purpose', () => {
     expect((parseQuestions(body)[0]?.options ?? []).map((o) => o.label)).toEqual(['one', 'two']);
     expect(parseTaskUnitRef('‹task:11111111-1111-1111-1111-111111111111› keep \t\n\n\n\nthis')?.prose).toBe('keep\n\nthis');
   });
-  it('an answer line reads the value after the arrow', () => {
+  it('an answer line reads the value after the arrow, and the question holds no asterisk', () => {
     expect(readAnswers(['**Which?** →   two'])).toEqual(new Map([['Which?', 'two']]));
+    expect(readAnswers(['**a*b** → c'])).toEqual(new Map());
+  });
+  it('an image target ends at a blank, and a title may follow it', () => {
+    const a = articleFrom('x.md', '# T\n\n![alt](https://x/a.png "the title")\n\n![b](https://x/b.png)');
+    expect(a.hero).toBe('https://x/a.png');
+    expect(a.images).toBe(2);
   });
   it('a plan item starts at its first non-blank and ends before its blanks', () => {
     expect(engineeringPlanItems('- [x]   Done thing   \r\n2)  Next one  ').map((i) => i.text)).toEqual(['Done thing', 'Next one']);
@@ -168,6 +174,7 @@ describe('the attack strings CodeQL named cost the input, not its square', () =>
   it('a run of markers, brackets, blanks and braces', () => {
     expect(ms(() => parseArticleRef('‹article:' + '‹article:!'.repeat(N / 10)))).toBeLessThan(200);
     expect(ms(() => articleFrom('x', '![' .repeat(N / 2)))).toBeLessThan(400);
+    expect(ms(() => articleFrom('x', '![](' + 'a'.repeat(N)))).toBeLessThan(400);
     expect(ms(() => scrubEmdash(' '.repeat(N) + 'a'))).toBeLessThan(200);
     expect(ms(() => briefPretty(' '.repeat(N) + 'a'))).toBeLessThan(200);
     expect(ms(() => { try { parseReviewVerdict('{{'.repeat(N / 2)); } catch { /* no verdict, said fast */ } })).toBeLessThan(200);
@@ -179,3 +186,21 @@ describe('the attack strings CodeQL named cost the input, not its square', () =>
     expect(ms(() => parseSkillFile('a/SKILL.md', '---\nname:' + ' '.repeat(N) + '\n---\nb'))).toBeLessThan(200);
   });
 });
+
+describe('markerSpans / stripMarkers (the 2026-09-19 CodeQL round: the brief and release markers, the html comments)', () => {
+  it('finds every closed span and stops at an opener with no closer, as the regex did', () => {
+    const text = 'a ‹brief:one› b ‹brief:two› c ‹brief:open';
+    expect(markerSpans(text, '‹brief:', '›').map((s) => s.inner)).toEqual(['one', 'two']);
+    expect(stripMarkers(text, '‹brief:', '›')).toBe(text.replace(/‹brief:[^›]*›/g, ''));
+    expect(stripMarkers('<p>x</p><!-- a --><!-- b -->y', '<!--', '-->')).toBe('<p>x</p>y');
+    expect(stripMarkers('nothing here', '<!--', '-->')).toBe('nothing here');
+  });
+  it('a flood of unclosed openers costs the input once', () => {
+    const flood = '‹brief:'.repeat(20_000);
+    const t0 = performance.now();
+    expect(markerSpans(flood, '‹brief:', '›')).toEqual([]);
+    expect(stripMarkers(flood, '‹brief:', '›')).toBe(flood);
+    expect(performance.now() - t0).toBeLessThan(200);
+  });
+});
+

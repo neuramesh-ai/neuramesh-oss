@@ -52,6 +52,20 @@ describe('the em-dash scrub — agent prose only, fences exempt, defaults ON', (
     const a = await j(await send(rex, '/v1/messages', { ...base(), body: 'kept — as-is' }));
     expect(a.message.body).toBe('kept — as-is');
   });
+  it('an agent draft and its revision are scrubbed, body and image brief; a human draft is not', async () => {
+    const proj = await j(await send(george, '/v1/commands', { type: 'project.create', workspace: ws, name: 'Growth' }));
+    const { channelId } = await j(await send(george, '/v1/commands', { type: 'channel.create', workspace: ws, project: proj.projectId, slug: 'marketing' }));
+    const items = () => (store as unknown as { contentItems: Array<{ id: string; body: string; brief?: string | null }> }).contentItems;
+    const a = await j(await send(rex, '/v1/commands', { type: 'content.create', channel: channelId, platform: 'tiktok', body: '[0:00-0:03] HOOK — handheld, no laptop bag\nSpoken: "my code — Still there"', imageBrief: '9:16 — phone in hand' }));
+    expect(items().find((x) => x.id === a.itemId)).toMatchObject({ body: '[0:00-0:03] HOOK, handheld, no laptop bag\nSpoken: "my code. Still there"', brief: '9:16, phone in hand' });
+    await send(rex, '/v1/commands', { type: 'content.revise', item: a.itemId, body: 'second cut — tighter' });
+    expect(items().find((x) => x.id === a.itemId)?.body).toBe('second cut, tighter');
+    const h = await j(await send(george, '/v1/commands', { type: 'content.create', channel: channelId, platform: 'x', body: 'humans — keep theirs' }));
+    expect(items().find((x) => x.id === h.itemId)?.body).toBe('humans — keep theirs');
+    await send(george, '/v1/commands', { type: 'workspace.update', workspace: ws, commRules: { noEmdash: false } });
+    const o = await j(await send(rex, '/v1/commands', { type: 'content.create', channel: channelId, platform: 'x', body: 'opted out — kept' }));
+    expect(items().find((x) => x.id === o.itemId)?.body).toBe('opted out — kept');
+  });
   it('agent task titles and descriptions are scrubbed at birth', async () => {
     const r = await j(await send(rex, '/v1/commands', { type: 'task.create', ...base(), title: 'CTA test — homepage', description: 'measure — then decide', backlog: true }));
     expect(r.task.title).toBe('CTA test, homepage');

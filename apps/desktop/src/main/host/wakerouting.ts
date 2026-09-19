@@ -12,7 +12,7 @@ import type { HostedAgent, ThreadTask } from '../agents';
 import { pickDeadLetters, type SweepCandidate } from '../chatsweep';
 import { HIRE_CONFIRM_RE } from '../hirecards';
 import { type RunHandle } from './runs';
-import { addressedIn, genImageItemId, mentionRe, nobodyCanServe, parseCard, parseModeMarker, unaddressedWake } from '@neuramesh/shared';
+import { addressedIn, mentionRe, modelFreeItemId, nobodyCanServe, parseCard, parseModeMarker, unaddressedWake } from '@neuramesh/shared';
 import type { PowerSyncDatabase } from '@powersync/node';
 import type { ClaimVerdict, MachineCapability, SessionOrigin } from '@neuramesh/shared';
 import type { HostGuards } from './guards';
@@ -76,7 +76,7 @@ export function makeWakeRouting(ctx: {
     // THE DRAW BUTTON IS NOT A CONVERSATION. `‹gen-image:…›` runs no model turn (wake.ts draws
     // the draft from the brief already on it), so the runtime rung must not gate it — a cloud
     // machine with no CLI can draw perfectly well, and before this it skipped every one.
-    const modelFree = genImageItemId(msg?.body ?? '') !== null;
+    const modelFree = modelFreeItemId(msg?.body ?? '') !== null; // a draw or a film: no runtime asked of the machine
     const originUserId = msg?.author_kind === 'human' ? msg.author_id : null;
     const priorMachineId = await priorMachineFor(where.threadId, where.taskId);
     // the session's own designation and origin (0134, rule D9): the composer's chip or the desktop

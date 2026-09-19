@@ -37,6 +37,7 @@ describe('the registry', () => {
     expect(UNIT_PLAYBOOK_IDS).not.toContain('copylab');
     expect(UNIT_PLAYBOOK_IDS).not.toContain('hooks');
     expect(UNIT_PLAYBOOK_IDS).not.toContain('email');
+    expect(UNIT_PLAYBOOK_IDS).not.toContain('ugc'); // UGC scripts are handed over in the thread (draft cards), never a unit
     expect(UNIT_PLAYBOOK_IDS.length).toBe(PLAYBOOKS.filter((p) => p.engine === 'unit').length);
   });
 
@@ -51,7 +52,7 @@ describe('the registry', () => {
   it('a playbook that declares connector needs is one whose run cannot proceed without them', () => {
     // the gate is data, not prose: an entry with `needs` is refused at create when unmet
     const gated = PLAYBOOKS.filter((p) => p.needs?.length);
-    expect(gated.map((p) => p.id)).toEqual(['engage']);
+    expect(gated.map((p) => p.id)).toEqual(['engage', 'release']);
     expect(gated[0]!.needs![0]).toMatchObject({ kind: 'connector', min: 1 });
   });
 

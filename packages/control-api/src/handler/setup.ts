@@ -49,8 +49,13 @@ export async function setupCommands(store: Store, actor: Actor, cmd: Command): P
     // the value's SHAPE follows the step: focus is the one array-valued write today, and its
     // members ride the same enum marketing.setup enforces — one validator, not two drifting
     if (step.writes === 'focus' && cmd.value !== undefined) {
-      const arr = Array.isArray(cmd.value) ? cmd.value : [cmd.value];
+      const arr = Array.isArray(cmd.value) ? cmd.value : typeof cmd.value === 'string' ? [cmd.value] : [];
       for (const v of arr) if (!['social', 'content', 'seo', 'email', 'ads'].includes(v)) throw new DomainError('INVALID_INPUT', `not a focus area: ${v}`);
+    }
+    // the releases step writes an object, and only that step does
+    if (cmd.value !== undefined) {
+      const isObj = typeof cmd.value === 'object' && !Array.isArray(cmd.value);
+      if ((step.writes === 'releases') !== isObj) throw new DomainError('INVALID_INPUT', `the ${step.id} step takes ${step.writes === 'releases' ? 'an object' : 'a text value'}`);
     }
     const patch = step.writes !== undefined && cmd.value !== undefined ? { [step.writes]: cmd.value } : {};
     const { id } = await store.setChannelSetupStep(

@@ -14,6 +14,7 @@ import {
 import { inviteMeta, joinedMeta } from './templates-account';
 import { day1Meta, day3Meta, welcomeMeta } from './templates-lifecycle';
 import { hostedFreeNoticeMeta } from './templates-notice';
+import { announceReadyMeta } from './templates-announce';
 
 export interface RenderedEmail {
   subject: string;
@@ -242,6 +243,7 @@ export const TEMPLATE_META: Record<string, TemplateMeta> = {
   invite: inviteMeta, joined: joinedMeta, publishFailed: publishFailedMeta,
   welcome: welcomeMeta, day1: day1Meta, day3: day3Meta, marketing: marketingMeta,
   day7: day7Meta, digest: digestMeta, broadcast: broadcastMeta, hostedFreeNotice: hostedFreeNoticeMeta,
+  announceReady: announceReadyMeta,
 };
 
 export { APP_URL };

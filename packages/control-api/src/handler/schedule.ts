@@ -129,6 +129,18 @@ export async function scheduleCommands(store: Store, actor: Actor, cmd: Command)
     }));
     return { ok: true } as never;
   }
+  if (cmd.type === 'schedule.set_cursor') {
+    // the scan's finish line, written by whichever lane completed it: the cursor moves ONLY here,
+    // never on the claim, so a scan that dies after claiming leaves tomorrow's window covering today
+    await store.setScheduleCursor(cmd.schedule, cmd.cursor, cmd.log ?? null, (ws) => createEvent({
+      type: 'schedule.cursor',
+      source: actorAddress(actor),
+      target: formatAddress({ kind: 'resource', type: 'schedule', id: cmd.schedule }),
+      workspace: ws,
+      payload: { schedule: cmd.schedule, cursor: cmd.cursor, note: cmd.log?.note ?? null },
+    }));
+    return { ok: true } as never;
+  }
   // Left behind when this module was first split out: these branches sat in handler.ts
   // beside the FSM tail with no reason other than the order they were written in.
 

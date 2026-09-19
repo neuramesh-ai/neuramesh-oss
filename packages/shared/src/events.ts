@@ -101,6 +101,7 @@ export const EVENT_TYPES = [
   'schedule.deleted',
   'schedule.run_claimed',
   'schedule.result',
+  'schedule.cursor',
   'content.created',
   'content.approved',
   'content.unscheduled',

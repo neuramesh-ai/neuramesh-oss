@@ -1,7 +1,7 @@
 // Routines — the inventory of what is armed (docs/automations).
 // Extracted from App.tsx (track A2).
 import { IconChevron, IconPause, IconPlay, IconTrash } from '../ui/icons';
-import { shortAgo , replyPreview } from '@neuramesh/shared';
+import { shortAgo , replyPreview, type ReleaseLogRow } from '@neuramesh/shared';
 import type { ScheduleRunRow } from '../bridge/rows-content';
 import type { ScopeProps } from '../shell/useScopeMemory';
 import { SCHED_WEEKDAYS, ScheduleFormModal, nextRunLabel } from '../schedule/schedule';
@@ -14,6 +14,28 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 // Imported bindings lose control-flow narrowing inside closures, so re-bind (same as App.tsx).
 const nm = nmBridge;
+
+// A release routine (docs/design/release-drafts-2026-09 §4.7, releasescan.ts) keeps its own
+// ledger in `payload.release.log`: one line per tick. A fired day's key is the tag, and its
+// session is already a run row; a quiet day has no key and opened nothing, so the ledger line is
+// the only place it can be read from. The repository slug rides the same payload.
+function releaseOf(x: ScheduleRow): { slug: string | null; log: ReleaseLogRow[] } | null {
+  try {
+    const rel = (JSON.parse(x.payload ?? '{}') as { release?: { slug?: string | null; log?: ReleaseLogRow[] } }).release;
+    return rel ? { slug: rel.slug ?? null, log: Array.isArray(rel.log) ? rel.log : [] } : null;
+  } catch { return null; }
+}
+type LedgerRow = { id: string; at: string; run?: ScheduleRunRow; note?: string };
+/** the runs and the ledger as one list, newest first — a keyed line whose tag heads a run's
+ *  title is that run (skipped), every other line is a quiet row */
+function ledgerRows(runs: ScheduleRunRow[], log: ReleaseLogRow[]): LedgerRow[] {
+  const rows: LedgerRow[] = runs.map((r) => ({ id: r.id, at: r.created_at, run: r }));
+  for (const l of log) {
+    if (l.key && runs.some((r) => (r.title ?? '').includes(l.key!))) continue;
+    rows.push({ id: `log-${l.at}`, at: l.at, note: l.note });
+  }
+  return rows.sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
+}
 
 // One centered modal for arming AND editing a drafting schedule (round 21): sched=null
 // arms a new one (schedule.create), else edits in place (schedule.update, run_count
@@ -130,7 +152,7 @@ export function RoutinesView({ projects, chans, onCount, onNew, onOpenRun, scope
           own right edge, never lining up with the next one's. The anatomy is the bell popover's,
           at destination scale, so the product has one list idiom rather than two. */}
       <div className="rtlist">
-      {[...active, ...paused].map((x) => (
+      {[...active, ...paused].map((x) => { const rel = releaseOf(x); return (
         <div key={x.id} className={`rtrow${x.status === 'paused' ? ' paused' : ''}${openRuns === x.id ? ' open' : ''}`} role="button" tabIndex={0} title={`${x.title} — click to edit`}
           onClick={() => setEdit(x)}
           // …only when the Enter came from the ROW ITSELF. Every button inside bubbles its keydown
@@ -147,6 +169,8 @@ export function RoutinesView({ projects, chans, onCount, onNew, onOpenRun, scope
             {/* one line, not two: here the prompt IDENTIFIES the routine — the full text is one
                 click away in the editor */}
             {x.prompt && <span className="rtprompt">{x.prompt}</span>}
+            {/* a release routine names the repository it watches, in the room's mono voice */}
+            {rel?.slug && <span className="rtroom">{rel.slug}</span>}
           </span>
           {/* the ledger and the verbs share ONE fixed slot: the meta steps aside and the buttons
               rise in its place, so the row never reflows under the pointer */}
@@ -194,30 +218,47 @@ export function RoutinesView({ projects, chans, onCount, onNew, onOpenRun, scope
               to run rather than a disappearance. */}
           <span className={`runspanel${openRuns === x.id ? ' open' : ''}`} onClick={(e) => e.stopPropagation()}>
             <span className="runspanelin">
-              {runsLoading === x.id && !runs[x.id] && <span className="runsnote">Looking up this automation&rsquo;s runs…</span>}
-              {runs[x.id]?.length === 0 && runsLoading !== x.id && (
-                // the honest empty: run_count counts every fire since the routine was armed, and
-                // the thread link only exists for fires after 0119 — so "it ran, I can't show you
-                // where" is a real state, and saying nothing would read as a broken button.
-                <span className="runsnote">No run conversations recorded yet — runs from before this update aren&rsquo;t linked.</span>
-              )}
-              {(runs[x.id] ?? []).map((r, i) => (
-                <button key={r.id} className="runsrow" title={new Date(r.created_at).toLocaleString()}
-                  style={{ ['--i' as string]: String(Math.min(i, 7)) } as React.CSSProperties}
-                  onClick={() => onOpenRun(r.id, r.channel_id)}>
-                  <span className="runswhen">{shortAgo(r.created_at)}</span>
-                  <span className="runstitle">{(r.last_body && replyPreview(r.last_body, 120)) || r.title || 'Untitled run'}</span>
-                  {/* a run nobody answered is the one you want to notice: its prompt is the only
-                      message in the thread, so the reply count IS the outcome */}
-                  <span className={`runsreplies${r.msg_count <= 1 ? ' quiet' : ''}`}>
-                    {r.msg_count <= 1 ? 'no reply' : `${r.msg_count - 1} repl${r.msg_count - 1 === 1 ? 'y' : 'ies'}`}
-                  </span>
-                </button>
-              ))}
+              {(() => {
+                const fetched = runs[x.id];
+                // a release routine's list is the runs AND its ledger; every other routine's is its runs
+                const rows: LedgerRow[] = rel ? ledgerRows(fetched ?? [], rel.log) : (fetched ?? []).map((r) => ({ id: r.id, at: r.created_at, run: r }));
+                return (<>
+                  {runsLoading === x.id && !fetched && <span className="runsnote">Looking up this automation&rsquo;s runs…</span>}
+                  {fetched && rows.length === 0 && runsLoading !== x.id && (
+                    // the honest empty: run_count counts every fire since the routine was armed, and
+                    // the thread link only exists for fires after 0119 — so "it ran, I can't show you
+                    // where" is a real state, and saying nothing would read as a broken button.
+                    <span className="runsnote">No run conversations recorded yet. Runs from before this update are not linked.</span>
+                  )}
+                  {rows.map((row, i) => row.run ? (
+                    <button key={row.id} className="runsrow" title={new Date(row.run.created_at).toLocaleString()}
+                      style={{ ['--i' as string]: String(Math.min(i, 7)) } as React.CSSProperties}
+                      onClick={() => onOpenRun(row.run!.id, row.run!.channel_id)}>
+                      <span className="runswhen">{shortAgo(row.run.created_at)}</span>
+                      {/* a release run is titled once from the feature (the tag heads it), so the title
+                          IS the row; any other routine's runs share one title, and the last line is
+                          what differs between them */}
+                      <span className="runstitle">{(rel && row.run.title) || (row.run.last_body && replyPreview(row.run.last_body, 120)) || row.run.title || 'Untitled run'}</span>
+                      {/* a run nobody answered is the one you want to notice: its prompt is the only
+                          message in the thread, so the reply count IS the outcome */}
+                      <span className={`runsreplies${row.run.msg_count <= 1 ? ' quiet' : ''}`}>
+                        {row.run.msg_count <= 1 ? 'no reply' : `${row.run.msg_count - 1} repl${row.run.msg_count - 1 === 1 ? 'y' : 'ies'}`}
+                      </span>
+                    </button>
+                  ) : (
+                    // a quiet tick: the routine looked, found nothing to announce, and opened no session
+                    <span key={row.id} className="runsrow quiet" title={new Date(row.at).toLocaleString()} style={{ ['--i' as string]: String(Math.min(i, 7)) } as React.CSSProperties}>
+                      <span className="runswhen">{shortAgo(row.at)}</span>
+                      <span className="runstitle quiet">{row.note}</span>
+                      <span className="runsreplies quiet">checked</span>
+                    </span>
+                  ))}
+                </>);
+              })()}
             </span>
           </span>
         </div>
-      ))}
+      ); })}
       </div>
       {/* the row's OWN room, not the scope — at All scope there is no one room to edit against */}
       {edit && <ScheduleFormModal channelId={edit.channel_id ?? channelId ?? ''} sched={edit} onClose={() => setEdit(null)} onChanged={reload} />}

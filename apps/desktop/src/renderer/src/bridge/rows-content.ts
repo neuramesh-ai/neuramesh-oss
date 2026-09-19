@@ -72,6 +72,9 @@ export interface ScheduleRow {
   // answers it), so the Automations destination tags every row with it at All scope
   channel_id?: string;
   channel_slug?: string | null;
+  /** the jsonb payload as text — every schedules read selects it; a release routine keeps its
+   *  cursor and its ledger lines in `payload.release` (releasescan.ts), which the Routines view reads */
+  payload?: string | null;
 }
 
 export interface SkillRow {

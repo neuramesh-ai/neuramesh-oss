@@ -7,7 +7,7 @@
 // a previous turn's seat would spend the wrong credential.
 
 
-import { normalizeDraft } from '@neuramesh/shared';
+import { normalizeDraft, parseDraftRevisions } from '@neuramesh/shared';
 import type { OrchTool, ToolCtx } from './orchtools';
 
 export function contentTools(tc: ToolCtx): OrchTool[] {
@@ -84,14 +84,15 @@ export function contentTools(tc: ToolCtx): OrchTool[] {
     // The orchestrator can WRITE a draft and PROPOSE a slot; it can never publish (content.
     // approve is HUMAN_ONLY), so scheduling builds a confirmation card whose click fires the
     // command as the human. The publish gate stays structural, not prompted.
-    { name: 'draft_posts', description: 'Hand over drafted social posts as REVIEWABLE CARDS in this conversation — how posts are delivered, in any room. NEVER write posts.json or paste posts as markdown (nothing to click). `body` is ONLY the wire text — no character counts, no "(draft only)" footers, no image briefs inside it; it would publish verbatim. Art direction goes in `imageBrief`, only when the post should carry a visual (Instagram and TikTok always do). Call ONCE with every post — calling again ADDS drafts (revise_posts changes one in place).', schema: {
+    { name: 'draft_posts', description: 'Hand over drafted social posts as REVIEWABLE CARDS in this conversation — how posts are delivered, in any room. NEVER write posts.json or paste posts as markdown (nothing to click). `body` is ONLY the wire text — no character counts, no "(draft only)" footers, no image briefs inside it; it would publish verbatim. Art direction goes in `imageBrief`, only when the post should carry a visual (Instagram and TikTok always do). A VIDEO post (a UGC or creator script) puts the script in `script` and the caption that posts with the video in `body`; never the script in the body. Draft for the platform the ask names, else for the connected accounts. Call ONCE with every post — calling again ADDS drafts (revise_posts changes one in place).', schema: {
       posts: z.array(z.object({
-        platform: z.enum(['x', 'instagram', 'linkedin', 'tiktok', 'email']).describe('the network this post is for'),
-        body: z.string().min(1).max(10_000).describe('the post text exactly as it would publish, within the network\'s limit'),
-        imageBrief: z.string().max(2000).optional().describe('art direction for this post\'s picture — subject, composition, light, mood, on-brand look. Omit for a text-only post.'),
+        platform: z.enum(['x', 'instagram', 'linkedin', 'tiktok', 'email']).describe('the network this post is for: the one asked for, else a connected account'),
+        body: z.string().min(1).max(10_000).describe('the post text exactly as it would publish, within the network\'s limit. For a video post: the caption that posts with the video.'),
+        imageBrief: z.string().max(2000).optional().describe('art direction for this post\'s picture — subject, composition, light, mood, on-brand look. For a video post: the shot direction the film follows. Omit for a text-only post.'),
         mediaUrl: z.string().max(2000).optional().describe('a genuinely real public image URL, if you have one. Never invent one.'),
+        script: z.string().max(10_000).optional().describe('a VIDEO post only: the creator\'s script, timestamped beats ([0:00-0:03] direction, Spoken: "…", CAPTION: …). The card folds it and can film its hook.'),
       })).min(1).max(20).describe('one entry per post, in the order they should read'),
-    }, run: async (input: { posts: Array<{ platform: string; body: string; imageBrief?: string; mediaUrl?: string }> }) => {
+    }, run: async (input: { posts: Array<{ platform: string; body: string; imageBrief?: string; mediaUrl?: string; script?: string }> }) => {
       // The anchor: a task thread's drafts ride the TASK (unchanged, so a content task reads
       // byte-identically); a conversation's ride the THREAD (0115). Without one there is no
       // surface to render on — a channel-level draft would card nowhere.
@@ -109,7 +110,7 @@ export function contentTools(tc: ToolCtx): OrchTool[] {
       for (const d of drafts) {
         const res = await post('/v1/commands', actor, {
           type: 'content.create', channel: ch.id, ...anchor, platform: d.platform, body: d.body,
-          ...(d.imageBrief ? { imageBrief: d.imageBrief } : {}), ...(d.mediaUrl ? { mediaUrl: d.mediaUrl } : {}),
+          ...(d.imageBrief ? { imageBrief: d.imageBrief } : {}), ...(d.mediaUrl ? { mediaUrl: d.mediaUrl } : {}), ...(d.script ? { script: d.script } : {}),
         }).catch(() => null);
         if (res?.ok) made += 1;
       }
@@ -121,10 +122,11 @@ export function contentTools(tc: ToolCtx): OrchTool[] {
     { name: 'revise_posts', description: 'Rewrite drafts that are ALREADY on screen here, in place — always use this when the human asks to change a post ("make b punchier", "drop the emoji on a"). Name each by its card letter. The card keeps its letter and its earlier version stays readable beneath it, so the human sees what changed. Calling draft_posts instead would leave the old draft sitting there and add a second one beside it, which is the wrong answer to "change this".', schema: {
       revisions: z.array(z.object({
         letter: z.string().describe('the card letter to rewrite: a, b, c…'),
-        body: z.string().max(10_000).optional().describe('the replacement post text, in full — wire text only, no notes'),
-        imageBrief: z.string().max(2000).optional().describe('replacement art direction for this post\'s picture'),
+        body: z.string().max(10_000).optional().describe('the replacement post text, in full — wire text only, no notes (a video post: its caption)'),
+        imageBrief: z.string().max(2000).optional().describe('replacement art direction for this post\'s picture (a video post: its shot direction)'),
+        script: z.string().max(10_000).optional().describe('a video post: the replacement script, in full. The card films the new one on the next Generate video.'),
       })).min(1).max(20),
-    }, run: async (input: { revisions: Array<{ letter: string; body?: string; imageBrief?: string }> }) => {
+    }, run: async (input: { revisions: Array<{ letter: string; body?: string; imageBrief?: string; script?: string }> }) => {
       const here = await draftsHere();
       if (!here) return 'revise_posts works on the drafts in a thread — open the conversation or task that has them.';
       if (!here.posts.length) return 'There are no drafts here to revise — draft_posts first.';
@@ -139,14 +141,16 @@ export function contentTools(tc: ToolCtx): OrchTool[] {
         // published posts are history — the server refuses them too, but saying WHICH letter
         // failed is what lets the reply be honest instead of claiming a change that never landed
         if (!target || target.status === 'published') { missed.push(r.letter); continue; }
-        const cleaned = r.body ? normalizeDraft({ platform: target.platform, body: r.body }) : null;
-        if (!r.body && !r.imageBrief) { missed.push(r.letter); continue; }
-        if (r.body && !cleaned) { missed.push(r.letter); continue; }
+        // ONE cleaner for a revision (parseDraftRevisions, the posts-file path's): the caption
+        // stripped of notes, a script filed under a heading in the brief or the body lifted out
+        const [rev] = parseDraftRevisions(JSON.stringify([r]));
+        if (!rev) { missed.push(r.letter); continue; }
+        const { body, imageBrief: brief, script } = rev;
         const res = await post('/v1/commands', actor, {
           type: 'content.revise', item: target.id,
-          ...(cleaned ? { body: cleaned.body } : {}), ...(r.imageBrief ? { imageBrief: r.imageBrief } : {}),
+          ...(body ? { body } : {}), ...(brief ? { imageBrief: brief } : {}), ...(script ? { script } : {}),
         }).catch(() => null);
-        if (res?.ok) { done.push(target.letter); if (r.imageBrief) drew.push(target.letter); } else missed.push(r.letter);
+        if (res?.ok) { done.push(target.letter); if (brief) drew.push(target.letter); } else missed.push(r.letter);
       }
       if (!done.length) return `Nothing was revised (${missed.join(', ') || 'no matching cards'}) — say so plainly rather than pasting the new copy into your reply.`;
       log?.({ kind: 'tool', phase: 'call', summary: `revise_posts — ${done.join('/')}` });

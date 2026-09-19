@@ -11,6 +11,7 @@ import { renderDay7, renderDigest, renderMarketing, renderPublishFailed, TEMPLAT
 import { renderDay1, renderDay3, renderWelcome } from '../src/email/templates-lifecycle';
 import { renderInvite, renderJoined } from '../src/email/templates-account';
 import { renderHostedFreeNotice } from '../src/email/templates-notice';
+import { renderAnnounceReady } from '../src/email/templates-announce';
 
 const APP = 'https://neuramesh.app';        // user-facing: /join, /downloads, /billing
 const API = 'https://api.neuramesh.app';    // the unsubscribe route lives on the control-api
@@ -22,6 +23,7 @@ const SAMPLES: Array<{ key: string; email: RenderedEmail }> = [
   // the `error` here stands in for a provider's verbatim message. We quote those as-is, so it
   // is the one string in an email we never rewrite for house style.
   { key: 'publishFailed', email: renderPublishFailed({ platform: 'X', slot: '09:00 today', error: '401 Unauthorized: token expired', queuedBehind: 2, reconnectUrl: `${APP}/downloads` }) },
+  { key: 'announceReady', email: renderAnnounceReady({ repo: 'neuramesh-ai/neuramesh-oss', tag: 'v0.134.0', title: 'The browser terminal', networks: ['x', 'linkedin', 'instagram'], site: 'https://neuramesh.app', link: `${APP}/announce/demo`, verdict: 'feature' }) },
   { key: 'welcome', email: renderWelcome({ downloadUrl: `${APP}/downloads`, unsubscribeUrl: unsub }) },
   { key: 'day1', email: renderDay1({ openUrl: `${APP}/downloads`, unsubscribeUrl: unsub }) },
   { key: 'day3', email: renderDay3({ lesson: "This repo's tests never mock the database. Use the pg fixture in test/helpers.", taskNumber: 1042, channel: 'dev', reviewer: 'scout', worker: 'patch', statAccepted: 4, statReviews: 11, statLessons: 6, window: 'your first week', openUrl: `${APP}/downloads`, unsubscribeUrl: unsub }) },

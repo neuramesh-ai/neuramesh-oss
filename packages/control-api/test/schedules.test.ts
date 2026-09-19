@@ -151,3 +151,47 @@ describe('schedule.update — edit + reschedule, human-only', () => {
     expect((await send(george, { type: 'schedule.update', schedule: scheduleId, title: 'x', prompt: 'y', cadence: 'once', runAt: new Date(Date.now() + 3600e3).toISOString() })).status).toBe(200);
   });
 });
+
+describe('schedule.set_cursor — the release routine’s finish line (release-drafts plan §4.2)', () => {
+  const release = { ...base, title: 'Release drafts · neuramesh-oss', prompt: 'Run the release drafts playbook.', routine: true };
+  async function armRelease(): Promise<string> {
+    const channel = await makeRoom();
+    await store.setWorkspacePlan('ws_acme', { plan: 'cloud' });
+    const { scheduleId } = await j(await send(george, { ...release, channel }));
+    // the routine's own state rides payload.release — planted by the setup door in the product;
+    // here, seeded straight onto the memory row
+    const row = schedRow(store, scheduleId);
+    row.payload['release'] = { repo: 'r1', slug: 'neuramesh-ai/neuramesh-oss', cursor: { at: '2026-09-16T09:00:00.000Z', tag: 'v0.133.0' } };
+    return scheduleId;
+  }
+
+  it('moves the cursor and appends the ledger line, from the daemon lane', async () => {
+    const id = await armRelease();
+    const r = await send(plume, { type: 'schedule.set_cursor', schedule: id, cursor: { at: '2026-09-17T09:00:00.000Z', tag: 'v0.134.0' }, log: { at: '2026-09-17T09:00:00.000Z', key: 'v0.134.0', note: 'v0.134.0 · 1 release · 3 merged' } });
+    expect(r.status).toBe(200);
+    const rel = schedRow(store, id).payload['release'] as { cursor: unknown; log: unknown[]; slug: string };
+    expect(rel.cursor).toEqual({ at: '2026-09-17T09:00:00.000Z', tag: 'v0.134.0' });
+    expect(rel.log).toEqual([{ at: '2026-09-17T09:00:00.000Z', key: 'v0.134.0', note: 'v0.134.0 · 1 release · 3 merged' }]);
+    expect(rel.slug).toBe('neuramesh-ai/neuramesh-oss'); // the rest of the release payload survives the merge
+  });
+
+  it('a quiet day is a row too, and the log stays capped at twelve', async () => {
+    const id = await armRelease();
+    for (let i = 0; i < 14; i++) {
+      const at = new Date(Date.UTC(2026, 8, 1 + i, 9)).toISOString();
+      expect((await send(plume, { type: 'schedule.set_cursor', schedule: id, cursor: { at, tag: 'v0.133.0' }, log: { at, key: null, note: 'nothing new since v0.133.0' } })).status).toBe(200);
+    }
+    const rel = schedRow(store, id).payload['release'] as { log: Array<{ at: string }> };
+    expect(rel.log).toHaveLength(12);
+    expect(rel.log[11]!.at).toBe(new Date(Date.UTC(2026, 8, 14, 9)).toISOString());
+  });
+
+  it('refuses a routine that watches no repository, a missing row, and a bad cursor', async () => {
+    const channel = await makeRoom();
+    await store.setWorkspacePlan('ws_acme', { plan: 'cloud' });
+    const { scheduleId } = await j(await send(george, { ...base, channel }));
+    expect((await send(plume, { type: 'schedule.set_cursor', schedule: scheduleId, cursor: { at: '2026-09-17T09:00:00.000Z', tag: null } })).status).toBe(422);
+    expect((await send(plume, { type: 'schedule.set_cursor', schedule: '11111111-1111-1111-1111-111111111111', cursor: { at: '2026-09-17T09:00:00.000Z', tag: null } })).status).toBe(404);
+    expect((await send(plume, { type: 'schedule.set_cursor', schedule: scheduleId, cursor: { at: 'yesterday', tag: null } })).status).toBe(400);
+  });
+});

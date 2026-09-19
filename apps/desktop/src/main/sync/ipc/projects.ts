@@ -77,10 +77,13 @@ ipcMain.handle('nm:channel-kind', async (_e, { channelId, kind }: { channelId: s
   if (kind === 'marketing') void ensureMarketingSeedsRef?.(ws(), [channelId]);
   return out;
 });
-ipcMain.handle('nm:marketing-setup', async (_e, { channelId, website, focus, goal }: { channelId: string; website: string; focus: string[]; goal?: string }) =>
-  api('/v1/commands', { type: 'marketing.setup', channel: channelId, website: website || undefined, focus: focus.length ? focus : undefined, goal: goal || undefined }));
-// one answered setup-flow step (setupflows.ts) — persisted as it lands so the wizard resumes
-ipcMain.handle('nm:setup-step', async (_e, { channelId, flow, step, value }: { channelId: string; flow: string; step: string; value?: string | string[] }) =>
+// step 5 (release drafts, docs/design/release-drafts-2026-09 §4.7) rides the same command: the
+// server plants the one-shot, and the daily routine where the plan allows it, and answers which
+ipcMain.handle('nm:marketing-setup', async (_e, { channelId, website, focus, goal, releases }: { channelId: string; website: string; focus: string[]; goal?: string; releases?: { repoId?: string | null; slug?: string | null; now: boolean; watch: boolean; at?: string; tz?: string } }) =>
+  api('/v1/commands', { type: 'marketing.setup', channel: channelId, website: website || undefined, focus: focus.length ? focus : undefined, goal: goal || undefined, ...(releases ? { releases } : {}) }));
+// one answered setup-flow step (setupflows.ts) — persisted as it lands so the wizard resumes.
+// The releases step writes an object; every other step a text or a list (the server checks the shape).
+ipcMain.handle('nm:setup-step', async (_e, { channelId, flow, step, value }: { channelId: string; flow: string; step: string; value?: string | string[] | Record<string, unknown> }) =>
   api('/v1/commands', { type: 'setup.step', channel: channelId, flow, step, value }));
 // marketing MCP integrations (integrations-and-skills-plan.md): the toggle syncs on the
 // room; the credential stays MACHINE-LOCAL (mcp-keys.json) — never synced, never on our

@@ -123,19 +123,32 @@ export function playbookTools(tc: ToolCtx): OrchTool[] {
         `select k.provider, k.status from connectors k join channels c on c.id = ? and c.project_id = k.project_id`,
         [here()],
       ).catch(() => [] as Array<{ provider: string; status: string }>);
-      const verdict = checkNeeds(pb.needs, connRows);
+      // a `repo` need reads the room's project for its primary repository (release drafts)
+      const [repoRow] = pb.needs?.some((n) => n.kind === 'repo')
+        ? await db.getAll<{ org_name: string; name: string; project_id: string }>(
+          `select r.org_name, r.name, c.project_id from repos r join project_repos pr on pr.repo_id = r.id
+             join channels c on c.project_id = pr.project_id where c.id = ? order by coalesce(pr.is_primary, 0) desc limit 1`,
+          [here()],
+        ).catch(() => [] as Array<{ org_name: string; name: string; project_id: string }>)
+        : [];
+      const verdict = checkNeeds(pb.needs, connRows, repoRow ? { slug: `${repoRow.org_name}/${repoRow.name}` } : null);
       if (!verdict.ok) {
-        const need = pb.needs?.find((n) => n.kind === 'connector');
+        const need = pb.needs?.find((n) => n.kind === (verdict.repoMissing ? 'repo' : 'connector'));
+        const [chRow] = verdict.repoMissing ? await db.getAll<{ project_id: string | null }>(`select project_id from channels where id = ?`, [here()]).catch(() => []) : [];
+        const lead = verdict.repoMissing ? `${pb.title} needs a repository to read, and this room's project has none` : `${pb.title} needs an account to read, and this room has none`;
         await post('/v1/messages', actor, {
           workspace: ch.workspace_id, channel: here(),
           ...(thread ? { taskId: thread.id } : convoThreadId ? { threadId: convoThreadId } : {}),
-          body: `Before I staff this — ${pb.title} needs an account to read, and this room has none:\n\n${needBlock({
+          body: `Before I staff this — ${lead}:\n\n${needBlock({
             channel: here(), ask: pb.title, why: need?.why ?? 'this playbook reads through the room\'s connected accounts',
-            connect: verdict.missing, readable: verdict.missing.filter((p) => p === 'x'),
+            connect: verdict.repoMissing ? [] : verdict.missing, readable: verdict.missing.filter((p) => p === 'x'),
+            ...(verdict.repoMissing ? { attach: 'repo' as const, project: chRow?.project_id ?? null } : {}),
           })}`,
         }).catch(() => null);
-        log?.({ kind: 'tool', phase: 'call', summary: `run_playbook ${pb.id} — blocked, no connector` });
-        return `NOT created: ${pb.title} needs at least one connected account and this room has none. The human has a card here to connect one — say plainly that you are waiting on the connection, and do NOT create a task, a subtask or a backlog item for it. Connecting is theirs to do, not work to be staffed.`;
+        log?.({ kind: 'tool', phase: 'call', summary: `run_playbook ${pb.id} — blocked, ${verdict.repoMissing ? 'no repository' : 'no connector'}` });
+        return verdict.repoMissing
+          ? `NOT created: ${pb.title} needs a repository and this room's project has none. The human has a card here to attach one — say plainly that you are waiting on it, and do NOT create a task, a subtask or a backlog item for it.`
+          : `NOT created: ${pb.title} needs at least one connected account and this room has none. The human has a card here to connect one — say plainly that you are waiting on the connection, and do NOT create a task, a subtask or a backlog item for it. Connecting is theirs to do, not work to be staffed.`;
       }
       // what the run may READ, and how each connected network is covered (George, 2026-08-26:
       // one connector is enough, and a run covers every one that is live)

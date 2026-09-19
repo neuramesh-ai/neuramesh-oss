@@ -7,6 +7,9 @@ import { DomainError } from './errors';
 import { dueContentItemsSql, upcomingContentItemsSql, type DueItem, type UpcomingItem } from './store/content-reads';
 import { setThreadMachineSql, workspaceMachine } from './store/thread-machine';
 import { latestHumanWordSql, setThreadSettledSql, threadTaskIdSql } from './store/thread-settle';
+import { markScheduleResultSql, setScheduleCursorSql } from './store/release-routine';
+import { seedBundledPacksSql } from './store/skillpack-seed';
+import { PgAnnounceStore } from './store/announce';
 import { computeRetro } from './retro';
 import { SKILL_SEED } from './seed/skill-seed';
 import { MARKETING_SKILL_SEED } from './seed/marketing-skill-seed';
@@ -54,6 +57,8 @@ export class PostgresStore implements Store {
   /** the pool, readable by modules that own their own SQL (credits.ts) rather than
    *  becoming five more delegates on a file already at its size cap */
   readonly sql: postgres.Sql;
+  private ann?: PgAnnounceStore;
+  get announcements(): PgAnnounceStore { return (this.ann ??= new PgAnnounceStore(this.sql)); }
 
   constructor(url: string) {
     // prepare:false keeps Supavisor pooler compatibility.
@@ -331,7 +336,7 @@ export class PostgresStore implements Store {
         if (kind === 'marketing') await this.ensureSetupTask(sql, workspaceId, ch!['id'] as string);
       }
       // #build (né #dev) ships with the bundled default skill packs (gstack + addyosmani)
-      if (devId) await this.seedBundledPacksInto(sql, workspaceId, devId);
+      if (devId) await seedBundledPacksSql(sql, workspaceId, devId, SKILL_SEED);
       await this.insertEvent(sql, { ...event, workspace: workspaceId }, null);
       return { workspaceId, channelId: generalId };
     }) as Promise<{ workspaceId: string; channelId: string }>;
@@ -1605,35 +1610,14 @@ export class PostgresStore implements Store {
     }) as Promise<{ id: string }>;
   }
 
-  // insert the bundled default packs into a channel, skipping any pack already
-  // present — idempotent (used at workspace creation and to backfill existing
-  // rooms). The seed list follows the room's kind: build rooms get the
-  // engineering packs, marketing rooms get marketing-core. Runs in the caller's tx.
-  private async seedBundledPacksInto(sql: postgres.Sql, workspaceId: string, channelId: string, seed: typeof SKILL_SEED = SKILL_SEED): Promise<number> {
-    let added = 0;
-    for (const { pack, skills } of seed) {
-      const [exists] = await sql`select 1 from skill_packs where workspace_id = ${workspaceId}::uuid and channel_id = ${channelId} and name = ${pack.name}`;
-      if (exists) continue;
-      const [row] = await sql`insert into skill_packs (workspace_id, channel_id, name, description, source_url, source_ref, version, origin, status)
-        values (${workspaceId}::uuid, ${channelId}, ${pack.name}, ${pack.description}, ${pack.source_url}, ${pack.source_ref}, ${pack.version}, 'bundled', 'ready') returning id`;
-      const packId = row!['id'] as string;
-      for (const s of skills) {
-        await sql`insert into skills (workspace_id, channel_id, name, description, scope, body, status, author_kind, author_id, pack_id, enabled)
-          values (${workspaceId}::uuid, ${channelId}, ${s.name}, ${s.description}, 'channel', ${s.body}, 'active', 'agent'::actor_kind, '00000000-0000-0000-0000-000000000000'::uuid, ${packId}::uuid, true)`;
-      }
-      added++;
-    }
-    return added;
-  }
-
-  async seedDefaultPacks(workspace: string, channel: string, event: NMEvent, kind: 'build' | 'marketing' = 'build'): Promise<{ added: number }> {
+  async seedDefaultPacks(workspace: string, channel: string, event: NMEvent, kind: 'build' | 'marketing' = 'build'): Promise<{ added: number; refreshed: number }> {
     return this.sql.begin(async (_tx) => {
       const sql = asSql(_tx);
       const chId = await resolveChannelId(sql, workspace, channel);
-      const added = await this.seedBundledPacksInto(sql, workspace, chId, kind === 'marketing' ? [...MARKETING_SKILL_SEED, ...MARKETING_OS_SKILL_SEED] : SKILL_SEED);
-      if (added > 0) await this.insertEvent(sql, { ...event, workspace }, null);
-      return { added };
-    }) as Promise<{ added: number }>;
+      const { added, refreshed } = await seedBundledPacksSql(sql, workspace, chId, kind === 'marketing' ? [...MARKETING_SKILL_SEED, ...MARKETING_OS_SKILL_SEED] : SKILL_SEED);
+      if (added > 0 || refreshed > 0) await this.insertEvent(sql, { ...event, workspace }, null);
+      return { added, refreshed };
+    }) as Promise<{ added: number; refreshed: number }>;
   }
 
   async linkRepo(
@@ -2218,7 +2202,7 @@ export class PostgresStore implements Store {
   }
 
   async createContentItem(
-    input: { channelId: string; taskId?: string | null; threadId?: string | null; platform: string; body: string; scheduleId: string | null; slotAt?: string | null; mediaUrl?: string | null; imageBrief?: string | null; thumb?: string | null; imageError?: string | null; createdByKind: string; createdBy: string },
+    input: { channelId: string; taskId?: string | null; threadId?: string | null; platform: string; body: string; scheduleId: string | null; slotAt?: string | null; mediaUrl?: string | null; imageBrief?: string | null; script?: string | null; thumb?: string | null; imageError?: string | null; createdByKind: string; createdBy: string },
     makeEvent: (workspace: string) => NMEvent,
   ): Promise<{ id: string }> {
     return this.sql.begin(async (_tx) => {
@@ -2229,7 +2213,7 @@ export class PostgresStore implements Store {
       // a draft born from a schedule carries its intended slot in scheduled_at while
       // status stays 'draft' — the calendar places the chip there, approve keeps it
       const [row] = await sql`insert into content_items (workspace_id, channel_id, task_id, thread_id, schedule_id, platform, body, scheduled_at, media, created_by_kind, created_by)
-        values (${ws}::uuid, ${input.channelId}::uuid, ${input.taskId ?? null}, ${input.threadId ?? null}, ${input.scheduleId}, ${input.platform}, ${input.body}, ${input.slotAt ?? null}, ${input.mediaUrl || input.imageBrief || input.thumb || input.imageError ? sql.json({ ...(input.mediaUrl ? { image_url: input.mediaUrl } : {}), ...(input.imageBrief ? { brief: input.imageBrief } : {}), ...(input.thumb ? { thumb: input.thumb } : {}), ...(input.imageError ? { image_error: input.imageError } : {}) } as never) : null}, ${input.createdByKind}, ${input.createdBy})
+        values (${ws}::uuid, ${input.channelId}::uuid, ${input.taskId ?? null}, ${input.threadId ?? null}, ${input.scheduleId}, ${input.platform}, ${input.body}, ${input.slotAt ?? null}, ${input.mediaUrl || input.imageBrief || input.script || input.thumb || input.imageError ? sql.json({ ...(input.mediaUrl ? { image_url: input.mediaUrl } : {}), ...(input.imageBrief ? { brief: input.imageBrief } : {}), ...(input.script ? { script: input.script } : {}), ...(input.thumb ? { thumb: input.thumb } : {}), ...(input.imageError ? { image_error: input.imageError } : {}) } as never) : null}, ${input.createdByKind}, ${input.createdBy})
         returning id`;
       await this.insertEvent(sql, makeEvent(ws), null);
       return { id: row!['id'] as string };
@@ -2280,7 +2264,7 @@ export class PostgresStore implements Store {
     }) as Promise<{ id: string }>;
   }
 
-  async reviseDraft(itemId: string, patch: { body: string | null; imageBrief: string | null; thumb: string | null; imageError?: string | null }, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }> {
+  async reviseDraft(itemId: string, patch: { body: string | null; imageBrief: string | null; script?: string | null; thumb: string | null; imageError?: string | null; videoError?: string | null }, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }> {
     return this.sql.begin(async (_tx) => {
       const sql = asSql(_tx);
       // Revisable while a 'draft' OR a proposed 'scheduled' slot — the marketer owns the content
@@ -2295,11 +2279,12 @@ export class PostgresStore implements Store {
       // A content REVISION (new body or brief) snapshots the prior version + renders as a new card
       // after the reply. An image-only touch (a retry's thumb, or its failure reason) updates the
       // SAME card in place — no version, no re-anchor — so retrying a picture never forks the draft.
-      const isRevision = patch.body !== null || patch.imageBrief !== null;
+      const isRevision = patch.body !== null || patch.imageBrief !== null || !!patch.script;
       if (isRevision) {
         const snapshot = {
           body: cur['body'] as string,
           ...(media['brief'] ? { brief: media['brief'] } : {}),
+          ...(media['script'] ? { script: media['script'] } : {}),
           ...(media['thumb'] ? { thumb: media['thumb'] } : {}),
           at: (media['revised_at'] as string) ?? new Date(cur['created_at'] as string).toISOString(),
         };
@@ -2307,8 +2292,11 @@ export class PostgresStore implements Store {
         media['revised_at'] = new Date().toISOString();
       }
       if (patch.imageBrief !== null) media['brief'] = patch.imageBrief;
+      // a new script means the old film is of the old script: it goes, the card films again
+      if (patch.script) { media['script'] = patch.script; delete media['video_id']; delete media['video_error']; }
       if (patch.thumb !== null) { media['thumb'] = patch.thumb; delete media['image_error']; } // an image landed → drop the error
       if (patch.imageError !== undefined) { if (patch.imageError) media['image_error'] = patch.imageError; else delete media['image_error']; }
+      if (patch.videoError !== undefined) { if (patch.videoError) media['video_error'] = patch.videoError; else delete media['video_error']; }
       const newBody = patch.body ?? (cur['body'] as string);
       // Rewriting the COPY/brief of a SCHEDULED post UNSCHEDULES it back to 'draft' and clears its
       // approval: dueContentItems auto-publishes on status='scheduled' alone, so the changed text
@@ -2348,16 +2336,20 @@ export class PostgresStore implements Store {
         values (${ws}::uuid, ${itemId}::uuid, ${mime}, ${bytes}, ${bytes.length}, ${actor.kind}, ${actor.id}) returning id`;
       const mediaId = row!['id'] as string;
       // MERGE — the same jsonb carries the marketer's brief and the card's inline thumbnail; a
-      // hosted image clears any prior image_error (the card now shows the picture, not the reason)
-      await sql`update content_items set media = (coalesce(media, '{}'::jsonb) || ${sql.json({ image_id: mediaId } as never)}::jsonb) - 'image_error' where id = ${itemId}::uuid`;
+      // hosted image clears any prior image_error (the card now shows the picture, not the reason).
+      // A FILM (video/*) takes the one media slot the same way: video_id in, video_error out, and the
+      // picture's keys out with it, because the bytes it pointed at are gone.
+      const film = mime.startsWith('video/');
+      const patch = film ? { video_id: mediaId } : { image_id: mediaId };
+      await sql`update content_items set media = (((coalesce(media, '{}'::jsonb) || ${sql.json(patch as never)}::jsonb) - ${film ? 'video_error' : 'image_error'}) - ${film ? 'image_id' : 'video_id'}) - ${film ? 'thumb' : 'video_error'} where id = ${itemId}::uuid`;
       await this.insertEvent(sql, makeEvent(ws), null);
       return { id: mediaId };
     }) as Promise<{ id: string }>;
   }
 
-  async contentMediaBytes(mediaId: string): Promise<{ mime: string; bytes: Buffer } | null> {
-    const [r] = await this.sql`select mime, bytes from content_media where id = ${mediaId}::uuid limit 1`;
-    return r ? { mime: r['mime'] as string, bytes: Buffer.from(r['bytes'] as Uint8Array) } : null;
+  async contentMediaBytes(mediaId: string): Promise<{ mime: string; bytes: Buffer; workspace: string } | null> {
+    const [r] = await this.sql`select mime, bytes, workspace_id from content_media where id = ${mediaId}::uuid limit 1`;
+    return r ? { mime: r['mime'] as string, bytes: Buffer.from(r['bytes'] as Uint8Array), workspace: r['workspace_id'] as string } : null;
   }
 
   async createChannelArtifact(
@@ -2601,11 +2593,11 @@ export class PostgresStore implements Store {
   async dueContentItems(nowIso: string, limit: number): Promise<DueItem[]> { return dueContentItemsSql(this.sql, nowIso, limit); }
   async upcomingContentItems(fromIso: string, toIso: string, limit: number): Promise<UpcomingItem[]> { return upcomingContentItemsSql(this.sql, fromIso, toIso, limit); }
 
-  async contentItemMedia(itemId: string): Promise<{ platform: string; mediaUrl: string | null; mediaId?: string | null } | null> {
-    const [r] = await this.sql`select platform, media from content_items where id = ${itemId}::uuid limit 1`;
+  async contentItemMedia(itemId: string): Promise<{ platform: string; mediaUrl: string | null; mediaId?: string | null; workspace: string } | null> {
+    const [r] = await this.sql`select platform, media, workspace_id from content_items where id = ${itemId}::uuid limit 1`;
     if (!r) return null;
     const m = r['media'] as { image_url?: string; image_id?: string } | null;
-    return { platform: r['platform'] as string, mediaUrl: m?.image_url ?? null, mediaId: m?.image_id ?? null };
+    return { platform: r['platform'] as string, mediaUrl: m?.image_url ?? null, mediaId: m?.image_id ?? null, workspace: r['workspace_id'] as string };
   }
 
   async markContentPublished(itemId: string, url: string, publishedAtIso: string): Promise<void> {
@@ -2639,9 +2631,15 @@ export class PostgresStore implements Store {
   async markScheduleResult(scheduleId: string, error: string | null, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }> {
     return this.sql.begin(async (_tx) => {
       const sql = asSql(_tx);
-      const [row] = await sql`update schedules set last_error = ${error} where id = ${scheduleId}::uuid returning workspace_id`;
-      if (!row) throw new DomainError('NOT_FOUND', 'schedule not found');
-      await this.insertEvent(sql, makeEvent(row['workspace_id'] as string), null);
+      await this.insertEvent(sql, makeEvent(await markScheduleResultSql(sql, scheduleId, error)), null);
+      return { id: scheduleId };
+    }) as Promise<{ id: string }>;
+  }
+
+  async setScheduleCursor(scheduleId: string, cursor: { at: string; tag: string | null }, log: { at: string; key: string | null; note: string } | null, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }> {
+    return this.sql.begin(async (_tx) => {
+      const sql = asSql(_tx);
+      await this.insertEvent(sql, makeEvent(await setScheduleCursorSql(sql, scheduleId, cursor, log)), null);
       return { id: scheduleId };
     }) as Promise<{ id: string }>;
   }

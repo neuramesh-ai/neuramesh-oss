@@ -512,6 +512,28 @@ real work — if it is decoration, drop it and keep the pill.
   ▸ **A typed message that vanishes is the failure this exists to prevent.** The upload lane refuses
   writes on a free hosted workspace, so a box that accepts text there is a trap. Replace it, never
   grey it.
+- **The release brief card** (release drafts, 2026-09-17, docs/44; visual contract
+  `docs/design/release-drafts-2026-09/Thread.dc.html`) — the `‹brief:<artifact id>›` marker worn as
+  a card, the ArticleCard/ReportCard idiom exactly: `.relcard` on the elevated stratum (`--card`,
+  hairline, `--r-lg`, the resting shadow, 620px), a head row (the mono `Release brief` kicker, the
+  tag chip, the date, the verdict chip at the right: `.chip.rv-feature` in the done hue,
+  `.rv-improvement` in the prog hue, `.rv-fix` in the warn hue, `.rv-none` the quiet chip), the
+  feature title at 15.5/500, the why in body ink with pull requests as plain numbers (a `#N` in a
+  thread is a TASK ref, so the digest and the brief say `PR 385`), then the `Audience · Assets ·
+  Not known` rows with an 82px muted key column (the gaps row italic, never hidden), and a foot of
+  `Open brief ↗` (the same doc tab door ReportCard uses) and `Save to Files` (`★ in Files` once
+  promoted). One card per brief, rendered by both thread renderers from one parse
+  (`shared/releasebrief.ts`).
+  ▸ **A session shows the cards of the units it owns.** A conversation renders the post cards of a
+  content unit anchored to it (`tasks.origin_thread_id`) after the unit's completion note, through
+  the one `postCardsFrom` derivation, wearing the unit's number (`#1142·c`). A lens on the rows,
+  never a copy: the peek and the session can never disagree. Unanswered drafts on an owned unit
+  make the session `needs you` (`threadstatus.ts`, `draftsWaiting`), so the queue lifts it.
+  ▸ **The wizard's switch rows** (`Setup.dc.html`): a setup step that arms something wears the
+  `.togrow` rows, a label with a muted sub-line and the control at the trailing edge (a checkbox for
+  a one-time act, the settled `.shsw` switch for a standing one). The repository is a mono chip
+  (`.repochip`: owner/name, the branch dimmed, `Change` beside it), never a text field the person
+  retypes. A machine marker (`‹release:…›` and its siblings in `thread/markers.ts`) never renders.
 - **Answerable cards** (rail-ink round, 2026-09-04) — the question card is `--card` + one hairline +
   the resting shadow at `--r-lg`-ish 12px, and inside it: options are **ghost pills** (a single-line
   control, §6) and become **blocks** only when they carry a second, explanatory line

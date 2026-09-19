@@ -37,13 +37,13 @@ export function descriptionFromReadme(md: string, cap = 160): string {
   const out: string[] = [];
   for (const raw of lines) {
     // each strip stops at the next opener of its own kind, so a run of openers is scanned once
-    // (CodeQL js/polynomial-redos, 2026-09-18); the result is text for a description field
-    const stripped = raw
+    // (CodeQL js/polynomial-redos, 2026-09-18); the tag strip repeats until nothing changes, so a
+    // tag nested in a tag leaves too; the result is text for a description field
+    let text = raw
       .replace(/!\[[^[\]]*\]\([^()]*\)/g, '') // images/badges
-      .replace(/\[([^[\]]*)\]\([^()]*\)/g, '$1') // links → text
-      .replace(/<[^<>]+>/g, '') // html
-      .replace(/[`*_]+/g, '')
-      .trim();
+      .replace(/\[([^[\]]*)\]\([^()]*\)/g, '$1'); // links → text
+    for (let before = ''; before !== text;) { before = text; text = text.replace(/<[^<>]+>/g, ''); } // html
+    const stripped = text.replace(/[`*_]+/g, '').trim();
     const skip = !stripped || /^#/.test(raw.trim()) || /^[->|]/.test(raw.trim()) || /^[=-]{3,}$/.test(stripped);
     if (skip) { if (out.length) break; continue; } // blank/again-skippable line ends a started paragraph
     out.push(stripped);

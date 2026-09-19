@@ -5,6 +5,11 @@
 // app started calling) are no longer the same file.
 import sampleLogos from './sample-logos.json';
 import { composeFailover, buildFailoverCard, PACKS } from '@neuramesh/shared';
+// the release-drafts doors (their own file, re-exported so the mock bridge reads one world: this file sits at its size cap)
+import { DOOR_MARKETING_PROFILE, DOOR_RELEASE_SCHEDULE, DOOR_SETUP_TASK_ID, DOOR_TASKS } from './mock-doors'; export * from './mock-doors';
+// the release session (board B of the release-drafts round) lives in its own file and splices in below
+import { spliceRelease } from './mock-release';
+export { releaseBriefArt } from './mock-release';
 // Preview-only mock of the Electron `window.nm` bridge. NOT shipped — it exists so the
 // real <App/> renders against the design handoff's sample data for screenshot evidence
 // (docs/evidence/rebrand/), with no Electron/daemon/DB/sync. Sample data mirrors 01-app.png.
@@ -290,7 +295,7 @@ export const mockContentItems: Array<{ id: string; channelId: string; task_id?: 
   { id: 'ci-c2', channelId: 'c-dev', thread_id: 'th-posts-chat', platform: 'x', body: 'Memory is not a bigger context window. It is a record the whole team reads.', status: 'draft', scheduled_at: null, published_at: null, external_url: null, created_at: t(249_000), schedule_id: null, media: JSON.stringify({ revised_at: new Date(Date.now() - 88_000).toISOString(), history: [{ body: 'Amnesia, but make it enterprise. \u2728 A thread on why your \u201Ccontext window\u201D is a memory hole wearing a trench coat.', at: new Date(Date.now() - 249_000).toISOString() }] }) },
   { id: 'ci-c3', channelId: 'c-dev', thread_id: 'th-posts-chat', platform: 'linkedin', body: 'We stopped re-explaining our codebase every morning.\n\nEvery correction a reviewer makes is written into the team\u2019s memory and recalled into the next task \u2014 so the same mistake is not made twice.', status: 'draft', scheduled_at: null, published_at: null, external_url: null, created_at: t(248_000), schedule_id: null, media: JSON.stringify({ brief: 'warm gold key light on near-black, a single desk lamp over an open notebook' }) },
 ];
-export const mockSchedules: Array<{ id: string; channelId: string; title: string; cadence: string; at_time: string; tz: string; next_run_at: string | null; status: string; run_count?: number; prompt?: string; weekday?: number | null; last_error?: string | null }> = [
+export const mockSchedules: Array<{ id: string; channelId: string; title: string; cadence: string; at_time: string; tz: string; next_run_at: string | null; status: string; run_count?: number; prompt?: string; weekday?: number | null; last_error?: string | null }> = [DOOR_RELEASE_SCHEDULE,
   // #dev carries two so the Routines tab shows, with both states on screen. The first wears a
   // last_error so the attention bar's routine row is on screen (failure-alerts round).
   { id: 'sch-dev-1', channelId: 'c-dev', title: 'Morning dependency audit', last_error: 'no usable credentials for scout — reconnect its provider login', prompt: 'Check our top 20 dependencies for new CVEs and majors; file anything urgent.', cadence: 'weekdays', at_time: '09:00', tz: 'America/Vancouver', weekday: null, next_run_at: new Date(Date.now() + 3600e3).toISOString(), status: 'active', run_count: 5 },
@@ -308,10 +313,11 @@ export const channels = [
   { id: 'cf-general', slug: 'general', topic: 'Flowe AI — team home', project_id: 'p-flowe', msg_count: 8 },
   { id: 'cf-dev', slug: 'dev', topic: 'Flowe AI · native nav rebuild', project_id: 'p-flowe', msg_count: 41 },
   { id: 'cf-research', slug: 'research', topic: 'Flowe AI — discovery & benchmarks', project_id: 'p-flowe', msg_count: 0 },
-  // marketing KIND with no profile = the setup card's own state, which the harness previously
-  // could not reach at all (c-marketing is already configured, so it renders the finished HQ).
-  // The four-connector step 3 is only screenshottable from here.
-  { id: 'cf-marketing', slug: 'marketing', topic: 'Flowe AI — launch positioning', project_id: 'p-flowe', kind: 'marketing', marketing: null },
+  // marketing KIND mid-setup = the wizard's own state, which the harness previously could not
+  // reach at all (c-marketing is already configured, so it renders the finished HQ). The profile
+  // stopped after step 4 (mock-doors.ts), so the card resumes on step 5 — the release drafts step —
+  // and ‹ Back walks the earlier steps (the four-connector step 4 is one Back away).
+  { id: 'cf-marketing', slug: 'marketing', topic: 'Flowe AI — launch positioning', project_id: 'p-flowe', kind: 'marketing', marketing: DOOR_MARKETING_PROFILE },
 ];
 
 // ?setupcards=cloud models a FRESH cloud-first workspace — a runner, one member, no credential.
@@ -523,8 +529,13 @@ export const tasksByChannel: Record<string, any[]> = {
   { id: 'tk-1028', number: 1028, title: 'Draft 4 X posts: Flowe AI use cases (spread over next week)', kind: 'content', description: 'Draft 4 X posts, one every ~2 days, two with image guidance.', state: 'in_progress', assignee_kind: 'agent', assignee_id: 'a-plume', offered_agent_id: null, requirements: '["four X posts","two with images"]', requirements_confirmed: 1, definition_of_done: '- Four X posts', project_id: 'p-acme', channel_id: 'c-marketing', branch: null, repo_id: null, submitted_sha: null, pr_url: '', pr_number: null, artifact_count: 0 },
     { id: 'tk-1005', number: 1005, title: 'Competitor SEO analysis of flowe.ai — findings + recommendations report', kind: 'research', description: 'Competitor benchmark, report-only, no code.', state: 'todo', assignee_kind: null, assignee_id: null, offered_agent_id: null, requirements: '["competitor set agreed in thread","deliverable: findings + recommendations report"]', requirements_confirmed: 1, definition_of_done: '', project_id: 'p-acme', channel_id: 'c-marketing', branch: null, repo_id: null, submitted_sha: null, pr_url: '', pr_number: null, artifact_count: 0 },
   ],
+  // the release-drafts doors (mock-doors.ts): the setup task whose thread resumes the wizard
+  'cf-marketing': DOOR_TASKS,
 };
 
+// the release routine's session (release drafts, board B; ?openConvo=marketing::browser terminal): its
+// thread, transcript, unit, drafts and schedule land in the sets above — before allTasks derives below
+spliceRelease({ mockThreads, convoMsgs, mockContentItems, mockSchedules, tasksByChannel });
 export const tasksAllWatchers = new Set<(rows: any[]) => void>();
 /** harness hook: ?home=clear empties Home's queue (see watchTasksAll) */
 export const homeIsClear = typeof location !== 'undefined' && new URLSearchParams(location.search).get('home') === 'clear';
@@ -1086,7 +1097,7 @@ export const baseThreadRows = (id: string): any[] => (id === 'tk-1032' ? [
   { id: 'mt5b', author_kind: 'agent', author_id: 'a-plume', created_at: t(34_000), body: 'Both X drafts as they stand — a carries the revised opening, b is unchanged.\n\n‹cards:ci-t1,ci-t2›' },
   { id: 'mt6', author_kind: 'human', author_id: 'u-george', created_at: t(30_000), body: 'looks good @rex — schedule them both for 9am the next two mornings' },
   { id: 'mt7', author_kind: 'agent', author_id: 'a-rex', created_at: t(20_000), body: "Here's the proposed schedule — approve to set the slots; NeuraMesh posts each at its time.\n\n```nmq\n" + JSON.stringify({ question: 'Schedule 2 posts for #1025?', schedule: { action: 'schedule', items: [{ item: 'ci-t1', letter: 'a', platform: 'x', slot: '2026-07-26T09:00:00', preview: 'Your agents forget everything the second a task ends' }, { item: 'ci-t2', letter: 'b', platform: 'x', slot: '2026-07-27T09:00:00', preview: '"Context window" is a euphemism for amnesia. The fix' }] }, options: [{ label: 'Schedule all', description: 'apply the proposal above' }, { label: 'Not now', description: 'leave them as they are' }], allowOther: false }) + '\n```' },
-  ] : [
+  ] : id === DOOR_SETUP_TASK_ID ? [] : [
   { id: 'tt1', author_kind: 'human', author_id: 'u-george', created_at: t(900_000), body: 'Drawer opens but focus gets trapped on iOS Safari — can’t Esc out. @rex can someone take this?' },
   { id: 'tt2', author_kind: 'agent', author_id: 'a-patch', created_at: t(120_000), body: 'Rewrote the focus trap to release on Escape and restore focus to the trigger. 15/15 green, before/after screenshots attached.' },
   // every hyperlinked-resource kind in one message (PR link · #task refs · plan file), so the

@@ -344,8 +344,9 @@ export function stripSuggestions(body: string): string {
   return body.replace(NMS_BLOCK, '').replace(NMS_PARTIAL, '').trimEnd();
 }
 
-// the answer starts with a non-blank, so the blanks after the arrow have one owner (CodeQL, 2026-09-18)
-const ANSWER_LINE = /^\*\*(.+?)\*\*[ \t]*→[ \t]*(\S.*)$/;
+// the question holds no asterisk and the answer starts with a non-blank, so neither the bold marks
+// nor the blanks after the arrow have two owners (CodeQL js/polynomial-redos, 2026-09-18)
+const ANSWER_LINE = /^\*\*([^*]+)\*\*[ \t]*→[ \t]*(\S.*)$/;
 
 // Which questions the given human message bodies have already answered.
 export function readAnswers(bodies: string[]): Map<string, string> {

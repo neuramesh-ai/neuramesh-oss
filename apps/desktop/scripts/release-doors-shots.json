@@ -1,0 +1,58 @@
+[
+  {
+    "name": "setup-step5-dark",
+    "query": {
+      "theme": "dark",
+      "plan": "cloud",
+      "project": "p-flowe",
+      "openTask": "1070"
+    },
+    "settle": 3600
+  },
+  {
+    "name": "setup-step5-cream",
+    "query": {
+      "theme": "cream-oak",
+      "plan": "cloud",
+      "project": "p-flowe",
+      "openTask": "1070"
+    },
+    "settle": 3600
+  },
+  {
+    "name": "routines-ledger-dark",
+    "query": {
+      "theme": "dark"
+    },
+    "settle": 2200,
+    "js": "(async () => { const wait = (ms) => new Promise((r) => setTimeout(r, ms)); const byLabel = (l) => document.querySelector(`[aria-label=\"${l}\"]`) || [...document.querySelectorAll('button')].find((b) => (b.getAttribute('aria-label') || '').startsWith(l)); byLabel('Scheduled, collapsed')?.click(); await wait(250); byLabel('Routines')?.click(); await wait(1200); const row = [...document.querySelectorAll('.rtrow')].find((r) => (r.textContent || '').includes('neuramesh-ai/neuramesh-oss')); row?.querySelector('button[aria-expanded]')?.click(); await wait(1100); })()"
+  },
+  {
+    "name": "routines-ledger-cream",
+    "query": {
+      "theme": "cream-oak"
+    },
+    "settle": 2200,
+    "js": "(async () => { const wait = (ms) => new Promise((r) => setTimeout(r, ms)); const byLabel = (l) => document.querySelector(`[aria-label=\"${l}\"]`) || [...document.querySelectorAll('button')].find((b) => (b.getAttribute('aria-label') || '').startsWith(l)); byLabel('Scheduled, collapsed')?.click(); await wait(250); byLabel('Routines')?.click(); await wait(1200); const row = [...document.querySelectorAll('.rtrow')].find((r) => (r.textContent || '').includes('neuramesh-ai/neuramesh-oss')); row?.querySelector('button[aria-expanded]')?.click(); await wait(1100); })()"
+  },
+  {
+    "name": "setup-step5-free-upgrade-dark",
+    "query": {
+      "theme": "dark",
+      "project": "p-flowe",
+      "openTask": "1070"
+    },
+    "settle": 3600,
+    "js": "(async () => { const wait = (ms) => new Promise((r) => setTimeout(r, ms)); const go = [...document.querySelectorAll('.mkqfoot .btn.primary')].find((b) => /Put the crew to work/.test(b.textContent || '')); go?.click(); await wait(1600); })()"
+  },
+  {
+    "name": "setup-step5-free-upgrade-cream",
+    "query": {
+      "theme": "cream-oak",
+      "project": "p-flowe",
+      "openTask": "1070"
+    },
+    "settle": 3600,
+    "js": "(async () => { const wait = (ms) => new Promise((r) => setTimeout(r, ms)); const go = [...document.querySelectorAll('.mkqfoot .btn.primary')].find((b) => /Put the crew to work/.test(b.textContent || '')); go?.click(); await wait(1600); })()"
+  }
+]

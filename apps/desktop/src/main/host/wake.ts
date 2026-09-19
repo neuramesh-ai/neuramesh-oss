@@ -24,7 +24,8 @@ import { foLabel } from './staffing';
 import { withTimeout } from './turnkit';
 import { postWithRetry } from '../presence';
 import { isStandDown } from '../replypolicy';
-import { TURN_BUDGETS, genImageItemId, isChatThread, parseModeMarker } from '@neuramesh/shared';
+import { TURN_BUDGETS, genImageItemId, genVideoItemId, isChatThread, modelFreeItemId, parseModeMarker } from '@neuramesh/shared';
+import { makeFilm } from './videogen';
 import type { PowerSyncDatabase } from '@powersync/node';
 import type { HostedAgent, SkillRef, ThreadTask } from '../agents';
 import type { LogFn } from '../agentlog';
@@ -44,6 +45,7 @@ type OrchestratorTurn = (agent: HostedAgent, ch: { id: string; slug: string; wor
 // Every type here is INFERRED from the maker that produces it — never restated.
 export function makeWake(ctx: {
   db: PowerSyncDatabase;
+  agents: Map<string, HostedAgent>;
   NO_RUN: ReturnType<typeof makeRuns>['NO_RUN'];
   alog: (agent: HostedAgent, t?: { id: string; number: number; channel_id?: string } | null, channelSlug?: string | null, runId?: string | null) => LogFn;
   apiUrl: string;
@@ -72,6 +74,8 @@ export function makeWake(ctx: {
   wakeStarted: (chId: string) => void;
 }) {
   const { db } = ctx;
+  // the film lane (videogen.ts): the card's ‹gen-video:› marker, served like the draw marker
+  const { filmDraft } = makeFilm({ db, apiUrl: ctx.apiUrl, ownerActorId: ctx.ownerActorId, post: ctx.post, agents: ctx.agents });
   const { NO_RUN, alog, apiUrl, arun, blockFor, brainNotes, brainResults, chatTurn, discoverSkills, echoOrchestrate, echoPlanReview, echoThreadOrchestrate, generateDraftImage, handleExhaustion, openWakeRun, orchestratorTurn, ownerActorId, post, rearmWake, reviseContentDrafts, seatFor, setStatus, threadModeFor, threadTranscript, wakeEnded, wakeStarted } = ctx;
 
 
@@ -128,6 +132,8 @@ export function makeWake(ctx: {
               ? await echoPlanReview(agent, t, ch, m.body)
               : `[echo · ${agent.name}] noted in #${t.number}: “${m.body.slice(0, 80)}”`;
         }
+      } else if (t.kind === 'content' && t.assignee_kind === 'agent' && t.assignee_id === agent.id && genVideoItemId(m.body)) {
+        reply = await filmDraft(agent, ch, genVideoItemId(m.body)!);
       } else if (t.kind === 'content' && t.assignee_kind === 'agent' && t.assignee_id === agent.id && genImageItemId(m.body)) {
         // the card's "Generate image" / "Try again" — draw ONE draft from its EXISTING brief, no LLM turn
         reply = await generateDraftImage(agent, ch, genImageItemId(m.body)!);
@@ -243,7 +249,7 @@ export function makeWake(ctx: {
       // not a conversation — it is a button, and routing it through a model turn would have the
       // agent narrate the request instead of answering it. Ungating this from content tasks is
       // the reported half of the wider "features must not be gated on a thread's kind" ruling.
-      const genImage = m.thread_id ? genImageItemId(m.body) : null;
+      const genImage = m.thread_id ? modelFreeItemId(m.body) : null; // a draw or a film
       // ── Chat mode (docs/34) ────────────────────────────────────────────────────────────
       // The thread decides, not the agent's role: a conversation with Tasks off runs the chat
       // turn for WHOEVER was woken. Read straight from the replica — the mode is a synced
@@ -251,11 +257,19 @@ export function makeWake(ctx: {
       const chatMode = m.thread_id ? isChatThread(await threadModeFor(m.thread_id)) : false;
       if (genImage) {
         const glog = alog(agent, null, ch.slug, runId);
-        glog({ kind: 'wake', phase: 'channel', summary: `generating the image for one draft` });
-        reply = await generateDraftImage(agent, ch, genImage);
-      } else if (chatMode && mode === 'claude') {
+        const filming = genVideoItemId(m.body) !== null;
+        glog({ kind: 'wake', phase: 'channel', summary: filming ? `filming one draft` : `generating the image for one draft` });
+        reply = filming ? await filmDraft(agent, ch, genImage) : await generateDraftImage(agent, ch, genImage);
+      } else if ((chatMode || (agent.role === 'marketer' && !!m.thread_id)) && mode === 'claude') {
+        // The marketer's deliverables are thread-native (docs/design/thread-posts: drafts hand over
+        // with draft_posts in ANY room), so an @mention of the marketer in a session takes the
+        // conversation turn — its skills, its draft cards, no board tools — instead of the tool-less
+        // reply, which answered "UGC drafting has to move through a task card" to a plain content ask
+        // in a release session (live, 2026-09-18). Nothing reaches the board from this turn either way.
+        // IN A THREAD only: a channel-level mention has no conversation to draft into (the chat
+        // workspace is keyed on the thread id), and took the whole wake down on null (live, 2026-09-19).
         const clog = alog(agent, null, ch.slug, runId);
-        clog({ kind: 'wake', phase: 'channel', summary: `chat turn (Tasks off) — answering in the thread, nothing reaches the board` });
+        clog({ kind: 'wake', phase: 'channel', summary: chatMode ? `chat turn (Tasks off) — answering in the thread, nothing reaches the board` : `the marketer answers in the thread with its drafting tools, nothing reaches the board` });
         const recent = await db.getAll<{ author_kind: string; author_id: string; body: string }>(
           `select author_kind, author_id, body from messages where thread_id = ? order by created_at desc limit 24`,
           [m.thread_id],

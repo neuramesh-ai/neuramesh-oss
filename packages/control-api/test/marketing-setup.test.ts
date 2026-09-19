@@ -103,3 +103,40 @@ describe('marketing.setup — the HQ front door (free, human-only, conversationa
     expect(bad.status).toBe(404);
   });
 });
+
+describe('marketing.setup with releases — step 5 plants the routines (release-drafts plan §4.7)', () => {
+  const rel = { repoId: 'r-oss', slug: 'neuramesh-ai/neuramesh-oss', now: true, watch: true, at: '09:00', tz: 'UTC' };
+  it('on Team: the free one-shot and the daily watch, both routines that carry the repository', async () => {
+    const channel = await makeMarketingRoom();
+    await store.setWorkspacePlan('ws_acme', { plan: 'cloud' });
+    const r = await j(await send(george, { type: 'marketing.setup', channel, website: 'https://neuramesh.app', focus: ['social'], releases: rel }));
+    expect(r.releases).toEqual({ now: true, watch: 'armed' });
+    const mine = schedulesOf(store).filter((s) => s.channelId === channel && String(s.title).startsWith('Release drafts'));
+    expect(mine.map((s) => s.cadence).sort()).toEqual(['daily', 'once']);
+    for (const s of mine) {
+      expect(s.payload['routine']).toBe(true);
+      expect(s.payload['prompt']).toBe('Run the release drafts playbook.');
+      expect((s.payload['release'] as { repo: string; slug: string }).repo).toBe('r-oss');
+    }
+    const daily = mine.find((s) => s.cadence === 'daily')!;
+    expect((daily.payload['release'] as { cursor: { tag: null }; log: unknown[] }).cursor.tag).toBeNull();
+    expect((mine.find((s) => s.cadence === 'once')!.payload['release'] as { latest: boolean }).latest).toBe(true);
+    // the profile remembers the answer through the completing command itself, never only the step write
+    const ch = (store as unknown as { channels: Array<{ id: string; marketing?: Record<string, unknown> }> }).channels.find((c) => c.id === channel)!;
+    expect(ch.marketing?.['releases']).toEqual({ repoId: 'r-oss', slug: 'neuramesh-ai/neuramesh-oss', now: true, watch: true });
+  });
+  it('on Free: the one-shot runs, the watch is refused by name, nothing else changes', async () => {
+    const channel = await makeMarketingRoom();
+    const r = await j(await send(george, { type: 'marketing.setup', channel, website: 'https://neuramesh.app', releases: rel }));
+    expect(r.releases).toEqual({ now: true, watch: 'plan_limit' });
+    const mine = schedulesOf(store).filter((s) => s.channelId === channel && String(s.title).startsWith('Release drafts'));
+    expect(mine.map((s) => s.cadence)).toEqual(['once']);
+  });
+  it('a watch with no repository is refused, and a switched-off step plants nothing', async () => {
+    const channel = await makeMarketingRoom();
+    expect((await send(george, { type: 'marketing.setup', channel, releases: { now: true, watch: false } })).status).toBe(422);
+    const r = await j(await send(george, { type: 'marketing.setup', channel, releases: { repoId: 'r-oss', now: false, watch: false } }));
+    expect(r.releases).toBeUndefined();
+    expect(schedulesOf(store).filter((s) => s.channelId === channel && String(s.title).startsWith('Release drafts'))).toEqual([]);
+  });
+});

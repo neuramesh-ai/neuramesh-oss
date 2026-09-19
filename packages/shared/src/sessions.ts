@@ -174,7 +174,8 @@ export function historyRows<T extends HistoryTask>(input: {
         task,
         branch: task?.branch ?? null,
         title: plainTitle(t.title || 'New thread'),
-        snip: (t.last_body ?? '').replace(/‹task:[0-9a-fA-F-]{36}›/g, '▸ filed a task — card in the thread').trim(),
+        // a card marker is the thread's business: the row keeps the prose beside it
+        snip: (t.last_body ?? '').replace(/‹task:[0-9a-fA-F-]{36}›/g, '▸ filed a task — card in the thread').replace(/\s*‹(?:brief|release|report|article|wb|plan):[^›]*›/g, '').trim(),
         when: t.updated_at,
         state: task?.state ?? null,
         scheduleId: t.schedule_id ?? null,

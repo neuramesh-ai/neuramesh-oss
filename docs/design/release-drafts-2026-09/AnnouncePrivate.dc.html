@@ -1,0 +1,118 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>D2 · announce · a private repository · the grant</title><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;450;500;600&amp;family=Geist+Mono:wght@400;500;600&amp;family=Bricolage+Grotesque:wght@500;600&amp;display=swap"><style>body{margin:0}
+  .site { --fbody: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif; --fmono: 'Geist Mono', ui-monospace, Menlo, monospace; --fbrand: 'Bricolage Grotesque', var(--fbody);
+    position: relative; box-sizing: border-box; width: 1440px; height: 1000px; overflow: hidden; background: var(--paper); color: var(--ink); font: 14px/1.5 var(--fbody); -webkit-font-smoothing: antialiased;
+    background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px); background-size: 48px 48px; }
+  .site *, .site *::before, .site *::after { box-sizing: border-box; }
+  .site svg { display: block; }
+  .snav { height: 72px; display: flex; align-items: center; gap: 32px; padding: 0 40px; background: color-mix(in srgb, var(--paper) 88%, transparent); }
+  .lockup { display: inline-flex; align-items: center; gap: 9px; font: 600 17px var(--fbrand); letter-spacing: -.015em; color: var(--ink); }
+  .porch { width: 22px; height: 22px; border-radius: 4px; background: #834a2b; position: relative; }
+  .porch::after { content: ''; position: absolute; left: 6px; top: 6px; width: 10px; height: 10px; border-radius: 2px; background: #fff7ee; }
+  .snavr { margin-left: auto; display: inline-flex; align-items: center; gap: 22px; font-size: 14px; color: var(--body); }
+  .sbtn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 32px; padding: 0 14px; border-radius: 3px; font: 500 13px var(--fmono); letter-spacing: -.02em; text-transform: uppercase; border: 1px solid var(--line2); background: transparent; color: var(--ink); position: relative; isolation: isolate; overflow: hidden; white-space: nowrap; }
+  .sbtn::before { content: ""; position: absolute; inset: 0; z-index: -1; background: repeating-linear-gradient(135deg, currentColor 0 1px, transparent 1px 7px); opacity: .08; }
+  .sbtn.primary { background: var(--ink); color: var(--paper); border-color: var(--ink); } .sbtn.primary::before { opacity: .14; }
+  .sbtn.big { height: 38px; padding: 0 18px; font-size: 14px; }
+  .swrap { max-width: 900px; margin: 0 auto; padding: 26px 40px 0; }
+  .seyebrow { font: 500 12px var(--fmono); letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
+  .site h1 { font: 500 40px/1.08 var(--fbody); letter-spacing: -.035em; margin: 8px 0 8px; color: var(--ink); }
+  .slead { font-size: 15.5px; color: var(--muted); line-height: 1.6; max-width: 60ch; }
+  .srepo { display: flex; gap: 10px; margin-top: 16px; }
+  .sinput { flex: 1; display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 12px; border: 1px solid var(--line2); border-radius: 3px; background: var(--surface); font: 500 14px var(--fmono); color: var(--ink); }
+  .sinput .dim { color: var(--muted); }
+  .sinput.focus { border-color: var(--ink); }
+  /* the detect row: one line under the input, the repository's kind and its latest release */
+  .sdetect { display: flex; align-items: center; gap: 9px; margin-top: 9px; font: 500 12px var(--fmono); color: var(--body); }
+  .sdetect i { width: 7px; height: 7px; border-radius: 50%; background: var(--green); flex: none; }
+  .sdetect.warn i { background: var(--warn); }
+  .sdetect b { color: var(--ink); font-weight: 500; }
+  .sdetect .go { color: var(--accent); margin-left: 2px; }
+  /* the form: two fields on one row, one note under them */
+  .sform { margin-top: 18px; border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 16px 18px 14px; }
+  .sfields { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .sfield label { display: block; font: 500 11px var(--fmono); letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+  .sfield .sinput { height: 36px; font-family: var(--fbody); font-weight: 400; }
+  .sfield .hint { display: block; margin-top: 5px; font: 500 11px var(--fmono); color: var(--muted); }
+  .sfoot { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
+  .snote { font: 500 12px var(--fmono); color: var(--muted); line-height: 1.5; }
+  /* the grant card: what the app reads, read only, the pick is theirs */
+  .sgrant { margin-top: 18px; border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 18px 20px 16px; max-width: 620px; }
+  .sgrant h2 { margin: 0; font: 500 20px/1.25 var(--fbody); letter-spacing: -.025em; color: var(--ink); }
+  .sgrant p { margin: 6px 0 0; font-size: 13.5px; color: var(--body); line-height: 1.5; }
+  .srows { margin-top: 12px; border-top: 1px solid var(--line); }
+  .srow2 { display: flex; gap: 12px; align-items: baseline; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+  .srow2 .k { flex: none; width: 96px; color: var(--muted); }
+  .srow2 .v { color: var(--ink); }
+  .srow2 .v small { color: var(--muted); font-size: 12px; margin-left: 6px; }
+  .safter { margin-top: 14px; display: flex; align-items: center; gap: 12px; }
+  .safter .lbl { font: 500 11px var(--fmono); letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+  /* the wait: the status rows of the first-run card, and the email beside them */
+  .swait { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 18px; align-items: start; }
+  .sstat { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 16px 18px 14px; }
+  .sstat h2 { margin: 0 0 4px; font: 500 20px/1.25 var(--fbody); letter-spacing: -.025em; color: var(--ink); }
+  .sstat p { margin: 0 0 8px; font-size: 13.5px; color: var(--body); line-height: 1.5; }
+  .ssrow { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid var(--line); font-size: 13.5px; color: var(--ink); }
+  .ssrow .st { margin-left: auto; font: 500 10.5px var(--fmono); letter-spacing: .04em; text-transform: uppercase; color: var(--green); display: inline-flex; align-items: center; gap: 6px; }
+  .ssrow .st.wait { color: var(--muted); } .ssrow .st.wait i { width: 7px; height: 7px; border-radius: 50%; background: var(--warn); }
+  .ssrow .st.next { color: var(--muted); }
+  .ssrow small { color: var(--muted); font: 500 11px var(--fmono); margin-left: 8px; }
+  .sstat .snote { display: block; margin-top: 10px; }
+  .semail { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; overflow: hidden; }
+  .semailhd { padding: 12px 18px; border-bottom: 1px solid var(--line); background: var(--surface2); }
+  .semailhd div { display: flex; gap: 10px; font: 500 12px var(--fmono); color: var(--muted); line-height: 1.7; }
+  .semailhd div b { color: var(--ink); font-weight: 500; font-family: var(--fbody); font-size: 13.5px; }
+  .semailhd div span:first-child { width: 58px; flex: none; }
+  .semailbody { padding: 18px 20px 20px; font-size: 14px; line-height: 1.6; color: var(--ink); }
+  .semailbody p { margin: 0 0 12px; } .semailbody p.small { font-size: 12.5px; color: var(--muted); margin-bottom: 0; }
+  .semailbody .sbtn { margin: 4px 0 14px; }
+  /* the result */
+  .sres { margin-top: 18px; border: 1px solid var(--line); background: var(--surface); border-radius: 8px; overflow: hidden; }
+  .sreshd { display: flex; align-items: center; gap: 10px; padding: 12px 18px; border-bottom: 1px solid var(--line); font: 500 12.5px var(--fmono); color: var(--body); }
+  .sreshd b { color: var(--ink); font-weight: 500; }
+  .stag { font: 500 11px var(--fmono); color: var(--ink); border: 1px solid var(--line2); border-radius: 3px; padding: 1.5px 7px; }
+  .sfeat { margin-left: auto; font: 500 10px var(--fmono); letter-spacing: .04em; text-transform: uppercase; color: var(--green); border: 1px solid color-mix(in srgb, var(--green) 45%, transparent); border-radius: 3px; padding: 2px 7px; }
+  .sresbody { padding: 16px 18px 6px; }
+  .srest { font: 500 20px/1.25 var(--fbody); letter-spacing: -.025em; color: var(--ink); }
+  .sresw { font-size: 13.5px; color: var(--body); margin-top: 6px; line-height: 1.5; }
+  .sposts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding: 10px 18px 14px; }
+  .spost { border: 1px solid var(--line); border-radius: 6px; background: var(--paper); display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
+  .sposthd { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--line); font: 500 10.5px var(--fmono); letter-spacing: -.02em; text-transform: uppercase; color: var(--muted); }
+  .sposthd .g { color: var(--ink); font-size: 12px; }
+  .sposthd .cc { margin-left: auto; color: var(--muted); }
+  .spostt { padding: 11px 12px; font-size: 13px; line-height: 1.5; color: var(--ink); white-space: pre-wrap; flex: 1; }
+  .spostt code { font: 500 12px var(--fmono); }
+  .spimg { margin: 0 12px 12px; height: 132px; border-radius: 4px; background: #161616; position: relative; overflow: hidden; border: 1px solid var(--line); }
+  .spimg .rc { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: flex-end; padding: 12px 14px; background: radial-gradient(120% 90% at 100% 0%, rgba(131,74,43,.35), transparent 60%); }
+  .spimg .rcv { font: 500 10px var(--fmono); letter-spacing: -.02em; text-transform: uppercase; color: #a6a6a6; }
+  .spimg .rct { font: 500 18px/1.1 var(--fbody); letter-spacing: -.03em; color: #eaeaea; margin-top: 3px; }
+  .spimg .rcm { position: absolute; top: 12px; left: 14px; width: 14px; height: 14px; border-radius: 3px; background: #834a2b; }
+  .spcap { padding: 0 12px 10px; font: 500 10.5px var(--fmono); color: var(--muted); }
+  .sctas { display: flex; align-items: center; gap: 10px; padding: 14px 18px; border-top: 1px solid var(--line); }
+  .sctas .link { margin-left: auto; font: 500 12px var(--fmono); color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
+  .sdoors { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 16px; }
+  .sdoor { padding: 12px 14px; border: 1px solid var(--line); border-radius: 6px; background: color-mix(in srgb, var(--surface) 70%, transparent); }
+  .sdoor .n { font: 500 11px var(--fmono); letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
+  .sdoor b { display: block; font-size: 14.5px; font-weight: 500; color: var(--ink); margin: 6px 0 3px; }
+  .sdoor p { margin: 0; font-size: 12.5px; color: var(--body); line-height: 1.5; }
+  .sdoor code { font: 500 12px var(--fmono); color: var(--ink); background: var(--surface2); border-radius: 3px; padding: 1px 5px; }
+</style></head><body><div class="site" data-bt="light" style="--ink:#0c0b0a;--paper:#f5f4f2;--surface:#ffffff;--surface2:#ebe9e6;--line:#dedbd6;--line2:#b9b4ae;--muted:#6b665f;--body:#57534e;--accent:#834a2b;--accent-ink:#fff7ee;--green:#21734e;--warn:#a06a1f;--grid:rgba(0,0,0,.07);"><div class="snav"><span class="lockup"><span class="porch"></span>neuramesh</span><span class="snavr"><span>Downloads</span><span>Source</span><span>Pro</span><span class="sbtn">Sign in</span></span></div><div class="swrap">
+  <div class="seyebrow">Announce</div><h1>Your release, announced.</h1><p class="slead">Paste a GitHub repository. NeuraMesh reads the latest release and your site, then drafts the posts for X, LinkedIn and Instagram, with a release card. We email you the link when they are ready. Sign in to save and schedule.</p>
+  <div class="srepo"><span class="sinput"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 19c-4.3 1.4-4.3-2.5-6-3m12 5v-3.5c0-1 .1-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6 0 0 0-1.3-3.2 4.2 4.2 0 0 0-.1-3.2s-1.1-.3-3.5 1.3a12.3 12.3 0 0 0-6.2 0C6.5 2.8 5.4 3.1 5.4 3.1a4.2 4.2 0 0 0-.1 3.2A4.6 4.6 0 0 0 4 9.5c0 4.6 2.7 5.7 5.5 6-.6.6-.6 1.2-.5 2V21"/></svg><span class="dim">github.com/</span>gads-inc/flowe</span></div>
+  <div class="sdetect warn"><i></i><b>Private, or not found.</b> Grant NeuraMesh read access to continue.</div>
+  <div class="sgrant">
+    <h2>Grant read access on GitHub</h2>
+    <p>GitHub opens its own page. You pick the repositories. NeuraMesh reads them and never writes.</p>
+    <div class="srows">
+      <div class="srow2"><span class="k">Reads</span><span class="v">Releases, pull requests, README and CHANGELOG<small>metadata and contents, read only</small></span></div>
+      <div class="srow2"><span class="k">Never</span><span class="v">Code checkouts, pushes, issues, or anything you did not pick</span></div>
+      <div class="srow2"><span class="k">Tokens</span><span class="v">Minted per read, one hour, never stored<small>revoke on GitHub at any time</small></span></div>
+    </div>
+    <div class="sfoot"><span class="sbtn primary big"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 19c-4.3 1.4-4.3-2.5-6-3m12 5v-3.5c0-1 .1-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6 0 0 0-1.3-3.2 4.2 4.2 0 0 0-.1-3.2s-1.1-.3-3.5 1.3a12.3 12.3 0 0 0-6.2 0C6.5 2.8 5.4 3.1 5.4 3.1a4.2 4.2 0 0 0-.1 3.2A4.6 4.6 0 0 0 4 9.5c0 4.6 2.7 5.7 5.5 6-.6.6-.6 1.2-.5 2V21"/></svg>Grant access on GitHub ↗</span><span class="sbtn big">Cancel</span></div>
+  </div>
+  <div class="safter"><span class="lbl">After the grant</span><div class="sdetect" style="margin-top:0"><i></i><b>Private</b>· access granted · latest release <b>v2.3.0</b> · published Sep 14 · the form appears below</div></div>
+  <div class="sdoors">
+  <div class="sdoor"><div class="n">In the app</div><b>Watch the repository</b><p>The marketing room checks it daily and opens one session per release that ships a feature.</p></div>
+  <div class="sdoor"><div class="n">From your terminal</div><b><code>npx neuramesh announce</code></b><p>Reads the remote and the latest tag, then posts the notes to the same endpoint.</p></div>
+  <div class="sdoor"><div class="n">From your CI</div><b><code>neuramesh-ai/announce@v1</code></b><p>On <code>release: published</code>, the action sends the notes and comments the link on the release.</p></div>
+</div>
+</div></div></body></html>

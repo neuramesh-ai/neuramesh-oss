@@ -13,12 +13,13 @@
     "gen:skill-seed": "tsx scripts/gen-skill-seed.ts",
     "gen:marketing-os-seed": "tsx scripts/gen-marketing-os-seed.ts",
     "migrate": "node scripts/migrate.mjs",
-    "build:server": "esbuild src/server.ts --bundle --platform=node --format=esm --outfile=dist/server.mjs --external:hono --external:@hono/node-server --external:postgres --external:posthog-node --external:stripe --external:zod --external:fastembed",
-    "build:vercel": "esbuild src/vercel.ts --bundle --platform=node --format=esm --outfile=index.js --external:hono --external:@hono/node-server --external:postgres --external:posthog-node --external:stripe --external:zod --external:fastembed"
+    "build:server": "esbuild src/server.ts --bundle --platform=node --format=esm --outfile=dist/server.mjs --external:hono --external:@hono/node-server --external:postgres --external:posthog-node --external:stripe --external:zod --external:fastembed --external:@resvg/resvg-wasm",
+    "build:vercel": "esbuild src/vercel.ts --bundle --platform=node --format=esm --outfile=index.js --external:hono --external:@hono/node-server --external:postgres --external:posthog-node --external:stripe --external:zod --external:fastembed --external:@resvg/resvg-wasm"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.7",
     "@neuramesh/shared": "workspace:*",
+    "@resvg/resvg-wasm": "2.6.2",
     "hono": "^4.6.14",
     "postgres": "^3.4.5",
     "posthog-node": "^5.38.4",

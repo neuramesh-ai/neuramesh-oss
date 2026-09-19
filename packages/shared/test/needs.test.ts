@@ -60,3 +60,28 @@ describe('the nmneed block', () => {
     expect(parseNeed(needBlock({ ...data, connect: [] }))).toBeNull();
   });
 });
+
+describe('the repo need (release drafts)', () => {
+  const NEEDS2: Need[] = [{ kind: 'repo', why: 'the run reads the release' }, { kind: 'connector', min: 1, any: ['x', 'linkedin'], why: 'one draft per account' }];
+  it('no repository ⇒ blocked even with an account', () => {
+    const v = checkNeeds(NEEDS2, rows(['x', 'connected']), null);
+    expect(v.ok).toBe(false);
+    expect(v.repoMissing).toBe(true);
+  });
+  it('a repository and one account ⇒ runs', () => {
+    const v = checkNeeds(NEEDS2, rows(['x', 'connected']), { slug: 'o/r' });
+    expect(v.ok).toBe(true);
+    expect(v.repoMissing).toBe(false);
+  });
+  it('a repository but no account ⇒ blocked on the account', () => {
+    const v = checkNeeds(NEEDS2, [], { slug: 'o/r' });
+    expect(v.ok).toBe(false);
+    expect(v.repoMissing).toBe(false);
+    expect(v.missing).toEqual(['x', 'linkedin']);
+  });
+  it('the card can carry the attach instead of accounts', () => {
+    const body = needBlock({ channel: 'c1', ask: 'Release drafts', why: 'reads the release', connect: [], attach: 'repo', project: 'p1' });
+    expect(parseNeed(body)).toEqual({ channel: 'c1', ask: 'Release drafts', why: 'reads the release', connect: [], attach: 'repo', project: 'p1' });
+    expect(parseNeed(needBlock({ channel: 'c1', ask: 'x', why: 'y', connect: [] }))).toBeNull();
+  });
+});

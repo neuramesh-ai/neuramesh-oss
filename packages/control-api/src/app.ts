@@ -2,6 +2,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { CREDIT_PACKS, MAX_PACK_CREDITS, MIN_PACK_CREDITS, attachmentLimits, authDecisionQuestion, commRulesFrom, createEvent, DESIGN_PROVIDER_QUESTION, DESKTOP_AUTH_TTL_MS, formatAddress, parseAuthCard, parseCard, parseQuestions, readAnswers, RETRO_RANGES, scrubEmdash, usdForCredits, WB_SCENE_MAX, WB_SNAPSHOT_MAX, WB_TITLE_MAX, type Actor, type RetroRange } from '@neuramesh/shared';
 import { Hono } from 'hono';
 import { cronRoutes } from './cron-routes';
+import { announceClaimRoute, announceRoutes } from './announce';
 import { fleetRoutes } from './fleet';
 import { relayRoutes } from './relay';
 import { resolveBearerActor } from './bearer-auth';
@@ -25,6 +26,7 @@ import { ActorSchema, CommandSchema } from './commands';
 import { DomainError } from './errors';
 import { exportRoutes } from './export';
 import { importRoutes } from './import';
+import { contentMediaRoute } from './content-media-route';
 import { executeCommand } from './handler';
 import { hostedFreeGate } from './hosted-gate';
 import { pushAfterCommand, type PushService } from './push';
@@ -120,7 +122,7 @@ const webOrigin = (origin: string): string | null =>
   origin === 'https://neuramesh.app' || origin === 'https://www.neuramesh.app'
   || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin) ? origin : null;
 
-export function createApp(store: Store, opts: { push?: PushService } = {}) {
+export function createApp(store: Store, opts: { push?: PushService; announce?: Parameters<typeof announceRoutes>[2] } = {}) {
   const app = new Hono<Env>();
 
   // errors NEVER leave as text/html: clients parse JSON envelopes. P0001 is
@@ -168,6 +170,15 @@ export function createApp(store: Store, opts: { push?: PushService } = {}) {
   // Clerk session JWT, resolve the Clerk user to our stable internal uuid (the id
   // the host then mints a PowerSync token for). Outside /v1 because the caller has
   // no nm actor yet — this is what establishes it.
+  // EVERY route the marketing site fetches from a browser (www.neuramesh.app → api) is mounted
+  // here, on webOrigin: /join's invite read, /pro's sign-in, its workspace poll and its checkout,
+  // and /announce's claim. A route without the header is not closed, it is invisible: the /join
+  // page told invitees with live invitations that theirs had expired, and /pro's sign-in died at a
+  // 404 preflight with "Checkout did not start. Failed to fetch." (found again on the announce
+  // claim, 2026-09-18). Registered ahead of every one of those routes and of the /v1 guard: Hono
+  // runs middleware in declaration order, a `use` below a handler never fires for it, and an
+  // OPTIONS carries no bearer, so the guard would answer it 401 before cors could.
+  for (const path of ['/invites/*', '/auth/clerk', '/v1/workspaces', '/v1/billing/*', '/v1/announce/*']) app.use(path, cors({ origin: webOrigin, allowMethods: ['GET', 'POST', 'OPTIONS'], allowHeaders: ['authorization', 'content-type'] }));
   app.post('/auth/clerk', async (c) => {
     const body = (await c.req.json().catch(() => ({}))) as { token?: string };
     const token = body.token ?? c.req.header('authorization')?.replace(/^Bearer\s+/i, '');
@@ -361,6 +372,12 @@ export function createApp(store: Store, opts: { push?: PushService } = {}) {
     tiktok: { start: tiktokStartUrl, callback: tiktokCallback, scopes: 'user.info.basic video.upload' },
   };
 
+  // the public door (announce.ts): /announce/*, /connect/github/*, /internal/announce-due. It sits
+  // ABOVE the social connectors' /connect/:provider/* on purpose: registered below them, GitHub's
+  // grant landed on the generic handler and answered "github connect is not configured on this
+  // server" (the live install, 2026-09-18).
+  announceRoutes(app, store, opts.announce);
+
   app.get('/connect/:provider/start', (c) => {
     const provider = c.req.param('provider');
     const flow = CONNECT_FLOWS[provider];
@@ -460,11 +477,8 @@ export function createApp(store: Store, opts: { push?: PushService } = {}) {
     return c.json({ ok }, ok ? 200 : 400);
   });
 
-  // The /join page IS a browser calling this cross-origin (neuramesh.app → api.neuramesh.app),
-  // so it needs the same trusted-origin headers the desktop handoff gets. Registered ahead of
-  // the route: Hono runs middleware in declaration order, so a `use` below the handler never fires.
-  app.use('/invites/*', cors({ origin: webOrigin, allowMethods: ['GET', 'OPTIONS'] }));
-
+  // The /join page IS a browser calling this cross-origin (neuramesh.app → api.neuramesh.app):
+  // its CORS rides the site mount above, with /pro's and /announce's.
   // What does this invite token point at? Public + read-only: the /join page renders the
   // workspace name and prefills the address before the invitee has any session at all.
   // Membership is never granted here — that happens on verified sign-in (docs/27 §1d).
@@ -539,6 +553,8 @@ export function createApp(store: Store, opts: { push?: PushService } = {}) {
   meRoute(app, store);
   exportRoutes(app, store); // GET /v1/workspaces/:id/export — owner only, exempt from the gate (export.ts)
   importRoutes(app, store); // POST /v1/workspaces/:id/import/batches, owner only, cloud target only (import.ts)
+  announceClaimRoute(app, store); // POST /v1/announce/:id/claim — the signed-in save (announce.ts)
+  contentMediaRoute(app, store); // GET /v1/content/media/:id — a draft's film or picture for the card, members only
 
   app.post('/v1/commands', async (c) => {
     const body = await c.req.json().catch(() => null);

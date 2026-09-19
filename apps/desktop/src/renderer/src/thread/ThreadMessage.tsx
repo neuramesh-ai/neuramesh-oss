@@ -13,9 +13,10 @@ import { SuggestionRow } from '../cards/SuggestionRow';
 import { answersFrom } from '../answers';
 import { authorLabel } from '../views/SkillsView';
 import { docDropParts } from '../docdrop';
-import { formatBytes, journeyFor, parseArticleRef, parseModeMarker, parsePlanRef, parseReportRef, parseSuggestions, parseTaskUnitRef, parseWhiteboardRef, type WorkPlan } from '@neuramesh/shared';
+import { formatBytes, journeyFor, parseArticleRef, parseBriefRef, parseModeMarker, parsePlanRef, parseReportRef, parseSuggestions, parseTaskUnitRef, parseWhiteboardRef, type WorkPlan } from '@neuramesh/shared';
 import { ArticleCard, type ArticleOpen } from './ArticleCard';
 import { ReportCard } from './ReportCard';
+import { ReleaseCard } from './ReleaseCard';
 import { DocDropCard } from './DocDropCard';
 import { PhaseRing } from '../task/BeatsTracker';
 import type { TaskAllRow } from '../bridge/rows-board';
@@ -261,15 +262,18 @@ export function ThreadMessage({
   const article = drop || wb || unit ? null : parseArticleRef(m.body);
   // a scored report (marketing-os round): the ‹report:id› marker worn as the scorecard
   const report = drop || wb || unit || article ? null : parseReportRef(m.body);
+  // the release brief (release-drafts round): the ‹brief:id› marker worn as the ReleaseCard
+  const brief = drop || wb || unit || article || report ? null : parseBriefRef(m.body);
   // the plan-review card (2026-08-19): ‹plan:vN› + a task-thread context = the gate as a
   // thread-native card; without planCtx (a conversation) the readable line renders as prose
-  const plan = drop || wb || unit || article || report || !planCtx ? null : parsePlanRef(m.body);
+  const plan = drop || wb || unit || article || report || brief || !planCtx ? null : parsePlanRef(m.body);
   // every marker shares one anatomy: surrounding prose stays prose, the marker becomes its card
   const marker = plan && planCtx ? { prose: plan.prose, card: <PlanReviewCard version={plan.version} task={planCtx.task} onOpenPlan={planCtx.onOpenPlan} onArmRevise={planCtx.onArmRevise} handsOff={planCtx.handsOff} /> }
     : wb ? { prose: wb.prose, card: <WbCard id={wb.id} onOpen={onOpenWhiteboard} /> }
     : unit ? { prose: unit.prose, card: <UnitCard id={unit.id} onOpen={onOpenTask} /> }
     : article ? { prose: article.prose, card: <ArticleCard id={article.id} onOpen={onOpenArticle} /> }
     : report ? { prose: report.prose, card: <ReportCard id={report.id} onOpen={onOpenDoc} /> }
+    : brief ? { prose: brief.prose, card: <ReleaseCard id={brief.id} onOpen={onOpenDoc} /> }
     : null;
   return (
     <div className={`msg${a.agent ? '' : a.self ? ' human mine' : ' human'}`}>

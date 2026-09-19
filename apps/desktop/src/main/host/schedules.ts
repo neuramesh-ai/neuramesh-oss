@@ -8,7 +8,8 @@
 // fact, and a timer buried in a maker is one nobody can find when it stops firing.
 import { authBlockedCard, resolveToken, runtimeFor } from '../agents';
 import { isStandDown } from '../replypolicy';
-import { nextScheduleRun } from '@neuramesh/shared';
+import { isReleasePayload, nextScheduleRun, type ReleasePayload } from '@neuramesh/shared';
+import { makeReleaseWatch, type Preflight } from './releasewatch';
 import type { PowerSyncDatabase } from '@powersync/node';
 import type { HostedAgent } from '../agents';
 import type { LogFn } from '../agentlog';
@@ -27,6 +28,9 @@ export function makeSchedules(ctx: {
   runMarketingBootstrap: (runner: HostedAgent, s: { id: string; workspace_id: string; channel_id: string }, anchor: { threadId?: string; taskId?: string }, opts?: { only?: string[] }) => Promise<void>;
 }) {
   const { db, apiUrl, ownerActorId, post, agents, bootstrapAuthCardPosted, arun, runMarketingBootstrap } = ctx;
+  // the release routine (docs/design/release-drafts-2026-09): a schedule whose payload carries
+  // `release` watches a repository with this machine's gh, and opens one session per window
+  const releaseWatch = makeReleaseWatch({ db, ownerActorId, post });
 
   // ── schedules (marketing-channel plan §4.6): the minute-tick ─────────────────────────
   // Claim each due row via the run_count CAS (the server refuses the loser), then run the
@@ -64,8 +68,8 @@ export function makeSchedules(ctx: {
       const next = s.cadence === 'once'
         ? null
         : nextScheduleRun({ cadence: s.cadence as 'daily' | 'weekdays' | 'weekly', atTime: s.at_time, tz: s.tz, weekday: s.weekday, after: new Date(Math.max(Date.now(), new Date(s.next_run_at).getTime() + 60_000)) })?.toISOString() ?? null;
-      const payload = ((): { prompt?: string; bootstrap?: boolean; threadId?: string; taskId?: string; routine?: boolean } => {
-        try { return JSON.parse(s.payload ?? '{}') as { prompt?: string; bootstrap?: boolean; threadId?: string; taskId?: string }; } catch { return {}; }
+      const payload = ((): { prompt?: string; bootstrap?: boolean; threadId?: string; taskId?: string; routine?: boolean; release?: ReleasePayload } => {
+        try { return JSON.parse(s.payload ?? '{}') as { prompt?: string; bootstrap?: boolean; threadId?: string; taskId?: string; release?: ReleasePayload }; } catch { return {}; }
       })();
       // round 3: a bootstrap anchors to the setup TASK's thread (one owning session); the
       // threadId shape survives for pre-flows rooms that never had a setup task
@@ -115,11 +119,24 @@ export function makeSchedules(ctx: {
       // carries no marker, so it still drafts.
       const [chk] = isBootstrap ? [] : await db.getAll<{ kind: string | null }>(`select kind from channels where id = ? limit 1`, [s.channel_id]).catch(() => [] as Array<{ kind: string | null }>);
       const isRoutine = !isBootstrap && (payload.routine === true || (chk?.kind ?? 'build') !== 'marketing');
+      // a release routine decides BEFORE the claim whether this machine can read the repository:
+      // no repository, no remote or no gh login leaves the row due for another machine, and says so
+      // on the bar once the slot is well past
+      const isRelease = !isBootstrap && isReleasePayload(payload as Record<string, unknown>);
+      let releasePre: Preflight | null = null;
+      if (isRelease) {
+        releasePre = await releaseWatch.preflight(s, payload.release!);
+        if (!releasePre.ok) {
+          console.warn(`schedule_run id=${s.id} waiting: ${releasePre.reason} — slot left due`);
+          if (overdue) await writeResult(releasePre.reason);
+          continue;
+        }
+      }
       // Only DRAFTING needs a seat and a key: a routine just posts a message as the owner, so
       // demanding a hosted marketer for it would strand routines in rooms that have none. Checking
       // here means a host that cannot draft leaves the row due — the next tick, or another machine,
       // picks it up, and a blocked credential self-heals after login instead of eating the slot.
-      if (!isBootstrap && !isRoutine) {
+      if (!isBootstrap && !isRoutine && !isRelease) {
         if (!runner) {
           console.warn(`schedule_run id=${s.id} waiting: no hosted agent for the room — slot left due`);
           if (overdue) await writeResult('no hosted agent for this room — the run cannot start until one is online');
@@ -141,6 +158,12 @@ export function makeSchedules(ctx: {
       // orchestrator triages it exactly like a composer send. Marketing keeps the
       // drafting turn below (content items, calendar chips, publish gate).
       {
+        if (isRelease && releasePre?.ok) {
+          const out = await releaseWatch.fire(s, payload.release!, releasePre);
+          console.log(`schedule_run id=${s.id} release watch ${out.outcome}${out.error ? `: ${out.error}` : ''}`);
+          await writeResult(out.error);
+          continue;
+        }
         if (isRoutine) {
           const routinePrompt = payload.prompt ?? s.title;
           // each execution is its OWN conversation (George, 2026-07-30): the fire carries a fresh

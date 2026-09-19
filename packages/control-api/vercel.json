@@ -25,6 +25,10 @@
     {
       "path": "/internal/routines-due",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/internal/announce-due",
+      "schedule": "* * * * *"
     }
   ]
 }

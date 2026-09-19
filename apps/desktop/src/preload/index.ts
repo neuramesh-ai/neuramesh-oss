@@ -292,11 +292,11 @@ contextBridge.exposeInMainWorld('nm', {
     ipcRenderer.invoke('nm:channel-delete', { channelId }),
   channelKind: (channelId: string, kind: 'build' | 'marketing'): Promise<{ ok: boolean; channelId: string }> =>
     ipcRenderer.invoke('nm:channel-kind', { channelId, kind }),
-  marketingSetup: (channelId: string, website: string, focus: string[], goal?: string): Promise<{ ok: boolean; channelId: string; threadId?: string; taskId?: string }> =>
-    ipcRenderer.invoke('nm:marketing-setup', { channelId, website, focus, goal }),
+  marketingSetup: (channelId: string, website: string, focus: string[], goal?: string, releases?: { repoId?: string | null; slug?: string | null; now: boolean; watch: boolean; at?: string; tz?: string }): Promise<{ ok: boolean; channelId: string; threadId?: string; taskId?: string; releases?: { now: boolean; watch: 'armed' | 'plan_limit' | 'off' } }> =>
+    ipcRenderer.invoke('nm:marketing-setup', { channelId, website, focus, goal, releases }),
   // one answered setup-flow step, persisted AS IT LANDS (setupflows.ts) — abandoning the
   // wizard is a pause, not a loss
-  setupStep: (channelId: string, flow: string, step: string, value?: string | string[]): Promise<{ ok: boolean }> =>
+  setupStep: (channelId: string, flow: string, step: string, value?: string | string[] | Record<string, unknown>): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('nm:setup-step', { channelId, flow, step, value }),
   marketingIntegration: (channelId: string, provider: 'posthog' | 'meta' | 'tiktok', enabled: boolean): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('nm:marketing-integration', { channelId, provider, enabled }),
@@ -350,6 +350,7 @@ contextBridge.exposeInMainWorld('nm', {
     ipcRenderer.invoke('nm:content-unschedule', { itemId }),
   draftImage: (itemId: string, opts?: { angle?: string; rewrite?: boolean }): Promise<{ ok: boolean; pending?: boolean; thumb?: string; body?: string; error?: string }> =>
     ipcRenderer.invoke('nm:draft-image', { itemId, ...opts }),
+  contentMedia: (mediaId: string): Promise<string | null> => ipcRenderer.invoke('nm:content-media', { mediaId }),
   mediaPreview: (url: string): Promise<{ dataUrl: string | null }> =>
     ipcRenderer.invoke('nm:media-preview', { url }),
   connectorStart: (channelId: string, provider?: 'x' | 'linkedin' | 'instagram' | 'tiktok'): Promise<{ ok: boolean }> =>

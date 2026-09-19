@@ -654,3 +654,140 @@ plus hiding the one-line snippet while open; card buttons moved off the deeper `
 the card's own `--card` surface (the qopt idiom, George's third strike on this shade); and
 the Workbench got a top inset + head hairline — naked on the frame per 2026-08-16, but no
 longer reading as part of the frame header.
+
+## 16. Release drafts joins the catalog (2026-09-17)
+
+The `release` playbook (docs/44): engine unit, task kind content, born approved, needs a repository
+and one connected account, the `release-announcement` skill in marketing-core. The daily routine the
+marketing setup plants opens a session with the release digest, and rex answers it with
+`run_playbook('release')`. The armed state derives from the schedule prompt as every other row does
+(`Run the release drafts playbook.`).
+
+## 17. UGC scripts and the content frame join the catalog (2026-09-18)
+
+George, on the release-drafts PR: "lets add the content-creator and marketing-ugc-strategy skills
+[from the LobeHub marketplace] … we should also add a ugc playbook, and test that the marketing
+agent can generate ugcs when asked." Two community skills, vendored byte-verbatim under
+`packages/control-api/vendor/community-skills/` with their licences and pins (content-creator from
+Shubhamsaboo/awesome-llm-apps at `ca3a3d37`, which upstream later removed as a "basic prompt-dump
+skill"; ugc-strategy from brainbytes-dev/everything-claude-marketing at `453d32d4`, MIT), and
+composed into the **marketing-os pack** (v1.2) by the same generator as the marketing-os modules:
+`marketing-os-manifest.ts` gained a `root: 'community-skills'` source root, and a fifth preamble,
+`ugc`, says what "make UGC for this release" hands over in the thread: three to five creator-style
+scripts as `draft_posts` cards (tiktok or instagram, 9:16, the hook in three seconds, the product on
+screen, captions, one call to action, the visual direction in `imageBrief`), the creator brief shelved
+as `ugc-brief-YYYY-MM-DD.md`, the disclosure line, no invented customer or quote. The playbook
+`ugc` (chat engine, skill `ugc-strategy`, group content) is a tile on the desk (a person glyph) and
+a line in the orchestrator's note; the pack convergence lands both skills in every existing marketing
+room at the next boot (proven on the dev stack: the Ember Forge room had them after one restart).
+
+The live test (Ember Forge, the v0.134.0 release session, plume on Claude) found the gap that
+mattered: an @mention of the marketer in a `tasks`-mode session ran the tool-less board-chat reply,
+so plume answered "UGC drafting is real work and has to move through a task card". The marketer's
+deliverables are thread-native, so `host/wake.ts` now routes a mentioned marketer through the
+conversation turn in any session (its skills, its draft cards, no board tools). Second ask: three
+TikTok scripts as cards (a first-person walkthrough, a before-and-after, "three things I did not
+expect"), each timestamped with the hook, the spoken line, the on-screen caption and the call to
+action, the visual direction in the image brief, `[NEED: …]` where a number or a link must be
+confirmed, and `ugc-brief-2026-09-18.md` in the library (`evidence/live-ugc-session-{light,dark}.png`).
+
+### 17.1 The script folds, and the hook is filmed (2026-09-18, later)
+
+George: "right now I only see the script, also the script should be collapsed, user can click the
+text to expand it, we should have a generate video button similar to the generate image that
+generates the actual video." Built on the image lane's own shape, not beside it:
+
+- **The fold.** A timestamped script (two or more `[m:ss-m:ss]` beats) folds to its first beat with a
+  quiet "the script ›" tail; the text itself is the toggle (click, Enter or Space).
+- **The film.** The card's "Generate video" posts `‹gen-video:itemId›`, the marker the draw lane's
+  twin: the wake gate treats it as model-free work, both wake paths route it to `host/videogen.ts`,
+  which builds the prompt from the script's first beat (direction, the spoken line, the caption) and
+  the brief, films it on Veo through the Gemini API with the workspace's Google key (the image
+  ladder's Gemini rung, else the machine's env), and attaches the clip to the draft with
+  `content.attach_media` (video/mp4 rides the same lane, one media per draft, `video_id` on the
+  row). A clip is eight seconds, so the film is the HOOK and the reply says so. A refusal or a missing
+  key lands on the card as `video_error`, with Try again.
+- **The read.** A film is too big for the synced row, so the card reads it with the session through
+  `GET /v1/content/media/:id` (members only, content-media-route.ts) via the `contentMedia` bridge
+  lane, and plays it where the picture stands. The renderer's CSP gained `media-src 'self' data: blob:`.
+- **Found live:** Veo 3.1 refuses `personGeneration: allow_adult` on text-to-video ("currently not
+  supported"); the lane sends no person parameter and the model's default films people. The first
+  film rendered the caption as "no lapop, still shoping": a video model spells like an image model,
+  so the prompt now asks for NO lettering and a clear bottom third, and the caption is burned in at
+  publish time like any other post.
+- **The scrub reaches drafts.** The live scripts read "HOOK — handheld": the house style's em-dash
+  scrub covered messages (app.ts) and tasks (createtask.ts) but never `content.create` or
+  `content.revise`, so the one piece of agent copy that leaves the building escaped it. The
+  content handler now scrubs an agent's body and image brief (humans never, an opted-out workspace
+  never); the card's own "needs image —" separator became a middle dot.
+
+### 17.2 The video post: caption, script, film. And which providers can film (2026-09-19)
+
+George, on the first film: "I don't see the text description alongside the video, only the
+script and video"; "a video post should not offer Generate image"; "TikTok is the default but the
+platform should follow the ask or the connected accounts"; "which other providers can we use? Veo is
+nice, but OpenAI or Claude models when the user has that connection. Do the research."
+
+**The shape.** A video post is three things, and the card now shows all three: the **caption**
+(`body`, what posts with the video), the **script** beside it (`media.script`, what the creator
+reads and films, folded to its first beat), and the **film**. Before this the script WAS the body,
+so a card had no caption and the script would have published as the post. `draft_posts` and
+`revise_posts` carry `script`; `content.create`/`content.revise` store it in `media.script`; a new
+script is a content revision (snapshotted, unscheduled) and drops the old film, since the film is
+of the old script. A draft from before this round (the script as the body) still reads as a
+script (`cardparts.ts`), so the live cards did not break.
+
+**The video card.** A card with a script is a video card: no Generate image, no redraw, no
+image brief row. Its brief row reads "needs video · <shot direction>" and its one button is
+Generate video / Film again. Editing the script is the ordinary request-changes reply: plume
+revises the script in place and the next Generate video films the new one. Any platform can carry
+a video post (X and LinkedIn take vertical video), so the film button no longer gates on TikTok.
+
+**The platform.** The marketer drafted TikTok for a room whose accounts are X and LinkedIn
+because a chat turn never said which networks the room can reach: the content-task path has
+`stageConnections`, the chat turn had nothing. The chat turn now appends the same CONNECTED
+ACCOUNTS note, the UGC preamble says "the platform the ask names, else the connected accounts",
+and the `ugc` playbook gained a `platform` input.
+
+**The preamble had to REACH the room.** `seedBundledPacksSql` added missing skill NAMES only, so a
+changed body (this preamble, the round-3 preambles before it) never reached a room that already
+held the pack. The 2026-08-21 fix (34183cd8, refresh by content: the stored version is
+`<pin>+<sha256-12 of the seed bytes>`, differs ⇒ the deploy wins, curated/deprecated/imported rows
+untouched) was written and tested but never landed; it is ported here with its twelve pg cases.
+Live: `skillpack.seed_defaults` on the three marketing rooms answered `refreshed: 2` each and the
+ugc-strategy body carries the new rule.
+
+**Providers, researched 2026-09-18.**
+
+| Provider | Model | UGC fit | Status for a NeuraMesh connection |
+|---|---|---|---|
+| Google (Gemini API key) | **Gemini Omni Flash** `gemini-omni-1.1-flash` | Google's own default for video; #1 on the Artificial Analysis text-to-video leaderboard (Elo 1233, audio); native dialogue, 9:16, 3–10 s, one synchronous call, about $0.10/s at 720p | **Built: the first rung** |
+| Google | Veo 3.1 (`veo-3.1-fast-generate-preview`, `veo-3.1-generate-preview`) | "excellent dialogue and natural performance"; long-running operation; $0.10/s fast, $0.40/s standard at 720p | **Built: the fallback rungs** |
+| OpenAI | Sora 2 / Sora 2 Pro, the Videos API | strong non-talking UGC texture | **Shut down 2026-09-24, no successor** (deprecations page: announced 2026-03-24). Not built; an OpenAI-only workspace is told to add a Google key |
+| Anthropic | none | | Claude has no image or video model. Not possible |
+| ByteDance | Seedance 2.0 | "the leader for consistent branded UGC": native audio with lip-sync, 9:16, about $0.02/s (mini) | needs a BytePlus ModelArk key: a new connection kind |
+| Kuaishou | Kling 3.0 | cheap motion-led drafts, lip-sync, 4K | needs a Kling key: a new connection kind |
+| MiniMax | H3 / Hailuo | #4 on the leaderboard with audio | needs a MiniMax key: a new connection kind |
+| Alibaba | Wan 3.0 | #2 on the leaderboard, open weights | Model Studio key or self-hosted: a new connection kind |
+| Runway | Gen-4 | "less native audio support for realistic UGC" | not a UGC fit |
+
+The decision: the ladder is data (`VIDEO_MODELS`, one entry per rung, `kind` names the API
+shape), Google is the one connection that films today, and the next rung worth adding is Seedance
+2.0 or an aggregator connection (fal.ai exposes Seedance, Kling, MiniMax and Wan under one key),
+which is a product decision about connection kinds, not a lane change.
+
+**Proven live** (`evidence/live-videopost-*.png`, `live-videopost-omni-hook.mp4`): plume redrafted
+the UGC as six video posts for the room's X and LinkedIn accounts, caption and script and shot
+direction apart; the script field reached the conversation registry only on the second try (the
+chat turn's `draft_posts` is a second copy in `chattools.ts`, and plume said "the tool has no
+script field" until it did); Generate video on card d filmed on `gemini-omni-1.1-flash` in 25 s,
+8 s, 720x1280 with audio, 1.7 MB. Found live: the Interactions API answers with `steps` (a thought,
+then the model_output), where the docs' example says `outputs`; the lane reads both. And what a
+text-to-video model films for "a screen recording of the app" is an invented app: the clip is a
+storyboard for the creator, never the recording itself.
+
+Two harness traps for the next round, in the memory file: `POST /v1/messages` takes `threadId`
+(a `thread` field is dropped and the ask lands at channel level, where rex triages it into a unit
+and the marketer's chat turn crashed on a null thread, now guarded); and a wake in the first
+seconds after the daemon boots sees no Claude runtime, so the Starter door fires and pins the
+conversation's brain until `thread.set_brain` clears it.

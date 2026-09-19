@@ -29,6 +29,8 @@ import {
 } from '@neuramesh/shared';
 import type { Command } from '../commands';
 import { DomainError } from '../errors';
+import { localMode } from '../localmode';
+import { nextScheduleRun, playbookAsk, playbookById } from '@neuramesh/shared';
 
 
 import { type Store } from '../store';
@@ -54,6 +56,9 @@ export async function marketingCommands(store: Store, actor: Actor, cmd: Command
       cmd.channel,
       {
         website: cmd.website ?? null, focus, ...(cmd.goal ? { goal: cmd.goal } : {}),
+        // the last step's answer rides the completing command too: the wizard's per-step write races
+        // this merge, and the loser's profile forgot the repository (live harness, 2026-09-18)
+        ...(cmd.releases ? { releases: { repoId: cmd.releases.repoId ?? null, slug: cmd.releases.slug ?? null, now: cmd.releases.now, watch: cmd.releases.watch } } : {}),
         setup_by: actor.id, setup_at: new Date().toISOString(), bootstrap_thread_id: threadId,
       },
       (ws) => createEvent({
@@ -102,11 +107,41 @@ export async function marketingCommands(store: Store, actor: Actor, cmd: Command
         payload: { channel: cmd.channel, title: 'Brand foundation', cadence: 'once', bootstrap: true },
       }),
     );
+    // ── step 5, release drafts (docs/design/release-drafts-2026-09 §4.7) ──
+    // The one-shot "draft the latest release now" rides the internal createSchedule like the
+    // bootstrap (free on every plan). The daily watch is a routine, so it meets the same plan
+    // gate schedule.create enforces: refused on Free, and the answer says so.
+    let releases: { now: boolean; watch: 'armed' | 'plan_limit' | 'off' } | undefined;
+    if (cmd.releases && (cmd.releases.now || cmd.releases.watch)) {
+      if (!cmd.releases.repoId) throw new DomainError('INVALID_INPUT', 'release drafts need a repository');
+      const r = cmd.releases;
+      const short = r.slug?.split('/')[1] ?? 'repository';
+      const ask = playbookAsk(playbookById('release')!);
+      const tz = r.tz ?? 'UTC';
+      const at = r.at ?? '09:00';
+      const nowIso = new Date().toISOString();
+      const plant = (input: { title: string; cadence: 'once' | 'daily'; nextRunAt: string; release: Record<string, unknown> }) => store.createSchedule(
+        { channelId: id, title: input.title, prompt: ask, cadence: input.cadence, atTime: at, tz, weekday: null, nextRunAt: input.nextRunAt, agentName: null, createdByKind: actor.kind, createdBy: actor.id, payloadExtra: { routine: true, release: input.release } },
+        (ws) => createEvent({ type: 'schedule.created', source: actorAddress(actor), target: formatAddress({ kind: 'channel', slug: cmd.channel }), workspace: ws, payload: { channel: cmd.channel, title: input.title, cadence: input.cadence, nextRunAt: input.nextRunAt, release: true } }),
+      );
+      let watch: 'armed' | 'plan_limit' | 'off' = 'off';
+      if (r.now) await plant({ title: `Release drafts · ${short} · the latest release`, cadence: 'once', nextRunAt: nowIso, release: { repo: r.repoId, slug: r.slug ?? null, latest: true } });
+      if (r.watch) {
+        if (!localMode() && (await store.workspacePlan(workspace)) === 'free') watch = 'plan_limit';
+        else {
+          const next = nextScheduleRun({ cadence: 'daily', atTime: at, tz, weekday: null, after: new Date() });
+          if (!next) throw new DomainError('INVALID_INPUT', 'could not compute the next run — check the time and timezone');
+          await plant({ title: `Release drafts · ${short}`, cadence: 'daily', nextRunAt: next.toISOString(), release: { repo: r.repoId, slug: r.slug ?? null, cursor: { at: nowIso, tag: null }, log: [] } });
+          watch = 'armed';
+        }
+      }
+      releases = { now: !!r.now, watch };
+    }
     // the client opens (and posts the human's answers into) whichever session owns the
     // first-run — the setup task when the room has one, the legacy conversation otherwise.
     // Returning threadId in BOTH cases would let the card's summary message birth the
     // conversation thread anyway (postMessage's on-conflict path), undoing the anchoring.
-    return { ok: true, channelId: id, ...(setupTaskId ? { taskId: setupTaskId } : { threadId }) } as never;
+    return { ok: true, channelId: id, ...(setupTaskId ? { taskId: setupTaskId } : { threadId }), ...(releases ? { releases } : {}) } as never;
   }
   if (cmd.type === 'marketing.set_integration') {
     if (actor.kind !== 'human') throw new DomainError('HUMAN_ONLY', 'integrations are managed by a human');
