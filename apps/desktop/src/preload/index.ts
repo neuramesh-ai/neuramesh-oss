@@ -528,6 +528,12 @@ contextBridge.exposeInMainWorld('nm', {
   onConnections: (cb: (list: unknown[]) => void): (() => void) => { const l = (_e: unknown, list: unknown[]) => cb(list); ipcRenderer.on('nm:connections', l); return () => { ipcRenderer.removeListener('nm:connections', l); }; },
   setForeground: (connectionId: string, workspaceId?: string | null) => ipcRenderer.invoke('nm:set-foreground', { connectionId, workspaceId: workspaceId ?? null }),
   watchRailRows: (cb: (p: Record<string, unknown[]>) => void): (() => void) => { const subId = crypto.randomUUID(); const l = (_e: unknown, p: { subId: string } & Record<string, unknown[]>) => { if (p.subId === subId) cb(p); }; ipcRenderer.on('nm:rail-rows', l); invokeRetry('nm:watch-rail-rows', { subId }); return () => { ipcRenderer.removeListener('nm:rail-rows', l); void ipcRenderer.invoke('nm:unwatch', { subId }); }; },
+  // the first-run doors (main/firstrunipc.ts): the door's state, the three doors, the wait's two buttons
+  firstRunState: () => ipcRenderer.invoke('nm:first-run-state'),
+  onFirstRun: (cb: (s: unknown) => void): (() => void) => { const l = (_e: unknown, s: unknown) => cb(s); ipcRenderer.on('nm:first-run', l); return () => { ipcRenderer.removeListener('nm:first-run', l); }; },
+  firstRunChoose: (door: string) => ipcRenderer.invoke('nm:first-run-choose', { door }),
+  firstRunReopen: () => ipcRenderer.invoke('nm:first-run-reopen'),
+  firstRunCancel: () => ipcRenderer.invoke('nm:first-run-cancel'),
   // Local mode's stack (main/localStack/ipc.ts): the card's state, its actions, the one setting
   localStackState: () => ipcRenderer.invoke('nm:local-stack-state'),
   onLocalStack: (cb: (p: unknown) => void): (() => void) => {

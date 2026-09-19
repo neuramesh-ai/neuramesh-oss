@@ -11,7 +11,7 @@ import { type ContentItemWide, type SkillRow, type SkillPackRow } from './bridge
 import { type TaskRow, type TaskAllRow, type DecisionAllRow, type ProjectRow, type WorkspaceProjectRow, type RepoUI, type RunUI, type ArtifactUI, type AttachmentRow } from './bridge/rows-board';
 import { type AgentRow, type MachineRow, type MemberRow, type WorkspaceMembership, type PendingInvite } from './bridge/rows-crew';
 import { type CredRow, type UpdateState, type FailoverRow, type ProcList } from './bridge/rows-infra';
-import { nm as nmBridge, type ConnectionInfo, type LocalStackPayload } from './bridge/nm';
+import { nm as nmBridge, type ConnectionInfo } from './bridge/nm';
 import { ProjectsPage } from './ProjectsPage';
 import { MarketingOS } from './views/MarketingOS';
 import { EngineeringOS, EngineeringWorkspaceHeader, engineeringHistoryRows, useEngineeringNavigation } from './engineering';
@@ -151,6 +151,8 @@ import { updateKey, updateVisible } from './shell/updatecard-state';
 import { InvitedFirstRun } from './views/join';
 import { Login } from './views/Login';
 import { LocalStackGate } from './views/LocalStackGate';
+import { FirstRunDoor } from './views/FirstRunDoor';
+import { useBootGates } from './shell/useBootGates';
 import { AddRepoModal, ChannelSettingsModal, CreateChannelModal } from './projects/rooms';
 import { MarketingCalendar, MarketingLibrary } from './marketing/room-tabs';
 import { WhiteboardsHome } from './views/WhiteboardsHome';
@@ -568,14 +570,8 @@ export function App() {
   const [boot, setBoot] = useState<{ needsOnboarding: boolean; resumeWorkspaceId?: string; machineName: string; workspace: { name: string; slug: string }; workspaceId?: string; workspaces?: WorkspaceMembership[]; invites?: PendingInvite[]; connection?: ConnectionInfo; resolving?: boolean } | null>(null);
   /** the connection the shell stands in (main/connections.ts) — the rail's `.on` band, the foot's glyph */
   const fgConnId = boot?.connection?.id ?? null;
-  // Local mode's stack (main/localStack): the first-run card's state, pushed by main. Read only on a
-  // local connection — a cloud or dev boot has no stack and never asks.
-  const [localStack, setLocalStack] = useState<LocalStackPayload | null>(null);
-  useEffect(() => {
-    if (!nm || auth?.mode !== 'local' || !nm.localStackState) return;
-    void nm.localStackState().then(setLocalStack).catch(() => {});
-    return nm.onLocalStack?.(setLocalStack);
-  }, [auth?.mode]);
+  // the boot gates (shell/useBootGates.ts): the first-run doors, then Local mode's stack card
+  const { firstRun, setFirstRun, doorDone, localStack, setLocalStack } = useBootGates(auth?.mode);
   const engineeringNav = useEngineeringNavigation(boot?.workspaceId, view === 'engineering');
   // Why the splash is still up. bootstrap() is polled every 1.5s and its rejection used to be
   // swallowed (`.catch(() => {})`), so an unreachable API meant an infinite silent retry behind
@@ -1165,10 +1161,10 @@ export function App() {
     }, { focus: 'home' });
   };
   useEffect(() => {
-    if (!nm) return;
+    if (!nm || !doorDone) return;
     // fall back to the sign-in screen rather than a hung splash if the check ever fails
     void nm.authStatus().then(setAuth).catch(() => setAuth({ mode: 'clerk', user: null }));
-  }, []);
+  }, [doorDone]);
 
   // data effects wait for auth: pre-login there is no sync process and no
   // nm:* handlers — invoking them just spams 'No handler registered'
@@ -2476,6 +2472,7 @@ export function App() {
   // Local mode (artboards A1–A6): while the stack has not reached `ready` — or a warm boot is still in
   // one of its two waits — the first-run card is the whole screen. The card draws main's state; the
   // splash covers the beat before the first payload and the beat between `ready` and the workspace.
+  if (firstRun && firstRun.phase !== 'done' && nm) return <FirstRunDoor state={firstRun} onChoose={(door) => void nm.firstRunChoose?.(door).then(setFirstRun)} onReopen={() => void nm.firstRunReopen?.()} onCancel={() => void nm.firstRunCancel?.().then(setFirstRun)} />;
   if (auth?.mode === 'local' && localStack?.blocking && localStack.state.phase !== 'probing' && nm) {
     return <LocalStackGate payload={localStack} onPick={(r) => void nm.localStackPick?.(r).then(setLocalStack)} onInstall={() => void nm.localStackInstall?.().then(setLocalStack)} onRescan={() => void nm.localStackRescan?.().then(setLocalStack)} onQuit={() => void nm.localStackQuit?.()} />;
   }

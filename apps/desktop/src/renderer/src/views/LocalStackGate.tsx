@@ -37,8 +37,8 @@ function ProgressRow({ item }: { item: LocalProgressItem }) {
   );
 }
 
-/** a status row: name · ready | please wait… (the install and engine cards) */
-function StatusRow({ name, ready, top }: { name: string; ready: boolean; top?: boolean }) {
+/** a status row: name · ready | please wait… (the install and engine cards, the first-run doors' wait) */
+export function StatusRow({ name, ready, top }: { name: string; ready: boolean; top?: boolean }) {
   return (
     <div className={`lsgsrow${top ? ' top' : ''}`}>
       <span className="lsgnm">{name}</span>
@@ -80,7 +80,8 @@ function Chain({ services }: { services: Array<{ name: string; status: LocalServ
   );
 }
 
-function Card({ kicker, title, p, children, actions, foot }: { kicker: string; title: string; p?: string; children?: React.ReactNode; actions?: React.ReactNode; foot?: string }) {
+/** the one card recipe every gate state shares (the first-run doors draw on it too) */
+export function Card({ kicker, title, p, children, actions, foot }: { kicker: string; title: string; p?: string; children?: React.ReactNode; actions?: React.ReactNode; foot?: string }) {
   return (
     <div className="lsgcard" role="dialog" aria-labelledby="lsgtitle">
       <span className="lsgmark" aria-hidden><PorchMark size={40} cut="std" animated /></span>

@@ -35,5 +35,10 @@ describe.skipIf(!DB)('the first sign-in creates the workspace (postgres)', () =>
     expect(Number(members!['c'])).toBe(1);
     const [rooms] = await sql!`select count(*)::int as c from channels where workspace_id = ${workspaces[0].id}::uuid`;
     expect(Number(rooms!['c'])).toBeGreaterThan(0);
+    // the first workspace starts with 500 credits, once (the first-run doors, 2026-09-19): the
+    // second arrival made no workspace, so it granted nothing either
+    const [grants] = await sql!`select count(*)::int as c, coalesce(sum(micros), 0)::bigint as micros from credit_grants where workspace_id = ${workspaces[0].id}::uuid and kind = 'signup'`;
+    expect(Number(grants!['c'])).toBe(1);
+    expect(Number(grants!['micros'])).toBe(500 * 10_000);
   });
 });

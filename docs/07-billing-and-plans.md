@@ -24,7 +24,7 @@ per-workspace, and the desktop doesn't use `@clerk/clerk-react`).
 | Local machines | 1 (`MACHINE_LIMIT`, transfer-or-upgrade) | unlimited |
 | Cloud machine | **none** | the runner (keys + starter brain), minted by the webhook at the flip to Pro (`plan-flip.ts`, `FLEET_AUTOPROVISION` gates dev stacks) **plus a machine per member**, born asleep at join; 50 GB each |
 | Teammate seats | **1** — the owner (`FREE_SEAT_CAP`; an invitation is refused with Pro named) | per seat; the first invitation promotes the runner into the owner's machine; **the seat count follows the roster** (below) |
-| Monthly credits | **none** (no signup grant, no refill: the worklist filters `plan = 'cloud'`) | 1,500 × seats at the flip, then 1,500 × seats on the 1st of every month |
+| Monthly credits | **500 once**, at the first workspace (2026-09-19); no refill: the worklist filters `plan = 'cloud'` | 1,500 × seats at the flip, then 1,500 × seats on the 1st of every month |
 
 A blocked command returns `PLAN_LIMIT` (402) / `MACHINE_LIMIT` (402); the desktop routes those to the
 upgrade modal / the transfer-or-upgrade card — never a dead-end.
@@ -136,6 +136,20 @@ one workspace's machines (#375).
 
 **Not built / open:** per-user credit attribution inside a workspace; storage metering (columns
 defined, unwritten); granting for BYOS tokens (never — those stay the user's).
+
+## Free in the cloud starts with 500 credits (2026-09-19, the first-run doors)
+
+> **Amended 2026-09-19** ([docs/design/first-run-doors-2026-09](design/first-run-doors-2026-09/plan.md)).
+> George: "cloud should indicate free 500 credits to get started". A free hosted account's **first
+> workspace is granted `SIGNUP_GRANT_CREDITS` (500) once**, at its creation in `first-workspace.ts`
+> (the ledger's `signup` kind, best effort behind the creation: a sign-in never fails because a
+> ledger row did not land). The refill worklist still skips `plan = 'free'`, so the 500 do not renew.
+> **The hosted write gate below stands down for free hosted workspaces:** `NM_HOSTED_FREE_GATE`
+> stays `0` (it is NOT flipped on 2026-09-29), and the desktop's `hostedrule.ts` answers false for
+> every plan, so a free hosted workspace writes. The caps of the entitlements table (one seat, three
+> projects, one local machine, no cloud machine) are unchanged: those are entitlements, not the gate.
+> The site's "Free is your Mac. Pro is the cloud." line and the notice mailed on 2026-09-15 are
+> George's follow-ups.
 
 ## The hosted write gate, the export, and the notice (2026-09-12, unit U1b)
 
