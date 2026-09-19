@@ -5,6 +5,7 @@ export * from './artifacts';
 export * from './states';
 export * from './workspaces';
 export * from './compute';
+export * from './compute-voice';
 export * from './code-sessions';
 export * from './sessions';
 export * from './machine-choice';

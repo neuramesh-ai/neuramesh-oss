@@ -659,6 +659,14 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 .mkpostcard:hover .mkpckebab, .mkpckebab.show, .mkpckebab:focus-visible { opacity: 1; }
 .mkpckebab:hover, .mkpckebab.show { background: var(--hover-bg); color: var(--text); }
 .mkpcmenu { top: 32px; right: 8px; width: 188px; }
+/* THE ANGLE CARD's platform row (the UGC playbook): the connected accounts picked, the rest one tap
+   away, the unconnected marked with a dot; the chips are the composer's pill idiom, mono, small */
+.qplatforms { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 2px 0 8px; }
+.qplatlbl { font: 500 10.5px var(--fmono); letter-spacing: .02em; text-transform: uppercase; color: var(--dim); margin-right: 2px; }
+.qplat { font: 500 11px var(--fmono); padding: 4px 9px; border: 1px solid var(--border); border-radius: 999px; background: var(--panel2); color: var(--muted); cursor: pointer; transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
+.qplat:hover { border-color: var(--hover-border); color: var(--text); }
+.qplat.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--panel2)); color: var(--text); }
+.qplat:focus-visible { outline: 1.5px solid var(--accent); outline-offset: 1px; }
 /* the film in the post preview: the card's player, seated where the image floor stands */
 .mkpvfilm { margin: 10px 0; max-height: 380px; }
 .mkpvfilmnone { margin-top: 10px; }
@@ -7184,7 +7192,9 @@ button.dprovideropt:hover:not(:disabled), .dprovideropt.external:hover { border-
 @keyframes mkpcprog { from { transform: translateX(-20%); } to { transform: translateX(180%); } }
 @media (prefers-reduced-motion: reduce) { .mkpcprog i { animation: none; width: 60%; } }
 /* Settings › Connections › the Video row: a statement, and for Pro the three tiers as radio cards */
-.mkvideonote { display: grid; gap: 8px; padding: 2px 10px 10px 34px; font-size: 12px; line-height: 1.5; color: var(--muted); }
+.mkvideorow { cursor: pointer; }
+.mkvideorow .mkico.on { opacity: 1; color: var(--text); }
+.mkvideonote { display: grid; gap: 8px; padding: 2px 10px 10px 34px; font-size: 12px; line-height: 1.5; color: var(--muted); animation: nm-rise var(--dur-enter) var(--ease); }
 .mkvideonote b { color: var(--text); font-weight: 500; }
 .mkvideotiers { display: grid; gap: 6px; }
 .mkvideotier { display: grid; gap: 1px; text-align: left; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--panel2); color: var(--muted); font: inherit; cursor: pointer; }

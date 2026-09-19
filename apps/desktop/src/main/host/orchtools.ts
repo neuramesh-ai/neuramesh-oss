@@ -25,6 +25,7 @@ import type { WhiteboardToolClosures } from '../harness/toolbus';
 import { boardTools } from './tools-board';
 import { routeTools } from './tools-route';
 import { contentTools } from './tools-content';
+import { newGrounding, type Grounding } from './grounding';
 import { replyTools } from './tools-replies';
 import { contextTools } from './tools-context';
 import { roomTools } from './tools-room';
@@ -35,6 +36,8 @@ import { playbookTools } from './tools-playbooks';
  *  over a previous turn's seat or thread would spend the wrong credential or answer in the wrong
  *  place, which is why every group takes this rather than reaching for a module-level value. */
 export interface ToolCtx {
+  /** what this turn has read from the shelf (host/grounding.ts): draft_posts asks it before it writes */
+  grounding: Grounding;
   z: typeof import('zod')['z'];
   db: PowerSyncDatabase;
   post: HostCtx['post'];
@@ -313,7 +316,7 @@ async function buildOrchestratorTools(ctx: {
 
   // The registry, by domain (tools-*.ts). It is ONE list to both transports; the split is for
   // the reader. ToolCtx is what each group needs to answer for THIS turn.
-  const tc: ToolCtx = { z, db, post, ch, agent, actor, thread, convoThreadId, deepWorkToken, kind, spawnLeg, log, skills,
+  const tc: ToolCtx = { grounding: newGrounding(), z, db, post, ch, agent, actor, thread, convoThreadId, deepWorkToken, kind, spawnLeg, log, skills,
     draftsHere, here, filed, known, kindField, taskByNumber, resolveRepoBinding, roomMenu, siblings, wbReads, wbWrites,
     agents, apiGet, brain, buildScheduleCard, ensureChatWorkspace, executeHire, generateDraftImage, generateShareImage, libraryDocs,
     startDeepWork, subjectFor, workspaceListing, workspaceRead };

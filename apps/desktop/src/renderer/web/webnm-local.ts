@@ -81,6 +81,13 @@ export function localOverrides(): Partial<NMBridge> {
     fsRead: async () => ({ content: '', error: NO_MACHINE }),
     fsWrite: async () => ({ ok: false, error: NO_MACHINE }),
 
+    // THE FIRST-RUN DOOR IS THE DESKTOP'S (#548): a browser tab never builds a local stack and never
+    // waits on a sign-in URL of its own. Left unwired, the fallback's truthy empty answer read as a
+    // door with no phase, and the whole web client stopped at the Porch mark (found on the local
+    // fleet harness, 2026-09-19). The honest answer is "done": no door here.
+    firstRunState: async () => ({ phase: 'done' as const, door: null }),
+    onFirstRun: () => () => {},
+
     // ── native host affordances ────────────────────────────────────────────────────────────
     // null is what "the human cancelled the picker" already means, so every caller handles it
     pickFolder: async () => null,

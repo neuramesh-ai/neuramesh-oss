@@ -443,6 +443,7 @@ describe('consent', () => {
 });
 
 import { applyShare, nobodyCanServe } from '../src/compute';
+import { hostSpeaksForOrigin } from '../src/compute-voice';
 
 describe('applyShare — the set math the CLIENT must not do', () => {
   const ALL = ['u-george', 'u-bob', 'u-carol'];
@@ -478,6 +479,28 @@ describe('nobodyCanServe — so a request is never dropped in silence', () => {
   it('an offline lender cannot serve', () => {
     const asleep = mach({ machineId: 'm-b', ownerUserId: BOB, sharesWith: [GEORGE], lastSeenAt: stale });
     expect(nobodyCanServe([asleep], 'claude-code', GEORGE, NOW)).toBe(true);
+  });
+});
+
+describe('hostSpeaksForOrigin — who says "nobody can", so the request never vanishes', () => {
+  it("the origin's own machine always speaks", () => {
+    expect(hostSpeaksForOrigin([], GEORGE, GEORGE, 'local', NOW)).toBe(true);
+    expect(hostSpeaksForOrigin([], GEORGE, GEORGE, 'member', NOW)).toBe(true);
+  });
+  it('a runner speaks only when the origin has no awake machine of their own', () => {
+    const runnerOwner = 'u-workspace';
+    // the local fleet harness (2026-09-19): the runner was the only host and stayed silent, so a
+    // human sat on "thinking…" forever
+    expect(hostSpeaksForOrigin([], GEORGE, runnerOwner, 'runner', NOW)).toBe(true);
+    const georgeAsleep = mach({ machineId: 'm-g', ownerUserId: GEORGE, lastSeenAt: stale });
+    expect(hostSpeaksForOrigin([georgeAsleep], GEORGE, runnerOwner, 'runner', NOW)).toBe(true);
+    const georgeAwake = mach({ machineId: 'm-g', ownerUserId: GEORGE, runtimes: [] });
+    expect(hostSpeaksForOrigin([georgeAwake], GEORGE, runnerOwner, 'runner', NOW)).toBe(false);
+  });
+  it("another member's laptop never speaks, and nobody speaks for no origin", () => {
+    expect(hostSpeaksForOrigin([], GEORGE, BOB, 'local', NOW)).toBe(false);
+    expect(hostSpeaksForOrigin([], GEORGE, BOB, 'member', NOW)).toBe(false);
+    expect(hostSpeaksForOrigin([], null, GEORGE, 'runner', NOW)).toBe(false);
   });
 });
 

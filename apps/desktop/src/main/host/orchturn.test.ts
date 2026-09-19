@@ -13,7 +13,7 @@
 import assert from 'node:assert/strict';
 import { afterEach, describe, test } from 'node:test';
 import { z } from 'zod';
-import { geminiDispatch, geminiOrchestratorTurn } from './orchturn';
+import { geminiDispatch, geminiOrchestratorTurn, zodShapeToGemini } from './orchturn';
 import type { OrchTool } from './orchtools';
 
 const BASE = {
@@ -150,5 +150,49 @@ describe('the proxy answers raw REST, and the loop must not be able to tell', ()
     const f = stubFetch([{ body: restText('   ') }]); undo = f.restore;
     const out = await geminiOrchestratorTurn({ ...BASE, starter: true, ...CTX });
     assert.equal(out, '', 'ORCH_EMPTY_TURN — say nothing rather than say nothing loudly');
+  });
+});
+
+describe('zodShapeToGemini — the schema the house model is handed', () => {
+  const Type = { STRING: 'STRING', NUMBER: 'NUMBER', BOOLEAN: 'BOOLEAN', ARRAY: 'ARRAY', OBJECT: 'OBJECT' };
+  test('an array of objects nests: draft_posts read as items STRING and the model answered fragments ten times', () => {
+    const shape = {
+      posts: z.array(z.object({
+        platform: z.enum(['x', 'linkedin']).describe('the network'),
+        body: z.string().min(1).describe('the caption'),
+        imageBrief: z.string().optional(),
+        beats: z.array(z.string()).optional(),
+      })).min(1).describe('one entry per post'),
+      dryRun: z.boolean().optional(),
+      count: z.number().default(3),
+    };
+    const out = zodShapeToGemini(shape, Type as never);
+    assert.deepEqual(out, {
+      type: 'OBJECT',
+      properties: {
+        posts: {
+          type: 'ARRAY',
+          items: {
+            type: 'OBJECT',
+            properties: {
+              platform: { type: 'STRING', enum: ['x', 'linkedin'], description: 'the network' },
+              body: { type: 'STRING', description: 'the caption' },
+              imageBrief: { type: 'STRING' },
+              beats: { type: 'ARRAY', items: { type: 'STRING' } },
+            },
+            required: ['platform', 'body'],
+          },
+          description: 'one entry per post',
+        },
+        dryRun: { type: 'BOOLEAN' },
+        count: { type: 'NUMBER' },
+      },
+      required: ['posts'],
+    });
+  });
+  test('a no-arg tool omits parameters, and an optional array of objects unwraps its items too', () => {
+    assert.equal(zodShapeToGemini({}, Type as never), undefined);
+    const out = zodShapeToGemini({ rows: z.array(z.object({ a: z.string() }).optional()) }, Type as never);
+    assert.deepEqual(out.properties.rows.items, { type: 'OBJECT', properties: { a: { type: 'STRING' } }, required: ['a'] });
   });
 });

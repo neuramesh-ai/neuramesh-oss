@@ -792,6 +792,13 @@ and the marketer's chat turn crashed on a null thread, now guarded); and a wake 
 seconds after the daemon boots sees no Claude runtime, so the Starter door fires and pins the
 conversation's brain until `thread.set_brain` clears it.
 
+### 17.4 The UGC playbook is two turns: research, the angle card, the drafts (2026-09-19)
+
+`docs/design/brand-grounding-2026-09/plan.md` §4. A creator-video ask reads the shelf, posts the
+angle card (`propose_angles`: the angles from the product's facts, the platforms as chips), and
+drafts one video post per picked platform only after the human's pick. Both steps are gates in
+the tools, not lines in a prompt.
+
 ### 17.3 The video rung: Seedance, Kling and MiniMax on the platform's key, on credits (2026-09-19)
 
 Built from the design round in `docs/design/video-rung-2026-09/plan.md` (issue #539). The card's

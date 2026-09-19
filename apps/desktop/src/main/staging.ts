@@ -55,7 +55,6 @@ export async function loadMessageAttachments(db: AttDbLike, messageId: string): 
   return { list, manifest };
 }
 
-import { BRAND_DOC_NAMES } from '@neuramesh/shared';
 import type { LogFn } from './agentlog';
 import { attachmentFilePath, readAttachment } from './attachments';
 import { cachePath } from './harness/brain';
@@ -64,6 +63,7 @@ import { type AgentAttachment } from './runtime/adapter';
 // type-only + pure helpers that stayed in agents.ts; the edge is erased at compile time
 import { STAGING_EXCLUDES, excludeFromGit, isTextual } from './agents';
 import type { AttDbLike } from './agents';
+import { readBrand } from './host/brandnote';
 // Coding/execution path: copy a task's attachments into the worktree (./.nm-attachments/) and return
 // a prompt manifest. This is the universal — EVERY runtime (Claude, Codex, Gemini, agy) can Read the
 // files with its own file tools during a build, so an agent implementing a task sees attached mockups
@@ -227,33 +227,13 @@ export async function stagePriorDesignRound(
 // and return a binding prompt note. Returns '' for non-marketing rooms, so #build fan-out
 // stays byte-identical.
 export async function stageBrandContext(db: AttDbLike, channelId: string, dir: string): Promise<string> {
-  const [ch] = await db.getAll<{ kind: string; marketing: string | null; website: string | null; logo: string | null }>(
-    `select c.kind as kind, c.marketing as marketing, p.website as website, p.logo_url as logo
-       from channels c left join projects p on p.id = c.project_id where c.id = ?`,
-    [channelId],
-  ).catch(() => [] as Array<{ kind: string; marketing: string | null; website: string | null; logo: string | null }>);
-  if (!ch || ch.kind !== 'marketing') return '';
-
-  const rows = await db.getAll<{ name: string; inline_content: string | null }>(
-    `select name, inline_content from artifacts where channel_id = ? and kind = 'doc' order by created_at desc`,
-    [channelId],
-  ).catch(() => [] as Array<{ name: string; inline_content: string | null }>);
-  const picked = new Map<string, string>(); // newest of each named brand doc
-  for (const r of rows) if (BRAND_DOC_NAMES.includes(r.name) && r.inline_content && !picked.has(r.name)) picked.set(r.name, r.inline_content);
-
-  // by PROJECT (0106): `channel_id` only records where the OAuth round-trip was started, so a
-  // channel-keyed read told the marketer "nothing is connected" in every room but that one.
-  const conns = await db.getAll<{ provider: string; handle: string }>(
-    `select k.provider, k.handle from connectors k
-      where k.status = 'connected'
-        and k.workspace_id = (select workspace_id from channels where id = ?)
-        and (k.project_id is null or k.project_id = (select project_id from channels where id = ?))
-      order by (k.project_id is not null) desc`,
-    [channelId, channelId],
-  ).catch(() => [] as Array<{ provider: string; handle: string }>);
-
-  let profile: { website?: string; focus?: string[]; goal?: string } = {};
-  try { if (ch.marketing) profile = JSON.parse(ch.marketing); } catch { /* leave empty */ }
+  // one reader with the conversation note (host/brandnote.ts), so the two never disagree on the shelf
+  const b = await readBrand(db, channelId);
+  if (!b.marketing) return '';
+  const picked = b.docs;
+  const conns = b.conns;
+  const profile = b.profile;
+  const product = b.product;
 
   const staged: string[] = [];
   if (picked.size) {
@@ -267,8 +247,7 @@ export async function stageBrandContext(db: AttDbLike, channelId: string, dir: s
   }
 
   const lines: string[] = [];
-  const product = profile.website || ch.website;
-  if (product) lines.push(`Product: ${product}${ch.logo ? ' (logo on file)' : ''}.`);
+  if (product) lines.push(`Product: ${product}${b.logo ? ' (logo on file)' : ''}.`);
   if (profile.goal) lines.push(`Growth goal: ${profile.goal}.`);
   if (profile.focus?.length) lines.push(`Focus: ${profile.focus.join(', ')}.`);
   if (conns.length) lines.push(`Connected accounts you may draft for: ${conns.map((c) => `${c.provider}${c.handle ? ` ${c.handle}` : ''}`).join(', ')} — draft only for these unless told otherwise.`);

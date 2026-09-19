@@ -1158,7 +1158,7 @@ export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId,
   });
   const { chatTurn, defaultResponder, threadModeFor } = makeChatTurn({
     post, machineId, guards, db, agents, apiGet, discoverSkills, draftsForAnchor, ensureChatWorkspace,
-    generateDraftImage, generateShareImage, narrate, whiteboardClosures,
+    generateDraftImage, generateShareImage, libraryDocs, narrate, whiteboardClosures,
   });
 
 

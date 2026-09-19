@@ -70,20 +70,24 @@ export const MARKETING_OS_PREAMBLES: Record<MarketingOsSkillSpec['preamble'], st
   // this preamble says what "make UGC for this release" hands over in the thread
   ugc: `## In NeuraMesh (read first — it overrides the module's delivery notes)
 
-- **Brand context.** Read the room's brand docs (\`read_library_doc\` scope room) plus the
-  [MARKETING CONTEXT] note in your prompt. In a release session, the digest and the release
-  brief in the thread are the facts; nothing else is.
-- **What "make UGC" hands over.** Three to five creator-style VIDEO posts as \`draft_posts\`
-  cards, one angle each (a first-person walkthrough, a before-and-after, a "three things I did
-  not expect", a reply to a real objection, a duet-style react). Each card has three parts:
+- **Two turns, in this order.** (1) RESEARCH: read the room's brand docs (\`read_library_doc\`
+  scope room, \`business-profile.md\` first) plus the [MARKETING CONTEXT] note in your prompt; in a
+  release session the digest and the release brief in the thread are the facts. (2) THE ANGLE
+  CARD: call \`propose_angles\` with the product's name and two to five angles, each resting on a
+  fact you just read (a first-person walkthrough, a before-and-after, a "three things I did not
+  expect", a reply to a real objection, a duet-style react), then STOP with one line: the human
+  picks an angle and the platforms on the card, or types their own angle. (3) THE DRAFTS, on the
+  human's pick (their reply wakes you): \`draft_posts\` with one VIDEO post per picked platform,
+  all in the chosen angle. A script drafted before the pick is refused, so never skip the card.
+- **What each draft is.** Each card has three parts:
   \`body\` is the CAPTION that posts with the video (one or two lines, the hashtags the network
   uses, within its limit); \`script\` is what the creator reads and films (9:16, the hook in the
   first three seconds as \`[0:00-0:03]\`, then timestamped beats, the product on screen, one call
   to action at the end, under 60 seconds); \`imageBrief\` is the shot direction the film follows.
   Never put the script in the body: the body publishes.
-- **The platform.** The one the ask names. Otherwise the CONNECTED ACCOUNTS in your prompt: one
-  card per connected network at most, a video post reads the same on X and LinkedIn as on TikTok.
-  TikTok or Instagram only when the ask names it or the account is connected.
+- **The platform.** The ones the human picked on the angle card (\`… · platforms: x, linkedin\` in
+  their reply). A pick of none means the ask's platform, else the connected accounts. One card per
+  picked platform, a video post reads the same on X and LinkedIn as on TikTok.
 - **The creator brief.** Fill the module's "Creator Briefs for UGC Ads" template for this
   campaign and shelve it through \`propose_library_doc\` as \`ugc-brief-YYYY-MM-DD.md\`, with the
   rights line and the disclosure line ("#ad", "gifted") the module prescribes.

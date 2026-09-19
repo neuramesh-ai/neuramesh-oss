@@ -23,6 +23,11 @@ export function QuestionFlow({
   const [picked, setPicked] = useState<Record<number, string>>({});
   const [other, setOther] = useState('');
   const [sent, setSent] = useState(false);
+  // THE ANGLE CARD (the UGC playbook, 2026-09-19): the platforms ride beside the angles as chips,
+  // connected accounts picked from the start, and the tap on an angle carries them in its answer
+  const ugc = questions.find((x) => x.ugc)?.ugc;
+  const [platforms, setPlatforms] = useState<string[]>(() => (ugc?.platforms ?? []).filter((p) => p.connected).map((p) => p.id));
+  const withPlatforms = (a: string): string => (ugc ? `${a} · platforms: ${platforms.length ? platforms.join(', ') : 'none picked'}` : a);
   const isDesignProvider = questions.some((x) => x.kind === 'design-provider');
   const [designConnection, setDesignConnection] = useState<{ configured: boolean; claudeAuthed: boolean; detail: string } | null>(null);
   const [designConnecting, setDesignConnecting] = useState(false);
@@ -80,7 +85,7 @@ export function QuestionFlow({
     const a = answer.trim();
     if (!a) return;
     setOther('');
-    const final = { ...picked, [idx]: a };
+    const final = { ...picked, [idx]: q.ugc ? withPlatforms(a) : a };
     setPicked(final);
     if (!last) {
       setIdx(idx + 1);
@@ -103,6 +108,21 @@ export function QuestionFlow({
         <div className="qwhy">
           {q.risk === 'high' && <span className="qrisk">high</span>}
           {q.reason && <span>{q.reason}</span>}
+        </div>
+      )}
+      {/* "prepare for", not "posts to" (George, 2026-09-19): a pick here prepares drafts, it schedules nothing */}
+      {q.ugc && (
+        <div className="qplatforms" role="group" aria-label="Platforms to prepare for">
+          <span className="qplatlbl">prepare for</span>
+          {q.ugc.platforms.map((p) => {
+            const on = platforms.includes(p.id);
+            return (
+              <button key={p.id} type="button" className={`qplat${on ? ' on' : ''}`} aria-pressed={on} title={p.connected ? `${p.label} is connected` : `${p.label} is not connected yet`}
+                onClick={() => setPlatforms((cur) => (cur.includes(p.id) ? cur.filter((x) => x !== p.id) : [...cur, p.id]))}>
+                {p.label}{p.connected ? '' : ' ·'}
+              </button>
+            );
+          })}
         </div>
       )}
       {q.kind === 'design-provider' ? (

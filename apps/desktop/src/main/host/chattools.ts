@@ -17,6 +17,9 @@ import { normalizeDraft, parseDraftRevisions } from '@neuramesh/shared';
 import { shareChatTools } from './chattools-share';
 import { playbookCatalogText } from './tools-playbooks';
 import { searchXText } from './searchx';
+import { newGrounding, ungrounded, type LibraryReader } from './grounding';
+import { unpicked } from './ugcflow';
+import { libraryChatTools, ugcChatTools } from './chattools-library';
 
 import type { HostedAgent } from '../agents';
 import type { LogFn } from '../agentlog';
@@ -47,11 +50,15 @@ export interface ChatToolCtx {
   draftsForAnchor: (taskId: string | null, threadId: string | null) => Promise<{ posts: DraftRow[]; msgAnchor: { taskId: string } | { threadId: string } } | null>;
   generateDraftImage: (agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, itemId: string) => Promise<string>;
   generateShareImage: (agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, brief: string) => Promise<{ thumb?: string; error?: string }>;
+  /** the room's shelf (host/workspace.ts): the conversation had no way to read it before 2026-09-19 */
+  libraryDocs: LibraryReader;
 }
 
 export function makeChatTools(t: ChatToolCtx) {
   const { z, tool, createSdkMcpServer, text, agent, ch, threadId, log,
           db, post, apiGet, recallFor, loadSkillBody, whiteboardClosures, draftsForAnchor, generateDraftImage } = t;
+  // what this turn has read from the shelf: draft_posts asks it before it writes (host/grounding.ts)
+  const grounding = newGrounding();
 // The nm tools a CONVERSATION gets. Everything board-shaped is absent by construction for
 // every seat but one — there is no create_task here (or anywhere) to call, so "never file
 // work uninvited" is a fact, not an instruction. The ORCHESTRATOR carries the backlog trio
@@ -75,6 +82,8 @@ const nm = createSdkMcpServer({
       { name: z.string().min(1) },
       async (i) => text(await loadSkillBody(ch.id, ch.workspace_id, String(i.name))),
     ),
+    ...libraryChatTools(t, grounding),
+    ...ugcChatTools(t, grounding),
     tool(
       'list_playbooks',
       'The marketing playbook catalog (marketing-os) joined to this room\'s state — consult it before improvising on a marketing ask. Light flows you answer here after load_skill; heavy ones you describe and let the human ask rex to run.',
@@ -209,6 +218,14 @@ const nm = createSdkMcpServer({
         })).min(1).max(20),
       },
       async (i) => {
+        // the grounding gate (host/grounding.ts): a marketing room's brand docs are read before a draft is written
+        const gate = await ungrounded(db, ch.id, grounding);
+        if (gate) { log({ kind: 'tool', phase: 'result', summary: 'draft_posts refused: the brand docs were not read this turn' }); return text(gate); }
+        // the angle gate (host/ugcflow.ts): a VIDEO post drafts only after the human picked an angle on the card
+        if ((i.posts as Array<{ script?: string }>).some((p) => p.script)) {
+          const pick = await unpicked(db, { threadId });
+          if (pick) { log({ kind: 'tool', phase: 'result', summary: 'draft_posts refused: no answered angle card in this thread' }); return text(pick); }
+        }
         const drafts = (i.posts as Array<{ platform: string; body: string; imageBrief?: string; script?: string }>)
           .map((p) => normalizeDraft(p)).filter((p): p is NonNullable<typeof p> => !!p);
         if (!drafts.length) return text('none of those entries were usable posts — each needs a supported platform and a body that is more than working notes');

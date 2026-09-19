@@ -11,11 +11,11 @@ import { MAX_LEGS, normalizeLegs } from '../runs';
 
 import type { OrchTool, ToolCtx } from './orchtools';
 import { searchXText } from './searchx';
+import { readLibraryDoc } from './grounding';
 
 export function contextTools(tc: ToolCtx): OrchTool[] {
   const { z, db, post, ch, agent, actor, thread, convoThreadId, deepWorkToken, log, skills,
-          
-          apiGet, brain, libraryDocs,
+          apiGet, brain, grounding, libraryDocs,
           startDeepWork, subjectFor, workspaceListing, workspaceRead } = tc;
   return [
     // `description` is what makes this a STAFFING picture rather than a headcount: without it
@@ -96,20 +96,9 @@ export function contextTools(tc: ToolCtx): OrchTool[] {
     }, run: async (input) => {
       const want = String(input.name);
       const scope = (input.scope as 'room' | 'project' | 'workspace' | undefined) ?? 'room';
-      const docs = await libraryDocs(ch.id, 60, scope);
-      const hit = docs.find((d) => d.name === want) ?? docs.find((d) => d.name.toLowerCase() === want.toLowerCase());
-      if (!hit) return `no document named "${want}" in this ${scope} \u2014 call list_library${scope === 'room' ? ' (or widen it with scope)' : ` with scope:'${scope}'`} for the names`;
-      log?.({ kind: 'tool', phase: 'call', summary: `read_library_doc ${hit.name}` });
-      const body = hit.inline_content ?? '';
-      // An image's `inline_content` is a data URI, not prose. Returning it raw spent the turn's
-      // context on base64; returning '' let the model report the document as empty. Say what it
-      // is instead, so the agent reports the limit rather than inventing the contents.
-      if ((hit.mime ?? '').startsWith('image/') || body.startsWith('data:image')) {
-        return `"${hit.name}" is an image (${hit.mime ?? 'image'}), not a text document \u2014 it cannot be read as text. It is in the library and a human can view it.`;
-      }
-      if (!body.trim()) return `"${hit.name}" is in the library but has no readable text body.`;
-      // capped so one long report cannot eat the turn's context; the model is TOLD it was cut
-      return body.length > 24_000 ? `${body.slice(0, 24_000)}\n\n\u2026(truncated \u2014 this document is ${body.length} characters)` : body;
+      log?.({ kind: 'tool', phase: 'call', summary: `read_library_doc ${want}` });
+      // the shared reader (host/grounding.ts): the read is RECORDED on the turn, and draft_posts asks
+      return readLibraryDoc(libraryDocs, ch.id, want, scope, grounding);
     } },
     // The library was READ-ONLY to every agent: list_library + read_library_doc and no writer,
     // and no library command on the server either. So an orchestrator asked to update

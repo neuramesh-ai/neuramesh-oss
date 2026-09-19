@@ -471,6 +471,16 @@ stands.
   stays HUMAN_ONLY, and the routine already speaks as the owner), the reason is posted, and the turn
   continues on the new seat. A **human's** conversation gets the reason and the card; nothing moves
   until they click. One role at a time: the seat that failed, never the whole cast.
+- **On a cloud machine the human's conversation moves by itself too** (George, 2026-09-19: "it
+  should be the default on cloud anyways", "default on web"). A runner or member machine
+  (`NM_MACHINE_KIND`, set by machined on the image) carries no vendor login by design, and a person
+  in a browser has nothing on it to sign in to, so a card that asks for a click there asks for the
+  only answer there is. The door takes the routine path: the override as the owner, the record card
+  in the thread reading *"This conversation continues on the NeuraMesh brain, on credits. Reset the
+  brain in this conversation to go back."*, the turn on the new seat. Out of credits, the card as
+  on a laptop. The fleet must RUN that door: the machine image pin (`scripts/pin-machine-image.mjs`,
+  `infra/k8s/cluster/overlays/gke/fleet-deployment.yaml`) sat at a 09-09 build until 09-19, so the
+  cloud machines answered with the notice the door replaced. `pnpm fleet:pin` rolls them.
 - **The reason is said, in full, where the person looks.** *"@rex cannot run on OpenAI / Codex here.
   This machine has no OpenAI / Codex login. Your cloud machine has no OpenAI / Codex login either.
   This routine continues on the NeuraMesh brain, on credits. Reset the brain in this

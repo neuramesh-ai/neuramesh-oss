@@ -160,10 +160,20 @@ export interface TaskProposalCardData {
 
 // An agent question: rendered as tappable choices whose answer posts back to the
 // thread. A message may carry several (one JSON object per fenced ```nmq block).
+/** THE ANGLE CARD's payload (the UGC playbook, 2026-09-19): the platforms the drafts will post to,
+ *  as chips beside the angles. Connected accounts come picked, the rest are one tap away. The tap on
+ *  an angle posts the answer with the picked platforms in it. */
+export interface UgcCardData {
+  product: string;
+  platforms: Array<{ id: 'x' | 'linkedin' | 'instagram' | 'tiktok'; label: string; connected: boolean }>;
+}
+
 export interface NmQuestion {
   question: string;
   options?: Array<{ label: string; description?: string; icon?: 'iris' | 'claude-design'; provider?: 'iris' | 'claude-design' }>;
   allowOther?: boolean;
+  /** the UGC angle card: the question's options are the angles, this is the platform row */
+  ugc?: UgcCardData;
   // Permission-request variant (agent policy engine, Phase 1): the daemon raises these when
   // a tool call resolves to `ask`. `kind` lets the UI style it and the push fan-out gate it;
   // `risk` drives whether it pushes immediately (high) or surfaces in-app only (low).
