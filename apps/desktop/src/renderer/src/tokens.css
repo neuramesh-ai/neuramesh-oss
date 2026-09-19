@@ -7184,7 +7184,9 @@ button.dprovideropt:hover:not(:disabled), .dprovideropt.external:hover { border-
 @keyframes mkpcprog { from { transform: translateX(-20%); } to { transform: translateX(180%); } }
 @media (prefers-reduced-motion: reduce) { .mkpcprog i { animation: none; width: 60%; } }
 /* Settings › Connections › the Video row: a statement, and for Pro the three tiers as radio cards */
-.mkvideonote { display: grid; gap: 8px; padding: 2px 10px 10px 34px; font-size: 12px; line-height: 1.5; color: var(--muted); }
+.mkvideorow { cursor: pointer; }
+.mkvideorow .mkico.on { opacity: 1; color: var(--text); }
+.mkvideonote { display: grid; gap: 8px; padding: 2px 10px 10px 34px; font-size: 12px; line-height: 1.5; color: var(--muted); animation: nm-rise var(--dur-enter) var(--ease); }
 .mkvideonote b { color: var(--text); font-weight: 500; }
 .mkvideotiers { display: grid; gap: 6px; }
 .mkvideotier { display: grid; gap: 1px; text-align: left; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--panel2); color: var(--muted); font: inherit; cursor: pointer; }
