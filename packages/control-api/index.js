@@ -4674,19 +4674,6 @@ var init_staffing = __esm({
   }
 });
 
-// ../shared/src/typists.ts
-function taskTypists(agents, assigneeId, isLive, streamingAgentName) {
-  if (!assigneeId) return [];
-  return agents.filter(
-    (a) => a.id === assigneeId && (a.status === "thinking" || a.status === "working") && a.name !== streamingAgentName && isLive(a)
-  );
-}
-var init_typists = __esm({
-  "../shared/src/typists.ts"() {
-    "use strict";
-  }
-});
-
 // ../shared/src/browse.ts
 function searchUrlFor(query) {
   return `https://duckduckgo.com/?q=${encodeURIComponent(query)}`;
@@ -8692,7 +8679,6 @@ __export(src_exports, {
   taskReviseShipPlanCommand: () => taskReviseShipPlanCommand,
   taskSelectDesignProviderCommand: () => taskSelectDesignProviderCommand,
   taskSetDefinitionOfDoneCommand: () => taskSetDefinitionOfDoneCommand,
-  taskTypists: () => taskTypists,
   taskUnblockCommand: () => taskUnblockCommand,
   taskUpdateDetailsCommand: () => taskUpdateDetailsCommand,
   tasksInProject: () => tasksInProject,
@@ -8792,7 +8778,6 @@ var init_src = __esm({
     init_commands();
     init_policy();
     init_staffing();
-    init_typists();
     init_browse();
     init_threads();
     init_threadwake();

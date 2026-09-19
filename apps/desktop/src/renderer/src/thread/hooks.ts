@@ -1,4 +1,4 @@
-// Thread hooks — live runs, who owns which stream, and the token stream itself.
+// Thread hooks — live runs and the token stream itself.
 // Extracted from App.tsx (track A3).
 import { nm as nmBridge } from '../bridge/nm';
 import { type RunUI } from '../bridge/rows-board';
@@ -26,37 +26,6 @@ export function useAgentStream(key: string | null): { agent: string; text: strin
     });
   }, [key]);
   return s;
-}
-
-/**
- * WHICH THREAD an agent is streaming into, right now — `agent name → stream key` (2026-08-10).
- *
- * The ghost's precise signal has always been the stream, keyed `channel:thread`. Its FALLBACK
- * was "an agent in this room is thinking", which is thread-blind — fine while a channel could
- * only show one thread at a time, and provably wrong the moment the task peek put two threads
- * from the same room on screen together: replying in the peek made the parent conversation grow
- * a ghost narrating work that belongs to the task (George, live).
- *
- * So the fallback now has to answer "is this agent working HERE?", and this hook is the honest
- * answer: if the agent is streaming into some OTHER key, it is not thinking for this thread.
- * One subscription per mount, state only on start/stop/rebind — delta storms never re-render.
- */
-export function useStreamOwners(): Map<string, string> {
-  const [owners, setOwners] = useState<Map<string, string>>(() => new Map());
-  useEffect(() => {
-    if (!nm) return;
-    return nm.watchAgentStream((p) => {
-      setOwners((prev) => {
-        const cur = prev.get(p.agent);
-        if (p.done) { if (cur !== p.key) return prev; const next = new Map(prev); next.delete(p.agent); return next; }
-        if (cur === p.key) return prev;
-        const next = new Map(prev);
-        next.set(p.agent, p.key);
-        return next;
-      });
-    });
-  }, []);
-  return owners;
 }
 
 /** the room's runs, live from the synced replica */

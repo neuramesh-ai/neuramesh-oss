@@ -39,7 +39,7 @@ import { type AgentRow, type MachineRow, type MemberRow } from '../bridge/rows-c
 import { type ArtifactUI, type AttachmentRow, type DecisionAllRow, type TaskAllRow } from '../bridge/rows-board';
 import { type ChannelArtifactRow, type MessageRow, type ThreadRow } from '../bridge/rows-rooms';
 import { type SkillPackRow, type SkillRow } from '../bridge/rows-content';
-import { useAgentStream, useRuns, useStreamOwners } from './hooks';
+import { useAgentStream, useRuns } from './hooks';
 import { createPortal } from 'react-dom';
 import { CapGate } from '../compute/CapGate';
 import { HostedGate } from '../shell/HostedGate';
@@ -107,8 +107,6 @@ export function ConvoThread({ threadId, back, thread, channelId, channelSlug, ch
   // content once tokens flow
   const stream = useAgentStream(`${channelId}:${threadId}`);
   const streaming = streamContent(stream);
-  // who is streaming WHERE — the thread-blind fallback below reads it (2026-08-10)
-  const streamOwners = useStreamOwners();
   const [draft, setDraft] = useState('');
   const [attachedSkill, setAttachedSkill] = useState<{ name: string; pack?: string | null } | null>(null);
   const atts = useAttachments(plan, onUpgrade);
@@ -172,7 +170,7 @@ export function ConvoThread({ threadId, back, thread, channelId, channelSlug, ch
   const trees = useMemo(() => runTrees(runRows, { threadId }).filter(isWatchableRun), [runRows, threadId]);
   // who is live here: the working ghost, the wait ghost that precedes it, and the run cards that
   // outrank both. One derivation, because the typist chip below has to agree with all three.
-  const { ghostAgent, waitGhost, carded } = useConvoPresence({ rows, agents, machines, channelId, threadId, runRows, trees, stream, streaming, streamOwners });
+  const { ghostAgent, waitGhost, carded, typists } = useConvoPresence({ rows, agents, machines, channelId, threadId, runRows, trees, stream, streaming });
   // The drafted posts, in the transcript where they were handed over. Originals land as ONE strip
   // at the first draft's time; a revision rides its own strip after the reply that asked for it,
   // so scrolling back replays the review round rather than showing only the final copy.
@@ -302,17 +300,16 @@ export function ConvoThread({ threadId, back, thread, channelId, channelSlug, ch
       <div className="tcompose">
         <RunDock trees={trees} agents={agents} onOpen={onActivity} scrollRef={listRef} />
         {(() => {
-          // who's on it: the live streamer (precise) + this room's THINKING agents — a chat
-          // wake holds 'thinking', so this is the "responding right now" set; 'working' means
-          // a claimed task elsewhere and must not bleed into a fresh conversation
-          const busy = agents.filter((a) => a.status === 'thinking' && agentLive(a, machines) && agentInChannel(a.channel_ids, channelId));
-          const streamer = stream ? agents.find((a) => a.name === stream.agent) ?? null : null;
+          // who's on it: the agents working in THIS thread (convo-presence), streamer first. It
+          // was this room's THINKING set — fine while a room showed one conversation, and a
+          // cross-thread leak once it showed many (an agent thinking in another thread, or on
+          // another machine, is not typing here).
           // card › ghost › chip — the precedence the task panel already encodes. The ghost is
-          // selected by the SAME predicate as `busy`, so without this filter every ghost was
-          // narrated twice: once as a card in the transcript, once as a chip on the composer,
-          // each offering its own door to the one activity log. An agent an open run card
-          // already names is spoken for too. What survives is the case neither covers — an
-          // agent `working` a claimed task elsewhere, which mints no ghost in this room.
+          // the head of the SAME list, so without this filter every ghost was narrated twice:
+          // once as a card in the transcript, once as a chip on the composer, each offering its
+          // own door to the one activity log. An agent an open run card already names is spoken
+          // for too. What survives: the streamer while its bubble draws (`typing`), and a second
+          // agent working this thread beside the one the ghost narrates.
           const spokenFor = new Set<string>([
             ...(ghostAgent ? [ghostAgent.id] : []),
             // the WAIT ghost speaks for its agent too, and it is on screen exactly when the
@@ -321,13 +318,12 @@ export function ConvoThread({ threadId, back, thread, channelId, channelSlug, ch
             ...(!ghostAgent && waitGhost ? [waitGhost.agent.id] : []),
             ...carded,
           ]);
-          const shown = busy.filter((a) => !spokenFor.has(a.id));
-          const list = streamer && !spokenFor.has(streamer.id) && !shown.some((b) => b.id === streamer.id) ? [streamer, ...shown] : shown;
+          const list = typists.filter((a) => !spokenFor.has(a.id));
           if (!list.length) return null;
           return (
             <div className="typingbar">
               {list.map((a) => {
-                const label = streamer && a.id === streamer.id && stream!.text.trim() ? 'typing' : 'thinking';
+                const label = stream && a.name === stream.agent && stream.text.trim() ? 'typing' : 'thinking';
                 return <TypistChip key={a.id} name={a.name} label={label} onOpen={() => onActivity?.(a)} />;
               })}
               <span className="tdots"><i /><i /><i /></span>

@@ -5,23 +5,22 @@
 // is up. The facts line (`factcap`) names the holder, because "who has the ball" is the question
 // a task panel exists to answer. Split out of thread/TaskThread.tsx.
 import { useMemo } from 'react';
-import { agentLive } from '../../lib/presence';
-import { isRunOpen, journeyFor, taskTypists, type RunState, type ShipPlan } from '@neuramesh/shared';
+import { isRunOpen, journeyFor, type RunState, type ShipPlan } from '@neuramesh/shared';
 import { TypistChip } from '../parts';
-
-import { useStreamOwners } from '../hooks';
+import { ghostPick, workingHere } from '../ghost-rule';
 import type { AgentRow, MachineRow } from '../../bridge/rows-crew';
-import type { BeatUI, TaskRow } from '../../bridge/rows-board';
+import type { BeatUI, RunUI, TaskRow } from '../../bridge/rows-board';
 import type { RunTree } from '../../runs/runs';
 
 export function useTaskPresence(d: {
   task: TaskRow;
-  channelId: string;
   agents: AgentRow[];
   machines: MachineRow[];
   beats: BeatUI[];
   spectrumLegs: ReturnType<typeof journeyFor>;
   runTrees_: RunTree[];
+  /** the room's run rows — the rule keys them to this task itself */
+  taskRunRows: RunUI[];
   assignee: string | null;
   offered: string | null;
   threadStream: { agent: string; text: string } | null;
@@ -33,7 +32,7 @@ export function useTaskPresence(d: {
   setBlockReason: (v: string) => void;
   onActivity?: (a: AgentRow) => void;
 }) {
-  const { task, channelId, agents, machines, beats, spectrumLegs, runTrees_, assignee, offered, threadStream, busy, act, blocking, setBlocking, blockReason, setBlockReason, onActivity } = d;
+  const { task, agents, machines, beats, spectrumLegs, runTrees_, taskRunRows, assignee, offered, threadStream, busy, act, blocking, setBlocking, blockReason, setBlockReason, onActivity } = d;
 // The facts caption is the ASSIGNMENT line only (George, 2026-07-30): its old live-leg form
 // ("DESIGN · IRIS") restated what the state chip and the phase ring already say a few px to
 // the left — the caption earns its ink only for what nothing else carries: who holds it, or
@@ -55,18 +54,18 @@ const factHolder = assignee ?? workingNow ?? null;
 const factcap =
   task.state === 'backlog' ? 'parked idea' : factHolder ? `@${factHolder}` : offered ? `offered @${offered}` : 'unassigned';
 
-// ONLY this task's work — its live assignee (the developer while in_progress, the
-// reviewer while in_review; assignee_id tracks the owner across the FSM). Channel-wide
-// "who's busy" lives on the channel composer, never here: an agent typing in another
-// thread must not bleed into this one. The live streamer is shown in the composer bar
-// below, so it's excluded to avoid a duplicate chip.
-// …and an agent streaming into ANOTHER thread is not typing here (2026-08-10): with the task
-// peek, this task and a second thread from the same room can be on screen together, and the
-// assignee alone cannot say which of them the agent is working. Same guard as the chat ghost.
-const streamOwners = useStreamOwners();
-const myStreamKey = `${channelId}:${task.id}`;
-const typists = taskTypists(agents, task.assignee_id, (a) => agentLive(a, machines), threadStream?.agent)
-  .filter((a) => (streamOwners.get(a.name) ?? myStreamKey) === myStreamKey);
+// ONLY this task's work (thread/ghost-rule.ts): the agent streaming into this task's key, and
+// every agent with an open run ON this task — the execution's work run, a wake answering in
+// its thread, wherever either is served. It used to be "the assignee, if busy", scoped by where
+// the LOCAL stream said the assignee was (2026-08-10): a claimed task holds `working` on one
+// column for the whole workspace, so an assignee executing #1046 on a teammate's machine wore
+// the orb in #1042 too, a task that was already done (George, 2026-09-18). The run row says
+// which task; the status never could. (The legs that open no run — design, plan, review, ship —
+// narrate through their beats below, as they always have.)
+const typists = useMemo(
+  () => workingHere({ agents, machines, where: { taskId: task.id }, runs: taskRunRows, stream: threadStream }),
+  [agents, machines, task.id, taskRunRows, threadStream],
+);
 // the live run's active step — the ghost pill carries it (docs/26: one live surface)
 const liveBeat = useMemo(() => {
   if (!beats.length) return null;
@@ -103,11 +102,11 @@ const carded = useMemo(
   [runTrees_],
 );
 const ghostAgentId = useMemo(() => {
-  const waker = threadStream ? agents.find((a) => a.name === threadStream.agent) ?? null : null;
-  const ga = waker ?? typists[0] ?? (liveBeat || shipBeat ? agents.find((a) => a.id === task.assignee_id) ?? null : null);
+  const ga = ghostPick(typists, carded) ?? (liveBeat || shipBeat ? agents.find((a) => a.id === task.assignee_id) ?? null : null);
   return ga && !carded.has(ga.id) ? ga.id : null;
-}, [threadStream, agents, typists, liveBeat, shipBeat, task.assignee_id, carded]);
-const shownTypists = typists.filter((a) => !carded.has(a.id) && a.id !== ghostAgentId);
+}, [agents, typists, liveBeat, shipBeat, task.assignee_id, carded]);
+// the live streamer is shown by the composer's own stream chip, so it is excluded here too
+const shownTypists = typists.filter((a) => !carded.has(a.id) && a.id !== ghostAgentId && a.name !== threadStream?.agent);
 const typistsBar = shownTypists.length ? (
   <div className="typingbar" style={{ padding: '6px 12px 0' }}>
     {shownTypists.map((a) => (

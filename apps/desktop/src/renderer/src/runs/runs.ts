@@ -18,13 +18,24 @@ export const runClock = (r: RunUI): string => runElapsed({ startedAt: r.started_
  */
 export type RunTree = RunTreeOf<RunUI>;
 
+/** the surface a run belongs to: a task, a conversation thread, or the room itself */
+export interface RunWhere { threadId?: string | null; taskId?: string | null }
+
+/**
+ * Does this run belong to that surface? ONE predicate, because the run card tree and the thread's
+ * live presence (thread/ghost-rule.ts) must agree on what "here" means — a task's runs carry
+ * `task_id` and no thread, a conversation's carry `thread_id`, and a run with neither was born in
+ * the channel itself.
+ */
+export const runAt = (where: RunWhere) => (r: Pick<RunUI, 'thread_id' | 'task_id'>): boolean => {
+  if (where.taskId) return r.task_id === where.taskId;
+  if (where.threadId) return r.thread_id === where.threadId;
+  return !r.thread_id && !r.task_id;
+};
+
 /** group a room's flat run rows into the trees for one surface (a convo thread, or a task) */
-export function runTrees(rows: RunUI[], where: { threadId?: string | null; taskId?: string | null }): RunTree[] {
-  return buildRunTrees(rows, (r) => {
-    if (where.taskId) return r.task_id === where.taskId;
-    if (where.threadId) return r.thread_id === where.threadId;
-    return !r.thread_id && !r.task_id; // the room feed: runs born in the channel itself
-  });
+export function runTrees(rows: RunUI[], where: RunWhere): RunTree[] {
+  return buildRunTrees(rows, runAt(where));
 }
 
 /**
