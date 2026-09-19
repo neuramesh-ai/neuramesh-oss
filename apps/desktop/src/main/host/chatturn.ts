@@ -155,11 +155,14 @@ async function chatTurn(args: {
         },
         cwd: dir,
         systemPrompt: system + skillsNote,
+        stderr: (d: string) => { for (const line of d.split('\n')) if (/mcp|\bnm\b/i.test(line)) log({ kind: 'turn', summary: `claude: ${line.trim().slice(0, 240)}`, level: 'warn' }); },
       },
     }) as AsyncIterable<any>,
     ORCH_EMPTY_TURN,
     narrate(run, log), // a minute-long turn narrates through the ghost the room already paints
     onDelta,
+    undefined,
+    { mcp: 'nm' }, // a turn the CLI opened without the nm server stops and says so (turnkit.ts)
   );
 
   // Whatever it actually wrote this turn becomes a deliverable, rendered in the thread.
