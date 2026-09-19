@@ -12,7 +12,7 @@ const reader: LibraryReader = async () => SHELF;
 function fakeDb(kind: string, docs: Array<{ name: string; inline_content: string | null }>) {
   return { getAll: async <T = Record<string, unknown>>(sql: string): Promise<T[]> => {
     if (sql.includes('from channels c')) return [{ kind, marketing: null, website: 'https://flowe.ai', logo: null }] as T[];
-    if (sql.includes('from artifacts')) return docs as T[];
+    if (sql.includes('from artifacts')) return docs.map((d) => ({ kind: 'doc', ...d })) as T[]; // a real row always has a kind
     return [];
   } };
 }

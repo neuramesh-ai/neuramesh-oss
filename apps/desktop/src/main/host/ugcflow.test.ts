@@ -11,7 +11,7 @@ const ANGLES = { product: 'Flowe AI', angles: [{ title: 'The 2am spiral', why: '
 function fakeDb(o: { kind?: string; docs?: Array<{ name: string; inline_content: string | null }>; conns?: Array<{ provider: string; handle: string | null }>; msgs?: Array<{ author_kind: string; body: string | null }> }) {
   return { getAll: async <T = Record<string, unknown>>(sql: string): Promise<T[]> => {
     if (sql.includes('from channels c')) return [{ kind: o.kind ?? 'marketing', marketing: null, website: 'https://flowe.ai', logo: null }] as T[];
-    if (sql.includes('from artifacts')) return (o.docs ?? []) as T[];
+    if (sql.includes('from artifacts')) return (o.docs ?? []).map((d) => ({ kind: 'doc', ...d })) as T[]; // a real row always has a kind
     if (sql.includes('from connectors')) return (o.conns ?? []) as T[];
     if (sql.includes('from messages')) return (o.msgs ?? []) as T[];
     return [];

@@ -83,8 +83,11 @@ export const MARKETING_OS_PREAMBLES: Record<MarketingOsSkillSpec['preamble'], st
   \`body\` is the CAPTION that posts with the video (one or two lines, the hashtags the network
   uses, within its limit); \`script\` is what the creator reads and films (9:16, the hook in the
   first three seconds as \`[0:00-0:03]\`, then timestamped beats, the product on screen, one call
-  to action at the end, under 60 seconds); \`imageBrief\` is the shot direction the film follows.
-  Never put the script in the body: the body publishes.
+  to action at the end, under 60 seconds); \`imageBrief\` is the shot direction the film follows;
+  \`frame\` is the name of a screenshot on this room's shelf (the [MARKETING CONTEXT] note lists
+  them), so the film shows the real product, never an invented interface. With no screenshot on
+  the shelf, draft without one and ask the human for a screenshot. Never put the script in the
+  body: the body publishes.
 - **The platform.** The ones the human picked on the angle card (\`… · platforms: x, linkedin\` in
   their reply). A pick of none means the ask's platform, else the connected accounts. One card per
   picked platform, a video post reads the same on X and LinkedIn as on TikTok.

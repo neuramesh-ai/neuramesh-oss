@@ -33,6 +33,13 @@ test('the facts line: the tier and the price before a film, the record after, th
   assert.equal(filmingOn(null), 'the platform');
 });
 
+test('the frame on the facts line: named before the film, and after it whether the lane took it', () => {
+  assert.deepEqual(filmFacts({ frame: 'App-Home.png' }, CATALOG)!.at(-1), 'frame · App-Home.png');
+  assert.deepEqual(filmFacts({ video: { tier: 'starter', model: 'Seedance 2.0', seconds: 8, credits: 194, at: 'bad', frame: 'App-Home.png', frameUsed: true } }, CATALOG), ['NeuraMesh Video Starter', 'Seedance 2.0', '8 s', '194 credits', 'frame · App-Home.png']);
+  assert.deepEqual(filmFacts({ video: { tier: 'xpress', model: 'MiniMax H3', seconds: 8, credits: 48, at: 'bad', frame: 'App-Home.png', frameUsed: false } }, CATALOG)!.at(-1), 'frame · App-Home.png · not used');
+  assert.deepEqual(filmFacts({ video: { tier: 'starter', model: 'Seedance 2.0', seconds: 8, credits: 194, at: 'bad' } }, CATALOG), ['NeuraMesh Video Starter', 'Seedance 2.0', '8 s', '194 credits']);
+});
+
 
 test('the film as a file: the bytes the card plays, named for the card, and nothing for a picture', () => {
   assert.deepEqual(filmFile('data:video/mp4;base64,AAAA', 'marketing-e-hook'), { name: 'marketing-e-hook.mp4', content: 'AAAA', base64: true });

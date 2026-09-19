@@ -8,7 +8,7 @@ import type postgres from 'postgres';
 
 export type FilmStatus = 'queued' | 'running' | 'done' | 'failed';
 /** what filmed a draft, as the card reads it: the tier and model, the length, the credits, when */
-export interface VideoMeta { tier: string; model: string; seconds: number; credits: number; at: string }
+export interface VideoMeta { tier: string; model: string; seconds: number; credits: number; at: string; frame?: string | null; frameUsed?: boolean }
 export interface FilmRow {
   id: string;
   workspaceId: string;
@@ -24,10 +24,13 @@ export interface FilmRow {
   status: FilmStatus;
   error: string | null;
   createdBy: string | null;
+  /** the shelf image the draft named, and whether the lane took it (brand-grounding plan §6) */
+  frame: string | null;
+  frameUsed: boolean;
   createdAt: string;
   finishedAt: string | null;
 }
-export interface FilmCreate { workspaceId: string; itemId: string; tier: string; model: string; endpoint: string; requestId: string | null; seconds: number; micros: number; grantMicros: number; purchasedMicros: number; createdBy: string | null }
+export interface FilmCreate { workspaceId: string; itemId: string; tier: string; model: string; endpoint: string; requestId: string | null; seconds: number; micros: number; grantMicros: number; purchasedMicros: number; createdBy: string | null; frame?: string | null; frameUsed?: boolean }
 export type FilmPatch = Partial<Pick<FilmRow, 'status' | 'error' | 'requestId' | 'finishedAt'>>;
 
 export interface FilmStore {
@@ -47,7 +50,7 @@ export class MemFilmStore implements FilmStore {
   rows: FilmRow[] = [];
   async create(input: FilmCreate): Promise<{ id: string }> {
     const id = crypto.randomUUID();
-    this.rows.push({ id, ...input, status: 'queued', error: null, createdAt: new Date().toISOString(), finishedAt: null });
+    this.rows.push({ id, ...input, frame: input.frame ?? null, frameUsed: input.frameUsed ?? false, status: 'queued', error: null, createdAt: new Date().toISOString(), finishedAt: null });
     return { id };
   }
   async get(id: string): Promise<FilmRow | null> { return this.rows.find((r) => r.id === id) ?? null; }
@@ -61,20 +64,20 @@ export class MemFilmStore implements FilmStore {
 }
 
 // ── postgres ───────────────────────────────────────────────────────────────────────────────────
-const COLS = 'id, workspace_id, item_id, tier, model, endpoint, request_id, seconds, micros, grant_micros, purchased_micros, status, error, created_by, created_at, finished_at';
+const COLS = 'id, workspace_id, item_id, tier, model, endpoint, request_id, seconds, micros, grant_micros, purchased_micros, status, error, created_by, frame, frame_used, created_at, finished_at';
 type Row = Record<string, unknown>;
 const rowOf = (r: Row): FilmRow => ({
   id: r['id'] as string, workspaceId: r['workspace_id'] as string, itemId: r['item_id'] as string, tier: r['tier'] as string, model: r['model'] as string, endpoint: r['endpoint'] as string,
   requestId: (r['request_id'] as string | null) ?? null, seconds: Number(r['seconds']), micros: Number(r['micros']), grantMicros: Number(r['grant_micros']), purchasedMicros: Number(r['purchased_micros']),
-  status: r['status'] as FilmStatus, error: (r['error'] as string | null) ?? null, createdBy: (r['created_by'] as string | null) ?? null,
+  status: r['status'] as FilmStatus, error: (r['error'] as string | null) ?? null, createdBy: (r['created_by'] as string | null) ?? null, frame: (r['frame'] as string | null) ?? null, frameUsed: !!r['frame_used'],
   createdAt: new Date(r['created_at'] as string).toISOString(), finishedAt: r['finished_at'] ? new Date(r['finished_at'] as string).toISOString() : null,
 });
 
 export class PgFilmStore implements FilmStore {
   constructor(private readonly sql: postgres.Sql) {}
   async create(input: FilmCreate): Promise<{ id: string }> {
-    const [row] = await this.sql`insert into films (workspace_id, item_id, tier, model, endpoint, request_id, seconds, micros, grant_micros, purchased_micros, created_by)
-      values (${input.workspaceId}::uuid, ${input.itemId}::uuid, ${input.tier}, ${input.model}, ${input.endpoint}, ${input.requestId}, ${input.seconds}, ${input.micros}, ${input.grantMicros}, ${input.purchasedMicros}, ${input.createdBy}::uuid)
+    const [row] = await this.sql`insert into films (workspace_id, item_id, tier, model, endpoint, request_id, seconds, micros, grant_micros, purchased_micros, created_by, frame, frame_used)
+      values (${input.workspaceId}::uuid, ${input.itemId}::uuid, ${input.tier}, ${input.model}, ${input.endpoint}, ${input.requestId}, ${input.seconds}, ${input.micros}, ${input.grantMicros}, ${input.purchasedMicros}, ${input.createdBy}::uuid, ${input.frame ?? null}, ${input.frameUsed ?? false})
       returning id`;
     return { id: row!['id'] as string };
   }

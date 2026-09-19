@@ -6,11 +6,11 @@ import { brandNote, readBrand } from './brandnote';
 
 const PROFILE = `# Business profile\n\nFlowe AI turns a founder's notes into a weekly plan.\n\n## Who it is for\n\nSolo founders who ship every week.\n${'A line of detail.\n'.repeat(120)}`;
 
-function fakeDb(rows: { channel?: Record<string, unknown>; docs?: Array<{ name: string; inline_content: string | null }>; conns?: Array<{ provider: string; handle: string | null }> }) {
+function fakeDb(rows: { channel?: Record<string, unknown>; docs?: Array<{ name: string; kind?: string; inline_content: string | null }>; conns?: Array<{ provider: string; handle: string | null }> }) {
   return {
     getAll: async <T = Record<string, unknown>>(sql: string): Promise<T[]> => {
       if (sql.includes('from channels c')) return (rows.channel ? [rows.channel] : []) as T[];
-      if (sql.includes('from artifacts')) return (rows.docs ?? []) as T[];
+      if (sql.includes('from artifacts')) return (rows.docs ?? []).map((d) => ({ kind: 'doc', ...d })) as T[];
       if (sql.includes('from connectors')) return (rows.conns ?? []) as T[];
       return [];
     },
@@ -26,17 +26,21 @@ test('a marketing room: the product, the docs by name, and the tool that reads t
       { name: 'business-profile.md', inline_content: 'an older copy' }, // superseded by name: the newest wins
       { name: 'notes.md', inline_content: 'not a brand doc' },
       { name: 'market-research.md', inline_content: null }, // no body: not on the shelf
+      { name: 'App-Home.png', kind: 'screenshot', inline_content: 'data:image/png;base64,iVBORw0KGgo=' }, // a frame a video post can name
+      { name: 'App-Home.png', kind: 'screenshot', inline_content: 'data:image/png;base64,older=' },
     ],
     conns: [{ provider: 'x', handle: '@joinflowe' }],
   });
   const b = await readBrand(db, 'ch1');
   assert.deepEqual([...b.docs.keys()], ['brand-guidelines.md', 'business-profile.md']);
   assert.equal(b.docs.get('business-profile.md'), PROFILE);
+  assert.deepEqual(b.images, ['App-Home.png']);
   const note = await brandNote(db, 'ch1');
   assert.match(note, /^\n\n\[MARKETING CONTEXT/);
   assert.match(note, /Product: https:\/\/flowe\.ai \(logo on file\)\./);
   assert.match(note, /Growth goal: first 100 paying teams\./);
   assert.match(note, /Brand docs on this room's shelf: brand-guidelines\.md, business-profile\.md\. Read them with read_library_doc \(scope room\) before you draft/);
+  assert.match(note, /Screenshots on the shelf: App-Home\.png\. A video post that shows the product names one of them as its frame/);
   assert.doesNotMatch(note, /Never say/, 'guidance on the tools, not a forbidden sentence');
   assert.doesNotMatch(note, /Flowe AI turns/, 'the docs are read with the tool, not recited in the prompt');
   assert.doesNotMatch(note.replace(/MARKETING CONTEXT —/, ''), /—|;/, 'STE in the note itself');
@@ -48,6 +52,8 @@ test('a marketing room with no brand docs: the tools that widen the search, then
   assert.match(note, /list_library with scope project in case they live in another room of this project/);
   assert.doesNotMatch(note, /workspace/, 'another project is another product: the search never widens past the project');
   assert.match(note, /ask the human for the product facts you need before you draft, or to finish the marketing setup, and shelve what you learn with propose_library_doc/);
+  // no screenshot either: the note says what a film would do without one, and what to ask for
+  assert.match(note, /No screenshot of the product is on this room's shelf, so a film would invent the interface\. Ask the human to upload a real screenshot/);
 });
 
 test('outside a marketing room: no note at all', async () => {

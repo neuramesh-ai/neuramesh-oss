@@ -9,12 +9,13 @@
 
 import { normalizeDraft, parseDraftRevisions } from '@neuramesh/shared';
 import type { OrchTool, ToolCtx } from './orchtools';
+import { frameArg, framesFor } from './frames';
 import { ungrounded } from './grounding';
 import { ugcOrchTools, unpicked } from './ugcflow';
 
 export function contentTools(tc: ToolCtx): OrchTool[] {
   const { z, db, post, ch, agent, actor, thread, convoThreadId, log,
-          draftsHere, grounding,
+          draftsHere, grounding, libraryDocs,
           buildScheduleCard, generateDraftImage, generateShareImage } = tc;
   // the message a deliverable anchors to: a task thread's ride the TASK, a conversation's the
   // THREAD (0115) — the same rule every content surface keys on
@@ -94,8 +95,9 @@ export function contentTools(tc: ToolCtx): OrchTool[] {
         imageBrief: z.string().max(2000).optional().describe('art direction for this post\'s picture — subject, composition, light, mood, on-brand look. For a video post: the shot direction the film follows. Omit for a text-only post.'),
         mediaUrl: z.string().max(2000).optional().describe('a genuinely real public image URL, if you have one. Never invent one.'),
         script: z.string().max(10_000).optional().describe('a VIDEO post only: the creator\'s script, timestamped beats ([0:00-0:03] direction, Spoken: "…", CAPTION: …). The card folds it and can film its hook.'),
+        frame: z.string().max(200).optional().describe('a VIDEO post that shows the product: the name of an IMAGE on this room\'s shelf (a real screenshot, see list_library). The film then shows that screen, never an invented one. Omit when the shelf has no screenshot, and ask the human for one.'),
       })).min(1).max(20).describe('one entry per post, in the order they should read'),
-    }, run: async (input: { posts: Array<{ platform: string; body: string; imageBrief?: string; mediaUrl?: string; script?: string }> }) => {
+    }, run: async (input: { posts: Array<{ platform: string; body: string; imageBrief?: string; mediaUrl?: string; script?: string; frame?: string }> }) => {
       // The anchor: a task thread's drafts ride the TASK (unchanged, so a content task reads
       // byte-identically); a conversation's ride the THREAD (0115). Without one there is no
       // surface to render on — a channel-level draft would card nowhere.
@@ -117,11 +119,14 @@ export function contentTools(tc: ToolCtx): OrchTool[] {
       // "Character count: 196/280" footer is stripped identically whichever door it came in
       const drafts = input.posts.map((p) => normalizeDraft(p)).filter((p): p is NonNullable<typeof p> => !!p);
       if (!drafts.length) return 'None of those entries were usable posts — each needs a supported platform and a body that is more than working notes.';
+      // the frame (host/frames.ts): a name the shelf does not hold is refused before anything is written
+      const frames = await framesFor(libraryDocs, ch.id, input.posts);
+      if (!frames.ok) { log?.({ kind: 'tool', phase: 'result', summary: 'draft_posts refused: a frame is not on the shelf' }); return frames.why; }
       let made = 0;
-      for (const d of drafts) {
+      for (const [i, d] of drafts.entries()) {
         const res = await post('/v1/commands', actor, {
           type: 'content.create', channel: ch.id, ...anchor, platform: d.platform, body: d.body,
-          ...(d.imageBrief ? { imageBrief: d.imageBrief } : {}), ...(d.mediaUrl ? { mediaUrl: d.mediaUrl } : {}), ...(d.script ? { script: d.script } : {}),
+          ...(d.imageBrief ? { imageBrief: d.imageBrief } : {}), ...(d.mediaUrl ? { mediaUrl: d.mediaUrl } : {}), ...(d.script ? { script: d.script } : {}), ...(frames.names.has(i) ? { frame: frames.names.get(i) } : {}),
         }).catch(() => null);
         if (res?.ok) made += 1;
       }
@@ -136,8 +141,9 @@ export function contentTools(tc: ToolCtx): OrchTool[] {
         body: z.string().max(10_000).optional().describe('the replacement post text, in full — wire text only, no notes (a video post: its caption)'),
         imageBrief: z.string().max(2000).optional().describe('replacement art direction for this post\'s picture (a video post: its shot direction)'),
         script: z.string().max(10_000).optional().describe('a video post: the replacement script, in full. The card films the new one on the next Generate video.'),
+        frame: z.string().max(200).optional().describe('a video post: the name of an image on this room\'s shelf the film shows as the product (a real screenshot). "none" drops the frame.'),
       })).min(1).max(20),
-    }, run: async (input: { revisions: Array<{ letter: string; body?: string; imageBrief?: string; script?: string }> }) => {
+    }, run: async (input: { revisions: Array<{ letter: string; body?: string; imageBrief?: string; script?: string; frame?: string }> }) => {
       const here = await draftsHere();
       if (!here) return 'revise_posts works on the drafts in a thread — open the conversation or task that has them.';
       if (!here.posts.length) return 'There are no drafts here to revise — draft_posts first.';
@@ -155,11 +161,13 @@ export function contentTools(tc: ToolCtx): OrchTool[] {
         // ONE cleaner for a revision (parseDraftRevisions, the posts-file path's): the caption
         // stripped of notes, a script filed under a heading in the brief or the body lifted out
         const [rev] = parseDraftRevisions(JSON.stringify([r]));
-        if (!rev) { missed.push(r.letter); continue; }
-        const { body, imageBrief: brief, script } = rev;
+        if (!rev && !r.frame?.trim()) { missed.push(r.letter); continue; } // a frame alone is a change too
+        const { body, imageBrief: brief, script } = rev ?? {};
+        const fr = await frameArg(libraryDocs, ch.id, r.frame);
+        if (!fr.ok) return fr.why;
         const res = await post('/v1/commands', actor, {
           type: 'content.revise', item: target.id,
-          ...(body ? { body } : {}), ...(brief ? { imageBrief: brief } : {}), ...(script ? { script } : {}),
+          ...(body ? { body } : {}), ...(brief ? { imageBrief: brief } : {}), ...(script ? { script } : {}), ...(fr.frame !== undefined ? { frame: fr.frame } : {}),
         }).catch(() => null);
         if (res?.ok) { done.push(target.letter); if (brief) drew.push(target.letter); } else missed.push(r.letter);
       }
