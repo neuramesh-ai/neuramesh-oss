@@ -384,6 +384,8 @@ export const CommandSchema = z.discriminatedUnion('type', [
     autoFailover: z.boolean().optional(), activeModelPack: packId.optional(),
     // the workspace's voice (docs/design/agent-comm-rules-2026-08) — HUMAN-only in the handler; null reads as defaults-ON
     commRules: z.object({ ste100: z.boolean().optional(), noEmdash: z.boolean().optional(), custom: z.array(z.string().min(1).max(200)).max(8).optional() }).optional(),
+    // the video tier (0140): a Pro workspace's pick among the tiers the server serves; null = the default
+    videoTier: z.enum(['starter', 'xpress', 'premium']).nullable().optional(),
   }),
   // re-bind every agent to its home-remit channels across all projects (recovery for orphaned
   // registrations + makes the team usable across projects). idempotent.
@@ -757,7 +759,10 @@ export const CommandSchema = z.discriminatedUnion('type', [
   // but ONLY while status='draft' (a scheduled/published item is the human's, enforced in the
   // handler). body updates the copy; imageBrief re-states the visual it wants (kept in media.brief,
   // the daemon regenerates + re-hosts separately via attach_media).
-  z.object({ type: z.literal('content.revise'), item: z.string().min(1), body: z.string().trim().min(1).max(10_000).optional(), imageBrief: z.string().trim().max(2000).optional(), script: z.string().trim().min(1).max(10_000).optional(), thumb: z.string().startsWith('data:image/').max(200_000).optional(), imageError: z.union([z.string().trim().max(600), z.literal('')]).optional(), videoError: z.union([z.string().trim().max(600), z.literal('')]).optional() }),
+  z.object({ type: z.literal('content.revise'), item: z.string().min(1), body: z.string().trim().min(1).max(10_000).optional(), imageBrief: z.string().trim().max(2000).optional(), script: z.string().trim().min(1).max(10_000).optional(),
+    // the film's facts (the video rung): what filmed it, for how long, at what price; the machine's own-key lane writes them, the server's lane writes them itself
+    videoMeta: z.object({ tier: z.string().max(40), model: z.string().max(80), seconds: z.number().int().min(1).max(60), credits: z.number().int().min(0), at: z.string().datetime() }).optional(),
+    videoErrorCode: z.enum(['NO_CREDITS', 'UNAVAILABLE']).nullable().optional(), thumb: z.string().startsWith('data:image/').max(200_000).optional(), imageError: z.union([z.string().trim().max(600), z.literal('')]).optional(), videoError: z.union([z.string().trim().max(600), z.literal('')]).optional() }),
   // host a draft's image so it can actually PUBLISH (0090). Every network takes media only as a
   // public URL someone else fetches — Meta pulls it directly, TikTok pulls it through our proxy,
   // X wants the bytes — so a picture generated on the user's machine has to land somewhere

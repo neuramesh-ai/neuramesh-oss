@@ -10,12 +10,15 @@ import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, writeFile
 import { localPortsFor } from '../connections';
 import { join } from 'node:path';
 import type { Keychain } from '../keychain';
-import { PROJECT_NAME, PullProgress, SERVICES, composeCommand, composeImages, isHumanBearer, mintSecrets, parseEnv, planEnv, renderEnv, type StackEnv } from './compose';
+import { PullProgress, SERVICES, composeCommand, composeImages, isHumanBearer, mintSecrets, parseEnv, planEnv, renderEnv, type StackEnv } from './compose';
 import { initialState, reduce, stackBehind, type StackEvent, type StackState } from './driver';
 import { detectEngine, nmBinDir, type EngineKind, type EngineProbe } from './engine';
+import { StackError, awaitHealth, composeFailure, preflightPorts, wedgedServices, type HealthCtx } from './health';
 import { downloadRuntime, installRuntime, realFs, runtimeEnv, startEngine, type RuntimeDeps } from './runtime-install';
 import type { Runtime } from './install';
 import { run, runLines, waitFor, type SpawnFn } from './proc';
+
+export { StackError, parseInspect, pickLastLine } from './health';
 
 /** the keychain account the human bearer is filed under (service: keychain.ts KEYCHAIN_SERVICE) */
 export const BEARER_ACCOUNT = 'local-human-bearer';
@@ -39,6 +42,10 @@ export interface LocalStackDeps {
   onState: (s: StackState) => void;
   log: (line: string) => void;
   sleepImpl?: (ms: number) => Promise<void>;
+  /** the clock the two waits read (Date.now) — the tests move it with sleepImpl */
+  now?: () => number;
+  /** can 127.0.0.1:port be bound right now (proc.ts portFree) — the tests answer for the OS */
+  portFree?: (port: number) => Promise<boolean>;
 }
 
 const STARTING_BUDGET_MS = 90_000;
@@ -49,6 +56,8 @@ export class LocalStack {
   private waiters: Array<() => void> = [];
   private pickResolve: (() => void) | null = null;
   private stackEnv: StackEnv | null = null;
+  /** the services the next `up` removes first, so Try again never re-runs a wedged container */
+  private recreate = new Set<string>();
   bearer = '';
 
   constructor(private readonly d: LocalStackDeps) {}
@@ -96,9 +105,10 @@ export class LocalStack {
         await this.bootOnce();
         return;
       } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        this.d.log(`stack error: ${message}`);
-        this.emit({ type: 'error', message });
+        const e = err instanceof StackError ? err : new StackError(err instanceof Error ? err.message : String(err));
+        for (const svc of e.failed ?? []) this.recreate.add(svc);
+        this.d.log(`stack error: ${e.message}${e.detail ? ` · ${e.detail}` : ''}${this.recreate.size ? ` recreate=${[...this.recreate].join(',')}` : ''}`);
+        this.emit({ type: 'error', message: e.message, detail: e.detail, remedy: e.remedy });
         await this.waitForPick();
       }
     }
@@ -122,11 +132,25 @@ export class LocalStack {
     if (!probe.dockerBin) { await downloadRuntime('colima', this.rt()); probe = await this.detect(); }
     if (!probe.dockerBin) throw new Error('No docker command found.');
     const plan = await this.prepareFiles();
+    await this.precheck(probe.dockerBin);
     await this.pullIfNeeded(probe.dockerBin, plan);
     await this.up(probe.dockerBin);
-    await this.awaitHealth(probe.dockerBin);
+    await awaitHealth(this.health(probe.dockerBin), STARTING_BUDGET_MS);
     const version = await this.awaitConfig();
     this.emit({ type: 'ready', version, engine: probe.engine ?? 'other' });
+  }
+
+  /** the checks' view of the driver (health.ts): docker, the card's events, the clock */
+  private health(dockerBin: string): HealthCtx {
+    const { spawn, env, log, sleepImpl, now, portFree } = this.d;
+    return { spawn, dockerBin, dockerEnv: this.dockerEnv(), env, emit: (ev) => this.emit(ev), log, sleepImpl, now, portFree };
+  }
+
+  /** the checks before a container is made: a wedged container is marked, a taken port is the card */
+  private async precheck(dockerBin: string): Promise<void> {
+    for (const svc of await wedgedServices(this.health(dockerBin))) this.recreate.add(svc);
+    const env = this.stackEnv!;
+    await preflightPorts(this.health(dockerBin), { api: Number(env.NM_API_PORT), powersync: Number(env.NM_POWERSYNC_PORT) });
   }
 
   /** the compose file rendered, the .env written 0600, the bearer in the keychain — never in the clear on disk */
@@ -183,31 +207,27 @@ export class LocalStack {
     return composeCommand({ dockerBin, root: this.d.root, dir: this.d.dir, hasStandalone: existsSync(join(nmBinDir(this.d.root), 'docker-compose')) }, args);
   }
 
+  /** the services marked for recreation are stopped and removed first (`compose rm -sf`, never a
+   *  volume flag: the data folder is a bind mount and stays), then the one `up` the boot always ran */
   private async up(dockerBin: string): Promise<void> {
     this.emit({ type: 'up', services: SERVICES.map((s) => s.label) });
+    if (this.recreate.size) {
+      const rm = this.compose(dockerBin, ['rm', '-sf', ...this.recreate]);
+      this.d.log(`${rm.bin} ${rm.args.join(' ')}`);
+      const r = await run(this.d.spawn, rm.bin, rm.args, { cwd: rm.cwd, env: this.dockerEnv(), timeoutMs: 60_000 });
+      if (r.code !== 0) throw new StackError('The local stack did not start.', { detail: (r.err || r.out).trim().slice(-240), remedy: 'Try again starts fresh containers.' });
+      this.recreate.clear();
+    }
     const c = this.compose(dockerBin, ['up', '-d', '--remove-orphans']);
     this.d.log(`${c.bin} ${c.args.join(' ')}`);
     const r = await run(this.d.spawn, c.bin, c.args, { cwd: c.cwd, env: this.dockerEnv(), timeoutMs: 5 * 60_000 });
-    if (r.code !== 0) throw new Error(`The local stack did not start: ${(r.err || r.out).trim().slice(-240)}`);
-  }
-
-  /** each container's own healthcheck, polled — 90 s once the images exist */
-  private async awaitHealth(dockerBin: string): Promise<void> {
-    const pending = new Set(SERVICES.map((s) => s.service));
-    const ok = await waitFor(async () => {
-      for (const svc of [...pending]) {
-        const r = await run(this.d.spawn, dockerBin, ['inspect', '--format', '{{.State.Health.Status}}', `${PROJECT_NAME}-${svc}-1`], { env: this.dockerEnv(), timeoutMs: 10_000 });
-        if (r.code === 0 && r.out.trim() === 'healthy') { pending.delete(svc); this.emit({ type: 'health', service: SERVICES.find((s) => s.service === svc)!.label }); }
-      }
-      return pending.size === 0;
-    }, { everyMs: 2000, budgetMs: STARTING_BUDGET_MS, sleepImpl: this.d.sleepImpl });
-    if (!ok) throw new Error(`The local stack did not start in 90 seconds (${[...pending].join(', ')} not healthy).`);
+    if (r.code !== 0) throw composeFailure((r.err || r.out).trim());
   }
 
   /** /healthz, then nm-config: a stack behind the app is refused (F7), never a half-working shell */
   private async awaitConfig(): Promise<string> {
     const api = `http://127.0.0.1:${this.stackEnv!.NM_API_PORT}`;
-    const healthy = await waitFor(async () => (await this.d.fetchImpl(`${api}/healthz`).catch(() => null))?.ok ?? false, { everyMs: 1000, budgetMs: 30_000, sleepImpl: this.d.sleepImpl });
+    const healthy = await waitFor(async () => (await this.d.fetchImpl(`${api}/healthz`).catch(() => null))?.ok ?? false, { everyMs: 1000, budgetMs: 30_000, sleepImpl: this.d.sleepImpl, now: this.d.now });
     if (!healthy) throw new Error('The NeuraMesh API did not answer.');
     const res = await this.d.fetchImpl(`${api}/.well-known/nm-config`);
     const cfg = (await res.json().catch(() => ({}))) as { mode?: string; version?: string; schemaVersion?: string | null };
@@ -224,14 +244,16 @@ export class LocalStack {
     if (!bin || this.state.phase !== 'ready') return;
     try {
       await this.stop();
+      await this.precheck(bin);
       await this.up(bin);
-      await this.awaitHealth(bin);
+      await awaitHealth(this.health(bin), STARTING_BUDGET_MS);
       const version = await this.awaitConfig();
       this.emit({ type: 'ready', version, engine: this.probe?.engine ?? 'other' });
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      this.d.log(`restart error: ${message}`);
-      this.emit({ type: 'error', message });
+      const e = err instanceof StackError ? err : new StackError(err instanceof Error ? err.message : String(err));
+      for (const svc of e.failed ?? []) this.recreate.add(svc);
+      this.d.log(`restart error: ${e.message}${e.detail ? ` · ${e.detail}` : ''}`);
+      this.emit({ type: 'error', message: e.message, detail: e.detail, remedy: e.remedy });
     }
   }
 

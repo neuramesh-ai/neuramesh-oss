@@ -14,4 +14,7 @@ regexes = [
   '''^nmm_probe$''',
   # a shell variable in a curl header (`-H "authorization: Bearer $FLEET_SECRET"`) is a name, not a value
   '''Bearer \$\{?[A-Za-z_][A-Za-z0-9_]*''',
+  # the video registry's model keys (`key: 'kling-3.0-pro'`, packages/control-api/src/video-registry.ts
+  # and its bundle) are vendor-version names, never values: the generic rule reads `key:` plus entropy
+  '''^(seedance|kling|minimax|wan|veo|hailuo)-[0-9]+(\.[0-9]+)?(-[a-z0-9]+)*$''',
 ]

@@ -27,6 +27,7 @@ import { DomainError } from './errors';
 import { exportRoutes } from './export';
 import { importRoutes } from './import';
 import { contentMediaRoute } from './content-media-route';
+import { filmsCronRoute, starterVideoRoutes } from './starter-video';
 import { executeCommand } from './handler';
 import { hostedFreeGate } from './hosted-gate';
 import { pushAfterCommand, type PushService } from './push';
@@ -122,7 +123,7 @@ const webOrigin = (origin: string): string | null =>
   origin === 'https://neuramesh.app' || origin === 'https://www.neuramesh.app'
   || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin) ? origin : null;
 
-export function createApp(store: Store, opts: { push?: PushService; announce?: Parameters<typeof announceRoutes>[2] } = {}) {
+export function createApp(store: Store, opts: { push?: PushService; announce?: Parameters<typeof announceRoutes>[2]; starterVideo?: Parameters<typeof starterVideoRoutes>[2] } = {}) {
   const app = new Hono<Env>();
 
   // errors NEVER leave as text/html: clients parse JSON envelopes. P0001 is
@@ -377,6 +378,7 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
   // grant landed on the generic handler and answered "github connect is not configured on this
   // server" (the live install, 2026-09-18).
   announceRoutes(app, store, opts.announce);
+  filmsCronRoute(app, store, opts.starterVideo); // GET /internal/films-due — the video rung's minute cron (starter-video.ts)
 
   app.get('/connect/:provider/start', (c) => {
     const provider = c.req.param('provider');
@@ -555,6 +557,7 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
   importRoutes(app, store); // POST /v1/workspaces/:id/import/batches, owner only, cloud target only (import.ts)
   announceClaimRoute(app, store); // POST /v1/announce/:id/claim — the signed-in save (announce.ts)
   contentMediaRoute(app, store); // GET /v1/content/media/:id — a draft's film or picture for the card, members only
+  starterVideoRoutes(app, store, opts.starterVideo); // GET /v1/starter/video + POST /v1/starter/film — the video rung on credits (starter-video.ts)
 
   app.post('/v1/commands', async (c) => {
     const body = await c.req.json().catch(() => null);

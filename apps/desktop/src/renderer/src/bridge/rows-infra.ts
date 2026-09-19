@@ -69,6 +69,8 @@ export interface WorkspaceUsage {
    *  activeSeconds are telemetry; the credit balance is the budget. */
   machine: { minutesToday: number; activeSecondsToday: number; capMinutes: number | null; plan: string };
   brain: { callsToday: number; model: string };
+  /** the video rung: films today and what they cost */
+  video?: { clipsToday: number; creditsToday: number };
   /** the disk the plan PROVISIONS. `metered: false` means nothing counts bytes on it yet, so a
    *  surface may say "10 GB included" and must never say "3 of 10 GB used". */
   storage: { gb: number; metered: boolean };
@@ -77,6 +79,18 @@ export interface WorkspaceUsage {
 
 /** the utilization dashboard's history (GET /v1/credits/history) */
 export interface CreditHistory {
-  days: Array<{ day: string; activeSeconds: number; modelCalls: number; modelInTokens: number; modelOutTokens: number; brainCredits: number; machineCredits: number }>;
+  days: Array<{ day: string; activeSeconds: number; modelCalls: number; modelInTokens: number; modelOutTokens: number; brainCredits: number; machineCredits: number; videoClips?: number; videoCredits?: number }>;
   grants: Array<{ credits: number; kind: string; note: string | null; day: string }>;
+  /** the video rung: every film as its own row (a film is the largest thing a credit buys) */
+  films?: Array<{ id: string; item: string; tier: string; model: string; seconds: number; credits: number; status: 'queued' | 'running' | 'done' | 'failed'; day: string; at: string }>;
+}
+
+/** GET /v1/starter/video — what this server films on, in credits, and the workspace's tier pick (the video rung). */
+export interface StarterVideo {
+  served: boolean;
+  tier: string | null;
+  pick: string | null;
+  /** the pick is a Pro setting */
+  canPick?: boolean;
+  tiers: Array<{ tier: string; label: string; model: string; vendor: string; seconds: number; credits: number }>;
 }

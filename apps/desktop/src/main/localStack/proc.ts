@@ -1,5 +1,6 @@
 // The one seam between the stack driver and the operating system: a spawn the tests replace.
 import { spawn as nodeSpawn } from 'node:child_process';
+import { createServer } from 'node:net';
 
 export interface ChildLike {
   stdout: NodeJS.ReadableStream | null;
@@ -66,4 +67,14 @@ export async function waitFor(probe: () => Promise<boolean>, opts: { everyMs: nu
     if (now() >= deadline) return false;
     await zzz(opts.everyMs);
   }
+}
+
+/** can 127.0.0.1:port be bound right now — the preflight's OS probe (a wildcard listener on
+ *  another address does not count, exactly as Docker's own bind would not collide with it) */
+export function portFree(port: number): Promise<boolean> {
+  return new Promise((res) => {
+    const srv = createServer();
+    srv.once('error', () => res(false));
+    srv.listen({ port, host: '127.0.0.1' }, () => srv.close(() => res(true)));
+  });
 }

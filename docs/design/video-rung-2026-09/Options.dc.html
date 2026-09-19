@@ -1,0 +1,63 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>G · the options and the registry</title><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;450;500;600&amp;family=Geist+Mono:wght@400;500;600&amp;family=Bricolage+Grotesque:wght@500;600&amp;display=swap"><style>body{margin:0}
+  .opts { box-sizing: border-box; width: 1440px; height: 1000px; background: #141414; color: #cbcbcb; font: 14px/1.45 'Geist', sans-serif; padding: 26px 32px; overflow: hidden; }
+  .opts * { box-sizing: border-box; }
+  .otitle { font: 500 10.5px 'Geist Mono', monospace; letter-spacing: -.02em; text-transform: uppercase; color: #848484; margin-bottom: 12px; }
+  .ogrid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 22px; }
+  .otab { border: 1px solid #2c2c2c; border-radius: 8px; background: #1a1a1a; overflow: hidden; }
+  .otab h3 { margin: 0; padding: 9px 14px; font: 500 12px 'Geist Mono', monospace; letter-spacing: -.02em; text-transform: uppercase; color: #cbcbcb; border-bottom: 1px solid #2c2c2c; display: flex; gap: 10px; }
+  .otab h3 span { color: #848484; font-weight: 400; text-transform: none; letter-spacing: 0; font-family: 'Geist', sans-serif; font-size: 12px; }
+  .orow { display: grid; grid-template-columns: 26px 200px 1fr 84px; gap: 10px; align-items: start; padding: 8px 14px; border-bottom: 1px solid #262626; font-size: 12.5px; }
+  .orow:last-child { border-bottom: 0; }
+  .orow .m { width: 14px; height: 14px; border-radius: 3px; border: 1px solid #3a3a3a; margin-top: 3px; display: grid; place-items: center; font-size: 10px; color: #77ac8d; }
+  .orow.on .m { border-color: #834a2b; background: #2a1d14; color: #d19a72; }
+  .orow.on { background: #1e1e1e; }
+  .orow b { font-weight: 500; color: #e0e0e0; }
+  .orow.on b { color: #f0e6da; }
+  .orow p { margin: 0; color: #a6a6a6; }
+  .orow i { font: 500 10px 'Geist Mono', monospace; letter-spacing: -.02em; text-transform: uppercase; color: #848484; font-style: normal; text-align: right; }
+  .orow.on i { color: #d19a72; }
+  .odev { margin-top: 16px; border: 1px solid #2c2c2c; border-radius: 8px; padding: 10px 14px; background: #171717; display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .odev div { font-size: 12px; color: #a6a6a6; line-height: 1.45; }
+  .odev div b { display: block; font: 500 10.5px 'Geist Mono', monospace; letter-spacing: -.02em; text-transform: uppercase; color: #cbcbcb; margin-bottom: 3px; }
+  .otable { margin-top: 16px; border: 1px solid #2c2c2c; border-radius: 8px; overflow: hidden; font-size: 12px; }
+  .otable .r { display: grid; grid-template-columns: 170px 1fr 120px 130px 110px; gap: 10px; padding: 7px 14px; border-bottom: 1px solid #262626; color: #a6a6a6; }
+  .otable .r:last-child { border-bottom: 0; }
+  .otable .r.h { font: 500 10.5px 'Geist Mono', monospace; text-transform: uppercase; letter-spacing: -.02em; color: #848484; background: #171717; }
+  .otable .r b { color: #e0e0e0; font-weight: 500; }
+  .otable .r.on { background: #1e1e1e; }
+</style></head><body><div class="opts"><div class="otitle">The options, reviewed · the lit rows are the recommendation · the table is the registry as researched on 2026-09-19</div>
+<div class="ogrid">
+  <div class="otab"><h3>Who picks the model <span>George: "switch models with an env variable"</span></h3>
+    <div class="orow on"><span class="m">✓</span><b>One env variable on the server</b><p>STARTER_VIDEO_MODELS names the active model first and the fallbacks after it. No picker in the app. The card and Settings READ the active model from GET /v1/starter/video and say it out loud with its price.</p><i>recommended</i></div>
+    <div class="orow"><span class="m"></span><b>A per-workspace picker</b><p>A select under Image generation. More surface, a synced preference, and a person choosing between models they cannot compare. Later, when a second lane exists.</p><i>later</i></div>
+    <div class="orow"><span class="m"></span><b>The agent picks</b><p>plume chooses by angle. Unpredictable spend. No.</p><i>no</i></div>
+  </div>
+  <div class="otab"><h3>Who pays first <span>a Google key beside credits</span></h3>
+    <div class="orow on"><span class="m">✓</span><b>The Starter lane first, the own key when the door says 402 or 503</b><p>One press, one outcome, and the card names which lane filmed. A workspace with a key and no credits still films. The facts line shows the credits BEFORE the press.</p><i>recommended</i></div>
+    <div class="orow"><span class="m"></span><b>The own key first</b><p>Free for the person, but Omni is weaker for creators than Seedance, and George wants the platform models used. A person who wants their key can set no credits.</p><i>no</i></div>
+    <div class="orow"><span class="m"></span><b>Ask on every press</b><p>A question card per film. Ceremony for a 2-minute action.</p><i>no</i></div>
+  </div>
+  <div class="otab"><h3>When the clip is charged <span>a film takes minutes</span></h3>
+    <div class="orow on"><span class="m">✓</span><b>Debit at submit, refund on failure</b><p>The balance guard runs before the submit, the price is known (a fixed duration), and a refused or failed film puts the credits back with a ledger row beside the charge. Two concurrent presses cannot overspend.</p><i>recommended</i></div>
+    <div class="orow"><span class="m"></span><b>Charge on completion</b><p>Two presses in flight can both pass the guard. The Starter brain charges after the call only because a reply is seconds, not minutes.</p><i>no</i></div>
+  </div>
+  <div class="otab"><h3>How the server waits <span>Vercel holds no stream</span></h3>
+    <div class="orow on"><span class="m">✓</span><b>A films row and the minute cron</b><p>The announce lane’s shape: submit, 202, a row the cron works. fal’s status endpoint is idempotent, so a missed minute costs a minute. The card shows video_pending from the row.</p><i>recommended</i></div>
+    <div class="orow"><span class="m"></span><b>fal’s webhook</b><p>Faster by up to a minute, but a public endpoint that must verify the sender, and retries to dedupe. Add later as the fast path with the cron as the backstop.</p><i>v1.5</i></div>
+    <div class="orow"><span class="m"></span><b>The desktop polls fal</b><p>The key would have to reach the machine. Never.</p><i>no</i></div>
+  </div>
+</div>
+<div class="otable">
+  <div class="r h"><span>registry key</span><span>fal endpoint · inputs</span><span>720p, audio</span><span>8 s clip</span><span>credits</span></div>
+  <div class="r on"><b>seedance-2.0-fast</b><span>bytedance/seedance-2.0/fast/text-to-video · resolution 720p · duration "8" · aspect_ratio 9:16 · generate_audio</span><span>$0.2419 /s</span><span>$1.94</span><b>194</b></div>
+  <div class="r"><b>seedance-2.0</b><span>bytedance/seedance-2.0/text-to-video · same inputs, the standard tier</span><span>$0.3034 /s</span><span>$2.43</span><span>243</span></div>
+  <div class="r"><b>kling-3.0</b><span>fal-ai/kling-video/v3/standard/text-to-video · duration "8" · aspect_ratio 9:16 · generate_audio true</span><span>$0.126 /s</span><span>$1.01</span><span>101</span></div>
+  <div class="r"><b>kling-3.0-pro</b><span>fal-ai/kling-video/v3/pro/text-to-video · same inputs</span><span>$0.168 /s</span><span>$1.34</span><span>134</span></div>
+  <div class="r"><b>minimax-h3</b><span>minimax/h3/text-to-video · duration 8 · resolution 768P · aspect_ratio 9:16</span><span>$0.06 /s</span><span>$0.48</span><span>48</span></div>
+  <div class="r"><b>minimax-h3-max</b><span>minimax/h3-max/text-to-video · same inputs · launch price until Sep 30</span><span>$0.04 /s</span><span>$0.32</span><span>32</span></div>
+</div>
+<div class="odev">
+  <div><b>Decided · at cost</b>The Starter brain meters at list price and so does a film, rounded up to whole credits so the card, the charge, the refund and the history say one number. 194 for a Seedance 2.0 hook.</div>
+  <div><b>Decided · three tiers, Seedance fast first</b>NeuraMesh Video Starter (Seedance 2.0), Xpress (MiniMax H3), Premium (Seedance 2.0 Standard). NM_VIDEO_TIERS maps each tier to a registry key; Pro workspaces pick, Free films on Starter or its own key.</div>
+  <div><b>Decided · the models are named</b>The tier is the house word, the vendor model stands beside it on the card, in Settings and in the credits history: "NeuraMesh Video Starter · Seedance 2.0 · 8 s · 194 credits".</div>
+</div></div></body></html>

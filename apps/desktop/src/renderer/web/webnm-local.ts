@@ -84,7 +84,20 @@ export function localOverrides(): Partial<NMBridge> {
     // ── native host affordances ────────────────────────────────────────────────────────────
     // null is what "the human cancelled the picker" already means, so every caller handles it
     pickFolder: async () => null,
-    saveFileAs: async () => ({ saved: false }),
+    // a browser saves its own files, the same way it opens its own links: the bytes become a Blob
+    // and an anchor's download click, the tab's one door to the disk (the browser then asks where,
+    // or drops it in Downloads, by its own setting). Not a degradation, the native way.
+    saveFileAs: async (f: { name: string; content: string; base64?: boolean }) => {
+      if (typeof document === 'undefined') return { saved: false };
+      const name = (f.name ?? 'file').replace(/[/\\]/g, '-') || 'file';
+      const bytes = f.base64 ? Uint8Array.from(atob(f.content), (c) => c.charCodeAt(0)) : f.content;
+      const url = URL.createObjectURL(new Blob([bytes]));
+      const a = document.createElement('a');
+      a.href = url; a.download = name; a.rel = 'noopener';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      return { saved: true };
+    },
     projectDetect: async () => null,
     logoDetect: async () => null,
 

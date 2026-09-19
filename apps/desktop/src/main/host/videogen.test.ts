@@ -2,7 +2,7 @@
 // a faked Gemini API, and the draft lane's three outcomes (no key, refused, filmed).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { filmPrompt, firstBeat, makeFilm, veoFilm } from './videogen';
+import { askDoor, filmPrompt, firstBeat, makeFilm, veoFilm } from './videogen';
 
 const SCRIPT = `[0:00-0:03] HOOK — handheld, walking, no laptop bag
 Spoken: "My laptop's in my bag. My code isn't waiting for me."
@@ -107,24 +107,59 @@ test('a key that cannot see the fast Veo rung falls to the next; a refusal on an
   assert.match(omniRefused.error!, /declined the prompt/);
 });
 
-/** the draft lane against a fake db and a fake command post */
-function lane(media: string | null, film: Parameters<typeof makeFilm>[0]['film']) {
+/** the draft lane against a fake db, a fake command post, and a door that answers as told (no credits by default, so the own-key lane runs) */
+function lane(media: string | null, film: Parameters<typeof makeFilm>[0]['film'], door: Parameters<typeof makeFilm>[0]['door'] = async () => ({ filming: false, code: 'NO_CREDITS', error: 'out of credits', credits: 194 })) {
   const posted: Array<Record<string, unknown>> = [];
   const db = { getAll: async () => [{ body: SCRIPT, media }] } as never;
   const post = async (_path: string, _actor: unknown, body: unknown) => { posted.push(body as Record<string, unknown>); return new Response('{"ok":true}', { status: 200 }); };
-  const { filmDraft } = makeFilm({ db, apiUrl: 'http://api', ownerActorId: 'u1', post: post as never, agents: new Map(), film });
+  const { filmDraft } = makeFilm({ db, apiUrl: 'http://api', ownerActorId: 'u1', post: post as never, agents: new Map(), film, door });
   const agent = { id: 'a1', name: 'plume', role: 'marketer', channels: new Set(['c1']) } as never;
   return { posted, run: () => filmDraft(agent, { id: 'c1', slug: 'marketing', workspace_id: 'w1' }, 'item-1') };
 }
+
+test('the platform first: a 202 from the door means the server films, and the lane says so; the own key never runs', async () => {
+  process.env['GEMINI_API_KEY'] = 'env-key';
+  try {
+    let filmed = 0;
+    const l = lane(JSON.stringify({ brief: 'handheld' }), async () => { filmed += 1; return { bytes: MP4, mime: 'video/mp4' }; }, async (_post, _actor, body) => { assert.equal(body.workspace, 'w1'); assert.equal(body.item, 'item-1'); assert.match(body.prompt, /handheld/); return { filming: true, tier: 'NeuraMesh Video Starter', model: 'Seedance 2.0', credits: 194 }; });
+    assert.match(await l.run(), /Filming the hook on NeuraMesh Video Starter \(Seedance 2\.0\)\. It takes about two minutes and costs 194 credits/);
+    assert.equal(filmed, 0);
+    assert.deepEqual(l.posted, []);
+  } finally { delete process.env['GEMINI_API_KEY']; }
+});
+
+test('no credits and no Google key: the card says the price and the two ways forward, with the code the card reads', async () => {
+  delete process.env['GEMINI_API_KEY']; delete process.env['GOOGLE_API_KEY'];
+  const l = lane(null, async () => ({ error: 'never' }));
+  assert.match(await l.run(), /out of credits\. A film costs about 194 credits\. Add credits, or add a Google AI key/);
+  assert.equal(l.posted[0]!['videoErrorCode'], 'NO_CREDITS');
+});
+
+test('an upstream refusal from the door lands on the card and never falls to the own key', async () => {
+  process.env['GEMINI_API_KEY'] = 'env-key';
+  try {
+    const l = lane(null, async () => ({ bytes: MP4, mime: 'video/mp4' }), async () => ({ filming: false, code: 'UPSTREAM', error: 'Seedance 2.0 did not accept the film.' }));
+    assert.match(await l.run(), /The film did not start: Seedance 2\.0 did not accept the film\. The reason is on the card/);
+    assert.deepEqual(l.posted[0], { type: 'content.revise', item: 'item-1', videoError: 'Seedance 2.0 did not accept the film' });
+  } finally { delete process.env['GEMINI_API_KEY']; }
+});
+
+test('askDoor reads the door\'s answers: 202 films, 402 names the credits, 503 is no lane', async () => {
+  const mk = (status: number, body: unknown) => async () => new Response(JSON.stringify(body), { status });
+  assert.deepEqual(await askDoor(mk(202, { ok: true, tier: { label: 'NeuraMesh Video Starter', model: 'Seedance 2.0' }, credits: 194 }) as never, { kind: 'agent', id: 'a' }, { workspace: 'w', item: 'i', prompt: 'p' }), { filming: true, tier: 'NeuraMesh Video Starter', model: 'Seedance 2.0', credits: 194 });
+  assert.deepEqual(await askDoor(mk(402, { code: 'NO_CREDITS', error: 'out of credits', credits: 194 }) as never, { kind: 'agent', id: 'a' }, { workspace: 'w', item: 'i', prompt: 'p' }), { filming: false, code: 'NO_CREDITS', error: 'out of credits', credits: 194 });
+  assert.deepEqual(await askDoor(mk(503, { code: 'UNAVAILABLE', error: 'no lane' }) as never, { kind: 'agent', id: 'a' }, { workspace: 'w', item: 'i', prompt: 'p' }), { filming: false, code: 'UNAVAILABLE', error: 'no lane' });
+});
 
 test('the draft lane: filmed → the bytes attach as video/mp4; refused → the reason lands on the card', async () => {
   process.env['GEMINI_API_KEY'] = 'env-key';
   try {
     const ok = lane(JSON.stringify({ brief: 'handheld' }), async (key, prompt) => { assert.equal(key, 'env-key'); assert.match(prompt, /handheld/); return { bytes: MP4, mime: 'video/mp4', model: 'gemini-omni-1.1-flash' }; });
     const reply = await ok.run();
-    assert.match(reply, /Filmed the hook on gemini-omni-1.1-flash\. An eight-second cut/);
+    assert.match(reply, /Filmed the hook on gemini-omni-1.1-flash with your Google key\. An eight-second cut/);
     assert.equal(ok.posted[0]!['type'], 'content.attach_media');
     assert.ok(String(ok.posted[0]!['dataUrl']).startsWith('data:video/mp4;base64,'));
+    assert.deepEqual({ ...(ok.posted[1] as Record<string, unknown>), videoMeta: { ...((ok.posted[1] as { videoMeta: Record<string, unknown> }).videoMeta), at: 'x' } }, { type: 'content.revise', item: 'item-1', videoMeta: { tier: 'own', model: 'gemini-omni-1.1-flash', seconds: 8, credits: 0, at: 'x' } });
     const bad = lane(null, async () => ({ error: 'the model declined the prompt' }));
     assert.match(await bad.run(), /The film did not come: the model declined the prompt\. The reason is on the card/);
     assert.deepEqual(bad.posted[0], { type: 'content.revise', item: 'item-1', videoError: 'the model declined the prompt' });
@@ -138,7 +173,7 @@ test('the draft lane films the SCRIPT beside the caption (media.script), not the
     const db = { getAll: async () => [{ body: 'Three things in the new update I did not expect. #neuramesh', media: JSON.stringify({ brief: 'phone in hand', script: SCRIPT }) }] } as never;
     const post = async (_p: string, _a: unknown, body: unknown) => { posted.push(body as Record<string, unknown>); return new Response('{"ok":true}', { status: 200 }); };
     let seen = '';
-    const { filmDraft } = makeFilm({ db, apiUrl: 'http://api', ownerActorId: 'u1', post: post as never, agents: new Map(), film: async (_k, prompt) => { seen = prompt; return { bytes: MP4, mime: 'video/mp4', model: 'gemini-omni-1.1-flash' }; } });
+    const { filmDraft } = makeFilm({ db, apiUrl: 'http://api', ownerActorId: 'u1', post: post as never, agents: new Map(), film: async (_k, prompt) => { seen = prompt; return { bytes: MP4, mime: 'video/mp4', model: 'gemini-omni-1.1-flash' }; }, door: async () => ({ filming: false, code: 'UNAVAILABLE', error: 'no lane' }) });
     await filmDraft({ id: 'a1', name: 'plume', role: 'marketer', channels: new Set(['c1']) } as never, { id: 'c1', slug: 'marketing', workspace_id: 'w1' }, 'item-1');
     assert.match(seen, /Opening shot: handheld, walking, no laptop bag/);
     assert.doesNotMatch(seen, /Three things in the new update/);

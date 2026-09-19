@@ -80,11 +80,14 @@ export function planEnv(input: { existing: Partial<StackEnv>; version: string; d
   return { env, tagChanged: !firstRun && existing.NM_IMAGE_TAG !== input.version, firstRun, changed };
 }
 
-/** the compose services, in the order the card lists them, with the names a person reads */
+/** the compose services in BOOT order (each `depends_on` the one above it), which is the order
+ *  the card lists them: the chain reads top to bottom as the containers come up (2026-09-18: it
+ *  used to list PowerSync second, and PowerSync is the last to start, so a person watched the
+ *  middle row wait for a container that was never asked to start) */
 export const SERVICES: ReadonlyArray<{ service: string; label: string }> = [
   { service: 'pg', label: 'Postgres' },
-  { service: 'powersync', label: 'PowerSync' },
   { service: 'control-api', label: 'NeuraMesh API' },
+  { service: 'powersync', label: 'PowerSync' },
 ];
 
 /** `${VAR}`, `${VAR:-default}` and `${VAR:?message}` — the three forms the compose file uses */

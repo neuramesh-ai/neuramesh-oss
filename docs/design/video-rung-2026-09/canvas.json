@@ -1,0 +1,136 @@
+{
+  "artboards": [
+    {
+      "file": "Before.dc.html",
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 1000,
+      "title": "A · the card before the press · graphite"
+    },
+    {
+      "file": "Filming.dc.html",
+      "x": 1580,
+      "y": 0,
+      "w": 1440,
+      "h": 1000,
+      "title": "B · filming · graphite"
+    },
+    {
+      "file": "FilmingCream.dc.html",
+      "x": 3160,
+      "y": 0,
+      "w": 1440,
+      "h": 1000,
+      "title": "B · filming · cream oak"
+    },
+    {
+      "file": "Filmed.dc.html",
+      "x": 0,
+      "y": 1260,
+      "w": 1440,
+      "h": 1000,
+      "title": "C · the film landed · graphite"
+    },
+    {
+      "file": "States.dc.html",
+      "x": 1580,
+      "y": 1260,
+      "w": 1440,
+      "h": 1000,
+      "title": "D · out of credits, the own-key fallback, no lane · graphite"
+    },
+    {
+      "file": "Settings.dc.html",
+      "x": 3160,
+      "y": 1260,
+      "w": 1440,
+      "h": 1000,
+      "title": "E · Settings › Connections · the Video line and the credits history · cream oak"
+    },
+    {
+      "file": "Architecture.dc.html",
+      "x": 0,
+      "y": 2520,
+      "w": 1440,
+      "h": 1000,
+      "title": "F · how it runs · your machine, our server"
+    },
+    {
+      "file": "Options.dc.html",
+      "x": 1580,
+      "y": 2520,
+      "w": 1440,
+      "h": 1000,
+      "title": "G · the options and the registry"
+    }
+  ],
+  "annotations": [
+    {
+      "id": "note-top",
+      "x": 0,
+      "y": -300,
+      "w": 4600,
+      "text": "THE VIDEO RUNG · Seedance 2.0, Kling 3.0 and MiniMax H3 through one fal.ai key on the backend, metered on cloud credits (design round 1, 2026-09-19, issue #539)\nGeorge: \"we'll use a fal.ai key on the backend and limit usage based on cloud credits\", and \"configure multiple models support so we can easily switch video generation models with an env variable\". The Starter brain is the shape: the platform key never leaves the control-api, the balance is checked before the call, the ledger is debited with a row beside it. What changes for the person: the same Generate video button, with the model and the credits said BEFORE the press, a pending state that survives a reload, the film with its facts after, and two honest answers when the credits are gone. No picker. Nothing publishes a clip yet."
+    },
+    {
+      "id": "note-a",
+      "x": 0,
+      "y": 1020,
+      "w": 1440,
+      "text": "A · BEFORE THE PRESS. The video card from #535: caption, folded script, the shot direction. New: the facts line beside Generate video names the active model, the clip length, the credits it costs and how long it takes, read from GET /v1/starter/video. A spend is never a surprise. When the workspace has no credits and a Google key, the line reads \"Gemini Omni Flash · your key\"."
+    },
+    {
+      "id": "note-b",
+      "x": 1580,
+      "y": 1020,
+      "w": 1440,
+      "text": "B · FILMING. The press posts the marker; the daemon asks the door; the door answers 202 with the films row and stamps video_pending on the draft, so the state survives a reload and shows on every machine. The card holds a quiet progress row with the model, the length and the credits. plume's line in the thread says the same. The button is off, not gone."
+    },
+    {
+      "id": "note-bc",
+      "x": 3160,
+      "y": 1020,
+      "w": 1440,
+      "text": "B · CREAM OAK. The same card in the signature light. The pending row is a dashed hairline box in the card's stratum, the progress bar wears the link ink, the facts line stays mono and muted."
+    },
+    {
+      "id": "note-c",
+      "x": 0,
+      "y": 2280,
+      "w": 1440,
+      "text": "C · THE FILM LANDED. The minute cron found the request COMPLETED, downloaded the clip, hosted it through the picture's lane, cleared video_pending. The card plays it where the picture stands; the row reads \"shot direction\"; the facts line records what filmed it, for how long, at what price, when. Film again spends again, and says so."
+    },
+    {
+      "id": "note-d",
+      "x": 1580,
+      "y": 2280,
+      "w": 1440,
+      "text": "D · THE THREE ANSWERS WHEN THE LANE CANNOT FILM. Out of credits: the row names the price and the two ways forward (Add credits, or a Google key). With a Google key set, the rung falls to it on its own and the film carries \"your key · no credits used\". With neither, the card says video is not set up here and points at Image generation. The local stack has no Starter lane by rule (CLAUDE.md #5) and reads the third state."
+    },
+    {
+      "id": "note-e",
+      "x": 3160,
+      "y": 2280,
+      "w": 1440,
+      "text": "E · WHERE THE SPEND SHOWS. Settings › Connections › Image generation gains one Video line: the active model, its price, the fallback. It is a statement, not a control, because the model is the server's env variable. The credits card lists every film as its own row with the draft, the length and the session, and a refund beside a failed one. A film is the single largest thing a credit buys, so it is never folded into a daily total."
+    },
+    {
+      "id": "note-f",
+      "x": 0,
+      "y": 3540,
+      "w": 1440,
+      "text": "F · HOW IT RUNS. Two lanes, one door. The machine never holds the key and never polls fal: it asks once and reads the row. The server's door is the Starter brain's twin (member gate, balance FIRST, price, debit, submit, 202). The minute cron works the films rows: status, download, host, stamp; a failure refunds and lands on the card. STARTER_VIDEO_MODELS is the only switch: the first key is the active model, the rest are the fallbacks when fal answers that an endpoint is unavailable."
+    },
+    {
+      "id": "note-g",
+      "x": 1580,
+      "y": 3540,
+      "w": 1440,
+      "text": "G · THE OPTIONS AND THE REGISTRY. Four decisions with the recommendation lit. The table is the registry as fal publishes it on 2026-09-19: the endpoint, the inputs the lane sends, the per-second price at 720p with audio, an eight-second clip in dollars and in credits (1 credit = $0.01). Three questions are left for George at the foot: at cost or with a margin, the first model on day one, and the vendor names on the card."
+    }
+  ],
+  "launch": {
+    "fit": "all"
+  }
+}

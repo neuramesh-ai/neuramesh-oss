@@ -30,6 +30,7 @@ export interface Store {
   machineUsageToday?(workspaceId: string): Promise<{ day: string; minutes: number }>;
   /** the public announce door (0139): one object, two implementations (store/announce.ts) */
   announcements?: import('./announce').AnnounceStore;
+  films?: import('./films').FilmStore; // the video rung's job rows (0140): the door writes, the minute cron works, the history reads
   createTask(task: Task, event: NMEvent): Promise<Task>;
   // Duplicate-create guard (handler createTask): the newest OPEN non-backlog task in the
   // channel whose normalizeTaskTitle(title) matches, created at/after sinceIso — else null.
@@ -76,9 +77,10 @@ export interface Store {
   createWorkspace(input: { name: string; slug: string; createdBy: string }, event: NMEvent): Promise<{ workspaceId: string; channelId: string }>;
   listWorkspaces(userId: string): Promise<Array<{ id: string; name: string; slug: string; role: string; memberCount: number; autoFailover: boolean; activeModelPack: string; commRules: unknown; plan: string; seats: number; subscriptionStatus: string | null; currentPeriodEnd: string | null; primaryMachineId: string | null }>>;
   // Workspace-level settings (provider-auth failover policy + the active model-config pack).
-  updateWorkspace(workspaceId: string, patch: { autoFailover?: boolean; activeModelPack?: string; commRules?: { ste100?: boolean; noEmdash?: boolean; custom?: string[] } }, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }>;
+  updateWorkspace(workspaceId: string, patch: { autoFailover?: boolean; activeModelPack?: string; commRules?: { ste100?: boolean; noEmdash?: boolean; custom?: string[] }; videoTier?: string | null }, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }>;
   /** the workspace's stored comm_rules jsonb (null = never configured = defaults) */
   getCommRules(workspace: string): Promise<unknown>;
+  getVideoTier(workspace: string): Promise<string | null>; // the workspace's video tier pick (0140), null = the server's default
   // Custom brains (user-authored model packs, docs/10 §14): workspace-scoped named role→model
   // maps. save upserts (create mints `custom:<uuid>`; duplicate name → CONFLICT); delete also
   // resets workspaces.active_model_pack to the 'custom' sentinel when it pointed at the pack —
@@ -408,7 +410,7 @@ export interface Store {
   setContentStatus(itemId: string, patch: { status: 'draft' | 'scheduled'; scheduledAt: string | null; approvedBy: string | null; keepSlot?: boolean }, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }>;
   updateContentBody(itemId: string, body: string, mediaUrl: string | null | undefined, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }>;
   /** the marketer revises its OWN unpublished draft (§4.5) — body/imageBrief/thumb; DRAFT status only */
-  reviseDraft(itemId: string, patch: { body: string | null; imageBrief: string | null; script?: string | null; thumb: string | null; imageError?: string | null; videoError?: string | null }, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }>;
+  reviseDraft(itemId: string, patch: { body: string | null; imageBrief: string | null; script?: string | null; videoPending?: boolean; videoMeta?: import('./films').VideoMeta | null; videoErrorCode?: 'NO_CREDITS' | 'UNAVAILABLE' | null; thumb: string | null; imageError?: string | null; videoError?: string | null }, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }>;
   deleteContentItem(itemId: string, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }>;
   /** host a draft's image bytes (0090) and point content_items.media.image_id at them — the
    *  only way a locally generated picture can ever reach a network that fetches URLs */
@@ -440,7 +442,7 @@ export interface Store {
   // imageIntended: the post was MEANT to carry an image (a brief was written, a preview was
   // generated, or generation errored) — so the publish pass can refuse to send it text-only if the
   // picture isn't attached yet, instead of quietly dropping the image.
-  dueContentItems(nowIso: string, limit: number): Promise<Array<{ id: string; workspace: string; channel: string; platform: string; body: string; mediaUrl?: string | null; mediaId?: string | null; imageIntended: boolean }>>;
+  dueContentItems(nowIso: string, limit: number): Promise<Array<{ id: string; workspace: string; channel: string; platform: string; body: string; mediaUrl?: string | null; mediaId?: string | null; mediaKind?: 'image' | 'video' | null; imageIntended: boolean }>>;
   /** scheduled items landing between two moments — the review reminder's read. Deliberately not
    *  dueContentItems: that one is "past due, publish it", this one is "coming, tell somebody". */
   upcomingContentItems(fromIso: string, toIso: string, limit: number): Promise<Array<{ id: string; workspace: string; channel: string; threadId: string | null; platform: string; body: string; scheduledAt: string }>>;

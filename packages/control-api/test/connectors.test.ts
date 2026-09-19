@@ -2,7 +2,7 @@
 // (AES-256-GCM) and never leave the server; due + approved items publish through an
 // injectable Poster (the X client in prod, a fake here); one failure never blocks the
 // batch and always lands loudly on the row. Disconnect is a human call.
-import type { Actor } from '@neuramesh/shared';
+import { createEvent, formatAddress, type Actor } from '@neuramesh/shared';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from '../src/app';
 import { XReauthRequired, igPoster, liPoster, publishDueItems, ttPoster, type Poster, type TokenBundle, xPoster, xSearchOnConnector, xSearchRecent, xStartUrl } from '../src/connectors';
@@ -102,6 +102,45 @@ describe('publishDueItems — due + approved → post → receipt', () => {
     await send(plume, { type: 'content.attach_media', item: itemId, dataUrl: GIF });
     expect(await publishDueItems(store, { x: poster }, now, 'https://api.neuramesh.app')).toEqual({ published: 1, failed: 0, held: 0 });
     expect(posted).toBe(1);
+  });
+
+  it('a film is the post\'s media on X, holds while the film is in flight, and fails on another network with the way out', async () => {
+    const channel = await makeRoom();
+    const MP4 = `data:video/mp4;base64,${Buffer.concat([Buffer.from([0, 0, 0, 0x18]), Buffer.from('ftypisom'), Buffer.alloc(24)]).toString('base64')}`;
+    const stamp = (ws: string) => createEvent({ type: 'content.updated', source: formatAddress(plume), target: 'resource/content/x', workspace: ws, payload: {} });
+    const schedule = async (itemId: string): Promise<Date> => { const at = new Date(Date.now() + 3600e3); await send(george, { type: 'content.approve', item: itemId, scheduledAt: at.toISOString() }); return new Date(at.getTime() + 60e3); };
+    for (const provider of ['x', 'linkedin']) { const { id } = await store.upsertConnector({ workspace: 'ws_acme', channelId: channel, provider, handle: '@_neuramesh', connectedBy: 'george', scopes: '' }); await store.setConnectorSecret(id, seal({ access_token: 'live-token' })); }
+    const seen: Array<{ platform: string; mediaUrl: string | null | undefined }> = [];
+    const poster = (platform: string): Poster => ({ async post(_t, _b, opts) { seen.push({ platform, mediaUrl: opts?.mediaUrl }); return { url: `https://${platform}/1` }; } });
+    const posters = { x: poster('x'), linkedin: poster('linkedin') };
+
+    // a video post on X: the caption, the script, the shot direction as its brief (never a picture)
+    const { itemId } = await j(await send(plume, { type: 'content.create', channel, platform: 'x', body: 'caption', script: '[0:00-0:03] hook\n[0:03-0:08] the app', imageBrief: 'Vertical 9:16, direct to camera' }));
+    const now = await schedule(itemId);
+    // the film is in flight → HELD, never sent as text (the brief is not an image intent here)
+    await store.reviseDraft(itemId, { body: null, imageBrief: null, thumb: null, videoPending: true }, stamp);
+    expect(await publishDueItems(store, posters, now, 'https://api.neuramesh.app')).toEqual({ published: 0, failed: 0, held: 1 });
+    // the film lands → it is the media the poster gets, through the signed hosted url
+    await store.reviseDraft(itemId, { body: null, imageBrief: null, thumb: null, videoPending: false }, stamp);
+    const { mediaId } = await j(await send(plume, { type: 'content.attach_media', item: itemId, dataUrl: MP4 }));
+    expect(await publishDueItems(store, posters, now, 'https://api.neuramesh.app')).toEqual({ published: 1, failed: 0, held: 0 });
+    expect(seen).toEqual([{ platform: 'x', mediaUrl: expect.stringContaining(`/media/${mediaId}?s=`) }]);
+
+    // the same film on LinkedIn: a loud failure that names the way out, never a text post
+    const { itemId: li } = await j(await send(plume, { type: 'content.create', channel, platform: 'linkedin', body: 'caption', script: '[0:00-0:03] hook\n[0:03-0:08] the app' }));
+    await send(plume, { type: 'content.attach_media', item: li, dataUrl: MP4 });
+    const now2 = await schedule(li);
+    expect(await publishDueItems(store, posters, now2, 'https://api.neuramesh.app')).toEqual({ published: 0, failed: 1, held: 0 });
+    expect(seen.length).toBe(1);
+    const row = (store as unknown as { contentItems: Array<{ id: string; status: string; lastError?: string | null }> }).contentItems.find((x) => x.id === li);
+    expect(row?.status).toBe('failed');
+    expect(row?.lastError).toMatch(/cannot post a video to linkedin yet.*Download the film/);
+
+    // a video post with no film and none in flight posts its caption: the preview said so before the approve
+    const { itemId: bare } = await j(await send(plume, { type: 'content.create', channel, platform: 'x', body: 'caption only', script: '[0:00-0:03] hook\n[0:03-0:08] the app', imageBrief: 'Vertical 9:16' }));
+    const now3 = await schedule(bare);
+    expect(await publishDueItems(store, posters, now3, 'https://api.neuramesh.app')).toEqual({ published: 1, failed: 0, held: 0 });
+    expect(seen[1]).toEqual({ platform: 'x', mediaUrl: null });
   });
 
   it('no connected account → the item fails loudly, the batch continues', async () => {

@@ -30,6 +30,8 @@ export interface UsageToday {
   modelCalls: number;
   modelMicros: number;
   machineMicros: number;
+  videoClips: number;
+  videoMicros: number;
 }
 
 /** the balance, created on first read — a workspace that has never been granted reads zero
@@ -189,8 +191,8 @@ export async function chargeMachineActivity(
 }
 
 export async function usageToday(sql: postgres.Sql, workspaceId: string): Promise<UsageToday> {
-  const [row] = await sql<{ minutes: number; active_seconds: number; model_calls: number; model_micros: string; machine_micros: string }[]>`
-    select minutes, active_seconds, model_calls, model_micros, machine_micros from machine_usage
+  const [row] = await sql<{ minutes: number; active_seconds: number; model_calls: number; model_micros: string; machine_micros: string; video_clips: number; video_micros: string }[]>`
+    select minutes, active_seconds, model_calls, model_micros, machine_micros, video_clips, video_micros from machine_usage
      where workspace_id = ${workspaceId}::uuid and day = (now() at time zone 'utc')::date`;
   return {
     day: new Date().toISOString().slice(0, 10),
@@ -199,6 +201,8 @@ export async function usageToday(sql: postgres.Sql, workspaceId: string): Promis
     modelCalls: Number(row?.model_calls ?? 0),
     modelMicros: Number(row?.model_micros ?? 0),
     machineMicros: Number(row?.machine_micros ?? 0),
+    videoClips: Number(row?.video_clips ?? 0),
+    videoMicros: Number(row?.video_micros ?? 0),
   };
 }
 
@@ -221,3 +225,67 @@ export async function workspacesDueRefill(sql: postgres.Sql): Promise<Array<{ wo
  *  transactional concern with its own semantics, not five more delegates on a store already at
  *  its size cap — and stores without a pool (memory) simply serve 501, exactly as the fleet's
  *  optional methods do. */
+
+/** spend for a FILM (the video rung, 0140). The same guard and the same pools as spendCredits,
+ *  but the meter row counts clips and seconds instead of tokens, and the split across the two
+ *  pools comes back so a refund can put each part where it came from. Refuses (null) when the
+ *  balance cannot cover the whole clip: a film is charged BEFORE it is made, so a partial fit is
+ *  a refusal, never a debt. */
+export async function spendCreditsForFilm(
+  sql: postgres.Sql,
+  workspaceId: string,
+  micros: number,
+  clip: { seconds: number },
+): Promise<{ remainingMicros: number; grantMicros: number; purchasedMicros: number } | null> {
+  return sql.begin(async (tx) => {
+    const [bal] = await tx<{ granted_micros: string; spent_micros: string; purchased_micros: string; purchased_spent_micros: string }[]>`
+      select granted_micros, spent_micros, purchased_micros, purchased_spent_micros
+        from workspace_credits
+       where workspace_id = ${workspaceId}::uuid for update`;
+    const grantLeft = Math.max(0, Number(bal?.granted_micros ?? 0) - Number(bal?.spent_micros ?? 0));
+    const purchasedLeft = Math.max(0, Number(bal?.purchased_micros ?? 0) - Number(bal?.purchased_spent_micros ?? 0));
+    if (grantLeft + purchasedLeft < micros) return null;
+    const fromGrant = Math.min(micros, grantLeft);
+    const fromPurchased = micros - fromGrant;
+    await tx`update workspace_credits
+                set spent_micros = spent_micros + ${fromGrant},
+                    purchased_spent_micros = purchased_spent_micros + ${fromPurchased},
+                    updated_at = now()
+              where workspace_id = ${workspaceId}::uuid`;
+    await tx`insert into machine_usage (workspace_id, day, minutes, video_clips, video_seconds, video_micros)
+             values (${workspaceId}::uuid, (now() at time zone 'utc')::date, 0, 1, ${clip.seconds}, ${micros})
+             on conflict (workspace_id, day) do update
+               set video_clips = machine_usage.video_clips + 1,
+                   video_seconds = machine_usage.video_seconds + ${clip.seconds},
+                   video_micros = machine_usage.video_micros + ${micros}`;
+    return { remainingMicros: grantLeft + purchasedLeft - micros, grantMicros: fromGrant, purchasedMicros: fromPurchased };
+  });
+}
+
+/** give a failed film's credits back: each pool exactly as it was drained (never below zero),
+ *  the day's meter reduced, and a `refund` row in the grant ledger as the audit line beside the
+ *  charge. The ledger row does not raise granted_micros: the reversal is on the spent side, so a
+ *  refunded purchase keeps its never-expires nature and a refunded grant keeps its reset. */
+export async function refundFilm(
+  sql: postgres.Sql,
+  workspaceId: string,
+  split: { grantMicros: number; purchasedMicros: number; seconds: number },
+  note: string,
+): Promise<void> {
+  const micros = split.grantMicros + split.purchasedMicros;
+  if (micros <= 0) return;
+  await sql.begin(async (tx) => {
+    await tx`update workspace_credits
+                set spent_micros = greatest(0, spent_micros - ${split.grantMicros}),
+                    purchased_spent_micros = greatest(0, purchased_spent_micros - ${split.purchasedMicros}),
+                    updated_at = now()
+              where workspace_id = ${workspaceId}::uuid`;
+    await tx`update machine_usage
+                set video_clips = greatest(0, video_clips - 1),
+                    video_seconds = greatest(0, video_seconds - ${split.seconds}),
+                    video_micros = greatest(0, video_micros - ${micros})
+              where workspace_id = ${workspaceId}::uuid and day = (now() at time zone 'utc')::date`;
+    await tx`insert into credit_grants (workspace_id, micros, kind, rate_version, note)
+             values (${workspaceId}::uuid, ${micros}, 'refund', ${RATE_VERSION}, ${note})`;
+  });
+}

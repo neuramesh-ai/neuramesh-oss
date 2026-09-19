@@ -1,0 +1,89 @@
+{
+  "artboards": [
+    {
+      "file": "Main.dc.html",
+      "x": 0,
+      "y": 0,
+      "w": 880,
+      "h": 540,
+      "title": "B1 · The chain · the API starts · graphite"
+    },
+    {
+      "file": "B2-ChainStopped.dc.html",
+      "x": 960,
+      "y": 0,
+      "w": 880,
+      "h": 540,
+      "title": "B2 · The chain · PowerSync stopped"
+    },
+    {
+      "file": "B3-ErrorStopped.dc.html",
+      "x": 1920,
+      "y": 0,
+      "w": 880,
+      "h": 540,
+      "title": "B3 · Did not start · a container stopped"
+    },
+    {
+      "file": "B4-ErrorPort.dc.html",
+      "x": 2880,
+      "y": 0,
+      "w": 880,
+      "h": 540,
+      "title": "B4 · Did not start · a port is in use"
+    },
+    {
+      "file": "B5-ChainCream.dc.html",
+      "x": 0,
+      "y": 720,
+      "w": 880,
+      "h": 540,
+      "title": "B5 · The chain · cream oak"
+    },
+    {
+      "file": "B6-ErrorCream.dc.html",
+      "x": 960,
+      "y": 720,
+      "w": 880,
+      "h": 540,
+      "title": "B6 · Did not start · cream oak"
+    },
+    {
+      "file": "Z0-Today.dc.html",
+      "x": 1920,
+      "y": 720,
+      "w": 880,
+      "h": 540,
+      "title": "Z0 · Before · v0.137.1 · for reference"
+    },
+    {
+      "file": "Z1-TodayError.dc.html",
+      "x": 2880,
+      "y": 720,
+      "w": 880,
+      "h": 540,
+      "title": "Z1 · Before · the 90-second dead end"
+    }
+  ],
+  "notes": {
+    "head": {
+      "x": 0,
+      "y": -300,
+      "kind": "title1",
+      "maxW": 3760,
+      "text": "First run: the stack starts, and when it does not · 2026-09-18 · decided"
+    },
+    "decided": {
+      "x": 0,
+      "y": 1440,
+      "w": 1200,
+      "text": "DECIDED (George, 2026-09-18): B, the chain. The stopped node wears --term-red. The foot line is gone. The Porch mark is back on the card, with its look left and right. The title reads \"NeuraMesh is starting up…\". The A (rows) and B7 (stage line) alternates of version 2 retired. This version is the visual contract the build follows: apps/desktop/src/renderer/src/views/LocalStackGate.tsx, tokens.css .lsg*, evidence in docs/design/first-run-stack-2026-09/evidence."
+    },
+    "fail": {
+      "x": 1280,
+      "y": 1440,
+      "w": 1200,
+      "text": "THE FAILURE CARD has three parts: the CAUSE in plain words, the container's own last line in a mono well, the REMEDY. COPY DETAILS puts the three on the clipboard. An error with no diagnosis (Colima did not start.) keeps the two-line card.\nThe bug on George's Mac: a first start failed on a port clash (the dev stack holds 127.0.0.1:58081), Docker Desktop then dropped the container's network, and every later start \"succeeded\" with no network. Try again could never fix it, because compose keeps a container whose config did not change. The driver now checks both ports first (B4), marks a container with no network for recreation, ends a crash loop in seconds with the container's last line (B2, B3), and recreates the failed container on Try again."
+    }
+  }
+}

@@ -406,11 +406,42 @@ real work — if it is decoration, drop it and keep the pill.
   centres on it — the elevated stratum with nothing between it and the frame, because no sheet
   exists yet to float on. One recipe for six states: mono kicker (`.lsgkick`, 10px uppercase) →
   20px/500 title → one 14px sentence → the body rows → `.lsgacts` (mono uppercase 3px buttons) →
-  `.lsgfoot` (one hairline, one mono fact). Body rows are two shapes and no more: a **download row**
-  (`.lsgprow`: name · pinned size · a 4px bar that is bytes over total) and a **status row**
-  (`.lsgsrow`: name · `READY` in `--green` or a warm `.lsgwait` dot + `PLEASE WAIT…`). The picker's
+  `.lsgfoot` (one hairline, one mono fact). Body rows are three shapes and no more: a **download row**
+  (`.lsgprow`: name · pinned size · a 4px bar that is bytes over total), a **status row**
+  (`.lsgsrow`: name · `READY` in `--green` or a warm `.lsgwait` dot + `PLEASE WAIT…`, the install and
+  engine cards) and the **chain row** (`.lsgcrow`, below, the stack card). The picker's
   rows (`.lsgrow`) are the settled radio idiom: hairline, hover lifts, the chosen one wears `--sel-bg`
   (§3's one exception).
+  ▸ **The stack card is the CHAIN, and the card wears the mark** (the first-run round, 2026-09-18,
+  George: B, `--term-red`, no foot line, the mark back, "NeuraMesh is starting up…" — visual
+  contract `docs/design/first-run-stack-2026-09/`, evidence beside it). The picker's radio column
+  becomes the status column: one 18px node per container in BOOT order (Postgres, then the API,
+  then PowerSync — the order `depends_on` runs, which the old list did not follow, so a person
+  watched the middle row wait for a container that was never asked to start), name · one fact on
+  ONE line (`.lsgcname`), and a 1px segment that lights `--green` once the node above it is ready.
+  Four node states and no words but one: ready = `--green` filled with a check · starting = an
+  `--accent` dot under the wizard's dashed halo (`ob-ringspin`, the one constant motion that means
+  alive, stilled under reduced motion) · queued = a `--border2` ring, the name in `--body` ·
+  stopped = `--term-red` filled with a cross plus the mono word `stopped` at the right, the one
+  word a failure earns. The chain shows the order, so the sentence about order died and the "ports
+  open on 127.0.0.1 only" foot went with it: the card says what it is (three containers) and how
+  long (under a minute). The title keeps George's splash wording, "NeuraMesh is starting up…", a
+  recorded exception to STE's no-`-ing` rule for this one display moment. The Porch mark sits at
+  the card's top (`.lsgmark`, 40px) on EVERY gate state: it plays the launch grammar once at mount
+  (the `.launchpeek.full` timings, so the two never drift into different characters) and then
+  glances left and right every 9 s while the person waits (`lsg-glance`, no fill so it stays
+  silent until the first look has played).
+  ▸ **The failure card has three parts, or one.** The cause in plain words (`.lsgcause`, 14px
+  `--text`: "PowerSync stopped 3 times.", "Port 58081 is in use by another program."), the
+  container's own last line in a warm well (`.lsgwell`, `--panel2`, mono 11, three lines then a
+  clip, selectable), and the remedy (`.lsgremedy`, 13px `--muted`: what Try again will do). `COPY
+  DETAILS` puts the three lines on the clipboard, as a quiet button at the right of Try again ·
+  Quit. An error with no diagnosis (Colima did not start.) keeps the two-line card: the well and
+  the remedy draw only when main sent them. Main decides here too: the driver reads each
+  container's status, exit code and restart count every poll, so a crash loop ends the wait in
+  seconds with the container's own words instead of a 90-second "not healthy", and Try again
+  recreates the container that failed (a wedged container with its config intact survived every
+  retry before this, `main/localStack/index.ts`).
   ▸ **Bars, never a clock.** A download that has not announced its total draws an idle track, not a
   guess; "About 900 MB" appears only once every total is known, as a number the card was handed.
   ▸ **The card draws, main decides.** Every string, which state blocks the screen, and the MB figure

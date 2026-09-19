@@ -1,7 +1,7 @@
 // Image mime truth (2026-08-20): the bytes outrank every declaration in the pipeline — this
 // sniffer is what stops a webp wearing a png label from dying at X's finalize.
 import { describe, expect, it } from 'vitest';
-import { genImageItemId, sniffImageMime } from '../src/images';
+import { genImageItemId, sniffImageMime, sniffVideoMime } from '../src/images';
 
 const bytes = (...parts: Array<number[] | string>): Uint8Array => {
   const out: number[] = [];
@@ -29,6 +29,17 @@ describe('sniffImageMime', () => {
 
 // ONE matcher, because three places must agree: the two wake paths that draw, and the wake GATE
 // that decides whether this machine may serve the wake at all (they disagreed, 2026-09-05).
+describe('sniffVideoMime', () => {
+  it('recognizes an mp4 by the ftyp box and WebM by its EBML head (a film rides the media lane to X)', () => {
+    expect(sniffVideoMime(bytes([0, 0, 0, 0x18], 'ftypisom', [0, 0, 2, 0]))).toBe('video/mp4');
+    expect(sniffVideoMime(bytes([0x1a, 0x45, 0xdf, 0xa3], [0x9f, 0x42, 0x86, 0x81, 1, 0x42, 0xf7, 0x81]))).toBe('video/webm');
+  });
+  it('answers null for a picture and for nothing at all', () => {
+    expect(sniffVideoMime(bytes([0x89], 'PNG', [0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0]))).toBe(null);
+    expect(sniffVideoMime(bytes([0, 0, 0]))).toBe(null);
+  });
+});
+
 describe('the draw marker', () => {
   const ITEM = '0f2c4a1b-9d3e-4c77-8a21-5b6d0e7f1234';
 

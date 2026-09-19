@@ -55,21 +55,26 @@ test('the first pull is Download, a later tag change is Update, and both fill pe
   assert.equal(aboutMb(known.items), 896);
 });
 
-test('up lists the services pending, health turns them one by one, ready ends it', () => {
-  let s = run([{ type: 'up', services: ['Postgres', 'PowerSync', 'NeuraMesh API'] }]);
-  assert.deepEqual(s, { phase: 'starting', services: [{ name: 'Postgres', ready: false }, { name: 'PowerSync', ready: false }, { name: 'NeuraMesh API', ready: false }] });
-  s = run([{ type: 'health', service: 'Postgres' }, { type: 'health', service: 'PowerSync' }], s);
-  assert.deepEqual((s as { services: Array<{ ready: boolean }> }).services.map((x) => x.ready), [true, true, false]);
+test('up lists the services queued, each poll moves one along the boot order, ready ends it', () => {
+  let s = run([{ type: 'up', services: ['Postgres', 'NeuraMesh API', 'PowerSync'] }]);
+  assert.deepEqual(s, { phase: 'starting', services: [{ name: 'Postgres', status: 'queued', restarts: 0 }, { name: 'NeuraMesh API', status: 'queued', restarts: 0 }, { name: 'PowerSync', status: 'queued', restarts: 0 }] });
+  s = run([{ type: 'service', service: 'Postgres', status: 'ready' }, { type: 'service', service: 'NeuraMesh API', status: 'starting' }], s);
+  assert.deepEqual((s as { services: Array<{ status: string }> }).services.map((x) => x.status), ['ready', 'starting', 'queued']);
+  // a crash loop is a status with a count, drawn as the row's one word
+  s = run([{ type: 'service', service: 'NeuraMesh API', status: 'ready' }, { type: 'service', service: 'PowerSync', status: 'stopped', restarts: 3 }], s);
+  assert.deepEqual((s as { services: Array<{ status: string; restarts: number }> }).services[2], { name: 'PowerSync', status: 'stopped', restarts: 3 });
   s = run([{ type: 'ready', version: '0.132.0', engine: 'colima' }], s);
   assert.deepEqual(s, { phase: 'ready', version: '0.132.0', engine: 'colima' });
   // a probe after ready does not regress the shell
   assert.equal(run([probe({ engine: 'colima', running: true })], s).phase, 'ready');
 });
 
-test('an error remembers where it came from, and a second error keeps the first origin', () => {
+test('an error remembers where it came from, a second error keeps the first origin, and a diagnosis rides only when given', () => {
   const e = run([{ type: 'up', services: ['Postgres'] }, { type: 'error', message: 'compose up failed' }]);
   assert.deepEqual(e, { phase: 'error', message: 'compose up failed', from: 'starting' });
   assert.deepEqual(run([{ type: 'error', message: 'again' }], e), { phase: 'error', message: 'again', from: 'starting' });
+  assert.deepEqual(run([{ type: 'error', message: 'PowerSync stopped 3 times.', detail: 'postgres query failed', remedy: 'Try again starts a fresh PowerSync container.' }], e),
+    { phase: 'error', message: 'PowerSync stopped 3 times.', detail: 'postgres query failed', remedy: 'Try again starts a fresh PowerSync container.', from: 'starting' });
 });
 
 test('blocks: the picker, the installs, the pulls and an error take the screen; the two waits do not on a warm boot (F9)', () => {

@@ -105,9 +105,7 @@ async function awaitClip(key: string, name: string, c: Clock): Promise<Film> {
     if (!op?.done) continue;
     const clip = clipUri(op);
     if (!clip.uri) return { error: clip.error };
-    const dl = await c.fetchFn(clip.uri, { headers: { 'x-goog-api-key': key }, redirect: 'follow' });
-    if (!dl.ok) return { error: `the film could not be downloaded (${dl.status})` };
-    return clipBytes(Buffer.from(await dl.arrayBuffer()));
+    return download(key, clip.uri, c);
   }
 }
 
@@ -139,12 +137,15 @@ async function omniClip(key: string, started: Interaction, c: Clock): Promise<Fi
   if (it.error || it.status === 'failed') return { error: it.error?.message ?? 'the film failed' };
   const video = [...(it.steps ?? []), ...(it.outputs ?? [])].flatMap((o) => o.content ?? []).find((part) => part.type === 'video');
   if (video?.data) return clipBytes(Buffer.from(video.data, 'base64'));
-  if (video?.uri) {
-    const dl = await c.fetchFn(video.uri, { headers: { 'x-goog-api-key': key }, redirect: 'follow' });
-    if (!dl.ok) return { error: `the film could not be downloaded (${dl.status})` };
-    return clipBytes(Buffer.from(await dl.arrayBuffer()));
-  }
+  if (video?.uri) return download(key, video.uri, c);
   return { error: 'the model declined the prompt: the film came back empty' };
+}
+
+/** the clip at a Google-hosted uri, fetched with the key */
+async function download(key: string, uri: string, c: Clock): Promise<Film> {
+  const dl = await c.fetchFn(uri, { headers: { 'x-goog-api-key': key }, redirect: 'follow' });
+  if (!dl.ok) return { error: `the film could not be downloaded (${dl.status})` };
+  return clipBytes(Buffer.from(await dl.arrayBuffer()));
 }
 
 /** the start call for one rung: Omni's Interactions create, or Veo's long-running predict */
@@ -178,7 +179,37 @@ export async function veoFilm(key: string, prompt: string, opts: Partial<Clock> 
   return { error: 'this key reaches no video model. Video needs a Google AI key that can use Gemini Omni Flash or Veo' };
 }
 
-/** The draft-scoped lane the wake calls: read the draft, find a Google key, film, attach or explain. */
+/** The platform's answer to a film ask (POST /v1/starter/film): filming, or why the rung falls to the person's own key. */
+export type DoorAnswer = { filming: true; tier: string; model: string; credits: number } | { filming: false; code: 'NO_CREDITS' | 'UNAVAILABLE' | 'UPSTREAM' | 'IN_FLIGHT' | 'OTHER'; error: string; credits?: number };
+
+/** ask the door once; the server owns the film from a 202 on */
+export async function askDoor(post: (path: string, actor: { kind: string; id: string; role?: string }, body: unknown) => Promise<Response>, actor: { kind: string; id: string; role?: string }, body: { workspace: string; item: string; prompt: string }): Promise<DoorAnswer> {
+  const r = await post('/v1/starter/film', actor, body).catch(() => null);
+  if (!r) return { filming: false, code: 'OTHER', error: 'the server did not answer' };
+  const j = (await r.json().catch(() => ({}))) as { code?: string; error?: string; credits?: number; tier?: { label?: string; model?: string } };
+  if (r.status === 202) return { filming: true, tier: j.tier?.label ?? 'NeuraMesh Video', model: j.tier?.model ?? '', credits: j.credits ?? 0 };
+  const code = j.code === 'NO_CREDITS' || j.code === 'UNAVAILABLE' || j.code === 'UPSTREAM' || j.code === 'IN_FLIGHT' ? j.code : 'OTHER';
+  return { filming: false, code, error: j.error ?? `the door answered ${r.status}`, ...(j.credits ? { credits: j.credits } : {}) };
+}
+
+/** the script beside the caption (media.script); an older draft carried it as the body */
+function scriptOf(d: { body: string; media: string | null }): { script: string; brief: string } {
+  try {
+    const m = JSON.parse(d.media ?? 'null') as { brief?: string; script?: string } | null;
+    return { script: m?.script || d.body, brief: m?.brief ?? '' };
+  } catch { return { script: d.body, brief: '' }; }
+}
+
+/** why a draft has no film when the platform said no and the workspace holds no Google key */
+function noKeyReason(answer: Exclude<DoorAnswer, { filming: true }>, provider: string | undefined): string {
+  if (answer.code === 'NO_CREDITS') return `out of credits. A film costs about ${answer.credits ?? 'a few hundred'} credits. Add credits, or add a Google AI key under Image generation and the film runs on your key`;
+  if (provider === 'openai') return 'this workspace has an OpenAI key only. Video needs a Google AI key under Image generation: OpenAI closed its video API on 2026-09-24';
+  return 'video is not set up here. Add a Google AI key under Image generation to film on your own key';
+}
+
+/** The draft-scoped lane the wake calls: read the draft, ask the platform's door first (a film on
+ *  credits, the server owns it from a 202), fall to the workspace's own Google key when the door
+ *  says no credits or no lane, and explain on the card otherwise. */
 export function makeFilm(ctx: {
   db: PowerSyncDatabase;
   apiUrl: string;
@@ -186,27 +217,38 @@ export function makeFilm(ctx: {
   post: (path: string, actor: { kind: string; id: string; role?: string }, body: unknown) => Promise<Response>;
   agents: Map<string, HostedAgent>;
   film?: typeof veoFilm;
+  door?: typeof askDoor;
 }) {
   const { db, apiUrl, ownerActorId, post, agents } = ctx;
   const film = ctx.film ?? veoFilm;
+  const door = ctx.door ?? askDoor;
   async function filmDraft(agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, itemId: string): Promise<string> {
     const [d] = await db.getAll<{ body: string; media: string | null }>(
       `select body, media from content_items where id = ? and channel_id = ? and status = 'draft'`,
       [itemId, ch.id],
     ).catch(() => [] as Array<{ body: string; media: string | null }>);
     if (!d) return `That draft is not available to film (already scheduled or gone).`;
-    // the script beside the caption (media.script); an older draft carried it as the body
-    let brief = '';
-    let script = d.body;
-    try {
-      const m = JSON.parse(d.media ?? 'null') as { brief?: string; script?: string } | null;
-      brief = m?.brief ?? '';
-      if (m?.script) script = m.script;
-    } catch { /* none */ }
+    const { script, brief } = scriptOf(d);
     const postCmd = async (cmd: unknown): Promise<boolean> => {
       const r = await post('/v1/commands', { kind: 'agent', id: agent.id, role: agent.role }, cmd).catch(() => null);
       return !!(r && (r as { ok?: boolean }).ok);
     };
+    const prompt = filmPrompt(script, brief);
+    // THE PLATFORM FIRST (the video rung, issue #539): a film on credits, the model the server's env
+    // names for the workspace's tier. A 202 means the server films and lands it on the card itself;
+    // no credits or no lane sends the rung down to the person's own Google key, exactly the lane
+    // that shipped in 0.137.0. Any other answer is the card's to show.
+    const actor = { kind: 'agent', id: agent.id, role: agent.role };
+    const answer = await door(post, actor, { workspace: ch.workspace_id, item: itemId, prompt });
+    if (answer.filming) {
+      console.log(`agent_gen_video agent=${agent.name} room=#${ch.slug} item=${itemId.slice(0, 8)} filming on ${answer.model} credits=${answer.credits}`);
+      return `Filming the hook on ${answer.tier} (${answer.model}). It takes about two minutes and costs ${answer.credits} credits. The film lands on the card.`;
+    }
+    if (answer.code === 'UPSTREAM' || answer.code === 'IN_FLIGHT' || answer.code === 'OTHER') {
+      const why = answer.error.replace(/\.$/, '');
+      await postCmd({ type: 'content.revise', item: itemId, videoError: why });
+      return `The film did not start: ${why}. The reason is on the card.`;
+    }
     // the workspace's Google key: the designer's seat when it is Gemini, else the image ladder's
     // Gemini rung, else the machine's own env. Only a Google key reaches a video model (see the
     // head of this file), so an OpenAI-only workspace is told what to add, not that nothing exists.
@@ -214,13 +256,11 @@ export function makeFilm(ctx: {
     const { cred } = await designerImageCred(apiUrl, ch.workspace_id, designer, ownerActorId);
     const key = cred?.provider === 'gemini' ? cred.key : (process.env['GEMINI_API_KEY'] || process.env['GOOGLE_API_KEY'] || null);
     if (!key) {
-      const why = cred?.provider === 'openai'
-        ? 'this workspace has an OpenAI key only. Video needs a Google AI key under Image generation: OpenAI closed its video API on 2026-09-24'
-        : 'no Google key on this workspace. Video needs a Google AI key under Image generation';
-      await postCmd({ type: 'content.revise', item: itemId, videoError: why });
+      const why = noKeyReason(answer, cred?.provider);
+      await postCmd({ type: 'content.revise', item: itemId, videoError: why, videoErrorCode: answer.code });
       return `I cannot film it: ${why}.`;
     }
-    const out = await film(key, filmPrompt(script, brief));
+    const out = await film(key, prompt);
     if (!out.bytes) {
       const why = (out.error ?? 'the film came back empty').replace(/\.$/, '');
       await postCmd({ type: 'content.revise', item: itemId, videoError: why });
@@ -232,8 +272,10 @@ export function makeFilm(ctx: {
       await postCmd({ type: 'content.revise', item: itemId, videoError: 'the film did not attach to the draft' });
       return `The film came back but did not attach to the draft. Try again.`;
     }
+    // the film's facts on the card: the person's own key, no credits
+    await postCmd({ type: 'content.revise', item: itemId, videoMeta: { tier: 'own', model: out.model ?? 'google', seconds: 8, credits: 0, at: new Date().toISOString() } });
     console.log(`agent_gen_video agent=${agent.name} room=#${ch.slug} item=${itemId.slice(0, 8)} ok model=${out.model ?? '?'} bytes=${out.bytes.length}`);
-    return `Filmed the hook${out.model ? ` on ${out.model}` : ''}. An eight-second cut is on the card. Nothing publishes until you approve.`;
+    return `Filmed the hook${out.model ? ` on ${out.model}` : ''} with your Google key. An eight-second cut is on the card. Nothing publishes until you approve.`;
   }
   return { filmDraft };
 }

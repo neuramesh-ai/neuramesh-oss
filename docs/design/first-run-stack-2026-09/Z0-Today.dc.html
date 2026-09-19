@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Z0 · Before · v0.137.1 · for reference</title>
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;450;500;600&amp;family=Geist+Mono:wght@500;600&amp;family=Bricolage+Grotesque:wght@600&amp;display=swap">
+  <style>
+  body { margin: 0; }
+  .frame { --fbody: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; --fmono: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace; --fbrand: 'Bricolage Grotesque', var(--fbody);
+    --dur: .15s; --ease: cubic-bezier(.22,1,.36,1);
+    position: relative; box-sizing: border-box; width: 880px; height: 540px; background: var(--win); color: var(--text); font: 14px/1.5 var(--fbody); -webkit-font-smoothing: antialiased; overflow: hidden; display: flex; flex-direction: column; }
+  .frame *, .frame *::before, .frame *::after { box-sizing: border-box; }
+  .ftop { flex: none; display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 14px; }
+  .mark { width: 16px; height: 16px; display: inline-grid; place-items: center; color: var(--brand); }
+  .wordmark { font: 600 14px var(--fbrand); letter-spacing: -.015em; color: var(--text); }
+  .center { flex: 1; display: grid; place-items: center; padding: 24px; }
+  .stage { flex: none; display: flex; align-items: center; justify-content: flex-end; gap: 14px; height: 34px; padding: 0 16px; font: 500 10px var(--fmono); letter-spacing: -.02em; text-transform: uppercase; color: var(--dim); }
+  .stage i { width: 3px; height: 3px; border-radius: 50%; background: var(--dim); }
+  /* the Porch mark on the card: the launch grammar once, then a glance every 9 s (tokens.css .lsgmark) */
+  .cmark { display: inline-flex; width: 40px; height: 40px; margin-bottom: 2px; }
+  .cmark .pk-arch { animation: pk-fade .25s ease both; }
+  .cmark .pk-peekg { animation: pk-peek .4s var(--ease) .35s both; }
+  .cmark .pk-lookg { animation: pk-look 1.15s var(--ease) .85s both, glance 9s var(--ease) 4s infinite; }
+  .cmark .pk-smile { stroke-dasharray: 1; animation: pk-draw .4s var(--ease) 2.05s both, pk-fade .01s linear 2.05s both; }
+  .cmark svg { animation: pk-bounce .5s var(--ease) 2.5s both; }
+  @keyframes pk-fade { from { opacity: 0; } }
+  @keyframes pk-peek { from { transform: translateY(13px); } }
+  @keyframes pk-look { 0%, 14% { transform: none; } 26%, 44% { transform: translateX(-2.6px); } 56%, 78% { transform: translateX(2.6px); } 92%, 100% { transform: none; } }
+  @keyframes pk-draw { from { stroke-dashoffset: 1; } }
+  @keyframes pk-bounce { 0%, 100% { transform: none; } 35% { transform: translateY(-4px); } 70% { transform: translateY(1.5px); } }
+  @keyframes glance { 0%, 4% { transform: none; } 7%, 9% { transform: translateX(-2.6px); } 12%, 14% { transform: translateX(2.6px); } 17%, 100% { transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .cmark * { animation: none !important; stroke-dashoffset: 0; } }
+  /* the card: .lsgcard */
+  .card { width: 460px; padding: 26px 26px 20px; display: flex; flex-direction: column; gap: 14px; background: var(--card); border: 1px solid var(--card-border); border-radius: var(--r-lg); box-shadow: var(--shadow-card); }
+  .kick { font: 500 10px var(--fmono); letter-spacing: -.02em; text-transform: uppercase; color: var(--dim); }
+  .h1 { margin: 2px 0 0; font-family: var(--fbody); font-size: 20px; font-weight: 500; letter-spacing: -.02em; line-height: 1.25; color: var(--text); }
+  .p { margin: 0; font-size: 14px; line-height: 1.5; color: var(--body); }
+  .foot { display: flex; align-items: center; gap: 8px; margin-top: 2px; padding-top: 12px; border-top: 1px solid var(--border); }
+  .mono { font: 500 11px var(--fmono); letter-spacing: -.02em; color: var(--dim); }
+  /* today's status rows: .lsgsrow */
+  .srow { display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 4px; border-bottom: 1px solid var(--border); }
+  .srow:last-child { border-bottom: 0; }
+  .srow .nm { flex: 1; font-size: 14px; color: var(--body); }
+  .st { font: 500 10px var(--fmono); letter-spacing: -.02em; text-transform: uppercase; color: var(--dim); display: inline-flex; align-items: center; gap: 6px; }
+  .st.ok { color: var(--green); }
+  .st.bad { color: var(--term-red); }
+  .wait { width: 6px; height: 6px; border-radius: 50%; background: var(--warn); box-shadow: 0 0 0 3px color-mix(in srgb, var(--warn) 22%, transparent); }
+  /* B · the chain: the picker's radio column becomes the stack's status column */
+  .chain { display: flex; flex-direction: column; margin: 2px 0 0; }
+  .crow { position: relative; display: grid; grid-template-columns: 22px 1fr auto; align-items: center; gap: 12px; height: 40px; padding: 0 4px; }
+  .node { position: relative; width: 18px; height: 18px; display: grid; place-items: center; }
+  .node svg { position: absolute; inset: 0; }
+  .node.ready circle { fill: var(--green); }
+  .node.ready path { stroke: var(--card); stroke-width: 2.4; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+  .node.queued circle { fill: none; stroke: var(--border2); stroke-width: 1.5; }
+  .node.live .halo { fill: none; stroke: color-mix(in srgb, var(--accent) 42%, transparent); stroke-width: 1.5; stroke-dasharray: 1.5 4.4; stroke-linecap: round; transform-origin: center; animation: halo 10s linear infinite; }
+  .node.live .dot { fill: var(--accent); }
+  .node.stopped circle { fill: var(--term-red); }
+  .node.stopped path { stroke: var(--card); stroke-width: 2.2; fill: none; stroke-linecap: round; }
+  @keyframes halo { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .node.live .halo { animation: none; } }
+  .seg { position: absolute; left: 14px; top: 30px; width: 1px; height: 20px; background: var(--border); }
+  .seg.lit { background: var(--green); }
+  .cname { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+  .cname .nm { font-size: 14px; font-weight: 500; color: var(--text); }
+  .cname .fact { font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cname.dimmed .nm { color: var(--body); }
+  /* A · honest rows: kind glyph · name · fact · state icon */
+  .arow { display: grid; grid-template-columns: 18px 1fr auto; align-items: center; gap: 12px; height: 38px; padding: 0 4px; border-bottom: 1px solid var(--border); }
+  .arow:last-child { border-bottom: 0; }
+  .arow .glyph { color: var(--muted); display: grid; place-items: center; }
+  .aicon { display: inline-grid; place-items: center; width: 14px; height: 14px; }
+  .aicon.ok { color: var(--green); }
+  .aicon.queued { width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--border2); }
+  /* the error card's three parts: cause · the container's own last line · remedy */
+  .cause { margin: 0; font-size: 14px; line-height: 1.5; color: var(--text); }
+  .well { background: var(--panel2); border-radius: var(--r-md); padding: 9px 12px; font: 500 11px/1.55 var(--fmono); letter-spacing: -.02em; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; word-break: break-word; }
+  .remedy { margin: 0; font-size: 13px; line-height: 1.5; color: var(--muted); }
+  /* buttons: .btn, .btn.primary (the hatch), .btn.quiet */
+  .acts { display: flex; align-items: center; gap: 8px; margin-top: 2px; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 34px; padding: 0 14px; border-radius: var(--r-xs); border: 1px solid var(--border2); background: var(--btn); color: var(--btn-fg); font-family: var(--fmono); font-size: 12px; font-weight: 500; letter-spacing: -.02em; text-transform: uppercase; position: relative; white-space: nowrap; cursor: pointer; }
+  .btn.primary { background: var(--brand); color: var(--brand-ink); border-color: transparent; }
+  .btn.primary::before { content: ""; position: absolute; inset: 0; border-radius: inherit; background: repeating-linear-gradient(135deg, rgba(255,255,255,.16) 0 1px, transparent 1px 7px); background-size: 9.9px 9.9px; pointer-events: none; }
+  .btn.primary > * { position: relative; }
+  .btn.quiet { border-color: transparent; color: var(--muted); }
+  .btn.sm { height: 28px; padding: 0 10px; font-size: 10px; }
+  .grow { flex: 1; }
+  .lbl { position: absolute; left: 12px; bottom: 8px; font: 500 10px var(--fmono); letter-spacing: -.02em; text-transform: uppercase; color: var(--dim); z-index: 5; }
+</style>
+</helmet>
+<div class="frame" style="--win:#0d0d0d;--bg:#141414;--panel:#161616;--panel2:#1a1a1a;--panel3:#262626;--border:#262626;--border2:#3a3a3a;--card-border:#2c2c2c;--card:#1e1e1e;--text:#cbcbcb;--body:#a6a6a6;--muted:#848484;--dim:#6a6a6a;--link:#d19a72;--brand:#834a2b;--brand-ink:#fff7ee;--green:#77ac8d;--warn:#c9a15e;--accent:#cbcbcb;--term-red:#c98f8f;--btn:#232323;--btn-fg:#efefef;--shadow:rgba(0,0,0,0.62);--hover-border:#404040;--ring:#525252;--shadow-card:0 1px 2px rgba(0,0,0,.25);--shadow-lift:0 8px 20px -8px rgba(0,0,0,.55);--r-xs:3px;--r-sm:4px;--r-md:6px;--r-lg:8px;--r-full:999px;"><div class="ftop"><span class="mark"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 21V11a8 8 0 0 1 16 0v10"/><path d="M8 21v-9a4 4 0 0 1 8 0v9"/></svg></span><span class="wordmark">neuramesh</span></div><div class="center"><div class="card" role="dialog" aria-labelledby="t"><span class="kick">First run</span><h1 class="h1" id="t">NeuraMesh starts on this Mac</h1><p class="p">Your workspace on this Mac runs in three containers. They start now. Please wait…</p><div><div class="srow"><span class="nm">Postgres</span><span class="st ok"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>ready</span></div><div class="srow"><span class="nm">PowerSync</span><span class="st"><span class="wait"></span>please wait…</span></div><div class="srow"><span class="nm">NeuraMesh API</span><span class="st ok"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>ready</span></div></div><div class="foot"><span class="mono">Ports open on 127.0.0.1 only</span></div></div></div><span class="lbl">before</span></div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":880,"height":540}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

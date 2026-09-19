@@ -10,8 +10,8 @@ import type { ChannelRow, ChannelPersonRow, ChannelHistoryRow, ChannelArtifactRo
 import type { ConnectorRow, ContentItemRow, ContentItemWide, ScheduleRow, SkillRow, SkillPackRow , ScheduleRunRow } from './rows-content';
 import type { TaskRow, TaskAllRow, DecisionAllRow, ProjectRow, WorkspaceProjectRow, RepoUI, BeatUI, RunUI, ArtifactUI, AttachmentRow } from './rows-board';
 import type { AgentRow, MachineRow, MemberRow, WorkspaceMembership, PendingInvite, LogRow, RunRow } from './rows-crew';
-export type { WorkspaceUsage, CreditHistory } from './rows-infra';
-import type { WorkspaceUsage, CreditHistory } from './rows-infra';
+export type { WorkspaceUsage, CreditHistory, StarterVideo } from './rows-infra';
+import type { WorkspaceUsage, CreditHistory, StarterVideo } from './rows-infra';
 import type { CredRow, ProviderId, ProviderStatus, UpdateState, ArchivedThreadRow, FailoverRow, PolicyRowUI, ProcList, FootprintSnapshot, FootprintReply } from './rows-infra';
 import type { AlertConnectorRow, AlertPostRow, AlertScheduleRow, BrainOverride, RetroPayload, ThreadMode } from '@neuramesh/shared';
 import type { EngineeringNMBridge } from './engineering';
@@ -72,16 +72,19 @@ export interface RailRowsPayload {
 export type LocalRuntime = 'colima' | 'orbstack' | 'docker-desktop';
 export type LocalEngine = 'docker-desktop' | 'orbstack' | 'colima' | 'other';
 export interface LocalProgressItem { name: string; bytes: number; total: number | null; done: boolean }
+/** a container's place in the boot order: waits on the one above it · runs, not yet healthy · healthy · in its restart loop */
+export type LocalServiceStatus = 'queued' | 'starting' | 'ready' | 'stopped';
 export type LocalStackState =
   | { phase: 'probing' }
   | { phase: 'no-engine'; picked: LocalRuntime }
   | { phase: 'installing'; runtime: LocalRuntime; items: LocalProgressItem[]; vm: 'pending' | 'starting' | 'ready' }
   | { phase: 'engine-starting'; engine: LocalEngine }
   | { phase: 'downloading'; items: LocalProgressItem[] }
-  | { phase: 'starting'; services: Array<{ name: string; ready: boolean }> }
+  | { phase: 'starting'; services: Array<{ name: string; status: LocalServiceStatus; restarts: number }> }
   | { phase: 'updating'; version: string; items: LocalProgressItem[] }
   | { phase: 'ready'; version: string; engine: LocalEngine }
-  | { phase: 'error'; message: string; from: string };
+  /** `message` is the cause, `detail` the container's own last line, `remedy` what Try again does */
+  | { phase: 'error'; message: string; detail?: string; remedy?: string; from: string };
 export interface LocalStackPayload { state: LocalStackState; blocking: boolean; aboutMb: number | null }
 /** Settings › Connections (main/connectionsipc.ts): one card per connection */
 export interface ConnectionWorkspace { id: string; name: string; slug: string; plan: string | null; seats: number | null; subscriptionStatus: string | null; currentPeriodEnd: string | null }
@@ -140,7 +143,7 @@ export interface NMBridge extends EngineeringNMBridge, TerminalNMBridge {
   channelMeta(channelId: string): Promise<{ projects: ProjectRow[]; repos: RepoUI[]; reposAll: RepoUI[] }>;
   workspaceMeta(): Promise<{ projects: WorkspaceProjectRow[] }>;
   workspaceSettings(): Promise<{ autoFailover: boolean; activeModelPack: string; commRules: unknown; plan: string; seats: number; subscriptionStatus: string | null; currentPeriodEnd: string | null; primaryMachineId: string | null }>;
-  workspaceUpdate(input: { autoFailover?: boolean; activeModelPack?: string; commRules?: { ste100?: boolean; noEmdash?: boolean; custom?: string[] } }): Promise<unknown>;
+  workspaceUpdate(input: { autoFailover?: boolean; activeModelPack?: string; commRules?: { ste100?: boolean; noEmdash?: boolean; custom?: string[] }; videoTier?: 'starter' | 'xpress' | 'premium' | null }): Promise<unknown>;
   /** create the workspace ALONE (no crew, no machine) — the browser wizard's first step,
    *  where the id it mints is what the workspace's cloud machine is provisioned against. */
   workspaceCreate(input: { name: string; slug: string }): Promise<{ workspaceId: string }>;
@@ -162,6 +165,8 @@ export interface NMBridge extends EngineeringNMBridge, TerminalNMBridge {
   billingCheckout?(): Promise<{ ok: boolean }>;
   /** the utilization dashboard's history — daily meters + the grant ledger */
   creditsHistory?(): Promise<CreditHistory | null>;
+  /** the video rung: the tiers this server films on, with credits, and the workspace's pick */
+  starterVideo?(): Promise<StarterVideo | null>;
   /** buy a credit pack: names a size, the server prices it, opens hosted Checkout */
   creditsCheckout?(credits: number): Promise<{ ok: boolean }>;
   billingPortal?(): Promise<{ ok: boolean }>;

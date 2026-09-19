@@ -10,6 +10,7 @@ import { latestHumanWordSql, setThreadSettledSql, threadTaskIdSql } from './stor
 import { markScheduleResultSql, setScheduleCursorSql } from './store/release-routine';
 import { seedBundledPacksSql } from './store/skillpack-seed';
 import { PgAnnounceStore } from './store/announce';
+import { PgFilmStore } from './store/films';
 import { computeRetro } from './retro';
 import { SKILL_SEED } from './seed/skill-seed';
 import { MARKETING_SKILL_SEED } from './seed/marketing-skill-seed';
@@ -21,7 +22,7 @@ import { bumpMachineWake, machineSweep, machineUsageToday, type MachineSweepResu
 import { chargeMachineActivity } from './credit-ledger';
 import { localMode } from './localmode';
 import { schemaVersionSql, seedLocalUserSql, userIdForLocalTokenHashSql, type LocalUserSeed } from './store/local-identity';
-import type { ArtifactRow, AttachmentInput, DecisionRow, DecisionSeed, DesktopAuthResult, MutationResult, NMMessage, PolicyInput, PolicyRow, RunInput, ScheduleInput, Store, WhiteboardCreate, WhiteboardLwwPatch, WhiteboardMeta, WhiteboardRow, WhiteboardUpdate } from './store';
+import type { ArtifactRow, AttachmentInput, DecisionRow, DecisionSeed, DesktopAuthResult, MutationResult, NMMessage, PolicyInput, PolicyRow, RunInput, ScheduleInput, Store, VideoMeta, WhiteboardCreate, WhiteboardLwwPatch, WhiteboardMeta, WhiteboardRow, WhiteboardUpdate } from './store';
 
 type Row = Record<string, any>;
 // postgres.js TransactionSql isn't assignable to Sql in the typings even
@@ -59,6 +60,7 @@ export class PostgresStore implements Store {
   readonly sql: postgres.Sql;
   private ann?: PgAnnounceStore;
   get announcements(): PgAnnounceStore { return (this.ann ??= new PgAnnounceStore(this.sql)); }
+  private filmStore: PgFilmStore | undefined;   get films(): PgFilmStore { return (this.filmStore ??= new PgFilmStore(this.sql)); }
 
   constructor(url: string) {
     // prepare:false keeps Supavisor pooler compatibility.
@@ -1770,7 +1772,7 @@ export class PostgresStore implements Store {
 
   async updateWorkspace(
     workspaceId: string,
-    patch: { autoFailover?: boolean; activeModelPack?: string; commRules?: { ste100?: boolean; noEmdash?: boolean; custom?: string[] } },
+    patch: { autoFailover?: boolean; activeModelPack?: string; commRules?: { ste100?: boolean; noEmdash?: boolean; custom?: string[] }; videoTier?: string | null },
     makeEvent: (workspace: string) => NMEvent,
   ): Promise<{ id: string }> {
     return this.sql.begin(async (_tx) => {
@@ -1779,6 +1781,7 @@ export class PostgresStore implements Store {
       if (!ws) throw new DomainError('NOT_FOUND', 'workspace not found');
       // per-column coalesce: sending only autoFailover must not clobber active_model_pack, and vice-versa
       await sql`update workspaces set auto_failover = coalesce(${patch.autoFailover ?? null}, auto_failover), active_model_pack = coalesce(${patch.activeModelPack ?? null}, active_model_pack), comm_rules = coalesce(${patch.commRules ? sql.json(patch.commRules as never) : null}, comm_rules) where id = ${workspaceId}::uuid`;
+      if (patch.videoTier !== undefined) await sql`update workspaces set video_tier = ${patch.videoTier} where id = ${workspaceId}::uuid`; // cleared on purpose (null = the default), so not coalesced
       await this.insertEvent(sql, makeEvent(workspaceId), null);
       return { id: workspaceId };
     }) as Promise<{ id: string }>;
@@ -1788,6 +1791,7 @@ export class PostgresStore implements Store {
     const [r] = await this.sql`select comm_rules from workspaces where id = ${workspace}::uuid`;
     return r?.['comm_rules'] ?? null;
   }
+  async getVideoTier(workspace: string): Promise<string | null> { const [r] = await this.sql`select video_tier from workspaces where id = ${workspace}::uuid`; return (r?.['video_tier'] as string | null) ?? null; }
 
   async listModelPacks(workspace: string): Promise<Array<{ id: string; name: string; roles: Record<string, string>; updatedAt: string }>> {
     const rows = await this.sql`select id, name, roles, updated_at from custom_model_packs where workspace_id = ${workspace}::uuid order by created_at`;
@@ -2264,7 +2268,7 @@ export class PostgresStore implements Store {
     }) as Promise<{ id: string }>;
   }
 
-  async reviseDraft(itemId: string, patch: { body: string | null; imageBrief: string | null; script?: string | null; thumb: string | null; imageError?: string | null; videoError?: string | null }, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }> {
+  async reviseDraft(itemId: string, patch: { body: string | null; imageBrief: string | null; script?: string | null; videoPending?: boolean; videoMeta?: VideoMeta | null; videoErrorCode?: 'NO_CREDITS' | 'UNAVAILABLE' | null; thumb: string | null; imageError?: string | null; videoError?: string | null }, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }> {
     return this.sql.begin(async (_tx) => {
       const sql = asSql(_tx);
       // Revisable while a 'draft' OR a proposed 'scheduled' slot — the marketer owns the content
@@ -2296,7 +2300,9 @@ export class PostgresStore implements Store {
       if (patch.script) { media['script'] = patch.script; delete media['video_id']; delete media['video_error']; }
       if (patch.thumb !== null) { media['thumb'] = patch.thumb; delete media['image_error']; } // an image landed → drop the error
       if (patch.imageError !== undefined) { if (patch.imageError) media['image_error'] = patch.imageError; else delete media['image_error']; }
-      if (patch.videoError !== undefined) { if (patch.videoError) media['video_error'] = patch.videoError; else delete media['video_error']; }
+      if (patch.videoError !== undefined) { if (patch.videoError) media['video_error'] = patch.videoError; else { delete media['video_error']; delete media['video_error_code']; } }   if (patch.videoErrorCode !== undefined) { if (patch.videoErrorCode) media['video_error_code'] = patch.videoErrorCode; else delete media['video_error_code']; }
+      // the film in flight on the platform's key (0140): set by the door, cleared by the cron; a film's facts land beside it
+      if (patch.videoPending !== undefined) { if (patch.videoPending) media['video_pending'] = true; else delete media['video_pending']; }   if (patch.videoMeta !== undefined) { if (patch.videoMeta) media['video'] = patch.videoMeta; else delete media['video']; }
       const newBody = patch.body ?? (cur['body'] as string);
       // Rewriting the COPY/brief of a SCHEDULED post UNSCHEDULES it back to 'draft' and clears its
       // approval: dueContentItems auto-publishes on status='scheduled' alone, so the changed text

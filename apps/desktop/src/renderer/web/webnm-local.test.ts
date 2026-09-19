@@ -47,6 +47,25 @@ describe('the machine-local refusals', () => {
     assert.match(r.error ?? '', /not available in the browser/);
   });
 
+  test('a browser saves a file through its own download: the bytes as a Blob on an anchor click, named for the card', async () => {
+    const fn = arm<(f: { name: string; content: string; base64?: boolean }) => Promise<{ saved: boolean }>>('saveFileAs');
+    // no document (a worker, a test) = the honest no
+    assert.deepEqual(await fn({ name: 'a.mp4', content: 'AAAA', base64: true }), { saved: false });
+    // a page: the anchor carries the name, the object URL and the click, and leaves the DOM after
+    const clicks: Array<{ download: string; href: string; attached: boolean }> = [];
+    const anchor = { href: '', download: '', rel: '', attached: false, click() { clicks.push({ download: this.download, href: this.href, attached: this.attached }); }, remove() { this.attached = false; } };
+    const g = globalThis as Record<string, unknown>;
+    g['document'] = { createElement: () => anchor, body: { appendChild: () => { anchor.attached = true; } } };
+    try {
+      assert.deepEqual(await fn({ name: 'growth/e-hook.mp4', content: 'AAAA', base64: true }), { saved: true });
+      assert.equal(clicks.length, 1);
+      assert.equal(clicks[0]!.download, 'growth-e-hook.mp4');
+      assert.match(clicks[0]!.href, /^blob:/);
+      assert.equal(clicks[0]!.attached, true);
+      assert.equal(anchor.attached, false);
+    } finally { delete g['document']; }
+  });
+
   test('every machine-local lane is answered here, not left to the fallback', async () => {
     // the point of the module: drop one of these and the truthy empty answers it again.
     // mediaPreview is deliberately ABSENT: it began here as a blanket null, and webnm-content.ts

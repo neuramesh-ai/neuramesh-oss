@@ -72,7 +72,7 @@ import { AgentDetails } from './views/AgentDetails';
 import { WorkspaceFiles, type WsFile } from './views/WorkspaceFiles';
 import { DocOverlay, previewType } from './views/docpreview';
 import { HistoryRail } from './views/HistoryRail';
-import { ImageKeyForm, setImageConnectOpener } from './settings/ConnectionsList';
+import { ImageKeyForm, setCreditsOpener, setImageConnectOpener } from './settings/ConnectionsList';
 
 import { BrainChip } from './brain/BrainChip';
 import { readBrainDraft } from './brain/draft';
@@ -964,8 +964,8 @@ export function App() {
     setConnectionsSettingsOpener(() => { setFocusTab('connections'); setWsOpen(true); });
     setMoveToCloudOpener(() => setMoveOpen(true));
     setPolicySettingsOpener(() => { setFocusPolicy(true); setWsOpen(true); });
-    setImageConnectOpener(() => setImageConnectOpen(true));
-    return () => { setProviderSettingsOpener(null); setPolicySettingsOpener(null); setImageConnectOpener(null); setUpgradeOpener(null); setConnectionsSettingsOpener(null); setMoveToCloudOpener(null); };
+    setImageConnectOpener(() => setImageConnectOpen(true));   setCreditsOpener(() => { setNav('home'); setView('credits'); }); // a video card out of credits (the video rung)
+    return () => { setProviderSettingsOpener(null); setPolicySettingsOpener(null); setImageConnectOpener(null); setCreditsOpener(null); setUpgradeOpener(null); setConnectionsSettingsOpener(null); setMoveToCloudOpener(null); };
   }, []);
   const refreshRoster = () => nm?.roster().then(setRoster);
   const [roster, setRoster] = useState<{ machines: MachineRow[]; agents: AgentRow[] }>({ machines: [], agents: [] });

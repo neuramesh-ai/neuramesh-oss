@@ -1,0 +1,66 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>F · how it runs · your machine, our server</title><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;450;500;600&amp;family=Geist+Mono:wght@400;500;600&amp;family=Bricolage+Grotesque:wght@500;600&amp;display=swap"><style>body{margin:0}
+  .diag { box-sizing: border-box; width: 1440px; height: 1000px; background: #141414; color: #cbcbcb; font: 14px/1.4 'Geist', sans-serif; padding: 26px 32px; position: relative; overflow: hidden; }
+  .diag * { box-sizing: border-box; }
+  .dtitle { font: 500 10.5px 'Geist Mono', monospace; letter-spacing: -.02em; text-transform: uppercase; color: #848484; margin-bottom: 8px; }
+  .diag svg { display: block; width: 1376px; height: auto; }
+  .diag text { font-family: 'Geist', sans-serif; fill: #cbcbcb; }
+  .diag .k { font-family: 'Geist Mono', monospace; font-size: 10.5px; letter-spacing: -.02em; text-transform: uppercase; fill: #848484; }
+  .diag .t { font-size: 13.5px; font-weight: 500; fill: #e0e0e0; }
+  .diag .s { font-size: 11.5px; fill: #a6a6a6; }
+  .diag .l { font-family: 'Geist Mono', monospace; font-size: 10.5px; fill: #848484; }
+  .diag .lane { fill: none; stroke: #2c2c2c; stroke-dasharray: 4 5; }
+  .diag .bx { fill: #1e1e1e; stroke: #3a3a3a; }
+  .diag .bx.h { fill: #2a1d14; stroke: #834a2b; }
+  .diag .bx.q { fill: #171717; stroke: #2c2c2c; }
+  .diag .bx.env { fill: #14201a; stroke: #2f6b4b; }
+  .diag .ar { stroke: #848484; fill: none; stroke-width: 1.4; }
+  .diag .ar.d { stroke-dasharray: 5 4; }
+</style></head><body><div class="diag"><div class="dtitle">The video rung · how it runs · the card on your machine, the film on our server, the key never leaves it</div>
+<svg viewBox="0 0 1376 930" role="img" aria-label="The card's Generate video posts a marker; the daemon asks the control-api's film door; the door checks the balance first, prices the clip, debits, submits to fal's queue and answers 202 with a films row; the minute cron polls the queue, downloads the clip, hosts it through the media lane and stamps the draft; a failure refunds the credits and lands on the card. The model comes from one env variable on the server.">
+  <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#848484"/></marker></defs>
+  <rect class="lane" x="0" y="0" width="1376" height="250" rx="8"/>
+  <text class="k" x="14" y="22">On your machine · the app and the daemon · no key, no polling</text>
+  <rect class="bx " x="20" y="50" width="230" height="60" rx="6"/><text class="t" x="32" y="74">The video card</text><text class="s" x="32" y="93">Generate video · facts line names the model and the credits</text>
+  <path class="ar " d="M250 80 H325" marker-end="url(#ah)"/><text class="l" x="256" y="70">‹gen-video›</text>
+  <rect class="bx " x="330" y="50" width="250" height="60" rx="6"/><text class="t" x="342" y="74">The daemon wake</text><text class="s" x="342" y="93">model-free · reads the script and the brief</text>
+  <path class="ar " d="M455 110 V160" marker-end="url(#ah)"/><text class="l" x="462" y="140">the film prompt</text>
+  <rect class="bx h" x="330" y="165" width="250" height="60" rx="6"/><text class="t" x="342" y="189">The rung</text><text class="s" x="342" y="208">starter first · own Google key when 402 · the card says which</text>
+  <path class="ar " d="M580 195 H700" marker-end="url(#ah)"/><text class="l" x="590" y="185">POST /v1/starter/film</text>
+  <rect class="bx q" x="705" y="165" width="250" height="60" rx="6"/><text class="t" x="717" y="189">The card, pending</text><text class="s" x="717" y="208">video_pending on the row · survives a reload</text>
+  <rect class="bx q" x="1000" y="50" width="356" height="60" rx="6"/><text class="t" x="1012" y="74">Own Google key (unchanged)</text><text class="s" x="1012" y="93">Gemini Omni Flash → Veo 3.1 · films on the machine · no credits</text>
+  <path class="ar d" d="M580 80 H995" marker-end="url(#ah)"/><text class="l" x="640" y="70">when the door answers 402 or 503</text>
+
+  <rect class="lane" x="0" y="280" width="1376" height="640" rx="8"/>
+  <text class="k" x="14" y="302">On our server · the control-api · FAL_KEY and the model list live here</text>
+  <rect class="bx h" x="20" y="330" width="250" height="60" rx="6"/><text class="t" x="32" y="354">POST /v1/starter/film</text><text class="s" x="32" y="373">member gate · the Starter brain’s twin</text>
+  <path class="ar " d="M270 360 H345" marker-end="url(#ah)"/>
+  <rect class="bx " x="350" y="330" width="220" height="60" rx="6"/><text class="t" x="362" y="354">Balance guard FIRST</text><text class="s" x="362" y="373">remaining ≤ 0 → 402 NO_CREDITS</text>
+  <path class="ar " d="M570 360 H645" marker-end="url(#ah)"/>
+  <rect class="bx " x="650" y="330" width="230" height="60" rx="6"/><text class="t" x="662" y="354">Price the clip</text><text class="s" x="662" y="373">per-second table · micros · 194 credits</text>
+  <path class="ar " d="M880 360 H955" marker-end="url(#ah)"/>
+  <rect class="bx " x="960" y="330" width="200" height="60" rx="6"/><text class="t" x="972" y="354">Debit</text><text class="s" x="972" y="373">ledger.spend · kind video</text>
+  <path class="ar " d="M1060 390 V440" marker-end="url(#ah)"/>
+  <rect class="bx " x="960" y="445" width="396" height="60" rx="6"/><text class="t" x="972" y="469">Submit to fal · queue.fal.run/{endpoint}</text><text class="s" x="972" y="488">Authorization: Key FAL_KEY · 9:16 · 8 s · audio on → request_id</text>
+  <path class="ar " d="M960 475 H890" marker-end="url(#ah)"/>
+  <rect class="bx " x="650" y="445" width="235" height="60" rx="6"/><text class="t" x="662" y="469">films row · 202</text><text class="s" x="662" y="488">workspace · item · model · request · micros · queued</text>
+  <rect class="bx env" x="20" y="445" width="250" height="60" rx="6"/><text class="t" x="32" y="469">STARTER_VIDEO_MODELS</text><text class="s" x="32" y="488">seedance-2.0-fast, kling-3.0, minimax-h3 · the rest are fallbacks</text>
+  <path class="ar " d="M270 475 H345" marker-end="url(#ah)"/><text class="l" x="276" y="465">first = active</text>
+  <rect class="bx " x="350" y="445" width="220" height="60" rx="6"/><text class="t" x="362" y="469">The registry</text><text class="s" x="362" y="488">key → fal endpoint, inputs, price, label</text>
+  <path class="ar " d="M570 475 H645" marker-end="url(#ah)"/>
+
+  <rect class="bx h" x="20" y="560" width="250" height="60" rx="6"/><text class="t" x="32" y="584">Minute cron · /internal/films-due</text><text class="s" x="32" y="603">the announce cron’s shape</text>
+  <path class="ar " d="M270 590 H345" marker-end="url(#ah)"/><text class="l" x="282" y="580">open rows</text>
+  <rect class="bx " x="350" y="560" width="220" height="60" rx="6"/><text class="t" x="362" y="584">GET …/status</text><text class="s" x="362" y="603">IN_QUEUE · IN_PROGRESS · COMPLETED</text>
+  <path class="ar " d="M570 590 H645" marker-end="url(#ah)"/><text class="l" x="585" y="580">COMPLETED</text>
+  <rect class="bx " x="650" y="560" width="235" height="60" rx="6"/><text class="t" x="662" y="584">Download the mp4</text><text class="s" x="662" y="603">8 MB cap · sniffed video/mp4</text>
+  <path class="ar " d="M885 590 H955" marker-end="url(#ah)"/>
+  <rect class="bx h" x="960" y="560" width="396" height="60" rx="6"/><text class="t" x="972" y="584">attachContentMedia · video_id on the draft</text><text class="s" x="972" y="603">the picture’s lane · members-only read · video_pending cleared</text>
+  <path class="ar " d="M1158 620 V670" marker-end="url(#ah)"/>
+  <rect class="bx q" x="960" y="675" width="396" height="60" rx="6"/><text class="t" x="972" y="699">The card shows the film</text><text class="s" x="972" y="718">Film again · the facts line: model, seconds, credits</text>
+  <path class="ar d" d="M460 620 V670" marker-end="url(#ah)"/><text class="l" x="468" y="650">error · timeout · refused</text>
+  <rect class="bx q" x="350" y="675" width="220" height="60" rx="6"/><text class="t" x="362" y="699">Refund</text><text class="s" x="362" y="718">credit_grants kind refund · +194</text>
+  <path class="ar d" d="M570 705 H645" marker-end="url(#ah)"/>
+  <rect class="bx q" x="650" y="675" width="235" height="60" rx="6"/><text class="t" x="662" y="699">video_error on the draft</text><text class="s" x="662" y="718">Try again on the card</text>
+  <rect class="bx q" x="20" y="790" width="640" height="60" rx="6"/><text class="t" x="32" y="814">Also: GET /v1/starter/video</text><text class="s" x="32" y="833">the active model, its label, seconds and credits · the card’s facts line and the Settings line read it</text>
+  <rect class="bx q" x="700" y="790" width="656" height="60" rx="6"/><text class="t" x="712" y="814">Credits history</text><text class="s" x="712" y="833">films are rows in machine_usage.video_micros and the grant ledger, one per clip, refunds beside them</text>
+</svg></div></body></html>

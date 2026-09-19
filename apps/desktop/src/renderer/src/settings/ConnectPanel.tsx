@@ -54,6 +54,10 @@ let _openImageConnect: (() => void) | null = null;
 /** The shell owns the modal; it registers the opener while mounted (an import cannot assign). */
 export function setImageConnectOpener(fn: (() => void) | null) { _openImageConnect = fn; }
 export function openImageConnect() { _openImageConnect?.(); }
+/** the same seam for the Credits view: a video card that ran out of credits points there (the video rung) */
+let _openCredits: (() => void) | null = null;
+export function setCreditsOpener(fn: (() => void) | null) { _openCredits = fn; }
+export function openCredits() { _openCredits?.(); }
 
 type KeyId = 'posthog' | 'meta' | 'tiktokads';
 type OauthId = 'x' | 'linkedin' | 'instagram' | 'tiktok';

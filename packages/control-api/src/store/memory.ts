@@ -7,15 +7,15 @@
 import { applyShare, type BrainOverride, parseBrainOverride, attachmentUpgradeReason, buildAgentCard, flowForChannelKind, planLabel, readAnswers, taskBranch, TaskSchema, threadModeOf, threadTitle, type ActorRef, type Beat, type BeatStatus, type NMEvent, type Run, type RunSettleState, type Task, type TaskKind, type TaskState, type ThreadMode } from '@neuramesh/shared';
 import { DomainError } from '../errors';
 import { deleteScheduleMem, markScheduleResultMem, setScheduleCursorMem, setScheduleStatusMem } from './release-routine';
-import { MemAnnounceStore } from './announce';
+import { MemAnnounceStore } from './announce';   import { MemFilmStore } from './films';
 import { pickHumanWord, settleMemoryThread } from './thread-settle';
 import type { LifecycleRow } from '../lifecycle';
 import { normalizeTaskTitle } from './types';
 import type { MutationResult, ArtifactRow, AttachmentInput, ScheduleInput, NMMessage, DecisionSeed, DecisionRow, PolicyRow, PolicyInput, DesktopAuthResult, RunInput, WhiteboardRow, WhiteboardMeta, WhiteboardCreate, WhiteboardLwwPatch, WhiteboardUpdate } from './types';
-import type { Store } from './contract';
+import type { Store } from './contract';   import type { VideoMeta } from './films';
 
 export class MemoryStore implements Store {
-  readonly announcements = new MemAnnounceStore();
+  readonly announcements = new MemAnnounceStore();   readonly films = new MemFilmStore();
   // readable in tests like `threads` — the memory store IS the test double
   tasks = new Map<string, Task>();
   private events: NMEvent[] = [];
@@ -338,7 +338,7 @@ export class MemoryStore implements Store {
     return { id };
   }
 
-  private workspaces: Array<{ id: string; name: string; slug: string; createdBy: string; autoFailover: boolean; activeModelPack: string; commRules?: unknown }> = [];
+  private workspaces: Array<{ id: string; name: string; slug: string; createdBy: string; autoFailover: boolean; activeModelPack: string; commRules?: unknown; videoTier?: string | null }> = [];
   private plans = new Map<string, string>(); // workspace id → plan ('free' default); set by setWorkspacePlan (Stripe webhook / tests)
 
   async createWorkspace(input: { name: string; slug: string; createdBy: string }, event: NMEvent): Promise<{ workspaceId: string; channelId: string }> {
@@ -356,19 +356,18 @@ export class MemoryStore implements Store {
       .map((w) => ({ id: w.id, name: w.name, slug: w.slug, role: 'owner', memberCount: 1, autoFailover: w.autoFailover, activeModelPack: w.activeModelPack, commRules: w.commRules ?? null, plan: this.plans.get(w.id) ?? 'free', seats: 1, subscriptionStatus: null, currentPeriodEnd: null, primaryMachineId: null }));
   }
 
-  async updateWorkspace(workspaceId: string, patch: { autoFailover?: boolean; activeModelPack?: string; commRules?: { ste100?: boolean; noEmdash?: boolean; custom?: string[] } }, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }> {
+  async updateWorkspace(workspaceId: string, patch: { autoFailover?: boolean; activeModelPack?: string; commRules?: { ste100?: boolean; noEmdash?: boolean; custom?: string[] }; videoTier?: string | null }, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }> {
     const w = this.workspaces.find((x) => x.id === workspaceId);
     if (!w) throw new DomainError('NOT_FOUND', 'workspace not found');
     if (patch.autoFailover !== undefined) w.autoFailover = patch.autoFailover;
     if (patch.activeModelPack !== undefined) w.activeModelPack = patch.activeModelPack;
-    if (patch.commRules !== undefined) w.commRules = patch.commRules;
+    if (patch.commRules !== undefined) w.commRules = patch.commRules;   if (patch.videoTier !== undefined) w.videoTier = patch.videoTier;
     this.events.push(makeEvent(workspaceId));
     return { id: workspaceId };
   }
 
-  async getCommRules(workspace: string): Promise<unknown> {
-    return this.workspaces.find((x) => x.id === workspace)?.commRules ?? null;
-  }
+  async getCommRules(workspace: string): Promise<unknown> { return this.workspaces.find((x) => x.id === workspace)?.commRules ?? null; }
+  async getVideoTier(workspace: string): Promise<string | null> { return this.workspaces.find((x) => x.id === workspace)?.videoTier ?? null; }
 
   private modelPacks: Array<{ id: string; workspaceId: string; name: string; roles: Record<string, string>; updatedAt: string }> = [];
 
@@ -1335,7 +1334,7 @@ export class MemoryStore implements Store {
     this.schedules = rest as typeof this.schedules;
     return { id: scheduleId };
   }
-  private contentItems: Array<{ id: string; workspace: string; channelId: string; taskId: string | null; threadId: string | null; platform: string; body: string; scheduleId: string | null; status: string; scheduledAt: string | null; approvedBy: string | null; mediaUrl: string | null; mediaId?: string | null; brief?: string | null; script?: string | null; lastError?: string | null }> = [];
+  private contentItems: Array<{ id: string; workspace: string; channelId: string; taskId: string | null; threadId: string | null; platform: string; body: string; scheduleId: string | null; status: string; scheduledAt: string | null; approvedBy: string | null; mediaUrl: string | null; mediaId?: string | null; brief?: string | null; script?: string | null; videoPending?: boolean; videoMeta?: VideoMeta | null; videoErrorCode?: 'NO_CREDITS' | 'UNAVAILABLE' | null; lastError?: string | null }> = [];
   async createContentItem(input: { channelId: string; taskId?: string | null; threadId?: string | null; platform: string; body: string; scheduleId: string | null; slotAt?: string | null; mediaUrl?: string | null; imageBrief?: string | null; script?: string | null; thumb?: string | null; imageError?: string | null; createdByKind: string; createdBy: string }, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }> {
     const c = this.channels.find((x) => x.id === input.channelId);
     if (!c) throw new DomainError('NOT_FOUND', 'channel not found');
@@ -1366,13 +1365,13 @@ export class MemoryStore implements Store {
     this.events.push(makeEvent(it.workspace));
     return { id: itemId };
   }
-  async reviseDraft(itemId: string, patch: { body: string | null; imageBrief: string | null; script?: string | null; thumb: string | null; imageError?: string | null; videoError?: string | null }, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }> {
+  async reviseDraft(itemId: string, patch: { body: string | null; imageBrief: string | null; script?: string | null; videoPending?: boolean; videoMeta?: VideoMeta | null; videoErrorCode?: 'NO_CREDITS' | 'UNAVAILABLE' | null; thumb: string | null; imageError?: string | null; videoError?: string | null }, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }> {
     // draft OR scheduled, never published — mirrors pg (and updateContentBody/delete)
     const it = this.contentItems.find((x) => x.id === itemId && (x.status === 'draft' || x.status === 'scheduled'));
     if (!it) throw new DomainError('NOT_FOUND', 'content item not found (already published or gone)');
     const isRevision = patch.body !== null || patch.imageBrief !== null || !!patch.script;
     if (patch.body !== null) it.body = patch.body;
-    if (patch.imageBrief !== null) it.brief = patch.imageBrief;   if (patch.script) it.script = patch.script;
+    if (patch.imageBrief !== null) it.brief = patch.imageBrief;   if (patch.script) it.script = patch.script;   if (patch.videoPending !== undefined) it.videoPending = patch.videoPending;   if (patch.videoMeta !== undefined) it.videoMeta = patch.videoMeta;   if (patch.videoErrorCode !== undefined) it.videoErrorCode = patch.videoErrorCode;
     // thumb tracked in the mem store only for parity; the card reads it from media in pg
     // rewriting the copy/brief of a SCHEDULED post unschedules it back to draft (pg parity), so the
     // changed text can't auto-publish on the old slot without a fresh human approve
@@ -1519,11 +1518,12 @@ export class MemoryStore implements Store {
     this.events.push(makeEvent(c.workspace));
     return { id: connectorId };
   }
-  async dueContentItems(nowIso: string, limit: number): Promise<Array<{ id: string; workspace: string; channel: string; platform: string; body: string; mediaUrl?: string | null; mediaId?: string | null; imageIntended: boolean }>> {
+  async dueContentItems(nowIso: string, limit: number): Promise<Array<{ id: string; workspace: string; channel: string; platform: string; body: string; mediaUrl?: string | null; mediaId?: string | null; mediaKind?: 'image' | 'video' | null; imageIntended: boolean }>> {
     return this.contentItems
       .filter((i) => i.status === 'scheduled' && !!i.scheduledAt && i.scheduledAt <= nowIso)
       .slice(0, limit)
-      .map((i) => ({ id: i.id, workspace: i.workspace, channel: i.channelId, platform: i.platform, body: i.body, mediaUrl: i.mediaUrl, mediaId: i.mediaId ?? null, imageIntended: !!i.brief }));
+      // the one media slot holds a picture or a film: the row's mime says which (pg: video_id vs image_id); a video post's hold is its film in flight
+      .map((i) => ({ id: i.id, workspace: i.workspace, channel: i.channelId, platform: i.platform, body: i.body, mediaUrl: i.mediaUrl, mediaId: i.mediaId ?? null, mediaKind: i.mediaId ? ((this.contentMedia.get(i.mediaId)?.mime ?? '').startsWith('video/') ? 'video' as const : 'image' as const) : null, imageIntended: i.script || i.videoPending ? !!i.videoPending && !i.mediaId : !!i.brief }));
   }
   async upcomingContentItems(fromIso: string, toIso: string, limit: number): Promise<Array<{ id: string; workspace: string; channel: string; threadId: string | null; platform: string; body: string; scheduledAt: string }>> {
     return this.contentItems

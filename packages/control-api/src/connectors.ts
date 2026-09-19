@@ -254,10 +254,14 @@ export async function publishDueItems(store: Store, posters: Record<string, Post
       // fact. HOLD it: leave it scheduled (no status change) so the very next pass sends it complete
       // once the image is attached. A genuinely image-less post (no brief/preview) still publishes.
       if (!mediaUrl && item.imageIntended) {
-        console.log(`publish_hold item=${item.id.slice(0, 8)} platform=${item.platform} reason=image_not_ready`);
+        console.log(`publish_hold item=${item.id.slice(0, 8)} platform=${item.platform} reason=media_not_ready`);
         held += 1;
         continue;
       }
+      // A FILM posts to X (the video rung, 2026-09-19: the chunked upload takes a video the way it
+      // takes a picture). The other networks' posters know pictures only, so a film fails loudly
+      // with the way out, never silently as a text post or as an upload that dies in their words.
+      if (item.mediaKind === 'video' && item.platform !== 'x') throw new Error(`NeuraMesh cannot post a video to ${item.platform} yet. Download the film from the card menu and post it there.`);
       // the item's own room decides which project's account posts it (0106)
       const conn = await store.connectorWithSecret(item.workspace, item.platform, item.channel ?? null);
       if (!conn || conn.status !== 'connected' || !conn.ciphertext) throw new Error(`no connected ${item.platform} account`);

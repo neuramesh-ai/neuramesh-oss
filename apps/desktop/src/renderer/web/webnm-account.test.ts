@@ -56,7 +56,7 @@ const WS_OK = { workspaces: [{ id: 'w1', name: 'Acme', slug: 'acme', role: 'owne
 
 const LANES = [
   'login', 'loginGitHub', 'authClerk', 'accountBlockers', 'accountDelete', 'billingCheckout',
-  'billingPortal', 'creditsHistory', 'creditsCheckout', 'invites', 'myInvites', 'workspaces', 'machineTransfer',
+  'billingPortal', 'creditsHistory', 'starterVideo', 'creditsCheckout', 'invites', 'myInvites', 'workspaces', 'machineTransfer',
   'setNotificationsEnabled', 'providerReauth', 'claudeDesignConnect', 'claudeDesignStatus',
   'mcpKeys', 'mcpKeySet', 'mcpVerify',
   // the cloud-cap round: the meter + intent read, and the human's manual wake
