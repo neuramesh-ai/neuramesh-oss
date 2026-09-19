@@ -1,0 +1,87 @@
+{
+  "artboards": [
+    {
+      "file": "Main.dc.html",
+      "x": 0,
+      "y": 0,
+      "w": 880,
+      "h": 540,
+      "title": "D1 · The door · graphite · decided"
+    },
+    {
+      "file": "D1b-DoorCloud.dc.html",
+      "x": 960,
+      "y": 0,
+      "w": 880,
+      "h": 540,
+      "title": "D1b · The door · the cloud row chosen"
+    },
+    {
+      "file": "D2-Wait.dc.html",
+      "x": 1920,
+      "y": 0,
+      "w": 880,
+      "h": 540,
+      "title": "D2 · Finish in your browser"
+    },
+    {
+      "file": "D3-WaitExpired.dc.html",
+      "x": 2880,
+      "y": 0,
+      "w": 880,
+      "h": 540,
+      "title": "D3 · The browser did not finish"
+    },
+    {
+      "file": "D4-DoorCream.dc.html",
+      "x": 0,
+      "y": 720,
+      "w": 880,
+      "h": 540,
+      "title": "D4 · The door · cream oak"
+    },
+    {
+      "file": "D5-WaitCream.dc.html",
+      "x": 960,
+      "y": 720,
+      "w": 880,
+      "h": 540,
+      "title": "D5 · The wait · cream oak"
+    },
+    {
+      "file": "D6-Flow.dc.html",
+      "x": 1920,
+      "y": 720,
+      "w": 880,
+      "h": 700,
+      "title": "D6 · The complete flow · what exists, what is new"
+    }
+  ],
+  "notes": {
+    "head": {
+      "x": 0,
+      "y": -300,
+      "kind": "title1",
+      "maxW": 3760,
+      "text": "First run: the doors · 2026-09-19 · a blocker · decided"
+    },
+    "decided": {
+      "x": 2880,
+      "y": 720,
+      "w": 880,
+      "text": "DECIDED (George, 2026-09-19, round 2): \"Where should your workspace live?\" · the sub says you can upgrade to the cloud at any time · the rows are This Mac and The cloud, each with its glyph (IconMachine, IconCloud) · the cloud row is FREE with 500 credits to start, and says sync across desktop, web and mobile. Both rows are free, so the tags died.\nWhat the cloud row pulls in on the server: the signup grant (500 credits, once, at the first workspace of a free hosted account) came out on 2026-09-12 and comes back; the hosted write gate (NM_HOSTED_FREE_GATE, scheduled to flip on 2026-09-29) stays off and the desktop's gate card stands down for free hosted workspaces; docs/07 and the site's \"Free is your Mac\" line follow. The 09-15 notice to hosted-free owners needs a follow-up: George's call."
+    },
+    "what": {
+      "x": 0,
+      "y": 1440,
+      "w": 880,
+      "text": "WHY THIS HAPPENED. The shipped app makes the Local connection first and the cloud only once a Clerk session is stored. George's old session was not found, so the stack booted and the fresh local workspace opened the wizard. No screen before the shell offers Sign in: the Login page renders only on the Clerk lane, and the only cloud door on a local connection is Get Pro inside the shell.\nThe door runs BEFORE the stack: nothing downloads, no container starts, until This Mac is chosen. Sign in and The cloud reuse the hosted hand-off (neuramesh.app/desktop-signin, both faces, the phone's lane) and land the cloud connection in front with Local dormant, the rule that already exists for a cloud user."
+    },
+    "copy": {
+      "x": 960,
+      "y": 1440,
+      "w": 880,
+      "text": "THE WORDS (STE): \"Where should your workspace live?\" · \"Pick one now. You can upgrade to the cloud at any time.\" · This Mac · \"No account. Three containers on this Mac. Your keys stay here.\" · The cloud · \"500 free credits to start. Sync across desktop, web and mobile.\" · CONTINUE → · SIGN IN · foot \"Have an account? Sign in opens neuramesh.app\" · the wait: \"Finish in your browser\" · \"Sign up on neuramesh.app. This window waits.\" (Sign in on the sign-in door) · \"The browser did not finish.\" · \"Try again opens the page with a fresh code.\"\nPreselected: This Mac (the sub says the cloud is one upgrade away)."
+    }
+  }
+}

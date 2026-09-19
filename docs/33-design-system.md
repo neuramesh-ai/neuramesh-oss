@@ -442,6 +442,22 @@ real work — if it is decoration, drop it and keep the pill.
   seconds with the container's own words instead of a 90-second "not healthy", and Try again
   recreates the container that failed (a wedged container with its config intact survived every
   retry before this, `main/localStack/index.ts`).
+  ▸ **The first-run DOORS come before the stack** (2026-09-19, George, a blocker: a fresh install had
+  walked an existing customer into the local wizard; visual contract
+  `docs/design/first-run-doors-2026-09/`, evidence beside it). On a fresh profile (no stored
+  session, no chosen connection, no local `.env`, no server added) the first screen after the splash
+  is the same card: kicker FIRST RUN, "Where should your workspace live?", "Pick one now. You can
+  upgrade to the cloud at any time.", two picker rows in the runtime picker's radio idiom with a
+  glyph between the radio and the name (`.lsgglyph`: IconMachine, IconCloud; `.lsgrow.place` narrows
+  the name to 84px so the fact keeps two lines): **This Mac** · "No account. Three containers on
+  this Mac. Your keys stay here." (preselected) and **The cloud** · "500 free credits to start. Sync
+  across desktop, web and mobile.". Both free, so no tags. `CONTINUE →` primary, `SIGN IN` a
+  secondary at the row's right, foot "Have an account? Sign in opens neuramesh.app". Nothing
+  downloads and no container starts until a row is chosen. The wait while the browser finishes
+  ("Finish in your browser" · one status row `neuramesh.app · please wait…` · OPEN THE PAGE AGAIN ·
+  CANCEL), the expired card ("The browser did not finish." · TRY AGAIN) and the error card reuse the
+  failure card's three parts. Main decides (`main/firstrun.ts`): which page opens, when the wait
+  expires, where the shell lands.
   ▸ **Bars, never a clock.** A download that has not announced its total draws an idle track, not a
   guess; "About 900 MB" appears only once every total is known, as a number the card was handed.
   ▸ **The card draws, main decides.** Every string, which state blocks the screen, and the MB figure

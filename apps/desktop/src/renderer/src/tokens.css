@@ -3770,6 +3770,12 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 .lsgradio { flex: none; width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid var(--border2); }
 .lsgradio.on { border-color: var(--accent); background: radial-gradient(circle, var(--accent) 42%, transparent 48%); }
 .lsgtag { font: 500 9.5px var(--fmono); letter-spacing: -.02em; text-transform: uppercase; color: var(--muted); }
+/* the first-run doors' place rows (docs/design/first-run-doors-2026-09, D1): the picker's radio row
+   with a glyph (IconMachine · IconCloud) between the radio and the name, the name narrower so the
+   fact keeps two lines */
+.lsgglyph { flex: none; width: 18px; display: grid; place-items: center; color: var(--muted); }
+.lsgrow.on .lsgglyph { color: var(--text); }
+.lsgrow.place .lsgnm { min-width: 84px; }
 /* a download row: bytes over total. No total yet = an idle track, never a clock. */
 .lsgprow { display: grid; grid-template-columns: 1fr auto; row-gap: 6px; column-gap: 12px; align-items: center; padding: 8px 0; }
 .lsgprow .lsgnm { font-size: 14px; color: var(--body); display: flex; align-items: center; gap: 8px; }

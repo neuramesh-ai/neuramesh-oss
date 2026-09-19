@@ -95,6 +95,16 @@ const LOCAL_STATES: Record<string, any> = {
   'error-plain': { phase: 'error', message: 'Colima did not start.', from: 'engine-starting' },
   ready: { phase: 'ready', version: '0.132.0', engine: 'docker-desktop' },
 };
+const firstrun = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('firstrun') : null;
+const FIRST_RUN_STATES: Record<string, any> = {
+  choose: { phase: 'choose' },
+  waiting: { phase: 'waiting', door: 'cloud', url: 'https://neuramesh.app/desktop-signin?nonce=preview&mode=signup' },
+  'waiting-signin': { phase: 'waiting', door: 'signin', url: 'https://neuramesh.app/desktop-signin?nonce=preview' },
+  landing: { phase: 'landing', door: 'signin' },
+  expired: { phase: 'expired', door: 'cloud' },
+  error: { phase: 'error', door: 'signin', message: 'The cloud did not answer.' },
+};
+const firstRunFixture = (): any => FIRST_RUN_STATES[firstrun ?? ''] ?? { phase: 'done', door: null };
 const localStackFixture = (): any => {
   const state = LOCAL_STATES[localstack ?? 'ready'] ?? LOCAL_STATES['ready'], about = state.items?.every((i: any) => i.total !== null) ? Math.round(state.items.reduce((n: number, i: any) => n + i.total, 0) / MB) : null;
   return { state, blocking: state.phase !== 'ready', aboutMb: about };
@@ -149,6 +159,12 @@ const explicit: Record<string, any> = {
   onConnections: () => noop,
   setForeground: (connectionId: string, workspaceId?: string | null) => swapForeground(connectionId, workspaceId),
   watchRailRows: (cb: any) => { setTimeout(() => cb(railRowsSnapshot()), 0); return noop; },
+  // the first-run doors (main/firstrunipc.ts): ?firstrun=choose|waiting|expired|error seeds the door, else done
+  firstRunState: async () => firstRunFixture(),
+  onFirstRun: () => noop,
+  firstRunChoose: async () => firstRunFixture(),
+  firstRunReopen: async () => firstRunFixture(),
+  firstRunCancel: async () => firstRunFixture(),
   localStackState: async () => localStackFixture(),
   onLocalStack: () => noop,
   localStackPick: async () => localStackFixture(),

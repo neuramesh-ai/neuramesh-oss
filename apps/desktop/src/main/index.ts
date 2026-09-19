@@ -11,6 +11,7 @@ import { currentClerkUser, loadClerkSession } from './auth-clerk';
 import { artifactMime, bootDormant, initConnections, resyncWorkspace, setForeground, startSync, DEV_USER } from './sync';
 import { connections, type Connection } from './connections';
 import { startLocalStack } from './localStack/ipc';
+import { registerFirstRunIpc } from './firstrunipc';
 import { registerUpgradeIpc } from './upgradeipc';
 import { registerConnectionsIpc } from './connectionsipc';
 import { registerMoveIpc } from './moveipc';
@@ -260,6 +261,9 @@ app.whenReady().then(async () => {
   // replica while the stack comes up (F9). A first run — no marker, or one with nothing in it —
   // keeps the card on screen through the two waits.
   const startLocal = () => { if (local && !localReachable) localReachable = startLocalStack(local, { warm: () => { try { return !!parseWorkspaceIdent(readFileSync(local.markerPath, 'utf8')); } catch { return false; } } }); };
+  // THE DOORS (firstrunipc.ts): a fresh profile chooses before anything builds, so its Local goes
+  // dormant here and stays so until the door says This Mac. Every other profile keeps today's rule.
+  registerFirstRunIpc({ local, startLocal });
   if (local && !local.dormant) startLocal();
   // the door for a cloud user whose Local stayed dormant: start the driver, boot the connection,
   // bring it to the front. Idempotent — a live Local just comes to the front.

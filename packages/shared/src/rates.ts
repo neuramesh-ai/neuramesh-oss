@@ -50,12 +50,13 @@ export function priceModelCall(model: string, inTokens: number, outTokens: numbe
 
 // ── the grant ────────────────────────────────────────────────────────────────────────────
 //
-// FREE GRANTS NOTHING (source release, 2026-09-12): a Free workspace has no cloud machine and
-// no metered brain, so nothing to grant for. The server mints no signup grant and the refill
-// worklist skips `plan = 'free'`. These two constants survive only as the numbers the desktop's
-// pre-release onboarding copy still prints (unit U5 retires that sentence); no server path
-// reads them. Pro's allocation is CLOUD_SEAT_MONTHLY_CREDITS below, granted per seat at the
-// plan flip and again on the 1st of every month.
+// FREE STARTS WITH 500 (the first-run doors, 2026-09-19, George: "cloud should indicate free 500
+// credits to get started"): a free hosted account's first workspace is granted SIGNUP_GRANT_CREDITS
+// once (control-api first-workspace.ts), so the starter brain answers before a key is added. The
+// refill worklist still skips `plan = 'free'`: the 500 do not renew, and the balance drains once.
+// (Between 2026-09-12 and 2026-09-19 Free granted nothing.) MONTHLY_GRANT_CREDITS survives only as
+// a number old copy printed; no server path reads it. Pro's allocation is CLOUD_SEAT_MONTHLY_CREDITS
+// below, granted per seat at the plan flip and again on the 1st of every month.
 export const SIGNUP_GRANT_CREDITS = 500;
 export const MONTHLY_GRANT_CREDITS = 500;
 

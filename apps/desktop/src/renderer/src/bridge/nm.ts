@@ -86,6 +86,16 @@ export type LocalStackState =
   /** `message` is the cause, `detail` the container's own last line, `remedy` what Try again does */
   | { phase: 'error'; message: string; detail?: string; remedy?: string; from: string };
 export interface LocalStackPayload { state: LocalStackState; blocking: boolean; aboutMb: number | null }
+/** the first-run doors (main/firstrun.ts): a fresh profile chooses before anything builds. `done` on
+ *  every other profile, and once a door is walked. The renderer draws these and decides nothing. */
+export type FirstRunDoor = 'local' | 'cloud' | 'signin';
+export type FirstRunState =
+  | { phase: 'choose' }
+  | { phase: 'waiting'; door: 'cloud' | 'signin'; url: string }
+  | { phase: 'landing'; door: 'cloud' | 'signin' }
+  | { phase: 'expired'; door: 'cloud' | 'signin' }
+  | { phase: 'error'; door: FirstRunDoor; message: string }
+  | { phase: 'done'; door: FirstRunDoor | null };
 /** Settings › Connections (main/connectionsipc.ts): one card per connection */
 export interface ConnectionWorkspace { id: string; name: string; slug: string; plan: string | null; seats: number | null; subscriptionStatus: string | null; currentPeriodEnd: string | null }
 export interface ConnectionCard { id: string; kind: ConnectionKind; authMode: AuthMode; foreground: boolean; apiUrl: string; powersyncUrl: string; webUrl: string; account: { email: string } | null; workspaceId: string; workspaces: ConnectionWorkspace[]; moved?: MovedMarker }
@@ -393,6 +403,12 @@ export interface NMBridge extends EngineeringNMBridge, TerminalNMBridge {
   /** bring another connection to the foreground, standing in one of its workspaces — the shell remounts */
   setForeground?(connectionId: string, workspaceId?: string | null): Promise<{ ok: true; switching: true }>;
   watchRailRows?(cb: (p: RailRowsPayload) => void): () => void;
+  // ── the first-run doors (main/firstrunipc.ts) — desktop only; absent = no door, as on the browser ──
+  firstRunState?(): Promise<FirstRunState>;
+  onFirstRun?(cb: (s: FirstRunState) => void): () => void;
+  firstRunChoose?(door: FirstRunDoor): Promise<FirstRunState>;
+  firstRunReopen?(): Promise<FirstRunState>;
+  firstRunCancel?(): Promise<FirstRunState>;
   // ── Local mode's stack (main/localStack/ipc.ts) — desktop only, the browser has no stack ──
   localStackState?(): Promise<LocalStackPayload>;
   onLocalStack?(cb: (p: LocalStackPayload) => void): () => void;

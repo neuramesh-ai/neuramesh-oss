@@ -1,4 +1,5 @@
-// The hosted gate's rule: cloud + free gates, cloud + cloud does not, local never does.
+// The hosted gate's rule, STOOD DOWN 2026-09-19 (the first-run doors): a free hosted workspace writes
+// again, so no connection and no plan gates. The cases stay so the day the ruling changes is one edit.
 // Run from apps/desktop:  pnpm exec tsx --test src/renderer/src/shell/hostedrule.test.ts
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -10,8 +11,8 @@ const dev = { kind: 'custom', authMode: 'dev' } as const;
 const customClerk = { kind: 'custom', authMode: 'clerk' } as const;
 const customLocal = { kind: 'custom', authMode: 'local' } as const;
 
-test('a cloud connection on a free workspace row is gated', () => {
-  assert.equal(hostedGateFor(cloud, 'free'), true);
+test('a cloud connection on a free workspace row is NOT gated: Free in the cloud starts with 500 credits', () => {
+  assert.equal(hostedGateFor(cloud, 'free'), false);
 });
 
 test('a cloud connection on a Pro row is not — Pro is plan id `cloud`', () => {
@@ -24,9 +25,9 @@ test('a local connection is never gated, whatever the row says', () => {
   assert.equal(hostedGateFor(customLocal, 'free'), false);
 });
 
-test('a custom server with a Clerk sign-in, and the dev lane, follow the row like the cloud', () => {
-  assert.equal(hostedGateFor(customClerk, 'free'), true);
-  assert.equal(hostedGateFor(dev, 'free'), true);
+test('a custom server with a Clerk sign-in, and the dev lane, follow the row like the cloud: nothing gates', () => {
+  assert.equal(hostedGateFor(customClerk, 'free'), false);
+  assert.equal(hostedGateFor(dev, 'free'), false);
   assert.equal(hostedGateFor(dev, 'cloud'), false);
 });
 
