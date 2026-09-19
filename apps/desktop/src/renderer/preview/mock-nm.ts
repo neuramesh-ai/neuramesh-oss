@@ -557,7 +557,7 @@ const explicit: Record<string, any> = {
     grants: [{ credits: 500, kind: 'purchase', note: 'pack', day: '2026-08-20' }, { credits: 500, kind: 'monthly', note: 'monthly refill (free)', day: '2026-08-01' }],
   }),
   creditsCheckout: async () => ({ ok: true }),
-  starterVideo: async () => ({ served: true, tier: 'starter', pick: null, tiers: [{ tier: 'starter', label: 'NeuraMesh Video Starter', model: 'Seedance 2.0', vendor: 'ByteDance', seconds: 8, credits: 194 }, { tier: 'xpress', label: 'NeuraMesh Video Xpress', model: 'MiniMax H3', vendor: 'MiniMax', seconds: 8, credits: 48 }, { tier: 'premium', label: 'NeuraMesh Video Premium', model: 'Seedance 2.0 Standard', vendor: 'ByteDance', seconds: 8, credits: 243 }] }),
+  starterVideo: async () => ({ served: true, tier: 'starter', pick: null, canPick: localStorage.getItem('nm:plan') === 'cloud', tiers: [{ tier: 'starter', label: 'NeuraMesh Video Starter', model: 'Seedance 2.0', vendor: 'ByteDance', seconds: 8, credits: 194 }, { tier: 'xpress', label: 'NeuraMesh Video Xpress', model: 'MiniMax H3', vendor: 'MiniMax', seconds: 8, credits: 48 }, { tier: 'premium', label: 'NeuraMesh Video Premium', model: 'Seedance 2.0 Standard', vendor: 'ByteDance', seconds: 8, credits: 243 }] }),
   billingPortal: async () => ({ ok: true }),
   // ?machinelimit=1 surfaces the Free single-machine transfer-or-upgrade card for capture/preview
   machineLimitInfo: async () =>

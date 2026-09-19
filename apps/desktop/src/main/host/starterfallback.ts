@@ -12,8 +12,13 @@
 //     machine through seatFor), and says why in the thread;
 //   · a HUMAN conversation says why and offers the switch as a button on the card. Nothing moves
 //     until the person clicks, and the click moves THIS conversation's seat, so a pinned agent
-//     moves too (docs/10 §15.1, thread > pin).
-// Credits gate both: out of credits, the door says so and offers nothing it cannot deliver.
+//     moves too (docs/10 §15.1, thread > pin);
+//   · on a CLOUD machine (George, 2026-09-19: "it should be the default on cloud anyways", "default
+//     on web") a human conversation moves by itself too. The machine carries no vendor login by
+//     design, the person is in a browser with nothing to sign in to, and a card that asks for a
+//     click there asks for the only answer there is. The NeuraMesh brain is that machine's default,
+//     and the switch is recorded in the thread the same way a routine's is.
+// Credits gate all three: out of credits, the door says so and offers nothing it cannot deliver.
 //
 // Configured once at boot (agents.ts, beside the worker lane) so the flows keep their signatures.
 import { AUTH_LABEL, STARTER_MODEL, authCardBlock, parseBrainOverride, runtimeForModel, type AgentRole, type BrainOverride, type NmAuth } from '@neuramesh/shared';
@@ -52,14 +57,16 @@ export function whyUnavailable(u: Unavailable, runtime: string): string {
 }
 
 export type FallbackOutcome = 'auto' | 'offer' | 'nocredits' | 'house';
+/** who moved by itself: a routine's conversation, or a conversation on a cloud machine */
+export type AutoOwner = 'routine' | 'conversation';
 
 /** the sentence the thread reads — the reason first, then what happens now */
-export function fallbackText(agent: { name: string; runtime: string }, u: Unavailable, outcome: FallbackOutcome): string {
+export function fallbackText(agent: { name: string; runtime: string }, u: Unavailable, outcome: FallbackOutcome, owner: AutoOwner = 'routine'): string {
   const label = labelOf(u, agent.runtime);
   const why = whyUnavailable(u, agent.runtime);
   if (outcome === 'house') return `@${agent.name} cannot run on the NeuraMesh brain now. ${why}`;
   const head = `@${agent.name} cannot run on ${label} here. ${why}`;
-  if (outcome === 'auto') return `${head} This routine continues on the NeuraMesh brain, on credits. Reset the brain in this conversation to go back.`;
+  if (outcome === 'auto') return `${head} This ${owner} continues on the NeuraMesh brain, on credits. Reset the brain in this conversation to go back.`;
   if (outcome === 'nocredits') return `${head} The NeuraMesh brain cannot take it either: this workspace is out of credits. Sign in to ${label} again on this machine, or add credits.`;
   return `${head} Sign in to ${label} again on this machine, or run this conversation on the NeuraMesh brain, on credits.`;
 }
@@ -81,9 +88,12 @@ export function offerCard(agent: HostedAgent, u: Unavailable, scope: { threadId:
 
 /** the record a routine's conversation gets: the same card, marked as a switch that already happened
  *  (2026-09-17, George: "easily missed") — the docked notice reads it, the server mints no decision from it */
-export function switchedCard(agent: HostedAgent, u: Unavailable, scope: { threadId: string }, taskNumber?: number): string {
-  return `${fallbackText(agent, u, 'auto')}\n\n${authCardBlock({ ...cardOf(agent, u, scope, true, taskNumber), switched: true })}`;
+export function switchedCard(agent: HostedAgent, u: Unavailable, scope: { threadId: string }, taskNumber?: number, owner: AutoOwner = 'routine'): string {
+  return `${fallbackText(agent, u, 'auto', owner)}\n\n${authCardBlock({ ...cardOf(agent, u, scope, true, taskNumber), switched: true })}`;
 }
+
+/** a cloud machine (runner or member): machined sets NM_MACHINE_KIND on the image, a laptop leaves it unset */
+export const onCloudMachine = (): boolean => ['runner', 'member'].includes(process.env['NM_MACHINE_KIND'] ?? '');
 
 export const reseatOnStarter = (a: HostedAgent): HostedAgent => ({ ...a, model: STARTER_MODEL, runtime: runtimeForModel(STARTER_MODEL) });
 
@@ -163,7 +173,10 @@ export async function starterFallback(
     log?.({ kind: 'wake', phase: 'stood_down', summary: `${whyUnavailable(u, agent.runtime)} ${credits ? 'offered the NeuraMesh brain' : 'out of credits'}`, level: 'warn' });
     return null;
   };
-  if (!thread?.routine || !credits) return offer();
+  // a routine moves by itself, and so does any conversation on a cloud machine: the default there
+  const auto = !!thread && (thread.routine || onCloudMachine());
+  if (!auto || !credits) return offer();
+  const owner: AutoOwner = thread.routine ? 'routine' : 'conversation';
   const override: BrainOverride = { ...(thread.override ?? {}), [agent.role]: STARTER_MODEL };
   // the routine runs as the owner already (schedules.ts posts its opener as the human), so the
   // owner's word records the move — the server keeps set_brain HUMAN_ONLY, and this is the human's rule
@@ -176,11 +189,11 @@ export async function starterFallback(
   // trigger, so the normal wake path re-asks the turn on the new seat. Every other cause is found
   // before the turn, and the caller simply continues with the returned agent.
   if (u.kind === 'capped') {
-    await post('/v1/messages', { kind: 'human', id: ownerActorId }, { ...placed, body: fallbackText(agent, u, 'auto') }).catch(() => {});
+    await post('/v1/messages', { kind: 'human', id: ownerActorId }, { ...placed, body: fallbackText(agent, u, 'auto', owner) }).catch(() => {});
   } else {
     // the reason, and a card that RECORDS the switch: the docked notice in the thread reads it.
     // Not a reply to the trigger — the turn continues, and its real answer is that reply.
-    await say(switchedCard(agent, u, { threadId: thread.id }, where.taskNumber), false);
+    await say(switchedCard(agent, u, { threadId: thread.id }, where.taskNumber, owner), false);
   }
   log?.({ kind: 'wake', phase: 'channel', summary: `re-seated on the NeuraMesh brain — ${whyUnavailable(u, agent.runtime)}` });
   return reseatOnStarter(agent);

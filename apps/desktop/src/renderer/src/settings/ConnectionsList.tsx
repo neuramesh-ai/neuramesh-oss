@@ -10,7 +10,7 @@ import { useConnectorStates } from './useConnectorStates';
 import { useEffect, useState } from 'react';
 import { nm as nmBridge } from '../bridge/nm';
 import type { StarterVideo } from '../bridge/nm';
-import { IconPlay } from '../ui/icons';
+import { IconPlay, IconSettings } from '../ui/icons';
 
 // their old homes, kept as re-exports so the shell, the post cards and the thread hooks import nothing new
 export { IMAGE_CRED_ORDER, imageCredOf } from './connectors';
@@ -66,10 +66,13 @@ export function ConnectionsList({ channelId, marketing }: { channelId: string; m
 /** THE VIDEO ROW (the video rung, 2026-09-19): a statement of what films a video post and what it
  *  costs, read from the server (the model behind a tier is its env variable, never a key here). A
  *  Pro workspace picks among the tiers the server serves; Free films on the default tier only, or
- *  on its own Google key. The pick is a workspace setting (workspace.update videoTier). */
+ *  on its own Google key. The pick is a workspace setting (workspace.update videoTier). The row is
+ *  FOLDED like every other row here (George, 2026-09-19: "it should be collapsed, until user clicks
+ *  on the video item or a cog"): the row names the tier, the cog or the row opens the tiers. */
 function VideoRow() {
   const [cat, setCat] = useState<StarterVideo | null | undefined>(undefined);
   const [busy, setBusy] = useState(false);
+  const [open, setOpen] = useState(false);
   useEffect(() => { let live = true; void (nmBridge?.starterVideo?.() ?? Promise.resolve(null)).then((c) => { if (live) setCat(c ?? null); }).catch(() => { if (live) setCat(null); }); return () => { live = false; }; }, []);
   if (cat === undefined || !cat?.served) return null;
   const active = cat.tiers.find((t) => t.tier === cat.tier) ?? cat.tiers[0];
@@ -79,12 +82,15 @@ function VideoRow() {
     setBusy(false);
   };
   return (
-    <div className="mkrailconnwrap">
-      <div className="mkrailrow mkrailconn mkvideorow">
+    <div className={`mkrailconnwrap${open ? ' open' : ''}`}>
+      <div className="mkrailrow mkrailconn mkvideorow" role="button" tabIndex={0} aria-expanded={open} onClick={() => setOpen((v) => !v)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen((v) => !v); } }}>
         <span aria-hidden className="mkconnmark"><IconPlay s={13} /></span><b>Video</b>
-        <span className="mkconndone"><span className="mkintok">on credits</span></span>
+        <span className="mkconndone">
+          <span className="mkintok">{active ? `${active.label.replace(/^NeuraMesh Video /, '')} · on credits` : 'on credits'}</span>
+          <button className={`mkico${open ? ' on' : ''}`} title={open ? 'Close' : 'Configure video'} aria-label={open ? 'Close video settings' : 'Configure video'} onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}><IconSettings s={12} /></button>
+        </span>
       </div>
-      <div className="mkvideonote">
+      {open && <div className="mkvideonote">
         {cat.canPick
           ? <>
               <span>NeuraMesh films video posts on the tier you pick. Your Google key is the fallback when the credits are out.</span>
@@ -97,7 +103,7 @@ function VideoRow() {
               </div>
             </>
           : active && <span>NeuraMesh films video posts on <b>{active.label}</b> ({active.model}), about {active.credits} credits for an eight-second hook. Your Google key is the fallback. Pro workspaces pick among {cat.tiers.length} tiers.</span>}
-      </div>
+      </div>}
     </div>
   );
 }

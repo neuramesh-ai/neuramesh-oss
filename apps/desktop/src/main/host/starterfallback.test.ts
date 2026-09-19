@@ -102,6 +102,30 @@ test('a HUMAN conversation gets the reason and the card with the switch, and the
   assert.deepEqual(JSON.parse(/```nmauth\n([\s\S]*?)```/.exec(said?.body.body)![1]!).scope, { threadId: 't-human', role: 'orchestrator' });
 });
 
+test('on a CLOUD machine a human conversation moves by itself too: the NeuraMesh brain is that machine\'s default (George, 2026-09-19), and the record says "conversation"', async () => {
+  const kind = process.env['NM_MACHINE_KIND'];
+  process.env['NM_MACHINE_KIND'] = 'member';
+  try {
+    rows['thread:t-web'] = { id: 't-web', schedule_id: null, brain_override: null };
+    const next = await starterFallback(rex, { kind: 'nocompute', provider: 'anthropic', reason: 'missing', cloudLacksLogin: true }, { workspace: 'ws', channelId: 'ch', threadId: 't-web', replyTo: 'm3' });
+    assert.equal(next?.model, STARTER_MODEL);
+    const setBrain = calls.find((c) => c.url.endsWith('/v1/commands'));
+    assert.deepEqual(setBrain?.body, { type: 'thread.set_brain', workspace: 'ws', threadId: 't-web', override: { orchestrator: STARTER_MODEL } });
+    assert.equal(setBrain?.actor?.kind, 'human', 'the owner\'s word, as for a routine');
+    const said = calls.find((c) => c.url.endsWith('/v1/messages'));
+    assert.match(said?.body.body, /This conversation continues on the NeuraMesh brain, on credits/);
+    assert.doesNotMatch(said?.body.body, /routine/);
+    assert.equal(said?.body.replyTo, undefined, 'the turn continues: its real answer replies to the trigger');
+    assert.equal(JSON.parse(/```nmauth\n([\s\S]*?)```/.exec(said?.body.body)![1]!).switched, true);
+    // out of credits on the cloud machine: the card, no move, exactly as on a laptop
+    calls = []; usage = { outOfCredits: true };
+    rows['thread:t-web2'] = { id: 't-web2', schedule_id: null, brain_override: null };
+    assert.equal(await starterFallback(rex, expired, { workspace: 'ws', channelId: 'ch', threadId: 't-web2', replyTo: 'm4' }), null);
+    assert.ok(!calls.some((c) => c.url.endsWith('/v1/commands')));
+    assert.match(calls.find((c) => c.url.endsWith('/v1/messages'))?.body.body, /out of credits/);
+  } finally { if (kind === undefined) delete process.env['NM_MACHINE_KIND']; else process.env['NM_MACHINE_KIND'] = kind; }
+});
+
 test('a unit anchored to a routine conversation is routine-owned, and the move lands on the unit\'s own thread (the row threadBrain reads first)', async () => {
   rows['own:task9'] = { id: 't-own', schedule_id: null, brain_override: null };
   rows['origin:task9'] = { id: 't-routine', schedule_id: 's1', brain_override: null };
