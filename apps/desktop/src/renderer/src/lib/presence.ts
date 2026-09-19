@@ -6,13 +6,13 @@ import type { TaskRow, RunUI } from '../bridge/rows-board';
 export const isOnline = (lastSeen: string | null) => !!lastSeen && Date.now() - new Date(lastSeen).getTime() < 90_000;
 // agent presence is derived, not stored: status rows go stale when a host
 // dies mid-session — the machine heartbeat is the liveness ground truth
-export const agentLive = (a: AgentRow, machines: MachineRow[]) =>
+export const agentLive = (a: Pick<AgentRow, 'machine_id'>, machines: Pick<MachineRow, 'id' | 'last_seen_at'>[]) =>
   !!a.machine_id && machines.some((m) => m.id === a.machine_id && isOnline(m.last_seen_at));
 // mid-task, by the agent's own synced status. The ONE definition — the rail's working-first
 // sort, the ping ring, and the overlay's status line all read it, so "busy" can't mean three
 // different things in three places.
 export const AGENT_BUSY = new Set(['working', 'review', 'thinking']);
-export const agentBusy = (a: AgentRow) => AGENT_BUSY.has(a.status);
+export const agentBusy = (a: Pick<AgentRow, 'status'>) => AGENT_BUSY.has(a.status);
 // an agent's current focus line — its in-flight assigned task, else its live status.
 // derived (not stored); reused by the unified nav's Agents section (was LiveRail.focusOf).
 // Runs (docs/29) come FIRST: an open run is the most specific true thing we know about an

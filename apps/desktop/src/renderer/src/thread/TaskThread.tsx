@@ -384,7 +384,7 @@ export function TaskThread({
   const { designActions, designHandoff, artStrip, blockedActions } = useTaskGates({ task, channelId, arts, busy, actErr, act, assignee, channelArchitect, composerMode, setComposerMode, onPreview, studioOpen, roundMockups, latestRound, openDesign, designProvider, claudeDesignUrl });
 
 
-  const { liveLeg, factHolder, factcap, liveBeat, shipBeat, ghostAgentId, typists, typistsBar, blockingInput } = useTaskPresence({ task, channelId, agents, machines, beats, spectrumLegs, runTrees_, assignee, offered, threadStream, busy, act, blocking, setBlocking, blockReason, setBlockReason, onActivity });
+  const { liveLeg, factHolder, factcap, liveBeat, shipBeat, ghostAgentId, typists, typistsBar, blockingInput } = useTaskPresence({ task, agents, machines, beats, spectrumLegs, runTrees_, taskRunRows, assignee, offered, threadStream, busy, act, blocking, setBlocking, blockReason, setBlockReason, onActivity });
 
   // Marketing content is reviewed PER-CARD (each card opens the human PostPreviewModal to approve +
   // schedule), so there's no group Approve gate for the DRAFTS — but the TASK still needs a way to

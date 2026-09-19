@@ -67,13 +67,29 @@ scoping is exactly why rex, who answers in threads he doesn't own, showed nothin
   `streamContent()` returns it only once tokens flow. **Presence mounts the ghost, text
   draws the bubble.**
 - The ghost's subject is, in order: the **stream's own agent** (any agent, assignee or not),
-  the assignee typing, then an assignee with a live beat/ship leg. Beat and checklist
-  context ride **only the assignee's** ghost — a visiting agent never borrows another's
-  step.
+  then each agent with an **open run on this surface** (newest first), then an assignee with
+  a live beat/ship leg — and never an agent whose own run card is already on screen (card ›
+  ghost › chip, on both surfaces since 2026-09-18). Beat and checklist context ride **only
+  the assignee's** ghost — a visiting agent never borrows another's step.
 
 The result: rex thinking in a task thread narrates his own tool activity there and nowhere
-else; a runtime that emits no deltas still falls back to the room's thinking set in
-conversation sheets.
+else.
+
+**Work on another machine (2026-09-18).** The stream is the *local* daemon's word, so work
+served by a cloud machine or a teammate's laptop emits none here. Both surfaces used to fall
+back to status — a conversation asked "is an agent in this room `thinking`", a task asked "is
+my assignee busy" (the v0.30.4 `taskTypists`) — scoped only by which surface the local stream
+said the agent was in, and with no stream that map is empty. One cloud wake lit the orb in
+every open conversation, settled ones included, and an assignee executing #1046 on a teammate's
+machine wore the orb in #1042, which was done. Status is gone as a claim. The cross-machine
+rung is the **synced run row** (docs/29): both wake paths and a task's execution open one
+before any work, carrying the surface it belongs to (`runAt`, the same predicate that builds
+the run cards), so `thread/ghost-rule.ts` names an agent working *here* only from the stream
+keyed to this surface or an open run on it. The legs that open no run — design, plan, review,
+ship — narrate through their beats, as before. Status survives as a gate (an unsettled row on
+a quiet agent must not spin forever), liveness is the machine *serving* the run
+(`agents.machine_id` is provenance since 0114), and each surface's typist chip reads the same
+list — the conversation's selected on the room-wide set too, and would have inherited the leak.
 
 ## 5. The wait ghost — the seconds before a ghost can exist (2026-09-09)
 

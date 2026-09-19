@@ -46,7 +46,6 @@ export * from './brainnotice';
 export * from './commands';
 export * from './policy';
 export * from './staffing';
-export * from './typists';
 export * from './browse';
 export * from './threads';
 export * from './threadwake';

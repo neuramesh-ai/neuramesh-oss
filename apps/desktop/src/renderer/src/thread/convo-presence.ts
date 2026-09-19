@@ -6,10 +6,11 @@
 // the ratchet is shrink-only on purpose (scripts/lint-ratchet.mjs): a file that grows extracts.
 //
 // They are answers to ONE question, so they must not be computed in two places. The typist chip
-// selects on the same "thinking in this room" predicate as the ghosts, so `spokenFor` and the
-// ghosts have to agree, or the same agent narrates itself twice under two labels.
-import { agentInChannel, isRunOpen, type RunState } from '@neuramesh/shared';
-import { agentLive } from '../lib/presence';
+// used to select on its own "thinking in this room" predicate beside the ghost's, and the two had
+// to agree by hand or the same agent narrated itself twice under two labels. `typists` is now the
+// ghost's own list, so they cannot disagree — and neither can name an agent working elsewhere.
+import { isRunOpen, type RunState } from '@neuramesh/shared';
+import { ghostPick, workingHere } from './ghost-rule';
 import { useWaitGhost } from './WaitGhost';
 import { waitRunFor, type WaitGhostRow } from './waitghost-rule';
 import type { RunTree } from '../runs/runs';
@@ -25,6 +26,9 @@ export interface ConvoPresence {
   waitGhost: WaitGhostRow | null;
   /** agents whose own run card is on screen (docs/29 §4) */
   carded: Set<string>;
+  /** everyone working HERE, streamer first — the composer chip names whoever the surfaces above
+   *  it have not already spoken for */
+  typists: AgentRow[];
 }
 
 export function useConvoPresence(d: {
@@ -38,26 +42,26 @@ export function useConvoPresence(d: {
   stream: { agent: string; text: string } | null;
   /** the same entry once TOKENS flow — presence mounts the ghost, text draws the bubble (§4) */
   streaming: { agent: string; text: string } | null;
-  streamOwners: Map<string, string>;
 }): ConvoPresence {
-  const { rows, agents, machines, channelId, threadId, runRows, trees, stream, streaming, streamOwners } = d;
-  // the ghost fills the reply slot while an agent works here and no text flows yet. The
-  // STREAM names it (daemon attribution — precise even for an agent busy elsewhere too);
-  // the room's thinking set is the fallback for runtimes that emit no deltas.
-  const ghostAgent = useMemo(() => {
-    if (streaming) return null;
-    if (stream) return agents.find((a) => a.name === stream.agent) ?? null;
-    // …and the room-wide fallback stands down for an agent streaming into ANOTHER thread: the
-    // task peek can put two of this room's threads on screen at once, and a channel-scoped
-    // guess would narrate the task's work in the conversation beside it (George, live).
-    return agents.find((a) => a.status === 'thinking' && agentLive(a, machines) && agentInChannel(a.channel_ids, channelId)
-      && (streamOwners.get(a.name) ?? `${channelId}:${threadId}`) === `${channelId}:${threadId}`) ?? null;
-  }, [agents, machines, channelId, threadId, stream, streaming, streamOwners]);
+  const { rows, agents, machines, channelId, threadId, runRows, trees, stream, streaming } = d;
+  // Who is working in THIS thread (ghost-rule.ts): the local stream names the wake this machine
+  // runs, and the synced run row names one served anywhere else — by the thread it answers in,
+  // never by the agent's global status. The old room-wide fallback ("an agent here is thinking",
+  // scoped only by where the LOCAL stream said it was) lit the orb in every open thread for one
+  // cloud wake, because a wake on another machine never fills that map (George, 2026-09-18).
+  const typists = useMemo(
+    () => workingHere({ agents, machines, where: { threadId }, runs: runRows, stream }),
+    [agents, machines, threadId, runRows, stream],
+  );
   const carded = useMemo(() => new Set(trees.filter((t) => isRunOpen(t.run.state as RunState)).map((t) => t.run.agent_id)), [trees]);
+  // the ghost fills the reply slot while an agent works here and no text flows yet — and stands
+  // down for an agent whose own run card is on screen (card › ghost › chip), which the
+  // conversation alone had skipped: a fanned-out wake showed rex's card and rex's ghost together
+  const ghostAgent = streaming ? null : ghostPick(typists, carded);
   // …and who holds the row before any of that exists (docs/26 §5). On the browser this is the
   // only orb for the first seconds of every message: with no local stream, the working ghost
-  // cannot mount until `thinking` has made a round trip to the runner and back.
+  // cannot mount until the wake's run row has made a round trip to the runner and back.
   const waitRun = useMemo(() => waitRunFor(runRows.filter((r) => r.thread_id === threadId), rows), [runRows, threadId, rows]);
   const waitGhost = useWaitGhost({ rows, agents, channelId, run: waitRun, carded });
-  return { ghostAgent, waitGhost, carded };
+  return { ghostAgent, waitGhost, carded, typists };
 }
