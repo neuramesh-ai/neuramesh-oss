@@ -116,6 +116,10 @@ export interface ClaimContext {
 
 export type SessionOrigin = 'desktop' | 'web' | 'routine';
 
+/** a session started on the web, on the phone (web-born by construction) or by a routine: it runs
+ *  on the cloud (rung 0 of shouldClaim). A desktop-born session keeps the member's own defaults. */
+export const isCloudBorn = (origin: SessionOrigin | null | undefined): boolean => origin === 'web' || origin === 'routine';
+
 export type ClaimVerdict =
   /** claim it now */
   | { act: 'claim'; why: 'origin' | 'no-origin-host' | 'grace-elapsed' | 'unattributed' | 'designated' | 'cloud' }
@@ -136,6 +140,8 @@ export function machineOnline(m: MachineCapability, now: number): boolean {
  * Should THIS host claim this unit of work?
  *
  * The order matters and each rule earns its place:
+ *   0. a cloud-born session (web, phone, routine) → the cloud machine, capability unasked: a brain
+ *      it lacks is re-seated on the NeuraMesh brain by the wake's own door, in the thread.
  *   1. incapable → never. Claiming work you cannot run converts a slow answer into a failed one,
  *      and the claim is what stops anyone else from trying.
  *   2. I am an origin machine → claim immediately. The member who asked has their own keys and
@@ -166,13 +172,28 @@ export function machineOnline(m: MachineCapability, now: number): boolean {
  * for and the card sat on "still drawing" with no error, because the machine could not even
  * post one. Ask what the WORK needs, not what the agent usually needs.
  */
-const runtimeOk = (m: MachineCapability, ctx: Pick<ClaimContext, 'runtime' | 'model' | 'modelFree'>): boolean =>
+export const runtimeOk = (m: MachineCapability, ctx: Pick<ClaimContext, 'runtime' | 'model' | 'modelFree'>): boolean =>
   ctx.modelFree === true || isHouseBrain(ctx.model) || m.runtimes.includes(ctx.runtime);
 
 export function shouldClaim(ctx: ClaimContext, now: number): ClaimVerdict {
   const grace = ctx.graceMs ?? DEFAULT_GRACE_MS;
 
-  // 1 — capability, always first
+  // 0 — CLOUD-BORN SESSIONS RUN ON THE CLOUD (George, 2026-09-19: "all queries / routines started on
+  // the web or mobile should always run on the cloud machine; if their configured brain isn't
+  // available, it should use the neuramesh brain with credits; brain availability across their
+  // devices shouldn't be what decides where a thread runs"). The capability question is NOT asked
+  // of the cloud machine: a brain it lacks is the wake's own door's to handle (host/starterfallback
+  // .ts re-seats the conversation on the NeuraMesh brain and says so in the thread). Before this
+  // rung, capability came first: the runner asked "can I serve claude-code?", skipped, and the
+  // member's laptop took a web session on whatever build it ran — and the laptop, asking the same
+  // question about the runner, never saw it as a candidate at all. A laptop that is not the cloud
+  // machine waits the window; no cloud machine awake, or one that never claimed inside it, and the
+  // rungs below decide, as they do for a wedged designation — a delay, never a black hole.
+  const cloudBorn = isCloudBorn(ctx.origin) ? cloudMachineForSession(ctx, now) : null;
+  if (cloudBorn === ctx.self.machineId) return { act: 'claim', why: 'cloud' };
+  if (cloudBorn && ctx.elapsedMs < grace) return { act: 'wait', why: 'cloud-may-serve', retryInMs: Math.max(250, grace - ctx.elapsedMs) };
+
+  // 1 — capability, always first for everything else
   if (!runtimeOk(ctx.self, ctx)) return { act: 'skip', why: 'incapable' };
 
   // 2 — designation: the ladder above origin affinity (0118). Continuity outranks preference —
@@ -257,19 +278,36 @@ function designatedMachine(ctx: ClaimContext, now: number): string | null {
 }
 
 /** the cloud machine a session with a known origin prefers: the member's own live member machine
- *  when they have one, else a live workspace runner. Capability and the online window apply, and
- *  a member machine must be the origin member's own (it is never lent). null = none awake. */
+ *  when they have one, else a live workspace runner. The online window applies, and a member
+ *  machine must be the origin member's own (it is never lent). Capability applies when `need` is
+ *  given; `null` asks none, for a cloud-born session (its door re-seats). null = none awake. */
 export function liveCloudMachine(
   machines: readonly MachineCapability[],
   originUserId: string | null,
-  need: Pick<ClaimContext, 'runtime' | 'model' | 'modelFree'>,
+  need: Pick<ClaimContext, 'runtime' | 'model' | 'modelFree'> | null,
   now: number,
 ): string | null {
-  const ok = (m: MachineCapability): boolean => runtimeOk(m, need) && machineOnline(m, now);
+  const ok = (m: MachineCapability): boolean => (need === null || runtimeOk(m, need)) && machineOnline(m, now);
   const mine = originUserId ? machines.find((m) => m.kind === 'member' && m.ownerUserId === originUserId && ok(m)) : undefined;
   if (mine) return mine.machineId;
   const runner = machines.find((m) => m.kind === 'runner' && ok(m));
   return runner?.machineId ?? null;
+}
+
+/** The cloud machine a CLOUD-BORN session runs on (rung 0), capability unasked. The chip's pick of
+ *  a laptop is a designation for rung 2, so the rung stands aside; among cloud machines,
+ *  continuity keeps a thread where its files are (a Code session's worktree), then the chip's
+ *  pick (the runner is everyone's; a member machine is its owner's, or anyone's for a routine),
+ *  then the member's own live member machine, else the live runner. */
+function cloudMachineForSession(ctx: ClaimContext, now: number): string | null {
+  const find = (id: string | null | undefined): MachineCapability | undefined => (id ? ctx.machines.find((m) => m.machineId === id) : undefined);
+  const cloud = (m: MachineCapability | undefined): m is MachineCapability => !!m && (m.kind ?? 'local') !== 'local' && machineOnline(m, now);
+  const named = find(ctx.threadMachineId);
+  if (named && (named.kind ?? 'local') === 'local') return null;
+  const prior = find(ctx.priorMachineId);
+  if (cloud(prior)) return prior.machineId;
+  if (cloud(named) && (named.kind === 'runner' || !ctx.originUserId || named.ownerUserId === ctx.originUserId)) return named.machineId;
+  return liveCloudMachine(ctx.machines, ctx.originUserId, null, now);
 }
 
 /** Where a NEW conversation with this agent would run for this member — the Compute panel's
@@ -316,7 +354,8 @@ export function placementFor(
   if (capable(byAgent)) return { machineId: byAgent!, why: 'agent-choice' };
   if (capable(prefs?.machine)) return { machineId: prefs!.machine!, why: 'default' };
   if (origin) {
-    const cloud = liveCloudMachine(reachable, selfUserId, { runtime: agent.runtime, model: agent.model ?? null }, now);
+    // a cloud-born session's cloud machine needs no capability (rung 0: its door re-seats)
+    const cloud = liveCloudMachine(reachable, selfUserId, isCloudBorn(origin) ? null : { runtime: agent.runtime, model: agent.model ?? null }, now);
     if (cloud) return { machineId: cloud, why: 'cloud' };
   }
   const mine = reachable.find((m) => m.ownerUserId === selfUserId && servesAgent(m));
@@ -557,27 +596,4 @@ export function capResetLabel(now: number): string {
   const at = new Date(now + msUntilCapReset(now));
   const time = at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
   return at.toDateString() === new Date(now).toDateString() ? time : `tomorrow at ${time}`;
-}
-
-/**
- * THE SLEEPER RUNG (member-machines plan §4.3), the pure half. When nobody awake can serve, a
- * CLOUD machine that published this runtime while it was awake and is now asleep can be asked to
- * wake: the origin's own, one its owner lends the origin, or — for unattributed work such as a
- * routine — one lent to the whole workspace. The runner is the workspace's, so it always
- * qualifies on consent. Ordered best-first: the origin's own machine before a lent one. The
- * daemon side (host/sleepers.ts) does the asking and the remembering.
- */
-export function wakeCandidates(
-  ctx: Pick<ClaimContext, 'machines' | 'runtime' | 'model' | 'modelFree' | 'originUserId' | 'requireGrant'>,
-  now: number,
-): MachineCapability[] {
-  const gated = ctx.requireGrant !== false;
-  const lent = (m: MachineCapability): boolean => {
-    if (m.kind === 'runner') return true;
-    if (ctx.originUserId) return !gated || machineAvailableTo(m, ctx.originUserId);
-    return (m.sharesWith ?? []).includes('*');
-  };
-  return ctx.machines
-    .filter((m) => (m.kind ?? 'local') !== 'local' && !machineOnline(m, now) && runtimeOk(m, ctx as ClaimContext) && lent(m))
-    .sort((a, b) => Number(b.ownerUserId === ctx.originUserId) - Number(a.ownerUserId === ctx.originUserId));
 }

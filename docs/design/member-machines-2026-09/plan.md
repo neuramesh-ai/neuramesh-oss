@@ -115,7 +115,10 @@ waits the grace window, exactly as it does for a designation. A thread born befo
 no origin and keeps the old ladder. Found while writing it and fixed in the same change: **an
 elapsed grace window used to claim outright**, which was the one path on which an *ungranted*
 machine could step into designated work — both deferral rungs now fall through to the lower
-rungs, consent included, after the window.
+rungs, consent included, after the window. **Amended 2026-09-19:** a cloud-born session (web,
+phone, routine) now resolves its cloud machine in a rung *above* capability and continuity, and the
+cloud machine takes it whatever brain it holds (the door re-seats): rule D9's amendment in the
+desktop Code bridge plan has the ruling and the reason.
 
 **Provisioning is a hook on membership** (Team only):
 

@@ -1,7 +1,8 @@
 // Origin-affinity claim policy (0114). Every host's decision to spend a member's tokens runs
 // through shouldClaim, so this is where the "shared compute" contract is actually pinned down.
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_GRACE_MS, MACHINE_ONLINE_MS, machineOnline, newestSeen, shouldClaim, wakeCandidates, type MachineCapability } from '../src/compute';
+import { DEFAULT_GRACE_MS, MACHINE_ONLINE_MS, isCloudBorn, machineOnline, newestSeen, shouldClaim, type MachineCapability } from '../src/compute';
+import { wakeCandidates } from '../src/compute-sleepers';
 
 const NOW = Date.parse('2026-08-07T12:00:00Z');
 const fresh = new Date(NOW - 10_000).toISOString();
@@ -288,11 +289,81 @@ describe('the origin rung: a session born on the web or by a routine prefers the
     const asleep = [georgeMac, bobMac, cloudAsleep, runnerAsleep];
     expect(shouldClaim(ctx(georgeMac, { machines: asleep, origin: 'desktop' }), NOW)).toEqual({ act: 'claim', why: 'origin' });
     expect(shouldClaim(ctx(georgeMac, { machines: asleep, origin: 'web' }), NOW)).toEqual({ act: 'claim', why: 'origin' });
-    // an incapable cloud machine is no cloud machine for this runtime
+    // desktop-born on Auto: an incapable cloud machine is no cloud machine for this runtime — the
+    // member's Mac has their login right there, so it keeps the session (web-born differs: below)
     const cloudNoGemini = mach({ machineId: 'm-george-cloud', ownerUserId: GEORGE, kind: 'member', runtimes: ['claude-code'] });
     const georgeGemini = mach({ machineId: 'm-george', ownerUserId: GEORGE, runtimes: ['gemini'] });
-    expect(shouldClaim(ctx(georgeGemini, { machines: [georgeGemini, cloudNoGemini], runtime: 'gemini', origin: 'web' }), NOW))
+    expect(shouldClaim(ctx(georgeGemini, { machines: [georgeGemini, cloudNoGemini], runtime: 'gemini', origin: 'desktop' }), NOW))
       .toEqual({ act: 'claim', why: 'origin' });
+  });
+
+  // RUNG 0 (George, 2026-09-19): "all queries / routines started on the web or mobile should always
+  // run on the cloud machine; if their configured brain isn't available, it should use the
+  // neuramesh brain with credits; brain availability across their devices shouldn't be what
+  // decides where a thread runs". Seen live: rex seated on Claude, the runner publishing only
+  // codex, `wake_skip … cannot serve claude-code` twice, and the laptop answering on an old build.
+  describe('rung 0: a cloud-born session runs on the cloud, whatever brain the cloud machine holds', () => {
+    const runnerCodex = mach({ machineId: 'm-runner', ownerUserId: 'u-platform', kind: 'runner', runtimes: ['codex'] });
+    const noClaudeCloud = [georgeMac, bobMac, runnerCodex];
+
+    it('web-born on a Claude seat: the codex-only runner claims; the capable laptop waits, then steps in as the origin', () => {
+      expect(shouldClaim(ctx(runnerCodex, { machines: noClaudeCloud, origin: 'web' }), NOW)).toEqual({ act: 'claim', why: 'cloud' });
+      expect(shouldClaim(ctx(georgeMac, { machines: noClaudeCloud, origin: 'web' }), NOW))
+        .toEqual({ act: 'wait', why: 'cloud-may-serve', retryInMs: DEFAULT_GRACE_MS });
+      // the runner never took it inside the window (wedged): a delay, never a black hole
+      expect(shouldClaim(ctx(georgeMac, { machines: noClaudeCloud, origin: 'web', elapsedMs: DEFAULT_GRACE_MS }), NOW)).toEqual({ act: 'claim', why: 'origin' });
+    });
+
+    it('routine-born likewise, with nobody\'s member machine to prefer', () => {
+      expect(shouldClaim(ctx(runnerCodex, { machines: noClaudeCloud, origin: 'routine', originUserId: null }), NOW)).toEqual({ act: 'claim', why: 'cloud' });
+      expect(shouldClaim(ctx(georgeMac, { machines: noClaudeCloud, origin: 'routine', originUserId: null }), NOW)).toMatchObject({ act: 'wait', why: 'cloud-may-serve' });
+    });
+
+    it('the member\'s own cloud machine outranks the runner, capability unasked of either', () => {
+      const cloudCodex = mach({ machineId: 'm-george-cloud', ownerUserId: GEORGE, kind: 'member', runtimes: ['codex'] });
+      const both = [georgeMac, cloudCodex, runnerCodex];
+      expect(shouldClaim(ctx(cloudCodex, { machines: both, origin: 'web' }), NOW)).toEqual({ act: 'claim', why: 'cloud' });
+      expect(shouldClaim(ctx(runnerCodex, { machines: both, origin: 'web' }), NOW)).toMatchObject({ act: 'wait', why: 'cloud-may-serve' });
+      // after the window the runner is judged by the old rungs, and it cannot serve Claude: it skips
+      expect(shouldClaim(ctx(runnerCodex, { machines: both, origin: 'web', elapsedMs: DEFAULT_GRACE_MS }), NOW)).toEqual({ act: 'skip', why: 'incapable' });
+    });
+
+    it('the chip\'s explicit pick of the cloud machine holds even when it lacks the brain', () => {
+      expect(shouldClaim(ctx(runnerCodex, { machines: noClaudeCloud, origin: 'web', threadMachineId: 'm-runner' }), NOW)).toEqual({ act: 'claim', why: 'cloud' });
+      expect(shouldClaim(ctx(georgeMac, { machines: noClaudeCloud, origin: 'web', threadMachineId: 'm-runner' }), NOW)).toMatchObject({ act: 'wait', why: 'cloud-may-serve' });
+      // a member machine named by another member is not theirs to pick: Auto's own pick instead (the runner)
+      const bobCloud = mach({ machineId: 'm-bob-cloud', ownerUserId: BOB, kind: 'member', runtimes: ['codex'] });
+      expect(shouldClaim(ctx(runnerCodex, { machines: [...noClaudeCloud, bobCloud], origin: 'web', threadMachineId: 'm-bob-cloud' }), NOW)).toEqual({ act: 'claim', why: 'cloud' });
+      expect(shouldClaim(ctx(bobCloud, { machines: [...noClaudeCloud, bobCloud], origin: 'web', threadMachineId: 'm-bob-cloud' }), NOW)).toMatchObject({ act: 'wait' });
+    });
+
+    it('the chip\'s explicit pick of a laptop is a designation: the rung stands aside', () => {
+      expect(shouldClaim(ctx(georgeMac, { machines: noClaudeCloud, origin: 'web', threadMachineId: 'm-george' }), NOW)).toEqual({ act: 'claim', why: 'designated' });
+      expect(shouldClaim(ctx(runnerCodex, { machines: noClaudeCloud, origin: 'web', threadMachineId: 'm-george' }), NOW)).toEqual({ act: 'skip', why: 'incapable' });
+    });
+
+    it('continuity to a laptop does not pin a cloud-born session; continuity among cloud machines does', () => {
+      // a web-born thread the laptop once served (the old ladder) moves to the cloud on its next message
+      expect(shouldClaim(ctx(runnerCodex, { machines: noClaudeCloud, origin: 'web', priorMachineId: 'm-george' }), NOW)).toEqual({ act: 'claim', why: 'cloud' });
+      expect(shouldClaim(ctx(georgeMac, { machines: noClaudeCloud, origin: 'web', priorMachineId: 'm-george' }), NOW)).toMatchObject({ act: 'wait', why: 'cloud-may-serve' });
+      // a thread the runner served keeps its files there, even once the member's own cloud machine wakes
+      const cloudCodex = mach({ machineId: 'm-george-cloud', ownerUserId: GEORGE, kind: 'member', runtimes: ['codex'] });
+      const both = [georgeMac, cloudCodex, runnerCodex];
+      expect(shouldClaim(ctx(runnerCodex, { machines: both, origin: 'web', priorMachineId: 'm-runner' }), NOW)).toEqual({ act: 'claim', why: 'cloud' });
+      expect(shouldClaim(ctx(cloudCodex, { machines: both, origin: 'web', priorMachineId: 'm-runner' }), NOW)).toMatchObject({ act: 'wait', why: 'cloud-may-serve' });
+      // a prior cloud machine that is asleep is no home: Auto's pick again
+      const runnerAsleep = mach({ machineId: 'm-runner', ownerUserId: 'u-platform', kind: 'runner', runtimes: ['codex'], lastSeenAt: stale });
+      expect(shouldClaim(ctx(cloudCodex, { machines: [georgeMac, cloudCodex, runnerAsleep], origin: 'web', priorMachineId: 'm-runner' }), NOW)).toEqual({ act: 'claim', why: 'cloud' });
+    });
+
+    it('a thread born before the column, and a desktop-born one, never reach the rung', () => {
+      expect(isCloudBorn('web')).toBe(true);
+      expect(isCloudBorn('routine')).toBe(true);
+      expect(isCloudBorn('desktop')).toBe(false);
+      expect(isCloudBorn(null)).toBe(false);
+      expect(shouldClaim(ctx(runnerCodex, { machines: noClaudeCloud }), NOW)).toEqual({ act: 'skip', why: 'incapable' });
+      expect(shouldClaim(ctx(runnerCodex, { machines: noClaudeCloud, origin: 'desktop' }), NOW)).toEqual({ act: 'skip', why: 'incapable' });
+    });
   });
 
   it('the desktop default on “here”: the session is DESIGNATED to that Mac at birth, and designation outranks the cloud', () => {
@@ -317,9 +388,9 @@ describe('the origin rung: a session born on the web or by a routine prefers the
       .toEqual({ act: 'claim', why: 'designated' });
   });
 
-  it('continuity still outranks everything: an old thread stays on the machine that served it', () => {
-    expect(shouldClaim(ctx(bobMac, { machines: fleet, origin: 'web', priorMachineId: 'm-bob' }), NOW)).toEqual({ act: 'claim', why: 'designated' });
-    expect(shouldClaim(ctx(georgeCloud, { machines: fleet, origin: 'web', priorMachineId: 'm-bob' }), NOW).act).toBe('wait');
+  it('continuity still outranks everything for a desktop-born thread: it stays on the machine that served it', () => {
+    expect(shouldClaim(ctx(bobMac, { machines: fleet, origin: 'desktop', priorMachineId: 'm-bob' }), NOW)).toEqual({ act: 'claim', why: 'designated' });
+    expect(shouldClaim(ctx(georgeCloud, { machines: fleet, origin: 'desktop', priorMachineId: 'm-bob' }), NOW).act).toBe('wait');
   });
 
   it('liveCloudMachine names the member’s own cloud machine before the runner, and only when awake and capable', () => {
@@ -328,10 +399,18 @@ describe('the origin rung: a session born on the web or by a routine prefers the
     expect(liveCloudMachine(fleet, BOB, need, NOW)).toBe('m-runner');
     expect(liveCloudMachine(fleet, null, need, NOW)).toBe('m-runner');
     expect(liveCloudMachine([georgeMac, bobMac], GEORGE, need, NOW)).toBeNull();
+    // capability unasked (rung 0): the codex-only runner is still the cloud for a Claude seat
+    const runnerCodex = mach({ machineId: 'm-runner', ownerUserId: 'u-platform', kind: 'runner', runtimes: ['codex'] });
+    expect(liveCloudMachine([georgeMac, runnerCodex], GEORGE, need, NOW)).toBeNull();
+    expect(liveCloudMachine([georgeMac, runnerCodex], GEORGE, null, NOW)).toBe('m-runner');
   });
 
   it('placementFor with an origin previews the same rung, after the member’s own choices', () => {
     expect(placementFor({ id: 'a-rex', runtime: 'claude-code' }, null, fleet, GEORGE, NOW, 'web')).toEqual({ machineId: 'm-george-cloud', why: 'cloud' });
+    // the preview agrees with rung 0: a cloud-born session's cloud machine needs no capability
+    const runnerCodex = mach({ machineId: 'm-runner', ownerUserId: 'u-platform', kind: 'runner', runtimes: ['codex'] });
+    expect(placementFor({ id: 'a-rex', runtime: 'claude-code' }, null, [georgeMac, runnerCodex], GEORGE, NOW, 'web')).toEqual({ machineId: 'm-runner', why: 'cloud' });
+    expect(placementFor({ id: 'a-rex', runtime: 'claude-code' }, null, [georgeMac, runnerCodex], GEORGE, NOW, 'desktop')).toEqual({ machineId: 'm-george', why: 'origin' });
     expect(placementFor({ id: 'a-rex', runtime: 'claude-code' }, { machine: 'm-george' }, fleet, GEORGE, NOW, 'web')).toEqual({ machineId: 'm-george', why: 'default' });
     // the Compute panel's standing column asks with no origin and reads as before
     expect(placementFor({ id: 'a-rex', runtime: 'claude-code' }, null, fleet, GEORGE, NOW)).toEqual({ machineId: 'm-george', why: 'origin' });
