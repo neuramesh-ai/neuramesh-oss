@@ -72,7 +72,7 @@ our nice cards." Built (`host/ugcflow.ts`, both registries, the angle card in `Q
 2. **The angle card.** `propose_angles` posts one question card: two to five angles from the
    product's facts as the options, "type your own" as the alternate, and a platform row of chips
    labelled "prepare for" (X, LinkedIn, Instagram, TikTok, the connected ones picked, the others one
-   tap away and marked; George: "posts to" read as automatic scheduling, and a pick schedules nothing).
+   tap away and marked. George: "posts to" read as automatic scheduling, and a pick schedules nothing).
    The tap on an angle posts the pick with the platforms in it (`… · platforms: x, linkedin`). The
    tool refuses before the research, and with a choice of one.
 3. **The drafts.** The pick wakes the agent. `draft_posts` with a script (a video post) refuses
@@ -82,9 +82,46 @@ our nice cards." Built (`host/ugcflow.ts`, both registries, the angle card in `Q
 The skill preamble (`marketing-os-preambles.ts`, the pack refreshes by content) and the
 orchestrator's marketing block say the order. The order is a fact either way: the two gates.
 
-## 5. Not in this round
+## 5. The film, on the harness (George: "test that the generate video is on-brand")
 
-- A film on the cloud machine (the fal door needs the API's `FAL_KEY`, not on the harness).
+The harness API got `FAL_KEY` (the `control-api-fleet` launch entry reads it from `.env`), the
+machine image was rebuilt, and Generate video was pressed on draft a of §4 (the X post, the
+"before and after" angle). One film, 194 credits, 6.5 minutes from the press to the card
+(`harness-film-filming-*.png`, `harness-film-landed-*.png`, the Review · Schedule preview
+`harness-film-preview-light.png`, four frames `harness-film-frames.png`).
+
+**Found before the press.** The house model writes the whole hook on the timestamp line
+(`[0:00-0:05] Hook: Show a messy desktop … CAPTION: The agent chat loop is broken.`), and
+`firstBeat` read that as one direction. The prompt would have said `Opening shot: : Show a messy
+desktop … CAPTION: The agent chat loop is broken.. Render no text` and never asked for the clear
+bottom third: the caption's words handed to the model as lettering, beside the instruction not to
+letter. Fixed (the caption and the spoken line read by name off that line, the label and the
+trailing period dropped, tests for both live shapes), and the film ran on the fixed prompt:
+
+> A vertical 9:16 short-form video, 8 seconds, filmed on a phone like a creator would: handheld,
+> natural light, no studio. Opening shot: Show a messy desktop with overlapping AI chat logs. Leave
+> the bottom third of the frame clear for a caption. Render no text, no subtitles, no lettering.
+> Visual direction: Split-screen video. Left side: messy terminal windows and endless browser tabs
+> with glowing red error text. Right side: clean NeuraMesh board showing a structured plan, build
+> leg, and green review checkmark. Natural desk lighting, shot on 35mm. Keep it raw and real. No
+> logos or brand text beyond what the app shows on screen.
+
+**The verdict, against `business-profile.md`.** On brand in substance: the hook opens on the
+messy chat windows, cuts to the split screen the brief asked for, and the right half is a board
+with a build leg, an "In Progress" row and a green check, which is the profile's plan, build,
+review cycle. The caption and the script say what the profile says (tracked plan, a clean
+worktree, review before merge, the free Mac app, the server blocks self-approval), and the
+tone is the profile's (one developer to another, no hype). The bottom third stays clear, so the
+caption burns in at publish. Off brand in the picture of the product: the board is an invented
+dark-navy phone app with a blue toggle and a green check, not NeuraMesh's monochrome graphite or
+paper, and its labels are pseudo-words ("Teron Inrdret", "Trun Fieg") beside a correct
+"NeuraMesh Board". That is the video model drawing a UI it has never seen. The lever is a
+reference frame: Seedance takes an image, and a real screenshot of the board (the project's own
+app, or the workspace logo) would make the product on screen the product. Not built here.
+
+## 6. Not in this round
+
+- The reference frame above (the film lane is LLM-free by design, the frame is one more input).
 - The classifier is path rules. A change that reaches a surface through a path the rules do not
   name is the next lesson to add to the table.
 - The cloud surface's live check stays by hand (the k3d harness). A CI k3d run with a real machine

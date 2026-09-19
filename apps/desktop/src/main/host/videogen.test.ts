@@ -20,6 +20,21 @@ test('the first beat is the hook block: direction, the spoken line, the caption'
   assert.deepEqual(firstBeat('"I started a coding session from my couch. No laptop opened."\n"This is Home. My queue and every session, one list."'), { direction: '', spoken: 'I started a coding session from my couch. No laptop opened.', caption: '' });
 });
 
+test('a beat written on the timestamp line (the house model, live 2026-09-19) still yields its three parts', () => {
+  // the hook as a quoted line with the caption after it: spoken + caption, no direction
+  assert.deepEqual(firstBeat('[0:00-0:05] Hook: "Stop letting AI agents edit your codebase without a plan." CAPTION: From messy chat logs to structured agent workflows.\n[0:05-0:20] Problem: contrast chat with workflows.'),
+    { direction: '', spoken: 'Stop letting AI agents edit your codebase without a plan.', caption: 'From messy chat logs to structured agent workflows.' });
+  // the hook as a direction with the caption after it: no stray colon, no trailing period, the caption read
+  assert.deepEqual(firstBeat('[0:00-0:05] Hook: Show a messy desktop with overlapping AI chat logs. CAPTION: The agent chat loop is broken.\n[0:05-0:20] Problem: the chaos of untracked edits.'),
+    { direction: 'Show a messy desktop with overlapping AI chat logs', spoken: '', caption: 'The agent chat loop is broken.' });
+  // a spoken label inline
+  assert.deepEqual(firstBeat('[0:00-0:03] Creator points at camera. Spoken: "Three things we learned."'), { direction: 'Creator points at camera', spoken: 'Three things we learned.', caption: '' });
+  // and the prompt of that beat never carries the caption's words, but asks for the clear bottom third
+  const p = filmPrompt('[0:00-0:05] Hook: Show a messy desktop with overlapping AI chat logs. CAPTION: The agent chat loop is broken.', 'Split screen.');
+  assert.match(p, /Opening shot: Show a messy desktop with overlapping AI chat logs\. Leave the bottom third/);
+  assert.doesNotMatch(p, /CAPTION|chat loop is broken|: :/);
+});
+
 test('the prompt is a vertical phone clip of the hook, with the caption and the brief, under the cap', () => {
   const p = filmPrompt(SCRIPT, '9:16 vertical. Real screen recording cut with handheld shots.');
   assert.match(p, /9:16/);

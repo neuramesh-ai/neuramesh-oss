@@ -95,7 +95,7 @@ We are not building a tool that's merely *correct*. We're building the thing eng
 ### 5.1 Definition of Done — six artifacts, no exceptions
 1. **Code** that matches the codebase's idiom.
 2. **Tests** that fail without the change (unit at minimum; loop-level for anything touching the FSM, sync, or agent layer).
-3. **Evidence** — screenshots for UI, perf numbers for hot paths, repro-then-green for bugs.
+3. **Evidence** — screenshots for UI, perf numbers for hot paths, repro-then-green for bugs — one block per surface the change reaches, each with that surface's automated check and its screenshots in both themes ([docs/45 §5](45-feature-placement.md#5-proof-per-surface)).
 4. **Docs** updated in the same PR if behavior changed (README, docs/, llms.txt).
 5. **Budgets** respected (§6) — measured, not vibes.
 6. **Review** passed — and for risky changes, *adversarial* review: the reviewer's job is to break it, not bless it.
@@ -170,6 +170,7 @@ When a budget and a feature conflict, the budget wins until a human explicitly r
 8. **Respect every budget** — performance (§6), scope (the task's requirements), and tokens (don't spend a dollar of compute to avoid a dime of thinking).
 9. **Report faithfully.** If tests fail, say so with output. If you skipped something, say that. Optimistic status reports are evidence-culture violations.
 10. **Make it feel fast and look beautiful**, in both themes, or it isn't NeuraMesh.
+11. **Place the feature before you build it** ([docs/45](45-feature-placement.md)): the tier (Pro, the hosted side, is the default, Free is the local app) and the plan (`cloud` only, or every hosted plan), the surfaces in order (the browser client, the phone, then the API and the cloud machines as needed), the gate, the proof per surface. The desktop app is open source and ships as needed: a Free feature, a fix installed apps need, or a parity catch-up. A feature ahead of the desktop gets its ledger row in the same PR.
 
 ---
 

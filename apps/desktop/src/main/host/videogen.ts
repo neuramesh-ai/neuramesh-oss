@@ -33,6 +33,23 @@ const unavailable = (status: number, msg: string): boolean =>
 
 export interface FilmBeat { direction: string; spoken: string; caption: string }
 
+/** The timestamp line's remainder. A house model writes the whole beat ON that line
+ *  (`[0:00-0:05] Hook: "Stop letting agents edit main." CAPTION: The chat loop is broken.`, live
+ *  2026-09-19), so the caption and the spoken line are read off it by name, a quoted remainder is
+ *  the creator's line, the `Hook:` label is dropped, and what is left is the direction. Read as
+ *  one line, that beat put the caption's words in the prompt beside "render no text". */
+function stampLine(rest: string, beat: FilmBeat): void {
+  let s = rest;
+  const cap = /\bCAPTION(?:\s+ON\s+SCREEN)?\s*:\s*(.*)$/i.exec(s);
+  if (cap) { beat.caption = cap[1]!.trim(); s = s.slice(0, cap.index); }
+  const spoken = /\bSpoken\s*:\s*(.*)$/i.exec(s);
+  if (spoken) { beat.spoken = spoken[1]!.replace(/^["“]|["”]$/g, '').trim(); s = s.slice(0, spoken.index); }
+  s = s.replace(/^(?:the\s+)?hook\s*[:—–-]?\s*/i, '').trim();
+  const quoted = /^["“](.+)["”]\s*$/.exec(s);
+  if (quoted) { if (!beat.spoken) beat.spoken = quoted[1]!.trim(); s = ''; }
+  beat.direction = s.replace(/\.\s*$/, '').trim();
+}
+
 /** The script's first beat: the `[0:00-0:03]` block a UGC script opens with. Direction is the
  *  rest of the timestamp line, `Spoken:` and `CAPTION` lines are read by name. A body without
  *  timestamps is one beat: its first three lines. */
@@ -43,7 +60,7 @@ export function firstBeat(body: string): FilmBeat {
   const beat: FilmBeat = { direction: '', spoken: '', caption: '' };
   for (const l of block) {
     const stamp = /^\[[^\]]+\]\s*(.*)$/.exec(l);
-    if (stamp) { beat.direction = stamp[1]!.replace(/^(?:hook|the hook)\s*[—–-]?\s*/i, '').trim(); continue; }
+    if (stamp) { stampLine(stamp[1]!, beat); continue; }
     const spoken = /^spoken\s*:\s*(.*)$/i.exec(l);
     if (spoken) { beat.spoken = spoken[1]!.replace(/^["“]|["”]$/g, '').trim(); continue; }
     // a bare quoted line is a spoken line too (a script written as the creator's lines, no labels)

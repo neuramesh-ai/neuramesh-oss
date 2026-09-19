@@ -9,7 +9,10 @@ release reaches an installed app.
 
 The rule (2026-09-14): **the public repository is the desktop app and what it needs to run.** The
 site, the phone app, the cloud platform, the pipelines that deploy it, and their identifiers stay
-private. `scripts/public-tree.sh` is the one list of what stays out, and the two scripts below read it.
+private. `scripts/public-tree.sh` is the one list, and the two scripts below read it: `PUBLIC_EXCLUDE`
+names what stays out of the tree, and `PUBLIC_DOCS` names the documents that ship. **A document is
+private until it is named** (2026-09-19): a new page, a new folder or a new design round under
+`docs/` never rides a publish until a line is added, and a design round's `evidence/` never ships.
 
 ## 1. What is public
 
@@ -19,7 +22,7 @@ private. `scripts/public-tree.sh` is the one list of what stays out, and the two
 | `packages/control-api` | The API (Hono), the command handler, and the migrations |
 | `packages/shared` | The types, the FSM, the entitlements, and the protocols every client speaks |
 | `dev/stack` | The dev stack: Postgres, PowerSync, and the sync rules |
-| `docs` | The design docs, less the evidence and the runbooks of the hosted service |
+| `docs` | The documents named in `PUBLIC_DOCS`: the numbered design docs, the decision log, the design rounds' plans and boards. A new document is private until it is named |
 
 | Private | Why |
 |---|---|
@@ -27,7 +30,7 @@ private. `scripts/public-tree.sh` is the one list of what stays out, and the two
 | `apps/mobile` | The phone app. It is Pro only and carries the App Store and production ids |
 | `infra`, `packages/fleet` | The cloud platform and the operator that runs the cloud machines |
 | `packages/bench/suite` | The held-out benchmark task set |
-| `docs/evidence`, the rollout log, the publish runbook, the audits | Dev data, production identifiers, and the adversarial review |
+| Every document not named in `PUBLIC_DOCS`, every design round's `evidence/`, the rollout log, the publish runbook, the audits | Dev data in screenshots and logs, production identifiers, the adversarial review, and whatever nobody meant to publish yet |
 
 Only four workflows ship: `ci.yml`, `control-api-bundle.yml`, `control-api-image.yml`, and
 `local-stack-smoke.yml`. Every other workflow deploys, signs, or publishes with a secret or an
@@ -95,7 +98,9 @@ Every public pull request follows the template: What & why, Evidence, Deploy not
 `pr-template.yml` runs `scripts/pr-template-check.sh` on the body and fails the pull request when a
 section is missing or holds no words of its own (the template's comments do not count). It runs
 again when the body is edited, so the fix is a fix to the text. The private template has the same
-three sections, so a port carries them as they are.
+three sections and a fourth, `## Placement` ([docs/45](45-feature-placement.md)), that the
+maintainer fills at the port: a contribution is desktop work by construction, Free tier, and it
+ships with the next desktop release.
 
 ## 4. One app, two connections
 
@@ -111,6 +116,15 @@ pipelines. The entitlements that separate the two live in `packages/shared` and 
 `hostedGateFor(connection, plan)` shows Get Pro to a Free plan on any connection that is not local.
 A local workspace migrates into a Pro workspace whenever the person likes, and the local copy stays
 on the Mac as a backup.
+
+**Pro features reach the browser and the phone first** (2026-09-19, [docs/45](45-feature-placement.md)).
+The desktop app carries them on its next release, and the
+[desktop parity ledger](desktop-parity-ledger.md) lists what the newest published desktop does not
+carry yet. A feature that lives on the phone or the site alone is never in this tree. A feature of
+the shared renderer that only the browser's bridge answers stays dark in the desktop app until its
+IPC lane is ported: the renderer feature-detects the bridge method and says so in one line, the way
+it says "No shell here". A Pro feature is gated on the connection and the plan, never on the
+platform, so the desktop's own Cloud connection gets it with the release that carries it.
 
 ```mermaid
 flowchart TB
@@ -133,6 +147,11 @@ flowchart TB
 A version lives in two places, and the order matters. The image must exist before the desktop that
 pulls it is published: an installed app that updates to `X.Y.Z` pulls the image `X.Y.Z` at once, and
 a missing tag is a boot failure on every Mac.
+
+A desktop release is cut as needed ([docs/45 §4](45-feature-placement.md#4-when-the-desktop-ships)):
+a Free feature, a fix installed apps need, the server's compatibility window, or a parity catch-up
+the ledger makes worth it. Never one per feature. The version-bump PR closes the ledger rows the
+release carries.
 
 1. Bump the version on the private `main`. The publish runs, and a human merges the public pull request.
 2. Tag `vX.Y.Z` on the **public** commit, from a clone of the public repository.

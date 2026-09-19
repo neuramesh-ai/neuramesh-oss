@@ -35,6 +35,15 @@ command -v gitleaks >/dev/null 2>&1 || { echo "public-scan: gitleaks is not inst
 EXCL=()
 while IFS= read -r line; do EXCL+=("$line"); done < <(public_exclude_pathspec)
 printf '· scanning the tree that ships (%s private paths and workflows left out)\n' "${#EXCL[@]}"
+# the documents PUBLIC_DOCS does not name, said out loud: a document nobody meant to publish shows
+# up here on the pull request that adds it, not in the public tree
+unnamed=$(public_docs_private)
+if [ -n "$unnamed" ]; then
+  printf '· %s document(s) stay private because PUBLIC_DOCS does not name them (scripts/public-tree.sh):\n' "$(printf '%s\n' "$unnamed" | wc -l | tr -d ' ')"
+  printf '%s\n' "$unnamed" | sed 's/^/    /'
+else
+  echo '· every document under docs/ is named in PUBLIC_DOCS'
+fi
 
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT

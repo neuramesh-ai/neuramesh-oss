@@ -24,6 +24,8 @@ makes it enforceable per change.
 
 **And its mirror: the server may stop accepting an old credential only after the newest *published* desktop sends the new one.** Closing the `x-nm-actor` lane in prod on 2026-08-30 assumed the desktop already sent a Clerk bearer — true of `main` (#360, 08-28), false of every build a user could install (v0.121.0 was tagged 08-26; v0.122.0, the first bearer desktop, was still a draft). Every installed app then failed its first `/v1` call after sign-in and signed itself out. Check the *shipped* build, not the branch: `git merge-base --is-ancestor <commit> <latest tag>` — and keep the update card reachable from the sign-in screen (docs/33 §8), so a build the server no longer accepts can still update itself.
 
+**A desktop release is cut as needed, never per feature** ([docs/45 §4](45-feature-placement.md#4-when-the-desktop-ships), 2026-09-19): a Free feature, a fix installed apps need, the compatibility window above, or a parity catch-up the [desktop parity ledger](desktop-parity-ledger.md) makes worth it. Pro work lands on the web and the phone first, and the version-bump PR closes the ledger rows the release carries.
+
 **The schema and control-api code a desktop build depends on must be live in prod *before* you publish that build.** A desktop app that calls a column or endpoint that isn't there yet is a broken release. Order every coupled rollout: land the backend PR (migrations + bundle) → verify prod → *then* tag/publish the desktop app. This is the v0.5.0 lesson — see §5.
 
 ---
@@ -76,6 +78,7 @@ Rules of thumb for what needs a rule change at all:
 
 ## 2 · Desktop release
 
+0. **Read the ledger** ([desktop-parity-ledger.md](desktop-parity-ledger.md)). The version-bump PR closes the rows this release carries (the version in the last column), updates the header's newest-published line once the draft is published, and the release notes name the rows. A row on a bridge lane the desktop lacks ships with its IPC port or stays open.
 1. **Bump the version in both files** — they must match:
    - [`package.json`](../package.json) (root)
    - [`apps/desktop/package.json`](../apps/desktop/package.json)
@@ -143,6 +146,7 @@ A coupled feature (backend + desktop):
 - [ ] Backend PR merged → Vercel prod deploy green → migration applied (verify with the curl in §1)
 - [ ] PowerSync: the main run's **`Deploy sync rules … → success`** step confirmed (not `skipped`); re-snapshotted if the Deploy notes said so
 - [ ] Prod smoke: public route returns the new code
+- [ ] Ledger rows closed, header updated ([desktop-parity-ledger.md](desktop-parity-ledger.md))
 - [ ] Version bumped in **both** `package.json`s
 - [ ] `vX.Y.Z` tag pushed → `release.yml` green (arm64)
 - [ ] Draft reviewed → **published**
