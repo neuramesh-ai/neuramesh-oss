@@ -103,6 +103,7 @@ The second command starts the dev stack in Docker (Postgres and PowerSync), star
 | [docs/33-design-system.md](docs/33-design-system.md) | The design system: tokens, motion, and the two themes |
 | [docs/05-engineering-philosophy.md](docs/05-engineering-philosophy.md) | The doctrine this repo is built on |
 | [docs/43-public-repository.md](docs/43-public-repository.md) | How this repo is published from the private one, how a contribution comes back, and how the app relates to Pro |
+| [docs/45-feature-placement.md](docs/45-feature-placement.md) | Where a feature lives: Free or Pro, which surfaces, and the [ledger](docs/desktop-parity-ledger.md) of what the desktop app does not carry yet |
 | [CLAUDE.md](CLAUDE.md) | The agent operating doctrine, and the index of [docs/](docs/) |
 
 ```

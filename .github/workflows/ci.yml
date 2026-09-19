@@ -137,5 +137,8 @@ jobs:
         run: |
           if [ -n "$PUBLIC_SCAN_LOCAL" ]; then printf '%s\n' "$PUBLIC_SCAN_LOCAL" > .public-scan.local; fi
 
+      - name: Self-test the public tree list (the docs rule on a throwaway repository, then this one)
+        run: bash scripts/public-tree.sh --self-test
+
       - name: Scan
         run: bash scripts/public-scan.sh

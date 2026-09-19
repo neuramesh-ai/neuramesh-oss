@@ -17,9 +17,10 @@
 # trees that differ cannot mirror.)
 #
 # What stays private is ONE list, scripts/public-tree.sh (the desktop app and what it needs to run
-# ship; the site, the phone app, the cloud platform and its pipelines stay). From a clean clone of
-# HEAD (so uncommitted work never rides along) this script removes every path in PUBLIC_EXCLUDE and
-# every workflow not in PUBLIC_WORKFLOWS, places the public repository's own files from PUBLIC_OWN
+# ship; the site, the phone app, the cloud platform and its pipelines stay; of docs/ only the
+# documents named in PUBLIC_DOCS ship). From a clean clone of HEAD (so uncommitted work never rides
+# along) this script removes every path in PUBLIC_EXCLUDE, every document not named in PUBLIC_DOCS
+# and every workflow not in PUBLIC_WORKFLOWS, places the public repository's own files from PUBLIC_OWN
 # (its pull request template and the workflow that enforces it), one line each so the log is the
 # evidence. Then it runs scripts/public-scan.sh on the result (with the founder's .public-scan.local
 # when the source checkout has one), fetches the public main, and commits the scrubbed tree on top
@@ -66,14 +67,15 @@ SHIP=()
 while IFS= read -r line; do SHIP+=("$line"); done < <(public_exclude_pathspec)
 
 # ── the private paths ────────────────────────────────────────────────────────────────────────
-for p in "${PUBLIC_EXCLUDE[@]}"; do
-  for f in $p; do # a glob entry expands here, a plain path is itself
-    if [ -e "$f" ] || git ls-files --error-unmatch "$f" >/dev/null 2>&1; then
-      git rm -r -q --cached --ignore-unmatch "$f"
-      rm -rf "$f"
-      echo "· removed $f"
-    fi
-  done
+# PUBLIC_EXCLUDE with its globs expanded, then every document PUBLIC_DOCS does not name: one
+# function prints them (public-tree.sh), so the removal and the scan's pathspec cannot drift.
+# The paths are read first: a removal must not move the ground under the listing.
+PRIVATE=()
+while IFS= read -r f; do PRIVATE+=("$f"); done < <(public_private_paths)
+for f in "${PRIVATE[@]}"; do
+  git rm -r -q --cached --ignore-unmatch "$f"
+  rm -rf "$f"
+  echo "· removed $f"
 done
 
 # ── the public repository's own files ────────────────────────────────────────────────────────
