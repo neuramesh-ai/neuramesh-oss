@@ -36,7 +36,7 @@ import { nm as nmBridge } from '../bridge/nm';
 import { suggestionTarget, type TaskRefInfo } from '../cards/parse';
 
 import { type AgentRow, type MachineRow, type MemberRow } from '../bridge/rows-crew';
-import { type ArtifactUI, type AttachmentRow, type DecisionAllRow } from '../bridge/rows-board';
+import { type ArtifactUI, type AttachmentRow, type DecisionAllRow, type TaskAllRow } from '../bridge/rows-board';
 import { type ChannelArtifactRow, type MessageRow, type ThreadRow } from '../bridge/rows-rooms';
 import { type SkillPackRow, type SkillRow } from '../bridge/rows-content';
 import { useAgentStream, useRuns, useStreamOwners } from './hooks';
@@ -47,6 +47,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ThreadMessage } from './ThreadMessage';
 import { BrandSections } from './../marketing/BrandSections';
 import { useThreadPosts } from './usePosts';
+import { useOwnedUnitPosts } from './useOwnedUnitPosts';
 import { convoArtifactSection, useThreadArtifacts } from './useArtifacts';
 
 // Imported bindings lose control-flow narrowing inside closures, so re-bind (same as App.tsx).
@@ -129,6 +130,10 @@ export function ConvoThread({ threadId, back, thread, channelId, channelSlug, ch
   }, [threadId]);
   const convoDrop = useDropZone(atts.addFiles);
   const { mkPosts, mkImageReady, mkPreview, setMkPreview, mkReplyTo, setMkReplyTo, setMkTick } = useThreadPosts(threadId, rows.length);
+  // the post cards of the content units this conversation OWNS (release drafts §4.5), and the one
+  // armed pill: whichever kind of card asked for changes, the composer reads it from here
+  const units = useOwnedUnitPosts(threadId, rows);
+  const armed = mkReplyTo ?? units.replyTo;
   const convoArts = useThreadArtifacts(threadId, rows.length);
   // docs/34 — this conversation's mode, and the human's flip. The thread row is the truth
   // (synced, so every machine agrees); `pending` is the optimistic value while the command
@@ -151,9 +156,10 @@ export function ConvoThread({ threadId, back, thread, channelId, channelSlug, ch
     atts.reset();
     // "Request changes" on a draft card arms the composer, and the ↩ prefix is what tells the
     // agent WHICH card — the same sentence shape a content task uses, minus the task number a
-    // conversation doesn't have. The agent answers it with revise_posts, in place.
-    const prefix = mkReplyTo ? `↩ Re draft ${mkReplyTo.letter}: ` : '';
-    setMkReplyTo(null);
+    // conversation doesn't have; a unit's card keeps its number (#1142·c, TaskThread's form).
+    // The agent answers it with revise_posts, in place.
+    const prefix = mkReplyTo ? `↩ Re draft ${mkReplyTo.letter}: ` : units.replyTo ? `↩ Re #${units.replyTo.number}·${units.replyTo.letter}: ` : '';
+    setMkReplyTo(null); units.setReplyTo(null);
     await nm.send(channelId, prefix + marker + consumeWbAttach(body), { id: msgId, attachments: attSpecs, threadId });
   };
   // answered nmq cards collapse to ✓ lines here exactly as in the room feed — replies in
@@ -173,7 +179,7 @@ export function ConvoThread({ threadId, back, thread, channelId, channelSlug, ch
   const mkCards = useMemo(() => postCardsFrom(mkPosts, rows), [mkPosts, rows]);
   const stream1 = useMemo(() => {
     const originals = mkCards.filter((c) => !c.isRevision);
-    const items: Array<{ at: string; msg?: MessageRow; tree?: RunTree; strip?: PostVCard[]; delivery?: ChannelArtifactRow[]; key?: string }> = [
+    const items: Array<{ at: string; msg?: MessageRow; tree?: RunTree; strip?: PostVCard[]; unit?: TaskAllRow; delivery?: ChannelArtifactRow[]; key?: string }> = [
       ...rows.map((m) => ({ at: m.created_at, msg: m })),
       ...trees.map((t) => ({ at: t.run.started_at, tree: t })),
       ...(originals.length
@@ -198,9 +204,11 @@ export function ConvoThread({ threadId, back, thread, channelId, channelSlug, ch
         return rowArts.length ? [{ at: rowArts[rowArts.length - 1]!.created_at, delivery: rowArts, key: `delivery-${rowArts[0]!.id}` }] : [];
       }),
       ...mkCards.filter((c) => c.isRevision).map((c) => ({ at: new Date(c.anchor).toISOString(), strip: [c], key: `rev-${c.key}` })),
+      // an owned content unit's drafts (release drafts §4.5): one strip per unit, under its completion note
+      ...units.strips.map((s) => ({ at: s.at, strip: s.cards, unit: s.unit, key: `unit-${s.unit.id}` })),
     ];
     return items.sort((a, b) => a.at.localeCompare(b.at));
-  }, [rows, trees, mkCards]);
+  }, [rows, trees, mkCards, units.strips]);
   return (
     <aside
       className="threadpanel convo"
@@ -252,14 +260,13 @@ export function ConvoThread({ threadId, back, thread, channelId, channelSlug, ch
               <div className="mkdraftsgrid">
                 {it.strip.map((c) => (
                   <SocialPostCard
-                    key={c.key} item={c.item} channelSlug={channelSlug} letter={c.letter}
-                    version={c.version} superseded={c.superseded}
-                    onOpen={() => setMkPreview(c.item)}
-                    onReply={c.superseded ? undefined : () => { setMkReplyTo({ id: c.item.id, letter: c.letter }); setCfocus((n) => n + 1); }}
-                    // the marker is what the daemon acts on; the prose is for the transcript.
-                    // A conversation names the letter, having no task number to borrow.
-                    onGenerateImage={c.superseded ? undefined : (redraw) => void nm?.send(channelId, `${redraw ? 'Redraw' : 'Generate'} the image for draft ${c.letter}.‹gen-image:${c.item.id}›`, { threadId })}
-                    imageReady={mkImageReady}
+                    key={c.key} item={c.item} channelSlug={channelSlug} letter={c.letter} taskNumber={it.unit?.number} onOpen={() => setMkPreview(c.item)}
+                    version={c.version} superseded={c.superseded} imageReady={it.unit ? units.imageReady : mkImageReady}
+                    onReply={c.superseded ? undefined : () => { if (it.unit) units.setReplyTo({ id: c.item.id, letter: c.letter, number: it.unit.number }); else setMkReplyTo({ id: c.item.id, letter: c.letter }); setCfocus((n) => n + 1); }}
+                    // the marker is what the daemon acts on; the prose is for the transcript. A
+                    // conversation names the letter, having no task number to borrow; a unit's card
+                    // posts into the UNIT's own thread, where the agent that drew it listens.
+                    onGenerateImage={c.superseded ? undefined : (redraw, kind) => { const ask = kind === 'video' ? `Film the hook for draft ${c.letter}.‹gen-video:${c.item.id}›` : `${redraw ? 'Redraw' : 'Generate'} the image for draft ${c.letter}.‹gen-image:${c.item.id}›`; void (it.unit ? nm?.sendThread(it.unit.id, channelId, ask) : nm?.send(channelId, ask, { threadId })); }}
                   />
                 ))}
               </div>
@@ -336,9 +343,9 @@ export function ConvoThread({ threadId, back, thread, channelId, channelSlug, ch
         <CapGate onUpgrade={onUpgradeReason} onSeeUsage={onSeeUsage} />
         {hostedGate ? <HostedGate /> : (
         <div
-          className={`cbox${convoDrop.dragging ? ' dropping' : ''}${mkReplyTo ? ' armed' : ''}`}
+          className={`cbox${convoDrop.dragging ? ' dropping' : ''}${armed ? ' armed' : ''}`}
           {...convoDrop.dropProps}
-          onKeyDownCapture={(e) => { if (e.key === 'Escape' && mkReplyTo) { e.stopPropagation(); setMkReplyTo(null); } }}
+          onKeyDownCapture={(e) => { if (e.key === 'Escape' && armed) { e.stopPropagation(); setMkReplyTo(null); units.setReplyTo(null); } }}
         >
           {attachedSkill && (
             <div className="skillattach">
@@ -348,10 +355,10 @@ export function ConvoThread({ threadId, back, thread, channelId, channelSlug, ch
           )}
           {/* the armed "request changes" pill — the card it belongs to, named, so a long reply
               never loses which draft it is about */}
-          {mkReplyTo && (
+          {armed && (
             <div className="skillattach">
-              <span className="skillchip modechip"><IconReply s={12} /> Request changes · draft {mkReplyTo.letter}</span>
-              <button className="skillattachx" title="cancel — esc" onClick={() => setMkReplyTo(null)}><IconClose s={12} /></button>
+              <span className="skillchip modechip"><IconReply s={12} /> Request changes · {'number' in armed ? `#${armed.number}·${armed.letter}` : `draft ${armed.letter}`}</span>
+              <button className="skillattachx" title="cancel — esc" onClick={() => { setMkReplyTo(null); units.setReplyTo(null); }}><IconClose s={12} /></button>
             </div>
           )}
           <AttachTray items={atts.items} onRemove={atts.remove} />
@@ -367,9 +374,7 @@ export function ConvoThread({ threadId, back, thread, channelId, channelSlug, ch
             onClearSkill={() => setAttachedSkill(null)}
             onOpenSkills={() => {}}
             onPaste={(e) => { const fs = filesFromPaste(e); if (fs.length) { e.preventDefault(); atts.addFiles(fs); } }}
-            placeholder={mkReplyTo
-              ? `What should change on draft ${mkReplyTo.letter}? · esc cancels`
-              : mode === 'chat' ? 'Ask anything — ↵ send' : 'Reply — @ mention · / skill · ↵ send'}
+            placeholder={armed ? `What should change on draft ${armed.letter}? · esc cancels` : mode === 'chat' ? 'Ask anything — ↵ send' : 'Reply — @ mention · / skill · ↵ send'}
             focusSignal={cfocus}
             mentionSignal={cmention}
           />
@@ -418,7 +423,7 @@ export function ConvoThread({ threadId, back, thread, channelId, channelSlug, ch
           channelId={channelId}
           projectName={crumbProject?.name ?? null}
           onClose={() => setMkPreview(null)}
-          onChanged={() => { setMkPreview(null); setMkTick((n) => n + 1); }}
+          onChanged={() => { setMkPreview(null); setMkTick((n) => n + 1); units.setTick((n) => n + 1); }}
         />
       )}
     </aside>

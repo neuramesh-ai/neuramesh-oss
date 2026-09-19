@@ -190,8 +190,10 @@ export interface NMBridge extends EngineeringNMBridge, TerminalNMBridge {
   channelCreate(projectId: string, slug: string, topic?: string): Promise<{ ok: boolean; channelId: string; slug: string }>;
   channelRename(channelId: string, slug?: string, topic?: string): Promise<{ ok: boolean; channelId: string; slug: string }>;
   channelKind(channelId: string, kind: 'build' | 'marketing'): Promise<{ ok: boolean; channelId: string }>;
-  marketingSetup(channelId: string, website: string, focus: string[], goal?: string): Promise<{ ok: boolean; channelId: string; threadId?: string; taskId?: string }>;
-  setupStep(channelId: string, flow: string, step: string, value?: string | string[]): Promise<{ ok: boolean }>;
+  /** step 5 (release drafts §4.7) rides `releases`: the repository, a free one-shot (`now`), a daily Team routine (`watch`); the answer says whether the routine armed or the plan refused it */
+  marketingSetup(channelId: string, website: string, focus: string[], goal?: string, releases?: { repoId?: string | null; slug?: string | null; now: boolean; watch: boolean; at?: string; tz?: string }): Promise<{ ok: boolean; channelId: string; threadId?: string; taskId?: string; releases?: { now: boolean; watch: 'armed' | 'plan_limit' | 'off' } }>;
+  /** the releases step writes an object; every other step a text or a list (the server checks the shape per step) */
+  setupStep(channelId: string, flow: string, step: string, value?: string | string[] | Record<string, unknown>): Promise<{ ok: boolean }>;
   contentUpdate(itemId: string, body: string, mediaUrl?: string): Promise<{ ok: boolean }>;
   contentDelete(itemId: string): Promise<{ ok: boolean }>;
   marketingIntegration(channelId: string, provider: 'posthog' | 'meta' | 'tiktok', enabled: boolean): Promise<{ ok: boolean }>;
@@ -218,6 +220,8 @@ export interface NMBridge extends EngineeringNMBridge, TerminalNMBridge {
   /** the image floor: generate/regenerate (and with `rewrite`, redraft body+brief) for one draft */
   /** `pending`: the picture was ASKED FOR (a tab posting to the draft's thread) and lands on the row by sync; the desktop draws in place and answers with the thumb */
   draftImage(itemId: string, opts?: { angle?: string; rewrite?: boolean }): Promise<{ ok: boolean; pending?: boolean; thumb?: string; body?: string; error?: string }>;
+  /** a draft's hosted media (the UGC film) as a data: URL — read with the session, members only; null when it is gone */
+  contentMedia(mediaId: string): Promise<string | null>;
   contentUnschedule(itemId: string): Promise<{ ok: boolean }>;
   mediaPreview(url: string): Promise<{ dataUrl: string | null }>;
   connectorStart(channelId: string, provider?: 'x' | 'linkedin' | 'instagram' | 'tiktok'): Promise<{ ok: boolean }>;

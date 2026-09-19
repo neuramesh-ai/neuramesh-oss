@@ -7,7 +7,7 @@ import { emptyNavScope, navFlat, type NavScope, isChatRow, isCodeRow } from './n
 import { bindReview, reviewKind, reviewPacket, type ReviewBinding, type ReviewComment, type ReviewRound, type ReviewSubject, type ReviewVerdict } from './review';
 import { BrandLockup } from './brand';
 import { type ChannelRow, type ChannelPersonRow, type ChannelHistoryRow, type MessageRow, type ThreadRow, type HomeConvoRow, type HistoryThreadRow } from './bridge/rows-rooms';
-import { type SkillRow, type SkillPackRow } from './bridge/rows-content';
+import { type ContentItemWide, type SkillRow, type SkillPackRow } from './bridge/rows-content';
 import { type TaskRow, type TaskAllRow, type DecisionAllRow, type ProjectRow, type WorkspaceProjectRow, type RepoUI, type RunUI, type ArtifactUI, type AttachmentRow } from './bridge/rows-board';
 import { type AgentRow, type MachineRow, type MemberRow, type WorkspaceMembership, type PendingInvite } from './bridge/rows-crew';
 import { type CredRow, type UpdateState, type FailoverRow, type ProcList } from './bridge/rows-infra';
@@ -467,6 +467,7 @@ export function App() {
   // reason to look, so it cannot wait until you are already looking. WorkspaceCalendar reports the
   // live number through onCount while it is open; this poll keeps it true while it is not.
   const [roomContent, setRoomContent] = useState(0);
+  const [comingPosts, setComingPosts] = useState<ContentItemWide[]>([]);
   useEffect(() => { setRoomView('feed'); }, [current?.id]);
   // brief loading state right after a project switch — drives room/chat skeletons so nothing stale
   // flashes while the new project's channels + messages resolve. Set synchronously here so the very
@@ -1720,12 +1721,15 @@ export function App() {
   // the Calendar badge: posts still COMING (draft + scheduled), workspace-wide — the destination's
   // own resting scope, so the number and the surface can never disagree about what they count.
   // Published is deliberately out: it already happened, and a badge is for what is still owed.
+  // The rows themselves feed the session marks too (release drafts §4.5): a draft on a unit a
+  // conversation owns lifts that conversation into Needs you, off this same poll.
   useEffect(() => {
     if (!nm) return;
     let live = true;
     const load = () => { void nm.contentAll().then((r) => {
       if (!live) return;
-      setRoomContent(r.items.filter((it) => it.status === 'draft' || it.status === 'scheduled').length);
+      const coming = r.items.filter((it) => it.status === 'draft' || it.status === 'scheduled');
+      setComingPosts(coming); setRoomContent(coming.length);
     }).catch(() => {}); };
     load();
     const iv = setInterval(load, 30_000);
@@ -1775,7 +1779,7 @@ export function App() {
     return new Set(live.flatMap((r) => [...(r.task_id ? [r.task_id, ...liveKin(r.task_id)] : []), ...(r.thread_id ? [r.thread_id] : [])]));
   }, [openRuns, liveKin]);
   // the three words a thread can wear (shared/threadstatus.ts), for the ⌘Y overlay's chips and filter
-  const rowMarks = useMemo(() => makeRowMarks({ decisions: decisionsAll, liveIds: histLiveIds, threads: histAll, tasks: tasksAll }), [decisionsAll, histLiveIds, histAll, tasksAll]);
+  const rowMarks = useMemo(() => makeRowMarks({ decisions: decisionsAll, liveIds: histLiveIds, threads: histAll, tasks: tasksAll, drafts: comingPosts }), [decisionsAll, histLiveIds, histAll, tasksAll, comingPosts]);
   // …and for the OPEN session's head (settle round, 2026-09-09). The same derivation the rail's
   // rows run, asked about the one session on screen — a task's thread id lives on TaskAllRow, not
   // on the TaskRow the panel holds, so it is resolved here rather than inside the head.

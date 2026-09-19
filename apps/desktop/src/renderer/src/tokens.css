@@ -448,6 +448,24 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 .mkconnname { font-size: 12px; font-weight: 600; }
 .mkconnok { margin-left: auto; font-size: 10.5px; font-weight: 600; color: var(--done); }
 .mkconnbtn { margin-left: auto; }
+/* step 5, release drafts (docs/design/release-drafts-2026-09 §4.7, the Setup board): a mono
+   label per question, the repository as a chip, and two switch rows. The daily watch reuses the
+   settings switch (.shsw); the one-shot is a small box, the board's own idiom. */
+.mkqlabel { font: 500 9.5px var(--fmono); letter-spacing: -.02em; text-transform: uppercase; color: var(--dim); margin: 10px 0 5px; }
+.mkrepo { display: flex; align-items: center; gap: 9px; padding: 2px 2px 8px; }
+.mkrepo .mkurlrow { flex: 1; min-width: 0; }
+.repochip { display: inline-flex; align-items: center; gap: 7px; font: 500 12px var(--fmono); color: var(--text); border: 1px solid var(--border2); background: var(--panel2); border-radius: 6px; padding: 5px 10px; }
+.repochip .br { color: var(--dim); }
+.mkqnote { font-size: 11px; color: var(--muted); padding: 6px 2px 0; }
+.togrow { display: flex; align-items: center; gap: 10px; padding: 8px 2px; border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent); }
+.togrow:last-child { border-bottom: 0; }
+.togrow .lbl { font-size: 12.5px; font-weight: 500; color: var(--text); }
+.togrow .sub { display: block; font-size: 11px; color: var(--muted); margin-top: 1px; }
+.togrow .shsw { margin-left: auto; }
+.mkcb { margin-left: auto; width: 15px; height: 15px; border-radius: 3px; border: 1px solid var(--border2); background: none; display: grid; place-items: center; color: var(--green); font: 600 11px/1 var(--fbody); flex: none; padding: 0; cursor: pointer; transition: border-color var(--dur-fast) var(--ease); }
+.mkcb.on { border-color: var(--green); }
+.mkcb:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--ring); }
+.togrow .shsw:disabled, .mkcb:disabled { opacity: .45; cursor: default; }
 /* .mkqhint has no users since 2026-08-09 — the setup card's two reassurance paragraphs were
    removed (the facts live where they are acted on). Kept as the wizard's hint style for the
    next step that genuinely needs one. */
@@ -976,6 +994,11 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 .ndopt { display: flex; align-items: flex-start; gap: 10px; width: 100%; text-align: left; border: 1px solid var(--border); background: var(--card); border-radius: var(--r-md); padding: 9px 12px; margin-bottom: 6px; cursor: pointer; font-family: inherit; color: var(--text);
   transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease); }
 .ndopt:hover:not(:disabled) { border-color: var(--border2); background: var(--hover-bg); }
+/* the attach row (release drafts): the same card, a repository instead of an account */
+.ndattach { display: flex; align-items: center; gap: 8px; margin: 2px 0 8px; flex-wrap: wrap; }
+.ndinput { flex: 1; min-width: 220px; height: 30px; padding: 0 10px; border: 1px solid var(--border2); background: var(--panel2); border-radius: var(--r-xs); color: var(--text); font: 500 12.5px var(--fmono); outline: none; }
+.ndinput:focus { border-color: var(--ring); }
+.nderr { flex-basis: 100%; font-size: 11.5px; color: var(--warn); }
 .ndopt:disabled { opacity: .7; cursor: default; }
 .ndopt.primary { border-color: var(--border2); }
 .ndopt .g { flex: none; width: 20px; height: 20px; display: grid; place-items: center; font-size: 11px; border: 1px solid var(--border2); border-radius: 6px; color: var(--muted); }
@@ -1847,6 +1870,37 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 .repgaps .k { flex: none; font: 500 8.5px var(--fmono); letter-spacing: -.02em; text-transform: uppercase; color: var(--dim); }
 .repacts { display: flex; align-items: center; gap: 6px; padding: 10px 14px 12px; border-top: 1px solid var(--border); flex-wrap: wrap; }
 .reparmed { font: 600 10px var(--fmono); color: var(--muted); border: 1px solid var(--border2); border-radius: var(--r-pill); padding: 3px 9px; }
+
+/* ── THE RELEASE CARD (release-drafts round, docs/design/release-drafts-2026-09 §4.4) — the
+   artcard family with a verdict: kicker · tag · date · verdict chip · the feature title · the
+   why · Audience / Assets / Not known rows · actions. The verdict wears a status hue because it
+   IS one (feature = done, improvement = prog, fix = warn, none = muted), never --accent. The
+   pull requests in the why are plain text: a #385 here names a PR, not a task. ── */
+.relcard { background: var(--card); border: 1px solid var(--card-border); border-radius: var(--r-lg);
+  box-shadow: var(--shadow-card); overflow: hidden; max-width: 620px; margin-top: 8px; }
+.relcard.relgone { padding: 12px 14px; font-size: 12px; color: var(--muted); }
+.relhd { display: flex; align-items: center; gap: 9px; padding: 9px 14px; border-bottom: 1px solid var(--border); }
+.relhd .k { font: 600 10px var(--fmono); letter-spacing: -.02em; text-transform: uppercase; color: var(--muted); }
+.reltag { font: 500 11px var(--fmono); color: var(--text); border: 1px solid var(--border2); border-radius: var(--r-xs); padding: 1.5px 7px; }
+.reldate { font: 500 10.5px var(--fmono); color: var(--dim); }
+.relhd .chip { margin-left: auto; }
+.chip.rv-feature { background: color-mix(in srgb, var(--done) 16%, transparent); color: var(--done); }
+.chip.rv-improvement { background: color-mix(in srgb, var(--prog) 16%, transparent); color: var(--prog); }
+.chip.rv-fix { background: color-mix(in srgb, var(--warn) 16%, transparent); color: var(--warn); }
+.chip.rv-none { background: color-mix(in srgb, var(--muted) 14%, transparent); color: var(--muted); }
+.relbody { padding: 10px 14px 4px; }
+.reltitle { font: 500 15.5px/1.35 var(--fbody); letter-spacing: -.015em; color: var(--text); }
+.relwhy { font-size: 12.5px; line-height: 1.5; color: var(--body); margin-top: 5px; }
+.relrows { margin-top: 8px; border-top: 1px solid color-mix(in srgb, var(--border) 60%, transparent); }
+.relrow { display: flex; gap: 10px; padding: 5px 0; border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent); font-size: 12px; line-height: 1.45; }
+.relrow:last-child { border-bottom: 0; }
+.relrow .k { flex: none; width: 82px; color: var(--muted); }
+.relrow .v { color: var(--body); min-width: 0; }
+.relrow .gap { color: var(--muted); font-style: italic; }
+.relfoot { display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-top: 1px solid var(--border); }
+.relfoot .artsaved { margin-left: 0; }
+.relfoot .sp { flex: 1; }
+.relfoot .mono { font: 500 10.5px var(--fmono); color: var(--dim); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ── MARKETING OS — the destination (docs/design/marketing-os-2026-08 round 2; the desk round,
    docs/design/marketing-os-desk-2026-09, 2026-09-17). ONE page in today's order: the desk, the
@@ -7049,7 +7103,17 @@ button.dprovideropt:hover:not(:disabled), .dprovideropt.external:hover { border-
 /* image outcome on the card — failure reason + Try again, or a Generate button */
 .mkpcimgerr { background: color-mix(in srgb, var(--blocked) 8%, transparent); }
 .mkpcimgerr b { color: var(--text); }
-.mkpcimggen { background: none; border-top: 1px dashed var(--border2); }
+.mkpcimggen { background: none; border-top: 1px dashed var(--border2); flex-direction: row; flex-wrap: wrap; align-items: center; }
+/* ── THE SCRIPT AND ITS FILM (the UGC round, 2026-09-18) — a timestamped script folds to its first
+   beat with a quiet "the script ›" tail; the text itself is the toggle (George: "user can click the
+   text to expand it"). The film stands where the picture stands, same box, same border. ── */
+.mkscript { cursor: pointer; }
+.mkscript.mkscriptunder { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--border); }
+.mkscript .mkscripttext { color: var(--muted); }
+.mkscript:not(.open) .mkpvtext { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.mkscript:focus-visible { outline: 1.5px solid var(--accent); outline-offset: 2px; border-radius: var(--r-sm); }
+.mkscriptmore { display: block; margin-top: 4px; font: 500 11px var(--fmono); color: var(--accent); letter-spacing: .02em; }
+.mkpcfilm { display: block; width: 100%; max-height: 420px; margin-top: 10px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--panel2); object-fit: contain; }
 /* the pending picture stands WHERE the picture will be (same box as .mkpcimg), so the card shows
    the shape of what is coming instead of a button insisting it is busy. The sweep is the only
    motion here and it is non-blocking, so it sits outside the ≤150ms budget by design. */
@@ -7622,7 +7686,9 @@ button.dprovideropt:hover:not(:disabled), .dprovideropt.external:hover { border-
    about the reveal is 0119's, untouched: 0fr → 1fr animates to the content's own height, and the
    panel stays mounted so closing has a transition to run. */
 .rtrow { flex-wrap: wrap; }
-.rtrow > .runspanel { flex: 0 0 100%; grid-column: auto; margin-left: 116px; }
+/* the basis leaves room for its own margin: at 100% plus 116px the panel ran 116px past the row, and
+   every run row's last column (the reply count, the ledger's `checked`) sat off the right edge */
+.rtrow > .runspanel { flex: 0 0 calc(100% - 116px); grid-column: auto; margin-left: 116px; }
 .rtrow.open { background: var(--card); border-color: var(--card-border); box-shadow: var(--shadow-card); }
 [data-theme='dark'] .rtrow.open, [data-theme='soft-dark'] .rtrow.open { background: var(--panel2); border-color: transparent; box-shadow: none; }
 /* …and an OPEN row keeps its verbs and its meta: the hover swap is for a row you are passing
@@ -7673,6 +7739,11 @@ button.dprovideropt:hover:not(:disabled), .dprovideropt.external:hover { border-
 .runsreplies { flex: none; font: 500 10px var(--fmono); color: var(--muted); }
 /* a fired prompt nobody answered — the one run you want to catch, so it is the one that deviates */
 .runsreplies.quiet { color: var(--dim); font-style: italic; }
+/* a release routine's quiet tick (release drafts §4.7): it looked, found nothing to announce and
+   opened no session, so the ledger line is the row — read-only, in the same italic as no reply */
+.runstitle.quiet { color: var(--muted); font-style: italic; }
+.runsrow.quiet { cursor: default; }
+.runsrow.quiet:hover { background: none; }
 
 /* ── A leg's seat (docs/29 §4d): which config it runs on, and whose ─────────────────────────────
    This is where "who is doing this" lives now. It used to be the board card's assignee, and under

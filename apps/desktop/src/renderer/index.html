@@ -6,7 +6,7 @@
   <!-- img-src must allow blob: (composer attachment previews via createObjectURL) and the
        nm-attachment: scheme (full-res attachment bytes in the feed + lightbox). Without blob:
        the staged-image preview tiles render broken even though staging/sending works. -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: nm-attachment:" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: nm-attachment:; media-src 'self' data: blob:" />
   <title>neuramesh · your agent workshop</title>
   <meta name="description" content="Orchestrate teams of AI agents that plan, code, and ship together — on your infra, with your models." />
   <meta name="theme-color" content="#f0e5d3" />

@@ -18,7 +18,21 @@ export interface RowMarks { status: ThreadStatus; ask: boolean; settle: boolean 
  *  rows do, without a HistoryRow to hand (the thread head's chip and Settle, 2026-09-09) */
 export type MarkableRow = Pick<HistoryRow<TaskAllRow>, 'threadId' | 'task'>;
 
-export function makeRowMarks(i: { decisions: DecisionAllRow[]; liveIds: Set<string>; threads: HistoryThreadRow[]; tasks?: TaskAllRow[] }): (r: MarkableRow) => RowMarks {
+/** what a drafted post has to carry to count (the nm.contentAll() rows): its unit, its birth, its state */
+export type DraftLike = { task_id: string | null; created_at: string; status: string };
+
+/** drafted posts still waiting, per unit: how many, and the newest one's birth */
+function draftsByUnit(drafts: DraftLike[]): Map<string, { n: number; at: string }> {
+  const out = new Map<string, { n: number; at: string }>();
+  for (const d of drafts) {
+    if (d.status !== 'draft' || !d.task_id) continue;
+    const cur = out.get(d.task_id);
+    out.set(d.task_id, { n: (cur?.n ?? 0) + 1, at: laterOf(cur?.at, d.created_at) ?? d.created_at });
+  }
+  return out;
+}
+
+export function makeRowMarks(i: { decisions: DecisionAllRow[]; liveIds: Set<string>; threads: HistoryThreadRow[]; tasks?: TaskAllRow[]; drafts?: DraftLike[] }): (r: MarkableRow) => RowMarks {
   // the units each conversation OWNS (docs/41): an anchored unit has no row, so its gate shows on the owner's
   const ownedByThread = new Map<string, TaskAllRow[]>();
   for (const t of i.tasks ?? []) {
@@ -35,10 +49,17 @@ export function makeRowMarks(i: { decisions: DecisionAllRow[]; liveIds: Set<stri
     if (d.thread_id && !byThread.has(d.thread_id)) byThread.set(d.thread_id, d);
     if (d.task_id && !byTask.has(d.task_id)) byTask.set(d.task_id, d);
   }
+  // drafted posts still waiting, per unit (the release-drafts round, §4.5): a conversation carries the
+  // drafts of the content units it OWNS, so they lift it exactly as an owned unit's gate does. Only
+  // the owned units count — a task's own row already wears its state. Absent (the other callers,
+  // shell/useNavBands.ts), the rule is inert.
+  const draftsByTask = draftsByUnit(i.drafts ?? []);
   const threadById = new Map(i.threads.map((t) => [t.id, t]));
   return (r) => {
     const th = r.threadId ? threadById.get(r.threadId) : undefined;
     const card = (r.task ? byTask.get(r.task.id) : undefined) ?? (r.threadId ? byThread.get(r.threadId) : undefined) ?? null;
+    const owned = r.threadId ? ownedByThread.get(r.threadId) : undefined;
+    const waits = (owned ?? []).flatMap((u) => draftsByTask.get(u.id) ?? []);
     const input = {
       task: r.task,
       card,
@@ -46,7 +67,9 @@ export function makeRowMarks(i: { decisions: DecisionAllRow[]; liveIds: Set<stri
       lastAuthorKind: th?.last_author_kind ?? null,
       lastAt: th?.last_at ?? null,
       settledAt: laterOf(th?.settled_at, r.task?.settled_at),
-      owned: r.threadId ? ownedByThread.get(r.threadId) : undefined,
+      owned,
+      draftsWaiting: waits.reduce((n, w) => n + w.n, 0),
+      draftsAt: waits.reduce<string | null>((at, w) => laterOf(at, w.at), null),
     };
     // one input, both answers — the word on the row and the act its control offers can never drift
     return { status: threadStatus(input), ask: card !== null, settle: !!r.threadId && canSettle(input) };

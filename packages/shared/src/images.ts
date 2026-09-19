@@ -12,6 +12,28 @@ export function genImageItemId(body: string): string | null {
   return GEN_IMAGE_RE.exec(body)?.[1] ?? null;
 }
 
+// THE FILM MARKER (2026-09-18, George: "a generate video button similar to the generate image
+// that generates the actual video"). The card's "Generate video" posts ‹gen-video:itemId› and the
+// daemon films that one draft from the script and the brief already on it — no model turn. The
+// same three sites agree on it as on the draw marker: both wake paths and the wake gate.
+const GEN_VIDEO_RE = /‹gen-video:([0-9a-f-]{8,})›/;
+export function genVideoItemId(body: string): string | null {
+  return GEN_VIDEO_RE.exec(body)?.[1] ?? null;
+}
+/** a message that asks for a draw or a film runs no model: the wake gate must not ask for a runtime */
+export function modelFreeItemId(body: string): string | null {
+  return genImageItemId(body) ?? genVideoItemId(body);
+}
+
+/** The video type the BYTES say they are: an ISO base media file (`ftyp` at byte 4) is mp4, an
+ *  EBML head is webm. null when they say nothing we recognize. */
+export function sniffVideoMime(bytes: Uint8Array): string | null {
+  if (bytes.length < 12) return null;
+  if (bytes[4] === 0x66 && bytes[5] === 0x74 && bytes[6] === 0x79 && bytes[7] === 0x70) return 'video/mp4';
+  if (bytes[0] === 0x1a && bytes[1] === 0x45 && bytes[2] === 0xdf && bytes[3] === 0xa3) return 'video/webm';
+  return null;
+}
+
 // Image mime TRUTH (2026-08-20). A generated image's declared type is a guess three times
 // over — the model's default output format, a hardcoded 'image/png' at decode, a content-type
 // header echoing the stored guess — and X's media finalize sniffs the actual bytes, so the

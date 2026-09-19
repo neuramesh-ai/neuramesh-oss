@@ -41,6 +41,10 @@ describe('titles are plain text (2026-09-12)', () => {
   it('a routine body titles as its plain first line', () => {
     expect(threadTitle('Routine · do some research on AI for mental health\n\nRead the last three briefs and…')).toBe('Routine · do some research on AI for mental health');
   });
+  it('a period inside a token is not a sentence stop: a version number survives the cut', () => {
+    expect(threadTitle('Release drafts · v0.134.0 · alonge-dev/neuramesh\n\n**The first check** · checked 22:14')).toBe('Release drafts · v0.134.0 · alonge-dev/neuramesh');
+    expect(threadTitle('Ship v2.1 today. Then rest.')).toBe('Ship v2.1 today');
+  });
   it('emphasis, code ticks and a heading hash never reach a title', () => {
     expect(threadTitle('**Routine — hey rex, can we do some research**')).toBe('Routine — hey rex, can we do some research');
     expect(threadTitle('## Fix the `focus-trap` on *iPad*')).toBe('Fix the focus-trap on iPad');

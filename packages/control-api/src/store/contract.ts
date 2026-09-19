@@ -28,6 +28,8 @@ export interface Store {
   bumpMachineWake?(workspaceId: string, originUserId?: string | null): Promise<void>;
   machineSweep?(intervalMin: number): Promise<import('../fleet-lifecycle').MachineSweepResult>;
   machineUsageToday?(workspaceId: string): Promise<{ day: string; minutes: number }>;
+  /** the public announce door (0139): one object, two implementations (store/announce.ts) */
+  announcements?: import('./announce').AnnounceStore;
   createTask(task: Task, event: NMEvent): Promise<Task>;
   // Duplicate-create guard (handler createTask): the newest OPEN non-backlog task in the
   // channel whose normalizeTaskTitle(title) matches, created at/after sinceIso — else null.
@@ -200,10 +202,7 @@ export interface Store {
   // Idempotent: an already-retired fact returns retired=false, appends no event.
   retireFact(factId: string, supersededBy: string | null, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string; retired: boolean }>;
   // Memory spine: upsert the channel's summary block (docs/03 §6).
-  refreshMemoryBlock(
-    input: { workspace: string; channel: string; kind: string; content: string; basisCount: number },
-    event: NMEvent,
-  ): Promise<{ id: string }>;
+  refreshMemoryBlock(input: { workspace: string; channel: string; kind: string; content: string; basisCount: number }, event: NMEvent): Promise<{ id: string }>;
   // Channel library curation: marks the artifact promoted (docs/03 §7).
   // The event factory receives the workspace the artifact belongs to.
   promoteArtifact(artifactId: string, promotedByAgent: string | null, makeEvent: (workspace: string) => NMEvent): Promise<{ workspace: string }>;
@@ -355,7 +354,7 @@ export interface Store {
   removeSkillPack(packId: string, event: NMEvent): Promise<{ id: string }>;
   // idempotently seed the bundled default packs (gstack + addyosmani) into a
   // channel — used to backfill existing #dev channels (creation seeds inline).
-  seedDefaultPacks(workspace: string, channel: string, event: NMEvent, kind?: 'build' | 'marketing'): Promise<{ added: number }>;
+  seedDefaultPacks(workspace: string, channel: string, event: NMEvent, kind?: 'build' | 'marketing'): Promise<{ added: number; refreshed: number }>;
   // Register a GitHub repo to the workspace so tasks can bind + push to it
   // (idempotent on workspace+provider+org+name); attaches to the channel's
   // default project. Metadata only — no tokens. Event persisted on first link.
@@ -400,18 +399,22 @@ export interface Store {
    * `schedules.last_error` — the synced truth the attention bar renders — and `null` clears it.
    * The column existed since 0082 with no writer, which is why a failing routine was invisible. */
   markScheduleResult(scheduleId: string, error: string | null, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }>;
+  /** The release routine's cursor and ledger line, merged into `payload.release` through the shared
+   * `mergeReleaseCursor` (one derivation for both stores). INVALID_INPUT on a row that carries no
+   * `release` payload: a plain routine has no cursor to move. */
+  setScheduleCursor(scheduleId: string, cursor: { at: string; tag: string | null }, log: { at: string; key: string | null; note: string } | null, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }>;
   // content items (marketing-channel plan §4.7) — agents draft, humans publish
-  createContentItem(input: { channelId: string; taskId?: string | null; threadId?: string | null; platform: string; body: string; scheduleId: string | null; slotAt?: string | null; mediaUrl?: string | null; imageBrief?: string | null; thumb?: string | null; imageError?: string | null; createdByKind: string; createdBy: string }, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }>;
+  createContentItem(input: { channelId: string; taskId?: string | null; threadId?: string | null; platform: string; body: string; scheduleId: string | null; slotAt?: string | null; mediaUrl?: string | null; imageBrief?: string | null; script?: string | null; thumb?: string | null; imageError?: string | null; createdByKind: string; createdBy: string }, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }>;
   setContentStatus(itemId: string, patch: { status: 'draft' | 'scheduled'; scheduledAt: string | null; approvedBy: string | null; keepSlot?: boolean }, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }>;
   updateContentBody(itemId: string, body: string, mediaUrl: string | null | undefined, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }>;
   /** the marketer revises its OWN unpublished draft (§4.5) — body/imageBrief/thumb; DRAFT status only */
-  reviseDraft(itemId: string, patch: { body: string | null; imageBrief: string | null; thumb: string | null; imageError?: string | null }, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }>;
+  reviseDraft(itemId: string, patch: { body: string | null; imageBrief: string | null; script?: string | null; thumb: string | null; imageError?: string | null; videoError?: string | null }, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }>;
   deleteContentItem(itemId: string, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }>;
   /** host a draft's image bytes (0090) and point content_items.media.image_id at them — the
    *  only way a locally generated picture can ever reach a network that fetches URLs */
   attachContentMedia(itemId: string, mime: string, bytes: Buffer, actor: { kind: string; id: string }, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }>;
   /** the public /media/:id route's read — bytes only, gated by mediaSig upstream */
-  contentMediaBytes(mediaId: string): Promise<{ mime: string; bytes: Buffer } | null>;
+  contentMediaBytes(mediaId: string): Promise<{ mime: string; bytes: Buffer; workspace: string } | null>;
   // a plain channel artifact (no task) — the conversational bootstrap's doc drops
   createChannelArtifact(input: { channelId: string; kind: string; name: string; inlineContent: string; mime: string | null; tags?: string[]; createdByKind: string; createdBy: string }, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }>;
   // Whiteboards (docs/38). createWhiteboard is idempotent on id (the desktop's local-first PUT
@@ -442,7 +445,7 @@ export interface Store {
    *  dueContentItems: that one is "past due, publish it", this one is "coming, tell somebody". */
   upcomingContentItems(fromIso: string, toIso: string, limit: number): Promise<Array<{ id: string; workspace: string; channel: string; threadId: string | null; platform: string; body: string; scheduledAt: string }>>;
   /** the TikTok media proxy's lookup — platform + media only, nothing publishable leaks */
-  contentItemMedia(itemId: string): Promise<{ platform: string; mediaUrl: string | null; mediaId?: string | null } | null>;
+  contentItemMedia(itemId: string): Promise<{ platform: string; mediaUrl: string | null; mediaId?: string | null; workspace: string } | null>;
   markContentPublished(itemId: string, url: string, publishedAtIso: string): Promise<void>;
   markContentFailed(itemId: string, error: string): Promise<void>;
   // permanently delete a channel + everything in it (messages/tasks/history). irreversible.

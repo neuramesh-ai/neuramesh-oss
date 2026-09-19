@@ -35,8 +35,9 @@ export interface ArticleMeta {
 }
 
 // the alt text stops at a bracket and the target at a parenthesis, so a run of openers is scanned
-// once, not once per opener (CodeQL js/polynomial-redos, 2026-09-18)
-const IMG_RE = /!\[[^[\]]*\]\(([^()\s]+)[^()]*\)/g;
+// once, not once per opener; a title after the target begins with a blank, so the target and the
+// title cannot trade characters (CodeQL js/polynomial-redos, 2026-09-18)
+const IMG_RE = /!\[[^[\]]*\]\(([^()\s]+)(?:\s[^()]*)?\)/g;
 
 export function articleFrom(name: string, markdown: string): ArticleMeta {
   const md = markdown.trim();

@@ -5,7 +5,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { nm as nmBridge } from '../bridge/nm';
 import { ConnectorMark } from '../settings/connector-marks';
 import type { ConnectorId } from '../settings/connectors';
-import { IconAnchor, IconCompass, IconCrosshair, IconFlask, IconGauge, IconGlobe, IconMail, IconPhone, IconRadar, IconRocket, IconSpeaker } from '../ui/icons';
+import { IconAnchor, IconBranch, IconCompass, IconCrosshair, IconFlask, IconGauge, IconGlobe, IconMail, IconPhone, IconRadar, IconRocket, IconSpeaker, IconUser } from '../ui/icons';
 import type { ConnectorRow } from '../bridge/rows-content';
 import type { Playbook } from '@neuramesh/shared';
 
@@ -68,6 +68,7 @@ export const PLAYBOOK_GLYPH: Record<string, ReactNode> = {
   audit: <IconGauge s={15} />, geo: <IconGlobe s={15} />, teardown: <IconCrosshair s={15} />, positioning: <IconCompass s={15} />,
   engage: <IconRadar s={15} />, copylab: <IconFlask s={15} />, hooks: <IconAnchor s={15} />, email: <IconMail s={15} />,
   launch: <IconRocket s={15} />, ads: <IconSpeaker s={15} />, appstore: <IconPhone s={15} />,
+  release: <IconBranch s={15} />, ugc: <IconUser s={15} />,
 };
 
 /** the tile's one-glance connector row: publish networks + PostHog as the composer foot's marks, live status dots */

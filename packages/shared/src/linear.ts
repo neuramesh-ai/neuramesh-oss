@@ -87,3 +87,29 @@ export function firstSentence(text: string): string {
   const m = /[.!?]/.exec(text);
   return m ? text.slice(0, m.index) : text;
 }
+
+/** every `open…close` span of `text`, by index: what `/open[^close]*close/g` finds, without the
+ *  rescans a run of unclosed openers costs it. `inner` is the text between the two. */
+export function markerSpans(text: string, open: string, close: string): Array<{ start: number; end: number; inner: string }> {
+  const out: Array<{ start: number; end: number; inner: string }> = [];
+  let from = 0;
+  for (;;) {
+    const start = text.indexOf(open, from);
+    if (start === -1) return out;
+    const stop = text.indexOf(close, start + open.length);
+    if (stop === -1) return out; // an opener with no closer ends the scan, as the regex would
+    out.push({ start, end: stop + close.length, inner: text.slice(start + open.length, stop) });
+    from = stop + close.length;
+  }
+}
+
+/** `text` with every `open…close` span removed: what `text.replace(/open[^close]*close/g, '')` returns. */
+export function stripMarkers(text: string, open: string, close: string): string {
+  const spans = markerSpans(text, open, close);
+  if (!spans.length) return text;
+  let out = '';
+  let at = 0;
+  for (const sp of spans) { out += text.slice(at, sp.start); at = sp.end; }
+  return out + text.slice(at);
+}
+

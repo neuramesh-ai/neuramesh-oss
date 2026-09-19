@@ -1,6 +1,7 @@
 // The marketing research leg and the site's design tokens — what the bootstrap gathers before
 // it writes anything. Split out of host/marketing.ts.
 
+import { brandSummary, brandTokens, tallyFonts, tallyPalette } from '@neuramesh/shared';
 import type { HostedAgent } from '../agents';
 import { claudePathOption, providerEnv } from '../runtime/adapter';
 import { drainQuery } from './turnkit';
@@ -78,19 +79,13 @@ async function siteDesignTokens(site: string): Promise<string | null> {
       } catch { /* skip this sheet */ }
     }
     if (!css.trim()) return null;
-    const tally = new Map<string, number>();
-    for (const m of css.matchAll(/#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{3})\b/g)) {
-      const k = m[0].toLowerCase();
-      tally.set(k, (tally.get(k) ?? 0) + 1);
-    }
-    const hexes = [...tally.entries()].sort((a, b) => b[1] - a[1]).slice(0, 14).map(([h, n]) => `${h} (×${n})`);
-    const vars = [...new Set([...css.matchAll(/--[\w-]*(?:bg|background|text|primary|secondary|accent|link)[\w-]*:\s*#[0-9a-fA-F]{3,8}/gi)].map((m) => m[0].replace(/\s+/g, ' ').slice(0, 60)))].slice(0, 12);
-    const fonts = [...new Set([...css.matchAll(/font-family:\s*([^;}]+)/gi)].map((m) => m[1]!.trim().replace(/\s+/g, ' ').slice(0, 90)))].slice(0, 5);
-    if (!hexes.length && !fonts.length) return null;
-    return `VERIFIED design tokens, read from the site's own CSS${used.length ? ` (${used.join(' , ')})` : ' (inline styles)'}:` +
-      `${hexes.length ? `\n- hex colors by frequency: ${hexes.join(', ')}` : ''}` +
-      `${vars.length ? `\n- named variables: ${vars.join('; ')}` : ''}` +
-      `${fonts.length ? `\n- font-family stacks: ${fonts.join(' | ')}` : ''}`;
+    // ONE brand read for the researcher and the public door (shared/brandread.ts): the declared
+    // ground, ink and accent first, then what the site paints most, then its fonts. The old tally
+    // alone handed the researcher chart series as "the brand" (neuramesh.app, 2026-09-18).
+    const read = { tokens: brandTokens(css, html), palette: tallyPalette(css, 14), fonts: tallyFonts(css, 5) };
+    const summary = brandSummary(read);
+    if (!summary) return null;
+    return `VERIFIED design tokens, read from the site's own CSS${used.length ? ` (${used.join(' , ')})` : ' (inline styles)'}:\n${summary.replace(/^/gm, '- ')}`;
   } catch { return null; }
 }
 

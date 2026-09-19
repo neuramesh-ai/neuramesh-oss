@@ -581,4 +581,9 @@ test('a unit-card marker never leaks into a session snippet', () => {
   assert.ok(row, 'the conversation has a row');
   assert.ok(!row!.snip.includes('‹task:'), 'raw marker stripped');
   assert.ok(row!.snip.includes('filed a task'), 'the human line stands in');
+  const brief = historyRows({
+    threads: [{ id: 'th2', title: 'Release drafts · v0.134.0', channel_id: 'c1', task_id: null, updated_at: '2026-09-18T05:18:00Z', mode: 'tasks', last_body: 'The brief is in. ‹brief:d4c8d771-31b7-400d-be67-855d43038dcc›' } as never],
+    tasks: [], channelId: 'c1', channelSlug: 'marketing', query: '',
+  }).find((r) => String(r.key).includes('th2'))!;
+  assert.equal(brief.snip, 'The brief is in.', 'a brief marker leaves the prose alone (live harness, 2026-09-18: the Home row printed the raw marker)');
 });

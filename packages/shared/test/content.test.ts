@@ -1,5 +1,5 @@
 import { describe, it, test, expect } from 'vitest';
-import { parseDraftedPosts, parseShowLetters, normalizeDraft } from '../src/content';
+import { liftScript, parseDraftedPosts, parseShowLetters, normalizeDraft } from '../src/content';
 
 test('parseDraftedPosts: a bare array of valid posts, normalized', () => {
   const posts = parseDraftedPosts(JSON.stringify([
@@ -167,3 +167,37 @@ test('normalizeDraft: keeps a real http mediaUrl and drops anything else', () =>
 test('normalizeDraft: platform defaults to x when the caller omits it', () => {
   expect(normalizeDraft({ body: 'no platform named' })).toEqual({ platform: 'x', body: 'no platform named' });
 });
+
+test('a video post: the script rides beside the caption, trimmed and capped, never inside the body', () => {
+  const post = normalizeDraft({ platform: 'tiktok', body: '3 things in the new update I did not expect to care about. #neuramesh', script: '  [0:00-0:03] HOOK, phone in hand\nSpoken: "My laptop is in my bag."\n[0:03-0:08] the app on screen  ' });
+  expect(post).toEqual({ platform: 'tiktok', body: '3 things in the new update I did not expect to care about. #neuramesh', script: '[0:00-0:03] HOOK, phone in hand\nSpoken: "My laptop is in my bag."\n[0:03-0:08] the app on screen' });
+  expect(normalizeDraft({ platform: 'x', body: 'caption', script: '   ' })).toEqual({ platform: 'x', body: 'caption' });
+  const revs = parseDraftRevisions(JSON.stringify([{ letter: 'a', script: '[0:00-0:03] a tighter hook' }, { letter: 'b' }]));
+  expect(revs).toEqual([{ letter: 'a', script: '[0:00-0:03] a tighter hook' }]);
+  expect(parseDraftedPosts(JSON.stringify([{ platform: 'instagram', body: 'cap', script: '[0:00-0:02] x' }]))[0]?.script).toBe('[0:00-0:02] x');
+});
+
+test('a script filed under a SCRIPT heading is lifted out of the brief, or out of the body, into script', () => {
+  // the live shape (plume, 2026-09-19): shot direction, then "CREATOR SCRIPT", all inside imageBrief
+  const brief = 'VIDEO: vertical 9:16, under 60s.\n\nSHOT DIRECTION\n0:00-0:05 Handheld, creator face.\n0:05-0:15 Screen record: Home.\n\nCREATOR SCRIPT\n"I started a coding session from my couch."\n"This is Home."';
+  const post = normalizeDraft({ platform: 'x', body: 'From my couch. #neuramesh', imageBrief: brief });
+  expect(post).toEqual({ platform: 'x', body: 'From my couch. #neuramesh', imageBrief: 'VIDEO: vertical 9:16, under 60s.\n\nSHOT DIRECTION\n0:00-0:05 Handheld, creator face.\n0:05-0:15 Screen record: Home.', script: '"I started a coding session from my couch."\n"This is Home."' });
+  // after the caption in the body, under a markdown heading
+  const inBody = normalizeDraft({ platform: 'tiktok', body: 'Three things. #neuramesh\n\n## Script\n[0:00-0:03] HOOK\nSpoken: "hi"' });
+  expect(inBody).toEqual({ platform: 'tiktok', body: 'Three things. #neuramesh', script: '[0:00-0:03] HOOK\nSpoken: "hi"' });
+  // a declared script wins, and the brief is left alone
+  expect(normalizeDraft({ platform: 'x', body: 'cap', imageBrief: 'SCRIPT\nnot lifted', script: '[0:00-0:02] mine' })).toEqual({ platform: 'x', body: 'cap', imageBrief: 'SCRIPT\nnot lifted', script: '[0:00-0:02] mine' });
+  // a revision lifts the same way
+  const revs = parseDraftRevisions(JSON.stringify([{ letter: 'b', imageBrief: 'phone in hand\nCreator script:\n"new line"' }]));
+  expect(revs).toEqual([{ letter: 'b', imageBrief: 'phone in hand', script: '"new line"' }]);
+  expect(liftScript('no heading here')).toEqual({ rest: 'no heading here' });
+});
+
+test('the script heading is read per line, so a flood of spaces after "script" costs the input once', () => {
+  const t0 = performance.now();
+  expect(liftScript('script' + ' '.repeat(50_000) + '\nbody')).toEqual({ rest: '', script: 'body' });
+  expect(liftScript('caption\n### Creator   Script :\n[0:00-0:03] hook')).toEqual({ rest: 'caption', script: '[0:00-0:03] hook' });
+  expect(liftScript('a script is not a heading\nmore')).toEqual({ rest: 'a script is not a heading\nmore' });
+  expect(performance.now() - t0).toBeLessThan(200);
+});
+

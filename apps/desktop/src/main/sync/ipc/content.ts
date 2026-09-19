@@ -7,6 +7,7 @@ import { shell } from 'electron';
 import { api, actorId, apiUrl } from '../../sync';
 import { HOST_NOT_RUNNING, directActs } from '../../host/directacts';
 import { fetchImageDataUrl } from '../../mediafetch';
+import { apiAuthHeaders } from '../../apiauth';
 import { ipcMain } from 'electron';
 import type { PowerSyncDatabase } from '@powersync/node';
 
@@ -136,6 +137,14 @@ ipcMain.handle('nm:content-unschedule', async (_e, { itemId }: { itemId: string 
 // RUNNING host via the directacts slot — no thread detour, no marker message. Resolves when
 // the draw lands (5–25s); the result carries the fresh thumb/body because the modal's item
 // prop is a click-time snapshot. Never rejects: the modal renders {ok:false} reasons inline.
+// the card's film: the bytes are too big for the synced row, so the renderer asks with the session
+ipcMain.handle('nm:content-media', async (_e, { mediaId }: { mediaId: string }): Promise<string | null> => {
+  if (!/^[0-9a-f-]{36}$/i.test(mediaId)) return null;
+  const res = await fetch(`${apiUrl()}/v1/content/media/${mediaId}`, { headers: await apiAuthHeaders(apiUrl(), { kind: 'human', id: actorId() }) }).catch(() => null);
+  if (!res?.ok) return null;
+  const mime = (res.headers.get('content-type') ?? 'application/octet-stream').split(';')[0]!;
+  return `data:${mime};base64,${Buffer.from(await res.arrayBuffer()).toString('base64')}`;
+});
 ipcMain.handle('nm:draft-image', async (_e, { itemId, angle, rewrite }: { itemId: string; angle?: string; rewrite?: boolean }) => {
   if (!directActs.draftImage) return { ok: false, error: HOST_NOT_RUNNING };
   return directActs.draftImage(itemId, { angle, rewrite }).catch((err: unknown) => ({ ok: false, error: err instanceof Error ? err.message : 'that didn’t stick — try again' }));

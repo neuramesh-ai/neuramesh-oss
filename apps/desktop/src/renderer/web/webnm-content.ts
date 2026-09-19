@@ -36,7 +36,7 @@ import type { NMBridge } from '../src/bridge/nm';
 import type { ConnectorRow, ContentItemRow, ContentItemWide, ScheduleRow, ScheduleRunRow } from '../src/bridge/rows-content';
 import { orEmpty, shelfOverrides } from './webnm-shelf';
 import { insertMessage } from './webnm-convo';
-import { postCommand, type WebNmConfig } from './webnm';
+import { authHeaders, postCommand, type WebNmConfig } from './webnm';
 
 /** ported from sync/ipc/content.ts — the calendar's atoms and the four human moves on them */
 function contentLanes(cfg: WebNmConfig, db: PowerSyncDatabase): Partial<NMBridge> {
@@ -116,6 +116,15 @@ function contentLanes(cfg: WebNmConfig, db: PowerSyncDatabase): Partial<NMBridge
      * "drawing on your cloud machine" while it waits — the earlier "open the desktop app" refusal was
      * written before the browser had a machine of its own. Only a draft can be redrawn, as on the desktop.
      */
+    contentMedia: async (mediaId: string) => {
+      const res = await fetch(`${cfg.apiUrl}/v1/content/media/${encodeURIComponent(mediaId)}`, { headers: await authHeaders(cfg) }).catch(() => null);
+      if (!res?.ok) return null;
+      const mime = (res.headers.get('content-type') ?? 'application/octet-stream').split(';')[0]!;
+      const bytes = new Uint8Array(await res.arrayBuffer());
+      let bin = '';
+      for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+      return `data:${mime};base64,${btoa(bin)}`;
+    },
     draftImage: async (itemId: string, opts?: { angle?: string; rewrite?: boolean }) => {
       type DraftRow = { status: string; platform: string; body: string; channel_id: string; thread_id: string | null; task_id: string | null };
       const [d] = (await db.getAll<DraftRow>(`select status, platform, body, channel_id, thread_id, task_id from content_items where id = ?`, [itemId]).catch(orEmpty('draftImage'))) as DraftRow[];
@@ -293,18 +302,21 @@ function connectorLanes(cfg: WebNmConfig, db: PowerSyncDatabase): Partial<NMBrid
     // Point a marketing room at the product. Writes the profile onto channels.marketing and fans out
     // the bootstrap through the ordinary path; stamping setup_at is what every surface gate reads
     // (docs/39 — "ran to the end", never presence).
-    marketingSetup: async (channelId: string, website: string, focus: string[], goal?: string) => {
+    // …and step 5 (release drafts §4.7): `releases` plants the one-shot and, where the plan allows, the
+    // daily routine; the answer's `watch` says which happened, and the card reacts to `plan_limit`.
+    marketingSetup: async (channelId: string, website: string, focus: string[], goal?: string, releases?: { repoId?: string | null; slug?: string | null; now: boolean; watch: boolean; at?: string; tz?: string }) => {
       const r = (await postCommand(cfg, {
         type: 'marketing.setup', channel: channelId,
         website: website || undefined, focus: focus.length ? focus : undefined, goal: goal || undefined,
-      })) as { threadId?: string; taskId?: string };
-      return { ok: true, channelId, threadId: r.threadId, taskId: r.taskId };
+        ...(releases ? { releases } : {}),
+      })) as { threadId?: string; taskId?: string; releases?: { now: boolean; watch: 'armed' | 'plan_limit' | 'off' } };
+      return { ok: true, channelId, threadId: r.threadId, taskId: r.taskId, ...(r.releases ? { releases: r.releases } : {}) };
     },
 
     // one answered setup-flow step (shared/setupflows.ts) — persisted as it lands so the wizard
     // resumes. Wired alongside marketingSetup because without it an abandoned browser wizard has
     // nothing to come back to.
-    setupStep: async (channelId: string, flow: string, step: string, value?: string | string[]) => {
+    setupStep: async (channelId: string, flow: string, step: string, value?: string | string[] | Record<string, unknown>) => {
       await postCommand(cfg, { type: 'setup.step', channel: channelId, flow, step, value });
       return { ok: true };
     },

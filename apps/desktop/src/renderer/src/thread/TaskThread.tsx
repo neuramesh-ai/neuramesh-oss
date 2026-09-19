@@ -722,7 +722,7 @@ export function TaskThread({
               version={c.version} superseded={c.superseded}
               onOpen={() => setMkPreview(c.item)}
               onReply={c.superseded ? undefined : () => { setMkReplyTo({ id: c.item.id, letter: c.letter }); setCfocus((n) => n + 1); }}
-              onGenerateImage={c.superseded ? undefined : (redraw) => void nm?.sendThread(task.id, channelId, `${redraw ? 'Redraw' : 'Generate'} the image for #${task.number}·${c.letter}.‹gen-image:${c.item.id}›`)}
+              onGenerateImage={c.superseded ? undefined : (redraw, kind) => void nm?.sendThread(task.id, channelId, kind === 'video' ? `Film the hook for #${task.number}·${c.letter}.‹gen-video:${c.item.id}›` : `${redraw ? 'Redraw' : 'Generate'} the image for #${task.number}·${c.letter}.‹gen-image:${c.item.id}›`)}
               imageReady={mkImageReady}
             />
           );

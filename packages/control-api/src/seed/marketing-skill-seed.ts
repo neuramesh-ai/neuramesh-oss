@@ -107,6 +107,45 @@ Key Hashtags / Communities · Quick-Win Content Ideas (5 concrete drafts in the 
 - **Weekly review:** what shipped, what got engagement, which pillar earned the next week's
   extra slot. Write it as a short room note.`,
   },
+  {
+    name: 'release-announcement',
+    description: 'A release becomes posts: judge the feature, write the brief, one draft per connected account.',
+    body: `# Release announcement
+
+You turn a release into its announcement. The session opens with a digest: the release, its notes, and the pull requests that were merged for it. Read that first. Then read the brand docs in \`.nm-evidence/brand/\` for the voice, the palette and the audience.
+
+## 1. Judge first
+
+Decide, from the digest alone, which of these is true:
+
+- **feature**: something a user can now do that they could not do before. The notes lead with it, or the pull requests build it.
+- **improvement**: an existing thing got faster, safer or simpler, and a user would notice.
+- **fix**: a defect was removed. Announce it only when the defect was public or painful.
+- **none**: nothing in this window is worth a post. Say so in one line and stop. No posts.
+
+Name ONE headline. A release with three features gets one headline and two mentions. The pull request numbers are your evidence: cite them by number in the brief.
+
+## 2. The brief
+
+Write \`release-report-YYYY-MM-DD.md\`. The first line is \`# Release brief · <tag>\`. The second line is \`Verdict: <feature|improvement|fix|none> · Basis: <what you read>\`. Then these sections, each short:
+
+- \`## Why\`: the headline feature in one sentence, then the reasons with the pull requests by number.
+- \`## Audience\`: who this release is for, in the brand docs' words.
+- \`## Assets\`: what you drew and why. Instagram and TikTok take the release card. Say when a screenshot would have been better and why it was not made.
+- \`## What I could not determine\`: every gap, honestly. A merge date you do not have, a claim you could not verify.
+
+## 3. The posts
+
+One post per connected account, in that network's own shape:
+
+- **X**: under 280 characters. One idea. The feature, what it lets the reader do, the version. No hashtags unless the brand docs use them.
+- **LinkedIn**: three short paragraphs. What shipped, why it matters, where to read more. No emoji walls.
+- **Instagram**: one or two sentences as the caption, plus an \`imageBrief\` for the release card: the version and the feature name on the brand palette, the brand mark, no other text.
+- **TikTok**: one sentence for the caption, plus an \`imageBrief\`. The post lands in the creator's inbox as a private draft.
+
+Write in the brand's voice. Simple tenses, active voice, one idea per sentence. Never invent a number, a quote or a customer. Never announce a fix as a feature. A version number is not a headline: the thing the reader can now do is.
+`,
+  },
 ];
 
 export const MARKETING_SKILL_SEED: SeedPack[] = [

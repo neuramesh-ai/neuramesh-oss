@@ -357,6 +357,41 @@
         "scripts/dev-app-cdp.sh"
       ],
       "port": 9237
+    },
+    {
+      "name": "github-app",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "scripts/github-app-manifest.mjs"
+      ],
+      "autoPort": true
+    },
+    {
+      "name": "control-api-release",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "cd packages/control-api && DATABASE_URL=postgresql://postgres:nm@127.0.0.1:55435/nm PORT=8789 CRON_SECRET=local-cron NM_ALLOW_ACTOR_HEADER=1 FLEET_AUTOPROVISION=off STARTER_GOOGLE_API_KEY=\"$(grep -E '^STARTER_GOOGLE_API_KEY=' ../../.env | head -1 | cut -d= -f2- | sed -E 's/^[\\\"\\x27]//; s/[\\\"\\x27]$//')\" RESEND_API_KEY=\"$(grep -E '^RESEND_API_KEY=' ../../.env | head -1 | cut -d= -f2- | sed -E 's/^[\\\"\\x27]//; s/[\\\"\\x27]$//')\" NM_MAIL_ALLOWLIST=\"$(grep -E '^NM_MAIL_ALLOWLIST=' ../../.env | head -1 | cut -d= -f2- | sed -E 's/^[\\\"\\x27]//; s/[\\\"\\x27]$//')\" NM_MAIL_FROM=\"$(grep -E '^NM_MAIL_FROM=' ../../.env | head -1 | cut -d= -f2- | sed -E 's/^[\\\"\\x27]//; s/[\\\"\\x27]$//')\" NM_CONNECTOR_KEY=\"$(grep -E '^NM_CONNECTOR_KEY=' ../../.env | head -1 | cut -d= -f2- | sed -E 's/^[\\\"\\x27]//; s/[\\\"\\x27]$//')\" X_CLIENT_ID=\"$(grep -E '^X_CLIENT_ID=' ../../.env | head -1 | cut -d= -f2- | sed -E 's/^[\\\"\\x27]//; s/[\\\"\\x27]$//')\" X_CLIENT_SECRET=\"$(grep -E '^X_CLIENT_SECRET=' ../../.env | head -1 | cut -d= -f2- | sed -E 's/^[\\\"\\x27]//; s/[\\\"\\x27]$//')\" LINKEDIN_CLIENT_ID=\"$(grep -E '^LINKEDIN_CLIENT_ID=' ../../.env | head -1 | cut -d= -f2- | sed -E 's/^[\\\"\\x27]//; s/[\\\"\\x27]$//')\" LINKEDIN_CLIENT_SECRET=\"$(grep -E '^LINKEDIN_CLIENT_SECRET=' ../../.env | head -1 | cut -d= -f2- | sed -E 's/^[\\\"\\x27]//; s/[\\\"\\x27]$//')\" GEMINI_API_KEY=\"$(grep -E '^GEMINI_API_KEY=' ../../.env | head -1 | cut -d= -f2- | sed -E 's/^[\\\"\\x27]//; s/[\\\"\\x27]$//')\" GITHUB_APP_ID=\"$(grep -E '^GITHUB_APP_ID=' ../../.env | head -1 | cut -d= -f2- | sed -E 's/^[\"\\x27]//; s/[\"\\x27]$//')\" GITHUB_APP_SLUG=\"$(grep -E '^GITHUB_APP_SLUG=' ../../.env | head -1 | cut -d= -f2- | sed -E 's/^[\"\\x27]//; s/[\"\\x27]$//')\" GITHUB_APP_PRIVATE_KEY_B64=\"$(grep -E '^GITHUB_APP_PRIVATE_KEY_B64=' ../../.env | head -1 | cut -d= -f2- | sed -E 's/^[\"\\x27]//; s/[\"\\x27]$//')\" GITHUB_APP_WEBHOOK_SECRET=\"$(grep -E '^GITHUB_APP_WEBHOOK_SECRET=' ../../.env | head -1 | cut -d= -f2- | sed -E 's/^[\"\\x27]//; s/[\"\\x27]$//')\" CLERK_SECRET_KEY=\"$(grep -E '^CLERK_SECRET_KEY=' ../../.env | head -1 | cut -d= -f2- | sed -E 's/^[\"\\x27]//; s/[\"\\x27]$//')\" CLERK_PUBLISHABLE_KEY=\"$(grep -E '^CLERK_PUBLISHABLE_KEY=' ../../.env | head -1 | cut -d= -f2- | sed -E 's/^[\"\\x27]//; s/[\"\\x27]$//')\" NM_APP_URL=http://localhost:5178 pnpm exec tsx src/server.ts"
+      ],
+      "port": 8789
+    },
+    {
+      "name": "web-release",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "VITE_CLERK_PUBLISHABLE_KEY=\"$(grep -E '^CLERK_PUBLISHABLE_KEY=' .env | head -1 | cut -d= -f2- | sed -E 's/^[\"\\x27]//; s/[\"\\x27]$//')\" VITE_NM_API=http://127.0.0.1:8789 pnpm --filter @neuramesh/web dev --port 5178 --strictPort"
+      ],
+      "port": 5178
+    },
+    {
+      "name": "browser-client-release",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "VITE_NM_DEV_USER=00000000-0000-0000-0000-000000000001 NM_DEV_API_TARGET=http://127.0.0.1:8789 VITE_NM_POWERSYNC_URL=http://127.0.0.1:58081 pnpm --dir apps/desktop exec vite --config vite.web.config.mts --port 5211 --strictPort"
+      ],
+      "port": 5211
     }
   ]
 }

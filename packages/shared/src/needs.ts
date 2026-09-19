@@ -21,7 +21,14 @@ export interface ConnectorNeed {
   any: readonly ReplyPlatform[];
   why: string;
 }
-export type Need = ConnectorNeed;
+/** the room's project must have a repository (release drafts: the run reads its releases) */
+export interface RepoNeed {
+  kind: 'repo';
+  why: string;
+}
+export type Need = ConnectorNeed | RepoNeed;
+/** the project's primary repository as the preflight reads it: null when the project has none */
+export interface RepoState { slug: string | null }
 
 /** a room's connector as the preflight reads it — the shape `nm.connectors` already returns */
 export interface ConnectorState { provider: string; status: string; handle?: string | null }
@@ -52,20 +59,25 @@ export interface NeedVerdict {
   unread: ReplyPlatform[];
   /** what to offer when it is not ok */
   missing: ReplyPlatform[];
+  /** a `repo` need is declared and the project has no repository: the card offers the attach */
+  repoMissing: boolean;
 }
 
 /** the whole preflight: pure, so the tool, the card and the tests agree by construction */
-export function checkNeeds(needs: readonly Need[] | undefined, rows: ReadonlyArray<ConnectorState>): NeedVerdict {
-  const need = needs?.find((n) => n.kind === 'connector');
+export function checkNeeds(needs: readonly Need[] | undefined, rows: ReadonlyArray<ConnectorState>, repo?: RepoState | null): NeedVerdict {
+  const need = needs?.find((n): n is ConnectorNeed => n.kind === 'connector');
+  const repoNeed = needs?.find((n): n is RepoNeed => n.kind === 'repo');
   const scope = need?.any ?? REPLY_PLATFORMS;
   const live = liveConnectors(rows, scope);
   const readable = live.filter(isReadable);
+  const repoMissing = !!repoNeed && !repo?.slug;
   return {
-    ok: !need || live.length >= Math.max(1, need.min),
+    ok: (!need || live.length >= Math.max(1, need.min)) && !repoMissing,
     live,
     readable,
     unread: live.filter((p) => !isReadable(p)),
     missing: scope.filter((p) => !live.includes(p)),
+    repoMissing,
   };
 }
 
@@ -79,6 +91,10 @@ export interface NmNeed {
   connect: ReplyPlatform[];
   /** which of those actually unblock reading (the card says so rather than implying parity) */
   readable?: ReplyPlatform[];
+  /** the other fix a card can carry: the project needs a repository (release drafts) */
+  attach?: 'repo';
+  /** the project the attach lands in (repo.link needs it, a channel id names a room) */
+  project?: string | null;
 }
 
 export function needBlock(data: NmNeed): string {
@@ -92,10 +108,12 @@ export function parseNeed(body: string): NmNeed | null {
     const d = JSON.parse(m.inner) as NmNeed;
     if (!d || typeof d.channel !== 'string' || typeof d.ask !== 'string') return null;
     const connect = (Array.isArray(d.connect) ? d.connect : []).filter((p): p is ReplyPlatform => (REPLY_PLATFORMS as readonly string[]).includes(p));
-    if (!connect.length) return null;
+    const attach = d.attach === 'repo' ? 'repo' as const : undefined;
+    if (!connect.length && !attach) return null;
     return {
       channel: d.channel, ask: d.ask.slice(0, 160), why: String(d.why ?? '').slice(0, 400), connect,
       ...(Array.isArray(d.readable) ? { readable: d.readable.filter((p): p is ReplyPlatform => (REPLY_PLATFORMS as readonly string[]).includes(p)) } : {}),
+      ...(attach ? { attach, project: typeof d.project === 'string' ? d.project : null } : {}),
     };
   } catch { return null; }
 }

@@ -1,0 +1,55 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>F · the options, reviewed</title><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;450;500;600&amp;family=Geist+Mono:wght@400;500;600&amp;family=Bricolage+Grotesque:wght@500;600&amp;display=swap"><style>body{margin:0}
+  .opts { box-sizing: border-box; width: 1440px; height: 1000px; background: #141414; color: #cbcbcb; font: 14px/1.45 'Geist', sans-serif; padding: 26px 32px; overflow: hidden; }
+  .opts * { box-sizing: border-box; }
+  .otitle { font: 500 10.5px 'Geist Mono', monospace; letter-spacing: -.02em; text-transform: uppercase; color: #848484; margin-bottom: 12px; }
+  .ogrid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 22px; }
+  .otab { border: 1px solid #2c2c2c; border-radius: 8px; background: #1a1a1a; overflow: hidden; }
+  .otab h3 { margin: 0; padding: 9px 14px; font: 500 12px 'Geist Mono', monospace; letter-spacing: -.02em; text-transform: uppercase; color: #cbcbcb; border-bottom: 1px solid #2c2c2c; display: flex; gap: 10px; }
+  .otab h3 span { color: #848484; font-weight: 400; text-transform: none; letter-spacing: 0; font-family: 'Geist', sans-serif; font-size: 12px; }
+  .orow { display: grid; grid-template-columns: 26px 210px 1fr 78px; gap: 10px; align-items: start; padding: 8px 14px; border-bottom: 1px solid #262626; font-size: 12.5px; }
+  .orow:last-child { border-bottom: 0; }
+  .orow .m { width: 14px; height: 14px; border-radius: 3px; border: 1px solid #3a3a3a; margin-top: 3px; display: grid; place-items: center; font-size: 10px; color: #77ac8d; }
+  .orow.on .m { border-color: #834a2b; background: #2a1d14; color: #d19a72; }
+  .orow.on { background: #1e1e1e; }
+  .orow b { font-weight: 500; color: #e0e0e0; }
+  .orow.on b { color: #f0e6da; }
+  .orow p { margin: 0; color: #a6a6a6; }
+  .orow i { font: 500 10px 'Geist Mono', monospace; letter-spacing: -.02em; text-transform: uppercase; color: #848484; font-style: normal; text-align: right; }
+  .orow.on i { color: #d19a72; }
+  .odev { margin-top: 16px; border: 1px solid #2c2c2c; border-radius: 8px; padding: 10px 14px; background: #171717; display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; }
+  .odev div { font-size: 12px; color: #a6a6a6; line-height: 1.45; }
+  .odev div b { display: block; font: 500 10.5px 'Geist Mono', monospace; letter-spacing: -.02em; text-transform: uppercase; color: #cbcbcb; margin-bottom: 3px; }
+</style></head><body><div class="opts"><div class="otitle">The options, reviewed · the lit rows are the recommendation</div>
+<div class="ogrid">
+  <div class="otab"><h3>The signal <span>how we learn that something shipped</span></h3>
+    <div class="orow on"><span class="m">✓</span><b>Your machine polls with gh</b><p>The daemon’s minute tick and the machine’s own gh login. Private repositories work. The platform holds no token. A cloud machine signs in through the browser terminal.</p><i>v1 · app</i></div>
+    <div class="orow on"><span class="m">✓</span><b>Our server reads public repositories</b><p>GitHub’s REST API with our own app token, public data only. This is the public door.</p><i>v1 · site</i></div>
+    <div class="orow"><span class="m"></span><b>A GitHub Action sends the notes</b><p>The CI posts the release text to one endpoint. Private repositories work because the text travels and no token does.</p><i>v1.5</i></div>
+    <div class="orow"><span class="m"></span><b>npx neuramesh announce</b><p>Reads the local remote and the latest tag, then posts to the same endpoint.</p><i>v1.5</i></div>
+    <div class="orow on"><span class="m">✓</span><b>The GitHub App for private repositories</b><p>Detected after the paste. The person grants read access on GitHub’s own page and picks the repositories. Tokens are minted per read and never stored. Its webhooks are the v1.5 hook for instant fires.</p><i>v1 · site</i></div>
+  </div>
+  <div class="otab"><h3>The object <span>where a release’s drafts live</span></h3>
+    <div class="orow"><span class="m"></span><b>A channel per release</b><p>A channel is a folder of sessions and an ACL boundary, with agents registered to it and a setup task. One per release fills the rail and answers no question.</p><i>no</i></div>
+    <div class="orow on"><span class="m">✓</span><b>A session per release</b><p>The routine’s own thread in the project’s marketing room. Drafts are thread-native cards. A quiet day opens nothing.</p><i>v1</i></div>
+    <div class="orow on"><span class="m">✓</span><b>A unit anchored to that session</b><p>The playbook unit holds the work record, the brief and the acceptance. It never earns a nav row. The thread shows its cards.</p><i>v1</i></div>
+  </div>
+  <div class="otab"><h3>The engine <span>who drafts, and how</span></h3>
+    <div class="orow"><span class="m"></span><b>rex drafts in the thread</b><p>One turn on the chat registry with draft_posts. Fast, but no file tools, no image lane with the designer, no acceptance record. The public door uses this shape on the Starter brain, as a queued job.</p><i>site only</i></div>
+    <div class="orow on"><span class="m">✓</span><b>A playbook unit, born approved</b><p>The release playbook in the registry. plume on the worker lane with the brand docs staged and the skill loaded. posts.json and the brief attach to the unit. The routine is hands-off, and the human’s gate is the card.</p><i>v1</i></div>
+    <div class="orow"><span class="m"></span><b>A content task the human plans first</b><p>A plan review on a canned template is a second consent for the same click. The marketing-os round retired it.</p><i>no</i></div>
+  </div>
+  <div class="otab"><h3>The doors <span>where it is switched on</span></h3>
+    <div class="orow on"><span class="m">✓</span><b>Setup step 5 of 5</b><p>The marketing wizard ends with the repository, the accounts, and two switches: draft the latest release now, watch daily.</p><i>v1</i></div>
+    <div class="orow on"><span class="m">✓</span><b>The Marketing OS catalog row</b><p>Release announcement, with the armed cadence as its fact. Run for… drafts the latest release once.</p><i>v1</i></div>
+    <div class="orow on"><span class="m">✓</span><b>Automations › Routines</b><p>The routine card like every other, with its ledger: one row per checked window, quiet days included.</p><i>v1</i></div>
+    <div class="orow on"><span class="m">✓</span><b>neuramesh.app/announce</b><p>Paste a repository, leave a website and an email, get the link by email, sign in to save and schedule. The website is the brand read, the email is the spam gate.</p><i>v1</i></div>
+    <div class="orow"><span class="m"></span><b>The terminal and the CI</b><p>Two more doors onto the same endpoint.</p><i>v1.5</i></div>
+  </div>
+</div>
+<div class="odev">
+  <div><b>No channel per release</b>A session per release in the marketing room. The rail stays a list of work.</div>
+  <div><b>The App reads, the machine polls</b>In the app the tick polls with gh. On the site the GitHub App reads a private repository. Its webhooks are v1.5.</div>
+  <div><b>Detection is code</b>The scan, the cursor and the dedupe are code. The feature call is the agent’s, in the thread, with its reasons.</div>
+  <div><b>One image, always</b>Every draft set carries a release card on the site’s palette. A screen capture of the feature is phase 2.</div>
+  <div><b>Email is the gate</b>The public door asks for an email and a website. The email carries the link and bounds the spend. The daily watch is a Team routine.</div>
+</div></div></body></html>

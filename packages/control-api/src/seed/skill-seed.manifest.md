@@ -110,3 +110,11 @@ Source: https://github.com/emilkowalski/skills (main)
 - `animation-vocabulary` — Reverse-lookup glossary that turns a vague description of a web animation or motion effect into its exact term ("the bouncy thing when a popover opens" → Pop in; "the iOS rubber-band scroll" → Rubber-banding). Use when the user asks "what's it called when…", or describes a motion effect without know
 - `emil-design-eng` — This skill encodes Emil Kowalski's philosophy on UI polish, component design, animation decisions, and the invisible details that make software feel great.
 - `review-animations` — Reviews animation and motion code against a high craft bar derived from Emil Kowalski's design engineering philosophy. Default to flagging; approval is earned.
+
+## marketing-os (community additions) — bundled@bb67dff5f04b+ca3a3d37+453d32d4
+
+Source: vendor/community-skills (see its README for the two upstream repositories, pins and licences)
+
+**Included (2):**
+- `content-creator` — Content creator — audience, hook, value, scannable, action; blog/X/LinkedIn templates (Shubhamsaboo/awesome-llm-apps @ ca3a3d37, Apache-2.0 repo, MIT frontmatter)
+- `ugc-strategy` — UGC — creator-style scripts and briefs, rights, disclosure; campaigns and curation (brainbytes-dev/everything-claude-marketing @ 453d32d4, MIT)

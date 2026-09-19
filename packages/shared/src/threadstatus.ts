@@ -51,6 +51,14 @@ export interface StatusInput {
   lastAt: string | null;
   /** threads.settled_at */
   settledAt: string | null;
+  /**
+   * Drafted posts that wait on this session's OWNED content units (the release-drafts round, §4.5):
+   * their cards render in the owning conversation, so the queue lifts it while they wait. `draftsAt`
+   * is the newest draft's birth: a human word after it (a request for changes) hands the ball back
+   * to the agent, and a settle after it hides them exactly as it hides a gate.
+   */
+  draftsWaiting?: number;
+  draftsAt?: string | null;
 }
 
 /** true when `at` is newer than the stamp — or when there is no stamp, or no time to compare (an
@@ -78,11 +86,22 @@ export function ownedGate(i: Pick<StatusInput, 'owned' | 'settledAt'>): StatusTa
   return (i.owned ?? []).find((u) => gateNeedsHuman(u) && afterSettle(u.updated_at, i.settledAt)) ?? null;
 }
 
+/** drafts still waiting on the human: some landed, nothing settled them away, and the human has not
+ *  spoken since the newest one (an unknown moment reads as "still waiting", the afterSettle default) */
+export function draftsNeedHuman(i: Pick<StatusInput, 'draftsWaiting' | 'draftsAt' | 'lastAuthorKind' | 'lastAt' | 'settledAt'>): boolean {
+  if (!((i.draftsWaiting ?? 0) > 0)) return false;
+  if (!afterSettle(i.draftsAt, i.settledAt)) return false;
+  if (i.lastAuthorKind !== 'human') return true;
+  const spoke = i.lastAt ? Date.parse(i.lastAt) : NaN;
+  const landed = i.draftsAt ? Date.parse(i.draftsAt) : NaN;
+  return !(Number.isFinite(spoke) && Number.isFinite(landed) && spoke > landed);
+}
+
 export function threadStatus(i: StatusInput): ThreadStatus {
   const t = i.task;
   const gate = (!!t && gateNeedsHuman(t) && afterSettle(t.updated_at, i.settledAt)) || !!ownedGate(i);
   const card = !!i.card && i.card.status === 'open' && !decisionHandled(i.card) && afterSettle(i.card.created_at, i.settledAt);
-  if (gate || card) return 'needs_you';
+  if (gate || card || draftsNeedHuman(i)) return 'needs_you';
   if (i.live) return 'in_progress';
   // an owned unit still moving keeps the conversation in progress
   if ((i.owned ?? []).some((u) => ACTIVE.has(u.state) || (u.state === 'plan_review' && !!u.plan_approved_at))) return 'in_progress';
@@ -109,6 +128,7 @@ function stampCovers(i: StatusInput): boolean {
   const t = i.task;
   if (t && gateNeedsHuman(t) && afterSettle(t.updated_at, i.settledAt)) return true;
   if (ownedGate(i)) return true;
+  if (draftsNeedHuman(i)) return true;
   if (i.card && i.card.status === 'open' && !decisionHandled(i.card) && afterSettle(i.card.created_at, i.settledAt)) return true;
   return i.lastAuthorKind === 'human' && afterSettle(i.lastAt, i.settledAt);
 }
@@ -136,8 +156,10 @@ export function canSettle(i: StatusInput): boolean {
  * WHY a row needs you — the snippet on a needs-you row says it, so the person can decide from the
  * list (frame 1 of the thread-status design). A card is the more direct ask, so it leads.
  */
-export function needsYouWhy(i: { task: StatusTask | null; card: { question: string } | null; asker?: string | null }): string | null {
+export function needsYouWhy(i: { task: StatusTask | null; card: { question: string } | null; asker?: string | null; draftsWaiting?: number }): string | null {
   if (i.card) return `${i.asker ?? 'An agent'} asks: ${i.card.question}`;
+  // the drafts are the direct ask: the person approves them on the cards, before any accept
+  if ((i.draftsWaiting ?? 0) > 0) return 'The drafts wait for your approval.';
   const t = i.task;
   if (!t) return null;
   if (t.kind === 'setup') return 'Setup is not finished.';

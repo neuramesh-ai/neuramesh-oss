@@ -4,7 +4,7 @@ import { planLabel, seatLimitReason, threadTitle } from '@neuramesh/shared';
 import sampleLogos from './sample-logos.json';
 import { gateArtifactReason, isGateArtifact } from '@neuramesh/shared';
 import { openConnectionsSettings, openMoveToCloud, openUpgrade } from '../src/lib/toast';
-import { FLOW, FRESH_CLOUD, HAS_INVITE, LIVE_RUNS, MOCK_WS_ID, MSG_DELAY, NOKEY, TERM_PALETTE_PROOF, agents, allTasks, artWatchers, artifacts, baseThreadRows, beatsByTask, chanRunWatchers, channels, convoMsgs, convoWatchers, customPacks, decisionWatchers, designProviders, emitLog, emitMockStream, failoverWatchers, historyAllWatchers, homeIsClear, liveTerms, logWatchers, logs, machines, members, memoryBlock, mockArticleArt, mockConnectors, mockContentItems, mockConvoAtts, mockDecisions, mockFailover, mockMcpPresence, mockReplyCounts, mockRuns, mockSchedules, mockThreadArts, mockThreads, mockUpdateState, mockWhiteboards, mockWorkRuns, mockWorkspaces, msgWatchers, msgsByChannel, noop, notifyProcs, openMockTerm, openRunWatchers, packs, pingArts, pingConvo, pingDecisions, pingFailover, pingOpenRuns, pingTasksAll, pingThreads, pingWb, procWatchers, projects, promotedArtifacts, roomMessagesFor, rosterWatchers, screen, seedIso, setMockFailover, skills, streamWatchers, stripThumb, t, taskChanWatchers, taskThreadExtra, taskThreadWatchers, tasksAllWatchers, tasksByChannel, threadWatchers, threadsAllSnapshot, threadsAllWatchers, wbListWatchers, wbRowWatchers, wbRowsFor, wsLibraryRows, libAllWatchers, deleteMockArtifact } from './mock-fixtures';
+import { FLOW, FRESH_CLOUD, HAS_INVITE, LIVE_RUNS, MOCK_WS_ID, MSG_DELAY, NOKEY, TERM_PALETTE_PROOF, agents, allTasks, artWatchers, artifacts, baseThreadRows, beatsByTask, chanRunWatchers, channels, convoMsgs, convoWatchers, customPacks, decisionWatchers, designProviders, emitLog, emitMockStream, failoverWatchers, historyAllWatchers, homeIsClear, liveTerms, logWatchers, logs, machines, members, memoryBlock, mockArticleArt, mockConnectors, mockContentItems, mockConvoAtts, mockDecisions, mockFailover, mockMcpPresence, mockReplyCounts, mockRuns, mockSchedules, mockThreadArts, mockThreads, mockUpdateState, mockWhiteboards, mockWorkRuns, mockWorkspaces, msgWatchers, msgsByChannel, noop, notifyProcs, openMockTerm, openRunWatchers, packs, pingArts, pingConvo, pingDecisions, pingFailover, pingOpenRuns, pingTasksAll, pingThreads, pingWb, procWatchers, projects, promotedArtifacts, releaseBriefArt, roomMessagesFor, rosterWatchers, screen, seedIso, setMockFailover, skills, streamWatchers, stripThumb, t, taskChanWatchers, taskThreadExtra, taskThreadWatchers, tasksAllWatchers, tasksByChannel, threadWatchers, threadsAllSnapshot, threadsAllWatchers, wbListWatchers, wbRowWatchers, wbRowsFor, wsLibraryRows, libAllWatchers, deleteMockArtifact, DOOR_REPOS, DOOR_SCHEDULE_RUNS } from './mock-fixtures';
 import { marketingArtifacts, marketingSchedules } from './mock-marketing';
 import { CONNS, connectionList, foregroundTasks, foregroundThreads, mockForeground, mockForegroundWorkspace, railRowsSnapshot, swapForeground, watchForeground } from './mock-connections';
 
@@ -44,7 +44,7 @@ let upgradeCb: ((p: { phase: string; url?: string; message?: string }) => void) 
 const upgradeSeed = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('upgrade') : null;
 
 // 0119: the conversations an automation's slots opened — what the card's reveal lists.
-const mockScheduleRuns: Record<string, Array<{ id: string; title: string; last_body: string; created_at: string; updated_at: string; channel_id: string; channel_slug: string; msg_count: number }>> = {
+const mockScheduleRuns: Record<string, Array<{ id: string; title: string; last_body: string; created_at: string; updated_at: string; channel_id: string; channel_slug: string; msg_count: number }>> = { ...DOOR_SCHEDULE_RUNS,
   'sch-dev-1': [
     { id: 'th-run-1', title: 'Routine — Morning dependency audit', last_body: 'The prompt landed at 09:00 and nobody picked it up.', created_at: new Date(Date.now() - 3 * 3600e3).toISOString(), updated_at: new Date(Date.now() - 3 * 3600e3).toISOString(), channel_id: 'c-dev', channel_slug: 'dev', msg_count: 1 },
     { id: 'th-run-2', title: 'Routine — Morning dependency audit', last_body: '3 majors and 1 CVE (lodash 4.17.20 → GHSA-35jh). Filed #1071 for the CVE; the majors can wait for the next window.', created_at: new Date(Date.now() - 27 * 3600e3).toISOString(), updated_at: new Date(Date.now() - 26 * 3600e3).toISOString(), channel_id: 'c-dev', channel_slug: 'dev', msg_count: 4 },
@@ -262,11 +262,12 @@ const explicit: Record<string, any> = {
     if (c) c.kind = kind; // the channel re-poll flips the room's surface
     return { ok: true, channelId };
   },
-  marketingSetup: async (channelId: string, website: string, focus: string[], goal?: string) => {
+  marketingSetup: async (channelId: string, website: string, focus: string[], goal?: string, releases?: { repoId?: string | null; slug?: string | null; now: boolean; watch: boolean }) => {
     const c = channels.find((x) => x.id === channelId) as { marketing?: string } | undefined;
     const threadId = '9b2a6c1e-0000-4000-8000-00000000a001';
-    if (c) c.marketing = JSON.stringify({ website: website || null, focus, ...(goal ? { goal } : {}), setup_by: 'h-george', setup_at: new Date().toISOString(), bootstrap_thread_id: threadId });
-    return { ok: true, channelId, threadId };
+    if (c) c.marketing = JSON.stringify({ website: website || null, focus, ...(goal ? { goal } : {}), ...(releases ? { releases } : {}), setup_by: 'h-george', setup_at: new Date().toISOString(), bootstrap_thread_id: threadId });
+    // step 5 answers like the server: the one-shot is free, the daily watch meets the plan gate (the scheduleCreate seam below)
+    return { ok: true, channelId, threadId, ...(releases ? { releases: { now: !!releases.now, watch: !releases.watch ? 'off' as const : localStorage.getItem('nm:plan') !== 'cloud' ? 'plan_limit' as const : 'armed' as const } } : {}) };
   },
   // the launcher's "Give me ideas": a beat of typing dots, then room-grounded pills
   launcherIdeas: async (_channelId: string, mode: 'task' | 'routine') => {
@@ -325,6 +326,7 @@ const explicit: Record<string, any> = {
   },
   // the image floor: after a beat, a generated picture lands on the draft (a tiny inline SVG
   // thumb so the preview harness shows the landed state without any provider)
+  contentMedia: async () => null, // the harness has no hosted film to hand back
   draftImage: async (itemId: string, opts?: { angle?: string; rewrite?: boolean }) => {
     await new Promise((r) => setTimeout(r, 1200));
     const it = mockContentItems.find((x) => x.id === itemId);
@@ -347,7 +349,7 @@ const explicit: Record<string, any> = {
     return { ok: true };
   },
   // the \u2039article:id\u203a card's self-read (article round) + its OS-browser export
-  artifact: async (artifactId: string) => ({ artifact: artifactId === mockArticleArt.id ? { ...mockArticleArt } : null }),
+  artifact: async (artifactId: string) => { const hit = [mockArticleArt, releaseBriefArt].find((a) => a.id === artifactId); return { artifact: hit ? { ...hit } : null }; },
   articleExternal: async () => ({ ok: true }),
   connectors: async () => ({ connectors: [...mockConnectors] }),
   // the attention bar's three row sets (failure-alerts round) — the same conditions the real
@@ -378,7 +380,7 @@ const explicit: Record<string, any> = {
     }
     return {};
   },
-  channelMeta: async () => ({ projects: projects.map((p) => ({ id: p.id, name: p.name, slug: p.slug, is_default: p.is_default })), repos: [{ id: 'r1', provider: 'github', org_name: 'acme', name: 'marketing-site', default_branch: 'main', local_path: null, project_ids: 'p-acme', primary_project_ids: 'p-acme' }, { id: 'r2', provider: 'local', org_name: 'local', name: 'flowe-mobile', default_branch: 'feat/nav', local_path: '~/code/flowe-mobile', project_ids: 'p-flowe', primary_project_ids: 'p-flowe' }] }),
+  channelMeta: async (channelId: string) => ({ projects: projects.map((p) => ({ id: p.id, name: p.name, slug: p.slug, is_default: p.is_default })), repos: channelId === 'cf-marketing' ? DOOR_REPOS : [{ id: 'r1', provider: 'github', org_name: 'acme', name: 'marketing-site', default_branch: 'main', local_path: null, project_ids: 'p-acme', primary_project_ids: 'p-acme' }, { id: 'r2', provider: 'local', org_name: 'local', name: 'flowe-mobile', default_branch: 'feat/nav', local_path: '~/code/flowe-mobile', project_ids: 'p-flowe', primary_project_ids: 'p-flowe' }] }),
   repoAdd: async (_opts: { url?: string; localPath?: string; name?: string; channelSlug?: string; defaultBranch?: string }) => ({ ok: true, repoId: 'r-new', inserted: true }),
   pickFolder: async () => ({ path: '~/code/flowe-mobile', name: 'flowe-mobile', isGit: true, branch: 'feat/nav' }),
   // one fake worktree, shared by the dock editor's tree, the docs/36 file pane and its ⌘P walk.
@@ -940,7 +942,7 @@ const explicit: Record<string, any> = {
   // flips to its ✓ confirmation.
   saveFileAs: async (f: { name: string }) => ({ saved: true, path: `~/Downloads/${f.name}` }),
   // Save-to-Files (article round): the harness flips the fixture so the ★ state is on screen
-  promoteArtifact: async (artifactId: string) => { if (artifactId === mockArticleArt.id) mockArticleArt.promoted = 1; return { ok: true }; },
+  promoteArtifact: async (artifactId: string) => { for (const a of [mockArticleArt, releaseBriefArt]) if (a.id === artifactId) a.promoted = 1; return { ok: true }; },
   // Deleting one — and REFUSING the ones a gate stands on, with the server's own predicate rather
   // than a mock-shaped guess. A mock that always succeeds would let the refusal rot unnoticed.
   artifactDelete: async (artifactId: string) => {

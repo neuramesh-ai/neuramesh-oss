@@ -4,8 +4,8 @@
 // chain in executeCommand carries on. Every branch is verbatim: the guards, the DomainError
 // codes and the events are the product's contract, and this move is about where they live.
 import {
-
-
+  commRulesFrom,
+  scrubEmdash,
 
   createEvent,
 
@@ -39,10 +39,20 @@ import { actorAddress } from './guards';
 
 import type { CommandOutcome } from '../handler';
 
+/** The house style's teeth for a draft (docs/design/agent-comm-rules-2026-08): a post is the copy a
+ *  person publishes, so an agent's body and image brief take the em-dash scrub a message (app.ts)
+ *  and a task (createtask.ts) take. Humans are never rewritten. A failed rules read fails open. */
+async function styledBy(store: Store, actor: Actor, workspace: () => Promise<string | undefined>): Promise<(text: string) => string> {
+  if (actor.kind !== 'agent') return (t) => t;
+  const on = await workspace().then((ws) => (ws ? store.getCommRules(ws) : null)).then((r) => commRulesFrom(r).noEmdash).catch(() => false);
+  return on ? scrubEmdash : (t) => t;
+}
+
 export async function contentCommands(store: Store, actor: Actor, cmd: Command): Promise<CommandOutcome | undefined> {
   if (cmd.type === 'content.create') {
+    const styled = await styledBy(store, actor, () => store.channelWorkspace(cmd.channel).then((c) => c.workspace));
     const { id } = await store.createContentItem(
-      { channelId: cmd.channel, taskId: cmd.task ?? null, threadId: cmd.thread ?? null, platform: cmd.platform, body: cmd.body, scheduleId: cmd.schedule ?? null, slotAt: cmd.slotAt ?? null, mediaUrl: cmd.mediaUrl ?? null, imageBrief: cmd.imageBrief ?? null, thumb: cmd.thumb ?? null, imageError: cmd.imageError ?? null, createdByKind: actor.kind, createdBy: actor.id },
+      { channelId: cmd.channel, taskId: cmd.task ?? null, threadId: cmd.thread ?? null, platform: cmd.platform, body: styled(cmd.body), scheduleId: cmd.schedule ?? null, slotAt: cmd.slotAt ?? null, mediaUrl: cmd.mediaUrl ?? null, imageBrief: cmd.imageBrief == null ? null : styled(cmd.imageBrief), script: cmd.script == null ? null : styled(cmd.script), thumb: cmd.thumb ?? null, imageError: cmd.imageError ?? null, createdByKind: actor.kind, createdBy: actor.id },
       (ws) => createEvent({
         type: 'content.created',
         source: actorAddress(actor),
@@ -54,11 +64,11 @@ export async function contentCommands(store: Store, actor: Actor, cmd: Command):
     return { ok: true, itemId: id } as never;
   }
   if (cmd.type === 'content.attach_media') {
-    const m = /^data:(image\/[a-z0-9.+-]+);base64,(.+)$/i.exec(cmd.dataUrl);
+    const m = /^data:((?:image|video)\/[a-z0-9.+-]+);base64,(.+)$/i.exec(cmd.dataUrl);
     if (!m) throw new DomainError('INVALID_INPUT', 'media must be a base64 data: URI');
     const bytes = Buffer.from(m[2]!, 'base64');
     if (!bytes.length) throw new DomainError('INVALID_INPUT', 'media decoded to nothing');
-    // Instagram's own ceiling is 8MB; anything past it could never publish anyway
+    // Instagram's own ceiling is 8MB; anything past it could never publish anyway (a film is capped the same)
     if (bytes.length > 8_000_000) throw new DomainError('INVALID_INPUT', `media too large (${bytes.length} bytes, max 8MB)`);
     const { id } = await store.attachContentMedia(cmd.item, m[1]!.toLowerCase(), bytes, { kind: actor.kind, id: actor.id }, (ws) => createEvent({
       type: 'content.updated',
@@ -73,8 +83,9 @@ export async function contentCommands(store: Store, actor: Actor, cmd: Command):
     // the marketer revising a draft OR a proposed 'scheduled' slot (never a published post) — a
     // human asking for a change in the thread reaches every unpublished draft. Rewriting a
     // scheduled post's copy unschedules it back to draft (store), so nothing publishes unreviewed.
-    if (!cmd.body && cmd.imageBrief === undefined && !cmd.thumb && cmd.imageError === undefined) throw new DomainError('INVALID_INPUT', 'a revision needs a new body or image brief');
-    const { id } = await store.reviseDraft(cmd.item, { body: cmd.body ?? null, imageBrief: cmd.imageBrief ?? null, thumb: cmd.thumb ?? null, imageError: cmd.imageError === undefined ? undefined : (cmd.imageError || null) }, (ws) => createEvent({
+    if (!cmd.body && cmd.imageBrief === undefined && !cmd.script && !cmd.thumb && cmd.imageError === undefined && cmd.videoError === undefined) throw new DomainError('INVALID_INPUT', 'a revision needs a new body, script or image brief');
+    const styled = await styledBy(store, actor, () => store.contentItemMedia(cmd.item).then((m) => m?.workspace));
+    const { id } = await store.reviseDraft(cmd.item, { body: cmd.body ? styled(cmd.body) : null, imageBrief: cmd.imageBrief ? styled(cmd.imageBrief) : (cmd.imageBrief ?? null), script: cmd.script ? styled(cmd.script) : null, thumb: cmd.thumb ?? null, videoError: cmd.videoError, imageError: cmd.imageError === undefined ? undefined : (cmd.imageError || null) }, (ws) => createEvent({
       type: 'content.updated', source: actorAddress(actor), target: formatAddress({ kind: 'resource', type: 'content', id: cmd.item }), workspace: ws,
       payload: { item: cmd.item, revised: true },
     }));

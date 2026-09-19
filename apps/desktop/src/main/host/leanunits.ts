@@ -3,7 +3,7 @@
 // subtask's finish. Submitting one instead would invent a reviewer round its plan declared
 // away. Split from flows.ts (the file cap): detection reads the replica, the finish is one
 // command — each used at exactly one call site in the worker flow.
-import { playbookById, playbookReportName, reportFrom } from '@neuramesh/shared';
+import { playbookById, playbookReportName, reportFrom, briefMarker, releaseBriefFrom } from '@neuramesh/shared';
 import { distillNextSteps } from './nextstepsflow';
 import { distillReplyCard } from './replydistill';
 import { type LogFn } from '../agentlog';
@@ -48,7 +48,8 @@ export function contractDeliverables<T extends Deliverable>(files: T[], playbook
   // a sole markdown IS the report; among several (found live: GEO delivered audit + notes +
   // rewrites), the one carrying the scored-report head is — the shape is the identity, so
   // renaming it is reading, not guessing. Ambiguity (0 or 2+ scored) leaves names alone.
-  const scored = md.length === 1 ? md : md.filter((f) => /^.+\n.*Score:\s*\d{1,3}\s*\/\s*100/m.test(f.content.slice(0, 400)));
+  // a release brief's head is `Verdict: …` (releasebrief.ts): the same identity rule, no score
+  const scored = md.length === 1 ? md : md.filter((f) => /^.+\n.*(?:Score:\s*\d{1,3}\s*\/\s*100|Verdict:\s*[a-z]+)/m.test(f.content.slice(0, 400)));
   if (scored.length !== 1) return files;
   return files.map((f) => (f === scored[0] ? { ...f, name: want } : f));
 }
@@ -114,6 +115,13 @@ export async function finishLeanUnit(
       });
     }
   } catch { /* the finish stands; the note is best-effort */ }
+  // release drafts: the brief earns its card in the session that owns the run (the ‹report:id›
+  // idiom below, for a deliverable the ReportCard cannot read). The artifact row lands a beat
+  // after the finish, so the id is polled, never assumed.
+  if (playbook === 'release') {
+    const brief = artifacts.find((a) => /\.md$/i.test(a.name) && releaseBriefFrom(a.name, a.content));
+    if (brief) await postReleaseBrief(db, post, voice, ch, t, brief.name).catch(() => {});
+  }
   // §13: the run's report earns its next-steps card, in the thread that owns the run —
   // the origin conversation for anchored units, the unit's own thread otherwise
   if (distill) {
@@ -179,5 +187,23 @@ export async function postSubtaskAcceptance(
       return;
     }
     await new Promise((r) => setTimeout(r, 1000));
+  }
+}
+
+/** the brief's card in the owning session: poll the synced artifact row (up to 12 × 500 ms), then
+ *  post the ‹brief:id› marker the ReleaseCard renders from — the postSubtaskAcceptance idiom */
+async function postReleaseBrief(db: ReplicaGet, post: Post, voice: Actor, ch: { id: string; workspace_id: string }, t: { id: string; number: number }, name: string): Promise<void> {
+  const trow = await db.get<{ origin_thread_id: string | null }>('select origin_thread_id from tasks where id = ?', [t.id]).catch(() => null);
+  for (let i = 0; i < 12; i++) {
+    const row = await db.get<{ id: string }>('select id from artifacts where task_id = ? and name = ? order by created_at desc limit 1', [t.id, name]).catch(() => null);
+    if (row) {
+      await post('/v1/messages', voice, {
+        workspace: ch.workspace_id, channel: ch.id,
+        ...(trow?.origin_thread_id ? { threadId: trow.origin_thread_id } : { taskId: t.id }),
+        body: `The brief is in. ${briefMarker(row.id)}`,
+      });
+      return;
+    }
+    await new Promise((r) => setTimeout(r, 500));
   }
 }

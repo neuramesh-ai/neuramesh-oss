@@ -51,3 +51,14 @@ the person who abandoned it.
   adds `'setup'`, 0117 builds the index that references it.
 - The tasks-all watch had to start selecting `t.kind` — a predicate on an unselected column
   is silently always-false (the selector-audit failure class).
+
+## The fifth step (2026-09-17, release drafts)
+
+`marketing.v1` gained an optional fifth step, `releases` (docs/44). It writes an object,
+`{ repoId, slug, now, watch }`, and only that step does (`setup.step` refuses a text value there
+and an object anywhere else). The completing command reads the same object from `marketing.setup`
+and plants the routines: `now` is a free one-shot (`cadence: 'once'`, `payload.release.latest`),
+`watch` is a daily routine and meets the plan gate schedule.create enforces (`releases.watch:
+'plan_limit'` in the answer on Free, and the card opens the Upgrade sheet). The flow id stays
+`marketing.v1`: progress is profile-derived, a finished room reads complete through `setup_at`,
+and a room mid-wizard resumes at the new step only when it has not passed it.

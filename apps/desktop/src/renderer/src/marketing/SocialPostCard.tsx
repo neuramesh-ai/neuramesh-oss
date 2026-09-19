@@ -1,12 +1,14 @@
 // Social post cards (docs/design/thread-posts) — a drafted post, its per-network preview,
 // and the approve/schedule controls. Thread-native: the same card renders in a conversation
 // and in a task panel from one derivation. Extracted from App.tsx (track A3).
-import { IconImage, IconReply } from '../ui/icons';
+import { IconImage, IconPlay, IconReply } from '../ui/icons';
 import { MK_PLATFORMS, MK_PLATFORM_ICON } from '../thread/DeliveryStrip';
 import { openImageConnect } from '../settings/ConnectionsList';
 import { type ContentItemRow } from '../bridge/rows-content';
 import { type PostVCard } from '../thread/parts';
 import { useEffect, useState } from 'react';
+import { nm as nmBridge } from '../bridge/nm';
+import { cardParts, type CardMedia } from './cardparts';
 
 export function postCardsFrom(items: ContentItemRow[], rows: ReadonlyArray<{ body: string; created_at: string }>): PostVCard[] {
   // A draft's ORIGINAL version + its replaced history land in ONE delivery strip (they were
@@ -17,18 +19,31 @@ export function postCardsFrom(items: ContentItemRow[], rows: ReadonlyArray<{ bod
   const cards: PostVCard[] = [];
   [...items].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()).forEach((it, i) => {
     const letter = String.fromCharCode(97 + i);
-    const media = ((): { history?: Array<{ body: string; brief?: string; thumb?: string; at: string }>; revised_at?: string } => { try { return JSON.parse(it.media ?? '{}') as never; } catch { return {}; } })();
+    const media = ((): { history?: Array<{ body: string; brief?: string; script?: string; thumb?: string; at: string }>; revised_at?: string } => { try { return JSON.parse(it.media ?? '{}') as never; } catch { return {}; } })();
     const history = media.history ?? [];
     history.forEach((h, vi) => cards.push({
       key: `${it.id}:v${vi}`, letter, version: vi + 1, superseded: true, isRevision: false, anchor: new Date(h.at).getTime(),
-      item: { ...it, body: h.body, status: 'draft', scheduled_at: null, external_url: null, media: JSON.stringify({ ...(h.brief ? { brief: h.brief } : {}), ...(h.thumb ? { thumb: h.thumb } : {}) }) },
+      item: { ...it, body: h.body, status: 'draft', scheduled_at: null, external_url: null, media: JSON.stringify({ ...(h.brief ? { brief: h.brief } : {}), ...(h.script ? { script: h.script } : {}), ...(h.thumb ? { thumb: h.thumb } : {}) }) },
     }));
     cards.push({ key: it.id, item: it, letter, version: history.length + 1, superseded: false, isRevision: revisedAt.has(it.id) || !!media.revised_at, anchor: revisedAt.get(it.id) ?? new Date(media.revised_at ?? it.created_at).getTime() });
   });
   return cards;
 }
 
-export function SocialPostCard({ item, channelSlug, taskNumber, letter, onOpen, onReply, onGenerateImage, imageReady, version, superseded }: { item: ContentItemRow; channelSlug: string; taskNumber?: number | null; letter: string; onOpen: () => void; onReply?: () => void; /* `redraw` = the card already had a picture, so the message the thread records says so */ onGenerateImage?: (redraw: boolean) => void; imageReady?: boolean; version?: number; superseded?: boolean }) {
+
+/** The film on a card: the media row's bytes, read once with the session (the film is too big for the synced row). */
+function useFilm(videoId: string | undefined): string | null {
+  const [src, setSrc] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    setSrc(null);
+    if (videoId) void nmBridge?.contentMedia(videoId).then((d) => { if (live) setSrc(d); }).catch(() => {});
+    return () => { live = false; };
+  }, [videoId]);
+  return src;
+}
+
+export function SocialPostCard({ item, channelSlug, taskNumber, letter, onOpen, onReply, onGenerateImage, imageReady, version, superseded }: { item: ContentItemRow; channelSlug: string; taskNumber?: number | null; letter: string; onOpen: () => void; onReply?: () => void; /* `redraw` = the card already had a picture, so the message the thread records says so; `kind` = 'video' films the script's hook instead of drawing */ onGenerateImage?: (redraw: boolean, kind?: 'image' | 'video') => void; imageReady?: boolean; version?: number; superseded?: boolean }) {
   // the handle the human and the agent both use for this card. A task's drafts wear its number
   // (#1048·b); a conversation's have no board row to point at, so the letter alone IS the handle —
   // "change b" reaches the same card either way.
@@ -44,9 +59,22 @@ export function SocialPostCard({ item, channelSlug, taskNumber, letter, onOpen, 
   // media jsonb: `thumb` is the generated image's inline preview, `brief` the visual the marketer
   // asked for. The brief is only ever its own row — it must never ride in the post text, where it
   // would publish verbatim and break the character count.
-  const media = ((): { image_url?: string; brief?: string; thumb?: string; image_error?: string } | null => {
-    try { return JSON.parse(item.media ?? 'null') as { image_url?: string; brief?: string; thumb?: string; image_error?: string } | null; } catch { return null; }
+  const media = ((): CardMedia | null => {
+    try { return JSON.parse(item.media ?? 'null') as CardMedia | null; } catch { return null; }
   })();
+  // THE SCRIPT AND ITS FILM (George, 2026-09-18). A VIDEO post is the caption that posts, the
+  // creator's script beside it, and the film. The script is long: the card folds it to its first
+  // beat and a click on the text opens it. The script can be FILMED: the hook, as an eight-second
+  // clip, on the same lane a picture takes (the marker, the daemon, the attach), and the film shows
+  // on the card where a picture would. A video card never offers a picture: the film is its media,
+  // and a new script (request changes) films again.
+  const { caption, script } = cardParts(item.body, media);
+  const isVideo = !!script;
+  const [open, setOpen] = useState(false);
+  const canFilm = isVideo && !superseded && item.status === 'draft';
+  const film = useFilm(media?.video_id);
+  const [filmPending, setFilmPending] = useState(false);
+  useEffect(() => { setFilmPending(false); }, [media?.video_id, media?.video_error]);
   // THE CARD'S IMAGE STATE, in two questions rather than one.
   //
   // It used to be a single `wantsImage` whose first clause was `!media?.thumb` — so the moment a
@@ -58,8 +86,8 @@ export function SocialPostCard({ item, channelSlug, taskNumber, letter, onOpen, 
   // redraw offered on a SCHEDULED card would fail every time. That is also the right gate — a
   // scheduled post is human-approved, and changing what publishes is what unschedule is for
   // (revising its copy already drops the slot for exactly this reason).
-  const hasImage = !!media?.thumb || !!media?.image_url;
-  const canDraw = !!media?.brief && !superseded && item.status === 'draft';
+  const hasImage = !isVideo && (!!media?.thumb || !!media?.image_url);
+  const canDraw = !isVideo && !!media?.brief && !superseded && item.status === 'draft';
   const wantsImage = !hasImage && canDraw;
   const [tryPending, setTryPending] = useState(false);
   useEffect(() => { setTryPending(false); }, [media?.thumb, media?.image_error]); // a fresh outcome clears the spinner
@@ -75,8 +103,17 @@ export function SocialPostCard({ item, channelSlug, taskNumber, letter, onOpen, 
           <span className={`mkpvav${grad ? ' grad' : ''}`}>{channelSlug[0]?.toUpperCase() ?? 'N'}</span>
           <b>{channelSlug}</b><span className="mkpvhandle">· {superseded ? `earlier version` : item.status === 'published' ? 'posted' : 'draft'}</span>
         </div>
-        <div className="mkpvtext ro">{item.body}</div>
-        {media?.thumb && <img className="mkpcimg" src={media.thumb} alt={media.brief ?? 'generated post image'} title={media.brief ?? undefined} />}
+        {caption && <div className="mkpvtext ro">{caption}</div>}
+        {script && (
+          <div className={`mkscript${open ? ' open' : ''}${caption ? ' mkscriptunder' : ''}`} role="button" tabIndex={0} title={open ? 'Fold the script' : 'Show the whole script'}
+            onClick={() => setOpen((v) => !v)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen((v) => !v); } }}>
+            <div className="mkpvtext ro mkscripttext">{script}</div>
+            <span className="mkscriptmore">{open ? 'fold the script ‹' : 'the script ›'}</span>
+          </div>
+        )}
+        {hasImage && media?.thumb && <img className="mkpcimg" src={media.thumb} alt={media.brief ?? 'generated post image'} title={media.brief ?? undefined} />}
+        {media?.video_id && (film ? <video className="mkpcfilm" src={film} controls playsInline preload="metadata" /> : <div className="mkpcimgwait" aria-live="polite">loading the film…</div>)}
+        {filmPending && !media?.video_id && <div className="mkpcimgwait" aria-live="polite">filming the hook…</div>}
         {/* the shape of what is coming, where it will appear — a pending state belongs on the
             picture, not in a banner whose own button has to argue it is busy */}
         {tryPending && !media?.thumb && <div className="mkpcimgwait" aria-live="polite">drawing…</div>}
@@ -86,13 +123,19 @@ export function SocialPostCard({ item, channelSlug, taskNumber, letter, onOpen, 
       {(wantsImage || (hasImage && !!media?.brief && !superseded)) && (
         <div className="mkpcbrief" title="the visual the marketer described">
           <IconImage s={13} />
-          <span><span className="mkpcbriefk">{hasImage ? 'image brief' : 'needs image'}</span> — {media!.brief}</span>
+          <span><span className="mkpcbriefk">{hasImage ? 'image brief' : 'needs image'}</span> · {media!.brief}</span>
+        </div>
+      )}
+      {isVideo && !!media?.brief && !superseded && (
+        <div className="mkpcbrief" title="the shot direction the film follows">
+          <IconPlay s={13} />
+          <span><span className="mkpcbriefk">{media.video_id ? 'shot direction' : 'needs video'}</span> · {media.brief}</span>
         </div>
       )}
       {/* one clear image state per card — the reason on the card, not buried in a summary message */}
       {wantsImage && imageReady === false && (
         <div className="mkpcsetup">
-          <b>No image model connected.</b> Your designer wrote the art direction but has nothing to draw with — a subscription login carries no API key.
+          <b>No image model connected.</b> Your designer wrote the art direction but has nothing to draw with. A subscription login carries no API key.
           <button className="btn sm" onClick={() => openImageConnect()}>Connect an image model →</button>
         </div>
       )}
@@ -111,6 +154,17 @@ export function SocialPostCard({ item, channelSlug, taskNumber, letter, onOpen, 
           <button className="btn sm" disabled={tryPending || imageReady !== true}
             title={imageReady === undefined ? 'checking for an image model…' : undefined}
             onClick={() => { setTryPending(true); onGenerateImage(false); }}>{tryPending ? 'Drawing…' : 'Generate image'}</button>
+        </div>
+      )}
+      {canFilm && !media?.video_error && onGenerateImage && (
+        <div className="mkpcsetup mkpcimggen">
+          <button className="btn sm" disabled={filmPending} title="Film the hook: an eight-second vertical clip from the script" onClick={() => { setFilmPending(true); onGenerateImage(!!media?.video_id, 'video'); }}>{filmPending ? 'Filming…' : media?.video_id ? 'Film again' : 'Generate video'}</button>
+        </div>
+      )}
+      {canFilm && media?.video_error && !filmPending && (
+        <div className="mkpcsetup mkpcimgerr">
+          <b>Video didn&rsquo;t generate.</b> {media.video_error}
+          {onGenerateImage && <button className="btn sm" onClick={() => { setFilmPending(true); onGenerateImage(false, 'video'); }}>Try again</button>}
         </div>
       )}
       <div className="mkpcfoot">

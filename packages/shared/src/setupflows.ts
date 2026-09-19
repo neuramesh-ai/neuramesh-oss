@@ -47,6 +47,9 @@ export const MARKETING_SETUP_FLOW: SetupFlow = {
     { id: 'goal', label: 'Goal', writes: 'goal', optional: true },
     { id: 'focus', label: 'Focus', writes: 'focus' },
     { id: 'connect', label: 'Connect', optional: true },
+    // release drafts (docs/design/release-drafts-2026-09 §4.7): the repository, the accounts, two
+    // switches. Writes `{ repoId, slug, now, watch }`; the completing command plants the routines.
+    { id: 'releases', label: 'Releases', writes: 'releases', optional: true },
   ],
 };
 

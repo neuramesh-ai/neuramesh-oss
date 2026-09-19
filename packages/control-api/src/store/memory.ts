@@ -6,6 +6,8 @@
 // into repositories — the split waits for the contract suite that would prove it safe.
 import { applyShare, type BrainOverride, parseBrainOverride, attachmentUpgradeReason, buildAgentCard, flowForChannelKind, planLabel, readAnswers, taskBranch, TaskSchema, threadModeOf, threadTitle, type ActorRef, type Beat, type BeatStatus, type NMEvent, type Run, type RunSettleState, type Task, type TaskKind, type TaskState, type ThreadMode } from '@neuramesh/shared';
 import { DomainError } from '../errors';
+import { deleteScheduleMem, markScheduleResultMem, setScheduleCursorMem, setScheduleStatusMem } from './release-routine';
+import { MemAnnounceStore } from './announce';
 import { pickHumanWord, settleMemoryThread } from './thread-settle';
 import type { LifecycleRow } from '../lifecycle';
 import { normalizeTaskTitle } from './types';
@@ -13,6 +15,7 @@ import type { MutationResult, ArtifactRow, AttachmentInput, ScheduleInput, NMMes
 import type { Store } from './contract';
 
 export class MemoryStore implements Store {
+  readonly announcements = new MemAnnounceStore();
   // readable in tests like `threads` — the memory store IS the test double
   tasks = new Map<string, Task>();
   private events: NMEvent[] = [];
@@ -1135,8 +1138,8 @@ export class MemoryStore implements Store {
   }
   // the in-memory store isn't used for bundled-pack tests (PostgresStore is) —
   // avoid pulling the ~2MB seed module into the test path
-  async seedDefaultPacks(_workspace: string, _channel: string, _event: NMEvent, _kind?: 'build' | 'marketing'): Promise<{ added: number }> {
-    return { added: 0 };
+  async seedDefaultPacks(_workspace: string, _channel: string, _event: NMEvent, _kind?: 'build' | 'marketing'): Promise<{ added: number; refreshed: number }> {
+    return { added: 0, refreshed: 0 };
   }
 
   async linkRepo(
@@ -1316,10 +1319,7 @@ export class MemoryStore implements Store {
     return { id };
   }
   async setScheduleStatus(scheduleId: string, status: 'active' | 'paused', makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }> {
-    const s = this.schedules.find((x) => x.id === scheduleId);
-    if (!s) throw new DomainError('NOT_FOUND', 'schedule not found');
-    s.status = status;
-    this.events.push(makeEvent(s.workspace));
+    this.events.push(makeEvent(setScheduleStatusMem(this.schedules, scheduleId, status).workspace));
     return { id: scheduleId };
   }
   async updateSchedule(scheduleId: string, patch: { title: string; prompt: string; cadence: string; atTime: string; tz: string; weekday: number | null; nextRunAt: string }, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }> {
@@ -1330,18 +1330,17 @@ export class MemoryStore implements Store {
     return { id: scheduleId };
   }
   async deleteSchedule(scheduleId: string, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }> {
-    const s = this.schedules.find((x) => x.id === scheduleId);
-    if (!s) throw new DomainError('NOT_FOUND', 'schedule not found');
-    this.events.push(makeEvent(s.workspace));
-    this.schedules = this.schedules.filter((x) => x.id !== scheduleId);
+    const { workspace, rest } = deleteScheduleMem(this.schedules, scheduleId);
+    this.events.push(makeEvent(workspace));
+    this.schedules = rest as typeof this.schedules;
     return { id: scheduleId };
   }
-  private contentItems: Array<{ id: string; workspace: string; channelId: string; taskId: string | null; threadId: string | null; platform: string; body: string; scheduleId: string | null; status: string; scheduledAt: string | null; approvedBy: string | null; mediaUrl: string | null; mediaId?: string | null; brief?: string | null; lastError?: string | null }> = [];
-  async createContentItem(input: { channelId: string; taskId?: string | null; threadId?: string | null; platform: string; body: string; scheduleId: string | null; slotAt?: string | null; mediaUrl?: string | null; imageBrief?: string | null; thumb?: string | null; imageError?: string | null; createdByKind: string; createdBy: string }, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }> {
+  private contentItems: Array<{ id: string; workspace: string; channelId: string; taskId: string | null; threadId: string | null; platform: string; body: string; scheduleId: string | null; status: string; scheduledAt: string | null; approvedBy: string | null; mediaUrl: string | null; mediaId?: string | null; brief?: string | null; script?: string | null; lastError?: string | null }> = [];
+  async createContentItem(input: { channelId: string; taskId?: string | null; threadId?: string | null; platform: string; body: string; scheduleId: string | null; slotAt?: string | null; mediaUrl?: string | null; imageBrief?: string | null; script?: string | null; thumb?: string | null; imageError?: string | null; createdByKind: string; createdBy: string }, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }> {
     const c = this.channels.find((x) => x.id === input.channelId);
     if (!c) throw new DomainError('NOT_FOUND', 'channel not found');
     const id = crypto.randomUUID();
-    this.contentItems.push({ id, workspace: c.workspace, channelId: input.channelId, taskId: input.taskId ?? null, threadId: input.threadId ?? null, platform: input.platform, body: input.body, scheduleId: input.scheduleId, status: 'draft', scheduledAt: input.slotAt ?? null, approvedBy: null, mediaUrl: input.mediaUrl ?? null, brief: input.imageBrief ?? null });
+    this.contentItems.push({ id, workspace: c.workspace, channelId: input.channelId, taskId: input.taskId ?? null, threadId: input.threadId ?? null, platform: input.platform, body: input.body, scheduleId: input.scheduleId, status: 'draft', scheduledAt: input.slotAt ?? null, approvedBy: null, mediaUrl: input.mediaUrl ?? null, brief: input.imageBrief ?? null, script: input.script ?? null });
     this.events.push(makeEvent(c.workspace));
     return { id };
   }
@@ -1367,13 +1366,13 @@ export class MemoryStore implements Store {
     this.events.push(makeEvent(it.workspace));
     return { id: itemId };
   }
-  async reviseDraft(itemId: string, patch: { body: string | null; imageBrief: string | null; thumb: string | null; imageError?: string | null }, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }> {
+  async reviseDraft(itemId: string, patch: { body: string | null; imageBrief: string | null; script?: string | null; thumb: string | null; imageError?: string | null; videoError?: string | null }, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }> {
     // draft OR scheduled, never published — mirrors pg (and updateContentBody/delete)
     const it = this.contentItems.find((x) => x.id === itemId && (x.status === 'draft' || x.status === 'scheduled'));
     if (!it) throw new DomainError('NOT_FOUND', 'content item not found (already published or gone)');
-    const isRevision = patch.body !== null || patch.imageBrief !== null;
+    const isRevision = patch.body !== null || patch.imageBrief !== null || !!patch.script;
     if (patch.body !== null) it.body = patch.body;
-    if (patch.imageBrief !== null) it.brief = patch.imageBrief;
+    if (patch.imageBrief !== null) it.brief = patch.imageBrief;   if (patch.script) it.script = patch.script;
     // thumb tracked in the mem store only for parity; the card reads it from media in pg
     // rewriting the copy/brief of a SCHEDULED post unschedules it back to draft (pg parity), so the
     // changed text can't auto-publish on the old slot without a fresh human approve
@@ -1381,18 +1380,18 @@ export class MemoryStore implements Store {
     this.events.push(makeEvent(it.workspace));
     return { id: itemId };
   }
-  private contentMedia = new Map<string, { mime: string; bytes: Buffer }>();
+  private contentMedia = new Map<string, { mime: string; bytes: Buffer; workspace: string }>();
   async attachContentMedia(itemId: string, mime: string, bytes: Buffer, _actor: { kind: string; id: string }, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }> {
     const it = this.contentItems.find((x) => x.id === itemId && (x.status === 'draft' || x.status === 'scheduled'));
     if (!it) throw new DomainError('NOT_FOUND', 'content item not found (or already published)');
     if (it.mediaId) this.contentMedia.delete(it.mediaId); // mirror pg: one hosted image per draft
     const id = crypto.randomUUID();
-    this.contentMedia.set(id, { mime, bytes });
+    this.contentMedia.set(id, { mime, bytes, workspace: it.workspace });
     it.mediaId = id;
     this.events.push(makeEvent(it.workspace));
     return { id };
   }
-  async contentMediaBytes(mediaId: string): Promise<{ mime: string; bytes: Buffer } | null> {
+  async contentMediaBytes(mediaId: string): Promise<{ mime: string; bytes: Buffer; workspace: string } | null> {
     return this.contentMedia.get(mediaId) ?? null;
   }
   async deleteContentItem(itemId: string, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }> {
@@ -1532,9 +1531,9 @@ export class MemoryStore implements Store {
       .slice(0, limit)
       .map((i) => ({ id: i.id, workspace: i.workspace, channel: i.channelId, threadId: (i as { threadId?: string | null }).threadId ?? null, platform: i.platform, body: i.body, scheduledAt: i.scheduledAt! }));
   }
-  async contentItemMedia(itemId: string): Promise<{ platform: string; mediaUrl: string | null; mediaId?: string | null } | null> {
+  async contentItemMedia(itemId: string): Promise<{ platform: string; mediaUrl: string | null; mediaId?: string | null; workspace: string } | null> {
     const it = this.contentItems.find((x) => x.id === itemId);
-    return it ? { platform: it.platform, mediaUrl: it.mediaUrl ?? null, mediaId: it.mediaId ?? null } : null;
+    return it ? { platform: it.platform, mediaUrl: it.mediaUrl ?? null, mediaId: it.mediaId ?? null, workspace: it.workspace } : null;
   }
   async markContentPublished(itemId: string, _url: string, _publishedAtIso: string): Promise<void> {
     const it = this.contentItems.find((x) => x.id === itemId);
@@ -1559,10 +1558,11 @@ export class MemoryStore implements Store {
     return { claimed: true };
   }
   async markScheduleResult(scheduleId: string, error: string | null, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }> {
-    const s = this.schedules.find((x) => x.id === scheduleId);
-    if (!s) throw new DomainError('NOT_FOUND', 'schedule not found');
-    s.lastError = error;
-    this.events.push(makeEvent(s.workspace));
+    this.events.push(makeEvent(markScheduleResultMem(this.schedules, scheduleId, error).workspace));
+    return { id: scheduleId };
+  }
+  async setScheduleCursor(scheduleId: string, cursor: { at: string; tag: string | null }, log: { at: string; key: string | null; note: string } | null, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }> {
+    this.events.push(makeEvent(setScheduleCursorMem(this.schedules, scheduleId, cursor, log).workspace));
     return { id: scheduleId };
   }
   async deleteChannel(channelId: string, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }> {

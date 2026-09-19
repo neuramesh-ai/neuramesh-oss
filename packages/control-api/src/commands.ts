@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { MACHINE_COMMANDS } from './commands-machine';
+import { MARKETING_RELEASES, SCHEDULE_RUN_COMMANDS, SETUP_RELEASES_VALUE } from './commands-schedule';
 import { WORK_PLAN_LEGS,
   MODEL_ID_SET, PACKS, CUSTOM_PACK_ID, isCustomPackId, TASK_KINDS, TASK_STATES, BEAT_STATUSES, RUN_KINDS, RUN_SETTLE_STATES, THREAD_MODES,
   // Human (companion) command schemas — defined in @neuramesh/shared so mobile/web
@@ -710,16 +711,9 @@ export const CommandSchema = z.discriminatedUnion('type', [
     tz: z.string().max(64).optional(),
     weekday: z.number().int().min(0).max(6).optional(),
   }),
-  // the daemon's atomic claim of a due run: counter CAS (ship-stage lesson) so two machines
-  // never double-fire. nextRunAt is the claimer's recomputed advance (null = done).
-  z.object({
-    type: z.literal('schedule.claim_run'),
-    schedule: z.string().min(1),
-    runCount: z.number().int().min(0),
-    nextRunAt: z.string().datetime().nullable(),
-  }),
-  // the fire's outcome → schedules.last_error (the attention bar's truth); null = the next clean run clears it
-  z.object({ type: z.literal('schedule.mark_result'), schedule: z.string().min(1), error: z.string().max(500).nullable() }),
+  // the verbs the daemon's schedule tick writes (claim_run · mark_result · set_cursor) ride
+  // commands-schedule.ts, the commands-machine.ts shape: this file sits at its ratchet cap
+  ...SCHEDULE_RUN_COMMANDS,
   // content items (marketing-channel plan §4.7): agents DRAFT (create), humans PUBLISH —
   // approve is HUMAN_ONLY and is what puts an item on the clock; unschedule bounces it
   // back to draft. Actual posting is the server's publish pass once connectors land.
@@ -750,6 +744,9 @@ export const CommandSchema = z.discriminatedUnion('type', [
     // why a briefed draft has no image (generation failed / capped) — shown ON the card with a
     // Try-again, instead of the reason being buried in the marketer's summary message
     imageError: z.string().trim().max(600).optional(),
+    // a VIDEO post's creator script (the UGC round): the body is the caption that posts with the
+    // video, the script is what the creator films. Kept in media.script, never in the body.
+    script: z.string().trim().min(1).max(10_000).optional(),
   }),
   // the human tweaks a draft's text/media before approving (calendar preview edit) — never
   // a published item, and agents never rewrite what a human is reviewing. mediaUrl: a url
@@ -760,12 +757,13 @@ export const CommandSchema = z.discriminatedUnion('type', [
   // but ONLY while status='draft' (a scheduled/published item is the human's, enforced in the
   // handler). body updates the copy; imageBrief re-states the visual it wants (kept in media.brief,
   // the daemon regenerates + re-hosts separately via attach_media).
-  z.object({ type: z.literal('content.revise'), item: z.string().min(1), body: z.string().trim().min(1).max(10_000).optional(), imageBrief: z.string().trim().max(2000).optional(), thumb: z.string().startsWith('data:image/').max(200_000).optional(), imageError: z.union([z.string().trim().max(600), z.literal('')]).optional() }),
+  z.object({ type: z.literal('content.revise'), item: z.string().min(1), body: z.string().trim().min(1).max(10_000).optional(), imageBrief: z.string().trim().max(2000).optional(), script: z.string().trim().min(1).max(10_000).optional(), thumb: z.string().startsWith('data:image/').max(200_000).optional(), imageError: z.union([z.string().trim().max(600), z.literal('')]).optional(), videoError: z.union([z.string().trim().max(600), z.literal('')]).optional() }),
   // host a draft's image so it can actually PUBLISH (0090). Every network takes media only as a
   // public URL someone else fetches — Meta pulls it directly, TikTok pulls it through our proxy,
   // X wants the bytes — so a picture generated on the user's machine has to land somewhere
   // fetchable. The bytes ride in as a data: URI and become /media/<id>, HMAC-gated.
-  z.object({ type: z.literal('content.attach_media'), item: z.string().min(1), dataUrl: z.string().startsWith('data:image/').max(9_000_000) }),
+  // a video rides the same lane (the UGC film, 2026-09-18): `data:video/mp4` bytes, one media per draft
+  z.object({ type: z.literal('content.attach_media'), item: z.string().min(1), dataUrl: z.string().regex(/^data:(?:image|video)\//).max(9_000_000) }),
   // remove a draft/scheduled item from the calendar entirely (published stays, it's history)
   z.object({ type: z.literal('content.delete'), item: z.string().min(1) }),
   z.object({
@@ -825,6 +823,9 @@ export const CommandSchema = z.discriminatedUnion('type', [
     website: z.string().trim().max(400).optional(),
     focus: z.array(z.enum(['social', 'content', 'seo', 'email', 'ads'])).max(5).optional(),
     goal: z.string().trim().max(300).optional(), // the human's stated aim, in their words
+    // step 5, release drafts (docs/design/release-drafts-2026-09 §4.7): the repository to watch,
+    // draft the latest release now (a free one-shot), watch daily (a Team routine)
+    releases: MARKETING_RELEASES.optional(),
   }),
   // flip one marketing MCP integration on the room (marketing.mcp.<provider>) — the daemon
   // attaches the enabled servers to marketer research runs with MACHINE-LOCAL creds
@@ -844,7 +845,7 @@ export const CommandSchema = z.discriminatedUnion('type', [
     channel: z.string().min(1), // channel id
     flow: z.string().min(1), // the registered flow id, e.g. 'marketing.v1'
     step: z.string().min(1), // a step id of that flow
-    value: z.union([z.string().trim().max(400), z.array(z.string().trim().max(40)).max(8)]).optional(),
+    value: z.union([z.string().trim().max(400), z.array(z.string().trim().max(40)).max(8), SETUP_RELEASES_VALUE]).optional(),
   }),
   // release-day backfill (idempotent, daemon boot): setup tasks for flow-bearing rooms that
   // predate setup flows and were never configured. Returns how many were created.

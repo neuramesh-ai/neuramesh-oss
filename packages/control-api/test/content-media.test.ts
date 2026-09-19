@@ -76,6 +76,28 @@ describe('content.attach_media', () => {
     expect((await send(plume, { type: 'content.attach_media', item, dataUrl: huge })).status).toBe(400);
   });
 
+  it('a FILM rides the same lane (the UGC video, 2026-09-18): video/mp4 attaches, and the app reads it back with a session', async () => {
+    (store as unknown as { wsMembers: Map<string, Set<string>> }).wsMembers.set('ws_acme', new Set(['george']));
+    const item = await makeDraft();
+    // an ISO base media head: size box + `ftyp` — what Veo hands back
+    const MP4_B64 = Buffer.from([0, 0, 0, 0x18, 0x66, 0x74, 0x79, 0x70, 0x69, 0x73, 0x6f, 0x6d, 0, 0, 0, 0]).toString('base64');
+    const res = await send(plume, { type: 'content.attach_media', item, dataUrl: `data:video/mp4;base64,${MP4_B64}` });
+    expect(res.status).toBe(200);
+    const { mediaId } = await j(res);
+    expect((await store.contentMediaBytes(mediaId))?.mime).toBe('video/mp4');
+    // the card's read: members only, the bytes with their type
+    const mine = await app.request(`/v1/content/media/${mediaId}`, { headers: { 'x-nm-actor': JSON.stringify(george) } });
+    expect(mine.status).toBe(200);
+    expect(mine.headers.get('content-type')).toBe('video/mp4');
+    expect(Buffer.from(await mine.arrayBuffer()).toString('base64')).toBe(MP4_B64);
+    const stranger = await app.request(`/v1/content/media/${mediaId}`, { headers: { 'x-nm-actor': JSON.stringify({ kind: 'human', id: 'mallory' }) } });
+    expect(stranger.status).toBe(403);
+    expect((await app.request('/v1/content/media/00000000-0000-4000-8000-000000000000', { headers: { 'x-nm-actor': JSON.stringify(george) } })).status).toBe(404);
+    // the film's failure reason lives beside the picture's, and clears the same way
+    expect((await send(plume, { type: 'content.revise', item, videoError: 'the model refused the prompt' })).status).toBe(200);
+    expect((await send(plume, { type: 'content.revise', item, videoError: '' })).status).toBe(200);
+  });
+
   it('will not attach to an item that already published — history is immutable', async () => {
     const item = await makeDraft();
     await send(george, { type: 'content.approve', item, scheduledAt: new Date(Date.now() + 3600e3).toISOString() });
@@ -232,6 +254,19 @@ describe('content.revise (marketer edits its own draft)', () => {
     // assert the command was accepted and the item is still a draft the human can approve)
     const res = await send(plume, { type: 'content.revise', item, body: 'and new copy' });
     expect(res.status).toBe(200);
+  });
+
+  it('a VIDEO post keeps its script beside the caption; a new script is a revision (and unschedules)', async () => {
+    const proj = await j(await send(george, { type: 'project.create', workspace: 'ws_acme', name: 'Growth' }));
+    const chan = await j(await send(george, { type: 'channel.create', workspace: 'ws_acme', project: proj.projectId, slug: 'marketing' }));
+    const { itemId } = await j(await send(plume, { type: 'content.create', channel: chan.channelId, platform: 'x', body: 'the caption that posts', script: '[0:00-0:03] HOOK, phone in hand\nSpoken: "My laptop is in my bag."' }));
+    const rows = () => (store as unknown as { contentItems: Array<{ id: string; body: string; script?: string | null; status: string }> }).contentItems;
+    expect(rows().find((x) => x.id === itemId)).toMatchObject({ body: 'the caption that posts', script: '[0:00-0:03] HOOK, phone in hand\nSpoken: "My laptop is in my bag."' });
+    await send(george, { type: 'content.approve', item: itemId, scheduledAt: new Date(Date.now() + 3600e3).toISOString() });
+    expect(rows().find((x) => x.id === itemId)?.status).toBe('scheduled');
+    // a script-only revision is a content revision: accepted, and the scheduled post comes off the clock
+    expect((await send(plume, { type: 'content.revise', item: itemId, script: '[0:00-0:03] a tighter hook' })).status).toBe(200);
+    expect(rows().find((x) => x.id === itemId)).toMatchObject({ body: 'the caption that posts', script: '[0:00-0:03] a tighter hook', status: 'draft' });
   });
 
   it('refuses a no-op revision', async () => {

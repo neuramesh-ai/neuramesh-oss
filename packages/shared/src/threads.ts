@@ -105,7 +105,8 @@ export function threadTitle(body: string): string {
   if (!stripped) return 'New thread';
   // first sentence-ish chunk (a ? or ! stays — questions title better with them),
   // then a hard cap on a word boundary
-  const firstStop = stripped.search(/[.!?\n]/);
+  // a period ends a sentence only before a space or the end: `v0.134.0` and `3.5 mm` are one token
+  const firstStop = stripped.search(/\.(?=\s|$)|[!?\n]/);
   const keepStop = firstStop >= 0 && /[!?]/.test(stripped[firstStop]!) ? 1 : 0;
   let t = (firstStop > 8 ? stripped.slice(0, firstStop + keepStop) : stripped).trim();
   t = t.replace(/[\s\-–—:;,]+$/, '');

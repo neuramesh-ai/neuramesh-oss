@@ -30,7 +30,7 @@ describe('setupProgress — derived from the synced profile, never from UI state
   it('a fresh room: nothing done, resume lands on the first step', () => {
     for (const raw of [null, undefined, '', '{}', 'not json']) {
       const p = setupProgress(MARKETING_SETUP_FLOW, raw);
-      expect(p).toEqual({ done: 0, total: 4, next: 'product', complete: false });
+      expect(p).toEqual({ done: 0, total: 5, next: 'product', complete: false });
     }
   });
 
@@ -39,7 +39,7 @@ describe('setupProgress — derived from the synced profile, never from UI state
     expect(p.done).toBe(2);
     expect(p.next).toBe('focus');
     expect(p.complete).toBe(false);
-    expect(setupProgressLabel(MARKETING_SETUP_FLOW, p)).toBe('step 3 of 4 — Focus');
+    expect(setupProgressLabel(MARKETING_SETUP_FLOW, p)).toBe('step 3 of 5 — Focus');
   });
 
   it('the progress marker covers skipped-optional and write-less steps', () => {
@@ -70,7 +70,7 @@ describe('setupProgress — derived from the synced profile, never from UI state
     const p = setupProgress(MARKETING_SETUP_FLOW, JSON.stringify({
       website: 'flowe.app', focus: ['social'], setup_by: 'u1', setup_at: '2026-07-20T00:00:00Z',
     }));
-    expect(p).toEqual({ done: 4, total: 4, next: null, complete: true });
+    expect(p).toEqual({ done: 5, total: 5, next: null, complete: true });
     expect(setupProgressLabel(MARKETING_SETUP_FLOW, p)).toBe('complete');
   });
 });

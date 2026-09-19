@@ -4,7 +4,10 @@
 // card). Pure + strictly validated so a malformed or hallucinated model output can never mint a
 // junk draft — an unparseable file yields no posts, not a crash.
 
-export type DraftedPost = { platform: string; body: string; mediaUrl?: string; imageBrief?: string };
+// `script` (the UGC round, 2026-09-18): a VIDEO post carries the creator's script beside the
+// caption. The body is the caption that posts with the video; the script is what the creator
+// reads and films (and what the film lane films). Kept apart because the body publishes.
+export type DraftedPost = { platform: string; body: string; mediaUrl?: string; imageBrief?: string; script?: string };
 
 // Mirrors the content_items.platform CHECK (0084 + 0088) and content.create's zod enum.
 export const CONTENT_PLATFORMS = ['x', 'instagram', 'linkedin', 'tiktok', 'email'] as const;
@@ -49,20 +52,48 @@ function splitBody(raw: string): { body: string; imageBrief?: string } {
  * Returns null when the entry could never be a post: an unsupported platform, or a body that was
  * only working notes. The caller drops it rather than minting a junk draft.
  */
-export function normalizeDraft(input: { platform?: string; body?: string; imageBrief?: string; mediaUrl?: string }): DraftedPost | null {
+// A model given a `script` field still files the script under a SCRIPT heading inside the shot
+// direction, or after the caption (plume, live, 2026-09-19: "SHOT DIRECTION … CREATOR SCRIPT …"
+// all in imageBrief). The heading is the seam: what follows it is the script, what precedes it
+// stays where it was. A structural lift, not a prompt line, because the prompt line was there.
+// on a TRIMMED line, so no run of spaces can be split two ways (CodeQL js/polynomial-redos, 2026-09-19)
+const SCRIPT_HEAD_RE = /^(?:#+ |\*\*)?(?:creator |the )?script(?:\*\*)? ?:?$/i;
+const isScriptHead = (line: string): boolean => SCRIPT_HEAD_RE.test(line.trim().replace(/\s+/g, ' '));
+
+/** split `text` at its SCRIPT heading line: the part before stays, the part after is the script */
+export function liftScript(text: string): { rest: string; script?: string } {
+  const lines = text.split('\n');
+  const at = lines.findIndex(isScriptHead);
+  if (at === -1) return { rest: text };
+  const script = lines.slice(at + 1).join('\n').trim();
+  const rest = lines.slice(0, at).join('\n').trim();
+  return script ? { rest, script } : { rest: text };
+}
+
+export function normalizeDraft(input: { platform?: string; body?: string; imageBrief?: string; mediaUrl?: string; script?: string }): DraftedPost | null {
   const platform = String(input.platform ?? 'x').toLowerCase().trim();
   if (!(CONTENT_PLATFORMS as readonly string[]).includes(platform)) return null;
-  const { body, imageBrief } = splitBody(typeof input.body === 'string' ? input.body : '');
-  if (!body) return null;
+  const split = splitBody(typeof input.body === 'string' ? input.body : '');
   const declaredBrief = typeof input.imageBrief === 'string' ? input.imageBrief.trim() : '';
   const rawMedia = typeof input.mediaUrl === 'string' ? input.mediaUrl.trim() : '';
   const mediaUrl = /^https?:\/\/\S+$/i.test(rawMedia) ? rawMedia : undefined;
-  const brief = declaredBrief || imageBrief;
+  let script = typeof input.script === 'string' ? input.script.trim() : '';
+  let body = split.body;
+  let brief = declaredBrief || split.imageBrief || '';
+  if (!script) {
+    // the script filed under a heading in the brief, or after the caption in the body
+    const fromBrief = liftScript(brief);
+    const fromBody = liftScript(body);
+    if (fromBrief.script) { brief = fromBrief.rest; script = fromBrief.script; }
+    else if (fromBody.script) { body = fromBody.rest; script = fromBody.script; }
+  }
+  if (!body) return null;
   return {
     platform,
     body: body.slice(0, 10_000),
     ...(mediaUrl ? { mediaUrl } : {}),
     ...(brief ? { imageBrief: brief.slice(0, 2_000) } : {}),
+    ...(script ? { script: script.slice(0, 10_000) } : {}),
   };
 }
 
@@ -91,6 +122,7 @@ export function parseDraftedPosts(raw: string, cap = 20): DraftedPost[] {
       ...(typeof rec['body'] === 'string' ? { body: rec['body'] } : {}),
       ...(typeof rec['imageBrief'] === 'string' ? { imageBrief: rec['imageBrief'] } : {}),
       ...(typeof rec['mediaUrl'] === 'string' ? { mediaUrl: rec['mediaUrl'] } : {}),
+      ...(typeof rec['script'] === 'string' ? { script: rec['script'] } : {}),
     });
     if (!post) continue;
     out.push(post);
@@ -126,7 +158,7 @@ export function parseShowLetters(raw: string, cap = 20): string[] {
 // change one card, writes `revised.json` keying each edit by the draft's LETTER (a/b/c — the
 // #1027·a the human replied to). Only the drafts named change; the rest are left alone. `body`
 // and/or `imageBrief` — at least one — or the entry is meaningless and dropped.
-export type DraftRevision = { letter: string; body?: string; imageBrief?: string; dropImage?: boolean };
+export type DraftRevision = { letter: string; body?: string; imageBrief?: string; script?: string; dropImage?: boolean };
 
 export function parseDraftRevisions(raw: string, cap = 20): DraftRevision[] {
   let parsed: unknown;
@@ -146,16 +178,25 @@ export function parseDraftRevisions(raw: string, cap = 20): DraftRevision[] {
     const letter = (/([a-z])\s*$/.exec(rawLetter)?.[1]) ?? '';
     if (!letter || seen.has(letter)) continue;
     const rawBody = typeof rec['body'] === 'string' ? rec['body'] : '';
-    const { body, imageBrief: bodyBrief } = rawBody.trim() ? splitBody(rawBody) : { body: '', imageBrief: undefined };
+    const { body: cleanBody, imageBrief: bodyBrief } = rawBody.trim() ? splitBody(rawBody) : { body: '', imageBrief: undefined };
     const declaredBrief = typeof rec['imageBrief'] === 'string' ? rec['imageBrief'].trim() : '';
-    const brief = declaredBrief || bodyBrief;
+    let brief = declaredBrief || bodyBrief || '';
+    let body = cleanBody;
     const dropImage = rec['dropImage'] === true || rec['removeImage'] === true;
-    if (!body && !brief && !dropImage) continue; // nothing to actually change
+    let script = typeof rec['script'] === 'string' ? rec['script'].trim() : '';
+    if (!script) { // the same lift as normalizeDraft: a script filed under a heading
+      const fromBrief = liftScript(brief);
+      const fromBody = liftScript(body);
+      if (fromBrief.script) { brief = fromBrief.rest; script = fromBrief.script; }
+      else if (fromBody.script) { body = fromBody.rest; script = fromBody.script; }
+    }
+    if (!body && !brief && !script && !dropImage) continue; // nothing to actually change
     seen.add(letter);
     out.push({
       letter,
       ...(body ? { body: body.slice(0, 10_000) } : {}),
       ...(brief ? { imageBrief: brief.slice(0, 2_000) } : {}),
+      ...(script ? { script: script.slice(0, 10_000) } : {}),
       ...(dropImage ? { dropImage: true } : {}),
     });
     if (out.length >= cap) break;

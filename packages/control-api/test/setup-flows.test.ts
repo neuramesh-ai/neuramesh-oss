@@ -136,3 +136,19 @@ describe('the lean life and the backfill', () => {
     expect((await send(worker, { type: 'setup.backfill', workspace: 'ws_acme' })).status).toBe(403);
   });
 });
+
+describe('the releases step (step 5) writes an object, and only that step does', () => {
+  it('stores the choices on the profile and keeps the marker', async () => {
+    const channel = await makeMarketingRoom('mk5');
+    const value = { repoId: 'r-oss', slug: 'neuramesh-ai/neuramesh-oss', now: true, watch: false };
+    expect((await send(george, { type: 'setup.step', channel, flow: 'marketing.v1', step: 'releases', value })).status).toBe(200);
+    const ch = channelsOf(store).find((c) => c.id === channel)!;
+    expect(ch.marketing?.['releases']).toEqual(value);
+    expect(ch.marketing?.['setup_progress']).toEqual({ flow: 'marketing.v1', step: 'releases' });
+  });
+  it('a text value on the releases step, or an object on another step, is refused', async () => {
+    const channel = await makeMarketingRoom('mk5b');
+    expect((await send(george, { type: 'setup.step', channel, flow: 'marketing.v1', step: 'releases', value: 'r-oss' })).status).toBe(422);
+    expect((await send(george, { type: 'setup.step', channel, flow: 'marketing.v1', step: 'product', value: { now: true } })).status).toBe(422);
+  });
+});

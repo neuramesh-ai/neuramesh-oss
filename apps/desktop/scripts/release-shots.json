@@ -1,0 +1,80 @@
+[
+  {
+    "name": "release-session-dark",
+    "query": {
+      "theme": "dark",
+      "plan": "cloud",
+      "openConvo": "marketing::browser terminal"
+    },
+    "settle": 3200
+  },
+  {
+    "name": "release-session-cream",
+    "query": {
+      "theme": "cream-oak",
+      "plan": "cloud",
+      "openConvo": "marketing::browser terminal"
+    },
+    "settle": 3200
+  },
+  {
+    "name": "release-brief-dark",
+    "query": {
+      "theme": "dark",
+      "plan": "cloud",
+      "openConvo": "marketing::browser terminal"
+    },
+    "settle": 3200,
+    "js": "document.querySelector('.relcard')?.scrollIntoView({ block: 'center' })"
+  },
+  {
+    "name": "release-brief-cream",
+    "query": {
+      "theme": "cream-oak",
+      "plan": "cloud",
+      "openConvo": "marketing::browser terminal"
+    },
+    "settle": 3200,
+    "js": "document.querySelector('.relcard')?.scrollIntoView({ block: 'center' })"
+  },
+  {
+    "name": "release-drafts-dark",
+    "query": {
+      "theme": "dark",
+      "plan": "cloud",
+      "openConvo": "marketing::browser terminal"
+    },
+    "settle": 3200,
+    "js": "document.querySelector('.mkdrafts')?.scrollIntoView({ block: 'start' })"
+  },
+  {
+    "name": "release-drafts-cream",
+    "query": {
+      "theme": "cream-oak",
+      "plan": "cloud",
+      "openConvo": "marketing::browser terminal"
+    },
+    "settle": 3200,
+    "js": "document.querySelector('.mkdrafts')?.scrollIntoView({ block: 'start' })"
+  },
+  {
+    "name": "release-reply-dark",
+    "query": {
+      "theme": "dark",
+      "plan": "cloud",
+      "openConvo": "marketing::browser terminal"
+    },
+    "settle": 3200,
+    "js": "[...document.querySelectorAll('.mkpcreply')].find((b) => b.getAttribute('aria-label') === 'Request changes on draft c')?.click(); document.querySelector('.mkdrafts')?.scrollIntoView({ block: 'start' })"
+  },
+  {
+    "name": "release-reply-cream",
+    "query": {
+      "theme": "cream-oak",
+      "plan": "cloud",
+      "openConvo": "marketing::browser terminal"
+    },
+    "settle": 3200,
+    "js": "[...document.querySelectorAll('.mkpcreply')].find((b) => b.getAttribute('aria-label') === 'Request changes on draft c')?.click(); document.querySelector('.mkdrafts')?.scrollIntoView({ block: 'start' })"
+  }
+]
