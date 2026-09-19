@@ -40,8 +40,9 @@ const MANIFEST: Record<string, string[]> = {
   'sweep.digest': ['list_backlog', 'list_tasks', 'post_thread', 'recall', 'task_status'].sort(),
   'sweep.watchdog': ['list_agents', 'list_tasks', 'offer_task', 'post_thread', 'recall', 'request_changes',
     'request_verdict', 'revise_design', 'revise_plan', 'revise_ship_plan', 'task_status'].sort(),
-  'sweep.monitor': ['create_task', 'list_agents', 'list_backlog', 'list_tasks', 'offer_task', 'post_thread',
-    'propose_impl_plan', 'recall', 'request_changes', 'request_design', 'request_plan', 'request_verdict',
+  // no create_task, no propose_impl_plan (2026-09-19): a self-check routes existing work, it never mints a unit
+  'sweep.monitor': ['list_agents', 'list_backlog', 'list_tasks', 'offer_task', 'post_thread',
+    'recall', 'request_changes', 'request_design', 'request_plan', 'request_verdict',
     'revise_design', 'revise_plan', 'task_status'].sort(),
 };
 

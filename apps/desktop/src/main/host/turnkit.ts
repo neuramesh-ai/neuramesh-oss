@@ -32,7 +32,35 @@ export function toolSummary(name: string, input: any): string {
   return name;
 }
 
-export async function drainQuery(stream: AsyncIterable<any>, fallback: string, log?: LogFn, onDelta?: (t: string) => void, onTodos?: (todos: Array<{ content?: string; status?: string }>) => void): Promise<string> {
+/** the text a turn answers with when the CLI came up without the nm server: honest, visible, and
+ *  never a tool-less prose deliverable the next self-check mistakes for a request that fell through */
+export const NM_TOOLS_MISSING = 'I could not reach my NeuraMesh tools on this machine for that turn (the nm tool server did not connect), so I did nothing rather than guess. Say it again in a minute, and if it repeats, the activity log under this turn names the reason.';
+
+/** the CLI's opening inventory: which MCP servers came up and whether the nm server is among them.
+ *  Logged on every turn (the 2026-09-19 desktop went ten days answering as a tool-less writer
+ *  before anyone could see that the nm server was absent from every Claude turn). */
+export function mcpInventory(init: { tools?: string[]; mcp_servers?: Array<{ name: string; status: string }> }, expect: string): { ok: boolean; pending: boolean; summary: string } {
+  const servers = init.mcp_servers ?? [];
+  const nm = servers.find((s) => s.name === expect);
+  const own = (init.tools ?? []).filter((t) => t.startsWith(`mcp__${expect}__`)).length;
+  const summary = `mcp servers: ${servers.map((s) => `${s.name}=${s.status}`).join(', ') || 'none'} · ${expect} tools in the prompt: ${own}`;
+  // `pending` may still connect (the caller gives it a moment and asks again); failed, needs-auth, disabled and absent never do
+  return { ok: nm?.status === 'connected' || nm?.status === 'pending', pending: nm?.status === 'pending', summary };
+}
+
+/** the init inventory, with a pending server given up to six seconds to connect through the CLI's own status call */
+async function settledInventory(stream: unknown, init: { tools?: string[]; mcp_servers?: Array<{ name: string; status: string }> }, expect: string): Promise<{ ok: boolean; summary: string }> {
+  let inv = mcpInventory(init, expect);
+  const ask = (stream as { mcpServerStatus?: () => Promise<Array<{ name: string; status: string }>> }).mcpServerStatus;
+  for (let i = 0; i < 12 && inv.pending && typeof ask === 'function'; i++) {
+    await new Promise((r) => setTimeout(r, 500));
+    const st = await ask.call(stream).catch(() => null);
+    if (st) inv = mcpInventory({ tools: init.tools, mcp_servers: st }, expect);
+  }
+  return { ok: inv.ok && !inv.pending, summary: inv.summary };
+}
+
+export async function drainQuery(stream: AsyncIterable<any>, fallback: string, log?: LogFn, onDelta?: (t: string) => void, onTodos?: (todos: Array<{ content?: string; status?: string }>) => void, expect?: { mcp: string }): Promise<string> {
   let text = '';
   // every superseded text block, because cards written in one are NOT narration — carryCards
   // rescues any ```nmq/```nms fence the final block dropped ("Waiting on those two", 2026-08-06)
@@ -41,6 +69,13 @@ export async function drainQuery(stream: AsyncIterable<any>, fallback: string, l
   // rule would otherwise drop when a later tool call and its confirmation close the turn
   const spoken: string[] = [];
   for await (const m of stream) {
+    if (m.type === 'system' && m.subtype === 'init' && expect) {
+      const inv = await settledInventory(stream, m, expect.mcp);
+      log?.({ kind: 'turn', summary: `tools: ${inv.summary}`, level: inv.ok ? 'info' : 'warn' });
+      // no nm server = no board, no shelf, no cards: the turn cannot do its job, so it says so and
+      // stops instead of writing what a tool-less model writes (the prose scripts of 2026-09-19)
+      if (!inv.ok) return NM_TOOLS_MISSING;
+    }
     if (m.type === 'assistant' && m.message?.content) {
       const standalone = !m.message.content.some((b: { type?: string }) => b.type === 'tool_use');
       for (const b of m.message.content) {

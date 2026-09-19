@@ -24,7 +24,8 @@ test('static payload report — the numbers every diet commit answers to', async
     assert.ok((totals[`registry.${kind}.tools`] ?? 0) >= 10, `orchestrator ${kind} registry lost most of its tools`);
   }
   // sweeps are scoped (2026-08-18): each carries its own small set — see SWEEP_TOOLSETS
-  for (const [scope, minTools] of [['digest', 5], ['watchdog', 10], ['monitor', 14]] as const) {
+  // monitor 14 → 12 (2026-09-19): create_task and propose_impl_plan left it, a self-check never creates work
+  for (const [scope, minTools] of [['digest', 5], ['watchdog', 10], ['monitor', 12]] as const) {
     assert.ok((totals[`registry.sweep.${scope}`] ?? 0) > 500, `sweep.${scope} registry weighed (nearly) nothing`);
     assert.ok((totals[`registry.sweep.${scope}.tools`] ?? 0) >= minTools, `sweep.${scope} registry lost tools its prompt instructs`);
   }

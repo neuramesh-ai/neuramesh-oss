@@ -110,9 +110,15 @@ const SWEEP_TOOLSETS: Record<'digest' | 'watchdog' | 'monitor', readonly string[
   digest: ['list_tasks', 'task_status', 'list_backlog', 'recall', 'post_thread'],
   watchdog: ['list_tasks', 'task_status', 'list_agents', 'recall', 'post_thread',
              'offer_task', 'request_changes', 'revise_design', 'revise_plan', 'revise_ship_plan', 'request_verdict'],
+  // A SELF-CHECK NEVER CREATES WORK (George, 2026-09-19: "rex creates random tickets on its own").
+  // #1096 "Draft grounded Flowe UGC scripts" was born from the monitor: a human's ask got a
+  // tool-less prose answer, and ten minutes later the periodic check judged it "a request that
+  // fell through" and minted a unit with a plan. The monitor routes and nudges EXISTING work; the
+  // human's own word (or a routine they armed) is the only thing that creates a unit. Enforced by
+  // the inventory, not the prompt: create_task and propose_impl_plan are absent here.
   monitor: ['list_tasks', 'task_status', 'list_agents', 'list_backlog', 'recall', 'post_thread',
             'offer_task', 'request_changes', 'revise_design', 'revise_plan', 'request_verdict',
-            'request_design', 'request_plan', 'create_task', 'propose_impl_plan'],
+            'request_design', 'request_plan'],
 };
 
 export function makeOrchTools(ctx: HostCtx & {

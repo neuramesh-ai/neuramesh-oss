@@ -109,7 +109,16 @@ now make that impossible-by-construction, not discouraged:
    bypass in both directions.
 3. **The prompt** (last resort, not the enforcement): the self-check now routes by the
    same ladder as fresh intake — `request_design` before any plan for user-facing
-   surfaces — and must re-run `list_tasks` immediately before any `create_task`.
+   surfaces.
+4. **A self-check never creates work** (2026-09-19, George: "rex creates random tickets on
+   its own"). The monitor's toolset (`SWEEP_TOOLSETS.monitor`, orchtools.ts) carries no
+   `create_task` and no `propose_impl_plan`. The case that shaped it: a human asked for UGC
+   scripts in a conversation, the Claude turn came up without its nm tools and answered as a
+   tool-less writer, and ten minutes later the monitor read that as "a request that fell
+   through" and minted #1096 "Draft grounded Flowe UGC scripts" with a plan. The monitor
+   routes and nudges existing work. A unit is born from the human's own word in a
+   conversation (docs/41), a routine the human armed, or a playbook the human asked to run,
+   never from a periodic check. The watchdog and the digest never carried creation.
 
 ## 5. Deliberate non-goals (v1)
 

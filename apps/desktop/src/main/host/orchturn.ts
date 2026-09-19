@@ -195,11 +195,16 @@ export async function anthropicOrchestratorTurn(args: OrchTransportArgs): Promis
         permissionMode: 'bypassPermissions',
         cwd: args.cwd ?? os.tmpdir(),
         systemPrompt: args.systemPrompt,
+        // the CLI's own stderr into the activity log, MCP lines only: when the nm server does not
+        // come up, the reason is printed there and nowhere else (2026-09-19)
+        stderr: (d: string) => { for (const line of d.split('\n')) if (/mcp|\bnm\b/i.test(line)) args.log?.({ kind: 'turn', summary: `claude: ${line.trim().slice(0, 240)}`, level: 'warn' }); },
       },
     }) as AsyncIterable<any>,
     ORCH_EMPTY_TURN, // empty stream → stand down, never a posted placeholder
     args.log,
     args.onDelta,
+    undefined,
+    { mcp: 'nm' }, // a turn the CLI opened without the nm server stops and says so (turnkit.ts)
   );
 }
 
