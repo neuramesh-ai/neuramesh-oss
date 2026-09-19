@@ -406,11 +406,11 @@ export interface Store {
    * `release` payload: a plain routine has no cursor to move. */
   setScheduleCursor(scheduleId: string, cursor: { at: string; tag: string | null }, log: { at: string; key: string | null; note: string } | null, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }>;
   // content items (marketing-channel plan §4.7) — agents draft, humans publish
-  createContentItem(input: { channelId: string; taskId?: string | null; threadId?: string | null; platform: string; body: string; scheduleId: string | null; slotAt?: string | null; mediaUrl?: string | null; imageBrief?: string | null; script?: string | null; thumb?: string | null; imageError?: string | null; createdByKind: string; createdBy: string }, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }>;
+  createContentItem(input: { channelId: string; taskId?: string | null; threadId?: string | null; platform: string; body: string; scheduleId: string | null; slotAt?: string | null; mediaUrl?: string | null; imageBrief?: string | null; script?: string | null; frame?: string | null; thumb?: string | null; imageError?: string | null; createdByKind: string; createdBy: string }, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }>;
   setContentStatus(itemId: string, patch: { status: 'draft' | 'scheduled'; scheduledAt: string | null; approvedBy: string | null; keepSlot?: boolean }, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }>;
   updateContentBody(itemId: string, body: string, mediaUrl: string | null | undefined, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }>;
   /** the marketer revises its OWN unpublished draft (§4.5) — body/imageBrief/thumb; DRAFT status only */
-  reviseDraft(itemId: string, patch: { body: string | null; imageBrief: string | null; script?: string | null; videoPending?: boolean; videoMeta?: import('./films').VideoMeta | null; videoErrorCode?: 'NO_CREDITS' | 'UNAVAILABLE' | null; thumb: string | null; imageError?: string | null; videoError?: string | null }, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }>;
+  reviseDraft(itemId: string, patch: { body: string | null; imageBrief: string | null; script?: string | null; frame?: string | null; videoPending?: boolean; videoMeta?: import('./films').VideoMeta | null; videoErrorCode?: 'NO_CREDITS' | 'UNAVAILABLE' | null; thumb: string | null; imageError?: string | null; videoError?: string | null }, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }>;
   deleteContentItem(itemId: string, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }>;
   /** host a draft's image bytes (0090) and point content_items.media.image_id at them — the
    *  only way a locally generated picture can ever reach a network that fetches URLs */
@@ -447,7 +447,7 @@ export interface Store {
    *  dueContentItems: that one is "past due, publish it", this one is "coming, tell somebody". */
   upcomingContentItems(fromIso: string, toIso: string, limit: number): Promise<Array<{ id: string; workspace: string; channel: string; threadId: string | null; platform: string; body: string; scheduledAt: string }>>;
   /** the TikTok media proxy's lookup — platform + media only, nothing publishable leaks */
-  contentItemMedia(itemId: string): Promise<{ platform: string; mediaUrl: string | null; mediaId?: string | null; workspace: string } | null>;
+  contentItemMedia(itemId: string): Promise<{ platform: string; mediaUrl: string | null; mediaId?: string | null; workspace: string; channel?: string; frame?: string | null } | null>;
   markContentPublished(itemId: string, url: string, publishedAtIso: string): Promise<void>;
   markContentFailed(itemId: string, error: string): Promise<void>;
   // permanently delete a channel + everything in it (messages/tasks/history). irreversible.

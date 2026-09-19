@@ -20,7 +20,16 @@ export interface VideoModel {
   resolution: string;
   /** the request body fal's queue takes for this endpoint */
   input: (prompt: string, seconds: number) => Record<string, unknown>;
+  /** the model's reference lane, when it has one (brand-grounding plan §6): the endpoint that takes
+   *  images beside the prompt, and the body with the frame in it. A model without one films the
+   *  text lane and the card says the frame was not used. */
+  reference?: { endpoint: string; input: (prompt: string, seconds: number, imageUrls: string[]) => Record<string, unknown> };
 }
+
+/** what the prompt says about the frame, appended ONLY on a reference lane: a text lane must never
+ *  read "@Image1". The screenshot's own lettering is the one lettering the film may show. */
+export const REFERENCE_CLAUSE = 'The product on screen is @Image1, a real screenshot of the app: show that interface exactly, its layout, colors and type, and invent no other interface. The only lettering in the film is what @Image1 shows.';
+const withFrame = (prompt: string): string => `${prompt} ${REFERENCE_CLAUSE}`;
 
 const usd = (dollarsPerSecond: number): number => Math.round(dollarsPerSecond * 1_000_000);
 
@@ -28,10 +37,13 @@ export const VIDEO_MODELS: Record<string, VideoModel> = {
   'seedance-2.0-fast': {
     key: 'seedance-2.0-fast', label: 'Seedance 2.0', vendor: 'ByteDance', endpoint: 'bytedance/seedance-2.0/fast/text-to-video', perSecondMicros: usd(0.2419), resolution: '720p',
     input: (prompt, seconds) => ({ prompt, resolution: '720p', duration: String(seconds), aspect_ratio: '9:16', generate_audio: true }),
+    // the same price per second as the text lane (fal, read 2026-09-19); up to nine images, data URIs accepted
+    reference: { endpoint: 'bytedance/seedance-2.0/fast/reference-to-video', input: (prompt, seconds, image_urls) => ({ prompt: withFrame(prompt), image_urls, resolution: '720p', duration: String(seconds), aspect_ratio: '9:16', generate_audio: true }) },
   },
   'seedance-2.0': {
     key: 'seedance-2.0', label: 'Seedance 2.0 Standard', vendor: 'ByteDance', endpoint: 'bytedance/seedance-2.0/text-to-video', perSecondMicros: usd(0.3034), resolution: '720p',
     input: (prompt, seconds) => ({ prompt, resolution: '720p', duration: String(seconds), aspect_ratio: '9:16', generate_audio: true }),
+    reference: { endpoint: 'bytedance/seedance-2.0/reference-to-video', input: (prompt, seconds, image_urls) => ({ prompt: withFrame(prompt), image_urls, resolution: '720p', duration: String(seconds), aspect_ratio: '9:16', generate_audio: true }) },
   },
   'kling-3.0': {
     key: 'kling-3.0', label: 'Kling 3.0', vendor: 'Kuaishou', endpoint: 'fal-ai/kling-video/v3/standard/text-to-video', perSecondMicros: usd(0.126), resolution: '1080p',

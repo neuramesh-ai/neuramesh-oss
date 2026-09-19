@@ -2206,7 +2206,7 @@ export class PostgresStore implements Store {
   }
 
   async createContentItem(
-    input: { channelId: string; taskId?: string | null; threadId?: string | null; platform: string; body: string; scheduleId: string | null; slotAt?: string | null; mediaUrl?: string | null; imageBrief?: string | null; script?: string | null; thumb?: string | null; imageError?: string | null; createdByKind: string; createdBy: string },
+    input: { channelId: string; taskId?: string | null; threadId?: string | null; platform: string; body: string; scheduleId: string | null; slotAt?: string | null; mediaUrl?: string | null; imageBrief?: string | null; script?: string | null; frame?: string | null; thumb?: string | null; imageError?: string | null; createdByKind: string; createdBy: string },
     makeEvent: (workspace: string) => NMEvent,
   ): Promise<{ id: string }> {
     return this.sql.begin(async (_tx) => {
@@ -2217,7 +2217,7 @@ export class PostgresStore implements Store {
       // a draft born from a schedule carries its intended slot in scheduled_at while
       // status stays 'draft' — the calendar places the chip there, approve keeps it
       const [row] = await sql`insert into content_items (workspace_id, channel_id, task_id, thread_id, schedule_id, platform, body, scheduled_at, media, created_by_kind, created_by)
-        values (${ws}::uuid, ${input.channelId}::uuid, ${input.taskId ?? null}, ${input.threadId ?? null}, ${input.scheduleId}, ${input.platform}, ${input.body}, ${input.slotAt ?? null}, ${input.mediaUrl || input.imageBrief || input.script || input.thumb || input.imageError ? sql.json({ ...(input.mediaUrl ? { image_url: input.mediaUrl } : {}), ...(input.imageBrief ? { brief: input.imageBrief } : {}), ...(input.script ? { script: input.script } : {}), ...(input.thumb ? { thumb: input.thumb } : {}), ...(input.imageError ? { image_error: input.imageError } : {}) } as never) : null}, ${input.createdByKind}, ${input.createdBy})
+        values (${ws}::uuid, ${input.channelId}::uuid, ${input.taskId ?? null}, ${input.threadId ?? null}, ${input.scheduleId}, ${input.platform}, ${input.body}, ${input.slotAt ?? null}, ${input.mediaUrl || input.imageBrief || input.script || input.frame || input.thumb || input.imageError ? sql.json({ ...(input.mediaUrl ? { image_url: input.mediaUrl } : {}), ...(input.imageBrief ? { brief: input.imageBrief } : {}), ...(input.script ? { script: input.script } : {}), ...(input.frame ? { frame: input.frame } : {}), ...(input.thumb ? { thumb: input.thumb } : {}), ...(input.imageError ? { image_error: input.imageError } : {}) } as never) : null}, ${input.createdByKind}, ${input.createdBy})
         returning id`;
       await this.insertEvent(sql, makeEvent(ws), null);
       return { id: row!['id'] as string };
@@ -2268,7 +2268,7 @@ export class PostgresStore implements Store {
     }) as Promise<{ id: string }>;
   }
 
-  async reviseDraft(itemId: string, patch: { body: string | null; imageBrief: string | null; script?: string | null; videoPending?: boolean; videoMeta?: VideoMeta | null; videoErrorCode?: 'NO_CREDITS' | 'UNAVAILABLE' | null; thumb: string | null; imageError?: string | null; videoError?: string | null }, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }> {
+  async reviseDraft(itemId: string, patch: { body: string | null; imageBrief: string | null; script?: string | null; frame?: string | null; videoPending?: boolean; videoMeta?: VideoMeta | null; videoErrorCode?: 'NO_CREDITS' | 'UNAVAILABLE' | null; thumb: string | null; imageError?: string | null; videoError?: string | null }, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }> {
     return this.sql.begin(async (_tx) => {
       const sql = asSql(_tx);
       // Revisable while a 'draft' OR a proposed 'scheduled' slot — the marketer owns the content
@@ -2297,7 +2297,7 @@ export class PostgresStore implements Store {
       }
       if (patch.imageBrief !== null) media['brief'] = patch.imageBrief;
       // a new script means the old film is of the old script: it goes, the card films again
-      if (patch.script) { media['script'] = patch.script; delete media['video_id']; delete media['video_error']; }
+      if (patch.script) { media['script'] = patch.script; delete media['video_id']; delete media['video_error']; }   if (patch.frame !== undefined) { if (patch.frame) media['frame'] = patch.frame; else delete media['frame']; delete media['video_id']; delete media['video']; delete media['video_error']; } // a new frame: the old film is of the old frame, it goes
       if (patch.thumb !== null) { media['thumb'] = patch.thumb; delete media['image_error']; } // an image landed → drop the error
       if (patch.imageError !== undefined) { if (patch.imageError) media['image_error'] = patch.imageError; else delete media['image_error']; }
       if (patch.videoError !== undefined) { if (patch.videoError) media['video_error'] = patch.videoError; else { delete media['video_error']; delete media['video_error_code']; } }   if (patch.videoErrorCode !== undefined) { if (patch.videoErrorCode) media['video_error_code'] = patch.videoErrorCode; else delete media['video_error_code']; }
@@ -2599,11 +2599,11 @@ export class PostgresStore implements Store {
   async dueContentItems(nowIso: string, limit: number): Promise<DueItem[]> { return dueContentItemsSql(this.sql, nowIso, limit); }
   async upcomingContentItems(fromIso: string, toIso: string, limit: number): Promise<UpcomingItem[]> { return upcomingContentItemsSql(this.sql, fromIso, toIso, limit); }
 
-  async contentItemMedia(itemId: string): Promise<{ platform: string; mediaUrl: string | null; mediaId?: string | null; workspace: string } | null> {
-    const [r] = await this.sql`select platform, media, workspace_id from content_items where id = ${itemId}::uuid limit 1`;
+  async contentItemMedia(itemId: string): Promise<{ platform: string; mediaUrl: string | null; mediaId?: string | null; workspace: string; channel?: string; frame?: string | null } | null> {
+    const [r] = await this.sql`select platform, media, workspace_id, channel_id from content_items where id = ${itemId}::uuid limit 1`;
     if (!r) return null;
-    const m = r['media'] as { image_url?: string; image_id?: string } | null;
-    return { platform: r['platform'] as string, mediaUrl: m?.image_url ?? null, mediaId: m?.image_id ?? null, workspace: r['workspace_id'] as string };
+    const m = r['media'] as { image_url?: string; image_id?: string; frame?: string } | null;
+    return { platform: r['platform'] as string, mediaUrl: m?.image_url ?? null, mediaId: m?.image_id ?? null, workspace: r['workspace_id'] as string, channel: r['channel_id'] as string, frame: m?.frame ?? null };
   }
 
   async markContentPublished(itemId: string, url: string, publishedAtIso: string): Promise<void> {

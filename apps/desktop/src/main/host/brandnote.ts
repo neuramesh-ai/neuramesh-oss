@@ -25,10 +25,12 @@ export interface BrandFacts {
   profile: { website?: string; focus?: string[]; goal?: string };
   /** the newest of each named brand doc on this room's shelf, by name */
   docs: Map<string, string>;
+  /** the images on the shelf, by name: what a video post can name as its frame (plan §6) */
+  images: string[];
   conns: Array<{ provider: string; handle: string | null }>;
 }
 
-const NONE: BrandFacts = { marketing: false, product: null, logo: false, profile: {}, docs: new Map(), conns: [] };
+const NONE: BrandFacts = { marketing: false, product: null, logo: false, profile: {}, docs: new Map(), images: [], conns: [] };
 
 /** the room's kind, product, profile, brand docs and connected accounts, in one read */
 export async function readBrand(db: AttDbLike, channelId: string): Promise<BrandFacts> {
@@ -38,12 +40,16 @@ export async function readBrand(db: AttDbLike, channelId: string): Promise<Brand
     [channelId],
   ).catch(() => [] as Array<{ kind: string; marketing: string | null; website: string | null; logo: string | null }>);
   if (!ch || ch.kind !== 'marketing') return NONE;
-  const rows = await db.getAll<{ name: string; inline_content: string | null }>(
-    `select name, inline_content from artifacts where channel_id = ? and kind = 'doc' order by created_at desc`,
+  const rows = await db.getAll<{ name: string; kind: string; inline_content: string | null }>(
+    `select name, kind, inline_content from artifacts where channel_id = ? and inline_content is not null order by created_at desc`,
     [channelId],
-  ).catch(() => [] as Array<{ name: string; inline_content: string | null }>);
+  ).catch(() => [] as Array<{ name: string; kind: string; inline_content: string | null }>);
   const docs = new Map<string, string>();
-  for (const r of rows) if (BRAND_DOC_NAMES.includes(r.name) && r.inline_content && !docs.has(r.name)) docs.set(r.name, r.inline_content);
+  const images: string[] = [];
+  for (const r of rows) {
+    if (r.kind === 'doc' && BRAND_DOC_NAMES.includes(r.name) && r.inline_content && !docs.has(r.name)) docs.set(r.name, r.inline_content);
+    else if (r.inline_content?.startsWith('data:image/') && !images.includes(r.name)) images.push(r.name);
+  }
   // by PROJECT (0106): `channel_id` only records where the OAuth round-trip was started, so a
   // channel-keyed read told the marketer "nothing is connected" in every room but that one.
   const conns = await db.getAll<{ provider: string; handle: string | null }>(
@@ -56,7 +62,7 @@ export async function readBrand(db: AttDbLike, channelId: string): Promise<Brand
   ).catch(() => [] as Array<{ provider: string; handle: string | null }>);
   let profile: BrandFacts['profile'] = {};
   try { if (ch.marketing) profile = JSON.parse(ch.marketing) as BrandFacts['profile']; } catch { /* leave empty */ }
-  return { marketing: true, product: profile.website || ch.website || null, logo: !!ch.logo, profile, docs, conns };
+  return { marketing: true, product: profile.website || ch.website || null, logo: !!ch.logo, profile, docs, images, conns };
 }
 
 /**
@@ -77,5 +83,8 @@ export async function brandNote(db: AttDbLike, channelId: string): Promise<strin
     // project scope only: a project is one product, and another project's brand docs are another product's
     lines.push(`This room has no brand docs yet (the marketing setup writes ${BRAND_DOC_NAMES.join(', ')}). Call list_library with scope project in case they live in another room of this project. If none exist, ask the human for the product facts you need before you draft, or to finish the marketing setup, and shelve what you learn with propose_library_doc.`);
   }
+  // the frame (plan §6): a video post names a shelf image, and the film shows that screen instead of an invented one
+  if (b.images.length) lines.push(`Screenshots on the shelf: ${b.images.join(', ')}. A video post that shows the product names one of them as its frame (draft_posts frame, revise_posts frame), so the film shows the real screen.`);
+  else lines.push('No screenshot of the product is on this room\'s shelf, so a film would invent the interface. Ask the human to upload a real screenshot to this room\'s Files, then name it as the frame on the video post.');
   return `\n\n[MARKETING CONTEXT — this conversation is in a marketing room. Where its brand lives:\n- ${lines.join('\n- ')}]`;
 }

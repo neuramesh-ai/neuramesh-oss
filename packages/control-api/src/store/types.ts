@@ -33,6 +33,8 @@ export interface ArtifactRow {
   createdAt: string;
   messageId?: string | null; // chat attachments link to their message
   promoted?: boolean;
+  channel?: string; // the shelf it sits on (the frame lookup, store/frames.ts)
+  mime?: string | null;
 }
 
 // A chat attachment (image/file) added to a message. Persisted as an artifact row so it shows

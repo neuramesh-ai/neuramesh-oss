@@ -193,6 +193,51 @@ describe('the door', () => {
     expect(led.calls.filter((c) => c['op'] === 'refundFilm')).toHaveLength(2);
   });
 
+  it('the frame: a draft that names a shelf image films on the reference lane with it; a model without one films the text lane and says so; an unknown name is refused where the draft is written', async () => {
+    const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+    // the shelf: a real screenshot uploaded to the room (the chat attachment lane, 0048)
+    expect((await send(george, '/v1/artifacts', { id: '00000000-0000-4000-8000-00000000aa01', workspace: ws, channel, messageId: '00000000-0000-4000-8000-00000000bb01', kind: 'screenshot', name: 'App-Home.png', mime: 'image/png', inlineContent: PNG, sizeBytes: 70 })).status).toBe(200);
+    // an unknown name never reaches the draft
+    const bad = await send(plume, '/v1/commands', { type: 'content.create', channel, platform: 'x', body: 'four', script: '[0:00-0:03] hook', frame: 'nope.png' });
+    expect(bad.status).toBe(404);
+    expect((await j(bad)).error).toMatch(/no image named "nope.png"/);
+    // the name is stored as the shelf spells it, whichever case the agent wrote
+    const { itemId: framed } = await j(await send(plume, '/v1/commands', { type: 'content.create', channel, platform: 'x', body: 'four', script: '[0:00-0:03] hook', frame: 'app-home.png' }));
+    expect((await store.contentItemMedia(framed))?.frame).toBe('App-Home.png');
+    const fal = fakeFal({ polls: 2 });
+    const led = fakeLedger(5_000_000);
+    door(led.ledger, fal.fetchFn);
+    const r = await send(george, '/v1/starter/film', { workspace: ws, item: framed, prompt: 'a vertical clip of the hook' });
+    expect(r.status).toBe(202);
+    expect(await j(r)).toMatchObject({ frame: 'App-Home.png', frameUsed: true, credits: 194 }); // the same price as the text lane
+    expect(fal.calls[0]!.url).toBe('https://queue.fal.run/bytedance/seedance-2.0/fast/reference-to-video');
+    expect(fal.calls[0]!.body).toMatchObject({ image_urls: [PNG], aspect_ratio: '9:16', duration: '8' });
+    expect((fal.calls[0]!.body as { prompt: string }).prompt).toMatch(/^a vertical clip of the hook The product on screen is @Image1/);
+    expect(store.films.rows.at(-1)).toMatchObject({ itemId: framed, endpoint: 'bytedance/seedance-2.0/fast/reference-to-video', frame: 'App-Home.png', frameUsed: true });
+    const t0 = Date.parse(store.films.rows.at(-1)!.createdAt);
+    await filmsDue(store, { ledger: led.ledger, env: ENV, fetchFn: fal.fetchFn, now: () => t0 + 1000 });
+    await filmsDue(store, { ledger: led.ledger, env: ENV, fetchFn: fal.fetchFn, now: () => t0 + 1000 });
+    const items = (store as unknown as { contentItems: Array<{ id: string; videoMeta?: unknown; frame?: string | null }> }).contentItems;
+    expect(items.find((x) => x.id === framed)!.videoMeta).toMatchObject({ frame: 'App-Home.png', frameUsed: true });
+    // the xpress tier (MiniMax H3) has no reference lane: the text lane, the prompt clean of @Image1, the row says the frame was not used
+    (store as unknown as { plans: Map<string, string> }).plans.set(ws, 'cloud');
+    await send(george, '/v1/commands', { type: 'workspace.update', workspace: ws, videoTier: 'xpress' });
+    const { itemId: framed2 } = await j(await send(plume, '/v1/commands', { type: 'content.create', channel, platform: 'x', body: 'five', script: '[0:00-0:03] hook', frame: 'App-Home.png' }));
+    const fal2 = fakeFal();
+    door(led.ledger, fal2.fetchFn);
+    expect(await j(await send(george, '/v1/starter/film', { workspace: ws, item: framed2, prompt: 'a vertical clip of the hook' }))).toMatchObject({ frame: 'App-Home.png', frameUsed: false });
+    expect(fal2.calls[0]!.url).toBe('https://queue.fal.run/minimax/h3/text-to-video');
+    expect((fal2.calls[0]!.body as { prompt: string; image_urls?: unknown }).prompt).toBe('a vertical clip of the hook');
+    expect((fal2.calls[0]!.body as { image_urls?: unknown }).image_urls).toBeUndefined();
+    // a revision drops the frame with null, and refuses a name the shelf does not hold
+    expect((await send(plume, '/v1/commands', { type: 'content.revise', item: framed2, frame: 'missing.png' })).status).toBe(404);
+    expect((await send(plume, '/v1/commands', { type: 'content.revise', item: framed2, frame: null })).status).toBe(200);
+    expect((await store.contentItemMedia(framed2))?.frame).toBe(null);
+    // a frame change makes the old film stale, the way a new script does: the record goes and the card films again
+    expect((await send(plume, '/v1/commands', { type: 'content.revise', item: framed, frame: 'App-Home.png' })).status).toBe(200);
+    expect(items.find((x) => x.id === framed)!.videoMeta).toBe(null);
+  });
+
   it('the cron door wants the secret', async () => {
     expect((await app.request('/internal/films-due')).status).toBe(403);
   });

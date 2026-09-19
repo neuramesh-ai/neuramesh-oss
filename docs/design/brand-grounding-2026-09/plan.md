@@ -119,9 +119,60 @@ paper, and its labels are pseudo-words ("Teron Inrdret", "Trun Fieg") beside a c
 reference frame: Seedance takes an image, and a real screenshot of the board (the project's own
 app, or the workspace logo) would make the product on screen the product. Not built here.
 
-## 6. Not in this round
+## 6. The frame: the product on screen is the product (George: "scope the reference frame rung, and lets fix")
 
-- The reference frame above (the film lane is LLM-free by design, the frame is one more input).
+**What.** A video post can name one image on its room's shelf as its `frame`. The film then shows
+that screen, not an interface the model invents. Seedance 2.0 takes reference images
+(`bytedance/seedance-2.0/fast/reference-to-video` and the standard twin: `image_urls`, up to nine,
+`@Image1` in the prompt, data URIs accepted, the same price per second as text-to-video, 9:16 kept
+by `aspect_ratio`). A reference is not a first frame: the hook still opens the way the script says,
+and the product appears as itself when the script cuts to it.
+
+**Where the frame comes from.** The room's shelf, by name. A human uploads a real screenshot of
+the app to the marketing room's Files (an image on the shelf already lives as a data URI in
+`artifacts.inline_content`, readable by the server that films and by the machine that drafts).
+The brand note names the shelf's images beside its docs, and says what to do when there is none:
+ask the human for a screenshot. No image is ever invented, and no image is picked for the agent.
+
+**The plumbing, enforced at each door.**
+1. `draft_posts` and `revise_posts` (both registries) take `frame`: the name of an image on the
+   room's shelf. An unknown name is refused with the shelf's images listed. The name rides the
+   `content.create` and `content.revise` commands (`frame`, `null` clears), where the server
+   checks it again against the item's room and stores the canonical name in `media.frame`.
+2. The door (`POST /v1/starter/film`) reads the draft's frame itself. When the tier's model has a
+   reference lane, the door submits to it with the image and appends the reference clause to the
+   prompt (the clause lives beside the lane in `video-registry.ts`, so a text-only lane never sees
+   `@Image1`). When the model has no reference lane, the door films without the frame and says so.
+3. The films row records the frame and whether it rode (`frame`, `frame_used`, migration 0141), and
+   the landed draft's `video` facts carry both. The card's facts line says `frame · app-board.png`
+   or `frame · not on MiniMax H3`. The draft state shows the frame beside the shot direction.
+4. The own-key lane (Veo, Omni) films without the frame in this rung.
+
+**Not in this rung.** A screenshot the app takes of itself and shelves (the desktop can capture its
+own window). Reference lanes for Kling and MiniMax (their image inputs are first frames, a different
+promise). The human choosing the frame on the card (an agent names it, and the human can say
+"use app-home.png" in the thread).
+
+**Proven on the harness (PR #564).** A real screenshot of Home (`evidence/harness-frame-app-home.jpg`,
+1280 by 800, cream oak) went onto the marketing room's shelf through `artifact.create`. In the UGC
+session, "@rex use app-home.jpg from the shelf as the frame on draft a" made the house model call
+`revise_posts` with the frame on its first try, the card said `frame · app-home.jpg` before the film
+(`harness-frame-before-light.png`), the door submitted to `reference-to-video` with the image
+(`films.frame_used = true`), and the film landed in 4.5 minutes (`harness-frame-landed-*.png`,
+`harness-frame-film-frames.png`). The right half of the split screen is now the product: the cream
+paper, the mark and wordmark, the Chat and Code toggle, the rail's rows and icons, the setup card
+with its green checks, the workspace footer with the credits ring. The lettering is still
+pseudo-words (a 720p video model does not reproduce text from a reference), and the model re-laid the
+desktop screenshot as a phone panel, which the brief's "split-screen" invited. A film without the
+frame (§5) drew a navy app with blue toggles that had nothing of the product in it. One more Seedance
+film, 194 credits.
+
+A frame change retires the film on the card the way a new script does: the old film was of the old
+frame, so the record goes and the card films again.
+
+## 7. Not in this round
+
+- Nothing else. Sections 5 and 6 are the film's.
 - The classifier is path rules. A change that reaches a surface through a path the rules do not
   name is the next lesson to add to the table.
 - The cloud surface's live check stays by hand (the k3d harness). A CI k3d run with a real machine

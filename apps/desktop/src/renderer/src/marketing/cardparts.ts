@@ -6,7 +6,9 @@
 export type CardMedia = {
   image_url?: string; brief?: string; script?: string; thumb?: string; image_error?: string; video_id?: string; video_error?: string;
   /** the video rung: a film in flight on the platform's key, and what filmed a draft */
-  video_pending?: boolean; video_error_code?: 'NO_CREDITS' | 'UNAVAILABLE'; video?: { tier: string; model: string; seconds: number; credits: number; at: string };
+  video_pending?: boolean; video_error_code?: 'NO_CREDITS' | 'UNAVAILABLE'; video?: { tier: string; model: string; seconds: number; credits: number; at: string; frame?: string | null; frameUsed?: boolean };
+  /** the frame (brand-grounding plan §6): the shelf image the film shows as the product */
+  frame?: string;
 };
 
 /** the tiers this server films on, as GET /v1/starter/video answers them */
@@ -21,14 +23,16 @@ export function filmFacts(media: CardMedia | null, catalog: StarterVideoCatalog)
   if (v) {
     const when = new Date(v.at);
     const at = Number.isNaN(when.getTime()) ? '' : when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
-    if (v.tier === 'own') return [v.model, `${v.seconds} s`, 'your key', 'no credits', at].filter(Boolean);
+    // the frame the film was asked to show, and whether the lane took it (a model without a reference lane films without it)
+    const frame = v.frame ? [`frame · ${v.frame}${v.frameUsed ? '' : ' · not used'}`] : [];
+    if (v.tier === 'own') return [v.model, `${v.seconds} s`, 'your key', 'no credits', at, ...frame].filter(Boolean);
     const tier = catalog?.tiers.find((t) => t.tier === v.tier);
-    return [tier?.label ?? v.tier, v.model, `${v.seconds} s`, `${v.credits} credits`, at].filter(Boolean);
+    return [tier?.label ?? v.tier, v.model, `${v.seconds} s`, `${v.credits} credits`, at, ...frame].filter(Boolean);
   }
   if (media?.video_pending) return null;
   const active = catalog?.served ? catalog.tiers.find((t) => t.tier === catalog.tier) : null;
   if (!active) return null;
-  return [active.label, active.model, `${active.seconds} s`, `about ${active.credits} credits`, '2 min'];
+  return [active.label, active.model, `${active.seconds} s`, `about ${active.credits} credits`, '2 min', ...(media?.frame ? [`frame · ${media.frame}`] : [])];
 }
 
 /** the film in flight: its tier and model from the catalog, for the pending row */

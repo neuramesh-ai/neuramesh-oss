@@ -13,6 +13,7 @@ import { falResult, falStatus, falSubmit, type FalFetch } from './fal';
 import { localMode } from './localmode';
 import type { Store } from './store';
 import type { FilmRow } from './store/films';
+import { libraryImage } from './store/frames';
 import { VIDEO_MODELS, priceFilm, tierFor, videoTiers, type VideoTierSpec } from './video-registry';
 
 const FILM_MAX_BYTES = 8_000_000; // the attach lane's ceiling (Instagram's own)
@@ -60,19 +61,27 @@ export function starterVideoRoutes<E extends Env & { Variables: { actor: Actor }
     if (!media || media.workspace !== workspace) return c.json({ error: 'draft not found', code: 'NOT_FOUND' }, 404);
     if (await store.films.openForItem(item)) return c.json({ error: 'a film is already in flight for this draft', code: 'IN_FLIGHT' }, 409);
     const micros = priceFilm(tier.model, tier.seconds);
+    // the frame (brand-grounding plan §6): the draft names a shelf image, the door reads it itself.
+    // A model with a reference lane films with it; one without films the text lane and the row
+    // says the frame was not used, so the card can say so too.
+    const frame = media.frame && media.channel ? await libraryImage(store, media.channel, media.frame) : null;
+    const lane = frame && tier.model.reference ? tier.model.reference : null;
+    const endpoint = lane?.endpoint ?? tier.model.endpoint;
+    const input = lane ? lane.input(prompt, tier.seconds, [frame!.dataUrl]) : tier.model.input(prompt, tier.seconds);
+    if (media.frame && !lane) console.warn(`starter_film item=${item.slice(0, 8)} frame "${media.frame}" not used: ${frame ? `${tier.model.label} has no reference lane` : 'not on the shelf'}`);
     // the whole clip or nothing: charged before the submit, so two presses in flight cannot overspend
     const spent = await ledger.spendFilm(workspace, micros, { seconds: tier.seconds });
     if (!spent) return c.json({ error: 'out of credits', code: 'NO_CREDITS', remainingCredits: Math.floor(before.remainingMicros / CREDIT_MICROS), credits: Math.ceil(micros / CREDIT_MICROS) }, 402);
     const key = env['FAL_KEY']!;
-    const sub = await falSubmit(key, tier.model.endpoint, tier.model.input(prompt, tier.seconds), fetchFn);
+    const sub = await falSubmit(key, endpoint, input, fetchFn);
     if (!sub.requestId) {
       await ledger.refundFilm(workspace, { grantMicros: spent.grantMicros, purchasedMicros: spent.purchasedMicros, seconds: tier.seconds }, `refund: ${tier.model.label} did not accept the film`);
       return c.json({ error: sub.error ?? 'the film was not accepted', code: sub.unavailable ? 'UNAVAILABLE' : 'UPSTREAM' }, sub.unavailable ? 503 : 502);
     }
-    const { id } = await store.films.create({ workspaceId: workspace, itemId: item, tier: tier.tier, model: tier.model.key, endpoint: tier.model.endpoint, requestId: sub.requestId, seconds: tier.seconds, micros, grantMicros: spent.grantMicros, purchasedMicros: spent.purchasedMicros, createdBy: actor.kind === 'human' ? actor.id : null });
+    const { id } = await store.films.create({ workspaceId: workspace, itemId: item, tier: tier.tier, model: tier.model.key, endpoint, requestId: sub.requestId, seconds: tier.seconds, micros, grantMicros: spent.grantMicros, purchasedMicros: spent.purchasedMicros, createdBy: actor.kind === 'human' ? actor.id : null, frame: media.frame ?? null, frameUsed: !!lane });
     await store.reviseDraft(item, { body: null, imageBrief: null, thumb: null, videoPending: true, videoError: '' }, (ws) => createEvent({ type: 'content.updated', source: formatAddress({ kind: actor.kind, id: actor.id }), target: formatAddress({ kind: 'resource', type: 'content', id: item }), workspace: ws, payload: { item, filming: id } })).catch(() => {});
     c.header('x-nm-credits-remaining', String(Math.floor(spent.remainingMicros / CREDIT_MICROS)));
-    return c.json({ ok: true, film: id, tier: tierView(tier), credits: Math.ceil(micros / CREDIT_MICROS), remainingCredits: Math.floor(spent.remainingMicros / CREDIT_MICROS) }, 202);
+    return c.json({ ok: true, film: id, tier: tierView(tier), credits: Math.ceil(micros / CREDIT_MICROS), remainingCredits: Math.floor(spent.remainingMicros / CREDIT_MICROS), frame: media.frame ?? null, frameUsed: !!lane }, 202);
   });
 }
 
@@ -124,7 +133,7 @@ export async function filmsDue(store: Store, opts: { ledger?: Ledger | null; env
     } catch (e) { await fail(`the film did not attach to the draft (${e instanceof Error ? e.message : String(e)})`); continue; }
     const at = new Date(now()).toISOString();
     // the model's NAME on the card (Seedance 2.0), the registry key stays on the row
-    await patchDraft(store, row, { videoPending: false, videoError: '', videoMeta: { tier: row.tier, model: VIDEO_MODELS[row.model]?.label ?? row.model, seconds: row.seconds, credits: Math.ceil(row.micros / CREDIT_MICROS), at } });
+    await patchDraft(store, row, { videoPending: false, videoError: '', videoMeta: { tier: row.tier, model: VIDEO_MODELS[row.model]?.label ?? row.model, seconds: row.seconds, credits: Math.ceil(row.micros / CREDIT_MICROS), at, frame: row.frame, frameUsed: row.frameUsed } });
     await store.films.update(row.id, { status: 'done', finishedAt: at });
     out.push({ id: row.id, outcome: 'done' });
   }

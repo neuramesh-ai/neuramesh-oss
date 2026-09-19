@@ -19,6 +19,7 @@ import { playbookCatalogText } from './tools-playbooks';
 import { searchXText } from './searchx';
 import { newGrounding, ungrounded, type LibraryReader } from './grounding';
 import { unpicked } from './ugcflow';
+import { frameArg, framesFor } from './frames';
 import { libraryChatTools, ugcChatTools } from './chattools-library';
 
 import type { HostedAgent } from '../agents';
@@ -56,7 +57,7 @@ export interface ChatToolCtx {
 
 export function makeChatTools(t: ChatToolCtx) {
   const { z, tool, createSdkMcpServer, text, agent, ch, threadId, log,
-          db, post, apiGet, recallFor, loadSkillBody, whiteboardClosures, draftsForAnchor, generateDraftImage } = t;
+          db, post, apiGet, recallFor, loadSkillBody, whiteboardClosures, draftsForAnchor, generateDraftImage, libraryDocs } = t;
   // what this turn has read from the shelf: draft_posts asks it before it writes (host/grounding.ts)
   const grounding = newGrounding();
 // The nm tools a CONVERSATION gets. Everything board-shaped is absent by construction for
@@ -215,6 +216,7 @@ const nm = createSdkMcpServer({
           body: z.string().min(1).max(10_000).describe('the post text exactly as it would publish, within the network\'s limit. For a video post: the caption that posts with the video.'),
           imageBrief: z.string().max(2000).optional().describe('art direction for this post\'s picture — omit for a text-only post. For a video post: the shot direction the film follows.'),
           script: z.string().max(10_000).optional().describe('a VIDEO post only: the creator\'s script, timestamped beats ([0:00-0:03] direction, Spoken: "…"). The card folds it and can film its hook. Never inside body or imageBrief.'),
+          frame: z.string().max(200).optional().describe('a VIDEO post that shows the product: the name of an IMAGE on this room\'s shelf (a real screenshot, see list_library). The film shows that screen, never an invented one. Omit when the shelf has no screenshot, and ask the human for one.'),
         })).min(1).max(20),
       },
       async (i) => {
@@ -226,14 +228,16 @@ const nm = createSdkMcpServer({
           const pick = await unpicked(db, { threadId });
           if (pick) { log({ kind: 'tool', phase: 'result', summary: 'draft_posts refused: no answered angle card in this thread' }); return text(pick); }
         }
-        const drafts = (i.posts as Array<{ platform: string; body: string; imageBrief?: string; script?: string }>)
+        const drafts = (i.posts as Array<{ platform: string; body: string; imageBrief?: string; script?: string; frame?: string }>)
           .map((p) => normalizeDraft(p)).filter((p): p is NonNullable<typeof p> => !!p);
         if (!drafts.length) return text('none of those entries were usable posts — each needs a supported platform and a body that is more than working notes');
+        const frames = await framesFor(libraryDocs, ch.id, i.posts as Array<{ frame?: string }>); // the frame (host/frames.ts): checked before anything is written
+        if (!frames.ok) return text(frames.why);
         let made = 0;
-        for (const d of drafts) {
+        for (const [n, d] of drafts.entries()) {
           const r = await post('/v1/commands', { kind: 'agent', id: agent.id }, {
             type: 'content.create', channel: ch.id, thread: threadId, platform: d.platform, body: d.body,
-            ...(d.imageBrief ? { imageBrief: d.imageBrief } : {}), ...(d.script ? { script: d.script } : {}),
+            ...(d.imageBrief ? { imageBrief: d.imageBrief } : {}), ...(d.script ? { script: d.script } : {}), ...(frames.names.has(n) ? { frame: frames.names.get(n) } : {}),
           }).catch(() => null);
           if (r?.ok) made += 1;
         }
@@ -252,6 +256,7 @@ const nm = createSdkMcpServer({
           body: z.string().max(10_000).optional().describe('the replacement post text, in full (a video post: its caption)'),
           imageBrief: z.string().max(2000).optional().describe('replacement art direction (a video post: its shot direction)'),
           script: z.string().max(10_000).optional().describe('a video post: the replacement script, in full. The next Generate video films it.'),
+          frame: z.string().max(200).optional().describe('a video post: the name of an image on this room\'s shelf the film shows as the product (a real screenshot). "none" drops the frame.'),
         })).min(1).max(20),
       },
       async (i) => {
@@ -261,16 +266,18 @@ const nm = createSdkMcpServer({
         const done: string[] = [];
         const missed: string[] = [];
         const drew: string[] = [];
-        for (const r of i.revisions as Array<{ letter: string; body?: string; imageBrief?: string; script?: string }>) {
+        for (const r of i.revisions as Array<{ letter: string; body?: string; imageBrief?: string; script?: string; frame?: string }>) {
           const target = byLetter.get(r.letter.trim().toLowerCase());
           // ONE cleaner for a revision (parseDraftRevisions, the posts-file path's): the caption
           // stripped of notes, a script filed under a heading in the brief or the body lifted out
           const [rev] = parseDraftRevisions(JSON.stringify([r]));
-          if (!target || target.status === 'published' || !rev) { missed.push(r.letter); continue; }
-          const { body, imageBrief: brief, script } = rev;
+          if (!target || target.status === 'published' || (!rev && !r.frame?.trim())) { missed.push(r.letter); continue; } // a frame alone is a change too
+          const { body, imageBrief: brief, script } = rev ?? {};
+          const fr = await frameArg(libraryDocs, ch.id, r.frame);
+          if (!fr.ok) return text(fr.why);
           const res = await post('/v1/commands', { kind: 'agent', id: agent.id }, {
             type: 'content.revise', item: target.id,
-            ...(body ? { body } : {}), ...(brief ? { imageBrief: brief } : {}), ...(script ? { script } : {}),
+            ...(body ? { body } : {}), ...(brief ? { imageBrief: brief } : {}), ...(script ? { script } : {}), ...(fr.frame !== undefined ? { frame: fr.frame } : {}),
           }).catch(() => null);
           if (res?.ok) { done.push(target.letter); if (brief) drew.push(target.letter); } else missed.push(r.letter);
         }
