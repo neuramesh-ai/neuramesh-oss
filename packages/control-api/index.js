@@ -637,6 +637,9 @@ function machineOnline(m, now) {
 }
 function shouldClaim(ctx, now) {
   const grace = ctx.graceMs ?? DEFAULT_GRACE_MS;
+  const cloudBorn = isCloudBorn(ctx.origin) ? cloudMachineForSession(ctx, now) : null;
+  if (cloudBorn === ctx.self.machineId) return { act: "claim", why: "cloud" };
+  if (cloudBorn && ctx.elapsedMs < grace) return { act: "wait", why: "cloud-may-serve", retryInMs: Math.max(250, grace - ctx.elapsedMs) };
   if (!runtimeOk(ctx.self, ctx)) return { act: "skip", why: "incapable" };
   const designated = designatedMachine(ctx, now);
   if (designated) {
@@ -671,11 +674,21 @@ function designatedMachine(ctx, now) {
   return live(ctx.priorMachineId, false) ?? live(ctx.threadMachineId, !!ctx.originUserId) ?? (ctx.originUserId ? live(ctx.agentId ? ctx.prefs?.agents?.[ctx.agentId] : null, true) ?? live(ctx.prefs?.machine, true) : null);
 }
 function liveCloudMachine(machines, originUserId, need, now) {
-  const ok2 = (m) => runtimeOk(m, need) && machineOnline(m, now);
+  const ok2 = (m) => (need === null || runtimeOk(m, need)) && machineOnline(m, now);
   const mine = originUserId ? machines.find((m) => m.kind === "member" && m.ownerUserId === originUserId && ok2(m)) : void 0;
   if (mine) return mine.machineId;
   const runner = machines.find((m) => m.kind === "runner" && ok2(m));
   return runner?.machineId ?? null;
+}
+function cloudMachineForSession(ctx, now) {
+  const find = (id) => id ? ctx.machines.find((m) => m.machineId === id) : void 0;
+  const cloud = (m) => !!m && (m.kind ?? "local") !== "local" && machineOnline(m, now);
+  const named = find(ctx.threadMachineId);
+  if (named && (named.kind ?? "local") === "local") return null;
+  const prior = find(ctx.priorMachineId);
+  if (cloud(prior)) return prior.machineId;
+  if (cloud(named) && (named.kind === "runner" || !ctx.originUserId || named.ownerUserId === ctx.originUserId)) return named.machineId;
+  return liveCloudMachine(ctx.machines, ctx.originUserId, null, now);
 }
 function placementFor(agent, prefs, machines, selfUserId, now, origin = null) {
   const reachable = availableMachines(machines, selfUserId);
@@ -688,7 +701,7 @@ function placementFor(agent, prefs, machines, selfUserId, now, origin = null) {
   if (capable(byAgent)) return { machineId: byAgent, why: "agent-choice" };
   if (capable(prefs?.machine)) return { machineId: prefs.machine, why: "default" };
   if (origin) {
-    const cloud = liveCloudMachine(reachable, selfUserId, { runtime: agent.runtime, model: agent.model ?? null }, now);
+    const cloud = liveCloudMachine(reachable, selfUserId, isCloudBorn(origin) ? null : { runtime: agent.runtime, model: agent.model ?? null }, now);
     if (cloud) return { machineId: cloud, why: "cloud" };
   }
   const mine = reachable.find((m) => m.ownerUserId === selfUserId && servesAgent(m));
@@ -754,20 +767,12 @@ function capResetLabel(now) {
   const time = at.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
   return at.toDateString() === new Date(now).toDateString() ? time : `tomorrow at ${time}`;
 }
-function wakeCandidates(ctx, now) {
-  const gated = ctx.requireGrant !== false;
-  const lent = (m) => {
-    if (m.kind === "runner") return true;
-    if (ctx.originUserId) return !gated || machineAvailableTo(m, ctx.originUserId);
-    return (m.sharesWith ?? []).includes("*");
-  };
-  return ctx.machines.filter((m) => (m.kind ?? "local") !== "local" && !machineOnline(m, now) && runtimeOk(m, ctx) && lent(m)).sort((a, b2) => Number(b2.ownerUserId === ctx.originUserId) - Number(a.ownerUserId === ctx.originUserId));
-}
-var DEFAULT_GRACE_MS, MACHINE_ONLINE_MS, runtimeOk, isHouseBrain, MACHINE_WAKE_GRACE_MS, MACHINE_WAIT_LINE, MACHINE_WAIT_STALLED;
+var isCloudBorn, DEFAULT_GRACE_MS, MACHINE_ONLINE_MS, runtimeOk, isHouseBrain, MACHINE_WAKE_GRACE_MS, MACHINE_WAIT_LINE, MACHINE_WAIT_STALLED;
 var init_compute = __esm({
   "../shared/src/compute.ts"() {
     "use strict";
     init_rates();
+    isCloudBorn = (origin) => origin === "web" || origin === "routine";
     DEFAULT_GRACE_MS = 8e3;
     MACHINE_ONLINE_MS = 9e4;
     runtimeOk = (m, ctx) => ctx.modelFree === true || isHouseBrain(ctx.model) || m.runtimes.includes(ctx.runtime);
@@ -801,6 +806,23 @@ function hostSpeaksForOrigin(machines, originUserId, hostOwnerUserId, hostKind, 
 }
 var init_compute_voice = __esm({
   "../shared/src/compute-voice.ts"() {
+    "use strict";
+    init_compute();
+  }
+});
+
+// ../shared/src/compute-sleepers.ts
+function wakeCandidates(ctx, now) {
+  const gated = ctx.requireGrant !== false;
+  const lent = (m) => {
+    if (m.kind === "runner") return true;
+    if (ctx.originUserId) return !gated || machineAvailableTo(m, ctx.originUserId);
+    return (m.sharesWith ?? []).includes("*");
+  };
+  return ctx.machines.filter((m) => (m.kind ?? "local") !== "local" && !machineOnline(m, now) && runtimeOk(m, ctx) && lent(m)).sort((a, b2) => Number(b2.ownerUserId === ctx.originUserId) - Number(a.ownerUserId === ctx.originUserId));
+}
+var init_compute_sleepers = __esm({
+  "../shared/src/compute-sleepers.ts"() {
     "use strict";
     init_compute();
   }
@@ -8420,6 +8442,7 @@ __export(src_exports, {
   inviteMeta: () => inviteMeta,
   isAddress: () => isAddress,
   isChatThread: () => isChatThread,
+  isCloudBorn: () => isCloudBorn,
   isCustomPackId: () => isCustomPackId,
   isEchoArtifact: () => isEchoArtifact,
   isEngineeringCommand: () => isEngineeringCommand,
@@ -8621,6 +8644,7 @@ __export(src_exports, {
   runFraction: () => runFraction,
   runLine: () => runLine,
   runtimeForModel: () => runtimeForModel,
+  runtimeOk: () => runtimeOk,
   saturation: () => saturation,
   scanWindow: () => scanWindow,
   scheduleCreateCommand: () => scheduleCreateCommand,
@@ -8759,6 +8783,7 @@ var init_src = __esm({
     init_workspaces();
     init_compute();
     init_compute_voice();
+    init_compute_sleepers();
     init_code_sessions();
     init_sessions();
     init_machine_choice();

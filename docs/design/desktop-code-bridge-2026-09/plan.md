@@ -42,14 +42,34 @@ A session runs on **the machine it was designated to**, else on **the machine of
 | session started from | designated by | default (nothing picked) |
 |---|---|---|
 | the **desktop app** | the composer's machine chip | the member's *desktop sessions* setting: **This Mac** (opt-in, desktop-only) or **Auto** (today's ladder: cloud when awake, else this Mac) |
-| the **browser** | the composer's machine chip | **a cloud machine when one is awake** (member machine, else the runner); else the member's own machine; else failover |
-| a **routine** | — | **cloud when available** (the routine wake already raises the runner, #412); else whichever capable machine is awake |
+| the **browser** (and the phone, web-born by construction) | the composer's machine chip | **the cloud machine, whatever brain it holds** (the member's own when awake, else the runner). A brain the cloud machine lacks is re-seated on the NeuraMesh brain, on credits, and the thread says so. Only when no cloud machine is awake: the member's own machine, else failover |
+| a **routine** | — | **the cloud machine, the same way** (the routine wake already raises the runner, #412); else whichever capable machine is awake |
 
-Continuity still outranks everything: a thread that already ran somewhere keeps running there
-(George, 2026-08-12). A designation names a machine that is asleep → the wake raises it (cloud) or
-waits the grace window (a laptop) and then falls back, exactly as the ladder does today. Nothing here
-is a prompt: the designation is a column, the rule is shared pure code with tests, the claim is a
-lease.
+Continuity still outranks everything for a desktop-born thread: a thread that already ran somewhere
+keeps running there (George, 2026-08-12). A designation names a machine that is asleep → the wake
+raises it (cloud) or waits the grace window (a laptop) and then falls back, exactly as the ladder
+does today. Nothing here is a prompt: the designation is a column, the rule is shared pure code
+with tests, the claim is a lease.
+
+**Amended 2026-09-19 (rung 0, `shouldClaim`).** George's ground truths, after a web session in the
+Flowe AI marketing room ran on his laptop while the cloud machine logged `wake_skip … cannot
+serve claude-code` twice: *all queries and routines started on the web or mobile always run on
+the cloud machine. If their configured brain is not available there, they run on the NeuraMesh
+brain, with credits. Brain availability across a member's devices never decides where a thread
+runs.* The ladder used to ask capability first, so a runner with no Claude login stood down from
+a web session seated on Claude, and the member's laptop, asking the same question about the
+runner, never saw it as a candidate. Now a **cloud-born** session (`threads.origin` web or
+routine) resolves its cloud machine before any other rung, capability unasked: continuity among
+cloud machines keeps a thread where its files are, then the chip's pick of a cloud machine, then
+the member's own live member machine, else the live runner. The wake's own door
+(`host/starterfallback.ts`, already the default on a cloud machine since #547) re-seats a brain
+the machine lacks on the NeuraMesh brain and posts the switched card in the thread. A laptop
+waits the grace window and steps in only when no cloud machine is awake or the cloud machine
+never claimed inside the window. The chip's explicit pick of a laptop stays a designation. A
+desktop-born session keeps the table above, capability included: the member's Mac has their
+login right there, and moving it to the cloud would spend credits unasked. Continuity to a laptop
+no longer pins a cloud-born thread: the next message moves it to the cloud. Units (task claims)
+keep the claim ladder, which has no origin: the rung covers conversations.
 
 ## The surfaces (mockup.html, sections 1–3)
 
