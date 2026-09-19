@@ -2,7 +2,7 @@
 // Pure: the regexes Md scans for, the card payload types, and the labels the cards read.
 import type { MessageRow } from '../bridge/rows-rooms';
 import type { AgentRow } from '../bridge/rows-crew';
-import type { FailoverCardData, ScheduleCardData, TaskProposalCardData, VerdictCardData } from '@neuramesh/shared';
+import type { FailoverCardData, ScheduleCardData, TaskProposalCardData, UgcCardData, VerdictCardData } from '@neuramesh/shared';
 import { parseCard } from '@neuramesh/shared';
 
 // agents emit question cards as fenced ```nmq blocks (JSON: question, options,
@@ -25,6 +25,7 @@ export interface NmQuestion {
   schedule?: ScheduleCardData; // marketing schedule-confirm cards carry the proposed slots; ordinary cards omit it
   verdict?: VerdictCardData; // task-verdict cards: the human's click fires task.approve/task.accept
   proposal?: TaskProposalCardData; // task-proposal cards: the human's click fires task.create
+  ugc?: UgcCardData; // the UGC angle card: the options are the angles, this is the platform row
 }
 
 // Answers post back as `**question** → answer` lines — that convention is the answered-state

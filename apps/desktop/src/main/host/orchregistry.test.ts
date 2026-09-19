@@ -21,7 +21,8 @@ const BASE = [
   'accept_task', 'add_agent_to_channel', 'add_backlog_item', 'add_subtask', 'create_agent', 'create_project',
   'create_task', 'draft_article', 'draft_posts', 'draft_replies', 'generate_image', 'list_agents', 'list_backlog', 'list_library',
   'list_playbooks', 'list_projects', 'list_repos', 'list_tasks', 'list_workspace', 'load_skill', 'offer_task',
-  'post_thread', 'promote_backlog_item', 'propose_design_round', 'propose_impl_plan',
+  // propose_angles (2026-09-19): the UGC playbook's angle card, before any creator script is drafted (host/ugcflow.ts)
+  'post_thread', 'promote_backlog_item', 'propose_angles', 'propose_design_round', 'propose_impl_plan',
   'propose_library_doc', 'read_library_doc', 'read_workspace_file', 'recall', 'register_repo',
   'request_changes', 'request_design', 'request_plan', 'request_verdict', 'revise_design',
   'revise_plan', 'revise_posts', 'revise_replies', 'revise_ship_plan', 'run_playbook', 'schedule_posts', 'search_x',

@@ -66,6 +66,13 @@ describe('the machine-local refusals', () => {
     } finally { delete g['document']; }
   });
 
+  test('the first-run door is done in a browser: the truthy empty fallback read as a door with no phase and stopped the boot', async () => {
+    const state = arm<() => Promise<{ phase: string }>>('firstRunState');
+    assert.deepEqual(await state(), { phase: 'done', door: null });
+    const on = arm<(cb: unknown) => () => void>('onFirstRun');
+    assert.equal(typeof on(() => {}), 'function');
+  });
+
   test('every machine-local lane is answered here, not left to the fallback', async () => {
     // the point of the module: drop one of these and the truthy empty answers it again.
     // mediaPreview is deliberately ABSENT: it began here as a blanket null, and webnm-content.ts
@@ -74,7 +81,7 @@ describe('the machine-local refusals', () => {
       'projectDetect', 'logoDetect', 'footprintGet', 'footprintReclaim', 'agentLogs', 'exportLogs',
       'ensureRuntimeCli', 'processKill', 'sandboxGet', 'sandboxSet', 'fileUpload',
       'watchProcesses', 'watchAgentLogs', 'openExternal', 'openHtml',
-      'updateCheck', 'updateDownload', 'updateInstall', 'onOpenThread', 'onPlanLimit']) {
+      'updateCheck', 'updateDownload', 'updateInstall', 'onOpenThread', 'onPlanLimit', 'firstRunState', 'onFirstRun']) {
       assert.equal(typeof arm(name), 'function', `${name} fell through to the fallback`);
     }
   });

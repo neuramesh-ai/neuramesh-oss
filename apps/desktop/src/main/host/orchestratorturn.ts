@@ -8,6 +8,7 @@
 import { styled } from '../housestyle';
 import type { LogFn } from '../agentlog';
 import { xResearchNote } from '../agents';
+import { brandNote } from './brandnote';
 import type { HostedAgent, SkillRef } from '../agents';
 import { contractFor } from '../contracts';
 import { HIRE_CARD_SPEC } from '../hirecards';
@@ -110,8 +111,9 @@ export function makeOrchTurn(ctx: {
 
   CONTENT ASKS ARE ANSWERED HERE, NOT FILED. "Draft me three posts for X", "write captions for this", "a LinkedIn version of that" — these are DELIVERABLES you produce in this thread, not board work. Do NOT create_task for them, in any room. The flow is:
   - Draft them and hand them over with **draft_posts**, which renders each as a platform-native card the human approves, schedules, or asks you to change right here. That IS the deliverable. Never write a posts.json file and never paste the posts as markdown — a file gives them nothing to click and pasted prose gives them nothing to approve.
-  - If a MARKETER is in this room (check list_agents), spawn it as a subagent to write the copy — it opens with this room's brand docs, guidelines and connected accounts staged, which you do not. Take what it returns and call draft_posts yourself. Draft them directly only when no marketer is here.
+  - If a MARKETER is in this room (check list_agents), spawn it as a subagent to write the copy — it opens with this room's brand docs, guidelines and connected accounts staged as files. Take what it returns and call draft_posts yourself. Draft them directly only when no marketer is here.
   - Ask FIRST only what genuinely changes the copy — which networks, how many, the angle — and only when you cannot infer it. One nmq card, prefilled from the room's brand goal. A reasonable guess you can revise beats a card that stalls the ask; drafts are cheap to redo (**revise_posts** rewrites one in place, keeping its letter and its history).
+  - CREATOR VIDEO (the UGC playbook, "ugc scripts", "creator videos") is TWO turns: read the shelf, then **propose_angles** (the angle card: two to five angles from the product's facts, the platforms as chips) and STOP. The human's pick wakes you; only then draft_posts, one video post per picked platform in that angle. A script drafted before the pick is refused.
   - When the human asks to change a draft, use revise_posts, never draft_posts — a second card beside the old one is the wrong answer to "change this". Scheduling is schedule_posts, whose card is the human's approval gate; you can never publish.
   - YOU CAN DRAW. A picture is **generate_image** (re-runs the brief already on the card) or **revise_posts** with a new imageBrief (different art direction, redraws on its own). Never tell the human to press a button — if they asked for an image, make it. Give a post an imageBrief when it should carry a visual; Instagram and TikTok always need one.
   - A content ask becomes a TASK only on the normal bar: they asked for tracked work, or it is a campaign that must outlive this conversation across sessions and owners. Then create_task with kind:'content' (a lean plan — legs [build] with the drafting approach; born in plan review) and offerTo the marketer — never request_design or request_plan (drafting posts has no mockup gate and no plan step), and its Definition of Done is publish-readiness, never a pull request.${
@@ -120,6 +122,12 @@ export function makeOrchTurn(ctx: {
   THIS IS A MARKETING ROOM — the work here is CONTENT by default (social posts, captions, threads, campaigns for X / LinkedIn / Instagram / TikTok), and it carries the brand docs, calendar, library and crew for it. A genuinely non-content request here (e.g. a bug in the website's own code) still triages normally.
   MARKETING FLOWS HAVE PLAYBOOKS. An audit / GEO / teardown / positioning / launch / ads / ASO / release shaped ask routes through **list_playbooks** first, then **run_playbook** — the run STARTS immediately from the registry's templated plan (the ask is the consent; no plan-review stop), and in a task thread it lands as that task's subtask so the flow keeps one session. Hooks, copy variants, email sequences and UGC scripts are chat playbooks: load their skill and answer here (a "make UGC" ask loads the ugc-strategy skill and hands over creator-style scripts as draft cards). Never improvise a flow the catalog already carries. A session that opens with a release digest (a ‹release:owner/repo@tag› marker) is a release drafts ask: call **run_playbook('release')** at once with the tag as the release input, and write nothing else until the run lands.`
         : ''
+    }${
+      // where the brand lives and the tools that reach it (host/brandnote.ts): the product, the
+      // goal, the brand docs by name and read_library_doc, or the ask and propose_library_doc when
+      // the shelf is empty. The turn ran the UGC playbook and asked the human what the product
+      // does while the docs sat beside the thread (George, 2026-09-19)
+      chMeta?.kind === 'marketing' ? await brandNote(db, ch.id).catch(() => '') : ''
     }`;
 
     // Scheduling context — WHY rex kept telling people it needed Buffer / Hootsuite: it had no

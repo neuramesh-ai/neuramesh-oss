@@ -9,10 +9,12 @@
 
 import { normalizeDraft, parseDraftRevisions } from '@neuramesh/shared';
 import type { OrchTool, ToolCtx } from './orchtools';
+import { ungrounded } from './grounding';
+import { ugcOrchTools, unpicked } from './ugcflow';
 
 export function contentTools(tc: ToolCtx): OrchTool[] {
-  const { z, post, ch, agent, actor, thread, convoThreadId, log,
-          draftsHere,
+  const { z, db, post, ch, agent, actor, thread, convoThreadId, log,
+          draftsHere, grounding,
           buildScheduleCard, generateDraftImage, generateShareImage } = tc;
   // the message a deliverable anchors to: a task thread's ride the TASK, a conversation's the
   // THREAD (0115) — the same rule every content surface keys on
@@ -84,6 +86,7 @@ export function contentTools(tc: ToolCtx): OrchTool[] {
     // The orchestrator can WRITE a draft and PROPOSE a slot; it can never publish (content.
     // approve is HUMAN_ONLY), so scheduling builds a confirmation card whose click fires the
     // command as the human. The publish gate stays structural, not prompted.
+    ...ugcOrchTools(tc, msgAnchor),
     { name: 'draft_posts', description: 'Hand over drafted social posts as REVIEWABLE CARDS in this conversation — how posts are delivered, in any room. NEVER write posts.json or paste posts as markdown (nothing to click). `body` is ONLY the wire text — no character counts, no "(draft only)" footers, no image briefs inside it; it would publish verbatim. Art direction goes in `imageBrief`, only when the post should carry a visual (Instagram and TikTok always do). A VIDEO post (a UGC or creator script) puts the script in `script` and the caption that posts with the video in `body`; never the script in the body. Draft for the platform the ask names, else for the connected accounts. Call ONCE with every post — calling again ADDS drafts (revise_posts changes one in place).', schema: {
       posts: z.array(z.object({
         platform: z.enum(['x', 'instagram', 'linkedin', 'tiktok', 'email']).describe('the network this post is for: the one asked for, else a connected account'),
@@ -98,6 +101,14 @@ export function contentTools(tc: ToolCtx): OrchTool[] {
       // surface to render on — a channel-level draft would card nowhere.
       const anchor = thread ? { task: thread.id } : convoThreadId ? { thread: convoThreadId } : null;
       if (!anchor) return 'draft_posts needs a thread to deliver into — reply inside the conversation and draft there.';
+      // the grounding gate (host/grounding.ts): a marketing room's brand docs are read before a draft is written
+      const gate = await ungrounded(db, ch.id, grounding);
+      if (gate) { log?.({ kind: 'tool', phase: 'result', summary: 'draft_posts refused: the brand docs were not read this turn' }); return gate; }
+      // the angle gate (host/ugcflow.ts): a VIDEO post is the UGC playbook's, and it drafts only after the human picked an angle
+      if (input.posts.some((p) => p.script)) {
+        const pick = await unpicked(db, { threadId: convoThreadId, taskId: thread?.id });
+        if (pick) { log?.({ kind: 'tool', phase: 'result', summary: 'draft_posts refused: no answered angle card in this thread' }); return pick; }
+      }
       // The guard that used to live here is GONE, and its removal is the point: it refused any
       // task the triage had not typed `content`, because the renderer's two transcript builders
       // meant those drafts would card nowhere. There is one builder now — every thread renders

@@ -17,6 +17,7 @@ import { type WhiteboardToolClosures } from '../harness/toolbus';
 
 
 import { runtimeFor, stageConnections, xPublishConnectedFor, xResearchNote } from '../agents';
+import { brandNote } from './brandnote';
 import type { HostedAgent, SkillRef } from '../agents';
 // `chatSystemPrompt` is already taken by the BOARD's chat prompt (runtime/adapter), which says
 // the opposite thing ("work moves through the board"), so this one is aliased, not shadowed.
@@ -37,10 +38,11 @@ export function makeChatTurn(ctx: HostCtx & {
   ensureChatWorkspace: (threadId: string) => string;
   generateDraftImage: (agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, itemId: string) => Promise<string>;
   generateShareImage: (agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, brief: string) => Promise<{ thumb?: string; error?: string }>;
+  libraryDocs: import('./grounding').LibraryReader;
   narrate: (run: RunHandle, log: LogFn) => LogFn;
   whiteboardClosures: (actor: { kind: string; id: string; role?: string }, ch: { id: string; workspace_id: string }, at: { taskId?: string; threadId?: string }) => WhiteboardToolClosures;
 }) {
-const { post, db, agents, apiGet, discoverSkills, draftsForAnchor, ensureChatWorkspace, generateDraftImage, generateShareImage, narrate, whiteboardClosures } = ctx;
+const { post, db, agents, apiGet, discoverSkills, draftsForAnchor, ensureChatWorkspace, generateDraftImage, generateShareImage, libraryDocs, narrate, whiteboardClosures } = ctx;
 const { defaultResponder, threadModeFor, recallFor, loadSkillBody, chatProtectedPaths, chatPermissionGate, deliverChatFiles } = makeChatSupport({ post, machineId: ctx.machineId, guards: ctx.guards, db, agents, apiGet, discoverSkills });
 
 // ── Chat mode (docs/34): the turn a thread with Tasks OFF runs ────────────────────────────
@@ -80,10 +82,12 @@ async function chatTurn(args: {
     // the connected account is the read capability (search_x rides the nm registry below)
     const xConn = await xPublishConnectedFor(db, ch);
     return xResearchNote(xConn);
-  })() + await stageConnections(db, ch.id).catch(() => '');
+  })() + await stageConnections(db, ch.id).catch(() => '') + await brandNote(db, ch.id).catch(() => '');
   // ^ the room's connected accounts, the same note a content task gets: a marketer asked for
   // creator scripts drafted TikTok for a room whose accounts were X and LinkedIn (live, 2026-09-18),
-  // because nothing in a chat turn said which networks this room can reach
+  // because nothing in a chat turn said which networks this room can reach. And the room's shelf
+  // (host/brandnote.ts): the brand docs by name and the head of the business profile, so a turn
+  // never tells the human the room has no brand docs while they sit beside the thread (2026-09-19)
 
   if (!canUseTools) {
     // Honest degradation (docs/34 §6): this runtime has no tool loop through our seam, so it
@@ -112,7 +116,7 @@ async function chatTurn(args: {
 
   // The conversation registry (host/chattools.ts) — turn-scoped, so it takes the turn.
   const nm = makeChatTools({ z, tool, createSdkMcpServer, text, agent, ch, threadId, log,
-    db, post, apiGet, recallFor, loadSkillBody, whiteboardClosures, draftsForAnchor, generateDraftImage, generateShareImage });
+    db, post, apiGet, recallFor, loadSkillBody, whiteboardClosures, draftsForAnchor, generateDraftImage, generateShareImage, libraryDocs });
 
   const jail = sandboxFsEnabled()
     ? claudeSandboxOptions(computeFsJail({

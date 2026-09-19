@@ -12,7 +12,7 @@ import type { HostedAgent, ThreadTask } from '../agents';
 import { pickDeadLetters, type SweepCandidate } from '../chatsweep';
 import { HIRE_CONFIRM_RE } from '../hirecards';
 import { type RunHandle } from './runs';
-import { addressedIn, mentionRe, modelFreeItemId, nobodyCanServe, parseCard, parseModeMarker, unaddressedWake } from '@neuramesh/shared';
+import { addressedIn, hostSpeaksForOrigin, mentionRe, modelFreeItemId, nobodyCanServe, parseCard, parseModeMarker, unaddressedWake } from '@neuramesh/shared';
 import type { PowerSyncDatabase } from '@powersync/node';
 import type { ClaimVerdict, MachineCapability, SessionOrigin } from '@neuramesh/shared';
 import type { HostGuards } from './guards';
@@ -125,9 +125,12 @@ export function makeWakeRouting(ctx: {
         // itself, so when they all skip the human gets silence: no ghost, no reply, no reason.
         // The ORIGIN's own machine is the one host guaranteed awake here, so it answers for the
         // workspace — and only when the ladder says NOBODY can, or a machine that merely wasn't
-        // chosen would speak over the one about to work.
+        // chosen would speak over the one about to work. A RUNNER speaks in its place when the
+        // origin has no awake machine of their own (the sleeper rung above already lets it): on
+        // the local fleet harness (2026-09-19) a workspace whose only host was its runner left a
+        // human on "thinking…" forever, because the runner's owner is never the origin.
         const peers = await peerMachines();
-        if (originUserId && ownerActorId === originUserId && !saidNoCompute.has(triggerMessageId)
+        if (hostSpeaksForOrigin(peers, originUserId, ownerActorId, process.env['NM_MACHINE_KIND'], Date.now()) && !saidNoCompute.has(triggerMessageId)
             && nobodyCanServe(peers, agent.runtime, originUserId, Date.now(), agent.model ?? null)) {
           saidNoCompute.add(triggerMessageId);
           const ch = await db.get<{ id: string; workspace_id: string }>('select id, workspace_id from channels where id = ?', [where.channelId]).catch(() => null);
