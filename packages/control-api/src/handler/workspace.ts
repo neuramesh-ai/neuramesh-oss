@@ -144,9 +144,11 @@ export async function workspaceCommands(store: Store, actor: Actor, cmd: Command
     // re-seats every agent through agent.update (orchestrator-allowed), so refusing it
     // the pointer only left the workspace disagreeing with its own seats — and the
     // daemon swallowed the 403, so the drift was silent. Policy toggles stay human-only.
-    const packPointerOnly = cmd.activeModelPack !== undefined && cmd.autoFailover === undefined && cmd.commRules === undefined;
+    const packPointerOnly = cmd.activeModelPack !== undefined && cmd.autoFailover === undefined && cmd.commRules === undefined && cmd.videoTier === undefined;
     const mayUpdate = actor.kind === 'human' || (actor.role === 'orchestrator' && packPointerOnly);
     if (!mayUpdate) throw new DomainError('NOT_PERMITTED', 'workspace settings are managed by humans');
+    // the video tier is a Pro setting (the video rung): a Free workspace holds no credits to film with
+    if (cmd.videoTier && (await store.workspacePlan(cmd.workspace)) !== 'cloud') throw new DomainError('NOT_PERMITTED', 'video tiers are a Pro setting');
     // a custom-brain id must reference a saved row — a typo'd/deleted id can't persist
     if (cmd.activeModelPack && isCustomPackId(cmd.activeModelPack)) {
       const packs = await store.listModelPacks(cmd.workspace);
@@ -154,7 +156,7 @@ export async function workspaceCommands(store: Store, actor: Actor, cmd: Command
     }
     const { id } = await store.updateWorkspace(
       cmd.workspace,
-      { autoFailover: cmd.autoFailover, activeModelPack: cmd.activeModelPack, commRules: cmd.commRules },
+      { autoFailover: cmd.autoFailover, activeModelPack: cmd.activeModelPack, commRules: cmd.commRules, videoTier: cmd.videoTier },
       (workspace) => createEvent({
         type: 'workspace.updated',
         source: actorAddress(actor),

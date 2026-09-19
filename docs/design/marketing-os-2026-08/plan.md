@@ -791,3 +791,15 @@ Two harness traps for the next round, in the memory file: `POST /v1/messages` ta
 and the marketer's chat turn crashed on a null thread, now guarded); and a wake in the first
 seconds after the daemon boots sees no Claude runtime, so the Starter door fires and pins the
 conversation's brain until `thread.set_brain` clears it.
+
+### 17.3 The video rung: Seedance, Kling and MiniMax on the platform's key, on credits (2026-09-19)
+
+Built from the design round in `docs/design/video-rung-2026-09/plan.md` (issue #539). The card's
+Generate video asks the platform first: a film on the workspace's tier (NeuraMesh Video Starter,
+Xpress or Premium, each a vendor model the server's `NM_VIDEO_TIERS` names, priced at cost in
+whole credits), debited at submit, worked by the minute cron through fal's queue, refunded on
+failure; the own Google key is the fallback when the credits are out or the lane is not served.
+The card names what films it and what it costs before the press, holds a pending row that
+survives a reload, and every button lives in its foot. Pro picks the tier under Marketing OS ›
+Connections; Credits shows a Video meter and every film as a row.
+

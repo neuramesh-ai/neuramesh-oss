@@ -97,6 +97,13 @@ app version the image was built from. `schemaVersion` is the last migration the 
 To reach a stack on a server, put your own TLS proxy or an SSH tunnel in front of both ports. The
 stack does not terminate TLS.
 
+The app checks both ports before it starts a container. A port that another container or program
+holds is one card: "Port 58081 is in use by another program", with the holder named. Stop that
+program, then press Try again. To run the app on other ports, start it with `NM_LOCAL_API_PORT`
+and `NM_LOCAL_POWERSYNC_PORT` in its environment. On a machine that runs the repository's dev
+stack (`dev/stack`), its PowerSync holds `127.0.0.1:58081`, so the packaged app and the dev stack
+do not run at the same time on the default ports.
+
 ## Your data
 
 Postgres writes to `~/.neuramesh/local/pgdata/`. PowerSync's config lives in
@@ -164,6 +171,8 @@ The image sets `NM_LOCAL`, `FLEET_AUTOPROVISION`, `PUSH_ENABLED`, `NM_MAIL_DRY_R
 |---|---|---|
 | `control-api` restarts and its log ends with `NM_LOCAL_HUMAN_TOKEN_HASH must be the sha256 hex` | The hash is missing or malformed in `.env`. | Mint a bearer and write its hash. |
 | `powersync` never becomes healthy | It waits for the control API. Read the control API log first. | `docker compose logs control-api` |
+| A container restarts forever, and `docker inspect` shows `"Networks": {}` | Its first start failed on a taken port. Docker Desktop then drops the container's network, and every later start runs it with no network at all. The app removes such a container by itself and says which. | `docker compose rm -sf <service>`, then `up -d` again. Never `down -v`. |
+| The app says a container stopped N times | The container is in a restart loop. The card shows its last log line. | Press Try again. The app starts a fresh container. `docker compose logs <service>` has the whole log. |
 | `docker compose up` prints `set NM_LOCAL_DIR to the folder that holds this stack` | A required variable is missing from `.env`. | The message names it. |
 | `/auth/local/token` returns 503 | `NM_SYNC_KEY` is not set. | Fill it in `.env` and restart. |
 | `/v1/me` returns 401 | The bearer does not match the hash. | Check the hash, or mint a new bearer. |

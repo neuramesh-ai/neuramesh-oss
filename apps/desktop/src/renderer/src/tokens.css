@@ -646,12 +646,22 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
    the thread, so three X posts stay legible in a narrow panel (George's ask) */
 .mkdraftsgrid { display: flex; gap: 10px; overflow-x: auto; overflow-y: hidden; padding-bottom: 6px; scroll-snap-type: x proximity; scrollbar-width: thin; overscroll-behavior-x: contain; }
 .mkdraftsgrid > .mkpostcard { flex: 0 0 clamp(240px, 72%, 280px); scroll-snap-align: start; }
-.mkpostcard { border: 1px solid var(--card-border); background: var(--card); border-radius: var(--r-lg); overflow: hidden; }
+.mkpostcard { position: relative; border: 1px solid var(--card-border); background: var(--card); border-radius: var(--r-lg); overflow: hidden; }
 .mkpchd { display: flex; align-items: center; gap: 8px; padding: 7px 11px; border-bottom: 1px solid var(--border); }
 .mkpcnet { display: inline-flex; align-items: center; gap: 6px; font: 600 10px var(--fmono); letter-spacing: -.02em; text-transform: uppercase; color: var(--muted); }
 .mkpcg { width: 17px; height: 17px; border-radius: 3px; display: grid; place-items: center; font-size: 10px; background: var(--panel3); border: 1px solid var(--border2); color: var(--body); }
 .mkpcid { font: 600 10px var(--fmono); color: var(--dim); border: 1px solid var(--border2); border-radius: 3px; padding: 1.5px 6px; }
 .mkpchd .chip { margin-left: auto; }
+/* the card's menu door (the video rung, George 2026-09-19: the film's Download lives behind the
+   kebab, not on the card): the project card's mark, quiet until the card is hovered or the menu is
+   open; the menu itself is the shell's .pmenu, seated under the header */
+.mkpckebab { flex: none; width: 22px; height: 22px; display: grid; place-items: center; margin: -3px -5px -3px 0; border: none; border-radius: var(--r-sm); background: none; color: var(--dim); cursor: pointer; opacity: .4; transition: opacity var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
+.mkpostcard:hover .mkpckebab, .mkpckebab.show, .mkpckebab:focus-visible { opacity: 1; }
+.mkpckebab:hover, .mkpckebab.show { background: var(--hover-bg); color: var(--text); }
+.mkpcmenu { top: 32px; right: 8px; width: 188px; }
+/* the film in the post preview: the card's player, seated where the image floor stands */
+.mkpvfilm { margin: 10px 0; max-height: 380px; }
+.mkpvfilmnone { margin-top: 10px; }
 .mkpostcard .mkpv { border: none; border-radius: 0; margin: 0; padding: 11px 12px; background: none; }
 .mkpostcard .mkpvtext { font-size: 12.5px; line-height: 1.5; }
 .mkpostcard .mkpvengage { display: none; }
@@ -695,7 +705,7 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 .mkpcbrief { display: flex; align-items: flex-start; gap: 6px; padding: 7px 11px; border-top: 1px dashed var(--border2); font-size: 11px; line-height: 1.45; color: var(--muted); background: color-mix(in srgb, var(--text) 3%, transparent); }
 .mkpcbrief svg { flex: 0 0 auto; margin-top: 2px; opacity: .75; }
 .mkpcbriefk { color: var(--text); opacity: .72; }
-.mkpcfoot { display: flex; align-items: center; gap: 10px; padding: 7px 11px; border-top: 1px solid var(--border); }
+.mkpcfoot { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 7px 11px; border-top: 1px solid var(--border); }
 .mkpccc { font: 600 10px var(--fmono); color: var(--dim); }
 .mkpcwhen { font: 600 10px var(--fmono); color: var(--prog); }
 .mkpclive { font: 600 10px var(--fmono); color: var(--done); }
@@ -3782,6 +3792,46 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 .lsgacts .btn.quiet { border-color: transparent; color: var(--muted); }
 .lsggrow { flex: 1; }
 .lsgfoot { display: flex; align-items: center; gap: 8px; margin-top: 2px; padding-top: 12px; border-top: 1px solid var(--border); }
+/* the mark on the card (the first-run round, 2026-09-18): the launch grammar once at mount — arch,
+   eyes peek, a look left and right, the smile draws, the bounce (timings = .launchpeek.full, so the
+   two never drift into different characters) — then one glance every 9 s while the person waits.
+   The glance rides no fill, so it stays silent until the first look has played. */
+.lsgmark { display: inline-flex; width: 40px; height: 40px; margin-bottom: 2px; }
+.lsgmark .pk-arch { animation: pk-fade .25s ease both; }
+.lsgmark .pk-peekg { animation: pk-peek .4s var(--ease) .35s both; }
+.lsgmark .pk-lookg { animation: pk-look 1.15s var(--ease) .85s both, lsg-glance 9s var(--ease) 4s infinite; }
+.lsgmark .pk-smile { stroke-dasharray: 1; animation: pk-draw .4s var(--ease) 2.05s both, pk-fade .01s linear 2.05s both; }
+.lsgmark .porchmark { animation: pk-bounce .5s var(--ease) 2.5s both; }
+@keyframes lsg-glance { 0%, 4% { transform: none; } 7%, 9% { transform: translateX(-2.6px); } 12%, 14% { transform: translateX(2.6px); } 17%, 100% { transform: none; } }
+/* the chain (artboards B1 to B6): the picker's radio column becomes the status column. One node per
+   container in boot order, a segment that lights once the node above it is ready, name · fact on
+   one line, and the one word a failure earns at the right. */
+.lsgchain { display: flex; flex-direction: column; margin-top: 2px; }
+.lsgcrow { position: relative; display: grid; grid-template-columns: 22px 1fr auto; align-items: center; gap: 12px; height: 40px; padding: 0 4px; }
+.lsgnode { position: relative; width: 18px; height: 18px; display: grid; place-items: center; }
+.lsgnode svg { position: absolute; inset: 0; }
+.lsgnode.ready circle { fill: var(--green); }
+.lsgnode.ready path { stroke: var(--card); stroke-width: 2.4; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.lsgnode.queued circle { fill: none; stroke: var(--border2); stroke-width: 1.5; }
+/* the live node: a dot under the wizard's dashed halo (.obringspin), the one constant motion that means alive */
+.lsgnode.starting .lsghalo { fill: none; stroke: color-mix(in srgb, var(--accent) 42%, transparent); stroke-width: 1.5; stroke-dasharray: 1.5 4.4; stroke-linecap: round; transform-origin: center; animation: ob-ringspin 10s linear infinite; }
+.lsgnode.starting .lsgdot { fill: var(--accent); }
+/* a stopped node wears the failure ink: --term-red, the one red every theme already carries */
+.lsgnode.stopped circle { fill: var(--term-red); }
+.lsgnode.stopped path { stroke: var(--card); stroke-width: 2.2; fill: none; stroke-linecap: round; }
+.lsgseg { position: absolute; left: 14px; top: 30px; width: 1px; height: 20px; background: var(--border); transition: background var(--dur) var(--ease); }
+.lsgseg.lit { background: var(--green); }
+.lsgcname { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.lsgcname .lsgnm { font-size: 14px; font-weight: 500; color: var(--text); }
+.lsgcname.dimmed .lsgnm { color: var(--body); }
+.lsgcname .lsgfact { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lsgsr { display: inline-flex; align-items: center; min-width: 0; }
+.lsgst.bad { color: var(--term-red); }
+/* the failure card's three parts: the cause, the container's own last line in a warm well, the remedy */
+.lsgcause { margin: 0; font-size: 14px; line-height: 1.5; color: var(--text); }
+.lsgwell { background: var(--panel2); border-radius: var(--r-md); padding: 9px 12px; font: 500 11px/1.55 var(--fmono); letter-spacing: -.02em; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; word-break: break-word; user-select: text; -webkit-user-select: text; }
+.lsgremedy { margin: 0; font-size: 13px; line-height: 1.5; color: var(--muted); }
+@media (prefers-reduced-motion: reduce) { .lsgnode.starting .lsghalo { animation: none; } }
 /* the sync mark on a LOCAL connection reads its word (A5): the glyph plus `local`, one mono kicker */
 .livepill.loc { width: auto; padding: 0 8px; gap: 6px; font: 500 10px var(--fmono); letter-spacing: -.02em; text-transform: uppercase; color: var(--muted); }
 /* the workspace foot wears its connection's glyph: the laptop on local, the cloud on cloud */
@@ -7103,7 +7153,6 @@ button.dprovideropt:hover:not(:disabled), .dprovideropt.external:hover { border-
 /* image outcome on the card — failure reason + Try again, or a Generate button */
 .mkpcimgerr { background: color-mix(in srgb, var(--blocked) 8%, transparent); }
 .mkpcimgerr b { color: var(--text); }
-.mkpcimggen { background: none; border-top: 1px dashed var(--border2); flex-direction: row; flex-wrap: wrap; align-items: center; }
 /* ── THE SCRIPT AND ITS FILM (the UGC round, 2026-09-18) — a timestamped script folds to its first
    beat with a quiet "the script ›" tail; the text itself is the toggle (George: "user can click the
    text to expand it"). The film stands where the picture stands, same box, same border. ── */
@@ -7114,6 +7163,31 @@ button.dprovideropt:hover:not(:disabled), .dprovideropt.external:hover { border-
 .mkscript:focus-visible { outline: 1.5px solid var(--accent); outline-offset: 2px; border-radius: var(--r-sm); }
 .mkscriptmore { display: block; margin-top: 4px; font: 500 11px var(--fmono); color: var(--accent); letter-spacing: .02em; }
 .mkpcfilm { display: block; width: 100%; max-height: 420px; margin-top: 10px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--panel2); object-fit: contain; }
+/* ── THE VIDEO RUNG (2026-09-19, issue #539): a film on the platform's key, on credits. The card's
+   buttons live in ONE place, the foot's left cluster (.mkpcdo), so a card never wears a button
+   above another; the facts line above the foot says what films it and what it costs, mono and
+   muted, the credits in the link ink; the pending row stands where the film will land. ── */
+.mkpcdo { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.mkpcfacts { display: flex; flex-wrap: wrap; align-items: center; gap: 0 6px; padding: 6px 11px 0; font: 500 10.5px var(--fmono); letter-spacing: -.01em; color: var(--muted); }
+.mkpcfacts span + span::before { content: '·'; margin-right: 6px; color: var(--dim); }
+.mkpcfacts .cr { color: var(--accent); }
+.mkpcfilmwait { display: grid; gap: 7px; margin-top: 10px; padding: 12px 12px 11px; border: 1px dashed var(--border2); border-radius: var(--r-md); background: var(--panel2); color: var(--muted); font-size: 12px; line-height: 1.45; }
+.mkpcfilmwait b { color: var(--text); font-weight: 500; }
+.mkpcprog { display: block; height: 3px; border-radius: 3px; background: color-mix(in srgb, var(--text) 8%, transparent); overflow: hidden; }
+.mkpcprog i { display: block; height: 100%; width: 38%; border-radius: 3px; background: var(--accent); animation: mkpcprog 2.4s ease-in-out infinite alternate; }
+@keyframes mkpcprog { from { transform: translateX(-20%); } to { transform: translateX(180%); } }
+@media (prefers-reduced-motion: reduce) { .mkpcprog i { animation: none; width: 60%; } }
+/* Settings › Connections › the Video row: a statement, and for Pro the three tiers as radio cards */
+.mkvideonote { display: grid; gap: 8px; padding: 2px 10px 10px 34px; font-size: 12px; line-height: 1.5; color: var(--muted); }
+.mkvideonote b { color: var(--text); font-weight: 500; }
+.mkvideotiers { display: grid; gap: 6px; }
+.mkvideotier { display: grid; gap: 1px; text-align: left; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--panel2); color: var(--muted); font: inherit; cursor: pointer; }
+.mkvideotier b { font-weight: 500; color: var(--text); font-size: 12.5px; }
+.mkvideotier span { font: 500 10.5px var(--fmono); letter-spacing: -.01em; }
+.mkvideotier.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--panel2)); }
+.mkvideotier:hover:not(:disabled) { border-color: var(--hover-border); }
+.mkvideotier:focus-visible { outline: 1.5px solid var(--accent); outline-offset: 1px; }
+.mkvideotier:disabled { opacity: .6; cursor: default; }
 /* the pending picture stands WHERE the picture will be (same box as .mkpcimg), so the card shows
    the shape of what is coming instead of a button insisting it is busy. The sweep is the only
    motion here and it is non-blocking, so it sits outside the ≤150ms budget by design. */
@@ -8821,6 +8895,7 @@ button.dprovideropt:hover:not(:disabled), .dprovideropt.external:hover { border-
 .credv-ledger td:last-child { text-align: right; font-family: var(--fmono); font-variant-numeric: tabular-nums; }
 .credv-k { color: var(--muted); font-size: 11.5px; }
 .credv-cr { color: var(--green); }
+.credv-sp { color: var(--text); } /* a spend: a film's row (the video rung) */
 
 /* THE BRAIN NOTICE (thread/BrainNotice.tsx, docs/10 §15.7, 2026-09-17) — the attention bar's anatomy
    docked above a conversation's composer. `needs` wears the amber rule: nothing moved, the

@@ -205,6 +205,43 @@ describe('xPoster media', () => {
     expect(JSON.parse(inits[0]!).media_type).toBe('image/webp'); // the bytes' truth, not the label
   });
 
+  it('a film uploads as tweet_video and waits for X to process it before the tweet names it', async () => {
+    // the video rung: the same chunked flow, the video category, and the processing wait a film
+    // always has (finalize answers pending, STATUS walks in_progress → succeeded)
+    const MP4 = Buffer.concat([Buffer.from([0, 0, 0, 0x18]), Buffer.from('ftypisom'), Buffer.alloc(24)]);
+    const calls: Array<{ url: string; body: unknown }> = [];
+    const states = ['in_progress', 'succeeded'];
+    const fake = (async (url: string, init: RequestInit) => {
+      calls.push({ url: String(url), body: init?.body });
+      if (String(url).endsWith('/media/upload/initialize')) return { ok: true, status: 200, json: async () => ({ data: { id: 'media-v' } }) } as Response;
+      if (String(url).endsWith('/append')) return { ok: true, status: 204, json: async () => { throw new Error('no body'); } } as unknown as Response;
+      if (String(url).endsWith('/finalize')) return { ok: true, status: 200, json: async () => ({ data: { id: 'media-v', processing_info: { state: 'pending', check_after_secs: 0 } } }) } as Response;
+      if (String(url).includes('command=STATUS')) return { ok: true, status: 200, json: async () => ({ data: { id: 'media-v', processing_info: { state: states.shift(), check_after_secs: 0 } } }) } as Response;
+      if (String(url).includes('/2/tweets')) return { ok: true, status: 200, json: async () => ({ data: { id: 'tweet-v' } }) } as Response;
+      return { ok: true, status: 200, arrayBuffer: async () => MP4.buffer.slice(MP4.byteOffset, MP4.byteOffset + MP4.byteLength), headers: new Headers({ 'content-type': 'video/mp4' }) } as unknown as Response;
+    }) as unknown as typeof fetch;
+    const out = await xPoster.post(tokens, 'the hook', { mediaUrl: 'https://api.neuramesh.app/media/v?s=y' }, fake);
+    expect(out.url).toBe('https://x.com/i/web/status/tweet-v');
+    expect(JSON.parse(String(calls[1]?.body))).toEqual({ media_type: 'video/mp4', total_bytes: MP4.length, media_category: 'tweet_video' });
+    const status = calls.filter((c) => c.url.includes('command=STATUS&media_id=media-v'));
+    expect(status.length).toBe(2); // in_progress, then succeeded: the tweet waited for both
+    expect(JSON.parse(String(calls.at(-1)?.body))).toEqual({ text: 'the hook', media: { media_ids: ['media-v'] } });
+  });
+
+  it('a film X is still processing after the leash fails with "publish again", never a tweet without it', async () => {
+    const MP4 = Buffer.concat([Buffer.from([0, 0, 0, 0x18]), Buffer.from('ftypisom'), Buffer.alloc(24)]);
+    let tweets = 0;
+    const fake = (async (url: string) => {
+      if (String(url).endsWith('/media/upload/initialize')) return { ok: true, status: 200, json: async () => ({ data: { id: 'media-v' } }) } as Response;
+      if (String(url).endsWith('/append')) return { ok: true, status: 204, json: async () => { throw new Error('no body'); } } as unknown as Response;
+      if (String(url).endsWith('/finalize') || String(url).includes('command=STATUS')) return { ok: true, status: 200, json: async () => ({ data: { id: 'media-v', processing_info: { state: 'in_progress', check_after_secs: 0 } } }) } as Response;
+      if (String(url).includes('/2/tweets')) { tweets += 1; return { ok: true, status: 200, json: async () => ({ data: { id: 'tweet-v' } }) } as Response; }
+      return { ok: true, status: 200, arrayBuffer: async () => MP4.buffer.slice(MP4.byteOffset, MP4.byteOffset + MP4.byteLength), headers: new Headers({ 'content-type': 'video/mp4' }) } as unknown as Response;
+    }) as unknown as typeof fetch;
+    await expect(xPoster.post(tokens, 'the hook', { mediaUrl: 'https://api.neuramesh.app/media/v?s=y' }, fake)).rejects.toThrow(/still processing the video.*publish again/);
+    expect(tweets).toBe(0);
+  });
+
   it('still posts text-only when there is no image', async () => {
     const bodies: string[] = [];
     const fake = (async (_url: string, init: RequestInit) => {

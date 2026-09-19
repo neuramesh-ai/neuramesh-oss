@@ -19,7 +19,7 @@
 // card a launch object it then paints "Connected." over. Both are the machineLimitInfo bug in a
 // new place: a lane that decides whether something renders must answer, not guess.
 import type { PowerSyncDatabase } from '@powersync/web';
-import type { CreditHistory, NMBridge } from '../src/bridge/nm';
+import type { CreditHistory, NMBridge, StarterVideo } from '../src/bridge/nm';
 import type { PendingInvite, WorkspaceMembership } from '../src/bridge/rows-crew';
 import { authHeaders, postCommand, type WebNmConfig } from './webnm';
 
@@ -144,6 +144,7 @@ function httpLanes(cfg: WebNmConfig): Partial<NMBridge> {
     billingCheckout: () => billing(cfg, 'checkout'),
     billingPortal: () => billing(cfg, 'portal'),
     creditsHistory: async () => (await apiGet(cfg, `/v1/credits/history?workspace=${encodeURIComponent(cfg.workspaceId())}`).catch(() => null)) as CreditHistory | null,
+    starterVideo: async () => (await apiGet(cfg, `/v1/starter/video?workspace=${encodeURIComponent(cfg.workspaceId())}`).catch(() => null)) as StarterVideo | null,
     creditsCheckout: async (credits: number) => {
       const { url } = await apiPost<{ url?: string }>(cfg, '/v1/billing/credits-checkout', { workspace: cfg.workspaceId(), credits });
       if (url) openHosted(url);

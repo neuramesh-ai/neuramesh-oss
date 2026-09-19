@@ -83,9 +83,9 @@ export async function contentCommands(store: Store, actor: Actor, cmd: Command):
     // the marketer revising a draft OR a proposed 'scheduled' slot (never a published post) — a
     // human asking for a change in the thread reaches every unpublished draft. Rewriting a
     // scheduled post's copy unschedules it back to draft (store), so nothing publishes unreviewed.
-    if (!cmd.body && cmd.imageBrief === undefined && !cmd.script && !cmd.thumb && cmd.imageError === undefined && cmd.videoError === undefined) throw new DomainError('INVALID_INPUT', 'a revision needs a new body, script or image brief');
+    if (!cmd.body && cmd.imageBrief === undefined && !cmd.script && !cmd.thumb && cmd.imageError === undefined && cmd.videoError === undefined && !cmd.videoMeta && cmd.videoErrorCode === undefined) throw new DomainError('INVALID_INPUT', 'a revision needs a new body, script or image brief');
     const styled = await styledBy(store, actor, () => store.contentItemMedia(cmd.item).then((m) => m?.workspace));
-    const { id } = await store.reviseDraft(cmd.item, { body: cmd.body ? styled(cmd.body) : null, imageBrief: cmd.imageBrief ? styled(cmd.imageBrief) : (cmd.imageBrief ?? null), script: cmd.script ? styled(cmd.script) : null, thumb: cmd.thumb ?? null, videoError: cmd.videoError, imageError: cmd.imageError === undefined ? undefined : (cmd.imageError || null) }, (ws) => createEvent({
+    const { id } = await store.reviseDraft(cmd.item, { body: cmd.body ? styled(cmd.body) : null, imageBrief: cmd.imageBrief ? styled(cmd.imageBrief) : (cmd.imageBrief ?? null), script: cmd.script ? styled(cmd.script) : null, thumb: cmd.thumb ?? null, videoError: cmd.videoError, videoErrorCode: cmd.videoErrorCode, videoMeta: cmd.videoMeta, imageError: cmd.imageError === undefined ? undefined : (cmd.imageError || null) }, (ws) => createEvent({
       type: 'content.updated', source: actorAddress(actor), target: formatAddress({ kind: 'resource', type: 'content', id: cmd.item }), workspace: ws,
       payload: { item: cmd.item, revised: true },
     }));

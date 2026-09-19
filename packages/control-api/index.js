@@ -584,7 +584,7 @@ function nextRefillOn(periodStart, today, plan) {
   if (start < monthTop) return null;
   return new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, 1));
 }
-var RATE_VERSION, CREDIT_MICROS, creditsToMicros, microsToCredits, STARTER_MODEL, STARTER_THINKING_LEVEL, MODEL_RATES, SIGNUP_GRANT_CREDITS, MONTHLY_GRANT_CREDITS, CLOUD_SEAT_MONTHLY_CREDITS, CREDIT_PACKS, CREDITS_PER_USD, usdForCredits, creditsForUsd, MIN_PACK_CREDITS, MAX_PACK_CREDITS, CREDITS_ROLL_OVER, MACHINE_MICROS_PER_ACTIVE_MINUTE, priceActiveSeconds, STORAGE_MICROS_PER_GB_HOUR;
+var RATE_VERSION, CREDIT_MICROS, creditsToMicros, microsToCredits, STARTER_MODEL, STARTER_THINKING_LEVEL, MODEL_RATES, SIGNUP_GRANT_CREDITS, MONTHLY_GRANT_CREDITS, CLOUD_SEAT_MONTHLY_CREDITS, CREDIT_PACKS, CREDITS_PER_USD, usdForCredits, creditsForUsd, MIN_PACK_CREDITS, MAX_PACK_CREDITS, CREDITS_ROLL_OVER, MACHINE_MICROS_PER_ACTIVE_MINUTE, priceActiveSeconds, STORAGE_MICROS_PER_GB_HOUR, VIDEO_TIERS, VIDEO_TIER_LABELS, isVideoTier;
 var init_rates = __esm({
   "../shared/src/rates.ts"() {
     "use strict";
@@ -609,13 +609,16 @@ var init_rates = __esm({
     ];
     CREDITS_PER_USD = 1e6 / CREDIT_MICROS;
     usdForCredits = (credits) => credits / CREDITS_PER_USD;
-    creditsForUsd = (usd) => Math.round(usd * CREDITS_PER_USD);
+    creditsForUsd = (usd2) => Math.round(usd2 * CREDITS_PER_USD);
     MIN_PACK_CREDITS = 500;
     MAX_PACK_CREDITS = 1e6;
     CREDITS_ROLL_OVER = false;
     MACHINE_MICROS_PER_ACTIVE_MINUTE = 1e3;
     priceActiveSeconds = (seconds) => Math.round(seconds / 60 * MACHINE_MICROS_PER_ACTIVE_MINUTE);
     STORAGE_MICROS_PER_GB_HOUR = null;
+    VIDEO_TIERS = ["starter", "xpress", "premium"];
+    VIDEO_TIER_LABELS = { starter: "NeuraMesh Video Starter", xpress: "NeuraMesh Video Xpress", premium: "NeuraMesh Video Premium" };
+    isVideoTier = (s) => typeof s === "string" && VIDEO_TIERS.includes(s);
   }
 });
 
@@ -8229,6 +8232,8 @@ __export(src_exports, {
   TaskSchema: () => TaskSchema,
   UNBLOCK_MARKER: () => UNBLOCK_MARKER,
   UNIT_PLAYBOOK_IDS: () => UNIT_PLAYBOOK_IDS,
+  VIDEO_TIERS: () => VIDEO_TIERS,
+  VIDEO_TIER_LABELS: () => VIDEO_TIER_LABELS,
   WAIT_LIMIT_MS: () => WAIT_LIMIT_MS,
   WAIT_RETRY: () => WAIT_RETRY,
   WAIT_THINKING: () => WAIT_THINKING,
@@ -8420,6 +8425,7 @@ __export(src_exports, {
   isRunStale: () => isRunStale,
   isStandDown: () => isStandDown,
   isUnroutableTodo: () => isUnroutableTodo,
+  isVideoTier: () => isVideoTier,
   isWorkflowArtifact: () => isWorkflowArtifact,
   joinedMeta: () => joinedMeta,
   journeyFor: () => journeyFor,
@@ -8845,10 +8851,69 @@ function unseal(sealed) {
 }
 
 // src/connectors-x.ts
-init_src();
 import { createHash as createHash2, randomBytes as randomBytes2 } from "node:crypto";
+
+// src/connectors-x-media.ts
+init_src();
 var XReauthRequired = class extends Error {
 };
+var X_MEDIA_MAX = 5e6;
+var X_VIDEO_MAX = 64e6;
+async function fetchMediaBytes(url, fetchFn) {
+  const res = await fetchFn(url, { signal: AbortSignal.timeout(2e4), redirect: "follow" });
+  if (!res.ok) throw new Error(`media url did not load (${res.status})`);
+  const bytes = Buffer.from(await res.arrayBuffer());
+  if (!bytes.length) throw new Error("media url returned no bytes");
+  const ct = ((res.headers.get("content-type") ?? "").split(";")[0] ?? "").toLowerCase();
+  const head = new Uint8Array(bytes.subarray(0, 16));
+  const video = sniffVideoMime(head);
+  if (video && bytes.length > X_VIDEO_MAX) throw new Error(`video too large for X (${bytes.length} bytes, max 64MB)`);
+  if (video) return { bytes, mime: video };
+  if (bytes.length > X_MEDIA_MAX) throw new Error(`image too large for X (${bytes.length} bytes, max 5MB)`);
+  const sniffed = sniffImageMime(head);
+  if (!sniffed) throw new Error(`the hosted media is not a recognizable image or video (served ${ct || "no content-type"}, ${bytes.length} bytes, head ${bytes.subarray(0, 8).toString("hex")}) \u2014 regenerate the media on the card (Try again), then re-approve`);
+  return { bytes, mime: sniffed };
+}
+async function uploadXMedia(accessToken, bytes, mime, fetchFn) {
+  const U = "https://api.x.com/2/media/upload";
+  const sent = `sent ${mime} ${bytes.length}B head ${bytes.subarray(0, 8).toString("hex")}`;
+  const guard = async (res, step) => {
+    if (res.status === 403) throw new XReauthRequired(`x refused the image upload (403) \u2014 the connected account's authorization predates image posting (no media.write grant). X said: ${(await res.text().catch(() => "")).slice(0, 160)}`);
+    if (!res.ok) throw new Error(`x media ${step} failed ${res.status} (${sent}): ${(await res.text().catch(() => "")).slice(0, 180)}`);
+    return await res.json().catch(() => ({}));
+  };
+  const idOf = (j) => j.data?.id ?? j.id ?? j.media_id_string;
+  const init = await guard(await fetchFn(`${U}/initialize`, {
+    method: "POST",
+    headers: { authorization: `Bearer ${accessToken}`, "content-type": "application/json" },
+    body: JSON.stringify({ media_type: mime, total_bytes: bytes.length, media_category: mime.startsWith("video/") ? "tweet_video" : "tweet_image" })
+  }), "init");
+  const id = idOf(init);
+  if (!id) throw new Error(`x media init returned no media id (${sent})`);
+  const CHUNK = 1024 * 1024;
+  for (let i = 0; i * CHUNK < bytes.length; i += 1) {
+    const part = bytes.subarray(i * CHUNK, Math.min((i + 1) * CHUNK, bytes.length));
+    await guard(await fetchFn(`${U}/${id}/append`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${accessToken}`, "content-type": "application/json" },
+      body: JSON.stringify({ segment_index: i, media: part.toString("base64") })
+    }), "append");
+  }
+  let fin = await guard(await fetchFn(`${U}/${id}/finalize`, { method: "POST", headers: { authorization: `Bearer ${accessToken}` } }), "finalize");
+  const film = mime.startsWith("video/");
+  for (let i = 0; i < (film ? 12 : 3); i += 1) {
+    const p2 = fin.data?.processing_info;
+    if (!p2?.state || p2.state === "succeeded") return id;
+    if (p2.state === "failed") throw new Error(`x media processing failed after upload (${sent})${p2.error?.message ? `: ${p2.error.message}` : ""}`);
+    await new Promise((r) => setTimeout(r, Math.min(5, p2.check_after_secs ?? 1) * 1e3));
+    fin = await guard(await fetchFn(`${U}?command=STATUS&media_id=${encodeURIComponent(id)}`, { headers: { authorization: `Bearer ${accessToken}` } }), "status");
+  }
+  const last = fin.data?.processing_info?.state;
+  if (last && last !== "succeeded") throw new Error(`x is still processing the ${film ? "video" : "image"} (${last}) \u2014 publish again in a minute`);
+  return id;
+}
+
+// src/connectors-x.ts
 var X_SCOPES = "tweet.read tweet.write users.read offline.access media.write";
 function xStartUrl(ctx, redirectUri) {
   const verifier = randomBytes2(32).toString("base64url");
@@ -8904,53 +8969,6 @@ async function refreshTokens(tokens, fetchFn, persist) {
   };
   if (persist) await persist(next).catch((e) => console.error("x token rotation persist failed:", e));
   return next;
-}
-var X_MEDIA_MAX = 5e6;
-async function fetchMediaBytes(url, fetchFn) {
-  const res = await fetchFn(url, { signal: AbortSignal.timeout(2e4), redirect: "follow" });
-  if (!res.ok) throw new Error(`media url did not load (${res.status})`);
-  const bytes = Buffer.from(await res.arrayBuffer());
-  if (!bytes.length) throw new Error("media url returned no bytes");
-  if (bytes.length > X_MEDIA_MAX) throw new Error(`image too large for X (${bytes.length} bytes, max 5MB)`);
-  const ct = ((res.headers.get("content-type") ?? "").split(";")[0] ?? "").toLowerCase();
-  const sniffed = sniffImageMime(new Uint8Array(bytes.subarray(0, 16)));
-  if (!sniffed) throw new Error(`the hosted media is not a recognizable image (served ${ct || "no content-type"}, ${bytes.length} bytes, head ${bytes.subarray(0, 8).toString("hex")}) \u2014 regenerate the image on the card (Try again), then re-approve`);
-  return { bytes, mime: sniffed };
-}
-async function uploadXMedia(accessToken, bytes, mime, fetchFn) {
-  const U = "https://api.x.com/2/media/upload";
-  const sent = `sent ${mime} ${bytes.length}B head ${bytes.subarray(0, 8).toString("hex")}`;
-  const guard = async (res, step) => {
-    if (res.status === 403) throw new XReauthRequired(`x refused the image upload (403) \u2014 the connected account's authorization predates image posting (no media.write grant). X said: ${(await res.text().catch(() => "")).slice(0, 160)}`);
-    if (!res.ok) throw new Error(`x media ${step} failed ${res.status} (${sent}): ${(await res.text().catch(() => "")).slice(0, 180)}`);
-    return await res.json().catch(() => ({}));
-  };
-  const idOf = (j) => j.data?.id ?? j.id ?? j.media_id_string;
-  const init = await guard(await fetchFn(`${U}/initialize`, {
-    method: "POST",
-    headers: { authorization: `Bearer ${accessToken}`, "content-type": "application/json" },
-    body: JSON.stringify({ media_type: mime, total_bytes: bytes.length, media_category: "tweet_image" })
-  }), "init");
-  const id = idOf(init);
-  if (!id) throw new Error(`x media init returned no media id (${sent})`);
-  const CHUNK = 1024 * 1024;
-  for (let i = 0; i * CHUNK < bytes.length; i += 1) {
-    const part = bytes.subarray(i * CHUNK, Math.min((i + 1) * CHUNK, bytes.length));
-    await guard(await fetchFn(`${U}/${id}/append`, {
-      method: "POST",
-      headers: { authorization: `Bearer ${accessToken}`, "content-type": "application/json" },
-      body: JSON.stringify({ segment_index: i, media: part.toString("base64") })
-    }), "append");
-  }
-  let fin = await guard(await fetchFn(`${U}/${id}/finalize`, { method: "POST", headers: { authorization: `Bearer ${accessToken}` } }), "finalize");
-  for (let i = 0; i < 3; i += 1) {
-    const p2 = fin.data?.processing_info;
-    if (!p2?.state || p2.state === "succeeded") break;
-    if (p2.state === "failed") throw new Error(`x media processing failed after upload (${sent})${p2.error?.message ? `: ${p2.error.message}` : ""}`);
-    await new Promise((r) => setTimeout(r, Math.min(5, p2.check_after_secs ?? 1) * 1e3));
-    fin = await guard(await fetchFn(`${U}?command=STATUS&media_id=${encodeURIComponent(id)}`, { headers: { authorization: `Bearer ${accessToken}` } }), "status");
-  }
-  return id;
 }
 var xPoster = {
   async post(tokens, body, opts, fetchFn = fetch) {
@@ -9327,10 +9345,11 @@ async function publishDueItems(store2, posters, now = /* @__PURE__ */ new Date()
       if (!poster) throw new Error(`publishing for ${item.platform} isn't wired yet`);
       const mediaUrl = item.mediaId && publicBase ? `${publicBase}/media/${item.mediaId}?s=${mediaSig(item.mediaId)}` : item.mediaUrl ?? null;
       if (!mediaUrl && item.imageIntended) {
-        console.log(`publish_hold item=${item.id.slice(0, 8)} platform=${item.platform} reason=image_not_ready`);
+        console.log(`publish_hold item=${item.id.slice(0, 8)} platform=${item.platform} reason=media_not_ready`);
         held += 1;
         continue;
       }
+      if (item.mediaKind === "video" && item.platform !== "x") throw new Error(`NeuraMesh cannot post a video to ${item.platform} yet. Download the film from the card menu and post it there.`);
       const conn = await store2.connectorWithSecret(item.workspace, item.platform, item.channel ?? null);
       if (!conn || conn.status !== "connected" || !conn.ciphertext) throw new Error(`no connected ${item.platform} account`);
       const opts = {
@@ -9400,10 +9419,10 @@ async function sendEmail(input) {
     console.log(`mail_dry_run to=${redact(to)} subject="${email.subject}" bytes=${email.html.length}`);
     return { status: DRY_RUN ? "skipped" : "skipped", error: DRY_RUN ? "NM_MAIL_DRY_RUN=1" : "RESEND_API_KEY unset" };
   }
-  const headers = {};
+  const headers2 = {};
   if (input.unsubscribeUrl) {
-    headers["List-Unsubscribe"] = `<${input.unsubscribeUrl}>`;
-    headers["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click";
+    headers2["List-Unsubscribe"] = `<${input.unsubscribeUrl}>`;
+    headers2["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click";
   }
   const body = {
     from: FROM,
@@ -9414,7 +9433,7 @@ async function sendEmail(input) {
     // multipart: HTML-only mail scores worse with spam filters
   };
   if (REPLY_TO) body["reply_to"] = REPLY_TO;
-  if (Object.keys(headers).length) body["headers"] = headers;
+  if (Object.keys(headers2).length) body["headers"] = headers2;
   try {
     const res = await (input.fetchFn ?? fetch)("https://api.resend.com/emails", {
       method: "POST",
@@ -9683,7 +9702,7 @@ async function chargeMachineActivity(sql, workspaceId, micros, activeSeconds) {
 }
 async function usageToday(sql, workspaceId) {
   const [row] = await sql`
-    select minutes, active_seconds, model_calls, model_micros, machine_micros from machine_usage
+    select minutes, active_seconds, model_calls, model_micros, machine_micros, video_clips, video_micros from machine_usage
      where workspace_id = ${workspaceId}::uuid and day = (now() at time zone 'utc')::date`;
   return {
     day: (/* @__PURE__ */ new Date()).toISOString().slice(0, 10),
@@ -9691,7 +9710,9 @@ async function usageToday(sql, workspaceId) {
     activeSeconds: Number(row?.active_seconds ?? 0),
     modelCalls: Number(row?.model_calls ?? 0),
     modelMicros: Number(row?.model_micros ?? 0),
-    machineMicros: Number(row?.machine_micros ?? 0)
+    machineMicros: Number(row?.machine_micros ?? 0),
+    videoClips: Number(row?.video_clips ?? 0),
+    videoMicros: Number(row?.video_micros ?? 0)
   };
 }
 async function workspacesDueRefill(sql) {
@@ -9701,6 +9722,49 @@ async function workspacesDueRefill(sql) {
      where w.plan = 'cloud'
        and c.period_start < date_trunc('month', (now() at time zone 'utc')::date)`;
   return rows2.map((r) => ({ workspaceId: r.workspace_id, plan: r.plan, seats: Math.max(1, Number(r.seats ?? 1)) }));
+}
+async function spendCreditsForFilm(sql, workspaceId, micros, clip2) {
+  return sql.begin(async (tx) => {
+    const [bal] = await tx`
+      select granted_micros, spent_micros, purchased_micros, purchased_spent_micros
+        from workspace_credits
+       where workspace_id = ${workspaceId}::uuid for update`;
+    const grantLeft = Math.max(0, Number(bal?.granted_micros ?? 0) - Number(bal?.spent_micros ?? 0));
+    const purchasedLeft = Math.max(0, Number(bal?.purchased_micros ?? 0) - Number(bal?.purchased_spent_micros ?? 0));
+    if (grantLeft + purchasedLeft < micros) return null;
+    const fromGrant = Math.min(micros, grantLeft);
+    const fromPurchased = micros - fromGrant;
+    await tx`update workspace_credits
+                set spent_micros = spent_micros + ${fromGrant},
+                    purchased_spent_micros = purchased_spent_micros + ${fromPurchased},
+                    updated_at = now()
+              where workspace_id = ${workspaceId}::uuid`;
+    await tx`insert into machine_usage (workspace_id, day, minutes, video_clips, video_seconds, video_micros)
+             values (${workspaceId}::uuid, (now() at time zone 'utc')::date, 0, 1, ${clip2.seconds}, ${micros})
+             on conflict (workspace_id, day) do update
+               set video_clips = machine_usage.video_clips + 1,
+                   video_seconds = machine_usage.video_seconds + ${clip2.seconds},
+                   video_micros = machine_usage.video_micros + ${micros}`;
+    return { remainingMicros: grantLeft + purchasedLeft - micros, grantMicros: fromGrant, purchasedMicros: fromPurchased };
+  });
+}
+async function refundFilm(sql, workspaceId, split, note) {
+  const micros = split.grantMicros + split.purchasedMicros;
+  if (micros <= 0) return;
+  await sql.begin(async (tx) => {
+    await tx`update workspace_credits
+                set spent_micros = greatest(0, spent_micros - ${split.grantMicros}),
+                    purchased_spent_micros = greatest(0, purchased_spent_micros - ${split.purchasedMicros}),
+                    updated_at = now()
+              where workspace_id = ${workspaceId}::uuid`;
+    await tx`update machine_usage
+                set video_clips = greatest(0, video_clips - 1),
+                    video_seconds = greatest(0, video_seconds - ${split.seconds}),
+                    video_micros = greatest(0, video_micros - ${micros})
+              where workspace_id = ${workspaceId}::uuid and day = (now() at time zone 'utc')::date`;
+    await tx`insert into credit_grants (workspace_id, micros, kind, rate_version, note)
+             values (${workspaceId}::uuid, ${micros}, 'refund', ${RATE_VERSION}, ${note})`;
+  });
 }
 
 // src/fleet.ts
@@ -10103,6 +10167,90 @@ async function computeFleetDesired(sql) {
   return rowsToDesired(rows2);
 }
 
+// src/video-registry.ts
+init_src();
+var usd = (dollarsPerSecond) => Math.round(dollarsPerSecond * 1e6);
+var VIDEO_MODELS = {
+  "seedance-2.0-fast": {
+    key: "seedance-2.0-fast",
+    label: "Seedance 2.0",
+    vendor: "ByteDance",
+    endpoint: "bytedance/seedance-2.0/fast/text-to-video",
+    perSecondMicros: usd(0.2419),
+    resolution: "720p",
+    input: (prompt, seconds) => ({ prompt, resolution: "720p", duration: String(seconds), aspect_ratio: "9:16", generate_audio: true })
+  },
+  "seedance-2.0": {
+    key: "seedance-2.0",
+    label: "Seedance 2.0 Standard",
+    vendor: "ByteDance",
+    endpoint: "bytedance/seedance-2.0/text-to-video",
+    perSecondMicros: usd(0.3034),
+    resolution: "720p",
+    input: (prompt, seconds) => ({ prompt, resolution: "720p", duration: String(seconds), aspect_ratio: "9:16", generate_audio: true })
+  },
+  "kling-3.0": {
+    key: "kling-3.0",
+    label: "Kling 3.0",
+    vendor: "Kuaishou",
+    endpoint: "fal-ai/kling-video/v3/standard/text-to-video",
+    perSecondMicros: usd(0.126),
+    resolution: "1080p",
+    input: (prompt, seconds) => ({ prompt, duration: String(seconds), aspect_ratio: "9:16", generate_audio: true })
+  },
+  "kling-3.0-pro": {
+    key: "kling-3.0-pro",
+    label: "Kling 3.0 Pro",
+    vendor: "Kuaishou",
+    endpoint: "fal-ai/kling-video/v3/pro/text-to-video",
+    perSecondMicros: usd(0.168),
+    resolution: "1080p",
+    input: (prompt, seconds) => ({ prompt, duration: String(seconds), aspect_ratio: "9:16", generate_audio: true })
+  },
+  "minimax-h3": {
+    key: "minimax-h3",
+    label: "MiniMax H3",
+    vendor: "MiniMax",
+    endpoint: "minimax/h3/text-to-video",
+    perSecondMicros: usd(0.06),
+    resolution: "768P",
+    input: (prompt, seconds) => ({ prompt, duration: seconds, resolution: "768P", aspect_ratio: "9:16" })
+  },
+  "minimax-h3-max": {
+    key: "minimax-h3-max",
+    label: "MiniMax H3 Max",
+    vendor: "MiniMax",
+    endpoint: "minimax/h3-max/text-to-video",
+    perSecondMicros: usd(0.04),
+    resolution: "768P",
+    input: (prompt, seconds) => ({ prompt, duration: seconds, resolution: "768P", aspect_ratio: "9:16" })
+  }
+};
+var DEFAULT_TIERS = "starter=seedance-2.0-fast,xpress=minimax-h3,premium=seedance-2.0";
+var FILM_SECONDS = 8;
+var filmCredits = (model2, seconds) => Math.ceil(model2.perSecondMicros * seconds / CREDIT_MICROS);
+var priceFilm = (model2, seconds) => filmCredits(model2, seconds) * CREDIT_MICROS;
+function videoTiers(env = process.env) {
+  if (!env["FAL_KEY"]) return [];
+  const seconds = Number(env["NM_VIDEO_SECONDS"] ?? FILM_SECONDS) || FILM_SECONDS;
+  const out = [];
+  for (const pair of (env["NM_VIDEO_TIERS"] ?? DEFAULT_TIERS).split(",")) {
+    const [tier, key2] = pair.split("=").map((s) => s.trim());
+    if (!isVideoTier(tier) || !key2) continue;
+    const model2 = VIDEO_MODELS[key2];
+    if (!model2) {
+      console.warn(`video_tier ${tier}: unknown model ${key2}, not served`);
+      continue;
+    }
+    if (out.some((t2) => t2.tier === tier)) continue;
+    out.push({ tier, label: VIDEO_TIER_LABELS[tier], model: model2, seconds, credits: filmCredits(model2, seconds) });
+  }
+  return VIDEO_TIERS.flatMap((t2) => out.filter((x) => x.tier === t2));
+}
+function tierFor(tiers, pick) {
+  return tiers.find((t2) => t2.tier === pick) ?? tiers[0] ?? null;
+}
+
 // src/credits.ts
 function sqlOf(store2) {
   return store2.sql ?? null;
@@ -10127,7 +10275,9 @@ function ledgerFor(store2) {
   return {
     balance: (w) => creditBalance(sql, w),
     spend: (w, micros, usage) => spendCredits(sql, w, micros, usage),
-    usage: (w) => usageToday(sql, w)
+    usage: (w) => usageToday(sql, w),
+    spendFilm: (w, micros, clip2) => spendCreditsForFilm(sql, w, micros, clip2),
+    refundFilm: (w, split, note) => refundFilm(sql, w, split, note)
   };
 }
 var GenerateSchema = z10.object({
@@ -10187,7 +10337,7 @@ function creditRoutes(app, store2, ledger = ledgerFor(store2)) {
     const [days, grants] = await Promise.all([
       sql`
         select to_char(day, 'YYYY-MM-DD') as day, minutes, active_seconds, model_calls,
-               model_in_tokens, model_out_tokens, model_micros, machine_micros
+               model_in_tokens, model_out_tokens, model_micros, machine_micros, video_clips, video_micros
           from machine_usage
          where workspace_id = ${workspace}::uuid and day > (now() at time zone 'utc')::date - 31
          order by day`,
@@ -10197,6 +10347,7 @@ function creditRoutes(app, store2, ledger = ledgerFor(store2)) {
          where workspace_id = ${workspace}::uuid
          order by created_at desc limit 20`
     ]);
+    const films = store2.films ? await store2.films.forWorkspace(workspace, 20) : [];
     return c.json({
       days: days.map((d) => ({
         day: String(d["day"]),
@@ -10205,14 +10356,17 @@ function creditRoutes(app, store2, ledger = ledgerFor(store2)) {
         modelInTokens: Number(d["model_in_tokens"] ?? 0),
         modelOutTokens: Number(d["model_out_tokens"] ?? 0),
         brainCredits: microsToCredits(Number(d["model_micros"] ?? 0)),
-        machineCredits: microsToCredits(Number(d["machine_micros"] ?? 0))
+        machineCredits: microsToCredits(Number(d["machine_micros"] ?? 0)),
+        videoClips: Number(d["video_clips"] ?? 0),
+        videoCredits: microsToCredits(Number(d["video_micros"] ?? 0))
       })),
       grants: grants.map((g) => ({
         credits: microsToCredits(Number(g["micros"] ?? 0)),
         kind: String(g["kind"]),
         note: g["note"] ?? null,
         day: String(g["on_day"])
-      }))
+      })),
+      films: films.map((f) => ({ id: f.id, item: f.itemId, tier: f.tier, model: VIDEO_MODELS[f.model]?.label ?? f.model, seconds: f.seconds, credits: Math.ceil(f.micros / CREDIT_MICROS), status: f.status, day: f.createdAt.slice(0, 10), at: f.createdAt }))
     });
   });
   app.get("/v1/usage", async (c) => {
@@ -10246,6 +10400,7 @@ function creditRoutes(app, store2, ledger = ledgerFor(store2)) {
       // yet metered", which told nobody anything. It must never be printed as "x of 10 GB used".
       storage: { gb: planDiskGb(plan), metered: false },
       brain: { callsToday: used.modelCalls, model: STARTER_MODEL },
+      video: { clipsToday: used.videoClips, creditsToday: microsToCredits(used.videoMicros) },
       rateVersion: RATE_VERSION
     });
   });
@@ -10556,6 +10711,89 @@ var PgAnnounceStore = class {
   }
 };
 
+// src/store/films.ts
+var MemFilmStore = class {
+  rows = [];
+  async create(input) {
+    const id = crypto.randomUUID();
+    this.rows.push({ id, ...input, status: "queued", error: null, createdAt: (/* @__PURE__ */ new Date()).toISOString(), finishedAt: null });
+    return { id };
+  }
+  async get(id) {
+    return this.rows.find((r) => r.id === id) ?? null;
+  }
+  async open(limit) {
+    return this.rows.filter((r) => r.status === "queued" || r.status === "running").slice(0, limit);
+  }
+  async update(id, patch) {
+    const r = this.rows.find((x) => x.id === id);
+    if (r) Object.assign(r, patch);
+  }
+  async forWorkspace(workspaceId, limit) {
+    return this.rows.filter((r) => r.workspaceId === workspaceId).reverse().slice(0, limit);
+  }
+  async openForItem(itemId) {
+    return this.rows.find((r) => r.itemId === itemId && (r.status === "queued" || r.status === "running")) ?? null;
+  }
+};
+var COLS2 = "id, workspace_id, item_id, tier, model, endpoint, request_id, seconds, micros, grant_micros, purchased_micros, status, error, created_by, created_at, finished_at";
+var rowOf2 = (r) => ({
+  id: r["id"],
+  workspaceId: r["workspace_id"],
+  itemId: r["item_id"],
+  tier: r["tier"],
+  model: r["model"],
+  endpoint: r["endpoint"],
+  requestId: r["request_id"] ?? null,
+  seconds: Number(r["seconds"]),
+  micros: Number(r["micros"]),
+  grantMicros: Number(r["grant_micros"]),
+  purchasedMicros: Number(r["purchased_micros"]),
+  status: r["status"],
+  error: r["error"] ?? null,
+  createdBy: r["created_by"] ?? null,
+  createdAt: new Date(r["created_at"]).toISOString(),
+  finishedAt: r["finished_at"] ? new Date(r["finished_at"]).toISOString() : null
+});
+var PgFilmStore = class {
+  constructor(sql) {
+    this.sql = sql;
+  }
+  sql;
+  async create(input) {
+    const [row] = await this.sql`insert into films (workspace_id, item_id, tier, model, endpoint, request_id, seconds, micros, grant_micros, purchased_micros, created_by)
+      values (${input.workspaceId}::uuid, ${input.itemId}::uuid, ${input.tier}, ${input.model}, ${input.endpoint}, ${input.requestId}, ${input.seconds}, ${input.micros}, ${input.grantMicros}, ${input.purchasedMicros}, ${input.createdBy}::uuid)
+      returning id`;
+    return { id: row["id"] };
+  }
+  async get(id) {
+    const [row] = await this.sql.unsafe(`select ${COLS2} from films where id = $1::uuid`, [id]);
+    return row ? rowOf2(row) : null;
+  }
+  async open(limit) {
+    const rows2 = await this.sql.unsafe(`select ${COLS2} from films where status in ('queued', 'running') order by created_at limit $1`, [limit]);
+    return rows2.map((r) => rowOf2(r));
+  }
+  async update(id, patch) {
+    const sql = this.sql;
+    const sets = [sql`updated_at = now()`];
+    if (patch.status !== void 0) sets.push(sql`status = ${patch.status}`);
+    if (patch.error !== void 0) sets.push(sql`error = ${patch.error}`);
+    if (patch.requestId !== void 0) sets.push(sql`request_id = ${patch.requestId}`);
+    if (patch.finishedAt !== void 0) sets.push(sql`finished_at = ${patch.finishedAt}`);
+    const joined = sets.reduce((acc, s, i) => i === 0 ? s : sql`${acc}, ${s}`);
+    await sql`update films set ${joined} where id = ${id}::uuid`;
+  }
+  async forWorkspace(workspaceId, limit) {
+    const rows2 = await this.sql.unsafe(`select ${COLS2} from films where workspace_id = $1::uuid order by created_at desc limit $2`, [workspaceId, limit]);
+    return rows2.map((r) => rowOf2(r));
+  }
+  async openForItem(itemId) {
+    const [row] = await this.sql.unsafe(`select ${COLS2} from films where item_id = $1::uuid and status in ('queued', 'running') order by created_at desc limit 1`, [itemId]);
+    return row ? rowOf2(row) : null;
+  }
+};
+
 // src/store/thread-settle.ts
 async function threadTaskIdSql(sql, workspace, threadId) {
   const [row] = await sql`select task_id from threads where id = ${threadId}::uuid and workspace_id = ${workspace}::uuid`;
@@ -10590,6 +10828,7 @@ function pickHumanWord(messages, threads, taskId3, since) {
 // src/store/memory.ts
 var MemoryStore = class {
   announcements = new MemAnnounceStore();
+  films = new MemFilmStore();
   // readable in tests like `threads` — the memory store IS the test double
   tasks = /* @__PURE__ */ new Map();
   events = [];
@@ -10895,11 +11134,15 @@ var MemoryStore = class {
     if (patch.autoFailover !== void 0) w.autoFailover = patch.autoFailover;
     if (patch.activeModelPack !== void 0) w.activeModelPack = patch.activeModelPack;
     if (patch.commRules !== void 0) w.commRules = patch.commRules;
+    if (patch.videoTier !== void 0) w.videoTier = patch.videoTier;
     this.events.push(makeEvent(workspaceId));
     return { id: workspaceId };
   }
   async getCommRules(workspace) {
     return this.workspaces.find((x) => x.id === workspace)?.commRules ?? null;
+  }
+  async getVideoTier(workspace) {
+    return this.workspaces.find((x) => x.id === workspace)?.videoTier ?? null;
   }
   modelPacks = [];
   async listModelPacks(workspace) {
@@ -11824,6 +12067,9 @@ var MemoryStore = class {
     if (patch.body !== null) it.body = patch.body;
     if (patch.imageBrief !== null) it.brief = patch.imageBrief;
     if (patch.script) it.script = patch.script;
+    if (patch.videoPending !== void 0) it.videoPending = patch.videoPending;
+    if (patch.videoMeta !== void 0) it.videoMeta = patch.videoMeta;
+    if (patch.videoErrorCode !== void 0) it.videoErrorCode = patch.videoErrorCode;
     if (isRevision && it.status === "scheduled") {
       it.status = "draft";
       it.scheduledAt = null;
@@ -11965,7 +12211,7 @@ var MemoryStore = class {
     return { id: connectorId };
   }
   async dueContentItems(nowIso, limit) {
-    return this.contentItems.filter((i) => i.status === "scheduled" && !!i.scheduledAt && i.scheduledAt <= nowIso).slice(0, limit).map((i) => ({ id: i.id, workspace: i.workspace, channel: i.channelId, platform: i.platform, body: i.body, mediaUrl: i.mediaUrl, mediaId: i.mediaId ?? null, imageIntended: !!i.brief }));
+    return this.contentItems.filter((i) => i.status === "scheduled" && !!i.scheduledAt && i.scheduledAt <= nowIso).slice(0, limit).map((i) => ({ id: i.id, workspace: i.workspace, channel: i.channelId, platform: i.platform, body: i.body, mediaUrl: i.mediaUrl, mediaId: i.mediaId ?? null, mediaKind: i.mediaId ? (this.contentMedia.get(i.mediaId)?.mime ?? "").startsWith("video/") ? "video" : "image" : null, imageIntended: i.script || i.videoPending ? !!i.videoPending && !i.mediaId : !!i.brief }));
   }
   async upcomingContentItems(fromIso, toIso, limit) {
     return this.contentItems.filter((i) => i.status === "scheduled" && !!i.scheduledAt && i.scheduledAt > fromIso && i.scheduledAt <= toIso).slice(0, limit).map((i) => ({ id: i.id, workspace: i.workspace, channel: i.channelId, threadId: i.threadId ?? null, platform: i.platform, body: i.body, scheduledAt: i.scheduledAt }));
@@ -13166,16 +13412,17 @@ async function workspaceCommands(store2, actor, cmd) {
     return { ok: true };
   }
   if (cmd.type === "workspace.update") {
-    const packPointerOnly = cmd.activeModelPack !== void 0 && cmd.autoFailover === void 0 && cmd.commRules === void 0;
+    const packPointerOnly = cmd.activeModelPack !== void 0 && cmd.autoFailover === void 0 && cmd.commRules === void 0 && cmd.videoTier === void 0;
     const mayUpdate = actor.kind === "human" || actor.role === "orchestrator" && packPointerOnly;
     if (!mayUpdate) throw new DomainError("NOT_PERMITTED", "workspace settings are managed by humans");
+    if (cmd.videoTier && await store2.workspacePlan(cmd.workspace) !== "cloud") throw new DomainError("NOT_PERMITTED", "video tiers are a Pro setting");
     if (cmd.activeModelPack && isCustomPackId(cmd.activeModelPack)) {
       const packs = await store2.listModelPacks(cmd.workspace);
       if (!packs.some((p2) => p2.id === cmd.activeModelPack)) throw new DomainError("INVALID_INPUT", "unknown model pack");
     }
     const { id } = await store2.updateWorkspace(
       cmd.workspace,
-      { autoFailover: cmd.autoFailover, activeModelPack: cmd.activeModelPack, commRules: cmd.commRules },
+      { autoFailover: cmd.autoFailover, activeModelPack: cmd.activeModelPack, commRules: cmd.commRules, videoTier: cmd.videoTier },
       (workspace) => createEvent({
         type: "workspace.updated",
         source: actorAddress(actor),
@@ -13432,9 +13679,9 @@ async function contentCommands(store2, actor, cmd) {
     return { ok: true, mediaId: id };
   }
   if (cmd.type === "content.revise") {
-    if (!cmd.body && cmd.imageBrief === void 0 && !cmd.script && !cmd.thumb && cmd.imageError === void 0 && cmd.videoError === void 0) throw new DomainError("INVALID_INPUT", "a revision needs a new body, script or image brief");
+    if (!cmd.body && cmd.imageBrief === void 0 && !cmd.script && !cmd.thumb && cmd.imageError === void 0 && cmd.videoError === void 0 && !cmd.videoMeta && cmd.videoErrorCode === void 0) throw new DomainError("INVALID_INPUT", "a revision needs a new body, script or image brief");
     const styled = await styledBy(store2, actor, () => store2.contentItemMedia(cmd.item).then((m) => m?.workspace));
-    const { id } = await store2.reviseDraft(cmd.item, { body: cmd.body ? styled(cmd.body) : null, imageBrief: cmd.imageBrief ? styled(cmd.imageBrief) : cmd.imageBrief ?? null, script: cmd.script ? styled(cmd.script) : null, thumb: cmd.thumb ?? null, videoError: cmd.videoError, imageError: cmd.imageError === void 0 ? void 0 : cmd.imageError || null }, (ws) => createEvent({
+    const { id } = await store2.reviseDraft(cmd.item, { body: cmd.body ? styled(cmd.body) : null, imageBrief: cmd.imageBrief ? styled(cmd.imageBrief) : cmd.imageBrief ?? null, script: cmd.script ? styled(cmd.script) : null, thumb: cmd.thumb ?? null, videoError: cmd.videoError, videoErrorCode: cmd.videoErrorCode, videoMeta: cmd.videoMeta, imageError: cmd.imageError === void 0 ? void 0 : cmd.imageError || null }, (ws) => createEvent({
       type: "content.updated",
       source: actorAddress(actor),
       target: formatAddress({ kind: "resource", type: "content", id: cmd.item }),
@@ -15534,15 +15781,15 @@ var GitHubApiError = class extends Error {
 async function request(method, path, opts) {
   const env = opts.env ?? process.env;
   const token = opts.token ?? env["GITHUB_READ_TOKEN"] ?? "";
-  const headers = {
+  const headers2 = {
     accept: opts.accept ?? "application/vnd.github+json",
     "x-github-api-version": "2022-11-28",
     "user-agent": UA
   };
-  if (token) headers["authorization"] = `Bearer ${token}`;
-  const init = { method, headers, signal: AbortSignal.timeout(1e4) };
+  if (token) headers2["authorization"] = `Bearer ${token}`;
+  const init = { method, headers: headers2, signal: AbortSignal.timeout(1e4) };
   if (method === "POST") {
-    headers["content-type"] = "application/json";
+    headers2["content-type"] = "application/json";
     init.body = "{}";
   }
   const res = await (opts.fetchFn ?? fetch)(`${API}${path}`, init);
@@ -16464,7 +16711,9 @@ var CommandSchema = z13.discriminatedUnion("type", [
     autoFailover: z13.boolean().optional(),
     activeModelPack: packId.optional(),
     // the workspace's voice (docs/design/agent-comm-rules-2026-08) — HUMAN-only in the handler; null reads as defaults-ON
-    commRules: z13.object({ ste100: z13.boolean().optional(), noEmdash: z13.boolean().optional(), custom: z13.array(z13.string().min(1).max(200)).max(8).optional() }).optional()
+    commRules: z13.object({ ste100: z13.boolean().optional(), noEmdash: z13.boolean().optional(), custom: z13.array(z13.string().min(1).max(200)).max(8).optional() }).optional(),
+    // the video tier (0140): a Pro workspace's pick among the tiers the server serves; null = the default
+    videoTier: z13.enum(["starter", "xpress", "premium"]).nullable().optional()
   }),
   // re-bind every agent to its home-remit channels across all projects (recovery for orphaned
   // registrations + makes the team usable across projects). idempotent.
@@ -16864,7 +17113,19 @@ var CommandSchema = z13.discriminatedUnion("type", [
   // but ONLY while status='draft' (a scheduled/published item is the human's, enforced in the
   // handler). body updates the copy; imageBrief re-states the visual it wants (kept in media.brief,
   // the daemon regenerates + re-hosts separately via attach_media).
-  z13.object({ type: z13.literal("content.revise"), item: z13.string().min(1), body: z13.string().trim().min(1).max(1e4).optional(), imageBrief: z13.string().trim().max(2e3).optional(), script: z13.string().trim().min(1).max(1e4).optional(), thumb: z13.string().startsWith("data:image/").max(2e5).optional(), imageError: z13.union([z13.string().trim().max(600), z13.literal("")]).optional(), videoError: z13.union([z13.string().trim().max(600), z13.literal("")]).optional() }),
+  z13.object({
+    type: z13.literal("content.revise"),
+    item: z13.string().min(1),
+    body: z13.string().trim().min(1).max(1e4).optional(),
+    imageBrief: z13.string().trim().max(2e3).optional(),
+    script: z13.string().trim().min(1).max(1e4).optional(),
+    // the film's facts (the video rung): what filmed it, for how long, at what price; the machine's own-key lane writes them, the server's lane writes them itself
+    videoMeta: z13.object({ tier: z13.string().max(40), model: z13.string().max(80), seconds: z13.number().int().min(1).max(60), credits: z13.number().int().min(0), at: z13.string().datetime() }).optional(),
+    videoErrorCode: z13.enum(["NO_CREDITS", "UNAVAILABLE"]).nullable().optional(),
+    thumb: z13.string().startsWith("data:image/").max(2e5).optional(),
+    imageError: z13.union([z13.string().trim().max(600), z13.literal("")]).optional(),
+    videoError: z13.union([z13.string().trim().max(600), z13.literal("")]).optional()
+  }),
   // host a draft's image so it can actually PUBLISH (0090). Every network takes media only as a
   // public URL someone else fetches — Meta pulls it directly, TikTok pulls it through our proxy,
   // X wants the bytes — so a picture generated on the user's machine has to land somewhere
@@ -17441,7 +17702,7 @@ function meRoute(app, store2) {
 
 // src/app.ts
 import { cors as cors2 } from "hono/cors";
-import { z as z17 } from "zod";
+import { z as z18 } from "zod";
 
 // src/fleet-lifecycle.ts
 init_src();
@@ -18144,6 +18405,169 @@ function contentMediaRoute(app, store2) {
   });
 }
 
+// src/starter-video.ts
+init_src();
+import { z as z17 } from "zod";
+
+// src/fal.ts
+var FAL_QUEUE = "https://queue.fal.run";
+var headers = (key2) => ({ authorization: `Key ${key2}`, "content-type": "application/json" });
+var queueBase = (endpoint) => endpoint.split("/").slice(0, 2).join("/");
+var unavailable = (status, msg2) => status === 404 || status === 422 && /not found|unavailable|deprecated|no longer/i.test(msg2);
+async function falSubmit(key2, endpoint, input, fetchFn = fetch, timeoutSeconds = 480) {
+  const res = await fetchFn(`${FAL_QUEUE}/${endpoint}`, { method: "POST", headers: { ...headers(key2), "x-fal-request-timeout": String(timeoutSeconds) }, body: JSON.stringify(input) }).catch((e) => new Response(JSON.stringify({ detail: String(e) }), { status: 599 }));
+  const body = await res.json().catch(() => null);
+  if (res.ok && body?.request_id) return { requestId: body.request_id, status: res.status };
+  const msg2 = typeof body?.detail === "string" ? body.detail : Array.isArray(body?.detail) ? JSON.stringify(body.detail) : body?.error ?? `fal ${res.status}`;
+  return { error: msg2, status: res.status, unavailable: unavailable(res.status, msg2) };
+}
+async function falStatus(key2, endpoint, requestId, fetchFn = fetch) {
+  const res = await fetchFn(`${FAL_QUEUE}/${queueBase(endpoint)}/requests/${requestId}/status`, { headers: headers(key2) }).catch((e) => new Response(JSON.stringify({ detail: String(e) }), { status: 599 }));
+  const body = await res.json().catch(() => null);
+  if (!res.ok) return { state: "failed", error: typeof body?.detail === "string" ? body.detail : `fal status ${res.status}` };
+  if (body?.error) return { state: "failed", error: body.error };
+  if (body?.status === "COMPLETED") return { state: "done" };
+  if (body?.status === "IN_PROGRESS") return { state: "running" };
+  return { state: "queued", ...typeof body?.queue_position === "number" ? { position: body.queue_position } : {} };
+}
+async function falResult(key2, endpoint, requestId, fetchFn = fetch) {
+  const res = await fetchFn(`${FAL_QUEUE}/${queueBase(endpoint)}/requests/${requestId}`, { headers: headers(key2) }).catch((e) => new Response(JSON.stringify({ detail: String(e) }), { status: 599 }));
+  const body = await res.json().catch(() => null);
+  if (!res.ok) return { error: typeof body?.detail === "string" ? body.detail : body?.error ?? `fal result ${res.status}` };
+  if (!body?.video?.url) return { error: "the film came back without a video" };
+  return { url: body.video.url, contentType: body.video.content_type };
+}
+
+// src/starter-video.ts
+var FILM_MAX_BYTES = 8e6;
+var FILM_TIMEOUT_MS = 12 * 6e4;
+var SYSTEM = { kind: "agent", id: "00000000-0000-0000-0000-000000000000" };
+var FilmSchema = z17.object({ workspace: z17.string().uuid(), item: z17.string().uuid(), prompt: z17.string().min(8).max(2e3) });
+var tierView = (t2) => ({ tier: t2.tier, label: t2.label, model: t2.model.label, vendor: t2.model.vendor, seconds: t2.seconds, credits: t2.credits });
+function starterVideoRoutes(app, store2, opts = {}) {
+  const ledger = opts.ledger === void 0 ? ledgerFor(store2) : opts.ledger;
+  const env = opts.env ?? process.env;
+  const fetchFn = opts.fetchFn ?? fetch;
+  app.get("/v1/starter/video", async (c) => {
+    const workspace = c.req.query("workspace");
+    if (!workspace) return c.json({ error: "workspace required", code: "INVALID_INPUT" }, 400);
+    if (!await actorInWorkspace(store2, c.get("actor"), workspace)) return c.json({ error: "not your workspace", code: "NOT_PERMITTED" }, 403);
+    const tiers = localMode() ? [] : videoTiers(env);
+    const [pick, plan] = await Promise.all([store2.getVideoTier(workspace).catch(() => null), store2.workspacePlan(workspace).catch(() => "free")]);
+    const active = tierFor(tiers, pick);
+    return c.json({ served: tiers.length > 0 && !!ledger, tier: active?.tier ?? null, pick: pick ?? null, canPick: plan === "cloud", tiers: tiers.map(tierView), labels: VIDEO_TIER_LABELS });
+  });
+  app.post("/v1/starter/film", async (c) => {
+    if (localMode()) return c.json({ error: "The local stack has no video lane. Add a Google AI key under Image generation.", code: "UNAVAILABLE" }, 503);
+    if (!ledger || !store2.films) return c.json({ error: "credits not served by this store", code: "UNAVAILABLE" }, 503);
+    const body = FilmSchema.safeParse(await c.req.json().catch(() => null));
+    if (!body.success) return c.json({ error: "invalid body", issues: body.error.issues }, 400);
+    const { workspace, item, prompt } = body.data;
+    const actor = c.get("actor");
+    if (!await actorInWorkspace(store2, actor, workspace)) return c.json({ error: "not your workspace", code: "NOT_PERMITTED" }, 403);
+    const before = await ledger.balance(workspace);
+    if (before.remainingMicros <= 0) return c.json({ error: "out of credits", code: "NO_CREDITS", remainingCredits: 0 }, 402);
+    const tiers = videoTiers(env);
+    const tier = tierFor(tiers, await store2.getVideoTier(workspace).catch(() => null));
+    if (!tier) return c.json({ error: "video is not served here", code: "UNAVAILABLE" }, 503);
+    const media = await store2.contentItemMedia(item);
+    if (!media || media.workspace !== workspace) return c.json({ error: "draft not found", code: "NOT_FOUND" }, 404);
+    if (await store2.films.openForItem(item)) return c.json({ error: "a film is already in flight for this draft", code: "IN_FLIGHT" }, 409);
+    const micros = priceFilm(tier.model, tier.seconds);
+    const spent = await ledger.spendFilm(workspace, micros, { seconds: tier.seconds });
+    if (!spent) return c.json({ error: "out of credits", code: "NO_CREDITS", remainingCredits: Math.floor(before.remainingMicros / CREDIT_MICROS), credits: Math.ceil(micros / CREDIT_MICROS) }, 402);
+    const key2 = env["FAL_KEY"];
+    const sub = await falSubmit(key2, tier.model.endpoint, tier.model.input(prompt, tier.seconds), fetchFn);
+    if (!sub.requestId) {
+      await ledger.refundFilm(workspace, { grantMicros: spent.grantMicros, purchasedMicros: spent.purchasedMicros, seconds: tier.seconds }, `refund: ${tier.model.label} did not accept the film`);
+      return c.json({ error: sub.error ?? "the film was not accepted", code: sub.unavailable ? "UNAVAILABLE" : "UPSTREAM" }, sub.unavailable ? 503 : 502);
+    }
+    const { id } = await store2.films.create({ workspaceId: workspace, itemId: item, tier: tier.tier, model: tier.model.key, endpoint: tier.model.endpoint, requestId: sub.requestId, seconds: tier.seconds, micros, grantMicros: spent.grantMicros, purchasedMicros: spent.purchasedMicros, createdBy: actor.kind === "human" ? actor.id : null });
+    await store2.reviseDraft(item, { body: null, imageBrief: null, thumb: null, videoPending: true, videoError: "" }, (ws) => createEvent({ type: "content.updated", source: formatAddress({ kind: actor.kind, id: actor.id }), target: formatAddress({ kind: "resource", type: "content", id: item }), workspace: ws, payload: { item, filming: id } })).catch(() => {
+    });
+    c.header("x-nm-credits-remaining", String(Math.floor(spent.remainingMicros / CREDIT_MICROS)));
+    return c.json({ ok: true, film: id, tier: tierView(tier), credits: Math.ceil(micros / CREDIT_MICROS), remainingCredits: Math.floor(spent.remainingMicros / CREDIT_MICROS) }, 202);
+  });
+}
+function filmsCronRoute(app, store2, opts = {}) {
+  app.get("/internal/films-due", async (c) => {
+    const secret = (opts.env ?? process.env)["CRON_SECRET"];
+    if (!secret || c.req.header("authorization") !== `Bearer ${secret}`) return c.json({ error: "forbidden" }, 403);
+    const results = await filmsDue(store2, opts);
+    return c.json({ processed: results.length, results });
+  });
+}
+async function filmsDue(store2, opts = {}) {
+  const ledger = opts.ledger === void 0 ? ledgerFor(store2) : opts.ledger;
+  const env = opts.env ?? process.env;
+  const fetchFn = opts.fetchFn ?? fetch;
+  const now = opts.now ?? Date.now;
+  const key2 = env["FAL_KEY"];
+  if (!store2.films || !ledger || !key2) return [];
+  const out = [];
+  for (const row of await store2.films.open(opts.limit ?? 10)) {
+    const fail = async (why) => {
+      await ledger.refundFilm(row.workspaceId, { grantMicros: row.grantMicros, purchasedMicros: row.purchasedMicros, seconds: row.seconds }, `refund: film ${row.id.slice(0, 8)} on ${row.model} failed`);
+      await store2.films.update(row.id, { status: "failed", error: why, finishedAt: new Date(now()).toISOString() });
+      await patchDraft(store2, row, { videoPending: false, videoError: why });
+      out.push({ id: row.id, outcome: `failed: ${why}` });
+    };
+    if (now() - new Date(row.createdAt).getTime() > FILM_TIMEOUT_MS) {
+      await fail("the film took longer than twelve minutes");
+      continue;
+    }
+    if (!row.requestId) {
+      await fail("the film was never submitted");
+      continue;
+    }
+    const st = await falStatus(key2, row.endpoint, row.requestId, fetchFn);
+    if (st.state === "failed") {
+      await fail(st.error ?? "the film failed");
+      continue;
+    }
+    if (st.state !== "done") {
+      if (st.state === "running" && row.status !== "running") await store2.films.update(row.id, { status: "running" });
+      out.push({ id: row.id, outcome: st.state });
+      continue;
+    }
+    const res = await falResult(key2, row.endpoint, row.requestId, fetchFn);
+    if (!res.url) {
+      await fail(res.error ?? "the film came back empty");
+      continue;
+    }
+    const dl = await fetchFn(res.url, { redirect: "follow" }).catch(() => null);
+    if (!dl?.ok) {
+      await fail(`the film could not be downloaded (${dl?.status ?? "no answer"})`);
+      continue;
+    }
+    const bytes = Buffer.from(await dl.arrayBuffer());
+    if (!bytes.length) {
+      await fail("the film downloaded empty");
+      continue;
+    }
+    if (bytes.length > FILM_MAX_BYTES) {
+      await fail(`the film is too large to attach (${Math.round(bytes.length / 1e6)} MB, max 8 MB)`);
+      continue;
+    }
+    const mime = sniffVideoMime(new Uint8Array(bytes.subarray(0, 16))) ?? res.contentType ?? "video/mp4";
+    try {
+      await store2.attachContentMedia(row.itemId, mime, bytes, SYSTEM, (ws) => createEvent({ type: "content.updated", source: formatAddress(SYSTEM), target: formatAddress({ kind: "resource", type: "content", id: row.itemId }), workspace: ws, payload: { item: row.itemId, media: "hosted", film: row.id } }));
+    } catch (e) {
+      await fail(`the film did not attach to the draft (${e instanceof Error ? e.message : String(e)})`);
+      continue;
+    }
+    const at = new Date(now()).toISOString();
+    await patchDraft(store2, row, { videoPending: false, videoError: "", videoMeta: { tier: row.tier, model: VIDEO_MODELS[row.model]?.label ?? row.model, seconds: row.seconds, credits: Math.ceil(row.micros / CREDIT_MICROS), at } });
+    await store2.films.update(row.id, { status: "done", finishedAt: at });
+    out.push({ id: row.id, outcome: "done" });
+  }
+  return out;
+}
+async function patchDraft(store2, row, patch) {
+  await store2.reviseDraft(row.itemId, { body: null, imageBrief: null, thumb: null, ...patch }, (ws) => createEvent({ type: "content.updated", source: formatAddress(SYSTEM), target: formatAddress({ kind: "resource", type: "content", id: row.itemId }), workspace: ws, payload: { item: row.itemId, film: row.id } })).catch(() => {
+  });
+}
+
 // src/push.ts
 init_src();
 var GATE_STATES = /* @__PURE__ */ new Set(["done", "design_review", "plan_review", "ship_review", "blocked"]);
@@ -18324,75 +18748,75 @@ function expoFetchSender(accessToken) {
 }
 
 // src/app.ts
-var MessageInputSchema = z17.object({
+var MessageInputSchema = z18.object({
   // Client-supplied id keeps optimistic local rows identical to server rows
   // (PowerSync echo-back would otherwise duplicate-then-swap them).
-  id: z17.string().uuid().optional(),
-  workspace: z17.string().min(1),
-  channel: z17.string().min(1),
+  id: z18.string().uuid().optional(),
+  workspace: z18.string().min(1),
+  channel: z18.string().min(1),
   // may be empty when the message carries only attachments (no caption)
-  body: z17.string(),
-  taskId: z17.string().min(1).optional(),
+  body: z18.string(),
+  taskId: z18.string().min(1).optional(),
   // the conversation thread this message belongs to (conversation-first shell). A
   // fresh client-generated id births the thread transactionally with the message.
-  threadId: z17.string().uuid().optional(),
+  threadId: z18.string().uuid().optional(),
   // docs/34: the composer's Tasks toggle, applied ONLY when this send births the thread.
   // A later message carrying it is ignored — the mode is the thread's, and changing it is
   // thread.set_mode (human-only), never a side effect of typing.
-  threadMode: z17.enum(["tasks", "chat"]).optional(),
+  threadMode: z18.enum(["tasks", "chat"]).optional(),
   // docs/10 §15: the composer's brain draft, applied ONLY when this send births the thread —
   // the same birth-time contract as threadMode above, and for the same reason. Moving it
   // afterwards is thread.set_brain (human-only), never a side effect of typing.
-  brainOverride: z17.record(z17.string(), z17.string()).nullable().optional(),
+  brainOverride: z18.record(z18.string(), z18.string()).nullable().optional(),
   // docs/31: when this send BIRTHS a thread, the room message it hangs off. The root is
   // referenced, never moved — it keeps its place in the feed and grows a replies footer.
-  rootMessageId: z17.string().uuid().optional(),
+  rootMessageId: z18.string().uuid().optional(),
   // 0119: the automation whose slot fired this send, applied ONLY when it births the thread —
   // the same birth-time contract as threadMode/brainOverride. It is what lets the Automations
   // card list a routine's runs without pattern-matching the marker in its opening line.
-  scheduleId: z17.string().uuid().optional(),
+  scheduleId: z18.string().uuid().optional(),
   // 0134, rule D9: WHERE the session runs and WHICH client bore it, applied ONLY when this send
   // births the thread — the same birth-time contract as the three above. Moving the machine
   // afterwards is thread.set_machine (human-only); the origin never moves.
-  threadMachineId: z17.string().uuid().nullable().optional(),
-  threadOrigin: z17.enum(["desktop", "web", "routine"]).optional(),
+  threadMachineId: z18.string().uuid().nullable().optional(),
+  threadOrigin: z18.enum(["desktop", "web", "routine"]).optional(),
   // the message this reply ANSWERS (agent wake replies) — the server enforces one
   // reply per (agent, trigger) so concurrent daemons can't double-reply (0060).
-  replyTo: z17.string().uuid().optional()
+  replyTo: z18.string().uuid().optional()
 });
-var ArtifactCreateSchema = z17.object({
-  id: z17.string().uuid(),
-  workspace: z17.string().min(1),
-  channel: z17.string().min(1),
-  taskId: z17.string().min(1).optional(),
-  messageId: z17.string().uuid(),
-  kind: z17.enum(["screenshot", "file", "doc", "diff", "test_report"]).default("file"),
-  name: z17.string().min(1).max(512),
-  mime: z17.string().max(255).optional(),
-  inlineContent: z17.string().max(4e5).optional(),
-  sizeBytes: z17.number().int().nonnegative().optional(),
-  width: z17.number().int().positive().optional(),
-  height: z17.number().int().positive().optional()
+var ArtifactCreateSchema = z18.object({
+  id: z18.string().uuid(),
+  workspace: z18.string().min(1),
+  channel: z18.string().min(1),
+  taskId: z18.string().min(1).optional(),
+  messageId: z18.string().uuid(),
+  kind: z18.enum(["screenshot", "file", "doc", "diff", "test_report"]).default("file"),
+  name: z18.string().min(1).max(512),
+  mime: z18.string().max(255).optional(),
+  inlineContent: z18.string().max(4e5).optional(),
+  sizeBytes: z18.number().int().nonnegative().optional(),
+  width: z18.number().int().positive().optional(),
+  height: z18.number().int().positive().optional()
 });
-var WhiteboardPutSchema = z17.object({
-  id: z17.string().uuid(),
-  workspace: z17.string().min(1),
-  channel: z17.string().min(1),
-  threadId: z17.string().uuid().optional(),
-  taskId: z17.string().optional(),
-  title: z17.string().trim().min(1).max(WB_TITLE_MAX).catch("Untitled board"),
-  scene: z17.string().max(WB_SCENE_MAX).optional(),
-  snapshotSvg: z17.string().max(WB_SNAPSHOT_MAX).optional(),
-  snapshotRev: z17.number().int().nonnegative().optional(),
-  rev: z17.number().int().min(1).default(1)
+var WhiteboardPutSchema = z18.object({
+  id: z18.string().uuid(),
+  workspace: z18.string().min(1),
+  channel: z18.string().min(1),
+  threadId: z18.string().uuid().optional(),
+  taskId: z18.string().optional(),
+  title: z18.string().trim().min(1).max(WB_TITLE_MAX).catch("Untitled board"),
+  scene: z18.string().max(WB_SCENE_MAX).optional(),
+  snapshotSvg: z18.string().max(WB_SNAPSHOT_MAX).optional(),
+  snapshotRev: z18.number().int().nonnegative().optional(),
+  rev: z18.number().int().min(1).default(1)
 });
-var WhiteboardPatchSchema = z17.object({
-  rev: z17.number().int().min(1),
-  title: z17.string().trim().min(1).max(WB_TITLE_MAX).optional(),
-  scene: z17.string().max(WB_SCENE_MAX).optional(),
-  snapshotSvg: z17.string().max(WB_SNAPSHOT_MAX).optional(),
-  snapshotRev: z17.number().int().nonnegative().optional(),
-  archivedAt: z17.string().nullable().optional()
+var WhiteboardPatchSchema = z18.object({
+  rev: z18.number().int().min(1),
+  title: z18.string().trim().min(1).max(WB_TITLE_MAX).optional(),
+  scene: z18.string().max(WB_SCENE_MAX).optional(),
+  snapshotSvg: z18.string().max(WB_SNAPSHOT_MAX).optional(),
+  snapshotRev: z18.number().int().nonnegative().optional(),
+  archivedAt: z18.string().nullable().optional()
 });
 var webOrigin = (origin) => origin === "https://neuramesh.app" || origin === "https://www.neuramesh.app" || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin) ? origin : null;
 function createApp(store2, opts = {}) {
@@ -18558,6 +18982,7 @@ function createApp(store2, opts = {}) {
     tiktok: { start: tiktokStartUrl, callback: tiktokCallback, scopes: "user.info.basic video.upload" }
   };
   announceRoutes(app, store2, opts.announce);
+  filmsCronRoute(app, store2, opts.starterVideo);
   app.get("/connect/:provider/start", (c) => {
     const provider = c.req.param("provider");
     const flow = CONNECT_FLOWS[provider];
@@ -18688,6 +19113,7 @@ function createApp(store2, opts = {}) {
   importRoutes(app, store2);
   announceClaimRoute(app, store2);
   contentMediaRoute(app, store2);
+  starterVideoRoutes(app, store2, opts.starterVideo);
   app.post("/v1/commands", async (c) => {
     const body = await c.req.json().catch(() => null);
     const parsed = CommandSchema.safeParse(body);
@@ -19141,7 +19567,8 @@ async function dueContentItemsSql(sql, nowIso, limit) {
     order by scheduled_at limit ${limit}`;
   return rows2.map((r) => {
     const m = r["media"];
-    const imageIntended = !!(m && (m.brief || m.thumb || m.image_error));
+    const video = !!(m && (m.script || m.video_id || m.video_pending));
+    const imageIntended = video ? !!m?.video_pending && !m?.video_id : !!(m && (m.brief || m.thumb || m.image_error));
     return {
       id: r["id"],
       workspace: r["workspace_id"],
@@ -19149,7 +19576,8 @@ async function dueContentItemsSql(sql, nowIso, limit) {
       platform: r["platform"],
       body: r["body"],
       mediaUrl: m?.image_url ?? null,
-      mediaId: m?.image_id ?? null,
+      mediaId: m?.video_id ?? m?.image_id ?? null,
+      mediaKind: m?.video_id ? "video" : m?.image_id ? "image" : null,
       imageIntended
     };
   });
@@ -20308,6 +20736,10 @@ var PostgresStore = class {
   ann;
   get announcements() {
     return this.ann ??= new PgAnnounceStore(this.sql);
+  }
+  filmStore;
+  get films() {
+    return this.filmStore ??= new PgFilmStore(this.sql);
   }
   constructor(url) {
     const serverless = !!process.env["VERCEL"];
@@ -21725,6 +22157,7 @@ var PostgresStore = class {
       const [ws] = await sql`select id from workspaces where id = ${workspaceId}::uuid`;
       if (!ws) throw new DomainError("NOT_FOUND", "workspace not found");
       await sql`update workspaces set auto_failover = coalesce(${patch.autoFailover ?? null}, auto_failover), active_model_pack = coalesce(${patch.activeModelPack ?? null}, active_model_pack), comm_rules = coalesce(${patch.commRules ? sql.json(patch.commRules) : null}, comm_rules) where id = ${workspaceId}::uuid`;
+      if (patch.videoTier !== void 0) await sql`update workspaces set video_tier = ${patch.videoTier} where id = ${workspaceId}::uuid`;
       await this.insertEvent(sql, makeEvent(workspaceId), null);
       return { id: workspaceId };
     });
@@ -21732,6 +22165,10 @@ var PostgresStore = class {
   async getCommRules(workspace) {
     const [r] = await this.sql`select comm_rules from workspaces where id = ${workspace}::uuid`;
     return r?.["comm_rules"] ?? null;
+  }
+  async getVideoTier(workspace) {
+    const [r] = await this.sql`select video_tier from workspaces where id = ${workspace}::uuid`;
+    return r?.["video_tier"] ?? null;
   }
   async listModelPacks(workspace) {
     const rows2 = await this.sql`select id, name, roles, updated_at from custom_model_packs where workspace_id = ${workspace}::uuid order by created_at`;
@@ -22126,7 +22563,22 @@ var PostgresStore = class {
       }
       if (patch.videoError !== void 0) {
         if (patch.videoError) media["video_error"] = patch.videoError;
-        else delete media["video_error"];
+        else {
+          delete media["video_error"];
+          delete media["video_error_code"];
+        }
+      }
+      if (patch.videoErrorCode !== void 0) {
+        if (patch.videoErrorCode) media["video_error_code"] = patch.videoErrorCode;
+        else delete media["video_error_code"];
+      }
+      if (patch.videoPending !== void 0) {
+        if (patch.videoPending) media["video_pending"] = true;
+        else delete media["video_pending"];
+      }
+      if (patch.videoMeta !== void 0) {
+        if (patch.videoMeta) media["video"] = patch.videoMeta;
+        else delete media["video"];
       }
       const newBody = patch.body ?? cur["body"];
       if (isRevision && cur["status"] === "scheduled") {

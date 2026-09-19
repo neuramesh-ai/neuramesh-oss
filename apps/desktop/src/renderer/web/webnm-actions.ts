@@ -271,8 +271,8 @@ function spaceWrites(cfg: WebNmConfig, db: PowerSyncDatabase): Partial<NMBridge>
       cmd<{ ok: boolean }>(cfg, { type: 'member.set_compute', workspace: ws(), machine: prefs.machine, agents: prefs.agents, shares: prefs.shares }),
     shareCompute: (member: string, on: boolean) => cmd<{ ok: boolean }>(cfg, { type: 'member.share_compute', workspace: ws(), member, on }),
 
-    workspaceUpdate: (input: { autoFailover?: boolean; activeModelPack?: string; commRules?: { ste100?: boolean; noEmdash?: boolean; custom?: string[] } }) =>
-      postCommand(cfg, { type: 'workspace.update', workspace: ws(), autoFailover: input.autoFailover, activeModelPack: input.activeModelPack, commRules: input.commRules }),
+    workspaceUpdate: (input: { autoFailover?: boolean; activeModelPack?: string; commRules?: { ste100?: boolean; noEmdash?: boolean; custom?: string[] }; videoTier?: 'starter' | 'xpress' | 'premium' | null }) =>
+      postCommand(cfg, { type: 'workspace.update', workspace: ws(), autoFailover: input.autoFailover, activeModelPack: input.activeModelPack, commRules: input.commRules, videoTier: input.videoTier }),
     // deleting the ACTIVE workspace needs no local flag on the web: the next boot reads
     // /v1/workspaces, the dead one is simply not in it, and applyBootRoute lands the shell on
     // whatever remains (or onboarding). The desktop had to set needsOnboarding because its WS

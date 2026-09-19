@@ -4,4 +4,5 @@
 // what let the layer be split without touching any of them.
 export * from './store/types';
 export type { Store } from './store/contract';
+export type { VideoMeta } from './store/films';
 export { MemoryStore } from './store/memory';

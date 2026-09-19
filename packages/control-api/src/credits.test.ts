@@ -40,8 +40,10 @@ describe('the credit routes', () => {
     app.use('/v1/*', async (c, next) => { c.set('actor' as never, actor as never); await next(); });
     const ledger: Ledger = {
       balance: async () => ({ grantedMicros: 5_000_000, spentMicros: 1_000_000, purchasedMicros: 0, purchasedSpentMicros: 0, remainingMicros: 4_000_000, grantRemainingMicros: 4_000_000, purchasedRemainingMicros: 0, periodStart: '2026-08-01' }),
-      usage: async () => ({ day: '2026-08-28', minutes: 23, activeSeconds: 480, modelCalls: 7, modelMicros: 1_000_000, machineMicros: 8_000 }),
+      usage: async () => ({ day: '2026-08-28', minutes: 23, activeSeconds: 480, modelCalls: 7, modelMicros: 1_000_000, machineMicros: 8_000, videoClips: 0, videoMicros: 0 }),
       spend: async () => ({ remainingMicros: 0 }),
+      spendFilm: async () => ({ remainingMicros: 0, grantMicros: 0, purchasedMicros: 0 }),
+      refundFilm: async () => {},
       ...over.ledger,
     };
     const store = { humanMemberIds: async () => ['u-me'], agentWorkspace: async () => WS, workspacePlan: async () => 'free', ...over.store } as unknown as Store;

@@ -7,11 +7,14 @@ import { ConnectorMark } from './connector-marks';
 import { ConnectPanel, disconnectConnector } from './ConnectPanel';
 import { type ConnectorId, type ConnectorState } from './connectors';
 import { useConnectorStates } from './useConnectorStates';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { nm as nmBridge } from '../bridge/nm';
+import type { StarterVideo } from '../bridge/nm';
+import { IconPlay } from '../ui/icons';
 
 // their old homes, kept as re-exports so the shell, the post cards and the thread hooks import nothing new
 export { IMAGE_CRED_ORDER, imageCredOf } from './connectors';
-export { ImageKeyForm, openImageConnect, setImageConnectOpener } from './ConnectPanel';
+export { ImageKeyForm, openCredits, openImageConnect, setCreditsOpener, setImageConnectOpener } from './ConnectPanel';
 
 // The full Connections surface (round 19): every provider row + its own connect flow —
 // lives in the dock's Connections overlay. Same state machine as the old rail section.
@@ -55,6 +58,46 @@ export function ConnectionsList({ channelId, marketing }: { channelId: string; m
           </div>
         );
       })}
+      <VideoRow />
+    </div>
+  );
+}
+
+/** THE VIDEO ROW (the video rung, 2026-09-19): a statement of what films a video post and what it
+ *  costs, read from the server (the model behind a tier is its env variable, never a key here). A
+ *  Pro workspace picks among the tiers the server serves; Free films on the default tier only, or
+ *  on its own Google key. The pick is a workspace setting (workspace.update videoTier). */
+function VideoRow() {
+  const [cat, setCat] = useState<StarterVideo | null | undefined>(undefined);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { let live = true; void (nmBridge?.starterVideo?.() ?? Promise.resolve(null)).then((c) => { if (live) setCat(c ?? null); }).catch(() => { if (live) setCat(null); }); return () => { live = false; }; }, []);
+  if (cat === undefined || !cat?.served) return null;
+  const active = cat.tiers.find((t) => t.tier === cat.tier) ?? cat.tiers[0];
+  const pick = async (tier: string) => {
+    setBusy(true);
+    try { await nmBridge?.workspaceUpdate({ videoTier: tier as 'starter' | 'xpress' | 'premium' }); setCat({ ...cat, tier, pick: tier }); } catch { /* the row keeps what the server holds */ }
+    setBusy(false);
+  };
+  return (
+    <div className="mkrailconnwrap">
+      <div className="mkrailrow mkrailconn mkvideorow">
+        <span aria-hidden className="mkconnmark"><IconPlay s={13} /></span><b>Video</b>
+        <span className="mkconndone"><span className="mkintok">on credits</span></span>
+      </div>
+      <div className="mkvideonote">
+        {cat.canPick
+          ? <>
+              <span>NeuraMesh films video posts on the tier you pick. Your Google key is the fallback when the credits are out.</span>
+              <div className="mkvideotiers" role="radiogroup" aria-label="Video tier">
+                {cat.tiers.map((t) => (
+                  <button key={t.tier} type="button" role="radio" aria-checked={t.tier === cat.tier} className={`mkvideotier${t.tier === cat.tier ? ' on' : ''}`} disabled={busy} onClick={() => void pick(t.tier)}>
+                    <b>{t.label}</b><span>{t.model} · {t.seconds} s · {t.credits} credits a film</span>
+                  </button>
+                ))}
+              </div>
+            </>
+          : active && <span>NeuraMesh films video posts on <b>{active.label}</b> ({active.model}), about {active.credits} credits for an eight-second hook. Your Google key is the fallback. Pro workspaces pick among {cat.tiers.length} tiers.</span>}
+      </div>
     </div>
   );
 }

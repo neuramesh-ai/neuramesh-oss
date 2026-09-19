@@ -2,10 +2,16 @@
 // (main/localStack). Artboards A1 (the picker), A1b (installing), A2 (the engine starts), A3
 // (download), A4 (the stack starts), A6 (update); `ready` is the shell. One card recipe on the
 // frame (`.lsgcard`, docs/33 §8), and the card DRAWS: every decision — which state blocks, how many
-// MB — arrived in the payload, so nothing here can drift from main.
-import { Wordmark } from '../brand';
+// MB, which container is stopped and why — arrived in the payload, so nothing here can drift from main.
+//
+// The stack card is the CHAIN (the first-run round, 2026-09-18, docs/design/first-run-stack-2026-09):
+// the picker's radio column becomes the status column, one node per container in boot order, a
+// segment that lights once the node above it is ready. The card wears the Porch mark, which plays
+// the launch grammar once at mount and then glances left and right every few seconds.
+import { useState } from 'react';
+import { PorchMark, Wordmark } from '../brand';
 import { IconCheck } from '../ui/icons';
-import type { LocalProgressItem, LocalRuntime, LocalStackPayload } from '../bridge/nm';
+import type { LocalProgressItem, LocalRuntime, LocalServiceStatus, LocalStackPayload } from '../bridge/nm';
 
 const RUNTIME_LABEL: Record<LocalRuntime, string> = { colima: 'Colima', orbstack: 'OrbStack', 'docker-desktop': 'Docker Desktop' };
 const ENGINE_LABEL: Record<string, string> = { colima: 'Colima', orbstack: 'OrbStack', 'docker-desktop': 'Docker Desktop', other: 'Docker' };
@@ -14,6 +20,8 @@ const RUNTIMES: Array<{ id: LocalRuntime; fact: string; tag?: string }> = [
   { id: 'orbstack', fact: 'Free for personal use. Opens its installer.' },
   { id: 'docker-desktop', fact: 'Free under 250 people. Asks for your password.' },
 ];
+/** one phrase per container, the way the picker's rows carry one fact each */
+const SERVICE_FACT: Record<string, string> = { Postgres: 'The workspace database', 'NeuraMesh API': 'The NeuraMesh server', PowerSync: 'The sync engine' };
 
 const mb = (bytes: number | null): string => (bytes === null ? '' : `${Math.round(bytes / 1e6)} MB`);
 
@@ -29,7 +37,7 @@ function ProgressRow({ item }: { item: LocalProgressItem }) {
   );
 }
 
-/** a status row: name · ready | please wait… */
+/** a status row: name · ready | please wait… (the install and engine cards) */
 function StatusRow({ name, ready, top }: { name: string; ready: boolean; top?: boolean }) {
   return (
     <div className={`lsgsrow${top ? ' top' : ''}`}>
@@ -39,16 +47,60 @@ function StatusRow({ name, ready, top }: { name: string; ready: boolean; top?: b
   );
 }
 
-function Card({ kicker, title, p, children, actions, foot }: { kicker: string; title: string; p: string; children?: React.ReactNode; actions?: React.ReactNode; foot?: string }) {
+/** a chain node: ready = filled, a check · starting = a dot under the wizard's spinning halo · queued = a ring · stopped = the failure ink, a cross */
+function Node({ status }: { status: LocalServiceStatus }) {
+  return (
+    <span className={`lsgnode ${status}`} aria-hidden>
+      <svg width="18" height="18" viewBox="0 0 18 18">
+        {status === 'ready' && <><circle cx="9" cy="9" r="8" /><path d="m5.6 9.3 2.4 2.4 4.6-4.9" /></>}
+        {status === 'starting' && <><circle className="lsghalo" cx="9" cy="9" r="8" /><circle className="lsgdot" cx="9" cy="9" r="3.2" /></>}
+        {status === 'stopped' && <><circle cx="9" cy="9" r="8" /><path d="m6.4 6.4 5.2 5.2M11.6 6.4l-5.2 5.2" /></>}
+        {status === 'queued' && <circle cx="9" cy="9" r="7.75" />}
+      </svg>
+    </span>
+  );
+}
+
+/** the chain: the containers in boot order, a segment lit once the node above it is ready, the one word a failure earns */
+function Chain({ services }: { services: Array<{ name: string; status: LocalServiceStatus }> }) {
+  return (
+    <div className="lsgchain" role="list" aria-label="Containers">
+      {services.map((s, i) => (
+        <div className="lsgcrow" role="listitem" key={s.name}>
+          <Node status={s.status} />
+          {i < services.length - 1 && <span className={`lsgseg${s.status === 'ready' ? ' lit' : ''}`} aria-hidden />}
+          <span className={`lsgcname${s.status === 'queued' ? ' dimmed' : ''}`}>
+            <span className="lsgnm">{s.name}</span>
+            {SERVICE_FACT[s.name] && <span className="lsgfact">{SERVICE_FACT[s.name]}</span>}
+          </span>
+          <span className="lsgsr" aria-label={s.status}>{s.status === 'stopped' && <span className="lsgst bad">stopped</span>}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function Card({ kicker, title, p, children, actions, foot }: { kicker: string; title: string; p?: string; children?: React.ReactNode; actions?: React.ReactNode; foot?: string }) {
   return (
     <div className="lsgcard" role="dialog" aria-labelledby="lsgtitle">
+      <span className="lsgmark" aria-hidden><PorchMark size={40} cut="std" animated /></span>
       <span className="lsgkick">{kicker}</span>
       <h1 className="lsgtitle" id="lsgtitle">{title}</h1>
-      <p className="lsgp">{p}</p>
+      {p && <p className="lsgp">{p}</p>}
       {children}
       {actions && <div className="lsgacts">{actions}</div>}
       {foot && <div className="lsgfoot"><span className="lsgmono">{foot}</span></div>}
     </div>
+  );
+}
+
+/** the three lines on the clipboard, for a report */
+function CopyDetails({ lines }: { lines: string[] }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button type="button" className="btn quiet sm" onClick={() => { void navigator.clipboard?.writeText(lines.join('\n')); setCopied(true); window.setTimeout(() => setCopied(false), 1600); }}>
+      {copied ? 'copied ✓' : 'Copy details'}
+    </button>
   );
 }
 
@@ -112,8 +164,8 @@ export function LocalStackGate({ payload, onPick, onInstall, onRescan, onQuit }:
       break;
     case 'starting':
       card = (
-        <Card kicker="First run" title="NeuraMesh starts on this Mac" p="Your workspace on this Mac runs in three containers. They start now. Please wait…" foot="Ports open on 127.0.0.1 only">
-          <div>{s.services.map((sv) => <StatusRow key={sv.name} name={sv.name} ready={sv.ready} />)}</div>
+        <Card kicker="First run" title="NeuraMesh is starting up…" p="Your workspace runs in three containers. This usually takes under a minute.">
+          <Chain services={s.services} />
         </Card>
       );
       break;
@@ -125,9 +177,19 @@ export function LocalStackGate({ payload, onPick, onInstall, onRescan, onQuit }:
       );
       break;
     case 'error':
+      // the cause in plain words, the container's own last line in a well, what Try again does — an
+      // error with no diagnosis (Colima did not start.) keeps the two-line card
       card = (
-        <Card kicker="Local mode" title="NeuraMesh did not start on this Mac" p={s.message}
-          actions={<><button type="button" className="btn primary" onClick={onRescan}>Try again</button><button type="button" className="btn quiet" onClick={onQuit}>Quit</button></>} />
+        <Card kicker="Local mode" title="NeuraMesh did not start on this Mac"
+          actions={<>
+            <button type="button" className="btn primary" onClick={onRescan}>Try again</button>
+            <button type="button" className="btn quiet" onClick={onQuit}>Quit</button>
+            {s.detail && <><span className="lsggrow" /><CopyDetails lines={[s.message, s.detail, ...(s.remedy ? [s.remedy] : [])]} /></>}
+          </>}>
+          <p className="lsgcause">{s.message}</p>
+          {s.detail && <div className="lsgwell">{s.detail}</div>}
+          {s.remedy && <p className="lsgremedy">{s.remedy}</p>}
+        </Card>
       );
       break;
     case 'probing':

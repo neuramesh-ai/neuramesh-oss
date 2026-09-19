@@ -27,6 +27,10 @@
       "schedule": "*/5 * * * *"
     },
     {
+      "path": "/internal/films-due",
+      "schedule": "* * * * *"
+    },
+    {
       "path": "/internal/announce-due",
       "schedule": "* * * * *"
     }

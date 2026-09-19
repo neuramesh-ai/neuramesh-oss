@@ -1,14 +1,27 @@
 // Social post cards (docs/design/thread-posts) — a drafted post, its per-network preview,
 // and the approve/schedule controls. Thread-native: the same card renders in a conversation
 // and in a task panel from one derivation. Extracted from App.tsx (track A3).
-import { IconImage, IconPlay, IconReply } from '../ui/icons';
+import { IconDownload, IconImage, IconKebab, IconPlay, IconReply } from '../ui/icons';
 import { MK_PLATFORMS, MK_PLATFORM_ICON } from '../thread/DeliveryStrip';
 import { openImageConnect } from '../settings/ConnectionsList';
 import { type ContentItemRow } from '../bridge/rows-content';
 import { type PostVCard } from '../thread/parts';
 import { useEffect, useState } from 'react';
 import { nm as nmBridge } from '../bridge/nm';
-import { cardParts, type CardMedia } from './cardparts';
+import { cardParts, filmFacts, filmFile, filmingOn, type CardMedia, type StarterVideoCatalog } from './cardparts';
+import { useFilm } from './FilmPreview';
+import { openCredits } from '../settings/ConnectionsList';
+
+// THE TIER CATALOG (the video rung): what this server films on and what it costs, read once per
+// session and shared by every card, so a thread of six video cards asks the server once, not six
+// times. A card that mounts before the answer shows no facts line rather than a wrong one.
+let catalogOnce: Promise<StarterVideoCatalog> | null = null;
+const readCatalog = (): Promise<StarterVideoCatalog> => (catalogOnce ??= (nmBridge?.starterVideo?.() ?? Promise.resolve(null)).then((c) => (c as StarterVideoCatalog) ?? null).catch(() => null));
+export function useStarterVideo(): StarterVideoCatalog {
+  const [cat, setCat] = useState<StarterVideoCatalog>(null);
+  useEffect(() => { let live = true; void readCatalog().then((c) => { if (live) setCat(c); }); return () => { live = false; }; }, []);
+  return cat;
+}
 
 export function postCardsFrom(items: ContentItemRow[], rows: ReadonlyArray<{ body: string; created_at: string }>): PostVCard[] {
   // A draft's ORIGINAL version + its replaced history land in ONE delivery strip (they were
@@ -30,18 +43,6 @@ export function postCardsFrom(items: ContentItemRow[], rows: ReadonlyArray<{ bod
   return cards;
 }
 
-
-/** The film on a card: the media row's bytes, read once with the session (the film is too big for the synced row). */
-function useFilm(videoId: string | undefined): string | null {
-  const [src, setSrc] = useState<string | null>(null);
-  useEffect(() => {
-    let live = true;
-    setSrc(null);
-    if (videoId) void nmBridge?.contentMedia(videoId).then((d) => { if (live) setSrc(d); }).catch(() => {});
-    return () => { live = false; };
-  }, [videoId]);
-  return src;
-}
 
 export function SocialPostCard({ item, channelSlug, taskNumber, letter, onOpen, onReply, onGenerateImage, imageReady, version, superseded }: { item: ContentItemRow; channelSlug: string; taskNumber?: number | null; letter: string; onOpen: () => void; onReply?: () => void; /* `redraw` = the card already had a picture, so the message the thread records says so; `kind` = 'video' films the script's hook instead of drawing */ onGenerateImage?: (redraw: boolean, kind?: 'image' | 'video') => void; imageReady?: boolean; version?: number; superseded?: boolean }) {
   // the handle the human and the agent both use for this card. A task's drafts wear its number
@@ -73,8 +74,25 @@ export function SocialPostCard({ item, channelSlug, taskNumber, letter, onOpen, 
   const [open, setOpen] = useState(false);
   const canFilm = isVideo && !superseded && item.status === 'draft';
   const film = useFilm(media?.video_id);
+  const catalog = useStarterVideo();
+  // a film in flight: the local press until the server's row says so (video_pending, which
+  // survives a reload), or the own-key lane's thirty seconds
   const [filmPending, setFilmPending] = useState(false);
-  useEffect(() => { setFilmPending(false); }, [media?.video_id, media?.video_error]);
+  useEffect(() => { setFilmPending(false); }, [media?.video_id, media?.video_error, media?.video_pending]);
+  const filming = filmPending || !!media?.video_pending;
+  const facts = isVideo ? filmFacts(media, catalog) : null;
+  // THE FILM IS A FILE (George, 2026-09-19). A clip the card plays can be saved, on any card that
+  // shows one: the bytes are already here, so Save hands them to the OS dialog (the desktop) or the
+  // browser's own download, named for the card. The door is the card's menu (the kebab in the
+  // header, the project card's idiom), not a button beside the actions: saving is not a step in
+  // the draft's life, so it does not stand with Film again and Review.
+  const canSave = !!media?.video_id && !!film && !filming;
+  const [menu, setMenu] = useState(false);
+  const saveFilm = () => {
+    setMenu(false);
+    const f = filmFile(film, `${channelSlug}-${taskNumber ? `${taskNumber}-` : ''}${letter}-hook`);
+    if (f) void nmBridge?.saveFileAs(f).catch(() => null);
+  };
   // THE CARD'S IMAGE STATE, in two questions rather than one.
   //
   // It used to be a single `wantsImage` whose first clause was `!media?.thumb` — so the moment a
@@ -97,7 +115,16 @@ export function SocialPostCard({ item, channelSlug, taskNumber, letter, onOpen, 
         <span className="mkpcnet"><span className="mkpcg">{glyph}</span>{platformName}</span>
         <span className="mkpcid">{ref}{version && version > 1 ? ` · v${version}` : ''}</span>
         <span className={`chip ${superseded ? 'mk-old' : `mk-${item.status}`}`}>{superseded ? 'replaced' : item.status}</span>
+        {canSave && <button className={`mkpckebab${menu ? ' show' : ''}`} title="Card menu" aria-label={`Menu for draft ${letter}`} aria-haspopup="menu" aria-expanded={menu} onClick={() => setMenu((v) => !v)}><IconKebab s={14} /></button>}
       </div>
+      {menu && (
+        <>
+          <div className="projmenu-scrim" onClick={() => setMenu(false)} />
+          <div className="pmenu mkpcmenu" role="menu">
+            <button role="menuitem" onClick={saveFilm}><IconDownload s={13} />Download the film</button>
+          </div>
+        </>
+      )}
       <div className={pvClass}>
         <div className="mkpvhead">
           <span className={`mkpvav${grad ? ' grad' : ''}`}>{channelSlug[0]?.toUpperCase() ?? 'N'}</span>
@@ -112,8 +139,14 @@ export function SocialPostCard({ item, channelSlug, taskNumber, letter, onOpen, 
           </div>
         )}
         {hasImage && media?.thumb && <img className="mkpcimg" src={media.thumb} alt={media.brief ?? 'generated post image'} title={media.brief ?? undefined} />}
-        {media?.video_id && (film ? <video className="mkpcfilm" src={film} controls playsInline preload="metadata" /> : <div className="mkpcimgwait" aria-live="polite">loading the film…</div>)}
-        {filmPending && !media?.video_id && <div className="mkpcimgwait" aria-live="polite">filming the hook…</div>}
+        {media?.video_id && !filming && (film ? <video className="mkpcfilm" src={film} controls playsInline preload="metadata" /> : <div className="mkpcimgwait" aria-live="polite">loading the film…</div>)}
+        {filming && (
+          <div className="mkpcfilmwait" aria-live="polite">
+            <b>Filming on {filmingOn(catalog)}</b>
+            <span>About two minutes. The film lands on this card, and you can leave the page.</span>
+            <span className="mkpcprog"><i /></span>
+          </div>
+        )}
         {/* the shape of what is coming, where it will appear — a pending state belongs on the
             picture, not in a banner whose own button has to argue it is busy */}
         {tryPending && !media?.thumb && <div className="mkpcimgwait" aria-live="polite">drawing…</div>}
@@ -132,42 +165,38 @@ export function SocialPostCard({ item, channelSlug, taskNumber, letter, onOpen, 
           <span><span className="mkpcbriefk">{media.video_id ? 'shot direction' : 'needs video'}</span> · {media.brief}</span>
         </div>
       )}
-      {/* one clear image state per card — the reason on the card, not buried in a summary message */}
+      {/* one clear state per card — the reason on the card, not buried in a summary message. The
+          rows say WHY; every button lives in the foot below (George, 2026-09-19: "align the buttons
+          at the bottom of the preview social cards, now we have buttons scattered"). */}
       {wantsImage && imageReady === false && (
-        <div className="mkpcsetup">
-          <b>No image model connected.</b> Your designer wrote the art direction but has nothing to draw with. A subscription login carries no API key.
-          <button className="btn sm" onClick={() => openImageConnect()}>Connect an image model →</button>
-        </div>
+        <div className="mkpcsetup"><b>No image model connected.</b> Your designer wrote the art direction but has nothing to draw with. A subscription login carries no API key.</div>
       )}
       {wantsImage && imageReady !== false && media?.image_error && (
-        <div className="mkpcsetup mkpcimgerr">
-          <b>Image didn&rsquo;t generate.</b> {media.image_error}
-          {onGenerateImage && <button className="btn sm" disabled={tryPending} onClick={() => { setTryPending(true); onGenerateImage(false); }}>{tryPending ? 'Drawing…' : 'Try again'}</button>}
-        </div>
+        <div className="mkpcsetup mkpcimgerr"><b>Image didn&rsquo;t generate.</b> {media.image_error}</div>
       )}
-      {/* `imageReady` is undefined while the credential lookup is in flight (or after it rejected),
-          and every branch here tests === true / === false — so this row used to render NOTHING at
-          all, indistinguishable from a card that never wanted a picture. A disabled control is the
-          honest placeholder: it exists, it is not ready yet. */}
-      {wantsImage && !media?.image_error && onGenerateImage && (
-        <div className="mkpcsetup mkpcimggen">
-          <button className="btn sm" disabled={tryPending || imageReady !== true}
-            title={imageReady === undefined ? 'checking for an image model…' : undefined}
-            onClick={() => { setTryPending(true); onGenerateImage(false); }}>{tryPending ? 'Drawing…' : 'Generate image'}</button>
-        </div>
+      {canFilm && media?.video_error && !filming && (
+        <div className="mkpcsetup mkpcimgerr"><b>{media.video_error_code === 'NO_CREDITS' ? 'Out of credits.' : 'Video didn\u2019t generate.'}</b> {media.video_error}</div>
       )}
-      {canFilm && !media?.video_error && onGenerateImage && (
-        <div className="mkpcsetup mkpcimggen">
-          <button className="btn sm" disabled={filmPending} title="Film the hook: an eight-second vertical clip from the script" onClick={() => { setFilmPending(true); onGenerateImage(!!media?.video_id, 'video'); }}>{filmPending ? 'Filming…' : media?.video_id ? 'Film again' : 'Generate video'}</button>
-        </div>
-      )}
-      {canFilm && media?.video_error && !filmPending && (
-        <div className="mkpcsetup mkpcimgerr">
-          <b>Video didn&rsquo;t generate.</b> {media.video_error}
-          {onGenerateImage && <button className="btn sm" onClick={() => { setFilmPending(true); onGenerateImage(false, 'video'); }}>Try again</button>}
-        </div>
-      )}
+      {/* the facts line: what films this card and what it costs, said before the press; what filmed it, after */}
+      {facts && !superseded && <div className="mkpcfacts">{facts.map((f, i) => <span key={i} className={/credits$/.test(f) ? 'cr' : undefined}>{f}</span>)}</div>}
       <div className="mkpcfoot">
+        {/* the primary actions, one place: draw, film, retry, connect, add credits */}
+        {!superseded && item.status === 'draft' && onGenerateImage && (
+          <span className="mkpcdo">
+            {wantsImage && imageReady === false && <button className="btn sm" onClick={() => openImageConnect()}>Connect an image model →</button>}
+            {/* `imageReady` is undefined while the credential lookup is in flight: a disabled control is the honest placeholder */}
+            {wantsImage && imageReady !== false && (
+              <button className="btn sm" disabled={tryPending || imageReady !== true} title={imageReady === undefined ? 'checking for an image model…' : undefined}
+                onClick={() => { setTryPending(true); onGenerateImage(false); }}>{tryPending ? 'Drawing…' : media?.image_error ? 'Try again' : 'Generate image'}</button>
+            )}
+            {canFilm && (
+              <button className="btn sm" disabled={filming} title="Film the hook: an eight-second vertical clip from the script"
+                onClick={() => { setFilmPending(true); onGenerateImage(!!media?.video_id, 'video'); }}>{filming ? 'Filming…' : media?.video_error ? 'Try again' : media?.video_id ? 'Film again' : 'Generate video'}</button>
+            )}
+            {canFilm && media?.video_error_code === 'NO_CREDITS' && !filming && <button className="btn sm" onClick={() => openCredits()}>Add credits →</button>}
+            {canFilm && media?.video_error_code && !filming && <button className="btn sm" onClick={() => openImageConnect()}>Add a Google key →</button>}
+          </span>
+        )}
         {limit != null && <span className="mkpccc">{chars}/{limit}</span>}
         {item.status === 'scheduled' && slot && <span className="mkpcwhen">◷ {slot.toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false })}</span>}
         {item.status === 'published' && item.external_url && <span className="mkpclive">✓ live</span>}

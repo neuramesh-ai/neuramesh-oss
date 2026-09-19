@@ -72,8 +72,8 @@ ipcMain.handle('nm:usage', async () => {
   if (cur().kind === 'local') return null;
   try { return await api(`/v1/usage?workspace=${encodeURIComponent(ws())}`); } catch { return null; }
 });
-ipcMain.handle('nm:workspace-update', async (_e, { autoFailover, activeModelPack, commRules }: { autoFailover?: boolean; activeModelPack?: string; commRules?: { ste100?: boolean; noEmdash?: boolean; custom?: string[] } }) => {
-  const r = await api('/v1/commands', { type: 'workspace.update', workspace: ws(), autoFailover, activeModelPack, commRules });
+ipcMain.handle('nm:workspace-update', async (_e, { autoFailover, activeModelPack, commRules, videoTier }: { autoFailover?: boolean; activeModelPack?: string; commRules?: { ste100?: boolean; noEmdash?: boolean; custom?: string[] }; videoTier?: 'starter' | 'xpress' | 'premium' | null }) => {
+  const r = await api('/v1/commands', { type: 'workspace.update', workspace: ws(), autoFailover, activeModelPack, commRules, videoTier });
   // a voice change reaches the very next agent turn — no TTL wait, no restart
   if (commRules !== undefined) void refreshHouseStyle();
   return r;
@@ -180,6 +180,10 @@ ipcMain.handle('nm:billing-portal', async () => {
 // the utilization dashboard's history — daily meters + the grant ledger, read-only.
 ipcMain.handle('nm:credits-history', async () => {
   try { return await api(`/v1/credits/history?workspace=${encodeURIComponent(ws())}`); } catch { return null; }
+});
+// the video rung's catalog: what this server films on, in credits, and the workspace's tier pick
+ipcMain.handle('nm:starter-video', async () => {
+  try { return await api(`/v1/starter/video?workspace=${encodeURIComponent(ws())}`); } catch { return null; }
 });
 // buy a credit pack: the client names a SIZE, the server prices it (never client-priced), then
 // the human pays on Stripe's page exactly as the Cloud checkout does.

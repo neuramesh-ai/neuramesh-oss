@@ -85,9 +85,14 @@ const LOCAL_STATES: Record<string, any> = {
   installing: { phase: 'installing', runtime: 'colima', items: [pi('Colima', 16, 16, true), pi('Lima', 24, 38), pi('Docker CLI', 0, 20), pi('Compose', 0, null)], vm: 'pending' },
   'engine-starting': { phase: 'engine-starting', engine: 'colima' },
   downloading: { phase: 'downloading', items: [pi('Postgres', 412, 412, true), pi('PowerSync', 166, 286), pi('NeuraMesh API', 0, 198)] },
-  starting: { phase: 'starting', services: [{ name: 'Postgres', ready: true }, { name: 'PowerSync', ready: true }, { name: 'NeuraMesh API', ready: false }] },
+  // the chain (B1 to B6): boot order, one node per container; `stalled` is the moment a node fails
+  starting: { phase: 'starting', services: [{ name: 'Postgres', status: 'ready', restarts: 0 }, { name: 'NeuraMesh API', status: 'starting', restarts: 0 }, { name: 'PowerSync', status: 'queued', restarts: 0 }] },
+  stalled: { phase: 'starting', services: [{ name: 'Postgres', status: 'ready', restarts: 0 }, { name: 'NeuraMesh API', status: 'ready', restarts: 0 }, { name: 'PowerSync', status: 'stopped', restarts: 3 }] },
   updating: { phase: 'updating', version: '0.133.0', items: [pi('NeuraMesh API 0.133.0', 80, 201)] },
-  error: { phase: 'error', message: 'The local stack did not start in 90 seconds (NeuraMesh API not healthy).', from: 'starting' },
+  // the failure card: a container stopped (B3), a port in use (B4), and an error with no diagnosis
+  error: { phase: 'error', message: 'PowerSync stopped 3 times.', detail: 'Fatal startup error - exiting with code 150. postgres query failed', remedy: 'Try again starts a fresh PowerSync container.', from: 'starting' },
+  'error-port': { phase: 'error', message: 'Port 58081 is in use by another program.', detail: '127.0.0.1:58081 · held by stack-powersync-1 (Docker)', remedy: 'Stop that program, then try again.', from: 'starting' },
+  'error-plain': { phase: 'error', message: 'Colima did not start.', from: 'engine-starting' },
   ready: { phase: 'ready', version: '0.132.0', engine: 'docker-desktop' },
 };
 const localStackFixture = (): any => {
@@ -536,6 +541,7 @@ const explicit: Record<string, any> = {
     grants: [{ credits: 500, kind: 'purchase', note: 'pack', day: '2026-08-20' }, { credits: 500, kind: 'monthly', note: 'monthly refill (free)', day: '2026-08-01' }],
   }),
   creditsCheckout: async () => ({ ok: true }),
+  starterVideo: async () => ({ served: true, tier: 'starter', pick: null, tiers: [{ tier: 'starter', label: 'NeuraMesh Video Starter', model: 'Seedance 2.0', vendor: 'ByteDance', seconds: 8, credits: 194 }, { tier: 'xpress', label: 'NeuraMesh Video Xpress', model: 'MiniMax H3', vendor: 'MiniMax', seconds: 8, credits: 48 }, { tier: 'premium', label: 'NeuraMesh Video Premium', model: 'Seedance 2.0 Standard', vendor: 'ByteDance', seconds: 8, credits: 243 }] }),
   billingPortal: async () => ({ ok: true }),
   // ?machinelimit=1 surfaces the Free single-machine transfer-or-upgrade card for capture/preview
   machineLimitInfo: async () =>

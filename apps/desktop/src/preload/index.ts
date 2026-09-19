@@ -238,7 +238,7 @@ contextBridge.exposeInMainWorld('nm', {
   channelMeta: (channelId: string) => ipcRenderer.invoke('nm:channel-meta', { channelId }),
   workspaceMeta: () => ipcRenderer.invoke('nm:workspace-meta'),
   workspaceSettings: (): Promise<{ autoFailover: boolean; activeModelPack: string; commRules: unknown; plan: string; seats: number; subscriptionStatus: string | null; currentPeriodEnd: string | null; primaryMachineId: string | null }> => ipcRenderer.invoke('nm:workspace-settings'),
-  workspaceUpdate: (input: { autoFailover?: boolean; activeModelPack?: string; commRules?: { ste100?: boolean; noEmdash?: boolean; custom?: string[] } }) => ipcRenderer.invoke('nm:workspace-update', input),
+  workspaceUpdate: (input: { autoFailover?: boolean; activeModelPack?: string; commRules?: { ste100?: boolean; noEmdash?: boolean; custom?: string[] }; videoTier?: 'starter' | 'xpress' | 'premium' | null }) => ipcRenderer.invoke('nm:workspace-update', input),
   workspaceCreate: (input: { name: string; slug: string }): Promise<{ workspaceId: string }> => ipcRenderer.invoke('nm:workspace-create', input),
   // the nav foot's credit ring — /v1/usage over HTTP; null when this deployment doesn't serve it
   usage: (): Promise<unknown> => ipcRenderer.invoke('nm:usage'),
@@ -250,6 +250,7 @@ contextBridge.exposeInMainWorld('nm', {
   modelPackDelete: (packId: string): Promise<{ ok: boolean }> => ipcRenderer.invoke('nm:model-pack-delete', { packId }),
   billingCheckout: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('nm:billing-checkout'),
   creditsHistory: (): Promise<unknown> => ipcRenderer.invoke('nm:credits-history'),
+  starterVideo: (): Promise<unknown> => ipcRenderer.invoke('nm:starter-video'),
   creditsCheckout: (credits: number): Promise<{ ok: boolean }> => ipcRenderer.invoke('nm:credits-checkout', { credits }),
   billingPortal: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('nm:billing-portal'),
   machineLimitInfo: (): Promise<{ message: string } | null> => ipcRenderer.invoke('nm:machine-limit-info'),

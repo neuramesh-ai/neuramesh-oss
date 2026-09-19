@@ -12,9 +12,10 @@ import { useEffect, useState } from 'react';
 import { CreditTopUp } from './CreditTopUp';
 import { nm } from '../bridge/nm';
 import type { WorkspaceUsage, CreditHistory } from '../bridge/nm';
-import { CREDIT_PACKS, planLabel } from '@neuramesh/shared';
+import { CREDIT_PACKS, planLabel, VIDEO_TIER_LABELS } from '@neuramesh/shared';
 
 const fmt = (n: number): string => n.toLocaleString('en-US');
+const tierName = (tier: string): string => tier === 'own' ? 'your key' : (VIDEO_TIER_LABELS as Record<string, string>)[tier] ?? tier;
 const hoursFrom = (seconds: number): string => (seconds / 3600).toFixed(seconds >= 36000 ? 0 : 1);
 
 export function CreditsView() {
@@ -62,6 +63,7 @@ export function CreditsView() {
   const today = history?.days.find((d) => d.day === todayKey) ?? null;
   const brainCr = today?.brainCredits ?? 0;
   const machineCr = today?.machineCredits ?? 0;
+  const videoCr = today?.videoCredits ?? usage.video?.creditsToday ?? 0; // the video rung: films today
   const machineHrs = hoursFrom(usage.machine.activeSecondsToday);
 
   const buy = async (credits: number): Promise<void> => {
@@ -110,6 +112,10 @@ export function CreditsView() {
             detail={`${fmt(usage.brain.callsToday)} calls today`} tone="var(--viz-berths)" of={c.granted} />
           <Meter name="Machine" sub="active minutes only" credits={machineCr}
             detail={`${machineHrs}h worked today`} tone="var(--viz-clones)" of={c.granted} />
+          {(videoCr > 0 || (history?.films?.length ?? 0) > 0) && (
+            <Meter name="Video" sub="films on the platform" credits={videoCr}
+              detail={`${fmt(usage.video?.clipsToday ?? today?.videoClips ?? 0)} film${(usage.video?.clipsToday ?? today?.videoClips ?? 0) === 1 ? '' : 's'} today`} tone="var(--viz-donors)" of={c.granted} />
+          )}
           <div className="credv-meter">
             <div className="credv-mn">Storage<small>over the {usage.storage.gb} GB included</small></div>
             <div className="credv-mt"><div className="credv-mf" style={{ width: '0%' }} /></div>
@@ -142,6 +148,22 @@ export function CreditsView() {
         {buyErr && <div className="credv-buyerr" role="alert">{buyErr}</div>}
       </div>
 
+      {/* every film is its own row: a film is the largest thing a credit buys, so it is never folded into a daily total */}
+      {history && (history.films?.length ?? 0) > 0 && (
+        <div className="credv-ledger">
+          <div className="credv-lh">Recent films</div>
+          <table>
+            <tbody>
+              {history.films!.map((f) => (
+                <tr key={f.id}>
+                  <td>{f.day} <span className="credv-k">· {tierName(f.tier)} · {f.model} · {f.seconds} s{f.status === 'failed' ? ' · failed, refunded' : f.status === 'done' ? '' : ' · filming'}</span></td>
+                  <td className={f.status === 'failed' ? 'credv-cr' : 'credv-sp'}>{f.status === 'failed' ? `+${fmt(f.credits)}` : `−${fmt(f.credits)}`} cr</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
       {history && history.grants.length > 0 && (
         <div className="credv-ledger">
           <div className="credv-lh">Recent grants</div>

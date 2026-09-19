@@ -155,3 +155,16 @@ export const priceActiveSeconds = (seconds: number): number =>
 // fixed disk cannot be exceeded, so an overage meter would bill a physically impossible state.
 // The rate slot stays for the day disks grow on demand.
 export const STORAGE_MICROS_PER_GB_HOUR: number | null = null;
+
+// ── the video tiers ───────────────────────────────────────────────────────
+//
+// A film on the platform's key (docs/design/video-rung-2026-09, issue #539). The person picks a
+// TIER by its house name; which vendor model a tier films on, and its price, is the server's
+// registry, switched by an env variable. Free workspaces film on the default tier only (they hold
+// no credits); Pro workspaces pick. The card names the vendor model beside the tier, because a
+// film is a look a person chooses.
+export const VIDEO_TIERS = ['starter', 'xpress', 'premium'] as const;
+export type VideoTier = (typeof VIDEO_TIERS)[number];
+export const VIDEO_TIER_LABELS: Record<VideoTier, string> = { starter: 'NeuraMesh Video Starter', xpress: 'NeuraMesh Video Xpress', premium: 'NeuraMesh Video Premium' };
+export const isVideoTier = (s: unknown): s is VideoTier => typeof s === 'string' && (VIDEO_TIERS as readonly string[]).includes(s);
+

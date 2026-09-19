@@ -13,6 +13,11 @@ export interface ProgressItem {
   done: boolean;
 }
 
+/** a container's place in the boot order, as `docker inspect` reports it: not yet started (it waits
+ *  on the one above it), running but not healthy, healthy, or exited into its restart loop */
+export type ServiceStatus = 'queued' | 'starting' | 'ready' | 'stopped';
+export interface ServiceItem { name: string; status: ServiceStatus; restarts: number }
+
 export type StackState =
   /** before the first probe answers: the shell draws its splash, never the picker (a picker that
    *  flashes for the two seconds Docker takes to answer asks a question it is about to withdraw) */
@@ -21,10 +26,13 @@ export type StackState =
   | { phase: 'installing'; runtime: Runtime; items: ProgressItem[]; vm: 'pending' | 'starting' | 'ready' }
   | { phase: 'engine-starting'; engine: EngineKind }
   | { phase: 'downloading'; items: ProgressItem[] }
-  | { phase: 'starting'; services: Array<{ name: string; ready: boolean }> }
+  | { phase: 'starting'; services: ServiceItem[] }
   | { phase: 'updating'; version: string; items: ProgressItem[] }
   | { phase: 'ready'; version: string; engine: EngineKind }
-  | { phase: 'error'; message: string; from: StackState['phase'] };
+  /** `message` is the cause in plain words. `detail` is the container's own last line (or the port
+   *  and who holds it), `remedy` what Try again will do — both optional: an error with no diagnosis
+   *  (Colima did not start.) draws the two-line card. */
+  | { phase: 'error'; message: string; detail?: string; remedy?: string; from: StackState['phase'] };
 
 export type StackEvent =
   | { type: 'probed'; probe: EngineProbe }
@@ -37,9 +45,9 @@ export type StackEvent =
   | { type: 'pull.progress'; name: string; bytes: number; total: number | null }
   | { type: 'pull.done'; name: string }
   | { type: 'up'; services: string[] }
-  | { type: 'health'; service: string }
+  | { type: 'service'; service: string; status: ServiceStatus; restarts?: number }
   | { type: 'ready'; version: string; engine: EngineKind }
-  | { type: 'error'; message: string };
+  | { type: 'error'; message: string; detail?: string; remedy?: string };
 
 export const initialState = (): StackState => ({ phase: 'probing' });
 
@@ -74,13 +82,13 @@ export function reduce(state: StackState, ev: StackEvent): StackState {
       if (state.phase === 'downloading' || state.phase === 'updating') return { ...state, items: state.items.map((it) => (it.name === ev.name ? { ...it, bytes: it.total ?? it.bytes, done: true } : it)) };
       return state;
     case 'up':
-      return { phase: 'starting', services: ev.services.map((name) => ({ name, ready: false })) };
-    case 'health':
-      return state.phase === 'starting' ? { ...state, services: state.services.map((s) => (s.name === ev.service ? { ...s, ready: true } : s)) } : state;
+      return { phase: 'starting', services: ev.services.map((name) => ({ name, status: 'queued', restarts: 0 })) };
+    case 'service':
+      return state.phase === 'starting' ? { ...state, services: state.services.map((s) => (s.name === ev.service ? { ...s, status: ev.status, restarts: ev.restarts ?? s.restarts } : s)) } : state;
     case 'ready':
       return { phase: 'ready', version: ev.version, engine: ev.engine };
     case 'error':
-      return { phase: 'error', message: ev.message, from: state.phase === 'error' ? state.from : state.phase };
+      return { phase: 'error', message: ev.message, ...(ev.detail ? { detail: ev.detail } : {}), ...(ev.remedy ? { remedy: ev.remedy } : {}), from: state.phase === 'error' ? state.from : state.phase };
   }
 }
 

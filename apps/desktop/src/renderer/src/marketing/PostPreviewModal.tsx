@@ -11,6 +11,8 @@ import { WhenPicker, localYmd } from './WhenPicker';
 import { ImageFloor } from './ImageFloor';
 import { anchorPoint } from '../ui/anchor';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { cardParts, type CardMedia } from './cardparts';
+import { FilmPreview, useFilm } from './FilmPreview';
 
 // Imported bindings lose control-flow narrowing inside closures, so re-bind (same as App.tsx).
 const nm = nmBridge;
@@ -29,6 +31,15 @@ export function PostPreviewModal({ item, channelSlug, channelId, projectName, on
   onChanged: () => void;
 }) {
   const [body, setBody] = useState(item.body);
+  // THE FILM IN THE PREVIEW (George, 2026-09-19: "when I click on review/schedule, the preview
+  // doesn't show the film"). A video post previews as its card does: the caption, the script
+  // beside it, and the film where a picture would stand. Never the image floor: the film is its
+  // media, and a video post never offers a picture.
+  const cardMedia = useMemo((): CardMedia | null => { try { return JSON.parse(item.media ?? 'null') as CardMedia | null; } catch { return null; } }, [item.media]);
+  const { script } = cardParts(item.body, cardMedia);
+  const isVideo = !!script;
+  const film = useFilm(cardMedia?.video_id);
+  const filmBlock = isVideo && <FilmPreview script={script} film={film} hasFilm={!!cardMedia?.video_id} pending={!!cardMedia?.video_pending} />;
   const origMedia = useMemo(() => { try { return ((JSON.parse(item.media ?? 'null') as { image_url?: string } | null)?.image_url) ?? ''; } catch { return ''; } }, [item.media]);
   // the generated image's inline preview (marketing-workflow §4.6) — present on any platform,
   // and what the human is actually approving when no remote URL was pasted
@@ -213,9 +224,9 @@ export function PostPreviewModal({ item, channelSlug, channelId, projectName, on
                 {byline}<span className="mkpvhandle">· {item.status === 'published' ? 'posted' : item.status}</span>
               </div>
               {gen === 'rewrite' ? <div className="mkgenghost" aria-hidden><i /><i style={{ width: '82%' }} /><i style={{ width: '58%' }} /></div> : textArea}
-              <ImageFloor thumb={shownThumb} canGen={item.status === 'draft'} gen={gen} err={genErr || imageErr} pending={pending}
+              {isVideo ? filmBlock : <ImageFloor thumb={shownThumb} canGen={item.status === 'draft'} gen={gen} err={genErr || imageErr} pending={pending}
                 angleOpen={angleOpen} angle={angle} onAngle={setAngle} onAngleOpen={setAngleOpen}
-                onGen={() => void runGen()} onRewrite={() => void runGen({ rewrite: true })} />
+                onGen={() => void runGen()} onRewrite={() => void runGen({ rewrite: true })} />}
               <div className="mkpvengage" aria-hidden><span>💬 —</span><span>⇄ —</span><span>♡ —</span><span>{timeLabel}</span></div>
             </div>
           )}
@@ -225,7 +236,8 @@ export function PostPreviewModal({ item, channelSlug, channelId, projectName, on
                 <span className="mkpvav grad">{(handleBare || channelSlug)[0]?.toUpperCase() ?? 'N'}</span>
                 {byline}<span className="mkpvhandle">· {platformName}</span>
               </div>
-              {preview.state === 'ok' && preview.src
+              {isVideo ? filmBlock
+                : preview.state === 'ok' && preview.src
                 ? <img className="mkpvimg" src={preview.src} alt="post media" />
                 : preview.state === 'idle' && genThumb
                 ? <img className="mkpvimg" src={genThumb} alt="generated post image" />
@@ -234,7 +246,7 @@ export function PostPreviewModal({ item, channelSlug, channelId, projectName, on
                     : preview.state === 'broken' ? 'that image URL didn’t load — check it’s public'
                     : item.platform === 'instagram' ? 'Instagram requires an image — paste its URL below'
                     : 'TikTok requires an image — paste its URL below'}</span></div>}
-              {editable && (
+              {editable && !isVideo && (
                 <div className="mkpvmediarow">
                   <input value={mediaUrl} onChange={(e) => setMediaUrl(e.target.value)} placeholder="public image URL (https://…)" aria-label="Post media URL" spellCheck={false} />
                 </div>
@@ -246,9 +258,9 @@ export function PostPreviewModal({ item, channelSlug, channelId, projectName, on
           {item.platform !== 'x' && item.platform !== 'instagram' && item.platform !== 'tiktok' && (
             <div className="mkpv">
               {gen === 'rewrite' ? <div className="mkgenghost" aria-hidden><i /><i style={{ width: '82%' }} /><i style={{ width: '58%' }} /></div> : textArea}
-              <ImageFloor thumb={shownThumb} canGen={item.status === 'draft'} gen={gen} err={genErr || imageErr} pending={pending}
+              {isVideo ? filmBlock : <ImageFloor thumb={shownThumb} canGen={item.status === 'draft'} gen={gen} err={genErr || imageErr} pending={pending}
                 angleOpen={angleOpen} angle={angle} onAngle={setAngle} onAngleOpen={setAngleOpen}
-                onGen={() => void runGen()} onRewrite={() => void runGen({ rewrite: true })} />
+                onGen={() => void runGen()} onRewrite={() => void runGen({ rewrite: true })} />}
             </div>
           )}
           <div className="mkpvwhen">

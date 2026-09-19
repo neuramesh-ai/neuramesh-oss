@@ -13,6 +13,7 @@ import {
   microsToCredits,
   priceModelCall,
   type Actor,
+  CREDIT_MICROS,
 } from '@neuramesh/shared';
 // credits.ts stays the module's front door: it re-exports the ledger's surface so callers that
 // imported these before the 2026-08-31 split keep working, and imports for its own use the few
@@ -21,9 +22,10 @@ export {
   chargeMachineActivity, creditBalance, grantCredits, spendCredits, usageToday,
   workspacesDueRefill, type CreditBalance, type UsageToday,
 } from './credit-ledger';
-import { creditBalance, grantCredits, spendCredits, usageToday, type CreditBalance, type UsageToday } from './credit-ledger';
+import { creditBalance, grantCredits, spendCredits, usageToday, type CreditBalance, type UsageToday, spendCreditsForFilm, refundFilm } from './credit-ledger';
 import { planDiskGb } from './fleet';
 import { localMode } from './localmode';
+import { VIDEO_MODELS } from './video-registry';
 import type { Store } from './store';
 
 export function sqlOf(store: Store): postgres.Sql | null {
@@ -70,6 +72,9 @@ export interface Ledger {
   balance(workspaceId: string): Promise<CreditBalance>;
   spend(workspaceId: string, micros: number, usage: { inTokens: number; outTokens: number }): Promise<{ remainingMicros: number } | null>;
   usage(workspaceId: string): Promise<UsageToday>;
+  /** a film's charge (the video rung): the whole clip or nothing, and how it split across the pools */
+  spendFilm(workspaceId: string, micros: number, clip: { seconds: number }): Promise<{ remainingMicros: number; grantMicros: number; purchasedMicros: number } | null>;
+  refundFilm(workspaceId: string, split: { grantMicros: number; purchasedMicros: number; seconds: number }, note: string): Promise<void>;
 }
 
 export function ledgerFor(store: Store): Ledger | null {
@@ -79,6 +84,8 @@ export function ledgerFor(store: Store): Ledger | null {
     balance: (w) => creditBalance(sql, w),
     spend: (w, micros, usage) => spendCredits(sql, w, micros, usage),
     usage: (w) => usageToday(sql, w),
+    spendFilm: (w, micros, clip) => spendCreditsForFilm(sql, w, micros, clip),
+    refundFilm: (w, split, note) => refundFilm(sql, w, split, note),
   };
 }
 
@@ -165,7 +172,7 @@ export function creditRoutes<E extends Env & { Variables: { actor: Actor } }>(ap
     const [days, grants] = await Promise.all([
       sql<Array<Record<string, unknown>>>`
         select to_char(day, 'YYYY-MM-DD') as day, minutes, active_seconds, model_calls,
-               model_in_tokens, model_out_tokens, model_micros, machine_micros
+               model_in_tokens, model_out_tokens, model_micros, machine_micros, video_clips, video_micros
           from machine_usage
          where workspace_id = ${workspace}::uuid and day > (now() at time zone 'utc')::date - 31
          order by day`,
@@ -175,6 +182,9 @@ export function creditRoutes<E extends Env & { Variables: { actor: Actor } }>(ap
          where workspace_id = ${workspace}::uuid
          order by created_at desc limit 20`,
     ]);
+    // the films ride beside the grants: a film is the single largest thing a credit buys, so it is
+    // never folded into a daily total (the video rung, 0140)
+    const films = store.films ? await store.films.forWorkspace(workspace, 20) : [];
     return c.json({
       days: days.map((d) => ({
         day: String(d['day']),
@@ -184,6 +194,8 @@ export function creditRoutes<E extends Env & { Variables: { actor: Actor } }>(ap
         modelOutTokens: Number(d['model_out_tokens'] ?? 0),
         brainCredits: microsToCredits(Number(d['model_micros'] ?? 0)),
         machineCredits: microsToCredits(Number(d['machine_micros'] ?? 0)),
+        videoClips: Number(d['video_clips'] ?? 0),
+        videoCredits: microsToCredits(Number(d['video_micros'] ?? 0)),
       })),
       grants: grants.map((g) => ({
         credits: microsToCredits(Number(g['micros'] ?? 0)),
@@ -191,6 +203,7 @@ export function creditRoutes<E extends Env & { Variables: { actor: Actor } }>(ap
         note: (g['note'] as string | null) ?? null,
         day: String(g['on_day']),
       })),
+      films: films.map((f) => ({ id: f.id, item: f.itemId, tier: f.tier, model: VIDEO_MODELS[f.model]?.label ?? f.model, seconds: f.seconds, credits: Math.ceil(f.micros / CREDIT_MICROS), status: f.status, day: f.createdAt.slice(0, 10), at: f.createdAt })),
     });
   });
 
@@ -232,6 +245,7 @@ export function creditRoutes<E extends Env & { Variables: { actor: Actor } }>(ap
       // yet metered", which told nobody anything. It must never be printed as "x of 10 GB used".
       storage: { gb: planDiskGb(plan), metered: false },
       brain: { callsToday: used.modelCalls, model: STARTER_MODEL },
+      video: { clipsToday: used.videoClips, creditsToday: microsToCredits(used.videoMicros) },
       rateVersion: RATE_VERSION,
     });
   });
