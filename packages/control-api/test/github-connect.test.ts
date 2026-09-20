@@ -25,6 +25,8 @@ let store: MemoryStore;
 let calls: string[];
 /** GitHub: acme/site is private; installation 555 (selected: acme/site) reads it; installation 777 is on all of `orgall` */
 let gone = false;
+/** what installation 555 reads: one repository unless a test grants more */
+let repos555 = ['acme/site'];
 const github: typeof fetch = async (input, init) => {
   const url = String(input);
   const path = new URL(url).pathname + (new URL(url).search || '');
@@ -37,8 +39,10 @@ const github: typeof fetch = async (input, init) => {
   if (path === '/app/installations/555') return json({ account: { login: 'acme' }, repository_selection: 'selected' });
   if (path === '/app/installations/777/access_tokens') return json({ token: 'ghs_777', expires_at: new Date(Date.now() + 3_600_000).toISOString() }, 201);
   if (path === '/app/installations/777') return json({ account: { login: 'orgall' }, repository_selection: 'all' });
-  if (path === '/installation/repositories?per_page=100') return json({ repositories: auth === 'Bearer ghs_777' ? [{ full_name: 'orgall/one' }] : [{ full_name: 'acme/site' }] });
+  if (path === '/installation/repositories?per_page=100') return json({ repositories: auth === 'Bearer ghs_777' ? [{ full_name: 'orgall/one' }] : repos555.map((full_name) => ({ full_name })) });
   if (path === '/repos/acme/site') return installed ? json({ private: true, homepage: 'https://acme.dev', default_branch: 'main', description: 'the site' }) : json({ message: 'Not Found' }, 404);
+  if (path === '/repos/acme/docs') return installed && repos555.includes('acme/docs') ? json({ private: false, default_branch: 'trunk' }) : json({ message: 'Not Found' }, 404);
+  if (path === '/repos/acme/docs/installation') return repos555.includes('acme/docs') && !gone ? json({ id: 555, account: { login: 'acme' } }) : json({ message: 'Not Found' }, 404);
   if (path.startsWith('/repos/acme/site/releases')) return installed ? json([RELEASE]) : json({ message: 'Not Found' }, 404);
   if (path.startsWith('/repos/acme/site/pulls')) return json([PULL]);
   if (path.startsWith('/repos/acme/site/commits')) return json([{ sha: 'abc1234', html_url: 'https://github.com/acme/site/commit/abc1234', commit: { message: 'Ship the inbox\n\nlong body', author: { date: '2026-09-16T09:00:00Z', name: 'Maya' } }, author: { login: 'maya' } }]);
@@ -55,6 +59,7 @@ beforeEach(async () => {
   store = new MemoryStore();
   calls = [];
   gone = false;
+  repos555 = ['acme/site'];
   forgetToken(555);
   vi.stubEnv('GITHUB_APP_ID', '4994365');
   vi.stubEnv('GITHUB_APP_PRIVATE_KEY_B64', Buffer.from(pem).toString('base64'));
@@ -68,7 +73,7 @@ beforeEach(async () => {
 });
 afterEach(() => { vi.unstubAllEnvs(); });
 
-const resolve = (ch: string, actor: Actor = george) => app.request('/v1/github/resolve', { method: 'POST', headers: { 'content-type': 'application/json', ...as(actor) }, body: JSON.stringify({ channel: ch }) });
+const resolve = (ch: string, actor: Actor = george, more: Record<string, unknown> = {}) => app.request('/v1/github/resolve', { method: 'POST', headers: { 'content-type': 'application/json', ...as(actor) }, body: JSON.stringify({ channel: ch, ...more }) });
 const read = (path: string, ch: string, actor: Actor = rex) => app.request(`/v1/repo/${path}${path.includes('?') ? '&' : '?'}channel=${ch}`, { headers: as(actor) });
 
 describe('the doors', () => {
@@ -105,21 +110,22 @@ describe('POST /v1/github/resolve', () => {
   it('writes the row when the App reads the repository, and answers the install door when it does not', async () => {
     gone = true;
     const miss = await j(await resolve(channel));
-    expect(miss).toMatchObject({ ok: false, code: 'NOT_INSTALLED' });
+    expect(miss).toMatchObject({ ok: false, code: 'NOT_INSTALLED', repos: [], hint: null });
     expect(miss.install).toContain('https://github.com/apps/neuramesh/installations/new?state=');
     gone = false;
     forgetToken(555);
-    expect(await j(await resolve(channel))).toEqual({ ok: true, handle: 'acme/site' });
+    expect(await j(await resolve(channel))).toEqual({ ok: true, handle: 'acme/site', attached: false });
     expect(await store.connectorWithSecret('ws_acme', 'github', channel)).toMatchObject({ status: 'connected', handle: 'acme/site' });
   });
   it('a room whose project has no repository, a stranger, and an agent are each refused by name', async () => {
-    expect(await j(await resolve(other))).toMatchObject({ ok: false, code: 'NO_REPO' });
+    expect(await j(await resolve(other))).toMatchObject({ ok: false, code: 'NO_REPO', repos: [], hint: null });
+    expect((await resolve('no-such-room')).status).toBe(404);
     expect((await resolve(channel, stranger)).status).toBe(403);
     expect((await resolve(channel, rex)).status).toBe(403);
   });
   it('a stale row for the same repository (the live harness held a fake id) loses to GitHub\'s own answer and is forgotten', async () => {
     await store.announcements.upsertInstallation({ installationId: 424242, account: 'acme', repos: ['acme/site'], selection: 'selected' });
-    expect(await j(await resolve(channel))).toEqual({ ok: true, handle: 'acme/site' });
+    expect(await j(await resolve(channel))).toEqual({ ok: true, handle: 'acme/site', attached: false });
     expect(store.announcements.installations.map((i) => i.installationId)).toEqual([555]);
     expect(calls).toContain('POST /app/installations/424242/access_tokens app');
     expect(calls).toContain('GET /repos/acme/site/installation app');
@@ -128,6 +134,79 @@ describe('POST /v1/github/resolve', () => {
     await store.announcements.upsertInstallation({ installationId: 777, account: 'orgall', repos: ['orgall/one'], selection: 'all' });
     expect(await store.announcements.installationForRepo('orgall/new-repo')).toEqual({ installationId: 777 });
     expect(await store.announcements.installationForRepo('acme/site')).toBeNull();
+  });
+});
+
+describe('the pick (plan §7): the grant first, the repository comes back with it', () => {
+  let folder: string;
+  const link = (ch: string, body: Record<string, unknown>) => app.request('/v1/commands', { method: 'POST', headers: { 'content-type': 'application/json', ...as(george) }, body: JSON.stringify({ type: 'repo.link', workspace: 'ws_acme', channel: ch, ...body }) });
+  beforeEach(async () => {
+    folder = (await store.createChannel({ workspace: 'ws_acme', projectId: 'p3', slug: 'folder', topic: '' }, { type: 'test', workspace: 'ws_acme' } as never)).id;
+    // a folder attached from a desktop: the project's primary, with no GitHub side
+    expect((await link(folder, { localPath: '/home/george/code/site', name: 'site' })).status).toBe(200);
+    expect(await store.announcements.repoForChannel(folder)).toMatchObject({ orgName: 'local', name: 'site', cloneUrl: null });
+  });
+  it('a folder project with nothing readable: NO_REPO with the install door, nothing attached', async () => {
+    const r = await j(await resolve(folder));
+    expect(r).toMatchObject({ ok: false, code: 'NO_REPO', repos: [], hint: null });
+    expect(r.error).toContain('site is a folder on a machine');
+    expect(r.install).toContain('installations/new?state=');
+  });
+  it('the App reads repositories for the workspace: the pick, the folder\'s namesake as the hint, and an open step never attaches', async () => {
+    repos555 = ['acme/site', 'acme/docs'];
+    await store.announcements.upsertInstallation({ installationId: 555, account: 'acme', repos: ['acme/site'], selection: 'selected', workspaceId: 'ws_acme' });
+    const r = await j(await resolve(folder));
+    // refreshed from GitHub: the list carries the repository added since the memo
+    expect(r).toMatchObject({ ok: false, code: 'NO_REPO', repos: ['acme/docs', 'acme/site'], hint: 'acme/site' });
+    expect(r.error).toBe('Pick the repository site lives in.');
+    expect(await store.connectorWithSecret('ws_acme', 'github', folder)).toBeNull();
+    expect(await store.announcements.repoForChannel(folder)).toMatchObject({ orgName: 'local' });
+  });
+  it('the pick attaches the repository to the project (a second repository beside the folder) and writes the row', async () => {
+    repos555 = ['acme/site', 'acme/docs'];
+    await store.announcements.upsertInstallation({ installationId: 555, account: 'acme', repos: ['acme/site'], selection: 'selected', workspaceId: 'ws_acme' });
+    expect(await j(await resolve(folder, george, { repo: 'acme/docs' }))).toEqual({ ok: true, handle: 'acme/docs', attached: true });
+    expect(await store.connectorWithSecret('ws_acme', 'github', folder)).toMatchObject({ status: 'connected', handle: 'acme/docs' });
+    // the connector's repository is the GitHub-addressed one now, the folder stays linked too
+    expect(await store.announcements.repoForChannel(folder)).toMatchObject({ orgName: 'acme', name: 'docs', cloneUrl: 'https://github.com/acme/docs.git', provider: 'github' });
+    expect(store.announcements.repoLinks.filter((l) => l.channelId === folder).map((l) => l.name).sort()).toEqual(['docs', 'site']);
+    expect((store as unknown as { repos: Array<{ name: string; defaultBranch: string }> }).repos.find((x) => x.name === 'docs')).toMatchObject({ defaultBranch: 'trunk' });
+    // a second resolve is the plain path: read, connected, nothing re-attached
+    expect(await j(await resolve(folder))).toEqual({ ok: true, handle: 'acme/docs', attached: false });
+    // the reads work through it
+    expect((await read('tree', folder)).status).toBe(400);   // acme/docs has no tree in the fixture: the read reached GitHub for it
+    expect(calls.some((c) => c.startsWith('GET /repos/acme/docs/git/trees'))).toBe(true);
+  });
+  it('a pick the App cannot read is refused by name, and nothing is attached', async () => {
+    await store.announcements.upsertInstallation({ installationId: 555, account: 'acme', repos: ['acme/site'], selection: 'selected', workspaceId: 'ws_acme' });
+    const r = await j(await resolve(folder, george, { repo: 'acme/secret' }));
+    expect(r).toMatchObject({ ok: false, code: 'NOT_INSTALLED', repos: ['acme/site'] });
+    expect(r.error).toContain('cannot read acme/secret');
+    expect(await store.announcements.repoForChannel(folder)).toMatchObject({ orgName: 'local' });
+  });
+  it('the callback of a grant for the room: the one repository the App reads attaches on its own', async () => {
+    const start = await app.request(`/connect/github/start?workspace=ws_acme&channel=${folder}&actor=george`);
+    const state = new URL(start.headers.get('location')!).searchParams.get('state')!;
+    expect(unseal(state)).toMatchObject({ channel: folder, slug: null });
+    const r = await app.request(`/connect/github/callback?installation_id=555&setup_action=install&state=${encodeURIComponent(state)}`);
+    expect(await r.text()).toContain('acme/site</b> is connected');
+    expect(await store.connectorWithSecret('ws_acme', 'github', folder)).toMatchObject({ status: 'connected', handle: 'acme/site' });
+    expect(await store.announcements.repoForChannel(folder)).toMatchObject({ orgName: 'acme', name: 'site', provider: 'github' });
+  });
+  it('the callback of a grant that reads several: the page counts them and sends the person to the pick', async () => {
+    repos555 = ['acme/site', 'acme/docs'];
+    const start = await app.request(`/connect/github/start?workspace=ws_acme&channel=${folder}&actor=george`);
+    const state = new URL(start.headers.get('location')!).searchParams.get('state')!;
+    const r = await app.request(`/connect/github/callback?installation_id=555&setup_action=install&state=${encodeURIComponent(state)}`);
+    expect(await r.text()).toContain('reads 2 repositories');
+    expect(await store.connectorWithSecret('ws_acme', 'github', folder)).toBeNull();
+    expect(await store.announcements.repoForChannel(folder)).toMatchObject({ orgName: 'local' });
+  });
+  it('a dead installation in the workspace list is forgotten by the refresh, a live one is read', async () => {
+    await store.announcements.upsertInstallation({ installationId: 424242, account: 'acme', repos: ['acme/old'], selection: 'selected', workspaceId: 'ws_acme' });
+    await store.announcements.upsertInstallation({ installationId: 555, account: 'acme', repos: [], selection: 'selected', workspaceId: 'ws_acme' });
+    expect(await j(await resolve(folder))).toMatchObject({ ok: false, repos: ['acme/site'], hint: 'acme/site' });
+    expect(store.announcements.installations.map((i) => i.installationId)).toEqual([555]);
   });
 });
 

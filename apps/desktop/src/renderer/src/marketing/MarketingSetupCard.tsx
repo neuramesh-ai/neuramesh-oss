@@ -262,9 +262,9 @@ export function MarketingSetupCard({ channel, agent, projectWebsite, onDone, onS
                       {repo && <button type="button" className="btn ghost sm" onClick={() => { setAttachOpen(false); setAttachUrl(''); }}>Cancel</button>}
                     </div>
                   )}
-                  {/* read access (docs/design/github-connector-2026-09): the daily watch runs on a cloud
-                      machine, which has no gh login, so the grant is what lets it read the repository */}
-                  {repo && <GitHubSetupRow channelId={channel.id} conn={connOf('github') ?? null} />}
+                  {/* read access (docs/design/github-connector-2026-09, the pick round §7): the grant first, and
+                      the repository the pick attaches becomes the one the drafts watch (re-read until the row lands) */}
+                  <GitHubSetupRow channelId={channel.id} conn={connOf('github') ?? null} onDone={() => { void (async () => { for (let i = 0; i < 25; i++) { const gh = (await loadMeta()).find((r) => r.org_name !== 'local' && r.provider !== 'local'); if (gh) { setRepoId(gh.id); return; } await new Promise((res) => setTimeout(res, 400)); } })(); }} />
                   <div className="mkqlabel">Drafts go to every connected account</div>
                   {SETUP_CONNECTORS.map(([provider, icon, label]) => {
                     const conn = connOf(provider);

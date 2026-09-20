@@ -1147,16 +1147,12 @@ export class MemoryStore implements Store {
     event: NMEvent,
   ): Promise<{ id: string; inserted: boolean }> {
     const existing = this.repos.find((r) => r.workspace === input.workspace && r.provider === input.provider && r.orgName === input.orgName && r.name === input.name);
-    if (existing) {
-      existing.defaultBranch = input.defaultBranch;
-      existing.cloneUrl = input.cloneUrl;
-      existing.localPath = input.localPath;
-      return { id: existing.id, inserted: false };
-    }
-    const id = crypto.randomUUID();
-    this.repos.push({ id, workspace: input.workspace, provider: input.provider, orgName: input.orgName, name: input.name, defaultBranch: input.defaultBranch, cloneUrl: input.cloneUrl, localPath: input.localPath });
-    this.events.push(event);
-    return { id, inserted: true };
+    const id = existing?.id ?? crypto.randomUUID();
+    if (existing) { existing.defaultBranch = input.defaultBranch; existing.cloneUrl = input.cloneUrl; existing.localPath = input.localPath; }
+    else { this.repos.push({ id, workspace: input.workspace, provider: input.provider, orgName: input.orgName, name: input.name, defaultBranch: input.defaultBranch, cloneUrl: input.cloneUrl, localPath: input.localPath }); this.events.push(event); }
+    // the memory world's project_repos: a repo linked through a room reads back from `announcements.repoForChannel`
+    if (input.channel) this.announcements.linkRoom({ channelId: input.channel, workspaceId: input.workspace, projectId: input.project ?? this.channels.find((c) => c.id === input.channel)?.projectId ?? null, repoId: id, orgName: input.orgName, name: input.name, cloneUrl: input.cloneUrl, provider: input.provider });
+    return { id, inserted: !existing };
   }
 
   // Projects: MemoryStore tracks just enough for auth/guard unit tests; the

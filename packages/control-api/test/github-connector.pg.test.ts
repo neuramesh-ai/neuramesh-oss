@@ -34,12 +34,17 @@ describe.skipIf(!DB)('the GitHub connector on postgres', () => {
     expect(n!['n']).toBe(1);
     await expect(sql!`insert into connectors (workspace_id, provider) values (${WS}::uuid, 'gitlab')`).rejects.toThrow(/connectors_provider_check/);
   });
-  it('the room\'s primary repository, through the project', async () => {
+  it('the room\'s repository, through the project: the one with a GitHub address wins over a local primary (plan §7)', async () => {
     const proj = await j(await send(george, { type: 'project.create', workspace: WS, name: `GitHub repo ${Date.now()}` }));
     const chan = await j(await send(george, { type: 'channel.create', workspace: WS, project: proj.projectId, slug: `ghr-${Date.now().toString(36)}` }));
-    expect(await store!.announcements.primaryRepoForChannel(chan.channelId)).toBeNull();
-    await sql!`insert into project_repos (project_id, repo_id, is_primary) values (${proj.projectId}::uuid, ${REPO}::uuid, true)`;
-    expect(await store!.announcements.primaryRepoForChannel(chan.channelId)).toMatchObject({ workspaceId: WS, projectId: proj.projectId, repoId: REPO, orgName: 'acme', name: 'marketing-site', cloneUrl: 'git@github.com:acme/marketing-site.git' });
+    expect(await store!.announcements.repoForChannel(chan.channelId)).toBeNull();
+    // a folder attached from a desktop is the primary: it names no GitHub side
+    const local = await j(await send(george, { type: 'repo.link', workspace: WS, channel: chan.channelId, localPath: `/home/george/code/site-${Date.now()}`, name: 'marketing-site' }));
+    expect(await store!.announcements.repoForChannel(chan.channelId)).toMatchObject({ repoId: local.repoId, orgName: 'local', cloneUrl: null });
+    await sql!`insert into project_repos (project_id, repo_id, is_primary) values (${proj.projectId}::uuid, ${REPO}::uuid, false)`;
+    expect(await store!.announcements.repoForChannel(chan.channelId)).toMatchObject({ workspaceId: WS, projectId: proj.projectId, repoId: REPO, orgName: 'acme', name: 'marketing-site', cloneUrl: 'git@github.com:acme/marketing-site.git' });
+    const [primary] = await sql!`select repo_id from project_repos where project_id = ${proj.projectId}::uuid and is_primary`;
+    expect(primary!['repo_id']).toBe(local.repoId);
   });
   it('installations: by name, or by account on an all-repositories grant; a workspace once named is kept', async () => {
     const ann = store!.announcements;
@@ -52,6 +57,8 @@ describe.skipIf(!DB)('the GitHub connector on postgres', () => {
     await ann.upsertInstallation({ installationId: 990001, account: 'acme', repos: ['acme/marketing-site', 'acme/two'] });
     const [row] = await sql!`select workspace_id, selection, repos from github_installations where installation_id = 990001`;
     expect(row).toMatchObject({ workspace_id: WS, selection: 'selected', repos: ['acme/marketing-site', 'acme/two'] });
+    // the pick lists the workspace's own installations, never the door's
+    expect((await ann.installationsForWorkspace(WS)).filter((i) => i.installationId >= 990001)).toEqual([{ installationId: 990001, account: 'acme', repos: ['acme/marketing-site', 'acme/two'], selection: 'selected' }]);
     await sql!`delete from github_installations where installation_id in (990001, 990002)`;
   });
 });

@@ -54,11 +54,17 @@ export interface AnnounceStore {
   installationForRepo(slug: string): Promise<{ installationId: number } | null>;
   /** a row GitHub answers 404 for is dead: forgotten, so it never wins a lookup again */
   forgetInstallation(installationId: number): Promise<void>;
-  /** the connector's repository: the PRIMARY repository of the room's project (the release preflight's
-   *  own order), with the workspace the row belongs to. Null when the room has none. */
-  primaryRepoForChannel(channelId: string): Promise<PrimaryRepo | null>;
+  /** the installations a member of this workspace granted through the app: what the pick lists (plan §7) */
+  installationsForWorkspace(workspaceId: string): Promise<Installation[]>;
+  /** the connector's repository for the room's project: the one with a GitHub address first (a folder
+   *  attached from a desktop is `local`, unreadable by the App), the primary among those, with the
+   *  workspace the row belongs to. Null when the room has none. */
+  repoForChannel(channelId: string): Promise<PrimaryRepo | null>;
 }
 export interface PrimaryRepo { workspaceId: string; projectId: string | null; repoId: string; orgName: string; name: string; cloneUrl: string | null; provider: string | null }
+export interface Installation { installationId: number; account: string; repos: string[]; selection: 'all' | 'selected' }
+/** a repository row the App could read: a clone URL, or an org that is not the desktop's `local` */
+export const hasGitHubAddress = (r: Pick<PrimaryRepo, 'orgName' | 'cloneUrl' | 'provider'>): boolean => !!r.cloneUrl || (r.orgName !== 'local' && r.provider !== 'local');
 
 const norm = (s: string): string => s.trim().toLowerCase();
 
@@ -69,8 +75,11 @@ export class MemAnnounceStore implements AnnounceStore {
   /** the memory world tracks no project_repos: a test seeds the room's repository here */
   repoLinks: Array<{ channelId: string } & PrimaryRepo> = [];
   seedRepo(link: { channelId: string } & PrimaryRepo): void { this.repoLinks.push(link); }
-  async primaryRepoForChannel(channelId: string): Promise<PrimaryRepo | null> {
-    const hit = this.repoLinks.find((r) => r.channelId === channelId);
+  /** the memory store's linkRepo lands here, once per room and repo */
+  linkRoom(link: { channelId: string } & PrimaryRepo): void { if (!this.repoLinks.some((l) => l.channelId === link.channelId && l.repoId === link.repoId)) this.repoLinks.push(link); }
+  async repoForChannel(channelId: string): Promise<PrimaryRepo | null> {
+    const links = this.repoLinks.filter((r) => r.channelId === channelId);
+    const hit = links.find(hasGitHubAddress) ?? links[0];
     return hit ? { workspaceId: hit.workspaceId, projectId: hit.projectId, repoId: hit.repoId, orgName: hit.orgName, name: hit.name, cloneUrl: hit.cloneUrl, provider: hit.provider } : null;
   }
   async create(input: AnnounceCreate): Promise<{ id: string } | null> {
@@ -116,6 +125,9 @@ export class MemAnnounceStore implements AnnounceStore {
     return hit ? { installationId: hit.installationId } : null;
   }
   async forgetInstallation(installationId: number): Promise<void> { this.installations = this.installations.filter((i) => i.installationId !== installationId); }
+  async installationsForWorkspace(workspaceId: string): Promise<Installation[]> {
+    return this.installations.filter((i) => i.workspaceId === workspaceId).map(({ installationId, account, repos, selection }) => ({ installationId, account, repos, selection }));
+  }
 }
 
 // ── postgres ───────────────────────────────────────────────────────────────────────────────────
@@ -202,10 +214,15 @@ export class PgAnnounceStore implements AnnounceStore {
   async forgetInstallation(installationId: number): Promise<void> {
     await this.sql`delete from github_installations where installation_id = ${installationId}`;
   }
-  async primaryRepoForChannel(channelId: string): Promise<PrimaryRepo | null> {
+  async installationsForWorkspace(workspaceId: string): Promise<Installation[]> {
+    const rows = await this.sql`select installation_id, account, repos, selection from github_installations where workspace_id = ${workspaceId}::uuid order by updated_at desc`;
+    return rows.map((r) => ({ installationId: Number(r['installation_id']), account: r['account'] as string, repos: (r['repos'] as string[] | null) ?? [], selection: r['selection'] === 'all' ? 'all' as const : 'selected' as const }));
+  }
+  async repoForChannel(channelId: string): Promise<PrimaryRepo | null> {
     const [row] = await this.sql`select c.workspace_id, c.project_id, r.id as repo_id, r.org_name, r.name, r.clone_url, r.provider
       from channels c join project_repos pr on pr.project_id = c.project_id join repos r on r.id = pr.repo_id
-      where c.id = ${channelId}::uuid order by pr.is_primary desc, r.org_name, r.name limit 1`;
+      where c.id = ${channelId}::uuid
+      order by (r.clone_url is not null or (r.org_name <> 'local' and r.provider <> 'local')) desc, pr.is_primary desc, r.org_name, r.name limit 1`;
     return row ? { workspaceId: row['workspace_id'] as string, projectId: (row['project_id'] as string | null) ?? null, repoId: row['repo_id'] as string, orgName: row['org_name'] as string, name: row['name'] as string, cloneUrl: (row['clone_url'] as string | null) || null, provider: (row['provider'] as string | null) ?? null } : null;
   }
 }

@@ -6430,6 +6430,29 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 .connrowtxt { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 6px; white-space: nowrap; overflow: hidden; }
 .connrowtxt b { font-size: 12.5px; font-weight: 600; color: var(--text); }
 .cmachst.warn { color: var(--warn); }
+/* the GitHub pick (docs/design/github-connector-2026-09 §7): the repositories the App reads, one row each on the
+   machine-chip row idiom, the picked row on --sel-bg with the check; the same rows unfold under setup step 5's row
+   and inside the dependency card (.inpick), and the popover's acts wrap when the second door needs the line */
+.picklist { display: flex; flex-direction: column; margin: 0 -9px; }
+.pickrow { display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 9px; border-radius: 6px; cursor: pointer; text-align: left; background: none; border: none; font-family: inherit; color: var(--text); transition: background var(--dur-fast) var(--ease); }
+.pickrow:hover { background: var(--hover-bg); }
+.pickrow.on { background: var(--sel-bg); }
+.pickrow .cprojglyph { width: 16px; }
+.pickrow .cprojglyph svg { display: block; width: 13px; height: 13px; opacity: .85; }
+.pickrow .connrowtxt { flex-direction: column; align-items: flex-start; gap: 0; }
+.pickrow .connrowtxt b { font: 500 12px var(--fmono); letter-spacing: -.02em; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.pickrow .connrowtxt .connsub { font-family: var(--fbody); font-size: 10.5px; letter-spacing: 0; line-height: 1.2; }
+.pickrow .cmachst { display: grid; place-items: center; }
+.pickrow .cmachst svg { display: block; }
+.connacts:has(.ghost) { flex-wrap: wrap; }
+.connhint { color: var(--muted); }
+.connhint b, .connpopbody p b { color: var(--text); font-weight: 600; }
+.connwait { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); }
+.connwait i { width: 6px; height: 6px; border-radius: var(--r-full); background: var(--warn); }
+.inpick { border: 1px solid var(--border2); border-radius: 6px; background: var(--panel2); padding: 3px 4px; margin: 2px 0 6px; }
+.inpick .picklist { margin: 0; }
+.mkconnpick { padding: 6px 2px 8px; border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent); }
+.mkconnpick > p { margin: 0 0 6px; font-size: 11px; color: var(--muted); line-height: 1.5; }
 /* the Connections rows wear the same marks (the text glyphs 𝕏 / in / ◫ / ♪ drew at four weights) */
 .mkconnmark { display: inline-grid; place-items: center; width: 14px; color: var(--muted); flex: none; }
 .stagewrap .homewm { bottom: 0; }

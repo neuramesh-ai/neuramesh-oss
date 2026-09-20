@@ -197,8 +197,8 @@ ipcMain.handle('nm:connector-start', async (_e, { channelId, provider }: { chann
 // The GitHub connector's resolve (docs/design/github-connector-2026-09): the server checks whether the
 // App can read the room's project's repository and writes the connectors row itself. A refusal the
 // server states (no repository, not installed) comes back as its own answer, never as a throw.
-ipcMain.handle('nm:github-resolve', async (_e, { channelId }: { channelId: string }) => {
-  try { return await api('/v1/github/resolve', { channel: channelId }); }
+ipcMain.handle('nm:github-resolve', async (_e, { channelId, repo }: { channelId: string; repo?: string }) => {
+  try { return await api('/v1/github/resolve', { channel: channelId, ...(repo ? { repo } : {}) }); }
   catch (e) { return { ok: false, code: 'UNREACHABLE', error: e instanceof Error ? e.message : String(e) }; }
 });
 // A connector is per PROJECT (0106) — two products do not share an X handle. This was
