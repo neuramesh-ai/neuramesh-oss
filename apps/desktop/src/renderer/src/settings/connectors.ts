@@ -3,20 +3,22 @@
 // foot's marks both read `connectorStates`, so a surface can never say "connected" about a row
 // the other calls "Connect" — the one-derivation rule (docs/33 §8, the bell's count).
 //
-// Three kinds, three truths: an OAuth connector is a workspace-wide `connectors` row (keyed
+// Four kinds, four truths: an OAuth connector is a workspace-wide `connectors` row (keyed
 // workspace + provider); a key connector is a MACHINE-LOCAL MCP key plus the room's own
 // integration flag (`marketing.mcp`), so its verdict is per room; the image model is a
-// workspace credential (`<provider>-image`, never the agents' seat).
+// workspace credential (`<provider>-image`, never the agents' seat); an APP connector (GitHub,
+// docs/design/github-connector-2026-09) is a `connectors` row too, but the grant behind it is the
+// platform's GitHub App installation, so there is no secret to seal and no token on any machine.
 import type { ConnectorRow } from '../bridge/rows-content';
 import type { CredRow } from '../bridge/rows-infra';
 
-export type ConnectorId = 'x' | 'linkedin' | 'instagram' | 'tiktok' | 'posthog' | 'meta' | 'tiktokads' | 'images';
-export type ConnectorKind = 'oauth' | 'key' | 'image';
+export type ConnectorId = 'x' | 'linkedin' | 'instagram' | 'tiktok' | 'github' | 'posthog' | 'meta' | 'tiktokads' | 'images';
+export type ConnectorKind = 'oauth' | 'app' | 'key' | 'image';
 export interface ConnectorDef {
   id: ConnectorId;
   label: string;
   kind: ConnectorKind;
-  /** the `connectors.provider` value (oauth) or the MCP presence key (key); '' for the image model */
+  /** the `connectors.provider` value (oauth, app) or the MCP presence key (key); '' for the image model */
   provider: string;
 }
 
@@ -26,6 +28,8 @@ export const CONNECTORS: readonly ConnectorDef[] = [
   { id: 'linkedin', label: 'LinkedIn', kind: 'oauth', provider: 'linkedin' },
   { id: 'instagram', label: 'Instagram', kind: 'oauth', provider: 'instagram' },
   { id: 'tiktok', label: 'TikTok', kind: 'oauth', provider: 'tiktok' },
+  // what you publish to, then what you read from, then the keys, then the image model
+  { id: 'github', label: 'GitHub', kind: 'app', provider: 'github' },
   { id: 'posthog', label: 'PostHog', kind: 'key', provider: 'posthog' },
   { id: 'meta', label: 'Meta Ads', kind: 'key', provider: 'meta' },
   { id: 'tiktokads', label: 'TikTok Ads', kind: 'key', provider: 'tiktok' },
@@ -71,7 +75,7 @@ export function connectorStates(input: {
   creds: CredRow[];
 }): ConnectorState[] {
   return CONNECTORS.map((d) => {
-    if (d.kind === 'oauth') {
+    if (d.kind === 'oauth' || d.kind === 'app') {
       const live = input.conns.find((c) => c.provider === d.provider && c.status === 'connected') ?? null;
       const dead = live ? null : input.conns.find((c) => c.provider === d.provider && (c.status === 'revoked' || c.status === 'reauth_required') && !!c.handle) ?? null;
       return { ...d, connected: !!live, handle: live?.handle || null, dead, conn: live };

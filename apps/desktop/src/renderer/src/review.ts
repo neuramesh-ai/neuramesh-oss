@@ -11,7 +11,7 @@
 // presenting a live gate, and that keep a human-only sign-off labelled as one, are provable
 // without mounting anything.
 
-import { TRANSITIONS, type TransitionName } from '@neuramesh/shared';
+import { HUMAN_ONLY_SIGN_OFFS, TRANSITIONS, type TransitionName } from '@neuramesh/shared';
 // The artifact-name parsers live in review-names.ts. They are re-exported here because this
 // module is the public face of reviewing — a consumer should not have to know the file split.
 export { designVer, planVer, reviewKind, shipPlanVer } from './review-names';
@@ -33,10 +33,11 @@ const KINDS: Record<ReviewKind, KindSpec> = {
     label: 'plan review',
     subject: 'the plan',
     reviewState: 'plan_review',
-    // There is no `approve_plan` edge: the human answers the orchestrator's question card and the
-    // orchestrator offers the task. The Approve button posts that card's EXACT answer line, so the
-    // card collapses as answered and the reply-watch treats it as the human's verdict.
-    approve: { label: 'Approve', command: null, say: (n) => `**Approve the plan for #${n}?** → Approve` },
+    // The plan's sign-off is the HUMAN_ONLY command `task.approve_plan` (docs/41, since #281), the
+    // same one the plan card's button sends. Until 2026-09-20 this row still posted the answer line
+    // of a question card that had been retired: the sentence woke rex, who answered it, and the
+    // unit stayed in plan_review while the button looked spent (George: "fix it").
+    approve: { label: 'Approve plan', command: 'task.approve_plan' },
     changes: { label: 'Request changes', command: 'task.revise_plan' },
   },
   ship: {
@@ -63,6 +64,9 @@ const KINDS: Record<ReviewKind, KindSpec> = {
  */
 export function humanOnly(command: string | null): boolean {
   if (!command) return false;
+  // a sign-off that is not a transition (approve_plan stamps the plan, the state stays) is named
+  // beside the command schema, since the table cannot carry it
+  if (HUMAN_ONLY_SIGN_OFFS.includes(command)) return true;
   const name = command.replace(/^task\./, '') as TransitionName;
   const specs = TRANSITIONS.filter((t) => t.name === name);
   return specs.length > 0 && specs.every((t) => t.by.length === 1 && t.by[0] === 'human');

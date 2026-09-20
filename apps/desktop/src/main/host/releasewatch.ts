@@ -1,9 +1,11 @@
 // The release routine's tick branch (docs/design/release-drafts-2026-09 §5.1). A schedule whose
-// payload carries `release` watches a repository: the tick reads it with the MACHINE's own gh (the
-// platform never holds a token), hands the rows to the pure scan, opens ONE session with the digest
-// when there is something to read, and moves the cursor only after the scan completed. A quiet
-// window opens nothing and leaves one ledger line. Path selection and the preflight run BEFORE the
-// claim (the schedules.ts rule: the claim consumes the slot); the fire runs after it.
+// payload carries `release` watches a repository: the tick reads it through the room's GitHub
+// connector when the project holds one (docs/design/github-connector-2026-09: the App reads
+// server-side, which is what lets a cloud machine with no login run the watch), else with the
+// MACHINE's own gh; hands the rows to the pure scan, opens ONE session with the digest when there
+// is something to read, and moves the cursor only after the scan completed. A quiet window opens
+// nothing and leaves one ledger line. Path selection and the preflight run BEFORE the claim (the
+// schedules.ts rule: the claim consumes the slot); the fire runs after it.
 import {
   isNoisePr, releaseDigest, releaseLogNote, releaseMarker, releaseTitle, scanWindow,
   type ReleasePayload, type ScanPr, type ScanRelease, type ScanTag,
@@ -15,7 +17,7 @@ type ReplicaDb = { getAll<T>(sql: string, params?: unknown[]): Promise<T[]> };
 type Post = (path: string, actor: { kind: string; id: string; role?: string }, body: unknown) => Promise<Response>;
 interface RepoRow { id: string; org_name: string; name: string; clone_url: string | null; local_path: string | null; provider: string | null }
 export interface SlotRow { id: string; workspace_id: string; channel_id: string; title: string; at_time: string; tz?: string | null }
-export type Preflight = { ok: true; slug: string; repo: RepoRow } | { ok: false; reason: string };
+export type Preflight = { ok: true; slug: string; repo: RepoRow; door: 'connector' | 'gh' } | { ok: false; reason: string };
 
 const day = (iso: string): string => iso.slice(0, 10);
 
@@ -56,11 +58,15 @@ export function makeReleaseWatch(ctx: {
   post: Post;
   read?: (slug: string, since: string) => Promise<RepoSignals>;
   capable?: () => Promise<boolean>;
+  /** the connector door: is the room's project's GitHub row live, and the read through it (host/reporead.ts) */
+  connected?: (channelId: string) => Promise<boolean>;
+  readViaConnector?: (channelId: string, since: string) => Promise<RepoSignals | null>;
   now?: () => Date;
   threadId?: () => string;
 }) {
   const read = ctx.read ?? readRepoSignals;
   const capable = ctx.capable ?? ghCapable;
+  const connected = ctx.connected ?? (async () => false);
   const now = ctx.now ?? (() => new Date());
   const mintThread = ctx.threadId ?? (() => crypto.randomUUID());
   const owner = { kind: 'human', id: ctx.ownerActorId };
@@ -81,8 +87,9 @@ export function makeReleaseWatch(ctx: {
     const slug = await repoSlugFor(repo);
     // a locally attached checkout stores org_name 'local' and no clone_url: gh cannot read `local/<name>`
     if (!slug || slug.startsWith('local/')) return { ok: false, reason: `${repo.name} has no GitHub remote to read` };
-    if (!(await capable())) return { ok: false, reason: `no machine with a GitHub login can read ${slug}. Sign in with gh on a machine that hosts this room.` };
-    return { ok: true, slug, repo };
+    if (await connected(s.channel_id)) return { ok: true, slug, repo, door: 'connector' };
+    if (!(await capable())) return { ok: false, reason: `nothing can read ${slug}: connect GitHub from Connections, or sign in with gh on a machine that hosts this room.` };
+    return { ok: true, slug, repo, door: 'gh' };
   }
 
   /** after the claim: read, scan, dedupe, open the session or leave a quiet line, move the cursor */
@@ -91,7 +98,13 @@ export function makeReleaseWatch(ctx: {
     const cursorAt = payload.latest ? '1970-01-01T00:00:00.000Z' : (payload.cursor?.at ?? at.toISOString());
     const sinceTag = payload.cursor?.tag ?? null;
     let signals: RepoSignals;
-    try { signals = await read(pre.slug, payload.latest ? new Date(at.getTime() - 120 * 86_400_000).toISOString() : cursorAt); } catch (e) {
+    const since = payload.latest ? new Date(at.getTime() - 120 * 86_400_000).toISOString() : cursorAt;
+    try {
+      // the connector first when the preflight chose it; a row that died between the two reads falls
+      // back to gh on this machine, and to the honest failure where there is none
+      const viaConnector = pre.door === 'connector' && ctx.readViaConnector ? await ctx.readViaConnector(s.channel_id, since) : null;
+      signals = viaConnector ?? await read(pre.slug, since);
+    } catch (e) {
       // the cursor stays: tomorrow's window covers today, and the row says why the bar lit
       return { outcome: 'failed', error: e instanceof Error ? e.message : String(e) };
     }

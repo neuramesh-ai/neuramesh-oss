@@ -30,6 +30,7 @@ import { replyTools } from './tools-replies';
 import { contextTools } from './tools-context';
 import { roomTools } from './tools-room';
 import { playbookTools } from './tools-playbooks';
+import { repoTools } from './tools-repo';
 
 /** a library document as the registry hands it to a tool */
 /** What a tool group needs to answer for THIS turn. Turn-scoped by design: a tool that closed
@@ -330,7 +331,7 @@ async function buildOrchestratorTools(ctx: {
   // spread and the orchestrator spent five days commanded to draw with no drawing tool
   // (promptbudget/orchregistry tests now assert the BUILT registry, so a lost spread fails CI).
   const wbTools = [...wbWrites, ...wbReads].filter((t) => toolAvailable(t.name as NmTool, kind));
-  const all = [...contextTools(tc), ...boardTools(tc), ...routeTools(tc), ...roomTools(tc), ...contentTools(tc), ...replyTools(tc), ...playbookTools(tc), ...wbTools];
+  const all = [...contextTools(tc), ...boardTools(tc), ...routeTools(tc), ...roomTools(tc), ...contentTools(tc), ...replyTools(tc), ...playbookTools(tc), ...repoTools(tc), ...wbTools];
   if (kind !== 'sweep') return all;
   const scoped = new Set(SWEEP_TOOLSETS[ctx.sweepScope ?? 'monitor']);
   return all.filter((t) => scoped.has(t.name));

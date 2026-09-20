@@ -142,7 +142,7 @@ export const geminiAdapter: RuntimeAdapter = {
     const ud = userDataDir();
     ensureAgyBus(ud); // idempotent MERGE into agy's own mcp_config; inert outside a turn
     const bus = await openBusBridge(
-      { kind: opts?.turnKind ?? (promptOverride ? 'design' : 'work'), host: { dir, log, skills, proposeSkill, recordLesson, addBacklogItem, ...(beats ? { beats: beatsAdapter(beats) } : {}), ...(opts?.spawn ? { spawn: opts.spawn } : {}), ...(opts?.park ? { park: opts.park } : {}), ...(opts?.whiteboards ? { whiteboards: opts.whiteboards } : {}), ...(opts?.searchX ? { searchX: opts.searchX } : {}), ...(opts?.draftReplies ? { draftReplies: opts.draftReplies } : {}) } },
+      { kind: opts?.turnKind ?? (promptOverride ? 'design' : 'work'), host: { dir, log, skills, proposeSkill, recordLesson, addBacklogItem, ...(beats ? { beats: beatsAdapter(beats) } : {}), ...(opts?.spawn ? { spawn: opts.spawn } : {}), ...(opts?.park ? { park: opts.park } : {}), ...(opts?.whiteboards ? { whiteboards: opts.whiteboards } : {}), ...(opts?.searchX ? { searchX: opts.searchX } : {}), ...(opts?.draftReplies ? { draftReplies: opts.draftReplies } : {}), ...(opts?.repo ? { repo: opts.repo } : {}) } },
       ud,
       log,
     );

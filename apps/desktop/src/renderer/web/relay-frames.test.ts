@@ -50,8 +50,11 @@ test('every relay close code says something a person can act on', () => {
     const r = closeReason(code);
     assert.ok(r.length > 10 && /[.!]$/.test(r), `code ${code} needs a real sentence, got ${r}`);
   }
-  // the asleep case is the one people will actually hit, so it must name the fix
-  assert.match(closeReason(4404), /asleep/i);
+  // 4404 is the one people will actually hit, so it must name what is true and what to do: the
+  // machine is online (ensureMachine ran) and not on the relay, and it comes back on its own
+  assert.match(closeReason(4404), /not on the relay yet/i);
+  assert.doesNotMatch(closeReason(4404), /asleep/i);
+  assert.match(closeReason(4404), /again/i);
   assert.match(closeReason(1013), /again/i);
   // AN UNKNOWN CODE CARRIES ITS NUMBER. Without it the fallback read exactly like the four named
   // refusals above, so a report of "the connection closed" ruled nothing in or out — 1006 (a

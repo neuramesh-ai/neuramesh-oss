@@ -8,6 +8,7 @@
 import { createServer } from 'node:http';
 import { WebSocketServer } from 'ws';
 import { createHub } from './hub.js';
+import { keepAlive } from './keepalive.js';
 import { makeValidators } from './validate.js';
 
 const port = Number(process.env['PORT'] ?? 8787);
@@ -36,7 +37,12 @@ const server = createServer((req, res) => {
 
 // pty frames are small; a megabyte is already generous. never buffer the world.
 const wss = new WebSocketServer({ server, maxPayload: 1024 * 1024 });
-wss.on('connection', (sock, req) => hub.handleConnection(sock, req));
+wss.on('connection', (sock, req) => {
+  // the half-open socket (keepalive.ts): a peer that misses a pong is terminated, so the hub's
+  // close handlers run (machine_gone) instead of routing into a socket the balancer already closed
+  keepAlive(sock, undefined, () => console.log('[relay] keepalive_reap: no pong, terminating'));
+  hub.handleConnection(sock, req);
+});
 
 server.listen(port, host, () => console.log(`[relay] listening on ${host}:${port}`));
 

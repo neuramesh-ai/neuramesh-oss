@@ -194,6 +194,13 @@ ipcMain.handle('nm:connector-start', async (_e, { channelId, provider }: { chann
   void shell.openExternal(url);
   return { ok: true };
 });
+// The GitHub connector's resolve (docs/design/github-connector-2026-09): the server checks whether the
+// App can read the room's project's repository and writes the connectors row itself. A refusal the
+// server states (no repository, not installed) comes back as its own answer, never as a throw.
+ipcMain.handle('nm:github-resolve', async (_e, { channelId }: { channelId: string }) => {
+  try { return await api('/v1/github/resolve', { channel: channelId }); }
+  catch (e) { return { ok: false, code: 'UNREACHABLE', error: e instanceof Error ? e.message : String(e) }; }
+});
 // A connector is per PROJECT (0106) — two products do not share an X handle. This was
 // unfiltered, and the table was workspace-unique besides, so a brand-new project's marketing
 // setup showed another project's account as already connected (George, 2026-08-02).

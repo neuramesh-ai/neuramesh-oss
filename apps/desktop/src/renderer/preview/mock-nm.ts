@@ -7,6 +7,7 @@ import { openConnectionsSettings, openMoveToCloud, openUpgrade } from '../src/li
 import { FLOW, FRESH_CLOUD, HAS_INVITE, LIVE_RUNS, MOCK_WS_ID, MSG_DELAY, NOKEY, TERM_PALETTE_PROOF, agents, allTasks, artWatchers, artifacts, baseThreadRows, beatsByTask, chanRunWatchers, channels, convoMsgs, convoWatchers, customPacks, decisionWatchers, designProviders, emitLog, emitMockStream, failoverWatchers, historyAllWatchers, homeIsClear, liveTerms, logWatchers, logs, machines, members, memoryBlock, mockArticleArt, mockConnectors, mockContentItems, mockConvoAtts, mockDecisions, mockFailover, mockMcpPresence, mockReplyCounts, mockRuns, mockSchedules, mockThreadArts, mockThreads, mockUpdateState, mockWhiteboards, mockWorkRuns, mockWorkspaces, msgWatchers, msgsByChannel, noop, notifyProcs, openMockTerm, openRunWatchers, packs, pingArts, pingConvo, pingDecisions, pingFailover, pingOpenRuns, pingTasksAll, pingThreads, pingWb, procWatchers, projects, promotedArtifacts, releaseBriefArt, roomMessagesFor, rosterWatchers, screen, seedIso, setMockFailover, skills, streamWatchers, stripThumb, t, taskChanWatchers, taskThreadExtra, taskThreadWatchers, tasksAllWatchers, tasksByChannel, threadWatchers, threadsAllSnapshot, threadsAllWatchers, wbListWatchers, wbRowWatchers, wbRowsFor, wsLibraryRows, libAllWatchers, deleteMockArtifact, DOOR_REPOS, DOOR_SCHEDULE_RUNS } from './mock-fixtures';
 import { marketingArtifacts, marketingSchedules } from './mock-marketing';
 import { CONNS, connectionList, foregroundTasks, foregroundThreads, mockForeground, mockForegroundWorkspace, railRowsSnapshot, swapForeground, watchForeground } from './mock-connections';
+import { githubLanes } from './mock-github';
 
 // Mutable harness state the bridge REASSIGNS — it must live here, not in the fixture
 // module: an ESM import is a read-only binding, so `mockInvites = []` from another
@@ -364,11 +365,10 @@ const explicit: Record<string, any> = {
     if (it) { it.status = 'draft'; it.scheduled_at = null; }
     return { ok: true };
   },
-  // connectors: Connect "completes the external OAuth" after a beat so shots capture both states
-  connectorStart: async (_channelId: string) => {
-    setTimeout(() => { mockConnectors.push({ id: 'conn-x', provider: 'x', handle: '@_neuramesh', status: 'connected' }); }, 800);
-    return { ok: true };
-  },
+  // connectors: Connect "finishes in the browser" after a beat, and the GitHub resolve (mock-github.ts;
+  // the two entries stay literal here for the drift guard)
+  connectorStart: githubLanes(mockConnectors).connectorStart,
+  githubResolve: githubLanes(mockConnectors).githubResolve,
   // the \u2039article:id\u203a card's self-read (article round) + its OS-browser export
   artifact: async (artifactId: string) => { const hit = [mockArticleArt, releaseBriefArt].find((a) => a.id === artifactId); return { artifact: hit ? { ...hit } : null }; },
   articleExternal: async () => ({ ok: true }),

@@ -33,8 +33,9 @@ test('every catalogued tool has a definition, and none is duplicated', () => {
   assert.equal(new Set(names).size, names.length, 'duplicate definition');
   // the module-load assertion in toolbus.ts covers missing names; this pins the count so a tool
   // added to the catalogue without a test being considered shows up here
-  // 15 = the original ten + the four whiteboard tools (docs/38) + search_x on legs (marketing-os)
-  assert.equal(defs.length, 16);
+  // 19 = the original ten + the four whiteboard tools (docs/38) + search_x on legs (marketing-os)
+  // + draft_replies + the three repository reads (docs/design/github-connector-2026-09)
+  assert.equal(defs.length, 19);
 });
 
 test('whiteboard tools (docs/38): availability, serviceability, and the write guards', async () => {

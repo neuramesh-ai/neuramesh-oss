@@ -10,6 +10,8 @@ import { authBlockedCard, resolveToken, runtimeFor } from '../agents';
 import { isStandDown } from '../replypolicy';
 import { isReleasePayload, nextScheduleRun, type ReleasePayload } from '@neuramesh/shared';
 import { makeReleaseWatch, type Preflight } from './releasewatch';
+import { githubConnected, readSignalsViaConnector } from './reporead';
+import type { ApiGetFn } from './searchx';
 import type { PowerSyncDatabase } from '@powersync/node';
 import type { HostedAgent } from '../agents';
 import type { LogFn } from '../agentlog';
@@ -19,6 +21,8 @@ export function makeSchedules(ctx: {
   apiUrl: string;
   ownerActorId: string;
   post: (path: string, actor: { kind: string; id: string; role?: string }, body: unknown) => Promise<Response>;
+  /** the release watch's connector read (host/reporead.ts): GET /v1/repo/changes as the owner */
+  apiGet: ApiGetFn;
   agents: Map<string, HostedAgent>;
   /** one auth card per bootstrap schedule — a Set, so it passes by reference and stays shared */
   bootstrapAuthCardPosted: Set<string>;
@@ -27,10 +31,15 @@ export function makeSchedules(ctx: {
    *  in turn, so the two makers are a cycle and one of them has to be built first. */
   runMarketingBootstrap: (runner: HostedAgent, s: { id: string; workspace_id: string; channel_id: string }, anchor: { threadId?: string; taskId?: string }, opts?: { only?: string[] }) => Promise<void>;
 }) {
-  const { db, apiUrl, ownerActorId, post, agents, bootstrapAuthCardPosted, arun, runMarketingBootstrap } = ctx;
+  const { db, apiUrl, ownerActorId, post, apiGet, agents, bootstrapAuthCardPosted, arun, runMarketingBootstrap } = ctx;
   // the release routine (docs/design/release-drafts-2026-09): a schedule whose payload carries
   // `release` watches a repository with this machine's gh, and opens one session per window
-  const releaseWatch = makeReleaseWatch({ db, ownerActorId, post });
+  const owner = { kind: 'human', id: ownerActorId };
+  const releaseWatch = makeReleaseWatch({
+    db, ownerActorId, post,
+    connected: (channelId) => githubConnected(db, channelId),
+    readViaConnector: (channelId, since) => readSignalsViaConnector(apiGet, owner, channelId, since),
+  });
 
   // ── schedules (marketing-channel plan §4.6): the minute-tick ─────────────────────────
   // Claim each due row via the run_count CAS (the server refuses the loser), then run the

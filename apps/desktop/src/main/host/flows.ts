@@ -14,8 +14,7 @@
 // under it. The turn-inputs block above it moved out instead (host/workerturn.ts) precisely
 // because it crosses the boundary in one direction only.
 import { starterFallback, unavailableOf, whyUnavailable } from './starterfallback';
-import { CONTENT_OUTPUT_CONTRACT, RESEARCH_OUTPUT_CONTRACT, EXEC_FAIL_BLOCK_AFTER, brandTokensFor, collectFiles, designerImageCred, generateBrandImage, imageDataUri, projectPolicy, resolveToken, runCoding, runtimeFor, stageApprovedDesigns, stageBrandContext, stageConnections, stageTaskAttachments, stoppedTasks, worktreeRun } from '../agents';
-import type { ExecTask, HostedAgent, OfferedTask, SkillRef } from '../agents';
+import { CONTENT_OUTPUT_CONTRACT, RESEARCH_OUTPUT_CONTRACT, EXEC_FAIL_BLOCK_AFTER, brandTokensFor, collectFiles, designerImageCred, generateBrandImage, imageDataUri, projectPolicy, resolveToken, runCoding, runtimeFor, stageApprovedDesigns, stageBrandContext, stageConnections, stageTaskAttachments, stoppedTasks, worktreeRun, type ExecTask, type HostedAgent, type OfferedTask, type SkillRef } from '../agents';
 import { EVIDENCE_IMAGE_BUDGET, IMAGE_EXT, evidenceDropNote, planEvidenceBudget, sweepEvidenceImages } from '../evidence';
 import { approvedPlanNote } from './planinject';
 import { FINISH_NOW_NOTE, claimsPendingWork, shouldBlockEcho } from '../runtime/honesty';
@@ -48,7 +47,7 @@ import type { Brain } from '../harness/brain';
 import type { AgentAttachment } from '../runtime/adapter';
 import type { HostQueue } from '../harness/hostqueue';
 import type { ParkBook } from '../harness/park';
-import type { WhiteboardToolClosures } from '../harness/toolbus';
+import type { RepoReader, WhiteboardToolClosures } from '../harness/toolbus';
 import type { makeRuns, RunHandle } from './runs';
 import type { makeBeats } from './beats';
 import type { makePark } from './park';
@@ -116,11 +115,13 @@ export function makeFlows(ctx: HostCtx & {
   replyDraft: (actor: { kind: string; id: string; role?: string }, ch: { id: string; workspace_id: string }, at: { taskId?: string; threadId?: string }) => (i: { report?: string; baseline?: string; replies: unknown[] }) => Promise<string>;
   /** X reads for a WORK turn — the grant and the closure move together (see agents.ts) */
   searchXFor: (actor: { kind: string; id: string; role?: string }, ch: { id: string; workspace_id: string }) => (q: { query: string; max?: number }) => Promise<string>;
+  /** the repository reads for a WORK turn (docs/design/github-connector-2026-09): the same rule */
+  repoFor: (actor: { kind: string; id: string; role?: string }, ch: { id: string; workspace_id: string }) => RepoReader;
 }) {
 const { db, apiUrl, workspace, ownerActorId, post, agents, parkBook, execQueue, claimed,
         NO_RUN, openRun, narrate, declareBeats, advanceBeat, parkFor,
         arun, handleExhaustion,
-        seatFor, setStatus, spawnLegFor, whiteboardClosures, replyDraft, searchXFor } = ctx;
+        seatFor, setStatus, spawnLegFor, whiteboardClosures, replyDraft, searchXFor, repoFor } = ctx;
 // The guard registry's fields keep their short names, exactly as they read inside startAgentHost.
 const { 
         parkRequests, parkResumeNotes, reviewed,
@@ -361,10 +362,10 @@ async function executeFlow(agent: HostedAgent, t: ExecTask, ch: { id: string; sl
           // each child takes a slice, and the slices are what terminate depth.
           const spawnLeg = spawnLegFor(agent, { workspace: ch.workspace_id, channelId: ch.id, taskId: t.id }, dir, t, TURN_BUDGETS.work, log, 0);
           const parkTurn = parkFor(agent, t, ch);
-          let run = await runCoding(adapter, agent, t, dir, token, await blockFor(t.channel_id), true, log, skills, proposeSkill, reworkNotes, attNote, recordLesson, memoryNote, addBacklogItem, beatsFns, permissionGate, sandboxProtectedPaths, { spawn: spawnLeg, park: parkTurn, whiteboards: whiteboardClosures(actor, ch, { taskId: t.id }) });
+          let run = await runCoding(adapter, agent, t, dir, token, await blockFor(t.channel_id), true, log, skills, proposeSkill, reworkNotes, attNote, recordLesson, memoryNote, addBacklogItem, beatsFns, permissionGate, sandboxProtectedPaths, { spawn: spawnLeg, park: parkTurn, whiteboards: whiteboardClosures(actor, ch, { taskId: t.id }), repo: repoFor(actor, ch) });
           if (!run.stopped && claimsPendingWork(run.note)) {
             log({ kind: 'exec', phase: 'held', summary: 'turn ended still waiting on background work — one nudge to finish here', level: 'warn' });
-            run = await runCoding(adapter, agent, t, dir, token, await blockFor(t.channel_id), true, log, skills, proposeSkill, [reworkNotes, FINISH_NOW_NOTE].filter(Boolean).join('\n\n'), attNote, recordLesson, memoryNote, addBacklogItem, beatsFns, permissionGate, sandboxProtectedPaths, { spawn: spawnLeg, park: parkTurn, whiteboards: whiteboardClosures(actor, ch, { taskId: t.id }) });
+            run = await runCoding(adapter, agent, t, dir, token, await blockFor(t.channel_id), true, log, skills, proposeSkill, [reworkNotes, FINISH_NOW_NOTE].filter(Boolean).join('\n\n'), attNote, recordLesson, memoryNote, addBacklogItem, beatsFns, permissionGate, sandboxProtectedPaths, { spawn: spawnLeg, park: parkTurn, whiteboards: whiteboardClosures(actor, ch, { taskId: t.id }), repo: repoFor(actor, ch) });
             if (!run.stopped && claimsPendingWork(run.note)) heldReason = run.note.replace(/\s+/g, ' ').trim().slice(0, 400);
           }
           note = run.stopped ? stoppedNote : run.note;
@@ -425,12 +426,12 @@ async function executeFlow(agent: HostedAgent, t: ExecTask, ch: { id: string; sl
       // deliverable dir — same budget root, same ownership rules, different working directory
       const spawnLeg = spawnLegFor(agent, { workspace: ch.workspace_id, channelId: ch.id, taskId: t.id }, scratch, t, TURN_BUDGETS.work, log, 0);
       const parkTurn = parkFor(agent, t, ch);
-      let run = await runCoding(adapter, agent, t, scratch, token, await blockFor(t.channel_id), false, log, skills, proposeSkill, reworkNotes, attNote, recordLesson, memoryNote, addBacklogItem, beatsFns, permissionGate, sandboxProtectedPaths, { spawn: spawnLeg, park: parkTurn, whiteboards: whiteboardClosures(actor, ch, { taskId: t.id }), draftReplies: replyDraft(actor, ch, { taskId: t.id }), searchX: searchXFor(actor, ch) });
+      let run = await runCoding(adapter, agent, t, scratch, token, await blockFor(t.channel_id), false, log, skills, proposeSkill, reworkNotes, attNote, recordLesson, memoryNote, addBacklogItem, beatsFns, permissionGate, sandboxProtectedPaths, { spawn: spawnLeg, park: parkTurn, whiteboards: whiteboardClosures(actor, ch, { taskId: t.id }), draftReplies: replyDraft(actor, ch, { taskId: t.id }), searchX: searchXFor(actor, ch), repo: repoFor(actor, ch) });
       // the #1032 case: the summary WAS "waiting for the background research agents…" and it
       // got submitted as result.md. Retry in the SAME workspace so the work so far survives.
       if (!run.stopped && claimsPendingWork(run.note)) {
         log({ kind: 'exec', phase: 'held', summary: 'turn ended still waiting on background work — one nudge to finish here', level: 'warn' });
-        run = await runCoding(adapter, agent, t, scratch, token, await blockFor(t.channel_id), false, log, skills, proposeSkill, [reworkNotes, FINISH_NOW_NOTE].filter(Boolean).join('\n\n'), attNote, recordLesson, memoryNote, addBacklogItem, beatsFns, permissionGate, sandboxProtectedPaths, { spawn: spawnLeg, park: parkTurn, whiteboards: whiteboardClosures(actor, ch, { taskId: t.id }) });
+        run = await runCoding(adapter, agent, t, scratch, token, await blockFor(t.channel_id), false, log, skills, proposeSkill, [reworkNotes, FINISH_NOW_NOTE].filter(Boolean).join('\n\n'), attNote, recordLesson, memoryNote, addBacklogItem, beatsFns, permissionGate, sandboxProtectedPaths, { spawn: spawnLeg, park: parkTurn, whiteboards: whiteboardClosures(actor, ch, { taskId: t.id }), repo: repoFor(actor, ch) });
         if (!run.stopped && claimsPendingWork(run.note)) heldReason = run.note.replace(/\s+/g, ' ').trim().slice(0, 400);
       }
       const collected = await collectFiles(scratch); // salvage whether the run finished or was stopped

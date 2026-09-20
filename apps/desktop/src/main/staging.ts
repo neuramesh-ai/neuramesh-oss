@@ -280,7 +280,7 @@ export async function stageConnections(db: AttDbLike, channelId: string): Promis
   const live = rows.filter((r) => r.status === 'connected');
   const dead = rows.filter((r) => r.status === 'reauth_required' || r.status === 'revoked');
   const lines = [
-    ...live.map((r) => `- ${r.provider}${r.handle ? ` (${r.handle})` : ''} — CONNECTED${r.provider === 'x' ? '; read its conversations with `search_x` (real engagement numbers)' : '; publish-only, no read API — cover it by public web research and never attach engagement numbers you did not measure'}`),
+    ...live.map((r) => `- ${r.provider}${r.handle ? ` (${r.handle})` : ''} — CONNECTED${r.provider === 'x' ? '; read its conversations with `search_x` (real engagement numbers)' : r.provider === 'github' ? '; the project repository, read it with `list_repo_changes` (what shipped), `read_repo_file` (the CHANGELOG, a doc, a source file) and `list_repo_files`' : '; publish-only, no read API — cover it by public web research and never attach engagement numbers you did not measure'}`),
     ...dead.map((r) => `- ${r.provider}${r.handle ? ` (${r.handle})` : ''} — AUTHORIZATION EXPIRED: unusable until a human reconnects it. Do not plan around it; say so.`),
   ];
   if (!lines.length) return '';

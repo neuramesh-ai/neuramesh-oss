@@ -27,8 +27,15 @@ export interface RepoNeed {
   why: string;
 }
 export type Need = ConnectorNeed | RepoNeed;
-/** the project's primary repository as the preflight reads it: null when the project has none */
-export interface RepoState { slug: string | null }
+/** the project's primary repository as the preflight reads it: null when the project has none.
+ *  `readable` = something on this machine can READ it (the GitHub connector, or the machine's own
+ *  gh login): attached is not enough, a cloud machine has no login (docs/design/github-connector-2026-09) */
+export interface RepoState { slug: string | null; readable?: boolean }
+
+/** what a dependency card can offer to connect: a publishing network, or GitHub (read access) */
+export type ConnectProvider = ReplyPlatform | 'github';
+export const CONNECT_PROVIDERS: readonly ConnectProvider[] = [...REPLY_PLATFORMS, 'github'];
+const isConnectProvider = (p: unknown): p is ConnectProvider => (CONNECT_PROVIDERS as readonly unknown[]).includes(p);
 
 /** a room's connector as the preflight reads it — the shape `nm.connectors` already returns */
 export interface ConnectorState { provider: string; status: string; handle?: string | null }
@@ -61,6 +68,8 @@ export interface NeedVerdict {
   missing: ReplyPlatform[];
   /** a `repo` need is declared and the project has no repository: the card offers the attach */
   repoMissing: boolean;
+  /** a repository is attached and nothing here can read it: the card offers Connect GitHub */
+  repoUnreadable: boolean;
 }
 
 /** the whole preflight: pure, so the tool, the card and the tests agree by construction */
@@ -71,13 +80,16 @@ export function checkNeeds(needs: readonly Need[] | undefined, rows: ReadonlyArr
   const live = liveConnectors(rows, scope);
   const readable = live.filter(isReadable);
   const repoMissing = !!repoNeed && !repo?.slug;
+  // an unstated `readable` keeps the old verdict (attached = fine): only a caller that CHECKED says no
+  const repoUnreadable = !!repoNeed && !!repo?.slug && repo.readable === false;
   return {
-    ok: (!need || live.length >= Math.max(1, need.min)) && !repoMissing,
+    ok: (!need || live.length >= Math.max(1, need.min)) && !repoMissing && !repoUnreadable,
     live,
     readable,
     unread: live.filter((p) => !isReadable(p)),
     missing: scope.filter((p) => !live.includes(p)),
     repoMissing,
+    repoUnreadable,
   };
 }
 
@@ -87,8 +99,8 @@ export interface NmNeed {
   /** what wanted to run, named as the human asked for it */
   ask: string;
   why: string;
-  /** the networks to offer, in order — each row is a Connect click */
-  connect: ReplyPlatform[];
+  /** the networks to offer, in order — each row is a Connect click; `github` offers read access to the repository */
+  connect: ConnectProvider[];
   /** which of those actually unblock reading (the card says so rather than implying parity) */
   readable?: ReplyPlatform[];
   /** the other fix a card can carry: the project needs a repository (release drafts) */
@@ -107,7 +119,7 @@ export function parseNeed(body: string): NmNeed | null {
   try {
     const d = JSON.parse(m.inner) as NmNeed;
     if (!d || typeof d.channel !== 'string' || typeof d.ask !== 'string') return null;
-    const connect = (Array.isArray(d.connect) ? d.connect : []).filter((p): p is ReplyPlatform => (REPLY_PLATFORMS as readonly string[]).includes(p));
+    const connect = (Array.isArray(d.connect) ? d.connect : []).filter(isConnectProvider);
     const attach = d.attach === 'repo' ? 'repo' as const : undefined;
     if (!connect.length && !attach) return null;
     return {

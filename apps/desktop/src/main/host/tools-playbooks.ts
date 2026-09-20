@@ -15,6 +15,8 @@ import {
   resolvePlaybookInputs,
   type Playbook, checkNeeds, coverageNote, needBlock } from '@neuramesh/shared';
 import type { OrchTool, ToolCtx } from './orchtools';
+import { ghCapable } from './gh';
+import { releaseDigestFor } from './releasedigest';
 
 interface RoomState { lastAt: string | null; lastScore: number | null; armed: string | null }
 
@@ -81,7 +83,7 @@ export async function playbookCatalogText(db: ReplicaDb, roomId: string): Promis
 }
 
 export function playbookTools(tc: ToolCtx): OrchTool[] {
-  const { z, db, post, ch, actor, thread, convoThreadId, log, here, known } = tc;
+  const { z, db, post, ch, actor, thread, convoThreadId, log, here, known, apiGet } = tc;
   // ch carries no kind/marketing — read the (possibly filed-to) room's row when needed
   const roomRow = async (): Promise<{ kind: string | null; marketing: string | null }> =>
     (await db.getAll<{ kind: string | null; marketing: string | null }>(`select kind, marketing from channels where id = ?`, [here()]).catch(() => []))[0]
@@ -131,24 +133,31 @@ export function playbookTools(tc: ToolCtx): OrchTool[] {
           [here()],
         ).catch(() => [] as Array<{ org_name: string; name: string; project_id: string }>)
         : [];
-      const verdict = checkNeeds(pb.needs, connRows, repoRow ? { slug: `${repoRow.org_name}/${repoRow.name}` } : null);
+      // attached is not readable (docs/design/github-connector-2026-09): a cloud machine has no gh
+      // login, so the repository reads only through the GitHub connector or this machine's gh
+      const repoState = repoRow ? { slug: `${repoRow.org_name}/${repoRow.name}`, readable: connRows.some((k) => k.provider === 'github' && k.status === 'connected') || await ghCapable() } : null;
+      const verdict = checkNeeds(pb.needs, connRows, repoState);
       if (!verdict.ok) {
-        const need = pb.needs?.find((n) => n.kind === (verdict.repoMissing ? 'repo' : 'connector'));
+        const need = pb.needs?.find((n) => n.kind === (verdict.repoMissing || verdict.repoUnreadable ? 'repo' : 'connector'));
         const [chRow] = verdict.repoMissing ? await db.getAll<{ project_id: string | null }>(`select project_id from channels where id = ?`, [here()]).catch(() => []) : [];
-        const lead = verdict.repoMissing ? `${pb.title} needs a repository to read, and this room's project has none` : `${pb.title} needs an account to read, and this room has none`;
+        const lead = verdict.repoMissing ? `${pb.title} needs a repository to read, and this room's project has none`
+          : verdict.repoUnreadable ? `${pb.title} needs to read ${repoState?.slug}, and nothing here can: this machine has no GitHub login and GitHub is not connected`
+          : `${pb.title} needs an account to read, and this room has none`;
         await post('/v1/messages', actor, {
           workspace: ch.workspace_id, channel: here(),
           ...(thread ? { taskId: thread.id } : convoThreadId ? { threadId: convoThreadId } : {}),
           body: `Before I staff this — ${lead}:\n\n${needBlock({
             channel: here(), ask: pb.title, why: need?.why ?? 'this playbook reads through the room\'s connected accounts',
-            connect: verdict.repoMissing ? [] : verdict.missing, readable: verdict.missing.filter((p) => p === 'x'),
+            connect: verdict.repoMissing ? [] : verdict.repoUnreadable ? ['github'] : verdict.missing, readable: verdict.missing.filter((p) => p === 'x'),
             ...(verdict.repoMissing ? { attach: 'repo' as const, project: chRow?.project_id ?? null } : {}),
           })}`,
         }).catch(() => null);
-        log?.({ kind: 'tool', phase: 'call', summary: `run_playbook ${pb.id} — blocked, ${verdict.repoMissing ? 'no repository' : 'no connector'}` });
+        log?.({ kind: 'tool', phase: 'call', summary: `run_playbook ${pb.id} — blocked, ${verdict.repoMissing ? 'no repository' : verdict.repoUnreadable ? 'repository unreadable' : 'no connector'}` });
         return verdict.repoMissing
           ? `NOT created: ${pb.title} needs a repository and this room's project has none. The human has a card here to attach one — say plainly that you are waiting on it, and do NOT create a task, a subtask or a backlog item for it.`
-          : `NOT created: ${pb.title} needs at least one connected account and this room has none. The human has a card here to connect one — say plainly that you are waiting on the connection, and do NOT create a task, a subtask or a backlog item for it. Connecting is theirs to do, not work to be staffed.`;
+          : verdict.repoUnreadable
+            ? `NOT created: ${pb.title} needs to read ${repoState?.slug} and nothing here can. The human has a card here to connect GitHub (read only, one minute) — say plainly that you are waiting on it, and do NOT create a task, a subtask or a backlog item for it.`
+            : `NOT created: ${pb.title} needs at least one connected account and this room has none. The human has a card here to connect one — say plainly that you are waiting on the connection, and do NOT create a task, a subtask or a backlog item for it. Connecting is theirs to do, not work to be staffed.`;
       }
       // what the run may READ, and how each connected network is covered (George, 2026-08-26:
       // one connector is enough, and a run covers every one that is live)
@@ -156,6 +165,12 @@ export function playbookTools(tc: ToolCtx): OrchTool[] {
       // the plan is built AFTER the preflight: {coverage} is a RUN-time slot (which networks
       // are live and how each is read), so building the plan first bakes the literal in
       const plan = playbookPlan(pb, values);
+      // the release digest at creation (docs/design/github-connector-2026-09 §3.4): a run asked for
+      // in a thread that carries no digest read nothing, and plume judged from an empty page (the
+      // live web run, 2026-09-19). The read rides the same two doors the tools use; a thread the
+      // routine opened already carries its digest, and is left alone.
+      const digest = pb.id === 'release' ? await releaseDigestFor({ db, apiGet, actor, channelId: here(), threadId: convoThreadId ?? thread?.id ?? null, release: values['release'] ?? null }).catch(() => null) : null;
+      const digestNote = digest ? `\n\n${digest}` : '';
 
       // ── the TASK-THREAD lane (round 3, George): a playbook run asked for inside a task's
       // thread becomes that task's SUBTASK — the flow keeps one owning session, the deliverable
@@ -167,7 +182,7 @@ export function playbookTools(tc: ToolCtx): OrchTool[] {
           channel: here(),
           parent: thread.id,
           title: plan.title.slice(0, 72),
-          description: `Playbook: ${pb.id} (marketing-os). ${pb.tagline}.\nInputs: ${JSON.stringify(values)}\n\n${plan.approach}\n\nDefinition of done: ${plan.definitionOfDone}`,
+          description: `Playbook: ${pb.id} (marketing-os). ${pb.tagline}.\nInputs: ${JSON.stringify(values)}\n\n${plan.approach}\n\nDefinition of done: ${plan.definitionOfDone}${digestNote}`,
           ...(marketer ? { offerTo: marketer.name } : {}),
         });
         const body = (await res.json().catch(() => ({}))) as { task?: { id?: string; number?: number }; error?: string; code?: string };
@@ -183,7 +198,7 @@ export function playbookTools(tc: ToolCtx): OrchTool[] {
         workspace: ch.workspace_id,
         channel: here(),
         title: plan.title.slice(0, 72),
-        description: `Playbook: ${pb.id} (marketing-os). ${pb.tagline}.\nInputs: ${JSON.stringify(values)}`,
+        description: `Playbook: ${pb.id} (marketing-os). ${pb.tagline}.\nInputs: ${JSON.stringify(values)}${digestNote}`,
         kind: pb.taskKind ?? 'research',
         plan: { legs: plan.legs, subtasks: plan.subtasks, approach: plan.approach },
         definitionOfDone: plan.definitionOfDone,

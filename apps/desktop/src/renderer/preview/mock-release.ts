@@ -94,11 +94,28 @@ export const releaseItems: any[] = [
   { id: 'ci-r4', channelId: 'c-marketing', task_id: RELEASE_UNIT_ID, platform: 'tiktok', body: 'Open a terminal on your cloud machine from your phone. v0.134.0.', status: 'draft', scheduled_at: null, published_at: null, external_url: null, created_at: ago(LANDED), schedule_id: null, media: JSON.stringify({ thumb: THUMB }) },
 ];
 
+// THE UNREADABLE REPOSITORY (docs/design/github-connector-2026-09): the same ask on a cloud machine
+// with no gh login and no GitHub connection. run_playbook refuses and posts the dependency card
+// with the one fix, Connect GitHub. A second conversation, so the release session above stays the
+// happy path.
+export const GRANT_THREAD_ID = 'th-rel-grant';
+const NEED = JSON.stringify({ channel: 'c-marketing', ask: 'Release drafts', why: 'the run reads the release and the pull requests that built it, and nothing on this machine can read acme/marketing-site: the machine has no GitHub login', connect: ['github'], readable: [] });
+export const grantThread: any = {
+  id: GRANT_THREAD_ID, title: 'Run the release drafts playbook', description: '', created_by: 'human:u-george', task_id: null,
+  schedule_id: null, created_at: ago(40 * MIN), updated_at: ago(39 * MIN), msg_count: 2,
+  last_body: 'Before I staff this, Release drafts needs to read the repository.', last_author_kind: 'agent', last_at: ago(39 * MIN),
+};
+export const grantMsgs: any[] = [
+  { id: 'rg1', author_kind: 'human', author_id: 'u-george', created_at: ago(40 * MIN), body: 'Run the release drafts playbook' },
+  { id: 'rg2', author_kind: 'agent', author_id: 'a-rex', created_at: ago(39 * MIN), body: 'Before I staff this, Release drafts needs to read the repository:\n\n```nmneed\n' + NEED + '\n```' },
+];
+
 /** the one splice mock-fixtures.ts makes: mutation, never reassignment, so its exported consts stay the
  *  bindings every other module holds. Runs before allTasks derives from tasksByChannel. */
 export function spliceRelease(w: { mockThreads: Record<string, any[]>; convoMsgs: Record<string, any[]>; mockContentItems: any[]; mockSchedules: any[]; tasksByChannel: Record<string, any[]> }): void {
-  (w.mockThreads['c-marketing'] ??= []).push(releaseThread);
+  (w.mockThreads['c-marketing'] ??= []).push(releaseThread, grantThread);
   w.convoMsgs[RELEASE_THREAD_ID] = releaseMsgs;
+  w.convoMsgs[GRANT_THREAD_ID] = grantMsgs;
   w.mockContentItems.push(...releaseItems);
   if (!w.mockSchedules.some((x) => x.id === RELEASE_SCHEDULE_ID)) w.mockSchedules.push(releaseSchedule); // mock-doors.ts seeds it first
   (w.tasksByChannel['c-marketing'] ??= []).push(releaseUnit);

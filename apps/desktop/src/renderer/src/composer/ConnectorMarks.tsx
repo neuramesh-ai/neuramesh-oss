@@ -26,6 +26,7 @@ const CONNECTED_LINE: Record<ConnectorId, string> = {
   linkedin: 'neuramesh publishes to your LinkedIn profile only after you approve a post.',
   instagram: 'neuramesh publishes to Instagram only after you approve a post.',
   tiktok: 'An approved draft lands in your TikTok inbox. You publish it in the TikTok app.',
+  github: 'Your agents read this repository through the neuramesh app on GitHub: releases, pull requests and files. It never writes.',
   posthog: 'Your agents read PostHog through this key.',
   meta: 'Your agents reach this Meta Ads account through the connector.',
   tiktokads: 'Your agents reach this TikTok Ads account through the connector.',

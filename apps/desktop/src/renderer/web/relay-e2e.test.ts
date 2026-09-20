@@ -147,11 +147,13 @@ test('a refused member sees the forbidden sentence, not silence', async () => {
   await p.waitFor(/do not have access/);
 });
 
-test('attaching to an unknown machine reports it as asleep', async () => {
+test('attaching to a machine the relay does not hold says it is not on the relay yet', async () => {
   const { url } = await boot();
   const p = pane();
   openRelayPty(cfg(url, 'm-does-not-exist'), { cols: 80, rows: 24, onData: p.onData, onExit: p.onExit });
-  await p.waitFor(/asleep/);
+  // never "asleep" (2026-09-19): ensureMachine runs before every attach, so the machine is
+  // online by the API's account when 4404 arrives; it is a socket the balancer closed
+  await p.waitFor(/not on the relay yet/);
 });
 
 test('Engineering JSON crosses the real browser, hub, and machine edges', async () => {

@@ -10,6 +10,7 @@ import {
   createHub, MAX_CHANNELS_PER_CLIENT, MAX_CLIENT_INGRESS_BYTES_PER_SECOND, MAX_ENGINEERING_CHANNELS_PER_ACTOR,
   MAX_RELAY_SOCKET_BUFFERED_BYTES, sendBounded, type Hub, type HubOptions,
 } from './hub.js';
+import { keepAlive } from './keepalive.js';
 import { connectEchoMachine, type MachineClient } from './machine-client.js';
 import { CLOSE, fromB64, toB64, type ChannelFrame, type RelayMessage } from './protocol.js';
 
@@ -29,12 +30,16 @@ interface Relay {
 
 const open: { servers: Server[]; socks: WebSocket[]; machines: MachineClient[] } = { servers: [], socks: [], machines: [] };
 
-function startRelay(overrides: Partial<HubOptions> = {}): Promise<Relay> {
+function startRelay(overrides: Partial<HubOptions> = {}, keepaliveMs = 0): Promise<Relay> {
   const logs: string[] = [];
   const hub = createHub({ ...validators, ...overrides, log: (l) => logs.push(l) });
   const server = createServer();
   const wss = new WebSocketServer({ server });
-  wss.on('connection', (sock, req) => hub.handleConnection(sock, req));
+  wss.on('connection', (sock, req) => {
+    // index.ts's own habit: the server keeps every socket alive (keepalive.ts), the hub routes
+    if (keepaliveMs > 0) keepAlive(sock, keepaliveMs, () => logs.push('keepalive_reap: no pong, terminating'));
+    hub.handleConnection(sock, req);
+  });
   open.servers.push(server);
   return new Promise((resolve) => {
     server.listen(0, () => {
@@ -293,5 +298,33 @@ describe('relay hub', () => {
     c.send(JSON.stringify({ ch: 'c2', t: 'open' } satisfies ChannelFrame));
     expect(((await echo) as ChannelFrame).ch).toBe('c2');
     b.close();
+  });
+
+  // KEEPALIVE (2026-09-19): a machine that stops answering pings is a half-open socket (the load
+  // balancer's idle timeout closed it without a close reaching the other side); the hub reaps it,
+  // so the browser's next attach is refused with MACHINE_OFFLINE instead of routed into a void,
+  // and a machine that answers stays online for as many beats as it likes.
+  it('keepalive: a machine that answers pings stays online; one that does not is reaped as gone', async () => {
+    // 200 ms, not 40: under the whole-repo check a pong can arrive tens of milliseconds late,
+    // and a period that tight reaped a live machine once. Production beats every 30 s.
+    const relay = await startRelay({}, 200);
+    const live = machine(relay.url);
+    await until(() => relay.hub.stats().machines.includes(M1), 'machine registration');
+    await new Promise((r) => setTimeout(r, 700)); // three beats, every one answered by ws's auto-pong
+    expect(relay.hub.stats().machines).toEqual([M1]);
+    live.close();
+    await until(() => !relay.hub.stats().machines.length, 'the live machine to leave');
+    // the dead peer: a raw machine socket with the automatic pong switched off
+    const dead = new WebSocket(relay.url, { headers: { authorization: 'Bearer nmm_good' }, autoPong: false });
+    open.socks.push(dead);
+    await new Promise<void>((resolve) => dead.once('open', () => { dead.send(JSON.stringify({ t: 'hello', machineId: M1 })); resolve(); }));
+    await until(() => relay.hub.stats().machines.includes(M1), 'the dead peer to register');
+    await until(() => relay.logs.some((l) => l.startsWith('keepalive_reap')), 'the reap');
+    await until(() => !relay.hub.stats().machines.length, 'machine_gone after the reap');
+    expect(relay.logs.some((l) => l.startsWith(`machine_gone machine=${M1}`))).toBe(true);
+    const c = await connectClient(relay.url);
+    const closed = closedWith(c);
+    c.send(JSON.stringify({ t: 'attach', machineId: M1, token: 'clerk-good' }));
+    expect((await closed).code).toBe(CLOSE.MACHINE_OFFLINE);
   });
 });

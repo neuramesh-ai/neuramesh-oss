@@ -11,7 +11,7 @@
 // deploy), so redialling is a first-class path rather than error handling.
 import WebSocket from 'ws';
 import { existsSync, mkdirSync } from 'node:fs';
-import { isChannelFrame, parseMessage, toB64, fromB64, type ChannelFrame } from '@neuramesh/relay';
+import { isChannelFrame, keepAlive, parseMessage, toB64, fromB64, type ChannelFrame } from '@neuramesh/relay';
 import { makeJail } from './jail';
 import { brainRoot, cachePath, deliverablePath } from '../harness/brain';
 import { isEngineeringOpenMeta, type EngineeringRuntimeEvent } from '../../engineering-protocol';
@@ -28,6 +28,8 @@ export interface MachineEdgeOptions {
   /** a shell ended — a vendor login may just have happened in it (member-machines plan §4) */
   onSessionEnd?(): void;
   engineering?: EngineeringMachineHost;
+  /** the keepalive period (tests shorten it) */
+  keepaliveMs?: number;
 }
 
 interface Session {
@@ -217,6 +219,10 @@ export function connectMachineEdge(opts: MachineEdgeOptions): { close(): void; k
       attempt = 0;
       s.send(JSON.stringify({ t: 'hello', machineId: opts.machineId }));
       log(`dialled ${opts.relayUrl}`);
+      // the half-open socket (2026-09-19, @neuramesh/relay keepalive.ts): the balancer closed this
+      // socket at its idle timeout and this side never saw a close, so no redial ran for hours. A
+      // missed pong terminates it, which is the close event the redial below waits for.
+      keepAlive(s, opts.keepaliveMs, () => log('keepalive: no pong, terminating the socket'));
     });
     s.on('message', (raw: WebSocket.RawData) => {
       const text = Array.isArray(raw) ? Buffer.concat(raw).toString('utf8') : Buffer.from(raw as Buffer).toString('utf8');

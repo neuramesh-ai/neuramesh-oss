@@ -15,7 +15,7 @@ const SIGNALS: RepoSignals = {
   tags: [],
 };
 
-function harness(opts: { repoRows?: unknown[]; seen?: number; capable?: boolean; read?: () => Promise<RepoSignals>; postStatus?: number } = {}) {
+function harness(opts: { repoRows?: unknown[]; seen?: number; capable?: boolean; read?: () => Promise<RepoSignals>; postStatus?: number; connected?: boolean; readViaConnector?: () => Promise<RepoSignals | null> } = {}) {
   const posts: Array<{ path: string; body: Record<string, unknown> }> = [];
   const db = {
     getAll: async <T,>(sql: string) => {
@@ -29,6 +29,8 @@ function harness(opts: { repoRows?: unknown[]; seen?: number; capable?: boolean;
     post: async (path, _actor, body) => { posts.push({ path, body: body as Record<string, unknown> }); return new Response('{"ok":true}', { status: opts.postStatus ?? 200 }); },
     read: opts.read ?? (async () => SIGNALS),
     capable: async () => opts.capable ?? true,
+    connected: async () => opts.connected ?? false,
+    ...(opts.readViaConnector ? { readViaConnector: opts.readViaConnector } : {}),
     now: () => NOW,
     threadId: () => 'thread-1',
   });
@@ -44,14 +46,32 @@ test('preflight: no repository, no remote, no gh login each leave the row due wi
   assert.equal(b.ok, false); assert.match((b as { reason: string }).reason, /no GitHub remote/);
   const noGh = harness({ capable: false });
   const c = await noGh.w.preflight(SLOT, { repo: 'r1' });
-  assert.equal(c.ok, false); assert.match((c as { reason: string }).reason, /no machine with a GitHub login/);
+  assert.equal(c.ok, false); assert.match((c as { reason: string }).reason, /connect GitHub from Connections, or sign in with gh/);
   const ok = await harness().w.preflight(SLOT, { repo: 'r1' });
-  assert.deepEqual(ok, { ok: true, slug: 'neuramesh-ai/neuramesh-oss', repo: REPO });
+  assert.deepEqual(ok, { ok: true, slug: 'neuramesh-ai/neuramesh-oss', repo: REPO, door: 'gh' });
+});
+
+test('the connector door (github-connector round): a live github row reads through the API, no gh needed, and falls back to gh when the read answers null', async () => {
+  const viaApi: string[] = [];
+  const h = harness({ capable: false, connected: true, readViaConnector: async () => { viaApi.push('read'); return SIGNALS; } });
+  const pre = await h.w.preflight(SLOT, { repo: 'r1' });
+  assert.deepEqual(pre, { ok: true, slug: 'neuramesh-ai/neuramesh-oss', repo: REPO, door: 'connector' });
+  const cursor = { at: '2026-09-16T09:00:00.000Z', tag: 'v0.133.0' };
+  const out = await h.w.fire(SLOT, { repo: 'r1', cursor }, pre as Extract<typeof pre, { ok: true }>);
+  assert.equal(out.outcome, 'fired');
+  assert.deepEqual(viaApi, ['read']);
+  assert.ok(h.posts.some((p) => p.path === '/v1/messages' && String(p.body['body']).includes('‹release:neuramesh-ai/neuramesh-oss@v0.134.0›')));
+  // the row died between the preflight and the read: gh on this machine answers instead
+  let ghReads = 0;
+  const fallback = harness({ capable: true, connected: true, readViaConnector: async () => null, read: async () => { ghReads++; return SIGNALS; } });
+  const pre2 = await fallback.w.preflight(SLOT, { repo: 'r1' });
+  assert.equal((await fallback.w.fire(SLOT, { repo: 'r1', cursor }, pre2 as Extract<typeof pre2, { ok: true }>)).outcome, 'fired');
+  assert.equal(ghReads, 1);
 });
 
 test('fire: a release in the window opens one session with the digest and the marker, then moves the cursor', async () => {
   const { w, posts } = harness();
-  const out = await w.fire(SLOT, { repo: 'r1', cursor: { at: '2026-09-16T09:00:00.000Z', tag: 'v0.133.0' } }, { ok: true, slug: 'neuramesh-ai/neuramesh-oss', repo: REPO });
+  const out = await w.fire(SLOT, { repo: 'r1', cursor: { at: '2026-09-16T09:00:00.000Z', tag: 'v0.133.0' } }, { ok: true, slug: 'neuramesh-ai/neuramesh-oss', repo: REPO, door: 'gh' });
   assert.deepEqual(out, { outcome: 'fired', error: null });
   assert.equal(posts.length, 2);
   const msg = posts[0]!;
@@ -70,7 +90,7 @@ test('fire: a release in the window opens one session with the digest and the ma
 
 test('fire: a quiet window opens nothing and leaves one ledger line', async () => {
   const { w, posts } = harness({ read: async () => ({ releases: [], prs: [], tags: [] }) });
-  const out = await w.fire(SLOT, { repo: 'r1', cursor: { at: '2026-09-16T09:00:00.000Z', tag: 'v0.133.0' } }, { ok: true, slug: 'o/r', repo: REPO });
+  const out = await w.fire(SLOT, { repo: 'r1', cursor: { at: '2026-09-16T09:00:00.000Z', tag: 'v0.133.0' } }, { ok: true, slug: 'o/r', repo: REPO, door: 'gh' });
   assert.deepEqual(out, { outcome: 'quiet', error: null });
   assert.equal(posts.length, 1);
   assert.equal(posts[0]!.path, '/v1/commands');
@@ -80,14 +100,14 @@ test('fire: a quiet window opens nothing and leaves one ledger line', async () =
 
 test('fire: a key that already heads a session of this routine never fires twice', async () => {
   const { w, posts } = harness({ seen: 1 });
-  const out = await w.fire(SLOT, { repo: 'r1', cursor: { at: '2026-09-16T09:00:00.000Z', tag: 'v0.133.0' } }, { ok: true, slug: 'o/r', repo: REPO });
+  const out = await w.fire(SLOT, { repo: 'r1', cursor: { at: '2026-09-16T09:00:00.000Z', tag: 'v0.133.0' } }, { ok: true, slug: 'o/r', repo: REPO, door: 'gh' });
   assert.equal(out.outcome, 'quiet');
   assert.equal(posts.filter((p) => p.path === '/v1/messages').length, 0);
 });
 
 test('fire: the one-shot takes the newest release whatever the cursor says, and keeps the cursor', async () => {
   const { w, posts } = harness();
-  const out = await w.fire(SLOT, { repo: 'r1', latest: true, cursor: { at: '2026-09-17T08:00:00.000Z', tag: 'v0.134.0' } }, { ok: true, slug: 'o/r', repo: REPO });
+  const out = await w.fire(SLOT, { repo: 'r1', latest: true, cursor: { at: '2026-09-17T08:00:00.000Z', tag: 'v0.134.0' } }, { ok: true, slug: 'o/r', repo: REPO, door: 'gh' });
   assert.equal(out.outcome, 'fired');
   assert.match(String(posts[0]!.body['body']), /^Release drafts · v0\.134\.0 · o\/r/);
   assert.deepEqual(posts[1]!.body['cursor'], { at: '2026-09-17T08:00:00.000Z', tag: 'v0.134.0' });
@@ -95,7 +115,7 @@ test('fire: the one-shot takes the newest release whatever the cursor says, and 
 
 test('fire: a failed read leaves the cursor where it was and says why', async () => {
   const { w, posts } = harness({ read: async () => { throw new Error('gh could not read o/r: HTTP 401'); } });
-  const out = await w.fire(SLOT, { repo: 'r1', cursor: { at: '2026-09-16T09:00:00.000Z', tag: null } }, { ok: true, slug: 'o/r', repo: REPO });
+  const out = await w.fire(SLOT, { repo: 'r1', cursor: { at: '2026-09-16T09:00:00.000Z', tag: null } }, { ok: true, slug: 'o/r', repo: REPO, door: 'gh' });
   assert.deepEqual(out, { outcome: 'failed', error: 'gh could not read o/r: HTTP 401' });
   assert.equal(posts.length, 0);
 });

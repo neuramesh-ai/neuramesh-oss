@@ -69,7 +69,7 @@ test('all three kinds bind to the same shape — only the data differs', () => {
   assert.deepEqual(all.map((b) => b.kind), ['plan', 'ship', 'design']);
   assert.deepEqual(all.map((b) => b.label), ['plan review', 'release plan', 'design review']);
   assert.deepEqual(all.map((b) => b.gate.subject), ['the plan', 'the release', 'the design']);
-  assert.deepEqual(all.map((b) => verdict(b, 'approve')?.label), ['Approve', 'Approve release plan', 'Approve design']);
+  assert.deepEqual(all.map((b) => verdict(b, 'approve')?.label), ['Approve plan', 'Approve release plan', 'Approve design']);
 });
 
 test('the gate says who may decide, and it is READ FROM THE FSM', () => {
@@ -77,8 +77,10 @@ test('the gate says who may decide, and it is READ FROM THE FSM', () => {
   // human-only badge because the table says so, not because a reviewer remembered it.
   assert.equal(ok(bindShip()).gate.humanOnly, true);
   assert.equal(ok(bindDesign()).gate.humanOnly, true);
-  // a plan is approved by answering the orchestrator's card, not by an FSM edge — no badge
-  assert.equal(ok(bindPlan()).gate.humanOnly, false);
+  // a plan's sign-off is not an FSM edge (approve_plan stamps the plan, the state stays), so it is
+  // named beside the command schema — and the badge reads that list too
+  assert.equal(ok(bindPlan()).gate.humanOnly, true);
+  assert.equal(humanOnly('task.approve_plan'), true, 'named in HUMAN_ONLY_SIGN_OFFS, refused to every other actor by the handler');
 
   // the derivation, not a literal: flipping the table would flip the badge
   for (const [name, b] of [['approve_ship_plan', ok(bindShip())], ['approve_design', ok(bindDesign())]] as const) {
@@ -121,12 +123,12 @@ test('a round with a predecessor offers a diff against it', () => {
 
 // ── the verdicts are the buttons ───────────────────────────────────────────────────────────────
 
-test('approving a plan ANSWERS the card; approving a release fires the command', () => {
-  // the plan's Approve posts the exact answer line the nmq card asks for, so the card collapses
-  // as answered — there is no approve_plan edge in the FSM
+test('approving a plan, a release and a design each fire their command; none posts a sentence in its place', () => {
+  // until 2026-09-20 the plan's Approve posted the answer line of a retired question card: the
+  // sentence woke rex, who answered it, and nothing approved. The command is the sign-off.
   const plan = verdict(ok(bindPlan()), 'approve');
-  assert.equal(plan?.say, '**Approve the plan for #1005?** → Approve');
-  assert.equal(plan?.command, null);
+  assert.equal(plan?.command, 'task.approve_plan');
+  assert.equal(plan?.say, null);
 
   const ship = verdict(ok(bindShip()), 'approve');
   assert.equal(ship?.command, 'task.approve_ship_plan');

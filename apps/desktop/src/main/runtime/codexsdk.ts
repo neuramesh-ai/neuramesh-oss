@@ -114,7 +114,7 @@ export const codexSdkAdapter: RuntimeAdapter = {
     // a discovery, and beats depended on the model echoing NM_BEAT_DONE into stdout. The bus gives
     // it the SAME toolset a Claude worker gets, over the loopback MCP bridge.
     const bus = await openBusBridge(
-      { kind: opts?.turnKind ?? (promptOverride ? 'design' : 'work'), host: { dir, log, skills, proposeSkill, recordLesson, addBacklogItem, ...(beats ? { beats: beatsAdapter(beats) } : {}), ...(opts?.spawn ? { spawn: opts.spawn } : {}), ...(opts?.park ? { park: opts.park } : {}), ...(opts?.whiteboards ? { whiteboards: opts.whiteboards } : {}), ...(opts?.searchX ? { searchX: opts.searchX } : {}), ...(opts?.draftReplies ? { draftReplies: opts.draftReplies } : {}) } },
+      { kind: opts?.turnKind ?? (promptOverride ? 'design' : 'work'), host: { dir, log, skills, proposeSkill, recordLesson, addBacklogItem, ...(beats ? { beats: beatsAdapter(beats) } : {}), ...(opts?.spawn ? { spawn: opts.spawn } : {}), ...(opts?.park ? { park: opts.park } : {}), ...(opts?.whiteboards ? { whiteboards: opts.whiteboards } : {}), ...(opts?.searchX ? { searchX: opts.searchX } : {}), ...(opts?.draftReplies ? { draftReplies: opts.draftReplies } : {}), ...(opts?.repo ? { repo: opts.repo } : {}) } },
       userDataDir(),
       log,
     );
