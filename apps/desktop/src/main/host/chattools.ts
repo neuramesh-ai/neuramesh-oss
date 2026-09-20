@@ -21,6 +21,7 @@ import { newGrounding, ungrounded, type LibraryReader } from './grounding';
 import { unpicked } from './ugcflow';
 import { frameArg, framesFor } from './frames';
 import { libraryChatTools, ugcChatTools } from './chattools-library';
+import { repoChatTools } from './chattools-repo';
 
 import type { HostedAgent } from '../agents';
 import type { LogFn } from '../agentlog';
@@ -85,6 +86,7 @@ const nm = createSdkMcpServer({
     ),
     ...libraryChatTools(t, grounding),
     ...ugcChatTools(t, grounding),
+    ...repoChatTools(t),
     tool(
       'list_playbooks',
       'The marketing playbook catalog (marketing-os) joined to this room\'s state — consult it before improvising on a marketing ask. Light flows you answer here after load_skill; heavy ones you describe and let the human ask rex to run.',

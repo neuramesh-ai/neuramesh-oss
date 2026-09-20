@@ -40,7 +40,11 @@ export function closeReason(code: number): string {
   switch (code) {
     case 4401: return 'This machine did not accept the connection. Try reloading.';
     case 4403: return 'You do not have access to this workspace machine.';
-    case 4404: return 'The machine is asleep. Start it, then open the terminal again.';
+    // 4404 is the relay's "no socket for this machine". Every lane runs ensureMachine first, so
+    // the machine is online by the API's account when this arrives: it is not asleep, it is not
+    // on the relay (a dropped socket the keepalive now catches within a minute). The old sentence
+    // said "asleep" to a person looking at a green machine (George, 2026-09-19).
+    case 4404: return 'The machine is not on the relay yet. It reconnects within a minute. Try again.';
     case 4409: return 'This machine reconnected somewhere else.';
     case 4410: return 'The machine went away.';
     case 1013: return 'Cannot reach NeuraMesh to check permissions. Try again shortly.';

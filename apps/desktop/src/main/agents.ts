@@ -54,6 +54,7 @@ import { makeLegs } from './host/legs';
 import { makeOrchTurn } from './host/orchestratorturn';
 import { postReplyCard } from './host/replycard';
 import { searchXText } from './host/searchx';
+import { makeRepoReader, type RepoReader } from './host/reporead';
 import { makeWbClosures } from './host/wbclosures';
 import { type SweepSnapshot } from './harness/berths';
 
@@ -1019,11 +1020,10 @@ export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId,
   // advertised when the host can SERVICE it — and the closure was built for legs only. Live, the
   // worker said so itself: "no X rows were fabricated because search_x was not surfaced". The
   // grant and the closure have to move together or the grant is a lie.
-  const searchXFor = (
-    actor: { kind: string; id: string; role?: string },
-    ch: { id: string; workspace_id: string },
-  ) => (q: { query: string; max?: number }): Promise<string> =>
+  const searchXFor = (actor: { kind: string; id: string; role?: string }, ch: { id: string; workspace_id: string }) => (q: { query: string; max?: number }): Promise<string> =>
     searchXText(apiGet, actor, { workspaceId: ch.workspace_id, channelId: ch.id }, q.query, q.max);
+  // the repository reads (docs/design/github-connector-2026-09): the same rule, one reader per room
+  const repoFor = (actor: { kind: string; id: string; role?: string }, ch: { id: string; workspace_id: string }): RepoReader => makeRepoReader({ apiGet, actor, db, channelId: ch.id });
 
   const replyDraft = (
     actor: { kind: string; id: string; role?: string },
@@ -1918,7 +1918,7 @@ export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId,
   // The minute-tick for armed routines (schedules.ts). A THUNK for runMarketingBootstrap because
   // the two are a cycle — a bootstrap schedule fires the flow, and the flow re-ticks the schedules.
   const { runDueSchedules } = makeSchedules({
-    db, apiUrl, ownerActorId, post, agents, bootstrapAuthCardPosted, arun,
+    db, apiUrl, ownerActorId, post, apiGet, agents, bootstrapAuthCardPosted, arun,
     runMarketingBootstrap: (...a) => runMarketingBootstrap(...a),
   });
 
@@ -1938,7 +1938,7 @@ export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId,
     alog, arun, brainNotes, brainNotesFor, brainResults, channelLessons, claimVerdict, discoverSkills,
     handleExhaustion, legSummary, mineLessons, originOf, priorMachineFor, readOnlyStudy, requestSleeperWake, nobodyServes, unitBirth,
     orchestratorTurn: (...args: Parameters<typeof orchestratorTurn>) => orchestratorTurn(...args),
-    seatFor, setStatus, sinceFirstSeen, spawnLegFor, taskRecallNote, whiteboardClosures, replyDraft, searchXFor,
+    seatFor, setStatus, sinceFirstSeen, spawnLegFor, taskRecallNote, whiteboardClosures, replyDraft, searchXFor, repoFor,
   });
 
   // Triage and dispatch (host/dispatch.ts) — routing to the architect or the designer, the

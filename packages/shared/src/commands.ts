@@ -115,6 +115,10 @@ export const taskApproveDesignCommand = z.object({ type: z.literal('task.approve
 // approve_plan is the HUMAN sign-off on a plan-first unit (docs/41) — not a transition: it unlocks
 // the edge out of plan_review. Mirrored for the phone's needs-you card (the mobile-cloud round, S3).
 export const taskApprovePlanCommand = z.object({ type: z.literal('task.approve_plan'), taskId });
+/** the human sign-offs that are NOT transitions, so the FSM table cannot say who may fire them: the
+ *  handler refuses every other actor (HUMAN_ONLY), and a surface that wears a human-only badge reads
+ *  this list beside the table (renderer review.ts humanOnly) */
+export const HUMAN_ONLY_SIGN_OFFS: readonly string[] = ['task.approve_plan'];
 // Ship gate (docs/23): approve_ship_plan is the HUMAN sign-off that releases the
 // checklist for execution; revise bounces the plan back to the shipper with
 // feedback; check ticks a checklist item (the handler enforces who may tick

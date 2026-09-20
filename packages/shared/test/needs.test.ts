@@ -85,3 +85,22 @@ describe('the repo need (release drafts)', () => {
     expect(parseNeed(needBlock({ channel: 'c1', ask: 'x', why: 'y', connect: [] }))).toBeNull();
   });
 });
+
+describe('the readable repository (the GitHub connector round)', () => {
+  const NEEDS3: Need[] = [{ kind: 'repo', why: 'the run reads the release' }, { kind: 'connector', min: 1, any: ['x', 'linkedin'], why: 'one draft per account' }];
+  it('attached but unreadable ⇒ blocked on the read, not on the account', () => {
+    const v = checkNeeds(NEEDS3, rows(['x', 'connected']), { slug: 'o/r', readable: false });
+    expect(v.ok).toBe(false);
+    expect(v.repoMissing).toBe(false);
+    expect(v.repoUnreadable).toBe(true);
+  });
+  it('readable through the connector or the machine ⇒ runs; an unstated readable keeps the old verdict', () => {
+    expect(checkNeeds(NEEDS3, rows(['x', 'connected']), { slug: 'o/r', readable: true }).ok).toBe(true);
+    expect(checkNeeds(NEEDS3, rows(['x', 'connected']), { slug: 'o/r' }).repoUnreadable).toBe(false);
+  });
+  it('the card can offer GitHub, and a stray provider is dropped', () => {
+    const body = needBlock({ channel: 'c1', ask: 'Release drafts', why: 'reads the release', connect: ['github'], readable: [] });
+    expect(parseNeed(body)!.connect).toEqual(['github']);
+    expect(parseNeed(needBlock({ channel: 'c1', ask: 'x', why: 'y', connect: ['gitlab' as never] }))).toBeNull();
+  });
+});

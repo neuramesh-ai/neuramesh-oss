@@ -7,6 +7,7 @@
 // (slice 2) implement the same three methods their own way (CLI coding loop + raw
 // SDK turns). The seam stays thin: prompts, worktrees, tools, and the echo
 // branches all live in the host; the adapter is only the model invocation.
+import type { RepoReader } from '../host/reporead';
 import { styled } from '../housestyle';
 import { existsSync } from 'node:fs';
 import { join, sep } from 'node:path';
@@ -96,6 +97,8 @@ export interface TurnOpts {
   /** the reply card (reply-radar round) — host/tools-replies.ts closed over the thread, so the
    *  worker that FOUND the conversations is the one that hands them over */
   draftReplies?: (i: { report?: string; baseline?: string; replies: unknown[] }) => Promise<string>;
+  /** the repository reads (docs/design/github-connector-2026-09) — host/reporead.ts closed over the room */
+  repo?: RepoReader;
   /** the REAL turn kind for the tool bus. The CLI adapters used to hardcode
    *  `promptOverride ? 'design' : 'work'`, so a leg bridged as a design turn and
    *  TOOL_KINDS could never grant a leg anything — that literal is now the fallback only. */

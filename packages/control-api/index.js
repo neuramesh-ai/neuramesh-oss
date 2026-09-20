@@ -87,7 +87,7 @@ var PROVIDER_LABEL, providerLabel, metaOf, alertsSummary;
 var init_alerts = __esm({
   "../shared/src/alerts.ts"() {
     "use strict";
-    PROVIDER_LABEL = { x: "X", linkedin: "LinkedIn", instagram: "Instagram", tiktok: "TikTok", email: "Email" };
+    PROVIDER_LABEL = { x: "X", linkedin: "LinkedIn", instagram: "Instagram", tiktok: "TikTok", github: "GitHub", email: "Email" };
     providerLabel = (p2) => PROVIDER_LABEL[p2] ?? p2;
     metaOf = (projectName, channelSlug) => [projectName, channelSlug ? `#${channelSlug}` : null].filter(Boolean).join(" \xB7 ");
     alertsSummary = (alerts) => alerts.map((a) => a.short).join(" \xB7 ");
@@ -1210,7 +1210,7 @@ function historyRows(input) {
   const bare = tasks.filter((t2) => inScope(t2) && !linked.has(t2.id) && !t2.parent_task_id && !t2.origin_thread_id);
   const ownedElsewhere = (t2, task) => !!task && (!!task.parent_task_id || !!task.origin_thread_id && task.origin_thread_id !== t2.id);
   const loose = (messages ?? []).filter((m) => m.author_kind === "human" && !m.thread_id && !m.task_id && !m.root_thread_id);
-  const slugOf = (id) => tasks.find((t2) => t2.channel_id === id)?.channel_slug ?? channelSlug;
+  const slugOf2 = (id) => tasks.find((t2) => t2.channel_id === id)?.channel_slug ?? channelSlug;
   return [
     ...scopedThreads.flatMap((t2) => {
       const task = t2.task_id ? tasks.find((x) => x.id === t2.task_id) ?? null : null;
@@ -1219,7 +1219,7 @@ function historyRows(input) {
         key: `th:${t2.id}`,
         threadId: t2.id,
         channelId: t2.channel_id ?? task?.channel_id ?? channelId,
-        channelSlug: t2.channel_slug ?? task?.channel_slug ?? slugOf(t2.channel_id),
+        channelSlug: t2.channel_slug ?? task?.channel_slug ?? slugOf2(t2.channel_id),
         task,
         branch: task?.branch ?? null,
         title: plainTitle(t2.title || "New thread"),
@@ -4192,7 +4192,7 @@ var init_brainnotice = __esm({
 
 // ../shared/src/commands.ts
 import { z as z6 } from "zod";
-var taskId, taskCreateCommand, taskAcceptCommand, taskApproveCommand, taskRequestChangesCommand, taskCancelCommand, taskBlockCommand, taskUnblockCommand, taskArchiveCommand, taskPromoteCommand, taskReopenCommand, taskUpdateDetailsCommand, taskSetDefinitionOfDoneCommand, taskRequestPlanCommand, taskRevisePlanCommand, taskRequestDesignCommand, taskSelectDesignProviderCommand, taskReviseDesignCommand, taskApproveDesignCommand, taskApprovePlanCommand, taskApproveShipPlanCommand, taskReviseShipPlanCommand, taskCheckShipItemCommand, taskFinishSubtaskCommand, taskAddShipItemCommand, messagePinCommand, decisionAnswerCommand, decisionDismissCommand, workspaceCreateCommand, workspaceUpdateCommand, agentUpdateCommand, repoLinkCommand, contentApproveCommand, contentUnscheduleCommand, contentUpdateCommand, workspaceInviteCommand, workspaceAcceptInviteCommand, workspaceDeclineInviteCommand, credentialSetCommand, agentRegisterCommand, memberShareComputeCommand, memberSetComputeCommand, threadSetMachineCommand, threadSetBrainCommand, threadSettleCommand, threadUnsettleCommand, scheduleCreateCommand, scheduleSetStatusCommand, scheduleDeleteCommand, scheduleUpdateCommand, machineWakeCommand, HumanCommandSchema;
+var taskId, taskCreateCommand, taskAcceptCommand, taskApproveCommand, taskRequestChangesCommand, taskCancelCommand, taskBlockCommand, taskUnblockCommand, taskArchiveCommand, taskPromoteCommand, taskReopenCommand, taskUpdateDetailsCommand, taskSetDefinitionOfDoneCommand, taskRequestPlanCommand, taskRevisePlanCommand, taskRequestDesignCommand, taskSelectDesignProviderCommand, taskReviseDesignCommand, taskApproveDesignCommand, taskApprovePlanCommand, HUMAN_ONLY_SIGN_OFFS, taskApproveShipPlanCommand, taskReviseShipPlanCommand, taskCheckShipItemCommand, taskFinishSubtaskCommand, taskAddShipItemCommand, messagePinCommand, decisionAnswerCommand, decisionDismissCommand, workspaceCreateCommand, workspaceUpdateCommand, agentUpdateCommand, repoLinkCommand, contentApproveCommand, contentUnscheduleCommand, contentUpdateCommand, workspaceInviteCommand, workspaceAcceptInviteCommand, workspaceDeclineInviteCommand, credentialSetCommand, agentRegisterCommand, memberShareComputeCommand, memberSetComputeCommand, threadSetMachineCommand, threadSetBrainCommand, threadSettleCommand, threadUnsettleCommand, scheduleCreateCommand, scheduleSetStatusCommand, scheduleDeleteCommand, scheduleUpdateCommand, machineWakeCommand, HumanCommandSchema;
 var init_commands = __esm({
   "../shared/src/commands.ts"() {
     "use strict";
@@ -4285,6 +4285,7 @@ var init_commands = __esm({
     taskReviseDesignCommand = z6.object({ type: z6.literal("task.revise_design"), taskId, feedback: z6.string().min(1) });
     taskApproveDesignCommand = z6.object({ type: z6.literal("task.approve_design"), taskId });
     taskApprovePlanCommand = z6.object({ type: z6.literal("task.approve_plan"), taskId });
+    HUMAN_ONLY_SIGN_OFFS = ["task.approve_plan"];
     taskApproveShipPlanCommand = z6.object({ type: z6.literal("task.approve_ship_plan"), taskId });
     taskReviseShipPlanCommand = z6.object({ type: z6.literal("task.revise_ship_plan"), taskId, feedback: z6.string().min(1) });
     taskCheckShipItemCommand = z6.object({
@@ -4909,7 +4910,7 @@ var init_playbooks_campaigns = __esm({
           { kind: "connector", min: 1, any: ["x", "linkedin", "instagram", "tiktok"], why: "one draft per connected account, in each network\u2019s own shape" }
         ],
         legs: ["build"],
-        approach: "Load the `release-announcement` skill. Read the release digest in this thread (the notes and the merged pull requests) for {release}. Decide whether a feature shipped and name the ONE headline feature, or say that nothing is worth announcing and stop. Ground the voice in the brand docs (.nm-evidence/brand/). Write the release brief, then one post per connected account. {coverage} Instagram and TikTok posts carry an image brief for the release card. Never invent a number, a quote or a customer.",
+        approach: "Load the `release-announcement` skill. Read the release digest for {release}: in this thread, or in the task description (read at creation). When you need more, read the repository itself with list_repo_changes (releases, merged pull requests, commits), read_repo_file (the CHANGELOG, a doc) and list_repo_files. Decide whether a feature shipped and name the ONE headline feature, or say that nothing is worth announcing and stop. Ground the voice in the brand docs (.nm-evidence/brand/). Write the release brief, then one post per connected account. {coverage} Instagram and TikTok posts carry an image brief for the release card. Never invent a number, a quote or a customer.",
         dod: "Two deliverables: (1) `release-report-YYYY-MM-DD.md`, whose first line is `# Release brief \xB7 <tag>` and whose second line reads `Verdict: feature \xB7 Basis: <what was read>` (the verdict is one of feature, improvement, fix, none), carrying `## Why` (the reasons, the pull requests by number), `## Audience`, `## Assets` (what was drawn and why) and `## What I could not determine`; (2) `posts.json` with one post per connected account, each in that network\u2019s own shape and length, with an `imageBrief` on Instagram and TikTok posts. Nothing invented: no fabricated numbers, quotes or names."
       },
       {
@@ -5448,13 +5449,15 @@ function checkNeeds(needs, rows2, repo) {
   const live = liveConnectors(rows2, scope);
   const readable = live.filter(isReadable);
   const repoMissing = !!repoNeed && !repo?.slug;
+  const repoUnreadable = !!repoNeed && !!repo?.slug && repo.readable === false;
   return {
-    ok: (!need || live.length >= Math.max(1, need.min)) && !repoMissing,
+    ok: (!need || live.length >= Math.max(1, need.min)) && !repoMissing && !repoUnreadable,
     live,
     readable,
     unread: live.filter((p2) => !isReadable(p2)),
     missing: scope.filter((p2) => !live.includes(p2)),
-    repoMissing
+    repoMissing,
+    repoUnreadable
   };
 }
 function needBlock(data) {
@@ -5466,7 +5469,7 @@ function parseNeed(body) {
   try {
     const d = JSON.parse(m.inner);
     if (!d || typeof d.channel !== "string" || typeof d.ask !== "string") return null;
-    const connect = (Array.isArray(d.connect) ? d.connect : []).filter((p2) => REPLY_PLATFORMS.includes(p2));
+    const connect = (Array.isArray(d.connect) ? d.connect : []).filter(isConnectProvider);
     const attach = d.attach === "repo" ? "repo" : void 0;
     if (!connect.length && !attach) return null;
     return {
@@ -5492,12 +5495,14 @@ function coverageNote(v) {
   ].filter(Boolean);
   return `Cover EVERY connected network: ${parts.join(" \xB7 ")}.`;
 }
-var READABLE, isReadable;
+var CONNECT_PROVIDERS, isConnectProvider, READABLE, isReadable;
 var init_needs = __esm({
   "../shared/src/needs.ts"() {
     "use strict";
     init_linear();
     init_replyops();
+    CONNECT_PROVIDERS = [...REPLY_PLATFORMS, "github"];
+    isConnectProvider = (p2) => CONNECT_PROVIDERS.includes(p2);
     READABLE = ["x"];
     isReadable = (p2) => READABLE.includes(p2);
   }
@@ -5969,11 +5974,11 @@ function parseBrandGuidelines(md) {
     avoid: prose(section2(md, "what to avoid", "avoid", "don't"))
   };
 }
-function buildImagePrompt(brief, tokens, platform, product) {
+function buildImagePrompt(brief, tokens2, platform, product) {
   const subject = (brief ?? "").trim();
   if (!subject) return null;
   const canvas = CANVAS[platform] ?? CANVAS["x"];
-  const t2 = tokens ?? EMPTY_BRAND;
+  const t2 = tokens2 ?? EMPTY_BRAND;
   const lines = [`Create one ${canvas.shape} social image for a ${platform === "x" ? "post on X" : `${platform} post`}.`, "", `Subject: ${subject}`];
   if (t2.palette.length) {
     lines.push("", `Brand palette \u2014 use these exact colours and no others: ${t2.palette.map((p2) => `${p2.role} ${p2.hex}`).join(", ")}.`);
@@ -6078,7 +6083,10 @@ var init_harness = __esm({
       "list_whiteboards",
       "read_whiteboard",
       "search_x",
-      "draft_replies"
+      "draft_replies",
+      "list_repo_changes",
+      "read_repo_file",
+      "list_repo_files"
     ];
     TOOL_KINDS = {
       screenshot: ["own", "design", "work", "review", "deep", "leg"],
@@ -6134,7 +6142,14 @@ var init_harness = __esm({
       // and why it is worth joining, and routing that back through the orchestrator would make rex
       // retype facts it did not gather. `chat`/`triage` carry their own copy in the host registry
       // (host/tools-replies.ts), exactly as the content tools do.
-      draft_replies: ["work", "leg"]
+      draft_replies: ["work", "leg"],
+      // The repository reads (docs/design/github-connector-2026-09): the room's project's repository through
+      // the GitHub connector (or the machine's own gh). Broad by design, like the whiteboard reads: a
+      // triage turn deciding whether a feature shipped, a chat turn asked what changed, a marketer's
+      // leg reading the CHANGELOG. Read only, so nothing here can move the board or the repository.
+      list_repo_changes: ["chat", "triage", "own", "design", "plan", "work", "review", "ship", "deep", "leg"],
+      read_repo_file: ["chat", "triage", "own", "design", "plan", "work", "review", "ship", "deep", "leg"],
+      list_repo_files: ["chat", "triage", "own", "design", "plan", "work", "review", "ship", "deep", "leg"]
     };
     RUNTIME_CAPABILITIES = {
       "claude-code": { agenticLoop: true, inlineImages: true, nativeSandbox: false, gatesNativeTools: true, toolTransport: "in-process", resumable: false },
@@ -8136,6 +8151,7 @@ __export(src_exports, {
   CODE_SESSION_MODES: () => CODE_SESSION_MODES,
   CODE_SESSION_STATES: () => CODE_SESSION_STATES,
   COMM_RULE_CAPS: () => COMM_RULE_CAPS,
+  CONNECT_PROVIDERS: () => CONNECT_PROVIDERS,
   CONTENT_PLATFORMS: () => CONTENT_PLATFORMS,
   CORE_PACK: () => CORE_PACK,
   CREDITS_PER_USD: () => CREDITS_PER_USD,
@@ -8168,6 +8184,7 @@ __export(src_exports, {
   FALL_FORWARD: () => FALL_FORWARD,
   FREE_SEAT_CAP: () => FREE_SEAT_CAP,
   GATE_ARTIFACT_KINDS: () => GATE_ARTIFACT_KINDS,
+  HUMAN_ONLY_SIGN_OFFS: () => HUMAN_ONLY_SIGN_OFFS,
   HumanCommandSchema: () => HumanCommandSchema,
   IMPORT_BATCH_MAX_BYTES: () => IMPORT_BATCH_MAX_BYTES,
   IMPORT_COLUMNS: () => IMPORT_COLUMNS,
@@ -8980,22 +8997,22 @@ async function xCallback(code, sealedState, redirectUri, fetchFn = fetch) {
   });
   if (!tokRes.ok) throw new Error(`x token exchange failed ${tokRes.status}: ${await tokRes.text()}`);
   const tok = await tokRes.json();
-  const tokens = {
+  const tokens2 = {
     access_token: tok.access_token,
     ...tok.refresh_token ? { refresh_token: tok.refresh_token } : {},
     ...tok.expires_in ? { expires_at: Date.now() + tok.expires_in * 1e3 } : {}
   };
-  const meRes = await fetchFn("https://api.x.com/2/users/me", { headers: { authorization: `Bearer ${tokens.access_token}` } });
+  const meRes = await fetchFn("https://api.x.com/2/users/me", { headers: { authorization: `Bearer ${tokens2.access_token}` } });
   const handle = meRes.ok ? `@${(await meRes.json()).data?.username ?? ""}` : "";
-  return { workspace: st.workspace, channel: st.channel, actor: st.actor, handle, tokens };
+  return { workspace: st.workspace, channel: st.channel, actor: st.actor, handle, tokens: tokens2 };
 }
-async function refreshTokens(tokens, fetchFn, persist) {
-  if (!tokens.refresh_token) throw new XReauthRequired("x token expired and the stored authorization has no refresh token");
+async function refreshTokens(tokens2, fetchFn, persist) {
+  if (!tokens2.refresh_token) throw new XReauthRequired("x token expired and the stored authorization has no refresh token");
   const basic = Buffer.from(`${process.env["X_CLIENT_ID"]}:${process.env["X_CLIENT_SECRET"]}`).toString("base64");
   const res = await fetchFn("https://api.x.com/2/oauth2/token", {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded", authorization: `Basic ${basic}` },
-    body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: tokens.refresh_token }).toString()
+    body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: tokens2.refresh_token }).toString()
   });
   if (!res.ok) {
     const detail = (await res.text().catch(() => "")).slice(0, 200);
@@ -9005,15 +9022,15 @@ async function refreshTokens(tokens, fetchFn, persist) {
   const tok = await res.json();
   const next = {
     access_token: tok.access_token,
-    refresh_token: tok.refresh_token ?? tokens.refresh_token,
+    refresh_token: tok.refresh_token ?? tokens2.refresh_token,
     ...tok.expires_in ? { expires_at: Date.now() + tok.expires_in * 1e3 } : {}
   };
   if (persist) await persist(next).catch((e) => console.error("x token rotation persist failed:", e));
   return next;
 }
 var xPoster = {
-  async post(tokens, body, opts, fetchFn = fetch) {
-    let t2 = tokens;
+  async post(tokens2, body, opts, fetchFn = fetch) {
+    let t2 = tokens2;
     let refreshed = false;
     if (t2.expires_at && t2.expires_at < Date.now() + 3e4) {
       t2 = await refreshTokens(t2, fetchFn, opts?.persistPatch);
@@ -9046,8 +9063,8 @@ var xPoster = {
     return { url: `https://x.com/i/web/status/${id}`, ...refreshed ? { secretPatch: t2 } : {} };
   }
 };
-async function xSearchRecent(tokens, query, max, fetchFn = fetch, persist) {
-  let t2 = tokens;
+async function xSearchRecent(tokens2, query, max, fetchFn = fetch, persist) {
+  let t2 = tokens2;
   let refreshed = false;
   if (t2.expires_at && t2.expires_at < Date.now() + 3e4) {
     t2 = await refreshTokens(t2, fetchFn, persist);
@@ -9158,12 +9175,12 @@ async function instagramCallback(code, sealedState, redirectUri, fetchFn = fetch
   if (!pages.ok) throw new Error(`meta pages lookup failed ${pages.status}`);
   const ig = (await pages.json()).data?.map((p2) => p2.instagram_business_account).find((a) => !!a);
   if (!ig) throw new Error("no Instagram business account is linked to your Facebook Pages \u2014 link one in Meta Business Suite, then reconnect");
-  const tokens = {
+  const tokens2 = {
     access_token: longTok.access_token,
     ...longTok.expires_in ? { expires_at: Date.now() + longTok.expires_in * 1e3 } : {},
     meta: { ig_user: ig.id }
   };
-  return { workspace: st.workspace, channel: st.channel, actor: st.actor, handle: ig.username ? `@${ig.username}` : "Instagram", tokens };
+  return { workspace: st.workspace, channel: st.channel, actor: st.actor, handle: ig.username ? `@${ig.username}` : "Instagram", tokens: tokens2 };
 }
 function tiktokStartUrl(ctx, redirectUri) {
   const state = seal({ ...ctx, nonce: randomBytes3(16).toString("base64url") });
@@ -9193,13 +9210,13 @@ async function tiktokCallback(code, sealedState, redirectUri, fetchFn = fetch) {
   if (!tok.access_token) throw new Error(`tiktok token exchange rejected: ${tok.error_description ?? tok.error ?? "no access_token"}`);
   const meRes = await fetchFn(`${TT}/user/info/?fields=display_name,username`, { headers: { authorization: `Bearer ${tok.access_token}` } });
   const me = meRes.ok ? (await meRes.json()).data?.user : void 0;
-  const tokens = {
+  const tokens2 = {
     access_token: tok.access_token,
     ...tok.refresh_token ? { refresh_token: tok.refresh_token } : {},
     ...tok.expires_in ? { expires_at: Date.now() + tok.expires_in * 1e3 } : {},
     ...tok.open_id ? { meta: { open_id: tok.open_id } } : {}
   };
-  return { workspace: st.workspace, channel: st.channel, actor: st.actor, handle: me?.username ? `@${me.username}` : me?.display_name ?? "TikTok", tokens };
+  return { workspace: st.workspace, channel: st.channel, actor: st.actor, handle: me?.username ? `@${me.username}` : me?.display_name ?? "TikTok", tokens: tokens2 };
 }
 
 // src/connectors.ts
@@ -9242,24 +9259,24 @@ async function linkedinCallback(code, sealedState, redirectUri, fetchFn = fetch)
   if (!meRes.ok) throw new Error(`linkedin userinfo failed ${meRes.status}`);
   const me = await meRes.json();
   if (!me.sub) throw new Error("linkedin userinfo returned no subject");
-  const tokens = {
+  const tokens2 = {
     access_token: tok.access_token,
     ...tok.refresh_token ? { refresh_token: tok.refresh_token } : {},
     ...tok.expires_in ? { expires_at: Date.now() + tok.expires_in * 1e3 } : {},
     meta: { person: me.sub }
   };
-  return { workspace: st.workspace, channel: st.channel, actor: st.actor, handle: me.name ?? "LinkedIn", tokens };
+  return { workspace: st.workspace, channel: st.channel, actor: st.actor, handle: me.name ?? "LinkedIn", tokens: tokens2 };
 }
 var liPoster = {
-  async post(tokens, body, _opts, fetchFn = fetch) {
-    const person = tokens.meta?.["person"];
+  async post(tokens2, body, _opts, fetchFn = fetch) {
+    const person = tokens2.meta?.["person"];
     if (!person) throw new Error("linkedin token bundle is missing the person id \u2014 reconnect LinkedIn");
-    if (tokens.expires_at && tokens.expires_at < Date.now()) throw new Error("linkedin token expired \u2014 reconnect LinkedIn from the room");
+    if (tokens2.expires_at && tokens2.expires_at < Date.now()) throw new Error("linkedin token expired \u2014 reconnect LinkedIn from the room");
     const res = await fetchFn("https://api.linkedin.com/rest/posts", {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        authorization: `Bearer ${tokens.access_token}`,
+        authorization: `Bearer ${tokens2.access_token}`,
         "LinkedIn-Version": LI_VERSION,
         "X-Restli-Protocol-Version": "2.0.0"
       },
@@ -9280,15 +9297,15 @@ var liPoster = {
   }
 };
 var igPoster = {
-  async post(tokens, body, opts, fetchFn = fetch) {
-    const igUser = tokens.meta?.["ig_user"];
+  async post(tokens2, body, opts, fetchFn = fetch) {
+    const igUser = tokens2.meta?.["ig_user"];
     if (!igUser) throw new Error("instagram token bundle is missing the account id \u2014 reconnect Instagram");
     if (!opts?.mediaUrl) throw new Error("instagram needs an image on the draft \u2014 add a media URL in the post preview");
-    if (tokens.expires_at && tokens.expires_at < Date.now()) throw new Error("instagram token expired \u2014 reconnect Instagram from the room");
+    if (tokens2.expires_at && tokens2.expires_at < Date.now()) throw new Error("instagram token expired \u2014 reconnect Instagram from the room");
     const cont = await fetchFn(`${FB}/${igUser}/media`, {
       method: "POST",
       headers: { "content-type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ image_url: opts.mediaUrl, caption: body, access_token: tokens.access_token }).toString()
+      body: new URLSearchParams({ image_url: opts.mediaUrl, caption: body, access_token: tokens2.access_token }).toString()
     });
     if (!cont.ok) throw new Error(`instagram container failed ${cont.status}: ${await cont.text()}`);
     const creation = (await cont.json()).id;
@@ -9296,18 +9313,18 @@ var igPoster = {
     const pub = await fetchFn(`${FB}/${igUser}/media_publish`, {
       method: "POST",
       headers: { "content-type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ creation_id: creation, access_token: tokens.access_token }).toString()
+      body: new URLSearchParams({ creation_id: creation, access_token: tokens2.access_token }).toString()
     });
     if (!pub.ok) throw new Error(`instagram publish failed ${pub.status}: ${await pub.text()}`);
     const mediaId = (await pub.json()).id;
     if (!mediaId) throw new Error("instagram publish returned no id");
-    const perma = await fetchFn(`${FB}/${mediaId}?fields=permalink&access_token=${encodeURIComponent(tokens.access_token)}`);
+    const perma = await fetchFn(`${FB}/${mediaId}?fields=permalink&access_token=${encodeURIComponent(tokens2.access_token)}`);
     const url = perma.ok ? (await perma.json()).permalink ?? `https://www.instagram.com/` : "https://www.instagram.com/";
     return { url };
   }
 };
-async function ttRefresh(tokens, fetchFn) {
-  if (!tokens.refresh_token) throw new Error("tiktok token expired and no refresh token \u2014 reconnect TikTok from the room");
+async function ttRefresh(tokens2, fetchFn) {
+  if (!tokens2.refresh_token) throw new Error("tiktok token expired and no refresh token \u2014 reconnect TikTok from the room");
   const res = await fetchFn(`${TT}/oauth/token/`, {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
@@ -9315,7 +9332,7 @@ async function ttRefresh(tokens, fetchFn) {
       client_key: String(process.env["TIKTOK_CLIENT_KEY"]),
       client_secret: String(process.env["TIKTOK_CLIENT_SECRET"]),
       grant_type: "refresh_token",
-      refresh_token: tokens.refresh_token
+      refresh_token: tokens2.refresh_token
     }).toString()
   });
   if (!res.ok) throw new Error(`tiktok token refresh failed ${res.status} \u2014 reconnect TikTok from the room`);
@@ -9323,18 +9340,18 @@ async function ttRefresh(tokens, fetchFn) {
   if (!tok.access_token) throw new Error("tiktok token refresh returned no access_token \u2014 reconnect TikTok from the room");
   return {
     access_token: tok.access_token,
-    refresh_token: tok.refresh_token ?? tokens.refresh_token,
+    refresh_token: tok.refresh_token ?? tokens2.refresh_token,
     // TikTok may rotate — keep the returned one
     ...tok.expires_in ? { expires_at: Date.now() + tok.expires_in * 1e3 } : {},
-    ...tokens.meta ? { meta: tokens.meta } : {}
+    ...tokens2.meta ? { meta: tokens2.meta } : {}
   };
 }
 var TT_DRAFTS_URL = "https://www.tiktok.com/tiktokstudio/content?tab=draft";
 var ttPoster = {
-  async post(tokens, body, opts, fetchFn = fetch) {
+  async post(tokens2, body, opts, fetchFn = fetch) {
     if (!opts?.mediaUrl) throw new Error("tiktok needs an image on the draft \u2014 add a media URL in the post preview");
     if (!opts.itemId || !opts.publicBase) throw new Error("tiktok publishing needs the public API base for its media proxy \u2014 set it up before arming tiktok posts");
-    let t2 = tokens;
+    let t2 = tokens2;
     let refreshed = false;
     if (t2.expires_at && t2.expires_at < Date.now() + 6e4) {
       t2 = await ttRefresh(t2, fetchFn);
@@ -10614,6 +10631,15 @@ var norm2 = (s) => s.trim().toLowerCase();
 var MemAnnounceStore = class {
   rows = [];
   installations = [];
+  /** the memory world tracks no project_repos: a test seeds the room's repository here */
+  repoLinks = [];
+  seedRepo(link) {
+    this.repoLinks.push(link);
+  }
+  async primaryRepoForChannel(channelId) {
+    const hit = this.repoLinks.find((r) => r.channelId === channelId);
+    return hit ? { workspaceId: hit.workspaceId, projectId: hit.projectId, repoId: hit.repoId, orgName: hit.orgName, name: hit.name, cloneUrl: hit.cloneUrl, provider: hit.provider } : null;
+  }
   async create(input) {
     if (input.tag && this.rows.some((r) => r.repo === norm2(input.repo) && r.tag === input.tag && r.email === norm2(input.email))) return null;
     const id = crypto.randomUUID();
@@ -10665,11 +10691,17 @@ var MemAnnounceStore = class {
     if (hit) {
       hit.account = input.account;
       hit.repos = repos;
-    } else this.installations.push({ ...input, repos });
+      hit.selection = input.selection ?? hit.selection;
+      if (input.workspaceId) hit.workspaceId = input.workspaceId;
+    } else this.installations.push({ installationId: input.installationId, account: input.account, repos, selection: input.selection ?? "selected", workspaceId: input.workspaceId ?? null });
   }
   async installationForRepo(slug) {
-    const hit = this.installations.find((i) => i.repos.includes(norm2(slug)));
+    const s = norm2(slug);
+    const hit = this.installations.find((i) => i.repos.includes(s) || i.selection === "all" && norm2(i.account) === s.split("/")[0]);
     return hit ? { installationId: hit.installationId } : null;
+  }
+  async forgetInstallation(installationId) {
+    this.installations = this.installations.filter((i) => i.installationId !== installationId);
   }
 };
 var rowOf = (r) => ({
@@ -10753,12 +10785,26 @@ var PgAnnounceStore = class {
     await this.sql`update announcements set claimed_by = ${by.userId}::uuid, claimed_workspace_id = ${by.workspaceId}::uuid, claimed_thread_id = ${by.threadId}::uuid, claimed_at = now() where id = ${id}::uuid`;
   }
   async upsertInstallation(input) {
-    await this.sql`insert into github_installations (installation_id, account, repos) values (${input.installationId}, ${input.account}, ${input.repos.map(norm2)})
-      on conflict (installation_id) do update set account = excluded.account, repos = excluded.repos, updated_at = now()`;
+    await this.sql`insert into github_installations (installation_id, account, repos, selection, workspace_id)
+      values (${input.installationId}, ${input.account}, ${input.repos.map(norm2)}, ${input.selection ?? "selected"}, ${input.workspaceId ?? null})
+      on conflict (installation_id) do update set account = excluded.account, repos = excluded.repos, selection = excluded.selection,
+        workspace_id = coalesce(excluded.workspace_id, github_installations.workspace_id), updated_at = now()`;
   }
   async installationForRepo(slug) {
-    const [row] = await this.sql`select installation_id from github_installations where ${norm2(slug)} = any(repos) order by updated_at desc limit 1`;
+    const s = norm2(slug);
+    const [row] = await this.sql`select installation_id from github_installations
+      where ${s} = any(repos) or (selection = 'all' and lower(account) = ${s.split("/")[0] ?? ""})
+      order by updated_at desc limit 1`;
     return row ? { installationId: Number(row["installation_id"]) } : null;
+  }
+  async forgetInstallation(installationId) {
+    await this.sql`delete from github_installations where installation_id = ${installationId}`;
+  }
+  async primaryRepoForChannel(channelId) {
+    const [row] = await this.sql`select c.workspace_id, c.project_id, r.id as repo_id, r.org_name, r.name, r.clone_url, r.provider
+      from channels c join project_repos pr on pr.project_id = c.project_id join repos r on r.id = pr.repo_id
+      where c.id = ${channelId}::uuid order by pr.is_primary desc, r.org_name, r.name limit 1`;
+    return row ? { workspaceId: row["workspace_id"], projectId: row["project_id"] ?? null, repoId: row["repo_id"], orgName: row["org_name"], name: row["name"], cloneUrl: row["clone_url"] || null, provider: row["provider"] ?? null } : null;
   }
 };
 
@@ -15631,7 +15677,7 @@ function cronRoutes(app, store2, push2) {
 // src/announce.ts
 import { cors } from "hono/cors";
 import { createHash as createHash4 } from "node:crypto";
-import { z as z14 } from "zod";
+import { z as z15 } from "zod";
 
 // src/announce-job.ts
 init_src();
@@ -16201,8 +16247,8 @@ function absolute(href, base, sameOriginOrHttps = false) {
 function linkHrefs(html, base, rels, sameOriginOrHttps) {
   const out = [];
   for (const t2 of tags(html, "link")) {
-    const tokens = (attr(t2, "rel") ?? "").toLowerCase().split(/\s+/);
-    const href = rels.some((r) => tokens.includes(r)) ? absolute(attr(t2, "href"), base, sameOriginOrHttps) : null;
+    const tokens2 = (attr(t2, "rel") ?? "").toLowerCase().split(/\s+/);
+    const href = rels.some((r) => tokens2.includes(r)) ? absolute(attr(t2, "href"), base, sameOriginOrHttps) : null;
     if (href && !out.includes(href)) out.push(href);
   }
   return out;
@@ -17432,6 +17478,258 @@ Drafted at neuramesh.app/announce.`;
   return { threadId, channelId, projectId };
 }
 
+// src/github-connect.ts
+import { z as z14 } from "zod";
+
+// src/github-reads.ts
+var FILE_TEXT_CAP = 6e4;
+var FILE_SIZE_CAP = 1e6;
+var TREE_CAP = 500;
+function cleanPath(p2) {
+  const parts = String(p2 ?? "").split("/").map((s) => s.trim()).filter((s) => s && s !== ".");
+  if (parts.some((s) => s === "..")) throw new GitHubApiError("a path cannot climb out of the repository", 400);
+  return parts.join("/");
+}
+var looksBinary = (buf) => buf.subarray(0, 8e3).includes(0);
+async function readRepoFile(slug, path, ref, opts) {
+  const p2 = cleanPath(path);
+  if (!p2) throw new GitHubApiError("name a file path", 400);
+  const r = await githubGet(`/repos/${slug}/contents/${p2.split("/").map(encodeURIComponent).join("/")}${ref ? `?ref=${encodeURIComponent(ref)}` : ""}`, opts);
+  if (r.status === 404) throw new GitHubApiError(`no file at ${p2}${ref ? ` on ${ref}` : ""}`, 404);
+  if (r.status < 200 || r.status >= 300) throw new GitHubApiError(`GitHub answered ${r.status} for ${p2}`, r.status);
+  if (Array.isArray(r.json)) throw new GitHubApiError(`${p2} is a directory: list it with the tree read`, 400);
+  const b2 = r.json;
+  if (b2.type !== "file") throw new GitHubApiError(`${p2} is a ${b2.type ?? "link"}, not a file`, 400);
+  const size = b2.size ?? 0;
+  if (size > FILE_SIZE_CAP || b2.encoding !== "base64" || typeof b2.content !== "string") throw new GitHubApiError(`${p2} is larger than 1 MB: read a smaller file`, 413);
+  const buf = Buffer.from(b2.content.replace(/\n/g, ""), "base64");
+  if (looksBinary(buf)) throw new GitHubApiError(`${p2} is a binary file`, 415);
+  const text = buf.toString("utf8");
+  return { path: p2, ref, size, sha: b2.sha ?? "", content: text.length > FILE_TEXT_CAP ? text.slice(0, FILE_TEXT_CAP) : text, truncated: text.length > FILE_TEXT_CAP };
+}
+async function readRepoTree(slug, path, ref, opts) {
+  const p2 = cleanPath(path);
+  const at = ref || "HEAD";
+  const r = await githubGet(`/repos/${slug}/git/trees/${encodeURIComponent(at)}?recursive=1`, opts);
+  if (r.status === 404) throw new GitHubApiError(`no tree at ${at}`, 404);
+  if (r.status < 200 || r.status >= 300) throw new GitHubApiError(`GitHub answered ${r.status} for the tree`, r.status);
+  const b2 = r.json;
+  const prefix = p2 ? `${p2}/` : "";
+  const rows2 = (b2.tree ?? []).filter((e) => (e.type === "blob" || e.type === "tree") && (!prefix || e.path.startsWith(prefix)));
+  if (p2 && !rows2.length) throw new GitHubApiError(`no directory at ${p2}`, 404);
+  const entries = rows2.slice(0, TREE_CAP).map((e) => ({ path: e.path, type: e.type, size: e.type === "blob" ? e.size ?? null : null }));
+  return { ref: at, path: p2, entries, truncated: !!b2.truncated || rows2.length > TREE_CAP };
+}
+async function readRepoCommits(slug, since, branch, opts) {
+  const qs = new URLSearchParams({ since, per_page: "50" });
+  if (branch) qs.set("sha", branch);
+  const r = await githubGet(`/repos/${slug}/commits?${qs.toString()}`, opts);
+  if (r.status < 200 || r.status >= 300 || !Array.isArray(r.json)) return [];
+  return r.json.map((c) => ({ sha: c.sha, message: (c.commit?.message ?? "").split("\n")[0] ?? "", date: c.commit?.author?.date ?? null, author: c.author?.login ?? c.commit?.author?.name ?? null, url: c.html_url }));
+}
+async function installationFacts(installationId, opts = {}) {
+  const r = await githubGet(`/app/installations/${installationId}`, { ...opts, token: appJwt(opts.env, opts.now) });
+  if (r.status < 200 || r.status >= 300) throw new GitHubApiError(`GitHub answered ${r.status} for installation ${installationId}`, r.status);
+  const b2 = r.json;
+  return { account: b2.account?.login ?? b2.account?.slug ?? "", selection: b2.repository_selection === "all" ? "all" : "selected" };
+}
+
+// src/github-connect.ts
+var GITHUB_SCOPES = "metadata:read contents:read pull_requests:read";
+function slugOf(repo) {
+  const fromUrl = repo.cloneUrl ? parseRepoInput(repo.cloneUrl)?.slug ?? null : null;
+  if (fromUrl) return fromUrl;
+  if (!repo.orgName || repo.orgName === "local" || !repo.name) return null;
+  return `${repo.orgName}/${repo.name}`;
+}
+async function installationFor(ann, slug, fetchFn, workspaceId = null) {
+  if (!githubAppConfigured()) return null;
+  const known = await ann.installationForRepo(slug);
+  if (known) {
+    try {
+      return { installationId: known.installationId, token: await tokenFor(known.installationId, fetchFn) };
+    } catch (e) {
+      forgetToken(known.installationId);
+      if (e instanceof GitHubApiError && e.status === 404) await ann.forgetInstallation(known.installationId).catch(() => {
+      });
+      else throw e;
+    }
+  }
+  const found = await findInstallation(slug, { fetchFn }).catch(() => null);
+  if (!found) return null;
+  const token = await tokenFor(found.id, fetchFn).catch(() => null);
+  if (!token) return null;
+  await rememberInstallation(ann, found.id, fetchFn, workspaceId).catch(() => {
+  });
+  return { installationId: found.id, token };
+}
+async function rememberInstallation(ann, installationId, fetchFn, workspaceId) {
+  const tok = await tokenFor(installationId, fetchFn);
+  const repos = await githubGet("/installation/repositories?per_page=100", { token: tok, fetchFn });
+  const names = repos.status === 200 ? (repos.json.repositories ?? []).map((r) => r.full_name) : [];
+  const facts = await installationFacts(installationId, { fetchFn }).catch(() => ({ account: names[0]?.split("/")[0] ?? "", selection: "selected" }));
+  await ann.upsertInstallation({ installationId, account: facts.account, repos: names, selection: facts.selection, workspaceId });
+}
+var tokens = /* @__PURE__ */ new Map();
+async function tokenFor(installationId, fetchFn) {
+  const hit = tokens.get(installationId);
+  if (hit && hit.until > Date.now()) return hit.token;
+  const t2 = await installationToken(installationId, { fetchFn });
+  const until = (Date.parse(t2.expiresAt) || Date.now() + 36e5) - 5 * 6e4;
+  tokens.set(installationId, { token: t2.token, until });
+  return t2.token;
+}
+var forgetToken = (installationId) => {
+  tokens.delete(installationId);
+};
+async function resolveConnector(store2, ctx, fetchFn) {
+  const ann = store2.announcements;
+  const repo = await ann.primaryRepoForChannel(ctx.channel);
+  const slug = repo ? slugOf(repo) : null;
+  if (!repo) return { ok: false, code: "NO_REPO", error: "This project has no repository yet.", slug: null };
+  if (!slug) return { ok: false, code: "NO_REPO", error: `${repo.name} has no GitHub address. Attach the repository by its GitHub URL.`, slug: null };
+  const inst = await installationFor(ann, slug, fetchFn, ctx.workspace).catch(() => null);
+  if (!inst) return { ok: false, code: "NOT_INSTALLED", error: `The neuramesh app is not installed on ${slug}.`, slug };
+  const r = await githubGet(`/repos/${slug}`, { token: inst.token, fetchFn });
+  if (r.status !== 200) return { ok: false, code: "NOT_INSTALLED", error: `The neuramesh app cannot read ${slug}. Add the repository to the installation on GitHub.`, slug };
+  await store2.upsertConnector({ workspace: ctx.workspace, channelId: ctx.channel, provider: "github", handle: slug, connectedBy: ctx.actor, scopes: GITHUB_SCOPES });
+  return { ok: true, handle: slug };
+}
+var page = (title, lines) => `<!doctype html><meta charset="utf-8"><title>${title}</title><body style="font:15px system-ui;display:grid;place-items:center;height:100vh;margin:0;background:#1d1d1d;color:#e6e6e6"><div style="text-align:center;max-width:36em">${lines.map((l) => `<p>${l}</p>`).join("")}</div></body>`;
+var tryUnseal = (state) => {
+  try {
+    const s = unseal(state);
+    return s?.github === 1 && s.workspace && s.actor ? s : null;
+  } catch {
+    return null;
+  }
+};
+function githubConnectRoutes(app, store2, opts = {}) {
+  const fetchFn = opts.fetchFn ?? fetch;
+  const ann = () => store2.announcements;
+  app.get("/connect/github/start", async (c) => {
+    if (!githubAppConfigured()) return c.json({ error: "the GitHub App is not configured on this server" }, 501);
+    const workspace = c.req.query("workspace");
+    const actor = c.req.query("actor");
+    if (workspace && actor) {
+      if (!process.env["NM_CONNECTOR_KEY"] || !ann()) return c.text("github connect is not configured on this server", 501);
+      const channel = c.req.query("channel") ?? null;
+      const repo = channel ? await ann().primaryRepoForChannel(channel) : null;
+      const state = { github: 1, workspace, channel, actor, slug: repo ? slugOf(repo) : null };
+      return c.redirect(installUrl(seal(state)), 302);
+    }
+    const parsed = parseRepoInput(c.req.query("repo") ?? "");
+    return c.redirect(installUrl(parsed?.slug ?? ""), 302);
+  });
+  app.get("/connect/github/callback", async (c) => {
+    const id = Number(c.req.query("installation_id"));
+    const raw = c.req.query("state") ?? "";
+    const grant = tryUnseal(raw);
+    if (grant) {
+      if (!ann() || !githubAppConfigured() || !Number.isFinite(id) || id <= 0) return c.html(page("GitHub", ["The grant did not land.", "Try again from Connections in neuramesh."]), 400);
+      try {
+        await rememberInstallation(ann(), id, fetchFn, grant.workspace);
+        const out = grant.channel ? await resolveConnector(store2, { workspace: grant.workspace, channel: grant.channel, actor: grant.actor }, fetchFn) : null;
+        if (out?.ok) return c.html(page("Connected", ['<span style="font-size:34px">\u2713</span>', `<b>${out.handle}</b> is connected.`, '<span style="color:#8f8f8f">Head back to neuramesh. The room already knows.</span>']));
+        const why = out ? out.error : "The installation is recorded.";
+        return c.html(page("GitHub", [why, '<span style="color:#8f8f8f">Pick the repository on GitHub, then press Check again in neuramesh.</span>']));
+      } catch (e) {
+        console.warn(`github connect callback failed: ${e instanceof Error ? e.message : String(e)}`);
+        return c.html(page("GitHub", ["The grant did not land.", "Close this tab and try again from Connections in neuramesh."]), 400);
+      }
+    }
+    const slug = parseRepoInput(raw)?.slug ?? "";
+    if (!ann() || !githubAppConfigured() || !Number.isFinite(id) || id <= 0) return c.redirect(`${APP_URL2}/announce?granted=0`, 302);
+    try {
+      await rememberInstallation(ann(), id, fetchFn, null);
+    } catch (e) {
+      console.warn(`github app callback failed: ${e instanceof Error ? e.message : String(e)}`);
+      return c.redirect(`${APP_URL2}/announce?granted=0${slug ? `&repo=${encodeURIComponent(slug)}` : ""}`, 302);
+    }
+    return c.redirect(`${APP_URL2}/announce?granted=1${slug ? `&repo=${encodeURIComponent(slug)}` : ""}`, 302);
+  });
+}
+function githubApiRoutes(app, store2, opts = {}) {
+  const fetchFn = opts.fetchFn ?? fetch;
+  const ann = () => store2.announcements;
+  app.post("/v1/github/resolve", async (c) => {
+    const actor = c.get("actor");
+    if (actor.kind !== "human") return c.json({ error: "a person connects GitHub", code: "HUMAN_ONLY" }, 403);
+    const body = z14.object({ channel: z14.string().min(1) }).safeParse(await c.req.json().catch(() => null));
+    if (!body.success) return c.json({ error: "invalid body", code: "INVALID_INPUT" }, 400);
+    if (!githubAppConfigured() || !ann()) return c.json({ ok: false, code: "NOT_CONFIGURED", error: "GitHub connecting is not configured on this server." });
+    const repo = await ann().primaryRepoForChannel(body.data.channel);
+    if (!repo) return c.json({ ok: false, code: "NO_REPO", error: "This project has no repository yet." });
+    if (!await actorInWorkspace(store2, actor, repo.workspaceId)) return c.json({ error: "not your workspace", code: "NOT_PERMITTED" }, 403);
+    const out = await resolveConnector(store2, { workspace: repo.workspaceId, channel: body.data.channel, actor: actor.id }, fetchFn);
+    if (out.ok) return c.json({ ok: true, handle: out.handle });
+    const state = { github: 1, workspace: repo.workspaceId, channel: body.data.channel, actor: actor.id, slug: out.slug };
+    return c.json({ ok: false, code: out.code, error: out.error, install: out.code === "NOT_INSTALLED" && process.env["NM_CONNECTOR_KEY"] ? installUrl(seal(state)) : null });
+  });
+  const open = async (c) => {
+    const channel = c.req.query("channel");
+    if (!channel) return { status: 400, body: { error: "channel is required", code: "INVALID_INPUT" } };
+    if (!githubAppConfigured() || !ann()) return { status: 501, body: { error: "GitHub connecting is not configured on this server", code: "NOT_CONFIGURED" } };
+    const repo = await ann().primaryRepoForChannel(channel);
+    const slug = repo ? slugOf(repo) : null;
+    if (!repo || !slug) return { status: 409, body: { error: "this room's project has no GitHub repository", code: "NO_REPO" } };
+    if (!await actorInWorkspace(store2, c.get("actor"), repo.workspaceId)) return { status: 403, body: { error: "not your workspace", code: "NOT_PERMITTED" } };
+    const conn = await store2.connectorWithSecret(repo.workspaceId, "github", channel);
+    if (!conn) return { status: 409, body: { error: "GitHub is not connected for this room", code: "NOT_CONNECTED" } };
+    const reconnect = { status: 409, body: { error: `GitHub no longer lets neuramesh read ${slug}. A person needs to connect GitHub again from Connections.`, code: "RECONNECT_REQUIRED" } };
+    if (conn.status !== "connected") return reconnect;
+    try {
+      const inst = await installationFor(ann(), slug, fetchFn);
+      if (!inst) {
+        await store2.markConnectorReauth(conn.id);
+        return reconnect;
+      }
+      return { slug, token: inst.token, repo, connId: conn.id };
+    } catch (e) {
+      if (e instanceof GitHubApiError && (e.status === 401 || e.status === 403)) {
+        await store2.markConnectorReauth(conn.id);
+        return reconnect;
+      }
+      return { status: 502, body: { error: e instanceof Error ? e.message : "GitHub did not answer", code: "GITHUB_ERROR" } };
+    }
+  };
+  const isRefusal = (o) => "status" in o;
+  const failed = (e) => e instanceof GitHubApiError && e.status >= 400 && e.status < 500 ? { status: 400, body: { error: e.message, code: e.status === 404 ? "NOT_FOUND" : "INVALID_INPUT" } } : { status: 502, body: { error: e instanceof Error ? e.message : "GitHub did not answer", code: "GITHUB_ERROR" } };
+  app.get("/v1/repo/changes", async (c) => {
+    const o = await open(c);
+    if (isRefusal(o)) return c.json(o.body, o.status);
+    const since = c.req.query("since") || new Date(Date.now() - 30 * 864e5).toISOString();
+    try {
+      const signals = await readRepoSignals(o.slug, since, { token: o.token, fetchFn });
+      const commits = await readRepoCommits(o.slug, since, signals.repo.defaultBranch, { token: o.token, fetchFn });
+      return c.json({ slug: o.slug, since, ...signals, commits });
+    } catch (e) {
+      const f = failed(e);
+      return c.json(f.body, f.status);
+    }
+  });
+  app.get("/v1/repo/file", async (c) => {
+    const o = await open(c);
+    if (isRefusal(o)) return c.json(o.body, o.status);
+    try {
+      return c.json({ slug: o.slug, ...await readRepoFile(o.slug, c.req.query("path") ?? "", c.req.query("ref") || null, { token: o.token, fetchFn }) });
+    } catch (e) {
+      const f = failed(e);
+      return c.json(f.body, f.status);
+    }
+  });
+  app.get("/v1/repo/tree", async (c) => {
+    const o = await open(c);
+    if (isRefusal(o)) return c.json(o.body, o.status);
+    try {
+      return c.json({ slug: o.slug, ...await readRepoTree(o.slug, c.req.query("path") ?? "", c.req.query("ref") || null, { token: o.token, fetchFn }) });
+    } catch (e) {
+      const f = failed(e);
+      return c.json(f.body, f.status);
+    }
+  });
+}
+
 // src/announce.ts
 var siteOrigin = (origin) => origin === "https://neuramesh.app" || origin === "https://www.neuramesh.app" || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin) ? origin : null;
 var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -17444,8 +17742,8 @@ var maskEmail = (e) => {
   const [u = "", d = ""] = e.split("@");
   return `${u.slice(0, 1)}\u2022\u2022\u2022@${d}`;
 };
-var CreateSchema = z14.object({ repo: z14.string().min(3).max(200), tag: z14.string().max(120).nullable().optional(), website: z14.string().trim().min(3).max(400), email: z14.string().trim().max(200) });
-var DetectSchema = z14.object({ repo: z14.string().min(3).max(200) });
+var CreateSchema = z15.object({ repo: z15.string().min(3).max(200), tag: z15.string().max(120).nullable().optional(), website: z15.string().trim().min(3).max(400), email: z15.string().trim().max(200) });
+var DetectSchema = z15.object({ repo: z15.string().min(3).max(200) });
 async function latestOf(slug, token, fetchFn) {
   const rel = await githubGet(`/repos/${slug}/releases?per_page=5`, { token, fetchFn });
   const rows2 = rel.status === 200 && Array.isArray(rel.json) ? rel.json : [];
@@ -17495,21 +17793,7 @@ function announceRoutes(app, store2, opts = {}) {
   const ann = () => store2.announcements;
   app.use("/announce/*", cors({ origin: siteOrigin, allowMethods: ["GET", "POST", "OPTIONS"] }));
   app.use("/announce", cors({ origin: siteOrigin, allowMethods: ["POST", "OPTIONS"] }));
-  const installationFor = async (slug) => {
-    if (!githubAppConfigured()) return null;
-    const known = await ann().installationForRepo(slug);
-    if (known) return known;
-    const found = await findInstallation(slug, { fetchFn }).catch(() => null);
-    if (!found) return null;
-    try {
-      const tok = await installationToken(found.id, { fetchFn });
-      const repos = await githubGet("/installation/repositories?per_page=100", { token: tok.token, fetchFn });
-      const names = (repos.json?.repositories ?? []).map((r) => r.full_name);
-      if (repos.status === 200 && names.length) await ann().upsertInstallation({ installationId: found.id, account: found.account, repos: names });
-    } catch {
-    }
-    return { installationId: found.id };
-  };
+  const installationFor2 = (slug) => installationFor(ann(), slug, fetchFn);
   app.post("/announce/detect", async (c) => {
     if (!ann()) return c.json({ ok: false, reason: "unconfigured" }, 501);
     const body = DetectSchema.safeParse(await c.req.json().catch(() => null));
@@ -17520,7 +17804,7 @@ function announceRoutes(app, store2, opts = {}) {
     let repo = await githubGet(`/repos/${slug}`, { fetchFn });
     let installed = false;
     if (repo.status !== 200) {
-      const inst = await installationFor(slug);
+      const inst = await installationFor2(slug);
       if (inst) {
         token = (await installationToken(inst.installationId, { fetchFn }).catch(() => null))?.token ?? null;
         if (token) {
@@ -17551,7 +17835,7 @@ function announceRoutes(app, store2, opts = {}) {
     if (await ann().countSince({ email, sinceIso: day3 }) >= cap("ANNOUNCE_EMAIL_CAP", 5)) return c.json({ error: "This email already asked for five draft sets today. Try again tomorrow." }, 429);
     if (ipHash && await ann().countSince({ ipHash, sinceIso: hour }) >= cap("ANNOUNCE_IP_CAP", 10)) return c.json({ error: "Too many requests from this address. Try again in an hour." }, 429);
     if (await ann().countSince({ sinceIso: day3 }) >= cap("ANNOUNCE_DAILY_CAP", 200)) return c.json({ error: "The door is busy today. Try again tomorrow." }, 429);
-    const inst = await installationFor(parsed.slug);
+    const inst = await installationFor2(parsed.slug);
     let tag = body.data.tag ?? null;
     if (!tag) {
       const token = inst ? (await installationToken(inst.installationId, { fetchFn }).catch(() => null))?.token ?? null : null;
@@ -17575,27 +17859,7 @@ function announceRoutes(app, store2, opts = {}) {
     if (!img) return c.text("not found", 404);
     return new Response(Buffer.from(img.bytes), { headers: { "content-type": img.mime, "cache-control": "public, max-age=86400" } });
   });
-  app.get("/connect/github/start", (c) => {
-    if (!githubAppConfigured()) return c.json({ error: "the GitHub App is not configured on this server" }, 501);
-    const parsed = parseRepoInput(c.req.query("repo") ?? "");
-    return c.redirect(installUrl(parsed?.slug ?? ""), 302);
-  });
-  app.get("/connect/github/callback", async (c) => {
-    const id = Number(c.req.query("installation_id"));
-    const slug = parseRepoInput(c.req.query("state") ?? "")?.slug ?? "";
-    if (!ann() || !githubAppConfigured() || !Number.isFinite(id) || id <= 0) return c.redirect(`${APP_URL2}/announce?granted=0`, 302);
-    try {
-      const tok = await installationToken(id, { fetchFn });
-      const repos = await githubGet("/installation/repositories?per_page=100", { token: tok.token, fetchFn });
-      const names = repos.status === 200 ? (repos.json.repositories ?? []).map((r) => r.full_name) : [];
-      const acct = names[0]?.split("/")[0] ?? "";
-      await ann().upsertInstallation({ installationId: id, account: acct, repos: names });
-    } catch (e) {
-      console.warn(`github app callback failed: ${e instanceof Error ? e.message : String(e)}`);
-      return c.redirect(`${APP_URL2}/announce?granted=0${slug ? `&repo=${encodeURIComponent(slug)}` : ""}`, 302);
-    }
-    return c.redirect(`${APP_URL2}/announce?granted=1${slug ? `&repo=${encodeURIComponent(slug)}` : ""}`, 302);
-  });
+  githubConnectRoutes(app, store2, { fetchFn });
   app.get("/internal/announce-due", async (c) => {
     const secret = process.env["CRON_SECRET"];
     if (!secret || c.req.header("authorization") !== `Bearer ${secret}`) return c.json({ error: "forbidden" }, 403);
@@ -17608,13 +17872,14 @@ function announceRoutes(app, store2, opts = {}) {
     return c.json({ processed: rows2.length, results });
   });
 }
-function announceClaimRoute(app, store2) {
+function announceClaimRoute(app, store2, opts = {}) {
+  githubApiRoutes(app, store2, { fetchFn: opts.fetchFn });
   app.post("/v1/announce/:id/claim", async (c) => {
     const ann = store2.announcements;
     if (!ann) return c.json({ error: "announcements not served by this store" }, 501);
     const actor = c.get("actor");
     if (actor.kind !== "human") return c.json({ error: "a person claims a draft set", code: "HUMAN_ONLY" }, 403);
-    const body = z14.object({ workspace: z14.string().min(1) }).safeParse(await c.req.json().catch(() => null));
+    const body = z15.object({ workspace: z15.string().min(1) }).safeParse(await c.req.json().catch(() => null));
     if (!body.success) return c.json({ error: "invalid body" }, 400);
     if (!await actorInWorkspace(store2, actor, body.data.workspace)) return c.json({ error: "not your workspace", code: "NOT_PERMITTED" }, 403);
     const row = await ann.get(c.req.param("id"));
@@ -17628,10 +17893,10 @@ function announceClaimRoute(app, store2) {
 
 // src/relay.ts
 import { timingSafeEqual as timingSafeEqual4 } from "node:crypto";
-import { z as z15 } from "zod";
-var ValidateMachineSchema = z15.object({ token: z15.string().min(1) });
-var ValidateClientSchema = z15.object({ clerkToken: z15.string().min(1), machineId: z15.string().uuid() });
-var DevRelayUserSchema = z15.string().uuid();
+import { z as z16 } from "zod";
+var ValidateMachineSchema = z16.object({ token: z16.string().min(1) });
+var ValidateClientSchema = z16.object({ clerkToken: z16.string().min(1), machineId: z16.string().uuid() });
+var DevRelayUserSchema = z16.string().uuid();
 function devRelayUser(token) {
   if (process.env["NM_ALLOW_DEV_RELAY"] !== "1") return null;
   const expected = process.env["NM_DEV_RELAY_TOKEN"];
@@ -17811,7 +18076,7 @@ function meRoute(app, store2) {
 
 // src/app.ts
 import { cors as cors2 } from "hono/cors";
-import { z as z18 } from "zod";
+import { z as z19 } from "zod";
 
 // src/fleet-lifecycle.ts
 init_src();
@@ -18255,7 +18520,7 @@ function exportRoutes(app, store2) {
 
 // src/import.ts
 init_src();
-import { z as z16 } from "zod";
+import { z as z17 } from "zod";
 
 // src/import-batch.ts
 init_src();
@@ -18432,26 +18697,26 @@ async function slugMapOf(sql, ws, table, ids, sent) {
 
 // src/import.ts
 var UUID3 = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-var uuid = z16.string().uuid();
+var uuid = z17.string().uuid();
 var PRO_REFUSAL = "This workspace needs Pro. Get Pro to migrate a workspace into it.";
 var STORAGE_REFUSAL = "Not enough storage on this plan. Delete files in this workspace, or migrate a smaller workspace.";
 var SIZE_REFUSAL = "The batch is over 4 MB. Send smaller batches.";
-var ManifestSchema = z16.object({
-  format: z16.literal(EXPORT_FORMAT),
-  version: z16.literal(EXPORT_VERSION),
-  workspace: z16.object({ id: z16.string(), name: z16.string(), slug: z16.string() }),
-  exportedAt: z16.string(),
-  counts: z16.record(z16.number().int().min(0))
+var ManifestSchema = z17.object({
+  format: z17.literal(EXPORT_FORMAT),
+  version: z17.literal(EXPORT_VERSION),
+  workspace: z17.object({ id: z17.string(), name: z17.string(), slug: z17.string() }),
+  exportedAt: z17.string(),
+  counts: z17.record(z17.number().int().min(0))
 });
-var ImportBatchSchema = z16.object({
+var ImportBatchSchema = z17.object({
   importId: uuid,
-  seq: z16.number().int().min(0),
-  table: z16.enum(EXPORT_TABLES),
-  rows: z16.array(z16.object({ id: uuid }).passthrough()),
-  first: z16.object({ manifest: ManifestSchema, totalBytes: z16.number().int().min(0) }).optional(),
-  links: z16.literal(true).optional(),
-  idMap: z16.record(uuid, uuid).optional(),
-  last: z16.literal(true).optional()
+  seq: z17.number().int().min(0),
+  table: z17.enum(EXPORT_TABLES),
+  rows: z17.array(z17.object({ id: uuid }).passthrough()),
+  first: z17.object({ manifest: ManifestSchema, totalBytes: z17.number().int().min(0) }).optional(),
+  links: z17.literal(true).optional(),
+  idMap: z17.record(uuid, uuid).optional(),
+  last: z17.literal(true).optional()
 }).superRefine((b2, ctx) => {
   if (b2.first && (b2.seq !== 0 || b2.rows.length)) ctx.addIssue({ code: "custom", message: "The opening batch has seq 0 and no rows." });
   if (b2.links && !lateKeys(b2.table).length) ctx.addIssue({ code: "custom", message: `${b2.table} has no link pass.` });
@@ -18516,7 +18781,7 @@ function contentMediaRoute(app, store2) {
 
 // src/starter-video.ts
 init_src();
-import { z as z17 } from "zod";
+import { z as z18 } from "zod";
 
 // src/fal.ts
 var FAL_QUEUE = "https://queue.fal.run";
@@ -18551,7 +18816,7 @@ async function falResult(key2, endpoint, requestId, fetchFn = fetch) {
 var FILM_MAX_BYTES = 8e6;
 var FILM_TIMEOUT_MS = 12 * 6e4;
 var SYSTEM = { kind: "agent", id: "00000000-0000-0000-0000-000000000000" };
-var FilmSchema = z17.object({ workspace: z17.string().uuid(), item: z17.string().uuid(), prompt: z17.string().min(8).max(2e3) });
+var FilmSchema = z18.object({ workspace: z18.string().uuid(), item: z18.string().uuid(), prompt: z18.string().min(8).max(2e3) });
 var tierView = (t2) => ({ tier: t2.tier, label: t2.label, model: t2.model.label, vendor: t2.model.vendor, seconds: t2.seconds, credits: t2.credits });
 function starterVideoRoutes(app, store2, opts = {}) {
   const ledger = opts.ledger === void 0 ? ledgerFor(store2) : opts.ledger;
@@ -18862,75 +19127,75 @@ function expoFetchSender(accessToken) {
 }
 
 // src/app.ts
-var MessageInputSchema = z18.object({
+var MessageInputSchema = z19.object({
   // Client-supplied id keeps optimistic local rows identical to server rows
   // (PowerSync echo-back would otherwise duplicate-then-swap them).
-  id: z18.string().uuid().optional(),
-  workspace: z18.string().min(1),
-  channel: z18.string().min(1),
+  id: z19.string().uuid().optional(),
+  workspace: z19.string().min(1),
+  channel: z19.string().min(1),
   // may be empty when the message carries only attachments (no caption)
-  body: z18.string(),
-  taskId: z18.string().min(1).optional(),
+  body: z19.string(),
+  taskId: z19.string().min(1).optional(),
   // the conversation thread this message belongs to (conversation-first shell). A
   // fresh client-generated id births the thread transactionally with the message.
-  threadId: z18.string().uuid().optional(),
+  threadId: z19.string().uuid().optional(),
   // docs/34: the composer's Tasks toggle, applied ONLY when this send births the thread.
   // A later message carrying it is ignored — the mode is the thread's, and changing it is
   // thread.set_mode (human-only), never a side effect of typing.
-  threadMode: z18.enum(["tasks", "chat"]).optional(),
+  threadMode: z19.enum(["tasks", "chat"]).optional(),
   // docs/10 §15: the composer's brain draft, applied ONLY when this send births the thread —
   // the same birth-time contract as threadMode above, and for the same reason. Moving it
   // afterwards is thread.set_brain (human-only), never a side effect of typing.
-  brainOverride: z18.record(z18.string(), z18.string()).nullable().optional(),
+  brainOverride: z19.record(z19.string(), z19.string()).nullable().optional(),
   // docs/31: when this send BIRTHS a thread, the room message it hangs off. The root is
   // referenced, never moved — it keeps its place in the feed and grows a replies footer.
-  rootMessageId: z18.string().uuid().optional(),
+  rootMessageId: z19.string().uuid().optional(),
   // 0119: the automation whose slot fired this send, applied ONLY when it births the thread —
   // the same birth-time contract as threadMode/brainOverride. It is what lets the Automations
   // card list a routine's runs without pattern-matching the marker in its opening line.
-  scheduleId: z18.string().uuid().optional(),
+  scheduleId: z19.string().uuid().optional(),
   // 0134, rule D9: WHERE the session runs and WHICH client bore it, applied ONLY when this send
   // births the thread — the same birth-time contract as the three above. Moving the machine
   // afterwards is thread.set_machine (human-only); the origin never moves.
-  threadMachineId: z18.string().uuid().nullable().optional(),
-  threadOrigin: z18.enum(["desktop", "web", "routine"]).optional(),
+  threadMachineId: z19.string().uuid().nullable().optional(),
+  threadOrigin: z19.enum(["desktop", "web", "routine"]).optional(),
   // the message this reply ANSWERS (agent wake replies) — the server enforces one
   // reply per (agent, trigger) so concurrent daemons can't double-reply (0060).
-  replyTo: z18.string().uuid().optional()
+  replyTo: z19.string().uuid().optional()
 });
-var ArtifactCreateSchema = z18.object({
-  id: z18.string().uuid(),
-  workspace: z18.string().min(1),
-  channel: z18.string().min(1),
-  taskId: z18.string().min(1).optional(),
-  messageId: z18.string().uuid(),
-  kind: z18.enum(["screenshot", "file", "doc", "diff", "test_report"]).default("file"),
-  name: z18.string().min(1).max(512),
-  mime: z18.string().max(255).optional(),
-  inlineContent: z18.string().max(4e5).optional(),
-  sizeBytes: z18.number().int().nonnegative().optional(),
-  width: z18.number().int().positive().optional(),
-  height: z18.number().int().positive().optional()
+var ArtifactCreateSchema = z19.object({
+  id: z19.string().uuid(),
+  workspace: z19.string().min(1),
+  channel: z19.string().min(1),
+  taskId: z19.string().min(1).optional(),
+  messageId: z19.string().uuid(),
+  kind: z19.enum(["screenshot", "file", "doc", "diff", "test_report"]).default("file"),
+  name: z19.string().min(1).max(512),
+  mime: z19.string().max(255).optional(),
+  inlineContent: z19.string().max(4e5).optional(),
+  sizeBytes: z19.number().int().nonnegative().optional(),
+  width: z19.number().int().positive().optional(),
+  height: z19.number().int().positive().optional()
 });
-var WhiteboardPutSchema = z18.object({
-  id: z18.string().uuid(),
-  workspace: z18.string().min(1),
-  channel: z18.string().min(1),
-  threadId: z18.string().uuid().optional(),
-  taskId: z18.string().optional(),
-  title: z18.string().trim().min(1).max(WB_TITLE_MAX).catch("Untitled board"),
-  scene: z18.string().max(WB_SCENE_MAX).optional(),
-  snapshotSvg: z18.string().max(WB_SNAPSHOT_MAX).optional(),
-  snapshotRev: z18.number().int().nonnegative().optional(),
-  rev: z18.number().int().min(1).default(1)
+var WhiteboardPutSchema = z19.object({
+  id: z19.string().uuid(),
+  workspace: z19.string().min(1),
+  channel: z19.string().min(1),
+  threadId: z19.string().uuid().optional(),
+  taskId: z19.string().optional(),
+  title: z19.string().trim().min(1).max(WB_TITLE_MAX).catch("Untitled board"),
+  scene: z19.string().max(WB_SCENE_MAX).optional(),
+  snapshotSvg: z19.string().max(WB_SNAPSHOT_MAX).optional(),
+  snapshotRev: z19.number().int().nonnegative().optional(),
+  rev: z19.number().int().min(1).default(1)
 });
-var WhiteboardPatchSchema = z18.object({
-  rev: z18.number().int().min(1),
-  title: z18.string().trim().min(1).max(WB_TITLE_MAX).optional(),
-  scene: z18.string().max(WB_SCENE_MAX).optional(),
-  snapshotSvg: z18.string().max(WB_SNAPSHOT_MAX).optional(),
-  snapshotRev: z18.number().int().nonnegative().optional(),
-  archivedAt: z18.string().nullable().optional()
+var WhiteboardPatchSchema = z19.object({
+  rev: z19.number().int().min(1),
+  title: z19.string().trim().min(1).max(WB_TITLE_MAX).optional(),
+  scene: z19.string().max(WB_SCENE_MAX).optional(),
+  snapshotSvg: z19.string().max(WB_SNAPSHOT_MAX).optional(),
+  snapshotRev: z19.number().int().nonnegative().optional(),
+  archivedAt: z19.string().nullable().optional()
 });
 var webOrigin = (origin) => origin === "https://neuramesh.app" || origin === "https://www.neuramesh.app" || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin) ? origin : null;
 function createApp(store2, opts = {}) {
@@ -19225,7 +19490,7 @@ function createApp(store2, opts = {}) {
   meRoute(app, store2);
   exportRoutes(app, store2);
   importRoutes(app, store2);
-  announceClaimRoute(app, store2);
+  announceClaimRoute(app, store2, opts.announce);
   contentMediaRoute(app, store2);
   starterVideoRoutes(app, store2, opts.starterVideo);
   app.post("/v1/commands", async (c) => {

@@ -137,6 +137,32 @@ export const DEFS: ToolDef[] = [
       return text(msg);
     },
   },
+    // The repository reads (docs/design/github-connector-2026-09): closure-gated like search_x, one
+  // implementation (host/reporead.ts) — the bus copies only log and forward.
+  {
+    ...spec('list_repo_changes'),
+    async run(host, input) {
+      if (!host.repo) return text('repository reads are unavailable on this turn');
+      host.log?.({ kind: 'tool', phase: 'call', summary: `list_repo_changes${input['since'] ? ` since ${String(input['since']).slice(0, 10)}` : ''}` });
+      return text(await host.repo.changes({ ...(input['since'] ? { since: String(input['since']) } : {}) }));
+    },
+  },
+  {
+    ...spec('read_repo_file'),
+    async run(host, input) {
+      if (!host.repo) return text('repository reads are unavailable on this turn');
+      host.log?.({ kind: 'tool', phase: 'call', summary: `read_repo_file ${String(input['path']).slice(0, 80)}` });
+      return text(await host.repo.file({ path: String(input['path']), ...(input['ref'] ? { ref: String(input['ref']) } : {}) }));
+    },
+  },
+  {
+    ...spec('list_repo_files'),
+    async run(host, input) {
+      if (!host.repo) return text('repository reads are unavailable on this turn');
+      host.log?.({ kind: 'tool', phase: 'call', summary: `list_repo_files ${String(input['path'] ?? '/').slice(0, 80)}` });
+      return text(await host.repo.tree({ ...(input['path'] ? { path: String(input['path']) } : {}), ...(input['ref'] ? { ref: String(input['ref']) } : {}) }));
+    },
+  },
   ...WHITEBOARD_DEFS,
   {
     ...spec('advance_beat'),

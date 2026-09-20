@@ -13,6 +13,7 @@
 // of the main bundle) while the bus imports it statically — the builder serves both without
 // forcing either import style.
 import type { z as Zod } from 'zod';
+import { REPO_CHANGES_DESC, REPO_FILE_DESC, REPO_TREE_DESC } from './tooldesc';
 
 type Shape = Record<string, Zod.ZodTypeAny>;
 export interface ToolSpec { description: string; params: (z: typeof Zod) => Shape }
@@ -132,6 +133,29 @@ export const TOOL_SPECS = {
         why: z.string().max(160).optional(),
         imageBrief: z.string().max(2000).optional().describe('art direction — only when a picture genuinely helps; it is drawn for the human to download'),
       })).min(1).max(8),
+    }),
+  },
+  // The repository reads (docs/design/github-connector-2026-09): host/reporead.ts is the ONE
+  // implementation behind the orchestrator, chat and worker copies; the words live in tooldesc.ts
+  // so the three registries cannot drift.
+  list_repo_changes: {
+    description: REPO_CHANGES_DESC,
+    params: (z) => ({
+      since: z.string().optional().describe('an ISO date; the window starts here (default: the last 30 days)'),
+    }),
+  },
+  read_repo_file: {
+    description: REPO_FILE_DESC,
+    params: (z) => ({
+      path: z.string().min(1).max(500).describe('the file path from the repository root, e.g. CHANGELOG.md or src/app/page.tsx'),
+      ref: z.string().max(200).optional().describe('a branch, tag or commit (default: the default branch)'),
+    }),
+  },
+  list_repo_files: {
+    description: REPO_TREE_DESC,
+    params: (z) => ({
+      path: z.string().max(500).optional().describe('a directory to list (default: the whole repository, capped)'),
+      ref: z.string().max(200).optional().describe('a branch, tag or commit (default: the default branch)'),
     }),
   },
 } satisfies Record<string, ToolSpec>;

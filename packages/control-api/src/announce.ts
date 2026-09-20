@@ -11,8 +11,8 @@ import type { Actor } from '@neuramesh/shared';
 import { defaultDeps, runAnnounceJob, type AnnounceDeps } from './announce-job';
 import { claimAnnouncement } from './announce-claim';
 import { actorInWorkspace } from './credits';
-import { findInstallation, githubAppConfigured, githubGet, installUrl, installationToken, parseRepoInput } from './github-app';
-import { APP_URL } from './mail';
+import { githubAppConfigured, githubGet, installUrl, installationToken, parseRepoInput } from './github-app';
+import { githubApiRoutes, githubConnectRoutes, installationFor as installationForRepo } from './github-connect';
 import { queueAndSend } from './onauth';
 import type { Store } from './store';
 import type { AnnouncementRow } from './store/announce';
@@ -74,25 +74,12 @@ export function announceRoutes<E extends Env>(app: Hono<E>, store: Store, opts: 
   app.use('/announce/*', cors({ origin: siteOrigin, allowMethods: ['GET', 'POST', 'OPTIONS'] }));
   app.use('/announce', cors({ origin: siteOrigin, allowMethods: ['POST', 'OPTIONS'] }));
 
-  // the App's installation for a repository: the row the callback wrote, else GitHub's own answer,
-  // remembered with the installation's whole repository list the way the callback writes it. The
-  // callback is not the only door: the grant can land on another deployment's callback, and on the
-  // live install (2026-09-18) create read only the table, so the job read the private repository
-  // anonymously and failed on 404 while detect said installed.
-  const installationFor = async (slug: string): Promise<{ installationId: number } | null> => {
-    if (!githubAppConfigured()) return null;
-    const known = await ann()!.installationForRepo(slug);
-    if (known) return known;
-    const found = await findInstallation(slug, { fetchFn }).catch(() => null);
-    if (!found) return null;
-    try {
-      const tok = await installationToken(found.id, { fetchFn });
-      const repos = await githubGet('/installation/repositories?per_page=100', { token: tok.token, fetchFn });
-      const names = ((repos.json as { repositories?: Array<{ full_name: string }> })?.repositories ?? []).map((r) => r.full_name);
-      if (repos.status === 200 && names.length) await ann()!.upsertInstallation({ installationId: found.id, account: found.account, repos: names });
-    } catch { /* the id is the answer; the memo is a convenience */ }
-    return { installationId: found.id };
-  };
+  // the App's installation for a repository: the row a callback wrote, else GitHub's own answer,
+  // remembered (github-connect.ts, shared with the in-app connector). The callback is not the only
+  // door: the grant can land on another deployment's callback, and on the live install (2026-09-18)
+  // create read only the table, so the job read the private repository anonymously and failed on
+  // 404 while detect said installed.
+  const installationFor = (slug: string): Promise<{ installationId: number } | null> => installationForRepo(ann()!, slug, fetchFn);
 
   app.post('/announce/detect', async (c) => {
     if (!ann()) return c.json({ ok: false, reason: 'unconfigured' }, 501);
@@ -164,28 +151,9 @@ export function announceRoutes<E extends Env>(app: Hono<E>, store: Store, opts: 
     return new Response(Buffer.from(img.bytes), { headers: { 'content-type': img.mime, 'cache-control': 'public, max-age=86400' } });
   });
 
-  // the GitHub App's grant: GitHub's own install page, then back here with the installation id
-  app.get('/connect/github/start', (c) => {
-    if (!githubAppConfigured()) return c.json({ error: 'the GitHub App is not configured on this server' }, 501);
-    const parsed = parseRepoInput(c.req.query('repo') ?? '');
-    return c.redirect(installUrl(parsed?.slug ?? ''), 302);
-  });
-  app.get('/connect/github/callback', async (c) => {
-    const id = Number(c.req.query('installation_id'));
-    const slug = parseRepoInput(c.req.query('state') ?? '')?.slug ?? '';
-    if (!ann() || !githubAppConfigured() || !Number.isFinite(id) || id <= 0) return c.redirect(`${APP_URL}/announce?granted=0`, 302);
-    try {
-      const tok = await installationToken(id, { fetchFn });
-      const repos = await githubGet('/installation/repositories?per_page=100', { token: tok.token, fetchFn });
-      const names = repos.status === 200 ? ((repos.json as { repositories?: Array<{ full_name: string }> }).repositories ?? []).map((r) => r.full_name) : [];
-      const acct = names[0]?.split('/')[0] ?? '';
-      await ann()!.upsertInstallation({ installationId: id, account: acct, repos: names });
-    } catch (e) {
-      console.warn(`github app callback failed: ${e instanceof Error ? e.message : String(e)}`);
-      return c.redirect(`${APP_URL}/announce?granted=0${slug ? `&repo=${encodeURIComponent(slug)}` : ''}`, 302);
-    }
-    return c.redirect(`${APP_URL}/announce?granted=1${slug ? `&repo=${encodeURIComponent(slug)}` : ''}`, 302);
-  });
+  // the GitHub App's grant (`/connect/github/start` + `/callback`) lives in github-connect.ts, where
+  // the same two routes serve the in-app connector and this door (the state tells them apart)
+  githubConnectRoutes(app, store, { fetchFn });
 
   // the cron: one row per tick, so a job's reads and its one model turn fit a function's time
   app.get('/internal/announce-due', async (c) => {
@@ -202,7 +170,9 @@ export function announceRoutes<E extends Env>(app: Hono<E>, store: Store, opts: 
 }
 
 /** POST /v1/announce/:id/claim — after the /v1 guard: the signed-in human saves the drafts into a workspace */
-export function announceClaimRoute<E extends Env & { Variables: { actor: Actor } }>(app: Hono<E>, store: Store): void {
+export function announceClaimRoute<E extends Env & { Variables: { actor: Actor } }>(app: Hono<E>, store: Store, opts: { fetchFn?: Fetch } = {}): void {
+  // the GitHub connector's /v1 lane (github-connect.ts): the resolve and the three reads, after the guard
+  githubApiRoutes(app, store, { fetchFn: opts.fetchFn });
   app.post('/v1/announce/:id/claim', async (c) => {
     const ann = store.announcements;
     if (!ann) return c.json({ error: 'announcements not served by this store' }, 501);

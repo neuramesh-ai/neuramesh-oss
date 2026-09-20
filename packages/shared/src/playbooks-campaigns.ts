@@ -67,7 +67,8 @@ export const CAMPAIGN_PLAYBOOKS: Playbook[] = [
     ],
     legs: ['build'],
     approach:
-      'Load the `release-announcement` skill. Read the release digest in this thread (the notes and the merged pull requests) for {release}. ' +
+      'Load the `release-announcement` skill. Read the release digest for {release}: in this thread, or in the task description (read at creation). ' +
+      'When you need more, read the repository itself with list_repo_changes (releases, merged pull requests, commits), read_repo_file (the CHANGELOG, a doc) and list_repo_files. ' +
       'Decide whether a feature shipped and name the ONE headline feature, or say that nothing is worth announcing and stop. ' +
       'Ground the voice in the brand docs (.nm-evidence/brand/). Write the release brief, then one post per connected account. {coverage} ' +
       'Instagram and TikTok posts carry an image brief for the release card. Never invent a number, a quote or a customer.',

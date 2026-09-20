@@ -282,7 +282,7 @@ function connectorLanes(cfg: WebNmConfig, db: PowerSyncDatabase): Partial<NMBrid
      * dev proxy forwards (only /v1 and /auth), so with an empty VITE_NM_API_URL this URL is
      * same-origin and 404s. A deployed bundle sets a real API base and the link resolves.
      */
-    connectorStart: async (channelId: string, provider?: 'x' | 'linkedin' | 'instagram' | 'tiktok') => {
+    connectorStart: async (channelId: string, provider?: 'x' | 'linkedin' | 'instagram' | 'tiktok' | 'github') => {
       const win = window.open('', '_blank');
       const [ch] = await db.getAll<{ workspace_id: string }>('select workspace_id from channels where id = ? limit 1', [channelId])
         .catch(orEmpty<{ workspace_id: string }>('connectorStart.channel'));
@@ -297,6 +297,23 @@ function connectorLanes(cfg: WebNmConfig, db: PowerSyncDatabase): Partial<NMBrid
     connectorDisconnect: async (connectorId: string) => {
       await postCommand(cfg, { type: 'connector.disconnect', connector: connectorId });
       return { ok: true };
+    },
+
+    // the GitHub connector's resolve (docs/design/github-connector-2026-09): the server writes the row
+    // when the App can read the room's project's repository; a stated refusal is an answer, a dead
+    // network is UNREACHABLE
+    githubResolve: async (channelId: string) => {
+      try {
+        const res = await fetch(`${cfg.apiUrl}/v1/github/resolve`, {
+          method: 'POST', headers: { 'content-type': 'application/json', ...(await authHeaders(cfg)) },
+          body: JSON.stringify({ channel: channelId }),
+        });
+        const body = (await res.json().catch(() => null)) as { ok?: boolean; handle?: string; code?: string; error?: string; install?: string | null } | null;
+        if (res.ok && body?.ok) return { ok: true as const, handle: body.handle ?? '' };
+        return { ok: false as const, code: (body?.code ?? 'UNREACHABLE') as 'NOT_INSTALLED' | 'NO_REPO' | 'NOT_CONFIGURED' | 'UNREACHABLE', error: body?.error ?? `resolve failed (${res.status})`, install: body?.install ?? null };
+      } catch (e) {
+        return { ok: false as const, code: 'UNREACHABLE' as const, error: e instanceof Error ? e.message : String(e) };
+      }
     },
 
     // Point a marketing room at the product. Writes the profile onto channels.marketing and fans out

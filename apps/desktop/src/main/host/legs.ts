@@ -15,6 +15,7 @@ import { Subtree, planSpawn } from '../harness/subagents';
 import { type Seat } from './lookups';
 import { withTimeout } from './turnkit';
 import { searchXText, type ApiGetFn } from './searchx';
+import { makeRepoReader } from './reporead';
 import { runtimeForModel, type AgentRole } from '@neuramesh/shared';
 import { join } from 'node:path';
 import type { PowerSyncDatabase } from '@powersync/node';
@@ -101,7 +102,8 @@ export function makeLegs(ctx: {
             undefined, undefined, undefined, undefined,
             // the leg's REAL kind on the bus (TOOL_KINDS can finally grant a leg something), and
             // the X read closed over this room — host/searchx.ts, the one implementation
-            { turnKind: 'leg', searchX: (q) => searchXText(apiGet, { kind: 'agent', id: seated.id, ...(seated.role ? { role: seated.role } : {}) }, { workspaceId: where.workspace, channelId: where.channelId }, q.query, q.max) },
+            { turnKind: 'leg', searchX: (q) => searchXText(apiGet, { kind: 'agent', id: seated.id, ...(seated.role ? { role: seated.role } : {}) }, { workspaceId: where.workspace, channelId: where.channelId }, q.query, q.max),
+              repo: makeRepoReader({ apiGet, actor: { kind: 'agent', id: seated.id, ...(seated.role ? { role: seated.role } : {}) }, db, channelId: where.channelId }) },
           ),
           decision.budget.wallMs,
           `subagent "${label}" exceeded its ${Math.round(decision.budget.wallMs / 60_000)}m slice`,

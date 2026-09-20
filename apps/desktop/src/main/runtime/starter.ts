@@ -143,7 +143,7 @@ export async function starterRunQuery(
   const host: ToolHost = { dir, log, skills, proposeSkill, recordLesson, addBacklogItem,
     ...(beats && !promptOverride ? { beats: beatsAdapter(beats) } : {}),
     ...(opts?.spawn ? { spawn: opts.spawn } : {}), ...(opts?.park ? { park: opts.park } : {}), ...(opts?.whiteboards ? { whiteboards: opts.whiteboards } : {}),
-    ...(opts?.searchX ? { searchX: opts.searchX } : {}), ...(opts?.draftReplies ? { draftReplies: opts.draftReplies } : {}) };
+    ...(opts?.searchX ? { searchX: opts.searchX } : {}), ...(opts?.draftReplies ? { draftReplies: opts.draftReplies } : {}), ...(opts?.repo ? { repo: opts.repo } : {}) };
   const tools = [...busToolsForStarter(kind, host), ...fileTools(dir, permissionGate, log)];
   log?.({ kind: 'tool', phase: 'inject', summary: `${tools.length} tools on the Starter lane (${kind} turn) — bus + files, no shell` });
   const prompt = (promptOverride?.prompt ?? buildCodingPrompt(t, channelBlock, repoBacked, skills, reworkNotes, attachmentsNote, lessonsNote, agent.brief, true)) + STARTER_NOTE;

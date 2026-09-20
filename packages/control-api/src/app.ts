@@ -373,10 +373,11 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
     tiktok: { start: tiktokStartUrl, callback: tiktokCallback, scopes: 'user.info.basic video.upload' },
   };
 
-  // the public door (announce.ts): /announce/*, /connect/github/*, /internal/announce-due. It sits
-  // ABOVE the social connectors' /connect/:provider/* on purpose: registered below them, GitHub's
-  // grant landed on the generic handler and answered "github connect is not configured on this
-  // server" (the live install, 2026-09-18).
+  // the public door (announce.ts): /announce/*, /internal/announce-due, and the GitHub App's two
+  // doors (github-connect.ts, mounted from announce.ts): /connect/github/start + /callback serve the
+  // in-app connector and the door alike. They sit ABOVE the social connectors' /connect/:provider/*
+  // on purpose: registered below them, GitHub's grant landed on the generic handler and answered
+  // "github connect is not configured on this server" (the live install, 2026-09-18).
   announceRoutes(app, store, opts.announce);
   filmsCronRoute(app, store, opts.starterVideo); // GET /internal/films-due — the video rung's minute cron (starter-video.ts)
 
@@ -555,7 +556,7 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
   meRoute(app, store);
   exportRoutes(app, store); // GET /v1/workspaces/:id/export — owner only, exempt from the gate (export.ts)
   importRoutes(app, store); // POST /v1/workspaces/:id/import/batches, owner only, cloud target only (import.ts)
-  announceClaimRoute(app, store); // POST /v1/announce/:id/claim — the signed-in save (announce.ts)
+  announceClaimRoute(app, store, opts.announce); // POST /v1/announce/:id/claim — the signed-in save, plus the GitHub connector's /v1 lane (announce.ts → github-connect.ts)
   contentMediaRoute(app, store); // GET /v1/content/media/:id — a draft's film or picture for the card, members only
   starterVideoRoutes(app, store, opts.starterVideo); // GET /v1/starter/video + POST /v1/starter/film — the video rung on credits (starter-video.ts)
 

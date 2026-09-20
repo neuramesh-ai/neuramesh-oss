@@ -8,6 +8,7 @@ import { type ConnectorRow } from '../bridge/rows-content';
 import { errMsg } from '../lib/text';
 import { flashToast } from '../lib/toast';
 import { CONNECTORS, type ConnectorId, type ConnectorState } from './connectors';
+import { GitHubStep } from './GitHubStep';
 
 // Imported bindings lose control-flow narrowing inside closures, so re-bind (same as App.tsx).
 const nm = nmBridge;
@@ -85,6 +86,7 @@ export async function disconnectConnector(s: ConnectorState, channelId: string):
  *  an OAuth hand-off finishes in the browser, and the caller's poll picks that up. */
 export function ConnectPanel({ id, channelId, dead, onDone }: { id: ConnectorId; channelId: string; dead?: ConnectorRow | null; onDone: () => void }) {
   if (id === 'images') return <ImageKeyForm onSaved={onDone} />;
+  if (id === 'github') return <GitHubStep channelId={channelId} dead={!!dead} onDone={onDone} />;
   if (OAUTH.has(id)) return <OauthStep id={id as OauthId} channelId={channelId} dead={dead ?? null} />;
   return <KeyStep id={id as KeyId} channelId={channelId} onDone={onDone} />;
 }

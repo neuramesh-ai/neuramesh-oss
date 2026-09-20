@@ -73,7 +73,7 @@ export interface Alert {
   linked?: boolean;
 }
 
-const PROVIDER_LABEL: Record<string, string> = { x: 'X', linkedin: 'LinkedIn', instagram: 'Instagram', tiktok: 'TikTok', email: 'Email' };
+const PROVIDER_LABEL: Record<string, string> = { x: 'X', linkedin: 'LinkedIn', instagram: 'Instagram', tiktok: 'TikTok', github: 'GitHub', email: 'Email' };
 export const providerLabel = (p: string): string => PROVIDER_LABEL[p] ?? p;
 
 const metaOf = (projectName: string | null, channelSlug: string | null): string =>

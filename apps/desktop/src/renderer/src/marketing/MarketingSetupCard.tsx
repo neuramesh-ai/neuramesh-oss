@@ -5,6 +5,7 @@ import { MARKETING_SETUP_FLOW, setupProgress } from '@neuramesh/shared';
 import { nm as nmBridge } from '../bridge/nm';
 import { openUpgrade } from '../lib/toast';
 import { IconBranch } from '../ui/icons';
+import { GitHubSetupRow } from '../settings/GitHubStep';
 
 import { type ConnectorRow } from '../bridge/rows-content';
 import { type RepoUI } from '../bridge/rows-board';
@@ -261,6 +262,9 @@ export function MarketingSetupCard({ channel, agent, projectWebsite, onDone, onS
                       {repo && <button type="button" className="btn ghost sm" onClick={() => { setAttachOpen(false); setAttachUrl(''); }}>Cancel</button>}
                     </div>
                   )}
+                  {/* read access (docs/design/github-connector-2026-09): the daily watch runs on a cloud
+                      machine, which has no gh login, so the grant is what lets it read the repository */}
+                  {repo && <GitHubSetupRow channelId={channel.id} conn={connOf('github') ?? null} />}
                   <div className="mkqlabel">Drafts go to every connected account</div>
                   {SETUP_CONNECTORS.map(([provider, icon, label]) => {
                     const conn = connOf(provider);

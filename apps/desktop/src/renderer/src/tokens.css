@@ -861,7 +861,11 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 .subpagex:hover { color: var(--text); background: var(--hover-bg); }
 .subpagebody { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; }
 /* a connected row's badge + its disconnect affordance (× → "sure?"), one quiet unit */
-.mkconndone { display: inline-flex; align-items: center; gap: 4px; }
+.mkconndone { display: inline-flex; align-items: center; gap: 4px; min-width: 0; flex: 1 1 auto; justify-content: flex-end; }
+/* a connected row keeps its label: the handle is the box that gives (a GitHub slug is long, and it pushed
+   the label to zero width live, 2026-09-19). Specific enough to beat `.mkrailrow b` below. */
+.mkrailrow.mkrailconn > b { min-width: max-content; }
+.mkconndone .mkintok { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .mkconndone .mkico { opacity: 0.45; }
 .mkrailconn:hover .mkconndone .mkico, .mkconndone .mkicodanger { opacity: 1; }
 .mkintkey { display: flex; align-items: center; gap: 6px; }

@@ -61,6 +61,9 @@ export const NM_TOOLS = [
   'read_whiteboard',
   'search_x',
   'draft_replies',
+  'list_repo_changes',
+  'read_repo_file',
+  'list_repo_files',
 ] as const;
 export type NmTool = (typeof NM_TOOLS)[number];
 
@@ -130,6 +133,13 @@ export const TOOL_KINDS: Record<NmTool, readonly TurnKind[]> = {
   // retype facts it did not gather. `chat`/`triage` carry their own copy in the host registry
   // (host/tools-replies.ts), exactly as the content tools do.
   draft_replies: ['work', 'leg'],
+  // The repository reads (docs/design/github-connector-2026-09): the room's project's repository through
+  // the GitHub connector (or the machine's own gh). Broad by design, like the whiteboard reads: a
+  // triage turn deciding whether a feature shipped, a chat turn asked what changed, a marketer's
+  // leg reading the CHANGELOG. Read only, so nothing here can move the board or the repository.
+  list_repo_changes: ['chat', 'triage', 'own', 'design', 'plan', 'work', 'review', 'ship', 'deep', 'leg'],
+  read_repo_file: ['chat', 'triage', 'own', 'design', 'plan', 'work', 'review', 'ship', 'deep', 'leg'],
+  list_repo_files: ['chat', 'triage', 'own', 'design', 'plan', 'work', 'review', 'ship', 'deep', 'leg'],
 };
 
 /** Is this tool available to this turn kind? The single reader every surface agrees through. */

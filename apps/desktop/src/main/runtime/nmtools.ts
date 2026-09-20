@@ -10,6 +10,7 @@
 import { IMAGE_EXT } from '../evidence';
 import type { createBeatRun } from '../beats';
 import { TOOL_SPECS, type SpeccedTool } from '../harness/toolspec';
+import { repoClones } from './nmtools-repo';
 import { WB_CREATE_DESC, WB_LIST_DESC, WB_READ_DESC, WB_UPDATE_DESC } from '../harness/tooldesc';
 import type { SkillRef } from '../agents';
 import type { LogFn } from '../agentlog';
@@ -241,6 +242,8 @@ export async function nmToolServer(a: {
           },
         ),
       ] : []),
+      // the repository reads (docs/design/github-connector-2026-09): closure-gated like search_x (nmtools-repo.ts)
+      ...(opts?.repo ? repoClones(opts.repo, tool, z, log) : []),
       // Beats (docs/17): the runtime-OWNED write path for the worker's live progress
       // plan. TodoWrite still maps automatically when the model uses it, but these
       // tools are the primary the prompt instructs — beats must never again depend on

@@ -12,3 +12,4 @@ export {
   type ChannelFrame, type ChannelLane, type EdgeMessage, type FrameType, type RelayMessage,
 } from './protocol.js';
 export { makeValidators } from './validate.js';
+export { keepAlive, KEEPALIVE_MS } from './keepalive.js';

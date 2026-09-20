@@ -13,7 +13,9 @@ import type { AgentRow, MachineRow, MemberRow, WorkspaceMembership, PendingInvit
 export type { WorkspaceUsage, CreditHistory, StarterVideo } from './rows-infra';
 import type { WorkspaceUsage, CreditHistory, StarterVideo } from './rows-infra';
 import type { CredRow, ProviderId, ProviderStatus, UpdateState, ArchivedThreadRow, FailoverRow, PolicyRowUI, ProcList, FootprintSnapshot, FootprintReply } from './rows-infra';
-import type { AlertConnectorRow, AlertPostRow, AlertScheduleRow, BrainOverride, RetroPayload, ThreadMode } from '@neuramesh/shared';
+import type { AlertConnectorRow, AlertPostRow, AlertScheduleRow, BrainOverride, ConnectProvider, RetroPayload, ThreadMode } from '@neuramesh/shared';
+/** what /v1/github/resolve answers: connected (the row exists now), or why not, with the install door when GitHub has it */
+export type GitHubResolve = { ok: true; handle: string } | { ok: false; code: 'NOT_INSTALLED' | 'NO_REPO' | 'NOT_CONFIGURED' | 'UNREACHABLE'; error: string; install?: string | null };
 import type { EngineeringNMBridge } from './engineering';
 import type { TerminalNMBridge } from './terminal';
 
@@ -239,7 +241,11 @@ export interface NMBridge extends EngineeringNMBridge, TerminalNMBridge {
   contentMedia(mediaId: string): Promise<string | null>;
   contentUnschedule(itemId: string): Promise<{ ok: boolean }>;
   mediaPreview(url: string): Promise<{ dataUrl: string | null }>;
-  connectorStart(channelId: string, provider?: 'x' | 'linkedin' | 'instagram' | 'tiktok'): Promise<{ ok: boolean }>;
+  connectorStart(channelId: string, provider?: ConnectProvider): Promise<{ ok: boolean }>;
+  /** the GitHub connector's resolve (docs/design/github-connector-2026-09): is the App installed for
+   *  the room's project's repository? Connected in place when it is, else the install link. Optional
+   *  on the type because an older bridge may lack it (the "No shell here" idiom: feature-detect). */
+  githubResolve?(channelId: string): Promise<GitHubResolve>;
   connectors(channelId?: string): Promise<{ connectors: ConnectorRow[] }>;
   /** the attention bar's three row sets (failure-alerts round) — folded by shared deriveAlerts */
   alerts(): Promise<{ connectors: AlertConnectorRow[]; schedules: AlertScheduleRow[]; posts: AlertPostRow[] }>;

@@ -18,3 +18,15 @@ export const WB_LIST_DESC =
 
 export const WB_READ_DESC =
   'Read one whiteboard by id: its title, current rev (you need this for update_whiteboard), and its content — the Excalidraw scene JSON (elements with type/x/y/text), or the pending mermaid/skeleton source if no desktop has drawn it yet.';
+
+// The repository reads (docs/design/github-connector-2026-09): three registries speak them (the
+// orchestrator's, the conversation's, the worker bus + its Claude clones), one implementation
+// answers (host/reporead.ts), so the words live here once.
+export const REPO_CHANGES_DESC =
+  'What shipped in this room\'s project repository: the releases (newest first, with their notes), the pull requests merged since a date, the tags when nothing is released, the commits on the default branch. Use it for any question about what shipped or what a release contains, and for release drafts when the thread carries no digest. It reads through the room\'s GitHub connection or this machine\'s gh login, and answers facts or an honest refusal that names the fix. Never invent a release, a version or a pull request.';
+
+export const REPO_FILE_DESC =
+  'Read ONE file of this room\'s project repository as text (the README, CHANGELOG.md, a doc, a source file), by its path from the root; `ref` picks a branch, tag or commit. Cut at 60,000 characters, and says so; binaries are refused. Use list_repo_files first when the path is unknown. Read only.';
+
+export const REPO_TREE_DESC =
+  'List the files of this room\'s project repository: the whole tree (capped at 500 entries) or the entries under a path. Use it to find what to read. Read only.';

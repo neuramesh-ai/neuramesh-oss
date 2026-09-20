@@ -20,10 +20,11 @@ const BASE = [
   // accept_task (2026-09-08): accept on the human's WORD — the Accept button's replacement, routeTools
   'accept_task', 'add_agent_to_channel', 'add_backlog_item', 'add_subtask', 'create_agent', 'create_project',
   'create_task', 'draft_article', 'draft_posts', 'draft_replies', 'generate_image', 'list_agents', 'list_backlog', 'list_library',
-  'list_playbooks', 'list_projects', 'list_repos', 'list_tasks', 'list_workspace', 'load_skill', 'offer_task',
+  // the repository reads (2026-09-19, docs/design/github-connector-2026-09): what shipped, a file, the tree (host/tools-repo.ts)
+  'list_playbooks', 'list_projects', 'list_repo_changes', 'list_repo_files', 'list_repos', 'list_tasks', 'list_workspace', 'load_skill', 'offer_task',
   // propose_angles (2026-09-19): the UGC playbook's angle card, before any creator script is drafted (host/ugcflow.ts)
   'post_thread', 'promote_backlog_item', 'propose_angles', 'propose_design_round', 'propose_impl_plan',
-  'propose_library_doc', 'read_library_doc', 'read_workspace_file', 'recall', 'register_repo',
+  'propose_library_doc', 'read_library_doc', 'read_repo_file', 'read_workspace_file', 'recall', 'register_repo',
   'request_changes', 'request_design', 'request_plan', 'request_verdict', 'revise_design',
   'revise_plan', 'revise_posts', 'revise_replies', 'revise_ship_plan', 'run_playbook', 'schedule_posts', 'search_x',
   'share_images', 'start_deep_work', 'take_task', 'task_status', 'unschedule_posts', 'update_backlog_item',
