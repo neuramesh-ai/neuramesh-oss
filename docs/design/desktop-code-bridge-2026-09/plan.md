@@ -68,8 +68,22 @@ waits the grace window and steps in only when no cloud machine is awake or the c
 never claimed inside the window. The chip's explicit pick of a laptop stays a designation. A
 desktop-born session keeps the table above, capability included: the member's Mac has their
 login right there, and moving it to the cloud would spend credits unasked. Continuity to a laptop
-no longer pins a cloud-born thread: the next message moves it to the cloud. Units (task claims)
-keep the claim ladder, which has no origin: the rung covers conversations.
+no longer pins a cloud-born thread: the next message moves it to the cloud.
+
+**Units follow their conversation (the same day, George: "units for routines or threads started
+on the cloud (web or mobile) should also run there on the cloud runner").** A unit's claim
+(`host/claimflow.ts`) now hands the ladder the owning conversation's `origin` and `machine_id`
+(`host/lookups.ts` `unitBirth`: `tasks.origin_thread_id`, a subtask's parent's; a board-born
+task has none and keeps the ladder it had), with the conversation's human as the origin member,
+so rung 0 places a cloud-born unit exactly as it places the conversation's wakes, and the claim's
+own door re-seats a brain the runner lacks. A repo-backed unit on a cloud machine with no GitHub
+login blocks at the claim with the fix named (`gh auth login` in the machine's terminal, docs/42)
+instead of failing at the push. Under shared compute a unit running on the runner is also visible
+to a laptop that boots mid-unit, whose resume watch used to pick it up beside the runner: the
+resume (`host/dispatch.ts` `resumeUnit`, one body for the live watch and the boot reconcile) now
+stands down while another awake machine holds a running run for the unit, and resumes it only
+once that machine stops beating. The plan, design, review and ship legs are board-driven watches
+with no ladder of their own and are unchanged.
 
 ## The surfaces (mockup.html, sections 1–3)
 

@@ -1,9 +1,11 @@
 // CLAIMING AND OWNING — how a task reaches a machine: the voluntary claim, the orchestrator
 // taking it itself, the remote A2A delegate, and the checklist/estimate a claim resolves.
 // Split out of host/flows.ts.
-import { conversationOrigin, starterDoorOpen, starterFallback, unavailableOf, whyUnavailable } from './starterfallback';
+import { conversationOrigin, onCloudMachine, starterDoorOpen, starterFallback, unavailableOf, whyUnavailable } from './starterfallback';
 import { noComputeReasonOf } from '../computenotice';
 import { providerFor } from '../runtime/adapter';
+import { ghRaw } from './gh';
+import type { UnitBirth } from './lookups';
 
 /** units this host already offered the Starter switch for — one card per unit, never one per poll */
 const offered = new Set<string>();
@@ -11,7 +13,7 @@ import { resolveToken } from '../agents';
 import type { ExecTask, HostedAgent, OfferedTask, SkillRef } from '../agents';
 
 
-import { type ClaimVerdict } from '@neuramesh/shared';
+import { isCloudBorn, type ClaimVerdict, type SessionOrigin } from '@neuramesh/shared';
 
 
 
@@ -70,6 +72,8 @@ import { makeClaimOwn } from './claim-own';
 // and the resume watch (an ExecTask carrying its assignee). Narrowing the parameter to the fields
 // used beats widening either row shape to satisfy the other.
 export type OwnedTask = { id: string; number: number; title: string; channel_id: string; requirements?: string | null };
+/** what the ladder needs of a unit before any claim: an offer, an owned unit, a plan row alike */
+export type AdmitTask = OwnedTask & Partial<Pick<OfferedTask, 'creator_kind' | 'creator_id'>>;
 
 export function makeClaimFlow(ctx: HostCtx & {
   db: PowerSyncDatabase;
@@ -97,13 +101,13 @@ export function makeClaimFlow(ctx: HostCtx & {
   brainNotesFor: (task: ExecTask, cap?: number, perNote?: number) => string;
   brainResults: (subject: SubjectRef, cap?: number, per?: number) => string;
   channelLessons: (workspaceId: string, channelId: string) => Promise<string>;
-  claimVerdict: (runtime: string, model: string | null, originUserId: string | null, elapsedMs: number, extra?: { agentId?: string; priorMachineId?: string | null }) => Promise<ClaimVerdict>;
+  claimVerdict: (runtime: string, model: string | null, originUserId: string | null, elapsedMs: number, extra?: { agentId?: string; priorMachineId?: string | null; threadMachineId?: string | null; origin?: SessionOrigin | null }) => Promise<ClaimVerdict>;
   discoverSkills: (channelId: string, workspaceId: string) => Promise<SkillRef[]>;
   handleExhaustion: (agent: HostedAgent, t: ExecTask | null, ch: { id: string; slug: string; workspace_id: string }) => Promise<void>;
   legSummary: (out: string) => string;
   mineLessons: (reviewer: HostedAgent, t: { id: string; number: number; title: string }, ch: { id: string; slug: string; workspace_id: string }, token: string, live: boolean, log?: LogFn) => Promise<void>;
   orchestratorTurn: (agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, transcript: string, token: string, thread?: { id: string; number: number; title: string; state: string }, log?: LogFn, skills?: SkillRef[], attachments?: AgentAttachment[], convoThreadId?: string | null, run?: RunHandle, onDelta?: (t: string) => void) => Promise<string>;
-  originOf: (t: OfferedTask) => string | null;
+  originOf: (t: Pick<OfferedTask, 'creator_kind' | 'creator_id'>) => string | null;
   priorMachineFor: (threadId?: string | null, taskId?: string | null) => Promise<string | null>;
   requestSleeperWake: ReturnType<typeof makeSleeperWake>['requestSleeperWake'];
   nobodyServes: ReturnType<typeof makeSleeperWake>['nobodyServes'];
@@ -113,6 +117,8 @@ export function makeClaimFlow(ctx: HostCtx & {
   sinceFirstSeen: (key: string) => number;
   spawnLegFor: (parent: HostedAgent, where: { workspace: string; channelId: string; taskId?: string | null; threadId?: string | null }, dir: string, task: ExecTask, budget: { wallMs: number; contextTokens: number }, log: LogFn | undefined, _depth: number) => (i: { role: string; prompt: string; label?: string }) => Promise<{ ok: boolean; summary?: string; error?: string }>;
   taskRecallNote: (workspaceId: string, query: string, lessonsNote: string) => Promise<string>;
+  /** the owning conversation's origin and designation (host/lookups.ts): a unit runs where it runs */
+  unitBirth: (taskId: string) => Promise<UnitBirth>;
   whiteboardClosures: (actor: { kind: string; id: string; role?: string }, ch: { id: string; workspace_id: string }, at: { taskId?: string; threadId?: string }) => WhiteboardToolClosures;
   executeFlow: ReturnType<typeof makeFlows>['executeFlow'];
 }) {
@@ -120,14 +126,80 @@ const { db, apiUrl, workspace, ownerActorId, post, claimed, execQueue,
         
         alog, claimVerdict, 
         originOf, priorMachineFor, requestSleeperWake, nobodyServes,
-        sinceFirstSeen, executeFlow } = ctx;
+        sinceFirstSeen, executeFlow, unitBirth } = ctx;
 // The guard registry's fields keep their short names, exactly as they read inside startAgentHost.
 const { claimFailNoticed, 
  } = ctx.guards;
 
   // Split-out neighbours: same ctx, so every call below keeps the name it always used.
   const { estimateFor, checklistFor } = makeClaimResolve(ctx);
-  const { ownFlow, owningContext, remoteDelegate } = makeClaimOwn(ctx);
+  const { ownFlow, owningContext, remoteDelegate } = makeClaimOwn(ctx, { admitUnit });
+
+/**
+ * THE LADDER BEFORE ANY CLAIM, for claimFlow and ownFlow alike (2026-09-19: an OWNED unit raced
+ * `task.claim` with no ladder at all, and the runner, when it won, blocked it for want of a
+ * credential). The seat the turn will take is what the ladder judges (2026-09-16, the Starter
+ * worker lane: a unit in a conversation switched to the Starter brain is servable by any awake
+ * machine, whatever login the agent's base runtime would need). Resolves to true when this host
+ * proceeds to the claim, false when it stands down: a better-placed machine is given the window,
+ * a sleeper is asked, or the claim door re-seats the unit and `again` runs it on the new seat.
+ */
+async function admitUnit<T extends AdmitTask>(agent: HostedAgent, t: T, kind: 'work' | 'own', again: (seat: HostedAgent, t: T) => Promise<void>): Promise<boolean> {
+  const actor = { kind: 'agent', id: agent.id, role: agent.role };
+  const seat = await ctx.seatFor(agent, t.channel_id, { taskId: t.id });
+  // A UNIT RUNS WHERE ITS CONVERSATION RUNS (George, 2026-09-19): the owning conversation's origin
+  // and designation go to the ladder exactly as a chat wake's do (wakerouting.ts), so a unit born
+  // of a web, phone or routine session claims on the cloud machine (rung 0), whatever brain it
+  // holds. Before this the claim passed no origin: rung 0 never fired, capability decided, and
+  // the member's laptop took the units of a conversation the cloud machine had just answered.
+  // The origin MEMBER is the conversation's human for a cloud-born unit (the orchestrator files
+  // it, so the creator is an agent), which keeps the member's own cloud machine ahead of the
+  // runner; every other unit keeps its creator, as before.
+  const birth = await unitBirth(t.id);
+  const originUser = isCloudBorn(birth.origin) ? (originOf(t) ?? await conversationOrigin({ taskId: t.id })) : originOf(t);
+  const verdict = await claimVerdict(seat.runtime, seat.model ?? null, originUser, sinceFirstSeen(t.id), { agentId: agent.id, priorMachineId: await priorMachineFor(null, t.id), threadMachineId: birth.machineId, origin: birth.origin });
+  if (verdict.act === 'skip') {
+    // THE SLEEPER RUNG (member-machines plan §4.3): this host cannot run the runtime, but a lent
+    // cloud machine that can may be asleep — ask the fleet, then stand down; the offer waits
+    if (verdict.why !== 'incapable') return false;
+    const sleeper = await requestSleeperWake({ runtime: seat.runtime, model: seat.model ?? null, originUserId: originOf(t), workspace, actor }).catch(() => null);
+    // THE STARTER DOOR for a seat NOBODY can serve (host/starterfallback.ts, 2026-09-17): no sleeper
+    // to wake, no awake machine that could — the origin member's own machine speaks, once per unit.
+    // A routine's unit is re-seated on the house model (any awake machine serves it) and the offer is
+    // evaluated again; a human's unit gets the reason and the card in its thread, and is looked at
+    // again each minute so the click is acted on without a restart. Before this, such a unit sat
+    // unclaimed and silent until the stall watchdog noticed.
+    // a unit the orchestrator created has no human creator, but its CONVERSATION does (a routine's
+    // opener is the owner's word) — that member's machine is the one that speaks
+    const origin = originOf(t) ?? await conversationOrigin({ taskId: t.id });
+    const nobody = await nobodyServes({ runtime: seat.runtime, model: seat.model ?? null, originUserId: origin });
+    // said out loud, like wake_skip: a unit nobody can serve is the exact silence this door exists to end
+    console.log(`agent_claim_door agent=${agent.name} task=${t.number} seat=${seat.model}/${seat.runtime} sleeper=${sleeper ? 'asked' : 'none'} origin=${origin ? (origin === ownerActorId ? 'mine' : 'other') : 'none'} nobody=${nobody} door=${starterDoorOpen()} offered=${offered.has(t.id)}`);
+    if (sleeper || !origin || origin !== ownerActorId || !starterDoorOpen() || !nobody) return false;
+    if (!offered.has(t.id)) {
+      offered.add(t.id);
+      const probe = await resolveToken(apiUrl, workspace, seat, ownerActorId).catch(() => null);
+      const next = await starterFallback(seat, { kind: 'nocompute', provider: providerFor(seat.runtime), reason: noComputeReasonOf(probe) }, { workspace, channelId: t.channel_id, taskId: t.id, taskNumber: t.number });
+      // the offer watch fires on TASK rows and the re-seat touched none: the re-seated unit is
+      // claimed right here, through the same flow, on the seat it now has
+      if (next) { await again(next, t); return false; }
+    }
+    // still offered, still unservable: looked at again in a minute (the click on the card touches
+    // no task row either), until the seat moves or a machine that can serve it comes online. The
+    // sleeper memo keeps the fleet ask to one per five minutes.
+    setTimeout(() => {
+      claimed.delete(t.id); claimed.add(t.id);
+      execQueue.run({ key: t.id, kind, cause: 'board', agentId: agent.id, subject: { kind: 'task', number: t.number } }, () => again(agent, t));
+    }, 60_000);
+    return false;
+  }
+  if (verdict.act === 'wait') {
+    // re-ask rather than drop: a wedged origin machine must be a delay, never a black hole
+    setTimeout(() => { claimed.delete(t.id); }, verdict.retryInMs);
+    return false;
+  }
+  return true;
+}
 
 async function claimFlow(agent: HostedAgent, t: OfferedTask) {
   const actor = { kind: 'agent', id: agent.id, role: agent.role };
@@ -137,55 +209,21 @@ async function claimFlow(agent: HostedAgent, t: OfferedTask) {
     // gets first refusal; we step in only if it cannot serve, or if it has not within the
     // grace window. The server's atomic claim below is still the thing that makes exactly one
     // host win — this only stops the pointless attempts (and, on a wake, the pointless spend).
-    // the SEAT decides capability (2026-09-16, the Starter worker lane): a unit in a conversation
-    // switched to the Starter brain is servable by any awake machine, whatever login the agent's
-    // base runtime would need — the ladder must judge the seat the turn will actually take
-    const seat = await ctx.seatFor(agent, t.channel_id, { taskId: t.id });
-    const verdict = await claimVerdict(seat.runtime, seat.model ?? null, originOf(t), sinceFirstSeen(t.id), { agentId: agent.id, priorMachineId: await priorMachineFor(null, t.id) });
-    if (verdict.act === 'skip') {
-      // THE SLEEPER RUNG (member-machines plan §4.3): this host cannot run the runtime, but a lent
-      // cloud machine that can may be asleep — ask the fleet, then stand down; the offer waits
-      if (verdict.why !== 'incapable') return;
-      const sleeper = await requestSleeperWake({ runtime: seat.runtime, model: seat.model ?? null, originUserId: originOf(t), workspace, actor }).catch(() => null);
-      // THE STARTER DOOR for a seat NOBODY can serve (host/starterfallback.ts, 2026-09-17): no sleeper
-      // to wake, no awake machine that could — the origin member's own machine speaks, once per unit.
-      // A routine's unit is re-seated on the house model (any awake machine serves it) and the offer is
-      // evaluated again; a human's unit gets the reason and the card in its thread, and is looked at
-      // again each minute so the click is acted on without a restart. Before this, such a unit sat
-      // unclaimed and silent until the stall watchdog noticed.
-      // a unit the orchestrator created has no human creator, but its CONVERSATION does (a routine's
-      // opener is the owner's word) — that member's machine is the one that speaks
-      const origin = originOf(t) ?? await conversationOrigin({ taskId: t.id });
-      const nobody = await nobodyServes({ runtime: seat.runtime, model: seat.model ?? null, originUserId: origin });
-      // said out loud, like wake_skip: a unit nobody can serve is the exact silence this door exists to end
-      console.log(`agent_claim_door agent=${agent.name} task=${t.number} seat=${seat.model}/${seat.runtime} sleeper=${sleeper ? 'asked' : 'none'} origin=${origin ? (origin === ownerActorId ? 'mine' : 'other') : 'none'} nobody=${nobody} door=${starterDoorOpen()} offered=${offered.has(t.id)}`);
-      if (sleeper || !origin || origin !== ownerActorId || !starterDoorOpen() || !nobody) return;
-      if (!offered.has(t.id)) {
-        offered.add(t.id);
-        const probe = await resolveToken(apiUrl, workspace, seat, ownerActorId).catch(() => null);
-        const next = await starterFallback(seat, { kind: 'nocompute', provider: providerFor(seat.runtime), reason: noComputeReasonOf(probe) }, { workspace, channelId: t.channel_id, taskId: t.id, taskNumber: t.number });
-        // the offer watch fires on TASK rows and the re-seat touched none: the re-seated unit is
-        // claimed right here, through the same flow, on the seat it now has
-        if (next) return claimFlow(next, t);
-      }
-      // still offered, still unservable: looked at again in a minute (the click on the card touches
-      // no task row either), until the seat moves or a machine that can serve it comes online. The
-      // sleeper memo keeps the fleet ask to one per five minutes.
-      setTimeout(() => {
-        claimed.delete(t.id); claimed.add(t.id);
-        execQueue.run({ key: t.id, kind: 'work', cause: 'board', agentId: agent.id, subject: { kind: 'task', number: t.number } }, () => claimFlow(agent, t));
-      }, 60_000);
-      return;
-    }
-    if (verdict.act === 'wait') {
-      // re-ask rather than drop: a wedged origin machine must be a delay, never a black hole
-      setTimeout(() => { claimed.delete(t.id); }, verdict.retryInMs);
-      return;
-    }
+    if (!(await admitUnit(agent, t, 'work', claimFlow))) return;
 
     const claim = await post('/v1/commands', actor, { type: 'task.claim', taskId: t.id });
     if (claim.status === 409) return; // someone else won — offers are voluntary
     if (!claim.ok) throw new Error(`claim ${claim.status}: ${await claim.text()}`);
+
+    // A repo-backed unit needs a push credential, and a cloud machine carries none until its
+    // owner signs in through the machine's terminal (docs/42). Said at the claim, with the fix,
+    // rather than at the push, where it read as a raw git error. Asked live, not memoized: the
+    // login lands while the daemon runs. A laptop keeps its own git remotes and SSH keys: no gate.
+    if (t.repo_id && onCloudMachine() && !(await ghRaw(['auth', 'status']).then((r) => r.ok).catch(() => false))) {
+      await post('/v1/commands', actor, { type: 'task.block', taskId: t.id, reason: `This cloud machine has no GitHub login, so it cannot push a branch for #${t.number}. Open the machine's terminal and run \`gh auth login\`, then unblock #${t.number}.` }).catch((e) => console.error(`task_block #${t.number} failed:`, e));
+      console.log(`agent_claim agent=${agent.name} task=${t.number} blocked=no_gh_login_on_cloud`);
+      return;
+    }
 
     const ch = await db.get<{ id: string; slug: string; workspace_id: string }>('select id, slug, workspace_id from channels where id = ?', [t.channel_id]);
     let cred = await resolveToken(apiUrl, ch.workspace_id, agent, ownerActorId);

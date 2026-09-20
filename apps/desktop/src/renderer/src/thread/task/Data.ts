@@ -7,6 +7,7 @@
 // effects react to the task moving, not to anything loading. Split out of thread/TaskThread.tsx.
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { groupByMessage } from '../parts';
+import { mergeTranscript } from './merge';
 import { useRuns } from '../hooks';
 import { isWatchableRun, runTrees } from '../../runs/runs';
 import { nm as nmBridge } from '../../bridge/nm';
@@ -61,8 +62,18 @@ useEffect(() => {
   setRows([]);
   let first = true;
   // a task born from a conversation shows the WHOLE exchange — the pre-task chat rides
-  // in via the thread union (watchConvo); a plain task thread reads by task as before
-  const sub = (cb: (r: MessageRow[]) => void) => (convoThreadId ? nm!.watchConvo(convoThreadId, cb) : nm!.watchThread(task.id, cb));
+  // in via the thread union (watchConvo); a plain task thread reads by task as before.
+  // AN ANCHORED UNIT'S OWN ROWS RIDE BESIDE THE CONVERSATION'S (2026-09-20, thread/task/merge.ts
+  // says why): the unit's task-scoped rows are watched too and merged by time
+  const anchored = !!convoThreadId && convoThreadId === task.origin_thread_id;
+  const sub = (cb: (r: MessageRow[]) => void): (() => void) => {
+    if (!convoThreadId) return nm!.watchThread(task.id, cb);
+    if (!anchored) return nm!.watchConvo(convoThreadId, cb);
+    let convo: MessageRow[] = []; let own: MessageRow[] = [];
+    const unConvo = nm!.watchConvo(convoThreadId, (r) => { convo = r; cb(mergeTranscript(convo, own)); });
+    const unOwn = nm!.watchThread(task.id, (r) => { own = r; cb(mergeTranscript(convo, own)); });
+    return () => { unConvo(); unOwn(); };
+  };
   return sub((r) => {
     const el = listRef.current;
     const nearBottom = !el || el.scrollHeight - el.scrollTop - el.clientHeight < 200;
@@ -74,7 +85,7 @@ useEffect(() => {
     if (initial || nearBottom)
       requestAnimationFrame(() => listRef.current?.scrollTo({ top: listRef.current.scrollHeight }));
   });
-}, [task.id, convoThreadId]);
+}, [task.id, convoThreadId, task.origin_thread_id]);
 
 useEffect(() => {
   if (!nm) return;

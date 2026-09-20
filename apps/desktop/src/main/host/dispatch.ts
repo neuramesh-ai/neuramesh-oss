@@ -22,6 +22,8 @@ import type { makeClaimFlow } from './claimflow';
 
 import type { HostCtx } from './ctx';
 
+export type ResumeRow = ExecTask & { assignee_id: string; requirements_confirmed: number };
+
 export function makeDispatch(ctx: HostCtx & {
   agents: Map<string, HostedAgent>;
   architectFlow: ReturnType<typeof makePlanFlow>['architectFlow'];
@@ -30,6 +32,8 @@ export function makeDispatch(ctx: HostCtx & {
   designProviderFor: (taskId: string) => Promise<{ provider: DesignProvider; runKey: string } | null>;
   designerFlow: ReturnType<typeof makeDesignFlow>['designerFlow'];
   execQueue: HostQueue;
+  /** is another awake machine running this unit? (host/lookups.ts) */
+  heldElsewhere: (taskId: string) => Promise<boolean>;
   orchDesignNotify: ReturnType<typeof makeDesignFlow>['orchDesignNotify'];
   orchPlanDecision: ReturnType<typeof makePlanFlow>['orchPlanDecision'];
   ownFlow: ReturnType<typeof makeClaimFlow>['ownFlow'];
@@ -38,7 +42,7 @@ export function makeDispatch(ctx: HostCtx & {
   setStatus: (agent: HostedAgent, status: 'online' | 'thinking' | 'working') => void;
   workspace: string;
 }) {
-const { agents, architectFlow, claimed, db, designProviderFor, designerFlow, execQueue, orchDesignNotify, orchPlanDecision, ownFlow, post, resumeFlow, setStatus } = ctx;
+const { agents, architectFlow, claimed, db, designProviderFor, designerFlow, execQueue, heldElsewhere, orchDesignNotify, orchPlanDecision, ownFlow, post, resumeFlow, setStatus } = ctx;
 const { decided , designAsked, designNotified, designQuestionRetries, designed, planned, planningStaffingNotified } = ctx.guards;
 
 // A design approval can enter planning without an architect because the human
@@ -208,19 +212,41 @@ async function reconcileBoard() {
   }
   // in_progress tasks assigned to a local agent that this process isn't running (host restarted
   // mid-task) — same boot race: the resume watch fires before the roster loads. Pick them back up.
-  type ResumeRow = ExecTask & { assignee_id: string; requirements_confirmed: number };
   const resumeRows = await db.getAll<ResumeRow>(
     `select id, number, title, channel_id, assignee_id, repo_id, base_ref, branch, requirements, requirements_confirmed
      from tasks where state = 'in_progress' and assignee_kind = 'agent'`,
   ).catch(() => [] as ResumeRow[]);
-  for (const t of resumeRows) {
-    if (claimed.has(t.id)) continue;
-    const agent = agents.get(t.assignee_id);
-    if (!agent) continue;
-    claimed.add(t.id);
-    execQueue.run({ key: t.id, kind: 'work', cause: 'board', agentId: agent.id, subject: { kind: 'task', number: t.number } }, () => resumeFlow(agent, t));
-  }
+  for (const t of resumeRows) await resumeUnit(t);
 }
 
-  return { dispatchDesigner, dispatchPlanning, reconcileBoard, retryDesignQuestion, surfacePlanningStaffing };
+/**
+ * RESUME, from the live watch and the boot reconcile alike (one body since 2026-09-19; the boot
+ * copy lacked the owned branch below): an in-progress unit assigned to an agent this host serves
+ * and this process is not executing. NOT while another awake machine is running it
+ * (host/lookups.ts heldElsewhere: a laptop that booted mid-unit resumed the runner's unit beside
+ * it, and cloud-born units run on the runner by default now); the guard is released so a later
+ * tick resumes it if that machine dies.
+ *
+ * THE REWORK LOOP (docs/29 §4d). A task bouncing back to in_progress on an OWNED task is the
+ * reviewer's changes landing on the owner — and the owner judges them: act on them by spawning a
+ * fixer, push back with reasoning, or raise an `nmq` card when the call is genuinely the human's.
+ * `resumeFlow` would instead drop rex into the worker's coding resume, which is the same category
+ * error as claimFlow on the way in. Re-entry is already sound: `claimed` is released only when a
+ * task reaches in_review / done / blocked, so an owning turn that ends with the task still
+ * in_progress (waiting on a human) does not immediately re-fire — a human replying in the thread
+ * wakes rex through the normal message path instead.
+ */
+async function resumeUnit(t: ResumeRow): Promise<void> {
+  const agent = agents.get(t.assignee_id);
+  if (!agent || claimed.has(t.id)) return;
+  claimed.add(t.id);
+  if (await heldElsewhere(t.id)) { claimed.delete(t.id); return; }
+  const owning = agent.role === 'orchestrator';
+  execQueue.run(
+    { key: t.id, kind: owning ? 'own' : 'work', cause: 'board', agentId: agent.id, subject: { kind: 'task', number: t.number } },
+    owning ? () => ownFlow(agent, t) : () => resumeFlow(agent, t),
+  );
+}
+
+  return { dispatchDesigner, dispatchPlanning, reconcileBoard, resumeUnit, retryDesignQuestion, surfacePlanningStaffing };
 }
