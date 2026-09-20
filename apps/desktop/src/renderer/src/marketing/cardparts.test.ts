@@ -61,3 +61,14 @@ test('the film as a file: the bytes the card plays, named for the card, and noth
   assert.equal(filmFile('https://cdn.example/clip.mp4', 'a'), null);
   assert.equal(filmFile(null, 'a'), null);
 });
+
+test('the product shots on the facts line (plan §9): the script\'s SHOW images before the film, what landed after', () => {
+  const script = '[0:00-0:03] Hook.\n[0:03-0:07] Cut to the app. SHOW: app-home.jpg\n[0:07-0:11] Close on pricing. SHOW: pricing.png';
+  assert.equal(filmFacts({ seconds: 15 }, CATALOG, script)!.at(-1), 'product shot · app-home.jpg, pricing.png');
+  assert.equal(filmFacts({ seconds: 15 }, CATALOG, '[0:00-0:03] Hook.')!.at(-1), '4 min');
+  const v = { tier: 'starter', model: 'Seedance 2.0', seconds: 15, credits: 363, at: 'bad' };
+  assert.equal(filmFacts({ video: { ...v, shots: { asked: 1, applied: 1 } } }, CATALOG)!.at(-1), 'product shot');
+  assert.equal(filmFacts({ video: { ...v, shots: { asked: 2, applied: 2 } } }, CATALOG)!.at(-1), 'product shots · 2 of 2');
+  assert.equal(filmFacts({ video: { ...v, shots: { asked: 1, applied: 0, why: 'not on the shelf: gone.png' } } }, CATALOG)!.at(-1), 'product shot · not applied · not on the shelf: gone.png');
+  assert.deepEqual(filmFacts({ video: v }, CATALOG), ['NeuraMesh Video Starter', 'Seedance 2.0', '15 s', '363 credits']);
+});

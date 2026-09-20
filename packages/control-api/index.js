@@ -307,9 +307,14 @@ function labelled(l, label) {
 }
 function stampLine(rest, beat) {
   let s = oneSpaced(rest);
-  const cap2 = /(?:^| )caption(?: on screen)? ?:/i.exec(s);
+  const show = /(?:^| )show ?:/i.exec(s);
+  if (show) {
+    beat.show = s.slice(show.index + show[0].length).trim();
+    s = s.slice(0, show.index);
+  }
+  const cap2 = /(?:^| )(?:caption(?: on screen)?|(?:on-screen |on screen )?title|text on screen|on-screen text) ?:/i.exec(s);
   if (cap2) {
-    beat.caption = s.slice(cap2.index + cap2[0].length).trim();
+    beat.caption = unquote(s.slice(cap2.index + cap2[0].length));
     s = s.slice(0, cap2.index);
   }
   const spoken = /(?:^| )spoken ?:/i.exec(s);
@@ -339,7 +344,12 @@ function readLine(raw, beat) {
   }
   const cap2 = labelled(l, CAPTION_LABEL);
   if (cap2 !== null) {
-    beat.caption = cap2;
+    beat.caption = unquote(cap2);
+    return;
+  }
+  const show = labelled(l, SHOW_LABEL);
+  if (show !== null) {
+    beat.show = show;
     return;
   }
   if (!beat.direction) beat.direction = tidyDirection(trimEndChars(l, "." + BLANKS));
@@ -351,15 +361,23 @@ function scriptBeats(body) {
   for (const l of lines) {
     const m = STAMP_RE.exec(l);
     if (m) {
-      cur = { start: Number(m[1]) * 60 + Number(m[2]), direction: "", spoken: "", caption: "" };
+      cur = newBeat(Number(m[1]) * 60 + Number(m[2]), Number(m[3]) * 60 + Number(m[4]));
       beats.push(cur);
-      stampLine(m[3], cur);
+      stampLine(m[5], cur);
     } else if (cur) readLine(l, cur);
   }
   if (beats.length) return beats;
-  const one = { start: 0, direction: "", spoken: "", caption: "" };
+  const one = newBeat(0, 0);
   for (const l of lines.slice(0, 3)) readLine(l, one);
   return [one];
+}
+function productShots(body) {
+  const beats = scriptBeats(body);
+  return beats.flatMap((b2, i) => {
+    if (!b2.show) return [];
+    const end = b2.end > b2.start ? b2.end : beats[i + 1]?.start ?? b2.start + 3;
+    return [{ start: b2.start, end, show: b2.show }];
+  });
 }
 function beatsWithin(body, seconds) {
   const all = scriptBeats(body);
@@ -398,13 +416,13 @@ function filmPrompt(body, brief, seconds = 8) {
   for (let n = shots.length - 1; out.length > FILM_PROMPT_MAX && n >= 1; n -= 1) out = assemble(shots.slice(0, n), false);
   return out.slice(0, FILM_PROMPT_MAX);
 }
-var BLANKS, STAMP_RE, MAX_BEATS, DIRECTION_WORDS, SPOKEN_WORDS, LOOK_WORDS, FILM_PROMPT_MAX, unquote, words, tidyDirection, CAPTION_LABEL, SPOKEN_LABEL, oneSpaced, firstBeat, CAPTION_ASK_RE, filmMinutes;
+var BLANKS, STAMP_RE, MAX_BEATS, DIRECTION_WORDS, SPOKEN_WORDS, LOOK_WORDS, FILM_PROMPT_MAX, unquote, words, tidyDirection, CAPTION_LABEL, SPOKEN_LABEL, SHOW_LABEL, oneSpaced, newBeat, PRODUCT_WORDS_RE, looksLikeProductBeat, firstBeat, CAPTION_ASK_RE, filmMinutes;
 var init_filmprompt = __esm({
   "../shared/src/filmprompt.ts"() {
     "use strict";
     init_linear();
     BLANKS = " 	";
-    STAMP_RE = /^\[(\d+):(\d\d)[ \t]*[-–][ \t]*\d+:\d\d\](.*)$/;
+    STAMP_RE = /^\[(\d+):(\d\d)[ \t]*[-–][ \t]*(\d+):(\d\d)\](.*)$/;
     MAX_BEATS = 3;
     DIRECTION_WORDS = 14;
     SPOKEN_WORDS = 16;
@@ -413,9 +431,13 @@ var init_filmprompt = __esm({
     unquote = (s) => trimEndChars(trimStartChars(s.trim(), '"\u201C'), '"\u201D').trim();
     words = (s) => s.split(/\s+/).filter(Boolean);
     tidyDirection = (s) => trimEndChars(trimStartChars(s, ",;:\u2013-" + BLANKS).replace(/^(?:then )?(?:smash |jump )?cut (?:back )?to /i, ""), ",;:\u2013-" + BLANKS).trim();
-    CAPTION_LABEL = /^caption(?: on screen)? ?:/i;
+    CAPTION_LABEL = /^(?:caption(?: on screen)?|(?:on-screen |on screen )?title|text on screen|on-screen text) ?:/i;
     SPOKEN_LABEL = /^spoken ?:/i;
+    SHOW_LABEL = /^show ?:/i;
     oneSpaced = (s) => s.replace(/[ \t]+/g, " ").trim();
+    newBeat = (start, end) => ({ start, end, direction: "", spoken: "", caption: "", show: "" });
+    PRODUCT_WORDS_RE = /\b(app|screen|phone|product|interface|dashboard|recording|ui|home screen|the board|laptop screen)\b/i;
+    looksLikeProductBeat = (b2) => PRODUCT_WORDS_RE.test(b2.direction);
     firstBeat = (body) => scriptBeats(body)[0];
     CAPTION_ASK_RE = /\b(captions?|subtitles?|on-screen text|text overlays?|overlay text|text on screen|lettering|title cards?|lower thirds?|watermarks?|logos?|headlines?|burned[- ]in|the words)\b/i;
     filmMinutes = (seconds) => Math.max(2, Math.ceil(seconds / 4));
@@ -8653,6 +8675,7 @@ __export(src_exports, {
   liveConnectors: () => liveConnectors,
   liveKinOf: () => liveKinOf,
   lookFrom: () => lookFrom,
+  looksLikeProductBeat: () => looksLikeProductBeat,
   luminance: () => luminance,
   machineAvailableTo: () => machineAvailableTo,
   machineKindLabel: () => machineKindLabel,
@@ -8757,6 +8780,7 @@ __export(src_exports, {
   preview: () => preview,
   priceActiveSeconds: () => priceActiveSeconds,
   priceModelCall: () => priceModelCall,
+  productShots: () => productShots,
   productizeStoredEngineeringSession: () => productizeStoredEngineeringSession,
   projectDeveloperModel: () => projectDeveloperModel,
   providerForModel: () => providerForModel,
@@ -11337,9 +11361,13 @@ var MemoryStore = class {
     return { id: input.id };
   }
   async libraryImage(channelId, name) {
-    const a = [...this.artifacts].reverse().find((x) => x.channel === channelId && x.name.toLowerCase() === name.toLowerCase() && (x.content ?? "").startsWith("data:image/"));
+    const project = this.channels.find((c) => c.id === channelId)?.projectId;
+    const rooms = new Set(this.channels.filter((c) => c.projectId === project).map((c) => c.id));
+    const hits = [...this.artifacts].reverse().filter((x) => (x.channel === channelId || rooms.has(x.channel ?? "")) && x.name.toLowerCase() === name.toLowerCase() && (x.content ?? "").startsWith("data:image/"));
+    const a = hits.find((x) => x.channel === channelId) ?? hits[0];
     return a ? { name: a.name, mime: a.mime ?? null, content: a.content } : null;
   }
+  // the room's shelf first, then the project's (store/frames.ts)
   async promoteArtifact(artifactId, _promotedByAgent, makeEvent) {
     const art = this.artifacts.find((a) => a.id === artifactId);
     if (!art) throw new DomainError("NOT_FOUND", `artifact ${artifactId} not found`);
@@ -12524,7 +12552,7 @@ var MemoryStore = class {
   }
   async contentItemMedia(itemId) {
     const it = this.contentItems.find((x) => x.id === itemId);
-    return it ? { platform: it.platform, mediaUrl: it.mediaUrl ?? null, mediaId: it.mediaId ?? null, workspace: it.workspace, channel: it.channelId, frame: it.frame ?? null, seconds: it.seconds ?? null } : null;
+    return it ? { platform: it.platform, mediaUrl: it.mediaUrl ?? null, mediaId: it.mediaId ?? null, workspace: it.workspace, channel: it.channelId, frame: it.frame ?? null, seconds: it.seconds ?? null, script: it.script ?? null } : null;
   }
   async markContentPublished(itemId, _url, _publishedAtIso) {
     const it = this.contentItems.find((x) => x.id === itemId);
@@ -13956,9 +13984,10 @@ async function libraryImage(store2, channelId, name) {
   if (sql) {
     const [row] = await sql`
       select name, mime, inline_content from artifacts
-       where channel_id = ${channelId}::uuid and lower(name) = lower(${name})
-         and inline_content like 'data:image/%'
-       order by created_at desc limit 1`;
+       where lower(name) = lower(${name}) and inline_content like 'data:image/%'
+         and (channel_id = ${channelId}::uuid
+              or channel_id in (select id from channels where project_id = (select project_id from channels where id = ${channelId}::uuid)))
+       order by (channel_id = ${channelId}::uuid) desc, created_at desc limit 1`;
     return row ? frameOf(row.name, row.mime, row.inline_content) : null;
   }
   const mem = store2;
@@ -13968,6 +13997,10 @@ async function libraryImage(store2, channelId, name) {
 var frameOf = (name, mime, dataUrl) => ({ name, mime: mime ?? (/^data:(image\/[a-z0-9.+-]+)/i.exec(dataUrl)?.[1] ?? "image/png"), dataUrl });
 
 // src/handler/content.ts
+init_src();
+async function shotsOnShelf(store2, channelId, script) {
+  for (const shot of script ? productShots(script) : []) await frameName(store2, channelId, shot.show);
+}
 async function frameName(store2, channelId, frame) {
   if (frame === void 0) return void 0;
   if (frame === null || frame === "") return null;
@@ -13984,6 +14017,7 @@ async function contentCommands(store2, actor, cmd) {
   if (cmd.type === "content.create") {
     const styled = await styledBy(store2, actor, () => store2.channelWorkspace(cmd.channel).then((c) => c.workspace));
     const frame = await frameName(store2, cmd.channel, cmd.frame);
+    await shotsOnShelf(store2, cmd.channel, cmd.script);
     const { id } = await store2.createContentItem(
       { channelId: cmd.channel, frame, seconds: cmd.seconds ?? null, taskId: cmd.task ?? null, threadId: cmd.thread ?? null, platform: cmd.platform, body: styled(cmd.body), scheduleId: cmd.schedule ?? null, slotAt: cmd.slotAt ?? null, mediaUrl: cmd.mediaUrl ?? null, imageBrief: cmd.imageBrief == null ? null : styled(cmd.imageBrief), script: cmd.script == null ? null : styled(cmd.script), thumb: cmd.thumb ?? null, imageError: cmd.imageError ?? null, createdByKind: actor.kind, createdBy: actor.id },
       (ws) => createEvent({
@@ -14016,6 +14050,7 @@ async function contentCommands(store2, actor, cmd) {
     const media = await store2.contentItemMedia(cmd.item);
     const styled = await styledBy(store2, actor, async () => media?.workspace);
     const frame = await frameName(store2, media?.channel, cmd.frame);
+    await shotsOnShelf(store2, media?.channel, cmd.script);
     const { id } = await store2.reviseDraft(cmd.item, { frame, seconds: cmd.seconds, body: cmd.body ? styled(cmd.body) : null, imageBrief: cmd.imageBrief ? styled(cmd.imageBrief) : cmd.imageBrief ?? null, script: cmd.script ? styled(cmd.script) : null, thumb: cmd.thumb ?? null, videoError: cmd.videoError, videoErrorCode: cmd.videoErrorCode, videoMeta: cmd.videoMeta, imageError: cmd.imageError === void 0 ? void 0 : cmd.imageError || null }, (ws) => createEvent({
       type: "content.updated",
       source: actorAddress(actor),
@@ -19071,6 +19106,126 @@ async function falResult(key2, endpoint, requestId, fetchFn = fetch) {
   if (!body?.video?.url) return { error: "the film came back without a video" };
   return { url: body.video.url, contentType: body.video.content_type };
 }
+async function falUpload(key2, bytes, contentType, fileName, fetchFn = fetch) {
+  const init = await fetchFn("https://rest.alpha.fal.ai/storage/upload/initiate?storage_type=fal-cdn-v3", { method: "POST", headers: headers(key2), body: JSON.stringify({ content_type: contentType, file_name: fileName }) }).catch((e) => new Response(JSON.stringify({ detail: String(e) }), { status: 599 }));
+  const body = await init.json().catch(() => null);
+  if (!init.ok || !body?.upload_url || !body.file_url) return { error: typeof body?.detail === "string" ? body.detail : `fal upload ${init.status}` };
+  const put = await fetchFn(body.upload_url, { method: "PUT", headers: { "content-type": contentType }, body: bytes }).catch(() => null);
+  if (!put?.ok) return { error: `fal upload put ${put?.status ?? "no answer"}` };
+  return { url: body.file_url };
+}
+async function falRun(key2, endpoint, input, fetchFn = fetch, timeoutMs = 9e4) {
+  const res = await fetchFn(`https://fal.run/${endpoint}`, { method: "POST", headers: headers(key2), body: JSON.stringify(input), signal: AbortSignal.timeout(timeoutMs) }).catch((e) => new Response(JSON.stringify({ detail: e instanceof Error && e.name === "TimeoutError" ? "timed out" : String(e) }), { status: 599 }));
+  const body = await res.json().catch(() => null);
+  if (!res.ok || !body) return { error: typeof body?.detail === "string" ? body.detail : `fal ${endpoint} ${res.status}` };
+  return { result: body };
+}
+
+// src/film-compose.ts
+var FRAME_W = 720;
+var FRAME_H = 1280;
+var FPS = 24;
+var MIN_PIECE = 0.25;
+var GROUND = "#141414";
+function imageSize(dataUrl) {
+  const m = /^data:image\/([a-z0-9.+-]+);base64,/i.exec(dataUrl);
+  if (!m) return null;
+  const b2 = Buffer.from(dataUrl.slice(m[0].length, m[0].length + 2e5), "base64");
+  if (b2.length > 24 && b2[0] === 137 && b2[1] === 80) return { w: b2.readUInt32BE(16), h: b2.readUInt32BE(20) };
+  if (b2.length > 4 && b2[0] === 255 && b2[1] === 216) {
+    for (let at = 2; at + 9 < b2.length; ) {
+      if (b2[at] !== 255) {
+        at += 1;
+        continue;
+      }
+      const marker = b2[at + 1];
+      if (marker === 216 || marker >= 208 && marker <= 215 || marker === 1) {
+        at += 2;
+        continue;
+      }
+      const len = b2.readUInt16BE(at + 2);
+      if (marker >= 192 && marker <= 207 && marker !== 196 && marker !== 200 && marker !== 204) return { h: b2.readUInt16BE(at + 5), w: b2.readUInt16BE(at + 7) };
+      at += 2 + len;
+    }
+  }
+  return null;
+}
+function productFrameSvg(dataUrl, w = FRAME_W, h = FRAME_H) {
+  const pad = Math.round(w * 0.04);
+  const iw = w - pad * 2;
+  const size = imageSize(dataUrl);
+  const wide = !!size && size.w / size.h > 1.25;
+  const ih = wide ? Math.round(iw * 1.25) : h - pad * 2;
+  const y = wide ? Math.round((h - ih) / 2) : pad;
+  const r = Math.round(w * 0.03);
+  return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><defs><clipPath id="c"><rect x="${pad}" y="${y}" width="${iw}" height="${ih}" rx="${r}" ry="${r}"/></clipPath></defs><rect width="${w}" height="${h}" fill="${GROUND}"/><image x="${pad}" y="${y}" width="${iw}" height="${ih}" preserveAspectRatio="xMidYMid ${wide ? "slice" : "meet"}" clip-path="url(#c)" xlink:href="${dataUrl}" href="${dataUrl}"/></svg>`;
+}
+async function renderProductFrame(dataUrl, opts = {}) {
+  const { Resvg } = await resvgModule(opts.initWasm !== false);
+  const r = new Resvg(productFrameSvg(dataUrl), { fitTo: { mode: "original" } });
+  try {
+    const img = r.render();
+    try {
+      return img.asPng();
+    } finally {
+      img.free();
+    }
+  } finally {
+    r.free();
+  }
+}
+function timeline(seconds, shots) {
+  const out = [];
+  let at = 0;
+  for (const shot of [...shots].sort((a, b2) => a.start - b2.start)) {
+    const start = Math.max(at, Math.min(shot.start, seconds));
+    const end = Math.min(shot.end, seconds);
+    if (end - start < MIN_PIECE) continue;
+    if (start - at >= MIN_PIECE) out.push({ kind: "film", start: at, end: start });
+    out.push({ kind: "shot", start, end, shot });
+    at = end;
+  }
+  if (seconds - at >= MIN_PIECE) out.push({ kind: "film", start: at, end: seconds });
+  return out;
+}
+async function composeShots(key2, clipUrl, seconds, shots, opts = {}) {
+  const fetchFn = opts.fetchFn ?? fetch;
+  const pieces = timeline(seconds, shots);
+  const wanted = pieces.filter((p2) => p2.kind === "shot").length;
+  if (!wanted) return { applied: 0, why: "no product beat fell inside the film" };
+  const frames = /* @__PURE__ */ new Map();
+  for (const p2 of pieces) {
+    if (p2.kind !== "shot" || frames.has(p2.shot.show)) continue;
+    let png;
+    try {
+      png = await renderProductFrame(p2.shot.dataUrl, { initWasm: opts.initWasm });
+    } catch (e) {
+      return { applied: 0, why: `the product frame for ${p2.shot.show} did not render (${e instanceof Error ? e.message : String(e)})` };
+    }
+    const up = await falUpload(key2, png, "image/png", `${p2.shot.show.replace(/[^\w.-]+/g, "-")}.png`, fetchFn);
+    if (!up.url) return { applied: 0, why: `the product frame did not upload (${up.error ?? "no answer"})` };
+    frames.set(p2.shot.show, up.url);
+  }
+  const urls = [];
+  for (const p2 of pieces) {
+    if (p2.kind === "film") {
+      const r = await falRun(key2, "fal-ai/workflow-utilities/trim-video", { video_url: clipUrl, start_time: p2.start, end_time: p2.end }, fetchFn);
+      if (!r.result?.video?.url) return { applied: 0, why: `the film did not trim at ${p2.start}-${p2.end} s (${r.error ?? "no video"})` };
+      urls.push(r.result.video.url);
+    } else {
+      const r = await falRun(key2, "fal-ai/ffmpeg-api/images-to-video", { fps: FPS, images: [{ url: frames.get(p2.shot.show), frames: Math.max(1, Math.round((p2.end - p2.start) * FPS)) }] }, fetchFn);
+      if (!r.result?.video?.url) return { applied: 0, why: `the product shot ${p2.shot.show} did not render as a clip (${r.error ?? "no video"})` };
+      urls.push(r.result.video.url);
+    }
+  }
+  const tracks = [
+    { id: "video", type: "video", keyframes: pieces.map((p2, i) => ({ timestamp: Math.round(p2.start * 1e3), url: urls[i], duration: Math.round((p2.end - p2.start) * 1e3) })) },
+    { id: "audio", type: "audio", keyframes: [{ timestamp: 0, url: clipUrl, duration: Math.round(seconds * 1e3) }] }
+  ];
+  const c = await falRun(key2, "fal-ai/ffmpeg-api/compose", { tracks }, fetchFn, 12e4);
+  if (!c.result?.video_url) return { applied: 0, why: `the pieces did not compose (${c.error ?? "no video"})` };
+  return { url: c.result.video_url, applied: wanted };
+}
 
 // src/starter-video.ts
 var FILM_MAX_BYTES = 4e7;
@@ -19175,7 +19330,15 @@ async function filmsDue(store2, opts = {}) {
       await fail(res.error ?? "the film came back empty");
       continue;
     }
-    const dl = await fetchFn(res.url, { redirect: "follow" }).catch(() => null);
+    const shots = await shotsFor(store2, row.itemId);
+    let clipUrl = res.url;
+    let shotsMeta;
+    if (shots.asked) {
+      const c = shots.list.length ? await composeShots(key2, res.url, row.seconds, shots.list, { fetchFn, initWasm: opts.initWasm }) : { applied: 0, why: shots.why };
+      if (c.url) clipUrl = c.url;
+      shotsMeta = { asked: shots.asked, applied: c.applied, ...c.why ? { why: c.why } : {} };
+    }
+    const dl = await fetchFn(clipUrl, { redirect: "follow" }).catch(() => null);
     if (!dl?.ok) {
       await fail(`the film could not be downloaded (${dl?.status ?? "no answer"})`);
       continue;
@@ -19197,11 +19360,24 @@ async function filmsDue(store2, opts = {}) {
       continue;
     }
     const at = new Date(now()).toISOString();
-    await patchDraft(store2, row, { videoPending: false, videoError: "", videoMeta: { tier: row.tier, model: VIDEO_MODELS[row.model]?.label ?? row.model, seconds: row.seconds, credits: Math.ceil(row.micros / CREDIT_MICROS), at, frame: row.frame, frameUsed: row.frameUsed } });
+    await patchDraft(store2, row, { videoPending: false, videoError: "", videoMeta: { tier: row.tier, model: VIDEO_MODELS[row.model]?.label ?? row.model, seconds: row.seconds, credits: Math.ceil(row.micros / CREDIT_MICROS), at, frame: row.frame, frameUsed: row.frameUsed, ...shotsMeta ? { shots: shotsMeta } : {} } });
     await store2.films.update(row.id, { status: "done", finishedAt: at });
     out.push({ id: row.id, outcome: "done" });
   }
   return out;
+}
+async function shotsFor(store2, itemId) {
+  const media = await store2.contentItemMedia(itemId).catch(() => null);
+  const wants = media?.script ? productShots(media.script) : [];
+  if (!wants.length) return { asked: 0, list: [] };
+  const list = [];
+  const missing = [];
+  for (const w of wants) {
+    const img = media?.channel ? await libraryImage(store2, media.channel, w.show).catch(() => null) : null;
+    if (img) list.push({ ...w, dataUrl: img.dataUrl });
+    else missing.push(w.show);
+  }
+  return { asked: wants.length, list, ...missing.length ? { why: `not on the shelf: ${missing.join(", ")}` } : {} };
 }
 async function patchDraft(store2, row, patch) {
   await store2.reviseDraft(row.itemId, { body: null, imageBrief: null, thumb: null, ...patch }, (ws) => createEvent({ type: "content.updated", source: formatAddress(SYSTEM), target: formatAddress({ kind: "resource", type: "content", id: row.itemId }), workspace: ws, payload: { item: row.itemId, film: row.id } })).catch(() => {
@@ -21132,7 +21308,7 @@ var MARKETING_OS_SKILL_SEED = [
       {
         "name": "ugc-strategy",
         "description": "UGC \u2014 creator-style scripts and briefs, rights, disclosure; campaigns and curation",
-        "body": '## In NeuraMesh (read first \u2014 it overrides the module\'s delivery notes)\n\n- **Two turns, in this order.** (1) RESEARCH: read the room\'s brand docs (`read_library_doc`\n  scope room, `business-profile.md` first) plus the [MARKETING CONTEXT] note in your prompt; in a\n  release session the digest and the release brief in the thread are the facts. (2) THE ANGLE\n  CARD: call `propose_angles` with the product\'s name and two to five angles, each resting on a\n  fact you just read (a first-person walkthrough, a before-and-after, a "three things I did not\n  expect", a reply to a real objection, a duet-style react), then STOP with one line: the human\n  picks an angle, the platforms and the film\'s length on the card, or types their own angle. (3)\n  THE DRAFTS, on the human\'s pick (their reply wakes you): `draft_posts` with one VIDEO post per\n  picked platform, all in the chosen angle. A script drafted before the pick is refused, so never\n  skip the card.\n- **What each draft is.** Each card has three parts:\n  `body` is the CAPTION that posts with the video (one or two lines, the hashtags the network\n  uses, within its limit); `script` is what the creator reads and films (9:16, the hook in the\n  first three seconds as `[0:00-0:03]`, then timestamped beats, the product on screen, one call\n  to action at the end), written to the LENGTH the human picked (`\u2026 \xB7 length: 15 s` in their\n  reply, eight seconds when they picked none): the beats end at that second, the spoken lines are\n  short, and no beat asks for on-screen text, captions or subtitles beyond one title of three\n  words at most (a video model cannot spell more; the caption that posts is the body). The film\n  shows the script\'s first seconds; `imageBrief` is the shot direction the film follows;\n  `frame` is the name of a screenshot on this room\'s shelf (the [MARKETING CONTEXT] note lists\n  them), so the film shows the real product, never an invented interface. With no screenshot on\n  the shelf, draft without one and ask the human for a screenshot. Never put the script in the\n  body: the body publishes.\n- **The platform.** The ones the human picked on the angle card (`\u2026 \xB7 platforms: x, linkedin` in\n  their reply). A pick of none means the ask\'s platform, else the connected accounts. One card per\n  picked platform, a video post reads the same on X and LinkedIn as on TikTok.\n- **A change to a draft.** "\u21A9 Re draft b: \u2026" is the human asking for a change on card b: call\n  `read_drafts`, then `revise_posts` with the script or caption changed from what the card\n  holds, in full. Never redraft from memory, never add a second card.\n- **The creator brief.** Fill the module\'s "Creator Briefs for UGC Ads" template for this\n  campaign and shelve it through `propose_library_doc` as `ugc-brief-YYYY-MM-DD.md`, with the\n  rights line and the disclosure line ("#ad", "gifted") the module prescribes.\n- **Honesty.** No invented customers, quotes, numbers or testimonials: a script speaks as "I",\n  a creator, about what the release does, and cites nothing it cannot cite. Say `[NEED: x]`\n  for a claim the human must confirm. Run the `slop-patterns` checks before hand-over.\n- **Custody.** You draft. Approving, scheduling, publishing and paying creators stay human.\n\n---\n\n# UGC Strategy\n\n## When to Activate\n\n- Building social proof for a new or growing brand\n- Ad creative costs are high and performance is declining (UGC ads often outperform polished creative)\n- Customer reviews and testimonials are sparse or unstructured\n- Launching a UGC campaign or contest\n- Scaling content production without proportionally scaling the content team\n- Community building is a strategic priority\n- Exploring influencer or creator partnerships that include UGC components\n\n## First Questions\n\n1. What type of UGC is most valuable for your business? (Reviews, photos, videos, testimonials, social posts?)\n2. Where do customers already talk about you organically? (Social, forums, review sites?)\n3. What incentive (if any) will motivate customers to create content?\n4. Do you have a process for obtaining content rights and permissions?\n5. Where will UGC be used? (Social, website, ads, email, packaging?)\n6. What is the quality bar? (Authentic and raw vs semi-polished?)\n7. What is the legal landscape? (FTC guidelines, platform terms, privacy requirements?)\n\n## UGC Types\n\n### Reviews and Ratings\n- Product reviews on your site, Amazon, G2, Capterra, Yelp\n- Star ratings and aggregate scores\n- Review response strategy (responding to both positive and negative reviews)\n- Review solicitation campaigns (post-purchase email sequences)\n\n### Testimonials\n- Written quotes from happy customers\n- Video testimonials (short-form, interview-style, or self-recorded)\n- Case study quotes\n- Social proof snippets for landing pages and ads\n\n### Social Media Posts\n- Photos of customers using the product\n- Unboxing and first-impression content\n- Stories, Reels, and TikToks featuring the product\n- Brand mentions and tags\n- Hashtag campaign contributions\n\n### Video Content\n- Unboxing videos\n- Product reviews and tutorials\n- Before/after transformations\n- "Day in the life" featuring the product\n- Reaction and first-impression videos\n- How-to content created by users\n\n### Community Content\n- Forum posts and discussions\n- Community Q&A contributions\n- User-created templates, workflows, or resources\n- Fan art and creative interpretations\n- User-submitted tips and hacks\n\n## UGC Campaign Design\n\n### Campaign Structure\n\n```\n1. GOAL\n   What business objective does this campaign serve?\n   (Social proof, content volume, community engagement, product launch buzz)\n\n2. AUDIENCE\n   Who are you asking to create content?\n   (Existing customers, new buyers, fans, creators, employees)\n\n3. PROMPT\n   What specific content are you asking for?\n   (Be specific \u2014 "Share a video of..." not "Post something about us")\n\n4. MECHANIC\n   How do people participate?\n   (Hashtag, form submission, direct upload, email, contest entry)\n\n5. INCENTIVE\n   What do participants get?\n   (Recognition, prizes, features, discounts, early access, nothing but community)\n\n6. CURATION\n   How will you select and surface the best content?\n   (Manual review, community voting, algorithm, editorial selection)\n\n7. AMPLIFICATION\n   Where will the best UGC be shared?\n   (Brand social, website, ads, email, retail displays)\n\n8. TIMELINE\n   When does the campaign run?\n   (Always-on vs time-bound, launch windows, seasonal alignment)\n```\n\n### Campaign Examples\n\n**Product launch buzz:**\n"Show us your first five minutes with [Product]. Tag #FirstFiveMinutes for a chance to be featured on our page and win a year free."\n\n**Community building:**\n"What\'s the most creative way you use [Product]? Share your setup with #My[Product]Setup. We\'ll feature the best ones every Friday."\n\n**Social proof at scale:**\n"Love [Product]? Leave a 30-second video review and get 20% off your next order. Honest reviews only \u2014 we want the real story."\n\n**Seasonal:**\n"Show us how [Product] fits into your holiday routine. Best entries get featured in our holiday campaign and receive a gift box."\n\n## Incentive Structures\n\n| Incentive Type | Effectiveness | Cost | Best For |\n|---|---|---|---|\n| **Featured/recognition** | High for engaged communities | Free | Brand advocates, creators who want exposure |\n| **Discounts/credits** | Medium-high, reliable | Low-medium | Review solicitation, repeat customers |\n| **Contest/sweepstakes** | High for volume, lower quality | Medium | Large-scale campaigns, viral moments |\n| **Free product** | High for detailed content | Medium | Unboxing, review, tutorial content |\n| **Cash/payment** | Highest for quality | High | Creator partnerships, produced content |\n| **Early access** | High for power users | Free | Product launches, beta features |\n| **No incentive** | Works for strong brands with loyal communities | Free | Organic advocacy, authentic social proof |\n\n### Incentive Rules\n\n- Match the incentive to the effort required. A 10% discount is not enough for a 5-minute video review.\n- Overly generous incentives can attract low-quality submissions motivated only by the reward.\n- Non-monetary incentives (recognition, featuring, access) often produce more authentic content.\n- Always disclose when content was incentivized (FTC requirement in the US).\n\n## Rights Management and Permissions\n\n### Getting Content Rights\n\nYou MUST have explicit permission to use customer content in your marketing. Approaches:\n\n**1. Terms of participation.** Campaign terms and conditions state that submissions grant the brand a license to use the content. Common for hashtag campaigns and contests.\n\n**2. Direct permission request.** DM or email the creator asking for permission to use their content. Document the approval.\n\n**3. Creator agreements.** For paid or partnership UGC, use a content license agreement specifying:\n- Usage rights (which channels, which formats)\n- Duration (perpetual, 12 months, campaign-only)\n- Exclusivity (can the creator post the same content for competitors?)\n- Modification rights (can you edit, crop, add text?)\n- Attribution requirements (must you credit the creator?)\n\n### Rights Management Template\n\n```\nCreator: [Name / Handle]\nContent: [Description / Link]\nDate obtained: [Date]\nPermission method: [ToS / DM approval / Agreement]\nUsage rights: [Social, web, ads, email, print \u2014 specify]\nDuration: [Perpetual / Time-bound]\nAttribution required: [Yes \u2014 format / No]\nIncentive provided: [None / Discount / Payment / Product]\nDisclosure required: [Yes \u2014 #ad, #sponsored, #gifted / No]\nNotes: [Any restrictions or special terms]\n```\n\n## Content Curation Workflow\n\n### Monitoring\n\n- Set up social listening for brand mentions, product hashtags, and relevant keywords\n- Monitor review platforms on a set cadence (daily for high-volume, weekly for low-volume)\n- Tools: Sprout Social, Brandwatch, Mention, Google Alerts, native platform search\n\n### Selection Criteria\n\nRate incoming UGC on:\n\n| Criterion | Weight | Notes |\n|---|---|---|\n| Quality (visual/audio clarity) | High | Must meet minimum quality for intended use |\n| Authenticity | High | Feels real, not staged or scripted |\n| Brand alignment | High | Matches brand values and visual standards |\n| Diversity | Medium | Represents diverse users and use cases |\n| Message clarity | Medium | The value proposition or experience is clear |\n| Engagement potential | Medium | Will this resonate when amplified? |\n| Legal safety | Must pass | No IP issues, no minors without consent, no misleading claims |\n\n### Curation Process\n\n```\n1. COLLECT \u2014 Aggregate UGC from all sources into a central library\n2. SCREEN \u2014 Filter for quality, brand safety, and legal compliance\n3. OBTAIN RIGHTS \u2014 Secure usage permissions (do not skip this step)\n4. CATEGORIZE \u2014 Tag by theme, product, format, platform, and use case\n5. STORE \u2014 Archive with metadata in a searchable asset library\n6. DEPLOY \u2014 Match curated UGC to marketing needs (ads, social, web, email)\n7. TRACK \u2014 Monitor performance of deployed UGC\n```\n\n## UGC in Ads\n\nUGC ads frequently outperform brand-produced creative, especially on social platforms.\n\n### UGC Ad Formats\n\n**Whitelisting / Spark Ads:** Run ads from the creator\'s account (not your brand account). Appears native in the feed. Available on TikTok (Spark Ads) and Meta (partnership ads).\n\n**Brand account with UGC creative:** Use UGC footage/images in ads run from your brand account. Feels more authentic than polished brand creative.\n\n**Testimonial ads:** Customer quotes or video testimonials formatted as ad creative.\n\n**Mashup ads:** Combine multiple UGC clips into a single compilation ad.\n\n### UGC Ad Best Practices\n\n- **Keep it raw.** Over-editing UGC removes its authenticity advantage. Light editing only.\n- **First 3 seconds.** The hook must grab attention immediately. Lead with the most compelling moment.\n- **Include the product.** UGC ads still need to clearly show or mention the product.\n- **Add captions.** Most social video is watched without sound. Caption all spoken content.\n- **Test at scale.** UGC ads thrive on volume and variation. Test multiple creators and angles.\n- **Disclose properly.** If the creator was paid or gifted, the ad must disclose the relationship.\n\n### Creator Briefs for UGC Ads\n\nWhen commissioning UGC from creators, provide:\n\n```\nProduct: [What they\'re reviewing/showing]\nKey message: [The one thing viewers should take away]\nFormat: [Video length, orientation (9:16 vertical), platform]\nMust include: [Product visible, specific feature mention, CTA]\nMust avoid: [Competitor mentions, specific claims, inappropriate content]\nTone: [Authentic, excited, educational, casual]\nDeadline: [When raw footage is due]\nDelivery: [How and where to submit files]\nCompensation: [Payment, product, or other incentive]\nUsage rights: [How the content will be used and for how long]\n```\n\n## Quality Control\n\n### Content Moderation\n\n- Review all UGC before amplifying \u2014 never auto-publish without review\n- Check for brand safety issues (offensive content, competitor products in frame, inappropriate language)\n- Verify factual claims in reviews and testimonials (do not amplify false claims about your product)\n- Ensure diversity in featured UGC \u2014 do not inadvertently represent only one demographic\n\n### Maintaining Authenticity\n\n- Do not over-edit UGC \u2014 imperfections are part of its value\n- Do not script UGC so heavily that it sounds like a commercial\n- Do not fake UGC \u2014 fabricated "customer" content is a legal and reputational risk\n- Do not cherry-pick only positive content \u2014 balanced representation builds more trust\n\n## Legal Considerations\n\n### FTC Disclosure Requirements (US)\n\n- **Material connection = disclosure required.** If the creator received anything of value (payment, free product, discount, early access), the relationship must be disclosed.\n- **Disclosure must be clear and conspicuous.** "#ad" or "#sponsored" at the beginning of the post, not buried in 30 hashtags.\n- **Platform tools preferred.** Use built-in partnership/sponsored content labels where available.\n- **Applies to all formats.** Written, photo, video, audio, Stories, Reels, TikToks \u2014 all require disclosure.\n\n### Other Legal Considerations\n\n- **Privacy.** Do not use content featuring identifiable individuals (especially minors) without explicit consent.\n- **Copyright.** The creator owns their content. Reposting without permission is copyright infringement.\n- **Trademark.** Ensure UGC does not misuse third-party trademarks.\n- **Claims.** If UGC makes product efficacy claims (especially in health, finance, education), verify compliance with advertising regulations.\n- **International.** Privacy and disclosure laws vary by country. GDPR in EU, PIPEDA in Canada, etc.\n\n**Disclaimer:** This is general guidance, not legal advice. Consult with a lawyer for your specific situation and jurisdictions.\n\n## Common Pitfalls\n\n1. **No rights management.** Using customer content without permission exposes you to legal risk and damages creator relationships.\n2. **Over-controlling the content.** If you script and direct every detail, it is not UGC \u2014 it is a commercial with an amateur actor.\n3. **Ignoring negative UGC.** Negative reviews and critical posts are feedback. Respond professionally, do not hide from them.\n4. **One-and-done campaigns.** UGC should be an ongoing program, not a single campaign. Build systems, not events.\n5. **No curation process.** Without a system for collecting, screening, and deploying UGC, valuable content gets lost.\n6. **Mismatched incentives.** Asking for a 5-minute video review in exchange for a 10% discount is a bad deal for the creator.\n\n## Quality Gate\n\nBefore launching a UGC program or campaign:\n\n- [ ] UGC types and formats are defined with clear examples\n- [ ] Campaign mechanic is simple and specific (participants know exactly what to create)\n- [ ] Incentive structure matches the effort required from participants\n- [ ] Rights management process is established with templates for permission requests\n- [ ] Content moderation and curation workflow is defined\n- [ ] Legal requirements are understood (FTC disclosure, privacy, copyright)\n- [ ] Deployment plan specifies where UGC will be used (social, ads, web, email)\n- [ ] Creator briefs are ready (for paid/commissioned UGC)\n- [ ] Success metrics are defined (submission volume, engagement, ad performance, conversion lift)\n- [ ] Escalation plan exists for negative or brand-unsafe submissions'
+        "body": '## In NeuraMesh (read first \u2014 it overrides the module\'s delivery notes)\n\n- **Two turns, in this order.** (1) RESEARCH: read the room\'s brand docs (`read_library_doc`\n  scope room, `business-profile.md` first) plus the [MARKETING CONTEXT] note in your prompt; in a\n  release session the digest and the release brief in the thread are the facts. (2) THE ANGLE\n  CARD: call `propose_angles` with the product\'s name and two to five angles, each resting on a\n  fact you just read (a first-person walkthrough, a before-and-after, a "three things I did not\n  expect", a reply to a real objection, a duet-style react), then STOP with one line: the human\n  picks an angle, the platforms and the film\'s length on the card, or types their own angle. (3)\n  THE DRAFTS, on the human\'s pick (their reply wakes you): `draft_posts` with one VIDEO post per\n  picked platform, all in the chosen angle. A script drafted before the pick is refused, so never\n  skip the card.\n- **What each draft is.** Each card has three parts:\n  `body` is the CAPTION that posts with the video (one or two lines, the hashtags the network\n  uses, within its limit); `script` is what the creator reads and films (9:16, the hook in the\n  first three seconds as `[0:00-0:03]`, then timestamped beats, the product on screen, one call\n  to action at the end), written to the LENGTH the human picked (`\u2026 \xB7 length: 15 s` in their\n  reply, eight seconds when they picked none): the beats end at that second, the spoken lines are\n  short, and no beat asks for on-screen text, captions or subtitles beyond one title of three\n  words at most (a video model cannot spell more; the caption that posts is the body). The film\n  shows the script\'s first seconds; `imageBrief` is the shot direction the film follows;\n  `frame` is the name of a screenshot on this room\'s shelf (the [MARKETING CONTEXT] note lists\n  them), so the film\'s own picture of the product follows the real one. Never put the script in\n  the body: the body publishes.\n- **The product is real, never drawn.** A video model cannot copy a screen: every beat that shows\n  the product (the app, a screen, the phone, the product itself) carries `SHOW: <image name>`,\n  an image on the shelf, and the film CUTS TO that image for the beat once it lands. Find the\n  image first: `list_library` with scope project lists every room\'s images. None fits: for an\n  app, ask the human for a screenshot; for a product you can picture, `make_product_image`\n  makes one and shelves it under the name you then use. A product beat without a SHOW line is\n  refused.\n- **The platform.** The ones the human picked on the angle card (`\u2026 \xB7 platforms: x, linkedin` in\n  their reply). A pick of none means the ask\'s platform, else the connected accounts. One card per\n  picked platform, a video post reads the same on X and LinkedIn as on TikTok.\n- **A change to a draft.** "\u21A9 Re draft b: \u2026" is the human asking for a change on card b: call\n  `read_drafts`, then `revise_posts` with the script or caption changed from what the card\n  holds, in full. Never redraft from memory, never add a second card.\n- **The creator brief.** Fill the module\'s "Creator Briefs for UGC Ads" template for this\n  campaign and shelve it through `propose_library_doc` as `ugc-brief-YYYY-MM-DD.md`, with the\n  rights line and the disclosure line ("#ad", "gifted") the module prescribes.\n- **Honesty.** No invented customers, quotes, numbers or testimonials: a script speaks as "I",\n  a creator, about what the release does, and cites nothing it cannot cite. Say `[NEED: x]`\n  for a claim the human must confirm. Run the `slop-patterns` checks before hand-over.\n- **Custody.** You draft. Approving, scheduling, publishing and paying creators stay human.\n\n---\n\n# UGC Strategy\n\n## When to Activate\n\n- Building social proof for a new or growing brand\n- Ad creative costs are high and performance is declining (UGC ads often outperform polished creative)\n- Customer reviews and testimonials are sparse or unstructured\n- Launching a UGC campaign or contest\n- Scaling content production without proportionally scaling the content team\n- Community building is a strategic priority\n- Exploring influencer or creator partnerships that include UGC components\n\n## First Questions\n\n1. What type of UGC is most valuable for your business? (Reviews, photos, videos, testimonials, social posts?)\n2. Where do customers already talk about you organically? (Social, forums, review sites?)\n3. What incentive (if any) will motivate customers to create content?\n4. Do you have a process for obtaining content rights and permissions?\n5. Where will UGC be used? (Social, website, ads, email, packaging?)\n6. What is the quality bar? (Authentic and raw vs semi-polished?)\n7. What is the legal landscape? (FTC guidelines, platform terms, privacy requirements?)\n\n## UGC Types\n\n### Reviews and Ratings\n- Product reviews on your site, Amazon, G2, Capterra, Yelp\n- Star ratings and aggregate scores\n- Review response strategy (responding to both positive and negative reviews)\n- Review solicitation campaigns (post-purchase email sequences)\n\n### Testimonials\n- Written quotes from happy customers\n- Video testimonials (short-form, interview-style, or self-recorded)\n- Case study quotes\n- Social proof snippets for landing pages and ads\n\n### Social Media Posts\n- Photos of customers using the product\n- Unboxing and first-impression content\n- Stories, Reels, and TikToks featuring the product\n- Brand mentions and tags\n- Hashtag campaign contributions\n\n### Video Content\n- Unboxing videos\n- Product reviews and tutorials\n- Before/after transformations\n- "Day in the life" featuring the product\n- Reaction and first-impression videos\n- How-to content created by users\n\n### Community Content\n- Forum posts and discussions\n- Community Q&A contributions\n- User-created templates, workflows, or resources\n- Fan art and creative interpretations\n- User-submitted tips and hacks\n\n## UGC Campaign Design\n\n### Campaign Structure\n\n```\n1. GOAL\n   What business objective does this campaign serve?\n   (Social proof, content volume, community engagement, product launch buzz)\n\n2. AUDIENCE\n   Who are you asking to create content?\n   (Existing customers, new buyers, fans, creators, employees)\n\n3. PROMPT\n   What specific content are you asking for?\n   (Be specific \u2014 "Share a video of..." not "Post something about us")\n\n4. MECHANIC\n   How do people participate?\n   (Hashtag, form submission, direct upload, email, contest entry)\n\n5. INCENTIVE\n   What do participants get?\n   (Recognition, prizes, features, discounts, early access, nothing but community)\n\n6. CURATION\n   How will you select and surface the best content?\n   (Manual review, community voting, algorithm, editorial selection)\n\n7. AMPLIFICATION\n   Where will the best UGC be shared?\n   (Brand social, website, ads, email, retail displays)\n\n8. TIMELINE\n   When does the campaign run?\n   (Always-on vs time-bound, launch windows, seasonal alignment)\n```\n\n### Campaign Examples\n\n**Product launch buzz:**\n"Show us your first five minutes with [Product]. Tag #FirstFiveMinutes for a chance to be featured on our page and win a year free."\n\n**Community building:**\n"What\'s the most creative way you use [Product]? Share your setup with #My[Product]Setup. We\'ll feature the best ones every Friday."\n\n**Social proof at scale:**\n"Love [Product]? Leave a 30-second video review and get 20% off your next order. Honest reviews only \u2014 we want the real story."\n\n**Seasonal:**\n"Show us how [Product] fits into your holiday routine. Best entries get featured in our holiday campaign and receive a gift box."\n\n## Incentive Structures\n\n| Incentive Type | Effectiveness | Cost | Best For |\n|---|---|---|---|\n| **Featured/recognition** | High for engaged communities | Free | Brand advocates, creators who want exposure |\n| **Discounts/credits** | Medium-high, reliable | Low-medium | Review solicitation, repeat customers |\n| **Contest/sweepstakes** | High for volume, lower quality | Medium | Large-scale campaigns, viral moments |\n| **Free product** | High for detailed content | Medium | Unboxing, review, tutorial content |\n| **Cash/payment** | Highest for quality | High | Creator partnerships, produced content |\n| **Early access** | High for power users | Free | Product launches, beta features |\n| **No incentive** | Works for strong brands with loyal communities | Free | Organic advocacy, authentic social proof |\n\n### Incentive Rules\n\n- Match the incentive to the effort required. A 10% discount is not enough for a 5-minute video review.\n- Overly generous incentives can attract low-quality submissions motivated only by the reward.\n- Non-monetary incentives (recognition, featuring, access) often produce more authentic content.\n- Always disclose when content was incentivized (FTC requirement in the US).\n\n## Rights Management and Permissions\n\n### Getting Content Rights\n\nYou MUST have explicit permission to use customer content in your marketing. Approaches:\n\n**1. Terms of participation.** Campaign terms and conditions state that submissions grant the brand a license to use the content. Common for hashtag campaigns and contests.\n\n**2. Direct permission request.** DM or email the creator asking for permission to use their content. Document the approval.\n\n**3. Creator agreements.** For paid or partnership UGC, use a content license agreement specifying:\n- Usage rights (which channels, which formats)\n- Duration (perpetual, 12 months, campaign-only)\n- Exclusivity (can the creator post the same content for competitors?)\n- Modification rights (can you edit, crop, add text?)\n- Attribution requirements (must you credit the creator?)\n\n### Rights Management Template\n\n```\nCreator: [Name / Handle]\nContent: [Description / Link]\nDate obtained: [Date]\nPermission method: [ToS / DM approval / Agreement]\nUsage rights: [Social, web, ads, email, print \u2014 specify]\nDuration: [Perpetual / Time-bound]\nAttribution required: [Yes \u2014 format / No]\nIncentive provided: [None / Discount / Payment / Product]\nDisclosure required: [Yes \u2014 #ad, #sponsored, #gifted / No]\nNotes: [Any restrictions or special terms]\n```\n\n## Content Curation Workflow\n\n### Monitoring\n\n- Set up social listening for brand mentions, product hashtags, and relevant keywords\n- Monitor review platforms on a set cadence (daily for high-volume, weekly for low-volume)\n- Tools: Sprout Social, Brandwatch, Mention, Google Alerts, native platform search\n\n### Selection Criteria\n\nRate incoming UGC on:\n\n| Criterion | Weight | Notes |\n|---|---|---|\n| Quality (visual/audio clarity) | High | Must meet minimum quality for intended use |\n| Authenticity | High | Feels real, not staged or scripted |\n| Brand alignment | High | Matches brand values and visual standards |\n| Diversity | Medium | Represents diverse users and use cases |\n| Message clarity | Medium | The value proposition or experience is clear |\n| Engagement potential | Medium | Will this resonate when amplified? |\n| Legal safety | Must pass | No IP issues, no minors without consent, no misleading claims |\n\n### Curation Process\n\n```\n1. COLLECT \u2014 Aggregate UGC from all sources into a central library\n2. SCREEN \u2014 Filter for quality, brand safety, and legal compliance\n3. OBTAIN RIGHTS \u2014 Secure usage permissions (do not skip this step)\n4. CATEGORIZE \u2014 Tag by theme, product, format, platform, and use case\n5. STORE \u2014 Archive with metadata in a searchable asset library\n6. DEPLOY \u2014 Match curated UGC to marketing needs (ads, social, web, email)\n7. TRACK \u2014 Monitor performance of deployed UGC\n```\n\n## UGC in Ads\n\nUGC ads frequently outperform brand-produced creative, especially on social platforms.\n\n### UGC Ad Formats\n\n**Whitelisting / Spark Ads:** Run ads from the creator\'s account (not your brand account). Appears native in the feed. Available on TikTok (Spark Ads) and Meta (partnership ads).\n\n**Brand account with UGC creative:** Use UGC footage/images in ads run from your brand account. Feels more authentic than polished brand creative.\n\n**Testimonial ads:** Customer quotes or video testimonials formatted as ad creative.\n\n**Mashup ads:** Combine multiple UGC clips into a single compilation ad.\n\n### UGC Ad Best Practices\n\n- **Keep it raw.** Over-editing UGC removes its authenticity advantage. Light editing only.\n- **First 3 seconds.** The hook must grab attention immediately. Lead with the most compelling moment.\n- **Include the product.** UGC ads still need to clearly show or mention the product.\n- **Add captions.** Most social video is watched without sound. Caption all spoken content.\n- **Test at scale.** UGC ads thrive on volume and variation. Test multiple creators and angles.\n- **Disclose properly.** If the creator was paid or gifted, the ad must disclose the relationship.\n\n### Creator Briefs for UGC Ads\n\nWhen commissioning UGC from creators, provide:\n\n```\nProduct: [What they\'re reviewing/showing]\nKey message: [The one thing viewers should take away]\nFormat: [Video length, orientation (9:16 vertical), platform]\nMust include: [Product visible, specific feature mention, CTA]\nMust avoid: [Competitor mentions, specific claims, inappropriate content]\nTone: [Authentic, excited, educational, casual]\nDeadline: [When raw footage is due]\nDelivery: [How and where to submit files]\nCompensation: [Payment, product, or other incentive]\nUsage rights: [How the content will be used and for how long]\n```\n\n## Quality Control\n\n### Content Moderation\n\n- Review all UGC before amplifying \u2014 never auto-publish without review\n- Check for brand safety issues (offensive content, competitor products in frame, inappropriate language)\n- Verify factual claims in reviews and testimonials (do not amplify false claims about your product)\n- Ensure diversity in featured UGC \u2014 do not inadvertently represent only one demographic\n\n### Maintaining Authenticity\n\n- Do not over-edit UGC \u2014 imperfections are part of its value\n- Do not script UGC so heavily that it sounds like a commercial\n- Do not fake UGC \u2014 fabricated "customer" content is a legal and reputational risk\n- Do not cherry-pick only positive content \u2014 balanced representation builds more trust\n\n## Legal Considerations\n\n### FTC Disclosure Requirements (US)\n\n- **Material connection = disclosure required.** If the creator received anything of value (payment, free product, discount, early access), the relationship must be disclosed.\n- **Disclosure must be clear and conspicuous.** "#ad" or "#sponsored" at the beginning of the post, not buried in 30 hashtags.\n- **Platform tools preferred.** Use built-in partnership/sponsored content labels where available.\n- **Applies to all formats.** Written, photo, video, audio, Stories, Reels, TikToks \u2014 all require disclosure.\n\n### Other Legal Considerations\n\n- **Privacy.** Do not use content featuring identifiable individuals (especially minors) without explicit consent.\n- **Copyright.** The creator owns their content. Reposting without permission is copyright infringement.\n- **Trademark.** Ensure UGC does not misuse third-party trademarks.\n- **Claims.** If UGC makes product efficacy claims (especially in health, finance, education), verify compliance with advertising regulations.\n- **International.** Privacy and disclosure laws vary by country. GDPR in EU, PIPEDA in Canada, etc.\n\n**Disclaimer:** This is general guidance, not legal advice. Consult with a lawyer for your specific situation and jurisdictions.\n\n## Common Pitfalls\n\n1. **No rights management.** Using customer content without permission exposes you to legal risk and damages creator relationships.\n2. **Over-controlling the content.** If you script and direct every detail, it is not UGC \u2014 it is a commercial with an amateur actor.\n3. **Ignoring negative UGC.** Negative reviews and critical posts are feedback. Respond professionally, do not hide from them.\n4. **One-and-done campaigns.** UGC should be an ongoing program, not a single campaign. Build systems, not events.\n5. **No curation process.** Without a system for collecting, screening, and deploying UGC, valuable content gets lost.\n6. **Mismatched incentives.** Asking for a 5-minute video review in exchange for a 10% discount is a bad deal for the creator.\n\n## Quality Gate\n\nBefore launching a UGC program or campaign:\n\n- [ ] UGC types and formats are defined with clear examples\n- [ ] Campaign mechanic is simple and specific (participants know exactly what to create)\n- [ ] Incentive structure matches the effort required from participants\n- [ ] Rights management process is established with templates for permission requests\n- [ ] Content moderation and curation workflow is defined\n- [ ] Legal requirements are understood (FTC disclosure, privacy, copyright)\n- [ ] Deployment plan specifies where UGC will be used (social, ads, web, email)\n- [ ] Creator briefs are ready (for paid/commissioned UGC)\n- [ ] Success metrics are defined (submission volume, engagement, ad performance, conversion lift)\n- [ ] Escalation plan exists for negative or brand-unsafe submissions'
       },
       {
         "name": "honest-analytics",
@@ -23489,7 +23665,7 @@ var PostgresStore = class {
     const [r] = await this.sql`select platform, media, workspace_id, channel_id from content_items where id = ${itemId}::uuid limit 1`;
     if (!r) return null;
     const m = r["media"];
-    return { platform: r["platform"], mediaUrl: m?.image_url ?? null, mediaId: m?.image_id ?? null, workspace: r["workspace_id"], channel: r["channel_id"], frame: m?.frame ?? null, seconds: m?.seconds ?? null };
+    return { platform: r["platform"], mediaUrl: m?.image_url ?? null, mediaId: m?.image_id ?? null, workspace: r["workspace_id"], channel: r["channel_id"], frame: m?.frame ?? null, seconds: m?.seconds ?? null, script: m?.script ?? null };
   }
   async markContentPublished(itemId, url, publishedAtIso) {
     await this.sql`update content_items set status = 'published', external_url = ${url}, published_at = ${publishedAtIso}, last_error = null where id = ${itemId}::uuid`;

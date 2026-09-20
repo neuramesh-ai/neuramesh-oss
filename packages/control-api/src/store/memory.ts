@@ -233,7 +233,7 @@ export class MemoryStore implements Store {
     });
     return { id: input.id };
   }
-  async libraryImage(channelId: string, name: string): Promise<{ name: string; mime: string | null; content: string } | null> { const a = [...this.artifacts].reverse().find((x) => x.channel === channelId && x.name.toLowerCase() === name.toLowerCase() && (x.content ?? '').startsWith('data:image/')); return a ? { name: a.name, mime: a.mime ?? null, content: a.content! } : null; }
+  async libraryImage(channelId: string, name: string): Promise<{ name: string; mime: string | null; content: string } | null> { const project = this.channels.find((c) => c.id === channelId)?.projectId; const rooms = new Set(this.channels.filter((c) => c.projectId === project).map((c) => c.id)); const hits = [...this.artifacts].reverse().filter((x) => (x.channel === channelId || rooms.has(x.channel ?? '')) && x.name.toLowerCase() === name.toLowerCase() && (x.content ?? '').startsWith('data:image/')); const a = hits.find((x) => x.channel === channelId) ?? hits[0]; return a ? { name: a.name, mime: a.mime ?? null, content: a.content! } : null; } // the room's shelf first, then the project's (store/frames.ts)
 
   async promoteArtifact(artifactId: string, _promotedByAgent: string | null, makeEvent: (workspace: string) => NMEvent): Promise<{ workspace: string }> {
     const art = this.artifacts.find((a) => a.id === artifactId);
@@ -1528,9 +1528,9 @@ export class MemoryStore implements Store {
       .slice(0, limit)
       .map((i) => ({ id: i.id, workspace: i.workspace, channel: i.channelId, threadId: (i as { threadId?: string | null }).threadId ?? null, platform: i.platform, body: i.body, scheduledAt: i.scheduledAt! }));
   }
-  async contentItemMedia(itemId: string): Promise<{ platform: string; mediaUrl: string | null; mediaId?: string | null; workspace: string; channel?: string; frame?: string | null; seconds?: number | null } | null> {
+  async contentItemMedia(itemId: string): Promise<{ platform: string; mediaUrl: string | null; mediaId?: string | null; workspace: string; channel?: string; frame?: string | null; seconds?: number | null; script?: string | null } | null> {
     const it = this.contentItems.find((x) => x.id === itemId);
-    return it ? { platform: it.platform, mediaUrl: it.mediaUrl ?? null, mediaId: it.mediaId ?? null, workspace: it.workspace, channel: it.channelId, frame: it.frame ?? null, seconds: it.seconds ?? null } : null;
+    return it ? { platform: it.platform, mediaUrl: it.mediaUrl ?? null, mediaId: it.mediaId ?? null, workspace: it.workspace, channel: it.channelId, frame: it.frame ?? null, seconds: it.seconds ?? null, script: it.script ?? null } : null;
   }
   async markContentPublished(itemId: string, _url: string, _publishedAtIso: string): Promise<void> {
     const it = this.contentItems.find((x) => x.id === itemId);

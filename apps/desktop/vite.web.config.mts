@@ -46,6 +46,9 @@ export default defineConfig(({ command, mode }) => {
     proxy: {
       '/v1': { target: API_TARGET, changeOrigin: true },
       '/auth': { target: API_TARGET, changeOrigin: true },
+      // the connectors' door (the GitHub grant, the social authorizations): the API answers a
+      // redirect to the provider, and the browser follows it from the tab the click opened
+      '/connect': { target: API_TARGET, changeOrigin: true },
     },
   },
   build: { outDir: resolve(here, 'out/web'), emptyOutDir: true, chunkSizeWarningLimit: 6000 },

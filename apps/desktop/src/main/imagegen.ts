@@ -248,6 +248,31 @@ export async function publishDataUrl(bytes: Buffer): Promise<string | null> {
   }
 }
 
+// A shelf copy (the product shots, video-rung plan §9): an image an agent made lands on the room's
+// shelf as a data URI inside `artifact.create`'s 300k-character cap, at a size the film's product
+// frame can hold at 720 px wide. JPEG, the long side to 1280, the quality ladder until it fits.
+const SHELF_DIM = 1280;
+const SHELF_MAX = 300_000;
+
+export async function shelfDataUrl(bytes: Buffer): Promise<string | null> {
+  try {
+    const { nativeImage } = await import('electron');
+    const img = nativeImage.createFromBuffer(bytes);
+    if (img.isEmpty()) return null;
+    const { width, height } = img.getSize();
+    const long = Math.max(width, height);
+    if (!long) return null;
+    const sized = long > SHELF_DIM ? img.resize({ width: Math.round((width * SHELF_DIM) / long), quality: 'best' }) : img;
+    for (const q of [82, 68, 55, 42]) {
+      const url = `data:image/jpeg;base64,${sized.toJPEG(q).toString('base64')}`;
+      if (url.length <= SHELF_MAX) return url;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export async function thumbDataUrl(bytes: Buffer): Promise<string | null> {
   try {
     const { nativeImage } = await import('electron');

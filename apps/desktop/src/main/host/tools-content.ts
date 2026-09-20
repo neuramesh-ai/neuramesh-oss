@@ -9,7 +9,8 @@
 
 import { normalizeDraft, parseDraftRevisions } from '@neuramesh/shared';
 import type { OrchTool, ToolCtx } from './orchtools';
-import { frameArg, framesFor } from './frames';
+import { frameArg, framesFor, productShotsFor, productShotsGate } from './frames';
+import { productOrchTools } from './chattools-product';
 import { ungrounded } from './grounding';
 import { draftSeconds, ugcOrchTools, unpicked } from './ugcflow';
 import { draftsOrchTools, unreadRevision } from './chattools-drafts';
@@ -90,6 +91,7 @@ export function contentTools(tc: ToolCtx): OrchTool[] {
     // command as the human. The publish gate stays structural, not prompted.
     ...ugcOrchTools(tc, msgAnchor),
     ...draftsOrchTools(db, () => ({ taskId: thread?.id, threadId: convoThreadId }), grounding, log),
+    ...productOrchTools(tc),
     { name: 'draft_posts', description: 'Hand over drafted social posts as REVIEWABLE CARDS in this conversation — how posts are delivered, in any room. NEVER write posts.json or paste posts as markdown (nothing to click). `body` is ONLY the wire text — no character counts, no "(draft only)" footers, no image briefs inside it; it would publish verbatim. Art direction goes in `imageBrief`, only when the post should carry a visual (Instagram and TikTok always do). A VIDEO post (a UGC or creator script) puts the script in `script` and the caption that posts with the video in `body`; never the script in the body. Draft for the platform the ask names, else for the connected accounts. Call ONCE with every post — calling again ADDS drafts (revise_posts changes one in place).', schema: {
       posts: z.array(z.object({
         platform: z.enum(['x', 'instagram', 'linkedin', 'tiktok', 'email']).describe('the network this post is for: the one asked for, else a connected account'),
@@ -126,6 +128,9 @@ export function contentTools(tc: ToolCtx): OrchTool[] {
       // the frame (host/frames.ts): a name the shelf does not hold is refused before anything is written
       const frames = await framesFor(libraryDocs, ch.id, input.posts);
       if (!frames.ok) { log?.({ kind: 'tool', phase: 'result', summary: 'draft_posts refused: a frame is not on the shelf' }); return frames.why; }
+      // the product shots (host/frames.ts, plan §9): a beat that shows the product names a shelf image, or the draft waits
+      const shots = await productShotsFor(libraryDocs, ch.id, drafts);
+      if (shots) { log?.({ kind: 'tool', phase: 'result', summary: 'draft_posts refused: a product beat names no shelf image' }); return shots; }
       let made = 0;
       for (const [i, d] of drafts.entries()) {
         const res = await post('/v1/commands', actor, {
@@ -172,6 +177,8 @@ export function contentTools(tc: ToolCtx): OrchTool[] {
         const { body, imageBrief: brief, script } = rev ?? {};
         const fr = await frameArg(libraryDocs, ch.id, r.frame);
         if (!fr.ok) return fr.why;
+        const shots = script ? await productShotsGate(libraryDocs, ch.id, script) : null; // the product shots (plan §9)
+        if (shots) return shots;
         const res = await post('/v1/commands', actor, {
           type: 'content.revise', item: target.id,
           ...(body ? { body } : {}), ...(brief ? { imageBrief: brief } : {}), ...(script ? { script } : {}), ...(fr.frame !== undefined ? { frame: fr.frame } : {}), ...(r.seconds ? { seconds: r.seconds } : {}),

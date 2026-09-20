@@ -22,14 +22,17 @@
 
 import { trimEndChars, trimStartChars } from './linear';
 
-export interface FilmBeat { start: number; direction: string; spoken: string; caption: string }
+/** one beat of a script: its window in seconds, the direction, the creator's line, the caption, and
+ *  the PRODUCT SHOT it cuts to (`SHOW: <image>`, an image on the room's shelf, cut into the film as it is:
+ *  video-rung plan §9) */
+export interface FilmBeat { start: number; end: number; direction: string; spoken: string; caption: string; show: string }
 
 // EVERY PATTERN HERE COSTS THE LINE ONCE (the public publish runs CodeQL, and its js/polynomial-redos
 // named eight of the first draft's regexes): a value after a label starts right after the `:` and is
 // trimmed, never `\s*` beside `(.*)`; a trailing run is cut by index (linear.ts); a quoted span stops
 // at the next quote of any kind, so an opener that recurs cannot make the body backtrack.
 const BLANKS = ' \t';
-const STAMP_RE = /^\[(\d+):(\d\d)[ \t]*[-–][ \t]*\d+:\d\d\](.*)$/;
+const STAMP_RE = /^\[(\d+):(\d\d)[ \t]*[-–][ \t]*(\d+):(\d\d)\](.*)$/;
 const MAX_BEATS = 3;
 const DIRECTION_WORDS = 14;
 const SPOKEN_WORDS = 16;
@@ -68,8 +71,9 @@ function labelled(l: string, label: RegExp): string | null {
   const m = label.exec(l);
   return m ? l.slice(m[0].length).trim() : null;
 }
-const CAPTION_LABEL = /^caption(?: on screen)? ?:/i;
+const CAPTION_LABEL = /^(?:caption(?: on screen)?|(?:on-screen |on screen )?title|text on screen|on-screen text) ?:/i;
 const SPOKEN_LABEL = /^spoken ?:/i;
+const SHOW_LABEL = /^show ?:/i;
 /** blanks collapsed to one space, so every label pattern can be written with single spaces and stay linear */
 const oneSpaced = (s: string): string => s.replace(/[ \t]+/g, ' ').trim();
 
@@ -79,9 +83,12 @@ const oneSpaced = (s: string): string => s.replace(/[ \t]+/g, ' ').trim();
  *  the creator's line, the `Hook:` label is dropped, and what is left is the direction. */
 function stampLine(rest: string, beat: FilmBeat): void {
   let s = oneSpaced(rest);
-  // the caption and the spoken line by name, wherever they sit on the line (a word boundary, then the label)
-  const cap = /(?:^| )caption(?: on screen)? ?:/i.exec(s);
-  if (cap) { beat.caption = s.slice(cap.index + cap[0].length).trim(); s = s.slice(0, cap.index); }
+  // the product shot, the caption and the spoken line by name, wherever they sit on the line (a word boundary, then the label)
+  const show = /(?:^| )show ?:/i.exec(s);
+  if (show) { beat.show = s.slice(show.index + show[0].length).trim(); s = s.slice(0, show.index); }
+  // the caption by any of its names (CAPTION, TITLE, TEXT ON SCREEN: the live marketer wrote `TITLE: "Try NeuraMesh"`)
+  const cap = /(?:^| )(?:caption(?: on screen)?|(?:on-screen |on screen )?title|text on screen|on-screen text) ?:/i.exec(s);
+  if (cap) { beat.caption = unquote(s.slice(cap.index + cap[0].length)); s = s.slice(0, cap.index); }
   const spoken = /(?:^| )spoken ?:/i.exec(s);
   if (spoken) { beat.spoken = unquote(s.slice(spoken.index + spoken[0].length)); s = s.slice(0, spoken.index); }
   s = trimStartChars(s.replace(/^(?:the )?hook ?[:—–,-]?/i, ''), BLANKS);
@@ -100,9 +107,13 @@ function readLine(raw: string, beat: FilmBeat): void {
   const quoted = '"“'.includes(l[0] ?? '') ? quotedTail(l) : null;
   if (quoted && !quoted.before) { if (!beat.spoken) beat.spoken = quoted.line; return; }
   const cap = labelled(l, CAPTION_LABEL);
-  if (cap !== null) { beat.caption = cap; return; }
+  if (cap !== null) { beat.caption = unquote(cap); return; }
+  const show = labelled(l, SHOW_LABEL);
+  if (show !== null) { beat.show = show; return; }
   if (!beat.direction) beat.direction = tidyDirection(trimEndChars(l, '.' + BLANKS));
 }
+
+const newBeat = (start: number, end: number): FilmBeat => ({ start, end, direction: '', spoken: '', caption: '', show: '' });
 
 /** The script as beats: one per `[m:ss-m:ss]` block with its start second, `Spoken:` and
  *  `CAPTION:` read by name. A body without timestamps is one beat at 0: its first three lines. */
@@ -113,16 +124,31 @@ export function scriptBeats(body: string): FilmBeat[] {
   for (const l of lines) {
     const m = STAMP_RE.exec(l);
     if (m) {
-      cur = { start: Number(m[1]) * 60 + Number(m[2]), direction: '', spoken: '', caption: '' };
+      cur = newBeat(Number(m[1]) * 60 + Number(m[2]), Number(m[3]) * 60 + Number(m[4]));
       beats.push(cur);
-      stampLine(m[3]!, cur);
+      stampLine(m[5]!, cur);
     } else if (cur) readLine(l, cur);
   }
   if (beats.length) return beats;
-  const one: FilmBeat = { start: 0, direction: '', spoken: '', caption: '' };
+  const one = newBeat(0, 0);
   for (const l of lines.slice(0, 3)) readLine(l, one);
   return [one];
 }
+
+/** THE PRODUCT SHOTS (plan §9): the beats that cut to a real image, in order, each a window in seconds
+ *  and the shelf image's name. A window that ends before it starts is read as the next beat's start. */
+export function productShots(body: string): Array<{ start: number; end: number; show: string }> {
+  const beats = scriptBeats(body);
+  return beats.flatMap((b, i) => {
+    if (!b.show) return [];
+    const end = b.end > b.start ? b.end : (beats[i + 1]?.start ?? b.start + 3);
+    return [{ start: b.start, end, show: b.show }];
+  });
+}
+
+const PRODUCT_WORDS_RE = /\b(app|screen|phone|product|interface|dashboard|recording|ui|home screen|the board|laptop screen)\b/i;
+/** a beat that shows the product on screen, by its words: the gate that asks for a SHOW line reads this */
+export const looksLikeProductBeat = (b: FilmBeat): boolean => PRODUCT_WORDS_RE.test(b.direction);
 
 /** the first beat, for the callers that want the hook alone */
 export const firstBeat = (body: string): FilmBeat => scriptBeats(body)[0]!;

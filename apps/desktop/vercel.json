@@ -6,6 +6,7 @@
   "rewrites": [
     { "source": "/v1/:path*", "destination": "https://api.neuramesh.app/v1/:path*" },
     { "source": "/auth/:path*", "destination": "https://api.neuramesh.app/auth/:path*" },
+    { "source": "/connect/:path*", "destination": "https://api.neuramesh.app/connect/:path*" },
     { "source": "/((?!.*\\.).*)", "destination": "/index.html" }
   ],
   "headers": [

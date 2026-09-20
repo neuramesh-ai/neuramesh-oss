@@ -13,15 +13,18 @@ import type { Store } from './contract';
 
 export interface FrameImage { name: string; mime: string; dataUrl: string }
 
-/** the newest image on the room's shelf with that name (case-insensitive), else null */
+/** the newest image with that name (case-insensitive) on the room's shelf, else on a shelf of the
+ *  room's PROJECT (a product is one project's, and its screenshots sit where they were uploaded:
+ *  George 2026-09-20, "search the project files for actual product images"), else null */
 export async function libraryImage(store: Store, channelId: string, name: string): Promise<FrameImage | null> {
   const sql = sqlOf(store);
   if (sql) {
     const [row] = await sql<Array<{ name: string; mime: string | null; inline_content: string }>>`
       select name, mime, inline_content from artifacts
-       where channel_id = ${channelId}::uuid and lower(name) = lower(${name})
-         and inline_content like 'data:image/%'
-       order by created_at desc limit 1`;
+       where lower(name) = lower(${name}) and inline_content like 'data:image/%'
+         and (channel_id = ${channelId}::uuid
+              or channel_id in (select id from channels where project_id = (select project_id from channels where id = ${channelId}::uuid)))
+       order by (channel_id = ${channelId}::uuid) desc, created_at desc limit 1`;
     return row ? frameOf(row.name, row.mime, row.inline_content) : null;
   }
   const mem = store as { libraryImage?: (channelId: string, name: string) => Promise<{ name: string; mime: string | null; content: string } | null> };

@@ -132,7 +132,8 @@ import { BrowserPane, type MainView, type TermHandle, TerminalView, viewFromUrl,
 import { DockBar, NavWorkspaceFoot, UtilCluster } from './shell/chrome';
 import { StatusCluster } from './shell/statuscluster';
 import { useCompute } from './compute/useCompute';
-import { SCHEDULED_SEC } from './shell/navdest';
+import { isScheduledView } from './shell/navdest';
+import { ScheduledHead } from './shell/ScheduledHead';
 import { workbenchApplies, workbenchState } from './shell/workbench-state';
 import { BellButton, BellPopover } from './shell/BellPopover';
 import { bellFlight, bellQueue } from './shell/bell';
@@ -618,7 +619,7 @@ export function App() {
   // collapsible nav sections (side dock) — keyed by section; absent/false = expanded (default). Persisted.
   const [navSec, setNavSec] = useState<Record<string, boolean>>(() => {
     // Scheduled opens FOLDED on a fresh machine (George, 2026-09-12); a fold the human changed is theirs and wins
-    try { return { [SCHEDULED_SEC]: true, ...JSON.parse(localStorage.getItem('nm:navSec') || '{}') }; } catch { return { [SCHEDULED_SEC]: true }; }
+    try { return JSON.parse(localStorage.getItem('nm:navSec') || '{}') as Record<string, boolean>; } catch { return {}; }
   });
   const toggleSec = (k: string) => setNavSec((s) => { const n = { ...s, [k]: !s[k] }; try { localStorage.setItem('nm:navSec', JSON.stringify(n)); } catch { /* private */ } return n; });
   // side-dock workspace nav compresses to 4 primary items + an expandable "More" group
@@ -3179,10 +3180,10 @@ export function App() {
                 {/* rows derived in shell/navdest.ts (tested), drawn in shell/NavDestBand.tsx —
                     extracted from here in the marketing-os round to hold App's line ratchet */}
                 {!navSec.shortcuts && (
-                  <NavDestBand nav={nav} view={view} navSec={navSec} routines={roomRoutines} calendar={roomContent} mode={navMode}
+                  <NavDestBand nav={nav} view={view} mode={navMode}
                     goView={(v) => goConversation(() => { setNav('home'); setOpenTaskId(null); setOpenThreadId(null); setView(v); })}
                     goFiles={() => goConversation(() => { setNav('artifacts'); setOpenTaskId(null); setOpenThreadId(null); })}
-                    toggleScheduled={() => toggleSec(SCHEDULED_SEC)} goCode={() => setRailMode('code')} />
+                    goCode={() => setRailMode('code')} />
                 )}
                 {!chans.length && <div className="navsect">syncing…</div>}
                 {/* The "no channels here" prompt retired with the channel list (2026-08-07): a
@@ -3624,9 +3625,11 @@ export function App() {
             universal launcher (＋New task ▾) and the room's own composer — a bare input + repo
             select on a board is the pre-conversation-first idiom docs/33 §8 retired. The backlog
             column keeps its in-place quick-add: that parks an idea in the column it lands in. */}
+        {/* Scheduled: one destination, two lenses — the name and the Routines · Calendar tab strip
+            (shell/ScheduledHead.tsx) in place of the nav fold this pair used to live in (docs/33 §8) */}
+        {isScheduledView(nav, view) && <ScheduledHead view={view} routines={roomRoutines} calendar={roomContent} setView={setView} />}
         {view === 'automations' && (
           <>
-            <div className="topbar">Scheduled · Routines<span className="desc">every schedule in the workspace — filter by project or room</span></div>
             <RoutinesView scope={scopeOf('routines')} setScope={(x) => setScope('routines', x)}
               projects={wsProjects}
               chans={chans}
@@ -3641,7 +3644,6 @@ export function App() {
             be asked the only question a calendar is for: what is going out this week. */}
         {view === 'calendar' && (
           <>
-            <div className="topbar">Content calendar<span className="desc">every drafted and scheduled post — filter by project or room</span></div>
             <WorkspaceCalendar scope={scopeOf('calendar')} setScope={(x) => setScope('calendar', x)} projects={wsProjects} chans={chans} onCount={setRoomContent} />
           </>
         )}

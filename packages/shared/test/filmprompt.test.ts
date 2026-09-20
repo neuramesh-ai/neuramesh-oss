@@ -2,7 +2,7 @@
 // rule, the brief cut to a look, and the cap. The old prompt's traps are pinned here: the caption
 // handed to the model beside "no text", a brief that asks for burned-in captions, 1,400 characters.
 import { describe, expect, it } from 'vitest';
-import { FILM_PROMPT_MAX, beatsWithin, filmMinutes, filmPrompt, firstBeat, lettering, lookFrom, scriptBeats } from '../src/filmprompt';
+import { FILM_PROMPT_MAX, beatsWithin, filmMinutes, filmPrompt, firstBeat, lettering, looksLikeProductBeat, lookFrom, productShots, scriptBeats } from '../src/filmprompt';
 
 const SCRIPT = `[0:00-0:03] HOOK — handheld, walking, no laptop bag
 Spoken: "My laptop's in my bag. My code isn't waiting for me."
@@ -29,7 +29,7 @@ describe('the script as beats', () => {
     expect(firstBeat(SCRIPT)).toMatchObject({ direction: 'handheld, walking, no laptop bag', caption: 'no laptop, still shipping' });
   });
   it('a body without timestamps is one beat: its first lines; bare quoted lines are spoken', () => {
-    expect(firstBeat('Meet the shared inbox.\nSpoken: "One thread per customer."')).toEqual({ start: 0, direction: 'Meet the shared inbox', spoken: 'One thread per customer.', caption: '' });
+    expect(firstBeat('Meet the shared inbox.\nSpoken: "One thread per customer."')).toEqual({ start: 0, end: 0, direction: 'Meet the shared inbox', spoken: 'One thread per customer.', caption: '', show: '' });
     expect(firstBeat('"I started a coding session from my couch."\n"This is Home."')).toMatchObject({ direction: '', spoken: 'I started a coding session from my couch.' });
   });
   it('a beat written on the timestamp line (the house model, live 2026-09-19) still yields its parts', () => {
@@ -38,6 +38,9 @@ describe('the script as beats', () => {
     expect(firstBeat('[0:00-0:05] Hook: Show a messy desktop with overlapping AI chat logs. CAPTION: The agent chat loop is broken.\n[0:05-0:20] Problem: chaos.'))
       .toMatchObject({ direction: 'Show a messy desktop with overlapping AI chat logs', spoken: '', caption: 'The agent chat loop is broken.' });
     expect(firstBeat('[0:00-0:03] Creator points at camera. Spoken: "Three things we learned."')).toMatchObject({ direction: 'Creator points at camera', spoken: 'Three things we learned.' });
+    // a title is a caption by another name (live 2026-09-20: `Spoken: "Link's below." TITLE: "Try NeuraMesh"`), quotes off
+    expect(firstBeat('[0:12-0:15] Spoken: "Free forever on Mac. Link\'s below." TITLE: "Try NeuraMesh"')).toMatchObject({ spoken: "Free forever on Mac. Link's below.", caption: 'Try NeuraMesh' });
+    expect(firstBeat('[0:12-0:15] Close on the mark.\nOn-screen title: "Try NeuraMesh"')).toMatchObject({ direction: 'Close on the mark', caption: 'Try NeuraMesh' });
   });
   it('a beat as the live marketer wrote it (2026-09-20): a label with a comma, a quoted tail, a "Cut to" of its own', () => {
     const live = `[0:00-0:03] Hook, straight to camera: "I expected a catch. There wasn't one."
@@ -51,6 +54,27 @@ describe('the script as beats', () => {
     const p = filmPrompt(live, '', 15);
     expect(p).toMatch(/Open on straight to camera\. The creator says to camera, casual: "I expected a catch\. There wasn't one\." Then cut to screen recording of the app home screen\. "Surprise one: free forever on Mac\." Then cut to creator, casual tone\./);
     expect(p).not.toMatch(/Open on ,|cut to Cut/);
+  });
+  it('the product shots (plan §9): a SHOW line names the shelf image a beat cuts to, with the beat\'s window', () => {
+    const script = `[0:00-0:03] Hook, straight to camera: "I expected a catch."
+[0:03-0:07] Cut to the app home screen. SHOW: app-home.jpg
+Spoken: "Surprise one: free forever on Mac."
+[0:07-0:11] Cut back to creator, casual tone. Spoken: "Surprise two."
+[0:11-0:15] Close on the phone.
+SHOW: pricing.png`;
+    expect(scriptBeats(script).map((b) => [b.start, b.end, b.show])).toEqual([[0, 3, ''], [3, 7, 'app-home.jpg'], [7, 11, ''], [11, 15, 'pricing.png']]);
+    expect(productShots(script)).toEqual([{ start: 3, end: 7, show: 'app-home.jpg' }, { start: 11, end: 15, show: 'pricing.png' }]);
+    expect(productShots(SCRIPT)).toEqual([]);
+    // a SHOW line never reaches the prompt as lettering or direction
+    const p = filmPrompt(script, '', 15);
+    expect(p).not.toMatch(/SHOW|app-home|pricing\.png/);
+    expect(p).toMatch(/Then cut to the app home screen\. "Surprise one: free forever on Mac\."/);
+    // a window the marketer left open (0:11-0:00) reads as the next beat's start, or three seconds
+    expect(productShots('[0:00-0:00] the app. SHOW: a.png\n[0:04-0:08] talk')).toEqual([{ start: 0, end: 4, show: 'a.png' }]);
+    expect(productShots('[0:05-0:00] the app. SHOW: a.png')).toEqual([{ start: 5, end: 8, show: 'a.png' }]);
+    // the words that make a beat a product beat, for the gate that asks for a SHOW line
+    expect(scriptBeats(script).map(looksLikeProductBeat)).toEqual([false, true, false, true]);
+    expect(looksLikeProductBeat(firstBeat('[0:00-0:03] An apple on the desk.'))).toBe(false);
   });
   it('a film shows the beats that start inside it, three at most', () => {
     expect(beatsWithin(SCRIPT, 5).map((b) => b.start)).toEqual([0, 3]);
@@ -128,9 +152,12 @@ describe('the prompt', () => {
       `Cut to ${'x,'.repeat(10_000)}${' ,;:'.repeat(5_000)}`,
       `${'“'.repeat(10_000)} a look ${'.'.repeat(10_000)}`,
       `${'caption '.repeat(5_000)}${'x'.repeat(10_000)}!!!!${' '.repeat(10_000)}`,
+      `[0:00-0:03] the app${blanks}SHOW:${blanks}${'a'.repeat(10_000)}`,
     ];
+    const pass = () => { for (const f of floods) { scriptBeats(f); scriptBeats(`[0:00-0:03] ${f}\n${f}`); lookFrom(f); lettering(f); filmPrompt(f, f, 15); productShots(f); } };
+    pass(); // the first pass pays the runtime's warm-up; the second is the parsers' own cost
     const t0 = Date.now();
-    for (const f of floods) { scriptBeats(f); scriptBeats(`[0:00-0:03] ${f}\n${f}`); lookFrom(f); lettering(f); filmPrompt(f, f, 15); }
+    pass();
     expect(Date.now() - t0).toBeLessThan(200);
   });
   it('the wait the card promises grows with the length', () => {

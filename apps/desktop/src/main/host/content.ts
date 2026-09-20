@@ -184,7 +184,7 @@ async function draftImageFor(itemId: string, opts: { angle?: string; rewrite?: b
  * it had nowhere to put. This is the draft-free seam share_images rides — same credential ladder,
  * same brand tokens, the bytes come back to the caller instead of onto a card.
  */
-async function generateShareImage(agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, brief: string): Promise<{ thumb?: string; error?: string }> {
+async function generateShareImage(agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, brief: string): Promise<{ thumb?: string; bytes?: Buffer; error?: string }> {
   const designer = [...agents.values()].find((a) => a.role === 'designer' && a.channels.has(ch.id));
   const { cred } = await designerImageCred(apiUrl, ch.workspace_id, designer, ownerActorId);
   if (!cred) return { error: 'no image key connected — add an OpenAI or Gemini key under Image generation' };
@@ -193,7 +193,7 @@ async function generateShareImage(agent: HostedAgent, ch: { id: string; slug: st
   const g = await generateBrandImage(cred, reviewSeat, brand, brief, 'x', agent.name);
   if (g.error || !g.thumb) return { error: g.error ?? 'the image came back empty' };
   console.log(`agent_share_image agent=${agent.name} room=#${ch.slug} ok model=${g.model ?? '?'}`);
-  return { thumb: g.thumb };
+  return { thumb: g.thumb, bytes: g.bytes }; // the bytes too: make_product_image shelves a copy (chattools-product.ts)
 }
 async function reviseContentDrafts(agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, t: ThreadTask, m: { id: string; body: string }, mode: string, token: string): Promise<string | null> {
   // draft AND scheduled: a human's free-form "change the drafts" reaches every unpublished post,

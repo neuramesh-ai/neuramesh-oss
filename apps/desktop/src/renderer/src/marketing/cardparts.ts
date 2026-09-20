@@ -2,12 +2,12 @@
 // is testable without React: a VIDEO post carries its script beside the caption (media.script);
 // a draft from before that round carried the script AS the body, so it is still read as one.
 // Either way the caption is what publishes and the script is what gets filmed.
-import { filmCredits, filmMinutes } from '@neuramesh/shared';
+import { filmCredits, filmMinutes, productShots } from '@neuramesh/shared';
 
 export type CardMedia = {
   image_url?: string; brief?: string; script?: string; thumb?: string; image_error?: string; video_id?: string; video_error?: string;
   /** the video rung: a film in flight on the platform's key, and what filmed a draft */
-  video_pending?: boolean; video_error_code?: 'NO_CREDITS' | 'UNAVAILABLE'; video?: { tier: string; model: string; seconds: number; credits: number; at: string; frame?: string | null; frameUsed?: boolean };
+  video_pending?: boolean; video_error_code?: 'NO_CREDITS' | 'UNAVAILABLE'; video?: { tier: string; model: string; seconds: number; credits: number; at: string; frame?: string | null; frameUsed?: boolean; shots?: { asked: number; applied: number; why?: string } };
   /** the frame (brand-grounding plan §6): the shelf image the film shows as the product */
   frame?: string;
   /** the length the next film takes (video-rung plan §8): the angle card's pick, or the human's word; eight when unset */
@@ -30,16 +30,18 @@ export function filmSeconds(media: CardMedia | null, tier: { seconds: number; le
  *  row. Before a film: the workspace's tier from the catalog. After: the draft's own record. A film
  *  on the person's own key says so, and that it cost no credits. Null when there is nothing honest
  *  to say (no catalog yet, no film yet, no key known). */
-export function filmFacts(media: CardMedia | null, catalog: StarterVideoCatalog): string[] | null {
+export function filmFacts(media: CardMedia | null, catalog: StarterVideoCatalog, script: string | null = null): string[] | null {
   const v = media?.video;
   if (v) {
     const when = new Date(v.at);
     const at = Number.isNaN(when.getTime()) ? '' : when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
     // the frame the film was asked to show, and whether the lane took it (a model without a reference lane films without it)
     const frame = v.frame ? [`frame · ${v.frame}${v.frameUsed ? '' : ' · not used'}`] : [];
-    if (v.tier === 'own') return [v.model, `${v.seconds} s`, 'your key', 'no credits', at, ...frame].filter(Boolean);
+    // the product shots cut into the film (plan §9): how many of the script's SHOW beats landed, or why none did
+    const shots = v.shots ? [v.shots.applied ? `product shot${v.shots.asked > 1 ? `s · ${v.shots.applied} of ${v.shots.asked}` : ''}` : `product shot · not applied${v.shots.why ? ` · ${v.shots.why}` : ''}`] : [];
+    if (v.tier === 'own') return [v.model, `${v.seconds} s`, 'your key', 'no credits', at, ...frame, ...shots].filter(Boolean);
     const tier = catalog?.tiers.find((t) => t.tier === v.tier);
-    return [tier?.label ?? v.tier, v.model, `${v.seconds} s`, `${v.credits} credits`, at, ...frame].filter(Boolean);
+    return [tier?.label ?? v.tier, v.model, `${v.seconds} s`, `${v.credits} credits`, at, ...frame, ...shots].filter(Boolean);
   }
   if (media?.video_pending) return null;
   const active = catalog?.served ? catalog.tiers.find((t) => t.tier === catalog.tier) : null;
@@ -47,7 +49,8 @@ export function filmFacts(media: CardMedia | null, catalog: StarterVideoCatalog)
   // the draft's own length, priced by the same formula the door charges with (one number everywhere)
   const seconds = filmSeconds(media, active);
   const credits = active.perSecondMicros ? filmCredits(active.perSecondMicros, seconds) : active.credits;
-  return [active.label, active.model, `${seconds} s`, `about ${credits} credits`, `${filmMinutes(seconds)} min`, ...(media?.frame ? [`frame · ${media.frame}`] : [])];
+  const shows = [...new Set((script ? productShots(script) : []).map((p) => p.show))];
+  return [active.label, active.model, `${seconds} s`, `about ${credits} credits`, `${filmMinutes(seconds)} min`, ...(media?.frame ? [`frame · ${media.frame}`] : []), ...(shows.length ? [`product shot · ${shows.join(', ')}`] : [])];
 }
 
 /** the film in flight: its tier and model from the catalog, for the pending row */

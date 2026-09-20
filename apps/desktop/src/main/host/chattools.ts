@@ -19,9 +19,9 @@ import { playbookCatalogText } from './tools-playbooks';
 import { searchXText } from './searchx';
 import { newGrounding, ungrounded, type LibraryReader } from './grounding';
 import { draftSeconds, unpicked } from './ugcflow';
-import { frameArg, framesFor } from './frames';
+import { frameArg, framesFor, productShotsFor, productShotsGate } from './frames';
 import { libraryChatTools, ugcChatTools } from './chattools-library';
-import { draftsChatTools, unreadRevision } from './chattools-drafts'; import { repoChatTools } from './chattools-repo'; // two leaves, one line: this file sits at its cap
+import { draftsChatTools, unreadRevision } from './chattools-drafts'; import { repoChatTools } from './chattools-repo'; import { productChatTools } from './chattools-product'; // three leaves, one line: this file sits at its cap
 
 import type { HostedAgent } from '../agents';
 import type { LogFn } from '../agentlog';
@@ -51,7 +51,7 @@ export interface ChatToolCtx {
   whiteboardClosures: (actor: { kind: string; id: string; role?: string }, ch: { id: string; workspace_id: string }, at: { taskId?: string; threadId?: string }) => WhiteboardToolClosures;
   draftsForAnchor: (taskId: string | null, threadId: string | null) => Promise<{ posts: DraftRow[]; msgAnchor: { taskId: string } | { threadId: string } } | null>;
   generateDraftImage: (agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, itemId: string) => Promise<string>;
-  generateShareImage: (agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, brief: string) => Promise<{ thumb?: string; error?: string }>;
+  generateShareImage: (agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, brief: string) => Promise<{ thumb?: string; bytes?: Buffer; error?: string }>;
   /** the room's shelf (host/workspace.ts): the conversation had no way to read it before 2026-09-19 */
   libraryDocs: LibraryReader;
 }
@@ -85,7 +85,7 @@ const nm = createSdkMcpServer({
       async (i) => text(await loadSkillBody(ch.id, ch.workspace_id, String(i.name))),
     ),
     ...libraryChatTools(t, grounding),
-    ...ugcChatTools(t, grounding), ...draftsChatTools(t, grounding), ...repoChatTools(t),
+    ...ugcChatTools(t, grounding), ...draftsChatTools(t, grounding), ...repoChatTools(t), ...productChatTools(t),
     tool(
       'list_playbooks',
       'The marketing playbook catalog (marketing-os) joined to this room\'s state — consult it before improvising on a marketing ask. Light flows you answer here after load_skill; heavy ones you describe and let the human ask rex to run.',
@@ -234,7 +234,7 @@ const nm = createSdkMcpServer({
         const drafts = (await draftSeconds(db, { threadId }, posts)).map((sec, n) => { const d = normalizeDraft(posts[n]!); return d && { ...d, seconds: sec }; }).filter((p): p is NonNullable<typeof p> => !!p);
         if (!drafts.length) return text('none of those entries were usable posts — each needs a supported platform and a body that is more than working notes');
         const frames = await framesFor(libraryDocs, ch.id, i.posts as Array<{ frame?: string }>); // the frame (host/frames.ts): checked before anything is written
-        if (!frames.ok) return text(frames.why);
+        if (!frames.ok) return text(frames.why);   const shots = await productShotsFor(libraryDocs, ch.id, posts); if (shots) { log({ kind: 'tool', phase: 'result', summary: 'draft_posts refused: a product beat names no shelf image' }); return text(shots); } // the product shots (plan §9)
         let made = 0;
         for (const [n, d] of drafts.entries()) {
           const r = await post('/v1/commands', { kind: 'agent', id: agent.id }, {
@@ -277,7 +277,7 @@ const nm = createSdkMcpServer({
           const unread = unreadRevision(grounding, target.letter, r); if (unread) { log({ kind: 'tool', phase: 'result', summary: `revise_posts refused: draft ${target.letter} was not read this turn` }); return text(unread); } // the read gate (chattools-drafts.ts): a rewrite starts from the card
           const { body, imageBrief: brief, script } = rev ?? {};
           const fr = await frameArg(libraryDocs, ch.id, r.frame);
-          if (!fr.ok) return text(fr.why);
+          if (!fr.ok) return text(fr.why);   const shots = script ? await productShotsGate(libraryDocs, ch.id, script) : null; if (shots) return text(shots); // the product shots (plan §9)
           const res = await post('/v1/commands', { kind: 'agent', id: agent.id }, {
             type: 'content.revise', item: target.id,
             ...(body ? { body } : {}), ...(brief ? { imageBrief: brief } : {}), ...(script ? { script } : {}), ...(fr.frame !== undefined ? { frame: fr.frame } : {}), ...(r.seconds ? { seconds: r.seconds } : {}),

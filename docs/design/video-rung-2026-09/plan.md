@@ -331,3 +331,83 @@ checkout). A desktop-born session ran on the desktop daemon; the cloud runner st
 The pick's wake goes to the ORCHESTRATOR (the default responder), so `draft_posts`/`read_drafts`/
 `revise_posts` ran on the orchestrator registry and `propose_angles` on plume's conversation registry:
 both were exercised. One film: 363 of Ember Forge's 370 dev credits, about $3.63 of the fal key.
+
+## 9. The product shots: the real image, cut in (2026-09-20)
+
+George, on a frame of a Flowe film with "Medtatun pruaticalts" on the phone: "i still see mumbled
+texts in the video images why?" then "lets compose the rung and ensure that actual product images
+are used in the ugc videos where an actual product is needed; the agent should be able to search
+the project files for actual product images or generate the product images using an image model
+for the image it needs and then pass that in during the film generation automatically".
+
+**Why a prompt cannot do it.** The reference lane hands the model the real screenshot and the model
+re-draws it: layout, colors and shapes survive, letters do not. A video model has no way to copy
+small type, at any bitrate. The only exact product on a film is the real image itself, cut in.
+
+**The lane.** A script beat that shows the product carries `SHOW: <image name>` (an image on the
+room's shelf, or on any shelf of the room's project). When the film lands, the cron cuts that beat's
+window out of the film and the real image in, on fal's own ffmpeg utilities, synchronously, in
+about twenty seconds: `trim-video` for the film's pieces around each window, `images-to-video` to
+hold the framed image for the window, one `compose` call to lay the pieces on one timeline with the
+film's own audio underneath, so the creator's voice runs through the shot. The frame is rendered here
+with resvg (the release card's renderer): the image on a 720×1280 canvas on the house graphite,
+corners rounded, never stretched (the first trial stretched a desktop screenshot into a phone's
+shape). A portrait or square image is fitted whole. A wide image (a desktop screenshot, the live
+case) is shown as a close-up: a 4:5 window of it, centered, because fitted whole it filled a third
+of the phone's frame and its type was a fifth of the size (§9.1). `compose` alone is a single-track
+concatenator ("Multiple video tracks are not supported"), which is why the pieces are made first. Best effort, never a refund: a compose that
+fails lands the plain film with the reason on the card (`video.shots.why`).
+
+**Enforced at the draft, not prompted.** `draft_posts` and `revise_posts` (both registries) refuse
+a script whose SHOW name is not on the shelf, listing the images it does hold, and refuse a beat
+whose words show the product (the app, a screen, the phone) without a SHOW line, naming the three
+ways out: name an image, make one, or write the beat without the screen. The command refuses a
+missing name again (the frame's rule). `make_product_image` (both registries) makes one on the
+room's image key, shrinks it for the shelf and shelves it under the name the script will use; its
+description says a made picture of an app is an invented interface and asks for a screenshot
+first. `list_library` scope project is the search; the shelf lookup widened to the project on both
+sides, the room's own images first.
+
+**The card.** Before the film: `product shot · app-home.jpg` on the facts line. After: `product shot`
+(or `product shots · 2 of 2`), or `product shot · not applied · <why>`.
+
+**Not in this round.** A pan or zoom over the image (the frame holds still), a picture-in-picture
+shot beside the creator, a screen recording as the shot (an mp4 on the shelf), the own-key lane
+(no fal key on a machine: the plain film, the card says so), and the model's pacing: a shot's window
+is the script's, and the model may have placed that beat a second earlier or later.
+
+Evidence: `evidence/harness-ugc-shots-{dark,cream-oak}.png` (the facts line before and after), the
+live round in §9.1.
+
+### 9.1 The live round (2026-09-20, the desktop app on this branch's API, Ember Forge › Launch › #marketing)
+
+The same walk as §8.4, on the daemon and API of this branch: the shelf holds `app-home.jpg` (the
+Home screen, 1280×800), plume read it and asked the angle card with the lengths, 15 s picked, and
+rex drafted two posts. **Both scripts carried `[0:03-0:08] SHOW: app-home.jpg` unprompted**: the
+orchestrator's rule and the gate agreed, so no refusal round ran (the gate's refusals are covered by
+`frames.test.ts`). The marketer wrote `TITLE: "Try NeuraMesh"` on one beat, which the parser had not
+read as a caption: `TITLE` and `ON-SCREEN TITLE` now read as a caption, so the film asks for it as a
+title and not as spoken words. The card said `frame · app-home.jpg · product shot` before the film
+(`evidence/live-shots-before.png`).
+
+Generate video: 363 credits, the reference lane, Seedance 2.0, 15 s. The cron composed on the done
+tick, `shots: {asked: 1, applied: 1}`, and **the real Home screen is on the film from 3 s to 8 s**
+(`evidence/live-seedance-15s-product-shot.mp4`, the frame strip in `-frames.png`): the creator
+speaks over it, the film's own audio under the whole timeline. Card: `… · 15 s · 363 credits ·
+13:00 · frame · app-home.jpg · product shot` in both themes (`evidence/live-shots-{dark,cream-oak}.png`).
+The composed clip is 15.1 s, 720×1280, 1.0 Mbps, 1.9 MB: fal's concat encoder writes about a tenth
+of the 9.6 Mbps the film came in at. The shot is a still, so it loses nothing, and the creator's
+pieces look fine on a phone, but a film with product shots is no longer the high-bitrate clip. A
+re-encode at a higher rate is a compose option to look at if a customer notices.
+
+What the frame taught: fitted whole, the 1280×800 screenshot sat in the middle third of the portrait
+frame with its type about 5 px tall on a phone. The frame now shows a wide image as a centered 4:5
+close-up (`evidence/product-frame-wide-closeup.png`: the greeting, the composer and the session rows,
+legible), and the same clip composed again through the changed frame is
+`evidence/live-seedance-15s-product-shot-closeup.mp4` (34 s on fal, the strip in `-frames.png`: the
+creator at 1 s, the close-up at 4, 5.5 and 7.5 s, the model's own laptop at 10 and 12.5 s). A
+portrait screenshot on the shelf still gives the best shot, and `make_product_image` says so.
+Elsewhere in the film the model still draws its own laptop, with its own pseudo-words on the screen:
+a beat that shows the product without a SHOW line is refused at the draft, but the model adds screens
+the script never asked for, and those stay drawn. The next lever there is the prompt's look line
+("no screens in shot" outside the SHOW beats), not tried this round.
