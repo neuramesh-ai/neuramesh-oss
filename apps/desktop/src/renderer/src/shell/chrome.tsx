@@ -74,13 +74,11 @@ export function SubStrip({ subs, agents, onOpen }: { subs: TaskAllRow[]; agents:
  * (`.ftfold`, present in every view). Folded, that pin wears the unread dot so the fold still
  * costs no information.
  */
-export function NavWorkspaceFoot({ workspace, initial, anyLive, unread, faceOpen, onToggleFace, onHover, onUpgrade, connection, connectionHost }: {
+export function NavWorkspaceFoot({ workspace, initial, unread, faceOpen, onToggleFace, onHover, onUpgrade, connection, connectionHost }: {
   /** the WORKSPACE name — the bar's whole subject */
   workspace: string;
   /** its tile letter (the workspace's initial, never the signed-in person's) */
   initial: string;
-  /** an agent is working somewhere in this workspace */
-  anyLive: boolean;
   /** a room has moved and you have not seen it */
   unread: boolean;
   /** the column above it is showing its workspace face */
@@ -110,7 +108,8 @@ export function NavWorkspaceFoot({ workspace, initial, anyLive, unread, faceOpen
         aria-label={`${workspace} workspace menu${unread ? ', unread channels' : ''}`}
       >
         <span className="navwstile" aria-hidden>
-          {anyLive && <span className="navwslive" />}
+          {/* no live pulse here (George, 2026-09-19: "the weird border blinking on the workspace icon"):
+              liveness stays on the tree's group headers, per project, where it names its work */}
           {unread && <span className="navwsunread" />}
           {initial}
         </span>

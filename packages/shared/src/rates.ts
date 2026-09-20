@@ -168,4 +168,12 @@ export const VIDEO_TIERS = ['starter', 'xpress', 'premium'] as const;
 export type VideoTier = (typeof VIDEO_TIERS)[number];
 export const VIDEO_TIER_LABELS: Record<VideoTier, string> = { starter: 'NeuraMesh Video Starter', xpress: 'NeuraMesh Video Xpress', premium: 'NeuraMesh Video Premium' };
 export const isVideoTier = (s: unknown): s is VideoTier => typeof s === 'string' && (VIDEO_TIERS as readonly string[]).includes(s);
+/** what one film costs, at cost, rounded UP to whole credits: the card, the charge, the refund and
+ *  the history then all say the same number (193.52 credits floored one way and ceiled another
+ *  read as 193 beside 194, found live). One formula, because the card prices a draft's length
+ *  before the door does. */
+export const filmCredits = (perSecondMicros: number, seconds: number): number => Math.ceil((perSecondMicros * seconds) / CREDIT_MICROS);
+/** the lengths a card offers, in seconds: the ones inside the model's range, so a chip is never a length the lane refuses */
+export const FILM_LENGTHS = [5, 8, 10, 15, 20, 30] as const;
+export const filmLengthsWithin = (min: number, max: number): number[] => FILM_LENGTHS.filter((s) => s >= min && s <= max);
 

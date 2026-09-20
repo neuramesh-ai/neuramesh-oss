@@ -32,13 +32,17 @@ async function relay(autoPong: boolean): Promise<{ url: string; hellos: number; 
   return state;
 }
 
+// 200 ms periods, not 30: under the whole-repo check a pong can arrive tens of milliseconds late,
+// and a period that tight reaped a live relay once (the hub test learned the same). Production beats every 30 s.
+const PERIOD = 200;
+
 test('a relay that answers pings keeps the socket: no redial', async () => {
   const r = await relay(true);
   const logs: string[] = [];
-  const edge = connectMachineEdge({ relayUrl: r.url, token: 'nmm_t', machineId: 'm1', keepaliveMs: 30, log: (l) => logs.push(l) });
+  const edge = connectMachineEdge({ relayUrl: r.url, token: 'nmm_t', machineId: 'm1', keepaliveMs: PERIOD, log: (l) => logs.push(l) });
   try {
     await until(() => r.hellos === 1, 'the hello');
-    await new Promise((res) => setTimeout(res, 200)); // six beats
+    await new Promise((res) => setTimeout(res, PERIOD * 3.5)); // three beats
     assert.equal(r.hellos, 1, 'one dial, one hello');
     assert.ok(!logs.some((l) => l.startsWith('keepalive')), `no keepalive verdict: ${logs.join(' | ')}`);
   } finally { edge.close(); r.close(); }
@@ -47,7 +51,7 @@ test('a relay that answers pings keeps the socket: no redial', async () => {
 test('a peer that stops answering is terminated and the edge redials', async () => {
   const r = await relay(false);
   const logs: string[] = [];
-  const edge = connectMachineEdge({ relayUrl: r.url, token: 'nmm_t', machineId: 'm1', keepaliveMs: 30, log: (l) => logs.push(l) });
+  const edge = connectMachineEdge({ relayUrl: r.url, token: 'nmm_t', machineId: 'm1', keepaliveMs: PERIOD, log: (l) => logs.push(l) });
   try {
     await until(() => r.hellos === 1, 'the first hello');
     await until(() => logs.some((l) => l.startsWith('keepalive: no pong')), 'the watchdog');

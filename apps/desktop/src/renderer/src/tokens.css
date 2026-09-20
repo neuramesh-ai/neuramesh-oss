@@ -667,6 +667,8 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 .qplat:hover { border-color: var(--hover-border); color: var(--text); }
 .qplat.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--panel2)); color: var(--text); }
 .qplat:focus-visible { outline: 1.5px solid var(--accent); outline-offset: 1px; }
+.qlengths { margin-top: -2px; }
+.qlencost { font: 500 10.5px var(--fmono); letter-spacing: -.01em; color: var(--accent); margin-left: 2px; }
 /* the film in the post preview: the card's player, seated where the image floor stands */
 .mkpvfilm { margin: 10px 0; max-height: 380px; }
 .mkpvfilmnone { margin-top: 10px; }
@@ -724,8 +726,8 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 .mkpcold:hover { opacity: .82; }
 .chip.mk-old { background: color-mix(in srgb, var(--text) 8%, transparent); color: var(--dim); }
 .mkpcverlbl { font: 600 10px var(--fmono); color: var(--dim); }
-.mkpcactions { margin-left: auto; display: flex; align-items: center; gap: 6px; }
-.mkpcreply { display: inline-flex; align-items: center; justify-content: center; padding: 4px; border-radius: var(--r-sm); color: var(--dim); }
+.mkpcactions { margin-left: auto; display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 6px; }
+.mkpcreply { display: inline-flex; align-items: center; justify-content: center; gap: 5px; height: auto; padding: 4px 8px 4px 6px; border-radius: var(--r-sm); color: var(--muted); font: 500 10.5px var(--fmono); letter-spacing: .02em; text-transform: uppercase; white-space: nowrap; }
 .mkpcreply:hover { color: var(--text); background: color-mix(in srgb, var(--text) 8%, transparent); }
 @media (prefers-reduced-motion: reduce) { .mkpostpop { animation: none; } }
 
@@ -1244,14 +1246,12 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 [data-theme='soft-dark'] .navwsfoot:hover, [data-theme='soft-dark'] .navwsfoot.open { background: var(--panel3); box-shadow: none; border-color: transparent; }
 .navwsmain { flex: 1; min-width: 0; display: flex; align-items: center; gap: 9px; padding: 3px 4px;
   border: none; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; border-radius: var(--r-sm); }
-/* the workspace tile, and the two marks the spine carried. They coexist: a pulse says an agent is
-   working somewhere, the dot says a room moved unseen — picking one would drop a signal exactly
-   when the workspace is busiest. Per-project liveness stays on the tree's group headers. */
+/* the workspace tile and the one mark it keeps: the dot says a room moved unseen. The live pulse
+   that rang the tile whenever an agent worked anywhere left on 2026-09-19 (George: "the weird
+   border blinking on the workspace icon"); per-project liveness stays on the tree's group headers. */
 .navwstile { position: relative; flex: none; width: 24px; height: 24px; border-radius: var(--r-sm);
   background: var(--panel3); border: 1px solid var(--border2); display: grid; place-items: center;
   font: 600 11px var(--fbody); color: var(--body); }
-.navwslive { position: absolute; inset: -3px; border-radius: 8px; pointer-events: none;
-  box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--prog) 55%, transparent); animation: nm-prpulse 1.8s ease-in-out infinite; }
 .navwsunread { position: absolute; top: -3px; right: -3px; width: 7px; height: 7px; border-radius: 50%;
   background: var(--link); box-shadow: 0 0 0 2px var(--win); }
 .navwsname { flex: 1; min-width: 0; font-size: 12.5px; font-weight: 600; color: var(--body);
@@ -1262,8 +1262,9 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 .navwscar.open { transform: rotate(0deg); }
 /* ── THE CREDIT RING (2026-08-28) — the workspace's balance, third element in the foot, LEFT of
    the account avatar. A ring, not a number: at rest it carries no digits, because a number asks
-   to be read and a ring asks only to be glanced at. The arc shortens as credits go and turns
-   `--warn` below a fifth; the breakdown lives one click in. Absent data draws NOTHING — the
+   to be read and a ring asks only to be glanced at. The arc shortens as credits go and its hue
+   follows: green above a half, `--warn` below it, red below a fifth (2026-09-19); the breakdown
+   lives one click in. Absent data draws NOTHING — the
    component returns null, so there is no "empty ring" resting state to style. */
 .credring { flex: none; width: 30px; height: 30px; padding: 0; border: none; background: none; cursor: pointer;
   border-radius: 50%; display: grid; place-items: center; }
@@ -1274,7 +1275,8 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 .credring:hover .crednum, .credring.open .crednum { fill: var(--text); }
 .credtrack { stroke: var(--panel3); }
 .credarc { stroke: var(--green); stroke-linecap: round; transition: stroke-dashoffset var(--dur) var(--ease), stroke var(--dur) var(--ease); }
-.credarc.low { stroke: var(--warn); }
+.credarc.mid { stroke: var(--warn); }
+.credarc.low { stroke: var(--danger, #c2564b); }
 .credring:hover .credtrack, .credring.open .credtrack { stroke: var(--border2); }
 .credpop { position: fixed; z-index: 60; width: 250px; background: var(--card); border: 1px solid var(--card-border);
   border-radius: var(--r-lg); box-shadow: var(--shadow-pop); padding: 12px 13px; animation: nm-rise var(--dur-enter) var(--ease) both; }
@@ -1290,7 +1292,7 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
   background: conic-gradient(var(--prog) var(--frac, 0%), color-mix(in srgb, var(--dim) 30%, transparent) 0); }
 .pfnew .pfring::after { content: ''; position: absolute; inset: 3px; border-radius: 50%; background: var(--win); }
 @keyframes nm-prpulse { 50% { opacity: .34; } }
-@media (prefers-reduced-motion: reduce) { .navwslive { animation: none; } .navwscar { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .navwscar { transition: none; } }
 /* Folded, the nav is gone and so is this bar — so the frame top's fold pin carries the unread
    dot. A fold must not cost information (docs/33 §8's rail rule, applied to the nav itself). */
 .ftfold { position: relative; }
@@ -1942,12 +1944,21 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 /* the desk: one tile per project, three lines — identity and the score or the door, the facts, the marks */
 .mkdesk { display: grid; grid-template-columns: repeat(auto-fill, minmax(238px, 1fr)); gap: 10px; }
 .mkdeskline { display: flex; flex-direction: column; }
-.mktile { display: flex; flex-direction: column; align-items: stretch; gap: 5px; min-width: 0; background: var(--card);
+.mktile { position: relative; display: flex; flex-direction: column; align-items: stretch; gap: 5px; min-width: 0; background: var(--card);
   border: 1px solid var(--card-border); border-radius: var(--r-lg); box-shadow: var(--shadow-card);
-  padding: 9px 12px 8px; cursor: pointer; font-family: inherit; text-align: left; color: var(--text);
+  padding: 9px 12px 8px; font-family: inherit; text-align: left; color: var(--text);
   transition: transform var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease); }
 .mktile:hover { transform: translateY(-1px); box-shadow: var(--shadow-lift); }
-.mktile:focus-visible { outline: none; border-color: var(--ring); box-shadow: 0 0 0 3px var(--focus-glow); }
+/* the click is the tile's top two lines (a button of its own, since the strip's ⋯ opens buttons of its own,
+   2026-09-19); the card look stays on the tile, the focus ring rides the button */
+.mktilebtn { display: flex; flex-direction: column; align-items: stretch; gap: 5px; min-width: 0; margin: 0; padding: 0; border: 0; background: none;
+  font: inherit; color: inherit; text-align: left; cursor: pointer; border-radius: var(--r-sm); }
+.mktilebtn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-glow); }
+/* the ⋯ door's popover opens DOWNWARD here (the desk sits at the page's top) and the open tile rises above
+   the sticky bar (z 4) so neither the popover nor a tip sits under it */
+.mktile:has(.connpop) { z-index: 6; transform: none; }
+.mktile .cfootapps { margin-left: 4px; }
+.mktile .cfootapps .cprojpop { top: calc(100% + 8px); bottom: auto; }
 .mkt1 { display: flex; align-items: center; gap: 9px; min-width: 0; min-height: 24px; }
 .mkt1 > b { flex: 1; min-width: 0; font: 500 14px var(--font); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mkscore { display: inline-flex; align-items: center; gap: 7px; flex: none; }
@@ -1963,11 +1974,16 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 .mkc { position: relative; width: 20px; height: 20px; border-radius: var(--r-xs); display: inline-flex; align-items: center; justify-content: center; color: var(--dim); flex: none; }
 .mkc svg { display: block; }
 .mkc.on, .mkc.warnc { color: var(--body); }
-.mkc.on::after, .mkc.warnc::after { content: ''; position: absolute; right: 1px; bottom: 1px; width: 5px; height: 5px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 1.5px var(--card); }
-.mkc.warnc::after { background: var(--warn); }
+/* the dot is ::before: ::after is the tip's ([data-tip]::after), and the dot on it left a connected mark
+   with no label at all. The tips flip ABOVE the marks: below, they sat under the sticky bar (2026-09-19). */
+.mkc.on::before, .mkc.warnc::before { content: ''; position: absolute; right: 1px; bottom: 1px; width: 5px; height: 5px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 1.5px var(--card); }
+.mkc.warnc::before { background: var(--warn); }
+.mkconns [data-tip]::after { top: auto; bottom: calc(100% + 7px); transform: translateX(-50%) translateY(3px) scale(.97); }
+.mkconns [data-tip]:hover::after { transform: translateX(-50%) translateY(0) scale(1); }
 .mkconnlbl { font: 500 10px var(--fmono); color: var(--dim); margin-left: auto; white-space: nowrap; }
 /* a project picked: the desk is one line, the same tile laid flat */
 .mktile.line { flex-direction: row; align-items: center; gap: 12px; min-height: 46px; padding: 0 12px; }
+.mktile.line .mktilebtn { flex: 1; flex-direction: row; align-items: center; gap: 12px; min-height: 46px; }
 .mktile.line .mkt1 { flex: none; }
 .mktile.line .mkt1 > b { flex: none; }
 .mktile.line .mkfacts { flex: 1; }

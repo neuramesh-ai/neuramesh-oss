@@ -4,6 +4,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { nm as nmBridge } from '../bridge/nm';
 import { ConnectorMark } from '../settings/connector-marks';
+import { ConnectorMarks } from '../composer/ConnectorMarks';
 import type { ConnectorId } from '../settings/connectors';
 import { IconAnchor, IconBranch, IconCompass, IconCrosshair, IconFlask, IconGauge, IconGlobe, IconMail, IconPhone, IconRadar, IconRocket, IconSpeaker, IconUser } from '../ui/icons';
 import type { ConnectorRow } from '../bridge/rows-content';
@@ -71,8 +72,10 @@ export const PLAYBOOK_GLYPH: Record<string, ReactNode> = {
   release: <IconBranch s={15} />, ugc: <IconUser s={15} />,
 };
 
-/** the tile's one-glance connector row: publish networks + PostHog as the composer foot's marks, live status dots */
-export function ConnStrip({ conns, marketing }: { conns: ConnectorRow[]; marketing?: string | null }) {
+/** the tile's one-glance connector row: publish networks + PostHog as the composer foot's marks, live
+ *  status dots, and the ⋯ door at the right (the composer foot's own popover: every connector, Connect
+ *  in place) when the strip knows its room (George, 2026-09-19: connect from the desk too) */
+export function ConnStrip({ conns, marketing, channelId }: { conns: ConnectorRow[]; marketing?: string | null; channelId?: string }) {
   const posthog = ((): boolean => {
     try { return !!(JSON.parse(marketing ?? '{}') as { mcp?: { posthog?: boolean } }).mcp?.posthog; } catch { return false; }
   })();
@@ -91,6 +94,7 @@ export function ConnStrip({ conns, marketing }: { conns: ConnectorRow[]; marketi
       })}
       <span className={`mkc${posthog ? ' on' : ''}`} data-tip={`PostHog: ${posthog ? 'connected' : 'not connected'}`}><ConnectorMark id="posthog" s={13} /></span>
       <span className="mkconnlbl">{live ? `${live} live` : 'nothing connected'}{warn ? ` · ${warn} needs re-auth` : ''}</span>
+      {channelId && <ConnectorMarks channelId={channelId} marketing={marketing} marks={[]} />}
     </span>
   );
 }

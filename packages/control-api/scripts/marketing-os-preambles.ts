@@ -76,14 +76,19 @@ export const MARKETING_OS_PREAMBLES: Record<MarketingOsSkillSpec['preamble'], st
   CARD: call \`propose_angles\` with the product's name and two to five angles, each resting on a
   fact you just read (a first-person walkthrough, a before-and-after, a "three things I did not
   expect", a reply to a real objection, a duet-style react), then STOP with one line: the human
-  picks an angle and the platforms on the card, or types their own angle. (3) THE DRAFTS, on the
-  human's pick (their reply wakes you): \`draft_posts\` with one VIDEO post per picked platform,
-  all in the chosen angle. A script drafted before the pick is refused, so never skip the card.
+  picks an angle, the platforms and the film's length on the card, or types their own angle. (3)
+  THE DRAFTS, on the human's pick (their reply wakes you): \`draft_posts\` with one VIDEO post per
+  picked platform, all in the chosen angle. A script drafted before the pick is refused, so never
+  skip the card.
 - **What each draft is.** Each card has three parts:
   \`body\` is the CAPTION that posts with the video (one or two lines, the hashtags the network
   uses, within its limit); \`script\` is what the creator reads and films (9:16, the hook in the
   first three seconds as \`[0:00-0:03]\`, then timestamped beats, the product on screen, one call
-  to action at the end, under 60 seconds); \`imageBrief\` is the shot direction the film follows;
+  to action at the end), written to the LENGTH the human picked (\`… · length: 15 s\` in their
+  reply, eight seconds when they picked none): the beats end at that second, the spoken lines are
+  short, and no beat asks for on-screen text, captions or subtitles beyond one title of three
+  words at most (a video model cannot spell more; the caption that posts is the body). The film
+  shows the script's first seconds; \`imageBrief\` is the shot direction the film follows;
   \`frame\` is the name of a screenshot on this room's shelf (the [MARKETING CONTEXT] note lists
   them), so the film shows the real product, never an invented interface. With no screenshot on
   the shelf, draft without one and ask the human for a screenshot. Never put the script in the
@@ -91,6 +96,9 @@ export const MARKETING_OS_PREAMBLES: Record<MarketingOsSkillSpec['preamble'], st
 - **The platform.** The ones the human picked on the angle card (\`… · platforms: x, linkedin\` in
   their reply). A pick of none means the ask's platform, else the connected accounts. One card per
   picked platform, a video post reads the same on X and LinkedIn as on TikTok.
+- **A change to a draft.** "↩ Re draft b: …" is the human asking for a change on card b: call
+  \`read_drafts\`, then \`revise_posts\` with the script or caption changed from what the card
+  holds, in full. Never redraft from memory, never add a second card.
 - **The creator brief.** Fill the module's "Creator Briefs for UGC Ads" template for this
   campaign and shelve it through \`propose_library_doc\` as \`ugc-brief-YYYY-MM-DD.md\`, with the
   rights line and the disclosure line ("#ad", "gifted") the module prescribes.

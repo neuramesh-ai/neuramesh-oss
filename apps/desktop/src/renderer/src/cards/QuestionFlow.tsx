@@ -24,10 +24,14 @@ export function QuestionFlow({
   const [other, setOther] = useState('');
   const [sent, setSent] = useState(false);
   // THE ANGLE CARD (the UGC playbook, 2026-09-19): the platforms ride beside the angles as chips,
-  // connected accounts picked from the start, and the tap on an angle carries them in its answer
+  // connected accounts picked from the start, and the tap on an angle carries them in its answer.
+  // The film's LENGTH rides the same way (video-rung plan §8): the lengths the workspace's tier
+  // films, one picked (eight seconds, the default, else the shortest), each priced by the door.
   const ugc = questions.find((x) => x.ugc)?.ugc;
   const [platforms, setPlatforms] = useState<string[]>(() => (ugc?.platforms ?? []).filter((p) => p.connected).map((p) => p.id));
-  const withPlatforms = (a: string): string => (ugc ? `${a} · platforms: ${platforms.length ? platforms.join(', ') : 'none picked'}` : a);
+  const lengths = ugc?.lengths ?? [];
+  const [length, setLength] = useState<number | null>(() => (lengths.find((l) => l.seconds === 8) ?? lengths[0])?.seconds ?? null);
+  const withPlatforms = (a: string): string => (ugc ? `${a} · platforms: ${platforms.length ? platforms.join(', ') : 'none picked'}${length ? ` · length: ${length} s` : ''}` : a);
   const isDesignProvider = questions.some((x) => x.kind === 'design-provider');
   const [designConnection, setDesignConnection] = useState<{ configured: boolean; claudeAuthed: boolean; detail: string } | null>(null);
   const [designConnecting, setDesignConnecting] = useState(false);
@@ -123,6 +127,19 @@ export function QuestionFlow({
               </button>
             );
           })}
+        </div>
+      )}
+      {/* the film's length: one chip picked, the picked one's price said in the row (the charge
+          shown per film, George's rule); the row is absent when the lane offers one length or none */}
+      {q.ugc && lengths.length > 1 && (
+        <div className="qplatforms qlengths" role="radiogroup" aria-label="Film length">
+          <span className="qplatlbl">length</span>
+          {lengths.map((l) => (
+            <button key={l.seconds} type="button" role="radio" className={`qplat${length === l.seconds ? ' on' : ''}`} aria-checked={length === l.seconds} title={`about ${l.credits} credits a film`} onClick={() => setLength(l.seconds)}>
+              {l.seconds} s
+            </button>
+          ))}
+          {length != null && <span className="qlencost">about {lengths.find((l) => l.seconds === length)?.credits ?? '?'} credits</span>}
         </div>
       )}
       {q.kind === 'design-provider' ? (

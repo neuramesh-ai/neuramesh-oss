@@ -2,7 +2,7 @@
 // and the chat registry had no tool that could. The same reads as the orchestrator's, one
 // implementation (host/grounding.ts), split from chattools.ts at the size gate.
 import { listLibrary, readLibraryDoc, type Grounding } from './grounding';
-import { angleCard, angleGate, connectedPlatforms, type AngleInput } from './ugcflow';
+import { angleCard, angleGate, connectedPlatforms, videoLengths, type AngleInput } from './ugcflow';
 import type { ChatToolCtx } from './chattools';
 
 export function libraryChatTools(t: Pick<ChatToolCtx, 'z' | 'tool' | 'text' | 'ch' | 'log' | 'libraryDocs'>, grounding: Grounding) {
@@ -32,8 +32,8 @@ export function libraryChatTools(t: Pick<ChatToolCtx, 'z' | 'tool' | 'text' | 'c
 }
 
 /** THE UGC PLAYBOOK's second step in the conversation registry (host/ugcflow.ts): the angle card */
-export function ugcChatTools(t: Pick<ChatToolCtx, 'z' | 'tool' | 'text' | 'agent' | 'ch' | 'threadId' | 'log' | 'db' | 'post'>, grounding: Grounding) {
-  const { z, tool, text, agent, ch, threadId, log, db, post } = t;
+export function ugcChatTools(t: Pick<ChatToolCtx, 'z' | 'tool' | 'text' | 'agent' | 'ch' | 'threadId' | 'log' | 'db' | 'post' | 'apiGet'>, grounding: Grounding) {
+  const { z, tool, text, agent, ch, threadId, log, db, post, apiGet } = t;
   return [
     tool(
       'propose_angles',
@@ -49,11 +49,13 @@ export function ugcChatTools(t: Pick<ChatToolCtx, 'z' | 'tool' | 'text' | 'agent
         const input = i as AngleInput;
         const gate = await angleGate(db, ch.id, grounding, input);
         if (gate) return text(gate);
-        const conns = await connectedPlatforms(db, ch.id);
-        const posted = await post('/v1/messages', { kind: 'agent', id: agent.id }, { workspace: ch.workspace_id, channel: ch.id, threadId, body: angleCard(input, conns) }).catch(() => null);
+        // the platforms as chips, and the lengths the workspace's tier films, priced (video-rung plan §8)
+        const actor = { kind: 'agent', id: agent.id, ...(agent.role ? { role: agent.role } : {}) };
+        const [conns, lengths] = await Promise.all([connectedPlatforms(db, ch.id), videoLengths(apiGet, actor, ch.workspace_id)]);
+        const posted = await post('/v1/messages', { kind: 'agent', id: agent.id }, { workspace: ch.workspace_id, channel: ch.id, threadId, body: angleCard(input, conns, lengths) }).catch(() => null);
         if (!posted?.ok) return text('the angle card could not be posted — say so plainly rather than listing the angles in your reply');
-        log({ kind: 'tool', phase: 'call', summary: `propose_angles — ${input.angles.length} angles, platforms ${conns.join(', ') || 'none connected'}` });
-        return text(`Angle card posted with ${input.angles.length} angles. STOP here and say one line: the human picks on the card. Their pick wakes you; then call draft_posts with one video post per picked platform in that angle.`);
+        log({ kind: 'tool', phase: 'call', summary: `propose_angles — ${input.angles.length} angles, platforms ${conns.join(', ') || 'none connected'}, lengths ${lengths.map((l) => l.seconds).join('/') || 'default'}` });
+        return text(`Angle card posted with ${input.angles.length} angles. STOP here and say one line: the human picks on the card. Their pick wakes you; then call draft_posts with one video post per picked platform in that angle, the script written to the length they picked.`);
       },
     ),
   ];

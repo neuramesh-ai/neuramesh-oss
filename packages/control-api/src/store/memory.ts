@@ -1335,12 +1335,12 @@ export class MemoryStore implements Store {
     this.schedules = rest as typeof this.schedules;
     return { id: scheduleId };
   }
-  private contentItems: Array<{ id: string; workspace: string; channelId: string; taskId: string | null; threadId: string | null; platform: string; body: string; scheduleId: string | null; status: string; scheduledAt: string | null; approvedBy: string | null; mediaUrl: string | null; mediaId?: string | null; brief?: string | null; script?: string | null; videoPending?: boolean; videoMeta?: VideoMeta | null; videoErrorCode?: 'NO_CREDITS' | 'UNAVAILABLE' | null; frame?: string | null; lastError?: string | null }> = [];
-  async createContentItem(input: { channelId: string; taskId?: string | null; threadId?: string | null; platform: string; body: string; scheduleId: string | null; slotAt?: string | null; mediaUrl?: string | null; imageBrief?: string | null; script?: string | null; frame?: string | null; thumb?: string | null; imageError?: string | null; createdByKind: string; createdBy: string }, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }> {
+  private contentItems: Array<{ id: string; workspace: string; channelId: string; taskId: string | null; threadId: string | null; platform: string; body: string; scheduleId: string | null; status: string; scheduledAt: string | null; approvedBy: string | null; mediaUrl: string | null; mediaId?: string | null; brief?: string | null; script?: string | null; videoPending?: boolean; videoMeta?: VideoMeta | null; videoErrorCode?: 'NO_CREDITS' | 'UNAVAILABLE' | null; frame?: string | null; seconds?: number | null; lastError?: string | null }> = [];
+  async createContentItem(input: { channelId: string; taskId?: string | null; threadId?: string | null; platform: string; body: string; scheduleId: string | null; slotAt?: string | null; mediaUrl?: string | null; imageBrief?: string | null; script?: string | null; frame?: string | null; seconds?: number | null; thumb?: string | null; imageError?: string | null; createdByKind: string; createdBy: string }, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }> {
     const c = this.channels.find((x) => x.id === input.channelId);
     if (!c) throw new DomainError('NOT_FOUND', 'channel not found');
     const id = crypto.randomUUID();
-    this.contentItems.push({ id, workspace: c.workspace, channelId: input.channelId, taskId: input.taskId ?? null, threadId: input.threadId ?? null, platform: input.platform, body: input.body, scheduleId: input.scheduleId, status: 'draft', scheduledAt: input.slotAt ?? null, approvedBy: null, mediaUrl: input.mediaUrl ?? null, brief: input.imageBrief ?? null, script: input.script ?? null, frame: input.frame ?? null });
+    this.contentItems.push({ id, workspace: c.workspace, channelId: input.channelId, taskId: input.taskId ?? null, threadId: input.threadId ?? null, platform: input.platform, body: input.body, scheduleId: input.scheduleId, status: 'draft', scheduledAt: input.slotAt ?? null, approvedBy: null, mediaUrl: input.mediaUrl ?? null, brief: input.imageBrief ?? null, script: input.script ?? null, frame: input.frame ?? null, seconds: input.seconds ?? null });
     this.events.push(makeEvent(c.workspace));
     return { id };
   }
@@ -1366,13 +1366,13 @@ export class MemoryStore implements Store {
     this.events.push(makeEvent(it.workspace));
     return { id: itemId };
   }
-  async reviseDraft(itemId: string, patch: { body: string | null; imageBrief: string | null; script?: string | null; frame?: string | null; videoPending?: boolean; videoMeta?: VideoMeta | null; videoErrorCode?: 'NO_CREDITS' | 'UNAVAILABLE' | null; thumb: string | null; imageError?: string | null; videoError?: string | null }, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }> {
+  async reviseDraft(itemId: string, patch: { body: string | null; imageBrief: string | null; script?: string | null; frame?: string | null; seconds?: number | null; videoPending?: boolean; videoMeta?: VideoMeta | null; videoErrorCode?: 'NO_CREDITS' | 'UNAVAILABLE' | null; thumb: string | null; imageError?: string | null; videoError?: string | null }, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }> {
     // draft OR scheduled, never published — mirrors pg (and updateContentBody/delete)
     const it = this.contentItems.find((x) => x.id === itemId && (x.status === 'draft' || x.status === 'scheduled'));
     if (!it) throw new DomainError('NOT_FOUND', 'content item not found (already published or gone)');
     const isRevision = patch.body !== null || patch.imageBrief !== null || !!patch.script;
     if (patch.body !== null) it.body = patch.body;
-    if (patch.imageBrief !== null) it.brief = patch.imageBrief;   if (patch.script) it.script = patch.script;   if (patch.frame !== undefined) { it.frame = patch.frame; it.videoMeta = null; }   if (patch.videoPending !== undefined) it.videoPending = patch.videoPending;   if (patch.videoMeta !== undefined) it.videoMeta = patch.videoMeta;   if (patch.videoErrorCode !== undefined) it.videoErrorCode = patch.videoErrorCode;
+    if (patch.imageBrief !== null) it.brief = patch.imageBrief;   if (patch.script) it.script = patch.script;   if (patch.frame !== undefined) { it.frame = patch.frame; it.videoMeta = null; }   if (patch.seconds !== undefined) it.seconds = patch.seconds;   if (patch.videoPending !== undefined) it.videoPending = patch.videoPending;   if (patch.videoMeta !== undefined) it.videoMeta = patch.videoMeta;   if (patch.videoErrorCode !== undefined) it.videoErrorCode = patch.videoErrorCode;
     // thumb tracked in the mem store only for parity; the card reads it from media in pg
     // rewriting the copy/brief of a SCHEDULED post unschedules it back to draft (pg parity), so the
     // changed text can't auto-publish on the old slot without a fresh human approve
@@ -1532,9 +1532,9 @@ export class MemoryStore implements Store {
       .slice(0, limit)
       .map((i) => ({ id: i.id, workspace: i.workspace, channel: i.channelId, threadId: (i as { threadId?: string | null }).threadId ?? null, platform: i.platform, body: i.body, scheduledAt: i.scheduledAt! }));
   }
-  async contentItemMedia(itemId: string): Promise<{ platform: string; mediaUrl: string | null; mediaId?: string | null; workspace: string; channel?: string; frame?: string | null } | null> {
+  async contentItemMedia(itemId: string): Promise<{ platform: string; mediaUrl: string | null; mediaId?: string | null; workspace: string; channel?: string; frame?: string | null; seconds?: number | null } | null> {
     const it = this.contentItems.find((x) => x.id === itemId);
-    return it ? { platform: it.platform, mediaUrl: it.mediaUrl ?? null, mediaId: it.mediaId ?? null, workspace: it.workspace, channel: it.channelId, frame: it.frame ?? null } : null;
+    return it ? { platform: it.platform, mediaUrl: it.mediaUrl ?? null, mediaId: it.mediaId ?? null, workspace: it.workspace, channel: it.channelId, frame: it.frame ?? null, seconds: it.seconds ?? null } : null;
   }
   async markContentPublished(itemId: string, _url: string, _publishedAtIso: string): Promise<void> {
     const it = this.contentItems.find((x) => x.id === itemId);

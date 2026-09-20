@@ -166,6 +166,8 @@ export interface TaskProposalCardData {
 export interface UgcCardData {
   product: string;
   platforms: Array<{ id: 'x' | 'linkedin' | 'instagram' | 'tiktok'; label: string; connected: boolean }>;
+  /** the film lengths the workspace's tier offers, with the price of each (video-rung plan §8); absent = the lane is not served here, no row */
+  lengths?: Array<{ seconds: number; credits: number }>;
 }
 
 export interface NmQuestion {

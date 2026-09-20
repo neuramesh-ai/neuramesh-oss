@@ -4,18 +4,20 @@
 //
 //   1. research: the shelf is read (the grounding gate already makes that so);
 //   2. the angle card: `propose_angles` posts ONE question card whose options are the angles the
-//      research produced, with "type your own" as the alternate and the room's platforms as chips
-//      ("prepare for": connected accounts picked from the start, nothing is scheduled by a pick);
-//      the turn stops there;
+//      research produced, with "type your own" as the alternate, the room's platforms as chips
+//      ("prepare for": connected accounts picked from the start, nothing is scheduled by a pick),
+//      and the film's LENGTH as chips (video-rung plan §8: the lengths the workspace's tier films,
+//      each priced, read from the door when it is served); the turn stops there;
 //   3. the drafts: when the human's pick arrives, `draft_posts` writes one video post per picked
-//      platform in the chosen angle, as the cards.
+//      platform in the chosen angle, as the cards, each carrying the picked length.
 //
 // Enforced, not prompted: `draft_posts` with a script (a video post) refuses until this thread
 // holds an answered angle card, and `propose_angles` refuses until the shelf was read. The agent
-// keeps every judgment (which angles, what copy); it cannot skip the research or the pick.
+// keeps every judgment (which angles, what copy); it cannot skip the research or the pick. The
+// length is read off the human's answer by code, never trusted to the model's retelling.
 import type { AttDbLike } from '../agents';
 import type { OrchTool, ToolCtx } from './orchtools';
-import type { UgcCardData } from '@neuramesh/shared';
+import { filmCredits, type UgcCardData } from '@neuramesh/shared';
 import { readBrand } from './brandnote';
 import { ungrounded, type Grounding } from './grounding';
 
@@ -24,11 +26,14 @@ const PLATFORM_IDS = Object.keys(PLATFORM_LABELS) as Array<UgcCardData['platform
 
 export interface AngleInput { product: string; angles: Array<{ title: string; why: string }> }
 
-/** the card's message body: a question whose options are the angles, with the platform row */
-export function angleCard(input: AngleInput, connected: readonly string[]): string {
+export type FilmLength = { seconds: number; credits: number };
+
+/** the card's message body: a question whose options are the angles, with the platform row and the length row */
+export function angleCard(input: AngleInput, connected: readonly string[], lengths: readonly FilmLength[] = []): string {
   const ugc: UgcCardData = {
     product: input.product,
     platforms: PLATFORM_IDS.map((id) => ({ id, label: PLATFORM_LABELS[id], connected: connected.includes(id) })),
+    ...(lengths.length > 1 ? { lengths: [...lengths] } : {}), // one length is no choice: no row
   };
   const card = {
     question: `Which angle should the UGC scripts take for ${input.product}?`,
@@ -39,11 +44,28 @@ export function angleCard(input: AngleInput, connected: readonly string[]): stri
   return `\`\`\`nmq\n${JSON.stringify(card)}\n\`\`\``;
 }
 
-/** the answer's platforms, as the card wrote them ("… · platforms: x, linkedin") */
+/** the answer's platforms, as the card wrote them ("… · platforms: x, linkedin · length: 15 s") */
 export function pickedPlatforms(answer: string): string[] {
-  const m = /platforms:\s*([a-z, ]+)$/i.exec(answer.trim());
+  const m = /platforms:\s*([a-z, ]+)/i.exec(answer.trim());
   if (!m) return [];
   return m[1]!.split(',').map((s) => s.trim().toLowerCase()).filter((s) => (PLATFORM_IDS as string[]).includes(s));
+}
+/** the answer's film length in seconds, as the card wrote it ("… · length: 15 s"); null when the answer names none */
+export function pickedLength(answer: string | null | undefined): number | null {
+  const m = /\blength:\s*(\d{1,3})\s*s\b/i.exec(answer ?? '');
+  return m ? Number(m[1]) : null;
+}
+
+type Catalog = { served?: boolean; tier?: string | null; tiers?: Array<{ tier: string; lengths?: number[]; perSecondMicros?: number }> };
+/** the lengths the workspace's tier films, priced, from the door (GET /v1/starter/video): empty when the
+ *  lane is not served here (the local stack, no FAL_KEY), so the card shows no row and the default holds.
+ *  The daemon's apiGet hands back the raw Response (host/searchx.ts reads it the same way); a fake may hand the body. */
+export async function videoLengths(apiGet: (path: string, actor: { kind: string; id: string; role?: string }) => Promise<any>, actor: { kind: string; id: string; role?: string }, workspaceId: string): Promise<FilmLength[]> {
+  const res = await apiGet(`/v1/starter/video?workspace=${encodeURIComponent(workspaceId)}`, actor).catch(() => null) as (Catalog & { ok?: boolean; json?: () => Promise<unknown> }) | null;
+  const cat = (res && typeof res.json === 'function' ? (res.ok ? await res.json().catch(() => null) : null) : res) as Catalog | null;
+  const active = cat?.served ? cat.tiers?.find((t) => t.tier === cat.tier) ?? cat.tiers?.[0] : null;
+  if (!active?.lengths?.length || !active.perSecondMicros) return [];
+  return active.lengths.map((seconds) => ({ seconds, credits: filmCredits(active.perSecondMicros!, seconds) }));
 }
 
 type MsgRow = { author_kind: string; body: string | null };
@@ -70,6 +92,21 @@ export async function unpicked(db: AttDbLike, at: { threadId?: string | null; ta
   return null;
 }
 
+/** the human's answer to the thread's last angle card (their first message after it), or null */
+export async function angleAnswer(db: AttDbLike, at: { threadId?: string | null; taskId?: string | null }): Promise<string | null> {
+  const msgs = await threadMessages(db, at);
+  const last = msgs.map(isAngleCard).lastIndexOf(true);
+  if (last < 0) return null;
+  return msgs.slice(last + 1).find((m) => m.author_kind === 'human' && !!m.body?.trim())?.body ?? null;
+}
+
+/** the length each video draft carries: the tool's own `seconds` when the human named one in the
+ *  conversation, else the angle card's pick, read off the answer by code; a text post carries none */
+export async function draftSeconds<P extends { script?: string; seconds?: number }>(db: AttDbLike, at: { threadId?: string | null; taskId?: string | null }, posts: P[]): Promise<Array<number | undefined>> {
+  const picked = posts.some((p) => p.script) ? pickedLength(await angleAnswer(db, at)) : null;
+  return posts.map((p) => (p.script ? p.seconds ?? picked ?? undefined : undefined));
+}
+
 /** what `propose_angles` asks before it posts: the shelf read (research first), and a real set of angles */
 export async function angleGate(db: AttDbLike, channelId: string, grounding: Grounding, input: AngleInput): Promise<string | null> {
   const shelf = await ungrounded(db, channelId, grounding);
@@ -85,8 +122,8 @@ export async function connectedPlatforms(db: AttDbLike, channelId: string): Prom
 }
 
 /** the orchestrator registry's tool (tools-content.ts spreads it beside draft_posts) */
-export function ugcOrchTools(tc: Pick<ToolCtx, 'z' | 'db' | 'post' | 'ch' | 'actor' | 'log' | 'grounding'>, msgAnchor: () => { taskId: string } | { threadId: string } | null): OrchTool[] {
-  const { z, db, post, ch, actor, log, grounding } = tc;
+export function ugcOrchTools(tc: Pick<ToolCtx, 'z' | 'db' | 'post' | 'apiGet' | 'ch' | 'actor' | 'log' | 'grounding'>, msgAnchor: () => { taskId: string } | { threadId: string } | null): OrchTool[] {
+  const { z, db, post, apiGet, ch, actor, log, grounding } = tc;
   return [
     { name: 'propose_angles', description: 'THE UGC PLAYBOOK, step two, after the research: post the ANGLE CARD in this conversation — two to five angles for the creator videos, each resting on a fact from the brand docs you just read, with "type your own" as the alternate and the room\'s platforms as chips (connected accounts come picked). Then STOP: the human\'s pick wakes you, and only then draft_posts, one video post per picked platform in the chosen angle. A creator script drafted before this card is answered is refused.', schema: {
       product: z.string().min(1).max(80).describe('the product name as the brand docs say it'),
@@ -99,11 +136,11 @@ export function ugcOrchTools(tc: Pick<ToolCtx, 'z' | 'db' | 'post' | 'ch' | 'act
       if (gate) return gate;
       const anchor = msgAnchor();
       if (!anchor) return 'propose_angles needs a conversation to post into — reply inside the thread and propose there.';
-      const conns = await connectedPlatforms(db, ch.id);
-      const posted = await post('/v1/messages', actor, { workspace: ch.workspace_id, channel: ch.id, ...anchor, body: angleCard(input, conns) }).catch(() => null);
+      const [conns, lengths] = await Promise.all([connectedPlatforms(db, ch.id), videoLengths(apiGet, actor, ch.workspace_id)]);
+      const posted = await post('/v1/messages', actor, { workspace: ch.workspace_id, channel: ch.id, ...anchor, body: angleCard(input, conns, lengths) }).catch(() => null);
       if (!posted?.ok) return 'the angle card could not be posted — say so plainly rather than listing the angles in your reply';
-      log?.({ kind: 'tool', phase: 'call', summary: `propose_angles — ${input.angles.length} angles, platforms ${conns.join(', ') || 'none connected'}` });
-      return `Angle card posted with ${input.angles.length} angles. STOP here and say one line: the human picks on the card. Their pick wakes you; then call draft_posts with one video post per picked platform in that angle.`;
+      log?.({ kind: 'tool', phase: 'call', summary: `propose_angles — ${input.angles.length} angles, platforms ${conns.join(', ') || 'none connected'}, lengths ${lengths.map((l) => l.seconds).join('/') || 'default'}` });
+      return `Angle card posted with ${input.angles.length} angles. STOP here and say one line: the human picks on the card. Their pick wakes you; then call draft_posts with one video post per picked platform in that angle, the script written to the length they picked.`;
     } },
   ];
 }

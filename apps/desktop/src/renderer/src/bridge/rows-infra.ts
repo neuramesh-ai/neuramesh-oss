@@ -92,5 +92,6 @@ export interface StarterVideo {
   pick: string | null;
   /** the pick is a Pro setting */
   canPick?: boolean;
-  tiers: Array<{ tier: string; label: string; model: string; vendor: string; seconds: number; credits: number }>;
+  /** `seconds`/`credits` are the default length and its price; `lengths` the ones a card offers, priced by `perSecondMicros` with the shared formula (video-rung plan §8) */
+  tiers: Array<{ tier: string; label: string; model: string; vendor: string; seconds: number; credits: number; lengths?: number[]; perSecondMicros?: number }>;
 }

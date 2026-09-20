@@ -2,7 +2,7 @@
 // pnpm exec tsx --test src/renderer/src/marketing/cardparts.test.ts
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { cardParts, filmFacts, filmFile, filmingOn, isScript } from './cardparts';
+import { cardParts, filmFacts, filmFile, filmSeconds, filmingOn, isScript } from './cardparts';
 
 const SCRIPT = '[0:00-0:03] HOOK, phone in hand\nSpoken: "My laptop is in my bag."\n[0:03-0:08] the app on screen';
 
@@ -20,7 +20,16 @@ test('a plain post: the body is the caption and there is nothing to film', () =>
   assert.deepEqual(cardParts('Ship on Friday.', null), { caption: 'Ship on Friday.', script: null });
 });
 
-const CATALOG = { served: true, tier: 'starter', tiers: [{ tier: 'starter', label: 'NeuraMesh Video Starter', model: 'Seedance 2.0', seconds: 8, credits: 194 }, { tier: 'xpress', label: 'NeuraMesh Video Xpress', model: 'MiniMax H3', seconds: 8, credits: 48 }] };
+const CATALOG = { served: true, tier: 'starter', tiers: [{ tier: 'starter', label: 'NeuraMesh Video Starter', model: 'Seedance 2.0', seconds: 8, credits: 194, lengths: [5, 8, 10, 15], perSecondMicros: 241_900 }, { tier: 'xpress', label: 'NeuraMesh Video Xpress', model: 'MiniMax H3', seconds: 8, credits: 48 }] };
+
+test('the length on the facts line (plan §8): the draft\'s pick priced by the door\'s own formula, held inside the tier\'s lengths, the default when it has none', () => {
+  assert.deepEqual(filmFacts({ seconds: 15 }, CATALOG), ['NeuraMesh Video Starter', 'Seedance 2.0', '15 s', 'about 363 credits', '4 min']);
+  assert.deepEqual(filmFacts({ seconds: 30 }, CATALOG)!.slice(2, 4), ['15 s', 'about 363 credits']); // 30 s on a 15 s tier: the door films 15, the card says 15
+  assert.deepEqual(filmFacts({ seconds: 5 }, CATALOG)!.slice(2, 5), ['5 s', 'about 121 credits', '2 min']);
+  assert.equal(filmSeconds(null, CATALOG.tiers[0]), 8);
+  assert.equal(filmSeconds({ seconds: 12 }, CATALOG.tiers[1]), 12); // a tier without lengths takes the pick as it is
+  assert.equal(filmSeconds({ seconds: 12 }, null), 12);
+});
 
 test('the facts line: the tier and the price before a film, the record after, the own key named, nothing when nothing is known', () => {
   assert.deepEqual(filmFacts(null, CATALOG), ['NeuraMesh Video Starter', 'Seedance 2.0', '8 s', 'about 194 credits', '2 min']);

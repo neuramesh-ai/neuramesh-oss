@@ -5,9 +5,10 @@ import { createEvent, formatAddress, type Actor } from '@neuramesh/shared';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from '../src/app';
 import type { Ledger } from '../src/credits';
-import { filmsDue } from '../src/starter-video';
+import { filmTimeoutMs, filmsDue } from '../src/starter-video';
 import { MemoryStore } from '../src/store';
-import { tierFor, videoTiers } from '../src/video-registry';
+import { clampSeconds, filmCredits, tierFor, videoTiers } from '../src/video-registry';
+import { filmCredits as sharedFilmCredits } from '@neuramesh/shared';
 
 const george: Actor = { kind: 'human', id: 'george' };
 const plume: Actor = { kind: 'agent', id: 'plume', role: 'marketer' };
@@ -69,6 +70,19 @@ describe('the registry and the tiers', () => {
     expect(tierFor(all, 'xpress')?.tier).toBe('xpress');
     expect(tierFor(all, 'bogus')?.tier).toBe('starter');
   });
+  it('the lengths a tier offers sit inside its model\'s range (plan §8): Seedance 2.0 to 15 s, MiniMax from 5, Seedance 2.5 to 30', () => {
+    const all = videoTiers({ ...ENV, NM_VIDEO_TIERS: 'starter=seedance-2.0-fast,xpress=minimax-h3,premium=seedance-2.5' });
+    expect(all.map((t) => t.lengths)).toEqual([[5, 8, 10, 15], [5, 8, 10, 15], [5, 8, 10, 15, 20, 30]]);
+    expect(all.map((t) => t.seconds)).toEqual([8, 8, 8]);
+    // a length is held inside the model's range, whole seconds, the default when nothing was asked
+    const [fast, , long] = all.map((t) => t.model);
+    expect([clampSeconds(fast!, 30), clampSeconds(fast!, 2), clampSeconds(fast!, null), clampSeconds(fast!, 12.4), clampSeconds(long!, 30)]).toEqual([15, 4, 8, 12, 30]);
+    // a default length past a tier's range is held too (NM_VIDEO_SECONDS=20 on a 15 s model films 15)
+    expect(videoTiers({ ...ENV, NM_VIDEO_SECONDS: '20' }).map((t) => t.seconds)).toEqual([15, 15, 15]);
+    // the shared formula prices any length in whole credits: 15 s on Seedance 2.0 fast is 363, the same number the card computes
+    expect(filmCredits(fast!, 15)).toBe(363);
+    expect(sharedFilmCredits(fast!.perSecondMicros, 15)).toBe(363);
+  });
 });
 
 describe('the door', () => {
@@ -96,6 +110,8 @@ describe('the door', () => {
     expect(r.served).toBe(true);
     expect(r.tier).toBe('starter');
     expect(r.tiers.map((t: { tier: string; model: string; credits: number }) => [t.tier, t.model, t.credits])).toEqual([['starter', 'Seedance 2.0', 194], ['xpress', 'MiniMax H3', 48], ['premium', 'Seedance 2.0 Standard', 243]]);
+    // the lengths a card offers and the rate it prices them at (the shared formula), so the facts line says what the door will charge
+    expect(r.tiers[0]).toMatchObject({ lengths: [5, 8, 10, 15], perSecondMicros: 241_900, seconds: 8 });
     // the pick is a Pro setting: Free is refused, Pro picks, an agent never may
     expect(r.canPick).toBe(false);
     expect((await send(george, '/v1/commands', { type: 'workspace.update', workspace: ws, videoTier: 'premium' })).status).toBe(403);
@@ -134,7 +150,8 @@ describe('the door', () => {
     expect(body.tier.model).toBe('Seedance 2.0');
     expect(led.calls[0]).toEqual({ op: 'spendFilm', micros: 1_940_000, seconds: 8 });
     expect(fal.calls[0]!.url).toBe('https://queue.fal.run/bytedance/seedance-2.0/fast/text-to-video');
-    expect(fal.calls[0]!.body).toEqual({ prompt: 'a vertical clip of the hook', resolution: '720p', duration: '8', aspect_ratio: '9:16', generate_audio: true });
+    // the high bitrate rides every Seedance lane (the same price, less smear on lettering, plan §8)
+    expect(fal.calls[0]!.body).toEqual({ prompt: 'a vertical clip of the hook', resolution: '720p', duration: '8', aspect_ratio: '9:16', generate_audio: true, bitrate_mode: 'high' });
     const [row] = store.films.rows;
     expect(row).toMatchObject({ itemId: item, tier: 'starter', model: 'seedance-2.0-fast', requestId: 'req-1', micros: 1_940_000, status: 'queued' });
     expect((store as unknown as { contentItems: Array<{ id: string; videoPending?: boolean; mediaId?: string | null; videoMeta?: unknown }> }).contentItems.find((x) => x.id === item)).toMatchObject({ videoPending: true });
@@ -189,7 +206,7 @@ describe('the door', () => {
     door(led.ledger, slow.fetchFn);
     await send(george, '/v1/starter/film', { workspace: ws, item, prompt: 'a vertical clip of the hook' });
     const t1 = Date.parse(store.films.rows[2]!.createdAt);
-    expect((await filmsDue(store, { ledger: led.ledger, env: ENV, fetchFn: slow.fetchFn, now: () => t1 + 13 * 60_000 })).map((r) => r.outcome)).toEqual(['failed: the film took longer than twelve minutes']);
+    expect((await filmsDue(store, { ledger: led.ledger, env: ENV, fetchFn: slow.fetchFn, now: () => t1 + 13 * 60_000 })).map((r) => r.outcome)).toEqual(['failed: the film took longer than 12 minutes']);
     expect(led.calls.filter((c) => c['op'] === 'refundFilm')).toHaveLength(2);
   });
 
@@ -212,7 +229,8 @@ describe('the door', () => {
     expect(await j(r)).toMatchObject({ frame: 'App-Home.png', frameUsed: true, credits: 194 }); // the same price as the text lane
     expect(fal.calls[0]!.url).toBe('https://queue.fal.run/bytedance/seedance-2.0/fast/reference-to-video');
     expect(fal.calls[0]!.body).toMatchObject({ image_urls: [PNG], aspect_ratio: '9:16', duration: '8' });
-    expect((fal.calls[0]!.body as { prompt: string }).prompt).toMatch(/^a vertical clip of the hook The product on screen is @Image1/);
+    expect((fal.calls[0]!.body as { prompt: string }).prompt).toMatch(/^a vertical clip of the hook @Image1 is a real screenshot of the product\./);
+    expect((fal.calls[0]!.body as { prompt: string }).prompt).not.toMatch(/lettering/); // the clause no longer invites typesetting the screenshot's small type
     expect(store.films.rows.at(-1)).toMatchObject({ itemId: framed, endpoint: 'bytedance/seedance-2.0/fast/reference-to-video', frame: 'App-Home.png', frameUsed: true });
     const t0 = Date.parse(store.films.rows.at(-1)!.createdAt);
     await filmsDue(store, { ledger: led.ledger, env: ENV, fetchFn: fal.fetchFn, now: () => t0 + 1000 });
@@ -236,6 +254,46 @@ describe('the door', () => {
     // a frame change makes the old film stale, the way a new script does: the record goes and the card films again
     expect((await send(plume, '/v1/commands', { type: 'content.revise', item: framed, frame: 'App-Home.png' })).status).toBe(200);
     expect(items.find((x) => x.id === framed)!.videoMeta).toBe(null);
+  });
+
+  it('the length is the draft\'s (plan §8): a 15 s pick films 15 s at 363 credits; a 30 s pick on a 15 s tier films 15 and says so; the timeout grows with it', async () => {
+    const fal = fakeFal({ polls: 2 });
+    const led = fakeLedger(50_000_000);
+    door(led.ledger, fal.fetchFn);
+    // the pick rides content.create as `seconds` (the angle card's length row), and content.revise can change it
+    const { itemId: long } = await j(await send(plume, '/v1/commands', { type: 'content.create', channel, platform: 'x', body: 'six', script: '[0:00-0:03] hook\n[0:03-0:12] body', seconds: 15 }));
+    expect((await store.contentItemMedia(long))?.seconds).toBe(15);
+    const r = await send(george, '/v1/starter/film', { workspace: ws, item: long, prompt: 'a vertical clip, fifteen seconds' });
+    expect(r.status).toBe(202);
+    expect(await j(r)).toMatchObject({ seconds: 15, credits: 363 });
+    expect(led.calls.at(-1)).toEqual({ op: 'spendFilm', micros: 3_630_000, seconds: 15 });
+    expect(fal.calls[0]!.body).toMatchObject({ duration: '15' });
+    expect((fal.calls[0] as { url: string }).url).toBe('https://queue.fal.run/bytedance/seedance-2.0/fast/text-to-video');
+    expect(store.films.rows.at(-1)).toMatchObject({ seconds: 15, micros: 3_630_000 });
+    // the cron lands it with its own length on the facts
+    const t0 = Date.parse(store.films.rows.at(-1)!.createdAt);
+    await filmsDue(store, { ledger: led.ledger, env: ENV, fetchFn: fal.fetchFn, now: () => t0 + 1000 });
+    await filmsDue(store, { ledger: led.ledger, env: ENV, fetchFn: fal.fetchFn, now: () => t0 + 1000 });
+    const items = (store as unknown as { contentItems: Array<{ id: string; videoMeta?: { seconds: number; credits: number } | null }> }).contentItems;
+    expect(items.find((x) => x.id === long)!.videoMeta).toMatchObject({ seconds: 15, credits: 363 });
+    // a 30 s ask on Seedance 2.0 (15 s at most) films 15; a revision to 30 keeps the film on the card
+    expect((await send(plume, '/v1/commands', { type: 'content.revise', item: long, seconds: 30 })).status).toBe(200);
+    expect(items.find((x) => x.id === long)!.videoMeta).toMatchObject({ seconds: 15 });
+    const fal2 = fakeFal({ polls: 99 });
+    door(led.ledger, fal2.fetchFn);
+    expect(await j(await send(george, '/v1/starter/film', { workspace: ws, item: long, prompt: 'a vertical clip, thirty seconds' }))).toMatchObject({ seconds: 15, credits: 363 });
+    expect(fal2.calls[0]!.body).toMatchObject({ duration: '15' });
+    // a 15 s row is failed at twelve minutes like an 8 s one; a 30 s row on a long tier gets twenty
+    expect(filmTimeoutMs(8)).toBe(12 * 60_000);
+    expect(filmTimeoutMs(30)).toBe(20 * 60_000);
+    // Seedance 2.5 behind a tier films the long lane at its own rate
+    const env25 = { ...ENV, NM_VIDEO_TIERS: 'starter=seedance-2.5' } as NodeJS.ProcessEnv;
+    const fal3 = fakeFal();
+    door(led.ledger, fal3.fetchFn, env25);
+    const { itemId: longer } = await j(await send(plume, '/v1/commands', { type: 'content.create', channel, platform: 'x', body: 'seven', script: '[0:00-0:03] hook', seconds: 30 }));
+    expect(await j(await send(george, '/v1/starter/film', { workspace: ws, item: longer, prompt: 'a vertical clip, thirty seconds' }))).toMatchObject({ seconds: 30, credits: 1419 });
+    expect((fal3.calls[0] as { url: string }).url).toBe('https://queue.fal.run/bytedance/seedance-2.5/text-to-video');
+    expect(fal3.calls[0]!.body).toMatchObject({ duration: '30', bitrate_mode: 'high' });
   });
 
   it('the cron door wants the secret', async () => {

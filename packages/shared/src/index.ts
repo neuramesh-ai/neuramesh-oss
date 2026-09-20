@@ -1,6 +1,7 @@
 export * from './alerts';
 export * from './articles';
 export * from './images';
+export * from './filmprompt';
 export * from './artifacts';
 export * from './states';
 export * from './workspaces';

@@ -10,7 +10,9 @@
  * argument that depletion is a shape before it is a figure; it stayed a shape nobody could read
  * without a click, and the one place the number then appeared — the switch button in a thread —
  * read as a price. So the balance rides INSIDE the ring now, compact (479 · 1.5k · 12k), and the
- * arc keeps saying the same thing at a glance: it shortens, and warms below a fifth. The three
+ * arc keeps saying the same thing at a glance: it shortens, and its hue follows the level (George,
+ * 2026-09-19: "green at 100%, amber as it reduces"): green above a half, the house amber below
+ * it, red below a fifth. Three bands, not a gradient: a band is a state a person can name. The three
  * named lines (Brain · Machine · Storage) survive one click in, where someone who wants the
  * breakdown goes looking, and the popover's last line is the one that matters: connecting your
  * own brain stops the drain, which turns the meter into a reason rather than a threat.
@@ -43,8 +45,10 @@ const nm = nmBridge;
 const R = 12.5;
 const C = 15;
 const CIRC = 2 * Math.PI * R;
-/** below a fifth remaining the arc turns warm — the one threshold the design names */
+/** the arc's bands: green down to a half, amber below it, red below a fifth */
+const MID = 0.5;
 const LOW = 0.2;
+export const bandOf = (frac: number): '' | 'mid' | 'low' => (frac < LOW ? 'low' : frac < MID ? 'mid' : '');
 
 /**
  * POLLING, decided rather than defaulted. The ring's whole claim is that it depletes VISIBLY,
@@ -211,7 +215,7 @@ export function CreditRing({ workspace, onUpgrade, connection }: {
   const left = Math.max(0, remaining);
   // a never-granted workspace reads zero on both — an empty ring, which is the true picture
   const frac = granted > 0 ? Math.max(0, Math.min(1, left / granted)) : 0;
-  const low = frac < LOW;
+  const band = bandOf(frac);
   const label = `${left} of ${granted} credits left`;
 
   return (
@@ -229,7 +233,7 @@ export function CreditRing({ workspace, onUpgrade, connection }: {
           {/* the arc starts at twelve o'clock: the circles turn, the number does not */}
           <circle className="credtrack" cx={C} cy={C} r={R} transform={`rotate(-90 ${C} ${C})`} />
           <circle
-            className={`credarc${low ? ' low' : ''}`}
+            className={`credarc${band ? ` ${band}` : ''}`}
             cx={C} cy={C} r={R} transform={`rotate(-90 ${C} ${C})`}
             style={{ strokeDasharray: CIRC, strokeDashoffset: CIRC * (1 - frac) }}
           />
