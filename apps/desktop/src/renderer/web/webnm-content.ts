@@ -302,15 +302,15 @@ function connectorLanes(cfg: WebNmConfig, db: PowerSyncDatabase): Partial<NMBrid
     // the GitHub connector's resolve (docs/design/github-connector-2026-09): the server writes the row
     // when the App can read the room's project's repository; a stated refusal is an answer, a dead
     // network is UNREACHABLE
-    githubResolve: async (channelId: string) => {
+    githubResolve: async (channelId: string, repo?: string) => {
       try {
         const res = await fetch(`${cfg.apiUrl}/v1/github/resolve`, {
           method: 'POST', headers: { 'content-type': 'application/json', ...(await authHeaders(cfg)) },
-          body: JSON.stringify({ channel: channelId }),
+          body: JSON.stringify({ channel: channelId, ...(repo ? { repo } : {}) }),
         });
-        const body = (await res.json().catch(() => null)) as { ok?: boolean; handle?: string; code?: string; error?: string; install?: string | null } | null;
-        if (res.ok && body?.ok) return { ok: true as const, handle: body.handle ?? '' };
-        return { ok: false as const, code: (body?.code ?? 'UNREACHABLE') as 'NOT_INSTALLED' | 'NO_REPO' | 'NOT_CONFIGURED' | 'UNREACHABLE', error: body?.error ?? `resolve failed (${res.status})`, install: body?.install ?? null };
+        const body = (await res.json().catch(() => null)) as { ok?: boolean; handle?: string; attached?: boolean; code?: string; error?: string; install?: string | null; repos?: string[]; hint?: string | null } | null;
+        if (res.ok && body?.ok) return { ok: true as const, handle: body.handle ?? '', attached: !!body.attached };
+        return { ok: false as const, code: (body?.code ?? 'UNREACHABLE') as 'NOT_INSTALLED' | 'NO_REPO' | 'NOT_CONFIGURED' | 'UNREACHABLE', error: body?.error ?? `resolve failed (${res.status})`, install: body?.install ?? null, repos: body?.repos ?? [], hint: body?.hint ?? null };
       } catch (e) {
         return { ok: false as const, code: 'UNREACHABLE' as const, error: e instanceof Error ? e.message : String(e) };
       }

@@ -10808,6 +10808,7 @@ function deleteScheduleMem(rows2, scheduleId) {
 }
 
 // src/store/announce.ts
+var hasGitHubAddress = (r) => !!r.cloneUrl || r.orgName !== "local" && r.provider !== "local";
 var norm2 = (s) => s.trim().toLowerCase();
 var MemAnnounceStore = class {
   rows = [];
@@ -10817,8 +10818,13 @@ var MemAnnounceStore = class {
   seedRepo(link) {
     this.repoLinks.push(link);
   }
-  async primaryRepoForChannel(channelId) {
-    const hit = this.repoLinks.find((r) => r.channelId === channelId);
+  /** the memory store's linkRepo lands here, once per room and repo */
+  linkRoom(link) {
+    if (!this.repoLinks.some((l) => l.channelId === link.channelId && l.repoId === link.repoId)) this.repoLinks.push(link);
+  }
+  async repoForChannel(channelId) {
+    const links = this.repoLinks.filter((r) => r.channelId === channelId);
+    const hit = links.find(hasGitHubAddress) ?? links[0];
     return hit ? { workspaceId: hit.workspaceId, projectId: hit.projectId, repoId: hit.repoId, orgName: hit.orgName, name: hit.name, cloneUrl: hit.cloneUrl, provider: hit.provider } : null;
   }
   async create(input) {
@@ -10883,6 +10889,9 @@ var MemAnnounceStore = class {
   }
   async forgetInstallation(installationId) {
     this.installations = this.installations.filter((i) => i.installationId !== installationId);
+  }
+  async installationsForWorkspace(workspaceId) {
+    return this.installations.filter((i) => i.workspaceId === workspaceId).map(({ installationId, account, repos, selection }) => ({ installationId, account, repos, selection }));
   }
 };
 var rowOf = (r) => ({
@@ -10981,10 +10990,15 @@ var PgAnnounceStore = class {
   async forgetInstallation(installationId) {
     await this.sql`delete from github_installations where installation_id = ${installationId}`;
   }
-  async primaryRepoForChannel(channelId) {
+  async installationsForWorkspace(workspaceId) {
+    const rows2 = await this.sql`select installation_id, account, repos, selection from github_installations where workspace_id = ${workspaceId}::uuid order by updated_at desc`;
+    return rows2.map((r) => ({ installationId: Number(r["installation_id"]), account: r["account"], repos: r["repos"] ?? [], selection: r["selection"] === "all" ? "all" : "selected" }));
+  }
+  async repoForChannel(channelId) {
     const [row] = await this.sql`select c.workspace_id, c.project_id, r.id as repo_id, r.org_name, r.name, r.clone_url, r.provider
       from channels c join project_repos pr on pr.project_id = c.project_id join repos r on r.id = pr.repo_id
-      where c.id = ${channelId}::uuid order by pr.is_primary desc, r.org_name, r.name limit 1`;
+      where c.id = ${channelId}::uuid
+      order by (r.clone_url is not null or (r.org_name <> 'local' and r.provider <> 'local')) desc, pr.is_primary desc, r.org_name, r.name limit 1`;
     return row ? { workspaceId: row["workspace_id"], projectId: row["project_id"] ?? null, repoId: row["repo_id"], orgName: row["org_name"], name: row["name"], cloneUrl: row["clone_url"] || null, provider: row["provider"] ?? null } : null;
   }
 };
@@ -12131,16 +12145,17 @@ var MemoryStore = class {
   }
   async linkRepo(input, event) {
     const existing = this.repos.find((r) => r.workspace === input.workspace && r.provider === input.provider && r.orgName === input.orgName && r.name === input.name);
+    const id = existing?.id ?? crypto.randomUUID();
     if (existing) {
       existing.defaultBranch = input.defaultBranch;
       existing.cloneUrl = input.cloneUrl;
       existing.localPath = input.localPath;
-      return { id: existing.id, inserted: false };
+    } else {
+      this.repos.push({ id, workspace: input.workspace, provider: input.provider, orgName: input.orgName, name: input.name, defaultBranch: input.defaultBranch, cloneUrl: input.cloneUrl, localPath: input.localPath });
+      this.events.push(event);
     }
-    const id = crypto.randomUUID();
-    this.repos.push({ id, workspace: input.workspace, provider: input.provider, orgName: input.orgName, name: input.name, defaultBranch: input.defaultBranch, cloneUrl: input.cloneUrl, localPath: input.localPath });
-    this.events.push(event);
-    return { id, inserted: true };
+    if (input.channel) this.announcements.linkRoom({ channelId: input.channel, workspaceId: input.workspace, projectId: input.project ?? this.channels.find((c) => c.id === input.channel)?.projectId ?? null, repoId: id, orgName: input.orgName, name: input.name, cloneUrl: input.cloneUrl, provider: input.provider });
+    return { id, inserted: !existing };
   }
   // Projects: MemoryStore tracks just enough for auth/guard unit tests; the
   // seeded-default + 1:N channel-ownership behavior is gate-tested on PostgresStore.
@@ -17718,12 +17733,13 @@ async function installationFacts(installationId, opts = {}) {
   return { account: b2.account?.login ?? b2.account?.slug ?? "", selection: b2.repository_selection === "all" ? "all" : "selected" };
 }
 
-// src/github-connect.ts
+// src/github-resolve.ts
+init_src();
 var GITHUB_SCOPES = "metadata:read contents:read pull_requests:read";
 function slugOf(repo) {
   const fromUrl = repo.cloneUrl ? parseRepoInput(repo.cloneUrl)?.slug ?? null : null;
   if (fromUrl) return fromUrl;
-  if (!repo.orgName || repo.orgName === "local" || !repo.name) return null;
+  if (!hasGitHubAddress(repo) || !repo.orgName || !repo.name) return null;
   return `${repo.orgName}/${repo.name}`;
 }
 async function installationFor(ann, slug, fetchFn, workspaceId = null) {
@@ -17750,9 +17766,10 @@ async function installationFor(ann, slug, fetchFn, workspaceId = null) {
 async function rememberInstallation(ann, installationId, fetchFn, workspaceId) {
   const tok = await tokenFor(installationId, fetchFn);
   const repos = await githubGet("/installation/repositories?per_page=100", { token: tok, fetchFn });
-  const names = repos.status === 200 ? (repos.json.repositories ?? []).map((r) => r.full_name) : [];
+  const names = repos.status === 200 ? (repos.json.repositories ?? []).map((r) => r.full_name.toLowerCase()) : [];
   const facts = await installationFacts(installationId, { fetchFn }).catch(() => ({ account: names[0]?.split("/")[0] ?? "", selection: "selected" }));
   await ann.upsertInstallation({ installationId, account: facts.account, repos: names, selection: facts.selection, workspaceId });
+  return names;
 }
 var tokens = /* @__PURE__ */ new Map();
 async function tokenFor(installationId, fetchFn) {
@@ -17766,19 +17783,71 @@ async function tokenFor(installationId, fetchFn) {
 var forgetToken = (installationId) => {
   tokens.delete(installationId);
 };
-async function resolveConnector(store2, ctx, fetchFn) {
-  const ann = store2.announcements;
-  const repo = await ann.primaryRepoForChannel(ctx.channel);
-  const slug = repo ? slugOf(repo) : null;
-  if (!repo) return { ok: false, code: "NO_REPO", error: "This project has no repository yet.", slug: null };
-  if (!slug) return { ok: false, code: "NO_REPO", error: `${repo.name} has no GitHub address. Attach the repository by its GitHub URL.`, slug: null };
-  const inst = await installationFor(ann, slug, fetchFn, ctx.workspace).catch(() => null);
-  if (!inst) return { ok: false, code: "NOT_INSTALLED", error: `The neuramesh app is not installed on ${slug}.`, slug };
-  const r = await githubGet(`/repos/${slug}`, { token: inst.token, fetchFn });
-  if (r.status !== 200) return { ok: false, code: "NOT_INSTALLED", error: `The neuramesh app cannot read ${slug}. Add the repository to the installation on GitHub.`, slug };
-  await store2.upsertConnector({ workspace: ctx.workspace, channelId: ctx.channel, provider: "github", handle: slug, connectedBy: ctx.actor, scopes: GITHUB_SCOPES });
-  return { ok: true, handle: slug };
+async function readableRepos(ann, workspaceId, fetchFn) {
+  const out = /* @__PURE__ */ new Set();
+  for (const row of await ann.installationsForWorkspace(workspaceId)) {
+    try {
+      for (const s of await rememberInstallation(ann, row.installationId, fetchFn, workspaceId)) out.add(s);
+    } catch (e) {
+      forgetToken(row.installationId);
+      if (e instanceof GitHubApiError && e.status === 404) await ann.forgetInstallation(row.installationId).catch(() => {
+      });
+      else for (const s of row.repos) out.add(s);
+    }
+  }
+  return [...out].sort();
 }
+var hintFor = (repo, repos) => (repo && repos.find((s) => s.split("/")[1] === repo.name.toLowerCase())) ?? null;
+async function attachRepo(store2, ctx, slug, defaultBranch) {
+  const [orgName = "", name = ""] = slug.split("/");
+  const event = createEvent({
+    type: "repo.linked",
+    source: formatAddress({ kind: "human", id: ctx.actor }),
+    target: formatAddress({ kind: "resource", type: "repo", id: `${orgName}-${name}`.replace(/[^A-Za-z0-9._-]/g, "-") }),
+    workspace: ctx.workspace,
+    payload: { orgName, name, provider: "github", channel: ctx.channel, door: "github-app" }
+  });
+  await store2.linkRepo({ workspace: ctx.workspace, channel: ctx.channel, project: null, provider: "github", orgName, name, defaultBranch, cloneUrl: `https://github.com/${slug}.git`, localPath: null }, event);
+}
+async function resolveConnector(store2, ctx, fetchFn, opts = {}) {
+  const pick = opts.pick ?? null;
+  const ann = store2.announcements;
+  const repo = await ann.repoForChannel(ctx.channel);
+  const slug = repo ? slugOf(repo) : null;
+  const connect = async (target) => {
+    const inst = await installationFor(ann, target, fetchFn, ctx.workspace).catch(() => null);
+    if (!inst) return null;
+    const r = await githubGet(`/repos/${target}`, { token: inst.token, fetchFn });
+    return r.status === 200 ? { facts: r.json } : null;
+  };
+  const written = async (target, attached) => {
+    await store2.upsertConnector({ workspace: ctx.workspace, channelId: ctx.channel, provider: "github", handle: target, connectedBy: ctx.actor, scopes: GITHUB_SCOPES });
+    return { ok: true, handle: target, attached };
+  };
+  if (pick) {
+    const target = parseRepoInput(pick)?.slug ?? null;
+    const read = target ? await connect(target) : null;
+    if (!target || !read) return { ok: false, code: "NOT_INSTALLED", error: `The neuramesh app cannot read ${target ?? pick}. Add the repository on GitHub, then pick it.`, slug: target, repos: await readableRepos(ann, ctx.workspace, fetchFn), hint: null };
+    if (target !== slug) await attachRepo(store2, ctx, target, read.facts.default_branch || "main");
+    return written(target, target !== slug);
+  }
+  if (slug && await connect(slug)) return written(slug, false);
+  const repos = await readableRepos(ann, ctx.workspace, fetchFn);
+  const hint = hintFor(repo, repos);
+  if (opts.granted && !slug && repos.length === 1) {
+    const only = repos[0];
+    const read = await connect(only);
+    if (read) {
+      await attachRepo(store2, ctx, only, read.facts.default_branch || "main");
+      return written(only, true);
+    }
+  }
+  if (!repo) return { ok: false, code: "NO_REPO", error: repos.length ? "Pick the repository this project lives in." : "This project has no repository yet. Grant access on GitHub and pick it there.", slug: null, repos, hint };
+  if (!slug) return { ok: false, code: "NO_REPO", error: repos.length ? `Pick the repository ${repo.name} lives in.` : `${repo.name} is a folder on a machine. Grant access on GitHub and pick its repository there.`, slug: null, repos, hint };
+  return { ok: false, code: "NOT_INSTALLED", error: repos.length ? `The neuramesh app cannot read ${slug}. Add it on GitHub, or pick another repository.` : `The neuramesh app is not installed on ${slug}. Grant access on GitHub.`, slug, repos, hint };
+}
+
+// src/github-connect.ts
 var page = (title, lines) => `<!doctype html><meta charset="utf-8"><title>${title}</title><body style="font:15px system-ui;display:grid;place-items:center;height:100vh;margin:0;background:#1d1d1d;color:#e6e6e6"><div style="text-align:center;max-width:36em">${lines.map((l) => `<p>${l}</p>`).join("")}</div></body>`;
 var tryUnseal = (state) => {
   try {
@@ -17798,7 +17867,7 @@ function githubConnectRoutes(app, store2, opts = {}) {
     if (workspace && actor) {
       if (!process.env["NM_CONNECTOR_KEY"] || !ann()) return c.text("github connect is not configured on this server", 501);
       const channel = c.req.query("channel") ?? null;
-      const repo = channel ? await ann().primaryRepoForChannel(channel) : null;
+      const repo = channel ? await ann().repoForChannel(channel) : null;
       const state = { github: 1, workspace, channel, actor, slug: repo ? slugOf(repo) : null };
       return c.redirect(installUrl(seal(state)), 302);
     }
@@ -17813,8 +17882,9 @@ function githubConnectRoutes(app, store2, opts = {}) {
       if (!ann() || !githubAppConfigured() || !Number.isFinite(id) || id <= 0) return c.html(page("GitHub", ["The grant did not land.", "Try again from Connections in neuramesh."]), 400);
       try {
         await rememberInstallation(ann(), id, fetchFn, grant.workspace);
-        const out = grant.channel ? await resolveConnector(store2, { workspace: grant.workspace, channel: grant.channel, actor: grant.actor }, fetchFn) : null;
+        const out = grant.channel ? await resolveConnector(store2, { workspace: grant.workspace, channel: grant.channel, actor: grant.actor }, fetchFn, { granted: true }) : null;
         if (out?.ok) return c.html(page("Connected", ['<span style="font-size:34px">\u2713</span>', `<b>${out.handle}</b> is connected.`, '<span style="color:#8f8f8f">Head back to neuramesh. The room already knows.</span>']));
+        if (out && out.repos.length) return c.html(page("GitHub", [`The neuramesh app reads ${out.repos.length} ${out.repos.length === 1 ? "repository" : "repositories"}.`, '<span style="color:#8f8f8f">Pick this project\u2019s in neuramesh. The step shows them.</span>']));
         const why = out ? out.error : "The installation is recorded.";
         return c.html(page("GitHub", [why, '<span style="color:#8f8f8f">Pick the repository on GitHub, then press Check again in neuramesh.</span>']));
       } catch (e) {
@@ -17839,22 +17909,22 @@ function githubApiRoutes(app, store2, opts = {}) {
   app.post("/v1/github/resolve", async (c) => {
     const actor = c.get("actor");
     if (actor.kind !== "human") return c.json({ error: "a person connects GitHub", code: "HUMAN_ONLY" }, 403);
-    const body = z14.object({ channel: z14.string().min(1) }).safeParse(await c.req.json().catch(() => null));
+    const body = z14.object({ channel: z14.string().min(1), repo: z14.string().min(1).optional() }).safeParse(await c.req.json().catch(() => null));
     if (!body.success) return c.json({ error: "invalid body", code: "INVALID_INPUT" }, 400);
     if (!githubAppConfigured() || !ann()) return c.json({ ok: false, code: "NOT_CONFIGURED", error: "GitHub connecting is not configured on this server." });
-    const repo = await ann().primaryRepoForChannel(body.data.channel);
-    if (!repo) return c.json({ ok: false, code: "NO_REPO", error: "This project has no repository yet." });
-    if (!await actorInWorkspace(store2, actor, repo.workspaceId)) return c.json({ error: "not your workspace", code: "NOT_PERMITTED" }, 403);
-    const out = await resolveConnector(store2, { workspace: repo.workspaceId, channel: body.data.channel, actor: actor.id }, fetchFn);
-    if (out.ok) return c.json({ ok: true, handle: out.handle });
-    const state = { github: 1, workspace: repo.workspaceId, channel: body.data.channel, actor: actor.id, slug: out.slug };
-    return c.json({ ok: false, code: out.code, error: out.error, install: out.code === "NOT_INSTALLED" && process.env["NM_CONNECTOR_KEY"] ? installUrl(seal(state)) : null });
+    const { workspace } = await store2.channelWorkspace(body.data.channel).catch(() => ({ workspace: null }));
+    if (!workspace) return c.json({ error: "channel not found", code: "NOT_FOUND" }, 404);
+    if (!await actorInWorkspace(store2, actor, workspace)) return c.json({ error: "not your workspace", code: "NOT_PERMITTED" }, 403);
+    const out = await resolveConnector(store2, { workspace, channel: body.data.channel, actor: actor.id }, fetchFn, { pick: body.data.repo ?? null });
+    if (out.ok) return c.json({ ok: true, handle: out.handle, attached: out.attached });
+    const state = { github: 1, workspace, channel: body.data.channel, actor: actor.id, slug: out.slug };
+    return c.json({ ok: false, code: out.code, error: out.error, repos: out.repos, hint: out.hint, install: process.env["NM_CONNECTOR_KEY"] ? installUrl(seal(state)) : null });
   });
   const open = async (c) => {
     const channel = c.req.query("channel");
     if (!channel) return { status: 400, body: { error: "channel is required", code: "INVALID_INPUT" } };
     if (!githubAppConfigured() || !ann()) return { status: 501, body: { error: "GitHub connecting is not configured on this server", code: "NOT_CONFIGURED" } };
-    const repo = await ann().primaryRepoForChannel(channel);
+    const repo = await ann().repoForChannel(channel);
     const slug = repo ? slugOf(repo) : null;
     if (!repo || !slug) return { status: 409, body: { error: "this room's project has no GitHub repository", code: "NO_REPO" } };
     if (!await actorInWorkspace(store2, c.get("actor"), repo.workspaceId)) return { status: 403, body: { error: "not your workspace", code: "NOT_PERMITTED" } };

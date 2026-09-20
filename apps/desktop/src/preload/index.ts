@@ -356,7 +356,7 @@ contextBridge.exposeInMainWorld('nm', {
     ipcRenderer.invoke('nm:media-preview', { url }),
   connectorStart: (channelId: string, provider?: 'x' | 'linkedin' | 'instagram' | 'tiktok' | 'github'): Promise<{ ok: boolean }> => ipcRenderer.invoke('nm:connector-start', { channelId, provider }),
   /** the GitHub connector's resolve (docs/design/github-connector-2026-09): the row is written server-side when the App reads the repository */
-  githubResolve: (channelId: string): Promise<{ ok: true; handle: string } | { ok: false; code: string; error: string; install?: string | null }> => ipcRenderer.invoke('nm:github-resolve', { channelId }),
+  githubResolve: (channelId: string, repo?: string): Promise<{ ok: true; handle: string; attached?: boolean } | { ok: false; code: string; error: string; install?: string | null; repos?: string[]; hint?: string | null }> => ipcRenderer.invoke('nm:github-resolve', { channelId, repo }),
   connectors: (channelId?: string): Promise<{ connectors: Array<{ id: string; provider: string; handle: string; status: string }> }> =>
     ipcRenderer.invoke('nm:connectors', { channelId }),
   connectorDisconnect: (connectorId: string): Promise<{ ok: boolean }> =>
