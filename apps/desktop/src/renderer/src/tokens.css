@@ -1539,41 +1539,6 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 /* active indicator — a short inset rounded pill (design parity; was a flush full-height box-shadow bar) */
 .navitem.on::before { content: none; }
 .navitem svg { flex: none; }
-/* ── a destination with more than one surface in it (Scheduled › Routines · Calendar) ──────────
-   Rebuilt 2026-08-16. The 2026-08-13 nesting shipped four things that read as chrome moving on
-   its own: the children existed only while you were already inside the section, the parent wore a
-   "section marker" while a child wore the fill, the disclosure opened and closed itself as you
-   navigated, and the parent linked to its own default child. The rule now is one line —
-   **the parent folds, the children navigate** — and the derivation is tested (shell/navdest.ts).
-
-   The parent NEVER carries the fill. Standing inside the group tints it instead: a different
-   signal in kind, not a second and weaker selection. `.on` is therefore impossible on a parent by
-   construction (navDestRows returns `on: false`), and this rule is the drawing of that fact. */
-.navitem.navparent { color: var(--muted); }
-.navitem.navparent.ingroup { color: var(--text); font-weight: 500; }
-.navitem.navparent.ingroup svg { color: var(--text); }
-.navpchev { flex: none; display: inline-grid; place-items: center; color: var(--dim); margin-left: 2px;
-  transition: transform var(--dur-fast) var(--ease); }
-.navpchev.c { transform: rotate(-90deg); }
-.navitem.navparent .navitembadge + .navpchev { margin-left: 6px; }
-@media (prefers-reduced-motion: reduce) { .navpchev { transition: none; } }
-/* The children hang off a hairline, so the group reads as ONE object rather than three rows that
-   happen to be adjacent. The indent is not decorative: 30 + 1 + 13 lands a child's LABEL at 44px
-   from the panel edge, which is exactly where the PARENT's label starts (8 margin + 9 padding +
-   16 glyph + 11 gap) — so the children sit under the word they belong to and the guide runs under
-   the parent's own icon. No child glyphs (2026-08-16): the parent's loop repeated under itself
-   was noise, and the indent plus the hairline already do the subordinating.
-
-   Scoped to `.navdest` at (0,3,0) ON PURPOSE. `.navdest .navitem { margin: 0 8px }` is (0,2,0)
-   and sits later in this file, so an unscoped `.navitem.navsub { margin-left }` LOST the cascade
-   and the children rendered flush with their parent — shipped once, caught on sight (George,
-   2026-08-16). Any future sub-row geometry has to win the same fight. */
-/* children take a SECOND step (36px) and no guide hairline — trap 9b, and the Claude/Codex
-   rails say the same: structure from indentation, a line only between two documents */
-.navdest .navitem.navsub { margin: 0 8px; width: calc(100% - 16px); padding: 5px 9px 5px 36px; gap: 9px;
-  font-size: 12.5px; border-radius: 6px; }
-.navdest .navitem.navsub:first-of-type { margin-top: 2px; }
-.navdest .navitem.navsub:last-of-type { margin-bottom: 3px; }
 .navlabel { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* informational count — neutral (was accent); the mission "needs-you" badge re-colours via .attn */
 .navitembadge { min-width: 18px; height: 18px; padding: 0 5px; border-radius: var(--r-full); background: var(--panel3); color: var(--body); border: 1px solid var(--border2); font: 600 10px var(--fmono); display: grid; place-items: center; flex: none; }
@@ -1709,6 +1674,15 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 .navfoot { display: flex; align-items: center; gap: 8px; padding: 8px; flex: none; }
 /* ── TOP dock: TWO rows — global chrome (row 1) + scoped context (row 2) ────── */
 .navpanel[data-pos="top"] { width: auto; min-width: 0; height: auto; min-height: 0; flex-flow: row wrap; align-items: center; border-right: none; border-bottom: 1px solid var(--border); padding: 0; gap: 0; overflow: visible; }
+/* The faces wrapper is transparent here (2026-09-20). v0.76 put `.navfaces` (a grid that clips
+   the faces' cross-fade) and `.navface.rooms` (a column) between the panel and its rows, but the
+   top dock has ONE face and nothing to clip. Through the two boxes the row-wrap above never
+   reached navhead/navgroup/navscroll/navfoot (a column of rows), `.navscroll`'s `flex-basis: 100%`
+   resolved against the HEIGHT and spilled under the sheet with the context strip inside it, and
+   the clip cut the account menu at the panel's edge — the one door back out of this dock (George,
+   live). No box: the rows are the panel's own flex items again, and the menu hangs below the row
+   the way `overflow: visible` above always meant it to. */
+.navpanel[data-pos="top"] .navfaces, .navpanel[data-pos="top"] .navface.rooms { display: contents; }
 .navpanel[data-pos="top"] .navhead { flex: none; border-bottom: none; padding: 7px 10px; gap: 7px; }
 .navpanel[data-pos="top"] .wsproj { flex: none; max-width: 168px; }
 .navpanel[data-pos="top"] .wsswitch-txt small { display: none; }
@@ -5172,6 +5146,9 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 .roomhead { flex: none; }
 .roomhead .topbar { height: 44px; min-height: 44px; }
 .roomtabbar { display: inline-flex; gap: 2px; margin: 6px 18px 10px; background: var(--panel2); border-radius: var(--r-pill); padding: 3px; align-self: flex-start; }
+/* the same strip under a DESTINATION's head (Scheduled › Routines · Calendar, 2026-09-20): the
+   pair left the nav's fold for the page, so it wears the room idiom, inset to the head's 20px */
+.roomtabbar.desttabs { margin: 0 20px 8px; }
 .roomtab { display: inline-flex; align-items: center; gap: 6px; border: 0; background: none; color: var(--muted); font: 500 12.5px var(--font); padding: 6px 15px; border-radius: var(--r-pill); cursor: pointer; transition: color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease); }
 /* the tab's own count — open work on Board, threads moved since you last looked on History */
 .roomtabn { min-width: 16px; height: 16px; padding: 0 4px; border-radius: var(--r-full); background: var(--panel3); color: var(--muted); font: 600 9.5px var(--fmono); display: grid; place-items: center; }

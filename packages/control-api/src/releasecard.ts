@@ -100,7 +100,8 @@ const require = createRequire(import.meta.url);
 let wasmReady: Promise<void> | null = null;
 let fonts: Uint8Array[] | null = null;
 
-async function resvgModule(init: boolean): Promise<ResvgModule> {
+/** the one resvg loader in this process (film-compose.ts renders the product frames through it too: a second initWasm throws) */
+export async function resvgModule(init: boolean): Promise<ResvgModule> {
   const mod = (await import('@resvg/resvg-wasm')) as unknown as ResvgModule;
   if (init) {
     wasmReady ??= readFile(require.resolve('@resvg/resvg-wasm/index_bg.wasm')).then((bytes) => mod.initWasm(bytes));

@@ -447,7 +447,7 @@ export interface Store {
    *  dueContentItems: that one is "past due, publish it", this one is "coming, tell somebody". */
   upcomingContentItems(fromIso: string, toIso: string, limit: number): Promise<Array<{ id: string; workspace: string; channel: string; threadId: string | null; platform: string; body: string; scheduledAt: string }>>;
   /** the TikTok media proxy's lookup — platform + media only, nothing publishable leaks */
-  contentItemMedia(itemId: string): Promise<{ platform: string; mediaUrl: string | null; mediaId?: string | null; workspace: string; channel?: string; frame?: string | null; seconds?: number | null } | null>;
+  contentItemMedia(itemId: string): Promise<{ platform: string; mediaUrl: string | null; mediaId?: string | null; workspace: string; channel?: string; frame?: string | null; seconds?: number | null; script?: string | null } | null>;
   markContentPublished(itemId: string, url: string, publishedAtIso: string): Promise<void>;
   markContentFailed(itemId: string, error: string): Promise<void>;
   // permanently delete a channel + everything in it (messages/tasks/history). irreversible.

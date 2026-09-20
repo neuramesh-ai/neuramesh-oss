@@ -90,9 +90,15 @@ export const MARKETING_OS_PREAMBLES: Record<MarketingOsSkillSpec['preamble'], st
   words at most (a video model cannot spell more; the caption that posts is the body). The film
   shows the script's first seconds; \`imageBrief\` is the shot direction the film follows;
   \`frame\` is the name of a screenshot on this room's shelf (the [MARKETING CONTEXT] note lists
-  them), so the film shows the real product, never an invented interface. With no screenshot on
-  the shelf, draft without one and ask the human for a screenshot. Never put the script in the
-  body: the body publishes.
+  them), so the film's own picture of the product follows the real one. Never put the script in
+  the body: the body publishes.
+- **The product is real, never drawn.** A video model cannot copy a screen: every beat that shows
+  the product (the app, a screen, the phone, the product itself) carries \`SHOW: <image name>\`,
+  an image on the shelf, and the film CUTS TO that image for the beat once it lands. Find the
+  image first: \`list_library\` with scope project lists every room's images. None fits: for an
+  app, ask the human for a screenshot; for a product you can picture, \`make_product_image\`
+  makes one and shelves it under the name you then use. A product beat without a SHOW line is
+  refused.
 - **The platform.** The ones the human picked on the angle card (\`… · platforms: x, linkedin\` in
   their reply). A pick of none means the ask's platform, else the connected accounts. One card per
   picked platform, a video post reads the same on X and LinkedIn as on TikTok.

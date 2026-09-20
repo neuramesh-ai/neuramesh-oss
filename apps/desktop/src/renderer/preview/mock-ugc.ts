@@ -31,7 +31,7 @@ const SCRIPT_A = `[0:00-0:03] Handheld, walking, phone in hand, no laptop bag.
 Spoken: "My laptop is in my bag. My code is not waiting for me."
 CAPTION: still shipping
 
-[0:03-0:09] Open the app to Home, the queue and every session in one list.
+[0:03-0:09] Open the app to Home, the queue and every session in one list. SHOW: app-home.jpg
 Spoken: "This is Home. My queue, every session, one list."
 
 [0:09-0:15] Tap a session, the agent's plan on screen, the accept button at the end.
@@ -40,7 +40,7 @@ Spoken: "I read the plan, I say merge it. Done."`;
 const SCRIPT_B = `[0:00-0:03] A desk with fourteen browser tabs open, the creator sighs at the screen.
 Spoken: "Fourteen tabs to know what my agents did today."
 
-[0:03-0:10] Cut to the app: one room, the day's sessions grouped, the needs-you row on top.
+[0:03-0:10] Cut to the app: one room, the day's sessions grouped, the needs-you row on top. SHOW: app-home.jpg
 Spoken: "Now it is one list. What needs me is at the top."
 
 [0:10-0:15] Close on the phase dial on a session row.
@@ -72,7 +72,7 @@ export const ugcMsgs: Record<string, any[]> = {
 // the two drafts: a is filmed at fifteen seconds (its facts line says so), b waits with its length picked
 export const ugcItems: any[] = [
   { id: '00000000-0000-4000-8000-00000000a00a', channelId: 'c-marketing', thread_id: UGC_DRAFTS_THREAD_ID, platform: 'x', body: 'Fourteen tabs to know what my agents did today. Now it is one list, and what needs me is at the top. #FloweAI', status: 'draft', scheduled_at: null, published_at: null, external_url: null, created_at: ago(28 * MIN + 1000), schedule_id: null,
-    media: JSON.stringify({ script: SCRIPT_A, brief: 'Handheld phone footage, natural window light, the app on the creator\'s phone screen in the second beat. No studio.', seconds: 15, frame: 'app-home.jpg', video_id: 'film-ugc-a', video: { tier: 'starter', model: 'Seedance 2.0', seconds: 15, credits: 363, at: ago(2 * MIN), frame: 'app-home.jpg', frameUsed: true } }) },
+    media: JSON.stringify({ script: SCRIPT_A, brief: 'Handheld phone footage, natural window light, the app on the creator\'s phone screen in the second beat. No studio.', seconds: 15, frame: 'app-home.jpg', video_id: 'film-ugc-a', video: { tier: 'starter', model: 'Seedance 2.0', seconds: 15, credits: 363, at: ago(2 * MIN), frame: 'app-home.jpg', frameUsed: true, shots: { asked: 1, applied: 1 } } }) },
   { id: '00000000-0000-4000-8000-00000000a00b', channelId: 'c-marketing', thread_id: UGC_DRAFTS_THREAD_ID, platform: 'linkedin', body: 'I stopped opening fourteen tabs to find out what my agents did. One list, what needs me on top, and the state of every piece of work at a glance.', status: 'draft', scheduled_at: null, published_at: null, external_url: null, created_at: ago(28 * MIN), schedule_id: null,
     media: JSON.stringify({ script: SCRIPT_B, brief: 'A cluttered desk, then the app: one room, the day grouped, the needs-you row on top. Warm desk lamp, shot on a phone.', seconds: 15 }) },
 ];

@@ -39,6 +39,12 @@ import { actorAddress } from './guards';
 
 import type { CommandOutcome } from '../handler';
 import { libraryImage } from '../store/frames';
+import { productShots } from '@neuramesh/shared';
+
+/** every product shot a script names (`SHOW: <image>`, plan §9) must be on the room's shelf, the frame's rule: the daemon refused once, the command refuses again */
+async function shotsOnShelf(store: Store, channelId: string | undefined, script: string | null | undefined): Promise<void> {
+  for (const shot of script ? productShots(script) : []) await frameName(store, channelId, shot.show);
+}
 
 /** the frame's name as the shelf spells it: a video post names an image on its ROOM's shelf, and a
  *  name the shelf does not hold is refused here, whichever door wrote it (brand-grounding plan §6) */
@@ -63,6 +69,7 @@ export async function contentCommands(store: Store, actor: Actor, cmd: Command):
   if (cmd.type === 'content.create') {
     const styled = await styledBy(store, actor, () => store.channelWorkspace(cmd.channel).then((c) => c.workspace));
     const frame = await frameName(store, cmd.channel, cmd.frame);
+    await shotsOnShelf(store, cmd.channel, cmd.script);
     const { id } = await store.createContentItem(
       { channelId: cmd.channel, frame, seconds: cmd.seconds ?? null, taskId: cmd.task ?? null, threadId: cmd.thread ?? null, platform: cmd.platform, body: styled(cmd.body), scheduleId: cmd.schedule ?? null, slotAt: cmd.slotAt ?? null, mediaUrl: cmd.mediaUrl ?? null, imageBrief: cmd.imageBrief == null ? null : styled(cmd.imageBrief), script: cmd.script == null ? null : styled(cmd.script), thumb: cmd.thumb ?? null, imageError: cmd.imageError ?? null, createdByKind: actor.kind, createdBy: actor.id },
       (ws) => createEvent({
@@ -99,6 +106,7 @@ export async function contentCommands(store: Store, actor: Actor, cmd: Command):
     const media = await store.contentItemMedia(cmd.item);
     const styled = await styledBy(store, actor, async () => media?.workspace);
     const frame = await frameName(store, media?.channel, cmd.frame);
+    await shotsOnShelf(store, media?.channel, cmd.script);
     const { id } = await store.reviseDraft(cmd.item, { frame, seconds: cmd.seconds, body: cmd.body ? styled(cmd.body) : null, imageBrief: cmd.imageBrief ? styled(cmd.imageBrief) : (cmd.imageBrief ?? null), script: cmd.script ? styled(cmd.script) : null, thumb: cmd.thumb ?? null, videoError: cmd.videoError, videoErrorCode: cmd.videoErrorCode, videoMeta: cmd.videoMeta, imageError: cmd.imageError === undefined ? undefined : (cmd.imageError || null) }, (ws) => createEvent({
       type: 'content.updated', source: actorAddress(actor), target: formatAddress({ kind: 'resource', type: 'content', id: cmd.item }), workspace: ws,
       payload: { item: cmd.item, revised: true },

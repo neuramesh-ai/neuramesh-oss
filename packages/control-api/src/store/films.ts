@@ -8,7 +8,7 @@ import type postgres from 'postgres';
 
 export type FilmStatus = 'queued' | 'running' | 'done' | 'failed';
 /** what filmed a draft, as the card reads it: the tier and model, the length, the credits, when */
-export interface VideoMeta { tier: string; model: string; seconds: number; credits: number; at: string; frame?: string | null; frameUsed?: boolean }
+export interface VideoMeta { tier: string; model: string; seconds: number; credits: number; at: string; frame?: string | null; frameUsed?: boolean; shots?: { asked: number; applied: number; why?: string } }
 export interface FilmRow {
   id: string;
   workspaceId: string;

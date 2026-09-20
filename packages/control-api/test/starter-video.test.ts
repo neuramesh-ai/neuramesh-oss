@@ -36,7 +36,9 @@ function fakeFal(opts: { submit?: 'ok' | 'gone' | 'refuse'; fail?: string; polls
   const json = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status, headers: { 'content-type': 'application/json' } });
   const fetchFn: typeof fetch = async (input, init) => {
     const url = String(input);
-    calls.push({ url, ...(init?.body ? { body: JSON.parse(String(init.body)) } : {}) });
+    // a JSON body is recorded parsed; the frame's PUT carries PNG bytes, recorded as their length
+    const parsed = (() => { if (!init?.body) return {}; try { return { body: JSON.parse(String(init.body)) }; } catch { return { body: { bytes: (init.body as Uint8Array).length } }; } })();
+    calls.push({ url, ...parsed });
     if (init?.method === 'POST' && url.startsWith('https://queue.fal.run/')) {
       if (opts.submit === 'gone') return json({ detail: 'Not Found' }, 404);
       if (opts.submit === 'refuse') return json({ detail: [{ msg: 'prompt too long' }] }, 422);
@@ -52,6 +54,12 @@ function fakeFal(opts: { submit?: 'ok' | 'gone' | 'refuse'; fail?: string; polls
     }
     if (url.endsWith('/requests/req-1')) return json({ video: { url: 'https://v3.fal.media/files/x/clip.mp4', content_type: 'video/mp4', file_name: 'clip.mp4', file_size: MP4.length }, seed: 1 });
     if (url.endsWith('/clip.mp4')) return new Response(new Uint8Array(MP4), { status: 200, headers: { 'content-type': 'video/mp4' } });
+    // the product shots' lane (film-compose.ts): the storage, the utilities, the compose, a composed clip that is one byte longer
+    if (url.includes('/storage/upload/initiate')) return json({ upload_url: 'https://v3b.fal.media/up/frame.png', file_url: 'https://v3b.fal.media/files/frame.png' });
+    if (url.includes('/up/frame.png')) return new Response('', { status: 200 });
+    if (url.includes('trim-video') || url.includes('images-to-video')) return json({ video: { url: `https://v3b.fal.media/files/piece-${calls.length}.mp4` } });
+    if (url.includes('ffmpeg-api/compose')) return json({ video_url: 'https://v3b.fal.media/files/composed.mp4' });
+    if (url.endsWith('/composed.mp4')) return new Response(new Uint8Array([...MP4, 7]), { status: 200, headers: { 'content-type': 'video/mp4' } });
     return json({ detail: 'unexpected call' }, 500);
   };
   return { fetchFn, calls };
@@ -294,6 +302,47 @@ describe('the door', () => {
     expect(await j(await send(george, '/v1/starter/film', { workspace: ws, item: longer, prompt: 'a vertical clip, thirty seconds' }))).toMatchObject({ seconds: 30, credits: 1419 });
     expect((fal3.calls[0] as { url: string }).url).toBe('https://queue.fal.run/bytedance/seedance-2.5/text-to-video');
     expect(fal3.calls[0]!.body).toMatchObject({ duration: '30', bitrate_mode: 'high' });
+  });
+
+  it('the product shots (plan §9): a script whose beat names a shelf image lands the film with that image cut in, its facts on the card; a name the shelf lost lands the plain film and says so', async () => {
+    const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+    await send(george, '/v1/artifacts', { id: '00000000-0000-4000-8000-00000000aa02', workspace: ws, channel, messageId: '00000000-0000-4000-8000-00000000bb02', kind: 'screenshot', name: 'app-home.png', mime: 'image/png', inlineContent: PNG, sizeBytes: 70 });
+    const script = '[0:00-0:03] Hook, straight to camera: "I expected a catch."\n[0:03-0:07] Cut to the app home screen. SHOW: app-home.png\nSpoken: "Surprise one."\n[0:07-0:15] Back to the creator.';
+    const { itemId: shown } = await j(await send(plume, '/v1/commands', { type: 'content.create', channel, platform: 'x', body: 'eight', script, seconds: 15 }));
+    const fal = fakeFal({ polls: 2 });
+    const led = fakeLedger(50_000_000);
+    door(led.ledger, fal.fetchFn);
+    expect((await send(george, '/v1/starter/film', { workspace: ws, item: shown, prompt: 'a vertical clip, fifteen seconds' })).status).toBe(202);
+    const t0 = Date.parse(store.films.rows.at(-1)!.createdAt);
+    const pass = () => filmsDue(store, { ledger: led.ledger, env: ENV, fetchFn: fal.fetchFn, now: () => t0 + 1000 });
+    await pass();
+    expect((await pass()).map((r) => r.outcome)).toEqual(['done']);
+    const urls = fal.calls.map((c) => c.url.replace(/^https:\/\//, '').replace(/\?.*$/, ''));
+    expect(urls.filter((u) => !u.startsWith('queue.fal.run'))).toEqual([
+      'rest.alpha.fal.ai/storage/upload/initiate', 'v3b.fal.media/up/frame.png',
+      'fal.run/fal-ai/workflow-utilities/trim-video', 'fal.run/fal-ai/ffmpeg-api/images-to-video', 'fal.run/fal-ai/workflow-utilities/trim-video',
+      'fal.run/fal-ai/ffmpeg-api/compose', 'v3b.fal.media/files/composed.mp4',
+    ]);
+    const items = (store as unknown as { contentItems: Array<{ id: string; mediaId?: string | null; videoMeta?: { shots?: unknown } | null }> }).contentItems;
+    const it = items.find((x) => x.id === shown)!;
+    expect(it.videoMeta?.shots).toEqual({ asked: 1, applied: 1 });
+    expect((await store.contentMediaBytes(it.mediaId!))?.bytes.length).toBe(MP4.length + 1); // the composed clip, not the plain one
+    // a SHOW name the shelf does not hold is refused at the command, the frame's rule (the daemon refused it once already)
+    const bad = await send(plume, '/v1/commands', { type: 'content.create', channel, platform: 'x', body: 'nine', script: script.replace('SHOW: app-home.png', 'SHOW: gone.png'), seconds: 15 });
+    expect(bad.status).toBe(404);
+    expect((await j(bad)).error).toMatch(/no image named "gone.png"/);
+    expect((await send(plume, '/v1/commands', { type: 'content.revise', item: shown, script: '[0:00-0:03] hook\n[0:03-0:07] the app. SHOW: gone.png' })).status).toBe(404);
+    // the shelf lost the image between the draft and the film (the store, past the command): the plain film lands and the card says why
+    await store.reviseDraft(shown, { body: null, imageBrief: null, thumb: null, script: '[0:00-0:03] hook\n[0:03-0:07] the app. SHOW: gone.png' }, (w) => createEvent({ type: 'content.updated', source: formatAddress(plume), target: formatAddress({ kind: 'resource', type: 'content', id: shown }), workspace: w, payload: {} }));
+    const fal2 = fakeFal({ polls: 2 });
+    door(led.ledger, fal2.fetchFn);
+    expect((await send(george, '/v1/starter/film', { workspace: ws, item: shown, prompt: 'a vertical clip, fifteen seconds' })).status).toBe(202);
+    const t1 = Date.parse(store.films.rows.at(-1)!.createdAt);
+    await filmsDue(store, { ledger: led.ledger, env: ENV, fetchFn: fal2.fetchFn, now: () => t1 + 1000 });
+    expect((await filmsDue(store, { ledger: led.ledger, env: ENV, fetchFn: fal2.fetchFn, now: () => t1 + 1000 })).map((r) => r.outcome)).toEqual(['done']);
+    expect(it.videoMeta?.shots).toEqual({ asked: 1, applied: 0, why: 'not on the shelf: gone.png' });
+    expect(fal2.calls.some((c) => /\/\/fal\.run\//.test(c.url))).toBe(false); // nothing composed
+    expect((await store.contentMediaBytes(it.mediaId!))?.bytes.length).toBe(MP4.length);
   });
 
   it('the cron door wants the secret', async () => {

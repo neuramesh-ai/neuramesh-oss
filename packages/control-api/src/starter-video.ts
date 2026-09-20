@@ -5,7 +5,7 @@
 // downloads the clip, hosts it through the picture's lane and stamps the draft; a failure refunds
 // the credits with a ledger row beside the charge and lands on the card. The key lives in this
 // process only, and the local stack keeps this door shut (CLAUDE.md #5).
-import { CREDIT_MICROS, VIDEO_TIER_LABELS, createEvent, formatAddress, sniffVideoMime, type Actor } from '@neuramesh/shared';
+import { CREDIT_MICROS, VIDEO_TIER_LABELS, createEvent, formatAddress, productShots, sniffVideoMime, type Actor } from '@neuramesh/shared';
 import type { Env, Hono } from 'hono';
 import { z } from 'zod';
 import { actorInWorkspace, ledgerFor, type Ledger } from './credits';
@@ -14,6 +14,7 @@ import { localMode } from './localmode';
 import type { Store } from './store';
 import type { FilmRow } from './store/films';
 import { libraryImage } from './store/frames';
+import { composeShots, type ProductShot } from './film-compose';
 import { VIDEO_MODELS, clampSeconds, priceFilm, tierFor, videoTiers, type VideoTierSpec } from './video-registry';
 
 // a 30-second clip at the high bitrate (plan §8): sized from the 3.4 MB an 8-second standard
@@ -103,7 +104,7 @@ export function filmsCronRoute<E extends Env>(app: Hono<E>, store: Store, opts: 
 }
 
 /** One cron pass over the open films: status, then the clip, then the draft. Returns what happened to each row. */
-export async function filmsDue(store: Store, opts: { ledger?: Ledger | null; env?: NodeJS.ProcessEnv; fetchFn?: FalFetch; now?: () => number; limit?: number } = {}): Promise<Array<{ id: string; outcome: string }>> {
+export async function filmsDue(store: Store, opts: { ledger?: Ledger | null; env?: NodeJS.ProcessEnv; fetchFn?: FalFetch; now?: () => number; limit?: number; initWasm?: boolean } = {}): Promise<Array<{ id: string; outcome: string }>> {
   const ledger = opts.ledger === undefined ? ledgerFor(store) : opts.ledger;
   const env = opts.env ?? process.env;
   const fetchFn = opts.fetchFn ?? fetch;
@@ -129,7 +130,17 @@ export async function filmsDue(store: Store, opts: { ledger?: Ledger | null; env
     }
     const res = await falResult(key, row.endpoint, row.requestId, fetchFn);
     if (!res.url) { await fail(res.error ?? 'the film came back empty'); continue; }
-    const dl = await fetchFn(res.url, { redirect: 'follow' }).catch(() => null);
+    // the product shots (film-compose.ts, plan §9): the beats that name a shelf image are cut in
+    // before the download; a compose that fails lands the plain film with the reason on the card
+    const shots = await shotsFor(store, row.itemId);
+    let clipUrl = res.url;
+    let shotsMeta: { asked: number; applied: number; why?: string } | undefined;
+    if (shots.asked) {
+      const c = shots.list.length ? await composeShots(key, res.url, row.seconds, shots.list, { fetchFn, initWasm: opts.initWasm }) : { applied: 0, why: shots.why };
+      if (c.url) clipUrl = c.url;
+      shotsMeta = { asked: shots.asked, applied: c.applied, ...(c.why ? { why: c.why } : {}) };
+    }
+    const dl = await fetchFn(clipUrl, { redirect: 'follow' }).catch(() => null);
     if (!dl?.ok) { await fail(`the film could not be downloaded (${dl?.status ?? 'no answer'})`); continue; }
     const bytes = Buffer.from(await dl.arrayBuffer());
     if (!bytes.length) { await fail('the film downloaded empty'); continue; }
@@ -140,11 +151,26 @@ export async function filmsDue(store: Store, opts: { ledger?: Ledger | null; env
     } catch (e) { await fail(`the film did not attach to the draft (${e instanceof Error ? e.message : String(e)})`); continue; }
     const at = new Date(now()).toISOString();
     // the model's NAME on the card (Seedance 2.0), the registry key stays on the row
-    await patchDraft(store, row, { videoPending: false, videoError: '', videoMeta: { tier: row.tier, model: VIDEO_MODELS[row.model]?.label ?? row.model, seconds: row.seconds, credits: Math.ceil(row.micros / CREDIT_MICROS), at, frame: row.frame, frameUsed: row.frameUsed } });
+    await patchDraft(store, row, { videoPending: false, videoError: '', videoMeta: { tier: row.tier, model: VIDEO_MODELS[row.model]?.label ?? row.model, seconds: row.seconds, credits: Math.ceil(row.micros / CREDIT_MICROS), at, frame: row.frame, frameUsed: row.frameUsed, ...(shotsMeta ? { shots: shotsMeta } : {}) } });
     await store.films.update(row.id, { status: 'done', finishedAt: at });
     out.push({ id: row.id, outcome: 'done' });
   }
   return out;
+}
+
+/** the draft's product shots as the compose wants them: each SHOW name read off the shelf; a name the
+ *  shelf no longer holds is said, not skipped in silence (the draft gate refused it once already) */
+async function shotsFor(store: Store, itemId: string): Promise<{ asked: number; list: ProductShot[]; why?: string }> {
+  const media = await store.contentItemMedia(itemId).catch(() => null);
+  const wants = media?.script ? productShots(media.script) : [];
+  if (!wants.length) return { asked: 0, list: [] };
+  const list: ProductShot[] = [];
+  const missing: string[] = [];
+  for (const w of wants) {
+    const img = media?.channel ? await libraryImage(store, media.channel, w.show).catch(() => null) : null;
+    if (img) list.push({ ...w, dataUrl: img.dataUrl }); else missing.push(w.show);
+  }
+  return { asked: wants.length, list, ...(missing.length ? { why: `not on the shelf: ${missing.join(', ')}` } : {}) };
 }
 
 async function patchDraft(store: Store, row: FilmRow, patch: { videoPending: boolean; videoError: string; videoMeta?: import('./store').VideoMeta }): Promise<void> {

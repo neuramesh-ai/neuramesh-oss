@@ -2599,11 +2599,11 @@ export class PostgresStore implements Store {
   async dueContentItems(nowIso: string, limit: number): Promise<DueItem[]> { return dueContentItemsSql(this.sql, nowIso, limit); }
   async upcomingContentItems(fromIso: string, toIso: string, limit: number): Promise<UpcomingItem[]> { return upcomingContentItemsSql(this.sql, fromIso, toIso, limit); }
 
-  async contentItemMedia(itemId: string): Promise<{ platform: string; mediaUrl: string | null; mediaId?: string | null; workspace: string; channel?: string; frame?: string | null; seconds?: number | null } | null> {
+  async contentItemMedia(itemId: string): Promise<{ platform: string; mediaUrl: string | null; mediaId?: string | null; workspace: string; channel?: string; frame?: string | null; seconds?: number | null; script?: string | null } | null> {
     const [r] = await this.sql`select platform, media, workspace_id, channel_id from content_items where id = ${itemId}::uuid limit 1`;
     if (!r) return null;
-    const m = r['media'] as { image_url?: string; image_id?: string; frame?: string; seconds?: number } | null;
-    return { platform: r['platform'] as string, mediaUrl: m?.image_url ?? null, mediaId: m?.image_id ?? null, workspace: r['workspace_id'] as string, channel: r['channel_id'] as string, frame: m?.frame ?? null, seconds: m?.seconds ?? null };
+    const m = r['media'] as { image_url?: string; image_id?: string; frame?: string; seconds?: number; script?: string } | null;
+    return { platform: r['platform'] as string, mediaUrl: m?.image_url ?? null, mediaId: m?.image_id ?? null, workspace: r['workspace_id'] as string, channel: r['channel_id'] as string, frame: m?.frame ?? null, seconds: m?.seconds ?? null, script: m?.script ?? null };
   }
 
   async markContentPublished(itemId: string, url: string, publishedAtIso: string): Promise<void> {

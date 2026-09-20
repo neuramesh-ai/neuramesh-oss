@@ -81,7 +81,7 @@ export function SocialPostCard({ item, channelSlug, taskNumber, letter, onOpen, 
   const [filmPending, setFilmPending] = useState(false);
   useEffect(() => { setFilmPending(false); }, [media?.video_id, media?.video_error, media?.video_pending]);
   const filming = filmPending || !!media?.video_pending;
-  const facts = isVideo ? filmFacts(media, catalog) : null;
+  const facts = isVideo ? filmFacts(media, catalog, script) : null;
   // the length the next film takes (plan §8): the angle card's pick on the draft, held to the tier's lengths
   const seconds = filmSeconds(media, catalog?.served ? catalog.tiers.find((t) => t.tier === catalog.tier) : null);
   // THE FILM IS A FILE (George, 2026-09-19). A clip the card plays can be saved, on any card that

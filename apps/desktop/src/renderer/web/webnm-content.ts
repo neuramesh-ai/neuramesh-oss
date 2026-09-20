@@ -278,9 +278,12 @@ function connectorLanes(cfg: WebNmConfig, db: PowerSyncDatabase): Partial<NMBrid
      * be read.) The lookup still happens, because the replica holds every workspace you belong to
      * and the room's OWN workspace is what the round trip must carry.
      *
-     * DEV-HARNESS CAVEAT, stated rather than papered over: /connect is not one of the paths the vite
-     * dev proxy forwards (only /v1 and /auth), so with an empty VITE_NM_API_URL this URL is
-     * same-origin and 404s. A deployed bundle sets a real API base and the link resolves.
+     * The deployed bundle carries an EMPTY VITE_NM_API_URL, so this URL is same-origin like every
+     * /v1 call, and it reaches the API only through a rewrite: apps/desktop/vercel.json forwards
+     * /connect/* to the API beside /v1 and /auth, and vite.web.config.mts proxies it in the dev
+     * harness. Before the rewrite (2026-09-20, the first live GitHub grant on hq) the SPA's
+     * catch-all served the app itself in the new tab, which then normalised the URL to the
+     * workspace's home: the grant never reached GitHub, and neither did any social authorization.
      */
     connectorStart: async (channelId: string, provider?: 'x' | 'linkedin' | 'instagram' | 'tiktok' | 'github') => {
       const win = window.open('', '_blank');

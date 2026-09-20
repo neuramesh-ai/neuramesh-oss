@@ -886,6 +886,20 @@ real work — if it is decoration, drop it and keep the pill.
   parent — shipped once, caught on sight.
   And because a fold must not cost information, a **folded parent carries its children's summed
   count** — the same rule the thread rail's collapsed tab obeys.
+  ▸ **Superseded 2026-09-20 (George) — the pair are TABS on the page, and the row is plain.**
+  "Instead of the drop down scheduled design, can we make scheduled just a single item and instead
+  make routines and calendar text style tabs within the main area view on the scheduled page;
+  helps declutter left menu and aligns more to our design." The fold, its child rows, the four rules above and their CSS
+  (`.navparent`, `.navsub`, `.navpchev`, the `nm:navSec.scheduled` key) retired with it. What
+  replaced them: `Scheduled` is a row like Whiteboards and Files, **lit on either surface** (one
+  door, two lenses — `isScheduledView`, tested), and the page head is the name with the **room tab
+  strip** under it (`shell/ScheduledHead.tsx`: `.roomtabbar.desttabs`, inset to the head's 20px),
+  `Routines · Calendar`, each tab wearing the count it names in `.roomtabn`. The row carries **no
+  count**: armed routines and drafted posts are inventory, the Whiteboards ruling, and each number
+  now sits on the tab that says what it counts. The two "every schedule in the workspace…"
+  sub-lines went with the heads (say less). The general rule is therefore inverted for this case
+  and stands nowhere else yet: **a destination with two lenses wears the room tab strip on its
+  page**; a second such destination reuses `.desttabs` rather than minting a strip of its own.
 - **A notification is not a destination** (2026-08-16). A count that means *someone is waiting on
   you* lives on **chrome** and opens a **popover** (the bell, `.bellbtn` → `.bellpop`, leading the
   workspace strip's right rail); a count that means *how much is in there* lives on the thing it
@@ -1135,7 +1149,7 @@ real work — if it is decoration, drop it and keep the pill.
 
   | strip | what it switches | when to use it |
   |---|---|---|
-  | **`.roomtabbar`** — a room's surfaces (`Conversations · Board`, plus `Calendar · Library · Routines`) | **alternate views of one subject**, on its own line under the heading it belongs to, pill-grouped in a warm well | a container that genuinely has more than one lens. A count rides `.roomtabn`: a warm well when idle, `--sel-bg` when active, mono, **never accent-filled** — a tab count is information, not a notification |
+  | **`.roomtabbar`** — a room's surfaces (`Conversations · Board`, plus `Calendar · Library · Routines`), and since 2026-09-20 a destination's two lenses (`Scheduled › Routines · Calendar`, `.desttabs`) | **alternate views of one subject**, on its own line under the heading it belongs to, pill-grouped in a warm well | a container that genuinely has more than one lens. A count rides `.roomtabn`: a warm well when idle, `--sel-bg` when active, mono, **never accent-filled** — a tab count is information, not a notification |
   | **the workspace tab strip** — the side dock's open things | **different subjects held open at once**, each with its own kind and lifetime | the side dock only (rail-ink round 3). One per window. This is the only strip whose tabs are **closable** and whose contents the user created |
   | **the dock's `.docktabs`** | — | **RETIRED with the dock** (docs/36 §6). Do not revive it; its records became the workspace strip's |
 

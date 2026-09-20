@@ -10,28 +10,29 @@ when a row opens and when it closes. Newest first.
   in the last column. Keep the closed rows of the last two releases, then trim.
 - **`not this app`** rows move to the second table with the gate that keeps them out, once.
 
-**Newest published desktop:** v0.146.0 (published 2026-09-20, cut at `0ae80ade`). v0.147.0 is cut
+**Newest published desktop:** v0.147.0 (published 2026-09-20, cut at `2317f6a0`). v0.148.0 is cut
 at this PR's merge. Update this line in every version-bump PR.
 
 The raw list since the newest published desktop, from git (the ledger names features, git names
 commits, and the two must agree):
 
 ```bash
-git log v0.146.0..origin/main --oneline -- apps/desktop/src/renderer apps/desktop/src/main packages/shared packages/client-core defaults
+git log v0.147.0..origin/main --oneline -- apps/desktop/src/renderer apps/desktop/src/main packages/shared packages/client-core defaults
 ```
 
 ## Open
 
 | Opened | Feature | PR | Plan | Live on | Desktop needs | Closed in |
 |---|---|---|---|---|---|---|
+| 2026-09-20 | Scheduled is one nav row (the fold and its child rows retired) and Routines · Calendar are the room tab strip on its page, each tab wearing its count | #593 | [docs/33 §8](33-design-system.md) | web | the same renderer: an older desktop keeps the fold in the rail | v0.148.0 |
+| 2026-09-20 | The product shots: a video beat that shows the product names a real image (`SHOW:`), the film cuts to it once it lands, make_product_image shelves one when none fits | #591 | [video rung §9](design/video-rung-2026-09/plan.md#9-the-product-shots-the-real-image-cut-in-2026-09-20) | web · cloud (the runner's gate and tool, next release tag) · api (the cron composes) | the daemon's gate + make_product_image, the shared SHOW parser, the card's facts | v0.148.0 |
+| 2026-09-20 | Top dock: the account menu hangs below the row (it opened cut at the panel's edge with the dock segment under the sheet, so a person who docked to the top could not dock back), and the dock is two rows with its context strip again | #587 | fix | web | the same renderer: a fix installed apps need | v0.148.0 |
 | 2026-09-20 | The GitHub connector's pick round: the grant is the first move on every door, GitHub's install page is the repository picker, one granted repository attaches itself to the project and several show a pick in the step (the popover, setup step 5, the dependency card), and a local folder as the primary never blocks a read | #585 | [plan §7](design/github-connector-2026-09/plan.md#7-the-pick-round-2026-09-20-the-grant-first-the-repository-comes-back-with-it) | web · api | the same renderer (the step's faces, the pick rows): an older desktop keeps the demand for a GitHub-addressed repository and its "Attach a repository first" note | v0.147.0 |
 | 2026-09-20 | Marketing OS desk: the tile's ⋯ opens the full Connections list (Connect in place), the marks' labels flip above the sticky bar and connected marks get theirs back, the credit ring's arc goes green · amber · red by level, the workspace tile's live pulse is gone | #580 | polish | web | the same renderer | v0.146.0 |
 | 2026-09-19 | UGC films: the angle card asks the film's length (5 to 15 s on Seedance 2.0, to 30 s on 2.5) and prices it, the film is the script's first N seconds on a clean plate at the high bitrate, and Request changes on a card reads the draft before it rewrites it | #578 | [video rung §8](design/video-rung-2026-09/plan.md#8-lettering-length-and-the-refine-loop-2026-09-19-georges-three-points-on-the-ugc-films) | web · cloud (the runner films and reads drafts, next release tag) | the same renderer (the length row, the labelled control, the facts line) and the daemon's read_drafts + the shared prompt: an older desktop films eight seconds of the hook with the old prompt | v0.146.0 |
-| 2026-09-20 | The plan overlay's Approve fires `task.approve_plan` (it posted a retired question card's answer line, which woke rex and approved nothing) and wears the human-only badge | #576 | fix | web | the same renderer: a fix installed apps need | v0.145.0 |
-| 2026-09-19 | The GitHub connector: the project's repository readable by its agents through the App (the Connections row, the connect step, the dependency card's Connect GitHub, setup step 5, the three repo tools, the release lane on a cloud machine) | #575 | [plan](design/github-connector-2026-09/plan.md) | web · api · cloud (the daemon's tools and the tick's connector door, by hand pin or the next release tag) | the same renderer rows, the daemon's tools and its gh door: an older desktop shows no GitHub row and its agents keep reading with the machine's gh alone | v0.145.0 |
 
 ## Not this app
 
 | Placed | Feature | PR | Live on | The gate |
 |---|---|---|---|---|
-| | *None yet.* | | | |
+| 2026-09-20 | The connectors' door reaches the API from the browser client: `/connect/*` is rewritten to the API beside `/v1` and `/auth` (the deployed bundle's API base is empty), so Grant access on GitHub and the social authorizations open the provider, not the app itself, in the new tab | (this PR) | web | the desktop opens the door over IPC with the API's absolute URL: no bundle, no rewrite |
