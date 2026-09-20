@@ -10,20 +10,21 @@ when a row opens and when it closes. Newest first.
   in the last column. Keep the closed rows of the last two releases, then trim.
 - **`not this app`** rows move to the second table with the gate that keeps them out, once.
 
-**Newest published desktop:** v0.144.0 (published 2026-09-20, cut at `4b0f76db`). v0.145.0 is cut
+**Newest published desktop:** v0.145.0 (published 2026-09-20, cut at `3d5b2c67`). v0.146.0 is cut
 at this PR's merge. Update this line in every version-bump PR.
 
 The raw list since the newest published desktop, from git (the ledger names features, git names
 commits, and the two must agree):
 
 ```bash
-git log v0.144.0..origin/main --oneline -- apps/desktop/src/renderer apps/desktop/src/main packages/shared packages/client-core defaults
+git log v0.145.0..origin/main --oneline -- apps/desktop/src/renderer apps/desktop/src/main packages/shared packages/client-core defaults
 ```
 
 ## Open
 
 | Opened | Feature | PR | Plan | Live on | Desktop needs | Closed in |
 |---|---|---|---|---|---|---|
+| 2026-09-19 | UGC films: the angle card asks the film's length (5 to 15 s on Seedance 2.0, to 30 s on 2.5) and prices it, the film is the script's first N seconds on a clean plate at the high bitrate, and Request changes on a card reads the draft before it rewrites it | #578 | [video rung §8](design/video-rung-2026-09/plan.md#8-lettering-length-and-the-refine-loop-2026-09-19-georges-three-points-on-the-ugc-films) | web · cloud (the runner films and reads drafts, next release tag) | the same renderer (the length row, the labelled control, the facts line) and the daemon's read_drafts + the shared prompt: an older desktop films eight seconds of the hook with the old prompt | v0.146.0 |
 | 2026-09-20 | The plan overlay's Approve fires `task.approve_plan` (it posted a retired question card's answer line, which woke rex and approved nothing) and wears the human-only badge | #576 | fix | web | the same renderer: a fix installed apps need | v0.145.0 |
 | 2026-09-20 | The peek of a conversation-born unit shows the unit's own rows again: the plan card with Approve, the claim line, the deliverables (lost in #526, v0.135.0) | #572 | fix | web | the same renderer: a fix installed apps need | v0.144.0 |
 | 2026-09-19 | Units follow their conversation: a unit born of a web, phone or routine session claims on the cloud machine (rung 0), and a resume stands down while another awake machine runs the unit | #571 | [rule D9, amended](design/desktop-code-bridge-2026-09/plan.md#the-rule-d9) | cloud (the runner, next release tag) | the laptop half: deferring the claim to the cloud machine, and the resume guard | v0.144.0 |

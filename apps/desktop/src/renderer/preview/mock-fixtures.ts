@@ -8,7 +8,7 @@ import { composeFailover, buildFailoverCard, PACKS } from '@neuramesh/shared';
 // the release-drafts doors (their own file, re-exported so the mock bridge reads one world: this file sits at its size cap)
 import { DOOR_MARKETING_PROFILE, DOOR_RELEASE_SCHEDULE, DOOR_SETUP_TASK_ID, DOOR_TASKS } from './mock-doors'; export * from './mock-doors';
 // the release session (board B of the release-drafts round) lives in its own file and splices in below
-import { spliceRelease } from './mock-release';
+import { spliceRelease } from './mock-release'; import { spliceUgc } from './mock-ugc'; // both splice worlds in (this file sits at its cap)
 import { stageThinking } from './mock-thinking';
 export { releaseBriefArt } from './mock-release';
 // Preview-only mock of the Electron `window.nm` bridge. NOT shipped — it exists so the
@@ -536,7 +536,7 @@ export const tasksByChannel: Record<string, any[]> = {
 
 // the release routine's session (release drafts, board B; ?openConvo=marketing::browser terminal): its
 // thread, transcript, unit, drafts and schedule land in the sets above — before allTasks derives below
-spliceRelease({ mockThreads, convoMsgs, mockContentItems, mockSchedules, tasksByChannel });
+spliceRelease({ mockThreads, convoMsgs, mockContentItems, mockSchedules, tasksByChannel }); spliceUgc({ mockThreads, convoMsgs, mockContentItems }); // + the UGC sessions (video-rung plan §8): the angle card with lengths, the filmed draft
 export const tasksAllWatchers = new Set<(rows: any[]) => void>();
 /** harness hook: ?home=clear empties Home's queue (see watchTasksAll) */
 export const homeIsClear = typeof location !== 'undefined' && new URLSearchParams(location.search).get('home') === 'clear';

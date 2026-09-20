@@ -14,16 +14,20 @@ import { localMode } from './localmode';
 import type { Store } from './store';
 import type { FilmRow } from './store/films';
 import { libraryImage } from './store/frames';
-import { VIDEO_MODELS, priceFilm, tierFor, videoTiers, type VideoTierSpec } from './video-registry';
+import { VIDEO_MODELS, clampSeconds, priceFilm, tierFor, videoTiers, type VideoTierSpec } from './video-registry';
 
-const FILM_MAX_BYTES = 8_000_000; // the attach lane's ceiling (Instagram's own)
-const FILM_TIMEOUT_MS = 12 * 60_000; // a row older than this is failed and refunded, whatever fal says
+// a 30-second clip at the high bitrate (plan §8): sized from the 3.4 MB an 8-second standard
+// clip weighed live, doubled for the rate and the length, with room. X takes 512 MB; the media
+// route streams the bytes, so the size never meets a function's response cap.
+const FILM_MAX_BYTES = 40_000_000;
+/** a row older than this is failed and refunded, whatever fal says: twelve minutes, more for a long film */
+export const filmTimeoutMs = (seconds: number): number => Math.max(12 * 60_000, seconds * 40_000);
 const SYSTEM: Actor = { kind: 'agent', id: '00000000-0000-0000-0000-000000000000' };
 
 const FilmSchema = z.object({ workspace: z.string().uuid(), item: z.string().uuid(), prompt: z.string().min(8).max(2_000) });
 
-/** the tiers as a client reads them: what each films on and what it costs */
-export const tierView = (t: VideoTierSpec) => ({ tier: t.tier, label: t.label, model: t.model.label, vendor: t.model.vendor, seconds: t.seconds, credits: t.credits });
+/** the tiers as a client reads them: what each films on, what the default length costs, the lengths it offers and the rate the card prices them at */
+export const tierView = (t: VideoTierSpec) => ({ tier: t.tier, label: t.label, model: t.model.label, vendor: t.model.vendor, seconds: t.seconds, credits: t.credits, lengths: t.lengths, perSecondMicros: t.model.perSecondMicros });
 
 export function starterVideoRoutes<E extends Env & { Variables: { actor: Actor } }>(app: Hono<E>, store: Store, opts: { ledger?: Ledger | null; env?: NodeJS.ProcessEnv; fetchFn?: FalFetch } = {}): void {
   const ledger = opts.ledger === undefined ? ledgerFor(store) : opts.ledger;
@@ -60,28 +64,31 @@ export function starterVideoRoutes<E extends Env & { Variables: { actor: Actor }
     const media = await store.contentItemMedia(item);
     if (!media || media.workspace !== workspace) return c.json({ error: 'draft not found', code: 'NOT_FOUND' }, 404);
     if (await store.films.openForItem(item)) return c.json({ error: 'a film is already in flight for this draft', code: 'IN_FLIGHT' }, 409);
-    const micros = priceFilm(tier.model, tier.seconds);
+    // the length is the DRAFT's (media.seconds, the human's pick on the angle card or their word),
+    // held inside the model's range: a 30 s ask on a 15 s tier films 15 s and the answer says so
+    const seconds = clampSeconds(tier.model, media.seconds);
+    const micros = priceFilm(tier.model, seconds);
     // the frame (brand-grounding plan §6): the draft names a shelf image, the door reads it itself.
     // A model with a reference lane films with it; one without films the text lane and the row
     // says the frame was not used, so the card can say so too.
     const frame = media.frame && media.channel ? await libraryImage(store, media.channel, media.frame) : null;
     const lane = frame && tier.model.reference ? tier.model.reference : null;
     const endpoint = lane?.endpoint ?? tier.model.endpoint;
-    const input = lane ? lane.input(prompt, tier.seconds, [frame!.dataUrl]) : tier.model.input(prompt, tier.seconds);
+    const input = lane ? lane.input(prompt, seconds, [frame!.dataUrl]) : tier.model.input(prompt, seconds);
     if (media.frame && !lane) console.warn(`starter_film item=${item.slice(0, 8)} frame "${media.frame}" not used: ${frame ? `${tier.model.label} has no reference lane` : 'not on the shelf'}`);
     // the whole clip or nothing: charged before the submit, so two presses in flight cannot overspend
-    const spent = await ledger.spendFilm(workspace, micros, { seconds: tier.seconds });
+    const spent = await ledger.spendFilm(workspace, micros, { seconds });
     if (!spent) return c.json({ error: 'out of credits', code: 'NO_CREDITS', remainingCredits: Math.floor(before.remainingMicros / CREDIT_MICROS), credits: Math.ceil(micros / CREDIT_MICROS) }, 402);
     const key = env['FAL_KEY']!;
-    const sub = await falSubmit(key, endpoint, input, fetchFn);
+    const sub = await falSubmit(key, endpoint, input, fetchFn, Math.ceil(filmTimeoutMs(seconds) / 1000));
     if (!sub.requestId) {
-      await ledger.refundFilm(workspace, { grantMicros: spent.grantMicros, purchasedMicros: spent.purchasedMicros, seconds: tier.seconds }, `refund: ${tier.model.label} did not accept the film`);
+      await ledger.refundFilm(workspace, { grantMicros: spent.grantMicros, purchasedMicros: spent.purchasedMicros, seconds }, `refund: ${tier.model.label} did not accept the film`);
       return c.json({ error: sub.error ?? 'the film was not accepted', code: sub.unavailable ? 'UNAVAILABLE' : 'UPSTREAM' }, sub.unavailable ? 503 : 502);
     }
-    const { id } = await store.films.create({ workspaceId: workspace, itemId: item, tier: tier.tier, model: tier.model.key, endpoint, requestId: sub.requestId, seconds: tier.seconds, micros, grantMicros: spent.grantMicros, purchasedMicros: spent.purchasedMicros, createdBy: actor.kind === 'human' ? actor.id : null, frame: media.frame ?? null, frameUsed: !!lane });
+    const { id } = await store.films.create({ workspaceId: workspace, itemId: item, tier: tier.tier, model: tier.model.key, endpoint, requestId: sub.requestId, seconds, micros, grantMicros: spent.grantMicros, purchasedMicros: spent.purchasedMicros, createdBy: actor.kind === 'human' ? actor.id : null, frame: media.frame ?? null, frameUsed: !!lane });
     await store.reviseDraft(item, { body: null, imageBrief: null, thumb: null, videoPending: true, videoError: '' }, (ws) => createEvent({ type: 'content.updated', source: formatAddress({ kind: actor.kind, id: actor.id }), target: formatAddress({ kind: 'resource', type: 'content', id: item }), workspace: ws, payload: { item, filming: id } })).catch(() => {});
     c.header('x-nm-credits-remaining', String(Math.floor(spent.remainingMicros / CREDIT_MICROS)));
-    return c.json({ ok: true, film: id, tier: tierView(tier), credits: Math.ceil(micros / CREDIT_MICROS), remainingCredits: Math.floor(spent.remainingMicros / CREDIT_MICROS), frame: media.frame ?? null, frameUsed: !!lane }, 202);
+    return c.json({ ok: true, film: id, tier: tierView(tier), seconds, credits: Math.ceil(micros / CREDIT_MICROS), remainingCredits: Math.floor(spent.remainingMicros / CREDIT_MICROS), frame: media.frame ?? null, frameUsed: !!lane }, 202);
   });
 }
 
@@ -111,7 +118,7 @@ export async function filmsDue(store: Store, opts: { ledger?: Ledger | null; env
       await patchDraft(store, row, { videoPending: false, videoError: why });
       out.push({ id: row.id, outcome: `failed: ${why}` });
     };
-    if (now() - new Date(row.createdAt).getTime() > FILM_TIMEOUT_MS) { await fail('the film took longer than twelve minutes'); continue; }
+    if (now() - new Date(row.createdAt).getTime() > filmTimeoutMs(row.seconds)) { await fail(`the film took longer than ${Math.round(filmTimeoutMs(row.seconds) / 60_000)} minutes`); continue; }
     if (!row.requestId) { await fail('the film was never submitted'); continue; }
     const st = await falStatus(key, row.endpoint, row.requestId, fetchFn);
     if (st.state === 'failed') { await fail(st.error ?? 'the film failed'); continue; }
@@ -126,7 +133,7 @@ export async function filmsDue(store: Store, opts: { ledger?: Ledger | null; env
     if (!dl?.ok) { await fail(`the film could not be downloaded (${dl?.status ?? 'no answer'})`); continue; }
     const bytes = Buffer.from(await dl.arrayBuffer());
     if (!bytes.length) { await fail('the film downloaded empty'); continue; }
-    if (bytes.length > FILM_MAX_BYTES) { await fail(`the film is too large to attach (${Math.round(bytes.length / 1e6)} MB, max 8 MB)`); continue; }
+    if (bytes.length > FILM_MAX_BYTES) { await fail(`the film is too large to attach (${Math.round(bytes.length / 1e6)} MB, max ${FILM_MAX_BYTES / 1e6} MB)`); continue; }
     const mime = sniffVideoMime(new Uint8Array(bytes.subarray(0, 16))) ?? res.contentType ?? 'video/mp4';
     try {
       await store.attachContentMedia(row.itemId, mime, bytes, SYSTEM, (ws) => createEvent({ type: 'content.updated', source: formatAddress(SYSTEM), target: formatAddress({ kind: 'resource', type: 'content', id: row.itemId }), workspace: ws, payload: { item: row.itemId, media: 'hosted', film: row.id } }));

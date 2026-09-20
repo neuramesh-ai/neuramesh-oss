@@ -11,7 +11,8 @@ import { normalizeDraft, parseDraftRevisions } from '@neuramesh/shared';
 import type { OrchTool, ToolCtx } from './orchtools';
 import { frameArg, framesFor } from './frames';
 import { ungrounded } from './grounding';
-import { ugcOrchTools, unpicked } from './ugcflow';
+import { draftSeconds, ugcOrchTools, unpicked } from './ugcflow';
+import { draftsOrchTools, unreadRevision } from './chattools-drafts';
 
 export function contentTools(tc: ToolCtx): OrchTool[] {
   const { z, db, post, ch, agent, actor, thread, convoThreadId, log,
@@ -88,16 +89,18 @@ export function contentTools(tc: ToolCtx): OrchTool[] {
     // approve is HUMAN_ONLY), so scheduling builds a confirmation card whose click fires the
     // command as the human. The publish gate stays structural, not prompted.
     ...ugcOrchTools(tc, msgAnchor),
+    ...draftsOrchTools(db, () => ({ taskId: thread?.id, threadId: convoThreadId }), grounding, log),
     { name: 'draft_posts', description: 'Hand over drafted social posts as REVIEWABLE CARDS in this conversation — how posts are delivered, in any room. NEVER write posts.json or paste posts as markdown (nothing to click). `body` is ONLY the wire text — no character counts, no "(draft only)" footers, no image briefs inside it; it would publish verbatim. Art direction goes in `imageBrief`, only when the post should carry a visual (Instagram and TikTok always do). A VIDEO post (a UGC or creator script) puts the script in `script` and the caption that posts with the video in `body`; never the script in the body. Draft for the platform the ask names, else for the connected accounts. Call ONCE with every post — calling again ADDS drafts (revise_posts changes one in place).', schema: {
       posts: z.array(z.object({
         platform: z.enum(['x', 'instagram', 'linkedin', 'tiktok', 'email']).describe('the network this post is for: the one asked for, else a connected account'),
         body: z.string().min(1).max(10_000).describe('the post text exactly as it would publish, within the network\'s limit. For a video post: the caption that posts with the video.'),
         imageBrief: z.string().max(2000).optional().describe('art direction for this post\'s picture — subject, composition, light, mood, on-brand look. For a video post: the shot direction the film follows. Omit for a text-only post.'),
         mediaUrl: z.string().max(2000).optional().describe('a genuinely real public image URL, if you have one. Never invent one.'),
-        script: z.string().max(10_000).optional().describe('a VIDEO post only: the creator\'s script, timestamped beats ([0:00-0:03] direction, Spoken: "…", CAPTION: …). The card folds it and can film its hook.'),
+        script: z.string().max(10_000).optional().describe('a VIDEO post only: the creator\'s script, timestamped beats ([0:00-0:03] direction, Spoken: "…", CAPTION: …), written to the film\'s length. The card folds it and films its first seconds.'),
         frame: z.string().max(200).optional().describe('a VIDEO post that shows the product: the name of an IMAGE on this room\'s shelf (a real screenshot, see list_library). The film then shows that screen, never an invented one. Omit when the shelf has no screenshot, and ask the human for one.'),
+        seconds: z.number().int().min(4).max(30).optional().describe('a VIDEO post: the film\'s length in seconds, when the human named one in the conversation. The angle card\'s pick is read by itself; omit to keep it.'),
       })).min(1).max(20).describe('one entry per post, in the order they should read'),
-    }, run: async (input: { posts: Array<{ platform: string; body: string; imageBrief?: string; mediaUrl?: string; script?: string; frame?: string }> }) => {
+    }, run: async (input: { posts: Array<{ platform: string; body: string; imageBrief?: string; mediaUrl?: string; script?: string; frame?: string; seconds?: number }> }) => {
       // The anchor: a task thread's drafts ride the TASK (unchanged, so a content task reads
       // byte-identically); a conversation's ride the THREAD (0115). Without one there is no
       // surface to render on — a channel-level draft would card nowhere.
@@ -111,13 +114,14 @@ export function contentTools(tc: ToolCtx): OrchTool[] {
         const pick = await unpicked(db, { threadId: convoThreadId, taskId: thread?.id });
         if (pick) { log?.({ kind: 'tool', phase: 'result', summary: 'draft_posts refused: no answered angle card in this thread' }); return pick; }
       }
+      const seconds = await draftSeconds(db, { threadId: convoThreadId, taskId: thread?.id }, input.posts); // the angle card's length rides every video draft (plan §8)
       // The guard that used to live here is GONE, and its removal is the point: it refused any
       // task the triage had not typed `content`, because the renderer's two transcript builders
       // meant those drafts would card nowhere. There is one builder now — every thread renders
       // the drafts it holds — so there is no longer a place a draft can be invisible.
       // one cleaner for the tool path and the marketer's posts.json (normalizeDraft), so a
       // "Character count: 196/280" footer is stripped identically whichever door it came in
-      const drafts = input.posts.map((p) => normalizeDraft(p)).filter((p): p is NonNullable<typeof p> => !!p);
+      const drafts = input.posts.map((p, n) => { const d = normalizeDraft(p); return d && { ...d, seconds: seconds[n] }; }).filter((p): p is NonNullable<typeof p> => !!p);
       if (!drafts.length) return 'None of those entries were usable posts — each needs a supported platform and a body that is more than working notes.';
       // the frame (host/frames.ts): a name the shelf does not hold is refused before anything is written
       const frames = await framesFor(libraryDocs, ch.id, input.posts);
@@ -126,7 +130,7 @@ export function contentTools(tc: ToolCtx): OrchTool[] {
       for (const [i, d] of drafts.entries()) {
         const res = await post('/v1/commands', actor, {
           type: 'content.create', channel: ch.id, ...anchor, platform: d.platform, body: d.body,
-          ...(d.imageBrief ? { imageBrief: d.imageBrief } : {}), ...(d.mediaUrl ? { mediaUrl: d.mediaUrl } : {}), ...(d.script ? { script: d.script } : {}), ...(frames.names.has(i) ? { frame: frames.names.get(i) } : {}),
+          ...(d.imageBrief ? { imageBrief: d.imageBrief } : {}), ...(d.mediaUrl ? { mediaUrl: d.mediaUrl } : {}), ...(d.script ? { script: d.script } : {}), ...(frames.names.has(i) ? { frame: frames.names.get(i) } : {}), ...(d.seconds ? { seconds: d.seconds } : {}),
         }).catch(() => null);
         if (res?.ok) made += 1;
       }
@@ -135,15 +139,16 @@ export function contentTools(tc: ToolCtx): OrchTool[] {
       const letters = drafts.slice(0, made).map((_, i) => String.fromCharCode(97 + i)).join('/');
       return `${made} draft${made === 1 ? '' : 's'} delivered as cards in this thread (${letters}) — the human reads them there and approves, schedules, or asks for changes. Do NOT repeat the posts in your reply: one short line naming what you drafted and what you'd change on their word.`;
     } },
-    { name: 'revise_posts', description: 'Rewrite drafts that are ALREADY on screen here, in place — always use this when the human asks to change a post ("make b punchier", "drop the emoji on a"). Name each by its card letter. The card keeps its letter and its earlier version stays readable beneath it, so the human sees what changed. Calling draft_posts instead would leave the old draft sitting there and add a second one beside it, which is the wrong answer to "change this".', schema: {
+    { name: 'revise_posts', description: 'Rewrite drafts that are ALREADY on screen here, in place — always use this when the human asks to change a post ("make b punchier", "↩ Re draft b: shorten the hook"). Read the card first (read_drafts) and change it from what it holds. Name each by its card letter. The card keeps its letter and its earlier version stays readable beneath it, so the human sees what changed. Calling draft_posts instead would leave the old draft sitting there and add a second one beside it, which is the wrong answer to "change this".', schema: {
       revisions: z.array(z.object({
         letter: z.string().describe('the card letter to rewrite: a, b, c…'),
         body: z.string().max(10_000).optional().describe('the replacement post text, in full — wire text only, no notes (a video post: its caption)'),
         imageBrief: z.string().max(2000).optional().describe('replacement art direction for this post\'s picture (a video post: its shot direction)'),
-        script: z.string().max(10_000).optional().describe('a video post: the replacement script, in full. The card films the new one on the next Generate video.'),
+        script: z.string().max(10_000).optional().describe('a video post: the replacement script, in full, written to the film\'s length. The card films the new one on the next Generate video.'),
         frame: z.string().max(200).optional().describe('a video post: the name of an image on this room\'s shelf the film shows as the product (a real screenshot). "none" drops the frame.'),
+        seconds: z.number().int().min(4).max(30).optional().describe('a video post: a new film length in seconds, when the human asked for one. The film on the card stays; the next Generate video takes it.'),
       })).min(1).max(20),
-    }, run: async (input: { revisions: Array<{ letter: string; body?: string; imageBrief?: string; script?: string; frame?: string }> }) => {
+    }, run: async (input: { revisions: Array<{ letter: string; body?: string; imageBrief?: string; script?: string; frame?: string; seconds?: number }> }) => {
       const here = await draftsHere();
       if (!here) return 'revise_posts works on the drafts in a thread — open the conversation or task that has them.';
       if (!here.posts.length) return 'There are no drafts here to revise — draft_posts first.';
@@ -161,13 +166,15 @@ export function contentTools(tc: ToolCtx): OrchTool[] {
         // ONE cleaner for a revision (parseDraftRevisions, the posts-file path's): the caption
         // stripped of notes, a script filed under a heading in the brief or the body lifted out
         const [rev] = parseDraftRevisions(JSON.stringify([r]));
-        if (!rev && !r.frame?.trim()) { missed.push(r.letter); continue; } // a frame alone is a change too
+        if (!rev && !r.frame?.trim() && !r.seconds) { missed.push(r.letter); continue; } // a frame or a length alone is a change too
+        const unread = unreadRevision(grounding, target.letter, r); // the read gate (chattools-drafts.ts): a rewrite starts from the card
+        if (unread) { log?.({ kind: 'tool', phase: 'result', summary: `revise_posts refused: draft ${target.letter} was not read this turn` }); return unread; }
         const { body, imageBrief: brief, script } = rev ?? {};
         const fr = await frameArg(libraryDocs, ch.id, r.frame);
         if (!fr.ok) return fr.why;
         const res = await post('/v1/commands', actor, {
           type: 'content.revise', item: target.id,
-          ...(body ? { body } : {}), ...(brief ? { imageBrief: brief } : {}), ...(script ? { script } : {}), ...(fr.frame !== undefined ? { frame: fr.frame } : {}),
+          ...(body ? { body } : {}), ...(brief ? { imageBrief: brief } : {}), ...(script ? { script } : {}), ...(fr.frame !== undefined ? { frame: fr.frame } : {}), ...(r.seconds ? { seconds: r.seconds } : {}),
         }).catch(() => null);
         if (res?.ok) { done.push(target.letter); if (brief) drew.push(target.letter); } else missed.push(r.letter);
       }

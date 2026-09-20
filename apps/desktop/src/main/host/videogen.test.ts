@@ -1,8 +1,9 @@
-// The film lane (videogen.ts): the script's first beat, the prompt Veo films, the client against
-// a faked Gemini API, and the draft lane's three outcomes (no key, refused, filmed).
+// The film lane (videogen.ts): the client against a faked Gemini API, and the draft lane's three
+// outcomes (no key, refused, filmed), with the draft's length carried through. The prompt itself
+// (the beats, the text rule, the cap) is shared/filmprompt.ts and tested there.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { askDoor, filmPrompt, firstBeat, makeFilm, veoFilm } from './videogen';
+import { askDoor, makeFilm, ownKeySeconds, veoFilm } from './videogen';
 
 const SCRIPT = `[0:00-0:03] HOOK — handheld, walking, no laptop bag
 Spoken: "My laptop's in my bag. My code isn't waiting for me."
@@ -12,44 +13,15 @@ CAPTION ON SCREEN: no laptop, still shipping
 Spoken: "This is Home."
 CAPTION: queue + sessions, synced`;
 
-test('the first beat is the hook block: direction, the spoken line, the caption', () => {
-  assert.deepEqual(firstBeat(SCRIPT), { direction: 'handheld, walking, no laptop bag', spoken: "My laptop's in my bag. My code isn't waiting for me.", caption: 'no laptop, still shipping' });
-  // a body without timestamps: its first lines
-  assert.deepEqual(firstBeat('Meet the shared inbox.\nSpoken: "One thread per customer."'), { direction: 'Meet the shared inbox.', spoken: 'One thread per customer.', caption: '' });
-  // a script written as the creator's bare quoted lines (plume, live, 2026-09-19): the first line is spoken
-  assert.deepEqual(firstBeat('"I started a coding session from my couch. No laptop opened."\n"This is Home. My queue and every session, one list."'), { direction: '', spoken: 'I started a coding session from my couch. No laptop opened.', caption: '' });
-});
-
-test('a beat written on the timestamp line (the house model, live 2026-09-19) still yields its three parts', () => {
-  // the hook as a quoted line with the caption after it: spoken + caption, no direction
-  assert.deepEqual(firstBeat('[0:00-0:05] Hook: "Stop letting AI agents edit your codebase without a plan." CAPTION: From messy chat logs to structured agent workflows.\n[0:05-0:20] Problem: contrast chat with workflows.'),
-    { direction: '', spoken: 'Stop letting AI agents edit your codebase without a plan.', caption: 'From messy chat logs to structured agent workflows.' });
-  // the hook as a direction with the caption after it: no stray colon, no trailing period, the caption read
-  assert.deepEqual(firstBeat('[0:00-0:05] Hook: Show a messy desktop with overlapping AI chat logs. CAPTION: The agent chat loop is broken.\n[0:05-0:20] Problem: the chaos of untracked edits.'),
-    { direction: 'Show a messy desktop with overlapping AI chat logs', spoken: '', caption: 'The agent chat loop is broken.' });
-  // a spoken label inline
-  assert.deepEqual(firstBeat('[0:00-0:03] Creator points at camera. Spoken: "Three things we learned."'), { direction: 'Creator points at camera', spoken: 'Three things we learned.', caption: '' });
-  // and the prompt of that beat never carries the caption's words, but asks for the clear bottom third
-  const p = filmPrompt('[0:00-0:05] Hook: Show a messy desktop with overlapping AI chat logs. CAPTION: The agent chat loop is broken.', 'Split screen.');
-  assert.match(p, /Opening shot: Show a messy desktop with overlapping AI chat logs\. Leave the bottom third/);
-  assert.doesNotMatch(p, /CAPTION|chat loop is broken|: :/);
-});
-
-test('the prompt is a vertical phone clip of the hook, with the caption and the brief, under the cap', () => {
-  const p = filmPrompt(SCRIPT, '9:16 vertical. Real screen recording cut with handheld shots.');
-  assert.match(p, /9:16/);
-  assert.match(p, /Opening shot: handheld, walking, no laptop bag\./);
-  assert.match(p, /The creator says to camera, casually: "My laptop's in my bag/);
-  assert.match(p, /Leave the bottom third of the frame clear for a caption\. Render no text/);
-  assert.doesNotMatch(p, /no laptop, still shipping/); // the caption is never asked of the model (it misspells)
-  assert.match(p, /Visual direction: 9:16 vertical\. Real screen recording/);
-  assert.ok(p.length <= 1_400);
+test('the own key films what Google allows: Veo 4, 6 or 8 seconds, Omni up to ten', () => {
+  assert.deepEqual([3, 5, 8, 15].map((n) => ownKeySeconds(n, 'veo')), [4, 6, 8, 8]);
+  assert.deepEqual([3, 8, 10, 15].map((n) => ownKeySeconds(n, 'omni')), [3, 8, 10, 10]);
 });
 
 const MP4 = Buffer.from([0, 0, 0, 0x18, 0x66, 0x74, 0x79, 0x70, 0x69, 0x73, 0x6f, 0x6d, 0, 0, 0, 0, 1, 2, 3, 4]);
 /** Gemini's video API, faked. Omni (the Interactions API) answers in one call unless `omniMissing`
  *  sends the key down to Veo, where the operation starts, polls twice, then hands a download link. */
-function fakeGemini(opts: { omniMissing?: boolean; firstRungMissing?: boolean; refuse?: boolean; omniUri?: boolean } = {}) {
+function fakeGemini(opts: { omniMissing?: boolean; firstRungMissing?: boolean; refuse?: boolean; omniUri?: boolean; veoSeconds?: number } = {}) {
   const calls: string[] = [];
   let polls = 0;
   const json = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status, headers: { 'content-type': 'application/json' } });
@@ -72,7 +44,7 @@ function fakeGemini(opts: { omniMissing?: boolean; firstRungMissing?: boolean; r
       if (opts.firstRungMissing && url.includes('veo-3.1-fast')) return json({ error: { message: 'model not found' } }, 404);
       const body = JSON.parse(String(init?.body)) as { parameters: { aspectRatio: string; durationSeconds: number } };
       assert.equal(body.parameters.aspectRatio, '9:16');
-      assert.equal(body.parameters.durationSeconds, 8);
+      assert.equal(body.parameters.durationSeconds, opts.veoSeconds ?? 8);
       return json({ name: 'models/veo/operations/op-1' });
     }
     if (url.endsWith('/operations/op-1')) {
@@ -109,7 +81,13 @@ test('a key that cannot see Omni falls to Veo: the operation starts, polls until
   assert.equal(r.error, undefined);
   assert.equal(r.model, 'veo-3.1-fast-generate-preview');
   assert.equal(r.bytes!.length, MP4.length);
+  assert.equal(r.seconds, 8);
   assert.ok(g.calls[1]!.startsWith('POST models/veo-3.1-fast-generate-preview:predictLongRunning'));
+  // a 15 s draft films Veo's eight, and says so in the facts
+  const g15 = fakeGemini({ omniMissing: true, veoSeconds: 8 });
+  assert.equal((await veoFilm('key', 'a clip', { fetchFn: g15.fetchFn, ...quick }, 15)).seconds, 8);
+  const g5 = fakeGemini({ omniMissing: true, veoSeconds: 6 });
+  assert.equal((await veoFilm('key', 'a clip', { fetchFn: g5.fetchFn, ...quick }, 5)).seconds, 6);
 });
 
 test('a key that cannot see the fast Veo rung falls to the next; a refusal on any rung is the answer', async () => {
@@ -136,10 +114,15 @@ test('the platform first: a 202 from the door means the server films, and the la
   process.env['GEMINI_API_KEY'] = 'env-key';
   try {
     let filmed = 0;
-    const l = lane(JSON.stringify({ brief: 'handheld' }), async () => { filmed += 1; return { bytes: MP4, mime: 'video/mp4' }; }, async (_post, _actor, body) => { assert.equal(body.workspace, 'w1'); assert.equal(body.item, 'item-1'); assert.match(body.prompt, /handheld/); return { filming: true, tier: 'NeuraMesh Video Starter', model: 'Seedance 2.0', credits: 194 }; });
-    assert.match(await l.run(), /Filming the hook on NeuraMesh Video Starter \(Seedance 2\.0\)\. It takes about two minutes and costs 194 credits/);
+    const l = lane(JSON.stringify({ brief: 'handheld' }), async () => { filmed += 1; return { bytes: MP4, mime: 'video/mp4' }; }, async (_post, _actor, body) => { assert.equal(body.workspace, 'w1'); assert.equal(body.item, 'item-1'); assert.match(body.prompt, /8 seconds.*handheld/); return { filming: true, tier: 'NeuraMesh Video Starter', model: 'Seedance 2.0', credits: 194, seconds: 8 }; });
+    assert.match(await l.run(), /Filming 8 s on NeuraMesh Video Starter \(Seedance 2\.0\)\. It takes about 2 minutes and costs 194 credits/);
     assert.equal(filmed, 0);
     assert.deepEqual(l.posted, []);
+    // the draft's length (media.seconds, the angle card's pick) shapes the prompt and the reply; a length the tier holds down is said
+    const long = lane(JSON.stringify({ brief: 'handheld', seconds: 15 }), async () => ({ bytes: MP4, mime: 'video/mp4' }), async (_post, _actor, body) => { assert.match(body.prompt, /^Vertical 9:16 phone video, 15 seconds/); return { filming: true, tier: 'NeuraMesh Video Starter', model: 'Seedance 2.0', credits: 363, seconds: 15 }; });
+    assert.match(await long.run(), /Filming 15 s on NeuraMesh Video Starter \(Seedance 2\.0\)\. It takes about 4 minutes and costs 363 credits/);
+    const held = lane(JSON.stringify({ brief: 'handheld', seconds: 30 }), async () => ({ bytes: MP4, mime: 'video/mp4' }), async () => ({ filming: true, tier: 'NeuraMesh Video Starter', model: 'Seedance 2.0', credits: 363, seconds: 15 }));
+    assert.match(await held.run(), /Filming 15 s on NeuraMesh Video Starter \(Seedance 2\.0\) \(NeuraMesh Video Starter films up to 15 s\)/);
   } finally { delete process.env['GEMINI_API_KEY']; }
 });
 
@@ -161,7 +144,7 @@ test('an upstream refusal from the door lands on the card and never falls to the
 
 test('askDoor reads the door\'s answers: 202 films, 402 names the credits, 503 is no lane', async () => {
   const mk = (status: number, body: unknown) => async () => new Response(JSON.stringify(body), { status });
-  assert.deepEqual(await askDoor(mk(202, { ok: true, tier: { label: 'NeuraMesh Video Starter', model: 'Seedance 2.0' }, credits: 194 }) as never, { kind: 'agent', id: 'a' }, { workspace: 'w', item: 'i', prompt: 'p' }), { filming: true, tier: 'NeuraMesh Video Starter', model: 'Seedance 2.0', credits: 194 });
+  assert.deepEqual(await askDoor(mk(202, { ok: true, tier: { label: 'NeuraMesh Video Starter', model: 'Seedance 2.0' }, credits: 194, seconds: 8 }) as never, { kind: 'agent', id: 'a' }, { workspace: 'w', item: 'i', prompt: 'p' }), { filming: true, tier: 'NeuraMesh Video Starter', model: 'Seedance 2.0', credits: 194, seconds: 8 });
   assert.deepEqual(await askDoor(mk(402, { code: 'NO_CREDITS', error: 'out of credits', credits: 194 }) as never, { kind: 'agent', id: 'a' }, { workspace: 'w', item: 'i', prompt: 'p' }), { filming: false, code: 'NO_CREDITS', error: 'out of credits', credits: 194 });
   assert.deepEqual(await askDoor(mk(503, { code: 'UNAVAILABLE', error: 'no lane' }) as never, { kind: 'agent', id: 'a' }, { workspace: 'w', item: 'i', prompt: 'p' }), { filming: false, code: 'UNAVAILABLE', error: 'no lane' });
 });
@@ -169,12 +152,16 @@ test('askDoor reads the door\'s answers: 202 films, 402 names the credits, 503 i
 test('the draft lane: filmed → the bytes attach as video/mp4; refused → the reason lands on the card', async () => {
   process.env['GEMINI_API_KEY'] = 'env-key';
   try {
-    const ok = lane(JSON.stringify({ brief: 'handheld' }), async (key, prompt) => { assert.equal(key, 'env-key'); assert.match(prompt, /handheld/); return { bytes: MP4, mime: 'video/mp4', model: 'gemini-omni-1.1-flash' }; });
+    const ok = lane(JSON.stringify({ brief: 'handheld' }), async (key, prompt, _opts, seconds) => { assert.equal(key, 'env-key'); assert.match(prompt, /handheld/); assert.equal(seconds, 8); return { bytes: MP4, mime: 'video/mp4', model: 'gemini-omni-1.1-flash', seconds: 8 }; });
     const reply = await ok.run();
-    assert.match(reply, /Filmed the hook on gemini-omni-1.1-flash with your Google key\. An eight-second cut/);
+    assert.match(reply, /Filmed 8 s on gemini-omni-1.1-flash with your Google key\. The cut is on the card/);
     assert.equal(ok.posted[0]!['type'], 'content.attach_media');
     assert.ok(String(ok.posted[0]!['dataUrl']).startsWith('data:video/mp4;base64,'));
     assert.deepEqual({ ...(ok.posted[1] as Record<string, unknown>), videoMeta: { ...((ok.posted[1] as { videoMeta: Record<string, unknown> }).videoMeta), at: 'x' } }, { type: 'content.revise', item: 'item-1', videoMeta: { tier: 'own', model: 'gemini-omni-1.1-flash', seconds: 8, credits: 0, at: 'x' } });
+    // a 15 s draft on the own key: the prompt is rebuilt for the ten seconds Omni films, and the reply says the key's limit
+    const ten = lane(JSON.stringify({ brief: 'handheld', seconds: 15 }), async (_key, prompt, _opts, seconds) => { assert.match(prompt, /^Vertical 9:16 phone video, 10 seconds/); assert.equal(seconds, 10); return { bytes: MP4, mime: 'video/mp4', model: 'gemini-omni-1.1-flash', seconds: 10 }; });
+    assert.match(await ten.run(), /Filmed 10 s on gemini-omni-1.1-flash with your Google key \(your key films up to 10 s\)/);
+    assert.equal((ten.posted[1] as { videoMeta: { seconds: number } }).videoMeta.seconds, 10);
     const bad = lane(null, async () => ({ error: 'the model declined the prompt' }));
     assert.match(await bad.run(), /The film did not come: the model declined the prompt\. The reason is on the card/);
     assert.deepEqual(bad.posted[0], { type: 'content.revise', item: 'item-1', videoError: 'the model declined the prompt' });
@@ -190,7 +177,7 @@ test('the draft lane films the SCRIPT beside the caption (media.script), not the
     let seen = '';
     const { filmDraft } = makeFilm({ db, apiUrl: 'http://api', ownerActorId: 'u1', post: post as never, agents: new Map(), film: async (_k, prompt) => { seen = prompt; return { bytes: MP4, mime: 'video/mp4', model: 'gemini-omni-1.1-flash' }; }, door: async () => ({ filming: false, code: 'UNAVAILABLE', error: 'no lane' }) });
     await filmDraft({ id: 'a1', name: 'plume', role: 'marketer', channels: new Set(['c1']) } as never, { id: 'c1', slug: 'marketing', workspace_id: 'w1' }, 'item-1');
-    assert.match(seen, /Opening shot: handheld, walking, no laptop bag/);
+    assert.match(seen, /Open on handheld, walking, no laptop bag/);
     assert.doesNotMatch(seen, /Three things in the new update/);
     assert.equal(posted[0]!['type'], 'content.attach_media');
   } finally { delete process.env['GEMINI_API_KEY']; }

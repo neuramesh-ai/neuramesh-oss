@@ -97,12 +97,12 @@ function VideoRow() {
               <div className="mkvideotiers" role="radiogroup" aria-label="Video tier">
                 {cat.tiers.map((t) => (
                   <button key={t.tier} type="button" role="radio" aria-checked={t.tier === cat.tier} className={`mkvideotier${t.tier === cat.tier ? ' on' : ''}`} disabled={busy} onClick={() => void pick(t.tier)}>
-                    <b>{t.label}</b><span>{t.model} · {t.seconds} s · {t.credits} credits a film</span>
+                    <b>{t.label}</b><span>{t.model} · {t.lengths?.length ? `${Math.min(...t.lengths)} to ${Math.max(...t.lengths)} s` : `${t.seconds} s`} · {t.credits} credits for {t.seconds} s</span>
                   </button>
                 ))}
               </div>
             </>
-          : active && <span>NeuraMesh films video posts on <b>{active.label}</b> ({active.model}), about {active.credits} credits for an eight-second hook. Your Google key is the fallback. Pro workspaces pick among {cat.tiers.length} tiers.</span>}
+          : active && <span>NeuraMesh films video posts on <b>{active.label}</b> ({active.model}), about {active.credits} credits for {active.seconds} s{active.lengths?.length ? `, up to ${Math.max(...active.lengths)} s a film` : ''}. Your Google key is the fallback. Pro workspaces pick among {cat.tiers.length} tiers.</span>}
       </div>}
     </div>
   );

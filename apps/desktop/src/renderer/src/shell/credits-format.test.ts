@@ -14,3 +14,13 @@ test('the ring\'s figure: three characters wide at most, never negative, never a
   assert.equal(fmtCredits(-5), '0');
   assert.equal(fmtCredits(479.6), '480');
 });
+
+test('the ring\'s bands: green above a half, amber below it, red below a fifth (2026-09-19)', async () => {
+  const { bandOf } = await import('./CreditRing');
+  assert.equal(bandOf(1), '');
+  assert.equal(bandOf(0.5), '');
+  assert.equal(bandOf(0.49), 'mid');
+  assert.equal(bandOf(0.2), 'mid');
+  assert.equal(bandOf(0.19), 'low');
+  assert.equal(bandOf(0), 'low');
+});

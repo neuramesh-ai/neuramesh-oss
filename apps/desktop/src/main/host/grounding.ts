@@ -14,8 +14,9 @@ import type { AttDbLike } from '../agents';
 import type { LibDoc } from './orchtools';
 import { readBrand } from './brandnote';
 
-export interface Grounding { read: Set<string> }
-export const newGrounding = (): Grounding => ({ read: new Set() });
+/** what this turn has read: shelf documents by name, and the draft cards by letter (chattools-drafts.ts) */
+export interface Grounding { read: Set<string>; drafts: Set<string> }
+export const newGrounding = (): Grounding => ({ read: new Set(), drafts: new Set() });
 
 type Scope = 'room' | 'project' | 'workspace';
 export type LibraryReader = (channelId: string, limit?: number, scope?: Scope) => Promise<LibDoc[]>;

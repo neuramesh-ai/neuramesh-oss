@@ -42,23 +42,27 @@ export function MarketingDesk({ cards, line, onOpenTask, onAsk, onScope }: {
           : scored
             ? `${cadences}${audit?.lastAt ? ` · audited ${whenShort(audit.lastAt)}` : ''}`
             : `no baseline yet · docs ✓ · ${cadences}`;
+        // the click is the tile's top two lines; the strip is its own row, because its ⋯ door opens a
+        // popover of buttons (Connect, Disconnect) and a button cannot live inside a button
         return (
-          <button key={p.id} type="button" className={`mktile${line ? ' line' : ''}`}
-            onClick={() => {
-              if (!progress.complete && setupTask) return onOpenTask(setupTask.id);
-              if (progress.complete && audit?.lastScore == null) return onAsk(room.id, playbookAsk(AUDIT));
-              onScope(p.id);
-            }}>
-            <span className="mkt1">
-              <ProjLogo logo={p.logo_url} name={p.name || p.slug} size={22} />
-              <b>{p.name || p.slug}</b>
-              {scored
-                ? <span className="mkscore"><Dial score={audit!.lastScore!} /><b>{audit!.lastScore}</b></span>
-                : <span className="mkcta">{progress.complete ? 'Run the baseline audit ›' : 'Finish setup ›'}</span>}
-            </span>
-            <span className="mkfacts">{facts}</span>
-            <ConnStrip conns={conns} marketing={room.marketing} />
-          </button>
+          <div key={p.id} className={`mktile${line ? ' line' : ''}`}>
+            <button type="button" className="mktilebtn"
+              onClick={() => {
+                if (!progress.complete && setupTask) return onOpenTask(setupTask.id);
+                if (progress.complete && audit?.lastScore == null) return onAsk(room.id, playbookAsk(AUDIT));
+                onScope(p.id);
+              }}>
+              <span className="mkt1">
+                <ProjLogo logo={p.logo_url} name={p.name || p.slug} size={22} />
+                <b>{p.name || p.slug}</b>
+                {scored
+                  ? <span className="mkscore"><Dial score={audit!.lastScore!} /><b>{audit!.lastScore}</b></span>
+                  : <span className="mkcta">{progress.complete ? 'Run the baseline audit ›' : 'Finish setup ›'}</span>}
+              </span>
+              <span className="mkfacts">{facts}</span>
+            </button>
+            <ConnStrip conns={conns} marketing={room.marketing} channelId={room.id} />
+          </div>
         );
       })}
     </div>

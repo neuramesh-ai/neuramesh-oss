@@ -33,7 +33,13 @@ const CONNECTED_LINE: Record<ConnectorId, string> = {
   images: 'Your designer draws post images on this key.',
 };
 
-export function ConnectorMarks({ channelId, marketing }: { channelId: string | null; marketing?: string | null }) {
+/**
+ * `marks` is which connectors draw as their own door before the ⋯ (the composer's four publishing
+ * networks by default). The Marketing OS desk passes none (2026-09-19, George: the tile's marks
+ * should open the full list with Connect): its tile draws the strip itself, and the ⋯ alone is the
+ * door, so a person connects from the desk without leaving it, through this one recipe.
+ */
+export function ConnectorMarks({ channelId, marketing, marks = FOOT_MARKS }: { channelId: string | null; marketing?: string | null; marks?: readonly ConnectorId[] }) {
   const [face, setFace] = useState<Face | null>(null);
   const { states, refresh } = useConnectorStates(channelId, marketing, !!face);
   useEffect(() => {
@@ -47,12 +53,13 @@ export function ConnectorMarks({ channelId, marketing }: { channelId: string | n
   if (!channelId) return null;
   // the derivation maps the whole registry, so every id resolves
   const byId = (id: ConnectorId) => states.find((s) => s.id === id) ?? { ...CONNECTORS.find((c) => c.id === id)!, connected: false, handle: null, dead: null, conn: null };
-  const rest = CONNECTORS.length - FOOT_MARKS.length;
+  const rest = CONNECTORS.length - marks.length;
+  const doorTip = marks.length ? `${rest} more connections` : 'Connections';
   const listOpen = face?.id === 'list';
   const done = () => { refresh(); setFace(null); };
   return (
     <div className="cfootapps">
-      {FOOT_MARKS.map((id) => {
+      {marks.map((id) => {
         const s = byId(id);
         const open = face?.id === id;
         const tip = tipOf(s);
@@ -64,7 +71,7 @@ export function ConnectorMarks({ channelId, marketing }: { channelId: string | n
           </button>
         );
       })}
-      <button type="button" className={`cfootapp${listOpen ? ' open' : ''}`} aria-label={`${rest} more connections`} data-tip={`${rest} more connections`}
+      <button type="button" className={`cfootapp${listOpen ? ' open' : ''}`} aria-label={doorTip} data-tip={doorTip}
         aria-haspopup="dialog" aria-expanded={listOpen} onClick={() => setFace(listOpen ? null : { id: 'list' })}>
         <IconEllipsis s={16} />
       </button>

@@ -2,6 +2,7 @@
 // is testable without React: a VIDEO post carries its script beside the caption (media.script);
 // a draft from before that round carried the script AS the body, so it is still read as one.
 // Either way the caption is what publishes and the script is what gets filmed.
+import { filmCredits, filmMinutes } from '@neuramesh/shared';
 
 export type CardMedia = {
   image_url?: string; brief?: string; script?: string; thumb?: string; image_error?: string; video_id?: string; video_error?: string;
@@ -9,10 +10,21 @@ export type CardMedia = {
   video_pending?: boolean; video_error_code?: 'NO_CREDITS' | 'UNAVAILABLE'; video?: { tier: string; model: string; seconds: number; credits: number; at: string; frame?: string | null; frameUsed?: boolean };
   /** the frame (brand-grounding plan §6): the shelf image the film shows as the product */
   frame?: string;
+  /** the length the next film takes (video-rung plan §8): the angle card's pick, or the human's word; eight when unset */
+  seconds?: number;
 };
 
 /** the tiers this server films on, as GET /v1/starter/video answers them */
-export type StarterVideoCatalog = { served: boolean; tier: string | null; tiers: Array<{ tier: string; label: string; model: string; seconds: number; credits: number }> } | null;
+export type StarterVideoCatalog = { served: boolean; tier: string | null; tiers: Array<{ tier: string; label: string; model: string; seconds: number; credits: number; lengths?: number[]; perSecondMicros?: number }> } | null;
+
+/** the length a draft's next film takes: its own pick, held inside the tier's lengths, else the tier's default */
+export function filmSeconds(media: CardMedia | null, tier: { seconds: number; lengths?: number[] } | null | undefined): number {
+  const asked = media?.seconds && media.seconds > 0 ? Math.round(media.seconds) : null;
+  if (!asked) return tier?.seconds ?? 8;
+  const max = tier?.lengths?.length ? Math.max(...tier.lengths) : asked;
+  const min = tier?.lengths?.length ? Math.min(...tier.lengths) : asked;
+  return Math.min(max, Math.max(min, asked));
+}
 
 /** The facts line under a video card's buttons: what will film it, or what did, in one quiet mono
  *  row. Before a film: the workspace's tier from the catalog. After: the draft's own record. A film
@@ -32,7 +44,10 @@ export function filmFacts(media: CardMedia | null, catalog: StarterVideoCatalog)
   if (media?.video_pending) return null;
   const active = catalog?.served ? catalog.tiers.find((t) => t.tier === catalog.tier) : null;
   if (!active) return null;
-  return [active.label, active.model, `${active.seconds} s`, `about ${active.credits} credits`, '2 min', ...(media?.frame ? [`frame · ${media.frame}`] : [])];
+  // the draft's own length, priced by the same formula the door charges with (one number everywhere)
+  const seconds = filmSeconds(media, active);
+  const credits = active.perSecondMicros ? filmCredits(active.perSecondMicros, seconds) : active.credits;
+  return [active.label, active.model, `${seconds} s`, `about ${credits} credits`, `${filmMinutes(seconds)} min`, ...(media?.frame ? [`frame · ${media.frame}`] : [])];
 }
 
 /** the film in flight: its tier and model from the catalog, for the pending row */

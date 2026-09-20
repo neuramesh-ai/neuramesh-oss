@@ -1687,15 +1687,6 @@ export function App() {
   // …and the spine's pulses: which PROJECTS have an agent working in them right now. A run names
   // its channel, and a channel names its project — the same resolution every scope here uses, and
   // the same watch the Recents dot reads, so the strip can never disagree with the list.
-  const liveProjectIds = useMemo(() => {
-    const s = new Set<string>();
-    for (const r of openRuns) {
-      if (r.state !== 'running') continue;
-      const pid = chans.find((c) => c.id === r.channel_id)?.project_id;
-      if (pid) s.add(pid);
-    }
-    return s;
-  }, [openRuns, chans]);
   const histInProj = useMemo(() => rowsInProject(histAll, chans, projScope), [histAll, chans, projScope]);
   // The scope, RESOLVED — and self-healing: a scoped room that leaves the project (switched
   // away from, deleted, moved) reads as All rather than as a room that is no longer there.
@@ -3291,7 +3282,6 @@ export function App() {
           <NavWorkspaceFoot
             workspace={boot?.workspace.name || ''}
             initial={(boot?.workspace.name?.[0] ?? 'N').toUpperCase()}
-            anyLive={wsProjects.some((p) => p.status === 'active' && liveProjectIds.has(p.id))}
             unread={anyRoomUnread}
             faceOpen={navFace === 'projects'}
             onToggleFace={toggleFace}

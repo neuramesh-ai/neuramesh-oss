@@ -8,7 +8,8 @@ import { type ContentItemRow } from '../bridge/rows-content';
 import { type PostVCard } from '../thread/parts';
 import { useEffect, useState } from 'react';
 import { nm as nmBridge } from '../bridge/nm';
-import { cardParts, filmFacts, filmFile, filmingOn, type CardMedia, type StarterVideoCatalog } from './cardparts';
+import { cardParts, filmFacts, filmFile, filmSeconds, filmingOn, type CardMedia, type StarterVideoCatalog } from './cardparts';
+import { filmMinutes } from '@neuramesh/shared';
 import { useFilm } from './FilmPreview';
 import { openCredits } from '../settings/ConnectionsList';
 
@@ -81,6 +82,8 @@ export function SocialPostCard({ item, channelSlug, taskNumber, letter, onOpen, 
   useEffect(() => { setFilmPending(false); }, [media?.video_id, media?.video_error, media?.video_pending]);
   const filming = filmPending || !!media?.video_pending;
   const facts = isVideo ? filmFacts(media, catalog) : null;
+  // the length the next film takes (plan §8): the angle card's pick on the draft, held to the tier's lengths
+  const seconds = filmSeconds(media, catalog?.served ? catalog.tiers.find((t) => t.tier === catalog.tier) : null);
   // THE FILM IS A FILE (George, 2026-09-19). A clip the card plays can be saved, on any card that
   // shows one: the bytes are already here, so Save hands them to the OS dialog (the desktop) or the
   // browser's own download, named for the card. The door is the card's menu (the kebab in the
@@ -142,8 +145,8 @@ export function SocialPostCard({ item, channelSlug, taskNumber, letter, onOpen, 
         {media?.video_id && !filming && (film ? <video className="mkpcfilm" src={film} controls playsInline preload="metadata" /> : <div className="mkpcimgwait" aria-live="polite">loading the film…</div>)}
         {filming && (
           <div className="mkpcfilmwait" aria-live="polite">
-            <b>Filming on {filmingOn(catalog)}</b>
-            <span>About two minutes. The film lands on this card, and you can leave the page.</span>
+            <b>Filming {seconds} s on {filmingOn(catalog)}</b>
+            <span>About {filmMinutes(seconds)} minutes. The film lands on this card, and you can leave the page.</span>
             <span className="mkpcprog"><i /></span>
           </div>
         )}
@@ -190,7 +193,7 @@ export function SocialPostCard({ item, channelSlug, taskNumber, letter, onOpen, 
                 onClick={() => { setTryPending(true); onGenerateImage(false); }}>{tryPending ? 'Drawing…' : media?.image_error ? 'Try again' : 'Generate image'}</button>
             )}
             {canFilm && (
-              <button className="btn sm" disabled={filming} title="Film the hook: an eight-second vertical clip from the script"
+              <button className="btn sm" disabled={filming} title={`Film the script's first ${seconds} seconds as a vertical clip`}
                 onClick={() => { setFilmPending(true); onGenerateImage(!!media?.video_id, 'video'); }}>{filming ? 'Filming…' : media?.video_error ? 'Try again' : media?.video_id ? 'Film again' : 'Generate video'}</button>
             )}
             {canFilm && media?.video_error_code === 'NO_CREDITS' && !filming && <button className="btn sm" onClick={() => openCredits()}>Add credits →</button>}
@@ -205,9 +208,11 @@ export function SocialPostCard({ item, channelSlug, taskNumber, letter, onOpen, 
         <span className="mkpcactions">
           {/* request changes on THIS draft — arms the thread composer with the card as a pill,
               rather than an inline field on the card (George's ask). Not on a live post, and not on
-              a superseded version (it's history — request changes on the current one). */}
+              a superseded version (it's history — request changes on the current one). It wears
+              its name (2026-09-19, George: "it seems hidden on the card"): the bare arrow read as
+              decoration beside the labelled buttons, and the one way to refine a script went unseen. */}
           {onReply && !superseded && item.status !== 'published' && (
-            <button className="mkico mkpcreply" title="Request changes on this draft" aria-label={`Request changes on draft ${letter}`} onClick={onReply}><IconReply s={13} /></button>
+            <button className="mkico mkpcreply" title={isVideo ? 'Ask for a change to the script or the caption' : 'Ask for a change to this draft'} aria-label={`Request changes on draft ${letter}`} onClick={onReply}><IconReply s={13} /><span>Request changes</span></button>
           )}
           {/* REDRAW — the affordance a card with a picture never had. Quiet, in the same family as
               Reply, because a card whose image already looks right should not wear a banner about

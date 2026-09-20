@@ -64,7 +64,7 @@ export async function contentCommands(store: Store, actor: Actor, cmd: Command):
     const styled = await styledBy(store, actor, () => store.channelWorkspace(cmd.channel).then((c) => c.workspace));
     const frame = await frameName(store, cmd.channel, cmd.frame);
     const { id } = await store.createContentItem(
-      { channelId: cmd.channel, frame, taskId: cmd.task ?? null, threadId: cmd.thread ?? null, platform: cmd.platform, body: styled(cmd.body), scheduleId: cmd.schedule ?? null, slotAt: cmd.slotAt ?? null, mediaUrl: cmd.mediaUrl ?? null, imageBrief: cmd.imageBrief == null ? null : styled(cmd.imageBrief), script: cmd.script == null ? null : styled(cmd.script), thumb: cmd.thumb ?? null, imageError: cmd.imageError ?? null, createdByKind: actor.kind, createdBy: actor.id },
+      { channelId: cmd.channel, frame, seconds: cmd.seconds ?? null, taskId: cmd.task ?? null, threadId: cmd.thread ?? null, platform: cmd.platform, body: styled(cmd.body), scheduleId: cmd.schedule ?? null, slotAt: cmd.slotAt ?? null, mediaUrl: cmd.mediaUrl ?? null, imageBrief: cmd.imageBrief == null ? null : styled(cmd.imageBrief), script: cmd.script == null ? null : styled(cmd.script), thumb: cmd.thumb ?? null, imageError: cmd.imageError ?? null, createdByKind: actor.kind, createdBy: actor.id },
       (ws) => createEvent({
         type: 'content.created',
         source: actorAddress(actor),
@@ -95,11 +95,11 @@ export async function contentCommands(store: Store, actor: Actor, cmd: Command):
     // the marketer revising a draft OR a proposed 'scheduled' slot (never a published post) — a
     // human asking for a change in the thread reaches every unpublished draft. Rewriting a
     // scheduled post's copy unschedules it back to draft (store), so nothing publishes unreviewed.
-    if (!cmd.body && cmd.imageBrief === undefined && !cmd.script && cmd.frame === undefined && !cmd.thumb && cmd.imageError === undefined && cmd.videoError === undefined && !cmd.videoMeta && cmd.videoErrorCode === undefined) throw new DomainError('INVALID_INPUT', 'a revision needs a new body, script, frame or image brief');
+    if (!cmd.body && cmd.imageBrief === undefined && !cmd.script && cmd.frame === undefined && cmd.seconds === undefined && !cmd.thumb && cmd.imageError === undefined && cmd.videoError === undefined && !cmd.videoMeta && cmd.videoErrorCode === undefined) throw new DomainError('INVALID_INPUT', 'a revision needs a new body, script, frame, length or image brief');
     const media = await store.contentItemMedia(cmd.item);
     const styled = await styledBy(store, actor, async () => media?.workspace);
     const frame = await frameName(store, media?.channel, cmd.frame);
-    const { id } = await store.reviseDraft(cmd.item, { frame, body: cmd.body ? styled(cmd.body) : null, imageBrief: cmd.imageBrief ? styled(cmd.imageBrief) : (cmd.imageBrief ?? null), script: cmd.script ? styled(cmd.script) : null, thumb: cmd.thumb ?? null, videoError: cmd.videoError, videoErrorCode: cmd.videoErrorCode, videoMeta: cmd.videoMeta, imageError: cmd.imageError === undefined ? undefined : (cmd.imageError || null) }, (ws) => createEvent({
+    const { id } = await store.reviseDraft(cmd.item, { frame, seconds: cmd.seconds, body: cmd.body ? styled(cmd.body) : null, imageBrief: cmd.imageBrief ? styled(cmd.imageBrief) : (cmd.imageBrief ?? null), script: cmd.script ? styled(cmd.script) : null, thumb: cmd.thumb ?? null, videoError: cmd.videoError, videoErrorCode: cmd.videoErrorCode, videoMeta: cmd.videoMeta, imageError: cmd.imageError === undefined ? undefined : (cmd.imageError || null) }, (ws) => createEvent({
       type: 'content.updated', source: actorAddress(actor), target: formatAddress({ kind: 'resource', type: 'content', id: cmd.item }), workspace: ws,
       payload: { item: cmd.item, revised: true },
     }));

@@ -5,7 +5,7 @@ import sampleLogos from './sample-logos.json';
 import { gateArtifactReason, isGateArtifact } from '@neuramesh/shared';
 import { openConnectionsSettings, openMoveToCloud, openUpgrade } from '../src/lib/toast';
 import { FLOW, FRESH_CLOUD, HAS_INVITE, LIVE_RUNS, MOCK_WS_ID, MSG_DELAY, NOKEY, TERM_PALETTE_PROOF, agents, allTasks, artWatchers, artifacts, baseThreadRows, beatsByTask, chanRunWatchers, channels, convoMsgs, convoWatchers, customPacks, decisionWatchers, designProviders, emitLog, emitMockStream, failoverWatchers, historyAllWatchers, homeIsClear, liveTerms, logWatchers, logs, machines, members, memoryBlock, mockArticleArt, mockConnectors, mockContentItems, mockConvoAtts, mockDecisions, mockFailover, mockMcpPresence, mockReplyCounts, mockRuns, mockSchedules, mockThreadArts, mockThreads, mockUpdateState, mockWhiteboards, mockWorkRuns, mockWorkspaces, msgWatchers, msgsByChannel, noop, notifyProcs, openMockTerm, openRunWatchers, packs, pingArts, pingConvo, pingDecisions, pingFailover, pingOpenRuns, pingTasksAll, pingThreads, pingWb, procWatchers, projects, promotedArtifacts, releaseBriefArt, roomMessagesFor, rosterWatchers, screen, seedIso, setMockFailover, skills, streamWatchers, stripThumb, t, taskChanWatchers, taskThreadExtra, taskThreadWatchers, tasksAllWatchers, tasksByChannel, threadWatchers, threadsAllSnapshot, threadsAllWatchers, wbListWatchers, wbRowWatchers, wbRowsFor, wsLibraryRows, libAllWatchers, deleteMockArtifact, DOOR_REPOS, DOOR_SCHEDULE_RUNS } from './mock-fixtures';
-import { marketingArtifacts, marketingSchedules } from './mock-marketing';
+import { marketingArtifacts, marketingSchedules } from './mock-marketing'; import { UGC_FILM } from './mock-ugc';
 import { CONNS, connectionList, foregroundTasks, foregroundThreads, mockForeground, mockForegroundWorkspace, railRowsSnapshot, swapForeground, watchForeground } from './mock-connections';
 import { githubLanes } from './mock-github';
 
@@ -348,7 +348,7 @@ const explicit: Record<string, any> = {
   },
   // the image floor: after a beat, a generated picture lands on the draft (a tiny inline SVG
   // thumb so the preview harness shows the landed state without any provider)
-  contentMedia: async () => null, // the harness has no hosted film to hand back
+  contentMedia: async (id: string) => (id === 'film-ugc-a' ? UGC_FILM : null), // the UGC session's filmed card plays a frame; nothing else is hosted here
   draftImage: async (itemId: string, opts?: { angle?: string; rewrite?: boolean }) => {
     await new Promise((r) => setTimeout(r, 1200));
     const it = mockContentItems.find((x) => x.id === itemId);
@@ -557,7 +557,7 @@ const explicit: Record<string, any> = {
     grants: [{ credits: 500, kind: 'purchase', note: 'pack', day: '2026-08-20' }, { credits: 500, kind: 'monthly', note: 'monthly refill (free)', day: '2026-08-01' }],
   }),
   creditsCheckout: async () => ({ ok: true }),
-  starterVideo: async () => ({ served: true, tier: 'starter', pick: null, canPick: localStorage.getItem('nm:plan') === 'cloud', tiers: [{ tier: 'starter', label: 'NeuraMesh Video Starter', model: 'Seedance 2.0', vendor: 'ByteDance', seconds: 8, credits: 194 }, { tier: 'xpress', label: 'NeuraMesh Video Xpress', model: 'MiniMax H3', vendor: 'MiniMax', seconds: 8, credits: 48 }, { tier: 'premium', label: 'NeuraMesh Video Premium', model: 'Seedance 2.0 Standard', vendor: 'ByteDance', seconds: 8, credits: 243 }] }),
+  starterVideo: async () => ({ served: true, tier: 'starter', pick: null, canPick: localStorage.getItem('nm:plan') === 'cloud', tiers: [{ tier: 'starter', label: 'NeuraMesh Video Starter', model: 'Seedance 2.0', vendor: 'ByteDance', seconds: 8, credits: 194, lengths: [5, 8, 10, 15], perSecondMicros: 241_900 }, { tier: 'xpress', label: 'NeuraMesh Video Xpress', model: 'MiniMax H3', vendor: 'MiniMax', seconds: 8, credits: 48, lengths: [5, 8, 10, 15], perSecondMicros: 60_000 }, { tier: 'premium', label: 'NeuraMesh Video Premium', model: 'Seedance 2.0 Standard', vendor: 'ByteDance', seconds: 8, credits: 243, lengths: [5, 8, 10, 15], perSecondMicros: 303_400 }] }),
   billingPortal: async () => ({ ok: true }),
   // ?machinelimit=1 surfaces the Free single-machine transfer-or-upgrade card for capture/preview
   machineLimitInfo: async () =>
