@@ -1,6 +1,7 @@
 // The orchestrator taking a task itself, and the remote A2A delegate — the two ways a task gets
 // an owner that is not a channel worker claiming it. Split out of host/claimflow.ts.
 import { resolveToken } from '../agents';
+import { starterFallback, unavailableOf, whyUnavailable } from './starterfallback';
 import type { ExecTask, HostedAgent, OfferedTask, SkillRef } from '../agents';
 import { TURN_BUDGETS, type ClaimVerdict } from '@neuramesh/shared';
 import { a2aArtifactsToSubmit, a2aSend } from './a2a';
@@ -10,7 +11,7 @@ import { isStandDown } from '../replypolicy';
 import { type LogFn } from '../agentlog';
 import { withTimeout } from './turnkit';
 import { STATIC_CHECKLIST } from './flows';
-import type { OwnedTask } from './claimflow';
+import type { AdmitTask, OwnedTask } from './claimflow';
 import type { HostCtx } from './ctx';
 import type { PowerSyncDatabase } from '@powersync/node';
 import type { Brain } from '../harness/brain';
@@ -63,7 +64,11 @@ export function makeClaimOwn(ctx: HostCtx & {
   spawnLegFor: (parent: HostedAgent, where: { workspace: string; channelId: string; taskId?: string | null; threadId?: string | null }, dir: string, task: ExecTask, budget: { wallMs: number; contextTokens: number }, log: LogFn | undefined, _depth: number) => (i: { role: string; prompt: string; label?: string }) => Promise<{ ok: boolean; summary?: string; error?: string }>;
   taskRecallNote: (workspaceId: string, query: string, lessonsNote: string) => Promise<string>;
   whiteboardClosures: (actor: { kind: string; id: string; role?: string }, ch: { id: string; workspace_id: string }, at: { taskId?: string; threadId?: string }) => WhiteboardToolClosures;
+}, wiring: {
+  /** the ladder before any claim (host/claimflow.ts admitUnit): one for the worker's claim and the owner's alike */
+  admitUnit: <T extends AdmitTask>(agent: HostedAgent, t: T, kind: 'work' | 'own', again: (seat: HostedAgent, t: T) => Promise<void>) => Promise<boolean>;
 }) {
+const { admitUnit } = wiring;
 const { db, apiUrl, workspace, ownerActorId, post, claimed,
         NO_RUN, openRun, 
         arun, brainNotes, brainResults, discoverSkills,
@@ -73,6 +78,7 @@ const {
  } = ctx.guards;
 
 async function ownFlow(orch: HostedAgent, t: OwnedTask): Promise<void> {
+  orch = await ctx.seatFor(orch, t.channel_id, { taskId: t.id }); // per-project + per-thread brains (docs/10)
   const actor = { kind: 'agent', id: orch.id, role: 'orchestrator' };
   const ch = await db.get<{ id: string; slug: string; workspace_id: string }>(
     'select id, slug, workspace_id from channels where id = ?', [t.channel_id],
@@ -93,6 +99,11 @@ async function ownFlow(orch: HostedAgent, t: OwnedTask): Promise<void> {
     startState = held?.state ?? null;
     const alreadyMine = held?.state === 'in_progress' && held.assignee_id === orch.id;
     if (!alreadyMine) {
+      // THE LADDER (2026-09-19): an owned unit used to race the claim with no placement at all, so
+      // every host that served rex raced, and the runner, when it won, blocked the unit for want
+      // of a credential. The same admission as the worker's claim: the seat, the unit's birth
+      // (a cloud-born conversation's unit claims on the cloud, rung 0), the sleeper rung, the door.
+      if (!(await admitUnit(orch, t, 'own', ownFlow))) return;
       const res = await post('/v1/commands', actor, { type: 'task.claim', taskId: t.id });
       if (!res.ok) throw new Error(`claim ${res.status}: ${await res.text().catch(() => '')}`.slice(0, 200));
       log({ kind: 'lifecycle', phase: 'claimed', summary: `took ownership of #${t.number} "${t.title}"` });
@@ -100,10 +111,20 @@ async function ownFlow(orch: HostedAgent, t: OwnedTask): Promise<void> {
       log({ kind: 'lifecycle', phase: 'resumed', summary: `picking #${t.number} back up — continuing from the notes` });
     }
 
-    const cred = await resolveToken(apiUrl, ch.workspace_id, orch, ownerActorId);
-    if (cred.blocked || cred.authMode === 'none') {
-      await post('/v1/commands', actor, { type: 'task.block', taskId: t.id, reason: 'no usable credential to run the owning turn' }).catch(() => {});
-      return;
+    let cred = await resolveToken(apiUrl, ch.workspace_id, orch, ownerActorId);
+    // the seat cannot run → the Starter door (host/starterfallback.ts), the ONE door every flow
+    // walks through: a routine's unit and any unit on a cloud machine re-seat on the NeuraMesh
+    // brain and say so; a human's unit on a laptop gets the reason and the card, and blocks until
+    // they act. Before this the owning turn posted its own block, "no usable credential", and a
+    // cloud machine that owned a unit could never run it.
+    const gap = unavailableOf(cred, orch.runtime);
+    if (gap) {
+      const next = await starterFallback(orch, gap, { workspace: ch.workspace_id, channelId: ch.id, taskId: t.id, taskNumber: t.number }, log);
+      if (!next) {
+        await post('/v1/commands', actor, { type: 'task.block', taskId: t.id, reason: `@${orch.name} cannot run here. ${whyUnavailable(gap, orch.runtime)} Sign in again, or switch this conversation to the NeuraMesh brain, then unblock #${t.number}.` }).catch(() => {});
+        return;
+      }
+      orch = next; cred = await resolveToken(apiUrl, ch.workspace_id, orch, ownerActorId);
     }
     run = await openRun(orch, { workspace: ch.workspace_id, channelId: ch.id, taskId: t.id }, {
       // "Owning #N — …", never the bare task title: this row is the owner's TURN, and a

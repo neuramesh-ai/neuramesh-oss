@@ -111,7 +111,7 @@ import { makeEcho } from './host/echo';
 import { makeMarketing } from './host/marketing';
 import { makeWorkspace } from './host/workspace';
 import { makeMemory } from './host/memory';
-import { makeDispatch } from './host/dispatch';
+import { makeDispatch, type ResumeRow } from './host/dispatch';
 import { makeStaffing } from './host/staffing';
 import { makeContent } from './host/content';
 
@@ -886,7 +886,7 @@ export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId,
   /** The member a task is attributed to. Only a HUMAN creator counts: an orchestrator-filed task
    *  is nobody's in particular, and pretending otherwise would park it behind a grace window for
    *  a machine that never asked for it. */
-  const originOf = (t: OfferedTask): string | null =>
+  const originOf = (t: Pick<OfferedTask, 'creator_kind' | 'creator_id'>): string | null =>
     (t.creator_kind === 'human' && t.creator_id) ? t.creator_id : null;
 
   /** How long this host has known about an item. Tracked locally rather than read off a column:
@@ -968,7 +968,7 @@ export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId,
   const ctx: HostCtx = { post, guards, machineId };
   const { declareBeats, advanceBeat, beatCursor } = makeBeats(ctx);
   const { NO_RUN, LEASE_LOST, openRun, narrate } = makeRuns(ctx);
-  const { taskOf, seatLabel, workspaceOf, parentRunOf } = makeLookups(ctx, { db });
+  const { taskOf, seatLabel, workspaceOf, parentRunOf, unitBirth, heldElsewhere } = makeLookups(ctx, { db, machineId });
 
   // A Set-shaped facade so all ~15 existing call sites read unchanged, while `delete` — which every
   // caller uses to mean "let this run again" (a request_changes bounce, a failed claim) — also
@@ -1637,28 +1637,10 @@ export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId,
      from tasks where state = 'in_progress' and assignee_kind = 'agent'`,
     [],
     {
+      // one body with the boot reconcile's, in host/dispatch.ts: the held-elsewhere guard and the
+      // owned-unit branch (docs/29 §4d) live there
       onResult: (r) => {
-        for (const t of (r.rows?._array ?? []) as Array<ExecTask & { assignee_id: string; requirements_confirmed: number }>) {
-          const agent = agents.get(t.assignee_id);
-          if (!agent || claimed.has(t.id)) continue;
-          claimed.add(t.id);
-          // THE REWORK LOOP (docs/29 §4d). A task bouncing back to in_progress on an OWNED task is
-          // the reviewer's changes landing on the owner — and the owner judges them: act on them by
-          // spawning a fixer, push back with reasoning, or raise an `nmq` card when the call is
-          // genuinely the human's. `resumeFlow` would instead drop rex into the worker's coding
-          // resume, which is the same category error as claimFlow on the way in.
-          //
-          // Re-entry is already sound: `claimed` is released only when a task reaches in_review /
-          // done / blocked, so an owning turn that ends with the task still in_progress (waiting on
-          // a human) does not immediately re-fire — a human replying in the thread wakes rex through
-          // the normal message path instead.
-          const owning = agent.role === 'orchestrator';
-          const flow = owning ? () => ownFlow(agent, t) : () => resumeFlow(agent, t);
-          execQueue.run(
-            { key: t.id, kind: owning ? 'own' : 'work', cause: 'board', agentId: agent.id, subject: { kind: 'task', number: t.number } },
-            flow,
-          );
-        }
+        for (const t of (r.rows?._array ?? []) as ResumeRow[]) void resumeUnit(t);
       },
       onError: () => {},
     },
@@ -1954,16 +1936,16 @@ export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId,
     post, machineId, guards, db, apiUrl, workspace, ownerActorId, agents, brain, parkBook, execQueue, claimed,
     NO_RUN, openRun, narrate, declareBeats, advanceBeat, beatCursor, parkFor,
     alog, arun, brainNotes, brainNotesFor, brainResults, channelLessons, claimVerdict, discoverSkills,
-    handleExhaustion, legSummary, mineLessons, originOf, priorMachineFor, readOnlyStudy, requestSleeperWake, nobodyServes,
+    handleExhaustion, legSummary, mineLessons, originOf, priorMachineFor, readOnlyStudy, requestSleeperWake, nobodyServes, unitBirth,
     orchestratorTurn: (...args: Parameters<typeof orchestratorTurn>) => orchestratorTurn(...args),
     seatFor, setStatus, sinceFirstSeen, spawnLegFor, taskRecallNote, whiteboardClosures, replyDraft, searchXFor,
   });
 
   // Triage and dispatch (host/dispatch.ts) — routing to the architect or the designer, the
   // staffing gap, and the board reconcile that re-derives what should be running.
-  const { dispatchPlanning, dispatchDesigner, reconcileBoard } = makeDispatch({
+  const { dispatchPlanning, dispatchDesigner, reconcileBoard, resumeUnit } = makeDispatch({
     post, machineId, guards, db, workspace, agents, claimed, execQueue, setStatus,
-    architectFlow, designerFlow, orchPlanDecision, orchDesignNotify, ownFlow, resumeFlow,
+    architectFlow, designerFlow, orchPlanDecision, orchDesignNotify, ownFlow, resumeFlow, heldElsewhere,
     designProviderFor,
   });
 

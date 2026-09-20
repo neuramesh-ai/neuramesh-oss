@@ -97,14 +97,14 @@ export function makeFlows(ctx: HostCtx & {
   brainNotesFor: (task: ExecTask, cap?: number, perNote?: number) => string;
   brainResults: (subject: SubjectRef, cap?: number, per?: number) => string;
   channelLessons: (workspaceId: string, channelId: string) => Promise<string>;
-  claimVerdict: (runtime: string, model: string | null, originUserId: string | null, elapsedMs: number, extra?: { agentId?: string; priorMachineId?: string | null }) => Promise<ClaimVerdict>;
+  claimVerdict: (runtime: string, model: string | null, originUserId: string | null, elapsedMs: number, extra?: { agentId?: string; priorMachineId?: string | null; threadMachineId?: string | null; origin?: import('@neuramesh/shared').SessionOrigin | null }) => Promise<ClaimVerdict>;
   discoverSkills: (channelId: string, workspaceId: string) => Promise<SkillRef[]>;
   handleExhaustion: (agent: HostedAgent, t: ExecTask | null, ch: { id: string; slug: string; workspace_id: string }) => Promise<void>;
   legSummary: (out: string) => string;
   mineLessons: (reviewer: HostedAgent, t: { id: string; number: number; title: string }, ch: { id: string; slug: string; workspace_id: string }, token: string, live: boolean, log?: LogFn) => Promise<void>;
   orchestratorTurn: (agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, transcript: string, token: string, thread?: { id: string; number: number; title: string; state: string }, log?: LogFn, skills?: SkillRef[], attachments?: AgentAttachment[], convoThreadId?: string | null, run?: RunHandle, onDelta?: (t: string) => void) => Promise<string>;
-  originOf: (t: OfferedTask) => string | null;
-  priorMachineFor: (threadId?: string | null, taskId?: string | null) => Promise<string | null>; requestSleeperWake: ReturnType<typeof import('./sleepers').makeSleeperWake>['requestSleeperWake']; nobodyServes: ReturnType<typeof import('./sleepers').makeSleeperWake>['nobodyServes'];
+  originOf: (t: Pick<OfferedTask, 'creator_kind' | 'creator_id'>) => string | null;
+  priorMachineFor: (threadId?: string | null, taskId?: string | null) => Promise<string | null>; unitBirth: (taskId: string) => Promise<import('./lookups').UnitBirth>; requestSleeperWake: ReturnType<typeof import('./sleepers').makeSleeperWake>['requestSleeperWake']; nobodyServes: ReturnType<typeof import('./sleepers').makeSleeperWake>['nobodyServes'];
   readOnlyStudy: (agent: HostedAgent, dir: string, token: string, log?: LogFn) => ((system: string, user: string) => Promise<string>) | null;
   seatFor: (agent: HostedAgent, channelId: string, scope?: { threadId?: string | null; taskId?: string | null }) => Promise<HostedAgent>;
   setStatus: (agent: HostedAgent, status: 'online' | 'thinking' | 'working') => void;
