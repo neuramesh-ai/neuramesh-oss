@@ -17,6 +17,12 @@ const row = (over: Partial<CloudMachineRow>): CloudMachineRow => ({
 });
 
 describe('rowsToDesired', () => {
+  it('carries the substrate only when it is claim — a volume row says nothing, as before 0136', () => {
+    const out = rowsToDesired([row({ id: 'v', kind: 'runner', substrate: 'volume' }), row({ id: 'c', kind: 'runner', workspace_id: 'ws2', substrate: 'claim' }), row({ id: 'n', kind: 'member' })]);
+    const by = Object.fromEntries(out.workspaces.flatMap((w) => w.machines).map((m) => [m.id, m.substrate]));
+    expect(by).toEqual({ v: undefined, c: 'claim', n: undefined });
+  });
+
   it('groups machines under their workspace with plan quotas', () => {
     const out = rowsToDesired([
       row({ id: 'a' }),

@@ -22,6 +22,7 @@ PUBLIC_EXCLUDE=(
   scripts/fleet-e2e.sh                         # the operator's k3d proving ground
   scripts/fleet-local.sh                       # the operator against a local cluster
   scripts/fleet-gke-smoke.sh                   # the operator against the production cluster
+  scripts/egress-floor-gke-test.sh             # the egress floor proved on the production cluster
   scripts/pin-machine-image.mjs                # the machine image pin in the cluster manifests
   scripts/build-mobile-terminal.mjs            # the phone app's terminal page
   'docs/design/*/evidence/*'                   # every design round's evidence: screenshots and logs with dev data (George, 2026-09-19)

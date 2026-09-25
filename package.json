@@ -2,7 +2,7 @@
   "name": "neuramesh",
   "private": true,
   "license": "Elastic-2.0",
-  "version": "0.148.0",
+  "version": "0.149.0",
   "engines": {
     "node": ">=22"
   },
@@ -16,6 +16,7 @@
     "db:validate": "bash scripts/validate-db.sh",
     "test:pg": "bash scripts/test-pg.sh",
     "cloud:e2e": "node packages/control-api/scripts/cloud-e2e.mjs",
+    "claim:e2e": "node packages/control-api/scripts/claim-e2e.mjs",
     "e2e": "bash scripts/dev-e2e.sh",
     "app": "bash scripts/cloud-app.sh",
     "app:local": "bash scripts/dev-app.sh",

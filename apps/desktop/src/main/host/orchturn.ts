@@ -6,7 +6,7 @@
 // — an empty turn means something different in each — and collapsing them would hide that.
 import { apiAuthHeaders } from '../apiauth';
 import { drainQuery, claudeAgentPrompt } from './turnkit';
-import { claudePathOption, keyEnvFor, providerEnv, type AgentAttachment } from '../runtime/adapter';
+import { claudePathOption, codexSandboxMode, keyEnvFor, providerEnv, type AgentAttachment } from '../runtime/adapter';
 import { ORCH_EMPTY_TURN } from '../replypolicy';
 import { stripPseudoToolCalls } from './pseudocalls';
 import type { LogFn } from '../agentlog';
@@ -320,7 +320,7 @@ export async function codexSdkOrchestratorTurn(args: OrchTransportArgs): Promise
   const dir = mkdtempSync(join(os.tmpdir(), 'nm-codexorch-'));
   const config = { mcp_servers: { nm: orchmcp.codexNmServer('node', shim, { NM_ORCH_URL: `http://127.0.0.1:${port}`, NM_ORCH_TURN: turnId, NM_ORCH_SECRET: secret }) } };
   const codex = new Codex({ codexPathOverride: bin, apiKey: args.token || undefined, env, config });
-  const opts = { sandboxMode: 'read-only', workingDirectory: dir, skipGitRepoCheck: true, approvalPolicy: 'never' };
+  const opts = { sandboxMode: codexSandboxMode('read-only'), workingDirectory: dir, skipGitRepoCheck: true, approvalPolicy: 'never' };
   const prompt = `${args.systemPrompt}\n\n${args.transcript}`;
   try {
     let turn: { finalResponse: string };

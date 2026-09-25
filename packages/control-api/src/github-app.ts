@@ -78,7 +78,7 @@ export class GitHubApiError extends Error {
 }
 
 export interface GitHubReply { status: number; json: unknown; headers: Headers }
-export interface GitHubOpts { token?: string | null; fetchFn?: typeof fetch; accept?: string; env?: Env }
+export interface GitHubOpts { token?: string | null; fetchFn?: typeof fetch; accept?: string; env?: Env; body?: unknown }
 /** the App calls mint their own JWT: `now` pins its clock in tests */
 export interface AppOpts extends Omit<GitHubOpts, 'token'> { now?: number }
 
@@ -92,7 +92,7 @@ async function request(method: 'GET' | 'POST', path: string, opts: GitHubOpts): 
   };
   if (token) headers['authorization'] = `Bearer ${token}`;
   const init: RequestInit = { method, headers, signal: AbortSignal.timeout(10_000) };
-  if (method === 'POST') { headers['content-type'] = 'application/json'; init.body = '{}'; }
+  if (method === 'POST') { headers['content-type'] = 'application/json'; init.body = opts.body === undefined ? '{}' : JSON.stringify(opts.body); }
   const res = await (opts.fetchFn ?? fetch)(`${API}${path}`, init);
   const json: unknown = await res.json().catch(() => null);
   return { status: res.status, json, headers: res.headers };
@@ -116,10 +116,14 @@ export async function findInstallation(slug: string, opts: AppOpts = {}): Promis
   return { id: b.id, account: b.account?.login ?? b.account?.slug ?? '' };
 }
 
+/** what a per-run token may do, narrowed at mint time: GitHub grants the subset of the App's own
+ *  permissions the body asks for, on the repositories it names, and 422s past the App's grant */
+export interface TokenScope { repositories?: string[]; permissions?: Record<string, 'read' | 'write'> }
+
 /** One installation token, minted now, one hour on GitHub's side. Held in memory for the read and
- *  never written down (plan §4.9). */
-export async function installationToken(installationId: number, opts: AppOpts = {}): Promise<{ token: string; expiresAt: string }> {
-  const r = await request('POST', `/app/installations/${installationId}/access_tokens`, { ...opts, token: appJwt(opts.env, opts.now) });
+ *  never written down (plan §4.9). With a `scope`, narrowed to those repositories and permissions. */
+export async function installationToken(installationId: number, opts: AppOpts & { scope?: TokenScope } = {}): Promise<{ token: string; expiresAt: string }> {
+  const r = await request('POST', `/app/installations/${installationId}/access_tokens`, { ...opts, token: appJwt(opts.env, opts.now), ...(opts.scope ? { body: opts.scope } : {}) });
   const b = r.json as { token?: string; expires_at?: string } | null;
   if (!ok(r) || !b?.token) throw new GitHubApiError(`GitHub refused an installation token (${r.status})`, r.status);
   return { token: b.token, expiresAt: b.expires_at ?? '' };

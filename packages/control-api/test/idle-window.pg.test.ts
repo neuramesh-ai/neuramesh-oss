@@ -5,6 +5,7 @@
 // Run via scripts/test-pg.sh — skipped without DATABASE_URL.
 import { afterAll, describe, expect, it } from 'vitest';
 import postgres from 'postgres';
+import { createCloudMachine } from '../src/fleet';
 import { machineSweep, idleStopMin, machineIntent } from '../src/fleet-lifecycle';
 
 const DB = process.env['DATABASE_URL'];
@@ -87,5 +88,35 @@ describe.skipIf(!DB)('the idle window is 48h, every plan (credits era)', () => {
     await seed(WS_CLOUD, 'cloud', 5, 30);
     const [m] = await machineIntent(sql!, WS_CLOUD);
     expect(m?.idleStopMin).toBe(idleStopMin());
+  });
+
+  // A mint with replicas 1 IS a wake. Before the stamp, the row carried neither last_wake_at nor
+  // last_active_at, greatest(1970, 1970) sat past every window, and the first sweep after the
+  // mint parked the machine (prod, 2026-09-21: a claim runner bootstrapped and was scaled to 0
+  // three minutes later, its spare destroyed with it).
+  it('a machine born awake survives its first sweep', async () => {
+    await cleanup();
+    await seed(WS_FREE, 'free', 5, 30);
+    await sql!`delete from machines where workspace_id = ${WS_FREE}::uuid`;
+    const { id } = await createCloudMachine(sql!, { workspaceId: WS_FREE, kind: 'runner', ownerUserId: OWNER, name: 'born-awake', tokenHash: 'h-born-awake', replicas: 1 });
+    const out = await machineSweep(sql!, 5);
+    expect(out.idleStopped).not.toContain(id);
+    const [row] = await sql!<{ desired_replicas: number; last_wake_at: string | null; started_at: string | null }[]>`
+      select desired_replicas, last_wake_at, started_at from machines where id = ${id}::uuid`;
+    expect(row?.desired_replicas).toBe(1);
+    expect(row?.last_wake_at).not.toBeNull();
+    expect(row?.started_at).not.toBeNull();
+  });
+
+  it('a machine born asleep carries no wake stamp — its first wake is the real one', async () => {
+    await cleanup();
+    await seed(WS_CLOUD, 'cloud', 5, 30);
+    await sql!`delete from machines where workspace_id = ${WS_CLOUD}::uuid`;
+    const { id } = await createCloudMachine(sql!, { workspaceId: WS_CLOUD, kind: 'member', ownerUserId: OWNER, name: 'born-asleep', tokenHash: 'h-born-asleep', replicas: 0 });
+    const [row] = await sql!<{ desired_replicas: number; last_wake_at: string | null; started_at: string | null }[]>`
+      select desired_replicas, last_wake_at, started_at from machines where id = ${id}::uuid`;
+    expect(row?.desired_replicas).toBe(0);
+    expect(row?.last_wake_at).toBeNull();
+    expect(row?.started_at).toBeNull();
   });
 });

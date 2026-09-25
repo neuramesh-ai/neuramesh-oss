@@ -16,7 +16,14 @@ streams:
       # Map the JWT sub (Clerk user id, or the dev/legacy uuid-as-text) → our internal
       # uuid via nm_users, then to the user's workspaces. Lets PowerSync validate the
       # auth provider's own token (sub stays theirs) while scoping by our stable uuid.
-      my_workspaces: select wm.workspace_id from workspace_members wm join nm_users u on u.id = wm.user_id where u.clerk_user_id = auth.user_id()
+      #
+      # A cloud machine syncs as its owner (control-api fleet.ts sync-token: sub = the owner's
+      # Clerk id) and its JWT names the ONE workspace it lives in (`workspace_id`). Without the
+      # second clause the machine replicated every workspace its owner belongs to: the first
+      # production claim runner's first sync saw four machines and its sweeps walked another
+      # workspace's tasks (2026-09-21), and a Team runner is open to every member's shell. A
+      # human's Clerk JWT carries no such claim, so the clause is null for them and nothing changes.
+      my_workspaces: select wm.workspace_id from workspace_members wm join nm_users u on u.id = wm.user_id where u.clerk_user_id = auth.user_id() and (auth.parameter('workspace_id') is null or wm.workspace_id = auth.parameter('workspace_id'))
     queries:
       - select * from channels where workspace_id in (select workspace_id from my_workspaces)
       - select * from projects where workspace_id in (select workspace_id from my_workspaces)

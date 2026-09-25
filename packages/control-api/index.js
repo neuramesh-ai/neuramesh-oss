@@ -9059,7 +9059,7 @@ var init_src = __esm({
 
 // src/app.ts
 init_src();
-import { createHash as createHash6, randomBytes as randomBytes7 } from "node:crypto";
+import { createHash as createHash7, randomBytes as randomBytes7 } from "node:crypto";
 import { Hono } from "hono";
 
 // src/connectors.ts
@@ -9929,10 +9929,10 @@ async function refundFilm(sql, workspaceId, split, note) {
 
 // src/credits.ts
 init_src();
-import { z as z10 } from "zod";
+import { z as z11 } from "zod";
 
 // src/fleet.ts
-import { z as z9 } from "zod";
+import { z as z10 } from "zod";
 
 // src/clerk.ts
 import { createPublicKey, verify } from "node:crypto";
@@ -10203,8 +10203,9 @@ async function createClerkSession(userId) {
   throw new DomainError("AUTH_FAILED", `could not create a Clerk session: ${lastErr}`);
 }
 
-// src/localmode.ts
-var localMode = () => process.env["NM_LOCAL"] === "1";
+// src/fleet-claims.ts
+import { createHash as createHash4, timingSafeEqual as timingSafeEqual3 } from "node:crypto";
+import { z as z9 } from "zod";
 
 // src/machine-auth.ts
 import { createHash as createHash3, createPrivateKey, createPublicKey as createPublicKey2, randomBytes as randomBytes5, sign as cryptoSign } from "node:crypto";
@@ -10259,6 +10260,79 @@ function machinePublicJwk(privatePem) {
   return { ...jwk, kid: MACHINE_KEY_ID, alg: "RS256", use: "sig" };
 }
 
+// src/fleet-claims.ts
+var runnerSubstrateDefault = () => process.env["FLEET_RUNNER_SUBSTRATE"] === "claim" ? "claim" : "volume";
+var LIVE = (sql) => sql`(lifecycle is null or lifecycle <> 'destroyed')`;
+async function bindMachinePod(sql, machineId, pod, uid2) {
+  const [row] = await sql`
+    update machines
+       set pod_name = ${pod}, pod_uid = ${uid2}, bootstrapped_at = null,
+           token_hash = case when pod_name is distinct from ${pod} or pod_uid is distinct from ${uid2} then null else token_hash end
+     where id = ${machineId}::uuid and substrate = 'claim' and kind <> 'local' and ${LIVE(sql)}
+     returning id`;
+  return row ?? null;
+}
+async function bootstrapMachine(sql, pod, uid2) {
+  const { token, hash } = mintMachineToken();
+  const [row] = await sql`
+    update machines
+       set token_hash = ${hash}, bootstrapped_at = now()
+     where pod_name = ${pod} and pod_uid = ${uid2} and substrate = 'claim' and ${LIVE(sql)}
+     returning id, workspace_id, kind, owner_user_id`;
+  if (!row) return null;
+  return { machineId: row.id, workspaceId: row.workspace_id, kind: row.kind, ownerUserId: row.owner_user_id, token };
+}
+async function promoteMachine(sql, workspaceId, machineId) {
+  const [row] = await sql`
+    update machines
+       set substrate = 'volume', pod_name = null, pod_uid = null, bootstrapped_at = null, token_hash = null,
+           desired_replicas = 1, last_wake_at = now(), started_at = now()
+     where id = ${machineId}::uuid and workspace_id = ${workspaceId}::uuid and substrate = 'claim' and ${LIVE(sql)}
+     returning id`;
+  return row ?? null;
+}
+var digest = (v) => createHash4("sha256").update(v).digest();
+function poolTokenOk(presented) {
+  const expected = process.env["FLEET_POOL_TOKEN"];
+  if (!expected || !presented) return false;
+  return timingSafeEqual3(digest(expected), digest(presented));
+}
+var BindSchema = z9.object({ pod: z9.string().min(1).max(253), uid: z9.string().min(1).max(64) });
+var BootstrapSchema = z9.object({ poolToken: z9.string().min(1), pod: z9.string().min(1).max(253), uid: z9.string().min(1).max(64) });
+function claimRoutes(app, store2) {
+  const fleetSecretOk = (auth) => {
+    const secret = process.env["FLEET_SECRET"];
+    return Boolean(secret) && auth === `Bearer ${secret}`;
+  };
+  app.post("/internal/machines/:id/bind", async (c) => {
+    if (!fleetSecretOk(c.req.header("authorization"))) return c.json({ error: "forbidden" }, 403);
+    const sql = sqlOf(store2);
+    if (!sql) return c.json({ error: "fleet not served by this store" }, 501);
+    const id = z9.string().uuid().safeParse(c.req.param("id"));
+    if (!id.success) return c.json({ error: "invalid machine id" }, 400);
+    const body = BindSchema.safeParse(await c.req.json().catch(() => null));
+    if (!body.success) return c.json({ error: "invalid body", issues: body.error.issues }, 400);
+    const row = await bindMachinePod(sql, id.data, body.data.pod, body.data.uid);
+    if (!row) return c.json({ error: "no live claim machine with that id" }, 404);
+    console.log(`machine_bound machine=${id.data} pod=${body.data.pod}`);
+    return c.json({ ok: true });
+  });
+  app.post("/v1/machines/bootstrap", async (c) => {
+    const body = BootstrapSchema.safeParse(await c.req.json().catch(() => null));
+    if (!body.success) return c.json({ error: "invalid body" }, 400);
+    if (!poolTokenOk(body.data.poolToken)) return c.json({ error: "unauthorized", code: "POOL_TOKEN" }, 401);
+    const sql = sqlOf(store2);
+    if (!sql) return c.json({ error: "fleet not served by this store" }, 501);
+    const identity = await bootstrapMachine(sql, body.data.pod, body.data.uid);
+    if (!identity) return c.json({ error: "not bound", code: "UNBOUND" }, 404);
+    console.log(`machine_bootstrapped machine=${identity.machineId} pod=${body.data.pod}`);
+    return c.json(identity);
+  });
+}
+
+// src/localmode.ts
+var localMode = () => process.env["NM_LOCAL"] === "1";
+
 // src/fleet.ts
 var QUOTAS = {
   free: { cpu: "4", memory: "8Gi", pvc: "2" },
@@ -10304,6 +10378,7 @@ function rowsToDesired(rows2) {
       // runners carry their provisioning owner too — it is their sync principal
       // (machined refuses to boot without one; the live roll proved it)
       ...r.owner_user_id ? { ownerUserId: r.owner_user_id } : {},
+      ...r.substrate === "claim" ? { substrate: "claim" } : {},
       replicas: r.desired_replicas === 1 ? 1 : 0,
       cpu: str("cpu"),
       memory: str("memory"),
@@ -10315,17 +10390,18 @@ function rowsToDesired(rows2) {
   for (const ws of byWorkspace.values()) ws.quotaPvcCount = String(Math.max(Number(ws.quotaPvcCount), ws.machines.length + 1));
   return { workspaces: [...byWorkspace.values()] };
 }
-var CreateMachineSchema = z9.object({
-  workspaceId: z9.string().uuid(),
-  kind: z9.enum(["member", "runner"]),
-  ownerUserId: z9.string().uuid(),
-  name: z9.string().min(1).max(60)
+var CreateMachineSchema = z10.object({
+  workspaceId: z10.string().uuid(),
+  kind: z10.enum(["member", "runner"]),
+  ownerUserId: z10.string().uuid(),
+  name: z10.string().min(1).max(60)
 });
 function fleetRoutes(app, store2) {
   const fleetSecretOk = (auth) => {
     const secret = process.env["FLEET_SECRET"];
     return Boolean(secret) && auth === `Bearer ${secret}`;
   };
+  claimRoutes(app, store2);
   app.get("/internal/fleet-desired", async (c) => {
     if (!fleetSecretOk(c.req.header("authorization"))) return c.json({ error: "forbidden" }, 403);
     if (!store2.fleetDesired) return c.json({ error: "fleet not served by this store" }, 501);
@@ -10349,7 +10425,7 @@ function fleetRoutes(app, store2) {
   app.post("/internal/machines/:id/token", async (c) => {
     if (!fleetSecretOk(c.req.header("authorization"))) return c.json({ error: "forbidden" }, 403);
     if (!store2.rotateMachineToken) return c.json({ error: "fleet not served by this store" }, 501);
-    const id = z9.string().uuid().safeParse(c.req.param("id"));
+    const id = z10.string().uuid().safeParse(c.req.param("id"));
     if (!id.success) return c.json({ error: "invalid machine id" }, 400);
     const { token, hash } = mintMachineToken();
     const row = await store2.rotateMachineToken(id.data, hash);
@@ -10376,9 +10452,12 @@ function fleetRoutes(app, store2) {
   });
 }
 async function createCloudMachine(sql, m) {
+  const substrate = m.substrate ?? (m.kind === "runner" ? runnerSubstrateDefault() : "volume");
+  const replicas = m.replicas ?? 1;
   const [row] = await sql`
-    insert into machines (workspace_id, owner_user_id, name, platform, kind, lifecycle, desired_replicas, token_hash)
-    values (${m.workspaceId}::uuid, ${m.ownerUserId}::uuid, ${m.name}, 'linux', ${m.kind}, 'provisioning', ${m.replicas ?? 1}, ${m.tokenHash})
+    insert into machines (workspace_id, owner_user_id, name, platform, kind, lifecycle, desired_replicas, token_hash, substrate, last_wake_at, started_at)
+    values (${m.workspaceId}::uuid, ${m.ownerUserId}::uuid, ${m.name}, 'linux', ${m.kind}, 'provisioning', ${replicas}, ${m.tokenHash}, ${substrate},
+            case when ${replicas} = 1 then now() end, case when ${replicas} = 1 then now() end)
     returning id`;
   return { id: row.id };
 }
@@ -10401,7 +10480,7 @@ async function machineByTokenHash(sql, hash) {
 async function computeFleetDesired(sql) {
   const rows2 = await sql`
     select m.id, m.workspace_id, w.plan as workspace_plan, m.kind, m.owner_user_id,
-           m.desired_replicas, m.lifecycle, m.resources
+           m.desired_replicas, m.lifecycle, m.resources, m.substrate
       from machines m
       join workspaces w on w.id = m.workspace_id
      where m.kind <> 'local'
@@ -10550,12 +10629,12 @@ function ledgerFor(store2) {
     refundFilm: (w, split, note) => refundFilm(sql, w, split, note)
   };
 }
-var GenerateSchema = z10.object({
-  workspace: z10.string().uuid(),
+var GenerateSchema = z11.object({
+  workspace: z11.string().uuid(),
   /** the turn, already assembled by the caller — this proxy is a transport, not a prompt author */
-  contents: z10.unknown(),
-  system: z10.string().optional(),
-  tools: z10.unknown().optional()
+  contents: z11.unknown(),
+  system: z11.string().optional(),
+  tools: z11.unknown().optional()
 });
 function creditRoutes(app, store2, ledger = ledgerFor(store2)) {
   app.post("/v1/starter/generate", async (c) => {
@@ -13413,12 +13492,12 @@ init_src();
 
 // src/member-machines.ts
 var fleetOn = () => process.env["FLEET_AUTOPROVISION"] !== "off";
-var LIVE = (sql) => sql`(lifecycle is null or lifecycle <> 'destroyed')`;
+var LIVE2 = (sql) => sql`(lifecycle is null or lifecycle <> 'destroyed')`;
 async function memberMachineOf(sql, workspaceId, userId) {
   const [row] = await sql`
     select id from machines
      where workspace_id = ${workspaceId}::uuid and owner_user_id = ${userId}::uuid and kind = 'member'
-       and ${LIVE(sql)} limit 1`;
+       and ${LIVE2(sql)} limit 1`;
   return row ?? null;
 }
 async function provisionMemberMachine(sql, workspaceId, userId) {
@@ -13447,7 +13526,7 @@ async function destroyMemberMachine(sql, workspaceId, userId) {
        set lifecycle = 'destroyed', desired_replicas = 0, started_at = null, token_hash = null,
            name = name || '-gone-' || left(id::text, 8)
      where workspace_id = ${workspaceId}::uuid and owner_user_id = ${userId}::uuid and kind = 'member'
-       and ${LIVE(sql)}
+       and ${LIVE2(sql)}
      returning id`;
   return rows2.map((r) => r.id);
 }
@@ -13464,6 +13543,7 @@ async function machineReach(sql, machineId) {
   return { workspaceId: row.workspace_id, kind: row.kind, ownerUserId: row.owner_user_id, shares };
 }
 var mayUse = (m, userId) => m.kind === "runner" || m.ownerUserId === userId || m.shares.includes("*") || m.shares.includes(userId);
+var mayAttach = (m, userId) => m.kind === "runner" || m.ownerUserId === userId;
 async function wakeMachine(sql, machineId) {
   const reach = await machineReach(sql, machineId);
   if (!reach) return { woken: false, capped: false };
@@ -13473,7 +13553,7 @@ async function wakeMachine(sql, machineId) {
        set desired_replicas = 1, last_wake_at = now(),
            -- only a STOPPED machine is starting; re-waking a running one must not reset its clock
            started_at = case when desired_replicas = 0 then now() else started_at end
-     where id = ${machineId}::uuid and kind <> 'local' and ${LIVE(sql)}
+     where id = ${machineId}::uuid and kind <> 'local' and ${LIVE2(sql)}
      returning id`;
   return { woken: rows2.length > 0, capped: false };
 }
@@ -13482,7 +13562,7 @@ async function ensureTeamShape(sql, workspaceId) {
     const tx = _tx;
     const [runner] = await tx`
       select id, owner_user_id from machines
-       where workspace_id = ${workspaceId}::uuid and kind = 'runner' and ${LIVE(tx)}
+       where workspace_id = ${workspaceId}::uuid and kind = 'runner' and ${LIVE2(tx)}
        for update`;
     if (!runner) return { promoted: null, runner: null };
     if (await memberMachineOf(tx, workspaceId, runner.owner_user_id)) return { promoted: null, runner: runner.id };
@@ -14184,6 +14264,17 @@ async function machineCommands(store2, actor, cmd) {
     const out = await wakeMachine(sql, cmd.machineId);
     if (out.capped) throw new DomainError("PLAN_LIMIT", "this workspace is out of credits \u2014 top up to wake its machine");
     return { ok: true, woken: out.woken };
+  }
+  if (cmd.type === "machine.promote") {
+    if (actor.kind !== "human") throw new DomainError("HUMAN_ONLY", "a machine is promoted by the member about to sign in on it");
+    if (!await actorInWorkspace(store2, actor, cmd.workspace)) throw new DomainError("NOT_PERMITTED", "not a member of this workspace");
+    const sql = sqlOf(store2);
+    if (!sql) throw NOT_SERVED();
+    const reach = await machineReach(sql, cmd.machineId);
+    if (!reach || reach.workspaceId !== cmd.workspace) throw new DomainError("NOT_FOUND", "no such cloud machine in this workspace");
+    if (!mayAttach(reach, actor.id)) throw new DomainError("NOT_PERMITTED", "only the owner signs in on this machine");
+    const promoted = await promoteMachine(sql, cmd.workspace, cmd.machineId);
+    return { ok: true, promoted: promoted !== null };
   }
   return void 0;
 }
@@ -15908,8 +15999,8 @@ function cronRoutes(app, store2, push2) {
 
 // src/announce.ts
 import { cors } from "hono/cors";
-import { createHash as createHash4 } from "node:crypto";
-import { z as z15 } from "zod";
+import { createHash as createHash5 } from "node:crypto";
+import { z as z16 } from "zod";
 
 // src/announce-job.ts
 init_src();
@@ -16118,7 +16209,7 @@ function parseDraftAnswer(text) {
 }
 
 // src/github-app.ts
-import { createHmac as createHmac3, createPrivateKey as createPrivateKey2, createSign, timingSafeEqual as timingSafeEqual3 } from "node:crypto";
+import { createHmac as createHmac3, createPrivateKey as createPrivateKey2, createSign, timingSafeEqual as timingSafeEqual4 } from "node:crypto";
 var API = "https://api.github.com";
 var UA = "neuramesh-announce";
 function githubAppConfigured(env = process.env) {
@@ -16174,7 +16265,7 @@ async function request(method, path, opts) {
   const init = { method, headers: headers2, signal: AbortSignal.timeout(1e4) };
   if (method === "POST") {
     headers2["content-type"] = "application/json";
-    init.body = "{}";
+    init.body = opts.body === void 0 ? "{}" : JSON.stringify(opts.body);
   }
   const res = await (opts.fetchFn ?? fetch)(`${API}${path}`, init);
   const json = await res.json().catch(() => null);
@@ -16192,7 +16283,7 @@ async function findInstallation(slug, opts = {}) {
   return { id: b2.id, account: b2.account?.login ?? b2.account?.slug ?? "" };
 }
 async function installationToken(installationId, opts = {}) {
-  const r = await request("POST", `/app/installations/${installationId}/access_tokens`, { ...opts, token: appJwt(opts.env, opts.now) });
+  const r = await request("POST", `/app/installations/${installationId}/access_tokens`, { ...opts, token: appJwt(opts.env, opts.now), ...opts.scope ? { body: opts.scope } : {} });
   const b2 = r.json;
   if (!ok(r) || !b2?.token) throw new GitHubApiError(`GitHub refused an installation token (${r.status})`, r.status);
   return { token: b2.token, expiresAt: b2.expires_at ?? "" };
@@ -16662,20 +16753,20 @@ async function runAnnounceJob(ann, row, deps) {
 init_src();
 
 // src/commands.ts
-import { z as z13 } from "zod";
+import { z as z14 } from "zod";
 
 // src/commands-machine.ts
 init_src();
-import { z as z11 } from "zod";
-var runtimes = z11.array(z11.string().min(1).max(40)).max(12).optional();
+import { z as z12 } from "zod";
+var runtimes = z12.array(z12.string().min(1).max(40)).max(12).optional();
 var MACHINE_COMMANDS = [
-  z11.object({
-    type: z11.literal("machine.register"),
-    workspace: z11.string().min(1),
-    name: z11.string().min(1),
-    platform: z11.string().min(1).default("darwin"),
-    daemonVersion: z11.string().min(1).default("0.0.0"),
-    transfer: z11.boolean().optional(),
+  z12.object({
+    type: z12.literal("machine.register"),
+    workspace: z12.string().min(1),
+    name: z12.string().min(1),
+    platform: z12.string().min(1).default("darwin"),
+    daemonVersion: z12.string().min(1).default("0.0.0"),
+    transfer: z12.boolean().optional(),
     // Free: re-point this member's single machine to me (the other stops syncing)
     // What this host can actually serve right now — a Claude/Codex/agy login present, or a key
     // available (0114). Published because capability has to be visible ACROSS machines: a host
@@ -16688,65 +16779,68 @@ var MACHINE_COMMANDS = [
   // runtimes: a cloud machine publishes what it can serve on the beat — it never registers, and a
   // login made in its browser terminal must reach the row or the ladder can never choose it
   // while it sleeps (member-machines plan §4).
-  z11.object({ type: z11.literal("machine.heartbeat"), machineId: z11.string().min(1), activeSeconds: z11.number().int().min(0).max(3600).optional(), busy: z11.boolean().optional(), runtimes }),
+  z12.object({ type: z12.literal("machine.heartbeat"), machineId: z12.string().min(1), activeSeconds: z12.number().int().min(0).max(3600).optional(), busy: z12.boolean().optional(), runtimes }),
   // "Add my cloud machine" — self only by construction: the handler writes the actor's own
-  z11.object({ type: z11.literal("machine.provision"), workspace: z11.string().min(1) }),
+  z12.object({ type: z12.literal("machine.provision"), workspace: z12.string().min(1) }),
   // the owner's "Remove machine": tombstone → the operator removes workload, Secret and PVC
-  z11.object({ type: z11.literal("machine.remove"), workspace: z11.string().min(1), machineId: z11.string().uuid() }),
+  z12.object({ type: z12.literal("machine.remove"), workspace: z12.string().min(1), machineId: z12.string().uuid() }),
   // wake ONE machine — a person from a surface, or a daemon whose ladder found a lent sleeper
   // forUserId: the member the work came FROM when a daemon asks — the ladder's origin — so a
   // member's own machine wakes for their request even when they lend it to nobody
-  z11.object({ type: z11.literal("machine.wake"), workspace: z11.string().min(1), machineId: z11.string().uuid(), forUserId: z11.string().uuid().optional() }),
+  z12.object({ type: z12.literal("machine.wake"), workspace: z12.string().min(1), machineId: z12.string().uuid(), forUserId: z12.string().uuid().optional() }),
+  // a login is about to land on a claim runner (round §4.2, D2): give it a disk of its own first.
+  // HUMAN_ONLY, from the terminal's sign-in flows; a no-op answer for a machine already on a volume
+  z12.object({ type: z12.literal("machine.promote"), workspace: z12.string().min(1), machineId: z12.string().uuid() }),
   // the Code-session rows a host and a client keep (commands-code.ts) ride the same spread
   ...CODE_SESSION_COMMANDS
 ];
 
 // src/commands-schedule.ts
-import { z as z12 } from "zod";
+import { z as z13 } from "zod";
 var SCHEDULE_RUN_COMMANDS = [
   // the daemon's atomic claim of a due run: counter CAS (ship-stage lesson) so two machines
   // never double-fire. nextRunAt is the claimer's recomputed advance (null = done).
-  z12.object({
-    type: z12.literal("schedule.claim_run"),
-    schedule: z12.string().min(1),
-    runCount: z12.number().int().min(0),
-    nextRunAt: z12.string().datetime().nullable()
+  z13.object({
+    type: z13.literal("schedule.claim_run"),
+    schedule: z13.string().min(1),
+    runCount: z13.number().int().min(0),
+    nextRunAt: z13.string().datetime().nullable()
   }),
   // the fire's outcome → schedules.last_error (the attention bar's truth); null = the next clean run clears it
-  z12.object({ type: z12.literal("schedule.mark_result"), schedule: z12.string().min(1), error: z12.string().max(500).nullable() }),
+  z13.object({ type: z13.literal("schedule.mark_result"), schedule: z13.string().min(1), error: z13.string().max(500).nullable() }),
   // the release routine's cursor (docs/design/release-drafts-2026-09 §4.2): the lane that FINISHED a
   // scan writes where the next window starts, plus one ledger line (a quiet day is a row too). Any
   // authenticated teammate, like claim_run and mark_result: the row is the truth, the Routines
   // ledger its reader. Refused on a row that is not a release routine.
-  z12.object({
-    type: z12.literal("schedule.set_cursor"),
-    schedule: z12.string().min(1),
-    cursor: z12.object({ at: z12.string().datetime(), tag: z12.string().max(120).nullable() }),
-    log: z12.object({ at: z12.string().datetime(), key: z12.string().max(120).nullable(), note: z12.string().trim().min(1).max(300) }).nullable().optional()
+  z13.object({
+    type: z13.literal("schedule.set_cursor"),
+    schedule: z13.string().min(1),
+    cursor: z13.object({ at: z13.string().datetime(), tag: z13.string().max(120).nullable() }),
+    log: z13.object({ at: z13.string().datetime(), key: z13.string().max(120).nullable(), note: z13.string().trim().min(1).max(300) }).nullable().optional()
   })
 ];
-var MARKETING_RELEASES = z12.object({
-  repoId: z12.string().min(1).nullable().optional(),
-  slug: z12.string().trim().max(200).nullable().optional(),
+var MARKETING_RELEASES = z13.object({
+  repoId: z13.string().min(1).nullable().optional(),
+  slug: z13.string().trim().max(200).nullable().optional(),
   // owner/name, for the titles
-  now: z12.boolean(),
-  watch: z12.boolean(),
-  at: z12.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
-  tz: z12.string().max(64).optional()
+  now: z13.boolean(),
+  watch: z13.boolean(),
+  at: z13.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
+  tz: z13.string().max(64).optional()
 });
-var SETUP_RELEASES_VALUE = z12.object({
-  repoId: z12.string().min(1).nullable().optional(),
-  slug: z12.string().trim().max(200).nullable().optional(),
-  now: z12.boolean().optional(),
-  watch: z12.boolean().optional()
+var SETUP_RELEASES_VALUE = z13.object({
+  repoId: z13.string().min(1).nullable().optional(),
+  slug: z13.string().trim().max(200).nullable().optional(),
+  now: z13.boolean().optional(),
+  watch: z13.boolean().optional()
 });
 
 // src/commands.ts
 init_src();
-var modelId = z13.string().min(1).refine((m) => MODEL_ID_SET.has(m), { message: "unknown model id" });
-var packId = z13.string().refine((p2) => p2 === CUSTOM_PACK_ID || p2 in PACKS || isCustomPackId(p2), { message: "unknown model pack" });
-var customPackId = z13.string().refine((p2) => isCustomPackId(p2), { message: "not a custom pack id" });
-var packRoles = z13.object({
+var modelId = z14.string().min(1).refine((m) => MODEL_ID_SET.has(m), { message: "unknown model id" });
+var packId = z14.string().refine((p2) => p2 === CUSTOM_PACK_ID || p2 in PACKS || isCustomPackId(p2), { message: "unknown model pack" });
+var customPackId = z14.string().refine((p2) => isCustomPackId(p2), { message: "not a custom pack id" });
+var packRoles = z14.object({
   worker: modelId,
   developer: modelId,
   reviewer: modelId,
@@ -16758,50 +16852,50 @@ var packRoles = z13.object({
   shipper: modelId,
   marketer: modelId
 }).refine((r) => r.worker === r.developer, { message: "worker aliases developer \u2014 their models must match" });
-var ActorSchema = z13.object({
-  kind: z13.enum(["human", "agent"]),
-  id: z13.string().min(1),
-  role: z13.enum(["worker", "developer", "reviewer", "orchestrator", "designer", "sales", "architect", "curator", "shipper", "marketer"]).optional()
+var ActorSchema = z14.object({
+  kind: z14.enum(["human", "agent"]),
+  id: z14.string().min(1),
+  role: z14.enum(["worker", "developer", "reviewer", "orchestrator", "designer", "sales", "architect", "curator", "shipper", "marketer"]).optional()
 });
-var taskId2 = z13.string().min(1);
-var taskKind = z13.enum(TASK_KINDS.filter((k) => k !== "setup"));
-var ArtifactInputSchema = z13.object({
-  kind: z13.enum(["screenshot", "test_report", "diff", "doc", "file", "design"]),
-  name: z13.string().min(1),
+var taskId2 = z14.string().min(1);
+var taskKind = z14.enum(TASK_KINDS.filter((k) => k !== "setup"));
+var ArtifactInputSchema = z14.object({
+  kind: z14.enum(["screenshot", "test_report", "diff", "doc", "file", "design"]),
+  name: z14.string().min(1),
   // small text artifacts (diffs, notes) inline; binary/large go to Storage later
-  content: z13.string().max(4e5).optional()
+  content: z14.string().max(4e5).optional()
 });
-var CommandSchema = z13.discriminatedUnion("type", [
+var CommandSchema = z14.discriminatedUnion("type", [
   taskCreateCommand,
-  z13.object({
-    type: z13.literal("task.offer"),
+  z14.object({
+    type: z14.literal("task.offer"),
     taskId: taskId2,
-    offerTo: z13.string().min(1),
+    offerTo: z14.string().min(1),
     // intake resolution may bind the repo the thread conversation settled on
-    repo: z13.object({ id: z13.string().min(1), baseRef: z13.string().min(1).default("main") }).optional(),
+    repo: z14.object({ id: z14.string().min(1), baseRef: z14.string().min(1).default("main") }).optional(),
     // the resolved requirement checks from the thread — recorded as confirmed
-    checklist: z13.array(z13.string().min(1)).optional(),
+    checklist: z14.array(z14.string().min(1)).optional(),
     // the Definition of Done the orchestrator settled on for this offer
-    definitionOfDone: z13.string().max(2e4).optional(),
+    definitionOfDone: z14.string().max(2e4).optional(),
     // work-type label (docs/16) — the handler requires the task to be labeled at
     // offer (this kind, or one already on the task); it never gates the route.
     kind: taskKind.optional()
   }),
-  z13.object({ type: z13.literal("task.claim"), taskId: taskId2 }),
-  z13.object({
-    type: z13.literal("task.confirm_requirements"),
+  z14.object({ type: z14.literal("task.claim"), taskId: taskId2 }),
+  z14.object({
+    type: z14.literal("task.confirm_requirements"),
     taskId: taskId2,
-    checklist: z13.array(z13.string().min(1)).min(1)
+    checklist: z14.array(z14.string().min(1)).min(1)
   }),
-  z13.object({
-    type: z13.literal("task.submit"),
+  z14.object({
+    type: z14.literal("task.submit"),
     taskId: taskId2,
-    artifacts: z13.array(ArtifactInputSchema).default([]),
-    sha: z13.string().min(1).optional(),
+    artifacts: z14.array(ArtifactInputSchema).default([]),
+    sha: z14.string().min(1).optional(),
     // repo-backed work opens a PR — its url/number ride the submit so the reviewer
     // can gate on CI and the merge-on-accept watch can squash-merge it.
-    prUrl: z13.string().min(1).optional(),
-    prNumber: z13.number().int().positive().optional()
+    prUrl: z14.string().min(1).optional(),
+    prNumber: z14.number().int().positive().optional()
   }),
   taskRequestChangesCommand,
   taskApproveCommand,
@@ -16824,16 +16918,16 @@ var CommandSchema = z13.discriminatedUnion("type", [
   taskRequestPlanCommand,
   // the architect's final plan rides in as markdown — attached as a reviewable
   // 'doc' artifact (implementation-plan.md) when the task enters plan_review
-  z13.object({
-    type: z13.literal("task.propose_plan"),
+  z14.object({
+    type: z14.literal("task.propose_plan"),
     taskId: taskId2,
-    plan: z13.string().min(1).max(6e4),
+    plan: z14.string().min(1).max(6e4),
     // Plan-first units (2026-08-17): a revise round may also update the STRUCTURE — the
     // declared legs and proposed subtasks — not just the prose. Floored by validateWorkPlanLegs
     // in the reducer; re-proposing always clears planApprovedAt (a changed plan needs a fresh
     // human sign-off, never an inherited one).
-    legs: z13.array(z13.enum(WORK_PLAN_LEGS)).min(1).max(3).optional(),
-    subtasks: z13.array(z13.string().min(1).max(200)).max(8).optional()
+    legs: z14.array(z14.enum(WORK_PLAN_LEGS)).min(1).max(3).optional(),
+    subtasks: z14.array(z14.string().min(1).max(200)).max(8).optional()
   }),
   taskRevisePlanCommand,
   // Design lifecycle (visual-quality gate BEFORE planning — docs/14). request_design
@@ -16843,14 +16937,14 @@ var CommandSchema = z13.discriminatedUnion("type", [
   // is the HUMAN sign-off (enforced) that releases the task into planning.
   taskRequestDesignCommand,
   taskSelectDesignProviderCommand,
-  z13.object({
-    type: z13.literal("task.propose_design"),
+  z14.object({
+    type: z14.literal("task.propose_design"),
     taskId: taskId2,
-    summary: z13.string().max(2e3).optional(),
+    summary: z14.string().max(2e3).optional(),
     // the proposal round, computed by the proposing host (count of prior rounds + 1)
     // — cosmetic versioning for artifact names; the FSM/kind are what's enforced
-    round: z13.number().int().min(1).max(99).default(1),
-    mockups: z13.array(z13.object({ name: z13.string().min(1).max(120), html: z13.string().min(1).max(3e5) })).min(1).max(6)
+    round: z14.number().int().min(1).max(99).default(1),
+    mockups: z14.array(z14.object({ name: z14.string().min(1).max(120), html: z14.string().min(1).max(3e5) })).min(1).max(6)
   }),
   taskReviseDesignCommand,
   taskApproveDesignCommand,
@@ -16861,26 +16955,26 @@ var CommandSchema = z13.discriminatedUnion("type", [
   // a versioned 'ship' artifact) + the owner-tagged checklist into ship_review.
   // approve/revise/check/add are the shared human commands above; execute_ship is the
   // shipper's merge trigger, structurally refused until every item is checked (SHIP_ITEMS_PENDING).
-  z13.object({ type: z13.literal("task.claim_ship"), taskId: taskId2 }),
-  z13.object({
-    type: z13.literal("task.propose_ship_plan"),
+  z14.object({ type: z14.literal("task.claim_ship"), taskId: taskId2 }),
+  z14.object({
+    type: z14.literal("task.propose_ship_plan"),
     taskId: taskId2,
-    report: z13.string().min(1).max(6e4),
-    risk: z13.enum(SHIP_RISKS),
-    summary: z13.string().max(2e3).default(""),
+    report: z14.string().min(1).max(6e4),
+    risk: z14.enum(SHIP_RISKS),
+    summary: z14.string().max(2e3).default(""),
     // the proposal round, computed by the proposing host (count of prior rounds + 1)
-    round: z13.number().int().min(1).max(99).default(1),
-    items: z13.array(
-      z13.object({
-        id: z13.string().min(1).max(40),
-        title: z13.string().min(1).max(300),
-        detail: z13.string().max(2e3).default(""),
-        owner: z13.enum(SHIP_ITEM_OWNERS),
-        agentId: z13.string().min(1).optional(),
+    round: z14.number().int().min(1).max(99).default(1),
+    items: z14.array(
+      z14.object({
+        id: z14.string().min(1).max(40),
+        title: z14.string().min(1).max(300),
+        detail: z14.string().max(2e3).default(""),
+        owner: z14.enum(SHIP_ITEM_OWNERS),
+        agentId: z14.string().min(1).optional(),
         // 'ci' items are host-verified (gh pr checks) — may arrive pre-checked
-        auto: z13.enum(["ci"]).optional(),
-        state: z13.enum(["pending", "done"]).default("pending"),
-        note: z13.string().max(500).default("")
+        auto: z14.enum(["ci"]).optional(),
+        state: z14.enum(["pending", "done"]).default("pending"),
+        note: z14.string().max(500).default("")
       })
     ).min(1).max(20)
   }),
@@ -16889,162 +16983,162 @@ var CommandSchema = z13.discriminatedUnion("type", [
   taskCheckShipItemCommand,
   taskAddShipItemCommand,
   taskFinishSubtaskCommand,
-  z13.object({ type: z13.literal("task.execute_ship"), taskId: taskId2 }),
+  z14.object({ type: z14.literal("task.execute_ship"), taskId: taskId2 }),
   // confirm_release: the host's verifying watch reports the release landed —
   // post-merge CI on the merge commit + release workflows settled green — moving
   // verifying → accepted. Issued as the shipper by the machine that merged;
   // a red/pending verdict never sends it (the human's accept is the override).
-  z13.object({ type: z13.literal("task.confirm_release"), taskId: taskId2, note: z13.string().max(2e3).default("") }),
+  z14.object({ type: z14.literal("task.confirm_release"), taskId: taskId2, note: z14.string().max(2e3).default("") }),
   // Set/edit the task's Definition of Done (the acceptance contract the reviewer
   // gates on). Humans or the orchestrator, while the task is still open.
   taskSetDefinitionOfDoneCommand,
   // Beats (docs/17): an agent declares the ordered steps for the phase it just picked up,
   // then advances them live. The handler gates on the agent's role owning the current phase;
   // beats are DESCRIPTIVE and never gate an FSM transition.
-  z13.object({
-    type: z13.literal("beats.declare"),
+  z14.object({
+    type: z14.literal("beats.declare"),
     taskId: taskId2,
-    phase: z13.enum(TASK_STATES),
-    items: z13.array(z13.string().min(1).max(200)).min(1).max(12)
+    phase: z14.enum(TASK_STATES),
+    items: z14.array(z14.string().min(1).max(200)).min(1).max(12)
   }),
-  z13.object({ type: z13.literal("beats.advance"), taskId: taskId2, seq: z13.number().int().min(0), status: z13.enum(BEAT_STATUSES) }),
+  z14.object({ type: z14.literal("beats.advance"), taskId: taskId2, seq: z14.number().int().min(0), status: z14.enum(BEAT_STATUSES) }),
   // Runs (docs/29): the durable row behind a stretch of agent work. `run.open` mints it (an
   // agent, always — a human never opens a run), `run.step` bumps the live line + progress,
   // `run.settle` closes it into a terminal state. Descriptive, never gating.
   // The third of the four human gates (docs/29 §4d). Not a transition: approving does not move the
   // task, it unlocks the edge OUT of plan_review — the same shape as confirm_requirements, because
   // both the owned and the delegated path need the claim that follows to stay exactly as it is.
-  z13.object({
-    type: z13.literal("task.approve_plan"),
-    taskId: z13.string().min(1)
+  z14.object({
+    type: z14.literal("task.approve_plan"),
+    taskId: z14.string().min(1)
   }),
-  z13.object({
-    type: z13.literal("run.open"),
-    id: z13.string().uuid().optional(),
+  z14.object({
+    type: z14.literal("run.open"),
+    id: z14.string().uuid().optional(),
     // caller-minted so the daemon can address it before the round trip
-    workspace: z13.string().min(1),
-    channel: z13.string().min(1),
-    threadId: z13.string().min(1).optional(),
-    runTaskId: z13.string().min(1).optional(),
-    parentRunId: z13.string().min(1).optional(),
-    kind: z13.enum(RUN_KINDS),
-    title: z13.string().min(1).max(200),
-    total: z13.number().int().min(0).max(64).default(0),
-    step: z13.string().max(200).optional(),
+    workspace: z14.string().min(1),
+    channel: z14.string().min(1),
+    threadId: z14.string().min(1).optional(),
+    runTaskId: z14.string().min(1).optional(),
+    parentRunId: z14.string().min(1).optional(),
+    kind: z14.enum(RUN_KINDS),
+    title: z14.string().min(1).max(200),
+    total: z14.number().int().min(0).max(64).default(0),
+    step: z14.string().max(200).optional(),
     // which config this run is seated on — `role·model[·@specialist]` (0103). Leg runs only.
-    seat: z13.string().max(160).optional(),
+    seat: z14.string().max(160).optional(),
     // The WAKE LEASE (0114). Set to the message this run answers and the open becomes a claim:
     // one host per (agent, trigger) wins, the rest get `won: false` and stand down BEFORE
     // spending a token. Omitted for task/sweep runs, which their own claim already dedupes.
-    triggerMessageId: z13.string().uuid().optional(),
+    triggerMessageId: z14.string().uuid().optional(),
     // which member's machine is actually serving this run — the thing that makes shared compute
     // legible ("patch is working on bob's laptop") and billing attributable
-    machineId: z13.string().uuid().optional()
+    machineId: z14.string().uuid().optional()
   }),
-  z13.object({
-    type: z13.literal("run.step"),
-    runId: z13.string().min(1),
-    step: z13.string().max(200).optional(),
-    done: z13.number().int().min(0).max(64).optional(),
-    total: z13.number().int().min(0).max(64).optional()
+  z14.object({
+    type: z14.literal("run.step"),
+    runId: z14.string().min(1),
+    step: z14.string().max(200).optional(),
+    done: z14.number().int().min(0).max(64).optional(),
+    total: z14.number().int().min(0).max(64).optional()
   }),
-  z13.object({
-    type: z13.literal("run.settle"),
-    runId: z13.string().min(1),
-    state: z13.enum(RUN_SETTLE_STATES),
+  z14.object({
+    type: z14.literal("run.settle"),
+    runId: z14.string().min(1),
+    state: z14.enum(RUN_SETTLE_STATES),
     // includes `parked` — settleable, but NOT terminal
-    summary: z13.string().max(600).optional()
+    summary: z14.string().max(600).optional()
   }),
   // the machine commands live in commands-machine.ts (member-machines round, 2026-09-03): this
   // file sits at its size-ratchet cap and the kind grew three verbs
   ...MACHINE_COMMANDS,
-  z13.object({
-    type: z13.literal("agent.register"),
-    workspace: z13.string().min(1),
-    machineId: z13.string().min(1),
-    name: z13.string().min(1).regex(/^[a-z0-9][a-z0-9._-]*$/),
-    role: z13.enum(["worker", "developer", "reviewer", "orchestrator", "designer", "sales", "architect", "curator", "shipper", "marketer"]).default("developer"),
+  z14.object({
+    type: z14.literal("agent.register"),
+    workspace: z14.string().min(1),
+    machineId: z14.string().min(1),
+    name: z14.string().min(1).regex(/^[a-z0-9][a-z0-9._-]*$/),
+    role: z14.enum(["worker", "developer", "reviewer", "orchestrator", "designer", "sales", "architect", "curator", "shipper", "marketer"]).default("developer"),
     model: modelId.default("claude-opus-4-8"),
-    runtime: z13.enum(["claude-code", "codex", "gemini"]).default("claude-code"),
-    emoji: z13.string().min(1).max(8).optional(),
+    runtime: z14.enum(["claude-code", "codex", "gemini"]).default("claude-code"),
+    emoji: z14.string().min(1).max(8).optional(),
     // persona face; omitted → client derives from name
     // The two agent strings (0110). `description` is the ROUTING signal — third person, what it
     // does + when to route here — read by the orchestrator in list_agents and published on the
     // A2A card. `brief` is the INSTRUCTIONS: second person, how the work is done, injected into
     // every turn this agent takes. Two readers, two caps.
-    description: z13.string().min(1).max(280).optional(),
-    brief: z13.string().min(1).max(2e3).optional(),
-    channels: z13.array(z13.string().min(1)).min(1)
+    description: z14.string().min(1).max(280).optional(),
+    brief: z14.string().min(1).max(2e3).optional(),
+    channels: z14.array(z14.string().min(1)).min(1)
   }),
   // edit a registered agent's brain (model/provider), name, description or instructions — the
   // daemon re-reads them live. role stays immutable (FSM/permissions depend on it).
-  z13.object({
-    type: z13.literal("agent.update"),
-    agent: z13.string().min(1),
+  z14.object({
+    type: z14.literal("agent.update"),
+    agent: z14.string().min(1),
     // agent id
     model: modelId.optional(),
-    runtime: z13.enum(["claude-code", "codex", "gemini"]).optional(),
-    name: z13.string().min(1).regex(/^[a-z0-9][a-z0-9._-]*$/).optional(),
+    runtime: z14.enum(["claude-code", "codex", "gemini"]).optional(),
+    name: z14.string().min(1).regex(/^[a-z0-9][a-z0-9._-]*$/).optional(),
     // '' clears either string back to null (the UI's empty field must be able to mean "none")
-    description: z13.string().max(280).optional(),
-    brief: z13.string().max(2e3).optional(),
+    description: z14.string().max(280).optional(),
+    brief: z14.string().max(2e3).optional(),
     // provenance: 'manual' = a human pinned this brain (pack-apply must skip it); 'pack' = pack-managed.
     // The handler stamps 'manual' on a human model edit when the caller doesn't set it explicitly.
-    modelSource: z13.enum(["pack", "manual"]).optional()
+    modelSource: z14.enum(["pack", "manual"]).optional()
   }),
   // Retire an agent (HUMAN-ONLY, soft): it leaves the active roster — daemon stops
   // hosting it, selection pools skip it, its A2A card unpublishes — but the row and
   // every event/task attribution stay, so derived history (docs/13) never orphans.
   // Refused while the agent has open work. agent.register with the same name rehires.
-  z13.object({
-    type: z13.literal("agent.retire"),
-    agent: z13.string().min(1)
+  z14.object({
+    type: z14.literal("agent.retire"),
+    agent: z14.string().min(1)
     /* agent id */
   }),
   // Consume an external A2A agent: fetch its Agent Card by URL, register it as a
   // 'remote' agent (no local machine) the host delegates to over A2A JSON-RPC.
-  z13.object({
-    type: z13.literal("agent.connect_remote"),
-    workspace: z13.string().min(1),
-    channels: z13.array(z13.string().min(1)).min(1),
-    cardUrl: z13.string().min(1)
+  z14.object({
+    type: z14.literal("agent.connect_remote"),
+    workspace: z14.string().min(1),
+    channels: z14.array(z14.string().min(1)).min(1),
+    cardUrl: z14.string().min(1)
     // the agent's /.well-known/a2a/agent-card.json or card URL
   }),
-  z13.object({
-    type: z13.literal("agent.set_status"),
-    agentId: z13.string().min(1),
-    status: z13.enum(["online", "offline", "thinking", "working"])
+  z14.object({
+    type: z14.literal("agent.set_status"),
+    agentId: z14.string().min(1),
+    status: z14.enum(["online", "offline", "thinking", "working"])
   }),
-  z13.object({ type: z13.literal("artifact.promote"), artifactId: z13.string().min(1) }),
+  z14.object({ type: z14.literal("artifact.promote"), artifactId: z14.string().min(1) }),
   // Deleting a file (2026-08-18). HUMAN_ONLY, and REFUSED for anything a gate resolves against —
   // a design round, an implementation or release plan, a reviewer's diff, a test report. See
   // `isGateArtifact` in @neuramesh/shared: the client hides the control from the same predicate,
   // but the refusal lives here, because "don't delete the evidence" must be impossible rather
   // than discouraged (doctrine §4).
-  z13.object({ type: z13.literal("artifact.delete"), artifactId: z13.string().min(1) }),
-  z13.object({
-    type: z13.literal("memory.refresh_block"),
-    workspace: z13.string().min(1),
-    channel: z13.string().min(1),
-    kind: z13.enum(["channel_summary", "project_brief"]).default("channel_summary"),
-    content: z13.string().min(1).max(4e3),
-    basisCount: z13.number().int().nonnegative().default(0)
+  z14.object({ type: z14.literal("artifact.delete"), artifactId: z14.string().min(1) }),
+  z14.object({
+    type: z14.literal("memory.refresh_block"),
+    workspace: z14.string().min(1),
+    channel: z14.string().min(1),
+    kind: z14.enum(["channel_summary", "project_brief"]).default("channel_summary"),
+    content: z14.string().min(1).max(4e3),
+    basisCount: z14.number().int().nonnegative().default(0)
   }),
-  z13.object({
-    type: z13.literal("memory.upsert_fact"),
-    workspace: z13.string().min(1),
-    channel: z13.string().min(1),
-    content: z13.string().min(8).max(600),
-    basisCount: z13.number().int().nonnegative().default(0)
+  z14.object({
+    type: z14.literal("memory.upsert_fact"),
+    workspace: z14.string().min(1),
+    channel: z14.string().min(1),
+    content: z14.string().min(8).max(600),
+    basisCount: z14.number().int().nonnegative().default(0)
   }),
   // A lesson: the durable norm a review correction taught (e.g. "evidence renders
   // attach as artifacts — mock HTML never gets committed"). The one memory write ANY
   // teammate may make — the agent that was just corrected holds the freshest version.
-  z13.object({
-    type: z13.literal("memory.record_lesson"),
-    workspace: z13.string().min(1),
-    channel: z13.string().min(1),
-    content: z13.string().min(12).max(500),
+  z14.object({
+    type: z14.literal("memory.record_lesson"),
+    workspace: z14.string().min(1),
+    channel: z14.string().min(1),
+    content: z14.string().min(12).max(500),
     taskId: taskId2.optional()
     // provenance: the task whose review taught it
   }),
@@ -17052,278 +17146,278 @@ var CommandSchema = z13.discriminatedUnion("type", [
   // provenance stay; valid_until closes). supersededBy names the successor when a
   // correction was recorded but the reconcile's overlap check missed the rewrite,
   // so the supersession chain stays intact either way.
-  z13.object({
-    type: z13.literal("memory.retire_fact"),
-    factId: z13.string().uuid(),
-    supersededBy: z13.string().uuid().optional()
+  z14.object({
+    type: z14.literal("memory.retire_fact"),
+    factId: z14.string().uuid(),
+    supersededBy: z14.string().uuid().optional()
   }),
-  z13.object({
-    type: z13.literal("workspace.create"),
-    name: z13.string().min(1).max(60),
-    slug: z13.string().min(2).max(40).regex(/^[a-z0-9][a-z0-9-]*$/)
+  z14.object({
+    type: z14.literal("workspace.create"),
+    name: z14.string().min(1).max(60),
+    slug: z14.string().min(2).max(40).regex(/^[a-z0-9][a-z0-9-]*$/)
   }),
-  z13.object({ type: z13.literal("workspace.delete"), workspace: z13.string().min(1) }),
-  z13.object({ type: z13.literal("account.delete") }),
+  z14.object({ type: z14.literal("workspace.delete"), workspace: z14.string().min(1) }),
+  z14.object({ type: z14.literal("account.delete") }),
   // An invite is a pending row + an email; the invitee authenticates through Clerk and the
   // verified-email claim attaches them (docs/27 §1d). No password: the old one created a
   // Supabase auth user that Clerk would never accept, for an identity that never got a
   // membership. `password` is accepted-and-ignored for one release so an older desktop build
   // doesn't hard-fail zod validation mid-rollout.
-  z13.object({
-    type: z13.literal("workspace.invite"),
-    workspace: z13.string().min(1),
-    email: z13.string().email(),
-    password: z13.string().optional(),
-    memberRole: z13.enum(["member", "admin"]).default("member")
+  z14.object({
+    type: z14.literal("workspace.invite"),
+    workspace: z14.string().min(1),
+    email: z14.string().email(),
+    password: z14.string().optional(),
+    memberRole: z14.enum(["member", "admin"]).default("member")
   }),
-  z13.object({ type: z13.literal("workspace.revoke_invite"), workspace: z13.string().min(1), invite: z13.string().uuid() }),
+  z14.object({ type: z14.literal("workspace.revoke_invite"), workspace: z14.string().min(1), invite: z14.string().uuid() }),
   // Answering an invitation (0113). No `workspace` field on purpose: the invite id resolves its
   // own workspace, and taking one from the caller would invite a mismatch to reason about. The
   // server re-verifies the caller's email against the invite — the id is a handle, not a key.
-  z13.object({ type: z13.literal("workspace.accept_invite"), invite: z13.string().uuid() }),
-  z13.object({ type: z13.literal("workspace.decline_invite"), invite: z13.string().uuid() }),
+  z14.object({ type: z14.literal("workspace.accept_invite"), invite: z14.string().uuid() }),
+  z14.object({ type: z14.literal("workspace.decline_invite"), invite: z14.string().uuid() }),
   // Membership exits. `leave` acts on the caller; `remove_member` on someone else — kept apart
   // so the owner rules can differ (you may not leave as owner; nobody may remove the owner).
-  z13.object({ type: z13.literal("workspace.leave"), workspace: z13.string().min(1) }),
-  z13.object({ type: z13.literal("workspace.remove_member"), workspace: z13.string().min(1), member: z13.string().uuid() }),
+  z14.object({ type: z14.literal("workspace.leave"), workspace: z14.string().min(1) }),
+  z14.object({ type: z14.literal("workspace.remove_member"), workspace: z14.string().min(1), member: z14.string().uuid() }),
   // workspace-level settings (Workspace settings UI). autoFailover = the provider-auth
   // failover policy: when a preferred subscription login is down, false (default) surfaces
   // an auth card (no surprise spend); true fails over to a provided API key automatically.
-  z13.object({
-    type: z13.literal("workspace.update"),
-    workspace: z13.string().min(1),
-    autoFailover: z13.boolean().optional(),
+  z14.object({
+    type: z14.literal("workspace.update"),
+    workspace: z14.string().min(1),
+    autoFailover: z14.boolean().optional(),
     activeModelPack: packId.optional(),
     // the workspace's voice (docs/design/agent-comm-rules-2026-08) — HUMAN-only in the handler; null reads as defaults-ON
-    commRules: z13.object({ ste100: z13.boolean().optional(), noEmdash: z13.boolean().optional(), custom: z13.array(z13.string().min(1).max(200)).max(8).optional() }).optional(),
+    commRules: z14.object({ ste100: z14.boolean().optional(), noEmdash: z14.boolean().optional(), custom: z14.array(z14.string().min(1).max(200)).max(8).optional() }).optional(),
     // the video tier (0140): a Pro workspace's pick among the tiers the server serves; null = the default
-    videoTier: z13.enum(["starter", "xpress", "premium"]).nullable().optional()
+    videoTier: z14.enum(["starter", "xpress", "premium"]).nullable().optional()
   }),
   // re-bind every agent to its home-remit channels across all projects (recovery for orphaned
   // registrations + makes the team usable across projects). idempotent.
-  z13.object({ type: z13.literal("workspace.sync_agents"), workspace: z13.string().min(1) }),
+  z14.object({ type: z14.literal("workspace.sync_agents"), workspace: z14.string().min(1) }),
   // Custom brains (user-authored model packs): save = create (packId omitted; the server
   // mints `custom:<uuid>`) or update (packId present). Human-only in the handler, like
   // workspace.update. Activation stays a separate workspace.update {activeModelPack}.
-  z13.object({
-    type: z13.literal("modelpack.save"),
-    workspace: z13.string().min(1),
+  z14.object({
+    type: z14.literal("modelpack.save"),
+    workspace: z14.string().min(1),
     packId: customPackId.optional(),
-    name: z13.string().trim().min(1).max(40),
+    name: z14.string().trim().min(1).max(40),
     roles: packRoles
   }),
-  z13.object({ type: z13.literal("modelpack.delete"), workspace: z13.string().min(1), packId: customPackId }),
+  z14.object({ type: z14.literal("modelpack.delete"), workspace: z14.string().min(1), packId: customPackId }),
   // Agent permission policy (Phase 1): humans configure allow/ask/deny rules per scope.
   // setPolicy upserts by id (absent id = insert a new rule); selector is the shared DSL.
-  z13.object({
-    type: z13.literal("policy.set"),
-    workspace: z13.string().min(1),
-    id: z13.string().min(1).optional(),
-    scope: z13.enum(POLICY_SCOPES),
-    projectId: z13.string().min(1).nullable().optional(),
-    channelId: z13.string().min(1).nullable().optional(),
-    agentId: z13.string().min(1).nullable().optional(),
-    capability: z13.enum(POLICY_CAPABILITIES),
+  z14.object({
+    type: z14.literal("policy.set"),
+    workspace: z14.string().min(1),
+    id: z14.string().min(1).optional(),
+    scope: z14.enum(POLICY_SCOPES),
+    projectId: z14.string().min(1).nullable().optional(),
+    channelId: z14.string().min(1).nullable().optional(),
+    agentId: z14.string().min(1).nullable().optional(),
+    capability: z14.enum(POLICY_CAPABILITIES),
     selector: PolicySelectorSchema,
-    verdict: z13.enum(POLICY_VERDICTS),
-    rationale: z13.string().max(400).optional(),
-    locked: z13.boolean().optional()
+    verdict: z14.enum(POLICY_VERDICTS),
+    rationale: z14.string().max(400).optional(),
+    locked: z14.boolean().optional()
   }),
-  z13.object({ type: z13.literal("policy.delete"), workspace: z13.string().min(1), policyId: z13.string().min(1) }),
-  z13.object({
-    type: z13.literal("skill.create"),
-    workspace: z13.string().min(1),
-    channel: z13.string().min(1).optional(),
+  z14.object({ type: z14.literal("policy.delete"), workspace: z14.string().min(1), policyId: z14.string().min(1) }),
+  z14.object({
+    type: z14.literal("skill.create"),
+    workspace: z14.string().min(1),
+    channel: z14.string().min(1).optional(),
     // omitted/global scope = workspace-wide
-    name: z13.string().min(1).max(60).regex(/^[a-z0-9][a-z0-9-]*$/),
-    description: z13.string().min(1).max(300),
-    scope: z13.enum(["channel", "global"]).default("channel"),
-    body: z13.string().min(1).max(4e4),
-    packId: z13.string().min(1).optional(),
+    name: z14.string().min(1).max(60).regex(/^[a-z0-9][a-z0-9-]*$/),
+    description: z14.string().min(1).max(300),
+    scope: z14.enum(["channel", "global"]).default("channel"),
+    body: z14.string().min(1).max(4e4),
+    packId: z14.string().min(1).optional(),
     // bind into a skill pack (importer/seed use)
-    enabled: z13.boolean().default(true)
+    enabled: z14.boolean().default(true)
   }),
   // toggle a single skill's discoverability without deleting it (greyed in UI)
-  z13.object({ type: z13.literal("skill.set_enabled"), skillId: z13.string().min(1), enabled: z13.boolean() }),
-  z13.object({
-    type: z13.literal("skill.update"),
-    skillId: z13.string().min(1),
-    description: z13.string().min(1).max(300).optional(),
-    body: z13.string().min(1).max(4e4).optional(),
-    scope: z13.enum(["channel", "global"]).optional()
+  z14.object({ type: z14.literal("skill.set_enabled"), skillId: z14.string().min(1), enabled: z14.boolean() }),
+  z14.object({
+    type: z14.literal("skill.update"),
+    skillId: z14.string().min(1),
+    description: z14.string().min(1).max(300).optional(),
+    body: z14.string().min(1).max(4e4).optional(),
+    scope: z14.enum(["channel", "global"]).optional()
   }),
-  z13.object({ type: z13.literal("skill.deprecate"), skillId: z13.string().min(1) }),
+  z14.object({ type: z14.literal("skill.deprecate"), skillId: z14.string().min(1) }),
   // agent self-learning: any agent proposes a reusable procedure it discovered
   // → lands as draft for orchestrator/human curation (dedups onto an existing
   // draft of the same name+scope rather than spamming).
-  z13.object({
-    type: z13.literal("skill.propose"),
-    workspace: z13.string().min(1),
-    channel: z13.string().min(1).optional(),
-    name: z13.string().min(1).max(60).regex(/^[a-z0-9][a-z0-9-]*$/),
-    description: z13.string().min(1).max(300),
-    scope: z13.enum(["channel", "global"]).default("channel"),
-    body: z13.string().min(1).max(4e4)
+  z14.object({
+    type: z14.literal("skill.propose"),
+    workspace: z14.string().min(1),
+    channel: z14.string().min(1).optional(),
+    name: z14.string().min(1).max(60).regex(/^[a-z0-9][a-z0-9-]*$/),
+    description: z14.string().min(1).max(300),
+    scope: z14.enum(["channel", "global"]).default("channel"),
+    body: z14.string().min(1).max(4e4)
   }),
   // curation gate: promote a draft to active (supersedes a same-name active).
-  z13.object({ type: z13.literal("skill.promote"), skillId: z13.string().min(1) }),
+  z14.object({ type: z14.literal("skill.promote"), skillId: z14.string().min(1) }),
   // Skill packs: a versioned bundle of skills. create opens an 'importing' row;
   // the Curator (or the bundled seed path) commits the parsed skills atomically.
-  z13.object({
-    type: z13.literal("skillpack.create"),
-    workspace: z13.string().min(1),
-    channel: z13.string().min(1),
-    name: z13.string().min(1).max(60).regex(/^[a-z0-9][a-z0-9-]*$/),
-    description: z13.string().max(300).default(""),
-    sourceUrl: z13.string().max(400).default(""),
-    sourceRef: z13.string().min(1).max(120).default("main"),
-    origin: z13.enum(["bundled", "imported"]).default("imported")
+  z14.object({
+    type: z14.literal("skillpack.create"),
+    workspace: z14.string().min(1),
+    channel: z14.string().min(1),
+    name: z14.string().min(1).max(60).regex(/^[a-z0-9][a-z0-9-]*$/),
+    description: z14.string().max(300).default(""),
+    sourceUrl: z14.string().max(400).default(""),
+    sourceRef: z14.string().min(1).max(120).default("main"),
+    origin: z14.enum(["bundled", "imported"]).default("imported")
   }),
-  z13.object({
-    type: z13.literal("skillpack.commit"),
-    packId: z13.string().min(1),
-    version: z13.string().max(120).default(""),
-    skills: z13.array(
-      z13.object({
-        name: z13.string().min(1).max(60).regex(/^[a-z0-9][a-z0-9-]*$/),
-        description: z13.string().max(300).default(""),
-        body: z13.string().min(1).max(4e4)
+  z14.object({
+    type: z14.literal("skillpack.commit"),
+    packId: z14.string().min(1),
+    version: z14.string().max(120).default(""),
+    skills: z14.array(
+      z14.object({
+        name: z14.string().min(1).max(60).regex(/^[a-z0-9][a-z0-9-]*$/),
+        description: z14.string().max(300).default(""),
+        body: z14.string().min(1).max(4e4)
       })
     ).max(300)
   }),
-  z13.object({
-    type: z13.literal("skillpack.update"),
+  z14.object({
+    type: z14.literal("skillpack.update"),
     // importer progress + terminal states
-    packId: z13.string().min(1),
-    status: z13.enum(["importing", "ready", "error"]).optional(),
-    step: z13.string().max(120).optional(),
-    progress: z13.number().int().min(0).max(100).optional(),
-    error: z13.string().max(2e3).optional(),
-    description: z13.string().max(300).optional()
+    packId: z14.string().min(1),
+    status: z14.enum(["importing", "ready", "error"]).optional(),
+    step: z14.string().max(120).optional(),
+    progress: z14.number().int().min(0).max(100).optional(),
+    error: z14.string().max(2e3).optional(),
+    description: z14.string().max(300).optional()
   }),
-  z13.object({ type: z13.literal("skillpack.set_enabled"), packId: z13.string().min(1), enabled: z13.boolean() }),
-  z13.object({ type: z13.literal("skillpack.remove"), packId: z13.string().min(1) }),
+  z14.object({ type: z14.literal("skillpack.set_enabled"), packId: z14.string().min(1), enabled: z14.boolean() }),
+  z14.object({ type: z14.literal("skillpack.remove"), packId: z14.string().min(1) }),
   // idempotently seed the bundled default packs into a channel (backfills existing #dev);
   // kind picks the seed list — marketing rooms get marketing-core
-  z13.object({ type: z13.literal("skillpack.seed_defaults"), workspace: z13.string().min(1), channel: z13.string().min(1), kind: z13.enum(["build", "marketing"]).optional() }),
+  z14.object({ type: z14.literal("skillpack.seed_defaults"), workspace: z14.string().min(1), channel: z14.string().min(1), kind: z14.enum(["build", "marketing"]).optional() }),
   // register a GitHub repo to the workspace so tasks can bind + push to it.
   // Metadata only — no tokens stored; the executing machine's own git creds
   // authenticate at clone/push (platform never holds repo write tokens).
-  z13.object({
-    type: z13.literal("repo.link"),
-    workspace: z13.string().min(1),
-    channel: z13.string().min(1).optional(),
+  z14.object({
+    type: z14.literal("repo.link"),
+    workspace: z14.string().min(1),
+    channel: z14.string().min(1).optional(),
     // attach to this channel's default project
-    project: z13.string().min(1).optional(),
+    project: z14.string().min(1).optional(),
     // …or attach directly to this project (code workspace)
-    url: z13.string().min(1).optional(),
+    url: z14.string().min(1).optional(),
     // github/gitlab URL — or use localPath
-    localPath: z13.string().min(1).optional(),
+    localPath: z14.string().min(1).optional(),
     // a local folder on the machine → provider 'local'
-    name: z13.string().min(1).optional(),
+    name: z14.string().min(1).optional(),
     // display name for a local folder
-    defaultBranch: z13.string().min(1).default("main")
+    defaultBranch: z14.string().min(1).default("main")
   }),
   // Projects are the work axis: workspace-scoped initiatives that OWN channels
   // (1:N — a channel belongs to one project). create may move existing channels in.
-  z13.object({
-    type: z13.literal("project.create"),
-    workspace: z13.string().min(1),
-    name: z13.string().min(1).max(80),
+  z14.object({
+    type: z14.literal("project.create"),
+    workspace: z14.string().min(1),
+    name: z14.string().min(1).max(80),
     // the slug is set at creation (immutable after); omitted = derived from the name.
-    slug: z13.string().min(1).max(40).regex(/^[a-z0-9][a-z0-9-]*$/).optional(),
-    description: z13.string().max(2e3).default(""),
+    slug: z14.string().min(1).max(40).regex(/^[a-z0-9][a-z0-9-]*$/).optional(),
+    description: z14.string().max(2e3).default(""),
     // project identity — the site the project ships, and a small logo detected from it
     // (or from the repo folder) on the user's machine. The logo is a compact data: URL
     // (icon resized client-side) or an https URL; capped well under the inline sync limit.
-    website: z13.string().max(2048).regex(/^$|^https?:\/\//).optional(),
-    logoUrl: z13.string().max(2e5).regex(/^$|^(data:image\/|https?:\/\/)/).optional(),
-    channels: z13.array(z13.string().min(1)).default([]),
+    website: z14.string().max(2048).regex(/^$|^https?:\/\//).optional(),
+    logoUrl: z14.string().max(2e5).regex(/^$|^(data:image\/|https?:\/\/)/).optional(),
+    channels: z14.array(z14.string().min(1)).default([]),
     // channel ids to move into the new project
-    newChannels: z13.array(z13.string().min(1)).default([])
+    newChannels: z14.array(z14.string().min(1)).default([])
     // slugs of fresh channels to create in the new project
   }),
   // Conversation threads (the conversation-first shell): refine the heuristic title or
   // add a description — the orchestrator does this after its first reply; humans may too.
-  z13.object({
-    type: z13.literal("thread.update"),
-    workspace: z13.string().min(1),
-    threadId: z13.string().uuid(),
-    title: z13.string().min(1).max(120).optional(),
-    description: z13.string().max(2e3).optional()
+  z14.object({
+    type: z14.literal("thread.update"),
+    workspace: z14.string().min(1),
+    threadId: z14.string().uuid(),
+    title: z14.string().min(1).max(120).optional(),
+    description: z14.string().max(2e3).optional()
   }),
   // docs/34 — the Tasks toggle, moved on a conversation that already exists. HUMAN_ONLY: this
   // is the line between "the agent is talking to me" and "the agent is filing work", and an
   // agent must never be able to move its own conversation onto the board. Both directions are
   // legal — chat → tasks escalates in place (the next message triages), tasks → chat stops the
   // routing without touching whatever task the thread already carries.
-  z13.object({
-    type: z13.literal("thread.set_mode"),
-    workspace: z13.string().min(1),
-    threadId: z13.string().uuid(),
-    mode: z13.enum(THREAD_MODES)
+  z14.object({
+    type: z14.literal("thread.set_mode"),
+    workspace: z14.string().min(1),
+    threadId: z14.string().uuid(),
+    mode: z14.enum(THREAD_MODES)
   }),
   // WHERE A SESSION RUNS (0134, rule D9): move a conversation's designated machine. Human-only,
   // like the mode: an agent steering a conversation onto a machine is the confused-deputy shape.
   // Null = no designation (the ladder's origin rung and the member's standing choices decide).
-  z13.object({
-    type: z13.literal("thread.set_machine"),
-    workspace: z13.string().min(1),
-    threadId: z13.string().uuid(),
-    machineId: z13.string().uuid().nullable()
+  z14.object({
+    type: z14.literal("thread.set_machine"),
+    workspace: z14.string().min(1),
+    threadId: z14.string().uuid(),
+    machineId: z14.string().uuid().nullable()
   }),
   // Compute choice (0118): where THIS member's requests run — a default machine for new
   // conversations plus per-agent overrides. Self-only by construction: the handler writes the
   // ACTOR's row, so the payload cannot name another member. Null machine = back to origin
   // affinity. Advisory routing (shouldClaim reads it); the wake lease stays the enforcement.
-  z13.object({
-    type: z13.literal("member.set_compute"),
-    workspace: z13.string().min(1),
-    machine: z13.string().uuid().nullable().optional(),
-    agents: z13.record(z13.string().uuid(), z13.string().uuid()).optional(),
+  z14.object({
+    type: z14.literal("member.set_compute"),
+    workspace: z14.string().min(1),
+    machine: z14.string().uuid().nullable().optional(),
+    agents: z14.record(z14.string().uuid(), z14.string().uuid()).optional(),
     // consent (0119): members this one lends their machines to. '*' = the whole workspace.
-    shares: z13.array(z13.union([z13.literal("*"), z13.string().uuid()])).max(200).optional(),
+    shares: z14.array(z14.union([z14.literal("*"), z14.string().uuid()])).max(200).optional(),
     // rule D9 (2026-09-04): where sessions started on this member's desktop run — 'here' or 'auto'
-    desktopSessions: z13.enum(["here", "auto"]).optional()
+    desktopSessions: z14.enum(["here", "auto"]).optional()
   }),
   // ONE lend/revoke, as INTENT. The client used to compute the resulting set, which meant
   // expanding '*' from its own replica — and on a stale one that silently dropped everyone it had
   // not synced yet (live, 2026-08-14). The server has the real roster.
-  z13.object({
-    type: z13.literal("member.share_compute"),
-    workspace: z13.string().min(1),
-    member: z13.string().uuid(),
-    on: z13.boolean()
+  z14.object({
+    type: z14.literal("member.share_compute"),
+    workspace: z14.string().min(1),
+    member: z14.string().uuid(),
+    on: z14.boolean()
   }),
   // Auto-filing (0109): move a conversation into the room it belongs in. The orchestrator does
   // this during the triage turn it already runs, so the human never has to pick a room; a human
   // can correct it any time. Every rule lives in `canFileConversation` (packages/shared/filing.ts)
   // so the gate is one pure function both this handler and the daemon read.
-  z13.object({
-    type: z13.literal("thread.move"),
-    workspace: z13.string().min(1),
-    threadId: z13.string().uuid(),
-    channel: z13.string().uuid(),
+  z14.object({
+    type: z14.literal("thread.move"),
+    workspace: z14.string().min(1),
+    threadId: z14.string().uuid(),
+    channel: z14.string().uuid(),
     // the one clause shown beside Undo. Required of an agent (a move with no stated reason is a
     // move you cannot argue with); optional for a human, whose reason is that they said so.
-    reason: z13.string().min(1).max(200).optional()
+    reason: z14.string().min(1).max(200).optional()
   }),
   // Archiving a conversation (0108). HUMAN_ONLY: it is the human's own filing, and an agent that
   // could archive a thread could hide a conversation the human is waiting on. Chat threads only —
   // enforced in the handler, because a TASK thread's life belongs to the board, not to a list.
-  z13.object({
-    type: z13.literal("thread.archive"),
-    workspace: z13.string().min(1),
-    threadId: z13.string().uuid()
+  z14.object({
+    type: z14.literal("thread.archive"),
+    workspace: z14.string().min(1),
+    threadId: z14.string().uuid()
   }),
-  z13.object({
-    type: z13.literal("thread.unarchive"),
-    workspace: z13.string().min(1),
-    threadId: z13.string().uuid()
+  z14.object({
+    type: z14.literal("thread.unarchive"),
+    workspace: z14.string().min(1),
+    threadId: z14.string().uuid()
   }),
   // Settle (0137): settled_at and nothing else, HUMAN_ONLY, any thread (shared/threadstatus.ts). One line: the file's cap.
-  z13.object({ type: z13.literal("thread.settle"), workspace: z13.string().min(1), threadId: z13.string().uuid() }),
-  z13.object({ type: z13.literal("thread.unsettle"), workspace: z13.string().min(1), threadId: z13.string().uuid() }),
+  z14.object({ type: z14.literal("thread.settle"), workspace: z14.string().min(1), threadId: z14.string().uuid() }),
+  z14.object({ type: z14.literal("thread.unsettle"), workspace: z14.string().min(1), threadId: z14.string().uuid() }),
   // docs/10 §15 — the thread brain override: which MODEL each role runs in THIS conversation.
   // HUMAN_ONLY, like every other spend of money the human did not ask for: an agent that could
   // set its own model could move itself onto the most expensive one in the catalog.
@@ -17331,122 +17425,122 @@ var CommandSchema = z13.discriminatedUnion("type", [
   // `override: null` is Reset — the WHOLE override, never a per-role clear (ruling 7). The role
   // keys and model values are validated in the handler against the same allow-list the packs
   // use, so an unknown model is a 400 rather than a seat that fails at run time.
-  z13.object({
-    type: z13.literal("thread.set_brain"),
-    workspace: z13.string().min(1),
-    threadId: z13.string().uuid(),
-    override: z13.record(z13.string(), z13.string()).nullable()
+  z14.object({
+    type: z14.literal("thread.set_brain"),
+    workspace: z14.string().min(1),
+    threadId: z14.string().uuid(),
+    override: z14.record(z14.string(), z14.string()).nullable()
   }),
-  z13.object({
-    type: z13.literal("project.update"),
-    project: z13.string().min(1),
-    name: z13.string().min(1).max(80).optional(),
-    description: z13.string().max(2e3).optional(),
+  z14.object({
+    type: z14.literal("project.update"),
+    project: z14.string().min(1),
+    name: z14.string().min(1).max(80).optional(),
+    description: z14.string().max(2e3).optional(),
     // '' clears the stored value (omitted = keep) — same shape as project.create
-    website: z13.string().max(2048).regex(/^$|^https?:\/\//).optional(),
-    logoUrl: z13.string().max(2e5).regex(/^$|^(data:image\/|https?:\/\/)/).optional(),
-    autoOpenPr: z13.boolean().optional(),
-    runCiBeforeMerge: z13.boolean().optional(),
+    website: z14.string().max(2048).regex(/^$|^https?:\/\//).optional(),
+    logoUrl: z14.string().max(2e5).regex(/^$|^(data:image\/|https?:\/\/)/).optional(),
+    autoOpenPr: z14.boolean().optional(),
+    runCiBeforeMerge: z14.boolean().optional(),
     // the release gate (docs/23): reviewer-approved, PR-backed tasks get a
     // production-readiness plan from the channel shipper before merging.
     // Defaults ON — null/absent reads as true everywhere.
-    shipGate: z13.boolean().optional(),
+    shipGate: z14.boolean().optional(),
     // per-project brains (docs/10): overrides the workspace pack for work in this
     // project. '' clears the override (back to inherit); omitted keeps it.
-    modelPack: z13.union([packId, z13.literal("")]).optional()
+    modelPack: z14.union([packId, z14.literal("")]).optional()
   }),
   // move a channel into a project (1:N ownership)
-  z13.object({
-    type: z13.literal("channel.assign"),
-    channel: z13.string().min(1),
+  z14.object({
+    type: z14.literal("channel.assign"),
+    channel: z14.string().min(1),
     // channel id
-    project: z13.string().min(1)
+    project: z14.string().min(1)
     // project id
   }),
   // create a fresh room in a project (slug unique per project; topic optional)
-  z13.object({
-    type: z13.literal("channel.create"),
-    workspace: z13.string().min(1),
-    project: z13.string().min(1),
+  z14.object({
+    type: z14.literal("channel.create"),
+    workspace: z14.string().min(1),
+    project: z14.string().min(1),
     // owning project id
-    slug: z13.string().min(1).max(40).regex(/^[a-z0-9][a-z0-9-]*$/),
-    topic: z13.string().max(280).default("")
+    slug: z14.string().min(1).max(40).regex(/^[a-z0-9][a-z0-9-]*$/),
+    topic: z14.string().max(280).default("")
   }),
   // rename a room — slug and/or topic. Safe because a channel is identified by its
   // id, not its slug (everything refs the uuid); the slug is a per-project label.
-  z13.object({
-    type: z13.literal("channel.rename"),
-    channel: z13.string().min(1),
+  z14.object({
+    type: z14.literal("channel.rename"),
+    channel: z14.string().min(1),
     // channel id
-    slug: z13.string().min(1).max(40).regex(/^[a-z0-9][a-z0-9-]*$/).optional(),
-    topic: z13.string().max(280).optional()
+    slug: z14.string().min(1).max(40).regex(/^[a-z0-9][a-z0-9-]*$/).optional(),
+    topic: z14.string().max(280).optional()
   }),
   // set a room's threads mode (docs/03 §5, docs/20): 'on' (default) keeps task replies in
   // their threads (the channel reads as digests); 'off' widens the channel feed to show thread
   // traffic inline. A view lens, never a reroute — every message keeps its task_id.
-  z13.object({
-    type: z13.literal("channel.set_thread_mode"),
-    channel: z13.string().min(1),
+  z14.object({
+    type: z14.literal("channel.set_thread_mode"),
+    channel: z14.string().min(1),
     // channel id
-    mode: z13.enum(["on", "off"])
+    mode: z14.enum(["on", "off"])
   }),
   // what the room is for (docs/design/marketing-channel-2026-07): 'build' runs today's
   // chat + board; 'marketing' runs the growth HQ (Feed · Calendar · Library). A lens plus
   // a toolbelt, never a silo — ACL, FSM, and artifacts are untouched. Human-only: rooms
   // change trade by the settings Kind row or the one-time #marketing upgrade prompt.
-  z13.object({
-    type: z13.literal("channel.set_kind"),
-    channel: z13.string().min(1),
+  z14.object({
+    type: z14.literal("channel.set_kind"),
+    channel: z14.string().min(1),
     // channel id
-    kind: z13.enum(["build", "marketing"])
+    kind: z14.enum(["build", "marketing"])
   }),
   // permanently delete a room + everything in it (messages, tasks, history).
   // irreversible — the client gates it behind a type-the-slug confirmation.
-  z13.object({ type: z13.literal("channel.delete"), channel: z13.string().min(1) }),
+  z14.object({ type: z14.literal("channel.delete"), channel: z14.string().min(1) }),
   // schedules (marketing-channel plan §4.6): the generic "run X at time T" primitive. Arming
   // is human-only AND Cloud-gated — THE deep-funnel paywall moment (round 2); agents may only
   // propose (a card). 'once' carries its exact runAt; recurring carries local time + IANA tz
   // (+ weekday for weekly) and the server computes next_run_at via the shared cadence brain.
-  z13.object({
-    type: z13.literal("schedule.create"),
-    channel: z13.string().min(1),
+  z14.object({
+    type: z14.literal("schedule.create"),
+    channel: z14.string().min(1),
     // channel id
-    title: z13.string().trim().min(1).max(200),
-    prompt: z13.string().trim().min(1).max(4e3),
+    title: z14.string().trim().min(1).max(200),
+    prompt: z14.string().trim().min(1).max(4e3),
     // what the run asks the agent to do
-    cadence: z13.enum(["once", "daily", "weekdays", "weekly"]),
-    runAt: z13.string().datetime().optional(),
+    cadence: z14.enum(["once", "daily", "weekdays", "weekly"]),
+    runAt: z14.string().datetime().optional(),
     // once only
-    atTime: z13.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
+    atTime: z14.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
     // recurring, default 09:00
-    tz: z13.string().max(64).optional(),
+    tz: z14.string().max(64).optional(),
     // IANA, from the arming client
-    weekday: z13.number().int().min(0).max(6).optional(),
+    weekday: z14.number().int().min(0).max(6).optional(),
     // weekly only
-    agent: z13.string().min(1).optional(),
+    agent: z14.string().min(1).optional(),
     // agent name; defaults to the room's marketer at run time
     // A ROUTINE (the universal launcher) rather than a marketing content schedule. The two share
     // this table, and the firing path used to tell them apart by CHANNEL KIND — so a routine armed
     // in a marketing room silently took the drafting path and produced a scheduled-draft card
     // instead of its own conversation. The distinction belongs to the row, not to the room.
-    routine: z13.boolean().optional()
+    routine: z14.boolean().optional()
   }),
-  z13.object({ type: z13.literal("schedule.set_status"), schedule: z13.string().min(1), status: z13.enum(["active", "paused"]) }),
-  z13.object({ type: z13.literal("schedule.delete"), schedule: z13.string().min(1) }),
+  z14.object({ type: z14.literal("schedule.set_status"), schedule: z14.string().min(1), status: z14.enum(["active", "paused"]) }),
+  z14.object({ type: z14.literal("schedule.delete"), schedule: z14.string().min(1) }),
   // edit an armed schedule in place (round 20): title/prompt/cadence/time — next_run_at
   // recomputes from the same cadence brain create uses; run_count is untouched (this is an
   // edit, not a claim). HUMAN_ONLY like the rest of schedule management.
-  z13.object({
-    type: z13.literal("schedule.update"),
-    schedule: z13.string().min(1),
-    title: z13.string().trim().min(1).max(200),
-    prompt: z13.string().trim().min(1).max(4e3),
-    cadence: z13.enum(["once", "daily", "weekdays", "weekly"]),
-    runAt: z13.string().datetime().optional(),
+  z14.object({
+    type: z14.literal("schedule.update"),
+    schedule: z14.string().min(1),
+    title: z14.string().trim().min(1).max(200),
+    prompt: z14.string().trim().min(1).max(4e3),
+    cadence: z14.enum(["once", "daily", "weekdays", "weekly"]),
+    runAt: z14.string().datetime().optional(),
     // once only
-    atTime: z13.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
-    tz: z13.string().max(64).optional(),
-    weekday: z13.number().int().min(0).max(6).optional()
+    atTime: z14.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
+    tz: z14.string().max(64).optional(),
+    weekday: z14.number().int().min(0).max(6).optional()
   }),
   // the verbs the daemon's schedule tick writes (claim_run · mark_result · set_cursor) ride
   // commands-schedule.ts, the commands-machine.ts shape: this file sits at its ratchet cap
@@ -17454,140 +17548,140 @@ var CommandSchema = z13.discriminatedUnion("type", [
   // content items (marketing-channel plan §4.7): agents DRAFT (create), humans PUBLISH —
   // approve is HUMAN_ONLY and is what puts an item on the clock; unschedule bounces it
   // back to draft. Actual posting is the server's publish pass once connectors land.
-  z13.object({
-    type: z13.literal("content.create"),
-    channel: z13.string().min(1),
+  z14.object({
+    type: z14.literal("content.create"),
+    channel: z14.string().min(1),
     // channel id
-    task: z13.string().min(1).optional(),
+    task: z14.string().min(1).optional(),
     // the content task (kind:'content') this draft delivers — renders inline in its thread
     // …or the CONVERSATION this draft was written in (0115). A social-post ask does not need a
     // board row, and before this the card could only exist on a task — which is why an agent
     // asked for drafts in a thread had to propose one. Either anchor renders the same card.
-    thread: z13.string().min(1).optional(),
-    platform: z13.enum(["x", "instagram", "linkedin", "tiktok", "email"]).default("x"),
-    body: z13.string().trim().min(1).max(1e4),
-    schedule: z13.string().min(1).optional(),
+    thread: z14.string().min(1).optional(),
+    platform: z14.enum(["x", "instagram", "linkedin", "tiktok", "email"]).default("x"),
+    body: z14.string().trim().min(1).max(1e4),
+    schedule: z14.string().min(1).optional(),
     // the schedule row this draft came from
     // the slot this draft is FOR (draft-ahead: the tick runs ~30min early; approve
     // keeps this time unless overridden, and the calendar places the draft chip on it)
-    slotAt: z13.string().datetime().optional(),
+    slotAt: z14.string().datetime().optional(),
     // the public image URL the post publishes with (REQUIRED by Instagram; optional context elsewhere)
-    mediaUrl: z13.string().url().max(2e3).optional(),
+    mediaUrl: z14.string().url().max(2e3).optional(),
     // the visual the marketer described. Kept OUT of the body (where it would publish verbatim
     // and break the character count) and stored beside the post — it is what the image generator
     // draws from, and what the card shows when generation didn't happen.
-    imageBrief: z13.string().trim().max(2e3).optional(),
+    imageBrief: z14.string().trim().max(2e3).optional(),
     // inline preview of the generated image: a downscaled data: URI that replicates with the
     // draft so the card shows the real picture (the 0048 chat-attachment precedent — thumbnail
     // travels, full bytes stay on the machine that made them). Bounded to protect the replica.
-    thumb: z13.string().startsWith("data:image/").max(2e5).optional(),
+    thumb: z14.string().startsWith("data:image/").max(2e5).optional(),
     // why a briefed draft has no image (generation failed / capped) — shown ON the card with a
     // Try-again, instead of the reason being buried in the marketer's summary message
-    imageError: z13.string().trim().max(600).optional(),
+    imageError: z14.string().trim().max(600).optional(),
     // a VIDEO post's creator script (the UGC round): the body is the caption that posts with the
     // video, the script is what the creator films. Kept in media.script, never in the body.
     // `frame`: the shelf image the film shows as the product (brand-grounding plan §6), by name. `seconds`: the film's length (video-rung plan §8), the human's pick on the angle card or their word; the door holds it inside the tier's range
-    script: z13.string().trim().min(1).max(1e4).optional(),
-    frame: z13.string().trim().min(1).max(200).optional(),
-    seconds: z13.number().int().min(1).max(60).optional()
+    script: z14.string().trim().min(1).max(1e4).optional(),
+    frame: z14.string().trim().min(1).max(200).optional(),
+    seconds: z14.number().int().min(1).max(60).optional()
   }),
   // the human tweaks a draft's text/media before approving (calendar preview edit) — never
   // a published item, and agents never rewrite what a human is reviewing. mediaUrl: a url
   // sets it, '' clears it, absent leaves it alone.
-  z13.object({ type: z13.literal("content.update"), item: z13.string().min(1), body: z13.string().trim().min(1).max(1e4), mediaUrl: z13.union([z13.string().url().max(2e3), z13.literal("")]).optional() }),
+  z14.object({ type: z14.literal("content.update"), item: z14.string().min(1), body: z14.string().trim().min(1).max(1e4), mediaUrl: z14.union([z14.string().url().max(2e3), z14.literal("")]).optional() }),
   // the MARKETER revises its own still-unpublished draft after a human requests a change (§4.5).
   // Editing a draft is still DRAFTING — "agents draft, humans publish" — so this is agent-allowed,
   // but ONLY while status='draft' (a scheduled/published item is the human's, enforced in the
   // handler). body updates the copy; imageBrief re-states the visual it wants (kept in media.brief,
   // the daemon regenerates + re-hosts separately via attach_media).
-  z13.object({
-    type: z13.literal("content.revise"),
-    item: z13.string().min(1),
-    body: z13.string().trim().min(1).max(1e4).optional(),
-    imageBrief: z13.string().trim().max(2e3).optional(),
-    script: z13.string().trim().min(1).max(1e4).optional(),
-    frame: z13.string().trim().max(200).nullable().optional(),
-    seconds: z13.number().int().min(1).max(60).nullable().optional(),
+  z14.object({
+    type: z14.literal("content.revise"),
+    item: z14.string().min(1),
+    body: z14.string().trim().min(1).max(1e4).optional(),
+    imageBrief: z14.string().trim().max(2e3).optional(),
+    script: z14.string().trim().min(1).max(1e4).optional(),
+    frame: z14.string().trim().max(200).nullable().optional(),
+    seconds: z14.number().int().min(1).max(60).nullable().optional(),
     // the film's facts (the video rung): what filmed it, for how long, at what price; the machine's own-key lane writes them, the server's lane writes them itself
-    videoMeta: z13.object({ tier: z13.string().max(40), model: z13.string().max(80), seconds: z13.number().int().min(1).max(60), credits: z13.number().int().min(0), at: z13.string().datetime(), frame: z13.string().max(200).nullable().optional(), frameUsed: z13.boolean().optional() }).optional(),
-    videoErrorCode: z13.enum(["NO_CREDITS", "UNAVAILABLE"]).nullable().optional(),
-    thumb: z13.string().startsWith("data:image/").max(2e5).optional(),
-    imageError: z13.union([z13.string().trim().max(600), z13.literal("")]).optional(),
-    videoError: z13.union([z13.string().trim().max(600), z13.literal("")]).optional()
+    videoMeta: z14.object({ tier: z14.string().max(40), model: z14.string().max(80), seconds: z14.number().int().min(1).max(60), credits: z14.number().int().min(0), at: z14.string().datetime(), frame: z14.string().max(200).nullable().optional(), frameUsed: z14.boolean().optional() }).optional(),
+    videoErrorCode: z14.enum(["NO_CREDITS", "UNAVAILABLE"]).nullable().optional(),
+    thumb: z14.string().startsWith("data:image/").max(2e5).optional(),
+    imageError: z14.union([z14.string().trim().max(600), z14.literal("")]).optional(),
+    videoError: z14.union([z14.string().trim().max(600), z14.literal("")]).optional()
   }),
   // host a draft's image so it can actually PUBLISH (0090). Every network takes media only as a
   // public URL someone else fetches — Meta pulls it directly, TikTok pulls it through our proxy,
   // X wants the bytes — so a picture generated on the user's machine has to land somewhere
   // fetchable. The bytes ride in as a data: URI and become /media/<id>, HMAC-gated.
   // a video rides the same lane (the UGC film, 2026-09-18): `data:video/mp4` bytes, one media per draft
-  z13.object({ type: z13.literal("content.attach_media"), item: z13.string().min(1), dataUrl: z13.string().regex(/^data:(?:image|video)\//).max(9e6) }),
+  z14.object({ type: z14.literal("content.attach_media"), item: z14.string().min(1), dataUrl: z14.string().regex(/^data:(?:image|video)\//).max(9e6) }),
   // remove a draft/scheduled item from the calendar entirely (published stays, it's history)
-  z13.object({ type: z13.literal("content.delete"), item: z13.string().min(1) }),
-  z13.object({
-    type: z13.literal("content.approve"),
-    item: z13.string().min(1),
-    scheduledAt: z13.string().datetime().optional()
+  z14.object({ type: z14.literal("content.delete"), item: z14.string().min(1) }),
+  z14.object({
+    type: z14.literal("content.approve"),
+    item: z14.string().min(1),
+    scheduledAt: z14.string().datetime().optional()
     // default: one hour out
   }),
-  z13.object({ type: z13.literal("content.unschedule"), item: z13.string().min(1) }),
+  z14.object({ type: z14.literal("content.unschedule"), item: z14.string().min(1) }),
   // connectors (marketing-channel plan §4.8): connecting is the OAuth round-trip (no command);
   // disconnecting is a human call — revokes the row and deletes the sealed secret.
-  z13.object({ type: z13.literal("connector.disconnect"), connector: z13.string().min(1) }),
+  z14.object({ type: z14.literal("connector.disconnect"), connector: z14.string().min(1) }),
   // a plain channel artifact (no task): the marketing bootstrap's conversational doc drops
   // (round 4 — the analysis is a CONVERSATION, not a task) and any future channel-scoped file.
-  z13.object({
-    type: z13.literal("artifact.create"),
-    channel: z13.string().min(1),
+  z14.object({
+    type: z14.literal("artifact.create"),
+    channel: z14.string().min(1),
     // channel id
-    kind: z13.enum(["doc", "file"]).default("doc"),
-    name: z13.string().trim().min(1).max(200),
-    inlineContent: z13.string().min(1).max(3e5),
-    mime: z13.string().max(100).optional(),
-    tags: z13.array(z13.string().trim().min(1).max(40)).max(8).optional()
+    kind: z14.enum(["doc", "file"]).default("doc"),
+    name: z14.string().trim().min(1).max(200),
+    inlineContent: z14.string().min(1).max(3e5),
+    mime: z14.string().max(100).optional(),
+    tags: z14.array(z14.string().trim().min(1).max(40)).max(8).optional()
     // tags e.g. ['brand'] — the rail filters on it
   }),
   // Whiteboards (docs/38). create is the AGENT door — a board born from a generation source
   // (mermaid for flow/sequence/class, or an element-skeleton JSON string; strings only — the
   // lowest common schema every runtime's tool layer speaks). Humans create boards through the
   // local-first row path (/v1/whiteboards), never this command.
-  z13.object({
-    type: z13.literal("whiteboard.create"),
-    channel: z13.string().min(1),
+  z14.object({
+    type: z14.literal("whiteboard.create"),
+    channel: z14.string().min(1),
     // channel id — the board's filing
-    threadId: z13.string().optional(),
+    threadId: z14.string().optional(),
     // provenance: the session that asked for it
-    taskId: z13.string().optional(),
+    taskId: z14.string().optional(),
     // provenance: the task it evidences
-    title: z13.string().trim().min(1).max(WB_TITLE_MAX),
-    mermaid: z13.string().min(1).max(WB_MERMAID_MAX).optional(),
-    elements: z13.string().min(1).max(WB_SCENE_MAX).optional()
+    title: z14.string().trim().min(1).max(WB_TITLE_MAX),
+    mermaid: z14.string().min(1).max(WB_MERMAID_MAX).optional(),
+    elements: z14.string().min(1).max(WB_SCENE_MAX).optional()
   }),
   // update is three shapes over one strict rev guard (baseRev must equal the board's rev, else
   // WHITEBOARD_STALE — the caller re-reads and reapplies): a new generation SOURCE (agent edit),
   // MATERIALIZE (the first desktop to render converts source → scene + snapshot and clears it),
   // or a TITLE-only rename. The LWW autosave path is /v1/whiteboards PATCH, not this command.
-  z13.object({
-    type: z13.literal("whiteboard.update"),
-    whiteboardId: z13.string().min(1),
-    baseRev: z13.number().int().min(1),
-    title: z13.string().trim().min(1).max(WB_TITLE_MAX).optional(),
-    mermaid: z13.string().min(1).max(WB_MERMAID_MAX).optional(),
-    elements: z13.string().min(1).max(WB_SCENE_MAX).optional(),
-    scene: z13.string().min(1).max(WB_SCENE_MAX).optional(),
-    snapshotSvg: z13.string().min(1).max(WB_SNAPSHOT_MAX).optional(),
-    clearSource: z13.boolean().optional()
+  z14.object({
+    type: z14.literal("whiteboard.update"),
+    whiteboardId: z14.string().min(1),
+    baseRev: z14.number().int().min(1),
+    title: z14.string().trim().min(1).max(WB_TITLE_MAX).optional(),
+    mermaid: z14.string().min(1).max(WB_MERMAID_MAX).optional(),
+    elements: z14.string().min(1).max(WB_SCENE_MAX).optional(),
+    scene: z14.string().min(1).max(WB_SCENE_MAX).optional(),
+    snapshotSvg: z14.string().min(1).max(WB_SNAPSHOT_MAX).optional(),
+    clearSource: z14.boolean().optional()
   }),
   // marketing HQ setup (marketing-channel plan §4.3): point the room at the product. Writes the
   // profile onto channels.marketing and fans out the bootstrap task ("Build the brand foundation")
   // through the ordinary task path, so triage/staffing take it from there. Human-only; FREE on
   // every plan by design (round 2) — the paywall sits on schedule.*/content.*, not the front door.
-  z13.object({
-    type: z13.literal("marketing.setup"),
-    channel: z13.string().min(1),
+  z14.object({
+    type: z14.literal("marketing.setup"),
+    channel: z14.string().min(1),
     // channel id
-    website: z13.string().trim().max(400).optional(),
-    focus: z13.array(z13.enum(["social", "content", "seo", "email", "ads"])).max(5).optional(),
-    goal: z13.string().trim().max(300).optional(),
+    website: z14.string().trim().max(400).optional(),
+    focus: z14.array(z14.enum(["social", "content", "seo", "email", "ads"])).max(5).optional(),
+    goal: z14.string().trim().max(300).optional(),
     // the human's stated aim, in their words
     // step 5, release drafts (docs/design/release-drafts-2026-09 §4.7): the repository to watch,
     // draft the latest release now (a free one-shot), watch daily (a Team routine)
@@ -17596,71 +17690,71 @@ var CommandSchema = z13.discriminatedUnion("type", [
   // flip one marketing MCP integration on the room (marketing.mcp.<provider>) — the daemon
   // attaches the enabled servers to marketer research runs with MACHINE-LOCAL creds
   // (integrations-and-skills-plan.md: read paths local, publish custody stays ours)
-  z13.object({
-    type: z13.literal("marketing.set_integration"),
-    channel: z13.string().min(1),
+  z14.object({
+    type: z14.literal("marketing.set_integration"),
+    channel: z14.string().min(1),
     // channel id
-    provider: z13.enum(["posthog", "x", "meta", "tiktok"]),
-    enabled: z13.boolean()
+    provider: z14.enum(["posthog", "x", "meta", "tiktok"]),
+    enabled: z14.boolean()
   }),
   // one answered SETUP-FLOW step (shared/setupflows.ts), written as it lands — what makes an
   // abandoned wizard resumable. flow/step must name a registered flow; the value's shape is
   // checked against the step in the handler (a website string vs a focus array). Human-only:
   // setup is the human's checklist by construction, like the flow's completing command.
-  z13.object({
-    type: z13.literal("setup.step"),
-    channel: z13.string().min(1),
+  z14.object({
+    type: z14.literal("setup.step"),
+    channel: z14.string().min(1),
     // channel id
-    flow: z13.string().min(1),
+    flow: z14.string().min(1),
     // the registered flow id, e.g. 'marketing.v1'
-    step: z13.string().min(1),
+    step: z14.string().min(1),
     // a step id of that flow
-    value: z13.union([z13.string().trim().max(400), z13.array(z13.string().trim().max(40)).max(8), SETUP_RELEASES_VALUE]).optional()
+    value: z14.union([z14.string().trim().max(400), z14.array(z14.string().trim().max(40)).max(8), SETUP_RELEASES_VALUE]).optional()
   }),
   // release-day backfill (idempotent, daemon boot): setup tasks for flow-bearing rooms that
   // predate setup flows and were never configured. Returns how many were created.
-  z13.object({ type: z13.literal("setup.backfill"), workspace: z13.string().min(1) }),
+  z14.object({ type: z14.literal("setup.backfill"), workspace: z14.string().min(1) }),
   // add / remove an agent's membership in a channel (the agent_channels row). Agents are
   // workspace-scoped but only see a channel's context once added here — humans (the live-panel
   // "+") or the orchestrator (the "add @agent to #channel?" card). agent = id or name; channel = id or slug.
-  z13.object({ type: z13.literal("channel.add_agent"), workspace: z13.string().min(1), channel: z13.string().min(1), agent: z13.string().min(1) }),
-  z13.object({ type: z13.literal("channel.remove_agent"), workspace: z13.string().min(1), channel: z13.string().min(1), agent: z13.string().min(1) }),
+  z14.object({ type: z14.literal("channel.add_agent"), workspace: z14.string().min(1), channel: z14.string().min(1), agent: z14.string().min(1) }),
+  z14.object({ type: z14.literal("channel.remove_agent"), workspace: z14.string().min(1), channel: z14.string().min(1), agent: z14.string().min(1) }),
   // channel people roster (0094): which humans the room's rail lists. `person` is an
   // nm_users id. A ROSTER, not an ACL — membership here grants nothing and gates nothing.
-  z13.object({ type: z13.literal("channel.add_person"), workspace: z13.string().min(1), channel: z13.string().min(1), person: z13.string().min(1) }),
-  z13.object({ type: z13.literal("channel.remove_person"), workspace: z13.string().min(1), channel: z13.string().min(1), person: z13.string().min(1) }),
+  z14.object({ type: z14.literal("channel.add_person"), workspace: z14.string().min(1), channel: z14.string().min(1), person: z14.string().min(1) }),
+  z14.object({ type: z14.literal("channel.remove_person"), workspace: z14.string().min(1), channel: z14.string().min(1), person: z14.string().min(1) }),
   // pin/unpin a channel message so it stands out and can be found later
   messagePinCommand,
   // Card revisions (reply-radar): a card whose state lives in its body is rewritten IN PLACE,
   // never re-posted beside itself; the handler requires the new body to still carry a fence.
-  z13.object({ type: z13.literal("message.revise_card"), message: z13.string().min(1), body: z13.string().min(1).max(6e4) }),
+  z14.object({ type: z14.literal("message.revise_card"), message: z14.string().min(1), body: z14.string().min(1).max(6e4) }),
   // decisions (docs/12 slice 2): answer/dismiss an agent's nmq card — human-only, exactly-once
   decisionAnswerCommand,
   decisionDismissCommand,
-  z13.object({ type: z13.literal("project.archive"), project: z13.string().min(1) }),
-  z13.object({ type: z13.literal("project.unarchive"), project: z13.string().min(1) }),
+  z14.object({ type: z14.literal("project.archive"), project: z14.string().min(1) }),
+  z14.object({ type: z14.literal("project.unarchive"), project: z14.string().min(1) }),
   // permanently delete an ARCHIVED project + everything in it (rooms, tasks, messages, history).
   // irreversible — the client gates it behind a type-the-slug confirmation.
-  z13.object({ type: z13.literal("project.delete"), project: z13.string().min(1) }),
-  z13.object({
-    type: z13.literal("credential.set"),
-    workspace: z13.string().min(1),
-    provider: z13.string().min(1).default("anthropic"),
-    scope: z13.enum(["workspace", "agent"]),
-    agentId: z13.string().min(1).optional(),
+  z14.object({ type: z14.literal("project.delete"), project: z14.string().min(1) }),
+  z14.object({
+    type: z14.literal("credential.set"),
+    workspace: z14.string().min(1),
+    provider: z14.string().min(1).default("anthropic"),
+    scope: z14.enum(["workspace", "agent"]),
+    agentId: z14.string().min(1).optional(),
     // token is required for apikey mode (validated in the handler). In subscription mode the
     // login lives in the provider CLI, so a token is optional there — but if supplied it's kept
     // as the FAILOVER key (used only when the subscription is down and Auto failover is on).
-    token: z13.string().min(8).optional(),
-    authMode: z13.enum(["apikey", "subscription"]).default("apikey")
+    token: z14.string().min(8).optional(),
+    authMode: z14.enum(["apikey", "subscription"]).default("apikey")
   }),
   // a member edits their OWN profile — the display name shown on their messages and
   // in the channel/people lists. The handler scopes the write to actor.id, so a
   // member can only ever change their own row (no target user id is accepted).
-  z13.object({
-    type: z13.literal("member.update_profile"),
-    workspace: z13.string().min(1),
-    displayName: z13.string().trim().min(1).max(60)
+  z14.object({
+    type: z14.literal("member.update_profile"),
+    workspace: z14.string().min(1),
+    displayName: z14.string().trim().min(1).max(60)
   })
 ]);
 
@@ -17683,8 +17777,8 @@ async function claimAnnouncement(store2, ann, actor, workspace, row) {
   await run(store2, actor, { type: "setup.step", channel: channelId, flow: "marketing.v1", step: "product", value: website }).catch(() => void 0);
   if (repoId) await run(store2, actor, { type: "setup.step", channel: channelId, flow: "marketing.v1", step: "releases", value: { repoId, slug: row.repo, now: false, watch: false } }).catch(() => void 0);
   const threadId = crypto.randomUUID();
-  const digest = row.digest;
-  const scan = digest?.candidate ? { candidates: [digest.candidate], skipped: [], cursor: { at: row.createdAt, tag: digest.candidate.tag } } : null;
+  const digest2 = row.digest;
+  const scan = digest2?.candidate ? { candidates: [digest2.candidate], skipped: [], cursor: { at: row.createdAt, tag: digest2.candidate.tag } } : null;
   const tag = row.tag ?? "the latest release";
   const body = scan ? `Release drafts \xB7 ${tag} \xB7 ${row.repo}
 
@@ -17713,7 +17807,7 @@ Drafted at neuramesh.app/announce.`;
 }
 
 // src/github-connect.ts
-import { z as z14 } from "zod";
+import { z as z15 } from "zod";
 
 // src/github-reads.ts
 var FILE_TEXT_CAP = 6e4;
@@ -17882,6 +17976,45 @@ async function resolveConnector(store2, ctx, fetchFn, opts = {}) {
   return { ok: false, code: "NOT_INSTALLED", error: repos.length ? `The neuramesh app cannot read ${slug}. Add it on GitHub, or pick another repository.` : `The neuramesh app is not installed on ${slug}. Grant access on GitHub.`, slug, repos, hint };
 }
 
+// src/github-write.ts
+var RUN_WRITE_PERMISSIONS = { contents: "write", pull_requests: "write", metadata: "read" };
+function githubWriteRoutes(app, store2, fetchFn) {
+  const ann = () => store2.announcements;
+  app.post("/v1/repo/token", async (c) => {
+    const bearer = /^Bearer\s+(nmm_\S+)$/i.exec(c.req.header("authorization") ?? "")?.[1];
+    if (!bearer) return c.json({ error: "a repository write token is minted for a machine, never a person", code: "MACHINE_ONLY" }, 403);
+    if (!store2.machineByTokenHash) return c.json({ error: "fleet not served by this store", code: "NOT_CONFIGURED" }, 501);
+    const machine = await store2.machineByTokenHash(hashMachineToken(bearer));
+    if (!machine) return c.json({ error: "unknown machine token", code: "AUTH_FAILED" }, 401);
+    const body = await c.req.json().catch(() => null);
+    const channel = body?.channel;
+    if (!channel) return c.json({ error: "channel is required", code: "INVALID_INPUT" }, 400);
+    if (!githubAppConfigured() || !ann()) return c.json({ error: "GitHub connecting is not configured on this server", code: "NOT_CONFIGURED" }, 501);
+    const repo = await ann().repoForChannel(channel);
+    const slug = repo ? slugOf(repo) : null;
+    if (!repo || !slug) return c.json({ error: "this room's project has no GitHub repository", code: "NO_REPO" }, 409);
+    if (repo.workspaceId !== machine.workspace_id) return c.json({ error: "not this machine's workspace", code: "NOT_PERMITTED" }, 403);
+    const conn = await store2.connectorWithSecret(repo.workspaceId, "github", channel);
+    if (!conn || conn.status !== "connected") return c.json({ error: "GitHub is not connected for this room", code: "NOT_CONNECTED" }, 409);
+    try {
+      const inst = await installationFor(ann(), slug, fetchFn);
+      if (!inst) {
+        await store2.markConnectorReauth(conn.id);
+        return c.json({ error: `GitHub no longer lets neuramesh reach ${slug}. A person needs to connect GitHub again from Connections.`, code: "RECONNECT_REQUIRED" }, 409);
+      }
+      const name = slug.split("/")[1];
+      const t2 = await installationToken(inst.installationId, { fetchFn, scope: { repositories: [name], permissions: RUN_WRITE_PERMISSIONS } });
+      console.log(`repo_write_token machine=${machine.id} workspace=${machine.workspace_id} slug=${slug}`);
+      return c.json({ slug, token: t2.token, expiresAt: t2.expiresAt, permissions: RUN_WRITE_PERMISSIONS });
+    } catch (e) {
+      if (e instanceof GitHubApiError && e.status === 422) {
+        return c.json({ error: "the neuramesh GitHub App does not carry write permissions yet: it needs Contents: write and Pull requests: write, and every installation re-approves the change", code: "APP_NEEDS_WRITE" }, 409);
+      }
+      return c.json({ error: e instanceof Error ? e.message : "GitHub did not answer", code: "GITHUB_ERROR" }, 502);
+    }
+  });
+}
+
 // src/github-connect.ts
 var page = (title, lines) => `<!doctype html><meta charset="utf-8"><title>${title}</title><body style="font:15px system-ui;display:grid;place-items:center;height:100vh;margin:0;background:#1d1d1d;color:#e6e6e6"><div style="text-align:center;max-width:36em">${lines.map((l) => `<p>${l}</p>`).join("")}</div></body>`;
 var tryUnseal = (state) => {
@@ -17895,6 +18028,7 @@ var tryUnseal = (state) => {
 function githubConnectRoutes(app, store2, opts = {}) {
   const fetchFn = opts.fetchFn ?? fetch;
   const ann = () => store2.announcements;
+  githubWriteRoutes(app, store2, fetchFn);
   app.get("/connect/github/start", async (c) => {
     if (!githubAppConfigured()) return c.json({ error: "the GitHub App is not configured on this server" }, 501);
     const workspace = c.req.query("workspace");
@@ -17944,7 +18078,7 @@ function githubApiRoutes(app, store2, opts = {}) {
   app.post("/v1/github/resolve", async (c) => {
     const actor = c.get("actor");
     if (actor.kind !== "human") return c.json({ error: "a person connects GitHub", code: "HUMAN_ONLY" }, 403);
-    const body = z14.object({ channel: z14.string().min(1), repo: z14.string().min(1).optional() }).safeParse(await c.req.json().catch(() => null));
+    const body = z15.object({ channel: z15.string().min(1), repo: z15.string().min(1).optional() }).safeParse(await c.req.json().catch(() => null));
     if (!body.success) return c.json({ error: "invalid body", code: "INVALID_INPUT" }, 400);
     if (!githubAppConfigured() || !ann()) return c.json({ ok: false, code: "NOT_CONFIGURED", error: "GitHub connecting is not configured on this server." });
     const { workspace } = await store2.channelWorkspace(body.data.channel).catch(() => ({ workspace: null }));
@@ -18026,13 +18160,13 @@ var cap = (name, fallback) => {
   const n = Number(process.env[name]);
   return Number.isFinite(n) && n > 0 ? n : fallback;
 };
-var ipHashOf = (ip) => ip ? createHash4("sha256").update(ip.trim()).digest("hex").slice(0, 32) : null;
+var ipHashOf = (ip) => ip ? createHash5("sha256").update(ip.trim()).digest("hex").slice(0, 32) : null;
 var maskEmail = (e) => {
   const [u = "", d = ""] = e.split("@");
   return `${u.slice(0, 1)}\u2022\u2022\u2022@${d}`;
 };
-var CreateSchema = z15.object({ repo: z15.string().min(3).max(200), tag: z15.string().max(120).nullable().optional(), website: z15.string().trim().min(3).max(400), email: z15.string().trim().max(200) });
-var DetectSchema = z15.object({ repo: z15.string().min(3).max(200) });
+var CreateSchema = z16.object({ repo: z16.string().min(3).max(200), tag: z16.string().max(120).nullable().optional(), website: z16.string().trim().min(3).max(400), email: z16.string().trim().max(200) });
+var DetectSchema = z16.object({ repo: z16.string().min(3).max(200) });
 async function latestOf(slug, token, fetchFn) {
   const rel = await githubGet(`/repos/${slug}/releases?per_page=5`, { token, fetchFn });
   const rows2 = rel.status === 200 && Array.isArray(rel.json) ? rel.json : [];
@@ -18059,7 +18193,7 @@ function announceView(row, brief) {
     drafts: row.posts.length ? "ready" : s === "drafting" ? "wait" : "next",
     card: row.imageMime ? "ready" : "next"
   };
-  const digest = row.digest;
+  const digest2 = row.digest;
   return {
     id: row.id,
     status: s,
@@ -18068,7 +18202,7 @@ function announceView(row, brief) {
     website: row.website,
     email: maskEmail(row.email),
     steps,
-    latest: digest?.candidate ? { tag: digest.candidate.tag ?? row.tag, name: digest.candidate.name, publishedAt: digest.candidate.publishedAt } : null,
+    latest: digest2?.candidate ? { tag: digest2.candidate.tag ?? row.tag, name: digest2.candidate.name, publishedAt: digest2.candidate.publishedAt } : null,
     brief,
     posts: row.posts.map((p2) => ({ platform: p2.platform, body: p2.body, image: p2.platform === "instagram" && !!row.imageMime })),
     error: row.error,
@@ -18168,7 +18302,7 @@ function announceClaimRoute(app, store2, opts = {}) {
     if (!ann) return c.json({ error: "announcements not served by this store" }, 501);
     const actor = c.get("actor");
     if (actor.kind !== "human") return c.json({ error: "a person claims a draft set", code: "HUMAN_ONLY" }, 403);
-    const body = z15.object({ workspace: z15.string().min(1) }).safeParse(await c.req.json().catch(() => null));
+    const body = z16.object({ workspace: z16.string().min(1) }).safeParse(await c.req.json().catch(() => null));
     if (!body.success) return c.json({ error: "invalid body" }, 400);
     if (!await actorInWorkspace(store2, actor, body.data.workspace)) return c.json({ error: "not your workspace", code: "NOT_PERMITTED" }, 403);
     const row = await ann.get(c.req.param("id"));
@@ -18181,11 +18315,11 @@ function announceClaimRoute(app, store2, opts = {}) {
 }
 
 // src/relay.ts
-import { timingSafeEqual as timingSafeEqual4 } from "node:crypto";
-import { z as z16 } from "zod";
-var ValidateMachineSchema = z16.object({ token: z16.string().min(1) });
-var ValidateClientSchema = z16.object({ clerkToken: z16.string().min(1), machineId: z16.string().uuid() });
-var DevRelayUserSchema = z16.string().uuid();
+import { timingSafeEqual as timingSafeEqual5 } from "node:crypto";
+import { z as z17 } from "zod";
+var ValidateMachineSchema = z17.object({ token: z17.string().min(1) });
+var ValidateClientSchema = z17.object({ clerkToken: z17.string().min(1), machineId: z17.string().uuid() });
+var DevRelayUserSchema = z17.string().uuid();
 function devRelayUser(token) {
   if (process.env["NM_ALLOW_DEV_RELAY"] !== "1") return null;
   const expected = process.env["NM_DEV_RELAY_TOKEN"];
@@ -18193,7 +18327,7 @@ function devRelayUser(token) {
   if (!expected || expected.length < 32 || !parsed.success) return null;
   const actualBytes = Buffer.from(token);
   const expectedBytes = Buffer.from(expected);
-  if (actualBytes.length !== expectedBytes.length || !timingSafeEqual4(actualBytes, expectedBytes)) return null;
+  if (actualBytes.length !== expectedBytes.length || !timingSafeEqual5(actualBytes, expectedBytes)) return null;
   return parsed.data;
 }
 function relayRoutes(app, store2, deps = {}) {
@@ -18263,13 +18397,13 @@ async function resolveBearerActor(store2, userId, rawHeader) {
 }
 
 // src/local-auth.ts
-import { createHash as createHash5, createHmac as createHmac4, randomBytes as randomBytes6 } from "node:crypto";
+import { createHash as createHash6, createHmac as createHmac4, randomBytes as randomBytes6 } from "node:crypto";
 var LOCAL_USER = { clerkUserId: "local", email: "local@neuramesh.local" };
 var LOCAL_SYNC_KID = "nm-local";
 var LOCAL_SYNC_AUD = "powersync-local";
 var LOCAL_SYNC_TTL_SECONDS = 6 * 3600;
 function hashLocalToken(token) {
-  return createHash5("sha256").update(token).digest("hex");
+  return createHash6("sha256").update(token).digest("hex");
 }
 async function localUserIdForBearer(store2, bearer) {
   if (!localMode() || !bearer.startsWith("nmh_")) return null;
@@ -18365,7 +18499,7 @@ function meRoute(app, store2) {
 
 // src/app.ts
 import { cors as cors2 } from "hono/cors";
-import { z as z19 } from "zod";
+import { z as z20 } from "zod";
 
 // src/fleet-lifecycle.ts
 init_src();
@@ -18809,7 +18943,7 @@ function exportRoutes(app, store2) {
 
 // src/import.ts
 init_src();
-import { z as z17 } from "zod";
+import { z as z18 } from "zod";
 
 // src/import-batch.ts
 init_src();
@@ -18986,26 +19120,26 @@ async function slugMapOf(sql, ws, table, ids, sent) {
 
 // src/import.ts
 var UUID3 = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-var uuid = z17.string().uuid();
+var uuid = z18.string().uuid();
 var PRO_REFUSAL = "This workspace needs Pro. Get Pro to migrate a workspace into it.";
 var STORAGE_REFUSAL = "Not enough storage on this plan. Delete files in this workspace, or migrate a smaller workspace.";
 var SIZE_REFUSAL = "The batch is over 4 MB. Send smaller batches.";
-var ManifestSchema = z17.object({
-  format: z17.literal(EXPORT_FORMAT),
-  version: z17.literal(EXPORT_VERSION),
-  workspace: z17.object({ id: z17.string(), name: z17.string(), slug: z17.string() }),
-  exportedAt: z17.string(),
-  counts: z17.record(z17.number().int().min(0))
+var ManifestSchema = z18.object({
+  format: z18.literal(EXPORT_FORMAT),
+  version: z18.literal(EXPORT_VERSION),
+  workspace: z18.object({ id: z18.string(), name: z18.string(), slug: z18.string() }),
+  exportedAt: z18.string(),
+  counts: z18.record(z18.number().int().min(0))
 });
-var ImportBatchSchema = z17.object({
+var ImportBatchSchema = z18.object({
   importId: uuid,
-  seq: z17.number().int().min(0),
-  table: z17.enum(EXPORT_TABLES),
-  rows: z17.array(z17.object({ id: uuid }).passthrough()),
-  first: z17.object({ manifest: ManifestSchema, totalBytes: z17.number().int().min(0) }).optional(),
-  links: z17.literal(true).optional(),
-  idMap: z17.record(uuid, uuid).optional(),
-  last: z17.literal(true).optional()
+  seq: z18.number().int().min(0),
+  table: z18.enum(EXPORT_TABLES),
+  rows: z18.array(z18.object({ id: uuid }).passthrough()),
+  first: z18.object({ manifest: ManifestSchema, totalBytes: z18.number().int().min(0) }).optional(),
+  links: z18.literal(true).optional(),
+  idMap: z18.record(uuid, uuid).optional(),
+  last: z18.literal(true).optional()
 }).superRefine((b2, ctx) => {
   if (b2.first && (b2.seq !== 0 || b2.rows.length)) ctx.addIssue({ code: "custom", message: "The opening batch has seq 0 and no rows." });
   if (b2.links && !lateKeys(b2.table).length) ctx.addIssue({ code: "custom", message: `${b2.table} has no link pass.` });
@@ -19076,7 +19210,7 @@ function contentMediaRoute(app, store2) {
 
 // src/starter-video.ts
 init_src();
-import { z as z18 } from "zod";
+import { z as z19 } from "zod";
 
 // src/fal.ts
 var FAL_QUEUE = "https://queue.fal.run";
@@ -19231,7 +19365,7 @@ async function composeShots(key2, clipUrl, seconds, shots, opts = {}) {
 var FILM_MAX_BYTES = 4e7;
 var filmTimeoutMs = (seconds) => Math.max(12 * 6e4, seconds * 4e4);
 var SYSTEM = { kind: "agent", id: "00000000-0000-0000-0000-000000000000" };
-var FilmSchema = z18.object({ workspace: z18.string().uuid(), item: z18.string().uuid(), prompt: z18.string().min(8).max(2e3) });
+var FilmSchema = z19.object({ workspace: z19.string().uuid(), item: z19.string().uuid(), prompt: z19.string().min(8).max(2e3) });
 var tierView = (t2) => ({ tier: t2.tier, label: t2.label, model: t2.model.label, vendor: t2.model.vendor, seconds: t2.seconds, credits: t2.credits, lengths: t2.lengths, perSecondMicros: t2.model.perSecondMicros });
 function starterVideoRoutes(app, store2, opts = {}) {
   const ledger = opts.ledger === void 0 ? ledgerFor(store2) : opts.ledger;
@@ -19564,75 +19698,75 @@ function expoFetchSender(accessToken) {
 }
 
 // src/app.ts
-var MessageInputSchema = z19.object({
+var MessageInputSchema = z20.object({
   // Client-supplied id keeps optimistic local rows identical to server rows
   // (PowerSync echo-back would otherwise duplicate-then-swap them).
-  id: z19.string().uuid().optional(),
-  workspace: z19.string().min(1),
-  channel: z19.string().min(1),
+  id: z20.string().uuid().optional(),
+  workspace: z20.string().min(1),
+  channel: z20.string().min(1),
   // may be empty when the message carries only attachments (no caption)
-  body: z19.string(),
-  taskId: z19.string().min(1).optional(),
+  body: z20.string(),
+  taskId: z20.string().min(1).optional(),
   // the conversation thread this message belongs to (conversation-first shell). A
   // fresh client-generated id births the thread transactionally with the message.
-  threadId: z19.string().uuid().optional(),
+  threadId: z20.string().uuid().optional(),
   // docs/34: the composer's Tasks toggle, applied ONLY when this send births the thread.
   // A later message carrying it is ignored — the mode is the thread's, and changing it is
   // thread.set_mode (human-only), never a side effect of typing.
-  threadMode: z19.enum(["tasks", "chat"]).optional(),
+  threadMode: z20.enum(["tasks", "chat"]).optional(),
   // docs/10 §15: the composer's brain draft, applied ONLY when this send births the thread —
   // the same birth-time contract as threadMode above, and for the same reason. Moving it
   // afterwards is thread.set_brain (human-only), never a side effect of typing.
-  brainOverride: z19.record(z19.string(), z19.string()).nullable().optional(),
+  brainOverride: z20.record(z20.string(), z20.string()).nullable().optional(),
   // docs/31: when this send BIRTHS a thread, the room message it hangs off. The root is
   // referenced, never moved — it keeps its place in the feed and grows a replies footer.
-  rootMessageId: z19.string().uuid().optional(),
+  rootMessageId: z20.string().uuid().optional(),
   // 0119: the automation whose slot fired this send, applied ONLY when it births the thread —
   // the same birth-time contract as threadMode/brainOverride. It is what lets the Automations
   // card list a routine's runs without pattern-matching the marker in its opening line.
-  scheduleId: z19.string().uuid().optional(),
+  scheduleId: z20.string().uuid().optional(),
   // 0134, rule D9: WHERE the session runs and WHICH client bore it, applied ONLY when this send
   // births the thread — the same birth-time contract as the three above. Moving the machine
   // afterwards is thread.set_machine (human-only); the origin never moves.
-  threadMachineId: z19.string().uuid().nullable().optional(),
-  threadOrigin: z19.enum(["desktop", "web", "routine"]).optional(),
+  threadMachineId: z20.string().uuid().nullable().optional(),
+  threadOrigin: z20.enum(["desktop", "web", "routine"]).optional(),
   // the message this reply ANSWERS (agent wake replies) — the server enforces one
   // reply per (agent, trigger) so concurrent daemons can't double-reply (0060).
-  replyTo: z19.string().uuid().optional()
+  replyTo: z20.string().uuid().optional()
 });
-var ArtifactCreateSchema = z19.object({
-  id: z19.string().uuid(),
-  workspace: z19.string().min(1),
-  channel: z19.string().min(1),
-  taskId: z19.string().min(1).optional(),
-  messageId: z19.string().uuid(),
-  kind: z19.enum(["screenshot", "file", "doc", "diff", "test_report"]).default("file"),
-  name: z19.string().min(1).max(512),
-  mime: z19.string().max(255).optional(),
-  inlineContent: z19.string().max(4e5).optional(),
-  sizeBytes: z19.number().int().nonnegative().optional(),
-  width: z19.number().int().positive().optional(),
-  height: z19.number().int().positive().optional()
+var ArtifactCreateSchema = z20.object({
+  id: z20.string().uuid(),
+  workspace: z20.string().min(1),
+  channel: z20.string().min(1),
+  taskId: z20.string().min(1).optional(),
+  messageId: z20.string().uuid(),
+  kind: z20.enum(["screenshot", "file", "doc", "diff", "test_report"]).default("file"),
+  name: z20.string().min(1).max(512),
+  mime: z20.string().max(255).optional(),
+  inlineContent: z20.string().max(4e5).optional(),
+  sizeBytes: z20.number().int().nonnegative().optional(),
+  width: z20.number().int().positive().optional(),
+  height: z20.number().int().positive().optional()
 });
-var WhiteboardPutSchema = z19.object({
-  id: z19.string().uuid(),
-  workspace: z19.string().min(1),
-  channel: z19.string().min(1),
-  threadId: z19.string().uuid().optional(),
-  taskId: z19.string().optional(),
-  title: z19.string().trim().min(1).max(WB_TITLE_MAX).catch("Untitled board"),
-  scene: z19.string().max(WB_SCENE_MAX).optional(),
-  snapshotSvg: z19.string().max(WB_SNAPSHOT_MAX).optional(),
-  snapshotRev: z19.number().int().nonnegative().optional(),
-  rev: z19.number().int().min(1).default(1)
+var WhiteboardPutSchema = z20.object({
+  id: z20.string().uuid(),
+  workspace: z20.string().min(1),
+  channel: z20.string().min(1),
+  threadId: z20.string().uuid().optional(),
+  taskId: z20.string().optional(),
+  title: z20.string().trim().min(1).max(WB_TITLE_MAX).catch("Untitled board"),
+  scene: z20.string().max(WB_SCENE_MAX).optional(),
+  snapshotSvg: z20.string().max(WB_SNAPSHOT_MAX).optional(),
+  snapshotRev: z20.number().int().nonnegative().optional(),
+  rev: z20.number().int().min(1).default(1)
 });
-var WhiteboardPatchSchema = z19.object({
-  rev: z19.number().int().min(1),
-  title: z19.string().trim().min(1).max(WB_TITLE_MAX).optional(),
-  scene: z19.string().max(WB_SCENE_MAX).optional(),
-  snapshotSvg: z19.string().max(WB_SNAPSHOT_MAX).optional(),
-  snapshotRev: z19.number().int().nonnegative().optional(),
-  archivedAt: z19.string().nullable().optional()
+var WhiteboardPatchSchema = z20.object({
+  rev: z20.number().int().min(1),
+  title: z20.string().trim().min(1).max(WB_TITLE_MAX).optional(),
+  scene: z20.string().max(WB_SCENE_MAX).optional(),
+  snapshotSvg: z20.string().max(WB_SNAPSHOT_MAX).optional(),
+  snapshotRev: z20.number().int().nonnegative().optional(),
+  archivedAt: z20.string().nullable().optional()
 });
 var webOrigin = (origin) => origin === "https://neuramesh.app" || origin === "https://www.neuramesh.app" || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin) ? origin : null;
 function createApp(store2, opts = {}) {
@@ -19742,7 +19876,7 @@ function createApp(store2, opts = {}) {
   app.post("/auth/desktop/start", async (c) => {
     const nonce = randomBytes7(32).toString("base64url");
     const pollSecret = randomBytes7(32).toString("base64url");
-    await store2.startDesktopAuth({ nonce, pollSecretHash: createHash6("sha256").update(pollSecret).digest("hex"), ttlSeconds: DESKTOP_AUTH_TTL_MS / 1e3 });
+    await store2.startDesktopAuth({ nonce, pollSecretHash: createHash7("sha256").update(pollSecret).digest("hex"), ttlSeconds: DESKTOP_AUTH_TTL_MS / 1e3 });
     return c.json({ nonce, pollSecret, expiresIn: DESKTOP_AUTH_TTL_MS / 1e3 });
   });
   app.post("/auth/desktop/complete", async (c) => {
@@ -19767,7 +19901,7 @@ function createApp(store2, opts = {}) {
   app.post("/auth/desktop/poll", async (c) => {
     const body = await c.req.json().catch(() => ({}));
     if (!body.nonce || !body.pollSecret) return c.json({ error: "nonce and pollSecret required", code: "INVALID_INPUT" }, 400);
-    const out = await store2.claimDesktopAuth(body.nonce, createHash6("sha256").update(body.pollSecret).digest("hex"));
+    const out = await store2.claimDesktopAuth(body.nonce, createHash7("sha256").update(body.pollSecret).digest("hex"));
     if (out.status === "done") return c.json({ status: "done", ...out.result });
     return c.json({ status: out.status });
   });
@@ -19884,7 +20018,7 @@ function createApp(store2, opts = {}) {
     return c.json({ ok: ok2 }, ok2 ? 200 : 400);
   });
   app.get("/invites/:token", async (c) => {
-    const hash = createHash6("sha256").update(c.req.param("token")).digest("hex");
+    const hash = createHash7("sha256").update(c.req.param("token")).digest("hex");
     const inv = await store2.inviteByToken(hash);
     if (!inv) return c.json({ error: "this invitation has expired or been revoked", code: "NOT_FOUND" }, 404);
     return c.json({ workspace: inv.workspaceName, email: inv.email, role: inv.role });
@@ -20327,7 +20461,7 @@ function trackDomainEvent(e) {
 }
 
 // src/pgstore.ts
-import { createHash as createHash8, randomBytes as randomBytes8 } from "node:crypto";
+import { createHash as createHash9, randomBytes as randomBytes8 } from "node:crypto";
 import postgres from "postgres";
 
 // src/embedder.ts
@@ -20410,10 +20544,10 @@ async function setThreadMachineSql(sql, workspace, threadId, machineId) {
 }
 
 // src/seed/packversion.ts
-import { createHash as createHash7 } from "node:crypto";
+import { createHash as createHash8 } from "node:crypto";
 var field = (s) => `${s.length}:${s}`;
 function bundledPackVersion(entry) {
-  const h = createHash7("sha256");
+  const h = createHash8("sha256");
   h.update(field(entry.pack.description));
   h.update(field(entry.pack.source_url));
   h.update(field(entry.pack.source_ref));
@@ -21878,7 +22012,7 @@ var PostgresStore = class {
       where wm.workspace_id = ${input.workspace}::uuid and lower(u.email) = ${email}`;
     if (already) throw new DomainError("CONFLICT", "that address is already a member of this workspace");
     const token = randomBytes8(24).toString("base64url");
-    const tokenHash = createHash8("sha256").update(token).digest("hex");
+    const tokenHash = createHash9("sha256").update(token).digest("hex");
     const [ws] = await this.sql`select name from workspaces where id = ${input.workspace}::uuid`;
     return this.sql.begin(async (_tx) => {
       const sql = asSql2(_tx);

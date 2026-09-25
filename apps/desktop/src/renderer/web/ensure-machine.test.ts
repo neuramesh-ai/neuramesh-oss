@@ -100,3 +100,39 @@ test('a stopped machine is not something waiting can fix', async () => {
   assert.equal((out as { reason: string }).reason, 'unavailable');
   assert.equal(r.wakes(), 0);
 });
+
+test('the shell asks for a disk first: a promoted claim waits for a beat NEWER than the ask', async () => {
+  // the claim pod's last beat (t=0) must not count — it keeps reading as online for a minute
+  let t = 0, polls = 0;
+  const beats = [0, 0, 0, 12_500]; // ms, read after each wait: two stale beats, then the volume's first
+  const phases: EnsurePhase[] = [];
+  const deps: EnsureDeps = {
+    machineId: async () => 'r1',
+    status: async () => 'online',
+    wake: async () => { throw new Error('a promotion is not a wake'); },
+    promote: async () => ({ restarting: true }),
+    lastSeenAt: async () => beats[Math.min(polls, beats.length - 1)] ?? null,
+    wait: async (ms) => { t += ms; polls += 1; },
+    now: () => t,
+  };
+  const out = await ensureMachine(deps, (p) => phases.push(p));
+  assert.deepEqual(out, { ok: true, machineId: 'r1' });
+  assert.equal(polls, 3, 'two stale beats, then the volume\'s own');
+  assert.deepEqual(phases, ['starting', 'connecting']);
+});
+
+test('a machine that was already a volume is not restarting: the promote answers false and nothing waits', async () => {
+  const r = rig(['online']);
+  let asked = 0;
+  const out = await ensureMachine({ ...r.deps, promote: async () => { asked += 1; return { restarting: false }; }, lastSeenAt: async () => 0 }, (p) => r.phases.push(p));
+  assert.deepEqual(out, { ok: true, machineId: 'm1' });
+  assert.equal(asked, 1);
+  assert.deepEqual(r.phases, ['connecting']);
+});
+
+test('a lane with no promote dep (Code) is untouched', async () => {
+  const r = rig(['asleep', 'online']);
+  const out = await ensureMachine(r.deps);
+  assert.equal(out.ok, true);
+  assert.equal(r.wakes(), 1);
+});

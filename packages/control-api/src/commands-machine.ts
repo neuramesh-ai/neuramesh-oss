@@ -33,6 +33,9 @@ export const MACHINE_COMMANDS = [
   // forUserId: the member the work came FROM when a daemon asks — the ladder's origin — so a
   // member's own machine wakes for their request even when they lend it to nobody
   z.object({ type: z.literal('machine.wake'), workspace: z.string().min(1), machineId: z.string().uuid(), forUserId: z.string().uuid().optional() }),
+  // a login is about to land on a claim runner (round §4.2, D2): give it a disk of its own first.
+  // HUMAN_ONLY, from the terminal's sign-in flows; a no-op answer for a machine already on a volume
+  z.object({ type: z.literal('machine.promote'), workspace: z.string().min(1), machineId: z.string().uuid() }),
   // the Code-session rows a host and a client keep (commands-code.ts) ride the same spread
   ...CODE_SESSION_COMMANDS,
 ] as const;

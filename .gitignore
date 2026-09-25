@@ -42,3 +42,6 @@ dev/stack/secrets/
 
 # scripts/public-scan.sh: the founder-specific patterns (handles, exact infra ids). Never committed.
 .public-scan.local
+
+# verified downloads (scripts/agent-sandbox-manifest.sh)
+.cache/

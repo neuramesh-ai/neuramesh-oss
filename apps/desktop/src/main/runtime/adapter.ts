@@ -185,7 +185,26 @@ export function sandboxFsEnabled(): boolean {
   const v = process.env.NM_SANDBOX_FS;
   if (v === 'off' || v === '0') return false;
   if (v === 'on' || v === '1') return true;
+  // no sandbox inside the box on a cloud machine (onCloudMachine below); the env still overrides
+  if (onCloudMachine()) return false;
   return _sandboxFsCache;
+}
+
+// A cloud machine (a runner or a member machine) is the agents' own computer. The platform controls
+// what it can reach (the egress floor, docs/design/machine-hardening-2026-09), never what the agents
+// do inside it (George, 2026-09-25). And on gVisor the runtimes' own jails cannot start anyway: both
+// Claude's and Codex's are bwrap with a network namespace, which gVisor refuses ("Failed
+// RTM_NEWADDR", measured 2026-09-24). machined sets NM_MACHINE_KIND on the image; a laptop leaves it unset.
+export function onCloudMachine(): boolean {
+  return ['runner', 'member'].includes(process.env['NM_MACHINE_KIND'] ?? '');
+}
+
+export type CodexSandboxMode = 'read-only' | 'workspace-write' | 'danger-full-access';
+/** Codex's own sandbox for a turn: the mode the caller asks for on a laptop, full access on a cloud
+ *  machine. There every other mode fails each shell command before it runs, because Codex's Linux
+ *  sandbox needs the network namespace gVisor refuses (`codex sandbox -- sh -c 'echo ok'` fails). */
+export function codexSandboxMode(wanted: CodexSandboxMode): CodexSandboxMode {
+  return onCloudMachine() ? 'danger-full-access' : wanted;
 }
 
 // The clean base env for any agent child process: the allowlist ∩ the daemon env, plus any

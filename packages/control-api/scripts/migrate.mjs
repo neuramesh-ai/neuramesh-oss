@@ -1,7 +1,21 @@
 #!/usr/bin/env node
 // Idempotent migration runner. Applies every supabase/migrations/*.sql that isn't yet
 // recorded in the schema_migrations table, each in its own transaction, serialized by a
-// Postgres advisory lock. Re-running is a no-op.
+// TRANSACTION-level advisory lock taken inside that same transaction. Re-running is a no-op.
+//
+// WHY TRANSACTION-LEVEL, LEARNED IN PRODUCTION (2026-09-21). The runner used to take a
+// SESSION-level pg_advisory_lock across the whole run, over the transaction pooler (the only
+// url Vercel's IPv4 build network can reach). In transaction pooling every statement may land on
+// a different backend: the lock landed on one, the unlock on another, and the first backend kept
+// the lock for as long as the pooler kept it alive. From then on every deploy's migrate blocked
+// on that lock until the statement timeout killed it — three production deploys in a row failed
+// with "canceling statement due to statement timeout", none of them on a migration. A
+// transaction-level lock (pg_advisory_xact_lock) lives and dies with ONE transaction, which the
+// pooler pins to one backend, so a crash, a cancelled build or a dropped connection releases it
+// by construction. Two deploys racing the same migration: the second waits, then the guard
+// inside the transaction sees the tracking row the first one committed and skips. The key is a
+// NEW one on purpose: the leaked session lock on the old key may still be held by a pooled
+// backend, and this runner must never queue behind it again.
 //
 // Where it runs: the control-api's Vercel **production** deploy (vercel.json buildCommand) —
 // so the schema is migrated *before* the new code serves traffic. Preview deploys are gated
@@ -19,7 +33,11 @@ import postgres from 'postgres';
 
 // Overridable so the dev stack can adopt at its own latest (scripts/dev-migrate.sh); prod keeps 0046.
 const ADOPTION_BASELINE = process.env.MIGRATE_ADOPTION_BASELINE || '0046_desktop_auth_sessions.sql';
-const LOCK_KEY = 'neuramesh_schema_migrations'; // any stable string; hashed to a bigint below
+// v2: a fresh key, so the session-level lock the old runner leaked on 'neuramesh_schema_migrations'
+// can never block this one (see the header). Any stable string; hashed to a bigint below.
+const LOCK_KEY = 'neuramesh_schema_migrations_v2';
+/** what the in-transaction guard raises when another deploy applied the file first */
+const ALREADY_APPLIED = 'NM_MIGRATION_ALREADY_APPLIED';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(here, '../../..');
@@ -79,21 +97,29 @@ const sql = postgres(url, {
   },
 });
 
-let locked = false;
 try {
-  await sql`create table if not exists schema_migrations (
-    name text primary key,
-    applied_at timestamptz not null default now()
-  )`;
-
-  // Serialize concurrent deploys so two builds can't apply the same migration at once.
-  await sql`select pg_advisory_lock(hashtext(${LOCK_KEY}))`;
-  locked = true;
+  // two runners racing a FRESH database can both pass IF NOT EXISTS and collide in the catalog
+  // (a duplicate pg_type row); the loser re-reads and the table is simply there
+  try {
+    await sql`create table if not exists schema_migrations (
+      name text primary key,
+      applied_at timestamptz not null default now()
+    )`;
+  } catch (e) {
+    if (!/duplicate key|already exists/i.test(String(e.message))) throw e;
+  }
 
   const hasAuthSchema = (await sql`select 1 from pg_namespace where nspname = 'auth'`).length > 0;
   if (!hasAuthSchema) {
-    await sql.unsafe(await readFile(AUTH_SHIM, 'utf8'));
-    console.log('[migrate] applied the auth schema shim (plain Postgres, no Supabase auth)');
+    // the same fresh-database race as the table above: a second runner may have created the
+    // schema between the check and the shim, and then the shim's own objects are already there
+    try {
+      await sql.unsafe(await readFile(AUTH_SHIM, 'utf8'));
+      console.log('[migrate] applied the auth schema shim (plain Postgres, no Supabase auth)');
+    } catch (e) {
+      if (!/duplicate key|already exists/i.test(String(e.message))) throw e;
+      await sql.unsafe('rollback;').catch(() => {});
+    }
   }
 
   const applied = new Set((await sql`select name from schema_migrations`).map((r) => r.name));
@@ -126,13 +152,27 @@ try {
 
     const ddl = (await readFile(join(MIGRATIONS_DIR, f), 'utf8')).trim().replace(/;?\s*$/, ';');
     const safeName = f.replace(/'/g, "''");
-    // One simple-protocol batch = one transaction: the DDL and its tracking row commit together,
-    // so a crash can never leave a migration applied-but-untracked (or vice versa).
-    const batch = `begin;\n${ddl}\ninsert into schema_migrations (name) values ('${safeName}');\ncommit;`;
+    // One simple-protocol batch = one transaction = one pooled backend: the lock, the guard, the
+    // DDL and its tracking row commit together, so a crash can never leave a migration
+    // applied-but-untracked (or vice versa), and the lock never outlives the transaction. The
+    // guard is what makes two racing deploys safe: the loser waits on the lock, then sees the
+    // winner's tracking row and raises a signal this runner treats as "skip", not as failure.
+    const batch = [
+      'begin;',
+      `select pg_advisory_xact_lock(hashtext('${LOCK_KEY}')::bigint);`,
+      `do $nm_guard$ begin if exists (select 1 from schema_migrations where name = '${safeName}') then raise exception '${ALREADY_APPLIED}'; end if; end $nm_guard$;`,
+      ddl,
+      `insert into schema_migrations (name) values ('${safeName}');`,
+      'commit;',
+    ].join('\n');
     try {
       await sql.unsafe(batch);
     } catch (e) {
       await sql.unsafe('rollback;').catch(() => {});
+      if (String(e.message).includes(ALREADY_APPLIED)) {
+        console.log(`[migrate] ${f} was applied by a concurrent deploy — skipped`);
+        continue;
+      }
       throw new Error(`migration ${f} failed — rolled back: ${e.message}`);
     }
     console.log(`[migrate] applied ${f}`);
@@ -153,7 +193,6 @@ try {
   }
   process.exitCode = 1;
 } finally {
-  if (locked) await sql`select pg_advisory_unlock(hashtext(${LOCK_KEY}))`.catch(() => {});
   await sql.end({ timeout: 5 }).catch(() => {});
 }
 

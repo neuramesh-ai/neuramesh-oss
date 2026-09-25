@@ -7,6 +7,7 @@ import type { Env, Hono } from 'hono';
 import type postgres from 'postgres';
 import { z } from 'zod';
 import { clerkJwks } from './clerk';
+import { claimRoutes, runnerSubstrateDefault, type MachineSubstrate } from './fleet-claims';
 import { localMode } from './localmode';
 import { hashMachineToken, machinePublicJwk, mintMachineToken, signMachineSyncJwt } from './machine-auth';
 import type { Store } from './store';
@@ -15,6 +16,8 @@ export interface FleetMachine {
   id: string;
   kind: 'member' | 'runner';
   ownerUserId?: string;
+  /** absent = volume (fleet-claims.ts) */
+  substrate?: MachineSubstrate;
   replicas: 0 | 1;
   cpu: string;
   memory: string;
@@ -83,6 +86,7 @@ export interface CloudMachineRow {
   desired_replicas: number;
   lifecycle: string | null;
   resources: Record<string, unknown>;
+  substrate?: string;
 }
 
 /** pure mapper — rows in, the operator's contract out. unit-tested; the query stays thin. */
@@ -119,6 +123,7 @@ export function rowsToDesired(rows: CloudMachineRow[]): FleetDesired {
       // runners carry their provisioning owner too — it is their sync principal
       // (machined refuses to boot without one; the live roll proved it)
       ...(r.owner_user_id ? { ownerUserId: r.owner_user_id } : {}),
+      ...(r.substrate === 'claim' ? { substrate: 'claim' as const } : {}),
       replicas: r.desired_replicas === 1 ? 1 : 0,
       cpu: str('cpu'),
       memory: str('memory'),
@@ -150,6 +155,7 @@ export function fleetRoutes<E extends Env>(app: Hono<E>, store: Store): void {
     const secret = process.env['FLEET_SECRET'];
     return Boolean(secret) && auth === `Bearer ${secret}`;
   };
+  claimRoutes(app, store); // the bind and the bootstrap (fleet-claims.ts), same trust lanes as the routes below
 
   app.get('/internal/fleet-desired', async (c) => {
     if (!fleetSecretOk(c.req.header('authorization'))) return c.json({ error: 'forbidden' }, 403);
@@ -231,6 +237,8 @@ export interface CloudMachineCreate {
   /** 1 = born awake (the runner: its first message needs it) · 0 = born asleep (a member machine:
    *  no pod and, because the volume claim is created with the pod, no PVC — $0 until first use) */
   replicas?: 0 | 1;
+  /** absent = the env default for runners (fleet-claims.ts), always volume for members */
+  substrate?: MachineSubstrate;
 }
 
 export interface MachineIdentityRow {
@@ -243,9 +251,16 @@ export interface MachineIdentityRow {
 }
 
 export async function createCloudMachine(sql: postgres.Sql, m: CloudMachineCreate): Promise<{ id: string }> {
+  const substrate: MachineSubstrate = m.substrate ?? (m.kind === 'runner' ? runnerSubstrateDefault() : 'volume');
+  const replicas = m.replicas ?? 1;
+  // Born awake IS a wake: the sweep's idle clock reads greatest(last_wake_at, last_active_at)
+  // with a missing stamp as 1970 (#396), so a row with neither was parked by the first sweep
+  // after its mint (prod, 2026-09-21: a claim runner adopted a spare, bootstrapped, and was
+  // scaled to 0 three minutes later, the spare destroyed with it). Born asleep stays blank.
   const [row] = await sql<{ id: string }[]>`
-    insert into machines (workspace_id, owner_user_id, name, platform, kind, lifecycle, desired_replicas, token_hash)
-    values (${m.workspaceId}::uuid, ${m.ownerUserId}::uuid, ${m.name}, 'linux', ${m.kind}, 'provisioning', ${m.replicas ?? 1}, ${m.tokenHash})
+    insert into machines (workspace_id, owner_user_id, name, platform, kind, lifecycle, desired_replicas, token_hash, substrate, last_wake_at, started_at)
+    values (${m.workspaceId}::uuid, ${m.ownerUserId}::uuid, ${m.name}, 'linux', ${m.kind}, 'provisioning', ${replicas}, ${m.tokenHash}, ${substrate},
+            case when ${replicas} = 1 then now() end, case when ${replicas} = 1 then now() end)
     returning id`;
   return { id: row!.id };
 }
@@ -271,7 +286,7 @@ export async function machineByTokenHash(sql: postgres.Sql, hash: string): Promi
 export async function computeFleetDesired(sql: postgres.Sql): Promise<FleetDesired> {
   const rows = await sql<CloudMachineRow[]>`
     select m.id, m.workspace_id, w.plan as workspace_plan, m.kind, m.owner_user_id,
-           m.desired_replicas, m.lifecycle, m.resources
+           m.desired_replicas, m.lifecycle, m.resources, m.substrate
       from machines m
       join workspaces w on w.id = m.workspace_id
      where m.kind <> 'local'
