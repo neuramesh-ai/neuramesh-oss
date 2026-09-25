@@ -7,7 +7,10 @@
 // control-api for a short-lived PowerSync JWT; never a user session, never a vendor key.
 //
 //   env contract (stamped by the fleet's statefulset template — infra/k8s/templates):
-//     NM_MACHINE_TOKEN   the once-delivered machine secret (nmm_…)
+//     NM_MACHINE_TOKEN   the once-delivered machine secret (nmm_…) — ABSENT on a warm spare
+//                        (pool.yaml), which instead carries NM_POOL_TOKEN + NM_POD_NAME +
+//                        NM_POD_UID and redeems them for its identity at boot
+//                        (machined-bootstrap.ts, round §5.2)
 //     NM_MACHINE_ID      machines row id — the workload's identity
 //     NM_WORKSPACE_ID    the workspace whose namespace this pod lives in
 //     NM_MACHINE_KIND    member | runner
@@ -31,7 +34,8 @@ import { executing, localRuntimes, startAgentHost } from './agents';
 import { initAgentLog } from './agentlog';
 import { AppSchema } from './sync/schema';
 import { uploadCrudEntry, type UploadIdentity } from './sync/upload';
-import { readConfig, type MachinedConfig } from './machined-config';
+import { bootstrapEnvOf, configFromBootstrap, readConfig, type MachinedConfig } from './machined-config';
+import { bootstrapIdentity } from './machined-bootstrap';
 import { machineSyncCredentials } from './machined-credentials';
 import { connectMachineEdge } from './relay/machine-edge';
 import { createClineEngineeringHost } from './relay/engineering-host';
@@ -76,8 +80,21 @@ class MachineConnector implements PowerSyncBackendConnector {
   }
 }
 
+/** a stamped machine reads its env; a warm spare redeems its binding first (round §5.2) */
+async function resolveConfig(): Promise<MachinedConfig> {
+  const spare = bootstrapEnvOf(process.env);
+  if (!spare) return readConfig(process.env);
+  console.log(`[machined] unbound boot: pod=${spare.pod} asking ${spare.apiUrl} for an identity`);
+  const identity = await bootstrapIdentity(spare, {
+    fetch,
+    sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
+    log: (line) => console.log(`[machined] ${line}`),
+  });
+  return configFromBootstrap(process.env, identity);
+}
+
 export async function main(): Promise<void> {
-  const cfg = readConfig(process.env);
+  const cfg = await resolveConfig();
   const checkOnly = process.argv.includes('--check');
   console.log(`[machined] boot machine=${cfg.machineId} kind=${cfg.kind} workspace=${cfg.workspaceId}`);
 

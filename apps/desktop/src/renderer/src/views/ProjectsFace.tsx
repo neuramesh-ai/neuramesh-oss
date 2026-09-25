@@ -133,7 +133,7 @@ export function WsTile({ name, size = 24, active = false }: { name: string; size
 export function ProjectsFace({
   on, workspace, workspaceInitial,
   isCloud, account, navPos, workspaces, activeWorkspace, footprintPct,
-  connections, foregroundConnection, liveConnections, onPickWorkspace, onConnections, onNewWorkspace, onGetPro, onMoveToCloud,
+  connections, foregroundConnection, liveConnections, onPickWorkspace, onConnections, onGetPro, onMoveToCloud,
   onAll, onSwitchWorkspace, onUpgrade, onAgents, onFootprint, onCompute, onCredits, onRetro, onWorkspace, onProfile, onTour, onSignout, onAppearance, onNavPos,
 }: {
   /** showing, or crossing out — it stays mounted either way so the exit can animate */
@@ -162,7 +162,6 @@ export function ProjectsFace({
   onPickWorkspace?: (connectionId: string, w: WorkspaceMembership) => void;
   /** Settings › Connections */
   onConnections?: () => void;
-  onNewWorkspace?: () => void;
   /** the Get Pro door (App opens the Upgrade sheet) — drawn only while no cloud connection exists */
   onGetPro?: () => void;
   onMoveToCloud?: () => void;
@@ -246,7 +245,7 @@ export function ProjectsFace({
                 Picking a workspace on another connection is the rail's own swap, no relaunch. */}
             {connections && connections.length > 0 && onPickWorkspace ? (
               <WorkspacesByConnection connections={connections} foregroundConnection={foregroundConnection ?? null} activeWorkspace={activeWorkspace} liveConnections={liveConnections}
-                onPickWorkspace={onPickWorkspace} onProfile={onProfile} onConnections={onConnections} onNewWorkspace={onNewWorkspace} onGetPro={onGetPro} onMoveToCloud={onMoveToCloud} />
+                onPickWorkspace={onPickWorkspace} onProfile={onProfile} onConnections={onConnections} onGetPro={onGetPro} onMoveToCloud={onMoveToCloud} />
             ) : workspaces.length > 1 && (
               <>
                 <div className="acctsect">Workspaces</div>

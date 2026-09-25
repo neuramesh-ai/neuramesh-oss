@@ -10,7 +10,8 @@ import type { Command } from '../commands';
 import { actorInWorkspace, sqlOf } from '../credits';
 import { DomainError } from '../errors';
 import { localMode } from '../localmode';
-import { destroyMemberMachine, fleetOn, machineReach, mayUse, provisionMemberMachine, wakeMachine } from '../member-machines';
+import { promoteMachine } from '../fleet-claims';
+import { destroyMemberMachine, fleetOn, machineReach, mayAttach, mayUse, provisionMemberMachine, wakeMachine } from '../member-machines';
 import { type Store } from '../store';
 import { actorAddress } from './guards';
 import type { CommandOutcome } from '../handler';
@@ -81,6 +82,19 @@ export async function machineCommands(store: Store, actor: Actor, cmd: Command):
     const out = await wakeMachine(sql, cmd.machineId);
     if (out.capped) throw new DomainError('PLAN_LIMIT', 'this workspace is out of credits — top up to wake its machine');
     return { ok: true, woken: out.woken } as never;
+  }
+  if (cmd.type === 'machine.promote') {
+    // the person who is about to sign in on it: the machine's shell is theirs (the same bar the
+    // terminal attach holds), and a login on a claim would die with the pod at the next stop
+    if (actor.kind !== 'human') throw new DomainError('HUMAN_ONLY', 'a machine is promoted by the member about to sign in on it');
+    if (!(await actorInWorkspace(store, actor, cmd.workspace))) throw new DomainError('NOT_PERMITTED', 'not a member of this workspace');
+    const sql = sqlOf(store);
+    if (!sql) throw NOT_SERVED();
+    const reach = await machineReach(sql, cmd.machineId);
+    if (!reach || reach.workspaceId !== cmd.workspace) throw new DomainError('NOT_FOUND', 'no such cloud machine in this workspace');
+    if (!mayAttach(reach, actor.id)) throw new DomainError('NOT_PERMITTED', 'only the owner signs in on this machine');
+    const promoted = await promoteMachine(sql, cmd.workspace, cmd.machineId);
+    return { ok: true, promoted: promoted !== null } as never;
   }
   return undefined;
 }

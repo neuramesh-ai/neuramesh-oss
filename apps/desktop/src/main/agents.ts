@@ -72,7 +72,7 @@ import { readAnswers } from '@neuramesh/shared';
 import { pickImageProvider, generateImage, reviewImage, thumbDataUrl, publishDataUrl, type ImageCred } from './imagegen';
 import { parseBrandGuidelines, buildImagePrompt, EMPTY_BRAND, type BrandTokens } from '@neuramesh/shared';
 import type { RuntimeAdapter, ProviderName, PromptOverride } from './runtime/adapter';
-import { providerFor, keyEnvFor, setAgentProxy, sandboxFsEnabled, setSandboxFsCache } from './runtime/adapter';
+import { providerFor, keyEnvFor, setAgentProxy, sandboxFsEnabled, setSandboxFsCache, onCloudMachine, codexSandboxMode } from './runtime/adapter';
 import { startEgressProxy } from './sandbox/egress';
 import { readSandboxSetting } from './sandbox/setting';
 import { git, repoSlugFor, ghCapable, ghPrMerge, ghPrState } from './host/gh';
@@ -274,7 +274,7 @@ export async function resolveToken(
   const platformModel = agent.model === STARTER_MODEL;
   // A cloud machine (runner/member) has no vendor logins to reconnect — machined sets this on the
   // image, and a laptop the user owns leaves it unset.
-  const cloudMachine = ['runner', 'member'].includes(process.env['NM_MACHINE_KIND'] ?? '');
+  const cloudMachine = onCloudMachine();
   // Explicit API-key mode needs no machine detection (decideAuth ignores sub/login there).
   if (stored.authMode === 'apikey') {
     return decideAuth({ provider, storedAuthMode: 'apikey', storedToken: stored.token, autoFailover, subActive: false, loginPresent: false, envKey, memberKey, platformModel, cloudMachine });
@@ -780,11 +780,15 @@ export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId,
   // Containment L1b: load the per-machine sandbox toggle into the cache (default ON; NM_SANDBOX_FS
   // still overrides). Read once at boot; the IPC toggle updates the cache live for the next agent run.
   try { const { app } = require('electron') as typeof import('electron'); setSandboxFsCache(readSandboxSetting(app.getPath('userData'))); } catch { /* keep the default-on cache */ }
-  // Containment L1b boot status (kernel FS sandbox — jails cred-store + userData reads). Codex keeps
-  // its always-on native workspace-write regardless.
-  console.log(sandboxFsEnabled()
-    ? `agent FS sandbox ON: claude=native · agy=${process.platform === 'darwin' ? 'seatbelt' : 'off (non-darwin)'} · codex=workspace-write`
-    : 'agent FS sandbox OFF (NM_SANDBOX_FS=off) — agents can read cred stores; codex keeps its native workspace-write');
+  // Containment L1b boot status (kernel FS sandbox — jails cred-store + userData reads). It reports
+  // what RUNS, not what was asked for: the old line said `claude=native` on every cloud machine while
+  // the Claude sandbox could not start there (measured 2026-09-24).
+  const codexMode = codexSandboxMode('workspace-write');
+  console.log(onCloudMachine() && !sandboxFsEnabled()
+    ? `agent sandboxes OFF: a cloud machine is the agents' own box, and the platform egress floor is its boundary · codex=${codexMode}`
+    : sandboxFsEnabled()
+      ? `agent FS sandbox ON: claude=native · agy=${process.platform === 'darwin' ? 'seatbelt' : 'off (non-darwin)'} · codex=${codexMode}`
+      : `agent FS sandbox OFF (NM_SANDBOX_FS=off) — agents can read cred stores · codex=${codexMode}`);
   // context-bound log sink; alog(agent, task?, channelSlug?, runId?) -> LogFn
   const alog = (agent: HostedAgent, t?: { id: string; number: number; channel_id?: string } | null, channelSlug?: string | null, runId?: string | null): LogFn =>
     agentLog.for({ agentId: agent.id, agentName: agent.name, runId: runId ?? null, taskId: t?.id ?? null, taskNumber: t?.number ?? null, channelSlug: channelSlug ?? null });

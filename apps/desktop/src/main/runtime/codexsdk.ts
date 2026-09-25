@@ -9,7 +9,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import type { LogFn } from '../agentlog';
 import type { TurnOpts, RuntimeAdapter, ProposeSkillFn, RecordLessonFn, AddBacklogItemFn, BeatsFn, AgentAttachment, PromptOverride } from './adapter';
-import { buildCodingPrompt, chatSystemPrompt, providerEnv } from './adapter';
+import { buildCodingPrompt, chatSystemPrompt, codexSandboxMode, providerEnv } from './adapter';
 import { instructionsFor } from '../host/turnkit';
 import { beatMarkerSink, stripBeatMarkers } from '../beats';
 import { openBusBridge, userDataDir, beatsAdapter } from '../harness/turntools';
@@ -90,7 +90,7 @@ async function reason(system: string, user: string, token: string, model: string
   const codex = await mkCodex(token);
   const dir = mkdtempSync(join(tmpdir(), 'nm-codexsdk-'));
   try {
-    const { text, failure } = await runResilient(codex, { model, sandboxMode: 'read-only', workingDirectory: dir, skipGitRepoCheck: true }, codexInput(`${system}\n\n${user}`, attachments), {}, undefined, onDelta);
+    const { text, failure } = await runResilient(codex, { model, sandboxMode: codexSandboxMode('read-only'), workingDirectory: dir, skipGitRepoCheck: true }, codexInput(`${system}\n\n${user}`, attachments), {}, undefined, onDelta);
     if (!text && failure) throw new Error(`codex: ${failure.slice(0, 160)}`);
     return text;
   } finally {
@@ -133,6 +133,8 @@ export const codexSdkAdapter: RuntimeAdapter = {
     // which would break the writes a coding task needs); that gap is de-fanged by L0 (no secret env to
     // read) + L1a (a read it can't exfiltrate past the egress allowlist). Double-sandboxing codex under
     // our own sandbox-exec is intentionally avoided — it fights its own Seatbelt profile.
+    // On a CLOUD machine none of this applies: codexSandboxMode gives full access there, because the
+    // box is the agents' and Codex's Linux sandbox cannot start on gVisor (adapter.ts onCloudMachine).
     try {
       // approvalPolicy: codex ASKS before every MCP tool call by default, and a headless SDK turn
       // has nobody to ask — so each call came back to the model as "user cancelled MCP tool call".
@@ -141,7 +143,7 @@ export const codexSdkAdapter: RuntimeAdapter = {
       // findings into a markdown report instead of handing over the card. Approval was never the
       // boundary here anyway: codex self-sandboxes (workspace-write, see L1b below) and egress
       // rides the L1a proxy, so what it may touch is already decided before the turn starts.
-      const { text, tokens, failure } = await runResilient(codex, { model: agent.model, sandboxMode: 'workspace-write', approvalPolicy: 'never', workingDirectory: dir, skipGitRepoCheck: true }, promptOverride?.prompt ?? buildCodingPrompt(t, channelBlock, repoBacked, skills, reworkNotes, attachmentsNote, lessonsNote, agent.brief, bus.count > 0), ac ? { signal: ac.signal } : {}, log, undefined, onMarkerText);
+      const { text, tokens, failure } = await runResilient(codex, { model: agent.model, sandboxMode: codexSandboxMode('workspace-write'), approvalPolicy: 'never', workingDirectory: dir, skipGitRepoCheck: true }, promptOverride?.prompt ?? buildCodingPrompt(t, channelBlock, repoBacked, skills, reworkNotes, attachmentsNote, lessonsNote, agent.brief, bus.count > 0), ac ? { signal: ac.signal } : {}, log, undefined, onMarkerText);
       const clean = onMarkerText ? stripBeatMarkers(text) : text;
       if (ac?.signal.aborted) { log?.({ kind: 'result', phase: 'success', summary: 'capped · codex', tokens }); return clean || '(capped)'; }
       if (!clean && failure) { log?.({ kind: 'result', phase: 'error', summary: `failed · codex: ${failure.slice(0, 140)}`, level: 'error' }); throw new Error(`codex produced no output: ${failure.slice(0, 160)}`); }

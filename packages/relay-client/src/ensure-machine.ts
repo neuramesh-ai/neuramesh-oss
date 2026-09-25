@@ -24,6 +24,15 @@ export interface EnsureDeps {
   now(): number;
   /** a person navigating away cancels their WAIT, never the machine */
   cancelled?(): boolean;
+  /** THE SHELL'S ASK, first (docs/design/agent-sandbox-2026-09 §4.2, D2). A runner that adopted a
+   *  warm spare holds nothing at rest, and the only reason a person shells into a runner is to
+   *  sign something in — which would die with the pod at its next stop. So the shell asks for a
+   *  disk before it opens: `machine.promote`. `restarting: true` means the machine is about to
+   *  come back on a volume, and the beat the dying pod left must not count as "online".
+   *  Absent on lanes that are not a shell (Code), where a claim pod serves fine. */
+  promote?(): Promise<{ restarting: boolean }>;
+  /** the last heartbeat instant, ms — required beside `promote`, it is what "back" is measured by */
+  lastSeenAt?(): Promise<number | null>;
 }
 
 export type EnsureResult =
@@ -46,6 +55,29 @@ export async function ensureMachine(
 ): Promise<EnsureResult> {
   const bail = (): boolean => deps.cancelled?.() ?? false;
   const started = deps.now();
+
+  // a promotion restarts the machine on a volume: wait for a beat NEWER than the ask, because the
+  // claim pod's last beat keeps reading as "online" for a minute after the pod is gone
+  if (deps.promote && deps.lastSeenAt) {
+    const { restarting } = await deps.promote();
+    if (restarting) {
+      onPhase('starting');
+      for (;;) {
+        if (bail()) return { ok: false, reason: 'cancelled', detail: '' };
+        if (deps.now() - started > ENSURE_TIMEOUT_MS) {
+          return { ok: false, reason: 'unavailable', detail: 'The machine takes longer than usual. It can still start. Try again soon.' };
+        }
+        await deps.wait(POLL_MS);
+        if (bail()) return { ok: false, reason: 'cancelled', detail: '' };
+        const seen = await deps.lastSeenAt();
+        const id = await deps.machineId();
+        if (seen !== null && seen > started && id) {
+          onPhase('connecting');
+          return { ok: true, machineId: id };
+        }
+      }
+    }
+  }
 
   let id = await deps.machineId();
   let status = await deps.status();

@@ -61,6 +61,20 @@ export function createEngineeringAttachmentAcknowledgements(timeoutMs = 30_000) 
  *  created — which is approximately never. Short, because the FIRST wake creates the row,
  *  and a long cache would make the terminal keep saying "no machine yet" for minutes after
  *  one appeared. */
+/** machine.promote for the shell: `promoted` is true only when the row was a claim and is now a
+ *  volume coming back; a refusal (not this person's machine) or a volume already answers false,
+ *  and the shell opens on what is there — a promotion never blocks a terminal */
+async function nmPromote(env: RelayEnv, machineId: string): Promise<{ ok?: boolean; promoted?: boolean } | null> {
+  try {
+    const res = await fetch(`${env.apiUrl}/v1/commands`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', ...(await env.authHeaders()) },
+      body: JSON.stringify({ type: 'machine.promote', workspace: env.workspaceId(), machineId }),
+    });
+    return res.ok ? ((await res.json()) as { ok?: boolean; promoted?: boolean }) : null;
+  } catch { return null; }
+}
+
 /** POST the wake. A capped refusal is a 409 with a code, not a failure to report as one. */
 async function nmWake(env: RelayEnv): Promise<{ ok?: boolean; capped?: boolean } | null> {
   try {
@@ -127,6 +141,8 @@ export function relayOverrides(env: RelayEnv, relayUrl: string): Partial<NMBridg
   };
 
   return {
+    // the SHELL's ensure (guests.tsx is its one caller): a claim runner gets its own disk before
+    // the prompt appears, so a sign-in typed into it survives the next stop (round §4.2, D2)
     machineEnsure: async (onPhase, cancelled) => {
       const out = await ensureMachine({
         machineId,
@@ -134,6 +150,16 @@ export function relayOverrides(env: RelayEnv, relayUrl: string): Partial<NMBridg
         wake: async () => {
           const r = await nmWake(env);
           return { ok: !!r?.ok, capped: !!r?.capped };
+        },
+        promote: async () => {
+          const id = await machineId();
+          if (!id) return { restarting: false };
+          const r = await nmPromote(env, id);
+          return { restarting: !!r?.promoted };
+        },
+        lastSeenAt: async () => {
+          const m = (await readUsage(env))?.machines?.[0];
+          return m?.lastSeenAt ? Date.parse(m.lastSeenAt) : null;
         },
         wait: (ms) => new Promise((r) => setTimeout(r, ms)),
         now: () => Date.now(),

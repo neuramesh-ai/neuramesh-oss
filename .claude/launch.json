@@ -424,6 +424,15 @@
         "scripts/dev-app-cdp.sh"
       ],
       "port": 9233
+    },
+    {
+      "name": "control-api-claims",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "cd packages/control-api && DATABASE_URL=postgresql://postgres:nm@127.0.0.1:55435/nm PORT=8790 STARTER_GOOGLE_API_KEY=\"$(grep -E '^STARTER_GOOGLE_API_KEY=' ../../.env | head -1 | cut -d= -f2- | tr -d '\"')\" FLEET_SECRET=local-dev-fleet-secret FLEET_POOL_TOKEN=local-dev-pool-token FLEET_RUNNER_SUBSTRATE=claim CRON_SECRET=local-cron NM_ALLOW_DEV_TOKENS=1 NM_ALLOW_ACTOR_HEADER=1 FLEET_AUTOPROVISION=on FLEET_JWT_PRIVATE_KEY=\"$(cat ../../dev/stack/secrets/fleet-jwt-dev.pem)\" FAL_KEY=\"$(grep -E '^FAL_KEY=' ../../.env | head -1 | cut -d= -f2- | tr -d '\"')\" pnpm exec tsx src/server.ts"
+      ],
+      "port": 8790
     }
   ]
 }

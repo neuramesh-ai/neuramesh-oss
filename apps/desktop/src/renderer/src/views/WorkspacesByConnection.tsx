@@ -1,17 +1,21 @@
 // WORKSPACES BY CONNECTION (U3b, the source-release round — artboard B4): the block the workspace
 // foot's menu (ProjectsFace) lists its workspaces in once the desktop holds connections. The rows
 // list every workspace of every connection under the kickers the rail's bands wear (only when two
-// connections exist), the one you stand in selected, then the account on the cloud, Settings ›
-// Connections, and a new workspace. No cloud yet: one `Get Pro` row, the door to it. Picking a
-// workspace on another connection is the rail's own swap — `setForeground`, no relaunch.
+// connections exist), the one you stand in selected, then the account on the cloud and Settings ›
+// Connections. No cloud yet: one `Get Pro` row, the door to it. Picking a workspace on another
+// connection is the rail's own swap — `setForeground`, no relaunch.
+//
+// NO "New workspace" row (George, 2026-09-22): a person gets ONE workspace and separates work with
+// projects inside it, so this menu switches between the workspaces they belong to and never mints
+// another. The wizard still runs for a first workspace (App.tsx's boot gate, and the invite decline).
 import { Fragment } from 'react';
-import { IconCloud, IconCompose, IconServer, IconUser } from '../ui/icons';
+import { IconCloud, IconServer, IconUser } from '../ui/icons';
 import type { ConnectionSummary } from '../bridge/nm';
 import type { WorkspaceMembership } from '../bridge/rows-crew';
 import { navBandName, navConnectionOrder } from '../navbands';
 import { WsTile } from './ProjectsFace';
 
-export function WorkspacesByConnection({ connections, foregroundConnection, activeWorkspace, liveConnections, onPickWorkspace, onProfile, onConnections, onNewWorkspace, onGetPro, onMoveToCloud }: {
+export function WorkspacesByConnection({ connections, foregroundConnection, activeWorkspace, liveConnections, onPickWorkspace, onProfile, onConnections, onGetPro, onMoveToCloud }: {
   connections: ConnectionSummary[];
   foregroundConnection: string | null;
   activeWorkspace: string;
@@ -20,7 +24,6 @@ export function WorkspacesByConnection({ connections, foregroundConnection, acti
   onPickWorkspace: (connectionId: string, w: WorkspaceMembership) => void;
   onProfile: () => void;
   onConnections?: () => void;
-  onNewWorkspace?: () => void;
   onGetPro?: () => void;
   /** Move to Cloud (U7): the local workspace into a Pro workspace, the same door as the This Mac card (lib/toast openMoveToCloud) */
   onMoveToCloud?: () => void;
@@ -51,7 +54,6 @@ export function WorkspacesByConnection({ connections, foregroundConnection, acti
     ))}
     {cloud?.account && <button type="button" className="pfnew" onClick={onProfile}><IconUser s={14} /> Account · {cloud.account.email}</button>}
     {onConnections && <button type="button" className="pfnew" onClick={onConnections}><IconServer s={14} /> Connections</button>}
-    {onNewWorkspace && <button type="button" className="pfnew" onClick={onNewWorkspace}><IconCompose s={14} /> New workspace</button>}
     {onMoveToCloud && <button type="button" className="pfnew" onClick={onMoveToCloud}><IconCloud s={14} /> Migrate to Cloud</button>}
     {!cloud && onGetPro && <button type="button" className="pfnew" onClick={onGetPro}><IconCloud s={14} /> Get Pro</button>}
   </>);

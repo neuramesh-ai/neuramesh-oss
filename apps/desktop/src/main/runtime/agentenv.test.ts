@@ -3,7 +3,7 @@
 // Run: pnpm exec tsx --test src/main/runtime/agentenv.test.ts
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { agentBaseEnv, providerEnv, sandboxEnvForced, sandboxFsEnabled, setAgentProxy, setSandboxFsCache } from './adapter';
+import { agentBaseEnv, codexSandboxMode, onCloudMachine, providerEnv, sandboxEnvForced, sandboxFsEnabled, setAgentProxy, setSandboxFsCache } from './adapter';
 
 test('the FS sandbox is DEFAULT-ON; the NM_SANDBOX_FS env var overrides the UI toggle cache', () => {
   const prev = process.env.NM_SANDBOX_FS;
@@ -24,6 +24,52 @@ test('the FS sandbox is DEFAULT-ON; the NM_SANDBOX_FS env var overrides the UI t
     if (prev === undefined) delete process.env.NM_SANDBOX_FS; else process.env.NM_SANDBOX_FS = prev;
     setSandboxFsCache(true); // restore the default-on cache for other tests
   }
+});
+
+// A cloud machine is the agents' own box (docs/design/machine-hardening-2026-09, George 2026-09-25):
+// no sandbox inside it, and Codex at full access, because its Linux sandbox cannot start on gVisor.
+// A laptop keeps exactly what it had.
+const withEnv = (vars: Record<string, string | undefined>, fn: () => void): void => {
+  const prev = Object.fromEntries(Object.keys(vars).map((k) => [k, process.env[k]]));
+  try {
+    for (const [k, v] of Object.entries(vars)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
+    fn();
+  } finally {
+    for (const [k, v] of Object.entries(prev)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
+    setSandboxFsCache(true);
+  }
+};
+
+test('a cloud machine is a runner or a member machine, and a laptop is neither', () => {
+  withEnv({ NM_MACHINE_KIND: 'runner' }, () => assert.equal(onCloudMachine(), true));
+  withEnv({ NM_MACHINE_KIND: 'member' }, () => assert.equal(onCloudMachine(), true));
+  withEnv({ NM_MACHINE_KIND: undefined }, () => assert.equal(onCloudMachine(), false));
+  withEnv({ NM_MACHINE_KIND: 'local' }, () => assert.equal(onCloudMachine(), false));
+});
+
+test('a cloud machine runs no FS sandbox by default, and the env override still wins', () => {
+  withEnv({ NM_MACHINE_KIND: 'runner', NM_SANDBOX_FS: undefined }, () => {
+    setSandboxFsCache(true);
+    assert.equal(sandboxFsEnabled(), false, 'off inside the box, whatever the cache says');
+  });
+  withEnv({ NM_MACHINE_KIND: 'member', NM_SANDBOX_FS: 'on' }, () => {
+    assert.equal(sandboxFsEnabled(), true, 'NM_SANDBOX_FS=on is still an ops override');
+  });
+  withEnv({ NM_MACHINE_KIND: undefined, NM_SANDBOX_FS: undefined }, () => {
+    setSandboxFsCache(true);
+    assert.equal(sandboxFsEnabled(), true, 'a laptop keeps its default-on sandbox');
+  });
+});
+
+test('Codex runs at full access on a cloud machine and in the requested mode on a laptop', () => {
+  withEnv({ NM_MACHINE_KIND: 'runner' }, () => {
+    assert.equal(codexSandboxMode('workspace-write'), 'danger-full-access');
+    assert.equal(codexSandboxMode('read-only'), 'danger-full-access');
+  });
+  withEnv({ NM_MACHINE_KIND: undefined }, () => {
+    assert.equal(codexSandboxMode('workspace-write'), 'workspace-write');
+    assert.equal(codexSandboxMode('read-only'), 'read-only');
+  });
 });
 
 // a synthetic daemon env: the essentials an agent needs, mixed with secrets it must never see.

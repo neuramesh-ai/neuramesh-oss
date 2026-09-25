@@ -485,6 +485,17 @@ records a clarification and a fix, not a new architecture.
 | **Fleet operator** | `nm-fleet` Deployment in `nm-system` | reconciles workspace/machine **rows** into namespaces, StatefulSets, PVCs and token Secrets | Rows are truth; drift converges back. Machine tokens are provisioning-owned, never template-stamped |
 | **nm-relay** | `nm-relay` Deployment in `nm-system`, public at `relay.neuramesh.app` | nothing — a stateless byte-forwarder joining a browser to its machine | Holds **no keys**: both credentials are validated by control-api over `RELAY_SECRET` |
 
+**A machine's pod is made of one of two things** (agent-sandbox round, 2026-09-20,
+[docs/design/agent-sandbox-2026-09](design/agent-sandbox-2026-09/plan.md)). `machines.substrate`
+says which: `volume` is the StatefulSet + PVC above, the shape a login lives on and what every
+machine in production is; `claim` is a `SandboxClaim` in the shared `nm-runners` namespace that
+adopts a pre-warmed spare from the one pool the cluster runs (GKE Agent Sandbox, pinned by digest
+under `infra/k8s/vendor/agent-sandbox`), holds nothing at rest, and learns its identity by an
+outbound exchange: nm-fleet binds the adopted pod's name and uid to the row, machined redeems them
+with the pool token. Only a login-less runner is ever a claim, and the first login promotes it
+(`machine.promote`). Built and measured on k3d; production stays `volume` until the GKE arm proves
+the non-root image under gVisor.
+
 **The sentence that changes.** "Local compute, cloud truth" becomes **"your compute, cloud truth"** — the machine is still *yours* (your keys, your code, your subscriptions, outbound-only), it simply may not be your laptop. What did not change is the part that matters: the platform still holds no repo tokens and no model keys, and a machine still never accepts an inbound connection.
 
 **Reads and writes are unchanged.** A cloud machine is a PowerSync client like any other: local replica for reads, `/v1/commands` for writes. §2 applies to it verbatim.

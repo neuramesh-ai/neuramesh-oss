@@ -20,6 +20,7 @@ import { actorInWorkspace } from './credits';
 import { GitHubApiError, githubAppConfigured, installUrl, parseRepoInput, readRepoSignals } from './github-app';
 import { readRepoCommits, readRepoFile, readRepoTree } from './github-reads';
 import { installationFor, rememberInstallation, resolveConnector, slugOf } from './github-resolve';
+import { githubWriteRoutes } from './github-write';
 import { APP_URL } from './mail';
 import type { Store } from './store';
 import type { PrimaryRepo } from './store/announce';
@@ -45,6 +46,7 @@ const tryUnseal = (state: string): GrantState | null => {
 export function githubConnectRoutes<E extends Env>(app: Hono<E>, store: Store, opts: { fetchFn?: Fetch } = {}): void {
   const fetchFn = opts.fetchFn ?? fetch;
   const ann = () => store.announcements;
+  githubWriteRoutes(app, store, fetchFn); // POST /v1/repo/token, a machine's per-run write token (github-write.ts)
 
   app.get('/connect/github/start', async (c) => {
     if (!githubAppConfigured()) return c.json({ error: 'the GitHub App is not configured on this server' }, 501);

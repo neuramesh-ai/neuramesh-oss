@@ -3019,10 +3019,10 @@ export function App() {
             activeWorkspace={boot?.workspaceId ?? ''}
             footprintPct={footprintPctOf(footprint)}
             onSwitchWorkspace={(w) => { closeFace(); setWsSwitchTarget(w); }}
-            // the connections (U3b, artboard B4) — New workspace is the wizard, the desktop's one workspace-creation flow
+            // the connections (U3b, artboard B4). No creation row: one workspace per person, projects inside it (2026-09-22)
             connections={nm?.connections ? conns : null} foregroundConnection={fgConnId} liveConnections={new Set((navBandsState.bands ?? []).filter((b) => b.live).map((b) => b.id))}
             onPickWorkspace={(cid, w) => { closeFace(); setWsSwitchTarget({ ...w, connectionId: cid }); }} onConnections={() => { closeFace(); setFocusTab('connections'); setWsOpen(true); }}
-            onNewWorkspace={() => { closeFace(); setOnboardingActive(true); }} onGetPro={() => { closeFace(); setUpgradeReason(null); setUpgradeOpen(true); }}
+            onGetPro={() => { closeFace(); setUpgradeReason(null); setUpgradeOpen(true); }}
             onMoveToCloud={moveDoor === 'none' ? undefined : () => { closeFace(); if (moveDoor === 'move') openMoveToCloud(); else { setUpgradeReason(null); setUpgradeOpen(true); } }}
             onAll={() => { closeFace(); setNav('projects'); }}
             onUpgrade={() => { closeFace(); setUpgradeOpen(true); }}
