@@ -4,9 +4,8 @@
 // tool in tool(), Gemini renders them as function declarations, agy and the Codex SDK bridge
 // them. They are separate functions rather than one adapter because their failure modes differ
 // — an empty turn means something different in each — and collapsing them would hide that.
-import { apiAuthHeaders } from '../apiauth';
-import { NO_CREDITS_ERROR } from '../computenotice';
-import { drainQuery, claudeAgentPrompt } from './turnkit';
+import { drainQuery, claudeAgentPrompt, partialMessages } from './turnkit';
+import { starterGenerate, starterStream } from './starterproxy';
 import { claudePathOption, codexSandboxMode, keyEnvFor, providerEnv, type AgentAttachment } from '../runtime/adapter';
 import { ORCH_EMPTY_TURN } from '../replypolicy';
 import { stripPseudoToolCalls } from './pseudocalls';
@@ -31,26 +30,6 @@ export async function geminiDispatch(
   const { which } = await import('../runtime/cli');
   if (!args.token && (await which('agy'))) return agyOrchestratorTurn(args);
   return geminiOrchestratorTurn(args);
-}
-
-/** the metered lane: control-api holds the key, guards the balance, and records the spend. it
- *  answers with Google's own response body, so the caller's loop is unchanged. a 402 surfaces as
- *  a readable refusal rather than an empty turn — running out of credits is a thing to say, not
- *  a thing to fail silently at. */
-export async function starterGenerate(a: { apiUrl: string; workspace: string; actorId: string; contents: any[]; config: any }): Promise<any> {
-  const res = await fetch(`${a.apiUrl}/v1/starter/generate`, {
-    method: 'POST',
-    headers: await apiAuthHeaders(a.apiUrl, { kind: 'human', id: a.actorId }),
-    body: JSON.stringify({
-      workspace: a.workspace,
-      contents: a.contents,
-      system: a.config?.systemInstruction,
-      tools: a.config?.tools,
-    }),
-  });
-  if (res.status === 402) throw new Error(`${NO_CREDITS_ERROR}: add credits in Credits, or connect your own brain in Settings`);
-  if (!res.ok) throw new Error(`starter brain unavailable (${res.status})`);
-  return res.json();
 }
 
 // The orchestrator's tool-loop on GEMINI (the free default brain). Mirrors the Anthropic query()
@@ -100,6 +79,8 @@ export async function geminiOrchestratorTurn(args: {
   starter?: boolean; apiUrl?: string; workspace?: string; actorId?: string;
   /** a WORKER on the lane (runtime/starter.ts) takes more rounds than a routing turn, and a human Stop must end it */
   maxTurns?: number; abort?: AbortSignal;
+  /** the live bubble: on the metered lane, each round's words, growing, as the model writes them */
+  onDelta?: (t: string) => void;
 }): Promise<string> {
   const { GoogleGenAI, Type } = await import('@google/genai');
   const shapeToParams = (shape: Record<string, any>): any | undefined => zodShapeToGemini(shape, Type);
@@ -124,9 +105,15 @@ export async function geminiOrchestratorTurn(args: {
   let lastText = '';
   for (let turn = 0; turn < (args.maxTurns ?? 14); turn++) {
     if (args.abort?.aborted) throw new Error('stopped by a human');
-    const r: any = viaProxy
-      ? await starterGenerate({ apiUrl: args.apiUrl ?? '', workspace: args.workspace ?? '', actorId: args.actorId ?? '', contents, config })
-      : await ai!.models.generateContent({ model: args.model, contents, config });
+    const call = { apiUrl: args.apiUrl ?? '', workspace: args.workspace ?? '', actorId: args.actorId ?? '', contents, config };
+    // a watched round streams: the bubble types this round's words, filtered as the posted reply is
+    // below (a narrated call never types itself out); the next round's words replace them, as on Claude
+    const onDelta = args.onDelta;
+    let said = '';
+    const r: any = !viaProxy
+      ? await ai!.models.generateContent({ model: args.model, contents, config })
+      : onDelta ? await starterStream({ ...call, onText: (d) => { said += d; onDelta(stripPseudoToolCalls(said, byName.keys()).text); } })
+        : await starterGenerate(call);
     // the SDK exposes r.functionCalls; the proxy returns raw REST json, where the same calls
     // live on the candidate's parts. normalize so the loop below cannot tell them apart.
     const calls = (r.functionCalls ?? (r.candidates?.[0]?.content?.parts ?? [])
@@ -196,6 +183,7 @@ export async function anthropicOrchestratorTurn(args: OrchTransportArgs): Promis
         permissionMode: 'bypassPermissions',
         cwd: args.cwd ?? os.tmpdir(),
         systemPrompt: args.systemPrompt,
+        ...partialMessages(args.onDelta), // token deltas for the live bubble (turnkit.ts)
         // the CLI's own stderr into the activity log, MCP lines only: when the nm server does not
         // come up, the reason is printed there and nowhere else (2026-09-19)
         stderr: (d: string) => { for (const line of d.split('\n')) if (/mcp|\bnm\b/i.test(line)) args.log?.({ kind: 'turn', summary: `claude: ${line.trim().slice(0, 240)}`, level: 'warn' }); },

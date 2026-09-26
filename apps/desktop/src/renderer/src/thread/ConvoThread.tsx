@@ -39,7 +39,8 @@ import { type AgentRow, type MachineRow, type MemberRow } from '../bridge/rows-c
 import { type ArtifactUI, type AttachmentRow, type DecisionAllRow, type TaskAllRow } from '../bridge/rows-board';
 import { type ChannelArtifactRow, type MessageRow, type ThreadRow } from '../bridge/rows-rooms';
 import { type SkillPackRow, type SkillRow } from '../bridge/rows-content';
-import { useAgentStream, useRuns } from './hooks';
+import { useLandedGrace, useRuns, useThreadStream } from './hooks';
+import { useStickToBottom } from './useStickToBottom';
 import { createPortal } from 'react-dom';
 import { CapGate } from '../compute/CapGate';
 import { HostedGate } from '../shell/HostedGate';
@@ -105,13 +106,15 @@ export function ConvoThread({ threadId, back, thread, channelId, channelSlug, ch
   useEffect(() => (nm ? nm.watchConvo(threadId, setRows) : undefined), [threadId]);
   // who's working IN this conversation (thread-keyed emit): presence from the wake,
   // content once tokens flow
-  const stream = useAgentStream(`${channelId}:${threadId}`);
+  const stream = useThreadStream(`${channelId}:${threadId}`, rows, (name) => agents.find((a) => a.name === name)?.id ?? null);
   const streaming = streamContent(stream);
+  // the agent whose streamed reply just landed here: it is on screen as that reply (streamstore.ts)
+  const landedAgent = useLandedGrace(`${channelId}:${threadId}`);
   const [draft, setDraft] = useState('');
   const [attachedSkill, setAttachedSkill] = useState<{ name: string; pack?: string | null } | null>(null);
   const atts = useAttachments(plan, onUpgrade);
   const listRef = useRef<HTMLDivElement>(null);
-  useEffect(() => { const el = listRef.current; if (el) el.scrollTop = el.scrollHeight; }, [rows.length, stream?.text]);
+  useStickToBottom(listRef, threadId); // pinned while the reader is at the bottom, released when they scroll up
   const [cfocus, setCfocus] = useState(0); // ⌥-click on a pill drops its text here to edit
   const [cmention, setCmention] = useState(0); // nonce → the @ button types "@" + opens the picker
   // Attachments, both directions. A conversation could always SEND an image and never show you
@@ -288,14 +291,17 @@ export function ConvoThread({ threadId, back, thread, channelId, channelSlug, ch
         {ghostAgent && <AgentGhost key={ghostAgent.id} agent={ghostAgent} onActivity={onActivity} />}
         {/* NOBODY IS WORKING YET, AND THE THREAD STILL SAYS SO (docs/26 §5). On the browser this
             is the only orb for the first seconds of every message: with no local stream, the
-            working ghost cannot mount until `thinking` has made a round trip to the runner. */}
-        {!ghostAgent && (
+            working ghost cannot mount until `thinking` has made a round trip to the runner.
+            ONE LIVE SURFACE (docs/26 §3): words in the bubble are the answer, so the wait row
+            stands down while they flow. TaskThread already guards on its stream; this did not,
+            and "rex thinking…" sat above rex's own live reply. */}
+        {!ghostAgent && !streaming && (
           /* Retry = say it again, which is what a person does anyway. It re-fires the daemon's
              live message watch AND re-bumps the machine, so it uses the proven path rather than
              a second one nobody exercises. The duplicate in the transcript is the truth. */
           <WaitGhost found={waitGhost} onRetry={async () => { await nm?.send(channelId, rows[rows.length - 1]?.body ?? '', { threadId }); }} />
         )}
-        {streaming && <StreamBubble live={streaming} />}
+        {streaming && <StreamBubble live={streaming} role={agents.find((a) => a.name === streaming.agent)?.role} taskRef={taskRef} onOpenTask={onOpenTask} />}
       </div>
       <div className="tcompose">
         <RunDock trees={trees} agents={agents} onOpen={onActivity} scrollRef={listRef} />
@@ -317,13 +323,15 @@ export function ConvoThread({ threadId, back, thread, channelId, channelSlug, ch
             // said "rex is thinking" underneath it, at the same time (evidence shot, 2026-09-09)
             ...(!ghostAgent && waitGhost ? [waitGhost.agent.id] : []),
             ...carded,
+            // a streamer whose reply already landed is on screen as that reply, while its run settles
+            ...(landedAgent ? typists.filter((a) => a.name === landedAgent).map((a) => a.id) : []),
           ]);
           const list = typists.filter((a) => !spokenFor.has(a.id));
           if (!list.length) return null;
           return (
             <div className="typingbar">
               {list.map((a) => {
-                const label = stream && a.name === stream.agent && stream.text.trim() ? 'typing' : 'thinking';
+                const label = stream && a.name === stream.agent && stream.typing ? 'typing' : 'thinking';
                 return <TypistChip key={a.id} name={a.name} label={label} onOpen={() => onActivity?.(a)} />;
               })}
               <span className="tdots"><i /><i /><i /></span>

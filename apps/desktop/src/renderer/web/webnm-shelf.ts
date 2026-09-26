@@ -14,6 +14,7 @@ import type { ChannelArtifactRow } from '../src/bridge/rows-rooms';
 import type { ArtifactUI } from '../src/bridge/rows-board';
 import type { SkillRow, SkillPackRow } from '../src/bridge/rows-content';
 import { authHeaders, postCommand, type WebNmConfig } from './webnm';
+import { shareWatches, watchRows } from './webnm-watch';
 
 /** the ‹article:id› card's row: an artifact plus where it lives, which the card needs to link back
  *  to the room. Named because `orEmpty` needs a type to widen to and inference gives it `{}`. */
@@ -30,14 +31,7 @@ export const orEmpty = <T>(what: string) => (e: unknown): T[] => {
  *  for the renderer, minus the IPC hop the desktop needs. A failed re-read leaves the last good
  *  rows standing rather than blanking a surface that was already drawing. */
 export function watch<T>(db: PowerSyncDatabase, tables: string[], run: () => Promise<T[]>, cb: (rows: T[]) => void): () => void {
-  let live = true;
-  const push = () => {
-    if (!live) return;
-    void run().then((rows) => { if (live) cb(rows); }).catch((e: unknown) => { console.error('[webnm] watch read failed:', e); });
-  };
-  push();
-  const stop = db.onChangeWithCallback({ onChange: () => push() }, { tables });
-  return () => { live = false; stop(); };
+  return watchRows(db, tables, run, cb, (e: unknown) => { console.error('[webnm] watch read failed:', e); });
 }
 
 /** ported from sync/ipc/artifacts.ts + the two library watches in ipc/watch-board.ts */
@@ -305,5 +299,5 @@ function whiteboardLanes(cfg: WebNmConfig, db: PowerSyncDatabase): Partial<NMBri
 }
 
 export function shelfOverrides(cfg: WebNmConfig, db: PowerSyncDatabase): Partial<NMBridge> {
-  return { ...libraryLanes(cfg, db), ...skillLanes(cfg, db), ...whiteboardLanes(cfg, db) };
+  return shareWatches<Partial<NMBridge>>({ ...libraryLanes(cfg, db), ...skillLanes(cfg, db), ...whiteboardLanes(cfg, db) });
 }

@@ -125,6 +125,53 @@ Two things that are only true inside a WebView, and both fail silently:
   out (`apps/mobile/src/shell-text.ts`). Every substitution has an ASCII original; putting it back is
   the difference between a flag and an "unknown option" the user reads as their own mistake.
 
+## The stream lane: live replies reach the browser (2026-09-25)
+
+A browser had no token stream. `emitStream` (`apps/desktop/src/main/agents.ts`) sent the growing
+reply only to Electron windows, so a headless cloud machine dropped every token, and the web saw
+the reply whole when the final message synced, about 5 s after the first token existed. The relay
+now carries a third lane, `stream`, and the browser shows the reply while the agent writes it.
+
+- **The machine side.** `emitStream` also publishes to `main/livestreams.ts`. It keeps the text of
+  each live key, sends at most 30 frames a second for each key, and sends a delta: keep the first
+  N characters, then append the rest. A subscriber that arrives in the middle gets a full copy
+  first. `relay/stream-lane.ts` serves the lane at the machine edge.
+- **A subscriber is not a session.** It never counts as activity and never takes one of the 32
+  terminal slots, so an open tab does not keep a machine awake or billing. The hub gives the lane
+  its own budget: 2 channels for each client socket and 256 for each machine
+  (`packages/relay/src/stream-lane.ts`).
+- **The browser side.** `renderer/web/webnm-stream.ts` subscribes to the online cloud machines
+  the member may attach to: the runner, and the member's own machine. It never wakes a machine.
+  It asks for a full copy when it sees a gap in the sequence, redials with backoff (1 s, doubling
+  to 30 s), and closes a channel after 50 s of silence. The machine sends a heartbeat every 20 s.
+- **Access.** Every member of a workspace reads every room today (the sync rules send the whole
+  workspace, and `channel_members` is a roster, not an access list). The relay admits only
+  members, the hub stamps the verified user on every open, and the machine checks
+  `canRead(actorId, key)` on every frame. That check says yes today, and it is the place to
+  enforce room access later.
+
+### The lane is opened only where both edges name it
+
+This is the trap. **An older daemon reads an unknown lane as a terminal.** If a `stream` open
+reached it, it would start a shell for every tab and count each one as work. The relay and the
+web both deploy on the same merge, so their order is not fixed. So each edge holds the rule on
+its own:
+
+1. The machine's `hello` names the lanes it serves. An older daemon names none.
+2. The hub refuses a `stream` open to a machine that did not name the lane.
+3. The hub's `attached` reply repeats the machine's lanes. The browser opens a `stream` channel
+   only when `attached` names it. An older relay sends no list, so a new tab behind an old relay
+   never opens one.
+
+The end-to-end test in `renderer/web/relay-e2e.test.ts` attaches a tab to an older daemon and
+fails if a stream open leaves the tab.
+
+### Switches
+
+- `VITE_NM_STREAM_LANE=0` on the hq build turns the lane off with no code change. Unset keeps it
+  on wherever `VITE_NM_RELAY_URL` is set.
+- `VITE_NM_RELAY_URL` unset keeps the web exactly as it was: no lane, no socket.
+
 ## The lesson that cost the most
 
 Shipping this broke the fleet once, with a **fully green pipeline**.

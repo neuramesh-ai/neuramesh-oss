@@ -48,15 +48,24 @@ export const DECISIONS_ALL_SQL = `select d.id, d.channel_id, d.task_id, d.messag
               -- another conversation — the card's thread said needs you, the row said settled.
               -- …and a card hung on a SUBTASK counts the parent's thread as well, for the same
               -- reason the task watch above does: that is where the conversation is.
-              (select max(m.created_at) from messages m
-                where m.author_kind = 'human'
-                  and (case when d.task_id is null then
-                              case when (select m2.thread_id from messages m2 where m2.id = d.message_id) is null
-                                   then m.channel_id = d.channel_id and m.task_id is null
-                                   else m.thread_id = (select m2.thread_id from messages m2 where m2.id = d.message_id) end
-                            else m.task_id = d.task_id
-                                 or m.task_id = (select st.parent_task_id from tasks st where st.id = d.task_id)
-                            end)) as human_replied_at,
+              -- One branch per conversation shape, each on its own index. It was ONE scan with the
+              -- shape chosen by a CASE inside the WHERE, which no index can serve: every card read
+              -- every message, 0.5 s a run on a 1.7k-message replica. The branches are exclusive
+              -- where the CASE was, and max() over their union is the max over its OR.
+              (select max(v) from (
+                 select max(m.created_at) as v from messages m
+                  where d.task_id is null and (select m2.thread_id from messages m2 where m2.id = d.message_id) is null
+                    and m.channel_id = d.channel_id and m.task_id is null and m.author_kind = 'human'
+                 union all
+                 select max(m.created_at) from messages m
+                  where d.task_id is null and m.thread_id = (select m2.thread_id from messages m2 where m2.id = d.message_id)
+                    and m.author_kind = 'human'
+                 union all
+                 select max(m.created_at) from messages m where m.task_id = d.task_id and m.author_kind = 'human'
+                 union all
+                 select max(m.created_at) from messages m
+                  where m.task_id = (select st.parent_task_id from tasks st where st.id = d.task_id) and m.author_kind = 'human'
+              )) as human_replied_at,
               -- the settle stamps a card can sit under (0137): its own conversation's, and its task's thread's
               (select th.settled_at from threads th where th.id = (select m3.thread_id from messages m3 where m3.id = d.message_id)) as thread_settled_at,
               (select th.id from threads th where th.task_id = d.task_id order by th.created_at limit 1) as task_thread_id,

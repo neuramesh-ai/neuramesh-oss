@@ -8,25 +8,15 @@ import { useEffect, useState } from 'react';
 const nm = nmBridge;
 
 // live token stream for one conversation key (`${channelId}:${taskId??''}`).
-// local agents on this machine paint a building bubble; it clears on `done`,
-// just as the finished message lands over sync.
+// local agents on this machine paint a building bubble; it lands on `done`, and the
+// synced message takes its slot when it arrives (thread/streamstore.ts).
 // PRESENCE, not just content (v0.43.1): the daemon opens the stream the moment an agent
 // wakes for this surface — empty text means "working here, no tokens yet". That's how a
 // non-assignee (rex answering in someone else's task thread) gets a live status at all:
 // attribution comes from the daemon that ran the wake, never a guess at global status.
-// `done` closes it. Consumers split the two: presence mounts the ghost, text draws the bubble.
-export function useAgentStream(key: string | null): { agent: string; text: string } | null {
-  const [s, setS] = useState<{ agent: string; text: string } | null>(null);
-  useEffect(() => {
-    if (!nm || !key) return;
-    setS(null);
-    return nm.watchAgentStream((p) => {
-      if (p.key !== key) return;
-      setS(p.done ? null : { agent: p.agent, text: p.text });
-    });
-  }, [key]);
-  return s;
-}
+// Consumers split the two: presence (`typing` false) mounts the ghost, text draws the bubble,
+// and only the bubble subscribes to the text itself (useStreamText), so a delta re-renders it alone.
+export { useAgentStream, useLandedGrace, useStreamText, useThreadStream, type StreamPresence } from './streamstore';
 
 /** the room's runs, live from the synced replica */
 export function useRuns(channelId: string | null): RunUI[] {

@@ -8,7 +8,7 @@
 // existing kernel jail and the policy gate. Extracted from agents.ts (track B2).
 
 
-import { drainQuery, claudeAgentPrompt } from './turnkit';
+import { drainQuery, claudeAgentPrompt, partialMessages } from './turnkit';
 import { claudePathOption, providerEnv, providerFor, sandboxFsEnabled, type AgentAttachment } from '../runtime/adapter';
 import { claudeSandboxOptions, computeFsJail } from '../sandbox/fsjail';
 import { ORCH_EMPTY_TURN } from '../replypolicy';
@@ -155,6 +155,7 @@ async function chatTurn(args: {
         },
         cwd: dir,
         systemPrompt: system + skillsNote,
+        ...partialMessages(onDelta), // the chat types as it is written (turnkit.ts)
         stderr: (d: string) => { for (const line of d.split('\n')) if (/mcp|\bnm\b/i.test(line)) log({ kind: 'turn', summary: `claude: ${line.trim().slice(0, 240)}`, level: 'warn' }); },
       },
     }) as AsyncIterable<any>,

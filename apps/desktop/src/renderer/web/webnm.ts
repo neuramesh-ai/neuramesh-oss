@@ -10,7 +10,7 @@
 // ledger (docs/design/cloud-first-2026-08/web-parity-ledger.md) is the list of what
 // remains; a silent lie here would hide exactly the gap the ledger exists to name.
 
-import { PowerSyncDatabase, WASQLiteOpenFactory, WASQLiteVFS } from '@powersync/web';
+import { PowerSyncDatabase, SyncStreamConnectionMethod, WASQLiteOpenFactory, WASQLiteVFS } from '@powersync/web';
 import type { PowerSyncBackendConnector } from '@powersync/common';
 import { AppSchema } from '../../main/sync/schema';
 import { mintSyncToken } from './webnm-credentials';
@@ -35,6 +35,9 @@ export interface WebNmConfig {
    *  document, so a previous harness page still holding them makes `init()` hang forever with no
    *  error — a fresh name sidesteps it instead of fighting for the lock. */
   dbFilename?: string;
+  /** the sync transport: 'http' (the default, compressed by the service) or 'websocket' (the
+   *  lever back, set with VITE_NM_SYNC_METHOD on a deployment whose service does not compress) */
+  syncMethod?: 'http' | 'websocket';
   /** a live clerk session token for /v1 bearers — null when signed out */
   clerkBearer(): Promise<string | null>;
   /** relay attach credential. Normally the Clerk bearer; local harnesses may use a separate,
@@ -132,10 +135,17 @@ export function openWebDb(cfg: WebNmConfig): PowerSyncDatabase {
   // NO SESSION, NO CONNECT. A signed-out page has no credential to mint, and a connect that
   // cannot mint retries against the sign-in screen for nothing. Sign-in ends in a reload
   // (webnm-auth.ts), and the reloaded page connects.
+  // THE STREAM RIDES HTTP, NOT THE WEBSOCKET. The browser's own fetch asks for zstd or gzip and the
+  // service compresses the stream with it; the websocket's permessage-deflate runs with a 4 KB window.
+  // Measured on the dev stack's initial sync (18 rooms, ~1,440 messages): 12.8 MB of sync lines were
+  // 5.56 MB on the websocket's wire and 2.76 MB as zstd over HTTP. A first open downloads the whole
+  // replica before any row shows, so that is the cold time-to-data. Production's service negotiates
+  // the same websocket deflate (checked 2026-09-24).
   void db
     .init()
     .then(async () => {
-      if (cfg.devPowerSyncToken || (await cfg.clerkBearer())) return db.connect(connector);
+      const connectionMethod = cfg.syncMethod === 'websocket' ? SyncStreamConnectionMethod.WEB_SOCKET : SyncStreamConnectionMethod.HTTP;
+      if (cfg.devPowerSyncToken || (await cfg.clerkBearer())) return db.connect(connector, { connectionMethod });
       console.log('[webnm] signed out: the replica waits for sign-in');
     })
     .catch((e: unknown) => {
@@ -144,13 +154,19 @@ export function openWebDb(cfg: WebNmConfig): PowerSyncDatabase {
   return db;
 }
 
+/** bumped when a command this page posted has been answered: a write can change what a cached
+ *  server read says (membership, invites), so webnm-boot.ts re-asks the server after one instead
+ *  of waiting its cache out */
+let commandEpoch = 0;
+export const commandsPosted = (): number => commandEpoch;
+
 /** L2: the command lane — the same POST /v1/commands every client speaks */
 export async function postCommand(cfg: WebNmConfig, command: Record<string, unknown>): Promise<unknown> {
   const res = await fetch(`${cfg.apiUrl}/v1/commands`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', ...(await authHeaders(cfg)) },
     body: JSON.stringify(command),
-  });
+  }).finally(() => { commandEpoch++; });
   const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   if (!res.ok) throw new Error(String(body['error'] ?? `command failed ${res.status}`));
   return body;

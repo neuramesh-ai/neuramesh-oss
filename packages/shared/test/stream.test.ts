@@ -82,6 +82,22 @@ describe('the stand-down sentinel never renders', () => {
     const t = 'The sweep answers NO_REPLY when the board is quiet.';
     expect(visibleStream(t)).toEqual({ text: t, forming: null });
   });
+
+  // token streaming (2026-09-25): the sentinel arrives in pieces, and each piece used to flash
+  it('the sentinel still arriving, token by token, never flashes its first letters', () => {
+    for (const piece of ['N', 'NO', 'NO_', 'NO_R', 'NO_REP', 'NO_REPL', '**NO_RE']) {
+      expect(visibleStream(piece)).toEqual({ text: '', forming: null });
+    }
+    // narration closing on the sentinel shows the narration, never the tail, until the line completes
+    expect(visibleStream('Board is quiet.\n\nNO_RE')).toEqual({ text: 'Board is quiet.', forming: null });
+    expect(visibleStream('Board is quiet.\n\nNO_REPLY')).toEqual({ text: '', forming: null });
+  });
+
+  it('a real reply that begins like the sentinel is shown as soon as it says otherwise', () => {
+    expect(visibleStream('No, that is the wrong branch.')).toEqual({ text: 'No, that is the wrong branch.', forming: null });
+    expect(visibleStream('NOTE: the build is green.')).toEqual({ text: 'NOTE: the build is green.', forming: null });
+    expect(visibleStream('Now')).toEqual({ text: 'Now', forming: null });
+  });
 });
 
 describe('carryCards — cards written before the final block survive it', () => {

@@ -10,9 +10,10 @@ import {
   createHub, MAX_CHANNELS_PER_CLIENT, MAX_CLIENT_INGRESS_BYTES_PER_SECOND, MAX_ENGINEERING_CHANNELS_PER_ACTOR,
   MAX_RELAY_SOCKET_BUFFERED_BYTES, sendBounded, type Hub, type HubOptions,
 } from './hub.js';
+import { MAX_STREAM_CHANNELS_PER_CLIENT } from './stream-lane.js';
 import { keepAlive } from './keepalive.js';
 import { connectEchoMachine, type MachineClient } from './machine-client.js';
-import { CLOSE, fromB64, toB64, type ChannelFrame, type RelayMessage } from './protocol.js';
+import { CLOSE, fromB64, toB64, type ChannelFrame, type ChannelLane, type RelayMessage } from './protocol.js';
 
 const M1 = '3c9f8a04-8d2e-4d7b-9a51-0f6f0e1c2ab3';
 
@@ -58,8 +59,8 @@ function connectClient(url: string, headers?: Record<string, string>): Promise<W
   });
 }
 
-function machine(url: string, token = 'nmm_good', machineId = M1): MachineClient {
-  const m = connectEchoMachine({ relayUrl: url, token, machineId });
+function machine(url: string, token = 'nmm_good', machineId = M1, lanes?: ChannelLane[]): MachineClient {
+  const m = connectEchoMachine({ relayUrl: url, token, machineId, ...(lanes ? { lanes } : {}) });
   open.machines.push(m);
   return m;
 }
@@ -91,7 +92,7 @@ async function attach(url: string, token = 'clerk-good'): Promise<WebSocket> {
   const c = await connectClient(url);
   const ack = nextMessage(c);
   c.send(JSON.stringify({ t: 'attach', machineId: M1, token }));
-  expect(await ack).toEqual({ t: 'attached', machineId: M1 });
+  expect(await ack).toMatchObject({ t: 'attached', machineId: M1 });
   return c;
 }
 
@@ -248,6 +249,80 @@ describe('relay hub', () => {
     const echo = nextMessage(c);
     c.send(JSON.stringify({ ch: 'terminal-0', t: 'data', d: toB64('still alive') } satisfies ChannelFrame));
     expect(fromB64((await echo as ChannelFrame).d!).toString('utf8')).toBe('still alive');
+  });
+
+  it('a stream subscription has its own budget: a full terminal budget still admits one, and it takes no terminal slot', async () => {
+    const r = await startRelay();
+    machine(r.url, 'nmm_good', M1, ['terminal', 'stream']);
+    await until(() => r.hub.stats().machines.includes(M1), 'machine registration');
+    const c = await attach(r.url);
+    for (let index = 0; index < MAX_CHANNELS_PER_CLIENT; index += 1) {
+      const response = nextMessage(c);
+      c.send(JSON.stringify({ ch: `terminal-${index}`, t: 'open' } satisfies ChannelFrame));
+      expect((await response as ChannelFrame).t).toBe('data');
+    }
+    // the echo machine answers every OPEN it receives, so a data frame proves the hub forwarded it
+    for (let index = 0; index < MAX_STREAM_CHANNELS_PER_CLIENT; index += 1) {
+      const forwarded = nextMessage(c);
+      c.send(JSON.stringify({ ch: `stream-${index}`, t: 'open', lane: 'stream', meta: { v: 1 } } satisfies ChannelFrame));
+      expect(await forwarded).toMatchObject({ ch: `stream-${index}`, t: 'data' });
+    }
+    const refused = nextMessage(c);
+    c.send(JSON.stringify({ ch: 'stream-overflow', t: 'open', lane: 'stream', meta: { v: 1 } } satisfies ChannelFrame));
+    expect(await refused).toEqual({ ch: 'stream-overflow', t: 'close' });
+    expect(r.logs.some((line) => line.startsWith('refuse_stream_open') && line.endsWith('why=limit'))).toBe(true);
+    // closing a stream frees a stream slot, never a terminal one
+    c.send(JSON.stringify({ ch: 'stream-0', t: 'close' } satisfies ChannelFrame));
+    const again = nextMessage(c);
+    c.send(JSON.stringify({ ch: 'stream-again', t: 'open', lane: 'stream', meta: { v: 1 } } satisfies ChannelFrame));
+    expect(await again).toMatchObject({ ch: 'stream-again', t: 'data' });
+  });
+
+  it('a stream OPEN to a daemon that never named the lane is refused, never forwarded (it would spawn a shell)', async () => {
+    const r = await startRelay();
+    const m = await connectClient(r.url, { authorization: 'Bearer nmm_good' });
+    m.send(JSON.stringify({ t: 'hello', machineId: M1 })); // an older daemon: no lanes
+    await until(() => r.hub.stats().machines.includes(M1), 'machine registration');
+    let reachedMachine = false;
+    m.on('message', () => { reachedMachine = true; });
+    const c = await attach(r.url);
+    const refused = nextMessage(c);
+    c.send(JSON.stringify({ ch: 'stream-1', t: 'open', lane: 'stream', meta: { v: 1 } } satisfies ChannelFrame));
+    expect(await refused).toEqual({ ch: 'stream-1', t: 'close' });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(reachedMachine).toBe(false);
+    expect(r.logs.some((line) => line.startsWith('refuse_stream_open') && line.endsWith('why=lane'))).toBe(true);
+  });
+
+  it('attached names the lanes the machine announced, and none for a daemon that named none', async () => {
+    const r = await startRelay();
+    const m = await connectClient(r.url, { authorization: 'Bearer nmm_good' });
+    m.send(JSON.stringify({ t: 'hello', machineId: M1, lanes: ['terminal', 'stream'] }));
+    await until(() => r.hub.stats().machines.includes(M1), 'machine registration');
+    const c = await connectClient(r.url);
+    const ack = nextMessage(c);
+    c.send(JSON.stringify({ t: 'attach', machineId: M1, token: 'clerk-good' }));
+    // the browser opens a `stream` channel only on a name it reads here (relay-client.ts)
+    expect(await ack).toEqual({ t: 'attached', machineId: M1, lanes: ['terminal', 'stream'] });
+    // the same machine, restarted on an older daemon: a new socket whose hello names no lanes
+    const old = await connectClient(r.url, { authorization: 'Bearer nmm_good' });
+    old.send(JSON.stringify({ t: 'hello', machineId: M1 }));
+    await until(() => r.logs.some((l) => l.startsWith('takeover')), 'takeover');
+    const later = await connectClient(r.url);
+    const ack2 = nextMessage(later);
+    later.send(JSON.stringify({ t: 'attach', machineId: M1, token: 'clerk-good' }));
+    expect(await ack2).toEqual({ t: 'attached', machineId: M1, lanes: [] });
+  });
+
+  it('a stream OPEN reaches the machine carrying the attach verdict\'s user, never a client claim', async () => {
+    const r = await startRelay();
+    const m = await connectClient(r.url, { authorization: 'Bearer nmm_good' });
+    m.send(JSON.stringify({ t: 'hello', machineId: M1, lanes: ['terminal', 'stream'] }));
+    await until(() => r.hub.stats().machines.includes(M1), 'machine registration');
+    const c = await attach(r.url);
+    const atMachine = nextMessage(m);
+    c.send(JSON.stringify({ ch: 'stream-1', t: 'open', lane: 'stream', meta: { v: 1 }, actorId: 'someone-else' } satisfies ChannelFrame));
+    expect(await atMachine).toMatchObject({ ch: 'stream-1', t: 'open', lane: 'stream', meta: { v: 1 }, actorId: 'u1' });
   });
 
   it('contains an ingress flood to its source client and keeps peers attached', async () => {

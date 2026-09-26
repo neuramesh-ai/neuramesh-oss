@@ -19,6 +19,7 @@ import type { NMBridge } from '../src/bridge/nm';
 import type { ChannelRow } from '../src/bridge/rows-rooms';
 import type { ProjectRow, RepoUI, WorkspaceProjectRow } from '../src/bridge/rows-board';
 import type { WebNmConfig } from './webnm';
+import { keepIdentity } from './webnm-watch';
 
 
 /**
@@ -41,19 +42,20 @@ export function roomOverrides(cfg: WebNmConfig, db: PowerSyncDatabase): Partial<
   const ws = () => cfg.workspaceId();
   return {
     // ported from sync/ipc/rooms.ts. BUSIEST ROOMS FIRST — a room is busy because work happens
-    // in it, so msg_count counts the whole papertrail, task threads included.
-    channels: async () =>
+    // in it, so msg_count counts the whole papertrail, task threads included. App polls this and
+    // workspaceMeta every 2.5 s into state, so an unchanged answer comes back as the same object.
+    channels: keepIdentity(async () =>
       db.getAll<ChannelRow>(
         `select c.id, c.slug, c.topic, c.project_id, c.kind, c.marketing, c.created_by_kind, c.created_by, c.created_at,
                 (select count(*) from messages m where m.channel_id = c.id) as msg_count
            from channels c where c.workspace_id = ? order by msg_count desc, c.slug`,
         [ws()],
-      ).catch(orEmpty('channels')),
+      ).catch(orEmpty('channels'))),
 
     // ported from sync/ipc/settings.ts nm:workspace-meta — the project switcher's rows, with the
     // counts its cards read. Without this the switcher offered "New project / All projects" and
     // named none, on a workspace that always has at least the Default one.
-    workspaceMeta: async () => ({
+    workspaceMeta: keepIdentity(async () => ({
       projects: await db.getAll<WorkspaceProjectRow>(
         `select p.id, p.name, p.slug, p.is_default, p.status, p.description, p.auto_open_pr, p.run_ci_before_merge, p.ship_gate, p.website, p.logo_url, p.model_pack,
            (select group_concat(c.slug) from channels c where c.project_id = p.id) as channel_slugs,
@@ -68,7 +70,7 @@ export function roomOverrides(cfg: WebNmConfig, db: PowerSyncDatabase): Partial<
          from projects p where p.workspace_id = ? order by p.is_default desc, p.name`,
         [ws()],
       ).catch(orEmpty('workspaceMeta.projects')),
-    }),
+    })),
 
     // ported from sync/ipc/rooms.ts nm:channel-meta. The project the channel belongs to comes
     // first. Repos are workspace identities, not claims that the browser has local checkouts:

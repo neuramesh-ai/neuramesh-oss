@@ -27,6 +27,7 @@ import { postWithRetry } from '../presence';
 import { isStandDown } from '../replypolicy';
 import { TURN_BUDGETS, genImageItemId, genVideoItemId, isChatThread, modelFreeItemId, parseModeMarker } from '@neuramesh/shared';
 import { makeFilm } from './videogen';
+import { streamFixture } from './streamfixture';
 import type { PowerSyncDatabase } from '@powersync/node';
 import type { HostedAgent, SkillRef, ThreadTask } from '../agents';
 import type { LogFn } from '../agentlog';
@@ -269,7 +270,12 @@ export function makeWake(ctx: {
       // turn for WHOEVER was woken. Read straight from the replica — the mode is a synced
       // column, so this is the same answer on every machine.
       const chatMode = m.thread_id ? isChatThread(await threadModeFor(m.thread_id)) : false;
-      if (genImage) {
+      // TEST-ONLY (host/streamfixture.ts): echo mode with NM_STREAM_FIXTURE=1 writes a fixed reply
+      // at a model's pace through the SAME emitChat a real turn feeds, so the live lanes can be measured
+      const fixture = mode === 'echo' ? streamFixture() : null;
+      if (fixture) {
+        reply = await fixture.run((t2) => emitChat(t2, false));
+      } else if (genImage) {
         const glog = alog(agent, null, ch.slug, runId);
         const filming = genVideoItemId(m.body) !== null;
         glog({ kind: 'wake', phase: 'channel', summary: filming ? `filming one draft` : `generating the image for one draft` });

@@ -82,3 +82,57 @@ test('a turn that expects the nm server stops with the honest line when the CLI 
   // a turn that expects nothing (a worker's) ignores the inventory
   assert.equal(await drainQuery(stream([init([]), assistant([{ type: 'text', text: 'x' }]), result('x')]), 'fallback'), 'x');
 });
+
+// TOKEN STREAMING (the streamed-brains round, 2026-09-25). With `includePartialMessages` the SDK
+// adds one `stream_event` per Messages API streaming event (SDKPartialAssistantMessage in sdk.d.ts:
+// message_start, content_block_start, content_block_delta, content_block_stop, message_delta,
+// message_stop), and STILL sends each complete assistant message after them. The sequence below is
+// built from those types: a routing turn that says a line, calls a tool, thinks, and answers. No
+// Claude login was usable on the machine that wrote this, so it is typed, not recorded.
+const ev = (event: unknown, parent: string | null = null) => ({ type: 'stream_event', event, parent_tool_use_id: parent, uuid: 'u', session_id: 's' });
+const textStart = (index: number) => ev({ type: 'content_block_start', index, content_block: { type: 'text', text: '' } });
+const textDelta = (index: number, text: string, parent: string | null = null) => ev({ type: 'content_block_delta', index, delta: { type: 'text_delta', text } }, parent);
+
+test('partial messages: the bubble gets each text block as it grows, and the reply is still the final block', async () => {
+  const seen: string[] = [];
+  const reply = await drainQuery(stream([
+    ev({ type: 'message_start', message: { id: 'm1', role: 'assistant', content: [] } }),
+    textStart(0), textDelta(0, 'Let me'), textDelta(0, ' check the board.'),
+    ev({ type: 'content_block_stop', index: 0 }),
+    ev({ type: 'content_block_start', index: 1, content_block: { type: 'tool_use', id: 't1', name: 'mcp__nm__list_tasks', input: {} } }),
+    ev({ type: 'content_block_delta', index: 1, delta: { type: 'input_json_delta', partial_json: '{}' } }),
+    ev({ type: 'content_block_stop', index: 1 }),
+    ev({ type: 'message_delta', delta: { stop_reason: 'tool_use' }, usage: { output_tokens: 20 } }),
+    ev({ type: 'message_stop' }),
+    assistant([{ type: 'text', text: 'Let me check the board.' }, { type: 'tool_use', id: 't1', name: 'mcp__nm__list_tasks', input: {} }]),
+    { type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 't1', content: '[]' }] } },
+    // a subagent's words never reach this bubble
+    textDelta(0, 'SUBAGENT CHATTER', 't1'),
+    ev({ type: 'message_start', message: { id: 'm2', role: 'assistant', content: [] } }),
+    ev({ type: 'content_block_start', index: 0, content_block: { type: 'thinking', thinking: '' } }),
+    ev({ type: 'content_block_delta', index: 0, delta: { type: 'thinking_delta', thinking: 'the board is empty' } }),
+    ev({ type: 'content_block_stop', index: 0 }),
+    textStart(1), textDelta(1, 'The board'), textDelta(1, ' is empty.'), textDelta(1, ' Give me a goal.'),
+    ev({ type: 'content_block_stop', index: 1 }),
+    ev({ type: 'message_stop' }),
+    assistant([{ type: 'text', text: 'The board is empty. Give me a goal.' }]),
+    result('The board is empty. Give me a goal.'),
+  ]), 'fallback', undefined, (t) => seen.push(t));
+  assert.equal(reply, 'The board is empty. Give me a goal.'); // what posts is unchanged
+  assert.deepEqual(seen, [
+    'Let me', 'Let me check the board.', // the first block types itself out…
+    'Let me check the board.', // …and the complete block repeats it (the contract is whole-text-so-far)
+    'The board', 'The board is empty.', 'The board is empty. Give me a goal.', // the next block starts over
+    'The board is empty. Give me a goal.',
+  ]);
+});
+
+test('partialMessages asks for the partial stream only when a bubble is watching', async () => {
+  const { partialMessages } = await import('./turnkit');
+  assert.deepEqual(partialMessages((t: string) => t), { includePartialMessages: true });
+  assert.deepEqual(partialMessages(undefined), {});
+  // and a stream with no partial events drains exactly as before: one call per complete block
+  const seen: string[] = [];
+  await drainQuery(stream([assistant([{ type: 'text', text: 'whole' }]), result('whole')]), 'fallback', undefined, (t) => seen.push(t));
+  assert.deepEqual(seen, ['whole']);
+});

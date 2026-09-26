@@ -12,4 +12,5 @@ export {
   type ChannelFrame, type ChannelLane, type EdgeMessage, type FrameType, type RelayMessage,
 } from './protocol.js';
 export { makeValidators } from './validate.js';
+export { admitStream, MAX_STREAM_CHANNELS_PER_CLIENT, MAX_STREAM_CHANNELS_PER_MACHINE } from './stream-lane.js';
 export { keepAlive, KEEPALIVE_MS } from './keepalive.js';

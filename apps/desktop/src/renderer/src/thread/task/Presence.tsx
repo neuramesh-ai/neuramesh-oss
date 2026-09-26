@@ -8,6 +8,7 @@ import { useMemo } from 'react';
 import { isRunOpen, journeyFor, type RunState, type ShipPlan } from '@neuramesh/shared';
 import { TypistChip } from '../parts';
 import { ghostPick, workingHere } from '../ghost-rule';
+import { useLandedGrace } from '../streamstore';
 import type { AgentRow, MachineRow } from '../../bridge/rows-crew';
 import type { BeatUI, RunUI, TaskRow } from '../../bridge/rows-board';
 import type { RunTree } from '../../runs/runs';
@@ -23,7 +24,7 @@ export function useTaskPresence(d: {
   taskRunRows: RunUI[];
   assignee: string | null;
   offered: string | null;
-  threadStream: { agent: string; text: string } | null;
+  threadStream: { agent: string } | null;
   busy: boolean;
   act: (type: string, fb?: string, opts?: { silentThread?: boolean }) => Promise<void>;
   blocking: boolean;
@@ -101,10 +102,12 @@ const carded = useMemo(
   () => new Set(runTrees_.filter((t) => isRunOpen(t.run.state as RunState)).map((t) => t.run.agent_id)),
   [runTrees_],
 );
+// the beat after a streamed reply lands (its run is still settling): no ghost under the reply
+const graced = useLandedGrace(`${task.channel_id}:${task.id}`);
 const ghostAgentId = useMemo(() => {
-  const ga = ghostPick(typists, carded) ?? (liveBeat || shipBeat ? agents.find((a) => a.id === task.assignee_id) ?? null : null);
+  const ga = ghostPick(graced ? typists.filter((a) => a.name !== graced) : typists, carded) ?? (liveBeat || shipBeat ? agents.find((a) => a.id === task.assignee_id) ?? null : null);
   return ga && !carded.has(ga.id) ? ga.id : null;
-}, [agents, typists, liveBeat, shipBeat, task.assignee_id, carded]);
+}, [agents, typists, liveBeat, shipBeat, task.assignee_id, carded, graced]);
 // the live streamer is shown by the composer's own stream chip, so it is excluded here too
 const shownTypists = typists.filter((a) => !carded.has(a.id) && a.id !== ghostAgentId && a.name !== threadStream?.agent);
 const typistsBar = shownTypists.length ? (

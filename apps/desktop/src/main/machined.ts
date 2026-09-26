@@ -39,6 +39,7 @@ import { adoptIdentity, bootstrapEnvOf, readConfig, type MachinedConfig } from '
 import { bootstrapIdentity } from './machined-bootstrap';
 import { machineSyncCredentials } from './machined-credentials';
 import { connectMachineEdge } from './relay/machine-edge';
+import { liveStreams } from './livestreams';
 import { createClineEngineeringHost } from './relay/engineering-host';
 import { createCodeSessionRecorder } from './relay/engineering-record';
 import { ensureEngineeringWorkspace } from './relay/engineering-workspace';
@@ -197,6 +198,8 @@ export async function main(): Promise<void> {
   });
   const relay = relayUrl ? connectMachineEdge({
     relayUrl, token: cfg.machineToken, machineId: cfg.machineId, engineering,
+    // the `stream` lane: a browser's live bubble for the replies this machine writes (livestreams.ts)
+    streams: liveStreams,
     onSessionEnd: () => void redetect(),
   }) : null;
   console.log(relayUrl ? `[machined] relay edge dialling ${relayUrl}` : '[machined] NM_RELAY_URL unset — no browser terminal on this machine');

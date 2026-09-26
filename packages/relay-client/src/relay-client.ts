@@ -37,9 +37,16 @@ interface Conn {
   decoders: Map<string, (b64: string) => string>;
   engineeringSends: Promise<void>;
   engineeringNextSendAt: number;
+  /** the lanes the relay says this machine serves (`attached`). An older relay names none. */
+  lanes: ReadonlySet<string>;
 }
 
-let conn: Conn | null = null;
+// ONE SOCKET PER MACHINE, not one per tab. The attach message names one machine, so a socket can
+// only ever reach that one. The single shared `conn` this replaced returned the first machine's
+// socket for ANY machine id: a Code session naming a member machine (rule D9) rode the runner's
+// socket if a terminal had dialled the runner first, and the stream lane subscribes to every cloud
+// machine that may serve the workspace at once.
+const conns = new Map<string, Conn>();
 
 /** send if the socket is open; frames minted before `attached` are held by the caller */
 const raw = (sock: WebSocket, m: unknown): void => {
@@ -47,7 +54,8 @@ const raw = (sock: WebSocket, m: unknown): void => {
 };
 
 function connect(cfg: RelayConfig, machineId: string): Conn {
-  if (conn && conn.sock.readyState <= WebSocket.OPEN) return conn;
+  const held = conns.get(machineId);
+  if (held && held.sock.readyState <= WebSocket.OPEN) return held;
   const sock = new WebSocket(cfg.relayUrl);
   const channels = new Map<string, Handler>();
   const decoders = new Map<string, (b64: string) => string>();
@@ -72,7 +80,10 @@ function connect(cfg: RelayConfig, machineId: string): Conn {
     sock.addEventListener('message', (ev: MessageEvent<string>) => {
       let m: Record<string, unknown>;
       try { m = JSON.parse(ev.data) as Record<string, unknown>; } catch { return; }
-      if (m['t'] === 'attached') return resolve();
+      if (m['t'] === 'attached') {
+        conn.lanes = new Set(Array.isArray(m['lanes']) ? m['lanes'].filter((l): l is string => typeof l === 'string') : []);
+        return resolve();
+      }
       const ch = typeof m['ch'] === 'string' ? m['ch'] : null;
       if (!ch) return;
       const h = channels.get(ch);
@@ -88,7 +99,7 @@ function connect(cfg: RelayConfig, machineId: string): Conn {
       }
     });
     sock.addEventListener('close', (ev: CloseEvent) => {
-      if (conn?.sock === sock) conn = null;
+      if (conns.get(machineId)?.sock === sock) conns.delete(machineId);
       reject(new Error(closeReason(ev.code)));
       failAll(closeReason(ev.code));
     });
@@ -97,7 +108,8 @@ function connect(cfg: RelayConfig, machineId: string): Conn {
   // an unobserved rejection here is normal: the socket can close before any terminal opens
   ready.catch(() => {});
 
-  conn = { sock, ready, channels, decoders, engineeringSends: Promise.resolve(), engineeringNextSendAt: 0 };
+  const conn: Conn = { sock, ready, channels, decoders, engineeringSends: Promise.resolve(), engineeringNextSendAt: 0, lanes: new Set() };
+  conns.set(machineId, conn);
   return conn;
 }
 
@@ -155,7 +167,8 @@ function bufferedEngineeringRaw(c: Conn, message: unknown, canceled: () => boole
 export function openRelayJsonChannel(
   cfg: RelayConfig,
   opts: {
-    lane: 'engineering';
+    /** `engineering`: the Code lane · `stream`: a read-only subscription to live agent replies */
+    lane: 'engineering' | 'stream';
     meta: Record<string, unknown>;
     onMessage(message: unknown): void;
     onExit(): void;
@@ -202,6 +215,10 @@ export function openRelayJsonChannel(
       return fail(error instanceof Error ? error.message : 'Could not reach the relay.');
     }
     if (closed) { c.channels.delete(ch); return; }
+    // A LANE THE RELAY DOES NOT NAME IS NEVER OPENED. An older relay forwards any lane as-is, and an
+    // older daemon reads an unknown lane as a terminal: it would start a shell for every tab and
+    // count it as work. The hub names the machine's lanes in `attached`; no name, no open.
+    if (opts.lane === 'stream' && !c.lanes.has('stream')) { c.channels.delete(ch); return fail('This machine does not serve live replies yet.'); }
     opened = true;
     raw(c.sock, { ch, t: 'open', lane: opts.lane, meta: opts.meta });
     for (const item of queued.splice(0)) {
@@ -293,8 +310,8 @@ export function openRelayPty(
   };
 }
 
-/** test seam: drop the shared socket so the next open dials fresh */
+/** test seam: drop every machine's socket so the next open dials fresh */
 export function resetRelay(): void {
-  if (conn) { try { conn.sock.close(); } catch { /* already gone */ } }
-  conn = null;
+  for (const c of conns.values()) { try { c.sock.close(); } catch { /* already gone */ } }
+  conns.clear();
 }

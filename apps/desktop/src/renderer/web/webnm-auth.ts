@@ -5,7 +5,7 @@
 // every later /v1 call rides the clerk session token as a bearer — the middleware's
 // clerk lane resolves the actor server-side, no x-nm-actor anywhere.
 
-import { Clerk } from '@clerk/clerk-js';
+import type { Clerk } from '@clerk/clerk-js';
 
 const USER_KEY = 'nm:web:user';
 const ACTOR_KEY = 'nm:web:actorId';
@@ -13,9 +13,14 @@ const SESSION_KEY = 'nm:web:clerkSession';
 
 let clerkP: Promise<Clerk> | null = null;
 
+// clerk-js is imported when it is first needed, not with the page. It was 71% of the entry chunk
+// (1.5 MB of 2.1 MB): every visit parsed it before anything else could start, including builds and
+// sessions that never call it. A signed-in boot still asks for it at once (restoreSession), so it
+// downloads beside the App chunk instead of in front of it.
 export function loadClerk(publishableKey: string): Promise<Clerk> {
   clerkP ??= (async () => {
-    const c = new Clerk(publishableKey);
+    const { Clerk: ClerkJs } = await import('@clerk/clerk-js');
+    const c = new ClerkJs(publishableKey);
     await c.load();
     return c;
   })();

@@ -48,6 +48,12 @@ export const tasks = new Table({
   approved_at: column.text,
   accepted_at: column.text,
   closed_at: column.text,
+}, {
+  // indexes: see the note in rooms.ts
+  indexes: {
+    by_channel: ['channel_id', 'number'],
+    by_project: ['project_id', 'state'],
+  },
 });
 
 export const artifacts = new Table({
@@ -65,6 +71,11 @@ export const artifacts = new Table({
   promoted: column.integer,
   tags: column.text, // pg text[] arrives as its JSON text — e.g. ["brand"], the rail's filter
   created_at: column.text,
+}, {
+  indexes: {
+    by_task: ['task_id', 'created_at'],
+    by_channel: ['channel_id', 'created_at'],
+  },
 });
 
 // Beats (docs/17): per-phase agent progress steps, synced so the tracker renders in the thread.
@@ -81,6 +92,8 @@ export const beats = new Table({
   done_at: column.text,
   created_at: column.text,
   updated_at: column.text,
+}, {
+  indexes: { by_task: ['task_id', 'created_at'] },
 });
 
 // Runs (docs/29): the durable row behind a stretch of agent work — the ghost's synced twin.
@@ -111,6 +124,12 @@ export const runs = new Table({
   started_at: column.text,
   ended_at: column.text,
   updated_at: column.text,
+}, {
+  indexes: {
+    by_channel: ['channel_id', 'started_at'],
+    by_state: ['workspace_id', 'state'],
+    by_agent: ['agent_id', 'state'],
+  },
 });
 
 // Decisions (docs/12 slice 2): agents' nmq question cards as first-class rows with
@@ -133,4 +152,6 @@ export const decisions = new Table({
   answered_by_id: column.text,
   created_at: column.text,
   answered_at: column.text,
+}, {
+  indexes: { by_workspace: ['workspace_id', 'created_at'] },
 });

@@ -20,6 +20,7 @@ import { accountOverrides } from './webnm-account';
 import { opsOverrides } from './webnm-ops';
 import { localOverrides } from './webnm-local';
 import { relayOverrides } from './webnm-relay';
+import { streamOverrides } from './webnm-stream';
 import '@neuramesh/fonts/neuramesh-sans.css';
 import '@fontsource-variable/geist-mono/wght.css';
 import '@fontsource-variable/bricolage-grotesque/wght.css';
@@ -42,10 +43,17 @@ const DEV_RELAY_TOKEN = (import.meta.env['VITE_NM_DEV_RELAY_TOKEN'] as string | 
 // webnm-local's honest "No shell here.", which is the correct answer for an environment
 // that has no relay deployed. Setting it is what turns those three lanes real.
 const RELAY_URL = (import.meta.env['VITE_NM_RELAY_URL'] as string | undefined) ?? '';
+// the live-reply lane rides the relay and is on wherever a relay is; '0' turns it off for one
+// deployment without a code change (the rollback lever, and today's behaviour for a comparison)
+const STREAM_LANE = (import.meta.env['VITE_NM_STREAM_LANE'] as string | undefined) !== '0';
+// the sync transport (webnm.ts): HTTP unless a deployment sets 'websocket', the lever back if a
+// PowerSync service does not compress its HTTP stream (the websocket deflates with a 4 KB window)
+const SYNC_METHOD = (import.meta.env['VITE_NM_SYNC_METHOD'] as string | undefined) === 'websocket' ? 'websocket' as const : 'http' as const;
 
 const cfg = {
   apiUrl: API_URL,
   powersyncUrl: POWERSYNC_URL,
+  syncMethod: SYNC_METHOD,
   clerkSessionId: async () => localStorage.getItem('nm:web:clerkSession'),
   // the mint asks the LIVE client first and only falls back to the stored snapshot above; a
   // verified-dead session lands on sign-in rather than retrying forever (webnm-credentials.ts)
@@ -69,10 +77,17 @@ const cfg = {
 
 // async boot, the preview harness's ordering kept: window.nm exists BEFORE App's module
 // evaluates. an existing clerk session (or a just-completed oauth redirect) re-establishes
-// the nm identity first, so authStatus answers signed-in on reload.
+// the nm identity before App RENDERS, so authStatus answers signed-in on reload.
+//
+// The three slow starts run side by side, not in a row: the session restore (clerk-js plus its
+// round trips), the replica (worker, wasm, OPFS) and the App chunk. Awaiting the restore first
+// held the App download and the replica back by every one of those round trips. What must stay
+// ordered stays ordered: window.nm is installed before App evaluates, and App renders only after
+// the restore settles. The replica can open before the restore ends because its connect asks
+// the clerk bearer, which waits for the same clerk load (loadClerk is set synchronously below).
 void (async () => {
-  if (CLERK_PK) await restoreSession(CLERK_PK, API_URL);
-  else console.warn('[webnm] VITE_NM_CLERK_PK unset — sign-in disabled (dev identity lanes only)');
+  const restoring = CLERK_PK ? restoreSession(CLERK_PK, API_URL) : Promise.resolve();
+  if (!CLERK_PK) console.warn('[webnm] VITE_NM_CLERK_PK unset — sign-in disabled (dev identity lanes only)');
   // the replica opens first: the launch step's overrides query it to find the workspace's
   // runner, so they need the same handle the bridge syncs on.
   const db = openWebDb(cfg);
@@ -89,6 +104,9 @@ void (async () => {
     ...contentOverrides(cfg, db),
     ...accountOverrides(cfg, db),
     ...opsOverrides(cfg, db),
+    // the live bubble over the relay's `stream` lane (webnm-stream.ts). AFTER opsOverrides, whose
+    // silent watchAgentStream is what a build without a relay keeps — today's behaviour exactly.
+    ...(RELAY_URL && STREAM_LANE ? streamOverrides(cfg, db, RELAY_URL) : {}),
     ...onboardOverrides(cfg, db),
     ...(CLERK_PK ? authOverrides(CLERK_PK, API_URL) : {}),
   });
@@ -96,6 +114,9 @@ void (async () => {
   // LOCAL HARNESS ONLY: the replica handle, so a sync problem can be inspected from the console
   // instead of guessed at. DEV_USER is a build-time env no deployed bundle sets.
   if (DEV_USER) (window as unknown as { __nmDb: unknown }).__nmDb = handles.db;
-  const { App } = await import('../src/App');
+  const app = import('../src/App');
+  app.catch(() => {}); // a failed load still throws at the await below, once the restore settles
+  await restoring;
+  const { App } = await app;
   createRoot(document.getElementById('root')!).render(<App />);
 })();

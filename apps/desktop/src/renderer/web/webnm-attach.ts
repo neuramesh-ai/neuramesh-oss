@@ -20,21 +20,14 @@ import type { PowerSyncDatabase } from '@powersync/web';
 import type { NMBridge } from '../src/bridge/nm';
 import type { AttachmentRow } from '../src/bridge/rows-board';
 import type { WebNmConfig } from './webnm';
+import { shareWatches, watchRows } from './webnm-watch';
 
 /** a live query: run it, then re-run whenever one of `tables` changes. mirrors db.watch's
- *  contract for the renderer, minus the IPC hop the desktop needs. Duplicated from
- *  webnm-convo.ts/webnm-board.ts rather than shared, the same way `orEmpty` already is —
- *  these files are written in parallel and a lane file stands alone. */
+ *  contract for the renderer, minus the IPC hop the desktop needs. The mechanism is shared
+ *  (webnm-watch.ts): one run in flight, and an unchanged result is not delivered again. */
 function watch<T>(db: PowerSyncDatabase, tables: string[], run: () => Promise<T[]>, cb: (rows: T[]) => void): () => void {
-  let live = true;
-  const push = () => {
-    if (!live) return;
-    // a failed read leaves the last good rows standing rather than blanking the surface
-    void run().then((rows) => { if (live) cb(rows); }).catch((e: unknown) => { console.error('[webnm] attachment watch failed:', e); });
-  };
-  push();
-  const stop = db.onChangeWithCallback({ onChange: () => push() }, { tables });
-  return () => { live = false; stop(); };
+  // a failed read leaves the last good rows standing rather than blanking the surface
+  return watchRows(db, tables, run, cb, (e: unknown) => { console.error('[webnm] attachment watch failed:', e); });
 }
 
 // ── the queries, copied from sync/ipc/watch-rooms.ts ──────────────────────────────────────────
@@ -66,7 +59,7 @@ const TABLES = ['artifacts', 'messages'];
 
 export function attachOverrides(cfg: WebNmConfig, db: PowerSyncDatabase): Partial<NMBridge> {
   const ws = () => cfg.workspaceId();
-  return {
+  return shareWatches<Partial<NMBridge>>({
     watchMsgAttachments: (channelId: string, cb: (rows: AttachmentRow[]) => void) =>
       watch<AttachmentRow>(db, TABLES, () => db.getAll<AttachmentRow>(MSG_SQL, [channelId]), cb),
 
@@ -90,5 +83,5 @@ export function attachOverrides(cfg: WebNmConfig, db: PowerSyncDatabase): Partia
     // discarding a stage that never happened is a no-op, not an error: it runs on cleanup paths
     // that must not throw, and there is genuinely nothing to discard.
     attachDiscard: async () => {},
-  };
+  });
 }

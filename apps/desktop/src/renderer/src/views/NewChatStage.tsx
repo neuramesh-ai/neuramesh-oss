@@ -17,7 +17,8 @@ import { type AgentRow } from '../bridge/rows-crew';
 import { type ChannelRow } from '../bridge/rows-rooms';
 import { type SkillPackRow, type SkillRow } from '../bridge/rows-content';
 import { type WorkspaceProjectRow } from '../bridge/rows-board';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { handOffStaticShell, staticDraft, writeShellFacts } from '../lib/staticshell';
 import { CapGate } from '../compute/CapGate';
 import { HostedGate } from '../shell/HostedGate';
 import { useCompute } from '../compute/useCompute';
@@ -105,7 +106,10 @@ export function NewChatStage({ agents, projects, activeProjectId, channels, defa
 }) {
   // no machine can run, so the stage shows WHY instead of a composer that cannot deliver
   const capped = useCompute(true)?.status === 'capped';
-  const [draft, setDraft] = useState('');
+  // what the person typed into the browser's static composer before the app loaded (lib/staticshell.ts)
+  const [draft, setDraft] = useState(staticDraft);
+  const boxRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => { handOffStaticShell(boxRef.current?.querySelector('textarea') ?? null); }, []);
   const [sending, setSending] = useState(false);
   const [target, setTarget] = useState<string | null>(null);
   // a door just opened this composer — adopt whatever channel (and pre-written ask) it carried
@@ -151,6 +155,13 @@ export function NewChatStage({ agents, projects, activeProjectId, channels, defa
   const hello = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
   // with rows to read, the stage is a page you read down: top-aligned, on the reading column, scrolling
   const ledgered = (ledger?.rows.length ?? 0) > 0;
+  // the next visit's static first frame draws from these (lib/staticshell.ts); written after a
+  // settle so a boot's passing states are not what it remembers
+  const targetSlug = targetChan?.slug ?? null;
+  useEffect(() => {
+    const t = setTimeout(() => writeShellFacts({ name: greeting, project: ap?.slug ?? null, room: targetSlug, ledgered }), 800);
+    return () => clearTimeout(t);
+  }, [greeting, ap?.slug, targetSlug, ledgered]);
   return (
     <div className={`stagewrap${ledgered ? ' ledgered' : ''}`}>
       {/* the identity, behind the stage now that the stage owns the composer — it recedes the
@@ -197,7 +208,7 @@ export function NewChatStage({ agents, projects, activeProjectId, channels, defa
             A composer that cannot deliver is a trap, and suggestion pills below it are an
             invitation to press something that does nothing. Both are replaced, not decorated. */}
         {capped ? <CapGate variant="stage" onUpgrade={onUpgrade} onSeeUsage={onSeeUsage} /> : hostedGate ? <HostedGate variant="stage" /> : <>
-        <div className="hcomposer cbox stagebox">
+        <div className="hcomposer cbox stagebox" ref={boxRef}>
           {(() => {
             // the stage lands in ONE room (the chip), so it introduces THAT room's orchestrator
             const lead = leadFor(agents, targetChan?.id);

@@ -18,6 +18,7 @@ import type { AgentRow, MachineRow } from '../bridge/rows-crew';
 import type { MessageRow } from '../bridge/rows-rooms';
 import type { RunUI } from '../bridge/rows-board';
 import { useMemo } from 'react';
+import { useLandedGrace } from './streamstore';
 
 export interface ConvoPresence {
   /** the agent the WORKING ghost speaks for — null when nothing is under way here */
@@ -39,9 +40,9 @@ export function useConvoPresence(d: {
   threadId: string;
   runRows: RunUI[];
   trees: RunTree[];
-  stream: { agent: string; text: string } | null;
+  stream: { agent: string } | null;
   /** the same entry once TOKENS flow — presence mounts the ghost, text draws the bubble (§4) */
-  streaming: { agent: string; text: string } | null;
+  streaming: { agent: string } | null;
 }): ConvoPresence {
   const { rows, agents, machines, channelId, threadId, runRows, trees, stream, streaming } = d;
   // Who is working in THIS thread (ghost-rule.ts): the local stream names the wake this machine
@@ -57,7 +58,10 @@ export function useConvoPresence(d: {
   // the ghost fills the reply slot while an agent works here and no text flows yet — and stands
   // down for an agent whose own run card is on screen (card › ghost › chip), which the
   // conversation alone had skipped: a fanned-out wake showed rex's card and rex's ghost together
-  const ghostAgent = streaming ? null : ghostPick(typists, carded);
+  // …and for the beat after a streamed reply lands, while its run settles, the ghost does not blink
+  // back under the reply it just wrote (thread/streamstore.ts)
+  const graced = useLandedGrace(`${channelId}:${threadId}`);
+  const ghostAgent = streaming ? null : ghostPick(graced ? typists.filter((a) => a.name !== graced) : typists, carded);
   // …and who holds the row before any of that exists (docs/26 §5). On the browser this is the
   // only orb for the first seconds of every message: with no local stream, the working ghost
   // cannot mount until the wake's run row has made a round trip to the runner and back.

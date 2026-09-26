@@ -13,6 +13,8 @@ import { createHub, connectEchoMachine } from '@neuramesh/relay';
 import { connectMachineEdge } from '../../main/relay/machine-edge';
 import type { EngineeringMachineHost } from '../../main/relay/engineering-host';
 import { openRelayJsonChannel, openRelayPty, resetRelay, waitForRelayCapacity, type RelayConfig } from '@neuramesh/relay-client';
+import { createLiveStreams } from '../../main/livestreams';
+import { streamOverrides, type StreamDb, type StreamEvent } from './webnm-stream';
 
 test('Engineering relay upload waits above its bounded send high-water mark', async () => {
   const socket = { bufferedAmount: 1024, readyState: WebSocket.OPEN };
@@ -284,4 +286,116 @@ test('Engineering JSON crosses the real browser, hub, and machine edges', async 
   resetRelay();
   await new Promise<void>((resolve) => wss.close(() => resolve()));
   await new Promise<void>((resolve) => server.close(() => resolve()));
+});
+
+test('a live reply streams machine -> relay -> web bridge as deltas, and the synced message replaces it', async () => {
+  resetRelay();
+  const machineId = 'm-stream';
+  const hub = createHub({
+    validateMachine: async (token) => token === 'nmm_stream' ? { machineId, workspaceId: 'w1' } : null,
+    validateClient: async () => ({ allowed: true, userId: 'u1' }),
+  });
+  const server = createServer();
+  const wss = new WebSocketServer({ server });
+  let wireBytes = 0;
+  wss.on('connection', (sock: WsSocket, req) => {
+    // count what the relay hands the browser (the machine's frames, forwarded verbatim)
+    const send = sock.send.bind(sock);
+    sock.send = ((data: unknown, ...rest: unknown[]) => { wireBytes += String(data).length; return (send as (...a: unknown[]) => void)(data, ...rest); }) as typeof sock.send;
+    hub.handleConnection(sock, req);
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const url = `ws://127.0.0.1:${(server.address() as { port: number }).port}`;
+  // the machine: the SAME registry emitStream feeds, behind the real edge
+  const streams = createLiveStreams();
+  const edge = connectMachineEdge({ relayUrl: url, token: 'nmm_stream', machineId, streams, log: () => {} });
+  await waitForMachine(hub, machineId);
+  // the browser: the real bridge over a stand-in replica (the runner is up; the reply lands on cue)
+  let latestReply: string | null = '2026-09-24 10:00:00.000Z';
+  const onChange: Array<{ tables: string[]; fn: () => void }> = [];
+  const db: StreamDb = {
+    getAll: async <T,>(sql: string) => (sql.includes('from machines')
+      ? [{ id: machineId, kind: 'runner', owner_user_id: 'owner', last_seen_at: new Date().toISOString() }]
+      : [{ at: latestReply }]) as T[],
+    onChangeWithCallback: (handler, options) => { onChange.push({ tables: options.tables, fn: handler.onChange }); return () => {}; },
+  };
+  const bridge = streamOverrides({ workspaceId: () => 'w1', actorId: () => 'u1', relayBearer: async () => 'clerk-token' }, db, url);
+  const events: StreamEvent[] = [];
+  const stop = bridge.watchAgentStream!((e) => events.push(e));
+  const until = async (cond: () => boolean, what: string): Promise<void> => {
+    const deadline = Date.now() + 4000;
+    while (!cond()) {
+      if (Date.now() > deadline) throw new Error(`timed out: ${what}; events=${JSON.stringify(events.slice(-3))}`);
+      await new Promise((r) => setTimeout(r, 10));
+    }
+  };
+  await until(() => streams.stats().subscribers === 1, 'the tab subscribes to the online runner');
+
+  const key = 'c1:t1';
+  const reply = 'Hello, world. café 🚀, every byte survives the lane. '.repeat(40);
+  streams.publish(key, 'rex', '', false);
+  for (let n = 8; n < reply.length; n += 37) { streams.publish(key, 'rex', reply.slice(0, n), false); await new Promise((r) => setTimeout(r, 5)); }
+  streams.publish(key, 'rex', reply, false);
+  await until(() => events.at(-1)?.text === reply, 'the whole reply arrives');
+  const updates = events.filter((e) => e.key === key && e.text).length;
+  const fullTextBytes = events.filter((e) => e.key === key && e.text).reduce((sum, e) => sum + JSON.stringify(e).length, 0);
+  if (wireBytes >= fullTextBytes) throw new Error(`deltas cost ${wireBytes} B on the wire against ${fullTextBytes} B of whole-text updates`);
+
+  streams.publish(key, 'rex', '', true);
+  await new Promise((r) => setTimeout(r, 50));
+  if (events.at(-1)?.done) throw new Error('the bubble must hold its text until the synced reply is in the replica');
+  latestReply = '2026-09-24 10:00:30.000Z';
+  for (const l of onChange) if (l.tables.includes('messages')) l.fn();
+  await until(() => events.at(-1)?.done === true, 'the synced message replaces the bubble');
+  if (updates < 3) throw new Error(`expected a stream of updates, saw ${updates}`);
+
+  stop();
+  edge.close();
+  resetRelay();
+  await new Promise<void>((resolve) => wss.close(() => resolve()));
+  await new Promise<void>((resolve) => server.close(() => resolve()));
+});
+
+test('a tab never opens the stream lane on a machine whose relay does not name it (an older daemon would start a shell)', async () => {
+  resetRelay();
+  const machineId = 'm-old';
+  const logs: string[] = [];
+  const hub = createHub({
+    validateMachine: async (token) => token === 'nmm_old' ? { machineId, workspaceId: 'w1' } : null,
+    validateClient: async () => ({ allowed: true, userId: 'u1' }),
+    log: (line) => logs.push(line),
+  });
+  const server = createServer();
+  const wss = new WebSocketServer({ server });
+  wss.on('connection', (sock: WsSocket, req) => hub.handleConnection(sock, req));
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const url = `ws://127.0.0.1:${(server.address() as { port: number }).port}`;
+  // an older daemon: its hello names no lanes, and it would answer any OPEN with a shell
+  const machine = connectEchoMachine({ relayUrl: url, token: 'nmm_old', machineId });
+  await waitForMachine(hub, machineId);
+  const db: StreamDb = {
+    getAll: async <T,>(sql: string) => (sql.includes('from machines')
+      ? [{ id: machineId, kind: 'runner', owner_user_id: 'owner', last_seen_at: new Date().toISOString() }]
+      : [{ at: null }]) as T[],
+    onChangeWithCallback: () => () => {},
+  };
+  const bridge = streamOverrides({ workspaceId: () => 'w1', actorId: () => 'u1', relayBearer: async () => 'clerk-token' }, db, url);
+  const stop = bridge.watchAgentStream!(() => {});
+  try {
+    const deadline = Date.now() + 4000;
+    while (!logs.some((l) => l.startsWith('client_attached'))) {
+      if (Date.now() > deadline) throw new Error(`the tab never attached; logs=${JSON.stringify(logs)}`);
+      await new Promise((r) => setTimeout(r, 10));
+    }
+    await new Promise((r) => setTimeout(r, 200));
+    // the client read `attached` and sent no OPEN at all, so the hub never had to refuse one
+    const refused = logs.filter((l) => l.startsWith('refuse_stream_open'));
+    if (refused.length) throw new Error(`the tab sent a stream OPEN: ${JSON.stringify(refused)}`);
+  } finally {
+    stop();
+    machine.close();
+    resetRelay();
+    await new Promise<void>((resolve) => wss.close(() => resolve()));
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
 });
