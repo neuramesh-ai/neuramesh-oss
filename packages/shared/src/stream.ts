@@ -32,6 +32,8 @@
  * is how the renderer and the daemon come to disagree about what the human is looking at.
  */
 const SENTINEL = /^[\s*_`>]*NO_REPLY[\s*_`.!]*$/i;
+/** the sentinel's first letters, still arriving (upper case, as the prompts write it) */
+const SENTINEL_FORMING = /^[\s*_`>]*N(?:O(?:_(?:R(?:E(?:P(?:L)?)?)?)?)?)?$/;
 
 export function isStandDown(reply: string): boolean {
   const lines = reply.split('\n').map((l) => l.trim()).filter(Boolean);
@@ -63,6 +65,10 @@ export function fenceWork(tag: string): FenceWork {
 export function visibleStream(text: string): { text: string; forming: FenceWork | null } {
   // the sentinel is addressed to the daemon; showing it to a human is showing them the wiring
   if (isStandDown(text)) return { text: '', forming: null };
+  // a turn that streams token by token delivers the sentinel in pieces ("NO_", then "REPLY"), so a
+  // last line that is still forming it is held back until the next delta says what it is
+  const lines = text.trimEnd().split('\n');
+  if (SENTINEL_FORMING.test(lines[lines.length - 1] ?? '')) text = lines.slice(0, -1).join('\n');
   const closed = text.replace(CLOSED_RE, '');
   const open = OPEN_RE.exec(closed);
   const visible = (open ? closed.slice(0, open.index) : closed).replace(/\n{3,}/g, '\n\n').trimEnd();

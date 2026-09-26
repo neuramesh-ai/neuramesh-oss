@@ -9,6 +9,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { groupByMessage } from '../parts';
 import { mergeTranscript } from './merge';
 import { useRuns } from '../hooks';
+import { useStickToBottom } from '../useStickToBottom';
 import { isWatchableRun, runTrees } from '../../runs/runs';
 import { nm as nmBridge } from '../../bridge/nm';
 import type { ArtifactUI, BeatUI, TaskRow } from '../../bridge/rows-board';
@@ -25,11 +26,10 @@ export function useTaskData(d: {
   setBusy: (v: boolean) => void;
   setActErr: (v: string) => void;
   listRef: React.RefObject<HTMLDivElement | null>;
-  threadStream: { agent: string; text: string } | null;
   convoThreadId?: string | null;
   setComposerMode: (v: null) => void;
 }) {
-  const { task, channelId, busy, setBusy, setActErr, listRef, threadStream, convoThreadId, setComposerMode } = d;
+  const { task, channelId, busy, setBusy, setActErr, listRef, convoThreadId, setComposerMode } = d;
 const [rows, setRows] = useState<MessageRow[]>([]);
 const [threadAtts, setThreadAtts] = useState<AttachmentRow[]>([]);
 const threadAttByMsg = useMemo(() => groupByMessage(threadAtts), [threadAtts]);
@@ -60,7 +60,6 @@ const act = async (type: string, fb?: string, opts?: { silentThread?: boolean })
 useEffect(() => {
   if (!nm) return;
   setRows([]);
-  let first = true;
   // a task born from a conversation shows the WHOLE exchange — the pre-task chat rides
   // in via the thread union (watchConvo); a plain task thread reads by task as before.
   // AN ANCHORED UNIT'S OWN ROWS RIDE BESIDE THE CONVERSATION'S (2026-09-20, thread/task/merge.ts
@@ -74,18 +73,11 @@ useEffect(() => {
     const unOwn = nm!.watchThread(task.id, (r) => { own = r; cb(mergeTranscript(convo, own)); });
     return () => { unConvo(); unOwn(); };
   };
-  return sub((r) => {
-    const el = listRef.current;
-    const nearBottom = !el || el.scrollHeight - el.scrollTop - el.clientHeight < 200;
-    setRows(r);
-    const initial = first;
-    first = false;
-    // instant (not smooth): the smooth animation unpins a reader who was at the bottom, so a
-    // reply arriving right after another message stops following — see the channel feed note.
-    if (initial || nearBottom)
-      requestAnimationFrame(() => listRef.current?.scrollTo({ top: listRef.current.scrollHeight }));
-  });
+  return sub(setRows);
 }, [task.id, convoThreadId, task.origin_thread_id]);
+// the thread opens at its newest message and follows what arrives (new rows, a streaming reply,
+// its reveal between deltas) while the reader sits at the bottom; a scroll up lets go
+useStickToBottom(listRef, task.id);
 
 useEffect(() => {
   if (!nm) return;
@@ -113,15 +105,6 @@ useEffect(() => {
   setThreadAtts([]);
   return nm.watchThreadAttachments(task.id, setThreadAtts);
 }, [task.id]);
-// follow a streaming reply to the bottom while the reader is near it — parity with the channel
-// feed's chatStream follow, which the thread was missing (a growing bubble never scrolled). Instant
-// + a fresh near-bottom read, so a reader parked in history is never yanked down by the stream.
-useEffect(() => {
-  const el = listRef.current;
-  if (!el || !threadStream) return;
-  if (el.scrollHeight - el.scrollTop - el.clientHeight < 200)
-    requestAnimationFrame(() => el.scrollTo({ top: el.scrollHeight }));
-}, [threadStream?.text]);
 // the room's skill library backs the `/` picker here exactly as in the channel composer
 useEffect(() => {
   if (!nm) return;

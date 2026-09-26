@@ -68,8 +68,8 @@ export function groupByMessage(atts: AttachmentRow[]): Map<string, AttachmentRow
 }
 
 /** the growing bubble only exists once tokens flow — empty presence draws the ghost instead */
-export function streamContent(s: { agent: string; text: string } | null): { agent: string; text: string } | null {
-  return s && s.text.trim() ? s : null;
+export function streamContent<S extends { typing: boolean }>(s: S | null): S | null {
+  return s && s.typing ? s : null;
 }
 
 // The humans a composer can address: every workspace member, mentioned by the handle

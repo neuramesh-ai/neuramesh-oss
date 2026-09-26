@@ -1,5 +1,4 @@
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import '@xterm/xterm/css/xterm.css';
+import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { agentInChannel, type ShipPlan, awaitingAgent, actionableByHuman, decisionHandled, tasksInProject, rowsInProject, replyPreview, MARKETING_SETUP_FLOW, setupProgress, placementFor, type MachineCapability, type ThreadStatus , planLabel } from '@neuramesh/shared';
 import { historyRows, plainTitle, resolveRoomSurface, roomBriefs, roomTabsFor, type HistoryRow, type RoomSurface, liveKinOf } from './room-tabs';
 import { setConversation } from './wtabs';
@@ -154,6 +153,7 @@ import { Login } from './views/Login';
 import { LocalStackGate } from './views/LocalStackGate';
 import { FirstRunDoor } from './views/FirstRunDoor';
 import { useBootGates } from './shell/useBootGates';
+import { releaseStaticShell } from './lib/staticshell';
 import { AddRepoModal, ChannelSettingsModal, CreateChannelModal } from './projects/rooms';
 import { MarketingCalendar, MarketingLibrary } from './marketing/room-tabs';
 import { WhiteboardsHome } from './views/WhiteboardsHome';
@@ -1183,15 +1183,19 @@ export function App() {
     if (!nm || !authed) return;
     // A success clears the stall; a failure counts it. Retrying stays the behaviour — most of these
     // are a backend that is still coming up — but after ~5 tries the splash stops pretending.
+    // The poll keeps asking every 1.5 s. A fresh object with the same content re-rendered the whole
+    // shell each time; handing React the previous object instead lets it skip the render. The state
+    // is the same value either way.
+    const same = <T,>(prev: T, next: T): T => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next);
     const poll = () => nm.bootstrap()
       .then((b) => {
-        setBoot(b); setConnectionWebUrl(b.connection?.webUrl); // the site this connection's copy points at (weburl.ts)
+        setBoot((prev) => same(prev, b)); setConnectionWebUrl(b.connection?.webUrl); // the site this connection's copy points at (weburl.ts)
         setBootStall(null);
         // 0113: bootstrap carries the membership set + waiting invitations, so the switcher and
         // the join card render from the first frame — including offline, where a round trip
         // would leave both surfaces blank.
-        if (b.workspaces) setWsList(b.workspaces);
-        if (b.invites) setWsInvites(b.invites);
+        if (b.workspaces) { const ws = b.workspaces; setWsList((prev) => same(prev, ws)); }
+        if (b.invites) { const inv = b.invites; setWsInvites((prev) => same(prev, inv)); }
         // shared compute (0114): lets a run card tell "ran on someone else's machine" apart from
         // "called no tools" — see LegActivity
         setSelfMachine(b.machineName ?? null);
@@ -1509,9 +1513,15 @@ export function App() {
 
   useEffect(() => {
     if (!nm || !authed) return;
+    // an unchanged answer keeps the map it had: a new object every 5 s rendered the whole shell
+    // again, and with a long thread open that render was most of the idle main thread
+    const keep = (next: Record<string, string>) => (prev: Record<string, string>) => {
+      const ids = Object.keys(next);
+      return ids.length === Object.keys(prev).length && ids.every((id) => prev[id] === next[id]) ? prev : next;
+    };
     const load = () => {
-      nm.latest().then((rows) => setLatestMap(Object.fromEntries(rows.map((r) => [r.channel_id, r.latest])))).catch(() => {});
-      nm.latestThreads().then((rows) => setLatestThreadMap(Object.fromEntries(rows.map((r) => [r.task_id, r.latest])))).catch(() => {});
+      nm.latest().then((rows) => setLatestMap(keep(Object.fromEntries(rows.map((r) => [r.channel_id, r.latest]))))).catch(() => {});
+      nm.latestThreads().then((rows) => setLatestThreadMap(keep(Object.fromEntries(rows.map((r) => [r.task_id, r.latest]))))).catch(() => {});
     };
     void load();
     const t = setInterval(load, 5_000);
@@ -2457,6 +2467,12 @@ export function App() {
   const navBandsState = useNavBands({ authed, connections: conns, foregroundId: fgConnId, rows: histTreeRows, filter: navMode === 'code' ? isCodeRow : isChatRow, channels: chans, projects: wsProjects.filter((p) => p.status !== 'archived'), askIds, liveIds: histLiveIds, groupFold: { folded: navGroups.folded, expanded: navGroups.expanded } });
   // the cloud machine's state (cloud-cap round) — polled, not watched; see useCompute
   const computeState = useCompute(authed);
+  // THE BROWSER'S STATIC SHELL (lib/staticshell.ts) stays up only while this renders the splash: Home's
+  // composer takes it over on mount, and any other landing (a door, a gate, sign-in, the wizard, a
+  // boot that stalled) removes it here, so what the app shows is never hidden behind it.
+  const splashOnly = !(firstRun && firstRun.phase !== 'done') && !(auth?.mode === 'local' && localStack?.blocking)
+    && (!auth || (authed && (!boot || !!boot.resolving))) && (bootStall?.tries ?? 0) < 5;
+  useLayoutEffect(() => { if (!splashOnly) releaseStaticShell(); }, [splashOnly]);
 
   // Until we know who's signed in (auth) and — once authed — whether they need onboarding
   // (boot), show a neutral splash. Otherwise the main app shell flashes for a frame between
@@ -3862,7 +3878,7 @@ export function App() {
             return (
               <div className="typingbar">
                 {list.map((a) => {
-                  const label = streamer && a.id === streamer.id ? (chatStream!.text.trim() ? 'typing' : 'thinking') : a.status === 'thinking' ? 'typing' : a.status;
+                  const label = streamer && a.id === streamer.id ? (chatStream!.typing ? 'typing' : 'thinking') : a.status === 'thinking' ? 'typing' : a.status;
                   return <TypistChip key={a.id} name={a.name} label={label} onOpen={() => openAgentActivity(a)} />;
                 })}
                 <span className="tdots"><i /><i /><i /></span>

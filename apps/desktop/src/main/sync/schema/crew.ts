@@ -43,7 +43,10 @@ export const agents = new Table({
   brief: column.text,
 });
 
-export const agent_channels = new Table({ agent_id: column.text, channel_id: column.text, created_by_kind: column.text, created_by: column.text, created_at: column.text });
+// indexes: see the note in rooms.ts
+export const agent_channels = new Table({ agent_id: column.text, channel_id: column.text, created_by_kind: column.text, created_by: column.text, created_at: column.text }, {
+  indexes: { by_agent: ['agent_id'], by_channel: ['channel_id'] },
+});
 
 // `compute` (0118): the member's compute choice — read by the wake gate for the ORIGIN member
 export const workspace_members = new Table({ workspace_id: column.text, user_id: column.text, role: column.text, display_name: column.text, compute: column.text });

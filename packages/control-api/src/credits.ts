@@ -2,7 +2,7 @@
 // is called from HERE, never from a machine — the platform key stays in this process, so every
 // call is metered and the balance guard is a server invariant, not a client promise. The data
 // functions the routes stand on live in credit-ledger.ts.
-import type { Env, Hono } from 'hono';
+import type { Context, Env, Hono } from 'hono';
 import type postgres from 'postgres';
 import { z } from 'zod';
 import {
@@ -25,6 +25,7 @@ export {
 import { creditBalance, grantCredits, spendCredits, usageToday, type CreditBalance, type UsageToday, spendCreditsForFilm, refundFilm } from './credit-ledger';
 import { planDiskGb } from './fleet';
 import { localMode } from './localmode';
+import { starterStreamRoute } from './starter-stream';
 import { VIDEO_MODELS } from './video-registry';
 import type { Store } from './store';
 
@@ -98,66 +99,83 @@ const GenerateSchema = z.object({
   system: z.string().optional(),
   tools: z.unknown().optional(),
 });
+type StarterBody = z.infer<typeof GenerateSchema>;
 
-interface GeminiUsage { promptTokenCount?: number; candidatesTokenCount?: number }
+export interface GeminiUsage { promptTokenCount?: number; candidatesTokenCount?: number }
+export type StarterFetch = (url: string, init: RequestInit) => Promise<Response>;
+export const STARTER_MODEL_URL = `https://generativelanguage.googleapis.com/v1beta/models/${STARTER_MODEL}`;
+
+/** what BOTH starter routes check, in this order, before any model call. One function, so the
+ *  streamed door cannot drift from the whole-reply door on who may spend the platform's key. */
+export async function starterPreflight(c: Context, store: Store, ledger: Ledger | null): Promise<{ refusal: Response } | { ledger: Ledger; body: StarterBody; key: string }> {
+  // the one door the local stack keeps shut: the starter key lives on the cloud and never
+  // reaches a machine (CLAUDE.md #5). Said plainly, with the way forward.
+  if (localMode()) return { refusal: c.json({ error: 'The local stack has no starter brain. Add your own model key.', code: 'UNAVAILABLE' }, 503) };
+  if (!ledger) return { refusal: c.json({ error: 'credits not served by this store' }, 501) };
+  const body = GenerateSchema.safeParse(await c.req.json().catch(() => null));
+  if (!body.success) return { refusal: c.json({ error: 'invalid body', issues: body.error.issues }, 400) };
+  if (!(await actorInWorkspace(store, c.get('actor') as Actor, body.data.workspace))) {
+    return { refusal: c.json({ error: 'not your workspace', code: 'NOT_PERMITTED' }, 403) };
+  }
+  // the balance guard runs FIRST, before our own configuration check: "you are out of
+  // credits" is a true and stable answer about the caller's state whether or not the key is
+  // set, and putting it first makes the guard provably the first thing that happens.
+  const before = await ledger.balance(body.data.workspace);
+  if (before.remainingMicros <= 0) {
+    return { refusal: c.json({ error: 'out of credits', code: 'NO_CREDITS', remainingCredits: 0 }, 402) };
+  }
+  const key = process.env['STARTER_GOOGLE_API_KEY'];
+  if (!key) return { refusal: c.json({ error: 'starter brain not configured', code: 'UNAVAILABLE' }, 503) };
+  return { ledger, body: body.data, key };
+}
+
+/** the request Google gets, from either door */
+export function starterRequest(b: StarterBody): Record<string, unknown> {
+  return {
+    contents: b.contents,
+    ...(b.system ? { systemInstruction: { parts: [{ text: b.system }] } } : {}),
+    ...(b.tools ? { tools: b.tools } : {}),
+    generationConfig: { thinkingConfig: { thinkingLevel: STARTER_THINKING_LEVEL } },
+  };
+}
+
+/** THE price of one starter call, for both doors: meter what the vendor SAYS it used, never an
+ *  estimate — a ledger built on our own guess drifts away from the invoice it is supposed to
+ *  explain. The call already happened, so a refused debit means the balance emptied underneath
+ *  it: the answer is served, and the NEXT call is the one that stops. */
+export async function chargeStarterCall(ledger: Ledger, workspace: string, usage: GeminiUsage | undefined): Promise<{ remaining: number; spentMicros: number }> {
+  const inTok = usage?.promptTokenCount ?? 0;
+  const outTok = usage?.candidatesTokenCount ?? 0;
+  const micros = priceModelCall(STARTER_MODEL, inTok, outTok);
+  const spent = await ledger.spend(workspace, micros, { inTokens: inTok, outTokens: outTok });
+  return { remaining: microsToCredits(spent ? spent.remainingMicros : 0), spentMicros: micros };
+}
 
 /** the free plan's daily wake-minute allowance. INJECTED rather than imported: the cap is a
  *  fleet policy (fleet-lifecycle owns its env var and the force-stop that enforces it) and that
  *  module already imports this one, so reaching back for it would make the two routes a cycle.
  *  /v1/usage only REPORTS the number — the guard stays where the stop happens. */
-export function creditRoutes<E extends Env & { Variables: { actor: Actor } }>(app: Hono<E>, store: Store, ledger: Ledger | null = ledgerFor(store)): void {
+export function creditRoutes<E extends Env & { Variables: { actor: Actor } }>(app: Hono<E>, store: Store, ledger: Ledger | null = ledgerFor(store), fetchFn: StarterFetch = (u, i) => fetch(u, i)): void {
   // the starter brain. the platform key never leaves this process, the balance is checked
   // before the call and debited after it, and the response carries what is left so a client
   // never has to ask separately.
   app.post('/v1/starter/generate', async (c) => {
-    // the one door the local stack keeps shut: the starter key lives on the cloud and never
-    // reaches a machine (CLAUDE.md #5). Said plainly, with the way forward.
-    if (localMode()) return c.json({ error: 'The local stack has no starter brain. Add your own model key.', code: 'UNAVAILABLE' }, 503);
-    if (!ledger) return c.json({ error: 'credits not served by this store' }, 501);
-    const body = GenerateSchema.safeParse(await c.req.json().catch(() => null));
-    if (!body.success) return c.json({ error: 'invalid body', issues: body.error.issues }, 400);
-    const { workspace } = body.data;
-    if (!(await actorInWorkspace(store, c.get('actor'), workspace))) {
-      return c.json({ error: 'not your workspace', code: 'NOT_PERMITTED' }, 403);
-    }
-    // the balance guard runs FIRST, before our own configuration check: "you are out of
-    // credits" is a true and stable answer about the caller's state whether or not the key is
-    // set, and putting it first makes the guard provably the first thing that happens.
-    const before = await ledger.balance(workspace);
-    if (before.remainingMicros <= 0) {
-      return c.json({ error: 'out of credits', code: 'NO_CREDITS', remainingCredits: 0 }, 402);
-    }
-    const key = process.env['STARTER_GOOGLE_API_KEY'];
-    if (!key) return c.json({ error: 'starter brain not configured', code: 'UNAVAILABLE' }, 503);
-
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${STARTER_MODEL}:generateContent`,
-      {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
-        body: JSON.stringify({
-          contents: body.data.contents,
-          ...(body.data.system ? { systemInstruction: { parts: [{ text: body.data.system }] } } : {}),
-          ...(body.data.tools ? { tools: body.data.tools } : {}),
-          generationConfig: { thinkingConfig: { thinkingLevel: STARTER_THINKING_LEVEL } },
-        }),
-      },
-    );
+    const pre = await starterPreflight(c, store, ledger);
+    if ('refusal' in pre) return pre.refusal;
+    const res = await fetchFn(`${STARTER_MODEL_URL}:generateContent`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-goog-api-key': pre.key },
+      body: JSON.stringify(starterRequest(pre.body)),
+    });
     const payload = (await res.json().catch(() => ({}))) as { usageMetadata?: GeminiUsage };
     if (!res.ok) return c.json({ error: 'starter brain call failed', code: 'UPSTREAM', status: res.status }, 502);
-
-    // meter what the vendor SAYS it used, never an estimate — a ledger built on our own guess
-    // drifts away from the invoice it is supposed to explain.
-    const inTok = payload.usageMetadata?.promptTokenCount ?? 0;
-    const outTok = payload.usageMetadata?.candidatesTokenCount ?? 0;
-    const micros = priceModelCall(STARTER_MODEL, inTok, outTok);
-    const spent = await ledger.spend(workspace, micros, { inTokens: inTok, outTokens: outTok });
-    // the call already happened, so a refused debit means the balance emptied underneath it —
-    // serve the answer, and let the NEXT call be the one that stops.
-    const remaining = spent ? spent.remainingMicros : 0;
-    c.header('x-nm-credits-remaining', String(microsToCredits(remaining)));
-    return c.json({ ...payload, credits: { remaining: microsToCredits(remaining), spentMicros: micros } });
+    const credits = await chargeStarterCall(pre.ledger, pre.body.workspace, payload.usageMetadata);
+    c.header('x-nm-credits-remaining', String(credits.remaining));
+    return c.json({ ...payload, credits });
   });
+  // the same call, streamed (starter-stream.ts): text deltas as the model writes them, then the
+  // body above. Same guards, same price, handed over so the two doors cannot drift apart.
+  starterStreamRoute(app, { preflight: (c) => starterPreflight(c, store, ledger), request: starterRequest, charge: chargeStarterCall, fetchFn, modelUrl: STARTER_MODEL_URL });
 
   // the dashboard's history: daily meter rows + the grant ledger, one call. Read-only,
   // member-gated, straight off machine_usage/credit_grants (both deliberately unsynced).

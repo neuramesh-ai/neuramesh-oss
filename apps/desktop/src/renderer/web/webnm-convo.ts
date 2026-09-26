@@ -19,24 +19,17 @@ import type { NMBridge } from '../src/bridge/nm';
 import type { HomeConvoRow, MessageRow } from '../src/bridge/rows-rooms';
 import type { MemberRow } from '../src/bridge/rows-crew';
 import type { WebNmConfig } from './webnm';
+import { shareWatches, watchRows } from './webnm-watch';
 
-/** a live query: run it, then re-run whenever one of `tables` changes. mirrors db.watch's
- *  contract for the renderer, minus the IPC hop the desktop needs. */
+/** a live query: run it, then re-run whenever one of `tables` changes (webnm-watch.ts: one run in
+ *  flight, unchanged results not re-delivered). A failed read leaves the last good rows standing. */
 function watch<T>(
   db: PowerSyncDatabase,
   tables: string[],
   run: () => Promise<T[]>,
   cb: (rows: T[]) => void,
 ): () => void {
-  let live = true;
-  const push = () => {
-    if (!live) return;
-    // a failed read leaves the last good rows standing rather than blanking the surface
-    void run().then((rows) => { if (live) cb(rows); }).catch(() => {});
-  };
-  push();
-  const stop = db.onChangeWithCallback({ onChange: () => push() }, { tables });
-  return () => { live = false; stop(); };
+  return watchRows(db, tables, run, cb);
 }
 
 /** A failed read must not look like an empty workspace — that is the exact bug these lanes were
@@ -49,7 +42,7 @@ const orEmpty = <T>(what: string) => (e: unknown): T[] => {
 
 export function convoOverrides(cfg: WebNmConfig, db: PowerSyncDatabase): Partial<NMBridge> {
   const ws = () => cfg.workspaceId();
-  return {
+  return shareWatches<Partial<NMBridge>>({
     /**
      * HAS ANYONE HERE EVER SPOKEN? Ported from sync.ts nm:welcomed — the same replica question.
      *
@@ -114,7 +107,7 @@ export function convoOverrides(cfg: WebNmConfig, db: PowerSyncDatabase): Partial
     // typecheck fine — the overrides are Record<string, unknown> — and then send `undefined` as
     // the body of every message, which is the kind of break that only shows up in use.
     send: async (channelId: string, body: string, opts?: SendOpts) => insertMessage(db, cfg, channelId, body, opts),
-  };
+  });
 }
 
 export interface SendOpts {

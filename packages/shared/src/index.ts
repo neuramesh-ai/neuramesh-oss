@@ -16,6 +16,7 @@ export * from './beats';
 export * from './runs';
 export * from './deliverables';
 export * from './stream';
+export * from './livestream';
 export * from './agentdesc';
 export * from './agentcontract';
 export * from './replies';

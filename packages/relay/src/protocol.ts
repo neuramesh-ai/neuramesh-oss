@@ -14,12 +14,19 @@
 //
 // edge messages — relay handshakes, consumed by the relay, never forwarded:
 //
-//   { t: 'hello', machineId }          machine→relay, first message after header auth
-//                                      (`authorization: Bearer nmm_…` on the upgrade)
+//   { t: 'hello', machineId, lanes? }  machine→relay, first message after header auth
+//                                      (`authorization: Bearer nmm_…` on the upgrade). `lanes`
+//                                      names the lanes this daemon serves; a lane born after the
+//                                      field (`stream`) is only ever opened on a machine that
+//                                      names it, because an older daemon reads any unknown lane
+//                                      as a terminal and would spawn a shell for it
 //   { t: 'attach', machineId, token }  client→relay, first message; token = clerk bearer
 //                                      (a message, not a URL param — credentials never
 //                                      ride query strings)
-//   { t: 'attached', machineId }       relay→client: attach accepted, frames may flow
+//   { t: 'attached', machineId, lanes? } relay→client: attach accepted, frames may flow. `lanes`
+//                                      repeats what the machine's hello named, so a client opens a
+//                                      lane born after the field (`stream`) only when it sees it
+//                                      here: an older relay sends none, and forwards any lane as-is
 //
 // `ch` is minted by the client (one per pty session) and owned by the client that first
 // opens it; the relay routes machine frames back by that ownership and drops the rest.
@@ -45,7 +52,9 @@ export const CLOSE = {
 } as const;
 
 export type FrameType = 'data' | 'open' | 'close' | 'resize';
-export type ChannelLane = 'terminal' | 'engineering';
+/** `stream`: a read-only subscription to the machine's live agent replies (the browser's live
+ *  bubble). It is not a session: it has its own caps on both edges and never counts as activity. */
+export type ChannelLane = 'terminal' | 'engineering' | 'stream';
 
 export interface ChannelFrame {
   ch: string;
@@ -71,13 +80,14 @@ export interface ChannelFrame {
 }
 
 export type EdgeMessage =
-  | { t: 'hello'; machineId: string }
+  | { t: 'hello'; machineId: string; lanes?: ChannelLane[] }
   | { t: 'attach'; machineId: string; token: string }
-  | { t: 'attached'; machineId: string };
+  | { t: 'attached'; machineId: string; lanes?: ChannelLane[] };
 
 export type RelayMessage = ChannelFrame | EdgeMessage;
 
 const FRAME_TYPES: ReadonlySet<string> = new Set(['data', 'open', 'close', 'resize']);
+const LANES: ReadonlySet<string> = new Set(['terminal', 'engineering', 'stream']);
 export const MAX_CHANNEL_DATA_B64_CHARS = 512 * 1024;
 
 export function isChannelFrame(m: RelayMessage): m is ChannelFrame {
@@ -101,7 +111,9 @@ export function parseMessage(raw: string): RelayMessage | null {
     return isChannelFrame(frame) ? frame : null;
   }
   if (m['t'] === 'hello') {
-    return typeof m['machineId'] === 'string' ? { t: 'hello', machineId: m['machineId'] } : null;
+    if (typeof m['machineId'] !== 'string') return null;
+    const lanes = Array.isArray(m['lanes']) ? (m['lanes'] as unknown[]).filter((l): l is ChannelLane => typeof l === 'string' && LANES.has(l)) : undefined;
+    return { t: 'hello', machineId: m['machineId'], ...(lanes ? { lanes } : {}) };
   }
   if (m['t'] === 'attach') {
     return typeof m['machineId'] === 'string' && typeof m['token'] === 'string'

@@ -60,8 +60,27 @@ async function settledInventory(stream: unknown, init: { tools?: string[]; mcp_s
   return { ok: inv.ok && !inv.pending, summary: inv.summary };
 }
 
+/** the Agent SDK option that makes a turn TYPE: with a live bubble to feed, ask for the partial
+ *  stream events (token deltas); with none, the whole-block stream stays as it was */
+export const partialMessages = (onDelta?: unknown): { includePartialMessages?: true } => (onDelta ? { includePartialMessages: true } : {});
+
+/** one partial stream event (partialMessages) → the text block being written now. A new text block
+ *  starts over; a text delta grows it and feeds the bubble; a subagent's words and every other
+ *  event (thinking, tool input, message edges) change nothing. */
+function typedText(m: { parent_tool_use_id?: string | null; event?: any }, typing: string, onDelta?: (t: string) => void): string {
+  const ev = m.parent_tool_use_id ? null : m.event;
+  if (ev?.type === 'content_block_start' && ev.content_block?.type === 'text') return '';
+  if (ev?.type !== 'content_block_delta' || ev.delta?.type !== 'text_delta' || !ev.delta.text) return typing;
+  onDelta?.(typing + ev.delta.text);
+  return typing + ev.delta.text;
+}
+
 export async function drainQuery(stream: AsyncIterable<any>, fallback: string, log?: LogFn, onDelta?: (t: string) => void, onTodos?: (todos: Array<{ content?: string; status?: string }>) => void, expect?: { mcp: string }): Promise<string> {
   let text = '';
+  // the text block being written right now, from the partial stream events (partialMessages): the
+  // bubble gets it growing, the same whole-text-so-far contract as the complete block below, which
+  // still arrives and still decides the reply. A subagent's words (parent_tool_use_id) never show.
+  let typing = '';
   // every superseded text block, because cards written in one are NOT narration — carryCards
   // rescues any ```nmq/```nms fence the final block dropped ("Waiting on those two", 2026-08-06)
   const earlier: string[] = [];
@@ -69,6 +88,7 @@ export async function drainQuery(stream: AsyncIterable<any>, fallback: string, l
   // rule would otherwise drop when a later tool call and its confirmation close the turn
   const spoken: string[] = [];
   for await (const m of stream) {
+    if (m.type === 'stream_event') { typing = typedText(m, typing, onDelta); continue; }
     if (m.type === 'system' && m.subtype === 'init' && expect) {
       const inv = await settledInventory(stream, m, expect.mcp);
       log?.({ kind: 'turn', summary: `tools: ${inv.summary}`, level: inv.ok ? 'info' : 'warn' });
@@ -169,7 +189,7 @@ export async function claudeTurn(
     const reply = await drainQuery(
       // allowedTools:[] keeps this a true tool-less reply; otherwise the SDK's default tools can burn the
       // one turn on a tool call (→ error_max_turns, no text). Same trap as directComplete.
-      query({ prompt: claudeAgentPrompt(transcript, attachments), options: { ...claudePathOption(), env: providerEnv('anthropic', token), model: agent.model, maxTurns: 1, allowedTools: [], permissionMode: 'bypassPermissions', cwd: os.tmpdir(), systemPrompt: system } }) as AsyncIterable<any>,
+      query({ prompt: claudeAgentPrompt(transcript, attachments), options: { ...claudePathOption(), env: providerEnv('anthropic', token), model: agent.model, maxTurns: 1, allowedTools: [], permissionMode: 'bypassPermissions', cwd: os.tmpdir(), systemPrompt: system, ...partialMessages(onDelta) } }) as AsyncIterable<any>,
       '(no reply)', log, onDelta,
     );
     return reply.trim() || '(no reply)';

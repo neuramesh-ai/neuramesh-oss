@@ -3,6 +3,8 @@ import { mountShell } from './shell';
 // registers window.__nmAgentSays / __nmHumanSays / __nmHumanSaysInConvo — the states a shot
 // cannot reach by clicking (see harness-hooks.ts)
 import './harness-hooks';
+// ?perf=1 splices the long thread + the streamed-reply fixture in (render-smoothness round)
+import './mock-perf';
 // match the production renderer entry (main.tsx): self-hosted Geist + serifs +
 // Bricolage (wordmark) + tokens
 import '@neuramesh/fonts/neuramesh-sans.css';

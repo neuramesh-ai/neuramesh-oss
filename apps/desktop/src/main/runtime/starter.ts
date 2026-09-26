@@ -28,7 +28,8 @@ import { z } from 'zod';
 import { STARTER_MODEL, type TurnKind } from '@neuramesh/shared';
 import { invokeTool, outputToText, toolsForTurn, type ToolHost } from '../harness/toolbus';
 import { beatsAdapter } from '../harness/turntools';
-import { geminiOrchestratorTurn, starterGenerate } from '../host/orchturn';
+import { geminiOrchestratorTurn } from '../host/orchturn';
+import { starterGenerate, starterStream } from '../host/starterproxy';
 import { instructionsFor } from '../host/turnkit';
 import { buildCodingPrompt, codingSystemPrompt, type PermissionGate, type PromptOverride, type TurnOpts } from './adapter';
 import type { OrchTool } from '../host/orchtools';
@@ -122,9 +123,13 @@ export function busToolsForStarter(kind: TurnKind, host: ToolHost): OrchTool[] {
 const STARTER_NOTE = '\n\n[YOUR RUNTIME — the NeuraMesh Starter brain. You have write_file / read_file / list_files for the workspace and the nm tools listed above; you have NO shell: do not promise to run commands, tests or builds — produce the deliverable files directly, validate by re-reading them, and say what you could not verify.]';
 
 // ── The three seats of the adapter, on the proxy ───────────────────────────────────────────────
-export async function starterComplete(system: string, user: string): Promise<string> {
+/** one tool-less reply. With `onDelta` (a chat reply someone watches) it streams, and the bubble
+ *  gets the words so far as they arrive; without, the whole-reply door, as before. */
+export async function starterComplete(system: string, user: string, onDelta?: (text: string) => void): Promise<string> {
   const l = laneOrThrow();
-  const r: any = await starterGenerate({ apiUrl: l.apiUrl, workspace: l.workspace, actorId: l.actorId, contents: [{ role: 'user', parts: [{ text: user }] }], config: { systemInstruction: system } });
+  const call = { apiUrl: l.apiUrl, workspace: l.workspace, actorId: l.actorId, contents: [{ role: 'user', parts: [{ text: user }] }], config: { systemInstruction: system } };
+  let said = '';
+  const r: any = onDelta ? await starterStream({ ...call, onText: (d) => { said += d; onDelta(said); } }) : await starterGenerate(call);
   return ((r.candidates?.[0]?.content?.parts ?? []).map((p: any) => p?.text).filter(Boolean).join('') as string).trim();
 }
 

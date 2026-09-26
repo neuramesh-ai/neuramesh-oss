@@ -2,6 +2,8 @@ import react from '@vitejs/plugin-react';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { defineConfig, loadEnv } from 'vite';
+import { bootHints } from './vite.web.hints.mts';
+import { fontPreloads } from './vite.web.fonts.mts';
 
 // the browser client (W2): the real renderer + App on the web bridge (src/renderer/web).
 // serves over http (unlike the preview harness's file:// build). @powersync/web is
@@ -26,7 +28,7 @@ export default defineConfig(({ command, mode }) => {
   // not at the vite root — without this the key silently never loads
   envDir: here,
   base: '/',
-  plugins: [react()],
+  plugins: [react(), bootHints(env), fontPreloads()],
   optimizeDeps: { exclude: ['@powersync/web'] },
   worker: { format: 'es' },
   server: {

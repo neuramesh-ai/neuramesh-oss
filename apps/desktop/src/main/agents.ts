@@ -6,6 +6,7 @@
 // because they run headless too.
 import { apiAuthHeaders, apiBearerHeader } from './apiauth';
 import { electron } from './electronlazy';
+import { liveStreams } from './livestreams';
 import { startPlanRouteWatch, startRoutineBuildWatch } from './host/planroute';
 import { makeRoutineResume } from './host/routineresume';
 import { configureStarterFallback, setStarterLane } from './runtime/starter';
@@ -31,6 +32,9 @@ export function emitStream(key: string, agent: string, text: string, done: boole
   for (const w of electron()?.BrowserWindow.getAllWindows() ?? []) {
     if (!w.webContents.isDestroyed()) w.webContents.send('nm:agent-stream', { key, agent, text: body, done });
   }
+  // …and to the relay's `stream` lane (livestreams.ts): a headless machine has no windows, so
+  // this is the only way a browser sees the reply while it is written. Same filtered text.
+  liveStreams.publish(key, agent, body, done);
 }
 
 import type { PowerSyncDatabase } from '@powersync/node';

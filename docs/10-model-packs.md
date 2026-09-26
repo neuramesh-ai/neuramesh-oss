@@ -577,8 +577,45 @@ agent config — that's the whole point."*
   the cast, pinned ones included since 2026-09-17, moves to the Starter model in one apply, on the
   thread (or the sticky draft before a thread exists). The per-seat picker lists the house model as enabled with "runs on us" — it needs
   no provider connected. A pinned seat stays pinned and the roles list says so.
-- **Named limits.** No shell on the lane (a Starter-seated developer cannot run a build); the proxy
-  is non-streaming, so a chat reply on the lane arrives whole; chat mode's tool loop is still the
-  Claude runtime's — a Starter chat reply is conversational (docs/34 §6's honest degradation).
+- **Named limits.** No shell on the lane (a Starter-seated developer cannot run a build); chat
+  mode's tool loop is still the Claude runtime's — a Starter chat reply is conversational (docs/34
+  §6's honest degradation). The proxy streams since 2026-09-25 (§15.9).
 - Tests: `runtime/starter.test.ts` (the seat rule, the workspace jail, the bus shape per kind, the
   loud failure without a lane), `runtime/authpolicy.test.ts` (the reversal, dated).
+
+### 15.9 The Starter brain streams (2026-09-25)
+
+A reply on the Starter brain types itself out while the model writes it. Before this change, the
+proxy returned the whole reply, so the web showed the ghost and then the full message.
+
+- **The door.** `POST /v1/starter/stream` (`packages/control-api/src/starter-stream.ts`) takes the
+  body of `/v1/starter/generate` and runs the same guards in the same order (`starterPreflight`).
+  It asks Google for the SSE stream and answers with NDJSON: one `{"t":"text"}` line for each delta,
+  then one `{"t":"done","response":…}` line. The response is the body that the whole-reply door
+  returns: Google's response, assembled from the chunks, plus `credits`. A failure after the reply
+  begins is one `{"t":"error"}` line. `/v1/starter/generate` does not change.
+- **One price, one charge.** Both doors price a call with `chargeStarterCall`, from the tokens the
+  vendor reports. The stream charges once, when the upstream ends, fails, or stops, from the last
+  usage that Google reported. Google sends a cumulative count on every chunk, and the prompt count
+  arrives with the first chunk. When a client leaves, the server stops the call. If no chunk arrived
+  yet, the call runs until the first chunk reports its count. So a disconnect is never a free prompt.
+- **Tool rounds.** The proxy keeps the parts in their order. Only adjacent plain text parts merge,
+  so a function call keeps its `id` and a part keeps its `thoughtSignature`. Gemini 3 refuses a
+  tool round whose call lost its signature.
+- **The machine.** `host/starterproxy.ts` holds both doors. The orchestrator loop and the Starter
+  chat reply use the stream only when a live bubble watches (an `onDelta`). Workers and sweeps keep
+  the whole-reply door. The bubble gets the words of the current round, and the next round starts
+  over, as on the Claude path. An API without the route answers 404: the machine then uses the
+  whole-reply door without a word, and asks again after ten minutes.
+- **Claude.** When a bubble watches, the chat turn, the orchestrator turn, and the subscription
+  chat reply ask the Agent SDK for partial messages (`partialMessages` in `host/turnkit.ts`).
+  `drainQuery` gives the bubble each text block as it grows. The reply that posts does not change.
+- **Codex** streams one message at a time, not token by token: its event stream sends an agent
+  message as one completed item. The Codex orchestrator turn sends no bubble text. Not changed here.
+- **Measured** on the neuramesh Starter model through a local API on the dev stack: the first words at
+  615 to 793 ms, a delta every 101 ms at p50 and 152 ms at p95 (about 130 characters each), and the
+  charge 28 to 39 ms after the last delta. The whole-reply door showed the same prompt's reply at
+  1615 ms. Not yet measured through Vercel.
+- Tests: `starter-stream.test.ts`, `host/starterproxy.test.ts`, `host/turnkit-drain.test.ts`,
+  `runtime/starter.test.ts`, and `packages/shared/test/stream.test.ts` (a sentinel that arrives in
+  pieces never flashes in the bubble).

@@ -31,7 +31,11 @@ export function useAlerts(authed: boolean): { alerts: Alert[]; refresh: () => vo
   const capAlert = computeAlert(useCompute(authed));
   const refresh = () => {
     void nm?.alerts().then(
-      (r) => setAlerts(deriveAlerts(r.connectors, r.schedules, r.posts, readDismissals())),
+      // the same alerts keep the same array: the 15 s poll lives in App, so a new one re-renders the shell
+      (r) => {
+        const next = deriveAlerts(r.connectors, r.schedules, r.posts, readDismissals());
+        setAlerts((prev) => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next));
+      },
       () => { /* a failed read keeps the last derivation — never blank a real alert on a blip */ },
     );
   };

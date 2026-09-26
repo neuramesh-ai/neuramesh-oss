@@ -1889,6 +1889,8 @@ function fenceWork(tag) {
 }
 function visibleStream(text) {
   if (isStandDown(text)) return { text: "", forming: null };
+  const lines = text.trimEnd().split("\n");
+  if (SENTINEL_FORMING.test(lines[lines.length - 1] ?? "")) text = lines.slice(0, -1).join("\n");
   const closed = text.replace(CLOSED_RE, "");
   const open = OPEN_RE.exec(closed);
   const visible = (open ? closed.slice(0, open.index) : closed).replace(/\n{3,}/g, "\n\n").trimEnd();
@@ -1934,15 +1936,83 @@ ${fences.join("\n\n")}` : prose2(spoken);
 
 ${finalText}`;
 }
-var SENTINEL, MACHINE_TAG, CLOSED_RE, OPEN_RE, SPOKEN_MIN_CHARS;
+var SENTINEL, SENTINEL_FORMING, MACHINE_TAG, CLOSED_RE, OPEN_RE, SPOKEN_MIN_CHARS;
 var init_stream = __esm({
   "../shared/src/stream.ts"() {
     "use strict";
     SENTINEL = /^[\s*_`>]*NO_REPLY[\s*_`.!]*$/i;
+    SENTINEL_FORMING = /^[\s*_`>]*N(?:O(?:_(?:R(?:E(?:P(?:L)?)?)?)?)?)?$/;
     MACHINE_TAG = String.raw`(?:nm[a-z]*|revise|cards|posts)`;
     CLOSED_RE = new RegExp("```" + MACHINE_TAG + "\\b[^\\n]*\\n[\\s\\S]*?```[ \\t]*\\n?", "gi");
     OPEN_RE = new RegExp("```(" + MACHINE_TAG + ")\\b[\\s\\S]*$", "i");
     SPOKEN_MIN_CHARS = 120;
+  }
+});
+
+// ../shared/src/livestream.ts
+function liveDelta(prev, next) {
+  const max = Math.min(prev.length, next.length);
+  let keep = 0;
+  while (keep < max && prev.charCodeAt(keep) === next.charCodeAt(keep)) keep += 1;
+  if (keep > 0 && keep < next.length && isHigh(next.charCodeAt(keep - 1))) keep -= 1;
+  return { keep, add: next.slice(keep) };
+}
+function applyLiveFrame(cur, f) {
+  if (f.t === "snap") return { kind: "state", state: { a: f.a, e: f.e, s: f.s, text: f.text } };
+  if (f.t === "end") return cur && cur.e === f.e ? { kind: "end" } : { kind: "none" };
+  if (!cur || cur.e !== f.e) {
+    return f.s === 1 && f.keep === 0 ? { kind: "state", state: { a: f.a, e: f.e, s: 1, text: f.add } } : { kind: "resync" };
+  }
+  if (f.s <= cur.s) return { kind: "none" };
+  if (f.s !== cur.s + 1 || f.keep > cur.text.length) return { kind: "resync" };
+  return { kind: "state", state: { a: f.a, e: f.e, s: f.s, text: cur.text.slice(0, f.keep) + f.add } };
+}
+function parseLiveFrame(line) {
+  let v;
+  try {
+    v = JSON.parse(line);
+  } catch {
+    return null;
+  }
+  return liveFrameOf(v);
+}
+function liveFrameOf(v) {
+  if (typeof v !== "object" || v === null) return null;
+  const f = v;
+  const keyed = typeof f["k"] === "string" && typeof f["a"] === "string" && typeof f["e"] === "string" && typeof f["s"] === "number";
+  switch (f["t"]) {
+    case "snap":
+      return keyed && typeof f["text"] === "string" ? f : null;
+    case "d":
+      return keyed && typeof f["keep"] === "number" && f["keep"] >= 0 && typeof f["add"] === "string" ? f : null;
+    case "end":
+      return keyed ? f : null;
+    case "live":
+      return Array.isArray(f["keys"]) && f["keys"].every((k) => typeof k === "string") ? f : null;
+    case "hb":
+      return { t: "hb", at: typeof f["at"] === "number" ? f["at"] : 0 };
+    default:
+      return null;
+  }
+}
+function liveKeySurface(key2) {
+  const i = key2.indexOf(":");
+  if (i <= 0) return null;
+  const rest = key2.slice(i + 1);
+  return { channelId: key2.slice(0, i), subjectId: rest || null };
+}
+var LIVE_STREAM_LANE, isLiveStreamOpenMeta, LIVE_MAX_FPS, LIVE_MIN_FRAME_MS, LIVE_MAX_CHARS, LIVE_HEARTBEAT_MS, LIVE_SILENCE_MS, isHigh;
+var init_livestream = __esm({
+  "../shared/src/livestream.ts"() {
+    "use strict";
+    LIVE_STREAM_LANE = "stream";
+    isLiveStreamOpenMeta = (m) => typeof m === "object" && m !== null && m["v"] === 1;
+    LIVE_MAX_FPS = 30;
+    LIVE_MIN_FRAME_MS = Math.ceil(1e3 / LIVE_MAX_FPS);
+    LIVE_MAX_CHARS = 2e5;
+    LIVE_HEARTBEAT_MS = 2e4;
+    LIVE_SILENCE_MS = 5e4;
+    isHigh = (code) => code >= 55296 && code <= 56319;
   }
 });
 
@@ -8381,6 +8451,12 @@ __export(src_exports, {
   IMPORT_UNWRITTEN: () => IMPORT_UNWRITTEN,
   LEGACY_MODELS: () => LEGACY_MODELS,
   LINK_TABLES: () => LINK_TABLES,
+  LIVE_HEARTBEAT_MS: () => LIVE_HEARTBEAT_MS,
+  LIVE_MAX_CHARS: () => LIVE_MAX_CHARS,
+  LIVE_MAX_FPS: () => LIVE_MAX_FPS,
+  LIVE_MIN_FRAME_MS: () => LIVE_MIN_FRAME_MS,
+  LIVE_SILENCE_MS: () => LIVE_SILENCE_MS,
+  LIVE_STREAM_LANE: () => LIVE_STREAM_LANE,
   MACHINE_MICROS_PER_ACTIVE_MINUTE: () => MACHINE_MICROS_PER_ACTIVE_MINUTE,
   MACHINE_ONLINE_MS: () => MACHINE_ONLINE_MS,
   MACHINE_WAIT_LINE: () => MACHINE_WAIT_LINE,
@@ -8502,6 +8578,7 @@ __export(src_exports, {
   agentUpdateCommand: () => agentUpdateCommand,
   alertsSummary: () => alertsSummary,
   announceReadyMeta: () => announceReadyMeta,
+  applyLiveFrame: () => applyLiveFrame,
   applyRemoteEngineeringEvent: () => applyRemoteEngineeringEvent,
   applyReplyRevision: () => applyReplyRevision,
   applyShare: () => applyShare,
@@ -8665,6 +8742,7 @@ __export(src_exports, {
   isGateArtifact: () => isGateArtifact,
   isGrey: () => isGrey,
   isHouseBrain: () => isHouseBrain,
+  isLiveStreamOpenMeta: () => isLiveStreamOpenMeta,
   isLocalOverride: () => isLocalOverride,
   isLowRiskPermissionCard: () => isLowRiskPermissionCard,
   isNoisePr: () => isNoisePr,
@@ -8694,6 +8772,9 @@ __export(src_exports, {
   linkline: () => linkline,
   liveCloudMachine: () => liveCloudMachine,
   liveConnectors: () => liveConnectors,
+  liveDelta: () => liveDelta,
+  liveFrameOf: () => liveFrameOf,
+  liveKeySurface: () => liveKeySurface,
   liveKinOf: () => liveKinOf,
   lookFrom: () => lookFrom,
   looksLikeProductBeat: () => looksLikeProductBeat,
@@ -8755,6 +8836,7 @@ __export(src_exports, {
   parseDraftRevisions: () => parseDraftRevisions,
   parseDraftedPosts: () => parseDraftedPosts,
   parseExport: () => parseExport,
+  parseLiveFrame: () => parseLiveFrame,
   parseModeMarker: () => parseModeMarker,
   parseNeed: () => parseNeed,
   parseNextSteps: () => parseNextSteps,
@@ -9012,6 +9094,7 @@ var init_src = __esm({
     init_runs();
     init_deliverables();
     init_stream();
+    init_livestream();
     init_agentdesc();
     init_agentcontract();
     init_replies();
@@ -10509,6 +10592,166 @@ async function computeFleetDesired(sql) {
   return rowsToDesired(rows2);
 }
 
+// src/starter-stream.ts
+async function* sseChunks(body) {
+  const reader = body.getReader();
+  const dec = new TextDecoder();
+  let buf = "";
+  let data = [];
+  try {
+    for (; ; ) {
+      const { done: done2, value } = await reader.read();
+      buf += done2 ? dec.decode() : dec.decode(value, { stream: true });
+      if (done2) buf += "\n\n";
+      for (let nl = buf.indexOf("\n"); nl >= 0; nl = buf.indexOf("\n")) {
+        const line = buf.slice(0, nl).replace(/\r$/, "");
+        buf = buf.slice(nl + 1);
+        if (line.startsWith("data:")) data.push(line.slice(line.startsWith("data: ") ? 6 : 5));
+        else if (line === "" && data.length) {
+          const one = data.join("\n");
+          data = [];
+          yield JSON.parse(one);
+        }
+      }
+      if (done2) return;
+    }
+  } finally {
+    await reader.cancel().catch(() => {
+    });
+  }
+}
+var plainText = (p2) => typeof p2.text === "string" && Object.keys(p2).length === 1;
+function starterAssembly() {
+  const parts = [];
+  let cand = null;
+  let usage;
+  const top = {};
+  return {
+    /** fold one chunk in; answers the words it carried (thought parts are never shown) */
+    add(chunk2) {
+      const { candidates, usageMetadata, ...rest } = chunk2;
+      Object.assign(top, rest);
+      if (usageMetadata) usage = { ...usage, ...usageMetadata };
+      const first = candidates?.[0];
+      if (!first) return "";
+      const { content, ...fields } = first;
+      cand = { ...cand, ...fields };
+      let text = "";
+      for (const p2 of content?.parts ?? []) {
+        if (typeof p2.text === "string" && !p2.thought) text += p2.text;
+        if (plainText(p2) && !p2.text) continue;
+        const last = parts[parts.length - 1];
+        if (last && plainText(p2) && plainText(last)) last.text = `${last.text ?? ""}${p2.text ?? ""}`;
+        else parts.push({ ...p2 });
+      }
+      return text;
+    },
+    usage: () => usage,
+    response: () => ({
+      ...cand || parts.length ? { candidates: [{ content: { role: "model", parts }, ...cand }] } : {},
+      ...top,
+      ...usage ? { usageMetadata: usage } : {}
+    })
+  };
+}
+function starterReplyStream(o) {
+  const enc = new TextEncoder();
+  const acc = starterAssembly();
+  let ctl;
+  let gone = false;
+  let grace;
+  const send = (line) => {
+    if (gone || !ctl) return;
+    try {
+      ctl.enqueue(enc.encode(`${JSON.stringify(line)}
+`));
+    } catch {
+      gone = true;
+    }
+  };
+  const pump = async () => {
+    let failure = null;
+    try {
+      for await (const chunk2 of sseChunks(o.upstream)) {
+        if (chunk2.error) {
+          failure = "UPSTREAM";
+          break;
+        }
+        const text = acc.add(chunk2);
+        if (gone) {
+          o.abortUpstream();
+          failure = "CLIENT_GONE";
+          break;
+        }
+        if (text) send({ t: "text", text });
+      }
+    } catch {
+      failure = gone ? "CLIENT_GONE" : "UPSTREAM";
+    }
+    clearTimeout(grace);
+    let credits = null;
+    try {
+      credits = await o.settle(acc.usage());
+    } catch (e) {
+      const u = acc.usage();
+      o.log?.(`starter_stream_charge_failed in=${u?.promptTokenCount ?? 0} out=${u?.candidatesTokenCount ?? 0}: ${e instanceof Error ? e.message : String(e)}`);
+    }
+    if (!credits) send({ t: "error", error: "the charge for this call did not record", code: "INTERNAL" });
+    else if (failure) send({ t: "error", error: "starter brain call failed", code: failure });
+    else send({ t: "done", response: { ...acc.response(), credits } });
+    if (!gone) try {
+      ctl?.close();
+    } catch {
+    }
+  };
+  return new ReadableStream({
+    // two statements, not `keepAlive?.(pump())`: an optional call skips its arguments, so with no
+    // keepAlive the pump would never start
+    start(c) {
+      ctl = c;
+      const work = pump();
+      o.keepAlive?.(work);
+    },
+    cancel() {
+      gone = true;
+      if (acc.usage()) o.abortUpstream();
+      else grace = setTimeout(o.abortUpstream, o.graceMs ?? 3e4);
+    }
+  });
+}
+function vercelWaitUntil(work) {
+  const holder = globalThis[/* @__PURE__ */ Symbol.for("@vercel/request-context")];
+  holder?.get?.()?.waitUntil?.(work);
+}
+function starterStreamRoute(app, deps) {
+  app.post("/v1/starter/stream", async (c) => {
+    const pre = await deps.preflight(c);
+    if ("refusal" in pre) return pre.refusal;
+    const upstream = new AbortController();
+    const res = await deps.fetchFn(`${deps.modelUrl}:streamGenerateContent?alt=sse`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-goog-api-key": pre.key },
+      body: JSON.stringify(deps.request(pre.body)),
+      signal: upstream.signal
+    }).catch(() => null);
+    if (!res?.ok || !res.body) {
+      await res?.body?.cancel().catch(() => {
+      });
+      return c.json({ error: "starter brain call failed", code: "UPSTREAM", status: res?.status ?? 0 }, 502);
+    }
+    const workspace = pre.body.workspace;
+    const body = starterReplyStream({
+      upstream: res.body,
+      abortUpstream: () => upstream.abort(),
+      settle: (usage) => deps.charge(pre.ledger, workspace, usage),
+      keepAlive: vercelWaitUntil,
+      graceMs: deps.graceMs,
+      log: (line) => console.error(`${line} workspace=${workspace}`)
+    });
+    return new Response(body, { headers: { "content-type": "application/x-ndjson; charset=utf-8", "cache-control": "no-cache, no-transform", "x-accel-buffering": "no" } });
+  });
+}
+
 // src/video-registry.ts
 init_src();
 var REFERENCE_CLAUSE = "@Image1 is a real screenshot of the product. The screen in the film shows exactly that: the same layout, colors and shapes. Invent no other interface, add no labels, add no text.";
@@ -10657,45 +10900,54 @@ var GenerateSchema = z11.object({
   system: z11.string().optional(),
   tools: z11.unknown().optional()
 });
-function creditRoutes(app, store2, ledger = ledgerFor(store2)) {
+var STARTER_MODEL_URL = `https://generativelanguage.googleapis.com/v1beta/models/${STARTER_MODEL}`;
+async function starterPreflight(c, store2, ledger) {
+  if (localMode()) return { refusal: c.json({ error: "The local stack has no starter brain. Add your own model key.", code: "UNAVAILABLE" }, 503) };
+  if (!ledger) return { refusal: c.json({ error: "credits not served by this store" }, 501) };
+  const body = GenerateSchema.safeParse(await c.req.json().catch(() => null));
+  if (!body.success) return { refusal: c.json({ error: "invalid body", issues: body.error.issues }, 400) };
+  if (!await actorInWorkspace(store2, c.get("actor"), body.data.workspace)) {
+    return { refusal: c.json({ error: "not your workspace", code: "NOT_PERMITTED" }, 403) };
+  }
+  const before = await ledger.balance(body.data.workspace);
+  if (before.remainingMicros <= 0) {
+    return { refusal: c.json({ error: "out of credits", code: "NO_CREDITS", remainingCredits: 0 }, 402) };
+  }
+  const key2 = process.env["STARTER_GOOGLE_API_KEY"];
+  if (!key2) return { refusal: c.json({ error: "starter brain not configured", code: "UNAVAILABLE" }, 503) };
+  return { ledger, body: body.data, key: key2 };
+}
+function starterRequest(b2) {
+  return {
+    contents: b2.contents,
+    ...b2.system ? { systemInstruction: { parts: [{ text: b2.system }] } } : {},
+    ...b2.tools ? { tools: b2.tools } : {},
+    generationConfig: { thinkingConfig: { thinkingLevel: STARTER_THINKING_LEVEL } }
+  };
+}
+async function chargeStarterCall(ledger, workspace, usage) {
+  const inTok = usage?.promptTokenCount ?? 0;
+  const outTok = usage?.candidatesTokenCount ?? 0;
+  const micros = priceModelCall(STARTER_MODEL, inTok, outTok);
+  const spent = await ledger.spend(workspace, micros, { inTokens: inTok, outTokens: outTok });
+  return { remaining: microsToCredits(spent ? spent.remainingMicros : 0), spentMicros: micros };
+}
+function creditRoutes(app, store2, ledger = ledgerFor(store2), fetchFn = (u, i) => fetch(u, i)) {
   app.post("/v1/starter/generate", async (c) => {
-    if (localMode()) return c.json({ error: "The local stack has no starter brain. Add your own model key.", code: "UNAVAILABLE" }, 503);
-    if (!ledger) return c.json({ error: "credits not served by this store" }, 501);
-    const body = GenerateSchema.safeParse(await c.req.json().catch(() => null));
-    if (!body.success) return c.json({ error: "invalid body", issues: body.error.issues }, 400);
-    const { workspace } = body.data;
-    if (!await actorInWorkspace(store2, c.get("actor"), workspace)) {
-      return c.json({ error: "not your workspace", code: "NOT_PERMITTED" }, 403);
-    }
-    const before = await ledger.balance(workspace);
-    if (before.remainingMicros <= 0) {
-      return c.json({ error: "out of credits", code: "NO_CREDITS", remainingCredits: 0 }, 402);
-    }
-    const key2 = process.env["STARTER_GOOGLE_API_KEY"];
-    if (!key2) return c.json({ error: "starter brain not configured", code: "UNAVAILABLE" }, 503);
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${STARTER_MODEL}:generateContent`,
-      {
-        method: "POST",
-        headers: { "content-type": "application/json", "x-goog-api-key": key2 },
-        body: JSON.stringify({
-          contents: body.data.contents,
-          ...body.data.system ? { systemInstruction: { parts: [{ text: body.data.system }] } } : {},
-          ...body.data.tools ? { tools: body.data.tools } : {},
-          generationConfig: { thinkingConfig: { thinkingLevel: STARTER_THINKING_LEVEL } }
-        })
-      }
-    );
+    const pre = await starterPreflight(c, store2, ledger);
+    if ("refusal" in pre) return pre.refusal;
+    const res = await fetchFn(`${STARTER_MODEL_URL}:generateContent`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-goog-api-key": pre.key },
+      body: JSON.stringify(starterRequest(pre.body))
+    });
     const payload = await res.json().catch(() => ({}));
     if (!res.ok) return c.json({ error: "starter brain call failed", code: "UPSTREAM", status: res.status }, 502);
-    const inTok = payload.usageMetadata?.promptTokenCount ?? 0;
-    const outTok = payload.usageMetadata?.candidatesTokenCount ?? 0;
-    const micros = priceModelCall(STARTER_MODEL, inTok, outTok);
-    const spent = await ledger.spend(workspace, micros, { inTokens: inTok, outTokens: outTok });
-    const remaining = spent ? spent.remainingMicros : 0;
-    c.header("x-nm-credits-remaining", String(microsToCredits(remaining)));
-    return c.json({ ...payload, credits: { remaining: microsToCredits(remaining), spentMicros: micros } });
+    const credits = await chargeStarterCall(pre.ledger, pre.body.workspace, payload.usageMetadata);
+    c.header("x-nm-credits-remaining", String(credits.remaining));
+    return c.json({ ...payload, credits });
   });
+  starterStreamRoute(app, { preflight: (c) => starterPreflight(c, store2, ledger), request: starterRequest, charge: chargeStarterCall, fetchFn, modelUrl: STARTER_MODEL_URL });
   app.get("/v1/credits/history", async (c) => {
     const sql = sqlOf(store2);
     if (!sql) return c.json({ error: "credits not served by this store" }, 501);

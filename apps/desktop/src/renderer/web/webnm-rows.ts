@@ -15,6 +15,7 @@ import type { PowerSyncDatabase } from '@powersync/web';
 import type { NMBridge } from '../src/bridge/nm';
 import type { AgentRow, MachineRow, MemberRow } from '../src/bridge/rows-crew';
 import { authHeaders, type WebNmConfig } from './webnm';
+import { sameRows, shareWatches, watchQuery } from './webnm-watch';
 
 /** the three tables loadRoster reads. a change to any of them re-runs the query, the same
  *  contract the desktop's watchers give the renderer. */
@@ -43,20 +44,13 @@ async function readRoster(db: PowerSyncDatabase, ws: string): Promise<Roster> {
 }
 
 export function rowOverrides(cfg: WebNmConfig, db: PowerSyncDatabase): Partial<NMBridge> {
-  return {
-    watchRoster: (cb: (p: Roster) => void): (() => void) => {
-      let live = true;
-      // a failed read must not become an EMPTY roster: "no cloud machine" is a claim, and the
-      // tracker treats a missing lane and an empty one differently on purpose. so a throw leaves
-      // the last good value standing rather than publishing a lie.
-      const push = () => {
-        if (!live) return;
-        void readRoster(db, cfg.workspaceId()).then((r) => { if (live) cb(r); }).catch(() => {});
-      };
-      push();
-      const stop = db.onChangeWithCallback({ onChange: () => push() }, { tables: ROSTER_TABLES });
-      return () => { live = false; stop(); };
-    },
+  return shareWatches<Partial<NMBridge>>({
+    // a failed read must not become an EMPTY roster: "no cloud machine" is a claim, and the
+    // tracker treats a missing lane and an empty one differently on purpose. so a throw leaves
+    // the last good value standing rather than publishing a lie (watchQuery never delivers one).
+    watchRoster: (cb: (p: Roster) => void): (() => void) =>
+      watchQuery<Roster>(db, ROSTER_TABLES, () => readRoster(db, cfg.workspaceId()), cb,
+        (a, b) => sameRows(a.machines, b.machines) && sameRows(a.agents, b.agents) && sameRows(a.members, b.members)),
 
     // ported from sync/ipc/agents.ts:103 — the same route, issued from the page. the server
     // membership-checks it (credentials-authz.ts), so the browser gets no more than the desktop.
@@ -76,5 +70,5 @@ export function rowOverrides(cfg: WebNmConfig, db: PowerSyncDatabase): Partial<N
       if (!res.ok) return null;
       return res.json();
     },
-  };
+  });
 }

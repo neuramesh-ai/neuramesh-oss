@@ -69,6 +69,10 @@
       "max": 900,
       "reason": "THE REPLICA'S BOOT. 52 inline IPC handlers became 10 across seven sync/ipc/ modules; what is left is the boot sequence — connect, resolve the workspace, register the machine, arm the reconnector — which is linear and ordered and must READ that way. Moving a registration past a boot await is how a whole watch layer silently never attached, with 823 tests green. EXIT: none proposed. A boot sequence is a script, and a script is meant to be read top to bottom."
     },
+    "packages/relay/src/hub.ts": {
+      "max": 259,
+      "reason": "THE RELAY HUB: the routing tables, the two edges and every channel budget in one closure, which is what keeps routing decisions in one place (docs/42 §1: one replica, in-memory tables). It sat at exactly 250 when the web stream lane (2026-09-24) gave the third lane its own budget and the machine hello its lanes: nine lines, with the admission rule itself in stream-lane.ts. EXIT: the Pump class and the two edge handlers are the seams; split them in a relay pass with the hub tests beside it, not under a size gate."
+    },
     "apps/desktop/src/renderer/src/thread/TaskThread.tsx": {
       "max": 802,
       "reason": "THE TASK PANEL (docs/25). Zones measured, not guessed: thead 9 bindings (extracted as ThreadHead), phead 11, tcompose 27, the setup block 34. The panel declares 127 bindings and no remaining cluster exceeds 21 lines. EXIT: the docs/25 zones own their own state, the way destinations now do — that is the second half of the state-ownership round and wants its own design pass. · 2026-09-17: 800→802 for the docked brain notice (thread/BrainNotice.tsx): one import and one line above the dock; the bar derives its own state, so the thread pays nothing else. Exit condition unchanged."
@@ -82,8 +86,8 @@
       "reason": "THE ROLE FLOWS. architect → designer → developer → reviewer → shipper as one chain; the workerturn inputs already left. executeFlow's repo branch reads 20 locals and writes back 7 — a closure written longhand, on the path code takes to a PR, with no end-to-end test under it. EXIT: an e2e that drives a real repo-backed run; then the branch can be lifted safely."
     },
     "apps/desktop/src/main/host/wake.ts": {
-      "max": 330,
-      "reason": "THE RUNNER. Routing already left (host/wakerouting.ts) on a genuine one-way edge — 479 → 310. What remains is wake + wakeThread, one entry point and the task-thread case it delegates to, sharing the run handle, the beats and the exit paths. EXIT: none proposed. Splitting an entry point from its one delegate buys a file and costs the path."
+      "max": 334,
+      "reason": "THE RUNNER. Routing already left (host/wakerouting.ts) on a genuine one-way edge — 479 → 310. What remains is wake + wakeThread, one entry point and the task-thread case it delegates to, sharing the run handle, the beats and the exit paths. EXIT: none proposed. Splitting an entry point from its one delegate buys a file and costs the path. Raised 330 → 334 (the web speed round, 2026-09-26): the stream fixture's branch (host/streamfixture.ts), one import and three lines in front of the image draw, so an echo-mode reply streams at a model's pace for the perf harness. It runs only with NM_AGENT_MODE=echo and NM_STREAM_FIXTURE=1."
     }
   },
   "files": {}

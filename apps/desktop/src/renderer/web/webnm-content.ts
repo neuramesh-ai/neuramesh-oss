@@ -37,6 +37,7 @@ import type { ConnectorRow, ContentItemRow, ContentItemWide, ScheduleRow, Schedu
 import { orEmpty, shelfOverrides } from './webnm-shelf';
 import { insertMessage } from './webnm-convo';
 import { authHeaders, postCommand, type WebNmConfig } from './webnm';
+import { stableReads } from './webnm-watch';
 
 /** ported from sync/ipc/content.ts — the calendar's atoms and the four human moves on them */
 function contentLanes(cfg: WebNmConfig, db: PowerSyncDatabase): Partial<NMBridge> {
@@ -353,10 +354,11 @@ function connectorLanes(cfg: WebNmConfig, db: PowerSyncDatabase): Partial<NMBrid
 }
 
 export function contentOverrides(cfg: WebNmConfig, db: PowerSyncDatabase): Partial<NMBridge> {
-  return {
+  // the calendar, the routines list and both thread strips POLL these every 4–5 s into state
+  return stableReads({
     ...shelfOverrides(cfg, db),
     ...contentLanes(cfg, db),
     ...scheduleLanes(cfg, db),
     ...connectorLanes(cfg, db),
-  };
+  }, ['contentItems', 'contentAll', 'contentByTask', 'contentByThread', 'schedules', 'connectors']);
 }

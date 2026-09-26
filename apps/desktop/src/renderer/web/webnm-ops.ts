@@ -30,21 +30,14 @@ import type { AgentRow, MachineRow } from '../src/bridge/rows-crew';
 import type { HistoryThreadRow } from '../src/bridge/rows-rooms';
 import type { ArchivedThreadRow, FailoverRow, PolicyRowUI } from '../src/bridge/rows-infra';
 import { authHeaders, postCommand, type WebNmConfig } from './webnm';
+import { shareWatches, watchRows } from './webnm-watch';
 
 /** a live query: run it, then re-run whenever one of `tables` changes. mirrors db.watch's
- *  contract for the renderer, minus the IPC hop the desktop needs. Duplicated from
- *  webnm-board.ts rather than shared, the same way `orEmpty` already is: a lane file stands
- *  alone, and these are being written in parallel. */
+ *  contract for the renderer, minus the IPC hop the desktop needs. The mechanism is shared
+ *  (webnm-watch.ts): one run in flight, and an unchanged result is not delivered again. */
 function watch<T>(db: PowerSyncDatabase, tables: string[], run: () => Promise<T[]>, cb: (rows: T[]) => void): () => void {
-  let live = true;
-  const push = () => {
-    if (!live) return;
-    // a failed read leaves the last good rows standing rather than blanking the surface
-    void run().then((rows) => { if (live) cb(rows); }).catch((e: unknown) => { console.error('[webnm] watch read failed:', e); });
-  };
-  push();
-  const stop = db.onChangeWithCallback({ onChange: () => push() }, { tables });
-  return () => { live = false; stop(); };
+  // a failed read leaves the last good rows standing rather than blanking the surface
+  return watchRows(db, tables, run, cb, (e: unknown) => { console.error('[webnm] watch read failed:', e); });
 }
 
 /** A failed read must not look like an empty workspace. So it SAYS SO and then yields empty,
@@ -268,5 +261,5 @@ function machineLanes(): Partial<NMBridge> {
  * way for the same reason — the split is for readability, never to loosen the check.
  */
 export function opsOverrides(cfg: WebNmConfig, db: PowerSyncDatabase): Partial<NMBridge> {
-  return { ...replicaLanes(cfg, db), ...httpLanes(cfg), ...machineLanes() };
+  return { ...shareWatches(replicaLanes(cfg, db)), ...httpLanes(cfg), ...machineLanes() };
 }

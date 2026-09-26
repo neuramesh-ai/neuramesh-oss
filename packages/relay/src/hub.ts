@@ -6,7 +6,8 @@
 // and can restart freely. see protocol.ts for the frame vocabulary and close codes.
 import type { IncomingMessage } from 'node:http';
 import type { RawData, WebSocket } from 'ws';
-import { CLOSE, isChannelFrame, parseMessage, toB64, type ChannelFrame, type RelayMessage } from './protocol.js';
+import { CLOSE, isChannelFrame, parseMessage, toB64, type ChannelFrame, type ChannelLane, type RelayMessage } from './protocol.js';
+import { admitStream } from './stream-lane.js';
 
 export interface HubOptions {
   /** nmm_ token in, identity out; null = unknown token; throws = control-api unreachable */
@@ -16,11 +17,13 @@ export interface HubOptions {
   log?(line: string): void;
 }
 
-interface MachineEdge { sock: WebSocket; workspaceId: string }
+/** `lanes`: what the daemon's hello said it serves (an older daemon names none) */
+interface MachineEdge { sock: WebSocket; workspaceId: string; lanes: ReadonlySet<string> }
 
 interface ClientEdge {
   sock: WebSocket; machineId: string; userId: string | null;
-  channels: Set<string>; engineeringChannels: Set<string>;
+  /** `streamChannels`: live-reply subscriptions, capped apart from sessions (stream-lane.ts) */
+  channels: Set<string>; engineeringChannels: Set<string>; streamChannels: Set<string>;
   ingressBytes: number; ingressWindowStartedAt: number;
 }
 
@@ -102,7 +105,9 @@ export function createHub(opts: HubOptions): Hub {
   };
 
   const machineChannelCount = (machineId: string): number =>
-    [...(attached.get(machineId) ?? [])].reduce((count, edge) => count + edge.channels.size, 0);
+    [...(attached.get(machineId) ?? [])].reduce((count, edge) => count + edge.channels.size - edge.streamChannels.size, 0);
+  const machineStreamCount = (machineId: string): number =>
+    [...(attached.get(machineId) ?? [])].reduce((count, edge) => count + edge.streamChannels.size, 0);
 
   const rejectEngineeringOpen = (client: ClientEdge, ch: string): void => {
     const event = `${JSON.stringify({
@@ -130,7 +135,7 @@ export function createHub(opts: HubOptions): Hub {
     if (frame.t === 'close') {
       owners.get(machineId)?.delete(frame.ch);
       owner.channels.delete(frame.ch);
-      owner.engineeringChannels.delete(frame.ch);
+      owner.engineeringChannels.delete(frame.ch); owner.streamChannels.delete(frame.ch);
     }
   };
 
@@ -153,7 +158,7 @@ export function createHub(opts: HubOptions): Hub {
             if (!m || m.t !== 'hello') return sock.close(CLOSE.PROTOCOL, 'expected hello');
             if (m.machineId !== identity.machineId) return sock.close(CLOSE.UNAUTHORIZED, 'machine id mismatch');
             const prev = machines.get(identity.machineId);
-            machines.set(identity.machineId, { sock, workspaceId: identity.workspaceId });
+            machines.set(identity.machineId, { sock, workspaceId: identity.workspaceId, lanes: new Set(m.lanes ?? []) });
             self = identity.machineId;
             if (prev) { log(`takeover machine=${identity.machineId}`); prev.sock.close(CLOSE.TAKEOVER, 'replaced by a newer connection'); }
             else log(`machine_online machine=${identity.machineId}`);
@@ -181,7 +186,13 @@ export function createHub(opts: HubOptions): Hub {
         log(`refuse_open machine=${client.machineId} ch=${frame.ch} (owned elsewhere)`);
         return send(client.sock, { ch: frame.ch, t: 'close' });
       }
-      if (!holder && (client.channels.size >= MAX_CHANNELS_PER_CLIENT || machineChannelCount(client.machineId) >= MAX_CHANNELS_PER_MACHINE)) {
+      const stream = !holder && frame.lane === 'stream' ? admitStream(machine.lanes, client.streamChannels.size, machineStreamCount(client.machineId)) : null;
+      if (stream && stream !== 'ok') {
+        log(`refuse_stream_open machine=${client.machineId} user=${client.userId ?? '?'} why=${stream}`);
+        return send(client.sock, { ch: frame.ch, t: 'close' });
+      }
+      if (stream === 'ok') client.streamChannels.add(frame.ch);
+      else if (!holder && (client.channels.size - client.streamChannels.size >= MAX_CHANNELS_PER_CLIENT || machineChannelCount(client.machineId) >= MAX_CHANNELS_PER_MACHINE)) {
         log(`refuse_open_limit machine=${client.machineId} user=${client.userId ?? '?'} client_count=${client.channels.size}`);
         return send(client.sock, { ch: frame.ch, t: 'close' });
       }
@@ -204,7 +215,7 @@ export function createHub(opts: HubOptions): Hub {
     if (frame.t === 'close') {
       owners.get(client.machineId)?.delete(frame.ch);
       client.channels.delete(frame.ch);
-      client.engineeringChannels.delete(frame.ch);
+      client.engineeringChannels.delete(frame.ch); client.streamChannels.delete(frame.ch);
     }
   };
 
@@ -233,7 +244,7 @@ export function createHub(opts: HubOptions): Hub {
         if (machine) sendBounded(machine.sock, { ch, t: 'close' }, () => {});
       }
       self.channels.clear();
-      self.engineeringChannels.clear();
+      self.engineeringChannels.clear(); self.streamChannels.clear();
     });
     pump.set((text) => {
       const m = parseMessage(text);
@@ -247,14 +258,14 @@ export function createHub(opts: HubOptions): Hub {
           if (!machines.has(m.machineId)) return sock.close(CLOSE.MACHINE_OFFLINE, 'machine offline');
           const edge: ClientEdge = {
             sock, machineId: m.machineId, userId: verdict.userId ?? null,
-            channels: new Set(), engineeringChannels: new Set(), ingressBytes: 0, ingressWindowStartedAt: Date.now(),
+            channels: new Set(), engineeringChannels: new Set(), streamChannels: new Set(), ingressBytes: 0, ingressWindowStartedAt: Date.now(),
           };
           self = edge;
           const set = attached.get(m.machineId) ?? new Set<ClientEdge>();
           attached.set(m.machineId, set);
           set.add(edge);
           log(`client_attached machine=${m.machineId} user=${edge.userId ?? '?'}`);
-          send(sock, { t: 'attached', machineId: m.machineId });
+          send(sock, { t: 'attached', machineId: m.machineId, lanes: [...(machines.get(m.machineId)?.lanes ?? [])] as ChannelLane[] });
           pump.set((t2) => {
             if (!allowClientIngress(edge, t2)) return;
             const f = parseMessage(t2);

@@ -27,11 +27,11 @@ import { parseWbRow, type WbRow, wbNeedsMaterialize, wbSnapshotSrc } from '../wh
 import { stripMarkers } from './markers';
 import { timeAgoShort } from '../lib/time';
 import { PlanReviewCard } from '../cards/PlanReviewCard';
-import { type AgentRow, type MemberRow } from '../bridge/rows-crew';
-import { type AttachmentRow, type DecisionAllRow, type TaskRow } from '../bridge/rows-board';
-import { type MessageRow } from '../bridge/rows-rooms';
-import { type TaskRefInfo } from '../cards/parse';
-import { useEffect, useState } from 'react';
+import { type AttachmentRow, type DecisionAllRow } from '../bridge/rows-board';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { wasLanded } from './streamstore';
+import { sameRow, type ThreadMessageProps } from './rowmemo';
+export type { ThreadMessageProps } from './rowmemo';
 
 // Imported bindings lose control-flow narrowing inside closures, so re-bind (same as App.tsx).
 const nm = nmBridge;
@@ -204,39 +204,44 @@ export function UnitCard({ id, onOpen }: { id: string; onOpen?: (taskId: string)
  *
  * Everything that differed between the copies is a PROP, and every prop is optional: a
  * conversation simply passes fewer. Nothing here asks what kind of thread it is.
+ *
+ * The wrapper runs on every parent render and costs almost nothing; the row itself is memoized
+ * (sameRow in rowmemo.ts), so a keystroke in the composer or a stream delta no longer redraws the thread.
  */
-export function ThreadMessage({
+export function ThreadMessage(props: ThreadMessageProps) {
+  const latest = useRef(props);
+  latest.current = props;
+  const doors = useMemo(() => makeDoors(latest), []);
+  return <ThreadMessageRow {...props} doors={doors} />;
+}
+
+/** the row's doors: stable for the row's life, each one calling whatever the parent passed LAST */
+type Doors = ReturnType<typeof makeDoors>;
+function makeDoors(latest: { current: ThreadMessageProps }) {
+  const p = () => latest.current;
+  return {
+    onOpenAtt: (a: AttachmentRow) => p().onOpenAtt(a),
+    onAnswer: (text: string) => void answerDecisionsThenPost(text, p().decisions.filter((d) => d.message_id === p().m.id && d.status === 'open'), p().onAnswerPost),
+    onOpenTask: (id: string) => p().onOpenTask?.(id),
+    onOpenWhiteboard: (b: { id: string; title: string }) => p().onOpenWhiteboard?.(b),
+    onOpenDoc: (d: { label: string; file: string; doc: string }) => p().onOpenDoc?.(d),
+    onOpenArticle: (a: ArticleOpen) => p().onOpenArticle?.(a),
+    onOpenPlanCtx: (name?: string) => p().planCtx?.onOpenPlan(name),
+    onArmRevise: () => p().planCtx?.onArmRevise(),
+    onOpenPlanMd: (name?: string) => p().md?.onOpenPlan?.(name),
+    onDismissCard: (q: string) => p().md?.onDismissCard?.(q),
+    onOpenFile: (name: string) => p().md?.onOpenFile?.(name),
+    onPick: (t: string) => p().suggestions?.onPick(t),
+    onEdit: (t: string) => p().suggestions?.onEdit(t),
+  };
+}
+
+const ThreadMessageRow = memo(function ThreadMessageRow({
   m, agents, members, selfId, selfEmail, channelId,
-  atts, onOpenAtt, answers, decisions, onAnswerPost,
+  atts, answers,
   taskRef, onOpenTask, onOpenWhiteboard, onOpenDoc, onOpenArticle, planCtx,
-  md, suggestions,
-}: {
-  m: MessageRow;
-  agents: AgentRow[];
-  members: MemberRow[];
-  selfId?: string | null;
-  selfEmail?: string | null;
-  channelId: string;
-  atts: AttachmentRow[];
-  onOpenAtt: (a: AttachmentRow) => void;
-  answers: Map<string, string>;
-  decisions: DecisionAllRow[];
-  /** how THIS surface posts an answer back (a task thread and a conversation address differently) */
-  onAnswerPost: (text: string) => void;
-  taskRef?: (n: number) => TaskRefInfo | null;
-  onOpenTask?: (id: string) => void;
-  onOpenWhiteboard?: (b: { id: string; title: string }) => void;
-  onOpenDoc?: (d: { label: string; file: string; doc: string }) => void;
-  /** the ‹article:id› card's door — Open lands the article in a reading tab (article round) */
-  onOpenArticle?: (a: ArticleOpen) => void;
-  /** the plan-review card's world (task threads only): the thread's own task + its doors —
-   *  absent on conversations, where a ‹plan:vN› marker degrades to its readable line */
-  planCtx?: { task: TaskRow; onOpenPlan: (name?: string) => void; onArmRevise: () => void; handsOff?: boolean } | null;
-  /** the extra Md powers a task thread has and a conversation has no use for */
-  md?: Partial<React.ComponentProps<typeof Md>>;
-  /** null = this row is not the suggestion target, or the surface is suppressing them */
-  suggestions?: { onPick: (t: string) => void; onEdit: (t: string) => void } | null;
-}) {
+  md, suggestions, doors,
+}: ThreadMessageProps & { doors: Doors }) {
   // docs/34 — the Tasks flip, drawn as a rule across the transcript rather than a bubble: it is
   // something that HAPPENED to the thread, not something anyone said. A conversation that
   // escalated in place carries this marker into its task thread, so both must render it.
@@ -267,16 +272,21 @@ export function ThreadMessage({
   // the plan-review card (2026-08-19): ‹plan:vN› + a task-thread context = the gate as a
   // thread-native card; without planCtx (a conversation) the readable line renders as prose
   const plan = drop || wb || unit || article || report || brief || !planCtx ? null : parsePlanRef(m.body);
+  // every door exists exactly when the parent passed one (the cards read presence), and calls the latest
+  const openTask = onOpenTask ? doors.onOpenTask : undefined;
+  const openDoc = onOpenDoc ? doors.onOpenDoc : undefined;
   // every marker shares one anatomy: surrounding prose stays prose, the marker becomes its card
-  const marker = plan && planCtx ? { prose: plan.prose, card: <PlanReviewCard version={plan.version} task={planCtx.task} onOpenPlan={planCtx.onOpenPlan} onArmRevise={planCtx.onArmRevise} handsOff={planCtx.handsOff} /> }
-    : wb ? { prose: wb.prose, card: <WbCard id={wb.id} onOpen={onOpenWhiteboard} /> }
-    : unit ? { prose: unit.prose, card: <UnitCard id={unit.id} onOpen={onOpenTask} /> }
-    : article ? { prose: article.prose, card: <ArticleCard id={article.id} onOpen={onOpenArticle} /> }
-    : report ? { prose: report.prose, card: <ReportCard id={report.id} onOpen={onOpenDoc} /> }
-    : brief ? { prose: brief.prose, card: <ReleaseCard id={brief.id} onOpen={onOpenDoc} /> }
+  const marker = plan && planCtx ? { prose: plan.prose, card: <PlanReviewCard version={plan.version} task={planCtx.task} onOpenPlan={doors.onOpenPlanCtx} onArmRevise={doors.onArmRevise} handsOff={planCtx.handsOff} /> }
+    : wb ? { prose: wb.prose, card: <WbCard id={wb.id} onOpen={onOpenWhiteboard ? doors.onOpenWhiteboard : undefined} /> }
+    : unit ? { prose: unit.prose, card: <UnitCard id={unit.id} onOpen={openTask} /> }
+    : article ? { prose: article.prose, card: <ArticleCard id={article.id} onOpen={onOpenArticle ? doors.onOpenArticle : undefined} /> }
+    : report ? { prose: report.prose, card: <ReportCard id={report.id} onOpen={openDoc} /> }
+    : brief ? { prose: brief.prose, card: <ReleaseCard id={brief.id} onOpen={openDoc} /> }
     : null;
   return (
-    <div className={`msg${a.agent ? '' : a.self ? ' human mine' : ' human'}`}>
+    // data-landed: this row took over a streaming bubble's slot (thread/streamstore.ts), so it does
+    // not rise in again — the reply is already on screen, in this exact place
+    <div className={`msg${a.agent ? '' : a.self ? ' human mine' : ' human'}`} data-landed={wasLanded(m.id) ? '' : undefined}>
       {a.agent ? <AgentAvatar name={a.name} size={26} interactive /> : <span className="av">{a.initial}</span>}
       <div className="body">
         <div className="head">
@@ -286,26 +296,31 @@ export function ThreadMessage({
         </div>
         {marker ? (
           <>
-            {marker.prose ? <Md text={marker.prose} taskRef={taskRef} onOpenTask={onOpenTask} /> : null}
+            {marker.prose ? <Md text={marker.prose} taskRef={taskRef} onOpenTask={openTask} /> : null}
             {marker.card}
           </>
         ) : drop ? (
-          <DocDropCard drop={drop} channelId={channelId} onOpen={onOpenDoc} />
+          <DocDropCard drop={drop} channelId={channelId} onOpen={openDoc} />
         ) : (
           <Md
-            {...md}
             text={stripMarkers(m.body)}
             answers={answers}
-            onAnswer={(t) => void answerDecisionsThenPost(t, decisions.filter((d) => d.message_id === m.id && d.status === 'open'), onAnswerPost)}
+            onAnswer={doors.onAnswer}
             taskRef={taskRef}
-            onOpenTask={onOpenTask}
+            onOpenTask={openTask}
+            designTaskId={md?.designTaskId}
+            verdictTask={md?.verdictTask}
+            fileRef={md?.fileRef}
+            onOpenPlan={md?.onOpenPlan ? doors.onOpenPlanMd : undefined}
+            onOpenFile={md?.onOpenFile ? doors.onOpenFile : undefined}
+            onDismissCard={md?.onDismissCard ? doors.onDismissCard : undefined}
           />
         )}
-        <MsgAttachments atts={atts} onOpen={onOpenAtt} />
+        <MsgAttachments atts={atts} onOpen={doors.onOpenAtt} />
         {suggestions && (
-          <SuggestionRow suggestions={parseSuggestions(m.body)} onPick={suggestions.onPick} onEdit={suggestions.onEdit} />
+          <SuggestionRow suggestions={parseSuggestions(m.body)} onPick={doors.onPick} onEdit={doors.onEdit} />
         )}
       </div>
     </div>
   );
-}
+}, sameRow);

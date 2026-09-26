@@ -6,7 +6,7 @@
 // (apps/desktop/src/main/sync/ipc/terminals.ts is the frame source being re-homed:
 // open carries cols/rows, data is the pty byte stream, close reaps).
 import WebSocket from 'ws';
-import { fromB64, isChannelFrame, parseMessage, toB64, type ChannelFrame } from './protocol.js';
+import { fromB64, isChannelFrame, parseMessage, toB64, type ChannelFrame, type ChannelLane } from './protocol.js';
 
 export interface MachineClientOptions {
   /** the relay origin, e.g. wss://relay.neuramesh.app */
@@ -15,6 +15,8 @@ export interface MachineClientOptions {
   token: string;
   /** must match what the token resolves to — the relay refuses a mismatched hello */
   machineId: string;
+  /** the lanes the hello announces (tests); absent = an older daemon's hello */
+  lanes?: ChannelLane[];
   log?(line: string): void;
 }
 
@@ -45,7 +47,7 @@ export function connectEchoMachine(opts: MachineClientOptions): MachineClient {
     // resize is meaningless to an echo pty; the real daemon forwards it to PtyTerm.resize
   };
 
-  sock.on('open', () => sock.send(JSON.stringify({ t: 'hello', machineId: opts.machineId })));
+  sock.on('open', () => sock.send(JSON.stringify({ t: 'hello', machineId: opts.machineId, ...(opts.lanes ? { lanes: opts.lanes } : {}) })));
   sock.on('message', (raw) => {
     const m = parseMessage(Array.isArray(raw) ? Buffer.concat(raw).toString('utf8') : Buffer.from(raw as Buffer).toString('utf8'));
     if (m && isChannelFrame(m)) serve(m);

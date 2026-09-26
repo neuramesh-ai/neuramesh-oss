@@ -46,3 +46,28 @@ test('with no lane set, the proxy is never reached — it fails loudly', async (
   setStarterLane(null);
   await assert.rejects(() => starterComplete('sys', 'hi'), /Starter lane is not configured/);
 });
+
+test('a watched chat reply streams: the bubble gets the words so far, the answer is the same whole text', async () => {
+  const done = { candidates: [{ content: { role: 'model', parts: [{ text: 'Hello there.' }] } }], credits: { remaining: 1, spentMicros: 1 } };
+  const lines = [{ t: 'text', text: 'Hel' }, { t: 'text', text: 'lo' }, { t: 'text', text: ' there.' }, { t: 'done', response: done }];
+  const urls: string[] = [];
+  const real = globalThis.fetch;
+  globalThis.fetch = (async (url: string) => {
+    urls.push(String(url));
+    return String(url).endsWith('/stream')
+      ? new Response(lines.map((l) => `${JSON.stringify(l)}\n`).join(''), { headers: { 'content-type': 'application/x-ndjson' } })
+      : new Response(JSON.stringify(done), { headers: { 'content-type': 'application/json' } });
+  }) as typeof globalThis.fetch;
+  setStarterLane({ apiUrl: 'https://api.test', workspace: 'ws-1', actorId: 'u-1' });
+  try {
+    const seen: string[] = [];
+    assert.equal(await starterComplete('sys', 'hi', (t) => seen.push(t)), 'Hello there.');
+    assert.deepEqual(seen, ['Hel', 'Hello', 'Hello there.']);
+    // unwatched (complete(), the architect's drafts): the whole-reply door, as before
+    assert.equal(await starterComplete('sys', 'hi'), 'Hello there.');
+    assert.deepEqual(urls, ['https://api.test/v1/starter/stream', 'https://api.test/v1/starter/generate']);
+  } finally {
+    globalThis.fetch = real;
+    setStarterLane(null);
+  }
+});

@@ -4,6 +4,38 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>NeuraMesh</title>
+    <!-- THE THEME, BEFORE THE FIRST PAINT. App.tsx applies the same rule (theme/theme.ts) when its
+         module runs, which on a slow link is seconds in: until then a light theme showed the dark
+         default. The same four ids, the same 'system' rule, the same key. -->
+    <script>
+      (function () {
+        try {
+          var ls = window.localStorage, d = document.documentElement;
+          var pref = ls.getItem('nm:theme') || 'system';
+          if (!/^(dark|light|soft-dark|cream-oak|system)$/.test(pref)) pref = 'system';
+          d.dataset.theme = pref === 'system' ? (window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark') : pref;
+          // THE STATIC SHELL (below) is for a signed-in person on Home in the default layout: the
+          // same person the shell will open for. Anyone else gets the page as it was.
+          var user = null;
+          try { user = JSON.parse(ls.getItem('nm:web:user') || 'null'); } catch (e) { user = null; }
+          var dev = '%VITE_NM_DEV_USER%';
+          if (dev.charAt(0) === '%') dev = '';
+          if (!(user && user.id) && !dev) return;
+          if ((ls.getItem('nm:navPos') || 'left') !== 'left' || ls.getItem('nm:navFolded') === '1' || ls.getItem('nm:navMode') === 'code') return;
+          if (new URLSearchParams(location.search).get('view')) return;
+          d.setAttribute('data-nm-static', '');
+          window.__nmStaticBoot = { email: user && user.email ? String(user.email) : dev ? 'dev@local' : '' };
+        } catch (e) { /* no storage: no static shell, the page as it was */ }
+      })();
+    </script>
+    <style>
+      /* shown only once its script has filled it: a page can paint between the markup and the script */
+      #nm-static { display: none; }
+      html[data-nm-static][data-nm-static-ready] #nm-static { display: block; position: fixed; inset: 0; z-index: 300; }
+      #nm-static [data-nm-hold] { visibility: hidden; }
+      /* nothing here moves: a style that lands late must not play a transition on the way in */
+      #nm-static, #nm-static * { transition: none !important; }
+    </style>
     <!-- The Porch mark, the same asset the marketing site serves (apps/web/public/favicon.svg) —
          copied rather than re-drawn so the tab and the landing page can never diverge. SVG first
          for modern browsers; the 32px PNG is the fallback for the ones that ignore it. -->
@@ -16,6 +48,79 @@
     <meta name="theme-color" content="#141414" />
   </head>
   <body>
+    <!-- THE STATIC SHELL (the boot round, 2026-09-24): the frame, the rail and a REAL composer,
+         painted from this file and the stylesheet before any script arrives, so a person can click
+         the composer and type while the app loads. It is React's own first frame (the markup and
+         classes App renders, cut from it), so it paints with the same CSS. React takes the text,
+         the caret and the focus when its composer mounts (lib/staticshell.ts), then removes it.
+         What only data can say (rows, credits, setup) is left out and arrives with React. -->
+    <div id="nm-static" data-nm-static-shell><div class="shell" data-navpos="left"><header class="frametop" inert=""><span class="ftbrand"><span class="brandlockup"><span style="display: inline-flex; align-items: center; gap: 6px;"><svg class="porchmark" width="20" height="20" viewBox="0 0 48 48" aria-hidden="true"><path class="pk-arch" d="M5.5 22 C5.5 10.5 13.5 3.5 24 3.5 C34.5 3.5 42.5 10.5 42.5 22 L42.5 39 C42.5 42.5 40 44.5 37 44.5 L11 44.5 C8 44.5 5.5 42.5 5.5 39 Z" fill="var(--brand)"></path><g class="pk-blinkg"><circle cx="17.8" cy="21" r="3.5" fill="var(--brand-ink)"></circle><circle cx="30.2" cy="21" r="3.5" fill="var(--brand-ink)"></circle></g><path class="pk-smile" d="M17 28.6 C20.2 33.6 27.8 33.6 31 28.6" pathLength="1" fill="none" stroke="var(--brand-ink)" stroke-width="4" stroke-linecap="round"></path></svg><span style="font: 600 13px/1 var(--fbrand); letter-spacing: -0.015em; color: var(--text);">neuramesh</span></span></span></span><button class="ftfold" aria-pressed="false" aria-label="Hide the sidebar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"></rect><rect x="4.5" y="5.5" width="4" height="13" rx="1" fill="currentColor" stroke="none"></rect></svg></button><button class="ftsearch" aria-label="Search (⌘K)">⌕ <span class="ftslbl">Search — channels, tasks, artifacts</span> <b>⌘K</b></button><span class="ftutils"><button class="dockbarbtn ico utilkind" aria-pressed="false" aria-label="Side panel"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"></rect><rect x="15.5" y="5.5" width="4" height="13" rx="1" fill="currentColor" stroke="none"></rect></svg></button><button class="dockbarbtn ico utilkind" aria-label="Browser"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M3 12h18"></path><path d="M12 3a13.5 13.5 0 0 1 0 18 13.5 13.5 0 0 1 0-18z"></path></svg></button><button class="dockbarbtn ico utilkind" aria-label="Terminal"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="m7 9 2.5 2.5L7 14"></path><path d="M12.5 14H17"></path></svg></button><span class="ftutilmorewrap"><button class="dockbarbtn ico ftutilmore" aria-label="More tools" aria-expanded="false">⋯</button></span><div class="dockbarproc"><button class="dockbarbtn ico" aria-label="Background processes"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg></button></div><div class="dockbarstatus" data-nm-hold=""><button type="button" class="cpill unreachable" aria-label="Cloud machine. The machine does not answer. Start it again."><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="1.5" y="5.2" width="11" height="7.4" rx="1.6"></rect><path d="M4.6 15.4h5.4" stroke-linecap="round"></path><path d="M7.3 12.6v2.8" stroke-linecap="round"></path><path d="M12.9 6.3h3.4a1.7 1.7 0 0 0 .2-3.4 2.4 2.4 0 0 0-4.6.8 1.45 1.45 0 0 0 1 2.6z" stroke-linejoin="round"></path><path d="M7.3 7v2.3M7.3 11.1v.05" stroke-linecap="round"></path></svg></button><span class="livepill off" aria-label="Running locally. Nothing is syncing to the cloud yet."><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M15.4 9a6.4 6.4 0 0 1-11 4.5" stroke-linecap="round"></path><path d="M2.6 9a6.4 6.4 0 0 1 11-4.5" stroke-linecap="round"></path><path d="M2.6 15.4v-3.6h3.6" stroke-linecap="round"></path><path d="M15.4 2.6v3.6h-3.6" stroke-linecap="round"></path><path d="M3.2 15 14.8 3.4" stroke-linecap="round"></path></svg></span></div></span></header><nav class="navpanel" data-pos="left" style="--nm-navw: 320px;" inert=""><div class="navfaces"><div class="navface rooms" data-on="1"><div class="navscroll"><div class="navseg" role="tablist" aria-label="Rail mode"><button type="button" role="tab" aria-selected="true" class="on">Chat</button><button type="button" role="tab" aria-selected="false" class="">Code</button></div><div class="navnew"><button type="button" class="navnewrow" title="New chat — ⌘N" aria-label="New chat"><span class="nncico" aria-hidden="true"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-6"></path><path d="M18.4 3.6a2 2 0 0 1 2.8 2.8L13 14.6l-3.8.9.9-3.8z"></path></svg></span><span class="navhomelbl">New chat</span><span class="nnck" aria-hidden="true">⌘N</span></button><button type="button" class="navnewcaret" aria-label="More ways to start" aria-expanded="false"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></button></div><div class="navband navdest"><div class="navsecthd"><button class="navsecttoggle" aria-expanded="true"><span class="navchev" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></span>Shortcuts</button></div><button class="navitem" title="Whiteboards" aria-label="Whiteboards"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="m7 14.5 3.2-4.2 2.6 3 3.9-5.3"></path></svg><span class="navlabel">Whiteboards</span></button><button class="navitem" title="Scheduled" aria-label="Scheduled"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 2.5l4 4-4 4"></path><path d="M3 11.5v-2a3 3 0 0 1 3-3h15"></path><path d="M7 21.5l-4-4 4-4"></path><path d="M21 12.5v2a3 3 0 0 1-3 3H3"></path></svg><span class="navlabel">Scheduled</span></button><button class="navitem" title="Files" aria-label="Files"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg><span class="navlabel">Files</span></button><button class="navitem" title="Marketing OS" aria-label="Marketing OS"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m22 7-8.5 8.5-5-5L2 17"></path><path d="M16 7h6v6"></path></svg><span class="navlabel">Marketing OS</span></button><button class="navitem" title="Code" aria-label="Code"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 17l6-6-6-6"></path><path d="M13 19h7"></path></svg><span class="navlabel">Code</span></button><div class="navsect" data-nm-cold="">syncing…</div></div><div class="navhist"><div class="navgrphd"><button type="button" class="navprojchev" aria-expanded="true" aria-label="Collapse threads"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></button><button type="button" class="navgrphdlbl door" aria-pressed="false">Recents</button><span class="navgrphdsep" aria-hidden="true">·</span><button type="button" class="navgrphdlbl on" aria-pressed="true">Projects</button><span class="navgrphdcnt" data-nm-cold="">0</span><span class="navscopegrow"></span><button type="button" class="chanadd navhistfind" aria-label="Search every thread"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><path d="M21 21l-4.3-4.3"></path></svg></button></div><div class="navhistlist"><div class="navhistempty" data-nm-cold="">No threads yet</div><div class="navhistempty" data-nm-cold="">No threads yet</div></div></div></div></div></div><div class="navwsfoot" data-nm-needs="ws"><button type="button" class="navwsmain" aria-expanded="false"><span class="navwstile" aria-hidden="true" data-nm-slot="wsinitial">A</span><span class="navwsname" data-nm-slot="ws">Acme Robotics</span><span class="navwscar" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></span></button></div></nav><div class="navgrip" role="separator" aria-orientation="vertical" aria-label="Resize the sidebar" aria-valuenow="320" aria-valuemin="224" aria-valuemax="356" tabindex="0" inert=""><span class="navgripbar" aria-hidden="true"></span></div><div class="shellbody"><div class="main"><div class="wtstrip sheethd bare" inert=""><div class="wtright"><span class="bellwrap"><button class="bellbtn" aria-expanded="false" aria-label="Needs you — nothing waiting"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 1 0-12 0c0 6-2 7-2 7h16s-2-1-2-7"></path><path d="M13.7 20a2 2 0 0 1-3.4 0"></path></svg></button></span><button class="utilbtn" aria-label="Views"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"></path></svg></button></div></div><div class="wtbody"><div class="wtpanes"><div class="wtpane on" role="region" aria-label="Conversation"><div class="stagewrap" data-nm-slot="stage"><div class="homewm" aria-hidden="true"><span>neuramesh</span></div><div class="stagecol"><div class="stageeyebrow" data-nm-slot="date">Thursday · Sep 24</div><h1 class="stagehead" inert=""><span data-nm-slot="hello"></span> <span class="stageq">What’s next in <span class="stageproj"><button type="button" class="stageprojbtn" aria-haspopup="menu" aria-expanded="false" data-nm-slot="project">…</button></span>?</span></h1><div class="hcomposer cbox stagebox"><div class="cgrow"><div class="chl" aria-hidden="true">​</div><textarea placeholder="Describe the work, or just ask. Use @ to mention an agent or a user, and / for skills." rows="1" style="height: 40px; overflow-y: hidden;" data-nm-static-composer=""></textarea></div><div class="hrow" inert=""><span class="chipmenu"><button class="hchip chan" disabled="" aria-haspopup="menu" aria-expanded="false"><span class="h">#</span> <span data-nm-slot="room">…</span> <span class="cv">⌄</span></button></span><div class="cchips"><button class="cchip cmach auto" aria-haspopup="menu" aria-expanded="false"><span class="g" aria-hidden="true"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21v-7"></path><path d="M12 14c0-3.5-5-3.5-5-7.5"></path><path d="M12 14c0-3.5 5-3.5 5-7.5"></path><path d="M4.5 9 7 6.5 9.5 9"></path><path d="M14.5 9 17 6.5 19.5 9"></path></svg></span><span class="lbl">Auto</span><span class="car" aria-hidden="true">▾</span></button></div><div class="cchips" data-nm-needs="brain"><button class="cchip"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4.5a3 3 0 0 0-3 3.1c-1.8.4-3.1 1.9-3.1 3.8a3.9 3.9 0 0 0 1.5 3.1 3.4 3.4 0 0 0 3.3 4.4c.4 0 .9-.1 1.3-.2.4.1.9.2 1.3.2a3.4 3.4 0 0 0 3.3-4.4 3.9 3.9 0 0 0 1.5-3.1c0-1.9-1.3-3.4-3.1-3.8a3 3 0 0 0-3-3.1z"></path><path d="M12 4.5v15"></path></svg><span class="lbl" data-nm-slot="brain">Brain · Claude Core</span><span class="car">▾</span></button></div><button type="button" class="attachbtn" aria-label="Mention a teammate"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="3.6"></circle><path d="M15.6 8.4v4.9a2.6 2.6 0 0 0 5.2 0V12a8.8 8.8 0 1 0-3.5 7"></path></svg></button><input multiple="" type="file" style="display: none;"><button type="button" class="attachbtn" aria-label="Attach images or files"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg></button><span style="flex: 1 1 0%;"></span><button class="hsend" disabled="" aria-label="Send"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5"></path><path d="m5 12 7-7 7 7"></path></svg></button></div><div class="cfoot" inert=""><div class="cfootpills" aria-hidden="false"><button type="button" class="cfootpill" tabindex="0">Give me ideas</button><button type="button" class="cfootpill" tabindex="0">What moved while I was away?</button><button type="button" class="cfootpill" tabindex="0">Plan the next release</button></div></div></div></div></div></div></div></div></div></div></div></div>
+    <script>
+      (function () {
+        var d = document.documentElement, root = document.getElementById('nm-static');
+        if (!d.hasAttribute('data-nm-static')) { root.remove(); return; }
+        var boot = window.__nmStaticBoot || {}, facts = null;
+        try { facts = JSON.parse(localStorage.getItem('nm:web:shellFacts') || 'null'); } catch (e) { facts = null; }
+        var slot = function (n) { return root.querySelector('[data-nm-slot="' + n + '"]'); };
+        var set = function (n, t) { var el = slot(n); if (el) el.textContent = t; };
+        var now = new Date(), h = now.getHours();
+        set('date', now.toLocaleDateString([], { weekday: 'long' }) + ' \u00b7 ' + now.toLocaleDateString([], { month: 'short', day: 'numeric' }));
+        // the greeting App draws before the member list syncs: the email's name (lib/self.ts)
+        var local = (boot.email || '').split('@')[0] || '';
+        var label = local.replace(/[._-]+/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); });
+        var name = facts ? facts.name : (label.split(/\s+/)[0] || null);
+        if (name === 'you') name = null;
+        // the same text nodes React writes ({hello}{', ' + name}.), so the line shapes the same way
+        var hi = slot('hello');
+        [h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening', name ? ', ' + name : '', '.'].forEach(function (t) { if (t) hi.parentNode.insertBefore(document.createTextNode(t), hi); });
+        hi.remove();
+        set('project', facts && facts.project || '\u2026');
+        set('room', facts && facts.room || '\u2026');
+        var needs = root.querySelectorAll('[data-nm-needs]');
+        for (var i = 0; i < needs.length; i++) {
+          var key = needs[i].getAttribute('data-nm-needs');
+          if (!(facts && facts[key])) needs[i].style.visibility = 'hidden';
+        }
+        if (facts) {
+          set('brain', facts.brain || '');
+          set('ws', facts.ws || '');
+          set('wsinitial', (facts.ws || '').trim().charAt(0).toUpperCase());
+          if (facts.ledgered) {
+            slot('stage').classList.add('ledgered');
+            // the app's column scrolled last time: keep its scrollbar's width, so the column sits where React puts it
+            if (facts.scroll) slot('stage').style.overflowY = 'scroll';
+          }
+          var cold = root.querySelectorAll('[data-nm-cold]');
+          for (var j = 0; j < cold.length; j++) cold[j].style.display = 'none';
+        }
+        var nw = Number(localStorage.getItem('nm:navw'));
+        var nav = root.querySelector('.navpanel');
+        if (nav && nw > 0) nav.style.setProperty('--nm-navw', Math.max(224, Math.min(356, Math.round(nw))) + 'px');
+        var ta = root.querySelector('[data-nm-static-composer]');
+        var foot = root.querySelector('.cfoot'), send = root.querySelector('.hsend'), hl = root.querySelector('.chl');
+        ta.addEventListener('input', function () {
+          // what React's composer does as you type. Its textarea is transparent and the text shows in
+          // the backdrop behind it (ComposerInput: the text, then a zero-width tail), so the backdrop
+          // carries the text here too. The pills step aside, Send wakes, the box grows.
+          if (hl) { hl.textContent = ta.value + '\u200b'; hl.scrollTop = ta.scrollTop; }
+          if (foot) foot.classList.toggle('drafting', !!ta.value);
+          if (send) send.disabled = !ta.value.trim();
+          ta.style.height = 'auto';
+          ta.style.height = Math.max(40, ta.scrollHeight) + 'px';
+        });
+        // Enter sends in the real composer; here it only keeps the text (Shift+Enter is a new line)
+        ta.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) e.preventDefault(); });
+        var release = function () { if (root.isConnected) root.remove(); d.removeAttribute('data-nm-static'); d.removeAttribute('data-nm-static-ready'); };
+        window.__nmStaticShell = {
+          draft: function () { return root.isConnected ? { value: ta.value, start: ta.selectionStart, end: ta.selectionEnd, focused: document.activeElement === ta } : null; },
+          release: release,
+        };
+        // a boot that fails must show what it shows today, never a composer that goes nowhere
+        window.addEventListener('error', release);
+        window.addEventListener('unhandledrejection', release);
+        d.setAttribute('data-nm-static-ready', '');
+      })();
+    </script>
     <div id="root"></div>
     <script type="module" src="./main.tsx"></script>
   </body>

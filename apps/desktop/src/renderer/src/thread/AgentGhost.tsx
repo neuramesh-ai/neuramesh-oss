@@ -36,13 +36,24 @@ export const REDUCED_MOTION = typeof matchMedia !== 'undefined' && matchMedia('(
 export function useTypewriter(target: string, done: boolean): string {
   const [shownLen, setShownLen] = useState(() => (done || REDUCED_MOTION ? target.length : 0));
   const lenRef = useRef(shownLen);
+  // ONE TICKER FOR THE WHOLE REPLY, reading the newest target. The ticker used to restart with
+  // every new target, and a restart cancels the pending 48 ms tick: a stream that updates faster
+  // than ~20 times a second (every token, or the web lane's 30 frames a second) cancelled every
+  // tick, so the bubble stood still while the text poured in and jumped in the pauses.
+  const targetRef = useRef(target);
+  targetRef.current = target;
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; } }, []);
   useEffect(() => {
-    if (done || REDUCED_MOTION) { lenRef.current = target.length; setShownLen(target.length); return; }
-    if (lenRef.current >= target.length) return;
-    let alive = true;
+    if (done || REDUCED_MOTION) {
+      if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
+      lenRef.current = target.length; setShownLen(target.length); return;
+    }
+    if (lenRef.current >= target.length || timerRef.current) return; // caught up, or already ticking
     const tick = () => {
-      if (!alive) return;
-      const rest = target.slice(lenRef.current);
+      timerRef.current = null;
+      const cur = targetRef.current;
+      const rest = cur.slice(lenRef.current);
       if (!rest) return;
       // advance to the end of the 4th word boundary in the unrevealed tail
       let idx = 0;
@@ -51,12 +62,11 @@ export function useTypewriter(target: string, done: boolean): string {
         if (sp === -1) { idx = rest.length; break; }
         idx = sp;
       }
-      lenRef.current = Math.min(target.length, lenRef.current + Math.max(1, idx));
+      lenRef.current = Math.min(cur.length, lenRef.current + Math.max(1, idx));
       setShownLen(lenRef.current);
-      if (lenRef.current < target.length) timer = setTimeout(tick, 48);
+      if (lenRef.current < cur.length) timerRef.current = setTimeout(tick, 48);
     };
-    let timer = setTimeout(tick, 48);
-    return () => { alive = false; clearTimeout(timer); };
+    timerRef.current = setTimeout(tick, 48);
   }, [target, done]);
   return target.slice(0, Math.min(shownLen, target.length));
 }

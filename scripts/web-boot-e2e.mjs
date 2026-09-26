@@ -95,7 +95,9 @@ async function cdp(port, url, budgetMs) {
   let html = '';
   while (Date.now() - start < budgetMs) {
     await new Promise((r) => setTimeout(r, 1000));
-    const r = await send('Runtime.evaluate', { expression: 'document.documentElement.outerHTML', returnByValue: true });
+    // the static shell (web/index.html) says "New chat" before any script runs: it is not the app,
+    // so the verdict reads the page without it
+    const r = await send('Runtime.evaluate', { expression: '(() => { const c = document.documentElement.cloneNode(true); c.querySelector("#nm-static")?.remove(); return c.outerHTML; })()', returnByValue: true });
     html = r.result?.result?.value ?? '';
     if (verdictOf(html) === 'booted') break;
   }

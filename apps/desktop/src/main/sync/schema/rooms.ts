@@ -5,9 +5,19 @@
 // matching client-core mirror and a sync rule — the parity test is the tripwire.
 import { column, Table } from '@powersync/common';
 
+// INDEXES: a replica row is JSON in ps_data__<table>, and every column is a json_extract, so a
+// table with no index answers every `where x = ?` — and every correlated subquery, once PER OUTER
+// ROW — with a full scan that decodes each row's JSON. The watches join messages from threads,
+// tasks and decisions that way; on a 1.7k-message replica that cost 1.6 s for the session list
+// alone (docs/18). PowerSync turns each entry into an expression index on the same expression the
+// view uses, so the planner seeks. Each index is named for the lookup it serves; a new query
+// that filters or correlates on a column should find one here, or add one.
+
 // created_at + created_by* feed the room's papertrail (0093) — the intro block derives
 // "geo created this channel" from synced rows, so it reads offline like the rest of the feed.
-export const channels = new Table({ workspace_id: column.text, slug: column.text, topic: column.text, project_id: column.text, kind: column.text, marketing: column.text, created_by_kind: column.text, created_by: column.text, created_at: column.text });
+export const channels = new Table({ workspace_id: column.text, slug: column.text, topic: column.text, project_id: column.text, kind: column.text, marketing: column.text, created_by_kind: column.text, created_by: column.text, created_at: column.text }, {
+  indexes: { by_project: ['project_id'] },
+});
 
 export const messages = new Table({
   workspace_id: column.text,
@@ -36,6 +46,12 @@ export const messages = new Table({
   body: column.text,
   created_at: column.text,
   pinned: column.integer,
+}, {
+  indexes: {
+    by_thread: ['thread_id', 'created_at'],
+    by_task: ['task_id', 'created_at'],
+    by_channel: ['channel_id', 'created_at'],
+  },
 });
 
 // conversation threads: every send starts one; threads.task_id links the task a
@@ -69,6 +85,12 @@ export const threads = new Table({
   brain_override: column.text,
   created_at: column.text,
   updated_at: column.text,
+}, {
+  indexes: {
+    by_channel: ['channel_id', 'updated_at'],
+    by_task: ['task_id', 'created_at'],
+    by_root: ['root_message_id'],
+  },
 });
 
 // channel people roster (0094) — who the rail lists per room; not an ACL

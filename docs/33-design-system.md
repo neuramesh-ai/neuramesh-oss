@@ -369,6 +369,16 @@ real work — if it is decoration, drop it and keep the pill.
   reveal follows the live stream and a **done message mounts instantly** (scroll-back and
   reload never animate); **cards, files and run trees never type** — only prose; reduced
   motion gets instant text.
+  ▸ **The render round (2026-09-24) sets the pace and the hand-off.** The reply bubble types by
+  frame, not by timer (`thread/reveal.ts`). Each piece of text that arrives is due about 110 ms
+  later, and never more than 340 ms later. So the reveal stays a tenth of a second behind a steady
+  stream, and a burst types out over a third of a second. A step always ends on a word boundary,
+  and a table row shows only when the row is complete. The caret sits at the end of the last line
+  of text, not on a line of its own, so the text does not move when the caret goes. When the
+  stream is done, the bubble stays in place until the synced message arrives. The message then
+  takes the same slot in the same frame and does not rise in again (`.msg[data-landed]`). The
+  bubble wears the role chip that the ghost before it and the message after it wear. The caret
+  does not blink under reduced motion.
 - **The launch moment (Porch):** full Peek (~3s) once on first open, the short wake (~0.9s)
   every launch after (`LaunchPeek`, replayable from Appearance). It plays over the frame on
   `--win`, `pointer-events: none` — the animation may never gate input — and reduced motion

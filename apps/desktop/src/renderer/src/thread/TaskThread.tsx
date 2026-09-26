@@ -47,7 +47,7 @@ import { type AgentRow, type MachineRow, type MemberRow } from '../bridge/rows-c
 import { type ArtifactUI, type AttachmentRow, type DecisionAllRow, type TaskAllRow, type TaskRow } from '../bridge/rows-board';
 
 import { type MessageRow, type ThreadRow } from '../bridge/rows-rooms';
-import { useAgentStream } from './hooks';
+import { useThreadStream } from './hooks';
 import { useShipGate } from './task/ShipGate';
 import { useSubtasks } from './task/Subtasks';
 import { useTaskPosts } from './task/Posts';
@@ -233,8 +233,8 @@ export function TaskThread({
   const listRef = useRef<HTMLDivElement>(null);
   // presence (any agent the daemon woke for THIS thread — assignee or not, e.g. rex
   // answering here) vs content (tokens flowing)
-  const threadStream = useAgentStream(`${channelId}:${task.id}`);
-  const { rows, threadAttByMsg, arts, beats, openArt, setOpenArt, skills, packs, detail, act, artByName, runTrees_, taskRunRows } = useTaskData({ task, channelId, busy, setBusy, setActErr, listRef, threadStream, convoThreadId, setComposerMode });
+  const { rows, threadAttByMsg, arts, beats, openArt, setOpenArt, skills, packs, detail, act, artByName, runTrees_, taskRunRows } = useTaskData({ task, channelId, busy, setBusy, setActErr, listRef, convoThreadId, setComposerMode });
+  const threadStream = useThreadStream(`${channelId}:${task.id}`, rows, (name) => agents.find((a) => a.name === name)?.id ?? null);
   const { isContent, mkImageReady, mkPosts, mkPreview, setMkPreview, setMkTick } = useTaskPosts(task, rows.length);
   // The ghost the thread wears while nothing is working yet (docs/26 §5). Derived here, like its
   // sibling in useConvoPresence, so the surface knows whose face it is (run card › ghost › chip).
@@ -880,7 +880,7 @@ export function TaskThread({
         {!threadStreaming && !ghostAgentId && (
           <WaitGhost found={waitGhost} onRetry={async () => { await nm?.sendThread(task.id, channelId, rows[rows.length - 1]?.body ?? ''); }} />
         )}
-        {threadStreaming && <StreamBubble live={threadStreaming} />}
+        {threadStreaming && <StreamBubble live={threadStreaming} role={agents.find((a) => a.name === threadStreaming.agent)?.role} taskRef={taskRef} onOpenTask={onOpenTask} />}
         {/* runTrees_ belongs in this test: a live run card IS activity, and claiming otherwise
             directly under a spinning card is the thread calling itself empty while it works. */}
         {/* a SETUP thread renders no empty-state line at all (George, 2026-08-09): the wizard
@@ -922,7 +922,7 @@ export function TaskThread({
             becomes its caption. */}
         {threadStream && (threadStreaming || !ghostAgentId) && (
           <div className="typingbar">
-            <TypistChip name={threadStream.agent} label={threadStream.text.trim() ? 'typing' : 'thinking'} onOpen={() => { const ta = agents.find((x) => x.name === threadStream.agent); if (ta) onActivity?.(ta); }} />
+            <TypistChip name={threadStream.agent} label={threadStream.typing ? 'typing' : 'thinking'} onOpen={() => { const ta = agents.find((x) => x.name === threadStream.agent); if (ta) onActivity?.(ta); }} />
             <span className="tdots"><i /><i /><i /></span>
           </div>
         )}
