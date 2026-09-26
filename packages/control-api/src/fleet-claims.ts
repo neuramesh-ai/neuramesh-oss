@@ -21,9 +21,11 @@ import type { Store } from './store';
 
 export type MachineSubstrate = 'volume' | 'claim';
 
-/** what a NEW runner is made of: `claim` only where the cluster runs a pool (the k3d harness and,
- *  after the GKE arm proves it, production); members are always `volume`, a login lives there */
-export const runnerSubstrateDefault = (): MachineSubstrate => (process.env['FLEET_RUNNER_SUBSTRATE'] === 'claim' ? 'claim' : 'volume');
+/** what a NEW machine is made of, runner or member: `claim` only where the cluster runs a pool (the
+ *  k3d harness and production). A member's login needs a disk, and it gets one the way a runner's
+ *  does: the shell promotes the machine before the sign-in (R4, George 2026-09-25). The env name is
+ *  older than R4, when only runners took it. */
+export const newMachineSubstrate = (): MachineSubstrate => (process.env['FLEET_RUNNER_SUBSTRATE'] === 'claim' ? 'claim' : 'volume');
 
 const LIVE = (sql: postgres.Sql) => sql`(lifecycle is null or lifecycle <> 'destroyed')`;
 

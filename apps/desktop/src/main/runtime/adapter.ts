@@ -195,8 +195,8 @@ export function sandboxFsEnabled(): boolean {
 // do inside it (George, 2026-09-25). And on gVisor the runtimes' own jails cannot start anyway: both
 // Claude's and Codex's are bwrap with a network namespace, which gVisor refuses ("Failed
 // RTM_NEWADDR", measured 2026-09-24). machined sets NM_MACHINE_KIND on the image; a laptop leaves it unset.
-export function onCloudMachine(): boolean {
-  return ['runner', 'member'].includes(process.env['NM_MACHINE_KIND'] ?? '');
+export function onCloudMachine(env: NodeJS.ProcessEnv = process.env): boolean {
+  return ['runner', 'member'].includes(env['NM_MACHINE_KIND'] ?? '');
 }
 
 export type CodexSandboxMode = 'read-only' | 'workspace-write' | 'danger-full-access';
@@ -222,6 +222,12 @@ export function agentBaseEnv(source: NodeJS.ProcessEnv = process.env): NodeJS.Pr
   if (_agentProxyUrl && !out.HTTP_PROXY && !out.HTTPS_PROXY && !out.http_proxy && !out.https_proxy) {
     out.HTTP_PROXY = out.HTTPS_PROXY = out.http_proxy = out.https_proxy = _agentProxyUrl;
   }
+  // A CLOUD MACHINE IS THE AGENTS' OWN BOX (docs/design/machine-hardening-2026-09, decision 1). A
+  // volume machine runs the daemon as root, and Claude Code refuses to skip its permission prompts as
+  // root unless the environment says it is a sandbox: every Claude turn with tools there died with
+  // "--dangerously-skip-permissions cannot be used with root/sudo privileges" (k3d, 2026-09-26).
+  // A laptop is the user's own computer and keeps the check.
+  if (onCloudMachine(source)) out.IS_SANDBOX = '1';
   return out;
 }
 
@@ -256,9 +262,15 @@ export function asarUnpackedPath(resolved: string): string {
 // return undefined so the SDK's own default resolution runs unchanged — which is why dev never hit
 // this. Never throws: on any resolution failure return undefined and let the SDK surface its own
 // "native CLI not found" error.
-export function claudeExecutablePath(): string | undefined {
-  const { app } = require('electron') as typeof import('electron');
-  if (!app.isPackaged) return undefined;
+export function claudeExecutablePath(loadElectron: () => unknown = () => require('electron')): string | undefined {
+  // NO ELECTRON IS NOT PACKAGED. A cloud machine runs this module under plain node, where the
+  // electron package has no binary and its index THROWS at require ("Electron failed to install
+  // correctly"). Unguarded, that killed every Agent SDK turn on a cloud machine before it began
+  // (chat, task work, a Claude orchestrator): the k3d run on 2026-09-25 found it.
+  let packaged = false;
+  // under plain node the package exports its binary's PATH (a string), which has no `app`
+  try { packaged = (loadElectron() as { app?: { isPackaged?: boolean } } | null)?.app?.isPackaged === true; } catch { return undefined; }
+  if (!packaged) return undefined;
   const exe = process.platform === 'win32' ? 'claude.exe' : 'claude';
   const platformPkg = `claude-agent-sdk-${process.platform}-${process.arch}`;
   // Resolve by the on-disk layout, NOT require.resolve — the SDK's package.json has an "exports"

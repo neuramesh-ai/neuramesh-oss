@@ -3,6 +3,8 @@ import {
   PLAN_ENTITLEMENTS,
   PLAN_LABELS,
   planLabel,
+  hostedPlanLabel,
+  TRIAL_LABEL,
   planOf,
   attachmentLimits,
   formatBytes,
@@ -57,9 +59,24 @@ describe('plan labels', () => {
     expect(planLabel('enterprise')).toBe('Free');
   });
   it('the refusals name the plans through the labels, never by a hard-coded word', () => {
-    expect(seatLimitReason()).toMatch(/^Free workspaces are for one person\. Upgrade to Pro/);
+    expect(seatLimitReason()).toMatch(/^The Pro trial is for one person\. Upgrade to Pro/);
     expect(seatLimitReason()).not.toMatch(/Individual|Team/);
     expect(attachmentUpgradeReason('count')).not.toMatch(/Individual|Team/);
+  });
+  // George, 2026-09-25: a hosted signup is a Pro trial, and Free is the desktop app on a Mac
+  it('a hosted workspace on the free id reads Pro trial, and a paid one reads Pro', () => {
+    expect(TRIAL_LABEL).toBe('Pro trial');
+    expect(hostedPlanLabel('free')).toBe('Pro trial');
+    expect(hostedPlanLabel(null)).toBe('Pro trial');
+    expect(hostedPlanLabel('cloud')).toBe('Pro');
+  });
+  it('a limit a Mac and the cloud share names no current plan: Free is right on one, wrong on the other', () => {
+    for (const over of ['count', 'size'] as const) {
+      const r = attachmentUpgradeReason(over);
+      expect(r).not.toMatch(/\bFree\b|Pro trial/);
+      expect(r).toMatch(/\bPro\b/);
+      expect(r).not.toMatch(/[—;]/);
+    }
   });
 });
 

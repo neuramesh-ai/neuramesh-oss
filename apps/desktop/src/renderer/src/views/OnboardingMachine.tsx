@@ -7,6 +7,7 @@
 // workspace is minted — a cloud machine is provisioned against a workspace id, so the id
 // must exist before there is a machine to show. It never blocks: provisioning began at the
 // previous step and the Launch step absorbs whatever is left.
+import { SIGNUP_GRANT_CREDITS } from '@neuramesh/shared';
 import { IconMachine } from '../ui/icons';
 import { IS_WEB } from '../lib/platform';
 
@@ -24,7 +25,7 @@ export function OnboardingMachine({ machineName, connected, workspaceName, provi
       <>
         <h1 className="obtitle">Your machine is starting</h1>
         <p className="obsub">
-          {ws ? <><b>{ws}</b> has its cloud machine.</> : 'Your workspace has its cloud machine.'} Free to start.
+          {ws ? <><b>{ws}</b> has its cloud machine and {SIGNUP_GRANT_CREDITS} credits to start.</> : `Your workspace has its cloud machine and ${SIGNUP_GRANT_CREDITS} credits to start.`}
           Your agents run there, even when this tab is closed. A Mac can join later as home base.
         </p>
         <div className="obmachine">

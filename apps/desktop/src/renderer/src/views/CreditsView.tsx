@@ -12,7 +12,7 @@ import { useEffect, useState } from 'react';
 import { CreditTopUp } from './CreditTopUp';
 import { nm } from '../bridge/nm';
 import type { WorkspaceUsage, CreditHistory } from '../bridge/nm';
-import { CREDIT_PACKS, planLabel, VIDEO_TIER_LABELS } from '@neuramesh/shared';
+import { CREDIT_PACKS, hostedPlanLabel, VIDEO_TIER_LABELS } from '@neuramesh/shared';
 
 const fmt = (n: number): string => n.toLocaleString('en-US');
 const tierName = (tier: string): string => tier === 'own' ? 'your key' : (VIDEO_TIER_LABELS as Record<string, string>)[tier] ?? tier;
@@ -42,11 +42,15 @@ export function CreditsView() {
 
   const c = usage.credits;
   const total = c.grantRemaining + c.purchasedRemaining;
-  // the arc: fraction of the MONTHLY GRANT still available (purchases push it past full, which is
-  // honest — you have more than the plan gives). Clamp the visual at one turn.
-  const frac = c.monthlyGrant > 0 ? Math.min(1, total / c.monthlyGrant) : 0;
-  const R = 74, CIRC = 2 * Math.PI * R;
   const isCloud = usage.machine.plan === 'cloud';
+  // THE PRO TRIAL NEVER REFILLS (George, 2026-09-25): its grant is the 500 it started with, and the
+  // server says so with monthlyGrant 0. Read against 0, the row printed "480 of 0" and the arc drew
+  // empty with 480 credits left. So the trial measures against what it was granted.
+  const grantBase = isCloud ? c.monthlyGrant : c.granted;
+  // the arc: fraction of the grant still available (purchases push it past full, which is honest:
+  // you have more than the plan gives). Clamp the visual at one turn.
+  const frac = grantBase > 0 ? Math.min(1, total / grantBase) : 0;
+  const R = 74, CIRC = 2 * Math.PI * R;
 
   // THE TWO METERS COME FROM THE LEDGER'S OWN PER-METER COLUMNS, not from the balance.
   //
@@ -86,7 +90,7 @@ export function CreditsView() {
     <div className="credv">
       <div className="credv-head">
         <h1>Credits</h1>
-        <span>{planLabel(isCloud ? 'cloud' : 'free')} · {c.periodStart ? `resets ${refillLabel(c.periodStart)}` : ''}</span>
+        <span>{isCloud ? `${hostedPlanLabel('cloud')}${c.periodStart ? ` · resets ${refillLabel(c.periodStart)}` : ''}` : hostedPlanLabel('free')}</span>
       </div>
 
       <div className="credv-top">
@@ -101,7 +105,7 @@ export function CreditsView() {
             <div className="credv-arcn"><b>{fmt(total)}</b><small>credits left</small></div>
           </div>
           <div className="credv-split">
-            <div><span>Monthly grant</span><b>{fmt(c.grantRemaining)} of {fmt(c.monthlyGrant)}</b></div>
+            <div><span>{isCloud ? 'Monthly grant' : 'Trial credits'}</span><b>{fmt(c.grantRemaining)} of {fmt(grantBase)}</b></div>
             <div><span className="credv-keeps">Purchased · never expires</span><b className="credv-keeps">{fmt(c.purchasedRemaining)}</b></div>
           </div>
           <div className="credv-note">Grant spends first, so what you bought keeps.</div>
@@ -127,7 +131,7 @@ export function CreditsView() {
       </div>
 
       <div className="credv-packs">
-        <div className="credv-packh">Buy credits<small>works on any plan — no upgrade needed. Purchased credits never expire.</small></div>
+        <div className="credv-packh">Buy credits<small>They work on every plan and never expire.</small></div>
         <div className="credv-packrow">
           {CREDIT_PACKS.map((pk) => (
             <button key={pk.credits} type="button" className="credv-pack" disabled={buying !== null}

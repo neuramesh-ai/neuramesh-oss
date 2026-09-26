@@ -499,12 +499,15 @@ const explicit: Record<string, any> = {
     const q = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('credits') : null;
     if (q === 'none') return null;
     const remaining = q === 'low' ? 63 : q !== null && q !== '' && Number.isFinite(Number(q)) ? Number(q) : 412;
+    // ?plan=cloud is a paid Pro workspace (1,500 a seat each month); the default is the Pro trial,
+    // which the server answers with monthlyGrant 0 because nothing refills there (credits.ts)
+    const pro = new URLSearchParams(location.search).get('plan') === 'cloud', grant = pro ? 1500 : 500;
     return {
       // a MID-month period start on purpose: the refill is a calendar-month boundary, and a
       // fixture starting on the 1st agrees with an anniversary rule too — which is exactly how a
       // wrong refill date survives a harness pass. this date only reads right if the rule is.
-      credits: { remaining, granted: 500, periodStart: '2026-08-15', monthlyGrant: 500, grantRemaining: Math.min(remaining, 500), purchasedRemaining: Math.max(0, remaining - 500), outOfCredits: remaining <= 0 },
-      machine: { minutesToday: 23, activeSecondsToday: 5400, capMinutes: null, plan: 'free' },
+      credits: { remaining, granted: grant, periodStart: '2026-08-15', monthlyGrant: pro ? 1500 : 0, grantRemaining: Math.min(remaining, grant), purchasedRemaining: Math.max(0, remaining - grant), outOfCredits: remaining <= 0 },
+      machine: { minutesToday: 23, activeSecondsToday: 5400, capMinutes: null, plan: pro ? 'cloud' : 'free' },
       brain: { callsToday: 7, model: 'gemini-3.5-flash-lite' },
       storage: { gb: 10, metered: false },
       rateVersion: '2026-08-31.1',

@@ -4,7 +4,7 @@
 // Electron is loaded ON USE (see electronlazy.ts) — this module is 9k lines of behaviour that
 // tests import under plain node, and the three call sites below already tolerate its absence
 // because they run headless too.
-import { apiAuthHeaders } from './apiauth';
+import { apiAuthHeaders, apiBearerHeader } from './apiauth';
 import { electron } from './electronlazy';
 import { startPlanRouteWatch, startRoutineBuildWatch } from './host/planroute';
 import { makeRoutineResume } from './host/routineresume';
@@ -75,7 +75,8 @@ import type { RuntimeAdapter, ProviderName, PromptOverride } from './runtime/ada
 import { providerFor, keyEnvFor, setAgentProxy, sandboxFsEnabled, setSandboxFsCache, onCloudMachine, codexSandboxMode } from './runtime/adapter';
 import { startEgressProxy } from './sandbox/egress';
 import { readSandboxSetting } from './sandbox/setting';
-import { git, repoSlugFor, ghCapable, ghPrMerge, ghPrState } from './host/gh';
+import { git, repoSlugFor, ghLoggedIn, ghPrMerge, ghPrState } from './host/gh';
+import { makeRepoCred } from './host/repocred';
 import { withTimeout, claudeTurn, directComplete } from './host/turnkit';
 import { designBlocks } from './host/plan';
 
@@ -234,7 +235,7 @@ export async function withRepoLock<T>(repoId: string, fn: () => Promise<T>): Pro
 // keychain) is the local fallback. Keys never leave the machine.
 // what THIS machine can serve — lives in runtime/localruntimes.ts (member-machines round); the
 // re-export keeps sync.ts and machined.ts on the name they always imported
-import { localRuntimes } from './runtime/localruntimes';
+import { localRuntimes, runtimeProbe, workspaceKeyProbe } from './runtime/localruntimes';
 export { localRuntimes };
 
 export async function resolveToken(
@@ -805,8 +806,10 @@ export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId,
   // What this host can serve. Probed once at start and refreshed on the register heartbeat: a
   // login can appear (the human signs into Claude) or vanish mid-session, and a stale list makes
   // peers either wait on a machine that cannot serve or race one that can.
+  // a cloud machine also serves what the workspace's stored API keys unlock (runtime/localruntimes.ts)
+  const selfProbe = runtimeProbe({ cloud: onCloudMachine(), hasKey: workspaceKeyProbe(apiUrl, workspace, () => apiAuthHeaders(apiUrl, { kind: 'human', id: ownerActorId })) });
   let myRuntimes: string[] = [];
-  void localRuntimes().then((r) => {
+  void selfProbe.refresh().then((r) => {
     myRuntimes = r;
     console.log(`agent_host runtimes=${r.join(',') || 'none'} — what this machine can serve`);
   });
@@ -855,6 +858,8 @@ export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId,
     runtime: string, model: string | null, originUserId: string | null, elapsedMs: number,
     extra?: { agentId?: string; priorMachineId?: string | null; threadMachineId?: string | null; origin?: SessionOrigin | null; modelFree?: boolean },
   ): Promise<ClaimVerdict> {
+    // a key added a minute ago serves the next message: re-probe before this host refuses (cloud only)
+    if (model !== STARTER_MODEL && !extra?.modelFree) myRuntimes = await selfProbe.ensure(runtime);
     const machines = await peerMachines();
     const self = machines.find((m) => m.machineId === machineId)
       ?? { machineId, ownerUserId: ownerActorId, runtimes: myRuntimes, lastSeenAt: new Date().toISOString() };
@@ -970,6 +975,7 @@ export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId,
 
   // The context extracted services take (host/ctx.ts). It is assembled here because this is
   // where its parts exist — `post` closes over apiUrl/ownerActorId, guards over the brain root.
+  const repoCred = makeRepoCred({ apiUrl, cloud: onCloudMachine(), runner: process.env['NM_MACHINE_KIND'] === 'runner', ownLogin: ghLoggedIn, bearer: () => apiBearerHeader(apiUrl) });
   const ctx: HostCtx = { post, guards, machineId };
   const { declareBeats, advanceBeat, beatCursor } = makeBeats(ctx);
   const { NO_RUN, LEASE_LOST, openRun, narrate } = makeRuns(ctx);
@@ -1270,7 +1276,7 @@ export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId,
   // Built HERE rather than beside the other services: parkBook is its wiring, and this is
   // where it exists. resumeFlow is declared far below, so it arrives as a thunk.
   const { parkFor, runDueParks, settleOrphanedRuns } = makePark(ctx, {
-    db, parkBook, execQueue, agents, claimed,
+    db, parkBook, execQueue, agents, claimed, repoCred,
     resumeFlow: (agent, t) => resumeFlow(agent, t),
   });
   /** taskId → the park a live turn asked for, read once its runQuery returns. */
@@ -1565,7 +1571,7 @@ export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId,
     {
       onResult: async (r) => {
         for (const row of (r.rows?._array ?? []) as Array<{ id: string; number: number; channel_id: string; assignee_id: string | null; pr_number: number; pr_url: string | null; org_name: string; repo_name: string; clone_url: string | null; local_path: string | null }>) {
-          if (merged.has(row.id) || !(await ghCapable())) continue; // gh-less BYOK machine: skip without recording "handled" — a capable daemon merges
+          if (merged.has(row.id) || !(await repoCred.watches())) continue; // no own gh login and not the runner's App lane: skip without recording "handled" — a capable daemon merges
           merged.add(row.id);
           // Resolve the slug the SAME way the PR was opened (real remote, not the
           // placeholder org_name/name) so `gh pr merge` targets the actual GitHub repo
@@ -1582,13 +1588,16 @@ export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId,
             if (chan && row.assignee_id) await post('/v1/messages', actor, { workspace: chan.workspace_id, channel: chan.id, taskId: row.id, body: `⚠️ Accepted #${row.number}, but I couldn't merge [PR #${row.pr_number}](${row.pr_url}): this repo has no GitHub remote to resolve (\`git remote add origin <github-url>\` on its checkout, then merge it yourself).` }).catch(() => {});
             continue;
           }
+          // the machine's own login at once, the runner's App token after a grace (host/repocred.ts)
+          const cred = await repoCred.forMerge(slug, row.channel_id);
+          if (!cred.ok) { if (chan && row.assignee_id) await post('/v1/messages', actor, { workspace: chan.workspace_id, channel: chan.id, taskId: row.id, body: `⚠️ Accepted #${row.number}, but I couldn't merge [PR #${row.pr_number}](${row.pr_url}): ${cred.error}` }).catch(() => {}); continue; }
           // already merged (an earlier process, another machine, or a human): settled —
           // no re-merge, and above all no re-announcement (the duplicate 🎉 bug)
-          if ((await ghPrState(slug, row.pr_number)) === 'merged') {
+          if ((await ghPrState(slug, row.pr_number, cred.env)) === 'merged') {
             console.log(`pr_merge task=${row.number} pr=${row.pr_number} repo=${slug} already merged — quiet`);
             continue;
           }
-          const res = await ghPrMerge(slug, row.pr_number);
+          const res = await ghPrMerge(slug, row.pr_number, cred.env);
           if (res.ok) {
             console.log(`pr_merge task=${row.number} pr=${row.pr_number} repo=${slug} ok`);
             if (chan && row.assignee_id) await post('/v1/messages', actor, { workspace: chan.workspace_id, channel: chan.id, taskId: row.id, body: `🎉 Accepted — squash-merged [PR #${row.pr_number}](${row.pr_url}) into its base and deleted the branch.` }).catch(() => {});
@@ -1937,7 +1946,7 @@ export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId,
     orchPlanDecision, ownFlow,
     remoteDelegate, resumeFlow,
   } = makeFlows({
-    post, machineId, guards, db, apiUrl, workspace, ownerActorId, agents, brain, parkBook, execQueue, claimed,
+    post, machineId, guards, repoCred, db, apiUrl, workspace, ownerActorId, agents, brain, parkBook, execQueue, claimed,
     NO_RUN, openRun, narrate, declareBeats, advanceBeat, beatCursor, parkFor,
     alog, arun, brainNotes, brainNotesFor, brainResults, channelLessons, claimVerdict, discoverSkills,
     handleExhaustion, legSummary, mineLessons, originOf, priorMachineFor, readOnlyStudy, requestSleeperWake, nobodyServes, unitBirth,

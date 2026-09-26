@@ -9,12 +9,14 @@
 // or crashed run still yields whatever reached the disk.
 // Cached clone per repo + a worktree per task; the branch is pushed before
 // submit so review/acceptance never depends on this machine (docs/03 §9).
-// v1 intentionally uses the machine's own git credentials (BYO git).
+// A machine uses its own git credentials (BYO git). A login-less cloud machine
+// uses the GitHub App's token for the one repository instead (host/repocred.ts).
 import type { LogFn } from './agentlog';
 import { EVIDENCE_IMAGE_BUDGET, IMAGE_EXT, planEvidenceBudget, sweepEvidenceImages } from './evidence';
 import { cachePath } from './harness/brain';
 import { hydrateFromDonor, stashDonor } from './harness/donors';
 import { ghPrCreate, git, repoSlug } from './host/gh';
+import type { RepoCred } from './host/repocred';
 import { emitProcChange } from './procbus';
 import type { BeatsFn, PermissionGate, RuntimeAdapter, TurnOpts } from './runtime/adapter';
 import { formatSecretFindings, scanDiffForSecrets } from './sandbox/secrets';
@@ -27,8 +29,14 @@ export async function worktreeRun(
   repo: { clone_url: string; default_branch: string },
   work: (dir: string) => Promise<void>,
   autoOpenPr = true,
+  repoCred?: RepoCred,
 ): Promise<{ sha: string; branch: string; diff: string; prUrl?: string; prNumber?: number; prNote?: string }> {
   const { existsSync, mkdirSync, rmSync } = await import('node:fs');
+  const slug = repoSlug(repo.clone_url);
+  // the clone, the push and the PR run on the machine's own login, or on a login-less cloud
+  // machine on the App's token for this one repository. No credential fails before any work.
+  const cred = repoCred ? await repoCred.forRepo(slug, t.channel_id) : { ok: true as const, env: {}, lane: 'own' as const };
+  if (!cred.ok) throw new Error(`this machine has no GitHub credential for ${slug}: ${cred.error}`);
 
 
   const base = t.base_ref ?? repo.default_branch;
@@ -39,11 +47,11 @@ export async function worktreeRun(
   const baseSha = await withRepoLock(t.repo_id, async () => {
     if (!existsSync(cloneDir)) {
       mkdirSync(cachePath('repos'), { recursive: true });
-      await git(['clone', repo.clone_url, cloneDir]);
+      await git(['clone', repo.clone_url, cloneDir], undefined, cred.env);
     } else {
       // --prune: stale remote-tracking refs poison --force-with-lease pushes
       // (lease checks against a branch the remote no longer has)
-      await git(['fetch', 'origin', '--prune'], cloneDir);
+      await git(['fetch', 'origin', '--prune'], cloneDir, cred.env);
     }
     rmSync(wtDir, { recursive: true, force: true }); // crashed-run leftovers
     await git(['worktree', 'prune'], cloneDir);
@@ -67,7 +75,7 @@ export async function worktreeRun(
     await work(wtDir);
     if (await git(['status', '--porcelain'], wtDir)) {
       await git(['add', '-A'], wtDir);
-      await git(['commit', '-m', `nm #${t.number}: ${t.title}`], wtDir);
+      await git(['commit', '-m', `nm #${t.number}: ${t.title}`], wtDir, cred.env); // the App lane carries the committer identity
     }
     const sha = await git(['rev-parse', 'HEAD'], wtDir);
     if (sha === baseSha) throw new Error('no work product — nothing changed in the worktree');
@@ -78,7 +86,7 @@ export async function worktreeRun(
     // than pushing and then apologizing. The message is redacted; the agent removes it and resubmits.
     const secretHits = scanDiffForSecrets(diff);
     if (secretHits.length) throw new Error(`secret-scan blocked the submit — ${formatSecretFindings(secretHits)}. Never commit credentials: read them from an env var, or keep the file under .nm-evidence/ (git-excluded). Remove the secret and resubmit.`);
-    await git(['push', '--force-with-lease', 'origin', branch], wtDir);
+    await git(['push', '--force-with-lease', 'origin', branch], wtDir, cred.env);
     // the pushed run's installed deps become (or refresh) this repo's donor — clonefile-cheap,
     // serialized with clone-dir ops, and never allowed to fail the submit it rides on
     const stash = await withRepoLock(t.repo_id, () => stashDonor(wtDir, cachePath('donors', t.repo_id))).catch(() => null);
@@ -86,16 +94,17 @@ export async function worktreeRun(
     const CAP = 200_000;
     if (diff.length > CAP) diff = `${diff.slice(0, CAP)}\n… diff truncated at 200KB — fetch ${branch} for the rest`;
     // open (or reuse) a PULL REQUEST for the branch — the change is merged on the
-    // human's accept, never committed straight to main. Uses the machine's own gh
-    // creds; if gh is absent/unauthed we fall back to push-only (clear thread note).
-    const slug = repoSlug(repo.clone_url);
+    // human's accept, never committed straight to main. Uses the credential above;
+    // if gh is absent/unauthed we fall back to push-only (clear thread note).
     const pr = slug && autoOpenPr
-      ? await ghPrCreate(wtDir, slug, base, branch, `#${t.number} ${t.title}`, `NeuraMesh task #${t.number}. Review is pinned to ${sha.slice(0, 10)}; merged on acceptance.`)
+      ? await ghPrCreate(wtDir, slug, base, branch, `#${t.number} ${t.title}`, `NeuraMesh task #${t.number}. Review is pinned to ${sha.slice(0, 10)}; merged on acceptance.`, cred.env)
       : null;
     const prNote = !autoOpenPr
       ? `Pushed \`${branch}\` — auto-open-PR is off for this project. Review proceeds on the diff; open a PR manually to enable the CI gate + merge-on-accept.`
       : slug
-      ? (pr ? `Opened PR [#${pr.number}](${pr.url}) → \`${base}\` — merges on acceptance.` : `Pushed \`${branch}\` but could not open a PR (is \`gh\` installed and authed? \`gh auth login\`). Review proceeds on the diff; open a PR to enable the CI gate + merge-on-accept.`)
+      ? (pr ? `Opened PR [#${pr.number}](${pr.url}) → \`${base}\` — merges on acceptance.`
+        : cred.lane === 'app' ? `Pushed \`${branch}\`, but the neuramesh GitHub App could not open a pull request. Review proceeds on the diff. Open a pull request to turn on the CI gate and the merge on accept.`
+        : `Pushed \`${branch}\` but could not open a PR (is \`gh\` installed and authed? \`gh auth login\`). Review proceeds on the diff; open a PR to enable the CI gate + merge-on-accept.`)
       : '';
     return { sha, branch, diff, ...(pr ? { prUrl: pr.url, prNumber: pr.number } : {}), prNote };
   } catch (err) {

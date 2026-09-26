@@ -30,13 +30,19 @@ export async function nmToolServer(a: {
   addBacklogItem?: (input: { title: string; description?: string; parent?: boolean }) => Promise<{ ok: boolean; number?: number; error?: string }>;
   opts?: TurnOpts;
   beatRun: BeatRun;
+  /** the renderer, loaded on use (tests pass one that throws as Electron does on a cloud machine) */
+  loadRender?: () => Promise<typeof import('../render')>;
 }) {
   const { dir, log, skills, proposeSkill, recordLesson, addBacklogItem, opts, beatRun } = a;
   const { join, resolve } = await import('node:path');
   const { writeFile } = await import('node:fs/promises');
   const { z } = await import('zod');
   const { tool, createSdkMcpServer } = await import('@anthropic-ai/claude-agent-sdk');
-  const { renderHtmlFileToPng, renderUrlToPng } = await import('../render');
+  // render.ts imports Electron, and a cloud machine has none: under plain node the electron
+  // package's index THROWS at require. Imported up front, it killed every task turn on a cloud
+  // machine before its first tool call (k3d, 2026-09-26). Loaded on use, only the screenshot
+  // tool fails there, and it says why.
+  const render = a.loadRender ?? (() => import('../render'));
   // name + description + schema come from THE ONE TABLE (harness/toolspec.ts — shared with the
   // CLI loopback bus, 2026-08-18; the two hand-carried copies had already drifted on spawn/park).
   // What stays here is each tool's in-process execution over the SDK closures.
@@ -52,6 +58,7 @@ export async function nmToolServer(a: {
         async (input) => {
           try {
             if (!input.file && !input.url) return { content: [{ type: 'text' as const, text: 'screenshot needs either `file` (static .html) or `url` (a running app route)' }] };
+            const { renderHtmlFileToPng, renderUrlToPng } = await render();
             const png = input.url
               ? await renderUrlToPng(input.url, { width: input.width, height: input.height })
               : await renderHtmlFileToPng(resolve(dir, input.file!), { width: input.width, height: input.height });
@@ -67,7 +74,12 @@ export async function nmToolServer(a: {
             log?.({ kind: 'tool', phase: 'call', summary: `screenshot ${input.url ?? input.file} → ${outName} (${Math.round(png.length / 1024)}KB)` });
             return { content: [{ type: 'image' as const, data: png.toString('base64'), mimeType: 'image/png' }] };
           } catch (err) {
-            return { content: [{ type: 'text' as const, text: `screenshot failed: ${err instanceof Error ? err.message : 'render error'}` }] };
+            const msg = err instanceof Error ? err.message : 'render error';
+            // no Electron is a cloud machine: say what is true, not the package's reinstall advice
+            const text = /Electron failed to install/i.test(msg)
+              ? 'screenshot is not available on this machine: it renders with the desktop app\'s browser, and a cloud machine has none'
+              : `screenshot failed: ${msg}`;
+            return { content: [{ type: 'text' as const, text }] };
           }
         },
       ),

@@ -30,11 +30,12 @@ import {
   SyncStreamConnectionMethod,
   type PowerSyncBackendConnector,
 } from '@powersync/node';
-import { executing, localRuntimes, startAgentHost } from './agents';
+import { executing, startAgentHost } from './agents';
+import { machineRuntimes, workspaceKeyProbe } from './runtime/localruntimes';
 import { initAgentLog } from './agentlog';
 import { AppSchema } from './sync/schema';
 import { uploadCrudEntry, type UploadIdentity } from './sync/upload';
-import { bootstrapEnvOf, configFromBootstrap, readConfig, type MachinedConfig } from './machined-config';
+import { adoptIdentity, bootstrapEnvOf, readConfig, type MachinedConfig } from './machined-config';
 import { bootstrapIdentity } from './machined-bootstrap';
 import { machineSyncCredentials } from './machined-credentials';
 import { connectMachineEdge } from './relay/machine-edge';
@@ -90,7 +91,7 @@ async function resolveConfig(): Promise<MachinedConfig> {
     sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
     log: (line) => console.log(`[machined] ${line}`),
   });
-  return configFromBootstrap(process.env, identity);
+  return adoptIdentity(process.env, identity);
 }
 
 export async function main(): Promise<void> {
@@ -143,10 +144,13 @@ export async function main(): Promise<void> {
   // it sleeps — a login made in the browser terminal would be invisible to every peer. Detected
   // at boot, again when a terminal session ends (a login may just have happened), and every ten
   // minutes; sent when it changed, and on every tenth beat regardless so a lost beat heals.
-  let runtimes = await localRuntimes().catch(() => [] as string[]);
+  // and the runtimes the workspace's stored API keys unlock: a key typed in the Keys step is what
+  // makes this machine serve that provider (runtime/localruntimes.ts)
+  const probe = () => machineRuntimes({ cloud: true, hasKey: workspaceKeyProbe(cfg.apiUrl, cfg.workspaceId, async () => ({ authorization: `Bearer ${cfg.machineToken}` })) });
+  let runtimes = await probe().catch(() => [] as string[]);
   let publishRuntimes = true;
   const redetect = async (): Promise<void> => {
-    const r = await localRuntimes().catch(() => runtimes);
+    const r = await probe().catch(() => runtimes);
     if (r.join(',') !== runtimes.join(',')) { runtimes = r; publishRuntimes = true; console.log(`[machined] runtimes ${r.join(',') || 'none'}`); }
   };
   const redetectTimer = setInterval(() => void redetect(), 10 * 60_000);

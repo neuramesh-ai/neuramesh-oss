@@ -336,7 +336,11 @@ export function lifecycleRoutes<E extends Env & { Variables: { actor: Actor } }>
     // compute surface reads a zero-balance machine as an ordinary nap and tells the person a
     // message will wake it. It never will.
     const bal = sql ? await creditBalance(sql, workspace) : null;
-    return c.json({ ...usage, capMinutes, plan, machines, outOfCredits: bal ? bal.remainingMicros <= 0 : false });
+    // the caller's OWN machine, named by the server: the browser's shell opens it rather than the
+    // runner, so a member signs in where their logins belong (R4). machines[0] stays the runner
+    // for every client that reads it as "the" machine.
+    const yours = machines.find((m) => m.kind === 'member' && m.ownerUserId === actor.id)?.id ?? null;
+    return c.json({ ...usage, capMinutes, plan, machines, yours, outOfCredits: bal ? bal.remainingMicros <= 0 : false });
   });
 
   /** "Wake now" — the human's override for when the automatic wake did not happen. Human-only and

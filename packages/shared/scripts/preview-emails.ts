@@ -28,7 +28,7 @@ const SAMPLES: Array<{ key: string; email: RenderedEmail }> = [
   { key: 'day1', email: renderDay1({ openUrl: `${APP}/downloads`, unsubscribeUrl: unsub }) },
   { key: 'day3', email: renderDay3({ lesson: "This repo's tests never mock the database. Use the pg fixture in test/helpers.", taskNumber: 1042, channel: 'dev', reviewer: 'scout', worker: 'patch', statAccepted: 4, statReviews: 11, statLessons: 6, window: 'your first week', openUrl: `${APP}/downloads`, unsubscribeUrl: unsub }) },
   { key: 'marketing', email: renderMarketing({ shippedThing: 'the CSV export', worker: 'patch', reviewer: 'scout', openUrl: `${APP}/downloads`, unsubscribeUrl: unsub }) },
-  { key: 'day7', email: renderDay7({ seatsUsed: 2, seatCap: 3, billingUrl: `${APP}/billing`, downloadUrl: `${APP}/downloads`, unsubscribeUrl: unsub }) },
+  { key: 'day7', email: renderDay7({ billingUrl: `${APP}/billing`, openUrl: `${APP}/downloads`, unsubscribeUrl: unsub }) },
   { key: 'hostedFreeNotice', email: renderHostedFreeNotice({ workspaces: ['Flowe', 'Side Quest'], effectiveDate: '2026-09-29', proUrl: `${APP}/pro`, termsUrl: `${APP}/terms`, exportPath: 'GET /v1/workspaces/<workspace id>/export' }) },
   { key: 'digest', email: renderDigest({ channel: 'marketing', published: 3, waiting: 2, failed: 1, drafted: 6, window: '14–20 July', openUrl: `${APP}/downloads`, unsubscribeUrl: unsub }) },
 ];

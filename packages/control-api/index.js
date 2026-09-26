@@ -71,6 +71,18 @@ function deriveAlerts(connectors, schedules, posts, dismissals = {}) {
   return out.sort((a, b2) => rank[a.kind] - rank[b2.kind] || (b2.count ?? 0) - (a.count ?? 0) || a.title.localeCompare(b2.title));
 }
 function computeAlert(state) {
+  if (state?.cap?.outOfCredits) {
+    return {
+      kind: "compute",
+      key: "compute:no_credits",
+      title: "Out of credits",
+      short: "Out of credits",
+      why: state.status === "no_credits" ? state.reason : "Your agents cannot reply until you add credits.",
+      meta: "",
+      channelId: null,
+      addCredits: true
+    };
+  }
   if (!state || state.status !== "capped") return null;
   return {
     kind: "compute",
@@ -815,9 +827,9 @@ function formatBytes(n) {
 function attachmentUpgradeReason(over) {
   const f = PLAN_ENTITLEMENTS.free.attachments;
   const c = PLAN_ENTITLEMENTS.cloud.attachments;
-  return over === "count" ? `${planLabel("free")} includes ${f.maxPerMessage} attachments per message. Upgrade to ${planLabel("cloud")} for ${c.maxPerMessage}.` : `${planLabel("free")} allows files up to ${formatBytes(f.maxBytes)} each. Upgrade to ${planLabel("cloud")} for ${formatBytes(c.maxBytes)} per file.`;
+  return over === "count" ? `This workspace takes ${f.maxPerMessage} attachments per message. Upgrade to ${planLabel("cloud")} for ${c.maxPerMessage}.` : `This workspace takes files up to ${formatBytes(f.maxBytes)} each. Upgrade to ${planLabel("cloud")} for ${formatBytes(c.maxBytes)} per file.`;
 }
-var MB, PLAN_ENTITLEMENTS, PLAN_LABELS, planLabel, FREE_SEAT_CAP, seatLimitReason;
+var MB, PLAN_ENTITLEMENTS, PLAN_LABELS, planLabel, TRIAL_LABEL, hostedPlanLabel, FREE_SEAT_CAP, seatLimitReason;
 var init_entitlements = __esm({
   "../shared/src/entitlements.ts"() {
     "use strict";
@@ -828,8 +840,10 @@ var init_entitlements = __esm({
     };
     PLAN_LABELS = { free: "Free", cloud: "Pro" };
     planLabel = (plan) => PLAN_LABELS[planOf(plan)];
+    TRIAL_LABEL = "Pro trial";
+    hostedPlanLabel = (plan) => planOf(plan) === "cloud" ? PLAN_LABELS.cloud : TRIAL_LABEL;
     FREE_SEAT_CAP = 1;
-    seatLimitReason = () => `${planLabel("free")} workspaces are for one person. Upgrade to ${planLabel("cloud")} to invite teammates. Each teammate gets a cloud machine of their own.`;
+    seatLimitReason = () => `The ${TRIAL_LABEL} is for one person. Upgrade to ${planLabel("cloud")} to invite teammates. Each teammate gets a cloud machine of their own.`;
   }
 });
 
@@ -3103,7 +3117,7 @@ function onboardingItems(s) {
     {
       id: "machine",
       label: "Cloud machine",
-      detail: "Awake and yours. Free to start.",
+      detail: "Awake and yours.",
       done: s.machines === null ? null : s.machines.some(isCloud),
       action: "none"
     },
@@ -6854,23 +6868,22 @@ function renderMarketing(v) {
   }));
 }
 function renderDay7(v) {
-  const subject = v.seatsUsed > 1 ? `You're using ${v.seatsUsed} of your ${v.seatCap} seats` : "The third chair";
-  const preheader = `Free covers ${v.seatCap} people. Nothing expires when you reach the third.`;
+  const subject = "One week on the Pro trial";
+  const preheader = `Your trial started with ${fmtCredits(SIGNUP_GRANT_CREDITS)} credits. This is what Pro adds.`;
   return done(subject, preheader, layout({
     preheader,
     unsubscribeUrl: v.unsubscribeUrl,
-    footerWhy: "You've been on NeuraMesh for a week on the Individual plan. This is the last email in your onboarding sequence.",
+    footerWhy: "You have been on NeuraMesh for a week on the Pro trial. This is the last email in your onboarding sequence.",
     body: [
-      h1("The third chair"),
-      p(`Free NeuraMesh covers ${v.seatCap} people, 3 projects and one machine. That runs the whole loop: plan, build, review, ship, with two colleagues watching the same board.`),
-      p("It stops being enough at a specific moment, and you'll know the one when it arrives. A fourth person needs in. A second repo needs its own project. Or you want the crew working to a schedule instead of waiting for you to ask."),
-      h2("What Team adds"),
+      h1("One week on the Pro trial"),
+      p(`Your trial started with ${fmtCredits(SIGNUP_GRANT_CREDITS)} credits. Your agents spend them on the NeuraMesh brain and on the minutes your cloud machine works. When you spend them all, buy more in Credits. Credits you buy never expire.`),
+      h2("What Pro adds"),
       card(
-        `<div class="nm-ink" style="font-family:'Geist',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:14.5px;line-height:2.15;color:#38332d;font-weight:600;">` + ["A fourth teammate, and past that", "Unlimited projects", "Every machine you own", "Scheduled work: the crew on a cadence"].map((t2) => `<span class="nm-green" style="color:#2f9e6b;font-weight:700;">&#10003;</span>&nbsp; ${t2}`).join("<br>") + `</div>`
+        `<div class="nm-ink" style="font-family:'Geist',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:14.5px;line-height:2.15;color:#38332d;font-weight:600;">` + ["Teammates, each with a cloud machine of their own", `${fmtCredits(CLOUD_SEAT_MONTHLY_CREDITS)} credits a seat, every month`, "Unlimited projects", "Marketplace agents over A2A"].map((t2) => `<span class="nm-green" style="color:#2f9e6b;font-weight:700;">\u2713</span>&nbsp; ${t2}`).join("<br>") + `</div>`
       ),
-      p(`${b("$22 per seat, per month.")} Cancel from the billing portal whenever you like. Team stays on until the end of the period you've paid for.`),
-      button("Upgrade to Team", v.billingUrl),
-      linkline("Or don't. Free isn't a trial, and it doesn't expire.", v.downloadUrl)
+      p(`${b("$22 per seat, per month.")} Cancel from the billing portal at any time. Pro continues to the end of the period you paid for.`),
+      button("Get Pro", v.billingUrl),
+      linkline("Or keep the trial, and buy credits in the app when you need them.", v.openUrl)
     ].join("")
   }));
 }
@@ -6910,7 +6923,7 @@ function renderBroadcast(v) {
     ].join("")
   }));
 }
-var done, publishFailedMeta, marketingMeta, day7Meta, digestMeta, broadcastMeta, TEMPLATE_META;
+var fmtCredits, done, publishFailedMeta, marketingMeta, day7Meta, digestMeta, broadcastMeta, TEMPLATE_META;
 var init_templates = __esm({
   "../shared/src/email/templates.ts"() {
     "use strict";
@@ -6919,6 +6932,8 @@ var init_templates = __esm({
     init_templates_lifecycle();
     init_templates_notice();
     init_templates_announce();
+    init_rates();
+    fmtCredits = (n) => n.toLocaleString("en-US");
     done = (subject, preheader, html) => ({ subject, preheader, html, text: toText(html) });
     publishFailedMeta = {
       kind: "transactional",
@@ -6944,10 +6959,14 @@ var init_templates = __esm({
     };
     day7Meta = {
       kind: "lifecycle",
-      shape: "The threshold. The moment the current shape stops fitting",
+      shape: "The threshold. A week into the Pro trial: the credits it started with, and what Pro adds",
       claims: [
-        ["Free: 3 members, 3 projects, 1 machine", "entitlements.ts; docs/07:11-15"],
-        ["Schedules are Cloud-only", "handler.ts:947-951"],
+        ["The trial starts with 500 credits", "rates.ts SIGNUP_GRANT_CREDITS; first-workspace.ts grantSignupCredits"],
+        ["Bought credits never expire and work on every plan", "credit-ledger.ts purchased pool; CreditsView.tsx"],
+        ["Pro: 1,500 credits a seat, every month", "rates.ts CLOUD_SEAT_MONTHLY_CREDITS; fleet-lifecycle.ts monthly refill"],
+        ["A teammate needs Pro, and gets a cloud machine", "entitlements.ts seatLimitReason; member-machines.ts provisionMemberMachine"],
+        ["The trial holds 3 projects, Pro is unlimited", "handler/project.ts PLAN_LIMIT"],
+        ["Marketplace agents over A2A are a Pro feature", "Marketplace.tsx mktgate"],
         ["$22 per seat / month", "docs/07-billing-and-plans.md:3"],
         ["Cancellation runs through Stripe\u2019s hosted portal, to period end", "billing.ts:89-107; app.ts:556"]
       ]
@@ -8449,6 +8468,7 @@ __export(src_exports, {
   TOOL_KINDS: () => TOOL_KINDS,
   TRANSITIONS: () => TRANSITIONS,
   TRANSITION_EVENT: () => TRANSITION_EVENT,
+  TRIAL_LABEL: () => TRIAL_LABEL,
   TURN_BUDGETS: () => TURN_BUDGETS,
   TURN_KINDS: () => TURN_KINDS,
   TaskRepoSchema: () => TaskRepoSchema,
@@ -8629,6 +8649,7 @@ __export(src_exports, {
   historyRows: () => historyRows,
   hostSpeaksForOrigin: () => hostSpeaksForOrigin,
   hostedFreeNoticeMeta: () => hostedFreeNoticeMeta,
+  hostedPlanLabel: () => hostedPlanLabel,
   houseStyleBlock: () => houseStyleBlock,
   humanHandles: () => humanHandles,
   initialWizard: () => initialWizard,
@@ -10261,7 +10282,7 @@ function machinePublicJwk(privatePem) {
 }
 
 // src/fleet-claims.ts
-var runnerSubstrateDefault = () => process.env["FLEET_RUNNER_SUBSTRATE"] === "claim" ? "claim" : "volume";
+var newMachineSubstrate = () => process.env["FLEET_RUNNER_SUBSTRATE"] === "claim" ? "claim" : "volume";
 var LIVE = (sql) => sql`(lifecycle is null or lifecycle <> 'destroyed')`;
 async function bindMachinePod(sql, machineId, pod, uid2) {
   const [row] = await sql`
@@ -10452,7 +10473,7 @@ function fleetRoutes(app, store2) {
   });
 }
 async function createCloudMachine(sql, m) {
-  const substrate = m.substrate ?? (m.kind === "runner" ? runnerSubstrateDefault() : "volume");
+  const substrate = m.substrate ?? newMachineSubstrate();
   const replicas = m.replicas ?? 1;
   const [row] = await sql`
     insert into machines (workspace_id, owner_user_id, name, platform, kind, lifecycle, desired_replicas, token_hash, substrate, last_wake_at, started_at)
@@ -13558,14 +13579,15 @@ async function wakeMachine(sql, machineId) {
   return { woken: rows2.length > 0, capped: false };
 }
 async function ensureTeamShape(sql, workspaceId) {
-  return sql.begin(async (_tx) => {
+  const out = await sql.begin(async (_tx) => {
     const tx = _tx;
     const [runner] = await tx`
-      select id, owner_user_id from machines
+      select id, owner_user_id, substrate from machines
        where workspace_id = ${workspaceId}::uuid and kind = 'runner' and ${LIVE2(tx)}
        for update`;
-    if (!runner) return { promoted: null, runner: null };
-    if (await memberMachineOf(tx, workspaceId, runner.owner_user_id)) return { promoted: null, runner: runner.id };
+    if (!runner) return { promoted: null, runner: null, claimOwner: null };
+    if (await memberMachineOf(tx, workspaceId, runner.owner_user_id)) return { promoted: null, runner: runner.id, claimOwner: null };
+    if (runner.substrate === "claim") return { promoted: null, runner: runner.id, claimOwner: runner.owner_user_id };
     await tx`update machines set kind = 'member', name = ${`member-${runner.owner_user_id.slice(0, 8)}`} where id = ${runner.id}::uuid`;
     const fresh = await createCloudMachine(tx, {
       workspaceId,
@@ -13576,8 +13598,13 @@ async function ensureTeamShape(sql, workspaceId) {
       replicas: 1
     });
     console.log(`team_shape workspace=${workspaceId} promoted=${runner.id} runner=${fresh.id}`);
-    return { promoted: runner.id, runner: fresh.id };
+    return { promoted: runner.id, runner: fresh.id, claimOwner: null };
   });
+  if (out.claimOwner) {
+    const mine = await provisionMemberMachine(sql, workspaceId, out.claimOwner);
+    console.log(`team_shape workspace=${workspaceId} runner=${out.runner} stays a claim, owner machine ${mine.created ? `provisioned ${mine.id}` : mine.refused ?? "exists"}`);
+  }
+  return { promoted: out.promoted, runner: out.runner };
 }
 function provisionForJoin(store2, workspaceId, userId) {
   const sql = sqlOf(store2);
@@ -14234,7 +14261,7 @@ async function machineCommands(store2, actor, cmd) {
     if (actor.kind !== "human") throw new DomainError("HUMAN_ONLY", "a cloud machine is provisioned by the member it belongs to");
     if (!await actorInWorkspace(store2, actor, cmd.workspace)) throw new DomainError("NOT_PERMITTED", "not a member of this workspace");
     if (!localMode() && await store2.workspacePlan(cmd.workspace) !== "cloud") {
-      throw new DomainError("PLAN_LIMIT", `${planLabel("free")} has no cloud machine. Upgrade to ${planLabel("cloud")} for a cloud machine per member.`);
+      throw new DomainError("PLAN_LIMIT", `The ${TRIAL_LABEL} has one cloud machine, for the workspace. Upgrade to ${planLabel("cloud")} for a cloud machine per member.`);
     }
     const sql = sqlOf(store2);
     if (!sql || !fleetOn()) throw NOT_SERVED();
@@ -14589,7 +14616,7 @@ async function projectCommands(store2, actor, cmd) {
     if (!mayManage) throw new DomainError("NOT_PERMITTED", "projects are managed by humans or the orchestrator");
     if (actor.kind === "agent") await requireConfirmCard(store2, cmd.workspace, cmd.name, "creating a project");
     if (!localMode() && await store2.workspacePlan(cmd.workspace) === "free" && await store2.activeProjectCount(cmd.workspace) >= 3) {
-      throw new DomainError("PLAN_LIMIT", `${planLabel("free")} workspaces include up to 3 projects. Upgrade to ${planLabel("cloud")} for unlimited projects.`);
+      throw new DomainError("PLAN_LIMIT", `The ${TRIAL_LABEL} includes up to 3 projects. Upgrade to ${planLabel("cloud")} for unlimited projects.`);
     }
     const baseSlug = cmd.slug ?? slugify(cmd.name);
     const event = createEvent({
@@ -15764,6 +15791,59 @@ async function executeCommand(store2, actor, cmd) {
   return outcome;
 }
 
+// src/plan-flip.ts
+init_src();
+async function applyPlanPatch(store2, mapped) {
+  const { workspace, patch } = mapped;
+  const flips = patch.plan === "cloud" && await store2.workspacePlan(workspace) !== "cloud";
+  if (!flips) {
+    await store2.setWorkspacePlan(workspace, patch);
+    return "ok";
+  }
+  const sql = sqlOf(store2);
+  if (!sql) {
+    console.error(`plan_flip_unavailable workspace=${workspace}: store has no sql pool`);
+    return "unavailable";
+  }
+  try {
+    const [row] = await sql`select seats from workspaces where id = ${workspace}::uuid`;
+    const seats = Math.max(1, Number(patch.seats ?? row?.seats ?? 1));
+    const note = patch.stripeSubscriptionId ?? `plan-flip:${workspace}`;
+    await grantCredits(sql, workspace, CLOUD_SEAT_MONTHLY_CREDITS * seats, "promo", note);
+  } catch (e) {
+    console.error(`plan_flip_grant_failed workspace=${workspace}: ${e instanceof Error ? e.message : e}`);
+    return "failed";
+  }
+  await store2.setWorkspacePlan(workspace, patch);
+  await mintWorkspaceRunner(store2, sql, workspace, "plan_flip");
+  return "ok";
+}
+async function mintWorkspaceRunner(store2, sql, workspace, why) {
+  if (!fleetOn() || !store2.createCloudMachine) return;
+  try {
+    const [live] = await sql`
+      select id from machines where workspace_id = ${workspace}::uuid and kind = 'runner'
+         and (lifecycle is null or lifecycle <> 'destroyed') limit 1`;
+    if (live) return;
+    const [owner] = await sql`
+      select user_id from workspace_members where workspace_id = ${workspace}::uuid and role = 'owner' limit 1`;
+    if (!owner) {
+      console.error(`${why}_runner_skipped workspace=${workspace}: no owner row`);
+      return;
+    }
+    const { id } = await store2.createCloudMachine({
+      workspaceId: workspace,
+      kind: "runner",
+      ownerUserId: owner.user_id,
+      name: "runner",
+      tokenHash: mintMachineToken().hash
+    });
+    console.log(`${why}_runner workspace=${workspace} machine=${id}`);
+  } catch (e) {
+    console.error(`${why}_runner_failed workspace=${workspace}: ${e instanceof Error ? e.message : e}`);
+  }
+}
+
 // src/first-workspace.ts
 function firstWorkspaceName(firstName, email) {
   const who = firstName?.trim() || email?.split("@")[0]?.trim() || "";
@@ -15798,6 +15878,8 @@ async function ensureFirstWorkspace(store2, a) {
     const made = await executeCommand(store2, { kind: "human", id: a.userId }, { type: "workspace.create", name, slug });
     console.log(`first_workspace_created user=${a.userId} workspace=${made.workspaceId} slug=${slug}`);
     await grantSignupCredits(store2, made.workspaceId);
+    const sql = sqlOf(store2);
+    if (sql) await mintWorkspaceRunner(store2, sql, made.workspaceId, "signup");
     return { workspaceId: made.workspaceId, slug };
   };
   for (let i = 1; i <= ATTEMPTS; i++) {
@@ -15844,7 +15926,7 @@ async function onAuthArrival(store2, a) {
 async function onInviteAccepted(store2, a) {
   try {
     if (!a.inviterEmail) return;
-    const seatLine = a.plan === "cloud" ? null : `${a.seatsUsed} of ${FREE_SEAT_CAP} \xB7 ${planLabel("free")} plan`;
+    const seatLine = a.plan === "cloud" ? null : `${a.seatsUsed} of ${FREE_SEAT_CAP} \xB7 ${TRIAL_LABEL}`;
     const rendered = renderJoined({
       joinedEmail: a.joinedEmail,
       workspace: a.workspaceName,
@@ -15918,13 +16000,7 @@ function renderLifecycle(template, row) {
         unsubscribeUrl: unsub
       });
     case "day7":
-      return renderDay7({
-        seatsUsed: row.seatsUsed,
-        seatCap: 3,
-        billingUrl: `${APP_URL2}/billing`,
-        downloadUrl: `${APP_URL2}/downloads`,
-        unsubscribeUrl: unsub
-      });
+      return renderDay7({ billingUrl: `${APP_URL2}/billing`, openUrl: `${APP_URL2}/downloads`, unsubscribeUrl: unsub });
   }
 }
 async function runLifecyclePass(store2, limit = 50) {
@@ -16215,7 +16291,7 @@ var UA = "neuramesh-announce";
 function githubAppConfigured(env = process.env) {
   return !!env["GITHUB_APP_ID"] && !!(env["GITHUB_APP_PRIVATE_KEY_B64"] || env["GITHUB_APP_PRIVATE_KEY"]);
 }
-var appSlug = (env) => env["GITHUB_APP_SLUG"] || "neuramesh";
+var appSlug = (env = process.env) => env["GITHUB_APP_SLUG"] || "neuramesh";
 function privateKeyPem(env) {
   const b643 = env["GITHUB_APP_PRIVATE_KEY_B64"];
   if (b643) return Buffer.from(b643, "base64").toString("utf8");
@@ -17977,7 +18053,22 @@ async function resolveConnector(store2, ctx, fetchFn, opts = {}) {
 }
 
 // src/github-write.ts
-var RUN_WRITE_PERMISSIONS = { contents: "write", pull_requests: "write", metadata: "read" };
+var RUN_WRITE_PERMISSIONS = { contents: "write", pull_requests: "write", metadata: "read", checks: "read", statuses: "read", actions: "read" };
+var botIdentity = null;
+async function commitIdentity(fetchFn, token) {
+  const login = `${appSlug()}[bot]`;
+  if (botIdentity?.name === login) return botIdentity;
+  const fallback = { name: login, email: `${login}@users.noreply.github.com` };
+  try {
+    const r = await fetchFn(`https://api.github.com/users/${encodeURIComponent(login)}`, { headers: { authorization: `Bearer ${token}`, accept: "application/vnd.github+json", "user-agent": "neuramesh-announce" } });
+    const id = r.ok ? (await r.json()).id : void 0;
+    if (!id) return fallback;
+    botIdentity = { name: login, email: `${id}+${login}@users.noreply.github.com` };
+    return botIdentity;
+  } catch {
+    return fallback;
+  }
+}
 function githubWriteRoutes(app, store2, fetchFn) {
   const ann = () => store2.announcements;
   app.post("/v1/repo/token", async (c) => {
@@ -18005,10 +18096,10 @@ function githubWriteRoutes(app, store2, fetchFn) {
       const name = slug.split("/")[1];
       const t2 = await installationToken(inst.installationId, { fetchFn, scope: { repositories: [name], permissions: RUN_WRITE_PERMISSIONS } });
       console.log(`repo_write_token machine=${machine.id} workspace=${machine.workspace_id} slug=${slug}`);
-      return c.json({ slug, token: t2.token, expiresAt: t2.expiresAt, permissions: RUN_WRITE_PERMISSIONS });
+      return c.json({ slug, token: t2.token, expiresAt: t2.expiresAt, permissions: RUN_WRITE_PERMISSIONS, identity: await commitIdentity(fetchFn, t2.token) });
     } catch (e) {
       if (e instanceof GitHubApiError && e.status === 422) {
-        return c.json({ error: "the neuramesh GitHub App does not carry write permissions yet: it needs Contents: write and Pull requests: write, and every installation re-approves the change", code: "APP_NEEDS_WRITE" }, 409);
+        return c.json({ error: "The neuramesh GitHub App needs these permissions for a pull request: Contents write, Pull requests write, Checks read, Commit statuses read, and Actions read. Add them to the App, then accept the change on each installation.", code: "APP_NEEDS_WRITE" }, 409);
       }
       return c.json({ error: e instanceof Error ? e.message : "GitHub did not answer", code: "GITHUB_ERROR" }, 502);
     }
@@ -18746,7 +18837,8 @@ function lifecycleRoutes(app, store2) {
     const sql = sqlOf(store2);
     const machines = sql ? await machineIntent(sql, workspace) : [];
     const bal = sql ? await creditBalance(sql, workspace) : null;
-    return c.json({ ...usage, capMinutes, plan, machines, outOfCredits: bal ? bal.remainingMicros <= 0 : false });
+    const yours = machines.find((m) => m.kind === "member" && m.ownerUserId === actor.id)?.id ?? null;
+    return c.json({ ...usage, capMinutes, plan, machines, yours, outOfCredits: bal ? bal.remainingMicros <= 0 : false });
   });
   app.post("/v1/machines/wake", async (c) => {
     const { workspace, machineId } = await c.req.json().catch(() => ({}));
@@ -18772,59 +18864,6 @@ function lifecycleRoutes(app, store2) {
     }
     return c.json({ ok: true, woken: out.woken });
   });
-}
-
-// src/plan-flip.ts
-init_src();
-async function applyPlanPatch(store2, mapped) {
-  const { workspace, patch } = mapped;
-  const flips = patch.plan === "cloud" && await store2.workspacePlan(workspace) !== "cloud";
-  if (!flips) {
-    await store2.setWorkspacePlan(workspace, patch);
-    return "ok";
-  }
-  const sql = sqlOf(store2);
-  if (!sql) {
-    console.error(`plan_flip_unavailable workspace=${workspace}: store has no sql pool`);
-    return "unavailable";
-  }
-  try {
-    const [row] = await sql`select seats from workspaces where id = ${workspace}::uuid`;
-    const seats = Math.max(1, Number(patch.seats ?? row?.seats ?? 1));
-    const note = patch.stripeSubscriptionId ?? `plan-flip:${workspace}`;
-    await grantCredits(sql, workspace, CLOUD_SEAT_MONTHLY_CREDITS * seats, "promo", note);
-  } catch (e) {
-    console.error(`plan_flip_grant_failed workspace=${workspace}: ${e instanceof Error ? e.message : e}`);
-    return "failed";
-  }
-  await store2.setWorkspacePlan(workspace, patch);
-  await mintRunnerOnFlip(store2, sql, workspace);
-  return "ok";
-}
-async function mintRunnerOnFlip(store2, sql, workspace) {
-  if (!fleetOn() || !store2.createCloudMachine) return;
-  try {
-    const [live] = await sql`
-      select id from machines where workspace_id = ${workspace}::uuid and kind = 'runner'
-         and (lifecycle is null or lifecycle <> 'destroyed') limit 1`;
-    if (live) return;
-    const [owner] = await sql`
-      select user_id from workspace_members where workspace_id = ${workspace}::uuid and role = 'owner' limit 1`;
-    if (!owner) {
-      console.error(`plan_flip_runner_skipped workspace=${workspace}: no owner row`);
-      return;
-    }
-    const { id } = await store2.createCloudMachine({
-      workspaceId: workspace,
-      kind: "runner",
-      ownerUserId: owner.user_id,
-      name: "runner",
-      tokenHash: mintMachineToken().hash
-    });
-    console.log(`plan_flip_runner workspace=${workspace} machine=${id}`);
-  } catch (e) {
-    console.error(`plan_flip_runner_failed workspace=${workspace}: ${e instanceof Error ? e.message : e}`);
-  }
 }
 
 // src/credentials-authz.ts

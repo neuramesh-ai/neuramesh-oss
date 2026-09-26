@@ -40,6 +40,7 @@ import type { WhiteboardToolClosures } from '../harness/toolbus';
 import type { makeRuns, RunHandle } from './runs';
 import type { makeBeats } from './beats';
 import type { makePark } from './park';
+import type { RepoCred } from './repocred';
 
 
 
@@ -55,6 +56,8 @@ export function makeReviewFlow(ctx: HostCtx & {
   execQueue: HostQueue;
   /** the claim registry — `delete` also re-arms the queue slot, which is why it is not a bare Set */
   claimed: { has: (id: string) => boolean; add: (id: string) => unknown; delete: (id: string) => boolean };
+  /** the GitHub credential the CI gate reads with on a login-less cloud machine (host/repocred.ts) */
+  repoCred: RepoCred;
   // ── services other makers already built: their types are INFERRED, never restated ──────────
   NO_RUN: ReturnType<typeof makeRuns>['NO_RUN'];
   openRun: ReturnType<typeof makeRuns>['openRun'];
@@ -91,7 +94,7 @@ const { db, apiUrl, workspace, ownerActorId, post, agents, execQueue,
         beatCursor, 
         arun, channelLessons, 
         mineLessons, 
-        seatFor, setStatus, shipperFlow } = ctx;
+        seatFor, setStatus, shipperFlow, repoCred } = ctx;
 // The guard registry's fields keep their short names, exactly as they read inside startAgentHost.
 const { 
         reviewed,
@@ -174,9 +177,20 @@ async function reviewFlow(agent: HostedAgent, t: { id: string; number: number; t
     if (repoRequired && pushed && prNumber && full?.repo_clone && ciPolicy.runCiBeforeMerge) {
       const slug = repoSlug(full.repo_clone);
       rlog({ kind: 'tool', phase: 'ci', summary: `PR #${prNumber} — settling CI before review` });
-      const ci = await waitForCi(slug, prNumber, (n) => rlog({ kind: 'tool', phase: 'ci', summary: `PR #${prNumber} CI not settled yet — poll ${n}` }));
+      const cred = await repoCred.forRepo(slug, t.channel_id);
+      const ci = cred.ok ? await waitForCi(slug, prNumber, (n) => rlog({ kind: 'tool', phase: 'ci', summary: `PR #${prNumber} CI not settled yet — poll ${n}` }), cred.env) : { verdict: 'unknown' as const, detail: cred.error };
       if (ci.verdict === 'fail') { await requestChanges(`CI is red on the pull request — \`${ci.detail}\` failed. Fix it so the checks pass, then re-submit.`, 'CI failing'); return; }
       if (ci.verdict === 'pending') { await requestChanges(`the pull request's CI didn't finish within the wait window (\`${ci.detail}\`) — the workflow may be stuck; check the run and re-submit once it's green.`, 'CI stuck'); return; }
+      if (ci.verdict === 'unknown') {
+        // a CI read that FAILED is not "no CI": the gate used to pass it as none, and unverified work
+        // went on to review. Not the worker's fault either, so hold it for a person, not a bounce.
+        const reason = `I could not read the CI of PR #${prNumber}: ${ci.detail.replace(/\.$/, '')}. Fix that, then unblock the task.`;
+        await beats.fail();
+        await post('/v1/commands', actor, { type: 'task.block', taskId: t.id, reason }).catch((e) => console.error(`task_block #${t.number} failed:`, e));
+        await post('/v1/messages', actor, { workspace: ch.workspace_id, channel: ch.id, taskId: t.id, body: `Auto-review of #${t.number}: ⛔ blocked. ${reason}` }).catch(() => {});
+        rlog({ kind: 'lifecycle', phase: 'reviewed', summary: `blocked #${t.number}: CI unreadable`, level: 'warn' });
+        return;
+      }
       ciNote = ci.verdict === 'pass'
         ? `\n\nSystem CI gate: the PR's CI checks have PASSED (verified by the host) — treat any "CI passes / checks green" Definition-of-Done item as SATISFIED.`
         : `\n\nSystem CI gate: no CI is configured on this repo — any CI-related Definition-of-Done item is not applicable here.`;

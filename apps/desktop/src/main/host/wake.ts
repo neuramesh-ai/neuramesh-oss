@@ -17,6 +17,7 @@
 import { routineOwned, starterFallback, unavailableOf } from './starterfallback';
 import { SKILL_MARKER, echoTurn, emitStream, loadMessageAttachments, parseSkillMarker, resolveToken, runtimeFor } from '../agents';
 import { isLimitNotice } from '../execpolicy';
+import { isNoCreditsError, noCreditsNotice } from '../computenotice';
 import { assemble, assemblyLine, contextBudget, transcriptBlock } from '../harness/assemble';
 import { type RunHandle } from './runs';
 import type { AgentAttachment } from '../runtime/adapter';
@@ -77,6 +78,18 @@ export function makeWake(ctx: {
   // the film lane (videogen.ts): the card's ‹gen-video:› marker, served like the draw marker
   const { filmDraft } = makeFilm({ db, apiUrl: ctx.apiUrl, ownerActorId: ctx.ownerActorId, post: ctx.post, agents: ctx.agents });
   const { NO_RUN, alog, apiUrl, arun, blockFor, brainNotes, brainResults, chatTurn, discoverSkills, echoOrchestrate, echoPlanReview, echoThreadOrchestrate, generateDraftImage, handleExhaustion, openWakeRun, orchestratorTurn, ownerActorId, post, rearmWake, reviseContentDrafts, seatFor, setStatus, threadModeFor, threadTranscript, wakeEnded, wakeStarted } = ctx;
+  // the NeuraMesh brain refused the turn for credits: say so in the thread (computenotice.ts), never
+  // silence. replyTo keeps it to one notice per trigger: the server holds one reply per (agent, trigger).
+  // A conversation can move rooms mid-turn (file_conversation), so its thread names the room, as in wake().
+  const noCreditsReply = async (agent: HostedAgent, channelId: string, where: { replyTo: string; taskId?: string; threadId?: string }): Promise<void> => {
+    try {
+      const channel = where.threadId
+        ? (await db.get<{ channel_id: string }>('select channel_id from threads where id = ?', [where.threadId]).catch(() => null))?.channel_id ?? channelId
+        : channelId;
+      const ch = await db.get<{ workspace_id: string }>('select workspace_id from channels where id = ?', [channel]);
+      await post('/v1/messages', { kind: 'agent', id: agent.id }, { workspace: ch.workspace_id, channel, ...where, body: noCreditsNotice() });
+    } catch (e) { console.error('no-credits notice failed:', e); }
+  };
 
 
 
@@ -194,6 +207,7 @@ export function makeWake(ctx: {
       console.log(`agent_thread_wake agent=${agent.name} task=${t.number} mode=${mode} replied=ok${sent.tries > 1 ? ` tries=${sent.tries}` : ''}`);
     } catch (err) {
       console.error(`agent_thread_wake agent=${agent.name} task=${t.number} failed:`, err);
+      if (isNoCreditsError(err)) await noCreditsReply(agent, t.channel_id, { taskId: t.id, replyTo: m.id });
       await wakeRun.settle('failed', err instanceof Error ? err.message.slice(0, 200) : 'the turn failed');
     } finally {
       emitStream(`${t.channel_id}:${t.id}`, agent.name, '', true); // clear the live bubble on every exit (wake() already does)
@@ -423,6 +437,7 @@ export function makeWake(ctx: {
     } catch (err) {
       console.error(`agent_wake agent=${agent.name} failed:`, err);
       log({ kind: 'wake', phase: 'error', summary: `wake failed: ${err instanceof Error ? err.message.slice(0, 200) : 'unknown'}`, level: 'error' });
+      if (isNoCreditsError(err)) await noCreditsReply(agent, m.channel_id, { replyTo: m.id, ...(m.thread_id ? { threadId: m.thread_id } : {}) });
       await wakeRun.settle('failed', err instanceof Error ? err.message.slice(0, 200) : 'the turn failed');
     } finally {
       wakeEnded(m.channel_id);

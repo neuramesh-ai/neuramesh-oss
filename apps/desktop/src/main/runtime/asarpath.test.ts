@@ -4,7 +4,7 @@
 //   node --import tsx --test apps/desktop/src/main/runtime/asarpath.test.ts
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { asarUnpackedPath } from './adapter';
+import { asarUnpackedPath, claudeExecutablePath, claudePathOption } from './adapter';
 
 const PACKED =
   '/Applications/NeuraMesh.app/Contents/Resources/app.asar/node_modules/.pnpm/@anthropic-ai+claude-agent-sdk-darwin-arm64@0.3.193/node_modules/@anthropic-ai/claude-agent-sdk-darwin-arm64/claude';
@@ -30,4 +30,18 @@ test('the rewritten path no longer traverses the app.asar file (the ENOTDIR caus
   const out = asarUnpackedPath(PACKED);
   assert.ok(out.includes(`${'/app.asar.unpacked/'}node_modules/`));
   assert.ok(!out.includes('/app.asar/node_modules/'));
+});
+
+// A CLOUD MACHINE HAS NO ELECTRON (2026-09-25). There the electron package throws at require
+// ("Electron failed to install correctly"), and before the guard that killed every Agent SDK turn on
+// a cloud machine: chat, task work, a Claude orchestrator. No Electron means no packaged app, so the
+// SDK resolves its own binary.
+test('no Electron is not packaged: a throwing require answers undefined, never an exception', () => {
+  assert.equal(claudeExecutablePath(() => { throw new Error('Electron failed to install correctly, please delete node_modules/electron and try installing again'); }), undefined);
+});
+
+test('plain node with the electron package gets its binary path, not the API: not packaged either', () => {
+  assert.equal(claudeExecutablePath(() => '/x/node_modules/electron/dist/electron'), undefined);
+  // and the spread every SDK call site uses stays empty rather than throwing
+  assert.deepEqual(claudePathOption(), {});
 });

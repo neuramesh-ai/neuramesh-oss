@@ -14,7 +14,7 @@ import { cachePath, type SubjectRef } from '../harness/brain';
 
 
 
-import { ghCapable, ghPrMerge, ghPrMergeSha, ghPrState, git, repoSlug, repoSlugFor, waitForCi, waitForRelease } from './gh';
+import { ghPrMerge, ghPrMergeSha, ghPrState, git, repoSlug, repoSlugFor, waitForCi, waitForRelease } from './gh';
 
 
 
@@ -37,6 +37,7 @@ import type { WhiteboardToolClosures } from '../harness/toolbus';
 import type { makeRuns, RunHandle } from './runs';
 import type { makeBeats } from './beats';
 import type { makePark } from './park';
+import type { RepoCred } from './repocred';
 
 export function makeReleaseDocs(ctx: HostCtx & {
   db: PowerSyncDatabase;
@@ -49,6 +50,8 @@ export function makeReleaseDocs(ctx: HostCtx & {
   execQueue: HostQueue;
   /** the claim registry — `delete` also re-arms the queue slot, which is why it is not a bare Set */
   claimed: { has: (id: string) => boolean; add: (id: string) => unknown; delete: (id: string) => boolean };
+  /** the GitHub credential the ship watches merge and read with (host/repocred.ts) */
+  repoCred: RepoCred;
   // ── services other makers already built: their types are INFERRED, never restated ──────────
   NO_RUN: ReturnType<typeof makeRuns>['NO_RUN'];
   openRun: ReturnType<typeof makeRuns>['openRun'];
@@ -80,7 +83,7 @@ export function makeReleaseDocs(ctx: HostCtx & {
   taskRecallNote: (workspaceId: string, query: string, lessonsNote: string) => Promise<string>;
   whiteboardClosures: (actor: { kind: string; id: string; role?: string }, ch: { id: string; workspace_id: string }, at: { taskId?: string; threadId?: string }) => WhiteboardToolClosures;
 }) {
-const { db, workspace, post, agents, 
+const { db, workspace, post, agents, repoCred, 
         
         
         
@@ -121,7 +124,7 @@ db.watch(
   [],
   {
     onResult: async (r) => {
-      if (!(await ghCapable())) return; // BYOK lane: no gh credential — a capable daemon verifies CI + executes
+      if (!(await repoCred.watches())) return; // no own gh login and not the runner's App lane: a capable daemon verifies CI + executes
       for (const row of (r.rows?._array ?? []) as Array<ShipTask & { ship_plan: string | null }>) {
         let plan: ShipPlan | null = null;
         try { plan = row.ship_plan ? (JSON.parse(row.ship_plan) as ShipPlan) : null; } catch { continue; }
@@ -141,7 +144,8 @@ db.watch(
             const full = await db.get<{ repo_clone: string | null; repo_local: string | null }>(`select r.clone_url as repo_clone, r.local_path as repo_local from tasks t join repos r on r.id = t.repo_id where t.id = ?`, [row.id]).catch(() => null);
             const slug = full ? await repoSlugFor({ clone_url: full.repo_clone, local_path: full.repo_local, org_name: null, name: null }) : '';
             if (!slug) return;
-            const ci = await waitForCi(slug, row.pr_number!);
+            const cred = await repoCred.forRepo(slug, row.channel_id);
+            const ci = cred.ok ? await waitForCi(slug, row.pr_number!, undefined, cred.env) : { verdict: 'unknown' as const, detail: cred.error };
             if (ci.verdict === 'pass' || ci.verdict === 'none') {
               await post('/v1/commands', actor, { type: 'task.check_ship_item', taskId: row.id, itemId: item.id, state: 'done', note: ci.verdict === 'pass' ? `host-verified: ${ci.detail}` : 'no CI configured' }).catch(() => {});
             } else {
@@ -180,7 +184,7 @@ db.watch(
   [],
   {
     onResult: async (r) => {
-      if (!(await ghCapable())) return; // BYOK lane: no gh credential — a capable daemon merges + verifies
+      if (!(await repoCred.watches())) return; // no own gh login and not the runner's App lane: a capable daemon merges + verifies
       for (const row of (r.rows?._array ?? []) as Array<{ id: string; number: number; title: string; channel_id: string; pr_number: number; pr_url: string | null; ship_plan: string | null; org_name: string; repo_name: string; clone_url: string | null; local_path: string | null }>) {
         if (verifyInFlight.has(row.id)) continue;
         let plan: ShipPlan | null = null;
@@ -215,15 +219,18 @@ db.watch(
               return;
             }
 
+            // the machine's own login at once, the runner's App token after a grace (host/repocred.ts)
+            const cred = await repoCred.forMerge(slug, row.channel_id);
+            if (!cred.ok) { if (!(await said('could not reach GitHub for'))) await say(`⚠️ #${row.number} is ready to ship, but I could not reach GitHub for [PR #${row.pr_number}](${row.pr_url}): ${cred.error}`); return; }
             // 1 · the merge — the PR's own state is the cross-restart, cross-machine truth
-            let prState = await ghPrState(slug, row.pr_number);
+            let prState = await ghPrState(slug, row.pr_number, cred.env);
             if (prState === 'unknown') return; // transient gh failure — the next tick retries
             if (prState === 'closed') {
               if (!(await said('was closed without merging'))) { await say(`⚠️ [PR #${row.pr_number}](${row.pr_url}) was closed without merging — nothing to verify. Request changes to bounce a fresh round, or Accept if this was handled elsewhere.`); notifyDesktop(`Release blocked · #${row.number}`, `PR #${row.pr_number} closed unmerged`); }
               return;
             }
             if (prState === 'open') {
-              const res = await ghPrMerge(slug, row.pr_number);
+              const res = await ghPrMerge(slug, row.pr_number, cred.env);
               if (!res.ok) {
                 console.error(`ship_verify task=${row.number} pr=${row.pr_number} repo=${slug} merge FAILED: ${res.error}`);
                 if (!(await said('the squash-merge failed'))) { await say(`⚠️ #${row.number}: the squash-merge failed — ${res.error}. Fix it (or merge manually), then Accept; I retry on the next restart.`); notifyDesktop(`Merge failed · #${row.number}`, res.error); }
@@ -234,13 +241,16 @@ db.watch(
             }
 
             // 2 · the verdict — poll the merge commit until the release settles
-            const sha = await ghPrMergeSha(slug, row.pr_number);
+            const sha = await ghPrMergeSha(slug, row.pr_number, cred.env);
             if (!sha) return; // gh hasn't surfaced the merge commit yet — next tick
             await tickAuto('merge', `squash-merged as ${sha.slice(0, 7)}`);
             for (let round = 0; ; round++) {
               const cur = await db.get<{ state: string }>('select state from tasks where id = ?', [row.id]).catch(() => null);
               if (cur?.state !== 'verifying') return; // accepted / bounced / cancelled elsewhere — stand down
-              const v = await waitForRelease(slug, sha);
+              // a fresh credential per round: a release watch can outlive one token
+              const c = await repoCred.forRepo(slug, row.channel_id);
+              if (!c.ok) return; // the next tick retries
+              const v = await waitForRelease(slug, sha, undefined, c.env);
               if (v.verdict === 'green' || v.verdict === 'none') {
                 const note = v.verdict === 'green' ? v.detail : 'no post-merge CI or release workflows configured — proceeding on the review verdict';
                 await tickAuto('verify', note);

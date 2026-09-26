@@ -118,3 +118,26 @@ describe('the rendered email holds the line on docs/28 and CLAUDE.md #11', () =>
     }
   });
 });
+
+// THE DAY-7 EMAIL, A WEEK INTO THE PRO TRIAL (George, 2026-09-25). The old one sold "the third chair"
+// to a Free plan of three people; Free has been one person since 2026-09-03, and a hosted signup is
+// a trial of Pro with its starting credits. It lives here beside the other email copy checks.
+import { renderDay7 } from '../src/email/templates';
+import { CLOUD_SEAT_MONTHLY_CREDITS, SIGNUP_GRANT_CREDITS } from '../src/rates';
+
+describe('the day-7 email speaks the Pro trial', () => {
+  const r = renderDay7({ billingUrl: 'https://x/billing', openUrl: 'https://x/downloads', unsubscribeUrl: 'https://x/u' });
+  it('names the trial, its starting credits, and what Pro adds', () => {
+    expect(r.subject).toBe('One week on the Pro trial');
+    expect(r.text).toContain(`${SIGNUP_GRANT_CREDITS} credits`);
+    expect(r.text).toContain(`${CLOUD_SEAT_MONTHLY_CREDITS.toLocaleString('en-US')} credits a seat, every month`);
+    expect(r.text).toContain('Get Pro');
+  });
+  it('carries none of the claims that went false', () => {
+    expect(r.text + r.subject + r.preheader).not.toMatch(/third chair|isn't a trial|Individual|Upgrade to Team|covers 3|3 people/i);
+  });
+  it('no em dash and no semicolon anywhere a person reads', () => {
+    expect(r.subject + r.preheader).not.toMatch(/[—;]/);
+    expect(r.text).not.toMatch(/[—;]/);
+  });
+});

@@ -64,6 +64,14 @@ Every failure writes a sentence to the pane and exits — no machine yet, forbid
 
 Close codes are the diagnostic vocabulary. `4403` versus `1013` is worth knowing by heart: a *wrong* `RELAY_SECRET` closes `1013 VALIDATE_UNAVAILABLE`, so a `4403 FORBIDDEN` proves the relay reached control-api, authenticated, and got a real membership verdict back.
 
+## Which machine a terminal opens (2026-09-25)
+
+A plain shell is where a person signs in, so it opens that person's own machine. The server names it as `yours` in `/v1/machines/usage`, and a person without a machine of their own gets the runner. The shell promotes that machine first, because a sign-in on a claim ends with the pod. It wakes only that machine.
+
+A task's terminal opens the runner, which holds the task's worktree, and never promotes it. A promotion ends the claim pod, and the worktree ends with it.
+
+Code keeps the runner (`machines[0]`), because a Code lane does not wake a machine before it attaches.
+
 ## Operational shape
 
 | Piece | Where |
@@ -130,5 +138,7 @@ RUN tsx -e "import('/app/apps/desktop/src/main/machined.ts')"
 ```
 
 `main()` is guarded on being executed directly, so an import resolves the daemon's entire graph without starting anything. A missing workspace package, an over-pruned devDependency, or a native module built for the wrong ABI all become a **red build in about two seconds** instead of a dead fleet.
+
+**An import check cannot see a file (2026-09-26).** The daemon reads the agent contracts (`defaults/agents/*.yaml`) at runtime, and the image never copied them. Every import resolved, so the build stayed green, and every cloud machine ran its agents with an empty worker prompt. The image now copies `defaults/`, and the boot check also loads four contracts, so a missing one is a red build.
 
 **Never pin a machine image you have not watched boot.** `relay /healthz` going from `"machines":[]` to `"machines":["<id>"]` is the difference between "the workflows were green" and "a machine is actually on the relay".

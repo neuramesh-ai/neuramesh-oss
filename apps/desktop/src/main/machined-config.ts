@@ -40,17 +40,33 @@ export interface BootstrapIdentity {
   token: string;
 }
 
-/** a spare that redeemed its binding boots exactly like a stamped machine: the identity fills the
- *  env the StatefulSet template would have carried, and readConfig's own checks still apply */
-export function configFromBootstrap(env: Record<string, string | undefined>, identity: BootstrapIdentity): MachinedConfig {
-  return readConfig({
-    ...env,
+/** the env the StatefulSet template would have stamped (infra/k8s/templates/machine.yaml) */
+export function identityEnv(identity: BootstrapIdentity): Record<string, string> {
+  return {
     NM_MACHINE_TOKEN: identity.token,
     NM_MACHINE_ID: identity.machineId,
     NM_WORKSPACE_ID: identity.workspaceId,
     NM_MACHINE_KIND: identity.kind,
     NM_OWNER_USER_ID: identity.ownerUserId,
-  });
+  };
+}
+
+/** a spare that redeemed its binding boots exactly like a stamped machine: the identity fills the
+ *  env the StatefulSet template would have carried, and readConfig's own checks still apply */
+export function configFromBootstrap(env: Record<string, string | undefined>, identity: BootstrapIdentity): MachinedConfig {
+  return readConfig({ ...env, ...identityEnv(identity) });
+}
+
+/** ...and the PROCESS becomes one, environment included: `env` is machined's own process.env.
+ *  apiauth reads the machine bearer from the environment at call time, and until this only the
+ *  config held the token: a claim runner's agent host sent every /v1 call with no bearer, which
+ *  production's gate (header lane closed) answers 401 AUTH_REQUIRED. The dev stack opens the
+ *  header lane, which is why k3d never showed it (2026-09-26). Validates before it writes, so a
+ *  bad identity never lands. */
+export function adoptIdentity(env: Record<string, string | undefined>, identity: BootstrapIdentity): MachinedConfig {
+  const cfg = configFromBootstrap(env, identity);
+  Object.assign(env, identityEnv(identity));
+  return cfg;
 }
 
 /** pure and loud: a machine with half an identity must refuse to boot, not half-run */

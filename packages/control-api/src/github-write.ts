@@ -4,23 +4,42 @@
 // has to push a branch and open a pull request.
 //
 // Custody, in one paragraph. The platform holds the App's private key and mints an installation
-// token narrowed at mint time to ONE repository and the write permissions a pull request needs
-// (contents, pull_requests) — one hour on GitHub's side, held only by the machine that asked,
-// never written to a row, never cached here (the reads' token cache is a read token). A person
-// never gets one: the caller is a MACHINE, proven by its own bearer, and the repository is the
-// one the room's project connected, so the machine's workspace must be the connector's. The App
-// itself must carry the write permissions (a GitHub App setting, re-approved by every
-// installation); until it does GitHub answers 422 and the route says which permission is missing.
+// token narrowed at mint time to ONE repository and what a pull request needs (contents and
+// pull_requests write, and reads of its checks) — one hour on GitHub's side, held only by the
+// machine that asked, never written to a row, never cached here (the reads' token cache is a read
+// token). A person never gets one: the caller is a MACHINE, proven by its own bearer, and the
+// repository is the one the room's project connected, so the machine's workspace must be the
+// connector's. The App itself must carry those permissions (a GitHub App setting, re-approved by
+// every installation); until it does GitHub answers 422 and the route names what is missing.
 import type { Env, Hono } from 'hono';
 import { hashMachineToken } from './machine-auth';
-import { GitHubApiError, githubAppConfigured, installationToken } from './github-app';
+import { GitHubApiError, appSlug, githubAppConfigured, installationToken } from './github-app';
 import { installationFor, slugOf } from './github-resolve';
 import type { Store } from './store';
 
 type Fetch = typeof fetch;
 
-/** what the run may do with the token, no more: push its branch and open its pull request */
-export const RUN_WRITE_PERMISSIONS: Record<string, 'read' | 'write'> = { contents: 'write', pull_requests: 'write', metadata: 'read' };
+/** what the run may do with the token, no more: push its branch, open and merge its pull request,
+ *  and read that pull request's CI. The three reads matter: on a private repository a token without
+ *  them sees no checks at all, and the CI gate would read that as "no CI" (docs/design/repo-writes-2026-09). */
+export const RUN_WRITE_PERMISSIONS: Record<string, 'read' | 'write'> = { contents: 'write', pull_requests: 'write', metadata: 'read', checks: 'read', statuses: 'read', actions: 'read' };
+
+/** the App's own bot signs the commits a login-less machine makes. A cloud machine has no git
+ *  identity (`git commit` refused: "Author identity unknown"), and GitHub links a commit by its
+ *  email: `<id>+<slug>[bot]@users.noreply.github.com` is the bot account's own address. */
+let botIdentity: { name: string; email: string } | null = null;
+async function commitIdentity(fetchFn: Fetch, token: string): Promise<{ name: string; email: string }> {
+  const login = `${appSlug()}[bot]`;
+  if (botIdentity?.name === login) return botIdentity;
+  const fallback = { name: login, email: `${login}@users.noreply.github.com` };
+  try {
+    const r = await fetchFn(`https://api.github.com/users/${encodeURIComponent(login)}`, { headers: { authorization: `Bearer ${token}`, accept: 'application/vnd.github+json', 'user-agent': 'neuramesh-announce' } });
+    const id = r.ok ? ((await r.json()) as { id?: number }).id : undefined;
+    if (!id) return fallback;
+    botIdentity = { name: login, email: `${id}+${login}@users.noreply.github.com` };
+    return botIdentity;
+  } catch { return fallback; }
+}
 
 export function githubWriteRoutes<E extends Env>(app: Hono<E>, store: Store, fetchFn: Fetch): void {
   const ann = () => store.announcements;
@@ -50,11 +69,11 @@ export function githubWriteRoutes<E extends Env>(app: Hono<E>, store: Store, fet
       const name = slug.split('/')[1]!;
       const t = await installationToken(inst.installationId, { fetchFn, scope: { repositories: [name], permissions: RUN_WRITE_PERMISSIONS } });
       console.log(`repo_write_token machine=${machine.id} workspace=${machine.workspace_id} slug=${slug}`);
-      return c.json({ slug, token: t.token, expiresAt: t.expiresAt, permissions: RUN_WRITE_PERMISSIONS });
+      return c.json({ slug, token: t.token, expiresAt: t.expiresAt, permissions: RUN_WRITE_PERMISSIONS, identity: await commitIdentity(fetchFn, t.token) });
     } catch (e) {
       // 422 is GitHub's "the App does not have that permission": name the fix, not the code
       if (e instanceof GitHubApiError && e.status === 422) {
-        return c.json({ error: 'the neuramesh GitHub App does not carry write permissions yet: it needs Contents: write and Pull requests: write, and every installation re-approves the change', code: 'APP_NEEDS_WRITE' }, 409);
+        return c.json({ error: 'The neuramesh GitHub App needs these permissions for a pull request: Contents write, Pull requests write, Checks read, Commit statuses read, and Actions read. Add them to the App, then accept the change on each installation.', code: 'APP_NEEDS_WRITE' }, 409);
       }
       return c.json({ error: e instanceof Error ? e.message : 'GitHub did not answer', code: 'GITHUB_ERROR' }, 502);
     }

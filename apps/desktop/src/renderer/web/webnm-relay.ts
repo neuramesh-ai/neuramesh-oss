@@ -26,7 +26,18 @@ interface MachineRow {
   id: string; name: string; desiredReplicas: number;
   lastSeenAt: string | null; lastWakeAt: string | null; lifecycle: string | null;
 }
-interface UsageReply { machines?: MachineRow[]; minutes?: number; capMinutes?: number | null; plan?: string }
+interface UsageReply {
+  machines?: MachineRow[]; minutes?: number; capMinutes?: number | null; plan?: string;
+  /** the caller's own machine in this workspace, named by the server (R4) */
+  yours?: string | null;
+}
+
+/** which machine a lane dials. Code takes the workspace's runner: machines[0], because the server
+ *  lists the runner first. The SHELL takes the caller's own machine when the server names one, so
+ *  a member signs in where their logins belong (R4, George 2026-09-25), and the runner otherwise. */
+export const runnerOf = (u: UsageReply): MachineRow | null => u.machines?.[0] ?? null;
+export const shellMachineOf = (u: UsageReply): MachineRow | null =>
+  (u.yours ? u.machines?.find((m) => m.id === u.yours) : undefined) ?? runnerOf(u);
 
 export function createEngineeringAttachmentAcknowledgements(timeoutMs = 30_000) {
   const pending = new Map<string, { resolve(): void; reject(error: unknown): void; timer: ReturnType<typeof setTimeout> }>();
@@ -54,13 +65,6 @@ export function createEngineeringAttachmentAcknowledgements(timeoutMs = 30_000) 
   };
 }
 
-/** the workspace's runner id, cached briefly.
- *
- *  Cached because every terminal open would otherwise re-ask, and a person opening three
- *  tabs should not cost three round-trips for an answer that changes when a machine is
- *  created — which is approximately never. Short, because the FIRST wake creates the row,
- *  and a long cache would make the terminal keep saying "no machine yet" for minutes after
- *  one appeared. */
 /** machine.promote for the shell: `promoted` is true only when the row was a claim and is now a
  *  volume coming back; a refusal (not this person's machine) or a volume already answers false,
  *  and the shell opens on what is there — a promotion never blocks a terminal */
@@ -75,19 +79,27 @@ async function nmPromote(env: RelayEnv, machineId: string): Promise<{ ok?: boole
   } catch { return null; }
 }
 
-/** POST the wake. A capped refusal is a 409 with a code, not a failure to report as one. */
-async function nmWake(env: RelayEnv): Promise<{ ok?: boolean; capped?: boolean } | null> {
+/** POST the wake, for the ONE machine the shell dials: without an id the route wakes every machine
+ *  in the workspace, a teammate's too. A capped refusal is a 409 with a code, not a failure. */
+async function nmWake(env: RelayEnv, machineId: string | null): Promise<{ ok?: boolean; capped?: boolean } | null> {
   try {
     const res = await fetch(`${env.apiUrl}/v1/machines/wake`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', ...(await env.authHeaders()) },
-      body: JSON.stringify({ workspace: env.workspaceId() }),
+      body: JSON.stringify({ workspace: env.workspaceId(), ...(machineId ? { machineId } : {}) }),
     });
     return (await res.json()) as { ok?: boolean; capped?: boolean };
   } catch { return null; }
 }
 
-function machineResolver(env: RelayEnv): () => Promise<string | null> {
+/** a lane's machine id, cached briefly.
+ *
+ *  Cached because every terminal open would otherwise re-ask, and a person opening three
+ *  tabs should not cost three round-trips for an answer that changes when a machine is
+ *  created — which is approximately never. Short, because the FIRST wake creates the row,
+ *  and a long cache would make the terminal keep saying "no machine yet" for minutes after
+ *  one appeared. */
+function machineResolver(env: RelayEnv, pick: (u: UsageReply) => MachineRow | null = runnerOf): () => Promise<string | null> {
   let cached: string | null = null;
   let at = 0;
   return async () => {
@@ -99,8 +111,7 @@ function machineResolver(env: RelayEnv): () => Promise<string | null> {
       );
       if (!res.ok) return cached; // keep the last good answer; a failed read is not "no machine"
       const body = (await res.json()) as UsageReply;
-      // one runner per workspace by construction (the machines_one_runner unique index)
-      const id = body.machines?.[0]?.id ?? null;
+      const id = pick(body)?.id ?? null;
       if (id) { cached = id; at = Date.now(); }
       return id;
     } catch {
@@ -123,12 +134,14 @@ async function readUsage(env: RelayEnv): Promise<UsageReply | null> {
 export function relayOverrides(env: RelayEnv, relayUrl: string): Partial<NMBridge> {
   const machineId = machineResolver(env);
   const relay: RelayConfig = { relayUrl, clientBearer: env.relayBearer, machineId };
+  const shellMachineId = machineResolver(env, shellMachineOf);
+  const shell: RelayConfig = { ...relay, machineId: shellMachineId };
 
   // the SAME derivation every other compute surface uses — a second opinion about whether a
   // machine is awake is how two surfaces come to disagree about one machine
-  const status = async (): Promise<ReturnType<typeof machineState>['status'] | null> => {
+  const statusOf = (pick: (u: UsageReply) => MachineRow | null) => async (): Promise<ReturnType<typeof machineState>['status'] | null> => {
     const u = await readUsage(env);
-    const m = u?.machines?.[0];
+    const m = u ? pick(u) : null;
     if (!m) return null;
     const cap: MachineCap | null = u?.capMinutes == null
       ? null
@@ -141,26 +154,35 @@ export function relayOverrides(env: RelayEnv, relayUrl: string): Partial<NMBridg
   };
 
   return {
-    // the SHELL's ensure (guests.tsx is its one caller): a claim runner gets its own disk before
-    // the prompt appears, so a sign-in typed into it survives the next stop (round §4.2, D2)
-    machineEnsure: async (onPhase, cancelled) => {
+    // the terminal's ensure (guests.tsx is its one caller). A plain SHELL dials your own machine
+    // when you have one (R4) and the runner otherwise, and a claim gets its own disk before the
+    // prompt appears, so a sign-in typed into it survives the next stop (round §4.2, D2). A TASK's
+    // terminal dials the runner that holds the worktree and never promotes it: the promotion ends
+    // the claim pod, and the worktree ends with it.
+    machineEnsure: async (onPhase, cancelled, lane = 'shell') => {
+      const task = lane === 'task';
+      const id = task ? machineId : shellMachineId;
+      const pick = task ? runnerOf : shellMachineOf;
       const out = await ensureMachine({
-        machineId,
-        status,
+        machineId: id,
+        status: statusOf(pick),
         wake: async () => {
-          const r = await nmWake(env);
+          const r = await nmWake(env, await id());
           return { ok: !!r?.ok, capped: !!r?.capped };
         },
-        promote: async () => {
-          const id = await machineId();
-          if (!id) return { restarting: false };
-          const r = await nmPromote(env, id);
-          return { restarting: !!r?.promoted };
-        },
-        lastSeenAt: async () => {
-          const m = (await readUsage(env))?.machines?.[0];
-          return m?.lastSeenAt ? Date.parse(m.lastSeenAt) : null;
-        },
+        ...(task ? {} : {
+          promote: async () => {
+            const m = await id();
+            if (!m) return { restarting: false };
+            const r = await nmPromote(env, m);
+            return { restarting: !!r?.promoted };
+          },
+          lastSeenAt: async () => {
+            const u = await readUsage(env);
+            const m = u ? pick(u) : null;
+            return m?.lastSeenAt ? Date.parse(m.lastSeenAt) : null;
+          },
+        }),
         wait: (ms) => new Promise((r) => setTimeout(r, ms)),
         now: () => Date.now(),
         cancelled,
@@ -207,12 +229,12 @@ export function relayOverrides(env: RelayEnv, relayUrl: string): Partial<NMBridg
     // can stat the worktree; a browser cannot, and guessing yes would put a terminal button
     // in front of a workspace that has never woken. The machine edge resolves the path and
     // says so in the pane if it is missing — the same note the desktop prints today.
-    terminalInfo: async () => ({ available: (await machineId()) !== null, cwd: null }),
+    terminalInfo: async () => ({ available: (await shellMachineId()) !== null, cwd: null }),
 
     openTerminal: (taskNumber, hasRepo, cols, rows, onData, onExit) =>
       openRelayPty(relay, { cols, rows, taskNumber, hasRepo, onData, onExit }),
 
     openTerminalCwd: (cwd, cols, rows, onData, onExit) =>
-      openRelayPty(relay, { cols, rows, cwd, onData, onExit }),
+      openRelayPty(shell, { cols, rows, cwd, onData, onExit }),
   };
 }
