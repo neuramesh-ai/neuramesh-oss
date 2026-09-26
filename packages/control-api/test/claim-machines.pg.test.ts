@@ -182,13 +182,13 @@ describe.skipIf(!DB)('the claim substrate on postgres (0143)', () => {
     expect(bind.status).toBe(404);
   });
 
-  it('a new runner takes the env default substrate; a member is always a volume', async () => {
+  it('a new machine of either kind takes the env default substrate (R4: members too)', async () => {
     process.env['FLEET_RUNNER_SUBSTRATE'] = 'claim';
     const m = await createCloudMachine(sql!, { workspaceId: WS2, kind: 'member', ownerUserId: george.id, name: 'claim-test-member', tokenHash: sha('x') , replicas: 0 });
     const r = await createCloudMachine(sql!, { workspaceId: WS2, kind: 'runner', ownerUserId: george.id, name: 'claim-test-runner-2', tokenHash: sha('y') });
     delete process.env['FLEET_RUNNER_SUBSTRATE'];
     const subs = await sql!`select id, substrate from machines where id in (${m.id}::uuid, ${r.id}::uuid)`;
-    expect(Object.fromEntries(subs.map((x) => [x['id'], x['substrate']]))).toEqual({ [m.id]: 'volume', [r.id]: 'claim' });
+    expect(Object.fromEntries(subs.map((x) => [x['id'], x['substrate']]))).toEqual({ [m.id]: 'claim', [r.id]: 'claim' });
     await sql!`update machines set lifecycle = 'destroyed', name = name || '-gone' where id in (${m.id}::uuid, ${r.id}::uuid)`;
   });
 });

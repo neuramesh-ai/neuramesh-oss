@@ -7,6 +7,7 @@
 // the posts re-approve) — no ack table, no unread state, nothing for rex to write.
 import { alertsSummary, computeAlert, deriveAlerts, planLabel, providerLabel, type Alert } from '@neuramesh/shared';
 import { useCompute } from '../compute/useCompute';
+import { openCredits } from '../settings/ConnectPanel';
 import { nm as nmBridge } from '../bridge/nm';
 import { useEffect, useState, type ReactNode } from 'react';
 
@@ -123,8 +124,11 @@ export function AlertsBar({ alerts, refresh, dismiss, onOpenCalendar, onOpenRout
                 <button className="btn primary sm" onClick={onOpenRoutines}>Open routine</button>
                 <button className="btn ghost sm" disabled={busy === a.key} onClick={() => void pause(a)}>Pause it</button>
               </>)}
-              {/* the cap's only real move: nothing here can be fixed by retrying */}
-              {a.kind === 'compute' && <button className="btn primary sm" onClick={() => onUpgrade?.(a.why)}>Get {planLabel('cloud')}</button>}
+              {/* the cap's only real move: nothing here can be fixed by retrying. An empty balance's
+                  move is more credits (the Credits view), on any plan, so it never offers Pro */}
+              {a.kind === 'compute' && (a.addCredits
+                ? <button className="btn primary sm" onClick={() => openCredits()}>Add credits</button>
+                : <button className="btn primary sm" onClick={() => onUpgrade?.(a.why)}>Get {planLabel('cloud')}</button>)}
               {a.kind === 'posts' && <button className="btn primary sm" onClick={onOpenCalendar}>Review on calendar</button>}
               {a.kind === 'posts' && <button className="btn ghost sm" title="Stop showing these failures — a new one re-raises the bar" onClick={() => dismiss(a.key)}>Dismiss</button>}
             </span>

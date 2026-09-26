@@ -139,21 +139,33 @@ export async function wakeMachine(sql: postgres.Sql, machineId: string): Promise
  * never left without a runner.
  */
 export async function ensureTeamShape(sql: postgres.Sql, workspaceId: string): Promise<{ promoted: string | null; runner: string | null }> {
-  return sql.begin(async (_tx) => {
+  const out = await (sql.begin(async (_tx) => {
     const tx = _tx as unknown as postgres.Sql;
-    const [runner] = await tx<{ id: string; owner_user_id: string }[]>`
-      select id, owner_user_id from machines
+    const [runner] = await tx<{ id: string; owner_user_id: string; substrate: string }[]>`
+      select id, owner_user_id, substrate from machines
        where workspace_id = ${workspaceId}::uuid and kind = 'runner' and ${LIVE(tx)}
        for update`;
-    if (!runner) return { promoted: null, runner: null };
-    if (await memberMachineOf(tx, workspaceId, runner.owner_user_id)) return { promoted: null, runner: runner.id };
+    if (!runner) return { promoted: null, runner: null, claimOwner: null };
+    if (await memberMachineOf(tx, workspaceId, runner.owner_user_id)) return { promoted: null, runner: runner.id, claimOwner: null };
+    // A CLAIM runner holds no login and no volume: a login promotes it to a volume first
+    // (fleet-claims.ts), and a promoted runner reads `volume` here. So the conversion's reason, the
+    // owner's logins moving with their machine, does not apply to it. Converting it anyway left two
+    // awake claims serving one workspace, and a daemon that still believed it was the runner (the
+    // k3d e2e, 2026-09-25). The claim stays the workspace's runner, and the owner gets a machine of
+    // their own below, born asleep, exactly like anyone who joins.
+    if (runner.substrate === 'claim') return { promoted: null, runner: runner.id, claimOwner: runner.owner_user_id };
     await tx`update machines set kind = 'member', name = ${`member-${runner.owner_user_id.slice(0, 8)}`} where id = ${runner.id}::uuid`;
     const fresh = await createCloudMachine(tx, {
       workspaceId, kind: 'runner', ownerUserId: runner.owner_user_id, name: 'runner', tokenHash: mintMachineToken().hash, replicas: 1,
     });
     console.log(`team_shape workspace=${workspaceId} promoted=${runner.id} runner=${fresh.id}`);
-    return { promoted: runner.id, runner: fresh.id };
-  }) as Promise<{ promoted: string | null; runner: string | null }>;
+    return { promoted: runner.id, runner: fresh.id, claimOwner: null };
+  }) as Promise<{ promoted: string | null; runner: string | null; claimOwner: string | null }>);
+  if (out.claimOwner) {
+    const mine = await provisionMemberMachine(sql, workspaceId, out.claimOwner);
+    console.log(`team_shape workspace=${workspaceId} runner=${out.runner} stays a claim, owner machine ${mine.created ? `provisioned ${mine.id}` : mine.refused ?? 'exists'}`);
+  }
+  return { promoted: out.promoted, runner: out.runner };
 }
 
 /** the join hook — fire-and-forget, like the runner mint: a failed insert must never fail a join,
