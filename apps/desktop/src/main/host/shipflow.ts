@@ -40,6 +40,7 @@ import type { WhiteboardToolClosures } from '../harness/toolbus';
 import type { makeRuns, RunHandle } from './runs';
 import type { makeBeats } from './beats';
 import type { makePark } from './park';
+import type { RepoCred } from './repocred';
 
 
 
@@ -54,6 +55,8 @@ export function makeShipFlow(ctx: HostCtx & {
   execQueue: HostQueue;
   /** the claim registry — `delete` also re-arms the queue slot, which is why it is not a bare Set */
   claimed: { has: (id: string) => boolean; add: (id: string) => unknown; delete: (id: string) => boolean };
+  /** the GitHub credential the plan's reads use on a login-less cloud machine (host/repocred.ts) */
+  repoCred: RepoCred;
   // ── services other makers already built: their types are INFERRED, never restated ──────────
   NO_RUN: ReturnType<typeof makeRuns>['NO_RUN'];
   openRun: ReturnType<typeof makeRuns>['openRun'];
@@ -90,7 +93,7 @@ const { db, apiUrl, workspace, ownerActorId, post,
         beatCursor, 
         arun, channelLessons, discoverSkills,
         
-        seatFor, setStatus, releaseDocsNote } = ctx;
+        seatFor, setStatus, releaseDocsNote, repoCred } = ctx;
 // The guard registry's fields keep their short names, exactly as they read inside startAgentHost.
 const { 
         
@@ -138,12 +141,16 @@ async function shipperFlow(agent: HostedAgent, t: ShipTask, opts: { resume: bool
 
     // ── gather (host-verified, no model judgment) ──
     const slug = full?.repo_clone ? repoSlug(full.repo_clone) : await repoSlugFor({ clone_url: full?.repo_clone, local_path: full?.repo_local, org_name: null, name: null });
-    const pr = prNumber && slug ? await ghPrBody(slug, prNumber) : { title: '', body: '' };
+    const cred = await repoCred.forRepo(slug, t.channel_id);
+    const pr = prNumber && slug && cred.ok ? await ghPrBody(slug, prNumber, cred.env) : { title: '', body: '' };
     const deployNotes = deployNotesSection(pr.body);
-    const ci = prNumber && slug ? await waitForCi(slug, prNumber, (n) => slog({ kind: 'tool', phase: 'ci', summary: `PR #${prNumber} CI not settled — poll ${n}` })) : { verdict: 'none' as const, detail: '' };
+    const ci = !(prNumber && slug) ? { verdict: 'none' as const, detail: '' }
+      : cred.ok ? await waitForCi(slug, prNumber, (n) => slog({ kind: 'tool', phase: 'ci', summary: `PR #${prNumber} CI not settled — poll ${n}` }), cred.env)
+      : { verdict: 'unknown' as const, detail: cred.error };
     const ciNote = ci.verdict === 'pass' ? `CI on PR #${prNumber}: settled GREEN (${ci.detail}) — host-verified.`
       : ci.verdict === 'fail' ? `CI on PR #${prNumber}: RED (${ci.detail}) — the plan must surface this; the reviewer normally bounces red CI.`
       : ci.verdict === 'pending' ? `CI on PR #${prNumber}: still pending after the wait window.`
+      : ci.verdict === 'unknown' ? `CI on PR #${prNumber}: COULD NOT BE READ (${ci.detail}). The plan must surface this, and it is not "no CI".`
       : 'CI: none configured on this repo.';
     const diffArt = await db.get<{ inline_content: string | null }>(`select inline_content from artifacts where task_id = ? and kind = 'diff' order by created_at desc limit 1`, [t.id]).catch(() => null);
     const diffText = diffArt?.inline_content ?? '';

@@ -161,7 +161,9 @@ first wake, not at provisioning. Namespace quota is `max(plan default, machines 
 For the ladder to see a sleeping machine as capable, the machine must have **published its
 runtimes** while awake: the heartbeat carries `localRuntimes()` at boot, when a terminal session
 ends (a login may just have happened) and every ten minutes. On Individual this is what lets the
-runner say "I hold a Claude login" at all.
+runner say "I hold a Claude login" at all. Since #621, a cloud machine also counts a provider
+whose API key the workspace stores, so a key from the Keys step lets the machine serve that
+provider.
 
 ## 5. Cost per member
 

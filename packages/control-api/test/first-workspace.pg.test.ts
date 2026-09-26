@@ -16,6 +16,34 @@ const j = (r: Response): Promise<any> => r.json() as Promise<any>;
 
 afterAll(async () => { await sql?.end(); await store?.close(); });
 
+describe.skipIf(!DB)('the first sign-in gives the workspace its cloud machine (postgres)', () => {
+  // cloud is Pro, and it starts with a machine that bills from its 500 credits (George 2026-09-25).
+  // The pg lane runs with FLEET_AUTOPROVISION=off, so this test turns the fleet on for itself.
+  it('mints one runner, born awake, for the owner; a second arrival mints none', async () => {
+    const prev = process.env['FLEET_AUTOPROVISION'];
+    process.env['FLEET_AUTOPROVISION'] = 'on';
+    try {
+      const tag = Date.now().toString(36);
+      const [row] = await sql!`insert into nm_users (clerk_user_id, email) values (${`clerk_machine_${tag}`}, ${`machine-${tag}@sign.test`}) returning id`;
+      const userId = row!['id'] as string;
+      const arrival = { userId, email: `machine-${tag}@sign.test`, emailVerified: true, isNew: true, firstName: `Kim${tag}` };
+      await onAuthArrival(store!, arrival);
+      await onAuthArrival(store!, { ...arrival, isNew: false });
+      const [ws] = await sql!`select w.id from workspaces w join workspace_members m on m.workspace_id = w.id where m.user_id = ${userId}::uuid`;
+      const machines = await sql!`select kind, owner_user_id, desired_replicas, last_wake_at, lifecycle from machines where workspace_id = ${ws!['id']}::uuid`;
+      expect(machines).toHaveLength(1);
+      expect(machines[0]).toMatchObject({ kind: 'runner', owner_user_id: userId, desired_replicas: 1, lifecycle: 'provisioning' });
+      // born awake is a wake (#597): the first sweep must not park it
+      expect(machines[0]!['last_wake_at']).not.toBeNull();
+      // and the 500 credits it bills from are there
+      const [credits] = await sql!`select granted_micros from workspace_credits where workspace_id = ${ws!['id']}::uuid`;
+      expect(Number(credits!['granted_micros'])).toBeGreaterThan(0);
+    } finally {
+      if (prev === undefined) delete process.env['FLEET_AUTOPROVISION']; else process.env['FLEET_AUTOPROVISION'] = prev;
+    }
+  });
+});
+
 describe.skipIf(!DB)('the first sign-in creates the workspace (postgres)', () => {
   it('creates once, and the list carries role and plan', async () => {
     const tag = Date.now().toString(36);

@@ -7,7 +7,7 @@ import type { Env, Hono } from 'hono';
 import type postgres from 'postgres';
 import { z } from 'zod';
 import { clerkJwks } from './clerk';
-import { claimRoutes, runnerSubstrateDefault, type MachineSubstrate } from './fleet-claims';
+import { claimRoutes, newMachineSubstrate, type MachineSubstrate } from './fleet-claims';
 import { localMode } from './localmode';
 import { hashMachineToken, machinePublicJwk, mintMachineToken, signMachineSyncJwt } from './machine-auth';
 import type { Store } from './store';
@@ -251,7 +251,7 @@ export interface MachineIdentityRow {
 }
 
 export async function createCloudMachine(sql: postgres.Sql, m: CloudMachineCreate): Promise<{ id: string }> {
-  const substrate: MachineSubstrate = m.substrate ?? (m.kind === 'runner' ? runnerSubstrateDefault() : 'volume');
+  const substrate: MachineSubstrate = m.substrate ?? newMachineSubstrate();
   const replicas = m.replicas ?? 1;
   // Born awake IS a wake: the sweep's idle clock reads greatest(last_wake_at, last_active_at)
   // with a missing stamp as 1970 (#396), so a row with neither was parked by the first sweep

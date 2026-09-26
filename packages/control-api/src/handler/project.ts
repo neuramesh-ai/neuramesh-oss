@@ -12,6 +12,7 @@ import {
 
   formatAddress,
   planLabel,
+  TRIAL_LABEL,
 
 
 
@@ -56,7 +57,7 @@ export async function projectCommands(store: Store, actor: Actor, cmd: Command):
     // upgrade flow instead of failing blind.
     // The local stack lifts the cap (localmode.ts).
     if (!localMode() && (await store.workspacePlan(cmd.workspace)) === 'free' && (await store.activeProjectCount(cmd.workspace)) >= 3) {
-      throw new DomainError('PLAN_LIMIT', `${planLabel('free')} workspaces include up to 3 projects. Upgrade to ${planLabel('cloud')} for unlimited projects.`);
+      throw new DomainError('PLAN_LIMIT', `The ${TRIAL_LABEL} includes up to 3 projects. Upgrade to ${planLabel('cloud')} for unlimited projects.`);
     }
     // the human may set the slug at creation; otherwise derive it from the name
     const baseSlug = cmd.slug ?? slugify(cmd.name);

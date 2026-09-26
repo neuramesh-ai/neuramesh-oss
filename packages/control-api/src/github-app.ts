@@ -19,7 +19,7 @@ export function githubAppConfigured(env: Env = process.env): boolean {
   return !!env['GITHUB_APP_ID'] && !!(env['GITHUB_APP_PRIVATE_KEY_B64'] || env['GITHUB_APP_PRIVATE_KEY']);
 }
 
-const appSlug = (env: Env): string => env['GITHUB_APP_SLUG'] || 'neuramesh';
+export const appSlug = (env: Env = process.env): string => env['GITHUB_APP_SLUG'] || 'neuramesh';
 
 /** The App's PEM: base64 on Vercel (a multi-line secret survives no env editor), or the PEM itself
  *  with `\n` escapes tolerated. GitHub hands out PKCS#1; node:crypto reads PKCS#1 and PKCS#8 alike. */

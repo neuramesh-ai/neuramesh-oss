@@ -18,12 +18,19 @@
 // "cloud should indicate free 500 credits to get started"): a free hosted account's first workspace
 // gets 500 credits once, so the starter brain answers before a key is added. The grant is best
 // effort behind the creation: a sign-in never fails because a ledger row did not land.
+//
+// And it is born with its cloud machine (George, 2026-09-25: "cloud is pro, with 500 free credits
+// to start"; free is the local open-source desktop). Before this, a hosted signup got 500 credits
+// and nowhere to spend them: the web wizard said "has its cloud machine" and its Launch step waited
+// for a runner that only the Stripe plan flip minted. The mint is the plan flip's own
+// (mintWorkspaceRunner: once, best effort), so a later checkout finds the runner and mints nothing.
 import { SIGNUP_GRANT_CREDITS } from '@neuramesh/shared';
 import { grantCredits } from './credit-ledger';
 import { sqlOf } from './credits';
 import { DomainError } from './errors';
 import { executeCommand } from './handler';
 import { localMode } from './localmode';
+import { mintWorkspaceRunner } from './plan-flip';
 import type { Store } from './store';
 
 export function firstWorkspaceName(firstName: string | null, email: string | null): string {
@@ -74,6 +81,8 @@ export async function ensureFirstWorkspace(store: Store, a: FirstWorkspaceInput)
     const made = (await executeCommand(store, { kind: 'human', id: a.userId }, { type: 'workspace.create', name, slug })) as unknown as { workspaceId: string };
     console.log(`first_workspace_created user=${a.userId} workspace=${made.workspaceId} slug=${slug}`);
     await grantSignupCredits(store, made.workspaceId);
+    const sql = sqlOf(store);
+    if (sql) await mintWorkspaceRunner(store, sql, made.workspaceId, 'signup');
     return { workspaceId: made.workspaceId, slug };
   };
   for (let i = 1; i <= ATTEMPTS; i++) {

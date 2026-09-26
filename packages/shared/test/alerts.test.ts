@@ -1,7 +1,7 @@
 // The attention bar's derivation (docs/design/failure-alerts-2026-08): pure, so the Home bar
 // and the bell section cannot disagree — and so every fold/ignore rule is pinned here.
 import { describe, expect, it } from 'vitest';
-import { alertsSummary, deriveAlerts, type AlertConnectorRow, type AlertPostRow, type AlertScheduleRow } from '../src/alerts';
+import { alertsSummary, computeAlert, deriveAlerts, type AlertConnectorRow, type AlertPostRow, type AlertScheduleRow } from '../src/alerts';
 
 const conn = (over: Partial<AlertConnectorRow> = {}): AlertConnectorRow => ({
   id: 'k1', provider: 'x', handle: '@joinflowe', status: 'reauth_required',
@@ -85,3 +85,28 @@ describe('post-group dismissal (the watermark)', () => {
   });
 });
 
+describe('the compute alert: out of credits (2026-09-25)', () => {
+  const base = { minutes: 0, capMinutes: null };
+  it('a machine that is UP with an empty balance raises the alert, with the add-credits action', () => {
+    const a = computeAlert({ ...base, status: 'online', reason: 'Awake and ready for your agents.', cap: { outOfCredits: true } });
+    expect(a).toMatchObject({ key: 'compute:no_credits', title: 'Out of credits', addCredits: true });
+    expect(a!.why).toBe('Your agents cannot reply until you add credits.');
+  });
+  it('a parked machine keeps the reason the machine state already wrote for a person', () => {
+    const reason = 'No credits, so this machine cannot start. Add credits and the next message starts it.';
+    const a = computeAlert({ ...base, status: 'no_credits', reason, cap: { outOfCredits: true } });
+    expect(a).toMatchObject({ title: 'Out of credits', why: reason, addCredits: true });
+  });
+  it('a machine in any other state gets the plain line, never a reason that contradicts the title', () => {
+    for (const [status, reason] of [['waking', 'It starts now. Your agents continue their work automatically.'], ['unreachable', 'The machine does not answer. Start it again.']] as const) {
+      expect(computeAlert({ ...base, status, reason, cap: { outOfCredits: true } })!.why).toBe('Your agents cannot reply until you add credits.');
+    }
+  });
+  it('a funded workspace raises nothing, and the old minutes cap still reads as before', () => {
+    expect(computeAlert({ ...base, status: 'online', reason: 'up', cap: { outOfCredits: false } })).toBeNull();
+    expect(computeAlert(null)).toBeNull();
+    const capped = computeAlert({ status: 'capped', reason: 'spent', minutes: 60, capMinutes: 60, cap: { outOfCredits: false } });
+    expect(capped).toMatchObject({ key: 'compute:capped' });
+    expect(capped!.addCredits).toBeUndefined();
+  });
+});

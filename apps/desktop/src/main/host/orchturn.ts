@@ -5,6 +5,7 @@
 // them. They are separate functions rather than one adapter because their failure modes differ
 // — an empty turn means something different in each — and collapsing them would hide that.
 import { apiAuthHeaders } from '../apiauth';
+import { NO_CREDITS_ERROR } from '../computenotice';
 import { drainQuery, claudeAgentPrompt } from './turnkit';
 import { claudePathOption, codexSandboxMode, keyEnvFor, providerEnv, type AgentAttachment } from '../runtime/adapter';
 import { ORCH_EMPTY_TURN } from '../replypolicy';
@@ -47,7 +48,7 @@ export async function starterGenerate(a: { apiUrl: string; workspace: string; ac
       tools: a.config?.tools,
     }),
   });
-  if (res.status === 402) throw new Error('out of credits — connect your own brain in Settings, or wait for the monthly refill');
+  if (res.status === 402) throw new Error(`${NO_CREDITS_ERROR}: add credits in Credits, or connect your own brain in Settings`);
   if (!res.ok) throw new Error(`starter brain unavailable (${res.status})`);
   return res.json();
 }

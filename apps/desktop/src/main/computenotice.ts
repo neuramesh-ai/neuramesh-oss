@@ -30,6 +30,16 @@ export function noComputeNotice(a: { label: string; reason: NoComputeReason; clo
   return `I can't run this now. ${why}${cloud} Sign in to ${a.label} ${again}on this machine, or ask a teammate to lend you a machine in Settings › Compute › Sharing.`;
 }
 
+/** the NeuraMesh brain refused the turn for credits (2026-09-25): the reason and the two ways on,
+ *  never silence. The Add credits button lives on the attention bar (shared alerts.ts). */
+export function noCreditsNotice(): string {
+  return "I can't reply now. This workspace is out of credits. Add credits in Credits, or connect your own brain in Settings.";
+}
+/** how the Starter lane's refusal reads on the way out (host/orchturn.ts), so the wake can tell it apart */
+export const NO_CREDITS_ERROR = 'out of credits';
+export function isNoCreditsError(err: unknown): boolean {
+  return err instanceof Error && err.message.startsWith(NO_CREDITS_ERROR);
+}
 export function sleeperNotice(whose: string, runtime: string): string {
   return `Waking ${whose}. It holds the ${runtime} login this needs. Your message is answered once it is up, usually within a couple of minutes.`;
 }
@@ -38,6 +48,7 @@ export function sleeperNotice(whose: string, runtime: string): string {
 export function isComputeNotice(body: string | null | undefined): boolean {
   if (!body) return false;
   return /^I can't run this/.test(body)
+    || /^I can't reply now\. This workspace is out of credits/.test(body)
     || /^Waking (?:your|a teammate's) cloud machine/.test(body)
     || /```nmauth\b/.test(body);
 }

@@ -156,3 +156,15 @@ test('setAgentProxy routes agent egress through the L1 proxy, deferring to a use
   }
   assert.equal(agentBaseEnv(clean).HTTPS_PROXY, undefined);
 });
+
+// A volume machine runs the daemon as root, and Claude Code refuses to skip its permission prompts
+// as root unless the environment says it is a sandbox (k3d, 2026-09-26). A cloud machine is the
+// agents' own box, so it says so. A laptop keeps Claude Code's check.
+test('a cloud machine tells Claude Code it is a sandbox, and a laptop does not', () => {
+  assert.equal(agentBaseEnv({ PATH: '/usr/bin', NM_MACHINE_KIND: 'runner' }).IS_SANDBOX, '1');
+  assert.equal(agentBaseEnv({ PATH: '/usr/bin', NM_MACHINE_KIND: 'member' }).IS_SANDBOX, '1');
+  assert.equal(agentBaseEnv({ PATH: '/usr/bin' }).IS_SANDBOX, undefined);
+  assert.equal(agentBaseEnv({ PATH: '/usr/bin', NM_MACHINE_KIND: 'local' }).IS_SANDBOX, undefined);
+  // and it rides every provider's env, which is what the SDK's child process receives
+  assert.equal(providerEnv('anthropic', 'sk-test', { PATH: '/usr/bin', NM_MACHINE_KIND: 'runner' }).IS_SANDBOX, '1');
+});

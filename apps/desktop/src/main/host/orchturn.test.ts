@@ -14,6 +14,7 @@ import assert from 'node:assert/strict';
 import { afterEach, describe, test } from 'node:test';
 import { z } from 'zod';
 import { geminiDispatch, geminiOrchestratorTurn, zodShapeToGemini } from './orchturn';
+import { isNoCreditsError } from '../computenotice';
 import type { OrchTool } from './orchtools';
 
 const BASE = {
@@ -89,7 +90,9 @@ describe('running out of credits is a thing to say', () => {
       (e: Error) => {
         // the human has to learn what to DO — an empty turn teaches nothing
         assert.match(e.message, /credits/i);
-        assert.match(e.message, /connect your own brain|refill/i);
+        assert.match(e.message, /add credits in Credits, or connect your own brain/);
+        // the wake knows this refusal by its prefix and posts the thread notice (host/wake.ts)
+        assert.equal(isNoCreditsError(e), true);
         return true;
       },
     );
@@ -98,7 +101,11 @@ describe('running out of credits is a thing to say', () => {
 
   test('any other failure names its status rather than answering blankly', async () => {
     const f = stubFetch([{ status: 503, body: {} }]); undo = f.restore;
-    await assert.rejects(geminiOrchestratorTurn({ ...BASE, starter: true, ...CTX }), /503/);
+    await assert.rejects(geminiOrchestratorTurn({ ...BASE, starter: true, ...CTX }), (e: Error) => {
+      assert.match(e.message, /503/);
+      assert.equal(isNoCreditsError(e), false, 'a 503 is not a credits notice');
+      return true;
+    });
   });
 });
 

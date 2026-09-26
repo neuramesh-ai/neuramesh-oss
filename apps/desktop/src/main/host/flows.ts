@@ -70,7 +70,7 @@ export const workspaceFor = (t: ExecTask): string =>
 /** the shape the ship + verify flows read a task in — shared with host/releasedocs.ts */
 export type ShipTask = { id: string; number: number; title: string; channel_id: string; pr_number: number | null; ship_plan: string | null };
 
-export function makeFlows(ctx: HostCtx & {
+export function makeFlows(ctx: HostCtx & { repoCred: import('./repocred').RepoCred } & {
   db: PowerSyncDatabase;
   apiUrl: string;
   workspace: string;
@@ -405,7 +405,7 @@ async function executeFlow(agent: HostedAgent, t: ExecTask, ch: { id: string; sl
         }
         // stopped mid-run → don't commit/push/open a PR for abandoned work
         if (stoppedTasks.has(t.id)) throw new Error('__stopped__');
-      }, policy.autoOpenPr);
+      }, policy.autoOpenPr, ctx.repoCred);
       sha = pushed.sha;
       diffText = pushed.diff;
       prUrl = pushed.prUrl ?? null;

@@ -4,7 +4,8 @@
 import { conversationOrigin, onCloudMachine, starterDoorOpen, starterFallback, unavailableOf, whyUnavailable } from './starterfallback';
 import { noComputeReasonOf } from '../computenotice';
 import { providerFor } from '../runtime/adapter';
-import { ghRaw } from './gh';
+import { repoSlug } from './gh';
+import type { RepoCred } from './repocred';
 import type { UnitBirth } from './lookups';
 
 /** units this host already offered the Starter switch for — one card per unit, never one per poll */
@@ -121,8 +122,10 @@ export function makeClaimFlow(ctx: HostCtx & {
   unitBirth: (taskId: string) => Promise<UnitBirth>;
   whiteboardClosures: (actor: { kind: string; id: string; role?: string }, ch: { id: string; workspace_id: string }, at: { taskId?: string; threadId?: string }) => WhiteboardToolClosures;
   executeFlow: ReturnType<typeof makeFlows>['executeFlow'];
+  /** the push credential a repo-backed unit needs on a cloud machine (host/repocred.ts) */
+  repoCred: RepoCred;
 }) {
-const { db, apiUrl, workspace, ownerActorId, post, claimed, execQueue,
+const { db, apiUrl, workspace, ownerActorId, post, claimed, execQueue, repoCred,
         
         alog, claimVerdict, 
         originOf, priorMachineFor, requestSleeperWake, nobodyServes,
@@ -215,14 +218,21 @@ async function claimFlow(agent: HostedAgent, t: OfferedTask) {
     if (claim.status === 409) return; // someone else won — offers are voluntary
     if (!claim.ok) throw new Error(`claim ${claim.status}: ${await claim.text()}`);
 
-    // A repo-backed unit needs a push credential, and a cloud machine carries none until its
-    // owner signs in through the machine's terminal (docs/42). Said at the claim, with the fix,
-    // rather than at the push, where it read as a raw git error. Asked live, not memoized: the
-    // login lands while the daemon runs. A laptop keeps its own git remotes and SSH keys: no gate.
-    if (t.repo_id && onCloudMachine() && !(await ghRaw(['auth', 'status']).then((r) => r.ok).catch(() => false))) {
-      await post('/v1/commands', actor, { type: 'task.block', taskId: t.id, reason: `This cloud machine has no GitHub login, so it cannot push a branch for #${t.number}. Open the machine's terminal and run \`gh auth login\`, then unblock #${t.number}.` }).catch((e) => console.error(`task_block #${t.number} failed:`, e));
-      console.log(`agent_claim agent=${agent.name} task=${t.number} blocked=no_gh_login_on_cloud`);
-      return;
+    // A repo-backed unit needs a push credential. A cloud machine has its owner's own `gh auth
+    // login` (docs/42), or the GitHub App's token when the room's project connected GitHub
+    // (host/repocred.ts, which asks the login live: it lands while the daemon runs). Said at the
+    // claim, with the fix, rather than at the push, where it read as a raw git error. A laptop
+    // keeps its own git remotes and SSH keys: no gate.
+    if (t.repo_id && onCloudMachine()) {
+      const repo = await db.get<{ clone_url: string | null }>('select clone_url from repos where id = ?', [t.repo_id]).catch(() => null);
+      const cred = await repoCred.forRepo(repoSlug(repo?.clone_url ?? ''), t.channel_id);
+      if (!cred.ok) {
+        // the server's words name the fix when it knows one (the App's permissions, a reconnect)
+        const fix = cred.code === 'NOT_CONNECTED' || cred.code === 'NO_REPO' ? 'Connect GitHub for this project, or run `gh auth login` in the machine\'s terminal.' : 'A `gh auth login` in the machine\'s terminal also works.';
+        await post('/v1/commands', actor, { type: 'task.block', taskId: t.id, reason: `This cloud machine cannot push a branch for #${t.number}: ${cred.error.replace(/\.$/, '')}. ${fix} Then unblock #${t.number}.` }).catch((e) => console.error(`task_block #${t.number} failed:`, e));
+        console.log(`agent_claim agent=${agent.name} task=${t.number} blocked=no_repo_credential code=${cred.code}`);
+        return;
+      }
     }
 
     const ch = await db.get<{ id: string; slug: string; workspace_id: string }>('select id, slug, workspace_id from channels where id = ?', [t.channel_id]);

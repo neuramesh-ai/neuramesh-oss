@@ -86,7 +86,7 @@ export function Marketplace({ isCloud, onUpgrade, onClose }: { isCloud: boolean;
             <span className="mktgateico"><IconLock s={19} /></span>
             <div className="mktgatebody">
               <b>External agents are a {planLabel('cloud')} feature</b>
-              <span>You are on {planLabel('free')}. Browse freely. Marketplace agents over A2A unlock with {planLabel('cloud')}.</span>
+              <span>Browse freely. Marketplace agents over A2A unlock with {planLabel('cloud')}.</span>
             </div>
             <button className="btn primary" onClick={onUpgrade}>Get {planLabel('cloud')}</button>
           </div>

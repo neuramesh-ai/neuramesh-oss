@@ -5,7 +5,7 @@
 // chain in executeCommand carries on. register/heartbeat are verbatim from the extraction. The
 // cloud verbs ride sqlOf(store) — the credit-ledger idiom — so the Store contract grows no
 // delegates, and a store without postgres refuses them out loud rather than half-doing them.
-import { createEvent, formatAddress, planLabel, type Actor } from '@neuramesh/shared';
+import { createEvent, formatAddress, planLabel, TRIAL_LABEL, type Actor } from '@neuramesh/shared';
 import type { Command } from '../commands';
 import { actorInWorkspace, sqlOf } from '../credits';
 import { DomainError } from '../errors';
@@ -44,7 +44,7 @@ export async function machineCommands(store: Store, actor: Actor, cmd: Command):
     // The local stack lifts the plan gate (localmode.ts); without a fleet the refusal below is then
     // the true one — nothing to provision here — rather than an upgrade door that leads nowhere.
     if (!localMode() && (await store.workspacePlan(cmd.workspace)) !== 'cloud') {
-      throw new DomainError('PLAN_LIMIT', `${planLabel('free')} has no cloud machine. Upgrade to ${planLabel('cloud')} for a cloud machine per member.`);
+      throw new DomainError('PLAN_LIMIT', `The ${TRIAL_LABEL} has one cloud machine, for the workspace. Upgrade to ${planLabel('cloud')} for a cloud machine per member.`);
     }
     const sql = sqlOf(store);
     if (!sql || !fleetOn()) throw NOT_SERVED();

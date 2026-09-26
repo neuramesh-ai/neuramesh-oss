@@ -91,10 +91,7 @@ export function renderLifecycle(template: LifecycleTemplate, row: LifecycleRow):
         openUrl: `${APP_URL}/downloads`, unsubscribeUrl: unsub,
       });
     case 'day7':
-      return renderDay7({
-        seatsUsed: row.seatsUsed, seatCap: 3,
-        billingUrl: `${APP_URL}/billing`, downloadUrl: `${APP_URL}/downloads`, unsubscribeUrl: unsub,
-      });
+      return renderDay7({ billingUrl: `${APP_URL}/billing`, openUrl: `${APP_URL}/downloads`, unsubscribeUrl: unsub });
   }
 }
 

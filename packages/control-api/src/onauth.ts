@@ -4,7 +4,7 @@
 // converge, so this is the only hook that cannot be bypassed by a sign-in route.
 //
 // Fire-and-forget from the caller's point of view: a mail outage must never fail a sign-in.
-import { FREE_SEAT_CAP, planLabel, renderJoined, renderWelcome } from '@neuramesh/shared';
+import { FREE_SEAT_CAP, TRIAL_LABEL, renderJoined, renderWelcome } from '@neuramesh/shared';
 import { ensureFirstWorkspace } from './first-workspace';
 import { APP_URL, sendEmail, unsubscribeUrl } from './mail';
 import type { Store } from './store';
@@ -73,7 +73,7 @@ export async function onInviteAccepted(
 ): Promise<void> {
   try {
     if (!a.inviterEmail) return;
-    const seatLine = a.plan === 'cloud' ? null : `${a.seatsUsed} of ${FREE_SEAT_CAP} · ${planLabel('free')} plan`;
+    const seatLine = a.plan === 'cloud' ? null : `${a.seatsUsed} of ${FREE_SEAT_CAP} · ${TRIAL_LABEL}`;
     const rendered = renderJoined({
       joinedEmail: a.joinedEmail, workspace: a.workspaceName, role: a.role,
       seatLine, settingsUrl: `${APP_URL}/downloads`,

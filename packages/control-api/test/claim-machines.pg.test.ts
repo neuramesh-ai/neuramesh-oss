@@ -40,6 +40,7 @@ const github: typeof fetch = async (input, init) => {
     return json({ token: body?.permissions ? 'ghs_write_4242' : 'ghs_read_4242', expires_at: new Date(Date.now() + 3_600_000).toISOString() }, 201);
   }
   if (path === '/app/installations/4242') return json({ account: { login: 'acme' }, repository_selection: 'selected' });
+  if (path === '/users/neuramesh%5Bbot%5D') return json({ id: 331048932, login: 'neuramesh[bot]', type: 'Bot' });
   return json({ message: 'Not Found' }, 404);
 };
 const appWithGitHub = store ? createApp(store, { announce: { fetchFn: github } }) : null;
@@ -136,13 +137,15 @@ describe.skipIf(!DB)('the claim substrate on postgres (0143)', () => {
     const mint = (auth: Record<string, string>) => appWithGitHub!.request('/v1/repo/token', { method: 'POST', headers: { 'content-type': 'application/json', ...auth }, body: json({ channel: chan.channelId }) });
     // a person cannot: the token is a machine\'s
     expect((await mint({ 'x-nm-actor': JSON.stringify(george) })).status).toBe(403);
-    // the machine can, and the mint asked GitHub for exactly one repository and the write pair
+    // the machine can, and the mint asked GitHub for exactly one repository, the write pair, and the CI reads
     const res = await mint({ authorization: `Bearer ${MACHINE_TOKEN}` });
     expect(res.status).toBe(200);
     const out = await res.json() as { slug: string; token: string; permissions: Record<string, string> };
     expect(out).toMatchObject({ slug: 'acme/marketing-site', token: 'ghs_write_4242', permissions: { contents: 'write', pull_requests: 'write' } });
+    // the commits a login-less machine makes are signed by the App's own bot account
+    expect((out as unknown as { identity: unknown }).identity).toEqual({ name: 'neuramesh[bot]', email: '331048932+neuramesh[bot]@users.noreply.github.com' });
     const scoped = githubCalls.find((c) => c.path === '/app/installations/4242/access_tokens' && (c.body as { permissions?: unknown })?.permissions);
-    expect(scoped?.body).toEqual({ repositories: ['marketing-site'], permissions: { contents: 'write', pull_requests: 'write', metadata: 'read' } });
+    expect(scoped?.body).toEqual({ repositories: ['marketing-site'], permissions: { contents: 'write', pull_requests: 'write', metadata: 'read', checks: 'read', statuses: 'read', actions: 'read' } });
     // nothing at rest: the machine row still carries only its own token hash
     expect((await row())['token_hash']).toBe(sha(MACHINE_TOKEN));
     // an App without the write permissions: GitHub\'s 422 becomes the named fix
@@ -182,13 +185,13 @@ describe.skipIf(!DB)('the claim substrate on postgres (0143)', () => {
     expect(bind.status).toBe(404);
   });
 
-  it('a new runner takes the env default substrate; a member is always a volume', async () => {
+  it('a new machine of either kind takes the env default substrate (R4: members too)', async () => {
     process.env['FLEET_RUNNER_SUBSTRATE'] = 'claim';
     const m = await createCloudMachine(sql!, { workspaceId: WS2, kind: 'member', ownerUserId: george.id, name: 'claim-test-member', tokenHash: sha('x') , replicas: 0 });
     const r = await createCloudMachine(sql!, { workspaceId: WS2, kind: 'runner', ownerUserId: george.id, name: 'claim-test-runner-2', tokenHash: sha('y') });
     delete process.env['FLEET_RUNNER_SUBSTRATE'];
     const subs = await sql!`select id, substrate from machines where id in (${m.id}::uuid, ${r.id}::uuid)`;
-    expect(Object.fromEntries(subs.map((x) => [x['id'], x['substrate']]))).toEqual({ [m.id]: 'volume', [r.id]: 'claim' });
+    expect(Object.fromEntries(subs.map((x) => [x['id'], x['substrate']]))).toEqual({ [m.id]: 'claim', [r.id]: 'claim' });
     await sql!`update machines set lifecycle = 'destroyed', name = name || '-gone' where id in (${m.id}::uuid, ${r.id}::uuid)`;
   });
 });

@@ -8,11 +8,15 @@ import type { ReleaseSignal, ReleaseVerdict } from '../shipverify';
 import { checkRunSignals, commitStatusSignals, workflowRunSignals, classifyRelease } from '../shipverify';
 import { gitChildEnv } from '../harness/workspaces';
 
-export async function git(args: string[], cwd?: string): Promise<string> {
+/** extra environment for ONE git or gh call: a login-less cloud machine's App credential
+ *  (host/repocred.ts). Empty on a machine that uses its own login. */
+export type GhEnv = Readonly<Record<string, string>>;
+
+export async function git(args: string[], cwd?: string, env?: GhEnv): Promise<string> {
   const { execFile } = await import('node:child_process');
   const { promisify } = await import('node:util');
   const run = promisify(execFile);
-  const { stdout } = await run('git', args, { cwd, env: gitChildEnv() });
+  const { stdout } = await run('git', args, { cwd, env: { ...gitChildEnv(), ...env } });
   return stdout.trim();
 }
 
@@ -22,10 +26,10 @@ export async function git(args: string[], cwd?: string): Promise<string> {
 // it records the calls so the merge-on-accept watch + FSM can be proven in echo.
 export const ghFakeCalls: string[] = [];
 
-export async function ghRaw(args: string[], cwd?: string): Promise<{ ok: boolean; code: number; stdout: string; stderr: string }> {
+export async function ghRaw(args: string[], cwd?: string, env?: GhEnv): Promise<{ ok: boolean; code: number; stdout: string; stderr: string }> {
   const { execFile } = await import('node:child_process');
   return new Promise((resolve) => {
-    execFile('gh', args, { cwd, env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }, maxBuffer: 10_000_000 }, (err, stdout, stderr) => {
+    execFile('gh', args, { cwd, env: { ...process.env, GIT_TERMINAL_PROMPT: '0', ...env }, maxBuffer: 10_000_000 }, (err, stdout, stderr) => {
       const code = err && typeof (err as { code?: unknown }).code === 'number' ? (err as { code: number }).code : err ? 1 : 0;
       resolve({ ok: !err, code, stdout: (stdout || '').trim(), stderr: (stderr || '').trim() });
     });
@@ -41,10 +45,17 @@ let ghCapableP: Promise<boolean> | undefined;
 export function ghCapable(): Promise<boolean> {
   if (process.env['NM_GH_FAKE'] === '1') return Promise.resolve(true);
   ghCapableP ??= ghRaw(['auth', 'status']).then((r) => {
-    if (!r.ok) console.log('gh capability: absent — repo-cred watches idle on this machine (a gh-capable daemon merges)');
+    if (!r.ok) console.log('gh capability: absent — no gh login of its own on this machine');
     return r.ok;
   }).catch(() => false);
   return ghCapableP;
+}
+
+/** the machine's own gh login, asked LIVE: a login made in the machine's terminal lands while the
+ *  daemon runs (host/repocred.ts caches it for a minute). NM_GH_FAKE answers yes, like ghCapable. */
+export function ghLoggedIn(): Promise<boolean> {
+  if (process.env['NM_GH_FAKE'] === '1') return Promise.resolve(true);
+  return ghRaw(['auth', 'status']).then((r) => r.ok).catch(() => false);
 }
 
 // owner/repo from a clone URL (https or ssh), for `gh -R`.
@@ -74,12 +85,12 @@ export async function repoSlugFor(row: { clone_url?: string | null; local_path?:
 
 // Open a PR for the pushed branch (idempotent: reuse an existing one). Returns
 // null when gh is absent/unauthed/failed — the caller falls back to push-only.
-export async function ghPrCreate(cwd: string, slug: string, base: string, head: string, title: string, body: string): Promise<{ url: string; number: number } | null> {
+export async function ghPrCreate(cwd: string, slug: string, base: string, head: string, title: string, body: string, env?: GhEnv): Promise<{ url: string; number: number } | null> {
   if (process.env['NM_GH_FAKE'] === '1') { ghFakeCalls.push(`pr create ${slug} ${head}`); return { url: `https://github.com/${slug}/pull/7`, number: 7 }; }
   // reuse an existing PR for the branch (re-submits land on the same PR)
-  const view = await ghRaw(['pr', 'view', head, '-R', slug, '--json', 'url,number'], cwd);
+  const view = await ghRaw(['pr', 'view', head, '-R', slug, '--json', 'url,number'], cwd, env);
   if (view.ok) { try { const j = JSON.parse(view.stdout) as { url?: string; number?: number }; if (j.url && j.number) return { url: j.url, number: j.number }; } catch { /* create below */ } }
-  const create = await ghRaw(['pr', 'create', '-R', slug, '--base', base, '--head', head, '--title', title, '--body', body], cwd);
+  const create = await ghRaw(['pr', 'create', '-R', slug, '--base', base, '--head', head, '--title', title, '--body', body], cwd, env);
   if (!create.ok) return null;
   const url = create.stdout.split('\n').map((l) => l.trim()).find((l) => /\/pull\/\d+/.test(l)) ?? create.stdout.trim();
   const m = /\/pull\/(\d+)/.exec(url);
@@ -87,14 +98,22 @@ export async function ghPrCreate(cwd: string, slug: string, base: string, head: 
 }
 
 // CI verdict for a PR's checks. 'none' = no CI configured (proceed on review
-// alone); 'fail'/'pending' block; 'pass' = all green. Live-verified (a file://
-// fixture can't run GitHub Actions); the gate exercises the watch via NM_GH_FAKE.
-export async function ghPrChecks(cwd: string | undefined, slug: string, number: number): Promise<{ verdict: 'pass' | 'fail' | 'pending' | 'none'; detail: string }> {
+// alone); 'fail'/'pending' block; 'pass' = all green; 'unknown' = the read itself
+// failed (no login, a token without Checks read, a gh without `pr checks --json`),
+// which is NOT "no CI": a gate that read it as none passed unverified work
+// (docs/design/repo-writes-2026-09). Live-verified (a file:// fixture can't run
+// GitHub Actions); the gate exercises the watch via NM_GH_FAKE.
+export type CiVerdict = 'pass' | 'fail' | 'pending' | 'none' | 'unknown';
+export async function ghPrChecks(cwd: string | undefined, slug: string, number: number, env?: GhEnv): Promise<{ verdict: CiVerdict; detail: string }> {
   if (process.env['NM_GH_FAKE'] === '1') { ghFakeCalls.push(`pr checks ${slug} ${number}`); return { verdict: 'none', detail: '' }; }
-  const r = await ghRaw(['pr', 'checks', String(number), '-R', slug, '--json', 'name,state,bucket'], cwd);
+  return ciVerdictOf(await ghRaw(['pr', 'checks', String(number), '-R', slug, '--json', 'name,state,bucket'], cwd, env));
+}
+
+/** the verdict from one `gh pr checks --json` run, pure so the unknown/none line is testable */
+export function ciVerdictOf(r: { ok: boolean; stdout: string; stderr: string }): { verdict: CiVerdict; detail: string } {
   if (/no checks reported/i.test(r.stderr)) return { verdict: 'none', detail: '' };
   let checks: Array<{ name?: string; bucket?: string }> = [];
-  try { checks = JSON.parse(r.stdout) as typeof checks; } catch { return r.ok ? { verdict: 'pass', detail: '' } : { verdict: 'none', detail: r.stderr.slice(0, 120) }; }
+  try { checks = JSON.parse(r.stdout) as typeof checks; } catch { return r.ok ? { verdict: 'pass', detail: '' } : { verdict: 'unknown', detail: (r.stderr || r.stdout).slice(0, 160) }; }
   if (!checks.length) return { verdict: 'none', detail: '' };
   const fail = checks.find((c) => c.bucket === 'fail' || c.bucket === 'cancel');
   if (fail) return { verdict: 'fail', detail: fail.name ?? 'a required check' };
@@ -110,29 +129,31 @@ export async function ghPrChecks(cwd: string | undefined, slug: string, number: 
 // the single CI authority so the LLM reviewer never races a half-started pipeline
 // (the #1013 loop). No LLM involved; under NM_GH_FAKE it returns at once (gates stay
 // deterministic and fast).
-export async function waitForCi(slug: string, number: number, onPoll?: (n: number) => void, maxMs = 12 * 60_000, everyMs = 20_000, noneGrace = 4): Promise<{ verdict: 'pass' | 'fail' | 'pending' | 'none'; detail: string }> {
+export async function waitForCi(slug: string, number: number, onPoll?: (n: number) => void, env?: GhEnv, maxMs = 12 * 60_000, everyMs = 20_000, noneGrace = 4): Promise<{ verdict: CiVerdict; detail: string }> {
   if (process.env['NM_GH_FAKE'] === '1') return ghPrChecks(undefined, slug, number);
   const started = Date.now();
-  let v = await ghPrChecks(undefined, slug, number);
+  // 'unknown' gets the same grace as 'none': a read that fails once may be a network blip
+  const unsettled = (x: CiVerdict): boolean => x === 'none' || x === 'unknown';
+  let v = await ghPrChecks(undefined, slug, number, env);
   let n = 0;
-  let noneStreak = v.verdict === 'none' ? 1 : 0;
+  let noneStreak = unsettled(v.verdict) ? 1 : 0;
   // keep waiting while CI is running, OR checks haven't registered yet right after a
   // push ('none' for fewer than noneGrace consecutive polls). A settled pass/fail —
   // or 'none' that persists past the grace (no CI configured) — ends the wait.
-  while (Date.now() - started < maxMs && (v.verdict === 'pending' || (v.verdict === 'none' && noneStreak < noneGrace))) {
+  while (Date.now() - started < maxMs && (v.verdict === 'pending' || (unsettled(v.verdict) && noneStreak < noneGrace))) {
     await new Promise((r) => setTimeout(r, everyMs));
     onPoll?.(++n);
-    v = await ghPrChecks(undefined, slug, number);
-    noneStreak = v.verdict === 'none' ? noneStreak + 1 : 0;
+    v = await ghPrChecks(undefined, slug, number, env);
+    noneStreak = unsettled(v.verdict) ? noneStreak + 1 : 0;
   }
   return v;
 }
 
 // Squash-merge a PR and delete its branch — fired on human accept. The dev's host
 // (which opened the PR, holds the creds) performs it; no worktree needed (gh API).
-export async function ghPrMerge(slug: string, number: number): Promise<{ ok: boolean; error: string }> {
+export async function ghPrMerge(slug: string, number: number, env?: GhEnv): Promise<{ ok: boolean; error: string }> {
   if (process.env['NM_GH_FAKE'] === '1') { ghFakeCalls.push(`pr merge ${slug} ${number} --squash --delete-branch`); return { ok: true, error: '' }; }
-  const r = await ghRaw(['pr', 'merge', String(number), '-R', slug, '--squash', '--delete-branch']);
+  const r = await ghRaw(['pr', 'merge', String(number), '-R', slug, '--squash', '--delete-branch'], undefined, env);
   return { ok: r.ok, error: r.ok ? '' : (r.stderr || r.stdout).slice(0, 200) };
 }
 
@@ -142,9 +163,9 @@ export async function ghPrMerge(slug: string, number: number): Promise<{ ok: boo
 // the merge, and RE-ANNOUNCED the 🎉 in the thread. The PR's own state is the
 // cross-restart, cross-machine truth. Read-only: the fake gate returns a settable
 // state without recording a call, so gate assertions on the merge sequence hold.
-export async function ghPrState(slug: string, number: number): Promise<'open' | 'merged' | 'closed' | 'unknown'> {
+export async function ghPrState(slug: string, number: number, env?: GhEnv): Promise<'open' | 'merged' | 'closed' | 'unknown'> {
   if (process.env['NM_GH_FAKE'] === '1') return (process.env['NM_GH_FAKE_PR_STATE'] ?? 'open') as 'open' | 'merged' | 'closed';
-  const r = await ghRaw(['pr', 'view', String(number), '-R', slug, '--json', 'state']);
+  const r = await ghRaw(['pr', 'view', String(number), '-R', slug, '--json', 'state'], undefined, env);
   if (!r.ok) return 'unknown';
   try { return (String((JSON.parse(r.stdout) as { state?: string }).state ?? '').toLowerCase() || 'unknown') as 'open' | 'merged' | 'closed' | 'unknown'; } catch { return 'unknown'; }
 }
@@ -152,9 +173,9 @@ export async function ghPrState(slug: string, number: number): Promise<'open' | 
 // The squash-merge commit the PR landed as — post-merge verification targets THIS
 // sha on the base branch (the pre-merge head sha's checks are the old, already-
 // settled PR CI; the release pipelines hang off the merge commit's push event).
-export async function ghPrMergeSha(slug: string, number: number): Promise<string> {
+export async function ghPrMergeSha(slug: string, number: number, env?: GhEnv): Promise<string> {
   if (process.env['NM_GH_FAKE'] === '1') return 'fakemergesha';
-  const r = await ghRaw(['pr', 'view', String(number), '-R', slug, '--json', 'mergeCommit']);
+  const r = await ghRaw(['pr', 'view', String(number), '-R', slug, '--json', 'mergeCommit'], undefined, env);
   if (!r.ok) return '';
   try { return String((JSON.parse(r.stdout) as { mergeCommit?: { oid?: string } }).mergeCommit?.oid ?? ''); } catch { return ''; }
 }
@@ -165,7 +186,7 @@ export async function ghPrMergeSha(slug: string, number: number): Promise<string
 // (shipverify.ts); this is only the gh I/O. Fake mode answers from
 // NM_GH_FAKE_RELEASE ('green' default | 'red' | 'pending' | 'none') so the
 // gate exercises the verifying watch deterministically.
-export async function ghReleaseSignals(slug: string, sha: string): Promise<ReleaseSignal[]> {
+export async function ghReleaseSignals(slug: string, sha: string, env?: GhEnv): Promise<ReleaseSignal[]> {
   if (process.env['NM_GH_FAKE'] === '1') {
     ghFakeCalls.push(`release signals ${slug} ${sha}`);
     const fake = process.env['NM_GH_FAKE_RELEASE'] ?? 'green';
@@ -174,9 +195,9 @@ export async function ghReleaseSignals(slug: string, sha: string): Promise<Relea
     return [{ source: 'run', name: 'release', state }];
   }
   const [checks, status, runs] = await Promise.all([
-    ghRaw(['api', `repos/${slug}/commits/${sha}/check-runs`]),
-    ghRaw(['api', `repos/${slug}/commits/${sha}/status`]),
-    ghRaw(['run', 'list', '-R', slug, '--commit', sha, '--json', 'name,status,conclusion']),
+    ghRaw(['api', `repos/${slug}/commits/${sha}/check-runs`], undefined, env),
+    ghRaw(['api', `repos/${slug}/commits/${sha}/status`], undefined, env),
+    ghRaw(['run', 'list', '-R', slug, '--commit', sha, '--json', 'name,status,conclusion'], undefined, env),
   ]);
   const parse = (r: { ok: boolean; stdout: string }): unknown => { if (!r.ok) return null; try { return JSON.parse(r.stdout); } catch { return null; } };
   return [
@@ -192,16 +213,16 @@ export async function ghReleaseSignals(slug: string, sha: string): Promise<Relea
 // pipelines (sign/notarize/publish) run long, so the window is generous. A
 // still-pending timeout returns 'pending' — the caller alerts and re-checks
 // later rather than failing a slow-but-healthy pipeline.
-export async function waitForRelease(slug: string, sha: string, onPoll?: (n: number) => void, maxMs = 25 * 60_000, everyMs = 30_000, noneGrace = 4): Promise<ReleaseVerdict> {
+export async function waitForRelease(slug: string, sha: string, onPoll?: (n: number) => void, env?: GhEnv, maxMs = 25 * 60_000, everyMs = 30_000, noneGrace = 4): Promise<ReleaseVerdict> {
   if (process.env['NM_GH_FAKE'] === '1') return classifyRelease(await ghReleaseSignals(slug, sha));
   const started = Date.now();
-  let v = classifyRelease(await ghReleaseSignals(slug, sha));
+  let v = classifyRelease(await ghReleaseSignals(slug, sha, env));
   let n = 0;
   let noneStreak = v.verdict === 'none' ? 1 : 0;
   while (Date.now() - started < maxMs && (v.verdict === 'pending' || (v.verdict === 'none' && noneStreak < noneGrace))) {
     await new Promise((r) => setTimeout(r, everyMs));
     onPoll?.(++n);
-    v = classifyRelease(await ghReleaseSignals(slug, sha));
+    v = classifyRelease(await ghReleaseSignals(slug, sha, env));
     noneStreak = v.verdict === 'none' ? noneStreak + 1 : 0;
   }
   return v;
@@ -209,9 +230,9 @@ export async function waitForRelease(slug: string, sha: string, onPoll?: (n: num
 
 // The PR's own body (deploy-notes source). Fake-mode returns a fixed note so the
 // echo gate exercises the deploy-notes path deterministically; failures are ''.
-export async function ghPrBody(slug: string, number: number): Promise<{ title: string; body: string }> {
+export async function ghPrBody(slug: string, number: number, env?: GhEnv): Promise<{ title: string; body: string }> {
   if (process.env['NM_GH_FAKE'] === '1') { ghFakeCalls.push(`pr view ${slug} ${number}`); return { title: 'fake PR', body: '## Deploy notes\n- [ ] Migration: auto-applies on deploy' }; }
-  const r = await ghRaw(['pr', 'view', String(number), '-R', slug, '--json', 'title,body']);
+  const r = await ghRaw(['pr', 'view', String(number), '-R', slug, '--json', 'title,body'], undefined, env);
   if (!r.ok) return { title: '', body: '' };
   try { const j = JSON.parse(r.stdout) as { title?: string; body?: string }; return { title: j.title ?? '', body: j.body ?? '' }; } catch { return { title: '', body: '' }; }
 }

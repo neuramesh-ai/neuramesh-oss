@@ -14,6 +14,7 @@ import type { HostQueue } from '../harness/hostqueue';
 import type { HostedAgent, ExecTask } from '../agents';
 import type { ToolHost } from '../harness/toolbus';
 import type { HostCtx } from './ctx';
+import type { RepoCred } from './repocred';
 
 export interface ParkWiring {
   /** the claim facade — ephemeral by design, so a crashed host's work can be resumed */
@@ -24,9 +25,11 @@ export interface ParkWiring {
   agents: Map<string, HostedAgent>;
   /** deferred: the resume flow is declared after this service is built */
   resumeFlow: (agent: HostedAgent, t: ExecTask & { requirements_confirmed: number }) => Promise<void>;
+  /** the GitHub credential a CI read needs on a login-less cloud machine (host/repocred.ts) */
+  repoCred: RepoCred;
 }
 
-export function makePark({ post, guards }: HostCtx, { db, parkBook, execQueue, agents, claimed, resumeFlow }: ParkWiring) {
+export function makePark({ post, guards }: HostCtx, { db, parkBook, execQueue, agents, claimed, resumeFlow, repoCred }: ParkWiring) {
   // the park bookkeeping lives in the guard registry (host/guards.ts)
   const { parkRequests, parkResumeNotes } = guards;
 function parkFor(agent: HostedAgent, t: ExecTask, ch: { id: string }): NonNullable<ToolHost['park']> {
@@ -63,7 +66,10 @@ async function runDueParks(): Promise<void> {
     ).catch(() => null);
     if (!row?.pr_number) { ci[rec.condition.prNumber] = 'none'; continue; } // no PR → nothing to wait for
     const slug = await repoSlugFor(row).catch(() => `${row.org_name}/${row.name}`);
-    ci[rec.condition.prNumber] = (await ghPrChecks(undefined, slug, row.pr_number).catch(() => ({ verdict: 'pending' as const }))).verdict;
+    const cred = await repoCred.forRepo(slug, rec.subject.channelId ?? '');
+    // a read that failed is not "no CI": the park keeps waiting instead of waking on a false none
+    const v = cred.ok ? (await ghPrChecks(undefined, slug, row.pr_number, cred.env).catch(() => ({ verdict: 'pending' as const }))).verdict : 'pending';
+    ci[rec.condition.prNumber] = v === 'unknown' ? 'pending' : v;
   }
   for (const { record, why } of parkBook.due({ ci }, Date.now())) {
     parkBook.release(record.turnId);

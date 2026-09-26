@@ -36,6 +36,18 @@ export const PLAN_LABELS: Record<Plan, string> = { free: 'Free', cloud: 'Pro' };
 export const planLabel = (plan: string | null | undefined): string => PLAN_LABELS[planOf(plan)];
 
 /**
+ * A HOSTED workspace's plan, in words (George, 2026-09-25): "the web plan is not really a free plan
+ * anymore but a pro trial". A hosted signup gets a cloud machine and 500 credits, then buys credits
+ * or moves to Pro, whose seats refill every month. Free is the desktop app on a Mac. So on a hosted
+ * workspace the `free` id reads **Pro trial**. Use it wherever the reader is surely hosted (the
+ * server's refusals, which never run on the local stack, the Credits view, the web and phone
+ * first run, the email), and name no plan where a Mac and the cloud share one string.
+ */
+export const TRIAL_LABEL = 'Pro trial';
+export const hostedPlanLabel = (plan: string | null | undefined): string =>
+  planOf(plan) === 'cloud' ? PLAN_LABELS.cloud : TRIAL_LABEL;
+
+/**
  * Seats a Free workspace includes: ONE — the owner (George, 2026-09-03). Free is one person.
  * Wanting a second human is exactly the moment the workspace moves to Pro, where every member
  * gets a cloud machine of their own (docs/design/member-machines-2026-09) — so the invitation
@@ -53,7 +65,7 @@ export function seatCap(plan: string | null | undefined): number {
 }
 
 export const seatLimitReason = (): string =>
-  `${planLabel('free')} workspaces are for one person. Upgrade to ${planLabel('cloud')} to invite teammates. Each teammate gets a cloud machine of their own.`;
+  `The ${TRIAL_LABEL} is for one person. Upgrade to ${planLabel('cloud')} to invite teammates. Each teammate gets a cloud machine of their own.`;
 
 /** Normalize an arbitrary plan string to a known Plan; unknown/missing fails closed to 'free'. */
 export function planOf(plan: string | null | undefined): Plan {
@@ -76,7 +88,8 @@ export function formatBytes(n: number): string {
 export function attachmentUpgradeReason(over: 'count' | 'size'): string {
   const f = PLAN_ENTITLEMENTS.free.attachments;
   const c = PLAN_ENTITLEMENTS.cloud.attachments;
+  // no plan is named for the current one: the same sentence reaches a Mac (Free) and a hosted trial
   return over === 'count'
-    ? `${planLabel('free')} includes ${f.maxPerMessage} attachments per message. Upgrade to ${planLabel('cloud')} for ${c.maxPerMessage}.`
-    : `${planLabel('free')} allows files up to ${formatBytes(f.maxBytes)} each. Upgrade to ${planLabel('cloud')} for ${formatBytes(c.maxBytes)} per file.`;
+    ? `This workspace takes ${f.maxPerMessage} attachments per message. Upgrade to ${planLabel('cloud')} for ${c.maxPerMessage}.`
+    : `This workspace takes files up to ${formatBytes(f.maxBytes)} each. Upgrade to ${planLabel('cloud')} for ${formatBytes(c.maxBytes)} per file.`;
 }

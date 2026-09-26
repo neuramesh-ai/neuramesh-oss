@@ -59,12 +59,15 @@ const LABEL: Record<StepId, string> = { machine: 'Machine', keys: 'Keys', worksp
 // 5-step onboarding (handoff 07-onboard-machine + 01–05-onboard.png): a guarded linear
 // flow ending in the fan-out reveal. Preserves the nm.onboard backend contract, called at
 // Launch; the browser additionally mints its workspace at its own first step.
-export function Onboarding({ machineName, onDone, resumeWorkspaceId, local = false }: {
+export function Onboarding({ machineName, onDone, resumeWorkspaceId, resumeWorkspaceName, local = false }: {
   machineName: string;
   onDone: (orchestrator: string, goal: string) => void;
   /** an existing-but-unfinished workspace to carry on with, rather than mint a second one. set
    *  when the wizard was abandoned after its first step — see the boot rule in wsident.ts. */
   resumeWorkspaceId?: string;
+  /** that workspace's real name. The steps after the skipped name step show it, so a resume must
+   *  not show a random suggestion there (it read "Crimson Atelier" for a workspace with another name) */
+  resumeWorkspaceName?: string;
   /** a local connection (main/connections.ts): the Keys step has no starter door and requires a provider (artboard G) */
   local?: boolean;
 }) {
@@ -85,7 +88,8 @@ export function Onboarding({ machineName, onDone, resumeWorkspaceId, local = fal
   // wiped it — which is exactly how an abandoned wizard could have created another one.
   const wsIdRef = useRef<string | null>(resumeWorkspaceId ?? null);
   const [creatingWs, setCreatingWs] = useState(false);
-  const initialName = useMemo(randomWorkspaceName, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const initialName = useMemo(() => (resumeWorkspaceId && resumeWorkspaceName?.trim()) || randomWorkspaceName(), []);
   const [name, setName] = useState(initialName);
   const [slug, setSlug] = useState(() => slugifyName(initialName));
   const [slugEdited, setSlugEdited] = useState(false);

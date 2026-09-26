@@ -15,6 +15,10 @@ import { inviteMeta, joinedMeta } from './templates-account';
 import { day1Meta, day3Meta, welcomeMeta } from './templates-lifecycle';
 import { hostedFreeNoticeMeta } from './templates-notice';
 import { announceReadyMeta } from './templates-announce';
+import { CLOUD_SEAT_MONTHLY_CREDITS, SIGNUP_GRANT_CREDITS } from '../rates';
+
+/** credits as a person writes them: 1,500 */
+const fmtCredits = (n: number): string => n.toLocaleString('en-US');
 
 export interface RenderedEmail {
   subject: string;
@@ -130,42 +134,46 @@ export function renderMarketing(v: {
 
 export const day7Meta: TemplateMeta = {
   kind: 'lifecycle',
-  shape: 'The threshold. The moment the current shape stops fitting',
+  shape: 'The threshold. A week into the Pro trial: the credits it started with, and what Pro adds',
   claims: [
-    ['Free: 3 members, 3 projects, 1 machine', 'entitlements.ts; docs/07:11-15'],
-    ['Schedules are Cloud-only', 'handler.ts:947-951'],
+    ['The trial starts with 500 credits', 'rates.ts SIGNUP_GRANT_CREDITS; first-workspace.ts grantSignupCredits'],
+    ['Bought credits never expire and work on every plan', 'credit-ledger.ts purchased pool; CreditsView.tsx'],
+    ['Pro: 1,500 credits a seat, every month', 'rates.ts CLOUD_SEAT_MONTHLY_CREDITS; fleet-lifecycle.ts monthly refill'],
+    ['A teammate needs Pro, and gets a cloud machine', 'entitlements.ts seatLimitReason; member-machines.ts provisionMemberMachine'],
+    ['The trial holds 3 projects, Pro is unlimited', 'handler/project.ts PLAN_LIMIT'],
+    ['Marketplace agents over A2A are a Pro feature', 'Marketplace.tsx mktgate'],
     ['$22 per seat / month', 'docs/07-billing-and-plans.md:3'],
     ['Cancellation runs through Stripe’s hosted portal, to period end', 'billing.ts:89-107; app.ts:556'],
   ],
 };
 export function renderDay7(v: {
-  seatsUsed: number; seatCap: number; billingUrl: string; downloadUrl: string; unsubscribeUrl: string;
+  billingUrl: string; openUrl: string; unsubscribeUrl: string;
 }): RenderedEmail {
-  const subject = v.seatsUsed > 1
-    ? `You're using ${v.seatsUsed} of your ${v.seatCap} seats`
-    : 'The third chair';
-  const preheader = `Free covers ${v.seatCap} people. Nothing expires when you reach the third.`;
+  // THE PRO TRIAL (George, 2026-09-25): a hosted signup is a trial of Pro with its starting credits,
+  // not a Free plan. The old email sold "the third chair" to a plan of three people, and Free has
+  // been one person since 2026-09-03, so every claim in it had gone false.
+  const subject = 'One week on the Pro trial';
+  const preheader = `Your trial started with ${fmtCredits(SIGNUP_GRANT_CREDITS)} credits. This is what Pro adds.`;
   return done(subject, preheader, layout({
     preheader,
     unsubscribeUrl: v.unsubscribeUrl,
-    footerWhy: "You've been on NeuraMesh for a week on the Individual plan. This is the last email in your onboarding sequence.",
+    footerWhy: 'You have been on NeuraMesh for a week on the Pro trial. This is the last email in your onboarding sequence.',
     body: [
-      h1('The third chair'),
-      p(`Free NeuraMesh covers ${v.seatCap} people, 3 projects and one machine. That runs the whole loop: plan, build, review, ship, with two colleagues watching the same board.`),
-      p("It stops being enough at a specific moment, and you'll know the one when it arrives. A fourth person needs in. A second repo needs its own project. Or you want the crew working to a schedule instead of waiting for you to ask."),
+      h1('One week on the Pro trial'),
+      p(`Your trial started with ${fmtCredits(SIGNUP_GRANT_CREDITS)} credits. Your agents spend them on the NeuraMesh brain and on the minutes your cloud machine works. When you spend them all, buy more in Credits. Credits you buy never expire.`),
 
-      h2('What Team adds'),
+      h2('What Pro adds'),
       card(
         `<div class="nm-ink" style="font-family:'Geist',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:14.5px;line-height:2.15;color:#38332d;font-weight:600;">` +
-        ['A fourth teammate, and past that', 'Unlimited projects', 'Every machine you own', 'Scheduled work: the crew on a cadence']
-          .map((t) => `<span class="nm-green" style="color:#2f9e6b;font-weight:700;">&#10003;</span>&nbsp; ${t}`).join('<br>') +
+        ['Teammates, each with a cloud machine of their own', `${fmtCredits(CLOUD_SEAT_MONTHLY_CREDITS)} credits a seat, every month`, 'Unlimited projects', 'Marketplace agents over A2A']
+          .map((t) => `<span class="nm-green" style="color:#2f9e6b;font-weight:700;">✓</span>&nbsp; ${t}`).join('<br>') +
         `</div>`,
       ),
 
-      p(`${b('$22 per seat, per month.')} Cancel from the billing portal whenever you like. Team stays on until the end of the period you've paid for.`),
+      p(`${b('$22 per seat, per month.')} Cancel from the billing portal at any time. Pro continues to the end of the period you paid for.`),
 
-      button('Upgrade to Team', v.billingUrl),
-      linkline("Or don't. Free isn't a trial, and it doesn't expire.", v.downloadUrl),
+      button('Get Pro', v.billingUrl),
+      linkline('Or keep the trial, and buy credits in the app when you need them.', v.openUrl),
     ].join(''),
   }));
 }

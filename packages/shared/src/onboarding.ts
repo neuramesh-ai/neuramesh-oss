@@ -98,7 +98,7 @@ export function onboardingItems(s: OnboardingSignals): OnboardingItem[] {
     {
       id: 'machine',
       label: 'Cloud machine',
-      detail: 'Awake and yours. Free to start.',
+      detail: 'Awake and yours.',
       done: s.machines === null ? null : s.machines.some(isCloud),
       action: 'none',
     },
