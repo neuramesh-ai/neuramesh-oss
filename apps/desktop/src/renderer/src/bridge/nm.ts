@@ -329,8 +329,10 @@ export interface NMBridge extends EngineeringNMBridge, TerminalNMBridge {
   skillpackRetry(packId: string): Promise<unknown>;
   /** WEB ONLY. Make sure a machine exists and is awake before a machine-backed surface opens,
    *  reporting progress so the surface can show the boot. Undefined on desktop, where the
-   *  terminal is local — see docs/design/machine-autowake-2026-08. */
-  machineEnsure?(onPhase: (p: 'starting' | 'connecting') => void, cancelled?: () => boolean):
+   *  terminal is local — see docs/design/machine-autowake-2026-08. `lane` names which terminal
+   *  opens next: a plain shell dials your own machine and gets it a disk first (R4), a task's
+   *  terminal dials the runner that holds its worktree. */
+  machineEnsure?(onPhase: (p: 'starting' | 'connecting') => void, cancelled?: () => boolean, lane?: 'shell' | 'task'):
     Promise<{ ok: true } | { ok: false; reason: 'capped' | 'unavailable' | 'cancelled'; detail: string }>;
   terminalInfo(taskNumber: number, hasRepo: boolean): Promise<{ available: boolean; cwd: string | null }>;
   openTerminal(taskNumber: number, hasRepo: boolean, cols: number, rows: number, onData: (d: string) => void, onExit: () => void): { subId: string; input: (d: string) => void; resize: (c: number, r: number) => void; close: () => void };

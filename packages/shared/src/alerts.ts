@@ -71,6 +71,8 @@ export interface Alert {
   /** posts folded under a connector alert for the same project+platform: same cause, one card —
    *  the group keeps "Review on calendar" and never grows a second Reconnect */
   linked?: boolean;
+  /** a compute alert whose fix is more credits, not a plan: the row offers the top-up, not Pro */
+  addCredits?: boolean;
 }
 
 const PROVIDER_LABEL: Record<string, string> = { x: 'X', linkedin: 'LinkedIn', instagram: 'Instagram', tiktok: 'TikTok', github: 'GitHub', email: 'Email' };
@@ -172,7 +174,27 @@ export const alertsSummary = (alerts: Alert[]): string => alerts.map((a) => a.sh
  */
 export function computeAlert(state: {
   status: string; reason: string; minutes: number; capMinutes: number | null;
+  cap?: { outOfCredits?: boolean } | null;
 } | null): Alert | null {
+  // OUT OF CREDITS (George, 2026-09-25: "once their credit expire, they should get a notification
+  // with the app to top up"). Read from the balance, not the machine: a machine that is still up
+  // reads `online` while every Starter turn on it fails, and a parked one reads `no_credits`. This
+  // alert only ever reached `capped`, the daily-minutes cap the credits round retired, so an empty
+  // balance raised nothing anywhere and the agent's failure went to the machine's log alone.
+  // Only the parked state's own reason is about credits: `waking` says "It starts now", which an
+  // empty balance makes false, so every other state gets the plain line.
+  if (state?.cap?.outOfCredits) {
+    return {
+      kind: 'compute',
+      key: 'compute:no_credits',
+      title: 'Out of credits',
+      short: 'Out of credits',
+      why: state.status === 'no_credits' ? state.reason : 'Your agents cannot reply until you add credits.',
+      meta: '',
+      channelId: null,
+      addCredits: true,
+    };
+  }
   if (!state || state.status !== 'capped') return null;
   return {
     kind: 'compute',

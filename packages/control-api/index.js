@@ -71,6 +71,18 @@ function deriveAlerts(connectors, schedules, posts, dismissals = {}) {
   return out.sort((a, b2) => rank[a.kind] - rank[b2.kind] || (b2.count ?? 0) - (a.count ?? 0) || a.title.localeCompare(b2.title));
 }
 function computeAlert(state) {
+  if (state?.cap?.outOfCredits) {
+    return {
+      kind: "compute",
+      key: "compute:no_credits",
+      title: "Out of credits",
+      short: "Out of credits",
+      why: state.status === "no_credits" ? state.reason : "Your agents cannot reply until you add credits.",
+      meta: "",
+      channelId: null,
+      addCredits: true
+    };
+  }
   if (!state || state.status !== "capped") return null;
   return {
     kind: "compute",
@@ -10261,7 +10273,7 @@ function machinePublicJwk(privatePem) {
 }
 
 // src/fleet-claims.ts
-var runnerSubstrateDefault = () => process.env["FLEET_RUNNER_SUBSTRATE"] === "claim" ? "claim" : "volume";
+var newMachineSubstrate = () => process.env["FLEET_RUNNER_SUBSTRATE"] === "claim" ? "claim" : "volume";
 var LIVE = (sql) => sql`(lifecycle is null or lifecycle <> 'destroyed')`;
 async function bindMachinePod(sql, machineId, pod, uid2) {
   const [row] = await sql`
@@ -10452,7 +10464,7 @@ function fleetRoutes(app, store2) {
   });
 }
 async function createCloudMachine(sql, m) {
-  const substrate = m.substrate ?? (m.kind === "runner" ? runnerSubstrateDefault() : "volume");
+  const substrate = m.substrate ?? newMachineSubstrate();
   const replicas = m.replicas ?? 1;
   const [row] = await sql`
     insert into machines (workspace_id, owner_user_id, name, platform, kind, lifecycle, desired_replicas, token_hash, substrate, last_wake_at, started_at)
@@ -13558,14 +13570,15 @@ async function wakeMachine(sql, machineId) {
   return { woken: rows2.length > 0, capped: false };
 }
 async function ensureTeamShape(sql, workspaceId) {
-  return sql.begin(async (_tx) => {
+  const out = await sql.begin(async (_tx) => {
     const tx = _tx;
     const [runner] = await tx`
-      select id, owner_user_id from machines
+      select id, owner_user_id, substrate from machines
        where workspace_id = ${workspaceId}::uuid and kind = 'runner' and ${LIVE2(tx)}
        for update`;
-    if (!runner) return { promoted: null, runner: null };
-    if (await memberMachineOf(tx, workspaceId, runner.owner_user_id)) return { promoted: null, runner: runner.id };
+    if (!runner) return { promoted: null, runner: null, claimOwner: null };
+    if (await memberMachineOf(tx, workspaceId, runner.owner_user_id)) return { promoted: null, runner: runner.id, claimOwner: null };
+    if (runner.substrate === "claim") return { promoted: null, runner: runner.id, claimOwner: runner.owner_user_id };
     await tx`update machines set kind = 'member', name = ${`member-${runner.owner_user_id.slice(0, 8)}`} where id = ${runner.id}::uuid`;
     const fresh = await createCloudMachine(tx, {
       workspaceId,
@@ -13576,8 +13589,13 @@ async function ensureTeamShape(sql, workspaceId) {
       replicas: 1
     });
     console.log(`team_shape workspace=${workspaceId} promoted=${runner.id} runner=${fresh.id}`);
-    return { promoted: runner.id, runner: fresh.id };
+    return { promoted: runner.id, runner: fresh.id, claimOwner: null };
   });
+  if (out.claimOwner) {
+    const mine = await provisionMemberMachine(sql, workspaceId, out.claimOwner);
+    console.log(`team_shape workspace=${workspaceId} runner=${out.runner} stays a claim, owner machine ${mine.created ? `provisioned ${mine.id}` : mine.refused ?? "exists"}`);
+  }
+  return { promoted: out.promoted, runner: out.runner };
 }
 function provisionForJoin(store2, workspaceId, userId) {
   const sql = sqlOf(store2);
@@ -15764,6 +15782,59 @@ async function executeCommand(store2, actor, cmd) {
   return outcome;
 }
 
+// src/plan-flip.ts
+init_src();
+async function applyPlanPatch(store2, mapped) {
+  const { workspace, patch } = mapped;
+  const flips = patch.plan === "cloud" && await store2.workspacePlan(workspace) !== "cloud";
+  if (!flips) {
+    await store2.setWorkspacePlan(workspace, patch);
+    return "ok";
+  }
+  const sql = sqlOf(store2);
+  if (!sql) {
+    console.error(`plan_flip_unavailable workspace=${workspace}: store has no sql pool`);
+    return "unavailable";
+  }
+  try {
+    const [row] = await sql`select seats from workspaces where id = ${workspace}::uuid`;
+    const seats = Math.max(1, Number(patch.seats ?? row?.seats ?? 1));
+    const note = patch.stripeSubscriptionId ?? `plan-flip:${workspace}`;
+    await grantCredits(sql, workspace, CLOUD_SEAT_MONTHLY_CREDITS * seats, "promo", note);
+  } catch (e) {
+    console.error(`plan_flip_grant_failed workspace=${workspace}: ${e instanceof Error ? e.message : e}`);
+    return "failed";
+  }
+  await store2.setWorkspacePlan(workspace, patch);
+  await mintWorkspaceRunner(store2, sql, workspace, "plan_flip");
+  return "ok";
+}
+async function mintWorkspaceRunner(store2, sql, workspace, why) {
+  if (!fleetOn() || !store2.createCloudMachine) return;
+  try {
+    const [live] = await sql`
+      select id from machines where workspace_id = ${workspace}::uuid and kind = 'runner'
+         and (lifecycle is null or lifecycle <> 'destroyed') limit 1`;
+    if (live) return;
+    const [owner] = await sql`
+      select user_id from workspace_members where workspace_id = ${workspace}::uuid and role = 'owner' limit 1`;
+    if (!owner) {
+      console.error(`${why}_runner_skipped workspace=${workspace}: no owner row`);
+      return;
+    }
+    const { id } = await store2.createCloudMachine({
+      workspaceId: workspace,
+      kind: "runner",
+      ownerUserId: owner.user_id,
+      name: "runner",
+      tokenHash: mintMachineToken().hash
+    });
+    console.log(`${why}_runner workspace=${workspace} machine=${id}`);
+  } catch (e) {
+    console.error(`${why}_runner_failed workspace=${workspace}: ${e instanceof Error ? e.message : e}`);
+  }
+}
+
 // src/first-workspace.ts
 function firstWorkspaceName(firstName, email) {
   const who = firstName?.trim() || email?.split("@")[0]?.trim() || "";
@@ -15798,6 +15869,8 @@ async function ensureFirstWorkspace(store2, a) {
     const made = await executeCommand(store2, { kind: "human", id: a.userId }, { type: "workspace.create", name, slug });
     console.log(`first_workspace_created user=${a.userId} workspace=${made.workspaceId} slug=${slug}`);
     await grantSignupCredits(store2, made.workspaceId);
+    const sql = sqlOf(store2);
+    if (sql) await mintWorkspaceRunner(store2, sql, made.workspaceId, "signup");
     return { workspaceId: made.workspaceId, slug };
   };
   for (let i = 1; i <= ATTEMPTS; i++) {
@@ -18746,7 +18819,8 @@ function lifecycleRoutes(app, store2) {
     const sql = sqlOf(store2);
     const machines = sql ? await machineIntent(sql, workspace) : [];
     const bal = sql ? await creditBalance(sql, workspace) : null;
-    return c.json({ ...usage, capMinutes, plan, machines, outOfCredits: bal ? bal.remainingMicros <= 0 : false });
+    const yours = machines.find((m) => m.kind === "member" && m.ownerUserId === actor.id)?.id ?? null;
+    return c.json({ ...usage, capMinutes, plan, machines, yours, outOfCredits: bal ? bal.remainingMicros <= 0 : false });
   });
   app.post("/v1/machines/wake", async (c) => {
     const { workspace, machineId } = await c.req.json().catch(() => ({}));
@@ -18772,59 +18846,6 @@ function lifecycleRoutes(app, store2) {
     }
     return c.json({ ok: true, woken: out.woken });
   });
-}
-
-// src/plan-flip.ts
-init_src();
-async function applyPlanPatch(store2, mapped) {
-  const { workspace, patch } = mapped;
-  const flips = patch.plan === "cloud" && await store2.workspacePlan(workspace) !== "cloud";
-  if (!flips) {
-    await store2.setWorkspacePlan(workspace, patch);
-    return "ok";
-  }
-  const sql = sqlOf(store2);
-  if (!sql) {
-    console.error(`plan_flip_unavailable workspace=${workspace}: store has no sql pool`);
-    return "unavailable";
-  }
-  try {
-    const [row] = await sql`select seats from workspaces where id = ${workspace}::uuid`;
-    const seats = Math.max(1, Number(patch.seats ?? row?.seats ?? 1));
-    const note = patch.stripeSubscriptionId ?? `plan-flip:${workspace}`;
-    await grantCredits(sql, workspace, CLOUD_SEAT_MONTHLY_CREDITS * seats, "promo", note);
-  } catch (e) {
-    console.error(`plan_flip_grant_failed workspace=${workspace}: ${e instanceof Error ? e.message : e}`);
-    return "failed";
-  }
-  await store2.setWorkspacePlan(workspace, patch);
-  await mintRunnerOnFlip(store2, sql, workspace);
-  return "ok";
-}
-async function mintRunnerOnFlip(store2, sql, workspace) {
-  if (!fleetOn() || !store2.createCloudMachine) return;
-  try {
-    const [live] = await sql`
-      select id from machines where workspace_id = ${workspace}::uuid and kind = 'runner'
-         and (lifecycle is null or lifecycle <> 'destroyed') limit 1`;
-    if (live) return;
-    const [owner] = await sql`
-      select user_id from workspace_members where workspace_id = ${workspace}::uuid and role = 'owner' limit 1`;
-    if (!owner) {
-      console.error(`plan_flip_runner_skipped workspace=${workspace}: no owner row`);
-      return;
-    }
-    const { id } = await store2.createCloudMachine({
-      workspaceId: workspace,
-      kind: "runner",
-      ownerUserId: owner.user_id,
-      name: "runner",
-      tokenHash: mintMachineToken().hash
-    });
-    console.log(`plan_flip_runner workspace=${workspace} machine=${id}`);
-  } catch (e) {
-    console.error(`plan_flip_runner_failed workspace=${workspace}: ${e instanceof Error ? e.message : e}`);
-  }
 }
 
 // src/credentials-authz.ts

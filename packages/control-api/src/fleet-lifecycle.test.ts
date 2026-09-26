@@ -126,13 +126,13 @@ describe('GET /v1/machines/usage', () => {
     setEnv('FREE_STARTER_MINUTES_PER_DAY', '45');
     const res = await get(mkApp(usageStore('free')), WS);
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ day: '2026-08-27', minutes: 25, capMinutes: null, plan: 'free', machines: [], outOfCredits: false });
+    expect(await res.json()).toEqual({ day: '2026-08-27', minutes: 25, capMinutes: null, plan: 'free', machines: [], outOfCredits: false, yours: null });
   });
 
   it('returns capMinutes null for a cloud workspace', async () => {
     const res = await get(mkApp(usageStore('cloud')), WS);
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ day: '2026-08-27', minutes: 25, capMinutes: null, plan: 'cloud', machines: [], outOfCredits: false });
+    expect(await res.json()).toEqual({ day: '2026-08-27', minutes: 25, capMinutes: null, plan: 'cloud', machines: [], outOfCredits: false, yours: null });
   });
 
   it('501s for a member on a store that does not serve fleet', async () => {

@@ -49,13 +49,15 @@ export async function applyPlanPatch(store: Store, mapped: { workspace: string; 
     return 'failed';
   }
   await store.setWorkspacePlan(workspace, patch);
-  await mintRunnerOnFlip(store, sql, workspace);
+  await mintWorkspaceRunner(store, sql, workspace, 'plan_flip');
   return 'ok';
 }
 
-/** the runner, once: the hash minted here is a placeholder nobody holds — the operator rotates
- *  in the real token when it writes the machine's Secret (the pre-release create-time idiom) */
-async function mintRunnerOnFlip(store: Store, sql: postgres.Sql, workspace: string): Promise<void> {
+/** the workspace's runner, once — from the plan flip, and from the first hosted sign-in
+ *  (first-workspace.ts: cloud is Pro, and it starts with a machine that bills from its 500
+ *  credits, George 2026-09-25). The hash minted here is a placeholder nobody holds: the operator
+ *  rotates in the real token when it writes the machine's Secret (the pre-release create-time idiom). */
+export async function mintWorkspaceRunner(store: Store, sql: postgres.Sql, workspace: string, why: 'plan_flip' | 'signup'): Promise<void> {
   if (!fleetOn() || !store.createCloudMachine) return;
   try {
     const [live] = await sql<{ id: string }[]>`
@@ -64,13 +66,13 @@ async function mintRunnerOnFlip(store: Store, sql: postgres.Sql, workspace: stri
     if (live) return;
     const [owner] = await sql<{ user_id: string }[]>`
       select user_id from workspace_members where workspace_id = ${workspace}::uuid and role = 'owner' limit 1`;
-    if (!owner) { console.error(`plan_flip_runner_skipped workspace=${workspace}: no owner row`); return; }
+    if (!owner) { console.error(`${why}_runner_skipped workspace=${workspace}: no owner row`); return; }
     const { id } = await store.createCloudMachine({
       workspaceId: workspace, kind: 'runner', ownerUserId: owner.user_id, name: 'runner', tokenHash: mintMachineToken().hash,
     });
-    console.log(`plan_flip_runner workspace=${workspace} machine=${id}`);
+    console.log(`${why}_runner workspace=${workspace} machine=${id}`);
   } catch (e) {
     // a failed mint must never fail the flip — the plan is already Pro, and the runner is recoverable
-    console.error(`plan_flip_runner_failed workspace=${workspace}: ${e instanceof Error ? e.message : e}`);
+    console.error(`${why}_runner_failed workspace=${workspace}: ${e instanceof Error ? e.message : e}`);
   }
 }

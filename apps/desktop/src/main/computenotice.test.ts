@@ -3,7 +3,7 @@
 // Run from apps/desktop: pnpm exec tsx --test src/main/computenotice.test.ts
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { isComputeNotice, noComputeNotice, noComputeReasonOf, sleeperNotice } from './computenotice';
+import { isComputeNotice, isNoCreditsError, noComputeNotice, noComputeReasonOf, noCreditsNotice, sleeperNotice } from './computenotice';
 
 test('the reason comes from the credential probe: expired login, no login, or unknown', () => {
   assert.equal(noComputeReasonOf({ authMode: 'none', blocked: { provider: 'anthropic', reason: 'expired' } }), 'expired');
@@ -39,4 +39,20 @@ test('a real answer is not a notice', () => {
 test('the notices carry no em dash — user-facing text is STE', () => {
   for (const reason of ['expired', 'missing', null] as const) assert.equal(noComputeNotice({ label: 'Claude', reason, cloudLacksLogin: true }).includes('—'), false);
   assert.equal(sleeperNotice('your cloud machine', 'codex').includes('—'), false);
+});
+
+test('the out-of-credits notice is a notice, and it names both ways on', () => {
+  const n = noCreditsNotice();
+  assert.equal(isComputeNotice(n), true); // the routine resume re-answers once credits return
+  assert.match(n, /Add credits in Credits/);
+  assert.match(n, /connect your own brain in Settings/);
+  assert.equal(n.includes('—') || n.includes(';'), false);
+});
+
+test('only the metered lane refusal counts as out of credits', () => {
+  assert.equal(isNoCreditsError(new Error('out of credits: add credits in Credits, or connect your own brain in Settings')), true);
+  assert.equal(isNoCreditsError(new Error('starter brain unavailable (503)')), false);
+  // a provider's own cap wording goes to the capacity failover, not to this notice
+  assert.equal(isNoCreditsError(new Error('You have run out of credits on your Anthropic plan')), false);
+  assert.equal(isNoCreditsError('out of credits'), false);
 });

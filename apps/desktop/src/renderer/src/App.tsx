@@ -2500,6 +2500,7 @@ export function App() {
       <Onboarding
         machineName={boot.machineName} local={boot.connection?.authMode === 'local'}
         resumeWorkspaceId={boot.resumeWorkspaceId}
+        resumeWorkspaceName={boot.workspace?.name}
         onDone={(orchestrator, goal) => {
           // Seed the composer so they land one click from the loop: an explicit goal wins; otherwise
           // the orchestrator intro. A fresh workspace always gets it (no machine-level "welcomed" gate).

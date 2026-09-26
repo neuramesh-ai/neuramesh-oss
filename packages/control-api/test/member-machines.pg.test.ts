@@ -154,6 +154,73 @@ describe.skipIf(!DB)('per-member cloud machines (0133) — Individual and Team',
     expect(await ensureTeamShape(sql!, WS)).toEqual({ promoted: null, runner: runner.id });
   });
 
+  // With FLEET_RUNNER_SUBSTRATE=claim a runner is a warm claim: no volume, no login (a login promotes
+  // it first). Converting it at the first invitation left two awake claims serving one workspace and
+  // a daemon that still believed it was the runner (the k3d e2e, 2026-09-25).
+  it('a CLAIM runner stays the runner at the first invitation, and the owner gets a machine of their own, asleep', async () => {
+    const dan = await makeUser('clerk_mm_dan', 'dan@member-machines.test');
+    const erin = await makeUser('clerk_mm_erin', 'erin@member-machines.test');
+    const made = await j(await send(dan, { type: 'workspace.create', name: 'Claim Team', slug: `mmc-${Date.now().toString(36)}` }));
+    const ws = made.workspaceId as string;
+    const prevSub = process.env['FLEET_RUNNER_SUBSTRATE'];
+    process.env['FLEET_RUNNER_SUBSTRATE'] = 'claim';
+    try { await toTeam(ws, `sub_mmc_${ws.slice(0, 8)}`); } finally {
+      if (prevSub === undefined) delete process.env['FLEET_RUNNER_SUBSTRATE']; else process.env['FLEET_RUNNER_SUBSTRATE'] = prevSub;
+    }
+    const [claimRunner] = await sql!`select id, substrate from machines where workspace_id = ${ws}::uuid and kind = 'runner'`;
+    expect(claimRunner!['substrate']).toBe('claim');
+    const erins = await join(dan, ws, erin, 'erin@member-machines.test');
+    expect(erins, 'the joiner still gets a machine of their own').not.toBeNull();
+    const rows = live(await machinesOf(ws));
+    const runners = rows.filter((m) => m.kind === 'runner');
+    expect(runners, 'one runner, and it is the claim the workspace already had').toHaveLength(1);
+    expect(runners[0]!.id).toBe(claimRunner!['id']);
+    const dans = liveMemberOf(rows, dan.id);
+    expect(dans, 'the owner gets a machine of their own').toBeTruthy();
+    expect(dans!.id).not.toBe(claimRunner!['id']);
+    expect(dans!.desired_replicas, 'born asleep, like a joiner').toBe(0);
+    expect(await ensureTeamShape(sql!, ws)).toEqual({ promoted: null, runner: claimRunner!['id'] });
+  });
+
+  // R4 (George, 2026-09-25): a member's machine is a warm claim too, asleep until used. A sign-in
+  // needs a disk, so its owner's shell promotes it first, and the usage read names it as theirs so
+  // the browser's shell opens it and not the runner (webnm-relay.ts).
+  it('R4: under the claim default a member machine is a claim, asleep; only its owner promotes it; the usage read names it', async () => {
+    const fay = await makeUser('clerk_mm_fay', 'fay@member-machines.test');
+    const gus = await makeUser('clerk_mm_gus', 'gus@member-machines.test');
+    const made = await j(await send(fay, { type: 'workspace.create', name: 'R4 Team', slug: `mmr4-${Date.now().toString(36)}` }));
+    const ws = made.workspaceId as string;
+    const prevSub = process.env['FLEET_RUNNER_SUBSTRATE'];
+    process.env['FLEET_RUNNER_SUBSTRATE'] = 'claim';
+    let guss: MachineRow | null = null;
+    try {
+      await toTeam(ws, `sub_mmr4_${ws.slice(0, 8)}`);
+      guss = await join(fay, ws, gus, 'gus@member-machines.test');
+    } finally {
+      if (prevSub === undefined) delete process.env['FLEET_RUNNER_SUBSTRATE']; else process.env['FLEET_RUNNER_SUBSTRATE'] = prevSub;
+    }
+    expect(guss).not.toBeNull();
+    const fays = liveMemberOf(await machinesOf(ws), fay.id);
+    expect(fays, 'the owner gets a machine of their own at the first invitation').toBeTruthy();
+    const sub = async (id: string) => (await sql!`select substrate, desired_replicas from machines where id = ${id}::uuid`)[0]!;
+    for (const id of [guss!.id, fays!.id]) expect(await sub(id)).toMatchObject({ substrate: 'claim', desired_replicas: 0 });
+
+    // the usage read: the runner stays first for every client that reads machines[0], and each
+    // caller is told which machine is theirs
+    const usage = async (who: Actor) => j(await app!.request(`/v1/machines/usage?workspace=${ws}`, { headers: { 'x-nm-actor': JSON.stringify(who) } }));
+    const forGus = await usage(gus);
+    expect(forGus.machines[0].kind).toBe('runner');
+    expect(forGus.yours).toBe(guss!.id);
+    expect((await usage(fay)).yours).toBe(fays!.id);
+
+    // a teammate cannot put a disk under someone else's machine; its owner can, and it wakes
+    const byFay = await send(fay, { type: 'machine.promote', workspace: ws, machineId: guss!.id });
+    expect((await j(byFay)).code).toBe('NOT_PERMITTED');
+    expect(await sub(guss!.id)).toMatchObject({ substrate: 'claim' });
+    expect(await j(await send(gus, { type: 'machine.promote', workspace: ws, machineId: guss!.id }))).toMatchObject({ ok: true, promoted: true });
+    expect(await sub(guss!.id)).toMatchObject({ substrate: 'volume', desired_replicas: 1 });
+  });
+
   it('accepting an invitation provisions the joiner\'s machine, asleep, shared by default, and exactly once', async () => {
     const pending = await store!.pendingInvitesForEmail('bob@member-machines.test');
     expect((await send(bob, { type: 'workspace.accept_invite', invite: pending[0]!.inviteId })).status).toBe(200);

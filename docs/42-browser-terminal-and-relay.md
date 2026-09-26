@@ -64,6 +64,14 @@ Every failure writes a sentence to the pane and exits — no machine yet, forbid
 
 Close codes are the diagnostic vocabulary. `4403` versus `1013` is worth knowing by heart: a *wrong* `RELAY_SECRET` closes `1013 VALIDATE_UNAVAILABLE`, so a `4403 FORBIDDEN` proves the relay reached control-api, authenticated, and got a real membership verdict back.
 
+## Which machine a terminal opens (2026-09-25)
+
+A plain shell is where a person signs in, so it opens that person's own machine. The server names it as `yours` in `/v1/machines/usage`, and a person without a machine of their own gets the runner. The shell promotes that machine first, because a sign-in on a claim ends with the pod. It wakes only that machine.
+
+A task's terminal opens the runner, which holds the task's worktree, and never promotes it. A promotion ends the claim pod, and the worktree ends with it.
+
+Code keeps the runner (`machines[0]`), because a Code lane does not wake a machine before it attaches.
+
 ## Operational shape
 
 | Piece | Where |

@@ -105,6 +105,7 @@ export const TerminalView = forwardRef<TermHandle, { taskNumber?: number; hasRep
         const res = await nm.machineEnsure(
           (phase) => setBoot((b) => (b ? { ...b, phase } : b)),
           () => gone,
+          taskNumber != null ? 'task' : 'shell',
         );
         if (gone) return;
         if (!res.ok) {
