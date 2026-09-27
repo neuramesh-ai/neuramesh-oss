@@ -6,7 +6,7 @@
 // (an agent in a worktree included) can reach 127.0.0.1, so an open header would have made
 // self-approval one curl — the thing the whole product promises nothing needs to prevent.
 import { createHmac, randomBytes } from 'node:crypto';
-import { createEvent, formatAddress, type Actor } from '@neuramesh/shared';
+import { createEvent, formatAddress, MIN_DESKTOP_VERSION, type Actor } from '@neuramesh/shared';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../src/app';
 import { LOCAL_SYNC_AUD, LOCAL_SYNC_KID, LOCAL_USER, mintLocalToken, seedLocalUser } from '../src/local-auth';
@@ -53,7 +53,7 @@ describe('the nmh_ bearer', () => {
     const { token, userId } = await localStack();
     const res = await app.request('/v1/me', { headers: asBearer(token) });
     expect(res.status).toBe(200);
-    expect(await j(res)).toEqual({ actor: { kind: 'human', id: userId }, workspaces: [] });
+    expect(await j(res)).toEqual({ actor: { kind: 'human', id: userId }, workspaces: [], minDesktopVersion: MIN_DESKTOP_VERSION });
   });
 
   it('is refused when unknown, and shut entirely outside NM_LOCAL=1 even for a seeded hash', async () => {
@@ -138,18 +138,19 @@ describe('POST /auth/local/token', () => {
 });
 
 describe('GET /.well-known/nm-config', () => {
-  it('local: mode, powersyncUrl, version, schemaVersion — and nothing else (no ids)', async () => {
+  it('local: mode, powersyncUrl, version, schemaVersion, the floor — and nothing else (no ids)', async () => {
     await localStack();
     const body = await j(await app.request('/.well-known/nm-config'));
-    expect(Object.keys(body).sort()).toEqual(['mode', 'powersyncUrl', 'schemaVersion', 'version']);
-    expect(body).toMatchObject({ mode: 'local', powersyncUrl: 'http://127.0.0.1:58081', schemaVersion: null });
+    expect(Object.keys(body).sort()).toEqual(['minDesktopVersion', 'mode', 'powersyncUrl', 'schemaVersion', 'version']);
+    expect(body).toMatchObject({ mode: 'local', powersyncUrl: 'http://127.0.0.1:58081', schemaVersion: null, minDesktopVersion: MIN_DESKTOP_VERSION });
     expect(body.version).toMatch(/^\d+\.\d+\.\d+/);
   });
 
   it('cloud: the same shape with mode cloud', async () => {
     const body = await j(await app.request('/.well-known/nm-config'));
     expect(body.mode).toBe('cloud');
-    expect(Object.keys(body).sort()).toEqual(['mode', 'powersyncUrl', 'schemaVersion', 'version']);
+    expect(Object.keys(body).sort()).toEqual(['minDesktopVersion', 'mode', 'powersyncUrl', 'schemaVersion', 'version']);
+    expect(body.minDesktopVersion).toMatch(/^\d+\.\d+\.\d+$/);
   });
 });
 
@@ -157,12 +158,12 @@ describe('GET /v1/me', () => {
   it('a human lists its memberships as { id, name, slug }', async () => {
     const { workspaceId } = await store.createWorkspace({ name: 'Acme', slug: 'acme', createdBy: george.id }, ev(george.id));
     const body = await j(await app.request('/v1/me', { headers: asHeader(george) }));
-    expect(body).toEqual({ actor: { kind: 'human', id: 'george' }, workspaces: [{ id: workspaceId, name: 'Acme', slug: 'acme' }] });
+    expect(body).toEqual({ actor: { kind: 'human', id: 'george' }, workspaces: [{ id: workspaceId, name: 'Acme', slug: 'acme' }], minDesktopVersion: MIN_DESKTOP_VERSION });
   });
 
   it('an agent gets its identity and no workspaces — memberships are a human thing', async () => {
     const body = await j(await app.request('/v1/me', { headers: asHeader({ kind: 'agent', id: 'rex', role: 'orchestrator' }) }));
-    expect(body).toEqual({ actor: { kind: 'agent', id: 'rex' }, workspaces: [] });
+    expect(body).toEqual({ actor: { kind: 'agent', id: 'rex' }, workspaces: [], minDesktopVersion: MIN_DESKTOP_VERSION });
   });
 
   it('needs a credential', async () => {

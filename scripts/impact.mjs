@@ -21,10 +21,11 @@ export const SURFACES = ['web', 'desktop', 'mobile', 'cloud', 'api'];
 
 /** prefix (or exact path) → surfaces. The FIRST match that implicates wins nothing: every rule applies. */
 export const RULES = [
-  // the browser client and the site
-  { prefix: 'apps/desktop/src/renderer/', surfaces: ['web', 'desktop'] },
+  // the browser client (hq) and the site. hq split from the desktop renderer on 2026-09-26
+  // (docs/design/desktop-decoupling-2026-09/plan.md), so the desktop's renderer reaches the desktop only
+  { prefix: 'apps/hq/', surfaces: ['web'] },
+  { prefix: 'apps/desktop/src/renderer/', surfaces: ['desktop'] },
   { prefix: 'apps/desktop/src/preload/', surfaces: ['desktop'] },
-  { prefix: 'apps/desktop/vite.web.config.mts', surfaces: ['web'] },
   { prefix: 'apps/desktop/index.html', surfaces: ['desktop'] },
   { prefix: 'apps/web/', surfaces: ['web'] },
   // the daemon: the desktop app and every cloud machine run it
@@ -35,7 +36,9 @@ export const RULES = [
   { prefix: 'infra/images/machine/', surfaces: ['cloud'] },
   // packages every client carries
   { prefix: 'packages/shared/', surfaces: ['web', 'desktop', 'mobile', 'cloud', 'api'] },
-  { prefix: 'packages/client-core/', surfaces: ['web', 'desktop', 'mobile'] },
+  // the replica schema and the uploader live here since the decoupling plan's phase 2.1, and
+  // machined imports both, so a change here reaches the cloud machines too
+  { prefix: 'packages/client-core/', surfaces: ['web', 'desktop', 'mobile', 'cloud'] },
   { prefix: 'packages/fonts/', surfaces: ['web', 'desktop'] },
   { prefix: 'packages/relay-client/', surfaces: ['web', 'desktop'] },
   // the phone
@@ -71,6 +74,16 @@ export function classify(paths) {
   return { surfaces: Object.fromEntries(SURFACES.map((s) => [s, !!hit[s]])), why: hit };
 }
 
+/** A HQ-ONLY CHANGE: every path under apps/hq/ or in an evidence folder, and at least one under
+ *  apps/hq/. ci.yml then skips the desktop's typecheck, suites and Electron build (the decoupling
+ *  plan, phase 2 step 5): the two apps are separate since 2026-09-26, and nothing in the desktop
+ *  reads apps/hq. Narrower than INERT on purpose: a doc or a test elsewhere can feed a desktop
+ *  suite, so it keeps the whole run. */
+export function hqOnly(paths) {
+  const ps = paths.map((p) => p.trim()).filter(Boolean);
+  return ps.some((p) => p.startsWith('apps/hq/')) && ps.every((p) => p.startsWith('apps/hq/') || /(^|\/)evidence\//.test(p));
+}
+
 function changedPaths(base, head) {
   const range = head ? `${base}...${head}` : `${base}...HEAD`;
   const out = execSync(`git diff --name-only ${range}`, { encoding: 'utf8' });
@@ -79,6 +92,14 @@ function changedPaths(base, head) {
 
 function main() {
   const args = process.argv.slice(2);
+  // `--hq-only <base> <head>`: exit 0 when the diff is hq-only, 1 when it is not (ci.yml's scope step)
+  if (args[0] === '--hq-only') {
+    let ps;
+    try { ps = changedPaths(args[1] ?? 'origin/main', args[2]); } catch (e) { console.error(`[impact] cannot diff: ${e instanceof Error ? e.message : String(e)}`); process.exit(2); }
+    const yes = hqOnly(ps);
+    console.error(`[impact] ${ps.length} path(s): ${yes ? 'hq only, the desktop checks skip' : 'not hq only, every package is checked'}`);
+    process.exit(yes ? 0 : 1);
+  }
   let paths;
   if (args[0] === '--paths') paths = args.slice(1);
   else {

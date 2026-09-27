@@ -1,11 +1,11 @@
 # The web-client performance harness
 
-Measures the NeuraMesh browser client (the desktop renderer on the web bridge) in real Chrome
+Measures the NeuraMesh browser client (hq, `apps/hq`) in real Chrome
 over the DevTools protocol, and records video of what a person sees. Plain Node 22 ESM, no npm
 dependencies: Node's own `WebSocket` and `fetch`, `/usr/local/bin/ffmpeg` for video, Chrome itself
 for the label and timer frames. The style follows `scripts/web-boot-e2e.mjs`.
 
-Everything here runs against a BUILT client (`vite build --config vite.web.config.mts` with
+Everything here runs against a BUILT client (`vite build` in `apps/hq` with
 `VITE_NM_POWERSYNC_URL=http://127.0.0.1:58081 VITE_NM_DEV_USER=00000000-0000-0000-0000-000000000001`,
 so it boots as the dev user without sign-in) and the shared dev stack (Postgres on 55435,
 PowerSync on 58081).
@@ -286,7 +286,7 @@ node aggregate.mjs --before final-before --after final-after > final.json
 Each round serves the before build, runs the broadband and fast4g loads (cold and warm) and the
 cpu4x frame journeys, then does the same for the after build. The before build gets production's
 headers today (`--cache vercel`). The after build gets the same defaults plus the rules in
-`apps/desktop/vercel.json`, so a new header rule counts. `final.json` holds the median, p75, min
+`apps/hq/vercel.json`, so a new header rule counts. `final.json` holds the median, p75, min
 and max of every milestone, with the run count, the page architecture and the load average.
 
 The first comparison (2026-09-25, the web speed round) is in `docs/18-performance.md` §9.

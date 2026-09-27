@@ -17,18 +17,18 @@ import { anchorPoint } from '../ui/anchor';
 import { IconAlert, IconChevron, IconCode, IconHistory, IconLock, IconSearch } from '../ui/icons';
 
 /** the shell renders the chip (it owns the fleet); Code says which session it edits and whether it is locked */
-type MachineChipSlot = (value: string | null, onPick: (machineId: string | null) => void, disabled: boolean) => ReactNode;
-const repoOf = (repo: RepoUI): EngineeringRepo => ({ id: repo.id, name: repo.name, owner: repo.org_name, branch: repo.default_branch, root: repo.local_path ?? null });
-const projectOf = (project: WorkspaceProjectRow): EngineeringProject => ({ id: project.id, name: project.name, slug: project.slug, logoUrl: project.logo_url });
+export type MachineChipSlot = (value: string | null, onPick: (machineId: string | null) => void, disabled: boolean) => ReactNode;
+export const repoOf = (repo: RepoUI): EngineeringRepo => ({ id: repo.id, name: repo.name, owner: repo.org_name, branch: repo.default_branch, root: repo.local_path ?? null }); export const projectOf = (project: WorkspaceProjectRow): EngineeringProject => ({ id: project.id, name: project.name, slug: project.slug, logoUrl: project.logo_url });
 const ids = (value?: string | null) => new Set((value ?? '').split(',').filter(Boolean));
-const repoForProject = (repos: RepoUI[], projectId: string | null): RepoUI | null => {
-  if (!projectId) return repos[0] ?? null;
-  return repos.find((repo) => ids(repo.primary_project_ids).has(projectId)) ?? repos.find((repo) => ids(repo.project_ids).has(projectId)) ?? null;
+export const repoForProject = (repos: RepoUI[], projectId: string | null): RepoUI | null => {
+  if (!projectId) return repos[0] ?? null; return repos.find((repo) => ids(repo.primary_project_ids).has(projectId)) ?? repos.find((repo) => ids(repo.project_ids).has(projectId)) ?? null;
 };
+/** the deterministic local harness: the preview renderer (unless `?engruntime=unavailable` asks for the honest notice), or `?engineeringHarness=1` on the web */
+export const engineeringHarnessOn = (): boolean => (NM_PLATFORM === 'preview' && (typeof location === 'undefined' || new URLSearchParams(location.search).get('engruntime') !== 'unavailable')) || (typeof location !== 'undefined' && new URLSearchParams(location.search).get('engineeringHarness') === '1');
 
 const stateLabel = (state: EngineeringSession['state']) => ({ idle: 'Ready', streaming: 'Working', awaiting_approval: 'Needs approval', resumable: 'Paused', completed: 'Complete', error: 'Blocked' })[state];
 
-function ApprovalCard({ session, onResolve }: { session: EngineeringSession; onResolve: (approved: boolean) => void }) {
+export function ApprovalCard({ session, onResolve, onReview }: { session: EngineeringSession; onResolve: (approved: boolean) => void; onReview?: (() => void) | undefined }) {
   const approval = session.pendingApproval;
   const [shown, setShown] = useState(approval);
   const [closing, setClosing] = useState(false);
@@ -44,8 +44,8 @@ function ApprovalCard({ session, onResolve }: { session: EngineeringSession; onR
     <div className="engapproval" data-state={closing ? 'closing' : 'open'} role="alert">
       <div className="engapprovaltop"><span className="engapprovalico"><IconLock s={13} /></span><span><b>{shown.title}</b><small>{shown.detail}</small></span></div>
       {shown.command && <code>{shown.command}</code>}
-      {shown.changes?.length ? <div className="engapprovalstat">{shown.changes.length} files · complete patch open on the right</div> : null}
-      <div className="engapprovalactions">
+      {shown.changes?.length ? (onReview ? <div className="paths">{shown.changes.map((c) => { const add = c.after.split('\n').length, del = c.before ? c.before.split('\n').length : 0; return <span key={c.path}><i>{c.kind === 'deleted' ? `−${del}` : c.kind === 'added' ? `+${add}` : `+${add} −${del}`}</i>{c.path}</span>; })}</div> : <div className="engapprovalstat">{shown.changes.length} files · complete patch open on the right</div>) : null}
+      <div className="engapprovalactions">{onReview && shown.changes?.length ? <button className="btn sm" onClick={onReview}>Review the patch</button> : null}
         <button className="btn sm" onClick={() => onResolve(false)}>Decline</button>
         <button className="btn primary sm" onClick={() => onResolve(true)}>Approve once</button>
       </div>
@@ -53,10 +53,11 @@ function ApprovalCard({ session, onResolve }: { session: EngineeringSession; onR
   );
 }
 
-function Conversation({ session, projects, project, plan, onUpgrade, onNewProject, onProject, onSession, onSend, onMode, onPermission, onModel, onContinueInAct, onDismissModeHandoff, onApproval, machineChip }: {
+export function EngineeringConversation({ session, projects, project, plan, onUpgrade, onNewProject, onProject, onSession, onSend, onMode, onPermission, onModel, onContinueInAct, onDismissModeHandoff, onApproval, machineChip, prelude, postlude, gate }: {
   session: EngineeringSession; onSession: (session: EngineeringSession) => void;
   projects: WorkspaceProjectRow[]; project: WorkspaceProjectRow | null; plan: string;
-  onUpgrade: (reason: string) => void; onNewProject: (origin: { x: number; y: number } | null) => void; onProject: (id: string) => void;
+  onUpgrade: (reason: string) => void; onNewProject: (origin: { x: number; y: number } | null) => void; onProject?: (id: string) => void;
+  prelude?: ReactNode; postlude?: ReactNode; gate?: ReactNode; // a coding THREAD's own messages around the runtime's transcript (rex's line and the kind divider above, the unit card below), and its ONE gate card above the composer (docs/25)
   onSend?: (prompt: string, uploads: EngineeringAttachmentUpload[]) => void; onMode?: (mode: 'plan' | 'act') => void;
   onPermission?: (category: PermissionCategory, value: boolean) => void; onModel?: (modelId: string | null) => void;
   onContinueInAct?: () => void; onDismissModeHandoff?: () => void;
@@ -88,12 +89,12 @@ function Conversation({ session, projects, project, plan, onUpgrade, onNewProjec
           followsStream.current = atBottom;
           setShowJumpToBottom(!atBottom);
         }}>
-          <EngineeringTranscript messages={session.messages} />
+          {prelude}<EngineeringTranscript messages={session.messages} />{postlude}
           {session.state === 'streaming' && !streamingReasoning ? <EngineeringWorking session={session} /> : null}
           <ApprovalCard session={session} onResolve={(approved) => onApproval ? onApproval(approved) : onSession(resolveEngineeringApproval(session, approved))} />
         </div>
         {showJumpToBottom ? <button className="engscrollbottom" onClick={jumpToBottom} aria-label="Scroll to latest message" data-tip="Scroll to latest"><IconChevron s={14} /></button> : null}
-      </div>
+      </div>{gate}
       <EngineeringComposer session={session} onSession={onSession}
         onSend={(prompt, uploads) => onSend ? onSend(prompt, uploads) : onSession(submitEngineeringPrompt(session, prompt))}
         onMode={onMode} onPermission={onPermission} onModel={onModel}
@@ -196,7 +197,7 @@ function EngineeringStart({ repoRows, projects, initialProjectId, sessions, runt
   );
 }
 
-function EngineeringStandby({ repos }: { repos: EngineeringRepo[] }) {
+export function EngineeringStandby({ repos }: { repos: EngineeringRepo[] }) {
   return (
     <section className="engeditor engstandby" aria-label="Code workspace">
       <div className="engeditorbody">
@@ -223,7 +224,7 @@ export function EngineeringOS({ repos: repoRows, projects, activeProjectId = nul
   machineChip?: MachineChipSlot; defaultMachineId?: string | null;
 }) {
   // `?engruntime=unavailable` lets the preview harness render the unavailable notice: the mock bridge has no Code methods, so the hook lands in its "no bridge" branch
-  const harness = (NM_PLATFORM === 'preview' && (typeof location === 'undefined' || new URLSearchParams(location.search).get('engruntime') !== 'unavailable')) || (typeof location !== 'undefined' && new URLSearchParams(location.search).get('engineeringHarness') === '1');
+  const harness = engineeringHarnessOn();
   const repos = useMemo(() => repoRows.map(repoOf), [repoRows]);
   const engineering = useEngineeringRuntime(harness, repos, workspaceId, initialSessionId, defaultMachineId);
   const { active, sessions, runtime, reason } = engineering;
@@ -253,7 +254,7 @@ export function EngineeringOS({ repos: repoRows, projects, activeProjectId = nul
       <div ref={workspaceRef} className="engworkspace" data-resizing={composerResize.resizing || undefined}
         style={{ '--eng-composer-width': `${composerResize.width}px` } as CSSProperties}>
         {active ? (
-          <Conversation session={active} projects={projects.filter((project) => project.status === 'active')} project={activeProject}
+          <EngineeringConversation session={active} projects={projects.filter((project) => project.status === 'active')} project={activeProject}
             plan={plan} onUpgrade={onUpgrade} onNewProject={onNewProject} onProject={createForProject}
             onSession={engineering.update} machineChip={machineChip}
             {...(!harness ? { onSend: (prompt: string, uploads: EngineeringAttachmentUpload[]) => engineering.send(active, prompt, uploads), onMode: (mode: 'plan' | 'act') => engineering.setMode(active, mode), onContinueInAct: () => engineering.continueInAct(active), onDismissModeHandoff: () => engineering.dismissModeHandoff(active), onPermission: (category: PermissionCategory, value: boolean) => engineering.setPermission(active, category, value), onModel: (modelId: string | null) => engineering.setModel(active, modelId), onApproval: (approved: boolean) => engineering.approve(active, approved) } : {})} />

@@ -1,6 +1,6 @@
 // The routes the local stack and its desktop meet on (source-release round U2, review F1/F7),
 // plus the two non-Clerk token mints. Extracted from app.ts, which sits at its ratchet cap.
-import type { Actor } from '@neuramesh/shared';
+import { MIN_DESKTOP_VERSION, type Actor } from '@neuramesh/shared';
 import type { Env, Hono } from 'hono';
 import { signDevToken } from './devtoken';
 import { LOCAL_USER, localUserIdForBearer, signLocalSyncToken } from './local-auth';
@@ -39,13 +39,15 @@ export function localAuthRoutes<E extends Env>(app: Hono<E>, store: Store): void
   // What a client learns before it holds any credential: which kind of stack this is, where its
   // PowerSync lives, and the versions the desktop compares with its own (F7: a stack behind the app
   // shows the Update state, never a half-working shell). No ids — F1: an id here was the one value a
-  // forger needed. `schemaVersion` is the last migration the runner applied.
+  // forger needed. `schemaVersion` is the last migration the runner applied. `minDesktopVersion` is
+  // the soft floor (docs/46 rule 3): a desktop below it shows one line on its update card.
   app.get('/.well-known/nm-config', async (c) =>
     c.json({
       mode: localMode() ? 'local' : 'cloud',
       powersyncUrl: process.env['NM_POWERSYNC_URL'] ?? null,
       version: nmVersion(),
       schemaVersion: store.schemaVersion ? await store.schemaVersion() : null,
+      minDesktopVersion: MIN_DESKTOP_VERSION,
     }),
   );
 }
@@ -60,6 +62,6 @@ export function meRoute<E extends Env & { Variables: { actor: Actor } }>(app: Ho
     const workspaces = actor.kind === 'human'
       ? (await store.listWorkspaces(actor.id)).map(({ id, name, slug }) => ({ id, name, slug }))
       : [];
-    return c.json({ actor: { kind: actor.kind, id: actor.id }, workspaces });
+    return c.json({ actor: { kind: actor.kind, id: actor.id }, workspaces, minDesktopVersion: MIN_DESKTOP_VERSION });
   });
 }

@@ -14,6 +14,12 @@ export function codeSessionEndState(reason: string): CodeSessionState {
   return reason === 'completed' ? 'completed' : reason === 'error' ? 'error' : 'resumable';
 }
 
+/** the three thread words for a coding thread's session state (0144, rowstatus.ts and the phone):
+ *  an approval waiting on you is needs-you, a running turn is in progress, everything else rests */
+export function codeThreadStatus(state: string | null | undefined): 'needs_you' | 'in_progress' | 'settled' {
+  return state === 'awaiting_approval' ? 'needs_you' : state === 'streaming' ? 'in_progress' : 'settled';
+}
+
 /** the row's title: the first line of the first prompt, clipped — the desktop's own rule */
 export function codeSessionTitle(prompt: string, max = 120): string {
   const line = prompt.split('\n').map((l) => l.trim()).find((l) => l.length > 0) ?? '';

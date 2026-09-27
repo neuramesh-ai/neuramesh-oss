@@ -1,17 +1,19 @@
-# Desktop parity ledger
+# Desktop backlog (the desktop parity ledger until 2026-09-26)
 
-What is live on the hosted surfaces (the browser client at hq.neuramesh.app, the phone) and not in
-a published desktop build. [docs/45 §6](45-feature-placement.md#6-the-desktop-parity-ledger) says
-when a row opens and when it closes. Newest first.
+Web and phone features that the desktop may take later. Since the hq split (2026-09-26,
+the decoupling plan), hq and the desktop are separate
+apps, so a row is optional. It records a port that desktop users would want.
+[docs/45 §6](45-feature-placement.md#6-the-desktop-backlog-the-parity-ledger-until-2026-09-26) says
+when a row opens and when it closes. Newest first. The rows opened before the split still close
+with the next desktop tag, because the desktop's renderer copy already carries them.
 
-- **A row opens** in the PR that ships the feature, when its placement says the desktop gets it on
-  the next tag, or not at all.
-- **A row closes** in the version-bump PR of the desktop release that carries it: write the version
-  in the last column. Keep the closed rows of the last two releases, then trim.
+- **A row opens** in the PR that ships a feature, when desktop users would want it. It is optional.
+- **A row closes** in the version-bump PR of the desktop release that carries the port: write the
+  version in the last column. Keep the closed rows of the last two releases, then trim.
 - **`not this app`** rows move to the second table with the gate that keeps them out, once.
 
 **Newest published desktop:** v0.150.0 (published 2026-09-26, cut at `a59f1544`). No tag is in
-flight. Update this line in every version-bump PR.
+flight. The PR after the publish moves this line ([docs/11 §2](11-releases.md), step 6).
 
 The raw list since the newest published desktop, from git (the ledger names features, git names
 commits, and the two must agree):
@@ -24,6 +26,7 @@ git log v0.150.0..origin/main --oneline -- apps/desktop/src/renderer apps/deskto
 
 | Opened | Feature | PR | Plan | Live on | Desktop needs | Closed in |
 |---|---|---|---|---|---|---|
+| 2026-09-26 | Coding threads: a conversation on a repository is a thread with `kind = 'coding'` on the one session surface (the repo chip births one, rex's triage opens one, the phone lands it on its Code screen, `Make this a unit` is the valve to the board) | (this PR) | [coding-threads](design/coding-threads-2026-09/plan.md) | web · mobile · api (0144, `thread.set_kind`) · cloud (the triage tool and the wake gate, next release tag) | the same renderer and the daemon's tool: the code face, the repo chip, the wake gate | |
 | 2026-09-26 | The Pro trial: a hosted workspace on the free plan reads "Pro trial", and its Credits view measures the trial's own grant (it printed "480 of 0" with an empty ring) | #620 | [pro-trial](design/pro-trial-2026-09/plan.md) | web · mobile · api (the refusals and the Day-7 email) | the same renderer: the Credits view and the first-run text || v0.150.0 |
 | 2026-09-25 | Out of credits says so: the attention bar and the bell show "Out of credits" with Add credits (it opens Credits), and an agent that the NeuraMesh brain refuses for credits replies in the thread with the reason | #616 | fix | web · cloud (the thread notice, next release tag) | the same renderer and the daemon's notice: a fix installed apps need || v0.150.0 |
 | 2026-09-25 | A resumed wizard shows the workspace's real name, not a random suggestion ("Crimson Collective has its cloud machine" for "Acme Robotics") | #615 | fix | web | the same renderer: a fix installed apps need || v0.150.0 |

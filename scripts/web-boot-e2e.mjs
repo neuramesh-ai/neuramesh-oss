@@ -114,7 +114,8 @@ async function main() {
   if (!url) {
     const out = mkdtempSync(join(tmpdir(), 'nm-web-boot-'));
     say('building the web client');
-    const b = spawnSync('pnpm', ['--dir', 'apps/desktop', 'exec', 'vite', 'build', '--config', 'vite.web.config.mts', '--outDir', out, '--logLevel', 'error'], {
+    // hq's own package since the split (2026-09-26); its vite.config.mts is the default config
+    const b = spawnSync('pnpm', ['--dir', 'apps/hq', 'exec', 'vite', 'build', '--outDir', out, '--logLevel', 'error'], {
       cwd: root, stdio: 'inherit', env: { ...process.env, VITE_NM_POWERSYNC_URL: process.env['VITE_NM_POWERSYNC_URL'] ?? 'http://127.0.0.1:58081' },
     });
     if (b.status !== 0) die(2, 'the web build failed');

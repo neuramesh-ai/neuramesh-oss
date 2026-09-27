@@ -18,7 +18,7 @@ private until it is named** (2026-09-19): a new page, a new folder or a new desi
 
 | Public | What it is |
 |---|---|
-| `apps/desktop` | The Electron app, the browser client, and the preview harness |
+| `apps/desktop` | The Electron app and its preview harness. The browser client left it on 2026-09-26 (`apps/hq`, private) |
 | `packages/control-api` | The API (Hono), the command handler, and the migrations |
 | `packages/shared` | The types, the FSM, the entitlements, and the protocols every client speaks |
 | `dev/stack` | The dev stack: Postgres, PowerSync, and the sync rules |
@@ -27,6 +27,7 @@ private until it is named** (2026-09-19): a new page, a new folder or a new desi
 | Private | Why |
 |---|---|
 | `apps/web` | The site and the cloud web app at neuramesh.app |
+| `apps/hq` | hq, the browser client at hq.neuramesh.app. It split from the desktop renderer on 2026-09-26 (the decoupling plan, a private design round) |
 | `apps/mobile` | The phone app. It is Pro only and carries the App Store and production ids |
 | `infra`, `packages/fleet` | The cloud platform and the operator that runs the cloud machines |
 | `packages/bench/suite` | The held-out benchmark task set |
@@ -118,13 +119,13 @@ A local workspace migrates into a Pro workspace whenever the person likes, and t
 on the Mac as a backup.
 
 **Pro features reach the browser and the phone first** (2026-09-19, [docs/45](45-feature-placement.md)).
-The desktop app carries them on its next release, and the
-[desktop parity ledger](desktop-parity-ledger.md) lists what the newest published desktop does not
-carry yet. A feature that lives on the phone or the site alone is never in this tree. A feature of
-the shared renderer that only the browser's bridge answers stays dark in the desktop app until its
-IPC lane is ported: the renderer feature-detects the bridge method and says so in one line, the way
-it says "No shell here". A Pro feature is gated on the connection and the plan, never on the
-platform, so the desktop's own Cloud connection gets it with the release that carries it.
+Since the hq split (2026-09-26), the browser client is its own private app, so a feature that lives
+in hq, on the phone or on the site is never in this tree. The desktop app takes a web feature only
+when someone ports it to its renderer, and the [desktop backlog](desktop-parity-ledger.md) can list
+the ports that desktop users would want. A Pro feature is gated on the connection and the plan,
+never on the platform, so the desktop's own Cloud connection gets a ported feature with the release
+that carries it. What this tree and the hosted side share is the contract set
+([docs/46](46-client-contracts.md)).
 
 ```mermaid
 flowchart TB

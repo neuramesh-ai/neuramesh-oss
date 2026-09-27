@@ -35,7 +35,11 @@ export async function machineCommands(store: Store, actor: Actor, cmd: Command):
     return { machineId: id };
   }
   if (cmd.type === 'machine.heartbeat') {
-    await store.heartbeatMachine(cmd.machineId, { activeSeconds: cmd.activeSeconds ?? 0, busy: cmd.busy ?? false, ...(cmd.runtimes ? { runtimes: cmd.runtimes } : {}) });
+    await store.heartbeatMachine(cmd.machineId, {
+      activeSeconds: cmd.activeSeconds ?? 0, busy: cmd.busy ?? false,
+      ...(cmd.runtimes ? { runtimes: cmd.runtimes } : {}),
+      ...(cmd.daemonVersion ? { daemonVersion: cmd.daemonVersion } : {}),
+    });
     return { machineId: cmd.machineId };
   }
   if (cmd.type === 'machine.provision') {

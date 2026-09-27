@@ -6,7 +6,7 @@ import { homedir } from 'node:os';
 import { isCustomPackId, resolvePackRoles, runtimeForModel, type AgentRole, type CustomModelPack } from '@neuramesh/shared';
 import { berthSweepNow } from '../../agents';
 import { api, cur, machineLimit, setMachineLimit, thisMachineName } from '../../sync';
-import { pulseSelects } from '../../projmeta';
+import { pulseSelects } from '@neuramesh/client-core/projmeta';
 import { assembleFootprint, fleetLocations, readHistory, scanFleet } from '../../footprint';
 import { brainRoot } from '../../harness/brain';
 import { sandboxEnvForced, sandboxFsEnabled, setSandboxFsCache } from '../../runtime/adapter';

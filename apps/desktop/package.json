@@ -6,14 +6,13 @@
   "main": "out/main/index.js",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "node -e \"new (require('better-sqlite3'))(':memory:')\" >/dev/null 2>&1 || pnpm rebuild better-sqlite3 >/dev/null 2>&1; tsx --test 'src/main/**/*.test.ts' 'src/renderer/web/**/*.test.ts' 'src/renderer/src/**/*.test.ts'",
+    "test": "node -e \"new (require('better-sqlite3'))(':memory:')\" >/dev/null 2>&1 || pnpm rebuild better-sqlite3 >/dev/null 2>&1; tsx --test 'src/main/**/*.test.ts' 'src/renderer/src/**/*.test.ts'",
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "rebuild:native": "electron-rebuild -f -w better-sqlite3 -w node-pty",
     "smoke": "electron-vite build && electron . --smoke",
     "dist": "NM_DIST=1 electron-vite build && electron-builder --arm64",
-    "web:dev": "vite --config vite.web.config.mts",
-    "web:build": "vite build --config vite.web.config.mts"
+    "web:build": "pnpm --filter @neuramesh/hq build && rm -rf out/web && mkdir -p out && cp -R ../hq/out out/web"
   },
   "build": {
     "appId": "dev.neuramesh.app",
@@ -136,6 +135,7 @@
   "devDependencies": {
     "@electron/rebuild": "^4.0.4",
     "@fontsource-variable/bricolage-grotesque": "^5.3.0",
+    "@neuramesh/client-core": "workspace:^",
     "@neuramesh/fonts": "workspace:^",
     "@neuramesh/relay": "workspace:^",
     "@neuramesh/relay-client": "workspace:^",

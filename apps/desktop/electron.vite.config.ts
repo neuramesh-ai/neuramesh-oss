@@ -55,7 +55,9 @@ export default defineConfig({
     // with "Cannot find module …/packages/relay-client/src/relay-client" — the documented local dev
     // path, broken for anyone who ran it. The rule at the top of this block is the whole story: a
     // workspace package is raw TypeScript and MUST be bundled.
-    plugins: [externalizeDepsPlugin({ exclude: ['@neuramesh/shared', '@neuramesh/relay', '@neuramesh/relay-client'] })],
+    // @neuramesh/client-core joined on 2026-09-26 (the decoupling plan, phase 2.1): main imports the
+    // shared replica schema and the ps_crud uploader from it.
+    plugins: [externalizeDepsPlugin({ exclude: ['@neuramesh/shared', '@neuramesh/relay', '@neuramesh/relay-client', '@neuramesh/client-core'] })],
   },
   preload: { plugins: [externalizeDepsPlugin()] },
   renderer: {

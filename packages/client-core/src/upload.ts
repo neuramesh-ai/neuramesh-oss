@@ -1,6 +1,6 @@
 // THE UPLOADER'S MESSAGE MAPPING (the mobile-cloud round, S3): a queued local `messages` row →
 // the /v1/messages body, the birth columns forwarded exactly as the desktop's uploader forwards
-// them (apps/desktop/src/main/sync/upload.ts) — the root a reply hangs off (docs/31), the mode
+// them (./crud-upload.ts) — the root a reply hangs off (docs/31), the mode
 // (docs/34), where the session runs and which client bore it (0134). Pure, so the phone's
 // connector is one call and test/upload.test.ts fails the moment a birth column stops reaching
 // the wire: a send that lost its designation would still land, and only the machine would notice.
@@ -11,6 +11,7 @@ export type MessageUploadInput = Parameters<ControlApiClient['postMessage']>[0];
 
 const MODES = new Set(['tasks', 'chat']);
 const ORIGINS = new Set(['desktop', 'web', 'routine']);
+const KINDS = new Set(['chat', 'coding']);
 
 /** `d` is the crud op's `opData` — every column the local insert wrote, as SQLite hands it back */
 export function messageUploadInput(id: string, d: Record<string, unknown>): MessageUploadInput {
@@ -19,6 +20,7 @@ export function messageUploadInput(id: string, d: Record<string, unknown>): Mess
   const s = (k: string): string | undefined => (d[k] == null || d[k] === '' ? undefined : String(d[k]));
   const mode = s('birth_mode');
   const origin = s('birth_origin');
+  const kind = s('birth_kind');
   return {
     id,
     workspace: s('workspace_id') ?? '',
@@ -34,6 +36,8 @@ export function messageUploadInput(id: string, d: Record<string, unknown>): Mess
     brainOverride: parseBrainOverride(s('birth_brain')) ?? undefined,
     threadMachineId: s('birth_machine'),
     threadOrigin: origin && ORIGINS.has(origin) ? (origin as 'desktop' | 'web' | 'routine') : undefined,
+    // 0144: the kind the send births the thread with — `coding` when the repo chip was set
+    threadKind: kind && KINDS.has(kind) ? (kind as 'chat' | 'coding') : undefined,
   };
 }
 

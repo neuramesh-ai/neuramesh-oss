@@ -19,7 +19,7 @@
 // state, and `codeBridge()` is what the runtime hook reads — the bridge itself on the web, where
 // the methods are its own, and the composition on the desktop.
 // Plan: docs/design/desktop-code-bridge-2026-09/plan.md.
-import { relayOverrides as defaultOverrides, type RelayEnv } from '../../web/webnm-relay';
+import { relayOverrides as defaultOverrides, type RelayEnv } from './relay-lanes';
 import { nm, type NMBridge } from './nm';
 
 /** the keys the Code lanes compose — never a terminal one, never machineEnsure */

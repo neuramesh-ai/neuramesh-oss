@@ -5,7 +5,11 @@ import { setConversation } from './wtabs';
 import { emptyNavScope, navFlat, type NavScope, isChatRow, isCodeRow } from './navtree';
 import { bindReview, reviewKind, reviewPacket, type ReviewBinding, type ReviewComment, type ReviewRound, type ReviewSubject, type ReviewVerdict } from './review';
 import { BrandLockup } from './brand';
-import { type ChannelRow, type ChannelPersonRow, type ChannelHistoryRow, type MessageRow, type ThreadRow, type HomeConvoRow, type HistoryThreadRow } from './bridge/rows-rooms';
+import { type ChannelRow, type ChannelPersonRow, type ChannelHistoryRow, type MessageRow, type ThreadRow, type HomeConvoRow, type HistoryThreadRow, type CodeSessionRow } from './bridge/rows-rooms';
+import { CodingThread } from './views/CodingThread';
+import { RepoChip, repoLabel } from './composer/RepoChip';
+import { repoForProject } from './views/EngineeringOS';
+import { threadKindOf } from '@neuramesh/shared';
 import { type ContentItemWide, type SkillRow, type SkillPackRow } from './bridge/rows-content';
 import { type TaskRow, type TaskAllRow, type DecisionAllRow, type ProjectRow, type WorkspaceProjectRow, type RepoUI, type RunUI, type ArtifactUI, type AttachmentRow } from './bridge/rows-board';
 import { type AgentRow, type MachineRow, type MemberRow, type WorkspaceMembership, type PendingInvite } from './bridge/rows-crew';
@@ -13,7 +17,6 @@ import { type CredRow, type UpdateState, type FailoverRow, type ProcList } from 
 import { nm as nmBridge, type ConnectionInfo } from './bridge/nm';
 import { ProjectsPage } from './ProjectsPage';
 import { MarketingOS } from './views/MarketingOS';
-import { EngineeringOS, EngineeringWorkspaceHeader, engineeringHistoryRows, useEngineeringNavigation } from './engineering';
 import { NavDestBand } from './shell/NavDestBand';
 import { useNavGroups } from './shell/useNavGroups';
 import { useNavBands } from './shell/useNavBands';
@@ -521,6 +524,8 @@ export function App() {
   /** the Details face's portal target. STATE, not a ref: the open task has to re-render when the
    *  slot mounts, and a ref would hand it a stale null on the pass that matters. */
   const [wbSlot, setWbSlot] = useState<HTMLDivElement | null>(null);
+  // the Workbench card expanded to the whole sheet (George, 2026-09-26): a session state, never persisted
+  const [wbFull, setWbFull] = useState(false);
   /** the quick disk read, fetched once for the shell — the workspace face's Footprint gauge */
   const footprint = useFootprint();
   // The contract lives in shell/facehover.ts as a reducer, and the timer is just its clock. It
@@ -573,7 +578,6 @@ export function App() {
   const fgConnId = boot?.connection?.id ?? null;
   // the boot gates (shell/useBootGates.ts): the first-run doors, then Local mode's stack card
   const { firstRun, setFirstRun, doorDone, localStack, setLocalStack } = useBootGates(auth?.mode);
-  const engineeringNav = useEngineeringNavigation(boot?.workspaceId, view === 'engineering');
   // Why the splash is still up. bootstrap() is polled every 1.5s and its rejection used to be
   // swallowed (`.catch(() => {})`), so an unreachable API meant an infinite silent retry behind
   // "Getting your workspace ready…" with nothing to act on — the whole app looked hung. Counting
@@ -606,10 +610,12 @@ export function App() {
   const [navMode, setNavMode] = useState<'chat' | 'code'>(() => { try { return localStorage.getItem('nm:navMode') === 'code' ? 'code' : 'chat'; } catch { return 'chat'; } });
   // switching the mode also takes you there (Gemini's Chat | Spark): Code opens the Engineering
   // floor (#391), Chat brings you home from it — a mode is a place, not a filter you toggle blind
+  // Code is a FILTER on the one list (coding threads, 0144 — ruling 3, 2026-09-26): switching to it
+  // lands on Home with the rail relisted, never on a separate floor. A legacy Engineering session
+  // still opens its floor from its own row; a coding thread opens on the one session surface.
   const setRailMode = (m: 'chat' | 'code') => {
     setNavMode(m); try { localStorage.setItem('nm:navMode', m); } catch { /* private mode */ }
-    if (m === 'code') goConversation(() => { setNav('home'); setOpenTaskId(null); setOpenThreadId(null); setView('engineering'); });
-    else if (view === 'engineering') goConversation(() => { setNav('home'); setView('dashboard'); });
+    if (m === 'code' || view === 'engineering') goConversation(() => { setNav('home'); setOpenTaskId(null); setOpenThreadId(null); setView('dashboard'); });
   };
   // RECENTS · PROJECTS (the nav-recents round, 2026-09-12): the rail's grouping is a machine-local preference like the mode
   const [navView, setNavView] = useState<'recents' | 'projects'>(() => { try { return localStorage.getItem('nm:navView') === 'recents' ? 'recents' : 'projects'; } catch { return 'projects'; } });
@@ -1009,6 +1015,8 @@ export function App() {
    * A session opens by REPLACING the one before it. Enforced here rather than at each of the five
    * call sites, so the next list someone adds cannot reintroduce it.
    */
+  // a CODING thread (0144) opens on the one surface too, wearing the code face (views/CodingThread)
+  const openCodingThread = !!openThreadId && threadKindOf((chanThreads.find((t) => t.id === openThreadId) ?? histAll.find((t) => t.id === openThreadId))?.kind) === 'coding';
   const openConversation = (threadId: string, channelId?: string | null): void => {
     setOpenTaskId(null);
     if (channelId) {
@@ -1139,6 +1147,9 @@ export function App() {
   // the stage opens on the room with the ask pre-written; the human still sends. Consumed by
   // NewChatStage on the same composeSignal nonce as initialTarget.
   const [chatDraft, setChatDraft] = useState<string | null>(null);
+  // coding threads (0144): the repo chip's pre-set for the next New chat ('primary' = the room's primary repo), and the repo a
+  // thread was BORN with on this client (door 1), read by the surface that opens until its synced session row lands
+  const [chatRepo, setChatRepo] = useState<string | null>(null); const [codingRepoPicks, setCodingRepoPicks] = useState<Map<string, string>>(() => new Map());
   const openMarketingAsk = (channelId: string, text: string) => {
     // the stage's room chip lists the ACTIVE project's rooms — follow the ask's room there,
     // or the pre-set target silently falls back to whatever room the chip lands on
@@ -1148,12 +1159,13 @@ export function App() {
     setChatDraft(text);
     goConversation(() => { setOpenTaskId(null); setOpenThreadId(null); setNav('home'); setView('dashboard'); }, { focus: 'home' });
   };
-  const newChat = () => {
+  const newChat = (opts?: { repo?: 'primary' }) => {
     // round 2, ⑦: a chat started from inside a conversation files where you were standing —
     // the open thread's channel (and so its project) pre-sets the stage composer's chip.
     const fromChannel = openThreadId || openTaskId ? current?.id ?? null : null;
     setChatTarget(fromChannel ?? null);
     setChatDraft(null);
+    setChatRepo(opts?.repo ?? null);
     goConversation(() => {
       setOpenTaskId(null);
       setOpenThreadId(null);
@@ -1327,6 +1339,13 @@ export function App() {
   useEffect(() => {
     if (!nm || !authed) return;
     return nm.watchHistoryAll(setHistAll);
+  }, [authed]);
+  // the workspace's Code sessions (0144): a coding thread's row wears its session's repo, mode and
+  // state, on every list that draws the one derivation (historyRows) and the one status (makeRowMarks)
+  const [codeSessionsAll, setCodeSessionsAll] = useState<CodeSessionRow[]>([]);
+  useEffect(() => {
+    if (!nm || !authed) return;
+    return nm.watchCodeSessions(setCodeSessionsAll);
   }, [authed]);
 
   // ⌘K toggles the quick-actions palette from anywhere in the signed-in shell; ⌘\ folds the rail
@@ -1761,11 +1780,11 @@ export function App() {
   // project-scoped rows, so "search every thread" quietly meant "this project's threads"
   // (2026-08-07). It reads the workspace-wide sets now and narrows by project on demand.
   const histOvlRows = useMemo(
-    () => historyRows({ threads: histAll, tasks: tasksAll, channelId: null, channelSlug: '', query: histQ }),
-    [histAll, tasksAll, histQ],
+    () => historyRows({ threads: histAll, tasks: tasksAll, codeSessions: codeSessionsAll, channelId: null, channelSlug: '', query: histQ }),
+    [histAll, tasksAll, codeSessionsAll, histQ],
   );
   const projectOfChannel = useMemo(() => new Map(chans.map((c) => [c.id, c.project_id ?? null])), [chans]);
-  const homeRows = useMemo(() => historyRows({ threads: histAll, tasks: tasksAll, channelId: null, channelSlug: '', query: '' }), [histAll, tasksAll]); // Home's ledger: the overlay's rows, never its search
+  const homeRows = useMemo(() => historyRows({ threads: histAll, tasks: tasksAll, codeSessions: codeSessionsAll, channelId: null, channelSlug: '', query: '' }), [histAll, tasksAll, codeSessionsAll]); // Home's ledger: the overlay's rows, never its search
   // which rows have an agent in them right now — open runs carry the task or the thread they
   // belong to, and they are synced, so this is honest on every machine. ONE liveness signal for
   // every list that renders a session row (docs/29 §10 / docs/35 §3.2): the Recents rail's dot,
@@ -1777,7 +1796,7 @@ export function App() {
     return new Set(live.flatMap((r) => [...(r.task_id ? [r.task_id, ...liveKin(r.task_id)] : []), ...(r.thread_id ? [r.thread_id] : [])]));
   }, [openRuns, liveKin]);
   // the three words a thread can wear (shared/threadstatus.ts), for the ⌘Y overlay's chips and filter
-  const rowMarks = useMemo(() => makeRowMarks({ decisions: decisionsAll, liveIds: histLiveIds, threads: histAll, tasks: tasksAll, drafts: comingPosts }), [decisionsAll, histLiveIds, histAll, tasksAll, comingPosts]);
+  const rowMarks = useMemo(() => makeRowMarks({ decisions: decisionsAll, liveIds: histLiveIds, threads: histAll, tasks: tasksAll, drafts: comingPosts, codeSessions: codeSessionsAll }), [decisionsAll, histLiveIds, histAll, tasksAll, comingPosts, codeSessionsAll]);
   // …and for the OPEN session's head (settle round, 2026-09-09). The same derivation the rail's
   // rows run, asked about the one session on screen — a task's thread id lives on TaskAllRow, not
   // on the TaskRow the panel holds, so it is resolved here rather than inside the head.
@@ -1819,8 +1838,8 @@ export function App() {
   // THIS room's session list, off the same `historyRows` the rail and the ⌘Y overlay read, plus
   // the legacy pass over the room's own messages (loose human messages that predate sessions).
   const roomSessions = useMemo(
-    () => historyRows({ threads: histInProj, tasks: scopedTasksAll, channelId: current?.id ?? null, channelSlug: current?.slug ?? '', query: '', messages: msgs }),
-    [histInProj, scopedTasksAll, current?.id, current?.slug, msgs],
+    () => historyRows({ threads: histInProj, tasks: scopedTasksAll, codeSessions: codeSessionsAll, channelId: current?.id ?? null, channelSlug: current?.slug ?? '', query: '', messages: msgs }),
+    [histInProj, scopedTasksAll, codeSessionsAll, current?.id, current?.slug, msgs],
   );
   // …and the briefs pinned above it: this room's agents are the roster the predicate resolves
   // against, so a message signed by nobody in this room yields no card (room-tabs.ts).
@@ -1913,7 +1932,6 @@ export function App() {
   }, [convSubject.id, convSubject.title]);
   // the conversation is the SHEET, not a tab (rail-ink round 3, 2026-09-04): it is never hidden
   // behind a guest, so the conversation-active flag, the peek and the unread count all retired
-  const engineeringContextOn = view === 'engineering' && !openTaskId && !openThreadId;
   // the dock draws the guests; a guest coming to the front unfolds it, the last one leaving folds it
   const dockGuests = dockTabs(wtabs), dockActive = dockActiveId(wtabs, wactive);
   const dockPrev = useRef({ active: dockActive, count: dockGuests.length });
@@ -1926,8 +1944,17 @@ export function App() {
   const wtab = wtabs.find((t) => t.id === wactive) ?? null;
   const wtabDoc = wtab ? wdocs[wtab.id] : null;
   /** what the ＋ flyout and the file pane are pointed at: the ACTIVE tab's worktree, else the conversation's */
+  const codingRepoRoot = (() => {
+    if (!openCodingThread || !openThreadId) return null;
+    const rows = meta.reposAll.length ? meta.reposAll : meta.repos;
+    const cs = codeSessionsAll.find((c) => c.thread_id === openThreadId || c.id === openThreadId);
+    const r = rows.find((x) => x.id === cs?.repo_id) ?? rows.find((x) => x.id === codingRepoPicks.get(openThreadId)) ?? repoForProject(rows, currentLive?.project_id ?? activeProject ?? null);
+    return r?.local_path ? { path: r.local_path, label: repoLabel(r) } : null;
+  })();
   const wscope: WScope = (() => {
     const localRepo = (meta.repos || []).find((r) => r.provider === 'local' && r.local_path);
+    // a coding thread's Workbench browses the thread's repository (coding threads, 0144)
+    if (codingRepoRoot) return { root: codingRepoRoot.path, label: codingRepoRoot.label, taskId: null, taskNumber: null, hasRepo: true };
     if (wtab && (wtab.readOnly || wtabDoc)) return { root: null, label: 'artifacts', taskId: wtabDoc?.taskId ?? openTask?.id ?? null, taskNumber: wtabDoc?.taskNumber ?? wtab.taskNumber ?? null, hasRepo: false };
     // a file tab's subtitle is its path INSIDE the root, so the pane names the root itself — a
     // pane headed "src/components/NavDrawer.tsx" would be labelling itself with its own selection
@@ -2254,6 +2281,7 @@ export function App() {
   // WHERE THIS SESSION RUNS (rule D9): the chip's choice for the next send, and the designation the
   // send writes — the choice, or the desktop default's Mac; Auto writes nothing and the ladder decides
   const [sessionMachine, setSessionMachine] = useState<string | null>(null);
+  const [sessionRepo, setSessionRepo] = useState<string | null>(null); // the repo chip's pick for the next send (0144): set, it births a coding thread
   const sessionOrigin = NM_PLATFORM === 'web' ? 'web' as const : 'desktop' as const;
   const selfMachineId = boot?.machineName ? roster.machines.find((m) => m.name === boot.machineName)?.id ?? null : null;
   const sessionDesignation = (chosen: string | null) => designationFor({ origin: sessionOrigin, chosen, prefs: parseComputePrefs(members.find((m) => m.user_id === meId)?.compute), selfMachineId });
@@ -2294,8 +2322,10 @@ export function App() {
       // …and where it runs, and which client bore it (0134) — birth-only, like the two above
       threadMachineId: thread ? null : sessionDesignation(sessionMachine),
       threadOrigin: thread ? null : sessionOrigin,
+      ...(!thread && sessionRepo ? { threadKind: 'coding' as const } : {}), // …and the kind (0144): a repository picked makes this a coding conversation
     });
-    setSessionMachine(null);
+    if (!thread && sessionRepo) setCodingRepoPicks((m) => new Map(m).set(threadId, sessionRepo));
+    setSessionMachine(null); setSessionRepo(null);
     openConversation(threadId); // …and land in the session you just started
     setNote(`✓ sent in ${Math.max(1, Math.round(performance.now() - t0))}ms · syncing to team`);
     setTimeout(() => setNote(''), 2500);
@@ -2440,7 +2470,9 @@ export function App() {
   // active project would leave every other project invisible — which is exactly what shipped in
   // v0.87.0 (one group, the active one). `histAll`/`tasksAll` are the unscoped sets; the tree's
   // own per-project channel filter is the only narrowing it gets.
-  const histTreeRows = useMemo(() => [...engineeringHistoryRows(engineeringNav.sessions), ...historyRows({ threads: histAll, tasks: tasksAll, channelId: null, channelSlug: '', query: '' })].sort((a, b) => b.when.localeCompare(a.when)), [engineeringNav.sessions, histAll, tasksAll]);
+  // a LEGACY Engineering session (its id names no thread) keeps its own row and its own floor; a
+  // coding thread (0144) is a threads row and rides historyRows like every other conversation
+  const histTreeRows = useMemo(() => historyRows({ threads: histAll, tasks: tasksAll, codeSessions: codeSessionsAll, channelId: null, channelSlug: '', query: '' }).sort((a, b) => b.when.localeCompare(a.when)), [histAll, tasksAll, codeSessionsAll]);
   const navList = useMemo(() => {
     const keyed = (pick: Set<string>) => new Set(histTreeRows.filter((r) => (r.task && pick.has(r.task.id)) || (r.threadId && pick.has(r.threadId))).map((r) => r.key));
     return navFlat({
@@ -2614,7 +2646,7 @@ export function App() {
       [<IconRepeat s={13} key="v-au" />, 'Scheduled · Routines', () => { setNav('home'); setView('automations'); }],
       [<IconCalendar s={13} key="v-ca" />, 'Content calendar', () => { setNav('home'); setView('calendar'); }],
       [<IconTrend s={13} key="v-mk" />, 'Marketing OS', () => { setNav('home'); setView('marketing'); }],
-      [<IconCode s={13} key="v-en" />, 'Code', () => { setNav('home'); setView('engineering'); }],
+      [<IconCode s={13} key="v-en" />, 'Code', () => setRailMode('code')],
       [<IconFootprint s={13} key="v-fp" />, "Agents' footprint", () => { setNav('home'); setView('footprint'); }],
       [<IconCredits s={13} key="v-cr" />, 'Credits', () => { setNav('home'); setView('credits'); }],
       [<IconHistory s={13} key="v-hi" />, 'History', () => setHistOpen(true)],
@@ -3163,7 +3195,7 @@ export function App() {
                     home (#391). The 2026-08-16 "always New chat" ruling was about the verb changing
                     under you per DESTINATION; a mode you switched on purpose is a state you can see. */}
                 <button type="button" className="navnewrow"
-                  onClick={() => { setFtMenuOpen(false); if (navMode === 'code') goConversation(() => { setNav('home'); setOpenTaskId(null); setOpenThreadId(null); setView('engineering'); engineeringNav.home(); }); else newChat(); }}
+                  onClick={() => { setFtMenuOpen(false); if (navMode === 'code') newChat({ repo: 'primary' }); else newChat(); }}
                   title={navMode === 'code' ? 'New session' : 'New chat — ⌘N'} aria-label={navMode === 'code' ? 'New session' : 'New chat'}>
                   <span className="nncico" aria-hidden>{navMode === 'code' ? <IconCode s={15} /> : <IconCompose s={15} />}</span>
                   <span className="navhomelbl">{navMode === 'code' ? 'New session' : 'New chat'}</span>
@@ -3230,7 +3262,7 @@ export function App() {
               marksOf={(r) => navBandsState.marksOf(r) ?? rowMarks(r)}
               onSettle={(threadId) => void settleThread(threadId)}
               collapsed={!!navSec.recents}
-              openId={view === 'engineering' ? engineeringNav.activeId : openTaskId ?? openThreadId}
+              openId={openTaskId ?? openThreadId}
               onToggle={() => toggleSec('recents')}
               onPickProject={(pid) => {
                 // the rail's scope chip is the SWITCHER too (2026-08-07's ruling, kept): picking a
@@ -3261,7 +3293,6 @@ export function App() {
               // doors (this rail, Home's session list, the ⌘Y overlay) simply never used it.
               onOpenThread={(id, channelId) => goConversation(() => openConversation(id, channelId))}
               onOpenTask={(id) => goConversation(() => setOpenTaskId(id))}
-              onOpenEngineering={(id) => goConversation(() => { setNav('home'); setOpenTaskId(null); setOpenThreadId(null); engineeringNav.open(id); setView('engineering'); })}
               onExpand={() => setHistOpen(true)}
               groups={navGroups.groups} onToggleFold={navGroups.toggleFold} onShowMore={navGroups.showMore} projectRooms={navGroups.projectRooms}
               view={navView} onView={setRailView}
@@ -3374,10 +3405,7 @@ export function App() {
             what stays here is the sheet's head row: a destination's own controls and the room's
             rail. The session below is the sheet's body, the Workbench its floating card. */}
         <SheetHead
-          context={engineeringContextOn ? <EngineeringWorkspaceHeader
-            session={engineeringNav.activeSession} sessionCount={engineeringNav.sessions.length}
-            tab={engineeringNav.workspaceTab} onTab={engineeringNav.setWorkspaceTab}
-            onHome={engineeringNav.home} onNew={engineeringNav.home} /> : null}
+          context={null}
           aux={(
             <>
               {/* THE BELL leads the rail (2026-08-16) — Home's needs-you queue, on chrome. Unlike
@@ -3473,7 +3501,7 @@ export function App() {
               <button role="menuitem" onClick={() => setHistOpen(true)}><IconHistory s={14} /><span className="navlabel">History</span>{roomUnseenThreads ? <span className="navitembadge">{roomUnseenThreads > 9 ? '9+' : roomUnseenThreads}</span> : null}</button>
               <div className="viewmenusep" />
               <button role="menuitem" onClick={() => { setViewMenuOpen(false); setNav('home'); setView('marketing'); }}><IconTrend s={14} /><span className="navlabel">Marketing OS</span></button>
-              <button role="menuitem" onClick={() => { setViewMenuOpen(false); setNav('home'); setView('engineering'); }}><IconCode s={14} /><span className="navlabel">Code</span></button>
+              <button role="menuitem" onClick={() => { setViewMenuOpen(false); setRailMode('code'); }}><IconCode s={14} /><span className="navlabel">Code</span></button>
               <button role="menuitem" onClick={() => { setViewMenuOpen(false); setNav('home'); setView('skills'); }}><IconSkill s={14} /><span className="navlabel">Skills</span></button>
               <button role="menuitem" onClick={() => { setViewMenuOpen(false); setNav('artifacts'); }}><IconLibrary s={14} /><span className="navlabel">Files</span></button>
               <button role="menuitem" onClick={() => { setViewMenuOpen(false); setNav('home'); setView('memory'); }}><IconMemory s={14} /><span className="navlabel">Memory</span></button>
@@ -3596,6 +3624,8 @@ export function App() {
             composeSignal={homeCompose}
             initialTarget={chatTarget}
             initialDraft={chatDraft}
+            repos={meta.reposAll.length ? meta.reposAll : meta.repos} initialRepo={chatRepo} onConnectRepo={() => setAddRepoOpen(true)}
+            onCodingBirth={(id, repoId) => setCodingRepoPicks((m) => new Map(m).set(id, repoId))}
             onSend={(channelId, text, opts) => {
               // the stage targets a room that may not be the "current" one — align them so the
               // conversation watch, history and the session surface all read the room addressed
@@ -3678,16 +3708,6 @@ export function App() {
               onOpenTask={(id) => goConversation(() => { setNav('home'); setView('dashboard'); setOpenTaskId(id); })} onAsk={openMarketingAsk} />
           </>
         )}
-        {view === 'engineering' && <EngineeringOS key={boot?.workspaceId ?? 'workspace'} workspaceId={boot?.workspaceId ?? 'workspace'}
-          repos={meta.reposAll.length ? meta.reposAll : meta.repos} projects={wsProjects} activeProjectId={activeProj?.id ?? null}
-          plan={plan} onUpgrade={openUpgrade} onProjectChange={setActiveProject}
-          onNewProject={(origin) => { setCreateProjectOrigin(origin); setCreateProjectOpen(true); }}
-          initialSessionId={engineeringNav.requestedId} homeRequest={engineeringNav.homeRequest}
-          defaultMachineId={sessionDesignation(null)}
-          machineChip={(value, onPick, disabled) => <MachineChip machines={roster.machines} members={members} selfUserId={meId} selfMachineName={boot?.machineName ?? null}
-            origin={sessionOrigin} value={value} onPick={onPick} cloud={computeState} disabled={disabled} />}
-          editorTab={engineeringNav.workspaceTab} onEditorTab={engineeringNav.setWorkspaceTab}
-          onSessionsChange={engineeringNav.setSessions} onActiveSessionChange={engineeringNav.syncActive} />}
         {view === 'whiteboards' && (
           <>
             <div className="topbar">Whiteboards<span className="desc">every board in the workspace — filter by project or room</span></div>
@@ -3930,7 +3950,7 @@ export function App() {
               placeholder={current
                 ? replyTo
                   ? `Reply — this starts a conversation in #${current.slug} · ↵ send`
-                  : `Describe the work for #${current.slug} — or just ask · @ mention · / skill · ↵ send`
+                  : sessionRepo ? 'Describe what to investigate or change in the repository · ↵ send' : `Describe the work for #${current.slug} — or just ask · @ mention · / skill · ↵ send`
                 : 'syncing…'}
             />
             {/* ONE control row inside the box: the two things you can add to a message, then the
@@ -3952,6 +3972,7 @@ export function App() {
               {/* WHERE this session will run (rule D9) — the composer's third knob */}
               <MachineChip machines={roster.machines} members={members} selfUserId={meId} selfMachineName={boot?.machineName ?? null}
                 origin={sessionOrigin} value={sessionMachine} onPick={setSessionMachine} cloud={computeState} />
+              {!replyTo && <RepoChip repos={meta.reposAll.length ? meta.reposAll : meta.repos} projectId={activeProj?.id ?? null} value={sessionRepo} onPick={setSessionRepo} onConnect={() => setAddRepoOpen(true)} />} {/* the fourth knob (0144): a repository makes the send a coding conversation */}
               {/* the SAME pill as the thread composer (George, 2026-07-31): a message sent here
                   becomes a conversation too, so the crew and the roles table read identically */}
               <BrainChip
@@ -3978,7 +3999,21 @@ export function App() {
           behind it to dim, and no slide, because this is a surface swap (§11). The moment a
           conversation's thread row links a task, the upgrade effect swaps this for the task
           surface below — one continuous place, upgraded in situ. */}
-      {openThreadId && !openTask && (
+      {openThreadId && !openTask && openCodingThread && (
+        <div className="sessionsurf" data-peek={peekTask2 ? '1' : undefined} data-dragging={peekDragging ? '1' : undefined} style={peekStyle}>
+          <div className="sscol">
+          <CodingThread threadId={openThreadId} thread={chanThreads.find((t) => t.id === openThreadId) ?? null} back={sessionBack} channelSlug={current?.slug ?? ''} channelId={current?.id ?? ''} onOpenTask={peekTask} wbOpen={wbCardOn} onToggleWorkbench={toggleWorkbench} machineName={boot?.machineName ?? null}
+            railSlot={wpane ? wbSlot : null} onWorkbench={() => openWPane(true)}
+            crumbProject={(() => { const p = wsProjects.find((x) => x.id === (currentLive?.project_id ?? activeProject)); return p ? { name: p.name, logo_url: p.logo_url } : null; })()}
+            repos={meta.reposAll.length ? meta.reposAll : meta.repos} projects={wsProjects} projectId={currentLive?.project_id ?? activeProject ?? null} workspaceId={boot?.workspaceId ?? 'workspace'}
+            codeSession={codeSessionsAll.find((c) => c.thread_id === openThreadId || c.id === openThreadId) ?? null} pickedRepoId={codingRepoPicks.get(openThreadId) ?? null} marks={headMarks}
+            machineChip={(value, onPick, disabled) => <MachineChip machines={roster.machines} members={members} selfUserId={meId} selfMachineName={boot?.machineName ?? null} origin={sessionOrigin} value={value} onPick={onPick} cloud={computeState} disabled={disabled} />}
+            defaultMachineId={sessionDesignation(null)} plan={plan} onUpgrade={openUpgrade} onClose={closeConvo} agents={roster.agents} />
+          </div>
+          {peekNode}
+        </div>
+      )}
+      {openThreadId && !openTask && !openCodingThread && (
         <div className="sessionsurf" data-peek={peekTask2 ? '1' : undefined} data-dragging={peekDragging ? '1' : undefined} style={peekStyle}>
           <div className="sscol">
           <ConvoThread
@@ -4121,15 +4156,15 @@ export function App() {
             it held on the frame is the side dock's now. HIDDEN on a destination (2026-08-19) — see
             `workbenchApplies`: `wpane` is the human's preference and a destination does not edit it. */}
         {wbCardOn && (
-          <WorkbenchDock variant="card" width={wbW} min={WB_W_MIN} max={WB_W_MAX} mirrored={false} dragging={wbDragging}
+          <WorkbenchDock variant="card" full={wbFull} width={wbW} min={WB_W_MIN} max={WB_W_MAX} mirrored={false} dragging={wbDragging}
             onWidth={setWbWPersist} onReset={() => setWbWPersist(WB_W_DEFAULT)} onDragging={setWbDragging}>
             {/* a doorway, never a viewer: a file clicked in the drawer opens a TAB in the side dock */}
           <Workbench
             scope={wscope} activePath={wactivePath} dirtyPaths={wdirtyPaths} findSeq={wfind}
-            scopeLabel={wb.scopeLabel} files={wb.files}
+            scopeLabel={wb.scopeLabel} files={openCodingThread ? null : wb.files} headless={openCodingThread} /* a coding thread's Files is the code face's tab, and its tabs are the card's top row (George, 2026-09-26) */
             slotRef={setWbSlot}
-            onOpenFile={openFileTab}
-            onClose={() => openWPane(false)} />
+            onOpenFile={openFileTab} full={wbFull} onFull={() => setWbFull((v) => !v)}
+            onClose={() => { openWPane(false); setWbFull(false); }} />
           </WorkbenchDock>
         )}
         </div>

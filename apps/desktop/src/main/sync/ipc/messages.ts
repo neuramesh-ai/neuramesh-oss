@@ -29,17 +29,17 @@ export function registerMessageIpc(deps: {
     watchers.delete(subId);
   });
 
-  ipcMain.handle('nm:send', async (_e, { channelId, body, id: givenId, attachments, threadId, rootMessageId, threadMode, brainOverride, threadMachineId, threadOrigin }: { channelId: string; body: string; id?: string; attachments?: Array<{ id: string; name: string; mime: string }>; threadId?: string; rootMessageId?: string; threadMode?: 'tasks' | 'chat'; brainOverride?: Record<string, string> | null; threadMachineId?: string | null; threadOrigin?: 'desktop' | 'web' | 'routine' | null }) => {
+  ipcMain.handle('nm:send', async (_e, { channelId, body, id: givenId, attachments, threadId, rootMessageId, threadMode, brainOverride, threadMachineId, threadOrigin, threadKind }: { channelId: string; body: string; id?: string; attachments?: Array<{ id: string; name: string; mime: string }>; threadId?: string; rootMessageId?: string; threadMode?: 'tasks' | 'chat'; brainOverride?: Record<string, string> | null; threadMachineId?: string | null; threadOrigin?: 'desktop' | 'web' | 'routine' | null; threadKind?: 'chat' | 'coding' }) => {
     const id = givenId ?? randomUUID();
     // threads stay server-born (the message upload births the row; it syncs back down) —
     // the client only stamps the id, so offline sends still group correctly on arrival
     await db().execute(
-      `insert into messages (id, workspace_id, channel_id, thread_id, root_message_id, birth_mode, birth_brain, birth_machine, birth_origin, author_kind, author_id, body, created_at)
-       values (?, ?, ?, ?, ?, ?, ?, ?, ?, 'human', ?, ?, ?)`,
+      `insert into messages (id, workspace_id, channel_id, thread_id, root_message_id, birth_mode, birth_brain, birth_machine, birth_origin, author_kind, author_id, body, created_at, birth_kind)
+       values (?, ?, ?, ?, ?, ?, ?, ?, ?, 'human', ?, ?, ?, ?)`,
       [id, ws(), channelId, threadId ?? null, rootMessageId ?? null, threadMode ?? null,
        brainOverride && Object.keys(brainOverride).length ? JSON.stringify(brainOverride) : null,
        threadMachineId ?? null, threadOrigin ?? null,
-       actorId(), body, new Date().toISOString()],
+       actorId(), body, new Date().toISOString(), threadKind ?? null],
     );
     if (attachments?.length) await insertAttachments(id, channelId, null, attachments);
     return { id };

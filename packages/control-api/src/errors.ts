@@ -15,6 +15,8 @@ export type DomainErrorCode =
   | 'TASK_THREAD'
   // titled-once (0124): the conversation is already named — an agent asked to rename it; only a human may
   | 'THREAD_ALREADY_TITLED'
+  // coding threads (0144): thread.set_kind → coding on a project with no repository to work on
+  | 'REPO_REQUIRED'
   // auto-filing (0109, packages/shared/filing.ts). SAME_CHANNEL is not a failure so much as an
   // answer — rex reads it to tell "already in the right room" from "moved"; PROJECT_BOUNDARY is
   // the invariant that a conversation never leaves the project that can see it.
@@ -76,6 +78,8 @@ const STATUS: Record<DomainErrorCode, number> = {
   TASK_THREAD: 409,
   // 409 — the name is already set; the state is what it is, and only a human moves it
   THREAD_ALREADY_TITLED: 409,
+  // 422 — clears once a repository is connected; the caller retries on that change
+  REPO_REQUIRED: 422,
   // 409 — the move would be a no-op, or has already happened once. Both are "the state is
   // already what you are asking for", which is what 409 says.
   SAME_CHANNEL: 409,

@@ -24,7 +24,7 @@ serve() {
 t0=$(date +%s); say() { echo "[final $(( $(date +%s) - t0 ))s load $(sysctl -n vm.loadavg | awk '{print $2}')] $*"; }
 for r in $(seq 1 $ROUNDS); do
   for side in before after; do
-    if [[ $side == before ]]; then serve $BEFORE --cache vercel; else serve $AFTER --cache vercel --vercel-json $WT/apps/desktop/vercel.json; fi
+    if [[ $side == before ]]; then serve $BEFORE --cache vercel; else serve $AFTER --cache vercel --vercel-json $WT/apps/hq/vercel.json; fi
     say "round $r $side: $(curl -sI http://127.0.0.1:5341/assets/$(ls $([[ $side == before ]] && echo $BEFORE || echo $AFTER)/assets | grep '^index-.*\.js$' | head -1) | grep -i cache-control | tr -d '\r')"
     for p in broadband fast4g; do
       say "round $r $side load $p"

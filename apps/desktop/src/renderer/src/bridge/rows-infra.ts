@@ -18,13 +18,14 @@ export interface ProviderStatus {
   method: 'subscription' | 'apikey' | null;
 }
 
-// auto-update lifecycle the update card reflects (mirrors main/update.ts + preload)
-export type UpdateState =
+// auto-update lifecycle the update card reflects (mirrors main/update.ts + preload). `floor`
+// (docs/46 rule 3): the Cloud connection's minDesktopVersion, set only while this app is below it.
+export type UpdateState = { floor?: string } & (
   | { phase: 'idle' }
   | { phase: 'available'; version: string; notes: string | null }
   | { phase: 'downloading'; version: string; percent: number }
   | { phase: 'ready'; version: string }
-  | { phase: 'error'; message: string };
+  | { phase: 'error'; message: string });
 
 /** A conversation the human filed away (0108) — read ONLY by Settings › Archived chats. */
 export interface ArchivedThreadRow {

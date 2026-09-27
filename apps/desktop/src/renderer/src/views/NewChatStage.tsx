@@ -6,17 +6,18 @@ import { ComposerInput } from '../composer/ComposerInput';
 import { ConnectorMarks } from '../composer/ConnectorMarks';
 import { HomeLedger, type HomeLedgerProps } from './HomeLedger';
 import { HomeWatermark } from '../brand';
-import { IconClose, IconGrid, IconSend, IconSkill } from '../ui/icons';
+import { IconClose, IconCode, IconGrid, IconSend, IconSkill } from '../ui/icons';
+import { RepoChip, repoLabel } from '../composer/RepoChip'; import { repoForProject } from './EngineeringOS';
 import { MentionButton, filesFromPaste, type ComposerPerson } from '../thread/parts';
 
-import { agentInChannel, type BrainOverride, type Provider, type SessionOrigin, type ThreadMode } from '@neuramesh/shared';
+import { agentInChannel, type BrainOverride, type Provider, type SessionOrigin, type ThreadKind, type ThreadMode } from '@neuramesh/shared';
 import { errMsg } from '../lib/text';
 import { flashToast } from '../lib/toast';
 import { readBrainDraft } from '../brain/draft';
 import { type AgentRow } from '../bridge/rows-crew';
 import { type ChannelRow } from '../bridge/rows-rooms';
 import { type SkillPackRow, type SkillRow } from '../bridge/rows-content';
-import { type WorkspaceProjectRow } from '../bridge/rows-board';
+import { type RepoUI, type WorkspaceProjectRow } from '../bridge/rows-board';
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { handOffStaticShell, staticDraft, writeShellFacts } from '../lib/staticshell';
 import { CapGate } from '../compute/CapGate';
@@ -67,7 +68,7 @@ const SUGGESTIONS = ['Give me ideas', 'What moved while I was away?', 'Plan the 
 // (the report line George deleted from Home was exactly that mistake). The project name inside it
 // IS the project switcher — the chips-row pill, promoted into the sentence: one control, one
 // fact. Picking it moves the active project so the tree follows, and retargets the room chip.
-export function NewChatStage({ agents, projects, activeProjectId, channels, defaultChannelId, people, skills, packs, plan, greeting, composeSignal, initialTarget, initialDraft, topSections, onSend, onOpenThread, onPickProject, onNewProject, onAllProjects, onBrainConnect, onSetProjectPack, onUpgrade, onSeeUsage, machineChip, sessionBirth, ledger, hostedGate }: {
+export function NewChatStage({ agents, projects, activeProjectId, channels, defaultChannelId, people, skills, packs, plan, greeting, composeSignal, initialTarget, initialDraft, topSections, onSend, onOpenThread, onPickProject, onNewProject, onAllProjects, onBrainConnect, onSetProjectPack, onUpgrade, onSeeUsage, machineChip, sessionBirth, ledger, hostedGate , repos = [], initialRepo = null, onConnectRepo, onCodingBirth }: {
   agents: AgentRow[];
   projects: WorkspaceProjectRow[];
   activeProjectId: string;
@@ -87,7 +88,7 @@ export function NewChatStage({ agents, projects, activeProjectId, channels, defa
   /** a pre-written ask the next focus signal drops into the composer (a playbook pill is a
    * PRE-DRAFTED MESSAGE, never a command — the human still sends). null leaves the draft alone */
   initialDraft?: string | null;
-  onSend: (channelId: string, text: string, opts: { id?: string; attachments?: { id: string; name: string; mime: string }[]; threadId: string; rootMessageId?: string; threadMode?: ThreadMode; brainOverride?: BrainOverride | null; threadMachineId?: string | null; threadOrigin?: SessionOrigin | null }) => Promise<unknown>;
+  onSend: (channelId: string, text: string, opts: { id?: string; attachments?: { id: string; name: string; mime: string }[]; threadId: string; rootMessageId?: string; threadMode?: ThreadMode; brainOverride?: BrainOverride | null; threadMachineId?: string | null; threadOrigin?: SessionOrigin | null; threadKind?: ThreadKind }) => Promise<unknown>;
   /** WHERE this session runs (rule D9): the shell draws the chip (it owns the fleet) and says what the birth message writes — `threads.machine_id` + `threads.origin` (0134) */
   machineChip?: (value: string | null, onPick: (machineId: string | null) => void) => ReactNode;
   sessionBirth?: (chosen: string | null) => { threadMachineId: string | null; threadOrigin: SessionOrigin };
@@ -103,6 +104,8 @@ export function NewChatStage({ agents, projects, activeProjectId, channels, defa
   /** the thread list under the composer (docs/design/home-threads-2026-09) — the shell hands over the
    * same rows and marks the rail, the bell and ⌘Y read; absent on a client that has no history yet */
   ledger?: HomeLedgerProps;
+  /** the repo chip (coding threads, 0144 — door 1): the repositories, the pick a door pre-sets ('primary' = the room's primary repo, the Code rail's New session), the connect door, and the birth the shell remembers */
+  repos?: RepoUI[]; initialRepo?: string | null; onConnectRepo?: () => void; onCodingBirth?: (threadId: string, repoId: string) => void;
 }) {
   // no machine can run, so the stage shows WHY instead of a composer that cannot deliver
   const capped = useCompute(true)?.status === 'capped';
@@ -118,10 +121,12 @@ export function NewChatStage({ agents, projects, activeProjectId, channels, defa
     if (!composeSignal) return;
     setTarget(initialTarget ?? null);
     if (initialDraft != null) setDraft(initialDraft);
+    setRepo(initialRepo === 'primary' ? repoForProject(repos, channels.find((c) => c.id === (initialTarget ?? defaultChannelId))?.project_id ?? null)?.id ?? null : initialRepo ?? null); // the Code rail's New session pre-sets the repo chip to the room's primary repository (door 1)
   }, [composeSignal]); // eslint-disable-line react-hooks/exhaustive-deps
   const [chanPop, setChanPop] = useState(false);
   const [projPop, setProjPop] = useState(false);
   const [machine, setMachine] = useState<string | null>(null); // the chip's choice for the NEXT send; null = Auto
+  const [repo, setRepo] = useState<string | null>(null); // the repo chip's pick (0144): set, the send births a CODING thread
   const [attachedSkill, setAttachedSkill] = useState<{ name: string; pack?: string | null } | null>(null);
   const [cmention, setCmention] = useState(0); // nonce → the @ button types "@" + opens the picker
   const [hfocus, setHfocus] = useState(0); // nonce → focuses the composer (the hint's @name insert)
@@ -140,11 +145,9 @@ export function NewChatStage({ agents, projects, activeProjectId, channels, defa
       // this message IS the thread's root (docs/31): the server births + names the thread on it,
       // and the docs/34 mode + the pill's brain draft ride the birth message — this send BIRTHS
       // the conversation, so what the pill was showing is what the conversation starts on
-      await onSend(targetChan.id, marker + consumeWbAttach(text), { id: msgId, attachments: attSpecs, threadId, rootMessageId: msgId, brainOverride: readBrainDraft(), ...sessionBirth?.(machine) });
-      setDraft('');
-      setMachine(null);
-      setAttachedSkill(null);
-      atts.reset();
+      await onSend(targetChan.id, marker + consumeWbAttach(text), { id: msgId, attachments: attSpecs, threadId, rootMessageId: msgId, brainOverride: readBrainDraft(), ...sessionBirth?.(machine), ...(repo ? { threadKind: 'coding' as const } : {}) });
+      if (repo) onCodingBirth?.(threadId, repo);
+      setDraft(''); setMachine(null); setRepo(null); setAttachedSkill(null); atts.reset();
       // the send animates into its thread — the TARGET room rides along (docs/32)
       onOpenThread(threadId, targetChan.id);
     } catch (e) { flashToast(errMsg(e)); }
@@ -211,6 +214,8 @@ export function NewChatStage({ agents, projects, activeProjectId, channels, defa
         <div className="hcomposer cbox stagebox" ref={boxRef}>
           {(() => {
             // the stage lands in ONE room (the chip), so it introduces THAT room's orchestrator
+            // a repository picked: the cap names THAT consequence (docs/34 §7) — the coding runtime, not the orchestrator
+            if (repo) return <div className="chint coding"><span className="chintcode" aria-hidden><IconCode s={13} /></span><span>This conversation works on <b>{(() => { const picked = repos.find((x) => x.id === repo); return picked ? repoLabel(picked) : 'the repository'; })()}</b>. Reads run freely. Every edit and every command asks you first.</span></div>;
             const lead = leadFor(agents, targetChan?.id);
             if (!lead) return null;
             return <ComposerHint lead={lead} onInsert={(nm2) => {
@@ -237,7 +242,7 @@ export function NewChatStage({ agents, projects, activeProjectId, channels, defa
             onClearSkill={() => setAttachedSkill(null)}
             onOpenSkills={() => {}}
             onPaste={(e) => { const fs = filesFromPaste(e); if (fs.length) { e.preventDefault(); atts.addFiles(fs); } }}
-            placeholder={'Describe the work, or just ask. Use @ to mention an agent or a user, and / for skills.'}
+            placeholder={repo ? 'Describe what to investigate or change in the repository.' : 'Describe the work, or just ask. Use @ to mention an agent or a user, and / for skills.'}
             mentionSignal={cmention}
             focusSignal={hfocus}
           />
@@ -262,6 +267,7 @@ export function NewChatStage({ agents, projects, activeProjectId, channels, defa
               </button>
             </span>
             {machineChip?.(machine, setMachine)}
+            <RepoChip repos={repos} projectId={targetChan?.project_id ?? null} value={repo} onPick={setRepo} onConnect={onConnectRepo} /> {/* the fourth knob (0144): a repository makes the send a coding conversation */}
             {(() => {
               // the SAME pill as the thread composer (docs/10 §15) — one switcher, every surface
               return <BrainChip

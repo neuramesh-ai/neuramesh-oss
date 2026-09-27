@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { stripMarkdownInline, threadTitle } from '../src/threads';
+import { isCodingThread, kindMarker, parseKindMarker, stripMarkdownInline, threadKindOf, threadTitle } from '../src/threads';
+import { codeThreadStatus } from '../src/code-sessions';
 import { plainTitle } from '../src/sessions';
 
 describe('threadTitle', () => {
@@ -53,5 +54,28 @@ describe('titles are plain text (2026-09-12)', () => {
     expect(plainTitle('**Routine — hey rex, can we do s')).toBe('Routine — hey rex, can we do s');
     expect(plainTitle('rename `nm_worker` to snake_case_name')).toBe('rename nm_worker to snake_case_name');
     expect(stripMarkdownInline('~~old~~ __bold__ _soft_')).toBe('old bold soft');
+  });
+});
+
+describe('the thread KIND (0144, coding threads)', () => {
+  it('absent, unknown and legacy read as chat; only the word coding is coding', () => {
+    expect(threadKindOf(undefined)).toBe('chat');
+    expect(threadKindOf(null)).toBe('chat');
+    expect(threadKindOf('review')).toBe('chat');
+    expect(threadKindOf('coding')).toBe('coding');
+    expect(isCodingThread('coding')).toBe(true);
+    expect(isCodingThread('chat')).toBe(false);
+  });
+  it('the kind marker is a whole-body divider, like the mode marker', () => {
+    expect(kindMarker('coding')).toBe('‹kind:coding›');
+    expect(parseKindMarker(' ‹kind:coding› ')).toBe('coding');
+    expect(parseKindMarker('‹kind:chat›')).toBe('chat');
+    expect(parseKindMarker('rex: ‹kind:coding›')).toBeNull();
+    expect(parseKindMarker('‹mode:tasks›')).toBeNull();
+  });
+  it('a coding thread\'s status word comes from its session state', () => {
+    expect(codeThreadStatus('awaiting_approval')).toBe('needs_you');
+    expect(codeThreadStatus('streaming')).toBe('in_progress');
+    for (const s of ['idle', 'resumable', 'completed', 'error', null, undefined]) expect(codeThreadStatus(s)).toBe('settled');
   });
 });

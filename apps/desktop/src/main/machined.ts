@@ -33,9 +33,9 @@ import {
 import { executing, startAgentHost } from './agents';
 import { machineRuntimes, workspaceKeyProbe } from './runtime/localruntimes';
 import { initAgentLog } from './agentlog';
-import { AppSchema } from './sync/schema';
-import { uploadCrudEntry, type UploadIdentity } from './sync/upload';
-import { adoptIdentity, bootstrapEnvOf, readConfig, type MachinedConfig } from './machined-config';
+import { AppSchema } from '@neuramesh/client-core/schema';
+import { uploadCrudEntry, type UploadIdentity } from '@neuramesh/client-core/crud-upload';
+import { adoptIdentity, bootstrapEnvOf, heartbeatBody, imageShaOf, readConfig, type MachinedConfig } from './machined-config';
 import { bootstrapIdentity } from './machined-bootstrap';
 import { machineSyncCredentials } from './machined-credentials';
 import { connectMachineEdge } from './relay/machine-edge';
@@ -57,7 +57,7 @@ class MachineConnector implements PowerSyncBackendConnector {
     return credentials;
   }
 
-  // the same shared uploader the desktop Connector runs (sync/upload.ts — full table
+  // the same shared uploader the desktop Connector runs (client-core's crud-upload.ts — full table
   // coverage, per-table error policy), authenticated with the machine bearer; the actor
   // header carries authorship. tables the uploader doesn't know still throw loudly here:
   // better a visible wedge than a silently dropped write.
@@ -98,7 +98,9 @@ async function resolveConfig(): Promise<MachinedConfig> {
 export async function main(): Promise<void> {
   const cfg = await resolveConfig();
   const checkOnly = process.argv.includes('--check');
-  console.log(`[machined] boot machine=${cfg.machineId} kind=${cfg.kind} workspace=${cfg.workspaceId}`);
+  // the build this machine runs, as the image recorded it; it rides every beat (below)
+  const imageSha = imageShaOf(process.env);
+  console.log(`[machined] boot machine=${cfg.machineId} kind=${cfg.kind} workspace=${cfg.workspaceId} image=${imageSha ?? 'unknown'}`);
 
   for (const dir of [cfg.stateDir, join(cfg.stateDir, 'logs'), process.env['NM_HOME'] ?? '/nm/home', process.env['NM_CACHE'] ?? '/nm/cache']) {
     mkdirSync(dir, { recursive: true });
@@ -168,7 +170,7 @@ export async function main(): Promise<void> {
     fetch(`${cfg.apiUrl}/v1/commands`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${cfg.machineToken}` },
-      body: JSON.stringify({ type: 'machine.heartbeat', machineId: cfg.machineId, activeSeconds: report, busy: busyNow(), ...(withRuntimes ? { runtimes } : {}) }),
+      body: JSON.stringify(heartbeatBody(cfg.machineId, { activeSeconds: report, busy: busyNow(), ...(withRuntimes ? { runtimes } : {}), imageSha })),
     }).catch(() => {});
   }, 30_000);
 

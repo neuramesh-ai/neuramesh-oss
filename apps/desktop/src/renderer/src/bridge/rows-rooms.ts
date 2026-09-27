@@ -87,6 +87,8 @@ export interface ThreadRow {
   brain_override?: string | null;
   /** 0119: the automation that opened this thread (the header's routine chip) */
   schedule_id?: string | null;
+  /** 0144: `coding` = the coding runtime works on a repository in this thread (the code face) */
+  kind?: string | null;
   created_at: string;
   updated_at: string;
   msg_count?: number;
@@ -124,8 +126,32 @@ export interface HistoryThreadRow {
   last_body?: string | null;
   /** 0119: set = a scheduled automation opened this thread — the rows wear the routine marker */
   schedule_id?: string | null;
+  /** 0144: `coding` — the row wears the prompt glyph and its session's facts */
+  kind?: string | null;
   /** the status inputs (shared/threadstatus.ts, 0137): the settle stamp, who spoke last and when */
   settled_at?: string | null;
   last_author_kind?: string | null;
   last_at?: string | null;
+}
+
+/** a Code session's synced row (0135 + 0144) as the rail, Home and the ⌘Y overlay read it: the
+ *  coding thread it belongs to (`thread_id`, null on a legacy session), the repo, the mode, the state */
+export interface CodeSessionRow {
+  id: string;
+  thread_id: string | null;
+  project_id: string | null;
+  repo_id: string | null;
+  repo_name: string;
+  branch: string;
+  title: string;
+  mode: string;
+  state: string;
+  machine_id: string | null;
+  created_by: string;
+  last_line: string;
+  changes_count: number;
+  checkpoints_count: number;
+  created_at: string;
+  updated_at: string;
+  ended_at: string | null;
 }

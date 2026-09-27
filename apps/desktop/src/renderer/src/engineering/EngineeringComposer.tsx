@@ -25,7 +25,7 @@ const permissionSummary = (session: EngineeringSession) => {
   return names.length ? `Prefer auto: ${names.join(', ')}` : 'Ask before every action';
 };
 
-function PermissionsMenu({ session, onChange, onClose }: {
+export function PermissionsMenu({ session, onChange, onClose }: {
   session: EngineeringSession; onChange: (category: PermissionCategory, value: boolean) => void; onClose: () => void;
 }) {
   useEffect(() => {

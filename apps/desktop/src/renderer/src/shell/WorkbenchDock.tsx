@@ -12,7 +12,7 @@
 // shell's `row-reverse`, so only its drag direction inverts.
 import type { ReactNode } from 'react';
 
-export function WorkbenchDock({ width, min, max, mirrored, dragging, onWidth, onReset, onDragging, children, variant = 'card' }: {
+export function WorkbenchDock({ width, min, max, mirrored, dragging, onWidth, onReset, onDragging, children, variant = 'card', full = false }: {
   width: number;
   min: number;
   max: number;
@@ -25,6 +25,8 @@ export function WorkbenchDock({ width, min, max, mirrored, dragging, onWidth, on
   children: ReactNode;
   /** the Workbench card inside the sheet (`--nm-panew`), or the side dock on the frame (`--nm-dockw`) */
   variant?: 'card' | 'side';
+  /** the card fills the sheet and the session beside it folds away (George, 2026-09-26) */
+  full?: boolean;
 }) {
   const side = variant === 'side';
   const dir = side && mirrored ? 1 : -1;
@@ -66,7 +68,7 @@ export function WorkbenchDock({ width, min, max, mirrored, dragging, onWidth, on
         <span className="wbgripbar" aria-hidden />
         {dragging && <span className="wbgripout" aria-hidden>{width}px</span>}
       </div>
-      <div className={side ? 'sidedock' : 'wbdock'} data-dragging={dragging ? '1' : undefined} style={{ [side ? '--nm-dockw' : '--nm-panew']: `${width}px` } as React.CSSProperties}>
+      <div className={side ? 'sidedock' : full ? 'wbdock full' : 'wbdock'} data-dragging={dragging ? '1' : undefined} style={{ [side ? '--nm-dockw' : '--nm-panew']: `${width}px` } as React.CSSProperties}>
         {children}
       </div>
     </>

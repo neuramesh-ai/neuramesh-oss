@@ -92,7 +92,10 @@ test('powers and style match their pinned size', () => {
   // HUMAN'S WORD, NEVER A BUTTON. GATES now names accept_task and the server's proof it rides on
   // (a human message newer than the verdict, in the thread), and the style rules stop calling
   // accept a button — and stop offering the word as a follow-up pill, which would be one again.
-  assert.equal(c.prompt!['powers']!.length, 4381);
+  // 4381 → 4612 (2026-09-26, coding threads 0144, ruling 1): the ladder gains its fourth rung — a request
+  // that wants hands on the project's repository now goes to open_code_session, and the board's bar
+  // becomes rung 5. The contract's decision tree grew one branch; nothing else moved.
+  assert.equal(c.prompt!['powers']!.length, 4612);
   assert.equal(c.prompt!['style']!.length, 1430);
 });
 
@@ -105,6 +108,8 @@ test('the contract makes solving in-thread the default, and filing a proposal', 
   // (2026-08-18: the plan-first law lives in the channel tree; the ladder stays in powers)
   assert.match(channel, /born in plan_review, inert until they approve/);
   assert.match(powers, /create_task, directly/);
+  // the code door (0144): hands on the repo now → open_code_session, one rung above the board's bar
+  assert.match(powers, /open_code_session/);
   // the bar is named, so "this feels big" cannot quietly become a task
   assert.match(powers, /they asked for tracked work/);
   assert.match(powers, /OUTLIVE this conversation/);

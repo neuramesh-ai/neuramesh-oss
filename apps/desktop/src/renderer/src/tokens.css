@@ -4195,6 +4195,8 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 .updatecard-title { font-size: 12.5px; font-weight: 600; color: var(--text); line-height: 1.3; }
 .updatecard-sub { font-size: 11px; color: var(--muted); line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .updatecard-bar { height: 3px; border-radius: 99px; background: var(--border); overflow: hidden; margin-top: 5px; }
+/* docs/46: the app is below the floor the Cloud connection names. one line that wraps, in body ink. */
+.updatecard-floor { font-size: 11px; color: var(--body); line-height: 1.35; margin-top: 4px; }
 .updatecard-bar i { display: block; height: 100%; border-radius: 99px; background: var(--text); transition: width var(--dur) var(--ease); }
 .updatecard-go { flex: none; display: grid; place-items: center; color: var(--dim); transition: color var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease); }
 .updatecard-main:hover:not(:disabled) .updatecard-go { color: var(--text); transform: translateX(2px); }
@@ -6489,6 +6491,73 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 .hfoot { font: 500 10.5px var(--fmono); color: var(--dim); text-align: center; margin-top: auto; padding-top: 22px; background: none; border: none; cursor: pointer; }
 /* an in-flight chat conversation's row chip — neutral: a convo has no board state */
 .chip.c-chat { background: var(--panel3); color: var(--muted); border: 1px solid var(--border2); }
+/* THE CODING THREAD (0144, views/CodingThread.tsx): the one session surface wearing the code face — the
+   Engineering conversation and editor in the sheet's body under the thread head; the editor column
+   carries the tab strip the Code floor kept in the sheet head. */
+/* ── THE CODING THREAD (0144, docs/design/coding-threads-2026-09 §5, Thread.dc.html): the one session surface wearing the code face ── */
+.threadpanel.codingthread { display: flex; flex-direction: column; min-height: 0; }
+.codingthread .codinghead { padding: 0 22px 10px; border-bottom: 1px solid var(--border); }
+.codingthread .sssub { display: flex; align-items: center; gap: 6px; margin-top: 2px; color: var(--muted); font: 500 10.5px var(--fmono); min-width: 0; }
+.codingthread .sssub svg { opacity: .8; flex: none; }
+.codingthread .sssublink { background: none; border: 0; padding: 0; color: var(--link); font: inherit; cursor: pointer; }
+.codingthread .sssublink:hover { text-decoration: underline; }
+.codingthread .codingnotice { margin: 8px 22px 0; }
+/* the transcript is ground; the human keeps the hairline bubble; the runtime's rows fold under one Engineering voice */
+.codingthread .convomsgs .msg .av.eng { display: grid; place-items: center; width: 26px; height: 26px; min-width: 26px; border-radius: var(--r-sm); color: var(--muted); background: var(--panel3); box-shadow: inset 0 0 0 1px var(--border2); }
+.codingthread .think { display: flex; align-items: center; gap: 8px; padding: 2px 0 4px; color: var(--muted); font-size: 12px; }
+.codingthread .think .tw { width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid var(--border2); display: grid; place-items: center; color: var(--dim); flex: none; }
+.codingthread .think.live .tw { border: none; }
+.codingthread .receipts { display: flex; flex-direction: column; gap: 1px; margin: 2px 0 8px; }
+.codingthread .receipt { display: flex; align-items: center; gap: 8px; padding: 3px 8px; margin-left: -8px; border-radius: var(--r-sm); color: var(--muted); font-size: 11.5px; min-width: 0; }
+.codingthread .receipt > span:nth-child(2) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.codingthread .receipt code { font: 500 11px var(--fmono); color: var(--body); background: var(--panel2); padding: 1px 5px; border-radius: 3px; }
+.codingthread .receipt .ok { color: var(--done); display: inline-flex; }
+.codingthread .receipt .wait { color: var(--warn); display: inline-flex; }
+.codingthread .receipt .rl { margin-left: auto; font: 500 10px var(--fmono); color: var(--dim); }
+.codingthread .unitline { padding: 2px 10px 6px; }
+.codingthread .convomsgs .msg .av.quiet { display: grid; place-items: center; width: 26px; height: 26px; min-width: 26px; border-radius: var(--r-sm); color: var(--dim); background: transparent; box-shadow: inset 0 0 0 1px var(--border); }
+/* the ONE gate card docked above the composer (docs/25): the approval card, the Act handoff, or the valve */
+.codingthread .gateseat { padding: 0 12px; width: 100%; max-width: var(--col); margin: 0 auto; flex: none; }
+.codingthread .gateseat > .engapproval, .codingthread .gateseat > .engmodegate { margin: 8px 0 2px; }
+.codingthread .gateseat > .hgate.coding { margin: 8px 0 2px; }
+.codingthread .engapproval .paths { display: flex; flex-direction: column; gap: 3px; margin: 0 11px 8px 45px; }
+.codingthread .engapproval .paths span { font: 500 10.5px var(--fmono); color: var(--body); display: flex; gap: 8px; }
+.codingthread .engapproval .paths i { font-style: normal; color: var(--done); }
+/* the one composer wearing the two coding knobs; the row WRAPS: the knobs and Send stack on a second row and the box grows (George, 2026-09-26) */
+.codingthread .codingbox .trow { flex-wrap: wrap; gap: 6px 9px; align-items: center; }
+.codingthread .codingbox .trow > * { flex: none; min-width: 0; }
+.codingthread .codingbox .codingknobs { display: flex; align-items: center; gap: 9px; margin-left: auto; flex: none; }
+.codingthread .codingbox .codingseg { flex: none; }
+.codingthread .codingbox .codingperm { position: relative; }
+.codingthread .codingbox .engpermtrigger .lbl { white-space: nowrap; max-width: 220px; }
+.codingthread .codingbox .trow .tsend { margin-left: 0; }
+.codingthread .cbox.codingbox.waiting { padding-bottom: 12px; }
+/* the code face in the Workbench card (George, 2026-09-26): the tabs over the editor's pane, the branch in the foot; the card's own Files drawer is the one file tree */
+.wbslot .codeface { display: flex; flex-direction: column; min-height: 0; height: min(64vh, 680px); }
+.wbslot .codeface .codefacetabs { height: 36px; flex: none; display: flex; align-items: stretch; border-bottom: 1px solid var(--border); }
+.wbslot .codeface .codefacescroll { flex: 1; min-width: 0; height: 100%; display: flex; align-items: flex-end; gap: 1px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; padding: 0 6px; }
+.wbslot .codeface .codefacescroll::-webkit-scrollbar { width: 0; height: 0; }
+.wbslot .codeface .codefacegutter { flex: none; width: 58px; border-left: 1px solid var(--border); }
+/* the headless card's controls (expand · close) sit in the strip's gutter, never over a tab */
+.workbench { position: relative; }
+.wbacts.headless { position: absolute; top: 9px; right: 10px; z-index: 2; display: flex; align-items: center; gap: 4px; }
+/* expanded: the card takes the sheet and the session beside it folds away */
+.wbdock.full { flex: 1; width: auto; min-width: 0; margin-left: 8px; }
+.wtbody:has(> .wbdock.full) > .wtpanes, .wtbody:has(> .wbdock.full) > .wbgrip { display: none; }
+.wbdock.full .codeface { height: auto; flex: 1; min-height: 0; }
+.wbdock.full .wbslot.mkrail { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.wbslot .codeface .codefacescroll button { flex: none; white-space: nowrap; }
+.wbslot .codeface .codefacetabs button span { margin-left: 4px; }
+.wbslot .codeface > .engeditor { flex: 1; min-height: 0; }
+.wbslot .codeface .engeditor .engworktabs { display: none; }
+.wbslot .codeface .dockfoot { display: flex; align-items: center; gap: 8px; padding: 7px 12px; border-top: 1px solid var(--border); font: 500 10px var(--fmono); color: var(--dim); flex: none; }
+.wbslot .codeface .dockfoot .dockfootstate { margin-left: auto; }
+.chint.coding .chintcode { display: grid; place-items: center; width: 18px; height: 18px; border-radius: 4px; background: var(--panel3); color: var(--muted); box-shadow: inset 0 0 0 1px var(--border2); flex: none; }
+.chint.coding b { color: var(--text); font-weight: 600; }
+/* a coding thread's mode (0144): plan in the plan hue, act in the build hue, a bare code chip when the session has not opened yet */
+.chip.c-code { background: var(--panel3); color: var(--muted); border: 1px solid var(--border2); }
+.chip.c-plan { background: color-mix(in srgb, var(--plan) 16%, transparent); color: var(--plan); }
+.chip.c-act { background: color-mix(in srgb, var(--prog) 16%, transparent); color: var(--prog); }
 /* the brain pill's scope marker: a project override is a different promise from the
    workspace default, so it says so rather than looking identical */
 .brainscope { font: 600 8.5px var(--fmono); letter-spacing: -.02em; text-transform: uppercase; color: var(--muted); background: var(--panel3); border: 1px solid var(--border2); border-radius: var(--r-xs); padding: 1px 5px; }

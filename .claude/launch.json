@@ -35,11 +35,9 @@
       "runtimeExecutable": "pnpm",
       "runtimeArgs": [
         "--dir",
-        "apps/desktop",
+        "apps/hq",
         "exec",
         "vite",
-        "--config",
-        "vite.web.config.mts",
         "--port",
         "5202",
         "--strictPort"
@@ -250,7 +248,7 @@
       "runtimeExecutable": "bash",
       "runtimeArgs": [
         "-c",
-        "VITE_NM_DEV_USER=00000000-0000-0000-0000-000000000001 NM_DEV_API_TARGET=http://127.0.0.1:8787 VITE_NM_POWERSYNC_URL=http://127.0.0.1:58081 pnpm --dir apps/desktop exec vite --config vite.web.config.mts --port \"${PORT:-5210}\" --strictPort"
+        "VITE_NM_DEV_USER=00000000-0000-0000-0000-000000000001 NM_DEV_API_TARGET=http://127.0.0.1:8787 VITE_NM_POWERSYNC_URL=http://127.0.0.1:58081 pnpm --dir apps/hq exec vite --port \"${PORT:-5210}\" --strictPort"
       ],
       "autoPort": true
     },
@@ -389,7 +387,7 @@
       "runtimeExecutable": "bash",
       "runtimeArgs": [
         "-c",
-        "VITE_NM_DEV_USER=00000000-0000-0000-0000-000000000001 NM_DEV_API_TARGET=http://127.0.0.1:8789 VITE_NM_POWERSYNC_URL=http://127.0.0.1:58081 pnpm --dir apps/desktop exec vite --config vite.web.config.mts --port 5211 --strictPort"
+        "VITE_NM_DEV_USER=00000000-0000-0000-0000-000000000001 NM_DEV_API_TARGET=http://127.0.0.1:8789 VITE_NM_POWERSYNC_URL=http://127.0.0.1:58081 pnpm --dir apps/hq exec vite --port 5211 --strictPort"
       ],
       "port": 5211
     },
@@ -466,9 +464,38 @@
       "runtimeExecutable": "bash",
       "runtimeArgs": [
         "-c",
-        "VITE_NM_DEV_USER=\"${NM_E2E_USER:-3bcb99d3-4a4a-4458-80e0-2a8f6e322fb3}\" NM_DEV_API_TARGET=http://127.0.0.1:8790 VITE_NM_POWERSYNC_URL=http://127.0.0.1:58081 VITE_NM_RELAY_URL=ws://127.0.0.1:8796 VITE_NM_DEV_RELAY_TOKEN=local-dev-relay-token-e2e-0123456789abcdef pnpm --dir apps/desktop exec vite --config vite.web.config.mts --port 5203 --strictPort"
+        "VITE_NM_DEV_USER=\"${NM_E2E_USER:-3bcb99d3-4a4a-4458-80e0-2a8f6e322fb3}\" NM_DEV_API_TARGET=http://127.0.0.1:8790 VITE_NM_POWERSYNC_URL=http://127.0.0.1:58081 VITE_NM_RELAY_URL=ws://127.0.0.1:8796 VITE_NM_DEV_RELAY_TOKEN=local-dev-relay-token-e2e-0123456789abcdef pnpm --dir apps/hq exec vite --port 5203 --strictPort"
       ],
       "port": 5203
+    },
+    {
+      "name": "desktop-coding",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "NM_USERDATA=~/.neuramesh-mkos",
+        "NM_MACHINE_NAME=mkos-live",
+        "PORT=9238",
+        "NM_API_PORT=8787",
+        "bash",
+        "scripts/dev-app-cdp.sh"
+      ],
+      "port": 9238
+    },
+    {
+      "name": "hq-preview",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--dir",
+        "apps/hq",
+        "exec",
+        "vite",
+        "--config",
+        "vite.preview.config.mjs",
+        "--port",
+        "5212",
+        "--strictPort"
+      ],
+      "port": 5212
     }
   ]
 }

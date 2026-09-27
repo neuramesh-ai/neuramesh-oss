@@ -5,7 +5,7 @@ import type { HostedAgent } from '../agents';
 import { MAX_LEG_CONCURRENCY, fanoutStep, mapCapped, type WorkLeg } from '../runs';
 import { TURN_BUDGETS } from '@neuramesh/shared';
 
-import { briefFileName } from '../library';
+import { briefFileName } from '@neuramesh/client-core/library';
 
 import { claudePathOption, providerEnv } from '../runtime/adapter';
 import { drainQuery, withTimeout } from './turnkit';

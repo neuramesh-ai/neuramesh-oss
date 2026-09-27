@@ -38,10 +38,17 @@ test('Engineering work tabs share the live editor split coordinate', () => {
   assert.doesNotMatch(css, /\.engsplitter \{[^}]*border-inline:/);
 });
 
-test('Code workspace chrome yields when a non-Code task or conversation owns the surface', () => {
+test('The Engineering floor is not a destination: the Code shortcut relists Home, and a coding thread portals its code face into the Workbench', () => {
+  // coding threads (0144, docs/design/coding-threads-2026-09 §5 + ruling 4): the floor's mount, its
+  // navigation hook and its sheet-head chrome are gone; the one session surface wears the code face,
+  // and the Workbench card holds the code, opened by the thread itself
   const app = readFileSync(join(import.meta.dirname, '../App.tsx'), 'utf8');
-  assert.match(app, /const engineeringContextOn = view === 'engineering' && !openTaskId && !openThreadId;/);
-  assert.match(app, /context=\{engineeringContextOn \? <EngineeringWorkspaceHeader/);
+  assert.doesNotMatch(app, /<EngineeringOS /);
+  assert.doesNotMatch(app, /engineeringNav/);
+  assert.doesNotMatch(app, /engineeringContextOn/);
+  assert.match(app, /'Code', \(\) => setRailMode\('code'\)/);
+  assert.match(app, /railSlot=\{wpane \? wbSlot : null\} onWorkbench=\{\(\) => openWPane\(true\)\}/);
+  assert.match(app, /headless=\{openCodingThread\}/);
 });
 
 test('Code hides native scroll gutters and offers a contextual jump to the latest message', () => {
@@ -64,7 +71,8 @@ test('Code home keeps creation lazy, reuses the launch character, and incrementa
   assert.match(view, /setVisibleCount\(\(count\) => Math\.min\(count \+ 5, sorted\.length\)\)/);
   assert.match(view, />View all <span aria-hidden>→<\/span><\/button>/);
   assert.match(view, /<EngineeringCodeHistory sessions=\{sorted\}/);
-  assert.match(app, /onHome=\{engineeringNav\.home\} onNew=\{engineeringNav\.home\}/);
+  // the floor's home is no longer mounted by the app (coding threads, 0144)
+  assert.doesNotMatch(app, /onHome=\{engineeringNav\.home\}/);
 });
 
 test('Code handoff and approvals use borderless symmetric entrance and exit motion', () => {

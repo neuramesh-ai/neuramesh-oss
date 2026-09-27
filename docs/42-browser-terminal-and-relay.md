@@ -80,7 +80,7 @@ Code keeps the runner (`machines[0]`), because a Code lane does not wake a machi
 | Public endpoint | Gateway `gke-l7-global-external-managed`, static IP `nm-relay-ip`, `relay.neuramesh.app` |
 | TLS | Certificate Manager, Google-managed, **DNS-authorized** — no private key in the repo or the cluster |
 | Machine edge | `apps/desktop/src/main/relay/` (node-pty lives here, NOT in `packages/relay`, or the hub image would compile a native module it never calls) |
-| Browser edge | `apps/desktop/src/renderer/web/relay-client.ts`, wired at `webnm-relay.ts` |
+| Browser edge | `packages/relay-client` (the tab's transport), wired at `apps/hq/web/webnm-relay.ts` (hq since 2026-09-26) |
 | Secret | `RELAY_SECRET` — on Vercel for control-api, and `nm-relay-secret` in `nm-system`. **They must match**; a mismatch fails as a permanent 403 whose symptom points at the wrong component. |
 
 **Cost:** this is the cluster's first load balancer. A global external ALB bills roughly **$18/month just to exist**, plus traffic.

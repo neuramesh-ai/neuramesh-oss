@@ -308,3 +308,27 @@ whole thread — one old "Not now" pre-answered every future re-ask. Answered-st
 now (`answers.ts`): the string floor only accepts answers BELOW the card, and a synced decision
 row collapses only the card in the message it names — the identity the server's supersede
 already writes.
+
+## 15. Amended 2026-09-26 — coding is a KIND of thread, not a mode
+
+[Coding threads](design/coding-threads-2026-09/plan.md) (0144) add `threads.kind` (`chat` |
+`coding`) beside `threads.mode`. The two are orthogonal. `mode` stays the enforcement floor for
+what an agent may file. `kind` says who answers: in a coding thread the coding runtime takes every
+turn, the daemon never wakes an agent there (`wakerouting.ts` reads the kind), and both transcript
+builders strip the `‹kind:coding›` divider the way they strip `‹mode:tasks›`.
+
+Two doors open a coding thread, and both are enforced twice:
+
+- **The repo chip** (door 1): a pick on New chat or the room composer births the thread with
+  `threadKind: 'coding'` on the send. The kind is written at birth and a later message cannot
+  change it.
+- **rex's triage rung** (door 2): the orchestrator's `open_code_session` tool runs
+  `thread.set_kind` on the server and posts the divider. The tool exists only when the project
+  holds a primary repository and the thread is not coding yet (`codeDoor`). The server refuses the
+  command from any other agent (`NOT_PERMITTED`), on a task thread (`TASK_THREAD`), and when the
+  project has no repository (`REPO_REQUIRED`).
+
+A coding thread reaches the board through one valve: the `Make this a unit` card on a resting
+thread, HUMAN_ONLY. It creates a plan-first unit anchored to the conversation (docs/41), so the
+thread keeps its kind and wears the unit card. rex can name the card in one line and can never
+press it.

@@ -5,7 +5,11 @@
   "license": "Elastic-2.0",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./schema": "./src/schema.ts",
+    "./crud-upload": "./src/crud-upload.ts",
+    "./projmeta": "./src/projmeta.ts",
+    "./library": "./src/library.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

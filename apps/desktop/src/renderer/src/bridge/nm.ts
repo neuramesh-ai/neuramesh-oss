@@ -6,14 +6,14 @@
 // harness installs its mock on `window` BEFORE dynamically importing App (preview/main.tsx).
 // Do not move this read later (lazy) or earlier (a static preview import) without
 // re-checking that ordering.
-import type { ChannelRow, ChannelPersonRow, ChannelHistoryRow, ChannelArtifactRow, MessageRow, ThreadRow, HomeConvoRow, HistoryThreadRow } from './rows-rooms';
+import type { ChannelRow, ChannelPersonRow, ChannelHistoryRow, ChannelArtifactRow, MessageRow, ThreadRow, HomeConvoRow, HistoryThreadRow, CodeSessionRow } from './rows-rooms';
 import type { ConnectorRow, ContentItemRow, ContentItemWide, ScheduleRow, SkillRow, SkillPackRow , ScheduleRunRow } from './rows-content';
 import type { TaskRow, TaskAllRow, DecisionAllRow, ProjectRow, WorkspaceProjectRow, RepoUI, BeatUI, RunUI, ArtifactUI, AttachmentRow } from './rows-board';
 import type { AgentRow, MachineRow, MemberRow, WorkspaceMembership, PendingInvite, LogRow, RunRow } from './rows-crew';
 export type { WorkspaceUsage, CreditHistory, StarterVideo } from './rows-infra';
 import type { WorkspaceUsage, CreditHistory, StarterVideo } from './rows-infra';
 import type { CredRow, ProviderId, ProviderStatus, UpdateState, ArchivedThreadRow, FailoverRow, PolicyRowUI, ProcList, FootprintSnapshot, FootprintReply } from './rows-infra';
-import type { AlertConnectorRow, AlertPostRow, AlertScheduleRow, BrainOverride, ConnectProvider, RetroPayload, ThreadMode } from '@neuramesh/shared';
+import type { AlertConnectorRow, AlertPostRow, AlertScheduleRow, BrainOverride, ConnectProvider, RetroPayload, ThreadKind, ThreadMode } from '@neuramesh/shared';
 /** what /v1/github/resolve answers: connected (the row exists now), or why not, with the install door when GitHub has it */
 export type GitHubResolve = { ok: true; handle: string; attached?: boolean } | { ok: false; code: 'NOT_INSTALLED' | 'NO_REPO' | 'NOT_CONFIGURED' | 'UNREACHABLE'; error: string; install?: string | null; repos?: string[]; hint?: string | null };
 import type { EngineeringNMBridge } from './engineering';
@@ -111,7 +111,7 @@ export interface UpgradePush { phase: UpgradePhase; url?: string; message?: stri
 export interface NMBridge extends EngineeringNMBridge, TerminalNMBridge {
   electron: string;
   channels(): Promise<ChannelRow[]>;
-  send(channelId: string, body: string, opts?: { id?: string; attachments?: { id: string; name: string; mime: string }[]; threadId?: string; rootMessageId?: string; threadMode?: ThreadMode; brainOverride?: BrainOverride | null; threadMachineId?: string | null; threadOrigin?: 'desktop' | 'web' | 'routine' | null }): Promise<{ id: string }>;
+  send(channelId: string, body: string, opts?: { id?: string; attachments?: { id: string; name: string; mime: string }[]; threadId?: string; rootMessageId?: string; threadMode?: ThreadMode; brainOverride?: BrainOverride | null; threadMachineId?: string | null; threadOrigin?: 'desktop' | 'web' | 'routine' | null; threadKind?: ThreadKind }): Promise<{ id: string }>;
   /** docs/34 — flip an OPEN conversation's Tasks toggle (HUMAN_ONLY server-side) */
   threadSetMode(threadId: string, mode: ThreadMode): Promise<unknown>;
   // Archiving a conversation (0108) — HUMAN_ONLY and chat-only, both enforced server-side
@@ -355,6 +355,8 @@ export interface NMBridge extends EngineeringNMBridge, TerminalNMBridge {
   watchTasksAll(cb: (rows: TaskAllRow[]) => void): () => void;
   watchThreadsAll(cb: (rows: HomeConvoRow[]) => void): () => void;
   watchHistoryAll(cb: (rows: HistoryThreadRow[]) => void): () => void;
+  /** the workspace's Code sessions (0144): a coding thread's row wears its session's repo, mode and state */
+  watchCodeSessions(cb: (rows: CodeSessionRow[]) => void): () => void;
   watchDecisionsAll(cb: (rows: DecisionAllRow[]) => void): () => void;
   watchFailover(cb: (row: FailoverRow | null) => void): () => void;
   decisionAction(type: 'decision.answer' | 'decision.dismiss', decisionId: string, answer?: string): Promise<unknown>;

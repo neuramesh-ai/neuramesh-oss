@@ -2,7 +2,7 @@
 // API reads but does not write, and the refusal SHAPE is per lane. Commands answer 402
 // PLAN_LIMIT (the desktop routes that code to the upgrade flow). The PowerSync upload lanes
 // answer 409 PLAN_LIMIT, because the uploader drops a 409 and retries anything else while
-// holding every download behind it (apps/desktop/src/main/sync/upload.ts throwUnless409):
+// holding every download behind it (packages/client-core/src/crud-upload.ts throwUnless409):
 // a 402 there would wedge an old client's replica behind one refused message.
 //
 // The exemption list is tested one entry at a time. Every GET passes. Off by default, and

@@ -1,0 +1,134 @@
+[
+  {
+    "name": "ct1-rail-code-dark",
+    "settle": 2600,
+    "query": {
+      "theme": "dark",
+      "navmode": "code"
+    }
+  },
+  {
+    "name": "ct2-rail-code-cream",
+    "settle": 2600,
+    "query": {
+      "theme": "cream-oak",
+      "navmode": "code"
+    }
+  },
+  {
+    "name": "ct3-thread-handoff-dark",
+    "settle": 3200,
+    "query": {
+      "theme": "dark",
+      "engineeringHarness": "1",
+      "openConvo": "dev::sync watch"
+    }
+  },
+  {
+    "name": "ct4-thread-handoff-cream",
+    "settle": 3200,
+    "query": {
+      "theme": "cream-oak",
+      "engineeringHarness": "1",
+      "openConvo": "dev::sync watch"
+    }
+  },
+  {
+    "name": "ct5-thread-valve-dark",
+    "settle": 3200,
+    "query": {
+      "theme": "dark",
+      "engineeringHarness": "1",
+      "openConvo": "dev::sync watch"
+    },
+    "js": "(() => { const k=[...document.querySelectorAll('.codingthread .gateseat .btn')].find(b=>/Keep planning/.test(b.textContent||'')); k && k.click(); return new Promise(r=>setTimeout(r,700)); })()"
+  },
+  {
+    "name": "ct6-thread-unit-dark",
+    "settle": 3200,
+    "query": {
+      "theme": "dark",
+      "engineeringHarness": "1",
+      "openConvo": "dev::sync watch"
+    },
+    "js": "(() => { const k=[...document.querySelectorAll('.codingthread .gateseat .btn')].find(b=>/Keep planning/.test(b.textContent||'')); k && k.click(); return new Promise(r=>setTimeout(()=>{ const b=document.querySelector('.hgate.coding .btn.primary'); b && b.click(); setTimeout(()=>{ const m=document.querySelector('.codingthread .convomsgs'); if (m) m.scrollTop = m.scrollHeight; setTimeout(r,500); },900); },700)); })()"
+  },
+  {
+    "name": "ct7-thread-workbench-dark",
+    "settle": 3200,
+    "query": {
+      "theme": "dark",
+      "engineeringHarness": "1",
+      "openConvo": "dev::sync watch"
+    },
+    "js": "(() => { const t=[...document.querySelectorAll('.codeface .codefacetabs button')].find(x=>/Work Plan/.test(x.textContent||'')); t && t.click(); return new Promise(r=>setTimeout(r,700)); })()"
+  },
+  {
+    "name": "ct5-thread-valve-cream",
+    "settle": 3200,
+    "query": {
+      "theme": "cream-oak",
+      "engineeringHarness": "1",
+      "openConvo": "dev::sync watch"
+    },
+    "js": "(() => { const k=[...document.querySelectorAll('.codingthread .gateseat .btn')].find(b=>/Keep planning/.test(b.textContent||'')); k && k.click(); return new Promise(r=>setTimeout(r,700)); })()"
+  },
+  {
+    "name": "ct6-thread-unit-cream",
+    "settle": 3200,
+    "query": {
+      "theme": "cream-oak",
+      "engineeringHarness": "1",
+      "openConvo": "dev::sync watch"
+    },
+    "js": "(() => { const k=[...document.querySelectorAll('.codingthread .gateseat .btn')].find(b=>/Keep planning/.test(b.textContent||'')); k && k.click(); return new Promise(r=>setTimeout(()=>{ const b=document.querySelector('.hgate.coding .btn.primary'); b && b.click(); setTimeout(()=>{ const m=document.querySelector('.codingthread .convomsgs'); if (m) m.scrollTop = m.scrollHeight; setTimeout(r,500); },900); },700)); })()"
+  },
+  {
+    "name": "ct7-thread-workbench-cream",
+    "settle": 3200,
+    "query": {
+      "theme": "cream-oak",
+      "engineeringHarness": "1",
+      "openConvo": "dev::sync watch"
+    },
+    "js": "(() => { const t=[...document.querySelectorAll('.codeface .codefacetabs button')].find(x=>/Work Plan/.test(x.textContent||'')); t && t.click(); return new Promise(r=>setTimeout(r,700)); })()"
+  },
+  {
+    "name": "ct8-newchat-repochip-dark",
+    "settle": 2600,
+    "query": {
+      "theme": "dark",
+      "navmode": "code"
+    },
+    "js": "(() => { const n=document.querySelector('[aria-label=\"New session\"]'); n && n.click(); return new Promise(r=>setTimeout(()=>{ const c=document.querySelector('.cchip.crepo'); c && c.click(); setTimeout(r,500); },700)); })()"
+  },
+  {
+    "name": "ct9-newchat-repochip-cream",
+    "settle": 2600,
+    "query": {
+      "theme": "cream-oak",
+      "navmode": "code"
+    },
+    "js": "(() => { const n=document.querySelector('[aria-label=\"New session\"]'); n && n.click(); return new Promise(r=>setTimeout(()=>{ const c=document.querySelector('.cchip.crepo'); c && c.click(); setTimeout(r,500); },700)); })()"
+  },
+  {
+    "name": "ct10-thread-workbench-full-dark",
+    "settle": 3200,
+    "query": {
+      "theme": "dark",
+      "engineeringHarness": "1",
+      "openConvo": "dev::sync watch"
+    },
+    "js": "(() => { const b=document.querySelector('.wbacts.headless button[aria-label=\"Expand the Workbench\"]'); b && b.click(); return new Promise(r=>setTimeout(r,700)); })()"
+  },
+  {
+    "name": "ct10-thread-workbench-full-cream",
+    "settle": 3200,
+    "query": {
+      "theme": "cream-oak",
+      "engineeringHarness": "1",
+      "openConvo": "dev::sync watch"
+    },
+    "js": "(() => { const b=document.querySelector('.wbacts.headless button[aria-label=\"Expand the Workbench\"]'); b && b.click(); return new Promise(r=>setTimeout(r,700)); })()"
+  }
+]

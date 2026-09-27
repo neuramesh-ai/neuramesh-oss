@@ -1,5 +1,5 @@
-// The NeuraMesh palette as typed data for React Native (the desktop keeps it in
-// apps/desktop/src/renderer/src/tokens.css). A parity test (test/tokens.test.ts)
+// The NeuraMesh palette as typed data for React Native (hq keeps it in
+// apps/hq/src/tokens.css). A parity test (test/tokens.test.ts)
 // reads that stylesheet and fails if any hex here drifts from it, so the two
 // platforms can never disagree on a brand color. Only the plain-hex tokens live
 // here; color-mix/rgba derivations (rings, hovers, shadows) are computed in the

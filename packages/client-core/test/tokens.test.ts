@@ -4,9 +4,9 @@ import { describe, expect, it } from 'vitest';
 import { CSS_VAR, THEMES, type Theme, type ThemeName } from '../src/tokens';
 
 // Parity tripwire for the brand palette: read tokens.css and assert every hex the
-// mobile app ships matches the desktop stylesheet, per theme. A rebrand or a tweak
+// mobile app ships matches hq's stylesheet, per theme. A rebrand or a tweak
 // on one side fails here until both agree.
-const css = readFileSync(fileURLToPath(new URL('../../../apps/desktop/src/renderer/src/tokens.css', import.meta.url)), 'utf8');
+const css = readFileSync(fileURLToPath(new URL('../../../apps/hq/src/tokens.css', import.meta.url)), 'utf8');
 
 // The { … } declaration block whose selector contains `marker`.
 function blockVars(marker: string): Record<string, string> {

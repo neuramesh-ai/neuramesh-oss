@@ -52,6 +52,10 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          # a pull request's checkout is its merge commit, and its first parent is the base's tip:
+          # the scope step below diffs the two
+          fetch-depth: 2
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
@@ -63,6 +67,18 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
+
+      # A HQ-ONLY PULL REQUEST SKIPS THE DESKTOP (the decoupling plan, phase 2 step 5): its
+      # typecheck, its suites and its Electron build. hq and the desktop are separate apps since
+      # 2026-09-26, and nothing in the desktop reads apps/hq (scripts/impact.mjs, hqOnly). Any
+      # other change, and every push to main, checks every package, so main still proves the
+      # whole tree after each merge. A diff that fails exits 2, which checks everything too.
+      - name: Scope the checks
+        id: scope
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ] && node scripts/impact.mjs --hq-only HEAD^1 HEAD; then
+            echo "filter=--filter=!@neuramesh/desktop" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Install Linux Code sandbox
         run: |
@@ -79,7 +95,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Typecheck
-        run: pnpm -r typecheck
+        run: pnpm -r ${{ steps.scope.outputs.filter }} typecheck
 
       # The size gate (docs/design/modularization-2026-08/plan.md §2): max-lines 250 for new
       # files, a shrink-only per-file ratchet for today's offenders, unused-vars, hooks rules.
@@ -102,14 +118,18 @@ jobs:
         run: ./scripts/ci-db-bootstrap.sh
 
       - name: Test (unit + control-api pg integration)
-        run: pnpm -r test
+        run: pnpm -r ${{ steps.scope.outputs.filter }} test
         env:
           # The bare x-nm-actor lane is CLOSED by default (review F1, source-release round): the
           # suites speak through it, so the gate opens here and in the package's own test script.
           NM_ALLOW_ACTOR_HEADER: "1"
 
       - name: Build (bundles)
-        run: pnpm -r build
+        # hq's production build refuses to bake no PowerSync endpoint (apps/hq/vite.config.mts), which
+        # guards a real deploy. This build only proves hq compiles: nothing connects to the endpoint.
+        env:
+          VITE_NM_POWERSYNC_URL: http://127.0.0.1:58081
+        run: pnpm -r ${{ steps.scope.outputs.filter }} build
 
   # The public-repo gate (U4, docs/design/oss-release-2026-09/implementation-plan.md): gitleaks on
   # the tracked files and the history, the identifier greps, and the tracked-evidence check. A hit

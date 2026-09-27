@@ -25,8 +25,9 @@ LAST=$(ls supabase/migrations/*.sql | xargs -n1 basename | sort | tail -1)
 [ "$(json mode <<<"$CFG")" = local ] || fail "mode is local"
 [ "$(json schemaVersion <<<"$CFG")" = "$LAST" ] || fail "schemaVersion is $LAST"
 [ "$(json version <<<"$CFG")" = "$(node -p "require('./package.json').version")" ] || fail "version is the root package.json version"
-[ "$(node -e "console.log(Object.keys(JSON.parse(process.argv[1])).sort().join(','))" "$CFG")" = "mode,powersyncUrl,schemaVersion,version" ] || fail "nm-config carries exactly four fields, no ids"
-ok "mode local · version $(json version <<<"$CFG") · schemaVersion $LAST · no ids"
+[ "$(node -e "console.log(Object.keys(JSON.parse(process.argv[1])).sort().join(','))" "$CFG")" = "minDesktopVersion,mode,powersyncUrl,schemaVersion,version" ] || fail "nm-config carries exactly five fields, no ids"
+[[ "$(json minDesktopVersion <<<"$CFG")" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "minDesktopVersion is a version (docs/46)"
+ok "mode local · version $(json version <<<"$CFG") · schemaVersion $LAST · floor $(json minDesktopVersion <<<"$CFG") · no ids"
 
 echo "── the seeded human, and nothing else"
 [ "$(pgq "select count(*) from nm_users where clerk_user_id = 'local'")" = 1 ] || fail "one local user"

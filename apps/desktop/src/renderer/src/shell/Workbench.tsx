@@ -2,7 +2,7 @@
 // own details, as a card inside the thread's sheet (docs/33 §2). Split out of wtabs/filetree.tsx,
 // which keeps the tree NODE and the file viewer — the parts this opens.
 import { FsNode, wtabRel, type WScope } from '../wtabs/filetree';
-import { IconBranch, IconClose } from '../ui/icons';
+import { IconBranch, IconClose, IconCollapse, IconExpand } from '../ui/icons';
 import { nm as nmBridge } from '../bridge/nm';
 import { useEffect, useRef, useState } from 'react';
 import { WorkbenchEmpty } from './WorkbenchEmpty';
@@ -21,8 +21,13 @@ const nm = nmBridge;
 //
 // Still a doorway, never a viewer: a click opens a TAB in the side dock under the model's reuse
 // rule. It never renders a file inside itself, or we are back to two containers for one job.
-export function Workbench({ scope, scopeLabel, files, activePath, dirtyPaths, findSeq, slotRef, onOpenFile, onClose }: {
+export function Workbench({ scope, scopeLabel, files, activePath, dirtyPaths, findSeq, slotRef, onOpenFile, onClose, headless = false, full = false, onFull }: {
   scope: WScope; scopeLabel: string;
+  /** a coding thread's card: the code face's tabs are the top row, no title row (George, 2026-09-26) */
+  headless?: boolean;
+  /** expanded to the whole sheet, the conversation folded away (George: "an expand icon next to close") */
+  full?: boolean;
+  onFull?: (() => void) | undefined;
   /** the worktree the Files drawer browses — a session's, never a room's (workbench-state) */
   files: string | null;
   activePath: string | null; dirtyPaths: Set<string>; findSeq: number;
@@ -98,11 +103,19 @@ export function Workbench({ scope, scopeLabel, files, activePath, dirtyPaths, fi
   const branches = git?.branches.filter((b) => b.toLowerCase().includes(q.trim().toLowerCase())) ?? [];
   return (
     <aside className="workbench" aria-label="Workbench">
-      <div className="wbhead">
-        <b className="wbname">Workbench</b>
-        <span className="wbwt" title={scopeLabel}>{scopeLabel}</span>
-        <button className="wbx" aria-label="Close the Workbench" onClick={onClose}><IconClose s={11} /></button>
-      </div>
+      {headless ? (
+        <div className="wbacts headless">
+          {onFull && <button className="wbx" aria-label={full ? 'Shrink the Workbench' : 'Expand the Workbench'} data-tip={full ? 'Shrink' : 'Expand to the whole sheet'} onClick={onFull}>{full ? <IconCollapse s={11} /> : <IconExpand s={11} />}</button>}
+          <button className="wbx" aria-label="Close the Workbench" data-tip="Close" onClick={onClose}><IconClose s={11} /></button>
+        </div>
+      ) : (
+        <div className="wbhead">
+          <b className="wbname">Workbench</b>
+          <span className="wbwt" title={scopeLabel}>{scopeLabel}</span>
+          {onFull && <button className="wbx" aria-label={full ? 'Shrink the Workbench' : 'Expand the Workbench'} onClick={onFull}>{full ? <IconCollapse s={11} /> : <IconExpand s={11} />}</button>}
+          <button className="wbx" aria-label="Close the Workbench" onClick={onClose}><IconClose s={11} /></button>
+        </div>
+      )}
       {/* ONE scroller for the whole face: the subject's own sections portal into the slot (TaskThread ·
           ConvoThread · the room home), so this card never owns their state; the empty line under
           it is CSS-gated on the slot being childless, because only the portalling surface knows

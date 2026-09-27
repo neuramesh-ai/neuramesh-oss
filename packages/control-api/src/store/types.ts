@@ -1,7 +1,7 @@
 // Row + input shapes the Store speaks — extracted from store.ts (track C-store).
 // Pure types: no behaviour, so both implementations and every caller share ONE
 // definition instead of three that drift.
-import { type BrainOverride, type ActorRef, type NMEvent, type RunKind, type Task, type ThreadMode } from '@neuramesh/shared';
+import { type BrainOverride, type ActorRef, type NMEvent, type RunKind, type Task, type ThreadKind, type ThreadMode } from '@neuramesh/shared';
 
 export interface MutationResult {
   task: Task;
@@ -106,6 +106,8 @@ export interface NMMessage {
   /** 0134, rule D9 — birth-only, like scheduleId: the session's designated machine and the client that bore it */
   threadMachineId?: string | null;
   threadOrigin?: 'desktop' | 'web' | 'routine' | null;
+  /** 0144, coding threads — birth-only, like the two above: `coding` when the repo chip was set */
+  threadKind?: ThreadKind | null;
 }
 
 // A decision seed: one ```nmq card extracted from an agent message's body at POST

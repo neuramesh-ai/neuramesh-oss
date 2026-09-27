@@ -8,8 +8,6 @@
 import { before, test } from 'node:test';
 import assert from 'node:assert/strict';
 import Module from 'node:module';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3';
 
 // watch-board.ts imports `electron` at the top level; the constant under test does not need it
@@ -96,9 +94,6 @@ test('the rewrite answers what the CASE form answered, branch by branch', { skip
   });
 });
 
-test("the browser's copy is the desktop's, word for word", () => {
-  const grab = (rel: string) => /DECISIONS_ALL_SQL = `([\s\S]*?)`;/.exec(readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8'))?.[1];
-  const web = grab('../../../renderer/web/webnm-board.ts');
-  assert.ok(web, 'the web lane still declares DECISIONS_ALL_SQL');
-  assert.equal(web, DECISIONS_ALL_SQL);
-});
+// "the browser's copy is the desktop's, word for word" retired at the hq split (2026-09-26): the
+// browser client is apps/hq now, which owns its queries. the replica schema in client-core is the
+// contract the two share, not the text of each other's SQL.

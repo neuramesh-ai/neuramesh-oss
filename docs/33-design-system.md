@@ -678,6 +678,50 @@ real work — if it is decoration, drop it and keep the pill.
   right edge, not from their own chip, so a menu no wider than the column always fits whichever
   chip opened it (hung from the project chip's edge, the project menu ran under the left nav).
   Above 500px the machine chip keeps its intrinsic width and the other two do the shrinking.
+- **The repo chip** (2026-09-26, [coding threads](design/coding-threads-2026-09/plan.md), door 1;
+  visual contract `Doors.dc.html`) is the composer's fourth knob beside the room, the brain and
+  the machine: the `.cchip.crepo` pill (branch glyph, `repo` or `owner/name`, lit when set) opens
+  the same upward `.cprojpop.cmachpop` menu the machine chip uses. One row per repository of the
+  target room's project, the primary tagged `default`, `None · a conversation` first, `Connect a
+  repository…` when the project holds none, and a foot that names the consequence: a repository
+  makes the send a coding conversation. The chint cap, the placeholder and the routing hint move
+  with the pick (docs/34 §7). The Code rail's `New session` opens New chat with the chip pre-set
+  to the room's primary repository.
+- **The code face** (same round; visual contract `Thread.dc.html`) is what a coding thread ADDS to
+  the one session surface, never a second surface. `.threadpanel.convo.codingthread` keeps the
+  session head (crumb, title, the mode chip `c-plan` | `c-act`, the status chip, the Workbench
+  toggle) and adds `.codinghead` under it: the subline `.sssub` (branch · repository · machine,
+  mono, and `a unit ✓` once the valve made one). The transcript is the thread's own `.tmsgs`: the human's hairline
+  bubble, the Engineering rows (`.av.eng`, the folded `.think` line, the `.receipts`, the prose),
+  the thread's own messages around them (the `‹kind:coding›` divider as a `.sysline`, the unit card
+  as a `.unitline`). The `.gateseat` holds exactly ONE card above the composer: the approval card,
+  else the Act handoff, else the valve (`.hgate.coding`, eyebrow `coding · n changes · ⎇ branch ·
+  not a unit`, `Make it a unit` primary and `Keep it here` quiet). The composer is the thread's
+  `.tcompose > .cbox.codingbox`: the chips row (attach · model · machine: the room and the
+  repository are not switchable in a coding thread, so they are not chips, and the branch shows in
+  the Workbench's foot, George, 2026-09-26) and the two knobs, the `Plan | Act` `.threadseg` and
+  the permissions chip (`Reads run · edits ask`). The row WRAPS: the knobs and Send travel as one
+  group (`.codingknobs`) that takes its own row when the chips fill the first, and the box grows
+  (nothing is cut off). No chint in the thread: the consequence line lives on New chat, where the
+  pick is made, not on every reply. **The Workbench holds the
+  code** (George, 2026-09-26: "the workbench might be the right place for the tabs… and the
+  workbench should be open automatically for code tasks"): a coding thread opens the Workbench
+  card by itself and portals `.codeface` into the card's slot, as a conversation portals its
+  details: the tab strip `Changes n · Files · Work Plan ✓ · Checkpoints n · Terminal` as the
+  card's TOP row (no `Workbench · scope` title row on a coding thread: `headless`), scrolling
+  sideways and never wrapping, over the Engineering editor's pane, the branch and the state in the
+  `.dockfoot`. The card's own Files drawer is hidden under a coding thread (George: "use our files
+  tab from code"), so the editor's Files pane is the ONE file tree (docs/36 §3.3), scoped to the
+  thread's repository. The tabs scroll in their own lane (`.codefacescroll`), and a fixed gutter
+  at the strip's right end (`.codefacegutter`, a hairline on its left) holds the card's two
+  controls (`.wbacts.headless`): expand and close, never over a tab. **Expand** (`full`, also in
+  the title row of every other card) grows the card to the
+  whole sheet and folds the session column away (`.wtbody:has(> .wbdock.full) > .wtpanes`), a
+  session state that never persists; the same control shrinks it back.
+  An approval fronts the Changes tab, and the approval card's `Review the patch` opens the card. A
+  session row for a coding thread wears the code glyph and the mode chip (`.chip.c-code`,
+  `.c-plan`, `.c-act`) and reads its status from the synced `code_sessions` row. The Engineering
+  floor retired as a destination: the rail's Code shortcut and the view menu relist Home.
 - **The two cloud marks in the status cluster** (2026-09-05, George: "a machine icon to indicate
   the cloud machine and a cloud icon next to it is confusing") — the compute pill (`.cpill`) draws
   the **cloud machine**: the chassis on its stand with a small cloud badged at its top-right, one

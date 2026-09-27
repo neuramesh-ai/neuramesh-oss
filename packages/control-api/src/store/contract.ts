@@ -5,7 +5,7 @@
 // doing alongside the repositories that implement them, and those wait on a shared
 // contract suite — today's memory/pg test pairs are hand-written twice with mostly
 // disjoint cases, so nothing yet proves the two implementations agree (plan §5).
-import { type BrainOverride, type ActorRef, type Beat, type BeatStatus, type NMEvent, type Run, type RunSettleState, type RetroPayload, type RetroRange, type Task, type TaskKind, type TaskState, type ThreadMode } from '@neuramesh/shared';
+import { type BrainOverride, type ActorRef, type Beat, type BeatStatus, type NMEvent, type Run, type RunSettleState, type RetroPayload, type RetroRange, type Task, type TaskKind, type TaskState, type ThreadKind, type ThreadMode } from '@neuramesh/shared';
 import type { LifecycleRow } from '../lifecycle';
 import type { MutationResult, ArtifactRow, AttachmentInput, ScheduleInput, NMMessage, DecisionSeed, DecisionRow, PolicyRow, PolicyInput, DesktopAuthResult, RunInput, WhiteboardRow, WhiteboardMeta, WhiteboardCreate, WhiteboardLwwPatch, WhiteboardUpdate } from './types';
 
@@ -234,7 +234,7 @@ export interface Store {
   // stale id must not be mistaken for a chat). `setThreadMode` is the human-only escalation
   // valve behind thread.set_mode.
   getThreadMode(workspace: string, threadId: string): Promise<ThreadMode | null>;
-  setThreadMode(workspace: string, threadId: string, mode: ThreadMode): Promise<void>;
+  setThreadMode(workspace: string, threadId: string, mode: ThreadMode): Promise<void>; setThreadKind(workspace: string, threadId: string, kind: ThreadKind): Promise<void>; // 0144, coding threads: store/thread-machine.ts
   /** Compute choice (0118): replace the ACTOR's own compute prefs. Validates every named
    *  machine/agent id against the workspace — a pref naming a foreign machine must 404 at set
    *  time, not silently mis-route at claim time. */
@@ -294,7 +294,8 @@ export interface Store {
      *  "the origin is busy" from "the origin can never run this" */
     runtimes?: string[];
   }, event: NMEvent): Promise<{ id: string; inserted: boolean }>;
-  heartbeatMachine(machineId: string, activity?: { activeSeconds: number; busy: boolean; runtimes?: string[] }): Promise<void>;
+  /** `daemonVersion`: the build a cloud machine reports (its image's commit); absent keeps the row's */
+  heartbeatMachine(machineId: string, activity?: { activeSeconds: number; busy: boolean; runtimes?: string[]; daemonVersion?: string }): Promise<void>;
   // Upsert by (workspace, name); registers channel scope. Event on first insert.
   registerAgent(input: {
     workspace: string;

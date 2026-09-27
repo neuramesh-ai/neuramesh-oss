@@ -17,7 +17,7 @@ import { membershipChanged, parseWorkspaceIdent, pickBootWorkspace, shouldWipeRe
 import { ApiError, actorId, apiOn } from '../sync';
 import { Connector } from './connector';
 import { registerThisMachine } from './machine';
-import { AppSchema } from './schema';
+import { AppSchema } from '@neuramesh/client-core/schema';
 import { backfillSeeds } from './seeds';
 
 export interface BootDeps {

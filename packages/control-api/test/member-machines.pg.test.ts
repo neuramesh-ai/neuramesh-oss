@@ -13,7 +13,7 @@
 //   · waking by id honours the owner's grant; the relay attach read carries kind + owner
 //   · leaving or being removed tombstones the machine (the feed drops it) and frees its name;
 //     re-joining mints a fresh one
-//   · provisioning is credits-gated and idempotent; the heartbeat publishes runtimes
+//   · provisioning is credits-gated and idempotent; the heartbeat publishes runtimes and the build
 //
 // Run via scripts/test-pg.sh — skipped without DATABASE_URL.
 import type { Actor } from '@neuramesh/shared';
@@ -295,6 +295,19 @@ describe.skipIf(!DB)('per-member cloud machines (0133) — Individual and Team',
     expect(liveMemberOf(await machinesOf(WS), bob.id)!.runtimes).toEqual(['claude-code']);
     expect((await send(bob, { type: 'machine.heartbeat', machineId: bobs.id, activeSeconds: 5 })).status).toBe(200);
     expect(liveMemberOf(await machinesOf(WS), bob.id)!.runtimes).toEqual(['claude-code']);
+  });
+
+  it('the heartbeat records the build the machine runs, and an older machine\'s beat leaves it standing', async () => {
+    const bobs = liveMemberOf(await machinesOf(WS), bob.id)!;
+    const buildOf = async () => ((await sql!`select daemon_version from machines where id = ${bobs.id}::uuid`)[0]!['daemon_version'] as string | null);
+    // the fleet inserts a machine row with no build: before this, the pin was the only record
+    expect(await buildOf()).toBeNull();
+    const sha = '1f455e231a192aa542dc402a031e6f6fd2830778';
+    expect((await send(bob, { type: 'machine.heartbeat', machineId: bobs.id, daemonVersion: sha })).status).toBe(200);
+    expect(await buildOf()).toBe(sha);
+    // an image from before NM_IMAGE_SHA beats without the field: the beat lands, the build stays
+    expect((await send(bob, { type: 'machine.heartbeat', machineId: bobs.id, activeSeconds: 5 })).status).toBe(200);
+    expect(await buildOf()).toBe(sha);
   });
 
   it('leaving tombstones the machine — the feed drops it, the name is freed — and re-joining mints anew', async () => {
