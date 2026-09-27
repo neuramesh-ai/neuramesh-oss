@@ -1,7 +1,7 @@
 // The Code-session commands (0135, the mobile-cloud round) — SHARED, because the phone sends the
 // first two as itself and the machine host sends all three (handler/codesession.ts says who may
-// write what). The server spreads them into its CommandSchema through commands-machine.ts (its
-// commands.ts sits at its size cap); the client's HumanCommandSchema spreads the same tuple.
+// write what). The full union spreads them into CommandSchema through command-union-machine.ts
+// (command-union.ts sits at its size cap); the client's HumanCommandSchema spreads the same tuple.
 import { z } from 'zod';
 import { CODE_APPROVAL_CATEGORIES, CODE_SESSION_MODES, CODE_SESSION_STATES } from './code-sessions';
 import { THREAD_KINDS } from './threads';

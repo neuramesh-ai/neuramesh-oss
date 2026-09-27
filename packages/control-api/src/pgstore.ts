@@ -1201,16 +1201,24 @@ export class PostgresStore implements Store {
     }) as Promise<{ id: string; inserted: boolean }>;
   }
 
-  async heartbeatMachine(machineId: string, activity?: { activeSeconds: number; busy: boolean; runtimes?: string[]; daemonVersion?: string }): Promise<void> {
+  async heartbeatMachine(machineId: string, actorId: string, activity?: { activeSeconds: number; busy: boolean; runtimes?: string[]; daemonVersion?: string }): Promise<boolean> {
     const seconds = activity?.activeSeconds ?? 0;
     const active = seconds > 0 || activity?.busy === true;
     // runtimes and the build ride the beat for cloud machines (they never register): written only
-    // when sent, so an older machine's beat leaves the recorded build standing
+    // when sent, so an older machine's beat leaves the recorded build standing.
+    // WHO MAY BEAT is in the WHERE, so a beat that fails it moves and charges nothing: a cloud
+    // machine's owner only, and for a local one any human member of its workspace (two members'
+    // laptops can share a default name, and so one row, and a local beat is never billed).
     const [row] = await this.sql<{ workspace_id: string; kind: string }[]>`
-      update machines set last_seen_at = now(), last_active_at = case when ${active} then now() else last_active_at end, runtimes = case when ${!!activity?.runtimes} then ${this.sql.json((activity?.runtimes ?? []) as never)}::jsonb else runtimes end,
-             daemon_version = coalesce(${activity?.daemonVersion ?? null}::text, daemon_version) where id = ${machineId} returning workspace_id, kind`;
+      update machines m set last_seen_at = now(), last_active_at = case when ${active} then now() else m.last_active_at end, runtimes = case when ${!!activity?.runtimes} then ${this.sql.json((activity?.runtimes ?? []) as never)}::jsonb else m.runtimes end,
+             daemon_version = coalesce(${activity?.daemonVersion ?? null}::text, m.daemon_version)
+       where m.id = ${machineId}
+         and (m.owner_user_id::text = ${actorId}
+              or (m.kind = 'local' and exists (select 1 from workspace_members wm where wm.workspace_id = m.workspace_id and wm.user_id::text = ${actorId})))
+       returning m.workspace_id, m.kind`;
     // LOCAL machines beat too, and their time is the user's own hardware — never billed.
     if (row && row.kind !== 'local' && seconds > 0) await chargeMachineActivity(this.sql, row.workspace_id, priceActiveSeconds(seconds), seconds);
+    return !!row;
   }
 
   async registerAgent(

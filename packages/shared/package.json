@@ -5,7 +5,8 @@
   "license": "Elastic-2.0",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./command-union": "./src/command-union.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

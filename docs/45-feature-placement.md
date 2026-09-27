@@ -31,10 +31,8 @@ and how a release reaches an installed app. [docs/07](07-billing-and-plans.md) i
   side, Free is the local app), and **the plan** (`workspaces.plan`, `'free' | 'cloud'`, server
   truth, enforced in `handler.ts`) says whether a hosted feature is paid. Never in a prompt or a menu.
 - **The browser client is its own app (since 2026-09-26).** `hq.neuramesh.app` is `apps/hq`: the
-  App in `apps/hq/src` on the web bridge in `apps/hq/web`, built by `apps/hq/vercel.json`. Until
-  the Vercel project's root directory moves to `apps/hq`, the `web:build` script in
-  `apps/desktop/package.json` builds hq and copies it to `apps/desktop/out/web`. hq is
-  private. The desktop app keeps its own copy of the renderer (`apps/desktop/src/renderer/src`) on
+  App in `apps/hq/src` on the web bridge in `apps/hq/web`, built by `apps/hq/vercel.json` (the
+  Vercel project's root directory). hq is private. The desktop app keeps its own copy of the renderer (`apps/desktop/src/renderer/src`) on
   the Electron bridge. `apps/web` is the site alone. So a feature with a screen on the web is a
   change to hq, and it reaches the desktop only when someone ports it. Until 2026-09-26 the two
   were one renderer, and older rounds in `docs/` say so.

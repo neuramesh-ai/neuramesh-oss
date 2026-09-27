@@ -15,7 +15,7 @@ A person installs a desktop build and keeps it for weeks. The backend ships on e
 
 | Contract | Source | The snapshot keeps | A break |
 |---|---|---|---|
-| Commands | `CommandSchema` in `packages/control-api/src/commands.ts`, with the human commands from `packages/shared` | each command type, and each field: its kind, required or not, nullable or not, enum and literal values, length and size bounds, string formats | a command or a field that is gone, a field that became required, a new required field, a value that is gone, a narrower bound, a new format, a changed type |
+| Commands | `CommandSchema` in `packages/shared/src/command-union.ts` (the server re-exports it from `packages/control-api/src/commands.ts`), with the human commands from `packages/shared` | each command type, and each field: its kind, required or not, nullable or not, enum and literal values, length and size bounds, string formats | a command or a field that is gone, a field that became required, a new required field, a value that is gone, a narrower bound, a new format, a changed type |
 | HTTP routes | the Hono app that `createApp` builds | the method and the path of each route. Middleware is not a route, and `/internal/` and `/webhooks/` are server to server: no desktop calls them | a route that is gone |
 | Client schema | `TABLE_COLUMNS` in `packages/client-core/src/schema.ts`, the one schema that every client opens | each table and its column names | a table or a column that is gone |
 | Sync rules | `dev/stack/powersync/sync-config.yaml` | each table the rules serve, with its columns, or `*` for `select *` | a table the rules no longer serve, a column that a listed rule drops (only `messages` lists columns today), a `select *` rule that now lists columns |

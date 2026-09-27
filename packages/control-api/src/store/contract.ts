@@ -294,8 +294,11 @@ export interface Store {
      *  "the origin is busy" from "the origin can never run this" */
     runtimes?: string[];
   }, event: NMEvent): Promise<{ id: string; inserted: boolean }>;
-  /** `daemonVersion`: the build a cloud machine reports (its image's commit); absent keeps the row's */
-  heartbeatMachine(machineId: string, activity?: { activeSeconds: number; busy: boolean; runtimes?: string[]; daemonVersion?: string }): Promise<void>;
+  /** a beat from the human `actorId`. A cloud machine takes beats from its owner only (its token
+   *  resolves to the owner), and a local one from any human member of its workspace. false: no
+   *  machine this actor may beat has that id, and nothing moved or was charged. `daemonVersion`:
+   *  the build a cloud machine reports (its image's commit); absent keeps the row's */
+  heartbeatMachine(machineId: string, actorId: string, activity?: { activeSeconds: number; busy: boolean; runtimes?: string[]; daemonVersion?: string }): Promise<boolean>;
   // Upsert by (workspace, name); registers channel scope. Event on first insert.
   registerAgent(input: {
     workspace: string;

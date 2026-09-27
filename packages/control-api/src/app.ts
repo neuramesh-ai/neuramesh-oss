@@ -18,7 +18,7 @@ import { seal, verifyMediaSig } from './connector-crypto';
 import { clerkCreateUser, clerkFindUserByEmail, clerkPrimaryEmail, clerkVerifyPassword, createClerkSession, mintPowerSyncToken, verifyClerkToken } from './clerk';
 import { unsubscribePage, verifyUnsubscribeToken } from './mail';
 import { fireWakeBump, lifecycleRoutes } from './fleet-lifecycle';
-import { actorInWorkspace, applyCreditPack, creditRoutes, type WebhookOutcome } from './credits';
+import { applyCreditPack, billingCaller, creditRoutes, type WebhookOutcome } from './credits';
 import { applyPlanPatch } from './plan-flip';
 import { actorMayReadCredentials } from './credentials-authz';
 import { onAuthArrival } from './onauth';
@@ -931,13 +931,12 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
 
   // Billing (Cloud upgrade): mint a hosted Stripe Checkout / Customer-Portal URL the desktop opens in
   // the user's external browser — the human pays on Stripe's page, never in-app. The webhook flips the
-  // plan; the desktop re-reads it on focus. Human-only; no-op (404) when billing isn't configured.
+  // plan; the desktop re-reads it on focus. A human member only (billingCaller, credits.ts); no-op
+  // (404) when billing isn't configured.
   app.post('/v1/billing/checkout', async (c) => {
-    if (!billingEnabled()) return c.json({ error: 'billing not configured', code: 'NOT_FOUND' }, 404);
-    const actor = c.get('actor');
-    if (actor.kind !== 'human') return c.json({ error: 'billing is human-only', code: 'NOT_PERMITTED' }, 403);
-    const { workspace } = (await c.req.json().catch(() => ({}))) as { workspace?: string };
-    if (!workspace) return c.json({ error: 'workspace required', code: 'INVALID_INPUT' }, 400);
+    const who = await billingCaller(store, c.get('actor'), ((await c.req.json().catch(() => ({}))) as { workspace?: string }).workspace);
+    if ('refusal' in who) return c.json(who.refusal, who.status);
+    const { workspace } = who;
     const info = await store.workspaceForBilling(workspace);
     const url = await createCheckoutSession({ workspace, quantity: info?.memberCount ?? 1, customerId: info?.stripeCustomerId ?? null });
     return c.json({ url });
@@ -946,31 +945,26 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
   // credit packs: one-time purchase, ANY plan — free users top up without upgrading. The
   // webhook grants; this only mints the hosted page.
   app.post('/v1/billing/credits-checkout', async (c) => {
-    if (!billingEnabled()) return c.json({ error: 'billing not configured', code: 'NOT_FOUND' }, 404);
-    const actor = c.get('actor');
-    if (actor.kind !== 'human') return c.json({ error: 'billing is human-only', code: 'NOT_PERMITTED' }, 403);
-    const { workspace, credits } = (await c.req.json().catch(() => ({}))) as { workspace?: string; credits?: number };
-    if (!workspace) return c.json({ error: 'workspace required', code: 'INVALID_INPUT' }, 400);
+    const body = (await c.req.json().catch(() => ({}))) as { workspace?: string; credits?: number };
+    const who = await billingCaller(store, c.get('actor'), body.workspace);
+    if ('refusal' in who) return c.json(who.refusal, who.status);
+    const { workspace } = who;
     // THE CLIENT NAMES A SIZE, THE SERVER NAMES THE PRICE — the invariant that survived opening
     // this up to custom amounts. It used to hold because the size had to match a menu entry;
     // now it holds because the price is COMPUTED here from the flat rate and the request's own
     // dollar figure is never read. An amount outside the bounds is refused rather than clamped:
     // silently charging someone a different number than they typed is worse than a 400.
-    const n = Number(credits);
+    const n = Number(body.credits);
     if (!Number.isInteger(n) || n < MIN_PACK_CREDITS || n > MAX_PACK_CREDITS) return c.json({ error: `credits must be a whole number between ${MIN_PACK_CREDITS} and ${MAX_PACK_CREDITS}`, code: 'INVALID_INPUT', min: MIN_PACK_CREDITS, max: MAX_PACK_CREDITS, packs: CREDIT_PACKS }, 400);
-    if (!(await actorInWorkspace(store, actor, workspace))) return c.json({ error: 'not your workspace', code: 'NOT_PERMITTED' }, 403);
     const info = await store.workspaceForBilling(workspace);
     const url = await createCreditsCheckout({ workspace, credits: n, usd: usdForCredits(n), customerId: info?.stripeCustomerId ?? null });
     return c.json({ url });
   });
 
   app.post('/v1/billing/portal', async (c) => {
-    if (!billingEnabled()) return c.json({ error: 'billing not configured', code: 'NOT_FOUND' }, 404);
-    const actor = c.get('actor');
-    if (actor.kind !== 'human') return c.json({ error: 'billing is human-only', code: 'NOT_PERMITTED' }, 403);
-    const { workspace } = (await c.req.json().catch(() => ({}))) as { workspace?: string };
-    if (!workspace) return c.json({ error: 'workspace required', code: 'INVALID_INPUT' }, 400);
-    const info = await store.workspaceForBilling(workspace);
+    const who = await billingCaller(store, c.get('actor'), ((await c.req.json().catch(() => ({}))) as { workspace?: string }).workspace);
+    if ('refusal' in who) return c.json(who.refusal, who.status);
+    const info = await store.workspaceForBilling(who.workspace);
     if (!info?.stripeCustomerId) return c.json({ error: 'no Stripe customer yet — subscribe first', code: 'NOT_FOUND' }, 404);
     const url = await createPortalSession({ customerId: info.stripeCustomerId });
     return c.json({ url });

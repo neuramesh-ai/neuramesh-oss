@@ -10,7 +10,7 @@ import { AGENT_ROLES } from './states';
 // server package) so every human client — desktop, and now mobile/web — types its
 // command payloads against the SAME schemas the control-api validates. The server
 // composes these into its full CommandSchema alongside its agent/daemon/admin-only
-// commands (packages/control-api/src/commands.ts); a mobile client builds
+// commands (./command-union.ts); a mobile client builds
 // HumanCommandSchema from exactly this set. Agent/daemon commands (claim, submit,
 // propose_plan/design, register, memory, skills, project/channel admin) stay
 // server-side — a phone never sends them.
@@ -167,7 +167,7 @@ export const decisionDismissCommand = z.object({ type: z.literal('decision.dismi
 
 // ── The commands a PHONE sends beyond the board (the mobile-cloud round, S1.4) — onboarding,
 // compute, routines, the session's machine. Each is a MIRROR of the server's schema in
-// packages/control-api/src/commands.ts (a subset of its fields is fine; a field it lacks is not),
+// ./command-union.ts (a subset of its fields is fine; a field it lacks is not),
 // and packages/control-api/test/human-commands-drift.test.ts fails the build if they drift.
 export const workspaceCreateCommand = z.object({
   type: z.literal('workspace.create'),
@@ -204,7 +204,7 @@ export const repoLinkCommand = z.object({
   name: z.string().min(1).optional(),
   defaultBranch: z.string().min(1).default('main'),
 });
-// The calendar's two human moves, mirroring packages/control-api/src/commands.ts. Agents draft and
+// The calendar's two human moves, mirroring ./command-union.ts. Agents draft and
 // humans publish, so both are HUMAN_ONLY in the handler and belong in this set (the mobile fix
 // round, 2026-09-06 — the phone's calendar could show a post and do nothing about it). `scheduledAt`
 // omitted keeps a draft's own future slot; the server defaults to an hour out.

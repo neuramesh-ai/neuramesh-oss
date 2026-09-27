@@ -22,6 +22,7 @@ export {
   chargeMachineActivity, creditBalance, grantCredits, spendCredits, usageToday,
   workspacesDueRefill, type CreditBalance, type UsageToday,
 } from './credit-ledger';
+import { billingEnabled } from './billing';
 import { creditBalance, grantCredits, spendCredits, usageToday, type CreditBalance, type UsageToday, spendCreditsForFilm, refundFilm } from './credit-ledger';
 import { planDiskGb } from './fleet';
 import { localMode } from './localmode';
@@ -275,5 +276,17 @@ export async function actorInWorkspace(store: Store, actor: Actor, workspace: st
   if (actor.kind === 'human') return (await store.humanMemberIds(workspace)).includes(actor.id);
   if (actor.kind === 'agent') return (await store.agentWorkspace(actor.id)) === workspace;
   return false;
+}
+
+/** who may pay for a workspace or open its billing: a human member of it, and one guard for every
+ *  billing route (2026-09-27). Checkout and the Customer Portal used to ask only for a human, so any
+ *  signed-in person who held a workspace uuid could open that workspace's portal: its invoices, its
+ *  card, its Cancel. The config check comes last, so a stranger learns nothing about the deploy. */
+export async function billingCaller(store: Store, actor: Actor, workspace: string | undefined): Promise<{ workspace: string } | { refusal: { error: string; code: string }; status: 400 | 403 | 404 }> {
+  if (actor.kind !== 'human') return { refusal: { error: 'billing is human-only', code: 'NOT_PERMITTED' }, status: 403 };
+  if (!workspace) return { refusal: { error: 'workspace required', code: 'INVALID_INPUT' }, status: 400 };
+  if (!(await actorInWorkspace(store, actor, workspace))) return { refusal: { error: 'not your workspace', code: 'NOT_PERMITTED' }, status: 403 };
+  if (!billingEnabled()) return { refusal: { error: 'billing not configured', code: 'NOT_FOUND' }, status: 404 };
+  return { workspace };
 }
 

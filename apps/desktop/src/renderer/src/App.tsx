@@ -2646,7 +2646,6 @@ export function App() {
       [<IconRepeat s={13} key="v-au" />, 'Scheduled · Routines', () => { setNav('home'); setView('automations'); }],
       [<IconCalendar s={13} key="v-ca" />, 'Content calendar', () => { setNav('home'); setView('calendar'); }],
       [<IconTrend s={13} key="v-mk" />, 'Marketing OS', () => { setNav('home'); setView('marketing'); }],
-      [<IconCode s={13} key="v-en" />, 'Code', () => setRailMode('code')],
       [<IconFootprint s={13} key="v-fp" />, "Agents' footprint", () => { setNav('home'); setView('footprint'); }],
       [<IconCredits s={13} key="v-cr" />, 'Credits', () => { setNav('home'); setView('credits'); }],
       [<IconHistory s={13} key="v-hi" />, 'History', () => setHistOpen(true)],
@@ -3501,7 +3500,7 @@ export function App() {
               <button role="menuitem" onClick={() => setHistOpen(true)}><IconHistory s={14} /><span className="navlabel">History</span>{roomUnseenThreads ? <span className="navitembadge">{roomUnseenThreads > 9 ? '9+' : roomUnseenThreads}</span> : null}</button>
               <div className="viewmenusep" />
               <button role="menuitem" onClick={() => { setViewMenuOpen(false); setNav('home'); setView('marketing'); }}><IconTrend s={14} /><span className="navlabel">Marketing OS</span></button>
-              <button role="menuitem" onClick={() => { setViewMenuOpen(false); setRailMode('code'); }}><IconCode s={14} /><span className="navlabel">Code</span></button>
+              
               <button role="menuitem" onClick={() => { setViewMenuOpen(false); setNav('home'); setView('skills'); }}><IconSkill s={14} /><span className="navlabel">Skills</span></button>
               <button role="menuitem" onClick={() => { setViewMenuOpen(false); setNav('artifacts'); }}><IconLibrary s={14} /><span className="navlabel">Files</span></button>
               <button role="menuitem" onClick={() => { setViewMenuOpen(false); setNav('home'); setView('memory'); }}><IconMemory s={14} /><span className="navlabel">Memory</span></button>
