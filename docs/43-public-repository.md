@@ -45,14 +45,18 @@ Nobody develops in the public repository. Every push to the private `main` runs
 `scripts/public-snapshot.sh`:
 
 1. Clone the private repository at the pushed commit.
-2. Remove every path in `PUBLIC_EXCLUDE` and every workflow not in `PUBLIC_WORKFLOWS`. Place the
+2. Strip the private apps from the five files both trees share (2026-09-27): the lockfile's
+   importers, the lint globs, the size caps, the dev servers in `.claude/launch.json`, and the
+   root scripts. `scripts/public-config.mjs` reads its rules from `PUBLIC_EXCLUDE`, so it names no
+   app, and a private name that it cannot strip stops the publish.
+3. Remove every path in `PUBLIC_EXCLUDE` and every workflow not in `PUBLIC_WORKFLOWS`. Place the
    public repository's own files from `.github/public`: its pull request template and the
    workflow that enforces it, `pr-template.yml`.
-3. Scan the tree that ships with `scripts/public-scan.sh`: gitleaks, the generic patterns, and the
+4. Scan the tree that ships with `scripts/public-scan.sh`: gitleaks, the generic patterns, and the
    private patterns the job receives from a secret. A hit fails the publish.
-4. Commit the tree as one commit on top of the public `main`, on the rolling branch `publish`,
+5. Commit the tree as one commit on top of the public `main`, on the rolling branch `publish`,
    force-pushed.
-5. Open the pull request from `publish` to `main`, or update the one that is open. Its body has
+6. Open the pull request from `publish` to `main`, or update the one that is open. Its body has
    the template's three sections. What & why: the version, and the commits the private `main`
    landed in the tree that ships since the last publish, read from the newest `Publish main@<sha>`
    commit in the public history. Evidence: the scan run, and where the tree moved, one row per

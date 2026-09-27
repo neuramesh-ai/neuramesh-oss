@@ -26,12 +26,10 @@ export default [
       'packages/control-api/index.js',
       'packages/control-api/api/**',
       'packages/control-api/src/seed/skill-seed.ts', // gen-skill-seed.ts output — marketing-skill-seed.ts is hand-authored and stays linted
-      'apps/web/src/benchmarks.v1.json',
-      'apps/mobile/src/terminal-html.ts', // build-mobile-terminal.mjs output — the WebView's xterm page as one string (S8)
+      // build-mobile-terminal.mjs output — the WebView's xterm page as one string (S8)
       // non-product trees
       'mockups/**', 'docs/**', 'supabase/**', 'patches/**', '.claude/**',
-      'apps/desktop/build/**', 'apps/mobile/appstore/**',
-      // Phase 0 lints TypeScript only; scripts/*.mjs and config js join in a later phase
+      'apps/desktop/build/**', // Phase 0 lints TypeScript only; scripts/*.mjs and config js join in a later phase
       '**/*.js', '**/*.mjs', '**/*.cjs',
     ],
   },
@@ -55,7 +53,7 @@ export default [
     },
   },
   {
-    files: ['apps/desktop/src/renderer/**/*.{ts,tsx}', 'apps/hq/**/*.{ts,tsx}', 'apps/web/src/**/*.{ts,tsx}', 'apps/mobile/**/*.{ts,tsx}'],
+    files: ['apps/desktop/src/renderer/**/*.{ts,tsx}'],
     plugins: { 'react-hooks': reactHooks },
     rules: {
       'react-hooks/rules-of-hooks': 'error',

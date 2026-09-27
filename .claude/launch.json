@@ -18,33 +18,6 @@
       "port": 5210
     },
     {
-      "name": "web",
-      "runtimeExecutable": "pnpm",
-      "runtimeArgs": [
-        "--filter",
-        "@neuramesh/web",
-        "dev",
-        "--port",
-        "5177",
-        "--strictPort"
-      ],
-      "port": 5177
-    },
-    {
-      "name": "browser-client",
-      "runtimeExecutable": "pnpm",
-      "runtimeArgs": [
-        "--dir",
-        "apps/hq",
-        "exec",
-        "vite",
-        "--port",
-        "5202",
-        "--strictPort"
-      ],
-      "port": 5202
-    },
-    {
       "name": "desktop-preview",
       "runtimeExecutable": "pnpm",
       "runtimeArgs": [
@@ -244,15 +217,6 @@
       "port": 8787
     },
     {
-      "name": "browser-client-rw",
-      "runtimeExecutable": "bash",
-      "runtimeArgs": [
-        "-c",
-        "VITE_NM_DEV_USER=00000000-0000-0000-0000-000000000001 NM_DEV_API_TARGET=http://127.0.0.1:8787 VITE_NM_POWERSYNC_URL=http://127.0.0.1:58081 pnpm --dir apps/hq exec vite --port \"${PORT:-5210}\" --strictPort"
-      ],
-      "autoPort": true
-    },
-    {
       "name": "desktop-live-rail",
       "runtimeExecutable": "env",
       "runtimeArgs": [
@@ -276,30 +240,6 @@
         "docs/design/mobile-cloud-2026-09"
       ],
       "port": 5299
-    },
-    {
-      "name": "mobile-metro",
-      "runtimeExecutable": "bash",
-      "runtimeArgs": [
-        "-c",
-        "cd apps/mobile && pnpm exec expo start --dev-client --clear --port 8081"
-      ],
-      "port": 8081
-    },
-    {
-      "name": "engineering-harness",
-      "runtimeExecutable": "env",
-      "runtimeArgs": [
-        "NM_NODE_BIN=~/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
-        "NM_ENGINEERING_DETERMINISTIC=1",
-        "NM_ENGINEERING_API_PORT=8796",
-        "NM_ENGINEERING_RELAY_PORT=8795",
-        "NM_ENGINEERING_MODEL_PORT=8794",
-        "NM_WEB_PORT=5205",
-        "bash",
-        "scripts/dev-web-engineering.sh"
-      ],
-      "port": 5205
     },
     {
       "name": "design-canvas",
@@ -374,24 +314,6 @@
       "port": 8789
     },
     {
-      "name": "web-release",
-      "runtimeExecutable": "bash",
-      "runtimeArgs": [
-        "-c",
-        "VITE_CLERK_PUBLISHABLE_KEY=\"$(grep -E '^CLERK_PUBLISHABLE_KEY=' .env | head -1 | cut -d= -f2- | sed -E 's/^[\"\\x27]//; s/[\"\\x27]$//')\" VITE_NM_API=http://127.0.0.1:8789 pnpm --filter @neuramesh/web dev --port 5178 --strictPort"
-      ],
-      "port": 5178
-    },
-    {
-      "name": "browser-client-release",
-      "runtimeExecutable": "bash",
-      "runtimeArgs": [
-        "-c",
-        "VITE_NM_DEV_USER=00000000-0000-0000-0000-000000000001 NM_DEV_API_TARGET=http://127.0.0.1:8789 VITE_NM_POWERSYNC_URL=http://127.0.0.1:58081 pnpm --dir apps/hq exec vite --port 5211 --strictPort"
-      ],
-      "port": 5211
-    },
-    {
       "name": "control-api-fleet",
       "runtimeExecutable": "bash",
       "runtimeArgs": [
@@ -460,15 +382,6 @@
       "port": 8796
     },
     {
-      "name": "browser-claims-e2e",
-      "runtimeExecutable": "bash",
-      "runtimeArgs": [
-        "-c",
-        "VITE_NM_DEV_USER=\"${NM_E2E_USER:-3bcb99d3-4a4a-4458-80e0-2a8f6e322fb3}\" NM_DEV_API_TARGET=http://127.0.0.1:8790 VITE_NM_POWERSYNC_URL=http://127.0.0.1:58081 VITE_NM_RELAY_URL=ws://127.0.0.1:8796 VITE_NM_DEV_RELAY_TOKEN=local-dev-relay-token-e2e-0123456789abcdef pnpm --dir apps/hq exec vite --port 5203 --strictPort"
-      ],
-      "port": 5203
-    },
-    {
       "name": "desktop-coding",
       "runtimeExecutable": "env",
       "runtimeArgs": [
@@ -480,22 +393,6 @@
         "scripts/dev-app-cdp.sh"
       ],
       "port": 9238
-    },
-    {
-      "name": "hq-preview",
-      "runtimeExecutable": "pnpm",
-      "runtimeArgs": [
-        "--dir",
-        "apps/hq",
-        "exec",
-        "vite",
-        "--config",
-        "vite.preview.config.mjs",
-        "--port",
-        "5212",
-        "--strictPort"
-      ],
-      "port": 5212
     }
   ]
 }

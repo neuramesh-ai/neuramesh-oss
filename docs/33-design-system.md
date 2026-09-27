@@ -915,6 +915,23 @@ real work — if it is decoration, drop it and keep the pill.
   column of rows. **Shortcut rows step in** 22px from their kicker and children a second step
   (36px) with no guide hairline (trap 9b); the kicker itself is `--dim`, rows rest in `--body`,
   icons in `--muted`, the selected row in `--text` at 560.
+  ▸ **Superseded in part 2026-09-26 (the left-nav round, George; visual contract
+  [docs/design/left-nav-2026-09](design/left-nav-2026-09/plan.md)): the kicker retired and the verb reads
+  `New session`.** "No need for a shortcuts section title, the new chat changes to new session and the
+  other menu items sit underneath it on the same level." The rows sit under the verb on the verb's own
+  edge, the same 32px row (`.navdest .navitem`, the icon at 20px), and `nm:navSec.shortcuts` is dead.
+  One verb in both modes: the rail's row, the folders' `New session in …` and `New session here`, the
+  landing tab and the ⌘K row all say it. The band is **Automations · Customizations · Marketing OS ·
+  More**. Automations is the Scheduled row relabelled (label only, the keys stay). **Customizations** is
+  the second two-lens destination, Skills · Connections as `.desttabs` on one page (the Automations
+  shape, no new strip), each tab wearing the count it names, the scope bar shared; its Connections
+  lens lists the room's connectors in one card per purpose (`.cxsec` + `.cxkick`: Publish · Read ·
+  Ads · Media, `CONNECTOR_PURPOSE`). **More** holds Whiteboards · Files · Code behind the row menu the
+  folders wear (`.navrowmenu`, beside the row, the transparent scrim); a menu must not cost
+  information, so while you stand in one of its rows the More row wears the fill and its trailing
+  slot (`.navitemfact`) names the place. Code inside More stays the door onto the mode. Marketing OS
+  stays at the top level (George picked A over C, which folded it too). Two glyphs: `IconSliders` for
+  Customizations, `IconMoreH` for More. Code mode's band is unchanged.
 - **A destination with more than one surface nests in the NAV, it does not grow tabs**
   (2026-08-13, George — Scheduled › Routines · Calendar). The disclosure already IS the
   navigation, so a tab strip inside the main area beside it would be a second door to the same

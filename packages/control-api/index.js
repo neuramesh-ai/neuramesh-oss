@@ -4112,7 +4112,7 @@ var SUPPORTED_DESKTOP_VERSIONS, MIN_DESKTOP_VERSION, versionSegments, belowFloor
 var init_desktop_floor = __esm({
   "../shared/src/desktop-floor.ts"() {
     "use strict";
-    SUPPORTED_DESKTOP_VERSIONS = ["0.150.0", "0.149.0"];
+    SUPPORTED_DESKTOP_VERSIONS = ["0.151.0", "0.150.0"];
     MIN_DESKTOP_VERSION = SUPPORTED_DESKTOP_VERSIONS[1];
     versionSegments = (v) => v.split(".").map((n) => Number.parseInt(n, 10) || 0);
     belowFloor = (version, floor) => !!floor && /^\d+\.\d+/.test(floor) && compareVersions(version, floor) < 0;
@@ -4473,34 +4473,36 @@ function brainNoticeOf(messages, override) {
 function noticeProvider(n) {
   return AUTH_LABEL[n.card.provider] ?? n.card.provider;
 }
-function noticeWhy(n) {
+function noticeWhy(n, where = THIS_MACHINE) {
   const label = noticeProvider(n);
-  return n.card.why ?? (n.card.reason === "expired" ? `The ${label} login on this machine expired.` : `This machine has no ${label} login.`);
+  return n.card.why ?? (n.card.reason === "expired" ? `The ${label} login on ${where} expired.` : `${where.charAt(0).toUpperCase()}${where.slice(1)} has no ${label} login.`);
 }
-function brainNoticeLine(n) {
+function brainNoticeLine(n, where = THIS_MACHINE) {
   const who = n.card.agent ? `@${n.card.agent}` : "An agent";
-  return n.state === "needs" ? { title: `${who} cannot run here`, summary: noticeWhy(n) } : { title: `${who} runs on the NeuraMesh brain here`, summary: noticeWhy(n) };
+  return n.state === "needs" ? { title: `${who} cannot run here`, summary: noticeWhy(n, where) } : { title: `${who} runs on the NeuraMesh brain here`, summary: noticeWhy(n, where) };
 }
-function brainNoticeText(n) {
+function brainNoticeText(n, where = THIS_MACHINE) {
   const who = n.card.agent ? `@${n.card.agent}` : "The agent";
   const label = noticeProvider(n);
-  const why = noticeWhy(n);
+  const why = noticeWhy(n, where);
   if (n.state === "needs") {
     return {
       happened: `${who} cannot run on ${label} here. ${why} Nothing moved, so this conversation waits.`,
-      todo: n.card.starter === false ? `Sign in to ${label} again on this machine, or add credits. This workspace is out of credits, so the NeuraMesh brain cannot take it.` : `Sign in to ${label} again on this machine, or run this conversation on the NeuraMesh brain, on credits.`
+      todo: n.card.starter === false ? `Sign in to ${label} again on ${where}, or add credits. This workspace is out of credits, so the NeuraMesh brain cannot take it.` : `Sign in to ${label} again on ${where}, or run this conversation on the NeuraMesh brain, on credits.`
     };
   }
   return {
     happened: n.auto ? `${who} could not run on ${label} here. ${why} This routine continued on the NeuraMesh brain, on credits.` : `${who} could not run on ${label} here. ${why} You moved this conversation to the NeuraMesh brain, on credits.`,
-    todo: `Sign in to ${label} again on this machine, then reset the brain in this conversation to go back.`
+    todo: `Sign in to ${label} again on ${where}, then reset the brain in this conversation to go back.`
   };
 }
+var THIS_MACHINE;
 var init_brainnotice = __esm({
   "../shared/src/brainnotice.ts"() {
     "use strict";
     init_cards();
     init_rates();
+    THIS_MACHINE = "this machine";
   }
 });
 
@@ -8602,6 +8604,7 @@ __export(src_exports, {
   TASK_KINDS: () => TASK_KINDS,
   TASK_STATES: () => TASK_STATES,
   TEMPLATE_META: () => TEMPLATE_META,
+  THIS_MACHINE: () => THIS_MACHINE,
   THREAD_KINDS: () => THREAD_KINDS,
   THREAD_MODES: () => THREAD_MODES,
   THREAD_STATUSES: () => THREAD_STATUSES,
