@@ -8,15 +8,36 @@
 // a previous turn's seat would spend the wrong credential.
 import { HIRE_CARD_SPEC } from '../hirecards';
 import { AGENT_NAME_RE, HIREABLE_ROLES } from '../hire';
+import { kindMarker } from '@neuramesh/shared';
 
 
 import type { OrchTool, ToolCtx } from './orchtools';
 
 export function roomTools(tc: ToolCtx): OrchTool[] {
   const { z, db, post, ch, agent, actor, thread, convoThreadId, log,
-          filed, roomMenu, siblings,
+          filed, roomMenu, siblings, codeDoor,
           executeHire } = tc;
+  const repoLabel = codeDoor ? (codeDoor.repo.org_name === 'local' ? codeDoor.repo.name : `${codeDoor.repo.org_name}/${codeDoor.repo.name}`) : '';
   return [
+    // THE CODE DOOR (0144, door 2 — docs/design/coding-threads-2026-09 §5.1, ruling 1): a conversation
+    // that wants hands on the project's repository becomes a CODING thread, and the coding runtime
+    // takes its turns from that message on. Offered only while the gates hold (orchtools.ts codeDoor),
+    // so the model never sees a tool that would refuse it; the server re-checks every gate
+    // (handler/thread.ts thread.set_kind: a task thread and a project with no repository are refused).
+    ...(codeDoor && convoThreadId ? [{
+      name: 'open_code_session',
+      description: `Turn THIS conversation into a coding thread on ${repoLabel}: the coding runtime (Plan mode first; every edit and command asks the human) works on the repository from the human's message on, in this same thread. Use it when the request wants hands on this project's code NOW (read or change it, run its tests) and nothing about the board's bar is true: they did not ask for tracked work, it does not need a PR, review and merge, and it need not outlive this conversation. Call it once, then reply in ONE line saying the code work starts here. Do not answer the request yourself, and never create a task for the same ask.`,
+      schema: { reason: z.string().min(1).max(160).describe('ONE clause on why this is code work, for the activity log') },
+      run: async (input: { reason: string }) => {
+        const res = await post('/v1/commands', actor, { type: 'thread.set_kind', workspace: ch.workspace_id, threadId: convoThreadId, kind: 'coding' });
+        const body = (await res.json()) as any;
+        if (!res.ok) return `error ${res.status}: ${body.message ?? body.code ?? 'thread.set_kind failed'} — answer the request here instead`;
+        // the divider (a record, never a message anyone answers: the daemon skips it, both transcript builders strip it)
+        await post('/v1/messages', actor, { workspace: ch.workspace_id, channel: filed.to?.id ?? ch.id, threadId: convoThreadId, body: kindMarker('coding') }).catch(() => null);
+        log?.({ kind: 'lifecycle', phase: 'triage', summary: `opened code work on ${repoLabel} — ${input.reason}` });
+        return `this is a coding thread on ${repoLabel} now. The coding runtime takes it from here: reply in ONE line saying so, and stop.`;
+      },
+    }] : []),
     ...(convoThreadId ? [{
       name: 'set_thread_title',
       description: 'Rename THIS conversation thread. Its provisional title is the human\'s first message, near-verbatim — call this once, early, with a clean 2–6 word topic title: what the conversation is ABOUT, never their words echoed back. Optionally add a one-line description.',

@@ -27,7 +27,9 @@ export type Anchor = { key: string; row: RailRow; top: number; left: number };
 const HOVER_DELAY_MS = 350;
 const CARD_H = 150;
 
-export function kindOf(r: RailRow): RowKind { return r.engineeringSessionId ? 'code' : r.task ? 'task' : r.scheduleId ? 'routine' : 'chat'; }
+export function kindOf(r: RailRow): RowKind { return r.engineeringSessionId || r.kind === 'coding' ? 'code' : r.task ? 'task' : r.scheduleId ? 'routine' : 'chat'; }
+/** a row the coding runtime drives: a legacy Engineering session (its own floor) or a coding THREAD (0144, the one surface) */
+const codeDriven = (r: RailRow): boolean => !!r.engineeringSessionId || r.kind === 'coding';
 /** an engineering session's state, in the vocabulary a human reads (#391's runtime states) */
 export const ENG_LABEL: Record<string, string> = { idle: 'idle', streaming: 'working', awaiting_approval: 'needs your approval', resumable: 'paused', completed: 'completed', error: 'failed' };
 export function titleOf(r: RailRow): string { return r.task ? plainTitle(r.task.title) : r.title; }
@@ -86,8 +88,8 @@ export function HistoryRail({ nav, liveIds, liveRuns, askIds, collapsed, openId,
   /** the row names its own room, which on an unscoped rail is not the one you are standing in */
   onOpenThread: (id: string, channelId: string | null) => void;
   onOpenTask: (id: string) => void;
-  /** Engineering sessions have no room thread id; they route into the Engineering destination. */
-  onOpenEngineering: (id: string) => void;
+  /** a legacy Engineering session's door (the floor retired with coding threads, 0144): absent, such a row opens nothing */
+  onOpenEngineering?: ((id: string) => void) | undefined;
   onExpand: () => void;
   /** archiving a chat row, from the rail people actually browse */
   onArchive?: (threadId: string, title: string) => void;
@@ -128,7 +130,7 @@ export function HistoryRail({ nav, liveIds, liveRuns, askIds, collapsed, openId,
   const statusOf = (r: RailRow) => (marksOf && r.threadId && !r.engineeringSessionId ? marksOf(r).status : null);
   /** straight off the shared derivation — never guessed from the word (shared canSettle) */
   const settleOf = (r: RailRow): boolean =>
-    !!onSettle && !!marksOf && !!r.threadId && !r.engineeringSessionId && marksOf(r).settle;
+    !!onSettle && !!marksOf && !!r.threadId && !codeDriven(r) && marksOf(r).settle;
   const [hover, setHover] = useState<Anchor | null>(null);
   const [renaming, setRenaming] = useState<{ key: string; value: string } | null>(null);
   // both modes fold by project (George, on sight: Code's flat list read as "just all threads") — and
@@ -174,10 +176,11 @@ export function HistoryRail({ nav, liveIds, liveRuns, askIds, collapsed, openId,
   const rowEl = (r: RailRow) => {
           // an engineering session (#391) carries its own liveness: streaming is live, an approval
           // waiting on you is the ask; it has no run record, so the orb stands for the stream
-          const live = r.engineeringSessionId
+          // …and a coding THREAD (0144) carries the same two states on its session row
+          const live = codeDriven(r)
             ? r.engineeringState === 'streaming'
             : (r.task && liveIds.has(r.task.id)) || (r.threadId && liveIds.has(r.threadId));
-          const ask = !!(r.engineeringSessionId
+          const ask = !!(codeDriven(r)
             ? r.engineeringState === 'awaiting_approval'
             : (r.task && askIds.has(r.task.id)) || (r.threadId && askIds.has(r.threadId)));
           // the row you are STANDING in. Distinct from `live` by design: live is coloured and
@@ -186,14 +189,16 @@ export function HistoryRail({ nav, liveIds, liveRuns, askIds, collapsed, openId,
           // a row on ANOTHER connection (U3b): the `.on` row is the one row in the foreground band
           const foreign = !!r.foreign;
           const selected = !foreign && !!openId && (r.engineeringSessionId === openId || r.task?.id === openId || r.threadId === openId);
-          const run = !r.engineeringSessionId && live ? (r.task && liveRuns.get(r.task.id)) || (r.threadId && liveRuns.get(r.threadId)) || null : null;
+          const run = !codeDriven(r) && live ? (r.task && liveRuns.get(r.task.id)) || (r.threadId && liveRuns.get(r.threadId)) || null : null;
           const kind = kindOf(r);
           const state = r.task?.state ?? null;
           const glyph = rowGlyphFor({ kind, state, run: !!run || (kind === 'code' && !!live) });
           const shortBranch = r.branch && r.task ? `nm-${r.task.number}` : r.branch;
+          // a coding thread's one fact in Code mode is its repository (its session row names no worktree branch)
           const fact = codeMode
             ? (r.engineeringSessionId
                 ? (scopeProject && r.branch ? `⎇ ${r.branch}` : r.engineeringRepo ?? null)
+                : r.kind === 'coding' ? r.engineeringRepo ?? null
                 : r.branch ? `⎇ ${scopeProject ? r.branch : shortBranch}` : null)
             : (!scopeChannel && r.channelSlug ? `#${r.channelSlug}` : null);
           const status = statusOf(r);
@@ -247,7 +252,7 @@ export function HistoryRail({ nav, liveIds, liveRuns, askIds, collapsed, openId,
               aria-current={selected ? 'true' : undefined}
               aria-label={label}
               // the row carries its OWN room to the shell — see onOpenThread in HistoryRail's props
-              onClick={() => foreign && onOpenOn ? onOpenOn(r) : r.engineeringSessionId ? onOpenEngineering(r.engineeringSessionId) : (r.task ? onOpenTask(r.task.id) : onOpenThread(r.threadId!, r.channelId))}
+              onClick={() => foreign && onOpenOn ? onOpenOn(r) : r.engineeringSessionId ? onOpenEngineering?.(r.engineeringSessionId) : (r.task ? onOpenTask(r.task.id) : onOpenThread(r.threadId!, r.channelId))}
               onFocus={(e) => armHover(r, e.currentTarget)}
               onBlur={disarmHover}
             >

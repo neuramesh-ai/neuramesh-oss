@@ -12,7 +12,7 @@ import type { HostedAgent, ThreadTask } from '../agents';
 import { pickDeadLetters, type SweepCandidate } from '../chatsweep';
 import { HIRE_CONFIRM_RE } from '../hirecards';
 import { type RunHandle } from './runs';
-import { addressedIn, hostSpeaksForOrigin, mentionRe, modelFreeItemId, nobodyCanServe, parseCard, parseModeMarker, unaddressedWake } from '@neuramesh/shared';
+import { addressedIn, hostSpeaksForOrigin, isCodingThread, mentionRe, modelFreeItemId, nobodyCanServe, parseCard, parseKindMarker, parseModeMarker, unaddressedWake } from '@neuramesh/shared';
 import type { PowerSyncDatabase } from '@powersync/node';
 import type { ClaimVerdict, MachineCapability, SessionOrigin } from '@neuramesh/shared';
 import type { HostGuards } from './guards';
@@ -204,13 +204,16 @@ export function makeWakeRouting(ctx: {
     }
     // docs/34: the Tasks toggle's own line in the transcript. It is a RECORD of the flip, not a
     // message to anyone — waking on it would answer a divider.
-    if (parseModeMarker(m.body)) { processed.add(m.id); return; }
+    if (parseModeMarker(m.body) || parseKindMarker(m.body)) { processed.add(m.id); return; } // …and the kind flip's line (0144), the same record-not-message
     // round 9: "nudge me here" is WIRED — a human reply in a marketing room's bootstrap
     // thread finishes any MISSING brand docs instead of a generic chat turn. With the set
     // complete, the reply falls through to the ordinary wake (post-bootstrap Q&A).
     if (m.thread_id && live && orch) {
       processed.add(m.id);
       void (async () => {
+        // a CODING thread (0144): the coding runtime owns every turn in it, and no room agent
+        // answers there — by construction, never by prompt (ruling 2, 2026-09-26)
+        if (isCodingThread((await db.getAll<{ kind: string | null }>(`select kind from threads where id = ? limit 1`, [m.thread_id]).catch(() => [] as Array<{ kind: string | null }>))[0]?.kind)) return;
         try {
           const [mkch] = await db.getAll<{ workspace_id: string; marketing: string | null }>(
             `select workspace_id, marketing from channels where id = ? and kind = 'marketing' limit 1`, [m.channel_id],

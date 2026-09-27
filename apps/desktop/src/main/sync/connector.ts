@@ -7,7 +7,7 @@ import type { AbstractPowerSyncDatabase, PowerSyncBackendConnector } from '@powe
 import { apiBearerHeader } from '../apiauth';
 import { DEV_WS, type Connection } from '../connections';
 import { signDevToken } from '../token';
-import { uploadCrudEntry, type UploadIdentity } from './upload';
+import { uploadCrudEntry, type UploadIdentity } from '@neuramesh/client-core/crud-upload';
 
 /** the expiry a JWT names, so the SDK can refresh before it lapses instead of retrying a dead
  *  token as 401 noise. Undefined for an unreadable token — the SDK then refreshes on 401. */
@@ -81,7 +81,7 @@ export class Connector implements PowerSyncBackendConnector {
     const c = this.conn;
     // a throw here makes PowerSync retry the transaction AND hold back
     // checkpoint application — downloads wedge behind a failing write. The table
-    // branches live in sync/upload.ts, shared with machined so coverage can't drift.
+    // branches live in client-core's crud-upload.ts, shared with machined so coverage can't drift.
     if (!c.apiUrl) throw new Error('control-api not ready — write queued');
     const ident: UploadIdentity = {
       apiUrl: c.apiUrl,

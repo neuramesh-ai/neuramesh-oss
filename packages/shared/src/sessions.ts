@@ -7,7 +7,7 @@
 //
 // Moved verbatim from apps/desktop/src/renderer/src/room-tabs.ts; that file keeps the room's
 // surface lens (roomTabsFor / resolveRoomSurface) and re-exports everything here.
-import { stripMarkdownInline } from './threads';
+import { stripMarkdownInline, threadKindOf, type ThreadKind } from './threads';
 import { parseCard } from './cards';
 
 export interface HistoryThread {
@@ -21,6 +21,24 @@ export interface HistoryThread {
   channel_slug?: string | null;
   /** 0119: a scheduled automation opened this thread */
   schedule_id?: string | null;
+  /** 0144: `coding` = the coding runtime works on a repository in this thread (absent reads as chat) */
+  kind?: string | null;
+}
+
+/**
+ * A coding thread's session row (code_sessions, 0135 + 0144), as the list needs it: the repo, the
+ * mode, the state and the last line. Matched to its thread by `thread_id` (or by id — the session
+ * id IS the thread id). A legacy Code session, whose id names no thread, matches nothing here.
+ */
+export interface CodeSessionLite {
+  id: string;
+  thread_id?: string | null;
+  repo_name?: string | null;
+  branch?: string | null;
+  mode?: string | null;
+  state?: string | null;
+  last_line?: string | null;
+  updated_at?: string | null;
 }
 
 export interface HistoryTask {
@@ -74,6 +92,9 @@ export interface HistoryRow<T extends HistoryTask> {
   rootMessageId?: string;
   /** 0119: this session is a routine's run — the rows wear the clock marker */
   scheduleId?: string | null;
+  /** 0144: `coding` — the row wears the prompt glyph and the code face (engineeringRepo/Mode/State
+   *  below come from its session row); it still opens on the one session surface, by threadId */
+  kind?: ThreadKind;
   /** A workspace Engineering session shown in the global All threads rail. It has no room or
    * board task, so the rail uses this identity to route back into the Engineering surface. */
   engineeringSessionId?: string;
@@ -134,8 +155,12 @@ export function historyRows<T extends HistoryTask>(input: {
   limit?: number;
   /** this room's channel-root messages — omit to skip the legacy pass (Home has no such watch) */
   messages?: RoomMessage[];
+  /** the workspace's code_sessions rows (0144): a coding thread's row wears its session's facts */
+  codeSessions?: CodeSessionLite[];
 }): Array<HistoryRow<T>> {
   const { threads, tasks, channelId, channelSlug, query, messages } = input;
+  const codeByThread = new Map<string, CodeSessionLite>();
+  for (const c of input.codeSessions ?? []) codeByThread.set(c.thread_id ?? c.id, c);
   const needle = query.trim().toLowerCase();
   const inScope = <R extends { channel_id?: string | null }>(r: R) => channelId === null || r.channel_id === channelId;
   const scopedThreads = threads.filter((t) => t.channel_id === undefined || inScope(t));
@@ -166,6 +191,12 @@ export function historyRows<T extends HistoryTask>(input: {
     ...scopedThreads.flatMap((t) => {
       const task = t.task_id ? tasks.find((x) => x.id === t.task_id) ?? null : null;
       if (ownedElsewhere(t, task)) return [];
+      // 0144: a coding thread wears its session row's facts — the repo, the mode, the state, the
+      // last line — and its freshness is the later of the two rows (the session moves as turns run,
+      // the thread only when a message lands). The row still opens by threadId: one surface.
+      const kind = threadKindOf(t.kind);
+      const code = kind === 'coding' ? codeByThread.get(t.id) ?? null : null;
+      const snip = (t.last_body ?? '').replace(/‹task:[0-9a-fA-F-]{36}›/g, '▸ filed a task — card in the thread').replace(/\s*‹(?:brief|release|report|article|wb|plan|kind):[^›]*›/g, '').trim();
       return [{
         key: `th:${t.id}`,
         threadId: t.id as string | null,
@@ -175,10 +206,16 @@ export function historyRows<T extends HistoryTask>(input: {
         branch: task?.branch ?? null,
         title: plainTitle(t.title || 'New thread'),
         // a card marker is the thread's business: the row keeps the prose beside it
-        snip: (t.last_body ?? '').replace(/‹task:[0-9a-fA-F-]{36}›/g, '▸ filed a task — card in the thread').replace(/\s*‹(?:brief|release|report|article|wb|plan):[^›]*›/g, '').trim(),
-        when: t.updated_at,
+        snip: code?.last_line?.trim() ? code.last_line.trim() : snip,
+        when: code?.updated_at && code.updated_at > t.updated_at ? code.updated_at : t.updated_at,
         state: task?.state ?? null,
         scheduleId: t.schedule_id ?? null,
+        ...(kind === 'coding' ? {
+          kind,
+          ...(code?.repo_name ? { engineeringRepo: code.repo_name } : {}),
+          ...(code?.mode === 'plan' || code?.mode === 'act' ? { engineeringMode: code.mode as 'plan' | 'act' } : {}),
+          ...(code?.state ? { engineeringState: code.state as HistoryRow<T>['engineeringState'] } : {}),
+        } : {}),
       }];
     }),
     ...bare.map((t) => ({

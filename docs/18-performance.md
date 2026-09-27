@@ -182,7 +182,7 @@ alternate before and after.
 These numbers give three rules.
 
 - A query that filters, joins or correlates on a replica column needs a client-schema index in
-  `apps/desktop/src/main/sync/schema/`. Without one, each lookup decodes every row, and a
+  `packages/client-core/src/tables/`. Without one, each lookup decodes every row, and a
   correlated subquery does that once for each outer row.
 - A `CASE`, or an `OR` over different columns, in a `WHERE` makes the planner ignore every
   index. Write one branch for each shape and take the `max` over a `union all`.

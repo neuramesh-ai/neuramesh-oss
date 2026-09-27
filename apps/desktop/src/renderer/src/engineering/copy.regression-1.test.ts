@@ -52,7 +52,7 @@ test('static Engineering UI surfaces contain no vendor branding', () => {
     join(import.meta.dirname, 'EngineeringActivity.tsx'),
     join(import.meta.dirname, 'EngineeringEditor.tsx'),
     join(import.meta.dirname, '../App.tsx'),
-    join(import.meta.dirname, '../../web/webnm-local.ts'),
+    // the web bridge's webnm-local.ts left with hq (2026-09-26); hq's copy of this test scans it
   ];
   for (const file of surfaces) {
     assert.doesNotMatch(readFileSync(file, 'utf8'), /\bcline\b/i, file);

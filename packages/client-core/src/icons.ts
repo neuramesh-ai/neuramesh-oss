@@ -1,10 +1,10 @@
 // THE ICON SHEET, SHARED (the mobile-cloud round, S1.4 — "icons, not words" needs the same glyphs
-// on both clients). GENERATED from apps/desktop/src/renderer/src/ui/icons.tsx by the round's
-// build script and asserted against it by test/icons.test.ts: every entry is the desktop icon's
-// inner markup verbatim, on a 24-grid, stroke 2, currentColor, round caps and joins. The phone
-// draws them with react-native-svg (apps/mobile/src/icon.tsx parses the three primitives this
-// sheet uses — path, circle, rect); the desktop keeps its JSX sheet. Never hand-edit an entry:
-// change the desktop icon and regenerate.
+// on both clients). GENERATED from apps/hq/src/ui/icons.tsx (the desktop's sheet until the hq
+// split, 2026-09-26) by the round's build script and asserted against it by test/icons.test.ts:
+// every entry is the inner markup of hq's icon, verbatim, on a 24-grid, stroke 2, currentColor,
+// round caps and joins. The phone draws them with react-native-svg (apps/mobile/src/icon.tsx
+// parses the three primitives this sheet uses — path, circle, rect); hq and the desktop keep their
+// JSX sheets. Never hand-edit an entry: change hq's icon and regenerate.
 export const ICON_PATHS = {
   threads: "<path d=\"M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z\" />",
   code: "<path d=\"M4 17l6-6-6-6\" /><path d=\"M13 19h7\" />",

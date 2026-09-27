@@ -30,12 +30,13 @@ export interface ScheduleRunRow {
 
 // auto-update lifecycle reflected by the renderer's update card. Mirrors the
 // UpdateState union in main/update.ts and the NMBridge interface in App.tsx.
-export type UpdateState =
+// `floor` (docs/46 rule 3): the Cloud connection's minDesktopVersion, set only while below it.
+export type UpdateState = { floor?: string } & (
   | { phase: 'idle' }
   | { phase: 'available'; version: string; notes: string | null }
   | { phase: 'downloading'; version: string; percent: number }
   | { phase: 'ready'; version: string }
-  | { phase: 'error'; message: string };
+  | { phase: 'error'; message: string });
 
 // cold start can beat main's handler registration by a few hundred ms —
 // watch subscriptions must retry or they silently never attach
@@ -58,8 +59,8 @@ contextBridge.exposeInMainWorld('nm', {
   footprintGet: (quick?: boolean) => ipcRenderer.invoke('nm:footprint-get', { quick }),
   footprintReclaim: () => ipcRenderer.invoke('nm:footprint-reclaim'),
   sandboxSet: (enabled: boolean) => ipcRenderer.invoke('nm:sandbox-set', { enabled }),
-  send: (channelId: string, body: string, opts?: { id?: string; attachments?: { id: string; name: string; mime: string }[]; threadId?: string; rootMessageId?: string; threadMode?: 'tasks' | 'chat'; brainOverride?: Record<string, string> | null; threadMachineId?: string | null; threadOrigin?: 'desktop' | 'web' | 'routine' | null }) =>
-    ipcRenderer.invoke('nm:send', { channelId, body, id: opts?.id, attachments: opts?.attachments, threadId: opts?.threadId, rootMessageId: opts?.rootMessageId, threadMode: opts?.threadMode, brainOverride: opts?.brainOverride, threadMachineId: opts?.threadMachineId, threadOrigin: opts?.threadOrigin }),
+  send: (channelId: string, body: string, opts?: { id?: string; attachments?: { id: string; name: string; mime: string }[]; threadId?: string; rootMessageId?: string; threadMode?: 'tasks' | 'chat'; brainOverride?: Record<string, string> | null; threadMachineId?: string | null; threadOrigin?: 'desktop' | 'web' | 'routine' | null; threadKind?: 'chat' | 'coding' }) =>
+    ipcRenderer.invoke('nm:send', { channelId, body, id: opts?.id, attachments: opts?.attachments, threadId: opts?.threadId, rootMessageId: opts?.rootMessageId, threadMode: opts?.threadMode, brainOverride: opts?.brainOverride, threadMachineId: opts?.threadMachineId, threadOrigin: opts?.threadOrigin, threadKind: opts?.threadKind }),
   // docs/34 — flip an OPEN conversation's Tasks toggle. Chat → tasks escalates in place (the
   // next message triages); tasks → chat stops the routing without touching an existing task.
   // Archiving a conversation (0108): it leaves Recents, the room's session list and search, and
@@ -146,6 +147,7 @@ contextBridge.exposeInMainWorld('nm', {
     invokeRetry('nm:watch-history-all', { subId });
     return () => { ipcRenderer.removeListener('nm:history-all', listener); void ipcRenderer.invoke('nm:unwatch', { subId }); };
   },
+  watchCodeSessions: (cb: (rows: unknown[]) => void): (() => void) => { const subId = crypto.randomUUID(); const listener = (_e: unknown, p: { subId: string; rows: unknown[] }) => { if (p.subId === subId) cb(p.rows); }; ipcRenderer.on('nm:code-sessions', listener); invokeRetry('nm:watch-code-sessions', { subId }); return () => { ipcRenderer.removeListener('nm:code-sessions', listener); void ipcRenderer.invoke('nm:unwatch', { subId }); }; }, // 0144: the workspace's Code sessions
   watchConvo: (threadId: string, cb: (rows: MessageRow[]) => void): (() => void) => {
     const subId = crypto.randomUUID();
     const listener = (_e: unknown, p: { subId: string; rows: MessageRow[] }) => { if (p.subId === subId) cb(p.rows); };

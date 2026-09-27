@@ -84,7 +84,7 @@ export { pickActiveWorkspace } from '@neuramesh/shared';
 // client passes the page it is showing (25 to start), so the work is bounded by what a person
 // actually looks at. params: [workspaceId, limit]
 export const SESSION_THREADS_FOR_WORKSPACE =
-  `select t.id, t.task_id, t.title, t.updated_at, t.channel_id, c.slug as channel_slug, t.schedule_id, t.machine_id, t.origin, t.mode, t.settled_at,
+  `select t.id, t.task_id, t.title, t.updated_at, t.channel_id, c.slug as channel_slug, t.schedule_id, t.machine_id, t.origin, t.mode, t.kind, t.settled_at,
           (select m.body from messages m where m.thread_id = t.id order by m.created_at desc limit 1) as last_body,
           -- who spoke last, and when: a human last = the agent owes a reply (shared/threadstatus.ts)
           (select m.author_kind from messages m where m.thread_id = t.id order by m.created_at desc limit 1) as last_author_kind,
@@ -121,7 +121,7 @@ export const THREAD_MESSAGES =
 
 // The thread's own row — its head: title, mode, the birth machine and origin (0134), the room. params: [threadId]
 export const THREAD_HEAD =
-  `select t.id, t.title, t.mode, t.brain_override, t.machine_id, t.origin, t.task_id, t.schedule_id, t.root_message_id, t.channel_id, c.slug as channel_slug, t.workspace_id, t.created_at, t.settled_at
+  `select t.id, t.title, t.mode, t.kind, t.brain_override, t.machine_id, t.origin, t.task_id, t.schedule_id, t.root_message_id, t.channel_id, c.slug as channel_slug, t.workspace_id, t.created_at, t.settled_at
      from threads t join channels c on c.id = t.channel_id where t.id = ? limit 1`;
 
 // The agents registered to a room (the ACL) — the composer's brain pill and the room's crew. params: [channelId]
@@ -136,7 +136,7 @@ export const THREAD_ARTIFACTS =
 
 // Code sessions (0135) — the Code tab's list, newest first. params: [workspaceId]
 export const CODE_SESSIONS_FOR_WORKSPACE =
-  `select id, project_id, repo_id, repo_name, branch, title, mode, state, machine_id, created_by, last_line, changes_count, checkpoints_count, created_at, updated_at, ended_at
+  `select id, thread_id, project_id, repo_id, repo_name, branch, title, mode, state, machine_id, created_by, last_line, changes_count, checkpoints_count, created_at, updated_at, ended_at
      from code_sessions where workspace_id = ? order by updated_at desc limit 200`;
 
 // Routines — every armed or paused schedule with its room. params: [workspaceId]

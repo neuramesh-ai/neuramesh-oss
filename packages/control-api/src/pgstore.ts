@@ -1,11 +1,11 @@
-import { applyShare, type BrainOverride, parseBrainOverride, serializeBrainOverride, attachmentUpgradeReason, buildAgentCard, flowForChannelKind, FREE_SEAT_CAP, planLabel, seatLimitReason, readAnswers, taskBranch, threadModeOf, threadTitle, type ActorRef, type Beat, type BeatStatus, type NMEvent, type Run, type RunSettleState, type RetroPayload, type RetroRange, type Task, type TaskKind, type TaskState, type ThreadMode, priceActiveSeconds } from '@neuramesh/shared';
+import { applyShare, type BrainOverride, parseBrainOverride, serializeBrainOverride, attachmentUpgradeReason, buildAgentCard, flowForChannelKind, FREE_SEAT_CAP, planLabel, seatLimitReason, readAnswers, taskBranch, threadKindOf, threadModeOf, threadTitle, type ActorRef, type Beat, type BeatStatus, type NMEvent, type Run, type RunSettleState, type RetroPayload, type RetroRange, type Task, type TaskKind, type TaskState, type ThreadKind, type ThreadMode, priceActiveSeconds } from '@neuramesh/shared';
 import { trackDomainEvent } from './analytics';
 import { createHash, randomBytes } from 'node:crypto';
 import postgres from 'postgres';
 import { embed } from './embedder';
 import { DomainError } from './errors';
 import { dueContentItemsSql, upcomingContentItemsSql, type DueItem, type UpcomingItem } from './store/content-reads';
-import { setThreadMachineSql, workspaceMachine } from './store/thread-machine';
+import { setThreadKindSql, setThreadMachineSql, workspaceMachine } from './store/thread-machine';
 import { latestHumanWordSql, setThreadSettledSql, threadTaskIdSql } from './store/thread-settle';
 import { markScheduleResultSql, setScheduleCursorSql } from './store/release-routine';
 import { seedBundledPacksSql } from './store/skillpack-seed';
@@ -1201,13 +1201,14 @@ export class PostgresStore implements Store {
     }) as Promise<{ id: string; inserted: boolean }>;
   }
 
-  async heartbeatMachine(machineId: string, activity?: { activeSeconds: number; busy: boolean; runtimes?: string[] }): Promise<void> {
+  async heartbeatMachine(machineId: string, activity?: { activeSeconds: number; busy: boolean; runtimes?: string[]; daemonVersion?: string }): Promise<void> {
     const seconds = activity?.activeSeconds ?? 0;
     const active = seconds > 0 || activity?.busy === true;
-    // runtimes ride the beat for cloud machines (they never register): written only when sent
+    // runtimes and the build ride the beat for cloud machines (they never register): written only
+    // when sent, so an older machine's beat leaves the recorded build standing
     const [row] = await this.sql<{ workspace_id: string; kind: string }[]>`
-      update machines set last_seen_at = now(), last_active_at = case when ${active} then now() else last_active_at end, runtimes = case when ${!!activity?.runtimes} then ${this.sql.json((activity?.runtimes ?? []) as never)}::jsonb else runtimes end
-       where id = ${machineId} returning workspace_id, kind`;
+      update machines set last_seen_at = now(), last_active_at = case when ${active} then now() else last_active_at end, runtimes = case when ${!!activity?.runtimes} then ${this.sql.json((activity?.runtimes ?? []) as never)}::jsonb else runtimes end,
+             daemon_version = coalesce(${activity?.daemonVersion ?? null}::text, daemon_version) where id = ${machineId} returning workspace_id, kind`;
     // LOCAL machines beat too, and their time is the user's own hardware — never billed.
     if (row && row.kind !== 'local' && seconds > 0) await chargeMachineActivity(this.sql, row.workspace_id, priceActiveSeconds(seconds), seconds);
   }
@@ -2900,6 +2901,8 @@ export class PostgresStore implements Store {
 
   /** rule D9 (0134): a conversation's designated machine — store/thread-machine.ts */
   async setThreadMachine(workspace: string, threadId: string, machineId: string | null): Promise<void> { await setThreadMachineSql(this.sql, workspace, threadId, machineId); }
+  /** 0144, coding threads: a conversation's kind — store/thread-machine.ts */
+  async setThreadKind(workspace: string, threadId: string, kind: ThreadKind): Promise<void> { await setThreadKindSql(this.sql, workspace, threadId, kind); }
 
   async setThreadMode(workspace: string, threadId: string, mode: ThreadMode): Promise<void> {
     const [row] = await this.sql<Array<{ id: string }>>`update threads
@@ -2953,8 +2956,8 @@ export class PostgresStore implements Store {
           // slot owns the conversation it opened, and no later reply into it may re-attribute that.
           const bornBrain = parseBrainOverride(msg.brainOverride);
           // 0134: a designation naming a machine outside THIS workspace is dropped rather than mis-routing at claim time
-          await sql`insert into threads (id, workspace_id, channel_id, title, created_by, mode, brain_override, schedule_id, machine_id, origin)
-            values (${msg.threadId}::uuid, ${msg.workspace}::uuid, ${chId}, ${threadTitle(msg.body)}, ${`${msg.author.kind}:${msg.author.id}`}, ${threadModeOf(msg.threadMode)}, ${bornBrain ? sql.json(bornBrain as never) : null}, ${msg.scheduleId ?? null}::uuid, ${msg.threadMachineId ? await workspaceMachine(sql, msg.workspace, msg.threadMachineId) : null}::uuid, ${msg.threadOrigin ?? null})
+          await sql`insert into threads (id, workspace_id, channel_id, title, created_by, mode, brain_override, schedule_id, machine_id, origin, kind)
+            values (${msg.threadId}::uuid, ${msg.workspace}::uuid, ${chId}, ${threadTitle(msg.body)}, ${`${msg.author.kind}:${msg.author.id}`}, ${threadModeOf(msg.threadMode)}, ${bornBrain ? sql.json(bornBrain as never) : null}, ${msg.scheduleId ?? null}::uuid, ${msg.threadMachineId ? await workspaceMachine(sql, msg.workspace, msg.threadMachineId) : null}::uuid, ${msg.threadOrigin ?? null}, ${threadKindOf(msg.threadKind)})
             on conflict (id) do update set updated_at = now()`;
         }
         await sql`insert into messages (id, workspace_id, channel_id, task_id, thread_id, author_kind, author_id, body, reply_to)

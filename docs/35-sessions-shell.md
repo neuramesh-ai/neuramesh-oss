@@ -143,6 +143,17 @@ sheet, no dimmed plane behind it. Both of today's sheets become this one surface
 
 - a **chat** session — title + `chat` chip in the header, the docs/34 escalation valve above the
   composer (`⇧ make this a task`, HUMAN_ONLY, in place);
+- a **coding** session (2026-09-26, [coding threads](design/coding-threads-2026-09/plan.md),
+  0144: `threads.kind = 'coding'`) is the SAME surface with the code face added. The header wears
+  the mode chip (`plan` in the plan hue, `act` in the build hue). The middle is the coding
+  runtime's transcript with the thread's own messages above it (rex's one line, the kind divider).
+  The composer is the thread's own, with the Plan | Act segment and the permissions chip added.
+  The Workbench card opens by itself and holds the code: Changes, Files, Work Plan, Checkpoints
+  and Terminal as tabs over the editor's pane (its own Files drawer is hidden there). The gate seat above the composer holds one card: the approval, else the Act
+  handoff, else the valve, `Make this a unit` (HUMAN_ONLY), which
+  creates a plan-first unit anchored to the conversation, and the thread stays a coding thread
+  with the unit card in it. Nothing reaches the board without that card. The session id IS the
+  thread id, so the machine's history discovery and the synced `code_sessions` row agree;
 - a **task** session — which is **today's docs/25 panel, unsheeted**. Its zoning is untouched:
   identity + spectrum + the facts line of toks in the header, at most one drawer, thread owns the
   middle, exactly ONE gate card docked above the composer, the beats dial at rest.

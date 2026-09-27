@@ -1,7 +1,7 @@
 // The session list (docs/35) — one row anatomy, grouped Today/Yesterday/This week/Earlier.
 // Split out of views/HomeView.tsx.
 import { Fragment, useMemo } from 'react';
-import { IconArchive, IconRoutineClock, IconThreads } from '../ui/icons';
+import { IconArchive, IconCode, IconRoutineClock, IconThreads } from '../ui/icons';
 import { STATE_LABEL } from '../task/labels';
 import { archivableThreadId } from './HistoryRail';
 import { sessionGroups, type HistoryRow } from '../room-tabs';
@@ -54,7 +54,9 @@ export function SessionRow({ row, live, showRoom, roomTag, selected, onOpen, onA
   // a routine's run is its own species of session (2026-08-22, George): the clock glyph and
   // the chip say so at a glance — same anatomy, different marker, and liveness still wins
   const routine = !state && !!row.scheduleId;
-  const label = state ? STATE_LABEL[state] ?? state : routine ? 'routine' : row.rootMessageId ? 'room' : 'chat';
+  // a coding thread (0144): the prompt glyph, and the chip says its mode
+  const coding = !state && row.kind === 'coding';
+  const label = state ? STATE_LABEL[state] ?? state : routine ? 'routine' : coding ? row.engineeringMode ?? 'code' : row.rootMessageId ? 'room' : 'chat';
   const archiveId = onArchive ? archivableThreadId(row) : null;
   const inner = (
     <button
@@ -67,13 +69,13 @@ export function SessionRow({ row, live, showRoom, roomTag, selected, onOpen, onA
     >
       {state
         ? <span className={`sdial c-${state}${live ? ' live' : ''}`} style={{ ['--frac' as string]: `${DIAL_AT[state] ?? 50}%` }} aria-hidden />
-        : <span className={`sglyph${routine ? ' routine' : ''}${live ? ' live' : ''}`} aria-hidden>{routine ? <IconRoutineClock s={11} /> : <IconThreads s={11} />}</span>}
+        : <span className={`sglyph${routine ? ' routine' : ''}${live ? ' live' : ''}`} aria-hidden>{routine ? <IconRoutineClock s={11} /> : coding ? <IconCode s={11} /> : <IconThreads s={11} />}</span>}
       <span className="sbody">
         <span className="st">{row.title}</span>
         {row.snip ? <span className="ssnip">{row.snip}</span> : null}
       </span>
       <span className="smeta">
-        <span className={`chip c-${state ?? (routine ? 'routine' : 'chat')}`}>{label}</span>
+        <span className={`chip c-${state ?? (routine ? 'routine' : coding ? row.engineeringMode ?? 'code' : 'chat')}`}>{label}</span>
         <span className="swhen">{showRoom ? (roomTag ? roomTag(row) : `#${row.channelSlug}`) : timeAgoShort(row.when)}</span>
       </span>
     </button>

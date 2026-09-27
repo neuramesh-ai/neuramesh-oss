@@ -15,6 +15,7 @@
 
 PUBLIC_EXCLUDE=(
   apps/web                                     # the site and the cloud web app (neuramesh.app)
+  apps/hq                                      # hq, the browser client (hq.neuramesh.app), split from the desktop renderer 2026-09-26
   apps/mobile                                  # the phone app: Pro only, built and shipped from the Expo account
   infra                                        # the cloud platform: Pulumi, the cluster, the machine, fleet and relay images
   packages/fleet                               # the cluster operator that runs the cloud machines
@@ -24,6 +25,7 @@ PUBLIC_EXCLUDE=(
   scripts/fleet-gke-smoke.sh                   # the operator against the production cluster
   scripts/egress-floor-gke-test.sh             # the egress floor proved on the production cluster
   scripts/pin-machine-image.mjs                # the machine image pin in the cluster manifests
+  scripts/pin-machine-image.test.mjs           # the machine image's inputs, held to its private Dockerfile and workflow
   scripts/build-mobile-terminal.mjs            # the phone app's terminal page
   'docs/design/*/evidence/*'                   # every design round's evidence: screenshots and logs with dev data (George, 2026-09-19)
   docs/design/cloud-first-2026-08/rollout.md   # the live rollout log of the production project
@@ -93,6 +95,7 @@ PUBLIC_DOCS=(
   docs/43-public-repository.md
   docs/44-release-drafts.md
   docs/45-feature-placement.md
+  docs/46-client-contracts.md
   docs/decisions.md
   docs/desktop-parity-ledger.md
   docs/export-format.md

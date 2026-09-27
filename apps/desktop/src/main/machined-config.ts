@@ -90,3 +90,24 @@ export function readConfig(env: Record<string, string | undefined>): MachinedCon
     stateDir: env['NM_STATE'] ?? '/nm/state',
   };
 }
+
+/** the commit this machine's image was built from (the Dockerfile bakes NM_IMAGE_SHA from
+ *  machine-image.yml), or null on a local build. Only a full commit sha counts: the API stores it
+ *  as the machine's daemon_version, and a value it refused would cost the whole beat, not a field. */
+export function imageShaOf(env: Record<string, string | undefined>): string | null {
+  const sha = env['NM_IMAGE_SHA']?.trim() ?? '';
+  return /^[0-9a-f]{40}$/.test(sha) ? sha : null;
+}
+
+/** the 30-second beat's command (machined.ts). `daemonVersion` rides every beat once the image
+ *  names its commit; an older image sends none, and the API keeps whatever the row holds. */
+export function heartbeatBody(machineId: string, beat: { activeSeconds: number; busy: boolean; runtimes?: string[]; imageSha: string | null }) {
+  return {
+    type: 'machine.heartbeat' as const,
+    machineId,
+    activeSeconds: beat.activeSeconds,
+    busy: beat.busy,
+    ...(beat.runtimes ? { runtimes: beat.runtimes } : {}),
+    ...(beat.imageSha ? { daemonVersion: beat.imageSha } : {}),
+  };
+}

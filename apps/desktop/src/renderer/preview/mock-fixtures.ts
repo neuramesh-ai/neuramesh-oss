@@ -42,19 +42,21 @@ export const mockWorkspaces = () => (MULTI_WS
 // ?slow=<ms> delays message delivery so the load/switch skeleton stays on screen long enough to capture.
 export const MSG_DELAY = typeof location !== 'undefined' ? parseInt(new URLSearchParams(location.search).get('slow') || '0', 10) : 0;
 
-// ?update=available|downloading|ready|error drives the bottom-left auto-update card.
+// ?update=available|downloading|ready|error drives the bottom-left auto-update card, and
+// ?floor=<version> adds the below-the-floor line to it (docs/46 rule 3).
 export const UPDATE_PHASE = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('update') : null;
+const floor = (): object => { const f = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('floor') : null; return f ? { floor: f } : {}; };
 export const mockUpdateState = (): any => {
-  if (UPDATE_PHASE === 'available') return { phase: 'available', version: '0.4.2', notes: 'Faster cold start, review-cockpit polish, and fixes.' };
-  if (UPDATE_PHASE === 'downloading') return { phase: 'downloading', version: '0.4.2', percent: 46 };
-  if (UPDATE_PHASE === 'ready') return { phase: 'ready', version: '0.4.2' };
-  if (UPDATE_PHASE === 'error') return { phase: 'error', message: 'Could not reach the update server.' };
+  if (UPDATE_PHASE === 'available') return { phase: 'available', version: '0.4.2', notes: 'Faster cold start, review-cockpit polish, and fixes.', ...floor() };
+  if (UPDATE_PHASE === 'downloading') return { phase: 'downloading', version: '0.4.2', percent: 46, ...floor() };
+  if (UPDATE_PHASE === 'ready') return { phase: 'ready', version: '0.4.2', ...floor() };
+  if (UPDATE_PHASE === 'error') return { phase: 'error', message: 'Could not reach the update server.', ...floor() };
   return { phase: 'idle' };
 };
 
 // conversation threads (v0.40): mutable per-channel history + per-thread feeds; the mock
 // send() drives them so the preview demos born → named → answered → task-upgraded live
-export type MockThread = { id: string; title: string; description: string; created_by: string; task_id: string | null; mode?: 'tasks' | 'chat'; created_at: string; updated_at: string; msg_count: number; last_body: string | null };
+export type MockThread = { id: string; title: string; description: string; created_by: string; task_id: string | null; mode?: 'tasks' | 'chat'; kind?: 'chat' | 'coding'; created_at: string; updated_at: string; msg_count: number; last_body: string | null };
 export const seedIso = (msAgo: number) => new Date(Date.now() - msAgo).toISOString();
 // docs/31: a #dev room message with replies — the footer's fixture. The root keeps its place
 // in the feed; the thread carries the answers.
@@ -71,8 +73,11 @@ const OLDER_GENERAL_CHATS: MockThread[] = ["Rename the release notes", "Check th
   created_at: seedIso((4 + i) * 86_400_000 + 7_200_000), updated_at: seedIso((4 + i) * 86_400_000), msg_count: 2,
   last_body: 'Done. The note is in the thread.', last_author_kind: 'agent', last_at: seedIso((4 + i) * 86_400_000),
 })) as MockThread[];
+// 0144: a CODING thread in #dev — the coding runtime works on flowe/app in it; its session row (mockCodeSessions) waits on an approval
+export const CODING_THREAD_ID = 'th-coding-sync';
 export const mockThreads: Record<string, MockThread[]> = {
   'c-dev': [
+    { id: CODING_THREAD_ID, title: 'Fix the sync watch dropping thread replies', description: '', created_by: 'human:u-george', task_id: null, mode: 'tasks', kind: 'coding', created_at: seedIso(420_000), updated_at: seedIso(300_000), msg_count: 1, last_body: 'The sync watch drops thread replies after a reconnect. Find why and fix it. Keep the fix inside sync.ts.', last_author_kind: 'human', last_at: seedIso(420_000) } as any,
     { id: REPLY_THREAD_ID, title: 'the drawer still traps focus on iPad', description: '', created_by: 'human:u-george', task_id: null, created_at: seedIso(600_000), updated_at: seedIso(240_000), msg_count: 3, last_body: 'Confirmed on iPadOS 18 — backdrop keeps focus.', last_author_kind: 'agent',
       root_message_id: ROOT_MSG_ID, root_body: 'the drawer still traps focus on iPad — tab cycles inside it after close', root_author_kind: 'human', root_author_id: 'u-george', root_at: seedIso(600_000) } as any,
     // docs/38: a chat where the human asked for a diagram and sol answered with a whiteboard —
@@ -123,6 +128,7 @@ export const mockThreadArts: Record<string, any[]> = {
   ],
 };
 export const convoMsgs: Record<string, any[]> = {
+  [CODING_THREAD_ID]: [{ id: 'm-coding-1', author_kind: 'human', author_id: 'u-george', body: 'The sync watch drops thread replies after a reconnect. Find why and fix it. Keep the fix inside sync.ts.', created_at: seedIso(420_000) }],
   'th-bare-chat': [
     { id: 'bc1', author_kind: 'human', author_id: 'u-george', created_at: seedIso(70_000), body: 'is the phase ring stored anywhere, or derived?' },
     { id: 'bc2', author_kind: 'agent', author_id: 'a-rex', created_at: seedIso(50_000), body: 'Derived, never stored — `journeyFor` builds it per render from FSM state + routing evidence + the live roster.' },
@@ -232,10 +238,13 @@ export const emitLog = (row: Record<string, unknown>) => logWatchers.forEach((w)
 // docs/35 §7: ONE workspace-wide thread set feeds the session list, the Recents rail and the ⌘Y
 // overlay, so a send has to re-fire it or a brand-new session shows in the room and nowhere else.
 export const historyAllWatchers = new Set<(rows: any[]) => void>();
+// the workspace's Code sessions (0144): the coding thread's row, waiting on an approval
+export const mockCodeSessions = [{ id: CODING_THREAD_ID, thread_id: CODING_THREAD_ID, project_id: null, repo_id: 'r-flowe-app', repo_name: 'flowe/app', branch: 'main', title: 'Fix the sync watch dropping thread replies', mode: 'act', state: 'awaiting_approval', machine_id: null, created_by: 'u-george', last_line: 'Both edits are ready as one patch. The relay tests run after you approve.', changes_count: 2, checkpoints_count: 1, created_at: seedIso(420_000), updated_at: seedIso(180_000), ended_at: null }];
+export const codeSessionsWatchers = new Set<(rows: any[]) => void>();
 export const historyAllSnapshot = () => Object.entries(mockThreads)
   .flatMap(([cid, list]: [string, any[]]) => list.map((t) => ({
     id: t.id, channel_id: cid, channel_slug: channels.find((c) => c.id === cid)?.slug ?? 'dev',
-    title: t.title, task_id: t.task_id ?? null, updated_at: t.updated_at, last_body: t.last_body ?? null,
+    title: t.title, task_id: t.task_id ?? null, updated_at: t.updated_at, last_body: t.last_body ?? null, kind: t.kind ?? 'chat',
     // what threadStatus reads (settle round, 2026-09-09): this set feeds makeRowMarks, so without
     // these three the harness could only ever draw one of the three words
     last_author_kind: t.last_author_kind ?? 'agent', last_at: t.last_at ?? t.updated_at, settled_at: t.settled_at ?? null,

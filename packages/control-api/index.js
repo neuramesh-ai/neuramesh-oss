@@ -1114,6 +1114,9 @@ var init_compute_sleepers = __esm({
 function codeSessionEndState(reason) {
   return reason === "completed" ? "completed" : reason === "error" ? "error" : "resumable";
 }
+function codeThreadStatus(state) {
+  return state === "awaiting_approval" ? "needs_you" : state === "streaming" ? "in_progress" : "settled";
+}
 function codeSessionTitle(prompt, max = 120) {
   const line = prompt.split("\n").map((l) => l.trim()).find((l) => l.length > 0) ?? "";
   return line.length <= max ? line : `${line.slice(0, max - 1)}\u2026`;
@@ -1134,6 +1137,19 @@ function threadModeOf(value) {
 }
 function isChatThread(value) {
   return threadModeOf(value) === "chat";
+}
+function threadKindOf(value) {
+  return value === "coding" ? "coding" : DEFAULT_THREAD_KIND;
+}
+function isCodingThread(value) {
+  return threadKindOf(value) === "coding";
+}
+function kindMarker(kind) {
+  return `\u2039kind:${kind}\u203A`;
+}
+function parseKindMarker(body) {
+  const m = KIND_MARKER_RE.exec(body.trim());
+  return m ? m[1] : null;
 }
 function modeMarker(mode) {
   return `\u2039mode:${mode}\u203A`;
@@ -1169,13 +1185,16 @@ function threadTitle(body) {
   }
   return t2.charAt(0).toUpperCase() + t2.slice(1);
 }
-var MAX_TITLE, THREAD_MODES, DEFAULT_THREAD_MODE, MODE_MARKER_RE;
+var MAX_TITLE, THREAD_MODES, DEFAULT_THREAD_MODE, THREAD_KINDS, DEFAULT_THREAD_KIND, KIND_MARKER_RE, MODE_MARKER_RE;
 var init_threads = __esm({
   "../shared/src/threads.ts"() {
     "use strict";
     MAX_TITLE = 60;
     THREAD_MODES = ["tasks", "chat"];
     DEFAULT_THREAD_MODE = "tasks";
+    THREAD_KINDS = ["chat", "coding"];
+    DEFAULT_THREAD_KIND = "chat";
+    KIND_MARKER_RE = /^‹kind:(chat|coding)›$/;
     MODE_MARKER_RE = /^‹mode:(tasks|chat)›$/;
   }
 });
@@ -1385,6 +1404,8 @@ function clip(s, max) {
 }
 function historyRows(input) {
   const { threads, tasks, channelId, channelSlug, query, messages } = input;
+  const codeByThread = /* @__PURE__ */ new Map();
+  for (const c of input.codeSessions ?? []) codeByThread.set(c.thread_id ?? c.id, c);
   const needle = query.trim().toLowerCase();
   const inScope = (r) => channelId === null || r.channel_id === channelId;
   const scopedThreads = threads.filter((t2) => t2.channel_id === void 0 || inScope(t2));
@@ -1397,6 +1418,9 @@ function historyRows(input) {
     ...scopedThreads.flatMap((t2) => {
       const task = t2.task_id ? tasks.find((x) => x.id === t2.task_id) ?? null : null;
       if (ownedElsewhere(t2, task)) return [];
+      const kind = threadKindOf(t2.kind);
+      const code = kind === "coding" ? codeByThread.get(t2.id) ?? null : null;
+      const snip = (t2.last_body ?? "").replace(/‹task:[0-9a-fA-F-]{36}›/g, "\u25B8 filed a task \u2014 card in the thread").replace(/\s*‹(?:brief|release|report|article|wb|plan|kind):[^›]*›/g, "").trim();
       return [{
         key: `th:${t2.id}`,
         threadId: t2.id,
@@ -1406,10 +1430,16 @@ function historyRows(input) {
         branch: task?.branch ?? null,
         title: plainTitle(t2.title || "New thread"),
         // a card marker is the thread's business: the row keeps the prose beside it
-        snip: (t2.last_body ?? "").replace(/‹task:[0-9a-fA-F-]{36}›/g, "\u25B8 filed a task \u2014 card in the thread").replace(/\s*‹(?:brief|release|report|article|wb|plan):[^›]*›/g, "").trim(),
-        when: t2.updated_at,
+        snip: code?.last_line?.trim() ? code.last_line.trim() : snip,
+        when: code?.updated_at && code.updated_at > t2.updated_at ? code.updated_at : t2.updated_at,
         state: task?.state ?? null,
-        scheduleId: t2.schedule_id ?? null
+        scheduleId: t2.schedule_id ?? null,
+        ...kind === "coding" ? {
+          kind,
+          ...code?.repo_name ? { engineeringRepo: code.repo_name } : {},
+          ...code?.mode === "plan" || code?.mode === "act" ? { engineeringMode: code.mode } : {},
+          ...code?.state ? { engineeringState: code.state } : {}
+        } : {}
       }];
     }),
     ...bare.map((t2) => ({
@@ -1550,6 +1580,7 @@ var init_commands_code = __esm({
   "../shared/src/commands-code.ts"() {
     "use strict";
     init_code_sessions();
+    init_threads();
     CODE_SESSION_COMMANDS = [
       // create-or-update the session's synced row. `createdBy` names the member the session belongs
       // to; only the owner of the hosting machine may name someone other than themselves (a cloud
@@ -1587,6 +1618,16 @@ var init_commands_code = __esm({
         approvalId: z.string().min(1).max(200),
         category: z.enum(CODE_APPROVAL_CATEGORIES),
         toolName: z.string().min(1).max(120)
+      }),
+      // Coding threads (0144, docs/design/coding-threads-2026-09): a conversation becomes coding (the
+      // coding runtime works on the project's repository in it) or goes back to chat. A human, or the
+      // room's orchestrator from its triage turn (ruling 1, 2026-09-26); handler/thread.ts refuses a
+      // task thread (its unit IS the code path) and a project with no repository (REPO_REQUIRED).
+      z.object({
+        type: z.literal("thread.set_kind"),
+        workspace: z.string().min(1),
+        threadId: z.string().uuid(),
+        kind: z.enum(THREAD_KINDS)
       })
     ];
   }
@@ -4054,6 +4095,27 @@ var init_prompts = __esm({
     init_agentcontract();
     ReviewParseError = class extends Error {
     };
+  }
+});
+
+// ../shared/src/desktop-floor.ts
+function compareVersions(a, b2) {
+  const x = versionSegments(a);
+  const y = versionSegments(b2);
+  for (let i = 0; i < Math.max(x.length, y.length); i++) {
+    const d = (x[i] ?? 0) - (y[i] ?? 0);
+    if (d !== 0) return d < 0 ? -1 : 1;
+  }
+  return 0;
+}
+var SUPPORTED_DESKTOP_VERSIONS, MIN_DESKTOP_VERSION, versionSegments, belowFloor;
+var init_desktop_floor = __esm({
+  "../shared/src/desktop-floor.ts"() {
+    "use strict";
+    SUPPORTED_DESKTOP_VERSIONS = ["0.150.0", "0.149.0"];
+    MIN_DESKTOP_VERSION = SUPPORTED_DESKTOP_VERSIONS[1];
+    versionSegments = (v) => v.split(".").map((n) => Number.parseInt(n, 10) || 0);
+    belowFloor = (version, floor) => !!floor && /^\d+\.\d+/.test(floor) && compareVersions(version, floor) < 0;
   }
 });
 
@@ -8419,6 +8481,7 @@ __export(src_exports, {
   CUSTOM_PACK_ID: () => CUSTOM_PACK_ID,
   CUSTOM_PACK_PREFIX: () => CUSTOM_PACK_PREFIX,
   DEFAULT_GRACE_MS: () => DEFAULT_GRACE_MS,
+  DEFAULT_THREAD_KIND: () => DEFAULT_THREAD_KIND,
   DEFAULT_THREAD_MODE: () => DEFAULT_THREAD_MODE,
   DEFAULT_VERDICTS: () => DEFAULT_VERDICTS,
   DELIVERY_WINDOW_MS: () => DELIVERY_WINDOW_MS,
@@ -8467,6 +8530,7 @@ __export(src_exports, {
   MAX_SUGGESTIONS: () => MAX_SUGGESTIONS,
   MAX_SUGGESTION_CHARS: () => MAX_SUGGESTION_CHARS,
   MESSAGE_KINDS: () => MESSAGE_KINDS,
+  MIN_DESKTOP_VERSION: () => MIN_DESKTOP_VERSION,
   MIN_PACK_CREDITS: () => MIN_PACK_CREDITS,
   MODEL_IDS: () => MODEL_IDS,
   MODEL_ID_SET: () => MODEL_ID_SET,
@@ -8532,11 +8596,13 @@ __export(src_exports, {
   STARTER_THINKING_LEVEL: () => STARTER_THINKING_LEVEL,
   STORAGE_MICROS_PER_GB_HOUR: () => STORAGE_MICROS_PER_GB_HOUR,
   SUBTASK_TRANSITIONS: () => SUBTASK_TRANSITIONS,
+  SUPPORTED_DESKTOP_VERSIONS: () => SUPPORTED_DESKTOP_VERSIONS,
   ShipItemSchema: () => ShipItemSchema,
   ShipPlanSchema: () => ShipPlanSchema,
   TASK_KINDS: () => TASK_KINDS,
   TASK_STATES: () => TASK_STATES,
   TEMPLATE_META: () => TEMPLATE_META,
+  THREAD_KINDS: () => THREAD_KINDS,
   THREAD_MODES: () => THREAD_MODES,
   THREAD_STATUSES: () => THREAD_STATUSES,
   THREAD_STATUS_LABEL: () => THREAD_STATUS_LABEL,
@@ -8595,6 +8661,7 @@ __export(src_exports, {
   bareAddressRe: () => bareAddressRe,
   beatsWithin: () => beatsWithin,
   beginRemoteEngineeringPrompt: () => beginRemoteEngineeringPrompt,
+  belowFloor: () => belowFloor,
   bestAlternativeProvider: () => bestAlternativeProvider,
   brainCast: () => brainCast,
   brainNoticeLine: () => brainNoticeLine,
@@ -8639,8 +8706,10 @@ __export(src_exports, {
   cloudMachineFor: () => cloudMachineFor,
   codeSessionEndState: () => codeSessionEndState,
   codeSessionTitle: () => codeSessionTitle,
+  codeThreadStatus: () => codeThreadStatus,
   combinedDiff: () => combinedDiff,
   commRulesFrom: () => commRulesFrom,
+  compareVersions: () => compareVersions,
   composeFailover: () => composeFailover,
   composePrompt: () => composePrompt,
   computeAlert: () => computeAlert,
@@ -8734,6 +8803,7 @@ __export(src_exports, {
   isAddress: () => isAddress,
   isChatThread: () => isChatThread,
   isCloudBorn: () => isCloudBorn,
+  isCodingThread: () => isCodingThread,
   isCustomPackId: () => isCustomPackId,
   isEchoArtifact: () => isEchoArtifact,
   isEngineeringCommand: () => isEngineeringCommand,
@@ -8759,6 +8829,7 @@ __export(src_exports, {
   isWorkflowArtifact: () => isWorkflowArtifact,
   joinedMeta: () => joinedMeta,
   journeyFor: () => journeyFor,
+  kindMarker: () => kindMarker,
   kv: () => kv,
   lateKeys: () => lateKeys,
   launchCommands: () => launchCommands,
@@ -8836,6 +8907,7 @@ __export(src_exports, {
   parseDraftRevisions: () => parseDraftRevisions,
   parseDraftedPosts: () => parseDraftedPosts,
   parseExport: () => parseExport,
+  parseKindMarker: () => parseKindMarker,
   parseLiveFrame: () => parseLiveFrame,
   parseModeMarker: () => parseModeMarker,
   parseNeed: () => parseNeed,
@@ -9029,6 +9101,7 @@ __export(src_exports, {
   taskUpdateDetailsCommand: () => taskUpdateDetailsCommand,
   tasksInProject: () => tasksInProject,
   themeColors: () => themeColors,
+  threadKindOf: () => threadKindOf,
   threadModeOf: () => threadModeOf,
   threadSetBrainCommand: () => threadSetBrainCommand,
   threadSetMachineCommand: () => threadSetMachineCommand,
@@ -9116,6 +9189,7 @@ var init_src = __esm({
     init_failover();
     init_prompts();
     init_entitlements();
+    init_desktop_floor();
     init_export();
     init_import();
     init_desktop_auth();
@@ -10071,6 +10145,8 @@ var STATUS = {
   TASK_THREAD: 409,
   // 409 — the name is already set; the state is what it is, and only a human moves it
   THREAD_ALREADY_TITLED: 409,
+  // 422 — clears once a repository is connected; the caller retries on that change
+  REPO_REQUIRED: 422,
   // 409 — the move would be a no-op, or has already happened once. Both are "the state is
   // already what you are asking for", which is what 409 says.
   SAME_CHANNEL: 409,
@@ -12133,6 +12209,12 @@ var MemoryStore = class {
     if (!t2) throw new DomainError("NOT_FOUND", `thread ${threadId} not found`);
     t2.mode = mode;
   }
+  /** 0144, coding threads — the pg twin is store/thread-machine.ts setThreadKindSql */
+  async setThreadKind(workspace, threadId, kind) {
+    const t2 = this.threads.find((x) => x.id === threadId && x.workspace === workspace);
+    if (!t2) throw new DomainError("NOT_FOUND", `thread ${threadId} not found`);
+    t2.kind = kind;
+  }
   async shareCompute(workspace, userId, member, on) {
     const ids = [...this.wsMembers.get(workspace) ?? /* @__PURE__ */ new Set()];
     if (!ids.includes(userId)) throw new DomainError("NOT_FOUND", `not a member of ${workspace}`);
@@ -12187,7 +12269,7 @@ var MemoryStore = class {
   async postMessage(msg2, event, decisions) {
     if (msg2.threadId && !this.threads.some((t2) => t2.id === msg2.threadId)) {
       const namedRoot = msg2.rootMessageId && this.messages.some((m) => m.id === msg2.rootMessageId) ? msg2.rootMessageId : null;
-      this.threads.push({ id: msg2.threadId, workspace: msg2.workspace, channel: msg2.channel, title: threadTitle(msg2.body), description: "", createdBy: `${msg2.author.kind}:${msg2.author.id}`, taskId: null, rootMessageId: namedRoot ?? msg2.id, mode: threadModeOf(msg2.threadMode), brainOverride: parseBrainOverride(msg2.brainOverride), scheduleId: msg2.scheduleId ?? null });
+      this.threads.push({ id: msg2.threadId, workspace: msg2.workspace, channel: msg2.channel, title: threadTitle(msg2.body), description: "", createdBy: `${msg2.author.kind}:${msg2.author.id}`, taskId: null, rootMessageId: namedRoot ?? msg2.id, mode: threadModeOf(msg2.threadMode), kind: threadKindOf(msg2.threadKind), brainOverride: parseBrainOverride(msg2.brainOverride), scheduleId: msg2.scheduleId ?? null });
     }
     if (msg2.replyTo) {
       const dup = this.messages.some((m) => m.author.id === msg2.author.id && m.replyTo === msg2.replyTo);
@@ -14506,7 +14588,12 @@ async function machineCommands(store2, actor, cmd) {
     return { machineId: id };
   }
   if (cmd.type === "machine.heartbeat") {
-    await store2.heartbeatMachine(cmd.machineId, { activeSeconds: cmd.activeSeconds ?? 0, busy: cmd.busy ?? false, ...cmd.runtimes ? { runtimes: cmd.runtimes } : {} });
+    await store2.heartbeatMachine(cmd.machineId, {
+      activeSeconds: cmd.activeSeconds ?? 0,
+      busy: cmd.busy ?? false,
+      ...cmd.runtimes ? { runtimes: cmd.runtimes } : {},
+      ...cmd.daemonVersion ? { daemonVersion: cmd.daemonVersion } : {}
+    });
     return { machineId: cmd.machineId };
   }
   if (cmd.type === "machine.provision") {
@@ -15340,6 +15427,19 @@ async function threadCommands(store2, actor, cmd) {
     await store2.setThreadMachine(cmd.workspace, cmd.threadId, cmd.machineId);
     return { ok: true, threadId: cmd.threadId, machineId: cmd.machineId };
   }
+  if (cmd.type === "thread.set_kind") {
+    if (!(actor.kind === "human" || actor.role === "orchestrator")) {
+      throw new DomainError("NOT_PERMITTED", "a conversation becomes coding by a human or the orchestrator");
+    }
+    const subject = await store2.threadFiling(cmd.workspace, cmd.threadId);
+    if (!subject) throw new DomainError("NOT_FOUND", `thread ${cmd.threadId} not found`);
+    if (subject.taskId) throw new DomainError("TASK_THREAD", "a task thread is already the code path \u2014 its unit carries the worktree and the pull request");
+    if (cmd.kind === "coding" && !await store2.announcements?.repoForChannel(subject.channelId)) {
+      throw new DomainError("REPO_REQUIRED", "connect a repository to this project before code work can start here");
+    }
+    await store2.setThreadKind(cmd.workspace, cmd.threadId, cmd.kind);
+    return { ok: true, threadId: cmd.threadId, kind: cmd.kind };
+  }
   if (cmd.type === "thread.move") {
     const who = actor.kind === "human" ? "human" : actor.role === "orchestrator" ? "orchestrator" : "agent";
     if (who === "orchestrator" && !cmd.reason) {
@@ -15498,6 +15598,7 @@ async function machineOwnerIn(sql, workspaceId, machineId) {
 }
 function columnsOf(p2) {
   const out = {};
+  if (p2.threadId !== void 0) out["thread_id"] = p2.threadId;
   if (p2.projectId !== void 0) out["project_id"] = p2.projectId;
   if (p2.repoId !== void 0) out["repo_id"] = p2.repoId;
   if (p2.repoName !== void 0) out["repo_name"] = p2.repoName;
@@ -15510,6 +15611,10 @@ function columnsOf(p2) {
   if (p2.changesCount !== void 0) out["changes_count"] = p2.changesCount;
   if (p2.checkpointsCount !== void 0) out["checkpoints_count"] = p2.checkpointsCount;
   return out;
+}
+async function threadIdFor(sql, workspaceId, id) {
+  const [row] = await sql`select id from threads where id = ${id}::uuid and workspace_id = ${workspaceId}::uuid limit 1`;
+  return row?.id ?? null;
 }
 async function insertCodeSession(sql, input, event) {
   const cols = columnsOf(input);
@@ -15554,7 +15659,8 @@ async function codeSessionCommands(store2, actor, cmd) {
         if (!hostsIt) throw new DomainError("NOT_PERMITTED", "only the owner of the hosting machine records a session for someone else");
         if (!(await store2.humanMemberIds(workspace)).includes(createdBy)) throw new DomainError("NOT_FOUND", "that member is not in this workspace");
       }
-      await insertCodeSession(sql, { id: codeSessionId, workspaceId: workspace, createdBy, ...patch, ...machineId !== void 0 ? { machineId } : {} }, createEvent({
+      const threadId = await threadIdFor(sql, workspace, codeSessionId);
+      await insertCodeSession(sql, { id: codeSessionId, workspaceId: workspace, createdBy, ...patch, ...machineId !== void 0 ? { machineId } : {}, ...threadId ? { threadId } : {} }, createEvent({
         type: "code_session.created",
         source: actorAddress(actor),
         workspace,
@@ -17107,7 +17213,9 @@ var MACHINE_COMMANDS = [
   // runtimes: a cloud machine publishes what it can serve on the beat — it never registers, and a
   // login made in its browser terminal must reach the row or the ladder can never choose it
   // while it sleeps (member-machines plan §4).
-  z12.object({ type: z12.literal("machine.heartbeat"), machineId: z12.string().min(1), activeSeconds: z12.number().int().min(0).max(3600).optional(), busy: z12.boolean().optional(), runtimes }),
+  // daemonVersion: the same reason — a cloud machine's image names its commit (NM_IMAGE_SHA) and
+  // the beat is the only place it can say so. Optional: an older machine beats without it.
+  z12.object({ type: z12.literal("machine.heartbeat"), machineId: z12.string().min(1), activeSeconds: z12.number().int().min(0).max(3600).optional(), busy: z12.boolean().optional(), runtimes, daemonVersion: z12.string().min(1).max(64).optional() }),
   // "Add my cloud machine" — self only by construction: the handler writes the actor's own
   z12.object({ type: z12.literal("machine.provision"), workspace: z12.string().min(1) }),
   // the owner's "Remove machine": tombstone → the operator removes workload, Secret and PVC
@@ -18777,6 +18885,9 @@ function safeJson(raw) {
   }
 }
 
+// src/local-routes.ts
+init_src();
+
 // src/devtoken.ts
 import { createHmac as createHmac5 } from "node:crypto";
 var key = Buffer.from("TkVVUkFNRVNILVNQSUtFLUtFWS0wMDEtTkVVUkFNRVNILVNQSUtFLUtFWS0wMDE", "base64url");
@@ -18828,7 +18939,8 @@ function localAuthRoutes(app, store2) {
       mode: localMode() ? "local" : "cloud",
       powersyncUrl: process.env["NM_POWERSYNC_URL"] ?? null,
       version: nmVersion(),
-      schemaVersion: store2.schemaVersion ? await store2.schemaVersion() : null
+      schemaVersion: store2.schemaVersion ? await store2.schemaVersion() : null,
+      minDesktopVersion: MIN_DESKTOP_VERSION
     })
   );
 }
@@ -18836,7 +18948,7 @@ function meRoute(app, store2) {
   app.get("/v1/me", async (c) => {
     const actor = c.get("actor");
     const workspaces = actor.kind === "human" ? (await store2.listWorkspaces(actor.id)).map(({ id, name, slug }) => ({ id, name, slug })) : [];
-    return c.json({ actor: { kind: actor.kind, id: actor.id }, workspaces });
+    return c.json({ actor: { kind: actor.kind, id: actor.id }, workspaces, minDesktopVersion: MIN_DESKTOP_VERSION });
   });
 }
 
@@ -20019,8 +20131,12 @@ var MessageInputSchema = z20.object({
   // 0134, rule D9: WHERE the session runs and WHICH client bore it, applied ONLY when this send
   // births the thread — the same birth-time contract as the three above. Moving the machine
   // afterwards is thread.set_machine (human-only); the origin never moves.
+  // 0144, coding threads: the kind this send births the thread with — `coding` when the composer's
+  // repo chip was set, so the coding runtime works on that repository in it. Birth-only, like the
+  // rest; moving it afterwards is thread.set_kind (a human, or the room's orchestrator at triage).
   threadMachineId: z20.string().uuid().nullable().optional(),
   threadOrigin: z20.enum(["desktop", "web", "routine"]).optional(),
+  threadKind: z20.enum(["chat", "coding"]).optional(),
   // the message this reply ANSWERS (agent wake replies) — the server enforces one
   // reply per (agent, trigger) so concurrent daemons can't double-reply (0060).
   replyTo: z20.string().uuid().optional()
@@ -20413,6 +20529,7 @@ function createApp(store2, opts = {}) {
       // a routine's slot is its own origin, whichever daemon posts it
       threadMachineId: parsed.data.threadMachineId ?? null,
       threadOrigin: parsed.data.scheduleId ? "routine" : parsed.data.threadOrigin ?? null,
+      threadKind: parsed.data.threadKind ?? null,
       author: { kind: actor.kind, id: actor.id },
       body: styledBody,
       createdAt: (/* @__PURE__ */ new Date()).toISOString(),
@@ -20831,6 +20948,10 @@ async function workspaceMachine(sql, workspace, machineId) {
 async function setThreadMachineSql(sql, workspace, threadId, machineId) {
   if (machineId && !await workspaceMachine(sql, workspace, machineId)) throw new DomainError("NOT_FOUND", `machine ${machineId} is not in this workspace`);
   const [row] = await sql`update threads set machine_id = ${machineId}::uuid, updated_at = now() where id = ${threadId}::uuid and workspace_id = ${workspace}::uuid returning id`;
+  if (!row) throw new DomainError("NOT_FOUND", `thread ${threadId} not found`);
+}
+async function setThreadKindSql(sql, workspace, threadId, kind) {
+  const [row] = await sql`update threads set kind = ${kind}, updated_at = now() where id = ${threadId}::uuid and workspace_id = ${workspace}::uuid returning id`;
   if (!row) throw new DomainError("NOT_FOUND", `thread ${threadId} not found`);
 }
 
@@ -22941,8 +23062,8 @@ var PostgresStore = class {
     const seconds = activity?.activeSeconds ?? 0;
     const active = seconds > 0 || activity?.busy === true;
     const [row] = await this.sql`
-      update machines set last_seen_at = now(), last_active_at = case when ${active} then now() else last_active_at end, runtimes = case when ${!!activity?.runtimes} then ${this.sql.json(activity?.runtimes ?? [])}::jsonb else runtimes end
-       where id = ${machineId} returning workspace_id, kind`;
+      update machines set last_seen_at = now(), last_active_at = case when ${active} then now() else last_active_at end, runtimes = case when ${!!activity?.runtimes} then ${this.sql.json(activity?.runtimes ?? [])}::jsonb else runtimes end,
+             daemon_version = coalesce(${activity?.daemonVersion ?? null}::text, daemon_version) where id = ${machineId} returning workspace_id, kind`;
     if (row && row.kind !== "local" && seconds > 0) await chargeMachineActivity(this.sql, row.workspace_id, priceActiveSeconds(seconds), seconds);
   }
   async registerAgent(input, event) {
@@ -24345,6 +24466,10 @@ var PostgresStore = class {
   async setThreadMachine(workspace, threadId, machineId) {
     await setThreadMachineSql(this.sql, workspace, threadId, machineId);
   }
+  /** 0144, coding threads: a conversation's kind — store/thread-machine.ts */
+  async setThreadKind(workspace, threadId, kind) {
+    await setThreadKindSql(this.sql, workspace, threadId, kind);
+  }
   async setThreadMode(workspace, threadId, mode) {
     const [row] = await this.sql`update threads
         set mode = ${mode}, updated_at = now()
@@ -24371,8 +24496,8 @@ var PostgresStore = class {
         const chId = await resolveChannelId(sql, msg2.workspace, msg2.channel);
         if (msg2.threadId) {
           const bornBrain = parseBrainOverride(msg2.brainOverride);
-          await sql`insert into threads (id, workspace_id, channel_id, title, created_by, mode, brain_override, schedule_id, machine_id, origin)
-            values (${msg2.threadId}::uuid, ${msg2.workspace}::uuid, ${chId}, ${threadTitle(msg2.body)}, ${`${msg2.author.kind}:${msg2.author.id}`}, ${threadModeOf(msg2.threadMode)}, ${bornBrain ? sql.json(bornBrain) : null}, ${msg2.scheduleId ?? null}::uuid, ${msg2.threadMachineId ? await workspaceMachine(sql, msg2.workspace, msg2.threadMachineId) : null}::uuid, ${msg2.threadOrigin ?? null})
+          await sql`insert into threads (id, workspace_id, channel_id, title, created_by, mode, brain_override, schedule_id, machine_id, origin, kind)
+            values (${msg2.threadId}::uuid, ${msg2.workspace}::uuid, ${chId}, ${threadTitle(msg2.body)}, ${`${msg2.author.kind}:${msg2.author.id}`}, ${threadModeOf(msg2.threadMode)}, ${bornBrain ? sql.json(bornBrain) : null}, ${msg2.scheduleId ?? null}::uuid, ${msg2.threadMachineId ? await workspaceMachine(sql, msg2.workspace, msg2.threadMachineId) : null}::uuid, ${msg2.threadOrigin ?? null}, ${threadKindOf(msg2.threadKind)})
             on conflict (id) do update set updated_at = now()`;
         }
         await sql`insert into messages (id, workspace_id, channel_id, task_id, thread_id, author_kind, author_id, body, reply_to)

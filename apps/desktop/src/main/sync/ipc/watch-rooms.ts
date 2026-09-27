@@ -8,7 +8,7 @@ import type { WatchDeps } from './watchdeps';
 
 /** every session in a workspace — the rail's row-set. Named so the rail's union (watch-rail.ts) runs the
  *  SAME query for a background connection that this handler runs for the foreground, and the two cannot drift. */
-export const HISTORY_ALL_SQL = `select t.id, t.channel_id, c.slug as channel_slug, t.title, t.task_id, t.updated_at, t.schedule_id, t.settled_at,
+export const HISTORY_ALL_SQL = `select t.id, t.channel_id, c.slug as channel_slug, t.title, t.task_id, t.updated_at, t.schedule_id, t.settled_at, t.kind,
               (select m.body from messages m where m.thread_id = t.id order by m.created_at desc limit 1) as last_body,
               -- the status inputs (shared/threadstatus.ts): who spoke last, and when
               (select m.author_kind from messages m where m.thread_id = t.id order by m.created_at desc limit 1) as last_author_kind,
@@ -17,8 +17,28 @@ export const HISTORY_ALL_SQL = `select t.id, t.channel_id, c.slug as channel_slu
         where t.workspace_id = ? and t.archived_at is null
         order by t.updated_at desc limit 400`;
 
+/** the workspace's Code sessions (0135 + 0144): what a coding thread's row wears — the repo, the mode,
+ *  the state, the last line. Web twin: webnm-ops.ts CODE_SESSIONS_SQL. */
+export const CODE_SESSIONS_SQL = `select id, thread_id, project_id, repo_id, repo_name, branch, title, mode, state, machine_id, created_by, last_line,
+              changes_count, checkpoints_count, created_at, updated_at, ended_at
+         from code_sessions where workspace_id = ? order by updated_at desc limit 200`;
+
 export function registerRoomsWatches(d: WatchDeps): void {
 const { db, watchers, watchFailed, ws } = d;
+  ipcMain.handle('nm:watch-code-sessions', (event, { subId }: { subId: string }) => {
+    const ac = new AbortController();
+    watchers.set(subId, ac);
+    const sender: WebContents = event.sender;
+    db().watch(
+      CODE_SESSIONS_SQL,
+      [ws()],
+      {
+        onResult: (r) => { if (!sender.isDestroyed()) sender.send('nm:code-sessions', { subId, rows: (r.rows?._array ?? []) as unknown[] }); },
+        onError: watchFailed,
+      },
+      { signal: ac.signal },
+    );
+  });
   ipcMain.handle('nm:watch-messages', (event, { subId, channelId }: { subId: string; channelId: string }) => {
     const ac = new AbortController();
     watchers.set(subId, ac);
@@ -135,7 +155,7 @@ const { db, watchers, watchFailed, ws } = d;
     const sender: WebContents = event.sender;
     db().watch(
       // root_* (docs/31): the room message this thread hangs off, so the sheet can pin it
-      `select t.id, t.title, t.description, t.created_by, t.task_id, t.created_at, t.updated_at, t.root_message_id, t.mode, t.brain_override, t.schedule_id,
+      `select t.id, t.title, t.description, t.created_by, t.task_id, t.created_at, t.updated_at, t.root_message_id, t.mode, t.kind, t.brain_override, t.schedule_id,
               (select count(*) from messages m where m.thread_id = t.id) as msg_count,
               (select m.body from messages m where m.thread_id = t.id order by m.created_at desc limit 1) as last_body,
               (select m.body from messages m where m.id = t.root_message_id) as root_body,

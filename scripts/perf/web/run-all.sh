@@ -40,7 +40,7 @@ for p in none broadband fast4g; do
 done
 if step load-prodcache; then
   # production's real headers today: every static file max-age=0, must-revalidate (vercel.json sets none for /assets)
-  serve --cache vercel --vercel-json $WT/apps/desktop/vercel.json
+  serve --cache vercel --vercel-json $WT/apps/hq/vercel.json
   for p in broadband fast4g; do
     say "load $p, production cache headers"
     node measure-load.mjs --url $URL --profile $p --runs 5 --mode both --label $LABEL-prodcache > logs/load-$LABEL-prodcache-$p.log 2>&1 || say "load prodcache $p FAILED"

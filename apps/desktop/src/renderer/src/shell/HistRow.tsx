@@ -3,7 +3,7 @@
 // Icon → title + state chip + status chip → snippet → the ask pulse → room and age; the row's one
 // act (Settle) and the archive sit beside the button, revealed on hover or focus with their seats
 // reserved (tokens.css .histwrap.stl / .arch).
-import { IconArchive, IconThreads } from '../ui/icons';
+import { IconArchive, IconCode, IconThreads } from '../ui/icons';
 import { STATE_LABEL } from '../task/labels';
 import { archivableThreadId } from '../views/HistoryRail';
 import { historyRows } from '../room-tabs';
@@ -33,9 +33,9 @@ export function HistRow({ r, marks, grouped, roomTag, delayMs, onOpen, onSettle,
   return (
     <span className={`histwrap${archiveId ? ' arch' : ''}${onSettle && r.threadId && settle ? ' stl' : ''}`}>
       <button className="histrow" style={delayMs !== undefined ? { animationDelay: `${delayMs}ms` } : undefined} onClick={() => onOpen(r)}>
-        <span className="histico">{r.task ? <StateDial state={r.task.state} /> : <IconThreads s={14} />}</span>
+        <span className="histico">{r.task ? <StateDial state={r.task.state} /> : r.kind === 'coding' ? <IconCode s={14} /> : <IconThreads s={14} />}</span>
         <span className="histbody">
-          <span className="histtitle"><span>{r.title}</span>{r.task && <span className={`chip c-${r.task.state}`}>{STATE_LABEL[r.task.state as keyof typeof STATE_LABEL] ?? r.task.state}</span>}<span className={`chip st-${status}`}>{THREAD_STATUS_LABEL[status]}</span></span>
+          <span className="histtitle"><span>{r.title}</span>{r.task && <span className={`chip c-${r.task.state}`}>{STATE_LABEL[r.task.state as keyof typeof STATE_LABEL] ?? r.task.state}</span>}{!r.task && r.kind === 'coding' && <span className={`chip c-${r.engineeringMode ?? 'code'}`}>{r.engineeringMode ?? 'code'}</span>}<span className={`chip st-${status}`}>{THREAD_STATUS_LABEL[status]}</span></span>
           <span className="histsnip">{r.snip}</span>
         </span>
         {/* scoped to one room, `#dev` on all sixteen rows is noise, not information */}

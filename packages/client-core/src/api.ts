@@ -186,11 +186,13 @@ export class ControlApiClient {
   // Post a chat / thread message. `id` lets an optimistic local row match the server row.
   // The birth fields (docs/34 threadMode · docs/31 rootMessageId · 0119 scheduleId · 0134
   // threadMachineId/threadOrigin) apply ONLY when this send births the thread — the same
-  // birth-time contract the desktop's uploader honours (apps/desktop/src/main/sync/upload.ts).
+  // birth-time contract the desktop's uploader honours (./crud-upload.ts).
   postMessage(input: {
     workspace: string; channel: string; body: string; taskId?: string; id?: string;
     threadId?: string; threadMode?: 'tasks' | 'chat'; rootMessageId?: string; scheduleId?: string;
     threadMachineId?: string | null; threadOrigin?: 'desktop' | 'web' | 'routine';
+    // 0144: `coding` when the repo chip was set — birth-only, like the rest
+    threadKind?: 'chat' | 'coding';
     // role -> model for the conversation this send births (docs/10 §15). A birth field like the
     // rest: the server ignores it on a thread that already exists.
     brainOverride?: Record<string, string> | null;

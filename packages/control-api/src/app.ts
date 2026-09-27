@@ -63,7 +63,10 @@ const MessageInputSchema = z.object({
   // 0134, rule D9: WHERE the session runs and WHICH client bore it, applied ONLY when this send
   // births the thread — the same birth-time contract as the three above. Moving the machine
   // afterwards is thread.set_machine (human-only); the origin never moves.
-  threadMachineId: z.string().uuid().nullable().optional(), threadOrigin: z.enum(['desktop', 'web', 'routine']).optional(),
+  // 0144, coding threads: the kind this send births the thread with — `coding` when the composer's
+  // repo chip was set, so the coding runtime works on that repository in it. Birth-only, like the
+  // rest; moving it afterwards is thread.set_kind (a human, or the room's orchestrator at triage).
+  threadMachineId: z.string().uuid().nullable().optional(), threadOrigin: z.enum(['desktop', 'web', 'routine']).optional(), threadKind: z.enum(['chat', 'coding']).optional(),
   // the message this reply ANSWERS (agent wake replies) — the server enforces one
   // reply per (agent, trigger) so concurrent daemons can't double-reply (0060).
   replyTo: z.string().uuid().optional(),
@@ -639,7 +642,7 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
       brainOverride: parsed.data.brainOverride ?? null,
       scheduleId: parsed.data.scheduleId ?? null,
       // a routine's slot is its own origin, whichever daemon posts it
-      threadMachineId: parsed.data.threadMachineId ?? null, threadOrigin: parsed.data.scheduleId ? 'routine' : parsed.data.threadOrigin ?? null,
+      threadMachineId: parsed.data.threadMachineId ?? null, threadOrigin: parsed.data.scheduleId ? 'routine' : parsed.data.threadOrigin ?? null, threadKind: parsed.data.threadKind ?? null,
       author: { kind: actor.kind, id: actor.id },
       body: styledBody,
       createdAt: new Date().toISOString(),

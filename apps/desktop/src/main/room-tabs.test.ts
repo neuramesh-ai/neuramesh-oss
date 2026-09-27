@@ -587,3 +587,40 @@ test('a unit-card marker never leaks into a session snippet', () => {
   }).find((r) => String(r.key).includes('th2'))!;
   assert.equal(brief.snip, 'The brief is in.', 'a brief marker leaves the prose alone (live harness, 2026-09-18: the Home row printed the raw marker)');
 });
+
+test('a coding thread (0144) wears its session row: the kind, the repo, the mode, the state, the last line, the later clock', () => {
+  const rows = historyRows({
+    threads: [
+      { id: 'th-code', task_id: null, title: 'Fix the sync watch dropping thread replies', last_body: 'The sync watch drops replies after a reconnect.', updated_at: '2026-09-26T09:00:00Z', kind: 'coding' },
+      { id: 'th-chat', task_id: null, title: 'Who else is building agent rooms?', last_body: 'three, none with a crew', updated_at: '2026-09-26T09:30:00Z', kind: 'chat' },
+      // a coding thread whose session has not opened yet (door 2, before a client starts it)
+      { id: 'th-fresh', task_id: null, title: 'look at the code', last_body: 'look at the code', updated_at: '2026-09-26T08:00:00Z', kind: 'coding' },
+    ],
+    tasks: [],
+    codeSessions: [
+      { id: 'th-code', thread_id: 'th-code', repo_name: 'flowe/app', branch: 'main', mode: 'act', state: 'awaiting_approval', last_line: 'Both edits are ready as one patch.', updated_at: '2026-09-26T10:00:00Z' },
+      // a legacy Code session: its id names no thread, so it wears nothing here
+      { id: 'legacy-1', thread_id: null, repo_name: 'flowe/site', mode: 'plan', state: 'idle', last_line: 'x', updated_at: '2026-09-26T11:00:00Z' },
+    ],
+    channelId: null,
+    channelSlug: '',
+    query: '',
+  });
+  const code = rows.find((r) => r.key === 'th:th-code')!;
+  assert.equal(code.kind, 'coding');
+  assert.equal(code.engineeringRepo, 'flowe/app');
+  assert.equal(code.engineeringMode, 'act');
+  assert.equal(code.engineeringState, 'awaiting_approval');
+  assert.equal(code.snip, 'Both edits are ready as one patch.', 'the session\'s last line beats the thread\'s last body');
+  assert.equal(code.when, '2026-09-26T10:00:00Z', 'the session moved after the thread: its clock wins');
+  assert.equal(code.engineeringSessionId, undefined, 'a coding thread opens by threadId, never through the legacy floor');
+  assert.equal(code.threadId, 'th-code');
+  const chat = rows.find((r) => r.key === 'th:th-chat')!;
+  assert.equal(chat.kind, undefined);
+  assert.equal(chat.snip, 'three, none with a crew');
+  const fresh = rows.find((r) => r.key === 'th:th-fresh')!;
+  assert.equal(fresh.kind, 'coding');
+  assert.equal(fresh.engineeringState, undefined, 'no session row yet: the kind alone marks it');
+  assert.equal(fresh.when, '2026-09-26T08:00:00Z');
+  assert.ok(!rows.some((r) => r.key.includes('legacy-1')), 'a legacy session is not a thread and earns no row here');
+});

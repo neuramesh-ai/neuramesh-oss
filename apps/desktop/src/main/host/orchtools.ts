@@ -12,7 +12,8 @@
 
 
 
-import { TASK_KINDS, toolAvailable, type NmTool, type TurnKind } from '@neuramesh/shared';
+import { TASK_KINDS, isCodingThread, toolAvailable, type NmTool, type TurnKind } from '@neuramesh/shared';
+import { primaryRepoRow } from './reporead';
 import { WB_CREATE_DESC, WB_LIST_DESC, WB_READ_DESC, WB_UPDATE_DESC } from '../harness/tooldesc';
 
 import type { PowerSyncDatabase } from '@powersync/node';
@@ -68,6 +69,10 @@ export interface ToolCtx {
    *  round trip to learn something already known */
   roomMenu: string;
   siblings: Array<{ id: string; slug: string; topic: string | null; kind: string | null; marketing: string | null }>;
+  /** THE CODE DOOR (0144, door 2): the room's repository when open_code_session may be offered on this
+   *  conversation — a conversation (never a task thread) whose kind is not coding yet, in a room whose
+   *  project has a repository. Resolved before the turn, so the tool's PRESENCE is the gate. */
+  codeDoor: { repo: { id: string; org_name: string; name: string; local_path: string | null } } | null;
   wbReads: OrchTool[];
   wbWrites: OrchTool[];
   agents: Map<string, HostedAgent>;
@@ -223,6 +228,13 @@ async function buildOrchestratorTools(ctx: {
     const hq = c.kind === 'marketing' ? (c.marketing ? ' [marketing HQ — calendar, library, connectors]' : ' [marketing room, not set up yet]') : '';
     return `#${c.slug}${hq}${c.topic ? ` — ${c.topic}` : ''}`;
   }).join(' · ');
+  // the code door (0144): read here, once, so tools-room.ts can offer open_code_session as a plain spread
+  const codeDoor = convoThreadId && !thread ? await (async () => {
+    const repo = await primaryRepoRow(db, ch.id);
+    if (!repo) return null;
+    const [th] = await db.getAll<{ kind: string | null }>(`select kind from threads where id = ? limit 1`, [convoThreadId]).catch(() => [] as Array<{ kind: string | null }>);
+    return isCodingThread(th?.kind) ? null : { repo };
+  })() : null;
   // the create→post_thread→offer chain must not depend on sync latency: create_task records
   // number→id from the API response, and a thread wake seeds the task it runs in. The replica
   // lookup (with retry) only covers numbers from outside this turn (the model citing older work).
@@ -324,7 +336,7 @@ async function buildOrchestratorTools(ctx: {
   // The registry, by domain (tools-*.ts). It is ONE list to both transports; the split is for
   // the reader. ToolCtx is what each group needs to answer for THIS turn.
   const tc: ToolCtx = { grounding: newGrounding(), z, db, post, ch, agent, actor, thread, convoThreadId, deepWorkToken, kind, spawnLeg, log, skills,
-    draftsHere, here, filed, known, kindField, taskByNumber, resolveRepoBinding, roomMenu, siblings, wbReads, wbWrites,
+    draftsHere, here, filed, known, kindField, taskByNumber, resolveRepoBinding, roomMenu, siblings, codeDoor, wbReads, wbWrites,
     agents, apiGet, brain, buildScheduleCard, ensureChatWorkspace, executeHire, generateDraftImage, generateShareImage, libraryDocs,
     startDeepWork, subjectFor, workspaceListing, workspaceRead };
   // Whiteboards ride kind-gated from the shared catalogue — the #272 domain split dropped this

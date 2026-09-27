@@ -51,6 +51,7 @@ export function UpdateCard({ state, floating, signin, onClose }: { state: Update
           <b className="updatecard-title">{title}</b>
           <span className="updatecard-sub">{sub}</span>
           {state.phase === 'downloading' && <span className="updatecard-bar"><i style={{ width: `${Math.max(4, state.percent)}%` }} /></span>}
+          <FloorLine floor={state.floor} />
         </span>
         {act && (
           <span className="updatecard-go" aria-hidden>
@@ -61,6 +62,11 @@ export function UpdateCard({ state, floating, signin, onClose }: { state: Update
       {state.phase !== 'downloading' && <button className="updatecard-x" title="Dismiss" aria-label="Dismiss" onClick={onClose}>✕</button>}
     </div>
   );
+}
+
+// docs/46 rule 3: the Cloud connection names a floor above this app. one line, on any visible phase.
+function FloorLine({ floor }: { floor?: string }) {
+  return floor ? <span className="updatecard-floor">This version is too old for the cloud. Update the app to continue.</span> : null;
 }
 
 // GitHub-style appearance picker — a "sync with system" card + the 4 themes, each

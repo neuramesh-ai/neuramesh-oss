@@ -12,7 +12,7 @@
 import { apiAuthHeaders } from '../../apiauth';
 import { app, dialog, ipcMain, shell } from 'electron';
 import { discardAttachment, stageAttachment } from '../../attachments';
-import { channelLibrary, type DraftedPost, type LibraryRow } from '../../library';
+import { channelLibrary, type DraftedPost, type LibraryRow } from '@neuramesh/client-core/library';
 import { readFile, writeFile } from 'node:fs/promises';
 import type { PowerSyncDatabase } from '@powersync/node';
 import { basename, join } from 'node:path';

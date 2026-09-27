@@ -2,7 +2,7 @@
 // (shared/threadstatus.ts), fed from the rows the shell already holds — every task with its
 // last-human-message stamp, every open card, the live ids, and the thread rows' settle stamps and
 // last speaker. The ⌘Y overlay filters and chips by it; the phone's Threads tab runs the same rule.
-import { canSettle, decisionHandled, threadStatus, type ThreadStatus } from '@neuramesh/shared';
+import { canSettle, codeThreadStatus, decisionHandled, threadStatus, type ThreadStatus } from '@neuramesh/shared';
 import type { HistoryRow } from '@neuramesh/shared';
 import type { DecisionAllRow, TaskAllRow } from '../bridge/rows-board';
 import type { HistoryThreadRow } from '../bridge/rows-rooms';
@@ -32,7 +32,12 @@ function draftsByUnit(drafts: DraftLike[]): Map<string, { n: number; at: string 
   return out;
 }
 
-export function makeRowMarks(i: { decisions: DecisionAllRow[]; liveIds: Set<string>; threads: HistoryThreadRow[]; tasks?: TaskAllRow[]; drafts?: DraftLike[] }): (r: MarkableRow) => RowMarks {
+export function makeRowMarks(i: { decisions: DecisionAllRow[]; liveIds: Set<string>; threads: HistoryThreadRow[]; tasks?: TaskAllRow[]; drafts?: DraftLike[]; codeSessions?: Array<{ id: string; thread_id?: string | null; state: string }> }): (r: MarkableRow) => RowMarks {
+  // a CODING thread's word comes from its session row (0144): an approval waiting on you is the
+  // ask, a running turn is in progress, a resting session settles. No settle control — the
+  // runtime's state is not a stamp a human clears.
+  const codeByThread = new Map<string, string>();
+  for (const c of i.codeSessions ?? []) if (c.thread_id) codeByThread.set(c.thread_id, c.state);
   // the units each conversation OWNS (docs/41): an anchored unit has no row, so its gate shows on the owner's
   const ownedByThread = new Map<string, TaskAllRow[]>();
   for (const t of i.tasks ?? []) {
@@ -56,6 +61,8 @@ export function makeRowMarks(i: { decisions: DecisionAllRow[]; liveIds: Set<stri
   const draftsByTask = draftsByUnit(i.drafts ?? []);
   const threadById = new Map(i.threads.map((t) => [t.id, t]));
   return (r) => {
+    const codeState = !r.task && r.threadId ? codeByThread.get(r.threadId) : undefined;
+    if (codeState !== undefined) return { status: codeThreadStatus(codeState), ask: codeState === 'awaiting_approval', settle: false };
     const th = r.threadId ? threadById.get(r.threadId) : undefined;
     const card = (r.task ? byTask.get(r.task.id) : undefined) ?? (r.threadId ? byThread.get(r.threadId) : undefined) ?? null;
     const owned = r.threadId ? ownedByThread.get(r.threadId) : undefined;

@@ -7,7 +7,7 @@
 //   · POST /v1/commands answers 402 PLAN_LIMIT, the code the desktop routes to its upgrade flow
 //   · the PowerSync upload lanes (messages, artifacts, whiteboards) answer 409 PLAN_LIMIT, because
 //     the uploader drops a 409 and RETRIES anything else while holding every download behind it
-//     (apps/desktop/src/main/sync/upload.ts throwUnless409). 409 is the only answer an old client
+//     (packages/client-core/src/crud-upload.ts throwUnless409). 409 is the only answer an old client
 //     survives. The typed message still vanishes at the next checkpoint, which is why the new
 //     shell replaces the composer with the gate card (review F6).
 // The same verdict runs inside executeCommand (assertCommandAllowed), so a command that reaches

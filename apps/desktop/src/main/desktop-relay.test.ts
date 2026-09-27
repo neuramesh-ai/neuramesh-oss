@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { attachDesktopRelay, codeBridge, composeLanes, RELAY_KEYS } from '../renderer/src/bridge/desktop-relay';
 import type { NMBridge } from '../renderer/src/bridge/nm';
-import type { RelayEnv } from '../renderer/web/webnm-relay';
+import type { RelayEnv } from '../renderer/src/bridge/relay-lanes';
 
 type Fake = Partial<NMBridge> & Record<string, unknown>;
 

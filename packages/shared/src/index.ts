@@ -38,6 +38,7 @@ export * from './model-packs';
 export * from './failover';
 export * from './prompts';
 export * from './entitlements';
+export * from './desktop-floor';
 export * from './export';
 export * from './import';
 export * from './desktop-auth';

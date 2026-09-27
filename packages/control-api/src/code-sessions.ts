@@ -31,6 +31,8 @@ export async function machineOwnerIn(sql: postgres.Sql, workspaceId: string, mac
 }
 
 export interface CodeSessionPatch {
+  /** 0144: the coding thread this session belongs to — set once, at insert, by the handler */
+  threadId?: string | null;
   projectId?: string | null; repoId?: string | null; repoName?: string; branch?: string; title?: string;
   mode?: string; state?: string; machineId?: string | null; lastLine?: string; changesCount?: number; checkpointsCount?: number;
 }
@@ -38,6 +40,7 @@ export interface CodeSessionPatch {
 /** only the fields the patch carries, in the table's own names — an absent field is never a write */
 function columnsOf(p: CodeSessionPatch): Record<string, string | number | null> {
   const out: Record<string, string | number | null> = {};
+  if (p.threadId !== undefined) out['thread_id'] = p.threadId;
   if (p.projectId !== undefined) out['project_id'] = p.projectId;
   if (p.repoId !== undefined) out['repo_id'] = p.repoId;
   if (p.repoName !== undefined) out['repo_name'] = p.repoName;
@@ -50,6 +53,14 @@ function columnsOf(p: CodeSessionPatch): Record<string, string | number | null> 
   if (p.changesCount !== undefined) out['changes_count'] = p.changesCount;
   if (p.checkpointsCount !== undefined) out['checkpoints_count'] = p.checkpointsCount;
   return out;
+}
+
+/** 0144: the coding thread a session belongs to. Its id IS the thread id (the engineering thread
+ *  id the client mints is the threads row it births), so the link is a lookup, never a field the
+ *  host has to know: a legacy session's id names no thread and stays unlinked. */
+export async function threadIdFor(sql: postgres.Sql, workspaceId: string, id: string): Promise<string | null> {
+  const [row] = await sql<Array<{ id: string }>>`select id from threads where id = ${id}::uuid and workspace_id = ${workspaceId}::uuid limit 1`;
+  return row?.id ?? null;
 }
 
 export async function insertCodeSession(sql: postgres.Sql, input: { id: string; workspaceId: string; createdBy: string } & CodeSessionPatch, event: NMEvent): Promise<void> {

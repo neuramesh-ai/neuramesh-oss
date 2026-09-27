@@ -10,7 +10,7 @@
 // SQL rides sqlOf(store) (code-sessions.ts), so the Store contract grows no delegates.
 import { createEvent, formatAddress, type Actor } from '@neuramesh/shared';
 import type { Command } from '../commands';
-import { insertCodeSession, machineOwnerIn, patchCodeSession, readCodeSession, type CodeSessionHead } from '../code-sessions';
+import { insertCodeSession, machineOwnerIn, patchCodeSession, readCodeSession, threadIdFor, type CodeSessionHead } from '../code-sessions';
 import { actorInWorkspace, sqlOf } from '../credits';
 import { DomainError } from '../errors';
 import { type Store } from '../store';
@@ -46,7 +46,9 @@ export async function codeSessionCommands(store: Store, actor: Actor, cmd: Comma
         if (!hostsIt) throw new DomainError('NOT_PERMITTED', 'only the owner of the hosting machine records a session for someone else');
         if (!(await store.humanMemberIds(workspace)).includes(createdBy)) throw new DomainError('NOT_FOUND', 'that member is not in this workspace');
       }
-      await insertCodeSession(sql, { id: codeSessionId, workspaceId: workspace, createdBy, ...patch, ...(machineId !== undefined ? { machineId } : {}) }, createEvent({
+      // 0144: a session whose id is a coding thread's id belongs to that thread — linked here, once
+      const threadId = await threadIdFor(sql, workspace, codeSessionId);
+      await insertCodeSession(sql, { id: codeSessionId, workspaceId: workspace, createdBy, ...patch, ...(machineId !== undefined ? { machineId } : {}), ...(threadId ? { threadId } : {}) }, createEvent({
         type: 'code_session.created', source: actorAddress(actor), workspace,
         target: formatAddress({ kind: 'resource', type: 'code_session', id: codeSessionId }),
         payload: { createdBy, machineId, repoName: patch.repoName ?? null, branch: patch.branch ?? null },

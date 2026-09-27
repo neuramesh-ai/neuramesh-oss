@@ -248,13 +248,14 @@ export interface NavFlatResult<R> {
  * an engineering session (`engineeringSessionId`) the day that branch lands: the predicate is
  * written for both so the switch relists rather than reshapes. Pure; navtree.test.ts covers it.
  */
-export function isCodeRow(r: { branch?: string | null; task?: { branch?: string | null; pr_url?: string | null } | null; engineeringSessionId?: string | null }): boolean {
-  return !!(r.branch || r.task?.branch || r.task?.pr_url || r.engineeringSessionId);
+export function isCodeRow(r: { branch?: string | null; task?: { branch?: string | null; pr_url?: string | null } | null; engineeringSessionId?: string | null; kind?: string | null }): boolean {
+  return !!(r.branch || r.task?.branch || r.task?.pr_url || r.engineeringSessionId || r.kind === 'coding');
 }
 /** Chat mode's predicate: every conversation — a repo-backed task is still a thread — but never an
  *  engineering session, which has no room and belongs to Code (mixing them in was what produced
  *  rows like `Code · e2e-local · main`, George 2026-09-04) */
-export function isChatRow(r: { engineeringSessionId?: string | null }): boolean {
+export function isChatRow(r: { engineeringSessionId?: string | null; kind?: string | null }): boolean {
+  // a coding THREAD (0144) is a conversation: it lives in a room, so Chat lists it too
   return !r.engineeringSessionId;
 }
 

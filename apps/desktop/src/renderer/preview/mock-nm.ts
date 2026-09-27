@@ -4,7 +4,7 @@ import { planLabel, seatLimitReason, threadTitle } from '@neuramesh/shared';
 import sampleLogos from './sample-logos.json';
 import { gateArtifactReason, isGateArtifact } from '@neuramesh/shared';
 import { openConnectionsSettings, openMoveToCloud, openUpgrade } from '../src/lib/toast';
-import { FLOW, FRESH_CLOUD, HAS_INVITE, LIVE_RUNS, MOCK_WS_ID, MSG_DELAY, NOKEY, TERM_PALETTE_PROOF, agents, allTasks, artWatchers, artifacts, baseThreadRows, beatsByTask, chanRunWatchers, channels, convoMsgs, convoWatchers, customPacks, decisionWatchers, designProviders, emitLog, emitMockStream, failoverWatchers, historyAllWatchers, homeIsClear, liveTerms, logWatchers, logs, machines, members, memoryBlock, mockArticleArt, mockConnectors, mockContentItems, mockConvoAtts, mockDecisions, mockFailover, mockMcpPresence, mockReplyCounts, mockRuns, mockSchedules, mockThreadArts, mockThreads, mockUpdateState, mockWhiteboards, mockWorkRuns, mockWorkspaces, msgWatchers, msgsByChannel, noop, notifyProcs, openMockTerm, openRunWatchers, packs, pingArts, pingConvo, pingDecisions, pingFailover, pingOpenRuns, pingTasksAll, pingThreads, pingWb, procWatchers, projects, promotedArtifacts, releaseBriefArt, roomMessagesFor, rosterWatchers, screen, seedIso, setMockFailover, skills, streamWatchers, stripThumb, t, taskChanWatchers, taskThreadExtra, taskThreadWatchers, tasksAllWatchers, tasksByChannel, threadWatchers, threadsAllSnapshot, threadsAllWatchers, wbListWatchers, wbRowWatchers, wbRowsFor, wsLibraryRows, libAllWatchers, deleteMockArtifact, DOOR_REPOS, DOOR_SCHEDULE_RUNS } from './mock-fixtures';
+import { FLOW, FRESH_CLOUD, HAS_INVITE, LIVE_RUNS, MOCK_WS_ID, MSG_DELAY, NOKEY, TERM_PALETTE_PROOF, agents, allTasks, artWatchers, artifacts, baseThreadRows, beatsByTask, chanRunWatchers, channels, convoMsgs, convoWatchers, customPacks, decisionWatchers, designProviders, emitLog, emitMockStream, failoverWatchers, historyAllWatchers, homeIsClear, mockCodeSessions, codeSessionsWatchers, liveTerms, logWatchers, logs, machines, members, memoryBlock, mockArticleArt, mockConnectors, mockContentItems, mockConvoAtts, mockDecisions, mockFailover, mockMcpPresence, mockReplyCounts, mockRuns, mockSchedules, mockThreadArts, mockThreads, mockUpdateState, mockWhiteboards, mockWorkRuns, mockWorkspaces, msgWatchers, msgsByChannel, noop, notifyProcs, openMockTerm, openRunWatchers, packs, pingArts, pingConvo, pingDecisions, pingFailover, pingOpenRuns, pingTasksAll, pingThreads, pingWb, procWatchers, projects, promotedArtifacts, releaseBriefArt, roomMessagesFor, rosterWatchers, screen, seedIso, setMockFailover, skills, streamWatchers, stripThumb, t, taskChanWatchers, taskThreadExtra, taskThreadWatchers, tasksAllWatchers, tasksByChannel, threadWatchers, threadsAllSnapshot, threadsAllWatchers, wbListWatchers, wbRowWatchers, wbRowsFor, wsLibraryRows, libAllWatchers, deleteMockArtifact, DOOR_REPOS, DOOR_SCHEDULE_RUNS } from './mock-fixtures';
 import { marketingArtifacts, marketingSchedules } from './mock-marketing'; import { UGC_FILM } from './mock-ugc';
 import { CONNS, connectionList, foregroundTasks, foregroundThreads, mockForeground, mockForegroundWorkspace, railRowsSnapshot, swapForeground, watchForeground } from './mock-connections';
 import { githubLanes } from './mock-github';
@@ -674,7 +674,7 @@ const explicit: Record<string, any> = {
   },
   // ── conversation threads (v0.40): a tiny in-mock engine so the preview demos the full
   // send → thread born+named → rex answers → task-upgrade journey, deterministically ──
-  send: async (channelId: string, body: string, opts?: { id?: string; threadId?: string; attachments?: any[]; threadMode?: 'tasks' | 'chat' }) => {
+  send: async (channelId: string, body: string, opts?: { id?: string; threadId?: string; attachments?: any[]; threadMode?: 'tasks' | 'chat'; threadKind?: 'chat' | 'coding' }) => {
     const id = opts?.id ?? `m-${Date.now()}`;
     const th = opts?.threadId;
     // answering the capacity fly-up (a `**…usage limit…** → choice` line to the channel)
@@ -690,7 +690,7 @@ const explicit: Record<string, any> = {
       if (!tr) {
         // docs/34: the composer's Tasks toggle is frozen onto the thread AT BIRTH, exactly as
         // the server does it — so the harness can exercise a chat thread end to end
-        tr = { id: th, title: threadTitle(body), description: '', created_by: 'human:u-george', task_id: null, mode: opts?.threadMode ?? 'tasks', created_at: now, updated_at: now, msg_count: 1, last_body: body };
+        tr = { id: th, title: threadTitle(body), description: '', created_by: 'human:u-george', task_id: null, mode: opts?.threadMode ?? 'tasks', kind: opts?.threadKind ?? 'chat', created_at: now, updated_at: now, msg_count: 1, last_body: body };
         list.unshift(tr);
       } else { tr.updated_at = now; tr.msg_count += 1; tr.last_body = body; }
       (tr as any).last_author_kind = 'human';
@@ -787,12 +787,12 @@ const explicit: Record<string, any> = {
     setTimeout(() => cb(convoMsgs[threadId] ?? []), 0);
     return () => { const i = convoWatchers.indexOf(w); if (i >= 0) convoWatchers.splice(i, 1); };
   },
-  createTask: async (channelId: string, title: string, _o?: any, _p?: any, _r?: any, _b?: any, _bl?: any, thread?: string) => {
-    const num = nextMockNum++;
-    const task: any = { id: `tk-${num}`, number: num, title, description: '', state: 'todo', kind: 'feature', channel_id: channelId, channel_slug: channels.find((c) => c.id === channelId)?.slug ?? 'dev', updated_at: new Date().toISOString(), parent_task_id: null };
-    allTasks.unshift(task); (tasksByChannel[channelId] ??= []).unshift(task);
+  createTask: async (channelId: string, title: string, opts?: { description?: string; thread?: string; originThread?: string; plan?: unknown }) => {
+    const num = nextMockNum++; const thread = opts?.thread; // a plan-first create is born in plan_review, an anchored one posts its ‹task:id› unit card (docs/41)
+    const task: any = { id: opts?.originThread ? crypto.randomUUID() : `tk-${num}`, number: num, title, description: opts?.description ?? '', state: opts?.plan ? 'plan_review' : 'todo', kind: 'feature', channel_id: channelId, channel_slug: channels.find((c) => c.id === channelId)?.slug ?? 'dev', updated_at: new Date().toISOString(), parent_task_id: null };
+    allTasks.unshift(task); (tasksByChannel[channelId] ??= []).unshift(task); pingTasksAll();
     if (thread) { for (const list of Object.values(mockThreads)) { const tr = list.find((x) => x.id === thread); if (tr && !tr.task_id) { tr.task_id = task.id; tr.updated_at = task.updated_at; } } for (const ch of Object.keys(mockThreads)) pingThreads(ch); }
-    return { task };
+    if (opts?.originThread) { (convoMsgs[opts.originThread] ??= []).push({ id: `unit-${num}`, author_kind: 'human', author_id: 'u-george', body: `‹task:${task.id}›`, created_at: task.updated_at }); pingConvo(opts.originThread); } return { task };
   },
   watchTasks: (id: string, cb: any) => { const w = { id, cb }; taskChanWatchers.add(w); setTimeout(() => cb(tasksByChannel[id] ?? []), 0); return () => taskChanWatchers.delete(w); },
   // ?home=clear drains Home's queue so the caught-up state (Porch's peek + the wordmark
@@ -832,6 +832,7 @@ const explicit: Record<string, any> = {
     setTimeout(() => cb(foregroundThreads()), 0); // the foreground's rows (U3b: the cloud's after a swap)
     return () => historyAllWatchers.delete(cb);
   },
+  watchCodeSessions: (cb: any) => { codeSessionsWatchers.add(cb); setTimeout(() => cb([...mockCodeSessions]), 0); return () => codeSessionsWatchers.delete(cb); }, // 0144: the coding thread fixture's session row
   decisionAction: async (type: string, id: string, answer?: string) => {
     const d = mockDecisions.find((x) => x.id === id);
     if (!d) throw new Error('decision not found');

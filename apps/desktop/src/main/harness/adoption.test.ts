@@ -154,11 +154,12 @@ test('the orchestrator prompt carries a TRIAGE PROCEDURE, not just a tool list',
   const anchor = CONTRACT.indexOf('TRIAGE every request');
   assert.ok(anchor > 0, 'the triage procedure must actually be in the contract');
   const orch = CONTRACT.slice(anchor, anchor + 3_400);
-  // all four routes present and ORDERED, so the agent takes the first that fits
+  // all five routes present and ORDERED, so the agent takes the first that fits
   assert.match(orch, /1\. \*\*You can answer it now/);
   assert.match(orch, /2\. \*\*Understanding it splits into independent pieces/);
   assert.match(orch, /3\. \*\*It needs web research that outlives this reply/);
-  assert.match(orch, /4\. \*\*It genuinely belongs on the board\*\* → create_task/);
+  assert.match(orch, /4\. \*\*It wants hands on this project's repository now/); // the code door (0144)
+  assert.match(orch, /5\. \*\*It genuinely belongs on the board\*\* → create_task/);
   // the posture line sits ABOVE the numbered list, so it is asserted against the whole contract
   assert.match(CONTRACT, /THE DEFAULT IS TO SOLVE IT HERE/, 'the default posture must lead the triage');
   // decomposition first — a request's PARTS are what get routed, not the message

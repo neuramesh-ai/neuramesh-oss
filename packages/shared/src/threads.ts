@@ -37,6 +37,45 @@ export function isChatThread(value: unknown): boolean {
 }
 
 /**
+ * The thread's KIND (0144, docs/design/coding-threads-2026-09): `chat` is a conversation; `coding`
+ * is a conversation the coding runtime works on a repository in — the one session surface wears
+ * the code face, the row wears the prompt glyph, and no room agent answers inside it. Orthogonal
+ * to `mode`: the mode says whether the board is reachable, the kind says whose hands are on the
+ * repo. Born at the send (the repo chip) or moved by thread.set_kind (a human, or the room's
+ * orchestrator in its triage turn). Absent reads as `chat`, so every existing row is a conversation.
+ */
+export const THREAD_KINDS = ['chat', 'coding'] as const;
+export type ThreadKind = (typeof THREAD_KINDS)[number];
+export const DEFAULT_THREAD_KIND: ThreadKind = 'chat';
+
+export function threadKindOf(value: unknown): ThreadKind {
+  return value === 'coding' ? 'coding' : DEFAULT_THREAD_KIND;
+}
+
+/** True when the coding runtime owns this thread's turns. */
+export function isCodingThread(value: unknown): boolean {
+  return threadKindOf(value) === 'coding';
+}
+
+/**
+ * The kind flip, written into the transcript exactly as the mode flip is (below): one marker
+ * message the thread renders as a divider, so "we were talking, then the code work started" stays
+ * legible. The same two seams keep it from being noise — the daemon does not wake on it, and both
+ * transcript builders strip it.
+ */
+const KIND_MARKER_RE = /^‹kind:(chat|coding)›$/;
+
+export function kindMarker(kind: ThreadKind): string {
+  return `‹kind:${kind}›`;
+}
+
+/** The kind a marker announces, or null when the body is an ordinary message. */
+export function parseKindMarker(body: string): ThreadKind | null {
+  const m = KIND_MARKER_RE.exec(body.trim());
+  return m ? (m[1] as ThreadKind) : null;
+}
+
+/**
  * The mode flip, written into the transcript.
  *
  * A conversation that becomes work should SHOW where that happened — scroll back a week later

@@ -22,6 +22,7 @@ import { failRemoteEngineeringTransport } from './transport-state';
 import { engineeringSessionStorageReady, loadEngineeringSessions, persistEngineeringSessions } from './session-storage';
 import { flashToast } from '../lib/toast';
 import { closeInactiveEngineeringHandles } from './handle-lifecycle';
+import { codeSessionTitle } from '@neuramesh/shared';
 
 type RuntimeState = 'checking' | 'ready' | 'unavailable';
 type Handle = ReturnType<NonNullable<NMBridge['openEngineering']>>;
@@ -155,6 +156,19 @@ export function useEngineeringRuntime(harness: boolean, repos: EngineeringRepo[]
     }
   };
   const open = (id: string) => { setActiveId(id); const session = sessions.find((item) => item.id === id); if (session) connect(session); };
+  /** A CODING THREAD (0144): the session keyed by the thread's own id. This device's local session,
+   *  when it has one, is reopened; else the shell is minted WITH the thread's id and connected, and
+   *  the root message goes as the first prompt only when nothing has started the session yet — a
+   *  session another client started is resumed through the machine's history discovery instead. */
+  const adopt = (spec: { id: string; repo: EngineeringRepo; project?: EngineeringSession['project']; machineId?: string | null; firstPrompt?: string | null }) => {
+    const existing = sessionsRef.current.find((item) => item.id === spec.id); if (existing) { setActiveId(existing.id); connect(existing); return; }
+    const text = spec.firstPrompt?.trim() ?? '';
+    const created: EngineeringSession = { ...createEngineeringSession(spec.repo, text ? codeSessionTitle(text) : 'Code thread', spec.project ?? null, spec.machineId ?? defaultMachineId), id: spec.id, ...(harness ? {} : { checkpoints: [] }) };
+    if (!text) { setSessions((all) => [...all, { ...created, state: 'resumable' }]); setActiveId(spec.id); connect(created); return; }
+    setSessions((all) => [...all, harness ? submitEngineeringPrompt(created, text) : beginRemoteEngineeringPrompt(created, text, [])]); setActiveId(spec.id);
+    if (harness) return;
+    const handle = connect(created); if (handle) void sendEngineeringPrompt(handle, text, []).catch((error: unknown) => fail(spec.id, error)); else fail(spec.id, new Error('The Code workspace connection is unavailable.'));
+  };
   const send = (session: EngineeringSession, prompt: string, uploads: EngineeringAttachmentUpload[] = []) => {
     const handle = connect(session); if (!handle) return;
     update(beginRemoteEngineeringPrompt(session, prompt, uploads.map(({ name, mime }) => ({ name, mime }))));
@@ -195,5 +209,5 @@ export function useEngineeringRuntime(harness: boolean, repos: EngineeringRepo[]
     if (Number.isInteger(checkpointRunCount) && checkpointRunCount > 0) sendCommand(connect(session), { type: 'restore', checkpointRunCount }, (error) => fail(session.id, error));
   };
   const home = () => { closeInactiveEngineeringHandles(handles.current, sessions, null); setActiveId(null); };
-  return { sessions, active: sessions.find((session) => session.id === activeId) ?? null, runtime, reason, update, create, start, open, home, send, setMode, continueInAct, dismissModeHandoff, setPermission, setModel, approve, restore };
+  return { sessions, active: sessions.find((session) => session.id === activeId) ?? null, runtime, reason, update, create, start, open, adopt, home, send, setMode, continueInAct, dismissModeHandoff, setPermission, setModel, approve, restore };
 }

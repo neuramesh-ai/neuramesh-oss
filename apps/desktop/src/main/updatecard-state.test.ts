@@ -31,3 +31,15 @@ test('a download in flight and a failure are visible states with their own keys'
   assert.equal(updateKey({ phase: 'error', message: 'offline' }), 'error:');
   assert.equal(updateVisible({ phase: 'error', message: 'offline' }, 'error:'), false);
 });
+
+test('a floor above this app (docs/46) shows the card again, even when the plain card was dismissed', () => {
+  const plain = { phase: 'available' as const, version: '0.150.0', notes: null };
+  const below = { ...plain, floor: '0.149.0' };
+  assert.equal(updateKey(below), 'available:0.150.0:below:0.149.0');
+  assert.equal(updateVisible(below, updateKey(plain)), true);
+  assert.equal(updateVisible(below, updateKey(below)), false);
+});
+
+test('idle stays hidden with a floor: the floor makes main look for the update, and the card shows when one is found', () => {
+  assert.equal(updateVisible({ phase: 'idle', floor: '0.149.0' }, null), false);
+});

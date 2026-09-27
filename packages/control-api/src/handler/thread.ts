@@ -74,6 +74,24 @@ export async function threadCommands(store: Store, actor: Actor, cmd: Command): 
     await store.setThreadMachine(cmd.workspace, cmd.threadId, cmd.machineId);
     return { ok: true, threadId: cmd.threadId, machineId: cmd.machineId } as never;
   }
+  // Coding threads (0144, docs/design/coding-threads-2026-09): a human, or the room's orchestrator
+  // from its triage turn (ruling 1, 2026-09-26), moves a conversation onto the coding runtime.
+  // The two refusals are structural, never prompt: a thread that carries a task IS the code path
+  // already (its unit owns the worktree and the PR), and a coding thread needs a repository to
+  // work on — the same read the GitHub connector answers with (announce.repoForChannel).
+  if (cmd.type === 'thread.set_kind') {
+    if (!(actor.kind === 'human' || actor.role === 'orchestrator')) {
+      throw new DomainError('NOT_PERMITTED', 'a conversation becomes coding by a human or the orchestrator');
+    }
+    const subject = await store.threadFiling(cmd.workspace, cmd.threadId);
+    if (!subject) throw new DomainError('NOT_FOUND', `thread ${cmd.threadId} not found`);
+    if (subject.taskId) throw new DomainError('TASK_THREAD', 'a task thread is already the code path — its unit carries the worktree and the pull request');
+    if (cmd.kind === 'coding' && !(await store.announcements?.repoForChannel(subject.channelId))) {
+      throw new DomainError('REPO_REQUIRED', 'connect a repository to this project before code work can start here');
+    }
+    await store.setThreadKind(cmd.workspace, cmd.threadId, cmd.kind);
+    return { ok: true, threadId: cmd.threadId, kind: cmd.kind } as never;
+  }
   // Auto-filing (0109): move a conversation into the room it belongs in. The rules are one pure
   // function — `canFileConversation` (packages/shared/filing.ts) — so this handler and the
   // daemon's tool cannot drift, and every refusal is asserted without a database.

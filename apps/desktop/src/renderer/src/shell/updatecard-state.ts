@@ -8,8 +8,9 @@
 // saved them lived inside the signed-in shell. The update has to be reachable before sign-in.
 import type { UpdateState } from '../bridge/rows-infra';
 
-/** one dismissal per phase+version: a newer version, or the same one reaching 'ready', shows again */
-export const updateKey = (s: UpdateState): string => s.phase + ':' + ('version' in s ? s.version : '');
+/** one dismissal per phase+version: a newer version, or the same one reaching 'ready', shows again.
+ *  A floor above this app (docs/46) is part of the key, so a card dismissed before it rose shows again. */
+export const updateKey = (s: UpdateState): string => s.phase + ':' + ('version' in s ? s.version : '') + (s.floor ? ':below:' + s.floor : '');
 
 /** idle never shows; a dismissed key stays hidden until the state moves on */
 export const updateVisible = (s: UpdateState, hidden: string | null): boolean =>

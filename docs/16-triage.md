@@ -121,6 +121,15 @@ is the justified exception, not the fallback.**
 The kind's typical route (§3) is what you'd expect *before* reading the request; steps 1–3 are how the
 request itself decides. When they disagree, the request wins.
 
+**Before the procedure: the code door** (2026-09-26, [coding threads](design/coding-threads-2026-09/plan.md)).
+The procedure above routes work that reaches the board. A request that wants hands on the project's
+repository now (read or change its code, run its tests) and does not meet the bar for the board takes
+the orchestrator's `open_code_session` rung instead. The tool marks the conversation as a coding
+thread (`thread.set_kind`, server-checked) and the coding runtime takes the thread from there. The
+tool is present only when the project holds a primary repository and the thread is not coding yet.
+The bar for the board is unchanged: the person asked for a unit, or the work must outlive the
+conversation. A coding thread that later needs the board takes the human's `Make this a unit` card.
+
 > **Cause vs. approach (v0.17.1 refinement).** The one distinction that keeps triage honest: an unknown
 > **cause** (why is it broken? why did prior fixes fail?) is resolved by *investigation* — a developer with
 > the `investigate` skill — while an unknown **approach** (how should we design this net-new thing?) is

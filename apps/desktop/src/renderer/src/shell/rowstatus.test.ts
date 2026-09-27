@@ -82,3 +82,15 @@ test('drafted posts waiting on an owned content unit lift the conversation (rele
   // no drafts handed in (the callers that have none): the rule is inert
   assert.equal(makeRowMarks({ decisions: [], liveIds: new Set(), threads: [thread({ id: 'th1' })], tasks: [unit] })(row({ threadId: 'th1', task: null })).status, 'settled');
 });
+
+test('a coding thread (0144) takes its word from its session row, and offers no settle', () => {
+  const sessions = (state: string) => [{ id: 'th1', thread_id: 'th1', state }];
+  const at = (state: string) => makeRowMarks({ decisions: [], liveIds: new Set(), threads: [thread({ id: 'th1', last_author_kind: 'human', last_at: T2 })], codeSessions: sessions(state) })(row({ threadId: 'th1', task: null }));
+  assert.deepEqual(at('awaiting_approval'), { status: 'needs_you', ask: true, settle: false });
+  assert.deepEqual(at('streaming'), { status: 'in_progress', ask: false, settle: false });
+  assert.deepEqual(at('idle'), { status: 'settled', ask: false, settle: false });
+  assert.deepEqual(at('completed'), { status: 'settled', ask: false, settle: false });
+  // a session that names no thread (legacy) changes nothing: the thread's own derivation runs
+  const legacy = makeRowMarks({ decisions: [], liveIds: new Set(), threads: [thread({ id: 'th1', last_author_kind: 'human', last_at: T2 })], codeSessions: [{ id: 'legacy', thread_id: null, state: 'awaiting_approval' }] })(row({ threadId: 'th1', task: null }));
+  assert.equal(legacy.status, 'in_progress');
+});

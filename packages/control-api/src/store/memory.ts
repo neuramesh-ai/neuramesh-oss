@@ -4,7 +4,7 @@
 // behave exactly as PostgresStore does. That equivalence has no test today (the pairs are
 // written twice, not shared), which is why this moves as ONE file rather than being cut
 // into repositories — the split waits for the contract suite that would prove it safe.
-import { applyShare, type BrainOverride, parseBrainOverride, attachmentUpgradeReason, buildAgentCard, flowForChannelKind, planLabel, readAnswers, taskBranch, TaskSchema, threadModeOf, threadTitle, type ActorRef, type Beat, type BeatStatus, type NMEvent, type Run, type RunSettleState, type Task, type TaskKind, type TaskState, type ThreadMode } from '@neuramesh/shared';
+import { applyShare, type BrainOverride, parseBrainOverride, attachmentUpgradeReason, buildAgentCard, flowForChannelKind, planLabel, readAnswers, taskBranch, TaskSchema, threadKindOf, threadModeOf, threadTitle, type ActorRef, type Beat, type BeatStatus, type NMEvent, type Run, type RunSettleState, type Task, type TaskKind, type TaskState, type ThreadKind, type ThreadMode } from '@neuramesh/shared';
 import { DomainError } from '../errors';
 import { deleteScheduleMem, markScheduleResultMem, setScheduleCursorMem, setScheduleStatusMem } from './release-routine';
 import { MemAnnounceStore } from './announce';   import { MemFilmStore } from './films';
@@ -629,7 +629,7 @@ export class MemoryStore implements Store {
   private decisionRows: DecisionRow[] = [];
   private policyRows: PolicyRow[] = [];
 
-  threads: Array<{ id: string; workspace: string; channel: string; title: string; description: string; createdBy: string; taskId: string | null; rootMessageId?: string | null; mode: ThreadMode; brainOverride?: BrainOverride | null; archivedAt?: string | null; settledAt?: string | null; filedAt?: string | null; filedReason?: string | null; scheduleId?: string | null }> = [];
+  threads: Array<{ id: string; workspace: string; channel: string; title: string; description: string; createdBy: string; taskId: string | null; rootMessageId?: string | null; mode: ThreadMode; kind?: ThreadKind; brainOverride?: BrainOverride | null; archivedAt?: string | null; settledAt?: string | null; filedAt?: string | null; filedReason?: string | null; scheduleId?: string | null }> = [];
   async createThread(workspace: string, channelId: string, threadId: string, title: string, description: string, createdBy: string): Promise<void> {
     if (!this.threads.some((t) => t.id === threadId)) {
       this.threads.push({ id: threadId, workspace, channel: channelId, title, description, createdBy, taskId: null, rootMessageId: null, mode: 'tasks' });
@@ -711,6 +711,8 @@ export class MemoryStore implements Store {
     if (!t) throw new DomainError('NOT_FOUND', `thread ${threadId} not found`);
     t.mode = mode;
   }
+  /** 0144, coding threads — the pg twin is store/thread-machine.ts setThreadKindSql */
+  async setThreadKind(workspace: string, threadId: string, kind: ThreadKind): Promise<void> { const t = this.threads.find((x) => x.id === threadId && x.workspace === workspace); if (!t) throw new DomainError('NOT_FOUND', `thread ${threadId} not found`); t.kind = kind; }
 
   async shareCompute(workspace: string, userId: string, member: string, on: boolean): Promise<void> {
     const ids = [...(this.wsMembers.get(workspace) ?? new Set<string>())];
@@ -776,7 +778,7 @@ export class MemoryStore implements Store {
       // foreign key and used to 500 forever when the root had been purged; this store has no FK,
       // so without the same check the two stores would disagree exactly where it mattered.
       const namedRoot = msg.rootMessageId && this.messages.some((m) => m.id === msg.rootMessageId) ? msg.rootMessageId : null;
-      this.threads.push({ id: msg.threadId, workspace: msg.workspace, channel: msg.channel, title: threadTitle(msg.body), description: '', createdBy: `${msg.author.kind}:${msg.author.id}`, taskId: null, rootMessageId: namedRoot ?? msg.id, mode: threadModeOf(msg.threadMode), brainOverride: parseBrainOverride(msg.brainOverride), scheduleId: msg.scheduleId ?? null });
+      this.threads.push({ id: msg.threadId, workspace: msg.workspace, channel: msg.channel, title: threadTitle(msg.body), description: '', createdBy: `${msg.author.kind}:${msg.author.id}`, taskId: null, rootMessageId: namedRoot ?? msg.id, mode: threadModeOf(msg.threadMode), kind: threadKindOf(msg.threadKind), brainOverride: parseBrainOverride(msg.brainOverride), scheduleId: msg.scheduleId ?? null });
     }
     // one reply per (agent, trigger) — mirrors 0060's partial unique index
     if (msg.replyTo) {

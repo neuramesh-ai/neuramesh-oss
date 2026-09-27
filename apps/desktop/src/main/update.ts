@@ -1,25 +1,37 @@
 import { app, BrowserWindow, ipcMain, powerMonitor } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import type { ProgressInfo, UpdateInfo } from 'electron-updater';
+import { connections } from './connections';
+import { floorAbove } from './floor';
 
 // The single source of truth the renderer's update card reflects. The shape is
 // mirrored in preload/index.ts and the renderer's NMBridge — keep the three in
 // sync. Never blocks launch: the card only appears once an update is found.
-export type UpdateState =
+type Phase =
   | { phase: 'idle' }
   | { phase: 'available'; version: string; notes: string | null }
   | { phase: 'downloading'; version: string; percent: number }
   | { phase: 'ready'; version: string }
   | { phase: 'error'; message: string };
+// `floor` (docs/46 rule 3): the minDesktopVersion the Cloud connection names, set only while this
+// app is below it. the card adds one line for it. it never blocks anything.
+export type UpdateState = Phase & { floor?: string };
 
-let state: UpdateState = { phase: 'idle' };
+let state: Phase = { phase: 'idle' };
+let floor: string | null = null;
 const versionOf = (): string => ('version' in state ? state.version : '');
+const current = (): UpdateState => (floor ? { ...state, floor } : state);
 
-function set(next: UpdateState) {
-  state = next;
+function broadcast() {
+  const s = current();
   for (const win of BrowserWindow.getAllWindows()) {
-    if (!win.isDestroyed()) win.webContents.send('nm:update', state);
+    if (!win.isDestroyed()) win.webContents.send('nm:update', s);
   }
+}
+
+function set(next: Phase) {
+  state = next;
+  broadcast();
 }
 
 let checking = false; // collapse overlapping checks (the periodic timer + a manual retry)
@@ -41,6 +53,25 @@ async function check(force = false) {
     checking = false;
   }
 }
+
+// the floor rides the same moments as the update check, with its own throttle, and a Cloud
+// connection that appears or leaves reads it again at once.
+let floorAt = 0;
+let floorSeq = 0; // a slower, older answer never overwrites a newer one
+let floorUrl: string | null = null;
+const cloudUrl = (): string | null => connections.all().find((c) => c.kind === 'cloud')?.apiUrl ?? null;
+async function refreshFloor(force = false) {
+  if (!force && Date.now() - floorAt < CHECK_THROTTLE_MS) return;
+  floorAt = Date.now();
+  floorUrl = cloudUrl();
+  const seq = ++floorSeq;
+  const next = floorUrl ? await floorAbove(floorUrl, app.getVersion()) : null;
+  if (seq !== floorSeq || next === undefined || next === floor) return; // no answer keeps what we knew
+  floor = next;
+  broadcast();
+  if (floor && state.phase === 'idle') void check(true); // below the floor: look for the update now
+}
+const tick = (force = false) => { void check(force); void refreshFloor(force); };
 
 export function initAutoUpdate() {
   // Download is user-initiated: the card shows "Update available" and the user
@@ -68,9 +99,9 @@ export function initAutoUpdate() {
 
   // The card mounts after the first events may have fired, so it polls the
   // current state on mount rather than relying solely on the live broadcast.
-  ipcMain.handle('nm:update-state', () => state);
+  ipcMain.handle('nm:update-state', () => current());
   ipcMain.handle('nm:update-check', () => {
-    void check(true); // the user asked — bypass the throttle
+    tick(true); // the user asked — bypass the throttle
     return { ok: true };
   });
   ipcMain.handle('nm:update-download', async () => {
@@ -91,6 +122,9 @@ export function initAutoUpdate() {
     return { ok: true };
   });
 
+  void refreshFloor(true);
+  connections.onChanged(() => { if (cloudUrl() !== floorUrl) void refreshFloor(true); });
+
   // Only a packaged, signed app can self-update; in dev checkForUpdates throws
   // (no dev-app-update.yml). isUpdaterActive() === app.isPackaged guards check().
   if (app.isPackaged) {
@@ -100,9 +134,9 @@ export function initAutoUpdate() {
     // startup check (you'd quit first). Re-check when you return to the app, when the
     // machine wakes from sleep, and on a 30-min backstop (for a window left focused). The
     // throttle in check() collapses focus/wake bursts so none of this hammers the server.
-    app.on('browser-window-focus', () => void check());
-    powerMonitor.on('resume', () => void check());
-    const periodic = setInterval(() => void check(), 30 * 60 * 1000);
+    app.on('browser-window-focus', () => tick());
+    powerMonitor.on('resume', () => tick());
+    const periodic = setInterval(() => tick(), 30 * 60 * 1000);
     periodic.unref?.();
   }
 }

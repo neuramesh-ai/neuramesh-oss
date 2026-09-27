@@ -25,7 +25,7 @@ import { foLabel } from './staffing';
 import { withTimeout } from './turnkit';
 import { postWithRetry } from '../presence';
 import { isStandDown } from '../replypolicy';
-import { TURN_BUDGETS, genImageItemId, genVideoItemId, isChatThread, modelFreeItemId, parseModeMarker } from '@neuramesh/shared';
+import { TURN_BUDGETS, genImageItemId, genVideoItemId, isChatThread, modelFreeItemId, parseKindMarker, parseModeMarker } from '@neuramesh/shared';
 import { makeFilm } from './videogen';
 import { streamFixture } from './streamfixture';
 import type { PowerSyncDatabase } from '@powersync/node';
@@ -305,7 +305,7 @@ export function makeWake(ctx: {
         // and none of them knew the cost.
         const ctx = assemble([
           transcriptBlock(
-            recent.reverse().filter((r) => !parseModeMarker(r.body)).map((r) => ({ ...r, body: r.body.replace(SKILL_MARKER, '').trim() })),
+            recent.reverse().filter((r) => !parseModeMarker(r.body) && !parseKindMarker(r.body)).map((r) => ({ ...r, body: r.body.replace(SKILL_MARKER, '').trim() })),
             { selfId: agent.id },
           ),
           { source: 'attachments', text: att.manifest },
@@ -354,7 +354,7 @@ export function makeWake(ctx: {
             { source: 'notes', text: oSubject ? brainNotes(oSubject) : '' },
             { source: 'results', text: oSubject ? brainResults(oSubject) : '' },
             transcriptBlock(
-              recent.reverse().filter((r) => !parseModeMarker(r.body)).map((r) => ({ ...r, body: r.body.replace(SKILL_MARKER, '').trim() })),
+              recent.reverse().filter((r) => !parseModeMarker(r.body) && !parseKindMarker(r.body)).map((r) => ({ ...r, body: r.body.replace(SKILL_MARKER, '').trim() })),
               { selfId: agent.id },
             ),
             { source: 'skills', text: attached ? `[The human attached the skill "${attached.name}"${attached.pack ? ` from pack ${attached.pack}` : ''} via "/" — strongly consider load_skill on it and folding its guidance into how you scope/route this work.]` : '' },

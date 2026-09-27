@@ -4,6 +4,7 @@
 // commands.ts sits at its size cap); the client's HumanCommandSchema spreads the same tuple.
 import { z } from 'zod';
 import { CODE_APPROVAL_CATEGORIES, CODE_SESSION_MODES, CODE_SESSION_STATES } from './code-sessions';
+import { THREAD_KINDS } from './threads';
 
 export const CODE_SESSION_COMMANDS = [
   // create-or-update the session's synced row. `createdBy` names the member the session belongs
@@ -42,5 +43,15 @@ export const CODE_SESSION_COMMANDS = [
     approvalId: z.string().min(1).max(200),
     category: z.enum(CODE_APPROVAL_CATEGORIES),
     toolName: z.string().min(1).max(120),
+  }),
+  // Coding threads (0144, docs/design/coding-threads-2026-09): a conversation becomes coding (the
+  // coding runtime works on the project's repository in it) or goes back to chat. A human, or the
+  // room's orchestrator from its triage turn (ruling 1, 2026-09-26); handler/thread.ts refuses a
+  // task thread (its unit IS the code path) and a project with no repository (REPO_REQUIRED).
+  z.object({
+    type: z.literal('thread.set_kind'),
+    workspace: z.string().min(1),
+    threadId: z.string().uuid(),
+    kind: z.enum(THREAD_KINDS),
   }),
 ] as const;

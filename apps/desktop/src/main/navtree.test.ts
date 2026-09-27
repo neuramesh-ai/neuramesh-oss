@@ -292,3 +292,9 @@ test('foregroundSwapFor: a row on the other connection asks for { connectionId, 
   assert.equal(foregroundSwapFor({ key: 'eng', channelId: null, when: 't1' }, 'local', CONNS), null, 'an untagged row is the foreground\'s');
   assert.equal(foregroundSwapFor(tagged('z', 'gone', 't1'), 'local', CONNS), null, 'a tag the registry no longer knows swaps nothing');
 });
+
+test('a coding thread (0144) is code work in Code mode and a conversation in Chat mode', () => {
+  assert.equal(isCodeRow({ kind: 'coding' }), true);
+  assert.equal(isCodeRow({ kind: 'chat' }), false);
+  assert.equal(isChatRow({ kind: 'coding' }), true, 'a coding thread is a conversation: it lives in a room');
+});

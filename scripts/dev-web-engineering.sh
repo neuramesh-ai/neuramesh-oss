@@ -228,10 +228,10 @@ if ! sqlite3 "$HARNESS_ROOT/state/replica.db" \
 fi
 
 (
-  cd "$ROOT/apps/desktop"
+  cd "$ROOT/apps/hq"
   NM_DEV_API_TARGET="http://127.0.0.1:$API_PORT" VITE_NM_POWERSYNC_URL=http://127.0.0.1:58081 \
     VITE_NM_DEV_USER="$DEV_USER" VITE_NM_DEV_RELAY_TOKEN="$DEV_RELAY_TOKEN" VITE_NM_RELAY_URL="ws://127.0.0.1:$RELAY_PORT" \
-    pnpm exec vite --config vite.web.config.mts --host 127.0.0.1 --port "$WEB_PORT" --strictPort
+    pnpm exec vite --host 127.0.0.1 --port "$WEB_PORT" --strictPort
 ) > "$LOG_DIR/web.log" 2>&1 &
 PIDS+=("$!")
 wait_http web "http://127.0.0.1:$WEB_PORT" "${PIDS[-1]}"
