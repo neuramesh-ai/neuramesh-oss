@@ -36,7 +36,7 @@ import { isOnline, agentLive, agentBusy, agentFocus } from './lib/presence';
 import { selfInitial, selfLabel, setSelfMachine } from './lib/self';
 import { errMsg } from './lib/text';
 
-import { IconActivity, IconAgents, IconBoard, IconBurger, IconCalendar, IconCheck, IconChevron, IconClose, IconCode, IconDockLeft, IconDockRight, IconCredits, IconFootprint, IconGrid, IconHistory, IconHome, IconInbox, IconLibrary, IconMachine, IconMedal, IconMemory, IconPaperclip, IconProject, IconRepeat, IconReply, IconSend, IconSkill, IconThreads, IconTrend, IconWhiteboard, IconCompose, IconWorkbench } from './ui/icons';
+import { IconActivity, IconAgents, IconBoard, IconBranch, IconBurger, IconCalendar, IconCheck, IconChevron, IconClose, IconCode, IconDockLeft, IconDockRight, IconCredits, IconFootprint, IconGrid, IconHistory, IconHome, IconInbox, IconLibrary, IconMachine, IconMedal, IconMemory, IconPaperclip, IconProject, IconRepeat, IconReply, IconSend, IconSkill, IconThreads, IconTrend, IconWhiteboard, IconCompose, IconWorkbench } from './ui/icons';
 import { type ThemeId, type ThemePref, systemTheme, resolveTheme, applyTheme, loadThemePref } from './theme/theme';
 import { flashToast, useToast, setProviderSettingsOpener, setPolicySettingsOpener, setUpgradeOpener, setConnectionsSettingsOpener, setMoveToCloudOpener , openMoveToCloud } from './lib/toast';
 import { hostedGateFor } from './shell/hostedrule';
@@ -65,6 +65,7 @@ import { STATE_LABEL } from './task/labels';
 
 import { RetroView } from './views/RetroView';
 import { FootprintView, footprintPctOf, useFootprint } from './views/FootprintView';
+import { WorktreesView } from './views/WorktreesView';
 import { CreditsView } from './views/CreditsView';
 import { LogsScreen } from './views/LogsScreen';
 
@@ -291,6 +292,7 @@ const SURFACE_TABS: Partial<Record<MainView, string>> = {
   skills: 'Skills',
   memory: 'Memory',
   footprint: "Agents' footprint", // machine-scoped — a #channel-slug fallback title would be a lie
+  worktrees: 'Worktrees', // machine-scoped too (docs/design/worktrees-2026-09)
   credits: 'Credits', // workspace-scoped billing read — a room slug on its tab would be a lie
   marketing: 'Marketing OS',
   engineering: 'Code',
@@ -2647,6 +2649,7 @@ export function App() {
       [<IconCalendar s={13} key="v-ca" />, 'Content calendar', () => { setNav('home'); setView('calendar'); }],
       [<IconTrend s={13} key="v-mk" />, 'Marketing OS', () => { setNav('home'); setView('marketing'); }],
       [<IconFootprint s={13} key="v-fp" />, "Agents' footprint", () => { setNav('home'); setView('footprint'); }],
+      [<IconBranch s={13} key="v-wt" />, 'Worktrees', () => { setNav('home'); setView('worktrees'); }],
       [<IconCredits s={13} key="v-cr" />, 'Credits', () => { setNav('home'); setView('credits'); }],
       [<IconHistory s={13} key="v-hi" />, 'History', () => setHistOpen(true)],
       [<IconSkill s={13} key="v-sk" />, 'Skills', () => { setNav('home'); setView('skills'); }],
@@ -3722,6 +3725,12 @@ export function App() {
           <>
             <div className="topbar">Agents&rsquo; footprint<span className="desc">this machine</span></div>
             <FootprintView />
+          </>
+        )}
+        {view === 'worktrees' && (
+          <>
+            <div className="topbar">Worktrees<span className="desc">this machine</span></div>
+            <WorktreesView onOpenTask={(id) => goConversation(() => setOpenTaskId(id))} onOpenThread={(id, channelId) => goConversation(() => openConversation(id, channelId))} />
           </>
         )}
         {view === 'credits' && <CreditsView />}

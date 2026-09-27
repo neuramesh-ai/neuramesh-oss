@@ -12,7 +12,7 @@ import type { TaskRow, TaskAllRow, DecisionAllRow, ProjectRow, WorkspaceProjectR
 import type { AgentRow, MachineRow, MemberRow, WorkspaceMembership, PendingInvite, LogRow, RunRow } from './rows-crew';
 export type { WorkspaceUsage, CreditHistory, StarterVideo } from './rows-infra';
 import type { WorkspaceUsage, CreditHistory, StarterVideo } from './rows-infra';
-import type { CredRow, ProviderId, ProviderStatus, UpdateState, ArchivedThreadRow, FailoverRow, PolicyRowUI, ProcList, FootprintSnapshot, FootprintReply } from './rows-infra';
+import type { CredRow, ProviderId, ProviderStatus, UpdateState, ArchivedThreadRow, FailoverRow, PolicyRowUI, ProcList, FootprintSnapshot, FootprintReply, WorktreeRemoveInput, WorktreeRemoveReply, WorktreesReply } from './rows-infra';
 import type { AlertConnectorRow, AlertPostRow, AlertScheduleRow, BrainOverride, ConnectProvider, RetroPayload, ThreadKind, ThreadMode } from '@neuramesh/shared';
 /** what /v1/github/resolve answers: connected (the row exists now), or why not, with the install door when GitHub has it */
 export type GitHubResolve = { ok: true; handle: string; attached?: boolean } | { ok: false; code: 'NOT_INSTALLED' | 'NO_REPO' | 'NOT_CONFIGURED' | 'UNREACHABLE'; error: string; install?: string | null; repos?: string[]; hint?: string | null };
@@ -170,6 +170,9 @@ export interface NMBridge extends EngineeringNMBridge, TerminalNMBridge {
   sandboxSet(enabled: boolean): Promise<{ ok: boolean }>;
   footprintGet(quick?: boolean): Promise<FootprintReply>;
   footprintReclaim(): Promise<FootprintReply & { snapshot: FootprintSnapshot | null }>;
+  /** the Worktrees destination: this machine's worktrees, and the one act a person takes on a row */
+  worktreesGet(): Promise<WorktreesReply>;
+  worktreeRemove(input: WorktreeRemoveInput): Promise<WorktreeRemoveReply>;
   applyPack(packId: string): Promise<{ ok: boolean; applied: number }>;
   modelPacks(): Promise<{ packs: Array<{ id: string; name: string; roles: Record<string, string>; updatedAt: string }> }>;
   modelPackSave(input: { packId?: string; name: string; roles: Record<string, string> }): Promise<{ ok: boolean; packId: string }>;

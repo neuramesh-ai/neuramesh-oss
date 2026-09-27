@@ -58,6 +58,14 @@ export type FootprintPayloadUI = {
 };
 export type FootprintReply = { ready: true; payload: FootprintPayloadUI } | { ready: false; history: FootprintSnapshot[] };
 
+// the Worktrees destination (docs/design/worktrees-2026-09 §4): this machine's worktrees, one row each
+export type WorktreeTaskRowUI = { taskNumber: number; taskId: string | null; title: string | null; state: string | null; cls: 'leased' | 'warm' | 'dead' | 'orphan'; bytes: number; mtimeMs: number; repoId: string | null; repoName: string | null; branch: string | null; held: boolean };
+export type WorktreeThreadRowUI = { name: string; threadId: string | null; channelId: string | null; title: string | null; cls: 'working' | 'waits' | 'idle' | 'orphan'; bytes: number; mtimeMs: number; repoName: string | null; branch: string | null; dirty: number; held: boolean };
+export type WorktreesPayloadUI = { at: string; machine: string; tasks: WorktreeTaskRowUI[]; threads: WorktreeThreadRowUI[]; fleet: Array<{ tool: string; path: string; count: number; bytes: number; oldestMs: number | null }>; fleetPending?: boolean; settled: { count: number; bytes: number } };
+export type WorktreesReply = { ready: true; payload: WorktreesPayloadUI };
+export type WorktreeRemoveInput = { kind: 'task'; taskNumber: number; force?: boolean } | { kind: 'thread'; name: string; force?: boolean } | { kind: 'settled' };
+export type WorktreeRemoveReply = { ok: true; freedBytes: number; notes: string[]; payload: WorktreesPayloadUI } | { ok: false; code: 'WORKTREE_BUSY' | 'NOT_FOUND'; payload: WorktreesPayloadUI };
+
 export interface WorkspaceUsage {
   credits: {
     remaining: number; granted: number; periodStart: string; monthlyGrant: number;

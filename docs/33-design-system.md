@@ -924,7 +924,9 @@ real work — if it is decoration, drop it and keep the pill.
   landing tab and the ⌘K row all say it. The band is **Automations · Customizations · Marketing OS ·
   More**. Automations is the Scheduled row relabelled (label only, the keys stay). **Customizations** is
   the second two-lens destination, Skills · Connections as `.desttabs` on one page (the Automations
-  shape, no new strip), each tab wearing the count it names, the scope bar shared; its Connections
+  shape, no new strip), each tab wearing the count it names, the scope bar shared, the page laid out
+  like Routines (one scroller, `.custview`, the scope bar and the list on one centred 1120px measure,
+  George 2026-09-27: "center aligned like other pages content"); its Connections
   lens lists the room's connectors in one card per purpose (`.cxsec` + `.cxkick`: Publish · Read ·
   Ads · Media, `CONNECTOR_PURPOSE`). **More** holds Whiteboards · Files · Code behind the row menu the
   folders wear (`.navrowmenu`, beside the row, the transparent scrim); a menu must not cost
@@ -1435,6 +1437,19 @@ real work — if it is decoration, drop it and keep the pill.
   dissolved it into the page. `--accent-soft`/`--sel-bg` stay reserved for the *set/open* states.
   The rail's compact twin (`.railscope .scopepill .cchip`) is insulated at (0,3,0) and deliberately
   stays a transparent `--border2` pill — it sits on the dock, not on a sheet of cards.
+
+- **A table of things on a disk gets one row anatomy and a verb per row** (the Worktrees
+  destination, 2026-09-27, [docs/design/worktrees-2026-09](design/worktrees-2026-09/plan.md)):
+  glyph · name · repository and branch (mono) · the state chip · size (mono) · last touch · `Open`
+  and `Clean up`. The chip is the daemon's classification in plain words, never a stored word
+  (`.wtvchip.c-*`: `--prog` for active and working, `--review` for submitted, `--panel3` for
+  settled and idle, `--warn` only for a row nothing owns or a wait on the person). The head is a
+  session head (title, mono subline, a toks row that filters the table), and the one bulk action
+  sits top-right. **A destructive verb confirms in an anchored popover under the verb, never a
+  modal** (`.wtvconfirm`, the footprint's `.fpconfirm` rule): a title that names the thing, the
+  warning lines FIRST in `--warn` when there are any, then what goes and what stays, then
+  `Cancel · Clean up`. When the act crosses a line the system never crosses on its own, the verb
+  says so: `Clean up anyway`.
 
 - **A destination with two bodies gets ONE bar, and its words are subheadings** (the Marketing OS
   desk round, 2026-09-17, George; visual contract

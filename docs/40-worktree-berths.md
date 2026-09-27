@@ -88,6 +88,26 @@ Chart series ride the **`--viz-berths/donors/clones` tokens** (docs/33 §4) — 
 order, validated six-checks per theme against the card surface; the same identity on the card bar,
 the area bands, and the breakdown dots.
 
+## The Worktrees destination (2026-09-27, [docs/design/worktrees-2026-09](design/worktrees-2026-09/plan.md))
+
+The Code rail's `Worktrees` row opens a table of this machine's worktrees, not the footprint
+(George, 2026-09-26: "it should instead be showing active/open worktrees on the workspace, and
+user can cleanup any of the worktree whenever they want"). Two sections, one row anatomy: the
+task berths, each wearing `classifyBerth`'s word in plain English (`active` · `submitted` ·
+`settled` · `no task`), and the coding threads' retained worktrees
+(`cache/worktrees/engineering-<actor>-<repo>-<thread>`, the desktop Code bridge), each wearing
+what the runtime does there (`working` · `waits for you` · `idle` · `no thread`). The third-party
+dirs stay reported and never touched. **Clean up on every row**, including an active one: the
+confirm leads with the warning and its verb reads `Clean up anyway`, because a person may do once,
+out loud, what the sweeper never does on its own. The bulk button `Clean up settled` IS
+`decideSweep`'s remove verdict (settled and no-task rows), never a second policy. Removal is total
+the way this document says (dir, admin entry, local branch), `removeEngineeringWorktree` finds the
+clone through the worktree's own `.git` pointer (a desktop worktree is cut from the member's own
+checkout), and a thread's row on the board never moves: its next open cuts a fresh worktree from
+the branch. IPC: `nm:worktrees-get`, `nm:worktree-remove` (`WORKTREE_BUSY` while a run, a review
+shell or a local Code session stands in the directory, unless forced). Policy:
+`harness/worktree-rows.ts`. The footprint keeps its own doors and the disk gauge.
+
 ## Ops notes
 
 - `nm:footprint-get` caches 15 min; `quick=true` (the card) never waits on a cold fleet `du`.

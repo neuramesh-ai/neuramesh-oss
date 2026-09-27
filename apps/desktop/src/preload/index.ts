@@ -58,6 +58,8 @@ contextBridge.exposeInMainWorld('nm', {
   sandboxGet: () => ipcRenderer.invoke('nm:sandbox-get'),
   footprintGet: (quick?: boolean) => ipcRenderer.invoke('nm:footprint-get', { quick }),
   footprintReclaim: () => ipcRenderer.invoke('nm:footprint-reclaim'),
+  worktreesGet: () => ipcRenderer.invoke('nm:worktrees-get'),
+  worktreeRemove: (input: unknown) => ipcRenderer.invoke('nm:worktree-remove', input),
   sandboxSet: (enabled: boolean) => ipcRenderer.invoke('nm:sandbox-set', { enabled }),
   send: (channelId: string, body: string, opts?: { id?: string; attachments?: { id: string; name: string; mime: string }[]; threadId?: string; rootMessageId?: string; threadMode?: 'tasks' | 'chat'; brainOverride?: Record<string, string> | null; threadMachineId?: string | null; threadOrigin?: 'desktop' | 'web' | 'routine' | null; threadKind?: 'chat' | 'coding' }) =>
     ipcRenderer.invoke('nm:send', { channelId, body, id: opts?.id, attachments: opts?.attachments, threadId: opts?.threadId, rootMessageId: opts?.rootMessageId, threadMode: opts?.threadMode, brainOverride: opts?.brainOverride, threadMachineId: opts?.threadMachineId, threadOrigin: opts?.threadOrigin, threadKind: opts?.threadKind }),

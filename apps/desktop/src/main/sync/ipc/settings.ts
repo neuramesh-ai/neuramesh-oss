@@ -19,6 +19,11 @@ export interface SettingsDeps {
   ws: () => string;
 }
 
+// the footprint's cache lives inside registerSettings; a removal on the Worktrees destination
+// (sync/ipc/worktrees.ts) changes what it would measure, so this is its one door from outside
+let fpInvalidate: () => void = () => {};
+export function invalidateFootprintCache(): void { fpInvalidate(); }
+
 export function registerSettings({ db, ws }: SettingsDeps): void {
 // the Projects page + head: all workspace projects with the channels they own, an
 // open-task count, the four-bucket pulse (projmeta.ts), the registered-agent count,
@@ -100,6 +105,7 @@ ipcMain.handle('nm:sandbox-set', async (_e, { enabled }: { enabled: boolean }) =
 // run seconds cold on a 70GB third-party dir, so quick=true (the Home card) never waits on a
 // scan — it serves the cache, or history-only while a background build warms it.
 let fpCache: { at: number; payload: import('../../footprint').FootprintPayload } | null = null;
+fpInvalidate = () => { fpCache = null; };
 let fpInflight: Promise<import('../../footprint').FootprintPayload> | null = null;
 const fpBuild = (): Promise<import('../../footprint').FootprintPayload> => {
   fpInflight ??= (async () => {

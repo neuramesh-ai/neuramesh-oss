@@ -8465,6 +8465,60 @@ button.dprovideropt:hover:not(:disabled), .dprovideropt.external:hover { border-
   box-shadow: var(--shadow-pop); padding: 12px 14px; animation: nm-rise .18s var(--ease); }
 @media (prefers-reduced-motion: reduce) { .fpconfirm { animation: none; } }
 
+/* ── Worktrees (docs/design/worktrees-2026-09): the Code rail's table of this machine's worktrees.
+   One row anatomy for a task berth and a coding thread's worktree: glyph · name · repo and branch
+   (mono) · the state chip · size · last touch · Open and Clean up. The chip is the daemon's
+   classification (docs/40 classifyBerth, worktree-rows.ts), never a stored word; --warn marks a
+   row nothing owns and a confirm's warning line, never a series. ── */
+.wtview { max-width: 980px; padding: 6px 26px 46px; }
+.wtvhead { display: flex; align-items: flex-start; gap: 12px; padding: 8px 0 12px; border-bottom: 1px solid var(--border); }
+.wtvhead h1 { margin: 0; font-size: 17px; font-weight: 500; letter-spacing: -.02em; color: var(--text); }
+.wtvsub { display: flex; align-items: center; gap: 6px; margin-top: 3px; color: var(--muted); font: 500 10.5px var(--fmono); }
+.wtvsub svg { opacity: .8; }
+.wtvtoks { display: flex; gap: 6px; margin-top: 9px; flex-wrap: wrap; }
+.wtvtok { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: var(--r-pill); border: 1px solid var(--border); background: transparent; color: var(--muted); font: 500 10.5px var(--fmono); cursor: pointer; }
+.wtvtok:hover { color: var(--body); border-color: var(--hover-border); }
+.wtvtok.on { background: var(--panel3); color: var(--text); border-color: var(--border2); }
+.wtvright { margin-left: auto; display: flex; align-items: center; gap: 10px; padding-top: 2px; }
+.wtvnote { color: var(--muted); font-size: 11.5px; white-space: nowrap; }
+.wtvempty { color: var(--muted); font-size: 12.5px; padding: 18px 8px; }
+.wtvsec { display: flex; align-items: center; gap: 8px; margin: 16px 0 6px; padding: 0 8px; font: 600 9.5px/1 var(--fmono); letter-spacing: -.02em; text-transform: uppercase; color: var(--dim); }
+.wtvsec small { font-size: 9.5px; font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--dim); }
+.wtvrow { display: grid; grid-template-columns: 22px minmax(0, 1.6fr) minmax(0, 1.1fr) 96px 64px 84px auto; align-items: center; gap: 12px; padding: 7px 8px; border-radius: 6px; color: var(--body); font-size: 13px; }
+.wtvrow:hover { background: var(--hover-bg); }
+.wtvrow .gl { display: grid; place-items: center; color: var(--dim); }
+.wtvrow .nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); font-weight: 500; }
+.wtvrow .nm em { font-style: normal; color: var(--dim); font: 500 10.5px var(--fmono); margin-right: 6px; }
+.wtvrow .br { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font: 500 10.5px var(--fmono); }
+.wtvrow .sz { color: var(--body); font: 500 11px var(--fmono); text-align: right; white-space: nowrap; }
+.wtvrow .when { color: var(--dim); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wtvrow .acts { display: flex; gap: 6px; justify-content: flex-end; white-space: nowrap; }
+.wtvchip { display: inline-flex; align-items: center; height: 18px; padding: 0 7px; border-radius: var(--r-pill); font: 600 9.5px var(--fmono); letter-spacing: .02em; text-transform: uppercase; white-space: nowrap; }
+.wtvchip.c-active, .wtvchip.c-working { background: color-mix(in srgb, var(--prog) 18%, transparent); color: var(--prog); }
+.wtvchip.c-submitted { background: color-mix(in srgb, var(--review) 18%, transparent); color: var(--review); }
+.wtvchip.c-settled, .wtvchip.c-idle { background: var(--panel3); color: var(--muted); }
+.wtvchip.c-orphan, .wtvchip.c-waits { background: color-mix(in srgb, var(--warn) 14%, transparent); color: var(--warn); }
+/* the task glyph: a ring in the leg's hue, dashed when no task owns the directory */
+.wtvring { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--border2); }
+.wtvring.b { border-color: var(--prog); border-right-color: var(--border2); border-bottom-color: var(--border2); }
+.wtvring.r { border-color: var(--review); border-bottom-color: var(--border2); }
+.wtvring.d { border-color: var(--done); }
+.wtvring.o { border-style: dashed; border-color: var(--warn); }
+.wtvfleet { margin: 0 8px; padding: 10px 12px; border: 1px dashed var(--border2); border-radius: 6px; color: var(--muted); font-size: 12px; display: flex; flex-direction: column; gap: 6px; }
+.wtvfleet .r { display: flex; gap: 10px; align-items: center; justify-content: space-between; font: 500 10.5px var(--fmono); }
+.wtvfleet .r b { color: var(--body); font-weight: 500; white-space: nowrap; }
+.wtvfleet .foot { font-size: 11px; color: var(--dim); }
+/* the confirm: an anchored popover under the row's verb, never a modal (the footprint's .fpconfirm rule) */
+.wtvconfirmwrap { position: relative; display: inline-flex; }
+.wtvconfirm { position: absolute; top: calc(100% + 8px); right: 0; z-index: 5; width: 330px; text-align: left; white-space: normal;
+  background: var(--overlay); border: 1px solid var(--border2); border-radius: var(--r-lg); box-shadow: var(--shadow-pop); padding: 12px 14px; animation: nm-rise .18s var(--ease); }
+@media (prefers-reduced-motion: reduce) { .wtvconfirm { animation: none; } }
+.wtvconfirm b { display: block; color: var(--text); font-size: 13px; font-weight: 600; }
+.wtvconfirm p { color: var(--body); font-size: 12.5px; line-height: 1.5; margin: 5px 0 0; }
+.wtvconfirm p.warnline { color: var(--warn); }
+.wtvconfirm code { font: 500 11px var(--fmono); color: var(--text); word-break: break-all; }
+.wtvconfirm .acts { display: flex; justify-content: flex-end; gap: 6px; margin-top: 10px; }
+
 /* ── Engineering OS ──────────────────────────────────────────────────────────────────────────
    One conversation/history pane and one code-evidence pane. Session history also participates
    in the workspace rail; duplicating it as a third permanent column only spent editor width. */
