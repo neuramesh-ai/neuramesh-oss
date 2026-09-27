@@ -150,3 +150,36 @@ describe('the 401 retry', () => {
     expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('the generic lanes (getJson, postJson)', () => {
+  it('reads a route no typed method covers, with the same bearer and the same one retry', async () => {
+    const seen: Array<string | undefined> = [];
+    const fetchSpy = vi.fn(async (_u: string, init: RequestInit) => {
+      const auth = (init.headers as Record<string, string>)['authorization'];
+      seen.push(auth);
+      return auth === 'Bearer fresh' ? jsonResponse({ packs: [] }) : new Response(JSON.stringify({ error: 'token expired' }), { status: 401 });
+    });
+    vi.stubGlobal('fetch', fetchSpy);
+    const api = new ControlApiClient({ baseUrl: 'https://api.test', getToken: (force) => (force ? 'fresh' : 'stale') });
+    await expect(api.getJson('/v1/model-packs?workspace=w1')).resolves.toEqual({ packs: [] });
+    expect(firstCall(fetchSpy)[0]).toBe('https://api.test/v1/model-packs?workspace=w1');
+    expect(seen).toEqual(['Bearer stale', 'Bearer fresh']);
+  });
+
+  it('posts JSON and keeps the server envelope on a refusal', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({ error: 'billing not configured', code: 'BILLING_OFF' }, 400)));
+    await expect(client().postJson('/v1/billing/checkout', { workspace: 'w1' })).rejects.toMatchObject({
+      message: 'billing not configured', status: 400, code: 'BILLING_OFF',
+    });
+  });
+
+  it('sends no bearer when the body is the credential', async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({ userId: 'u1' }));
+    vi.stubGlobal('fetch', fetchMock);
+    await client().postJson('/auth/clerk', { token: 'session-jwt' }, { authed: false });
+    const [url, init] = firstCall(fetchMock);
+    expect(url).toBe('https://api.test/auth/clerk');
+    expect((init.headers as Record<string, string>).authorization).toBeUndefined();
+    expect(JSON.parse(init.body as string)).toEqual({ token: 'session-jwt' });
+  });
+});

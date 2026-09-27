@@ -924,7 +924,7 @@ export class MemoryStore implements Store {
     return { id: messageId };
   }
 
-  private machines = new Map<string, { id: string; lastSeenAt: string }>();
+  private machines = new Map<string, { id: string; lastSeenAt: string; ownerId: string }>();
 
   async registerMachine(
     input: { workspace: string; name: string; platform: string; daemonVersion: string; ownerId: string; transfer?: boolean; runtimes?: string[] },
@@ -943,15 +943,22 @@ export class MemoryStore implements Store {
       return { id: existing.id, inserted: false };
     }
     const id = crypto.randomUUID();
-    this.machines.set(key, { id, lastSeenAt: new Date().toISOString() });
+    this.machines.set(key, { id, lastSeenAt: new Date().toISOString(), ownerId: input.ownerId });
     this.events.push(event);
     return { id, inserted: true };
   }
 
-  async heartbeatMachine(machineId: string): Promise<void> {
-    for (const m of this.machines.values()) {
-      if (m.id === machineId) m.lastSeenAt = new Date().toISOString();
+  async heartbeatMachine(machineId: string, actorId: string): Promise<boolean> {
+    // every machine here is local (registerMachine): its owner or a human member of its workspace
+    // may beat it, the rule PostgresStore holds in its WHERE
+    for (const [key, m] of this.machines) {
+      if (m.id !== machineId) continue;
+      const workspace = key.slice(0, key.indexOf('/'));
+      if (m.ownerId !== actorId && !this.wsMembers.get(workspace)?.has(actorId)) return false;
+      m.lastSeenAt = new Date().toISOString();
+      return true;
     }
+    return false;
   }
 
   private agents = new Map<string, string>();

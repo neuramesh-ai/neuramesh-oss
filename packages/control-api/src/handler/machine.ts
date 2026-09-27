@@ -35,11 +35,18 @@ export async function machineCommands(store: Store, actor: Actor, cmd: Command):
     return { machineId: id };
   }
   if (cmd.type === 'machine.heartbeat') {
-    await store.heartbeatMachine(cmd.machineId, {
+    // A BEAT IS ITS MACHINE'S OWN (2026-09-27). It moves last_seen_at and, for a cloud machine,
+    // charges the machine's workspace for its active seconds. Any signed-in caller could beat any
+    // id, so it could keep another workspace's machine awake and bill it. Both real senders are
+    // humans: a desktop beats with its person's bearer, and a cloud machine with its token, which
+    // resolves to its owner (machine-auth.ts). Who may beat which machine is the store's WHERE.
+    if (actor.kind !== 'human') throw new DomainError('NOT_PERMITTED', 'a machine beats as its owner');
+    const beat = await store.heartbeatMachine(cmd.machineId, actor.id, {
       activeSeconds: cmd.activeSeconds ?? 0, busy: cmd.busy ?? false,
       ...(cmd.runtimes ? { runtimes: cmd.runtimes } : {}),
       ...(cmd.daemonVersion ? { daemonVersion: cmd.daemonVersion } : {}),
     });
+    if (!beat) throw new DomainError('NOT_FOUND', 'no machine you may beat has this id');
     return { machineId: cmd.machineId };
   }
   if (cmd.type === 'machine.provision') {

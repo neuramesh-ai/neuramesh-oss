@@ -10109,6 +10109,126 @@ async function refundFilm(sql, workspaceId, split, note) {
 init_src();
 import { z as z11 } from "zod";
 
+// src/billing.ts
+import Stripe from "stripe";
+var SECRET2 = process.env["STRIPE_SECRET_KEY"];
+var WEBHOOK_SECRET = process.env["STRIPE_WEBHOOK_SECRET"];
+var PRICE_ID = process.env["STRIPE_PRICE_ID"];
+var RETURN_BASE = process.env["NM_BILLING_RETURN_URL"] ?? "https://neuramesh.app/billing";
+function billingEnabled() {
+  return !!SECRET2;
+}
+var _stripe = null;
+function stripe() {
+  if (!SECRET2) throw new Error("billing not configured (STRIPE_SECRET_KEY unset)");
+  if (!_stripe) _stripe = new Stripe(SECRET2);
+  return _stripe;
+}
+async function setSubscriptionSeats(subscriptionId, seats) {
+  const s = stripe();
+  const sub = await s.subscriptions.retrieve(subscriptionId);
+  const item = sub.items.data[0];
+  if (!item) throw new Error(`subscription ${subscriptionId} has no items`);
+  await s.subscriptions.update(subscriptionId, { items: [{ id: item.id, quantity: seats }], proration_behavior: "create_prorations" });
+}
+async function createCheckoutSession(input) {
+  if (!PRICE_ID) throw new Error("billing not configured (STRIPE_PRICE_ID unset)");
+  const session = await stripe().checkout.sessions.create({
+    mode: "subscription",
+    line_items: [{ price: PRICE_ID, quantity: Math.max(1, input.quantity) }],
+    client_reference_id: input.workspace,
+    ...input.customerId ? { customer: input.customerId } : {},
+    subscription_data: { metadata: { workspace_id: input.workspace } },
+    allow_promotion_codes: true,
+    success_url: `${RETURN_BASE}/success?ws=${encodeURIComponent(input.workspace)}`,
+    cancel_url: `${RETURN_BASE}/cancel`
+  });
+  if (!session.url) throw new Error("stripe returned no checkout url");
+  return session.url;
+}
+async function createPortalSession(input) {
+  const session = await stripe().billingPortal.sessions.create({ customer: input.customerId, return_url: `${RETURN_BASE}/portal-return` });
+  return session.url;
+}
+function constructWebhookEvent(rawBody, signature) {
+  if (!WEBHOOK_SECRET) throw new Error("billing not configured (STRIPE_WEBHOOK_SECRET unset)");
+  return stripe().webhooks.constructEvent(rawBody, signature, WEBHOOK_SECRET);
+}
+var CLOUD_STATUSES = /* @__PURE__ */ new Set(["active", "trialing", "past_due"]);
+function planPatchFromEvent(event) {
+  const obj = event.data.object;
+  const metaWorkspace = obj["metadata"]?.["workspace_id"];
+  if (event.type === "checkout.session.completed") {
+    if (obj["mode"] === "payment") return null;
+    const workspace = obj["client_reference_id"] || metaWorkspace;
+    if (!workspace) return null;
+    return {
+      workspace,
+      patch: {
+        plan: "cloud",
+        subscriptionStatus: "active",
+        stripeCustomerId: obj["customer"] ?? null,
+        stripeSubscriptionId: obj["subscription"] ?? null
+      }
+    };
+  }
+  if (event.type === "customer.subscription.created" || event.type === "customer.subscription.updated" || event.type === "customer.subscription.deleted") {
+    if (!metaWorkspace) return null;
+    const status = event.type === "customer.subscription.deleted" ? "canceled" : obj["status"];
+    const item0 = obj["items"]?.data?.[0];
+    const quantity = item0?.quantity;
+    const periodEnd = obj["current_period_end"] ?? item0?.current_period_end;
+    return {
+      workspace: metaWorkspace,
+      patch: {
+        plan: CLOUD_STATUSES.has(status) ? "cloud" : "free",
+        subscriptionStatus: status,
+        ...quantity ? { seats: quantity } : {},
+        ...periodEnd ? { currentPeriodEnd: new Date(periodEnd * 1e3).toISOString() } : {},
+        stripeCustomerId: obj["customer"] ?? null,
+        stripeSubscriptionId: obj["id"] ?? null
+      }
+    };
+  }
+  return null;
+}
+async function createCreditsCheckout(input) {
+  const session = await stripe().checkout.sessions.create({
+    mode: "payment",
+    line_items: [{
+      price_data: {
+        currency: "usd",
+        unit_amount: input.usd * 100,
+        product_data: { name: `${input.credits.toLocaleString("en-US")} NeuraMesh credits` }
+      },
+      quantity: 1
+    }],
+    client_reference_id: input.workspace,
+    ...input.customerId ? { customer: input.customerId } : {},
+    metadata: { workspace_id: input.workspace, kind: "credit_pack", credits: String(input.credits) },
+    success_url: `${RETURN_BASE}/success?ws=${encodeURIComponent(input.workspace)}&credits=${input.credits}`,
+    // `/cancel`, matching the subscription checkout above and apps/web's route table. `/canceled`
+    // was a guess and the web app never routed it, so abandoning a pack landed on a dead page.
+    cancel_url: `${RETURN_BASE}/cancel`
+  });
+  if (!session.url) throw new Error("stripe returned no checkout url");
+  return session.url;
+}
+function creditGrantFromEvent(event) {
+  if (event.type !== "checkout.session.completed" && event.type !== "checkout.session.async_payment_succeeded") return null;
+  const obj = event.data.object;
+  if (obj["mode"] !== "payment") return null;
+  if (obj["payment_status"] !== "paid") return null;
+  const meta = obj["metadata"] ?? {};
+  if (meta["kind"] !== "credit_pack") return null;
+  const workspace = meta["workspace_id"] || obj["client_reference_id"];
+  const credits = Number(meta["credits"]);
+  if (!workspace || !Number.isFinite(credits) || credits <= 0) return null;
+  const sessionId = String(obj["id"] ?? "");
+  if (!sessionId) return null;
+  return { workspace, credits, sessionId };
+}
+
 // src/fleet.ts
 import { z as z10 } from "zod";
 
@@ -11107,6 +11227,13 @@ async function actorInWorkspace(store2, actor, workspace) {
   if (actor.kind === "human") return (await store2.humanMemberIds(workspace)).includes(actor.id);
   if (actor.kind === "agent") return await store2.agentWorkspace(actor.id) === workspace;
   return false;
+}
+async function billingCaller(store2, actor, workspace) {
+  if (actor.kind !== "human") return { refusal: { error: "billing is human-only", code: "NOT_PERMITTED" }, status: 403 };
+  if (!workspace) return { refusal: { error: "workspace required", code: "INVALID_INPUT" }, status: 400 };
+  if (!await actorInWorkspace(store2, actor, workspace)) return { refusal: { error: "not your workspace", code: "NOT_PERMITTED" }, status: 403 };
+  if (!billingEnabled()) return { refusal: { error: "billing not configured", code: "NOT_FOUND" }, status: 404 };
+  return { workspace };
 }
 
 // src/handler.ts
@@ -12410,14 +12537,19 @@ var MemoryStore = class {
       return { id: existing.id, inserted: false };
     }
     const id = crypto.randomUUID();
-    this.machines.set(key2, { id, lastSeenAt: (/* @__PURE__ */ new Date()).toISOString() });
+    this.machines.set(key2, { id, lastSeenAt: (/* @__PURE__ */ new Date()).toISOString(), ownerId: input.ownerId });
     this.events.push(event);
     return { id, inserted: true };
   }
-  async heartbeatMachine(machineId) {
-    for (const m of this.machines.values()) {
-      if (m.id === machineId) m.lastSeenAt = (/* @__PURE__ */ new Date()).toISOString();
+  async heartbeatMachine(machineId, actorId) {
+    for (const [key2, m] of this.machines) {
+      if (m.id !== machineId) continue;
+      const workspace = key2.slice(0, key2.indexOf("/"));
+      if (m.ownerId !== actorId && !this.wsMembers.get(workspace)?.has(actorId)) return false;
+      m.lastSeenAt = (/* @__PURE__ */ new Date()).toISOString();
+      return true;
     }
+    return false;
   }
   agents = /* @__PURE__ */ new Map();
   agentMeta = /* @__PURE__ */ new Map();
@@ -13955,126 +14087,6 @@ function destroyForLeave(store2, workspaceId, userId) {
   }).catch((e) => console.error(`member_machine_destroy_failed workspace=${workspaceId} user=${userId}: ${e instanceof Error ? e.message : e}`));
 }
 
-// src/billing.ts
-import Stripe from "stripe";
-var SECRET2 = process.env["STRIPE_SECRET_KEY"];
-var WEBHOOK_SECRET = process.env["STRIPE_WEBHOOK_SECRET"];
-var PRICE_ID = process.env["STRIPE_PRICE_ID"];
-var RETURN_BASE = process.env["NM_BILLING_RETURN_URL"] ?? "https://neuramesh.app/billing";
-function billingEnabled() {
-  return !!SECRET2;
-}
-var _stripe = null;
-function stripe() {
-  if (!SECRET2) throw new Error("billing not configured (STRIPE_SECRET_KEY unset)");
-  if (!_stripe) _stripe = new Stripe(SECRET2);
-  return _stripe;
-}
-async function setSubscriptionSeats(subscriptionId, seats) {
-  const s = stripe();
-  const sub = await s.subscriptions.retrieve(subscriptionId);
-  const item = sub.items.data[0];
-  if (!item) throw new Error(`subscription ${subscriptionId} has no items`);
-  await s.subscriptions.update(subscriptionId, { items: [{ id: item.id, quantity: seats }], proration_behavior: "create_prorations" });
-}
-async function createCheckoutSession(input) {
-  if (!PRICE_ID) throw new Error("billing not configured (STRIPE_PRICE_ID unset)");
-  const session = await stripe().checkout.sessions.create({
-    mode: "subscription",
-    line_items: [{ price: PRICE_ID, quantity: Math.max(1, input.quantity) }],
-    client_reference_id: input.workspace,
-    ...input.customerId ? { customer: input.customerId } : {},
-    subscription_data: { metadata: { workspace_id: input.workspace } },
-    allow_promotion_codes: true,
-    success_url: `${RETURN_BASE}/success?ws=${encodeURIComponent(input.workspace)}`,
-    cancel_url: `${RETURN_BASE}/cancel`
-  });
-  if (!session.url) throw new Error("stripe returned no checkout url");
-  return session.url;
-}
-async function createPortalSession(input) {
-  const session = await stripe().billingPortal.sessions.create({ customer: input.customerId, return_url: `${RETURN_BASE}/portal-return` });
-  return session.url;
-}
-function constructWebhookEvent(rawBody, signature) {
-  if (!WEBHOOK_SECRET) throw new Error("billing not configured (STRIPE_WEBHOOK_SECRET unset)");
-  return stripe().webhooks.constructEvent(rawBody, signature, WEBHOOK_SECRET);
-}
-var CLOUD_STATUSES = /* @__PURE__ */ new Set(["active", "trialing", "past_due"]);
-function planPatchFromEvent(event) {
-  const obj = event.data.object;
-  const metaWorkspace = obj["metadata"]?.["workspace_id"];
-  if (event.type === "checkout.session.completed") {
-    if (obj["mode"] === "payment") return null;
-    const workspace = obj["client_reference_id"] || metaWorkspace;
-    if (!workspace) return null;
-    return {
-      workspace,
-      patch: {
-        plan: "cloud",
-        subscriptionStatus: "active",
-        stripeCustomerId: obj["customer"] ?? null,
-        stripeSubscriptionId: obj["subscription"] ?? null
-      }
-    };
-  }
-  if (event.type === "customer.subscription.created" || event.type === "customer.subscription.updated" || event.type === "customer.subscription.deleted") {
-    if (!metaWorkspace) return null;
-    const status = event.type === "customer.subscription.deleted" ? "canceled" : obj["status"];
-    const item0 = obj["items"]?.data?.[0];
-    const quantity = item0?.quantity;
-    const periodEnd = obj["current_period_end"] ?? item0?.current_period_end;
-    return {
-      workspace: metaWorkspace,
-      patch: {
-        plan: CLOUD_STATUSES.has(status) ? "cloud" : "free",
-        subscriptionStatus: status,
-        ...quantity ? { seats: quantity } : {},
-        ...periodEnd ? { currentPeriodEnd: new Date(periodEnd * 1e3).toISOString() } : {},
-        stripeCustomerId: obj["customer"] ?? null,
-        stripeSubscriptionId: obj["id"] ?? null
-      }
-    };
-  }
-  return null;
-}
-async function createCreditsCheckout(input) {
-  const session = await stripe().checkout.sessions.create({
-    mode: "payment",
-    line_items: [{
-      price_data: {
-        currency: "usd",
-        unit_amount: input.usd * 100,
-        product_data: { name: `${input.credits.toLocaleString("en-US")} NeuraMesh credits` }
-      },
-      quantity: 1
-    }],
-    client_reference_id: input.workspace,
-    ...input.customerId ? { customer: input.customerId } : {},
-    metadata: { workspace_id: input.workspace, kind: "credit_pack", credits: String(input.credits) },
-    success_url: `${RETURN_BASE}/success?ws=${encodeURIComponent(input.workspace)}&credits=${input.credits}`,
-    // `/cancel`, matching the subscription checkout above and apps/web's route table. `/canceled`
-    // was a guess and the web app never routed it, so abandoning a pack landed on a dead page.
-    cancel_url: `${RETURN_BASE}/cancel`
-  });
-  if (!session.url) throw new Error("stripe returned no checkout url");
-  return session.url;
-}
-function creditGrantFromEvent(event) {
-  if (event.type !== "checkout.session.completed" && event.type !== "checkout.session.async_payment_succeeded") return null;
-  const obj = event.data.object;
-  if (obj["mode"] !== "payment") return null;
-  if (obj["payment_status"] !== "paid") return null;
-  const meta = obj["metadata"] ?? {};
-  if (meta["kind"] !== "credit_pack") return null;
-  const workspace = meta["workspace_id"] || obj["client_reference_id"];
-  const credits = Number(meta["credits"]);
-  if (!workspace || !Number.isFinite(credits) || credits <= 0) return null;
-  const sessionId = String(obj["id"] ?? "");
-  if (!sessionId) return null;
-  return { workspace, credits, sessionId };
-}
-
 // src/seats.ts
 async function syncSeats(sql, workspaceId) {
   if (!billingEnabled()) return { synced: false };
@@ -14588,12 +14600,14 @@ async function machineCommands(store2, actor, cmd) {
     return { machineId: id };
   }
   if (cmd.type === "machine.heartbeat") {
-    await store2.heartbeatMachine(cmd.machineId, {
+    if (actor.kind !== "human") throw new DomainError("NOT_PERMITTED", "a machine beats as its owner");
+    const beat = await store2.heartbeatMachine(cmd.machineId, actor.id, {
       activeSeconds: cmd.activeSeconds ?? 0,
       busy: cmd.busy ?? false,
       ...cmd.runtimes ? { runtimes: cmd.runtimes } : {},
       ...cmd.daemonVersion ? { daemonVersion: cmd.daemonVersion } : {}
     });
+    if (!beat) throw new DomainError("NOT_FOUND", "no machine you may beat has this id");
     return { machineId: cmd.machineId };
   }
   if (cmd.type === "machine.provision") {
@@ -17186,11 +17200,11 @@ async function runAnnounceJob(ann, row, deps) {
 // src/announce-claim.ts
 init_src();
 
-// src/commands.ts
+// ../shared/src/command-union.ts
 import { z as z14 } from "zod";
 
-// src/commands-machine.ts
-init_src();
+// ../shared/src/command-union-machine.ts
+init_commands_code();
 import { z as z12 } from "zod";
 var runtimes = z12.array(z12.string().min(1).max(40)).max(12).optional();
 var MACHINE_COMMANDS = [
@@ -17231,7 +17245,7 @@ var MACHINE_COMMANDS = [
   ...CODE_SESSION_COMMANDS
 ];
 
-// src/commands-schedule.ts
+// ../shared/src/command-union-schedule.ts
 import { z as z13 } from "zod";
 var SCHEDULE_RUN_COMMANDS = [
   // the daemon's atomic claim of a due run: counter CAS (ship-stage lesson) so two machines
@@ -17271,7 +17285,7 @@ var SETUP_RELEASES_VALUE = z13.object({
   watch: z13.boolean().optional()
 });
 
-// src/commands.ts
+// ../shared/src/command-union.ts
 init_src();
 var modelId = z14.string().min(1).refine((m) => MODEL_ID_SET.has(m), { message: "unknown model id" });
 var packId = z14.string().refine((p2) => p2 === CUSTOM_PACK_ID || p2 in PACKS || isCustomPackId(p2), { message: "unknown model pack" });
@@ -20748,35 +20762,28 @@ function createApp(store2, opts = {}) {
     return c.json({ packs: await store2.listModelPacks(workspace) });
   });
   app.post("/v1/billing/checkout", async (c) => {
-    if (!billingEnabled()) return c.json({ error: "billing not configured", code: "NOT_FOUND" }, 404);
-    const actor = c.get("actor");
-    if (actor.kind !== "human") return c.json({ error: "billing is human-only", code: "NOT_PERMITTED" }, 403);
-    const { workspace } = await c.req.json().catch(() => ({}));
-    if (!workspace) return c.json({ error: "workspace required", code: "INVALID_INPUT" }, 400);
+    const who = await billingCaller(store2, c.get("actor"), (await c.req.json().catch(() => ({}))).workspace);
+    if ("refusal" in who) return c.json(who.refusal, who.status);
+    const { workspace } = who;
     const info = await store2.workspaceForBilling(workspace);
     const url = await createCheckoutSession({ workspace, quantity: info?.memberCount ?? 1, customerId: info?.stripeCustomerId ?? null });
     return c.json({ url });
   });
   app.post("/v1/billing/credits-checkout", async (c) => {
-    if (!billingEnabled()) return c.json({ error: "billing not configured", code: "NOT_FOUND" }, 404);
-    const actor = c.get("actor");
-    if (actor.kind !== "human") return c.json({ error: "billing is human-only", code: "NOT_PERMITTED" }, 403);
-    const { workspace, credits } = await c.req.json().catch(() => ({}));
-    if (!workspace) return c.json({ error: "workspace required", code: "INVALID_INPUT" }, 400);
-    const n = Number(credits);
+    const body = await c.req.json().catch(() => ({}));
+    const who = await billingCaller(store2, c.get("actor"), body.workspace);
+    if ("refusal" in who) return c.json(who.refusal, who.status);
+    const { workspace } = who;
+    const n = Number(body.credits);
     if (!Number.isInteger(n) || n < MIN_PACK_CREDITS || n > MAX_PACK_CREDITS) return c.json({ error: `credits must be a whole number between ${MIN_PACK_CREDITS} and ${MAX_PACK_CREDITS}`, code: "INVALID_INPUT", min: MIN_PACK_CREDITS, max: MAX_PACK_CREDITS, packs: CREDIT_PACKS }, 400);
-    if (!await actorInWorkspace(store2, actor, workspace)) return c.json({ error: "not your workspace", code: "NOT_PERMITTED" }, 403);
     const info = await store2.workspaceForBilling(workspace);
     const url = await createCreditsCheckout({ workspace, credits: n, usd: usdForCredits(n), customerId: info?.stripeCustomerId ?? null });
     return c.json({ url });
   });
   app.post("/v1/billing/portal", async (c) => {
-    if (!billingEnabled()) return c.json({ error: "billing not configured", code: "NOT_FOUND" }, 404);
-    const actor = c.get("actor");
-    if (actor.kind !== "human") return c.json({ error: "billing is human-only", code: "NOT_PERMITTED" }, 403);
-    const { workspace } = await c.req.json().catch(() => ({}));
-    if (!workspace) return c.json({ error: "workspace required", code: "INVALID_INPUT" }, 400);
-    const info = await store2.workspaceForBilling(workspace);
+    const who = await billingCaller(store2, c.get("actor"), (await c.req.json().catch(() => ({}))).workspace);
+    if ("refusal" in who) return c.json(who.refusal, who.status);
+    const info = await store2.workspaceForBilling(who.workspace);
     if (!info?.stripeCustomerId) return c.json({ error: "no Stripe customer yet \u2014 subscribe first", code: "NOT_FOUND" }, 404);
     const url = await createPortalSession({ customerId: info.stripeCustomerId });
     return c.json({ url });
@@ -23058,13 +23065,18 @@ var PostgresStore = class {
       return { id, inserted: row["inserted"] };
     });
   }
-  async heartbeatMachine(machineId, activity) {
+  async heartbeatMachine(machineId, actorId, activity) {
     const seconds = activity?.activeSeconds ?? 0;
     const active = seconds > 0 || activity?.busy === true;
     const [row] = await this.sql`
-      update machines set last_seen_at = now(), last_active_at = case when ${active} then now() else last_active_at end, runtimes = case when ${!!activity?.runtimes} then ${this.sql.json(activity?.runtimes ?? [])}::jsonb else runtimes end,
-             daemon_version = coalesce(${activity?.daemonVersion ?? null}::text, daemon_version) where id = ${machineId} returning workspace_id, kind`;
+      update machines m set last_seen_at = now(), last_active_at = case when ${active} then now() else m.last_active_at end, runtimes = case when ${!!activity?.runtimes} then ${this.sql.json(activity?.runtimes ?? [])}::jsonb else m.runtimes end,
+             daemon_version = coalesce(${activity?.daemonVersion ?? null}::text, m.daemon_version)
+       where m.id = ${machineId}
+         and (m.owner_user_id::text = ${actorId}
+              or (m.kind = 'local' and exists (select 1 from workspace_members wm where wm.workspace_id = m.workspace_id and wm.user_id::text = ${actorId})))
+       returning m.workspace_id, m.kind`;
     if (row && row.kind !== "local" && seconds > 0) await chargeMachineActivity(this.sql, row.workspace_id, priceActiveSeconds(seconds), seconds);
+    return !!row;
   }
   async registerAgent(input, event) {
     return this.sql.begin(async (_tx) => {

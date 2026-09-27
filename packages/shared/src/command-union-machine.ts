@@ -1,7 +1,7 @@
-// The machine commands, spread into CommandSchema (commands.ts sits at its size-ratchet cap, and
+// The machine commands, spread into CommandSchema (command-union.ts sits at its size-ratchet cap, and
 // the cloud member kind added three verbs — member-machines round, 2026-09-03).
 import { z } from 'zod';
-import { CODE_SESSION_COMMANDS } from '@neuramesh/shared';
+import { CODE_SESSION_COMMANDS } from './commands-code';
 
 const runtimes = z.array(z.string().min(1).max(40)).max(12).optional();
 

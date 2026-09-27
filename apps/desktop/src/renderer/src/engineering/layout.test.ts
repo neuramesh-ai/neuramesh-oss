@@ -46,7 +46,9 @@ test('The Engineering floor is not a destination: the Code shortcut relists Home
   assert.doesNotMatch(app, /<EngineeringOS /);
   assert.doesNotMatch(app, /engineeringNav/);
   assert.doesNotMatch(app, /engineeringContextOn/);
-  assert.match(app, /'Code', \(\) => setRailMode\('code'\)/);
+  // the rail's Chat | Code switch is the ONE door to the Code filter (George, 2026-09-27): no shortcut row, no menu item
+  assert.doesNotMatch(app, /'Code', \(\) => setRailMode\('code'\)/);
+  assert.doesNotMatch(app, /<span className="navlabel">Code<\/span>/);
   assert.match(app, /railSlot=\{wpane \? wbSlot : null\} onWorkbench=\{\(\) => openWPane\(true\)\}/);
   assert.match(app, /headless=\{openCodingThread\}/);
 });

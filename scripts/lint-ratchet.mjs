@@ -62,7 +62,11 @@ if (mode === '--update') {
   writeFileSync(RATCHET_PATH, `${JSON.stringify(ratchet, null, 2)}\n`);
   console.log(`ratchet: ${Object.keys(next).length} burn-down entries${dropped.length ? `; retired: ${dropped.join(', ')}` : ''}`);
 } else if (mode === '--self-test') {
-  const stale = [...Object.keys(ratchet.files), ...Object.keys(ratchet.standing)].filter((f) => !existsSync(f));
+  // stale = a file gone from an app or package this tree still has. The public tree is a publish
+  // of this one without apps/hq (docs/43), and this file ships in it with hq's entries, so an
+  // entry whose whole app is absent belongs to another tree, not to a deleted file.
+  const rootOf = (f) => f.split('/').slice(0, 2).join('/');
+  const stale = [...Object.keys(ratchet.files), ...Object.keys(ratchet.standing)].filter((f) => !existsSync(f) && existsSync(rootOf(f)));
   if (stale.length) {
     console.error(`ratchet self-test FAIL: stale entries (file gone — prune them): ${stale.join(', ')}`);
     process.exit(1);

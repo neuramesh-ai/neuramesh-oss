@@ -310,6 +310,22 @@ describe.skipIf(!DB)('per-member cloud machines (0133) — Individual and Team',
     expect(await buildOf()).toBe(sha);
   });
 
+  it('only its owner beats a cloud machine: a member, a stranger and an agent move and charge nothing', async () => {
+    // a beat moves last_seen_at and bills the machine's workspace for its active seconds, so a beat
+    // from anyone but the owner could keep another person's machine awake and charge for it
+    const bobs = liveMemberOf(await machinesOf(WS), bob.id)!;
+    const seenOf = async () => String((await sql!`select last_seen_at from machines where id = ${bobs.id}::uuid`)[0]!['last_seen_at']);
+    const before = await seenOf();
+    // alice is a member of this workspace, and bob's machine is still not hers to beat
+    expect((await send(alice, { type: 'machine.heartbeat', machineId: bobs.id, activeSeconds: 60 })).status).toBe(404);
+    const stranger: Actor = { kind: 'human', id: '30000000-0000-0000-0000-000000000003' };
+    expect((await send(stranger, { type: 'machine.heartbeat', machineId: bobs.id, activeSeconds: 60 })).status).toBe(404);
+    const [ag] = await sql!`select id from agents where workspace_id = ${WS}::uuid limit 1`;
+    const agent: Actor = { kind: 'agent', id: ag!['id'] as string, role: 'orchestrator' };
+    expect((await send(agent, { type: 'machine.heartbeat', machineId: bobs.id, activeSeconds: 60 })).status).toBe(403);
+    expect(await seenOf()).toBe(before);
+  });
+
   it('leaving tombstones the machine — the feed drops it, the name is freed — and re-joining mints anew', async () => {
     const before = liveMemberOf(await machinesOf(WS), bob.id)!;
     expect((await send(bob, { type: 'workspace.leave', workspace: WS })).status).toBe(200);

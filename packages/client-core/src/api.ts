@@ -158,6 +158,17 @@ export class ControlApiClient {
     return this.send(path, {});
   }
 
+  /** a route with no typed method here yet: the same auth, the same one retry on 401, the same
+   *  envelope. The browser client calls most of /v1 through these two (apps/hq/web/webnm.ts). */
+  getJson<T = unknown>(path: string): Promise<T> {
+    return this.get(path) as Promise<T>;
+  }
+
+  /** `authed: false` for the few routes whose body IS the credential (the /auth/* exchanges) */
+  postJson<T = unknown>(path: string, body: unknown, opts?: { authed?: boolean }): Promise<T> {
+    return this.post(path, body, opts?.authed ?? true) as Promise<T>;
+  }
+
   // --- authenticated reads (Bearer) ---
 
   // Every workspace this identity belongs to (0113). NOT PowerSync-replicated: `workspaces`

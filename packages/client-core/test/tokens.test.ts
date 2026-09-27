@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { CSS_VAR, THEMES, type Theme, type ThemeName } from '../src/tokens';
@@ -6,7 +6,11 @@ import { CSS_VAR, THEMES, type Theme, type ThemeName } from '../src/tokens';
 // Parity tripwire for the brand palette: read tokens.css and assert every hex the
 // mobile app ships matches hq's stylesheet, per theme. A rebrand or a tweak
 // on one side fails here until both agree.
-const css = readFileSync(fileURLToPath(new URL('../../../apps/hq/src/tokens.css', import.meta.url)), 'utf8');
+// hq and the phone are private (docs/43), so the public tree has neither side of this parity, and
+// there the check skips. A tree that has apps/hq and lost the file still fails.
+const HQ = new URL('../../../apps/hq/', import.meta.url);
+const hqHere = existsSync(fileURLToPath(HQ));
+const css = hqHere ? readFileSync(fileURLToPath(new URL('src/tokens.css', HQ)), 'utf8') : '';
 
 // The { … } declaration block whose selector contains `marker`.
 function blockVars(marker: string): Record<string, string> {
@@ -32,7 +36,7 @@ const MARKERS: Record<ThemeName, string> = {
   'cream-oak': "[data-theme='cream-oak']",
 };
 
-describe('client-core theme tokens parity with tokens.css', () => {
+describe.runIf(hqHere)('client-core theme tokens parity with tokens.css', () => {
   for (const name of Object.keys(MARKERS) as ThemeName[]) {
     it(`${name}: every hex token matches the stylesheet`, () => {
       const declared = blockVars(MARKERS[name]);

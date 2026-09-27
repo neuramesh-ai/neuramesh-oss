@@ -7,6 +7,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./schema": "./src/schema.ts",
+    "./api": "./src/api.ts",
     "./crud-upload": "./src/crud-upload.ts",
     "./projmeta": "./src/projmeta.ts",
     "./library": "./src/library.ts"

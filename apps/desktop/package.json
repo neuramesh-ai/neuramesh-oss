@@ -1,6 +1,6 @@
 {
   "name": "@neuramesh/desktop",
-  "version": "0.150.0",
+  "version": "0.151.0",
   "private": true,
   "license": "Elastic-2.0",
   "main": "out/main/index.js",
@@ -11,8 +11,7 @@
     "build": "electron-vite build",
     "rebuild:native": "electron-rebuild -f -w better-sqlite3 -w node-pty",
     "smoke": "electron-vite build && electron . --smoke",
-    "dist": "NM_DIST=1 electron-vite build && electron-builder --arm64",
-    "web:build": "pnpm --filter @neuramesh/hq build && rm -rf out/web && mkdir -p out && cp -R ../hq/out out/web"
+    "dist": "NM_DIST=1 electron-vite build && electron-builder --arm64"
   },
   "build": {
     "appId": "dev.neuramesh.app",
