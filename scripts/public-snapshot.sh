@@ -72,6 +72,11 @@ while IFS= read -r line; do SHIP+=("$line"); done < <(public_exclude_pathspec)
 # The paths are read first: a removal must not move the ground under the listing.
 PRIVATE=()
 while IFS= read -r f; do PRIVATE+=("$f"); done < <(public_private_paths)
+# ── the shared config, without the private apps ──────────────────────────────────────────────
+# five files serve both trees whole and name the private apps (their importers, lint globs, size
+# caps, dev servers and scripts). Stripped BEFORE the removal below, while the private package
+# names can still be read, and the publish stops if a name it cannot strip remains.
+node scripts/public-config.mjs "${PRIVATE[@]}"
 for f in "${PRIVATE[@]}"; do
   git rm -r -q --cached --ignore-unmatch "$f"
   rm -rf "$f"

@@ -10,7 +10,7 @@
 // floor never blocks, and it only ever names a published desktop.
 
 /** newest first: the two newest published desktops. the control-api's contract test holds every tree to them. */
-export const SUPPORTED_DESKTOP_VERSIONS = ['0.150.0', '0.149.0'] as const;
+export const SUPPORTED_DESKTOP_VERSIONS = ['0.151.0', '0.150.0'] as const;
 
 /** the older supported desktop. a desktop below it reads "too old" on its update card. */
 export const MIN_DESKTOP_VERSION: string = SUPPORTED_DESKTOP_VERSIONS[1];

@@ -27,6 +27,10 @@ PUBLIC_EXCLUDE=(
   scripts/pin-machine-image.mjs                # the machine image pin in the cluster manifests
   scripts/pin-machine-image.test.mjs           # the machine image's inputs, held to its private Dockerfile and workflow
   scripts/build-mobile-terminal.mjs            # the phone app's terminal page
+  scripts/web-boot-e2e.mjs                     # boots the browser client (hq); only the private surface-e2e runs it
+  scripts/web-boot-e2e.test.mjs                # its test
+  scripts/perf/web                             # the browser client's performance lab
+  scripts/dev-web-engineering.sh               # the browser client's Code dev stack
   'docs/design/*/evidence/*'                   # every design round's evidence: screenshots and logs with dev data (George, 2026-09-19)
   docs/design/cloud-first-2026-08/rollout.md   # the live rollout log of the production project
   docs/design/oss-release-2026-09/cutover.md   # the publish runbook
@@ -34,6 +38,7 @@ PUBLIC_EXCLUDE=(
   docs/design/oss-release-2026-09/announcement.md  # the launch posts, until they are posted
   'docs/design/oss-release-2026-09/research-*.md'  # the four audits (a glob, expanded at use)
   private                                      # scratch trees, if any came back
+  memory                                       # working notes of past rounds, not docs (George, 2026-09-27)
   var
 )
 

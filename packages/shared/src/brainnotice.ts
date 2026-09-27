@@ -54,37 +54,41 @@ export function noticeProvider(n: BrainNotice): string {
   return AUTH_LABEL[n.card.provider] ?? n.card.provider;
 }
 
+/** where the login belongs, in words: the machine the app runs on for the desktop, and the
+ *  person's cloud machine for the web, where the browser is no machine (the hq leftovers round) */
+export const THIS_MACHINE = 'this machine';
+
 /** why the seat could not run, in one sentence */
-export function noticeWhy(n: BrainNotice): string {
+export function noticeWhy(n: BrainNotice, where = THIS_MACHINE): string {
   const label = noticeProvider(n);
-  return n.card.why ?? (n.card.reason === 'expired' ? `The ${label} login on this machine expired.` : `This machine has no ${label} login.`);
+  return n.card.why ?? (n.card.reason === 'expired' ? `The ${label} login on ${where} expired.` : `${where.charAt(0).toUpperCase()}${where.slice(1)} has no ${label} login.`);
 }
 
 /** the bar's one line: a title and the summary beside it */
-export function brainNoticeLine(n: BrainNotice): { title: string; summary: string } {
+export function brainNoticeLine(n: BrainNotice, where = THIS_MACHINE): { title: string; summary: string } {
   const who = n.card.agent ? `@${n.card.agent}` : 'An agent';
   return n.state === 'needs'
-    ? { title: `${who} cannot run here`, summary: noticeWhy(n) }
-    : { title: `${who} runs on the NeuraMesh brain here`, summary: noticeWhy(n) };
+    ? { title: `${who} cannot run here`, summary: noticeWhy(n, where) }
+    : { title: `${who} runs on the NeuraMesh brain here`, summary: noticeWhy(n, where) };
 }
 
 /** the expanded bar: what happened, then what to do (STE, one idea per sentence) */
-export function brainNoticeText(n: BrainNotice): { happened: string; todo: string } {
+export function brainNoticeText(n: BrainNotice, where = THIS_MACHINE): { happened: string; todo: string } {
   const who = n.card.agent ? `@${n.card.agent}` : 'The agent';
   const label = noticeProvider(n);
-  const why = noticeWhy(n);
+  const why = noticeWhy(n, where);
   if (n.state === 'needs') {
     return {
       happened: `${who} cannot run on ${label} here. ${why} Nothing moved, so this conversation waits.`,
       todo: n.card.starter === false
-        ? `Sign in to ${label} again on this machine, or add credits. This workspace is out of credits, so the NeuraMesh brain cannot take it.`
-        : `Sign in to ${label} again on this machine, or run this conversation on the NeuraMesh brain, on credits.`,
+        ? `Sign in to ${label} again on ${where}, or add credits. This workspace is out of credits, so the NeuraMesh brain cannot take it.`
+        : `Sign in to ${label} again on ${where}, or run this conversation on the NeuraMesh brain, on credits.`,
     };
   }
   return {
     happened: n.auto
       ? `${who} could not run on ${label} here. ${why} This routine continued on the NeuraMesh brain, on credits.`
       : `${who} could not run on ${label} here. ${why} You moved this conversation to the NeuraMesh brain, on credits.`,
-    todo: `Sign in to ${label} again on this machine, then reset the brain in this conversation to go back.`,
+    todo: `Sign in to ${label} again on ${where}, then reset the brain in this conversation to go back.`,
   };
 }

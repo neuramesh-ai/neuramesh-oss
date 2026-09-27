@@ -72,4 +72,16 @@ describe('brainNoticeOf', () => {
     expect(n?.state).toBe('needs');
     expect(brainNoticeLine(n!).summary).toBe('The Claude login on this machine expired.');
   });
+
+  // the web names the machine the login belongs on (hq leftovers D3): a browser is no machine
+  it('the web says "your cloud machine" where the desktop says "this machine"', () => {
+    const expired = brainNoticeOf([agentCard('m2', { provider: 'anthropic', reason: 'expired', agent: 'patch' }, '2026-09-18T00:00:01Z')], null)!;
+    const missing = brainNoticeOf([agentCard('m2', { provider: 'openai', reason: 'unavailable', agent: 'patch' }, '2026-09-18T00:00:01Z')], null)!;
+    expect(brainNoticeLine(expired, 'your cloud machine').summary).toBe('The Claude login on your cloud machine expired.');
+    expect(brainNoticeLine(missing, 'your cloud machine').summary).toBe('Your cloud machine has no OpenAI / Codex login.');
+    expect(brainNoticeText(expired, 'your cloud machine').todo).toBe('Sign in to Claude again on your cloud machine, or run this conversation on the NeuraMesh brain, on credits.');
+    // the desktop's words do not move
+    expect(brainNoticeLine(missing).summary).toBe('This machine has no OpenAI / Codex login.');
+    expect(brainNoticeText(expired).todo).toBe('Sign in to Claude again on this machine, or run this conversation on the NeuraMesh brain, on credits.');
+  });
 });
