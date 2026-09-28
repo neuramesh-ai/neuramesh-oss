@@ -27,11 +27,11 @@ export function NavDestBand({ nav, view, goView, goFiles, goCode, mode }: {
     library: goFiles,
     marketing: () => goView('marketing'),
     tasks: () => goView('board'),
-    footprint: () => goView('footprint'),
+    worktrees: () => goView('worktrees'),
     code: goCode,
   };
   const glyph: Record<string, React.ComponentType<{ s?: number }>> = {
-    whiteboards: IconWhiteboard, scheduled: IconRepeat, library: IconLibrary, marketing: IconTrend, tasks: IconBoard, footprint: IconBranch, code: IconCode,
+    whiteboards: IconWhiteboard, scheduled: IconRepeat, library: IconLibrary, marketing: IconTrend, tasks: IconBoard, worktrees: IconBranch, code: IconCode,
   };
   return navDestRows({ nav, view, mode }).map((r) => {
     const Icon = glyph[r.key];

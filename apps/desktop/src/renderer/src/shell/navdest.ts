@@ -43,12 +43,14 @@ export const isScheduledView = (nav: string, view: string): boolean =>
 export function navDestRows({ nav, view, mode }: NavDestInput): NavDestRow[] {
   const home = nav === 'home';
   // CODE MODE (rail-ink round, 2026-09-04): the same band, code's nouns — the board where
-  // repo-backed work is reviewed, and the worktrees (the footprint destination). Pull requests
-  // are the board's rows, so they get no second door (two doors onto one surface).
+  // repo-backed work is reviewed, and the worktrees. Pull requests are the board's rows, so they
+  // get no second door (two doors onto one surface). Until 2026-09-27 the Worktrees row opened the
+  // agents' footprint (the disk gauge); it opens the Worktrees table now, and the footprint keeps
+  // its own doors (docs/design/worktrees-2026-09 §3).
   if (mode === 'code') {
     return [
       { key: 'tasks', label: 'Tasks', on: home && view === 'board' },
-      { key: 'footprint', label: 'Worktrees', on: home && view === 'footprint' },
+      { key: 'worktrees', label: 'Worktrees', on: home && view === 'worktrees' },
     ];
   }
   const rows: NavDestRow[] = [

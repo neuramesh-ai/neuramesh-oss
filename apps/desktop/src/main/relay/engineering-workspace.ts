@@ -4,10 +4,10 @@ import type { EngineeringMachineOpenMeta } from '../../engineering-protocol';
 import { withRepoLock } from '../agents';
 import { cachePath } from '../harness/brain';
 import { git } from '../host/gh';
+import { engineeringBranchName, engineeringWorktreeName, safeSegment as safe } from '../harness/worktree-rows';
 
 interface RepoRow { clone_url: string | null; default_branch: string | null; local_path: string | null }
 
-const safe = (value: string): string => value.replace(/[^a-zA-Z0-9._-]+/g, '-').slice(0, 80);
 export const engineeringRepoRoot = (repoId: string): string => cachePath('repos', safe(repoId));
 
 /** Give every Engineering thread its own durable git worktree. It is intentionally retained when
@@ -33,7 +33,7 @@ export async function ensureEngineeringWorkspace(
   const local = opts.preferLocal && repo?.local_path && existsSync(repo.local_path) ? repo.local_path : null;
   if (!repo?.clone_url && !local) throw new Error(`${meta.repoName} is not available in this workspace or has no clone URL. Connect its Git remote before starting a cloud Engineering thread.`);
   const cloneDir = local ?? engineeringRepoRoot(meta.repoId);
-  const worktreeDir = cachePath('worktrees', `engineering-${safe(meta.actorId)}-${safe(meta.repoId)}-${safe(meta.threadId)}`);
+  const worktreeDir = cachePath('worktrees', engineeringWorktreeName(meta.actorId, meta.repoId, meta.threadId));
   if (existsSync(worktreeDir)) return worktreeDir;
   mkdirSync(cachePath('repos'), { recursive: true });
   mkdirSync(cachePath('worktrees'), { recursive: true });
@@ -45,7 +45,7 @@ export async function ensureEngineeringWorkspace(
     await git(['worktree', 'prune'], cloneDir);
     const base = meta.branch || repo?.default_branch || 'main';
     await git(['check-ref-format', '--branch', base], cloneDir);
-    const branch = `nm/engineering/${safe(meta.actorId)}/${safe(meta.threadId)}`;
+    const branch = engineeringBranchName(meta.actorId, meta.threadId);
     // Never reset an existing Engineering branch. A missing directory can follow a machine
     // restart or an operator cleanup while the branch still contains committed work; `-B`
     // would silently throw that work away by moving the branch back to origin/base.

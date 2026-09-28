@@ -181,6 +181,19 @@ export async function scanFleet(locations: Array<{ tool: string; path: string }>
   return out;
 }
 
+/** One more sample on the chart's file: the sweep appends one per run, and the Worktrees
+ *  destination appends one per removal a person makes, so the chart tells the truth. */
+export async function appendFootprintHistory(brainRootDir: string, snapshot: SweepSnapshot): Promise<void> {
+  try {
+    const { appendFile, mkdir, writeFile } = await import('node:fs/promises');
+    const hist = join(brainRootDir, 'state', 'footprint-history.jsonl');
+    await mkdir(join(brainRootDir, 'state'), { recursive: true });
+    await appendFile(hist, JSON.stringify(snapshot) + '\n');
+    const lines = (await readFile(hist, 'utf8')).split('\n').filter(Boolean);
+    if (lines.length > 1000) await writeFile(hist, lines.slice(-500).join('\n') + '\n');
+  } catch { /* history is nice-to-have, never the removal's failure */ }
+}
+
 export async function readHistory(brainRootDir: string, cap = 240): Promise<SweepSnapshot[]> {
   try {
     const raw = await readFile(join(brainRootDir, 'state', 'footprint-history.jsonl'), 'utf8');

@@ -10,6 +10,13 @@ import { apiAuthHeaders } from '../../apiauth';
 import { createLocalEngineeringHost, LocalEngineeringSessions } from '../../relay/engineering-local-host';
 import { apiUrl, ws, actorId, thisMachineId, thisMachineName } from '../../sync';
 
+// the sessions the local lane holds open right now, for the one reader outside this module: the
+// Worktrees destination refuses to remove a thread's worktree while its runtime stands in it
+let live: LocalEngineeringSessions | null = null;
+export function localCodeSessionOpen(threadId: string): boolean {
+  return live?.hasThread(threadId) ?? false;
+}
+
 export function registerLocalEngineering({ db }: { db: () => PowerSyncDatabase }): void {
   // the coding runtime is a dynamic import, external to the main bundle (electron.vite.config.ts),
   // and the honest answer to "can this Mac host Code" is whether it loads — asked once, off the
@@ -20,9 +27,11 @@ export function registerLocalEngineering({ db }: { db: () => PowerSyncDatabase }
   let host: { workspaceId: string; sessions: LocalEngineeringSessions } | null = null;
   const sessionsFor = (): LocalEngineeringSessions => {
     if (host && host.workspaceId === ws()) return host.sessions;
+    live = null;
     const authHeaders = () => apiAuthHeaders(apiUrl(), { kind: 'human', id: actorId() } as Actor);
     const created = createLocalEngineeringHost({ db: db(), apiUrl: apiUrl(), workspaceId: ws(), authHeaders, machineId: thisMachineId(), log: (line) => console.log(`[engineering:local] ${line}`) });
     host = { workspaceId: ws(), sessions: new LocalEngineeringSessions(created, actorId) };
+    live = host.sessions;
     return host.sessions;
   };
   for (const name of ['nm:engineering-local-info', 'nm:engineering-local-open', 'nm:engineering-local-command', 'nm:engineering-local-close']) ipcMain.removeHandler(name);

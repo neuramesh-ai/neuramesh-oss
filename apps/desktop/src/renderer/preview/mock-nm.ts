@@ -8,6 +8,7 @@ import { FLOW, FRESH_CLOUD, HAS_INVITE, LIVE_RUNS, MOCK_WS_ID, MSG_DELAY, NOKEY,
 import { marketingArtifacts, marketingSchedules } from './mock-marketing'; import { UGC_FILM } from './mock-ugc';
 import { CONNS, connectionList, foregroundTasks, foregroundThreads, mockForeground, mockForegroundWorkspace, railRowsSnapshot, swapForeground, watchForeground } from './mock-connections';
 import { githubLanes } from './mock-github';
+import { worktreeRemoveMock, worktreesFixture } from './mock-worktrees';
 
 // Mutable harness state the bridge REASSIGNS — it must live here, not in the fixture
 // module: an ESM import is a read-only binding, so `mockInvites = []` from another
@@ -537,6 +538,8 @@ const explicit: Record<string, any> = {
     footprintReclaimed = true;
     return { ready: true, payload: footprintFixture(), snapshot: { at: new Date().toISOString(), berths: { leased: 1, warm: 0, bytes: 1.8e9 }, donorsBytes: 1.2e9, clonesBytes: 1.1e9, actions: 3, reclaimedBytes: 2.3e9 } };
   },
+  worktreesGet: async () => ({ ready: true, payload: worktreesFixture() }),
+  worktreeRemove: async (input: Parameters<typeof worktreeRemoveMock>[0]) => worktreeRemoveMock(input),
   applyPack: async (packId: string) => { activePack = packId; return { ok: true, applied: 4 }; },
   modelPacks: async () => ({ packs: customPacks.map((p) => ({ ...p, roles: { ...p.roles } })) }),
   modelPackSave: async (input: { packId?: string; name: string; roles: Record<string, string> }) => {

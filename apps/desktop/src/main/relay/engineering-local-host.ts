@@ -91,4 +91,9 @@ export class LocalEngineeringSessions {
     return true;
   }
   get size(): number { return this.sessions.size; }
+  /** true while a session on this thread is open (the lease carries the thread id after the actor's) */
+  hasThread(threadId: string): boolean {
+    for (const { lease } of this.sessions.values()) if (lease.endsWith(`\0${threadId}`)) return true;
+    return false;
+  }
 }

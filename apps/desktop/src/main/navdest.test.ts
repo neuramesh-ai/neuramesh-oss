@@ -62,8 +62,10 @@ test('Code is a MODE with a DOOR in the Chat band: the row never wears the fill 
 });
 
 test('code mode: the band lists the board and the worktrees, and nothing else (rail-ink round)', () => {
-  const rows = navDestRows({ nav: 'home', view: 'footprint', mode: 'code' });
-  assert.deepEqual(rows.map((r) => r.key), ['tasks', 'footprint']);
+  // the Worktrees row opens the Worktrees table (2026-09-27); the footprint keeps its own doors
+  const rows = navDestRows({ nav: 'home', view: 'worktrees', mode: 'code' });
+  assert.deepEqual(rows.map((r) => r.key), ['tasks', 'worktrees']);
   assert.deepEqual(rows.map((r) => r.on), [false, true]);
+  assert.equal(navDestRows({ nav: 'home', view: 'footprint', mode: 'code' }).some((r) => r.on), false, 'the footprint lights no row');
   assert.equal(navDestRows({ nav: 'home', view: 'board', mode: 'chat' }).some((r) => r.key === 'tasks'), false, 'Chat mode is unchanged');
 });

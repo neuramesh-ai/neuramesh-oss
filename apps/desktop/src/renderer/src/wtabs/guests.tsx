@@ -167,7 +167,7 @@ export function BrowserPane({ url, onNavigate, onTitle }: {
 
 // `newchat` retired 2026-08-16 — it merged back into `dashboard`, which IS the landing now
 // (the composer) as well as the state a thread or task mounts over.
-export type MainView = 'chat' | 'library' | 'memory' | 'skills' | 'code' | 'dashboard' | 'board' | 'automations' | 'calendar' | 'whiteboards' | 'footprint' | 'compute' | 'marketing' | 'engineering' | 'credits';
+export type MainView = 'chat' | 'library' | 'memory' | 'skills' | 'code' | 'dashboard' | 'board' | 'automations' | 'calendar' | 'whiteboards' | 'footprint' | 'worktrees' | 'compute' | 'marketing' | 'engineering' | 'credits';
 
 /**
  * THE VIEW THE URL IS ASKING FOR, on the web only.

@@ -9,8 +9,10 @@
 // Electron-free on purpose, like the rest of harness/ — the daemon's own `git()` lives inside
 // agents.ts, which cannot be imported under `tsx --test` without dragging the app along.
 
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { rm } from 'node:fs/promises';
+import { dirname, join, resolve } from 'node:path';
+import { ENGINEERING_BRANCH_PREFIX } from './worktree-rows';
 
 /**
  * A child-git env with the repo-locating variables STRIPPED. `git commit` exports GIT_DIR /
@@ -76,5 +78,43 @@ export async function removeTaskWorkspace(o: {
   if (o.deliverableDir) {
     await rm(o.deliverableDir, { recursive: true, force: true }).then(() => notes.push('deliverables'), () => {});
   }
+  return notes;
+}
+
+/**
+ * The clone a linked worktree belongs to, read from the worktree's own `.git` file
+ * (`gitdir: <clone>/.git/worktrees/<name>`). A coding thread's worktree is cut from a cache clone
+ * on a machine and from the member's OWN checkout on the desktop (the desktop Code bridge), so the
+ * pointer, not a convention, says where its admin entry lives. null = not a linked worktree.
+ */
+export function worktreeCloneDir(wtDir: string): string | null {
+  try {
+    const m = /^gitdir:\s*(.+)$/m.exec(readFileSync(join(wtDir, '.git'), 'utf8'));
+    if (!m) return null;
+    const gitdir = resolve(wtDir, m[1]!.trim()); // <clone>/.git/worktrees/<name>, sometimes relative
+    return dirname(dirname(dirname(gitdir)));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Remove one coding thread's worktree completely (the Worktrees destination, docs/design/
+ * worktrees-2026-09 §3.3): the same three deletions as a task berth. The branch goes only when it
+ * is the thread's own (`nm/engineering/…`), never a branch a person made. Best-effort per step
+ * and serialized by the CALLER, exactly like removeTaskWorkspace.
+ */
+export async function removeEngineeringWorktree(wtDir: string): Promise<string[]> {
+  const notes: string[] = [];
+  const cloneDir = worktreeCloneDir(wtDir);
+  if (cloneDir && existsSync(cloneDir)) {
+    const branch = await runGit(['rev-parse', '--abbrev-ref', 'HEAD'], wtDir).catch(() => '');
+    await runGit(['worktree', 'remove', '--force', wtDir], cloneDir).then(() => notes.push('worktree'), () => {});
+    await runGit(['worktree', 'prune'], cloneDir).catch(() => {});
+    if (branch.startsWith(ENGINEERING_BRANCH_PREFIX)) {
+      await runGit(['branch', '-D', branch], cloneDir).then(() => notes.push(`branch ${branch}`), () => {});
+    }
+  }
+  await rm(wtDir, { recursive: true, force: true }).then(() => {}, () => {});
   return notes;
 }

@@ -44,6 +44,7 @@ import { ensureMarketingSeeds } from './sync/seeds';
 import { machineName } from './sync/machine';
 
 import { registerTerminals, type PtyTerm } from './sync/ipc/terminals';
+import { registerWorktrees } from './sync/ipc/worktrees';
 import { registerLocalEngineering } from './sync/ipc/engineering-local';
 import { registerWorkspaceFiles } from './sync/ipc/workspace-files';
 import { registerLogs } from './sync/ipc/logs';
@@ -362,6 +363,7 @@ async function registerIpc({ agentLog, ptys, killTaskPtys }: { agentLog: AgentLo
   const procWatchers = new Map<string, () => void>(); // background-processes 'change' subscribers, by subId
 
   registerTerminals({ db, ptys, procWatchers }); registerLocalEngineering({ db }); // + Code on this Mac (the desktop Code bridge, slice B1)
+  registerWorktrees({ db, ptys, killTaskPtys }); // the Worktrees destination: the table + the one act (docs/design/worktrees-2026-09)
   registerWorkspaceFiles();
   registerAgents({ db, ws });
   registerSkills({ db, ws, watchers });
