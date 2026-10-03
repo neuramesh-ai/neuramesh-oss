@@ -49,6 +49,9 @@ export const messages = new Table({
   body: column.text,
   created_at: column.text,
   pinned: column.integer,
+  // 0145, routine sessions: the schedule whose run this message opens. Synced, unlike the birth_*
+  // transport above: every client splits a routine's one session into its runs by it.
+  schedule_id: column.text,
 }, {
   indexes: {
     by_thread: ['thread_id', 'created_at'],

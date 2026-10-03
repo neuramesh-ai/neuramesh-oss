@@ -122,8 +122,10 @@ export async function createTask(
   // lands it `done` the server auto-accepts and pushes "routine finished" — the human opens the
   // thread to READ the run, never to unblock it. Scoped to repo-less work: a repo-backed task
   // merges code on accept, and that stays a human's signature whatever opened the thread.
+  // …and to ROUTINES (2026-09-27): a content schedule's session keeps its schedule id, but its
+  // drafts wait for a person, so a unit born there keeps every gate (store/routine-rule.ts).
   const routineScheduleId = workPlanInput && cmd.originThread
-    ? await store.getThreadScheduleId(cmd.workspace, cmd.originThread)
+    ? await store.getThreadRoutineId(cmd.workspace, cmd.originThread)
     : null;
   const routine = !!routineScheduleId && !cmd.repo;
   // ── Playbook runs are hands-off too (2026-08-21, founder review of the live pass) ──

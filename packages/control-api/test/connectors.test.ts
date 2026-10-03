@@ -428,6 +428,40 @@ describe('xSearchRecent — real numbers or an honest failure', () => {
     expect(out.secretPatch?.access_token).toBe('at2');
   });
 
+  // George, 2026-10-02: "it's not returning posts with the highest engagement or impressions". With no
+  // sort_order X answers the newest first, so a routine read the newest page and missed every popular post.
+  const page = (metrics: Array<{ impression_count?: number; like_count: number }>) => (async (url: string) => {
+    pageUrls.push(String(url));
+    return { ok: true, status: 200, json: async () => ({ data: metrics.map((m, i) => ({ id: String(i + 1), text: `post ${i + 1}`, public_metrics: { reply_count: 0, retweet_count: 0, quote_count: 0, ...m } })) }) };
+  }) as unknown as typeof fetch;
+  let pageUrls: string[] = [];
+
+  it('top (the default) asks X for its relevancy ranking and returns the page by impressions, then likes', async () => {
+    pageUrls = [];
+    const out = await xSearchRecent(tok, 'ai agents', 25, page([{ impression_count: 100, like_count: 1 }, { like_count: 90 }, { impression_count: 5000, like_count: 2 }, { impression_count: 100, like_count: 7 }]));
+    expect(pageUrls[0]).toContain('sort_order=relevancy');
+    expect(pageUrls[0]).not.toContain('start_time');
+    expect(out.hits.map((h) => h.id)).toEqual(['3', '4', '1', '2']); // a post X gave no impressions for goes last
+  });
+
+  it('latest keeps the newest first, and asks X for it', async () => {
+    pageUrls = [];
+    const out = await xSearchRecent(tok, 'ai agents', 25, page([{ impression_count: 1, like_count: 0 }, { impression_count: 900, like_count: 0 }]), undefined, { order: 'latest' });
+    expect(pageUrls[0]).toContain('sort_order=recency');
+    expect(out.hits.map((h) => h.id)).toEqual(['1', '2']);
+  });
+
+  it('hours sets a start_time inside the 7-day window, in X’s own format', async () => {
+    pageUrls = [];
+    const before = Date.now();
+    await xSearchRecent(tok, 'q', 25, page([]), undefined, { hours: 24 });
+    await xSearchRecent(tok, 'q', 25, page([]), undefined, { hours: 5000 });
+    const at = (u: string) => new URL(u).searchParams.get('start_time')!;
+    expect(at(pageUrls[0]!)).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+    expect(Math.abs(before - 24 * 3_600_000 - Date.parse(at(pageUrls[0]!)))).toBeLessThan(5_000);
+    expect(Math.abs(before - 167 * 3_600_000 - Date.parse(at(pageUrls[1]!)))).toBeLessThan(5_000); // never past X's 7 days
+  });
+
   it('403 and 429 say what the human can actually do about it', async () => {
     const mk = (status: number) => (async () => ({ ok: false, status, text: async () => '' })) as unknown as typeof fetch;
     await expect(xSearchRecent(tok, 'q', 10, mk(403))).rejects.toThrow(/API access may not include search/);
@@ -489,6 +523,18 @@ describe('x token rotation is durable; a dead grant says RECONNECT, once', () =>
     // the second call answers from the row — no more hammering X's token endpoint
     expect(await xSearchOnConnector(store, 'ws_acme', channel, 'q', 10, fetchFn)).toMatchObject({ ok: false, code: 'RECONNECT_REQUIRED' });
     expect(tokenCalls).toBe(1);
+  });
+
+  it('the room’s search passes its order and window through to X', async () => {
+    const channel = await makeRoom();
+    const { id } = await store.upsertConnector({ workspace: 'ws_acme', channelId: channel, provider: 'x', handle: '@joinflowe', connectedBy: 'george', scopes: '' });
+    await store.setConnectorSecret(id, seal({ access_token: 'live-at' }));
+    const urls: string[] = [];
+    const fetchFn = (async (url: string) => { urls.push(String(url)); return { ok: true, status: 200, json: async () => ({ data: [] }) }; }) as unknown as typeof fetch;
+    expect(await xSearchOnConnector(store, 'ws_acme', channel, 'q', 100, fetchFn, { order: 'latest', hours: 24 })).toMatchObject({ ok: true });
+    expect(urls[0]).toContain('sort_order=recency');
+    expect(urls[0]).toContain('max_results=100');
+    expect(urls[0]).toContain('start_time=');
   });
 
   it('a transient refresh failure (X 500) is loud but NEVER a reconnect verdict', async () => {

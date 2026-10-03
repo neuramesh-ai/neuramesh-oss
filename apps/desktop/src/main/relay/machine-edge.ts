@@ -20,7 +20,7 @@ import { createEngineeringCommandBuffer, MAX_ENGINEERING_COMMAND_BYTES } from '.
 import { createBoundedFrameSender } from './bounded-frame-sender';
 import { EngineeringSessionLeases } from './engineering-session-leases';
 import type { LiveStreams } from '../livestreams';
-import { createStreamLane } from './stream-lane';
+import { createStreamLane } from './stream-lane'; import { createBrowserLane } from './browser-lane';
 
 export interface MachineEdgeOptions {
   relayUrl: string;
@@ -34,6 +34,8 @@ export interface MachineEdgeOptions {
   keepaliveMs?: number;
   /** the live-reply registry emitStream feeds (livestreams.ts). Absent = no `stream` lane here. */
   streams?: Pick<LiveStreams, 'subscribe' | 'resync'>;
+  /** this machine's Chromium (browser/service.ts), a cloud machine only. absent = no `browser` lane here. */
+  browser?: import('../browser/service').BrowserService;
 }
 
 interface Session {
@@ -74,7 +76,8 @@ export function connectMachineEdge(opts: MachineEdgeOptions): { close(): void; k
   const log = opts.log ?? ((l: string) => console.log(`[relay-edge] ${l}`));
   const sessions = new Map<string, Session>();
   // `stream` lane subscribers: NOT sessions, so a tab left open never reads as work (stream-lane.ts)
-  const streamLane = createStreamLane(opts.streams, log);
+  // the `browser` lane's viewers are not sessions either (browser-lane.ts)
+  const streamLane = createStreamLane(opts.streams, log), browserLane = createBrowserLane(opts.browser, log);
   const pendingTerminals = new Map<string, { actorId: string; cancelled: boolean }>();
   const engineeringLeases = new EngineeringSessionLeases();
   let sock: WebSocket | null = null;
@@ -83,7 +86,7 @@ export function connectMachineEdge(opts: MachineEdgeOptions): { close(): void; k
   let timer: ReturnType<typeof setTimeout> | null = null;
 
   const killAll = (): void => {
-    streamLane.stopAll();
+    streamLane.stopAll(); browserLane.stopAll();
     const had = sessions.size > 0;
     for (const s of sessions.values()) s.kill();
     for (const pending of pendingTerminals.values()) pending.cancelled = true;
@@ -226,7 +229,7 @@ export function connectMachineEdge(opts: MachineEdgeOptions): { close(): void; k
       attempt = 0;
       // the lanes this daemon serves: the relay opens a `stream` channel only on a machine that
       // names it, because an older daemon would read the unknown lane as a terminal
-      const lanes = ['terminal', ...(opts.engineering ? ['engineering'] : []), ...(opts.streams ? ['stream'] : [])];
+      const lanes = ['terminal', ...(opts.engineering ? ['engineering'] : []), ...(opts.streams ? ['stream'] : []), ...(opts.browser ? ['browser'] : [])];
       s.send(JSON.stringify({ t: 'hello', machineId: opts.machineId, lanes }));
       log(`dialled ${opts.relayUrl}`);
       // the half-open socket (2026-09-19, @neuramesh/relay keepalive.ts): the balancer closed this
@@ -239,12 +242,13 @@ export function connectMachineEdge(opts: MachineEdgeOptions): { close(): void; k
       const m = parseMessage(text);
       if (!m || !isChannelFrame(m)) return;
       if (m.t === 'open') {
-        if (m.lane === 'stream') streamLane.open(m, send);
+        if (m.lane === 'stream') streamLane.open(m, send); else if (m.lane === 'browser') browserLane.open(m, send);
         else if (m.lane === 'engineering') void openEngineering(m, send).catch((e: unknown) => log(`engineering_open_failed ch=${m.ch}: ${String(e)}`));
         else void open(m, send).catch((e: unknown) => log(`pty_open_failed ch=${m.ch}: ${String(e)}`));
         return;
       }
-      if (streamLane.has(m.ch)) { streamLane.frame(m); return; }
+      const side = streamLane.has(m.ch) ? streamLane : browserLane.has(m.ch) ? browserLane : null;
+      if (side) { side.frame(m); return; }
       const sess = sessions.get(m.ch);
       if (!sess) return;
       if (m.t === 'data' && typeof m.d === 'string') {

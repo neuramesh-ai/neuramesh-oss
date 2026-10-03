@@ -82,14 +82,15 @@ export function routineAccept(task: Task, scheduleId: string): MutationResult {
 
 /**
  * Routines are hands-off through the LAST gate too (founder report): a unit whose origin
- * thread carries a schedule_id (0119) auto-accepts when review lands it `done` — the human
+ * thread a ROUTINE opened (0119, never a content schedule's session: store/routine-rule.ts)
+ * auto-accepts when review lands it `done` — the human
  * gets the "routine finished" push (app.ts routes it off the accepted event's payload) and
  * opens the thread to READ the run, never to unblock it. Floored to repo-less work inside
  * routineAccept: code still merges only on a human's accept.
  */
 export async function routineAcceptFollowup(store: Store, cmd: Command & { taskId: string }, outcome: MutationResult): Promise<MutationResult> {
   if (cmd.type !== 'task.approve' || outcome.task.state !== 'done' || outcome.task.repo || !outcome.task.originThreadId) return outcome;
-  const scheduleId = await store.getThreadScheduleId(outcome.task.workspace, outcome.task.originThreadId).catch(() => null);
+  const scheduleId = await store.getThreadRoutineId(outcome.task.workspace, outcome.task.originThreadId).catch(() => null);
   if (!scheduleId) return outcome;
   const accepted = await store.mutate(cmd.taskId, async (t) => routineAccept(t, scheduleId)).catch(() => null);
   return accepted ? { ...accepted, events: [...outcome.events, ...accepted.events] } : outcome;
@@ -101,7 +102,7 @@ export async function routineAcceptFollowup(store: Store, cmd: Command & { taskI
  * the board-born route (promoted todo → request_plan) that the birth-time stamp cannot see. */
 export async function routinePlanFollowup(store: Store, cmd: Command, outcome: MutationResult): Promise<MutationResult> {
   if (cmd.type !== 'task.propose_plan' || outcome.task.state !== 'plan_review' || outcome.task.planApprovedAt || outcome.task.repo || !outcome.task.originThreadId) return outcome;
-  const scheduleId = await store.getThreadScheduleId(outcome.task.workspace, outcome.task.originThreadId).catch(() => null);
+  const scheduleId = await store.getThreadRoutineId(outcome.task.workspace, outcome.task.originThreadId).catch(() => null);
   if (!scheduleId) return outcome;
   const approved = await store.mutate(outcome.task.id, async (t) => routinePlanApprove(t, scheduleId)).catch(() => null);
   return approved ? { ...approved, events: [...outcome.events, ...approved.events] } : outcome;
@@ -132,7 +133,7 @@ export function routineDesignApprove(task: Task, scheduleId: string, round: numb
  * unit's creator, fail-soft) — the human reads a run, never a gate. */
 export async function routineDesignFollowup(store: Store, cmd: Command, outcome: MutationResult): Promise<MutationResult> {
   if (cmd.type !== 'task.propose_design' || outcome.task.state !== 'design_review' || outcome.task.repo || !outcome.task.originThreadId) return outcome;
-  const scheduleId = await store.getThreadScheduleId(outcome.task.workspace, outcome.task.originThreadId).catch(() => null);
+  const scheduleId = await store.getThreadRoutineId(outcome.task.workspace, outcome.task.originThreadId).catch(() => null);
   if (!scheduleId) return outcome;
   const approved = await store.mutate(outcome.task.id, async (t) => routineDesignApprove(t, scheduleId, cmd.round)).catch(() => null);
   if (!approved) return outcome;

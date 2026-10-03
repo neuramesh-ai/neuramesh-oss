@@ -42,7 +42,7 @@ test('the rewrite answers what the CASE form answered, branch by branch', { skip
     create table channels (id text primary key, workspace_id text, slug text);
     create table tasks (id text primary key, workspace_id text, number integer, parent_task_id text);
     create table threads (id text primary key, task_id text, settled_at text, created_at text);
-    create table messages (id text primary key, workspace_id text, channel_id text, task_id text, thread_id text, author_kind text, created_at text);
+    create table messages (id text primary key, workspace_id text, channel_id text, task_id text, thread_id text, author_kind text, created_at text, schedule_id text);
     create table decisions (id text primary key, workspace_id text, channel_id text, task_id text, message_id text, asker_kind text, asker_id text,
       question text, options text, allow_other integer, status text, answer text, created_at text, answered_at text);
   `);

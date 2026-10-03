@@ -17,10 +17,10 @@ import { ColumnType, Schema } from '@powersync/common';
 import { channel_members, channels, messages, threads } from './tables/rooms';
 import { artifacts, beats, decisions, runs, tasks } from './tables/board';
 import { agent_channels, agents, machines, policies, workspace_members } from './tables/crew';
-import { code_sessions, connectors, content_items, schedules, skill_packs, skills, whiteboards } from './tables/content';
+import { code_sessions, connectors, content_items, reply_reminders, schedules, skill_packs, skills, whiteboards } from './tables/content';
 import { memory_blocks, project_repos, projects, repos } from './tables/infra';
 
-export const TABLES = { channels, projects, messages, threads, tasks, machines, agents, agent_channels, repos, project_repos, artifacts, beats, runs, decisions, policies, memory_blocks, skills, skill_packs, schedules, content_items, connectors, workspace_members, channel_members, whiteboards, code_sessions };
+export const TABLES = { channels, projects, messages, threads, tasks, machines, agents, agent_channels, repos, project_repos, artifacts, beats, runs, decisions, policies, memory_blocks, skills, skill_packs, schedules, content_items, connectors, workspace_members, channel_members, whiteboards, code_sessions, reply_reminders };
 
 export const AppSchema = new Schema(TABLES);
 

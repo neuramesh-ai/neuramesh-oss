@@ -31,11 +31,26 @@ const cmd = (actor: Actor, body: unknown) =>
     body: JSON.stringify(body),
   });
 
-/** a routine's thread: the schedule fires a message stamped with scheduleId (0119) */
-async function routineThread(): Promise<string> {
+/** a schedule's session: the slot fires a message stamped with the schedule's id (0119). The schedule
+ *  row is real, as pg's foreign key demands, because the hands-off rule reads it (store/routine-rule.ts):
+ *  `routine` is the launcher's marker, and an unmarked schedule in a marketing room drafts content.
+ *  The rule reads the schedule's own room, so the session itself stays in the suite's room. */
+async function sessionOf(opts: { routine?: boolean; marketing?: boolean }): Promise<{ threadId: string; scheduleId: string }> {
+  await store.setWorkspacePlan('ws_acme', { plan: 'cloud' }); // arming a schedule is Pro
+  const proj = await j(await cmd(george, { type: 'project.create', workspace: 'ws_acme', name: `Runs ${crypto.randomUUID().slice(0, 8)}` }));
+  const room = await j(await cmd(george, { type: 'channel.create', workspace: 'ws_acme', project: proj.projectId, slug: opts.marketing ? 'marketing' : 'ops' }));
+  if (opts.marketing) await cmd(george, { type: 'channel.set_kind', channel: room.channelId, kind: 'marketing' });
+  const armed = await j(await cmd(george, { type: 'schedule.create', channel: room.channelId, title: 'X audit', prompt: 'Audit the account.', cadence: 'weekdays', atTime: '09:00', tz: 'UTC', ...(opts.routine ? { routine: true } : {}) }));
   const threadId = crypto.randomUUID();
-  await send(george, { ...base, threadId, scheduleId: crypto.randomUUID(), body: '⏱ **Routine — X audit**\n\nAudit the account and reply opportunities.' });
-  return threadId;
+  // a routine speaks as the owner. a draft run speaks as its agent, with the draft under a plain first line
+  if (opts.routine || !opts.marketing) await send(george, { ...base, threadId, scheduleId: armed.scheduleId, body: 'Routine · X audit\n\nAudit the account and reply opportunities.' });
+  else await send(plume, { ...base, threadId, scheduleId: armed.scheduleId, body: 'Scheduled draft · X audit · for 09:00\n\nTired but wired. One fix for the 2am spiral.' });
+  return { threadId, scheduleId: armed.scheduleId };
+}
+
+/** a routine's thread: the launcher's marker, as the universal launcher arms it */
+async function routineThread(): Promise<string> {
+  return (await sessionOf({ routine: true })).threadId;
 }
 
 beforeEach(async () => {
@@ -231,5 +246,83 @@ describe('a routine-born unit is hands-off through the design gate too', () => {
     expect((await cmd(rex, { type: 'task.request_design', taskId: r.task.id, designer: 'iris' })).status).toBe(200);
     const p = await j(await cmd(iris, { type: 'task.propose_design', taskId: r.task.id, round: 1, mockups: [{ name: 'a', html: '<b>a</b>' }] }));
     expect(p.task.state).toBe('design_review');
+  });
+});
+
+// A SCHEDULED DRAFT'S SESSION (George, 2026-09-27, "Guard the routine rules"). The draft run opens a
+// session stamped with its schedule, so the rail shows the clock and the Automations card lists the
+// run. A draft waits for a person, so no hands-off rule may touch that session: a unit born there
+// keeps every gate a person's conversation has.
+describe('a content schedule\'s session keeps every human gate', () => {
+  const contentThread = async () => (await sessionOf({ marketing: true })).threadId;
+
+  it('a unit born there waits for its plan approval', async () => {
+    const threadId = await contentThread();
+    const r = await j(await cmd(rex, { type: 'task.create', ...base, title: 'Landing page for the post', description: 'x', kind: 'research', plan: PLAN, originThread: threadId, offerTo: 'plume' }));
+    expect(r.task.state).toBe('plan_review');
+    expect(r.task.planApprovedAt).toBeNull();
+    expect(r.events.find((e: any) => e.type === 'task.created').payload.routine).toBeUndefined();
+  });
+
+  it('a plan proposed on the board route parks for its person', async () => {
+    const threadId = await contentThread();
+    const atlas: Actor = { kind: 'agent', id: 'a-atlas', role: 'architect' };
+    await cmd(george, { type: 'agent.register', workspace: 'ws_acme', machineId: 'm1', name: 'atlas', role: 'architect', channels: ['dev'] });
+    const t = await j(await cmd(george, { type: 'task.create', ...base, title: 'Draft follow-up', description: 'x', kind: 'research', originThread: threadId }));
+    await cmd(rex, { type: 'task.request_plan', taskId: t.task.id, architect: 'atlas', kind: 'research' });
+    const p = await j(await cmd(atlas, { type: 'task.propose_plan', taskId: t.task.id, plan: '# Plan\n\ndo it.', legs: ['build'] }));
+    expect(p.task.state).toBe('plan_review');
+    expect(p.task.planApprovedAt ?? null).toBeNull();
+    expect(p.events.some((e: any) => e.type === 'task.plan_approved')).toBe(false);
+  });
+
+  it('its design round waits for its person', async () => {
+    const iris: Actor = { kind: 'agent', id: 'a-iris', role: 'designer' };
+    await cmd(george, { type: 'agent.register', workspace: 'ws_acme', machineId: 'm1', name: 'iris', role: 'designer', channels: ['dev'] });
+    const threadId = await contentThread();
+    const r = await j(await cmd(rex, { type: 'task.create', ...base, title: 'Visuals for the post', description: 'x', kind: 'content', plan: { legs: ['design', 'build'], subtasks: [], approach: 'Agree one image direction for the draft, then make the image the post needs.' }, originThread: threadId }));
+    expect((await cmd(george, { type: 'task.approve_plan', taskId: r.task.id })).status).toBe(200);
+    expect((await cmd(rex, { type: 'task.request_design', taskId: r.task.id, designer: 'iris' })).status).toBe(200);
+    const p = await j(await cmd(iris, { type: 'task.propose_design', taskId: r.task.id, round: 1, mockups: [{ name: 'a', html: '<b>a</b>' }] }));
+    expect(p.task.state).toBe('design_review');
+    expect(p.events.some((e: any) => e.type === 'task.design_approved')).toBe(false);
+  });
+
+  it('review lands it done, and it rests there for its person to accept', async () => {
+    const threadId = await contentThread();
+    const r = await j(await cmd(rex, { type: 'task.create', ...base, title: 'Post variants', description: 'x', kind: 'research', plan: PLAN, originThread: threadId, offerTo: 'plume' }));
+    expect((await cmd(george, { type: 'task.approve_plan', taskId: r.task.id })).status).toBe(200);
+    await cmd(plume, { type: 'task.claim', taskId: r.task.id });
+    await cmd(plume, { type: 'task.submit', taskId: r.task.id, artifacts: [{ kind: 'doc', name: 'variants.md', content: '# three variants' }] });
+    const done = await j(await cmd(scout, { type: 'task.approve', taskId: r.task.id }));
+    expect(done.task.state).toBe('done');
+    expect(done.events.some((e: any) => e.type === 'task.accepted')).toBe(false);
+  });
+});
+
+describe('the routine side of the split holds', () => {
+  it('a routine the launcher armed in a marketing room is hands-off', async () => {
+    const { threadId } = await sessionOf({ routine: true, marketing: true });
+    const r = await j(await cmd(rex, { type: 'task.create', ...base, title: 'Weekly X calendar', description: 'x', kind: 'research', plan: PLAN, originThread: threadId }));
+    expect(r.task.planApprovedAt).toBeTruthy();
+  });
+
+  it('a schedule armed before the marker, outside a marketing room, is a routine', async () => {
+    const { threadId } = await sessionOf({});
+    const r = await j(await cmd(rex, { type: 'task.create', ...base, title: 'Dependency audit', description: 'x', kind: 'research', plan: PLAN, originThread: threadId }));
+    expect(r.task.planApprovedAt).toBeTruthy();
+  });
+
+  it('store.getThreadRoutineId names a routine\'s schedule, and nothing for a draft\'s session, a person\'s thread or a deleted schedule', async () => {
+    const routine = await sessionOf({ routine: true });
+    const content = await sessionOf({ marketing: true });
+    const person = crypto.randomUUID();
+    await send(george, { ...base, threadId: person, body: 'what is on the calendar?' });
+    expect(await store.getThreadRoutineId('ws_acme', routine.threadId)).toBe(routine.scheduleId);
+    expect(await store.getThreadRoutineId('ws_acme', content.threadId)).toBeNull();
+    expect(await store.getThreadRoutineId('ws_acme', person)).toBeNull();
+    expect(await store.getThreadRoutineId('ws_other', routine.threadId)).toBeNull();
+    expect((await cmd(george, { type: 'schedule.delete', schedule: routine.scheduleId })).status).toBe(200);
+    expect(await store.getThreadRoutineId('ws_acme', routine.threadId)).toBeNull();
   });
 });

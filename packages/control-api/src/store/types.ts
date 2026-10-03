@@ -72,6 +72,10 @@ export interface ScheduleInput {
   /** extra keys merged into the payload jsonb beside `prompt` (e.g. the marketing
    * bootstrap's { bootstrap: true, threadId }) — server-internal callers only */
   payloadExtra?: Record<string, unknown> | null;
+  /** the routine writer (docs/design/routine-writer-2026-10): the session rex wrote the routine in. In the
+   * same transaction the store links it (threads.schedule_id, only while it holds no routine) and posts
+   * the divider there as the person who scheduled it */
+  session?: { threadId: string; dividerId: string; author: ActorRef; makeEvent: (workspace: string) => NMEvent } | null;
 }
 
 export interface NMMessage {

@@ -8,13 +8,15 @@ import { drainQuery, claudeAgentPrompt, partialMessages } from './turnkit';
 import { starterGenerate, starterStream } from './starterproxy';
 import { claudePathOption, codexSandboxMode, keyEnvFor, providerEnv, type AgentAttachment } from '../runtime/adapter';
 import { ORCH_EMPTY_TURN } from '../replypolicy';
+import { claudeEffort, codexEffort, geminiThinking } from '../runtime/thinking';
+import type { ThinkingLevel } from '@neuramesh/shared';
 import { stripPseudoToolCalls } from './pseudocalls';
 import type { LogFn } from '../agentlog';
 import type { OrchTool } from './orchtools';
 
 // The three orchestrator transports share ONE signature so `orchestratorTurn` dispatches by
 // provider with no coupling — each runs the SAME buildOrchestratorTools registry its own way.
-export type OrchTransportArgs = { model: string; token: string; systemPrompt: string; transcript: string; tools: OrchTool[]; log?: LogFn; attachments?: AgentAttachment[]; cwd?: string; onDelta?: (t: string) => void };
+export type OrchTransportArgs = { model: string; token: string; systemPrompt: string; transcript: string; tools: OrchTool[]; log?: LogFn; attachments?: AgentAttachment[]; cwd?: string; onDelta?: (t: string) => void; thinking?: ThinkingLevel | null };
 
 
 /** Which Gemini transport a turn takes. Lives here with the transports rather than in the host's
@@ -74,7 +76,7 @@ export function zodShapeToGemini(shape: Record<string, any>, Type: GeminiTypes):
 }
 
 export async function geminiOrchestratorTurn(args: {
-  model: string; token: string; systemPrompt: string; transcript: string; tools: OrchTool[]; log?: LogFn;
+  model: string; token: string; systemPrompt: string; transcript: string; tools: OrchTool[]; log?: LogFn; thinking?: ThinkingLevel | null;
   /** the platform pays: route through control-api's metered proxy, never a local key */
   starter?: boolean; apiUrl?: string; workspace?: string; actorId?: string;
   /** a WORKER on the lane (runtime/starter.ts) takes more rounds than a routing turn, and a human Stop must end it */
@@ -100,7 +102,8 @@ export async function geminiOrchestratorTurn(args: {
   });
   const byName = new Map(args.tools.map((t) => [t.name, t]));
   const contents: any[] = [{ role: 'user', parts: [{ text: args.transcript }] }];
-  const config = { systemInstruction: args.systemPrompt, tools: [{ functionDeclarations }], temperature: 0.4 };
+  // the person's level rides an API key only: the metered lane's level is fixed, and part of its price
+  const config = { systemInstruction: args.systemPrompt, tools: [{ functionDeclarations }], temperature: 0.4, ...(viaProxy ? {} : geminiThinking(args)) };
 
   let lastText = '';
   for (let turn = 0; turn < (args.maxTurns ?? 14); turn++) {
@@ -161,6 +164,7 @@ export async function anthropicOrchestratorTurn(args: OrchTransportArgs): Promis
         ...claudePathOption(),
         env: providerEnv('anthropic', args.token),
         model: args.model,
+        ...claudeEffort(args),
         maxTurns: 14,
         mcpServers: { nm },
         // AVAILABILITY is `tools` (the #1010 lesson — allowedTools only auto-permits), and
@@ -313,7 +317,7 @@ export async function codexSdkOrchestratorTurn(args: OrchTransportArgs): Promise
   const prompt = `${args.systemPrompt}\n\n${args.transcript}`;
   try {
     let turn: { finalResponse: string };
-    try { turn = await codex.startThread({ ...opts, model: args.model }).run(prompt); }
+    try { turn = await codex.startThread({ ...opts, model: args.model, ...codexEffort(args) }).run(prompt); }
     catch (e) {
       if (args.model && /not supported|unsupported|not available|invalid model|model .*not/i.test(String((e as Error)?.message))) {
         turn = await codex.startThread({ ...opts, model: undefined }).run(prompt); // model not on this plan → account default

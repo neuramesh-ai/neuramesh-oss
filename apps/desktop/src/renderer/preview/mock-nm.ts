@@ -9,6 +9,7 @@ import { marketingArtifacts, marketingSchedules } from './mock-marketing'; impor
 import { CONNS, connectionList, foregroundTasks, foregroundThreads, mockForeground, mockForegroundWorkspace, railRowsSnapshot, swapForeground, watchForeground } from './mock-connections';
 import { githubLanes } from './mock-github';
 import { worktreeRemoveMock, worktreesFixture } from './mock-worktrees';
+import { mockRunsFor, routineRun } from './mock-routines'; mockWorkRuns.push(routineRun); // today's routine run is live (one session per routine)
 
 // Mutable harness state the bridge REASSIGNS — it must live here, not in the fixture
 // module: an ESM import is a read-only binding, so `mockInvites = []` from another
@@ -44,18 +45,6 @@ let planLimitCb: ((p: { message: string }) => void) | null = null;
 // sheet in its waiting state (C2) — `?upgrade=1` opens the sheet, `?upgrade=waiting` presses Get Pro
 let upgradeCb: ((p: { phase: string; url?: string; message?: string }) => void) | null = null;
 const upgradeSeed = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('upgrade') : null;
-
-// 0119: the conversations an automation's slots opened — what the card's reveal lists.
-const mockScheduleRuns: Record<string, Array<{ id: string; title: string; last_body: string; created_at: string; updated_at: string; channel_id: string; channel_slug: string; msg_count: number }>> = { ...DOOR_SCHEDULE_RUNS,
-  'sch-dev-1': [
-    { id: 'th-run-1', title: 'Routine — Morning dependency audit', last_body: 'The prompt landed at 09:00 and nobody picked it up.', created_at: new Date(Date.now() - 3 * 3600e3).toISOString(), updated_at: new Date(Date.now() - 3 * 3600e3).toISOString(), channel_id: 'c-dev', channel_slug: 'dev', msg_count: 1 },
-    { id: 'th-run-2', title: 'Routine — Morning dependency audit', last_body: '3 majors and 1 CVE (lodash 4.17.20 → GHSA-35jh). Filed #1071 for the CVE; the majors can wait for the next window.', created_at: new Date(Date.now() - 27 * 3600e3).toISOString(), updated_at: new Date(Date.now() - 26 * 3600e3).toISOString(), channel_id: 'c-dev', channel_slug: 'dev', msg_count: 4 },
-    { id: 'th-run-3', title: 'Routine — Morning dependency audit', last_body: 'Clean sweep — no new CVEs. Two minors behind (vite, esbuild); neither is on a breaking line.', created_at: new Date(Date.now() - 51 * 3600e3).toISOString(), updated_at: new Date(Date.now() - 50 * 3600e3).toISOString(), channel_id: 'c-dev', channel_slug: 'dev', msg_count: 9 },
-    { id: 'th-run-4', title: 'Routine — Morning dependency audit', last_body: 'One CVE in the transitive tree (tar). Already patched upstream; bumped and pushed to nm/dep-audit.', created_at: new Date(Date.now() - 75 * 3600e3).toISOString(), updated_at: new Date(Date.now() - 75 * 3600e3).toISOString(), channel_id: 'c-dev', channel_slug: 'dev', msg_count: 3 },
-  ],
-  // fired twelve times, all of them before 0119 linked threads — the honest empty the panel names
-  'sch-dev-2': [],
-};
 
 // ?localstack=<phase> seeds Local mode's first-run card (main/localStack/driver.ts states) so every
 // state is capturable in both themes; `ready` (or ?conn=local) is the shell on a local connection.
@@ -321,9 +310,9 @@ const explicit: Record<string, any> = {
   },
   // mirrors the real handler (sync.ts): `null` = every room, and every row carries the room it
   // fires into so the Automations destination can tag it and scope it to the active project
-  scheduleRuns: async (scheduleId: string, limit?: number) => ({
-    runs: (mockScheduleRuns[scheduleId] ?? []).slice(0, limit ?? 8),
-  }),
+  // mirrors web/webnm-sessionruns.ts: a routine's runs and the rows their strips count (mock-routines.ts)
+  scheduleRuns: async (scheduleId: string, limit?: number) => mockRunsFor(scheduleId, limit ?? 8, { threads: Object.values(mockThreads).flat(), convoMsgs, tasks: allTasks, decisions: mockDecisions, items: mockContentItems, arts: mockThreadArts, runs: mockWorkRuns, legacy: DOOR_SCHEDULE_RUNS }) as never,
+  scheduleRunNow: async (scheduleId: string) => { const s = mockSchedules.find((x) => x.id === scheduleId); if (s) s.next_run_at = new Date().toISOString(); return { ok: true }; },
   schedules: async (channelId: string | null) => ({
     schedules: [...mockSchedules, ...marketingSchedules]
       .filter((s) => channelId === null || s.channelId === channelId)

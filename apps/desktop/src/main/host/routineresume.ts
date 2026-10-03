@@ -9,23 +9,30 @@
 // is not in this loop, twice, and the stall watchdog nagged them at 2am.
 //
 // Detection is code: a routine thread whose opener got no real answer — nothing after a grace, or
-// only compute notices — and that anchors no unit. Action is the ordinary wake: this host posts the
+// only compute notices — and that anchors no unit. a content schedule's session is not a routine's
+// (host/routinerule.ts, 2026-09-27), so it is never re-asked. Action is the ordinary wake: this host posts the
 // prompt again AS THE OWNER into the same thread. A fresh human trigger rides every mechanism
 // unchanged (the placement ladder, the wake lease, the exactly-once reply index, the thread wake
 // that carries the conversation), which is what makes the server birth the unit approved.
 //
 // Bounded three ways: never while a newer run of the same routine exists (the next slot supersedes
-// a missed one — no pile-up), at most MAX_REASKS per thread (counted in the thread itself, so a
+// a missed one — no pile-up), at most MAX_REASKS per run (counted in the thread itself, so a
 // restart cannot reset it), and only from the origin's own machine once it holds a usable
 // credential (the no-compute notice's own rule, so one host speaks, and never into the void).
+//
+// Per RUN since one session holds every run of its routine (docs/design/routine-sessions-2026-09,
+// PR 2): the window, the count, the unit check and the owner all start at the newest run's opener
+// (host/runwindow.ts). A re-ask carries no schedule, so it stays inside its run.
 import { resolveToken } from '../agents';
 import { isComputeNotice } from '../computenotice';
+import { isRoutineSchedule, schedulePayload } from '@neuramesh/shared';
 import type { HostedAgent } from '../agents';
 import type { PowerSyncDatabase } from '@powersync/node';
 
 export interface RoutineThreadState {
   threadId: string;
   scheduleId: string;
+  /** when the newest run opened: the session's birth for its first run */
   bornMs: number;
   /** who the opener was posted as — the owner whose machine may re-ask */
   ownerId: string;
@@ -62,6 +69,62 @@ export function pickStrandedRoutines(cands: RoutineThreadState[], nowMs: number)
   });
 }
 
+type ReadDb = { getAll: <T>(sql: string, params?: unknown[]) => Promise<T[]> };
+
+/** the room's routine sessions of the last day, as the picker reads them. a content schedule's session is
+ *  not one (2026-09-27): its draft waits for a person, and asking its drafting prompt again as the owner
+ *  only makes the agent draft a second post while the person's reply stays unanswered */
+export async function gatherRoutineThreads(db: ReadDb, ch: { id: string }, nowMs: number): Promise<RoutineThreadState[]> {
+  // each session's newest run opener (host/runwindow.ts runCut, per row). the window test runs on parsed
+  // times, never in SQL: the replica's time text and an ISO string do not sort together
+  const rows = await db.getAll<{ id: string; schedule_id: string; run_at: string | null; payload: string | null; room_kind: string | null }>(
+    `select th.id, th.schedule_id, s.payload, c.kind as room_kind,
+            coalesce((select max(m.created_at) from messages m where m.thread_id = th.id and m.schedule_id is not null),
+                     (select min(m.created_at) from messages m where m.thread_id = th.id)) as run_at
+       from threads th join schedules s on s.id = th.schedule_id left join channels c on c.id = s.channel_id
+      where th.channel_id = ? order by th.updated_at desc limit 20`,
+    [ch.id],
+  ).catch(() => [] as Array<{ id: string; schedule_id: string; run_at: string | null; payload: string | null; room_kind: string | null }>);
+  const runAt = (o: { run_at: string | null }): number => (o.run_at ? Date.parse(o.run_at) : NaN);
+  const out: RoutineThreadState[] = [];
+  for (const th of rows) {
+    const bornMs = runAt(th);
+    if (!Number.isFinite(bornMs) || nowMs - bornMs > RESUME_WINDOW_MS) continue;
+    if (!isRoutineSchedule(schedulePayload(th.payload), th.room_kind)) continue;
+    const msgs = await db.getAll<{ author_kind: string; author_id: string; body: string | null; created_at: string }>(
+      `select author_kind, author_id, body, created_at from messages where thread_id = ? and created_at >= ? order by created_at asc limit 60`, [th.id, th.run_at],
+    ).catch(() => [] as Array<{ author_kind: string; author_id: string; body: string | null; created_at: string }>);
+    const humans = msgs.filter((m) => m.author_kind === 'human');
+    if (!humans.length) continue;
+    const lastHumanAtMs = Date.parse(humans[humans.length - 1]!.created_at);
+    const [units] = await db.getAll<{ n: number }>(`select count(*) as n from tasks where origin_thread_id = ? and created_at >= ?`, [th.id, th.run_at]).catch(() => [{ n: 0 }]);
+    const [runs] = await db.getAll<{ n: number }>(`select count(*) as n from runs where thread_id = ? and state = 'running'`, [th.id]).catch(() => [{ n: 0 }]);
+    out.push({
+      threadId: th.id, scheduleId: th.schedule_id, bornMs, ownerId: humans[0]!.author_id, lastHumanAtMs,
+      agentReplies: msgs.filter((m) => m.author_kind === 'agent' && Date.parse(m.created_at) > lastHumanAtMs).map((m) => ({ atMs: Date.parse(m.created_at), body: m.body ?? '' })),
+      reasks: humans.filter((m) => (m.body ?? '').startsWith(REASK_PREFIX)).length,
+      anchoredUnits: units?.n ?? 0, runningRuns: runs?.n ?? 0,
+      newerRunExists: rows.some((o) => o.schedule_id === th.schedule_id && o.id !== th.id && runAt(o) > bornMs),
+    });
+  }
+  return out;
+}
+
+/** the monitor sweep's newest room messages, the other half of the rescue. a routine's session stays out
+ *  (2026-09-16, #1093): the thread wake answers it or the resume above asks again, and a sweep that saw it
+ *  once filed it flat. a content schedule's session stays in (2026-09-27): the resume skips it, so the sweep
+ *  is what rescues a reply there. the rule runs on the room's schedules, a handful of rows, so the query
+ *  still drops the routine sessions before its limit */
+export async function sweepMessages(db: ReadDb, channelId: string): Promise<Array<{ author_kind: string; body: string }>> {
+  const scheds = await db.getAll<{ id: string; payload: string | null; kind: string | null }>(
+    `select distinct s.id, s.payload, c.kind from threads th join schedules s on s.id = th.schedule_id left join channels c on c.id = s.channel_id where th.channel_id = ?`,
+    [channelId],
+  );
+  const routines = scheds.filter((s) => isRoutineSchedule(schedulePayload(s.payload), s.kind)).map((s) => s.id);
+  const keepOut = routines.length ? ` and (thread_id is null or thread_id not in (select id from threads where schedule_id in (${routines.map(() => '?').join(', ')})))` : '';
+  return db.getAll<{ author_kind: string; body: string }>(`select author_kind, body from messages where channel_id = ? and task_id is null${keepOut} order by created_at desc limit 18`, [channelId, ...routines]);
+}
+
 export function makeRoutineResume(ctx: {
   db: PowerSyncDatabase;
   apiUrl: string;
@@ -73,37 +136,11 @@ export function makeRoutineResume(ctx: {
   // the durable count above is what bounds the thread across restarts
   const reasked = new Map<string, number>();
 
-  async function gather(ch: { id: string }, nowMs: number): Promise<RoutineThreadState[]> {
-    const threads = await db.getAll<{ id: string; schedule_id: string; created_at: string }>(
-      `select id, schedule_id, created_at from threads where channel_id = ? and schedule_id is not null and created_at > ? order by created_at desc limit 20`,
-      [ch.id, new Date(nowMs - RESUME_WINDOW_MS).toISOString()],
-    ).catch(() => [] as Array<{ id: string; schedule_id: string; created_at: string }>);
-    const out: RoutineThreadState[] = [];
-    for (const th of threads) {
-      const msgs = await db.getAll<{ author_kind: string; author_id: string; body: string | null; created_at: string }>(
-        `select author_kind, author_id, body, created_at from messages where thread_id = ? order by created_at asc limit 60`, [th.id],
-      ).catch(() => [] as Array<{ author_kind: string; author_id: string; body: string | null; created_at: string }>);
-      const humans = msgs.filter((m) => m.author_kind === 'human');
-      if (!humans.length) continue;
-      const lastHumanAtMs = Date.parse(humans[humans.length - 1]!.created_at);
-      const [units] = await db.getAll<{ n: number }>(`select count(*) as n from tasks where origin_thread_id = ?`, [th.id]).catch(() => [{ n: 0 }]);
-      const [runs] = await db.getAll<{ n: number }>(`select count(*) as n from runs where thread_id = ? and state = 'running'`, [th.id]).catch(() => [{ n: 0 }]);
-      out.push({
-        threadId: th.id, scheduleId: th.schedule_id, bornMs: Date.parse(th.created_at), ownerId: humans[0]!.author_id, lastHumanAtMs,
-        agentReplies: msgs.filter((m) => m.author_kind === 'agent' && Date.parse(m.created_at) > lastHumanAtMs).map((m) => ({ atMs: Date.parse(m.created_at), body: m.body ?? '' })),
-        reasks: humans.filter((m) => (m.body ?? '').startsWith(REASK_PREFIX)).length,
-        anchoredUnits: units?.n ?? 0, runningRuns: runs?.n ?? 0,
-        newerRunExists: threads.some((o) => o.schedule_id === th.schedule_id && o.created_at > th.created_at),
-      });
-    }
-    return out;
-  }
-
   /** one channel, one tick: re-ask every stranded routine this host may speak for. Returns the count. */
   async function resumeStrandedRoutines(orch: HostedAgent, ch: { id: string; slug: string; workspace_id: string }): Promise<number> {
     if (process.env['NM_AGENT_MODE'] === 'echo') return 0;
     const now = Date.now();
-    const stranded = pickStrandedRoutines(await gather(ch, now), now)
+    const stranded = pickStrandedRoutines(await gatherRoutineThreads(db, ch, now), now)
       .filter((c) => (c.ownerId === ownerActorId || process.env['NM_MACHINE_KIND'] === 'runner') && now - (reasked.get(c.threadId) ?? 0) > REASK_GRACE_MS);
     if (!stranded.length) return 0;
     // still no compute here → the notice already said so; asking again would only post another one

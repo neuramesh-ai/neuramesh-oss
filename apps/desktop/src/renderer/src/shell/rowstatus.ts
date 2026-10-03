@@ -18,16 +18,17 @@ export interface RowMarks { status: ThreadStatus; ask: boolean; settle: boolean 
  *  rows do, without a HistoryRow to hand (the thread head's chip and Settle, 2026-09-09) */
 export type MarkableRow = Pick<HistoryRow<TaskAllRow>, 'threadId' | 'task'>;
 
-/** what a drafted post has to carry to count (the nm.contentAll() rows): its unit, its birth, its state */
-export type DraftLike = { task_id: string | null; created_at: string; status: string };
+/** what a drafted post has to carry to count (the nm.contentAll() rows): its unit or its session, its birth, its state */
+export type DraftLike = { task_id: string | null; thread_id?: string | null; created_at: string; status: string };
 
-/** drafted posts still waiting, per unit: how many, and the newest one's birth */
-function draftsByUnit(drafts: DraftLike[]): Map<string, { n: number; at: string }> {
+/** drafted posts still waiting, per unit or per session: how many, and the newest one's birth */
+function draftsWaitingBy(drafts: DraftLike[], key: (d: DraftLike) => string | null | undefined): Map<string, { n: number; at: string }> {
   const out = new Map<string, { n: number; at: string }>();
   for (const d of drafts) {
-    if (d.status !== 'draft' || !d.task_id) continue;
-    const cur = out.get(d.task_id);
-    out.set(d.task_id, { n: (cur?.n ?? 0) + 1, at: laterOf(cur?.at, d.created_at) ?? d.created_at });
+    const k = key(d);
+    if (d.status !== 'draft' || !k) continue;
+    const cur = out.get(k);
+    out.set(k, { n: (cur?.n ?? 0) + 1, at: laterOf(cur?.at, d.created_at) ?? d.created_at });
   }
   return out;
 }
@@ -58,7 +59,9 @@ export function makeRowMarks(i: { decisions: DecisionAllRow[]; liveIds: Set<stri
   // drafts of the content units it OWNS, so they lift it exactly as an owned unit's gate does. Only
   // the owned units count — a task's own row already wears its state. Absent (the other callers,
   // shell/useNavBands.ts), the rule is inert.
-  const draftsByTask = draftsByUnit(i.drafts ?? []);
+  // A session's OWN drafts count the same way (0115, and a scheduled draft run's session since #662).
+  const draftsByTask = draftsWaitingBy(i.drafts ?? [], (d) => d.task_id);
+  const draftsByThread = draftsWaitingBy(i.drafts ?? [], (d) => d.thread_id);
   const threadById = new Map(i.threads.map((t) => [t.id, t]));
   return (r) => {
     const codeState = !r.task && r.threadId ? codeByThread.get(r.threadId) : undefined;
@@ -66,7 +69,8 @@ export function makeRowMarks(i: { decisions: DecisionAllRow[]; liveIds: Set<stri
     const th = r.threadId ? threadById.get(r.threadId) : undefined;
     const card = (r.task ? byTask.get(r.task.id) : undefined) ?? (r.threadId ? byThread.get(r.threadId) : undefined) ?? null;
     const owned = r.threadId ? ownedByThread.get(r.threadId) : undefined;
-    const waits = (owned ?? []).flatMap((u) => draftsByTask.get(u.id) ?? []);
+    const own = !r.task && r.threadId ? draftsByThread.get(r.threadId) : undefined;
+    const waits = [...(owned ?? []).flatMap((u) => draftsByTask.get(u.id) ?? []), ...(own ? [own] : [])];
     const input = {
       task: r.task,
       card,

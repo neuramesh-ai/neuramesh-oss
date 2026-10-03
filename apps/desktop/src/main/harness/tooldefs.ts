@@ -11,6 +11,7 @@ import { z } from 'zod';
 import { NM_TOOLS } from '@neuramesh/shared';
 import { TOOL_SPECS, type SpeccedTool } from './toolspec';
 import { WHITEBOARD_DEFS } from './tooldefs-whiteboard';
+import { WEB_DEFS } from './tooldefs-web';
 import { text } from './toolbus';
 import type { ToolDef, ToolHost } from './toolbus';
 
@@ -164,6 +165,7 @@ export const DEFS: ToolDef[] = [
     },
   },
   ...WHITEBOARD_DEFS,
+  ...WEB_DEFS,
   {
     ...spec('advance_beat'),
     async run(host, input) {
@@ -181,7 +183,7 @@ export const DEFS: ToolDef[] = [
       if (!host.searchX) return text('X reads are unavailable on this turn');
       const query = String(input['query']);
       host.log?.({ kind: 'tool', phase: 'call', summary: `search_x ${query.slice(0, 60)}` });
-      return text(await host.searchX({ query, ...(input['max'] ? { max: Number(input['max']) } : {}) }));
+      return text(await host.searchX({ query, ...(input['max'] ? { max: Number(input['max']) } : {}), ...(input['order'] === 'latest' ? { order: 'latest' as const } : {}), ...(input['hours'] ? { hours: Number(input['hours']) } : {}) }));
     },
   },
   {

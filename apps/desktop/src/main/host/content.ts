@@ -9,12 +9,13 @@ import type { HostedAgent, ThreadTask } from '../agents';
 
 import { pickImageProvider, textComplete, type ImageCred } from '../imagegen';
 import { providerFor } from '../runtime/adapter';
-import { BRIEF_SYSTEM, REWRITE_SYSTEM, briefAsk, parseRewrite, rewriteAsk, type BrandBits } from './draftbrief';
+import { makeDraw } from './drawdraft';
 import { type DraftRow } from './orchtools';
 import { type LogFn } from '../agentlog';
 
 import { type SubjectRef } from '../harness/brain';
 import { withTimeout } from './turnkit';
+import { runDrafts } from './runwindow';
 import type { PowerSyncDatabase } from '@powersync/node';
 
 
@@ -80,11 +81,11 @@ async function generateDraftImage(agent: HostedAgent, ch: { id: string; slug: st
     [itemId, ch.id],
   ).catch(() => [] as Array<{ platform: string; media: string | null }>);
   if (!d) return `That draft isn't available to re-image (already scheduled or gone).`;
-  let brief = '';
-  try { brief = (JSON.parse(d.media ?? 'null') as { brief?: string } | null)?.brief ?? ''; } catch { /* none */ }
-  if (!brief) return `That draft has no image brief to draw from — ask me for a visual and I'll add one.`;
+  let media: { brief?: string; image_error?: string } = {};
+  try { media = (JSON.parse(d.media ?? 'null') as typeof media | null) ?? {}; } catch { /* none */ }
+  if (!media.brief) return `That draft has no image brief to draw from. Ask me for a visual and I'll add one.`;
 
-  const out = await drawBriefed(agent, ch, itemId, d.platform, brief);
+  const out = await drawBriefed(agent, ch, itemId, d.platform, media.brief, !!media.image_error);
   if (!out.ok) {
     return /no image key/.test(out.error ?? '')
       ? `I can't draw it — there's no image key connected. Add an OpenAI or Gemini key under Image generation and hit Try again.`
@@ -93,89 +94,11 @@ async function generateDraftImage(agent: HostedAgent, ch: { id: string; slug: st
   return `Drew the image${out.model ? ` on ${out.model}` : ''} — it's on the card now. Nothing publishes until you approve.`;
 }
 
-/** The draw tail both callers share: credential ladder → brand → pixels → attach + thumb (or
- *  the imageError revise). Outcome-shaped so the calendar's button gets data, not prose. */
-async function drawBriefed(agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, itemId: string, platform: string, brief: string): Promise<{ ok: boolean; thumb?: string; model?: string; error?: string }> {
-  const postCmd = async (cmd: unknown): Promise<boolean> => {
-    const r = await post('/v1/commands', { kind: 'agent', id: agent.id, role: agent.role }, cmd).catch(() => null);
-    return !!(r && (r as { ok?: boolean }).ok);
-  };
-  const designer = [...agents.values()].find((a) => a.role === 'designer' && a.channels.has(ch.id));
-  const { cred } = await designerImageCred(apiUrl, ch.workspace_id, designer, ownerActorId);
-  if (!cred) {
-    const why = 'no image key on this workspace — add one under Image generation';
-    await postCmd({ type: 'content.revise', item: itemId, imageError: why });
-    return { ok: false, error: why };
-  }
-  const brand = await brandTokensFor(db, ch.id);
-  const reviewSeat = providerFor(agent.runtime) === cred.provider ? agent.model : (PACKS[cred.provider === 'openai' ? 'openai-core' : 'gemini-core']?.roles.marketer ?? '');
-  const g = await generateBrandImage(cred, reviewSeat, brand, brief, platform, agent.name);
-  if (g.error || (!g.thumb && !g.publish)) {
-    const why = g.error ?? 'the image came back empty';
-    await postCmd({ type: 'content.revise', item: itemId, imageError: why });
-    console.log(`agent_gen_image agent=${agent.name} room=#${ch.slug} item=${itemId.slice(0, 8)} failed=${why}`);
-    return { ok: false, error: why };
-  }
-  if (g.publish) await postCmd({ type: 'content.attach_media', item: itemId, dataUrl: g.publish });
-  if (g.thumb) await postCmd({ type: 'content.revise', item: itemId, thumb: g.thumb });
-  console.log(`agent_gen_image agent=${agent.name} room=#${ch.slug} item=${itemId.slice(0, 8)} ok model=${g.model ?? '?'}`);
-  return { ok: true, thumb: g.thumb, model: g.model };
-}
-
-/**
- * The calendar's Generate/Regenerate/New-angle button (docs/design/calendar-image-gen-2026-08):
- * one direct entry, no thread detour, no marker message. Brief-less drafts get their brief
- * WRITTEN here (one text-only completion on the same image credential — one key powers words
- * and pixels, so "no image key" stays the single failure story); `rewrite` redrafts body +
- * brief from a new angle before drawing. Every mutation rides the command lane as the acting
- * agent — the channel's marketer, else the orchestrator — so sync and the papertrail hold.
- */
-async function draftImageFor(itemId: string, opts: { angle?: string; rewrite?: boolean } = {}): Promise<{ ok: boolean; thumb?: string; body?: string; error?: string }> {
-  const [d] = await db.getAll<{ platform: string; media: string | null; body: string; channel_id: string; slug: string; workspace_id: string }>(
-    `select ci.platform, ci.media, ci.body, ci.channel_id, c.slug, c.workspace_id
-       from content_items ci join channels c on c.id = ci.channel_id
-      where ci.id = ? and ci.status = 'draft'`,
-    [itemId],
-  ).catch(() => []);
-  if (!d) return { ok: false, error: 'that draft isn’t available (already scheduled or gone)' };
-  const ch = { id: d.channel_id, slug: d.slug, workspace_id: d.workspace_id };
-  const agent = [...agents.values()].find((a) => a.role === 'marketer' && a.channels.has(ch.id))
-    ?? [...agents.values()].find((a) => a.role === 'orchestrator');
-  if (!agent) return { ok: false, error: 'no agent is running on this machine to draw it — is the workspace still starting?' };
-  const postCmd = async (cmd: unknown): Promise<boolean> => {
-    const r = await post('/v1/commands', { kind: 'agent', id: agent.id, role: agent.role }, cmd).catch(() => null);
-    return !!(r && (r as { ok?: boolean }).ok);
-  };
-  const designer = [...agents.values()].find((a) => a.role === 'designer' && a.channels.has(ch.id));
-  const { cred } = await designerImageCred(apiUrl, ch.workspace_id, designer, ownerActorId);
-  if (!cred) {
-    const why = 'no image key on this workspace — add one under Image generation';
-    await postCmd({ type: 'content.revise', item: itemId, imageError: why });
-    return { ok: false, error: why };
-  }
-  const brandFull = await brandTokensFor(db, ch.id);
-  const bits: BrandBits = { palette: brandFull.tokens.palette.map((c) => c.hex), fonts: brandFull.tokens.fonts, product: brandFull.product };
-  const seat = providerFor(agent.runtime) === cred.provider ? agent.model : (PACKS[cred.provider === 'openai' ? 'openai-core' : 'gemini-core']?.roles.marketer ?? '');
-  let brief = '';
-  try { brief = (JSON.parse(d.media ?? 'null') as { brief?: string } | null)?.brief ?? ''; } catch { /* none */ }
-  let body: string | undefined;
-  if (opts.rewrite) {
-    const raw = await textComplete(cred, seat, REWRITE_SYSTEM, rewriteAsk(d.body, d.platform, bits, opts.angle)).catch(() => '');
-    const rw = parseRewrite(raw);
-    if (!rw) return { ok: false, error: 'the rewrite came back unusable — try again' };
-    body = rw.body;
-    brief = rw.brief;
-    if (!(await postCmd({ type: 'content.revise', item: itemId, body, imageBrief: brief }))) return { ok: false, error: 'saving the rewrite didn’t stick — try again' };
-    console.log(`draft_rewrite agent=${agent.name} room=#${ch.slug} item=${itemId.slice(0, 8)}${opts.angle ? ' angled' : ''}`);
-  } else if (!brief) {
-    const raw = await textComplete(cred, seat, BRIEF_SYSTEM, briefAsk(d.body, d.platform, bits)).catch(() => '');
-    brief = raw.trim().replace(/^["'`]+|["'`]+$/g, '').split('\n')[0]!.slice(0, 400);
-    if (!brief) return { ok: false, error: 'couldn’t write an image brief from this post — try again' };
-    await postCmd({ type: 'content.revise', item: itemId, imageBrief: brief });
-  }
-  const out = await drawBriefed(agent, ch, itemId, d.platform, brief);
-  return out.ok ? { ok: true, thumb: out.thumb, body } : { ok: false, body, error: out.error };
-}
+// the button's draw and the marker's answer (host/drawdraft.ts): one draw, whoever pressed Generate
+const { drawBriefed, draftImageFor, drawOnAsk } = makeDraw({
+  agents, db, post, paint: generateBrandImage, complete: textComplete, brandOf: (channelId) => brandTokensFor(db, channelId),
+  imageCred: async (ch) => (await designerImageCred(apiUrl, ch.workspace_id, [...agents.values()].find((a) => a.role === 'designer' && a.channels.has(ch.id)), ownerActorId)).cred,
+});
 /**
  * Draw ONE image for the CONVERSATION itself — no draft, no card (article round, 2026-08-19).
  *
@@ -313,19 +236,13 @@ async function draftsForAnchor(
   taskId: string | null,
   threadId: string | null,
 ): Promise<{ posts: DraftRow[]; msgAnchor: { taskId: string } | { threadId: string } } | null> {
-  const anchor = taskId
-    ? { col: 'task_id', id: taskId, msgAnchor: { taskId } as const }
-    : threadId
-      ? { col: 'thread_id', id: threadId, msgAnchor: { threadId } as const }
-      : null;
-  if (!anchor) return null;
-  const rows = await db.getAll<Omit<DraftRow, 'letter'>>(
-    `select id, platform, body, status, scheduled_at from content_items where ${anchor.col} = ? order by created_at asc`,
-    [anchor.id],
-  ).catch(() => [] as Array<Omit<DraftRow, 'letter'>>);
+  const msgAnchor = taskId ? { taskId } : threadId ? { threadId } : null;
+  if (!msgAnchor) return null;
+  // a schedule's session letters each run from a: the newest run's cards (host/runwindow.ts runDrafts)
+  const rows = await runDrafts<Omit<DraftRow, 'letter'>>(db, { taskId, threadId }, 'id, platform, body, status, scheduled_at');
   // letter BEFORE any status filter: a published post still holds its letter on screen, so
   // filtering first would silently re-letter the rest and schedule the wrong card.
-  return { posts: rows.map((p, i) => ({ ...p, letter: String.fromCharCode(97 + i) })), msgAnchor: anchor.msgAnchor };
+  return { posts: rows.map((p, i) => ({ ...p, letter: String.fromCharCode(97 + i) })), msgAnchor };
 }
 // Build the ```nmq body for a schedule-confirm card: the custom renderer draws the per-post slots
 // and a single Confirm that applies content.approve/unschedule as the HUMAN; the options are the
@@ -348,5 +265,5 @@ function buildScheduleCard(action: 'schedule' | 'unschedule', items: Array<{ ite
   return `\`\`\`nmq\n${JSON.stringify(q)}\n\`\`\``;
 }
 
-  return { buildScheduleCard, draftImageFor, draftsForAnchor, generateDraftImage, generateShareImage, orchSpawnFor, reviseContentDrafts, threadTranscript };
+  return { buildScheduleCard, draftImageFor, draftsForAnchor, drawOnAsk, generateDraftImage, generateShareImage, orchSpawnFor, reviseContentDrafts, threadTranscript };
 }

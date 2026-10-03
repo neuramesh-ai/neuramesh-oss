@@ -10,6 +10,7 @@
 
 import { drainQuery, claudeAgentPrompt, partialMessages } from './turnkit';
 import { claudePathOption, providerEnv, providerFor, sandboxFsEnabled, type AgentAttachment } from '../runtime/adapter';
+import { claudeEffort } from '../runtime/thinking';
 import { claudeSandboxOptions, computeFsJail } from '../sandbox/fsjail';
 import { ORCH_EMPTY_TURN } from '../replypolicy';
 import { type WhiteboardToolClosures } from '../harness/toolbus';
@@ -28,6 +29,8 @@ import type { HostCtx } from './ctx';
 import type { DraftRow } from './orchtools';
 import { makeChatSupport } from './chatsupport';
 import { makeChatTools } from './chattools';
+import { WEB_TOOL_NAMES } from '../runtime/nmtools-web';
+import { browserService } from '../browser/registry';
 
 export function makeChatTurn(ctx: HostCtx & {
   db: import('@powersync/node').PowerSyncDatabase;
@@ -134,12 +137,13 @@ async function chatTurn(args: {
         ...jail,
         env: providerEnv('anthropic', token),
         model: agent.model,
+        ...claudeEffort(agent),
         maxTurns: 24,
         mcpServers: { nm },
         // AVAILABILITY is `tools` (the #1010 lesson — allowedTools only auto-permits). The
         // preset pins the standard toolset; the allowlist is what runs without a prompt.
         tools: { type: 'preset' as const, preset: 'claude_code' as const },
-        allowedTools: ['WebSearch', 'WebFetch', 'Read', 'Write', 'Edit', 'Glob', 'Grep', 'Bash', 'TodoWrite', 'mcp__nm__recall', 'mcp__nm__load_skill', 'mcp__nm__list_playbooks', 'mcp__nm__create_whiteboard', 'mcp__nm__update_whiteboard', 'mcp__nm__list_whiteboards', 'mcp__nm__read_whiteboard', 'mcp__nm__draft_posts', 'mcp__nm__revise_posts', 'mcp__nm__generate_image', 'mcp__nm__search_x'],
+        allowedTools: ['WebSearch', 'WebFetch', 'Read', 'Write', 'Edit', 'Glob', 'Grep', 'Bash', 'TodoWrite', 'mcp__nm__recall', 'mcp__nm__load_skill', 'mcp__nm__list_playbooks', 'mcp__nm__create_whiteboard', 'mcp__nm__update_whiteboard', 'mcp__nm__list_whiteboards', 'mcp__nm__read_whiteboard', 'mcp__nm__draft_posts', 'mcp__nm__revise_posts', 'mcp__nm__generate_image', 'mcp__nm__search_x', ...(browserService() ? WEB_TOOL_NAMES.map((n) => `mcp__nm__${n}`) : [])],
         permissionMode: 'bypassPermissions',
         // the same policy engine a worker runs under — PreToolUse fires even under
         // bypassPermissions, so a shell call in a chat is gated exactly as one in a task

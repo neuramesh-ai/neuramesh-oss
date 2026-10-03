@@ -50,7 +50,7 @@ import { modelpackCommands } from './handler/modelpack';
 import { policyCommands } from './handler/policy';
 import { projectCommands } from './handler/project';
 import { repoCommands } from './handler/repo';
-import { scheduleCommands } from './handler/schedule';
+import { scheduleCommands } from './handler/schedule';   import { replyCommands } from './handler/replies';
 import { setupCommands } from './handler/setup';
 import { skillCommands } from './handler/skill';
 import { skillpackCommands } from './handler/skillpack';
@@ -105,7 +105,7 @@ export async function executeCommand(
   { const r = await repoCommands(store, actor, cmd); if (r !== undefined) return r; }
   { const r = await projectCommands(store, actor, cmd); if (r !== undefined) return r; }
   { const r = await threadCommands(store, actor, cmd); if (r !== undefined) return r; }
-  { const r = await scheduleCommands(store, actor, cmd); if (r !== undefined) return r; }
+  { const r = await scheduleCommands(store, actor, cmd); if (r !== undefined) return r; }   { const r = await replyCommands(store, actor, cmd); if (r !== undefined) return r; }
   { const r = await contentCommands(store, actor, cmd); if (r !== undefined) return r; }
   { const r = await connectorCommands(store, actor, cmd); if (r !== undefined) return r; }
   { const r = await marketingCommands(store, actor, cmd); if (r !== undefined) return r; }

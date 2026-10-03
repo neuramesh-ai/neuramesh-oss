@@ -9,7 +9,7 @@ import { type PostVCard } from '../thread/parts';
 import { useEffect, useState } from 'react';
 import { nm as nmBridge } from '../bridge/nm';
 import { cardParts, filmFacts, filmFile, filmSeconds, filmingOn, type CardMedia, type StarterVideoCatalog } from './cardparts';
-import { filmMinutes } from '@neuramesh/shared';
+import { draftLetters, filmMinutes } from '@neuramesh/shared';
 import { useFilm } from './FilmPreview';
 import { openCredits } from '../settings/ConnectionsList';
 
@@ -24,15 +24,17 @@ export function useStarterVideo(): StarterVideoCatalog {
   return cat;
 }
 
-export function postCardsFrom(items: ContentItemRow[], rows: ReadonlyArray<{ body: string; created_at: string }>): PostVCard[] {
+/** `runStarts`: a schedule's session restarts its letters at each run's opener (shared draftLetters) */
+export function postCardsFrom(items: ContentItemRow[], rows: ReadonlyArray<{ body: string; created_at: string }>, runStarts: readonly string[] = []): PostVCard[] {
   // A draft's ORIGINAL version + its replaced history land in ONE delivery strip (they were
   // handed over together); a targeted REVISION rides its own card after the reply that asked
   // for it (the ‹revised:id› marker carries that time).
   const revisedAt = new Map<string, number>();
   for (const m of rows) { const mk = /‹revised:([^›]+)›/.exec(m.body); if (mk) for (const id of mk[1]!.split(',')) revisedAt.set(id.trim(), new Date(m.created_at).getTime() + 1); }
   const cards: PostVCard[] = [];
-  [...items].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()).forEach((it, i) => {
-    const letter = String.fromCharCode(97 + i);
+  const letters = draftLetters(items, runStarts);
+  [...items].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()).forEach((it) => {
+    const letter = letters.get(it.id)!;
     const media = ((): { history?: Array<{ body: string; brief?: string; script?: string; thumb?: string; at: string }>; revised_at?: string } => { try { return JSON.parse(it.media ?? '{}') as never; } catch { return {}; } })();
     const history = media.history ?? [];
     history.forEach((h, vi) => cards.push({

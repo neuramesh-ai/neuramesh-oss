@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { CREDIT_PACKS, MAX_PACK_CREDITS, MIN_PACK_CREDITS, attachmentLimits, authDecisionQuestion, commRulesFrom, createEvent, DESIGN_PROVIDER_QUESTION, DESKTOP_AUTH_TTL_MS, formatAddress, parseAuthCard, parseCard, parseQuestions, readAnswers, RETRO_RANGES, scrubEmdash, usdForCredits, WB_SCENE_MAX, WB_SNAPSHOT_MAX, WB_TITLE_MAX, type Actor, type RetroRange } from '@neuramesh/shared';
+import { CREDIT_PACKS, MAX_PACK_CREDITS, MIN_PACK_CREDITS, attachmentLimits, authDecisionQuestion, commRulesFrom, createEvent, DESIGN_PROVIDER_QUESTION, DESKTOP_AUTH_TTL_MS, formatAddress, parseAuthCard, parseCard, parseQuestions, readAnswers, repairCardFences, RETRO_RANGES, routineCardGuard, routineDecisionQuestion, scrubEmdash, usdForCredits, WB_SCENE_MAX, WB_SNAPSHOT_MAX, WB_TITLE_MAX, type Actor, type RetroRange } from '@neuramesh/shared';
 import { Hono } from 'hono';
 import { cronRoutes } from './cron-routes';
 import { announceClaimRoute, announceRoutes } from './announce';
@@ -27,6 +27,7 @@ import { DomainError } from './errors';
 import { exportRoutes } from './export';
 import { importRoutes } from './import';
 import { contentMediaRoute } from './content-media-route';
+import { webFrameRoute } from './web-frame';
 import { filmsCronRoute, starterVideoRoutes } from './starter-video';
 import { executeCommand } from './handler';
 import { hostedFreeGate } from './hosted-gate';
@@ -70,6 +71,9 @@ const MessageInputSchema = z.object({
   // the message this reply ANSWERS (agent wake replies) — the server enforces one
   // reply per (agent, trigger) so concurrent daemons can't double-reply (0060).
   replyTo: z.string().uuid().optional(),
+  // the routine writer: set by propose_routine and offer_routine_session only, never by an agent's words. An
+  // agent's routine card without it is dropped (routineCardGuard), so the tools' checks cannot be skipped
+  routineCard: z.literal(true).optional(),
 });
 
 // Chat attachment forwarded by the desktop's PowerSync uploadData. The full bytes stay on the
@@ -561,6 +565,7 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
   importRoutes(app, store); // POST /v1/workspaces/:id/import/batches, owner only, cloud target only (import.ts)
   announceClaimRoute(app, store, opts.announce); // POST /v1/announce/:id/claim — the signed-in save, plus the GitHub connector's /v1 lane (announce.ts → github-connect.ts)
   contentMediaRoute(app, store); // GET /v1/content/media/:id — a draft's film or picture for the card, members only
+  webFrameRoute(app); // GET /v1/web/frame: may the web client frame this page? (web-frame.ts)
   starterVideoRoutes(app, store, opts.starterVideo); // GET /v1/starter/video + POST /v1/starter/film — the video rung on credits (starter-video.ts)
 
   app.post('/v1/commands', async (c) => {
@@ -590,7 +595,9 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
    * an ordinary user — who has no X developer app — get real posts by clicking Connect once.
    *
    * Scoped by CHANNEL → project (0106), identically to `publishDueItems`, so what an agent can
-   * read matches what its room could publish as. `max` is clamped: every call bills our X app.
+   * read matches what its room could publish as. `max` is clamped to X's page (10 to 100): every post
+   * read bills our X app. `order` is top (X's relevancy ranking, returned by impressions) unless it
+   * says latest, and `hours` sets the window (connectors-x.ts XSearchOpts).
    */
   app.get('/v1/x/search', async (c) => {
     const workspace = c.req.query('workspace');
@@ -600,12 +607,14 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
       return c.json({ error: 'x is not configured on this server', code: 'NOT_CONFIGURED' }, 501);
     }
     const channel = c.req.query('channel') ?? null;
-    const max = Math.min(25, Math.max(10, Number(c.req.query('max') ?? 10) || 10));
+    const max = Math.min(100, Math.max(10, Number(c.req.query('max') ?? 25) || 25));
+    const order = c.req.query('order') === 'latest' ? 'latest' : 'top';
+    const hours = Number(c.req.query('hours')) || 0;
     // token custody, rotation-at-refresh, and the dead-grant → RECONNECT_REQUIRED verdict all
     // live in xSearchOnConnector — this route only maps its outcomes onto HTTP statuses
-    const out = await xSearchOnConnector(store, workspace, channel, q, max);
+    const out = await xSearchOnConnector(store, workspace, channel, q, max, undefined, { order, ...(hours > 0 ? { hours } : {}) });
     if (!out.ok) return c.json({ error: out.error, code: out.code }, out.code === 'X_ERROR' ? 502 : 409);
-    return c.json({ query: q, hits: out.hits });
+    return c.json({ query: q, order, hits: out.hits });
   });
 
   app.post('/v1/messages', async (c) => {
@@ -617,11 +626,13 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
     // (docs/design/agent-comm-rules-2026-08 slice 3): with noEmdash on, agent-authored
     // prose is scrubbed fence-aware — quoted code stays untouched by construction.
     // Humans are never rewritten; a failed rules read fails open to the raw body.
+    const said = actor.kind === 'agent' ? routineCardGuard(repairCardFences(parsed.data.body), parsed.data.routineCard === true) : parsed.data.body;
+    if (!said.trim() && parsed.data.body.trim()) return c.json({ error: 'a routine card comes only from propose_routine', code: 'INVALID_INPUT' }, 422);
     const styledBody = actor.kind === 'agent'
       ? await store.getCommRules(parsed.data.workspace)
-          .then((r) => (commRulesFrom(r).noEmdash ? scrubEmdash(parsed.data.body) : parsed.data.body))
-          .catch(() => parsed.data.body)
-      : parsed.data.body;
+          .then((r) => (commRulesFrom(r).noEmdash ? scrubEmdash(said) : said))
+          .catch(() => said)
+      : said;
     const msg = {
       id: parsed.data.id ?? crypto.randomUUID(),
       workspace: parsed.data.workspace,
@@ -682,6 +693,9 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
     // A card that RECORDS a switch a routine already made asks nothing, and mints nothing.
     const auth = actor.kind === 'agent' && !inChatThread ? parseAuthCard(styledBody) : null;
     if (auth && !auth.switched) decisions.push({ id: crypto.randomUUID(), question: authDecisionQuestion(auth), options: [], allowOther: true });
+    // a routine draft waits on its person too (the routine writer): Schedule it, or Update for the routine the session runs
+    const routineQ = actor.kind === 'agent' && !inChatThread && msg.threadId && styledBody.includes('```nmroutine') ? routineDecisionQuestion(styledBody, !!(await store.threadFiling(msg.workspace, msg.threadId))?.scheduleId) : null;
+    if (routineQ) decisions.push({ id: crypto.randomUUID(), question: routineQ, options: [], allowOther: true });
     try {
       // Mobile and older clients post the rendered `question → answer` reply
       // without calling decision.answer first. Resolve the design-provider card

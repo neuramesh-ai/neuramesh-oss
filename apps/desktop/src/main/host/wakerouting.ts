@@ -12,7 +12,7 @@ import type { HostedAgent, ThreadTask } from '../agents';
 import { pickDeadLetters, type SweepCandidate } from '../chatsweep';
 import { HIRE_CONFIRM_RE } from '../hirecards';
 import { type RunHandle } from './runs';
-import { addressedIn, hostSpeaksForOrigin, isCodingThread, mentionRe, modelFreeItemId, nobodyCanServe, parseCard, parseKindMarker, parseModeMarker, unaddressedWake } from '@neuramesh/shared';
+import { addressedIn, hostSpeaksForOrigin, isCodingThread, isRoutineScheduledMarker, mentionRe, modelFreeItemId, nobodyCanServe, parseCard, parseKindMarker, parseModeMarker, unaddressedWake } from '@neuramesh/shared';
 import type { PowerSyncDatabase } from '@powersync/node';
 import type { ClaimVerdict, MachineCapability, SessionOrigin } from '@neuramesh/shared';
 import type { HostGuards } from './guards';
@@ -204,7 +204,7 @@ export function makeWakeRouting(ctx: {
     }
     // docs/34: the Tasks toggle's own line in the transcript. It is a RECORD of the flip, not a
     // message to anyone — waking on it would answer a divider.
-    if (parseModeMarker(m.body) || parseKindMarker(m.body)) { processed.add(m.id); return; } // …and the kind flip's line (0144), the same record-not-message
+    if (parseModeMarker(m.body) || parseKindMarker(m.body) || isRoutineScheduledMarker(m.body)) { processed.add(m.id); return; } // …and the kind flip's line (0144), and the routine's divider: the same record-not-message
     // round 9: "nudge me here" is WIRED — a human reply in a marketing room's bootstrap
     // thread finishes any MISSING brand docs instead of a generic chat turn. With the set
     // complete, the reply falls through to the ordinary wake (post-bootstrap Q&A).
@@ -329,9 +329,11 @@ export function makeWakeRouting(ctx: {
     if (!target) {
       // policy lives in shared/threadwake.ts so a missing state is a failing test, not a
       // silently dropped human message (that is how the design gate went unanswered)
-      const who = unaddressedWake(t.state, t.kind);
-      if (who === 'orchestrator') target = [...agents.values()].find((a) => a.role === 'orchestrator' && a.channels.has(t.channel_id));
-      else if (who === 'assignee' && t.assignee_kind === 'agent' && t.assignee_id) target = agents.get(t.assignee_id);
+      // …and a draw or a film is a button that needs a hand in ANY state: a person holding the work
+      // cannot draw, so the coordinator takes it (2026-09-27)
+      const who = unaddressedWake(t.state, t.kind, modelFreeItemId(m.body) !== null);
+      if (who === 'assignee' && t.assignee_kind === 'agent' && t.assignee_id) target = agents.get(t.assignee_id);
+      else if (who === 'orchestrator' || (who === 'assignee' && modelFreeItemId(m.body))) target = [...agents.values()].find((a) => a.role === 'orchestrator' && a.channels.has(t.channel_id));
     }
     if (!target) return;
     execQueue.run({ key: `thread:${m.id}:${target.id}`, kind: 'chat', cause: 'message', agentId: target.id, subject: { kind: 'task', number: t.number } }, () => wakeThread(target, m, t));

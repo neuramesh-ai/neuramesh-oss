@@ -151,6 +151,17 @@ export interface XSearchHit {
   url: string;
 }
 
+/** How a search reads (George, 2026-10-02: "it's not returning posts with the highest engagement or
+ * impressions"). X's default order is the newest first, so a routine read the newest page and missed
+ * every popular post from earlier in the window. `top` asks X for its relevancy ranking (keyword match,
+ * engagement, author reach, age) and returns the page by impressions, then likes. `latest` keeps X's
+ * newest-first order. `hours` sets the window (start_time). No X operator filters impressions. */
+export interface XSearchOpts { order?: 'top' | 'latest'; hours?: number }
+
+/** more reach first: impressions (a post X gave none for goes last), then likes */
+const byReach = (a: XSearchHit, b: XSearchHit): number =>
+  (b.metrics?.impressions ?? -1) - (a.metrics?.impressions ?? -1) || (b.metrics?.likes ?? 0) - (a.metrics?.likes ?? 0);
+
 /** Recent search (last 7 days) on a user-context token. Returns hits plus a re-sealed bundle
  * when the token had to refresh — the caller persists it, exactly like `xPoster` does. `persist`
  * additionally lands the rotation the MOMENT it happens, so a search that fails after a
@@ -161,6 +172,7 @@ export async function xSearchRecent(
   max: number,
   fetchFn: typeof fetch = fetch,
   persist?: (t: TokenBundle) => Promise<void>,
+  opts: XSearchOpts = {},
 ): Promise<{ hits: XSearchHit[]; secretPatch?: TokenBundle }> {
   let t = tokens;
   let refreshed = false;
@@ -170,6 +182,9 @@ export async function xSearchRecent(
     u.searchParams.set('query', query);
     // X's floor is 10; asking for less is a 400 rather than a smaller bill
     u.searchParams.set('max_results', String(Math.min(100, Math.max(10, max))));
+    u.searchParams.set('sort_order', opts.order === 'latest' ? 'recency' : 'relevancy');
+    // X takes a start_time inside the last 7 days only: 167 hours keeps a margin, in X's own format (no milliseconds)
+    if (opts.hours) u.searchParams.set('start_time', new Date(Date.now() - Math.min(167, Math.max(1, opts.hours)) * 3_600_000).toISOString().replace(/\.\d{3}Z$/, 'Z'));
     u.searchParams.set('tweet.fields', 'created_at,public_metrics,author_id');
     u.searchParams.set('expansions', 'author_id');
     u.searchParams.set('user.fields', 'username,name');
@@ -207,7 +222,7 @@ export async function xSearchRecent(
       url: u?.username ? `https://x.com/${u.username}/status/${d.id}` : `https://x.com/i/web/status/${d.id}`,
     };
   });
-  return { hits, ...(refreshed ? { secretPatch: t } : {}) };
+  return { hits: opts.order === 'latest' ? hits : [...hits].sort(byReach), ...(refreshed ? { secretPatch: t } : {}) };
 }
 
 /** The whole read, store-side: resolve the room's connector, search on it, persist any token
@@ -230,6 +245,7 @@ export async function xSearchOnConnector(
   query: string,
   max: number,
   fetchFn: typeof fetch = fetch,
+  opts: XSearchOpts = {},
 ): Promise<{ ok: true; hits: XSearchHit[] } | { ok: false; code: 'NOT_CONNECTED' | 'RECONNECT_REQUIRED' | 'X_ERROR'; error: string }> {
   const conn = await store.connectorWithSecret(workspace, 'x', channel);
   if (!conn?.ciphertext) return { ok: false, code: 'NOT_CONNECTED', error: 'no X account is connected for this room' };
@@ -241,7 +257,7 @@ export async function xSearchOnConnector(
   if (conn.status !== 'connected') return reconnect;
   const persist = (b: TokenBundle) => store.setConnectorSecret(conn.id, seal(b));
   const run = async (ciphertext: string): Promise<{ ok: true; hits: XSearchHit[] }> => {
-    const out = await xSearchRecent(unseal<TokenBundle>(ciphertext), query, max, fetchFn, persist);
+    const out = await xSearchRecent(unseal<TokenBundle>(ciphertext), query, max, fetchFn, persist, opts);
     if (out.secretPatch) await store.setConnectorSecret(conn.id, seal(out.secretPatch));
     return { ok: true, hits: out.hits };
   };

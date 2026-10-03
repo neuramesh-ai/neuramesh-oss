@@ -9,6 +9,8 @@ import { styled } from '../housestyle';
 import type { LogFn } from '../agentlog';
 import { xResearchNote } from '../agents';
 import { brandNote } from './brandnote';
+import { isRoutineThread } from './routinerule';
+import { previousRunNote, scheduleOfThread } from './runwindow';
 import type { HostedAgent, SkillRef } from '../agents';
 import { contractFor } from '../contracts';
 import { HIRE_CARD_SPEC } from '../hirecards';
@@ -21,6 +23,19 @@ import type { makeRuns } from './runs';
 import type { makeOrchTools } from './orchtools';
 import type { makeContent } from './content';
 import type { makeWorkspace } from './workspace';
+
+// ROUTINE wakes (0119 · 2026-08-19, founder report): a thread an automation opened runs
+// HANDS-OFF — the server births any task from it pre-approved (no plan gate, auto-accept on
+// done, a "finished" push). The turn must know, or rex phrases its digest as "awaiting your
+// review" for a gate that will never exist.
+export const ROUTINE_NOTE = `\n\n[ROUTINE RUN — this conversation was opened by a scheduled automation, and it runs HANDS-OFF: any task you create here starts immediately (the plan is auto-approved, a declared design round is auto-approved the moment the designer proposes it, review still runs, and the human is notified when it finishes — they are NOT in the loop). Create the tracked work with a full plan and a pre-named owner, phrase your reply as "started", and never ask for approval or say you are waiting on review. When the run drafts replies to posts, hand them over with draft_replies (the reply card), never as a list in your reply.]`;
+
+/** the routine note for this wake's conversation, or ''. only a ROUTINE's session gets it (2026-09-27): a
+ *  content schedule's session keeps its person, and the server births a unit there gated, so the note
+ *  would promise work that waits on them (host/routinerule.ts) */
+export async function routineNoteFor(db: { getAll: <T>(sql: string, params?: unknown[]) => Promise<T[]> }, convoThreadId: string | null): Promise<string> {
+  return (await isRoutineThread(db, convoThreadId)) ? ROUTINE_NOTE : '';
+}
 
 export function makeOrchTurn(ctx: {
   db: PowerSyncDatabase;
@@ -186,17 +201,12 @@ export function makeOrchTurn(ctx: {
     // no runtime gate: a codex/agy orchestrator gets the same tool the anthropic one does.
     const xResearchContext = xResearchNote(xPublishConnected);
 
-    // ROUTINE wakes (0119 · 2026-08-19, founder report): a thread an automation opened runs
-    // HANDS-OFF — the server births any task from it pre-approved (no plan gate, auto-accept on
-    // done, a "finished" push). The turn must know, or rex phrases its digest as "awaiting your
-    // review" for a gate that will never exist. Appended, not a ${var}, same contract-age rule
-    // as xResearchContext above.
-    const [routineRow] = convoThreadId
-      ? await db.getAll<{ schedule_id: string | null }>('select schedule_id from threads where id = ?', [convoThreadId]).catch(() => [] as Array<{ schedule_id: string | null }>)
-      : [];
-    const routineContext = routineRow?.schedule_id
-      ? `\n\n[ROUTINE RUN — this conversation was opened by a scheduled automation, and it runs HANDS-OFF: any task you create here starts immediately (the plan is auto-approved, a declared design round is auto-approved the moment the designer proposes it, review still runs, and the human is notified when it finishes — they are NOT in the loop). Create the tracked work with a full plan and a pre-named owner, phrase your reply as "started", and never ask for approval or say you are waiting on review.]`
-      : '';
+    // ROUTINE wakes: appended, not a ${var}, same contract-age rule as xResearchContext above
+    const routineContext = await routineNoteFor(db, convoThreadId);
+    // one session per routine (host/runwindow.ts): the transcript starts at this run's opener, so the
+    // previous run rides as one line, and the session keeps its schedule's title (the server names it)
+    const runContext = await previousRunNote(db, convoThreadId);
+    const namedBySchedule = !!(await scheduleOfThread(db, convoThreadId));
 
     // THE CONTRACT, not a literal. defaults/agents/orchestrator.yaml is the authoritative
     // statement of this agent's behaviour; this reads it. A machine-local copy overrides it
@@ -209,7 +219,7 @@ export function makeOrchTurn(ctx: {
 
     // conversation threads carry a provisional heuristic title until the orchestrator
     // names them — the instruction rides only on convo wakes (the tool is gated the same)
-    const convoNamer = convoThreadId
+    const convoNamer = convoThreadId && !namedBySchedule
       ? `\n\nThis exchange lives in a conversation thread whose provisional title is the human's first message, near-verbatim. Once you understand the topic — normally in this first reply — call set_thread_title ONCE with a clean 2–6 word title (what it's ABOUT, e.g. "Backlog check-in", never their words echoed back), plus a one-line description when the title alone is thin. Don't rename it again unless the human asks.`
       : '';
 
@@ -233,7 +243,7 @@ export function makeOrchTurn(ctx: {
       'agent.name': agent.name, 'ch.slug': ch.slug, projLine, powers, style,
       skillsNote, convoNamer, marketingNote, marketingSchedulingContext,
       HIRE_CARD_SPEC,
-    }) + xResearchContext + routineContext;
+    }) + xResearchContext + routineContext + runContext;
 
     // the task-thread turn is a contract block too (2026-08-18) — behaviour that cannot be read
     // cannot be reviewed, which is how the old literal kept a retired tool name for a week.
@@ -250,7 +260,7 @@ export function makeOrchTurn(ctx: {
     // The token is whatever resolveToken returned for the agent's provider (our free GEMINI_API_KEY
     // by default for a Gemini orchestrator; the user's subscription/key once they change the model).
     const args: OrchTransportArgs = {
-      model: agent.model, token, systemPrompt: styled(threadPrompt), transcript, tools: otools, log, attachments, onDelta,
+      model: agent.model, thinking: agent.thinking ?? null, token, systemPrompt: styled(threadPrompt), transcript, tools: otools, log, attachments, onDelta,
       // The turn used to run in os.tmpdir() with no file tools at all, which is why an
       // orchestrator asked to write a document truthfully said it could not. This is the SAME
       // directory its subagents work in (ensureChatWorkspace), so a file a leg produces is one

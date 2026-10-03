@@ -157,3 +157,128 @@ that was never observed is where both bugs were, and they compound:
 The lesson for this doc's own "proven up to the machine" line: a lane that ends at a machine is not
 proven until a machine runs it. The 401 was visible in the pod logs for a day as a 5-second
 `refresh_block` loop before the calendar made it a user-facing bug.
+
+## Amendment 2026-09-27: every draft has a place to ask, and the marker writes the brief
+
+George, on the web and the phone: "i get this error if i ask to generate an image on a draft", with
+the card's strip "No image: this draft has no conversation to ask in". Three gaps stood behind it.
+
+1. **A draft with no conversation.** The scheduled draft run (`host/schedules.ts`) saves each
+   draft with a schedule id only, so the tab had no thread to ask in and refused.
+2. **A task draft.** The tab read `threads.task_id`, which only the old chat-to-task upgrade
+   writes. Plan-first units anchor through `tasks.origin_thread_id`, so most task drafts had no
+   thread row to find either.
+3. **A draft with no brief.** The machine answered the marker with `generateDraftImage`, which
+   refuses a draft with no brief. This round's own ruling above called that refusal "right for a
+   conversation and wrong for a button". The marker is now only ever a button (the tab, the
+   phone, the thread card), so the marker runs the button's draw.
+
+The fix, one rule per gap:
+
+- **Where the ask lands** (`apps/hq/web/webnm-content.ts`, `apps/mobile/src/post-sheet.tsx`): a
+  thread draft asks in its thread. A task draft asks on its task, as the task card's own button
+  does. A draft with neither gets a home: the ask opens a session in the draft's room over HTTP,
+  then the new human-only command `content.anchor` moves the draft into it. Only a draft with no
+  thread and no task moves, and only into a conversation in its own room
+  (`store/content-anchor.ts`). The card then shows in that session, and the next ask lands there.
+- **The ask's words** (`drawAsk`, `@neuramesh/shared` images.ts): the first paragraph names the
+  draft by its first sentence, so the session it opens takes a readable title. The marker rides a
+  paragraph of its own.
+- **The machine's answer** (`host/drawdraft.ts`): the marker runs `drawDraft`, the calendar
+  button's own draw. A draft with no brief gets one written from its post first, and a reason the
+  draft carried is cleared before the draw, so a retry that fails the same way is a new outcome.
+  A draw runs no model, so neither wake path asks the seat's login for it. A task-draft ask wakes
+  the orchestrator in any state where no agent holds the work (`unaddressedWake`).
+- **The wait** (`apps/hq/src/marketing/drawwait.ts`): the tab's modal waits for the outcome, a
+  new thumb or the machine's reason, and never for the first change on the row. The brief now
+  lands first, and a modal that stopped there never showed the picture.
+- **The phone** (`canDrawPicture`): the button shows on every draft but a video post. Before, it
+  needed a brief and a thread or task, so a scheduled draft had no button at all.
+
+A fourth gap showed up only in the end-to-end run, which is why the run matters:
+
+4. **A cloud machine had no picture to show.** The machine wrote the brief, and the image model
+   returned a picture, but the draw still ended "the image came back empty". `imagegen.ts` made
+   the card's thumb, the publish copy and the shelf copy with Electron's `nativeImage`, and a cloud
+   machine runs the daemon without Electron (`import('electron')` throws there). So every picture a
+   cloud machine drew came back empty: draft images, `share_images` and product shots. The three
+   copies now share one resize step. The desktop keeps `nativeImage`, and a machine takes
+   `imagecodec.ts`: PNG and JPEG decode (pngjs, jpeg-js, both pure JS), an area-average downscale,
+   and a JPEG encode.
+
+### Evidence (2026-09-27, the local web + cloud harness)
+
+A cloud machine in k3d ran this checkout's daemon image, the API ran this checkout on the port the
+machine dials, and the browser client and the phone ran this checkout too. Each run seeds a draft
+the way the scheduled draft run makes one: no thread, no task, no brief.
+
+- **Web** (`scripts/capture-draft-image.mjs`, real Chrome over CDP, both themes): the calendar
+  modal before (`evidence/1-draft-no-home-*`), the ask (`2-asked-*`), the machine's picture in the
+  modal (`3-outcome-*`, drawn on gemini-3.1-flash-image with a brief the machine wrote), and the
+  session the ask opened with the card and rex's reply (`4-session-*`). No login notice appears.
+- **Phone** (iOS simulator, Paper and Graphite): the sheet offers Generate a picture on the same
+  kind of draft (`5-phone-draft-*`), and the picture lands on the open sheet with Open the room now
+  shown (`6-phone-drawn-*`).
+- **Before the image swap**, the same web ask reached the old machine image, which answered with
+  a seat-login notice and "That draft has no image brief to draw from". That is the reported bug,
+  reproduced end to end.
+
+What ships when: the command, the tab and the modal ship on merge. The phone ships on its next
+build. The machine half (the brief, the wake rule and the codec) reaches the cloud machines on the
+next `fleet-vN` tag, and desktops on the next desktop release. Until the tag, a draft with no brief
+still gets the old refusal, and a cloud draw still ends empty.
+
+## Amendment 2026-09-27 (later): the brief shows, and the wait draws in dots
+
+George, on the live web app after `fleet-v2`: "it just keeps spinning forever", "when we click on
+generate image, it should generate a brief for the image", "find a nice way to show the image
+description or brief in the drafts preview", and "improve the image generation animation … a dotted
+generator animation … similar to the one we use for the in-chat generation". His test ran during the
+fleet roll, so the old machine image answered it (a draft with no brief, refused, no reason on the
+row). The new image writes the brief first, and production drew with it the same hour. The floor did
+not show any of that, so this round makes it visible.
+
+- **One frame** (`apps/hq/src/marketing/ImageFloor.tsx`): the picture, or the dashed invitation, or
+  the dot field while the machine works, with the brief at its foot in the thread card's own words
+  ("image brief"). Past three lines the brief scrolls. Two `local` covers ride the text and hide two
+  `scroll` shades, so a shade shows only where more text is. A draft with no brief says so and says
+  that Generate image writes one.
+- **The dot field** (`DotField`): the dots that pulse in the drafts strip (`mkdot-pulse`,
+  DraftingCard), grown to the picture's footprint, 28 by 14. Each delay walks the dot's diagonal, so one wave
+  crosses the field per pulse. The thread card's "drawing…" box wears the same field. It is the
+  picture's placeholder, not agent liveness, so the orb ruling (docs/33 §7) does not apply, and it is
+  the surface's one heartbeat: the ticker dot, the brief's placeholder bars and a rewrite's ghost
+  lines do not move.
+- **Two steps** (`usedraw.ts`, `drawwait.ts freshBrief`): the poll shows the brief the moment the
+  machine writes it, and the ticker moves from "writes the image brief from the post" to "draws the
+  picture from the brief". A rewrite shows ghost lines until its new post and brief land.
+- **The modal stays open** when the picture lands. A conversation closes the modal on `onChanged`,
+  so the draw's own wait no longer calls it: every list polls itself. A second draw while the modal
+  stays open waits for a picture newer than the first one, not newer than the snapshot it opened with.
+- **A failure before the draw goes on the card** (`host/drawdraft.ts`): a brief the model leaves
+  empty, and a rewrite that comes back unusable or does not save, now write the reason to the row,
+  so a tab and a thread card stop their wait. Before, the reason went only into the thread reply,
+  and the tab waited three minutes.
+- **Not in this round:** the desktop's own floor (the desktop takes a web feature when someone ports
+  it), Instagram and TikTok previews (no floor there), and a retry that fails the same way within
+  a second (the poll may not see the cleared reason, so the tab shows its three-minute line).
+
+Two fixes from the same report are in this round too. A card that only records a brain switch
+(the routine fallback, `switched: true`) sends no push, as it already mints no needs-you item
+(`push.ts`). The phone's bubble drops the machine markers, so the phone's own draw no longer prints
+`‹gen-image:…›` under its words (`apps/mobile/src/card-strip.ts`).
+
+### Evidence (2026-09-27, later)
+
+- **Web, live** (`scripts/capture-draft-image.mjs`, the same harness: a k3d cloud machine on the #661
+  image, this checkout's API and browser client, real Chrome, both themes): `floor-1-no-brief-*` (a
+  draft with no brief), `floor-2-brief-step-*` (the dots and step 1), `floor-3-picture-step-*` (the
+  brief the machine wrote shows, step 2), `floor-4-landed-*` (the picture with its brief) and
+  `floor-5-session-*` (the card in the session the ask opened). The machine wrote the brief, then
+  drew on gemini-3.1-flash-image, and the brief on the floor equals the brief on the row.
+- **Phone** (iOS simulator on this checkout's Metro, Graphite and Paper): the two sessions the live
+  web runs opened show the ask as its words only, with no `‹gen-image:…›` under them
+  (`floor-6-phone-ask-*`).
+- **The preview harness** (`?client=web`, `preview/mock-draw.ts`) plays the same steps, and
+  `?draw=brief|picture|fail` holds each one still for a capture that a live run cannot hold. The
+  sheets `floor-0-states-*` show every state in each theme, the failure and the thread card too.

@@ -8,7 +8,7 @@ import { apiAuthHeaders, apiBearerHeader } from './apiauth';
 import { electron } from './electronlazy';
 import { liveStreams } from './livestreams';
 import { startPlanRouteWatch, startRoutineBuildWatch } from './host/planroute';
-import { makeRoutineResume } from './host/routineresume';
+import { makeRoutineResume, sweepMessages } from './host/routineresume';
 import { configureStarterFallback, setStarterLane } from './runtime/starter';
 
 // Desktop notification (local, the human's machine) — fired when a plan needs
@@ -56,8 +56,8 @@ import { makeWakeRouting } from './host/wakerouting';
 import { makeSleeperWake } from './host/sleepers';
 import { makeLegs } from './host/legs';
 import { makeOrchTurn } from './host/orchestratorturn';
-import { postReplyCard } from './host/replycard';
-import { searchXText } from './host/searchx';
+import { postReplyCard } from './host/replycard';   import { routineReplyTurn } from './host/routinereplies';
+import { searchXText, type SearchXQuery } from './host/searchx';
 import { makeRepoReader, type RepoReader } from './host/reporead';
 import { makeWbClosures } from './host/wbclosures';
 import { type SweepSnapshot } from './harness/berths';
@@ -131,6 +131,8 @@ export interface HostedAgent {
   // 'manual' = a human pinned this brain by hand; project packs (like workspace packs)
   // must never quietly move it. See seatFor().
   modelSource?: string | null;
+  /** the requester's thinking level for this seat (0148): set by seatFor, read by each transport (runtime/thinking.ts) */
+  thinking?: import('@neuramesh/shared').ThinkingLevel | null;
   channels: Set<string>;
 }
 
@@ -1034,8 +1036,8 @@ export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId,
   // advertised when the host can SERVICE it — and the closure was built for legs only. Live, the
   // worker said so itself: "no X rows were fabricated because search_x was not surfaced". The
   // grant and the closure have to move together or the grant is a lie.
-  const searchXFor = (actor: { kind: string; id: string; role?: string }, ch: { id: string; workspace_id: string }) => (q: { query: string; max?: number }): Promise<string> =>
-    searchXText(apiGet, actor, { workspaceId: ch.workspace_id, channelId: ch.id }, q.query, q.max);
+  const searchXFor = (actor: { kind: string; id: string; role?: string }, ch: { id: string; workspace_id: string }) => (q: SearchXQuery): Promise<string> =>
+    searchXText(apiGet, actor, { workspaceId: ch.workspace_id, channelId: ch.id }, q);
   // the repository reads (docs/design/github-connector-2026-09): the same rule, one reader per room
   const repoFor = (actor: { kind: string; id: string; role?: string }, ch: { id: string; workspace_id: string }): RepoReader => makeRepoReader({ apiGet, actor, db, channelId: ch.id });
 
@@ -1090,9 +1092,9 @@ export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId,
    * Bounded hard: notes are agent-authored and can be long, and this rides a prompt that already has a
    * budget. Newest first, capped, and truncated per note — a partial note is worth more than none.
    */
-  function brainNotes(subject: SubjectRef, cap = 4, perNote = 1_200): string {
+  function brainNotes(subject: SubjectRef, cap = 4, perNote = 1_200, since?: number): string {
     try {
-      const notes = brain.open(subject).notes();
+      const notes = brain.open(subject).notes(since);
       if (!notes.length) return '';
       const take = notes.slice(-cap).reverse();
       const what = subject.kind === 'task' ? 'this task' : 'this conversation';
@@ -1113,9 +1115,9 @@ export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId,
    * next, a result is what a leg handed its parent. A re-woken orchestrator that fanned out last
    * turn needs the second one or it re-runs the fan-out it already paid for.
    */
-  function brainResults(subject: SubjectRef, cap = 6, per = 900): string {
+  function brainResults(subject: SubjectRef, cap = 6, per = 900, since?: number): string {
     try {
-      const rows = brain.open(subject).messages().filter((m) => m.kind === 'result');
+      const rows = brain.open(subject).messages().filter((m) => m.kind === 'result' && !(since !== undefined && Date.parse(m.at) < since));
       if (!rows.length) return '';
       const take = rows.slice(-cap);
       const body = take.map((m) => {
@@ -1154,7 +1156,7 @@ export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId,
     activePackRoles, seatLabel, legSummary, workspaceListing, workspaceOf, apiGet,
   });
   // Drafted content (host/content.ts) — the image, the in-place revision, the turn transcript.
-  const { draftImageFor, generateDraftImage, generateShareImage, reviseContentDrafts, threadTranscript, orchSpawnFor, draftsForAnchor, buildScheduleCard } = makeContent({
+  const { draftImageFor, drawOnAsk, generateDraftImage, generateShareImage, reviseContentDrafts, threadTranscript, orchSpawnFor, draftsForAnchor, buildScheduleCard } = makeContent({
     post, machineId, guards, db, apiUrl, workspace, ownerActorId, agents, alog, brainBriefing,
     designerOverride, ensureChatWorkspace, legSummary, narrate, openRun, recordLegResult, resolveSeat, seatLabel, taskOf,
     blockFor: (...args: Parameters<typeof blockFor>) => blockFor(...args),
@@ -1977,12 +1979,12 @@ export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId,
   const wakeCtx = {
     db, LEASE_LOST, NO_RUN, SWEEP_LOOKBACK_MS, agents, alog, apiUrl, arun, blockFor, brainNotes, brainResults,
     chatTurn, claimVerdict, confirmAddAgent, confirmCreateAgent, confirmFailover, defaultResponder, discoverSkills,
-    echoOrchestrate, echoPlanReview, echoThreadOrchestrate, execQueue, generateDraftImage, handleExhaustion,
+    drawOnAsk, echoOrchestrate, echoPlanReview, echoThreadOrchestrate, execQueue, handleExhaustion,
     offerAddAgents, openWakeRun, ownerActorId, peerMachines, post, priorMachineFor, processed, queueWake,
     rearmWake, reviseContentDrafts, runDueSchedules, runMarketingBootstrap, saidNoCompute, seatFor, setStatus,
     threadModeFor, threadTranscript, wakeEnded, wakeStarted,
     // a THUNK: orchestratorTurn is built below, from services this maker also needs
-    orchestratorTurn: (...a: Parameters<typeof orchestratorTurn>) => orchestratorTurn(...a),
+    orchestratorTurn: (...a: Parameters<typeof orchestratorTurn>) => routineReplyTurn(orchestratorTurn, a, { db, post, runtimeFor }), // a routine's drafted replies land as the card
   };
   const { wake, wakeThread } = makeWake(wakeCtx);
 
@@ -1999,9 +2001,9 @@ export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId,
   // never run these). It uses its normal tools + posts a channel message, or stands down (NO_REPLY).
   const SUMMARY_MARKER: Record<string, string> = { morning: '☀️ Morning status', midday: '🕑 Midday status', evening: '🌙 Evening status' };
   const sweepTranscript = async (ch: { id: string; slug: string }): Promise<string> => {
-    // a routine's thread is never the sweep's business (2026-09-16, #1093): its ask is answered by the
-    // thread wake or re-asked by the routine resume, and a sweep that saw it once filed it flat
-    const recent = await db.getAll<{ author_kind: string; body: string }>(`select author_kind, body from messages where channel_id = ? and task_id is null and (thread_id is null or thread_id not in (select id from threads where schedule_id is not null)) order by created_at desc limit 18`, [ch.id]);
+    // a routine's session is never the sweep's business (2026-09-16, #1093), and a content schedule's
+    // session is (2026-09-27): the resume skips it, so nothing else rescues a reply there
+    const recent = await sweepMessages(db, ch.id);
     const open = await db.getAll<{ number: number; title: string; state: string; assignee: string | null }>(`select t.number, t.title, t.state, (select name from agents where id = t.assignee_id) as assignee from tasks t where t.channel_id = ? and t.state not in ('accepted','closed','backlog') order by t.number desc limit 30`, [ch.id]);
     // parked ideas ride along so summaries can carry the tally — they are NOT open work
     const [bl] = await db.getAll<{ n: number }>(`select count(*) as n from tasks where channel_id = ? and state = 'backlog'`, [ch.id]);

@@ -8,17 +8,17 @@
 // and a gate on revise_posts that refuses to rewrite a card's text this turn has not read.
 import type { AttDbLike } from '../agents';
 import type { Grounding } from './grounding';
+import { runDrafts } from './runwindow';
 import type { OrchTool } from './orchtools';
 import type { ChatToolCtx } from './chattools';
 
 type DraftRow = { id: string; platform: string; body: string; status: string; media: string | null };
 export type DraftView = { letter: string; platform: string; status: string; caption: string; script: string | null; brief: string | null; frame: string | null; seconds: number | null; film: string };
 
-/** the drafts a thread holds, lettered the way their cards are (created order, before any status filter) */
+/** the drafts a thread holds, lettered the way their cards are (created order, before any status filter).
+ *  a schedule's session letters each run from a, so this reads the newest run (host/runwindow.ts runDrafts) */
 export async function readDrafts(db: AttDbLike, at: { threadId?: string | null; taskId?: string | null }): Promise<DraftView[]> {
-  const anchor = at.taskId ? { col: 'task_id', id: at.taskId } : at.threadId ? { col: 'thread_id', id: at.threadId } : null;
-  if (!anchor) return [];
-  const rows = await db.getAll<DraftRow>(`select id, platform, body, status, media from content_items where ${anchor.col} = ? order by created_at asc`, [anchor.id]).catch(() => [] as DraftRow[]);
+  const rows = await runDrafts<DraftRow>(db, at, 'id, platform, body, status, media');
   return rows.map((r, i) => {
     const m = ((): { brief?: string; script?: string; frame?: string; seconds?: number; video_id?: string; video_pending?: boolean; video_error?: string; video?: { model?: string; seconds?: number } } => { try { return JSON.parse(r.media ?? '{}') as never; } catch { return {}; } })();
     const film = m.video_pending ? 'filming now' : m.video_id ? `filmed${m.video?.seconds ? `, ${m.video.seconds} s` : ''}${m.video?.model ? ` on ${m.video.model}` : ''}` : m.video_error ? `no film: ${m.video_error}` : 'not filmed yet';

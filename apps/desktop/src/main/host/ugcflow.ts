@@ -20,6 +20,7 @@ import type { OrchTool, ToolCtx } from './orchtools';
 import { filmCredits, type UgcCardData } from '@neuramesh/shared';
 import { readBrand } from './brandnote';
 import { ungrounded, type Grounding } from './grounding';
+import { runCut } from './runwindow';
 
 export const PLATFORM_LABELS: Record<UgcCardData['platforms'][number]['id'], string> = { x: 'X', linkedin: 'LinkedIn', instagram: 'Instagram', tiktok: 'TikTok' };
 const PLATFORM_IDS = Object.keys(PLATFORM_LABELS) as Array<UgcCardData['platforms'][number]['id']>;
@@ -69,10 +70,12 @@ export async function videoLengths(apiGet: (path: string, actor: { kind: string;
 }
 
 type MsgRow = { author_kind: string; body: string | null };
-/** the conversation's messages, oldest first, by the anchor a tool has (a task thread, or a conversation thread) */
+/** the conversation's messages, oldest first, by the anchor a tool has (a task thread, or a conversation thread).
+ *  a schedule's session is read from its newest run's opener (host/runwindow.ts): each run proposes its
+ *  own angles, and the next run's opener, posted as the owner, is no pick */
 async function threadMessages(db: AttDbLike, at: { threadId?: string | null; taskId?: string | null }): Promise<MsgRow[]> {
   if (at.taskId) return db.getAll<MsgRow>('select author_kind, body from messages where task_id = ? order by created_at', [at.taskId]).catch(() => []);
-  if (at.threadId) return db.getAll<MsgRow>('select author_kind, body from messages where thread_id = ? order by created_at', [at.threadId]).catch(() => []);
+  if (at.threadId) return db.getAll<MsgRow>('select author_kind, body from messages where thread_id = ? and created_at >= ? order by created_at', [at.threadId, await runCut(db, at.threadId)]).catch(() => []);
   return [];
 }
 

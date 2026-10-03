@@ -10,14 +10,18 @@ export type ApiGetFn = (path: string, actor: { kind: string; id: string; role?: 
 
 export interface SearchXWhere { workspaceId: string; channelId: string }
 
+/** what the model asks for (harness/tooldesc.ts searchXParams): top is X's relevancy ranking returned by impressions */
+export interface SearchXQuery { query: string; max?: number; order?: 'top' | 'latest'; hours?: number }
+
 export async function searchXText(
   apiGet: ApiGetFn,
   actor: { kind: string; id: string; role?: string },
   where: SearchXWhere,
-  query: string,
-  max?: number,
+  q: SearchXQuery,
 ): Promise<string> {
-  const qs = new URLSearchParams({ workspace: where.workspaceId, channel: where.channelId, q: query, max: String(max ?? 10) });
+  const { query } = q;
+  const order = q.order === 'latest' ? 'latest' : 'top';
+  const qs = new URLSearchParams({ workspace: where.workspaceId, channel: where.channelId, q: query, max: String(q.max ?? 25), order, ...(q.hours ? { hours: String(q.hours) } : {}) });
   const res = await apiGet(`/v1/x/search?${qs.toString()}`, actor);
   if (res.status === 409) {
     const body = (await res.json().catch(() => ({}))) as { code?: string; error?: string };
@@ -29,8 +33,10 @@ export async function searchXText(
   if (res.status === 501) return 'X connecting is not configured on this server — say so; there is nothing the human can do from here.';
   if (!res.ok) return `X search failed (${res.status}): ${(await res.text()).slice(0, 200)}. Report the failure; never fill the gap with guessed posts or numbers.`;
   const { hits } = (await res.json()) as { hits: Array<{ text: string; authorHandle: string | null; authorName: string | null; createdAt: string | null; metrics: { replies: number; reposts: number; likes: number; quotes: number; impressions: number | null } | null; url: string }> };
-  if (!hits.length) return `No posts on X match "${query}" in the last 7 days. Say that — it is a real answer.`;
-  return hits.map((h) => {
+  const window = q.hours ? `the last ${q.hours} hours` : 'the last 7 days';
+  if (!hits.length) return `No posts on X match "${query}" in ${window}. Say that — it is a real answer.`;
+  const head = order === 'latest' ? `The newest posts in ${window}:` : `Top posts in ${window}, most impressions first (${hits.length} read):`;
+  return `${head}\n\n` + hits.map((h) => {
     const m = h.metrics;
     const eng = m ? `${m.likes} likes · ${m.reposts} reposts · ${m.replies} replies${m.impressions != null ? ` · ${m.impressions} impressions` : ''}` : 'engagement not returned';
     return `${h.authorHandle ?? '(unknown)'}${h.authorName ? ` (${h.authorName})` : ''} · ${h.createdAt?.slice(0, 10) ?? ''}\n${h.text}\n${eng}\n${h.url}`;

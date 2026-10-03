@@ -6,6 +6,7 @@
 import type { SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 import { carryCards, resolveInstructions } from '@neuramesh/shared';
 import { buildClaudeUserContent, chatSystemPrompt, claudePathOption, imageBlocks, providerEnv, type AgentAttachment } from '../runtime/adapter';
+import { claudeEffort } from '../runtime/thinking';
 import { classifyExecError } from '../execpolicy';
 import { contractFor, localInstructions } from '../contracts';
 import { isStandDown } from '../replypolicy';
@@ -189,7 +190,7 @@ export async function claudeTurn(
     const reply = await drainQuery(
       // allowedTools:[] keeps this a true tool-less reply; otherwise the SDK's default tools can burn the
       // one turn on a tool call (→ error_max_turns, no text). Same trap as directComplete.
-      query({ prompt: claudeAgentPrompt(transcript, attachments), options: { ...claudePathOption(), env: providerEnv('anthropic', token), model: agent.model, maxTurns: 1, allowedTools: [], permissionMode: 'bypassPermissions', cwd: os.tmpdir(), systemPrompt: system, ...partialMessages(onDelta) } }) as AsyncIterable<any>,
+      query({ prompt: claudeAgentPrompt(transcript, attachments), options: { ...claudePathOption(), env: providerEnv('anthropic', token), model: agent.model, ...claudeEffort(agent), maxTurns: 1, allowedTools: [], permissionMode: 'bypassPermissions', cwd: os.tmpdir(), systemPrompt: system, ...partialMessages(onDelta) } }) as AsyncIterable<any>,
       '(no reply)', log, onDelta,
     );
     return reply.trim() || '(no reply)';

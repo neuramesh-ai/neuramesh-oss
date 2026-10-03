@@ -57,6 +57,11 @@ export async function threadCommands(store: Store, actor: Actor, cmd: Command): 
     // put emphasis markers on a rail row, and a stripped-empty title is refused rather than saved blank
     const title = cmd.title === undefined ? undefined : plainTitle(cmd.title);
     if (title !== undefined && !title) throw new DomainError('INVALID_INPUT', 'a title needs plain text in it');
+    // a routine's session wears the routine's title (docs/design/routine-sessions-2026-09, PR 2): an agent
+    // name there would stamp titled_at, and the session would stop following a renamed routine for good
+    if (title !== undefined && actor.kind !== 'human' && (await store.threadFiling(cmd.workspace, cmd.threadId))?.scheduleId) {
+      throw new DomainError('THREAD_ALREADY_TITLED', 'this session carries its routine\'s title. Only a person renames it.');
+    }
     await store.updateThread(cmd.workspace, cmd.threadId, { title, description: cmd.description }, { agentTitleOnce: actor.kind !== 'human' });
     return { ok: true, threadId: cmd.threadId } as never;
   }

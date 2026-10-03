@@ -1,5 +1,6 @@
 // Synced-row shapes (rows-content) — extracted from App.tsx (modularization track A1).
 // Pure types: what the renderer receives over the NMBridge watches/reads.
+import type { SessionRunDraft, SessionRunMessage } from '@neuramesh/shared';
 
 // connectors (marketing-channel plan §4.8): the visible half — never tokens
 export interface ConnectorRow {
@@ -30,6 +31,8 @@ export interface ContentItemRow {
   created_at: string;
   schedule_id: string | null;
   task_id: string | null; // the content task this draft delivers (marketing-workflow §4.5) — null for schedule-driven drafts
+  /** the session the draft was handed over in (0115): a scheduled draft run's session since #662 */
+  thread_id?: string | null;
 }
 
 // …the same atom seen from the WORKSPACE calendar, where the room is no longer implied by the
@@ -41,20 +44,32 @@ export interface ContentItemWide extends ContentItemRow {
 }
 
 // schedules (marketing-channel plan §4.6): a channel's armed drafting cadences
-/** One execution of an armed automation (0119) — the conversation its slot opened. Automations
- * run IN chat threads, so a routine's run history is already a list of sessions; this is the row
- * the card's reveal renders and clicks through to. */
+/** One RUN of an armed automation (routine sessions, docs/design/routine-sessions-2026-09): the
+ * message that opens it. A run keeps its schedule on that message (messages.schedule_id, 0145), and
+ * a session from before 0145 opens with its first message. The runs of one schedule live in its
+ * session, so a run is a place in a thread: the Automations panel lists them and opens each one. */
 export interface ScheduleRunRow {
+  /** the opener message: the run's own id, and the `?run=` of its link */
   id: string;
-  title: string | null;
-  created_at: string;
-  updated_at: string;
+  thread_id: string;
   channel_id: string;
   channel_slug: string | null;
-  /** 1 = the prompt landed and nobody (no agent, no human) answered it */
-  msg_count: number;
-  /** the run's last line — what it produced, which is the only thing that differs run to run */
-  last_body: string | null;
+  /** the session's title */
+  title: string | null;
+  created_at: string;
+  /** the session's settle stamp (0137) */
+  settled_at: string | null;
+}
+
+/** the listed runs, and the rows their strips count (shared session-runs.ts), for the sessions they live in */
+export interface ScheduleRunsResult {
+  runs: ScheduleRunRow[];
+  messages: Array<SessionRunMessage & { thread_id: string }>;
+  units: Array<{ id: string; number: number; title: string; state: string; kind: string | null; parent_task_id: string | null; plan_approved_at: string | null; pr_number: number | null; created_at: string; updated_at: string; last_human_msg_at: string | null; origin_thread_id: string }>;
+  cards: Array<{ message_id: string; status: string; created_at: string; allow_other: number; human_replied_at: string | null; thread_id: string }>;
+  drafts: Array<SessionRunDraft & { thread_id: string }>;
+  files: Array<{ created_at: string; name: string; thread_id: string }>;
+  openRuns: Array<{ started_at: string; thread_id: string }>;
 }
 
 export interface ScheduleRow {

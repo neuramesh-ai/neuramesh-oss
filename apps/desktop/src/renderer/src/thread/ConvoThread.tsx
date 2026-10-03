@@ -11,7 +11,7 @@ import { BrainChip } from '../brain/BrainChip';
 import { ComposerInput } from '../composer/ComposerInput';
 
 import { DeliveryStrip } from './DeliveryStrip';
-import { IconClose, IconPaperclip, IconReply, IconRoutineClock, IconSend, IconSkill, IconWorkbench } from '../ui/icons';
+import { IconClose, IconPaperclip, IconReply, IconSend, IconSkill, IconWorkbench } from '../ui/icons';
 
 import { MentionButton, ThreadCrumb, ThreadRoomChip, ThreadRootPin, ThreadSettleBtn, ThreadStatusChip, TypistChip, filesFromPaste, groupByMessage, streamContent, type ComposerPerson, type HeadStatus, type PostVCard, useDropZone } from './parts';
 
@@ -23,7 +23,7 @@ import { StreamBubble } from './StreamBubble';
 
 import { RailSections, RailToks } from './ThreadRail';
 
-import { agentInChannel, groupDeliveries, isPostsFile, parseBrainOverride, renderableDeliverables, threadModeOf, threadTitle, type ThreadMode } from '@neuramesh/shared';
+import { agentInChannel, groupDeliveries, isPostsFile, parseBrainOverride, renderableDeliverables, splitSessionRuns, threadModeOf, threadTitle, type ThreadMode } from '@neuramesh/shared';
 import { agentLive } from '../lib/presence';
 import { answersResolver } from '../answers';
 
@@ -50,6 +50,7 @@ import { BrandSections } from './../marketing/BrandSections';
 import { useThreadPosts } from './usePosts';
 import { useOwnedUnitPosts } from './useOwnedUnitPosts';
 import { convoArtifactSection, useThreadArtifacts } from './useArtifacts';
+import { RoutineChip, SessionRuns, draftStrips } from './SessionRuns';
 
 // Imported bindings lose control-flow narrowing inside closures, so re-bind (same as App.tsx).
 const nm = nmBridge;
@@ -177,15 +178,15 @@ export function ConvoThread({ threadId, back, thread, channelId, channelSlug, ch
   // The drafted posts, in the transcript where they were handed over. Originals land as ONE strip
   // at the first draft's time; a revision rides its own strip after the reply that asked for it,
   // so scrolling back replays the review round rather than showing only the final copy.
-  const mkCards = useMemo(() => postCardsFrom(mkPosts, rows), [mkPosts, rows]);
+  // a schedule's session holds one run per firing: draft letters and draft strips restart at each (SessionRuns.tsx)
+  const runStarts = useMemo(() => splitSessionRuns(rows, thread?.schedule_id)?.map((f) => f.at) ?? [], [rows, thread?.schedule_id]);
+  const mkCards = useMemo(() => postCardsFrom(mkPosts, rows, runStarts), [mkPosts, rows, runStarts]);
   const stream1 = useMemo(() => {
     const originals = mkCards.filter((c) => !c.isRevision);
     const items: Array<{ at: string; msg?: MessageRow; tree?: RunTree; strip?: PostVCard[]; unit?: TaskAllRow; delivery?: ChannelArtifactRow[]; key?: string }> = [
       ...rows.map((m) => ({ at: m.created_at, msg: m })),
       ...trees.map((t) => ({ at: t.run.started_at, tree: t })),
-      ...(originals.length
-        ? [{ at: new Date(Math.min(...originals.map((c) => c.anchor))).toISOString(), strip: originals, key: 'drafts' }]
-        : []),
+      ...draftStrips(originals, runStarts),
       // deliverable strips (docs/30) — a conversation produces real files and could only ever
       // LIST them; the task thread has carded them all along. Same grouping, same de-dupe: echoes
       // of messages already on screen drop, and so does the wire file when its posts card.
@@ -209,7 +210,7 @@ export function ConvoThread({ threadId, back, thread, channelId, channelSlug, ch
       ...units.strips.map((s) => ({ at: s.at, strip: s.cards, unit: s.unit, key: `unit-${s.unit.id}` })),
     ];
     return items.sort((a, b) => a.at.localeCompare(b.at));
-  }, [rows, trees, mkCards, units.strips]);
+  }, [rows, trees, mkCards, units.strips, runStarts]);
   return (
     <aside
       className="threadpanel convo"
@@ -225,9 +226,9 @@ export function ConvoThread({ threadId, back, thread, channelId, channelSlug, ch
         <ThreadCrumb project={crumbProject} slug={channelSlug} />
         {/* the chip is identity: this conversation's word, the one the rail row and ⌘Y wear */}
         <span className="convotitle" title={title}>{title}</span><ThreadStatusChip head={marks} />
-        {/* a routine's run says so in the header (2026-08-22, George) — the same quiet pill the
-            setup task wears, so "opened by an automation, runs hands-off" is one glance */}
-        {thread?.schedule_id ? <span className="routinechip" title="Opened by a scheduled routine — it runs hands-off"><IconRoutineClock s={10} /> routine</span> : null}
+        {/* a routine's session says so in the header (2026-08-22, George) — the same quiet pill the
+            setup task wears, and since routine sessions (2026-09-28) it names the cadence */}
+        <RoutineChip scheduleId={thread?.schedule_id} />
         {/* Settle leads the act cluster; the Workbench card lives inside this thread (rail-ink round 3) */}
         <div className="theadact"><ThreadSettleBtn head={marks} onSettle={onSettle} />{onToggleWorkbench && <button className={`navpin${wbOpen ? ' on' : ''}`} aria-pressed={!!wbOpen} title={wbOpen ? 'Hide the Workbench — ⌘P' : 'Show the Workbench — ⌘P'} aria-label={wbOpen ? 'Hide the Workbench' : 'Show the Workbench'} onClick={onToggleWorkbench}><IconWorkbench s={14} /></button>}</div>
       </div>
@@ -246,7 +247,7 @@ export function ConvoThread({ threadId, back, thread, channelId, channelSlug, ch
       <div className="tmsgs convomsgs" ref={listRef}>
         <ThreadRootPin thread={thread} rows={rows} agents={agents} members={members} />
         {rows.length === 0 && !stream && <div className="tempty">Say the word — the channel's agents see this thread.</div>}
-        {stream1.map((it) => {
+        <SessionRuns threadId={threadId} thread={thread} channelId={channelId} rows={rows} items={stream1} roomKind={channelKind} listRef={listRef} sources={{ units: units.anchored, cards: decisions, drafts: mkPosts, files: convoArts, openRuns: runRows }} render={(it) => {
           if (it.tree) return <RunCard key={it.tree.run.id} tree={it.tree} agent={agents.find((a) => a.id === it.tree!.run.agent_id) ?? null} onActivity={onActivity} />;
           if (it.delivery) return (
             <DeliveryStrip
@@ -287,7 +288,7 @@ export function ConvoThread({ threadId, back, thread, channelId, channelSlug, ch
                 : null}
             />
           );
-        })}
+        }} />
         {ghostAgent && <AgentGhost key={ghostAgent.id} agent={ghostAgent} onActivity={onActivity} />}
         {/* NOBODY IS WORKING YET, AND THE THREAD STILL SAYS SO (docs/26 §5). On the browser this
             is the only orb for the first seconds of every message: with no local stream, the

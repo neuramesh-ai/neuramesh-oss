@@ -15,6 +15,9 @@ export const SCHEDULE_RUN_COMMANDS = [
   }),
   // the fire's outcome → schedules.last_error (the attention bar's truth); null = the next clean run clears it
   z.object({ type: z.literal('schedule.mark_result'), schedule: z.string().min(1), error: z.string().max(500).nullable() }),
+  // Run now (routine sessions, 2026-09-28): a person makes the schedule due at once, and the next tick
+  // fires it into its session. Human-only in the handler, refused on a paused or finished row.
+  z.object({ type: z.literal('schedule.run_now'), schedule: z.string().min(1) }),
   // the release routine's cursor (docs/design/release-drafts-2026-09 §4.2): the lane that FINISHED a
   // scan writes where the next window starts, plus one ledger line (a quiet day is a row too). Any
   // authenticated teammate, like claim_run and mark_result: the row is the truth, the Routines

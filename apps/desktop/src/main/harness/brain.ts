@@ -179,11 +179,12 @@ export class SubjectBrain {
     writeFileSync(join(this.dir('notes'), safe.endsWith('.md') ? safe : `${safe}.md`), redact(body), 'utf8');
   }
 
-  notes(): Array<{ name: string; body: string }> {
+  /** `sinceMs` keeps the notes written or rewritten since then: a routine's next run starts clean (host/runwindow.ts) */
+  notes(sinceMs?: number): Array<{ name: string; body: string }> {
     const d = join(this.path, 'notes');
     if (!existsSync(d)) return [];
     return readdirSync(d)
-      .filter((f) => f.endsWith('.md'))
+      .filter((f) => f.endsWith('.md') && !(sinceMs !== undefined && statSync(join(d, f)).mtimeMs < sinceMs))
       .sort()
       .map((f) => ({ name: f, body: readFileSync(join(d, f), 'utf8') }));
   }

@@ -1,7 +1,8 @@
 // Image mime truth (2026-08-20): the bytes outrank every declaration in the pipeline — this
 // sniffer is what stops a webp wearing a png label from dying at X's finalize.
 import { describe, expect, it } from 'vitest';
-import { genImageItemId, sniffImageMime, sniffVideoMime } from '../src/images';
+import { drawAsk, genImageItemId, sniffImageMime, sniffVideoMime } from '../src/images';
+import { threadTitle } from '../src/threads';
 
 const bytes = (...parts: Array<number[] | string>): Uint8Array => {
   const out: number[] = [];
@@ -54,5 +55,26 @@ describe('the draw marker', () => {
 
   it('a marker without a plausible id is not a draw request', () => {
     expect(genImageItemId('\u2039gen-image:xyz\u203a')).toBeNull();
+  });
+});
+
+// the ask a tab or the phone posts (2026-09-27): a draft with no home opens a session with it, so
+// its first paragraph is the session's title, and the marker must still be found by the machine
+describe('the draw ask', () => {
+  const ITEM = '0f2c4a1b-9d3e-4c77-8a21-5b6d0e7f1234';
+  const body = "Body's exhausted. Mind's still sprinting through tomorrow's standup. That gap has a name.";
+
+  it('carries the marker the machine reads', () => {
+    expect(genImageItemId(drawAsk({ id: ITEM, body }))).toEqual(ITEM);
+    expect(drawAsk({ id: ITEM, body }, true)).toMatch(/^Redraw the image for/);
+  });
+
+  it('titles the session it opens by the draft, never by the marker', () => {
+    const title = threadTitle(drawAsk({ id: ITEM, body }));
+    expect(title).toBe('Generate the image for “Body\'s exhausted”');
+    expect(title).not.toContain('gen-image');
+    expect(threadTitle(drawAsk({ id: ITEM, body: 'Breathing exercises calm you for five minutes, then the loop comes back.' })))
+      .toBe('Generate the image for “Breathing exercises calm you for…”');
+    expect(threadTitle(drawAsk({ id: ITEM, body: '\n\nno first line' }))).toBe('Generate the image for this draft');
   });
 });

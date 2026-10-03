@@ -15,7 +15,7 @@ const SIGNALS: RepoSignals = {
   tags: [],
 };
 
-function harness(opts: { repoRows?: unknown[]; seen?: number; capable?: boolean; read?: () => Promise<RepoSignals>; postStatus?: number; connected?: boolean; readViaConnector?: () => Promise<RepoSignals | null> } = {}) {
+function harness(opts: { repoRows?: unknown[]; seen?: number; capable?: boolean; read?: () => Promise<RepoSignals>; postStatus?: number; connected?: boolean; readViaConnector?: () => Promise<RepoSignals | null>; session?: () => Promise<{ threadId: string; channelId: string }> } = {}) {
   const posts: Array<{ path: string; body: Record<string, unknown> }> = [];
   const db = {
     getAll: async <T,>(sql: string) => {
@@ -31,6 +31,7 @@ function harness(opts: { repoRows?: unknown[]; seen?: number; capable?: boolean;
     capable: async () => opts.capable ?? true,
     connected: async () => opts.connected ?? false,
     ...(opts.readViaConnector ? { readViaConnector: opts.readViaConnector } : {}),
+    ...(opts.session ? { session: opts.session } : {}),
     now: () => NOW,
     threadId: () => 'thread-1',
   });
@@ -118,4 +119,15 @@ test('fire: a failed read leaves the cursor where it was and says why', async ()
   const out = await w.fire(SLOT, { repo: 'r1', cursor: { at: '2026-09-16T09:00:00.000Z', tag: null } }, { ok: true, slug: 'o/r', repo: REPO, door: 'gh' });
   assert.deepEqual(out, { outcome: 'failed', error: 'gh could not read o/r: HTTP 401' });
   assert.equal(posts.length, 0);
+});
+
+test('fire: a window with news is the next run of the routine\'s one session, in the room the session lives in', async () => {
+  const h = harness({ session: async () => ({ threadId: 'session-1', channelId: 'ch-filed' }) });
+  const pre = await h.w.preflight(SLOT, { repo: 'r1' });
+  const out = await h.w.fire(SLOT, { repo: 'r1', cursor: { at: '2026-09-16T09:00:00.000Z', tag: 'v0.133.0' } }, pre as Extract<typeof pre, { ok: true }>);
+  assert.equal(out.outcome, 'fired');
+  const msg = h.posts.find((p) => p.path === '/v1/messages')!;
+  assert.equal(msg.body['threadId'], 'session-1');
+  assert.equal(msg.body['channel'], 'ch-filed');
+  assert.equal(msg.body['scheduleId'], 'sch-1');
 });

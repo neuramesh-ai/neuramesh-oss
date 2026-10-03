@@ -2,9 +2,9 @@
 // payload carries `release` watches a repository: the tick reads it through the room's GitHub
 // connector when the project holds one (docs/design/github-connector-2026-09: the App reads
 // server-side, which is what lets a cloud machine with no login run the watch), else with the
-// MACHINE's own gh; hands the rows to the pure scan, opens ONE session with the digest when there
-// is something to read, and moves the cursor only after the scan completed. A quiet window opens
-// nothing and leaves one ledger line. Path selection and the preflight run BEFORE the claim (the
+// MACHINE's own gh; hands the rows to the pure scan, posts the digest as one run of the routine's
+// session when there is something to read (the session continues, docs/design/routine-sessions-2026-09),
+// and moves the cursor only after the scan completed. A quiet window posts nothing and leaves one ledger line. Path selection and the preflight run BEFORE the claim (the
 // schedules.ts rule: the claim consumes the slot); the fire runs after it.
 import {
   isNoisePr, releaseDigest, releaseLogNote, releaseMarker, releaseTitle, scanWindow,
@@ -63,6 +63,8 @@ export function makeReleaseWatch(ctx: {
   readViaConnector?: (channelId: string, since: string) => Promise<RepoSignals | null>;
   now?: () => Date;
   threadId?: () => string;
+  /** the session the run continues (host/runsession.ts continueSession): its id and its own room */
+  session?: (s: SlotRow) => Promise<{ threadId: string; channelId: string }>;
 }) {
   const read = ctx.read ?? readRepoSignals;
   const capable = ctx.capable ?? ghCapable;
@@ -137,7 +139,9 @@ export function makeReleaseWatch(ctx: {
     try { checkedAt = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: s.tz || 'UTC' }).format(at); } catch { /* an unknown zone reads as UTC */ }
     const body = `${releaseTitle(pre.slug, scan)}\n\n${releaseDigest(pre.slug, scan, { since: sinceTag, checkedAt })}`;
     try {
-      const r = await ctx.post('/v1/messages', owner, { workspace: s.workspace_id, channel: s.channel_id, threadId: mintThread(), scheduleId: s.id, body });
+      // one session per routine: each window with news is a run in the routine's one session
+      const at = ctx.session ? await ctx.session(s) : { threadId: mintThread(), channelId: s.channel_id };
+      const r = await ctx.post('/v1/messages', owner, { workspace: s.workspace_id, channel: at.channelId, threadId: at.threadId, scheduleId: s.id, body });
       if (!r.ok) throw new Error(`the server refused the release session (${r.status})`);
       await setCursor();
     } catch (e) {

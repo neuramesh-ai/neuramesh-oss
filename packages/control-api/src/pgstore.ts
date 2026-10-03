@@ -1,16 +1,21 @@
-import { applyShare, type BrainOverride, parseBrainOverride, serializeBrainOverride, attachmentUpgradeReason, buildAgentCard, flowForChannelKind, FREE_SEAT_CAP, planLabel, seatLimitReason, readAnswers, taskBranch, threadKindOf, threadModeOf, threadTitle, type ActorRef, type Beat, type BeatStatus, type NMEvent, type Run, type RunSettleState, type RetroPayload, type RetroRange, type Task, type TaskKind, type TaskState, type ThreadKind, type ThreadMode, priceActiveSeconds } from '@neuramesh/shared';
+import { applyShare, type BrainOverride, parseBrainOverride, serializeBrainOverride, attachmentUpgradeReason, buildAgentCard, flowForChannelKind, FREE_SEAT_CAP, planLabel, seatLimitReason, readAnswers, taskBranch, threadKindOf, threadModeOf, type ActorRef, type Beat, type BeatStatus, type NMEvent, type Run, type RunSettleState, type RetroPayload, type RetroRange, type Task, type TaskKind, type TaskState, type ThreadKind, type ThreadMode, priceActiveSeconds } from '@neuramesh/shared';
 import { trackDomainEvent } from './analytics';
 import { createHash, randomBytes } from 'node:crypto';
 import postgres from 'postgres';
 import { embed } from './embedder';
 import { DomainError } from './errors';
 import { dueContentItemsSql, upcomingContentItemsSql, type DueItem, type UpcomingItem } from './store/content-reads';
+import { anchorContentItemSql } from './store/content-anchor';
+import { threadRoutineIdSql } from './store/routine-rule';
 import { setThreadKindSql, setThreadMachineSql, workspaceMachine } from './store/thread-machine';
+import { sessionTitleSql } from './store/session-title';
 import { latestHumanWordSql, setThreadSettledSql, threadTaskIdSql } from './store/thread-settle';
 import { markScheduleResultSql, setScheduleCursorSql } from './store/release-routine';
+import { runScheduleNowSql } from './store/schedule-now';
+import { linkRoutineSessionSql } from './store/routine-session';
 import { seedBundledPacksSql } from './store/skillpack-seed';
 import { PgAnnounceStore } from './store/announce';
-import { PgFilmStore } from './store/films';
+import { PgFilmStore } from './store/films';   import { PgReplyStore } from './store/replies';   import { PgAgentModelStore } from './store/agent-models';
 import { computeRetro } from './retro';
 import { SKILL_SEED } from './seed/skill-seed';
 import { MARKETING_SKILL_SEED } from './seed/marketing-skill-seed';
@@ -60,7 +65,7 @@ export class PostgresStore implements Store {
   readonly sql: postgres.Sql;
   private ann?: PgAnnounceStore;
   get announcements(): PgAnnounceStore { return (this.ann ??= new PgAnnounceStore(this.sql)); }
-  private filmStore: PgFilmStore | undefined;   get films(): PgFilmStore { return (this.filmStore ??= new PgFilmStore(this.sql)); }
+  private filmStore: PgFilmStore | undefined;   get films(): PgFilmStore { return (this.filmStore ??= new PgFilmStore(this.sql)); }   private replyStore: PgReplyStore | undefined;   get replies(): PgReplyStore { return (this.replyStore ??= new PgReplyStore(this.sql)); }   private modelStore: PgAgentModelStore | undefined;   get agentModels(): PgAgentModelStore { return (this.modelStore ??= new PgAgentModelStore(this.sql)); }
 
   constructor(url: string) {
     // prepare:false keeps Supavisor pooler compatibility.
@@ -2175,6 +2180,7 @@ export class PostgresStore implements Store {
         values (${ws}::uuid, ${input.channelId}::uuid, ${input.title}, ${input.cadence}, ${input.atTime}, ${input.tz}, ${input.weekday}, ${input.nextRunAt}, ${agentId}, ${sql.json({ prompt: input.prompt, ...(input.payloadExtra ?? {}) } as never)}, ${input.createdByKind}, ${input.createdBy})
         returning id`;
       await this.insertEvent(sql, makeEvent(ws), null);
+      await linkRoutineSessionSql(sql, ws, row!['id'] as string, input, (s, ev) => this.insertEvent(s, ev, null));
       return { id: row!['id'] as string };
     }) as Promise<{ id: string }>;
   }
@@ -2189,14 +2195,14 @@ export class PostgresStore implements Store {
     }) as Promise<{ id: string }>;
   }
 
-  async updateSchedule(scheduleId: string, patch: { title: string; prompt: string; cadence: string; atTime: string; tz: string; weekday: number | null; nextRunAt: string }, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }> {
+  async updateSchedule(scheduleId: string, patch: { title: string; prompt: string; cadence: string; atTime: string; tz: string; weekday: number | null; nextRunAt: string; replyGap?: number | null }, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }> {
     return this.sql.begin(async (_tx) => {
       const sql = asSql(_tx);
       // merge the new prompt into the jsonb payload; run_count is deliberately untouched
       const [row] = await sql`update schedules set
           title = ${patch.title}, cadence = ${patch.cadence}, at_time = ${patch.atTime}, tz = ${patch.tz},
           weekday = ${patch.weekday}, next_run_at = ${patch.nextRunAt},
-          payload = coalesce(payload, '{}'::jsonb) || ${sql.json({ prompt: patch.prompt } as never)}
+          payload = (coalesce(payload, '{}'::jsonb) - ${patch.replyGap === null ? 'replyGap' : ''}::text) || ${sql.json({ prompt: patch.prompt, ...(typeof patch.replyGap === 'number' ? { replyGap: patch.replyGap } : {}) } as never)}
         where id = ${scheduleId}::uuid returning workspace_id`;
       if (!row) throw new DomainError('NOT_FOUND', 'schedule not found');
       await this.insertEvent(sql, makeEvent(row['workspace_id'] as string), null);
@@ -2338,6 +2344,9 @@ export class PostgresStore implements Store {
       return { id: itemId };
     }) as Promise<{ id: string }>;
   }
+
+  /** a draft with no thread and no task moves into a conversation in its own room (store/content-anchor.ts) */
+  async anchorContentItem(itemId: string, threadId: string, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }> { return this.sql.begin((tx) => anchorContentItemSql(asSql(tx), itemId, threadId, (ws) => this.insertEvent(asSql(tx), makeEvent(ws), null))) as Promise<{ id: string }>; }
 
   async attachContentMedia(itemId: string, mime: string, bytes: Buffer, actor: { kind: string; id: string }, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }> {
     return this.sql.begin(async (_tx) => {
@@ -2643,6 +2652,8 @@ export class PostgresStore implements Store {
     }) as Promise<{ claimed: boolean }>;
   }
 
+  // Run now (routine sessions): store/schedule-now.ts
+  async runScheduleNow(scheduleId: string, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }> { return this.sql.begin(async (_tx) => { const sql = asSql(_tx); await this.insertEvent(sql, makeEvent(await runScheduleNowSql(sql, scheduleId)), null); return { id: scheduleId }; }) as Promise<{ id: string }>; }
   async markScheduleResult(scheduleId: string, error: string | null, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }> {
     return this.sql.begin(async (_tx) => {
       const sql = asSql(_tx);
@@ -2782,13 +2793,9 @@ export class PostgresStore implements Store {
     return row ? threadModeOf(row.mode) : null;
   }
 
-  // routines (0119): the automation that opened this thread — the server floor that makes a
-  // routine-born task hands-off reads it (createtask.ts, 2026-08-19)
-  async getThreadScheduleId(workspace: string, threadId: string): Promise<string | null> {
-    const [row] = await this.sql<Array<{ schedule_id: string | null }>>`select schedule_id from threads
-      where id = ${threadId}::uuid and workspace_id = ${workspace}::uuid`;
-    return row?.schedule_id ?? null;
-  }
+  // routines (0119): the ROUTINE that opened this thread, never a content schedule — the server floor
+  // that makes a routine-born task hands-off reads it (createtask.ts, 2026-08-19; store/routine-rule.ts)
+  async getThreadRoutineId(workspace: string, threadId: string): Promise<string | null> { return threadRoutineIdSql(this.sql, workspace, threadId); }
 
   /** the room's setup task (docs/39) — the bootstrap anchors its whole flow to THIS thread
    * (round 3): wizard, docs, close and playbook subtasks live in one session, not five */
@@ -2812,11 +2819,11 @@ export class PostgresStore implements Store {
 
   // Auto-filing (0109) — the three reads/writes behind thread.move.
   async threadFiling(workspace: string, threadId: string) {
-    const [row] = await this.sql<Array<{ task_id: string | null; filed_at: string | null; channel_id: string; project_id: string | null }>>`
-      select t.task_id, t.filed_at, t.channel_id, c.project_id
+    const [row] = await this.sql<Array<{ task_id: string | null; filed_at: string | null; channel_id: string; project_id: string | null; schedule_id: string | null; kind: string | null }>>`
+      select t.task_id, t.filed_at, t.channel_id, c.project_id, t.schedule_id, t.kind
         from threads t left join channels c on c.id = t.channel_id
        where t.id = ${threadId}::uuid and t.workspace_id = ${workspace}::uuid`;
-    return row ? { taskId: row.task_id, filedAt: row.filed_at, channelId: row.channel_id, projectId: row.project_id } : null;
+    return row ? { taskId: row.task_id, filedAt: row.filed_at, channelId: row.channel_id, projectId: row.project_id, scheduleId: row.schedule_id, kind: row.kind } : null;
   }
 
   async channelProject(workspace: string, channelId: string) {
@@ -2963,14 +2970,18 @@ export class PostgresStore implements Store {
           // …and 0119's schedule_id joins the birth-only set: the automation that fired this
           // slot owns the conversation it opened, and no later reply into it may re-attribute that.
           const bornBrain = parseBrainOverride(msg.brainOverride);
+          // a schedule's session wears the schedule's title, and a later run of it renames the session
+          // while nobody named it (titled_at): the conflict branch below, store/session-title.ts
           // 0134: a designation naming a machine outside THIS workspace is dropped rather than mis-routing at claim time
           await sql`insert into threads (id, workspace_id, channel_id, title, created_by, mode, brain_override, schedule_id, machine_id, origin, kind)
-            values (${msg.threadId}::uuid, ${msg.workspace}::uuid, ${chId}, ${threadTitle(msg.body)}, ${`${msg.author.kind}:${msg.author.id}`}, ${threadModeOf(msg.threadMode)}, ${bornBrain ? sql.json(bornBrain as never) : null}, ${msg.scheduleId ?? null}::uuid, ${msg.threadMachineId ? await workspaceMachine(sql, msg.workspace, msg.threadMachineId) : null}::uuid, ${msg.threadOrigin ?? null}, ${threadKindOf(msg.threadKind)})
-            on conflict (id) do update set updated_at = now()`;
+            values (${msg.threadId}::uuid, ${msg.workspace}::uuid, ${chId}, ${await sessionTitleSql(sql, msg.workspace, msg.scheduleId ?? null, msg.body)}, ${`${msg.author.kind}:${msg.author.id}`}, ${threadModeOf(msg.threadMode)}, ${bornBrain ? sql.json(bornBrain as never) : null}, (select id from schedules where id = ${msg.scheduleId ?? null}::uuid and workspace_id = ${msg.workspace}::uuid), ${msg.threadMachineId ? await workspaceMachine(sql, msg.workspace, msg.threadMachineId) : null}::uuid, ${msg.threadOrigin ?? null}, ${threadKindOf(msg.threadKind)})
+            on conflict (id) do update set updated_at = now(), title = case when threads.titled_at is null and threads.schedule_id = excluded.schedule_id then excluded.title else threads.title end`;
         }
-        await sql`insert into messages (id, workspace_id, channel_id, task_id, thread_id, author_kind, author_id, body, reply_to)
+        // 0145: a run's opener keeps its schedule, and only one of this workspace (else null, never a refusal)
+        await sql`insert into messages (id, workspace_id, channel_id, task_id, thread_id, author_kind, author_id, body, reply_to, schedule_id)
           values (${msg.id}, ${msg.workspace}::uuid, ${chId}, ${msg.taskId ?? null}, ${msg.threadId ?? null},
-            ${msg.author.kind}::actor_kind, ${msg.author.id}::uuid, ${msg.body}, ${msg.replyTo ?? null})`;
+            ${msg.author.kind}::actor_kind, ${msg.author.id}::uuid, ${msg.body}, ${msg.replyTo ?? null},
+            (select id from schedules where id = ${msg.scheduleId ?? null}::uuid and workspace_id = ${msg.workspace}::uuid))`;
         // A thread's opening message IS its root (docs/31) unless the client named a different
         // one (the reply flow, where the root is an older message that stays in the feed). Rootless
         // threads are the bug shape: the feed shows a thread's root and hides its replies, so a

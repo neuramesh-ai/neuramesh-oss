@@ -9,9 +9,11 @@
 // import — and it has exactly one consumer, the `runQuery` seat on the anthropic adapter.
 import { CLAUDE_DESIGN_MCP_URL } from '@neuramesh/shared';
 import { nmToolServer } from './nmtools';
+import { WEB_TOOL_NAMES } from './nmtools-web';
 import { createBeatRun } from '../beats';
 import { drainQuery, instructionsFor } from '../host/turnkit';
 import { buildCodingPrompt, claudePathOption, codingSystemPrompt, providerEnv, sandboxFsEnabled, type PermissionGate, type PromptOverride, type TurnOpts } from '../runtime/adapter';
+import { claudeEffort } from './thinking';
 import { claudeSandboxOptions, computeFsJail } from '../sandbox/fsjail';
 // type-only, so the agents.ts ⇄ here edge is erased at compile time
 import type { ExecTask, HostedAgent, SkillRef } from '../agents';
@@ -78,6 +80,7 @@ export async function claudeCode(
           ...claudeSandbox,
           env: providerEnv('anthropic', token),
           model: agent.model,
+          ...claudeEffort(agent),
           maxTurns: 30,
           ...(ac ? { abortController: ac } : {}),
           mcpServers: {
@@ -91,7 +94,7 @@ export async function claudeCode(
           // the SDK's default base toolset omits it). The claude_code preset pins the
           // full standard toolset explicitly instead of renting per-version defaults.
           tools: { type: 'preset' as const, preset: 'claude_code' as const },
-          allowedTools: ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Bash', 'TodoWrite', 'mcp__nm__screenshot', 'mcp__nm__load_skill', 'mcp__nm__propose_skill', 'mcp__nm__record_lesson', 'mcp__nm__add_backlog_item', ...(promptOverride?.claudeDesign ? ['mcp__claude-design__*'] : []), ...(beatRun ? ['mcp__nm__declare_beats', 'mcp__nm__advance_beat'] : []), ...(opts?.spawn ? ['mcp__nm__spawn'] : []), ...(opts?.park ? ['mcp__nm__park'] : []), ...(opts?.whiteboards ? ['mcp__nm__create_whiteboard', 'mcp__nm__update_whiteboard', 'mcp__nm__list_whiteboards', 'mcp__nm__read_whiteboard'] : []), ...(opts?.searchX ? ['mcp__nm__search_x'] : []), ...(opts?.draftReplies ? ['mcp__nm__draft_replies'] : []), ...(opts?.repo ? ['mcp__nm__list_repo_changes', 'mcp__nm__read_repo_file', 'mcp__nm__list_repo_files'] : [])],
+          allowedTools: ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Bash', 'TodoWrite', 'mcp__nm__screenshot', 'mcp__nm__load_skill', 'mcp__nm__propose_skill', 'mcp__nm__record_lesson', 'mcp__nm__add_backlog_item', ...(promptOverride?.claudeDesign ? ['mcp__claude-design__*'] : []), ...(beatRun ? ['mcp__nm__declare_beats', 'mcp__nm__advance_beat'] : []), ...(opts?.spawn ? ['mcp__nm__spawn'] : []), ...(opts?.park ? ['mcp__nm__park'] : []), ...(opts?.whiteboards ? ['mcp__nm__create_whiteboard', 'mcp__nm__update_whiteboard', 'mcp__nm__list_whiteboards', 'mcp__nm__read_whiteboard'] : []), ...(opts?.searchX ? ['mcp__nm__search_x'] : []), ...(opts?.draftReplies ? ['mcp__nm__draft_replies'] : []), ...(opts?.repo ? ['mcp__nm__list_repo_changes', 'mcp__nm__read_repo_file', 'mcp__nm__list_repo_files'] : []), ...(opts?.web ? WEB_TOOL_NAMES.map((n) => `mcp__nm__${n}`) : [])],
           permissionMode: 'bypassPermissions',
           // The policy gate (agent permission engine, Phase 1). PreToolUse fires even under
           // bypassPermissions and sees every tool; the gate maps the call, evaluates policy,

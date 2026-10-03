@@ -9,6 +9,7 @@ import { ghCapable, repoSlugFor } from './gh';
 import { readRepoSignals } from './releasewatch';
 import { githubConnected, primaryRepoRow, readSignalsViaConnector } from './reporead';
 import type { ApiGetFn } from './searchx';
+import { runCut } from './runwindow';
 
 type ReplicaDb = { getAll<T>(sql: string, params?: unknown[]): Promise<T[]> };
 const WINDOW_DAYS = 120;
@@ -16,7 +17,8 @@ const WINDOW_DAYS = 120;
 export async function releaseDigestFor(i: { db: ReplicaDb; apiGet: ApiGetFn; actor: { kind: string; id: string; role?: string }; channelId: string; threadId: string | null; release: string | null; now?: Date; capable?: () => Promise<boolean> }): Promise<string | null> {
   const { db, apiGet, actor, channelId } = i;
   if (i.threadId) {
-    const [hit] = await db.getAll<{ n: number }>(`select count(*) as n from messages where (thread_id = ? or task_id = ?) and body like '%‹release:%'`, [i.threadId, i.threadId]).catch(() => [{ n: 0 }]);
+    // the newest run only: a routine's one session holds a digest per run (host/runwindow.ts)
+    const [hit] = await db.getAll<{ n: number }>(`select count(*) as n from messages where (thread_id = ? or task_id = ?) and created_at >= ? and body like '%‹release:%'`, [i.threadId, i.threadId, await runCut(db, i.threadId)]).catch(() => [{ n: 0 }]);
     if ((hit?.n ?? 0) > 0) return null;
   }
   const repo = await primaryRepoRow(db, channelId);
