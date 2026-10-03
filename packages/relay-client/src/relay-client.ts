@@ -167,8 +167,9 @@ function bufferedEngineeringRaw(c: Conn, message: unknown, canceled: () => boole
 export function openRelayJsonChannel(
   cfg: RelayConfig,
   opts: {
-    /** `engineering`: the Code lane · `stream`: a read-only subscription to live agent replies */
-    lane: 'engineering' | 'stream';
+    /** `engineering`: the Code lane · `stream`: a read-only subscription to live agent replies ·
+     *  `browser`: the machine's Chromium in the web panel (@neuramesh/shared browser-lane.ts) */
+    lane: 'engineering' | 'stream' | 'browser';
     meta: Record<string, unknown>;
     onMessage(message: unknown): void;
     onExit(): void;
@@ -202,7 +203,7 @@ export function openRelayJsonChannel(
             incoming = incoming.slice(newline + 1);
             if (line) {
               try { opts.onMessage(JSON.parse(line) as unknown); }
-              catch { opts.onError('The Engineering runtime returned an invalid message.'); }
+              catch { opts.onError('The machine returned an invalid message.'); }
             }
             newline = incoming.indexOf('\n');
           }
@@ -219,6 +220,7 @@ export function openRelayJsonChannel(
     // older daemon reads an unknown lane as a terminal: it would start a shell for every tab and
     // count it as work. The hub names the machine's lanes in `attached`; no name, no open.
     if (opts.lane === 'stream' && !c.lanes.has('stream')) { c.channels.delete(ch); return fail('This machine does not serve live replies yet.'); }
+    if (opts.lane === 'browser' && !c.lanes.has('browser')) { c.channels.delete(ch); return fail('This cloud machine does not have a browser yet. It gets one at its next update.'); }
     opened = true;
     raw(c.sock, { ch, t: 'open', lane: opts.lane, meta: opts.meta });
     for (const item of queued.splice(0)) {

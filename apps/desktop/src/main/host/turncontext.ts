@@ -1,6 +1,6 @@
 // The turn transcript and the orchestrator's fan-out closure — what a turn is built FROM.
 // Split out of host/content.ts.
-import { TURN_BUDGETS, type AgentRole, type TurnKind } from '@neuramesh/shared';
+import { TURN_BUDGETS, cardsAsWords, type AgentRole, type TurnKind } from '@neuramesh/shared';
 import { resolveToken, runtimeFor } from '../agents';
 import type { ExecTask, HostedAgent, ThreadTask } from '../agents';
 import { Subtree, planSpawn } from '../harness/subagents';
@@ -72,7 +72,8 @@ async function threadTranscript(agent: HostedAgent, t: ThreadTask): Promise<stri
     rows
       .map((r, i) => {
         const who = r.author_kind === 'agent' ? (r.author_id === agent.id ? 'you' : 'agent') : 'human';
-        const body = i < cutoff && r.body.length > THREAD_OLDER_CHARS ? `${r.body.slice(0, THREAD_OLDER_CHARS)} […]` : r.body;
+        const text = cardsAsWords(r.body); // a card reads as words, never a block to copy (shared/cardwords.ts)
+        const body = i < cutoff && text.length > THREAD_OLDER_CHARS ? `${text.slice(0, THREAD_OLDER_CHARS)} […]` : text;
         return `${who}: ${body}`;
       })
       .join('\n')

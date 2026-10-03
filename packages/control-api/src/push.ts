@@ -1,4 +1,4 @@
-import { cardNotification, isLowRiskPermissionCard, parseCard, reviewPushFor } from '@neuramesh/shared';
+import { cardNotification, isLowRiskPermissionCard, parseAuthCard, parseCard, reviewPushFor } from '@neuramesh/shared';
 import type { Store } from './store';
 
 // Server-side push fan-out for the mobile companion. Fires when a task reaches a
@@ -110,6 +110,20 @@ export class PushService {
   }
 
   /**
+   * THE REPLY REMINDER (the reply queue, models-and-replies round): one queued reply's time came. Only
+   * its member is told, once (the key holds a week), and the tap opens X's reply box with the text in it
+   * (`url` in the data; the phone opens it straight, deeplink.ts).
+   */
+  async notifyReplyDue(r: { id: string; workspaceId: string; threadId: string | null; memberId: string; openUrl: string; words: { title: string; body: string } }): Promise<void> {
+    await this.dispatch({
+      workspace: r.workspaceId, excludeUserId: '', recipients: [r.memberId],
+      dedupeKey: `reply-due:${r.id}`, windowMs: 7 * 24 * 3600_000,
+      title: r.words.title, body: r.words.body,
+      data: { kind: 'reply', url: r.openUrl, reminderId: r.id, threadId: r.threadId, workspace: r.workspaceId },
+    });
+  }
+
+  /**
    * The routine's ONE notification (2026-08-19): the run finished — no gate, no ask. The human
    * opens the thread to read what it produced; nothing is waiting on them.
    */
@@ -137,6 +151,10 @@ export class PushService {
     // Routine (low-risk) permission approvals surface in-app only — no lock-screen push, to
     // avoid the notification fatigue Conseca warns about. High-risk asks + ordinary questions push.
     if (isLowRiskPermissionCard(msg.body)) return;
+    // A card that RECORDS a switch a routine already made asks nothing (app.ts mints no decision for
+    // it), so it earns no lock-screen push either: the thread shows the switch (George, 2026-09-27,
+    // "@rex cannot run on Claude here" on every routine run).
+    if (parseAuthCard(msg.body)?.switched) return;
     const notif = cardNotification(msg.body, where);
     if (!notif) return;
     await this.dispatch({

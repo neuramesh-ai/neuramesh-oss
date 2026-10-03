@@ -27,7 +27,7 @@ streams:
     queries:
       - select * from channels where workspace_id in (select workspace_id from my_workspaces)
       - select * from projects where workspace_id in (select workspace_id from my_workspaces)
-      - select id, workspace_id, channel_id, task_id, thread_id, author_kind, author_id, body, created_at, pinned from messages where workspace_id in (select workspace_id from my_workspaces)
+      - select id, workspace_id, channel_id, task_id, thread_id, author_kind, author_id, body, created_at, pinned, schedule_id from messages where workspace_id in (select workspace_id from my_workspaces)
       - select * from threads where workspace_id in (select workspace_id from my_workspaces)
       - select * from tasks where workspace_id in (select workspace_id from my_workspaces)
       - select * from machines where workspace_id in (select workspace_id from my_workspaces)
@@ -60,3 +60,6 @@ streams:
       # code_sessions (0135, mobile-cloud round) — one row per engineering session, so every client
       # can list Code work; the machine's transcript stays the execution authority
       - select * from code_sessions where workspace_id in (select workspace_id from my_workspaces)
+      # reply_reminders (0146, the reply queue) — one queued reply per row; the reply card draws its
+      # slots from it, and the web reminds its member when a row comes due
+      - select * from reply_reminders where workspace_id in (select workspace_id from my_workspaces)

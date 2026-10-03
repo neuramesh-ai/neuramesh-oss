@@ -20,6 +20,16 @@ const GEN_VIDEO_RE = /‹gen-video:([0-9a-f-]{8,})›/;
 export function genVideoItemId(body: string): string | null {
   return GEN_VIDEO_RE.exec(body)?.[1] ?? null;
 }
+/** the ask a client posts for a draft's picture. the first paragraph names the draft and stays under
+ *  the title cap, so a session the ask opens takes it as its title (threadTitle). the quote is the
+ *  post's first sentence without its stop, because threadTitle ends a title at the first stop. the
+ *  marker rides a paragraph of its own, and the machine reads only the marker. */
+export function drawAsk(item: { id: string; body: string }, redraw = false): string {
+  const head = (item.body.split(/\.(?=\s|$)|[!?\n]/)[0] ?? '').trim();
+  const quote = head ? `“${head.length > 32 ? `${head.slice(0, 32).trimEnd()}…` : head}”` : 'this draft';
+  return `${redraw ? 'Redraw' : 'Generate'} the image for ${quote}\n\n‹gen-image:${item.id}›`;
+}
+
 /** a message that asks for a draw or a film runs no model: the wake gate must not ask for a runtime */
 export function modelFreeItemId(body: string): string | null {
   return genImageItemId(body) ?? genVideoItemId(body);

@@ -71,7 +71,7 @@ export function normalizeSiteUrl(input: string): URL {
 }
 
 // Redirects are followed by hand so each hop faces the same host guard as the first URL.
-async function fetchPublic(start: URL, fetchFn: typeof fetch, signal: AbortSignal, accept: string): Promise<{ res: Response; url: URL }> {
+export async function fetchPublic(start: URL, fetchFn: typeof fetch, signal: AbortSignal, accept: string): Promise<{ res: Response; url: URL }> {
   let cur = start;
   for (let hop = 0; hop <= MAX_HOPS; hop++) {
     const res = await fetchFn(cur.toString(), { signal, redirect: 'manual', headers: { accept, 'user-agent': UA } }).catch((e: unknown) => {

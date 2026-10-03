@@ -99,6 +99,8 @@ export interface TurnOpts {
   draftReplies?: (i: { report?: string; baseline?: string; replies: unknown[] }) => Promise<string>;
   /** the repository reads (docs/design/github-connector-2026-09) — host/reporead.ts closed over the room */
   repo?: RepoReader;
+  /** the agents' browser (board C3): browser/agent-tools.ts closed over the turn, a cloud machine only */
+  web?: import('../browser/agent-tools').WebTools;
   /** the REAL turn kind for the tool bus. The CLI adapters used to hardcode
    *  `promptOverride ? 'design' : 'work'`, so a leg bridged as a design turn and
    *  TOOL_KINDS could never grant a leg anything — that literal is now the fallback only. */

@@ -12,16 +12,16 @@
 
 
 import { type WhiteboardToolClosures } from '../harness/toolbus';
-import { WB_CREATE_DESC, WB_LIST_DESC, WB_READ_DESC, WB_UPDATE_DESC } from '../harness/tooldesc';
+import { SEARCH_X_DESC, WB_CREATE_DESC, WB_LIST_DESC, WB_READ_DESC, WB_UPDATE_DESC, searchXParams } from '../harness/tooldesc';
 import { normalizeDraft, parseDraftRevisions } from '@neuramesh/shared';
 import { shareChatTools } from './chattools-share';
 import { playbookCatalogText } from './tools-playbooks';
-import { searchXText } from './searchx';
+import { searchXText, type SearchXQuery } from './searchx';
 import { newGrounding, ungrounded, type LibraryReader } from './grounding';
 import { draftSeconds, unpicked } from './ugcflow';
 import { frameArg, framesFor, productShotsFor, productShotsGate } from './frames';
 import { libraryChatTools, ugcChatTools } from './chattools-library';
-import { draftsChatTools, unreadRevision } from './chattools-drafts'; import { repoChatTools } from './chattools-repo'; import { productChatTools } from './chattools-product'; // three leaves, one line: this file sits at its cap
+import { draftsChatTools, unreadRevision } from './chattools-drafts'; import { repoChatTools } from './chattools-repo'; import { productChatTools } from './chattools-product'; import { webChatTools } from './chattools-web'; // four leaves, one line: this file sits at its cap
 
 import type { HostedAgent } from '../agents';
 import type { LogFn } from '../agentlog';
@@ -85,7 +85,7 @@ const nm = createSdkMcpServer({
       async (i) => text(await loadSkillBody(ch.id, ch.workspace_id, String(i.name))),
     ),
     ...libraryChatTools(t, grounding),
-    ...ugcChatTools(t, grounding), ...draftsChatTools(t, grounding), ...repoChatTools(t), ...productChatTools(t),
+    ...ugcChatTools(t, grounding), ...draftsChatTools(t, grounding), ...repoChatTools(t), ...productChatTools(t), ...webChatTools(t),
     tool(
       'list_playbooks',
       'The marketing playbook catalog (marketing-os) joined to this room\'s state — consult it before improvising on a marketing ask. Light flows you answer here after load_skill; heavy ones you describe and let the human ask rex to run.',
@@ -193,16 +193,13 @@ const nm = createSdkMcpServer({
     // people saying about X on X" gets asked, and the honest answer needs real posts.
     tool(
       'search_x',
-      'Search X (Twitter) for recent posts — the LAST 7 DAYS of public posts with their real author handles and real engagement numbers (likes, reposts, replies). Use it for ANY question about what is on X: finding posts to reply to, gauging a topic, checking whether a handle is active. It reads through this room\'s connected X account. Do NOT answer X questions with WebSearch/WebFetch instead — x.com blocks unauthenticated reads, so those produce guesses; this returns facts or an honest failure. Reads are metered, so use a specific query.',
-      {
-        query: z.string().min(2).max(400).describe('an X search query — supports X operators, e.g. `"ai agents" -is:retweet lang:en` or `from:handle`'),
-        max: z.number().int().min(10).max(25).optional().describe('how many posts to return (10–25, default 10)'),
-      },
+      SEARCH_X_DESC,
+      searchXParams(z),
       async (i) => {
         log({ kind: 'tool', phase: 'call', summary: `search_x ${String(i.query).slice(0, 60)}` });
         // ONE implementation (host/searchx.ts) — the orchestrator registry and worker legs read the same
         return text(await searchXText(apiGet, { kind: 'agent', id: agent.id, ...(agent.role ? { role: agent.role } : {}) },
-          { workspaceId: ch.workspace_id, channelId: ch.id }, String(i.query), i.max as number | undefined));
+          { workspaceId: ch.workspace_id, channelId: ch.id }, i as SearchXQuery));
       },
     ),
     // Social drafts are content, not board work — the same reasoning whiteboards ride on.

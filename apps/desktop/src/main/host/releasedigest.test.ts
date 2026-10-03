@@ -52,3 +52,17 @@ test('no connector and no gh: nothing is read, and the unit says so by carrying 
 test('a thread that already carries the routine\'s digest is left alone', async () => {
   assert.equal(await harness({ connected: true, marker: true })(null), null);
 });
+
+test('one session per routine: a digest in an earlier run does not stop this run\'s read', async () => {
+  const markers = ['2026-09-18 09:00:00Z']; // run one's digest, a day before the newest run opened
+  const db = { getAll: async <T,>(sql: string, params: unknown[] = []) => {
+    if (/ as cut/.test(sql)) return [{ cut: '2026-09-19 09:00:00Z' }] as T[];
+    if (/from connectors/.test(sql)) return [{ n: 1 }] as T[];
+    if (/from repos/.test(sql)) return [REPO] as T[];
+    if (/from messages/.test(sql)) return [{ n: markers.filter((m) => m >= String(params[2] ?? '')).length }] as T[];
+    return [] as T[];
+  } };
+  const apiGet = async () => ({ status: 200, ok: true, json: async () => CHANGES, text: async () => '' });
+  const out = await releaseDigestFor({ db, apiGet, actor: { kind: 'agent', id: 'rex' }, channelId: 'ch', threadId: 'th', release: null, now: NOW, capable: async () => false });
+  assert.ok(out, 'the newest run holds no digest yet, so the playbook reads one');
+});

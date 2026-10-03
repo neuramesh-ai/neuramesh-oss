@@ -10,6 +10,7 @@ import { join } from 'node:path';
 import type { LogFn } from '../agentlog';
 import type { TurnOpts, RuntimeAdapter, ProposeSkillFn, RecordLessonFn, AddBacklogItemFn, BeatsFn, AgentAttachment, PromptOverride } from './adapter';
 import { buildCodingPrompt, chatSystemPrompt, codexSandboxMode, providerEnv } from './adapter';
+import { codexEffort } from './thinking';
 import { instructionsFor } from '../host/turnkit';
 import { beatMarkerSink, stripBeatMarkers } from '../beats';
 import { openBusBridge, userDataDir, beatsAdapter } from '../harness/turntools';
@@ -18,7 +19,7 @@ import { ensureCli } from './cli';
 // Minimal shapes from @openai/codex-sdk (dynamically imported to keep the main bundle lean).
 type CodexCtor = new (opts?: { codexPathOverride?: string; apiKey?: string; env?: Record<string, string>; config?: Record<string, unknown> }) => CodexClient;
 interface CodexClient { startThread(opts?: ThreadOpts): CodexThread; resumeThread(id: string, opts?: ThreadOpts): CodexThread; }
-interface ThreadOpts { model?: string; sandboxMode?: 'read-only' | 'workspace-write' | 'danger-full-access'; workingDirectory?: string; skipGitRepoCheck?: boolean; approvalPolicy?: 'never' | 'on-request' | 'on-failure' | 'untrusted' }
+interface ThreadOpts { model?: string; modelReasoningEffort?: 'low' | 'medium' | 'high'; sandboxMode?: 'read-only' | 'workspace-write' | 'danger-full-access'; workingDirectory?: string; skipGitRepoCheck?: boolean; approvalPolicy?: 'never' | 'on-request' | 'on-failure' | 'untrusted' }
 // Codex accepts a plain string OR an array of typed input items — text + local_image (by file path).
 type CodexInput = string | Array<{ type: 'text'; text: string } | { type: 'local_image'; path: string }>;
 interface CodexThread { id: string | null; run(input: CodexInput, t?: { signal?: AbortSignal }): Promise<{ finalResponse: string; usage: CodexUsage | null }>; runStreamed(input: CodexInput, t?: { signal?: AbortSignal }): Promise<{ events: AsyncIterable<CodexEvent> }> }
@@ -82,15 +83,15 @@ async function runResilient(codex: CodexClient, opts: ThreadOpts, input: CodexIn
   const first = await drainTurn((await codex.startThread(opts).runStreamed(input, turnOpts)).events, log, onDelta, onMarkerText);
   if (first.text || !opts.model || !first.failure || !/not supported|unsupported|not available|invalid model|model .*not/i.test(first.failure)) return first;
   log?.({ kind: 'tool', phase: 'result', summary: `model "${opts.model}" unavailable on this account — using its default`, level: 'warn' });
-  return drainTurn((await codex.startThread({ ...opts, model: undefined }).runStreamed(input, turnOpts)).events, log, onDelta, onMarkerText);
+  return drainTurn((await codex.startThread({ ...opts, model: undefined, modelReasoningEffort: undefined }).runStreamed(input, turnOpts)).events, log, onDelta, onMarkerText);
 }
 
 // non-agentic turn in a throwaway read-only dir (codex needs a cwd).
-async function reason(system: string, user: string, token: string, model: string, onDelta?: (t: string) => void, attachments?: AgentAttachment[]): Promise<string> {
+async function reason(system: string, user: string, token: string, model: string, onDelta?: (t: string) => void, attachments?: AgentAttachment[], effort: ReturnType<typeof codexEffort> = {}): Promise<string> {
   const codex = await mkCodex(token);
   const dir = mkdtempSync(join(tmpdir(), 'nm-codexsdk-'));
   try {
-    const { text, failure } = await runResilient(codex, { model, sandboxMode: codexSandboxMode('read-only'), workingDirectory: dir, skipGitRepoCheck: true }, codexInput(`${system}\n\n${user}`, attachments), {}, undefined, onDelta);
+    const { text, failure } = await runResilient(codex, { model, ...effort, sandboxMode: codexSandboxMode('read-only'), workingDirectory: dir, skipGitRepoCheck: true }, codexInput(`${system}\n\n${user}`, attachments), {}, undefined, onDelta);
     if (!text && failure) throw new Error(`codex: ${failure.slice(0, 160)}`);
     return text;
   } finally {
@@ -102,7 +103,7 @@ export const codexSdkAdapter: RuntimeAdapter = {
   streamTurn(agent, channelSlug, transcript, token, _log, onDelta, attachments) {
     // instructionsFor, not agent.brief: local › baseline › shipped — a CLI seat honoring only
     // the synced brief silently ignored the machine's own overlay edits (2026-08-18 audit A6)
-    return reason(chatSystemPrompt(agent.name, channelSlug, instructionsFor(agent)), transcript, token, agent.model, onDelta, attachments).then((t) => t || '(no reply)');
+    return reason(chatSystemPrompt(agent.name, channelSlug, instructionsFor(agent)), transcript, token, agent.model, onDelta, attachments, codexEffort(agent)).then((t) => t || '(no reply)');
   },
   complete(system, user, token, model) {
     return reason(system, user, token, model);
@@ -114,7 +115,7 @@ export const codexSdkAdapter: RuntimeAdapter = {
     // a discovery, and beats depended on the model echoing NM_BEAT_DONE into stdout. The bus gives
     // it the SAME toolset a Claude worker gets, over the loopback MCP bridge.
     const bus = await openBusBridge(
-      { kind: opts?.turnKind ?? (promptOverride ? 'design' : 'work'), host: { dir, log, skills, proposeSkill, recordLesson, addBacklogItem, ...(beats ? { beats: beatsAdapter(beats) } : {}), ...(opts?.spawn ? { spawn: opts.spawn } : {}), ...(opts?.park ? { park: opts.park } : {}), ...(opts?.whiteboards ? { whiteboards: opts.whiteboards } : {}), ...(opts?.searchX ? { searchX: opts.searchX } : {}), ...(opts?.draftReplies ? { draftReplies: opts.draftReplies } : {}), ...(opts?.repo ? { repo: opts.repo } : {}) } },
+      { kind: opts?.turnKind ?? (promptOverride ? 'design' : 'work'), host: { dir, log, skills, proposeSkill, recordLesson, addBacklogItem, ...(beats ? { beats: beatsAdapter(beats) } : {}), ...(opts?.spawn ? { spawn: opts.spawn } : {}), ...(opts?.park ? { park: opts.park } : {}), ...(opts?.whiteboards ? { whiteboards: opts.whiteboards } : {}), ...(opts?.searchX ? { searchX: opts.searchX } : {}), ...(opts?.draftReplies ? { draftReplies: opts.draftReplies } : {}), ...(opts?.repo ? { repo: opts.repo } : {}), ...(opts?.web ? { web: opts.web } : {}) } },
       userDataDir(),
       log,
     );
@@ -143,7 +144,7 @@ export const codexSdkAdapter: RuntimeAdapter = {
       // findings into a markdown report instead of handing over the card. Approval was never the
       // boundary here anyway: codex self-sandboxes (workspace-write, see L1b below) and egress
       // rides the L1a proxy, so what it may touch is already decided before the turn starts.
-      const { text, tokens, failure } = await runResilient(codex, { model: agent.model, sandboxMode: codexSandboxMode('workspace-write'), approvalPolicy: 'never', workingDirectory: dir, skipGitRepoCheck: true }, promptOverride?.prompt ?? buildCodingPrompt(t, channelBlock, repoBacked, skills, reworkNotes, attachmentsNote, lessonsNote, agent.brief, bus.count > 0), ac ? { signal: ac.signal } : {}, log, undefined, onMarkerText);
+      const { text, tokens, failure } = await runResilient(codex, { model: agent.model, ...codexEffort(agent), sandboxMode: codexSandboxMode('workspace-write'), approvalPolicy: 'never', workingDirectory: dir, skipGitRepoCheck: true }, promptOverride?.prompt ?? buildCodingPrompt(t, channelBlock, repoBacked, skills, reworkNotes, attachmentsNote, lessonsNote, agent.brief, bus.count > 0), ac ? { signal: ac.signal } : {}, log, undefined, onMarkerText);
       const clean = onMarkerText ? stripBeatMarkers(text) : text;
       if (ac?.signal.aborted) { log?.({ kind: 'result', phase: 'success', summary: 'capped · codex', tokens }); return clean || '(capped)'; }
       if (!clean && failure) { log?.({ kind: 'result', phase: 'error', summary: `failed · codex: ${failure.slice(0, 140)}`, level: 'error' }); throw new Error(`codex produced no output: ${failure.slice(0, 160)}`); }

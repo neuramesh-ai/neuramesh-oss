@@ -53,17 +53,26 @@ export async function distillReplyCard(
       [taskId, threadId, taskId],
     ).catch(() => null);
     if (dupe) return;
-    const raw = (await complete(EXTRACT_SYSTEM, report.content.slice(0, 24_000), token, model, 8000)).trim();
-    const parsed = JSON.parse(raw.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '')) as { baseline?: string; replies?: unknown[] };
-    if (!Array.isArray(parsed.replies) || !parsed.replies.length) return;
-    // no draw: a report carries no image briefs, and the fallback's job is the card, not art
-    const said = await postReplyCard(
-      { post, actor: voice, ch, anchor },
-      { report: report.name, ...(parsed.baseline ? { baseline: parsed.baseline } : {}), replies: parsed.replies },
-    );
-    console.log(`replycard_distilled task=${taskId}: ${said.slice(0, 120)}`);
+    const said = await postDistilledCard(post, complete, model, token, voice, report, ch, anchor);
+    if (said) console.log(`replycard_distilled task=${taskId}: ${said.slice(0, 120)}`);
   } catch (err) {
     // the report already stands on its own — a failed distill costs the card, never the run
     console.warn(`replycard_distill skipped for ${report.name}:`, err instanceof Error ? err.message : err);
   }
+}
+
+/** extract the drafted replies from a text and post them as the card. Null when the text holds none.
+ *  The caller owns the dedupe (a task's run above, a routine's run in host/routinereplies.ts) */
+export async function postDistilledCard(
+  post: Post, complete: CompleteFn, model: string, token: string, voice: Actor,
+  report: { name: string; content: string }, ch: { id: string; workspace_id: string }, anchor: { taskId: string } | { threadId: string },
+): Promise<string | null> {
+  const raw = (await complete(EXTRACT_SYSTEM, report.content.slice(0, 24_000), token, model, 8000)).trim();
+  const parsed = JSON.parse(raw.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '')) as { baseline?: string; replies?: unknown[] };
+  if (!Array.isArray(parsed.replies) || !parsed.replies.length) return null;
+  // no draw: a report carries no image briefs, and the fallback's job is the card, not art
+  return postReplyCard(
+    { post, actor: voice, ch, anchor },
+    { report: report.name, ...(parsed.baseline ? { baseline: parsed.baseline } : {}), replies: parsed.replies },
+  );
 }

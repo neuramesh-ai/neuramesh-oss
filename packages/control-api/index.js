@@ -165,6 +165,13 @@ function genImageItemId(body) {
 function genVideoItemId(body) {
   return GEN_VIDEO_RE.exec(body)?.[1] ?? null;
 }
+function drawAsk(item, redraw = false) {
+  const head = (item.body.split(/\.(?=\s|$)|[!?\n]/)[0] ?? "").trim();
+  const quote2 = head ? `\u201C${head.length > 32 ? `${head.slice(0, 32).trimEnd()}\u2026` : head}\u201D` : "this draft";
+  return `${redraw ? "Redraw" : "Generate"} the image for ${quote2}
+
+\u2039gen-image:${item.id}\u203A`;
+}
 function modelFreeItemId(body) {
   return genImageItemId(body) ?? genVideoItemId(body);
 }
@@ -247,41 +254,41 @@ function stripFenced(body, lang) {
     rest = rest.slice(b2.end);
   }
 }
-function dotLines(text) {
-  return text.split(LINE_END);
+function dotLines(text2) {
+  return text2.split(LINE_END);
 }
-function lineHas(text, first, then) {
-  return dotLines(text).some((line) => {
+function lineHas(text2, first, then) {
+  return dotLines(text2).some((line) => {
     const at = line.indexOf(first);
     return at !== -1 && line.indexOf(then, at + first.length) !== -1;
   });
 }
-function firstSentence(text) {
-  const m = /[.!?]/.exec(text);
-  return m ? text.slice(0, m.index) : text;
+function firstSentence(text2) {
+  const m = /[.!?]/.exec(text2);
+  return m ? text2.slice(0, m.index) : text2;
 }
-function markerSpans(text, open, close) {
+function markerSpans(text2, open, close) {
   const out = [];
   let from = 0;
   for (; ; ) {
-    const start = text.indexOf(open, from);
+    const start = text2.indexOf(open, from);
     if (start === -1) return out;
-    const stop = text.indexOf(close, start + open.length);
+    const stop = text2.indexOf(close, start + open.length);
     if (stop === -1) return out;
-    out.push({ start, end: stop + close.length, inner: text.slice(start + open.length, stop) });
+    out.push({ start, end: stop + close.length, inner: text2.slice(start + open.length, stop) });
     from = stop + close.length;
   }
 }
-function stripMarkers(text, open, close) {
-  const spans = markerSpans(text, open, close);
-  if (!spans.length) return text;
+function stripMarkers(text2, open, close) {
+  const spans = markerSpans(text2, open, close);
+  if (!spans.length) return text2;
   let out = "";
   let at = 0;
   for (const sp of spans) {
-    out += text.slice(at, sp.start);
+    out += text2.slice(at, sp.start);
     at = sp.end;
   }
-  return out + text.slice(at);
+  return out + text2.slice(at);
 }
 var LINE_END;
 var init_linear = __esm({
@@ -1382,6 +1389,67 @@ var init_cards = __esm({
   }
 });
 
+// ../shared/src/cardfence.ts
+function repairCardJson(inner) {
+  const t2 = inner.trim().replace(/,(\s*[}\]])/g, "$1");
+  const tries = t2.startsWith('"') ? [t2, `{${t2}`, `{${t2}}`] : [t2];
+  for (const s of tries) if (parses(s)) return JSON.stringify(JSON.parse(s), null, 2);
+  return null;
+}
+function repairCardFences(body) {
+  if (!body.includes("```nm")) return body;
+  let out = "";
+  let from = 0;
+  for (const m of body.matchAll(OPEN)) {
+    const start = m.index ?? 0;
+    if (start < from) continue;
+    const lang = m[1];
+    const rest = (m[2] ?? "").trim();
+    if (rest && !rest.startsWith("{") && !rest.startsWith("[")) continue;
+    const innerStart = start + m[0].length;
+    const close = body.indexOf("```", innerStart);
+    if (close === -1) break;
+    const inner = `${rest ? `${rest}
+` : ""}${body.slice(innerStart, close)}`.replace(/\n$/, "");
+    const clean2 = !rest && m[2] === "" && body[close - 1] === "\n" && parses(inner);
+    const fixed = clean2 ? null : parses(inner) ? inner : repairCardJson(inner);
+    if (fixed !== null) {
+      out += `${body.slice(from, start)}\`\`\`${lang}
+${fixed}
+\`\`\``;
+      from = close + 3;
+    }
+  }
+  return from ? out + body.slice(from) : body;
+}
+function stripCardFences(body) {
+  if (!body.includes("```nm")) return body;
+  let out = "";
+  let from = 0;
+  for (let at = body.indexOf("```nm"); at !== -1; at = body.indexOf("```nm", from)) {
+    out += body.slice(from, at);
+    const close = body.indexOf("```", at + 5);
+    if (close === -1) return out.trim();
+    from = close + 3;
+  }
+  return (out + body.slice(from)).trim();
+}
+var OPEN, parses;
+var init_cardfence = __esm({
+  "../shared/src/cardfence.ts"() {
+    "use strict";
+    OPEN = /```(nm[a-z]+)([^\n]*)\n/g;
+    parses = (s) => {
+      try {
+        const v = JSON.parse(s);
+        return !!v && typeof v === "object";
+      } catch {
+        return false;
+      }
+    };
+  }
+});
+
 // ../shared/src/sessions.ts
 function liveKinOf(tasks) {
   const byId = new Map(tasks.map((t2) => [t2.id, t2]));
@@ -1420,7 +1488,7 @@ function historyRows(input) {
       if (ownedElsewhere(t2, task)) return [];
       const kind = threadKindOf(t2.kind);
       const code = kind === "coding" ? codeByThread.get(t2.id) ?? null : null;
-      const snip = (t2.last_body ?? "").replace(/‹task:[0-9a-fA-F-]{36}›/g, "\u25B8 filed a task \u2014 card in the thread").replace(/\s*‹(?:brief|release|report|article|wb|plan|kind):[^›]*›/g, "").trim();
+      const snip = stripCardFences(t2.last_body ?? "").replace(/‹task:[0-9a-fA-F-]{36}›/g, "\u25B8 filed a task \u2014 card in the thread").replace(/\s*‹(?:brief|release|report|article|wb|plan|kind):[^›]*›/g, "").trim();
       return [{
         key: `th:${t2.id}`,
         threadId: t2.id,
@@ -1472,8 +1540,8 @@ function historyRows(input) {
     })
   ].filter((r) => !needle || `${r.title} ${r.snip} ${r.channelSlug}`.toLowerCase().includes(needle)).sort((a, b2) => a.when < b2.when ? 1 : -1).slice(0, input.limit ?? 200);
 }
-function dayStart(ms, back) {
-  const d = new Date(ms);
+function dayStart(ms2, back) {
+  const d = new Date(ms2);
   d.setHours(0, 0, 0, 0);
   d.setDate(d.getDate() - back);
   return d.getTime();
@@ -1532,6 +1600,7 @@ var init_sessions = __esm({
     "use strict";
     init_threads();
     init_cards();
+    init_cardfence();
     BUCKETS = ["Today", "Yesterday", "This week", "Earlier"];
   }
 });
@@ -1928,11 +1997,11 @@ function isStandDown(reply) {
 function fenceWork(tag) {
   return /^(revise|cards|posts)$/i.test(tag) ? "drafts" : "card";
 }
-function visibleStream(text) {
-  if (isStandDown(text)) return { text: "", forming: null };
-  const lines = text.trimEnd().split("\n");
-  if (SENTINEL_FORMING.test(lines[lines.length - 1] ?? "")) text = lines.slice(0, -1).join("\n");
-  const closed = text.replace(CLOSED_RE, "");
+function visibleStream(text2) {
+  if (isStandDown(text2)) return { text: "", forming: null };
+  const lines = text2.trimEnd().split("\n");
+  if (SENTINEL_FORMING.test(lines[lines.length - 1] ?? "")) text2 = lines.slice(0, -1).join("\n");
+  const closed = text2.replace(CLOSED_RE, "");
   const open = OPEN_RE.exec(closed);
   const visible = (open ? closed.slice(0, open.index) : closed).replace(/\n{3,}/g, "\n\n").trimEnd();
   return { text: visible, forming: open ? fenceWork(open[1] ?? "") : null };
@@ -2057,6 +2126,76 @@ var init_livestream = __esm({
   }
 });
 
+// ../shared/src/browser-lane.ts
+function browserViewport(width, height) {
+  const w = side(width, BROWSER_VIEWPORT.minW, BROWSER_VIEWPORT.maxW);
+  const h = side(height, BROWSER_VIEWPORT.minH, BROWSER_VIEWPORT.maxH);
+  return w && h ? { width: w, height: h } : null;
+}
+function browserOpenMeta(m) {
+  if (typeof m !== "object" || m === null) return null;
+  const r = m;
+  if (r["v"] !== 1 || !isTab(r["tab"])) return null;
+  const size = browserViewport(r["width"], r["height"]);
+  return size ? { v: 1, tab: r["tab"], ...size } : null;
+}
+function parseBrowserInput(v) {
+  if (typeof v !== "object" || v === null) return null;
+  const m = v;
+  const read = typeof m["t"] === "string" && Object.hasOwn(READERS, m["t"]) ? READERS[m["t"]] : void 0;
+  return read ? read(m) : null;
+}
+var BROWSER_LANE, BROWSER_VIEWPORT, MAX_BROWSER_URL_CHARS, MAX_BROWSER_TEXT_CHARS, MAX_COORD, BROWSER_FRAME_WINDOW, BROWSER_QUALITY_STEPS, b64Length, isTab, num, int, str, side, optional, mods, point, withMods, isButton, isClicks, READERS, agentTabAllows;
+var init_browser_lane = __esm({
+  "../shared/src/browser-lane.ts"() {
+    "use strict";
+    BROWSER_LANE = "browser";
+    BROWSER_VIEWPORT = { minW: 320, minH: 240, maxW: 1920, maxH: 1440 };
+    MAX_BROWSER_URL_CHARS = 2048;
+    MAX_BROWSER_TEXT_CHARS = 2e3;
+    MAX_COORD = 1e4;
+    BROWSER_FRAME_WINDOW = 2;
+    BROWSER_QUALITY_STEPS = [60, 45, 30, 20];
+    b64Length = (bytes) => 4 * Math.ceil(bytes / 3);
+    isTab = (v) => v === "person" || v === "agent";
+    num = (v, lo, hi) => typeof v === "number" && Number.isFinite(v) && v >= lo && v <= hi;
+    int = (v, lo, hi) => num(v, lo, hi) && Number.isInteger(v);
+    str = (v, lo, hi) => typeof v === "string" && v.length >= lo && v.length <= hi;
+    side = (v, lo, hi) => num(v, 0, 1e5) ? Math.min(hi, Math.max(lo, Math.round(v))) : null;
+    optional = (v, ok2) => v === void 0 || ok2(v);
+    mods = (v) => optional(v, (x) => int(x, 0, 15));
+    point = (m) => num(m["x"], 0, MAX_COORD) && num(m["y"], 0, MAX_COORD) && mods(m["mods"]);
+    withMods = (m) => m["mods"] ? { mods: m["mods"] } : {};
+    isButton = (b2) => b2 === "left" || b2 === "middle" || b2 === "right";
+    isClicks = (c) => int(c, 1, 3);
+    READERS = {
+      navigate: (m) => str(m["url"], 1, MAX_BROWSER_URL_CHARS) ? { t: "navigate", url: m["url"] } : null,
+      back: () => ({ t: "back" }),
+      forward: () => ({ t: "forward" }),
+      reload: () => ({ t: "reload" }),
+      mouse: (m) => {
+        const type = m["type"];
+        if (type !== "down" && type !== "up" && type !== "move" || !point(m) || !optional(m["button"], isButton) || !optional(m["clicks"], isClicks)) return null;
+        return { t: "mouse", type, x: m["x"], y: m["y"], ...m["button"] ? { button: m["button"] } : {}, ...m["clicks"] ? { clicks: m["clicks"] } : {}, ...withMods(m) };
+      },
+      wheel: (m) => point(m) && num(m["dx"], -MAX_COORD, MAX_COORD) && num(m["dy"], -MAX_COORD, MAX_COORD) ? { t: "wheel", x: m["x"], y: m["y"], dx: m["dx"], dy: m["dy"], ...withMods(m) } : null,
+      key: (m) => {
+        const type = m["type"];
+        if (type !== "down" && type !== "up" || !str(m["key"], 1, 32) || !str(m["code"], 0, 32) || !int(m["keyCode"], 0, 255) || !mods(m["mods"])) return null;
+        return { t: "key", type, key: m["key"], code: m["code"], keyCode: m["keyCode"], ...withMods(m) };
+      },
+      text: (m) => str(m["text"], 1, MAX_BROWSER_TEXT_CHARS) ? { t: "text", text: m["text"] } : null,
+      resize: (m) => {
+        const size = browserViewport(m["width"], m["height"]);
+        return size ? { t: "resize", ...size } : null;
+      },
+      tab: (m) => isTab(m["tab"]) ? { t: "tab", tab: m["tab"] } : null,
+      ack: (m) => int(m["n"], 0, Number.MAX_SAFE_INTEGER) ? { t: "ack", n: m["n"] } : null
+    };
+    agentTabAllows = (m) => m.t === "tab" || m.t === "ack";
+  }
+});
+
 // ../shared/src/agentdesc.ts
 function defaultDescription(role) {
   return ROLE_DESCRIPTION[role] ?? null;
@@ -2109,8 +2248,8 @@ function replyFooter(s, now = Date.now()) {
   if (s.unread > 0) return `${s.unread} new \xB7 ${plural}`;
   return when ? `${plural} \xB7 ${when}` : plural;
 }
-function shortAgo(iso3, now = Date.now()) {
-  const t2 = Date.parse(iso3);
+function shortAgo(iso4, now = Date.now()) {
+  const t2 = Date.parse(iso4);
   if (!Number.isFinite(t2)) return "";
   const secs = Math.max(0, Math.round((now - t2) / 1e3));
   if (secs < 45) return `${Math.max(1, secs)}s ago`;
@@ -2221,22 +2360,22 @@ function humanHandles(labels, reserved = []) {
   }
   return out;
 }
-function tokenizeDraft(text, people) {
-  if (!text) return [];
+function tokenizeDraft(text2, people) {
+  if (!text2) return [];
   const byName = new Map(people.map((p2) => [p2.name.toLowerCase(), p2]));
   const spans = [];
   let bare = null;
   for (const p2 of people) {
     if (p2.kind !== "agent" || !p2.here) continue;
-    const m = bareAddressRe(p2.name).exec(text);
+    const m = bareAddressRe(p2.name).exec(text2);
     if (m && (!bare || p2.name.length > bare.name.length)) {
       const start = m[0].length - p2.name.length;
       bare = { name: p2.name, start, end: m[0].length };
     }
   }
-  if (bare) spans.push({ kind: "bare", text: text.slice(bare.start, bare.end), name: bare.name, start: bare.start, end: bare.end });
+  if (bare) spans.push({ kind: "bare", text: text2.slice(bare.start, bare.end), name: bare.name, start: bare.start, end: bare.end });
   const at = /@([\w-]+)/g;
-  for (let m = at.exec(text); m; m = at.exec(text)) {
+  for (let m = at.exec(text2); m; m = at.exec(text2)) {
     const p2 = byName.get(m[1].toLowerCase());
     if (!p2) continue;
     spans.push({ kind: "mention", text: m[0], name: p2.name, here: p2.here, who: p2.kind, start: m.index, end: m.index + m[0].length });
@@ -2245,12 +2384,12 @@ function tokenizeDraft(text, people) {
   const out = [];
   let pos = 0;
   for (const s of spans) {
-    if (s.start > pos) out.push({ kind: "text", text: text.slice(pos, s.start) });
+    if (s.start > pos) out.push({ kind: "text", text: text2.slice(pos, s.start) });
     const { start: _s, end: _e, ...seg } = s;
     out.push(seg);
     pos = s.end;
   }
-  if (pos < text.length) out.push({ kind: "text", text: text.slice(pos) });
+  if (pos < text2.length) out.push({ kind: "text", text: text2.slice(pos) });
   return out;
 }
 var escapeRe, slugWord, slugName;
@@ -2448,11 +2587,11 @@ function detectRoot() {
   return null;
 }
 function encodeRandom(len, prng) {
-  let str = "";
+  let str2 = "";
   for (; len > 0; len--) {
-    str = randomChar(prng) + str;
+    str2 = randomChar(prng) + str2;
   }
-  return str;
+  return str2;
 }
 function encodeTime(now, len) {
   if (isNaN(now)) {
@@ -2484,16 +2623,16 @@ function encodeTime(now, len) {
       }
     }, `Time must be an integer: ${now}`);
   }
-  let mod, str = "";
+  let mod, str2 = "";
   for (let currentLen = len; currentLen > 0; currentLen--) {
     mod = now % ENCODING_LEN;
-    str = ENCODING.charAt(mod) + str;
+    str2 = ENCODING.charAt(mod) + str2;
     now = (now - mod) / ENCODING_LEN;
   }
-  return str;
+  return str2;
 }
-function incrementBase32(str) {
-  let done2 = void 0, index = str.length, char, charIndex, output = str;
+function incrementBase32(str2) {
+  let done2 = void 0, index = str2.length, char, charIndex, output = str2;
   const maxCharIndex = ENCODING_LEN - 1;
   while (!done2 && index-- >= 0) {
     char = output[index];
@@ -2546,11 +2685,11 @@ function randomChar(prng) {
   }
   return ENCODING.charAt(rand);
 }
-function replaceCharAt(str, index, char) {
-  if (index > str.length - 1) {
-    return str;
+function replaceCharAt(str2, index, char) {
+  if (index > str2.length - 1) {
+    return str2;
   }
-  return str.substr(0, index) + char + str.substr(index + 1);
+  return str2.substr(0, index) + char + str2.substr(index + 1);
 }
 var ENCODING, ENCODING_LEN, TIME_MAX, TIME_LEN, RANDOM_LEN, ERROR_INFO;
 var init_node = __esm({
@@ -2760,8 +2899,8 @@ function designProviderFromEvents(events) {
   }
   return null;
 }
-function claudeDesignUrlFromText(text) {
-  const candidates = (text ?? "").match(/https:\/\/claude\.ai\/design(?:\/[A-Za-z0-9._~!$&'()*+,;=:@%/-]*)?(?:\?[A-Za-z0-9._~!$&'()*+,;=:@%/?-]*)?/g) ?? [];
+function claudeDesignUrlFromText(text2) {
+  const candidates = (text2 ?? "").match(/https:\/\/claude\.ai\/design(?:\/[A-Za-z0-9._~!$&'()*+,;=:@%/-]*)?(?:\?[A-Za-z0-9._~!$&'()*+,;=:@%/?-]*)?/g) ?? [];
   for (const raw of candidates) {
     try {
       const url = new URL(trimEndChars(raw, "),.;"));
@@ -2831,10 +2970,10 @@ function shipItemsPending(plan) {
 function shipPlanName(round) {
   return `ship-plan-v${round}.md`;
 }
-function parseWorkPlanLegs(text) {
-  if (!text) return null;
+function parseWorkPlanLegs(text2) {
+  if (!text2) return null;
   try {
-    return JSON.parse(text).legs ?? null;
+    return JSON.parse(text2).legs ?? null;
   } catch {
     return null;
   }
@@ -3193,6 +3332,511 @@ var init_threadstatus = __esm({
   }
 });
 
+// ../shared/src/replyqueue.ts
+function xPostId(url) {
+  const m = /^https?:\/\/(?:www\.|mobile\.)?(?:x|twitter)\.com\/[^/?#]+\/status(?:es)?\/(\d{5,25})(?:[/?#]|$)/i.exec(url.trim());
+  return m ? m[1] : null;
+}
+function replyIntentUrl(item) {
+  if (item.target.platform !== "x") return null;
+  const id = xPostId(item.target.url);
+  return id ? `https://x.com/intent/tweet?in_reply_to=${id}&text=${encodeURIComponent(item.draft)}` : null;
+}
+function queueTimes(count2, startMs, gapMin) {
+  return Array.from({ length: Math.max(0, count2) }, (_, i) => startMs + i * gapMin * 6e4);
+}
+function reminderWords(r) {
+  const inX = r.open_url.startsWith("https://x.com/intent/");
+  return {
+    title: `Reply ${r.letter} is ready to post`,
+    body: inX ? `@${r.handle} \xB7 Tap to open it in X with the text in it.` : `@${r.handle} \xB7 Tap to open the post. Copy the reply from the card.`
+  };
+}
+var REPLY_GAPS, isReplyGap, REMINDER_STATES, reminderOwed, replyOpenUrl;
+var init_replyqueue = __esm({
+  "../shared/src/replyqueue.ts"() {
+    "use strict";
+    REPLY_GAPS = [5, 8, 12, 20];
+    isReplyGap = (n) => typeof n === "number" && REPLY_GAPS.includes(n);
+    REMINDER_STATES = ["queued", "due", "opened", "posted", "skipped"];
+    reminderOwed = (s) => s === "queued" || s === "due";
+    replyOpenUrl = (item) => replyIntentUrl(item) ?? item.target.url;
+  }
+});
+
+// ../shared/src/schedule.ts
+function tzOffsetMs(tz, t2) {
+  const dtf = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false
+  });
+  const p2 = Object.fromEntries(dtf.formatToParts(new Date(t2)).map((x) => [x.type, x.value]));
+  const asUtc = Date.UTC(+p2["year"], +p2["month"] - 1, +p2["day"], +p2["hour"] % 24, +p2["minute"], +p2["second"]);
+  return asUtc - t2;
+}
+function wallToInstant(y, m, d, hh, mm, tz) {
+  const guess = Date.UTC(y, m - 1, d, hh, mm);
+  let t2 = guess - tzOffsetMs(tz, guess);
+  t2 = guess - tzOffsetMs(tz, t2);
+  return new Date(t2);
+}
+function wallParts(tz, t2) {
+  const dtf = new Intl.DateTimeFormat("en-US", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit", weekday: "short" });
+  const p2 = Object.fromEntries(dtf.formatToParts(new Date(t2)).map((x) => [x.type, x.value]));
+  const wd = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(p2["weekday"]);
+  return { y: +p2["year"], m: +p2["month"], d: +p2["day"], weekday: wd };
+}
+function nextScheduleRun(input) {
+  const { cadence, atTime, tz, after } = input;
+  if (cadence === "once") return null;
+  const m = TIME_RE.exec(atTime);
+  if (!m) return null;
+  const hh = +m[1];
+  const mm = +m[2];
+  try {
+    for (let i = 0; i <= 8; i++) {
+      const probe = wallParts(tz, after.getTime() + i * 864e5);
+      const cand = wallToInstant(probe.y, probe.m, probe.d, hh, mm, tz);
+      if (cand.getTime() <= after.getTime()) continue;
+      if (cadence === "weekdays" && (probe.weekday === 0 || probe.weekday === 6)) continue;
+      if (cadence === "weekly" && input.weekday != null && probe.weekday !== input.weekday) continue;
+      return cand;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+function scheduleFirings(schedules, from, to) {
+  const out = [];
+  for (const s of schedules) {
+    if (s.cadence === "once") {
+      const at = s.next_run_at ? new Date(s.next_run_at) : null;
+      if (at && !Number.isNaN(at.getTime()) && at >= from && at < to) out.push({ key: `${s.id}:once`, at, schedule: s });
+      continue;
+    }
+    let cursor = new Date(from.getTime() - 1);
+    for (let guard = 0; guard < 64; guard++) {
+      const at = nextScheduleRun({ cadence: s.cadence, atTime: s.at_time, tz: s.tz, weekday: s.weekday, after: cursor });
+      if (!at || at >= to) break;
+      out.push({ key: `${s.id}:${at.getTime()}`, at, schedule: s });
+      cursor = at;
+    }
+  }
+  return out.sort((a, b2) => a.at.getTime() - b2.at.getTime());
+}
+function cadenceLine(s) {
+  if (s.cadence === "once") return `Once \xB7 ${s.at_time}`;
+  if (s.cadence === "weekly") return `${SCHED_WEEKDAYS[s.weekday ?? 1]}s \xB7 ${s.at_time}`;
+  return `${s.cadence[0].toUpperCase()}${s.cadence.slice(1)} \xB7 ${s.at_time}`;
+}
+function nextRunLabel(iso4, now = Date.now()) {
+  if (!iso4) return "";
+  const mins = Math.round((new Date(iso4).getTime() - now) / 6e4);
+  if (mins <= 1) return "now";
+  if (mins < 60) return `in ${mins}m`;
+  if (mins < 48 * 60) return `in ${Math.round(mins / 60)}h`;
+  return `in ${Math.round(mins / (60 * 24))}d`;
+}
+function isRoutineSchedule(payload, roomKind) {
+  return payload?.routine === true || (roomKind ?? "build") !== "marketing";
+}
+function schedulePayload(raw) {
+  try {
+    const v = JSON.parse(raw ?? "{}");
+    return v && typeof v === "object" ? v : {};
+  } catch {
+    return {};
+  }
+}
+var SCHEDULE_CADENCES, TIME_RE, SCHED_WEEKDAYS;
+var init_schedule = __esm({
+  "../shared/src/schedule.ts"() {
+    "use strict";
+    SCHEDULE_CADENCES = ["once", "daily", "weekdays", "weekly"];
+    TIME_RE = /^([01]\d|2[0-3]):([0-5]\d)$/;
+    SCHED_WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  }
+});
+
+// ../shared/src/routine-draft.ts
+function routineDraftFrom(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw;
+  const cadence = ROUTINE_CADENCES.includes(r["cadence"]) ? r["cadence"] : null;
+  const parts = {
+    title: text(r["title"], ROUTINE_TITLE_MAX),
+    goal: text(r["goal"], ROUTINE_PART_MAX),
+    eachRun: text(r["eachRun"], ROUTINE_PART_MAX),
+    rules: text(r["rules"], ROUTINE_PART_MAX),
+    output: text(r["output"], ROUTINE_PART_MAX),
+    ifNone: text(r["ifNone"], ROUTINE_PART_MAX)
+  };
+  if (!cadence || Object.values(parts).some((v) => !v)) return null;
+  const at = r["atTime"];
+  const atTime = typeof at === "string" && HHMM.test(at) ? at : "09:00";
+  const runAtRaw = r["runAt"];
+  const runAt = cadence === "once" && typeof runAtRaw === "string" && Number.isFinite(Date.parse(runAtRaw)) ? new Date(runAtRaw).toISOString() : null;
+  if (cadence === "once" && !runAt) return null;
+  const wd = r["weekday"];
+  const weekday = cadence === "weekly" ? typeof wd === "number" && Number.isInteger(wd) && wd >= 0 && wd <= 6 ? wd : 1 : null;
+  const tz = text(r["tz"], 64);
+  const agent = text(r["agent"], 40).replace(/^@/, "");
+  const never = text(r["never"], ROUTINE_PART_MAX);
+  const replyGap = isReplyGap(r["replyGap"]) ? r["replyGap"] : null;
+  const replies = text(r["replies"], ROUTINE_PART_MAX) || (replyGap ? routineRepliesText(replyGap) : "");
+  return {
+    ...parts,
+    cadence,
+    atTime,
+    ...weekday !== null ? { weekday } : {},
+    ...runAt ? { runAt } : {},
+    ...tz ? { tz } : {},
+    ...agent ? { agent } : {},
+    ...never ? { never } : {},
+    ...replies ? { replies } : {},
+    ...replyGap ? { replyGap } : {}
+  };
+}
+function routineRepliesText(gap) {
+  return gap ? `Queue each reply ${gap} minutes apart, from the end of the run. Remind me to post each one in X.` : "Draft them only. I post them myself.";
+}
+function routineDraftsReplies(d) {
+  return !!d.replies || /\b(repl(?:y|ies)|respon(?:se|ses|d))\b/i.test(`${d.goal} ${d.eachRun} ${d.output}`);
+}
+function parseRoutineBlock(body) {
+  const b2 = fencedBlock(body ?? "", "nmroutine");
+  if (!b2) return null;
+  let raw;
+  try {
+    raw = JSON.parse(b2.inner);
+  } catch {
+    return null;
+  }
+  const offer = raw && typeof raw === "object" ? raw.offer : void 0;
+  if (typeof offer === "string") {
+    const request2 = offer.trim().slice(0, 1e3);
+    return request2 ? { kind: "offer", request: request2 } : null;
+  }
+  const draft = routineDraftFrom(raw);
+  return draft ? { kind: "draft", draft } : null;
+}
+function routineBlock(b2) {
+  return "```nmroutine\n" + JSON.stringify(b2.kind === "offer" ? { offer: b2.request } : b2.draft) + "\n```";
+}
+function stripRoutineBlocks(body) {
+  return stripFenced(body, "nmroutine").trim();
+}
+function routineCardGuard(body, fromTool) {
+  return fromTool || !body.includes("```nmroutine") ? body : stripRoutineBlocks(body);
+}
+function routineCardText(body) {
+  const b2 = parseRoutineBlock(body);
+  if (!b2) return body;
+  const card2 = b2.kind === "offer" ? `[the offer card of a new session, posted with offer_routine_session: \u201C${b2.request}\u201D]` : `[a routine draft card, posted with propose_routine: \u201C${b2.draft.title}\u201D \xB7 ${routineWhen(b2.draft)} \xB7 ${ROUTINE_PARTS.filter((p2) => b2.draft[p2.key]).map((p2) => `${p2.label}: ${b2.draft[p2.key]}`).join(" \xB7 ")}]`;
+  return [stripRoutineBlocks(body), card2].filter(Boolean).join("\n");
+}
+function routinePrompt(d) {
+  return ROUTINE_PARTS.filter((p2) => d[p2.key]).map((p2) => `${p2.label}: ${d[p2.key]}`).join("\n\n").slice(0, ROUTINE_PROMPT_MAX);
+}
+function routineWhen(d, tz) {
+  const zone = d.tz || tz || null;
+  const once = d.cadence === "once" && d.runAt ? `Once \xB7 ${new Date(d.runAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23", ...zone ? { timeZone: zone } : {} })}` : null;
+  const base = once ?? cadenceLine({ cadence: d.cadence, at_time: d.atTime, weekday: d.weekday ?? null });
+  return zone ? `${base} \xB7 ${zone}` : base;
+}
+function routineDraftsOf(messages) {
+  const out = [];
+  for (const m of [...messages].sort((a, b2) => Date.parse(a.created_at) - Date.parse(b2.created_at))) {
+    if (m.author_kind && m.author_kind !== "agent") continue;
+    const b2 = parseRoutineBlock(m.body);
+    if (b2?.kind === "draft") out.push({ id: m.id, at: m.created_at, version: out.length + 1, draft: b2.draft, author: m.author_id ?? null });
+  }
+  return out;
+}
+function draftIsLive(d, live) {
+  return routinePrompt(d) === live.prompt.trim() && d.cadence === live.cadence && d.atTime === live.atTime && (d.cadence !== "weekly" || (d.weekday ?? 1) === (live.weekday ?? 1));
+}
+function routineCardStates(drafts, s) {
+  const out = /* @__PURE__ */ new Map();
+  drafts.forEach((d) => out.set(d.id, "replaced"));
+  const newest = drafts[drafts.length - 1];
+  if (!newest) return out;
+  if (!s.linked) {
+    out.set(newest.id, "open");
+    return out;
+  }
+  const cut2 = s.dividerAt ? Date.parse(s.dividerAt) : -Infinity;
+  const live = s.live ?? null;
+  const running = (live ? [...drafts].reverse().find((d) => draftIsLive(d.draft, live)) : void 0) ?? [...drafts].reverse().find((d) => Date.parse(d.at) <= cut2);
+  if (running) out.set(running.id, "scheduled");
+  if (newest !== running && Date.parse(newest.at) > cut2) out.set(newest.id, "update");
+  return out;
+}
+function changedParts(prev, next) {
+  if (!prev) return [];
+  return ROUTINE_PARTS.map((p2) => p2.key).filter((k) => (prev[k] ?? "") !== (next[k] ?? ""));
+}
+function whenChanged(prev, next) {
+  if (!prev) return false;
+  return routineWhen(prev) !== routineWhen(next);
+}
+function isRoutineScheduledMarker(body) {
+  return (body ?? "").trim() === ROUTINE_SCHEDULED_MARKER;
+}
+function routineDecisionQuestion(body, linked) {
+  const b2 = parseRoutineBlock(body);
+  return b2?.kind === "draft" ? `${linked ? "Update" : "Schedule"} the routine \u201C${b2.draft.title}\u201D?` : null;
+}
+function tryOnceBody(d) {
+  return `${TRY_ONCE_HEAD}${d.title}
+
+${routinePrompt(d)}`;
+}
+function isTryOnce(body) {
+  return (body ?? "").startsWith(TRY_ONCE_HEAD);
+}
+function routineChangesPrefix(version) {
+  return `\u21A9 Re routine v${version}: `;
+}
+function routineAsk(request2 = "") {
+  return `${ROUTINE_ASK}${request2.trim()}`;
+}
+var ROUTINE_CADENCES, ROUTINE_PARTS, ROUTINE_TITLE_MAX, ROUTINE_PART_MAX, ROUTINE_PROMPT_MAX, HHMM, text, ROUTINE_SCHEDULED_MARKER, TRY_ONCE_HEAD, ROUTINE_ASK;
+var init_routine_draft = __esm({
+  "../shared/src/routine-draft.ts"() {
+    "use strict";
+    init_linear();
+    init_replyqueue();
+    init_schedule();
+    ROUTINE_CADENCES = ["daily", "weekdays", "weekly", "once"];
+    ROUTINE_PARTS = [
+      { key: "goal", label: "Goal" },
+      { key: "eachRun", label: "Each run" },
+      { key: "rules", label: "Rules" },
+      { key: "output", label: "Output" },
+      { key: "replies", label: "Replies" },
+      { key: "ifNone", label: "If nothing matches" },
+      { key: "never", label: "Never" }
+    ];
+    ROUTINE_TITLE_MAX = 80;
+    ROUTINE_PART_MAX = 600;
+    ROUTINE_PROMPT_MAX = 4e3;
+    HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+    text = (v, max) => typeof v === "string" ? v.trim().slice(0, max) : "";
+    ROUTINE_SCHEDULED_MARKER = "\u2039routine:scheduled\u203A";
+    TRY_ONCE_HEAD = "Try once \xB7 ";
+    ROUTINE_ASK = "Make a routine: ";
+  }
+});
+
+// ../shared/src/waiting.ts
+function waitTimedOut(sinceMs, now) {
+  return sinceMs !== null && Number.isFinite(sinceMs) && now - sinceMs >= WAIT_LIMIT_MS;
+}
+function waitTimeoutLine(sinceMs, now) {
+  const mins = Math.max(1, Math.floor((now - sinceMs) / 6e4));
+  return `No answer for ${mins} ${mins === 1 ? "minute" : "minutes"}.`;
+}
+var WAIT_THINKING, WAIT_LIMIT_MS, WAIT_RETRY, WAIT_TICK_MS;
+var init_waiting = __esm({
+  "../shared/src/waiting.ts"() {
+    "use strict";
+    WAIT_THINKING = "thinking\u2026";
+    WAIT_LIMIT_MS = 2 * 6e4;
+    WAIT_RETRY = "Send it again";
+    WAIT_TICK_MS = 15e3;
+  }
+});
+
+// ../shared/src/session-runs.ts
+function dividerIndex(sorted) {
+  for (let i = sorted.length - 1; i >= 0; i--) if (isRoutineScheduledMarker(sorted[i].body)) return i;
+  return -1;
+}
+function splitSessionRuns(messages, scheduleId) {
+  if (!scheduleId || !messages.length) return null;
+  const sorted = byAt(messages);
+  const cut2 = dividerIndex(sorted);
+  const out = [];
+  for (const m of cut2 < 0 ? sorted : sorted.slice(cut2 + 1)) {
+    if (m.schedule_id || cut2 < 0 && !out.length) out.push({ opener: m, messages: [m], at: m.created_at, until: null });
+    else if (out.length) out[out.length - 1].messages.push(m);
+  }
+  out.forEach((f, i) => {
+    f.until = out[i + 1]?.at ?? null;
+  });
+  return out;
+}
+function sessionSetup(messages) {
+  const sorted = byAt(messages);
+  const cut2 = dividerIndex(sorted);
+  if (cut2 < 0) return null;
+  const rest = sorted.slice(cut2 + 1);
+  const first = rest.findIndex((m) => !!m.schedule_id);
+  return { setup: sorted.slice(0, cut2), divider: sorted[cut2], between: first < 0 ? rest : rest.slice(0, first) };
+}
+function inSessionRun(f, at) {
+  const t2 = ms(at);
+  return Number.isFinite(t2) && t2 >= ms(f.at) && (f.until === null || t2 < ms(f.until));
+}
+function sessionRunFacts(f, s) {
+  const inRun = (rows2, at) => (rows2 ?? []).filter((r) => inSessionRun(f, at(r)));
+  const ids = new Set(f.messages.map((m) => m.id));
+  const settled = s.settledAt ?? null;
+  const units = inRun(s.units, (u) => u.created_at).sort(byTime);
+  const drafts = inRun(s.drafts, (d) => d.created_at).sort(byTime);
+  const failed = drafts.find((d) => d.status === "failed");
+  const waiting = drafts.filter((d) => d.status !== "published");
+  const answeredAt = [...f.messages].reverse().find((m) => m.author_kind === "human" && m !== f.opener)?.created_at ?? null;
+  const times = (xs) => xs.filter((x) => Number.isFinite(ms(x))).sort((a, b2) => ms(a) - ms(b2));
+  return {
+    openRuns: inRun(s.openRuns, (r) => r.started_at).length,
+    gates: units.filter((u) => gateNeedsHuman(u) && afterSettle(u.updated_at, settled)).length,
+    cards: (s.cards ?? []).filter((c) => ids.has(c.message_id) && c.status === "open" && !decisionHandled({ ...c, human_replied_at: answeredAt }) && afterSettle(c.created_at, settled)).length,
+    draftsWaiting: drafts.filter((d) => d.status === "draft" && afterSettle(d.created_at, settled)).length,
+    units: units.map((u) => ({ number: u.number, title: u.title })),
+    drafts: drafts.length,
+    files: inRun(s.files, (x) => x.created_at).length,
+    failure: failed ? failed.last_error?.trim() || "The post did not publish." : null,
+    published: drafts.length && !waiting.length ? times(drafts.map((d) => d.published_at)).at(-1) ?? null : null,
+    slot: times(waiting.map((d) => d.scheduled_at))[0] ?? null,
+    quote: drafts[0]?.body ?? null
+  };
+}
+function sessionRunLines(runs, rows2, scheduleId, nowMs) {
+  const of = (xs, thread) => xs.filter((x) => x.thread_id === thread);
+  const split = /* @__PURE__ */ new Map();
+  return runs.map((run2) => {
+    if (!split.has(run2.thread_id)) split.set(run2.thread_id, splitSessionRuns(of(rows2.messages, run2.thread_id), scheduleId));
+    const f = split.get(run2.thread_id)?.find((x) => x.opener.id === run2.id);
+    if (!f) return { run: run2, strip: null };
+    const facts = sessionRunFacts(f, {
+      units: rows2.units.filter((u) => u.origin_thread_id === run2.thread_id),
+      cards: of(rows2.cards, run2.thread_id),
+      drafts: of(rows2.drafts, run2.thread_id),
+      files: of(rows2.files, run2.thread_id).filter((a) => !isPostsFile(a.name ?? "")),
+      openRuns: of(rows2.openRuns, run2.thread_id),
+      settledAt: run2.settled_at ?? null
+    });
+    return { run: run2, strip: sessionRunStrip(f, facts, nowMs) };
+  });
+}
+function draftLetters(items, runStarts = []) {
+  const starts = runStarts.map(ms).filter(Number.isFinite).sort((a, b2) => a - b2);
+  const runOf = (t2) => starts.filter((x) => x <= t2).length;
+  const out = /* @__PURE__ */ new Map();
+  let run2 = -1;
+  let n = 0;
+  for (const it of [...items].sort(byTime)) {
+    const r = runOf(ms(it.created_at));
+    if (r !== run2) {
+      run2 = r;
+      n = 0;
+    }
+    out.set(it.id, String.fromCharCode(97 + n++));
+  }
+  return out;
+}
+function tookLabel(spanMs) {
+  const s = Math.max(0, Math.round(spanMs / 1e3));
+  if (s < 60) return `${s} s`;
+  const m = Math.round(s / 60);
+  if (m < 60) return `${m} min`;
+  const h = Math.floor(m / 60);
+  return m % 60 ? `${h} h ${m % 60} min` : `${h} h`;
+}
+function isSessionRunNotice(body) {
+  if (!body) return false;
+  return /^I can't run this/.test(body) || /^I can't reply now\./.test(body) || /^Waking (?:your|a teammate's) cloud machine/.test(body) || /```nmauth\b/.test(body);
+}
+function noticeLine(body) {
+  const auth = parseAuthCard(body);
+  if (auth) return auth.why ?? `${auth.agent ? `@${auth.agent}` : "The agent"} has no ${AUTH_LABEL[auth.provider] ?? auth.provider} login here.`;
+  const rest = body.replace(/^I can't (?:run this|reply) now\.\s*/, "");
+  return (/^[^.]*\./.exec(rest)?.[0] ?? rest).trim();
+}
+function sessionRunStrip(f, facts, nowMs) {
+  const agentLines = f.messages.filter((m) => m.author_kind === "agent" && m !== f.opener);
+  const newestAgent = [...f.messages].reverse().find((m) => m.author_kind === "agent") ?? null;
+  const state = stripState(f, facts, agentLines, nowMs);
+  const made = [...count(facts.units.length, "unit", "units"), ...count(facts.drafts, "draft", "drafts"), ...count(facts.files, "file", "files")];
+  return { state, word: stripWord(state, facts), took: stripTook(f, facts, state, newestAgent, nowMs), made, line: stripLine(facts, state, agentLines, newestAgent) };
+}
+function stripState(f, facts, agentLines, nowMs) {
+  if (facts.gates + facts.cards + facts.draftsWaiting > 0) return "needs";
+  if (facts.openRuns > 0) return "progress";
+  if (facts.failure) return "failed";
+  if (f.opener.author_kind === "agent" || agentLines.some((m) => !isSessionRunNotice(m.body))) return "done";
+  if (agentLines.length) return "failed";
+  return f.until === null && nowMs - ms(f.at) < WAIT_LIMIT_MS ? "progress" : "failed";
+}
+function stripWord(state, facts) {
+  if (state === "done" && facts.published) return "Published";
+  if (state === "done" && facts.slot) return "Scheduled";
+  return SESSION_RUN_WORD[state];
+}
+function stripTook(f, facts, state, newestAgent, nowMs) {
+  if (state === "progress") return `${tookLabel(nowMs - ms(f.at))} so far`;
+  if (facts.published) return sessionRunLabel(facts.published, nowMs);
+  if (facts.slot) return `for ${sessionRunLabel(facts.slot, nowMs)}`;
+  return f.opener.author_kind !== "agent" && newestAgent ? tookLabel(ms(newestAgent.created_at) - ms(f.at)) : "";
+}
+function stripLine(facts, state, agentLines, newestAgent) {
+  if (state === "failed") {
+    const lastNotice = [...agentLines].reverse().find((m) => isSessionRunNotice(m.body));
+    return facts.failure ?? (lastNotice ? noticeLine(lastNotice.body) : "No answer came.");
+  }
+  if (facts.units.length) return `#${facts.units[0].number} ${facts.units[0].title}`;
+  if (facts.quote) return `\u201C${replyPreview(facts.quote, 118)}\u201D`;
+  return newestAgent?.body ? replyPreview(newestAgent.body, 120) : "";
+}
+function sessionRunOpen(state, newest) {
+  return newest || state === "needs";
+}
+function sessionRunWhen(at, nowMs) {
+  const label = sessionRunLabel(at, nowMs);
+  const i = label.lastIndexOf(", ");
+  const day3 = label.slice(0, i);
+  return /^(Today|Tomorrow|Yesterday)$/.test(day3) ? `${day3.toLowerCase()} at ${label.slice(i + 2)}` : `on ${day3} at ${label.slice(i + 2)}`;
+}
+function sessionRunLabel(at, nowMs) {
+  const d = new Date(ms(at));
+  const now = new Date(nowMs);
+  const time = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  const dayOf = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const days = Math.round((dayOf(now) - dayOf(d)) / 864e5);
+  if (days === 0) return `Today, ${time}`;
+  if (days === 1) return `Yesterday, ${time}`;
+  if (days === -1) return `Tomorrow, ${time}`;
+  const date = d.toLocaleDateString("en-US", { month: "short", day: "numeric", ...d.getFullYear() !== now.getFullYear() ? { year: "numeric" } : {} });
+  return `${date}, ${time}`;
+}
+var ms, byAt, byTime, SESSION_RUN_WORD, count;
+var init_session_runs = __esm({
+  "../shared/src/session-runs.ts"() {
+    "use strict";
+    init_cards();
+    init_deliverables();
+    init_needsyou();
+    init_replies();
+    init_routine_draft();
+    init_threadstatus();
+    init_waiting();
+    ms = (at) => at ? Date.parse(at) : NaN;
+    byAt = (messages) => [...messages].sort((a, b2) => ms(a.created_at) - ms(b2.created_at));
+    byTime = (a, b2) => ms(a.created_at) - ms(b2.created_at);
+    SESSION_RUN_WORD = { progress: "In progress", needs: "Needs you", failed: "Failed", done: "Done" };
+    count = (n, one, many) => n > 0 ? [`${n} ${n === 1 ? one : many}`] : [];
+  }
+});
+
 // ../shared/src/dial.ts
 function dialFraction(state) {
   return (DIAL_AT[state] ?? 50) / 100;
@@ -3383,6 +4027,7 @@ function brainCast(input) {
 function seatModel(input) {
   const override = parseBrainOverride(input.threadOverride)?.[input.role];
   if (override) return override;
+  if (input.memberPick) return input.memberPick;
   if ((input.modelSource ?? "pack") === "manual") return input.currentModel;
   const roles = resolvePackRoles(input.projectPack, input.custom ?? []);
   if (!roles) return input.currentModel;
@@ -4258,8 +4903,8 @@ function planBatches(exp, opts) {
   batches[batches.length - 1].last = true;
   return { batches, totalBytes, tooLarge, ids };
 }
-function rewriteTaskRefs(text, numberMap) {
-  return text.replace(/(^|[^\w#])#(\d+)(?!\w)/g, (whole, before, n) => {
+function rewriteTaskRefs(text2, numberMap) {
+  return text2.replace(/(^|[^\w#])#(\d+)(?!\w)/g, (whole, before, n) => {
     const to = numberMap[n];
     return to === void 0 ? whole : `${before}#${to}`;
   });
@@ -4453,6 +5098,27 @@ var init_retro = __esm({
   }
 });
 
+// ../shared/src/cardwords.ts
+function cardsAsWords(body) {
+  if (!body.includes("```nm")) return body;
+  return routineCardText(repairCardFences(body)).replace(NMQ, (whole, inner) => {
+    const q = parseQuestionBlock(inner);
+    if (!q) return whole;
+    const options = q.options?.length ? ` \xB7 options: ${q.options.map((o) => o.label).join(" \xB7 ")}` : "";
+    return `[a question card: \u201C${q.question}\u201D${options}]`;
+  });
+}
+var NMQ;
+var init_cardwords = __esm({
+  "../shared/src/cardwords.ts"() {
+    "use strict";
+    init_cards();
+    init_cardfence();
+    init_routine_draft();
+    NMQ = /```nmq[ \t]*\n([\s\S]*?)```/g;
+  }
+});
+
 // ../shared/src/brainnotice.ts
 function brainNoticeOf(messages, override) {
   let last = null;
@@ -4506,9 +5172,104 @@ var init_brainnotice = __esm({
   }
 });
 
-// ../shared/src/commands.ts
+// ../shared/src/command-union-replies.ts
 import { z as z6 } from "zod";
-var taskId, taskCreateCommand, taskAcceptCommand, taskApproveCommand, taskRequestChangesCommand, taskCancelCommand, taskBlockCommand, taskUnblockCommand, taskArchiveCommand, taskPromoteCommand, taskReopenCommand, taskUpdateDetailsCommand, taskSetDefinitionOfDoneCommand, taskRequestPlanCommand, taskRevisePlanCommand, taskRequestDesignCommand, taskSelectDesignProviderCommand, taskReviseDesignCommand, taskApproveDesignCommand, taskApprovePlanCommand, HUMAN_ONLY_SIGN_OFFS, taskApproveShipPlanCommand, taskReviseShipPlanCommand, taskCheckShipItemCommand, taskFinishSubtaskCommand, taskAddShipItemCommand, messagePinCommand, decisionAnswerCommand, decisionDismissCommand, workspaceCreateCommand, workspaceUpdateCommand, agentUpdateCommand, repoLinkCommand, contentApproveCommand, contentUnscheduleCommand, contentUpdateCommand, workspaceInviteCommand, workspaceAcceptInviteCommand, workspaceDeclineInviteCommand, credentialSetCommand, agentRegisterCommand, memberShareComputeCommand, memberSetComputeCommand, threadSetMachineCommand, threadSetBrainCommand, threadSettleCommand, threadUnsettleCommand, scheduleCreateCommand, scheduleSetStatusCommand, scheduleDeleteCommand, scheduleUpdateCommand, machineWakeCommand, HumanCommandSchema;
+var GAP, REPLY_COMMANDS, REPLY_GAP_FIELD;
+var init_command_union_replies = __esm({
+  "../shared/src/command-union-replies.ts"() {
+    "use strict";
+    GAP = z6.union([z6.literal(5), z6.literal(8), z6.literal(12), z6.literal(20)]);
+    REPLY_COMMANDS = [
+      // queue rows of a reply card: the server reads the rows off the card, computes each time and link,
+      // and never trusts a draft or a link from the client
+      z6.object({
+        type: z6.literal("reply.queue"),
+        message: z6.string().uuid(),
+        letters: z6.array(z6.string().trim().min(1).max(2)).min(1).max(8),
+        gapMin: GAP,
+        startAt: z6.string().datetime()
+      }),
+      // what the person did with one row: opened X, posted it, skipped it, or queued it again
+      z6.object({ type: z6.literal("reply.mark"), reminder: z6.string().uuid(), state: z6.enum(["opened", "posted", "skipped", "queued"]) }),
+      // Clear queue: drop the owed rows of one card (the done rows stay as the record)
+      z6.object({ type: z6.literal("reply.clear"), message: z6.string().uuid() })
+    ];
+    REPLY_GAP_FIELD = GAP;
+  }
+});
+
+// ../shared/src/agent-models.ts
+function takesThinking(model2) {
+  if (!model2 || model2 === STARTER_MODEL) return false;
+  if (model2.startsWith("claude") || model2.startsWith("gpt")) return true;
+  return /^gemini-[3-9]/.test(model2) && !/flash-lite/.test(model2);
+}
+function parseAgentModels(raw) {
+  let v = raw;
+  if (typeof v === "string") {
+    try {
+      v = JSON.parse(v);
+    } catch {
+      return {};
+    }
+  }
+  if (!v || typeof v !== "object" || Array.isArray(v)) return {};
+  const out = {};
+  for (const [agent, p2] of Object.entries(v)) {
+    const model2 = p2?.model;
+    if (typeof model2 !== "string" || !KNOWN.has(model2)) continue;
+    const thinking = p2.thinking;
+    out[agent] = { model: model2, ...isLevel(thinking) && takesThinking(model2) ? { thinking } : {} };
+  }
+  return out;
+}
+function pickFor(picks, agentId) {
+  return picks?.[agentId] ?? null;
+}
+function thinkingFor(model2, pick) {
+  if (!takesThinking(model2) || pick?.model !== model2) return null;
+  return pick.thinking ?? null;
+}
+var THINKING_LEVELS, THINKING_LABEL, DEFAULT_THINKING, KNOWN, isLevel;
+var init_agent_models = __esm({
+  "../shared/src/agent-models.ts"() {
+    "use strict";
+    init_model_packs();
+    init_rates();
+    THINKING_LEVELS = ["low", "medium", "high"];
+    THINKING_LABEL = { low: "Low", medium: "Medium", high: "High" };
+    DEFAULT_THINKING = "medium";
+    KNOWN = new Set(MODEL_IDS);
+    isLevel = (v) => typeof v === "string" && THINKING_LEVELS.includes(v);
+  }
+});
+
+// ../shared/src/command-union-models.ts
+import { z as z7 } from "zod";
+var KNOWN2, MODEL_COMMANDS;
+var init_command_union_models = __esm({
+  "../shared/src/command-union-models.ts"() {
+    "use strict";
+    init_agent_models();
+    init_model_packs();
+    KNOWN2 = new Set(MODEL_IDS);
+    MODEL_COMMANDS = [
+      // one agent's model for THIS person, from their next message. null = back to the agent's own model.
+      // The level rides only a model that takes one (the handler drops it otherwise).
+      z7.object({
+        type: z7.literal("member.set_agent_model"),
+        workspace: z7.string().min(1),
+        agent: z7.string().uuid(),
+        model: z7.string().min(1).refine((m) => KNOWN2.has(m), { message: "unknown model id" }).nullable(),
+        thinking: z7.enum(THINKING_LEVELS).nullable().optional()
+      })
+    ];
+  }
+});
+
+// ../shared/src/commands.ts
+import { z as z8 } from "zod";
+var taskId, taskCreateCommand, taskAcceptCommand, taskApproveCommand, taskRequestChangesCommand, taskCancelCommand, taskBlockCommand, taskUnblockCommand, taskArchiveCommand, taskPromoteCommand, taskReopenCommand, taskUpdateDetailsCommand, taskSetDefinitionOfDoneCommand, taskRequestPlanCommand, taskRevisePlanCommand, taskRequestDesignCommand, taskSelectDesignProviderCommand, taskReviseDesignCommand, taskApproveDesignCommand, taskApprovePlanCommand, HUMAN_ONLY_SIGN_OFFS, taskApproveShipPlanCommand, taskReviseShipPlanCommand, taskCheckShipItemCommand, taskFinishSubtaskCommand, taskAddShipItemCommand, messagePinCommand, decisionAnswerCommand, decisionDismissCommand, workspaceCreateCommand, workspaceUpdateCommand, agentUpdateCommand, repoLinkCommand, contentApproveCommand, contentUnscheduleCommand, contentUpdateCommand, contentAnchorCommand, workspaceInviteCommand, workspaceAcceptInviteCommand, workspaceDeclineInviteCommand, credentialSetCommand, agentRegisterCommand, memberShareComputeCommand, memberSetComputeCommand, threadSetMachineCommand, threadSetBrainCommand, threadSettleCommand, threadUnsettleCommand, scheduleCreateCommand, scheduleSetStatusCommand, scheduleDeleteCommand, scheduleRunNowCommand, scheduleUpdateCommand, machineWakeCommand, HumanCommandSchema;
 var init_commands = __esm({
   "../shared/src/commands.ts"() {
     "use strict";
@@ -4517,210 +5278,218 @@ var init_commands = __esm({
     init_design();
     init_task();
     init_commands_code();
+    init_command_union_replies();
+    init_command_union_models();
     init_states();
-    taskId = z6.string().min(1);
-    taskCreateCommand = z6.object({
-      type: z6.literal("task.create"),
-      workspace: z6.string().min(1),
-      channel: z6.string().min(1),
-      project: z6.string().min(1).optional(),
-      title: z6.string().min(1),
-      description: z6.string().default(""),
-      repo: z6.object({ id: z6.string().min(1), baseRef: z6.string().min(1).default("main") }).optional(),
-      offerTo: z6.string().min(1).optional(),
+    taskId = z8.string().min(1);
+    taskCreateCommand = z8.object({
+      type: z8.literal("task.create"),
+      workspace: z8.string().min(1),
+      channel: z8.string().min(1),
+      project: z8.string().min(1).optional(),
+      title: z8.string().min(1),
+      description: z8.string().default(""),
+      repo: z8.object({ id: z8.string().min(1), baseRef: z8.string().min(1).default("main") }).optional(),
+      offerTo: z8.string().min(1).optional(),
       // parked idea: lands in the backlog column instead of todo (docs/15). Promotion
       // into todo stays human/orchestrator-only; a backlog item can't be born offered.
-      backlog: z6.boolean().default(false),
-      checklist: z6.array(z6.string().min(1)).optional(),
-      definitionOfDone: z6.string().max(2e4).optional(),
+      backlog: z8.boolean().default(false),
+      checklist: z8.array(z8.string().min(1)).optional(),
+      definitionOfDone: z8.string().max(2e4).optional(),
       // a marketing playbook run (docs/design/marketing-os-2026-08, round 3 — George): the plan is
       // a CANNED registry template the human's own ask selected, not an architect's reviewed
       // markdown, so a non-repo playbook unit is born APPROVED (the routine stamps) and starts
       // immediately. Repo-backed work ignores this — code keeps every gate.
-      playbook: z6.string().min(1).max(40).optional(),
+      playbook: z8.string().min(1).max(40).optional(),
       // work-type label (docs/16). The handler requires it only when creating an already-offered
       // task (offerTo present = routing); a bare/backlog task may omit it. Never a route gate.
-      kind: z6.enum(TASK_KINDS).optional(),
+      kind: z8.enum(TASK_KINDS).optional(),
       // subtask (docs/24): create this as companion work UNDER that parent task —
       // same channel, one level deep, ≤8 per parent, no repo of its own (it rides
       // the parent's), no kind required. Open to every actor, like task.create itself.
-      parent: z6.string().min(1).optional(),
+      parent: z8.string().min(1).optional(),
       // the conversation this task was fanned out OF: links threads.task_id so the chat
       // thread upgrades into the task's thread in place (conversation-first shell).
-      thread: z6.string().uuid().optional(),
+      thread: z8.string().uuid().optional(),
       // ── Plan-first units (2026-08-17) ──
       // The implementation plan proposed WITH the create: the unit is born in plan_review carrying
       // it, and the HUMAN approves in the unit's thread before any work starts. legs = the declared
       // journey (validateWorkPlanLegs floors review for repo-backed work); subtasks = proposed
       // companion work, minted as real subtask rows on approval; approach = the plan prose the
       // human reads. Ignored for backlog parks and subtasks (their parent's gates cover them).
-      plan: z6.object({
-        legs: z6.array(z6.enum(WORK_PLAN_LEGS)).min(1).max(3),
-        subtasks: z6.array(z6.string().min(1).max(200)).max(8).default([]),
-        approach: z6.string().min(1).max(6e4)
+      plan: z8.object({
+        legs: z8.array(z8.enum(WORK_PLAN_LEGS)).min(1).max(3),
+        subtasks: z8.array(z8.string().min(1).max(200)).max(8).default([]),
+        approach: z8.string().min(1).max(6e4)
       }).optional(),
       // Thread-owned work (2026-08-17): the conversation that OWNS this unit — sets
       // tasks.origin_thread_id and posts the ‹task:id› unit card into that thread. Unlike `thread`
       // (the legacy 1:1 upgrade that CONSUMES the conversation), many units share one origin.
-      originThread: z6.string().uuid().optional()
+      originThread: z8.string().uuid().optional()
     });
-    taskAcceptCommand = z6.object({ type: z6.literal("task.accept"), taskId });
-    taskApproveCommand = z6.object({ type: z6.literal("task.approve"), taskId });
-    taskRequestChangesCommand = z6.object({ type: z6.literal("task.request_changes"), taskId, feedback: z6.string().min(1) });
-    taskCancelCommand = z6.object({ type: z6.literal("task.cancel"), taskId });
-    taskBlockCommand = z6.object({ type: z6.literal("task.block"), taskId, reason: z6.string().min(1) });
-    taskUnblockCommand = z6.object({ type: z6.literal("task.unblock"), taskId });
-    taskArchiveCommand = z6.object({ type: z6.literal("task.archive"), taskId });
-    taskPromoteCommand = z6.object({ type: z6.literal("task.promote"), taskId });
-    taskReopenCommand = z6.object({ type: z6.literal("task.reopen"), taskId });
-    taskUpdateDetailsCommand = z6.object({
-      type: z6.literal("task.update_details"),
+    taskAcceptCommand = z8.object({ type: z8.literal("task.accept"), taskId });
+    taskApproveCommand = z8.object({ type: z8.literal("task.approve"), taskId });
+    taskRequestChangesCommand = z8.object({ type: z8.literal("task.request_changes"), taskId, feedback: z8.string().min(1) });
+    taskCancelCommand = z8.object({ type: z8.literal("task.cancel"), taskId });
+    taskBlockCommand = z8.object({ type: z8.literal("task.block"), taskId, reason: z8.string().min(1) });
+    taskUnblockCommand = z8.object({ type: z8.literal("task.unblock"), taskId });
+    taskArchiveCommand = z8.object({ type: z8.literal("task.archive"), taskId });
+    taskPromoteCommand = z8.object({ type: z8.literal("task.promote"), taskId });
+    taskReopenCommand = z8.object({ type: z8.literal("task.reopen"), taskId });
+    taskUpdateDetailsCommand = z8.object({
+      type: z8.literal("task.update_details"),
       taskId,
-      title: z6.string().min(1).max(300).optional(),
-      description: z6.string().max(2e4).optional(),
+      title: z8.string().min(1).max(300).optional(),
+      description: z8.string().max(2e4).optional(),
       // work-type label (docs/16) — a pre-work scratch edit may (re)categorize the task.
-      kind: z6.enum(TASK_KINDS).optional()
+      kind: z8.enum(TASK_KINDS).optional()
     });
-    taskSetDefinitionOfDoneCommand = z6.object({ type: z6.literal("task.set_definition_of_done"), taskId, dod: z6.string().max(2e4) });
-    taskRequestPlanCommand = z6.object({ type: z6.literal("task.request_plan"), taskId, architect: z6.string().min(1).optional(), kind: z6.enum(TASK_KINDS).optional() });
-    taskRevisePlanCommand = z6.object({ type: z6.literal("task.revise_plan"), taskId, feedback: z6.string().min(1) });
-    taskRequestDesignCommand = z6.object({
-      type: z6.literal("task.request_design"),
+    taskSetDefinitionOfDoneCommand = z8.object({ type: z8.literal("task.set_definition_of_done"), taskId, dod: z8.string().max(2e4) });
+    taskRequestPlanCommand = z8.object({ type: z8.literal("task.request_plan"), taskId, architect: z8.string().min(1).optional(), kind: z8.enum(TASK_KINDS).optional() });
+    taskRevisePlanCommand = z8.object({ type: z8.literal("task.revise_plan"), taskId, feedback: z8.string().min(1) });
+    taskRequestDesignCommand = z8.object({
+      type: z8.literal("task.request_design"),
       taskId,
-      designer: z6.string().min(1).optional(),
-      kind: z6.enum(TASK_KINDS).optional(),
+      designer: z8.string().min(1).optional(),
+      kind: z8.enum(TASK_KINDS).optional(),
       // Iris always owns the workflow. Omit this unless the human already chose a
       // mockup engine; Iris asks after pickup when it is absent.
-      provider: z6.enum(DESIGN_PROVIDERS).optional()
+      provider: z8.enum(DESIGN_PROVIDERS).optional()
     });
-    taskSelectDesignProviderCommand = z6.object({
-      type: z6.literal("task.select_design_provider"),
+    taskSelectDesignProviderCommand = z8.object({
+      type: z8.literal("task.select_design_provider"),
       taskId,
-      provider: z6.enum(DESIGN_PROVIDERS)
+      provider: z8.enum(DESIGN_PROVIDERS)
     });
-    taskReviseDesignCommand = z6.object({ type: z6.literal("task.revise_design"), taskId, feedback: z6.string().min(1) });
-    taskApproveDesignCommand = z6.object({ type: z6.literal("task.approve_design"), taskId });
-    taskApprovePlanCommand = z6.object({ type: z6.literal("task.approve_plan"), taskId });
+    taskReviseDesignCommand = z8.object({ type: z8.literal("task.revise_design"), taskId, feedback: z8.string().min(1) });
+    taskApproveDesignCommand = z8.object({ type: z8.literal("task.approve_design"), taskId });
+    taskApprovePlanCommand = z8.object({ type: z8.literal("task.approve_plan"), taskId });
     HUMAN_ONLY_SIGN_OFFS = ["task.approve_plan"];
-    taskApproveShipPlanCommand = z6.object({ type: z6.literal("task.approve_ship_plan"), taskId });
-    taskReviseShipPlanCommand = z6.object({ type: z6.literal("task.revise_ship_plan"), taskId, feedback: z6.string().min(1) });
-    taskCheckShipItemCommand = z6.object({
-      type: z6.literal("task.check_ship_item"),
+    taskApproveShipPlanCommand = z8.object({ type: z8.literal("task.approve_ship_plan"), taskId });
+    taskReviseShipPlanCommand = z8.object({ type: z8.literal("task.revise_ship_plan"), taskId, feedback: z8.string().min(1) });
+    taskCheckShipItemCommand = z8.object({
+      type: z8.literal("task.check_ship_item"),
       taskId,
-      itemId: z6.string().min(1).max(40),
-      state: z6.enum(SHIP_ITEM_STATES),
-      note: z6.string().max(500).optional()
+      itemId: z8.string().min(1).max(40),
+      state: z8.enum(SHIP_ITEM_STATES),
+      note: z8.string().max(500).optional()
     });
-    taskFinishSubtaskCommand = z6.object({
-      type: z6.literal("task.finish_subtask"),
+    taskFinishSubtaskCommand = z8.object({
+      type: z8.literal("task.finish_subtask"),
       taskId,
-      note: z6.string().max(2e3).optional(),
-      artifacts: z6.array(z6.object({ kind: z6.string().min(1).max(20), name: z6.string().min(1).max(160), content: z6.string().max(4e5).optional() })).max(12).optional()
+      note: z8.string().max(2e3).optional(),
+      artifacts: z8.array(z8.object({ kind: z8.string().min(1).max(20), name: z8.string().min(1).max(160), content: z8.string().max(4e5).optional() })).max(12).optional()
     });
-    taskAddShipItemCommand = z6.object({
-      type: z6.literal("task.add_ship_item"),
+    taskAddShipItemCommand = z8.object({
+      type: z8.literal("task.add_ship_item"),
       taskId,
-      title: z6.string().min(1).max(300),
-      detail: z6.string().max(2e3).optional(),
-      owner: z6.enum(SHIP_ITEM_OWNERS).default("human"),
-      agentId: z6.string().min(1).optional()
+      title: z8.string().min(1).max(300),
+      detail: z8.string().max(2e3).optional(),
+      owner: z8.enum(SHIP_ITEM_OWNERS).default("human"),
+      agentId: z8.string().min(1).optional()
     });
-    messagePinCommand = z6.object({ type: z6.literal("message.pin"), message: z6.string().min(1), pinned: z6.boolean() });
-    decisionAnswerCommand = z6.object({ type: z6.literal("decision.answer"), decisionId: z6.string().min(1), answer: z6.string().min(1).max(2e3) });
-    decisionDismissCommand = z6.object({ type: z6.literal("decision.dismiss"), decisionId: z6.string().min(1) });
-    workspaceCreateCommand = z6.object({
-      type: z6.literal("workspace.create"),
-      name: z6.string().min(1).max(60),
-      slug: z6.string().min(2).max(40).regex(/^[a-z0-9][a-z0-9-]*$/)
+    messagePinCommand = z8.object({ type: z8.literal("message.pin"), message: z8.string().min(1), pinned: z8.boolean() });
+    decisionAnswerCommand = z8.object({ type: z8.literal("decision.answer"), decisionId: z8.string().min(1), answer: z8.string().min(1).max(2e3) });
+    decisionDismissCommand = z8.object({ type: z8.literal("decision.dismiss"), decisionId: z8.string().min(1) });
+    workspaceCreateCommand = z8.object({
+      type: z8.literal("workspace.create"),
+      name: z8.string().min(1).max(60),
+      slug: z8.string().min(2).max(40).regex(/^[a-z0-9][a-z0-9-]*$/)
     });
-    workspaceUpdateCommand = z6.object({ type: z6.literal("workspace.update"), workspace: z6.string().min(1), activeModelPack: z6.string().min(1).optional() });
-    agentUpdateCommand = z6.object({
-      type: z6.literal("agent.update"),
+    workspaceUpdateCommand = z8.object({ type: z8.literal("workspace.update"), workspace: z8.string().min(1), activeModelPack: z8.string().min(1).optional() });
+    agentUpdateCommand = z8.object({
+      type: z8.literal("agent.update"),
       // NO `workspace` here: the server resolves it from the agent id, and the drift test pins that a
       // client may not send a field the server does not accept.
-      agent: z6.string().min(1),
-      model: z6.string().min(1).optional(),
-      runtime: z6.enum(["claude-code", "codex", "gemini"]).optional()
+      agent: z8.string().min(1),
+      model: z8.string().min(1).optional(),
+      runtime: z8.enum(["claude-code", "codex", "gemini"]).optional()
     });
-    repoLinkCommand = z6.object({
-      type: z6.literal("repo.link"),
-      workspace: z6.string().min(1),
-      channel: z6.string().min(1).optional(),
-      project: z6.string().min(1).optional(),
-      url: z6.string().min(1).optional(),
-      localPath: z6.string().min(1).optional(),
-      name: z6.string().min(1).optional(),
-      defaultBranch: z6.string().min(1).default("main")
+    repoLinkCommand = z8.object({
+      type: z8.literal("repo.link"),
+      workspace: z8.string().min(1),
+      channel: z8.string().min(1).optional(),
+      project: z8.string().min(1).optional(),
+      url: z8.string().min(1).optional(),
+      localPath: z8.string().min(1).optional(),
+      name: z8.string().min(1).optional(),
+      defaultBranch: z8.string().min(1).default("main")
     });
-    contentApproveCommand = z6.object({
-      type: z6.literal("content.approve"),
-      item: z6.string().min(1),
-      scheduledAt: z6.string().datetime().optional()
+    contentApproveCommand = z8.object({
+      type: z8.literal("content.approve"),
+      item: z8.string().min(1),
+      scheduledAt: z8.string().datetime().optional()
     });
-    contentUnscheduleCommand = z6.object({ type: z6.literal("content.unschedule"), item: z6.string().min(1) });
-    contentUpdateCommand = z6.object({
-      type: z6.literal("content.update"),
-      item: z6.string().min(1),
-      body: z6.string().trim().min(1).max(1e4),
-      mediaUrl: z6.union([z6.string().url().max(2e3), z6.literal("")]).optional()
+    contentUnscheduleCommand = z8.object({ type: z8.literal("content.unschedule"), item: z8.string().min(1) });
+    contentUpdateCommand = z8.object({
+      type: z8.literal("content.update"),
+      item: z8.string().min(1),
+      body: z8.string().trim().min(1).max(1e4),
+      mediaUrl: z8.union([z8.string().url().max(2e3), z8.literal("")]).optional()
     });
-    workspaceInviteCommand = z6.object({ type: z6.literal("workspace.invite"), workspace: z6.string().min(1), email: z6.string().email() });
-    workspaceAcceptInviteCommand = z6.object({ type: z6.literal("workspace.accept_invite"), invite: z6.string().uuid() });
-    workspaceDeclineInviteCommand = z6.object({ type: z6.literal("workspace.decline_invite"), invite: z6.string().uuid() });
-    credentialSetCommand = z6.object({
-      type: z6.literal("credential.set"),
-      workspace: z6.string().min(1),
-      provider: z6.string().min(1),
-      scope: z6.enum(["workspace", "agent"]),
-      token: z6.string().min(8).optional(),
-      authMode: z6.enum(["apikey", "subscription"])
+    contentAnchorCommand = z8.object({ type: z8.literal("content.anchor"), item: z8.string().uuid(), thread: z8.string().uuid() });
+    workspaceInviteCommand = z8.object({ type: z8.literal("workspace.invite"), workspace: z8.string().min(1), email: z8.string().email() });
+    workspaceAcceptInviteCommand = z8.object({ type: z8.literal("workspace.accept_invite"), invite: z8.string().uuid() });
+    workspaceDeclineInviteCommand = z8.object({ type: z8.literal("workspace.decline_invite"), invite: z8.string().uuid() });
+    credentialSetCommand = z8.object({
+      type: z8.literal("credential.set"),
+      workspace: z8.string().min(1),
+      provider: z8.string().min(1),
+      scope: z8.enum(["workspace", "agent"]),
+      token: z8.string().min(8).optional(),
+      authMode: z8.enum(["apikey", "subscription"])
     });
-    agentRegisterCommand = z6.object({
-      type: z6.literal("agent.register"),
-      workspace: z6.string().min(1),
-      machineId: z6.string().min(1),
-      name: z6.string().min(1).regex(/^[a-z0-9][a-z0-9._-]*$/),
-      role: z6.enum(AGENT_ROLES),
-      model: z6.string().min(1),
-      runtime: z6.enum(["claude-code", "codex", "gemini"]).optional(),
-      emoji: z6.string().min(1).max(8).optional(),
-      description: z6.string().min(1).max(280).optional(),
-      channels: z6.array(z6.string().min(1)).min(1)
+    agentRegisterCommand = z8.object({
+      type: z8.literal("agent.register"),
+      workspace: z8.string().min(1),
+      machineId: z8.string().min(1),
+      name: z8.string().min(1).regex(/^[a-z0-9][a-z0-9._-]*$/),
+      role: z8.enum(AGENT_ROLES),
+      model: z8.string().min(1),
+      runtime: z8.enum(["claude-code", "codex", "gemini"]).optional(),
+      emoji: z8.string().min(1).max(8).optional(),
+      description: z8.string().min(1).max(280).optional(),
+      channels: z8.array(z8.string().min(1)).min(1)
     });
-    memberShareComputeCommand = z6.object({ type: z6.literal("member.share_compute"), workspace: z6.string().min(1), member: z6.string().uuid(), on: z6.boolean() });
-    memberSetComputeCommand = z6.object({ type: z6.literal("member.set_compute"), workspace: z6.string().min(1), machine: z6.string().uuid().nullable().optional(), shares: z6.array(z6.string()).optional() });
-    threadSetMachineCommand = z6.object({ type: z6.literal("thread.set_machine"), workspace: z6.string().min(1), threadId: z6.string().uuid(), machineId: z6.string().uuid().nullable() });
-    threadSetBrainCommand = z6.object({ type: z6.literal("thread.set_brain"), workspace: z6.string().min(1), threadId: z6.string().uuid(), override: z6.record(z6.string(), z6.string()).nullable() });
-    threadSettleCommand = z6.object({ type: z6.literal("thread.settle"), workspace: z6.string().min(1), threadId: z6.string().uuid() });
-    threadUnsettleCommand = z6.object({ type: z6.literal("thread.unsettle"), workspace: z6.string().min(1), threadId: z6.string().uuid() });
-    scheduleCreateCommand = z6.object({
-      type: z6.literal("schedule.create"),
-      channel: z6.string().min(1),
-      title: z6.string().trim().min(1).max(200),
-      prompt: z6.string().trim().min(1).max(4e3),
-      cadence: z6.enum(["once", "daily", "weekdays", "weekly"]),
-      runAt: z6.string().datetime().optional(),
-      atTime: z6.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
-      tz: z6.string().max(64).optional(),
-      weekday: z6.number().int().min(0).max(6).optional(),
-      agent: z6.string().min(1).optional(),
-      routine: z6.boolean().optional()
+    memberShareComputeCommand = z8.object({ type: z8.literal("member.share_compute"), workspace: z8.string().min(1), member: z8.string().uuid(), on: z8.boolean() });
+    memberSetComputeCommand = z8.object({ type: z8.literal("member.set_compute"), workspace: z8.string().min(1), machine: z8.string().uuid().nullable().optional(), shares: z8.array(z8.string()).optional() });
+    threadSetMachineCommand = z8.object({ type: z8.literal("thread.set_machine"), workspace: z8.string().min(1), threadId: z8.string().uuid(), machineId: z8.string().uuid().nullable() });
+    threadSetBrainCommand = z8.object({ type: z8.literal("thread.set_brain"), workspace: z8.string().min(1), threadId: z8.string().uuid(), override: z8.record(z8.string(), z8.string()).nullable() });
+    threadSettleCommand = z8.object({ type: z8.literal("thread.settle"), workspace: z8.string().min(1), threadId: z8.string().uuid() });
+    threadUnsettleCommand = z8.object({ type: z8.literal("thread.unsettle"), workspace: z8.string().min(1), threadId: z8.string().uuid() });
+    scheduleCreateCommand = z8.object({
+      type: z8.literal("schedule.create"),
+      channel: z8.string().min(1),
+      title: z8.string().trim().min(1).max(200),
+      prompt: z8.string().trim().min(1).max(4e3),
+      cadence: z8.enum(["once", "daily", "weekdays", "weekly"]),
+      runAt: z8.string().datetime().optional(),
+      atTime: z8.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
+      tz: z8.string().max(64).optional(),
+      weekday: z8.number().int().min(0).max(6).optional(),
+      agent: z8.string().min(1).optional(),
+      routine: z8.boolean().optional(),
+      thread: z8.string().uuid().optional(),
+      replyGap: REPLY_GAP_FIELD.optional()
+      // the routine writer's session · the Replies part's gap
     });
-    scheduleSetStatusCommand = z6.object({ type: z6.literal("schedule.set_status"), schedule: z6.string().min(1), status: z6.enum(["active", "paused"]) });
-    scheduleDeleteCommand = z6.object({ type: z6.literal("schedule.delete"), schedule: z6.string().min(1) });
-    scheduleUpdateCommand = z6.object({
-      type: z6.literal("schedule.update"),
-      schedule: z6.string().min(1),
-      title: z6.string().trim().min(1).max(200),
-      prompt: z6.string().trim().min(1).max(4e3),
-      cadence: z6.enum(["once", "daily", "weekdays", "weekly"]),
-      runAt: z6.string().datetime().optional(),
-      atTime: z6.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
-      tz: z6.string().max(64).optional(),
-      weekday: z6.number().int().min(0).max(6).optional()
+    scheduleSetStatusCommand = z8.object({ type: z8.literal("schedule.set_status"), schedule: z8.string().min(1), status: z8.enum(["active", "paused"]) });
+    scheduleDeleteCommand = z8.object({ type: z8.literal("schedule.delete"), schedule: z8.string().min(1) });
+    scheduleRunNowCommand = z8.object({ type: z8.literal("schedule.run_now"), schedule: z8.string().min(1) });
+    scheduleUpdateCommand = z8.object({
+      type: z8.literal("schedule.update"),
+      schedule: z8.string().min(1),
+      title: z8.string().trim().min(1).max(200),
+      prompt: z8.string().trim().min(1).max(4e3),
+      cadence: z8.enum(["once", "daily", "weekdays", "weekly"]),
+      runAt: z8.string().datetime().optional(),
+      atTime: z8.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
+      tz: z8.string().max(64).optional(),
+      weekday: z8.number().int().min(0).max(6).optional(),
+      replyGap: REPLY_GAP_FIELD.nullable().optional()
     });
-    machineWakeCommand = z6.object({ type: z6.literal("machine.wake"), workspace: z6.string().min(1), machineId: z6.string().uuid() });
-    HumanCommandSchema = z6.discriminatedUnion("type", [
+    machineWakeCommand = z8.object({ type: z8.literal("machine.wake"), workspace: z8.string().min(1), machineId: z8.string().uuid() });
+    HumanCommandSchema = z8.discriminatedUnion("type", [
       taskCreateCommand,
       taskAcceptCommand,
       taskApproveCommand,
@@ -4752,6 +5521,7 @@ var init_commands = __esm({
       contentApproveCommand,
       contentUnscheduleCommand,
       contentUpdateCommand,
+      contentAnchorCommand,
       workspaceCreateCommand,
       workspaceUpdateCommand,
       agentUpdateCommand,
@@ -4770,14 +5540,17 @@ var init_commands = __esm({
       scheduleSetStatusCommand,
       scheduleDeleteCommand,
       scheduleUpdateCommand,
+      scheduleRunNowCommand,
       machineWakeCommand,
-      ...CODE_SESSION_COMMANDS
+      ...CODE_SESSION_COMMANDS,
+      ...REPLY_COMMANDS,
+      ...MODEL_COMMANDS
     ]);
   }
 });
 
 // ../shared/src/policy.ts
-import { z as z7 } from "zod";
+import { z as z9 } from "zod";
 function escapeRe2(s) {
   return s.replace(/[.+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -4948,24 +5721,24 @@ var init_policy = __esm({
       task: 4
     };
     SHELL_CLASSES = ["build", "test", "vcs", "network", "destructive", "pipe-to-shell", "other"];
-    PolicySelectorSchema = z7.discriminatedUnion("kind", [
-      z7.object({ kind: z7.literal("any") }),
-      z7.object({ kind: z7.literal("path"), glob: z7.string().min(1) }),
-      z7.object({ kind: z7.literal("host"), glob: z7.string().min(1) }),
-      z7.object({ kind: z7.literal("shellClass"), value: z7.enum(SHELL_CLASSES) }),
-      z7.object({ kind: z7.literal("tool"), name: z7.string().min(1) }),
-      z7.object({ kind: z7.literal("registry"), name: z7.string().min(1) }),
-      z7.object({ kind: z7.literal("flag"), name: z7.string().min(1) })
+    PolicySelectorSchema = z9.discriminatedUnion("kind", [
+      z9.object({ kind: z9.literal("any") }),
+      z9.object({ kind: z9.literal("path"), glob: z9.string().min(1) }),
+      z9.object({ kind: z9.literal("host"), glob: z9.string().min(1) }),
+      z9.object({ kind: z9.literal("shellClass"), value: z9.enum(SHELL_CLASSES) }),
+      z9.object({ kind: z9.literal("tool"), name: z9.string().min(1) }),
+      z9.object({ kind: z9.literal("registry"), name: z9.string().min(1) }),
+      z9.object({ kind: z9.literal("flag"), name: z9.string().min(1) })
     ]);
-    PolicyRuleSchema = z7.object({
-      id: z7.string().min(1),
-      scope: z7.enum(POLICY_SCOPES),
-      capability: z7.enum(POLICY_CAPABILITIES),
+    PolicyRuleSchema = z9.object({
+      id: z9.string().min(1),
+      scope: z9.enum(POLICY_SCOPES),
+      capability: z9.enum(POLICY_CAPABILITIES),
       selector: PolicySelectorSchema,
-      verdict: z7.enum(POLICY_VERDICTS),
-      rationale: z7.string().max(400).optional(),
+      verdict: z9.enum(POLICY_VERDICTS),
+      rationale: z9.string().max(400).optional(),
       /** workspace hard invariant — evaluated first, cannot be overridden by any scope */
-      locked: z7.boolean().optional()
+      locked: z9.boolean().optional()
     });
     DEFAULT_VERDICTS = {
       "fs.read": "allow",
@@ -5067,36 +5840,17 @@ var init_browse = __esm({
 });
 
 // ../shared/src/threadwake.ts
-function unaddressedWake(state, kind) {
+function unaddressedWake(state, kind, button2 = false) {
   if (kind === "setup" && state !== "closed") return "orchestrator";
   if (state === "todo" || state === "plan_review") return "orchestrator";
   if (state === "in_progress" || state === "blocked") return "assignee";
   if (state === "designing" || state === "design_review") return "assignee";
   if (kind === "content" && !["accepted", "closed"].includes(state)) return "assignee";
-  return null;
+  return button2 ? "orchestrator" : null;
 }
 var init_threadwake = __esm({
   "../shared/src/threadwake.ts"() {
     "use strict";
-  }
-});
-
-// ../shared/src/waiting.ts
-function waitTimedOut(sinceMs, now) {
-  return sinceMs !== null && Number.isFinite(sinceMs) && now - sinceMs >= WAIT_LIMIT_MS;
-}
-function waitTimeoutLine(sinceMs, now) {
-  const mins = Math.max(1, Math.floor((now - sinceMs) / 6e4));
-  return `No answer for ${mins} ${mins === 1 ? "minute" : "minutes"}.`;
-}
-var WAIT_THINKING, WAIT_LIMIT_MS, WAIT_RETRY, WAIT_TICK_MS;
-var init_waiting = __esm({
-  "../shared/src/waiting.ts"() {
-    "use strict";
-    WAIT_THINKING = "thinking\u2026";
-    WAIT_LIMIT_MS = 2 * 6e4;
-    WAIT_RETRY = "Send it again";
-    WAIT_TICK_MS = 15e3;
   }
 });
 
@@ -5564,32 +6318,32 @@ function withHouseStyle(system, block) {
 
 ${block}` : system;
 }
-function dashPass(text, capitals) {
+function dashPass(text2, capitals) {
   let out = "";
   let from = 0;
   let i = 0;
-  while (i < text.length) {
-    if (!isDash(text[i])) {
+  while (i < text2.length) {
+    if (!isDash(text2[i])) {
       i++;
       continue;
     }
     let end = i + 1;
-    while (end < text.length && isBlank(text[end])) end++;
-    const next = text[end];
+    while (end < text2.length && isBlank(text2[end])) end++;
+    const next = text2[end];
     if (capitals !== (next !== void 0 && next >= "A" && next <= "Z")) {
       i++;
       continue;
     }
     let start = i;
-    while (start > from && isBlank(text[start - 1])) start--;
-    out += text.slice(from, start) + (capitals ? ". " : ", ");
+    while (start > from && isBlank(text2[start - 1])) start--;
+    out += text2.slice(from, start) + (capitals ? ". " : ", ");
     from = end;
     i = end;
   }
-  return out + text.slice(from);
+  return out + text2.slice(from);
 }
-function scrubEmdash(text) {
-  const parts = text.split(/(```[\s\S]*?```|`[^`\n]*`)/);
+function scrubEmdash(text2) {
+  const parts = text2.split(/(```[\s\S]*?```|`[^`\n]*`)/);
   for (let i = 0; i < parts.length; i += 2) {
     parts[i] = dashPass(dashPass(parts[i], true), false);
   }
@@ -5677,11 +6431,11 @@ function cleanReplies(raw) {
     const t2 = o["target"] ?? {};
     const handle = typeof t2["handle"] === "string" ? t2["handle"].trim().replace(/^@+/, "").slice(0, 40) : "";
     const url = typeof t2["url"] === "string" && /^https?:\/\//.test(t2["url"].trim()) ? t2["url"].trim().slice(0, 500) : "";
-    const text = typeof t2["text"] === "string" ? t2["text"].trim().slice(0, 2e3) : "";
+    const text2 = typeof t2["text"] === "string" ? t2["text"].trim().slice(0, 2e3) : "";
     const draft = typeof o["draft"] === "string" ? o["draft"].trim().slice(0, 1e3) : "";
-    if (!handle || !url || !text || !draft) continue;
+    if (!handle || !url || !text2 || !draft) continue;
     const m = t2["metrics"] ?? {};
-    const metrics = { impressions: num(m["impressions"]), likes: num(m["likes"]), reposts: num(m["reposts"]), replies: num(m["replies"]) };
+    const metrics = { impressions: num2(m["impressions"]), likes: num2(m["likes"]), reposts: num2(m["reposts"]), replies: num2(m["replies"]) };
     const platform = REPLY_PLATFORMS.includes(t2["platform"]) ? t2["platform"] : "x";
     const source = t2["source"] === "web" ? "web" : "connector";
     const item = {
@@ -5689,7 +6443,7 @@ function cleanReplies(raw) {
       target: {
         handle,
         url,
-        text,
+        text: text2,
         platform,
         source,
         ...typeof t2["name"] === "string" && t2["name"].trim() ? { name: t2["name"].trim().slice(0, 60) } : {},
@@ -5740,7 +6494,7 @@ function applyReplyRevision(items, rev) {
     ...rev.imageBrief?.trim() ? { imageBrief: rev.imageBrief.trim().slice(0, 2e3) } : {}
   });
 }
-var REPLY_PLATFORMS, REPLIES_CAP, REPLIES_PAGE, REPLY_LIMITS, num;
+var REPLY_PLATFORMS, REPLIES_CAP, REPLIES_PAGE, REPLY_LIMITS, num2;
 var init_replyops = __esm({
   "../shared/src/replyops.ts"() {
     "use strict";
@@ -5749,7 +6503,7 @@ var init_replyops = __esm({
     REPLIES_CAP = 8;
     REPLIES_PAGE = 5;
     REPLY_LIMITS = { x: 280, linkedin: 1250, instagram: 2200, tiktok: 150 };
-    num = (v) => typeof v === "number" && Number.isFinite(v) && v >= 0 ? Math.round(v) : void 0;
+    num2 = (v) => typeof v === "number" && Number.isFinite(v) && v >= 0 ? Math.round(v) : void 0;
   }
 });
 
@@ -5927,104 +6681,14 @@ var init_review_reminder = __esm({
   }
 });
 
-// ../shared/src/schedule.ts
-function tzOffsetMs(tz, t2) {
-  const dtf = new Intl.DateTimeFormat("en-US", {
-    timeZone: tz,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false
-  });
-  const p2 = Object.fromEntries(dtf.formatToParts(new Date(t2)).map((x) => [x.type, x.value]));
-  const asUtc = Date.UTC(+p2["year"], +p2["month"] - 1, +p2["day"], +p2["hour"] % 24, +p2["minute"], +p2["second"]);
-  return asUtc - t2;
-}
-function wallToInstant(y, m, d, hh, mm, tz) {
-  const guess = Date.UTC(y, m - 1, d, hh, mm);
-  let t2 = guess - tzOffsetMs(tz, guess);
-  t2 = guess - tzOffsetMs(tz, t2);
-  return new Date(t2);
-}
-function wallParts(tz, t2) {
-  const dtf = new Intl.DateTimeFormat("en-US", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit", weekday: "short" });
-  const p2 = Object.fromEntries(dtf.formatToParts(new Date(t2)).map((x) => [x.type, x.value]));
-  const wd = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(p2["weekday"]);
-  return { y: +p2["year"], m: +p2["month"], d: +p2["day"], weekday: wd };
-}
-function nextScheduleRun(input) {
-  const { cadence, atTime, tz, after } = input;
-  if (cadence === "once") return null;
-  const m = TIME_RE.exec(atTime);
-  if (!m) return null;
-  const hh = +m[1];
-  const mm = +m[2];
-  try {
-    for (let i = 0; i <= 8; i++) {
-      const probe = wallParts(tz, after.getTime() + i * 864e5);
-      const cand = wallToInstant(probe.y, probe.m, probe.d, hh, mm, tz);
-      if (cand.getTime() <= after.getTime()) continue;
-      if (cadence === "weekdays" && (probe.weekday === 0 || probe.weekday === 6)) continue;
-      if (cadence === "weekly" && input.weekday != null && probe.weekday !== input.weekday) continue;
-      return cand;
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-function scheduleFirings(schedules, from, to) {
-  const out = [];
-  for (const s of schedules) {
-    if (s.cadence === "once") {
-      const at = s.next_run_at ? new Date(s.next_run_at) : null;
-      if (at && !Number.isNaN(at.getTime()) && at >= from && at < to) out.push({ key: `${s.id}:once`, at, schedule: s });
-      continue;
-    }
-    let cursor = new Date(from.getTime() - 1);
-    for (let guard = 0; guard < 64; guard++) {
-      const at = nextScheduleRun({ cadence: s.cadence, atTime: s.at_time, tz: s.tz, weekday: s.weekday, after: cursor });
-      if (!at || at >= to) break;
-      out.push({ key: `${s.id}:${at.getTime()}`, at, schedule: s });
-      cursor = at;
-    }
-  }
-  return out.sort((a, b2) => a.at.getTime() - b2.at.getTime());
-}
-function cadenceLine(s) {
-  if (s.cadence === "once") return `Once \xB7 ${s.at_time}`;
-  if (s.cadence === "weekly") return `${SCHED_WEEKDAYS[s.weekday ?? 1]}s \xB7 ${s.at_time}`;
-  return `${s.cadence[0].toUpperCase()}${s.cadence.slice(1)} \xB7 ${s.at_time}`;
-}
-function nextRunLabel(iso3, now = Date.now()) {
-  if (!iso3) return "";
-  const mins = Math.round((new Date(iso3).getTime() - now) / 6e4);
-  if (mins <= 1) return "now";
-  if (mins < 60) return `in ${mins}m`;
-  if (mins < 48 * 60) return `in ${Math.round(mins / 60)}h`;
-  return `in ${Math.round(mins / (60 * 24))}d`;
-}
-var SCHEDULE_CADENCES, TIME_RE, SCHED_WEEKDAYS;
-var init_schedule = __esm({
-  "../shared/src/schedule.ts"() {
-    "use strict";
-    SCHEDULE_CADENCES = ["once", "daily", "weekdays", "weekly"];
-    TIME_RE = /^([01]\d|2[0-3]):([0-5]\d)$/;
-    SCHED_WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  }
-});
-
 // ../shared/src/whiteboards.ts
 function whiteboardSource(kind, value) {
   return JSON.stringify({ kind, value });
 }
-function parseWhiteboardSource(text) {
-  if (!text) return null;
+function parseWhiteboardSource(text2) {
+  if (!text2) return null;
   try {
-    const v = JSON.parse(text);
+    const v = JSON.parse(text2);
     if ((v.kind === "mermaid" || v.kind === "elements") && typeof v.value === "string" && v.value.length > 0) {
       return { kind: v.kind, value: v.value };
     }
@@ -6032,10 +6696,10 @@ function parseWhiteboardSource(text) {
   }
   return null;
 }
-function parseWhiteboardScene(text) {
-  if (!text) return null;
+function parseWhiteboardScene(text2) {
+  if (!text2) return null;
   try {
-    const v = JSON.parse(text);
+    const v = JSON.parse(text2);
     if (!Array.isArray(v.elements)) return null;
     const appState = v.appState && typeof v.appState === "object" ? v.appState : void 0;
     return { elements: v.elements, appState };
@@ -6103,13 +6767,13 @@ function splitBody(raw) {
     imageBrief: brief.join(" ").trim() || void 0
   };
 }
-function liftScript(text) {
-  const lines = text.split("\n");
+function liftScript(text2) {
+  const lines = text2.split("\n");
   const at = lines.findIndex(isScriptHead);
-  if (at === -1) return { rest: text };
+  if (at === -1) return { rest: text2 };
   const script = lines.slice(at + 1).join("\n").trim();
   const rest = lines.slice(0, at).join("\n").trim();
-  return script ? { rest, script } : { rest: text };
+  return script ? { rest, script } : { rest: text2 };
 }
 function normalizeDraft(input) {
   const platform = String(input.platform ?? "x").toLowerCase().trim();
@@ -6337,7 +7001,7 @@ var init_brandimage = __esm({
 });
 
 // ../shared/src/harness.ts
-import { z as z8 } from "zod";
+import { z as z10 } from "zod";
 function toolAvailable(tool, kind) {
   return TOOL_KINDS[tool].includes(kind);
 }
@@ -6353,7 +7017,7 @@ function sliceBudget(remaining, share = 0.5) {
   if (wallMs < BUDGET_FLOOR.wallMs || contextTokens < BUDGET_FLOOR.contextTokens) return null;
   return { wallMs, contextTokens };
 }
-var TURN_KINDS, OWNING_KINDS, WORKING_KINDS, NM_TOOLS, TOOL_KINDS, RUNTIME_CAPABILITIES, MESSAGE_KINDS, AgentMessageSchema, TURN_BUDGETS, BUDGET_FLOOR;
+var TURN_KINDS, OWNING_KINDS, WORKING_KINDS, NM_TOOLS, WEB_KINDS, TOOL_KINDS, RUNTIME_CAPABILITIES, MESSAGE_KINDS, AgentMessageSchema, TURN_BUDGETS, BUDGET_FLOOR;
 var init_harness = __esm({
   "../shared/src/harness.ts"() {
     "use strict";
@@ -6402,8 +7066,14 @@ var init_harness = __esm({
       "draft_replies",
       "list_repo_changes",
       "read_repo_file",
-      "list_repo_files"
+      "list_repo_files",
+      "web_open",
+      "web_read",
+      "web_click",
+      "web_type",
+      "web_screenshot"
     ];
+    WEB_KINDS = ["chat", "triage", "own", "design", "plan", "work", "review", "ship", "deep", "leg"];
     TOOL_KINDS = {
       screenshot: ["own", "design", "work", "review", "deep", "leg"],
       load_skill: [...TURN_KINDS],
@@ -6465,7 +7135,12 @@ var init_harness = __esm({
       // leg reading the CHANGELOG. Read only, so nothing here can move the board or the repository.
       list_repo_changes: ["chat", "triage", "own", "design", "plan", "work", "review", "ship", "deep", "leg"],
       read_repo_file: ["chat", "triage", "own", "design", "plan", "work", "review", "ship", "deep", "leg"],
-      list_repo_files: ["chat", "triage", "own", "design", "plan", "work", "review", "ship", "deep", "leg"]
+      list_repo_files: ["chat", "triage", "own", "design", "plan", "work", "review", "ship", "deep", "leg"],
+      web_open: WEB_KINDS,
+      web_read: WEB_KINDS,
+      web_click: WEB_KINDS,
+      web_type: WEB_KINDS,
+      web_screenshot: WEB_KINDS
     };
     RUNTIME_CAPABILITIES = {
       "claude-code": { agenticLoop: true, inlineImages: true, nativeSandbox: false, gatesNativeTools: true, toolTransport: "in-process", resumable: false },
@@ -6473,29 +7148,29 @@ var init_harness = __esm({
       gemini: { agenticLoop: true, inlineImages: false, nativeSandbox: false, gatesNativeTools: false, toolTransport: "mcp-loopback", resumable: false }
     };
     MESSAGE_KINDS = ["request", "result", "progress", "question", "answer", "handoff", "failure"];
-    AgentMessageSchema = z8.object({
-      id: z8.string().min(1),
-      v: z8.literal(1),
-      from: z8.object({ kind: z8.enum(["agent", "subagent", "human", "harness"]), id: z8.string(), turnId: z8.string().optional() }),
-      to: z8.object({ kind: z8.enum(["agent", "subagent", "parent", "thread"]), id: z8.string().optional() }),
-      kind: z8.enum(MESSAGE_KINDS),
-      subject: z8.object({
-        workspaceId: z8.string(),
-        channelId: z8.string(),
-        threadId: z8.string().optional(),
-        taskId: z8.string().optional()
+    AgentMessageSchema = z10.object({
+      id: z10.string().min(1),
+      v: z10.literal(1),
+      from: z10.object({ kind: z10.enum(["agent", "subagent", "human", "harness"]), id: z10.string(), turnId: z10.string().optional() }),
+      to: z10.object({ kind: z10.enum(["agent", "subagent", "parent", "thread"]), id: z10.string().optional() }),
+      kind: z10.enum(MESSAGE_KINDS),
+      subject: z10.object({
+        workspaceId: z10.string(),
+        channelId: z10.string(),
+        threadId: z10.string().optional(),
+        taskId: z10.string().optional()
       }),
-      body: z8.object({ text: z8.string().optional(), data: z8.unknown().optional() }),
+      body: z10.object({ text: z10.string().optional(), data: z10.unknown().optional() }),
       // brain-RELATIVE paths only: an absolute path here would leak a host filesystem layout into a
       // record that is designed to be exported to another machine (docs/harness/01 §4).
-      refs: z8.array(z8.discriminatedUnion("kind", [
-        z8.object({ kind: z8.literal("artifact"), id: z8.string() }),
-        z8.object({ kind: z8.literal("file"), path: z8.string().refine((p2) => !p2.startsWith("/"), "refs.file.path must be brain-relative, never absolute") }),
-        z8.object({ kind: z8.literal("turn"), id: z8.string() }),
-        z8.object({ kind: z8.literal("task"), number: z8.number().int() })
+      refs: z10.array(z10.discriminatedUnion("kind", [
+        z10.object({ kind: z10.literal("artifact"), id: z10.string() }),
+        z10.object({ kind: z10.literal("file"), path: z10.string().refine((p2) => !p2.startsWith("/"), "refs.file.path must be brain-relative, never absolute") }),
+        z10.object({ kind: z10.literal("turn"), id: z10.string() }),
+        z10.object({ kind: z10.literal("task"), number: z10.number().int() })
       ])).optional(),
-      causedBy: z8.string().optional(),
-      at: z8.string()
+      causedBy: z10.string().optional(),
+      at: z10.string()
     }).refine(
       // a human-visible kind with no prose would render as a blank thread message; fail at validation
       // rather than at render time, which is where a blank message is merely confusing.
@@ -7455,9 +8130,9 @@ function finishVerification(session) {
   return { ...session, messages, pendingApproval: null, state: "completed", activeActivity: null, checkpoints: [...session.checkpoints, checkpoint], updatedAt: stamp() };
 }
 function submitEngineeringPrompt(session, prompt) {
-  const text = prompt.trim();
-  if (!text || session.state === "streaming" || session.state === "awaiting_approval") return session;
-  const title = session.title === "New Code task" || session.title === "New engineering task" ? firstSentence(text).slice(0, 64) || session.title : session.title;
+  const text2 = prompt.trim();
+  if (!text2 || session.state === "streaming" || session.state === "awaiting_approval") return session;
+  const title = session.title === "New Code task" || session.title === "New engineering task" ? firstSentence(text2).slice(0, 64) || session.title : session.title;
   const started = {
     ...session,
     title,
@@ -7466,7 +8141,7 @@ function submitEngineeringPrompt(session, prompt) {
     pendingModeHandoff: null,
     pendingApproval: null,
     proposedChanges: [],
-    messages: [...session.messages, msg("user", text)],
+    messages: [...session.messages, msg("user", text2)],
     updatedAt: stamp()
   };
   const decision = effectivePermission(started.mode, "read", started.permissions, started.policy);
@@ -7739,16 +8414,16 @@ ${after.split("\n").filter(Boolean).map((line) => `+${line}`).join("\n")}
   }));
 }
 function beginRemoteEngineeringPrompt(session, prompt, attachments = []) {
-  const text = prompt.trim();
-  if (!text || session.state === "streaming" || session.state === "awaiting_approval") return session;
-  const title = session.title === "New Code task" || session.title === "New engineering task" ? firstSentence(text).slice(0, 64) || session.title : session.title;
+  const text2 = prompt.trim();
+  if (!text2 || session.state === "streaming" || session.state === "awaiting_approval") return session;
+  const title = session.title === "New Code task" || session.title === "New engineering task" ? firstSentence(text2).slice(0, 64) || session.title : session.title;
   return {
     ...session,
     title,
     state: "streaming",
     activeActivity: { phase: "thinking", startedAt: stamp2() },
     pendingModeHandoff: null,
-    messages: [...session.messages, { ...message("user", text), ...attachments.length ? { attachments } : {} }],
+    messages: [...session.messages, { ...message("user", text2), ...attachments.length ? { attachments } : {} }],
     updatedAt: stamp2()
   };
 }
@@ -8002,10 +8677,10 @@ function engineeringPlanItems(value) {
     const numbered = line.match(/^\s*\d+[.)]\s+(\S.*)$/);
     if (!checkbox && !numbered) return [];
     const marker = checkbox?.[1]?.toLowerCase();
-    const text = (checkbox?.[2] ?? numbered?.[1] ?? "").replace(/\*\*/g, "").replace(/`/g, "").replace(/^\d+[.)]\s+/, "").trim();
-    if (!text) return [];
+    const text2 = (checkbox?.[2] ?? numbered?.[1] ?? "").replace(/\*\*/g, "").replace(/`/g, "").replace(/^\d+[.)]\s+/, "").trim();
+    if (!text2) return [];
     return [{
-      text,
+      text: text2,
       status: marker === "x" ? "complete" : marker && marker !== " " ? "active" : "pending"
     }];
   }).slice(0, 20);
@@ -8159,9 +8834,9 @@ function parseReleaseRef(body) {
   }
   return null;
 }
-function shortDate(iso3) {
-  const d = new Date(iso3);
-  return Number.isNaN(d.getTime()) ? iso3 : `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}`;
+function shortDate(iso4) {
+  const d = new Date(iso4);
+  return Number.isNaN(d.getTime()) ? iso4 : `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}`;
 }
 function releaseDigest(slug, scan, opts) {
   const lines = [];
@@ -8215,11 +8890,11 @@ var init_releasescan = __esm({
     BOT_AUTHOR = /(?:\[bot\]$|^dependabot|^renovate|^github-actions$|^greenkeeper)/i;
     PUBLISH_TITLE = /^publish main@[0-9a-f]{6,}/i;
     VERSION_TITLE = /^\s*(?:v|version\s+)\d+\.\d+(?:\.\d+)?(?:\s*[:·(-]|\s*$)/i;
-    t = (iso3) => {
-      const n = iso3 ? new Date(iso3).getTime() : NaN;
+    t = (iso4) => {
+      const n = iso4 ? new Date(iso4).getTime() : NaN;
       return Number.isNaN(n) ? 0 : n;
     };
-    day = (iso3) => iso3.slice(0, 10);
+    day = (iso4) => iso4.slice(0, 10);
     MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     excerpt = (s, n) => {
       const one = s.replace(/\r/g, "").replace(/\n{2,}/g, " \xB7 ").replace(/\n/g, " ").replace(/\s+/g, " ").trim();
@@ -8277,10 +8952,10 @@ function briefMarker(artifactId) {
   return `\u2039brief:${artifactId}\u203A`;
 }
 function parseBriefRef(body) {
-  const text = body ?? "";
-  const hit = markerSpans(text, "\u2039brief:", "\u203A").find((sp) => sp.inner.length === 36 && /^[0-9a-fA-F-]{36}$/.test(sp.inner));
+  const text2 = body ?? "";
+  const hit = markerSpans(text2, "\u2039brief:", "\u203A").find((sp) => sp.inner.length === 36 && /^[0-9a-fA-F-]{36}$/.test(sp.inner));
   if (!hit) return null;
-  return { id: hit.inner.toLowerCase(), prose: trimLineEnds(stripMarkers(text, "\u2039brief:", "\u203A")).replace(/\n{3,}/g, "\n\n").trim() };
+  return { id: hit.inner.toLowerCase(), prose: trimLineEnds(stripMarkers(text2, "\u2039brief:", "\u203A")).replace(/\n{3,}/g, "\n\n").trim() };
 }
 var HEAD_RE, VERDICT_RE, VERDICTS;
 var init_releasebrief = __esm({
@@ -8462,6 +9137,10 @@ __export(src_exports, {
   BEAT_PHASE_ROLES: () => BEAT_PHASE_ROLES,
   BEAT_STATUSES: () => BEAT_STATUSES,
   BRAND_DOC_NAMES: () => BRAND_DOC_NAMES,
+  BROWSER_FRAME_WINDOW: () => BROWSER_FRAME_WINDOW,
+  BROWSER_LANE: () => BROWSER_LANE,
+  BROWSER_QUALITY_STEPS: () => BROWSER_QUALITY_STEPS,
+  BROWSER_VIEWPORT: () => BROWSER_VIEWPORT,
   BUDGET_FLOOR: () => BUDGET_FLOOR,
   BeatSchema: () => BeatSchema,
   CLAUDE_DESIGN_APP_URL: () => CLAUDE_DESIGN_APP_URL,
@@ -8483,6 +9162,7 @@ __export(src_exports, {
   CUSTOM_PACK_ID: () => CUSTOM_PACK_ID,
   CUSTOM_PACK_PREFIX: () => CUSTOM_PACK_PREFIX,
   DEFAULT_GRACE_MS: () => DEFAULT_GRACE_MS,
+  DEFAULT_THINKING: () => DEFAULT_THINKING,
   DEFAULT_THREAD_KIND: () => DEFAULT_THREAD_KIND,
   DEFAULT_THREAD_MODE: () => DEFAULT_THREAD_MODE,
   DEFAULT_VERDICTS: () => DEFAULT_VERDICTS,
@@ -8528,6 +9208,8 @@ __export(src_exports, {
   MACHINE_WAIT_STALLED: () => MACHINE_WAIT_STALLED,
   MACHINE_WAKE_GRACE_MS: () => MACHINE_WAKE_GRACE_MS,
   MARKETING_SETUP_FLOW: () => MARKETING_SETUP_FLOW,
+  MAX_BROWSER_TEXT_CHARS: () => MAX_BROWSER_TEXT_CHARS,
+  MAX_BROWSER_URL_CHARS: () => MAX_BROWSER_URL_CHARS,
   MAX_PACK_CREDITS: () => MAX_PACK_CREDITS,
   MAX_SUGGESTIONS: () => MAX_SUGGESTIONS,
   MAX_SUGGESTION_CHARS: () => MAX_SUGGESTION_CHARS,
@@ -8564,14 +9246,23 @@ __export(src_exports, {
   READABLE: () => READABLE,
   RECOMMENDED_ENGINEERING_PERMISSIONS: () => RECOMMENDED_ENGINEERING_PERMISSIONS,
   RELEASE_LOG_CAP: () => RELEASE_LOG_CAP,
+  REMINDER_STATES: () => REMINDER_STATES,
   REPLIES_CAP: () => REPLIES_CAP,
   REPLIES_PAGE: () => REPLIES_PAGE,
+  REPLY_GAPS: () => REPLY_GAPS,
   REPLY_LIMITS: () => REPLY_LIMITS,
   REPLY_PLATFORMS: () => REPLY_PLATFORMS,
   REPORT_SHAPE_DOD: () => REPORT_SHAPE_DOD,
   RETRO_RANGES: () => RETRO_RANGES,
   REVIEW_LEAD_MIN: () => REVIEW_LEAD_MIN,
   ROLE_DESCRIPTION: () => ROLE_DESCRIPTION,
+  ROUTINE_ASK: () => ROUTINE_ASK,
+  ROUTINE_CADENCES: () => ROUTINE_CADENCES,
+  ROUTINE_PARTS: () => ROUTINE_PARTS,
+  ROUTINE_PART_MAX: () => ROUTINE_PART_MAX,
+  ROUTINE_PROMPT_MAX: () => ROUTINE_PROMPT_MAX,
+  ROUTINE_SCHEDULED_MARKER: () => ROUTINE_SCHEDULED_MARKER,
+  ROUTINE_TITLE_MAX: () => ROUTINE_TITLE_MAX,
   RUNTIME_CAPABILITIES: () => RUNTIME_CAPABILITIES,
   RUNTIME_SLOTS: () => RUNTIME_SLOTS,
   RUN_KINDS: () => RUN_KINDS,
@@ -8583,6 +9274,7 @@ __export(src_exports, {
   RunSchema: () => RunSchema,
   SCHEDULE_CADENCES: () => SCHEDULE_CADENCES,
   SCHED_WEEKDAYS: () => SCHED_WEEKDAYS,
+  SESSION_RUN_WORD: () => SESSION_RUN_WORD,
   SETUP_FLOWS: () => SETUP_FLOWS,
   SETUP_TASK_TRANSITIONS: () => SETUP_TASK_TRANSITIONS,
   SHELL_CLASSES: () => SHELL_CLASSES,
@@ -8604,6 +9296,8 @@ __export(src_exports, {
   TASK_KINDS: () => TASK_KINDS,
   TASK_STATES: () => TASK_STATES,
   TEMPLATE_META: () => TEMPLATE_META,
+  THINKING_LABEL: () => THINKING_LABEL,
+  THINKING_LEVELS: () => THINKING_LEVELS,
   THIS_MACHINE: () => THIS_MACHINE,
   THREAD_KINDS: () => THREAD_KINDS,
   THREAD_MODES: () => THREAD_MODES,
@@ -8614,6 +9308,7 @@ __export(src_exports, {
   TRANSITIONS: () => TRANSITIONS,
   TRANSITION_EVENT: () => TRANSITION_EVENT,
   TRIAL_LABEL: () => TRIAL_LABEL,
+  TRY_ONCE_HEAD: () => TRY_ONCE_HEAD,
   TURN_BUDGETS: () => TURN_BUDGETS,
   TURN_KINDS: () => TURN_KINDS,
   TaskRepoSchema: () => TaskRepoSchema,
@@ -8644,6 +9339,7 @@ __export(src_exports, {
   afterSettle: () => afterSettle,
   agentInChannel: () => agentInChannel,
   agentRegisterCommand: () => agentRegisterCommand,
+  agentTabAllows: () => agentTabAllows,
   agentUpdateCommand: () => agentUpdateCommand,
   alertsSummary: () => alertsSummary,
   announceReadyMeta: () => announceReadyMeta,
@@ -8661,6 +9357,7 @@ __export(src_exports, {
   availableMachines: () => availableMachines,
   awaitingAgent: () => awaitingAgent,
   b: () => b,
+  b64Length: () => b64Length,
   bareAddressRe: () => bareAddressRe,
   beatsWithin: () => beatsWithin,
   beginRemoteEngineeringPrompt: () => beginRemoteEngineeringPrompt,
@@ -8678,6 +9375,8 @@ __export(src_exports, {
   briefPrettyFull: () => briefPrettyFull,
   briefSummary: () => briefSummary,
   broadcastMeta: () => broadcastMeta,
+  browserOpenMeta: () => browserOpenMeta,
+  browserViewport: () => browserViewport,
   buildAgentCard: () => buildAgentCard,
   buildDesignPrompt: () => buildDesignPrompt,
   buildFailoverCard: () => buildFailoverCard,
@@ -8697,7 +9396,9 @@ __export(src_exports, {
   card: () => card,
   cardNotification: () => cardNotification,
   cardTitle: () => cardTitle,
+  cardsAsWords: () => cardsAsWords,
   carryCards: () => carryCards,
+  changedParts: () => changedParts,
   checkNeeds: () => checkNeeds,
   choosableMachines: () => choosableMachines,
   classifyShellCommand: () => classifyShellCommand,
@@ -8716,6 +9417,7 @@ __export(src_exports, {
   composeFailover: () => composeFailover,
   composePrompt: () => composePrompt,
   computeAlert: () => computeAlert,
+  contentAnchorCommand: () => contentAnchorCommand,
   contentApproveCommand: () => contentApproveCommand,
   contentUnscheduleCommand: () => contentUnscheduleCommand,
   contentUpdateCommand: () => contentUpdateCommand,
@@ -8749,7 +9451,10 @@ __export(src_exports, {
   dismissEngineeringModeHandoff: () => dismissEngineeringModeHandoff,
   done: () => done,
   dotLines: () => dotLines,
+  draftIsLive: () => draftIsLive,
+  draftLetters: () => draftLetters,
   draftsNeedHuman: () => draftsNeedHuman,
+  drawAsk: () => drawAsk,
   effectivePermission: () => effectivePermission,
   engineeringActivePresentation: () => engineeringActivePresentation,
   engineeringActivityPresentation: () => engineeringActivityPresentation,
@@ -8801,6 +9506,7 @@ __export(src_exports, {
   hostedPlanLabel: () => hostedPlanLabel,
   houseStyleBlock: () => houseStyleBlock,
   humanHandles: () => humanHandles,
+  inSessionRun: () => inSessionRun,
   initialWizard: () => initialWizard,
   inviteMeta: () => inviteMeta,
   isAddress: () => isAddress,
@@ -8824,9 +9530,14 @@ __export(src_exports, {
   isPostsFile: () => isPostsFile,
   isReadable: () => isReadable,
   isReleasePayload: () => isReleasePayload,
+  isReplyGap: () => isReplyGap,
+  isRoutineSchedule: () => isRoutineSchedule,
+  isRoutineScheduledMarker: () => isRoutineScheduledMarker,
   isRunOpen: () => isRunOpen,
   isRunStale: () => isRunStale,
+  isSessionRunNotice: () => isSessionRunNotice,
   isStandDown: () => isStandDown,
+  isTryOnce: () => isTryOnce,
   isUnroutableTodo: () => isUnroutableTodo,
   isVideoTier: () => isVideoTier,
   isWorkflowArtifact: () => isWorkflowArtifact,
@@ -8901,11 +9612,13 @@ __export(src_exports, {
   packModelForRole: () => packModelForRole,
   packRequiredProviders: () => packRequiredProviders,
   parseAddress: () => parseAddress,
+  parseAgentModels: () => parseAgentModels,
   parseArticleRef: () => parseArticleRef,
   parseAuthCard: () => parseAuthCard,
   parseBrainOverride: () => parseBrainOverride,
   parseBrandGuidelines: () => parseBrandGuidelines,
   parseBriefRef: () => parseBriefRef,
+  parseBrowserInput: () => parseBrowserInput,
   parseCard: () => parseCard,
   parseDraftRevisions: () => parseDraftRevisions,
   parseDraftedPosts: () => parseDraftedPosts,
@@ -8923,6 +9636,7 @@ __export(src_exports, {
   parseReplies: () => parseReplies,
   parseReportRef: () => parseReportRef,
   parseReviewVerdict: () => parseReviewVerdict,
+  parseRoutineBlock: () => parseRoutineBlock,
   parseShowLetters: () => parseShowLetters,
   parseSkillFile: () => parseSkillFile,
   parseSkillFiles: () => parseSkillFiles,
@@ -8934,6 +9648,7 @@ __export(src_exports, {
   parseWorkPlanLegs: () => parseWorkPlanLegs,
   persistableEngineeringSession: () => persistableEngineeringSession,
   pickActiveWorkspace: () => pickActiveWorkspace,
+  pickFor: () => pickFor,
   placementFor: () => placementFor,
   plainTitle: () => plainTitle,
   planArtifactName: () => planArtifactName,
@@ -8966,6 +9681,7 @@ __export(src_exports, {
   providerName: () => providerName,
   providerReady: () => providerReady,
   publishFailedMeta: () => publishFailedMeta,
+  queueTimes: () => queueTimes,
   quote: () => quote,
   randomWorkspaceName: () => randomWorkspaceName,
   rateDeltaPoints: () => rateDeltaPoints,
@@ -8977,6 +9693,8 @@ __export(src_exports, {
   releaseLogNote: () => releaseLogNote,
   releaseMarker: () => releaseMarker,
   releaseTitle: () => releaseTitle,
+  reminderOwed: () => reminderOwed,
+  reminderWords: () => reminderWords,
   renderAnnounceReady: () => renderAnnounceReady,
   renderBroadcast: () => renderBroadcast,
   renderDay1: () => renderDay1,
@@ -8991,8 +9709,12 @@ __export(src_exports, {
   renderPublishFailed: () => renderPublishFailed,
   renderWelcome: () => renderWelcome,
   renderableDeliverables: () => renderableDeliverables,
+  repairCardFences: () => repairCardFences,
+  repairCardJson: () => repairCardJson,
   repliesBlock: () => repliesBlock,
   replyFooter: () => replyFooter,
+  replyIntentUrl: () => replyIntentUrl,
+  replyOpenUrl: () => replyOpenUrl,
   replyPreview: () => replyPreview,
   repoLinkCommand: () => repoLinkCommand,
   repoint: () => repoint,
@@ -9013,6 +9735,19 @@ __export(src_exports, {
   rolesActivatable: () => rolesActivatable,
   roomBrief: () => roomBrief,
   roomBriefs: () => roomBriefs,
+  routineAsk: () => routineAsk,
+  routineBlock: () => routineBlock,
+  routineCardGuard: () => routineCardGuard,
+  routineCardStates: () => routineCardStates,
+  routineCardText: () => routineCardText,
+  routineChangesPrefix: () => routineChangesPrefix,
+  routineDecisionQuestion: () => routineDecisionQuestion,
+  routineDraftFrom: () => routineDraftFrom,
+  routineDraftsOf: () => routineDraftsOf,
+  routineDraftsReplies: () => routineDraftsReplies,
+  routinePrompt: () => routinePrompt,
+  routineRepliesText: () => routineRepliesText,
+  routineWhen: () => routineWhen,
   rowsInProject: () => rowsInProject,
   rule: () => rule,
   runElapsed: () => runElapsed,
@@ -9025,6 +9760,8 @@ __export(src_exports, {
   scheduleCreateCommand: () => scheduleCreateCommand,
   scheduleDeleteCommand: () => scheduleDeleteCommand,
   scheduleFirings: () => scheduleFirings,
+  schedulePayload: () => schedulePayload,
+  scheduleRunNowCommand: () => scheduleRunNowCommand,
   scheduleSetStatusCommand: () => scheduleSetStatusCommand,
   scheduleUpdateCommand: () => scheduleUpdateCommand,
   scriptBeats: () => scriptBeats,
@@ -9036,6 +9773,13 @@ __export(src_exports, {
   seedCrew: () => seedCrew,
   serializeBrainOverride: () => serializeBrainOverride,
   sessionGroups: () => sessionGroups,
+  sessionRunFacts: () => sessionRunFacts,
+  sessionRunLabel: () => sessionRunLabel,
+  sessionRunLines: () => sessionRunLines,
+  sessionRunOpen: () => sessionRunOpen,
+  sessionRunStrip: () => sessionRunStrip,
+  sessionRunWhen: () => sessionRunWhen,
+  sessionSetup: () => sessionSetup,
   setEngineeringBrainPack: () => setEngineeringBrainPack,
   setEngineeringMachine: () => setEngineeringMachine,
   setEngineeringMode: () => setEngineeringMode,
@@ -9060,8 +9804,10 @@ __export(src_exports, {
   sniffVideoMime: () => sniffVideoMime,
   snippet: () => snippet,
   spacer: () => spacer,
+  splitSessionRuns: () => splitSessionRuns,
   stats: () => stats,
   streamingEngineeringText: () => streamingEngineeringText,
+  stripCardFences: () => stripCardFences,
   stripFenced: () => stripFenced,
   stripMarkdownInline: () => stripMarkdownInline,
   stripMarkers: () => stripMarkers,
@@ -9069,11 +9815,13 @@ __export(src_exports, {
   stripNextSteps: () => stripNextSteps,
   stripPlaybookRecs: () => stripPlaybookRecs,
   stripReplies: () => stripReplies,
+  stripRoutineBlocks: () => stripRoutineBlocks,
   stripSuggestions: () => stripSuggestions,
   submitEngineeringPrompt: () => submitEngineeringPrompt,
   subtreeSize: () => subtreeSize,
   summarizeReplies: () => summarizeReplies,
   supersededIds: () => supersededIds,
+  takesThinking: () => takesThinking,
   tallyFonts: () => tallyFonts,
   tallyPalette: () => tallyPalette,
   taskAcceptCommand: () => taskAcceptCommand,
@@ -9104,6 +9852,7 @@ __export(src_exports, {
   taskUpdateDetailsCommand: () => taskUpdateDetailsCommand,
   tasksInProject: () => tasksInProject,
   themeColors: () => themeColors,
+  thinkingFor: () => thinkingFor,
   threadKindOf: () => threadKindOf,
   threadModeOf: () => threadModeOf,
   threadSetBrainCommand: () => threadSetBrainCommand,
@@ -9114,12 +9863,14 @@ __export(src_exports, {
   threadUnsettleCommand: () => threadUnsettleCommand,
   toText: () => toText,
   tokenizeDraft: () => tokenizeDraft,
+  tookLabel: () => tookLabel,
   toolAvailable: () => toolAvailable,
   toolVerb: () => toolVerb,
   toolsForKind: () => toolsForKind,
   trimEndChars: () => trimEndChars,
   trimLineEnds: () => trimLineEnds,
   trimStartChars: () => trimStartChars,
+  tryOnceBody: () => tryOnceBody,
   unaddressedWake: () => unaddressedWake,
   unblockNote: () => unblockNote,
   unroutableTodos: () => unroutableTodos,
@@ -9130,6 +9881,7 @@ __export(src_exports, {
   waitTimeoutLine: () => waitTimeoutLine,
   wakeCandidates: () => wakeCandidates,
   welcomeMeta: () => welcomeMeta,
+  whenChanged: () => whenChanged,
   whiteboardShareBody: () => whiteboardShareBody,
   whiteboardSource: () => whiteboardSource,
   whyBelowTitle: () => whyBelowTitle,
@@ -9146,6 +9898,7 @@ __export(src_exports, {
   workspaceSlug: () => workspaceSlug,
   workspaceUpdateCommand: () => workspaceUpdateCommand,
   writeColumns: () => writeColumns,
+  xPostId: () => xPostId,
   xpForLevel: () => xpForLevel,
   xpOf: () => xpOf
 });
@@ -9171,6 +9924,7 @@ var init_src = __esm({
     init_deliverables();
     init_stream();
     init_livestream();
+    init_browser_lane();
     init_agentdesc();
     init_agentcontract();
     init_replies();
@@ -9182,6 +9936,8 @@ var init_src = __esm({
     init_journey();
     init_needsyou();
     init_threadstatus();
+    init_session_runs();
+    init_routine_draft();
     init_dial();
     init_onboarding();
     init_onboarding_wizard();
@@ -9201,6 +9957,8 @@ var init_src = __esm({
     init_filing();
     init_retro();
     init_cards();
+    init_cardfence();
+    init_cardwords();
     init_brainnotice();
     init_commands();
     init_policy();
@@ -9214,6 +9972,7 @@ var init_src = __esm({
     init_commrules();
     init_nextsteps();
     init_replyops();
+    init_replyqueue();
     init_needs();
     init_linear();
     init_reports();
@@ -9231,6 +9990,7 @@ var init_src = __esm({
     init_templates_announce();
     init_model_labels();
     init_model_selection();
+    init_agent_models();
     init_engineering();
     init_releasescan();
     init_releasebrief();
@@ -9426,7 +10186,8 @@ var xPoster = {
     return { url: `https://x.com/i/web/status/${id}`, ...refreshed ? { secretPatch: t2 } : {} };
   }
 };
-async function xSearchRecent(tokens2, query, max, fetchFn = fetch, persist) {
+var byReach = (a, b2) => (b2.metrics?.impressions ?? -1) - (a.metrics?.impressions ?? -1) || (b2.metrics?.likes ?? 0) - (a.metrics?.likes ?? 0);
+async function xSearchRecent(tokens2, query, max, fetchFn = fetch, persist, opts = {}) {
   let t2 = tokens2;
   let refreshed = false;
   if (t2.expires_at && t2.expires_at < Date.now() + 3e4) {
@@ -9437,6 +10198,8 @@ async function xSearchRecent(tokens2, query, max, fetchFn = fetch, persist) {
     const u = new URL("https://api.x.com/2/tweets/search/recent");
     u.searchParams.set("query", query);
     u.searchParams.set("max_results", String(Math.min(100, Math.max(10, max))));
+    u.searchParams.set("sort_order", opts.order === "latest" ? "recency" : "relevancy");
+    if (opts.hours) u.searchParams.set("start_time", new Date(Date.now() - Math.min(167, Math.max(1, opts.hours)) * 36e5).toISOString().replace(/\.\d{3}Z$/, "Z"));
     u.searchParams.set("tweet.fields", "created_at,public_metrics,author_id");
     u.searchParams.set("expansions", "author_id");
     u.searchParams.set("user.fields", "username,name");
@@ -9475,9 +10238,9 @@ async function xSearchRecent(tokens2, query, max, fetchFn = fetch, persist) {
       url: u?.username ? `https://x.com/${u.username}/status/${d.id}` : `https://x.com/i/web/status/${d.id}`
     };
   });
-  return { hits, ...refreshed ? { secretPatch: t2 } : {} };
+  return { hits: opts.order === "latest" ? hits : [...hits].sort(byReach), ...refreshed ? { secretPatch: t2 } : {} };
 }
-async function xSearchOnConnector(store2, workspace, channel, query, max, fetchFn = fetch) {
+async function xSearchOnConnector(store2, workspace, channel, query, max, fetchFn = fetch, opts = {}) {
   const conn = await store2.connectorWithSecret(workspace, "x", channel);
   if (!conn?.ciphertext) return { ok: false, code: "NOT_CONNECTED", error: "no X account is connected for this room" };
   const reconnect = {
@@ -9488,7 +10251,7 @@ async function xSearchOnConnector(store2, workspace, channel, query, max, fetchF
   if (conn.status !== "connected") return reconnect;
   const persist = (b2) => store2.setConnectorSecret(conn.id, seal(b2));
   const run2 = async (ciphertext) => {
-    const out = await xSearchRecent(unseal(ciphertext), query, max, fetchFn, persist);
+    const out = await xSearchRecent(unseal(ciphertext), query, max, fetchFn, persist, opts);
     if (out.secretPatch) await store2.setConnectorSecret(conn.id, seal(out.secretPatch));
     return { ok: true, hits: out.hits };
   };
@@ -10110,7 +10873,7 @@ async function refundFilm(sql, workspaceId, split, note) {
 
 // src/credits.ts
 init_src();
-import { z as z11 } from "zod";
+import { z as z13 } from "zod";
 
 // src/billing.ts
 import Stripe from "stripe";
@@ -10233,7 +10996,7 @@ function creditGrantFromEvent(event) {
 }
 
 // src/fleet.ts
-import { z as z10 } from "zod";
+import { z as z12 } from "zod";
 
 // src/clerk.ts
 import { createPublicKey, verify } from "node:crypto";
@@ -10270,6 +11033,9 @@ var STATUS = {
   THREAD_ALREADY_TITLED: 409,
   // 422 — clears once a repository is connected; the caller retries on that change
   REPO_REQUIRED: 422,
+  // 409 — the session is already what the command would make it, or belongs to another runtime
+  THREAD_HAS_ROUTINE: 409,
+  CODING_THREAD: 409,
   // 409 — the move would be a no-op, or has already happened once. Both are "the state is
   // already what you are asking for", which is what 409 says.
   SAME_CHANNEL: 409,
@@ -10508,7 +11274,7 @@ async function createClerkSession(userId) {
 
 // src/fleet-claims.ts
 import { createHash as createHash4, timingSafeEqual as timingSafeEqual3 } from "node:crypto";
-import { z as z9 } from "zod";
+import { z as z11 } from "zod";
 
 // src/machine-auth.ts
 import { createHash as createHash3, createPrivateKey, createPublicKey as createPublicKey2, randomBytes as randomBytes5, sign as cryptoSign } from "node:crypto";
@@ -10600,8 +11366,8 @@ function poolTokenOk(presented) {
   if (!expected || !presented) return false;
   return timingSafeEqual3(digest(expected), digest(presented));
 }
-var BindSchema = z9.object({ pod: z9.string().min(1).max(253), uid: z9.string().min(1).max(64) });
-var BootstrapSchema = z9.object({ poolToken: z9.string().min(1), pod: z9.string().min(1).max(253), uid: z9.string().min(1).max(64) });
+var BindSchema = z11.object({ pod: z11.string().min(1).max(253), uid: z11.string().min(1).max(64) });
+var BootstrapSchema = z11.object({ poolToken: z11.string().min(1), pod: z11.string().min(1).max(253), uid: z11.string().min(1).max(64) });
 function claimRoutes(app, store2) {
   const fleetSecretOk = (auth) => {
     const secret = process.env["FLEET_SECRET"];
@@ -10611,7 +11377,7 @@ function claimRoutes(app, store2) {
     if (!fleetSecretOk(c.req.header("authorization"))) return c.json({ error: "forbidden" }, 403);
     const sql = sqlOf(store2);
     if (!sql) return c.json({ error: "fleet not served by this store" }, 501);
-    const id = z9.string().uuid().safeParse(c.req.param("id"));
+    const id = z11.string().uuid().safeParse(c.req.param("id"));
     if (!id.success) return c.json({ error: "invalid machine id" }, 400);
     const body = BindSchema.safeParse(await c.req.json().catch(() => null));
     if (!body.success) return c.json({ error: "invalid body", issues: body.error.issues }, 400);
@@ -10670,7 +11436,7 @@ function rowsToDesired(rows2) {
     }
     const res = r.resources ?? {};
     const planDefaults = PLAN_DEFAULTS[r.workspace_plan] ?? PLAN_DEFAULTS["free"];
-    const str = (key2) => {
+    const str2 = (key2) => {
       const v = res[key2];
       if (typeof v === "string" && v.length > 0) return v;
       return planDefaults[key2] ?? DEFAULTS[key2];
@@ -10683,21 +11449,21 @@ function rowsToDesired(rows2) {
       ...r.owner_user_id ? { ownerUserId: r.owner_user_id } : {},
       ...r.substrate === "claim" ? { substrate: "claim" } : {},
       replicas: r.desired_replicas === 1 ? 1 : 0,
-      cpu: str("cpu"),
-      memory: str("memory"),
-      cpuLimit: str("cpuLimit"),
-      memoryLimit: str("memoryLimit"),
-      disk: str("disk")
+      cpu: str2("cpu"),
+      memory: str2("memory"),
+      cpuLimit: str2("cpuLimit"),
+      memoryLimit: str2("memoryLimit"),
+      disk: str2("disk")
     });
   }
   for (const ws of byWorkspace.values()) ws.quotaPvcCount = String(Math.max(Number(ws.quotaPvcCount), ws.machines.length + 1));
   return { workspaces: [...byWorkspace.values()] };
 }
-var CreateMachineSchema = z10.object({
-  workspaceId: z10.string().uuid(),
-  kind: z10.enum(["member", "runner"]),
-  ownerUserId: z10.string().uuid(),
-  name: z10.string().min(1).max(60)
+var CreateMachineSchema = z12.object({
+  workspaceId: z12.string().uuid(),
+  kind: z12.enum(["member", "runner"]),
+  ownerUserId: z12.string().uuid(),
+  name: z12.string().min(1).max(60)
 });
 function fleetRoutes(app, store2) {
   const fleetSecretOk = (auth) => {
@@ -10728,7 +11494,7 @@ function fleetRoutes(app, store2) {
   app.post("/internal/machines/:id/token", async (c) => {
     if (!fleetSecretOk(c.req.header("authorization"))) return c.json({ error: "forbidden" }, 403);
     if (!store2.rotateMachineToken) return c.json({ error: "fleet not served by this store" }, 501);
-    const id = z10.string().uuid().safeParse(c.req.param("id"));
+    const id = z12.string().uuid().safeParse(c.req.param("id"));
     if (!id.success) return c.json({ error: "invalid machine id" }, 400);
     const { token, hash } = mintMachineToken();
     const row = await store2.rotateMachineToken(id.data, hash);
@@ -10835,15 +11601,15 @@ function starterAssembly() {
       if (!first) return "";
       const { content, ...fields } = first;
       cand = { ...cand, ...fields };
-      let text = "";
+      let text2 = "";
       for (const p2 of content?.parts ?? []) {
-        if (typeof p2.text === "string" && !p2.thought) text += p2.text;
+        if (typeof p2.text === "string" && !p2.thought) text2 += p2.text;
         if (plainText(p2) && !p2.text) continue;
         const last = parts[parts.length - 1];
         if (last && plainText(p2) && plainText(last)) last.text = `${last.text ?? ""}${p2.text ?? ""}`;
         else parts.push({ ...p2 });
       }
-      return text;
+      return text2;
     },
     usage: () => usage,
     response: () => ({
@@ -10876,13 +11642,13 @@ function starterReplyStream(o) {
           failure = "UPSTREAM";
           break;
         }
-        const text = acc.add(chunk2);
+        const text2 = acc.add(chunk2);
         if (gone) {
           o.abortUpstream();
           failure = "CLIENT_GONE";
           break;
         }
-        if (text) send({ t: "text", text });
+        if (text2) send({ t: "text", text: text2 });
       }
     } catch {
       failure = gone ? "CLIENT_GONE" : "UPSTREAM";
@@ -11092,14 +11858,15 @@ function ledgerFor(store2) {
     refundFilm: (w, split, note) => refundFilm(sql, w, split, note)
   };
 }
-var GenerateSchema = z11.object({
-  workspace: z11.string().uuid(),
+var GenerateSchema = z13.object({
+  workspace: z13.string().uuid(),
   /** the turn, already assembled by the caller — this proxy is a transport, not a prompt author */
-  contents: z11.unknown(),
-  system: z11.string().optional(),
-  tools: z11.unknown().optional()
+  contents: z13.unknown(),
+  system: z13.string().optional(),
+  tools: z13.unknown().optional()
 });
 var STARTER_MODEL_URL = `https://generativelanguage.googleapis.com/v1beta/models/${STARTER_MODEL}`;
+var houseBrainServes = () => !localMode() && !!process.env["STARTER_GOOGLE_API_KEY"];
 async function starterPreflight(c, store2, ledger) {
   if (localMode()) return { refusal: c.json({ error: "The local stack has no starter brain. Add your own model key.", code: "UNAVAILABLE" }, 503) };
   if (!ledger) return { refusal: c.json({ error: "credits not served by this store" }, 501) };
@@ -11220,7 +11987,7 @@ function creditRoutes(app, store2, ledger = ledgerFor(store2), fetchFn = (u, i) 
       // provisions lets a surface say "10 GB included" — true, and actionable — instead of "not
       // yet metered", which told nobody anything. It must never be printed as "x of 10 GB used".
       storage: { gb: planDiskGb(plan), metered: false },
-      brain: { callsToday: used.modelCalls, model: STARTER_MODEL },
+      brain: { callsToday: used.modelCalls, model: STARTER_MODEL, serves: houseBrainServes() },
       video: { clipsToday: used.videoClips, creditsToday: microsToCredits(used.videoMicros) },
       rateVersion: RATE_VERSION
     });
@@ -11387,6 +12154,64 @@ function deleteScheduleMem(rows2, scheduleId) {
   const s = rows2.find((x) => x.id === scheduleId);
   if (!s) throw new DomainError("NOT_FOUND", "schedule not found");
   return { workspace: s.workspace, rest: rows2.filter((x) => x.id !== scheduleId) };
+}
+
+// src/store/schedule-now.ts
+var NOT_ACTIVE = "This routine is paused or finished. Resume it, then run it.";
+async function runScheduleNowSql(sql, scheduleId) {
+  const [row] = await sql`update schedules set next_run_at = now() where id = ${scheduleId}::uuid and status = 'active' returning workspace_id`;
+  if (row) return row["workspace_id"];
+  const [known] = await sql`select 1 from schedules where id = ${scheduleId}::uuid`;
+  throw known ? new DomainError("INVALID_INPUT", NOT_ACTIVE) : new DomainError("NOT_FOUND", "schedule not found");
+}
+function runScheduleNowMem(rows2, scheduleId, nowIso) {
+  const row = rows2.find((x) => x.id === scheduleId);
+  if (!row) throw new DomainError("NOT_FOUND", "schedule not found");
+  if (row.status !== "active") throw new DomainError("INVALID_INPUT", NOT_ACTIVE);
+  row.nextRunAt = nowIso;
+  return row.workspace;
+}
+
+// src/store/routine-session.ts
+init_src();
+
+// src/store/session-title.ts
+init_src();
+function sessionTitle(scheduleTitle, body) {
+  return (scheduleTitle ? plainTitle(scheduleTitle).slice(0, 120).trim() : "") || threadTitle(body);
+}
+async function sessionTitleSql(sql, workspace, scheduleId, body) {
+  const [s] = scheduleId ? await sql`select title from schedules where id = ${scheduleId}::uuid and workspace_id = ${workspace}::uuid` : [];
+  return sessionTitle(s?.title, body);
+}
+
+// src/store/routine-session.ts
+var ROUTINE_TAKEN = "This session already holds a routine. Open a new session for another one.";
+async function linkRoutineSessionSql(sql, ws, scheduleId, input, insertEvent) {
+  const s = input.session;
+  if (!s) return;
+  const [th] = await sql`update threads
+      set schedule_id = ${scheduleId}::uuid, updated_at = now(),
+          title = case when titled_at is null then ${sessionTitle(input.title, input.title)} else title end
+    where id = ${s.threadId}::uuid and workspace_id = ${ws}::uuid and channel_id = ${input.channelId}::uuid
+      and schedule_id is null and task_id is null and coalesce(kind, 'chat') <> 'coding'
+    returning id`;
+  if (!th) throw new DomainError("THREAD_HAS_ROUTINE", ROUTINE_TAKEN);
+  await sql`insert into messages (id, workspace_id, channel_id, task_id, thread_id, author_kind, author_id, body, reply_to, schedule_id)
+    values (${s.dividerId}, ${ws}::uuid, ${input.channelId}, null, ${s.threadId}, ${s.author.kind}::actor_kind, ${s.author.id}::uuid, ${ROUTINE_SCHEDULED_MARKER}, null, null)`;
+  await insertEvent(sql, s.makeEvent(ws));
+}
+function routineSessionMem(w, ws, input) {
+  const s = input.session;
+  if (!s) return null;
+  const th = w.threads.find((x) => x.id === s.threadId && x.workspace === ws && x.channel === input.channelId);
+  if (!th || th.scheduleId || th.taskId || th.kind === "coding") throw new DomainError("THREAD_HAS_ROUTINE", ROUTINE_TAKEN);
+  return (scheduleId) => {
+    th.scheduleId = scheduleId;
+    if (!th.titledAt) th.title = sessionTitle(input.title, input.title);
+    w.messages.push({ id: s.dividerId, workspace: ws, channel: input.channelId, taskId: null, threadId: s.threadId, author: s.author, body: ROUTINE_SCHEDULED_MARKER, createdAt: (/* @__PURE__ */ new Date()).toISOString(), scheduleId: null });
+    w.events.push(s.makeEvent(ws));
+  };
 }
 
 // src/store/announce.ts
@@ -11670,6 +12495,158 @@ var PgFilmStore = class {
   }
 };
 
+// src/store/replies.ts
+var OWED = /* @__PURE__ */ new Set(["queued", "due"]);
+var MemReplyStore = class {
+  constructor(message2 = () => void 0) {
+    this.message = message2;
+  }
+  message;
+  rows = [];
+  async cardMessage(messageId) {
+    const m = this.message(messageId);
+    return m ? { workspaceId: m.workspace, threadId: m.threadId ?? null, body: m.body } : null;
+  }
+  /** the routine cards the memory store would find by joining messages, threads and schedules: tests seed them */
+  routineCards = [];
+  async queue(input) {
+    for (const r of input.rows) {
+      const hit = this.rows.find((x) => x.messageId === input.messageId && x.letter === r.letter && x.memberId === input.memberId);
+      if (hit) Object.assign(hit, { ...r, state: "queued", notifiedAt: null });
+      else this.rows.push({ id: crypto.randomUUID(), workspaceId: input.workspaceId, threadId: input.threadId, messageId: input.messageId, memberId: input.memberId, ...r, state: "queued", notifiedAt: null });
+    }
+    return input.rows.length;
+  }
+  async mark(id, memberId, state) {
+    const r = this.rows.find((x) => x.id === id && x.memberId === memberId);
+    if (!r) return false;
+    r.state = state;
+    return true;
+  }
+  async clear(messageId, memberId) {
+    const before = this.rows.length;
+    this.rows = this.rows.filter((r) => !(r.messageId === messageId && r.memberId === memberId && OWED.has(r.state)));
+    return before - this.rows.length;
+  }
+  async due(nowIso, limit) {
+    return this.rows.filter((r) => r.state === "queued" && !r.notifiedAt && r.dueAt <= nowIso).sort((a, b2) => a.dueAt.localeCompare(b2.dueAt)).slice(0, limit);
+  }
+  async markNotified(id, atIso) {
+    const r = this.rows.find((x) => x.id === id);
+    if (r) Object.assign(r, { state: "due", notifiedAt: atIso });
+  }
+  async pendingRoutineCards(sinceIso, limit) {
+    return this.routineCards.filter((c) => c.createdAt >= sinceIso && !this.rows.some((r) => r.messageId === c.messageId)).slice(0, limit);
+  }
+};
+var iso = (v) => new Date(v).toISOString();
+var rowOf3 = (r) => ({
+  id: r["id"],
+  workspaceId: r["workspace_id"],
+  threadId: r["thread_id"] ?? null,
+  messageId: r["message_id"],
+  letter: r["letter"],
+  platform: r["platform"],
+  handle: r["handle"],
+  draft: r["draft"],
+  openUrl: r["open_url"],
+  dueAt: iso(r["due_at"]),
+  state: r["state"],
+  memberId: r["member_id"],
+  notifiedAt: r["notified_at"] ? iso(r["notified_at"]) : null
+});
+var PgReplyStore = class {
+  constructor(sql) {
+    this.sql = sql;
+  }
+  sql;
+  async cardMessage(messageId) {
+    const [m] = await this.sql`select workspace_id, thread_id, body from messages where id = ${messageId}::uuid`;
+    return m ? { workspaceId: m["workspace_id"], threadId: m["thread_id"] ?? null, body: m["body"] } : null;
+  }
+  async queue(input) {
+    for (const r of input.rows) {
+      await this.sql`insert into reply_reminders (workspace_id, thread_id, message_id, member_id, letter, platform, handle, draft, open_url, due_at)
+        values (${input.workspaceId}::uuid, ${input.threadId}::uuid, ${input.messageId}::uuid, ${input.memberId}::uuid, ${r.letter}, ${r.platform}, ${r.handle}, ${r.draft}, ${r.openUrl}, ${r.dueAt}::timestamptz)
+        on conflict (message_id, member_id, letter) do update set draft = excluded.draft, open_url = excluded.open_url, due_at = excluded.due_at,
+          state = 'queued', notified_at = null, updated_at = now()`;
+    }
+    return input.rows.length;
+  }
+  async mark(id, memberId, state) {
+    const rows2 = await this.sql`update reply_reminders set state = ${state}, updated_at = now() where id = ${id}::uuid and member_id = ${memberId}::uuid returning id`;
+    return rows2.length > 0;
+  }
+  async clear(messageId, memberId) {
+    const rows2 = await this.sql`delete from reply_reminders where message_id = ${messageId}::uuid and member_id = ${memberId}::uuid and state in ('queued', 'due') returning id`;
+    return rows2.length;
+  }
+  async due(nowIso, limit) {
+    const rows2 = await this.sql`select * from reply_reminders where state = 'queued' and notified_at is null and due_at <= ${nowIso}::timestamptz order by due_at limit ${limit}`;
+    return rows2.map(rowOf3);
+  }
+  async markNotified(id, atIso) {
+    await this.sql`update reply_reminders set state = 'due', notified_at = ${atIso}::timestamptz, updated_at = now() where id = ${id}::uuid and state = 'queued'`;
+  }
+  async pendingRoutineCards(sinceIso, limit) {
+    const rows2 = await this.sql`select m.id, m.workspace_id, m.thread_id, m.body, m.created_at, s.created_by, (s.payload->>'replyGap')::int as gap
+      from messages m join threads t on t.id = m.thread_id join schedules s on s.id = t.schedule_id
+      where m.author_kind = 'agent' and m.created_at >= ${sinceIso}::timestamptz and position('\`\`\`nmreply' in m.body) > 0
+        and s.created_by_kind = 'human' and (s.payload->>'replyGap') is not null
+        and not exists (select 1 from reply_reminders r where r.message_id = m.id)
+      order by m.created_at limit ${limit}`;
+    return rows2.map((r) => ({ messageId: r["id"], workspaceId: r["workspace_id"], threadId: r["thread_id"], body: r["body"], createdAt: iso(r["created_at"]), memberId: r["created_by"], gap: Number(r["gap"]) }));
+  }
+};
+
+// src/store/agent-models.ts
+init_src();
+var MemAgentModelStore = class {
+  constructor(isMember = () => false, agentOf = () => void 0) {
+    this.isMember = isMember;
+    this.agentOf = agentOf;
+  }
+  isMember;
+  agentOf;
+  rows = /* @__PURE__ */ new Map();
+  async get(workspace, userId) {
+    return { ...this.rows.get(`${workspace}/${userId}`) ?? {} };
+  }
+  async set(workspace, userId, agentId, pick) {
+    if (!this.isMember(workspace, userId)) throw new DomainError("NOT_FOUND", `not a member of ${workspace}`);
+    const a = this.agentOf(agentId);
+    if (!a || a.workspace !== workspace || a.retired) throw new DomainError("NOT_FOUND", `agent ${agentId} is not in this workspace`);
+    const key2 = `${workspace}/${userId}`;
+    const next = { ...this.rows.get(key2) ?? {} };
+    if (pick) next[agentId] = pick;
+    else delete next[agentId];
+    this.rows.set(key2, next);
+  }
+};
+var PgAgentModelStore = class {
+  constructor(sql) {
+    this.sql = sql;
+  }
+  sql;
+  async get(workspace, userId) {
+    const [row] = await this.sql`select agent_models from workspace_members
+      where workspace_id = ${workspace}::uuid and user_id = ${userId}::uuid`;
+    return parseAgentModels(row?.agent_models ?? null);
+  }
+  async set(workspace, userId, agentId, pick) {
+    const sql = this.sql;
+    const [agent] = await sql`select id from agents
+      where id = ${agentId}::uuid and workspace_id = ${workspace}::uuid and retired_at is null`;
+    if (!agent) throw new DomainError("NOT_FOUND", `agent ${agentId} is not in this workspace`);
+    const [row] = pick ? await sql`update workspace_members
+          set agent_models = coalesce(agent_models, '{}'::jsonb) || jsonb_build_object(${agentId}::text, ${sql.json(pick)}::jsonb)
+        where workspace_id = ${workspace}::uuid and user_id = ${userId}::uuid returning user_id` : await sql`update workspace_members
+          set agent_models = coalesce(agent_models, '{}'::jsonb) - ${agentId}::text
+        where workspace_id = ${workspace}::uuid and user_id = ${userId}::uuid returning user_id`;
+    if (!row) throw new DomainError("NOT_FOUND", `not a member of ${workspace}`);
+  }
+};
+
 // src/store/thread-settle.ts
 async function threadTaskIdSql(sql, workspace, threadId) {
   const [row] = await sql`select task_id from threads where id = ${threadId}::uuid and workspace_id = ${workspace}::uuid`;
@@ -11701,10 +12678,50 @@ function pickHumanWord(messages, threads, taskId3, since) {
   return w ? { id: w.id, createdAt: w.createdAt } : null;
 }
 
+// src/store/content-anchor.ts
+var REFUSED = "that draft already has a conversation, or the conversation is in another room";
+async function anchorContentItemSql(sql, itemId, threadId, event) {
+  const [row] = await sql`update content_items ci set thread_id = t.id
+      from threads t
+     where ci.id = ${itemId}::uuid and ci.thread_id is null and ci.task_id is null and ci.status in ('draft', 'scheduled')
+       and t.id = ${threadId}::uuid and t.channel_id = ci.channel_id and t.workspace_id = ci.workspace_id
+    returning ci.workspace_id`;
+  if (!row) throw new DomainError("NOT_FOUND", REFUSED);
+  await event(row.workspace_id);
+  return { id: itemId };
+}
+function anchorContentItemMem(items, threads, itemId, threadId) {
+  const it = items.find((x) => x.id === itemId && !x.threadId && !x.taskId && (x.status === "draft" || x.status === "scheduled"));
+  if (!it || !threads.some((t2) => t2.id === threadId && t2.channel === it.channelId && t2.workspace === it.workspace)) throw new DomainError("NOT_FOUND", REFUSED);
+  it.threadId = threadId;
+  return it.workspace;
+}
+
+// src/store/routine-rule.ts
+init_src();
+async function threadRoutineIdSql(sql, workspace, threadId) {
+  const [row] = await sql`select s.id from threads th
+      join schedules s on s.id = th.schedule_id
+      left join channels c on c.id = s.channel_id
+     where th.id = ${threadId}::uuid and th.workspace_id = ${workspace}::uuid
+       and ((s.payload -> 'routine') = 'true'::jsonb or coalesce(c.kind, 'build') <> 'marketing')`;
+  return row?.id ?? null;
+}
+function threadRoutineIdMem(threads, schedules, channels2, workspace, threadId) {
+  const t2 = threads.find((x) => x.id === threadId && x.workspace === workspace);
+  const s = t2?.scheduleId ? schedules.find((x) => x.id === t2.scheduleId) : void 0;
+  return s && isRoutineSchedule(s.payload, channels2.find((c) => c.id === s.channelId)?.kind) ? s.id : null;
+}
+
 // src/store/memory.ts
 var MemoryStore = class {
   announcements = new MemAnnounceStore();
   films = new MemFilmStore();
+  replies = new MemReplyStore((id) => this.messages.find((m) => m.id === id));
+  agentModels = new MemAgentModelStore((ws, u) => this.wsMembers.get(ws)?.has(u) ?? false, (id) => {
+    const m = this.agentMeta.get(id);
+    return m && { workspace: m.workspace, retired: this.retiredAgents.has(id) };
+  });
   // readable in tests like `threads` — the memory store IS the test double
   tasks = /* @__PURE__ */ new Map();
   events = [];
@@ -12279,11 +13296,10 @@ var MemoryStore = class {
     const t2 = this.threads.find((x) => x.id === threadId && x.workspace === workspace);
     return t2 ? threadModeOf(t2.mode) : null;
   }
-  // routines (0119): the automation that opened this thread — the server floor that makes a
-  // routine-born task hands-off reads it (createtask.ts, 2026-08-19)
-  async getThreadScheduleId(workspace, threadId) {
-    const t2 = this.threads.find((x) => x.id === threadId && x.workspace === workspace);
-    return t2?.scheduleId ?? null;
+  // routines (0119): the ROUTINE that opened this thread, never a content schedule — the pg twin is
+  // store/routine-rule.ts threadRoutineIdSql (createtask.ts, 2026-08-19)
+  async getThreadRoutineId(workspace, threadId) {
+    return threadRoutineIdMem(this.threads, this.schedules, this.channels, workspace, threadId);
   }
   async getSetupTaskId(channelId) {
     const t2 = [...this.tasks.values()].filter((x) => x.channel === channelId && x.kind === "setup").sort((a, b2) => a.createdAt < b2.createdAt ? 1 : -1)[0];
@@ -12314,7 +13330,9 @@ var MemoryStore = class {
       taskId: t2.taskId ?? null,
       filedAt: t2.filedAt ?? null,
       channelId: t2.channel,
-      projectId: this.channels.find((c) => c.id === t2.channel)?.projectId ?? null
+      projectId: this.channels.find((c) => c.id === t2.channel)?.projectId ?? null,
+      scheduleId: t2.scheduleId ?? null,
+      kind: t2.kind ?? null
     };
   }
   async channelProject(workspace, channelId) {
@@ -12399,7 +13417,11 @@ var MemoryStore = class {
   async postMessage(msg2, event, decisions) {
     if (msg2.threadId && !this.threads.some((t2) => t2.id === msg2.threadId)) {
       const namedRoot = msg2.rootMessageId && this.messages.some((m) => m.id === msg2.rootMessageId) ? msg2.rootMessageId : null;
-      this.threads.push({ id: msg2.threadId, workspace: msg2.workspace, channel: msg2.channel, title: threadTitle(msg2.body), description: "", createdBy: `${msg2.author.kind}:${msg2.author.id}`, taskId: null, rootMessageId: namedRoot ?? msg2.id, mode: threadModeOf(msg2.threadMode), kind: threadKindOf(msg2.threadKind), brainOverride: parseBrainOverride(msg2.brainOverride), scheduleId: msg2.scheduleId ?? null });
+      this.threads.push({ id: msg2.threadId, workspace: msg2.workspace, channel: msg2.channel, title: sessionTitle(this.schedules.find((x) => x.id === msg2.scheduleId && x.workspace === msg2.workspace)?.title, msg2.body), description: "", createdBy: `${msg2.author.kind}:${msg2.author.id}`, taskId: null, rootMessageId: namedRoot ?? msg2.id, mode: threadModeOf(msg2.threadMode), kind: threadKindOf(msg2.threadKind), brainOverride: parseBrainOverride(msg2.brainOverride), scheduleId: this.schedules.some((x) => x.id === msg2.scheduleId && x.workspace === msg2.workspace) ? msg2.scheduleId : null });
+    } else if (msg2.threadId) {
+      const t2 = this.threads.find((x) => x.id === msg2.threadId);
+      const own = this.schedules.find((x) => x.id === msg2.scheduleId && x.workspace === msg2.workspace);
+      if (t2 && own && !t2.titledAt && t2.scheduleId === own.id) t2.title = sessionTitle(own.title, msg2.body);
     }
     if (msg2.replyTo) {
       const dup = this.messages.some((m) => m.author.id === msg2.author.id && m.replyTo === msg2.replyTo);
@@ -12411,7 +13433,7 @@ var MemoryStore = class {
       if (!sameDelivery) throw new DomainError("CONFLICT", "a different message with this id already exists");
       return prior;
     }
-    this.messages.push(msg2);
+    this.messages.push({ ...msg2, scheduleId: this.schedules.some((x) => x.id === msg2.scheduleId && x.workspace === msg2.workspace) ? msg2.scheduleId : null });
     this.events.push(event);
     for (const d of decisions ?? []) {
       for (const prior2 of this.decisionRows) {
@@ -12910,8 +13932,10 @@ var MemoryStore = class {
     const c = this.channels.find((x) => x.id === input.channelId);
     if (!c) throw new DomainError("NOT_FOUND", "channel not found");
     const id = crypto.randomUUID();
+    const link = routineSessionMem({ threads: this.threads, messages: this.messages, events: this.events }, c.workspace, input);
     this.schedules.push({ id, workspace: c.workspace, channelId: input.channelId, title: input.title, prompt: input.prompt, cadence: input.cadence, atTime: input.atTime, tz: input.tz, weekday: input.weekday, nextRunAt: input.nextRunAt, runCount: 0, status: "active", payload: { prompt: input.prompt, ...input.payloadExtra ?? {} } });
     this.events.push(makeEvent(c.workspace));
+    link?.(id);
     return { id };
   }
   async setScheduleStatus(scheduleId, status, makeEvent) {
@@ -12921,7 +13945,7 @@ var MemoryStore = class {
   async updateSchedule(scheduleId, patch, makeEvent) {
     const s = this.schedules.find((x) => x.id === scheduleId);
     if (!s) throw new DomainError("NOT_FOUND", "schedule not found");
-    Object.assign(s, { title: patch.title, prompt: patch.prompt, cadence: patch.cadence, atTime: patch.atTime, tz: patch.tz, weekday: patch.weekday, nextRunAt: patch.nextRunAt, payload: { ...s.payload, prompt: patch.prompt } });
+    Object.assign(s, { title: patch.title, prompt: patch.prompt, cadence: patch.cadence, atTime: patch.atTime, tz: patch.tz, weekday: patch.weekday, nextRunAt: patch.nextRunAt, payload: { ...Object.fromEntries(Object.entries(s.payload ?? {}).filter(([k]) => !(k === "replyGap" && patch.replyGap === null))), prompt: patch.prompt, ...typeof patch.replyGap === "number" ? { replyGap: patch.replyGap } : {} } });
     this.events.push(makeEvent(s.workspace));
     return { id: scheduleId };
   }
@@ -13000,6 +14024,11 @@ var MemoryStore = class {
     if (!it) throw new DomainError("NOT_FOUND", "content item not found (published items stay \u2014 they are history)");
     this.contentItems = this.contentItems.filter((x) => x.id !== itemId);
     this.events.push(makeEvent(it.workspace));
+    return { id: itemId };
+  }
+  /** the pg twin is store/content-anchor.ts anchorContentItemSql */
+  async anchorContentItem(itemId, threadId, makeEvent) {
+    this.events.push(makeEvent(anchorContentItemMem(this.contentItems, this.threads, itemId, threadId)));
     return { id: itemId };
   }
   channelArtifacts = [];
@@ -13143,6 +14172,10 @@ var MemoryStore = class {
     if (nextRunAt === null) s.status = "done";
     this.events.push(makeEvent(s.workspace));
     return { claimed: true };
+  }
+  async runScheduleNow(scheduleId, makeEvent) {
+    this.events.push(makeEvent(runScheduleNowMem(this.schedules, scheduleId, (/* @__PURE__ */ new Date()).toISOString())));
+    return { id: scheduleId };
   }
   async markScheduleResult(scheduleId, error, makeEvent) {
     this.events.push(makeEvent(markScheduleResultMem(this.schedules, scheduleId, error).workspace));
@@ -13784,14 +14817,14 @@ function routineAccept(task, scheduleId) {
 }
 async function routineAcceptFollowup(store2, cmd, outcome) {
   if (cmd.type !== "task.approve" || outcome.task.state !== "done" || outcome.task.repo || !outcome.task.originThreadId) return outcome;
-  const scheduleId = await store2.getThreadScheduleId(outcome.task.workspace, outcome.task.originThreadId).catch(() => null);
+  const scheduleId = await store2.getThreadRoutineId(outcome.task.workspace, outcome.task.originThreadId).catch(() => null);
   if (!scheduleId) return outcome;
   const accepted = await store2.mutate(cmd.taskId, async (t2) => routineAccept(t2, scheduleId)).catch(() => null);
   return accepted ? { ...accepted, events: [...outcome.events, ...accepted.events] } : outcome;
 }
 async function routinePlanFollowup(store2, cmd, outcome) {
   if (cmd.type !== "task.propose_plan" || outcome.task.state !== "plan_review" || outcome.task.planApprovedAt || outcome.task.repo || !outcome.task.originThreadId) return outcome;
-  const scheduleId = await store2.getThreadScheduleId(outcome.task.workspace, outcome.task.originThreadId).catch(() => null);
+  const scheduleId = await store2.getThreadRoutineId(outcome.task.workspace, outcome.task.originThreadId).catch(() => null);
   if (!scheduleId) return outcome;
   const approved = await store2.mutate(outcome.task.id, async (t2) => routinePlanApprove(t2, scheduleId)).catch(() => null);
   return approved ? { ...approved, events: [...outcome.events, ...approved.events] } : outcome;
@@ -13812,7 +14845,7 @@ function routineDesignApprove(task, scheduleId, round) {
 }
 async function routineDesignFollowup(store2, cmd, outcome) {
   if (cmd.type !== "task.propose_design" || outcome.task.state !== "design_review" || outcome.task.repo || !outcome.task.originThreadId) return outcome;
-  const scheduleId = await store2.getThreadScheduleId(outcome.task.workspace, outcome.task.originThreadId).catch(() => null);
+  const scheduleId = await store2.getThreadRoutineId(outcome.task.workspace, outcome.task.originThreadId).catch(() => null);
   if (!scheduleId) return outcome;
   const approved = await store2.mutate(outcome.task.id, async (t2) => routineDesignApprove(t2, scheduleId, cmd.round)).catch(() => null);
   if (!approved) return outcome;
@@ -14528,6 +15561,17 @@ async function contentCommands(store2, actor, cmd) {
     const { id } = cmd.type === "content.update" ? await store2.updateContentBody(cmd.item, cmd.body, cmd.mediaUrl === void 0 ? void 0 : cmd.mediaUrl || null, mk("content.updated")) : await store2.deleteContentItem(cmd.item, mk("content.deleted"));
     return { ok: true, itemId: id };
   }
+  if (cmd.type === "content.anchor") {
+    if (actor.kind !== "human") throw new DomainError("HUMAN_ONLY", "a draft moves into a conversation on a human ask. agents draft in the thread they answer in");
+    const { id } = await store2.anchorContentItem(cmd.item, cmd.thread, (ws) => createEvent({
+      type: "content.updated",
+      source: actorAddress(actor),
+      target: formatAddress({ kind: "resource", type: "content", id: cmd.item }),
+      workspace: ws,
+      payload: { item: cmd.item, thread: cmd.thread }
+    }));
+    return { ok: true, itemId: id };
+  }
   if (cmd.type === "content.approve" || cmd.type === "content.unschedule") {
     if (actor.kind !== "human") throw new DomainError("HUMAN_ONLY", "content is approved by a human \u2014 agents draft, humans publish");
     const approve = cmd.type === "content.approve";
@@ -14792,6 +15836,14 @@ async function memberCommands(store2, actor, cmd) {
       ...cmd.shares !== void 0 ? { shares: cmd.shares } : {},
       ...cmd.desktopSessions !== void 0 ? { desktopSessions: cmd.desktopSessions } : {}
     });
+    return { ok: true };
+  }
+  if (cmd.type === "member.set_agent_model") {
+    if (actor.kind !== "human") throw new DomainError("HUMAN_ONLY", "a model pick is the member's own \u2014 an agent cannot set it");
+    if (!store2.agentModels) throw new DomainError("INVALID_INPUT", "model picks are not available on this server");
+    const pick = cmd.model ? { model: cmd.model, ...cmd.thinking && takesThinking(cmd.model) ? { thinking: cmd.thinking } : {} } : null;
+    await store2.agentModels.set(cmd.workspace, actor.id, cmd.agent, pick);
+    console.log(`member_agent_model workspace=${cmd.workspace} user=${actor.id} agent=${cmd.agent} model=${pick?.model ?? "default"}${pick?.thinking ? ` thinking=${pick.thinking}` : ""}`);
     return { ok: true };
   }
   if (cmd.type === "member.share_compute") {
@@ -15081,6 +16133,26 @@ async function repoCommands(store2, actor, cmd) {
 
 // src/handler/schedule.ts
 init_src();
+async function routineSession(store2, actor, workspace, channel, threadId) {
+  const th = await store2.threadFiling(workspace, threadId);
+  if (!th) throw new DomainError("NOT_FOUND", `session ${threadId} not found`);
+  if (th.taskId) throw new DomainError("TASK_THREAD", "A task's thread cannot hold a routine. Open a new session for it.");
+  if (isCodingThread(th.kind)) throw new DomainError("CODING_THREAD", "A coding thread cannot hold a routine. Open a new session for it.");
+  if (th.scheduleId) throw new DomainError("THREAD_HAS_ROUTINE", ROUTINE_TAKEN);
+  if (th.channelId !== channel) throw new DomainError("INVALID_INPUT", "A routine runs in the room of its session.");
+  return {
+    threadId,
+    dividerId: crypto.randomUUID(),
+    author: { kind: actor.kind, id: actor.id },
+    makeEvent: (ws) => createEvent({
+      type: "message.posted",
+      source: actorAddress(actor),
+      target: `channel/${channel}`,
+      workspace: ws,
+      payload: { preview: ROUTINE_SCHEDULED_MARKER }
+    })
+  };
+}
 async function scheduleCommands(store2, actor, cmd) {
   if (cmd.type === "schedule.create") {
     if (actor.kind !== "human") throw new DomainError("HUMAN_ONLY", "schedules are armed by a human \u2014 agents propose, humans arm");
@@ -15100,6 +16172,7 @@ async function scheduleCommands(store2, actor, cmd) {
       if (!next) throw new DomainError("INVALID_INPUT", "could not compute the next run \u2014 check the time and timezone");
       nextRunAt = next.toISOString();
     }
+    const session = cmd.thread ? await routineSession(store2, actor, workspace, cmd.channel, cmd.thread) : null;
     const { id } = await store2.createSchedule(
       {
         channelId: cmd.channel,
@@ -15113,7 +16186,8 @@ async function scheduleCommands(store2, actor, cmd) {
         agentName: cmd.agent ?? null,
         createdByKind: actor.kind,
         createdBy: actor.id,
-        ...cmd.routine ? { payloadExtra: { routine: true } } : {}
+        ...cmd.routine || session ? { payloadExtra: { routine: true, ...cmd.replyGap ? { replyGap: cmd.replyGap } : {} } } : {},
+        session
       },
       (ws) => createEvent({
         type: "schedule.created",
@@ -15141,7 +16215,7 @@ async function scheduleCommands(store2, actor, cmd) {
     }
     const { id } = await store2.updateSchedule(
       cmd.schedule,
-      { title: cmd.title, prompt: cmd.prompt, cadence: cmd.cadence, atTime, tz, weekday: cmd.weekday ?? null, nextRunAt },
+      { title: cmd.title, prompt: cmd.prompt, cadence: cmd.cadence, atTime, tz, weekday: cmd.weekday ?? null, nextRunAt, ...cmd.replyGap !== void 0 ? { replyGap: cmd.replyGap } : {} },
       (ws) => createEvent({
         type: "schedule.updated",
         source: actorAddress(actor),
@@ -15166,6 +16240,17 @@ async function scheduleCommands(store2, actor, cmd) {
       })
     );
     return { ok: true, claimed };
+  }
+  if (cmd.type === "schedule.run_now") {
+    if (actor.kind !== "human") throw new DomainError("HUMAN_ONLY", "a person runs a routine now. agents wait for its slot");
+    const { id } = await store2.runScheduleNow(cmd.schedule, (ws) => createEvent({
+      type: "schedule.updated",
+      source: actorAddress(actor),
+      target: formatAddress({ kind: "resource", type: "schedule", id: cmd.schedule }),
+      workspace: ws,
+      payload: { schedule: cmd.schedule, runNow: true }
+    }));
+    return { ok: true, scheduleId: id };
   }
   if (cmd.type === "schedule.mark_result") {
     await store2.markScheduleResult(cmd.schedule, cmd.error ?? null, (ws) => createEvent({
@@ -15200,6 +16285,53 @@ async function scheduleCommands(store2, actor, cmd) {
     return { ok: true, scheduleId: id };
   }
   return void 0;
+}
+
+// src/handler/replies.ts
+init_src();
+var SKEW_MS = 6e4;
+var HORIZON_MS = 7 * 24 * 36e5;
+function queueRows(items, startMs, gapMin) {
+  const times = queueTimes(items.length, startMs, gapMin);
+  return items.map((it, i) => ({
+    letter: it.letter,
+    platform: it.target.platform,
+    handle: it.target.handle,
+    draft: it.draft,
+    openUrl: replyOpenUrl(it),
+    dueAt: new Date(times[i]).toISOString()
+  }));
+}
+function repliesOf(store2) {
+  if (!store2.replies) throw new DomainError("INVALID_INPUT", "this server keeps no reply queue");
+  return store2.replies;
+}
+async function replyCommands(store2, actor, cmd) {
+  if (cmd.type !== "reply.queue" && cmd.type !== "reply.mark" && cmd.type !== "reply.clear") return void 0;
+  if (actor.kind !== "human") throw new DomainError("HUMAN_ONLY", "a person queues and marks their own replies");
+  const replies = repliesOf(store2);
+  if (cmd.type === "reply.queue") {
+    const card2 = await replies.cardMessage(cmd.message);
+    if (!card2) throw new DomainError("NOT_FOUND", "that reply card does not exist");
+    if (!await actorInWorkspace(store2, actor, card2.workspaceId)) throw new DomainError("NOT_PERMITTED", "not your workspace");
+    const data = parseReplies(card2.body);
+    if (!data) throw new DomainError("INVALID_INPUT", "that message carries no reply card");
+    const want = new Set(cmd.letters.map((l) => l.trim().toUpperCase()));
+    const items = data.items.filter((i) => want.has(i.letter));
+    if (!items.length) throw new DomainError("INVALID_INPUT", "no row on the card has those letters");
+    const now = Date.now();
+    const start = Date.parse(cmd.startAt);
+    if (start > now + HORIZON_MS) throw new DomainError("INVALID_INPUT", "a queue starts within a week");
+    const rows2 = queueRows(items, Math.max(start, now - SKEW_MS), cmd.gapMin);
+    const queued = await replies.queue({ workspaceId: card2.workspaceId, threadId: card2.threadId, messageId: cmd.message, memberId: actor.id, rows: rows2 });
+    return { ok: true, queued };
+  }
+  if (cmd.type === "reply.mark") {
+    if (!await replies.mark(cmd.reminder, actor.id, cmd.state)) throw new DomainError("NOT_FOUND", "that reply is not in your queue");
+    return { ok: true };
+  }
+  const cleared = await replies.clear(cmd.message, actor.id);
+  return { ok: true, cleared };
 }
 
 // src/handler/setup.ts
@@ -15427,6 +16559,9 @@ async function threadCommands(store2, actor, cmd) {
     }
     const title = cmd.title === void 0 ? void 0 : plainTitle(cmd.title);
     if (title !== void 0 && !title) throw new DomainError("INVALID_INPUT", "a title needs plain text in it");
+    if (title !== void 0 && actor.kind !== "human" && (await store2.threadFiling(cmd.workspace, cmd.threadId))?.scheduleId) {
+      throw new DomainError("THREAD_ALREADY_TITLED", "this session carries its routine's title. Only a person renames it.");
+    }
     await store2.updateThread(cmd.workspace, cmd.threadId, { title, description: cmd.description }, { agentTitleOnce: actor.kind !== "human" });
     return { ok: true, threadId: cmd.threadId };
   }
@@ -15747,7 +16882,7 @@ async function createTask(store2, actor, cmd) {
     const bad = validateWorkPlanLegs(workPlanInput.legs, !!cmd.repo);
     if (bad) throw new DomainError("INVALID_INPUT", bad);
   }
-  const routineScheduleId = workPlanInput && cmd.originThread ? await store2.getThreadScheduleId(cmd.workspace, cmd.originThread) : null;
+  const routineScheduleId = workPlanInput && cmd.originThread ? await store2.getThreadRoutineId(cmd.workspace, cmd.originThread) : null;
   const routine = !!routineScheduleId && !cmd.repo;
   const playbookRun = !!cmd.playbook && !cmd.repo && !!workPlanInput;
   const handsOff = routine || playbookRun;
@@ -15960,6 +17095,10 @@ async function executeCommand(store2, actor, cmd) {
   }
   {
     const r = await scheduleCommands(store2, actor, cmd);
+    if (r !== void 0) return r;
+  }
+  {
+    const r = await replyCommands(store2, actor, cmd);
     if (r !== void 0) return r;
   }
   {
@@ -16415,6 +17554,42 @@ async function runLifecyclePass(store2, limit = 50) {
 
 // src/cron-routes.ts
 init_src();
+
+// src/reply-cron.ts
+init_src();
+var LOOKBACK_MS = 60 * 6e4;
+async function queueRoutineReplies(store2, now) {
+  if (!store2.replies) return 0;
+  const cards = await store2.replies.pendingRoutineCards(new Date(now.getTime() - LOOKBACK_MS).toISOString(), 20);
+  let queued = 0;
+  for (const c of cards) {
+    try {
+      const data = parseReplies(c.body);
+      if (!data || !isReplyGap(c.gap)) continue;
+      const rows2 = queueRows(data.items, Math.max(now.getTime(), Date.parse(c.createdAt)), c.gap);
+      queued += await store2.replies.queue({ workspaceId: c.workspaceId, threadId: c.threadId, messageId: c.messageId, memberId: c.memberId, rows: rows2 });
+    } catch (e) {
+      console.error("routine reply queue failed:", c.messageId, e);
+    }
+  }
+  return queued;
+}
+async function remindDueReplies(store2, push2, now) {
+  if (!store2.replies) return 0;
+  const at = now.toISOString();
+  const rows2 = await store2.replies.due(at, 50);
+  for (const r of rows2) {
+    try {
+      if (push2) await push2.notifyReplyDue({ ...r, words: reminderWords({ letter: r.letter, handle: r.handle, open_url: r.openUrl }) });
+    } catch (e) {
+      console.error("reply reminder failed:", r.id, e);
+    }
+    await store2.replies.markNotified(r.id, at).catch(() => void 0);
+  }
+  return rows2.length;
+}
+
+// src/cron-routes.ts
 async function remindDuePosts(store2, push2, now) {
   if (!push2 || !store2.upcomingContentItems) return 0;
   const to = new Date(now.getTime() + REVIEW_LEAD_MIN * 6e4);
@@ -16436,9 +17611,10 @@ function cronRoutes(app, store2, push2) {
     if (!secret || c.req.header("authorization") !== `Bearer ${secret}`) return c.json({ error: "forbidden" }, 403);
     const now = /* @__PURE__ */ new Date();
     const reminded = await remindDuePosts(store2, push2, now);
-    if (!connectorsEnabled()) return c.json({ published: 0, failed: 0, reminded, note: "connectors not configured" });
+    const replies = await queueRoutineReplies(store2, now).then(async (queued) => ({ queued, reminded: await remindDueReplies(store2, push2, now) })).catch(() => ({ queued: 0, reminded: 0 }));
+    if (!connectorsEnabled()) return c.json({ published: 0, failed: 0, reminded, replies, note: "connectors not configured" });
     const out = await publishDueItems(store2, POSTERS, now, publicApiBase(c.req.url));
-    return c.json({ ...out, reminded });
+    return c.json({ ...out, reminded, replies });
   });
   app.get("/internal/emails-due", async (c) => {
     const secret = process.env["CRON_SECRET"];
@@ -16451,7 +17627,7 @@ function cronRoutes(app, store2, push2) {
 // src/announce.ts
 import { cors } from "hono/cors";
 import { createHash as createHash5 } from "node:crypto";
-import { z as z16 } from "zod";
+import { z as z18 } from "zod";
 
 // src/announce-job.ts
 init_src();
@@ -16628,12 +17804,12 @@ async function starterText(system, user, fetchFn = fetch, env = process.env) {
   });
   const payload = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(`starter brain call failed (${res.status})`);
-  const text = (payload.candidates?.[0]?.content?.parts ?? []).map((p2) => p2.text ?? "").join("");
-  if (!text.trim()) throw new Error("starter brain answered with no text");
-  return text;
+  const text2 = (payload.candidates?.[0]?.content?.parts ?? []).map((p2) => p2.text ?? "").join("");
+  if (!text2.trim()) throw new Error("starter brain answered with no text");
+  return text2;
 }
-function parseDraftAnswer(text) {
-  const raw = text.replace(/^\s*```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "").trim();
+function parseDraftAnswer(text2) {
+  const raw = text2.replace(/^\s*```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "").trim();
   let j;
   try {
     j = JSON.parse(raw);
@@ -16650,13 +17826,13 @@ function parseDraftAnswer(text) {
   const o = j;
   const verdict = String(o["verdict"] ?? "none").toLowerCase();
   if (!["feature", "improvement", "fix", "none"].includes(verdict)) return null;
-  const str = (k) => typeof o[k] === "string" ? o[k].trim() : "";
+  const str2 = (k) => typeof o[k] === "string" ? o[k].trim() : "";
   const posts = Array.isArray(o["posts"]) ? o["posts"].flatMap((p2) => {
     if (!p2 || typeof p2 !== "object") return [];
     const q = p2;
     return typeof q["body"] === "string" && q["body"].trim() ? [{ platform: String(q["platform"] ?? "x").toLowerCase(), body: q["body"].trim(), ...typeof q["imageBrief"] === "string" && q["imageBrief"].trim() ? { imageBrief: q["imageBrief"].trim() } : {} }] : [];
   }) : [];
-  return { verdict, title: str("title"), why: str("why"), audience: str("audience"), assets: str("assets"), gaps: str("gaps"), posts };
+  return { verdict, title: str2("title"), why: str2("why"), audience: str2("audience"), assets: str2("assets"), gaps: str2("gaps"), posts };
 }
 
 // src/github-app.ts
@@ -16684,8 +17860,8 @@ function appJwt(env = process.env, now = Date.now()) {
   return `${head}.${body}.${sig}`;
 }
 var RESERVED = /* @__PURE__ */ new Set(["orgs", "organizations", "apps", "settings", "marketplace", "topics", "explore", "search", "login", "join", "features", "sponsors", "notifications", "issues", "pulls", "new", "about", "pricing", "enterprise", "users", "collections", "trending", "codespaces"]);
-function parseRepoInput(text) {
-  let s = (text ?? "").trim().replace(/^git@github\.com:/i, "github.com/").replace(/^(?:https?|ssh|git):\/\/(?:[^@/\s]+@)?/i, "").replace(/^www\./i, "");
+function parseRepoInput(text2) {
+  let s = (text2 ?? "").trim().replace(/^git@github\.com:/i, "github.com/").replace(/^(?:https?|ssh|git):\/\/(?:[^@/\s]+@)?/i, "").replace(/^www\./i, "");
   const hosted = /^github\.com\//i.test(s);
   if (hosted) s = s.slice("github.com/".length);
   const parts = s.split(/[/?#]/);
@@ -16743,7 +17919,7 @@ function installUrl(state, env = process.env) {
   return `https://github.com/apps/${appSlug(env)}/installations/new?state=${encodeURIComponent(state)}`;
 }
 var rows = (r) => ok(r) && Array.isArray(r.json) ? r.json : [];
-var day2 = (iso3) => iso3.slice(0, 10);
+var day2 = (iso4) => iso4.slice(0, 10);
 async function readRepoSignals(slug, since, opts = {}) {
   const get = (path) => githubGet(path, opts);
   const repoRes = await get(`/repos/${slug}`);
@@ -16833,15 +18009,15 @@ function releaseCardSvg(input) {
   const lineH = Math.round(size * LEADING);
   const blockTop = d.h - d.pad - lines.length * lineH;
   const mark = d.small * 2;
-  const text = (x, y, weight, px, tracking, body, extra = "") => `<text x="${x}" y="${y}" font-family="${family}" font-weight="${weight}" font-size="${px}" letter-spacing="${tracking.toFixed(1)}" fill="${ink}"${extra}>${escapeXml(body)}</text>`;
-  const title = lines.map((l, i) => text(d.pad, blockTop + Math.round(size * 0.8) + i * lineH, 500, size, -size * 0.02, l)).join("\n");
+  const text2 = (x, y, weight, px, tracking, body, extra = "") => `<text x="${x}" y="${y}" font-family="${family}" font-weight="${weight}" font-size="${px}" letter-spacing="${tracking.toFixed(1)}" fill="${ink}"${extra}>${escapeXml(body)}</text>`;
+  const title = lines.map((l, i) => text2(d.pad, blockTop + Math.round(size * 0.8) + i * lineH, 500, size, -size * 0.02, l)).join("\n");
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${d.w}" height="${d.h}" viewBox="0 0 ${d.w} ${d.h}">
 <defs><radialGradient id="wash" cx="100%" cy="0%" r="80%"><stop offset="0" stop-color="${accent}" stop-opacity="0.1"/><stop offset="1" stop-color="${accent}" stop-opacity="0"/></radialGradient></defs>
 <rect width="${d.w}" height="${d.h}" fill="${bg}"/>
 <rect width="${d.w}" height="${d.h}" fill="url(#wash)"/>
 <rect x="${d.pad}" y="${d.pad}" width="${mark}" height="${mark}" rx="3" fill="${accent}"/>
-${text(d.pad + mark + Math.round(d.small * 0.9), d.pad + Math.round(mark / 2 + d.small * 0.36), 400, d.small, d.small * 0.18, input.product.toUpperCase())}
-${text(d.pad, blockTop - Math.round(size * 0.55), 400, Math.round(d.small * 0.93), d.small * 0.12, input.tag.toUpperCase(), ' fill-opacity="0.72"')}
+${text2(d.pad + mark + Math.round(d.small * 0.9), d.pad + Math.round(mark / 2 + d.small * 0.36), 400, d.small, d.small * 0.18, input.product.toUpperCase())}
+${text2(d.pad, blockTop - Math.round(size * 0.55), 400, Math.round(d.small * 0.93), d.small * 0.12, input.tag.toUpperCase(), ' fill-opacity="0.72"')}
 ${title}
 </svg>`;
 }
@@ -17035,8 +18211,8 @@ function voiceOf(html) {
   const h12 = /<h1\b[^>]*>([\s\S]*?)<\/h1>/i.exec(body);
   const headline = h12 ? clean(h12[1]) : "";
   if (h12) body = body.replace(h12[0], " ");
-  const text = clean(body);
-  return `${headline}${headline && text ? "\n" : ""}${text}`.slice(0, VOICE_CAP);
+  const text2 = clean(body);
+  return `${headline}${headline && text2 ? "\n" : ""}${text2}`.slice(0, VOICE_CAP);
 }
 async function readSheet(url, fetchFn, signal) {
   try {
@@ -17172,8 +18348,8 @@ async function runAnnounceJob(ann, row, deps) {
     }
     const brand = await deps.site(row.website).catch(() => null);
     await ann.update(row.id, { brand });
-    const text = await deps.brain(systemPrompt(), userPrompt(row.repo, scan, brand, row.website));
-    const answer = parseDraftAnswer(text);
+    const text2 = await deps.brain(systemPrompt(), userPrompt(row.repo, scan, brand, row.website));
+    const answer = parseDraftAnswer(text2);
     if (!answer) return fail("The drafts did not come back in a shape I could read. Try again.");
     const posts = answer.verdict === "none" ? [] : doorPosts(answer.posts);
     if (answer.verdict !== "none" && !posts.length) return fail("The drafts came back empty. Try again.");
@@ -17204,20 +18380,20 @@ async function runAnnounceJob(ann, row, deps) {
 init_src();
 
 // ../shared/src/command-union.ts
-import { z as z14 } from "zod";
+import { z as z16 } from "zod";
 
 // ../shared/src/command-union-machine.ts
 init_commands_code();
-import { z as z12 } from "zod";
-var runtimes = z12.array(z12.string().min(1).max(40)).max(12).optional();
+import { z as z14 } from "zod";
+var runtimes = z14.array(z14.string().min(1).max(40)).max(12).optional();
 var MACHINE_COMMANDS = [
-  z12.object({
-    type: z12.literal("machine.register"),
-    workspace: z12.string().min(1),
-    name: z12.string().min(1),
-    platform: z12.string().min(1).default("darwin"),
-    daemonVersion: z12.string().min(1).default("0.0.0"),
-    transfer: z12.boolean().optional(),
+  z14.object({
+    type: z14.literal("machine.register"),
+    workspace: z14.string().min(1),
+    name: z14.string().min(1),
+    platform: z14.string().min(1).default("darwin"),
+    daemonVersion: z14.string().min(1).default("0.0.0"),
+    transfer: z14.boolean().optional(),
     // Free: re-point this member's single machine to me (the other stops syncing)
     // What this host can actually serve right now — a Claude/Codex/agy login present, or a key
     // available (0114). Published because capability has to be visible ACROSS machines: a host
@@ -17232,68 +18408,73 @@ var MACHINE_COMMANDS = [
   // while it sleeps (member-machines plan §4).
   // daemonVersion: the same reason — a cloud machine's image names its commit (NM_IMAGE_SHA) and
   // the beat is the only place it can say so. Optional: an older machine beats without it.
-  z12.object({ type: z12.literal("machine.heartbeat"), machineId: z12.string().min(1), activeSeconds: z12.number().int().min(0).max(3600).optional(), busy: z12.boolean().optional(), runtimes, daemonVersion: z12.string().min(1).max(64).optional() }),
+  z14.object({ type: z14.literal("machine.heartbeat"), machineId: z14.string().min(1), activeSeconds: z14.number().int().min(0).max(3600).optional(), busy: z14.boolean().optional(), runtimes, daemonVersion: z14.string().min(1).max(64).optional() }),
   // "Add my cloud machine" — self only by construction: the handler writes the actor's own
-  z12.object({ type: z12.literal("machine.provision"), workspace: z12.string().min(1) }),
+  z14.object({ type: z14.literal("machine.provision"), workspace: z14.string().min(1) }),
   // the owner's "Remove machine": tombstone → the operator removes workload, Secret and PVC
-  z12.object({ type: z12.literal("machine.remove"), workspace: z12.string().min(1), machineId: z12.string().uuid() }),
+  z14.object({ type: z14.literal("machine.remove"), workspace: z14.string().min(1), machineId: z14.string().uuid() }),
   // wake ONE machine — a person from a surface, or a daemon whose ladder found a lent sleeper
   // forUserId: the member the work came FROM when a daemon asks — the ladder's origin — so a
   // member's own machine wakes for their request even when they lend it to nobody
-  z12.object({ type: z12.literal("machine.wake"), workspace: z12.string().min(1), machineId: z12.string().uuid(), forUserId: z12.string().uuid().optional() }),
+  z14.object({ type: z14.literal("machine.wake"), workspace: z14.string().min(1), machineId: z14.string().uuid(), forUserId: z14.string().uuid().optional() }),
   // a login is about to land on a claim runner (round §4.2, D2): give it a disk of its own first.
   // HUMAN_ONLY, from the terminal's sign-in flows; a no-op answer for a machine already on a volume
-  z12.object({ type: z12.literal("machine.promote"), workspace: z12.string().min(1), machineId: z12.string().uuid() }),
+  z14.object({ type: z14.literal("machine.promote"), workspace: z14.string().min(1), machineId: z14.string().uuid() }),
   // the Code-session rows a host and a client keep (commands-code.ts) ride the same spread
   ...CODE_SESSION_COMMANDS
 ];
 
 // ../shared/src/command-union-schedule.ts
-import { z as z13 } from "zod";
+import { z as z15 } from "zod";
 var SCHEDULE_RUN_COMMANDS = [
   // the daemon's atomic claim of a due run: counter CAS (ship-stage lesson) so two machines
   // never double-fire. nextRunAt is the claimer's recomputed advance (null = done).
-  z13.object({
-    type: z13.literal("schedule.claim_run"),
-    schedule: z13.string().min(1),
-    runCount: z13.number().int().min(0),
-    nextRunAt: z13.string().datetime().nullable()
+  z15.object({
+    type: z15.literal("schedule.claim_run"),
+    schedule: z15.string().min(1),
+    runCount: z15.number().int().min(0),
+    nextRunAt: z15.string().datetime().nullable()
   }),
   // the fire's outcome → schedules.last_error (the attention bar's truth); null = the next clean run clears it
-  z13.object({ type: z13.literal("schedule.mark_result"), schedule: z13.string().min(1), error: z13.string().max(500).nullable() }),
+  z15.object({ type: z15.literal("schedule.mark_result"), schedule: z15.string().min(1), error: z15.string().max(500).nullable() }),
+  // Run now (routine sessions, 2026-09-28): a person makes the schedule due at once, and the next tick
+  // fires it into its session. Human-only in the handler, refused on a paused or finished row.
+  z15.object({ type: z15.literal("schedule.run_now"), schedule: z15.string().min(1) }),
   // the release routine's cursor (docs/design/release-drafts-2026-09 §4.2): the lane that FINISHED a
   // scan writes where the next window starts, plus one ledger line (a quiet day is a row too). Any
   // authenticated teammate, like claim_run and mark_result: the row is the truth, the Routines
   // ledger its reader. Refused on a row that is not a release routine.
-  z13.object({
-    type: z13.literal("schedule.set_cursor"),
-    schedule: z13.string().min(1),
-    cursor: z13.object({ at: z13.string().datetime(), tag: z13.string().max(120).nullable() }),
-    log: z13.object({ at: z13.string().datetime(), key: z13.string().max(120).nullable(), note: z13.string().trim().min(1).max(300) }).nullable().optional()
+  z15.object({
+    type: z15.literal("schedule.set_cursor"),
+    schedule: z15.string().min(1),
+    cursor: z15.object({ at: z15.string().datetime(), tag: z15.string().max(120).nullable() }),
+    log: z15.object({ at: z15.string().datetime(), key: z15.string().max(120).nullable(), note: z15.string().trim().min(1).max(300) }).nullable().optional()
   })
 ];
-var MARKETING_RELEASES = z13.object({
-  repoId: z13.string().min(1).nullable().optional(),
-  slug: z13.string().trim().max(200).nullable().optional(),
+var MARKETING_RELEASES = z15.object({
+  repoId: z15.string().min(1).nullable().optional(),
+  slug: z15.string().trim().max(200).nullable().optional(),
   // owner/name, for the titles
-  now: z13.boolean(),
-  watch: z13.boolean(),
-  at: z13.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
-  tz: z13.string().max(64).optional()
+  now: z15.boolean(),
+  watch: z15.boolean(),
+  at: z15.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
+  tz: z15.string().max(64).optional()
 });
-var SETUP_RELEASES_VALUE = z13.object({
-  repoId: z13.string().min(1).nullable().optional(),
-  slug: z13.string().trim().max(200).nullable().optional(),
-  now: z13.boolean().optional(),
-  watch: z13.boolean().optional()
+var SETUP_RELEASES_VALUE = z15.object({
+  repoId: z15.string().min(1).nullable().optional(),
+  slug: z15.string().trim().max(200).nullable().optional(),
+  now: z15.boolean().optional(),
+  watch: z15.boolean().optional()
 });
 
 // ../shared/src/command-union.ts
+init_command_union_replies();
+init_command_union_models();
 init_src();
-var modelId = z14.string().min(1).refine((m) => MODEL_ID_SET.has(m), { message: "unknown model id" });
-var packId = z14.string().refine((p2) => p2 === CUSTOM_PACK_ID || p2 in PACKS || isCustomPackId(p2), { message: "unknown model pack" });
-var customPackId = z14.string().refine((p2) => isCustomPackId(p2), { message: "not a custom pack id" });
-var packRoles = z14.object({
+var modelId = z16.string().min(1).refine((m) => MODEL_ID_SET.has(m), { message: "unknown model id" });
+var packId = z16.string().refine((p2) => p2 === CUSTOM_PACK_ID || p2 in PACKS || isCustomPackId(p2), { message: "unknown model pack" });
+var customPackId = z16.string().refine((p2) => isCustomPackId(p2), { message: "not a custom pack id" });
+var packRoles = z16.object({
   worker: modelId,
   developer: modelId,
   reviewer: modelId,
@@ -17305,50 +18486,50 @@ var packRoles = z14.object({
   shipper: modelId,
   marketer: modelId
 }).refine((r) => r.worker === r.developer, { message: "worker aliases developer \u2014 their models must match" });
-var ActorSchema = z14.object({
-  kind: z14.enum(["human", "agent"]),
-  id: z14.string().min(1),
-  role: z14.enum(["worker", "developer", "reviewer", "orchestrator", "designer", "sales", "architect", "curator", "shipper", "marketer"]).optional()
+var ActorSchema = z16.object({
+  kind: z16.enum(["human", "agent"]),
+  id: z16.string().min(1),
+  role: z16.enum(["worker", "developer", "reviewer", "orchestrator", "designer", "sales", "architect", "curator", "shipper", "marketer"]).optional()
 });
-var taskId2 = z14.string().min(1);
-var taskKind = z14.enum(TASK_KINDS.filter((k) => k !== "setup"));
-var ArtifactInputSchema = z14.object({
-  kind: z14.enum(["screenshot", "test_report", "diff", "doc", "file", "design"]),
-  name: z14.string().min(1),
+var taskId2 = z16.string().min(1);
+var taskKind = z16.enum(TASK_KINDS.filter((k) => k !== "setup"));
+var ArtifactInputSchema = z16.object({
+  kind: z16.enum(["screenshot", "test_report", "diff", "doc", "file", "design"]),
+  name: z16.string().min(1),
   // small text artifacts (diffs, notes) inline; binary/large go to Storage later
-  content: z14.string().max(4e5).optional()
+  content: z16.string().max(4e5).optional()
 });
-var CommandSchema = z14.discriminatedUnion("type", [
+var CommandSchema = z16.discriminatedUnion("type", [
   taskCreateCommand,
-  z14.object({
-    type: z14.literal("task.offer"),
+  z16.object({
+    type: z16.literal("task.offer"),
     taskId: taskId2,
-    offerTo: z14.string().min(1),
+    offerTo: z16.string().min(1),
     // intake resolution may bind the repo the thread conversation settled on
-    repo: z14.object({ id: z14.string().min(1), baseRef: z14.string().min(1).default("main") }).optional(),
+    repo: z16.object({ id: z16.string().min(1), baseRef: z16.string().min(1).default("main") }).optional(),
     // the resolved requirement checks from the thread — recorded as confirmed
-    checklist: z14.array(z14.string().min(1)).optional(),
+    checklist: z16.array(z16.string().min(1)).optional(),
     // the Definition of Done the orchestrator settled on for this offer
-    definitionOfDone: z14.string().max(2e4).optional(),
+    definitionOfDone: z16.string().max(2e4).optional(),
     // work-type label (docs/16) — the handler requires the task to be labeled at
     // offer (this kind, or one already on the task); it never gates the route.
     kind: taskKind.optional()
   }),
-  z14.object({ type: z14.literal("task.claim"), taskId: taskId2 }),
-  z14.object({
-    type: z14.literal("task.confirm_requirements"),
+  z16.object({ type: z16.literal("task.claim"), taskId: taskId2 }),
+  z16.object({
+    type: z16.literal("task.confirm_requirements"),
     taskId: taskId2,
-    checklist: z14.array(z14.string().min(1)).min(1)
+    checklist: z16.array(z16.string().min(1)).min(1)
   }),
-  z14.object({
-    type: z14.literal("task.submit"),
+  z16.object({
+    type: z16.literal("task.submit"),
     taskId: taskId2,
-    artifacts: z14.array(ArtifactInputSchema).default([]),
-    sha: z14.string().min(1).optional(),
+    artifacts: z16.array(ArtifactInputSchema).default([]),
+    sha: z16.string().min(1).optional(),
     // repo-backed work opens a PR — its url/number ride the submit so the reviewer
     // can gate on CI and the merge-on-accept watch can squash-merge it.
-    prUrl: z14.string().min(1).optional(),
-    prNumber: z14.number().int().positive().optional()
+    prUrl: z16.string().min(1).optional(),
+    prNumber: z16.number().int().positive().optional()
   }),
   taskRequestChangesCommand,
   taskApproveCommand,
@@ -17371,16 +18552,16 @@ var CommandSchema = z14.discriminatedUnion("type", [
   taskRequestPlanCommand,
   // the architect's final plan rides in as markdown — attached as a reviewable
   // 'doc' artifact (implementation-plan.md) when the task enters plan_review
-  z14.object({
-    type: z14.literal("task.propose_plan"),
+  z16.object({
+    type: z16.literal("task.propose_plan"),
     taskId: taskId2,
-    plan: z14.string().min(1).max(6e4),
+    plan: z16.string().min(1).max(6e4),
     // Plan-first units (2026-08-17): a revise round may also update the STRUCTURE — the
     // declared legs and proposed subtasks — not just the prose. Floored by validateWorkPlanLegs
     // in the reducer; re-proposing always clears planApprovedAt (a changed plan needs a fresh
     // human sign-off, never an inherited one).
-    legs: z14.array(z14.enum(WORK_PLAN_LEGS)).min(1).max(3).optional(),
-    subtasks: z14.array(z14.string().min(1).max(200)).max(8).optional()
+    legs: z16.array(z16.enum(WORK_PLAN_LEGS)).min(1).max(3).optional(),
+    subtasks: z16.array(z16.string().min(1).max(200)).max(8).optional()
   }),
   taskRevisePlanCommand,
   // Design lifecycle (visual-quality gate BEFORE planning — docs/14). request_design
@@ -17390,14 +18571,14 @@ var CommandSchema = z14.discriminatedUnion("type", [
   // is the HUMAN sign-off (enforced) that releases the task into planning.
   taskRequestDesignCommand,
   taskSelectDesignProviderCommand,
-  z14.object({
-    type: z14.literal("task.propose_design"),
+  z16.object({
+    type: z16.literal("task.propose_design"),
     taskId: taskId2,
-    summary: z14.string().max(2e3).optional(),
+    summary: z16.string().max(2e3).optional(),
     // the proposal round, computed by the proposing host (count of prior rounds + 1)
     // — cosmetic versioning for artifact names; the FSM/kind are what's enforced
-    round: z14.number().int().min(1).max(99).default(1),
-    mockups: z14.array(z14.object({ name: z14.string().min(1).max(120), html: z14.string().min(1).max(3e5) })).min(1).max(6)
+    round: z16.number().int().min(1).max(99).default(1),
+    mockups: z16.array(z16.object({ name: z16.string().min(1).max(120), html: z16.string().min(1).max(3e5) })).min(1).max(6)
   }),
   taskReviseDesignCommand,
   taskApproveDesignCommand,
@@ -17408,26 +18589,26 @@ var CommandSchema = z14.discriminatedUnion("type", [
   // a versioned 'ship' artifact) + the owner-tagged checklist into ship_review.
   // approve/revise/check/add are the shared human commands above; execute_ship is the
   // shipper's merge trigger, structurally refused until every item is checked (SHIP_ITEMS_PENDING).
-  z14.object({ type: z14.literal("task.claim_ship"), taskId: taskId2 }),
-  z14.object({
-    type: z14.literal("task.propose_ship_plan"),
+  z16.object({ type: z16.literal("task.claim_ship"), taskId: taskId2 }),
+  z16.object({
+    type: z16.literal("task.propose_ship_plan"),
     taskId: taskId2,
-    report: z14.string().min(1).max(6e4),
-    risk: z14.enum(SHIP_RISKS),
-    summary: z14.string().max(2e3).default(""),
+    report: z16.string().min(1).max(6e4),
+    risk: z16.enum(SHIP_RISKS),
+    summary: z16.string().max(2e3).default(""),
     // the proposal round, computed by the proposing host (count of prior rounds + 1)
-    round: z14.number().int().min(1).max(99).default(1),
-    items: z14.array(
-      z14.object({
-        id: z14.string().min(1).max(40),
-        title: z14.string().min(1).max(300),
-        detail: z14.string().max(2e3).default(""),
-        owner: z14.enum(SHIP_ITEM_OWNERS),
-        agentId: z14.string().min(1).optional(),
+    round: z16.number().int().min(1).max(99).default(1),
+    items: z16.array(
+      z16.object({
+        id: z16.string().min(1).max(40),
+        title: z16.string().min(1).max(300),
+        detail: z16.string().max(2e3).default(""),
+        owner: z16.enum(SHIP_ITEM_OWNERS),
+        agentId: z16.string().min(1).optional(),
         // 'ci' items are host-verified (gh pr checks) — may arrive pre-checked
-        auto: z14.enum(["ci"]).optional(),
-        state: z14.enum(["pending", "done"]).default("pending"),
-        note: z14.string().max(500).default("")
+        auto: z16.enum(["ci"]).optional(),
+        state: z16.enum(["pending", "done"]).default("pending"),
+        note: z16.string().max(500).default("")
       })
     ).min(1).max(20)
   }),
@@ -17436,162 +18617,162 @@ var CommandSchema = z14.discriminatedUnion("type", [
   taskCheckShipItemCommand,
   taskAddShipItemCommand,
   taskFinishSubtaskCommand,
-  z14.object({ type: z14.literal("task.execute_ship"), taskId: taskId2 }),
+  z16.object({ type: z16.literal("task.execute_ship"), taskId: taskId2 }),
   // confirm_release: the host's verifying watch reports the release landed —
   // post-merge CI on the merge commit + release workflows settled green — moving
   // verifying → accepted. Issued as the shipper by the machine that merged;
   // a red/pending verdict never sends it (the human's accept is the override).
-  z14.object({ type: z14.literal("task.confirm_release"), taskId: taskId2, note: z14.string().max(2e3).default("") }),
+  z16.object({ type: z16.literal("task.confirm_release"), taskId: taskId2, note: z16.string().max(2e3).default("") }),
   // Set/edit the task's Definition of Done (the acceptance contract the reviewer
   // gates on). Humans or the orchestrator, while the task is still open.
   taskSetDefinitionOfDoneCommand,
   // Beats (docs/17): an agent declares the ordered steps for the phase it just picked up,
   // then advances them live. The handler gates on the agent's role owning the current phase;
   // beats are DESCRIPTIVE and never gate an FSM transition.
-  z14.object({
-    type: z14.literal("beats.declare"),
+  z16.object({
+    type: z16.literal("beats.declare"),
     taskId: taskId2,
-    phase: z14.enum(TASK_STATES),
-    items: z14.array(z14.string().min(1).max(200)).min(1).max(12)
+    phase: z16.enum(TASK_STATES),
+    items: z16.array(z16.string().min(1).max(200)).min(1).max(12)
   }),
-  z14.object({ type: z14.literal("beats.advance"), taskId: taskId2, seq: z14.number().int().min(0), status: z14.enum(BEAT_STATUSES) }),
+  z16.object({ type: z16.literal("beats.advance"), taskId: taskId2, seq: z16.number().int().min(0), status: z16.enum(BEAT_STATUSES) }),
   // Runs (docs/29): the durable row behind a stretch of agent work. `run.open` mints it (an
   // agent, always — a human never opens a run), `run.step` bumps the live line + progress,
   // `run.settle` closes it into a terminal state. Descriptive, never gating.
   // The third of the four human gates (docs/29 §4d). Not a transition: approving does not move the
   // task, it unlocks the edge OUT of plan_review — the same shape as confirm_requirements, because
   // both the owned and the delegated path need the claim that follows to stay exactly as it is.
-  z14.object({
-    type: z14.literal("task.approve_plan"),
-    taskId: z14.string().min(1)
+  z16.object({
+    type: z16.literal("task.approve_plan"),
+    taskId: z16.string().min(1)
   }),
-  z14.object({
-    type: z14.literal("run.open"),
-    id: z14.string().uuid().optional(),
+  z16.object({
+    type: z16.literal("run.open"),
+    id: z16.string().uuid().optional(),
     // caller-minted so the daemon can address it before the round trip
-    workspace: z14.string().min(1),
-    channel: z14.string().min(1),
-    threadId: z14.string().min(1).optional(),
-    runTaskId: z14.string().min(1).optional(),
-    parentRunId: z14.string().min(1).optional(),
-    kind: z14.enum(RUN_KINDS),
-    title: z14.string().min(1).max(200),
-    total: z14.number().int().min(0).max(64).default(0),
-    step: z14.string().max(200).optional(),
+    workspace: z16.string().min(1),
+    channel: z16.string().min(1),
+    threadId: z16.string().min(1).optional(),
+    runTaskId: z16.string().min(1).optional(),
+    parentRunId: z16.string().min(1).optional(),
+    kind: z16.enum(RUN_KINDS),
+    title: z16.string().min(1).max(200),
+    total: z16.number().int().min(0).max(64).default(0),
+    step: z16.string().max(200).optional(),
     // which config this run is seated on — `role·model[·@specialist]` (0103). Leg runs only.
-    seat: z14.string().max(160).optional(),
+    seat: z16.string().max(160).optional(),
     // The WAKE LEASE (0114). Set to the message this run answers and the open becomes a claim:
     // one host per (agent, trigger) wins, the rest get `won: false` and stand down BEFORE
     // spending a token. Omitted for task/sweep runs, which their own claim already dedupes.
-    triggerMessageId: z14.string().uuid().optional(),
+    triggerMessageId: z16.string().uuid().optional(),
     // which member's machine is actually serving this run — the thing that makes shared compute
     // legible ("patch is working on bob's laptop") and billing attributable
-    machineId: z14.string().uuid().optional()
+    machineId: z16.string().uuid().optional()
   }),
-  z14.object({
-    type: z14.literal("run.step"),
-    runId: z14.string().min(1),
-    step: z14.string().max(200).optional(),
-    done: z14.number().int().min(0).max(64).optional(),
-    total: z14.number().int().min(0).max(64).optional()
+  z16.object({
+    type: z16.literal("run.step"),
+    runId: z16.string().min(1),
+    step: z16.string().max(200).optional(),
+    done: z16.number().int().min(0).max(64).optional(),
+    total: z16.number().int().min(0).max(64).optional()
   }),
-  z14.object({
-    type: z14.literal("run.settle"),
-    runId: z14.string().min(1),
-    state: z14.enum(RUN_SETTLE_STATES),
+  z16.object({
+    type: z16.literal("run.settle"),
+    runId: z16.string().min(1),
+    state: z16.enum(RUN_SETTLE_STATES),
     // includes `parked` — settleable, but NOT terminal
-    summary: z14.string().max(600).optional()
+    summary: z16.string().max(600).optional()
   }),
   // the machine commands live in commands-machine.ts (member-machines round, 2026-09-03): this
   // file sits at its size-ratchet cap and the kind grew three verbs
   ...MACHINE_COMMANDS,
-  z14.object({
-    type: z14.literal("agent.register"),
-    workspace: z14.string().min(1),
-    machineId: z14.string().min(1),
-    name: z14.string().min(1).regex(/^[a-z0-9][a-z0-9._-]*$/),
-    role: z14.enum(["worker", "developer", "reviewer", "orchestrator", "designer", "sales", "architect", "curator", "shipper", "marketer"]).default("developer"),
+  z16.object({
+    type: z16.literal("agent.register"),
+    workspace: z16.string().min(1),
+    machineId: z16.string().min(1),
+    name: z16.string().min(1).regex(/^[a-z0-9][a-z0-9._-]*$/),
+    role: z16.enum(["worker", "developer", "reviewer", "orchestrator", "designer", "sales", "architect", "curator", "shipper", "marketer"]).default("developer"),
     model: modelId.default("claude-opus-4-8"),
-    runtime: z14.enum(["claude-code", "codex", "gemini"]).default("claude-code"),
-    emoji: z14.string().min(1).max(8).optional(),
+    runtime: z16.enum(["claude-code", "codex", "gemini"]).default("claude-code"),
+    emoji: z16.string().min(1).max(8).optional(),
     // persona face; omitted → client derives from name
     // The two agent strings (0110). `description` is the ROUTING signal — third person, what it
     // does + when to route here — read by the orchestrator in list_agents and published on the
     // A2A card. `brief` is the INSTRUCTIONS: second person, how the work is done, injected into
     // every turn this agent takes. Two readers, two caps.
-    description: z14.string().min(1).max(280).optional(),
-    brief: z14.string().min(1).max(2e3).optional(),
-    channels: z14.array(z14.string().min(1)).min(1)
+    description: z16.string().min(1).max(280).optional(),
+    brief: z16.string().min(1).max(2e3).optional(),
+    channels: z16.array(z16.string().min(1)).min(1)
   }),
   // edit a registered agent's brain (model/provider), name, description or instructions — the
   // daemon re-reads them live. role stays immutable (FSM/permissions depend on it).
-  z14.object({
-    type: z14.literal("agent.update"),
-    agent: z14.string().min(1),
+  z16.object({
+    type: z16.literal("agent.update"),
+    agent: z16.string().min(1),
     // agent id
     model: modelId.optional(),
-    runtime: z14.enum(["claude-code", "codex", "gemini"]).optional(),
-    name: z14.string().min(1).regex(/^[a-z0-9][a-z0-9._-]*$/).optional(),
+    runtime: z16.enum(["claude-code", "codex", "gemini"]).optional(),
+    name: z16.string().min(1).regex(/^[a-z0-9][a-z0-9._-]*$/).optional(),
     // '' clears either string back to null (the UI's empty field must be able to mean "none")
-    description: z14.string().max(280).optional(),
-    brief: z14.string().max(2e3).optional(),
+    description: z16.string().max(280).optional(),
+    brief: z16.string().max(2e3).optional(),
     // provenance: 'manual' = a human pinned this brain (pack-apply must skip it); 'pack' = pack-managed.
     // The handler stamps 'manual' on a human model edit when the caller doesn't set it explicitly.
-    modelSource: z14.enum(["pack", "manual"]).optional()
+    modelSource: z16.enum(["pack", "manual"]).optional()
   }),
   // Retire an agent (HUMAN-ONLY, soft): it leaves the active roster — daemon stops
   // hosting it, selection pools skip it, its A2A card unpublishes — but the row and
   // every event/task attribution stay, so derived history (docs/13) never orphans.
   // Refused while the agent has open work. agent.register with the same name rehires.
-  z14.object({
-    type: z14.literal("agent.retire"),
-    agent: z14.string().min(1)
+  z16.object({
+    type: z16.literal("agent.retire"),
+    agent: z16.string().min(1)
     /* agent id */
   }),
   // Consume an external A2A agent: fetch its Agent Card by URL, register it as a
   // 'remote' agent (no local machine) the host delegates to over A2A JSON-RPC.
-  z14.object({
-    type: z14.literal("agent.connect_remote"),
-    workspace: z14.string().min(1),
-    channels: z14.array(z14.string().min(1)).min(1),
-    cardUrl: z14.string().min(1)
+  z16.object({
+    type: z16.literal("agent.connect_remote"),
+    workspace: z16.string().min(1),
+    channels: z16.array(z16.string().min(1)).min(1),
+    cardUrl: z16.string().min(1)
     // the agent's /.well-known/a2a/agent-card.json or card URL
   }),
-  z14.object({
-    type: z14.literal("agent.set_status"),
-    agentId: z14.string().min(1),
-    status: z14.enum(["online", "offline", "thinking", "working"])
+  z16.object({
+    type: z16.literal("agent.set_status"),
+    agentId: z16.string().min(1),
+    status: z16.enum(["online", "offline", "thinking", "working"])
   }),
-  z14.object({ type: z14.literal("artifact.promote"), artifactId: z14.string().min(1) }),
+  z16.object({ type: z16.literal("artifact.promote"), artifactId: z16.string().min(1) }),
   // Deleting a file (2026-08-18). HUMAN_ONLY, and REFUSED for anything a gate resolves against —
   // a design round, an implementation or release plan, a reviewer's diff, a test report. See
   // `isGateArtifact` in @neuramesh/shared: the client hides the control from the same predicate,
   // but the refusal lives here, because "don't delete the evidence" must be impossible rather
   // than discouraged (doctrine §4).
-  z14.object({ type: z14.literal("artifact.delete"), artifactId: z14.string().min(1) }),
-  z14.object({
-    type: z14.literal("memory.refresh_block"),
-    workspace: z14.string().min(1),
-    channel: z14.string().min(1),
-    kind: z14.enum(["channel_summary", "project_brief"]).default("channel_summary"),
-    content: z14.string().min(1).max(4e3),
-    basisCount: z14.number().int().nonnegative().default(0)
+  z16.object({ type: z16.literal("artifact.delete"), artifactId: z16.string().min(1) }),
+  z16.object({
+    type: z16.literal("memory.refresh_block"),
+    workspace: z16.string().min(1),
+    channel: z16.string().min(1),
+    kind: z16.enum(["channel_summary", "project_brief"]).default("channel_summary"),
+    content: z16.string().min(1).max(4e3),
+    basisCount: z16.number().int().nonnegative().default(0)
   }),
-  z14.object({
-    type: z14.literal("memory.upsert_fact"),
-    workspace: z14.string().min(1),
-    channel: z14.string().min(1),
-    content: z14.string().min(8).max(600),
-    basisCount: z14.number().int().nonnegative().default(0)
+  z16.object({
+    type: z16.literal("memory.upsert_fact"),
+    workspace: z16.string().min(1),
+    channel: z16.string().min(1),
+    content: z16.string().min(8).max(600),
+    basisCount: z16.number().int().nonnegative().default(0)
   }),
   // A lesson: the durable norm a review correction taught (e.g. "evidence renders
   // attach as artifacts — mock HTML never gets committed"). The one memory write ANY
   // teammate may make — the agent that was just corrected holds the freshest version.
-  z14.object({
-    type: z14.literal("memory.record_lesson"),
-    workspace: z14.string().min(1),
-    channel: z14.string().min(1),
-    content: z14.string().min(12).max(500),
+  z16.object({
+    type: z16.literal("memory.record_lesson"),
+    workspace: z16.string().min(1),
+    channel: z16.string().min(1),
+    content: z16.string().min(12).max(500),
     taskId: taskId2.optional()
     // provenance: the task whose review taught it
   }),
@@ -17599,278 +18780,278 @@ var CommandSchema = z14.discriminatedUnion("type", [
   // provenance stay; valid_until closes). supersededBy names the successor when a
   // correction was recorded but the reconcile's overlap check missed the rewrite,
   // so the supersession chain stays intact either way.
-  z14.object({
-    type: z14.literal("memory.retire_fact"),
-    factId: z14.string().uuid(),
-    supersededBy: z14.string().uuid().optional()
+  z16.object({
+    type: z16.literal("memory.retire_fact"),
+    factId: z16.string().uuid(),
+    supersededBy: z16.string().uuid().optional()
   }),
-  z14.object({
-    type: z14.literal("workspace.create"),
-    name: z14.string().min(1).max(60),
-    slug: z14.string().min(2).max(40).regex(/^[a-z0-9][a-z0-9-]*$/)
+  z16.object({
+    type: z16.literal("workspace.create"),
+    name: z16.string().min(1).max(60),
+    slug: z16.string().min(2).max(40).regex(/^[a-z0-9][a-z0-9-]*$/)
   }),
-  z14.object({ type: z14.literal("workspace.delete"), workspace: z14.string().min(1) }),
-  z14.object({ type: z14.literal("account.delete") }),
+  z16.object({ type: z16.literal("workspace.delete"), workspace: z16.string().min(1) }),
+  z16.object({ type: z16.literal("account.delete") }),
   // An invite is a pending row + an email; the invitee authenticates through Clerk and the
   // verified-email claim attaches them (docs/27 §1d). No password: the old one created a
   // Supabase auth user that Clerk would never accept, for an identity that never got a
   // membership. `password` is accepted-and-ignored for one release so an older desktop build
   // doesn't hard-fail zod validation mid-rollout.
-  z14.object({
-    type: z14.literal("workspace.invite"),
-    workspace: z14.string().min(1),
-    email: z14.string().email(),
-    password: z14.string().optional(),
-    memberRole: z14.enum(["member", "admin"]).default("member")
+  z16.object({
+    type: z16.literal("workspace.invite"),
+    workspace: z16.string().min(1),
+    email: z16.string().email(),
+    password: z16.string().optional(),
+    memberRole: z16.enum(["member", "admin"]).default("member")
   }),
-  z14.object({ type: z14.literal("workspace.revoke_invite"), workspace: z14.string().min(1), invite: z14.string().uuid() }),
+  z16.object({ type: z16.literal("workspace.revoke_invite"), workspace: z16.string().min(1), invite: z16.string().uuid() }),
   // Answering an invitation (0113). No `workspace` field on purpose: the invite id resolves its
   // own workspace, and taking one from the caller would invite a mismatch to reason about. The
   // server re-verifies the caller's email against the invite — the id is a handle, not a key.
-  z14.object({ type: z14.literal("workspace.accept_invite"), invite: z14.string().uuid() }),
-  z14.object({ type: z14.literal("workspace.decline_invite"), invite: z14.string().uuid() }),
+  z16.object({ type: z16.literal("workspace.accept_invite"), invite: z16.string().uuid() }),
+  z16.object({ type: z16.literal("workspace.decline_invite"), invite: z16.string().uuid() }),
   // Membership exits. `leave` acts on the caller; `remove_member` on someone else — kept apart
   // so the owner rules can differ (you may not leave as owner; nobody may remove the owner).
-  z14.object({ type: z14.literal("workspace.leave"), workspace: z14.string().min(1) }),
-  z14.object({ type: z14.literal("workspace.remove_member"), workspace: z14.string().min(1), member: z14.string().uuid() }),
+  z16.object({ type: z16.literal("workspace.leave"), workspace: z16.string().min(1) }),
+  z16.object({ type: z16.literal("workspace.remove_member"), workspace: z16.string().min(1), member: z16.string().uuid() }),
   // workspace-level settings (Workspace settings UI). autoFailover = the provider-auth
   // failover policy: when a preferred subscription login is down, false (default) surfaces
   // an auth card (no surprise spend); true fails over to a provided API key automatically.
-  z14.object({
-    type: z14.literal("workspace.update"),
-    workspace: z14.string().min(1),
-    autoFailover: z14.boolean().optional(),
+  z16.object({
+    type: z16.literal("workspace.update"),
+    workspace: z16.string().min(1),
+    autoFailover: z16.boolean().optional(),
     activeModelPack: packId.optional(),
     // the workspace's voice (docs/design/agent-comm-rules-2026-08) — HUMAN-only in the handler; null reads as defaults-ON
-    commRules: z14.object({ ste100: z14.boolean().optional(), noEmdash: z14.boolean().optional(), custom: z14.array(z14.string().min(1).max(200)).max(8).optional() }).optional(),
+    commRules: z16.object({ ste100: z16.boolean().optional(), noEmdash: z16.boolean().optional(), custom: z16.array(z16.string().min(1).max(200)).max(8).optional() }).optional(),
     // the video tier (0140): a Pro workspace's pick among the tiers the server serves; null = the default
-    videoTier: z14.enum(["starter", "xpress", "premium"]).nullable().optional()
+    videoTier: z16.enum(["starter", "xpress", "premium"]).nullable().optional()
   }),
   // re-bind every agent to its home-remit channels across all projects (recovery for orphaned
   // registrations + makes the team usable across projects). idempotent.
-  z14.object({ type: z14.literal("workspace.sync_agents"), workspace: z14.string().min(1) }),
+  z16.object({ type: z16.literal("workspace.sync_agents"), workspace: z16.string().min(1) }),
   // Custom brains (user-authored model packs): save = create (packId omitted; the server
   // mints `custom:<uuid>`) or update (packId present). Human-only in the handler, like
   // workspace.update. Activation stays a separate workspace.update {activeModelPack}.
-  z14.object({
-    type: z14.literal("modelpack.save"),
-    workspace: z14.string().min(1),
+  z16.object({
+    type: z16.literal("modelpack.save"),
+    workspace: z16.string().min(1),
     packId: customPackId.optional(),
-    name: z14.string().trim().min(1).max(40),
+    name: z16.string().trim().min(1).max(40),
     roles: packRoles
   }),
-  z14.object({ type: z14.literal("modelpack.delete"), workspace: z14.string().min(1), packId: customPackId }),
+  z16.object({ type: z16.literal("modelpack.delete"), workspace: z16.string().min(1), packId: customPackId }),
   // Agent permission policy (Phase 1): humans configure allow/ask/deny rules per scope.
   // setPolicy upserts by id (absent id = insert a new rule); selector is the shared DSL.
-  z14.object({
-    type: z14.literal("policy.set"),
-    workspace: z14.string().min(1),
-    id: z14.string().min(1).optional(),
-    scope: z14.enum(POLICY_SCOPES),
-    projectId: z14.string().min(1).nullable().optional(),
-    channelId: z14.string().min(1).nullable().optional(),
-    agentId: z14.string().min(1).nullable().optional(),
-    capability: z14.enum(POLICY_CAPABILITIES),
+  z16.object({
+    type: z16.literal("policy.set"),
+    workspace: z16.string().min(1),
+    id: z16.string().min(1).optional(),
+    scope: z16.enum(POLICY_SCOPES),
+    projectId: z16.string().min(1).nullable().optional(),
+    channelId: z16.string().min(1).nullable().optional(),
+    agentId: z16.string().min(1).nullable().optional(),
+    capability: z16.enum(POLICY_CAPABILITIES),
     selector: PolicySelectorSchema,
-    verdict: z14.enum(POLICY_VERDICTS),
-    rationale: z14.string().max(400).optional(),
-    locked: z14.boolean().optional()
+    verdict: z16.enum(POLICY_VERDICTS),
+    rationale: z16.string().max(400).optional(),
+    locked: z16.boolean().optional()
   }),
-  z14.object({ type: z14.literal("policy.delete"), workspace: z14.string().min(1), policyId: z14.string().min(1) }),
-  z14.object({
-    type: z14.literal("skill.create"),
-    workspace: z14.string().min(1),
-    channel: z14.string().min(1).optional(),
+  z16.object({ type: z16.literal("policy.delete"), workspace: z16.string().min(1), policyId: z16.string().min(1) }),
+  z16.object({
+    type: z16.literal("skill.create"),
+    workspace: z16.string().min(1),
+    channel: z16.string().min(1).optional(),
     // omitted/global scope = workspace-wide
-    name: z14.string().min(1).max(60).regex(/^[a-z0-9][a-z0-9-]*$/),
-    description: z14.string().min(1).max(300),
-    scope: z14.enum(["channel", "global"]).default("channel"),
-    body: z14.string().min(1).max(4e4),
-    packId: z14.string().min(1).optional(),
+    name: z16.string().min(1).max(60).regex(/^[a-z0-9][a-z0-9-]*$/),
+    description: z16.string().min(1).max(300),
+    scope: z16.enum(["channel", "global"]).default("channel"),
+    body: z16.string().min(1).max(4e4),
+    packId: z16.string().min(1).optional(),
     // bind into a skill pack (importer/seed use)
-    enabled: z14.boolean().default(true)
+    enabled: z16.boolean().default(true)
   }),
   // toggle a single skill's discoverability without deleting it (greyed in UI)
-  z14.object({ type: z14.literal("skill.set_enabled"), skillId: z14.string().min(1), enabled: z14.boolean() }),
-  z14.object({
-    type: z14.literal("skill.update"),
-    skillId: z14.string().min(1),
-    description: z14.string().min(1).max(300).optional(),
-    body: z14.string().min(1).max(4e4).optional(),
-    scope: z14.enum(["channel", "global"]).optional()
+  z16.object({ type: z16.literal("skill.set_enabled"), skillId: z16.string().min(1), enabled: z16.boolean() }),
+  z16.object({
+    type: z16.literal("skill.update"),
+    skillId: z16.string().min(1),
+    description: z16.string().min(1).max(300).optional(),
+    body: z16.string().min(1).max(4e4).optional(),
+    scope: z16.enum(["channel", "global"]).optional()
   }),
-  z14.object({ type: z14.literal("skill.deprecate"), skillId: z14.string().min(1) }),
+  z16.object({ type: z16.literal("skill.deprecate"), skillId: z16.string().min(1) }),
   // agent self-learning: any agent proposes a reusable procedure it discovered
   // → lands as draft for orchestrator/human curation (dedups onto an existing
   // draft of the same name+scope rather than spamming).
-  z14.object({
-    type: z14.literal("skill.propose"),
-    workspace: z14.string().min(1),
-    channel: z14.string().min(1).optional(),
-    name: z14.string().min(1).max(60).regex(/^[a-z0-9][a-z0-9-]*$/),
-    description: z14.string().min(1).max(300),
-    scope: z14.enum(["channel", "global"]).default("channel"),
-    body: z14.string().min(1).max(4e4)
+  z16.object({
+    type: z16.literal("skill.propose"),
+    workspace: z16.string().min(1),
+    channel: z16.string().min(1).optional(),
+    name: z16.string().min(1).max(60).regex(/^[a-z0-9][a-z0-9-]*$/),
+    description: z16.string().min(1).max(300),
+    scope: z16.enum(["channel", "global"]).default("channel"),
+    body: z16.string().min(1).max(4e4)
   }),
   // curation gate: promote a draft to active (supersedes a same-name active).
-  z14.object({ type: z14.literal("skill.promote"), skillId: z14.string().min(1) }),
+  z16.object({ type: z16.literal("skill.promote"), skillId: z16.string().min(1) }),
   // Skill packs: a versioned bundle of skills. create opens an 'importing' row;
   // the Curator (or the bundled seed path) commits the parsed skills atomically.
-  z14.object({
-    type: z14.literal("skillpack.create"),
-    workspace: z14.string().min(1),
-    channel: z14.string().min(1),
-    name: z14.string().min(1).max(60).regex(/^[a-z0-9][a-z0-9-]*$/),
-    description: z14.string().max(300).default(""),
-    sourceUrl: z14.string().max(400).default(""),
-    sourceRef: z14.string().min(1).max(120).default("main"),
-    origin: z14.enum(["bundled", "imported"]).default("imported")
+  z16.object({
+    type: z16.literal("skillpack.create"),
+    workspace: z16.string().min(1),
+    channel: z16.string().min(1),
+    name: z16.string().min(1).max(60).regex(/^[a-z0-9][a-z0-9-]*$/),
+    description: z16.string().max(300).default(""),
+    sourceUrl: z16.string().max(400).default(""),
+    sourceRef: z16.string().min(1).max(120).default("main"),
+    origin: z16.enum(["bundled", "imported"]).default("imported")
   }),
-  z14.object({
-    type: z14.literal("skillpack.commit"),
-    packId: z14.string().min(1),
-    version: z14.string().max(120).default(""),
-    skills: z14.array(
-      z14.object({
-        name: z14.string().min(1).max(60).regex(/^[a-z0-9][a-z0-9-]*$/),
-        description: z14.string().max(300).default(""),
-        body: z14.string().min(1).max(4e4)
+  z16.object({
+    type: z16.literal("skillpack.commit"),
+    packId: z16.string().min(1),
+    version: z16.string().max(120).default(""),
+    skills: z16.array(
+      z16.object({
+        name: z16.string().min(1).max(60).regex(/^[a-z0-9][a-z0-9-]*$/),
+        description: z16.string().max(300).default(""),
+        body: z16.string().min(1).max(4e4)
       })
     ).max(300)
   }),
-  z14.object({
-    type: z14.literal("skillpack.update"),
+  z16.object({
+    type: z16.literal("skillpack.update"),
     // importer progress + terminal states
-    packId: z14.string().min(1),
-    status: z14.enum(["importing", "ready", "error"]).optional(),
-    step: z14.string().max(120).optional(),
-    progress: z14.number().int().min(0).max(100).optional(),
-    error: z14.string().max(2e3).optional(),
-    description: z14.string().max(300).optional()
+    packId: z16.string().min(1),
+    status: z16.enum(["importing", "ready", "error"]).optional(),
+    step: z16.string().max(120).optional(),
+    progress: z16.number().int().min(0).max(100).optional(),
+    error: z16.string().max(2e3).optional(),
+    description: z16.string().max(300).optional()
   }),
-  z14.object({ type: z14.literal("skillpack.set_enabled"), packId: z14.string().min(1), enabled: z14.boolean() }),
-  z14.object({ type: z14.literal("skillpack.remove"), packId: z14.string().min(1) }),
+  z16.object({ type: z16.literal("skillpack.set_enabled"), packId: z16.string().min(1), enabled: z16.boolean() }),
+  z16.object({ type: z16.literal("skillpack.remove"), packId: z16.string().min(1) }),
   // idempotently seed the bundled default packs into a channel (backfills existing #dev);
   // kind picks the seed list — marketing rooms get marketing-core
-  z14.object({ type: z14.literal("skillpack.seed_defaults"), workspace: z14.string().min(1), channel: z14.string().min(1), kind: z14.enum(["build", "marketing"]).optional() }),
+  z16.object({ type: z16.literal("skillpack.seed_defaults"), workspace: z16.string().min(1), channel: z16.string().min(1), kind: z16.enum(["build", "marketing"]).optional() }),
   // register a GitHub repo to the workspace so tasks can bind + push to it.
   // Metadata only — no tokens stored; the executing machine's own git creds
   // authenticate at clone/push (platform never holds repo write tokens).
-  z14.object({
-    type: z14.literal("repo.link"),
-    workspace: z14.string().min(1),
-    channel: z14.string().min(1).optional(),
+  z16.object({
+    type: z16.literal("repo.link"),
+    workspace: z16.string().min(1),
+    channel: z16.string().min(1).optional(),
     // attach to this channel's default project
-    project: z14.string().min(1).optional(),
+    project: z16.string().min(1).optional(),
     // …or attach directly to this project (code workspace)
-    url: z14.string().min(1).optional(),
+    url: z16.string().min(1).optional(),
     // github/gitlab URL — or use localPath
-    localPath: z14.string().min(1).optional(),
+    localPath: z16.string().min(1).optional(),
     // a local folder on the machine → provider 'local'
-    name: z14.string().min(1).optional(),
+    name: z16.string().min(1).optional(),
     // display name for a local folder
-    defaultBranch: z14.string().min(1).default("main")
+    defaultBranch: z16.string().min(1).default("main")
   }),
   // Projects are the work axis: workspace-scoped initiatives that OWN channels
   // (1:N — a channel belongs to one project). create may move existing channels in.
-  z14.object({
-    type: z14.literal("project.create"),
-    workspace: z14.string().min(1),
-    name: z14.string().min(1).max(80),
+  z16.object({
+    type: z16.literal("project.create"),
+    workspace: z16.string().min(1),
+    name: z16.string().min(1).max(80),
     // the slug is set at creation (immutable after); omitted = derived from the name.
-    slug: z14.string().min(1).max(40).regex(/^[a-z0-9][a-z0-9-]*$/).optional(),
-    description: z14.string().max(2e3).default(""),
+    slug: z16.string().min(1).max(40).regex(/^[a-z0-9][a-z0-9-]*$/).optional(),
+    description: z16.string().max(2e3).default(""),
     // project identity — the site the project ships, and a small logo detected from it
     // (or from the repo folder) on the user's machine. The logo is a compact data: URL
     // (icon resized client-side) or an https URL; capped well under the inline sync limit.
-    website: z14.string().max(2048).regex(/^$|^https?:\/\//).optional(),
-    logoUrl: z14.string().max(2e5).regex(/^$|^(data:image\/|https?:\/\/)/).optional(),
-    channels: z14.array(z14.string().min(1)).default([]),
+    website: z16.string().max(2048).regex(/^$|^https?:\/\//).optional(),
+    logoUrl: z16.string().max(2e5).regex(/^$|^(data:image\/|https?:\/\/)/).optional(),
+    channels: z16.array(z16.string().min(1)).default([]),
     // channel ids to move into the new project
-    newChannels: z14.array(z14.string().min(1)).default([])
+    newChannels: z16.array(z16.string().min(1)).default([])
     // slugs of fresh channels to create in the new project
   }),
   // Conversation threads (the conversation-first shell): refine the heuristic title or
   // add a description — the orchestrator does this after its first reply; humans may too.
-  z14.object({
-    type: z14.literal("thread.update"),
-    workspace: z14.string().min(1),
-    threadId: z14.string().uuid(),
-    title: z14.string().min(1).max(120).optional(),
-    description: z14.string().max(2e3).optional()
+  z16.object({
+    type: z16.literal("thread.update"),
+    workspace: z16.string().min(1),
+    threadId: z16.string().uuid(),
+    title: z16.string().min(1).max(120).optional(),
+    description: z16.string().max(2e3).optional()
   }),
   // docs/34 — the Tasks toggle, moved on a conversation that already exists. HUMAN_ONLY: this
   // is the line between "the agent is talking to me" and "the agent is filing work", and an
   // agent must never be able to move its own conversation onto the board. Both directions are
   // legal — chat → tasks escalates in place (the next message triages), tasks → chat stops the
   // routing without touching whatever task the thread already carries.
-  z14.object({
-    type: z14.literal("thread.set_mode"),
-    workspace: z14.string().min(1),
-    threadId: z14.string().uuid(),
-    mode: z14.enum(THREAD_MODES)
+  z16.object({
+    type: z16.literal("thread.set_mode"),
+    workspace: z16.string().min(1),
+    threadId: z16.string().uuid(),
+    mode: z16.enum(THREAD_MODES)
   }),
   // WHERE A SESSION RUNS (0134, rule D9): move a conversation's designated machine. Human-only,
   // like the mode: an agent steering a conversation onto a machine is the confused-deputy shape.
   // Null = no designation (the ladder's origin rung and the member's standing choices decide).
-  z14.object({
-    type: z14.literal("thread.set_machine"),
-    workspace: z14.string().min(1),
-    threadId: z14.string().uuid(),
-    machineId: z14.string().uuid().nullable()
+  z16.object({
+    type: z16.literal("thread.set_machine"),
+    workspace: z16.string().min(1),
+    threadId: z16.string().uuid(),
+    machineId: z16.string().uuid().nullable()
   }),
   // Compute choice (0118): where THIS member's requests run — a default machine for new
   // conversations plus per-agent overrides. Self-only by construction: the handler writes the
   // ACTOR's row, so the payload cannot name another member. Null machine = back to origin
   // affinity. Advisory routing (shouldClaim reads it); the wake lease stays the enforcement.
-  z14.object({
-    type: z14.literal("member.set_compute"),
-    workspace: z14.string().min(1),
-    machine: z14.string().uuid().nullable().optional(),
-    agents: z14.record(z14.string().uuid(), z14.string().uuid()).optional(),
+  z16.object({
+    type: z16.literal("member.set_compute"),
+    workspace: z16.string().min(1),
+    machine: z16.string().uuid().nullable().optional(),
+    agents: z16.record(z16.string().uuid(), z16.string().uuid()).optional(),
     // consent (0119): members this one lends their machines to. '*' = the whole workspace.
-    shares: z14.array(z14.union([z14.literal("*"), z14.string().uuid()])).max(200).optional(),
+    shares: z16.array(z16.union([z16.literal("*"), z16.string().uuid()])).max(200).optional(),
     // rule D9 (2026-09-04): where sessions started on this member's desktop run — 'here' or 'auto'
-    desktopSessions: z14.enum(["here", "auto"]).optional()
+    desktopSessions: z16.enum(["here", "auto"]).optional()
   }),
   // ONE lend/revoke, as INTENT. The client used to compute the resulting set, which meant
   // expanding '*' from its own replica — and on a stale one that silently dropped everyone it had
   // not synced yet (live, 2026-08-14). The server has the real roster.
-  z14.object({
-    type: z14.literal("member.share_compute"),
-    workspace: z14.string().min(1),
-    member: z14.string().uuid(),
-    on: z14.boolean()
+  z16.object({
+    type: z16.literal("member.share_compute"),
+    workspace: z16.string().min(1),
+    member: z16.string().uuid(),
+    on: z16.boolean()
   }),
   // Auto-filing (0109): move a conversation into the room it belongs in. The orchestrator does
   // this during the triage turn it already runs, so the human never has to pick a room; a human
   // can correct it any time. Every rule lives in `canFileConversation` (packages/shared/filing.ts)
   // so the gate is one pure function both this handler and the daemon read.
-  z14.object({
-    type: z14.literal("thread.move"),
-    workspace: z14.string().min(1),
-    threadId: z14.string().uuid(),
-    channel: z14.string().uuid(),
+  z16.object({
+    type: z16.literal("thread.move"),
+    workspace: z16.string().min(1),
+    threadId: z16.string().uuid(),
+    channel: z16.string().uuid(),
     // the one clause shown beside Undo. Required of an agent (a move with no stated reason is a
     // move you cannot argue with); optional for a human, whose reason is that they said so.
-    reason: z14.string().min(1).max(200).optional()
+    reason: z16.string().min(1).max(200).optional()
   }),
   // Archiving a conversation (0108). HUMAN_ONLY: it is the human's own filing, and an agent that
   // could archive a thread could hide a conversation the human is waiting on. Chat threads only —
   // enforced in the handler, because a TASK thread's life belongs to the board, not to a list.
-  z14.object({
-    type: z14.literal("thread.archive"),
-    workspace: z14.string().min(1),
-    threadId: z14.string().uuid()
+  z16.object({
+    type: z16.literal("thread.archive"),
+    workspace: z16.string().min(1),
+    threadId: z16.string().uuid()
   }),
-  z14.object({
-    type: z14.literal("thread.unarchive"),
-    workspace: z14.string().min(1),
-    threadId: z14.string().uuid()
+  z16.object({
+    type: z16.literal("thread.unarchive"),
+    workspace: z16.string().min(1),
+    threadId: z16.string().uuid()
   }),
   // Settle (0137): settled_at and nothing else, HUMAN_ONLY, any thread (shared/threadstatus.ts). One line: the file's cap.
-  z14.object({ type: z14.literal("thread.settle"), workspace: z14.string().min(1), threadId: z14.string().uuid() }),
-  z14.object({ type: z14.literal("thread.unsettle"), workspace: z14.string().min(1), threadId: z14.string().uuid() }),
+  z16.object({ type: z16.literal("thread.settle"), workspace: z16.string().min(1), threadId: z16.string().uuid() }),
+  z16.object({ type: z16.literal("thread.unsettle"), workspace: z16.string().min(1), threadId: z16.string().uuid() }),
   // docs/10 §15 — the thread brain override: which MODEL each role runs in THIS conversation.
   // HUMAN_ONLY, like every other spend of money the human did not ask for: an agent that could
   // set its own model could move itself onto the most expensive one in the catalog.
@@ -17878,263 +19059,275 @@ var CommandSchema = z14.discriminatedUnion("type", [
   // `override: null` is Reset — the WHOLE override, never a per-role clear (ruling 7). The role
   // keys and model values are validated in the handler against the same allow-list the packs
   // use, so an unknown model is a 400 rather than a seat that fails at run time.
-  z14.object({
-    type: z14.literal("thread.set_brain"),
-    workspace: z14.string().min(1),
-    threadId: z14.string().uuid(),
-    override: z14.record(z14.string(), z14.string()).nullable()
+  z16.object({
+    type: z16.literal("thread.set_brain"),
+    workspace: z16.string().min(1),
+    threadId: z16.string().uuid(),
+    override: z16.record(z16.string(), z16.string()).nullable()
   }),
-  z14.object({
-    type: z14.literal("project.update"),
-    project: z14.string().min(1),
-    name: z14.string().min(1).max(80).optional(),
-    description: z14.string().max(2e3).optional(),
+  z16.object({
+    type: z16.literal("project.update"),
+    project: z16.string().min(1),
+    name: z16.string().min(1).max(80).optional(),
+    description: z16.string().max(2e3).optional(),
     // '' clears the stored value (omitted = keep) — same shape as project.create
-    website: z14.string().max(2048).regex(/^$|^https?:\/\//).optional(),
-    logoUrl: z14.string().max(2e5).regex(/^$|^(data:image\/|https?:\/\/)/).optional(),
-    autoOpenPr: z14.boolean().optional(),
-    runCiBeforeMerge: z14.boolean().optional(),
+    website: z16.string().max(2048).regex(/^$|^https?:\/\//).optional(),
+    logoUrl: z16.string().max(2e5).regex(/^$|^(data:image\/|https?:\/\/)/).optional(),
+    autoOpenPr: z16.boolean().optional(),
+    runCiBeforeMerge: z16.boolean().optional(),
     // the release gate (docs/23): reviewer-approved, PR-backed tasks get a
     // production-readiness plan from the channel shipper before merging.
     // Defaults ON — null/absent reads as true everywhere.
-    shipGate: z14.boolean().optional(),
+    shipGate: z16.boolean().optional(),
     // per-project brains (docs/10): overrides the workspace pack for work in this
     // project. '' clears the override (back to inherit); omitted keeps it.
-    modelPack: z14.union([packId, z14.literal("")]).optional()
+    modelPack: z16.union([packId, z16.literal("")]).optional()
   }),
   // move a channel into a project (1:N ownership)
-  z14.object({
-    type: z14.literal("channel.assign"),
-    channel: z14.string().min(1),
+  z16.object({
+    type: z16.literal("channel.assign"),
+    channel: z16.string().min(1),
     // channel id
-    project: z14.string().min(1)
+    project: z16.string().min(1)
     // project id
   }),
   // create a fresh room in a project (slug unique per project; topic optional)
-  z14.object({
-    type: z14.literal("channel.create"),
-    workspace: z14.string().min(1),
-    project: z14.string().min(1),
+  z16.object({
+    type: z16.literal("channel.create"),
+    workspace: z16.string().min(1),
+    project: z16.string().min(1),
     // owning project id
-    slug: z14.string().min(1).max(40).regex(/^[a-z0-9][a-z0-9-]*$/),
-    topic: z14.string().max(280).default("")
+    slug: z16.string().min(1).max(40).regex(/^[a-z0-9][a-z0-9-]*$/),
+    topic: z16.string().max(280).default("")
   }),
   // rename a room — slug and/or topic. Safe because a channel is identified by its
   // id, not its slug (everything refs the uuid); the slug is a per-project label.
-  z14.object({
-    type: z14.literal("channel.rename"),
-    channel: z14.string().min(1),
+  z16.object({
+    type: z16.literal("channel.rename"),
+    channel: z16.string().min(1),
     // channel id
-    slug: z14.string().min(1).max(40).regex(/^[a-z0-9][a-z0-9-]*$/).optional(),
-    topic: z14.string().max(280).optional()
+    slug: z16.string().min(1).max(40).regex(/^[a-z0-9][a-z0-9-]*$/).optional(),
+    topic: z16.string().max(280).optional()
   }),
   // set a room's threads mode (docs/03 §5, docs/20): 'on' (default) keeps task replies in
   // their threads (the channel reads as digests); 'off' widens the channel feed to show thread
   // traffic inline. A view lens, never a reroute — every message keeps its task_id.
-  z14.object({
-    type: z14.literal("channel.set_thread_mode"),
-    channel: z14.string().min(1),
+  z16.object({
+    type: z16.literal("channel.set_thread_mode"),
+    channel: z16.string().min(1),
     // channel id
-    mode: z14.enum(["on", "off"])
+    mode: z16.enum(["on", "off"])
   }),
   // what the room is for (docs/design/marketing-channel-2026-07): 'build' runs today's
   // chat + board; 'marketing' runs the growth HQ (Feed · Calendar · Library). A lens plus
   // a toolbelt, never a silo — ACL, FSM, and artifacts are untouched. Human-only: rooms
   // change trade by the settings Kind row or the one-time #marketing upgrade prompt.
-  z14.object({
-    type: z14.literal("channel.set_kind"),
-    channel: z14.string().min(1),
+  z16.object({
+    type: z16.literal("channel.set_kind"),
+    channel: z16.string().min(1),
     // channel id
-    kind: z14.enum(["build", "marketing"])
+    kind: z16.enum(["build", "marketing"])
   }),
   // permanently delete a room + everything in it (messages, tasks, history).
   // irreversible — the client gates it behind a type-the-slug confirmation.
-  z14.object({ type: z14.literal("channel.delete"), channel: z14.string().min(1) }),
+  z16.object({ type: z16.literal("channel.delete"), channel: z16.string().min(1) }),
   // schedules (marketing-channel plan §4.6): the generic "run X at time T" primitive. Arming
   // is human-only AND Cloud-gated — THE deep-funnel paywall moment (round 2); agents may only
   // propose (a card). 'once' carries its exact runAt; recurring carries local time + IANA tz
   // (+ weekday for weekly) and the server computes next_run_at via the shared cadence brain.
-  z14.object({
-    type: z14.literal("schedule.create"),
-    channel: z14.string().min(1),
+  z16.object({
+    type: z16.literal("schedule.create"),
+    channel: z16.string().min(1),
     // channel id
-    title: z14.string().trim().min(1).max(200),
-    prompt: z14.string().trim().min(1).max(4e3),
+    title: z16.string().trim().min(1).max(200),
+    prompt: z16.string().trim().min(1).max(4e3),
     // what the run asks the agent to do
-    cadence: z14.enum(["once", "daily", "weekdays", "weekly"]),
-    runAt: z14.string().datetime().optional(),
+    cadence: z16.enum(["once", "daily", "weekdays", "weekly"]),
+    runAt: z16.string().datetime().optional(),
     // once only
-    atTime: z14.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
+    atTime: z16.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
     // recurring, default 09:00
-    tz: z14.string().max(64).optional(),
+    tz: z16.string().max(64).optional(),
     // IANA, from the arming client
-    weekday: z14.number().int().min(0).max(6).optional(),
+    weekday: z16.number().int().min(0).max(6).optional(),
     // weekly only
-    agent: z14.string().min(1).optional(),
+    agent: z16.string().min(1).optional(),
     // agent name; defaults to the room's marketer at run time
     // A ROUTINE (the universal launcher) rather than a marketing content schedule. The two share
     // this table, and the firing path used to tell them apart by CHANNEL KIND — so a routine armed
     // in a marketing room silently took the drafting path and produced a scheduled-draft card
     // instead of its own conversation. The distinction belongs to the row, not to the room.
-    routine: z14.boolean().optional()
+    // THE ROUTINE WRITER (docs/design/routine-writer-2026-10): `thread` is the session rex wrote the routine
+    // in. The routine runs in it from now on, and the server posts the divider there. Implies `routine`.
+    routine: z16.boolean().optional(),
+    thread: z16.string().uuid().optional(),
+    replyGap: REPLY_GAP_FIELD.optional()
+    // the Replies part's queue gap
   }),
-  z14.object({ type: z14.literal("schedule.set_status"), schedule: z14.string().min(1), status: z14.enum(["active", "paused"]) }),
-  z14.object({ type: z14.literal("schedule.delete"), schedule: z14.string().min(1) }),
+  z16.object({ type: z16.literal("schedule.set_status"), schedule: z16.string().min(1), status: z16.enum(["active", "paused"]) }),
+  z16.object({ type: z16.literal("schedule.delete"), schedule: z16.string().min(1) }),
   // edit an armed schedule in place (round 20): title/prompt/cadence/time — next_run_at
   // recomputes from the same cadence brain create uses; run_count is untouched (this is an
   // edit, not a claim). HUMAN_ONLY like the rest of schedule management.
-  z14.object({
-    type: z14.literal("schedule.update"),
-    schedule: z14.string().min(1),
-    title: z14.string().trim().min(1).max(200),
-    prompt: z14.string().trim().min(1).max(4e3),
-    cadence: z14.enum(["once", "daily", "weekdays", "weekly"]),
-    runAt: z14.string().datetime().optional(),
+  z16.object({
+    type: z16.literal("schedule.update"),
+    schedule: z16.string().min(1),
+    title: z16.string().trim().min(1).max(200),
+    prompt: z16.string().trim().min(1).max(4e3),
+    cadence: z16.enum(["once", "daily", "weekdays", "weekly"]),
+    runAt: z16.string().datetime().optional(),
     // once only
-    atTime: z14.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
-    tz: z14.string().max(64).optional(),
-    weekday: z14.number().int().min(0).max(6).optional()
+    atTime: z16.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
+    tz: z16.string().max(64).optional(),
+    weekday: z16.number().int().min(0).max(6).optional(),
+    replyGap: REPLY_GAP_FIELD.nullable().optional()
+    // null: the routine drafts only
   }),
   // the verbs the daemon's schedule tick writes (claim_run · mark_result · set_cursor) ride
   // commands-schedule.ts, the commands-machine.ts shape: this file sits at its ratchet cap
   ...SCHEDULE_RUN_COMMANDS,
+  ...REPLY_COMMANDS,
+  ...MODEL_COMMANDS,
+  // the reply queue's verbs (command-union-replies.ts) · a person's model for an agent (command-union-models.ts)
   // content items (marketing-channel plan §4.7): agents DRAFT (create), humans PUBLISH —
   // approve is HUMAN_ONLY and is what puts an item on the clock; unschedule bounces it
   // back to draft. Actual posting is the server's publish pass once connectors land.
-  z14.object({
-    type: z14.literal("content.create"),
-    channel: z14.string().min(1),
+  z16.object({
+    type: z16.literal("content.create"),
+    channel: z16.string().min(1),
     // channel id
-    task: z14.string().min(1).optional(),
+    task: z16.string().min(1).optional(),
     // the content task (kind:'content') this draft delivers — renders inline in its thread
     // …or the CONVERSATION this draft was written in (0115). A social-post ask does not need a
     // board row, and before this the card could only exist on a task — which is why an agent
     // asked for drafts in a thread had to propose one. Either anchor renders the same card.
-    thread: z14.string().min(1).optional(),
-    platform: z14.enum(["x", "instagram", "linkedin", "tiktok", "email"]).default("x"),
-    body: z14.string().trim().min(1).max(1e4),
-    schedule: z14.string().min(1).optional(),
+    thread: z16.string().min(1).optional(),
+    platform: z16.enum(["x", "instagram", "linkedin", "tiktok", "email"]).default("x"),
+    body: z16.string().trim().min(1).max(1e4),
+    schedule: z16.string().min(1).optional(),
     // the schedule row this draft came from
     // the slot this draft is FOR (draft-ahead: the tick runs ~30min early; approve
     // keeps this time unless overridden, and the calendar places the draft chip on it)
-    slotAt: z14.string().datetime().optional(),
+    slotAt: z16.string().datetime().optional(),
     // the public image URL the post publishes with (REQUIRED by Instagram; optional context elsewhere)
-    mediaUrl: z14.string().url().max(2e3).optional(),
+    mediaUrl: z16.string().url().max(2e3).optional(),
     // the visual the marketer described. Kept OUT of the body (where it would publish verbatim
     // and break the character count) and stored beside the post — it is what the image generator
     // draws from, and what the card shows when generation didn't happen.
-    imageBrief: z14.string().trim().max(2e3).optional(),
+    imageBrief: z16.string().trim().max(2e3).optional(),
     // inline preview of the generated image: a downscaled data: URI that replicates with the
     // draft so the card shows the real picture (the 0048 chat-attachment precedent — thumbnail
     // travels, full bytes stay on the machine that made them). Bounded to protect the replica.
-    thumb: z14.string().startsWith("data:image/").max(2e5).optional(),
+    thumb: z16.string().startsWith("data:image/").max(2e5).optional(),
     // why a briefed draft has no image (generation failed / capped) — shown ON the card with a
     // Try-again, instead of the reason being buried in the marketer's summary message
-    imageError: z14.string().trim().max(600).optional(),
+    imageError: z16.string().trim().max(600).optional(),
     // a VIDEO post's creator script (the UGC round): the body is the caption that posts with the
     // video, the script is what the creator films. Kept in media.script, never in the body.
     // `frame`: the shelf image the film shows as the product (brand-grounding plan §6), by name. `seconds`: the film's length (video-rung plan §8), the human's pick on the angle card or their word; the door holds it inside the tier's range
-    script: z14.string().trim().min(1).max(1e4).optional(),
-    frame: z14.string().trim().min(1).max(200).optional(),
-    seconds: z14.number().int().min(1).max(60).optional()
+    script: z16.string().trim().min(1).max(1e4).optional(),
+    frame: z16.string().trim().min(1).max(200).optional(),
+    seconds: z16.number().int().min(1).max(60).optional()
   }),
   // the human tweaks a draft's text/media before approving (calendar preview edit) — never
   // a published item, and agents never rewrite what a human is reviewing. mediaUrl: a url
   // sets it, '' clears it, absent leaves it alone.
-  z14.object({ type: z14.literal("content.update"), item: z14.string().min(1), body: z14.string().trim().min(1).max(1e4), mediaUrl: z14.union([z14.string().url().max(2e3), z14.literal("")]).optional() }),
+  z16.object({ type: z16.literal("content.update"), item: z16.string().min(1), body: z16.string().trim().min(1).max(1e4), mediaUrl: z16.union([z16.string().url().max(2e3), z16.literal("")]).optional() }),
   // the MARKETER revises its own still-unpublished draft after a human requests a change (§4.5).
   // Editing a draft is still DRAFTING — "agents draft, humans publish" — so this is agent-allowed,
   // but ONLY while status='draft' (a scheduled/published item is the human's, enforced in the
   // handler). body updates the copy; imageBrief re-states the visual it wants (kept in media.brief,
   // the daemon regenerates + re-hosts separately via attach_media).
-  z14.object({
-    type: z14.literal("content.revise"),
-    item: z14.string().min(1),
-    body: z14.string().trim().min(1).max(1e4).optional(),
-    imageBrief: z14.string().trim().max(2e3).optional(),
-    script: z14.string().trim().min(1).max(1e4).optional(),
-    frame: z14.string().trim().max(200).nullable().optional(),
-    seconds: z14.number().int().min(1).max(60).nullable().optional(),
+  z16.object({
+    type: z16.literal("content.revise"),
+    item: z16.string().min(1),
+    body: z16.string().trim().min(1).max(1e4).optional(),
+    imageBrief: z16.string().trim().max(2e3).optional(),
+    script: z16.string().trim().min(1).max(1e4).optional(),
+    frame: z16.string().trim().max(200).nullable().optional(),
+    seconds: z16.number().int().min(1).max(60).nullable().optional(),
     // the film's facts (the video rung): what filmed it, for how long, at what price; the machine's own-key lane writes them, the server's lane writes them itself
-    videoMeta: z14.object({ tier: z14.string().max(40), model: z14.string().max(80), seconds: z14.number().int().min(1).max(60), credits: z14.number().int().min(0), at: z14.string().datetime(), frame: z14.string().max(200).nullable().optional(), frameUsed: z14.boolean().optional() }).optional(),
-    videoErrorCode: z14.enum(["NO_CREDITS", "UNAVAILABLE"]).nullable().optional(),
-    thumb: z14.string().startsWith("data:image/").max(2e5).optional(),
-    imageError: z14.union([z14.string().trim().max(600), z14.literal("")]).optional(),
-    videoError: z14.union([z14.string().trim().max(600), z14.literal("")]).optional()
+    videoMeta: z16.object({ tier: z16.string().max(40), model: z16.string().max(80), seconds: z16.number().int().min(1).max(60), credits: z16.number().int().min(0), at: z16.string().datetime(), frame: z16.string().max(200).nullable().optional(), frameUsed: z16.boolean().optional() }).optional(),
+    videoErrorCode: z16.enum(["NO_CREDITS", "UNAVAILABLE"]).nullable().optional(),
+    thumb: z16.string().startsWith("data:image/").max(2e5).optional(),
+    imageError: z16.union([z16.string().trim().max(600), z16.literal("")]).optional(),
+    videoError: z16.union([z16.string().trim().max(600), z16.literal("")]).optional()
   }),
   // host a draft's image so it can actually PUBLISH (0090). Every network takes media only as a
   // public URL someone else fetches — Meta pulls it directly, TikTok pulls it through our proxy,
   // X wants the bytes — so a picture generated on the user's machine has to land somewhere
   // fetchable. The bytes ride in as a data: URI and become /media/<id>, HMAC-gated.
   // a video rides the same lane (the UGC film, 2026-09-18): `data:video/mp4` bytes, one media per draft
-  z14.object({ type: z14.literal("content.attach_media"), item: z14.string().min(1), dataUrl: z14.string().regex(/^data:(?:image|video)\//).max(9e6) }),
+  z16.object({ type: z16.literal("content.attach_media"), item: z16.string().min(1), dataUrl: z16.string().regex(/^data:(?:image|video)\//).max(9e6) }),
   // remove a draft/scheduled item from the calendar entirely (published stays, it's history)
-  z14.object({ type: z14.literal("content.delete"), item: z14.string().min(1) }),
-  z14.object({
-    type: z14.literal("content.approve"),
-    item: z14.string().min(1),
-    scheduledAt: z14.string().datetime().optional()
+  z16.object({ type: z16.literal("content.delete"), item: z16.string().min(1) }),
+  z16.object({
+    type: z16.literal("content.approve"),
+    item: z16.string().min(1),
+    scheduledAt: z16.string().datetime().optional()
     // default: one hour out
   }),
-  z14.object({ type: z14.literal("content.unschedule"), item: z14.string().min(1) }),
+  z16.object({ type: z16.literal("content.unschedule"), item: z16.string().min(1) }),
+  // a draft with no conversation moves into the session its first picture ask opened (HUMAN_ONLY)
+  contentAnchorCommand,
   // connectors (marketing-channel plan §4.8): connecting is the OAuth round-trip (no command);
   // disconnecting is a human call — revokes the row and deletes the sealed secret.
-  z14.object({ type: z14.literal("connector.disconnect"), connector: z14.string().min(1) }),
+  z16.object({ type: z16.literal("connector.disconnect"), connector: z16.string().min(1) }),
   // a plain channel artifact (no task): the marketing bootstrap's conversational doc drops
   // (round 4 — the analysis is a CONVERSATION, not a task) and any future channel-scoped file.
-  z14.object({
-    type: z14.literal("artifact.create"),
-    channel: z14.string().min(1),
+  z16.object({
+    type: z16.literal("artifact.create"),
+    channel: z16.string().min(1),
     // channel id
-    kind: z14.enum(["doc", "file"]).default("doc"),
-    name: z14.string().trim().min(1).max(200),
-    inlineContent: z14.string().min(1).max(3e5),
-    mime: z14.string().max(100).optional(),
-    tags: z14.array(z14.string().trim().min(1).max(40)).max(8).optional()
+    kind: z16.enum(["doc", "file"]).default("doc"),
+    name: z16.string().trim().min(1).max(200),
+    inlineContent: z16.string().min(1).max(3e5),
+    mime: z16.string().max(100).optional(),
+    tags: z16.array(z16.string().trim().min(1).max(40)).max(8).optional()
     // tags e.g. ['brand'] — the rail filters on it
   }),
   // Whiteboards (docs/38). create is the AGENT door — a board born from a generation source
   // (mermaid for flow/sequence/class, or an element-skeleton JSON string; strings only — the
   // lowest common schema every runtime's tool layer speaks). Humans create boards through the
   // local-first row path (/v1/whiteboards), never this command.
-  z14.object({
-    type: z14.literal("whiteboard.create"),
-    channel: z14.string().min(1),
+  z16.object({
+    type: z16.literal("whiteboard.create"),
+    channel: z16.string().min(1),
     // channel id — the board's filing
-    threadId: z14.string().optional(),
+    threadId: z16.string().optional(),
     // provenance: the session that asked for it
-    taskId: z14.string().optional(),
+    taskId: z16.string().optional(),
     // provenance: the task it evidences
-    title: z14.string().trim().min(1).max(WB_TITLE_MAX),
-    mermaid: z14.string().min(1).max(WB_MERMAID_MAX).optional(),
-    elements: z14.string().min(1).max(WB_SCENE_MAX).optional()
+    title: z16.string().trim().min(1).max(WB_TITLE_MAX),
+    mermaid: z16.string().min(1).max(WB_MERMAID_MAX).optional(),
+    elements: z16.string().min(1).max(WB_SCENE_MAX).optional()
   }),
   // update is three shapes over one strict rev guard (baseRev must equal the board's rev, else
   // WHITEBOARD_STALE — the caller re-reads and reapplies): a new generation SOURCE (agent edit),
   // MATERIALIZE (the first desktop to render converts source → scene + snapshot and clears it),
   // or a TITLE-only rename. The LWW autosave path is /v1/whiteboards PATCH, not this command.
-  z14.object({
-    type: z14.literal("whiteboard.update"),
-    whiteboardId: z14.string().min(1),
-    baseRev: z14.number().int().min(1),
-    title: z14.string().trim().min(1).max(WB_TITLE_MAX).optional(),
-    mermaid: z14.string().min(1).max(WB_MERMAID_MAX).optional(),
-    elements: z14.string().min(1).max(WB_SCENE_MAX).optional(),
-    scene: z14.string().min(1).max(WB_SCENE_MAX).optional(),
-    snapshotSvg: z14.string().min(1).max(WB_SNAPSHOT_MAX).optional(),
-    clearSource: z14.boolean().optional()
+  z16.object({
+    type: z16.literal("whiteboard.update"),
+    whiteboardId: z16.string().min(1),
+    baseRev: z16.number().int().min(1),
+    title: z16.string().trim().min(1).max(WB_TITLE_MAX).optional(),
+    mermaid: z16.string().min(1).max(WB_MERMAID_MAX).optional(),
+    elements: z16.string().min(1).max(WB_SCENE_MAX).optional(),
+    scene: z16.string().min(1).max(WB_SCENE_MAX).optional(),
+    snapshotSvg: z16.string().min(1).max(WB_SNAPSHOT_MAX).optional(),
+    clearSource: z16.boolean().optional()
   }),
   // marketing HQ setup (marketing-channel plan §4.3): point the room at the product. Writes the
   // profile onto channels.marketing and fans out the bootstrap task ("Build the brand foundation")
   // through the ordinary task path, so triage/staffing take it from there. Human-only; FREE on
   // every plan by design (round 2) — the paywall sits on schedule.*/content.*, not the front door.
-  z14.object({
-    type: z14.literal("marketing.setup"),
-    channel: z14.string().min(1),
+  z16.object({
+    type: z16.literal("marketing.setup"),
+    channel: z16.string().min(1),
     // channel id
-    website: z14.string().trim().max(400).optional(),
-    focus: z14.array(z14.enum(["social", "content", "seo", "email", "ads"])).max(5).optional(),
-    goal: z14.string().trim().max(300).optional(),
+    website: z16.string().trim().max(400).optional(),
+    focus: z16.array(z16.enum(["social", "content", "seo", "email", "ads"])).max(5).optional(),
+    goal: z16.string().trim().max(300).optional(),
     // the human's stated aim, in their words
     // step 5, release drafts (docs/design/release-drafts-2026-09 §4.7): the repository to watch,
     // draft the latest release now (a free one-shot), watch daily (a Team routine)
@@ -18143,71 +19336,71 @@ var CommandSchema = z14.discriminatedUnion("type", [
   // flip one marketing MCP integration on the room (marketing.mcp.<provider>) — the daemon
   // attaches the enabled servers to marketer research runs with MACHINE-LOCAL creds
   // (integrations-and-skills-plan.md: read paths local, publish custody stays ours)
-  z14.object({
-    type: z14.literal("marketing.set_integration"),
-    channel: z14.string().min(1),
+  z16.object({
+    type: z16.literal("marketing.set_integration"),
+    channel: z16.string().min(1),
     // channel id
-    provider: z14.enum(["posthog", "x", "meta", "tiktok"]),
-    enabled: z14.boolean()
+    provider: z16.enum(["posthog", "x", "meta", "tiktok"]),
+    enabled: z16.boolean()
   }),
   // one answered SETUP-FLOW step (shared/setupflows.ts), written as it lands — what makes an
   // abandoned wizard resumable. flow/step must name a registered flow; the value's shape is
   // checked against the step in the handler (a website string vs a focus array). Human-only:
   // setup is the human's checklist by construction, like the flow's completing command.
-  z14.object({
-    type: z14.literal("setup.step"),
-    channel: z14.string().min(1),
+  z16.object({
+    type: z16.literal("setup.step"),
+    channel: z16.string().min(1),
     // channel id
-    flow: z14.string().min(1),
+    flow: z16.string().min(1),
     // the registered flow id, e.g. 'marketing.v1'
-    step: z14.string().min(1),
+    step: z16.string().min(1),
     // a step id of that flow
-    value: z14.union([z14.string().trim().max(400), z14.array(z14.string().trim().max(40)).max(8), SETUP_RELEASES_VALUE]).optional()
+    value: z16.union([z16.string().trim().max(400), z16.array(z16.string().trim().max(40)).max(8), SETUP_RELEASES_VALUE]).optional()
   }),
   // release-day backfill (idempotent, daemon boot): setup tasks for flow-bearing rooms that
   // predate setup flows and were never configured. Returns how many were created.
-  z14.object({ type: z14.literal("setup.backfill"), workspace: z14.string().min(1) }),
+  z16.object({ type: z16.literal("setup.backfill"), workspace: z16.string().min(1) }),
   // add / remove an agent's membership in a channel (the agent_channels row). Agents are
   // workspace-scoped but only see a channel's context once added here — humans (the live-panel
   // "+") or the orchestrator (the "add @agent to #channel?" card). agent = id or name; channel = id or slug.
-  z14.object({ type: z14.literal("channel.add_agent"), workspace: z14.string().min(1), channel: z14.string().min(1), agent: z14.string().min(1) }),
-  z14.object({ type: z14.literal("channel.remove_agent"), workspace: z14.string().min(1), channel: z14.string().min(1), agent: z14.string().min(1) }),
+  z16.object({ type: z16.literal("channel.add_agent"), workspace: z16.string().min(1), channel: z16.string().min(1), agent: z16.string().min(1) }),
+  z16.object({ type: z16.literal("channel.remove_agent"), workspace: z16.string().min(1), channel: z16.string().min(1), agent: z16.string().min(1) }),
   // channel people roster (0094): which humans the room's rail lists. `person` is an
   // nm_users id. A ROSTER, not an ACL — membership here grants nothing and gates nothing.
-  z14.object({ type: z14.literal("channel.add_person"), workspace: z14.string().min(1), channel: z14.string().min(1), person: z14.string().min(1) }),
-  z14.object({ type: z14.literal("channel.remove_person"), workspace: z14.string().min(1), channel: z14.string().min(1), person: z14.string().min(1) }),
+  z16.object({ type: z16.literal("channel.add_person"), workspace: z16.string().min(1), channel: z16.string().min(1), person: z16.string().min(1) }),
+  z16.object({ type: z16.literal("channel.remove_person"), workspace: z16.string().min(1), channel: z16.string().min(1), person: z16.string().min(1) }),
   // pin/unpin a channel message so it stands out and can be found later
   messagePinCommand,
   // Card revisions (reply-radar): a card whose state lives in its body is rewritten IN PLACE,
   // never re-posted beside itself; the handler requires the new body to still carry a fence.
-  z14.object({ type: z14.literal("message.revise_card"), message: z14.string().min(1), body: z14.string().min(1).max(6e4) }),
+  z16.object({ type: z16.literal("message.revise_card"), message: z16.string().min(1), body: z16.string().min(1).max(6e4) }),
   // decisions (docs/12 slice 2): answer/dismiss an agent's nmq card — human-only, exactly-once
   decisionAnswerCommand,
   decisionDismissCommand,
-  z14.object({ type: z14.literal("project.archive"), project: z14.string().min(1) }),
-  z14.object({ type: z14.literal("project.unarchive"), project: z14.string().min(1) }),
+  z16.object({ type: z16.literal("project.archive"), project: z16.string().min(1) }),
+  z16.object({ type: z16.literal("project.unarchive"), project: z16.string().min(1) }),
   // permanently delete an ARCHIVED project + everything in it (rooms, tasks, messages, history).
   // irreversible — the client gates it behind a type-the-slug confirmation.
-  z14.object({ type: z14.literal("project.delete"), project: z14.string().min(1) }),
-  z14.object({
-    type: z14.literal("credential.set"),
-    workspace: z14.string().min(1),
-    provider: z14.string().min(1).default("anthropic"),
-    scope: z14.enum(["workspace", "agent"]),
-    agentId: z14.string().min(1).optional(),
+  z16.object({ type: z16.literal("project.delete"), project: z16.string().min(1) }),
+  z16.object({
+    type: z16.literal("credential.set"),
+    workspace: z16.string().min(1),
+    provider: z16.string().min(1).default("anthropic"),
+    scope: z16.enum(["workspace", "agent"]),
+    agentId: z16.string().min(1).optional(),
     // token is required for apikey mode (validated in the handler). In subscription mode the
     // login lives in the provider CLI, so a token is optional there — but if supplied it's kept
     // as the FAILOVER key (used only when the subscription is down and Auto failover is on).
-    token: z14.string().min(8).optional(),
-    authMode: z14.enum(["apikey", "subscription"]).default("apikey")
+    token: z16.string().min(8).optional(),
+    authMode: z16.enum(["apikey", "subscription"]).default("apikey")
   }),
   // a member edits their OWN profile — the display name shown on their messages and
   // in the channel/people lists. The handler scopes the write to actor.id, so a
   // member can only ever change their own row (no target user id is accepted).
-  z14.object({
-    type: z14.literal("member.update_profile"),
-    workspace: z14.string().min(1),
-    displayName: z14.string().trim().min(1).max(60)
+  z16.object({
+    type: z16.literal("member.update_profile"),
+    workspace: z16.string().min(1),
+    displayName: z16.string().trim().min(1).max(60)
   })
 ]);
 
@@ -18238,9 +19431,9 @@ async function claimAnnouncement(store2, ann, actor, workspace, row) {
 ${releaseDigest(row.repo, scan, { since: null, checkedAt: "on the site" })}` : `Release drafts \xB7 ${tag} \xB7 ${row.repo}
 
 Drafted at neuramesh.app/announce.`;
-  const post = (text) => store2.postMessage(
-    { id: crypto.randomUUID(), workspace, channel: channelId, taskId: null, threadId, author: { kind: actor.kind, id: actor.id }, body: text, createdAt: (/* @__PURE__ */ new Date()).toISOString(), threadOrigin: null },
-    createEvent({ type: "message.posted", source: formatAddress({ kind: actor.kind, id: actor.id }), target: `channel/${channelId}`, workspace, payload: { preview: text.slice(0, 120) } })
+  const post = (text2) => store2.postMessage(
+    { id: crypto.randomUUID(), workspace, channel: channelId, taskId: null, threadId, author: { kind: actor.kind, id: actor.id }, body: text2, createdAt: (/* @__PURE__ */ new Date()).toISOString(), threadOrigin: null },
+    createEvent({ type: "message.posted", source: formatAddress({ kind: actor.kind, id: actor.id }), target: `channel/${channelId}`, workspace, payload: { preview: text2.slice(0, 120) } })
   );
   await post(body);
   if (row.brief) {
@@ -18260,7 +19453,7 @@ Drafted at neuramesh.app/announce.`;
 }
 
 // src/github-connect.ts
-import { z as z15 } from "zod";
+import { z as z17 } from "zod";
 
 // src/github-reads.ts
 var FILE_TEXT_CAP = 6e4;
@@ -18285,8 +19478,8 @@ async function readRepoFile(slug, path, ref, opts) {
   if (size > FILE_SIZE_CAP || b2.encoding !== "base64" || typeof b2.content !== "string") throw new GitHubApiError(`${p2} is larger than 1 MB: read a smaller file`, 413);
   const buf = Buffer.from(b2.content.replace(/\n/g, ""), "base64");
   if (looksBinary(buf)) throw new GitHubApiError(`${p2} is a binary file`, 415);
-  const text = buf.toString("utf8");
-  return { path: p2, ref, size, sha: b2.sha ?? "", content: text.length > FILE_TEXT_CAP ? text.slice(0, FILE_TEXT_CAP) : text, truncated: text.length > FILE_TEXT_CAP };
+  const text2 = buf.toString("utf8");
+  return { path: p2, ref, size, sha: b2.sha ?? "", content: text2.length > FILE_TEXT_CAP ? text2.slice(0, FILE_TEXT_CAP) : text2, truncated: text2.length > FILE_TEXT_CAP };
 }
 async function readRepoTree(slug, path, ref, opts) {
   const p2 = cleanPath(path);
@@ -18546,7 +19739,7 @@ function githubApiRoutes(app, store2, opts = {}) {
   app.post("/v1/github/resolve", async (c) => {
     const actor = c.get("actor");
     if (actor.kind !== "human") return c.json({ error: "a person connects GitHub", code: "HUMAN_ONLY" }, 403);
-    const body = z15.object({ channel: z15.string().min(1), repo: z15.string().min(1).optional() }).safeParse(await c.req.json().catch(() => null));
+    const body = z17.object({ channel: z17.string().min(1), repo: z17.string().min(1).optional() }).safeParse(await c.req.json().catch(() => null));
     if (!body.success) return c.json({ error: "invalid body", code: "INVALID_INPUT" }, 400);
     if (!githubAppConfigured() || !ann()) return c.json({ ok: false, code: "NOT_CONFIGURED", error: "GitHub connecting is not configured on this server." });
     const { workspace } = await store2.channelWorkspace(body.data.channel).catch(() => ({ workspace: null }));
@@ -18633,8 +19826,8 @@ var maskEmail = (e) => {
   const [u = "", d = ""] = e.split("@");
   return `${u.slice(0, 1)}\u2022\u2022\u2022@${d}`;
 };
-var CreateSchema = z16.object({ repo: z16.string().min(3).max(200), tag: z16.string().max(120).nullable().optional(), website: z16.string().trim().min(3).max(400), email: z16.string().trim().max(200) });
-var DetectSchema = z16.object({ repo: z16.string().min(3).max(200) });
+var CreateSchema = z18.object({ repo: z18.string().min(3).max(200), tag: z18.string().max(120).nullable().optional(), website: z18.string().trim().min(3).max(400), email: z18.string().trim().max(200) });
+var DetectSchema = z18.object({ repo: z18.string().min(3).max(200) });
 async function latestOf(slug, token, fetchFn) {
   const rel = await githubGet(`/repos/${slug}/releases?per_page=5`, { token, fetchFn });
   const rows2 = rel.status === 200 && Array.isArray(rel.json) ? rel.json : [];
@@ -18770,7 +19963,7 @@ function announceClaimRoute(app, store2, opts = {}) {
     if (!ann) return c.json({ error: "announcements not served by this store" }, 501);
     const actor = c.get("actor");
     if (actor.kind !== "human") return c.json({ error: "a person claims a draft set", code: "HUMAN_ONLY" }, 403);
-    const body = z16.object({ workspace: z16.string().min(1) }).safeParse(await c.req.json().catch(() => null));
+    const body = z18.object({ workspace: z18.string().min(1) }).safeParse(await c.req.json().catch(() => null));
     if (!body.success) return c.json({ error: "invalid body" }, 400);
     if (!await actorInWorkspace(store2, actor, body.data.workspace)) return c.json({ error: "not your workspace", code: "NOT_PERMITTED" }, 403);
     const row = await ann.get(c.req.param("id"));
@@ -18784,10 +19977,10 @@ function announceClaimRoute(app, store2, opts = {}) {
 
 // src/relay.ts
 import { timingSafeEqual as timingSafeEqual5 } from "node:crypto";
-import { z as z17 } from "zod";
-var ValidateMachineSchema = z17.object({ token: z17.string().min(1) });
-var ValidateClientSchema = z17.object({ clerkToken: z17.string().min(1), machineId: z17.string().uuid() });
-var DevRelayUserSchema = z17.string().uuid();
+import { z as z19 } from "zod";
+var ValidateMachineSchema = z19.object({ token: z19.string().min(1) });
+var ValidateClientSchema = z19.object({ clerkToken: z19.string().min(1), machineId: z19.string().uuid() });
+var DevRelayUserSchema = z19.string().uuid();
 function devRelayUser(token) {
   if (process.env["NM_ALLOW_DEV_RELAY"] !== "1") return null;
   const expected = process.env["NM_DEV_RELAY_TOKEN"];
@@ -18971,7 +20164,7 @@ function meRoute(app, store2) {
 
 // src/app.ts
 import { cors as cors2 } from "hono/cors";
-import { z as z20 } from "zod";
+import { z as z22 } from "zod";
 
 // src/fleet-lifecycle.ts
 init_src();
@@ -19363,7 +20556,7 @@ function exportRoutes(app, store2) {
 
 // src/import.ts
 init_src();
-import { z as z18 } from "zod";
+import { z as z20 } from "zod";
 
 // src/import-batch.ts
 init_src();
@@ -19540,26 +20733,26 @@ async function slugMapOf(sql, ws, table, ids, sent) {
 
 // src/import.ts
 var UUID3 = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-var uuid = z18.string().uuid();
+var uuid = z20.string().uuid();
 var PRO_REFUSAL = "This workspace needs Pro. Get Pro to migrate a workspace into it.";
 var STORAGE_REFUSAL = "Not enough storage on this plan. Delete files in this workspace, or migrate a smaller workspace.";
 var SIZE_REFUSAL = "The batch is over 4 MB. Send smaller batches.";
-var ManifestSchema = z18.object({
-  format: z18.literal(EXPORT_FORMAT),
-  version: z18.literal(EXPORT_VERSION),
-  workspace: z18.object({ id: z18.string(), name: z18.string(), slug: z18.string() }),
-  exportedAt: z18.string(),
-  counts: z18.record(z18.number().int().min(0))
+var ManifestSchema = z20.object({
+  format: z20.literal(EXPORT_FORMAT),
+  version: z20.literal(EXPORT_VERSION),
+  workspace: z20.object({ id: z20.string(), name: z20.string(), slug: z20.string() }),
+  exportedAt: z20.string(),
+  counts: z20.record(z20.number().int().min(0))
 });
-var ImportBatchSchema = z18.object({
+var ImportBatchSchema = z20.object({
   importId: uuid,
-  seq: z18.number().int().min(0),
-  table: z18.enum(EXPORT_TABLES),
-  rows: z18.array(z18.object({ id: uuid }).passthrough()),
-  first: z18.object({ manifest: ManifestSchema, totalBytes: z18.number().int().min(0) }).optional(),
-  links: z18.literal(true).optional(),
-  idMap: z18.record(uuid, uuid).optional(),
-  last: z18.literal(true).optional()
+  seq: z20.number().int().min(0),
+  table: z20.enum(EXPORT_TABLES),
+  rows: z20.array(z20.object({ id: uuid }).passthrough()),
+  first: z20.object({ manifest: ManifestSchema, totalBytes: z20.number().int().min(0) }).optional(),
+  links: z20.literal(true).optional(),
+  idMap: z20.record(uuid, uuid).optional(),
+  last: z20.literal(true).optional()
 }).superRefine((b2, ctx) => {
   if (b2.first && (b2.seq !== 0 || b2.rows.length)) ctx.addIssue({ code: "custom", message: "The opening batch has seq 0 and no rows." });
   if (b2.links && !lateKeys(b2.table).length) ctx.addIssue({ code: "custom", message: `${b2.table} has no link pass.` });
@@ -19591,11 +20784,11 @@ function importRoutes(app, store2) {
     if (!me) return c.json({ error: "Only the workspace owner can migrate a workspace into it.", code: "NOT_PERMITTED" }, 403);
     const plan = me["plan"] ?? "free";
     if (plan !== "cloud") return c.json({ error: PRO_REFUSAL, code: "PLAN_LIMIT" }, 402);
-    const text = await c.req.text();
-    if (Buffer.byteLength(text, "utf8") > IMPORT_BATCH_MAX_BYTES) return c.json({ error: SIZE_REFUSAL, code: "IMPORT_TOO_LARGE" }, 413);
+    const text2 = await c.req.text();
+    if (Buffer.byteLength(text2, "utf8") > IMPORT_BATCH_MAX_BYTES) return c.json({ error: SIZE_REFUSAL, code: "IMPORT_TOO_LARGE" }, 413);
     let raw = null;
     try {
-      raw = JSON.parse(text);
+      raw = JSON.parse(text2);
     } catch {
       raw = null;
     }
@@ -19628,9 +20821,71 @@ function contentMediaRoute(app, store2) {
   });
 }
 
+// src/web-frame.ts
+function sourceAllows(src, origin) {
+  const s = src.toLowerCase();
+  if (s === "*") return true;
+  if (/^[a-z][a-z0-9+.-]*:$/.test(s)) return s === origin.protocol;
+  const m = /^(?:([a-z][a-z0-9+.-]*):\/\/)?(\*\.)?([^/:\s]+)(?::(\d+|\*))?/.exec(s);
+  if (!m || s.startsWith("'")) return false;
+  const [, scheme, wild, host = "", port] = m;
+  if (scheme && `${scheme}:` !== origin.protocol) return false;
+  if (!(wild ? origin.hostname.endsWith(`.${host}`) : origin.hostname === host)) return false;
+  const ours = origin.port || (origin.protocol === "https:" ? "443" : "80");
+  return !port || port === "*" || port === ours;
+}
+function frameVerdict(headers2, origin) {
+  const corp = headers2.get("cross-origin-resource-policy")?.trim().toLowerCase() || null;
+  let at;
+  try {
+    at = new URL(origin);
+  } catch {
+    return { frameable: false, reason: "bad-url", corp };
+  }
+  const directive = (headers2.get("content-security-policy") ?? "").split(/[,;]/).map((d) => d.trim()).find((d) => /^frame-ancestors(\s|$)/i.test(d));
+  if (directive) {
+    const sources = directive.split(/\s+/).slice(1);
+    return sources.some((src) => sourceAllows(src, at)) ? { frameable: true, corp } : { frameable: false, reason: "frame-ancestors", corp };
+  }
+  const xfo = headers2.get("x-frame-options")?.trim().toLowerCase() ?? "";
+  if (xfo === "deny" || xfo === "sameorigin") return { frameable: false, reason: "x-frame-options", corp };
+  return { frameable: true, corp };
+}
+var TTL_MS = 10 * 6e4;
+var cache = /* @__PURE__ */ new Map();
+async function checkFrame(raw, origin, fetchFn = fetch, now = Date.now()) {
+  let url;
+  try {
+    url = normalizeSiteUrl(raw);
+  } catch {
+    return { frameable: false, reason: "bad-url" };
+  }
+  const key2 = `${url.host}|${origin}`;
+  const hit = cache.get(key2);
+  if (hit && now - hit.at < TTL_MS) return hit.verdict;
+  let verdict;
+  try {
+    const { res } = await fetchPublic(url, fetchFn, AbortSignal.timeout(6e3), "text/html,*/*;q=0.8");
+    await res.body?.cancel().catch(() => void 0);
+    verdict = frameVerdict(res.headers, origin);
+  } catch {
+    verdict = { frameable: true, reason: "unreachable" };
+  }
+  cache.set(key2, { at: now, verdict });
+  return verdict;
+}
+function webFrameRoute(app) {
+  app.get("/v1/web/frame", async (c) => {
+    const url = c.req.query("url") ?? "";
+    const origin = c.req.query("origin") ?? "";
+    if (!url || !origin) return c.json({ error: "url and origin are required", code: "INVALID_INPUT" }, 400);
+    return c.json(await checkFrame(url, origin));
+  });
+}
+
 // src/starter-video.ts
 init_src();
-import { z as z19 } from "zod";
+import { z as z21 } from "zod";
 
 // src/fal.ts
 var FAL_QUEUE = "https://queue.fal.run";
@@ -19785,7 +21040,7 @@ async function composeShots(key2, clipUrl, seconds, shots, opts = {}) {
 var FILM_MAX_BYTES = 4e7;
 var filmTimeoutMs = (seconds) => Math.max(12 * 6e4, seconds * 4e4);
 var SYSTEM = { kind: "agent", id: "00000000-0000-0000-0000-000000000000" };
-var FilmSchema = z19.object({ workspace: z19.string().uuid(), item: z19.string().uuid(), prompt: z19.string().min(8).max(2e3) });
+var FilmSchema = z21.object({ workspace: z21.string().uuid(), item: z21.string().uuid(), prompt: z21.string().min(8).max(2e3) });
 var tierView = (t2) => ({ tier: t2.tier, label: t2.label, model: t2.model.label, vendor: t2.model.vendor, seconds: t2.seconds, credits: t2.credits, lengths: t2.lengths, perSecondMicros: t2.model.perSecondMicros });
 function starterVideoRoutes(app, store2, opts = {}) {
   const ledger = opts.ledger === void 0 ? ledgerFor(store2) : opts.ledger;
@@ -20005,6 +21260,23 @@ var PushService = class {
     });
   }
   /**
+   * THE REPLY REMINDER (the reply queue, models-and-replies round): one queued reply's time came. Only
+   * its member is told, once (the key holds a week), and the tap opens X's reply box with the text in it
+   * (`url` in the data; the phone opens it straight, deeplink.ts).
+   */
+  async notifyReplyDue(r) {
+    await this.dispatch({
+      workspace: r.workspaceId,
+      excludeUserId: "",
+      recipients: [r.memberId],
+      dedupeKey: `reply-due:${r.id}`,
+      windowMs: 7 * 24 * 36e5,
+      title: r.words.title,
+      body: r.words.body,
+      data: { kind: "reply", url: r.openUrl, reminderId: r.id, threadId: r.threadId, workspace: r.workspaceId }
+    });
+  }
+  /**
    * The routine's ONE notification (2026-08-19): the run finished — no gate, no ask. The human
    * opens the thread to read what it produced; nothing is waiting on them.
    */
@@ -20024,6 +21296,7 @@ var PushService = class {
     if (msg2.authorKind !== "agent") return;
     if (!parseCard(msg2.body)) return;
     if (isLowRiskPermissionCard(msg2.body)) return;
+    if (parseAuthCard(msg2.body)?.switched) return;
     const notif = cardNotification(msg2.body, where);
     if (!notif) return;
     await this.dispatch({
@@ -20118,79 +21391,82 @@ function expoFetchSender(accessToken) {
 }
 
 // src/app.ts
-var MessageInputSchema = z20.object({
+var MessageInputSchema = z22.object({
   // Client-supplied id keeps optimistic local rows identical to server rows
   // (PowerSync echo-back would otherwise duplicate-then-swap them).
-  id: z20.string().uuid().optional(),
-  workspace: z20.string().min(1),
-  channel: z20.string().min(1),
+  id: z22.string().uuid().optional(),
+  workspace: z22.string().min(1),
+  channel: z22.string().min(1),
   // may be empty when the message carries only attachments (no caption)
-  body: z20.string(),
-  taskId: z20.string().min(1).optional(),
+  body: z22.string(),
+  taskId: z22.string().min(1).optional(),
   // the conversation thread this message belongs to (conversation-first shell). A
   // fresh client-generated id births the thread transactionally with the message.
-  threadId: z20.string().uuid().optional(),
+  threadId: z22.string().uuid().optional(),
   // docs/34: the composer's Tasks toggle, applied ONLY when this send births the thread.
   // A later message carrying it is ignored — the mode is the thread's, and changing it is
   // thread.set_mode (human-only), never a side effect of typing.
-  threadMode: z20.enum(["tasks", "chat"]).optional(),
+  threadMode: z22.enum(["tasks", "chat"]).optional(),
   // docs/10 §15: the composer's brain draft, applied ONLY when this send births the thread —
   // the same birth-time contract as threadMode above, and for the same reason. Moving it
   // afterwards is thread.set_brain (human-only), never a side effect of typing.
-  brainOverride: z20.record(z20.string(), z20.string()).nullable().optional(),
+  brainOverride: z22.record(z22.string(), z22.string()).nullable().optional(),
   // docs/31: when this send BIRTHS a thread, the room message it hangs off. The root is
   // referenced, never moved — it keeps its place in the feed and grows a replies footer.
-  rootMessageId: z20.string().uuid().optional(),
+  rootMessageId: z22.string().uuid().optional(),
   // 0119: the automation whose slot fired this send, applied ONLY when it births the thread —
   // the same birth-time contract as threadMode/brainOverride. It is what lets the Automations
   // card list a routine's runs without pattern-matching the marker in its opening line.
-  scheduleId: z20.string().uuid().optional(),
+  scheduleId: z22.string().uuid().optional(),
   // 0134, rule D9: WHERE the session runs and WHICH client bore it, applied ONLY when this send
   // births the thread — the same birth-time contract as the three above. Moving the machine
   // afterwards is thread.set_machine (human-only); the origin never moves.
   // 0144, coding threads: the kind this send births the thread with — `coding` when the composer's
   // repo chip was set, so the coding runtime works on that repository in it. Birth-only, like the
   // rest; moving it afterwards is thread.set_kind (a human, or the room's orchestrator at triage).
-  threadMachineId: z20.string().uuid().nullable().optional(),
-  threadOrigin: z20.enum(["desktop", "web", "routine"]).optional(),
-  threadKind: z20.enum(["chat", "coding"]).optional(),
+  threadMachineId: z22.string().uuid().nullable().optional(),
+  threadOrigin: z22.enum(["desktop", "web", "routine"]).optional(),
+  threadKind: z22.enum(["chat", "coding"]).optional(),
   // the message this reply ANSWERS (agent wake replies) — the server enforces one
   // reply per (agent, trigger) so concurrent daemons can't double-reply (0060).
-  replyTo: z20.string().uuid().optional()
+  replyTo: z22.string().uuid().optional(),
+  // the routine writer: set by propose_routine and offer_routine_session only, never by an agent's words. An
+  // agent's routine card without it is dropped (routineCardGuard), so the tools' checks cannot be skipped
+  routineCard: z22.literal(true).optional()
 });
-var ArtifactCreateSchema = z20.object({
-  id: z20.string().uuid(),
-  workspace: z20.string().min(1),
-  channel: z20.string().min(1),
-  taskId: z20.string().min(1).optional(),
-  messageId: z20.string().uuid(),
-  kind: z20.enum(["screenshot", "file", "doc", "diff", "test_report"]).default("file"),
-  name: z20.string().min(1).max(512),
-  mime: z20.string().max(255).optional(),
-  inlineContent: z20.string().max(4e5).optional(),
-  sizeBytes: z20.number().int().nonnegative().optional(),
-  width: z20.number().int().positive().optional(),
-  height: z20.number().int().positive().optional()
+var ArtifactCreateSchema = z22.object({
+  id: z22.string().uuid(),
+  workspace: z22.string().min(1),
+  channel: z22.string().min(1),
+  taskId: z22.string().min(1).optional(),
+  messageId: z22.string().uuid(),
+  kind: z22.enum(["screenshot", "file", "doc", "diff", "test_report"]).default("file"),
+  name: z22.string().min(1).max(512),
+  mime: z22.string().max(255).optional(),
+  inlineContent: z22.string().max(4e5).optional(),
+  sizeBytes: z22.number().int().nonnegative().optional(),
+  width: z22.number().int().positive().optional(),
+  height: z22.number().int().positive().optional()
 });
-var WhiteboardPutSchema = z20.object({
-  id: z20.string().uuid(),
-  workspace: z20.string().min(1),
-  channel: z20.string().min(1),
-  threadId: z20.string().uuid().optional(),
-  taskId: z20.string().optional(),
-  title: z20.string().trim().min(1).max(WB_TITLE_MAX).catch("Untitled board"),
-  scene: z20.string().max(WB_SCENE_MAX).optional(),
-  snapshotSvg: z20.string().max(WB_SNAPSHOT_MAX).optional(),
-  snapshotRev: z20.number().int().nonnegative().optional(),
-  rev: z20.number().int().min(1).default(1)
+var WhiteboardPutSchema = z22.object({
+  id: z22.string().uuid(),
+  workspace: z22.string().min(1),
+  channel: z22.string().min(1),
+  threadId: z22.string().uuid().optional(),
+  taskId: z22.string().optional(),
+  title: z22.string().trim().min(1).max(WB_TITLE_MAX).catch("Untitled board"),
+  scene: z22.string().max(WB_SCENE_MAX).optional(),
+  snapshotSvg: z22.string().max(WB_SNAPSHOT_MAX).optional(),
+  snapshotRev: z22.number().int().nonnegative().optional(),
+  rev: z22.number().int().min(1).default(1)
 });
-var WhiteboardPatchSchema = z20.object({
-  rev: z20.number().int().min(1),
-  title: z20.string().trim().min(1).max(WB_TITLE_MAX).optional(),
-  scene: z20.string().max(WB_SCENE_MAX).optional(),
-  snapshotSvg: z20.string().max(WB_SNAPSHOT_MAX).optional(),
-  snapshotRev: z20.number().int().nonnegative().optional(),
-  archivedAt: z20.string().nullable().optional()
+var WhiteboardPatchSchema = z22.object({
+  rev: z22.number().int().min(1),
+  title: z22.string().trim().min(1).max(WB_TITLE_MAX).optional(),
+  scene: z22.string().max(WB_SCENE_MAX).optional(),
+  snapshotSvg: z22.string().max(WB_SNAPSHOT_MAX).optional(),
+  snapshotRev: z22.number().int().nonnegative().optional(),
+  archivedAt: z22.string().nullable().optional()
 });
 var webOrigin = (origin) => origin === "https://neuramesh.app" || origin === "https://www.neuramesh.app" || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin) ? origin : null;
 function createApp(store2, opts = {}) {
@@ -20487,6 +21763,7 @@ function createApp(store2, opts = {}) {
   importRoutes(app, store2);
   announceClaimRoute(app, store2, opts.announce);
   contentMediaRoute(app, store2);
+  webFrameRoute(app);
   starterVideoRoutes(app, store2, opts.starterVideo);
   app.post("/v1/commands", async (c) => {
     const body = await c.req.json().catch(() => null);
@@ -20513,17 +21790,21 @@ function createApp(store2, opts = {}) {
       return c.json({ error: "x is not configured on this server", code: "NOT_CONFIGURED" }, 501);
     }
     const channel = c.req.query("channel") ?? null;
-    const max = Math.min(25, Math.max(10, Number(c.req.query("max") ?? 10) || 10));
-    const out = await xSearchOnConnector(store2, workspace, channel, q, max);
+    const max = Math.min(100, Math.max(10, Number(c.req.query("max") ?? 25) || 25));
+    const order = c.req.query("order") === "latest" ? "latest" : "top";
+    const hours = Number(c.req.query("hours")) || 0;
+    const out = await xSearchOnConnector(store2, workspace, channel, q, max, void 0, { order, ...hours > 0 ? { hours } : {} });
     if (!out.ok) return c.json({ error: out.error, code: out.code }, out.code === "X_ERROR" ? 502 : 409);
-    return c.json({ query: q, hits: out.hits });
+    return c.json({ query: q, order, hits: out.hits });
   });
   app.post("/v1/messages", async (c) => {
     const body = await c.req.json().catch(() => null);
     const parsed = MessageInputSchema.safeParse(body);
     if (!parsed.success) return c.json({ error: "invalid message", issues: parsed.error.issues }, 400);
     const actor = c.get("actor");
-    const styledBody = actor.kind === "agent" ? await store2.getCommRules(parsed.data.workspace).then((r) => commRulesFrom(r).noEmdash ? scrubEmdash(parsed.data.body) : parsed.data.body).catch(() => parsed.data.body) : parsed.data.body;
+    const said = actor.kind === "agent" ? routineCardGuard(repairCardFences(parsed.data.body), parsed.data.routineCard === true) : parsed.data.body;
+    if (!said.trim() && parsed.data.body.trim()) return c.json({ error: "a routine card comes only from propose_routine", code: "INVALID_INPUT" }, 422);
+    const styledBody = actor.kind === "agent" ? await store2.getCommRules(parsed.data.workspace).then((r) => commRulesFrom(r).noEmdash ? scrubEmdash(said) : said).catch(() => said) : said;
     const msg2 = {
       id: parsed.data.id ?? crypto.randomUUID(),
       workspace: parsed.data.workspace,
@@ -20570,6 +21851,8 @@ function createApp(store2, opts = {}) {
     }));
     const auth = actor.kind === "agent" && !inChatThread ? parseAuthCard(styledBody) : null;
     if (auth && !auth.switched) decisions.push({ id: crypto.randomUUID(), question: authDecisionQuestion(auth), options: [], allowOther: true });
+    const routineQ = actor.kind === "agent" && !inChatThread && msg2.threadId && styledBody.includes("```nmroutine") ? routineDecisionQuestion(styledBody, !!(await store2.threadFiling(msg2.workspace, msg2.threadId))?.scheduleId) : null;
+    if (routineQ) decisions.push({ id: crypto.randomUUID(), question: routineQ, options: [], allowOther: true });
     try {
       if (actor.kind === "human" && msg2.taskId) {
         for (const [question, answer] of readAnswers([msg2.body])) {
@@ -21028,10 +22311,10 @@ async function refreshBundledPack(sql, workspaceId, channelId, packId2, entry, v
 
 // src/retro-queries.ts
 var DAY3 = 864e5;
-var iso = (ms) => new Date(ms).toISOString();
+var iso2 = (ms2) => new Date(ms2).toISOString();
 async function retroRows(a) {
   const { sql, workspaceId, dayStart: dayStart2, w } = a;
-  const [from, to, prevFrom, prevTo] = [iso(w.from), iso(w.to), iso(w.prevFrom), iso(w.prevTo)];
+  const [from, to, prevFrom, prevTo] = [iso2(w.from), iso2(w.to), iso2(w.prevFrom), iso2(w.prevTo)];
   const agents = await sql`
     select id, name, role from agents where workspace_id = ${workspaceId} and retired_at is null order by created_at
   `;
@@ -21144,14 +22427,14 @@ async function retroRows(a) {
       and type in ('task.approved', 'task.changes_requested') and ts >= ${from} and ts < ${to}
     group by agent_id, bucket
   `;
-  const curveFrom = iso(dayStart2 + DAY3 - 8 * 7 * DAY3);
+  const curveFrom = iso2(dayStart2 + DAY3 - 8 * 7 * DAY3);
   const curveRows = await sql`
     with approved as (
       select t.approved_at,
         (select count(*) from events e
           where e.task_id = t.id and e.type = 'task.changes_requested' and e.ts < t.approved_at) as bounces
       from tasks t
-      where t.workspace_id = ${workspaceId} and t.approved_at >= ${curveFrom} and t.approved_at < ${iso(dayStart2 + DAY3)}
+      where t.workspace_id = ${workspaceId} and t.approved_at >= ${curveFrom} and t.approved_at < ${iso2(dayStart2 + DAY3)}
     )
     select floor((extract(epoch from approved_at) * 1000 - ${dayStart2 + DAY3 - 8 * 7 * DAY3}) / ${7 * DAY3}) as wk,
       count(*) as d, count(*) filter (where bounces = 0) as n
@@ -21186,7 +22469,7 @@ async function retroRows(a) {
 // src/retro.ts
 init_src();
 var DAY4 = 864e5;
-var iso2 = (ms) => new Date(ms).toISOString();
+var iso3 = (ms2) => new Date(ms2).toISOString();
 var HEADLINE_OF = {
   developer: "firstTry",
   worker: "firstTry",
@@ -21196,7 +22479,7 @@ var HEADLINE_OF = {
 };
 async function computeRetro(sql, workspaceId, range, dayStart2) {
   const w = retroWindow(range, dayStart2);
-  const [from, to] = [iso2(w.from), iso2(w.to)];
+  const [from, to] = [iso3(w.from), iso3(w.to)];
   const bucketCount = Math.ceil((w.to - w.from) / w.bucketMs);
   const { acceptedRows, agents, curveRows, firstTryRows, learnedRows, lessonList, lessonRows, orgLessons, orgRows, planRows, reviewRows, routedRows, skillRows, sparkAccepted, sparkReviews } = await retroRows({ sql, workspaceId, dayStart: dayStart2, w });
   const byId = (rows2) => {
@@ -21204,7 +22487,7 @@ async function computeRetro(sql, workspaceId, range, dayStart2) {
     for (const r of rows2) m.set(r.agent_id ?? r.assignee_id, r);
     return m;
   };
-  const num2 = (v) => Number(v ?? 0);
+  const num3 = (v) => Number(v ?? 0);
   const accepted = byId(acceptedRows);
   const firstTry = byId(firstTryRows);
   const reviews = byId(reviewRows);
@@ -21219,17 +22502,17 @@ async function computeRetro(sql, workspaceId, range, dayStart2) {
       for (const r of rows2) {
         if (r.agent_id !== agentId) continue;
         const i = Number(r.bucket);
-        if (i >= 0 && i < bucketCount) spark[i] += num2(r.n);
+        if (i >= 0 && i < bucketCount) spark[i] += num3(r.n);
       }
     }
     return spark;
   };
   const cumCounts = (id, edge) => ({
-    accepted: num2(accepted.get(id)?.[edge]),
-    reviews: num2(reviews.get(id)?.[edge]),
-    plansApproved: num2(plans.get(id)?.[edge === "cum_end" ? "approved_cum_end" : "approved_cum_start"]),
-    lessons: num2(lessons.get(id)?.[edge]),
-    skillsProposed: num2(skills.get(id)?.[edge])
+    accepted: num3(accepted.get(id)?.[edge]),
+    reviews: num3(reviews.get(id)?.[edge]),
+    plansApproved: num3(plans.get(id)?.[edge === "cum_end" ? "approved_cum_end" : "approved_cum_start"]),
+    lessons: num3(lessons.get(id)?.[edge]),
+    skillsProposed: num3(skills.get(id)?.[edge])
   });
   let leveledUpCount = 0;
   const agentStats = agents.map((a) => {
@@ -21245,28 +22528,28 @@ async function computeRetro(sql, workspaceId, range, dayStart2) {
     let dPrev = 0;
     if (kind === "firstTry") {
       const f = firstTry.get(a.id);
-      n = num2(f?.n_cur);
-      d = num2(f?.d_cur);
-      nPrev = num2(f?.n_prev);
-      dPrev = num2(f?.d_prev);
+      n = num3(f?.n_cur);
+      d = num3(f?.d_cur);
+      nPrev = num3(f?.n_prev);
+      dPrev = num3(f?.d_prev);
     } else if (kind === "caught") {
       const r = reviews.get(a.id);
-      n = num2(r?.caught_cur);
-      d = num2(r?.cur);
-      nPrev = num2(r?.caught_prev);
-      dPrev = num2(r?.prev);
+      n = num3(r?.caught_cur);
+      d = num3(r?.cur);
+      nPrev = num3(r?.caught_prev);
+      dPrev = num3(r?.prev);
     } else if (kind === "planFirstPass") {
       const p2 = plans.get(a.id);
-      n = num2(p2?.["clean_cur"]);
-      d = num2(p2?.["approved_cur"]);
-      nPrev = num2(p2?.["clean_prev"]);
-      dPrev = num2(p2?.["approved_prev"]);
+      n = num3(p2?.["clean_cur"]);
+      d = num3(p2?.["approved_cur"]);
+      nPrev = num3(p2?.["clean_prev"]);
+      dPrev = num3(p2?.["approved_prev"]);
     } else {
       const r = routed.get(a.id);
-      n = num2(r?.cur);
-      d = num2(r?.cur);
-      nPrev = num2(r?.prev);
-      dPrev = num2(r?.prev);
+      n = num3(r?.cur);
+      d = num3(r?.cur);
+      nPrev = num3(r?.prev);
+      dPrev = num3(r?.prev);
     }
     return {
       id: a.id,
@@ -21284,11 +22567,11 @@ async function computeRetro(sql, workspaceId, range, dayStart2) {
         deltaPoints: kind === "routed" ? null : rateDeltaPoints({ n, d }, { n: nPrev, d: dPrev })
       },
       counts: {
-        accepted: num2(accepted.get(a.id)?.cur),
-        reviews: num2(reviews.get(a.id)?.cur),
-        plansApproved: num2(plans.get(a.id)?.["approved_cur"]),
-        lessons: num2(lessons.get(a.id)?.cur),
-        skillsProposed: num2(skills.get(a.id)?.cur)
+        accepted: num3(accepted.get(a.id)?.cur),
+        reviews: num3(reviews.get(a.id)?.cur),
+        plansApproved: num3(plans.get(a.id)?.["approved_cur"]),
+        lessons: num3(lessons.get(a.id)?.cur),
+        skillsProposed: num3(skills.get(a.id)?.cur)
       },
       spark: sparkOf(a.id),
       learned: learned.get(a.id)?.content ?? null
@@ -21297,10 +22580,10 @@ async function computeRetro(sql, workspaceId, range, dayStart2) {
   const org = orgRows[0];
   const curve = Array.from({ length: 8 }, (_, i) => {
     const row = curveRows.find((r) => Number(r.wk) === i);
-    const d = num2(row?.d);
-    const n = num2(row?.n);
+    const d = num3(row?.d);
+    const n = num3(row?.n);
     return {
-      weekStart: iso2(dayStart2 + DAY4 - 8 * 7 * DAY4 + i * 7 * DAY4),
+      weekStart: iso3(dayStart2 + DAY4 - 8 * 7 * DAY4 + i * 7 * DAY4),
       n,
       d,
       rate: rateOrNull(n, d)
@@ -21311,11 +22594,11 @@ async function computeRetro(sql, workspaceId, range, dayStart2) {
     from,
     to,
     org: {
-      accepted: num2(org?.cur),
-      acceptedPrev: num2(org?.prev),
+      accepted: num3(org?.cur),
+      acceptedPrev: num3(org?.prev),
       avgCycleMs: org?.cycle_cur == null ? null : Number(org.cycle_cur),
       prevAvgCycleMs: org?.cycle_prev == null ? null : Number(org.cycle_prev),
-      lessons: num2(orgLessons[0]?.n),
+      lessons: num3(orgLessons[0]?.n),
       leveledUp: leveledUpCount
     },
     agents: agentStats,
@@ -22112,6 +23395,14 @@ var PostgresStore = class {
   filmStore;
   get films() {
     return this.filmStore ??= new PgFilmStore(this.sql);
+  }
+  replyStore;
+  get replies() {
+    return this.replyStore ??= new PgReplyStore(this.sql);
+  }
+  modelStore;
+  get agentModels() {
+    return this.modelStore ??= new PgAgentModelStore(this.sql);
   }
   constructor(url) {
     const serverless = !!process.env["VERCEL"];
@@ -23829,6 +25120,7 @@ var PostgresStore = class {
         values (${ws}::uuid, ${input.channelId}::uuid, ${input.title}, ${input.cadence}, ${input.atTime}, ${input.tz}, ${input.weekday}, ${input.nextRunAt}, ${agentId}, ${sql.json({ prompt: input.prompt, ...input.payloadExtra ?? {} })}, ${input.createdByKind}, ${input.createdBy})
         returning id`;
       await this.insertEvent(sql, makeEvent(ws), null);
+      await linkRoutineSessionSql(sql, ws, row["id"], input, (s, ev) => this.insertEvent(s, ev, null));
       return { id: row["id"] };
     });
   }
@@ -23847,7 +25139,7 @@ var PostgresStore = class {
       const [row] = await sql`update schedules set
           title = ${patch.title}, cadence = ${patch.cadence}, at_time = ${patch.atTime}, tz = ${patch.tz},
           weekday = ${patch.weekday}, next_run_at = ${patch.nextRunAt},
-          payload = coalesce(payload, '{}'::jsonb) || ${sql.json({ prompt: patch.prompt })}
+          payload = (coalesce(payload, '{}'::jsonb) - ${patch.replyGap === null ? "replyGap" : ""}::text) || ${sql.json({ prompt: patch.prompt, ...typeof patch.replyGap === "number" ? { replyGap: patch.replyGap } : {} })}
         where id = ${scheduleId}::uuid returning workspace_id`;
       if (!row) throw new DomainError("NOT_FOUND", "schedule not found");
       await this.insertEvent(sql, makeEvent(row["workspace_id"]), null);
@@ -23989,6 +25281,10 @@ var PostgresStore = class {
       return { id: itemId };
     });
   }
+  /** a draft with no thread and no task moves into a conversation in its own room (store/content-anchor.ts) */
+  async anchorContentItem(itemId, threadId, makeEvent) {
+    return this.sql.begin((tx) => anchorContentItemSql(asSql2(tx), itemId, threadId, (ws) => this.insertEvent(asSql2(tx), makeEvent(ws), null)));
+  }
   async attachContentMedia(itemId, mime, bytes, actor, makeEvent) {
     return this.sql.begin(async (_tx) => {
       const sql = asSql2(_tx);
@@ -24028,10 +25324,10 @@ var PostgresStore = class {
   // scene/source as jsonb strings, which reads fine on the writing machine (its local row is
   // the source of truth) and arrives DOUBLE-ENCODED on every other device. Parse the validated
   // JSON text and hand postgres.js the real value via sql.json.
-  wbJson(text, what) {
-    if (text == null) return null;
+  wbJson(text2, what) {
+    if (text2 == null) return null;
     try {
-      return this.sql.json(JSON.parse(text));
+      return this.sql.json(JSON.parse(text2));
     } catch {
       throw new DomainError("INVALID_INPUT", `${what} is not valid JSON`);
     }
@@ -24251,6 +25547,14 @@ var PostgresStore = class {
       return { claimed: true };
     });
   }
+  // Run now (routine sessions): store/schedule-now.ts
+  async runScheduleNow(scheduleId, makeEvent) {
+    return this.sql.begin(async (_tx) => {
+      const sql = asSql2(_tx);
+      await this.insertEvent(sql, makeEvent(await runScheduleNowSql(sql, scheduleId)), null);
+      return { id: scheduleId };
+    });
+  }
   async markScheduleResult(scheduleId, error, makeEvent) {
     return this.sql.begin(async (_tx) => {
       const sql = asSql2(_tx);
@@ -24365,12 +25669,10 @@ var PostgresStore = class {
       where id = ${threadId}::uuid and workspace_id = ${workspace}::uuid`;
     return row ? threadModeOf(row.mode) : null;
   }
-  // routines (0119): the automation that opened this thread — the server floor that makes a
-  // routine-born task hands-off reads it (createtask.ts, 2026-08-19)
-  async getThreadScheduleId(workspace, threadId) {
-    const [row] = await this.sql`select schedule_id from threads
-      where id = ${threadId}::uuid and workspace_id = ${workspace}::uuid`;
-    return row?.schedule_id ?? null;
+  // routines (0119): the ROUTINE that opened this thread, never a content schedule — the server floor
+  // that makes a routine-born task hands-off reads it (createtask.ts, 2026-08-19; store/routine-rule.ts)
+  async getThreadRoutineId(workspace, threadId) {
+    return threadRoutineIdSql(this.sql, workspace, threadId);
   }
   /** the room's setup task (docs/39) — the bootstrap anchors its whole flow to THIS thread
    * (round 3): wizard, docs, close and playbook subtasks live in one session, not five */
@@ -24397,10 +25699,10 @@ var PostgresStore = class {
   // Auto-filing (0109) — the three reads/writes behind thread.move.
   async threadFiling(workspace, threadId) {
     const [row] = await this.sql`
-      select t.task_id, t.filed_at, t.channel_id, c.project_id
+      select t.task_id, t.filed_at, t.channel_id, c.project_id, t.schedule_id, t.kind
         from threads t left join channels c on c.id = t.channel_id
        where t.id = ${threadId}::uuid and t.workspace_id = ${workspace}::uuid`;
-    return row ? { taskId: row.task_id, filedAt: row.filed_at, channelId: row.channel_id, projectId: row.project_id } : null;
+    return row ? { taskId: row.task_id, filedAt: row.filed_at, channelId: row.channel_id, projectId: row.project_id, scheduleId: row.schedule_id, kind: row.kind } : null;
   }
   async channelProject(workspace, channelId) {
     const [row] = await this.sql`
@@ -24512,12 +25814,13 @@ var PostgresStore = class {
         if (msg2.threadId) {
           const bornBrain = parseBrainOverride(msg2.brainOverride);
           await sql`insert into threads (id, workspace_id, channel_id, title, created_by, mode, brain_override, schedule_id, machine_id, origin, kind)
-            values (${msg2.threadId}::uuid, ${msg2.workspace}::uuid, ${chId}, ${threadTitle(msg2.body)}, ${`${msg2.author.kind}:${msg2.author.id}`}, ${threadModeOf(msg2.threadMode)}, ${bornBrain ? sql.json(bornBrain) : null}, ${msg2.scheduleId ?? null}::uuid, ${msg2.threadMachineId ? await workspaceMachine(sql, msg2.workspace, msg2.threadMachineId) : null}::uuid, ${msg2.threadOrigin ?? null}, ${threadKindOf(msg2.threadKind)})
-            on conflict (id) do update set updated_at = now()`;
+            values (${msg2.threadId}::uuid, ${msg2.workspace}::uuid, ${chId}, ${await sessionTitleSql(sql, msg2.workspace, msg2.scheduleId ?? null, msg2.body)}, ${`${msg2.author.kind}:${msg2.author.id}`}, ${threadModeOf(msg2.threadMode)}, ${bornBrain ? sql.json(bornBrain) : null}, (select id from schedules where id = ${msg2.scheduleId ?? null}::uuid and workspace_id = ${msg2.workspace}::uuid), ${msg2.threadMachineId ? await workspaceMachine(sql, msg2.workspace, msg2.threadMachineId) : null}::uuid, ${msg2.threadOrigin ?? null}, ${threadKindOf(msg2.threadKind)})
+            on conflict (id) do update set updated_at = now(), title = case when threads.titled_at is null and threads.schedule_id = excluded.schedule_id then excluded.title else threads.title end`;
         }
-        await sql`insert into messages (id, workspace_id, channel_id, task_id, thread_id, author_kind, author_id, body, reply_to)
+        await sql`insert into messages (id, workspace_id, channel_id, task_id, thread_id, author_kind, author_id, body, reply_to, schedule_id)
           values (${msg2.id}, ${msg2.workspace}::uuid, ${chId}, ${msg2.taskId ?? null}, ${msg2.threadId ?? null},
-            ${msg2.author.kind}::actor_kind, ${msg2.author.id}::uuid, ${msg2.body}, ${msg2.replyTo ?? null})`;
+            ${msg2.author.kind}::actor_kind, ${msg2.author.id}::uuid, ${msg2.body}, ${msg2.replyTo ?? null},
+            (select id from schedules where id = ${msg2.scheduleId ?? null}::uuid and workspace_id = ${msg2.workspace}::uuid))`;
         if (msg2.threadId) {
           await sql`update threads
                        set root_message_id = coalesce((select m.id from messages m where m.id = ${msg2.rootMessageId ?? null}::uuid), ${msg2.id}::uuid)

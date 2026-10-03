@@ -11,6 +11,7 @@ import {
   MAX_RELAY_SOCKET_BUFFERED_BYTES, sendBounded, type Hub, type HubOptions,
 } from './hub.js';
 import { MAX_STREAM_CHANNELS_PER_CLIENT } from './stream-lane.js';
+import { MAX_BROWSER_CHANNELS_PER_CLIENT, MAX_BROWSER_CHANNELS_PER_MACHINE } from './browser-lane.js';
 import { keepAlive } from './keepalive.js';
 import { connectEchoMachine, type MachineClient } from './machine-client.js';
 import { CLOSE, fromB64, toB64, type ChannelFrame, type ChannelLane, type RelayMessage } from './protocol.js';
@@ -323,6 +324,86 @@ describe('relay hub', () => {
     const atMachine = nextMessage(m);
     c.send(JSON.stringify({ ch: 'stream-1', t: 'open', lane: 'stream', meta: { v: 1 }, actorId: 'someone-else' } satisfies ChannelFrame));
     expect(await atMachine).toMatchObject({ ch: 'stream-1', t: 'open', lane: 'stream', meta: { v: 1 }, actorId: 'u1' });
+  });
+
+  // the browser lane (models-and-replies round, board C3): the same rule as the stream lane. an older
+  // daemon reads an unknown lane as a terminal, so the hub refuses a browser open to a machine whose
+  // hello never named it, and the lane's own budget never takes a session slot.
+  it('a browser OPEN to a daemon that never named the lane is refused, never forwarded (it would spawn a shell)', async () => {
+    const r = await startRelay();
+    const m = await connectClient(r.url, { authorization: 'Bearer nmm_good' });
+    m.send(JSON.stringify({ t: 'hello', machineId: M1, lanes: ['terminal', 'stream'] })); // a daemon from before the browser lane
+    await until(() => r.hub.stats().machines.includes(M1), 'machine registration');
+    let reachedMachine = false;
+    m.on('message', () => { reachedMachine = true; });
+    const c = await attach(r.url);
+    const refused = nextMessage(c);
+    c.send(JSON.stringify({ ch: 'browser-1', t: 'open', lane: 'browser', meta: { v: 1, tab: 'person', width: 800, height: 600 } } satisfies ChannelFrame));
+    expect(await refused).toEqual({ ch: 'browser-1', t: 'close' });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(reachedMachine).toBe(false);
+    expect(r.logs.some((line) => line.startsWith('refuse_browser_open') && line.endsWith('why=lane'))).toBe(true);
+  });
+
+  it('a browser panel has its own budget: a full terminal budget still admits one, and it takes no terminal slot', async () => {
+    const r = await startRelay();
+    machine(r.url, 'nmm_good', M1, ['terminal', 'browser']);
+    await until(() => r.hub.stats().machines.includes(M1), 'machine registration');
+    const c = await attach(r.url);
+    for (let index = 0; index < MAX_CHANNELS_PER_CLIENT; index += 1) {
+      const response = nextMessage(c);
+      c.send(JSON.stringify({ ch: `terminal-${index}`, t: 'open' } satisfies ChannelFrame));
+      expect((await response as ChannelFrame).t).toBe('data');
+    }
+    const meta = { v: 1, tab: 'person', width: 800, height: 600 };
+    for (let index = 0; index < MAX_BROWSER_CHANNELS_PER_CLIENT; index += 1) {
+      const forwarded = nextMessage(c);
+      c.send(JSON.stringify({ ch: `browser-${index}`, t: 'open', lane: 'browser', meta } satisfies ChannelFrame));
+      expect(await forwarded).toMatchObject({ ch: `browser-${index}`, t: 'data' });
+    }
+    const refused = nextMessage(c);
+    c.send(JSON.stringify({ ch: 'browser-overflow', t: 'open', lane: 'browser', meta } satisfies ChannelFrame));
+    expect(await refused).toEqual({ ch: 'browser-overflow', t: 'close' });
+    expect(r.logs.some((line) => line.startsWith('refuse_browser_open') && line.endsWith('why=limit'))).toBe(true);
+    // closing a panel frees a panel slot, never a terminal one
+    c.send(JSON.stringify({ ch: 'browser-0', t: 'close' } satisfies ChannelFrame));
+    const again = nextMessage(c);
+    c.send(JSON.stringify({ ch: 'browser-again', t: 'open', lane: 'browser', meta } satisfies ChannelFrame));
+    expect(await again).toMatchObject({ ch: 'browser-again', t: 'data' });
+    const noSlot = nextMessage(c);
+    c.send(JSON.stringify({ ch: 'terminal-extra', t: 'open' } satisfies ChannelFrame));
+    expect(await noSlot).toEqual({ ch: 'terminal-extra', t: 'close' });
+  });
+
+  it('a machine holds at most its browser budget across every client', async () => {
+    const r = await startRelay();
+    machine(r.url, 'nmm_good', M1, ['terminal', 'browser']);
+    await until(() => r.hub.stats().machines.includes(M1), 'machine registration');
+    const meta = { v: 1, tab: 'agent', width: 800, height: 600 };
+    let opened = 0;
+    while (opened < MAX_BROWSER_CHANNELS_PER_MACHINE) {
+      const c = await attach(r.url);
+      for (let index = 0; index < MAX_BROWSER_CHANNELS_PER_CLIENT && opened < MAX_BROWSER_CHANNELS_PER_MACHINE; index += 1, opened += 1) {
+        const forwarded = nextMessage(c);
+        c.send(JSON.stringify({ ch: `b-${opened}`, t: 'open', lane: 'browser', meta } satisfies ChannelFrame));
+        expect(await forwarded).toMatchObject({ ch: `b-${opened}`, t: 'data' });
+      }
+    }
+    const late = await attach(r.url);
+    const refused = nextMessage(late);
+    late.send(JSON.stringify({ ch: 'b-late', t: 'open', lane: 'browser', meta } satisfies ChannelFrame));
+    expect(await refused).toEqual({ ch: 'b-late', t: 'close' });
+  });
+
+  it('a browser OPEN reaches the machine carrying the attach verdict\'s user, never a client claim', async () => {
+    const r = await startRelay();
+    const m = await connectClient(r.url, { authorization: 'Bearer nmm_good' });
+    m.send(JSON.stringify({ t: 'hello', machineId: M1, lanes: ['terminal', 'browser'] }));
+    await until(() => r.hub.stats().machines.includes(M1), 'machine registration');
+    const c = await attach(r.url);
+    const atMachine = nextMessage(m);
+    c.send(JSON.stringify({ ch: 'browser-1', t: 'open', lane: 'browser', meta: { v: 1, tab: 'person', width: 800, height: 600 }, actorId: 'someone-else' } satisfies ChannelFrame));
+    expect(await atMachine).toMatchObject({ ch: 'browser-1', t: 'open', lane: 'browser', actorId: 'u1' });
   });
 
   it('contains an ingress flood to its source client and keeps peers attached', async () => {

@@ -844,9 +844,8 @@ export function App() {
   // file tree, in the main area. Its glyph now toggles the Workbench, which is the one tree.
   const openKindTab = (kind: 'terminal' | 'browser') => {
     const match = [...wtabs].reverse().find((x) => x.kind === kind);
-    if (match) { activateWTab(match.id); return; }
-    if (kind === 'terminal') { openDefaultTerminal(); return; }
-    openBrowserTab();
+    if (match) activateWTab(match.id); else if (kind === 'terminal') openDefaultTerminal(); else openBrowserTab();
+    openDock(true); // fronting alone left a folded dock shut when the tab was already in front, as ⌘2 knew
   };
   useEffect(() => {
     const open = (event: Event) => {
@@ -2765,7 +2764,7 @@ export function App() {
               cluster, rehomed after the search: they show on almost every page, so they live on
               the chrome row that does. No ⌘K tile here — the search pill IS that door. */}
           <span className="ftutils">
-            <UtilCluster activeKind={wtabs.find((x) => x.id === wactive)?.kind ?? null} onKind={openKindTab}
+            <UtilCluster activeKind={dockOpen ? wtabs.find((x) => x.id === wactive)?.kind ?? null : null} onKind={openKindTab}
               dockOpen={dockOpen} onDock={() => openDock(!dockOpen)}
               procCount={procCount} procOpen={procOpen} onProc={() => setProcOpen((v) => !v)}
               procs={procsView} onKill={onKillProc} status={statusCluster} overflow />

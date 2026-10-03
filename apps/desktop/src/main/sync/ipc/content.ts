@@ -10,6 +10,7 @@ import { fetchImageDataUrl } from '../../mediafetch';
 import { apiAuthHeaders } from '../../apiauth';
 import { ipcMain } from 'electron';
 import type { PowerSyncDatabase } from '@powersync/node';
+import { scheduleRunsFor } from './session-runs';
 
 export interface ContentDeps {
   db: () => PowerSyncDatabase;
@@ -27,25 +28,14 @@ ipcMain.handle('nm:schedule-delete', async (_e, { scheduleId }: { scheduleId: st
   api('/v1/commands', { type: 'schedule.delete', schedule: scheduleId }));
 ipcMain.handle('nm:schedule-update', async (_e, p: { scheduleId: string; title: string; prompt: string; cadence: string; atTime?: string; tz?: string; weekday?: number; runAt?: string }) =>
   api('/v1/commands', { type: 'schedule.update', schedule: p.scheduleId, title: p.title, prompt: p.prompt, cadence: p.cadence, atTime: p.atTime, tz: p.tz, weekday: p.weekday, runAt: p.runAt }));
-// An automation's RUN HISTORY (0119, 2026-08-11): every routine fire opens its own conversation,
-// so the runs already exist — this is the join that finds them. `msg_count` is what separates a
-// run that started a real exchange from one nobody answered, and it is the only thing here the
-// thread row cannot say for itself. Capped at 8: the card reveals recent runs, not an archive —
-// the room's session list is where you go to read them all.
-ipcMain.handle('nm:schedule-runs', async (_e, { scheduleId, limit }: { scheduleId: string; limit?: number }) => ({
-  runs: await db().getAll(
-    `select t.id, t.title, t.created_at, t.updated_at, t.channel_id, c.slug as channel_slug,
-            (select count(*) from messages m where m.thread_id = t.id) as msg_count,
-            -- every run of one routine opens a thread with the SAME title (it is derived from the
-            -- same prompt), so a list of titles is four identical lines. The last message is what
-            -- actually differs between runs — it is what the run PRODUCED.
-            (select m.body from messages m where m.thread_id = t.id order by m.created_at desc limit 1) as last_body
-       from threads t left join channels c on c.id = t.channel_id
-      where t.schedule_id = ? and t.workspace_id = ? and t.archived_at is null
-      order by t.created_at desc limit ?`,
-    [scheduleId, ws(), Math.min(Math.max(limit ?? 8, 1), 50)],
-  ).catch(() => []),
-}));
+// A routine's RUNS (routine sessions, docs/design/routine-sessions-2026-09): one session holds every
+// run, and each run opens with a message that keeps the schedule (0145). The panel lists the newest
+// runs with the rows their strips count: sync/ipc/session-runs.ts, the twin of hq's lane.
+ipcMain.handle('nm:schedule-runs', async (_e, { scheduleId, limit }: { scheduleId: string; limit?: number }) =>
+  scheduleRunsFor(db(), ws(), scheduleId, limit));
+// Run now: HUMAN_ONLY on the server. The schedule is due at once, and the daemon's next tick fires it
+ipcMain.handle('nm:schedule-run-now', async (_e, { scheduleId }: { scheduleId: string }) =>
+  api('/v1/commands', { type: 'schedule.run_now', schedule: scheduleId }));
 // content items (marketing-channel plan §4.7): the calendar reads the local replica;
 // approve/unschedule ride api() (human actor), so guards + plan gates apply server-side.
 
@@ -101,7 +91,7 @@ ipcMain.handle('nm:content-items', async (_e, { channelId }: { channelId: string
 ipcMain.handle('nm:content-all', async () => ({
   items: await db().getAll(
     `select ci.id, ci.platform, ci.body, ci.media, ci.status, ci.last_error, ci.scheduled_at, ci.published_at,
-            ci.external_url, ci.created_at, ci.schedule_id, ci.task_id,
+            ci.external_url, ci.created_at, ci.schedule_id, ci.task_id, ci.thread_id,
             ci.channel_id, c.slug as channel_slug, c.project_id
        from content_items ci join channels c on c.id = ci.channel_id
       where ci.workspace_id = ?

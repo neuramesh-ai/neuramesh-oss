@@ -106,6 +106,11 @@ export interface GeminiUsage { promptTokenCount?: number; candidatesTokenCount?:
 export type StarterFetch = (url: string, init: RequestInit) => Promise<Response>;
 export const STARTER_MODEL_URL = `https://generativelanguage.googleapis.com/v1beta/models/${STARTER_MODEL}`;
 
+/** does this server serve the NeuraMesh brain at all: not on the local stack, and only with its key set.
+ *  /v1/usage says it (brain.serves), so a daemon moves an automation onto the house brain only where
+ *  one exists (models-and-replies round, 2026-10-02) */
+export const houseBrainServes = (): boolean => !localMode() && !!process.env['STARTER_GOOGLE_API_KEY'];
+
 /** what BOTH starter routes check, in this order, before any model call. One function, so the
  *  streamed door cannot drift from the whole-reply door on who may spend the platform's key. */
 export async function starterPreflight(c: Context, store: Store, ledger: Ledger | null): Promise<{ refusal: Response } | { ledger: Ledger; body: StarterBody; key: string }> {
@@ -263,7 +268,7 @@ export function creditRoutes<E extends Env & { Variables: { actor: Actor } }>(ap
       // provisions lets a surface say "10 GB included" — true, and actionable — instead of "not
       // yet metered", which told nobody anything. It must never be printed as "x of 10 GB used".
       storage: { gb: planDiskGb(plan), metered: false },
-      brain: { callsToday: used.modelCalls, model: STARTER_MODEL },
+      brain: { callsToday: used.modelCalls, model: STARTER_MODEL, serves: houseBrainServes() },
       video: { clipsToday: used.videoClips, creditsToday: microsToCredits(used.videoMicros) },
       rateVersion: RATE_VERSION,
     });

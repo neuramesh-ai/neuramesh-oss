@@ -3,7 +3,7 @@ import { TASK_KINDS } from './states';
 import { WORK_PLAN_LEGS } from './task';
 import { DESIGN_PROVIDERS } from './design';
 import { SHIP_ITEM_OWNERS, SHIP_ITEM_STATES } from './task';
-import { CODE_SESSION_COMMANDS } from './commands-code';
+import { CODE_SESSION_COMMANDS } from './commands-code';   import { REPLY_COMMANDS, REPLY_GAP_FIELD } from './command-union-replies';   import { MODEL_COMMANDS } from './command-union-models';
 import { AGENT_ROLES } from './states';
 
 // The human-sendable board commands. These live in @neuramesh/shared (not in the
@@ -223,6 +223,11 @@ export const contentUpdateCommand = z.object({
   body: z.string().trim().min(1).max(10_000),
   mediaUrl: z.union([z.string().url().max(2000), z.literal('')]).optional(),
 });
+// a draft with no conversation gets one (George, 2026-09-27: a draft's Generate image failed on the
+// web and the phone with "no conversation to ask in"). the first ask for its picture opens a session
+// in the draft's room, and this moves the draft into it, so its card shows there and the next ask
+// lands there too. HUMAN_ONLY in the handler, and only a draft with no thread and no task moves.
+export const contentAnchorCommand = z.object({ type: z.literal('content.anchor'), item: z.string().uuid(), thread: z.string().uuid() });
 export const workspaceInviteCommand = z.object({ type: z.literal('workspace.invite'), workspace: z.string().min(1), email: z.string().email() });
 export const workspaceAcceptInviteCommand = z.object({ type: z.literal('workspace.accept_invite'), invite: z.string().uuid() });
 export const workspaceDeclineInviteCommand = z.object({ type: z.literal('workspace.decline_invite'), invite: z.string().uuid() });
@@ -278,9 +283,12 @@ export const scheduleCreateCommand = z.object({
   weekday: z.number().int().min(0).max(6).optional(),
   agent: z.string().min(1).optional(),
   routine: z.boolean().optional(),
+  thread: z.string().uuid().optional(), replyGap: REPLY_GAP_FIELD.optional(), // the routine writer's session · the Replies part's gap
 });
 export const scheduleSetStatusCommand = z.object({ type: z.literal('schedule.set_status'), schedule: z.string().min(1), status: z.enum(['active', 'paused']) });
 export const scheduleDeleteCommand = z.object({ type: z.literal('schedule.delete'), schedule: z.string().min(1) });
+// Run now (routine sessions, 2026-09-28): the same shape as the server's (command-union-schedule.ts), so the phone can send it
+export const scheduleRunNowCommand = z.object({ type: z.literal('schedule.run_now'), schedule: z.string().min(1) });
 export const scheduleUpdateCommand = z.object({
   type: z.literal('schedule.update'),
   schedule: z.string().min(1),
@@ -290,7 +298,7 @@ export const scheduleUpdateCommand = z.object({
   runAt: z.string().datetime().optional(),
   atTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
   tz: z.string().max(64).optional(),
-  weekday: z.number().int().min(0).max(6).optional(),
+  weekday: z.number().int().min(0).max(6).optional(), replyGap: REPLY_GAP_FIELD.nullable().optional(),
 });
 export const machineWakeCommand = z.object({ type: z.literal('machine.wake'), workspace: z.string().min(1), machineId: z.string().uuid() });
 
@@ -328,6 +336,7 @@ export const HumanCommandSchema = z.discriminatedUnion('type', [
   contentApproveCommand,
   contentUnscheduleCommand,
   contentUpdateCommand,
+  contentAnchorCommand,
   workspaceCreateCommand,
   workspaceUpdateCommand,
   agentUpdateCommand,
@@ -346,8 +355,9 @@ export const HumanCommandSchema = z.discriminatedUnion('type', [
   scheduleSetStatusCommand,
   scheduleDeleteCommand,
   scheduleUpdateCommand,
+  scheduleRunNowCommand,
   machineWakeCommand,
-  ...CODE_SESSION_COMMANDS,
+  ...CODE_SESSION_COMMANDS,   ...REPLY_COMMANDS,   ...MODEL_COMMANDS,
 ]);
 
 export type HumanCommand = z.infer<typeof HumanCommandSchema>;

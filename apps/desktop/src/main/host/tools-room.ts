@@ -15,7 +15,7 @@ import type { OrchTool, ToolCtx } from './orchtools';
 
 export function roomTools(tc: ToolCtx): OrchTool[] {
   const { z, db, post, ch, agent, actor, thread, convoThreadId, log,
-          filed, roomMenu, siblings, codeDoor,
+          filed, roomMenu, siblings, codeDoor, namedBySchedule,
           executeHire } = tc;
   const repoLabel = codeDoor ? (codeDoor.repo.org_name === 'local' ? codeDoor.repo.name : `${codeDoor.repo.org_name}/${codeDoor.repo.name}`) : '';
   return [
@@ -38,7 +38,8 @@ export function roomTools(tc: ToolCtx): OrchTool[] {
         return `this is a coding thread on ${repoLabel} now. The coding runtime takes it from here: reply in ONE line saying so, and stop.`;
       },
     }] : []),
-    ...(convoThreadId ? [{
+    // a schedule's session wears its schedule's title: the server names it and refuses an agent's name
+    ...(convoThreadId && !namedBySchedule ? [{
       name: 'set_thread_title',
       description: 'Rename THIS conversation thread. Its provisional title is the human\'s first message, near-verbatim — call this once, early, with a clean 2–6 word topic title: what the conversation is ABOUT, never their words echoed back. Optionally add a one-line description.',
       schema: {

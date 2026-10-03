@@ -8,6 +8,7 @@ import { TURN_BUDGETS } from '@neuramesh/shared';
 import { briefFileName } from '@neuramesh/client-core/library';
 
 import { claudePathOption, providerEnv } from '../runtime/adapter';
+import { claudeEffort } from '../runtime/thinking';
 import { drainQuery, withTimeout } from './turnkit';
 
 
@@ -66,6 +67,7 @@ function readOnlyStudy(agent: HostedAgent, dir: string, token: string, log?: Log
           ...claudePathOption(),
           env: providerEnv('anthropic', token),
           model: agent.model,
+          ...claudeEffort(agent),
           maxTurns: 24,
           allowedTools: ['Read', 'Grep', 'Glob'],
           disallowedTools: ['Write', 'Edit', 'NotebookEdit', 'Bash', 'Task', 'WebSearch', 'WebFetch'],
@@ -104,6 +106,7 @@ async function deepWorkQuery(agent: HostedAgent, prompt: string, token: string, 
         ...claudePathOption(),
         env: providerEnv('anthropic', token),
         model: agent.model,
+        ...claudeEffort(agent),
         maxTurns: 16,
         allowedTools: ['WebSearch', 'WebFetch', 'Read', 'Grep', 'Glob'],
         disallowedTools: ['Write', 'Edit', 'NotebookEdit', 'Bash', 'Task'],

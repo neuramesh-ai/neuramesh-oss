@@ -436,12 +436,15 @@ export function brainCast(input: {
  *      2026-09-17 (docs/10 §15.1): the pin is the seat's default everywhere, the override is
  *      this one conversation's word — a routine's Starter stamp on Pro, or "Use Starter here",
  *      that a pinned orchestrator could ignore was found live to run on the human's vendor login.
- *   2. a human's manual pin (model_source='manual') — the most deliberate STANDING intent there
+ *   2. the REQUESTER's own pick for this agent (agent-models.ts, 2026-10-02: "model selection is a
+ *      user configuration, not workspace"). It is one person's standing word for one agent, so it
+ *      beats every workspace-wide default below it, and a conversation's word still beats it.
+ *   3. a human's manual pin (model_source='manual') — the most deliberate STANDING intent there
  *      is, and the UI already promises "Pinned · reset to pack default". A project pack must
  *      never quietly undo it.
- *   3. the project's pack override, by role (unknown role → the developer seat, matching
+ *   4. the project's pack override, by role (unknown role → the developer seat, matching
  *      how the failover switch fills gaps).
- *   4. `currentModel` — the workspace pack's materialized value, or a legacy/unmanaged model.
+ *   5. `currentModel` — the workspace pack's materialized value, or a legacy/unmanaged model.
  *
  * Resolved per WAKE, like everything else here, which is what makes "mid-run turns finish on the
  * model they started with" true by construction rather than by a guard.
@@ -453,6 +456,8 @@ export function seatModel(input: {
   projectPack?: string | null;
   custom?: readonly CustomModelPack[];
   threadOverride?: BrainOverride | null;
+  /** the requester's own pick for this agent's model (workspace_members.agent_models) */
+  memberPick?: string | null;
 }): string {
   // the conversation's word beats the pin (2026-09-17, reversed from `pin > thread`): a pin is the
   // seat's default everywhere, a thread override is THIS conversation's choice — and a routine on
@@ -460,6 +465,7 @@ export function seatModel(input: {
   // routine on the human's vendor login instead of the metered lane (docs/10 §15.1)
   const override = parseBrainOverride(input.threadOverride)?.[input.role];
   if (override) return override;
+  if (input.memberPick) return input.memberPick;
   if ((input.modelSource ?? 'pack') === 'manual') return input.currentModel;
   const roles = resolvePackRoles(input.projectPack, input.custom ?? []);
   if (!roles) return input.currentModel;

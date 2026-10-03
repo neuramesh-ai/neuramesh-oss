@@ -48,6 +48,8 @@ export const DECISIONS_ALL_SQL = `select d.id, d.channel_id, d.task_id, d.messag
               -- another conversation — the card's thread said needs you, the row said settled.
               -- …and a card hung on a SUBTASK counts the parent's thread as well, for the same
               -- reason the task watch above does: that is where the conversation is.
+              -- …and a message that carries a schedule answers no card: it opens a routine's run, posted as its
+              -- owner, and one session holds every run (routine sessions, 2026-09-28).
               -- One branch per conversation shape, each on its own index. It was ONE scan with the
               -- shape chosen by a CASE inside the WHERE, which no index can serve: every card read
               -- every message, 0.5 s a run on a 1.7k-message replica. The branches are exclusive
@@ -55,11 +57,11 @@ export const DECISIONS_ALL_SQL = `select d.id, d.channel_id, d.task_id, d.messag
               (select max(v) from (
                  select max(m.created_at) as v from messages m
                   where d.task_id is null and (select m2.thread_id from messages m2 where m2.id = d.message_id) is null
-                    and m.channel_id = d.channel_id and m.task_id is null and m.author_kind = 'human'
+                    and m.channel_id = d.channel_id and m.task_id is null and m.author_kind = 'human' and m.schedule_id is null
                  union all
                  select max(m.created_at) from messages m
                   where d.task_id is null and m.thread_id = (select m2.thread_id from messages m2 where m2.id = d.message_id)
-                    and m.author_kind = 'human'
+                    and m.author_kind = 'human' and m.schedule_id is null
                  union all
                  select max(m.created_at) from messages m where m.task_id = d.task_id and m.author_kind = 'human'
                  union all

@@ -69,6 +69,8 @@ export interface MessageRow {
   // its root's thread_id null, so neither column can answer this alone).
   thread_id?: string | null;
   root_thread_id?: string | null;
+  /** the schedule whose run this message opens (0145): a routine session splits into runs here */
+  schedule_id?: string | null;
 }
 
 // a conversation thread (the conversation-first shell): every send starts one; task_id
@@ -87,6 +89,8 @@ export interface ThreadRow {
   brain_override?: string | null;
   /** 0119: the automation that opened this thread (the header's routine chip) */
   schedule_id?: string | null;
+  /** 0137: the person's "I have seen this" stamp: a run's gate or card from before it waits on nobody */
+  settled_at?: string | null;
   /** 0144: `coding` = the coding runtime works on a repository in this thread (the code face) */
   kind?: string | null;
   created_at: string;
@@ -126,6 +130,10 @@ export interface HistoryThreadRow {
   last_body?: string | null;
   /** 0119: set = a scheduled automation opened this thread — the rows wear the routine marker */
   schedule_id?: string | null;
+  /** that schedule's payload (JSON text) and the kind of its own room: the plan card's approver test
+   *  (cards/planapprover.ts). null while the schedule row is not in the replica */
+  schedule_payload?: string | null;
+  schedule_room_kind?: string | null;
   /** 0144: `coding` — the row wears the prompt glyph and its session's facts */
   kind?: string | null;
   /** the status inputs (shared/threadstatus.ts, 0137): the settle stamp, who spoke last and when */

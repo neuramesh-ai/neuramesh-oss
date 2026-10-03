@@ -6034,6 +6034,43 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 .nhengineering.live { color: var(--prog); }
 .nhengineering.ask { color: var(--accent); }
 .routinechip { flex: none; display: inline-flex; align-items: center; gap: 4px; font: 600 9.5px var(--fmono); letter-spacing: -.02em; text-transform: uppercase; color: var(--muted); border: 1px solid var(--border2); border-radius: var(--r-pill); padding: 2.5px 8px; }
+/* ── one session per routine (docs/design/routine-sessions-2026-09, docs/33 §8) ──────────────────
+   A schedule's session holds every run. Each run opens with a DIVIDER (its date, mono and quiet, the
+   newest in the text color) and a STRIP: the state word in its state color, then the time it took and
+   what it made, and one line while the run is folded. The routine card sits on top and holds the
+   prompt once. Colors are the rail's state tokens, so a run reads the same word in the same color. */
+.sruncard { display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; margin-bottom: 4px;
+  border: 1px solid var(--border); border-radius: 8px; background: var(--panel2); }
+.sruncardico { flex: none; display: inline-flex; margin-top: 1px; color: var(--muted); }
+.sruncardtext { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.sruncardkick { font: 500 10px var(--fmono); letter-spacing: .06em; text-transform: uppercase; color: var(--dim); }
+.sruncardprompt { font-size: 13.5px; line-height: 1.5; color: var(--text); white-space: pre-wrap; overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.sruncardmeta { font: 500 11px var(--fmono); color: var(--muted); }
+.sruncardact { flex: none; display: flex; gap: 6px; }
+.sruncardact .btn.sm { padding: 5px 10px; font-size: 11px; gap: 6px; }
+.srundiv { display: flex; align-items: center; gap: 12px; margin: 18px 0 8px; scroll-margin-top: 12px; }
+.srundiv::before, .srundiv::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+.srundiv span { font: 500 10.5px var(--fmono); letter-spacing: .06em; text-transform: uppercase; color: var(--dim); }
+.srundiv.newest span { color: var(--text); }
+.srunstrip { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 7px 12px; margin-bottom: 4px;
+  border: 1px solid var(--border); border-radius: var(--r-md); background: var(--panel); font: 500 11px var(--fmono); color: var(--muted); }
+.srunword { flex: none; display: inline-flex; align-items: center; gap: 6px; font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase; }
+.srunword.s-progress { color: var(--prog); }
+.srunword.s-needs, .srunword.s-failed { color: var(--warn); }
+.srunword.s-done { color: var(--done); }
+.srundot { width: 7px; height: 7px; margin: 0 3px; border-radius: 50%; background: currentColor; }
+.srunsep { color: var(--dim); }
+.srunline { flex: 1; min-width: 0; margin-left: 6px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  font: 400 13px var(--font); color: var(--body); }
+.sruntoggle { flex: none; margin-left: auto; display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; background: none;
+  font: 500 10.5px var(--fmono); letter-spacing: .04em; text-transform: uppercase; color: var(--muted); cursor: pointer;
+  transition: color var(--dur-fast) var(--ease); }
+.sruntoggle:hover { color: var(--text); }
+.sruntoggle:focus-visible { outline: none; color: var(--text); box-shadow: 0 0 0 2px var(--ring); border-radius: var(--r-sm); }
+.sruntoggle svg { transition: transform var(--dur) var(--ease); }
+.sruntoggle.open svg { transform: rotate(180deg); }
+@media (prefers-reduced-motion: reduce) { .sruntoggle svg { transition: none; } }
 /* ONE liveness signal (docs/29 §10): the same pulse the Recents dot uses, on the same openRuns set */
 .srow .sdial.live, .srow .sglyph.live { box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 55%, transparent); }
 .srow .sglyph.live { border-color: var(--prog); color: var(--prog); }
@@ -7920,6 +7957,19 @@ button.dprovideropt:hover:not(:disabled), .dprovideropt.external:hover { border-
 .runsrow:focus-visible { outline: none; border-color: var(--ring); }
 .runswhen { flex: none; width: 62px; font: 500 10px var(--fmono); color: var(--dim); }
 .runstitle { flex: 1; min-width: 0; font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* a routine's runs (routine sessions, 2026-09-28): the date, the run's state word and its time, then
+   its one line, and the door to its place in the session. The state word is the session strip's own */
+.runshead { display: flex; align-items: center; gap: 10px; padding: 0 7px 4px; }
+.runsheadlbl { font: 500 10px var(--fmono); letter-spacing: .06em; text-transform: uppercase; color: var(--dim); }
+.runssession { margin-left: auto; padding: 0; border: 0; background: none; font: 500 10.5px var(--fmono); text-transform: uppercase; letter-spacing: .04em; color: var(--link); cursor: pointer; }
+.runssession:hover { text-decoration: underline; }
+.runssession:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--ring); border-radius: var(--r-sm); }
+.runsrow:has(.srunword) { align-items: center; }
+.runsrow:has(.srunword) .runswhen { width: 112px; }
+.runsrow .srunword { width: 104px; }
+.runstook { flex: none; width: 92px; font: 500 10.5px var(--fmono); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.runsopen { flex: none; font: 500 10.5px var(--fmono); text-transform: uppercase; letter-spacing: .04em; color: var(--link); opacity: .85; }
+.runsrow:hover .runsopen { opacity: 1; }
 .runsreplies { flex: none; font: 500 10px var(--fmono); color: var(--muted); }
 /* a fired prompt nobody answered — the one run you want to catch, so it is the one that deviates */
 .runsreplies.quiet { color: var(--dim); font-style: italic; }

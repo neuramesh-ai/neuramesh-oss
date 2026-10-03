@@ -136,7 +136,7 @@ forget. The round: [design/routine-handsoff-2026-09](design/routine-handsoff-202
 | floors | never repo-backed (code merges on a human whatever opened the thread); a human conversation keeps every gate; playbook units keep their own contract (born approved, lean to the accept gate) | the same modules |
 
 **The anchor is what the server sees.** "Routine" is read from `tasks.origin_thread_id →
-threads.schedule_id`, so the unit must be created BY the conversation's wake (which binds
+threads.schedule_id` → the schedule's row and room, so the unit must be created BY the conversation's wake (which binds
 `originThread`). Two things make that true by construction:
 
 - **The routine resume** (`host/routineresume.ts`, docs/19 §6): a routine thread whose opener got
@@ -151,10 +151,25 @@ threads.schedule_id`, so the unit must be created BY the conversation's wake (wh
   no `originThread` and the server could not see a routine. A routine thread has a deterministic
   owner now (fire → wake → resume → unit), and "fell through" is the resume's job.
 
+**A content schedule's session is not a routine's** (2026-09-27, George: "Guard the routine
+rules"). The scheduled draft run opens a session stamped with its schedule, so the rail shows the
+clock and the Automations card lists the run. A draft waits for a person, so no rule in this section
+applies to that session. The split is one test. The launcher marks a routine on its row
+(`payload.routine`), and a row armed before that marker counts as a routine unless its room is a
+marketing room. The room is the schedule's own. The test is `isRoutineSchedule` in
+`@neuramesh/shared` (`schedule.ts`), and the server runs it again in SQL (`getThreadRoutineId`,
+`store/routine-rule.ts`). The daemon's readers share it (`host/routinerule.ts`). So the resume
+skips a draft's session, and the monitor sweep reads it. The design notify asks its person, the
+build watch leaves the builder to the orchestrator, and the orchestrator's turn there gets no
+routine note. The browser client's plan card reads **auto-approved · routine** only when a routine
+approved the plan (`cards/planapprover.ts`), so a person's approval in a draft's session reads
+**approved**. The desktop app's copy of that card still reads the bare `schedule_id`, a row in the
+[desktop backlog](desktop-parity-ledger.md).
+
 **On Pro, the routine's orchestrator runs on the Starter brain** (2026-09-16, George: "routines should always run; on the cloud, on the neuramesh starter model, which is always available on credits and does not depend on a Claude, Codex or Gemini login — one benefit of Pro"). The server births the routine's thread with `brain_override = { orchestrator: STARTER_MODEL }` when `workspaces.plan` is Pro (docs/10 §15.6); the seat is read per wake, the house model is servable by any awake machine, and the origin rung sends a routine-born session to the cloud runner. The unit's build legs run wherever their seat is served — on the Starter worker lane when the conversation's brain is the house model (docs/10 §15.8), else on the runtime their seat needs.
 
 **Honesty follows the stamp.** The plan judgment (`orchPlanDecision`) never runs on an approved
 plan on any path; the design-review notify skips routine units; the `create_task` tool result says
 the unit *started*; the stall classifier treats an approved `plan_review` as a todo waiting on its
-offer; the plan card's compact record reads **auto-approved · routine** (the unit's origin thread
-carries `schedule_id`); the unit card reads *approved · awaiting its offer*.
+offer; the plan card's compact record reads **auto-approved · routine** (a routine approved the
+plan: the unit is repo-less, and a routine opened its conversation); the unit card reads *approved · awaiting its offer*.

@@ -294,6 +294,8 @@ carries three things:
    - **The rail row wears its status word** (mark M4), in the trailing slot the room fact held. A
      row that says nothing about its status cannot carry a verb that names one. It costs the room
      name and the age: both were already on the hover card, and ⌘Y is where you search.
+     **Amended 2026-09-30 (George):** the age returns after the word on every row, and a settled
+     row wears no word, because settled is the quiet rest state of most rows. Its label keeps it.
    - **Both hover controls become three**: rename · settle · ⋯ (`RowActs`), the check present only
      while a settle can move something. **The desktop and the web thread heads gain the phone's pair
      too**: the status chip beside the room crumb, and a worded Settle button leading the head's act
@@ -310,6 +312,12 @@ carries three things:
    overlay's row (`shell/HistRow.tsx`) off the same `historyRows` + `makeRowMarks` derivation the rail,
    the bell and ⌘Y read, so the count on the bell and the group on Home can never disagree. The grouping
    is `shell/ledger.ts`, pure and tested. A workspace with no threads keeps the centred stage.
+   ▸ **Amended 2026-09-30 (the home-cards round, George: the list under the composer "might be an
+   antipattern").** The list leaves Home. The stage is the attention bar, Porch over the greeting, the
+   composer, and six cards that start work (`views/HomeCards.tsx`, the phone's `stage-cards.tsx`), on
+   the centred stage with the wordmark watermark under them. The needs-you queue keeps its doors: the
+   attention bar, the bell, the rail's `needs you` word, and ⌘Y. The phone's Home tab keeps its queue.
+   Plan: [home-cards](design/home-cards-2026-09/plan.md).
 3. **New chat**, first verb in the rail, `⌘N` — Claude/Codex muscle memory. It opens a **blank
    session** with the composer focused; the chips pick the room and mode before or after you type.
    It is a *navigation* verb, not a second composer — docs/33 §8's "new features inherit the

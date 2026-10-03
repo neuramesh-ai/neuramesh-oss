@@ -8,8 +8,10 @@
 // fact, and a timer buried in a maker is one nobody can find when it stops firing.
 import { authBlockedCard, resolveToken, runtimeFor } from '../agents';
 import { isStandDown } from '../replypolicy';
-import { isReleasePayload, nextScheduleRun, type ReleasePayload } from '@neuramesh/shared';
+import { isReleasePayload, isRoutineSchedule, nextScheduleRun, type ReleasePayload } from '@neuramesh/shared';
 import { makeReleaseWatch, type Preflight } from './releasewatch';
+import { postDraftRun } from './draftrun';
+import { continueSession } from './runsession';
 import { githubConnected, readSignalsViaConnector } from './reporead';
 import type { ApiGetFn } from './searchx';
 import type { PowerSyncDatabase } from '@powersync/node';
@@ -33,10 +35,13 @@ export function makeSchedules(ctx: {
 }) {
   const { db, apiUrl, ownerActorId, post, apiGet, agents, bootstrapAuthCardPosted, arun, runMarketingBootstrap } = ctx;
   // the release routine (docs/design/release-drafts-2026-09): a schedule whose payload carries
-  // `release` watches a repository with this machine's gh, and opens one session per window
+  // `release` watches a repository with this machine's gh, and each window with news is one run
   const owner = { kind: 'human', id: ownerActorId };
+  // one session per routine (docs/design/routine-sessions-2026-09, PR 2): each run continues the
+  // schedule's newest session, in that session's room (host/runsession.ts)
+  const session = (s: { id: string; channel_id: string }, sameRoom = false) => continueSession({ db, post, ownerActorId }, s, { sameRoom });
   const releaseWatch = makeReleaseWatch({
-    db, ownerActorId, post,
+    db, ownerActorId, post, session,
     connected: (channelId) => githubConnected(db, channelId),
     readViaConnector: (channelId, since) => readSignalsViaConnector(apiGet, owner, channelId, since),
   });
@@ -125,9 +130,10 @@ export function makeSchedules(ctx: {
       // that marker existed — and it was the whole test until 2026-08-01, which is why a routine
       // armed in a marketing room took the drafting path and landed as a scheduled-draft card in the
       // room brief instead of opening its own conversation. A marketing CONTENT schedule (rex's card)
-      // carries no marker, so it still drafts.
+      // carries no marker, so it still drafts. The test is @neuramesh/shared isRoutineSchedule, the one the
+      // hands-off readers share (2026-09-27): a draft's session keeps its person.
       const [chk] = isBootstrap ? [] : await db.getAll<{ kind: string | null }>(`select kind from channels where id = ? limit 1`, [s.channel_id]).catch(() => [] as Array<{ kind: string | null }>);
-      const isRoutine = !isBootstrap && (payload.routine === true || (chk?.kind ?? 'build') !== 'marketing');
+      const isRoutine = !isBootstrap && isRoutineSchedule(payload, chk?.kind);
       // a release routine decides BEFORE the claim whether this machine can read the repository:
       // no repository, no remote or no gh login leaves the row due for another machine, and says so
       // on the bar once the slot is well past
@@ -175,18 +181,15 @@ export function makeSchedules(ctx: {
         }
         if (isRoutine) {
           const routinePrompt = payload.prompt ?? s.title;
-          // each execution is its OWN conversation (George, 2026-07-30): the fire carries a fresh
-          // threadId, the server roots the thread at this message (0098), and the orchestrator's
-          // wake — and everything downstream — lands in that thread with full visibility, instead
-          // of the marker sitting as a loose channel-root row.
-          // …and `scheduleId` stamps the newborn thread with the automation that opened it (0119),
-          // so the Automations card can list this routine's runs from a column instead of
-          // pattern-matching the ⏱ marker below — which stops meaning anything the moment
-          // somebody renames the routine.
-          // The first line is PLAIN text (2026-09-12, George): it becomes the thread's title, and the rail
-          // draws a routine's clock itself, so `⏱ **Routine — …**` only left a stray `**` on every row.
+          // one session per routine (2026-09-28, George: runs flooded the rail): the fire continues the
+          // schedule's newest session, or opens the first one, and the orchestrator's wake — and
+          // everything downstream — lands in that thread. `scheduleId` marks this message as the run's
+          // opener (0145), which is how every client splits the session into runs, and it stamps a
+          // newborn thread with the automation that opened it (0119). The server names the session
+          // after the schedule (store/session-title.ts), and the first line stays PLAIN text (2026-09-12).
           try {
-            const r = await post('/v1/messages', { kind: 'human', id: ownerActorId }, { workspace: s.workspace_id, channel: s.channel_id, threadId: crypto.randomUUID(), scheduleId: s.id, body: `Routine · ${s.title}\n\n${routinePrompt}` });
+            const at = await session(s);
+            const r = await post('/v1/messages', { kind: 'human', id: ownerActorId }, { workspace: s.workspace_id, channel: at.channelId, threadId: at.threadId, scheduleId: s.id, body: `Routine · ${s.title}\n\n${routinePrompt}` });
             if (!r.ok) throw new Error(`the server refused the routine's message (${r.status})`);
             console.log(`schedule_run id=${s.id} routine fired into the room`);
             await writeResult(null);
@@ -223,10 +226,12 @@ export function makeSchedules(ctx: {
         const slotLabel = ((): string => {
           try { return new Intl.DateTimeFormat([], { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: s.tz }).format(new Date(slotIso)); } catch { return s.at_time; }
         })();
-        await post('/v1/messages', actor, { workspace: s.workspace_id, channel: s.channel_id, body: `📝 **Scheduled draft — ${s.title}** · for ${slotLabel}\n\n${reply}` });
-        // the draft is also a content item carrying its slot — the calendar's atom,
-        // chip already on the slot, waiting for a human approve (which keeps the slot)
-        await post('/v1/commands', actor, { type: 'content.create', channel: s.channel_id, platform: 'x', body: reply, schedule: s.id, slotAt: slotIso }).catch(() => {});
+        // the run continues the schedule's session in its room, or opens the first one (2026-09-27): the
+        // message opens the run, then the draft names the thread, so the card renders there. the draft is
+        // also the calendar's atom: its chip sits on the slot and waits for a human approve, which keeps the
+        // slot. host/draftrun.ts. the session stays in the schedule's room: the run posts as its agent
+        const { threadId } = await session(s, true);
+        await postDraftRun(post, runner, { schedule: s, threadId, reply, slotAt: slotIso, slotLabel });
         log({ kind: 'wake', phase: 'replied', summary: `scheduled draft posted — ${s.title}` });
         console.log(`schedule_run id=${s.id} agent=${runner.name} posted=ok`);
         await writeResult(null);

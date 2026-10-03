@@ -11,6 +11,7 @@ import { MAX_LEGS, normalizeLegs } from '../runs';
 
 import type { OrchTool, ToolCtx } from './orchtools';
 import { searchXText } from './searchx';
+import { SEARCH_X_DESC, searchXParams } from '../harness/tooldesc';
 import { readLibraryDoc } from './grounding';
 
 export function contextTools(tc: ToolCtx): OrchTool[] {
@@ -164,13 +165,10 @@ export function contextTools(tc: ToolCtx): OrchTool[] {
     // REAL ones from X — which is the point: the run this replaced hit x.com's 402 login wall
     // and filed follower-count guesses labelled "high reach". No connection, no tool result
     // to launder: it says so, and the agent must say so too.
-    { name: 'search_x', description: 'Search X (Twitter) for recent posts — the LAST 7 DAYS of public posts, with their real author handles and real engagement numbers (likes, reposts, replies). Use this for ANY question about what is being said on X: finding posts to reply to, gauging a topic, checking whether a handle is active. It reads through the room\'s connected X account, server-side. Do NOT answer X questions from WebSearch/WebFetch instead — x.com blocks unauthenticated reads, so those produce guesses; this returns facts or an honest failure. Reads are metered against the connected account, so search deliberately, with a specific query.', schema: {
-      query: z.string().min(2).max(400).describe('an X search query — supports X operators, e.g. `"ai agents" -is:retweet lang:en` or `from:handle`'),
-      max: z.number().int().min(10).max(25).optional().describe('how many posts to return (10–25, default 10)'),
-    }, run: async (input) => {
+    { name: 'search_x', description: SEARCH_X_DESC, schema: searchXParams(z), run: async (input) => {
       log?.({ kind: 'tool', phase: 'call', summary: `search_x ${input.query.slice(0, 60)}` });
       // ONE implementation (host/searchx.ts) — the chat registry and worker legs read the same
-      return searchXText(apiGet, actor, { workspaceId: ch.workspace_id, channelId: ch.id }, input.query, input.max);
+      return searchXText(apiGet, actor, { workspaceId: ch.workspace_id, channelId: ch.id }, input);
     } },
     { name: 'load_skill', description: 'Load the full body of a team Agent Skill by name — call it when a skill listed for this channel looks relevant to how the work should be scoped or routed, then fold it into the task description / checklist you create.', schema: { name: z.string().describe('the skill name from the available-skills list') }, run: async (input) => {
       const sk = skills.find((x) => x.name === input.name);

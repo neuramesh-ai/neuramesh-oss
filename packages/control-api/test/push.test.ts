@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { authCardBlock } from '@neuramesh/shared';
 import { PushService, pushAfterCommand, type ExpoPushMessage, type ExpoTicket, type PushSender } from '../src/push';
 import type { Store } from '../src/store';
 
@@ -150,6 +151,17 @@ describe('PushService.notifyCardMessage', () => {
       '#growth',
     );
     expect(calls).toHaveLength(0);
+  });
+
+  it('a switched auth card records a switch and pushes nothing, while a blocked one still pushes', async () => {
+    const auth = (switched: boolean) => `@rex cannot run on Claude here.\n\n${authCardBlock({ provider: 'anthropic', agent: 'rex', ...(switched ? { switched: true } : {}) })}`;
+    const { store } = fakeStore({ members: ['bob'], devices: { bob: ['tok-b'] } });
+    const { sender, calls } = fakeSender();
+    const push = new PushService(store, sender);
+    await push.notifyCardMessage({ id: 'm-sw', workspace: 'ws', channelId: 'chan1', taskId: null, authorKind: 'agent', authorId: 'rex', body: auth(true) }, '#marketing');
+    expect(calls).toHaveLength(0);
+    await push.notifyCardMessage({ id: 'm-bl', workspace: 'ws', channelId: 'chan1', taskId: null, authorKind: 'agent', authorId: 'rex', body: auth(false) }, '#marketing');
+    expect(calls).toHaveLength(1);
   });
 
   it('ignores a human-authored message (only agents raise cards)', async () => {

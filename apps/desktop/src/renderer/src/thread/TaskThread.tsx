@@ -43,6 +43,7 @@ import { nm as nmBridge } from '../bridge/nm';
 import { pickPlans, pickShipPlans } from '../design/plans';
 import { plainTitle } from '../room-tabs';
 import { suggestionTarget, type TaskRefInfo } from '../cards/parse';
+import { approvedByRoutine } from '../cards/planapprover';
 import { type AgentRow, type MachineRow, type MemberRow } from '../bridge/rows-crew';
 import { type ArtifactUI, type AttachmentRow, type DecisionAllRow, type TaskAllRow, type TaskRow } from '../bridge/rows-board';
 
@@ -186,14 +187,15 @@ export function TaskThread({
   // subtasks, branch/PR, and the review loop.
   const [closing, setClosing] = useState(false);
   const [blocking, setBlocking] = useState(false);
-  // hands-off (2026-09-16): the unit's origin thread carries schedule_id when a routine opened it —
-  // the plan card's record then reads auto-approved · routine instead of a human's approved
+  // hands-off (2026-09-16): the plan card's record reads auto-approved · routine instead of a human's
+  // approved, but only when a ROUTINE approved the plan (2026-09-27, cards/planapprover.ts): never in a
+  // content schedule's session, and never on repo work
   const [routineBorn, setRoutineBorn] = useState(false);
   useEffect(() => {
     const origin = task.origin_thread_id;
     if (!nm?.watchHistoryAll || !origin) { setRoutineBorn(false); return; }
-    return nm.watchHistoryAll((rows) => setRoutineBorn(rows.some((r) => r.id === origin && !!r.schedule_id)));
-  }, [task.origin_thread_id]);
+    return nm.watchHistoryAll((rows) => setRoutineBorn(approvedByRoutine({ repo_id: task.repo_id }, rows.find((r) => r.id === origin))));
+  }, [task.origin_thread_id, task.repo_id]);
   const [blockReason, setBlockReason] = useState('');
   const [threadLightbox, setThreadLightbox] = useState<AttachmentRow | null>(null);
   const [cfocus, setCfocus] = useState(0); // ⌥-click on a pill drops its text here to edit

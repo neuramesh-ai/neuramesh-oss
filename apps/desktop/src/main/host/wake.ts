@@ -25,12 +25,13 @@ import { foLabel } from './staffing';
 import { withTimeout } from './turnkit';
 import { postWithRetry } from '../presence';
 import { isStandDown } from '../replypolicy';
-import { TURN_BUDGETS, genImageItemId, genVideoItemId, isChatThread, modelFreeItemId, parseKindMarker, parseModeMarker } from '@neuramesh/shared';
+import { TURN_BUDGETS, genVideoItemId, isChatThread, isRoutineScheduledMarker, modelFreeItemId, parseKindMarker, parseModeMarker, cardsAsWords } from '@neuramesh/shared';
 import { makeFilm } from './videogen';
 import { streamFixture } from './streamfixture';
 import type { PowerSyncDatabase } from '@powersync/node';
 import type { HostedAgent, SkillRef, ThreadTask } from '../agents';
 import type { LogFn } from '../agentlog';
+import { runWindow } from './runwindow';
 import type { SubjectRef } from '../harness/brain';
 import type { makeRuns } from './runs';
 import type { makeBlock } from './block';
@@ -53,14 +54,14 @@ export function makeWake(ctx: {
   apiUrl: string;
   arun: (agent: HostedAgent, t?: { id: string; number: number; channel_id?: string } | null, channelSlug?: string | null) => { log: LogFn; runId: string };
   blockFor: ReturnType<typeof makeBlock>['blockFor'];
-  brainNotes: (subject: SubjectRef, cap?: number, perNote?: number) => string;
-  brainResults: (subject: SubjectRef, cap?: number, per?: number) => string;
+  brainNotes: (subject: SubjectRef, cap?: number, perNote?: number, since?: number) => string;
+  brainResults: (subject: SubjectRef, cap?: number, per?: number, since?: number) => string;
   chatTurn: ReturnType<typeof makeChatTurn>['chatTurn'];
   discoverSkills: (channelId: string, workspaceId: string) => Promise<SkillRef[]>;
+  drawOnAsk: ReturnType<typeof makeContent>['drawOnAsk'];
   echoOrchestrate: ReturnType<typeof makeEcho>['echoOrchestrate'];
   echoPlanReview: ReturnType<typeof makeEcho>['echoPlanReview'];
   echoThreadOrchestrate: ReturnType<typeof makeEcho>['echoThreadOrchestrate'];
-  generateDraftImage: ReturnType<typeof makeContent>['generateDraftImage'];
   handleExhaustion: ReturnType<typeof makeStaffing>['handleExhaustion'];
   openWakeRun: (agent: HostedAgent, where: { workspace: string; channelId: string; threadId?: string | null; taskId?: string | null }, prompt: string, triggerMessageId?: string | null) => Promise<RunHandle>;
   orchestratorTurn: OrchestratorTurn;
@@ -78,7 +79,7 @@ export function makeWake(ctx: {
   const { db } = ctx;
   // the film lane (videogen.ts): the card's ‹gen-video:› marker, served like the draw marker
   const { filmDraft } = makeFilm({ db, apiUrl: ctx.apiUrl, ownerActorId: ctx.ownerActorId, post: ctx.post, agents: ctx.agents });
-  const { NO_RUN, alog, apiUrl, arun, blockFor, brainNotes, brainResults, chatTurn, discoverSkills, echoOrchestrate, echoPlanReview, echoThreadOrchestrate, generateDraftImage, handleExhaustion, openWakeRun, orchestratorTurn, ownerActorId, post, rearmWake, reviseContentDrafts, seatFor, setStatus, threadModeFor, threadTranscript, wakeEnded, wakeStarted } = ctx;
+  const { NO_RUN, alog, apiUrl, arun, blockFor, brainNotes, brainResults, chatTurn, discoverSkills, drawOnAsk, echoOrchestrate, echoPlanReview, echoThreadOrchestrate, handleExhaustion, openWakeRun, orchestratorTurn, ownerActorId, post, rearmWake, reviseContentDrafts, seatFor, setStatus, threadModeFor, threadTranscript, wakeEnded, wakeStarted } = ctx;
   // the NeuraMesh brain refused the turn for credits: say so in the thread (computenotice.ts), never
   // silence. replyTo keeps it to one notice per trigger: the server holds one reply per (agent, trigger).
   // A conversation can move rooms mid-turn (file_conversation), so its thread names the room, as in wake().
@@ -97,7 +98,7 @@ export function makeWake(ctx: {
 
 
   async function wakeThread(agent: HostedAgent, m: { id: string; body: string }, t: ThreadTask) {
-    agent = await seatFor(agent, t.channel_id, { taskId: t.id }); // per-project + per-thread brains (docs/10)
+    agent = await seatFor(agent, t.channel_id, { taskId: t.id, trigger: m.id }); // per-project + per-thread brains (docs/10), and the asker's own pick (0148)
     setStatus(agent, 'thinking');
     // open the thread's stream with NO text: presence, so the surface where the reply will
     // land shows this agent working from the first moment — the only reliable attribution
@@ -115,9 +116,13 @@ export function makeWake(ctx: {
       // another member's machine holds the lease — it is answering, so we generate nothing (0114)
       if (wakeRun.lost) return;
       let cred = await resolveToken(apiUrl, ch.workspace_id, agent, ownerActorId);
+      // a draw or a film is a BUTTON, not a turn (2026-09-27): it runs no model, so it asks nothing
+      // of the seat's login, and whoever woke answers it (a task draft's ask from a tab or the phone
+      // wakes whoever the task's state names, and before this only a content task's assignee drew)
+      const button = modelFreeItemId(m.body);
       // the seat cannot run → the Starter door (host/starterfallback.ts): a routine's unit re-seats
       // and says why, a human's gets the reason and the card
-      const gap = unavailableOf(cred, agent.runtime);
+      const gap = button ? null : unavailableOf(cred, agent.runtime);
       if (gap) {
         const next = await starterFallback(agent, gap, { workspace: ch.workspace_id, channelId: ch.id, taskId: t.id, taskNumber: t.number });
         if (!next) { console.log(`agent_thread_wake agent=${agent.name} task=${t.number} unavailable=${gap.kind}`); return; }
@@ -127,7 +132,9 @@ export function makeWake(ctx: {
       const mode = process.env['NM_AGENT_MODE'] === 'echo' ? 'echo' : cred.authMode !== 'none' ? 'claude' : 'echo';
 
       let reply: string;
-      if (agent.role === 'orchestrator') {
+      if (button) {
+        reply = genVideoItemId(m.body) ? await filmDraft(agent, ch, button) : await drawOnAsk(agent, ch, button);
+      } else if (agent.role === 'orchestrator') {
         const { log: tlog } = arun(agent, t, ch.slug);
         const skills = await discoverSkills(ch.id, ch.workspace_id);
         if (skills.length) tlog({ kind: 'tool', phase: 'inject', summary: `${skills.length} skill${skills.length === 1 ? '' : 's'} available in #${ch.slug}` });
@@ -146,11 +153,6 @@ export function makeWake(ctx: {
               ? await echoPlanReview(agent, t, ch, m.body)
               : `[echo · ${agent.name}] noted in #${t.number}: “${m.body.slice(0, 80)}”`;
         }
-      } else if (t.kind === 'content' && t.assignee_kind === 'agent' && t.assignee_id === agent.id && genVideoItemId(m.body)) {
-        reply = await filmDraft(agent, ch, genVideoItemId(m.body)!);
-      } else if (t.kind === 'content' && t.assignee_kind === 'agent' && t.assignee_id === agent.id && genImageItemId(m.body)) {
-        // the card's "Generate image" / "Try again" — draw ONE draft from its EXISTING brief, no LLM turn
-        reply = await generateDraftImage(agent, ch, genImageItemId(m.body)!);
       } else if (t.kind === 'content' && t.assignee_kind === 'agent' && t.assignee_id === agent.id) {
         // a content-task reply asks the marketer to REVISE its drafts, not just chat — it produces
         // a revised.json, the daemon applies it to the flagged cards, and the reply reports it (§4.5)
@@ -218,7 +220,7 @@ export function makeWake(ctx: {
   }
 
   async function wake(agent: HostedAgent, m: { id: string; channel_id: string; thread_id?: string | null; body: string }) {
-    agent = await seatFor(agent, m.channel_id, { threadId: m.thread_id }); // per-project + per-thread brains (docs/10)
+    agent = await seatFor(agent, m.channel_id, { threadId: m.thread_id, trigger: m.id }); // per-project + per-thread brains (docs/10), and the asker's own pick (0148)
     setStatus(agent, 'thinking');
     // registered before any awaits: the monitor self-check defers while a wake is live in
     // this channel (gateMonitor) — two concurrent triage turns once created duplicate tasks
@@ -248,7 +250,8 @@ export function makeWake(ctx: {
       // the seat cannot run → the Starter door (host/starterfallback.ts): a routine's conversation
       // re-seats it and says why; a human's gets the reason and the card, as a reply to their
       // message and in their thread, where they are looking. Nothing is billed unasked.
-      const gap = unavailableOf(cred, agent.runtime);
+      // …but never for a draw or a film in a conversation: a button runs no model (the task path's rule)
+      const gap = m.thread_id && modelFreeItemId(m.body) ? null : unavailableOf(cred, agent.runtime);
       if (gap) {
         const next = await starterFallback(agent, gap, { workspace: ch.workspace_id, channelId: ch.id, threadId: m.thread_id, replyTo: m.id }, log);
         if (!next) { emitChat('', true); setStatus(agent, 'online'); return; }
@@ -259,8 +262,8 @@ export function makeWake(ctx: {
 
       let reply: string;
       // ── The draft-card image button, in a CONVERSATION ─────────────────────────────────
-      // Same intercept the task wake carries: draw one draft from the brief already on it, no
-      // LLM turn, whatever the thread's mode. It sits ABOVE the chat-mode branch because it is
+      // Same intercept the task wake carries: draw one draft (its brief written first when it has
+      // none, host/drawdraft.ts), no turn, whatever the thread's mode. It sits ABOVE the chat-mode branch because it is
       // not a conversation — it is a button, and routing it through a model turn would have the
       // agent narrate the request instead of answering it. Ungating this from content tasks is
       // the reported half of the wider "features must not be gated on a thread's kind" ruling.
@@ -270,6 +273,8 @@ export function makeWake(ctx: {
       // turn for WHOEVER was woken. Read straight from the replica — the mode is a synced
       // column, so this is the same answer on every machine.
       const chatMode = m.thread_id ? isChatThread(await threadModeFor(m.thread_id)) : false;
+      // one session per routine: a schedule's session is read from its newest run's opener (host/runwindow.ts)
+      const win = await runWindow(db, m.thread_id);
       // TEST-ONLY (host/streamfixture.ts): echo mode with NM_STREAM_FIXTURE=1 writes a fixed reply
       // at a model's pace through the SAME emitChat a real turn feeds, so the live lanes can be measured
       const fixture = mode === 'echo' ? streamFixture() : null;
@@ -279,7 +284,7 @@ export function makeWake(ctx: {
         const glog = alog(agent, null, ch.slug, runId);
         const filming = genVideoItemId(m.body) !== null;
         glog({ kind: 'wake', phase: 'channel', summary: filming ? `filming one draft` : `generating the image for one draft` });
-        reply = filming ? await filmDraft(agent, ch, genImage) : await generateDraftImage(agent, ch, genImage);
+        reply = filming ? await filmDraft(agent, ch, genImage) : await drawOnAsk(agent, ch, genImage);
       } else if ((chatMode || (agent.role === 'marketer' && !!m.thread_id)) && mode === 'claude') {
         // The marketer's deliverables are thread-native (docs/design/thread-posts: drafts hand over
         // with draft_posts in ANY room), so an @mention of the marketer in a session takes the
@@ -291,8 +296,8 @@ export function makeWake(ctx: {
         const clog = alog(agent, null, ch.slug, runId);
         clog({ kind: 'wake', phase: 'channel', summary: chatMode ? `chat turn (Tasks off) — answering in the thread, nothing reaches the board` : `the marketer answers in the thread with its drafting tools, nothing reaches the board` });
         const recent = await db.getAll<{ author_kind: string; author_id: string; body: string }>(
-          `select author_kind, author_id, body from messages where thread_id = ? order by created_at desc limit 24`,
-          [m.thread_id],
+          `select author_kind, author_id, body from messages where thread_id = ? and created_at >= ? order by created_at desc limit 24`,
+          [m.thread_id, win.cut],
         );
         const att = await loadMessageAttachments(db, m.id);
         // a chat carries MORE history than a board wake (24 turns): the conversation IS the
@@ -305,7 +310,7 @@ export function makeWake(ctx: {
         // and none of them knew the cost.
         const ctx = assemble([
           transcriptBlock(
-            recent.reverse().filter((r) => !parseModeMarker(r.body) && !parseKindMarker(r.body)).map((r) => ({ ...r, body: r.body.replace(SKILL_MARKER, '').trim() })),
+            recent.reverse().filter((r) => !parseModeMarker(r.body) && !parseKindMarker(r.body) && !isRoutineScheduledMarker(r.body)).map((r) => ({ ...r, body: cardsAsWords(r.body.replace(SKILL_MARKER, '').trim()) })),
             { selfId: agent.id },
           ),
           { source: 'attachments', text: att.manifest },
@@ -333,8 +338,8 @@ export function makeWake(ctx: {
           // exchange being continued — instead of the room's interleaved feed.
           const recent = m.thread_id
             ? await db.getAll<{ author_kind: string; author_id: string; body: string }>(
-                `select author_kind, author_id, body from messages where thread_id = ? order by created_at desc limit 14`,
-                [m.thread_id],
+                `select author_kind, author_id, body from messages where thread_id = ? and created_at >= ? order by created_at desc limit 14`,
+                [m.thread_id, win.cut],
               )
             : await db.getAll<{ author_kind: string; author_id: string; body: string }>(
                 `select author_kind, author_id, body from messages where channel_id = ? and task_id is null order by created_at desc limit 14`,
@@ -351,10 +356,10 @@ export function makeWake(ctx: {
           const oSubject: SubjectRef | null = m.thread_id ? { kind: 'thread', id: m.thread_id } : null;
           const octx = assemble([
             { source: 'facts', text: block ? `[channel summary block]\n${block}` : '' },
-            { source: 'notes', text: oSubject ? brainNotes(oSubject) : '' },
-            { source: 'results', text: oSubject ? brainResults(oSubject) : '' },
+            { source: 'notes', text: oSubject ? brainNotes(oSubject, undefined, undefined, win.since) : '' },
+            { source: 'results', text: oSubject ? brainResults(oSubject, undefined, undefined, win.since) : '' },
             transcriptBlock(
-              recent.reverse().filter((r) => !parseModeMarker(r.body) && !parseKindMarker(r.body)).map((r) => ({ ...r, body: r.body.replace(SKILL_MARKER, '').trim() })),
+              recent.reverse().filter((r) => !parseModeMarker(r.body) && !parseKindMarker(r.body) && !isRoutineScheduledMarker(r.body)).map((r) => ({ ...r, body: cardsAsWords(r.body.replace(SKILL_MARKER, '').trim()) })),
               { selfId: agent.id },
             ),
             { source: 'skills', text: attached ? `[The human attached the skill "${attached.name}"${attached.pack ? ` from pack ${attached.pack}` : ''} via "/" — strongly consider load_skill on it and folding its guidance into how you scope/route this work.]` : '' },
@@ -370,8 +375,8 @@ export function makeWake(ctx: {
         // a conversation-thread trigger reads ITS thread, not the interleaved room feed
         const recent = m.thread_id
           ? await db.getAll<{ author_kind: string; body: string }>(
-              `select author_kind, body from messages where thread_id = ? order by created_at desc limit 8`,
-              [m.thread_id],
+              `select author_kind, body from messages where thread_id = ? and created_at >= ? order by created_at desc limit 8`,
+              [m.thread_id, win.cut],
             )
           : await db.getAll<{ author_kind: string; body: string }>(
               `select author_kind, body from messages where channel_id = ? and task_id is null order by created_at desc limit 8`,
