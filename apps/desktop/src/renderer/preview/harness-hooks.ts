@@ -11,10 +11,11 @@
 //   window.__nmAgentSays(taskId, agentId, body)      — an agent posts into a task thread
 //   window.__nmHumanSays(taskId, body, agoMs?)       — you replied, and nothing has answered
 //   window.__nmHumanSaysInConvo(threadId, body, ms?) — the same, in a conversation
+//   window.__nmAgentDelivers(taskId, file)           — an agent delivers a file to a task (it opens in the side panel)
 //
 // `agoMs` ages the message, which is what makes the WAIT DEADLINE reachable (docs/26 §5): a state
 // that by definition only exists minutes after a send.
-import { baseThreadRows, convoMsgs, pingConvo, taskThreadExtra, taskThreadWatchers } from './mock-fixtures';
+import { allTasks, artifacts, baseThreadRows, convoMsgs, pingArts, pingConvo, taskThreadExtra, taskThreadWatchers } from './mock-fixtures';
 
 const push = (rows: any[], key: string, row: Record<string, unknown>) => {
   rows.push({ id: `${key}-${rows.length + 1}`, created_at: new Date().toISOString(), ...row });
@@ -46,4 +47,12 @@ export const humanSaysInConvo = (threadId: string, body: string, agoMs = 0) => {
   pingConvo(threadId);
 };
 
-if (typeof window !== 'undefined') Object.assign(window, { __nmAgentSays: agentSays, __nmHumanSays: humanSays, __nmHumanSaysInConvo: humanSaysInConvo });
+/** an agent DELIVERS a file to a task after first paint: the artifact watch fires, and the side panel
+ *  opens it by itself (the side-panel round, 2026-10-03). `message_id` null: a deliverable, not an upload. */
+export const agentDelivers = (taskId: string, file: { name: string; kind?: string; content: string }) => {
+  const num = allTasks.find((t) => t.id === taskId)?.number ?? null;
+  (artifacts as any[]).push({ id: `late-art-${artifacts.length + 1}`, kind: file.kind ?? 'doc', name: file.name, inline_content: file.content, promoted: 0, created_at: new Date().toISOString(), task_number: num, channel_slug: 'dev', message_id: null });
+  pingArts(taskId);
+};
+
+if (typeof window !== 'undefined') Object.assign(window, { __nmAgentSays: agentSays, __nmHumanSays: humanSays, __nmHumanSaysInConvo: humanSaysInConvo, __nmAgentDelivers: agentDelivers });

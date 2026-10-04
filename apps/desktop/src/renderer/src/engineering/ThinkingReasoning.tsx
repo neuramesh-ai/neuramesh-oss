@@ -15,6 +15,8 @@ export interface ThinkingReasoningProps {
   elapsedSeconds?: number | null;
   collapseWhenDone?: boolean;
   ariaLabel?: string;
+  /** the header while it thinks (the live bubble's "Thoughts · 12 s"); the Code lane keeps its own */
+  liveLabel?: string;
 }
 
 const MAX_VIEWPORT_HEIGHT = 180;
@@ -25,6 +27,7 @@ export function ThinkingReasoning({
   elapsedSeconds,
   collapseWhenDone = true,
   ariaLabel = 'Toggle thought',
+  liveLabel = 'Thinking…',
 }: ThinkingReasoningProps) {
   const [open, setOpen] = useState(thinking || !collapseWhenDone);
   const [viewportHeight, setViewportHeight] = useState(0);
@@ -80,7 +83,7 @@ export function ThinkingReasoning({
         onClick={thinking ? undefined : () => setOpen((value) => !value)}
       >
         {thinking ? (
-          <span className={`${styles.trLabel} ${styles.trShimmer}`}>Thinking…</span>
+          <span className={`${styles.trLabel} ${styles.trShimmer}`}>{liveLabel}</span>
         ) : (
           <span className={styles.trLabel}><span className={styles.trVerb}>Thought</span>{duration}</span>
         )}

@@ -29,8 +29,8 @@ export interface Store {
   machineSweep?(intervalMin: number): Promise<import('../fleet-lifecycle').MachineSweepResult>;
   machineUsageToday?(workspaceId: string): Promise<{ day: string; minutes: number }>;
   /** the public announce door (0139): one object, two implementations (store/announce.ts) */
-  announcements?: import('./announce').AnnounceStore;
-  films?: import('./films').FilmStore; // the video rung's job rows (0140): the door writes, the minute cron works, the history reads
+  announcements?: import('./announce').AnnounceStore;   replies?: import('./replies').ReplyStore; // the reply queue (0146): the person queues, the minute cron reminds
+  films?: import('./films').FilmStore;   agentModels?: import('./agent-models').AgentModelStore; // the video rung's job rows (0140): the door writes, the minute cron works, the history reads · a person's model for each agent (0148)
   createTask(task: Task, event: NMEvent): Promise<Task>;
   // Duplicate-create guard (handler createTask): the newest OPEN non-backlog task in the
   // channel whose normalizeTaskTitle(title) matches, created at/after sinceIso — else null.
@@ -94,7 +94,7 @@ export interface Store {
   activeProjectCount(workspace: string): Promise<number>;
   setWorkspacePlan(workspace: string, patch: { plan?: string; seats?: number; subscriptionStatus?: string | null; stripeCustomerId?: string | null; stripeSubscriptionId?: string | null; currentPeriodEnd?: string | null }): Promise<void>;
   // Billing-checkout inputs: the existing Stripe customer (reuse it) + the member count to bill (seats).
-  workspaceForBilling(workspace: string): Promise<{ stripeCustomerId: string | null; memberCount: number } | null>;
+  workspaceForBilling(workspace: string): Promise<{ stripeCustomerId: string | null; memberCount: number; plan: string; stripeSubscriptionId: string | null } | null>;
   // Re-bind every agent to its home-remit channels across all projects (recovery + cross-project).
   syncWorkspaceAgents(workspace: string, makeEvent: (workspace: string) => NMEvent): Promise<{ registered: number }>;
   // Sanctioned purge: owner + sole member only; the events log clears under
@@ -216,8 +216,9 @@ export interface Store {
   // question in the same channel/thread, so re-emitted cards (plan re-review rounds) never
   // pile up as stale "needs you" entries.
   postMessage(msg: NMMessage, event: NMEvent, decisions?: DecisionSeed[]): Promise<NMMessage>;
-  /** the automation that opened this thread, when a routine did (0119) — null for human threads */
-  getThreadScheduleId(workspace: string, threadId: string): Promise<string | null>;
+  /** the ROUTINE that opened this thread (0119): null for a person's thread and for a content schedule's
+   *  session, whose drafts wait for a person (store/routine-rule.ts). every caller is hands-off machinery */
+  getThreadRoutineId(workspace: string, threadId: string): Promise<string | null>;
   /** the room's setup task id (docs/39) — null when the kind has no flow or none was planted */
   getSetupTaskId(channelId: string): Promise<string | null>;
   // Conversation threads: refine the heuristic title/description (thread.update — human or
@@ -257,7 +258,7 @@ export interface Store {
   // Auto-filing (0109). `threadFiling` is what the gate reads (canFileConversation, shared/filing);
   // `moveThread` performs it — the thread AND its messages, in one transaction, because a message
   // left behind in the old room is a conversation split across two rooms' surfaces.
-  threadFiling(workspace: string, threadId: string): Promise<{ taskId: string | null; filedAt: string | null; channelId: string; projectId: string | null } | null>;
+  threadFiling(workspace: string, threadId: string): Promise<{ taskId: string | null; filedAt: string | null; channelId: string; projectId: string | null; scheduleId?: string | null; kind?: string | null } | null>;
   channelProject(workspace: string, channelId: string): Promise<{ projectId: string | null; slug: string } | null>;
   /** `stamp` records the agent's one move; a human's correction leaves `filed_at` untouched. */
   moveThread(workspace: string, threadId: string, channelId: string, reason: string | null, stamp: boolean): Promise<void>;
@@ -398,9 +399,12 @@ export interface Store {
   // schedules (marketing-channel plan §4.6) — the generic "run X at time T" primitive
   createSchedule(input: ScheduleInput, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }>;
   setScheduleStatus(scheduleId: string, status: 'active' | 'paused', makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }>;
-  updateSchedule(scheduleId: string, patch: { title: string; prompt: string; cadence: string; atTime: string; tz: string; weekday: number | null; nextRunAt: string }, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }>;
+  updateSchedule(scheduleId: string, patch: { title: string; prompt: string; cadence: string; atTime: string; tz: string; weekday: number | null; nextRunAt: string; replyGap?: number | null }, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }>;
   deleteSchedule(scheduleId: string, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }>;
   claimScheduleRun(scheduleId: string, runCount: number, nextRunAt: string | null, makeEvent: (workspace: string) => NMEvent): Promise<{ claimed: boolean }>;
+  /** Run now (routine sessions, 2026-09-28): the schedule is due at once, so the next tick fires it into its
+   * session. INVALID_INPUT on a paused or finished row, NOT_FOUND on none (store/schedule-now.ts). */
+  runScheduleNow(scheduleId: string, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }>;
   /** The fire's outcome, written by the daemon that ran (or could not run) it: a string lands in
    * `schedules.last_error` — the synced truth the attention bar renders — and `null` clears it.
    * The column existed since 0082 with no writer, which is why a failing routine was invisible. */
@@ -416,6 +420,8 @@ export interface Store {
   /** the marketer revises its OWN unpublished draft (§4.5) — body/imageBrief/thumb; DRAFT status only */
   reviseDraft(itemId: string, patch: { body: string | null; imageBrief: string | null; script?: string | null; frame?: string | null; seconds?: number | null; videoPending?: boolean; videoMeta?: import('./films').VideoMeta | null; videoErrorCode?: 'NO_CREDITS' | 'UNAVAILABLE' | null; thumb: string | null; imageError?: string | null; videoError?: string | null }, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }>;
   deleteContentItem(itemId: string, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }>;
+  /** a draft with no thread and no task moves into a conversation in its own room (store/content-anchor.ts) */
+  anchorContentItem(itemId: string, threadId: string, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }>;
   /** host a draft's image bytes (0090) and point content_items.media.image_id at them — the
    *  only way a locally generated picture can ever reach a network that fetches URLs */
   attachContentMedia(itemId: string, mime: string, bytes: Buffer, actor: { kind: string; id: string }, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }>;

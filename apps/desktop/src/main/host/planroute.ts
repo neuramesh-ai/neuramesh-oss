@@ -7,6 +7,7 @@
 // one-shot guard so the next row change retries. Build-first units never come here — the claim
 // watch in agents.ts handles them (and both it and the server refuse to skip a design leg).
 import type { HostCtx } from './ctx';
+import { isRoutineUnit } from './routinerule';
 
 interface WatchDb {
   watch: (
@@ -68,7 +69,8 @@ export function startPlanRouteWatch(ctx: { db: WatchDb; post: HostCtx['post']; w
  * approved and nobody to offer it: a human's round wakes the orchestrator with their approval
  * click, a routine's cannot. Mechanical, like the design routing above — the room's worker is
  * offered exactly as an approved plan is (offerPlanToWorker). Routine-scoped on purpose: the human
- * path keeps the orchestrator's judgment about WHO builds. `artifacts.promoted` is the proof the
+ * path keeps the orchestrator's judgment about WHO builds, and a content schedule's session is a human
+ * path (host/routinerule.ts, 2026-09-27). `artifacts.promoted` is the proof the
  * round was approved (the approve promotes it in the same transaction), and the repo floor rides
  * in the query — a repo-backed round is a human's to approve, so it never lands here.
  */
@@ -96,6 +98,8 @@ export function startRoutineBuildWatch(ctx: {
           if (!orch) continue; // not this host's room — the host with the orchestrator offers
           offered.add(t.id);
           void (async () => {
+            // a content schedule's session keeps its person (2026-09-27): they approved this round, and their word wakes the orchestrator
+            if (!(await isRoutineUnit(db, t.id))) return;
             const [ch] = await db.getAll<{ id: string; slug: string; workspace_id: string }>('select id, slug, workspace_id from channels where id = ?', [t.channel_id]);
             if (!ch) { offered.delete(t.id); return; }
             await offerPlanToWorker(orch as never, t as never, ch);

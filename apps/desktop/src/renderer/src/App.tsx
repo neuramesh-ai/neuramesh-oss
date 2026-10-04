@@ -1,9 +1,10 @@
 import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { agentInChannel, type ShipPlan, awaitingAgent, actionableByHuman, decisionHandled, tasksInProject, rowsInProject, replyPreview, MARKETING_SETUP_FLOW, setupProgress, placementFor, type MachineCapability, type ThreadStatus , planLabel } from '@neuramesh/shared';
 import { historyRows, plainTitle, resolveRoomSurface, roomBriefs, roomTabsFor, type HistoryRow, type RoomSurface, liveKinOf } from './room-tabs';
-import { setConversation } from './wtabs';
+import { rekeyOwner, setConversation, type WTab } from './wtabs';
 import { emptyNavScope, navFlat, type NavScope, isChatRow, isCodeRow } from './navtree';
-import { bindReview, reviewKind, reviewPacket, type ReviewBinding, type ReviewComment, type ReviewRound, type ReviewSubject, type ReviewVerdict } from './review';
+import { bindReview, designVer, reviewKind, reviewPacket, type ReviewArtifact, type ReviewBinding, type ReviewComment, type ReviewKind, type ReviewRound, type ReviewSubject, type ReviewVerdict } from './review';
+import { familyEntry, refreshRev, reviewKey, reviewTitle, roundMockupsOf, stageMockup } from './review-round';
 import { BrandLockup } from './brand';
 import { type ChannelRow, type ChannelPersonRow, type ChannelHistoryRow, type MessageRow, type ThreadRow, type HomeConvoRow, type HistoryThreadRow, type CodeSessionRow } from './bridge/rows-rooms';
 import { CodingThread } from './views/CodingThread';
@@ -23,12 +24,17 @@ import { useNavBands } from './shell/useNavBands';
 import { useConnections, useForegroundSwap } from './shell/useConnections';
 import { isAskDecision, isAskTask } from './shell/asks';
 import { WorkspaceCalendar } from './WorkspaceCalendar';
-import { SheetHead } from './WorkspaceTabs';
+import { SheetHead, type SessionTabSpec } from './WorkspaceTabs';
+import type { CodeCounts } from './thread/CodeFace';
+import type { EngineeringWorkspaceTab } from './engineering/EngineeringEditor';
 import { MachineChip } from './compute/MachineChip';
 import { designationFor } from './compute/machine-choice';
 import { NM_PLATFORM } from './lib/platform';
-import { SideDock } from './shell/SideDock';
-import { dockActiveId, dockFoldAfter, dockKeyTarget, dockTabs } from './shell/sidedock-state';
+import { SidePanel } from './shell/SidePanel';
+import { FilesPane } from './shell/FilesPane';
+import { OverviewPane } from './shell/OverviewPane';
+import { decideArrivals, VERDICT_STATES, type PanelArrival } from './shell/arrivals';
+import { openWithSession, ownerSlot, panelFoldAfter, panelFront, panelGuests, panelKeyTarget, panelSessionOf, SESSION_TAB_LABEL, sessionTabId, sessionTabKeyOf, sessionTabsOf, type SessionTabKey } from './shell/panel-state';
 // A LOCAL alias on purpose: TS keeps control-flow narrowing inside closures for local
 // consts but drops it for imported bindings — the hundreds of `if (!nm) …` guards rely on it.
 const nm = nmBridge;
@@ -36,7 +42,7 @@ import { isOnline, agentLive, agentBusy, agentFocus } from './lib/presence';
 import { selfInitial, selfLabel, setSelfMachine } from './lib/self';
 import { errMsg } from './lib/text';
 
-import { IconActivity, IconAgents, IconBoard, IconBranch, IconBurger, IconCalendar, IconCheck, IconChevron, IconClose, IconCode, IconDockLeft, IconDockRight, IconCredits, IconFootprint, IconGrid, IconHistory, IconHome, IconInbox, IconLibrary, IconMachine, IconMedal, IconMemory, IconPaperclip, IconProject, IconRepeat, IconReply, IconSend, IconSkill, IconThreads, IconTrend, IconWhiteboard, IconCompose, IconWorkbench } from './ui/icons';
+import { IconActivity, IconAgents, IconBoard, IconBranch, IconBurger, IconCalendar, IconCheck, IconChevron, IconClose, IconCode, IconDockLeft, IconDockRight, IconCredits, IconFootprint, IconGrid, IconHistory, IconHome, IconInbox, IconLibrary, IconMachine, IconMedal, IconMemory, IconPaperclip, IconProject, IconRepeat, IconReply, IconSend, IconSkill, IconThreads, IconTrend, IconWhiteboard, IconCompose, IconFolder, IconPost, IconTerm } from './ui/icons';
 import { type ThemeId, type ThemePref, systemTheme, resolveTheme, applyTheme, loadThemePref } from './theme/theme';
 import { flashToast, useToast, setProviderSettingsOpener, setPolicySettingsOpener, setUpgradeOpener, setConnectionsSettingsOpener, setMoveToCloudOpener , openMoveToCloud } from './lib/toast';
 import { hostedGateFor } from './shell/hostedrule';
@@ -128,16 +134,15 @@ import { RailToks } from './thread/ThreadRail';
 import { createPortal } from 'react-dom';
 
 import { TaskThread } from './thread/TaskThread';
+import { FileBody, richFileBody } from './thread/FileBody';
+import { PanelShownContext } from './thread/RefCard';
 import { WFileView, type WScope, wtabBase } from './wtabs/filetree';
-import { Workbench } from './shell/Workbench';
-import { WorkbenchDock } from './shell/WorkbenchDock';
 import { BrowserPane, type MainView, type TermHandle, TerminalView, viewFromUrl, WhiteboardView } from './wtabs/guests';
 import { DockBar, NavWorkspaceFoot, UtilCluster } from './shell/chrome';
 import { StatusCluster } from './shell/statuscluster';
 import { useCompute } from './compute/useCompute';
 import { isScheduledView } from './shell/navdest';
 import { ScheduledHead } from './shell/ScheduledHead';
-import { workbenchApplies, workbenchState } from './shell/workbench-state';
 import { BellButton, BellPopover } from './shell/BellPopover';
 import { bellFlight, bellQueue } from './shell/bell';
 import { useBell, useBellHover } from './shell/useBell';
@@ -173,7 +178,7 @@ import { HistoryOverlay } from './shell/HistoryOverlay';
 import { anchorPoint, watchAnchors } from './ui/anchor';
 import { LinkChoiceHost } from './ui/LinkChoice';
 import { clampNavW, NAV_W_DEFAULT, NAV_W_MAX, NAV_W_MIN, useLayoutPrefs } from './shell/useLayoutPrefs';
-import { useWorkspaceTabs } from './wtabs/useWorkspaceTabs';
+import { useWorkspaceTabs, type OpenHow } from './wtabs/useWorkspaceTabs';
 
 // apply the persisted theme before first paint (module load runs before React mounts)
 applyTheme(resolveTheme(loadThemePref()));
@@ -241,12 +246,6 @@ const marketingReady = (marketing: string | null | undefined): boolean =>
 
 
 
-// the task peek's clamp (2026-08-10) — the split stage's second tenant sizes like the first:
-// a machine-local width, clamped so neither column can be starved into unreadability
-const PEEK_W_MIN = 300;
-const PEEK_W_MAX = 620;
-const PEEK_W_DEFAULT = 380;
-const clampPeekW = (w: number) => Math.max(PEEK_W_MIN, Math.min(PEEK_W_MAX, Math.round(w)));
 
 
 // The "@agent is typing…" status chip shown above a composer. It opens that agent's activity
@@ -503,31 +502,36 @@ export function App() {
   // mouse crosses it on the way to somewhere else constantly, so opening waits out an intent
   // delay and closing keeps a grace window (a diagonal move onto a project row must not dismiss
   // the thing under the cursor). The arrow, a click, and ⌘⇧P all open it outright.
-  // ── THE WORKBENCH's width (2026-08-16) — the nav grip's idiom at the frame's OTHER edge.
-  // Machine-local like the nav width, the theme and the fold; never synced.
-  const WB_W_MIN = 220, WB_W_MAX = 460, WB_W_DEFAULT = 284;
-  const [wbW, setWbW] = useState(() => {
-    const n = Number(localStorage.getItem('nm:panew'));
-    return Number.isFinite(n) && n >= WB_W_MIN && n <= WB_W_MAX ? n : WB_W_DEFAULT;
-  });
-  const [wbDragging, setWbDragging] = useState(false);
-  const setWbWPersist = (n: number) => {
-    const c = Math.max(WB_W_MIN, Math.min(WB_W_MAX, Math.round(n)));
-    setWbW(c);
-    try { localStorage.setItem('nm:panew', String(c)); } catch { /* private mode */ }
-  };
-  // ── THE SIDE DOCK's width (rail-ink round 3, 2026-09-04) — the same idiom, one seam further out
+  // ── THE SIDE PANEL's width (rail-ink round 3, 2026-09-04) — the nav grip's idiom at the frame's
+  // OTHER edge. Machine-local like the nav width, the theme and the fold; never synced.
   const SD_W_MIN = 320, SD_W_MAX = 1100, SD_W_DEFAULT = 460;
   const [sdW, setSdW] = useState(() => { const n = Number(localStorage.getItem('nm:sidedockw')); return Number.isFinite(n) && n >= SD_W_MIN && n <= SD_W_MAX ? n : SD_W_DEFAULT; });
   const [sdDragging, setSdDragging] = useState(false);
   const setSdWPersist = (n: number) => { const c = Math.max(SD_W_MIN, Math.min(SD_W_MAX, Math.round(n))); setSdW(c); try { localStorage.setItem('nm:sidedockw', String(c)); } catch { /* private mode */ } };
-  /** a repo picked from the `repos` face: the panel's root when no session supplies one */
-  const [wbRoot, setWbRoot] = useState<{ name: string; path: string } | null>(null);
-  /** the Details face's portal target. STATE, not a ref: the open task has to re-render when the
+  /** the session in front, for the tab openers (shell/panel-state.ts). Set further down the render,
+   *  where the open task or thread is known; openers run after the render, so they read it current. */
+  const panelOwnerRef = useRef<string | null>(null);
+  /** the Overview tab's portal target. STATE, not a ref: the open session has to re-render when the
    *  slot mounts, and a ref would hand it a stale null on the pass that matters. */
-  const [wbSlot, setWbSlot] = useState<HTMLDivElement | null>(null);
-  // the Workbench card expanded to the whole sheet (George, 2026-09-26): a session state, never persisted
-  const [wbFull, setWbFull] = useState(false);
+  const [panelSlot, setPanelSlot] = useState<HTMLDivElement | null>(null);
+  /** the panel as the global key handler reads it: the handler is bound once, so it reads a ref */
+  const panelKeysRef = useRef<{ sessionTabs: SessionTabKey[]; tabs: WTab[]; activate: (id: string) => void; files: () => void; expanded: boolean; collapse: () => void; toggle: () => void }>(
+    { sessionTabs: [], tabs: [], activate: () => {}, files: () => {}, expanded: false, collapse: () => {}, toggle: () => {} });
+  /** a fold made while an agent works, per session: it holds until that run ends (shell/arrivals.ts) */
+  const [panelHold, setPanelHold] = useState<Record<string, boolean>>({});
+  /** the coding thread's pane in the panel: the code face's body portals in here */
+  const [panelCodeSlot, setPanelCodeSlot] = useState<HTMLDivElement | null>(null);
+  /** the panel over the main area for a deep review (the card's expand, moved): a session state, never persisted */
+  const [panelExpanded, setPanelExpanded] = useState(false);
+  /** the session's drafted posts as its thread reports them: how many, and how many wait for approval */
+  const [draftsInfo, setDraftsInfo] = useState({ count: 0, waiting: 0 });
+  /** the Drafts tab's portal target: the thread draws its post cards in there */
+  const [panelDraftsSlot, setPanelDraftsSlot] = useState<HTMLDivElement | null>(null);
+  /** when the session in front opened, and which sessions already opened their waiting drafts */
+  const sessionOpenedAt = useRef(0);
+  const draftsOpenedFor = useRef(new Set<string>());
+  /** what the coding thread's own tabs wear: the change count, the checkpoints, the Work Plan's mark */
+  const [codeCounts, setCodeCounts] = useState<CodeCounts | null>(null);
   /** the quick disk read, fetched once for the shell — the workspace face's Footprint gauge */
   const footprint = useFootprint();
   // The contract lives in shell/facehover.ts as a reducer, and the timer is just its clock. It
@@ -668,9 +672,8 @@ export function App() {
     try { localStorage.setItem('nm:histSeen', JSON.stringify(n)); } catch { /* private */ }
     return n;
   });
-  const { activateWTab, closeWTab, openDefaultTerminal, openTermTab, openWPane, openWTab, patchWTab, setTabPty, setWTabDirty, setWTabMode, setWactive, setWfind, setWrbusy, setWrcomments, setWrerr, setWrevs, setWrmodes, setWtabs, subIdToTab, uniqueTitle, wactive, wactiveRef, wdocs, wfind, wpane, wrbusy, wrcomments, wrerr, wrevs, wrmodes, wstartup, wtabs, wtabsRef, dockOpen, openDock } = useWorkspaceTabs(meta);
+  const { activateWTab, closeWTab, frontOf, fronts, openDefaultTerminal, openTermTab, openWTab, patchWTab, setFront, setTabPty, setWTabDirty, setWTabMode, setWfind, setWrbusy, setWrcomments, setWrerr, setWrevs, setWrmodes, setWtabs, subIdToTab, uniqueTitle, wdocs, wfind, wrbusy, wrcomments, wrerr, wrevs, wrmodes, wstartup, wtabs, dockOpen, openDock } = useWorkspaceTabs(meta, panelOwnerRef);
   /** a workspace file, by absolute path — every doorway (the pane, ⌘P, a deliverable card, an agent's #ref) converges here */
-  const dockOpenRef = useRef(dockOpen); dockOpenRef.current = dockOpen;
   /** ⌘1: the composer in front of you — the thread's box, else Home's (the conversation is never hidden) */
   const focusComposer = () => { setHomeCompose((n) => n + 1); requestAnimationFrame(() => document.querySelector<HTMLTextAreaElement>('.tcompose textarea, .convcompose textarea')?.focus()); };
   const openFileTab = (root: string, rel: string) => {
@@ -678,19 +681,20 @@ export function App() {
     openWTab({ id: crypto.randomUUID(), kind: 'file', title: rel ? rel.split('/').pop()! : root.split('/').pop() || root, subtitle: rel || null, path, root, mode: 'edit' });
   };
   // `openEditorTab` retired 2026-08-16 — a file tab with no path was a THIRD file tree (the
-  // Workbench's, the old EditorView's, and this). The Workbench is the tree; a click in it opens
+  // Workbench's, the old EditorView's, and this). The side panel's Files tab is the tree; a click in it opens
   // a real file tab, which is what a reader actually wanted from "Editor".
   /** an agent's deliverable: read-only by capability, not by a button the UI declines to draw */
-  const openArtifactTab = (a: { id: string; kind: string; name: string; content: string }, task?: { id: string; number: number } | null) => {
+  const openArtifactTab = (a: { id: string; kind: string; name: string; content: string }, task?: { id: string; number: number } | null, how: OpenHow = {}) => {
     openWTab(
       { id: crypto.randomUUID(), kind: 'file', title: a.name, subtitle: task ? `#${task.number}` : null, path: null, artifactId: a.id, readOnly: true, taskNumber: task?.number ?? null, mode: 'preview' },
       { name: a.name, content: a.content, taskId: task?.id ?? null, taskNumber: task?.number ?? null },
+      how,
     );
   };
   const openBrowserTab = (url?: string) => openWTab({ id: crypto.randomUUID(), kind: 'browser', title: uniqueTitle('Browser'), url: url ?? null });
   // a board opens by its row id — reuse keys on whiteboardId, so one board is one tab (docs/38)
-  const openWhiteboardTab = (board: { id: string; title: string }) =>
-    openWTab({ id: crypto.randomUUID(), kind: 'whiteboard', title: board.title, whiteboardId: board.id });
+  const openWhiteboardTab = (board: { id: string; title: string }, how: OpenHow = {}) =>
+    openWTab({ id: crypto.randomUUID(), kind: 'whiteboard', title: board.title, whiteboardId: board.id }, undefined, how);
   // the ＋ flyout's Create → New whiteboard: filed to the scope's room (the chip in its header
   // names the filing), else the room you're in, else the project's first room — one decision,
   // made visibly, never a picker before you may draw
@@ -740,14 +744,10 @@ export function App() {
       setWrevs((prev) => {
         let changed = false;
         const next = { ...prev };
-        for (const [artId, rev] of Object.entries(prev)) {
-          if (rev.taskId !== taskId) continue;
-          // the artifact's own bytes too: an agent may rewrite a round in place
-          const mine = arts.find((a) => a.id === artId);
-          const content = mine?.content ?? rev.artifact.content;
-          if (JSON.stringify(rev.rounds) === JSON.stringify(rounds) && content === rev.artifact.content) continue;
-          next[artId] = { ...rev, rounds, artifact: { ...rev.artifact, content } };
-          changed = true;
+        for (const [key, rev] of Object.entries(prev)) {
+          // the bytes on stage, and a design round that grows (review-round.ts)
+          const up = rev.taskId === taskId ? refreshRev(rev, arts, rounds) : null;
+          if (up) { next[key] = up; changed = true; }
         }
         return changed ? next : prev;
       });
@@ -779,29 +779,30 @@ export function App() {
     try {
       if (say) await nm?.sendThread(rev.taskId, rev.channelId, say);
       if (v.command) await nm?.taskAction(v.command, rev.taskId, v.say === 'packet' ? packet : undefined);
-      if (v.closes) {
-        closeWTab(tabId);
-        // back to the conversation the verdict was announced in, not to whichever sibling tab
-        // happened to be next in the strip
-        const conv = wtabsRef.current.find((t) => t.kind === 'conversation');
-        if (conv) activateWTab(conv.id);
-      }
+      // the tab existed for a decision that no longer needs making: it closes, and the session's
+      // panel falls back to its own front (Overview), never to another session's tab
+      if (v.closes) closeWTab(tabId);
     } catch (e) {
       setWrerr((er) => ({ ...er, [artifactId]: errMsg(e).slice(0, 120) }));
     } finally {
       setWrbusy(null);
     }
   };
-  /** an artifact under a live or settled gate — the review tab (docs/36 §13), never a plain viewer */
-  const openReviewTab = (a: { id: string; kind: string; name: string; content: string }, rounds: ReviewRound[], task: { id: string; number: number; channel_id: string }) => {
-    const id = crypto.randomUUID();
-    openWTab({ id, kind: 'review', title: a.name, subtitle: `#${task.number}`, artifactId: a.id, readOnly: true, taskNumber: task.number });
-    setWrevs((r) => ({
-      ...r,
-      // keyed by ARTIFACT, not by tab id: the reuse rule may have handed us a tab that is already
-      // open, and its half-written batch (ruling 4) must survive being re-opened onto
-      [a.id]: { artifact: { id: a.id, name: a.name, content: a.content, kind: a.kind }, rounds, taskId: task.id, channelId: task.channel_id, taskNumber: task.number },
-    }));
+  /**
+   * A gate's artifact opens as a review tab (docs/36 §13), never a plain viewer, and a task has ONE
+   * tab per review family: its plan, its release plan, its design round (the side-panel round,
+   * 2026-10-03). A new version replaces what the tab shows and the head wears `new`, unless an
+   * automatic open meets comments you did not send (review-round.ts `familyEntry`). The batch is
+   * keyed by the family, so a re-open lands on the batch you were writing (ruling 4).
+   */
+  const openReviewTab = (kind: ReviewKind, one: ReviewArtifact, mockups: ReviewArtifact[], name: string | null, rounds: ReviewRound[], task: { id: string; number: number; channel_id: string }, how: OpenHow = {}) => {
+    const key = reviewKey(kind, task.id);
+    const open = { kind, artifact: one, mockups, name, rounds, taskId: task.id, channelId: task.channel_id, taskNumber: task.number };
+    const o = { auto: !!how.auto, batch: wrcomments[key]?.length ?? 0 };
+    const { entry, kept } = familyEntry(wrevs[key], open, o);
+    setWrevs((r) => ({ ...r, [key]: familyEntry(r[key], open, o).entry }));
+    // a version held back by your batch keeps the tab where it is, with a dot; any other open retitles it
+    openWTab({ id: crypto.randomUUID(), kind: 'review', title: reviewTitle(kind, entry.artifact.name), subtitle: `#${task.number}`, artifactId: key, readOnly: true, taskNumber: task.number }, undefined, kept ? { ...how, behind: true } : { ...how, retitle: true });
   };
   /**
    * The task thread's own doorway, where `ArtifactPreview` and `PlanReview` both used to open.
@@ -812,7 +813,7 @@ export function App() {
    * ruling 3 deleted the overlay for was two doors to one review, and adding a second opener would
    * have re-created it in a new place.
    */
-  const openTaskArtifact = async (task: { id: string; number: number; channel_id: string }, name?: string | null) => {
+  const openTaskArtifact = async (task: { id: string; number: number; channel_id: string }, name?: string | null, how: OpenHow = {}) => {
     const d = await nm?.taskDetail(task.id).catch(() => null);
     const arts = (d?.artifacts ?? []) as Array<{ id: string; kind: string; name: string; content?: string | null }>;
     if (!arts.length) return;
@@ -827,26 +828,31 @@ export function App() {
       ?? [...arts].sort((x, y) => rank[previewType(x.name, x.kind, x.content ?? '')] - rank[previewType(y.name, y.kind, y.content ?? '')])[0];
     if (!pick) return;
     const one = { id: pick.id, kind: pick.kind, name: pick.name, content: pick.content ?? '' };
-    if (reviewKind(one.name, one.kind)) openReviewTab(one, rounds, task);
-    else openArtifactTab(one, task);
+    const kind = reviewKind(one.name, one.kind);
+    if (kind) openReviewTab(kind, one, kind === 'design' ? roundMockupsOf(arts, designVer(one.name)) : [], name ? one.name : null, rounds, task, how);
+    else openArtifactTab(one, task, how);
   };
   /** an article deliverable: the reading tab (article round) — one artifact = one tab (wtabs dedupe) */
-  const openArticleTab = (a: { id: string; name: string; content: string; channelSlug: string | null }) =>
-    openWTab({ id: crypto.randomUUID(), kind: 'file', title: a.name.replace(/\.(md|markdown)$/i, ''), subtitle: a.channelSlug ? `#${a.channelSlug}` : 'article', path: null, artifactId: `article:${a.id}`, readOnly: true, mode: 'preview' }, { name: a.name, content: a.content });
+  const openArticleTab = (a: { id: string; name: string; content: string; channelSlug: string | null }, how: OpenHow = {}) =>
+    openWTab({ id: crypto.randomUUID(), kind: 'file', title: a.name.replace(/\.(md|markdown)$/i, ''), subtitle: a.channelSlug ? `#${a.channelSlug}` : 'article', path: null, artifactId: `article:${a.id}`, readOnly: true, mode: 'preview' }, { name: a.name, content: a.content }, how);
   /** a plan, a ship plan or a brief: a FILE, so it opens as a tab and stays open while you type */
-  const openDocTab = (d: { label: string; file: string; doc: string }) =>
+  const openDocTab = (d: { label: string; file: string; doc: string }, how: OpenHow = {}) =>
     openWTab(
       { id: crypto.randomUUID(), kind: 'file', title: d.file, subtitle: d.label, path: null, artifactId: `doc:${d.file}`, readOnly: true, mode: 'preview' },
       { name: d.file, content: d.doc },
+      how,
     );
   // the frame band's kind buttons: focus the most recent tab of that kind, else make one
   // `'file'` retired 2026-08-16: it opened an EDITOR tab — a second copy of the Workbench's own
-  // file tree, in the main area. Its glyph now toggles the Workbench, which is the one tree.
+  // file tree, in the main area. The side panel's Files tab is the one tree.
   const openKindTab = (kind: 'terminal' | 'browser') => {
-    const match = [...wtabs].reverse().find((x) => x.kind === kind);
-    if (match) { activateWTab(match.id); return; }
-    if (kind === 'terminal') { openDefaultTerminal(); return; }
-    openBrowserTab();
+    const p = panelKeysRef.current;
+    // a coding thread's Terminal is its own tab: the one kind of terminal, in its worktree
+    if (kind === 'terminal' && p.sessionTabs.includes('terminal')) { p.activate(sessionTabId('terminal')); openDock(true); return; }
+    // the newest tab of that kind IN THIS SESSION, else a new one here
+    const match = [...p.tabs].reverse().find((x) => x.kind === kind);
+    if (match) activateWTab(match.id); else if (kind === 'terminal') openDefaultTerminal(); else openBrowserTab();
+    openDock(true); // fronting alone left a folded panel shut when the tab was already in front, as ⌘2 knew
   };
   useEffect(() => {
     const open = (event: Event) => {
@@ -886,38 +892,20 @@ export function App() {
   const [addRemoteOpen, setAddRemoteOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false); // People-header "+" — invite (or the free-plan gate)
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
-  // ── THE TASK PEEK (2026-08-10 — docs/33 §8's split stage, second tenant) ────────────────────
-  // A `#N` clicked INSIDE a conversation docks the task beside it instead of replacing it: you
-  // were mid-something, and the thread you were reading is the context the task needs. Opening
-  // the same task from Home, Recents, ⌘K or the board still takes the whole surface — there,
-  // picking work IS the switch. Provenance decides the shape (openTaskFrom below).
-  const [peekTaskId, setPeekTaskId] = useState<string | null>(null);
-  // The Workbench follows the TASK (2026-08-26, George — narrowed from every session,
-  // 2026-08-17): a task opening still slides it out (progress in view); a CHAT opening leaves it
-  // wherever your toggle put it — every new conversation used to pop the panel open, which made
-  // closing it a per-chat chore. It still slides closed when a task peek docks (the peek needs
-  // the width), and the toggle — beside the bell — wins from there until the next change.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { if (openTaskId) openWPane(true); }, [openTaskId]);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { if (peekTaskId) openWPane(false); }, [peekTaskId]);
-  const [peekW, setPeekW] = useState<number>(() => {
-    try { const v = Number(localStorage.getItem('nm:peekw')); return Number.isFinite(v) && v > 0 ? clampPeekW(v) : PEEK_W_DEFAULT; }
-    catch { return PEEK_W_DEFAULT; }
-  });
-  const [peekDragging, setPeekDragging] = useState(false);
-  const closePeek = useCallback(() => setPeekTaskId(null), []);
-  // the shell's key handler is bound once (it must not re-bind per keystroke), so it reads the
-  // peek through refs — the same pattern the nav face uses two hooks up
-  const peekOpenRef = useRef(false);
-  peekOpenRef.current = !!peekTaskId;
-  const closePeekRef = useRef(closePeek);
-  closePeekRef.current = closePeek;
-  /** the PEEK door — every thread renderer's task refs come through here */
-  const peekTask = useCallback((id: string) => {
-    // a ref to the task you are already standing in is a no-op, not a peek of itself
-    setOpenTaskId((cur) => { if (cur !== id) setPeekTaskId(id); return cur; });
-  }, []);
+  // ── THE TASK TAB (the side-panel round, 2026-10-03, §3.7; the task peek of 2026-08-10 before it) ──
+  // A `#N` clicked INSIDE a session opens the task as a tab of that session's side panel, beside
+  // the conversation it was named in: you were mid-something, and that thread is the context the
+  // task needs. Opening the same task from Home, Recents, ⌘K or the board still takes the whole
+  // surface: there, to pick work IS the switch. The peek column inside the sheet retired.
+  /** the task tab door: every thread renderer's task refs come through here */
+  const peekTask = (id: string) => {
+    // a ref to the task you are already standing in is a no-op, and a ref that resolves to
+    // nothing (a purged task, a number from another workspace) opens nothing
+    const t = tasksAll.find((x) => x.id === id);
+    if (id === openTaskId || !t) return;
+    openWTab({ id: crypto.randomUUID(), kind: 'task', title: `#${t.number} ${t.title}`, taskId: id });
+    openDock(true);
+  };
   // null = unresolved; resolved from the replica (any human message = welcomed)
   const [welcomed, setWelcomed] = useState<boolean | null>(null);
   const [msgsReady, setMsgsReady] = useState(false);
@@ -1381,11 +1369,12 @@ export function App() {
       // and it costs no pixels at all. ⌘1 is always the conversation — its composer, since the
       // conversation never leaves the screen; ⌘2 onwards are the side dock's tabs (docs/36 §3.7).
       if ((e.metaKey || e.ctrlKey) && /^[1-9]$/.test(e.key)) {
-        const hit = dockKeyTarget(wtabsRef.current, Number(e.key));
-        if (hit) { e.preventDefault(); if (hit.kind === 'tab') { activateWTab(hit.id); openDock(true); } else focusComposer(); }
+        const p = panelKeysRef.current;
+        const hit = panelKeyTarget(p.sessionTabs, p.tabs, Number(e.key));
+        if (hit) { e.preventDefault(); if (hit.kind === 'tab') { p.activate(hit.id); openDock(true); } else focusComposer(); }
       }
       // ⌘J — the side dock, from the keyboard: the panel key every editor of this class uses
-      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === 'j') { e.preventDefault(); openDock(!dockOpenRef.current); }
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === 'j') { e.preventDefault(); panelKeysRef.current.toggle(); }
       // ⌘⇧P — the projects face, from the keyboard. Checked BEFORE ⌘P: they share a letter, and
       // the file finder must not open on the way to switching projects.
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'p') {
@@ -1393,20 +1382,18 @@ export function App() {
         setFaceState((prev) => faceHover(prev, { type: 'click' }));
         return;
       }
-      // ⌘P — open a file. The pane IS the finder: typing in it walks the same nm:fs-list the
-      // tree reads, so this needed no new IPC and no second tree.
+      // ⌘P — open a file: the session's Files tab, its finder focused. The pane IS the finder:
+      // typing in it walks the same nm:fs-list the tree reads. A session with no Files has nothing
+      // to browse, and the browser's print dialog is never what ⌘P meant here.
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'p') {
         e.preventDefault();
-        openWPane(true);
-        setWfind((n) => n + 1);
+        panelKeysRef.current.files();
       }
+      // Esc puts an expanded panel back beside the conversation first: Esc unwinds ONE layer, and
+      // the expand is the layer you opened last
+      if (e.key === 'Escape' && panelKeysRef.current.expanded) { e.preventDefault(); e.stopPropagation(); panelKeysRef.current.collapse(); return; }
       // Esc closes the face — it is a surface you opened, so the app's universal dismiss owns it
       if (e.key === 'Escape' && navFaceRef.current === 'projects') { e.preventDefault(); closeFaceRef.current(); }
-      // …and it closes the TASK PEEK before the session under it (2026-08-10): Esc unwinds
-      // exactly ONE layer, and the peek is the layer you opened last. The session's own Esc
-      // (the panel's back crumb) still owns the layer beneath — it just no longer fires first
-      // and takes the thread away when you meant to dismiss the task beside it.
-      if (e.key === 'Escape' && peekOpenRef.current) { e.preventDefault(); e.stopPropagation(); closePeekRef.current(); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -1426,8 +1413,14 @@ export function App() {
   useEffect(() => {
     if (!openThreadId) return;
     const t = chanThreads.find((x) => x.id === openThreadId);
-    if (t?.task_id) { setOpenTaskId(t.task_id); setOpenThreadId(null); }
-  }, [chanThreads, openThreadId]);
+    if (!t?.task_id) return;
+    // what you opened beside the conversation stays beside it once it is a task (the side panel
+    // is the session's, and the session just changed its key, not its subject)
+    const from = `thread:${openThreadId}`, to = `task:${t.task_id}`;
+    setWtabs((prev) => rekeyOwner(prev, from, to));
+    if (frontOf(from) && !frontOf(to)) setFront(to, frontOf(from));
+    setOpenTaskId(t.task_id); setOpenThreadId(null);
+  }, [chanThreads, openThreadId]); // eslint-disable-line react-hooks/exhaustive-deps
   const refreshProjects = () => nm?.workspaceMeta().then((m) => setWsProjects(m.projects)).catch(() => {});
   // channels are a cheap local-replica read too — re-poll them (not only at boot) so a freshly
   // created project's rooms show up and a moved channel re-homes without an app restart. Keep the
@@ -1666,19 +1659,6 @@ export function App() {
   const openTask = openTaskId
     ? (tasks.find((t) => t.id === openTaskId) ?? tasksAll.find((t) => t.id === openTaskId) ?? null)
     : null;
-  // ── the peeked task (2026-08-10) — resolved the same way, workspace-wide: a thread can name a
-  // task in another room, and a ref that resolves to nothing must simply not dock. ──
-  const peekTask2 = peekTaskId && peekTaskId !== openTaskId
-    ? (tasks.find((t) => t.id === peekTaskId) ?? tasksAll.find((t) => t.id === peekTaskId) ?? null)
-    : null;
-  // A PEEK ONLY EXISTS BESIDE A SESSION. Leaving the session (back to Home, another thread, a
-  // destination) takes the peek with it — that is what keeps it from becoming a second way to
-  // browse the board, and it is enforced here rather than at each of a dozen exits.
-  const sessionKey = openTaskId ?? openThreadId ?? '';
-  useEffect(() => { if (peekTaskId) closePeek(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [sessionKey]);
-  // …and a ref that resolves to nothing (a purged task, a number from another workspace) must
-  // not leave a half-open column standing
-  useEffect(() => { if (peekTaskId && !peekTask2) closePeek(); }, [peekTaskId, peekTask2, closePeek]);
 
   // park an idea on the backlog from the room's board — a channel is the ACL boundary, and
   // the board you are looking at names it: the idea files into the room whose board it is.
@@ -1924,28 +1904,57 @@ export function App() {
     setWtabs((prev) => {
       const head = prev[0];
       if (head?.kind === 'conversation' && head.id === convSubject.id && head.title === convSubject.title) return prev;
-      const r = setConversation(prev, { id: convSubject.id, title: convSubject.title, taskNumber: convSubject.taskNumber }, wactiveRef.current);
-      // the active tab CARRIES THROUGH a room switch — the file you are reading belongs to your
-      // work, not to the room you were standing in — unless you were ON the conversation, where
-      // staying put means following it rather than being dropped onto a sibling
-      setWactive(r.activeId ?? r.tabs[0]?.id ?? null);
-      return r.tabs;
+      // the record only: each session keeps its own front in the side panel (shell/panel-state.ts)
+      return setConversation(prev, { id: convSubject.id, title: convSubject.title, taskNumber: convSubject.taskNumber }, null).tabs;
     });
   }, [convSubject.id, convSubject.title]);
-  // the conversation is the SHEET, not a tab (rail-ink round 3, 2026-09-04): it is never hidden
-  // behind a guest, so the conversation-active flag, the peek and the unread count all retired
-  // the dock draws the guests; a guest coming to the front unfolds it, the last one leaving folds it
-  const dockGuests = dockTabs(wtabs), dockActive = dockActiveId(wtabs, wactive);
-  const dockPrev = useRef({ active: dockActive, count: dockGuests.length });
+  // ── THE SIDE PANEL's session (the side-panel round, 2026-10-03, shell/panel-state.ts) ────────
+  // The conversation is the SHEET and never a tab. Everything beside it lives in the side panel,
+  // which belongs to the session in front of you: a task, a conversation, a coding thread or a room
+  // home. The session owns the tabs it opened, and it has tabs of its own (Overview, Files, the
+  // code face) that derive from its kind. A move to another session shows that session's set.
+  const roomHome = view === 'chat' && !openTaskId && !openThreadId && !!current;
+  const roomSections = roomHome && currentLive?.kind === 'marketing' && setupProgress(MARKETING_SETUP_FLOW, currentLive.marketing ?? null).complete;
+  const panelSession = panelSessionOf({
+    taskId: openTask?.id ?? null,
+    threadId: openTask ? null : openThreadId,
+    coding: openCodingThread,
+    roomId: roomHome ? current!.id : null,
+    roomSections,
+    // a task's worktree is a Files tab only where this client can browse it (never on the web)
+    files: !!(openTask && taskWorktree),
+    drafts: draftsInfo.count > 0,
+  });
+  panelOwnerRef.current = panelSession.key;
+  const sessionTabs = sessionTabsOf(panelSession);
+  const panelTabs = panelGuests(wtabs, panelSession.key);
+  const front = panelFront(fronts[ownerSlot(panelSession.key)], sessionTabs, panelTabs);
+  /** front a tab of the panel: one of the session's own (`s:<key>`) or one it opened */
+  const activatePanel = (id: string) => { if (sessionTabKeyOf(id)) setFront(panelOwnerRef.current, id); else activateWTab(id); };
+  /** the session's own tab, in front, with the panel out */
+  const showSessionTab = (k: SessionTabKey) => { setFront(panelOwnerRef.current, sessionTabId(k)); openDock(true); };
+  // inside one session, a tab that comes to the front unfolds the panel and the last one leaving
+  // folds a panel with nothing of its own to show; a move to another session never moves the fold
+  const panelPrev = useRef({ owner: panelSession.key, front, guests: panelTabs.length });
   useEffect(() => {
-    const next = { active: dockActive, count: dockGuests.length };
-    const verdict = dockFoldAfter(dockPrev.current, next);
-    dockPrev.current = next;
+    const next = { owner: panelSession.key, front, guests: panelTabs.length, sessionTabs: sessionTabs.length };
+    const verdict = panelFoldAfter(panelPrev.current, next);
+    panelPrev.current = { owner: next.owner, front: next.front, guests: next.guests };
     if (verdict) openDock(verdict === 'open');
-  }, [dockActive, dockGuests.length]);
-  const wtab = wtabs.find((t) => t.id === wactive) ?? null;
+  }, [panelSession.key, front, panelTabs.length, sessionTabs.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  // opening a task or a coding thread brings the panel out (George, 2026-08-26: progress in view);
+  // a conversation leaves the fold where your toggle put it. Expand never outlives its session.
+  useEffect(() => {
+    setPanelExpanded(false);
+    sessionOpenedAt.current = Date.now();
+    const gate = !!openTask && VERDICT_STATES.has(openTask.state);
+    if (panelSession.key && openWithSession(panelSession.kind, gate)) openDock(true);
+    // a review that waits for your verdict opens with its session: it needs you (shell/arrivals.ts)
+    if (gate && openTask) void openTaskArtifact(openTask, null, { auto: true });
+  }, [panelSession.key]); // eslint-disable-line react-hooks/exhaustive-deps
+  const wtab = panelTabs.find((t) => t.id === front) ?? null;
   const wtabDoc = wtab ? wdocs[wtab.id] : null;
-  /** what the ＋ flyout and the file pane are pointed at: the ACTIVE tab's worktree, else the conversation's */
+  /** what the ＋ flyout and the Files tab are pointed at: the coding thread's repository, the front tab's worktree, else the task's */
   const codingRepoRoot = (() => {
     if (!openCodingThread || !openThreadId) return null;
     const rows = meta.reposAll.length ? meta.reposAll : meta.repos;
@@ -1955,59 +1964,25 @@ export function App() {
   })();
   const wscope: WScope = (() => {
     const localRepo = (meta.repos || []).find((r) => r.provider === 'local' && r.local_path);
-    // a coding thread's Workbench browses the thread's repository (coding threads, 0144)
     if (codingRepoRoot) return { root: codingRepoRoot.path, label: codingRepoRoot.label, taskId: null, taskNumber: null, hasRepo: true };
-    if (wtab && (wtab.readOnly || wtabDoc)) return { root: null, label: 'artifacts', taskId: wtabDoc?.taskId ?? openTask?.id ?? null, taskNumber: wtabDoc?.taskNumber ?? wtab.taskNumber ?? null, hasRepo: false };
+    // a task's own worktree outranks the front tab: the Files tab browses the task, whatever is in front
+    if (openTask) return { root: taskWorktree, label: taskWorktree ? `nm-${openTask.number}` : `#${openTask.number}`, taskId: openTask.id, taskNumber: openTask.number, hasRepo: !!openTask.branch };
+    if (wtab && (wtab.readOnly || wtabDoc)) return { root: null, label: 'artifacts', taskId: wtabDoc?.taskId ?? null, taskNumber: wtabDoc?.taskNumber ?? wtab.taskNumber ?? null, hasRepo: false };
     // a file tab's subtitle is its path INSIDE the root, so the pane names the root itself — a
     // pane headed "src/components/NavDrawer.tsx" would be labelling itself with its own selection
     if (wtab?.root) return { root: wtab.root, label: (wtab.path ? null : wtab.subtitle) || wtabBase(wtab.root), taskId: null, taskNumber: wtab.taskNumber ?? null, hasRepo: false };
-    if (openTask) return { root: taskWorktree, label: taskWorktree ? `nm-${openTask.number}` : `#${openTask.number}`, taskId: openTask.id, taskNumber: openTask.number, hasRepo: !!openTask.branch };
-    // nothing in front of you: a repo you picked in the Workbench's `repos` face, else the
-    // workspace's own local repo (which still targets the ＋ flyout's terminal, as it always did)
-    return { root: wbRoot?.path ?? localRepo?.local_path ?? null, label: wbRoot?.name ?? localRepo?.name ?? 'this machine', taskId: null, taskNumber: null, hasRepo: false };
+    // nothing in front of you: the workspace's own local repo, which the ＋ flyout's terminal targets
+    return { root: localRepo?.local_path ?? null, label: localRepo?.name ?? 'this machine', taskId: null, taskNumber: null, hasRepo: false };
   })();
-  /** a session or a file tab is in front of you — as opposed to the landing or a destination.
-   *  An open CONVERSATION counts (2026-08-17): it was the one thing missing from this list, and
-   *  its absence is why a chat thread could only ever reach the `repos` face — which is why its
-   *  details had to keep rendering inside the sheet. */
-  /**
-   * TWO SIGNALS, and the difference between them is `wbRoot` (George, 2026-08-19).
-   *
-   * `wbSessionOpen` — is a session actually in front of you? A thread, a task, or a file/artifact
-   * tab. This decides whether the panel APPEARS AT ALL (`workbenchApplies`).
-   *
-   * `wbSessionScoped` — the same, plus a repo you picked in the Repos face to browse. That decides
-   * which FACES a context offers, where a browsed root legitimately counts.
-   *
-   * Collapsing them into one was the bug: `wbRoot` is sticky and workspace-wide, so once you had
-   * browsed a repo the panel thought a session was open forever and followed you onto the New chat
-   * stage, which has no session at all. Browsing a repo is not a session; it is a place the panel
-   * can point WHEN there is one.
-   *
-   * One statement because App.tsx sits on a 3000-line ratchet and comments are free while code
-   * lines are not — the alternative was shedding a line somewhere unrelated to buy this one.
-   */
-  const wbSessionOpen = !!(wtab?.root || wtabDoc || wtab?.readOnly || openTask || openThreadId), wbSessionScoped = wbSessionOpen || !!wbRoot;
-  const wb = workbenchState({
-    root: wscope.root, taskId: wscope.taskId, taskNumber: wscope.taskNumber,
-    threadId: openTask ? null : openThreadId,
-    // the room backs the Details face when no session does — its brand docs, queue and
-    // connections, which used to mount as a panel of their own on the room home
-    channelId: current?.id ?? null,
-    label: wscope.label, sessionScoped: wbSessionScoped,
-  });
-  /** the Workbench card renders: a session-shaped surface, and a context with at least one face */
-  const wbCardApplies = workbenchApplies(view, wbSessionOpen) && !!wb.subject, wbCardOn = wpane && wbCardApplies;
-  const toggleWorkbench = () => openWPane(!wpane);
   const wactivePath = wtab?.path ?? (wtabDoc?.name ?? null);
   const wdirtyPaths = useMemo(() => new Set(wtabs.filter((t) => t.dirty && t.path).map((t) => t.path!)), [wtabs]);
   const wterms = useRef<Map<string, TermHandle>>(new Map());
   // a terminal computes 0 rows while its pane is hidden, so it re-fits the frame after it lands
   useEffect(() => {
-    if (!wactive) return;
-    const r = requestAnimationFrame(() => wterms.current.get(wactive)?.fit());
+    if (!front) return;
+    const r = requestAnimationFrame(() => wterms.current.get(front)?.fit());
     return () => cancelAnimationFrame(r);
-  }, [wactive]);
+  }, [front]);
   /** a note in the worktree you are working in — created on disk, then opened as its own tab */
   const newMarkdown = async () => {
     const root = wscope.root;
@@ -2017,11 +1992,14 @@ export function App() {
     await nm?.fsWrite(root, rel, `# Note\n\n`);
     openFileTab(root, rel);
   };
-  /** the side dock's ＋ (and ⌘P): what opens BESIDE the conversation, scoped to the active tab's worktree */
+  /** Files, in front, its finder focused (⌘P and the ＋ menu's "Open a file") — where the session has Files */
+  const openFiles = () => { if (!sessionTabs.includes('files')) return; showSessionTab('files'); setWfind((n) => n + 1); };
+  /** the side panel's ＋ (and ⌘P): what opens BESIDE the conversation, in this session */
   const openHere = (what: 'file' | 'terminal' | 'browser' | 'markdown' | 'whiteboard') => {
-    // "Open a file…" is the Workbench's finder — the card owns the one file tree (2026-08-16)
-    if (what === 'file') { openWPane(true); setWfind((n) => n + 1); return; }
+    if (what === 'file') { openFiles(); return; }
     if (what === 'terminal') {
+      // a coding thread HAS a terminal in its worktree: the one kind of terminal, never a second
+      if (panelSession.kind === 'coding') { showSessionTab('terminal'); return; }
       if (wscope.taskNumber != null) openTermTab({ taskNumber: wscope.taskNumber, hasRepo: wscope.hasRepo, title: `#${wscope.taskNumber}` });
       else if (wscope.root) openTermTab({ cwdRoot: wscope.root, title: wscope.label }); // the row promised "in <label>"
       else openDefaultTerminal();
@@ -2031,6 +2009,69 @@ export function App() {
     if (what === 'whiteboard') { void newWhiteboard(); return; }
     void newMarkdown();
   };
+  /** the Overview tab is what you are looking at: the toks under the head stand down */
+  const detailsShown = dockOpen && front === sessionTabId('overview');
+  const showDetails = () => showSessionTab('overview');
+  // the global key handler is bound once, so it reads the panel through this ref
+  panelKeysRef.current = { sessionTabs, tabs: panelTabs, activate: activatePanel, files: openFiles, expanded: panelExpanded, collapse: () => setPanelExpanded(false), toggle: () => togglePanel() };
+  /** the strip's own tabs, as it draws them: the code face's carry the coding thread's counts */
+  const sessionTabSpecs: SessionTabSpec[] = sessionTabs.map((k) => ({
+    key: k, label: SESSION_TAB_LABEL[k],
+    icon: k === 'overview' ? <IconGrid s={12} /> : k === 'files' ? <IconFolder s={12} /> : k === 'drafts' ? <IconPost s={12} /> : k === 'changes' ? <IconCode s={12} /> : k === 'plan' ? <IconThreads s={12} /> : k === 'checkpoints' ? <IconHistory s={12} /> : <IconTerm s={12} />,
+    count: k === 'drafts' ? draftsInfo.count : panelSession.kind !== 'coding' || !codeCounts ? null
+      : k === 'changes' ? (codeCounts.changes || null) : k === 'checkpoints' ? (codeCounts.checkpoints || null) : k === 'plan' ? (codeCounts.plan ? '✓' : null) : null,
+    // drafts that wait for your approval hold a gate
+    warm: k === 'drafts' && draftsInfo.waiting > 0,
+    // the code face drew Terminal as its glyph alone, and five labelled tabs do not fit 460px
+    iconOnly: k === 'terminal',
+  }));
+  // ── WHAT OPENS BY ITSELF (shell/arrivals.ts) — what a session makes while you look at it opens
+  // here. A fold made while an agent works HOLDS until that run ends: new tabs still join the strip,
+  // behind, and the frame top's button counts them.
+  const sessionLive = !!(openTask ? histLiveIds.has(openTask.id) : openThreadId && histLiveIds.has(openThreadId));
+  const held = !!panelHold[ownerSlot(panelSession.key)];
+  useEffect(() => { if (!sessionLive && held) setPanelHold((h) => ({ ...h, [ownerSlot(panelSession.key)]: false })); }, [sessionLive, held]); // eslint-disable-line react-hooks/exhaustive-deps
+  const foldPanel = () => { if (sessionLive) setPanelHold((h) => ({ ...h, [ownerSlot(panelSession.key)]: true })); openDock(false); };
+  const togglePanel = () => (dockOpen ? foldPanel() : openDock(true));
+  const openArrival = async (a: PanelArrival, how: OpenHow) => {
+    if (a.via === 'task') { if (openTask) await openTaskArtifact(openTask, a.name, how); return; }
+    if (a.via === 'doc') { openDocTab({ label: a.label, file: a.file, doc: a.doc }, how); return; }
+    if (a.via === 'board') { openWhiteboardTab({ id: a.id, title: a.title }, how); return; }
+    if (a.via === 'drafts') { if (!how.behind) setFront(panelOwnerRef.current, sessionTabId('drafts')); return; }
+    const art = (await nm?.artifact(a.id).catch(() => null))?.artifact;
+    if (!art?.inline_content) return;
+    if (a.article) openArticleTab({ id: art.id, name: art.name, content: art.inline_content, channelSlug: art.channel_slug ?? null }, how);
+    else openDocTab({ label: art.name.replace(/\.[^.]+$/, ''), file: art.name, doc: art.inline_content }, how);
+  };
+  const onArrive = (list: PanelArrival[]) => {
+    // the front tab holds your work: an unsaved edit, or review comments you did not send
+    const busy = !!wtab && (!!wtab.dirty || (wtab.kind === 'review' && (wrcomments[wtab.artifactId ?? '']?.length ?? 0) > 0));
+    const d = decideArrivals(list, { frontBusy: busy, hold: held });
+    for (const a of d.behind) void openArrival(a, { behind: true, auto: true });
+    if (d.front) void openArrival(d.front, { auto: true });
+    if (d.unfold) openDock(true);
+  };
+  /** one of the coding thread's own tabs in front: a click opens the panel, the editor's own jump to Changes obeys the hold */
+  const onCodeTab = (k: SessionTabKey, explicit = false) => { setFront(panelOwnerRef.current, sessionTabId(k)); if (explicit || !held) openDock(true); };
+  // drafts that already wait for your approval open with their session, once: they need you. A
+  // task's own gate opens first, a fold made during the run still holds, and a tab you opened
+  // yourself in the meantime keeps the front.
+  useEffect(() => {
+    const key = panelSession.key;
+    if (!key || draftsInfo.waiting === 0 || draftsOpenedFor.current.has(key) || Date.now() - sessionOpenedAt.current > 6000) return;
+    draftsOpenedFor.current.add(key);
+    if (held || (openTask && VERDICT_STATES.has(openTask.state)) || (front && front !== sessionTabId(sessionTabs[0]!))) return;
+    setFront(key, sessionTabId('drafts')); openDock(true);
+  }, [draftsInfo.waiting, panelSession.key]); // eslint-disable-line react-hooks/exhaustive-deps
+  /** the Drafts tab as a thread sees it: where its cards draw, what it reports, and its door */
+  const draftsDoor = { slot: panelDraftsSlot, onInfo: setDraftsInfo, onShow: () => showSessionTab('drafts') };
+  /** what the panel shows in front, for the threads' one-row cards (thread/RefCard.tsx) */
+  const panelShown = {
+    name: dockOpen && wtab ? (wtab.kind === 'review' ? wrevs[wtab.artifactId ?? '']?.artifact.name ?? wtab.title : wdocs[wtab.id]?.name ?? wtab.title) : null,
+    drafts: dockOpen && front === sessionTabId('drafts'),
+  };
+  /** what arrived behind while the panel was folded, counted on its button */
+  const panelFreshCount = dockOpen ? 0 : panelTabs.filter((t) => t.fresh).length;
   // which room Board/History open from OUTSIDE a room (the burger, the dock, ⌘K): the one you
   // are standing in, else the project's first — never a dead click
   // Stable across the 2.5s heartbeat (which only touches meta/chans, not tasks/roster), so the
@@ -2044,108 +2085,56 @@ export function App() {
     return { id: t.id, number: n, title: t.title, state: t.state, assignee: ag, branch: t.branch, pr: t.pr_number };
   }, [tasks, tasksAll, roster.agents]);
 
-  // ── THE TASK PEEK's column (2026-08-10) ─────────────────────────────────────────────────────
-  // The split stage's second tenant (docs/33 §8): ONE animated number (the peek's width) with the
-  // session column at `flex: 1` absorbing the difference, so open · resize · expand · close read
-  // as one gesture rather than two coincidental animations. The peek renders the SAME TaskThread
-  // the full surface renders — the panel is not forked, it is narrowed — with `peek` swapping the
-  // back crumb for close · expand · open full.
-  const peekStyle = { ['--nm-peekw' as string]: `${peekW}px` } as React.CSSProperties;
-  const peekChan = peekTask2 ? chans.find((c) => c.id === peekTask2.channel_id) ?? null : null;
-  const peekProject = peekTask2
-    ? wsProjects.find((p) => p.id === (tasksAll.find((x) => x.id === peekTask2.id)?.project_id ?? peekChan?.project_id ?? activeProject)) ?? null
-    : null;
-  const peekNode = peekTask2 ? (
-    <>
-      {/* the seam: invisible at rest, a 3px pill on hover, --ring while dragging — the nav grip's
-          own recipe, because it is the same act on a different edge */}
-      <div
-        className="pkgrip"
-        role="separator"
-        aria-orientation="vertical"
-        aria-label="Resize the task peek"
-        aria-valuenow={peekW}
-        aria-valuemin={PEEK_W_MIN}
-        aria-valuemax={PEEK_W_MAX}
-        tabIndex={0}
-        title="Drag to resize · double-click resets"
-        onPointerDown={(e) => {
-          e.preventDefault();
-          const el = e.currentTarget;
-          const startX = e.clientX;
-          const startW = peekW;
-          let last = startW;
-          setPeekDragging(true);
-          el.setPointerCapture(e.pointerId);
-          const move = (ev: PointerEvent) => { last = clampPeekW(startW - (ev.clientX - startX)); setPeekW(last); };
-          const up = () => {
-            try { localStorage.setItem('nm:peekw', String(last)); } catch { /* private mode */ }
-            setPeekDragging(false);
-            el.removeEventListener('pointermove', move);
-            el.removeEventListener('pointerup', up);
-            el.removeEventListener('pointercancel', up);
-          };
-          el.addEventListener('pointermove', move);
-          el.addEventListener('pointerup', up);
-          el.addEventListener('pointercancel', up);
-        }}
-        onDoubleClick={() => { setPeekW(PEEK_W_DEFAULT); try { localStorage.setItem('nm:peekw', String(PEEK_W_DEFAULT)); } catch { /* private mode */ } }}
-        onKeyDown={(e) => {
-          // functional updates: two presses in one frame must not both read the same render
-          if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
-          e.preventDefault();
-          setPeekW((w) => { const c = clampPeekW(w + (e.key === 'ArrowLeft' ? 12 : -12)); try { localStorage.setItem('nm:peekw', String(c)); } catch { /* private mode */ } return c; });
-        }}
-      >
-        <span className="pkgripbar" aria-hidden />
-      </div>
-      <div className="taskpeek" role="complementary" aria-label={`Task #${peekTask2.number}`}>
-        <TaskThread
-          key={peekTask2.id}
-          task={peekTask2}
-          back={sessionBack}
-          peek={{
-            // the promotion: hand the sheet over to the ordinary full session surface — the
-            // "I'm switching to this now" door, and the only one that changes what you are in
-            onFull: () => { const id = peekTask2.id; closePeek(); setOpenTaskId(id); },
-          }}
-          convoThreadId={chanThreads.find((t) => t.task_id === peekTask2.id)?.id ?? peekTask2.origin_thread_id ?? null}
-          convoThread={chanThreads.find((t) => t.task_id === peekTask2.id) ?? null}
-          threadBrain={(chanThreads.find((t) => t.task_id === peekTask2.id) ?? chanThreads.find((t) => t.id === peekTask2.origin_thread_id))?.brain_override ?? null}
-          brainProject={peekProject ? { id: peekProject.id, name: peekProject.name, pack: peekProject.model_pack ?? null } : null}
-          crumbProject={peekProject ? { name: peekProject.name, logo_url: peekProject.logo_url } : null}
-          onSetProjectPack={(packId) => setProjectPack(peekProject?.id ?? activeProject, packId)}
-          onBrainConnect={(p) => { setFocusProvider(p); setWsOpen(true); void refreshCreds(); }}
-          onOpenWhiteboard={openWhiteboardTab} onOpenDoc={openDocTab} onOpenArticle={openArticleTab}
-          agents={roster.agents}
-          machines={roster.machines}
-          members={members}
-          selfId={auth?.user?.id}
-          selfEmail={auth?.user?.email}
-          channelId={peekTask2.channel_id}
-          channelSlug={peekChan?.slug ?? tasksAll.find((x) => x.id === peekTask2.id)?.channel_slug ?? ''}
-          channelKind={peekChan?.kind ?? null}
-          channelMarketing={peekChan?.marketing ?? null}
-          decisions={decisionsAll.filter((d) => d.task_id === peekTask2.id)}
-          onClose={closePeek}
-          onPreview={(name?: string) => void openTaskArtifact(peekTask2, name)}
-          onViewLogs={() => viewTaskLogs(peekTask2.number)}
-          onActivity={openAgentActivity}
-          plan={plan} hostedGate={hostedGateFor(boot?.connection, plan)}
-          onUpgrade={openUpgrade}
-          onOpenReview={(name) => void openTaskArtifact(peekTask2, name)}
-          onOpenTerminal={(t) => openTermTab({ taskNumber: t.number, hasRepo: !!t.branch, title: '#' + t.number })}
-          onOpenSkills={() => { closePeek(); setOpenTaskId(null); setView('skills'); }}
-          taskRef={mdTaskRef}
-          // a ref inside the peek SWAPS its subject rather than stacking a second column —
-          // one peek at a time, the same rule the app gives every other panel at an edge
-          onOpenTask={peekTask}
-          subtasks={tasksAll.filter((x) => x.parent_task_id === peekTask2.id)}
-          shipGate={projShipGate(tasksAll.find((x) => x.id === peekTask2.id)?.project_id ?? null)}
-        />
-      </div>
-    </>
-  ) : null;
+  // ── THE TASK TAB's body (the side-panel round, 2026-10-03, §3.7) ─────────────────────────
+  // The SAME TaskThread the full surface renders, in a tab of the session's side panel, with
+  // `peek` swapping the back crumb for `Open the task ›`. The tab strip's ✕ closes it.
+  const taskTab = (tabId: string, pt: NonNullable<typeof openTask>) => {
+    const chan = chans.find((c) => c.id === pt.channel_id) ?? null;
+    const row = tasksAll.find((x) => x.id === pt.id);
+    const proj = wsProjects.find((p) => p.id === (row?.project_id ?? chan?.project_id ?? activeProject)) ?? null;
+    const convo = chanThreads.find((t) => t.task_id === pt.id) ?? null;
+    return (
+      <TaskThread
+        key={pt.id}
+        task={pt}
+        back={sessionBack}
+        // the promotion: the task takes the whole sheet with a back crumb, as a click on a task does everywhere else
+        peek={{ onFull: () => { closeWTab(tabId); setOpenTaskId(pt.id); } }}
+        convoThreadId={convo?.id ?? pt.origin_thread_id ?? null}
+        convoThread={convo}
+        threadBrain={(convo ?? chanThreads.find((t) => t.id === pt.origin_thread_id))?.brain_override ?? null}
+        brainProject={proj ? { id: proj.id, name: proj.name, pack: proj.model_pack ?? null } : null}
+        crumbProject={proj ? { name: proj.name, logo_url: proj.logo_url } : null}
+        onSetProjectPack={(packId) => setProjectPack(proj?.id ?? activeProject, packId)}
+        onBrainConnect={(p) => { setFocusProvider(p); setWsOpen(true); void refreshCreds(); }}
+        onOpenWhiteboard={openWhiteboardTab} onOpenDoc={openDocTab} onOpenArticle={openArticleTab}
+        agents={roster.agents}
+        machines={roster.machines}
+        members={members}
+        selfId={auth?.user?.id}
+        selfEmail={auth?.user?.email}
+        channelId={pt.channel_id}
+        channelSlug={chan?.slug ?? row?.channel_slug ?? ''}
+        channelKind={chan?.kind ?? null}
+        channelMarketing={chan?.marketing ?? null}
+        decisions={decisionsAll.filter((d) => d.task_id === pt.id)}
+        onClose={() => closeWTab(tabId)}
+        onPreview={(name?: string) => void openTaskArtifact(pt, name)}
+        onViewLogs={() => viewTaskLogs(pt.number)}
+        onActivity={openAgentActivity}
+        plan={plan} hostedGate={hostedGateFor(boot?.connection, plan)}
+        onUpgrade={openUpgrade}
+        onOpenReview={(name) => void openTaskArtifact(pt, name)}
+        onOpenTerminal={(t) => openTermTab({ taskNumber: t.number, hasRepo: !!t.branch, title: '#' + t.number })}
+        onOpenSkills={() => { closeWTab(tabId); setOpenTaskId(null); setView('skills'); }}
+        taskRef={mdTaskRef}
+        // a ref inside the tab opens a tab of its own: one task is one tab, each with its close
+        onOpenTask={peekTask}
+        subtasks={tasksAll.filter((x) => x.parent_task_id === pt.id)}
+        shipGate={projShipGate(row?.project_id ?? null)}
+      />
+    );
+  };
   // …and then by the nav head's channel scope on top of the project axis (2026-08-03): All shows
   // the project's whole library, a picked room shows that room's. Same knob as Home and Board.
   // Workspace Files is UNSCOPED by construction — the project axis is the folder grid, not a
@@ -2728,7 +2717,7 @@ export function App() {
   // Workspace views — row 1 in top dock, but inside the scroll region in side dock so it
   // scrolls together with the channels/people/agents below it. Collapse applies to side only.
   // the destinations block (surfaces/NavWorkspaceCard.tsx)
-  const workspaceCard = <NavWorkspaceCard {...{ moreOpen, nav, navPos, navSec, needsYou: bell.count, onWorkbench: () => openWPane(!wpane), roomContent, roomOpenTasks, roomRoutines, secHd, setMoreOpen, setNav, setView, view, wbOpen: wpane && workbenchApplies(view, wbSessionOpen) && !!wb.subject }} />;
+  const workspaceCard = <NavWorkspaceCard {...{ moreOpen, nav, navPos, navSec, needsYou: bell.count, roomContent, roomOpenTasks, roomRoutines, secHd, setMoreOpen, setNav, setView, view }} />;
   return (
     <AgentDirectory.Provider value={agentDirectory}>
     <FailoverBannerContext.Provider value={!!flyupOn}>
@@ -2765,8 +2754,8 @@ export function App() {
               cluster, rehomed after the search: they show on almost every page, so they live on
               the chrome row that does. No ⌘K tile here — the search pill IS that door. */}
           <span className="ftutils">
-            <UtilCluster activeKind={wtabs.find((x) => x.id === wactive)?.kind ?? null} onKind={openKindTab}
-              dockOpen={dockOpen} onDock={() => openDock(!dockOpen)}
+            <UtilCluster activeKind={dockOpen ? wtab?.kind ?? (front === sessionTabId('terminal') ? 'terminal' : null) : null} onKind={openKindTab}
+              dockOpen={dockOpen} onDock={togglePanel} dockCount={panelFreshCount}
               procCount={procCount} procOpen={procOpen} onProc={() => setProcOpen((v) => !v)}
               procs={procsView} onKill={onKillProc} status={statusCluster} overflow />
           </span>
@@ -3395,6 +3384,8 @@ export function App() {
         </div>
       )}
       <div className="shellbody">
+      {/* what the side panel shows in front, so a thread's one-row card can say "In the panel" */}
+      <PanelShownContext.Provider value={panelShown}>
       <div className="main">
         {/* docs/36 — THE WORKSPACE STRIP. `.main` is tabbed: tab one is the conversation, pinned
             and unclosable and following the room, and files, terminals and browsers open BESIDE
@@ -3403,9 +3394,10 @@ export function App() {
             the task panel's own terminal pin used to open a tab the open task buried. */}
         {/* docs/36, amended in the rail-ink round 3 (2026-09-04): the conversation IS the sheet.
             The workspace tab strip that opened this sheet — tab one the conversation, files and
-            terminals as closable siblings — lives in the SIDE DOCK now (shell/SideDock.tsx), so
+            terminals as closable siblings — lives in the SIDE PANEL now (shell/SidePanel.tsx), so
             what stays here is the sheet's head row: a destination's own controls and the room's
-            rail. The session below is the sheet's body, the Workbench its floating card. */}
+            rail. The session below is the sheet's body. Nothing floats over it since the side-panel
+            round (2026-10-03): its details are the side panel's Overview tab. */}
         <SheetHead
           context={null}
           aux={(
@@ -3464,16 +3456,6 @@ export function App() {
                   <span className="clun">{railOrder.length}</span>
                 </button>
               )}
-              {/* the Workbench toggle moved INTO the thread's header (rail-ink round 3, 2026-09-04):
-                  the panel is a card inside the thread now. A room home has details but no header
-                  of its own, so there it keeps a seat here, beside the views menu. In a session
-                  neither shows: the header has the toggle and the views menu belongs to the stage. */}
-              {!(openTaskId || openThreadId) && wbCardApplies && (
-                <button className={`utilbtn${wpane ? ' on' : ''}`} data-tip={wpane ? 'Hide the Workbench — ⌘P' : 'Show the Workbench — ⌘P'} aria-pressed={wpane}
-                  aria-label={wpane ? 'Hide the Workbench' : 'Show the Workbench'} onClick={toggleWorkbench}>
-                  <IconWorkbench s={15} />
-                </button>
-              )}
               {!(openTaskId || openThreadId) && (
                 <button className={`utilbtn${viewMenuOpen ? ' on' : ''}`} data-tip="Views" aria-label="Views" onClick={() => setViewMenuOpen((v) => !v)}>
                   <IconBurger s={15} />
@@ -3508,10 +3490,6 @@ export function App() {
               <button role="menuitem" onClick={() => { setViewMenuOpen(false); setNav('artifacts'); }}><IconLibrary s={14} /><span className="navlabel">Files</span></button>
               <button role="menuitem" onClick={() => { setViewMenuOpen(false); setNav('home'); setView('memory'); }}><IconMemory s={14} /><span className="navlabel">Memory</span></button>
               <button role="menuitem" onClick={() => { setViewMenuOpen(false); setNav('logs'); }}><IconActivity s={14} /><span className="navlabel">Activity</span></button>
-              {/* the Workbench, from the menu too — it is a PANEL, so this toggles rather than
-                  navigating, and it reads its own state (2026-08-16; the old "Code" row opened an
-                  editor tab that duplicated this panel's tree in the main area). */}
-              <button role="menuitem" onClick={() => { setViewMenuOpen(false); openWPane(!wpane); }} aria-pressed={wpane}><IconCode s={14} /><span className="navlabel">Workbench</span><span className="navitembadge">⌘P</span></button>
             </div>
           </>
         )}
@@ -3774,7 +3752,7 @@ export function App() {
 
       {view === 'memory' && <MemorySurface chans={chans} current={current} wsProjects={wsProjects} scope={scopeOf('memory')} setScope={(x) => setScope('memory', x)} />}
 
-        {/* the Code view is the WORKBENCH now — a frame-level panel, not a tab (2026-08-16) */}
+        {/* the Code view retired (2026-08-16): the code reads in the side panel, a frame-level panel, not a tab */}
 
       {view === 'library' && <LibrarySurface current={current} />}
 
@@ -3868,26 +3846,24 @@ export function App() {
           )}
         </div>
         </div>
-        {/* THE ROOM's sections (2026-08-17) — into the Workbench's Details face, the same one the
-            task and the conversation portal into. They used to mount here as `BrandDocsRail`, a
-            THIRD copy of one panel: the aside inside a task, the aside inside a chat, and this.
-            When the panel is shut the room says what it holds and opens it, exactly as a thread
+        {/* THE ROOM's sections (2026-08-17) — into the side panel's Overview tab, the same one the
+            task and the conversation portal into (the side-panel round, 2026-10-03). While the
+            Overview is not in view, the room says what it holds and opens it, exactly as a thread
             does — never an in-sheet panel of its own. */}
-        {currentLive?.kind === 'marketing' && setupProgress(MARKETING_SETUP_FLOW, currentLive.marketing ?? null).complete && (() => {
-          const sections = (
-            <BrandSections
-              channelId={currentLive.id}
-              channelSlug={currentLive.slug}
-              onOpen={(d) => openDocTab(d)}
-              marketing={currentLive.marketing}
-            />
-          );
-          if (wpane && wbSlot) return createPortal(sections, wbSlot);
-          return (
-            <RailToks sections={[]} extraLabel="brand · queue · connections" label={`#${currentLive.slug} details`}
-              onOpen={() => openWPane(true)} />
-          );
-        })()}
+        {roomSections && currentLive && (
+          <>
+            {panelSlot && createPortal(
+              <BrandSections
+                channelId={currentLive.id}
+                channelSlug={currentLive.slug}
+                onOpen={(d) => openDocTab(d)}
+                marketing={currentLive.marketing}
+              />, panelSlot)}
+            {!detailsShown && (
+              <RailToks sections={[]} extraLabel="brand · queue · connections" label={`#${currentLive.slug} details`} onOpen={showDetails} />
+            )}
+          </>
+        )}
         </div>
 
         <div className="composer">
@@ -4008,27 +3984,27 @@ export function App() {
           conversation's thread row links a task, the upgrade effect swaps this for the task
           surface below — one continuous place, upgraded in situ. */}
       {openThreadId && !openTask && openCodingThread && (
-        <div className="sessionsurf" data-peek={peekTask2 ? '1' : undefined} data-dragging={peekDragging ? '1' : undefined} style={peekStyle}>
+        <div className="sessionsurf">
           <div className="sscol">
-          <CodingThread threadId={openThreadId} thread={chanThreads.find((t) => t.id === openThreadId) ?? null} back={sessionBack} channelSlug={current?.slug ?? ''} channelId={current?.id ?? ''} onOpenTask={peekTask} wbOpen={wbCardOn} onToggleWorkbench={toggleWorkbench} machineName={boot?.machineName ?? null}
-            railSlot={wpane ? wbSlot : null} onWorkbench={() => openWPane(true)}
+          <CodingThread threadId={openThreadId} thread={chanThreads.find((t) => t.id === openThreadId) ?? null} back={sessionBack} channelSlug={current?.slug ?? ''} channelId={current?.id ?? ''} onOpenTask={peekTask} machineName={boot?.machineName ?? null}
+            // the code face is the coding thread's own tabs in the side panel (the side-panel round)
+            codeSlot={panelCodeSlot} codeTab={panelSession.kind === 'coding' ? sessionTabKeyOf(front) as EngineeringWorkspaceTab | null : null} onCodeTab={onCodeTab} onCodeCounts={setCodeCounts}
             crumbProject={(() => { const p = wsProjects.find((x) => x.id === (currentLive?.project_id ?? activeProject)); return p ? { name: p.name, logo_url: p.logo_url } : null; })()}
             repos={meta.reposAll.length ? meta.reposAll : meta.repos} projects={wsProjects} projectId={currentLive?.project_id ?? activeProject ?? null} workspaceId={boot?.workspaceId ?? 'workspace'}
+            onReposChanged={() => { if (current && nm) void nm.channelMeta(current.id).then((r) => setMeta({ projects: r?.projects ?? [], repos: r?.repos ?? [], reposAll: r?.reposAll ?? [] })).catch(() => {}); }}
             codeSession={codeSessionsAll.find((c) => c.thread_id === openThreadId || c.id === openThreadId) ?? null} pickedRepoId={codingRepoPicks.get(openThreadId) ?? null} marks={headMarks}
             machineChip={(value, onPick, disabled) => <MachineChip machines={roster.machines} members={members} selfUserId={meId} selfMachineName={boot?.machineName ?? null} origin={sessionOrigin} value={value} onPick={onPick} cloud={computeState} disabled={disabled} />}
-            defaultMachineId={sessionDesignation(null)} plan={plan} onUpgrade={openUpgrade} onClose={closeConvo} agents={roster.agents} />
+            defaultMachineId={sessionDesignation(null)} plan={plan} onUpgrade={openUpgrade} onClose={closeConvo} agents={roster.agents} decisions={decisionsAll.filter((d) => !d.task_id && d.channel_id === current?.id)} />
           </div>
-          {peekNode}
         </div>
       )}
       {openThreadId && !openTask && !openCodingThread && (
-        <div className="sessionsurf" data-peek={peekTask2 ? '1' : undefined} data-dragging={peekDragging ? '1' : undefined} style={peekStyle}>
+        <div className="sessionsurf">
           <div className="sscol">
           <ConvoThread
-            // a conversation's details go where a task's do (2026-08-17) — the Workbench, and
-            // only there. This was the half of the 2026-08-16 round that never landed.
-            railSlot={wpane ? wbSlot : null} wbOpen={wbCardOn} onToggleWorkbench={toggleWorkbench}
-            onWorkbench={() => openWPane(true)}
+            // a conversation's details go where a task's do: the side panel's Overview tab
+            railSlot={panelSlot} detailsShown={detailsShown} onDetails={showDetails} onArrive={onArrive}
+            drafts={draftsDoor}
             onUpgradeReason={(r) => { setUpgradeReason(r); setUpgradeOpen(true); }}
             onSeeUsage={() => { setNav('home'); setView('compute'); }}
             threadId={openThreadId}
@@ -4085,7 +4061,6 @@ export function App() {
             marks={headMarks} onSettle={(threadId) => void settleThread(threadId)}
           />
           </div>
-          {peekNode}
         </div>
       )}
       {/* the task session / review cockpit — the same surface and the same crumb anatomy as a
@@ -4093,12 +4068,13 @@ export function App() {
           Its docs/25 zoning is untouched. A task born from a conversation unions the chat
           prelude into its feed. */}
       {openTask && (
-        <div className="sessionsurf" data-peek={peekTask2 ? '1' : undefined} data-dragging={peekDragging ? '1' : undefined} style={peekStyle}>
+        <div className="sessionsurf">
         <div className="sscol">
         <TaskThread
-          // the details panel renders in the WORKBENCH, and only there (2026-08-17) — the in-sheet
-          // `.mkrail` retired with the flat round, so this is one panel at one edge with one door
-          railSlot={wpane ? wbSlot : null} wbOpen={wbCardOn} onToggleWorkbench={toggleWorkbench}
+          // the details render in the side panel's Overview tab, and only there (the side-panel
+          // round, 2026-10-03): one panel at one edge with one door
+          railSlot={panelSlot} detailsShown={detailsShown} onDetails={showDetails} onArrive={onArrive}
+          drafts={draftsDoor}
           // the thread's word and its settle act (settle round) — the PEEK deliberately carries
           // neither: its head keeps only the acts you take while reading beside a conversation
           marks={headMarks} onSettle={(threadId) => void settleThread(threadId)}
@@ -4144,59 +4120,70 @@ export function App() {
           onOpenTerminal={(t) => openTermTab({ taskNumber: t.number, hasRepo: !!t.branch, title: '#' + t.number })}
           onOpenSkills={() => { setOpenTaskId(null); setView('skills'); }}
           taskRef={mdTaskRef}
-          // a `#N` ref clicked INSIDE this thread PEEKS (docs/33 §8's split stage, second
-          // tenant): you were mid-something, so the task docks beside the conversation
-          // instead of replacing it. Lists keep setOpenTaskId — picking work IS the switch.
+          // a `#N` ref clicked INSIDE this thread opens a task tab in the side panel: you were
+          // mid-something, so the task sits beside the conversation instead of replacing it.
+          // Lists keep setOpenTaskId: to pick work IS the switch.
           onOpenTask={peekTask}
           subtasks={tasksAll.filter((x) => x.parent_task_id === openTask.id)}
           shipGate={projShipGate(tasksAll.find((x) => x.id === openTask.id)?.project_id ?? null)}
         />
         </div>
-        {peekNode}
         </div>
       )}
         </div>
         </div>
-        {/* THE WORKBENCH, a card inside the thread's sheet (rail-ink round 3, 2026-09-04, George,
-            Codex as the reference): the panel is the open session's own details, so it floats at
-            the sheet's right edge beside the conversation, which recentres in what is left. It was
-            a naked frame column (2026-08-16) and then a second sheet (2026-09-04 morning); the seat
-            it held on the frame is the side dock's now. HIDDEN on a destination (2026-08-19) — see
-            `workbenchApplies`: `wpane` is the human's preference and a destination does not edit it. */}
-        {wbCardOn && (
-          <WorkbenchDock variant="card" full={wbFull} width={wbW} min={WB_W_MIN} max={WB_W_MAX} mirrored={false} dragging={wbDragging}
-            onWidth={setWbWPersist} onReset={() => setWbWPersist(WB_W_DEFAULT)} onDragging={setWbDragging}>
-            {/* a doorway, never a viewer: a file clicked in the drawer opens a TAB in the side dock */}
-          <Workbench
-            scope={wscope} activePath={wactivePath} dirtyPaths={wdirtyPaths} findSeq={wfind}
-            scopeLabel={wb.scopeLabel} files={openCodingThread ? null : wb.files} headless={openCodingThread} /* a coding thread's Files is the code face's tab, and its tabs are the card's top row (George, 2026-09-26) */
-            slotRef={setWbSlot}
-            onOpenFile={openFileTab} full={wbFull} onFull={() => setWbFull((v) => !v)}
-            onClose={() => { openWPane(false); setWbFull(false); }} />
-          </WorkbenchDock>
-        )}
         </div>
         {/* the bottom strip survives ONLY in top-dock mode, which hides the frame top the
             cluster moved to (the shell round, 2026-08-10) — everywhere else it is gone and
             the frame's 38px bottom band went back to the sheet */}
         {navPos === 'top' && (
-          <DockBar activeKind={wtabs.find((x) => x.id === wactive)?.kind ?? null} onKind={openKindTab}
-            dockOpen={dockOpen} onDock={() => openDock(!dockOpen)}
+          <DockBar activeKind={wtab?.kind ?? (front === sessionTabId('terminal') ? 'terminal' : null)} onKind={openKindTab}
+            dockOpen={dockOpen} onDock={togglePanel} dockCount={panelFreshCount}
             procCount={procCount} procOpen={procOpen} onProc={() => setProcOpen((v) => !v)}
             procs={procsView} onKill={onKillProc} status={statusCluster} onCmdK={() => setCmdkOpen(true)} />
         )}
       </div>
       {(navPos === 'top' || navIsFolded) && <SetupCards connection={boot?.connection?.kind} />}
-      {/* THE SIDE DOCK (rail-ink round 3, 2026-09-04) — the tab strip's own column at the frame's
-          right edge, where the Workbench used to dock: files, terminals, browsers, whiteboards and
-          reviews open BESIDE the conversation, never over it. Mounted whenever it has tabs so a
-          folded dock keeps its ptys and page histories — the fold is CSS, not an unmount. */}
-      {(dockOpen || dockGuests.length > 0) && (
-        <SideDock open={dockOpen} width={sdW} min={SD_W_MIN} max={SD_W_MAX} mirrored={navPos === 'right'} dragging={sdDragging}
+      {/* THE SIDE PANEL (rail-ink round 3, 2026-09-04; the one right panel since the side-panel
+          round, 2026-10-03) — the frame's right tenant: the session's own tabs (Overview, Files,
+          the code face) and what it opened or made, BESIDE the conversation, never over it. It
+          belongs to the session in front of you. Mounted whenever ANY session has a tab, so a
+          folded panel or another session's terminal keeps its pty and page history: the fold and
+          the session switch are CSS, never an unmount. */}
+      {(dockOpen || sessionTabs.length > 0 || wtabs.some((t) => t.kind !== 'conversation')) && (
+        <SidePanel open={dockOpen} width={sdW} min={SD_W_MIN} max={SD_W_MAX} mirrored={navPos === 'right'} dragging={sdDragging}
           onWidth={setSdWPersist} onReset={() => setSdWPersist(SD_W_DEFAULT)} onDragging={setSdDragging}
-          tabs={dockGuests} activeId={dockActive} scope={wscope} onActivate={activateWTab} onClose={closeWTab} onNew={openHere} onFold={() => openDock(false)}>
+          expanded={panelExpanded} onExpand={setPanelExpanded}
+          sessionTabs={sessionTabSpecs} tabs={panelTabs} activeId={front} scope={wscope} canFind={sessionTabs.includes('files')}
+          onActivate={activatePanel} onClose={closeWTab} onNew={openHere} onFold={foldPanel}>
+        {sessionTabs.includes('overview') && (
+          <div className={`wtpane${front === sessionTabId('overview') ? ' on' : ' hidden'}`} role="tabpanel" aria-label="Overview" data-kind="overview">
+            <OverviewPane slotRef={setPanelSlot} />
+          </div>
+        )}
+        {sessionTabs.includes('drafts') && (
+          <div className={`wtpane${front === sessionTabId('drafts') ? ' on' : ' hidden'}`} role="tabpanel" aria-label="Drafts" data-kind="drafts">
+            <div className="draftsslot" ref={setPanelDraftsSlot} />
+          </div>
+        )}
+        {sessionTabs.includes('files') && wscope.root && panelSession.kind === 'task' && (
+          <div className={`wtpane${front === sessionTabId('files') ? ' on' : ' hidden'}`} role="tabpanel" aria-label="Files" data-kind="files">
+            <FilesPane root={wscope.root} scope={wscope} activePath={wactivePath} dirtyPaths={wdirtyPaths} findSeq={wfind} onOpenFile={openFileTab} />
+          </div>
+        )}
+        {/* the code face: the coding thread portals its editor in here, on the tab you picked */}
+        {panelSession.kind === 'coding' && (
+          <div className={`wtpane${sessionTabKeyOf(front) ? ' on' : ' hidden'}`} role="tabpanel" aria-label="Code" data-kind="code">
+            <div className="codepane" ref={setPanelCodeSlot} />
+            <div className="codepaneempty" role="note"><IconCode s={24} /><b>The code opens here when the coding runtime starts.</b></div>
+          </div>
+        )}
         {wtabs.filter((t) => t.kind !== 'conversation').map((t) => (
-          <div key={t.id} className={`wtpane${t.id === dockActive ? ' on' : ' hidden'}`} role="tabpanel" aria-label={t.title} data-kind={t.kind}>
+          <div key={t.id} className={`wtpane${t.id === front && (t.owner ?? null) === panelSession.key ? ' on' : ' hidden'}`} role="tabpanel" aria-label={t.title} data-kind={t.kind}>
+            {t.kind === 'task' && (() => {
+              const pt = t.taskId ? (tasks.find((x) => x.id === t.taskId) ?? tasksAll.find((x) => x.id === t.taskId) ?? null) : null;
+              return pt ? <div className="taskpane">{taskTab(t.id, pt)}</div> : <div className="wfempty">This task is not available.</div>;
+            })()}
             {t.kind === 'terminal' && (
               <TerminalView onUpgrade={() => setUpgradeOpen(true)}
                 ref={(r) => { if (r) wterms.current.set(t.id, r); else wterms.current.delete(t.id); }}
@@ -4217,30 +4204,12 @@ export function App() {
                   onShare={(r) => void shareWhiteboard(r)} />
               </Suspense>
             )}
-            {/* A file tab with no path used to be an EDITOR tab: a second copy of the Workbench's
-                file tree, rendered in the main area. `openEditorTab` is gone, so none can be made
-                — but a persisted tab set from before 2026-08-16 can still hold one, and a tab
-                that renders nothing is worse than the duplication was. It migrates itself: the
-                Workbench opens on the same root and the tab closes. */}
-            {t.kind === 'file' && !t.path && !t.artifactId && (
-              <div className="cwempty">
-                <div className="cwemptyinner">
-                  <span className="cwemptyico"><IconCode s={30} /></span>
-                  <h3>This is the Workbench now</h3>
-                  <p>Browsing a folder lives in the Workbench &mdash; the card inside the thread, beside your work &mdash; one file tree instead of two.</p>
-                  <div className="cwemptybtns">
-                    <button className="btn sm primary" onClick={() => {
-                      if (t.root) setWbRoot({ name: t.subtitle || t.title, path: t.root });
-                      openWPane(true);
-                      closeWTab(t.id);
-                    }}><IconCode s={13} /> Open the Workbench</button>
-                  </div>
-                </div>
-              </div>
-            )}
             {t.kind === 'file' && (t.path || t.artifactId) && (t.artifactId?.startsWith('article:')
               ? <ArticleView artifactId={t.artifactId.slice('article:'.length)} name={wdocs[t.id]?.name ?? t.title} content={wdocs[t.id]?.content ?? ''} />
-              : <WFileView tab={t} doc={wdocs[t.id]} onMode={(m) => setWTabMode(t.id, m)} onDirty={(d) => setWTabDirty(t.id, d)} />)}
+              // a table, the posts wire file and a scored report read best through the thread's old card body
+              : t.artifactId && richFileBody(wdocs[t.id]?.name ?? t.title, wdocs[t.id]?.content)
+                ? <div className="wfrich"><FileBody art={{ id: t.id, kind: 'doc', name: wdocs[t.id]?.name ?? t.title, inline_content: wdocs[t.id]?.content ?? null, created_at: '' }} /></div>
+                : <WFileView tab={t} doc={wdocs[t.id]} onMode={(m) => setWTabMode(t.id, m)} onDirty={(d) => setWTabDirty(t.id, d)} />)}
             {t.kind === 'review' && (() => {
               const art = t.artifactId ?? '';
               const rev = wrevs[art];
@@ -4255,6 +4224,8 @@ export function App() {
               return (
                 <WReviewView
                   tab={t} binding={binding} content={rev.artifact.content} comments={comments} mode={mode}
+                  mockups={rev.mockups} stageId={rev.artifact.id ?? null} isNew={!!rev.isNew}
+                  onStage={(mid) => setWrevs((r) => stageMockup(r, art, mid))}
                   busy={wrbusy === art} error={wrerr[art] ?? ''}
                   onComments={(next) => setWrcomments((c) => ({ ...c, [art]: next }))}
                   onMode={(m) => setWrmodes((ms) => ({ ...ms, [art]: m }))}
@@ -4265,8 +4236,9 @@ export function App() {
             })()}
           </div>
         ))}
-        </SideDock>
+        </SidePanel>
       )}
+      </PanelShownContext.Provider>
       </div>
       {cmdkOpen && <CmdKPalette items={buildCmdkItems()} onClose={() => setCmdkOpen(false)} />}
       <LinkChoiceHost openInApp={openBrowserTab} />

@@ -13,7 +13,7 @@
 // same, so it refuses otherwise, and --root is the way for such a tag.
 //
 // the logic is TypeScript (packages/control-api/src/client-contracts). this launcher loads tsx from
-// the control-api's own devDependencies so a .mjs can import it, as notify-hosted-free-owners.mjs does.
+// the control-api's own devDependencies so a .mjs can import it.
 import { execFileSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';

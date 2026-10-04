@@ -194,15 +194,6 @@ describe('NM_LOCAL=1 lifts every plan gate through localMode(), and only there',
       lifted: { status: 200 },
     },
     {
-      name: 'schedules (schedule.create on Free)',
-      trip: async () => {
-        const proj = await j(await cmd(asHeader(george), { type: 'project.create', workspace: 'ws_acme', name: 'Growth' }));
-        const chan = await j(await cmd(asHeader(george), { type: 'channel.create', workspace: 'ws_acme', project: proj.projectId, slug: 'marketing' }));
-        return cmd(asHeader(george), { type: 'schedule.create', channel: chan.channelId, title: 'Daily drafts', prompt: 'Draft one post.', cadence: 'weekdays', atTime: '09:00', tz: 'UTC' });
-      },
-      lifted: { status: 200 },
-    },
-    {
       name: 'cloud machines (machine.provision on Free — lifted, then honestly not served here)',
       trip: async () => {
         const { workspaceId } = await store.createWorkspace({ name: 'Acme', slug: 'acme', createdBy: george.id }, ev(george.id));

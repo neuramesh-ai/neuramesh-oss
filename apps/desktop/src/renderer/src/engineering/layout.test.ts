@@ -38,10 +38,11 @@ test('Engineering work tabs share the live editor split coordinate', () => {
   assert.doesNotMatch(css, /\.engsplitter \{[^}]*border-inline:/);
 });
 
-test('The Engineering floor is not a destination: the Code shortcut relists Home, and a coding thread portals its code face into the Workbench', () => {
-  // coding threads (0144, docs/design/coding-threads-2026-09 §5 + ruling 4): the floor's mount, its
-  // navigation hook and its sheet-head chrome are gone; the one session surface wears the code face,
-  // and the Workbench card holds the code, opened by the thread itself
+test('The Engineering floor is not a destination: the Code shortcut relists Home, and a coding thread portals its code face into the side panel', () => {
+  // coding threads (0144, docs/design/coding-threads-2026-09 §5): the floor's mount, its navigation
+  // hook and its sheet-head chrome are gone; the one session surface wears the code face, and the
+  // code face is the coding thread's own tabs in the side panel (the side-panel round, 2026-10-03:
+  // the Workbench card that held it retired)
   const app = readFileSync(join(import.meta.dirname, '../App.tsx'), 'utf8');
   assert.doesNotMatch(app, /<EngineeringOS /);
   assert.doesNotMatch(app, /engineeringNav/);
@@ -49,8 +50,10 @@ test('The Engineering floor is not a destination: the Code shortcut relists Home
   // the rail's Chat | Code switch is the ONE door to the Code filter (George, 2026-09-27): no shortcut row, no menu item
   assert.doesNotMatch(app, /'Code', \(\) => setRailMode\('code'\)/);
   assert.doesNotMatch(app, /<span className="navlabel">Code<\/span>/);
-  assert.match(app, /railSlot=\{wpane \? wbSlot : null\} onWorkbench=\{\(\) => openWPane\(true\)\}/);
-  assert.match(app, /headless=\{openCodingThread\}/);
+  assert.match(app, /codeSlot=\{panelCodeSlot\}/);
+  assert.match(app, /<div className="codepane" ref=\{setPanelCodeSlot\} \/>/);
+  // the card is gone for good: no slot, no toggle state, no card component
+  assert.doesNotMatch(app, /wbSlot|openWPane|<Workbench\b|WorkbenchDock/);
 });
 
 test('Code hides native scroll gutters and offers a contextual jump to the latest message', () => {

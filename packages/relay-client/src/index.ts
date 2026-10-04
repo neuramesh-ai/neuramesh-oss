@@ -8,4 +8,6 @@ export type { PtyHandle, RelayConfig, RelayJsonHandle } from './relay-client';
 export { closeReason, encodeB64, makeDecoder, notice } from './relay-frames';
 export { ensureMachine, ENSURE_TIMEOUT_MS } from './ensure-machine';
 export { PROD_RELAY_URL, relayUrlFor } from './relay-url';
+export { LAND_MAX_MS, LAND_SETTLE_MS, createLiveStreamClient, openLiveStreamLane } from './live-stream';
+export type { LiveChannel, LiveClientDeps, OpenLiveChannel, StreamDb, StreamEnv, StreamEvent } from './live-stream';
 export type { EnsureDeps, EnsurePhase, EnsureResult } from './ensure-machine';

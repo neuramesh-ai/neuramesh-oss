@@ -5,9 +5,13 @@ import { engineeringModeHandoff } from './handoff';
 import { engineeringSystemText } from './copy';
 import { engineeringPatchPaths } from './patch';
 let serial = 0; const stamp = () => new Date().toISOString();
-const message = (role: EngineeringMessage['role'], body: string, tone: EngineeringMessage['tone'] = 'plain'): EngineeringMessage => ({
-  id: `remote-${Date.now().toString(36)}-${(++serial).toString(36)}`, role, body, tone, createdAt: stamp(),
+const message = (role: EngineeringMessage['role'], body: string, tone: EngineeringMessage['tone'] = 'plain', kind = 'remote'): EngineeringMessage => ({
+  id: `${kind}-${Date.now().toString(36)}-${(++serial).toString(36)}`, role, body, tone, createdAt: stamp(),
 });
+const GITHUB_WAIT = 'github-wait';
+/** the machine's sentence when it cannot reach the code until GitHub is connected: the phone shows it as the reason,
+ *  and a client with the gate (hq, the desktop) hides it, since the gate and the connected divider say it there */
+export const isEngineeringGitHubWait = (m: Pick<EngineeringMessage, 'id'>): boolean => m.id.startsWith(`${GITHUB_WAIT}-`);
 const textValue = (value: unknown): string => typeof value === 'string' ? value : JSON.stringify(value, null, 2);
 const isPlanCeiling = (session: EngineeringSession, value: unknown): boolean => session.mode === 'plan' && lineHas(textValue(value).toLowerCase(), 'blocked by', 'plan mode');
 const terminalState = (reason: unknown): EngineeringTurnState => reason === 'completed' ? 'completed' : reason === 'error' ? 'error' : 'resumable';
@@ -20,9 +24,7 @@ function lastMessageIndex(messages: EngineeringMessage[], role: EngineeringMessa
   return -1;
 }
 
-function updateMessage(messages: EngineeringMessage[], index: number, next: EngineeringMessage): EngineeringMessage[] {
-  return messages.map((current, at) => at === index ? next : current);
-}
+const updateMessage = (messages: EngineeringMessage[], index: number, next: EngineeringMessage): EngineeringMessage[] => messages.map((current, at) => at === index ? next : current);
 function collapseReasoning(messages: EngineeringMessage[]): EngineeringMessage[] {
   return messages.map((current) => current.role === 'reasoning' && !current.collapsed ? { ...current, streaming: false, collapsed: true } : current);
 }
@@ -259,6 +261,10 @@ export function applyRemoteEngineeringEvent(session: EngineeringSession, wire: R
     // event is the user-facing state; surfacing the duplicate error makes a
     // successful read-only Plan look broken and can arrive after `ended`.
     if (isPlanCeiling(session, wire['message'])) return session;
+    // the machine cannot reach the code until GitHub is connected: the gate seat shows the GitHub card, and the
+    // grant opens the session again (docs/design/repo-connect-2026-10). The machine's sentence stays, marked
+    // (isEngineeringGitHubWait), so a client with no gate (the phone) still shows a reason
+    if (wire['code'] === 'ENGINEERING_GITHUB_REQUIRED') return { ...session, state: 'error', blockedOn: 'github', activeActivity: null, pendingApproval: null, messages: [...finishStreamingMessages(session.messages, false), message('assistant', engineeringSystemText(String(wire['message'] ?? 'Connect GitHub to code here.')), 'warning', GITHUB_WAIT)], updatedAt: stamp() };
     return { ...session, state: wire['recoverable'] ? 'resumable' : 'error', activeActivity: null, pendingApproval: null, messages: [...finishStreamingMessages(session.messages, false), message('assistant', engineeringSystemText(String(wire['message'] ?? 'Engineering failed.')), 'warning')], updatedAt: stamp() };
   }
   if (type === 'changes' && Array.isArray(wire['changes'])) return { ...session, changes: wire['changes'] as EngineeringChange[], proposedChanges: [], updatedAt: stamp() };

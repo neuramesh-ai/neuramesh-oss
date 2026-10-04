@@ -13,6 +13,7 @@ import type { RepoUI } from '../bridge/rows-board';
 import { nm } from '../bridge/nm';
 import { ApprovalCard } from '../views/EngineeringOS';
 import { IconCode } from '../ui/icons';
+import { GitHubGate } from './GitHubGate';
 
 const RESTING = new Set<EngineeringSession['state']>(['idle', 'completed', 'resumable']);
 const DIFF_CAP = 24_000;
@@ -77,12 +78,17 @@ function CodingValve({ session, threadId, channelId, title, repoRow, repoName, r
   );
 }
 
-export function CodingGate({ session, threadId, channelId, title, repoRow, repoName, root, unitId, hasTask, onApproval, onReviewChanges, onContinueInAct, onDismissHandoff, onMade }: {
-  session: EngineeringSession; threadId: string; channelId: string; title: string; repoRow: RepoUI | null; repoName: string; root: string | null;
+export function CodingGate({ session, threadId, channelId, room, title, repoRow, repoName, root, unitId, hasTask, onApproval, onReviewChanges, onContinueInAct, onDismissHandoff, onMade, onReopen }: {
+  session: EngineeringSession; threadId: string; channelId: string; room: string; title: string; repoRow: RepoUI | null; repoName: string; root: string | null;
   unitId: string | null; hasTask: boolean;
   onApproval: (approved: boolean) => void; onReviewChanges: () => void; onContinueInAct: () => void; onDismissHandoff: () => void; onMade: (taskId: string) => void;
+  /** the GitHub grant landed: open the session again (useEngineeringRuntime reopen) */
+  onReopen: () => void;
 }) {
+  // a live approval outranks a stored GitHub wait: the machine that asks it reached the code
   if (session.pendingApproval) return <ApprovalCard session={session} onResolve={onApproval} onReview={onReviewChanges} />;
+  // the machine cannot reach the code until GitHub is connected: the card leads (docs/design/repo-connect-2026-10)
+  if (session.blockedOn === 'github') return <GitHubGate channelId={channelId} room={room} repoName={repoName} folder={repoRow?.org_name === 'local' || repoRow?.provider === 'local'} onConnected={onReopen} />;
   if (session.pendingModeHandoff && session.mode === 'plan') return <HandoffCard session={session} onContinue={onContinueInAct} onDismiss={onDismissHandoff} />;
   const carries = session.changes.length > 0 || !!session.workPlan;
   if (repoRow && channelId && !unitId && !hasTask && RESTING.has(session.state) && carries) {

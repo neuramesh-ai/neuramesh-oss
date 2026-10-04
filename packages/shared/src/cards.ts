@@ -5,16 +5,18 @@
 // them and building their notification copy — shared by the desktop notifier, the
 // server-side push fan-out, and the mobile thread UI so the three never drift.
 
-export type CardKind = 'nmq' | 'nmauth';
+export type CardKind = 'nmq' | 'nmauth' | 'nmneed';
 
 export interface ParsedCard {
   kind: CardKind;
 }
 
-// Detect an nmq/nmauth card in a message body. nmauth wins when both markers are
-// present — the reconnect is the blocking, must-act-now one.
+// Detect an nmq/nmauth/nmneed card in a message body. nmauth wins when both markers are
+// present — the reconnect is the blocking, must-act-now one. A need card (needs.ts: connect
+// GitHub, connect an account) blocks the work too, so it ranks above a question.
 export function parseCard(body: string): ParsedCard | null {
   if (/```nmauth/.test(body)) return { kind: 'nmauth' };
+  if (/```nmneed/.test(body)) return { kind: 'nmneed' };
   if (/```nmq/.test(body)) return { kind: 'nmq' };
   return null;
 }
@@ -35,7 +37,7 @@ export function preview(body: string, max = 140): string {
 // The notification title for a card. `where` is the human-facing location — a task
 // ("#1234") or a channel ("#growth"). Copy lives here so every surface matches.
 export function cardTitle(kind: CardKind, where: string): string {
-  return kind === 'nmauth' ? `Action needed · ${where}` : `A question for you · ${where}`;
+  return kind === 'nmauth' || kind === 'nmneed' ? `Action needed · ${where}` : `A question for you · ${where}`;
 }
 
 export interface CardNotification {

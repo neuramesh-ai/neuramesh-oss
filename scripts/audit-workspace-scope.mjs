@@ -29,7 +29,7 @@ const FILES = [
 const WS_TABLES = new Set([
   'channels', 'projects', 'messages', 'threads', 'tasks', 'machines', 'agents', 'repos',
   'artifacts', 'beats', 'runs', 'decisions', 'policies', 'memory_blocks', 'skills',
-  'skill_packs', 'schedules', 'content_items', 'connectors', 'workspace_members', 'whiteboards',
+  'skill_packs', 'schedules', 'content_items', 'connectors', 'workspace_members', 'whiteboards', 'reply_reminders',
 ]);
 
 // Queries inside smokeSync() are the dev self-test harness driving a seeded workspace, not

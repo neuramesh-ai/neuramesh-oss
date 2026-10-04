@@ -14,7 +14,7 @@ import { resolveToken } from '../agents';
 import type { ExecTask, HostedAgent, OfferedTask, SkillRef } from '../agents';
 
 
-import { isCloudBorn, type ClaimVerdict, type SessionOrigin } from '@neuramesh/shared';
+import { GITHUB_WAIT_REASON, isCloudBorn, type ClaimVerdict, type SessionOrigin } from '@neuramesh/shared';
 
 
 
@@ -51,6 +51,7 @@ import type { makeBeats } from './beats';
 import type { makePark } from './park';
 import { makeClaimResolve } from './claim-resolve';
 import { makeClaimOwn } from './claim-own';
+import { postRepoNeed } from './reponeed';
 
 
 
@@ -227,9 +228,23 @@ async function claimFlow(agent: HostedAgent, t: OfferedTask) {
       const repo = await db.get<{ clone_url: string | null }>('select clone_url from repos where id = ?', [t.repo_id]).catch(() => null);
       const cred = await repoCred.forRepo(repoSlug(repo?.clone_url ?? ''), t.channel_id);
       if (!cred.ok) {
-        // the server's words name the fix when it knows one (the App's permissions, a reconnect)
-        const fix = cred.code === 'NOT_CONNECTED' || cred.code === 'NO_REPO' ? 'Connect GitHub for this project, or run `gh auth login` in the machine\'s terminal.' : 'A `gh auth login` in the machine\'s terminal also works.';
-        await post('/v1/commands', actor, { type: 'task.block', taskId: t.id, reason: `This cloud machine cannot push a branch for #${t.number}: ${cred.error.replace(/\.$/, '')}. ${fix} Then unblock #${t.number}.` }).catch((e) => console.error(`task_block #${t.number} failed:`, e));
+        // a grant fixes it: the GitHub card goes up in the task's thread, and the grant unblocks the
+        // task by itself (docs/design/repo-connect-2026-10, control-api github-resume.ts). Blocked
+        // FIRST, so the resume always finds a blocked task to send back to work.
+        const grantFixes = cred.code === 'NOT_CONNECTED' || cred.code === 'NO_REPO' || cred.code === 'RECONNECT_REQUIRED';
+        const reason = grantFixes
+          ? `${GITHUB_WAIT_REASON}: this cloud machine cannot push the branch of #${t.number} yet. Connect GitHub from the card in this thread, and #${t.number} starts again by itself. A \`gh auth login\` in the machine's terminal also works.`
+          : `This cloud machine cannot push a branch for #${t.number}: ${cred.error.replace(/\.$/, '')}. A \`gh auth login\` in the machine's terminal also works. Then unblock #${t.number}.`;
+        await post('/v1/commands', actor, { type: 'task.block', taskId: t.id, reason }).catch((e) => console.error(`task_block #${t.number} failed:`, e));
+        if (grantFixes) {
+          const room = await db.get<{ workspace_id: string }>('select workspace_id from channels where id = ?', [t.channel_id]).catch(() => null);
+          if (room) await postRepoNeed({ db, post, actor }, { workspace: room.workspace_id, channel: t.channel_id, taskId: t.id }, {
+            ask: `#${t.number} ${t.title}`.slice(0, 160),
+            why: `The cloud machine pushes the branch of #${t.number} through the neuramesh app, and the app cannot reach the repository yet.`,
+            lead: `I need GitHub to start #${t.number}: this cloud machine cannot push its branch yet.`,
+            after: `#${t.number} starts again by itself when GitHub is connected.`,
+          });
+        }
         console.log(`agent_claim agent=${agent.name} task=${t.number} blocked=no_repo_credential code=${cred.code}`);
         return;
       }

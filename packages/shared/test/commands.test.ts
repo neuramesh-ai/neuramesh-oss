@@ -4,6 +4,11 @@ import { HumanCommandSchema, taskCreateCommand } from '../src/commands';
 import { claudeDesignPromptBlock, claudeDesignUrlFromText, designProviderFromDecision, designProviderFromEvents, designProviderQuestionBlock } from '../src/design';
 
 describe('HumanCommandSchema', () => {
+  it('accepts schedule.run_now, the routine card\'s Run now on every client (routine sessions)', () => {
+    expect(HumanCommandSchema.safeParse({ type: 'schedule.run_now', schedule: 's1' }).success).toBe(true);
+    expect(HumanCommandSchema.safeParse({ type: 'schedule.run_now' }).success).toBe(false);
+  });
+
   it('accepts a task.accept gate', () => {
     const r = HumanCommandSchema.safeParse({ type: 'task.accept', taskId: 't1' });
     expect(r.success).toBe(true);

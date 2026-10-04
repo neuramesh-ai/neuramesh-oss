@@ -25,7 +25,8 @@ useEffect(() => {
 }
 
 /**
- * The conversation's Artifacts section, for the Workbench's Details face (2026-08-17).
+ * The conversation's Artifacts section, for the side panel's Overview tab (2026-08-17; the
+ * Workbench's Details face until 2026-10-03).
  *
  * It lives beside the hook that loads the rows rather than inside `ConvoThread`, which is where
  * it was written and where it pushed the file past the size gate. Same markup, same star: `☆`

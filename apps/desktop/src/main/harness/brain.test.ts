@@ -1,7 +1,7 @@
 // The brain (docs/harness/01). Run: pnpm exec tsx --test src/main/harness/brain.test.ts
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, writeFileSync, appendFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync, appendFileSync, utimesSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Brain, Ledger, brainRoot, subjectSlug, subjectPath, tierOf, exportable, importCompatible, BRAIN_SCHEMA_VERSION , resolveInWorkspace } from './brain';
@@ -56,6 +56,22 @@ test('an import from a NEWER build is refused, naming both versions', () => {
   assert.match(r.reason!, /update the app/, 'the error names the action that fixes it (doctrine §3.1)');
   assert.equal(importCompatible(BRAIN_SCHEMA_VERSION).ok, true);
   assert.equal(importCompatible(0).ok, true, 'an older brain is readable');
+});
+
+// one session per routine (docs/design/routine-sessions-2026-09, PR 2): a run starts clean, so the
+// next run of a schedule reads only the notes written since its opener, never yesterday's "do NOT redo it"
+test('notes since a moment: the notes written or rewritten after it, and every note without one', () => {
+  const root = tmp();
+  try {
+    const b = new Brain(root).open({ kind: 'thread', id: 'routine-session' });
+    b.writeNote('yesterday', 'Filed #1146 for lodash.');
+    b.writeNote('today', 'Nothing new in the audit.');
+    const opener = Date.now() - 60_000;
+    const old = new Date(opener - 24 * 3600_000);
+    utimesSync(join(b.path, 'notes', 'yesterday.md'), old, old);
+    assert.deepEqual(b.notes(opener).map((n) => n.name), ['today.md']);
+    assert.deepEqual(b.notes().map((n) => n.name), ['today.md', 'yesterday.md']);
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
 // ── The reason the brain exists: a second agent inherits what the first learned ───────────────

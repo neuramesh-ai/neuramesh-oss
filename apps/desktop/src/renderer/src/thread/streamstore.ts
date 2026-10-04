@@ -22,7 +22,8 @@ import { nm as nmBridge } from '../bridge/nm';
 
 const nm = nmBridge;
 
-type Entry = { agent: string; text: string; done: boolean };
+/** `thinking`: the turn's thoughts so far, beside the reply (the repo-connect round's Option A) */
+type Entry = { agent: string; text: string; done: boolean; thinking?: string };
 /** presence: who streams on a key and whether text flows (`landing` = the reply is done, its row is not here yet) */
 export type StreamPresence = { key: string; agent: string; typing: boolean; landing?: boolean };
 
@@ -45,7 +46,7 @@ function notify(key: string): void {
 }
 
 /** one event from the bridge. Exported so tests, and any other transport, can feed the store. */
-export function acceptStreamEvent(p: { key: string; agent: string; text: string; done: boolean }): void {
+export function acceptStreamEvent(p: { key: string; agent: string; text: string; done: boolean; thinking?: string }): void {
   const prev = entries.get(p.key);
   clearTimeout(expiry.get(p.key));
   if (p.done) {
@@ -60,10 +61,11 @@ export function acceptStreamEvent(p: { key: string; agent: string; text: string;
       landed.delete(p.key);
     }
   } else {
-    entries.set(p.key, { agent: p.agent, text: p.text, done: false });
+    entries.set(p.key, { agent: p.agent, text: p.text, done: false, ...(p.thinking ? { thinking: p.thinking } : {}) });
     landed.delete(p.key);
     const was = live.get(p.key);
-    const typing = !!p.text.trim();
+    // thoughts on screen are the bubble, not the ghost: the Thoughts block draws them before any word
+    const typing = !!p.text.trim() || !!p.thinking?.trim();
     // presence keeps its identity unless something a surface draws changed
     if (!was || was.agent !== p.agent || was.typing !== typing) live.set(p.key, { key: p.key, agent: p.agent, typing });
   }

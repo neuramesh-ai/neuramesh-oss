@@ -21,7 +21,7 @@ const nm = nmBridge;
 // centered overlay — the tweet reads like a tweet, the IG post like a post — with the text
 // editable in place while it's a draft/scheduled, the slot picker, and approve/unschedule/
 // delete. Agents draft; every mutation here is the human's.
-export function PostPreviewModal({ item, channelSlug, channelId, projectName, onClose, onChanged }: {
+export function PostPreviewModal({ item, channelSlug, channelId, projectName, onClose, onChanged, inline = false }: {
   item: ContentItemRow;
   channelSlug: string;
   /** the room this draft belongs to — its PROJECT owns the connector that will post it (0106) */
@@ -29,6 +29,9 @@ export function PostPreviewModal({ item, channelSlug, channelId, projectName, on
   projectName?: string | null;
   onClose: () => void;
   onChanged: () => void;
+  /** drawn IN the side panel's Drafts tab rather than over the window (the side-panel round): no
+   *  veil, no portal, and the close control reads as the way back to the list */
+  inline?: boolean;
 }) {
   const [body, setBody] = useState(item.body);
   // THE FILM IN THE PREVIEW (George, 2026-09-19: "when I click on review/schedule, the preview
@@ -208,13 +211,13 @@ export function PostPreviewModal({ item, channelSlug, channelId, projectName, on
   // and it grows out of the calendar chip or card you clicked. This overlay predates `ui/Popover`
   // and is its own `.mkdocovl`, so it takes the `bare` variant plus a pivot rather than being
   // rebuilt — same result, one class and a transform-origin.
-  const node = (
-    <div className="mkdocovl bare" role="dialog" aria-label={`${platformName} post`} onClick={onClose}>
-      <div className="mkdocpanel mkpvpanel pivot" ref={panelRef} onClick={(e) => e.stopPropagation()}>
+  const panel = (
+      <div className={`mkdocpanel mkpvpanel${inline ? ' inline' : ' pivot'}`} ref={panelRef} onClick={(e) => e.stopPropagation()}>
         <div className="mkdocpanelhead">
+          {inline && <button className="mkppback" onClick={onClose} aria-label="Back to all drafts">‹ Drafts</button>}
           <b>{platformName} post</b>
           <span className={`chip mk-${item.status}`}>{item.status}</span>
-          <button className="mkppx" onClick={onClose} aria-label="Close">✕</button>
+          {!inline && <button className="mkppx" onClick={onClose} aria-label="Close">✕</button>}
         </div>
         <div className="mkdocpanelbody">
           {item.platform === 'x' && (
@@ -303,7 +306,8 @@ export function PostPreviewModal({ item, channelSlug, channelId, projectName, on
           </div>
         </div>
       </div>
-    </div>
   );
+  if (inline) return panel;
+  const node = <div className="mkdocovl bare" role="dialog" aria-label={`${platformName} post`} onClick={onClose}>{panel}</div>;
   return createPortal(node, document.body);
 }

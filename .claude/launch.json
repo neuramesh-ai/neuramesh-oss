@@ -393,6 +393,15 @@
         "scripts/dev-app-cdp.sh"
       ],
       "port": 9238
+    },
+    {
+      "name": "api-trial-e2e",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "cd packages/control-api && export STRIPE_SECRET_KEY=\"$(grep -E '^STRIPE_SECRET_KEY=' ../../../../../.env | head -1 | cut -d= -f2- | tr -d '\\\"')\" && DATABASE_URL=postgresql://postgres:nm@127.0.0.1:55435/nm PORT=8798 CRON_SECRET=local-cron NM_ALLOW_DEV_TOKENS=1 NM_ALLOW_ACTOR_HEADER=1 FLEET_AUTOPROVISION=off NM_MAIL_DRY_RUN=1 NM_HQ_URL=http://localhost:5213 STRIPE_SECRET_KEY=\"$(grep -E '^STRIPE_SECRET_KEY=' ../../../../../.env | head -1 | cut -d= -f2- | tr -d '\\\"')\" STRIPE_PUBLISHABLE_KEY=\"$(grep -E '^STRIPE_PUBLISHABLE_KEY=' ../../../../../.env | head -1 | cut -d= -f2- | tr -d '\\\"')\" STRIPE_PRICE_ID=\"${NM_TRIAL_PRICE:-price_1TmMYqARAx1tUdcPRoYZbQfx}\" STRIPE_WEBHOOK_SECRET=\"$(stripe listen --api-key \"$STRIPE_SECRET_KEY\" --print-secret 2>/dev/null | tail -1)\" STARTER_GOOGLE_API_KEY=\"$(grep -E '^STARTER_GOOGLE_API_KEY=' ../../../../../.env | head -1 | cut -d= -f2- | tr -d '\\\"')\" pnpm exec tsx src/server.ts"
+      ],
+      "port": 8798
     }
   ]
 }

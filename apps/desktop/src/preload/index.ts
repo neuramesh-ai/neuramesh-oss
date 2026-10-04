@@ -14,19 +14,9 @@ export interface MessageRow {
   created_at: string;
 }
 
-/** One execution of an armed automation (0119): the conversation its slot opened. */
-export interface ScheduleRunRow {
-  id: string;
-  title: string | null;
-  created_at: string;
-  updated_at: string;
-  channel_id: string;
-  channel_slug: string | null;
-  /** how much of an exchange the run turned into — 1 is the prompt sitting unanswered */
-  msg_count: number;
-  /** the run's last line — what it produced, which is the only thing that differs run to run */
-  last_body: string | null;
-}
+/** One RUN of an armed automation (routine sessions, 2026-09-28): the message that opens it, in the
+ *  schedule's session. The strip's rows ride beside the runs (main/sync/ipc/session-runs.ts). */
+export interface ScheduleRunRow { id: string; thread_id: string; created_at: string; channel_id: string; channel_slug: string | null; title: string | null; settled_at: string | null }
 
 // auto-update lifecycle reflected by the renderer's update card. Mirrors the
 // UpdateState union in main/update.ts and the NMBridge interface in App.tsx.
@@ -324,9 +314,11 @@ contextBridge.exposeInMainWorld('nm', {
   /** `null` = every room (the Automations destination at All scope) */
   schedules: (channelId: string | null): Promise<{ schedules: Array<{ id: string; title: string; cadence: string; at_time: string; tz: string; weekday: number | null; next_run_at: string | null; status: string; prompt: string; channel_id: string; channel_slug: string | null }> }> =>
     ipcRenderer.invoke('nm:schedules', { channelId }),
-  /** an automation's run history (0119) — the conversations its slots opened, newest first */
-  scheduleRuns: (scheduleId: string, limit?: number): Promise<{ runs: ScheduleRunRow[] }> =>
+  /** a routine's runs, newest first, with the rows each run's strip counts (routine sessions) */
+  scheduleRuns: (scheduleId: string, limit?: number): Promise<{ runs: ScheduleRunRow[] } & Record<'messages' | 'units' | 'cards' | 'drafts' | 'files' | 'openRuns', unknown[]>> =>
     ipcRenderer.invoke('nm:schedule-runs', { scheduleId, limit }),
+  /** schedule.run_now: due at once, and the next tick fires it */
+  scheduleRunNow: (scheduleId: string): Promise<{ ok: boolean }> => ipcRenderer.invoke('nm:schedule-run-now', { scheduleId }),
   contentItems: (channelId: string): Promise<{ items: Array<{ id: string; platform: string; body: string; status: string; scheduled_at: string | null; published_at: string | null; external_url: string | null; created_at: string; schedule_id: string | null; task_id: string | null }> }> =>
     ipcRenderer.invoke('nm:content-items', { channelId }),
   contentByTask: (taskId: string): Promise<{ items: Array<{ id: string; platform: string; body: string; status: string; scheduled_at: string | null; published_at: string | null; external_url: string | null; created_at: string; schedule_id: string | null; task_id: string | null }> }> =>
@@ -709,7 +701,7 @@ contextBridge.exposeInMainWorld('nm', {
     };
   },
   // live token stream from local agents (host broadcasts to all windows; no subId)
-  watchAgentStream: (cb: (p: { key: string; agent: string; text: string; done: boolean }) => void): (() => void) => {
+  watchAgentStream: (cb: (p: { key: string; agent: string; text: string; done: boolean; thinking?: string }) => void): (() => void) => {
     const listener = (_e: unknown, p: { key: string; agent: string; text: string; done: boolean }) => cb(p);
     ipcRenderer.on('nm:agent-stream', listener);
     return () => ipcRenderer.removeListener('nm:agent-stream', listener);

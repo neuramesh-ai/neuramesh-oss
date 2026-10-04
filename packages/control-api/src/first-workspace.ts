@@ -14,23 +14,14 @@
 //
 // Not under NM_LOCAL: the local stack seeds a user and no workspace, and the wizard creates it (unit U2).
 //
-// The first workspace is born with SIGNUP_GRANT_CREDITS (the first-run doors, 2026-09-19, George:
-// "cloud should indicate free 500 credits to get started"): a free hosted account's first workspace
-// gets 500 credits once, so the starter brain answers before a key is added. The grant is best
-// effort behind the creation: a sign-in never fails because a ledger row did not land.
-//
-// And it is born with its cloud machine (George, 2026-09-25: "cloud is pro, with 500 free credits
-// to start"; free is the local open-source desktop). Before this, a hosted signup got 500 credits
-// and nowhere to spend them: the web wizard said "has its cloud machine" and its Launch step waited
-// for a runner that only the Stripe plan flip minted. The mint is the plan flip's own
+// the first workspace is born with SIGNUP_GRANT_CREDITS (the first-run doors, 2026-09-19) and its
+// cloud machine (George, 2026-09-25: "cloud is pro, with 500 free credits to start"). both now come
+// with workspace.create itself (workspace-birth.ts), for the person's first workspace, so a
+// workspace the wizard makes after an invitation gets them too. the mint is the plan flip's own
 // (mintWorkspaceRunner: once, best effort), so a later checkout finds the runner and mints nothing.
-import { SIGNUP_GRANT_CREDITS } from '@neuramesh/shared';
-import { grantCredits } from './credit-ledger';
-import { sqlOf } from './credits';
 import { DomainError } from './errors';
 import { executeCommand } from './handler';
 import { localMode } from './localmode';
-import { mintWorkspaceRunner } from './plan-flip';
 import type { Store } from './store';
 
 export function firstWorkspaceName(firstName: string | null, email: string | null): string {
@@ -56,21 +47,8 @@ export interface FirstWorkspaceInput {
 
 const ATTEMPTS = 20;
 
-/** the credits a first workspace starts with: 500, once, the ledger's `signup` kind */
-export async function grantSignupCredits(store: Store, workspaceId: string): Promise<boolean> {
-  const sql = sqlOf(store);
-  if (!sql) return false;
-  try {
-    await grantCredits(sql, workspaceId, SIGNUP_GRANT_CREDITS, 'signup', 'first workspace');
-    console.log(`signup_grant workspace=${workspaceId} credits=${SIGNUP_GRANT_CREDITS}`);
-    return true;
-  } catch (e) {
-    console.error(`signup_grant FAILED workspace=${workspaceId}:`, e);
-    return false;
-  }
-}
-
-/** Creates the person's first workspace when they have none, grants its starting credits, and answers what it made. */
+/** Creates the person's first workspace when they have none, and answers what it made. the
+ *  starting credits and the cloud machine come with workspace.create itself (workspace-birth.ts). */
 export async function ensureFirstWorkspace(store: Store, a: FirstWorkspaceInput): Promise<{ workspaceId: string; slug: string } | null> {
   if (localMode()) return null;
   if (a.pending.length > 0) return null;
@@ -80,9 +58,6 @@ export async function ensureFirstWorkspace(store: Store, a: FirstWorkspaceInput)
   const create = async (slug: string): Promise<{ workspaceId: string; slug: string }> => {
     const made = (await executeCommand(store, { kind: 'human', id: a.userId }, { type: 'workspace.create', name, slug })) as unknown as { workspaceId: string };
     console.log(`first_workspace_created user=${a.userId} workspace=${made.workspaceId} slug=${slug}`);
-    await grantSignupCredits(store, made.workspaceId);
-    const sql = sqlOf(store);
-    if (sql) await mintWorkspaceRunner(store, sql, made.workspaceId, 'signup');
     return { workspaceId: made.workspaceId, slug };
   };
   for (let i = 1; i <= ATTEMPTS; i++) {

@@ -1,9 +1,10 @@
 // The design hand-off card (docs/14) — the approved round, handed to the architect.
 // Extracted from App.tsx (track A2).
 import { AgentAvatar } from '../components/AgentAvatar';
-import { IconArrowR, IconCheck, IconExternal, IconImage } from '../ui/icons';
 import { claudeDesignProjectUrl } from '@neuramesh/shared';
 import { designMockupLabel, themedMockupDoc } from './plans';
+import { IconCheck, IconDesign, IconExternal, IconImage } from '../ui/icons';
+import { RefCard, usePanelShown } from '../thread/RefCard';
 import { nm as nmBridge } from '../bridge/nm';
 
 // Imported bindings lose control-flow narrowing inside closures, so re-bind (same as App.tsx).
@@ -36,6 +37,7 @@ export function DesignHandoffCard({
   designerName?: string | null;
   onOpen: (name?: string) => void;
 }) {
+  const shown = usePanelShown();
   const claude = provider === 'claude-design';
   const who = designerName ?? 'Iris';
   const working = taskState === 'designing';
@@ -101,8 +103,8 @@ export function DesignHandoffCard({
       : 'This design stays attached to the task as the visual contract for the build.'
     : ready
       ? claude
-        ? 'The latest Claude Design snapshot is synced here. Open any direction to review it full-size.'
-        : `${who} shared the latest mockups here. Open any direction to review it full-size.`
+        ? 'The latest Claude Design snapshot synced. The mockups open in the side panel.'
+        : `${who} shared the latest mockups. They open in the side panel.`
       : claude
         ? `Keep editing there. ${who} will sync the designs here automatically when they are ready.`
         : `${who} will share each reviewable direction here as soon as the round is ready.`;
@@ -145,28 +147,14 @@ export function DesignHandoffCard({
         })}
       </div>
 
+      {/* the round is ONE ROW (the side-panel round, 2026-10-03): its mockups open together in the
+          side panel's review tab by themselves, and a click on the row shows them again */}
       {mockups.length > 0 && (
-        <div className="dhandpreviews">
-          {mockups.map((mockup) => (
-            <button key={mockup.id} className="dhandpreview" onClick={() => onOpen(mockup.name)} title={`Open ${designMockupLabel(mockup.name)} in design review`}>
-              <span className="dhandclip" aria-hidden>
-                {mockup.inline_content
-                  ? <iframe className="dhandframe" sandbox="" tabIndex={-1} srcDoc={themedMockupDoc(mockup.inline_content)} title="" />
-                  : <span className="dhandempty"><IconImage s={18} /></span>}
-              </span>
-              <span className="dhandpreviewmeta">
-                <span><strong>{designMockupLabel(mockup.name)}</strong><small>Round {round} · synced snapshot</small></span>
-                <IconArrowR s={14} />
-              </span>
-            </button>
-          ))}
-        </div>
-      )}
-
-      {mockups.length > 0 && (
-        <div className="dhandfoot">
-          <span>{working ? `${who} is preparing round ${round + 1}; these are the previous synced directions.` : 'Click a preview to open that direction directly.'}</span>
-          <button className="btn primary sm" onClick={() => onOpen()}>Review all designs</button>
+        <div className="refrows dhandrows">
+          <RefCard glyph={<IconDesign s={14} />} tone="design" name={`Design round ${round}`}
+            meta={`${mockups.length} mockup${mockups.length === 1 ? '' : 's'}${working ? ` · ${who} drafts round ${round + 1}` : ''}`}
+            waits={working ? null : 'waits for your verdict'}
+            shown={!!shown.name && mockups.some((m) => m.name === shown.name)} onOpen={() => onOpen()} />
         </div>
       )}
     </section>

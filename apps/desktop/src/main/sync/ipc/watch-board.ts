@@ -17,8 +17,9 @@ export const TASKS_ALL_SQL = `select t.id, t.number, t.title, t.description, t.s
               -- (docs/24), so that is the thread the human is actually typing in — looking only
               -- at the subtask's own row meant an answer given in the obvious place never
               -- registered as an answer at all.
+              -- …and the grant's ‹github:connected:…› divider is no reply: it is posted as the person (github-resume.ts).
               (select max(m.created_at) from messages m
-                where m.author_kind = 'human'
+                where m.author_kind = 'human' and m.body not like '‹github:connected:%'
                   and (m.task_id = t.id or (t.parent_task_id is not null and m.task_id = t.parent_task_id))) as last_human_msg_at,
               -- the task's thread (thread-per-task) and its settle stamp (0137): a settle newer than the
               -- gate takes the row out of the bell; the thread id is what Settle acts on
@@ -48,6 +49,9 @@ export const DECISIONS_ALL_SQL = `select d.id, d.channel_id, d.task_id, d.messag
               -- another conversation — the card's thread said needs you, the row said settled.
               -- …and a card hung on a SUBTASK counts the parent's thread as well, for the same
               -- reason the task watch above does: that is where the conversation is.
+              -- …and a message that carries a schedule answers no card: it opens a routine's run, posted as its
+              -- owner, and one session holds every run (routine sessions, 2026-09-28).
+              -- …and neither does the grant's ‹github:connected:…› divider, posted as the person (github-resume.ts).
               -- One branch per conversation shape, each on its own index. It was ONE scan with the
               -- shape chosen by a CASE inside the WHERE, which no index can serve: every card read
               -- every message, 0.5 s a run on a 1.7k-message replica. The branches are exclusive
@@ -55,16 +59,16 @@ export const DECISIONS_ALL_SQL = `select d.id, d.channel_id, d.task_id, d.messag
               (select max(v) from (
                  select max(m.created_at) as v from messages m
                   where d.task_id is null and (select m2.thread_id from messages m2 where m2.id = d.message_id) is null
-                    and m.channel_id = d.channel_id and m.task_id is null and m.author_kind = 'human'
+                    and m.channel_id = d.channel_id and m.task_id is null and m.author_kind = 'human' and m.schedule_id is null and m.body not like '‹github:connected:%'
                  union all
                  select max(m.created_at) from messages m
                   where d.task_id is null and m.thread_id = (select m2.thread_id from messages m2 where m2.id = d.message_id)
-                    and m.author_kind = 'human'
+                    and m.author_kind = 'human' and m.schedule_id is null and m.body not like '‹github:connected:%'
                  union all
-                 select max(m.created_at) from messages m where m.task_id = d.task_id and m.author_kind = 'human'
+                 select max(m.created_at) from messages m where m.task_id = d.task_id and m.author_kind = 'human' and m.body not like '‹github:connected:%'
                  union all
                  select max(m.created_at) from messages m
-                  where m.task_id = (select st.parent_task_id from tasks st where st.id = d.task_id) and m.author_kind = 'human'
+                  where m.task_id = (select st.parent_task_id from tasks st where st.id = d.task_id) and m.author_kind = 'human' and m.body not like '‹github:connected:%'
               )) as human_replied_at,
               -- the settle stamps a card can sit under (0137): its own conversation's, and its task's thread's
               (select th.settled_at from threads th where th.id = (select m3.thread_id from messages m3 where m3.id = d.message_id)) as thread_settled_at,
@@ -98,7 +102,8 @@ const { db, watchers, watchFailed, ws } = d;
     watchers.set(subId, ac);
     const sender: WebContents = event.sender;
     db().watch(
-      `select id, kind, name, inline_content, promoted, created_at from artifacts
+      // message_id tells a human's attachment (set) from a deliverable (null): only a deliverable opens by itself
+      `select id, kind, name, inline_content, promoted, created_at, message_id from artifacts
        where task_id = ? order by created_at asc`,
       [taskId],
       {

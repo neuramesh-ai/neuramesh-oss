@@ -13,7 +13,8 @@
 // of the main bundle) while the bus imports it statically — the builder serves both without
 // forcing either import style.
 import type { z as Zod } from 'zod';
-import { REPO_CHANGES_DESC, REPO_FILE_DESC, REPO_TREE_DESC } from './tooldesc';
+import { REPO_CHANGES_DESC, REPO_FILE_DESC, REPO_TREE_DESC, SEARCH_X_DESC, searchXParams } from './tooldesc';
+import { WEB_CLICK_DESC, WEB_OPEN_DESC, WEB_READ_DESC, WEB_SCREENSHOT_DESC, WEB_TYPE_DESC, webClickParams, webOpenParams, webReadParams, webScreenshotParams, webTypeParams } from './tooldesc';
 
 type Shape = Record<string, Zod.ZodTypeAny>;
 export interface ToolSpec { description: string; params: (z: typeof Zod) => Shape }
@@ -101,14 +102,9 @@ export const TOOL_SPECS = {
     }),
   },
   search_x: {
-    // the leg copy (marketing-os round) — research legs read X through the room's connector,
-    // same honesty rules as the orchestrator/chat copies (host/searchx.ts is the ONE impl)
-    description:
-      'Search X (Twitter) for the LAST 7 DAYS of public posts, with real author handles and real engagement numbers. Use it for ANY question about what is being said on X — x.com blocks unauthenticated reads, so WebSearch/WebFetch produce guesses; this returns facts or an honest failure. Reads are metered against the room\'s connected account: search deliberately, with a specific query, and never fill a failure with guessed posts or numbers.',
-    params: (z) => ({
-      query: z.string().min(2).max(400).describe('an X search query — supports X operators, e.g. `"ai agents" -is:retweet lang:en` or `from:handle`'),
-      max: z.number().int().min(10).max(25).optional().describe('how many posts to return (10–25, default 10)'),
-    }),
+    // the leg copy (marketing-os round): the one wording and schema every registry speaks (tooldesc.ts)
+    description: SEARCH_X_DESC,
+    params: searchXParams,
   },
   draft_replies: {
     // the worker/leg copy (reply-radar round) — the turn that FOUND the conversations hands
@@ -158,6 +154,12 @@ export const TOOL_SPECS = {
       ref: z.string().max(200).optional().describe('a branch, tag or commit (default: the default branch)'),
     }),
   },
+  // the agents' browser (board C3): browser/agent-tools.ts is the one implementation behind every copy
+  web_open: { description: WEB_OPEN_DESC, params: webOpenParams },
+  web_read: { description: WEB_READ_DESC, params: webReadParams },
+  web_click: { description: WEB_CLICK_DESC, params: webClickParams },
+  web_type: { description: WEB_TYPE_DESC, params: webTypeParams },
+  web_screenshot: { description: WEB_SCREENSHOT_DESC, params: webScreenshotParams },
 } satisfies Record<string, ToolSpec>;
 
 export type SpeccedTool = keyof typeof TOOL_SPECS;

@@ -32,8 +32,11 @@ export const isLiveStreamOpenMeta = (m: unknown): m is LiveStreamOpenMeta =>
  *       where the clocks agree, and means nothing where they do not
  */
 export type LiveFrame =
-  | { t: 'snap'; k: string; a: string; e: string; s: number; text: string; at: number }
-  | { t: 'd'; k: string; a: string; e: string; s: number; keep: number; add: string; at: number }
+  /** `th`: the turn's thoughts so far, when the runtime shows them (the repo-connect round's Option A) */
+  | { t: 'snap'; k: string; a: string; e: string; s: number; text: string; th?: string; at: number }
+  /** `tk`/`ta`: the thoughts' own delta (keep, add), present only when they changed. A client of an
+   *  earlier version ignores both, and still types the reply */
+  | { t: 'd'; k: string; a: string; e: string; s: number; keep: number; add: string; tk?: number; ta?: string; at: number }
   | { t: 'end'; k: string; a: string; e: string; s: number; at: number }
   /** after the attach snapshots and after every resync: the keys live on this machine NOW. A
    *  subscriber drops (lands) any key it holds from this machine that is not in the list — the
@@ -66,8 +69,16 @@ export function liveDelta(prev: string, next: string): { keep: number; add: stri
   return { keep, add: next.slice(keep) };
 }
 
-/** what a subscriber holds for one key */
-export interface LiveKeyState { a: string; e: string; s: number; text: string }
+/** what a subscriber holds for one key: the reply so far, and the thoughts so far (`th`, absent when none) */
+export interface LiveKeyState { a: string; e: string; s: number; text: string; th?: string }
+
+/** the thoughts after a delta frame: kept as held when the frame carries none, else the delta applied.
+ *  null = the frame keeps more than is held (the subscriber lost its place) */
+function thoughtsAfter(held: string, f: { tk?: number; ta?: string }): string | null {
+  if (f.ta === undefined) return held;
+  const keep = f.tk ?? 0;
+  return keep > held.length ? null : held.slice(0, keep) + f.ta;
+}
 
 export type LiveStep =
   /** apply: the new state (the text changed or a new epoch began) */
@@ -81,15 +92,17 @@ export type LiveStep =
 
 /** one keyed frame against what is held for its key. Pure; the caller owns the map. */
 export function applyLiveFrame(cur: LiveKeyState | undefined, f: Extract<LiveFrame, { k: string }>): LiveStep {
-  if (f.t === 'snap') return { kind: 'state', state: { a: f.a, e: f.e, s: f.s, text: f.text } };
+  if (f.t === 'snap') return { kind: 'state', state: { a: f.a, e: f.e, s: f.s, text: f.text, ...(f.th ? { th: f.th } : {}) } };
   if (f.t === 'end') return cur && cur.e === f.e ? { kind: 'end' } : { kind: 'none' };
   // a new epoch may start from nothing: its first delta keeps nothing
   if (!cur || cur.e !== f.e) {
-    return f.s === 1 && f.keep === 0 ? { kind: 'state', state: { a: f.a, e: f.e, s: 1, text: f.add } } : { kind: 'resync' };
+    const th = thoughtsAfter('', f);
+    return f.s === 1 && f.keep === 0 && th !== null ? { kind: 'state', state: { a: f.a, e: f.e, s: 1, text: f.add, ...(th ? { th } : {}) } } : { kind: 'resync' };
   }
   if (f.s <= cur.s) return { kind: 'none' }; // a duplicate after a resync
-  if (f.s !== cur.s + 1 || f.keep > cur.text.length) return { kind: 'resync' };
-  return { kind: 'state', state: { a: f.a, e: f.e, s: f.s, text: cur.text.slice(0, f.keep) + f.add } };
+  const th = thoughtsAfter(cur.th ?? '', f);
+  if (f.s !== cur.s + 1 || f.keep > cur.text.length || th === null) return { kind: 'resync' };
+  return { kind: 'state', state: { a: f.a, e: f.e, s: f.s, text: cur.text.slice(0, f.keep) + f.add, ...(th ? { th } : {}) } };
 }
 
 /** parse one line from the wire; null = not a frame this version speaks */
@@ -105,8 +118,9 @@ export function liveFrameOf(v: unknown): LiveFrame | null {
   const f = v as Record<string, unknown>;
   const keyed = typeof f['k'] === 'string' && typeof f['a'] === 'string' && typeof f['e'] === 'string' && typeof f['s'] === 'number';
   switch (f['t']) {
-    case 'snap': return keyed && typeof f['text'] === 'string' ? (f as unknown as LiveFrame) : null;
-    case 'd': return keyed && typeof f['keep'] === 'number' && f['keep'] >= 0 && typeof f['add'] === 'string' ? (f as unknown as LiveFrame) : null;
+    case 'snap': return keyed && typeof f['text'] === 'string' && (f['th'] === undefined || typeof f['th'] === 'string') ? (f as unknown as LiveFrame) : null;
+    case 'd': return keyed && typeof f['keep'] === 'number' && f['keep'] >= 0 && typeof f['add'] === 'string'
+      && (f['ta'] === undefined || (typeof f['ta'] === 'string' && typeof f['tk'] === 'number' && f['tk'] >= 0)) ? (f as unknown as LiveFrame) : null;
     case 'end': return keyed ? (f as unknown as LiveFrame) : null;
     case 'live': return Array.isArray(f['keys']) && f['keys'].every((k) => typeof k === 'string') ? (f as unknown as LiveFrame) : null;
     case 'hb': return { t: 'hb', at: typeof f['at'] === 'number' ? f['at'] : 0 };

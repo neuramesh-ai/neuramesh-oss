@@ -6,6 +6,7 @@
 // prose follows, so one turn reads as one row, never as a stack of TOOL labels.
 import { useMemo } from 'react';
 import type { OrbState } from 'thinking-orbs';
+import { isEngineeringGitHubWait } from '@neuramesh/shared';
 import { engineeringActivePresentation, engineeringActivityPresentation, engineeringReasoningSeconds, groupEngineeringTranscript, streamingEngineeringText, type EngineeringActivityKind } from '../engineering/activity';
 import type { EngineeringMessage, EngineeringSession } from '../engineering/domain';
 import { Md } from '../md/Md';
@@ -86,8 +87,15 @@ function EngineeringRow({ row }: { row: Extract<Row, { kind: 'eng' }> }) {
   );
 }
 
+/** the session's greeting says "Ready in <repo>": while the machine cannot reach the code, it would say the opposite of
+ *  the gate below. The machine's GitHub sentence is the phone's reason (it has no gate): here the gate and the
+ *  connected divider say it, and after the grant the sentence would be stale, so it never shows */
+export function transcriptMessages(messages: EngineeringMessage[], blocked: boolean): EngineeringMessage[] {
+  return (blocked && messages[0]?.role === 'assistant' ? messages.slice(1) : messages).filter((m) => !isEngineeringGitHubWait(m));
+}
+
 export function CodingTranscript({ session }: { session: EngineeringSession }) {
-  const rows = useMemo(() => rowsOf(session.messages), [session.messages]);
+  const rows = useMemo(() => rowsOf(transcriptMessages(session.messages, !!session.blockedOn)), [session.messages, session.blockedOn]);
   const live = session.state === 'streaming' ? engineeringActivePresentation(session.activeActivity, session.mode) : null;
   return (
     <>

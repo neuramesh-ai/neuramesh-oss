@@ -64,8 +64,19 @@ export const NM_TOOLS = [
   'list_repo_changes',
   'read_repo_file',
   'list_repo_files',
+  'web_open',
+  'web_read',
+  'web_click',
+  'web_type',
+  'web_screenshot',
 ] as const;
 export type NmTool = (typeof NM_TOOLS)[number];
+
+/** the agents' browser (models-and-replies round, board C3): broad, like the repository reads,
+ *  because reading the web is part of most work. a `sweep` is the one exclusion: a digest or a
+ *  watchdog tick reads the board, never the web. the host offers these only on a machine whose
+ *  Chromium runs the agents' browser (apps/desktop browser/registry.ts), so the desktop never sees one. */
+const WEB_KINDS: readonly TurnKind[] = ['chat', 'triage', 'own', 'design', 'plan', 'work', 'review', 'ship', 'deep', 'leg'];
 
 /**
  * Which turn kinds may call each nm tool.
@@ -140,6 +151,11 @@ export const TOOL_KINDS: Record<NmTool, readonly TurnKind[]> = {
   list_repo_changes: ['chat', 'triage', 'own', 'design', 'plan', 'work', 'review', 'ship', 'deep', 'leg'],
   read_repo_file: ['chat', 'triage', 'own', 'design', 'plan', 'work', 'review', 'ship', 'deep', 'leg'],
   list_repo_files: ['chat', 'triage', 'own', 'design', 'plan', 'work', 'review', 'ship', 'deep', 'leg'],
+  web_open: WEB_KINDS,
+  web_read: WEB_KINDS,
+  web_click: WEB_KINDS,
+  web_type: WEB_KINDS,
+  web_screenshot: WEB_KINDS,
 };
 
 /** Is this tool available to this turn kind? The single reader every surface agrees through. */

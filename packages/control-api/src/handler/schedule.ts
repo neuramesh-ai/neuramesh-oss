@@ -23,13 +23,14 @@ import {
 
 
 
+  isCodingThread,
   nextScheduleRun,
+  ROUTINE_SCHEDULED_MARKER,
 
 
 } from '@neuramesh/shared';
 import type { Command } from '../commands';
 import { DomainError } from '../errors';
-import { localMode } from '../localmode';
 
 import { type Store } from '../store';
 import { actorAddress } from './guards';
@@ -38,17 +39,39 @@ import { actorAddress } from './guards';
 
 
 import type { CommandOutcome } from '../handler';
+import type { ScheduleInput } from '../store/types';
+import { ROUTINE_TAKEN } from '../store/routine-session';
+
+/**
+ * THE ROUTINE WRITER (docs/design/routine-writer-2026-10): the session a person schedules a routine in. It
+ * must be a plain conversation in the routine's own room that holds no routine yet. A task's thread belongs
+ * to its unit and a coding thread to the coding runtime, so neither can hold one. The store re-checks the
+ * last rule in its transaction, which is what stops two clicks from arming two routines into one session.
+ */
+async function routineSession(store: Store, actor: Actor, workspace: string, channel: string, threadId: string): Promise<NonNullable<ScheduleInput['session']>> {
+  const th = await store.threadFiling(workspace, threadId);
+  if (!th) throw new DomainError('NOT_FOUND', `session ${threadId} not found`);
+  if (th.taskId) throw new DomainError('TASK_THREAD', "A task's thread cannot hold a routine. Open a new session for it.");
+  if (isCodingThread(th.kind)) throw new DomainError('CODING_THREAD', 'A coding thread cannot hold a routine. Open a new session for it.');
+  if (th.scheduleId) throw new DomainError('THREAD_HAS_ROUTINE', ROUTINE_TAKEN);
+  if (th.channelId !== channel) throw new DomainError('INVALID_INPUT', "A routine runs in the room of its session.");
+  return {
+    threadId, dividerId: crypto.randomUUID(), author: { kind: actor.kind, id: actor.id },
+    makeEvent: (ws) => createEvent({
+      type: 'message.posted', source: actorAddress(actor), target: `channel/${channel}`, workspace: ws,
+      payload: { preview: ROUTINE_SCHEDULED_MARKER },
+    }),
+  };
+}
 
 export async function scheduleCommands(store: Store, actor: Actor, cmd: Command): Promise<CommandOutcome | undefined> {
   if (cmd.type === 'schedule.create') {
     if (actor.kind !== 'human') throw new DomainError('HUMAN_ONLY', 'schedules are armed by a human — agents propose, humans arm');
+    // no plan gate (George, 2026-10-03: "allow routines on the trial"). a routine runs on every
+    // plan: on the Pro trial its runs spend the trial's credits like any other work, and the
+    // credit gate is what stops them at zero. the old paywall refused routines on the trial
+    // while the site sold them.
     const { workspace } = await store.channelWorkspace(cmd.channel);
-    if (!localMode() && (await store.workspacePlan(workspace)) === 'free') {
-      // THE deep-funnel paywall (plan §4.2): the crew, the docs and the strategy were free —
-      // putting it on a cadence is Cloud. The desktop routes 402 to the full-powers card.
-      // The local stack lifts it (localmode.ts): the cadence runs on the person's own machine.
-      throw new DomainError('PLAN_LIMIT', 'Content schedules ship with Team — upgrade to put the crew on a cadence.');
-    }
     const atTime = cmd.atTime ?? '09:00';
     const tz = cmd.tz ?? 'UTC';
     let nextRunAt: string;
@@ -61,12 +84,14 @@ export async function scheduleCommands(store: Store, actor: Actor, cmd: Command)
       if (!next) throw new DomainError('INVALID_INPUT', 'could not compute the next run — check the time and timezone');
       nextRunAt = next.toISOString();
     }
+    const session = cmd.thread ? await routineSession(store, actor, workspace, cmd.channel, cmd.thread) : null;
     const { id } = await store.createSchedule(
       {
         channelId: cmd.channel, title: cmd.title, prompt: cmd.prompt, cadence: cmd.cadence,
         atTime, tz, weekday: cmd.weekday ?? null, nextRunAt, agentName: cmd.agent ?? null,
         createdByKind: actor.kind, createdBy: actor.id,
-        ...(cmd.routine ? { payloadExtra: { routine: true } } : {}),
+        ...(cmd.routine || session ? { payloadExtra: { routine: true, ...(cmd.replyGap ? { replyGap: cmd.replyGap } : {}) } } : {}),
+        session,
       },
       (ws) => createEvent({
         type: 'schedule.created',
@@ -94,7 +119,7 @@ export async function scheduleCommands(store: Store, actor: Actor, cmd: Command)
     }
     const { id } = await store.updateSchedule(
       cmd.schedule,
-      { title: cmd.title, prompt: cmd.prompt, cadence: cmd.cadence, atTime, tz, weekday: cmd.weekday ?? null, nextRunAt },
+      { title: cmd.title, prompt: cmd.prompt, cadence: cmd.cadence, atTime, tz, weekday: cmd.weekday ?? null, nextRunAt, ...(cmd.replyGap !== undefined ? { replyGap: cmd.replyGap } : {}) },
       (ws) => createEvent({
         type: 'schedule.updated', source: actorAddress(actor),
         target: formatAddress({ kind: 'resource', type: 'schedule', id: cmd.schedule }), workspace: ws,
@@ -116,6 +141,17 @@ export async function scheduleCommands(store: Store, actor: Actor, cmd: Command)
       }),
     );
     return { ok: true, claimed } as never;
+  }
+  if (cmd.type === 'schedule.run_now') {
+    // Run now (routine sessions, 2026-09-28): a person fires the routine into its session. The row turns
+    // due at once, and the daemon's next tick claims it like any slot (store/schedule-now.ts)
+    if (actor.kind !== 'human') throw new DomainError('HUMAN_ONLY', 'a person runs a routine now. agents wait for its slot');
+    const { id } = await store.runScheduleNow(cmd.schedule, (ws) => createEvent({
+      type: 'schedule.updated', source: actorAddress(actor),
+      target: formatAddress({ kind: 'resource', type: 'schedule', id: cmd.schedule }), workspace: ws,
+      payload: { schedule: cmd.schedule, runNow: true },
+    }));
+    return { ok: true, scheduleId: id } as never;
   }
   if (cmd.type === 'schedule.mark_result') {
     // the fire's outcome, written by the daemon lane that claimed the slot — any authenticated

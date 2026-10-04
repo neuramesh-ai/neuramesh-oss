@@ -2,7 +2,9 @@
 // failover when a model runs out. A hire is human-gated by construction: these functions
 // propose, and a card is what commits. Extracted from agents.ts (track B2).
 import type { HostedAgent } from '../agents';
-import { STARTER_MODEL, isCustomPackId, runtimeForModel as runtimeForModelId, seatModel, type AgentRole } from '@neuramesh/shared';
+import { STARTER_MODEL, type AgentRole } from '@neuramesh/shared';
+import { apiAuthHeaders } from '../apiauth';
+import { houseBrainHere, seatAgent, type SeatScope } from './seatpick';
 
 
 
@@ -104,34 +106,12 @@ async function confirmAddAgent(orch: HostedAgent, channelId: string, agentName: 
   if (r?.ok) await post('/v1/messages', actor, { workspace: ch.workspace_id, channel: channelId,
     body: `Added @${agentName} to #${ch.slug} — they're in the room now. Tag them and they'll jump in.` }).catch(() => {});
 }
-/**
- * The agent as it should run for work in this channel's project — and, when the work has a
- * conversation, under that conversation's brain override.
- *
- * `pin > thread > project > workspace`, all of it decided by `seatModel` in packages/shared so
- * the precedence lives in one tested place rather than in this call site.
- */
-async function seatFor(agent: HostedAgent, channelId: string, scope?: { threadId?: string | null; taskId?: string | null }): Promise<HostedAgent> {
-  // the conversation's override is read BEFORE the pin short-circuit (2026-09-17): a pinned
-  // orchestrator used to skip it, so a routine's Starter stamp on Pro never seated him and the
-  // routine ran on the human's vendor login — seen live in the harness. A pin still beats a pack.
-  const threadOverride = scope ? await threadBrain(scope) : null;
-  if ((agent.modelSource ?? 'pack') === 'manual' && !threadOverride) return agent;
-  const row = await db.get<{ workspace_id: string; model_pack: string | null }>(
-    `select c.workspace_id, p.model_pack from channels c
-       left join projects p on p.id = c.project_id
-      where c.id = ?`,
-    [channelId],
-  ).catch(() => null);
-  const pack = row?.model_pack ?? null;
-  // no project pack AND no thread override → the workspace materialization stands
-  if (!pack && !threadOverride) return agent;
-  const custom = pack && isCustomPackId(pack) ? await customPacksFor(row!.workspace_id) : [];
-  const model = seatModel({ role: agent.role as AgentRole, currentModel: agent.model, modelSource: agent.modelSource, projectPack: pack, custom, threadOverride });
-  if (model === agent.model) return agent;
-  const why = threadOverride?.[agent.role as AgentRole] ? 'thread_brain' : `project_pack=${pack}`;
-  console.log(`agent_seat agent=${agent.name} ${why} ${agent.model} → ${model}`);
-  return { ...agent, model, runtime: runtimeForModelId(model) };
+/** the agent as it should run for this work: host/seatpick.ts seatAgent decides, with this host's reads */
+async function seatFor(agent: HostedAgent, channelId: string, scope?: SeatScope): Promise<HostedAgent> {
+  return seatAgent(agent, channelId, scope, {
+    db, customPacksFor,
+    houseBrain: (ws) => houseBrainHere(ctx.apiUrl, ws, () => apiAuthHeaders(ctx.apiUrl, { kind: 'human', id: ctx.ownerActorId }) as Promise<Record<string, string>>),
+  });
 }
   return { activePackId, activePackRoles, confirmAddAgent, confirmCreateAgent, confirmFailover, customPacksFor, executeHire, handleExhaustion, offerAddAgents, seatFor, threadBrain };
 }

@@ -1,7 +1,8 @@
 // The lifecycle drip — welcome, day 1, day 3. Split out of email/templates.ts.
 import {
- b, button, card, esc, h1, h2, layout, linkline, monoList, p, quote, rule, small, stats,
+ b, button, card, esc, h1, h2, layout, monoList, p, quote, rule, small, stats,
 } from './layout';
+import { SIGNUP_GRANT_CREDITS } from '../rates';
 import { done, type RenderedEmail, type TemplateMeta } from './templates';
 
 
@@ -9,17 +10,22 @@ export const welcomeMeta: TemplateMeta = {
   kind: 'lifecycle',
   shape: 'The ensemble. A cast, named, one job each',
   claims: [
-    ['The six default agents and their roles', 'App.tsx:9272-9278 (+ rex, :9384)'],
-    ['Any of them can be renamed before launch', 'App.tsx:9387 setCrewAt'],
-    ['Setup is Machine, Keys, Workspace, Team, Launch', 'App.tsx:9354-9364'],
-    ['macOS, signed + notarized + stapled', 'docs/11-releases.md:68'],
-    ['rex turns a plain sentence into board tasks', 'sync.ts:2521-2528'],
+    ['The six default agents and their roles', 'onboarding-wizard.ts STARTER_CREW'],
+    ['Any of them can be renamed before launch', 'hq OnboardingCrew.tsx; mobile wizard.tsx crew step'],
+    ['The first workspace starts with its cloud machine and 500 credits', 'control-api workspace-birth.ts birthFirstWorkspace; rates.ts SIGNUP_GRANT_CREDITS'],
+    ['Agents work on the cloud machine after the tab closes', 'hq OnboardingMachine.tsx; machines idle-stop after 48 h (docs/07)'],
+    ['Setup resumes at the machine: four screens to launch', 'onboarding-wizard.ts initialWizard step 2; hq webnm-boot.ts resumeWorkspaceId'],
+    ['The same workspace opens in the iPhone app', 'mobile sign-in.tsx; the desktop-signin hand-off'],
+    ['rex makes board tasks from a plain sentence', 'sync.ts:2521-2528'],
   ],
 };
 
-export function renderWelcome(v: { downloadUrl: string; unsubscribeUrl: string }): RenderedEmail {
+// THE PRO TRIAL (George, 2026-09-25): the welcome goes to every new hosted account, and that
+// account's workspace already runs in the browser with its cloud machine and 500 credits. the old
+// welcome sent everyone to the Mac download ("Connect this Mac"), so the one CTA opens hq instead.
+export function renderWelcome(v: { openUrl: string; unsubscribeUrl: string }): RenderedEmail {
   const subject = 'Six of them, and they all have names';
-  const preheader = 'rex, atlas, patch, scout, iris and bosun. Setup is five screens.';
+  const preheader = 'rex, atlas, patch, scout, iris and bosun. They work on your own cloud machine.';
   return done(subject, preheader, layout({
     preheader,
     unsubscribeUrl: v.unsubscribeUrl,
@@ -44,14 +50,14 @@ export function renderWelcome(v: { downloadUrl: string; unsubscribeUrl: string }
 
       p('Rename any of them before they start. The roster is yours.'),
 
-      h2('Setup is five screens'),
-      p('Connect this Mac, add a model provider, name the workspace, pick the crew, launch. The download is signed and notarized.'),
+      h2('Your workspace is ready'),
+      p(`It has its own cloud machine and ${SIGNUP_GRANT_CREDITS.toLocaleString('en-US')} credits to start. Your agents work there after you close the tab.`),
+      p('Four short screens remain: the machine, a model provider, the crew, and launch. The same workspace also opens in the NeuraMesh iPhone app.'),
 
-      button('Download NeuraMesh', v.downloadUrl),
-      linkline('Already installed? Open the app and sign in.', v.downloadUrl),
+      button('Open your workspace', v.openUrl),
 
       rule(),
-      small(`Then say what you want in ${b('#general')}, in a plain sentence. rex turns it into board tasks and hands them out.`),
+      small(`Then say what you want in ${b('#general')}, in a plain sentence. rex makes board tasks from it and gives them to the crew.`),
     ].join(''),
   }));
 }

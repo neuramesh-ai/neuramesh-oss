@@ -1,8 +1,9 @@
 // The streaming bubble — tokens as they arrive, before the message row exists.
 // Extracted from App.tsx (track A3).
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AgentAvatar } from '../components/AgentAvatar';
 import { Md } from '../md/Md';
+import { ThinkingReasoning } from '../engineering/ThinkingReasoning';
 import type { TaskRefInfo } from '../cards/parse';
 import { useStreamText, type StreamPresence } from './streamstore';
 import { useReveal } from './reveal';
@@ -40,6 +41,22 @@ export function StreamBubble({ live, role, taskRef, onOpenTask }: {
   // were already swapped for the forming hint above).
   const shown = useReveal(text, !done);
   const typing = !done || shown.length < text.length;
+  // the turn's thoughts (the repo-connect round's Option A): codex reasoning sections and tool steps,
+  // Claude's summarized thinking. Live they read "Thoughts · 12 s"; the first word of the reply folds
+  // them to one line that keeps how long they took. Live only: the synced message carries none.
+  const thoughts = entry?.thinking ?? '';
+  const words = !!text.trim();
+  const since = useRef<number | null>(null);
+  if (thoughts && since.current === null) since.current = Date.now();
+  const tookFor = useRef<number | null>(null);
+  const [, tick] = useState(0);
+  useEffect(() => {
+    if (!thoughts || words || done) return;
+    const iv = setInterval(() => tick((n) => n + 1), 1000);
+    return () => clearInterval(iv);
+  }, [!!thoughts, words, done]); // eslint-disable-line react-hooks/exhaustive-deps
+  const secs = since.current ? Math.max(1, Math.round((Date.now() - since.current) / 1000)) : 0;
+  if ((words || done) && thoughts && tookFor.current === null) tookFor.current = secs;
   // the face and the head never change while the text grows: the same elements every step, so a
   // reveal step renders the markdown's tail and nothing else
   const avatar = useMemo(() => <AgentAvatar name={live.agent} size={26} interactive />, [live.agent]);
@@ -55,7 +72,12 @@ export function StreamBubble({ live, role, taskRef, onOpenTask }: {
       {avatar}
       <div className="body">
         {head}
-        <Md text={shown} caret={typing} taskRef={taskRef} onOpenTask={onOpenTask} />
+        {thoughts ? (
+          <ThinkingReasoning thinking={!words && !done} elapsedSeconds={tookFor.current ?? secs} liveLabel={`Thoughts · ${secs} s`} ariaLabel="Show or hide the thoughts">
+            <Md text={thoughts} />
+          </ThinkingReasoning>
+        ) : null}
+        {words || !thoughts ? <Md text={shown} caret={typing} taskRef={taskRef} onOpenTask={onOpenTask} /> : null}
       </div>
     </div>
   );

@@ -117,20 +117,29 @@ test('partial messages: the bubble gets each text block as it grows, and the rep
     ev({ type: 'message_stop' }),
     assistant([{ type: 'text', text: 'The board is empty. Give me a goal.' }]),
     result('The board is empty. Give me a goal.'),
-  ]), 'fallback', undefined, (t) => seen.push(t));
+  ]), 'fallback', undefined, (t, th) => seen.push(th ? `${t} | thoughts: ${th}` : t));
   assert.equal(reply, 'The board is empty. Give me a goal.'); // what posts is unchanged
   assert.deepEqual(seen, [
     'Let me', 'Let me check the board.', // the first block types itself out…
     'Let me check the board.', // …and the complete block repeats it (the contract is whole-text-so-far)
-    'The board', 'The board is empty.', 'The board is empty. Give me a goal.', // the next block starts over
-    'The board is empty. Give me a goal.',
+    // the thinking rides BESIDE the text (the repo-connect round's Option A): never in it
+    'Let me check the board. | thoughts: the board is empty',
+    'The board | thoughts: the board is empty', 'The board is empty. | thoughts: the board is empty', 'The board is empty. Give me a goal. | thoughts: the board is empty', // the next block starts over
+    'The board is empty. Give me a goal. | thoughts: the board is empty',
   ]);
+  assert.ok(seen.every((line) => !line.split(' | ')[0]!.includes('the board is empty')), 'a thought never becomes the reply text');
 });
 
 test('partialMessages asks for the partial stream only when a bubble is watching', async () => {
   const { partialMessages } = await import('./turnkit');
   assert.deepEqual(partialMessages((t: string) => t), { includePartialMessages: true });
   assert.deepEqual(partialMessages(undefined), {});
+  // a Claude 5 seat with a bubble asks for its summarized thoughts too; Haiku 4.5 keeps its default,
+  // and no bubble asks for nothing (the repo-connect round's Option A)
+  assert.deepEqual(partialMessages((t: string) => t, 'claude-sonnet-5'), { includePartialMessages: true, thinking: { type: 'adaptive', display: 'summarized' } });
+  assert.deepEqual(partialMessages((t: string) => t, 'claude-fable-5-1'), { includePartialMessages: true, thinking: { type: 'adaptive', display: 'summarized' } });
+  assert.deepEqual(partialMessages((t: string) => t, 'claude-haiku-4-5'), { includePartialMessages: true });
+  assert.deepEqual(partialMessages(undefined, 'claude-sonnet-5'), {});
   // and a stream with no partial events drains exactly as before: one call per complete block
   const seen: string[] = [];
   await drainQuery(stream([assistant([{ type: 'text', text: 'whole' }]), result('whole')]), 'fallback', undefined, (t) => seen.push(t));

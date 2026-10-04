@@ -38,12 +38,14 @@ export function unitStripAt(unit: Pick<TaskAllRow, 'id' | 'number'>, rows: Reado
 }
 
 export function useOwnedUnitPosts(threadId: string, rows: MessageRow[]) {
-  // the content units this conversation owns — the UnitCard idiom: watch the synced rows here
-  const [units, setUnits] = useState<TaskAllRow[]>([]);
+  // the units this conversation owns — the UnitCard idiom: watch the synced rows here. Every kind
+  // counts in a routine run's strip (SessionRuns.tsx); the content units also lend their post cards
+  const [anchored, setAnchored] = useState<TaskAllRow[]>([]);
   useEffect(() => {
     if (!nm?.watchTasksAll) return;
-    return nm.watchTasksAll((all) => setUnits(all.filter((t) => t.origin_thread_id === threadId && !t.parent_task_id && t.kind === 'content')));
+    return nm.watchTasksAll((all) => setAnchored(all.filter((t) => t.origin_thread_id === threadId && !t.parent_task_id)));
   }, [threadId]);
+  const units = useMemo(() => anchored.filter((t) => t.kind === 'content'), [anchored]);
   const [items, setItems] = useState<Record<string, ContentItemRow[]>>({});
   const [imageReady, setImageReady] = useState<boolean | undefined>(undefined);
   const [replyTo, setReplyTo] = useState<UnitReply | null>(null);
@@ -72,5 +74,5 @@ export function useOwnedUnitPosts(threadId: string, rows: MessageRow[]) {
     if (replyTo && !strips.some((s) => s.cards.some((c) => c.item.id === replyTo.id && c.item.status !== 'published'))) setReplyTo(null);
   }, [replyTo, strips]);
   useEffect(() => { setReplyTo(null); }, [threadId]);
-  return { strips, imageReady, replyTo, setReplyTo, tick, setTick };
+  return { strips, imageReady, replyTo, setReplyTo, tick, setTick, anchored };
 }

@@ -49,12 +49,12 @@ export const joinedMeta: TemplateMeta = {
   claims: [
     ['Members see the whole workspace, not just their channels', 'sync-config.yaml:11-40; 0001_core.sql:316'],
     ['Channel membership organises work, it does not restrict humans', 'sync-config.yaml:11'],
-    ['Free seat count (n of 3)', 'entitlements.ts FREE_SEAT_CAP; handler.ts workspace.invite'],
+    ['Trial seat count (n of 1); the line drops on Pro', 'entitlements.ts FREE_SEAT_CAP, TRIAL_LABEL; onauth.ts seatLine'],
   ],
 };
 
 export function renderJoined(v: {
-  joinedEmail: string; workspace: string; role: string; seatLine: string | null; settingsUrl: string;
+  joinedEmail: string; workspace: string; role: string; seatLine: string | null; openUrl: string;
 }): RenderedEmail {
   const subject = `${v.joinedEmail} joined ${v.workspace}`;
   const preheader = 'They can see the whole workspace. Worth knowing before you paste anything sensitive.';
@@ -71,7 +71,45 @@ export function renderJoined(v: {
       p(`A workspace member sees ${b('the whole workspace')}: every channel, every task, every artifact. Channel membership decides who works where. It doesn't hide a room from a teammate.`),
       p(`So if something belongs in a private repo rather than a channel, keep it there.`),
 
-      button('Open workspace settings', v.settingsUrl),
+      button('Open your workspace', v.openUrl),
+    ].join(''),
+  }));
+}
+
+export const trialEndingMeta: TemplateMeta = {
+  kind: 'transactional',
+  shape: 'The notice. A date and a price, and the one door to change them',
+  claims: [
+    ['Stripe sends the event 3 days before a trial ends', 'trial.ts trialReminder; Stripe customer.subscription.trial_will_end'],
+    ['The trial turns into Pro at the seat price', 'billing.ts createTrialSession; entitlements.ts PRO_SEAT_USD'],
+    ['A cancel before the date costs nothing', 'billing.ts trial_period_days; Stripe charges at the trial end'],
+    ['Pro credits refill on the 1st of each month', 'fleet-lifecycle.ts /internal/credit-refill'],
+    ['The Credits view opens the Stripe portal', 'CreditsView.tsx Manage plan'],
+  ],
+};
+
+export function renderTrialEnding(v: {
+  workspace: string; endsOn: string; seats: number; seatUsd: number; manageUrl: string;
+}): RenderedEmail {
+  const first = v.seats * v.seatUsd;
+  const subject = `Your Pro trial ends on ${v.endsOn}`;
+  const preheader = `Then Pro is $${v.seatUsd} a seat each month. Cancel before ${v.endsOn} and you pay nothing.`;
+  return done(subject, preheader, layout({
+    preheader,
+    footerWhy: 'You started a Pro trial with a payment method. We send this once, before the first charge.',
+    body: [
+      h1('Your Pro trial ends in 3 days'),
+      p(`The Pro trial for ${b(esc(v.workspace))} ends on ${b(esc(v.endsOn))}. Then Stripe charges the payment method you added.`),
+
+      card(kv('Trial ends', esc(v.endsOn)) + kv('First charge', `$${first} for ${v.seats} seat${v.seats === 1 ? '' : 's'}`) + kv('After that', `$${v.seatUsd} a seat each month`)),
+
+      h2('To keep Pro'),
+      p('Do nothing. Pro continues, and your credits refill on the 1st of each month.'),
+
+      h2('To stop'),
+      p(`Cancel before ${esc(v.endsOn)} and you pay nothing. Open Credits in your workspace, then manage your plan on Stripe.`),
+
+      button('Manage your plan', v.manageUrl),
     ].join(''),
   }));
 }

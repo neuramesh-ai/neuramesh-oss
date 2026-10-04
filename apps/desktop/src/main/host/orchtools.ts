@@ -30,8 +30,12 @@ import { newGrounding, type Grounding } from './grounding';
 import { replyTools } from './tools-replies';
 import { contextTools } from './tools-context';
 import { roomTools } from './tools-room';
+import { routineTools } from './tools-routine';
 import { playbookTools } from './tools-playbooks';
 import { repoTools } from './tools-repo';
+import { webTools } from './tools-web';
+import { scheduleOfThread } from './runwindow';
+import type { RepoReader } from './reporead';
 
 /** a library document as the registry hands it to a tool */
 /** What a tool group needs to answer for THIS turn. Turn-scoped by design: a tool that closed
@@ -73,6 +77,8 @@ export interface ToolCtx {
    *  conversation — a conversation (never a task thread) whose kind is not coding yet, in a room whose
    *  project has a repository. Resolved before the turn, so the tool's PRESENCE is the gate. */
   codeDoor: { repo: { id: string; org_name: string; name: string; local_path: string | null } } | null;
+  /** a schedule's session: the server names it after the schedule, so the title tool is not offered */
+  namedBySchedule: boolean;
   wbReads: OrchTool[];
   wbWrites: OrchTool[];
   agents: Map<string, HostedAgent>;
@@ -84,7 +90,7 @@ export interface ToolCtx {
   generateDraftImage: (agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, itemId: string) => Promise<string>;
   generateShareImage: (agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, brief: string) => Promise<{ thumb?: string; bytes?: Buffer; error?: string }>;
   libraryDocs: (channelId: string, limit?: number, scope?: 'room' | 'project' | 'workspace') => Promise<LibDoc[]>;
-  startDeepWork: (agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, where: { threadId?: string | null; taskId?: string | null }, title: string, legs: WorkLeg[], token: string) => Promise<string | null>;
+  startDeepWork: (agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, where: { threadId?: string | null; taskId?: string | null }, title: string, legs: WorkLeg[], token: string, opts?: { repo?: RepoReader | null }) => Promise<string | null>;
   subjectFor: (t: { thread?: { number: number } | null; convoThreadId?: string | null }) => SubjectRef | null;
   workspaceListing: (subject: SubjectRef, cap?: number) => Array<{ name: string; bytes: number; modified: string }>;
   workspaceRead: (subject: SubjectRef, name: string, cap?: number) => { ok: true; body: string } | { ok: false; error: string };
@@ -139,7 +145,7 @@ export function makeOrchTools(ctx: HostCtx & {
   generateDraftImage: (agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, itemId: string) => Promise<string>;
   generateShareImage: (agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, brief: string) => Promise<{ thumb?: string; bytes?: Buffer; error?: string }>;
   libraryDocs: (channelId: string, limit?: number, scope?: 'room' | 'project' | 'workspace') => Promise<LibDoc[]>;
-  startDeepWork: (agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, where: { threadId?: string | null; taskId?: string | null }, title: string, legs: WorkLeg[], token: string) => Promise<string | null>;
+  startDeepWork: (agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, where: { threadId?: string | null; taskId?: string | null }, title: string, legs: WorkLeg[], token: string, opts?: { repo?: RepoReader | null }) => Promise<string | null>;
   subjectFor: (t: { thread?: { number: number } | null; convoThreadId?: string | null }) => SubjectRef | null;
   whiteboardClosures: (actor: { kind: string; id: string; role?: string }, ch: { id: string; workspace_id: string }, at: { taskId?: string; threadId?: string }) => WhiteboardToolClosures;
   workspaceListing: (subject: SubjectRef, cap?: number) => Array<{ name: string; bytes: number; modified: string }>;
@@ -235,6 +241,7 @@ async function buildOrchestratorTools(ctx: {
     const [th] = await db.getAll<{ kind: string | null }>(`select kind from threads where id = ? limit 1`, [convoThreadId]).catch(() => [] as Array<{ kind: string | null }>);
     return isCodingThread(th?.kind) ? null : { repo };
   })() : null;
+  const namedBySchedule = !!(await scheduleOfThread(db, convoThreadId));
   // the create→post_thread→offer chain must not depend on sync latency: create_task records
   // number→id from the API response, and a thread wake seeds the task it runs in. The replica
   // lookup (with retry) only covers numbers from outside this turn (the model citing older work).
@@ -336,14 +343,14 @@ async function buildOrchestratorTools(ctx: {
   // The registry, by domain (tools-*.ts). It is ONE list to both transports; the split is for
   // the reader. ToolCtx is what each group needs to answer for THIS turn.
   const tc: ToolCtx = { grounding: newGrounding(), z, db, post, ch, agent, actor, thread, convoThreadId, deepWorkToken, kind, spawnLeg, log, skills,
-    draftsHere, here, filed, known, kindField, taskByNumber, resolveRepoBinding, roomMenu, siblings, codeDoor, wbReads, wbWrites,
+    draftsHere, here, filed, known, kindField, taskByNumber, resolveRepoBinding, roomMenu, siblings, codeDoor, namedBySchedule, wbReads, wbWrites,
     agents, apiGet, brain, buildScheduleCard, ensureChatWorkspace, executeHire, generateDraftImage, generateShareImage, libraryDocs,
     startDeepWork, subjectFor, workspaceListing, workspaceRead };
   // Whiteboards ride kind-gated from the shared catalogue — the #272 domain split dropped this
   // spread and the orchestrator spent five days commanded to draw with no drawing tool
   // (promptbudget/orchregistry tests now assert the BUILT registry, so a lost spread fails CI).
   const wbTools = [...wbWrites, ...wbReads].filter((t) => toolAvailable(t.name as NmTool, kind));
-  const all = [...contextTools(tc), ...boardTools(tc), ...routeTools(tc), ...roomTools(tc), ...contentTools(tc), ...replyTools(tc), ...playbookTools(tc), ...repoTools(tc), ...wbTools];
+  const all = [...contextTools(tc), ...boardTools(tc), ...routeTools(tc), ...roomTools(tc), ...routineTools(tc), ...contentTools(tc), ...replyTools(tc), ...playbookTools(tc), ...repoTools(tc), ...webTools(tc), ...wbTools];
   if (kind !== 'sweep') return all;
   const scoped = new Set(SWEEP_TOOLSETS[ctx.sweepScope ?? 'monitor']);
   return all.filter((t) => scoped.has(t.name));

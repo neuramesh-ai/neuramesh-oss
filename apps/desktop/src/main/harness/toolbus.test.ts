@@ -35,7 +35,8 @@ test('every catalogued tool has a definition, and none is duplicated', () => {
   // added to the catalogue without a test being considered shows up here
   // 19 = the original ten + the four whiteboard tools (docs/38) + search_x on legs (marketing-os)
   // + draft_replies + the three repository reads (docs/design/github-connector-2026-09)
-  assert.equal(defs.length, 19);
+  // + the five web tools of the agents' browser (models-and-replies round, board C3)
+  assert.equal(defs.length, 24);
 });
 
 test('whiteboard tools (docs/38): availability, serviceability, and the write guards', async () => {

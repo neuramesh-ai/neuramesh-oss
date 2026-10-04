@@ -8,23 +8,41 @@
 // machine has no gh login, so the grant is the only way the run reads). The GitHub row is the same
 // state machine as the connect step (the pick round §7): the grant when nothing is readable, the
 // pick when the App reads repositories for the workspace, connected when the row lands.
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { nm as nmBridge } from '../bridge/nm';
-import type { ConnectProvider, NmNeed } from '@neuramesh/shared';
+import { needDecisionQuestion, type ConnectProvider, type NmNeed } from '@neuramesh/shared';
 import { ConnectorMark } from '../settings/connector-marks';
 import { PickActs, RepoPick, useGitHubGrant } from '../settings/GitHubStep';
+import { IconCheck } from '../ui/icons';
 import { AttachRepo } from './AttachRepo';
 
 const nm = nmBridge;
 
 const LABEL: Record<string, string> = { x: 'X (Twitter)', linkedin: 'LinkedIn', instagram: 'Instagram', tiktok: 'TikTok', github: 'GitHub' };
+const CONNECTED = 'Connected ';
 
-/** the GitHub need: one option (the grant), or the pick, or the connected line */
-function GitHubNeed({ channelId }: { channelId: string }) {
-  const [done, setDone] = useState(false);
-  const g = useGitHubGrant(channelId, () => setDone(true));
-  const sub = 'one minute on GitHub · releases, pull requests and files, read only';
-  if (done) return <div className="ndopt primary" aria-disabled><span className="g" aria-hidden><ConnectorMark id="github" s={14} /></span><span className="ndtxt"><b>GitHub is connected</b><span>{sub}</span></span></div>;
+/** the GitHub card's face and foot. Its decision row leads (a tool's card mints one, shared/needs.ts): the resume
+ *  answers it `Connected owner/repo` when a grant lands on any surface (control-api github-resume.ts), so the card
+ *  stays connected after the App later loses access, and only a card the resume answered says the work continues.
+ *  A card with no row (an agent typed it), or a dismissed row, promises nothing: no resume answers it. */
+export function githubFace(answer: string | undefined, own: string | null, after: string | undefined): { connected: string | null; foot: string | null } {
+  const answered = answer?.startsWith(CONNECTED) ? answer.slice(CONNECTED.length) : null;
+  const connected = answered ?? own;
+  if (connected !== null) return { connected, foot: answered === null ? null : 'The work continues below.' };
+  return { connected: null, foot: (answer === 'dismissed' ? undefined : after) ?? 'Nothing ran yet. Connect GitHub, then ask again.' };
+}
+
+/** the GitHub card's faces (docs/design/repo-connect-2026-10): the grant, the wait on GitHub, the pick,
+ *  and connected. The card's own words (`why`) show on the grant and the wait: the pick has its own line. */
+function GitHubNeed({ channelId, why, answer, connected, onConnected }: { channelId: string; why: string; answer: string | undefined; connected: string | null; onConnected: (handle: string) => void }) {
+  const g = useGitHubGrant(channelId, (handle) => onConnected(handle ?? ''));
+  // the decision row moved (a grant landed on another surface, or the row was dismissed): the card asks again
+  const { ask } = g;
+  const was = useRef(answer);
+  useEffect(() => { if (was.current === answer) return; was.current = answer; void ask(); }, [answer, ask]);
+  if (connected !== null) {
+    return <div className="ndopt primary" aria-disabled><span className="g ok" aria-hidden><IconCheck s={12} /></span><span className="ndtxt"><b>{connected || 'GitHub is connected'}</b><span>The neuramesh app reads it for this project.</span></span></div>;
+  }
   if (g.phase !== 'waiting' && g.repos && g.repos.length > 0) {
     return (
       <>
@@ -35,19 +53,22 @@ function GitHubNeed({ channelId }: { channelId: string }) {
       </>
     );
   }
-  const word = g.phase === 'busy' ? 'Opening browser…' : g.phase === 'waiting' ? 'Finish on GitHub, then check again' : 'Connect GitHub';
+  const waiting = g.phase === 'waiting';
+  const word = g.phase === 'busy' ? 'Please wait…' : waiting ? 'Finish on GitHub, then check again' : 'Connect GitHub';
   return (
     <>
-      <button className="ndopt primary" disabled={g.phase === 'busy' || g.phase === 'asking'} onClick={() => void (g.phase === 'waiting' ? g.ask(true) : g.grant())}>
+      <div className="ndwhy">{why}</div>
+      <button className="ndopt primary" disabled={g.phase === 'busy' || g.phase === 'asking'} onClick={() => void (waiting ? g.ask(true) : g.grant())}>
         <span className="g" aria-hidden><ConnectorMark id="github" s={14} /></span>
-        <span className="ndtxt"><b>{word}</b><span>{sub}</span></span>
+        <span className="ndtxt"><b>{word}</b><span>{waiting ? 'GitHub is open in a new tab.' : 'One minute on GitHub. You pick the repositories.'}</span></span>
       </button>
+      {waiting && <div className="connacts"><span className="connwait"><i aria-hidden />This card checks every 5 s</span></div>}
       {g.note && <div className="nderr">{g.note}</div>}
     </>
   );
 }
 
-export function DependencyCard({ data }: { data: NmNeed }) {
+export function DependencyCard({ data, answers }: { data: NmNeed; answers?: Map<string, string> }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
   const connect = async (provider: ConnectProvider) => {
@@ -58,15 +79,30 @@ export function DependencyCard({ data }: { data: NmNeed }) {
     try { await nm.connectorStart(data.channel, provider); setDone(provider); }
     finally { setTimeout(() => setBusy(null), 2500); }
   };
+  // the GitHub card's own resolve: the handle it answered, or '' before it names one
+  const [connected, setConnected] = useState<string | null>(null);
+  // the card's decision row, as the thread's answers carry it (answers.ts): absent while it waits, and for a card with no row
+  const answer = answers?.get(needDecisionQuestion(data) ?? '');
+  const face = githubFace(answer, connected, data.after);
   const repo = data.attach === 'repo';
   const grant = !repo && data.connect.length === 1 && data.connect[0] === 'github';
+  if (grant) {
+    // the card waits on the grant, and the grant resumes the work by itself (control-api github-resume.ts)
+    return (
+      <div className="needcard">
+        <div className={`ndhead${face.connected !== null ? ' ok' : ''}`}>{face.connected !== null ? '✓ GitHub is connected' : '⚠ Waits for GitHub'}</div>
+        <GitHubNeed channelId={data.channel} why={data.why} answer={answer} connected={face.connected} onConnected={setConnected} />
+        {face.foot && <div className="ndfoot">{face.foot}</div>}
+      </div>
+    );
+  }
   return (
     <div className="needcard">
-      <div className="ndhead">⚠ Cannot run yet: {data.ask} needs {repo ? 'a repository to read' : grant ? 'read access to its repository' : 'a connected account'}</div>
+      <div className="ndhead">⚠ Cannot run yet: {data.ask} needs {repo ? 'a repository to read' : 'a connected account'}</div>
       <div className="ndwhy">{data.why}</div>
       {repo && <AttachRepo projectId={data.project ?? null} />}
       {data.connect.map((p) => {
-        if (p === 'github') return <GitHubNeed key={p} channelId={data.channel} />;
+        if (p === 'github') return <GitHubNeed key={p} channelId={data.channel} why="" answer={answer} connected={face.connected} onConnected={setConnected} />;
         const readable = data.readable?.includes(p as never);
         const word = busy === p ? 'Opening browser…' : done === p ? `Finish in the browser: ${LABEL[p] ?? p}` : `Connect ${LABEL[p] ?? p}`;
         return (
@@ -81,7 +117,7 @@ export function DependencyCard({ data }: { data: NmNeed }) {
           </button>
         );
       })}
-      <div className="ndfoot">Nothing was created. No task, no subtask, no offer. {repo ? 'Attach one and ask again.' : grant ? 'Grant it and ask again.' : 'Connect one and ask again.'}</div>
+      <div className="ndfoot">Nothing was created. No task, no subtask, no offer. {repo ? 'Attach one and ask again.' : 'Connect one and ask again.'}</div>
     </div>
   );
 }

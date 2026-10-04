@@ -8,6 +8,7 @@ import { runLifecyclePass } from './lifecycle';
 import { mailEnabled } from './mail';
 import { REVIEW_LEAD_MIN } from '@neuramesh/shared';
 import type { PushService } from './push';
+import { queueRoutineReplies, remindDueReplies } from './reply-cron';
 import type { Store } from './store';
 
 /** the reminder pass: every scheduled post landing inside the lead gets one push, ever. The window
@@ -43,9 +44,11 @@ export function cronRoutes<E extends Env>(app: Hono<E>, store: Store, push?: Pus
     // reminder is about the human's decision rather than the publish. This cron already fires every
     // minute, so the lead is exact and there is no second cron to add or forget.
     const reminded = await remindDuePosts(store, push, now);
-    if (!connectorsEnabled()) return c.json({ published: 0, failed: 0, reminded, note: 'connectors not configured' });
+    // the reply queue rides the same tick (reply-cron.ts): a routine's card is queued, then each due reply is reminded once
+    const replies = await queueRoutineReplies(store, now).then(async (queued) => ({ queued, reminded: await remindDueReplies(store, push, now) })).catch(() => ({ queued: 0, reminded: 0 }));
+    if (!connectorsEnabled()) return c.json({ published: 0, failed: 0, reminded, replies, note: 'connectors not configured' });
     const out = await publishDueItems(store, POSTERS, now, publicApiBase(c.req.url));
-    return c.json({ ...out, reminded });
+    return c.json({ ...out, reminded, replies });
   });
 
   // The lifecycle pass (docs/27 §3): Vercel cron GETs this with `authorization: Bearer

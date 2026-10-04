@@ -11,7 +11,7 @@ import { BrainChip } from '../brain/BrainChip';
 import { ComposerInput } from '../composer/ComposerInput';
 
 import { DeliveryStrip } from './DeliveryStrip';
-import { IconClose, IconPaperclip, IconReply, IconRoutineClock, IconSend, IconSkill, IconWorkbench } from '../ui/icons';
+import { IconClose, IconPaperclip, IconReply, IconSend, IconSkill } from '../ui/icons';
 
 import { MentionButton, ThreadCrumb, ThreadRoomChip, ThreadRootPin, ThreadSettleBtn, ThreadStatusChip, TypistChip, filesFromPaste, groupByMessage, streamContent, type ComposerPerson, type HeadStatus, type PostVCard, useDropZone } from './parts';
 
@@ -23,7 +23,7 @@ import { StreamBubble } from './StreamBubble';
 
 import { RailSections, RailToks } from './ThreadRail';
 
-import { agentInChannel, groupDeliveries, isPostsFile, parseBrainOverride, renderableDeliverables, threadModeOf, threadTitle, type ThreadMode } from '@neuramesh/shared';
+import { agentInChannel, groupDeliveries, isPostsFile, parseBrainOverride, renderableDeliverables, splitSessionRuns, threadModeOf, threadTitle, type ThreadMode } from '@neuramesh/shared';
 import { agentLive } from '../lib/presence';
 import { answersResolver } from '../answers';
 
@@ -50,19 +50,29 @@ import { BrandSections } from './../marketing/BrandSections';
 import { useThreadPosts } from './usePosts';
 import { useOwnedUnitPosts } from './useOwnedUnitPosts';
 import { convoArtifactSection, useThreadArtifacts } from './useArtifacts';
+import { convoArrivals, markerArrivals, useArrivals } from './useArrivals';
+import { DraftsRow, DraftsTab, stripCards, useDraftsTab, type DraftsDoor } from './DraftsPane';
+import type { PanelArrival } from '../shell/arrivals';
+import { RoutineChip, SessionRuns, draftStrips } from './SessionRuns';
 
 // Imported bindings lose control-flow narrowing inside closures, so re-bind (same as App.tsx).
 const nm = nmBridge;
 
-export function ConvoThread({ threadId, back, thread, channelId, channelSlug, channelKind, channelMarketing, agents, machines, members, selfEmail, people, skills, packs, plan, decisions, railSlot, onWorkbench, wbOpen, onToggleWorkbench, onUpgrade, onClose, onActivity, onUpgradeReason, onSeeUsage, taskRef, onOpenTask, onOpenDoc, onOpenArticle, onOpenWhiteboard, brainProject, crumbProject, onSetProjectPack, onBrainConnect, marks, onSettle, hostedGate }: {
+export function ConvoThread({ threadId, back, thread, channelId, channelSlug, channelKind, channelMarketing, agents, machines, members, selfEmail, people, skills, packs, plan, decisions, railSlot, detailsShown, onDetails, onArrive, drafts, onUpgrade, onClose, onActivity, onUpgradeReason, onSeeUsage, taskRef, onOpenTask, onOpenDoc, onOpenArticle, onOpenWhiteboard, brainProject, crumbProject, onSetProjectPack, onBrainConnect, marks, onSettle, hostedGate }: {
   threadId: string;
   /** what this conversation is doing, and the act its stamp offers (shell/rowstatus.ts) */
   marks?: HeadStatus | null; onSettle?: (threadId: string) => void;
-  /** the Workbench's Details slot when it is open on that face — this thread's sections portal
-   *  in there and nowhere else (2026-08-17; see ThreadRail's note) */
+  /** the side panel's Overview slot: this thread's sections portal in there and nowhere else
+   *  (the side-panel round, 2026-10-03; see ThreadRail's note) */
   railSlot?: HTMLElement | null;
-  /** OPEN the Workbench (the RailToks door while the panel is shut) — the toggle itself lives on the tab row now */
-  onWorkbench?: () => void; wbOpen?: boolean; onToggleWorkbench?: () => void; // + the Workbench card's state and its header toggle (rail-ink round 3)
+  /** the Overview tab is in view, so the toks under the head stand down */
+  detailsShown?: boolean;
+  /** show the Overview tab (the toks' door) */
+  onDetails?: () => void;
+  /** what this conversation makes while you look at it, for the side panel to open (shell/arrivals.ts) */
+  onArrive?: (list: PanelArrival[]) => void;
+  /** the side panel's Drafts tab: the cards portal in there, and its count and its door (the side-panel round) */
+  drafts?: DraftsDoor;
   /** where the back crumb goes — the room's list, or Home when the session was opened there */
   back: string;
   thread: ThreadRow | null; // null during the optimistic window before the server-born row syncs down
@@ -136,6 +146,9 @@ export function ConvoThread({ threadId, back, thread, channelId, channelSlug, ch
   const units = useOwnedUnitPosts(threadId, rows);
   const armed = mkReplyTo ?? units.replyTo;
   const convoArts = useThreadArtifacts(threadId, rows.length);
+  // what this conversation makes while you look at it opens in the side panel by itself (shell/arrivals.ts)
+  useArrivals(convoArts, `thread:${threadId}`, (fresh) => { const l = convoArrivals(fresh, rows); if (l.length) onArrive?.(l); });
+  useArrivals(rows, `thread:${threadId}`, (fresh) => { const l = markerArrivals(fresh); if (l.length) onArrive?.(l); });
   // docs/34 — this conversation's mode, and the human's flip. The thread row is the truth
   // (synced, so every machine agrees); `pending` is the optimistic value while the command
   // round-trips, so the chip never reads stale for the second it takes to land.
@@ -177,15 +190,15 @@ export function ConvoThread({ threadId, back, thread, channelId, channelSlug, ch
   // The drafted posts, in the transcript where they were handed over. Originals land as ONE strip
   // at the first draft's time; a revision rides its own strip after the reply that asked for it,
   // so scrolling back replays the review round rather than showing only the final copy.
-  const mkCards = useMemo(() => postCardsFrom(mkPosts, rows), [mkPosts, rows]);
+  // a schedule's session holds one run per firing: draft letters and draft strips restart at each (SessionRuns.tsx)
+  const runStarts = useMemo(() => splitSessionRuns(rows, thread?.schedule_id)?.map((f) => f.at) ?? [], [rows, thread?.schedule_id]);
+  const mkCards = useMemo(() => postCardsFrom(mkPosts, rows, runStarts), [mkPosts, rows, runStarts]);
   const stream1 = useMemo(() => {
     const originals = mkCards.filter((c) => !c.isRevision);
     const items: Array<{ at: string; msg?: MessageRow; tree?: RunTree; strip?: PostVCard[]; unit?: TaskAllRow; delivery?: ChannelArtifactRow[]; key?: string }> = [
       ...rows.map((m) => ({ at: m.created_at, msg: m })),
       ...trees.map((t) => ({ at: t.run.started_at, tree: t })),
-      ...(originals.length
-        ? [{ at: new Date(Math.min(...originals.map((c) => c.anchor))).toISOString(), strip: originals, key: 'drafts' }]
-        : []),
+      ...draftStrips(originals, runStarts),
       // deliverable strips (docs/30) — a conversation produces real files and could only ever
       // LIST them; the task thread has carded them all along. Same grouping, same de-dupe: echoes
       // of messages already on screen drop, and so does the wire file when its posts card.
@@ -209,7 +222,22 @@ export function ConvoThread({ threadId, back, thread, channelId, channelSlug, ch
       ...units.strips.map((s) => ({ at: s.at, strip: s.cards, unit: s.unit, key: `unit-${s.unit.id}` })),
     ];
     return items.sort((a, b) => a.at.localeCompare(b.at));
-  }, [rows, trees, mkCards, units.strips]);
+  }, [rows, trees, mkCards, units.strips, runStarts]);
+  /** one drafted post's card: the transcript's strips and the Drafts tab draw the very same one */
+  const renderDraft = (c: PostVCard, unit?: TaskAllRow) => (
+    <SocialPostCard
+      key={c.key} item={c.item} channelSlug={channelSlug} letter={c.letter} taskNumber={unit?.number} onOpen={() => setMkPreview(c.item)}
+      version={c.version} superseded={c.superseded} imageReady={unit ? units.imageReady : mkImageReady}
+      onReply={c.superseded ? undefined : () => { if (unit) units.setReplyTo({ id: c.item.id, letter: c.letter, number: unit.number }); else setMkReplyTo({ id: c.item.id, letter: c.letter }); setCfocus((n) => n + 1); }}
+      // the marker is what the daemon acts on; the prose is for the transcript. A
+      // conversation names the letter, having no task number to borrow; a unit's card
+      // posts into the UNIT's own thread, where the agent that drew it listens.
+      onGenerateImage={c.superseded ? undefined : (redraw, kind) => { const ask = kind === 'video' ? `Film the hook for draft ${c.letter}.‹gen-video:${c.item.id}›` : `${redraw ? 'Redraw' : 'Generate'} the image for draft ${c.letter}.‹gen-image:${c.item.id}›`; void (unit ? nm?.sendThread(unit.id, channelId, ask) : nm?.send(channelId, ask, { threadId })); }}
+    />
+  );
+  // THE DRAFTS TAB (the side-panel round): every strip's cards once, with the unit each came from
+  const draftEntries = useMemo(() => stripCards<PostVCard & { unit?: TaskAllRow }, { unit?: TaskAllRow }>(stream1, (it) => (it.unit ? { unit: it.unit } : {})), [stream1]);
+  useDraftsTab(draftEntries, mkPosts, `thread:${threadId}`, drafts, onArrive);
   return (
     <aside
       className="threadpanel convo"
@@ -225,19 +253,19 @@ export function ConvoThread({ threadId, back, thread, channelId, channelSlug, ch
         <ThreadCrumb project={crumbProject} slug={channelSlug} />
         {/* the chip is identity: this conversation's word, the one the rail row and ⌘Y wear */}
         <span className="convotitle" title={title}>{title}</span><ThreadStatusChip head={marks} />
-        {/* a routine's run says so in the header (2026-08-22, George) — the same quiet pill the
-            setup task wears, so "opened by an automation, runs hands-off" is one glance */}
-        {thread?.schedule_id ? <span className="routinechip" title="Opened by a scheduled routine — it runs hands-off"><IconRoutineClock s={10} /> routine</span> : null}
-        {/* Settle leads the act cluster; the Workbench card lives inside this thread (rail-ink round 3) */}
-        <div className="theadact"><ThreadSettleBtn head={marks} onSettle={onSettle} />{onToggleWorkbench && <button className={`navpin${wbOpen ? ' on' : ''}`} aria-pressed={!!wbOpen} title={wbOpen ? 'Hide the Workbench — ⌘P' : 'Show the Workbench — ⌘P'} aria-label={wbOpen ? 'Hide the Workbench' : 'Show the Workbench'} onClick={onToggleWorkbench}><IconWorkbench s={14} /></button>}</div>
+        {/* a routine's session says so in the header (2026-08-22, George) — the same quiet pill the
+            setup task wears, and since routine sessions (2026-09-28) it names the cadence */}
+        <RoutineChip scheduleId={thread?.schedule_id} />
+        {/* Settle leads the act cluster; the details are the side panel's Overview tab (the side-panel round) */}
+        <div className="theadact"><ThreadSettleBtn head={marks} onSettle={onSettle} /></div>
       </div>
-      {/* what the Details face holds, while it is shut (see ThreadRail's note) */}
-      {!railSlot && onWorkbench && (
+      {/* what the Overview tab holds, while it is not in view (see ThreadRail's note) */}
+      {!detailsShown && onDetails && (
         <RailToks
           sections={convoArtifactSection(convoArts)}
           extraLabel={channelKind === 'marketing' ? 'brand' : null}
           label="Thread details"
-          onOpen={onWorkbench}
+          onOpen={onDetails}
         />
       )}
       <ThreadLiveBar trees={trees} agents={agents} />
@@ -246,7 +274,7 @@ export function ConvoThread({ threadId, back, thread, channelId, channelSlug, ch
       <div className="tmsgs convomsgs" ref={listRef}>
         <ThreadRootPin thread={thread} rows={rows} agents={agents} members={members} />
         {rows.length === 0 && !stream && <div className="tempty">Say the word — the channel's agents see this thread.</div>}
-        {stream1.map((it) => {
+        <SessionRuns threadId={threadId} thread={thread} channelId={channelId} rows={rows} items={stream1} roomKind={channelKind} listRef={listRef} sources={{ units: units.anchored, cards: decisions, drafts: mkPosts, files: convoArts, openRuns: runRows }} render={(it) => {
           if (it.tree) return <RunCard key={it.tree.run.id} tree={it.tree} agent={agents.find((a) => a.id === it.tree!.run.agent_id) ?? null} onActivity={onActivity} />;
           if (it.delivery) return (
             <DeliveryStrip
@@ -256,23 +284,10 @@ export function ConvoThread({ threadId, back, thread, channelId, channelSlug, ch
               onOpen={(name) => { const a = it.delivery!.find((x) => x.name === name); if (a?.inline_content) onOpenDoc?.({ label: name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' '), file: name, doc: a.inline_content }); }}
             />
           );
-          if (it.strip) return (
-            <div className="mkdrafts" key={it.key}>
-              <div className="mkdraftsgrid">
-                {it.strip.map((c) => (
-                  <SocialPostCard
-                    key={c.key} item={c.item} channelSlug={channelSlug} letter={c.letter} taskNumber={it.unit?.number} onOpen={() => setMkPreview(c.item)}
-                    version={c.version} superseded={c.superseded} imageReady={it.unit ? units.imageReady : mkImageReady}
-                    onReply={c.superseded ? undefined : () => { if (it.unit) units.setReplyTo({ id: c.item.id, letter: c.letter, number: it.unit.number }); else setMkReplyTo({ id: c.item.id, letter: c.letter }); setCfocus((n) => n + 1); }}
-                    // the marker is what the daemon acts on; the prose is for the transcript. A
-                    // conversation names the letter, having no task number to borrow; a unit's card
-                    // posts into the UNIT's own thread, where the agent that drew it listens.
-                    onGenerateImage={c.superseded ? undefined : (redraw, kind) => { const ask = kind === 'video' ? `Film the hook for draft ${c.letter}.‹gen-video:${c.item.id}›` : `${redraw ? 'Redraw' : 'Generate'} the image for draft ${c.letter}.‹gen-image:${c.item.id}›`; void (it.unit ? nm?.sendThread(it.unit.id, channelId, ask) : nm?.send(channelId, ask, { threadId })); }}
-                  />
-                ))}
-              </div>
-            </div>
-          );
+          // a delivery of drafts is ONE ROW here; the cards read at full size in the side panel's Drafts tab
+          if (it.strip) return drafts
+            ? <DraftsRow key={it.key} cards={it.strip} onOpen={drafts.onShow} />
+            : <div className="mkdrafts" key={it.key}><div className="mkdraftsgrid">{it.strip.map((c) => renderDraft(c, it.unit))}</div></div>;
           const m = it.msg!;
           return (
             <ThreadMessage
@@ -287,7 +302,7 @@ export function ConvoThread({ threadId, back, thread, channelId, channelSlug, ch
                 : null}
             />
           );
-        })}
+        }} />
         {ghostAgent && <AgentGhost key={ghostAgent.id} agent={ghostAgent} onActivity={onActivity} />}
         {/* NOBODY IS WORKING YET, AND THE THREAD STILL SAYS SO (docs/26 §5). On the browser this
             is the only orb for the first seconds of every message: with no local stream, the
@@ -403,12 +418,9 @@ export function ConvoThread({ threadId, back, thread, channelId, channelSlug, ch
         )}
       </div>
       </div>
-      {/* THE CONVERSATION'S DETAILS (2026-08-17) — into the WORKBENCH, exactly as the task
-          thread's do. This is the half of the 2026-08-16 round that never landed: this component
-          mounted `<ThreadRail>` inline and unconditionally, so a content thread drew Brand docs ·
-          Upcoming · Connections inside the sheet, three inches from the panel built to hold them —
-          and opening the Workbench put a second panel at the same edge. Same portal, same
-          `RailSections`, same toks when it is shut. */}
+      {/* THE CONVERSATION'S DETAILS (2026-08-17) — into the side panel's Overview tab (the
+          Workbench card until 2026-10-03), exactly as the task thread's do. Same portal, same
+          `RailSections`, same toks while Overview is out of view. */}
       {(() => {
         if (!railSlot) return null;
         const extra = channelKind === 'marketing'
@@ -420,7 +432,7 @@ export function ConvoThread({ threadId, back, thread, channelId, channelSlug, ch
       {/* approve · schedule · edit · delete — the human's own surface, unchanged from the task
           panel's. Agents draft; every mutation in here is theirs. */}
       {convoLightbox && <AttachLightbox att={convoLightbox} onClose={() => setConvoLightbox(null)} />}
-      {mkPreview && (
+      {mkPreview && !drafts?.slot && (
         <PostPreviewModal
           item={mkPreview}
           channelSlug={channelSlug}
@@ -430,6 +442,8 @@ export function ConvoThread({ threadId, back, thread, channelId, channelSlug, ch
           onChanged={() => { setMkPreview(null); setMkTick((n) => n + 1); units.setTick((n) => n + 1); }}
         />
       )}
+      <DraftsTab door={drafts} cards={draftEntries} renderCard={(c) => renderDraft(c, c.unit)} preview={mkPreview} channelSlug={channelSlug} channelId={channelId} projectName={crumbProject?.name ?? null}
+        onClose={() => setMkPreview(null)} onChanged={() => { setMkPreview(null); setMkTick((n) => n + 1); units.setTick((n) => n + 1); }} />
     </aside>
   );
 }

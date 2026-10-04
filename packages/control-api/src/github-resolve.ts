@@ -2,20 +2,21 @@
 // the room's repository now, and which one? The grant is the first move on every surface, so the
 // resolve answers from what the App reads for the workspace, not from what the project already names:
 //   - the project names a repository with a GitHub address the App reads → the row, connected;
-//   - the person just granted (the callback, the state naming the room), the project names none (or
-//     a folder attached from a desktop) and the App reads exactly ONE repository → it is attached to
-//     the project and the row is written, no second click;
 //   - the App reads one or several → the answer lists them (the pick), with the row whose name
 //     matches the project's folder as the hint; the pick sends the slug back and lands in the first
-//     case. An open step never attaches on its own: only the grant and the pick do;
-//   - the App reads none for this workspace → nothing to pick from: the grant.
+//     case. Only the pick attaches: the install callback records the installation and nothing else,
+//     because its state and its installation_id prove no person (the step pre-selects the one
+//     repository a fresh grant reads, so that costs one click);
+//   - the App reads none for this workspace → nothing to pick from: the grant. A grant that no
+//     workspace recorded (the public door's, or a read's repair) gets words that name the way out.
 // The installation helpers (the verified lookup, the memo, the hourly token) live here too, shared by
 // the routes (github-connect.ts) and the public announce door.
 import { createEvent, formatAddress } from '@neuramesh/shared';
 import { GitHubApiError, findInstallation, githubAppConfigured, githubGet, installationToken, parseRepoInput } from './github-app';
 import { installationFacts } from './github-reads';
 import type { Store } from './store';
-import { hasGitHubAddress, type AnnounceStore, type PrimaryRepo } from './store/announce';
+import { hasGitHubAddress, type AnnounceStore, type Installation, type PrimaryRepo } from './store/announce';
+import { resumeAfterGitHub } from './github-resume';
 
 type Fetch = typeof fetch;
 export const GITHUB_SCOPES = 'metadata:read contents:read pull_requests:read';
@@ -52,11 +53,12 @@ export async function installationFor(ann: AnnounceStore, slug: string, fetchFn:
   return { installationId: found.id, token };
 }
 
+const PAGE = 100;   // GitHub's largest page
 /** what GitHub says the installation covers, written down (account, selection, the first page of
  *  repositories) and returned: the repositories, lowercased slugs */
 export async function rememberInstallation(ann: AnnounceStore, installationId: number, fetchFn: Fetch, workspaceId: string | null): Promise<string[]> {
   const tok = await tokenFor(installationId, fetchFn);
-  const repos = await githubGet('/installation/repositories?per_page=100', { token: tok, fetchFn });
+  const repos = await githubGet(`/installation/repositories?per_page=${PAGE}`, { token: tok, fetchFn });
   const names = repos.status === 200 ? ((repos.json as { repositories?: Array<{ full_name: string }> }).repositories ?? []).map((r) => r.full_name.toLowerCase()) : [];
   const facts = await installationFacts(installationId, { fetchFn }).catch(() => ({ account: names[0]?.split('/')[0] ?? '', selection: 'selected' as const }));
   await ann.upsertInstallation({ installationId, account: facts.account, repos: names, selection: facts.selection, workspaceId });
@@ -112,39 +114,79 @@ export type Resolve =
   | { ok: false; code: 'NO_REPO' | 'NOT_INSTALLED'; error: string; slug: string | null; repos: string[]; hint: string | null };
 
 /** can the App read the room's project's repository? Then the row exists, now. `pick`: the human
- *  chose one of the readable repositories, attached and connected in one move. `granted`: the
- *  callback of a grant for this room, so the one repository it reads attaches without a pick. */
-export async function resolveConnector(store: Store, ctx: { workspace: string; channel: string; actor: string }, fetchFn: Fetch, opts: { pick?: string | null; granted?: boolean } = {}): Promise<Resolve> {
+ *  chose one of the readable repositories, attached and connected in one move. `resume`: the /v1
+ *  resolve, which proves the person, resumes the project's open GitHub cards. */
+export async function resolveConnector(store: Store, ctx: { workspace: string; channel: string; actor: string }, fetchFn: Fetch, opts: { pick?: string | null; resume?: boolean } = {}): Promise<Resolve> {
   const pick = opts.pick ?? null;
   const ann = store.announcements!;
   const repo = await ann.repoForChannel(ctx.channel);
   const slug = repo ? slugOf(repo) : null;
+  let refreshed: Promise<string[]> | null = null;   // one refresh from GitHub per resolve
+  const readable = (): Promise<string[]> => (refreshed ??= readableRepos(ann, ctx.workspace, fetchFn));
+  // only an installation recorded for THIS workspace connects a repository: the GitHub-wide lookup
+  // (installationFor) answers for any workspace's grant, and its fallback stamps the grant onto
+  // the caller's workspace
+  const installed = async (target: string): Promise<number | null> => {
+    const t = target.toLowerCase();
+    const covers = (i: Installation): boolean => i.repos.includes(t) || (i.selection === 'all' && i.account.toLowerCase() === t.split('/')[0]);
+    const known = (await ann.installationsForWorkspace(ctx.workspace)).find(covers);
+    if (known) return known.installationId;
+    await readable();
+    const rows = await ann.installationsForWorkspace(ctx.workspace);
+    const hit = rows.find(covers);
+    if (hit) return hit.installationId;
+    // a stored list is GitHub's first page only: past a full one, GitHub's own answer counts, for an
+    // installation of this workspace alone, and nothing is written for the caller
+    if (!rows.some((i) => i.repos.length >= PAGE)) return null;
+    const found = await findInstallation(target, { fetchFn }).catch(() => null);
+    return found && rows.some((i) => i.installationId === found.id) ? found.id : null;
+  };
   const connect = async (target: string): Promise<{ facts: { default_branch?: string } } | null> => {
-    const inst = await installationFor(ann, target, fetchFn, ctx.workspace).catch(() => null);
-    if (!inst) return null;
-    const r = await githubGet(`/repos/${target}`, { token: inst.token, fetchFn });
+    const id = await installed(target).catch(() => null);
+    const token = id === null ? null : await tokenFor(id, fetchFn).catch(() => null);
+    if (!token) return null;
+    const r = await githubGet(`/repos/${target}`, { token, fetchFn });
     return r.status === 200 ? { facts: r.json as { default_branch?: string } } : null;
+  };
+  // a connection this project already holds keeps answering: the reads (github-connect.ts open()) serve
+  // it through any installation, so a room whose grant was recorded before the scoping never strands
+  const holds = async (target: string): Promise<boolean> => {
+    const row = await store.connectorWithSecret(ctx.workspace, 'github', ctx.channel).catch(() => null);
+    if (row?.status !== 'connected' || row.handle.toLowerCase() !== target.toLowerCase()) return false;
+    const inst = await installationFor(ann, target, fetchFn).catch(() => null);
+    return !!inst && (await githubGet(`/repos/${target}`, { token: inst.token, fetchFn }).catch(() => null))?.status === 200;
+  };
+  // a live grant that no workspace recorded (the public door's, or a read's repair after a reinstall
+  // on GitHub's own pages): GitHub sends no callback for an installation that exists already, so the
+  // grant door alone never connects it. Another workspace's grant keeps the plain words.
+  const stranded = async (target: string): Promise<string | null> => {
+    if (await installed(target).then((id) => id !== null, () => true)) return null;   // this workspace's own grant, or no answer
+    const door = await ann.installationForRepo(target, { unrecorded: true }).catch(() => null);
+    const live = door && await tokenFor(door.installationId, fetchFn).then(() => true, async (e: unknown) => {
+      if (e instanceof GitHubApiError && e.status === 404) await ann.forgetInstallation(door.installationId).catch(() => {});
+      return false;
+    });
+    return live ? `The neuramesh app reads ${target}, but this workspace did not install it. On GitHub, uninstall the neuramesh app from ${target.split('/')[0]}, then grant access again here.` : null;
   };
   const written = async (target: string, attached: boolean): Promise<Resolve> => {
     await store.upsertConnector({ workspace: ctx.workspace, channelId: ctx.channel, provider: 'github', handle: target, connectedBy: ctx.actor, scopes: GITHUB_SCOPES });
+    // the grant arms the work: every open GitHub card in the project resumes (github-resume.ts), and
+    // only from the /v1 resolve, because only its session proves the person
+    if (opts.resume) await resumeAfterGitHub(store, ctx, target).catch((e) => console.warn(`github resume failed: ${e instanceof Error ? e.message : String(e)}`));
     return { ok: true, handle: target, attached };
   };
   if (pick) {
     const target = parseRepoInput(pick)?.slug ?? null;
     const read = target ? await connect(target) : null;
-    if (!target || !read) return { ok: false, code: 'NOT_INSTALLED', error: `The neuramesh app cannot read ${target ?? pick}. Add the repository on GitHub, then pick it.`, slug: target, repos: await readableRepos(ann, ctx.workspace, fetchFn), hint: null };
+    if (!target || !read) return { ok: false, code: 'NOT_INSTALLED', error: (target && await stranded(target)) || `The neuramesh app cannot read ${target ?? pick}. Add the repository on GitHub, then pick it.`, slug: target, repos: await readable(), hint: null };
     if (target !== slug) await attachRepo(store, ctx, target, read.facts.default_branch || 'main');
     return written(target, target !== slug);
   }
-  if (slug && await connect(slug)) return written(slug, false);
-  const repos = await readableRepos(ann, ctx.workspace, fetchFn);
+  if (slug && (await connect(slug) || await holds(slug))) return written(slug, false);
+  const repos = await readable();
   const hint = hintFor(repo, repos);
-  if (opts.granted && !slug && repos.length === 1) {
-    const only = repos[0]!;
-    const read = await connect(only);
-    if (read) { await attachRepo(store, ctx, only, read.facts.default_branch || 'main'); return written(only, true); }
-  }
   if (!repo) return { ok: false, code: 'NO_REPO', error: repos.length ? 'Pick the repository this project lives in.' : 'This project has no repository yet. Grant access on GitHub and pick it there.', slug: null, repos, hint };
   if (!slug) return { ok: false, code: 'NO_REPO', error: repos.length ? `Pick the repository ${repo.name} lives in.` : `${repo.name} is a folder on a machine. Grant access on GitHub and pick its repository there.`, slug: null, repos, hint };
-  return { ok: false, code: 'NOT_INSTALLED', error: repos.length ? `The neuramesh app cannot read ${slug}. Add it on GitHub, or pick another repository.` : `The neuramesh app is not installed on ${slug}. Grant access on GitHub.`, slug, repos, hint };
+  const error = await stranded(slug) ?? (repos.length ? `The neuramesh app cannot read ${slug}. Add it on GitHub, or pick another repository.` : `The neuramesh app is not installed on ${slug}. Grant access on GitHub.`);
+  return { ok: false, code: 'NOT_INSTALLED', error, slug, repos, hint };
 }

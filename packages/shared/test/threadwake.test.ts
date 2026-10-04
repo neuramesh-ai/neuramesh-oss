@@ -49,3 +49,15 @@ test('settled and mention-only states stay silent', () => {
   expect(unaddressedWake('closed')).toBe(null);
   expect(unaddressedWake('backlog')).toBe(null);
 });
+
+// A draw or a film is a button, not a reply (2026-09-27): a tab's picture ask on a finished unit's
+// draft named nobody and woke nobody, so the card waited three minutes for a machine that never came.
+test('a draw or a film finds a hand in every state; live work keeps its assignee', () => {
+  expect(unaddressedWake('done', null, true)).toBe('orchestrator');
+  expect(unaddressedWake('closed', 'content', true)).toBe('orchestrator');
+  expect(unaddressedWake('in_review', null, true)).toBe('orchestrator');
+  expect(unaddressedWake('in_progress', null, true)).toBe('assignee');
+  expect(unaddressedWake('in_review', 'content', true)).toBe('assignee');
+  // a plain reply is unchanged
+  expect(unaddressedWake('done', null, false)).toBe(null);
+});

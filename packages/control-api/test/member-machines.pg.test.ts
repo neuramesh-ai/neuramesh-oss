@@ -2,7 +2,8 @@
 // in the Free / Pro model (source release 2026-09-12; Individual / Team before that).
 //
 // What this locks down:
-//   · a Free workspace is born with NO machine; the runner arrives with the Stripe flip to Pro
+//   · a person's SECOND Free workspace is born with NO machine (the first is the Pro trial,
+//     workspace-birth.ts); the runner arrives with the Stripe flip to Pro
 //     (plan-flip.ts), and on a one-person Pro the runner IS the owner's machine
 //   · Free cannot invite a second person, and cannot mint a machine of its own — Pro can
 //   · the FIRST invitation on Pro promotes the runner into the owner's machine (same id, same
@@ -92,6 +93,9 @@ beforeAll(async () => {
   alice = await makeUser('clerk_mm_alice', 'alice@member-machines.test');
   bob = await makeUser('clerk_mm_bob', 'bob@member-machines.test');
   cara = await makeUser('clerk_mm_cara', 'cara@member-machines.test');
+  // alice's FIRST workspace is the Pro trial (workspace-birth.ts: 500 credits and a runner). the
+  // suite's workspace is her second, born bare, so the flip below mints its runner as it always did
+  await send(alice, { type: 'workspace.create', name: 'Member Machines Trial', slug: `mm-trial-${Date.now().toString(36)}` });
   const made = await j(await send(alice, { type: 'workspace.create', name: 'Member Machines', slug: `mm-${Date.now().toString(36)}` }));
   WS = made.workspaceId as string;
 });
@@ -106,7 +110,7 @@ afterAll(async () => {
 });
 
 describe.skipIf(!DB)('per-member cloud machines (0133) — Individual and Team', () => {
-  it('a Free workspace is born with no machine at all (the runner comes with Pro)', async () => {
+  it('a second Free workspace is born with no machine at all (the runner comes with Pro)', async () => {
     await new Promise((r) => setTimeout(r, 300)); // give a hook that must NOT fire the chance to
     await sql!`update workspaces set plan = 'free' where id = ${WS}::uuid`;
     expect(await machinesOf(WS)).toHaveLength(0);
@@ -160,6 +164,8 @@ describe.skipIf(!DB)('per-member cloud machines (0133) — Individual and Team',
   it('a CLAIM runner stays the runner at the first invitation, and the owner gets a machine of their own, asleep', async () => {
     const dan = await makeUser('clerk_mm_dan', 'dan@member-machines.test');
     const erin = await makeUser('clerk_mm_erin', 'erin@member-machines.test');
+    // dan's first workspace is his Pro trial (workspace-birth.ts); the team below is his second, born bare
+    await send(dan, { type: 'workspace.create', name: 'Claim Trial', slug: `mmc-trial-${Date.now().toString(36)}` });
     const made = await j(await send(dan, { type: 'workspace.create', name: 'Claim Team', slug: `mmc-${Date.now().toString(36)}` }));
     const ws = made.workspaceId as string;
     const prevSub = process.env['FLEET_RUNNER_SUBSTRATE'];
@@ -188,6 +194,8 @@ describe.skipIf(!DB)('per-member cloud machines (0133) — Individual and Team',
   it('R4: under the claim default a member machine is a claim, asleep; only its owner promotes it; the usage read names it', async () => {
     const fay = await makeUser('clerk_mm_fay', 'fay@member-machines.test');
     const gus = await makeUser('clerk_mm_gus', 'gus@member-machines.test');
+    // fay's first workspace is her Pro trial (workspace-birth.ts); the team below is her second, born bare
+    await send(fay, { type: 'workspace.create', name: 'R4 Trial', slug: `mmr4-trial-${Date.now().toString(36)}` });
     const made = await j(await send(fay, { type: 'workspace.create', name: 'R4 Team', slug: `mmr4-${Date.now().toString(36)}` }));
     const ws = made.workspaceId as string;
     const prevSub = process.env['FLEET_RUNNER_SUBSTRATE'];

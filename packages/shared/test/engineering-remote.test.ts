@@ -2,7 +2,7 @@ import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { STARTER_MODEL } from '../src/rates';
 import { createEngineeringSession } from '../src/engineering/domain';
-import { applyRemoteEngineeringEvent, beginRemoteEngineeringPrompt, resolveRemoteEngineeringApproval } from '../src/engineering/remote';
+import { applyRemoteEngineeringEvent, beginRemoteEngineeringPrompt, isEngineeringGitHubWait, resolveRemoteEngineeringApproval } from '../src/engineering/remote';
 import { failRemoteEngineeringTransport } from '../src/engineering/transport-state';
 
 const repo = { id: 'r1', name: 'app', owner: 'acme', branch: 'main', root: null };
@@ -277,4 +277,24 @@ test('transport failures terminate streaming state and offer a retry', () => {
   assert.equal(failed.activeActivity, null);
   assert.equal(failed.messages.some((item) => item.streaming), false);
   assert.match(failed.messages.at(-1)?.body ?? '', /timed out.*Retry/i);
+});
+
+// docs/design/repo-connect-2026-10: a machine that cannot reach the code until GitHub is connected names
+// it by code, and the session waits on the card. The phone has no gate, so the machine's sentence stays
+// as the reason (PR #694 review #12), marked so that hq and the desktop hide it behind their gate
+test('a session the machine refused for GitHub waits on the grant, with the person\'s prompt and the machine\'s reason kept', () => {
+  const asked = beginRemoteEngineeringPrompt(createEngineeringSession(repo), 'Give me ideas for improving storage');
+  const blocked = applyRemoteEngineeringEvent(asked, { type: 'error', code: 'ENGINEERING_GITHUB_REQUIRED', message: 'app needs its GitHub copy on this cloud machine. Connect GitHub, and the session starts.' });
+  assert.equal(blocked.blockedOn, 'github');
+  assert.equal(blocked.state, 'error');
+  assert.deepEqual(blocked.messages.filter((m) => m.role === 'user').map((m) => m.body), ['Give me ideas for improving storage']);
+  const reason = blocked.messages.at(-1)!;
+  assert.deepEqual({ role: reason.role, tone: reason.tone, body: reason.body }, { role: 'assistant', tone: 'warning', body: 'app needs its GitHub copy on this cloud machine. Connect GitHub, and the session starts.' });
+  assert.equal(isEngineeringGitHubWait(reason), true);
+  assert.equal(blocked.messages.filter(isEngineeringGitHubWait).length, 1, 'only the machine\'s sentence wears the mark');
+  // any other refusal keeps its words, as before, and no gate client hides them
+  const failed = applyRemoteEngineeringEvent(asked, { type: 'error', code: 'ENGINEERING_START_FAILED', message: 'The clone failed.' });
+  assert.equal(failed.blockedOn ?? null, null);
+  assert.equal(failed.messages.at(-1)?.tone, 'warning');
+  assert.equal(isEngineeringGitHubWait(failed.messages.at(-1)!), false);
 });

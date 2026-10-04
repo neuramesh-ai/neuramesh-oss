@@ -188,9 +188,13 @@ export function toText(html: string): string {
     .replace(/<!--[\s\S]*?-->/g, '')
     .replace(/<style[\s\S]*?<\/style>/gi, '')
     .replace(/<head[\s\S]*?<\/head>/gi, '')
-    .replace(/<a[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi, (_m, href, label) => `${String(label).replace(/<[^>]+>/g, '').trim()} <${href}>`)
-    .replace(/<(br|\/p|\/h1|\/tr|\/div)[^>]*>/gi, '\n')
+    // a link keeps its address. the brackets ride as \u0001 and \u0002 until the tag strip below has
+    // run: a bare `<https://…>` reads as a tag to it, which is how every link in every text part vanished
+    .replace(/<a[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi, (_m, href, label) => `${String(label).replace(/<[^>]+>/g, '').trim()} \u0001${href}\u0002`)
+    // every block ends its line. with </h1> alone here, each h2 ran into the paragraph under it
+    .replace(/<(br|\/p|\/h[1-6]|\/tr|\/div|\/li|\/table)[^>]*>/gi, '\n')
     .replace(/<[^>]+>/g, '')
+    .replace(/\u0001/g, '<').replace(/\u0002/g, '>')
     .replace(/&nbsp;|&zwnj;/g, ' ')
     .replace(/&ldquo;|&rdquo;/g, '"').replace(/&rsaquo;/g, '>').replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"')

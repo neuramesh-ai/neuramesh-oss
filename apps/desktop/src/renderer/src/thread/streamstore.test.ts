@@ -66,3 +66,16 @@ describe('landing', () => {
     assert.equal(landedRow([...rows, { id: 'm5', author_kind: 'agent', author_id: 'a-rex' }], seen, 'a-rex')?.id, 'm5');
   });
 });
+
+// the repo-connect round's Option A: a turn's thoughts show before its first word
+describe('thoughts', () => {
+  test('thoughts with no words yet are the bubble, not the ghost, and a done stream with only thoughts lands nothing', () => {
+    acceptStreamEvent({ key: 'c:thoughts', agent: 'rex', text: '', done: false });
+    assert.equal(readPresence('c:thoughts')?.typing, false, 'presence alone is the ghost');
+    acceptStreamEvent({ key: 'c:thoughts', agent: 'rex', text: '', done: false, thinking: '**Comparing the storage adapters**' });
+    assert.equal(readPresence('c:thoughts')?.typing, true, 'thoughts on screen are the bubble');
+    assert.equal(readText('c:thoughts'), '', 'the thoughts never become the reply text');
+    acceptStreamEvent({ key: 'c:thoughts', agent: 'rex', text: '', done: true });
+    assert.equal(readLanding('c:thoughts'), null, 'only words land: the synced reply carries no thoughts');
+  });
+});

@@ -7,6 +7,7 @@
 
 import { nm as nmBridge } from '../../bridge/nm';
 import { DesignHandoffCard } from '../../design/DesignHandoffCard';
+import { usePanelShown } from '../RefCard';
 import { previewType } from '../../views/docpreview';
 import { unblockNote } from '@neuramesh/shared';
 import type { ArtifactUI, TaskRow } from '../../bridge/rows-board';
@@ -28,14 +29,16 @@ export function useTaskGates(d: {
   composerMode: ComposerMode;
   setComposerMode: React.Dispatch<React.SetStateAction<ComposerMode>>;
   onPreview: (name?: string) => void;
-  studioOpen: boolean;
   roundMockups: ArtifactUI[];
   latestRound: number | null;
   openDesign: (name?: string) => void;
   designProvider: string | null;
   claudeDesignUrl: string | null;
 }) {
-  const { task, channelId, arts, busy, actErr, act, assignee, channelArchitect, composerMode, setComposerMode, onPreview, studioOpen, roundMockups, latestRound, openDesign, designProvider, claudeDesignUrl } = d;
+  const { task, channelId, arts, busy, actErr, act, assignee, channelArchitect, composerMode, setComposerMode, onPreview, roundMockups, latestRound, openDesign, designProvider, claudeDesignUrl } = d;
+// the side panel shows the round in front (thread/RefCard.tsx): its review tab holds the verdict
+const shown = usePanelShown();
+const roundInPanel = !!shown.name && roundMockups.some((m) => m.name === shown.name);
 // The plan gate moved INTO the thread (2026-08-19, founder direction): the ‹plan:vN› message
 // renders PlanReviewCard — question-card pills over an embedded document canvas — so this hook
 // docks nothing for plan_review. Approve/revise live on the card; the composer arms from it.
@@ -45,10 +48,10 @@ export function useTaskGates(d: {
 // is rubber-stamping (the docs/12 §3.3 inversion, applied harder for visuals);
 // Approve stays one click away for a re-review. Feedback bounces to the designer
 // through the armed reply box (the Design-changes pill scopes the send).
-// docs/25: exactly ONE contextual gate. While the studio is open it HOLDS the design
-// approval (Approve + Redraw live at its foot), so the thread's dock stays empty —
-// two Approve buttons on one screen would be the bug.
-const designActions = task.state === 'design_review' && !studioOpen ? (
+// docs/25: exactly ONE contextual gate. While the side panel shows the round, its review
+// tab HOLDS the design approval, so the thread's dock stays empty: two Approve buttons on
+// one screen would be the bug. Fold the panel and the dock comes back.
+const designActions = task.state === 'design_review' && !roundInPanel ? (
   <>
     <div className="tactions">
       <button className="btn primary" disabled={busy} onClick={() => openDesign()}>Review design</button>

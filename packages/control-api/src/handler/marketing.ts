@@ -29,7 +29,6 @@ import {
 } from '@neuramesh/shared';
 import type { Command } from '../commands';
 import { DomainError } from '../errors';
-import { localMode } from '../localmode';
 import { nextScheduleRun, playbookAsk, playbookById } from '@neuramesh/shared';
 
 
@@ -109,8 +108,7 @@ export async function marketingCommands(store: Store, actor: Actor, cmd: Command
     );
     // ── step 5, release drafts (docs/design/release-drafts-2026-09 §4.7) ──
     // The one-shot "draft the latest release now" rides the internal createSchedule like the
-    // bootstrap (free on every plan). The daily watch is a routine, so it meets the same plan
-    // gate schedule.create enforces: refused on Free, and the answer says so.
+    // bootstrap. the daily watch is a routine, and routines run on every plan (2026-10-03).
     let releases: { now: boolean; watch: 'armed' | 'plan_limit' | 'off' } | undefined;
     if (cmd.releases && (cmd.releases.now || cmd.releases.watch)) {
       if (!cmd.releases.repoId) throw new DomainError('INVALID_INPUT', 'release drafts need a repository');
@@ -127,13 +125,12 @@ export async function marketingCommands(store: Store, actor: Actor, cmd: Command
       let watch: 'armed' | 'plan_limit' | 'off' = 'off';
       if (r.now) await plant({ title: `Release drafts · ${short} · the latest release`, cadence: 'once', nextRunAt: nowIso, release: { repo: r.repoId, slug: r.slug ?? null, latest: true } });
       if (r.watch) {
-        if (!localMode() && (await store.workspacePlan(workspace)) === 'free') watch = 'plan_limit';
-        else {
-          const next = nextScheduleRun({ cadence: 'daily', atTime: at, tz, weekday: null, after: new Date() });
-          if (!next) throw new DomainError('INVALID_INPUT', 'could not compute the next run — check the time and timezone');
-          await plant({ title: `Release drafts · ${short}`, cadence: 'daily', nextRunAt: next.toISOString(), release: { repo: r.repoId, slug: r.slug ?? null, cursor: { at: nowIso, tag: null }, log: [] } });
-          watch = 'armed';
-        }
+        // a routine on every plan, as schedule.create is (2026-10-03). 'plan_limit' stays in the
+        // answer's type for the desktops that still read it, and the server no longer sends it.
+        const next = nextScheduleRun({ cadence: 'daily', atTime: at, tz, weekday: null, after: new Date() });
+        if (!next) throw new DomainError('INVALID_INPUT', 'could not compute the next run — check the time and timezone');
+        await plant({ title: `Release drafts · ${short}`, cadence: 'daily', nextRunAt: next.toISOString(), release: { repo: r.repoId, slug: r.slug ?? null, cursor: { at: nowIso, tag: null }, log: [] } });
+        watch = 'armed';
       }
       releases = { now: !!r.now, watch };
     }

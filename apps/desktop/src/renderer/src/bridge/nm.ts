@@ -7,7 +7,7 @@
 // Do not move this read later (lazy) or earlier (a static preview import) without
 // re-checking that ordering.
 import type { ChannelRow, ChannelPersonRow, ChannelHistoryRow, ChannelArtifactRow, MessageRow, ThreadRow, HomeConvoRow, HistoryThreadRow, CodeSessionRow } from './rows-rooms';
-import type { ConnectorRow, ContentItemRow, ContentItemWide, ScheduleRow, SkillRow, SkillPackRow , ScheduleRunRow } from './rows-content';
+import type { ConnectorRow, ContentItemRow, ContentItemWide, ScheduleRow, SkillRow, SkillPackRow, ScheduleRunsResult } from './rows-content';
 import type { TaskRow, TaskAllRow, DecisionAllRow, ProjectRow, WorkspaceProjectRow, RepoUI, BeatUI, RunUI, ArtifactUI, AttachmentRow } from './rows-board';
 import type { AgentRow, MachineRow, MemberRow, WorkspaceMembership, PendingInvite, LogRow, RunRow } from './rows-crew';
 export type { WorkspaceUsage, CreditHistory, StarterVideo } from './rows-infra';
@@ -226,7 +226,8 @@ export interface NMBridge extends EngineeringNMBridge, TerminalNMBridge {
   scheduleDelete(scheduleId: string): Promise<{ ok: boolean }>;
   scheduleUpdate(p: { scheduleId: string; title: string; prompt: string; cadence: string; atTime?: string; tz?: string; weekday?: number; runAt?: string }): Promise<{ ok: boolean; nextRunAt: string }>;
   schedules(channelId: string | null): Promise<{ schedules: ScheduleRow[] }>;
-  scheduleRuns(scheduleId: string, limit?: number): Promise<{ runs: ScheduleRunRow[] }>;
+  scheduleRuns(scheduleId: string, limit?: number): Promise<ScheduleRunsResult>;
+  scheduleRunNow(scheduleId: string): Promise<{ ok: boolean }>; // schedule.run_now: due at once, the next tick fires it
   contentItems(channelId: string): Promise<{ items: ContentItemRow[] }>;
   contentByTask(taskId: string): Promise<{ items: ContentItemRow[] }>; // a content task's drafts (marketing-workflow §4.5), rendered inline in its thread
   contentByThread(threadId: string): Promise<{ items: ContentItemRow[] }>;
@@ -354,7 +355,7 @@ export interface NMBridge extends EngineeringNMBridge, TerminalNMBridge {
   debugSeedImport?(): Promise<{ ok: boolean }>;
   debugSeedLessons?(): Promise<{ ok: boolean; slug?: string; number?: number }>;
   watchAgentLogs(cb: (row: LogRow) => void): () => void;
-  watchAgentStream(cb: (p: { key: string; agent: string; text: string; done: boolean }) => void): () => void;
+  watchAgentStream(cb: (p: { key: string; agent: string; text: string; done: boolean; thinking?: string }) => void): () => void;
   watchTasksAll(cb: (rows: TaskAllRow[]) => void): () => void;
   watchThreadsAll(cb: (rows: HomeConvoRow[]) => void): () => void;
   watchHistoryAll(cb: (rows: HistoryThreadRow[]) => void): () => void;

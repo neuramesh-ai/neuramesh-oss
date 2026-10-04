@@ -76,9 +76,3 @@ export function designMockupLabel(name: string): string {
   return plain ? plain.replace(/\b\w/g, (c) => c.toUpperCase()) : 'Design direction';
 }
 
-// A note: something the human said in the round that should CHANGE. Local to the
-// studio (exactly like the review tab's comment batch, docs/36 §13) — they accumulate as
-// editable pills and are spent all at once by Redraw. Losing un-spent notes on close matches a
-// review tab losing its unsent batch when you close it; the alternative is a second store of design feedback,
-// and dual truth has bitten this codebase before.
-export type DesignNote = { id: number; text: string; from?: string | null };

@@ -6,7 +6,7 @@
 // database or a network. The QUERY that produces those rows is the store's; the SEND is
 // mail.ts. Nothing here decides copy.
 import { renderDay1, renderDay3, renderDay7, renderMarketing } from '@neuramesh/shared';
-import { APP_URL, unsubscribeUrl } from './mail';
+import { APP_URL, HQ_URL, unsubscribeUrl } from './mail';
 import { queueAndSend } from './onauth';
 import type { Store } from './store';
 
@@ -70,28 +70,39 @@ export function dueFor(row: LifecycleRow): LifecycleTemplate | null {
   return null;
 }
 
+/** where the lifecycle emails send a person. the workspace is in the browser (hq), Get Pro is the
+ *  site's /pro on its sign-in face (it opens Stripe for the owner's workspace), and buying credits
+ *  is hq's Credits view, which hq opens from `?view=credits` (wtabs/guests.tsx viewFromUrl). the
+ *  old links all went to the Mac download, and day 7's Get Pro went to /billing, a path the site
+ *  does not serve, so it showed the homepage. */
+export const LIFECYCLE_LINKS = {
+  open: HQ_URL,
+  getPro: `${APP_URL}/pro?mode=signin`,
+  credits: `${HQ_URL}/?view=credits`,
+} as const;
+
 /** Render the chosen template for a row. Kept beside `dueFor` so adding a stage touches one file. */
 export function renderLifecycle(template: LifecycleTemplate, row: LifecycleRow): { subject: string; preheader: string; html: string; text: string } | null {
   const unsub = unsubscribeUrl(row.userId);
   switch (template) {
     case 'day1':
-      return renderDay1({ openUrl: `${APP_URL}/downloads`, unsubscribeUrl: unsub });
+      return renderDay1({ openUrl: LIFECYCLE_LINKS.open, unsubscribeUrl: unsub });
     case 'day3': {
       if (!row.lesson) return null; // belt and braces: dueFor already required it
       return renderDay3({
         lesson: row.lesson.text, taskNumber: row.lesson.taskNumber, channel: row.lesson.channel,
         reviewer: row.lesson.reviewer, worker: row.lesson.worker,
         statAccepted: row.statAccepted, statReviews: row.statReviews, statLessons: row.statLessons,
-        window: 'your first week', openUrl: `${APP_URL}/downloads`, unsubscribeUrl: unsub,
+        window: 'your first week', openUrl: LIFECYCLE_LINKS.open, unsubscribeUrl: unsub,
       });
     }
     case 'marketing':
       return renderMarketing({
         shippedThing: row.shippedThing, worker: 'patch', reviewer: 'scout',
-        openUrl: `${APP_URL}/downloads`, unsubscribeUrl: unsub,
+        openUrl: LIFECYCLE_LINKS.open, unsubscribeUrl: unsub,
       });
     case 'day7':
-      return renderDay7({ billingUrl: `${APP_URL}/billing`, openUrl: `${APP_URL}/downloads`, unsubscribeUrl: unsub });
+      return renderDay7({ billingUrl: LIFECYCLE_LINKS.getPro, openUrl: LIFECYCLE_LINKS.credits, unsubscribeUrl: unsub });
   }
 }
 

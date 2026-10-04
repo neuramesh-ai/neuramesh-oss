@@ -8,6 +8,7 @@
 // values the panel already built, in the same order, so the render tree is unchanged.
 import { useMemo, useState } from 'react';
 import { nm as nmBridge } from '../../bridge/nm';
+import { usePanelShown } from '../RefCard';
 import type { ShipPlan } from '@neuramesh/shared';
 import type { ArtifactUI, TaskRow } from '../../bridge/rows-board';
 
@@ -40,6 +41,10 @@ const shipPlan = useMemo<ShipPlan | null>(() => {
   if (!task.ship_plan) return null;
   try { return JSON.parse(task.ship_plan) as ShipPlan; } catch { return null; }
 }, [task.ship_plan]);
+// docs/25, one gate on screen: while the side panel shows the release plan, its review tab
+// holds Approve and Request changes, and the dock keeps only the escape hatch
+const shown = usePanelShown();
+const planInPanel = !!latestShipPlan && shown.name === latestShipPlan.name && task.state === 'ship_review';
 const [shipAddOpen, setShipAddOpen] = useState(false);
 const [shipAddTitle, setShipAddTitle] = useState('');
 const tickShipItem = async (itemId: string, state: 'pending' | 'done' | 'na') => {
@@ -119,10 +124,10 @@ const shipCard = shipPlan && (task.state === 'ship_review' || task.state === 're
 const shipActions = task.state === 'ship_review' || task.state === 'releasing' || task.state === 'shipping' ? (
   <>
     <div className="tactions">
-      {task.state === 'ship_review' && (
+      {task.state === 'ship_review' && !planInPanel && (
         <button className="btn accept" disabled={busy || openSubs.length > 0} onClick={() => void act('task.approve_ship_plan')} title={openSubs.length ? `${openSubs.length} subtask(s) open — finish or cancel them first` : 'approve the release plan — owners tick their items, the shipper merges when the list clears'}>✓ Approve release plan</button>
       )}
-      {(task.state === 'ship_review' || task.state === 'shipping') && (
+      {(task.state === 'ship_review' || task.state === 'shipping') && !planInPanel && (
         <button
           className="btn"
           disabled={busy}
@@ -131,7 +136,7 @@ const shipActions = task.state === 'ship_review' || task.state === 'releasing' |
           title={task.state === 'shipping' ? 'add another round of notes — the shipper redrafts the plan' : 'send the plan back to the shipper — arms the reply box below'}
         >Request changes</button>
       )}
-      {canReview && (
+      {canReview && !planInPanel && (
         <button className="btn" disabled={busy} onClick={() => (latestShipPlan ? openPlan(latestShipPlan.name) : onPreview())} title="open the release plan — comment block-by-block, approve, or request changes">Open plan ↗</button>
       )}
       <button className="btn ghost" disabled={busy} onClick={() => void act('task.accept')} title="skip the gate — accept & merge now (the human escape hatch)">Skip gate — accept</button>

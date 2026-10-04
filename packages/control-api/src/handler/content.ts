@@ -128,6 +128,18 @@ export async function contentCommands(store: Store, actor: Actor, cmd: Command):
     return { ok: true, itemId: id } as never;
   }
 
+  // a draft with no conversation moves into the session its first picture ask opened, so the card
+  // shows there and the next ask finds it. a human's move (the ask is theirs), and only a draft with
+  // no thread and no task, into a conversation in its own room: an anchored draft never moves.
+  if (cmd.type === 'content.anchor') {
+    if (actor.kind !== 'human') throw new DomainError('HUMAN_ONLY', 'a draft moves into a conversation on a human ask. agents draft in the thread they answer in');
+    const { id } = await store.anchorContentItem(cmd.item, cmd.thread, (ws) => createEvent({
+      type: 'content.updated', source: actorAddress(actor), target: formatAddress({ kind: 'resource', type: 'content', id: cmd.item }), workspace: ws,
+      payload: { item: cmd.item, thread: cmd.thread },
+    }));
+    return { ok: true, itemId: id } as never;
+  }
+
   if (cmd.type === 'content.approve' || cmd.type === 'content.unschedule') {
     // agents draft, humans publish (plan §4.7) — structurally, like approve_design
     if (actor.kind !== 'human') throw new DomainError('HUMAN_ONLY', 'content is approved by a human — agents draft, humans publish');

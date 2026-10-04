@@ -1,5 +1,5 @@
-// The task thread (docs/25) — the conversation on a board task, its zoned panel, the gate
-// card above the composer and the design studio docked beside it.
+// The task thread (docs/25) — the conversation on a board task, its zoned panel and the gate
+// card above the composer. A design round reads in the side panel's review tab (2026-10-03).
 // Extracted from App.tsx (track A3).
 import { BrainNotice } from './BrainNotice';
 import { ThreadHead } from './ThreadHead';
@@ -15,7 +15,6 @@ import { BrandSections } from '../marketing/BrandSections';
 import { ComposerInput } from '../composer/ComposerInput';
 import { DeliveryStrip } from './DeliveryStrip';
 
-import { DesignStudio } from '../design/DesignStudio';
 import { DiffView } from '../views/docpreview';
 import { DraftingCard, MentionButton, ThreadRoomChip, ThreadRootPin, TypistChip, filesFromPaste, memberPeople, streamContent, type ComposerPerson, type HeadStatus, type PostVCard, type RailSection, useDropZone } from './parts';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
@@ -43,6 +42,7 @@ import { nm as nmBridge } from '../bridge/nm';
 import { pickPlans, pickShipPlans } from '../design/plans';
 import { plainTitle } from '../room-tabs';
 import { suggestionTarget, type TaskRefInfo } from '../cards/parse';
+import { approvedByRoutine } from '../cards/planapprover';
 import { type AgentRow, type MachineRow, type MemberRow } from '../bridge/rows-crew';
 import { type ArtifactUI, type AttachmentRow, type DecisionAllRow, type TaskAllRow, type TaskRow } from '../bridge/rows-board';
 
@@ -57,24 +57,13 @@ import { useTaskEvents } from './task/Events';
 import { useTaskGates } from './task/Gates';
 import { useTaskData } from './task/Data';
 import { useTaskPresence } from './task/Presence';
+import { markerArrivals, taskArrivals, useArrivals } from './useArrivals';
+import { DraftsRow, DraftsTab, useDraftsTab, type DraftsDoor } from './DraftsPane';
+import type { PanelArrival } from '../shell/arrivals';
 
 // Imported bindings lose control-flow narrowing inside closures, so re-bind (same as App.tsx).
 const nm = nmBridge;
 
-// The studio's docked width is a per-machine preference (docs/25 zone contract: the
-// thread keeps its --col measure, the studio spends the panel's slack). Floor keeps a
-// mockup legible; ceiling keeps the thread from being starved — under NARROW_PANEL the
-// studio takes the sheet instead, which is what the old overlay always did.
-export const STUDIO_W_KEY = 'nm.designStudio.w';
-
-export const STUDIO_MIN = 380;
-
-export const STUDIO_MAX = 900;
-
-export const clampStudio = (w: number) => Math.max(STUDIO_MIN, Math.min(STUDIO_MAX, Math.round(w)));
-
-/** Kept in lockstep with --dur-studio in tokens.css — the JS unmount waits it out. */
-export const STUDIO_ANIM_MS = 420;
 
 export function TaskThread({
   task,
@@ -111,7 +100,7 @@ export function TaskThread({
   crumbProject,
   onSetProjectPack,
   onBrainConnect,
-  railSlot, onWorkbench, wbOpen, onToggleWorkbench,
+  railSlot, detailsShown, onDetails, onArrive, drafts,
   marks, onSettle,
   peek,
 }: {
@@ -121,17 +110,20 @@ export function TaskThread({
   onSettle?: (threadId: string) => void;
   /** where the back crumb goes — one header anatomy for both session kinds (docs/35 §3.4) */
   back: string;
-  /** where the details panel renders — the Workbench's Details slot, and nowhere else since
-   *  2026-08-17. Null means it is shut or on another face, and the head's toks stand in for it.
-   *  A PEEK never gets one: at 380px the Workbench is the column. */
+  /** where the details render: the side panel's Overview tab, and nowhere else (the side-panel
+   *  round, 2026-10-03). A task in a panel tab never gets one: it IS the panel. */
   railSlot?: HTMLElement | null;
-  /** OPEN the Workbench (the RailToks door while the panel is shut) — the toggle lives on the tab row */
-  onWorkbench?: () => void;
-  wbOpen?: boolean; onToggleWorkbench?: () => void; // the Workbench card's state + its header toggle (rail-ink round 3)
-  /** the header's own toggle for the panel that holds this task's details */
-  /** rendered as a PEEK beside the thread it was opened from (the task-peek round,
-   *  2026-08-10 — docs/33 §8's split stage, second tenant). The panel is the same panel;
-   *  only its way out changes: close · open full replace the back crumb. */
+  /** the Overview tab is in view, so the toks under the head stand down */
+  detailsShown?: boolean;
+  /** show the Overview tab (the toks' door) */
+  onDetails?: () => void;
+  /** what this task makes while you look at it, for the side panel to open (shell/arrivals.ts) */
+  onArrive?: (list: PanelArrival[]) => void;
+  /** the side panel's Drafts tab: the cards portal in there, and its count and its door (the side-panel round) */
+  drafts?: DraftsDoor;
+  /** rendered in a TASK TAB of the side panel, beside the thread it was named in (the side-panel
+   *  round, 2026-10-03; the task peek of 2026-08-10 before it). The panel is the same panel; only
+   *  its way out changes: `Open the task ›` replaces the back crumb, and the tab strip closes it. */
   peek?: { onFull: () => void };
   agents: AgentRow[];
   machines: MachineRow[];
@@ -186,34 +178,19 @@ export function TaskThread({
   // subtasks, branch/PR, and the review loop.
   const [closing, setClosing] = useState(false);
   const [blocking, setBlocking] = useState(false);
-  // hands-off (2026-09-16): the unit's origin thread carries schedule_id when a routine opened it —
-  // the plan card's record then reads auto-approved · routine instead of a human's approved
+  // hands-off (2026-09-16): the plan card's record reads auto-approved · routine instead of a human's
+  // approved, but only when a ROUTINE approved the plan (2026-09-27, cards/planapprover.ts): never in a
+  // content schedule's session, and never on repo work
   const [routineBorn, setRoutineBorn] = useState(false);
   useEffect(() => {
     const origin = task.origin_thread_id;
     if (!nm?.watchHistoryAll || !origin) { setRoutineBorn(false); return; }
-    return nm.watchHistoryAll((rows) => setRoutineBorn(rows.some((r) => r.id === origin && !!r.schedule_id)));
-  }, [task.origin_thread_id]);
+    return nm.watchHistoryAll((rows) => setRoutineBorn(approvedByRoutine({ repo_id: task.repo_id }, rows.find((r) => r.id === origin))));
+  }, [task.origin_thread_id, task.repo_id]);
   const [blockReason, setBlockReason] = useState('');
   const [threadLightbox, setThreadLightbox] = useState<AttachmentRow | null>(null);
   const [cfocus, setCfocus] = useState(0); // ⌥-click on a pill drops its text here to edit
   const [cmention, setCmention] = useState(0); // nonce → the @ button types "@" + opens the picker
-  const [designOpen, setDesignOpen] = useState(false);
-  const [designInitialName, setDesignInitialName] = useState<string | null>(null);
-  // studio geometry: width is a per-machine preference, expanded is per-open
-  const [studioW, setStudioW] = useState(() => clampStudio(Number(localStorage.getItem(STUDIO_W_KEY)) || 520));
-  const [studioExp, setStudioExp] = useState(false);
-  useEffect(() => { localStorage.setItem(STUDIO_W_KEY, String(studioW)); }, [studioW]);
-  // drag the grip: measure from the panel's right edge so the studio grows leftward
-  const panelRef = useRef<HTMLElement | null>(null);
-  const startStudioDrag = (e: React.PointerEvent) => {
-    e.preventDefault();
-    const right = panelRef.current?.getBoundingClientRect().right ?? window.innerWidth;
-    const move = (ev: PointerEvent) => setStudioW(clampStudio(right - ev.clientX));
-    const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
-    window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup', up);
-  };
   const [draft, setDraft] = useState('');
   // Request-changes / design-changes speak through the thread composer (v0.33): arming sets a
   // mode pill that scopes the next send to the review action instead of a plain reply.
@@ -234,8 +211,25 @@ export function TaskThread({
   // presence (any agent the daemon woke for THIS thread — assignee or not, e.g. rex
   // answering here) vs content (tokens flowing)
   const { rows, threadAttByMsg, arts, beats, openArt, setOpenArt, skills, packs, detail, act, artByName, runTrees_, taskRunRows } = useTaskData({ task, channelId, busy, setBusy, setActErr, listRef, convoThreadId, setComposerMode });
+  // what this task makes while you look at it opens in the side panel by itself (shell/arrivals.ts);
+  // a task inside a panel tab reports nothing: it is not the session in front
+  useArrivals(arts, peek ? null : `task:${task.id}`, (fresh) => { const l = taskArrivals(fresh); if (l.length) onArrive?.(l); });
+  useArrivals(rows, peek ? null : `task:${task.id}`, (fresh) => { const l = markerArrivals(fresh); if (l.length) onArrive?.(l); });
   const threadStream = useThreadStream(`${channelId}:${task.id}`, rows, (name) => agents.find((a) => a.name === name)?.id ?? null);
   const { isContent, mkImageReady, mkPosts, mkPreview, setMkPreview, setMkTick } = useTaskPosts(task, rows.length);
+  // THE DRAFTS TAB (the side-panel round): the same cards the transcript drew, at full size in the panel
+  const draftCards = useMemo(() => postCardsFrom(mkPosts, rows), [mkPosts, rows]);
+  const renderDraft = (c: PostVCard) => (
+    <SocialPostCard
+      key={c.key} item={c.item} channelSlug={channelSlug} taskNumber={task.number} letter={c.letter}
+      version={c.version} superseded={c.superseded}
+      onOpen={() => setMkPreview(c.item)}
+      onReply={c.superseded ? undefined : () => { setMkReplyTo({ id: c.item.id, letter: c.letter }); setCfocus((n) => n + 1); }}
+      onGenerateImage={c.superseded ? undefined : (redraw, kind) => void nm?.sendThread(task.id, channelId, kind === 'video' ? `Film the hook for #${task.number}·${c.letter}.‹gen-video:${c.item.id}›` : `${redraw ? 'Redraw' : 'Generate'} the image for #${task.number}·${c.letter}.‹gen-image:${c.item.id}›`)}
+      imageReady={mkImageReady}
+    />
+  );
+  useDraftsTab(draftCards, mkPosts, `task:${task.id}`, drafts, onArrive);
   // The ghost the thread wears while nothing is working yet (docs/26 §5). Derived here, like its
   // sibling in useConvoPresence, so the surface knows whose face it is (run card › ghost › chip).
   const waitCarded = useMemo(() => new Set(runTrees_.filter((t) => isRunOpen(t.run.state as RunState)).map((t) => t.run.agent_id)), [runTrees_]);
@@ -325,7 +319,6 @@ export function TaskThread({
   // reserved against ALL active agents, not just in-room ones, so a member's handle is
   // the same in every composer.
   const liveAgents = agents.filter((a) => !a.retired_at);
-  const channelDesigner = liveAgents.find((a) => a.role === 'designer' && agentInChannel(a.channel_ids, channelId)) ?? null;
   const channelArchitect = liveAgents.find((a) => a.role === 'architect' && agentInChannel(a.channel_ids, channelId)) ?? null;
   const threadPeople: ComposerPerson[] = [
     ...liveAgents.filter((a) => agentInChannel(a.channel_ids, channelId)).map((a) => ({ name: a.name, kind: 'agent' as const, here: true, role: a.role, emoji: a.emoji })),
@@ -340,7 +333,7 @@ export function TaskThread({
   // explicit name wins (each link opens its exact version); a bare open falls back to the latest
   // implementation plan.
   const openPlan = (name?: string) => onPreview(name ?? latestPlan?.name ?? undefined);
-  const { openDesign, roundMockups, latestRound, studioOpen, studioShown } = useDesignDock({ task, arts, designOpen, setDesignOpen, setDesignInitialName, setStudioExp, listRef, onOpenReview });
+  const { openDesign, roundMockups, latestRound } = useDesignDock({ task, arts, listRef, onOpenReview });
   const { who, reviewT, events, designProvider, claudeDesignUrl, reviews, workAttempts } = useTaskEvents({ detail, agents, members, rows, task });
   const { canReview, detailsEditable, saveDetails } = useTaskContract({ task, arts, busy, setBusy, setActErr, titleDraft, descDraft, setEditDetails });
 
@@ -381,7 +374,7 @@ export function TaskThread({
   // provider question arrives as a decision card when it needs a human. A button that
   // second-guessed triage on every todo task was a second answer to an answered question.
 
-  const { designActions, designHandoff, artStrip, blockedActions } = useTaskGates({ task, channelId, arts, busy, actErr, act, assignee, channelArchitect, composerMode, setComposerMode, onPreview, studioOpen, roundMockups, latestRound, openDesign, designProvider, claudeDesignUrl });
+  const { designActions, designHandoff, artStrip, blockedActions } = useTaskGates({ task, channelId, arts, busy, actErr, act, assignee, channelArchitect, composerMode, setComposerMode, onPreview, roundMockups, latestRound, openDesign, designProvider, claudeDesignUrl });
 
 
   const { liveLeg, factHolder, factcap, liveBeat, shipBeat, ghostAgentId, typists, typistsBar, blockingInput } = useTaskPresence({ task, agents, machines, beats, spectrumLegs, runTrees_, taskRunRows, assignee, offered, threadStream, busy, act, blocking, setBlocking, blockReason, setBlockReason, onActivity });
@@ -554,20 +547,9 @@ export function TaskThread({
 
   return (
     <aside
-      ref={panelRef}
       className="threadpanel"
-      style={studioOpen ? ({
-        ['--studio-w' as never]: `${studioW}px`,
-        // the animated basis: 0 before it opens and while it closes, the dragged width
-        // docked, the whole sheet expanded. One number, so open/close/expand/collapse are
-        // all the same gesture and the thread column absorbs the difference by itself.
-        ['--studio-basis' as never]: !studioShown ? '0px' : studioExp ? '100%' : `${studioW}px`,
-      }) : undefined}
       onKeyDown={(e) => {
         if (e.key !== 'Escape' || closing) return;
-        // the studio unwinds a layer at a time: expanded → docked → closed
-        if (studioExp) { setStudioExp(false); return; }
-        if (studioOpen) { setDesignOpen(false); return; }
         onClose(); // Esc slides the sheet away (the rail folds from its own chevron)
       }}
     >
@@ -588,7 +570,7 @@ export function TaskThread({
           {actErr && <div className="acterr" style={{ marginTop: 8 }}>{actErr}</div>}
         </Modal>
       )}
-      <ThreadHead wbOpen={wbOpen} onToggleWorkbench={onToggleWorkbench} {...{ act, back, blocking, busy, channelSlug, crumbProject, editDetails, isContent, marks, onClose, onOpenTerminal, onSettle, onViewLogs, peek, setBlocking, setClosing, spectrumLegs, task }} />
+      <ThreadHead {...{ act, back, blocking, busy, channelSlug, crumbProject, editDetails, isContent, marks, onClose, onOpenTerminal, onSettle, onViewLogs, peek, setBlocking, setClosing, spectrumLegs, task }} />
       {/* the header zone (v0.36): identity + journey. The journey lives HERE — it IS the
           status summary — and the facts line folds every auxiliary surface into one row of
           toks; clicking one opens a single drawer under the tabs. v0.68: the journey is a
@@ -615,21 +597,19 @@ export function TaskThread({
             </span>
           </div>
         )}
-        {/* THE DETAILS TOKS (2026-08-17) — what the Workbench's Details face holds, said out loud
-            while it is shut, each one a door to it. The in-sheet rail retired this round, so
-            without this the description and the Definition of Done would simply be off-screen
-            with nothing on the thread to suggest they exist. It hides while the panel is open:
-            a strip pointing at a panel you are already looking at is noise. */}
-        {!railSlot && onWorkbench && (
-          <RailToks sections={railSections} label={`#${task.number} details`} onOpen={onWorkbench}
+        {/* THE DETAILS TOKS (2026-08-17) — what the side panel's Overview tab holds, said out loud
+            while it is not in view, each one a door to it. Without them the description and the
+            artifacts would simply be off-screen with nothing on the thread to suggest they exist.
+            They hide while Overview is in view: a strip that points at a tab you are already
+            looking at is noise. */}
+        {!detailsShown && onDetails && (
+          <RailToks sections={railSections} label={`#${task.number} details`} onOpen={onDetails}
             extraLabel={channelKind === 'marketing' ? 'brand' : null} />
         )}
       </div>
-      {/* The split (design round 2026-07-28): the studio is a resizable PEER column, not
-          an overlay — the thread keeps its --col measure and the studio spends the panel's
-          slack. Expanded, the thread column yields the sheet entirely. v0.64 retired the
-          tab strip, so the thread (and this split) is now the panel's only view. */}
-      <div className={`tsplit${studioOpen ? ' withstudio' : ''}${studioOpen && studioShown && studioExp ? ' exp' : ''}`}>
+      {/* the thread column: the design studio that once shared this row retired into the side
+          panel's review tab (the side-panel round, 2026-10-03) */}
+      <div className="tsplit">
         <div className="tcol">
           {actErr && <div className="acterr" style={{ padding: '4px 16px 0' }}>{actErr}</div>}
           {/* same bar as the conversation thread: a task worked on someone else's machine reads
@@ -715,17 +695,8 @@ export function TaskThread({
             : Number.NaN;
           const fallback = Number.isFinite(providerAt) ? providerAt : latestMessageAt;
 
-          const cards = postCardsFrom(mkPosts, rows);
-          const renderCard = (c: PostVCard) => (
-            <SocialPostCard
-              key={c.key} item={c.item} channelSlug={channelSlug} taskNumber={task.number} letter={c.letter}
-              version={c.version} superseded={c.superseded}
-              onOpen={() => setMkPreview(c.item)}
-              onReply={c.superseded ? undefined : () => { setMkReplyTo({ id: c.item.id, letter: c.letter }); setCfocus((n) => n + 1); }}
-              onGenerateImage={c.superseded ? undefined : (redraw, kind) => void nm?.sendThread(task.id, channelId, kind === 'video' ? `Film the hook for #${task.number}·${c.letter}.‹gen-video:${c.item.id}›` : `${redraw ? 'Redraw' : 'Generate'} the image for #${task.number}·${c.letter}.‹gen-image:${c.item.id}›`)}
-              imageReady={mkImageReady}
-            />
-          );
+          const cards = draftCards;
+          const renderCard = renderDraft;
           const deliveryCards = cards.filter((c) => !c.isRevision);   // originals + their replaced versions
           const revisionCards = cards.filter((c) => c.isRevision);    // each after its own reply
           // still drafting → a trailing skeleton, with N-of-M when the count is in the ask
@@ -823,7 +794,13 @@ export function TaskThread({
           if (draftStrip) {
             const deliveryAnchor = mkPosts.length ? Math.min(...mkPosts.map((p) => new Date(p.created_at).getTime())) : Date.now();
             const target = (() => { const m = /\b(\d+)\s+(?:x\s+|ig\s+|instagram\s+|social\s+|linkedin\s+|tiktok\s+)?(?:posts?|drafts?|tweets?|slides?)/i.exec(`${task.title} ${task.description ?? ''}`); const n = m ? parseInt(m[1]!, 10) : 0; return n >= 1 && n <= 20 ? n : 0; })();
-            entries.push({ at: deliveryAnchor, order: 10_000, value: (
+            // a delivery of drafts is ONE ROW here; the cards read at full size in the side panel's Drafts tab
+            entries.push({ at: deliveryAnchor, order: 10_000, value: drafts ? (
+              <div className="mkdrafts" key="delivery">
+                <DraftsRow cards={deliveryCards} onOpen={drafts.onShow} />
+                {stillDrafting && <div className="mkdraftsgrid"><DraftingCard done={mkPosts.length} total={target} /></div>}
+              </div>
+            ) : (
               <div className="mkdrafts" key="delivery">
                 <div className="mkdraftsgrid">
                   {deliveryCards.map(renderCard)}
@@ -833,7 +810,7 @@ export function TaskThread({
             ) });
           }
           for (const c of revisionCards) {
-            entries.push({ at: c.anchor, order: 10_000, value: <div className="mkdrafts" key={`rev-${c.key}`}><div className="mkdraftsgrid">{renderCard(c)}</div></div> });
+            entries.push({ at: c.anchor, order: 10_000, value: drafts ? <DraftsRow key={`rev-${c.key}`} cards={[c]} onOpen={drafts.onShow} /> : <div className="mkdrafts" key={`rev-${c.key}`}><div className="mkdraftsgrid">{renderCard(c)}</div></div> });
           }
           // SHOW (live #1048): a reply that NAMES drafts re-anchors those cards under it, instead
           // of the marketer retyping the posts as prose beside the cards already rendering them.
@@ -853,14 +830,16 @@ export function TaskThread({
               value: (
                 <div className="mkdrafts mkrecall" key={`show-${m.id}`}>
                   <div className="mkrecallhd"><span className="mkrecalldot" aria-hidden />drafts {shown.map((c) => c.letter).join(', ')}</div>
-                  <div className="mkdraftsgrid">{shown.map((c) => renderCard({ ...c, key: `show-${m.id}-${c.key}` }))}</div>
+                  {drafts ? <DraftsRow cards={shown} onOpen={drafts.onShow} /> : <div className="mkdraftsgrid">{shown.map((c) => renderCard({ ...c, key: `show-${m.id}-${c.key}` }))}</div>}
                 </div>
               ),
             });
           }
           return orderTranscriptEntries(entries);
         })()}
-        {mkPreview && <PostPreviewModal item={mkPreview} channelSlug={channelSlug} channelId={channelId} projectName={crumbProject?.name ?? null} onClose={() => setMkPreview(null)} onChanged={() => setMkTick((n) => n + 1)} />}
+        {mkPreview && !drafts?.slot && <PostPreviewModal item={mkPreview} channelSlug={channelSlug} channelId={channelId} projectName={crumbProject?.name ?? null} onClose={() => setMkPreview(null)} onChanged={() => setMkTick((n) => n + 1)} />}
+        <DraftsTab door={drafts} cards={draftCards} renderCard={renderDraft} preview={mkPreview} channelSlug={channelSlug} channelId={channelId} projectName={crumbProject?.name ?? null}
+          onClose={() => setMkPreview(null)} onChanged={() => { setMkPreview(null); setMkTick((n) => n + 1); }} />
         {/* The live-narration ghost, RESTORED for cardless work (2026-07-30, George's live-run
             report). v0.69.2 retired it because a task EXECUTION's run card narrates the same
             work — but a triage/reply wake draws no card (docs/29: a bare wake run is the
@@ -1016,49 +995,19 @@ export function TaskThread({
             for the inverted case: the brand panel used to mount in a conversation and the room
             home but never here, so a marketing room's own content task was the one place its
             voice and guidelines vanished. */}
-        {/* THE DETAILS PANEL (2026-08-16) — description · requirements · Definition of Done ·
-            artifacts · subtasks. It renders into the WORKBENCH when the shell offers a slot,
-            because two panels at the window's right edge is exactly the duplication this round
-            exists to remove: the Workbench was on the frame and this was inside the sheet, three
-            inches apart, both of them "the panel beside the thread" (George, live).
-            Without a slot — the Workbench closed, or a peek column, or the top dock — it falls
-            back to the in-sheet rail it always was, so the details are never simply gone. */}
+        {/* THE DETAILS (2026-08-16; the side panel's Overview tab since 2026-10-03) — description ·
+            artifacts · subtasks · pull request · review loop, and a marketing room's brand docs
+            under them. They portal into the Overview tab, so the panel beside the thread is the
+            one place they render. Without a slot (a task inside a panel tab) there is no copy. */}
         {(() => {
           const extra = channelKind === 'marketing'
             ? <BrandSections channelId={channelId} channelSlug={channelSlug} onOpen={(d) => onOpenDoc?.(d)} marketing={channelMarketing} />
             : null;
           if (railSlot) return createPortal(<RailSections sections={railSections} extra={extra} />, railSlot);
-          // no slot — the panel is shut or on another face. NOT an in-sheet copy of it (that was
-          // the second panel this round removed); the toks under the head say what it holds and
-          // open it. `onWorkbench` is the same door the head's dock-right pin uses.
+          // no slot: a task inside a panel tab, which IS the panel. NOT an in-sheet copy of it (that
+          // was the second panel the 2026-08-16 round removed).
           return null;
         })()}
-        {studioOpen && (
-          <>
-            <div
-              className="sgrip"
-              role="separator"
-              aria-orientation="vertical"
-              aria-label="Resize the design studio"
-              title="drag to resize"
-              onPointerDown={startStudioDrag}
-              onKeyDown={(e) => {
-                if (e.key === 'ArrowLeft') setStudioW((w) => clampStudio(w + 32));
-                if (e.key === 'ArrowRight') setStudioW((w) => clampStudio(w - 32));
-              }}
-              tabIndex={0}
-            />
-            <DesignStudio
-              taskId={task.id} taskNumber={task.number} channelId={channelId}
-              mockups={roundMockups} round={latestRound} taskState={task.state}
-              provider={designProvider === 'claude-design' ? 'claude-design' : 'iris'}
-              externalUrl={claudeDesignUrl} initialName={designInitialName} rows={rows} agents={agents}
-              designerName={(task.assignee_kind === 'agent' ? agentName(task.assignee_id) : null) ?? channelDesigner?.name ?? 'the designer'}
-              shown={studioShown} expanded={studioExp} onToggleExpand={() => setStudioExp((x) => !x)}
-              onClose={() => { setStudioExp(false); setDesignOpen(false); }}
-            />
-          </>
-        )}
         </div>
     </aside>
   );

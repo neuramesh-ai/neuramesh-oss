@@ -3,15 +3,17 @@
 // the code face, never a different surface: the head's mode chip, subline and toks · the runtime's
 // rows in the thread's own anatomy (thread/CodingTranscript) · ONE gate card above the composer
 // (thread/CodingGate) · the one composer with the two coding knobs (thread/CodingComposer) · the
-// Changes · Work Plan · Checkpoints · Terminal tabs in the WORKBENCH card (thread/CodeFace), which
-// opens by itself on a coding thread (George, 2026-09-26), so the conversation is never covered.
+// Changes · Files · Work Plan · Checkpoints · Terminal tabs, the coding thread's own tabs in the
+// side panel (thread/CodeFace; the Workbench card until the side-panel round, 2026-10-03), which
+// comes out by itself on a coding thread, so the conversation is never covered.
 // The session id IS the thread id: the machine's history discovery (actor + repo + thread) and
 // the synced code_sessions row agree. Ruling 2 (George, 2026-09-26): the runtime, the voice and
 // the brain rule are exactly the Code floor's. Who starts the session: the CLIENT that opens the
 // thread — door 1 with the root message as the first prompt, door 2 the same on the next open; a
 // thread whose session another client started is opened without a prompt.
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { answersResolver, type AnswerDecisionRow } from '../answers';
 import type { RepoUI, WorkspaceProjectRow } from '../bridge/rows-board';
 import type { AgentRow } from '../bridge/rows-crew';
 import type { CodeSessionRow, MessageRow, ThreadRow } from '../bridge/rows-rooms';
@@ -20,9 +22,10 @@ import type { EngineeringWorkspaceTab } from '../engineering/EngineeringEditor';
 import { useEngineeringRuntime } from '../engineering/useEngineeringRuntime';
 import { continueEngineeringInAct, dismissEngineeringModeHandoff, resolveEngineeringApproval, setEngineeringMode, setEngineeringModel, setEngineeringPermission, submitEngineeringPrompt } from '../engineering/domain';
 import { engineeringHarnessOn, projectOf, repoForProject, repoOf, type MachineChipSlot } from './EngineeringOS';
-import { CodeFace } from '../thread/CodeFace';
+import { CodePanel, codeCountsOf, type CodeCounts } from '../thread/CodeFace';
 import { CodingComposer } from '../thread/CodingComposer';
 import { CodingGate } from '../thread/CodingGate';
+import { connectedSigns, GitHubGate, GitHubSigns } from '../thread/GitHubGate';
 import { CodingTranscript } from '../thread/CodingTranscript';
 import { ThreadCrumb, ThreadStatusChip, type HeadStatus } from '../thread/parts';
 import { AgentAvatar } from '../components/AgentAvatar';
@@ -30,14 +33,19 @@ import { Md } from '../md/Md';
 import { MARKER_RE } from '../thread/markers';
 import { UnitCard } from '../thread/ThreadMessage';
 import { repoLabel } from '../composer/RepoChip';
-import { IconAlert, IconBranch, IconCode, IconMachine, IconThreads, IconWorkbench } from '../ui/icons';
-import { parseKindMarker, parseModeMarker, parseTaskUnitRef, threadTitle } from '@neuramesh/shared';
+import { IconAlert, IconBranch, IconCode, IconMachine, IconThreads } from '../ui/icons';
+import { parseGitHubConnected, parseKindMarker, parseModeMarker, parseNeed, parseTaskUnitRef, sessionRunLabel, threadTitle } from '@neuramesh/shared';
 
 /** the thread's own messages around the runtime's transcript: rex's line and the kind divider
  *  (door 2) above it, the unit card (the valve's result) below it. The root message is the
- *  session's first prompt, so the transcript carries it. */
-function ThreadRows({ rows, agents, repoName, onOpenTask }: { rows: MessageRow[]; agents: AgentRow[]; repoName: string | null; onOpenTask?: ((taskId: string) => void) | undefined }) {
+ *  session's first prompt, so the transcript carries it. While the session waits for GitHub, the gate
+ *  seat holds the one GitHub card, so a card rex posted before the thread turned to code is not drawn
+ *  twice (docs/design/repo-connect-2026-10). `answers` hands a card its decision row (answers.ts). */
+function ThreadRows({ rows, agents, repoName, onOpenTask, answers, hideNeeds = false }: { rows: MessageRow[]; agents: AgentRow[]; repoName: string | null; onOpenTask?: ((taskId: string) => void) | undefined; answers: (messageId: string) => Map<string, string>; hideNeeds?: boolean }) {
   return rows.map((m) => {
+    const connected = parseGitHubConnected(m.body);
+    if (connected) return <div key={m.id} className="srundiv"><span>GitHub connected · {connected} · {sessionRunLabel(m.created_at, Date.now())}</span></div>;
+    if (hideNeeds && parseNeed(m.body)?.connect.includes('github')) return null;
     const unit = parseTaskUnitRef(m.body);
     if (unit) return <div key={m.id} className="msg unitline"><span className="av quiet" aria-hidden><IconThreads s={13} /></span><div className="body">{unit.prose ? <Md text={unit.prose} /> : null}<UnitCard id={unit.id} onOpen={onOpenTask} /></div></div>;
     if (parseKindMarker(m.body) === 'coding') return <div key={m.id} className="sysline"><span>Code work starts here{repoName ? <>, on <b>{repoName}</b></> : null}. The coding runtime takes it from this message on.</span></div>;
@@ -46,13 +54,13 @@ function ThreadRows({ rows, agents, repoName, onOpenTask }: { rows: MessageRow[]
     return (
       <div key={m.id} className={`msg${m.author_kind === 'human' ? ' human mine' : ''}`}>
         {agent ? <span className="av"><AgentAvatar name={agent.name} emoji={agent.emoji} size={26} radius={4} role={agent.role} /></span> : null}
-        <div className="body">{agent ? <div className="head"><b>{agent.name}</b></div> : null}<Md text={m.body.replace(MARKER_RE, '').trim()} /></div>
+        <div className="body">{agent ? <div className="head"><b>{agent.name}</b></div> : null}<Md text={m.body.replace(MARKER_RE, '').trim()} answers={answers(m.id)} /></div>
       </div>
     );
   });
 }
 
-export function CodingThread({ threadId, thread, back, channelSlug, channelId, crumbProject, repos, projects, projectId, workspaceId, codeSession, pickedRepoId, marks, machineChip, machineName, defaultMachineId, plan, onUpgrade, onClose, agents, onOpenTask, railSlot, onWorkbench, wbOpen, onToggleWorkbench }: {
+export function CodingThread({ threadId, thread, back, channelSlug, channelId, crumbProject, repos, onReposChanged, projects, projectId, workspaceId, codeSession, pickedRepoId, marks, machineChip, machineName, defaultMachineId, plan, onUpgrade, onClose, agents, decisions, onOpenTask, codeSlot, codeTab, onCodeTab, onCodeCounts }: {
   threadId: string;
   thread: ThreadRow | null;
   back: string;
@@ -61,6 +69,8 @@ export function CodingThread({ threadId, thread, back, channelSlug, channelId, c
   channelId: string;
   crumbProject?: { name: string; logo_url?: string | null } | null;
   repos: RepoUI[];
+  /** reads the room's repositories again: the door of the gate that waits for a repository, since App reads them once per room */
+  onReposChanged: () => void;
   projects: WorkspaceProjectRow[];
   /** the room's project — the repository comes from it when nothing else names one */
   projectId: string | null;
@@ -78,14 +88,19 @@ export function CodingThread({ threadId, thread, back, channelSlug, channelId, c
   onUpgrade: (reason: string) => void;
   onClose: () => void;
   agents: AgentRow[];
+  /** the room's task-less decision rows, as a conversation gets them: a GitHub card above the root reads its own */
+  decisions: AnswerDecisionRow[];
   /** the unit card's door — the peek, as every #N ref opens */
   onOpenTask?: (taskId: string) => void;
-  /** the Workbench card's slot: the code face portals in there, as a conversation's details do */
-  railSlot?: HTMLElement | null;
-  /** opens the Workbench card — a coding thread opens it by itself (George, 2026-09-26) */
-  onWorkbench?: () => void;
-  wbOpen?: boolean;
-  onToggleWorkbench?: () => void;
+  /** the side panel's code pane: the code face's body portals in there, as a conversation's details do */
+  codeSlot?: HTMLElement | null;
+  /** which of the coding thread's own tabs the panel shows (null while another tab is in front) */
+  codeTab?: EngineeringWorkspaceTab | null;
+  /** bring one of the coding thread's own tabs to the front: `explicit` (a click) opens the panel,
+   *  the editor's own jump to Changes obeys a fold made during the run (shell/arrivals.ts) */
+  onCodeTab?: (tab: EngineeringWorkspaceTab, explicit?: boolean) => void;
+  /** the counts its tabs wear in the panel's strip */
+  onCodeCounts?: (counts: CodeCounts | null) => void;
 }) {
   const harness = engineeringHarnessOn();
   const engRepos = useMemo(() => repos.map(repoOf), [repos]);
@@ -94,8 +109,13 @@ export function CodingThread({ threadId, thread, back, channelSlug, channelId, c
   const [rows, setRows] = useState<MessageRow[]>([]);
   useEffect(() => { setRows([]); return nm ? nm.watchConvo(threadId, setRows) : undefined; }, [threadId]);
   const root = rows.find((m) => m.author_kind === 'human') ?? null;
-  const prelude = useMemo(() => rows.filter((m) => m.id !== root?.id && !parseTaskUnitRef(m.body)), [rows, root?.id]);
+  // the transcript draws the root as the session's first prompt. With no session open, the prelude draws it, so the
+  // person's own ask stays in view above the gate
+  const opened = !!active;
+  const prelude = useMemo(() => rows.filter((m) => (m.id !== root?.id || !opened) && !parseTaskUnitRef(m.body)), [rows, root?.id, opened]);
   const postlude = useMemo(() => rows.filter((m) => !!parseTaskUnitRef(m.body)), [rows]);
+  const answersFor = useMemo(() => answersResolver(rows, decisions), [rows, decisions]);
+  const signs = useMemo(() => connectedSigns(rows, answersFor), [rows, answersFor]);
   // the repository, in order: the synced row's, the chip's pick that birthed this thread, the project's primary
   const repoRow = useMemo(() => {
     const byId = (id?: string | null) => (id ? repos.find((r) => r.id === id) ?? null : null);
@@ -117,11 +137,21 @@ export function CodingThread({ threadId, thread, back, channelSlug, channelId, c
       firstPrompt: local ? null : harness ? root?.body ?? null : codeSession ? null : root?.body ?? null,
     });
   }, [threadId, harness, runtime, repoRow?.id, codeSession?.id, root?.id, engineering.sessions.length]); // eslint-disable-line react-hooks/exhaustive-deps
-  // the Workbench is where the code lives: it opens with the thread, and an approval fronts the Changes tab
+  // the side panel is where the code lives: the panel comes out with the thread (App), and an
+  // approval fronts Changes. The tab is the panel's, so a click in its strip and the editor's own
+  // jump to Changes go through one door. The door is held in a ref: the editor's effect lists it as
+  // a dependency, and a fresh function every render would re-front Changes on every render.
   const restore = !harness && active ? (checkpointId: string) => engineering.restore(active, checkpointId) : undefined;
-  const [wbTab, setWbTab] = useState<EngineeringWorkspaceTab>('changes');
-  useEffect(() => { onWorkbench?.(); }, [threadId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const wbTab: EngineeringWorkspaceTab = codeTab ?? 'changes';
+  const onCodeTabRef = useRef(onCodeTab);
+  onCodeTabRef.current = onCodeTab;
+  const setWbTab = useCallback((tab: EngineeringWorkspaceTab) => onCodeTabRef.current?.(tab), []);
   useEffect(() => { if (active?.pendingApproval?.changes?.length) setWbTab('changes'); }, [active?.pendingApproval?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  // the strip's counts: the changes, the checkpoints, the Work Plan's mark
+  const counts = active ? codeCountsOf(active) : null;
+  const countKey = counts ? `${counts.changes}|${counts.checkpoints}|${counts.plan}` : '';
+  useEffect(() => { onCodeCounts?.(counts); }, [countKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => onCodeCounts?.(null), []); // eslint-disable-line react-hooks/exhaustive-deps
   // the transcript follows the newest row, as the conversation thread does
   const listRef = useRef<HTMLDivElement>(null);
   useEffect(() => { const el = listRef.current; if (el) el.scrollTop = el.scrollHeight; }, [active?.messages.length, active?.state, rows.length]);
@@ -139,7 +169,9 @@ export function CodingThread({ threadId, thread, back, channelSlug, channelId, c
     continueInAct: () => harness ? engineering.update(continueEngineeringInAct(active)) : engineering.continueInAct(active),
     dismissHandoff: () => harness ? engineering.update(dismissEngineeringModeHandoff(active)) : engineering.dismissModeHandoff(active),
   } : null;
-  const reviewChanges = () => { setWbTab('changes'); onWorkbench?.(); };
+  const reviewChanges = () => onCodeTabRef.current?.('changes', true);
+  // the seat holds the GitHub gate (CodingGate ranks a live approval first): a card above it is a second door
+  const seatAsksGitHub = active ? active.blockedOn === 'github' && !active.pendingApproval : !repoRow && !codeSession;
   return (
     <div className="threadpanel convo codingthread" onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}>
       <div className="thead">
@@ -149,44 +181,43 @@ export function CodingThread({ threadId, thread, back, channelSlug, channelId, c
         {/* the mode is the thread's chip: plan in the plan hue, act in the build hue */}
         {active ? <span className={`chip c-${active.mode}`}>{active.mode}</span> : <span className="chip c-code">code</span>}
         <ThreadStatusChip head={marks} />
-        <div className="theadact">{onToggleWorkbench && <button className={`navpin${wbOpen ? ' on' : ''}`} aria-pressed={!!wbOpen} title={wbOpen ? 'Hide the Workbench — ⌘P' : 'Show the Workbench — ⌘P'} onClick={onToggleWorkbench}><IconWorkbench s={14} /></button>}</div>
       </div>
-      {/* the subline: branch · repository · machine (the facts live as counts on the Workbench's tabs) */}
+      {/* the subline: branch · repository · machine (the facts live as counts on the panel's code tabs) */}
       <div className="codinghead">
         <div className="sssub"><IconBranch s={11} /><span>{active?.repo.branch ?? codeSession?.branch ?? repoRow?.default_branch ?? 'main'}</span><span>·</span><span>{repoName ?? 'no repository'}</span>{machineName ? <><span>·</span><IconMachine s={11} /><span>{machineName}</span></> : null}{unitId || made ? <><span>·</span><button className="sssublink" onClick={() => onOpenTask?.(unitId ?? made!)}>a unit ✓</button></> : null}</div>
       </div>
-      {railSlot && active ? createPortal(<CodeFace session={active} tab={wbTab} onTab={setWbTab} onSession={engineering.update} onRestore={restore} />, railSlot) : null}
+      {codeSlot && active ? createPortal(<CodePanel session={active} tab={wbTab} onTab={setWbTab} onSession={engineering.update} onRestore={restore} />, codeSlot) : null}
       {!harness && runtime !== 'ready' && (
         <div className={`engnotice engruntime codingnotice${runtime === 'checking' ? '' : ' warning'}`} role="status">
           <span className="engnoticeico"><IconAlert s={14} /></span>
           <span className="engnoticecopy"><b>{runtime === 'checking' ? 'Connecting to your machine…' : 'Code unavailable'}</b><span>{reason ?? 'Connect the workspace relay and a machine to work on the code here.'}</span></span>
         </div>
       )}
-      {!repoRow && !codeSession && (
-        <div className="engnotice engruntime codingnotice warning" role="status">
-          <span className="engnoticeico"><IconAlert s={14} /></span>
-          <span className="engnoticecopy"><b>No repository</b><span>Connect a repository to this project. The coding runtime works on it here.</span></span>
-        </div>
-      )}
       <div className="convobody">
         <div className="convomain">
           <div className="tmsgs convomsgs" ref={listRef}>
-            <ThreadRows rows={prelude} agents={agents} repoName={repoName} onOpenTask={onOpenTask} />
+            <ThreadRows rows={prelude} agents={agents} repoName={repoName} onOpenTask={onOpenTask} answers={answersFor} hideNeeds={seatAsksGitHub} />
             {active ? <CodingTranscript session={active} /> : null}
-            <ThreadRows rows={postlude} agents={agents} repoName={repoName} onOpenTask={onOpenTask} />
+            <ThreadRows rows={postlude} agents={agents} repoName={repoName} onOpenTask={onOpenTask} answers={answersFor} />
           </div>
+          <GitHubSigns.Provider value={signs}>
           {active && act ? (
             <>
               <div className="gateseat">
-                <CodingGate session={active} threadId={threadId} channelId={channelId} title={title} repoRow={repoRow} repoName={repoName ?? 'the repository'} root={root?.body ?? null}
-                  unitId={unitId} hasTask={!!thread?.task_id} onApproval={act.approve} onReviewChanges={reviewChanges} onContinueInAct={act.continueInAct} onDismissHandoff={act.dismissHandoff} onMade={setMade} />
+                <CodingGate session={active} threadId={threadId} channelId={channelId} room={channelSlug} title={title} repoRow={repoRow} repoName={repoName ?? 'the repository'} root={root?.body ?? null}
+                  unitId={unitId} hasTask={!!thread?.task_id} onApproval={act.approve} onReviewChanges={reviewChanges} onContinueInAct={act.continueInAct} onDismissHandoff={act.dismissHandoff} onMade={setMade} onReopen={() => engineering.reopen(active)} />
               </div>
               <div className="tcompose"><CodingComposer session={active} project={project} plan={plan} onUpgrade={onUpgrade} machineChip={machineChip}
                 onSend={act.send} onMode={act.mode} onPermission={act.permission} onModel={act.model} /></div>
             </>
+          ) : !repoRow && !codeSession ? (
+            // no repository in the room's read: the GitHub gate, whose pick or door reads the repositories again,
+            // and adopt then opens the session on the root message (docs/design/repo-connect-2026-10)
+            <div className="gateseat"><GitHubGate channelId={channelId} room={channelSlug} repoName={null} folder={false} onConnected={onReposChanged} /></div>
           ) : (
-            <div className="tcompose"><div className="cbox codingbox waiting"><div className="chint coding"><span className="chintcode" aria-hidden><IconCode s={13} /></span><span>{repoRow ? `The coding runtime opens on ${repoName}…` : 'This conversation needs a repository first.'}</span></div></div></div>
+            <div className="tcompose"><div className="cbox codingbox waiting"><div className="chint coding"><span className="chintcode" aria-hidden><IconCode s={13} /></span><span>{`The coding runtime opens on ${repoName}…`}</span></div></div></div>
           )}
+          </GitHubSigns.Provider>
         </div>
       </div>
     </div>

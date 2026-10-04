@@ -6,6 +6,7 @@
 // the project's repository through the same leaf, for the same reason: the two store files are
 // at their caps, and the App's tables already live here.
 import type postgres from 'postgres';
+import { GITHUB_NEED_PREFIX } from '@neuramesh/shared';
 
 export type AnnounceStatus = 'queued' | 'reading' | 'drafting' | 'ready' | 'failed';
 export interface AnnouncePost { platform: 'x' | 'linkedin' | 'instagram' | 'tiktok'; body: string; imageBrief?: string }
@@ -50,17 +51,37 @@ export interface AnnounceStore {
   /** `selection: 'all'` = every repository of the account reads through it (0142); `workspaceId` names
    *  the workspace whose member granted it, when the grant came through the app rather than the door */
   upsertInstallation(input: { installationId: number; account: string; repos: string[]; selection?: 'all' | 'selected'; workspaceId?: string | null }): Promise<void>;
-  /** the installation that reads `owner/repo`: named in its list, or its account on an all-repositories grant */
-  installationForRepo(slug: string): Promise<{ installationId: number } | null>;
+  /** the installation that reads `owner/repo`: named in its list, or its account on an all-repositories grant.
+   *  `unrecorded`: only a grant no workspace recorded (the public door's, or a read's repair) */
+  installationForRepo(slug: string, opts?: { unrecorded?: boolean }): Promise<{ installationId: number } | null>;
   /** a row GitHub answers 404 for is dead: forgotten, so it never wins a lookup again */
   forgetInstallation(installationId: number): Promise<void>;
   /** the installations a member of this workspace granted through the app: what the pick lists (plan §7) */
   installationsForWorkspace(workspaceId: string): Promise<Installation[]>;
-  /** the connector's repository for the room's project: the one with a GitHub address first (a folder
-   *  attached from a desktop is `local`, unreadable by the App), the primary among those, with the
-   *  workspace the row belongs to. Null when the room has none. */
+  /** the connector's repository for the room's project: the one the project's GitHub row names first
+   *  while it is connected or waits for a new grant (a pick beside the primary is the one the reads
+   *  use, and the reconnect words name it too), then the one with a GitHub address (a folder attached
+   *  from a desktop is `local`, unreadable by the App), the primary among those, with the workspace
+   *  the row belongs to. A revoked row names nothing. Null when the room has none. */
   repoForChannel(channelId: string): Promise<PrimaryRepo | null>;
+  /** the open GitHub cards in the rooms of this room's project, oldest first: what the grant resumes
+   *  (github-resume.ts, docs/design/repo-connect-2026-10). A card is a row whose message holds the
+   *  nmneed block, so an agent's own question with the same prefix never resumes. The card's message
+   *  names its conversation, and a task card carries the reason of the task's last block. */
+  openGitHubNeeds(channelId: string): Promise<GitHubNeed[]>;
 }
+export interface GitHubNeed { decisionId: string; channelId: string; taskId: string | null; threadId: string | null; blockReason: string | null }
+/** what the memory twins read: the parent store's rows, lent by a closure */
+export interface NeedWorld {
+  decisions: Array<{ id: string; channel: string; taskId: string | null; messageId: string; question: string; status: string; createdAt: string }>;
+  messages: Array<{ id: string; threadId?: string | null; body: string }>;
+  channels: Array<{ id: string; workspace: string; projectId: string | null }>;
+  connectors: Array<{ workspace: string; projectId: string | null; provider: string; handle: string; status: string }>;
+  events: Array<{ type: string; target: string; workspace: string; payload: Record<string, unknown> }>;
+  tasks: ReadonlyMap<string, { workspace: string; number: number }>;
+}
+/** the GitHub card's block, as the message carries it (shared needBlock) */
+const NEED_FENCE = '```nmneed';
 export interface PrimaryRepo { workspaceId: string; projectId: string | null; repoId: string; orgName: string; name: string; cloneUrl: string | null; provider: string | null }
 export interface Installation { installationId: number; account: string; repos: string[]; selection: 'all' | 'selected' }
 /** a repository row the App could read: a clone URL, or an org that is not the desktop's `local` */
@@ -70,7 +91,24 @@ const norm = (s: string): string => s.trim().toLowerCase();
 
 // ── memory ─────────────────────────────────────────────────────────────────────────────────────
 export class MemAnnounceStore implements AnnounceStore {
+  constructor(private readonly world: () => NeedWorld = () => ({ decisions: [], messages: [], channels: [], connectors: [], events: [], tasks: new Map() })) {}
   rows: Array<AnnouncementRow & { ipHash: string | null; image?: { bytes: Uint8Array; mime: string } }> = [];
+  async openGitHubNeeds(channelId: string): Promise<GitHubNeed[]> {
+    const w = this.world();
+    const here = w.channels.find((c) => c.id === channelId);
+    if (!here) return [];
+    const rooms = new Set(w.channels.filter((c) => c.workspace === here.workspace && c.projectId === here.projectId).map((c) => c.id));
+    const blockReason = (taskId: string | null): string | null => {
+      const t = taskId ? w.tasks.get(taskId) : undefined;
+      const reason = t && w.events.filter((e) => e.type === 'task.blocked' && e.workspace === t.workspace && e.target === `task:${t.number}`).at(-1)?.payload['reason'];
+      return typeof reason === 'string' ? reason : null;
+    };
+    return w.decisions
+      .map((d) => ({ d, m: w.messages.find((m) => m.id === d.messageId) }))
+      .filter(({ d, m }) => d.status === 'open' && rooms.has(d.channel) && d.question.startsWith(GITHUB_NEED_PREFIX) && !!m?.body.includes(NEED_FENCE))
+      .sort((a, b) => a.d.createdAt.localeCompare(b.d.createdAt))
+      .map(({ d, m }) => ({ decisionId: d.id, channelId: d.channel, taskId: d.taskId, threadId: m?.threadId ?? null, blockReason: blockReason(d.taskId) }));
+  }
   installations: Array<{ installationId: number; account: string; repos: string[]; selection: 'all' | 'selected'; workspaceId: string | null }> = [];
   /** the memory world tracks no project_repos: a test seeds the room's repository here */
   repoLinks: Array<{ channelId: string } & PrimaryRepo> = [];
@@ -79,7 +117,10 @@ export class MemAnnounceStore implements AnnounceStore {
   linkRoom(link: { channelId: string } & PrimaryRepo): void { if (!this.repoLinks.some((l) => l.channelId === link.channelId && l.repoId === link.repoId)) this.repoLinks.push(link); }
   async repoForChannel(channelId: string): Promise<PrimaryRepo | null> {
     const links = this.repoLinks.filter((r) => r.channelId === channelId);
-    const hit = links.find(hasGitHubAddress) ?? links[0];
+    const w = this.world();
+    const room = w.channels.find((c) => c.id === channelId);
+    const named = room && w.connectors.find((k) => k.workspace === room.workspace && k.projectId === room.projectId && k.provider === 'github' && (k.status === 'connected' || k.status === 'reauth_required'))?.handle.toLowerCase();
+    const hit = links.find((l) => `${l.orgName}/${l.name}`.toLowerCase() === named) ?? links.find(hasGitHubAddress) ?? links[0];
     return hit ? { workspaceId: hit.workspaceId, projectId: hit.projectId, repoId: hit.repoId, orgName: hit.orgName, name: hit.name, cloneUrl: hit.cloneUrl, provider: hit.provider } : null;
   }
   async create(input: AnnounceCreate): Promise<{ id: string } | null> {
@@ -119,9 +160,9 @@ export class MemAnnounceStore implements AnnounceStore {
     if (hit) { hit.account = input.account; hit.repos = repos; hit.selection = input.selection ?? hit.selection; if (input.workspaceId) hit.workspaceId = input.workspaceId; }
     else this.installations.push({ installationId: input.installationId, account: input.account, repos, selection: input.selection ?? 'selected', workspaceId: input.workspaceId ?? null });
   }
-  async installationForRepo(slug: string): Promise<{ installationId: number } | null> {
+  async installationForRepo(slug: string, opts: { unrecorded?: boolean } = {}): Promise<{ installationId: number } | null> {
     const s = norm(slug);
-    const hit = this.installations.find((i) => i.repos.includes(s) || (i.selection === 'all' && norm(i.account) === s.split('/')[0]));
+    const hit = this.installations.find((i) => (!opts.unrecorded || i.workspaceId === null) && (i.repos.includes(s) || (i.selection === 'all' && norm(i.account) === s.split('/')[0])));
     return hit ? { installationId: hit.installationId } : null;
   }
   async forgetInstallation(installationId: number): Promise<void> { this.installations = this.installations.filter((i) => i.installationId !== installationId); }
@@ -204,10 +245,10 @@ export class PgAnnounceStore implements AnnounceStore {
       on conflict (installation_id) do update set account = excluded.account, repos = excluded.repos, selection = excluded.selection,
         workspace_id = coalesce(excluded.workspace_id, github_installations.workspace_id), updated_at = now()`;
   }
-  async installationForRepo(slug: string): Promise<{ installationId: number } | null> {
+  async installationForRepo(slug: string, opts: { unrecorded?: boolean } = {}): Promise<{ installationId: number } | null> {
     const s = norm(slug);
     const [row] = await this.sql`select installation_id from github_installations
-      where ${s} = any(repos) or (selection = 'all' and lower(account) = ${s.split('/')[0] ?? ''})
+      where (${s} = any(repos) or (selection = 'all' and lower(account) = ${s.split('/')[0] ?? ''})) and (${!opts.unrecorded}::boolean or workspace_id is null)
       order by updated_at desc limit 1`;
     return row ? { installationId: Number(row['installation_id']) } : null;
   }
@@ -219,10 +260,28 @@ export class PgAnnounceStore implements AnnounceStore {
     return rows.map((r) => ({ installationId: Number(r['installation_id']), account: r['account'] as string, repos: (r['repos'] as string[] | null) ?? [], selection: r['selection'] === 'all' ? 'all' as const : 'selected' as const }));
   }
   async repoForChannel(channelId: string): Promise<PrimaryRepo | null> {
+    // one connectors row per (workspace, project, provider): the join never doubles a repository
     const [row] = await this.sql`select c.workspace_id, c.project_id, r.id as repo_id, r.org_name, r.name, r.clone_url, r.provider
       from channels c join project_repos pr on pr.project_id = c.project_id join repos r on r.id = pr.repo_id
+      left join connectors k on k.workspace_id = c.workspace_id and k.project_id = c.project_id and k.provider = 'github' and k.status in ('connected', 'reauth_required')
       where c.id = ${channelId}::uuid
-      order by (r.clone_url is not null or (r.org_name <> 'local' and r.provider <> 'local')) desc, pr.is_primary desc, r.org_name, r.name limit 1`;
+      order by (lower(r.org_name || '/' || r.name) = lower(k.handle)) is true desc,
+        (r.clone_url is not null or (r.org_name <> 'local' and r.provider <> 'local')) desc, pr.is_primary desc, r.org_name, r.name limit 1`;
     return row ? { workspaceId: row['workspace_id'] as string, projectId: (row['project_id'] as string | null) ?? null, repoId: row['repo_id'] as string, orgName: row['org_name'] as string, name: row['name'] as string, cloneUrl: (row['clone_url'] as string | null) || null, provider: (row['provider'] as string | null) ?? null } : null;
+  }
+  async openGitHubNeeds(channelId: string): Promise<GitHubNeed[]> {
+    const rows = await this.sql<Array<{ decision_id: string; channel_id: string; task_id: string | null; thread_id: string | null; block_reason: string | null }>>`
+      select d.id as decision_id, d.channel_id, d.task_id, m.thread_id,
+             (select e.payload->>'reason' from events e where e.task_id = d.task_id and e.type = 'task.blocked' order by e.ts desc, e.id desc limit 1) as block_reason
+        from decisions d
+        join messages m on m.id = d.message_id
+        join channels c on c.id = d.channel_id
+        join channels here on here.id = ${channelId}::uuid
+       where d.status = 'open' and d.workspace_id = here.workspace_id
+         and c.project_id is not distinct from here.project_id
+         and d.question like ${`${GITHUB_NEED_PREFIX}%`} and strpos(m.body, ${NEED_FENCE}) > 0
+       order by d.created_at
+       limit 50`;
+    return rows.map((r) => ({ decisionId: r.decision_id, channelId: r.channel_id, taskId: r.task_id, threadId: r.thread_id, blockReason: r.block_reason }));
   }
 }

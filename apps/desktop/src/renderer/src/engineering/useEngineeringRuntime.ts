@@ -8,6 +8,7 @@ import {
   setEngineeringMode,
   setEngineeringPermission,
   submitEngineeringPrompt,
+  type EngineeringAttachment,
   type EngineeringRepo,
   type EngineeringSession,
   type PermissionCategory,
@@ -30,6 +31,9 @@ const sendCommand = (handle: Handle | null, command: Parameters<Handle['send']>[
   if (!handle) { failed(new Error('The Code workspace connection is unavailable.')); return; }
   void handle.send(command).catch(failed);
 };
+/** a prompt from the composer runs a turn, so the session waits on GitHub no more: a new refusal sets the wait again */
+export const beginComposerPrompt = (session: EngineeringSession, prompt: string, attachments: EngineeringAttachment[] = []): EngineeringSession =>
+  ({ ...beginRemoteEngineeringPrompt(session, prompt, attachments), blockedOn: null });
 
 export function useEngineeringRuntime(harness: boolean, repos: EngineeringRepo[], workspaceId: string, initialActiveId: string | null = null, defaultMachineId: string | null = null) {
   const [sessions, setSessions] = useState<EngineeringSession[]>(() => loadEngineeringSessions(workspaceId, repos));
@@ -169,9 +173,19 @@ export function useEngineeringRuntime(harness: boolean, repos: EngineeringRepo[]
     if (harness) return;
     const handle = connect(created); if (handle) void sendEngineeringPrompt(handle, text, []).catch((error: unknown) => fail(spec.id, error)); else fail(spec.id, new Error('The Code workspace connection is unavailable.'));
   };
+  /** the GitHub grant landed (docs/design/repo-connect-2026-10): the session opens again, and its first
+   *  prompt runs, because the machine refused the open before it read a word */
+  const reopen = (session: EngineeringSession) => {
+    handles.current.get(session.id)?.close(); handles.current.delete(session.id);
+    const prompt = session.messages.find((m) => m.role === 'user')?.body.trim() ?? '';
+    const next: EngineeringSession = { ...session, blockedOn: null, state: prompt ? 'streaming' : 'resumable', updatedAt: new Date().toISOString() };
+    update(next);
+    const handle = connect(next);
+    if (handle && prompt) void sendEngineeringPrompt(handle, prompt, []).catch((error: unknown) => fail(next.id, error));
+  };
   const send = (session: EngineeringSession, prompt: string, uploads: EngineeringAttachmentUpload[] = []) => {
     const handle = connect(session); if (!handle) return;
-    update(beginRemoteEngineeringPrompt(session, prompt, uploads.map(({ name, mime }) => ({ name, mime }))));
+    update(beginComposerPrompt(session, prompt, uploads.map(({ name, mime }) => ({ name, mime }))));
     void sendEngineeringPrompt(handle, prompt, uploads).catch((error: unknown) => fail(session.id, error));
   };
   const setMode = (session: EngineeringSession, mode: 'plan' | 'act') => {
@@ -209,5 +223,5 @@ export function useEngineeringRuntime(harness: boolean, repos: EngineeringRepo[]
     if (Number.isInteger(checkpointRunCount) && checkpointRunCount > 0) sendCommand(connect(session), { type: 'restore', checkpointRunCount }, (error) => fail(session.id, error));
   };
   const home = () => { closeInactiveEngineeringHandles(handles.current, sessions, null); setActiveId(null); };
-  return { sessions, active: sessions.find((session) => session.id === activeId) ?? null, runtime, reason, update, create, start, open, adopt, home, send, setMode, continueInAct, dismissModeHandoff, setPermission, setModel, approve, restore };
+  return { sessions, active: sessions.find((session) => session.id === activeId) ?? null, runtime, reason, update, create, start, open, adopt, reopen, home, send, setMode, continueInAct, dismissModeHandoff, setPermission, setModel, approve, restore };
 }

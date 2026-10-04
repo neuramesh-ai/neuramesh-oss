@@ -124,12 +124,16 @@ not offer, so ids retire in the same change as the reseat and never before it.
 Three findings from this pass worth carrying:
 
 - **`gpt-6-astra` needs codex-cli 0.153.0 or newer.** This is the `gpt-5.6-luna` trap from the
-  2026-07-17 pass, and it is now closed rather than avoided: `CODEX_MIN_VERSION` in
-  `apps/desktop/src/main/runtime/cli.ts` makes `ensureCli` probe `codex --version`, upgrade the CLI
-  when it is below the floor, re-probe, and fail loudly if the machine is still too old. Before
-  this, an old PATH binary would have rejected the model and `runResilient` would have retried the
-  turn on the account default, silently. Smoke evidence for all three OpenAI ids is in
+  2026-07-17 pass, and it is now closed rather than avoided: the codex `minVersion` in
+  `apps/desktop/src/main/runtime/cli.ts` (`cliFloor('codex')`) makes `ensureCli` probe
+  `codex --version`, upgrade the CLI when it is below the floor, re-probe, and fail loudly if the
+  machine is still too old. Before this, an old PATH binary would have rejected the model and
+  `runResilient` would have retried the turn on the account default, silently. Smoke evidence for
+  all three OpenAI ids is in
   [docs/design/model-benchmarks-2026-09/serving-smokes.md](design/model-benchmarks-2026-09/serving-smokes.md).
+  The cloud machine image installs codex at or above the same floor, and `cliversion.test.ts` fails
+  a Dockerfile pin below it. The pin stayed at 0.146.1 until 2026-10-03, so a GPT turn on a
+  machine had to upgrade codex before it could run.
 - **`gpt-5.6-luna` stays out**, now on the founder rule rather than on serving: a lite-tier model
   holds no working seat, so offering it would only invite a bad manual pick.
 - **There is still no Gemini 3.5 Pro or 3.8 Pro in the API.** The 3.5 line shipped Flash and Live

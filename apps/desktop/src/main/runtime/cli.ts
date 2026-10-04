@@ -24,6 +24,11 @@ const CLI: Record<string, { bin: string; pkg: string; minVersion?: string }> = {
   gemini: { bin: 'agy', pkg: '' },
 };
 
+/** the version a runtime's CLI is upgraded to when the machine's copy is older, if it has a floor */
+export function cliFloor(runtime: string): string | undefined {
+  return CLI[runtime]?.minVersion;
+}
+
 /** numeric-segment compare: '0.145.0' < '0.153.0' < '0.153.4'. Non-numeric suffixes are ignored. */
 export function versionBelow(have: string, want: string): boolean {
   const parts = (v: string): number[] => v.split('.').map((n) => Number.parseInt(n, 10) || 0);

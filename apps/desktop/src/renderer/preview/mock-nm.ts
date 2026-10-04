@@ -7,8 +7,9 @@ import { openConnectionsSettings, openMoveToCloud, openUpgrade } from '../src/li
 import { FLOW, FRESH_CLOUD, HAS_INVITE, LIVE_RUNS, MOCK_WS_ID, MSG_DELAY, NOKEY, TERM_PALETTE_PROOF, agents, allTasks, artWatchers, artifacts, baseThreadRows, beatsByTask, chanRunWatchers, channels, convoMsgs, convoWatchers, customPacks, decisionWatchers, designProviders, emitLog, emitMockStream, failoverWatchers, historyAllWatchers, homeIsClear, mockCodeSessions, codeSessionsWatchers, liveTerms, logWatchers, logs, machines, members, memoryBlock, mockArticleArt, mockConnectors, mockContentItems, mockConvoAtts, mockDecisions, mockFailover, mockMcpPresence, mockReplyCounts, mockRuns, mockSchedules, mockThreadArts, mockThreads, mockUpdateState, mockWhiteboards, mockWorkRuns, mockWorkspaces, msgWatchers, msgsByChannel, noop, notifyProcs, openMockTerm, openRunWatchers, packs, pingArts, pingConvo, pingDecisions, pingFailover, pingOpenRuns, pingTasksAll, pingThreads, pingWb, procWatchers, projects, promotedArtifacts, releaseBriefArt, roomMessagesFor, rosterWatchers, screen, seedIso, setMockFailover, skills, streamWatchers, stripThumb, t, taskChanWatchers, taskThreadExtra, taskThreadWatchers, tasksAllWatchers, tasksByChannel, threadWatchers, threadsAllSnapshot, threadsAllWatchers, wbListWatchers, wbRowWatchers, wbRowsFor, wsLibraryRows, libAllWatchers, deleteMockArtifact, DOOR_REPOS, DOOR_SCHEDULE_RUNS } from './mock-fixtures';
 import { marketingArtifacts, marketingSchedules } from './mock-marketing'; import { UGC_FILM } from './mock-ugc';
 import { CONNS, connectionList, foregroundTasks, foregroundThreads, mockForeground, mockForegroundWorkspace, railRowsSnapshot, swapForeground, watchForeground } from './mock-connections';
-import { githubLanes } from './mock-github';
+import { githubLanes } from './mock-github'; import { codeGateLanes, codeGateRepos, repoConnectArc, resolveWithResume } from './mock-repo-connect';
 import { worktreeRemoveMock, worktreesFixture } from './mock-worktrees';
+import { mockRunsFor, routineRun } from './mock-routines'; mockWorkRuns.push(routineRun); // today's routine run is live (one session per routine)
 
 // Mutable harness state the bridge REASSIGNS — it must live here, not in the fixture
 // module: an ESM import is a read-only binding, so `mockInvites = []` from another
@@ -44,18 +45,6 @@ let planLimitCb: ((p: { message: string }) => void) | null = null;
 // sheet in its waiting state (C2) — `?upgrade=1` opens the sheet, `?upgrade=waiting` presses Get Pro
 let upgradeCb: ((p: { phase: string; url?: string; message?: string }) => void) | null = null;
 const upgradeSeed = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('upgrade') : null;
-
-// 0119: the conversations an automation's slots opened — what the card's reveal lists.
-const mockScheduleRuns: Record<string, Array<{ id: string; title: string; last_body: string; created_at: string; updated_at: string; channel_id: string; channel_slug: string; msg_count: number }>> = { ...DOOR_SCHEDULE_RUNS,
-  'sch-dev-1': [
-    { id: 'th-run-1', title: 'Routine — Morning dependency audit', last_body: 'The prompt landed at 09:00 and nobody picked it up.', created_at: new Date(Date.now() - 3 * 3600e3).toISOString(), updated_at: new Date(Date.now() - 3 * 3600e3).toISOString(), channel_id: 'c-dev', channel_slug: 'dev', msg_count: 1 },
-    { id: 'th-run-2', title: 'Routine — Morning dependency audit', last_body: '3 majors and 1 CVE (lodash 4.17.20 → GHSA-35jh). Filed #1071 for the CVE; the majors can wait for the next window.', created_at: new Date(Date.now() - 27 * 3600e3).toISOString(), updated_at: new Date(Date.now() - 26 * 3600e3).toISOString(), channel_id: 'c-dev', channel_slug: 'dev', msg_count: 4 },
-    { id: 'th-run-3', title: 'Routine — Morning dependency audit', last_body: 'Clean sweep — no new CVEs. Two minors behind (vite, esbuild); neither is on a breaking line.', created_at: new Date(Date.now() - 51 * 3600e3).toISOString(), updated_at: new Date(Date.now() - 50 * 3600e3).toISOString(), channel_id: 'c-dev', channel_slug: 'dev', msg_count: 9 },
-    { id: 'th-run-4', title: 'Routine — Morning dependency audit', last_body: 'One CVE in the transitive tree (tar). Already patched upstream; bumped and pushed to nm/dep-audit.', created_at: new Date(Date.now() - 75 * 3600e3).toISOString(), updated_at: new Date(Date.now() - 75 * 3600e3).toISOString(), channel_id: 'c-dev', channel_slug: 'dev', msg_count: 3 },
-  ],
-  // fired twelve times, all of them before 0119 linked threads — the honest empty the panel names
-  'sch-dev-2': [],
-};
 
 // ?localstack=<phase> seeds Local mode's first-run card (main/localStack/driver.ts states) so every
 // state is capturable in both themes; `ready` (or ?conn=local) is the shell on a local connection.
@@ -321,9 +310,9 @@ const explicit: Record<string, any> = {
   },
   // mirrors the real handler (sync.ts): `null` = every room, and every row carries the room it
   // fires into so the Automations destination can tag it and scope it to the active project
-  scheduleRuns: async (scheduleId: string, limit?: number) => ({
-    runs: (mockScheduleRuns[scheduleId] ?? []).slice(0, limit ?? 8),
-  }),
+  // mirrors web/webnm-sessionruns.ts: a routine's runs and the rows their strips count (mock-routines.ts)
+  scheduleRuns: async (scheduleId: string, limit?: number) => mockRunsFor(scheduleId, limit ?? 8, { threads: Object.values(mockThreads).flat(), convoMsgs, tasks: allTasks, decisions: mockDecisions, items: mockContentItems, arts: mockThreadArts, runs: mockWorkRuns, legacy: DOOR_SCHEDULE_RUNS }) as never,
+  scheduleRunNow: async (scheduleId: string) => { const s = mockSchedules.find((x) => x.id === scheduleId); if (s) s.next_run_at = new Date().toISOString(); return { ok: true }; },
   schedules: async (channelId: string | null) => ({
     schedules: [...mockSchedules, ...marketingSchedules]
       .filter((s) => channelId === null || s.channelId === channelId)
@@ -369,7 +358,7 @@ const explicit: Record<string, any> = {
   // connectors: Connect "finishes in the browser" after a beat, and the GitHub resolve (mock-github.ts;
   // the two entries stay literal here for the drift guard)
   connectorStart: githubLanes(mockConnectors).connectorStart,
-  githubResolve: githubLanes(mockConnectors).githubResolve,
+  githubResolve: resolveWithResume(githubLanes(mockConnectors).githubResolve), ...codeGateLanes, // the grant's resume + the coding gate (mock-repo-connect.ts)
   // the \u2039article:id\u203a card's self-read (article round) + its OS-browser export
   artifact: async (artifactId: string) => { const hit = [mockArticleArt, releaseBriefArt].find((a) => a.id === artifactId); return { artifact: hit ? { ...hit } : null }; },
   articleExternal: async () => ({ ok: true }),
@@ -402,7 +391,7 @@ const explicit: Record<string, any> = {
     }
     return {};
   },
-  channelMeta: async (channelId: string) => ({ projects: projects.map((p) => ({ id: p.id, name: p.name, slug: p.slug, is_default: p.is_default })), repos: channelId === 'cf-marketing' ? DOOR_REPOS : [{ id: 'r1', provider: 'github', org_name: 'acme', name: 'marketing-site', default_branch: 'main', local_path: null, project_ids: 'p-acme', primary_project_ids: 'p-acme' }, { id: 'r2', provider: 'local', org_name: 'local', name: 'flowe-mobile', default_branch: 'feat/nav', local_path: '~/code/flowe-mobile', project_ids: 'p-flowe', primary_project_ids: 'p-flowe' }] }),
+  channelMeta: async (channelId: string) => ({ projects: projects.map((p) => ({ id: p.id, name: p.name, slug: p.slug, is_default: p.is_default })), repos: codeGateRepos(channelId === 'cf-marketing' ? DOOR_REPOS : [{ id: 'r1', provider: 'github', org_name: 'acme', name: 'marketing-site', default_branch: 'main', local_path: null, project_ids: 'p-acme', primary_project_ids: 'p-acme' }, { id: 'r2', provider: 'local', org_name: 'local', name: 'flowe-mobile', default_branch: 'feat/nav', local_path: '~/code/flowe-mobile', project_ids: 'p-flowe', primary_project_ids: 'p-flowe' }]) }),
   repoAdd: async (_opts: { url?: string; localPath?: string; name?: string; channelSlug?: string; defaultBranch?: string }) => ({ ok: true, repoId: 'r-new', inserted: true }),
   pickFolder: async () => ({ path: '~/code/flowe-mobile', name: 'flowe-mobile', isGit: true, branch: 'feat/nav' }),
   // one fake worktree, shared by the dock editor's tree, the docs/36 file pane and its ⌘P walk.
@@ -699,7 +688,7 @@ const explicit: Record<string, any> = {
       (tr as any).last_author_kind = 'human';
       pingThreads(channelId); pingConvo(th);
       // flow mode: the story is paced from outside — record where it starts and stand down
-      if (FLOW) { flowState.threadId = th; flowState.channelId = channelId; return { id }; }
+      if (FLOW) { flowState.threadId = th; flowState.channelId = channelId; return { id }; } if (repoConnectArc(channelId, th, tr, body)) return { id }; // the GitHub card (mock-repo-connect.ts)
       // a card answer (`**q** → a` reply) just lands — no new rex arc, no auto-upgrade
       if (/^\*\*.*\*\* →/.test(body.trim())) return { id };
       const isQ = /\?\s*$/.test(body.trim());

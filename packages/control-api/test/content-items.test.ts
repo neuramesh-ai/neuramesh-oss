@@ -103,6 +103,48 @@ describe('content items — agents draft, humans publish', () => {
     expect(rb?.body).toBe('scheduled copy, tightened');
   });
 
+  // a draft with no conversation gets one (George, 2026-09-27): a tab or the phone opens a session
+  // with its picture ask, then moves the draft into it, so the next ask lands in the same place
+  it('content.anchor moves a draft with no home into a session in its own room, once, on a human word', async () => {
+    const channel = await makeRoom();
+    const items = () => (store as unknown as { contentItems: Array<{ id: string; threadId: string | null }> }).contentItems;
+    const born = async (room: string) => {
+      const threadId = crypto.randomUUID();
+      const r = await app.request('/v1/messages', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-nm-actor': JSON.stringify(george) },
+        body: JSON.stringify({ workspace: 'ws_acme', channel: room, threadId, body: 'Generate the image for “no home yet”\n\n‹gen-image:00000000›' }),
+      });
+      expect(r.status).toBe(200);
+      return threadId;
+    };
+    const c = await j(await send(plume, { type: 'content.create', channel, platform: 'x', body: 'no home yet' }));
+    const t1 = await born(channel);
+    expect((await send(plume, { type: 'content.anchor', item: c.itemId, thread: t1 })).status).toBe(403);
+    expect((await send(george, { type: 'content.anchor', item: c.itemId, thread: t1 })).status).toBe(200);
+    expect(items().find((x) => x.id === c.itemId)?.threadId).toBe(t1);
+    // an anchored draft never moves again
+    expect((await send(george, { type: 'content.anchor', item: c.itemId, thread: await born(channel) })).status).toBe(404);
+  });
+
+  it('content.anchor refuses a conversation in another room, and a draft that already rides a task', async () => {
+    const channel = await makeRoom();
+    const proj = await j(await send(george, { type: 'project.create', workspace: 'ws_acme', name: 'Other' }));
+    const elsewhere = (await j(await send(george, { type: 'channel.create', workspace: 'ws_acme', project: proj.projectId, slug: 'elsewhere' }))).channelId as string;
+    const threadId = crypto.randomUUID();
+    await app.request('/v1/messages', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-nm-actor': JSON.stringify(george) },
+      body: JSON.stringify({ workspace: 'ws_acme', channel: elsewhere, threadId, body: 'a session in another room' }),
+    });
+    const orphan = await j(await send(plume, { type: 'content.create', channel, platform: 'x', body: 'no home yet' }));
+    expect((await send(george, { type: 'content.anchor', item: orphan.itemId, thread: threadId })).status).toBe(404);
+    const onTask = await j(await send(plume, { type: 'content.create', channel, task: crypto.randomUUID(), platform: 'x', body: 'rides a task' }));
+    expect((await send(george, { type: 'content.anchor', item: onTask.itemId, thread: threadId })).status).toBe(404);
+    // the schema holds both ids to uuids, so a slug never reaches the store's cast
+    expect((await send(george, { type: 'content.anchor', item: 'not-a-uuid', thread: threadId })).status).toBe(400);
+  });
+
   it('approve keeps a future draft-ahead slot; explicit time overrides', async () => {
     const channel = await makeRoom();
     const slot = new Date(Date.now() + 20 * 60_000).toISOString();

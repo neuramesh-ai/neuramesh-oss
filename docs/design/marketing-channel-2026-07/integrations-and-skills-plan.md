@@ -102,6 +102,15 @@ the data path disclosed in the connect UI.
   Cost: these reads bill OUR X app (pay-per-use since Feb 2026, ~$0.005/post read), which is the
   price of one-click. Bounded per call (10–25 results, an agent tool call, never a poll); a
   per-workspace budget is the open follow-up.
+  - **2026-10-02, the top read.** George: the search returned low-engagement posts. With no
+    `sort_order`, X answers the newest first, so a routine read the newest page and missed every
+    popular post from earlier in the window. `search_x` now takes `order` (top by default:
+    `sort_order=relevancy`, X's engagement ranking, and the page comes back by impressions, then
+    likes. latest: `sort_order=recency`) and `hours` (a `start_time`, at most 167 hours back). A
+    call reads 10 to 100 posts, 25 by default. The tool teaches X's own engagement operators,
+    `min_likes:`, `min_reposts:` and `min_replies:` (the web's `min_faves:` and `min_retweets:` fail
+    with a 400). No operator filters impressions, so a bar in impressions is a `min_likes:` floor in
+    the query plus a filter after the read. At 100 posts a call costs about $0.50.
 
   X's XMCP is gone from `mkmcp.ts` entirely — that module now serves PostHog/Meta/TikTok only.
 

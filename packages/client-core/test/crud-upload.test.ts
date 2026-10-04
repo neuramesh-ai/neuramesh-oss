@@ -86,9 +86,10 @@ test('unknown tables are unhandled — the caller owns the policy', async () => 
   assert.equal(calls.length, 0);
 });
 
-// The hosted write gate (control-api hosted-gate.ts): a `free` hosted workspace answers the upload
-// lanes with 409 PLAN_LIMIT, the ONE status this uploader drops instead of retrying. A 402 (the
-// commands lane's shape) would throw here, and a throw holds every download behind it.
+// A 409 PLAN_LIMIT on an upload lane is the ONE status this uploader drops instead of retrying. The
+// hosted write gate that sent it was deleted on 2026-10-03 (the Pro trial writes), and the rule
+// stays for any server that still answers it. A 402 (the commands lane's shape) would throw here,
+// and a throw holds every download behind it.
 test('the hosted write gate: 409 PLAN_LIMIT is dropped on every lane, a 402 is retried', async () => {
   const gated = () => harness(409, JSON.stringify({ error: 'This workspace needs Pro. Your threads stay readable. Get Pro to write again.', code: 'PLAN_LIMIT' }));
   assert.equal(await uploadCrudEntry(gated().ident, op('messages', 'PUT', { channel_id: 'c1', body: 'typed into a gated room' })), 'uploaded');

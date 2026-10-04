@@ -8,6 +8,7 @@ import { spawn } from 'node:child_process';
 import type { LogFn } from '../agentlog';
 import type { TurnOpts, RuntimeAdapter, ProposeSkillFn, RecordLessonFn, AddBacklogItemFn, BeatsFn, AgentAttachment, PromptOverride, PermissionGate } from './adapter';
 import { agentBaseEnv, buildCodingPrompt, chatSystemPrompt, isInlineImage, sandboxFsEnabled } from './adapter';
+import { geminiThinking } from './thinking';
 import { instructionsFor } from '../host/turnkit';
 import { beatMarkerSink, stripBeatMarkers } from '../beats';
 import { openBusBridge, ensureAgyBus, userDataDir, beatsAdapter } from '../harness/turntools';
@@ -106,7 +107,7 @@ export const geminiAdapter: RuntimeAdapter = {
         contents: geminiContents(transcript, attachments),
         // instructionsFor, not agent.brief: local › baseline › shipped — a CLI seat honoring only
         // the synced brief silently ignored the machine's own overlay edits (2026-08-18 audit A6)
-        config: { systemInstruction: chatSystemPrompt(agent.name, channelSlug, instructionsFor(agent)), maxOutputTokens: 1500 },
+        config: { systemInstruction: chatSystemPrompt(agent.name, channelSlug, instructionsFor(agent)), maxOutputTokens: 1500, ...geminiThinking(agent) },
       });
       let text = '';
       for await (const chunk of stream) {
@@ -142,7 +143,7 @@ export const geminiAdapter: RuntimeAdapter = {
     const ud = userDataDir();
     ensureAgyBus(ud); // idempotent MERGE into agy's own mcp_config; inert outside a turn
     const bus = await openBusBridge(
-      { kind: opts?.turnKind ?? (promptOverride ? 'design' : 'work'), host: { dir, log, skills, proposeSkill, recordLesson, addBacklogItem, ...(beats ? { beats: beatsAdapter(beats) } : {}), ...(opts?.spawn ? { spawn: opts.spawn } : {}), ...(opts?.park ? { park: opts.park } : {}), ...(opts?.whiteboards ? { whiteboards: opts.whiteboards } : {}), ...(opts?.searchX ? { searchX: opts.searchX } : {}), ...(opts?.draftReplies ? { draftReplies: opts.draftReplies } : {}), ...(opts?.repo ? { repo: opts.repo } : {}) } },
+      { kind: opts?.turnKind ?? (promptOverride ? 'design' : 'work'), host: { dir, log, skills, proposeSkill, recordLesson, addBacklogItem, ...(beats ? { beats: beatsAdapter(beats) } : {}), ...(opts?.spawn ? { spawn: opts.spawn } : {}), ...(opts?.park ? { park: opts.park } : {}), ...(opts?.whiteboards ? { whiteboards: opts.whiteboards } : {}), ...(opts?.searchX ? { searchX: opts.searchX } : {}), ...(opts?.draftReplies ? { draftReplies: opts.draftReplies } : {}), ...(opts?.repo ? { repo: opts.repo } : {}), ...(opts?.web ? { web: opts.web } : {}) } },
       ud,
       log,
     );

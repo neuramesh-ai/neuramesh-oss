@@ -11,9 +11,8 @@
 import {
   APP_URL, b, button, card, esc, h1, h2, layout, linkline, monoList, p, quote, rule, small, stats, toText,
 } from './layout';
-import { inviteMeta, joinedMeta } from './templates-account';
+import { inviteMeta, joinedMeta, trialEndingMeta } from './templates-account';
 import { day1Meta, day3Meta, welcomeMeta } from './templates-lifecycle';
-import { hostedFreeNoticeMeta } from './templates-notice';
 import { announceReadyMeta } from './templates-announce';
 import { CLOUD_SEAT_MONTHLY_CREDITS, SIGNUP_GRANT_CREDITS } from '../rates';
 
@@ -248,9 +247,9 @@ export function renderBroadcast(v: {
 
 /** Registry for the preview harness + the golden-file test. */
 export const TEMPLATE_META: Record<string, TemplateMeta> = {
-  invite: inviteMeta, joined: joinedMeta, publishFailed: publishFailedMeta,
+  invite: inviteMeta, joined: joinedMeta, trialEnding: trialEndingMeta, publishFailed: publishFailedMeta,
   welcome: welcomeMeta, day1: day1Meta, day3: day3Meta, marketing: marketingMeta,
-  day7: day7Meta, digest: digestMeta, broadcast: broadcastMeta, hostedFreeNotice: hostedFreeNoticeMeta,
+  day7: day7Meta, digest: digestMeta, broadcast: broadcastMeta,
   announceReady: announceReadyMeta,
 };
 

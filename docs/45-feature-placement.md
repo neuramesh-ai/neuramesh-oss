@@ -26,7 +26,7 @@ and how a release reaches an installed app. [docs/07](07-billing-and-plans.md) i
   local stack on this Mac, no limits. The hosted cloud is where Pro lives: a cloud machine per
   member, invites, monthly credits, the browser client, the phone, connectors that publish. Since
   the first-run doors (2026-09-19, docs/07) a hosted workspace can also be on the `free` plan, with
-  the entitlements table's caps (one seat, three projects, no cloud machine, 500 credits once), on
+  the entitlements table's caps (one seat, three projects, one cloud machine, 500 credits once: the Pro trial), on
   the same surfaces. So **the tier names the surfaces the feature lives on** (Pro is the hosted
   side, Free is the local app), and **the plan** (`workspaces.plan`, `'free' | 'cloud'`, server
   truth, enforced in `handler.ts`) says whether a hosted feature is paid. Never in a prompt or a menu.

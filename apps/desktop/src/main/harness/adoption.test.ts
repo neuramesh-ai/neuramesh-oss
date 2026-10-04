@@ -112,8 +112,9 @@ test('the orchestrator spawn closure is actually PASSED at the wake call site', 
   // merely looks present — which is the same failure one layer down.
   assert.match(HOST, /spawn: orchSpawnFor\(/, 'the wake turn builds the closure');
   // the trailing onDelta closure is the live-bubble feed (2026-08-06 — before it, an
-  // orchestrator's reply never streamed and popped in whole)
-  assert.match(HOST, /orchestratorTurn\(agent, ch, transcript, token, undefined, olog, skills, att\.list, m\.thread_id \?\? null, wakeRun, \(t\) => emitChat\(t, false\)\)/,
+  // orchestrator's reply never streamed and popped in whole), and it carries the turn's thoughts
+  // beside the text (the repo-connect round's Option A)
+  assert.match(HOST, /orchestratorTurn\(agent, ch, transcript, token, undefined, olog, skills, att\.list, m\.thread_id \?\? null, wakeRun, \(t, th\) => emitChat\(t, false, th\)\)/,
     'and passes its run + the stream feed, so legs parent onto it and tokens reach the bubble');
 });
 

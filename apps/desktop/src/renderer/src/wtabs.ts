@@ -11,7 +11,7 @@
 // and migrateDockTabs is the door a user's open dock tabs walk through, so the upgrade that
 // retires the dock does not silently empty them.
 
-export type WTabKind = 'conversation' | 'file' | 'terminal' | 'browser' | 'review' | 'whiteboard';
+export type WTabKind = 'conversation' | 'file' | 'terminal' | 'browser' | 'review' | 'whiteboard' | 'task';
 
 /**
  * How a file renders itself — per FILE, not per app: the same tab flips its own mode.
@@ -38,10 +38,20 @@ export interface WTab {
   artifactId?: string | null;
   /** a whiteboard tab's IDENTITY (docs/38) — its own field, because persistW drops artifactId tabs */
   whiteboardId?: string | null;
+  /** a task tab's IDENTITY: a task named in a session, read beside it in the side panel (the side-panel round) */
+  taskId?: string | null;
   /** an artifact: a record of what an agent produced, never an editing surface */
   readOnly?: boolean;
   mode?: WTabMode;
   dirty?: boolean;
+  /**
+   * the session that opened this tab (the side-panel round, 2026-10-03): `task:<id>`, `thread:<id>`
+   * or `room:<id>`, and null for the workspace set (Home and the destinations). The side panel shows
+   * the tabs of the session in front of you only (shell/panel-state.ts).
+   */
+  owner?: string | null;
+  /** it arrived behind the front tab and you have not looked at it yet: the strip's dot. Never persisted. */
+  fresh?: boolean;
 }
 
 /** the strip's whole state — the tab set plus which one the content area is showing */
@@ -76,6 +86,9 @@ const conversationOf = (tabs: WTab[]): WTab | null => tabs.find((t) => t.kind ==
  *
  * The conversation is not openable here: it belongs to the room, and setConversation is the one
  * door that moves it. Asking for one lands on the one that already exists.
+ *
+ * Every rule above holds WITHIN ONE SESSION (the side-panel round, 2026-10-03): the owner is part
+ * of a tab's identity, so the same plan opened in two sessions is two tabs, one in each panel.
  */
 export function openTab(tabs: WTab[], spec: WTab): WTabState {
   if (spec.kind === 'conversation') return { tabs, activeId: conversationOf(tabs)?.id ?? null };
@@ -86,6 +99,7 @@ export function openTab(tabs: WTab[], spec: WTab): WTabState {
 
 function reuses(open: WTab, spec: WTab): boolean {
   if (open.kind !== spec.kind) return false;
+  if ((open.owner ?? null) !== (spec.owner ?? null)) return false;
   switch (spec.kind) {
     case 'file':
       // artifact-backed file tabs (a doc, an article) key on the ARTIFACT — one artifact is one
@@ -101,6 +115,9 @@ function reuses(open: WTab, spec: WTab): boolean {
     case 'whiteboard':
       // one board is one tab — the same reason one file is: a canvas mid-edit cannot fork in two
       return !!spec.whiteboardId && open.whiteboardId === spec.whiteboardId;
+    case 'task':
+      // one task is one tab in a session: a second `#N` click shows the tab you already have
+      return !!spec.taskId && open.taskId === spec.taskId;
     default:
       return false;
   }
@@ -118,10 +135,21 @@ export function closeTab(tabs: WTab[], activeId: string | null, id: string): WTa
   if (!tab || tab.kind === 'conversation') return { tabs, activeId };
   const next = [...tabs.slice(0, i), ...tabs.slice(i + 1)];
   if (activeId !== id) return { tabs: next, activeId };
-  // the RIGHT neighbour takes over — you keep moving forward through what you opened — else the
-  // left, else slot 0, which holds the conversation whenever there is one (see setConversation).
-  const heir = next[i] ?? next[i - 1] ?? next[0];
-  return { tabs: next, activeId: heir?.id ?? null };
+  // the RIGHT neighbour IN THE SAME SESSION takes over — you keep moving forward through what you
+  // opened — else the left one. Another session's tab is never an heir: it is not in this panel.
+  const owner = tab.owner ?? null;
+  const mine = (t: WTab | undefined) => !!t && t.kind !== 'conversation' && (t.owner ?? null) === owner;
+  const right = next.slice(i).find(mine);
+  const left = [...next.slice(0, i)].reverse().find(mine);
+  return { tabs: next, activeId: (right ?? left)?.id ?? null };
+}
+
+/**
+ * A conversation that becomes a task in place (its thread row gains a task) keeps what you opened
+ * beside it: the tabs move from the thread's session to the task's.
+ */
+export function rekeyOwner(tabs: WTab[], from: string, to: string): WTab[] {
+  return tabs.some((t) => t.owner === from) ? tabs.map((t) => (t.owner === from ? { ...t, owner: to } : t)) : tabs;
 }
 
 /** A stale id (⌘3 for a tab that just closed) leaves the surface where it is. */
@@ -213,7 +241,8 @@ export function setMode(tabs: WTab[], id: string, mode: WTabMode): WTab[] {
  * the way a revived pty is (docs/38).
  */
 export function serializeTabs(tabs: WTab[]): WTab[] {
-  return tabs.filter((t) => t.kind === 'file' || t.kind === 'browser' || t.kind === 'whiteboard').map(({ dirty, ...kept }) => kept);
+  // the owner persists (a revived tab returns to its session); the dot does not
+  return tabs.filter((t) => t.kind === 'file' || t.kind === 'browser' || t.kind === 'whiteboard').map(({ dirty, fresh, ...kept }) => kept);
 }
 
 /**
@@ -235,20 +264,26 @@ export function reviveTabs(raw: unknown): WTab[] {
     if (!id || ids.has(id)) continue;
     if (kind !== 'file' && kind !== 'browser' && kind !== 'whiteboard') continue;
     const path = str(row.path);
-    if (path && paths.has(path)) continue; // one file is one tab, at boot too
+    const owner = str(row.owner);
+    // one file is one tab IN ITS SESSION, at boot too
+    if (path && paths.has(`${owner ?? ''}|${path}`)) continue;
+    // a file tab with no path and no bytes was the old editor's pane on a folder. The Files tab is
+    // that tree now, so a stale one from an older build has nothing to show: drop it.
+    if (kind === 'file' && !path && !str(row.artifactId)) continue;
     const whiteboardId = str(row.whiteboardId);
     if (kind === 'whiteboard') {
       if (!whiteboardId) continue; // a board tab with no board is a blank pane — drop it
-      if (boards.has(whiteboardId)) continue; // one board is one tab, at boot too
-      boards.add(whiteboardId);
+      if (boards.has(`${owner ?? ''}|${whiteboardId}`)) continue; // one board is one tab in its session, at boot too
+      boards.add(`${owner ?? ''}|${whiteboardId}`);
     }
     const readOnly = row.readOnly === true;
     const mode = MODES.find((m) => m === row.mode);
     ids.add(id);
-    if (path) paths.add(path);
+    if (path) paths.add(`${owner ?? ''}|${path}`);
     out.push({
       id,
       kind,
+      owner,
       title: titleFor(str(row.title), path, str(row.url)),
       subtitle: str(row.subtitle),
       path,

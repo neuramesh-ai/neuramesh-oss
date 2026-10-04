@@ -163,6 +163,22 @@ test('moved a moment ago by THIS host: a second pass takes the seat silently eve
   assert.ok(calls.length > posted);
 });
 
+test('the next run of a routine is a new trigger: inside the memo window it reads the replica, so a switch the next run ended is made again, with its card', async () => {
+  // live on k3d (2026-09-29): Run now twice, 60 s apart. host/runsession.ts ended run one's switch, and
+  // run two took the NeuraMesh brain silently on this memo, so its brain was never written or said
+  rows['thread:t-routine'] = { id: 't-routine', schedule_id: 's1', brain_override: null };
+  await starterFallback(rex, expired, { workspace: 'ws', channelId: 'ch', threadId: 't-routine', replyTo: 'opener-1' });
+  const posted = calls.length;
+  // the second door of the SAME wake: the same trigger, so nothing is said twice
+  await starterFallback(rex, expired, { workspace: 'ws', channelId: 'ch', threadId: 't-routine', replyTo: 'opener-1' });
+  assert.equal(calls.length, posted);
+  // the next run: a new opener, and the replica reads null again
+  const again = await starterFallback(rex, expired, { workspace: 'ws', channelId: 'ch', threadId: 't-routine', replyTo: 'opener-2' });
+  assert.equal(again?.model, STARTER_MODEL);
+  assert.ok(calls.some((c, i) => i >= posted && c.body?.type === 'thread.set_brain'), 'the switch is written again');
+  assert.ok(calls.some((c, i) => i >= posted && typeof c.body?.body === 'string' && c.body.body.includes('continues on the NeuraMesh brain')), 'and said again');
+});
+
 test('already moved by an earlier pass: the seat is taken silently, nothing is posted twice', async () => {
   rows['thread:t-routine'] = { id: 't-routine', schedule_id: 's1', brain_override: JSON.stringify({ orchestrator: STARTER_MODEL }) };
   const next = await starterFallback(rex, expired, { workspace: 'ws', channelId: 'ch', threadId: 't-routine' });

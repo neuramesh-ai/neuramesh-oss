@@ -69,7 +69,7 @@ export function makeOrchSweeps(ctx: {
          (select name from agents a where a.id = t.assignee_id) as assignee,
          (select name from agents a where a.id = t.offered_agent_id) as offered,
          (select max(m.created_at) from messages m where m.task_id = t.id) as last_msg_at,
-         (select max(m.created_at) from messages m where m.task_id = t.id and m.author_kind = 'human') as last_human_msg_at,
+         (select max(m.created_at) from messages m where m.task_id = t.id and m.author_kind = 'human' and m.body not like '‹github:connected:%') as last_human_msg_at,
          (select max(b.updated_at) from beats b where b.task_id = t.id) as last_beat_at,
          (select max(r.updated_at) from runs r where r.task_id = t.id) as last_run_at,
          (select count(*) from runs r where r.task_id = t.id and r.state = 'running') as open_runs,

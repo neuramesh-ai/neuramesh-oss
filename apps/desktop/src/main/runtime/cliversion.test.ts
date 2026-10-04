@@ -8,7 +8,8 @@
 // model that runs, or the turn fails loudly.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { versionBelow } from './cli';
+import { existsSync, readFileSync } from 'node:fs';
+import { cliFloor, versionBelow } from './cli';
 
 test('the machine version this repo was written on is below the Astra floor', () => {
   // codex-cli 0.145.0 cannot serve gpt-6-astra; 0.153.0 is the first that can
@@ -53,4 +54,17 @@ test('an install outside npm prefix is not npm-managed', async () => {
 test('an unreadable npm prefix never claims the binary', async () => {
   const { isNpmManagedAt } = await import('./cli');
   assert.equal(isNpmManagedAt('/home/x/.local/bin/codex', ''), false);
+});
+
+// the machine image installs codex when it builds, and a pin under the floor sends every GPT turn
+// on a cloud machine through an upgrade first (npm, on a layer the next restart throws away). the
+// pin sat at 0.146.1 from #324 while the floor moved to 0.153.0. infra/ stays in the private
+// repository (scripts/public-tree.sh), so the public tree skips this.
+const machineDockerfile = new URL('../../../../../infra/images/machine/Dockerfile', import.meta.url);
+test('the machine image installs a codex at or above the floor', { skip: !existsSync(machineDockerfile) && 'infra/ is not in this tree' }, () => {
+  const pin = /@openai\/codex@(\d+\.\d+\.\d+)/.exec(readFileSync(machineDockerfile, 'utf8'))?.[1];
+  const floor = cliFloor('codex');
+  assert.ok(pin, 'the image pins a codex version');
+  assert.ok(floor, 'codex has a floor');
+  assert.equal(versionBelow(pin, floor), false, `the image installs codex ${pin}, below the floor ${floor}`);
 });
