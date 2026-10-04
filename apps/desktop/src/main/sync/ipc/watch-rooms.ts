@@ -10,10 +10,14 @@ import type { WatchDeps } from './watchdeps';
  *  SAME query for a background connection that this handler runs for the foreground, and the two cannot drift. */
 export const HISTORY_ALL_SQL = `select t.id, t.channel_id, c.slug as channel_slug, t.title, t.task_id, t.updated_at, t.schedule_id, t.settled_at, t.kind,
               (select m.body from messages m where m.thread_id = t.id order by m.created_at desc limit 1) as last_body,
-              -- the status inputs (shared/threadstatus.ts): who spoke last, and when
-              (select m.author_kind from messages m where m.thread_id = t.id order by m.created_at desc limit 1) as last_author_kind,
-              (select max(m.created_at) from messages m where m.thread_id = t.id) as last_at
+              -- the status inputs (shared/threadstatus.ts): who spoke last, and when. a routine's opener carries its
+              -- schedule and is posted as its owner: it opens a run, and it is never the person's word
+              (select m.author_kind from messages m where m.thread_id = t.id and m.schedule_id is null order by m.created_at desc limit 1) as last_author_kind,
+              (select max(m.created_at) from messages m where m.thread_id = t.id and m.schedule_id is null) as last_at,
+              -- the plan card's approver test (renderer cards/planapprover.ts): the schedule's payload and its own room's kind
+              s.payload as schedule_payload, sc.kind as schedule_room_kind
          from threads t join channels c on c.id = t.channel_id
+         left join schedules s on s.id = t.schedule_id left join channels sc on sc.id = s.channel_id
         where t.workspace_id = ? and t.archived_at is null
         order by t.updated_at desc limit 400`;
 
@@ -155,7 +159,7 @@ const { db, watchers, watchFailed, ws } = d;
     const sender: WebContents = event.sender;
     db().watch(
       // root_* (docs/31): the room message this thread hangs off, so the sheet can pin it
-      `select t.id, t.title, t.description, t.created_by, t.task_id, t.created_at, t.updated_at, t.root_message_id, t.mode, t.kind, t.brain_override, t.schedule_id,
+      `select t.id, t.title, t.description, t.created_by, t.task_id, t.created_at, t.updated_at, t.root_message_id, t.mode, t.kind, t.brain_override, t.schedule_id, t.settled_at,
               (select count(*) from messages m where m.thread_id = t.id) as msg_count,
               (select m.body from messages m where m.thread_id = t.id order by m.created_at desc limit 1) as last_body,
               (select m.body from messages m where m.id = t.root_message_id) as root_body,
@@ -180,7 +184,7 @@ const { db, watchers, watchFailed, ws } = d;
     db().watch(
       `select t.id, t.channel_id, c.slug as channel_slug, t.title, t.task_id, t.updated_at, t.schedule_id,
               (select count(*) from messages m where m.thread_id = t.id) as msg_count,
-              (select m.author_kind from messages m where m.thread_id = t.id order by m.created_at desc limit 1) as last_author_kind
+              (select m.author_kind from messages m where m.thread_id = t.id and m.schedule_id is null order by m.created_at desc limit 1) as last_author_kind
          from threads t join channels c on c.id = t.channel_id
         where t.workspace_id = ? and t.task_id is null and t.archived_at is null
         order by t.updated_at desc limit 30`,
@@ -240,7 +244,8 @@ const { db, watchers, watchFailed, ws } = d;
     watchers.set(subId, ac);
     const sender: WebContents = event.sender;
     db().watch(
-      `select m.id, m.author_kind, m.author_id, m.body, m.created_at, m.pinned, m.task_id
+      // schedule_id (0145): a routine's session splits into runs at the messages that carry it (thread/SessionRuns.tsx)
+      `select m.id, m.author_kind, m.author_id, m.body, m.created_at, m.pinned, m.task_id, m.schedule_id
          from messages m
         where m.thread_id = ?
            or (m.task_id is not null and m.task_id = (select t.task_id from threads t where t.id = ?))

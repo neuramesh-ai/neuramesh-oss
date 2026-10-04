@@ -19,6 +19,11 @@ export interface ReplyCardDeps {
 
 export interface ReplyCardInput { report?: string; baseline?: string; replies: unknown[] }
 
+/** the threads a card landed in, and when: the routine guarantee asks this before it distills one
+ *  (host/routinereplies.ts). In memory, because the replica may not hold the card yet */
+const posted = new Map<string, number>();
+export const cardPostedSince = (threadId: string, sinceMs: number): boolean => (posted.get(threadId) ?? 0) >= sinceMs;
+
 /** the prose above the fence — one line, so the card is what the eye lands on */
 export function replyCardLead(n: number): string {
   return `${n} conversation${n === 1 ? '' : 's'} worth joining, ranked by reach and fit:`;
@@ -37,7 +42,7 @@ export async function postReplyCard(deps: ReplyCardDeps, input: ReplyCardInput):
   const { post, actor, ch, anchor, draw } = deps;
   if (!anchor) return 'draft_replies needs a thread to deliver into — reply inside the conversation and hand them over there.';
   const items = cleanReplies(input.replies.map((r, i) => ({ ...(r as object), letter: String.fromCharCode(65 + i) })));
-  if (!items.length) return "None of those rows were usable: each needs a real permalink, the target post's own text, and a drafted reply.";
+  if (!items.length) return "None of those rows were usable: each needs a real permalink, the target post's own text, and a drafted reply. Fix the rows and call draft_replies again. Do NOT paste the replies into your message.";
   const data: NmReply = {
     channel: ch.id, items,
     ...(input.report ? { report: input.report } : {}),
@@ -46,6 +51,7 @@ export async function postReplyCard(deps: ReplyCardDeps, input: ReplyCardInput):
   const res = await post('/v1/messages', actor, { workspace: ch.workspace_id, channel: ch.id, ...anchor, body: replyCardBody(data) }).catch(() => null);
   const messageId = res?.ok ? ((await res.json().catch(() => null)) as { message?: { id?: string } } | null)?.message?.id : null;
   if (!messageId) return 'The card could not be posted — say so plainly rather than pasting the replies into your message.';
+  if ('threadId' in anchor) posted.set(anchor.threadId, Date.now());
   // pictures are drawn AFTER the card exists so each attaches to the card's own message; a
   // failed draw costs its image, never the card
   const { drawn, failed } = draw ? await drawInto(draw, messageId, items, input.replies) : { drawn: 0, failed: [] as string[] };

@@ -6,7 +6,7 @@
 // Fire-and-forget from the caller's point of view: a mail outage must never fail a sign-in.
 import { FREE_SEAT_CAP, TRIAL_LABEL, renderJoined, renderWelcome } from '@neuramesh/shared';
 import { ensureFirstWorkspace } from './first-workspace';
-import { APP_URL, sendEmail, unsubscribeUrl } from './mail';
+import { HQ_URL, sendEmail, unsubscribeUrl } from './mail';
 import type { Store } from './store';
 
 export interface AuthArrival {
@@ -50,7 +50,7 @@ export async function onAuthArrival(store: Store, a: AuthArrival): Promise<{ pen
     // wrong first email — whether or not they end up saying yes.
     if (a.isNew && a.email && pending.length === 0) {
       const rendered = renderWelcome({
-        downloadUrl: `${APP_URL}/downloads`,
+        openUrl: HQ_URL,
         unsubscribeUrl: unsubscribeUrl(a.userId),
       });
       await queueAndSend(store, {
@@ -76,7 +76,7 @@ export async function onInviteAccepted(
     const seatLine = a.plan === 'cloud' ? null : `${a.seatsUsed} of ${FREE_SEAT_CAP} · ${TRIAL_LABEL}`;
     const rendered = renderJoined({
       joinedEmail: a.joinedEmail, workspace: a.workspaceName, role: a.role,
-      seatLine, settingsUrl: `${APP_URL}/downloads`,
+      seatLine, openUrl: HQ_URL,
     });
     await queueAndSend(store, {
       workspace: a.workspaceId, toEmail: a.inviterEmail, template: 'joined',

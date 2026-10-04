@@ -172,6 +172,71 @@ fails if a stream open leaves the tab.
   on wherever `VITE_NM_RELAY_URL` is set.
 - `VITE_NM_RELAY_URL` unset keeps the web exactly as it was: no lane, no socket.
 
+## The browser lane: the cloud machine's own browser (2026-10-02)
+
+A site that refuses frames (x.com, a sign-in page) cannot show in the web panel's iframe. So the
+page runs in Chromium on the member's cloud machine, and only its pixels and its state travel, over
+a fourth lane, `browser` (board C3, `docs/design/models-and-replies-2026-10`). The same browser
+service gives the agents five tools: `web_open`, `web_read`, `web_click`, `web_type` and
+`web_screenshot` (`apps/desktop/src/main/browser/agent-tools.ts`).
+
+- **Frames.** The machine starts a CDP screencast (`Page.startScreencast`, JPEG) and sends each
+  frame as one JSON line in one data frame: `{ t: 'frame', n, w, h, jpeg }`. A frame never spans two
+  data frames. The machine keeps each one under `MAX_CHANNEL_DATA_B64_CHARS` (512 KB of base64). It
+  drops a frame that does not fit, and the page lowers its JPEG quality (60, 45, 30, 20), then its
+  size. The pane acks each frame it draws, and the machine holds at most two frames that a
+  viewer did not ack. Past that it keeps only the newest. A slow link sees a later picture, never a
+  queue, and the machine's outbound buffer stays far below the 8 MB that closes its socket.
+- **State and input.** `state` carries the url, the title, back, forward and loading. The pane sends
+  navigate, back, forward, reload, mouse, wheel, key, text, resize, tab and ack. The machine checks
+  every field of every message (`packages/shared/src/browser-lane.ts`) and drops a message with one
+  bad field.
+- **Gating.** It is the stream lane's rule, on both edges. The daemon names `browser` in its hello
+  only when it has a browser service. The hub refuses a `browser` open to a machine that did not
+  name it, and the client opens one only when `attached` names it, because an older daemon reads
+  the lane as a terminal. The lane has a budget of its own, apart from the 32 session slots: two
+  channels for each client socket and four for each machine (`packages/relay/src/browser-lane.ts`).
+  A viewer is not a session, so a tab left open does not keep a machine awake. A person who types
+  counts as activity for one minute, and so does an agent call in flight.
+- **Two browsers, never shared.** The person's browser belongs to the user the hub verified, never
+  to a name in the meta, with a profile on the state volume (`/nm/state/browser/person-<user>`), so
+  a sign-in survives the next wake. A teammate who opens the panel on the same machine gets a
+  browser of their own. The agents get one browser on a temporary profile that the service deletes
+  with it, and only the web tools drive it. The panel can watch the agents' tab and cannot steer it: the
+  machine drops every input on that tab, whatever the pane sends.
+- **No port.** Chromium speaks CDP over `--remote-debugging-pipe` (fds 3 and 4). A loopback
+  debugging port is one request away from every agent shell on the machine, and on a cloud machine
+  those shells run as root with no sandbox.
+- **The address guard.** Both browsers reach the web only through an egress proxy inside the daemon
+  (`browser/egress-proxy.ts`). The proxy resolves each name itself and refuses it when any answer
+  is private, loopback, link-local (the metadata server 169.254.169.254 first), unique-local IPv6,
+  or a cluster name (`*.internal`, `*.local`, `localhost`). Then it connects to the address it
+  checked, so a DNS answer that changes between the check and the connection cannot pass.
+  Navigation and agent calls run the same guard first, and only http and https open. QUIC and
+  WebRTC UDP are off, so no packet goes around the proxy. The platform's egress floor stays the
+  boundary under all of this.
+- **Idle.** Chromium starts on first use and stops after five minutes with no viewer and no agent
+  call. A machine with no Chromium (`/usr/bin/chromium`, or the binary `NM_CHROMIUM` names) serves
+  no `browser` lane and offers no web tools.
+- **The web pane** (`apps/hq/src/wtabs/RemoteBrowserPane.tsx`) dials the person's own machine, as
+  the shell does, and wakes it first. The refused card offers it only on the cloud plan, on a cloud
+  connection, with a machine on the relay.
+
+What the lane does not guard: an agent shell on the same machine can read the person's profile
+files on the state volume. Agents run as root there by design (the 2026-09-25 ruling), so "sign-ins
+stay on that machine" means that they never leave it for the platform. It does not mean that the
+agents on that machine cannot reach them.
+
+The end-to-end test in `apps/desktop/src/main/relay/browser-e2e.test.ts` drives the tab's
+transport, the hub and the machine edge, and it fails if a browser open reaches a daemon that did
+not name the lane. `browser/live.test.ts` drives a real Chromium through the guard, the proxy, the
+two profiles and the tools when `NM_CHROMIUM` names a binary, and
+`scripts/machine-browser-boot.mjs` does the same inside a built machine image.
+
+### Switches
+
+None new. The lane rides `NM_RELAY_URL` and `VITE_NM_RELAY_URL`, as the other lanes do.
+
 ## The lesson that cost the most
 
 Shipping this broke the fleet once, with a **fully green pipeline**.

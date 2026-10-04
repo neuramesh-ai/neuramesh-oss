@@ -8,6 +8,7 @@ import type { IncomingMessage } from 'node:http';
 import type { RawData, WebSocket } from 'ws';
 import { CLOSE, isChannelFrame, parseMessage, toB64, type ChannelFrame, type ChannelLane, type RelayMessage } from './protocol.js';
 import { admitStream } from './stream-lane.js';
+import { admitBrowser } from './browser-lane.js';
 
 export interface HubOptions {
   /** nmm_ token in, identity out; null = unknown token; throws = control-api unreachable */
@@ -22,8 +23,9 @@ interface MachineEdge { sock: WebSocket; workspaceId: string; lanes: ReadonlySet
 
 interface ClientEdge {
   sock: WebSocket; machineId: string; userId: string | null;
-  /** `streamChannels`: live-reply subscriptions, capped apart from sessions (stream-lane.ts) */
-  channels: Set<string>; engineeringChannels: Set<string>; streamChannels: Set<string>;
+  /** `streamChannels`: live-reply subscriptions, `browserChannels`: browser panels. each side lane
+   *  is capped apart from the sessions (stream-lane.ts, browser-lane.ts) */
+  channels: Set<string>; engineeringChannels: Set<string>; streamChannels: Set<string>; browserChannels: Set<string>;
   ingressBytes: number; ingressWindowStartedAt: number;
 }
 
@@ -104,10 +106,11 @@ export function createHub(opts: HubOptions): Hub {
     return { actor, machine };
   };
 
+  const sessionCount = (edge: ClientEdge): number => edge.channels.size - edge.streamChannels.size - edge.browserChannels.size;
   const machineChannelCount = (machineId: string): number =>
-    [...(attached.get(machineId) ?? [])].reduce((count, edge) => count + edge.channels.size - edge.streamChannels.size, 0);
-  const machineStreamCount = (machineId: string): number =>
-    [...(attached.get(machineId) ?? [])].reduce((count, edge) => count + edge.streamChannels.size, 0);
+    [...(attached.get(machineId) ?? [])].reduce((count, edge) => count + sessionCount(edge), 0);
+  const machineSideCount = (machineId: string, lane: 'streamChannels' | 'browserChannels'): number =>
+    [...(attached.get(machineId) ?? [])].reduce((count, edge) => count + edge[lane].size, 0);
 
   const rejectEngineeringOpen = (client: ClientEdge, ch: string): void => {
     const event = `${JSON.stringify({
@@ -135,7 +138,7 @@ export function createHub(opts: HubOptions): Hub {
     if (frame.t === 'close') {
       owners.get(machineId)?.delete(frame.ch);
       owner.channels.delete(frame.ch);
-      owner.engineeringChannels.delete(frame.ch); owner.streamChannels.delete(frame.ch);
+      owner.engineeringChannels.delete(frame.ch); owner.streamChannels.delete(frame.ch); owner.browserChannels.delete(frame.ch);
     }
   };
 
@@ -186,13 +189,15 @@ export function createHub(opts: HubOptions): Hub {
         log(`refuse_open machine=${client.machineId} ch=${frame.ch} (owned elsewhere)`);
         return send(client.sock, { ch: frame.ch, t: 'close' });
       }
-      const stream = !holder && frame.lane === 'stream' ? admitStream(machine.lanes, client.streamChannels.size, machineStreamCount(client.machineId)) : null;
-      if (stream && stream !== 'ok') {
-        log(`refuse_stream_open machine=${client.machineId} user=${client.userId ?? '?'} why=${stream}`);
+      // the side lanes keep budgets of their own, so a team's open panels never eat the session slots
+      const side = holder ? null : frame.lane === 'stream' ? admitStream(machine.lanes, client.streamChannels.size, machineSideCount(client.machineId, 'streamChannels'))
+        : frame.lane === 'browser' ? admitBrowser(machine.lanes, client.browserChannels.size, machineSideCount(client.machineId, 'browserChannels')) : null;
+      if (side && side !== 'ok') {
+        log(`refuse_${frame.lane}_open machine=${client.machineId} user=${client.userId ?? '?'} why=${side}`);
         return send(client.sock, { ch: frame.ch, t: 'close' });
       }
-      if (stream === 'ok') client.streamChannels.add(frame.ch);
-      else if (!holder && (client.channels.size - client.streamChannels.size >= MAX_CHANNELS_PER_CLIENT || machineChannelCount(client.machineId) >= MAX_CHANNELS_PER_MACHINE)) {
+      if (side === 'ok') (frame.lane === 'stream' ? client.streamChannels : client.browserChannels).add(frame.ch);
+      else if (!holder && (sessionCount(client) >= MAX_CHANNELS_PER_CLIENT || machineChannelCount(client.machineId) >= MAX_CHANNELS_PER_MACHINE)) {
         log(`refuse_open_limit machine=${client.machineId} user=${client.userId ?? '?'} client_count=${client.channels.size}`);
         return send(client.sock, { ch: frame.ch, t: 'close' });
       }
@@ -215,7 +220,7 @@ export function createHub(opts: HubOptions): Hub {
     if (frame.t === 'close') {
       owners.get(client.machineId)?.delete(frame.ch);
       client.channels.delete(frame.ch);
-      client.engineeringChannels.delete(frame.ch); client.streamChannels.delete(frame.ch);
+      client.engineeringChannels.delete(frame.ch); client.streamChannels.delete(frame.ch); client.browserChannels.delete(frame.ch);
     }
   };
 
@@ -244,7 +249,7 @@ export function createHub(opts: HubOptions): Hub {
         if (machine) sendBounded(machine.sock, { ch, t: 'close' }, () => {});
       }
       self.channels.clear();
-      self.engineeringChannels.clear(); self.streamChannels.clear();
+      self.engineeringChannels.clear(); self.streamChannels.clear(); self.browserChannels.clear();
     });
     pump.set((text) => {
       const m = parseMessage(text);
@@ -258,7 +263,7 @@ export function createHub(opts: HubOptions): Hub {
           if (!machines.has(m.machineId)) return sock.close(CLOSE.MACHINE_OFFLINE, 'machine offline');
           const edge: ClientEdge = {
             sock, machineId: m.machineId, userId: verdict.userId ?? null,
-            channels: new Set(), engineeringChannels: new Set(), streamChannels: new Set(), ingressBytes: 0, ingressWindowStartedAt: Date.now(),
+            channels: new Set(), engineeringChannels: new Set(), streamChannels: new Set(), browserChannels: new Set(), ingressBytes: 0, ingressWindowStartedAt: Date.now(),
           };
           self = edge;
           const set = attached.get(m.machineId) ?? new Set<ClientEdge>();

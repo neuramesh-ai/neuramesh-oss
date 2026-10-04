@@ -66,7 +66,7 @@ describe('marketing.setup — the HQ front door (free, human-only, conversationa
 
   it('the bootstrap schedule bypasses the plan gate — a FREE workspace still gets the analysis', async () => {
     const channel = await makeMarketingRoom();
-    // (default MemoryStore plan is free; schedule.create would 402 here — setup must not)
+    // (default MemoryStore plan is free: the Pro trial, where a routine arms like on Pro)
     const res = await send(george, { type: 'marketing.setup', channel, website: 'flowe.app' });
     expect(res.status).toBe(200);
     expect(schedulesOf(store).some((s) => s.channelId === channel && s.payload['bootstrap'] === true)).toBe(true);
@@ -125,12 +125,12 @@ describe('marketing.setup with releases — step 5 plants the routines (release-
     const ch = (store as unknown as { channels: Array<{ id: string; marketing?: Record<string, unknown> }> }).channels.find((c) => c.id === channel)!;
     expect(ch.marketing?.['releases']).toEqual({ repoId: 'r-oss', slug: 'neuramesh-ai/neuramesh-oss', now: true, watch: true });
   });
-  it('on Free: the one-shot runs, the watch is refused by name, nothing else changes', async () => {
+  it('on the Pro trial: the one-shot and the daily watch both plant (routines on every plan, 2026-10-03)', async () => {
     const channel = await makeMarketingRoom();
     const r = await j(await send(george, { type: 'marketing.setup', channel, website: 'https://neuramesh.app', releases: rel }));
-    expect(r.releases).toEqual({ now: true, watch: 'plan_limit' });
+    expect(r.releases).toEqual({ now: true, watch: 'armed' });
     const mine = schedulesOf(store).filter((s) => s.channelId === channel && String(s.title).startsWith('Release drafts'));
-    expect(mine.map((s) => s.cadence)).toEqual(['once']);
+    expect(mine.map((s) => s.cadence).sort()).toEqual(['daily', 'once']);
   });
   it('a watch with no repository is refused, and a switched-off step plants nothing', async () => {
     const channel = await makeMarketingRoom();

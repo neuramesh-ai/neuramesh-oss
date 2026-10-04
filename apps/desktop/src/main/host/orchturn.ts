@@ -8,13 +8,16 @@ import { drainQuery, claudeAgentPrompt, partialMessages } from './turnkit';
 import { starterGenerate, starterStream } from './starterproxy';
 import { claudePathOption, codexSandboxMode, keyEnvFor, providerEnv, type AgentAttachment } from '../runtime/adapter';
 import { ORCH_EMPTY_TURN } from '../replypolicy';
+import { claudeEffort, codexEffort, geminiThinking } from '../runtime/thinking';
+import type { ThinkingLevel } from '@neuramesh/shared';
 import { stripPseudoToolCalls } from './pseudocalls';
 import type { LogFn } from '../agentlog';
 import type { OrchTool } from './orchtools';
+import type { CodexCtor } from '../runtime/codexsdk';
 
 // The three orchestrator transports share ONE signature so `orchestratorTurn` dispatches by
 // provider with no coupling — each runs the SAME buildOrchestratorTools registry its own way.
-export type OrchTransportArgs = { model: string; token: string; systemPrompt: string; transcript: string; tools: OrchTool[]; log?: LogFn; attachments?: AgentAttachment[]; cwd?: string; onDelta?: (t: string) => void };
+export type OrchTransportArgs = { model: string; token: string; systemPrompt: string; transcript: string; tools: OrchTool[]; log?: LogFn; attachments?: AgentAttachment[]; cwd?: string; onDelta?: (t: string, thinking?: string) => void; thinking?: ThinkingLevel | null };
 
 
 /** Which Gemini transport a turn takes. Lives here with the transports rather than in the host's
@@ -74,7 +77,7 @@ export function zodShapeToGemini(shape: Record<string, any>, Type: GeminiTypes):
 }
 
 export async function geminiOrchestratorTurn(args: {
-  model: string; token: string; systemPrompt: string; transcript: string; tools: OrchTool[]; log?: LogFn;
+  model: string; token: string; systemPrompt: string; transcript: string; tools: OrchTool[]; log?: LogFn; thinking?: ThinkingLevel | null;
   /** the platform pays: route through control-api's metered proxy, never a local key */
   starter?: boolean; apiUrl?: string; workspace?: string; actorId?: string;
   /** a WORKER on the lane (runtime/starter.ts) takes more rounds than a routing turn, and a human Stop must end it */
@@ -100,7 +103,8 @@ export async function geminiOrchestratorTurn(args: {
   });
   const byName = new Map(args.tools.map((t) => [t.name, t]));
   const contents: any[] = [{ role: 'user', parts: [{ text: args.transcript }] }];
-  const config = { systemInstruction: args.systemPrompt, tools: [{ functionDeclarations }], temperature: 0.4 };
+  // the person's level rides an API key only: the metered lane's level is fixed, and part of its price
+  const config = { systemInstruction: args.systemPrompt, tools: [{ functionDeclarations }], temperature: 0.4, ...(viaProxy ? {} : geminiThinking(args)) };
 
   let lastText = '';
   for (let turn = 0; turn < (args.maxTurns ?? 14); turn++) {
@@ -161,6 +165,7 @@ export async function anthropicOrchestratorTurn(args: OrchTransportArgs): Promis
         ...claudePathOption(),
         env: providerEnv('anthropic', args.token),
         model: args.model,
+        ...claudeEffort(args),
         maxTurns: 14,
         mcpServers: { nm },
         // AVAILABILITY is `tools` (the #1010 lesson — allowedTools only auto-permits), and
@@ -183,7 +188,7 @@ export async function anthropicOrchestratorTurn(args: OrchTransportArgs): Promis
         permissionMode: 'bypassPermissions',
         cwd: args.cwd ?? os.tmpdir(),
         systemPrompt: args.systemPrompt,
-        ...partialMessages(args.onDelta), // token deltas for the live bubble (turnkit.ts)
+        ...partialMessages(args.onDelta, args.model), // token deltas for the live bubble (turnkit.ts)
         // the CLI's own stderr into the activity log, MCP lines only: when the nm server does not
         // come up, the reason is printed there and nowhere else (2026-09-19)
         stderr: (d: string) => { for (const line of d.split('\n')) if (/mcp|\bnm\b/i.test(line)) args.log?.({ kind: 'turn', summary: `claude: ${line.trim().slice(0, 240)}`, level: 'warn' }); },
@@ -232,12 +237,14 @@ export function orchToolsToBridge(tools: OrchTransportArgs['tools']) {
 export async function agyOrchestratorTurn(args: OrchTransportArgs): Promise<string> {
   const { randomUUID } = await import('node:crypto');
   const { spawn } = await import('node:child_process');
-  const { app } = await import('electron');
+  // userDataDir, never electron's app: a cloud machine runs this under plain node, where importing
+  // electron throws, and the throw was the reply (orchturn-cloud.test.ts)
+  const { userDataDir } = await import('../harness/turntools');
   const orchmcp = await import('../runtime/orchmcp');
   const { ensureCli } = await import('../runtime/cli');
 
   const port = await orchmcp.ensureBridge();
-  const shim = orchmcp.ensureShim(app.getPath('userData'));
+  const shim = orchmcp.ensureShim(userDataDir());
   orchmcp.ensureAgyMcpConfig(shim);
   const bin = await ensureCli('gemini', args.log); // resolves the `agy` binary (or throws install steps)
 
@@ -292,13 +299,14 @@ export async function codexSdkOrchestratorTurn(args: OrchTransportArgs): Promise
   const os = await import('node:os');
   const { mkdtempSync, rmSync } = await import('node:fs');
   const { join } = await import('node:path');
-  const { app } = await import('electron');
+  const { userDataDir } = await import('../harness/turntools'); // not electron: see agyOrchestratorTurn
   const orchmcp = await import('../runtime/orchmcp');
   const { ensureCli } = await import('../runtime/cli');
-  const { Codex } = (await import('@openai/codex-sdk')) as unknown as { Codex: new (o?: unknown) => { startThread(o?: unknown): { run(i: string): Promise<{ finalResponse: string }> } } };
+  const { runResilient } = await import('../runtime/codexsdk');
+  const { Codex } = (await import('@openai/codex-sdk')) as unknown as { Codex: CodexCtor };
 
   const port = await orchmcp.ensureBridge();
-  const shim = orchmcp.ensureShim(app.getPath('userData'));
+  const shim = orchmcp.ensureShim(userDataDir());
   const bin = await ensureCli('codex', args.log);
   const turnId = randomUUID(); const secret = randomUUID();
   orchmcp.registerTurn(turnId, secret, orchToolsToBridge(args.tools));
@@ -307,20 +315,18 @@ export async function codexSdkOrchestratorTurn(args: OrchTransportArgs): Promise
   const env: Record<string, string> = {};
   for (const [k, v] of Object.entries(raw)) if (typeof v === 'string') env[k] = v;
   const dir = mkdtempSync(join(os.tmpdir(), 'nm-codexorch-'));
-  const config = { mcp_servers: { nm: orchmcp.codexNmServer('node', shim, { NM_ORCH_URL: `http://127.0.0.1:${port}`, NM_ORCH_TURN: turnId, NM_ORCH_SECRET: secret }) } };
+  // model_reasoning_summary: the reasoning sections are the live bubble's Thoughts (the repo-connect round's Option A)
+  const config = { model_reasoning_summary: 'detailed', mcp_servers: { nm: orchmcp.codexNmServer('node', shim, { NM_ORCH_URL: `http://127.0.0.1:${port}`, NM_ORCH_TURN: turnId, NM_ORCH_SECRET: secret }) } };
   const codex = new Codex({ codexPathOverride: bin, apiKey: args.token || undefined, env, config });
-  const opts = { sandboxMode: codexSandboxMode('read-only'), workingDirectory: dir, skipGitRepoCheck: true, approvalPolicy: 'never' };
+  const opts = { sandboxMode: codexSandboxMode('read-only'), workingDirectory: dir, skipGitRepoCheck: true, approvalPolicy: 'never' as const };
   const prompt = `${args.systemPrompt}\n\n${args.transcript}`;
   try {
-    let turn: { finalResponse: string };
-    try { turn = await codex.startThread({ ...opts, model: args.model }).run(prompt); }
-    catch (e) {
-      if (args.model && /not supported|unsupported|not available|invalid model|model .*not/i.test(String((e as Error)?.message))) {
-        turn = await codex.startThread({ ...opts, model: undefined }).run(prompt); // model not on this plan → account default
-      } else throw e;
-    }
+    // STREAMED, like every other codex turn: `.run()` gave the bubble nothing until the whole reply
+    // landed. runResilient falls back to the account default when the plan lacks the model.
+    const turn = await runResilient(codex, { ...opts, model: args.model, ...codexEffort(args) }, prompt, {}, args.log, args.onDelta);
+    if (!turn.text && turn.failure) throw new Error(`codex: ${turn.failure.slice(0, 200)}`);
     args.log?.({ kind: 'result', phase: 'success', summary: 'replied · codex (ChatGPT login)' });
-    return (turn.finalResponse || '').trim() || ORCH_EMPTY_TURN; // empty text → stand down, never a posted placeholder
+    return turn.text.trim() || ORCH_EMPTY_TURN; // empty text → stand down, never a posted placeholder
   } finally {
     orchmcp.unregisterTurn(turnId);
     rmSync(dir, { recursive: true, force: true });

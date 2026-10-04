@@ -134,3 +134,25 @@ export function nextRunLabel(iso: string | null, now: number = Date.now()): stri
   if (mins < 48 * 60) return `in ${Math.round(mins / 60)}h`;
   return `in ${Math.round(mins / (60 * 24))}d`;
 }
+
+// ROUTINE OR CONTENT: the two kinds of schedule that open a session (George, 2026-09-27, "Guard the
+// routine rules"). a ROUTINE runs with no person in the loop, so the hands-off machinery serves its
+// session. a CONTENT schedule drafts a post, and a draft always waits for a person, so its session
+// keeps every human gate. one definition for every reader: the daemon (host/routinerule.ts), the
+// memory store (control-api store/routine-rule.ts, whose pg twin is SQL) and the browser client's
+// plan card.
+
+/** does this schedule run with no person in the loop? the launcher marks a routine on its row
+ *  (payload.routine), and a row armed before that marker counts as a routine unless its room is a
+ *  marketing room. `roomKind` is the kind of the schedule's own room */
+export function isRoutineSchedule(payload: { routine?: unknown } | null | undefined, roomKind: string | null | undefined): boolean {
+  return payload?.routine === true || (roomKind ?? 'build') !== 'marketing';
+}
+
+/** a schedule payload as a replica holds it (JSON text), parsed. a payload that does not parse, or is not an object, reads as empty */
+export function schedulePayload(raw: string | null | undefined): { routine?: unknown } {
+  try {
+    const v: unknown = JSON.parse(raw ?? '{}');
+    return v && typeof v === 'object' ? (v as { routine?: unknown }) : {};
+  } catch { return {}; }
+}

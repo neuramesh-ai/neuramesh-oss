@@ -36,6 +36,7 @@ import { inviteAcceptUrl, sendEmail } from '../mail';
 import { syncSeatsForRoster } from '../seats';
 
 import { type Store } from '../store';
+import { birthFirstWorkspace } from '../workspace-birth';
 import { actorAddress } from './guards';
 
 
@@ -54,9 +55,9 @@ export async function workspaceCommands(store: Store, actor: Actor, cmd: Command
         payload: { name: cmd.name, slug: cmd.slug },
       }),
     );
-    // A workspace is born on Free with NO credits and NO cloud machine (source release,
-    // 2026-09-12). Both arrive with the plan flip to Pro, in the Stripe webhook (plan-flip.ts):
-    // the signup grant and the day-one runner were the bill this round stops.
+    // the Pro trial's birth (workspace-birth.ts): the person's first workspace starts with 500
+    // credits and its cloud machine, whatever door made it. a second one starts with neither.
+    await birthFirstWorkspace(store, actor.id, result.workspaceId);
     return result as never;
   }
   if (cmd.type === 'workspace.delete') {

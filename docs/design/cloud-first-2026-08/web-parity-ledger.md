@@ -431,7 +431,7 @@ handoff (`NM_WEB` defaults to `https://neuramesh.app`, auth-clerk.ts).
 | Build | `apps/desktop/vercel.json` → `pnpm run web:build`, output `out/web` |
 | Env (production) | `VITE_NM_CLERK_PK`, `VITE_NM_POWERSYNC_URL`. `VITE_NM_API_URL` is deliberately **unset** — empty means same-origin |
 | API lane | `/v1/*` and `/auth/*` rewrite to `api.neuramesh.app`, so the browser never makes a cross-origin API call and **CORS never enters the picture** (dev does the same through the vite proxy) |
-| Headers | COOP `same-origin` + COEP `require-corp` (OPFS isolation), nosniff, strict-origin-when-cross-origin |
+| Headers | COOP `same-origin-allow-popups`, nosniff, strict-origin-when-cross-origin. COEP `require-corp` until 2026-10-03: Stripe's payment form (the card trial) cannot load under it, and the replica's `OPFSCoopSyncVFS` needs no cross-origin isolation |
 
 **Verified live** on the first deploy (`neuramesh-hq.vercel.app`): headers served as
 configured; `/v1/workspaces` answers **401 from control-api** rather than 200 from the SPA

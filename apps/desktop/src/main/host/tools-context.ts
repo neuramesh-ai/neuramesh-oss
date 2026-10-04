@@ -11,11 +11,15 @@ import { MAX_LEGS, normalizeLegs } from '../runs';
 
 import type { OrchTool, ToolCtx } from './orchtools';
 import { searchXText } from './searchx';
+import { SEARCH_X_DESC, searchXParams } from '../harness/tooldesc';
 import { readLibraryDoc } from './grounding';
+import { makeRepoReader } from './reporead';
+import { postRepoNeed, repoReadable } from './reponeed';
+import { referencedTasks } from './taskrefs';
 
 export function contextTools(tc: ToolCtx): OrchTool[] {
   const { z, db, post, ch, agent, actor, thread, convoThreadId, deepWorkToken, log, skills,
-          apiGet, brain, grounding, libraryDocs,
+          apiGet, brain, grounding, libraryDocs, here,
           startDeepWork, subjectFor, workspaceListing, workspaceRead } = tc;
   return [
     // `description` is what makes this a STAFFING picture rather than a headcount: without it
@@ -164,13 +168,10 @@ export function contextTools(tc: ToolCtx): OrchTool[] {
     // REAL ones from X — which is the point: the run this replaced hit x.com's 402 login wall
     // and filed follower-count guesses labelled "high reach". No connection, no tool result
     // to launder: it says so, and the agent must say so too.
-    { name: 'search_x', description: 'Search X (Twitter) for recent posts — the LAST 7 DAYS of public posts, with their real author handles and real engagement numbers (likes, reposts, replies). Use this for ANY question about what is being said on X: finding posts to reply to, gauging a topic, checking whether a handle is active. It reads through the room\'s connected X account, server-side. Do NOT answer X questions from WebSearch/WebFetch instead — x.com blocks unauthenticated reads, so those produce guesses; this returns facts or an honest failure. Reads are metered against the connected account, so search deliberately, with a specific query.', schema: {
-      query: z.string().min(2).max(400).describe('an X search query — supports X operators, e.g. `"ai agents" -is:retweet lang:en` or `from:handle`'),
-      max: z.number().int().min(10).max(25).optional().describe('how many posts to return (10–25, default 10)'),
-    }, run: async (input) => {
+    { name: 'search_x', description: SEARCH_X_DESC, schema: searchXParams(z), run: async (input) => {
       log?.({ kind: 'tool', phase: 'call', summary: `search_x ${input.query.slice(0, 60)}` });
       // ONE implementation (host/searchx.ts) — the chat registry and worker legs read the same
-      return searchXText(apiGet, actor, { workspaceId: ch.workspace_id, channelId: ch.id }, input.query, input.max);
+      return searchXText(apiGet, actor, { workspaceId: ch.workspace_id, channelId: ch.id }, input);
     } },
     { name: 'load_skill', description: 'Load the full body of a team Agent Skill by name — call it when a skill listed for this channel looks relevant to how the work should be scoped or routed, then fold it into the task description / checklist you create.', schema: { name: z.string().describe('the skill name from the available-skills list') }, run: async (input) => {
       const sk = skills.find((x) => x.name === input.name);
@@ -184,10 +185,33 @@ export function contextTools(tc: ToolCtx): OrchTool[] {
         name: z.string().min(1).describe('the angle in 2–5 human words, e.g. "user reviews & complaints" — never an identifier'),
         prompt: z.string().min(1).describe('the full standalone brief for this angle: what to find out, and what a useful answer contains. The researcher sees ONLY this.'),
       })).min(1).max(MAX_LEGS).describe(`2–${MAX_LEGS} angles that genuinely differ — searching the same thing five ways is five times the cost and one answer`),
+      reads_code: z.boolean().describe('true when an angle needs the code of this room\'s repository (how a module works, what a file does, what changed); false for web research only. True makes sure the legs can read the code before any of them starts.'),
     }, run: async (input) => {
       const legs = normalizeLegs(input.legs);
       if (!legs.length) return 'error: no usable angles — each leg needs a short name and a standalone prompt';
-      const id = await startDeepWork(agent, ch, { threadId: convoThreadId ?? null, taskId: thread?.id ?? null }, input.title, legs, deepWorkToken);
+      // work that reads code never fans out blind (docs/design/repo-connect-2026-10): no reader, no legs,
+      // and the GitHub card instead, whose grant resumes this conversation
+      if (input.reads_code) {
+        const r = await repoReadable(db, here());
+        if (!r.ok) {
+          const place = { workspace: ch.workspace_id, channel: here(), threadId: thread ? null : convoThreadId ?? null, taskId: thread?.id ?? null };
+          const up = await postRepoNeed({ db, post, actor, get: apiGet }, place, {
+            ask: input.title.slice(0, 160),
+            why: r.repoName ? `“${input.title}” reads the code in ${r.repoName}. Nothing ran yet.` : 'This project has no repository yet. GitHub can attach one.',
+            lead: r.repoName ? `I need to read the code in ${r.repoName} for this, and nothing here can read it yet.` : 'I need a repository to read for this, and this project has none yet.',
+            after: `${agent.name} starts “${input.title}” here when GitHub is connected.`,
+          });
+          log?.({ kind: 'tool', phase: 'result', summary: `deep work held: ${input.title} needs the code, and the Connect GitHub card is ${up ? 'up' : 'missing'}` });
+          return up
+            ? `NOT started: “${input.title}” reads the code, and nothing here can read the repository yet. A Connect GitHub card is in this conversation now. Say in one short line that the work starts when GitHub is connected, then end the turn. Never start this work without the code.`
+            : 'error: the work reads the code, and nothing here can read the repository. Say so plainly: the person connects GitHub in Connections, or runs `gh auth login` on this machine for a repository with a GitHub address. Do NOT start the work.';
+        }
+      }
+      // the tasks the brief names travel in the brief: no leg holds a board read (host/taskrefs.ts)
+      const refs = await referencedTasks(db, ch.workspace_id, [input.title, ...legs.map((l) => l.prompt)].join('\n')).catch(() => '');
+      const briefed = refs ? legs.map((l) => ({ ...l, prompt: `${l.prompt}\n\n${refs}` })) : legs;
+      const repo = input.reads_code ? makeRepoReader({ apiGet, actor, db, channelId: here() }) : null;
+      const id = await startDeepWork(agent, ch, { threadId: convoThreadId ?? null, taskId: thread?.id ?? null }, input.title, briefed, deepWorkToken, { repo });
       if (!id) return 'error: could not open the run — do NOT tell the human work is running; answer with what you know now';
       log?.({ kind: 'tool', phase: 'inject', summary: `deep work opened: ${input.title} (${legs.length} legs)` });
       return `deep work started — ${legs.length} angle${legs.length === 1 ? '' : 's'} running (${legs.map((l) => l.name).join(', ')}). The card is live in this thread and the report posts here automatically when it lands. Tell the human it's running and what the angles are; do NOT invent an ETA, and never mention run ids or tooling.`;

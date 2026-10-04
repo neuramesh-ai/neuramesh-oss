@@ -4,14 +4,22 @@
 // Checkout/Portal URLs and (b) turns Stripe lifecycle events into a setWorkspacePlan patch. The
 // webhook is the ONLY writer of workspaces.plan, so a client can never grant itself Cloud.
 import Stripe from 'stripe';
+import { PRO_TRIAL_DAYS } from '@neuramesh/shared';
 
 const SECRET = process.env['STRIPE_SECRET_KEY'];
 const WEBHOOK_SECRET = process.env['STRIPE_WEBHOOK_SECRET'];
 const PRICE_ID = process.env['STRIPE_PRICE_ID']; // the $22/seat recurring price (per-unit → quantity = seats)
+const PUBLISHABLE_KEY = process.env['STRIPE_PUBLISHABLE_KEY']; // the browser's half, not a secret
 const RETURN_BASE = process.env['NM_BILLING_RETURN_URL'] ?? 'https://neuramesh.app/billing';
 
 export function billingEnabled(): boolean {
   return !!SECRET;
+}
+
+/** the key Stripe.js needs in the page that draws the card trial's form. null keeps that form
+ *  off: a server without it answers the trial routes as unconfigured (trial.ts). */
+export function billingPublishableKey(): string | null {
+  return PUBLISHABLE_KEY || null;
 }
 
 let _stripe: Stripe | null = null;
@@ -56,6 +64,46 @@ export async function createCheckoutSession(input: { workspace: string; quantity
   return session.url;
 }
 
+/**
+ * the card trial's session (2026-10-03, docs/design/pro-front-door-2026-10). the same subscription
+ * as the hosted Checkout above, in Stripe's `custom` UI mode: hq draws the payment form inside its
+ * own wizard step with Stripe's Payment Element, so the person never leaves the page. three
+ * differences, all deliberate:
+ *   · PRO_TRIAL_DAYS at $0, with the payment method collected up front (`always`), so the trial
+ *     turns into Pro on its own unless the person cancels.
+ *   · no `payment_method_types`: Stripe offers the methods the Dashboard turns on that can renew a
+ *     subscription (cards, Apple Pay, Google Pay, Link, bank debits), never a fixed list here.
+ *   · a `return_url` for the few methods that leave the page for their own site and come back.
+ * the webhooks are the hosted path's, so a trial reaches the plan the way a purchase does.
+ */
+export async function createTrialSession(input: {
+  workspace: string; quantity: number; customerId: string | null; email: string | null; returnUrl: string;
+}): Promise<{ id: string; clientSecret: string }> {
+  if (!PRICE_ID) throw new Error('billing not configured (STRIPE_PRICE_ID unset)');
+  const session = await stripe().checkout.sessions.create({
+    ui_mode: 'custom',
+    mode: 'subscription',
+    line_items: [{ price: PRICE_ID, quantity: Math.max(1, input.quantity) }],
+    client_reference_id: input.workspace,
+    // the email lets Link find a saved wallet, and spares the form an email field
+    ...(input.customerId ? { customer: input.customerId } : input.email ? { customer_email: input.email } : {}),
+    subscription_data: { trial_period_days: PRO_TRIAL_DAYS, metadata: { workspace_id: input.workspace } },
+    payment_method_collection: 'always',
+    return_url: input.returnUrl,
+  });
+  if (!session.client_secret) throw new Error('stripe returned no client secret');
+  return { id: session.id, clientSecret: session.client_secret };
+}
+
+/** a trial session as Stripe holds it now: whose it is, whether the person finished, and the
+ *  subscription it made. read by trial.ts after the form, so the plan flips without waiting on
+ *  the webhook (which still lands, and changes nothing a second time). */
+export async function trialSessionState(sessionId: string): Promise<{ workspace: string | null; status: string | null; subscription: Record<string, unknown> | null }> {
+  const s = await stripe().checkout.sessions.retrieve(sessionId, { expand: ['subscription'] });
+  const sub = s.subscription && typeof s.subscription === 'object' ? (s.subscription as unknown as Record<string, unknown>) : null;
+  return { workspace: s.client_reference_id ?? null, status: s.status ?? null, subscription: sub };
+}
+
 // Stripe-hosted Customer Portal: manage payment method, seats, invoices, cancel.
 export async function createPortalSession(input: { customerId: string }): Promise<string> {
   const session = await stripe().billingPortal.sessions.create({ customer: input.customerId, return_url: `${RETURN_BASE}/portal-return` });
@@ -96,11 +144,13 @@ export function planPatchFromEvent(event: BillingEventLike): { workspace: string
     if ((obj['mode'] as string) === 'payment') return null;
     const workspace = (obj['client_reference_id'] as string) || metaWorkspace;
     if (!workspace) return null;
+    // no subscriptionStatus here: the subscription events own it. a trial's subscription is
+    // `trialing`, and Stripe does not order events, so a completion that wrote 'active' could land
+    // after `customer.subscription.created` and leave a trial reading as a paid month.
     return {
       workspace,
       patch: {
         plan: 'cloud',
-        subscriptionStatus: 'active',
         stripeCustomerId: (obj['customer'] as string) ?? null,
         stripeSubscriptionId: (obj['subscription'] as string) ?? null,
       },
@@ -185,4 +235,18 @@ export function creditGrantFromEvent(event: BillingEventLike): { workspace: stri
   const sessionId = String(obj['id'] ?? '');
   if (!sessionId) return null;
   return { workspace, credits, sessionId };
+}
+
+/** pure: `customer.subscription.trial_will_end` (Stripe sends it 3 days before a trial ends) → the
+ *  reminder the card trial promises on its form, or null. the subscription id is the outbox's
+ *  dedupe key, so a redelivered event sends nothing twice. */
+export function trialReminderFromEvent(event: BillingEventLike): { workspace: string; subscriptionId: string; trialEnd: string; seats: number } | null {
+  if (event.type !== 'customer.subscription.trial_will_end') return null;
+  const obj = event.data.object as Record<string, unknown>;
+  const workspace = (obj['metadata'] as Record<string, unknown> | undefined)?.['workspace_id'] as string | undefined;
+  const subscriptionId = obj['id'] as string | undefined;
+  const end = obj['trial_end'] as number | undefined;
+  if (!workspace || !subscriptionId || !end) return null;
+  const quantity = (obj['items'] as { data?: Array<{ quantity?: number }> } | undefined)?.data?.[0]?.quantity;
+  return { workspace, subscriptionId, trialEnd: new Date(end * 1000).toISOString(), seats: Math.max(1, quantity ?? 1) };
 }

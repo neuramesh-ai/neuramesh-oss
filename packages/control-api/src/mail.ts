@@ -20,6 +20,9 @@ const ALLOWLIST = (process.env['NM_MAIL_ALLOWLIST'] ?? '')
 
 /** User-facing destinations (download, billing, /join). The WEB app. */
 export const APP_URL = process.env['NM_APP_URL'] ?? 'https://neuramesh.app';
+/** the workspace in the browser (apps/hq). the welcome and the lifecycle emails open it: a hosted
+ *  account's workspace runs there with its cloud machine, so the Mac download is not the door. */
+export const HQ_URL = process.env['NM_HQ_URL'] ?? 'https://hq.neuramesh.app';
 /** Where THIS server answers. The unsubscribe route lives on the control-api, not the web app,
  *  so its link — and the List-Unsubscribe header Gmail calls — must resolve here or one-click
  *  unsubscribe silently 404s into the marketing site's SPA catch-all. */

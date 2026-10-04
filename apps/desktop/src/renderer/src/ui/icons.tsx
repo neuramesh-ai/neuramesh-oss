@@ -110,10 +110,13 @@ export const IconCollapse = ({ s }: { s?: number }) => <Svg s={s}><path d="M14 1
 export const IconDockLeft = ({ s }: { s?: number }) => <Svg s={s}><rect x="3" y="4" width="18" height="16" rx="2" /><rect x="4.5" y="5.5" width="4" height="13" rx="1" fill="currentColor" stroke="none" /></Svg>;
 export const IconDockTop = ({ s }: { s?: number }) => <Svg s={s}><rect x="3" y="4" width="18" height="16" rx="2" /><rect x="4.5" y="5.5" width="15" height="4" rx="1" fill="currentColor" stroke="none" /></Svg>;
 export const IconDockRight = ({ s }: { s?: number }) => <Svg s={s}><rect x="3" y="4" width="18" height="16" rx="2" /><rect x="15.5" y="5.5" width="4" height="13" rx="1" fill="currentColor" stroke="none" /></Svg>;
-// the Workbench's own glyph (rail-ink round 3, 2026-09-04): a sheet with a card floating inside it
-// at the right edge — what the panel IS now. The dock-right glyph it used to wear means the side
-// panel, so the two switches stopped sharing a picture.
-export const IconWorkbench = ({ s }: { s?: number }) => <Svg s={s}><rect x="3" y="4" width="18" height="16" rx="2" /><rect x="11.5" y="8" width="6.5" height="8" rx="1.2" fill="currentColor" stroke="none" /></Svg>;
+// the side panel's kinds (the side-panel round, 2026-10-03): a reviewed document with its lines (a
+// plan, a release plan), and a drafted post (a card with its two lines). The Workbench's own glyph
+// retired with the card: the dock-right glyph is the one switch for the one right panel.
+export const IconReview = ({ s }: { s?: number }) => <Svg s={s}><rect x="5" y="3" width="14" height="18" rx="2" /><path d="M9 8h6" /><path d="M9 12h6" /><path d="M9 16h3" /></Svg>;
+export const IconPost = ({ s }: { s?: number }) => <Svg s={s}><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M7 9h10" /><path d="M7 13h6" /></Svg>;
+// a design round: a frame with its header and its side column
+export const IconDesign = ({ s }: { s?: number }) => <Svg s={s}><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18" /><path d="M9 21V9" /></Svg>;
 // chrome icons (replacing the boring emoji set — gear/person/sparkle/logout/home/cloud/machine/lock/store)
 export const IconSettings = ({ s }: { s?: number }) => <Svg s={s}><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" /><circle cx="12" cy="12" r="3" /></Svg>;
 export const IconArchive = ({ s }: { s?: number }) => <Svg s={s}><rect x="3" y="3.5" width="18" height="5" rx="1.5" /><path d="M5 8.5V19a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8.5" /><path d="M10 12.5h4" /></Svg>;

@@ -34,8 +34,9 @@ const BASE = [
 const WB_ALL = ['create_whiteboard', 'update_whiteboard', 'list_whiteboards', 'read_whiteboard'];
 
 const MANIFEST: Record<string, string[]> = {
-  // a conversation wake: full board powers + fan-out + drawing + the thread-title tool
-  triage: [...BASE, ...WB_ALL, 'spawn', 'set_thread_title'].sort(),
+  // a conversation wake: full board powers + fan-out + drawing + the thread-title tool, and the routine writer's two
+  // (2026-10-01, host/tools-routine.ts): the draft card in this session, or the offer of a new session for one
+  triage: [...BASE, ...WB_ALL, 'spawn', 'set_thread_title', 'propose_routine', 'offer_routine_session'].sort(),
   // advancing an owned task: same minus the conversation-only namer
   own: [...BASE, ...WB_ALL, 'spawn'].sort(),
   // Sweeps are SCOPED (2026-08-18 diet): each gets exactly what its prompt instructs. Before,

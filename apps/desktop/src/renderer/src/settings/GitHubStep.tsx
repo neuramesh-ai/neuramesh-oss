@@ -5,8 +5,8 @@
 // the grant (nothing readable), the pick (one or more readable repositories, the folder's namesake
 // pre-selected; Connect attaches the picked one to the project and writes the row), or connected.
 // While the person is on GitHub the step polls the resolve every 5 s, and "Check again" is the manual
-// door, so a grant that lands on another deployment's callback still flips the row (docs/44). An
-// open step never attaches on its own: the server attaches on the grant's callback and on the pick.
+// door. The install callback only records the installation, so the resolve that the poll sends
+// writes the row. An open step never attaches on its own: the server attaches only on the pick.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { nm as nmBridge } from '../bridge/nm';
 import type { RepoUI } from '../bridge/rows-board';
@@ -35,7 +35,9 @@ export interface GitHubGrant {
   pick: string | null;
   setPick: (slug: string) => void;
   note: string | null;
-  /** the resolve: connected → onDone; else the face's ingredients. True when connected. `manual`
+  /** the repository the last connected answer named ('' before it names one), else null. A quiet step shows it */
+  connected: string | null;
+  /** the resolve: connected → onDone(handle); else the face's ingredients. True when connected. `manual`
    *  is Check again: it leaves the waiting face whenever there is something to pick from. */
   ask: (manual?: boolean) => Promise<boolean>;
   /** GitHub's install page in the browser, then the poll */
@@ -44,32 +46,39 @@ export interface GitHubGrant {
   connect: () => Promise<void>;
 }
 
-/** ONE state machine for every surface that connects GitHub */
-export function useGitHubGrant(channelId: string, onDone: () => void): GitHubGrant {
+/** whether a connected answer to the resolve finishes the step (onDone). A quiet step finishes only after the person
+ *  left for GitHub from it: the coding gate's onDone opens the session again, and its mount ask can answer connected
+ *  while the machine still refuses, which opened the session in a loop. A pick always finishes. */
+export const answerFinishes = (quiet: boolean, granted: boolean): boolean => !quiet || granted;
+
+/** ONE state machine for every surface that connects GitHub. `quiet`: the coding gate (answerFinishes) */
+export function useGitHubGrant(channelId: string, onDone: (handle?: string) => void, { quiet = false }: { quiet?: boolean } = {}): GitHubGrant {
   const [phase, setPhase] = useState<GrantPhase>('asking');
   const [repos, setRepos] = useState<string[] | null>(null);
   const [hint, setHint] = useState<string | null>(null);
   const [pick, setPick] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
+  const [connected, setConnected] = useState<string | null>(null);
   // the caller's onDone is a fresh closure every render: held in a ref so the mount ask runs ONCE per room
   const done = useRef(onDone);
   done.current = onDone;
   // what the App read when the person left for GitHub: the waiting face ends when a repository
   // the list did not have appears (Add more on GitHub), not on the next poll that repeats the old list
   const seen = useRef<Set<string>>(new Set());
+  const granted = useRef(false);
   const ask = useCallback(async (manual = false) => {
     const r = await nm?.githubResolve?.(channelId).catch(() => null);
-    if (r?.ok) { setPhase('idle'); done.current(); return true; }
+    if (r?.ok) { setConnected(r.handle); setPhase('idle'); if (answerFinishes(quiet, granted.current)) done.current(r.handle); return true; }
     const list = r && !r.ok ? r.repos ?? [] : [];
     const named = (r && !r.ok && r.hint) || null;
-    setRepos(list); setHint(named);
+    setConnected(null); setRepos(list); setHint(named);
     const fresh = list.find((s) => !seen.current.has(s)) ?? null;
     setPick((p) => (fresh && seen.current.size ? fresh : p && list.includes(p) ? p : named || list[0] || null));
     if (r && !r.ok && (r.code === 'NOT_CONFIGURED' || r.code === 'UNREACHABLE')) setNote(r.error);
     // back from GitHub with something new to pick from (or Check again with anything): the pick shows
     setPhase((ph) => (ph === 'asking' || (ph === 'waiting' && list.length > 0 && (manual || !!fresh)) ? 'idle' : ph));
     return false;
-  }, [channelId]);
+  }, [channelId, quiet]);
   useEffect(() => { void ask(); }, [ask]);
   // while the person is on GitHub: the resolve every 5 s, so the row flips the moment the grant lands
   useEffect(() => {
@@ -81,7 +90,7 @@ export function useGitHubGrant(channelId: string, onDone: () => void): GitHubGra
     setPhase('busy'); setNote(null);
     seen.current = new Set(repos ?? []);
     const start = await nm?.connectorStart(channelId, 'github').catch(() => ({ ok: false }));
-    if (start?.ok) setPhase('waiting');
+    if (start?.ok) { granted.current = true; setPhase('waiting'); }
     else { setPhase('idle'); setNote('GitHub did not open. Try again.'); }
   }, [channelId, repos]);
   const connect = useCallback(async () => {
@@ -89,12 +98,12 @@ export function useGitHubGrant(channelId: string, onDone: () => void): GitHubGra
     setPhase('busy'); setNote(null);
     try {
       const r = await nm?.githubResolve?.(channelId, pick);
-      if (r?.ok) { setPhase('idle'); done.current(); return; }
+      if (r?.ok) { setConnected(r.handle); setPhase('idle'); done.current(r.handle); return; }
       setPhase('idle');
       setNote(r && !r.ok ? r.error : 'That did not connect. Try again.');
     } catch (e) { setPhase('idle'); flashToast(errMsg(e)); }
   }, [channelId, pick]);
-  return { phase, repos, hint, pick, setPick, note, ask, grant, connect };
+  return { phase, repos, hint, pick, setPick, note, connected, ask, grant, connect };
 }
 
 /** the readable repositories, one row each (the machine-chip row idiom); the picked row wears the check */
@@ -137,7 +146,7 @@ export function GitHubStep({ channelId, dead, onDone }: { channelId: string; dea
     : g.repos && g.repos.length > 0
       ? <><p>The neuramesh app reads these repositories. Pick the one this project lives in.</p><RepoPick repos={g.repos} pick={g.pick} hint={g.hint} onPick={g.setPick} /><PickActs g={g} /></>
       : <>
-          <p>neuramesh reads releases, pull requests and files through the neuramesh app on GitHub. It never writes.</p>
+          <p>neuramesh reads releases, pull requests and files through the neuramesh app on GitHub.</p>
           {folder && <p className="connhint">This project's folder is <b>{folder}</b>. Pick its repository on GitHub.</p>}
           {repo && !folder && <p className="connhint">Pick <b>{repo.org_name}/{repo.name}</b> on GitHub.</p>}
           <button type="button" className="btn primary sm" disabled={g.phase === 'busy'} onClick={() => void g.grant()}>{g.phase === 'busy' ? 'Please wait…' : 'Grant access on GitHub'}</button>
@@ -160,7 +169,7 @@ export function GitHubSetupRow({ channelId, conn, onDone }: { channelId: string;
     <>
       <div className="mkconnrow">
         <span className="mkconnico" aria-hidden><IconGitHub s={13} /></span>
-        <span className="mkconnname">GitHub{!conn && <span className="mkqopt"> · read access, never a write</span>}</span>
+        <span className="mkconnname">GitHub</span>
         {conn
           ? <span className="mkconnok">✓ {conn.handle || 'connected'}</span>
           : g.phase === 'waiting'

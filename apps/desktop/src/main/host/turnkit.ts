@@ -6,6 +6,7 @@
 import type { SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 import { carryCards, resolveInstructions } from '@neuramesh/shared';
 import { buildClaudeUserContent, chatSystemPrompt, claudePathOption, imageBlocks, providerEnv, type AgentAttachment } from '../runtime/adapter';
+import { claudeEffort } from '../runtime/thinking';
 import { classifyExecError } from '../execpolicy';
 import { contractFor, localInstructions } from '../contracts';
 import { isStandDown } from '../replypolicy';
@@ -60,27 +61,47 @@ async function settledInventory(stream: unknown, init: { tools?: string[]; mcp_s
   return { ok: inv.ok && !inv.pending, summary: inv.summary };
 }
 
-/** the Agent SDK option that makes a turn TYPE: with a live bubble to feed, ask for the partial
- *  stream events (token deltas); with none, the whole-block stream stays as it was */
-export const partialMessages = (onDelta?: unknown): { includePartialMessages?: true } => (onDelta ? { includePartialMessages: true } : {});
+/** the Claude models that think adaptively, so a summarized display changes only what streams (sdk.d.ts
+ *  ThinkingAdaptive: the default for models that support it). Haiku 4.5 keeps its own default. */
+const SHOWS_THINKING = /^claude-(fable|opus|sonnet)-5/;
 
-/** one partial stream event (partialMessages) → the text block being written now. A new text block
- *  starts over; a text delta grows it and feeds the bubble; a subagent's words and every other
- *  event (thinking, tool input, message edges) change nothing. */
-function typedText(m: { parent_tool_use_id?: string | null; event?: any }, typing: string, onDelta?: (t: string) => void): string {
+/** the Agent SDK options that make a turn TYPE: with a live bubble to feed, ask for the partial stream
+ *  events (token deltas), and for a Claude 5 seat, its summarized thoughts in them too (the repo-connect
+ *  round's Option A: the bubble's Thoughts block). With no bubble, the whole-block stream stays as it was. */
+export const partialMessages = (onDelta?: unknown, model?: string | null): { includePartialMessages?: true; thinking?: { type: 'adaptive'; display: 'summarized' } } =>
+  (onDelta ? { includePartialMessages: true, ...(model && SHOWS_THINKING.test(model) ? { thinking: { type: 'adaptive' as const, display: 'summarized' as const } } : {}) } : {});
+
+/** what the partial stream has drawn: the text block being written now, and the turn's thoughts */
+interface Typed { typing: string; thinking: string }
+
+/** one partial stream event (partialMessages) → the live bubble. A new text block starts over, a text
+ *  delta grows it; a thinking delta grows the turn's thoughts, which ride beside the text (never in it);
+ *  a subagent's words and every other event (tool input, message edges) change nothing. */
+function typedText(m: { parent_tool_use_id?: string | null; event?: any }, live: Typed, onDelta?: (t: string, thinking?: string) => void): void {
   const ev = m.parent_tool_use_id ? null : m.event;
-  if (ev?.type === 'content_block_start' && ev.content_block?.type === 'text') return '';
-  if (ev?.type !== 'content_block_delta' || ev.delta?.type !== 'text_delta' || !ev.delta.text) return typing;
-  onDelta?.(typing + ev.delta.text);
-  return typing + ev.delta.text;
+  if (ev?.type === 'content_block_start') {
+    if (ev.content_block?.type === 'text') live.typing = '';
+    else if (ev.content_block?.type === 'thinking' && live.thinking) live.thinking += '\n\n';
+    return;
+  }
+  if (ev?.type !== 'content_block_delta') return;
+  if (ev.delta?.type === 'thinking_delta' && ev.delta.thinking) {
+    live.thinking += ev.delta.thinking;
+    onDelta?.(live.typing, live.thinking);
+    return;
+  }
+  if (ev.delta?.type !== 'text_delta' || !ev.delta.text) return;
+  live.typing += ev.delta.text;
+  onDelta?.(live.typing, live.thinking || undefined);
 }
 
-export async function drainQuery(stream: AsyncIterable<any>, fallback: string, log?: LogFn, onDelta?: (t: string) => void, onTodos?: (todos: Array<{ content?: string; status?: string }>) => void, expect?: { mcp: string }): Promise<string> {
+export async function drainQuery(stream: AsyncIterable<any>, fallback: string, log?: LogFn, onDelta?: (t: string, thinking?: string) => void, onTodos?: (todos: Array<{ content?: string; status?: string }>) => void, expect?: { mcp: string }): Promise<string> {
   let text = '';
   // the text block being written right now, from the partial stream events (partialMessages): the
   // bubble gets it growing, the same whole-text-so-far contract as the complete block below, which
   // still arrives and still decides the reply. A subagent's words (parent_tool_use_id) never show.
-  let typing = '';
+  // The turn's thoughts grow beside it, and never become the reply.
+  const live: Typed = { typing: '', thinking: '' };
   // every superseded text block, because cards written in one are NOT narration — carryCards
   // rescues any ```nmq/```nms fence the final block dropped ("Waiting on those two", 2026-08-06)
   const earlier: string[] = [];
@@ -88,7 +109,7 @@ export async function drainQuery(stream: AsyncIterable<any>, fallback: string, l
   // rule would otherwise drop when a later tool call and its confirmation close the turn
   const spoken: string[] = [];
   for await (const m of stream) {
-    if (m.type === 'stream_event') { typing = typedText(m, typing, onDelta); continue; }
+    if (m.type === 'stream_event') { typedText(m, live, onDelta); continue; }
     if (m.type === 'system' && m.subtype === 'init' && expect) {
       const inv = await settledInventory(stream, m, expect.mcp);
       log?.({ kind: 'turn', summary: `tools: ${inv.summary}`, level: inv.ok ? 'info' : 'warn' });
@@ -103,7 +124,7 @@ export async function drainQuery(stream: AsyncIterable<any>, fallback: string, l
           if (text) earlier.push(text);
           text = b.text;
           if (standalone) spoken.push(b.text);
-          onDelta?.(b.text);
+          onDelta?.(b.text, live.thinking || undefined);
           // NO_REPLY is addressed to US, not to a reader — the daemon drops the turn on it. Logged
           // as narration it rendered a bare "NO_REPLY" line in the activity feed under the tool
           // calls, which is the wiring showing through (founder report). The stand-down is already
@@ -175,7 +196,7 @@ export async function claudeTurn(
   transcript: string,
   token: string,
   log?: LogFn,
-  onDelta?: (text: string) => void,
+  onDelta?: (text: string, thinking?: string) => void,
   attachments?: AgentAttachment[],
 ): Promise<string> {
   const system = chatSystemPrompt(agent.name, channelSlug, instructionsFor(agent));
@@ -189,7 +210,7 @@ export async function claudeTurn(
     const reply = await drainQuery(
       // allowedTools:[] keeps this a true tool-less reply; otherwise the SDK's default tools can burn the
       // one turn on a tool call (→ error_max_turns, no text). Same trap as directComplete.
-      query({ prompt: claudeAgentPrompt(transcript, attachments), options: { ...claudePathOption(), env: providerEnv('anthropic', token), model: agent.model, maxTurns: 1, allowedTools: [], permissionMode: 'bypassPermissions', cwd: os.tmpdir(), systemPrompt: system, ...partialMessages(onDelta) } }) as AsyncIterable<any>,
+      query({ prompt: claudeAgentPrompt(transcript, attachments), options: { ...claudePathOption(), env: providerEnv('anthropic', token), model: agent.model, ...claudeEffort(agent), maxTurns: 1, allowedTools: [], permissionMode: 'bypassPermissions', cwd: os.tmpdir(), systemPrompt: system, ...partialMessages(onDelta, agent.model) } }) as AsyncIterable<any>,
       '(no reply)', log, onDelta,
     );
     return reply.trim() || '(no reply)';

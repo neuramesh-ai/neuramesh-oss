@@ -1,9 +1,9 @@
 // The whiteboard review view (docs/38) — a scene, read-only, pinned to a task.
 // Extracted from App.tsx (track A2).
-import { ALERT_META, parsePlanAlert, splitPlanBlocks, themedMockupDoc } from '../design/plans';
+import { ALERT_META, designMockupLabel, parsePlanAlert, splitPlanBlocks, themedMockupDoc } from '../design/plans';
 import { DiffView } from './docpreview';
 import { Md } from '../md/Md';
-import { addComment, deleteComment, diffRounds, editComment, type ReviewBinding, type ReviewComment, type ReviewMode, type ReviewVerdict } from '../review';
+import { addComment, deleteComment, diffRounds, editComment, type ReviewArtifact, type ReviewBinding, type ReviewComment, type ReviewMode, type ReviewVerdict } from '../review';
 import { highlightCode } from '../lib/highlight';
 import { type WTab } from '../wtabs';
 import { useMemo, useState } from 'react';
@@ -24,9 +24,16 @@ import { useMemo, useState } from 'react';
  *  - the comment batch is owned by the tab, not by this component (ruling 4), so switching tabs
  *    mid-batch cannot lose it.
  */
-export function WReviewView({ tab, binding, content, comments, mode, onComments, onMode, onSpend, onOpenLatest, onClose, busy, error }: {
+export function WReviewView({ tab, binding, content, comments, mode, mockups, stageId, onStage, isNew, onComments, onMode, onSpend, onOpenLatest, onClose, busy, error }: {
   tab: WTab; binding: ReviewBinding; content: string;
   comments: ReviewComment[]; mode: ReviewMode;
+  /** a design round's mockups (the side-panel round, 2026-10-03): one tab for the round, a strip to pick from */
+  mockups?: ReviewArtifact[];
+  /** the mockup on stage */
+  stageId?: string | null;
+  onStage?: (id: string) => void;
+  /** a newer version replaced what this tab showed: the head wears `new` instead of `latest` */
+  isNew?: boolean;
   onComments: (next: ReviewComment[]) => void;
   onMode: (m: ReviewMode) => void;
   onSpend: (v: ReviewVerdict, comments: ReviewComment[]) => void;
@@ -40,6 +47,11 @@ export function WReviewView({ tab, binding, content, comments, mode, onComments,
   const [draft, setDraft] = useState('');
   const [float, setFloat] = useState<{ block: number; quote: string; x: number; y: number } | null>(null);
   const count = comments.length;
+  const round = !!mockups?.length;
+  // a rendered mockup has no text to select, so a note on it quotes the mockup's name: the
+  // designer reads which direction each note is about from the packet
+  const stage = round ? mockups!.find((m) => m.id === stageId) ?? mockups![0]! : null;
+  const anchor = stage && mode === 'rendered' ? designMockupLabel(stage.name) : undefined;
 
   const openComment = (block: number, quote?: string, editId?: number) => {
     setFloat(null);
@@ -68,7 +80,7 @@ export function WReviewView({ tab, binding, content, comments, mode, onComments,
   // also the ONLY way to comment on a rendered artifact — a design round lives in an iframe, whose
   // selection this document cannot reach — so the same act covers both without a second affordance.
   const spend = (v: ReviewVerdict) => {
-    if (v.needsComments && !count) { openComment(0); return; }
+    if (v.needsComments && !count) { openComment(0, anchor); return; }
     onSpend(v, comments);
   };
   const trunc = (s: string) => (s.length > 90 ? s.slice(0, 90) + '…' : s);
@@ -109,9 +121,9 @@ export function WReviewView({ tab, binding, content, comments, mode, onComments,
       <div className="wrvhead">
         <span className={`wrvkind ${binding.kind}`}>{binding.kind === 'ship' ? '⚓' : '◪'} {binding.label}</span>
         {tab.subtitle && <span className="wrvtask">{tab.subtitle}</span>}
-        <b className="wrvname">{binding.name}</b>
-        {binding.version > 0 && <span className="wrvver">· v{binding.version}</span>}
-        {binding.latest && <span className="wrvlatest">latest</span>}
+        <b className="wrvname">{round ? `Design round ${binding.version}` : binding.name}</b>
+        {binding.version > 0 && !round && <span className="wrvver">· v{binding.version}</span>}
+        {binding.latest && (isNew ? <span className="wrvnew">new</span> : <span className="wrvlatest">latest</span>)}
         <div className="wrvseg" role="group" aria-label="Render mode">
           {binding.modes.map((m) => (
             <button key={m} className={mode === m ? 'on' : ''} aria-pressed={mode === m} onClick={() => onMode(m)}>
@@ -120,6 +132,22 @@ export function WReviewView({ tab, binding, content, comments, mode, onComments,
           ))}
         </div>
       </div>
+      {round && mockups!.length > 1 && (
+        <div className="wrvmocks" role="tablist" aria-label="Mockups in this round">
+          {mockups!.map((m) => (
+            <button key={m.id ?? m.name} type="button" role="tab" aria-selected={m.id === stage?.id}
+              className={`wrvmock${m.id === stage?.id ? ' on' : ''}`} title={designMockupLabel(m.name)} onClick={() => m.id && onStage?.(m.id)}>
+              <span className="wrvmockpic" aria-hidden>
+                <iframe className="wrvmockframe" sandbox="" tabIndex={-1} srcDoc={themedMockupDoc(m.content)} title="" />
+              </span>
+              <span className="wrvmockcap">{designMockupLabel(m.name)}</span>
+            </button>
+          ))}
+          {open && mode === 'rendered' && (
+            <button type="button" className="wrvmockcmt" onClick={() => openComment(0, anchor)}>Comment on this mockup</button>
+          )}
+        </div>
+      )}
       <div className="wrvdoc" onMouseUp={onMouseUp} onMouseDownCapture={() => float && setFloat(null)}>
         {mode === 'preview' && (
           <div className="wrvdocinner">
@@ -171,8 +199,8 @@ export function WReviewView({ tab, binding, content, comments, mode, onComments,
         {binding.gate.humanOnly && <span className="wrvgate human" title="the FSM accepts this sign-off from a human only">human only</span>}
         <span className="wrvlbl">
           {open ? <>Your call on <b>{binding.gate.subject}</b></> : <span className="wrvsettled">{binding.gate.note}</span>}
-          {open && count > 0 && <span className="wrvcount" aria-label={`${count} comment${count === 1 ? '' : 's'} pending`}>{count}</span>}
         </span>
+        {open && count > 0 && <span className="wrvcount" aria-label={`${count} comment${count === 1 ? '' : 's'} pending`}>{count}</span>}
         <span className="wrvsep" />
         {binding.verdicts.map((v) => (
           // `accept` is the app's existing affirmative pill (the mockup calls it `.go`) — the

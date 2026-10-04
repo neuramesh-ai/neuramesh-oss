@@ -24,7 +24,6 @@ import {
 } from '@neuramesh/shared';
 import type { Command } from './commands';
 import { DomainError } from './errors';
-import { assertCommandAllowed } from './hosted-gate';
 
 import { onInviteAccepted } from './onauth';
 import { type Store } from './store';
@@ -50,7 +49,7 @@ import { modelpackCommands } from './handler/modelpack';
 import { policyCommands } from './handler/policy';
 import { projectCommands } from './handler/project';
 import { repoCommands } from './handler/repo';
-import { scheduleCommands } from './handler/schedule';
+import { scheduleCommands } from './handler/schedule';   import { replyCommands } from './handler/replies';
 import { setupCommands } from './handler/setup';
 import { skillCommands } from './handler/skill';
 import { skillpackCommands } from './handler/skillpack';
@@ -87,8 +86,6 @@ export async function executeCommand(
   actor: Actor,
   cmd: Command,
 ): Promise<CommandOutcome | { machineId: string }> {
-  // the hosted write gate's second door (hosted-gate.ts): a `free` hosted workspace does not write
-  await assertCommandAllowed(store, cmd);
   // Domain branches (handler/<domain>.ts). Delegated in one place, before the FSM tail:
   // command types are unique, so matching here is identical to matching where they were.
   { const r = await machineCommands(store, actor, cmd); if (r !== undefined) return r; }
@@ -105,7 +102,7 @@ export async function executeCommand(
   { const r = await repoCommands(store, actor, cmd); if (r !== undefined) return r; }
   { const r = await projectCommands(store, actor, cmd); if (r !== undefined) return r; }
   { const r = await threadCommands(store, actor, cmd); if (r !== undefined) return r; }
-  { const r = await scheduleCommands(store, actor, cmd); if (r !== undefined) return r; }
+  { const r = await scheduleCommands(store, actor, cmd); if (r !== undefined) return r; }   { const r = await replyCommands(store, actor, cmd); if (r !== undefined) return r; }
   { const r = await contentCommands(store, actor, cmd); if (r !== undefined) return r; }
   { const r = await connectorCommands(store, actor, cmd); if (r !== undefined) return r; }
   { const r = await marketingCommands(store, actor, cmd); if (r !== undefined) return r; }

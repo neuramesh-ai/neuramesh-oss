@@ -43,12 +43,18 @@ describe('HumanCommandSchema mirrors the server', () => {
       { type: 'agent.register', workspace: uuid, machineId: uuid, name: 'rex', role: 'orchestrator', model: 'claude-opus-4-8', channels: ['general'] },
       { type: 'member.share_compute', workspace: uuid, member: uuid, on: false },
       { type: 'member.set_compute', workspace: uuid, shares: ['*'] },
+      { type: 'member.set_agent_model', workspace: uuid, agent: uuid, model: 'claude-opus-5', thinking: 'high' },
+      { type: 'member.set_agent_model', workspace: uuid, agent: uuid, model: null },
       { type: 'thread.set_machine', workspace: uuid, threadId: uuid, machineId: null },
       { type: 'thread.settle', workspace: uuid, threadId: uuid },
       { type: 'schedule.set_status', schedule: uuid, status: 'paused' },
       { type: 'machine.wake', workspace: uuid, machineId: uuid },
       { type: 'code_session.upsert', workspace: uuid, codeSessionId: uuid, repoName: 'nm', branch: 'b', mode: 'plan' },
       { type: 'code_session.close', workspace: uuid, codeSessionId: uuid, state: 'resumable' },
+      { type: 'reply.queue', message: uuid, letters: ['A', 'B'], gapMin: 8, startAt: '2026-10-03T15:10:00.000Z' },
+      { type: 'reply.mark', reminder: uuid, state: 'opened' },
+      { type: 'reply.clear', message: uuid },
+      { type: 'schedule.update', schedule: uuid, title: 't', prompt: 'p', cadence: 'daily', replyGap: null },
     ];
     for (const s of samples) {
       expect(HumanCommandSchema.safeParse(s).success, `client ${JSON.stringify(s)}`).toBe(true);

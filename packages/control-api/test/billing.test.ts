@@ -1,7 +1,7 @@
 // The single place plan transitions are decided: Stripe lifecycle event → workspaces.plan patch.
 // Pure (no Stripe client, no env), so it's driven with minimal event literals.
 import { describe, expect, it } from 'vitest';
-import { creditGrantFromEvent, planPatchFromEvent } from '../src/billing';
+import { creditGrantFromEvent, planPatchFromEvent, trialReminderFromEvent } from '../src/billing';
 
 describe('planPatchFromEvent — Stripe lifecycle → workspace plan patch', () => {
   it('checkout.session.completed → cloud, carrying the customer + subscription ids (workspace via client_reference_id)', () => {
@@ -9,7 +9,22 @@ describe('planPatchFromEvent — Stripe lifecycle → workspace plan patch', () 
       type: 'checkout.session.completed',
       data: { object: { client_reference_id: 'ws_1', customer: 'cus_1', subscription: 'sub_1' } },
     });
-    expect(r).toEqual({ workspace: 'ws_1', patch: { plan: 'cloud', subscriptionStatus: 'active', stripeCustomerId: 'cus_1', stripeSubscriptionId: 'sub_1' } });
+    expect(r).toEqual({ workspace: 'ws_1', patch: { plan: 'cloud', stripeCustomerId: 'cus_1', stripeSubscriptionId: 'sub_1' } });
+  });
+
+  it('a completion never writes the status, so a trial landing after its subscription event stays trialing', () => {
+    // Stripe does not order events: `customer.subscription.created` (trialing) can arrive first
+    const created = planPatchFromEvent({
+      type: 'customer.subscription.created',
+      data: { object: { id: 'sub_1', customer: 'cus_1', status: 'trialing', metadata: { workspace_id: 'ws_1' }, items: { data: [{ quantity: 1 }] } } },
+    });
+    const completed = planPatchFromEvent({
+      type: 'checkout.session.completed',
+      data: { object: { mode: 'subscription', client_reference_id: 'ws_1', customer: 'cus_1', subscription: 'sub_1' } },
+    });
+    expect(created?.patch.plan).toBe('cloud');
+    expect(created?.patch.subscriptionStatus).toBe('trialing');
+    expect(completed?.patch).not.toHaveProperty('subscriptionStatus');
   });
 
   it('customer.subscription.updated (active) → cloud with seats + period end (workspace via subscription metadata)', () => {
@@ -112,5 +127,31 @@ describe('creditGrantFromEvent — a paid pack becomes a grant, and nothing else
     const ev = { type: 'checkout.session.completed' as const, data: { object: paidSession() } };
     expect(creditGrantFromEvent(ev)).not.toBeNull();
     expect(planPatchFromEvent(ev)).toBeNull();
+  });
+});
+
+// ── the card trial's reminder (2026-10-03) ───────────────────────────────────────────────────
+
+describe('trialReminderFromEvent: Stripe’s 3-day notice becomes the email the trial form promises', () => {
+  const event = (object: Record<string, unknown>) => ({ type: 'customer.subscription.trial_will_end', data: { object } });
+
+  it('maps the workspace, the subscription (the dedupe key), the end date and the seats', () => {
+    const r = trialReminderFromEvent(event({ id: 'sub_1', trial_end: 1792195200, metadata: { workspace_id: 'ws_1' }, items: { data: [{ quantity: 3 }] } }));
+    expect(r).toEqual({ workspace: 'ws_1', subscriptionId: 'sub_1', trialEnd: new Date(1792195200 * 1000).toISOString(), seats: 3 });
+  });
+
+  it('reads one seat when the event carries no quantity', () => {
+    expect(trialReminderFromEvent(event({ id: 'sub_1', trial_end: 1792195200, metadata: { workspace_id: 'ws_1' } }))?.seats).toBe(1);
+  });
+
+  it('refuses an event it cannot address or dedupe, and every other event type', () => {
+    expect(trialReminderFromEvent(event({ trial_end: 1792195200, metadata: { workspace_id: 'ws_1' } }))).toBeNull();
+    expect(trialReminderFromEvent(event({ id: 'sub_1', trial_end: 1792195200 }))).toBeNull();
+    expect(trialReminderFromEvent(event({ id: 'sub_1', metadata: { workspace_id: 'ws_1' } }))).toBeNull();
+    expect(trialReminderFromEvent({ type: 'customer.subscription.updated', data: { object: { id: 'sub_1', trial_end: 1, metadata: { workspace_id: 'ws_1' } } } })).toBeNull();
+  });
+
+  it('is never a plan change: planPatchFromEvent ignores the notice', () => {
+    expect(planPatchFromEvent(event({ id: 'sub_1', status: 'trialing', trial_end: 1792195200, metadata: { workspace_id: 'ws_1' } }))).toBeNull();
   });
 });

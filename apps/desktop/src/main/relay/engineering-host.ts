@@ -4,7 +4,7 @@ import type { EngineeringBrainResolution } from './engineering-brain';
 import { ClineChannelSession } from './engineering-channel';
 import { resolveEngineeringProvider } from './engineering-provider';
 import { createEngineeringToolExecutors } from './engineering-tools';
-import { engineeringRepoRoot } from './engineering-workspace';
+import { engineeringRepoRoot, type EngineeringWorkspace } from './engineering-workspace';
 import { CodeSessionRecord, type CodeSessionRecorder } from './engineering-record';
 
 export { resolveEngineeringProvider } from './engineering-provider';
@@ -24,7 +24,9 @@ export interface ClineEngineeringHostOptions {
   /** the member's headers instead of the machine's bearer — the desktop app hosting Code for its own user */
   authHeaders?: () => Promise<Record<string, string>>;
   workspaceId: string;
-  resolveCwd(meta: EngineeringMachineOpenMeta): Promise<string>;
+  /** the thread's worktree with the clone it came from (engineering-workspace.ts). A bare path is a
+   *  worktree of the session repository's own cache clone. */
+  resolveCwd(meta: EngineeringMachineOpenMeta): Promise<string | EngineeringWorkspace>;
   resolveBrain(meta: EngineeringMachineOpenMeta): Promise<EngineeringBrainResolution>;
   /** Machine-owned policy rules. Browser controls can only narrow session behavior. */
   resolvePolicyRules?(meta: EngineeringMachineOpenMeta): Promise<PolicyRule[]>;
@@ -42,9 +44,11 @@ export function createClineEngineeringHost(opts: ClineEngineeringHostOptions): E
     async open(meta, emit) {
       const record = opts.recorder ? new CodeSessionRecord(opts.recorder, meta) : null;
       const emitTo = record ? record.emit(emit) : emit;
-      const [cwd, brain, policyRules] = await Promise.all([
+      const [where, brain, policyRules] = await Promise.all([
         opts.resolveCwd(meta), opts.resolveBrain(meta), opts.resolvePolicyRules?.(meta) ?? defaultBaselineRules(),
       ]);
+      // the shell checks the worktree's git pointer against the clone it came from, a twin's included
+      const { cwd, repoRoot } = typeof where === 'string' ? { cwd: where, repoRoot: engineeringRepoRoot(meta.repoId) } : where;
       const provider = await resolveEngineeringProvider(opts, brain);
       // The desktop package is CommonJS while the coding runtime is import-only ESM. This must
       // remain dynamic or machined's tsx boot resolves Node's require condition and exits early.
@@ -52,7 +56,7 @@ export function createClineEngineeringHost(opts: ClineEngineeringHostOptions): E
       const createCore = opts.createCore ?? runtimeModule!.ClineCore.create.bind(runtimeModule!.ClineCore);
       const createDefaultExecutors = opts.createDefaultExecutors ?? runtimeModule?.createDefaultExecutors;
       const managedTools = createDefaultExecutors
-        ? await createEngineeringToolExecutors(cwd, createDefaultExecutors, policyRules, engineeringRepoRoot(meta.repoId))
+        ? await createEngineeringToolExecutors(cwd, createDefaultExecutors, policyRules, repoRoot)
         : undefined;
       const resolveProvider = async (modelId: string | null, brainPack: string | null) => resolveEngineeringProvider(
         opts,

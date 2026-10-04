@@ -1,5 +1,5 @@
-// schedules (marketing-channel plan §4.6): humans arm, agents propose; arming is THE
-// deep-funnel paywall (free → PLAN_LIMIT 402 with the full-powers upsell); claiming a due
+// schedules (marketing-channel plan §4.6): humans arm, agents propose; a routine arms on every
+// plan since 2026-10-03 (the Pro trial pays for its runs in credits); claiming a due
 // run is a run_count CAS so two daemons never double-fire (the ship-stage counter lesson).
 import type { Actor } from '@neuramesh/shared';
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -37,12 +37,14 @@ beforeEach(() => {
   app = createApp(store);
 });
 
-describe('schedule.create — humans arm, Team unlocks', () => {
-  it('FREE workspace → PLAN_LIMIT 402 (the deep-funnel paywall moment)', async () => {
+describe('schedule.create — humans arm, on every plan', () => {
+  // George, 2026-10-03: "allow routines on the trial". the paywall refused routines on the Pro
+  // trial (a hosted workspace on `free`) while the site sold them
+  it('a Pro trial workspace arms a routine: no plan gate', async () => {
     const channel = await makeRoom();
     const res = await send(george, { ...base, channel });
-    expect(res.status).toBe(402);
-    expect(String((await j(res)).error ?? '')).toMatch(/Team/);
+    expect(res.status).toBe(200);
+    expect((await j(res)).scheduleId).toBeTruthy();
   });
 
   it('agents can NOT arm — they propose (HUMAN_ONLY), even on Cloud', async () => {

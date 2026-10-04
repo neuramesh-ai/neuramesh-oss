@@ -6,13 +6,13 @@
 // that declares 127 bindings, which is what made it the one worth taking.
 import { PhaseRing } from '../task/BeatsTracker';
 import { STATE_LABEL } from '../task/labels';
-import { IconActivity, IconArrowUp, IconClose, IconPause, IconTerm, IconTrash, IconWorkbench } from '../ui/icons';
+import { IconActivity, IconArrowUp, IconPause, IconTerm, IconTrash } from '../ui/icons';
 import { KindChip, ThreadCrumb, ThreadSettleBtn, ThreadStatusChip, type HeadStatus } from './parts';
 import type { TaskRow } from '../bridge/rows-board';
 import type { JourneyLeg } from '@neuramesh/shared';
 import type { Dispatch, SetStateAction } from 'react';
 
-export function ThreadHead({ act, back, blocking, busy, channelSlug, crumbProject, editDetails, isContent, marks, onClose, onOpenTerminal, onSettle, onToggleWorkbench, onViewLogs, peek, setBlocking, setClosing, spectrumLegs, task, wbOpen }: {
+export function ThreadHead({ act, back, blocking, busy, channelSlug, crumbProject, editDetails, isContent, marks, onClose, onOpenTerminal, onSettle, onViewLogs, peek, setBlocking, setClosing, spectrumLegs, task }: {
   /** what this task's thread is doing, and the act its stamp offers (shell/rowstatus.ts) */
   marks?: HeadStatus | null;
   onSettle?: (threadId: string) => void;
@@ -30,10 +30,6 @@ export function ThreadHead({ act, back, blocking, busy, channelSlug, crumbProjec
   onClose: () => void;
   onOpenTerminal?: (t: TaskRow) => void;
   onViewLogs: () => void;
-  /** the Workbench holds this task's DETAILS, as a card inside this thread — so the header owns
-   *  its toggle (2026-08-16; back here in the rail-ink round 3 after a spell on the tab row) */
-  wbOpen?: boolean;
-  onToggleWorkbench?: () => void;
   busy: boolean;
   editDetails: boolean;
   isContent: boolean;
@@ -44,19 +40,12 @@ export function ThreadHead({ act, back, blocking, busy, channelSlug, crumbProjec
   <div className="thead">
     {/* the crumb leads the header — same anatomy as a chat session (docs/35 §3.4): this
         surface replaced the list it was opened from, so it names the way back.
-        IN A PEEK (the task-peek round, 2026-08-10) there is nothing to go back TO — the
-        thread it opened from is still on screen beside it — so the crumb's seat carries the
-        peek's own controls instead. Same header, same panel; only the way OUT differs.
-        TWO ways out, not three (George live, same day): ⤢ expand was retired the day it
-        shipped — the grip already makes the width whatever you want, so expand was a second
-        answer to the question the seam already answers, and its end state was a dead end you
-        had to undo. Close, or take the whole surface — and the ✕ moved to the FAR RIGHT
-        (George live, same day), because a dismiss belongs at the trailing edge like every
-        other in the product; `Open full ›` keeps this leading seat, being the forward door
-        rather than the close. */}
+        IN A TASK TAB (the side-panel round, 2026-10-03; the task peek of 2026-08-10 before it)
+        there is nothing to go back TO: the thread it opened from is still on screen beside it.
+        So the crumb's seat carries the forward door instead, and the tab strip's ✕ is the close. */}
     {peek ? (
       <span className="pkctl">
-        <button className="pkfull" title="Open the full task surface" onClick={peek.onFull}>Open full ›</button>
+        <button className="pkfull" title="Open the task on the whole sheet" onClick={peek.onFull}>Open the task ›</button>
       </span>
     ) : (
       <button className="scrumb" title="back — Esc" aria-label={`Back to ${back}`} onClick={onClose}>‹ {back}</button>
@@ -105,17 +94,11 @@ export function ThreadHead({ act, back, blocking, busy, channelSlug, crumbProjec
       {/* the terminal is a WAY IN, not a view of the task — it belongs with the other
           openers here, next to activity, instead of holding a slot in a tab strip */}
       {!peek && !isContent && (() => { const avail = !!task.branch || ['in_review', 'done', 'accepted'].includes(task.state); return (
-        <button className="navpin" disabled={!avail} title={avail ? 'open a terminal in this task’s worktree (bottom dock)' : 'no local workspace yet — opens once an agent runs this task here'} aria-label="Open a terminal in this task’s worktree" onClick={() => onOpenTerminal?.(task)}><IconTerm s={14} /></button>
+        <button className="navpin" disabled={!avail} title={avail ? 'open a terminal in this task’s worktree, in the side panel' : 'no local workspace yet — opens once an agent runs this task here'} aria-label="Open a terminal in this task’s worktree" onClick={() => onOpenTerminal?.(task)}><IconTerm s={14} /></button>
       ); })()}
       {!peek && <button className="navpin" title="agent activity for this task" onClick={onViewLogs}><IconActivity s={14} /></button>}
-      {/* THE WORKBENCH TOGGLE, home again (rail-ink round 3, 2026-09-04, George): the panel is a
-          card INSIDE this thread now, so its switch belongs to the thread — with a glyph of its
-          own, because the dock-right glyph it wore on the tab row means the side panel today. */}
-      {!peek && onToggleWorkbench && (
-        <button className={`navpin${wbOpen ? ' on' : ''}`} aria-pressed={!!wbOpen} title={wbOpen ? 'Hide the Workbench — ⌘P' : 'Show the Workbench — ⌘P'} aria-label={wbOpen ? 'Hide the Workbench' : 'Show the Workbench'} onClick={onToggleWorkbench}><IconWorkbench s={14} /></button>
-      )}
-      {/* the peek's dismiss, at the trailing edge with the other right-hand controls */}
-      {peek && <button className="navpin pkclose" title="Close — Esc" aria-label="Close the task peek" onClick={onClose}><IconClose s={14} /></button>}
+      {/* the Workbench toggle retired with the card (the side-panel round, 2026-10-03): the task's
+          details are the side panel's Overview tab, and the panel's one switch is the frame top's */}
     </div>
   </div>
   );

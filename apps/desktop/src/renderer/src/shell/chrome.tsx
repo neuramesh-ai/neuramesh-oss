@@ -162,14 +162,15 @@ export function ProcPopover({ procs, onKill, onClose }: { procs: ProcList; onKil
 // these show on almost every page, so they ride the one chrome row that does — and the old
 // dock's ⌘ tile folds into the search pill, so `onCmdK` renders only where no pill exists).
 // The top-dock mode keeps its bottom DockBar: that mode hides the frame top entirely.
-export function UtilCluster({ activeKind, onKind, dockOpen, onDock, procCount, procOpen, onProc, procs, onKill, status, onCmdK, overflow }: {
+export function UtilCluster({ activeKind, onKind, dockOpen, onDock, dockCount = 0, procCount, procOpen, onProc, procs, onKill, status, onCmdK, overflow }: {
   activeKind: WTabKind | null; onKind: (kind: 'terminal' | 'browser') => void;
   /** the SIDE DOCK is showing at the frame's right edge (rail-ink round 3, 2026-09-04) */
   dockOpen: boolean;
-  /** …and this is its toggle — the seat the Workbench button held (which had taken the Editor's,
-   *  2026-08-16). The Workbench moved inside the thread and is toggled from the thread's header;
-   *  the frame-level panel is the tab dock now, so the frame-level switch is the dock's. */
+  /** …and this is its toggle: the ONE switch for the one right panel (the side-panel round,
+   *  2026-10-03; the Workbench card and its own toggle retired) */
   onDock: () => void;
+  /** tabs that arrived behind while the panel was folded: the button counts them */
+  dockCount?: number;
   procCount: number; procOpen: boolean; onProc: () => void;
   procs: ProcList; onKill: (kind: 'agent' | 'terminal', id: string) => void; status?: React.ReactNode;
   onCmdK?: () => void;
@@ -185,7 +186,7 @@ export function UtilCluster({ activeKind, onKind, dockOpen, onDock, procCount, p
   return (
     <>
       {onCmdK && <button className="dockbarbtn ico" onClick={onCmdK} data-tip="Quick actions · ⌘K" aria-label="Quick actions (⌘K)"><IconCmd s={15} /></button>}
-      <button className={`dockbarbtn ico utilkind${dockOpen ? ' on' : ''}`} onClick={onDock} aria-pressed={dockOpen} data-tip="Side panel · ⌘J" aria-label="Side panel"><IconDockRight s={15} /></button>
+      <button className={`dockbarbtn ico utilkind${dockOpen ? ' on' : ''}`} onClick={onDock} aria-pressed={dockOpen} data-tip="Side panel · ⌘J" aria-label={dockCount ? `Side panel, ${dockCount} new` : 'Side panel'}><IconDockRight s={15} />{dockCount > 0 && <span className="dockbarbadge fresh">{dockCount}</span>}</button>
       {kinds.map(([k, Icon, label]) => (
         <button key={k} className={`dockbarbtn ico utilkind${activeKind === k ? ' on' : ''}`} onClick={() => onKind(k)} data-tip={label} aria-label={label}><Icon s={15} /></button>
       ))}

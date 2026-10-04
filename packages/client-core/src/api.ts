@@ -108,6 +108,9 @@ export interface WorkspaceMembership {
   role?: string;
   memberCount?: number;
   plan?: string;
+  /** false = the workspace exists but its wizard never finished (no agents yet). the first hosted
+   *  sign-in makes the workspace on the server, so a client resumes the wizard on it. */
+  onboarded?: boolean;
 }
 
 
@@ -118,6 +121,9 @@ function parseJson(text: string): unknown {
     return null;
   }
 }
+
+/** the resolve's answer: the row exists, or what the pick and the grant need */
+export type GitHubResolveResult = { ok: true; handle: string; attached?: boolean } | { ok: false; code: string; error: string; install?: string | null; repos?: string[]; hint?: string | null };
 
 export class ControlApiClient {
   constructor(private readonly opts: ControlApiOptions) {}
@@ -256,6 +262,11 @@ export class ControlApiClient {
       if (e instanceof ControlApiError && e.status === 409) return { ok: false, capped: true, code: e.code, error: e.message };
       throw e;
     }) as Promise<{ ok?: boolean; capped?: boolean; code?: string; error?: string }>;
+  }
+  /** the GitHub grant's resolve (docs/44, docs/design/repo-connect-2026-10): connected, else what the
+   *  neuramesh app reads for this workspace and the sealed install page. HUMAN_ONLY on the server */
+  githubResolve(channel: string, repo?: string): Promise<GitHubResolveResult> {
+    return this.post('/v1/github/resolve', { channel, ...(repo ? { repo } : {}) }) as Promise<GitHubResolveResult>;
   }
   /** the credit ring's read: the balance and the three named lines */
   usage(workspace: string): Promise<WorkspaceUsage> {

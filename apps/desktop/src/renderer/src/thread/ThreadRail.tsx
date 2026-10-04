@@ -10,16 +10,17 @@ import { type RailSection } from './parts';
  * and left the conversation's behind, so a content thread drew its brand panel three inches from
  * the panel built to hold it — and opening the Workbench put two panels at the same edge.
  *
- * The sections now live in exactly one place: the Workbench's **Details** face, scoped to whatever
- * you are standing in (`shell/workbench-state.ts`). `RailSections` — the body both surfaces always
- * shared — is unchanged and is what gets portalled in.
+ * The sections now live in exactly one place: the side panel's **Overview** tab (the Workbench's
+ * Details face until the side-panel round, 2026-10-03), owned by whatever session you are standing
+ * in (`shell/panel-state.ts`). `RailSections` — the body both surfaces always shared — is
+ * unchanged and is what gets portalled in.
  *
- * What replaces the in-sheet panel is `RailToks`: one line under the thread head naming what the
- * Details face holds, each tok a door to it. That is the honest answer to this cut's one real
- * cost — with the panel shut the sections are off-screen, so the thread has to say they exist.
+ * What stands in for it while Overview is not in view is `RailToks`: one line under the thread
+ * head naming what Overview holds, each tok a door to it — with the tab out of view the sections
+ * are off-screen, so the thread has to say they exist.
  */
 
-/** The rail's contents — portalled into the Workbench's Details slot. */
+/** The rail's contents — portalled into the side panel's Overview slot. */
 export function RailSections({ sections, extra }: { sections: RailSection[]; extra?: React.ReactNode }) {
   return (
     <>
@@ -39,8 +40,8 @@ export function RailSections({ sections, extra }: { sections: RailSection[]; ext
 }
 
 /**
- * The Details face's stand-in, under the thread head: what the panel holds, said out loud, one
- * click from opening it. Counts only where a count MEANS something — an empty section's `+`
+ * The Overview tab's stand-in, under the thread head: what the panel holds, said out loud, one
+ * click from showing it. Counts only where a count MEANS something — an empty section's `+`
  * invite reads as noise in a strip with no heading beside it to explain what it adds — and a
  * section holding a gate stays warm, which is the one thing that must survive the panel being shut.
  *

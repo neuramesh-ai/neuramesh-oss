@@ -21,7 +21,7 @@
 // Credits gate all three: out of credits, the door says so and offers nothing it cannot deliver.
 //
 // Configured once at boot (agents.ts, beside the worker lane) so the flows keep their signatures.
-import { AUTH_LABEL, STARTER_MODEL, authCardBlock, parseBrainOverride, runtimeForModel, type AgentRole, type BrainOverride, type NmAuth } from '@neuramesh/shared';
+import { AUTH_LABEL, STARTER_MODEL, authCardBlock, parseAuthCard, parseBrainOverride, runtimeForModel, type AgentRole, type BrainOverride, type NmAuth } from '@neuramesh/shared';
 import type { LogFn } from '../agentlog';
 import type { HostedAgent } from '../agents';
 import { apiAuthHeaders } from '../apiauth';
@@ -71,6 +71,15 @@ export function fallbackText(agent: { name: string; runtime: string }, u: Unavai
   return `${head} Sign in to ${label} again on this machine, or run this conversation on the NeuraMesh brain, on credits.`;
 }
 
+/** an automatic switch said in a thread: the switched card (its role), or the capped path's line that the
+ *  owner posts (its agent's name). null for anything else, a card that only offers the switch included.
+ *  the next run of a schedule reads it to end the switch (host/runsession.ts) */
+export function autoSwitchOf(body: string): { role?: string; agent?: string } | null {
+  const card = parseAuthCard(body);
+  if (card) return card.switched && (card.scope?.role || card.agent) ? (card.scope?.role ? { role: card.scope.role } : { agent: card.agent! }) : null;
+  const line = /^@(\S+) cannot run on .+ This (?:routine|conversation) continues on the NeuraMesh brain, on credits\./.exec(body);
+  return line ? { agent: line[1]! } : null;
+}
 /** the card's payload — what the renderer's card and the docked notice read (packages/shared cards.ts) */
 function cardOf(agent: HostedAgent, u: Unavailable, scope: { threadId: string } | null, starter: boolean, taskNumber?: number): NmAuth {
   return {
@@ -100,10 +109,12 @@ export const reseatOnStarter = (a: HostedAgent): HostedAgent => ({ ...a, model: 
 type Db = { get<T = Record<string, unknown>>(sql: string, params?: unknown[]): Promise<T | undefined | null> };
 interface Ctx { db: Db; apiUrl: string; ownerActorId: string }
 let ctx: Ctx | null = null;
-/** seats this host moved a moment ago (`thread:role` → when): the wake ladder's door and the wake's
- *  own door can run 40 ms apart, before the replica shows the first one's override — seen live as
- *  the reason posted twice. A seat moved within the window is taken silently, whatever the replica says. */
-const moved = new Map<string, number>();
+/** seats this host moved a moment ago (`thread:role` → when, and for which trigger): the wake ladder's
+ *  door and the wake's own door can run 40 ms apart, before the replica shows the first one's override —
+ *  seen live as the reason posted twice. A seat moved within the window is taken silently, whatever the
+ *  replica says, unless a NEW trigger asks: that is a new turn (a routine's next run, whose launcher
+ *  ended the switch, host/runsession.ts), and the replica is the truth for it. */
+const moved = new Map<string, { at: number; trigger: string | null }>();
 const MOVED_MEMO_MS = 60_000;
 export function configureStarterFallback(c: Ctx | null): void { ctx = c; moved.clear(); }
 
@@ -166,7 +177,8 @@ export async function starterFallback(
   // by the replica's word, or by this host's own memory when the replica has not caught up yet
   const key = thread ? `${thread.id}:${agent.role}` : null;
   if (thread?.override?.[agent.role as AgentRole] === STARTER_MODEL) return reseatOnStarter(agent);
-  if (key && Date.now() - (moved.get(key) ?? 0) < MOVED_MEMO_MS) return reseatOnStarter(agent);
+  const memo = key ? moved.get(key) : undefined;
+  if (memo && Date.now() - memo.at < MOVED_MEMO_MS && !(where.replyTo && memo.trigger && memo.trigger !== where.replyTo)) return reseatOnStarter(agent);
   const credits = await creditsOk(apiUrl, where.workspace, ownerActorId);
   const offer = async () => {
     await say(offerCard(agent, u, thread ? { threadId: thread.id } : null, credits, where.taskNumber));
@@ -182,7 +194,7 @@ export async function starterFallback(
   // owner's word records the move — the server keeps set_brain HUMAN_ONLY, and this is the human's rule
   const r = await post('/v1/commands', { kind: 'human', id: ownerActorId }, { type: 'thread.set_brain', workspace: where.workspace, threadId: thread.id, override }).catch(() => null);
   if (!r?.ok) return offer();
-  if (key) moved.set(key, Date.now());
+  if (key) moved.set(key, { at: Date.now(), trigger: where.replyTo ?? null });
   // a CAP arrives after the turn already ran, and a second run for the same (agent, trigger) loses
   // the wake lease by construction (runs' partial unique index). So the reason is posted AS THE
   // OWNER — the routine speaks as the owner already — and mentions the agent: that is a fresh

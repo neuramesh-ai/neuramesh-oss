@@ -7,7 +7,7 @@
 // server's wire shape, so there is one renderer per read.
 import type { ScanPr, ScanRelease, ScanTag } from '@neuramesh/shared';
 import type { ApiGetFn } from './searchx';
-import { ghCapable, ghRaw, repoSlugFor } from './gh';
+import { ghLoggedIn, ghRaw, repoSlugFor } from './gh';
 import { readRepoSignals as readSignalsViaGh, type RepoSignals } from './releasewatch';
 
 type ReplicaDb = { getAll<T>(sql: string, params?: unknown[]): Promise<T[]> };
@@ -25,9 +25,11 @@ export interface RepoReader {
 
 const FILE_TEXT_CAP = 60_000;
 const TREE_CAP = 500;
-const NOT_CONNECTED = 'This room cannot read its repository: GitHub is not connected for this project and this machine has no GitHub login. Say so plainly and point the human at Connections › GitHub (one minute on GitHub, read only). For a playbook ask, still call run_playbook: it posts the Connect GitHub card the human can click. Never guess what the repository contains.';
+const NOT_CONNECTED = 'This room cannot read its repository: GitHub is not connected for this project and this machine has no GitHub login. Say so plainly and point the human at Connections › GitHub (one minute on GitHub). For a playbook ask, still call run_playbook: it posts the Connect GitHub card the human can click. Never guess what the repository contains.';
 const NO_REPO = 'This room\'s project has no GitHub repository attached. Say so plainly: the human attaches one in the project (Attach the repository), then asks again.';
 const RECONNECT = 'GitHub no longer lets neuramesh read this repository: the grant ended on GitHub. Tell the human plainly to connect GitHub again from Connections. Do not retry, and never fill the gap with guesses.';
+/** the refusal once a Connect GitHub card is up (host/reponeed.ts): stop, one line, and the grant resumes the work */
+export const CARD_UP = 'Nothing here can read this room\'s repository yet, so a Connect GitHub card is in this conversation now. Stop the work that needs the code. Say in one short line that you wait for GitHub, then end the turn. The conversation continues by itself when the person connects. Never guess what the repository contains.';
 
 /** the room's primary repository from the replica (the release preflight's own order) */
 export async function primaryRepoRow(db: ReplicaDb, channelId: string): Promise<{ id: string; org_name: string; name: string; clone_url: string | null; local_path: string | null; provider: string | null } | null> {
@@ -37,6 +39,19 @@ export async function primaryRepoRow(db: ReplicaDb, channelId: string): Promise<
       where c.id = ? order by coalesce(pr.is_primary, 0) desc, r.org_name, r.name limit 1`, [channelId]).catch(() => []);
   return rows[0] ?? null;
 }
+
+/** a yes or no asked live and kept a minute, the way host/repocred.ts keeps the machine's login */
+export function liveCheck(ask: () => Promise<boolean>, now: () => number = () => Date.now()): () => Promise<boolean> {
+  let last: { at: number; yes: Promise<boolean> } | null = null;
+  return () => {
+    if (!last || now() - last.at > 60_000) last = { at: now(), yes: ask().catch(() => false) };
+    return last.yes;
+  };
+}
+
+/** this machine's own gh login, for every read and readability check: a `gh auth login` made while
+ *  the daemon runs counts within a minute, where ghCapable keeps its first answer until a restart */
+export const ghLive = liveCheck(ghLoggedIn);
 
 /** is the room's project's GitHub connector live, from the replica */
 export async function githubConnected(db: ReplicaDb, channelId: string): Promise<boolean> {
@@ -54,6 +69,14 @@ async function viaApi<T>(apiGet: ApiGetFn, actor: ActorRef, path: string, params
   const body = (await res.json().catch(() => ({}))) as T & { code?: string; error?: string };
   if (res.ok) return { ok: true, body };
   return { ok: false, code: body.code ?? 'ERROR', error: body.error ?? `read failed (${res.status})`, status: res.status };
+}
+
+/** can this server connect GitHub at all? A Local stack has no GitHub app, and its read route answers
+ *  NOT_CONFIGURED before it looks at the room (control-api github-connect.ts), so a card there could never
+ *  complete. Server truth, asked only when a card would go up */
+export async function githubGrantable(apiGet: ApiGetFn, actor: ActorRef, channelId: string): Promise<boolean> {
+  const r = await viaApi<unknown>(apiGet, actor, 'tree', { channel: channelId }).catch(() => null);
+  return !(r && !r.ok && r.code === 'NOT_CONFIGURED');
 }
 
 /** the release watch's read through the connector: the signals, or null when this room has no live grant */
@@ -127,9 +150,12 @@ export function renderTree(t: TreeOut): string {
 }
 
 /** the reader for one room: the connector first, the machine's gh second, the honest refusal third */
-export function makeRepoReader(deps: { apiGet: ApiGetFn; actor: ActorRef; db: ReplicaDb; channelId: string; capable?: () => Promise<boolean> }): RepoReader {
+export function makeRepoReader(deps: { apiGet: ApiGetFn; actor: ActorRef; db: ReplicaDb; channelId: string; capable?: () => Promise<boolean>; onNeed?: () => Promise<boolean> }): RepoReader {
   const { apiGet, actor, db, channelId } = deps;
-  const capable = deps.capable ?? ghCapable;
+  const capable = deps.capable ?? ghLive;
+  // a surface that can post the GitHub card (the orchestrator, the conversation) passes onNeed: every
+  // refusal that a grant fixes then puts the card up, and the model reads one instruction to stop
+  const needed = async (text: string): Promise<string> => (deps.onNeed && (await deps.onNeed().catch(() => false)) ? CARD_UP : text);
   // which door, decided per call: the row can flip between two reads (a human just connected)
   const door = async (): Promise<{ kind: 'api' } | { kind: 'gh'; slug: string } | { kind: 'none'; text: string }> => {
     if (await githubConnected(db, channelId)) return { kind: 'api' };
@@ -140,26 +166,26 @@ export function makeRepoReader(deps: { apiGet: ApiGetFn; actor: ActorRef; db: Re
     if (await capable()) return { kind: 'gh', slug };
     return { kind: 'none', text: NOT_CONNECTED };
   };
-  const refusal = (r: { code: string; error: string }): string => (r.code === 'RECONNECT_REQUIRED' ? RECONNECT : r.code === 'NO_REPO' ? NO_REPO : r.code === 'NOT_CONNECTED' ? NOT_CONNECTED : `The repository read failed: ${r.error}. Report it; never fill the gap with guesses.`);
+  const refusal = async (r: { code: string; error: string }): Promise<string> => (r.code === 'RECONNECT_REQUIRED' ? needed(RECONNECT) : r.code === 'NO_REPO' ? needed(NO_REPO) : r.code === 'NOT_CONNECTED' ? needed(NOT_CONNECTED) : `The repository read failed: ${r.error}. Report it; never fill the gap with guesses.`);
   return {
     async changes(i) {
       const since = i.since && !Number.isNaN(Date.parse(i.since)) ? new Date(i.since).toISOString() : new Date(Date.now() - 30 * 86_400_000).toISOString();
       const d = await door();
-      if (d.kind === 'none') return d.text;
+      if (d.kind === 'none') return needed(d.text);
       if (d.kind === 'gh') return renderChanges(await ghChanges(d.slug, since));
       const r = await viaApi<Changes>(apiGet, actor, 'changes', { channel: channelId, since });
       return r.ok ? renderChanges(r.body) : refusal(r);
     },
     async file(i) {
       const d = await door();
-      if (d.kind === 'none') return d.text;
+      if (d.kind === 'none') return needed(d.text);
       if (d.kind === 'gh') { const f = await ghFile(d.slug, i.path, i.ref); return typeof f === 'string' ? f : renderFile(f); }
       const r = await viaApi<FileOut>(apiGet, actor, 'file', { channel: channelId, path: i.path, ref: i.ref });
       return r.ok ? renderFile(r.body) : r.status === 400 ? r.error : refusal(r);
     },
     async tree(i) {
       const d = await door();
-      if (d.kind === 'none') return d.text;
+      if (d.kind === 'none') return needed(d.text);
       if (d.kind === 'gh') { const t = await ghTree(d.slug, i.path, i.ref); return typeof t === 'string' ? t : renderTree(t); }
       const r = await viaApi<TreeOut>(apiGet, actor, 'tree', { channel: channelId, path: i.path, ref: i.ref });
       return r.ok ? renderTree(r.body) : r.status === 400 ? r.error : refusal(r);

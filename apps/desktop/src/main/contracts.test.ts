@@ -95,7 +95,13 @@ test('powers and style match their pinned size', () => {
   // 4381 → 4612 (2026-09-26, coding threads 0144, ruling 1): the ladder gains its fourth rung — a request
   // that wants hands on the project's repository now goes to open_code_session, and the board's bar
   // becomes rung 5. The contract's decision tree grew one branch; nothing else moved.
-  assert.equal(c.prompt!['powers']!.length, 4612);
+  // 4612 → 5633 (2026-10-01, the routine writer, docs/design/routine-writer-2026-10): rung 0 sends work that
+  // repeats to THE ROUTINE WRITER, the bullet that says when to write a routine, when to ask "Make this a
+  // routine?" first, when to offer a new session, and that a vague filter is a question, never an invented
+  // bar (the first live run invented one). The routine's parts ride propose_routine's schema.
+  // 5633 → 5722 (the third live run): never ask for a time zone (it asked twice), and propose_routine is the
+  // one way a card is posted (it wrote v2 by hand; the server now drops such a block, routineCardGuard).
+  assert.equal(c.prompt!['powers']!.length, 5722);
   assert.equal(c.prompt!['style']!.length, 1430);
 });
 
@@ -110,6 +116,13 @@ test('the contract makes solving in-thread the default, and filing a proposal', 
   assert.match(powers, /create_task, directly/);
   // the code door (0144): hands on the repo now → open_code_session, one rung above the board's bar
   assert.match(powers, /open_code_session/);
+  // the routine writer: work that repeats is rung 0, written WITH the person, and a run is never re-written
+  assert.match(powers, /0\. \*\*It asks for work that repeats\*\*/);
+  assert.match(powers, /propose_routine/);
+  assert.match(powers, /offer_routine_session/);
+  assert.match(powers, /"Try once ·" and "Routine ·" messages are RUNS/);
+  assert.match(powers, /never a bar you invent/);
+  assert.match(powers, /Never ask for a time zone/);
   // the bar is named, so "this feels big" cannot quietly become a task
   assert.match(powers, /they asked for tracked work/);
   assert.match(powers, /OUTLIVE this conversation/);

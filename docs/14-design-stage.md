@@ -168,11 +168,22 @@ knows `design_review` (approval is the human's button — relay prose change req
   snapshots arrive, that same card becomes a visual gallery; each sandboxed thumbnail opens its
   matching tab directly in **DesignReview**. It remains available through review and after approval
   as the build's visual contract. Iris says: “Keep editing there. Iris will sync the designs here
-  when ready so you can review.”
+  when ready so you can review.” **Amended 2026-10-03 (the side-panel round):** the gallery of
+  thumbnails left the thread. A round that waits is ONE row in the card, and the row opens the
+  round's review tab in the side panel. The approved contract keeps its thumbnails.
 - **Artifacts screen:** design artifacts group under a "Design" section per task round; approved
   rounds appear in the channel library via promotion.
 
 ### 7.1 The Design Studio (2026-07-28)
+
+> **Amended 2026-10-03 (the side-panel round, [side-panel-2026-10](design/side-panel-2026-10/plan.md)):
+> the studio column retired.** Since 2026-08-01 a design round opened as review tabs, so no door
+> reached the studio any more. Now a design round is ONE review tab in the session's side panel,
+> with its mockups as a strip of stills and one on stage (docs/36 §13). The verdict bar holds the
+> human-only `Approve design` and `Revise`, and a note on a mockup quotes its name. While the panel
+> shows the round, the thread's gate dock stays empty (docs/25 "exactly one"). The thread keeps
+> one row for the round. The text below is history, and the probe that measured the animation
+> retired with the column.
 
 Design review docks **beside** the thread instead of on top of it — the docs/33 *split stage*
 idiom. One surface for **every** design round: `provider` selects the provenance strip and nothing
@@ -193,7 +204,7 @@ Esc unwinds a layer at a time: expanded → docked → closed. Width persists pe
 
 **The open is a layout animation** (docs/33 §7): one animated number — the studio's `flex-basis` —
 so the thread yields exactly the width the studio takes and the two read as a single gesture.
-Measured frame by frame in [probe-studio-anim.mjs](../scripts/probe-studio-anim.mjs): open runs
+Measured frame by frame in `scripts/probe-studio-anim.mjs` (retired 2026-10-03): open runs
 thread 1294→775 while the studio goes 1→520 over ~400ms, and their sum stays constant throughout;
 expand, collapse and close reverse the same path. The mount arms `shown` on a double-rAF **with an
 80ms timer beside it** — rAF is starved while the window is hidden, and without the timer a studio

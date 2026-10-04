@@ -61,9 +61,24 @@ The window is a **colored frame** that owns all chrome; content floats on an **e
   the main sheet's recipe exactly, resizable by the same grip. It is toggled from the frame top's
   side-panel glyph (`⌘J`), because a panel that lives on the frame is toggled from the frame; it
   **unfolds itself when a tab comes to the front and folds when the last one closes**
-  (`shell/sidedock-state.ts`, tested), and it stays MOUNTED while it has tabs — the fold is CSS,
+  (`shell/panel-state.ts` `panelFoldAfter`, tested, and `shell/sidedock-state.ts` before 2026-10-03), and it stays MOUNTED while it has tabs — the fold is CSS,
   so a terminal's pty and a browser's history survive it. Under 1100px it overlays the sheet.
-  ▸ **The Workbench is a CARD inside the sheet** — the open thread's own object, floating at the
+  ▸ **Amended 2026-10-03: the Workbench card retired into the side panel** (the side-panel round,
+  [docs/design/side-panel-2026-10](design/side-panel-2026-10/plan.md), George: "neuramesh becomes
+  a 3 pane interface"). The frame holds three panes: the rail, the sheet and the side panel. The
+  sheet holds the conversation in front of you and nothing else. The side panel belongs to that
+  session. Each session owns the tabs it opened (`WTab.owner`). A move to another session shows
+  that session's tabs, and the others stay mounted and hidden, so a terminal keeps its shell. A
+  session also has tabs of its own that are not records, so they never close or persist: a task
+  has Overview, Files where this client can browse its worktree, and Drafts when it drafted posts.
+  A conversation has Overview and Drafts. A room home with sections has Overview. A coding thread
+  has Changes · Files · Work Plan · Checkpoints · Terminal. What a session makes while you look at
+  it opens in the panel by itself (`shell/arrivals.ts`, tested): only what is new, never over your
+  own work, a burst as one event, and a fold made during a run holds until that run ends. While
+  the panel is open, its bottom line belongs to its own actions (a review tab's verdict bar, the
+  code pane's foot), so the reply reminders rise above that line. The three notes below describe
+  the card. They stay as history.
+  ▸ **(Retired 2026-10-03.) The Workbench is a CARD inside the sheet** — the open thread's own object, floating at the
   sheet's right edge on the thread's ground (`--card`, the card radius and shadow, the way a
   question card is), with the conversation recentring in what is left. It is toggled from the
   **thread's head** with a glyph of its own (`IconWorkbench`: a sheet with a card inside it; the
@@ -73,12 +88,14 @@ The window is a **colored frame** that owns all chrome; content floats on an **e
   card floats OVER the thread instead of beside it: a `@container (max-width: 760px)` rule on
   `.main` (a size container), keyed to the sheet's width rather than the window's, because the
   dock is what usually takes the room.
-  ▸ **The Workbench still follows the session** (2026-08-17, George): it opens BY DEFAULT when a
+  ▸ **(Retired 2026-10-03.) The Workbench still follows the session** (2026-08-17, George): it opens BY DEFAULT when a
   thread is created or opened and slides CLOSED when a task peek docks beside the thread; the
   user's own toggle wins from there until the session or peek changes.
   ▸ **One panel per edge, still** (2026-08-17's amendment, restated): the frame's right edge holds
   the dock and nothing else; the sheet's right edge holds the card and nothing else. What stands
   in for the card while it is shut is a row of toks under the thread head, not a second panel.
+  **Amended 2026-10-03:** the sheet's right edge holds nothing now. The side panel is the one
+  panel at the right, and the toks under a head open its Overview tab.
 - **Sheet** (`--bg`/`--panel`): the content surface — rounded (18px family), shadowed
   (`--shadow-sheet`), holding *content only*. No tab ears protruding above it; lenses and
   segmented controls live inside it.
@@ -135,6 +152,14 @@ in an agent message — question, verdict, schedule, plan — is the ONE elevate
 2026-08-06 "every said thing is a quiet hairline card" is retired for agents: a hairline on
 `--panel` around prose, with a second hairline on `--card` inside it, was two edges and no
 material (trap 12).
+
+**The details read on the second sheet, not on a card** (the side-panel round, 2026-10-03). The
+Workbench put a session's details on an elevated card inside the thread. They render in the side
+panel's Overview tab now, which is the main sheet's recipe at the frame's right edge (§2). In the
+thread, a thing that the panel shows keeps ONE elevated row (`.refcard`, `thread/RefCard.tsx`): the
+glyph, the name, the kind and its facts, the gate in the warm tone, and "In the panel" or "Open".
+The gate text never truncates: the facts give way first. The inline previews of a delivered file
+and the full post cards left the web thread for that row. The phone keeps its own cards.
 
 Plus one deliberate exception: **selected state** may wear the accent wash (`--accent-soft`) — a
 chosen pack card, an active filter. Warm-as-selection is idiom; warm-as-default is the bug.
@@ -202,7 +227,9 @@ Rules of use:
   and its seat stays reserved so the row never jumps when it appears (George, 2026-09-08). In the
   rail (amended by the settle round, 2026-09-09) the row **wears the status word itself**, in the
   one trailing slot — `.navhiststat`, the same `st-*` palette at rail scale, lowercase because the
-  rail's other mono ink is. The bell's
+  rail's other mono ink is. Since 2026-09-30 the row's age follows the word on every row
+  (`.navhistwhen`, mono `--dim`, right-aligned in one column), and a settled row wears no word: settled
+  is the quiet rest state, so the age alone says it (the row's label keeps the word). The bell's
   rows carry no extra mark; the badge already says every row there needs you. The needs-you rows carry NO buttons — approvals live on
   the artifact in the thread, a merge happens on the human's word, and the row's one act is Settle
   (a swipe or a long-press on the phone, a hover control on the desktop).
@@ -330,6 +357,9 @@ real work — if it is decoration, drop it and keep the pill.
   constant frame to frame), and **lay the incoming panel out at its final width from frame one**,
   clipped by the growing column — animating the column alone re-wraps every line inside it sixty
   times a second. Never transition `display`; that is an instant cut with extra steps.
+  ▸ **Amended 2026-10-03:** the Design Studio and the task peek, the two columns this rule was
+  written for, retired into the side panel. No column of the sheet changes hands now. The rule
+  stays for the next one.
 - **Exits are guarded:** `animationend` handlers must check `e.target === el` (bubbled child
   animation events kill exits otherwise), and exit paths need a ~220ms timeout fallback so
   reduced-motion never strands an overlay.
@@ -393,7 +423,7 @@ real work — if it is decoration, drop it and keep the pill.
 - **The setup tracker** (2026-08-28 — the cloud-first round; visual contract
   `mockups/starter-brain-and-credits.html:310-328`, placement A) — a workspace's remaining
   first-run steps are a **floating card, fixed bottom-right**, mounted once on the FRAME beside
-  the Workbench and portalled to `<body>`: `.setupdock` (fixed, 16px in from both edges, z-55) →
+  the side panel and portalled to `<body>`: `.setupdock` (fixed, 16px in from both edges, z-55) →
   `.setupcard` (290px, `--r-lg`, `--shadow-sheet`) → a progress ring + title + `done/total` mono
   count + fold and dismiss controls, then one `.setupti` per step (15px check box · label ·
   a `--link` verb). It **collapses to `.setuppill`**, ring + title + count.
@@ -591,6 +621,78 @@ real work — if it is decoration, drop it and keep the pill.
   a one-time act, the settled `.shsw` switch for a standing one). The repository is a mono chip
   (`.repochip`: owner/name, the branch dimmed, `Change` beside it), never a text field the person
   retypes. A machine marker (`‹release:…›` and its siblings in `thread/markers.ts`) never renders.
+- **The Pro offer** (the card trial, 2026-10-03, the canvas's Round 2, `docs/design/pro-front-door-2026-10`,
+  `pro/ProOffer.tsx`). One component in two hosts, the wizard's Pro step (`.obbody.obbodywide`, 920px)
+  and the Pro sheet (`.upmodal.pro`, 900px). What Pro gives sits on the left (`.proval`: an icon in a
+  `--card` well with a hairline, a title in body ink, one muted line), the payment card on the right
+  (`.procard`, the elevated stratum), and the two wrap to one column when they do not fit. Inside the
+  card: the wallet row Stripe draws, an `or` rule, Stripe's Payment Element opened **collapsed** (a
+  short row per method, because its open card form with Link's sign-up box runs ~740px and pushed the
+  button below the fold), the full-width oak button (`.procta`, held until Stripe can confirm), the terms in
+  muted ink, then a lock line in dim ink. Words lead with the value, and money comes second.
+  ▸ **Stripe is one more renderer of the tokens.** Stripe draws its fields in its own frames, so
+  `pro/look.ts` hands its Appearance API the page's tokens as plain colours (`--bg`, `--text`,
+  `--body`, `--dim`, `--border2`, `--accent`, `--term-red`), NeuraMesh Sans by URL, and the `night`
+  or `stripe` base by the card's luminance, and it re-themes on a `data-theme` change. A `color-mix()`
+  token never reaches Stripe: its fallback stands in. Wallet buttons follow the ground: white on
+  graphite, black on light.
+  ▸ **The quiet way past.** A decline that must exist but must not compete is a text link to the eye
+  and a real button to the keyboard (`.proskip`, `.credv-manage`): 13px or 12px muted ink, a dim
+  underline at 3px offset, 44px tall by padding, ink on hover. `Skip for now` in the wizard, `Not now`
+  in the sheet, `Manage plan` after the Credits head's plan line (clear of the pane's floating
+  top-right controls).
+- **The image floor** (calendar-image-gen round, amended 2026-09-27; `marketing/ImageFloor.tsx`) —
+  where a draft's picture lands in the post preview: ONE frame on `--panel2` with a hairline. The
+  picture sits above (or the dashed invitation, or the dot field while a machine works), and the
+  brief sits at its foot (`.mkgenbrief`: a mono `Image brief` kicker over body ink under a dashed
+  rule, the thread card's own `.mkpcbrief` words). A brief past three lines scrolls inside the
+  strip, with scroll shades from `local` covers, and the frame never grows for it. **The dot field**
+  (`DotField`, `.mkgendots`) is the picture's placeholder: the drafts strip's dots (`mkdot-pulse`)
+  in a grid, each delay on the dot's diagonal, so one wave crosses per pulse. It is not agent
+  liveness (the orb keeps that ruling), and it is the surface's one heartbeat, so the step line's
+  dot, the brief's placeholder bars and a rewrite's ghost lines do not move. The thread card's "drawing…" box wears the
+  same field. One step line under the frame names what the machine does now: the brief, then the
+  picture. Icons, never glyphs: `IconImage` on Generate, `IconRepeat` on Regenerate, `IconPen` on
+  New angle, and never a sparkle.
+  **The card's picture opens whole** (2026-09-30, `DraftImageLightbox`): the card crops it to its
+  width, so a zoom cursor and a corner `IconExpand` on hover say that a press opens all of it. It
+  opens in the attachment lightbox (`.alightbox`): the thumbnail at once, then the hosted full-size
+  copy, with Save in the bar. Escape closes the picture and nothing under it.
+- **The run divider and the run strip** (routine sessions, 2026-09-28 · `thread/SessionRuns.tsx`,
+  shared `session-runs.ts`): a schedule's session holds every run, and each run opens with two
+  rows. The **divider** (`.srundiv`) is the run's date in the reader's time (`Today, 09:00` ·
+  `Yesterday, 09:00` · `Sep 25, 09:00`), mono 10.5px uppercase `--dim` between two hairlines, the
+  newest in `--text`. The **strip** (`.srunstrip`) is one `--panel` row with a hairline at `--r-md`:
+  the state word with its glyph in the state token (`In progress` `--prog` with the dotted ring,
+  `Needs you` `--warn` with a dot, `Failed` `--warn` with `IconAlert`, `Done` `--done` with
+  `IconCheck`. A draft run says `Published` or `Scheduled` in `--done`.) Then come the time it took and
+  what it made, mono `--muted` with `·` between, and one body line in `--body` while the run is
+  folded (the first unit, the reason it failed, the quote of its draft, or the answer). Every run
+  but the newest folds to its strip, and a run that needs you stays open. `Show` and `Hide` are the
+  mono chevron verbs at the trailing edge. The strip is derived, never stored, and the Automations
+  panel's run rows wear the same word (`RunWord`) beside the date and the time. **The routine card**
+  (`.sruncard`) sits over the first run on `--panel2`: the mono kicker (`Routine · Daily · 09:00`,
+  or `Scheduled drafts`), the prompt once, the count and the next run, and `Run now` · `Edit`. A
+  routine's own opener message never renders in its run: the card holds its words. **The pin**
+  (`.srunpin`, 2026-09-30, `thread/RoutineCard.tsx`): once the card leaves the top of the transcript,
+  its prompt sticks there as one line on `--panel` across the sheet, with the same `Run now` · `Edit`.
+  It arrives like a stuck bar (a hairline and `--shadow-card`, in `--dur-fast`) and lies over the rows
+  in a zero-height sticky slot, so the card keeps its size and no row moves. A press on the prompt
+  opens all of it with the count and the next run (`--shadow-lift`), and a second press or Escape
+  closes it.
+- **The routine draft card** (the routine writer, 2026-10-01 · `thread/RoutineDraftCard.tsx`, shared
+  `routine-draft.ts`): the routine rex wrote, on the card stratum (`--card`, `--card-border`,
+  `--shadow-card`, `--r-lg`). The mono kicker (`Routine draft · v2`), the title at 15px 600, the when
+  line in mono `--muted` (`Weekdays · 09:00 · zone · #room · rex runs it`), then the parts as a grid: a
+  132px mono label in `--dim` beside the text at 13px in `--text`, one column below 560px. A part that
+  differs from the version before wears `Changed`, mono 9px on `--warn` at 14%. The foot sits on
+  `--panel2` under a hairline: `Schedule it` (the primary hatch), `Try once`, `Edit` (ghost), and
+  `Request changes` as the mono text verb at the trailing edge. An older version folds to one `--panel2`
+  line (`Replaced by v2`), and the version the routine runs says `Scheduled`. Once the person schedules
+  it, the talk that wrote it folds under the routine card to one `--panel` row (`.rdsetup`: `Written
+  with rex · 9 messages · 2 drafts`, the `Show` verb), the divider says `Scheduled · Today, 15:12`, and
+  until the first run one centred line in `--muted` says when it posts. Opening the fold keeps the row
+  where the reader pressed it.
 - **Answerable cards** (rail-ink round, 2026-09-04) — the question card is `--card` + one hairline +
   the resting shadow at `--r-lg`-ish 12px, and inside it: options are **ghost pills** (a single-line
   control, §6) and become **blocks** only when they carry a second, explanatory line
@@ -607,19 +709,27 @@ real work — if it is decoration, drop it and keep the pill.
   sections there and left the other two mountings behind — `ConvoThread` rendered its aside
   unconditionally, and the room home rendered a third as `BrandDocsRail` — which meant opening the
   Workbench in a content conversation put two panels at one edge, the exact duplication that move
-  existed to remove. The face is **scoped to what you are standing in** (`shell/workbench-state.ts`,
-  tested): a task → its description · requirements · DoD · artifacts · subtasks; a conversation →
-  its artifacts; a room home → its brand docs, queue and connections; and the room's sections ride
-  *under* a session's when both apply.
+  existed to remove. The face is **scoped to what you are standing in** (`shell/panel-state.ts`
+  `panelSessionOf` since 2026-10-03, tested, and `shell/workbench-state.ts` before): a task → its
+  description · artifacts · subtasks · pull request · review loop (requirements and the Definition
+  of Done left on 2026-09-04, see "The Workbench is ONE face"); a conversation → its artifacts; a
+  room home → its brand docs, queue and connections; and the room's sections ride *under* a
+  session's when both apply.
+  ▸ **Amended 2026-10-03: the ONE place is the side panel's Overview tab** (`shell/OverviewPane.tsx`,
+  the side-panel round). The sections portal into its slot as they did into the card's Details
+  face, and `.mkrail` stays the slot's class. A plan or a design round that waits for a verdict
+  wears **Needs you** in its row.
   ▸ **A closed panel must still say what it holds.** `.thfacts` — a row of toks under the thread
-  head (`description · requirements · subtasks 1/2 · pull request #1046 · review loop 2`), each one
-  a door that opens the panel to Details. A tok holding a gate stays warm. Without it this round's
+  head (`description · artifacts 2 · subtasks 1/2 · pull request #1046 · review loop 2`), each one
+  a door that opens the panel to Details (the side panel's Overview tab since 2026-10-03). A tok holding a gate stays warm. Without it this round's
   one real cost lands unmitigated: the Definition of Done simply off-screen with nothing on the
   thread to suggest it exists. The toks hide while the panel is open — a strip pointing at a panel
   you are looking at is noise.
   ▸ **Empty is a state, not a blank.** The Details face shows one line when its slot has no
   sections, gated structurally (`.wbslot:not(:empty) + .wbslotempty`) because only the portalling
-  surface knows whether it has anything to say.
+  surface knows whether it has anything to say. **Amended 2026-10-03:** an empty Overview says what
+  lands there ("What this session makes opens here.") with three rows: plans and reviews, files,
+  drafts. Same structural gate.
 - **Composer** — an elevated card with a warm **chint cap** (avatar + one-line guidance), the
   textarea, then a chips row: `#channel` chip · pickers as chips · attach · contextual chips ·
   round accent send. Every composer in the product (rooms, Home, thread, launcher) is this one
@@ -687,10 +797,24 @@ real work — if it is decoration, drop it and keep the pill.
   makes the send a coding conversation. The chint cap, the placeholder and the routing hint move
   with the pick (docs/34 §7). The Code rail's `New session` opens New chat with the chip pre-set
   to the room's primary repository.
+- **The model chip and the agent chip** (2026-10-02, [models and replies §4](design/models-and-replies-2026-10/plan.md),
+  boards D1 to D12) replace the brain pill on the web's four composers and on the phone. The
+  **model chip** (`.cchip.cmodel`: the provider's mark, the model's name, `· Level` when the person
+  set one, a `.wdot` when no machine they use can run it) sits with the knobs and names the model
+  of the agent the composer talks to, FOR THIS PERSON (`models/picks.ts` `seatView`, the daemon's
+  order). Its menu is the composer frame (`.cprojpop.cmodpop`, upward): the house brain first, then
+  one group per provider with its state at the right (`ready`, or the one act that fixes it), and a
+  model's levels open UNDER its row (`.cmodlv`), never beside it, because the menu scrolls. The
+  **agent chip** (`.cchip.cagent`) rides the row's right edge beside Send and picks who answers.
+  Its menu lists the room's agents, the main agent first with a `main` tag, each with the model it
+  runs for the person (`.cagmodel`, which opens that agent's list in the menu's own body). New
+  agent is a form in the same body, with role pills, never a select. Off the composer (Settings ›
+  Models, the agent page) the list opens in place of the table or under the field, the rule for a
+  container that scrolls. The brain pill below stays the desktop's until it ports these.
 - **The code face** (same round; visual contract `Thread.dc.html`) is what a coding thread ADDS to
   the one session surface, never a second surface. `.threadpanel.convo.codingthread` keeps the
-  session head (crumb, title, the mode chip `c-plan` | `c-act`, the status chip, the Workbench
-  toggle) and adds `.codinghead` under it: the subline `.sssub` (branch · repository · machine,
+  session head (crumb, title, the mode chip `c-plan` | `c-act`, the status chip, and the Workbench
+  toggle retired 2026-10-03) and adds `.codinghead` under it: the subline `.sssub` (branch · repository · machine,
   mono, and `a unit ✓` once the valve made one). The transcript is the thread's own `.tmsgs`: the human's hairline
   bubble, the Engineering rows (`.av.eng`, the folded `.think` line, the `.receipts`, the prose),
   the thread's own messages around them (the `‹kind:coding›` divider as a `.sysline`, the unit card
@@ -699,7 +823,7 @@ real work — if it is decoration, drop it and keep the pill.
   not a unit`, `Make it a unit` primary and `Keep it here` quiet). The composer is the thread's
   `.tcompose > .cbox.codingbox`: the chips row (attach · model · machine: the room and the
   repository are not switchable in a coding thread, so they are not chips, and the branch shows in
-  the Workbench's foot, George, 2026-09-26) and the two knobs, the `Plan | Act` `.threadseg` and
+  the code pane's foot, George, 2026-09-26) and the two knobs, the `Plan | Act` `.threadseg` and
   the permissions chip (`Reads run · edits ask`). The row WRAPS: the knobs and Send travel as one
   group (`.codingknobs`) that takes its own row when the chips fill the first, and the box grows
   (nothing is cut off). No chint in the thread: the consequence line lives on New chat, where the
@@ -722,6 +846,37 @@ real work — if it is decoration, drop it and keep the pill.
   session row for a coding thread wears the code glyph and the mode chip (`.chip.c-code`,
   `.c-plan`, `.c-act`) and reads its status from the synced `code_sessions` row. The Engineering
   floor retired as a destination: the rail's Code shortcut and the view menu relist Home.
+- **The GitHub card, its divider and the gate** (repo-connect round, 2026-10-03 · visual contract
+  `docs/design/repo-connect-2026-10`, `cards/DependencyCard.tsx`, `thread/GitHubGate.tsx`): work that
+  needs the repository asks for GitHub with ONE card in the thread, `.needcard` on the card stratum.
+  The head is mono uppercase: `⚠ Waits for GitHub` in `--warn`, and `.ndhead.ok` (`✓ GitHub is
+  connected`) in `--done`. The faces follow the GitHub step's one state machine (`useGitHubGrant`):
+  the grant (`.ndwhy` + one `.ndopt.primary` row, `Connect GitHub` · `One minute on GitHub. You pick
+  the repositories.`), the wait (the same row reads `Finish on GitHub, then check again`, and
+  `.needcard .connacts` holds the 5 s `.connwait` line), the pick (`.inpick` rows, the folder's
+  namesake marked `your folder`, `Connect` primary and `Add more on GitHub` ghost), and connected
+  (`.ndopt .g.ok`, the repository and `The neuramesh app reads it for this project.`). The foot is
+  the card's own `after` line (`rex continues here when GitHub is connected.`), then `The work
+  continues below.` once connected. No access line: the app also opens pull requests, so no copy
+  says "read only". The grant's divider is the run divider (`.srundiv`): `You connected GitHub ·
+  owner/repo · Today, 21:36`. A coding thread holds the same card in its gate seat: `.hgate.coding`
+  with a warm eyebrow (`.hgateeye.warm` in `--warn`, `coding · #room · repo · waits for GitHub`) and the faces
+  `Connect GitHub to code here`, `Finish on GitHub`, `Pick the repository` (`.hgate .inpick`). The
+  Workbench's foot reads `waits for GitHub`, and while it waits the transcript hides the session's
+  `Ready in` greeting and any GitHub card rex posted before the thread turned to code: the gate seat
+  holds the one card. The gate is quiet: its mount ask never opens the session. A connected answer the
+  person did not start there gets a fourth face from the same parts (the plain `.hgateeye`, `GitHub is
+  connected`, `The session starts with your message.`, the primary `Start the session`). The card
+  reads its own decision row: an answered row shows the connected face, and a card with no row shows no
+  foot under it. The `.sysline` rule (the Tasks flip, the coding divider) is back after #208.
+- **The live thoughts** (same round, Option A · `thread/StreamBubble.tsx` over
+  `engineering/ThinkingReasoning.tsx`): a turn's thoughts (codex reasoning summaries and tool steps
+  as `› tool · arg` lines, Claude's summarized thinking) render in the live bubble above the reply.
+  Live, the head is the shimmer label `Thoughts · 12 s`, and the viewport scrolls with the stream to
+  its 180px cap. The reply's first word folds the block to `Thought for 12s` with the chevron, and
+  the reply types under it. The landed message carries no thoughts (George: no persistence).
+  Markdown in the block keeps normal white space (`.trStream :global(.md)`), because the stream's
+  `pre-wrap` turned the gaps between blocks into blank lines.
 - **The two cloud marks in the status cluster** (2026-09-05, George: "a machine icon to indicate
   the cloud machine and a cloud icon next to it is confusing") — the compute pill (`.cpill`) draws
   the **cloud machine**: the chassis on its stand with a small cloud badged at its top-right, one
@@ -850,6 +1005,12 @@ real work — if it is decoration, drop it and keep the pill.
   rest draws none. Liveness still costs **no ground at all** (2026-08-01): the neutral card means *selected*.
   Now-truth displaces where-truth for as long as the run is open — the verb takes the meta line's
   seat rather than adding a third, so a working row and a quiet one are the same height.
+  ▸ **Amended 2026-10-03: the code face is the coding thread's own tabs in the side panel** (the
+  side-panel round). `Changes · Files · Work Plan · Checkpoints · Terminal` are session tabs, pinned
+  and never closed. Terminal wears its glyph alone, and in a narrow panel the tabs behind the front
+  one wear their glyphs alone too (a `sidepanel` container query). The code pane (`.codepane`)
+  holds the editor, with the branch and the state in its `.dockfoot`. The card, its expand and its
+  close retired. A proposed patch puts Changes in front, as it fronted the card's Changes tab.
 - **The session crumb** — an open session leads with `‹ #room · conversations` (or `‹ Home`,
   `‹ #room · board` — it names the lens it replaced), in the mono voice. A session takes the
   MAIN surface; nothing floats over a feed anymore (`.taskovl`/veil retired with the feed).
@@ -910,7 +1071,8 @@ real work — if it is decoration, drop it and keep the pill.
   `askOutside` speak about the mode's rows. Not a destination tab strip (the ruling below stands).
 - **The nav's verb is a text row** (rail-ink round, 2026-09-04 — supersedes the shell round's
   accent pill): `New chat` is a compose glyph, the label at 560 and `⌘N` in dim mono, hover wash
-  only; the caret beside it still carries the launcher's task and routine modes. "Menus are text
+  only; the caret beside it still carries the launcher's task mode, and New routine (since 2026-10-01 it opens
+  the New session composer with `Make a routine: `, the routine writer). "Menus are text
   with icons, not embossed buttons" (George) — a pill made the verb the one raised object in a
   column of rows. **Shortcut rows step in** 22px from their kicker and children a second step
   (36px) with no guide hairline (trap 9b); the kicker itself is `--dim`, rows rest in `--body`,
@@ -1005,7 +1167,7 @@ real work — if it is decoration, drop it and keep the pill.
   (absence over a full ring built on a failed fetch), and the ring is the **workspace's** balance
   beside the person spending it — if credits ever become per-user it moves to the avatar, because
   standing in the workspace bar would then say the wrong thing.
-- **The Workbench is ONE face** (rail-ink round 3, 2026-09-04 evening, George on the built card:
+- **(Retired 2026-10-03.) The Workbench is ONE face** (rail-ink round 3, 2026-09-04 evening, George on the built card:
   "I don't think we need the Details/Code tabs any more, just one tab"). The card holds the open
   session's **details** — description · requirements · Definition of Done · artifacts · subtasks ·
   the review loop — portalled in by the thread that owns them, and nothing else. **Requirements
@@ -1023,6 +1185,10 @@ real work — if it is decoration, drop it and keep the pill.
   side dock. Naming rule this settles: the left-nav destination is **Files** (workspace documents,
   ACL'd by room); the panel is the **Workbench** (this session's details and its disk). One word
   per noun, and the word that named a single tool inside the container ("Editor") is retired.
+  ▸ **Amended 2026-10-03:** the card retired into the side panel (§2). Its Details face is the
+  Overview tab, and its Files drawer is the Files tab, with the finder and the branch switch (`⌘P`
+  opens it). The naming rule moves with it: the panel is the **side panel**, and "Workbench"
+  retires as a product word.
 - **The split stage** — a review surface that must be *looked at and talked about at once* docks
   as a **resizable peer column** beside the thread, never as a `position: fixed` overlay: a hairline
   grip (pointer **and** arrow-key resizable, width persisted per machine — the idiom now serves
@@ -1065,11 +1231,18 @@ real work — if it is decoration, drop it and keep the pill.
   in every theme while being the §3 stratum that legitimately hosts controls, which a peek is full
   of. Rounding it also removes the seam problem by construction: an inset card's own border is the
   only edge in the gutter, so there is no second hairline to pile up (trap 9b).
+  ▸ **Amended 2026-10-03: both tenants retired into the side panel** (the side-panel round). A
+  design round is ONE review tab in the side panel, with its mockups as a strip (docs/36 §13). A
+  `#N` inside a session opens a **task tab** in that session's side panel: the same `TaskThread`,
+  narrowed, with `Open the task ›` in the crumb's seat, and the strip's ✕ to close it. Rulings ①
+  and ② stand. Ruling ③, the grip, the width and the Esc layer of the peek retired with the
+  column. No split stage remains inside the sheet.
 - **Suggestion pills** — ghost recipe; when generated live (the launcher's "Give me ideas"), the
   sequence is *ghost ask → typing dots → pills rising in stagger*.
 - **Accumulate, then spend** — feedback on a reviewable artifact collects as editable/deletable
   pills and is spent by **one** counted action (`.cbadge`), never one round-trip per remark:
-  `PlanReview`'s block comments → `revise_plan`, the Design Studio's notes → `revise_design`. The
+  `PlanReview`'s block comments → `revise_plan`, the design round's notes in its review tab →
+  `revise_design` (the Design Studio's until 2026-10-03, and a note on a mockup quotes its name). The
   composer stays plain — a mode chip that makes the human classify their own sentence before typing
   it is the anti-pattern this replaced (design round 2026-07-28).
 - **The link choice** (2026-09-17, George; visual contract
@@ -1172,7 +1345,7 @@ real work — if it is decoration, drop it and keep the pill.
   Comments are **inline under the block they are about**, not in a right gutter — the overlay
   could afford 250px of margin because it took the whole window, and a tab cannot. A commented
   block keeps a `--link` rail so a scrolled-past batch stays visible in the margin.
-- **The brain pill and its Roles popup** (2026-07-31 — [docs/10 §15](10-model-packs.md),
+- **The brain pill and its Roles popup** (retired on the web and the phone on 2026-10-02 for the model chip and the agent chip above; the desktop keeps it until the port) (2026-07-31 — [docs/10 §15](10-model-packs.md),
   `mockups/brain-config.html`) — **one pill everywhere**: a message sent from Home or a room becomes
   a conversation too, so the switcher must not change shape with the surface it sits on. It carries
   the seated crew's avatars (14px, 5px radius, overlapped −5px with a `--card` hairline) and states
@@ -1200,7 +1373,8 @@ real work — if it is decoration, drop it and keep the pill.
   rather than setting its own. Tabs reuse the `.roomtab` recipe (pill-grouped, `--card` when
   active) because they are the same act. Rows stagger in a beat apart (§7's entrance idiom) and the
   popup enters on `--dur-enter`, not `--dur-fast`: it is a surface, not a micro-interaction.
-- **The floating file pane** (docs/36) — a dismissable `--card` pane **floating over** the right
+- **(Retired.) The floating file pane** (docs/36): the tree became the Workbench's Files drawer on
+  2026-08-16, and the side panel's Files tab on 2026-10-03. The note stays as history. A dismissable `--card` pane **floating over** the right
   edge of the content area (inset 8px, ~200px, pop shadow), never a third column: it lists a
   worktree or a task's artifacts and a click **opens a tab**. It never renders a file inside
   itself — a doorway, not a viewer. Starts dismissed; its state is a **machine-local preference**,
@@ -1223,7 +1397,7 @@ real work — if it is decoration, drop it and keep the pill.
   | strip | what it switches | when to use it |
   |---|---|---|
   | **`.roomtabbar`** — a room's surfaces (`Conversations · Board`, plus `Calendar · Library · Routines`), and since 2026-09-20 a destination's two lenses (`Scheduled › Routines · Calendar`, `.desttabs`) | **alternate views of one subject**, on its own line under the heading it belongs to, pill-grouped in a warm well | a container that genuinely has more than one lens. A count rides `.roomtabn`: a warm well when idle, `--sel-bg` when active, mono, **never accent-filled** — a tab count is information, not a notification |
-  | **the workspace tab strip** — the side dock's open things | **different subjects held open at once**, each with its own kind and lifetime | the side dock only (rail-ink round 3). One per window. This is the only strip whose tabs are **closable** and whose contents the user created |
+  | **the workspace tab strip** — the side panel's strip | **the session's own tabs** (pinned, never closed: Overview, Files, Drafts, or the code face), a hairline, then **the tabs this session opened**, each with its own kind and lifetime (2026-10-03) | the side panel only. One per window, and it shows the session in front. Its opened tabs are the only **closable** tabs in the product. A tab that arrived behind the front one wears a dot |
   | **the dock's `.docktabs`** | — | **RETIRED with the dock** (docs/36 §6). Do not revive it; its records became the workspace strip's |
 
   The distinction to hold onto: **`.roomtabbar` switches lenses on one thing you did not open;
@@ -1411,6 +1585,18 @@ real work — if it is decoration, drop it and keep the pill.
      .mpop / .slashpop`): every composer menu anchors upward because every other composer sits at the
      bottom of its sheet, and at the top of a page that put them off the view (George, 2026-09-11, on the
      harness). The machine chip's height cap measures the side the CSS picks (`roomOn`).
+     ▸ **Amended 2026-09-30 (the home-cards round, [docs/design/home-cards-2026-09](design/home-cards-2026-09/plan.md)):
+     the ledger retires, and the stage is centred again.** After the attention bar, **Porch** (`.stagemark`,
+     40 px) looks left and right once, then glances every nine seconds (`pk-look`, `lsg-glance`), with no
+     peek, because the static first frame paints it still (`.stagemark.still`). Under the composer sit
+     **six cards** (`.stagecards`, three across, two below 620 px): the elevated stratum (`--card`,
+     `--card-border`, `--shadow-card`), a 22 px icon tile beside the title, at most two lines of outcome
+     (never how the work runs), and a 1 px lift with `--shadow-lift` on hover. A card fills the composer
+     with a first line, and so does the routine card since the routine writer (2026-10-01: `Make a routine: `;
+     before, it opened the routine launcher). The wordmark watermark shows
+     again. Every composer menu opens upward again (`roomOn` measures above). The stage scrolls once a short
+     window cannot hold it: auto margins centre the column, so its top stays reachable (the cards made the
+     stage taller than a 660 px window).
   Plus the frame ruling recorded in §2 (the dock strip's retirement) and one structural fix:
   **the main section's top-right is ONE rail** — the room's crew clusters and views burger slot
   into the workspace strip's right end (`WTabStrip aux`) before the file-pane toggle, one flex

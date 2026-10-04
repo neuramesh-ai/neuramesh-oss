@@ -1,8 +1,9 @@
 // Routines — the inventory of what is armed (docs/automations).
 // Extracted from App.tsx (track A2).
 import { IconChevron, IconPause, IconPlay, IconTrash } from '../ui/icons';
-import { shortAgo , replyPreview, type ReleaseLogRow } from '@neuramesh/shared';
+import { sessionRunLabel, sessionRunLines, shortAgo, type ReleaseLogRow, type SessionRunStrip } from '@neuramesh/shared';
 import type { ScheduleRunRow } from '../bridge/rows-content';
+import { RunWord, openRunLink } from '../thread/SessionRuns';
 import type { ScopeProps } from '../shell/useScopeMemory';
 import { SCHED_WEEKDAYS, ScheduleFormModal, nextRunLabel } from '../schedule/schedule';
 import { ScopeBar } from '../ui/ScopeBar';
@@ -25,13 +26,15 @@ function releaseOf(x: ScheduleRow): { slug: string | null; log: ReleaseLogRow[] 
     return rel ? { slug: rel.slug ?? null, log: Array.isArray(rel.log) ? rel.log : [] } : null;
   } catch { return null; }
 }
-type LedgerRow = { id: string; at: string; run?: ScheduleRunRow; note?: string };
+/** a run with its strip, as its session shows it (shared sessionRunLines) */
+type RunLine = { run: ScheduleRunRow; strip: SessionRunStrip | null };
+type LedgerRow = { id: string; at: string; line?: RunLine; note?: string };
 /** the runs and the ledger as one list, newest first — a keyed line whose tag heads a run's
  *  title is that run (skipped), every other line is a quiet row */
-function ledgerRows(runs: ScheduleRunRow[], log: ReleaseLogRow[]): LedgerRow[] {
-  const rows: LedgerRow[] = runs.map((r) => ({ id: r.id, at: r.created_at, run: r }));
+function ledgerRows(runs: RunLine[], log: ReleaseLogRow[]): LedgerRow[] {
+  const rows: LedgerRow[] = runs.map((r) => ({ id: r.run.id, at: r.run.created_at, line: r }));
   for (const l of log) {
-    if (l.key && runs.some((r) => (r.title ?? '').includes(l.key!))) continue;
+    if (l.key && runs.some((r) => (r.run.title ?? '').includes(l.key!))) continue;
     rows.push({ id: `log-${l.at}`, at: l.at, note: l.note });
   }
   return rows.sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
@@ -58,7 +61,7 @@ export function RoutinesView({ projects, chans, onCount, onNew, onOpenRun, scope
   chans: ChannelRow[];
   onCount: (n: number) => void;
   onNew: () => void;
-  /** open one of a routine's run conversations (0119) — the card lists them, the shell shows them */
+  /** open a routine's session (0119): at one of its runs when the panel's row names it (openRunLink) */
   onOpenRun: (threadId: string, channelId: string) => void;
   /** this destination's remembered narrowing (shell/useScopeMemory.ts) — the shell owns the
    *  remembering so every destination answers the same way when you navigate away and back */
@@ -77,14 +80,15 @@ export function RoutinesView({ projects, chans, onCount, onNew, onOpenRun, scope
   // and Remove: the card gains a disclosure, not a control. One open at a time — this is a grid
   // of cards, and two expanded cards reflow the neighbours of both.
   const [openRuns, setOpenRuns] = useState<string | null>(null);
-  const [runs, setRuns] = useState<Record<string, ScheduleRunRow[]>>({});
+  // each run with its strip, derived once per open from the lane's rows (shared sessionRunLines)
+  const [runs, setRuns] = useState<Record<string, RunLine[]>>({});
   const [runsLoading, setRunsLoading] = useState<string | null>(null);
   const toggleRuns = (id: string) => {
   if (openRuns === id) { setOpenRuns(null); return; }
   setOpenRuns(id);
   // refetch on every open: a routine that fired since you last looked must not show a stale list
   setRunsLoading(id);
-  void nm?.scheduleRuns(id).then((r) => { setRuns((prev) => ({ ...prev, [id]: r.runs })); })
+  void nm?.scheduleRuns(id).then((r) => { setRuns((prev) => ({ ...prev, [id]: sessionRunLines(r.runs, r, id, Date.now()) })); })
   .catch(() => setRuns((prev) => ({ ...prev, [id]: [] })))
   .finally(() => setRunsLoading((cur) => (cur === id ? null : cur)));
   };
@@ -221,32 +225,36 @@ export function RoutinesView({ projects, chans, onCount, onNew, onOpenRun, scope
               {(() => {
                 const fetched = runs[x.id];
                 // a release routine's list is the runs AND its ledger; every other routine's is its runs
-                const rows: LedgerRow[] = rel ? ledgerRows(fetched ?? [], rel.log) : (fetched ?? []).map((r) => ({ id: r.id, at: r.created_at, run: r }));
+                const rows: LedgerRow[] = rel ? ledgerRows(fetched ?? [], rel.log) : (fetched ?? []).map((l) => ({ id: l.run.id, at: l.run.created_at, line: l }));
+                const newest = fetched?.[0]?.run;
+                const now = Date.now();
                 return (<>
-                  {runsLoading === x.id && !fetched && <span className="runsnote">Looking up this automation&rsquo;s runs…</span>}
-                  {fetched && rows.length === 0 && runsLoading !== x.id && (
-                    // the honest empty: run_count counts every fire since the routine was armed, and
-                    // the thread link only exists for fires after 0119 — so "it ran, I can't show you
-                    // where" is a real state, and saying nothing would read as a broken button.
-                    <span className="runsnote">No run conversations recorded yet. Runs from before this update are not linked.</span>
+                  {newest && (
+                    <span className="runshead">
+                      <span className="runsheadlbl">Runs</span>
+                      <button className="runssession" onClick={() => onOpenRun(newest.thread_id, newest.channel_id)}>Open the session ›</button>
+                    </span>
                   )}
-                  {rows.map((row, i) => row.run ? (
-                    <button key={row.id} className="runsrow" title={new Date(row.run.created_at).toLocaleString()}
+                  {fetched && rows.length === 0 && runsLoading !== x.id && (
+                    // the honest empty: run_count counts every fire since the routine was armed, and a run
+                    // only has a place to open since 0119, so "it ran, and I can't show you where" is real
+                    <span className="runsnote">No runs to show yet. A run from before this update has no link here.</span>
+                  )}
+                  {rows.map((row, i) => row.line ? (
+                    <button key={row.id} className="runsrow" title={new Date(row.at).toLocaleString()}
                       style={{ ['--i' as string]: String(Math.min(i, 7)) } as React.CSSProperties}
-                      onClick={() => onOpenRun(row.run!.id, row.run!.channel_id)}>
-                      <span className="runswhen">{shortAgo(row.run.created_at)}</span>
+                      onClick={() => { openRunLink(row.line!.run.id); onOpenRun(row.line!.run.thread_id, row.line!.run.channel_id); }}>
+                      <span className="runswhen">{sessionRunLabel(row.at, now)}</span>
+                      {/* the run's strip, as its session shows it: the state, the time, what it made */}
+                      {row.line.strip && <RunWord state={row.line.strip.state} word={row.line.strip.word} />}
+                      <span className="runstook">{row.line.strip?.took}</span>
                       {/* a release run is titled once from the feature (the tag heads it), so the title
-                          IS the row; any other routine's runs share one title, and the last line is
-                          what differs between them */}
-                      <span className="runstitle">{(rel && row.run.title) || (row.run.last_body && replyPreview(row.run.last_body, 120)) || row.run.title || 'Untitled run'}</span>
-                      {/* a run nobody answered is the one you want to notice: its prompt is the only
-                          message in the thread, so the reply count IS the outcome */}
-                      <span className={`runsreplies${row.run.msg_count <= 1 ? ' quiet' : ''}`}>
-                        {row.run.msg_count <= 1 ? 'no reply' : `${row.run.msg_count - 1} repl${row.run.msg_count - 1 === 1 ? 'y' : 'ies'}`}
-                      </span>
+                          IS the row; any other run says its one line: the unit, the reason, the answer */}
+                      <span className="runstitle">{(rel && row.line.run.title) || row.line.strip?.line || row.line.run.title || 'Untitled run'}</span>
+                      <span className="runsopen">Open run ›</span>
                     </button>
                   ) : (
-                    // a quiet tick: the routine looked, found nothing to announce, and opened no session
+                    // a quiet tick: the routine looked, found nothing to announce, and opened no run
                     <span key={row.id} className="runsrow quiet" title={new Date(row.at).toLocaleString()} style={{ ['--i' as string]: String(Math.min(i, 7)) } as React.CSSProperties}>
                       <span className="runswhen">{shortAgo(row.at)}</span>
                       <span className="runstitle quiet">{row.note}</span>

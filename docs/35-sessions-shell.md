@@ -148,8 +148,9 @@ sheet, no dimmed plane behind it. Both of today's sheets become this one surface
   the mode chip (`plan` in the plan hue, `act` in the build hue). The middle is the coding
   runtime's transcript with the thread's own messages above it (rex's one line, the kind divider).
   The composer is the thread's own, with the Plan | Act segment and the permissions chip added.
-  The Workbench card opens by itself and holds the code: Changes, Files, Work Plan, Checkpoints
-  and Terminal as tabs over the editor's pane (its own Files drawer is hidden there). The gate seat above the composer holds one card: the approval, else the Act
+  The side panel opens with the session and holds the code: Changes, Files, Work Plan, Checkpoints
+  and Terminal are the coding thread's own tabs there (the Workbench card until the side-panel
+  round, 2026-10-03). The gate seat above the composer holds one card: the approval, else the Act
   handoff, else the valve, `Make this a unit` (HUMAN_ONLY), which
   creates a plan-first unit anchored to the conversation, and the thread stays a coding thread
   with the unit card in it. Nothing reaches the board without that card. The session id IS the
@@ -163,6 +164,14 @@ cluster there, a **session** puts its dial and state chip there — and, since t
 its **Workbench toggle**: the Workbench is a card floating inside the session's own sheet, and what
 a session opens — files, terminals, browsers, whiteboards, reviews — lands in the **side dock**
 beside the sheet, never over the session; docs/33 §2, docs/36 §3.3).
+
+> **Amended 2026-10-03 (the side-panel round, [docs/design/side-panel-2026-10](design/side-panel-2026-10/plan.md)):**
+> the Workbench toggle and the card retired. The session's details are the side panel's Overview
+> tab, and the toks under the head open it. The side panel belongs to the session in front: it
+> shows that session's own tabs and the tabs that the session opened, and what the session makes
+> opens there by itself. The frame top's side-panel button (`⌘J`) is the one switch. A `#N` in a
+> session opens the task as a tab of that session's side panel. **Open the task** takes the whole
+> sheet with a back crumb, as a click on a task does everywhere else.
 
 > **Do not un-portal anything.** docs/34 §11 etched the rule that a `position: fixed` veil mounting
 > inside app content must be portalled to `<body>`, and the proximate cause was `.threadpanel`'s
@@ -294,6 +303,8 @@ carries three things:
    - **The rail row wears its status word** (mark M4), in the trailing slot the room fact held. A
      row that says nothing about its status cannot carry a verb that names one. It costs the room
      name and the age: both were already on the hover card, and ⌘Y is where you search.
+     **Amended 2026-09-30 (George):** the age returns after the word on every row, and a settled
+     row wears no word, because settled is the quiet rest state of most rows. Its label keeps it.
    - **Both hover controls become three**: rename · settle · ⋯ (`RowActs`), the check present only
      while a settle can move something. **The desktop and the web thread heads gain the phone's pair
      too**: the status chip beside the room crumb, and a worded Settle button leading the head's act
@@ -310,6 +321,12 @@ carries three things:
    overlay's row (`shell/HistRow.tsx`) off the same `historyRows` + `makeRowMarks` derivation the rail,
    the bell and ⌘Y read, so the count on the bell and the group on Home can never disagree. The grouping
    is `shell/ledger.ts`, pure and tested. A workspace with no threads keeps the centred stage.
+   ▸ **Amended 2026-09-30 (the home-cards round, George: the list under the composer "might be an
+   antipattern").** The list leaves Home. The stage is the attention bar, Porch over the greeting, the
+   composer, and six cards that start work (`views/HomeCards.tsx`, the phone's `stage-cards.tsx`), on
+   the centred stage with the wordmark watermark under them. The needs-you queue keeps its doors: the
+   attention bar, the bell, the rail's `needs you` word, and ⌘Y. The phone's Home tab keeps its queue.
+   Plan: [home-cards](design/home-cards-2026-09/plan.md).
 3. **New chat**, first verb in the rail, `⌘N` — Claude/Codex muscle memory. It opens a **blank
    session** with the composer focused; the chips pick the room and mode before or after you type.
    It is a *navigation* verb, not a second composer — docs/33 §8's "new features inherit the

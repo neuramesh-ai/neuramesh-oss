@@ -1,5 +1,9 @@
 # Home threads — the ledger under the composer
 
+> **Retired 2026-09-30.** George: the list under the composer "might be an antipattern". The stage holds
+> cards that start work now, and the rows live in the rail, the bell and ⌘Y. See
+> [home-cards](../home-cards-2026-09/plan.md). What follows is the round as it was built.
+
 > **Status:** BUILT on the offscreen harness, 2026-09-11 (George picked direction A the same day and
 > ruled out the day buckets: "needs you and recent should be fine"). Visual contract: the canvas
 > [Home Threads and Composer](https://claude.ai/code/artifact/5e95b202-d080-4b1d-998b-6f80d2abf9d3)

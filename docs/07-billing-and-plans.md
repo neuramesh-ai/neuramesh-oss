@@ -21,10 +21,11 @@ per-workspace, and the desktop doesn't use `@clerk/clerk-react`).
 |---|---|---|
 | Full agent loop · BYOK · all 3 providers | ✅ | ✅ |
 | Projects | 3 (`project.create` count-check) | unlimited |
+| Routines (`schedule.create`, the release watch) | ✅ on every plan since 2026-10-03. The Pro trial's runs spend its credits | ✅ |
 | Local machines | 1 (`MACHINE_LIMIT`, transfer-or-upgrade) | unlimited |
-| Cloud machine | **none** | the runner (keys + starter brain), minted by the webhook at the flip to Pro (`plan-flip.ts`, `FLEET_AUTOPROVISION` gates dev stacks) **plus a machine per member**, born asleep at join; 50 GB each |
+| Cloud machine | **none** on a Mac. A hosted first workspace (the Pro trial) gets **one runner** with the workspace (`workspace-birth.ts`), billed from its credits | the runner (keys + starter brain), minted by the webhook at the flip to Pro (`plan-flip.ts`, `FLEET_AUTOPROVISION` gates dev stacks) **plus a machine per member**, born asleep at join; 50 GB each |
 | Teammate seats | **1** — the owner (`FREE_SEAT_CAP`; an invitation is refused with Pro named) | per seat; the first invitation promotes the runner into the owner's machine; **the seat count follows the roster** (below) |
-| Monthly credits | **500 once**, at the first workspace (2026-09-19); no refill: the worklist filters `plan = 'cloud'` | 1,500 × seats at the flip, then 1,500 × seats on the 1st of every month |
+| Monthly credits | **500 once**, at the person's first workspace, whatever door made it (2026-09-19, `workspace-birth.ts` since 2026-10-03); no refill: the worklist filters `plan = 'cloud'` | 1,500 × seats at the flip, then 1,500 × seats on the 1st of every month |
 
 A blocked command returns `PLAN_LIMIT` (402) / `MACHINE_LIMIT` (402); the desktop routes those to the
 upgrade modal / the transfer-or-upgrade card — never a dead-end.
@@ -39,10 +40,14 @@ upgrade modal / the transfer-or-upgrade card — never a dead-end.
   - `STRIPE_PRICE_ID` — the recurring price above.
   - `STRIPE_WEBHOOK_SECRET` — `whsec_…` for signature verification (per environment).
   - `NM_BILLING_RETURN_URL` — base for Checkout success/cancel + Portal return (e.g. the web app).
+  - `STRIPE_PUBLISHABLE_KEY`: the browser's key for the card trial's form (2026-10-03). Without it
+    the trial routes answer 404 and hq's Pro step passes itself on.
 - **`POST /webhooks/stripe`** (public, above the `/v1` guard) is the ONLY writer of `workspaces.plan`.
   `planPatchFromEvent` maps `checkout.session.completed` + `customer.subscription.{created,updated,deleted}`
   → `applyPlanPatch` (`plan-flip.ts`) → `setWorkspacePlan`. Enable exactly those events, plus
-  `invoice.payment_failed` for dunning.
+  `invoice.payment_failed` for dunning, plus `customer.subscription.trial_will_end` for the card
+  trial's reminder (2026-10-03). A checkout completion writes no `subscription_status`: the
+  subscription events own it, so a trial reads `trialing` in whatever order Stripe sends them.
 - **The flip `free → cloud` mints and grants** (`plan-flip.ts`, 2026-09-12). `applyPlanPatch` reads the
   previous plan BEFORE the write. On the flip it grants `CLOUD_SEAT_MONTHLY_CREDITS × seats` once
   (`grantCredits(..., 'promo', <subscription id>)`, deduped by note, so a redelivered event grants
@@ -73,10 +78,12 @@ pnpm --filter @neuramesh/control-api dev    # control-api on :8787
 
 ### Production (Vercel control-api at api.neuramesh.app)
 
-Create a webhook endpoint → `https://api.neuramesh.app/webhooks/stripe` with the five events above
+Create a webhook endpoint → `https://api.neuramesh.app/webhooks/stripe` with the six events above
 (`checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`,
-`customer.subscription.deleted`, `invoice.payment_failed`);
-put its `whsec_…` and `STRIPE_SECRET_KEY` / `STRIPE_PRICE_ID` / `NM_BILLING_RETURN_URL` in Vercel env.
+`customer.subscription.deleted`, `invoice.payment_failed`, `customer.subscription.trial_will_end`).
+Put its `whsec_…` and `STRIPE_SECRET_KEY` / `STRIPE_PRICE_ID` / `STRIPE_PUBLISHABLE_KEY` /
+`NM_BILLING_RETURN_URL` in Vercel env. The card trial's wallets also need hq's domain in Stripe
+(Settings › Payment methods › Payment method domains: `hq.neuramesh.app`).
 Webhooks go ONLY to the hosted control-api (never the desktop's embedded API).
 
 ## Verified (live, test mode, 2026-06-25)
@@ -141,38 +148,26 @@ defined, unwritten); granting for BYOS tokens (never — those stay the user's).
 
 > **Amended 2026-09-19** ([docs/design/first-run-doors-2026-09](design/first-run-doors-2026-09/plan.md)).
 > George: "cloud should indicate free 500 credits to get started". A free hosted account's **first
-> workspace is granted `SIGNUP_GRANT_CREDITS` (500) once**, at its creation in `first-workspace.ts`
-> (the ledger's `signup` kind, best effort behind the creation: a sign-in never fails because a
-> ledger row did not land). The refill worklist still skips `plan = 'free'`, so the 500 do not renew.
-> **The hosted write gate below stands down for free hosted workspaces:** `NM_HOSTED_FREE_GATE`
+> workspace is granted `SIGNUP_GRANT_CREDITS` (500) once**, at its creation (the ledger's `signup`
+> kind, best effort behind the creation: a sign-in never fails because a ledger row did not land).
+> Since 2026-10-03 the grant and the runner ride `workspace.create` itself (`workspace-birth.ts`), for
+> the person's first workspace, so a workspace the wizard makes after an invitation gets them too.
+> The refill worklist still skips `plan = 'free'`, so the 500 do not renew.
+> **The hosted write gate stands down for free hosted workspaces (deleted 2026-10-03):** `NM_HOSTED_FREE_GATE`
 > stays `0` (it is NOT flipped on 2026-09-29), and the desktop's `hostedrule.ts` answers false for
 > every plan, so a free hosted workspace writes. The caps of the entitlements table (one seat, three
-> projects, one local machine, no cloud machine) are unchanged: those are entitlements, not the gate.
+> projects, one local machine, and since 2026-09-24 the trial's one cloud machine) are unchanged: those are entitlements, not the gate.
 > The site's "Free is your Mac. Pro is the cloud." line and the notice mailed on 2026-09-15 are
 > George's follow-ups.
 
-## The hosted write gate, the export, and the notice (2026-09-12, unit U1b)
+## The export, and the hosted write gate that shipped with it (2026-09-12, unit U1b)
 
-Free is the local desktop app. A **hosted** workspace still on `free` keeps its rows and its reads
-and stops writing: `packages/control-api/src/hosted-gate.ts`, one `app.use('/v1/*', …)` after the
-auth middleware, plus the same verdict inside `executeCommand` (`assertCommandAllowed`). The flag
-is **`NM_HOSTED_FREE_GATE`**: `1` turns it on, anything else leaves it off, and `NM_LOCAL=1` keeps it
-off whatever the flag says. Vercel carries `0` at merge and flips to `1` on **2026-09-29**, fourteen
-days after the notice (decision D12).
-
-| Lane | On a `free` workspace | Why that shape |
-|---|---|---|
-| `POST /v1/commands` | `402 { error, code: 'PLAN_LIMIT' }` | the code the desktop routes to its upgrade flow |
-| `POST /v1/messages` · `POST /v1/artifacts` · `POST /v1/whiteboards` · `PATCH /v1/whiteboards/:id` | `409 { error, code: 'PLAN_LIMIT' }` | the PowerSync uploader drops a 409 and retries anything else while it holds every download (`upload.ts`), so 409 is the only answer an old client survives |
-| every `GET` | passes | reads stay |
-| `/auth/*` · `/v1/billing/*` · `POST /v1/machines/sync-token` · `GET /v1/workspaces` · `GET /v1/me` · `GET /v1/workspaces/:id/export` | pass | sign in, pay, sync, list, and the way out |
-| `workspace.create` · `machine.register` · `machine.heartbeat` | pass | a Free person still gets a workspace and keeps a replica |
-
-The refusal sentence is one string, `GATE_REFUSAL`: "This workspace needs Pro. Your threads stay
-readable. Get Pro to write again." The gate resolves the workspace from the body's `workspace`, a
-`taskId` or any other id the command carries (through the row), or the whiteboard the route names.
-A `cloud` workspace never meets it. Tests: `hosted-gate.test.ts` (the exemption list one entry at
-a time) and `hosted-gate.pg.test.ts`.
+> **The gate and the notice are deleted (2026-10-03).** Since the Pro trial (2026-09-26) a hosted
+> workspace on `free` writes, and the credit gate bounds what it spends. So the hosted write gate
+> (`hosted-gate.ts`, the flag `NM_HOSTED_FREE_GATE`, which production did not set on 2026-10-03) and the notice
+> (`scripts/notify-hosted-free-owners.mjs`, `renderHostedFreeNotice`) are gone, with their tests.
+> hq's gate card went with them. The desktop keeps its copy of the card behind `hostedGateFor`,
+> which answers false for every plan. The export stays.
 
 **The export.** `GET /v1/workspaces/:id/export`, owner only on a human bearer, streams one `tar.gz`:
 `manifest.json` then one JSONL file per table in dependency order. Format and the never-travels
@@ -185,12 +180,40 @@ through `workspace.create` when the person has no membership and no invitation w
 The desktop handoff (`/auth/desktop/*`) lives **fifteen minutes** (`DESKTOP_AUTH_TTL_MS`), because
 sign-up plus checkout takes longer than a sign-in.
 
-**The notice.** `scripts/notify-hosted-free-owners.mjs` lists every hosted owner on `free` (dry run)
-and with `--send` emails each owner once (`renderHostedFreeNotice`, subject "A change to your free
-NeuraMesh workspace"), idempotent by the `emails` outbox key
-`hosted_free_notice:2026-09-29:<user id>`. The founder runs it on **2026-09-15**.
+## The card trial (2026-10-03)
 
-Deploy notes for the round: Vercel `NM_HOSTED_FREE_GATE=0` at merge, `1` on 2026-09-29. No migration.
+George's direction: the trial's standard path asks for a payment method before the trial starts,
+says "$0 today" plainly, and keeps a muted way past it. The design is the canvas's Round 2
+(`docs/design/pro-front-door-2026-10/plan.md` §the card step).
+
+- **Where.** hq's setup wizard has a Pro step, 5 of 6, after the team step and before the crew's
+  reveal. The Pro sheet (`UpgradeSheet.tsx`) shows the same offer after a skip. The phone has no card
+  step (App Store rule 3.1.1).
+- **What it is.** A Stripe Checkout Session in the `custom` UI mode (`createTrialSession`,
+  `billing.ts`): the same subscription as hosted Checkout, with `trial_period_days` =
+  `PRO_TRIAL_DAYS` (14) and `payment_method_collection: 'always'`. hq draws Stripe's Express
+  Checkout Element (Apple Pay, Google Pay, Link) and the Payment Element (card, bank debits and the
+  other methods the Dashboard turns on that can renew a subscription) inside its own page. Stripe.js
+  loads on that step only, as its own chunk.
+- **Pro at once.** A `trialing` subscription is Pro (`CLOUD_STATUSES`), so the flip grants
+  `CLOUD_SEAT_MONTHLY_CREDITS × seats` (1,500 for one seat) at once. A person who cancels in the
+  trial keeps what is left. The refill on the 1st treats a trial as Pro, so a trial that converts
+  mid-month has credits for its first paid month.
+- **One trial a workspace.** `trialOffered` (`trial.ts`): a workspace on the trial plan that never
+  had a subscription. Every other workspace sees the older sheet (two cards, Get Pro in a new tab).
+- **Server truth after the form.** `POST /v1/billing/trial/sync` reads the session back from Stripe,
+  checks it is the caller's workspace, and applies the subscription the webhook also delivers (one
+  mapper, one flip, the grant deduped by subscription id). "Welcome to Pro" shows on that answer.
+- **The reminder.** `customer.subscription.trial_will_end` (3 days before the end) queues one email to
+  the owner (`renderTrialEnding`, dedupe key `trial_ending:<subscription>`). It names the date, the
+  first charge and the way out: Credits › Manage plan opens Stripe's portal.
+- **A method that leaves the page** (Amazon Pay, Cash App Pay on a phone) returns to
+  `/?pro_session=<id>`. The wizard saved its place first (no secret: a typed API key goes to the
+  server before Stripe confirms) and opens again at its Pro step. Outside the wizard, the web boot
+  reads the session and flips the plan.
+- **hq's headers.** Stripe.js cannot load under COEP `require-corp` (the browser blocks the script)
+  or `credentialless` (its frames never finish). hq now sends COOP `same-origin-allow-popups` and no
+  COEP. The replica's `OPFSCoopSyncVFS` needs no cross-origin isolation.
 
 ## Deferred
 

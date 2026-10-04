@@ -216,7 +216,7 @@ export const ttPoster: Poster = {
  * the human makes it live from the TikTok app. */
 // X lives in its own file (connectors-x.ts), but `connectors` stays the ONE import every
 // consumer uses — a split inside a module is not a reason for callers to learn a second path.
-export { XReauthRequired, xStartUrl, xCallback, xPoster, xSearchOnConnector, xSearchRecent, type XSearchHit } from './connectors-x';
+export { XReauthRequired, xStartUrl, xCallback, xPoster, xSearchOnConnector, xSearchRecent, type XSearchHit, type XSearchOpts } from './connectors-x';
 
 export const POSTERS: Record<string, Poster> = { x: xPosterImpl, linkedin: liPoster, instagram: igPoster, tiktok: ttPoster };
 

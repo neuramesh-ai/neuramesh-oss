@@ -6,9 +6,9 @@
 //   4. the rendered email itself — no unbounded claims, no missing preheader
 import { describe, expect, it } from 'vitest';
 import { MemoryStore } from '../src/store';
-import { dueFor, type LifecycleRow } from '../src/lifecycle';
+import { LIFECYCLE_LINKS, dueFor, renderLifecycle, type LifecycleRow } from '../src/lifecycle';
 import { unsubscribeToken, verifyUnsubscribeToken } from '../src/mail';
-import { renderDay3, renderHostedFreeNotice, renderInvite, renderJoined, renderWelcome } from '@neuramesh/shared';
+import { renderDay3, renderInvite, renderJoined, renderTrialEnding, renderWelcome } from '@neuramesh/shared';
 
 const row = (over: Partial<LifecycleRow> = {}): LifecycleRow => ({
   userId: 'u1', email: 'a@b.dev', workspaceId: 'ws', plan: 'free',
@@ -99,10 +99,10 @@ describe('unsubscribe tokens are unforgeable', () => {
 describe('rendered email holds the line on docs/28', () => {
   const rendered = [
     renderInvite({ inviter: 'George', inviterEmail: 'g@nm.app', workspace: 'Flowe', role: 'Member', acceptUrl: 'https://x/join?token=t' }),
-    renderWelcome({ downloadUrl: 'https://x/downloads', unsubscribeUrl: 'https://x/u/t' }),
-    renderJoined({ joinedEmail: 'ada@flowe.dev', workspace: 'Flowe', role: 'Member', seatLine: '2 of 3', settingsUrl: 'https://x' }),
+    renderWelcome({ openUrl: 'https://hq.x', unsubscribeUrl: 'https://x/u/t' }),
+    renderJoined({ joinedEmail: 'ada@flowe.dev', workspace: 'Flowe', role: 'Member', seatLine: '1 of 1 · Pro trial', openUrl: 'https://hq.x' }),
     renderDay3({ lesson: 'never mock the db', taskNumber: 1042, channel: 'dev', reviewer: 'scout', worker: 'patch', statAccepted: 4, statReviews: 11, statLessons: 6, window: 'your first week', openUrl: 'https://x', unsubscribeUrl: 'https://x/u/t' }),
-    renderHostedFreeNotice({ workspaces: ['Flowe', 'Side Quest'], effectiveDate: '2026-09-29', proUrl: 'https://x/pro', termsUrl: 'https://x/terms', exportPath: 'GET /v1/workspaces/ws-1/export' }),
+    renderTrialEnding({ workspace: 'Flowe', endsOn: 'Oct 17', seats: 1, seatUsd: 22, manageUrl: 'https://hq.x/?view=credits' }),
   ];
 
   it('every email has a subject, a preheader and a text alternative', () => {
@@ -164,31 +164,63 @@ describe('rendered email holds the line on docs/28', () => {
   });
 });
 
-// The hosted free notice (unit U1b): the subject the plan names, the date, the export, Get Pro,
-// and every sentence ASD-STE100 (no em dash, no semicolon).
-describe('the hosted free notice says what changes and offers both doors', () => {
-  const one = renderHostedFreeNotice({ workspaces: ['Flowe'], effectiveDate: '2026-09-29', proUrl: 'https://x/pro', termsUrl: 'https://x/terms', exportPath: 'GET /v1/workspaces/ws-1/export' });
-  const two = renderHostedFreeNotice({ workspaces: ['Flowe', 'Side Quest'], effectiveDate: '2026-09-29', proUrl: 'https://x/pro', termsUrl: 'https://x/terms', exportPath: 'GET /v1/workspaces/ws-1/export' });
-
-  it('carries the subject, the date, what stays, the export, and Get Pro', () => {
-    expect(one.subject).toBe('A change to your free NeuraMesh workspace');
-    expect(one.text).toContain('2026-09-29');
-    expect(one.text).toMatch(/stays readable/i);
-    expect(one.text).toMatch(/export/i);
-    expect(one.text).toContain('GET /v1/workspaces/ws-1/export');
-    expect(one.text).toContain('Files on a cloud machine are not in the export.');
-    expect(one.html).toContain('https://x/pro');
-    expect(one.text).toContain('$22 per seat, per month');
-    expect(one.text).toContain('https://x/terms');
+// THE PRO TRIAL'S DOOR (2026-10-03): a hosted account's workspace runs in the browser with its
+// cloud machine and 500 credits, so no email sends that person to the Mac download. day 7's Get
+// Pro went to /billing, which the site does not serve, and showed the homepage.
+describe('the emails open the workspace, not the Mac download', () => {
+  it('the welcome opens hq, names the machine and the credits, and asks for no download', () => {
+    const w = renderWelcome({ openUrl: 'https://hq.x', unsubscribeUrl: 'https://x/u/t' });
+    expect(w.html).toContain('href="https://hq.x"');
+    expect(w.text).toContain('Open your workspace');
+    expect(w.text).toMatch(/own cloud machine and 500 credits/);
+    expect(w.text + w.subject + w.preheader).not.toMatch(/download|this Mac|notarized/i);
+    expect(w.text + w.subject + w.preheader).not.toMatch(/[—;]/);
   });
 
-  it('names every workspace the owner holds, singular and plural', () => {
-    expect(one.text).toContain('a NeuraMesh workspace on the free plan: Flowe.');
-    expect(two.text).toContain('2 NeuraMesh workspaces on the free plan: Flowe, Side Quest.');
+  it('the lifecycle links are hq, the site\'s Get Pro on its sign-in face, and hq\'s Credits view', () => {
+    expect(LIFECYCLE_LINKS.open).toMatch(/^https:\/\/hq\./);
+    expect(LIFECYCLE_LINKS.getPro).toMatch(/\/pro\?mode=signin$/);
+    expect(LIFECYCLE_LINKS.credits).toMatch(/^https:\/\/hq\..*\/\?view=credits$/);
   });
 
-  it('has no semicolon anywhere a person reads (the em dash rule is checked above for every email)', () => {
-    expect(one.text).not.toMatch(/;/);
-    expect(one.subject + one.preheader).not.toMatch(/[—;]/);
+  it('no lifecycle stage links to /downloads or to the unserved /billing', () => {
+    const lesson = { text: 'never mock the db', taskNumber: 1042, channel: 'dev', reviewer: 'scout', worker: 'patch' };
+    for (const t of ['day1', 'day3', 'marketing', 'day7'] as const) {
+      const r = renderLifecycle(t, row({ lesson }))!;
+      expect(r.html, t).not.toMatch(/\/downloads|\/billing"/);
+      expect(r.html, t).toContain(LIFECYCLE_LINKS.open);
+    }
+    expect(renderLifecycle('day7', row())!.html).toContain(LIFECYCLE_LINKS.getPro);
+  });
+
+  it('joined opens the workspace, and its button says so', () => {
+    const j = renderJoined({ joinedEmail: 'ada@flowe.dev', workspace: 'Flowe', role: 'Member', seatLine: null, openUrl: 'https://hq.x' });
+    expect(j.html).toContain('href="https://hq.x"');
+    expect(j.text).toContain('Open your workspace');
+    expect(j.text).not.toMatch(/settings/i);
+  });
+});
+
+// THE CARD TRIAL'S REMINDER (2026-10-03): the trial form promises an email 3 days before the first
+// charge, so the email must say the date, the amount and the way out, and open the place to act.
+describe('the trial reminder says the date, the amount and the way out', () => {
+  const r = renderTrialEnding({ workspace: 'Flowe', endsOn: 'Oct 17', seats: 3, seatUsd: 22, manageUrl: 'https://hq.x/?view=credits' });
+
+  it('names the end date in the subject and the first charge as seats times the seat price', () => {
+    expect(r.subject).toBe('Your Pro trial ends on Oct 17');
+    expect(r.text).toMatch(/\$66 for 3 seats/);
+    expect(r.text).toMatch(/\$22 a seat each month/);
+  });
+
+  it('says a cancel before the date costs nothing, and opens hq\'s Credits view to do it', () => {
+    expect(r.text).toMatch(/Cancel before Oct 17 and you pay nothing/);
+    expect(r.html).toContain('href="https://hq.x/?view=credits"');
+    expect(r.text).toContain('Manage your plan');
+  });
+
+  it('holds STE: no em dash, no semicolon, no -ing verb in the words a person reads', () => {
+    const words = `${r.subject} ${r.preheader} ${r.text}`;
+    expect(words).not.toMatch(/[—;]/);
+    expect(words).not.toMatch(/\b(keeps working|continuing|charging|cancelling|canceling)\b/i);
   });
 });

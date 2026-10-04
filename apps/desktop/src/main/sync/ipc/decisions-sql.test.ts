@@ -42,7 +42,7 @@ test('the rewrite answers what the CASE form answered, branch by branch', { skip
     create table channels (id text primary key, workspace_id text, slug text);
     create table tasks (id text primary key, workspace_id text, number integer, parent_task_id text);
     create table threads (id text primary key, task_id text, settled_at text, created_at text);
-    create table messages (id text primary key, workspace_id text, channel_id text, task_id text, thread_id text, author_kind text, created_at text);
+    create table messages (id text primary key, workspace_id text, channel_id text, task_id text, thread_id text, author_kind text, body text, created_at text, schedule_id text);
     create table decisions (id text primary key, workspace_id text, channel_id text, task_id text, message_id text, asker_kind text, asker_id text,
       question text, options text, allow_other integer, status text, answer text, created_at text, answered_at text);
   `);
@@ -69,7 +69,7 @@ test('the rewrite answers what the CASE form answered, branch by branch', { skip
     ['sub-h', 'c2', 's', null, 'human', '2026-09-01T02'],
     ['ask-quiet', 'c2', null, null, 'agent', '2026-09-01T01'],
   ];
-  for (const [id, channel_id, task_id, thread_id, author_kind, created_at] of msgs) ins('messages', { id, workspace_id: 'w', channel_id, task_id, thread_id, author_kind, created_at });
+  for (const [id, channel_id, task_id, thread_id, author_kind, created_at] of msgs) ins('messages', { id, workspace_id: 'w', channel_id, task_id, thread_id, author_kind, body: id, created_at });
   const dec = (id: string, channel_id: string, task_id: string | null, message_id: string) =>
     ins('decisions', { id, workspace_id: 'w', channel_id, task_id, message_id, asker_kind: 'agent', asker_id: 'a', question: '?', options: '[]', allow_other: 1, status: 'open', answer: null, created_at: `2026-09-02-${id}`, answered_at: null });
   dec('d-room', 'c1', null, 'ask-room');

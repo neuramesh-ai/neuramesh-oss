@@ -186,6 +186,12 @@ it always was, inside the thread's sheet. Cost: width on a small window — the 
 (360px to 60%) and collapsible, and the Workbench card is fixed-width with the thread recentring
 beside it. Mockup section 10; decision D8.
 
+**Amended 2026-10-03 (the side-panel round, [side-panel-2026-10](../side-panel-2026-10/plan.md),
+George: "the neuramesh workbench should be decommissioned and functionality moved into the
+neuramesh aux right panel").** Point (2) of D8 stands, and the side panel now belongs to the
+session in front. Points (1) and (3) are reversed: the Workbench card retired into that side
+panel, so a session's details are its Overview tab, and the card's own toggle retired with it.
+
 **Rulings it reverses (dated in docs/33 with why):** the frame's right-edge tenant (2026-08-16), the
 Workbench toggled from the frame top, the main-area tab strip with the conversation as slot 0
 (v0.71), and "Back to chat".

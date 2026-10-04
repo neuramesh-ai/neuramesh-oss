@@ -18,7 +18,7 @@
  */
 export type WakeTarget = 'orchestrator' | 'assignee' | null;
 
-export function unaddressedWake(state: string, kind?: string | null): WakeTarget {
+export function unaddressedWake(state: string, kind?: string | null, button = false): WakeTarget {
   // a setup task's thread OWNS its room's first-run (marketing-os round 3): the bootstrap's
   // docs, its close and every follow-up playbook ask live there — long after the checklist
   // itself finished (marketing.setup lands it `done` in the same command). The coordinator
@@ -35,5 +35,8 @@ export function unaddressedWake(state: string, kind?: string | null): WakeTarget
   // a content task is its conversation too, even in_review where build tasks are
   // mention-only: a reply on a draft addresses the marketer (docs/16 §4.5)
   if (kind === 'content' && !['accepted', 'closed'].includes(state)) return 'assignee';
-  return null;
+  // a draw or a film (the ‹gen-image:› / ‹gen-video:› button) is not a reply: it runs no model and
+  // needs a hand in ANY state, or a tab's picture ask on a finished unit's draft wakes nobody
+  // (2026-09-27). the coordinator takes it, and host/wake.ts draws for whichever agent wakes.
+  return button ? 'orchestrator' : null;
 }

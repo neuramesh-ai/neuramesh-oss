@@ -179,6 +179,8 @@ export interface ArtifactUI {
   size_bytes?: number | null;
   task_id?: string | null;
   project_id?: string | null;
+  /** set on a human's attachment in a task thread, null on an agent's deliverable (the side panel opens deliverables only) */
+  message_id?: string | null;
 }
 
 export interface AttachmentRow {

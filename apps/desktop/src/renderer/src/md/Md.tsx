@@ -247,7 +247,7 @@ export function Md({ text, onAnswer, onDismissCard, answers, onOpenPlan, taskRef
       {plays.map((pl, i) => <PlaybookRecsCard key={i} plays={pl} onRun={onAnswer} />)}
       {nexts.map((nx, i) => <NextStepsCard key={i} data={nx} answers={answers} onAsk={onAnswer} onOpenTask={onOpenTask} />)}
       {replies.map((rp, i) => <ReplyOpsCard key={i} data={rp} onAsk={onAnswer} />)}
-      {needs.map((nd, i) => <DependencyCard key={i} data={nd} />)}
+      {needs.map((nd, i) => <DependencyCard key={i} data={nd} answers={answers} />)}
     </div>
   );
 }

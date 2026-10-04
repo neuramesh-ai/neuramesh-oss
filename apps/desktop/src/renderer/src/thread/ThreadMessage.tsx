@@ -13,7 +13,7 @@ import { SuggestionRow } from '../cards/SuggestionRow';
 import { answersFrom } from '../answers';
 import { authorLabel } from '../views/SkillsView';
 import { docDropParts } from '../docdrop';
-import { formatBytes, journeyFor, parseArticleRef, parseBriefRef, parseModeMarker, parsePlanRef, parseReportRef, parseSuggestions, parseTaskUnitRef, parseWhiteboardRef, type WorkPlan } from '@neuramesh/shared';
+import { formatBytes, journeyFor, parseArticleRef, parseBriefRef, parseGitHubConnected, parseModeMarker, parsePlanRef, parseReportRef, parseSuggestions, parseTaskUnitRef, parseWhiteboardRef, sessionRunLabel, type WorkPlan } from '@neuramesh/shared';
 import { ArticleCard, type ArticleOpen } from './ArticleCard';
 import { ReportCard } from './ReportCard';
 import { ReleaseCard } from './ReleaseCard';
@@ -256,6 +256,10 @@ const ThreadMessageRow = memo(function ThreadMessageRow({
     );
   }
   const a = authorLabel(m, agents, members, selfId ?? null, selfEmail ?? null);
+  // the repo-connect round: the grant's divider, posted as the person who connected GitHub. It wakes
+  // the agent that posted the card, and here it reads as what happened, never as a message
+  const connected = parseGitHubConnected(m.body);
+  if (connected) return <div className="srundiv"><span>{a.self ? 'You' : a.name} connected GitHub · {connected} · {sessionRunLabel(m.created_at, Date.now())}</span></div>;
   const drop = a.agent ? docDropParts(m.body) : null;
   // a shared whiteboard (docs/38): the marker becomes the snapshot card, the surrounding prose
   // stays prose — HUMAN shares included, so this sits outside the agent-only doc-drop gate

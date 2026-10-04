@@ -160,11 +160,19 @@ test('with nothing to the right, the LEFT neighbour inherits', () => {
   assert.equal(r.activeId, 'f1');
 });
 
-test('with no neighbour at all, the conversation inherits', () => {
+test('with no neighbour in its session, nothing inherits: the panel falls back to the session front', () => {
+  // the side-panel round (2026-10-03): the conversation is the sheet, never a panel tab, so it is
+  // never an heir. shell/panel-state.ts panelFront picks the session's own tab instead.
   const open = [conv(), term({ id: 't1' })];
   const r = closeTab(open, 't1', 't1');
   assert.deepEqual(ids(r.tabs), ['conv']);
-  assert.equal(r.activeId, 'conv');
+  assert.equal(r.activeId, null);
+});
+
+test('another session\'s tab is never an heir', () => {
+  const open = [conv(), file({ id: 'f1', path: '/w/a.ts', owner: 'thread:a' }), term({ id: 't1', owner: 'thread:b' })];
+  const r = closeTab(open, 't1', 't1');
+  assert.equal(r.activeId, null);
 });
 
 test('closing a background tab leaves the active one alone', () => {

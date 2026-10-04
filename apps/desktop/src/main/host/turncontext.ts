@@ -1,6 +1,6 @@
 // The turn transcript and the orchestrator's fan-out closure — what a turn is built FROM.
 // Split out of host/content.ts.
-import { TURN_BUDGETS, type AgentRole, type TurnKind } from '@neuramesh/shared';
+import { TURN_BUDGETS, cardsAsWords, type AgentRole, type TurnKind } from '@neuramesh/shared';
 import { resolveToken, runtimeFor } from '../agents';
 import type { ExecTask, HostedAgent, ThreadTask } from '../agents';
 import { Subtree, planSpawn } from '../harness/subagents';
@@ -19,6 +19,7 @@ import type { makeRuns } from './runs';
 import type { makeLookups } from './lookups';
 import type { makeBlock } from './block';
 import type { HostCtx } from './ctx';
+import type { RepoReader } from './reporead';
 
 export function makeTurnContext(ctx: HostCtx & {
   agents: Map<string, HostedAgent>;
@@ -38,6 +39,8 @@ export function makeTurnContext(ctx: HostCtx & {
   resolveSeat: (parent: HostedAgent, channelId: string, role: AgentRole, scope?: { threadId?: string | null; taskId?: string | null }) => Promise<Seat>;
   seatLabel: ReturnType<typeof makeLookups>['seatLabel'];
   taskOf: ReturnType<typeof makeLookups>['taskOf'];
+  /** the room's repository reader (host/reporead.ts): a spawned leg reads the code like a worker leg */
+  repoFor: (actor: { kind: string; id: string; role?: string }, ch: { id: string; workspace_id: string }) => RepoReader;
   workspace: string;
 }) {
 const { alog, apiUrl, blockFor, brainBriefing, db, designerOverride, ensureChatWorkspace, legSummary, narrate, openRun, ownerActorId, post, recordLegResult, resolveSeat, seatLabel, taskOf } = ctx;
@@ -72,7 +75,8 @@ async function threadTranscript(agent: HostedAgent, t: ThreadTask): Promise<stri
     rows
       .map((r, i) => {
         const who = r.author_kind === 'agent' ? (r.author_id === agent.id ? 'you' : 'agent') : 'human';
-        const body = i < cutoff && r.body.length > THREAD_OLDER_CHARS ? `${r.body.slice(0, THREAD_OLDER_CHARS)} […]` : r.body;
+        const text = cardsAsWords(r.body); // a card reads as words, never a block to copy (shared/cardwords.ts)
+        const body = i < cutoff && text.length > THREAD_OLDER_CHARS ? `${text.slice(0, THREAD_OLDER_CHARS)} […]` : text;
         return `${who}: ${body}`;
       })
       .join('\n')
@@ -157,7 +161,10 @@ function orchSpawnFor(
         runtimeFor(seated.runtime).runQuery(
           seated, subject, dir, cred.token ?? '', null, false, undefined, watchedLog,
           undefined, undefined, undefined, undefined, undefined, undefined,
-          override,
+          override, undefined, undefined, undefined, undefined,
+          // the leg reads the room's repository like a worker leg does (docs/design/repo-connect-2026-10):
+          // without it a subagent asked about the code had nothing to read but an empty workspace
+          { turnKind: i.role === 'designer' ? 'design' : 'leg', repo: ctx.repoFor({ kind: 'agent', id: seated.id, ...(seated.role ? { role: seated.role } : {}) }, ch) },
         ),
         decision.budget.wallMs,
         `subagent "${label}" exceeded its ${Math.round(decision.budget.wallMs / 60_000)}m slice`,

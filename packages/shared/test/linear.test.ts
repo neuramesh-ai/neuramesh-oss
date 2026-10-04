@@ -5,6 +5,7 @@
 // few milliseconds, so the bounds hold on a loaded runner.
 import { describe, expect, it } from 'vitest';
 import { articleFrom, parseArticleRef } from '../src/articles';
+import { repairCardFences, repairCardJson } from '../src/cardfence';
 import { parseQuestions, parseTaskUnitRef, readAnswers } from '../src/cards';
 import { scrubEmdash } from '../src/commrules';
 import { engineeringPlanItems } from '../src/engineering/activity';
@@ -204,3 +205,34 @@ describe('markerSpans / stripMarkers (the 2026-09-19 CodeQL round: the brief and
   });
 });
 
+describe('the card fence opener (the 2026-10-04 CodeQL round, js/polynomial-redos in cardfence.ts)', () => {
+  // the shipped repairCardFences of #676, its regex kept here as the spec
+  const parses = (x: string): boolean => { try { const v: unknown = JSON.parse(x); return !!v && typeof v === 'object'; } catch { return false; } };
+  const oldRepair = (body: string): string => {
+    if (!body.includes('```nm')) return body;
+    let out = '';
+    let from = 0;
+    for (const m of body.matchAll(/```(nm[a-z]+)([^\n]*)\n/g)) {
+      const start = m.index ?? 0;
+      if (start < from) continue;
+      const rest = (m[2] ?? '').trim();
+      if (rest && !rest.startsWith('{') && !rest.startsWith('[')) continue;
+      const innerStart = start + m[0].length;
+      const close = body.indexOf('```', innerStart);
+      if (close === -1) break;
+      const inner = `${rest ? `${rest}\n` : ''}${body.slice(innerStart, close)}`.replace(/\n$/, '');
+      const clean = !rest && m[2] === '' && body[close - 1] === '\n' && parses(inner);
+      const fixed = clean ? null : parses(inner) ? inner : repairCardJson(inner);
+      if (fixed !== null) { out += `${body.slice(from, start)}\`\`\`${m[1]}\n${fixed}\n\`\`\``; from = close + 3; }
+    }
+    return from ? out + body.slice(from) : body;
+  };
+  it('repairs exactly what the regex repaired', () => {
+    const alphabet = ['```nmq', '```nm', '```', 'nm', 'q', 'Q', ' ', '{', '}', '[', ']', '"a": 1', ',', '\n', 'x'];
+    for (const s of samples(alphabet, 6000, 14)) expect(repairCardFences(s), JSON.stringify(s)).toBe(oldRepair(s));
+  });
+  it('a long line with no line end costs the input, not its square', () => {
+    expect(ms(() => repairCardFences('```nma' + 'a'.repeat(100_000)))).toBeLessThan(200);
+    expect(ms(() => repairCardFences('```nmq ' + 'b'.repeat(100_000) + '```'))).toBeLessThan(200);
+  });
+});

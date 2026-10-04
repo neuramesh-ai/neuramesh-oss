@@ -124,6 +124,8 @@
 .trStream :global(.md) {
   color: inherit;
   font-size: inherit;
+  /* markdown keeps its own breaks: the stream's pre-wrap would turn the gaps between its blocks into blank lines */
+  white-space: normal;
 }
 
 .trStream :global(.md p + p),

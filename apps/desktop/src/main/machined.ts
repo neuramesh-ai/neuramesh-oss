@@ -45,6 +45,10 @@ import { createCodeSessionRecorder } from './relay/engineering-record';
 import { ensureEngineeringWorkspace } from './relay/engineering-workspace';
 import { loadEngineeringPolicyRules } from './relay/engineering-policy';
 import { resolveEngineeringBrain } from './relay/engineering-brain';
+import { onCloudMachine } from './runtime/adapter';
+import { chromiumBin } from './browser/chromium';
+import { createBrowserService } from './browser/service';
+import { setBrowserService } from './browser/registry';
 
 // the machine's sync credentials: machine token in, short-lived RS256 JWT out
 // (control-api /v1/machines/sync-token, verified against the static key in PowerSync).
@@ -139,7 +143,15 @@ export async function main(): Promise<void> {
   // The server prices what is reported and clamps at the balance — the daemon never sees rates.
   let activeSeconds = 0;
   const SAMPLE_MS = 5_000;
-  const busyNow = (): boolean => executing.size > 0 || (relay?.sessionCount() ?? 0) > 0;
+  // the machine's browser (models-and-replies round, board C3): Chromium for the web panel's
+  // `browser` lane and the agents' web_* tools, on a cloud machine whose image carries it. nothing
+  // starts here: the first viewer or the first tool call starts it, and it stops when idle. a person
+  // who types into it, or an agent call in flight, is work for the meter. a tab left open is not.
+  const chromium = onCloudMachine() ? chromiumBin() : null;
+  const browser = chromium ? createBrowserService({ bin: chromium, stateDir: cfg.stateDir, log: (line) => console.log(`[browser] ${line}`) }) : null;
+  setBrowserService(browser);
+  console.log(browser ? `[machined] browser ready (${chromium}), started on first use` : '[machined] no Chromium on this machine: no browser panel and no web tools');
+  const busyNow = (): boolean => executing.size > 0 || (relay?.sessionCount() ?? 0) > 0 || !!browser?.busy();
   const sampler = setInterval(() => { if (busyNow()) activeSeconds += SAMPLE_MS / 1000; }, SAMPLE_MS);
 
   // WHAT THIS MACHINE CAN SERVE rides the beat (member-machines plan §4). A cloud machine never
@@ -184,11 +196,13 @@ export async function main(): Promise<void> {
   // browser terminal, which is the right answer anywhere no relay is deployed. Started
   // BEFORE the agent host so the reclaim hook below has something to call.
   const relayUrl = process.env['NM_RELAY_URL'];
+  const engineeringCred = makeRepoCred({ apiUrl: cfg.apiUrl, cloud: true, runner: cfg.kind === 'runner', ownLogin: ghLoggedIn, bearer: async () => ({ authorization: `Bearer ${cfg.machineToken}` }) });
   const engineering = createClineEngineeringHost({
     apiUrl: cfg.apiUrl,
     machineToken: cfg.machineToken,
     workspaceId: cfg.workspaceId,
-    resolveCwd: (meta) => ensureEngineeringWorkspace(db, cfg.workspaceId, meta),
+    // a login-less machine clones a private repository through the App (host/repocred.ts, docs/design/repo-connect-2026-10)
+    resolveCwd: (meta) => ensureEngineeringWorkspace(db, cfg.workspaceId, meta, { credFor: (slug, channel) => engineeringCred.forRepo(slug, channel) }),
     resolveBrain: (meta) => resolveEngineeringBrain(db, {
       apiUrl: cfg.apiUrl,
       machineToken: cfg.machineToken,
@@ -202,6 +216,7 @@ export async function main(): Promise<void> {
     relayUrl, token: cfg.machineToken, machineId: cfg.machineId, engineering,
     // the `stream` lane: a browser's live bubble for the replies this machine writes (livestreams.ts)
     streams: liveStreams,
+    ...(browser ? { browser } : {}),
     onSessionEnd: () => void redetect(),
   }) : null;
   console.log(relayUrl ? `[machined] relay edge dialling ${relayUrl}` : '[machined] NM_RELAY_URL unset — no browser terminal on this machine');
@@ -232,6 +247,7 @@ export async function main(): Promise<void> {
     clearInterval(sampler);
     clearInterval(redetectTimer);
     relay?.close();
+    await browser?.close().catch(() => {});
     await db.disconnect();
     process.exit(0);
   };
@@ -242,6 +258,8 @@ export async function main(): Promise<void> {
 // run only when executed directly — importing this module (tests, tooling) must never
 // boot a daemon or exit the process
 import { pathToFileURL } from 'node:url';
+import { makeRepoCred } from './host/repocred';
+import { ghLoggedIn } from './host/gh';
 const executedDirectly = process.argv[1] ? import.meta.url === pathToFileURL(process.argv[1]).href : false;
 if (executedDirectly) {
   main().catch((err) => {

@@ -166,6 +166,21 @@ instead of one. That is the correct trade — two tabs is what you actually have
 > `hideConv` — are retired with it (§5, §6). The Workbench, meanwhile, moved *inside* the sheet as
 > the thread's own card, toggled from the thread head (docs/33 §2).
 
+> **Amended in the side-panel round (2026-10-03, George,
+> [docs/design/side-panel-2026-10](design/side-panel-2026-10/plan.md)): the panel belongs to the
+> SESSION in front.** The side dock is the **side panel** (`shell/SidePanel.tsx`), and the Workbench
+> card retired into it. Every tab carries an `owner`: `task:<id>`, `thread:<id>`, `room:<id>`, or
+> null for the workspace set (Home and the destinations). The panel shows the tabs of the session
+> in front only (`shell/panel-state.ts`, tested), and the tabs of other sessions stay mounted and
+> hidden. The reuse rule of §3.4 holds WITHIN one session: the same plan opened in two sessions is
+> two tabs, one in each panel. A session also has tabs of its own that are not records: Overview,
+> Files, Drafts, or the code face of a coding thread. They derive from the kind of the session, so
+> they never close, persist or leak. Each session keeps its own front tab. When a conversation
+> becomes a task in place, its tabs move to the task (`rekeyOwner`). This replaces "a tab's parent
+> is the content area, not the session" below. Closing hands the surface to a neighbour IN THE SAME
+> SESSION only, and with none the panel falls back to the session's own front. The conversation is
+> never an heir, because it is the sheet.
+
 > **Tab 0 is the conversation. It is pinned, unclosable, and cannot be reordered out of slot 0.**
 
 - **It follows the room.** Switching rooms **replaces tab 0 in place**; it never spawns a second
@@ -258,7 +273,10 @@ Two consequences of the same reasoning:
 
 `⌘1` is always the conversation — its **composer**, since the conversation never leaves the screen
 (rail-ink round 3); `⌘2 … ⌘9` select the side dock's tabs in strip order and unfold the dock; `⌘J`
-folds and unfolds the dock; `⌘P` opens a file (the Workbench card's finder). The global handler
+folds and unfolds the dock; `⌘P` opens a file (the Workbench card's finder). **Amended 2026-10-03:**
+`⌘2 … ⌘9` count the session's own tabs first, then the tabs it opened. `⌘P` shows the session's
+Files tab and focuses its finder, where this client can browse the worktree. `Esc` puts an
+expanded panel back beside the conversation. The global handler
 also owns `⌘K` (palette), `⌘\` (nav fold), `⌘Y` (history) and `⌘N` (new chat). This is the editor
 idiom every user of this class of app already has in their fingers, and it costs no pixels at all.
 
@@ -274,6 +292,12 @@ legal view of the same bytes, not a different view of them. Mutation-checked: ga
 like `edit` fails the suite.
 
 ## 4. The file pane
+
+> **Amended 2026-10-03 (the side-panel round): the file pane is the session's Files tab** in the
+> side panel (`shell/FilesPane.tsx`), with the finder, the branch switch and the tree. It shows
+> where the session has a worktree that this client can browse: a task on the desktop, and the
+> code face's Files on a coding thread. A click still opens a tab: the pane is a doorway, never a
+> viewer. The text below is the original slice-3 design, kept as history.
 
 A **floating, dismissable** pane over the right edge of the content area — not a third column that
 permanently narrows the content, which is the mistake docs/25's "deliberately set aside" list
@@ -613,6 +637,17 @@ server would reject is a lie told to the one person who trusted the button.
    closes it too — the round is gone either way.
 2. **Many review tabs may be open**; they are ordinary tabs. The §3.4 reuse rule keys a review on
    its **artifact**, so one artifact is one tab and the same plan cannot be opened twice.
+   **Amended 2026-10-03: one review FAMILY is one tab.** A task has one tab for its plan, one for
+   its release plan and one for its design round, keyed `plan:<task>`, `ship:<task>` and
+   `design:<task>` (`review-round.ts`, tested). A new version replaces what the tab shows, the tab
+   takes the version's name (`Plan v2`), and the head wears `new` in place of `latest`. Comments
+   that you did not send hold an automatic replace back: the tab keeps your version, which turns
+   superseded and offers the new one. A design round's mockups are a strip of stills under the
+   header, and a click puts one on stage. A note on a rendered mockup quotes the mockup's name, so
+   the packet tells the designer which direction each note is about. The round keeps one mockup
+   per name with the newest bytes, and the stage follows a mockup that the designer posts again.
+   While the side panel shows a design round or a release plan, the thread's gate dock yields its
+   Approve and Request changes to the tab: one gate on the screen (docs/25).
 3. **The `.apvwrap` overlay is DELETED in the same PR.** Two doors to one review is exactly the
    duplication that made the dock worth retiring. There is now **one** opener — `openTaskArtifact`
    — and it asks what the artifact *is*: under a gate → a review tab, otherwise → a read-only file
@@ -662,7 +697,10 @@ and that was the driver, not the app.
 
 ### 13.7 Limits, named
 
-- **The design studio still owns the design round's conversation.** §13 binds a design round to the
+- **Answered 2026-10-03 (the side-panel round): the studio folded into the tab.** The studio column
+  retired, and a design round is one review tab in the side panel with its mockups as a strip. The
+  round's conversation is the task thread beside it. The text of this limit stays as history.
+  **The design studio still owns the design round's conversation.** §13 binds a design round to the
   review tab (kind chip, `Approve design` / `Revise`, the human-only badge) and the studio keeps
   the stage, the compare mode and the lane. Two surfaces can reach `approve_design`. That is not
   the §13.3-③ duplication — a studio is for iterating, a review tab is for deciding — but **whether

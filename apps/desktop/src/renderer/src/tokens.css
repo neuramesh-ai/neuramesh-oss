@@ -1030,6 +1030,10 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 .ndtxt b { display: block; font-size: 12.5px; }
 .ndtxt > span { display: block; font-size: 11.5px; color: var(--muted); margin-top: 1px; }
 .ndfoot { font-size: 11px; color: var(--dim); margin-top: 2px; }
+/* the GitHub card's connected face (docs/design/repo-connect-2026-10): the head and the mark turn done */
+.ndhead.ok { color: var(--done); }
+.ndopt .g.ok { color: var(--done); border-color: color-mix(in srgb, var(--done) 45%, var(--border2)); }
+.needcard .connacts { margin: -2px 0 6px; }
 /* ── the reply-ops card (docs/design/reply-radar-2026-08) ──────────────────────────────────
    Conversations worth joining: the TARGET leads each row, the draft answers it. Deliberately
    NOT the SocialPostCard grammar — that card is a standalone-post preview whose schedule verb
@@ -2795,70 +2799,24 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
    of this element, so it must out-stack what it covers. */
 .sessionsurf { position: absolute; inset: 0; z-index: 2; display: flex; background: var(--win); animation: nm-fadein var(--dur) var(--ease); }
 
-/* ── THE TASK PEEK (2026-08-10) — docs/33 §8's split stage, second tenant ────────────────────
-   A `#N` clicked inside a conversation docks the task BESIDE it. ONE animated number does open ·
-   resize · expand · close: the peek's width. The session column is `flex: 1` and absorbs the
-   difference, so the two move as a single gesture and their widths sum constant frame to frame —
-   the studio's contract, at the session surface's edge. `--dur-studio` (.42s) is the deliberate
-   §7 deviation it inherits: a whole column changing hands reads as a jump-cut at .22s, and the
-   thread stays interactive throughout, so the ≤150ms blocking budget does not apply. */
-.sessionsurf > .sscol { flex: 1; min-width: 0; min-height: 0; display: flex; transition: opacity calc(var(--dur-studio, .42s) * .5) var(--ease); }
-.taskpeek { flex: none; width: 0; min-width: 0; overflow: hidden; display: flex; min-height: 0;
-  transition: width var(--dur-studio, .42s) var(--ease); }
-.sessionsurf[data-peek] .taskpeek { width: var(--nm-peekw, 380px); }
-/* THE PEEK IS AN ELEVATED CARD (George live, 2026-08-10 — amended within the hour). It first
-   took the frame's `--win` like the nav; correct in cream, wrong in graphite, where `--win` is
-   DEEPER than the sheet and the column read as a hole rather than a card. The rule that survives
-   is the one George stated: **same as the nav or lighter, never deeper.** `--card` is exactly
-   that in every theme (#fff over the cream sheet, #1e1e1e over graphite's #191919) — and it is
-   the §3 stratum that legitimately hosts controls, which a peek is full of. It carries the
-   component radius and its own hairline, so it reads as a card resting beside the thread. */
-.taskpeek { padding: 8px 8px 8px 0; }
-.taskpeek .threadpanel { background: var(--card); border: 1px solid var(--card-border); border-radius: var(--r-lg); overflow: hidden; }
-/* the sheet's own bottom-left/right rounding is the sheet's; the peek is inset from it */
-.sessionsurf[data-peek] > .sscol { padding-right: 0; }
-/* drag is direct manipulation — the .42s ease would make the column lag the pointer */
-.sessionsurf[data-dragging="1"] .taskpeek, .sessionsurf[data-dragging="1"] > .sscol { transition: none; }
-/* the seam: NOTHING at rest (the panels' own edges are the boundary — trap 9b), a 3px pill on
-   hover, --ring while dragging. The nav grip's recipe, because it is the same act. */
-.pkgrip { flex: none; width: 10px; margin: 0 -4px; position: relative; z-index: 3; cursor: col-resize; display: flex; align-items: center; justify-content: center; touch-action: none; }
-.pkgripbar { width: 3px; height: 64px; border-radius: var(--r-full); background: var(--border2); opacity: 0; transition: opacity var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease); }
-.pkgrip:hover .pkgripbar, .pkgrip:focus-visible .pkgripbar { opacity: 1; }
-.pkgrip:focus-visible { outline: none; }
-.pkgrip:focus-visible .pkgripbar { background: var(--ring); }
-.sessionsurf[data-dragging="1"] .pkgripbar { opacity: 1; background: var(--ring); }
-/* the peek's panel is the SAME panel, narrowed — and since it became an inset CARD (above) the
-   old double-hairline is gone by construction: the card's own border is the only edge in the
-   gutter, with the grip's space around it (trap 9b, caught live 2026-08-10). */
-/* PEEK SCALE (docs/25): the zoning is untouched — identity, facts toks, the spectrum, the thread,
-   one gate card — it simply stops spending width it does not have. The reading column yields
-   (a 380px column cannot centre on 860px), the header tightens, and the tok row wraps. */
-.taskpeek .threadpanel .tmsgs > *, .taskpeek .threadpanel .tdock > *, .taskpeek .threadpanel .tcompose { max-width: none; }
-/* (the peek's rail-hiding rule retired 2026-08-17 with the in-sheet aside — at 380px the
-   Workbench IS the column, and it lives on the frame outside the peek entirely) */
-/* ONE line, and it does not wrap (2026-08-10, George live: the wrapped header read as clutter).
-   What earns a seat at 380px: the way out · the room · #N · state · the dial. */
-.taskpeek .thead { padding-left: 10px; padding-right: 10px; gap: 6px; flex-wrap: nowrap; min-width: 0; }
-.taskpeek .thead .tid { font-size: 11px; flex: none; }
-.taskpeek .thead .chip { flex: none; }
+/* ── THE TASK TAB (the side-panel round, 2026-10-03; the task peek of 2026-08-10 before it) ───────
+   A task named in a session reads in a tab of that session's side panel: the same panel, narrowed.
+   The docs/25 zoning is untouched (identity, the spectrum, the thread, one gate card). It simply
+   stops spending width it does not have: the reading column yields, and the header tightens. */
+.sessionsurf > .sscol { flex: 1; min-width: 0; min-height: 0; display: flex; }
+.taskpane { flex: 1; min-width: 0; min-height: 0; display: flex; }
+.taskpane .threadpanel .tmsgs > *, .taskpane .threadpanel .tdock > *, .taskpane .threadpanel .tcompose { max-width: none; }
+/* ONE line, and it does not wrap (George live, 2026-08-10): the way out · the room · #N · state · the dial */
+.taskpane .thead { padding-left: 10px; padding-right: 10px; gap: 6px; flex-wrap: nowrap; min-width: 0; }
+.taskpane .thead .tid { font-size: 11px; flex: none; }
+.taskpane .thead .chip { flex: none; }
 .pkroom { font: 600 10.5px var(--fmono); color: var(--dim); flex: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 92px; }
-.taskpeek .tmsgs { padding-left: 12px; padding-right: 12px; }
-.taskpeek .tcompose { margin-left: 10px; margin-right: 10px; }
-/* the peek's way out, in the crumb's seat: close · expand · open full */
+.taskpane .tmsgs { padding-left: 12px; padding-right: 12px; }
+.taskpane .tcompose { margin-left: 10px; margin-right: 10px; }
+/* the tab's way forward, in the crumb's seat: the task on the whole sheet */
 .pkctl { display: inline-flex; align-items: center; gap: 2px; flex: none; }
-.pkctl .pkico { width: 24px; height: 24px; display: grid; place-items: center; border: none; background: none; border-radius: 6px; color: var(--dim); cursor: pointer; transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
-.pkctl .pkico:hover { background: var(--hover-bg); color: var(--text); }
-.pkctl .pkico.on { background: var(--sel-bg); color: var(--text); }
 .pkfull { font: 500 10.5px var(--fmono); letter-spacing: -.02em; color: var(--muted); background: none; border: none; padding: 4px 6px; border-radius: 6px; cursor: pointer; white-space: nowrap; transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
 .pkfull:hover { background: var(--hover-bg); color: var(--text); }
-/* Under 1100px two columns are two unreadable columns (docs/33 §8) — the peek takes the sheet
-   and the thread stands down until it is closed. */
-@media (max-width: 1100px) {
-  .sessionsurf[data-peek] > .sscol { display: none; }
-  .sessionsurf[data-peek] .pkgrip { display: none; }
-  .sessionsurf[data-peek] .taskpeek { flex: 1; width: auto; }
-}
-@media (prefers-reduced-motion: reduce) { .taskpeek, .sessionsurf > .sscol { transition: none; } }
 /* Inside the tabbed body the session is the TAB's content, not a sheet floating on the window:
    the strip and its active tab are painted --panel, so a --win backdrop under them draws a step
    right below the tab the user just clicked. Continuity is the whole point of a tab meeting its
@@ -2895,16 +2853,6 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 [data-theme='light'] .wtpane .threadpanel,
 [data-theme='cream-oak'] .wtpane .threadpanel {
   border-radius: 0; border-color: transparent;
-}
-/* …EXCEPT the peek's card, which does not meet the tab strip at all — it is inset inside the
-   pane, so squaring its top would round three corners and leave one, which reads as damage.
-   Scoped to out-specify the rule above (its `[data-theme=…] .wtpane` variants are (0,3,0), so
-   this repeats the theme scope the same way rather than trusting source order — the exact
-   cascade collision the comment above is about). */
-.wtpane .taskpeek .threadpanel,
-[data-theme='light'] .wtpane .taskpeek .threadpanel,
-[data-theme='cream-oak'] .wtpane .taskpeek .threadpanel {
-  border-radius: var(--r-lg); border-top-color: var(--card-border);
 }
 @media (prefers-reduced-motion: reduce) {
   .sessionsurf { animation: none; }
@@ -2982,8 +2930,7 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 .raildesc { padding: 2px 12px 4px; font-size: 11.5px; line-height: 1.5; color: var(--body); }
 .raildesc p { margin: 0 0 5px; }
 .raildesc p:last-child { margin-bottom: 0; }
-/* one conversation read top to bottom — no gutter, no rail (docs/33 §8); the same
-   reasoning the studio's lane already applies to itself */
+/* one conversation read top to bottom — no gutter, no rail (docs/33 §8) */
 .tmsgs { flex: 1; overflow-y: auto; min-height: 0; padding: 0 0 6px; scrollbar-width: none; }
 .tmsgs::-webkit-scrollbar { width: 0; height: 0; display: none; }
 .tmsgs .msg { padding-left: 14px; padding-right: 14px; }
@@ -3243,7 +3190,9 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 .diffcode .dline.del { background: color-mix(in srgb, var(--blocked) 12%, transparent); }
 .diffcode .dline.hunk { background: color-mix(in srgb, var(--prog) 10%, transparent); color: var(--prog); }
 .dlno { flex: 0 0 46px; text-align: right; padding: 0 10px; color: var(--dim); user-select: none; border-right: 1px solid var(--border); }
-.dltext { padding: 0 12px; white-space: pre-wrap; overflow-wrap: anywhere; flex: 1; min-width: 0; }
+/* the size, leading and ink here came from the retired design studio's .dltext by a name collision
+   (2026-10-03): kept, so the diff reads exactly as it did */
+.dltext { padding: 0 12px; white-space: pre-wrap; overflow-wrap: anywhere; flex: 1; min-width: 0; color: var(--body); font-size: 12.5px; line-height: 1.5; }
 .diffcode .dline.add .dltext, .diffcode .dline.del .dltext { color: var(--text); }
 .diffbadge { flex: none; width: 16px; height: 16px; display: grid; place-items: center; border-radius: 3px; font-size: 9px; font-weight: 600; }
 .diffbadge.added { background: color-mix(in srgb, var(--done) 18%, transparent); color: var(--done); }
@@ -4141,6 +4090,9 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 .hgate.thread { margin-top: 8px; }
 .hgate.stage { border-radius: var(--r-xl); box-shadow: var(--shadow-sheet); padding: 24px 26px 18px; }
 .hgateeye { font: 500 10px var(--fmono); letter-spacing: -.02em; text-transform: uppercase; color: var(--dim); }
+/* a gate that waits on the person's grant (the coding thread's GitHub gate, docs/design/repo-connect-2026-10) */
+.hgateeye.warm { color: var(--warn); }
+.hgate .inpick { margin: 0; }
 .hgateh { margin: 0; font-family: var(--fdisp); font-size: 17px; font-weight: 500; letter-spacing: -.02em; line-height: 1.3; color: var(--text); }
 .hgate.stage .hgateh { font-size: 20px; }
 .hgatep { margin: 0; font-size: 14px; line-height: 1.5; color: var(--body); }
@@ -5534,10 +5486,6 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
    The panel floats INSIDE the sheet at its right edge, a card on the thread's own ground, and the
    conversation recentres in what is left. It was a naked frame column (2026-08-16), then a second
    sheet (2026-09-04, morning); the frame seat it held belongs to the side dock now. Same grip. */
-.wbdock { flex: none; width: var(--nm-panew, 284px); min-width: var(--nm-panew, 284px); margin: 44px 8px 8px 0;
-  display: flex; flex-direction: column; min-height: 0;
-  transition: width var(--dur-enter) var(--ease), min-width var(--dur-enter) var(--ease); }
-.wbdock[data-dragging="1"] { transition: none; }
 /* ── THE SIDE DOCK (rail-ink round 3) — the tab strip's own column at the frame's right edge: a
    second sheet, the main sheet's recipe exactly, holding what opened BESIDE the conversation.
    Folded by CSS, never unmounted, so its ptys and page histories survive the fold. */
@@ -5551,6 +5499,84 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 .sdbody { display: block; }
 .sdempty { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 24px; text-align: center; color: var(--dim); font-size: 12px; line-height: 1.5; }
 .sdempty b { font-weight: 600; color: var(--muted); }
+/* ── THE SIDE PANEL's strip (the side-panel round, 2026-10-03): the session's own tabs lead it, pinned
+   and never closed, then a hairline, then what the session opened. A tab that arrived behind the front
+   one wears the link dot until you look at it. */
+.wtab.pin { flex: none; }
+.wtab.warm { color: var(--warn); }
+.wtabct { flex: none; font: 600 9.5px var(--fmono); color: var(--dim); }
+.wtab.on .wtabct { color: var(--muted); }
+.wtsep { flex: none; align-self: center; width: 1px; height: 16px; margin: 0 5px 1px; background: var(--border2); }
+.wtabnew { flex: none; width: 6px; height: 6px; border-radius: var(--r-full); background: var(--link); }
+/* the session's own panes: Overview (the sections, one scroller) and Files (the finder over the tree) */
+.ovpane { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: none; padding: 14px 14px 20px; display: flex; flex-direction: column; }
+.ovpane::-webkit-scrollbar { width: 0; height: 0; }
+.filespane { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.fpbar { flex: none; display: flex; align-items: center; gap: 8px; padding: 10px 12px 8px; }
+.fpbar .wbfind { flex: 1; min-width: 0; margin: 0; }
+.fpbar .wbbr { margin-left: 0; flex: none; }
+.fpbar .wbfilesn { margin-left: 0; max-width: 140px; font: 500 9.5px var(--fmono); color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.filespane .wblist { flex: 1; min-height: 0; padding: 0 8px 10px; }
+/* a narrow panel keeps many own tabs on one row (a coding thread's five): the tabs behind the front one
+   wear their glyph alone, and their title names them */
+.sidedock { container: sidepanel / inline-size; }
+@container sidepanel (max-width: 640px) {
+  .wtstrip.many .wtab.pin:not(.on) .wtablbl { display: none; }
+  .wtstrip.many .wtab.pin:not(.on) { padding-inline: 8px; }
+  /* the verdict bar keeps its gate and its buttons: the head already names what is under review */
+  .wrvverdict .wrvlbl:not(:has(.wrvsettled)) { display: none; }
+}
+.codepane:empty { display: none; }
+.codepane:not(:empty) + .codepaneempty { display: none; }
+.codepaneempty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 24px; text-align: center; color: var(--dim); }
+.codepaneempty b { font: 500 12.5px var(--fbody); color: var(--muted); max-width: 260px; }
+/* THE ONE-ROW CARD (the side-panel round): what the thread keeps once the panel shows the thing it
+   names — the glyph, the name, the kind and the gate, and "In the panel" or "Open" */
+.refrows { display: flex; flex-direction: column; gap: 6px; max-width: 560px; }
+.refcard { display: flex; align-items: center; gap: 10px; width: 100%; max-width: 560px; padding: 8px 10px 8px 9px; border: 1px solid var(--card-border); border-radius: var(--r-lg); background: var(--card); box-shadow: var(--shadow-card); color: inherit; font: inherit; text-align: left; cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease); }
+.refcard:hover { border-color: var(--border2); }
+.refcard:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--ring); }
+.refcard.on { border-color: var(--ring); box-shadow: 0 0 0 1px var(--ring), var(--shadow-card); }
+.refic { width: 30px; height: 30px; flex: none; border-radius: var(--r-md); display: grid; place-items: center; background: var(--panel2); color: var(--muted); }
+.refic.plan { background: color-mix(in srgb, var(--plan) 14%, var(--panel2)); color: var(--plan); }
+.refic.design { background: color-mix(in srgb, var(--design) 14%, var(--panel2)); color: var(--design); }
+.refic.mkt { background: color-mix(in srgb, var(--role-mkt, var(--warn)) 14%, var(--panel2)); color: var(--role-mkt, var(--warn)); }
+.reftx { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 1px; }
+.reftx b { font: 500 12.5px var(--fbody); color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.refmeta { display: flex; min-width: 0; font: 500 10px var(--fmono); color: var(--dim); white-space: nowrap; }
+.refmeta > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.refmeta em { flex: none; font-style: normal; color: var(--warn); }
+.refmeta > span:not(:empty) + em::before { content: ' · '; white-space: pre; color: var(--dim); }
+/* a delivery of drafts stands in the transcript where its strip stood: under the avatar column */
+.draftsrow { margin: 6px 0 2px; padding-left: 51px; max-width: 611px; }
+.mkdrafts .draftsrow { margin: 0; padding-left: 0; max-width: 560px; }
+.refchips { display: flex; gap: 4px; flex: none; }
+.refchips i { font: 600 9.5px var(--fmono); font-style: normal; color: var(--dim); border: 1px solid var(--border2); border-radius: 3px; padding: 1px 5px; }
+.refgo { flex: none; display: inline-flex; align-items: center; gap: 4px; font: 500 10px var(--fmono); text-transform: uppercase; letter-spacing: -.02em; color: var(--muted); }
+.refgo.here { color: var(--link); }
+/* THE DRAFTS TAB: the session's post cards at full size, and the post under review in place of the list */
+.draftsslot { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.draftspane { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: none; padding: 12px 14px 22px; display: flex; flex-direction: column; gap: 12px; }
+.draftspane::-webkit-scrollbar { width: 0; height: 0; }
+.drhd { display: flex; align-items: center; gap: 7px; }
+.drhd b { font: 600 12.5px var(--fbody); color: var(--text); }
+.drct { font: 600 10px var(--fmono); color: var(--dim); }
+.drsp { flex: 1; }
+.drseg { display: flex; gap: 1px; background: var(--panel2); border-radius: var(--r-sm); padding: 2px; }
+.drseg button { border: none; background: none; color: var(--muted); font: 500 11px var(--fbody); padding: 3px 9px; border-radius: 4px; cursor: pointer; }
+.drseg button.on { background: var(--panel); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+[data-theme='light'] .drseg button.on, [data-theme='cream-oak'] .drseg button.on { background: var(--card); }
+.drcards { display: flex; flex-direction: column; gap: 12px; }
+.draftspane .mkdocpanel.inline { position: static; width: auto; max-width: none; max-height: none; box-shadow: none; border: none; background: transparent; animation: none; }
+.mkppback { border: none; background: none; color: var(--link); font: 500 11.5px var(--fbody); cursor: pointer; padding: 2px 4px; margin-right: 4px; }
+/* the panel's reader for the rich kinds (a table, the posts wire file, a report): the card body, at full height */
+.wfrich { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 16px 24px; }
+.wfrich .filecanvas { max-height: none; overflow: visible; padding: 0; }
+.wfrich .filecanvas::after { display: none; }
+/* expanded: the panel covers the main area for a deep review; the sheet folds away but stays mounted */
+.sidedock.expanded { flex: 1; width: auto; min-width: 0; }
+.shellbody:has(.sidedock.expanded) > .main { display: none; }
 /* the sheet's head keeps the strip's classes so Code mode's grid override still lands. BARE (no
    context), it is the room's rail alone, floating over the sheet's top-right corner rather than
    holding a row of its own: the tab strip that once filled that row lives in the side dock, and an
@@ -5561,7 +5587,7 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
    keep the band as padding so nothing there moves (their own rules carry the 36px). */
 .sheethd { min-height: 36px; padding-top: 4px; }
 .sheethd.bare { position: absolute; top: 0; right: 0; min-height: 0; padding-top: 6px; z-index: 3; }
-@media (prefers-reduced-motion: reduce) { .wbdock, .sidedock { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .sidedock { transition: none; } }
 /* the grip — the nav-grip idiom's THIRD seam (nav · task peek · here): invisible at rest, a 3px
    pill on hover, --ring plus a live px readout while dragging */
 .wbgrip { flex: none; width: 10px; margin: 0 -3px; position: relative; cursor: col-resize; display: flex; align-items: center; justify-content: center; touch-action: none; z-index: 46; }
@@ -5573,22 +5599,15 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 .wbgrip:hover .wbgripbar, .wbgrip:focus-visible .wbgripbar { opacity: 1; }
 .wbgrip:focus-visible { outline: none; }
 .wbgrip:focus-visible .wbgripbar { background: var(--ring); }
-.wbdock[data-dragging="1"] ~ .wbgrip .wbgripbar, .wbgrip:active .wbgripbar { opacity: 1; background: var(--ring); }
+.sidedock[data-dragging="1"] ~ .wbgrip .wbgripbar, .wbgrip:active .wbgripbar { opacity: 1; background: var(--ring); }
 .wbgripout { position: absolute; top: 18px; left: 50%; transform: translateX(-50%); background: var(--overlay); color: var(--body); border: 1px solid var(--card-border); border-radius: 6px; padding: 2px 7px; font: 600 10px var(--fmono); box-shadow: var(--shadow-pop); white-space: nowrap; pointer-events: none; }
 /* the card: `--card` on the sheet's `--panel`, the card shadow, the card radius — the thread's own
    object, the way its question cards are (docs/33 §8). No hairline rule per theme: the card border
    token already answers both. */
-.workbench { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden;
-  background: var(--card); border: 1px solid var(--card-border); border-radius: var(--r-lg); box-shadow: var(--shadow-card); padding: 8px 10px 6px; }
 /* …naked, but not headless (George, 2026-08-22: the panel's top read as part of the frame
    header): a top inset + the head's own hairline give it a boundary without a second sheet */
-.wbhead { flex: none; display: flex; align-items: center; gap: 7px; padding: 7px 6px 9px 6px; border-bottom: 1px solid var(--border); margin-bottom: 8px; }
-.wbname { font-size: 12.5px; font-weight: 500; color: var(--text); }
 /* the scope chip — a quiet well, not a bordered control: it names what the panel is pointed at,
    it is not something you click */
-.wbwt { margin-left: auto; max-width: 132px; font: 600 9.5px var(--fmono); color: var(--dim);
-  background: var(--panel2); border-radius: var(--r-xs); padding: 2px 6px;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* the branch control — the same slot the scope label holds, because it answers the same question
    (which code am I looking at) and answers it truthfully after a switch */
 .wbbr { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; max-width: 128px; padding: 2px 5px; border: 1px solid transparent; border-radius: var(--r-xs); background: none; color: var(--dim); font: 500 9.5px var(--fmono); cursor: pointer; transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
@@ -5598,8 +5617,6 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 .wbbrc { flex: none; font-size: 7px; opacity: .7; }
 .wbbrdot { flex: none; width: 5px; height: 5px; border-radius: 99px; background: var(--border2); }
 .wbbrdot[data-on='1'] { background: var(--link); }
-.wbx { flex: none; display: grid; place-items: center; width: 18px; height: 18px; border: none; border-radius: var(--r-xs); background: none; color: var(--dim); cursor: pointer; }
-.wbx:hover { background: var(--hover-bg); color: var(--text); }
 /* the face segment — drawn ONLY when the context offers a real choice. With one face the panel
    says which one it is in the section voice instead: a one-tab tab strip is a lie. */
 .wbfind { flex: none; margin: 0 6px 7px; }
@@ -5622,8 +5639,6 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
    bodies were fitted to this layout, so it has to survive the surface that used to supply it */
 /* ONE scroller for the face (rail-ink round 3): the slot's sections, the empty line and the Files drawer
    scroll together, so the drawer is never pushed under the card's edge by a long details list */
-.wbbody { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow-y: auto; scrollbar-width: none; }
-.wbbody::-webkit-scrollbar { width: 0; height: 0; }
 .wbslot.mkrail { flex: none; width: auto; min-width: 0; max-width: none;
   display: flex; flex-direction: column; gap: 6px;
   border: none; border-radius: 0; background: transparent; box-shadow: none;
@@ -5646,15 +5661,7 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 /* THE FILES DRAWER (rail-ink round 3, 2026-09-04 — what survives of the Code face): shut by default,
    under a hairline, its head dressed as a section head (`.mkrailhead`'s recipe) so it reads as one
    more section of the face rather than a second panel; the branch chip is its trailing control */
-.wbfiles { flex: none; margin: 4px 2px 0; padding: 6px 0 2px; border-top: 1px solid var(--border); }
-.wbfileshd { display: flex; align-items: center; gap: 6px; padding: 0 2px; min-height: 26px; }
-.wbfilestg { display: inline-flex; align-items: center; gap: 6px; padding: 3px 5px; border: none; border-radius: var(--r-xs); background: none; color: var(--muted); font: 600 10.5px var(--fmono); text-transform: uppercase; letter-spacing: -.02em; cursor: pointer;
-  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
-.wbfilestg:hover { color: var(--text); background: var(--hover-bg); }
-.wbfilesc { display: inline-block; width: 9px; font-size: 8px; color: var(--dim); }
 .wbfilesn { margin-left: auto; max-width: 140px; font: 500 9.5px var(--fmono); color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.wbfiles .wbfind { margin: 6px 4px 4px; }
-.wbfiles .wblist { flex: none; max-height: 42vh; padding: 0 2px 6px; }
 .wbez { font: 500 12px/1.6 var(--fbody); color: var(--muted); margin-bottom: 12px;
   animation: nm-rise var(--dur-enter) var(--ease) both; }
 .wbelist { list-style: none; display: flex; flex-direction: column; gap: 11px; }
@@ -5672,19 +5679,8 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 }
 /* the panel hosts the same `FsNode` tree the file tabs use — one tree implementation (docs/36 §2.4) */
 .wblist .ftfile, .wblist .ftdir { font-size: 11.5px; }
-/* the repos face's one action, docked at the foot where a composer would be */
-.wbfolder { flex: none; display: flex; align-items: center; justify-content: center; gap: 7px; margin: 6px 8px 8px; padding: 7px 10px;
-  border: 1px solid var(--border2); border-radius: var(--r-pill); background: none; color: var(--body); font: 500 11.5px var(--fbody); cursor: pointer;
-  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
-.wbfolder:hover { background: var(--hover-bg); color: var(--text); }
-/* when the SHEET is narrow — a laptop window with the side dock open, or any window under ~1000px —
-   the card floats OVER the thread instead of beside it: the split stage's solo rule (docs/33 §8),
-   keyed to the sheet's own width (`.main` is a size container) rather than the window's, because
-   the dock is what usually takes the room. The dock itself overlays the sheet under 1100px. */
-@container (max-width: 760px) {
-  .wbgrip { display: none; }
-  .wbdock { position: absolute; top: 44px; right: 8px; bottom: 8px; width: min(var(--nm-panew, 284px), calc(100% - 16px)); min-width: 0; margin: 0; z-index: 3; }
-}
+/* under 1100px the side panel slides OVER the sheet: two columns that narrow are two unreadable
+   columns (docs/33 §2) */
 @media (max-width: 1100px) {
   .sidedock { position: absolute; top: 0; right: 0; bottom: 0; width: min(var(--nm-dockw, 460px), 90vw); min-width: 0; z-index: 61; }
 }
@@ -5706,12 +5702,27 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 .wrvkind.design { background: color-mix(in srgb, var(--planrev) 16%, transparent); color: var(--planrev); }
 .wrvtask { color: var(--dim); }
 .wrvname { font-family: var(--font); font-size: 12px; font-weight: 500; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.wrvver { color: var(--muted); }
+.wrvver { color: var(--muted); white-space: nowrap; }
 .wrvlatest { padding: 1px 6px; border-radius: var(--r-pill); background: color-mix(in srgb, var(--done) 15%, transparent); color: var(--done); font: 500 9px var(--fmono); letter-spacing: -.02em; }
+/* a newer version replaced what the tab showed (one family, one tab, the side-panel round) */
+.wrvnew { padding: 1px 6px; border-radius: var(--r-pill); background: color-mix(in srgb, var(--link) 16%, transparent); color: var(--link); font: 600 9px var(--fmono); letter-spacing: -.02em; text-transform: uppercase; white-space: nowrap; }
 .wrvseg { margin-left: auto; display: flex; gap: 1px; background: var(--panel2); border-radius: var(--r-sm); padding: 2px; }
 .wrvseg button { border: none; background: none; color: var(--muted); font-family: var(--font); font-size: 11px; padding: 3px 9px; border-radius: 6px; cursor: pointer; white-space: nowrap; }
 .wrvseg button:hover { color: var(--text); }
 .wrvseg button.on { background: var(--panel); color: var(--text); font-weight: 500; box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+/* a design round is ONE tab (the side-panel round, 2026-10-03): its mockups are a strip of stills
+   under the header, and a click puts one on stage. The stills are the mockups themselves at 12%,
+   the same trick as the approved design card (.dhandframe), so a thumb never drifts from its page. */
+.wrvmocks { flex: none; display: flex; align-items: flex-end; gap: 8px; padding: 8px 14px; border-bottom: 1px solid var(--border); overflow-x: auto; scrollbar-width: none; }
+.wrvmocks::-webkit-scrollbar { display: none; }
+.wrvmock { flex: none; width: 120px; display: flex; flex-direction: column; padding: 0; border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden; background: var(--panel2); color: var(--muted); cursor: pointer; text-align: left; transition: border-color var(--dur-fast) var(--ease); }
+.wrvmock:hover { border-color: var(--border2); color: var(--text); }
+.wrvmock.on { border-color: var(--ring); box-shadow: 0 0 0 1px var(--ring); color: var(--text); }
+.wrvmockpic { position: relative; display: block; height: 68px; overflow: hidden; background: var(--panel3); }
+.wrvmockframe { width: 1000px; height: 568px; border: 0; pointer-events: none; transform: scale(.12); transform-origin: 0 0; background: #fff; }
+.wrvmockcap { padding: 4px 7px; font: 500 10px var(--fmono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wrvmockcmt { flex: none; margin-left: auto; align-self: center; padding: 3px 10px; border: 1px solid var(--border2); border-radius: var(--r-pill); background: var(--card); color: var(--muted); font-family: var(--font); font-size: 11px; cursor: pointer; white-space: nowrap; }
+.wrvmockcmt:hover { color: var(--link); border-color: color-mix(in srgb, var(--link) 55%, var(--border2)); }
 /* the doc scrolls under the floating verdict; the tail padding is what keeps the last block from
    hiding beneath it. Scrollbars stay hidden — every main surface in this app hides them. */
 .wrvdoc { flex: 1; min-height: 0; overflow: auto; position: relative; scrollbar-width: none; }
@@ -5807,6 +5818,8 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 .dockbarbtn.ico { padding: 4px 7px; } /* icon-only: editor · browser · terminal · processes, tooltips carry the names */
 .dockbarproc { position: relative; }
 .dockbarbadge { min-width: 15px; height: 15px; padding: 0 4px; border-radius: 99px; background: var(--panel3); color: var(--body); border: 1px solid var(--border2); font: 600 9px var(--fmono); display: grid; place-items: center; }
+/* what arrived behind while the side panel was folded: the link dot's colour, a count */
+.dockbarbadge.fresh { background: var(--link); color: var(--accent-ink); border-color: transparent; }
 .procpop { position: absolute; bottom: calc(100% + 6px); right: 0; z-index: 40; /* right-anchored — the trigger now sits at the window's right edge */ min-width: 244px; max-width: 320px; max-height: 340px; overflow-y: auto; background: var(--panel); border: 1px solid var(--border2); border-radius: 8px; box-shadow: 0 18px 44px -16px var(--shadow); padding: 6px; animation: nm-pop var(--dur) var(--ease); }
 .procpophd { font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: -.02em; color: var(--dim); padding: 4px 8px 6px; }
 .procsect { font-size: 9.5px; font-weight: 600; text-transform: uppercase; letter-spacing: -.02em; color: var(--muted); padding: 6px 8px 3px; }
@@ -6034,6 +6047,49 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 .nhengineering.live { color: var(--prog); }
 .nhengineering.ask { color: var(--accent); }
 .routinechip { flex: none; display: inline-flex; align-items: center; gap: 4px; font: 600 9.5px var(--fmono); letter-spacing: -.02em; text-transform: uppercase; color: var(--muted); border: 1px solid var(--border2); border-radius: var(--r-pill); padding: 2.5px 8px; }
+/* ── one session per routine (docs/design/routine-sessions-2026-09, docs/33 §8) ──────────────────
+   A schedule's session holds every run. Each run opens with a DIVIDER (its date, mono and quiet, the
+   newest in the text color) and a STRIP: the state word in its state color, then the time it took and
+   what it made, and one line while the run is folded. The routine card sits on top and holds the
+   prompt once. Colors are the rail's state tokens, so a run reads the same word in the same color. */
+.sruncard { display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; margin-bottom: 4px;
+  border: 1px solid var(--border); border-radius: 8px; background: var(--panel2); }
+.sruncardico { flex: none; display: inline-flex; margin-top: 1px; color: var(--muted); }
+.sruncardtext { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.sruncardkick { font: 500 10px var(--fmono); letter-spacing: .06em; text-transform: uppercase; color: var(--dim); }
+.sruncardprompt { font-size: 13.5px; line-height: 1.5; color: var(--text); white-space: pre-wrap; overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.sruncardmeta { font: 500 11px var(--fmono); color: var(--muted); }
+.sruncardact { flex: none; display: flex; gap: 6px; }
+.sruncardact .btn.sm { padding: 5px 10px; font-size: 11px; gap: 6px; }
+/* the Tasks flip and the coding divider, drawn across the transcript: a thing that HAPPENED to the
+   conversation rather than a thing anyone said, so a rule with a label, never a bubble. The rule left
+   this file in #208 with the Tasks chip it sat beside, and the dividers drew as body text since */
+.sysline { display: flex; align-items: center; gap: 10px; max-width: var(--col); margin: 0 auto 16px; font-size: 11.5px; color: var(--muted); }
+.sysline::before, .sysline::after { content: ''; height: 1px; flex: 1; background: var(--border); }
+.sysline b { color: var(--body); font-weight: 600; }
+.srundiv { display: flex; align-items: center; gap: 12px; margin: 18px 0 8px; scroll-margin-top: 12px; }
+.srundiv::before, .srundiv::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+.srundiv span { font: 500 10.5px var(--fmono); letter-spacing: .06em; text-transform: uppercase; color: var(--dim); }
+.srundiv.newest span { color: var(--text); }
+.srunstrip { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 7px 12px; margin-bottom: 4px;
+  border: 1px solid var(--border); border-radius: var(--r-md); background: var(--panel); font: 500 11px var(--fmono); color: var(--muted); }
+.srunword { flex: none; display: inline-flex; align-items: center; gap: 6px; font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase; }
+.srunword.s-progress { color: var(--prog); }
+.srunword.s-needs, .srunword.s-failed { color: var(--warn); }
+.srunword.s-done { color: var(--done); }
+.srundot { width: 7px; height: 7px; margin: 0 3px; border-radius: 50%; background: currentColor; }
+.srunsep { color: var(--dim); }
+.srunline { flex: 1; min-width: 0; margin-left: 6px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  font: 400 13px var(--font); color: var(--body); }
+.sruntoggle { flex: none; margin-left: auto; display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; background: none;
+  font: 500 10.5px var(--fmono); letter-spacing: .04em; text-transform: uppercase; color: var(--muted); cursor: pointer;
+  transition: color var(--dur-fast) var(--ease); }
+.sruntoggle:hover { color: var(--text); }
+.sruntoggle:focus-visible { outline: none; color: var(--text); box-shadow: 0 0 0 2px var(--ring); border-radius: var(--r-sm); }
+.sruntoggle svg { transition: transform var(--dur) var(--ease); }
+.sruntoggle.open svg { transform: rotate(180deg); }
+@media (prefers-reduced-motion: reduce) { .sruntoggle svg { transition: none; } }
 /* ONE liveness signal (docs/29 §10): the same pulse the Recents dot uses, on the same openRuns set */
 .srow .sdial.live, .srow .sglyph.live { box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 55%, transparent); }
 .srow .sglyph.live { border-color: var(--prog); color: var(--prog); }
@@ -6532,26 +6588,14 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 .codingthread .codingbox .engpermtrigger .lbl { white-space: nowrap; max-width: 220px; }
 .codingthread .codingbox .trow .tsend { margin-left: 0; }
 .codingthread .cbox.codingbox.waiting { padding-bottom: 12px; }
-/* the code face in the Workbench card (George, 2026-09-26): the tabs over the editor's pane, the branch in the foot; the card's own Files drawer is the one file tree */
-.wbslot .codeface { display: flex; flex-direction: column; min-height: 0; height: min(64vh, 680px); }
-.wbslot .codeface .codefacetabs { height: 36px; flex: none; display: flex; align-items: stretch; border-bottom: 1px solid var(--border); }
-.wbslot .codeface .codefacescroll { flex: 1; min-width: 0; height: 100%; display: flex; align-items: flex-end; gap: 1px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; padding: 0 6px; }
-.wbslot .codeface .codefacescroll::-webkit-scrollbar { width: 0; height: 0; }
-.wbslot .codeface .codefacegutter { flex: none; width: 58px; border-left: 1px solid var(--border); }
-/* the headless card's controls (expand · close) sit in the strip's gutter, never over a tab */
-.workbench { position: relative; }
-.wbacts.headless { position: absolute; top: 9px; right: 10px; z-index: 2; display: flex; align-items: center; gap: 4px; }
-/* expanded: the card takes the sheet and the session beside it folds away */
-.wbdock.full { flex: 1; width: auto; min-width: 0; margin-left: 8px; }
-.wtbody:has(> .wbdock.full) > .wtpanes, .wtbody:has(> .wbdock.full) > .wbgrip { display: none; }
-.wbdock.full .codeface { height: auto; flex: 1; min-height: 0; }
-.wbdock.full .wbslot.mkrail { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-.wbslot .codeface .codefacescroll button { flex: none; white-space: nowrap; }
-.wbslot .codeface .codefacetabs button span { margin-left: 4px; }
-.wbslot .codeface > .engeditor { flex: 1; min-height: 0; }
-.wbslot .codeface .engeditor .engworktabs { display: none; }
-.wbslot .codeface .dockfoot { display: flex; align-items: center; gap: 8px; padding: 7px 12px; border-top: 1px solid var(--border); font: 500 10px var(--fmono); color: var(--dim); flex: none; }
-.wbslot .codeface .dockfoot .dockfootstate { margin-left: auto; }
+/* the code face in the side panel (the side-panel round, 2026-10-03): the coding thread's own tabs are
+   the panel's strip, so the pane holds the editor on the picked tab, and the branch in the foot */
+.codepane { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.codepane .codeface { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.codepane .codeface > .engeditor { flex: 1; min-height: 0; }
+.codepane .codeface .engeditor .engworktabs { display: none; }
+.codepane .codeface .dockfoot { display: flex; align-items: center; gap: 8px; padding: 7px 12px; border-top: 1px solid var(--border); font: 500 10px var(--fmono); color: var(--dim); flex: none; }
+.codepane .codeface .dockfoot .dockfootstate { margin-left: auto; }
 .chint.coding .chintcode { display: grid; place-items: center; width: 18px; height: 18px; border-radius: 4px; background: var(--panel3); color: var(--muted); box-shadow: inset 0 0 0 1px var(--border2); flex: none; }
 .chint.coding b { color: var(--text); font-weight: 600; }
 /* a coding thread's mode (0144): plan in the plan hue, act in the build hue, a bare code chip when the session has not opened yet */
@@ -6866,26 +6910,12 @@ button.dprovideropt:hover:not(:disabled), .dprovideropt.external:hover { border-
 .dhandstep.done > span { color: var(--panel); border-color: var(--design); background: var(--design); }
 .dhandstep.current { color: var(--text); }
 .dhandstep.current > span { color: var(--design); border-color: color-mix(in srgb, var(--design) 58%, var(--border2)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--design) 10%, transparent); }
-.dhandpreviews { display: flex; gap: 9px; padding: 10px; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x proximity; scrollbar-width: none; }
-.dhandpreviews::-webkit-scrollbar { width: 0; height: 0; display: none; }
-.dhandpreview { flex: 0 0 250px; min-width: 0; overflow: hidden; padding: 0; text-align: left; scroll-snap-align: start; border: 1px solid var(--card-border); border-radius: var(--r-md); background: var(--panel); box-shadow: var(--shadow-card); transition: transform var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease); }
-.dhandpreview:hover { transform: translateY(-1px); box-shadow: var(--shadow-lift); }
-.dhandpreview:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus-glow); }
-.dhandclip { position: relative; display: block; width: 100%; height: 142px; overflow: hidden; background: var(--panel3); }
-.dhandclip::after { content: ''; position: absolute; inset: auto 0 0; height: 26px; pointer-events: none; background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--panel) 18%, transparent)); }
+/* the waiting round is one row (the side-panel round, 2026-10-03): the mockups read in the side panel */
+.dhandrows { padding: 0 10px 10px; max-width: none; }
 .dhandframe { width: 1000px; height: 568px; border: 0; pointer-events: none; transform: scale(.25); transform-origin: 0 0; background: #fff; }
 .dhandempty { width: 100%; height: 100%; display: grid; place-items: center; color: var(--dim); }
-.dhandpreviewmeta { display: flex; align-items: center; gap: 9px; padding: 8px 9px 9px; }
-.dhandpreviewmeta > span { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.dhandpreviewmeta strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); font-size: 11px; }
-.dhandpreviewmeta small { color: var(--dim); font: 9px/1.2 var(--fmono); }
-.dhandpreviewmeta > svg { flex: none; color: var(--muted); transition: transform var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
-.dhandpreview:hover .dhandpreviewmeta > svg { color: var(--design); transform: translateX(2px); }
-.dhandfoot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 10px 10px; }
-.dhandfoot > span { color: var(--dim); font-size: 10px; line-height: 1.35; }
-.dhandfoot .btn { flex: none; }
 /* the settled contract: what a decided design leaves behind in the thread — elevated
-   white, sealed in done-green, both thumbnails one click from a read-only studio */
+   white, sealed in done-green, both thumbnails one click from the round's review tab */
 .dcontract { margin: 6px 0 10px; border: 1px solid var(--card-border); border-radius: var(--r-lg); background: var(--card); box-shadow: var(--shadow-card); overflow: hidden; }
 .dconthead { display: flex; align-items: center; gap: 10px; padding: 11px 12px 10px; }
 /* The approved-design contract wears the DESIGN hue, not green (founder round 2026-08-01) — the same
@@ -6904,163 +6934,12 @@ button.dprovideropt:hover:not(:disabled), .dprovideropt.external:hover { border-
 .dcontcap { display: block; padding: 6px 8px 7px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font: 600 10px/1.3 var(--fmono); }
 .dcontfoot { padding: 0 12px 11px; color: var(--dim); font-size: 11px; }
 
-/* ── THE DESIGN STUDIO (docs/14; design round 2026-07-28) ───────────────────────────
-   Replaces the full-screen DesignReview overlay for every design round, both providers.
-   Docked it is a resizable peer column beside the thread; expanded it takes the sheet
-   and the same three parts rotate (stage left, lane/composer/gate right). Never a modal:
-   looking at the design and talking about it must be possible at the same time. */
-/* ONE animated number drives open / close / expand / collapse: --studio-basis. The
-   studio's flex-basis rides it and the thread column is `flex: 1`, so the thread yields
-   exactly the width the studio takes — the two move as a single gesture rather than two
-   coincidental animations. Nothing here transitions `display`, which is why the exit is
-   visible at all (the old `display: none` on expand was an instant cut).
-
-   --dur-studio (.42s) is a DELIBERATE deviation from docs/33 §7's .22s entrance: this is a
-   whole column of the sheet changing hands, and at .22s it reads as a jump-cut rather than
-   a movement. It is non-blocking — the thread stays interactive throughout — so the ≤150ms
-   budget (blocking transitions only) does not apply. Recorded in docs/33 §7. */
-.tsplit { --dur-studio: .42s; flex: 1; min-height: 0; display: flex; }
-.tsplit > .tcol { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; transition: opacity calc(var(--dur-studio) * .5) var(--ease); }
-/* expanded: the task feed yields the sheet — the lane IS that feed filtered, so the
-   conversation is never what disappears */
-.tsplit.exp > .tcol { opacity: 0; pointer-events: none; }
-
-/* the drag handle — a hairline at rest with a grabbable pill, per docs/33 (shape, not
-   a louder border); keyboard-resizable because a pointer-only affordance is a trap */
-.sgrip { position: relative; flex: none; width: 9px; overflow: hidden; cursor: col-resize; touch-action: none; transition: width var(--dur-studio) var(--ease); }
-.tsplit.exp > .sgrip { width: 0; }
-/* no hairline of its own — .dstudio's left border already draws this seam, and two
-   lines 4px apart is the "multiple separators" defect (docs/33 §9) */
-.sgrip::after { content: ''; position: absolute; left: 1px; right: 1px; top: 50%; height: 38px; transform: translateY(-50%); border-radius: 99px; background: color-mix(in srgb, var(--text) 22%, transparent); transition: background var(--dur-fast) var(--ease); }
-.sgrip:hover::after, .sgrip:focus-visible::after { background: var(--design); }
-.sgrip:focus-visible { outline: none; }
-
-.dstudio {
-  flex: 0 0 var(--studio-basis, 0px);
-  min-width: 0; min-height: 0; overflow: hidden; display: flex;
-  background: var(--panel); border-left: 1px solid var(--border);
-  /* the panel opens; the content behind it fades and settles a beat later, so the eye
-     follows the edge first and reads the design once there is room for it */
-  opacity: 0;
-  transition: flex-basis var(--dur-studio) var(--ease),
-              opacity calc(var(--dur-studio) * .55) var(--ease) 70ms;
-}
-.dstudio.in { opacity: 1; }
-/* laid out at the FULL width from frame one and clipped by the column — the open reveals
-   a finished panel instead of reflowing every line of it 60 times a second */
-.dstudioinner { flex: none; width: var(--studio-w, 520px); min-height: 0; display: flex; flex-direction: column; transition: width var(--dur-studio) var(--ease); }
-.dstudio.exp .dstudioinner { width: 100%; flex-direction: row; }
-.dstudio.exp { border-left: none; }
-.dexpstage { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
-.dexpstage .dstage { flex: 1; height: auto; min-height: 0; }
-.dexpside { flex: none; width: 352px; min-height: 0; display: flex; flex-direction: column; border-left: 1px solid var(--border); }
-/* a narrow panel can't host two columns — the studio takes the sheet, exactly as the
-   overlay always did. This is the docs/25 "don't starve the thread" ruling, honoured. */
-@media (max-width: 1100px) {
-  .tsplit.withstudio > .tcol { opacity: 0; pointer-events: none; }
-  .tsplit.withstudio > .sgrip { width: 0; }
-  .tsplit.withstudio > .dstudio.in { flex-basis: 100%; }
-  .tsplit.withstudio .dstudioinner { width: 100%; }
-}
-/* reduced motion: the global rule kills the transitions, so the panel simply appears at
-   its width — but flex-basis must still resolve, which it does (it is not animated, set) */
-
-.dstagehead { flex: none; display: flex; align-items: center; gap: 7px; padding: 8px 10px; border-bottom: 1px solid var(--border); }
-.dround { flex: none; display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: var(--r-full); color: var(--design); background: color-mix(in srgb, var(--design) 14%, transparent); font: 500 9px/1 var(--fmono); letter-spacing: -.02em; }
-.ddirs { flex: 1; min-width: 0; display: flex; align-items: center; gap: 2px; overflow-x: auto; scrollbar-width: none; }
-.ddirs::-webkit-scrollbar { display: none; }
-.ddir { flex: none; padding: 5px 9px; border: none; border-radius: var(--r-xs); background: none; color: var(--muted); font: 600 11px/1 var(--font); white-space: nowrap; cursor: pointer; }
-.ddir:hover:not(.on) { background: var(--hover-bg); color: var(--body); }
-.ddir.on { color: var(--text); background: var(--sel-bg); }
-.ddirdiv { flex: none; width: 1px; height: 15px; margin: 0 5px; background: var(--border2); }
-.ddir.cmp.on { color: var(--design); background: color-mix(in srgb, var(--design) 12%, transparent); }
-.dseg { flex: none; display: flex; gap: 2px; padding: 2px; border-radius: var(--r-pill); background: var(--panel2); }
-.dseg button { width: 23px; height: 20px; display: grid; place-items: center; border: none; border-radius: var(--r-pill); background: none; color: var(--dim); font-size: 10px; cursor: pointer; }
-.dseg button.on { background: var(--card); color: var(--text); box-shadow: var(--shadow-card); }
-.dsico { flex: none; display: grid; place-items: center; width: 25px; height: 25px; border: none; border-radius: var(--r-xs); background: none; color: var(--muted); cursor: pointer; }
-.dsico:hover { background: var(--hover-bg); color: var(--text); }
-
-/* docked, the stage and the lane SHARE the column — a fixed-height stage left the lane
-   at ~50px on a 760px panel, which is not a conversation. The stage still wins (2:1) and
-   both keep a floor; expanded, .dexpstage overrides the stage to take everything. */
-.dstage { position: relative; flex: 2 1 260px; min-height: 168px; overflow: hidden; background: var(--panel2); }
-.dstage .dframe { width: 100%; height: 100%; border: none; background: #fff; }
-.dstage .empty { display: grid; place-items: center; height: 100%; }
-/* a superseded round rests under a veil, never opacity — opacity blends the design
-   with whatever it stands on and muddies it */
-.dstage.stale::after { content: ''; position: absolute; inset: 0; background: color-mix(in srgb, var(--panel2) 58%, transparent); pointer-events: none; }
-.dcompare { position: absolute; inset: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--border); }
-.dcomppane { position: relative; overflow: hidden; background: var(--panel2); }
-.dcompcap { position: absolute; left: 0; right: 0; bottom: 0; padding: 5px 9px; background: color-mix(in srgb, var(--win) 74%, transparent); backdrop-filter: blur(8px); color: var(--body); font: 500 9px/1.3 var(--fmono); letter-spacing: -.02em; text-transform: uppercase; }
-
-/* provenance — the ONE provider-aware element in the studio */
-/* a quiet caption, not a boxed strip: it carried a border top AND bottom plus a tint,
-   three separations for one line of provenance (docs/33 §9) */
-.dprov { flex: none; display: flex; align-items: center; gap: 8px; padding: 7px 10px 6px; }
-.dprovmark { flex: none; display: grid; place-items: center; width: 19px; height: 19px; border-radius: 3px; color: color-mix(in srgb, #d9986c 84%, var(--text)); background: color-mix(in srgb, #d9986c 18%, var(--panel3)); font: 600 10px/1 Georgia, serif; overflow: hidden; }
-.dprovmark > .av, .dprovmark img { border-radius: 3px; }
-.dprovmark.iris { color: var(--design); background: color-mix(in srgb, var(--design) 16%, var(--panel3)); }
-.dprovtext { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font: 600 9.5px/1.35 var(--fmono); letter-spacing: -.02em; text-transform: uppercase; }
-.dprovlink { flex: none; display: inline-flex; align-items: center; gap: 4px; border: none; background: none; color: var(--link); font: 600 10px/1 var(--font); cursor: pointer; }
-.dprovlink:hover { text-decoration: underline; }
-
-/* the talk lane — the thread, filtered to this round. Never a second store. */
-/* the lane scrolls with NO native bar and no rail — a 9px gutter inside a 520px column
-   is chrome the conversation can't spare, and a tick rail belongs to the channel feed */
-.dlanewrap { position: relative; flex: 1 1 190px; min-height: 124px; display: flex; flex-direction: column; }
-.dexpside .dlanewrap { flex: 1 1 auto; }
-.dlane { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: none; padding: 11px 12px; display: flex; flex-direction: column; gap: 11px; }
-.dlane::-webkit-scrollbar { width: 0; height: 0; display: none; }
-.dlanekick { display: flex; align-items: center; gap: 8px; }
+/* the task thread's column row: the design studio that once shared it retired into the side
+   panel's review tab (the side-panel round, 2026-10-03) */
+.tsplit { flex: 1; min-height: 0; display: flex; }
+.tsplit > .tcol { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+/* the small mono kicker the approved design contract wears (.dcontid) */
 .dkick { font: 500 9px/1 var(--fmono); letter-spacing: -.02em; text-transform: uppercase; color: var(--dim); }
-.dlmsg { display: flex; gap: 8px; }
-.dlav { flex: none; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; background: var(--panel2); color: var(--muted); font: 600 9.5px/1 var(--font); }
-.dlbody { flex: 1; min-width: 0; }
-.dlhead { display: flex; align-items: baseline; gap: 6px; margin-bottom: 2px; }
-.dlhead b { font-size: 11.5px; }
-.dlhead span { color: var(--dim); font: 10px/1 var(--fmono); }
-.dltext { color: var(--body); font-size: 12.5px; line-height: 1.5; overflow-wrap: anywhere; }
-.dltext .md p { margin: 0 0 4px; }
-.dltext .md > :last-child { margin-bottom: 0; }
-/* a designer's markdown is a message, not a document: headings carry weight, never the
-   underline other surfaces give h2, and a bare --- is our hairline, not Chromium's
-   2px grooved default */
-.dltext .md h1, .dltext .md h2, .dltext .md h3 { font-size: 12.5px; font-weight: 600; color: var(--text); margin: 7px 0 3px; padding: 0; border: none; }
-.dltext .md hr { border: none; border-top: 1px solid var(--border); margin: 9px 0; }
-.dmark { display: inline-flex; align-items: center; gap: 4px; margin-top: 5px; height: 21px; padding: 0 8px; border: 1px dashed var(--border2); border-radius: var(--r-full); background: none; color: var(--muted); font: 600 10px/1 var(--font); cursor: pointer; }
-.dmark:hover { border-style: solid; border-color: color-mix(in srgb, var(--design) 50%, var(--border2)); color: var(--design); }
-
-/* a note: something said in the round that should CHANGE. The review tab's .wrvnote recipe —
-   editable, deletable, and spent all at once by Redraw. */
-.dnote { display: flex; align-items: flex-start; gap: 8px; margin-left: 30px; padding: 7px 9px; border: 1px solid color-mix(in srgb, var(--design) 34%, var(--border)); border-left: 2px solid var(--design); border-radius: var(--r-sm); background: color-mix(in srgb, var(--design) 6%, var(--card)); }
-.dnb { flex: 1; min-width: 0; }
-.dnb .dkick { display: inline; margin-right: 6px; color: var(--design); }
-.dnt { display: inline; color: var(--text); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
-.dna { flex: none; display: flex; gap: 2px; }
-.dna button { display: grid; place-items: center; width: 19px; height: 19px; border: none; border-radius: 3px; background: none; color: var(--dim); font-size: 10px; cursor: pointer; }
-.dna button:hover { background: var(--hover-bg); color: var(--text); }
-.dnoteedit { flex: 1; min-width: 0; border: none; background: none; color: var(--text); font: 12px/1.5 var(--font); outline: none; }
-
-/* the composer — plain. No modes: nothing typed here moves the task. */
-.dcomp { flex: none; margin: 0 11px 10px; border: 1px solid var(--card-border); border-radius: var(--r-lg); background: var(--card); box-shadow: var(--shadow-card); overflow: hidden; }
-.dchint { display: flex; align-items: center; gap: 7px; padding: 6px 10px 2px; color: var(--muted); }
-.dchint span { font-size: 10.5px; }
-/* the composer is deliberately lean — every px it takes comes out of the lane, and the
-   lane is the conversation this whole surface exists to make possible */
-.dcta { display: block; width: 100%; border: none; background: none; padding: 7px 11px 2px; color: var(--text); font: 12.5px/1.45 var(--font); resize: none; outline: none; }
-.dcrow { display: flex; align-items: center; gap: 6px; padding: 0 8px 6px 10px; }
-.dsend { flex: none; display: grid; place-items: center; width: 28px; height: 28px; border: none; border-radius: 50%; background: var(--brand); color: var(--brand-ink); cursor: pointer; }
-.dsend:disabled { background: var(--btn); color: var(--dim); cursor: default; }
-
-/* the gate — the human-only sign-off, always in reach, never a scroll away */
-/* the standard ground, not a warm well — this row holds the most consequential button
-   in the product (docs/33 §3); a ledge shadow lifts it off the lane instead of a rule */
-.dgate { flex: none; display: flex; align-items: center; gap: 10px 12px; flex-wrap: wrap; padding: 10px 12px 11px; background: var(--panel); box-shadow: 0 -10px 22px -20px var(--shadow); }
-.dgatecopy { flex: 1 1 180px; min-width: 0; }
-.dgatecopy strong { display: block; font: 500 13px/1.2 var(--fdisp); }
-.dgatecopy span { color: var(--muted); font-size: 10.5px; }
-.dgateacts { flex: none; display: flex; align-items: center; gap: 7px; }
-.dgateacts .cbadge { display: inline-grid; place-items: center; min-width: 16px; height: 16px; margin-left: 5px; padding: 0 4px; border-radius: 99px; background: var(--design); color: var(--panel); font: 600 9.5px/1 var(--fmono); }
 .libdesign { position: relative; display: flex; flex-direction: column; width: 224px; overflow: hidden; cursor: pointer; border: 1px solid var(--border2); border-radius: 8px; background: var(--panel); }
 .libdesign.on { outline: 2px solid var(--design); outline-offset: -2px; }
 /* the mockup renders at near-desktop width and is scaled down into the tile */
@@ -7076,7 +6955,6 @@ button.dprovideropt:hover:not(:disabled), .dprovideropt.external:hover { border-
   .dhandhead { align-items: flex-start; flex-wrap: wrap; }
   .dhandtitle { min-width: calc(100% - 46px); }
   .dhandsync { margin-left: 44px; }
-  .dhandpreview { flex-basis: 228px; }
 }
 /* Home's needs-you badge is a notification, not a count — halo + the ag-ping
    ring (the app's live-signal language) so it reads even mid-conversation. */
@@ -7920,6 +7798,19 @@ button.dprovideropt:hover:not(:disabled), .dprovideropt.external:hover { border-
 .runsrow:focus-visible { outline: none; border-color: var(--ring); }
 .runswhen { flex: none; width: 62px; font: 500 10px var(--fmono); color: var(--dim); }
 .runstitle { flex: 1; min-width: 0; font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* a routine's runs (routine sessions, 2026-09-28): the date, the run's state word and its time, then
+   its one line, and the door to its place in the session. The state word is the session strip's own */
+.runshead { display: flex; align-items: center; gap: 10px; padding: 0 7px 4px; }
+.runsheadlbl { font: 500 10px var(--fmono); letter-spacing: .06em; text-transform: uppercase; color: var(--dim); }
+.runssession { margin-left: auto; padding: 0; border: 0; background: none; font: 500 10.5px var(--fmono); text-transform: uppercase; letter-spacing: .04em; color: var(--link); cursor: pointer; }
+.runssession:hover { text-decoration: underline; }
+.runssession:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--ring); border-radius: var(--r-sm); }
+.runsrow:has(.srunword) { align-items: center; }
+.runsrow:has(.srunword) .runswhen { width: 112px; }
+.runsrow .srunword { width: 104px; }
+.runstook { flex: none; width: 92px; font: 500 10.5px var(--fmono); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.runsopen { flex: none; font: 500 10.5px var(--fmono); text-transform: uppercase; letter-spacing: .04em; color: var(--link); opacity: .85; }
+.runsrow:hover .runsopen { opacity: 1; }
 .runsreplies { flex: none; font: 500 10px var(--fmono); color: var(--muted); }
 /* a fired prompt nobody answered — the one run you want to catch, so it is the one that deviates */
 .runsreplies.quiet { color: var(--dim); font-style: italic; }
@@ -8953,23 +8844,10 @@ button.dprovideropt:hover:not(:disabled), .dprovideropt.external:hover { border-
   border: 1px solid var(--card-border); background: var(--card); border-radius: var(--r-lg); }
 .plangatehead { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .plangatek { font: 600 9.5px var(--fmono); letter-spacing: -.02em; text-transform: uppercase; color: var(--dim); }
-/* The plan-review CARD (2026-08-19): the question-card idiom, richer — pills over an embedded
-   document canvas, one component in the transcript. Header chips reuse plangatek/planlegs. */
-.plancard { display: flex; flex-direction: column; gap: 9px; margin-top: 6px; padding: 12px 14px;
-  background: var(--card); border: 1px solid var(--border2); border-radius: 8px; max-width: 640px; }
-.plancardhead { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.plancardpills { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.plancanvas { max-height: 300px; overflow-y: auto; padding: 10px 14px; font-size: 12.5px;
-  background: var(--panel2); border: 1px solid var(--border); border-radius: 6px; }
-.plancanvas h1 { font-size: 14px; margin: 2px 0 8px; }
-.plancanvas h2 { font-size: 12px; margin: 12px 0 5px; }
+/* the plan-review card is ONE ROW since the side-panel round (.refcard); its approved record keeps this link */
 .planopenlink { align-self: flex-start; font: 500 11.5px var(--fmono); color: var(--link);
   background: none; border: none; padding: 0; cursor: pointer; }
 .planopenlink:hover { text-decoration: underline; }
-/* the head's open-in-tab icon — unnamed, the message prose above already names the file */
-.planopen { margin-left: auto; border: none; background: none; padding: 2px 6px; border-radius: 6px;
-  font-size: 14px; line-height: 1; color: var(--dim); cursor: pointer; }
-.planopen:hover { color: var(--link); background: var(--hover-bg); }
 
 /* ── credits utilization dashboard (docs/design/credits-billing-2026-08) ────────────────────── */
 .credv { padding: 22px 26px 60px; max-width: 1000px; overflow-y: auto; container-type: inline-size; }

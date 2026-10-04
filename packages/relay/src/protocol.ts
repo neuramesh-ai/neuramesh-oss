@@ -17,9 +17,9 @@
 //   { t: 'hello', machineId, lanes? }  machine→relay, first message after header auth
 //                                      (`authorization: Bearer nmm_…` on the upgrade). `lanes`
 //                                      names the lanes this daemon serves; a lane born after the
-//                                      field (`stream`) is only ever opened on a machine that
-//                                      names it, because an older daemon reads any unknown lane
-//                                      as a terminal and would spawn a shell for it
+//                                      field (`stream`, `browser`) is only ever opened on a
+//                                      machine that names it, because an older daemon reads any
+//                                      unknown lane as a terminal and would spawn a shell for it
 //   { t: 'attach', machineId, token }  client→relay, first message; token = clerk bearer
 //                                      (a message, not a URL param — credentials never
 //                                      ride query strings)
@@ -53,8 +53,10 @@ export const CLOSE = {
 
 export type FrameType = 'data' | 'open' | 'close' | 'resize';
 /** `stream`: a read-only subscription to the machine's live agent replies (the browser's live
- *  bubble). It is not a session: it has its own caps on both edges and never counts as activity. */
-export type ChannelLane = 'terminal' | 'engineering' | 'stream';
+ *  bubble). it is not a session: it has its own caps on both edges and never counts as activity.
+ *  `browser`: the machine's Chromium drawn in the web panel (browser-lane.ts, docs/42). screencast
+ *  frames go out, input comes in, and it has its own small budget on both edges. */
+export type ChannelLane = 'terminal' | 'engineering' | 'stream' | 'browser';
 
 export interface ChannelFrame {
   ch: string;
@@ -87,7 +89,7 @@ export type EdgeMessage =
 export type RelayMessage = ChannelFrame | EdgeMessage;
 
 const FRAME_TYPES: ReadonlySet<string> = new Set(['data', 'open', 'close', 'resize']);
-const LANES: ReadonlySet<string> = new Set(['terminal', 'engineering', 'stream']);
+const LANES: ReadonlySet<string> = new Set(['terminal', 'engineering', 'stream', 'browser']);
 export const MAX_CHANNEL_DATA_B64_CHARS = 512 * 1024;
 
 export function isChannelFrame(m: RelayMessage): m is ChannelFrame {

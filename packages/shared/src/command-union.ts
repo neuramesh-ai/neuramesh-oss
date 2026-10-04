@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { MACHINE_COMMANDS } from './command-union-machine';
-import { MARKETING_RELEASES, SCHEDULE_RUN_COMMANDS, SETUP_RELEASES_VALUE } from './command-union-schedule';
+import { MARKETING_RELEASES, SCHEDULE_RUN_COMMANDS, SETUP_RELEASES_VALUE } from './command-union-schedule';   import { REPLY_COMMANDS, REPLY_GAP_FIELD } from './command-union-replies';   import { MODEL_COMMANDS } from './command-union-models';
 import { WORK_PLAN_LEGS,
   MODEL_ID_SET, PACKS, CUSTOM_PACK_ID, isCustomPackId, TASK_KINDS, TASK_STATES, BEAT_STATUSES, RUN_KINDS, RUN_SETTLE_STATES, THREAD_MODES,
   // Human (companion) command schemas — defined in @neuramesh/shared so mobile/web
@@ -13,7 +13,7 @@ import { WORK_PLAN_LEGS,
   taskReviseDesignCommand, taskApproveDesignCommand, messagePinCommand,
   taskApproveShipPlanCommand, taskReviseShipPlanCommand, taskCheckShipItemCommand,
   taskAddShipItemCommand, taskFinishSubtaskCommand, SHIP_ITEM_OWNERS, SHIP_RISKS,
-  decisionAnswerCommand, decisionDismissCommand,
+  decisionAnswerCommand, decisionDismissCommand, contentAnchorCommand,
   POLICY_SCOPES, POLICY_CAPABILITIES, POLICY_VERDICTS, PolicySelectorSchema,
   WB_TITLE_MAX, WB_MERMAID_MAX, WB_SCENE_MAX, WB_SNAPSHOT_MAX,
 } from './index';
@@ -681,8 +681,8 @@ export const CommandSchema = z.discriminatedUnion('type', [
   // irreversible — the client gates it behind a type-the-slug confirmation.
   z.object({ type: z.literal('channel.delete'), channel: z.string().min(1) }),
   // schedules (marketing-channel plan §4.6): the generic "run X at time T" primitive. Arming
-  // is human-only AND Cloud-gated — THE deep-funnel paywall moment (round 2); agents may only
-  // propose (a card). 'once' carries its exact runAt; recurring carries local time + IANA tz
+  // is human-only, on every plan since 2026-10-03 (the Pro trial pays for its runs in credits);
+  // agents may only propose (a card). 'once' carries its exact runAt; recurring carries local time + IANA tz
   // (+ weekday for weekly) and the server computes next_run_at via the shared cadence brain.
   z.object({
     type: z.literal('schedule.create'),
@@ -699,7 +699,9 @@ export const CommandSchema = z.discriminatedUnion('type', [
     // this table, and the firing path used to tell them apart by CHANNEL KIND — so a routine armed
     // in a marketing room silently took the drafting path and produced a scheduled-draft card
     // instead of its own conversation. The distinction belongs to the row, not to the room.
-    routine: z.boolean().optional(),
+    // THE ROUTINE WRITER (docs/design/routine-writer-2026-10): `thread` is the session rex wrote the routine
+    // in. The routine runs in it from now on, and the server posts the divider there. Implies `routine`.
+    routine: z.boolean().optional(), thread: z.string().uuid().optional(), replyGap: REPLY_GAP_FIELD.optional(), // the Replies part's queue gap
   }),
   z.object({ type: z.literal('schedule.set_status'), schedule: z.string().min(1), status: z.enum(['active', 'paused']) }),
   z.object({ type: z.literal('schedule.delete'), schedule: z.string().min(1) }),
@@ -715,11 +717,11 @@ export const CommandSchema = z.discriminatedUnion('type', [
     runAt: z.string().datetime().optional(), // once only
     atTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
     tz: z.string().max(64).optional(),
-    weekday: z.number().int().min(0).max(6).optional(),
+    weekday: z.number().int().min(0).max(6).optional(), replyGap: REPLY_GAP_FIELD.nullable().optional(), // null: the routine drafts only
   }),
   // the verbs the daemon's schedule tick writes (claim_run · mark_result · set_cursor) ride
   // commands-schedule.ts, the commands-machine.ts shape: this file sits at its ratchet cap
-  ...SCHEDULE_RUN_COMMANDS,
+  ...SCHEDULE_RUN_COMMANDS,   ...REPLY_COMMANDS,   ...MODEL_COMMANDS, // the reply queue's verbs (command-union-replies.ts) · a person's model for an agent (command-union-models.ts)
   // content items (marketing-channel plan §4.7): agents DRAFT (create), humans PUBLISH —
   // approve is HUMAN_ONLY and is what puts an item on the clock; unschedule bounces it
   // back to draft. Actual posting is the server's publish pass once connectors land.
@@ -782,6 +784,8 @@ export const CommandSchema = z.discriminatedUnion('type', [
     scheduledAt: z.string().datetime().optional(), // default: one hour out
   }),
   z.object({ type: z.literal('content.unschedule'), item: z.string().min(1) }),
+  // a draft with no conversation moves into the session its first picture ask opened (HUMAN_ONLY)
+  contentAnchorCommand,
   // connectors (marketing-channel plan §4.8): connecting is the OAuth round-trip (no command);
   // disconnecting is a human call — revokes the row and deletes the sealed secret.
   z.object({ type: z.literal('connector.disconnect'), connector: z.string().min(1) }),
@@ -826,7 +830,7 @@ export const CommandSchema = z.discriminatedUnion('type', [
   // marketing HQ setup (marketing-channel plan §4.3): point the room at the product. Writes the
   // profile onto channels.marketing and fans out the bootstrap task ("Build the brand foundation")
   // through the ordinary task path, so triage/staffing take it from there. Human-only; FREE on
-  // every plan by design (round 2) — the paywall sits on schedule.*/content.*, not the front door.
+  // every plan by design (round 2), and so is the daily release watch it plants (2026-10-03).
   z.object({
     type: z.literal('marketing.setup'),
     channel: z.string().min(1), // channel id

@@ -99,16 +99,22 @@ export interface TurnOpts {
   draftReplies?: (i: { report?: string; baseline?: string; replies: unknown[] }) => Promise<string>;
   /** the repository reads (docs/design/github-connector-2026-09) — host/reporead.ts closed over the room */
   repo?: RepoReader;
+  /** the agents' browser (board C3): browser/agent-tools.ts closed over the turn, a cloud machine only */
+  web?: import('../browser/agent-tools').WebTools;
   /** the REAL turn kind for the tool bus. The CLI adapters used to hardcode
    *  `promptOverride ? 'design' : 'work'`, so a leg bridged as a design turn and
    *  TOOL_KINDS could never grant a leg anything — that literal is now the fallback only. */
   turnKind?: TurnKind;
 }
 
+/** the live bubble's feed: the reply's whole text so far, and the turn's thoughts so far when the runtime
+ *  shows them (the repo-connect round's Option A: codex reasoning summaries, Claude's summarized thinking) */
+export type DeltaFn = (text: string, thinking?: string) => void;
+
 export interface RuntimeAdapter {
   // tool-less streaming reply (chat / thread). onDelta feeds the live bubble. attachments (chat
   // images/files) are threaded so Claude sees images; text-only runtimes read them via the transcript.
-  streamTurn(agent: HostedAgent, channelSlug: string, transcript: string, token: string, log?: LogFn, onDelta?: (text: string) => void, attachments?: AgentAttachment[]): Promise<string>;
+  streamTurn(agent: HostedAgent, channelSlug: string, transcript: string, token: string, log?: LogFn, onDelta?: DeltaFn, attachments?: AgentAttachment[]): Promise<string>;
   // tool-less one-shot completion (plan mixture-of-agents, review verdicts).
   complete(system: string, user: string, token: string, model: string, maxTokens?: number): Promise<string>;
   // agentic coding loop in the task's worktree/scratch dir; returns the summary.

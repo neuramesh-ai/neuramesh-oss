@@ -9,27 +9,27 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { renderDay7, renderDigest, renderMarketing, renderPublishFailed, TEMPLATE_META, type RenderedEmail } from '../src/email/templates';
 import { renderDay1, renderDay3, renderWelcome } from '../src/email/templates-lifecycle';
-import { renderInvite, renderJoined } from '../src/email/templates-account';
-import { renderHostedFreeNotice } from '../src/email/templates-notice';
+import { renderInvite, renderJoined, renderTrialEnding } from '../src/email/templates-account';
 import { renderAnnounceReady } from '../src/email/templates-announce';
 
-const APP = 'https://neuramesh.app';        // user-facing: /join, /downloads, /billing
+const APP = 'https://neuramesh.app';        // user-facing: /join, /pro, /announce
+const HQ = 'https://hq.neuramesh.app';      // the workspace in the browser: the lifecycle emails open it
 const API = 'https://api.neuramesh.app';    // the unsubscribe route lives on the control-api
 const unsub = `${API}/u/demo.token`;
 
 const SAMPLES: Array<{ key: string; email: RenderedEmail }> = [
   { key: 'invite', email: renderInvite({ inviter: 'George', inviterEmail: 'george@neuramesh.app', workspace: 'Flowe', role: 'Member', acceptUrl: `${APP}/join?token=demo` }) },
-  { key: 'joined', email: renderJoined({ joinedEmail: 'ada@flowe.dev', workspace: 'Flowe', role: 'Member', seatLine: '2 of 3 · free plan', settingsUrl: `${APP}/downloads` }) },
+  { key: 'joined', email: renderJoined({ joinedEmail: 'ada@flowe.dev', workspace: 'Flowe', role: 'Member', seatLine: null, openUrl: HQ }) },
+  { key: 'trialEnding', email: renderTrialEnding({ workspace: 'Flowe', endsOn: 'Oct 17', seats: 1, seatUsd: 22, manageUrl: `${HQ}/?view=credits` }) },
   // the `error` here stands in for a provider's verbatim message. We quote those as-is, so it
   // is the one string in an email we never rewrite for house style.
   { key: 'publishFailed', email: renderPublishFailed({ platform: 'X', slot: '09:00 today', error: '401 Unauthorized: token expired', queuedBehind: 2, reconnectUrl: `${APP}/downloads` }) },
   { key: 'announceReady', email: renderAnnounceReady({ repo: 'neuramesh-ai/neuramesh-oss', tag: 'v0.134.0', title: 'The browser terminal', networks: ['x', 'linkedin', 'instagram'], site: 'https://neuramesh.app', link: `${APP}/announce/demo`, verdict: 'feature' }) },
-  { key: 'welcome', email: renderWelcome({ downloadUrl: `${APP}/downloads`, unsubscribeUrl: unsub }) },
-  { key: 'day1', email: renderDay1({ openUrl: `${APP}/downloads`, unsubscribeUrl: unsub }) },
-  { key: 'day3', email: renderDay3({ lesson: "This repo's tests never mock the database. Use the pg fixture in test/helpers.", taskNumber: 1042, channel: 'dev', reviewer: 'scout', worker: 'patch', statAccepted: 4, statReviews: 11, statLessons: 6, window: 'your first week', openUrl: `${APP}/downloads`, unsubscribeUrl: unsub }) },
-  { key: 'marketing', email: renderMarketing({ shippedThing: 'the CSV export', worker: 'patch', reviewer: 'scout', openUrl: `${APP}/downloads`, unsubscribeUrl: unsub }) },
-  { key: 'day7', email: renderDay7({ billingUrl: `${APP}/billing`, openUrl: `${APP}/downloads`, unsubscribeUrl: unsub }) },
-  { key: 'hostedFreeNotice', email: renderHostedFreeNotice({ workspaces: ['Flowe', 'Side Quest'], effectiveDate: '2026-09-29', proUrl: `${APP}/pro`, termsUrl: `${APP}/terms`, exportPath: 'GET /v1/workspaces/<workspace id>/export' }) },
+  { key: 'welcome', email: renderWelcome({ openUrl: HQ, unsubscribeUrl: unsub }) },
+  { key: 'day1', email: renderDay1({ openUrl: HQ, unsubscribeUrl: unsub }) },
+  { key: 'day3', email: renderDay3({ lesson: "This repo's tests never mock the database. Use the pg fixture in test/helpers.", taskNumber: 1042, channel: 'dev', reviewer: 'scout', worker: 'patch', statAccepted: 4, statReviews: 11, statLessons: 6, window: 'your first week', openUrl: HQ, unsubscribeUrl: unsub }) },
+  { key: 'marketing', email: renderMarketing({ shippedThing: 'the CSV export', worker: 'patch', reviewer: 'scout', openUrl: HQ, unsubscribeUrl: unsub }) },
+  { key: 'day7', email: renderDay7({ billingUrl: `${APP}/pro?mode=signin`, openUrl: `${HQ}/?view=credits`, unsubscribeUrl: unsub }) },
   { key: 'digest', email: renderDigest({ channel: 'marketing', published: 3, waiting: 2, failed: 1, drafted: 6, window: '14–20 July', openUrl: `${APP}/downloads`, unsubscribeUrl: unsub }) },
 ];
 

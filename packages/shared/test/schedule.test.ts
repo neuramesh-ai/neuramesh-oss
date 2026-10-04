@@ -95,3 +95,33 @@ describe('the routine card words', () => {
     expect(nextRunLabel('2026-07-23T16:00:00Z', now)).toBe('in 3d');
   });
 });
+
+// routine or content (2026-09-27): the one test the daemon, the memory store and the plan card share
+import { isRoutineSchedule, schedulePayload } from '../src/schedule';
+
+describe('isRoutineSchedule — a draft waits for a person, a routine does not', () => {
+  it('the launcher marks a routine in any room', () => {
+    expect(isRoutineSchedule({ routine: true }, 'marketing')).toBe(true);
+    expect(isRoutineSchedule({ routine: true }, 'build')).toBe(true);
+  });
+
+  it('an unmarked row is content in a marketing room, and a routine anywhere else', () => {
+    expect(isRoutineSchedule({}, 'marketing')).toBe(false);
+    expect(isRoutineSchedule({ routine: false }, 'marketing')).toBe(false);
+    expect(isRoutineSchedule({}, 'build')).toBe(true);
+    expect(isRoutineSchedule(null, null)).toBe(true); // a room with no kind is a build room
+  });
+
+  it('only a boolean true marks a routine, as the server\'s jsonb test reads it', () => {
+    expect(isRoutineSchedule({ routine: 'true' }, 'marketing')).toBe(false);
+    expect(isRoutineSchedule({ routine: 1 }, 'marketing')).toBe(false);
+  });
+
+  it('schedulePayload reads the replica\'s JSON text, and anything else as empty', () => {
+    expect(schedulePayload('{"prompt":"x","routine":true}')).toEqual({ prompt: 'x', routine: true });
+    expect(schedulePayload('not json')).toEqual({});
+    expect(schedulePayload('123')).toEqual({});
+    expect(schedulePayload('null')).toEqual({});
+    expect(schedulePayload(null)).toEqual({});
+  });
+});

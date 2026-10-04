@@ -17,6 +17,10 @@ export type DomainErrorCode =
   | 'THREAD_ALREADY_TITLED'
   // coding threads (0144): thread.set_kind → coding on a project with no repository to work on
   | 'REPO_REQUIRED'
+  // the routine writer (docs/design/routine-writer-2026-10): schedule.create named a session that already
+  // holds a routine, or a coding thread, which the coding runtime owns
+  | 'THREAD_HAS_ROUTINE'
+  | 'CODING_THREAD'
   // auto-filing (0109, packages/shared/filing.ts). SAME_CHANNEL is not a failure so much as an
   // answer — rex reads it to tell "already in the right room" from "moved"; PROJECT_BOUNDARY is
   // the invariant that a conversation never leaves the project that can see it.
@@ -80,6 +84,9 @@ const STATUS: Record<DomainErrorCode, number> = {
   THREAD_ALREADY_TITLED: 409,
   // 422 — clears once a repository is connected; the caller retries on that change
   REPO_REQUIRED: 422,
+  // 409 — the session is already what the command would make it, or belongs to another runtime
+  THREAD_HAS_ROUTINE: 409,
+  CODING_THREAD: 409,
   // 409 — the move would be a no-op, or has already happened once. Both are "the state is
   // already what you are asking for", which is what 409 says.
   SAME_CHANNEL: 409,

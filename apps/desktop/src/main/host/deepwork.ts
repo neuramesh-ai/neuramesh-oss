@@ -8,7 +8,11 @@ import { TURN_BUDGETS } from '@neuramesh/shared';
 import { briefFileName } from '@neuramesh/client-core/library';
 
 import { claudePathOption, providerEnv } from '../runtime/adapter';
+import { claudeEffort } from '../runtime/thinking';
+import { codexToolTurn } from '../runtime/codexsdk';
+import { repoClones } from '../runtime/nmtools-repo';
 import { drainQuery, withTimeout } from './turnkit';
+import type { RepoReader } from './reporead';
 
 
 
@@ -66,6 +70,7 @@ function readOnlyStudy(agent: HostedAgent, dir: string, token: string, log?: Log
           ...claudePathOption(),
           env: providerEnv('anthropic', token),
           model: agent.model,
+          ...claudeEffort(agent),
           maxTurns: 24,
           allowedTools: ['Read', 'Grep', 'Glob'],
           disallowedTools: ['Write', 'Edit', 'NotebookEdit', 'Bash', 'Task', 'WebSearch', 'WebFetch'],
@@ -89,14 +94,25 @@ function readOnlyStudy(agent: HostedAgent, dir: string, token: string, log?: Log
 //
 // Web tools only. A research leg has NO business writing files or running commands on the
 // user's machine, so that's enforced at the SDK (disallowedTools), not asked for in a prompt.
-async function deepWorkQuery(agent: HostedAgent, prompt: string, token: string, log?: LogFn, dir?: string | null): Promise<string> {
+// a leg that reads the room's code (start_deep_work's reads_code, docs/design/repo-connect-2026-10):
+// the three repository reads ride the leg, through the connector or this machine's gh. Before this,
+// four legs reported "the workspace is empty" from a temp folder while the code sat on GitHub.
+const CODE_NOTE = 'You can read the team\'s own code: list_repo_files lists a folder, read_repo_file reads one file, and list_repo_changes shows the recent commits, pull requests and releases. Read the code before you say what it does, and name the files you read.';
+const REPO_TOOLS = ['mcp__nm__list_repo_changes', 'mcp__nm__read_repo_file', 'mcp__nm__list_repo_files'];
+
+async function deepWorkQuery(agent: HostedAgent, prompt: string, token: string, log?: LogFn, dir?: string | null, repo?: RepoReader | null): Promise<string> {
+  if (agent.runtime === 'codex' && repo) {
+    const os = await import('node:os');
+    return codexToolTurn(agent, `${CODE_NOTE}\n\n${prompt}`, token, { kind: 'deep', host: { dir: dir ?? os.tmpdir(), ...(log ? { log } : {}), repo } }, log);
+  }
   if (agent.runtime === 'codex' || agent.runtime === 'gemini') {
     // honest degradation: those adapters expose no web tools through our seam, so a leg
     // answers from what the model already knows. Weaker — never silently passed off as research.
     return runtimeFor(agent.runtime).streamTurn(agent, '', prompt, token, log);
   }
   const os = await import('node:os');
-  const { query } = await import('@anthropic-ai/claude-agent-sdk');
+  const { query, tool, createSdkMcpServer } = await import('@anthropic-ai/claude-agent-sdk');
+  const nm = repo ? createSdkMcpServer({ name: 'nm', alwaysLoad: true, tools: repoClones(repo, tool, (await import('zod')).z, log) }) : null;
   return drainQuery(
     query({
       prompt,
@@ -104,8 +120,10 @@ async function deepWorkQuery(agent: HostedAgent, prompt: string, token: string, 
         ...claudePathOption(),
         env: providerEnv('anthropic', token),
         model: agent.model,
+        ...claudeEffort(agent),
         maxTurns: 16,
-        allowedTools: ['WebSearch', 'WebFetch', 'Read', 'Grep', 'Glob'],
+        ...(nm ? { mcpServers: { nm } } : {}),
+        allowedTools: ['WebSearch', 'WebFetch', 'Read', 'Grep', 'Glob', ...(nm ? REPO_TOOLS : [])],
         disallowedTools: ['Write', 'Edit', 'NotebookEdit', 'Bash', 'Task'],
         permissionMode: 'bypassPermissions',
         // the brief dir when the caller staged one (see stageBrief): Read/Grep/Glob are
@@ -116,6 +134,7 @@ async function deepWorkQuery(agent: HostedAgent, prompt: string, token: string, 
           (dir
             ? 'Your working directory holds the TEAM\'S OWN documents about the subject — read them FIRST (Glob/Read) and treat them as ground truth. They tell you which product this actually is; a web search for the same name will often surface a different company, and a report about the wrong company is worthless. Where the web and these docs disagree about what the product is, the docs win. '
             : '') +
+          (nm ? `${CODE_NOTE} ` : '') +
           'Lead with the findings, cite the source domain inline, and say plainly when the evidence is thin — an honest "little evidence either way" is worth more than a confident guess. Under 400 words.',
       },
     }) as AsyncIterable<any>,
@@ -158,6 +177,7 @@ async function startDeepWork(
   title: string,
   legs: WorkLeg[],
   token: string,
+  opts: { repo?: RepoReader | null } = {},
 ): Promise<string | null> {
   const parent = await openRun(
     agent,
@@ -194,7 +214,7 @@ async function startDeepWork(
           // (docs/29). Sharing the parent's logger is what made five subagents one flat,
           // unattributed stream that no surface could split.
           const legLog = legRun.id ? alog(agent, null, ch.slug, legRun.id) : log;
-          const out = await withTimeout(deepWorkQuery(agent, leg.prompt, token, narrate(legRun, legLog), brief), TURN_BUDGETS.leg.wallMs, `leg "${leg.name}" timed out`);
+          const out = await withTimeout(deepWorkQuery(agent, leg.prompt, token, narrate(legRun, legLog), brief, opts.repo ?? null), TURN_BUDGETS.leg.wallMs, `leg "${leg.name}" timed out`);
           findings.push(`### ${leg.name}\n\n${out.trim()}`);
           await legRun.settle('done', out.trim().split('\n').find((l) => l.trim())?.slice(0, 200) ?? 'done');
           // the angle's findings survive the run: a note + a result envelope in the thread's

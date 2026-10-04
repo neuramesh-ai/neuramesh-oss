@@ -22,6 +22,7 @@ import type { makeRuns, RunHandle } from './runs';
 import type { makeBeats } from './beats';
 import type { makePark } from './park';
 import { makeBlock } from './block';
+import { isRoutineUnit } from './routinerule';
 
 export function makeDesignNotify(ctx: HostCtx & {
   db: PowerSyncDatabase;
@@ -91,9 +92,9 @@ async function orchDesignNotify(orch: HostedAgent, t: PlanTask) {
   if (!ch) { designNotified.delete(t.id); return; }
   // a routine's round auto-approves server-side as it is proposed (planfollowup.ts); the row this
   // watch saw was in flight, and asking the human for a verdict already given is the #1093 class.
-  // Repo-backed rounds keep the human, so the query carries the floor (2026-09-16).
-  const [routine] = await db.getAll<{ n: number }>(`select count(*) as n from tasks t join threads th on th.id = t.origin_thread_id where t.id = ? and th.schedule_id is not null and t.repo_id is null`, [t.id]).catch(() => [] as Array<{ n: number }>);
-  if (routine?.n) { console.log(`design_review #${t.number}: a routine's round — approved server-side, no human ask`); return; }
+  // Repo-backed rounds keep the human, so the query carries the floor (2026-09-16). a content
+  // schedule's session keeps its person too (2026-09-27): the server leaves its round for them.
+  if (await isRoutineUnit(db, t.id)) { console.log(`design_review #${t.number}: a routine's round — approved server-side, no human ask`); return; }
   try {
     const arts = await db.getAll<{ name: string }>(`select name from artifacts where task_id = ? and kind = 'design'`, [t.id]).catch(() => [] as Array<{ name: string }>);
     const latest = arts.reduce((m, a) => Math.max(m, Number(/^design-mockup-v(\d+)-/.exec(a.name)?.[1] ?? 0)), 0);

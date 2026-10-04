@@ -51,6 +51,25 @@ export const content_items = new Table({
   created_at: column.text,
 });
 
+// reply reminders (0146, the reply queue): one queued reply per row. The reply card draws its slots
+// from these, and the web reminds the row's member when it comes due. NeuraMesh posts none of them.
+export const reply_reminders = new Table({
+  workspace_id: column.text,
+  thread_id: column.text,
+  message_id: column.text,
+  member_id: column.text,
+  letter: column.text,
+  platform: column.text,
+  handle: column.text,
+  draft: column.text,
+  open_url: column.text,
+  due_at: column.text,
+  state: column.text,
+  notified_at: column.text,
+  created_at: column.text,
+  updated_at: column.text,
+});
+
 // connectors (marketing-channel plan §4.8): the VISIBLE half of a workspace's social
 // accounts — provider/handle/status only; sealed tokens never reach any client replica
 export const connectors = new Table({

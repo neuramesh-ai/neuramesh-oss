@@ -207,3 +207,50 @@ is the argument for [one-thread](../../../mockups/one-thread.html).
   what it produced, what it still needs) **and the transcript holds events** (what happened,
   draft cards included). Nothing is glanceable-only: the collapsed tab keeps the counts and goes
   warm when a section is holding a gate, which is the job the pills were doing.
+
+## 7. The phone (2026-09-29)
+
+George, on the phone: "i asked for a draft, it said it had drafted it but no drafts shown". The
+agent side worked. rex wrote three drafts with `draft_posts` in a conversation, and the rows synced
+to the phone. The phone's thread screen never read `content_items`, so the reply pointed at "the
+cards above" and the phone showed nothing there.
+
+The fix brings this round's design to the phone as it is:
+
+- `THREAD_POSTS` (client-core) reads a conversation's drafts. `apps/mobile/src/thread-posts-rule.ts`
+  is `postCardsFrom` and `draftStrips` for the phone: one strip per handover (per run in a
+  routine's session), a revision on its own strip after the reply that asked for it, the replaced
+  copy kept in the first strip, and the shared `draftLetters`.
+- `apps/mobile/src/thread-posts.tsx` draws hq's card at phone width: the network, the card's
+  letter, the post, its picture, the brief, and a foot with **Request changes** and **Review**. The
+  strip scrolls sideways under the agent's column. Request changes arms the composer with the
+  card's letter and sends hq's `↩ Re draft a:` shape. Review opens the post sheet, which steps
+  through the conversation's drafts. The picture control sits on the picture, and the card and the
+  sheet ask for a picture through one `askForPicture`.
+- In a routine's session, a run's strip folds with its run.
+
+Not on the phone yet: a video post shows its caption only (no script and no film), and file
+previews, whiteboard cards and article cards are a separate round.
+
+Evidence: `evidence/phone-{drafts,revision,sheet,change}-{dark,light}.png` (Graphite and Cream oak,
+iPhone 17 simulator, the local dev stack).
+
+## 8. The picture opens whole (2026-09-30)
+
+George: "why are images in drafts not clickable to expand so users can view them easier". The card
+drew its picture as a plain `<img>` with no handler, cropped to the card (`object-fit: cover`, 280 px
+at most). The only larger view was inside Review, at the post preview's size.
+
+- A press on the picture opens it in the thread's attachment lightbox (`DraftImageLightbox`, the
+  `.alightbox` styles). It opens with the 640 px thumbnail that rides the synced row, then swaps in
+  the hosted copy (`media.image_id`, the 2048 px image a post publishes) once `contentMedia` reads it.
+- The bar names the draft (`Draft a · X`) and offers Save. Escape closes the picture and stops there:
+  the thread closes its session on an Escape that reaches it. The lightbox sits on the body, so no
+  transformed parent can size it.
+- The zoom cursor and a corner `IconExpand` on hover say what a press does. The card itself keeps its
+  crop.
+- The phone needs no change: a tap on a draft there opens its post sheet.
+
+Evidence: `evidence/lightbox-{card,open}-{dark,light}.png` and `lightbox-facts.json`, from
+`scripts/capture-draft-lightbox.mjs`.
+

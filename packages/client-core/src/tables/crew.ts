@@ -48,8 +48,8 @@ export const agent_channels = new Table({ agent_id: column.text, channel_id: col
   indexes: { by_agent: ['agent_id'], by_channel: ['channel_id'] },
 });
 
-// `compute` (0118): the member's compute choice — read by the wake gate for the ORIGIN member
-export const workspace_members = new Table({ workspace_id: column.text, user_id: column.text, role: column.text, display_name: column.text, compute: column.text });
+// `compute` (0118): the member's compute choice — read by the wake gate for the ORIGIN member. `agent_models` (0148): the member's model for each agent — read when an agent is seated for that member
+export const workspace_members = new Table({ workspace_id: column.text, user_id: column.text, role: column.text, display_name: column.text, compute: column.text, agent_models: column.text });
 
 // Policies (agent permission engine, Phase 1): human-configured allow/ask/deny rules the
 // daemon reads from the replica to gate agent tool calls. selector jsonb → JSON text; locked 0/1.

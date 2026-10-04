@@ -107,6 +107,8 @@ export interface NmNeed {
   attach?: 'repo';
   /** the project the attach lands in (repo.link needs it, a channel id names a room) */
   project?: string | null;
+  /** the card's foot: who continues, and where, once the need is met ("rex continues here when GitHub is connected") */
+  after?: string;
 }
 
 export function needBlock(data: NmNeed): string {
@@ -126,12 +128,61 @@ export function parseNeed(body: string): NmNeed | null {
       channel: d.channel, ask: d.ask.slice(0, 160), why: String(d.why ?? '').slice(0, 400), connect,
       ...(Array.isArray(d.readable) ? { readable: d.readable.filter((p): p is ReplyPlatform => (REPLY_PLATFORMS as readonly string[]).includes(p)) } : {}),
       ...(attach ? { attach, project: typeof d.project === 'string' ? d.project : null } : {}),
+      ...(typeof d.after === 'string' && d.after.trim() ? { after: d.after.trim().slice(0, 200) } : {}),
     };
   } catch { return null; }
 }
 
 export function stripNeed(body: string): string {
   return stripFenced(body, 'nmneed').trim();
+}
+
+// ── the GitHub card's life after it posts (docs/design/repo-connect-2026-10) ─────────────────────
+// a card a tool posts (`needCard` on /v1/messages) mints a Needs-you decision, and the grant that
+// connects GitHub for the project resumes the work it waited for. A block an agent types itself
+// still renders (a published desktop's run_playbook posts it without the flag), but it mints
+// nothing, so nothing waits on it.
+
+/** the decisions' prefix the resume finds a GitHub card's row by */
+export const GITHUB_NEED_PREFIX = 'Connect GitHub: ';
+/** the block reason of a task a cloud machine cannot push yet: the grant's resume unblocks only these
+ *  (desktop host/claimflow.ts writes it, control-api github-resume.ts reads it) */
+export const GITHUB_WAIT_REASON = 'Waits for GitHub';
+
+/** the Needs-you question a GitHub card mints, one per ask, so two rooms that wait never supersede each other */
+export function needDecisionQuestion(data: NmNeed): string | null {
+  return data.connect.includes('github') ? `${GITHUB_NEED_PREFIX}${data.ask} waits to read the repository.`.slice(0, 400) : null;
+}
+
+export const isGitHubNeedQuestion = (question: string): boolean => question.startsWith(GITHUB_NEED_PREFIX);
+
+/**
+ * The divider the server posts as the person when the grant lands: `‹github:connected:owner/repo›`.
+ * Unlike the mode, kind and routine dividers it wakes the thread's agent, because the grant is the
+ * answer the card waited for. The transcript reads it as words, and the thread draws it as a rule.
+ */
+const GITHUB_CONNECTED = /^‹github:connected:([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)›$/;
+
+export function githubConnectedMarker(slug: string): string {
+  return `‹github:connected:${slug}›`;
+}
+
+/** the repository a connected divider names, or null for any other message */
+export function parseGitHubConnected(body: string | null | undefined): string | null {
+  return GITHUB_CONNECTED.exec((body ?? '').trim())?.[1] ?? null;
+}
+
+/** the divider as an agent's transcript reads it */
+export function githubConnectedWords(slug: string): string {
+  return `[the person connected GitHub: ${slug}. The repository is readable now. Continue the request the GitHub card waited for.]`;
+}
+
+/** a need card as an agent's transcript reads it: the ask and the wait, never a block to copy */
+export function needCardText(body: string): string {
+  const need = parseNeed(body);
+  if (!need) return body;
+  const fix = need.connect.includes('github') ? 'connect GitHub' : need.attach === 'repo' ? 'attach a repository' : `connect ${need.connect.join(' or ')}`;
+  return [stripNeed(body), `[a card asks the person to ${fix} before “${need.ask}” can run. The work waits for it.]`].filter(Boolean).join('\n');
 }
 
 /** the line a run puts in its own prompt: what it may read, and how each network is covered */

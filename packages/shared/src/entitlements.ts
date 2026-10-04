@@ -44,6 +44,15 @@ export const planLabel = (plan: string | null | undefined): string => PLAN_LABEL
  * first run, the email), and name no plan where a Mac and the cloud share one string.
  */
 export const TRIAL_LABEL = 'Pro trial';
+
+/**
+ * the card trial (George, 2026-10-03, docs/design/pro-front-door-2026-10): a hosted workspace that
+ * adds a payment method in hq's setup wizard (or later, on the Pro sheet) is Pro at once, at $0 for
+ * this many days, and then Stripe charges PRO_SEAT_USD a seat each month. one trial a workspace.
+ */
+export const PRO_TRIAL_DAYS = 14;
+/** Pro's price in dollars, a seat each month: the recurring price STRIPE_PRICE_ID names */
+export const PRO_SEAT_USD = 22;
 export const hostedPlanLabel = (plan: string | null | undefined): string =>
   planOf(plan) === 'cloud' ? PLAN_LABELS.cloud : TRIAL_LABEL;
 

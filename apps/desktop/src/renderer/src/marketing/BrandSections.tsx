@@ -99,4 +99,4 @@ export function BrandSections({ channelId, channelSlug, onOpen, marketing }: {
 
 // `BrandDocsRail` retired 2026-08-17: the room home's standalone panel was the THIRD mounting of
 // one surface (a task's aside, a chat's aside, and this). The room's sections now portal into the
-// Workbench's Details face like every other subject's — see shell/workbench-state.ts.
+// side panel's Overview tab like every other subject's — see shell/panel-state.ts.

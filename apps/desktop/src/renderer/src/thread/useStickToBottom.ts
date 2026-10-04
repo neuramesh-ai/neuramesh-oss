@@ -13,7 +13,8 @@
 // A reader's own scroll up (wheel, touch, keys, the scrollbar) releases the pin; coming back to
 // within a few pixels of the bottom takes it again. Programmatic scrolls elsewhere (the design
 // round reveal, the run dock) keep working: they only move scrollTop, and the next scroll event
-// re-reads where the reader is.
+// re-reads where the reader is. A jump that must hold (a run link, SessionRuns.tsx) lets go of the
+// pin by name first: it dispatches `nm:unpin` on the list.
 import { useLayoutEffect } from 'react';
 
 /** how close to the bottom counts as "at the bottom" when the reader scrolls back down */
@@ -40,6 +41,7 @@ export function useStickToBottom(ref: React.RefObject<HTMLElement | null>, reset
     const intent = () => { intentAt = performance.now(); };
     const onWheel = (e: WheelEvent) => { intent(); if (e.deltaY < 0) pinned = false; };
     const onKey = (e: KeyboardEvent) => { intent(); if (['ArrowUp', 'PageUp', 'Home'].includes(e.key)) pinned = false; };
+    const unpin = () => { pinned = false; };
     const onScroll = () => {
       const gap = el.scrollHeight - el.scrollTop - el.clientHeight;
       if (gap <= REPIN_PX) pinned = true;
@@ -50,6 +52,7 @@ export function useStickToBottom(ref: React.RefObject<HTMLElement | null>, reset
     el.addEventListener('pointerdown', intent, { passive: true });
     el.addEventListener('keydown', onKey);
     el.addEventListener('scroll', onScroll, { passive: true });
+    el.addEventListener('nm:unpin', unpin);
     return () => {
       ro.disconnect(); mo.disconnect();
       el.removeEventListener('wheel', onWheel);
@@ -57,6 +60,7 @@ export function useStickToBottom(ref: React.RefObject<HTMLElement | null>, reset
       el.removeEventListener('pointerdown', intent);
       el.removeEventListener('keydown', onKey);
       el.removeEventListener('scroll', onScroll);
+      el.removeEventListener('nm:unpin', unpin);
     };
   }, [ref, resetKey]);
 }

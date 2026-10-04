@@ -7,11 +7,14 @@
 // ACL: no row, no read. GitHub's refusal of the installation (removed on GitHub) marks the row
 // `reauth_required`, the same verdict a dead social grant gets, so the attention bar lights.
 //
-// Two doors write the row: the install callback (the sealed state names the workspace, the room
-// and the person, the social flows' idiom) and `POST /v1/github/resolve` (the app asks whether the
-// App can read the room's repository now, and the row is written when it can). The resolve is what
-// makes a grant that lands on another deployment's callback still count (the live trap of
-// 2026-09-18, docs/44). The public announce door keeps its slug-state branch on the same routes.
+// One door writes the row: `POST /v1/github/resolve` (the app asks whether the App can read the
+// room's repository now, and the row is written when it can). The install callback (the sealed
+// state names the workspace, the room and the person, the social flows' idiom) only records the
+// installation for that workspace: the start URL is public and GitHub does not sign installation_id,
+// so the callback proves no person, and it attaches nothing, writes no row and resumes nothing. The
+// resolve reads only the installations recorded for the room's workspace, never GitHub's answer for
+// any workspace's grant, so a grant whose callback lands on a deployment with another database does
+// not count here. The public announce door keeps its slug-state branch on the same routes.
 import type { Env, Hono } from 'hono';
 import { z } from 'zod';
 import type { Actor } from '@neuramesh/shared';
@@ -70,12 +73,11 @@ export function githubConnectRoutes<E extends Env>(app: Hono<E>, store: Store, o
     if (grant) {
       if (!ann() || !githubAppConfigured() || !Number.isFinite(id) || id <= 0) return c.html(page('GitHub', ['The grant did not land.', 'Try again from Connections in neuramesh.']), 400);
       try {
-        await rememberInstallation(ann()!, id, fetchFn, grant.workspace);
-        const out = grant.channel ? await resolveConnector(store, { workspace: grant.workspace, channel: grant.channel, actor: grant.actor }, fetchFn, { granted: true }) : null;
-        if (out?.ok) return c.html(page('Connected', ['<span style="font-size:34px">✓</span>', `<b>${out.handle}</b> is connected.`, '<span style="color:#8f8f8f">Head back to neuramesh. The room already knows.</span>']));
-        if (out && out.repos.length) return c.html(page('GitHub', [`The neuramesh app reads ${out.repos.length} ${out.repos.length === 1 ? 'repository' : 'repositories'}.`, '<span style="color:#8f8f8f">Pick this project\u2019s in neuramesh. The step shows them.</span>']));
-        const why = out ? out.error : 'The installation is recorded.';
-        return c.html(page('GitHub', [why, '<span style="color:#8f8f8f">Pick the repository on GitHub, then press Check again in neuramesh.</span>']));
+        // the record only: the state and the installation_id prove no person, so the row, the attach
+        // and the resume wait for the signed-in resolve, which the step asks every 5 s
+        const names = await rememberInstallation(ann()!, id, fetchFn, grant.workspace);
+        if (!names.length) return c.html(page('GitHub', ['The neuramesh app reads no repository yet.', '<span style="color:#8f8f8f">Pick the repository on GitHub, then press Check again in neuramesh.</span>']));
+        return c.html(page('GitHub', ['<span style="font-size:34px">✓</span>', `The neuramesh app reads ${names.length === 1 ? `<b>${names[0]}</b>` : `${names.length} repositories`}.`, '<span style="color:#8f8f8f">Return to neuramesh to finish.</span>']));
       } catch (e) {
         console.warn(`github connect callback failed: ${e instanceof Error ? e.message : String(e)}`);
         return c.html(page('GitHub', ['The grant did not land.', 'Close this tab and try again from Connections in neuramesh.']), 400);
@@ -110,7 +112,7 @@ export function githubApiRoutes<E extends ActorEnv>(app: Hono<E>, store: Store, 
     const { workspace } = await store.channelWorkspace(body.data.channel).catch(() => ({ workspace: null as string | null }));
     if (!workspace) return c.json({ error: 'channel not found', code: 'NOT_FOUND' }, 404);
     if (!(await actorInWorkspace(store, actor, workspace))) return c.json({ error: 'not your workspace', code: 'NOT_PERMITTED' }, 403);
-    const out = await resolveConnector(store, { workspace, channel: body.data.channel, actor: actor.id }, fetchFn, { pick: body.data.repo ?? null });
+    const out = await resolveConnector(store, { workspace, channel: body.data.channel, actor: actor.id }, fetchFn, { pick: body.data.repo ?? null, resume: true });
     if (out.ok) return c.json({ ok: true, handle: out.handle, attached: out.attached });
     const state: GrantState = { github: 1, workspace, channel: body.data.channel, actor: actor.id, slug: out.slug };
     return c.json({ ok: false, code: out.code, error: out.error, repos: out.repos, hint: out.hint, install: process.env['NM_CONNECTOR_KEY'] ? installUrl(seal(state)) : null });

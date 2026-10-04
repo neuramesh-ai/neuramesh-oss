@@ -83,6 +83,20 @@ test('drafted posts waiting on an owned content unit lift the conversation (rele
   assert.equal(makeRowMarks({ decisions: [], liveIds: new Set(), threads: [thread({ id: 'th1' })], tasks: [unit] })(row({ threadId: 'th1', task: null })).status, 'settled');
 });
 
+test('a session\'s own waiting draft lifts it, as a scheduled draft run\'s session holds one (0115, routine sessions)', () => {
+  const drafts = [
+    { task_id: null, thread_id: 'th1', created_at: T0, status: 'published' }, // an earlier run's, out already
+    { task_id: null, thread_id: 'th1', created_at: T1, status: 'draft' }, // today's, waits for approval
+    { task_id: null, thread_id: 'th2', created_at: T1, status: 'scheduled' }, // approved: waits for its slot only
+  ];
+  const marks = makeRowMarks({ decisions: [], liveIds: new Set(), threads: [thread({ id: 'th1' }), thread({ id: 'th2' })], drafts });
+  assert.deepEqual(marks(row({ threadId: 'th1', task: null })), { status: 'needs_you', ask: false, settle: true });
+  assert.equal(marks(row({ threadId: 'th2', task: null })).status, 'settled');
+  // a settle newer than the draft hides it, as it hides a unit's drafts
+  const settled = makeRowMarks({ decisions: [], liveIds: new Set(), threads: [thread({ id: 'th1', settled_at: T2 })], drafts });
+  assert.equal(settled(row({ threadId: 'th1', task: null })).status, 'settled');
+});
+
 test('a coding thread (0144) takes its word from its session row, and offers no settle', () => {
   const sessions = (state: string) => [{ id: 'th1', thread_id: 'th1', state }];
   const at = (state: string) => makeRowMarks({ decisions: [], liveIds: new Set(), threads: [thread({ id: 'th1', last_author_kind: 'human', last_at: T2 })], codeSessions: sessions(state) })(row({ threadId: 'th1', task: null }));

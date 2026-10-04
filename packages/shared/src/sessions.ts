@@ -9,6 +9,7 @@
 // surface lens (roomTabsFor / resolveRoomSurface) and re-exports everything here.
 import { stripMarkdownInline, threadKindOf, type ThreadKind } from './threads';
 import { parseCard } from './cards';
+import { stripCardFences } from './cardfence';
 
 export interface HistoryThread {
   id: string;
@@ -196,7 +197,7 @@ export function historyRows<T extends HistoryTask>(input: {
       // the thread only when a message lands). The row still opens by threadId: one surface.
       const kind = threadKindOf(t.kind);
       const code = kind === 'coding' ? codeByThread.get(t.id) ?? null : null;
-      const snip = (t.last_body ?? '').replace(/‹task:[0-9a-fA-F-]{36}›/g, '▸ filed a task — card in the thread').replace(/\s*‹(?:brief|release|report|article|wb|plan|kind):[^›]*›/g, '').trim();
+      const snip = stripCardFences(t.last_body ?? '').replace(/‹task:[0-9a-fA-F-]{36}›/g, '▸ filed a task — card in the thread').replace(/‹github:connected:([^›]+)›/g, 'GitHub connected · $1').replace(/\s*‹(?:brief|release|report|article|wb|plan|kind):[^›]*›/g, '').trim();
       return [{
         key: `th:${t.id}`,
         threadId: t.id as string | null,

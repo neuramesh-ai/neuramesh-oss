@@ -17,6 +17,7 @@ import { toolsForKind, type NmTool, type TurnKind } from '@neuramesh/shared';
 import type { LogFn } from '../agentlog';
 import { jsonSchemaFor } from './toolschema';
 import type { RepoReader } from '../host/reporead';
+import type { WebTools } from '../browser/agent-tools';
 export type { RepoReader };
 
 /** What a tool returns. `image` rides the Claude path as an image block and degrades to its note elsewhere. */
@@ -50,12 +51,15 @@ export interface ToolHost {
   whiteboards?: WhiteboardToolClosures;
   /** X reads on a research leg (marketing-os round) — the host/searchx.ts impl, closed over
    *  the leg's room; absent = the tool never exists (a build room's leg has no X to read) */
-  searchX?: (i: { query: string; max?: number }) => Promise<string>;
+  searchX?: (i: { query: string; max?: number; order?: 'top' | 'latest'; hours?: number }) => Promise<string>;
   /** the reply card (reply-radar) — host/replycard.ts closed over the turn's thread */
   draftReplies?: (i: { report?: string; baseline?: string; replies: unknown[] }) => Promise<string>;
   /** the repository reads (docs/design/github-connector-2026-09) — host/reporead.ts closed over the
    *  turn's room; absent = the tools never exist (a turn with no room has no repository) */
   repo?: RepoReader;
+  /** the agents' browser (board C3): browser/agent-tools.ts closed over the turn. absent = no
+   *  Chromium on this machine, and the five web_* tools never exist */
+  web?: WebTools;
 }
 
 /** Whiteboards (docs/38): what the daemon injects. One bundle, built once per turn, shared by the
@@ -122,6 +126,11 @@ function serviceable(name: NmTool, host: ToolHost): boolean {
     case 'list_repo_changes':
     case 'read_repo_file':
     case 'list_repo_files': return !!host.repo;
+    case 'web_open':
+    case 'web_read':
+    case 'web_click':
+    case 'web_type':
+    case 'web_screenshot': return !!host.web;
   }
 }
 

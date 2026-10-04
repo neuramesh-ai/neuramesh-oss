@@ -1,6 +1,6 @@
 // THE ONE COMPOSER, WEARING THE CODING KNOBS (coding threads §5, docs/33 §8): the thread's own
 // cbox — the input, the chips row (attach · model · machine; the room and the repository are not
-// switchable here, so they are not chips: the branch shows in the Workbench's foot, George,
+// switchable here, so they are not chips: the branch shows in the code pane's foot, George,
 // 2026-09-26) — plus the two knobs a coding thread ADDS: the Plan | Act segment and
 // the permissions chip. The row WRAPS (George, 2026-09-26): with more chips than a row holds, the
 // knobs and Send stack cleanly on a second row and the composer grows, so nothing is ever cut off

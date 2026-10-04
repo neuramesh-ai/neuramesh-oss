@@ -12,7 +12,7 @@ import type { HostedAgent, ThreadTask } from '../agents';
 import { pickDeadLetters, type SweepCandidate } from '../chatsweep';
 import { HIRE_CONFIRM_RE } from '../hirecards';
 import { type RunHandle } from './runs';
-import { addressedIn, hostSpeaksForOrigin, isCodingThread, mentionRe, modelFreeItemId, nobodyCanServe, parseCard, parseKindMarker, parseModeMarker, unaddressedWake } from '@neuramesh/shared';
+import { addressedIn, GITHUB_NEED_PREFIX, hostSpeaksForOrigin, isCodingThread, isRoutineScheduledMarker, mentionRe, modelFreeItemId, nobodyCanServe, parseCard, parseGitHubConnected, parseKindMarker, parseModeMarker, unaddressedWake } from '@neuramesh/shared';
 import type { PowerSyncDatabase } from '@powersync/node';
 import type { ClaimVerdict, MachineCapability, SessionOrigin } from '@neuramesh/shared';
 import type { HostGuards } from './guards';
@@ -204,7 +204,7 @@ export function makeWakeRouting(ctx: {
     }
     // docs/34: the Tasks toggle's own line in the transcript. It is a RECORD of the flip, not a
     // message to anyone — waking on it would answer a divider.
-    if (parseModeMarker(m.body) || parseKindMarker(m.body)) { processed.add(m.id); return; } // …and the kind flip's line (0144), the same record-not-message
+    if (parseModeMarker(m.body) || parseKindMarker(m.body) || isRoutineScheduledMarker(m.body)) { processed.add(m.id); return; } // …and the kind flip's line (0144), and the routine's divider: the same record-not-message
     // round 9: "nudge me here" is WIRED — a human reply in a marketing room's bootstrap
     // thread finishes any MISSING brand docs instead of a generic chat turn. With the set
     // complete, the reply falls through to the ordinary wake (post-bootstrap Q&A).
@@ -267,6 +267,14 @@ export function makeWakeRouting(ctx: {
     if (orchMentioned || live) { processed.add(m.id); queueWake(orch, m); }
   }
 
+  /** who a task's connected divider wakes: the agent that posted its newest answered GitHub card, while it
+   *  is in the room, else the room's coordinator. The state policy names neither (repo-connect-2026-10). */
+  async function githubAsker(t: ThreadTask): Promise<HostedAgent | undefined> {
+    const [card] = await db.getAll<{ asker_id: string }>(`select asker_id from decisions where task_id = ? and question like ? and status = 'answered' order by answered_at desc limit 1`, [t.id, `${GITHUB_NEED_PREFIX}%`]).catch(() => [] as Array<{ asker_id: string }>);
+    const asker = card ? agents.get(card.asker_id) : undefined;
+    return asker?.channels.has(t.channel_id) ? asker : [...agents.values()].find((a) => a.role === 'orchestrator' && a.channels.has(t.channel_id));
+  }
+
   async function routeThreadMessage(m: { id: string; task_id: string; channel_id: string; body: string }) {
     // the marketing setup card's submit, task-anchored (round 3: the setup TASK's thread owns
     // the whole first-run) — same law as the conversation shape in handleFeedMessage: the
@@ -276,22 +284,17 @@ export function makeWakeRouting(ctx: {
       setTimeout(() => { void runDueSchedules().catch(() => {}); }, 1500); // grace for the schedule row to reach the replica
       return;
     }
-    const [t] = await db.getAll<ThreadTask>(
-      `select id, number, title, description, state, channel_id, assignee_kind, assignee_id, kind from tasks where id = ?`,
-      [m.task_id],
-    );
-    if (!t) {
-      processed.delete(m.id); // task row not synced yet — the watch refires
-      return;
-    }
-    let target: HostedAgent | undefined;
+    const [t] = await db.getAll<ThreadTask>(`select id, number, title, description, state, channel_id, assignee_kind, assignee_id, kind from tasks where id = ?`, [m.task_id]);
+    if (!t) { processed.delete(m.id); return; } // task row not synced yet — the watch refires
+    // the grant's divider is not a reply: it continues the ask its card waited for, in any state
+    let target: HostedAgent | undefined = parseGitHubConnected(m.body) ? await githubAsker(t) : undefined;
     const liveThread = process.env['NM_AGENT_MODE'] !== 'echo';
     // round 9's "nudge me here", task-anchored (round 3): a human reply in the setup task's
     // thread while brand docs are MISSING resumes the bootstrap deterministically — the same
     // law as the conversation-anchored branch in handleFeedMessage. Gated on the profile's
     // setup_at (the wizard writes per step, so `marketing` is non-null from the FIRST answer —
     // presence would fire the bootstrap mid-wizard). Docs complete → ordinary wake (Q&A).
-    if (t.kind === 'setup' && liveThread) {
+    if (!target && t.kind === 'setup' && liveThread) {
       try {
         const [mkch] = await db.getAll<{ workspace_id: string; marketing: string | null }>(
           `select workspace_id, marketing from channels where id = ? and kind = 'marketing' limit 1`, [t.channel_id],
@@ -329,9 +332,11 @@ export function makeWakeRouting(ctx: {
     if (!target) {
       // policy lives in shared/threadwake.ts so a missing state is a failing test, not a
       // silently dropped human message (that is how the design gate went unanswered)
-      const who = unaddressedWake(t.state, t.kind);
-      if (who === 'orchestrator') target = [...agents.values()].find((a) => a.role === 'orchestrator' && a.channels.has(t.channel_id));
-      else if (who === 'assignee' && t.assignee_kind === 'agent' && t.assignee_id) target = agents.get(t.assignee_id);
+      // …and a draw or a film is a button that needs a hand in ANY state: a person holding the work
+      // cannot draw, so the coordinator takes it (2026-09-27)
+      const who = unaddressedWake(t.state, t.kind, modelFreeItemId(m.body) !== null);
+      if (who === 'assignee' && t.assignee_kind === 'agent' && t.assignee_id) target = agents.get(t.assignee_id);
+      else if (who === 'orchestrator' || (who === 'assignee' && modelFreeItemId(m.body))) target = [...agents.values()].find((a) => a.role === 'orchestrator' && a.channels.has(t.channel_id));
     }
     if (!target) return;
     execQueue.run({ key: `thread:${m.id}:${target.id}`, kind: 'chat', cause: 'message', agentId: target.id, subject: { kind: 'task', number: t.number } }, () => wakeThread(target, m, t));

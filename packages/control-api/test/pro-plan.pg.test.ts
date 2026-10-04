@@ -1,7 +1,8 @@
 // The bill stops, and Pro is named (source release 2026-09-12, unit U1a) — against the REAL schema.
 //
 // What this locks down:
-//   · a new workspace is born on Free with NO machine row and NO credit grant
+//   · a person's SECOND workspace is born on Free with NO machine row and NO credit grant (the
+//     first is the Pro trial, workspace-birth.ts)
 //   · the Stripe flip `free → cloud` (checkout.session.completed through applyPlanPatch) mints
 //     exactly one runner for the owner and grants CLOUD_SEAT_MONTHLY_CREDITS × seats ONCE
 //   · the same event redelivered mints nothing and grants nothing; a later subscription event
@@ -86,6 +87,9 @@ beforeAll(async () => {
   process.env['FLEET_AUTOPROVISION'] = 'on'; // the harness runs with the fleet off; this suite mints
   alice = await makeUser('clerk_u1a_alice', 'alice@pro-plan.test');
   bob = await makeUser('clerk_u1a_bob', 'bob@pro-plan.test');
+  // alice's FIRST workspace is the Pro trial (workspace-birth.ts: 500 credits and a runner). the
+  // suite's workspace is her second, born bare, so the bill and the flip below read as they did
+  await send(alice, { type: 'workspace.create', name: 'Pro Plan Trial', slug: `u1a-trial-${Date.now().toString(36)}` });
   const made = await j(await send(alice, { type: 'workspace.create', name: 'Pro Plan', slug: `u1a-${Date.now().toString(36)}` }));
   WS = made.workspaceId as string;
   // every test of a Free behaviour sets the plan out loud: the dev seed (97-dev-plan.sql) makes cloud
@@ -100,7 +104,7 @@ afterAll(async () => {
 });
 
 describe.skipIf(!DB)('the bill stops, and Pro is named (U1a)', () => {
-  it('a new Free workspace has no machine row and no credit grant', async () => {
+  it('a second Free workspace has no machine row and no credit grant', async () => {
     await new Promise((r) => setTimeout(r, 300)); // give a hook that must NOT fire the chance to
     expect(await machinesOf(WS)).toHaveLength(0);
     expect(await grantsOf(WS)).toHaveLength(0);

@@ -169,3 +169,42 @@ test('an unsubscribed tab hears nothing more', () => {
   advance(40);
   assert.equal(tab.frames.length, n);
 });
+
+// the repo-connect round's Option A: the turn's thoughts ride the same frames as their own delta
+test('thoughts go out as their own delta beside the reply, and only when they change', () => {
+  const { streams, advance, sub } = rig();
+  const tab = sub('t1');
+  streams.publish('c:th', 'rex', '', false);
+  streams.publish('c:th', 'rex', '', false, '**Comparing the storage adapters**');
+  advance(40);
+  streams.publish('c:th', 'rex', '', false, '**Comparing the storage adapters**\n\n› read_repo_file · contract.ts');
+  advance(40);
+  // a thoughts-only change is a frame of its own, with no reply text
+  const held = replay(tab.frames);
+  assert.equal(held.get('c:th')?.text, '');
+  assert.equal(held.get('c:th')?.th, '**Comparing the storage adapters**\n\n› read_repo_file · contract.ts');
+  // the reply starts: its frames carry no thoughts, because the thoughts did not change
+  streams.publish('c:th', 'rex', 'The storage layer', false, '**Comparing the storage adapters**\n\n› read_repo_file · contract.ts');
+  advance(40);
+  const last = tab.frames.filter((f) => f.t === 'd').at(-1) as { add: string; ta?: string };
+  assert.equal(last.add, 'The storage layer');
+  assert.equal(last.ta, undefined, 'unchanged thoughts never cross the wire again');
+  const thoughtAdds = tab.frames.filter((f) => f.t === 'd' && (f as { ta?: string }).ta !== undefined).map((f) => (f as { ta?: string }).ta);
+  assert.deepEqual(thoughtAdds, ['**Comparing the storage adapters**', '\n\n› read_repo_file · contract.ts'], 'only what changed in the thoughts crosses the wire');
+  // a tab that arrives now gets both in its snap
+  const late = sub('t2');
+  const snap = late.frames.find((f) => f.t === 'snap') as { text: string; th?: string };
+  assert.deepEqual({ text: snap.text, th: snap.th }, { text: 'The storage layer', th: '**Comparing the storage adapters**\n\n› read_repo_file · contract.ts' });
+  // publishing without thoughts (an older caller) keeps the ones held
+  streams.publish('c:th', 'rex', 'The storage layer has two shapes', false);
+  advance(40);
+  assert.equal(replay(tab.frames).get('c:th')?.th, '**Comparing the storage adapters**\n\n› read_repo_file · contract.ts');
+});
+
+test('a thoughts delta that keeps more than is held asks for a snap, and an old frame keeps the thoughts', () => {
+  const base = { k: 'c:th', a: 'rex', e: 'e1', at: 0 } as const;
+  const held = { a: 'rex', e: 'e1', s: 3, text: 'abc', th: 'xy' };
+  assert.deepEqual(applyLiveFrame(held, { ...base, t: 'd', s: 4, keep: 3, add: '', tk: 5, ta: 'z' }), { kind: 'resync' });
+  assert.deepEqual(applyLiveFrame(held, { ...base, t: 'd', s: 4, keep: 3, add: 'd' }), { kind: 'state', state: { a: 'rex', e: 'e1', s: 4, text: 'abcd', th: 'xy' } });
+  assert.deepEqual(applyLiveFrame(held, { ...base, t: 'd', s: 4, keep: 3, add: '', tk: 2, ta: 'z' }), { kind: 'state', state: { a: 'rex', e: 'e1', s: 4, text: 'abc', th: 'xyz' } });
+});

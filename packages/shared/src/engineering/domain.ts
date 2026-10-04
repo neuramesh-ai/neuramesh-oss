@@ -94,7 +94,10 @@ export interface EngineeringSession {
   machineId?: string | null;
   /** @deprecated Persisted only so Code threads created by older clients can resume. */
   brainPack: string | null;
-  provider?: string; model?: string;
+  /** blockedOn: the session could not open because its machine cannot reach the code until GitHub is
+   *  connected (the relay's ENGINEERING_GITHUB_REQUIRED, docs/design/repo-connect-2026-10): the gate
+   *  seat shows the GitHub card, and the grant opens the session again */
+  provider?: string; model?: string; blockedOn?: 'github' | null;
   createdAt: string; updatedAt: string;
 }
 

@@ -5,7 +5,7 @@
 // region so it scrolls with the channels below it, and only there can it collapse. That is why
 // it reads both navPos and navSec rather than one nav state.
 
-import { IconActivity, IconAgents, IconBoard, IconCalendar, IconChevron, IconCode, IconCredits, IconFootprint, IconHome, IconLibrary, IconMachine, IconMedal, IconMemory, IconRepeat, IconSkill, IconThreads, IconWhiteboard } from '../ui/icons';
+import { IconActivity, IconAgents, IconBoard, IconCalendar, IconChevron, IconCredits, IconFootprint, IconHome, IconLibrary, IconMachine, IconMedal, IconMemory, IconRepeat, IconSkill, IconThreads, IconWhiteboard } from '../ui/icons';
 
 import type { Dispatch, ReactNode, SetStateAction } from 'react';
 import type { MainView } from '../wtabs/guests';
@@ -25,12 +25,9 @@ type NavWorkspaceCardProps = {
   roomOpenTasks: number;
   roomRoutines: number;
   roomContent: number;
-  /** the Workbench is showing at the frame's right edge — this row is a TOGGLE, not a door */
-  wbOpen: boolean;
-  onWorkbench: () => void;
 };
 
-export function NavWorkspaceCard({ moreOpen, nav, navPos, navSec, needsYou, onWorkbench, roomContent, roomOpenTasks, roomRoutines, secHd, setMoreOpen, setNav, setView, view, wbOpen }: NavWorkspaceCardProps) {
+export function NavWorkspaceCard({ moreOpen, nav, navPos, navSec, needsYou, roomContent, roomOpenTasks, roomRoutines, secHd, setMoreOpen, setNav, setView, view }: NavWorkspaceCardProps) {
   return (
   <div className="navgroup">
     {secHd('workspace', 'Workspace')}
@@ -62,10 +59,8 @@ export function NavWorkspaceCard({ moreOpen, nav, navPos, navSec, needsYou, onWo
             ['memory', IconMemory, 'Memory', nav === 'home' && view === 'memory', () => { setNav('home'); setView('memory'); }, ''],
             ['activity', IconActivity, 'Activity', nav === 'logs', () => setNav('logs'), ''],
             ['retro', IconMedal, 'Retro', nav === 'retro', () => setNav('retro'), ''],
-            // the Workbench is a PANEL at the frame's right edge, so this row reads its own
-            // open state and toggles it (2026-08-16 — the old "Code" row opened an editor tab
-            // that rendered a second copy of the Workbench's file tree in the main area)
-            ['code', IconCode, 'Workbench', wbOpen, onWorkbench, ''],
+            // the Workbench row retired with the card (the side-panel round, 2026-10-03): the one
+            // right panel has one switch, the frame top's side panel button (⌘J)
           ];
           const PRIMARY = ['mission', 'threads', 'board', 'agents'];
           const renderItem = (item: [string, any, string, boolean, () => void, string]) => {
