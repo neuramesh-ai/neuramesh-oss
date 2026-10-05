@@ -39,7 +39,7 @@ import { openWithSession, ownerSlot, panelFoldAfter, panelFront, panelGuests, pa
 // consts but drops it for imported bindings — the hundreds of `if (!nm) …` guards rely on it.
 const nm = nmBridge;
 import { isOnline, agentLive, agentBusy, agentFocus } from './lib/presence';
-import { selfInitial, selfLabel, setSelfMachine } from './lib/self';
+import { selfInitial, selfLabel, setSelfMachine, setSelfUser } from './lib/self';
 import { errMsg } from './lib/text';
 
 import { IconActivity, IconAgents, IconBoard, IconBranch, IconBurger, IconCalendar, IconCheck, IconChevron, IconClose, IconCode, IconDockLeft, IconDockRight, IconCredits, IconFootprint, IconGrid, IconHistory, IconHome, IconInbox, IconLibrary, IconMachine, IconMedal, IconMemory, IconPaperclip, IconProject, IconRepeat, IconReply, IconSend, IconSkill, IconThreads, IconTrend, IconWhiteboard, IconCompose, IconFolder, IconPost, IconTerm } from './ui/icons';
@@ -85,6 +85,7 @@ import { ImageKeyForm, setCreditsOpener, setImageConnectOpener } from './setting
 
 import { BrainChip } from './brain/BrainChip';
 import { readBrainDraft } from './brain/draft';
+import { publishModelRoster } from './models/roster'; import { CodeModelChip } from './models/CodeModelChip';
 
 
 import { ComputePanel } from './compute/ComputePanel';
@@ -1139,7 +1140,7 @@ export function App() {
   const [chatDraft, setChatDraft] = useState<string | null>(null);
   // coding threads (0144): the repo chip's pre-set for the next New chat ('primary' = the room's primary repo), and the repo a
   // thread was BORN with on this client (door 1), read by the surface that opens until its synced session row lands
-  const [chatRepo, setChatRepo] = useState<string | null>(null); const [codingRepoPicks, setCodingRepoPicks] = useState<Map<string, string>>(() => new Map());
+  const [chatRepo, setChatRepo] = useState<string | null>(null); const [codingRepoPicks, setCodingRepoPicks] = useState<Map<string, { repo: string; model: string | null }>>(() => new Map()); // a coding birth's repository and model, by thread
   const openMarketingAsk = (channelId: string, text: string) => {
     // the stage's room chip lists the ACTIVE project's rooms — follow the ask's room there,
     // or the pre-set target silently falls back to whatever room the chip lands on
@@ -1274,7 +1275,7 @@ export function App() {
     return nm.watchRoster((p) => {
       rememberPersonas(p.agents); // before commit, so avatars render the chosen face on first paint
       setRoster({ machines: p.machines, agents: p.agents });
-      setMembers(p.members);
+      setMembers(p.members); publishModelRoster(p); // the Code chip reads the machines from here (models/roster.ts)
       setRosterReady(true);
     });
   }, [authed]);
@@ -1959,7 +1960,7 @@ export function App() {
     if (!openCodingThread || !openThreadId) return null;
     const rows = meta.reposAll.length ? meta.reposAll : meta.repos;
     const cs = codeSessionsAll.find((c) => c.thread_id === openThreadId || c.id === openThreadId);
-    const r = rows.find((x) => x.id === cs?.repo_id) ?? rows.find((x) => x.id === codingRepoPicks.get(openThreadId)) ?? repoForProject(rows, currentLive?.project_id ?? activeProject ?? null);
+    const r = rows.find((x) => x.id === cs?.repo_id) ?? rows.find((x) => x.id === codingRepoPicks.get(openThreadId)?.repo) ?? repoForProject(rows, currentLive?.project_id ?? activeProject ?? null);
     return r?.local_path ? { path: r.local_path, label: repoLabel(r) } : null;
   })();
   const wscope: WScope = (() => {
@@ -2162,6 +2163,7 @@ export function App() {
   // Machines joined to their owner's grant, so "may I use this?" is answered the same way here
   // as in the daemon — one shared predicate, never a second opinion in the UI.
   const meId = auth?.user?.id ?? null;
+  useEffect(() => setSelfUser(meId), [meId]); // the Code chip finds the member's own cloud machine by it (lib/self.ts)
   const machineCaps: MachineCapability[] = useMemo(() => roster.machines.map((m) => ({
     machineId: m.id, ownerUserId: m.owner_user_id ?? '', lastSeenAt: m.last_seen_at,
     runtimes: (() => { try { return JSON.parse(m.runtimes ?? '[]') as string[]; } catch { return []; } })(),
@@ -2273,6 +2275,7 @@ export function App() {
   // send writes — the choice, or the desktop default's Mac; Auto writes nothing and the ladder decides
   const [sessionMachine, setSessionMachine] = useState<string | null>(null);
   const [sessionRepo, setSessionRepo] = useState<string | null>(null); // the repo chip's pick for the next send (0144): set, it births a coding thread
+  const [sessionCodeModel, setSessionCodeModel] = useState<string | null>(null); // the Code chip's pick for that thread: null runs the NeuraMesh brain
   const sessionOrigin = NM_PLATFORM === 'web' ? 'web' as const : 'desktop' as const;
   const selfMachineId = boot?.machineName ? roster.machines.find((m) => m.name === boot.machineName)?.id ?? null : null;
   const sessionDesignation = (chosen: string | null) => designationFor({ origin: sessionOrigin, chosen, prefs: parseComputePrefs(members.find((m) => m.user_id === meId)?.compute), selfMachineId });
@@ -2315,8 +2318,8 @@ export function App() {
       threadOrigin: thread ? null : sessionOrigin,
       ...(!thread && sessionRepo ? { threadKind: 'coding' as const } : {}), // …and the kind (0144): a repository picked makes this a coding conversation
     });
-    if (!thread && sessionRepo) setCodingRepoPicks((m) => new Map(m).set(threadId, sessionRepo));
-    setSessionMachine(null); setSessionRepo(null);
+    if (!thread && sessionRepo) setCodingRepoPicks((m) => new Map(m).set(threadId, { repo: sessionRepo, model: sessionCodeModel }));
+    setSessionMachine(null); setSessionRepo(null); setSessionCodeModel(null);
     openConversation(threadId); // …and land in the session you just started
     setNote(`✓ sent in ${Math.max(1, Math.round(performance.now() - t0))}ms · syncing to team`);
     setTimeout(() => setNote(''), 2500);
@@ -3605,7 +3608,7 @@ export function App() {
             initialTarget={chatTarget}
             initialDraft={chatDraft}
             repos={meta.reposAll.length ? meta.reposAll : meta.repos} initialRepo={chatRepo} onConnectRepo={() => setAddRepoOpen(true)}
-            onCodingBirth={(id, repoId) => setCodingRepoPicks((m) => new Map(m).set(id, repoId))}
+            onCodingBirth={(id, repoId, model) => setCodingRepoPicks((m) => new Map(m).set(id, { repo: repoId, model }))}
             onSend={(channelId, text, opts) => {
               // the stage targets a room that may not be the "current" one — align them so the
               // conversation watch, history and the session surface all read the room addressed
@@ -3958,13 +3961,15 @@ export function App() {
                 origin={sessionOrigin} value={sessionMachine} onPick={setSessionMachine} cloud={computeState} />
               {!replyTo && <RepoChip repos={meta.reposAll.length ? meta.reposAll : meta.repos} projectId={activeProj?.id ?? null} value={sessionRepo} onPick={setSessionRepo} onConnect={() => setAddRepoOpen(true)} />} {/* the fourth knob (0144): a repository makes the send a coding conversation */}
               {/* the SAME pill as the thread composer (George, 2026-07-31): a message sent here
-                  becomes a conversation too, so the crew and the roles table read identically */}
-              <BrainChip
-                onConnect={(p) => { setFocusProvider(p); setWsOpen(true); void refreshCreds(); }}
-                project={activeProj ? { id: activeProj.id, name: activeProj.name, pack: activeProj.model_pack ?? null } : null}
-                onSetProjectPack={(packId) => setProjectPack(activeProject, packId)}
-                castAgents={roster.agents.filter((a) => !a.retired_at && agentInChannel(a.channel_ids, current?.id ?? ''))}
-              />
+                  becomes a conversation too, so the crew and the roles table read identically. A repository
+                  makes it a coding conversation, whose model the Code chip picks (2026-10-04) */}
+              {sessionRepo && !replyTo ? <CodeModelChip pick={sessionCodeModel} machineId={sessionDesignation(sessionMachine)} place="start" onPick={setSessionCodeModel} />
+                : <BrainChip
+                  onConnect={(p) => { setFocusProvider(p); setWsOpen(true); void refreshCreds(); }}
+                  project={activeProj ? { id: activeProj.id, name: activeProj.name, pack: activeProj.model_pack ?? null } : null}
+                  onSetProjectPack={(packId) => setProjectPack(activeProject, packId)}
+                  castAgents={roster.agents.filter((a) => !a.retired_at && agentInChannel(a.channel_ids, current?.id ?? ''))}
+                />}
               {showWelcomeHint && <span className="welcomehint">Your first message is drafted. Send it and meet your orchestrator →</span>}
               <span className="sendnote inline">{note}</span>
               <button className={`btn primary send${showWelcomeHint ? ' coach' : ''}`} disabled={atts.busy} onClick={() => void send()} aria-label={atts.busy ? 'Uploading attachments' : 'Send message'} data-tip="Send · ↵">
@@ -3992,7 +3997,7 @@ export function App() {
             crumbProject={(() => { const p = wsProjects.find((x) => x.id === (currentLive?.project_id ?? activeProject)); return p ? { name: p.name, logo_url: p.logo_url } : null; })()}
             repos={meta.reposAll.length ? meta.reposAll : meta.repos} projects={wsProjects} projectId={currentLive?.project_id ?? activeProject ?? null} workspaceId={boot?.workspaceId ?? 'workspace'}
             onReposChanged={() => { if (current && nm) void nm.channelMeta(current.id).then((r) => setMeta({ projects: r?.projects ?? [], repos: r?.repos ?? [], reposAll: r?.reposAll ?? [] })).catch(() => {}); }}
-            codeSession={codeSessionsAll.find((c) => c.thread_id === openThreadId || c.id === openThreadId) ?? null} pickedRepoId={codingRepoPicks.get(openThreadId) ?? null} marks={headMarks}
+            codeSession={codeSessionsAll.find((c) => c.thread_id === openThreadId || c.id === openThreadId) ?? null} pickedRepoId={codingRepoPicks.get(openThreadId)?.repo ?? null} pickedModelId={codingRepoPicks.get(openThreadId)?.model ?? null} marks={headMarks}
             machineChip={(value, onPick, disabled) => <MachineChip machines={roster.machines} members={members} selfUserId={meId} selfMachineName={boot?.machineName ?? null} origin={sessionOrigin} value={value} onPick={onPick} cloud={computeState} disabled={disabled} />}
             defaultMachineId={sessionDesignation(null)} plan={plan} onUpgrade={openUpgrade} onClose={closeConvo} agents={roster.agents} decisions={decisionsAll.filter((d) => !d.task_id && d.channel_id === current?.id)} />
           </div>

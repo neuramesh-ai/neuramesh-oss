@@ -9,15 +9,18 @@
 import { apiAuthHeaders } from '../apiauth';
 import { NO_CREDITS_ERROR } from '../computenotice';
 
-export interface StarterCall { apiUrl: string; workspace: string; actorId: string; contents: any[]; config: any }
+/** `thoughts`: ask for the model's thought summaries, for a live bubble's Thoughts block (host/starterthoughts.ts) */
+export interface StarterCall { apiUrl: string; workspace: string; actorId: string; contents: any[]; config: any; thoughts?: boolean }
 
 const OUT_OF_CREDITS = `${NO_CREDITS_ERROR}: add credits in Credits, or connect your own brain in Settings`;
 
+// the flag rides the call, so the 404 fallback to the whole-reply door sends this same body
 const proxyBody = (a: StarterCall): string => JSON.stringify({
   workspace: a.workspace,
   contents: a.contents,
   system: a.config?.systemInstruction,
   tools: a.config?.tools,
+  ...(a.thoughts ? { thoughts: true } : {}),
 });
 
 /** the whole-reply door: control-api holds the key, guards the balance, and records the spend. It
@@ -41,9 +44,9 @@ let streamMissingUntil = 0;
 /** tests only: forget that an older API answered 404 */
 export function resetStarterStreamProbe(): void { streamMissingUntil = 0; }
 
-/** the streamed door: `onText` gets each text delta as the model writes it, in order. Same errors,
- *  same answer as the whole-reply door. */
-export async function starterStream(a: StarterCall & { onText: (delta: string) => void }): Promise<any> {
+/** the streamed door: `onText` gets each text delta as the model writes it, in order, and `onThought`
+ *  each thought delta when the call asked for thoughts. Same errors, same answer as the whole-reply door. */
+export async function starterStream(a: StarterCall & { onText: (delta: string) => void; onThought?: (delta: string) => void }): Promise<any> {
   if (Date.now() < streamMissingUntil) return starterGenerate(a);
   const res = await fetch(`${a.apiUrl}/v1/starter/stream`, {
     method: 'POST',
@@ -58,24 +61,25 @@ export async function starterStream(a: StarterCall & { onText: (delta: string) =
   }
   if (res.status === 402) throw new Error(OUT_OF_CREDITS);
   if (!res.ok || !res.body) throw new Error(`starter brain unavailable (${res.status})`);
-  return readStarterStream(res.body, a.onText);
+  return readStarterStream(res.body, a.onText, a.onThought);
 }
 
-/** one NDJSON line: words go to onText, the answer comes back, a failure is thrown. An unknown
- *  line type is skipped, so the server can add one without breaking an older machine. */
-function readLine(line: string, onText: (delta: string) => void): { answer: unknown } | null {
+/** one NDJSON line: words go to onText, thoughts to onThought, the answer comes back, a failure is
+ *  thrown. An unknown line type is skipped, so the server can add one without breaking an older machine. */
+function readLine(line: string, onText: (delta: string) => void, onThought?: (delta: string) => void): { answer: unknown } | null {
   const msg = JSON.parse(line) as { t?: string; text?: string; response?: unknown; code?: string };
   if (msg.t === 'error') throw new Error(`starter brain unavailable (stream ${msg.code ?? 'error'})`);
   if (msg.t === 'done') return { answer: msg.response };
-  if (msg.t === 'text' && msg.text) {
-    try { onText(msg.text); } catch { /* a live bubble is never worth the turn */ }
+  const to = msg.t === 'text' ? onText : msg.t === 'thought' ? onThought : undefined;
+  if (to && msg.text) {
+    try { to(msg.text); } catch { /* a live bubble is never worth the turn */ }
   }
   return null;
 }
 
-/** the NDJSON answer: `text` lines to onText, then the `done` body. Decoded as a stream, because
- *  a network read may cut a multi-byte character in two. */
-export async function readStarterStream(body: ReadableStream<Uint8Array>, onText: (delta: string) => void): Promise<any> {
+/** the NDJSON answer: `text` lines to onText, `thought` lines to onThought, then the `done` body.
+ *  Decoded as a stream, because a network read may cut a multi-byte character in two. */
+export async function readStarterStream(body: ReadableStream<Uint8Array>, onText: (delta: string) => void, onThought?: (delta: string) => void): Promise<any> {
   const reader = body.getReader();
   const dec = new TextDecoder();
   let buf = '';
@@ -86,7 +90,7 @@ export async function readStarterStream(body: ReadableStream<Uint8Array>, onText
       for (let nl = buf.indexOf('\n'); nl >= 0; nl = buf.indexOf('\n')) {
         const line = buf.slice(0, nl).trim();
         buf = buf.slice(nl + 1);
-        const end = line ? readLine(line, onText) : null;
+        const end = line ? readLine(line, onText, onThought) : null;
         if (end) return end.answer;
       }
       if (done) break;

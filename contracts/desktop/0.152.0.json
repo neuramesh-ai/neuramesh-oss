@@ -1,0 +1,1700 @@
+{
+  "format": 1,
+  "version": "0.152.0",
+  "commands": {
+    "account.delete": {},
+    "agent.connect_remote": {
+      "cardUrl": {"kind":"string","min":1},
+      "channels": {"kind":"array","item":{"kind":"string","min":1},"min":1},
+      "workspace": {"kind":"string","min":1}
+    },
+    "agent.register": {
+      "brief": {"kind":"string","min":1,"max":2000,"optional":true},
+      "channels": {"kind":"array","item":{"kind":"string","min":1},"min":1},
+      "description": {"kind":"string","min":1,"max":280,"optional":true},
+      "emoji": {"kind":"string","min":1,"max":8,"optional":true},
+      "machineId": {"kind":"string","min":1},
+      "model": {"kind":"string","min":1,"optional":true},
+      "name": {"kind":"string","min":1,"formats":["regex:/^[a-z0-9][a-z0-9._-]*$/"]},
+      "role": {
+        "kind": "enum",
+        "values": [
+          "architect",
+          "curator",
+          "designer",
+          "developer",
+          "marketer",
+          "orchestrator",
+          "reviewer",
+          "sales",
+          "shipper",
+          "worker"
+        ],
+        "optional": true
+      },
+      "runtime": {"kind":"enum","values":["claude-code","codex","gemini"],"optional":true},
+      "workspace": {"kind":"string","min":1}
+    },
+    "agent.retire": {"agent":{"kind":"string","min":1}},
+    "agent.set_status": {
+      "agentId": {"kind":"string","min":1},
+      "status": {"kind":"enum","values":["offline","online","thinking","working"]}
+    },
+    "agent.update": {
+      "agent": {"kind":"string","min":1},
+      "brief": {"kind":"string","max":2000,"optional":true},
+      "description": {"kind":"string","max":280,"optional":true},
+      "model": {"kind":"string","min":1,"optional":true},
+      "modelSource": {"kind":"enum","values":["manual","pack"],"optional":true},
+      "name": {"kind":"string","min":1,"formats":["regex:/^[a-z0-9][a-z0-9._-]*$/"],"optional":true},
+      "runtime": {"kind":"enum","values":["claude-code","codex","gemini"],"optional":true}
+    },
+    "artifact.create": {
+      "channel": {"kind":"string","min":1},
+      "inlineContent": {"kind":"string","min":1,"max":300000},
+      "kind": {"kind":"enum","values":["doc","file"],"optional":true},
+      "mime": {"kind":"string","max":100,"optional":true},
+      "name": {"kind":"string","min":1,"max":200},
+      "tags": {"kind":"array","item":{"kind":"string","min":1,"max":40},"max":8,"optional":true}
+    },
+    "artifact.delete": {"artifactId":{"kind":"string","min":1}},
+    "artifact.promote": {"artifactId":{"kind":"string","min":1}},
+    "beats.advance": {
+      "seq": {"kind":"number","int":true,"min":0},
+      "status": {"kind":"enum","values":["active","blocked","done","pending"]},
+      "taskId": {"kind":"string","min":1}
+    },
+    "beats.declare": {
+      "items": {"kind":"array","item":{"kind":"string","min":1,"max":200},"min":1,"max":12},
+      "phase": {
+        "kind": "enum",
+        "values": [
+          "accepted",
+          "backlog",
+          "blocked",
+          "closed",
+          "design_review",
+          "designing",
+          "done",
+          "in_progress",
+          "in_review",
+          "plan_review",
+          "planning",
+          "releasing",
+          "ship_review",
+          "shipping",
+          "todo",
+          "verifying"
+        ]
+      },
+      "taskId": {"kind":"string","min":1}
+    },
+    "channel.add_agent": {
+      "agent": {"kind":"string","min":1},
+      "channel": {"kind":"string","min":1},
+      "workspace": {"kind":"string","min":1}
+    },
+    "channel.add_person": {
+      "channel": {"kind":"string","min":1},
+      "person": {"kind":"string","min":1},
+      "workspace": {"kind":"string","min":1}
+    },
+    "channel.assign": {"channel":{"kind":"string","min":1},"project":{"kind":"string","min":1}},
+    "channel.create": {
+      "project": {"kind":"string","min":1},
+      "slug": {"kind":"string","min":1,"max":40,"formats":["regex:/^[a-z0-9][a-z0-9-]*$/"]},
+      "topic": {"kind":"string","max":280,"optional":true},
+      "workspace": {"kind":"string","min":1}
+    },
+    "channel.delete": {"channel":{"kind":"string","min":1}},
+    "channel.remove_agent": {
+      "agent": {"kind":"string","min":1},
+      "channel": {"kind":"string","min":1},
+      "workspace": {"kind":"string","min":1}
+    },
+    "channel.remove_person": {
+      "channel": {"kind":"string","min":1},
+      "person": {"kind":"string","min":1},
+      "workspace": {"kind":"string","min":1}
+    },
+    "channel.rename": {
+      "channel": {"kind":"string","min":1},
+      "slug": {
+        "kind": "string",
+        "min": 1,
+        "max": 40,
+        "formats": ["regex:/^[a-z0-9][a-z0-9-]*$/"],
+        "optional": true
+      },
+      "topic": {"kind":"string","max":280,"optional":true}
+    },
+    "channel.set_kind": {
+      "channel": {"kind":"string","min":1},
+      "kind": {"kind":"enum","values":["build","marketing"]}
+    },
+    "channel.set_thread_mode": {
+      "channel": {"kind":"string","min":1},
+      "mode": {"kind":"enum","values":["off","on"]}
+    },
+    "code_session.approval_waiting": {
+      "approvalId": {"kind":"string","min":1,"max":200},
+      "category": {"kind":"enum","values":["command","edit","mcp","read","web"]},
+      "codeSessionId": {"kind":"string","formats":["uuid"]},
+      "toolName": {"kind":"string","min":1,"max":120},
+      "workspace": {"kind":"string","min":1}
+    },
+    "code_session.close": {
+      "codeSessionId": {"kind":"string","formats":["uuid"]},
+      "lastLine": {"kind":"string","max":400,"optional":true},
+      "state": {"kind":"enum","values":["completed","error","resumable"],"optional":true},
+      "workspace": {"kind":"string","min":1}
+    },
+    "code_session.upsert": {
+      "branch": {"kind":"string","max":200,"optional":true},
+      "changesCount": {"kind":"number","int":true,"min":0,"optional":true},
+      "checkpointsCount": {"kind":"number","int":true,"min":0,"optional":true},
+      "codeSessionId": {"kind":"string","formats":["uuid"]},
+      "createdBy": {"kind":"string","formats":["uuid"],"optional":true},
+      "lastLine": {"kind":"string","max":400,"optional":true},
+      "machineId": {"kind":"string","formats":["uuid"],"nullable":true,"optional":true},
+      "mode": {"kind":"enum","values":["act","plan"],"optional":true},
+      "projectId": {"kind":"string","formats":["uuid"],"nullable":true,"optional":true},
+      "repoId": {"kind":"string","formats":["uuid"],"nullable":true,"optional":true},
+      "repoName": {"kind":"string","max":200,"optional":true},
+      "state": {
+        "kind": "enum",
+        "values": ["awaiting_approval","completed","error","idle","resumable","streaming"],
+        "optional": true
+      },
+      "title": {"kind":"string","max":200,"optional":true},
+      "workspace": {"kind":"string","min":1}
+    },
+    "connector.disconnect": {"connector":{"kind":"string","min":1}},
+    "content.anchor": {
+      "item": {"kind":"string","formats":["uuid"]},
+      "thread": {"kind":"string","formats":["uuid"]}
+    },
+    "content.approve": {
+      "item": {"kind":"string","min":1},
+      "scheduledAt": {
+        "kind": "string",
+        "formats": ["datetime:{\"local\":false,\"offset\":false,\"precision\":null}"],
+        "optional": true
+      }
+    },
+    "content.attach_media": {
+      "dataUrl": {"kind":"string","max":9000000,"formats":["regex:/^data:(?:image|video)\\//"]},
+      "item": {"kind":"string","min":1}
+    },
+    "content.create": {
+      "body": {"kind":"string","min":1,"max":10000},
+      "channel": {"kind":"string","min":1},
+      "frame": {"kind":"string","min":1,"max":200,"optional":true},
+      "imageBrief": {"kind":"string","max":2000,"optional":true},
+      "imageError": {"kind":"string","max":600,"optional":true},
+      "mediaUrl": {"kind":"string","max":2000,"formats":["url"],"optional":true},
+      "platform": {
+        "kind": "enum",
+        "values": ["email","instagram","linkedin","tiktok","x"],
+        "optional": true
+      },
+      "schedule": {"kind":"string","min":1,"optional":true},
+      "script": {"kind":"string","min":1,"max":10000,"optional":true},
+      "seconds": {"kind":"number","int":true,"min":1,"max":60,"optional":true},
+      "slotAt": {
+        "kind": "string",
+        "formats": ["datetime:{\"local\":false,\"offset\":false,\"precision\":null}"],
+        "optional": true
+      },
+      "task": {"kind":"string","min":1,"optional":true},
+      "thread": {"kind":"string","min":1,"optional":true},
+      "thumb": {
+        "kind": "string",
+        "max": 200000,
+        "formats": ["startsWith:{\"value\":\"data:image/\"}"],
+        "optional": true
+      }
+    },
+    "content.delete": {"item":{"kind":"string","min":1}},
+    "content.revise": {
+      "body": {"kind":"string","min":1,"max":10000,"optional":true},
+      "frame": {"kind":"string","max":200,"nullable":true,"optional":true},
+      "imageBrief": {"kind":"string","max":2000,"optional":true},
+      "imageError": {
+        "kind": "union",
+        "options": [{"kind":"string","max":600},{"kind":"literal","literal":""}],
+        "optional": true
+      },
+      "item": {"kind":"string","min":1},
+      "script": {"kind":"string","min":1,"max":10000,"optional":true},
+      "seconds": {"kind":"number","int":true,"min":1,"max":60,"nullable":true,"optional":true},
+      "thumb": {
+        "kind": "string",
+        "max": 200000,
+        "formats": ["startsWith:{\"value\":\"data:image/\"}"],
+        "optional": true
+      },
+      "videoError": {
+        "kind": "union",
+        "options": [{"kind":"string","max":600},{"kind":"literal","literal":""}],
+        "optional": true
+      },
+      "videoErrorCode": {
+        "kind": "enum",
+        "values": ["NO_CREDITS","UNAVAILABLE"],
+        "nullable": true,
+        "optional": true
+      },
+      "videoMeta": {
+        "kind": "object",
+        "fields": {
+          "at": {
+            "kind": "string",
+            "formats": ["datetime:{\"local\":false,\"offset\":false,\"precision\":null}"]
+          },
+          "credits": {"kind":"number","int":true,"min":0},
+          "frame": {"kind":"string","max":200,"nullable":true,"optional":true},
+          "frameUsed": {"kind":"boolean","optional":true},
+          "model": {"kind":"string","max":80},
+          "seconds": {"kind":"number","int":true,"min":1,"max":60},
+          "tier": {"kind":"string","max":40}
+        },
+        "optional": true
+      }
+    },
+    "content.unschedule": {"item":{"kind":"string","min":1}},
+    "content.update": {
+      "body": {"kind":"string","min":1,"max":10000},
+      "item": {"kind":"string","min":1},
+      "mediaUrl": {
+        "kind": "union",
+        "options": [{"kind":"string","max":2000,"formats":["url"]},{"kind":"literal","literal":""}],
+        "optional": true
+      }
+    },
+    "credential.set": {
+      "agentId": {"kind":"string","min":1,"optional":true},
+      "authMode": {"kind":"enum","values":["apikey","subscription"],"optional":true},
+      "provider": {"kind":"string","min":1,"optional":true},
+      "scope": {"kind":"enum","values":["agent","workspace"]},
+      "token": {"kind":"string","min":8,"optional":true},
+      "workspace": {"kind":"string","min":1}
+    },
+    "decision.answer": {
+      "answer": {"kind":"string","min":1,"max":2000},
+      "decisionId": {"kind":"string","min":1}
+    },
+    "decision.dismiss": {"decisionId":{"kind":"string","min":1}},
+    "machine.heartbeat": {
+      "activeSeconds": {"kind":"number","int":true,"min":0,"max":3600,"optional":true},
+      "busy": {"kind":"boolean","optional":true},
+      "daemonVersion": {"kind":"string","min":1,"max":64,"optional":true},
+      "machineId": {"kind":"string","min":1},
+      "runtimes": {
+        "kind": "array",
+        "item": {"kind":"string","min":1,"max":40},
+        "max": 12,
+        "optional": true
+      }
+    },
+    "machine.promote": {
+      "machineId": {"kind":"string","formats":["uuid"]},
+      "workspace": {"kind":"string","min":1}
+    },
+    "machine.provision": {"workspace":{"kind":"string","min":1}},
+    "machine.register": {
+      "daemonVersion": {"kind":"string","min":1,"optional":true},
+      "name": {"kind":"string","min":1},
+      "platform": {"kind":"string","min":1,"optional":true},
+      "runtimes": {
+        "kind": "array",
+        "item": {"kind":"string","min":1,"max":40},
+        "max": 12,
+        "optional": true
+      },
+      "transfer": {"kind":"boolean","optional":true},
+      "workspace": {"kind":"string","min":1}
+    },
+    "machine.remove": {
+      "machineId": {"kind":"string","formats":["uuid"]},
+      "workspace": {"kind":"string","min":1}
+    },
+    "machine.wake": {
+      "forUserId": {"kind":"string","formats":["uuid"],"optional":true},
+      "machineId": {"kind":"string","formats":["uuid"]},
+      "workspace": {"kind":"string","min":1}
+    },
+    "marketing.set_integration": {
+      "channel": {"kind":"string","min":1},
+      "enabled": {"kind":"boolean"},
+      "provider": {"kind":"enum","values":["meta","posthog","tiktok","x"]}
+    },
+    "marketing.setup": {
+      "channel": {"kind":"string","min":1},
+      "focus": {
+        "kind": "array",
+        "item": {"kind":"enum","values":["ads","content","email","seo","social"]},
+        "max": 5,
+        "optional": true
+      },
+      "goal": {"kind":"string","max":300,"optional":true},
+      "releases": {
+        "kind": "object",
+        "fields": {
+          "at": {"kind":"string","formats":["regex:/^([01]\\d|2[0-3]):[0-5]\\d$/"],"optional":true},
+          "now": {"kind":"boolean"},
+          "repoId": {"kind":"string","min":1,"nullable":true,"optional":true},
+          "slug": {"kind":"string","max":200,"nullable":true,"optional":true},
+          "tz": {"kind":"string","max":64,"optional":true},
+          "watch": {"kind":"boolean"}
+        },
+        "optional": true
+      },
+      "website": {"kind":"string","max":400,"optional":true}
+    },
+    "member.set_agent_model": {
+      "agent": {"kind":"string","formats":["uuid"]},
+      "model": {"kind":"string","min":1,"nullable":true},
+      "thinking": {"kind":"enum","values":["high","low","medium"],"nullable":true,"optional":true},
+      "workspace": {"kind":"string","min":1}
+    },
+    "member.set_compute": {
+      "agents": {
+        "kind": "record",
+        "key": {"kind":"string","formats":["uuid"]},
+        "item": {"kind":"string","formats":["uuid"]},
+        "optional": true
+      },
+      "desktopSessions": {"kind":"enum","values":["auto","here"],"optional":true},
+      "machine": {"kind":"string","formats":["uuid"],"nullable":true,"optional":true},
+      "shares": {
+        "kind": "array",
+        "item": {
+          "kind": "union",
+          "options": [{"kind":"literal","literal":"*"},{"kind":"string","formats":["uuid"]}]
+        },
+        "max": 200,
+        "optional": true
+      },
+      "workspace": {"kind":"string","min":1}
+    },
+    "member.share_compute": {
+      "member": {"kind":"string","formats":["uuid"]},
+      "on": {"kind":"boolean"},
+      "workspace": {"kind":"string","min":1}
+    },
+    "member.update_profile": {
+      "displayName": {"kind":"string","min":1,"max":60},
+      "workspace": {"kind":"string","min":1}
+    },
+    "memory.record_lesson": {
+      "channel": {"kind":"string","min":1},
+      "content": {"kind":"string","min":12,"max":500},
+      "taskId": {"kind":"string","min":1,"optional":true},
+      "workspace": {"kind":"string","min":1}
+    },
+    "memory.refresh_block": {
+      "basisCount": {"kind":"number","int":true,"min":0,"optional":true},
+      "channel": {"kind":"string","min":1},
+      "content": {"kind":"string","min":1,"max":4000},
+      "kind": {"kind":"enum","values":["channel_summary","project_brief"],"optional":true},
+      "workspace": {"kind":"string","min":1}
+    },
+    "memory.retire_fact": {
+      "factId": {"kind":"string","formats":["uuid"]},
+      "supersededBy": {"kind":"string","formats":["uuid"],"optional":true}
+    },
+    "memory.upsert_fact": {
+      "basisCount": {"kind":"number","int":true,"min":0,"optional":true},
+      "channel": {"kind":"string","min":1},
+      "content": {"kind":"string","min":8,"max":600},
+      "workspace": {"kind":"string","min":1}
+    },
+    "message.pin": {"message":{"kind":"string","min":1},"pinned":{"kind":"boolean"}},
+    "message.revise_card": {
+      "body": {"kind":"string","min":1,"max":60000},
+      "message": {"kind":"string","min":1}
+    },
+    "modelpack.delete": {"packId":{"kind":"string"},"workspace":{"kind":"string","min":1}},
+    "modelpack.save": {
+      "name": {"kind":"string","min":1,"max":40},
+      "packId": {"kind":"string","optional":true},
+      "roles": {
+        "kind": "object",
+        "fields": {
+          "architect": {"kind":"string","min":1},
+          "curator": {"kind":"string","min":1},
+          "designer": {"kind":"string","min":1},
+          "developer": {"kind":"string","min":1},
+          "marketer": {"kind":"string","min":1},
+          "orchestrator": {"kind":"string","min":1},
+          "reviewer": {"kind":"string","min":1},
+          "sales": {"kind":"string","min":1},
+          "shipper": {"kind":"string","min":1},
+          "worker": {"kind":"string","min":1}
+        }
+      },
+      "workspace": {"kind":"string","min":1}
+    },
+    "policy.delete": {"policyId":{"kind":"string","min":1},"workspace":{"kind":"string","min":1}},
+    "policy.set": {
+      "agentId": {"kind":"string","min":1,"nullable":true,"optional":true},
+      "capability": {
+        "kind": "enum",
+        "values": [
+          "fs.read",
+          "fs.write",
+          "net.egress",
+          "pkg.install",
+          "shell.exec",
+          "tool.mcp",
+          "vcs.push"
+        ]
+      },
+      "channelId": {"kind":"string","min":1,"nullable":true,"optional":true},
+      "id": {"kind":"string","min":1,"optional":true},
+      "locked": {"kind":"boolean","optional":true},
+      "projectId": {"kind":"string","min":1,"nullable":true,"optional":true},
+      "rationale": {"kind":"string","max":400,"optional":true},
+      "scope": {"kind":"enum","values":["agent","channel","project","task","workspace"]},
+      "selector": {
+        "kind": "union",
+        "options": [
+          {"kind":"object","fields":{"kind":{"kind":"literal","literal":"any"}}},
+          {
+            "kind": "object",
+            "fields": {"glob":{"kind":"string","min":1},"kind":{"kind":"literal","literal":"path"}}
+          },
+          {
+            "kind": "object",
+            "fields": {"glob":{"kind":"string","min":1},"kind":{"kind":"literal","literal":"host"}}
+          },
+          {
+            "kind": "object",
+            "fields": {
+              "kind": {"kind":"literal","literal":"shellClass"},
+              "value": {
+                "kind": "enum",
+                "values": ["build","destructive","network","other","pipe-to-shell","test","vcs"]
+              }
+            }
+          },
+          {
+            "kind": "object",
+            "fields": {"kind":{"kind":"literal","literal":"tool"},"name":{"kind":"string","min":1}}
+          },
+          {
+            "kind": "object",
+            "fields": {
+              "kind": {"kind":"literal","literal":"registry"},
+              "name": {"kind":"string","min":1}
+            }
+          },
+          {
+            "kind": "object",
+            "fields": {"kind":{"kind":"literal","literal":"flag"},"name":{"kind":"string","min":1}}
+          }
+        ]
+      },
+      "verdict": {"kind":"enum","values":["allow","ask","deny"]},
+      "workspace": {"kind":"string","min":1}
+    },
+    "project.archive": {"project":{"kind":"string","min":1}},
+    "project.create": {
+      "channels": {"kind":"array","item":{"kind":"string","min":1},"optional":true},
+      "description": {"kind":"string","max":2000,"optional":true},
+      "logoUrl": {
+        "kind": "string",
+        "max": 200000,
+        "formats": ["regex:/^$|^(data:image\\/|https?:\\/\\/)/"],
+        "optional": true
+      },
+      "name": {"kind":"string","min":1,"max":80},
+      "newChannels": {"kind":"array","item":{"kind":"string","min":1},"optional":true},
+      "slug": {
+        "kind": "string",
+        "min": 1,
+        "max": 40,
+        "formats": ["regex:/^[a-z0-9][a-z0-9-]*$/"],
+        "optional": true
+      },
+      "website": {
+        "kind": "string",
+        "max": 2048,
+        "formats": ["regex:/^$|^https?:\\/\\//"],
+        "optional": true
+      },
+      "workspace": {"kind":"string","min":1}
+    },
+    "project.delete": {"project":{"kind":"string","min":1}},
+    "project.unarchive": {"project":{"kind":"string","min":1}},
+    "project.update": {
+      "autoOpenPr": {"kind":"boolean","optional":true},
+      "description": {"kind":"string","max":2000,"optional":true},
+      "logoUrl": {
+        "kind": "string",
+        "max": 200000,
+        "formats": ["regex:/^$|^(data:image\\/|https?:\\/\\/)/"],
+        "optional": true
+      },
+      "modelPack": {
+        "kind": "union",
+        "options": [{"kind":"string"},{"kind":"literal","literal":""}],
+        "optional": true
+      },
+      "name": {"kind":"string","min":1,"max":80,"optional":true},
+      "project": {"kind":"string","min":1},
+      "runCiBeforeMerge": {"kind":"boolean","optional":true},
+      "shipGate": {"kind":"boolean","optional":true},
+      "website": {
+        "kind": "string",
+        "max": 2048,
+        "formats": ["regex:/^$|^https?:\\/\\//"],
+        "optional": true
+      }
+    },
+    "reply.clear": {"message":{"kind":"string","formats":["uuid"]}},
+    "reply.mark": {
+      "reminder": {"kind":"string","formats":["uuid"]},
+      "state": {"kind":"enum","values":["opened","posted","queued","skipped"]}
+    },
+    "reply.queue": {
+      "gapMin": {
+        "kind": "union",
+        "options": [
+          {"kind":"literal","literal":5},
+          {"kind":"literal","literal":8},
+          {"kind":"literal","literal":12},
+          {"kind":"literal","literal":20}
+        ]
+      },
+      "letters": {"kind":"array","item":{"kind":"string","min":1,"max":2},"min":1,"max":8},
+      "message": {"kind":"string","formats":["uuid"]},
+      "startAt": {
+        "kind": "string",
+        "formats": ["datetime:{\"local\":false,\"offset\":false,\"precision\":null}"]
+      }
+    },
+    "repo.link": {
+      "channel": {"kind":"string","min":1,"optional":true},
+      "defaultBranch": {"kind":"string","min":1,"optional":true},
+      "localPath": {"kind":"string","min":1,"optional":true},
+      "name": {"kind":"string","min":1,"optional":true},
+      "project": {"kind":"string","min":1,"optional":true},
+      "url": {"kind":"string","min":1,"optional":true},
+      "workspace": {"kind":"string","min":1}
+    },
+    "run.open": {
+      "channel": {"kind":"string","min":1},
+      "id": {"kind":"string","formats":["uuid"],"optional":true},
+      "kind": {"kind":"enum","values":["leg","wake","work"]},
+      "machineId": {"kind":"string","formats":["uuid"],"optional":true},
+      "parentRunId": {"kind":"string","min":1,"optional":true},
+      "runTaskId": {"kind":"string","min":1,"optional":true},
+      "seat": {"kind":"string","max":160,"optional":true},
+      "step": {"kind":"string","max":200,"optional":true},
+      "threadId": {"kind":"string","min":1,"optional":true},
+      "title": {"kind":"string","min":1,"max":200},
+      "total": {"kind":"number","int":true,"min":0,"max":64,"optional":true},
+      "triggerMessageId": {"kind":"string","formats":["uuid"],"optional":true},
+      "workspace": {"kind":"string","min":1}
+    },
+    "run.settle": {
+      "runId": {"kind":"string","min":1},
+      "state": {"kind":"enum","values":["done","failed","parked","stopped"]},
+      "summary": {"kind":"string","max":600,"optional":true}
+    },
+    "run.step": {
+      "done": {"kind":"number","int":true,"min":0,"max":64,"optional":true},
+      "runId": {"kind":"string","min":1},
+      "step": {"kind":"string","max":200,"optional":true},
+      "total": {"kind":"number","int":true,"min":0,"max":64,"optional":true}
+    },
+    "schedule.claim_run": {
+      "nextRunAt": {
+        "kind": "string",
+        "formats": ["datetime:{\"local\":false,\"offset\":false,\"precision\":null}"],
+        "nullable": true
+      },
+      "runCount": {"kind":"number","int":true,"min":0},
+      "schedule": {"kind":"string","min":1}
+    },
+    "schedule.create": {
+      "agent": {"kind":"string","min":1,"optional":true},
+      "atTime": {"kind":"string","formats":["regex:/^([01]\\d|2[0-3]):[0-5]\\d$/"],"optional":true},
+      "cadence": {"kind":"enum","values":["daily","once","weekdays","weekly"]},
+      "channel": {"kind":"string","min":1},
+      "prompt": {"kind":"string","min":1,"max":4000},
+      "replyGap": {
+        "kind": "union",
+        "options": [
+          {"kind":"literal","literal":5},
+          {"kind":"literal","literal":8},
+          {"kind":"literal","literal":12},
+          {"kind":"literal","literal":20}
+        ],
+        "optional": true
+      },
+      "routine": {"kind":"boolean","optional":true},
+      "runAt": {
+        "kind": "string",
+        "formats": ["datetime:{\"local\":false,\"offset\":false,\"precision\":null}"],
+        "optional": true
+      },
+      "thread": {"kind":"string","formats":["uuid"],"optional":true},
+      "title": {"kind":"string","min":1,"max":200},
+      "tz": {"kind":"string","max":64,"optional":true},
+      "weekday": {"kind":"number","int":true,"min":0,"max":6,"optional":true}
+    },
+    "schedule.delete": {"schedule":{"kind":"string","min":1}},
+    "schedule.mark_result": {
+      "error": {"kind":"string","max":500,"nullable":true},
+      "schedule": {"kind":"string","min":1}
+    },
+    "schedule.run_now": {"schedule":{"kind":"string","min":1}},
+    "schedule.set_cursor": {
+      "cursor": {
+        "kind": "object",
+        "fields": {
+          "at": {
+            "kind": "string",
+            "formats": ["datetime:{\"local\":false,\"offset\":false,\"precision\":null}"]
+          },
+          "tag": {"kind":"string","max":120,"nullable":true}
+        }
+      },
+      "log": {
+        "kind": "object",
+        "fields": {
+          "at": {
+            "kind": "string",
+            "formats": ["datetime:{\"local\":false,\"offset\":false,\"precision\":null}"]
+          },
+          "key": {"kind":"string","max":120,"nullable":true},
+          "note": {"kind":"string","min":1,"max":300}
+        },
+        "nullable": true,
+        "optional": true
+      },
+      "schedule": {"kind":"string","min":1}
+    },
+    "schedule.set_status": {
+      "schedule": {"kind":"string","min":1},
+      "status": {"kind":"enum","values":["active","paused"]}
+    },
+    "schedule.update": {
+      "atTime": {"kind":"string","formats":["regex:/^([01]\\d|2[0-3]):[0-5]\\d$/"],"optional":true},
+      "cadence": {"kind":"enum","values":["daily","once","weekdays","weekly"]},
+      "prompt": {"kind":"string","min":1,"max":4000},
+      "replyGap": {
+        "kind": "union",
+        "options": [
+          {"kind":"literal","literal":5},
+          {"kind":"literal","literal":8},
+          {"kind":"literal","literal":12},
+          {"kind":"literal","literal":20}
+        ],
+        "nullable": true,
+        "optional": true
+      },
+      "runAt": {
+        "kind": "string",
+        "formats": ["datetime:{\"local\":false,\"offset\":false,\"precision\":null}"],
+        "optional": true
+      },
+      "schedule": {"kind":"string","min":1},
+      "title": {"kind":"string","min":1,"max":200},
+      "tz": {"kind":"string","max":64,"optional":true},
+      "weekday": {"kind":"number","int":true,"min":0,"max":6,"optional":true}
+    },
+    "setup.backfill": {"workspace":{"kind":"string","min":1}},
+    "setup.step": {
+      "channel": {"kind":"string","min":1},
+      "flow": {"kind":"string","min":1},
+      "step": {"kind":"string","min":1},
+      "value": {
+        "kind": "union",
+        "options": [
+          {"kind":"string","max":400},
+          {"kind":"array","item":{"kind":"string","max":40},"max":8},
+          {
+            "kind": "object",
+            "fields": {
+              "now": {"kind":"boolean","optional":true},
+              "repoId": {"kind":"string","min":1,"nullable":true,"optional":true},
+              "slug": {"kind":"string","max":200,"nullable":true,"optional":true},
+              "watch": {"kind":"boolean","optional":true}
+            }
+          }
+        ],
+        "optional": true
+      }
+    },
+    "skill.create": {
+      "body": {"kind":"string","min":1,"max":40000},
+      "channel": {"kind":"string","min":1,"optional":true},
+      "description": {"kind":"string","min":1,"max":300},
+      "enabled": {"kind":"boolean","optional":true},
+      "name": {"kind":"string","min":1,"max":60,"formats":["regex:/^[a-z0-9][a-z0-9-]*$/"]},
+      "packId": {"kind":"string","min":1,"optional":true},
+      "scope": {"kind":"enum","values":["channel","global"],"optional":true},
+      "workspace": {"kind":"string","min":1}
+    },
+    "skill.deprecate": {"skillId":{"kind":"string","min":1}},
+    "skill.promote": {"skillId":{"kind":"string","min":1}},
+    "skill.propose": {
+      "body": {"kind":"string","min":1,"max":40000},
+      "channel": {"kind":"string","min":1,"optional":true},
+      "description": {"kind":"string","min":1,"max":300},
+      "name": {"kind":"string","min":1,"max":60,"formats":["regex:/^[a-z0-9][a-z0-9-]*$/"]},
+      "scope": {"kind":"enum","values":["channel","global"],"optional":true},
+      "workspace": {"kind":"string","min":1}
+    },
+    "skill.set_enabled": {"enabled":{"kind":"boolean"},"skillId":{"kind":"string","min":1}},
+    "skill.update": {
+      "body": {"kind":"string","min":1,"max":40000,"optional":true},
+      "description": {"kind":"string","min":1,"max":300,"optional":true},
+      "scope": {"kind":"enum","values":["channel","global"],"optional":true},
+      "skillId": {"kind":"string","min":1}
+    },
+    "skillpack.commit": {
+      "packId": {"kind":"string","min":1},
+      "skills": {
+        "kind": "array",
+        "item": {
+          "kind": "object",
+          "fields": {
+            "body": {"kind":"string","min":1,"max":40000},
+            "description": {"kind":"string","max":300,"optional":true},
+            "name": {"kind":"string","min":1,"max":60,"formats":["regex:/^[a-z0-9][a-z0-9-]*$/"]}
+          }
+        },
+        "max": 300
+      },
+      "version": {"kind":"string","max":120,"optional":true}
+    },
+    "skillpack.create": {
+      "channel": {"kind":"string","min":1},
+      "description": {"kind":"string","max":300,"optional":true},
+      "name": {"kind":"string","min":1,"max":60,"formats":["regex:/^[a-z0-9][a-z0-9-]*$/"]},
+      "origin": {"kind":"enum","values":["bundled","imported"],"optional":true},
+      "sourceRef": {"kind":"string","min":1,"max":120,"optional":true},
+      "sourceUrl": {"kind":"string","max":400,"optional":true},
+      "workspace": {"kind":"string","min":1}
+    },
+    "skillpack.remove": {"packId":{"kind":"string","min":1}},
+    "skillpack.seed_defaults": {
+      "channel": {"kind":"string","min":1},
+      "kind": {"kind":"enum","values":["build","marketing"],"optional":true},
+      "workspace": {"kind":"string","min":1}
+    },
+    "skillpack.set_enabled": {"enabled":{"kind":"boolean"},"packId":{"kind":"string","min":1}},
+    "skillpack.update": {
+      "description": {"kind":"string","max":300,"optional":true},
+      "error": {"kind":"string","max":2000,"optional":true},
+      "packId": {"kind":"string","min":1},
+      "progress": {"kind":"number","int":true,"min":0,"max":100,"optional":true},
+      "status": {"kind":"enum","values":["error","importing","ready"],"optional":true},
+      "step": {"kind":"string","max":120,"optional":true}
+    },
+    "task.accept": {"taskId":{"kind":"string","min":1}},
+    "task.add_ship_item": {
+      "agentId": {"kind":"string","min":1,"optional":true},
+      "detail": {"kind":"string","max":2000,"optional":true},
+      "owner": {"kind":"enum","values":["agent","human","shipper"],"optional":true},
+      "taskId": {"kind":"string","min":1},
+      "title": {"kind":"string","min":1,"max":300}
+    },
+    "task.approve": {"taskId":{"kind":"string","min":1}},
+    "task.approve_design": {"taskId":{"kind":"string","min":1}},
+    "task.approve_plan": {"taskId":{"kind":"string","min":1}},
+    "task.approve_ship_plan": {"taskId":{"kind":"string","min":1}},
+    "task.archive": {"taskId":{"kind":"string","min":1}},
+    "task.block": {"reason":{"kind":"string","min":1},"taskId":{"kind":"string","min":1}},
+    "task.cancel": {"taskId":{"kind":"string","min":1}},
+    "task.check_ship_item": {
+      "itemId": {"kind":"string","min":1,"max":40},
+      "note": {"kind":"string","max":500,"optional":true},
+      "state": {"kind":"enum","values":["done","na","pending"]},
+      "taskId": {"kind":"string","min":1}
+    },
+    "task.claim": {"taskId":{"kind":"string","min":1}},
+    "task.claim_ship": {"taskId":{"kind":"string","min":1}},
+    "task.confirm_release": {
+      "note": {"kind":"string","max":2000,"optional":true},
+      "taskId": {"kind":"string","min":1}
+    },
+    "task.confirm_requirements": {
+      "checklist": {"kind":"array","item":{"kind":"string","min":1},"min":1},
+      "taskId": {"kind":"string","min":1}
+    },
+    "task.create": {
+      "backlog": {"kind":"boolean","optional":true},
+      "channel": {"kind":"string","min":1},
+      "checklist": {"kind":"array","item":{"kind":"string","min":1},"optional":true},
+      "definitionOfDone": {"kind":"string","max":20000,"optional":true},
+      "description": {"kind":"string","optional":true},
+      "kind": {
+        "kind": "enum",
+        "values": [
+          "bug",
+          "chore",
+          "content",
+          "design",
+          "docs",
+          "feature",
+          "refactor",
+          "research",
+          "setup",
+          "spike"
+        ],
+        "optional": true
+      },
+      "offerTo": {"kind":"string","min":1,"optional":true},
+      "originThread": {"kind":"string","formats":["uuid"],"optional":true},
+      "parent": {"kind":"string","min":1,"optional":true},
+      "plan": {
+        "kind": "object",
+        "fields": {
+          "approach": {"kind":"string","min":1,"max":60000},
+          "legs": {
+            "kind": "array",
+            "item": {"kind":"enum","values":["build","design","review"]},
+            "min": 1,
+            "max": 3
+          },
+          "subtasks": {
+            "kind": "array",
+            "item": {"kind":"string","min":1,"max":200},
+            "max": 8,
+            "optional": true
+          }
+        },
+        "optional": true
+      },
+      "playbook": {"kind":"string","min":1,"max":40,"optional":true},
+      "project": {"kind":"string","min":1,"optional":true},
+      "repo": {
+        "kind": "object",
+        "fields": {
+          "baseRef": {"kind":"string","min":1,"optional":true},
+          "id": {"kind":"string","min":1}
+        },
+        "optional": true
+      },
+      "thread": {"kind":"string","formats":["uuid"],"optional":true},
+      "title": {"kind":"string","min":1},
+      "workspace": {"kind":"string","min":1}
+    },
+    "task.execute_ship": {"taskId":{"kind":"string","min":1}},
+    "task.finish_subtask": {
+      "artifacts": {
+        "kind": "array",
+        "item": {
+          "kind": "object",
+          "fields": {
+            "content": {"kind":"string","max":400000,"optional":true},
+            "kind": {"kind":"string","min":1,"max":20},
+            "name": {"kind":"string","min":1,"max":160}
+          }
+        },
+        "max": 12,
+        "optional": true
+      },
+      "note": {"kind":"string","max":2000,"optional":true},
+      "taskId": {"kind":"string","min":1}
+    },
+    "task.offer": {
+      "checklist": {"kind":"array","item":{"kind":"string","min":1},"optional":true},
+      "definitionOfDone": {"kind":"string","max":20000,"optional":true},
+      "kind": {
+        "kind": "enum",
+        "values": ["bug","chore","content","design","docs","feature","refactor","research","spike"],
+        "optional": true
+      },
+      "offerTo": {"kind":"string","min":1},
+      "repo": {
+        "kind": "object",
+        "fields": {
+          "baseRef": {"kind":"string","min":1,"optional":true},
+          "id": {"kind":"string","min":1}
+        },
+        "optional": true
+      },
+      "taskId": {"kind":"string","min":1}
+    },
+    "task.promote": {"taskId":{"kind":"string","min":1}},
+    "task.propose_design": {
+      "mockups": {
+        "kind": "array",
+        "item": {
+          "kind": "object",
+          "fields": {
+            "html": {"kind":"string","min":1,"max":300000},
+            "name": {"kind":"string","min":1,"max":120}
+          }
+        },
+        "min": 1,
+        "max": 6
+      },
+      "round": {"kind":"number","int":true,"min":1,"max":99,"optional":true},
+      "summary": {"kind":"string","max":2000,"optional":true},
+      "taskId": {"kind":"string","min":1}
+    },
+    "task.propose_plan": {
+      "legs": {
+        "kind": "array",
+        "item": {"kind":"enum","values":["build","design","review"]},
+        "min": 1,
+        "max": 3,
+        "optional": true
+      },
+      "plan": {"kind":"string","min":1,"max":60000},
+      "subtasks": {
+        "kind": "array",
+        "item": {"kind":"string","min":1,"max":200},
+        "max": 8,
+        "optional": true
+      },
+      "taskId": {"kind":"string","min":1}
+    },
+    "task.propose_ship_plan": {
+      "items": {
+        "kind": "array",
+        "item": {
+          "kind": "object",
+          "fields": {
+            "agentId": {"kind":"string","min":1,"optional":true},
+            "auto": {"kind":"enum","values":["ci"],"optional":true},
+            "detail": {"kind":"string","max":2000,"optional":true},
+            "id": {"kind":"string","min":1,"max":40},
+            "note": {"kind":"string","max":500,"optional":true},
+            "owner": {"kind":"enum","values":["agent","human","shipper"]},
+            "state": {"kind":"enum","values":["done","pending"],"optional":true},
+            "title": {"kind":"string","min":1,"max":300}
+          }
+        },
+        "min": 1,
+        "max": 20
+      },
+      "report": {"kind":"string","min":1,"max":60000},
+      "risk": {"kind":"enum","values":["high","low","medium"]},
+      "round": {"kind":"number","int":true,"min":1,"max":99,"optional":true},
+      "summary": {"kind":"string","max":2000,"optional":true},
+      "taskId": {"kind":"string","min":1}
+    },
+    "task.reopen": {"taskId":{"kind":"string","min":1}},
+    "task.request_changes": {
+      "feedback": {"kind":"string","min":1},
+      "taskId": {"kind":"string","min":1}
+    },
+    "task.request_design": {
+      "designer": {"kind":"string","min":1,"optional":true},
+      "kind": {
+        "kind": "enum",
+        "values": [
+          "bug",
+          "chore",
+          "content",
+          "design",
+          "docs",
+          "feature",
+          "refactor",
+          "research",
+          "setup",
+          "spike"
+        ],
+        "optional": true
+      },
+      "provider": {"kind":"enum","values":["claude-design","iris"],"optional":true},
+      "taskId": {"kind":"string","min":1}
+    },
+    "task.request_plan": {
+      "architect": {"kind":"string","min":1,"optional":true},
+      "kind": {
+        "kind": "enum",
+        "values": [
+          "bug",
+          "chore",
+          "content",
+          "design",
+          "docs",
+          "feature",
+          "refactor",
+          "research",
+          "setup",
+          "spike"
+        ],
+        "optional": true
+      },
+      "taskId": {"kind":"string","min":1}
+    },
+    "task.revise_design": {"feedback":{"kind":"string","min":1},"taskId":{"kind":"string","min":1}},
+    "task.revise_plan": {"feedback":{"kind":"string","min":1},"taskId":{"kind":"string","min":1}},
+    "task.revise_ship_plan": {
+      "feedback": {"kind":"string","min":1},
+      "taskId": {"kind":"string","min":1}
+    },
+    "task.select_design_provider": {
+      "provider": {"kind":"enum","values":["claude-design","iris"]},
+      "taskId": {"kind":"string","min":1}
+    },
+    "task.set_definition_of_done": {
+      "dod": {"kind":"string","max":20000},
+      "taskId": {"kind":"string","min":1}
+    },
+    "task.submit": {
+      "artifacts": {
+        "kind": "array",
+        "item": {
+          "kind": "object",
+          "fields": {
+            "content": {"kind":"string","max":400000,"optional":true},
+            "kind": {
+              "kind": "enum",
+              "values": ["design","diff","doc","file","screenshot","test_report"]
+            },
+            "name": {"kind":"string","min":1}
+          }
+        },
+        "optional": true
+      },
+      "prNumber": {"kind":"number","int":true,"min":0,"minOpen":true,"optional":true},
+      "prUrl": {"kind":"string","min":1,"optional":true},
+      "sha": {"kind":"string","min":1,"optional":true},
+      "taskId": {"kind":"string","min":1}
+    },
+    "task.unblock": {"taskId":{"kind":"string","min":1}},
+    "task.update_details": {
+      "description": {"kind":"string","max":20000,"optional":true},
+      "kind": {
+        "kind": "enum",
+        "values": [
+          "bug",
+          "chore",
+          "content",
+          "design",
+          "docs",
+          "feature",
+          "refactor",
+          "research",
+          "setup",
+          "spike"
+        ],
+        "optional": true
+      },
+      "taskId": {"kind":"string","min":1},
+      "title": {"kind":"string","min":1,"max":300,"optional":true}
+    },
+    "thread.archive": {
+      "threadId": {"kind":"string","formats":["uuid"]},
+      "workspace": {"kind":"string","min":1}
+    },
+    "thread.move": {
+      "channel": {"kind":"string","formats":["uuid"]},
+      "reason": {"kind":"string","min":1,"max":200,"optional":true},
+      "threadId": {"kind":"string","formats":["uuid"]},
+      "workspace": {"kind":"string","min":1}
+    },
+    "thread.set_brain": {
+      "override": {"kind":"record","key":{"kind":"string"},"item":{"kind":"string"},"nullable":true},
+      "threadId": {"kind":"string","formats":["uuid"]},
+      "workspace": {"kind":"string","min":1}
+    },
+    "thread.set_kind": {
+      "kind": {"kind":"enum","values":["chat","coding"]},
+      "threadId": {"kind":"string","formats":["uuid"]},
+      "workspace": {"kind":"string","min":1}
+    },
+    "thread.set_machine": {
+      "machineId": {"kind":"string","formats":["uuid"],"nullable":true},
+      "threadId": {"kind":"string","formats":["uuid"]},
+      "workspace": {"kind":"string","min":1}
+    },
+    "thread.set_mode": {
+      "mode": {"kind":"enum","values":["chat","tasks"]},
+      "threadId": {"kind":"string","formats":["uuid"]},
+      "workspace": {"kind":"string","min":1}
+    },
+    "thread.settle": {
+      "threadId": {"kind":"string","formats":["uuid"]},
+      "workspace": {"kind":"string","min":1}
+    },
+    "thread.unarchive": {
+      "threadId": {"kind":"string","formats":["uuid"]},
+      "workspace": {"kind":"string","min":1}
+    },
+    "thread.unsettle": {
+      "threadId": {"kind":"string","formats":["uuid"]},
+      "workspace": {"kind":"string","min":1}
+    },
+    "thread.update": {
+      "description": {"kind":"string","max":2000,"optional":true},
+      "threadId": {"kind":"string","formats":["uuid"]},
+      "title": {"kind":"string","min":1,"max":120,"optional":true},
+      "workspace": {"kind":"string","min":1}
+    },
+    "whiteboard.create": {
+      "channel": {"kind":"string","min":1},
+      "elements": {"kind":"string","min":1,"max":524288,"optional":true},
+      "mermaid": {"kind":"string","min":1,"max":100000,"optional":true},
+      "taskId": {"kind":"string","optional":true},
+      "threadId": {"kind":"string","optional":true},
+      "title": {"kind":"string","min":1,"max":200}
+    },
+    "whiteboard.update": {
+      "baseRev": {"kind":"number","int":true,"min":1},
+      "clearSource": {"kind":"boolean","optional":true},
+      "elements": {"kind":"string","min":1,"max":524288,"optional":true},
+      "mermaid": {"kind":"string","min":1,"max":100000,"optional":true},
+      "scene": {"kind":"string","min":1,"max":524288,"optional":true},
+      "snapshotSvg": {"kind":"string","min":1,"max":153600,"optional":true},
+      "title": {"kind":"string","min":1,"max":200,"optional":true},
+      "whiteboardId": {"kind":"string","min":1}
+    },
+    "workspace.accept_invite": {"invite":{"kind":"string","formats":["uuid"]}},
+    "workspace.create": {
+      "name": {"kind":"string","min":1,"max":60},
+      "slug": {"kind":"string","min":2,"max":40,"formats":["regex:/^[a-z0-9][a-z0-9-]*$/"]}
+    },
+    "workspace.decline_invite": {"invite":{"kind":"string","formats":["uuid"]}},
+    "workspace.delete": {"workspace":{"kind":"string","min":1}},
+    "workspace.invite": {
+      "email": {"kind":"string","formats":["email"]},
+      "memberRole": {"kind":"enum","values":["admin","member"],"optional":true},
+      "password": {"kind":"string","optional":true},
+      "workspace": {"kind":"string","min":1}
+    },
+    "workspace.leave": {"workspace":{"kind":"string","min":1}},
+    "workspace.remove_member": {
+      "member": {"kind":"string","formats":["uuid"]},
+      "workspace": {"kind":"string","min":1}
+    },
+    "workspace.revoke_invite": {
+      "invite": {"kind":"string","formats":["uuid"]},
+      "workspace": {"kind":"string","min":1}
+    },
+    "workspace.sync_agents": {"workspace":{"kind":"string","min":1}},
+    "workspace.update": {
+      "activeModelPack": {"kind":"string","optional":true},
+      "autoFailover": {"kind":"boolean","optional":true},
+      "commRules": {
+        "kind": "object",
+        "fields": {
+          "custom": {
+            "kind": "array",
+            "item": {"kind":"string","min":1,"max":200},
+            "max": 8,
+            "optional": true
+          },
+          "noEmdash": {"kind":"boolean","optional":true},
+          "ste100": {"kind":"boolean","optional":true}
+        },
+        "optional": true
+      },
+      "videoTier": {
+        "kind": "enum",
+        "values": ["premium","starter","xpress"],
+        "nullable": true,
+        "optional": true
+      },
+      "workspace": {"kind":"string","min":1}
+    }
+  },
+  "routes": [
+    "GET /.well-known/a2a/agent-card.json",
+    "GET /.well-known/nm-config",
+    "GET /a2a/agents/:agentId/card.json",
+    "GET /announce/:id",
+    "GET /announce/:id/image",
+    "GET /connect/:provider/callback",
+    "GET /connect/:provider/start",
+    "GET /connect/github/callback",
+    "GET /connect/github/start",
+    "GET /connect/tiktok/media/:item",
+    "GET /healthz",
+    "GET /invites/:token",
+    "GET /media/:id",
+    "GET /u/:token",
+    "GET /v1/content/media/:id",
+    "GET /v1/credentials",
+    "GET /v1/credentials/resolve",
+    "GET /v1/credits/history",
+    "GET /v1/devices",
+    "GET /v1/invites",
+    "GET /v1/invites/mine",
+    "GET /v1/machines/usage",
+    "GET /v1/me",
+    "GET /v1/memory",
+    "GET /v1/model-packs",
+    "GET /v1/repo/changes",
+    "GET /v1/repo/file",
+    "GET /v1/repo/tree",
+    "GET /v1/retro",
+    "GET /v1/starter/video",
+    "GET /v1/sync-jwks",
+    "GET /v1/tasks/:id",
+    "GET /v1/usage",
+    "GET /v1/web/frame",
+    "GET /v1/whiteboards",
+    "GET /v1/whiteboards/:id",
+    "GET /v1/workspaces",
+    "GET /v1/workspaces/:id/export",
+    "GET /v1/x/search",
+    "PATCH /v1/whiteboards/:id",
+    "POST /announce",
+    "POST /announce/detect",
+    "POST /auth/clerk",
+    "POST /auth/clerk/password",
+    "POST /auth/clerk/signup",
+    "POST /auth/clerk/token",
+    "POST /auth/desktop/complete",
+    "POST /auth/desktop/poll",
+    "POST /auth/desktop/start",
+    "POST /auth/dev/token",
+    "POST /auth/local/token",
+    "POST /u/:token",
+    "POST /v1/announce/:id/claim",
+    "POST /v1/artifacts",
+    "POST /v1/billing/checkout",
+    "POST /v1/billing/credits-checkout",
+    "POST /v1/billing/portal",
+    "POST /v1/billing/trial",
+    "POST /v1/billing/trial/sync",
+    "POST /v1/commands",
+    "POST /v1/devices",
+    "POST /v1/devices/remove",
+    "POST /v1/github/resolve",
+    "POST /v1/machines/bootstrap",
+    "POST /v1/machines/sync-token",
+    "POST /v1/machines/wake",
+    "POST /v1/messages",
+    "POST /v1/recall",
+    "POST /v1/repo/token",
+    "POST /v1/starter/film",
+    "POST /v1/starter/generate",
+    "POST /v1/starter/stream",
+    "POST /v1/whiteboards",
+    "POST /v1/workspaces/:id/import/batches"
+  ],
+  "clientSchema": {
+    "agent_channels": ["agent_id","channel_id","created_at","created_by","created_by_kind"],
+    "agents": [
+      "brief",
+      "card",
+      "description",
+      "emoji",
+      "endpoint_url",
+      "kind",
+      "machine_id",
+      "model",
+      "model_source",
+      "name",
+      "retired_at",
+      "role",
+      "runtime",
+      "status",
+      "workspace_id"
+    ],
+    "artifacts": [
+      "channel_id",
+      "created_at",
+      "height",
+      "inline_content",
+      "kind",
+      "message_id",
+      "mime",
+      "name",
+      "promoted",
+      "size_bytes",
+      "tags",
+      "task_id",
+      "width",
+      "workspace_id"
+    ],
+    "beats": [
+      "created_at",
+      "done_at",
+      "phase",
+      "role",
+      "run_id",
+      "seq",
+      "started_at",
+      "status",
+      "task_id",
+      "title",
+      "updated_at",
+      "workspace_id"
+    ],
+    "channel_members": ["channel_id","created_at","created_by","user_id"],
+    "channels": [
+      "created_at",
+      "created_by",
+      "created_by_kind",
+      "kind",
+      "marketing",
+      "project_id",
+      "slug",
+      "topic",
+      "workspace_id"
+    ],
+    "code_sessions": [
+      "branch",
+      "changes_count",
+      "checkpoints_count",
+      "created_at",
+      "created_by",
+      "ended_at",
+      "last_line",
+      "machine_id",
+      "mode",
+      "project_id",
+      "repo_id",
+      "repo_name",
+      "state",
+      "thread_id",
+      "title",
+      "updated_at",
+      "workspace_id"
+    ],
+    "connectors": [
+      "channel_id",
+      "connected_by",
+      "created_at",
+      "handle",
+      "project_id",
+      "provider",
+      "scopes",
+      "status",
+      "workspace_id"
+    ],
+    "content_items": [
+      "approved_at",
+      "approved_by",
+      "body",
+      "channel_id",
+      "created_at",
+      "created_by",
+      "created_by_kind",
+      "external_url",
+      "last_error",
+      "media",
+      "platform",
+      "published_at",
+      "schedule_id",
+      "scheduled_at",
+      "status",
+      "task_id",
+      "thread_id",
+      "workspace_id"
+    ],
+    "decisions": [
+      "allow_other",
+      "answer",
+      "answered_at",
+      "answered_by_id",
+      "answered_by_kind",
+      "asker_id",
+      "asker_kind",
+      "channel_id",
+      "created_at",
+      "message_id",
+      "options",
+      "question",
+      "status",
+      "task_id",
+      "workspace_id"
+    ],
+    "machines": [
+      "daemon_version",
+      "kind",
+      "last_seen_at",
+      "name",
+      "owner_user_id",
+      "platform",
+      "runtimes",
+      "workspace_id"
+    ],
+    "memory_blocks": [
+      "basis_count",
+      "channel_id",
+      "content",
+      "kind",
+      "project_id",
+      "updated_at",
+      "workspace_id"
+    ],
+    "messages": [
+      "author_id",
+      "author_kind",
+      "birth_brain",
+      "birth_kind",
+      "birth_machine",
+      "birth_mode",
+      "birth_origin",
+      "body",
+      "channel_id",
+      "created_at",
+      "pinned",
+      "root_message_id",
+      "schedule_id",
+      "task_id",
+      "thread_id",
+      "workspace_id"
+    ],
+    "policies": [
+      "agent_id",
+      "capability",
+      "channel_id",
+      "created_at",
+      "created_by_id",
+      "created_by_kind",
+      "locked",
+      "project_id",
+      "rationale",
+      "scope",
+      "selector",
+      "updated_at",
+      "verdict",
+      "workspace_id"
+    ],
+    "project_repos": ["is_primary","project_id","repo_id"],
+    "projects": [
+      "auto_open_pr",
+      "channel_id",
+      "description",
+      "is_default",
+      "logo_url",
+      "model_pack",
+      "name",
+      "run_ci_before_merge",
+      "ship_gate",
+      "slug",
+      "status",
+      "website",
+      "workspace_id"
+    ],
+    "reply_reminders": [
+      "created_at",
+      "draft",
+      "due_at",
+      "handle",
+      "letter",
+      "member_id",
+      "message_id",
+      "notified_at",
+      "open_url",
+      "platform",
+      "state",
+      "thread_id",
+      "updated_at",
+      "workspace_id"
+    ],
+    "repos": ["clone_url","default_branch","local_path","name","org_name","provider","workspace_id"],
+    "runs": [
+      "agent_id",
+      "channel_id",
+      "done",
+      "ended_at",
+      "kind",
+      "machine_id",
+      "parent_run_id",
+      "seat",
+      "started_at",
+      "state",
+      "step",
+      "summary",
+      "task_id",
+      "thread_id",
+      "title",
+      "total",
+      "trigger_message_id",
+      "updated_at",
+      "workspace_id"
+    ],
+    "schedules": [
+      "agent_id",
+      "at_time",
+      "cadence",
+      "channel_id",
+      "created_at",
+      "created_by",
+      "created_by_kind",
+      "last_error",
+      "last_run_at",
+      "next_run_at",
+      "payload",
+      "run_count",
+      "status",
+      "title",
+      "tz",
+      "weekday",
+      "workspace_id"
+    ],
+    "skill_packs": [
+      "channel_id",
+      "created_at",
+      "description",
+      "enabled",
+      "error",
+      "name",
+      "origin",
+      "progress",
+      "source_ref",
+      "source_url",
+      "status",
+      "step",
+      "updated_at",
+      "version",
+      "workspace_id"
+    ],
+    "skills": [
+      "author_id",
+      "author_kind",
+      "body",
+      "channel_id",
+      "created_at",
+      "description",
+      "enabled",
+      "name",
+      "pack_id",
+      "scope",
+      "status",
+      "updated_at",
+      "version",
+      "workspace_id"
+    ],
+    "tasks": [
+      "accepted_at",
+      "approved_at",
+      "artifact_count",
+      "assignee_id",
+      "assignee_kind",
+      "base_ref",
+      "branch",
+      "channel_id",
+      "claimed_at",
+      "closed_at",
+      "created_at",
+      "creator_id",
+      "creator_kind",
+      "definition_of_done",
+      "description",
+      "kind",
+      "number",
+      "offered_agent_id",
+      "origin_thread_id",
+      "parent_task_id",
+      "plan_approved_at",
+      "pr_number",
+      "pr_url",
+      "project_id",
+      "repo_id",
+      "requirements",
+      "requirements_confirmed",
+      "ship_plan",
+      "state",
+      "submitted_at",
+      "submitted_sha",
+      "title",
+      "updated_at",
+      "work_plan",
+      "workspace_id"
+    ],
+    "threads": [
+      "archived_at",
+      "brain_override",
+      "channel_id",
+      "created_at",
+      "created_by",
+      "description",
+      "kind",
+      "machine_id",
+      "mode",
+      "origin",
+      "root_message_id",
+      "schedule_id",
+      "settled_at",
+      "task_id",
+      "title",
+      "updated_at",
+      "workspace_id"
+    ],
+    "whiteboards": [
+      "archived_at",
+      "channel_id",
+      "created_at",
+      "created_by",
+      "created_by_kind",
+      "rev",
+      "scene",
+      "snapshot_rev",
+      "snapshot_svg",
+      "source",
+      "task_id",
+      "thread_id",
+      "title",
+      "updated_at",
+      "updated_by",
+      "updated_by_kind",
+      "workspace_id"
+    ],
+    "workspace_members": ["agent_models","compute","display_name","role","user_id","workspace_id"]
+  },
+  "syncRules": {
+    "agent_channels": ["*"],
+    "agents": ["*"],
+    "artifacts": ["*"],
+    "beats": ["*"],
+    "channel_members": ["*"],
+    "channels": ["*"],
+    "code_sessions": ["*"],
+    "connectors": ["*"],
+    "content_items": ["*"],
+    "decisions": ["*"],
+    "machines": ["*"],
+    "memory_blocks": ["*"],
+    "messages": [
+      "author_id",
+      "author_kind",
+      "body",
+      "channel_id",
+      "created_at",
+      "id",
+      "pinned",
+      "schedule_id",
+      "task_id",
+      "thread_id",
+      "workspace_id"
+    ],
+    "policies": ["*"],
+    "project_repos": ["*"],
+    "projects": ["*"],
+    "reply_reminders": ["*"],
+    "repos": ["*"],
+    "runs": ["*"],
+    "schedules": ["*"],
+    "skill_packs": ["*"],
+    "skills": ["*"],
+    "tasks": ["*"],
+    "threads": ["*"],
+    "whiteboards": ["*"],
+    "workspace_members": ["*"]
+  },
+  "relay": {
+    "frames": ["attach","attached","close","data","hello","open","resize"],
+    "lanes": ["browser","engineering","stream","terminal"]
+  },
+  "agents": [
+    "architect.yaml",
+    "curator.yaml",
+    "designer.yaml",
+    "developer.yaml",
+    "marketer.yaml",
+    "orchestrator.yaml",
+    "reviewer.yaml",
+    "sales.yaml",
+    "shipper.yaml",
+    "worker.yaml"
+  ]
+}

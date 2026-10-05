@@ -1,6 +1,6 @@
 {
   "name": "@neuramesh/desktop",
-  "version": "0.151.0",
+  "version": "0.152.0",
   "private": true,
   "license": "Elastic-2.0",
   "main": "out/main/index.js",
@@ -107,6 +107,8 @@
     "@anthropic-ai/sdk": "^0.104.1",
     "@clerk/clerk-js": "6.30.1",
     "@cline/sdk": "0.0.81",
+    "ai-sdk-provider-claude-code": "4.3.3",
+    "ai-sdk-provider-codex-cli": "2.3.0",
     "@dicebear/core": "^9.4.3",
     "@dicebear/thumbs": "^9.4.2",
     "@excalidraw/excalidraw": "0.18.1",

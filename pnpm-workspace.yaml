@@ -12,6 +12,10 @@ onlyBuiltDependencies:
 
 patchedDependencies:
   '@powersync/node@0.19.0': patches/@powersync__node@0.19.0.patch
+  # the coding runtime's two sign-in lanes inside the packaged desktop app: the Claude Code binary is spawned from
+  # its app.asar.unpacked twin (a spawn inside app.asar throws ENOTDIR), and the Codex lane runs the codex on the
+  # PATH, as the desktop's agents do (runtime/adapter.ts claudePathOption, ensureCli)
+  '@cline/llms@0.0.81': patches/@cline__llms@0.0.81.patch
 
 overrides:
   '@types/react': 19.2.17

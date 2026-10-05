@@ -599,17 +599,30 @@ proxy returned the whole reply, so the web showed the ghost and then the full me
   returns: Google's response, assembled from the chunks, plus `credits`. A failure after the reply
   begins is one `{"t":"error"}` line. `/v1/starter/generate` does not change.
 - **One price, one charge.** Both doors price a call with `chargeStarterCall`, from the tokens the
-  vendor reports. The stream charges once, when the upstream ends, fails, or stops, from the last
-  usage that Google reported. Google sends a cumulative count on every chunk, and the prompt count
+  vendor reports. The thinking tokens (`thoughtsTokenCount`, outside `candidatesTokenCount`) count
+  as output tokens, as Google bills them (2026-10-04). The stream charges once, when the upstream
+  ends, fails, or stops, from the last usage that Google reported. Google sends a cumulative count
+  on every chunk, and the prompt count
   arrives with the first chunk. When a client leaves, the server stops the call. If no chunk arrived
   yet, the call runs until the first chunk reports its count. So a disconnect is never a free prompt.
 - **Tool rounds.** The proxy keeps the parts in their order. Only adjacent plain text parts merge,
   so a function call keeps its `id` and a part keeps its `thoughtSignature`. Gemini 3 refuses a
   tool round whose call lost its signature.
+- **Thoughts (2026-10-04).** A machine that shows the turn's thoughts sends `thoughts: true` in the
+  body of either door. The proxy then asks Google for thought summaries (`includeThoughts`) at the
+  same level. Without the flag the request does not change, because an older machine joins the text
+  of every part. On the stream, a chunk that carries a thought summary sends one
+  `{"t":"thought","text":…}` line before its `{"t":"text"}` line, and a text line never carries a
+  thought. `done` keeps each thought part as Google sent it. The charge does not change. The machine
+  (`host/starterthoughts.ts`) builds the bubble's thoughts as codex does: the summary in its own
+  section, and each tool step as it starts (`› list_tasks`). Measured live on 2026-10-04: at the
+  starter's level (`minimal`) Gemini did not think on any call, and at `low` it thought (269 thinking
+  tokens) but sent no summary part. So today the starter's thoughts are its tool steps, and a summary
+  shows when the model sends one.
 - **The machine.** `host/starterproxy.ts` holds both doors. The orchestrator loop and the Starter
   chat reply use the stream only when a live bubble watches (an `onDelta`). Workers and sweeps keep
-  the whole-reply door. The bubble gets the words of the current round, and the next round starts
-  over, as on the Claude path. An API without the route answers 404: the machine then uses the
+  the whole-reply door. The bubble keeps the last words until the next round's first word, so a
+  tool round with no words never empties it. An API without the route answers 404: the machine then uses the
   whole-reply door without a word, and asks again after ten minutes.
 - **Claude.** When a bubble watches, the chat turn, the orchestrator turn, and the subscription
   chat reply ask the Agent SDK for partial messages (`partialMessages` in `host/turnkit.ts`).

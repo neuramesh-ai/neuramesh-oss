@@ -2,9 +2,10 @@
 //
 // What must hold: the words reach the bubble in order and as the whole text so far; the answer is
 // the SAME body the whole-reply door returns, so the loop's final text is unchanged; a tool round
-// survives the stream with its call id and thought signature intact; and a machine newer than its
-// API (a 404) answers exactly as before, without a word. The proxy here is a fake that speaks the
-// route's NDJSON, cut at odd byte offsets the way a network cuts it.
+// survives the stream with its call id and thought signature intact; a machine newer than its
+// API (a 404) answers exactly as before, without a word; and the thoughts ride beside the words on
+// every update, never in the reply. The proxy here is a fake that speaks the route's NDJSON, cut
+// at odd byte offsets the way a network cuts it.
 // Run from apps/desktop: pnpm exec tsx --test src/main/host/starterproxy.test.ts
 import assert from 'node:assert/strict';
 import { afterEach, describe, test } from 'node:test';
@@ -112,6 +113,48 @@ describe('the streamed door', () => {
     const f = stubFetch([{ lines: [...words('fine'), { t: 'done', response: done }] }]); undo = f.restore;
     assert.deepEqual(await starterStream({ ...CALL, onText: () => { throw new Error('window gone'); } }), done);
   });
+
+  test('a thought line reaches onThought and never the words, and the flag asks for it', async () => {
+    const done = body([{ text: 'Weighing it.', thought: true }, { text: 'Two tasks.' }]);
+    const f = stubFetch([{ lines: [{ t: 'thought', text: 'Weigh' }, { t: 'thought', text: 'ing it.' }, ...words('Two', ' tasks.'), { t: 'done', response: done }] }]); undo = f.restore;
+    const said: string[] = [];
+    const thought: string[] = [];
+    const out = await starterStream({ ...CALL, thoughts: true, onText: (d) => said.push(d), onThought: (d) => thought.push(d) });
+    assert.deepEqual(thought, ['Weigh', 'ing it.']);
+    assert.deepEqual(said, ['Two', ' tasks.']);
+    assert.deepEqual(out, done);
+    assert.equal(f.calls[0]!.body.thoughts, true);
+  });
+
+  test('an unknown line type is still skipped, with a thoughts listener or without one', async () => {
+    const done = body([{ text: 'ok' }]);
+    const lines = [{ t: 'usage', text: 'not words' }, { t: 'thinking', text: 'not a thought' }, ...words('ok'), { t: 'done', response: done }];
+    const f = stubFetch([{ lines }, { lines }]); undo = f.restore;
+    const said: string[] = [];
+    const thought: string[] = [];
+    assert.deepEqual(await starterStream({ ...CALL, onText: (d) => said.push(d), onThought: (d) => thought.push(d) }), done);
+    assert.deepEqual(await starterStream({ ...CALL, onText: (d) => said.push(d) }), done);
+    assert.deepEqual(said, ['ok', 'ok']);
+    assert.deepEqual(thought, []);
+  });
+
+  test('a thoughts listener that throws never costs the turn', async () => {
+    const done = body([{ text: 'fine' }]);
+    const f = stubFetch([{ lines: [{ t: 'thought', text: 'hmm' }, ...words('fine'), { t: 'done', response: done }] }]); undo = f.restore;
+    const said: string[] = [];
+    assert.deepEqual(await starterStream({ ...CALL, thoughts: true, onText: (d) => said.push(d), onThought: () => { throw new Error('window gone'); } }), done);
+    assert.deepEqual(said, ['fine']);
+  });
+
+  test('the flag rides the call: the 404 fallback sends the same body, and a call with no flag sends none', async () => {
+    const whole = body([{ text: 'from the old door' }]);
+    const f = stubFetch([{ status: 404 }, { json: whole }, { json: whole }]); undo = f.restore;
+    await starterStream({ ...CALL, thoughts: true, onText: () => {}, onThought: () => {} });
+    await starterGenerate({ ...CALL, thoughts: false });
+    assert.deepEqual(f.calls[1]!.body, f.calls[0]!.body);
+    assert.deepEqual(f.calls[0]!.body, { workspace: 'ws-1', contents: CALL.contents, system: 'sys', thoughts: true });
+    assert.equal('thoughts' in f.calls[2]!.body, false);
+  });
 });
 
 describe('a watched house turn types as it is written', () => {
@@ -139,7 +182,8 @@ describe('a watched house turn types as it is written', () => {
     const out = await geminiOrchestratorTurn({ ...BASE, tools: [tool], starter: true, ...CTX, onDelta: (t) => seen.push(t) });
     assert.equal(out, 'You have two tasks.');
     assert.deepEqual(ran, [{ state: 'todo' }]);
-    assert.deepEqual(seen, ['Checking', 'Checking the board.', 'You have', 'You have two tasks.']);
+    // the third update is the tool step's own (starterthoughts.ts): this round's words stay, the step rides beside them
+    assert.deepEqual(seen, ['Checking', 'Checking the board.', 'Checking the board.', 'You have', 'You have two tasks.']);
     const second = f.calls[1]!.body;
     assert.deepEqual(second.contents[1], round1.candidates[0]!.content, 'the model turn goes back exactly as it came');
     assert.deepEqual(second.contents[2].parts[0].functionResponse, { id: 'call_1', name: 'list_tasks', response: { result: 'two tasks' } });
@@ -166,5 +210,110 @@ describe('a watched house turn types as it is written', () => {
     const f = stubFetch([{ json: body([{ text: 'quiet' }]) }]); undo = f.restore;
     await geminiOrchestratorTurn({ ...BASE, starter: true, ...CTX });
     assert.equal(f.calls[0]!.url, 'https://api.test/v1/starter/generate');
+  });
+});
+
+describe('a watched house turn shows its thoughts (starterthoughts.ts)', () => {
+  const STEP = '› list_repo_files · src/storage';
+
+  test('the summary and each tool step ride every update, the step shows before the tool runs, and the reply carries none', async () => {
+    const fed: Array<[string, string | undefined]> = [];
+    const atRun: Array<string | undefined> = [];
+    const tool: OrchTool = { name: 'list_repo_files', description: 'list the files', schema: { path: z.string() }, run: async () => { atRun.push(fed.at(-1)?.[1]); return 'adapter.ts'; } };
+    const round1 = body([{ text: '**Reading the tree**', thought: true }, { functionCall: { name: 'list_repo_files', args: { path: 'src/storage' }, id: 'call_1' }, thoughtSignature: 'c2ln' }]);
+    const round2 = body([{ text: 'Found it.', thought: true }, { text: 'The adapter is adapter.ts.' }]);
+    const f = stubFetch([
+      { lines: [{ t: 'thought', text: '**Reading' }, { t: 'thought', text: ' the tree**' }, { t: 'done', response: round1 }] },
+      { lines: [{ t: 'thought', text: 'Found it.' }, ...words('The adapter', ' is adapter.ts.'), { t: 'done', response: round2 }] },
+    ]);
+    undo = f.restore;
+    const out = await geminiOrchestratorTurn({ ...BASE, tools: [tool], starter: true, ...CTX, onDelta: (t, th) => { fed.push([t, th]); } });
+    assert.equal(out, 'The adapter is adapter.ts.', 'the posted reply carries no thought text');
+    assert.deepEqual(atRun, [`**Reading the tree**\n\n${STEP}`], 'the bubble shows the step before the tool runs');
+    const all = `**Reading the tree**\n\n${STEP}\n\nFound it.`;
+    assert.deepEqual(fed, [
+      ['', '**Reading'],
+      ['', '**Reading the tree**'],
+      ['', `**Reading the tree**\n\n${STEP}`],
+      ['', all],
+      ['The adapter', all],
+      ['The adapter is adapter.ts.', all],
+    ]);
+    assert.deepEqual(f.calls.map((c) => c.body.thoughts), [true, true], 'every round asks for the thoughts');
+    assert.deepEqual(f.calls[1]!.body.contents[1], round1.candidates[0]!.content, 'the model turn goes back exactly as it came, its thought part included');
+  });
+
+  test('the words of a round with no thought line still carry the thoughts so far', async () => {
+    const tool: OrchTool = { name: 'list_repo_files', description: 'list the files', schema: { path: z.string() }, run: async () => 'adapter.ts' };
+    const f = stubFetch([
+      { lines: [{ t: 'thought', text: 'Look first.' }, { t: 'done', response: body([{ text: 'Look first.', thought: true }, { functionCall: { name: 'list_repo_files', args: { path: 'src/storage' } } }]) }] },
+      { lines: [...words('Done.'), { t: 'done', response: body([{ text: 'Done.' }]) }] },
+    ]);
+    undo = f.restore;
+    const fed: Array<[string, string | undefined]> = [];
+    await geminiOrchestratorTurn({ ...BASE, tools: [tool], starter: true, ...CTX, onDelta: (t, th) => { fed.push([t, th]); } });
+    assert.deepEqual(fed.at(-1), ['Done.', `Look first.\n\n${STEP}`]);
+  });
+
+  test('the words outlive their round: a silent round\'s step and a later round\'s thought keep them, so the folded block never opens again', async () => {
+    const tool: OrchTool = { name: 'list_tasks', description: 'list the board', schema: { state: z.string() }, run: async () => 'two tasks' };
+    const f = stubFetch([
+      { lines: [...words('Checking the board.'), { t: 'done', response: body([{ text: 'Checking the board.' }, { functionCall: { name: 'list_tasks', args: { state: 'todo' } }, thoughtSignature: 'c2ln' }]) }] },
+      { lines: [{ t: 'done', response: body([{ functionCall: { name: 'list_tasks', args: { state: 'done' } } }]) }] },
+      { lines: [{ t: 'thought', text: 'Found two.' }, ...words('You have', ' two tasks.'), { t: 'done', response: body([{ text: 'Found two.', thought: true }, { text: 'You have two tasks.' }]) }] },
+    ]);
+    undo = f.restore;
+    const fed: Array<[string, string | undefined]> = [];
+    const out = await geminiOrchestratorTurn({ ...BASE, tools: [tool], starter: true, ...CTX, onDelta: (t, th) => { fed.push([t, th]); } });
+    assert.equal(out, 'You have two tasks.');
+    // every bubble folds the block at the first word and opens it again on an update with no words (StreamBubble: thinking={!words && !done})
+    assert.equal(fed.findIndex(([t]) => t === ''), -1, `an update dropped the words: ${JSON.stringify(fed)}`);
+    const steps = '› list_tasks · todo\n\n› list_tasks · done';
+    assert.deepEqual(fed, [
+      ['Checking the board.', undefined],
+      ['Checking the board.', '› list_tasks · todo'],
+      ['Checking the board.', steps],
+      ['Checking the board.', `${steps}\n\nFound two.`],
+      ['You have', `${steps}\n\nFound two.`],
+      ['You have two tasks.', `${steps}\n\nFound two.`],
+    ]);
+  });
+
+  test('a bubble that throws at a tool step never costs the turn: the tool runs once, and the reply comes back', async () => {
+    const ran: unknown[] = [];
+    const tool: OrchTool = { name: 'list_tasks', description: 'list the board', schema: { state: z.string() }, run: async (i) => { ran.push(i); return 'two tasks'; } };
+    const f = stubFetch([
+      { lines: [{ t: 'done', response: body([{ functionCall: { name: 'list_tasks', args: { state: 'todo' } } }]) }] },
+      { lines: [...words('You have two tasks.'), { t: 'done', response: body([{ text: 'You have two tasks.' }]) }] },
+    ]);
+    undo = f.restore;
+    const out = await geminiOrchestratorTurn({ ...BASE, tools: [tool], starter: true, ...CTX, onDelta: () => { throw new Error('window gone'); } });
+    assert.equal(out, 'You have two tasks.');
+    assert.deepEqual(ran, [{ state: 'todo' }]);
+  });
+
+  test('the person\'s own Gemini key goes through the SDK: no thoughts asked, no steps, nothing typed', async () => {
+    const ran: unknown[] = [];
+    const tool: OrchTool = { name: 'list_tasks', description: 'list the board', schema: { state: z.string() }, run: async (i) => { ran.push(i); return 'two tasks'; } };
+    const google = (parts: unknown[]) => ({ candidates: [{ content: { role: 'model', parts }, finishReason: 'STOP', index: 0 }] });
+    const f = stubFetch([
+      { json: google([{ functionCall: { name: 'list_tasks', args: { state: 'todo' } } }]) },
+      { json: google([{ text: 'Pondering.', thought: true }, { text: 'You have two tasks.' }]) },
+    ]);
+    undo = f.restore;
+    const fed: unknown[] = [];
+    const out = await geminiOrchestratorTurn({ ...BASE, token: 'AIza-own-key', tools: [tool], onDelta: (t, th) => { fed.push([t, th]); } });
+    assert.equal(out, 'You have two tasks.');
+    assert.deepEqual(ran, [{ state: 'todo' }]);
+    assert.deepEqual(fed, [], 'the SDK branch types nothing: no words, no thoughts, no steps');
+    assert.match(f.calls[0]!.url, /generativelanguage\.googleapis\.com/);
+    assert.ok(f.calls.every((c) => !JSON.stringify(c.body).includes('includeThoughts') && !('thoughts' in c.body)));
+  });
+
+  test('a turn nobody watches (a worker, a sweep) asks for no thoughts', async () => {
+    const tool: OrchTool = { name: 'list_tasks', description: 'list the board', schema: { state: z.string() }, run: async () => 'two tasks' };
+    const f = stubFetch([{ json: body([{ functionCall: { name: 'list_tasks', args: { state: 'todo' } } }]) }, { json: body([{ text: 'quiet' }]) }]); undo = f.restore;
+    await geminiOrchestratorTurn({ ...BASE, tools: [tool], starter: true, ...CTX });
+    assert.deepEqual(f.calls.map((c) => 'thoughts' in c.body), [false, false]);
   });
 });

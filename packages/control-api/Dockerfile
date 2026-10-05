@@ -20,7 +20,7 @@ FROM node:22-slim AS build
 ENV CI=1 COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 RUN corepack enable
 WORKDIR /app
-COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json ./
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .pnpmfile.cjs tsconfig.base.json ./
 COPY patches ./patches
 COPY packages/shared ./packages/shared
 COPY packages/control-api ./packages/control-api
@@ -32,7 +32,7 @@ FROM node:22-slim AS deps
 ENV CI=1 COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 RUN corepack enable
 WORKDIR /app
-COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .pnpmfile.cjs ./
 COPY patches ./patches
 COPY packages/shared/package.json ./packages/shared/package.json
 COPY packages/control-api/package.json ./packages/control-api/package.json

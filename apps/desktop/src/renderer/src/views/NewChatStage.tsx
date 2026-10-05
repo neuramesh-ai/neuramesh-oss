@@ -2,6 +2,7 @@
 import { AgentAvatar, ProjLogo } from '../components/AgentAvatar';
 import { AttachButton, AttachTray, consumeWbAttach, useAttachments } from '../composer/attach';
 import { BrainChip } from '../brain/BrainChip';
+import { CodeModelChip } from '../models/CodeModelChip';
 import { ComposerInput } from '../composer/ComposerInput';
 import { ConnectorMarks } from '../composer/ConnectorMarks';
 import { HomeLedger, type HomeLedgerProps } from './HomeLedger';
@@ -105,7 +106,7 @@ export function NewChatStage({ agents, projects, activeProjectId, channels, defa
    * same rows and marks the rail, the bell and ⌘Y read; absent on a client that has no history yet */
   ledger?: HomeLedgerProps;
   /** the repo chip (coding threads, 0144 — door 1): the repositories, the pick a door pre-sets ('primary' = the room's primary repo, the Code rail's New session), the connect door, and the birth the shell remembers */
-  repos?: RepoUI[]; initialRepo?: string | null; onConnectRepo?: () => void; onCodingBirth?: (threadId: string, repoId: string) => void;
+  repos?: RepoUI[]; initialRepo?: string | null; onConnectRepo?: () => void; onCodingBirth?: (threadId: string, repoId: string, modelId: string | null) => void;
 }) {
   // no machine can run, so the stage shows WHY instead of a composer that cannot deliver
   const capped = useCompute(true)?.status === 'capped';
@@ -127,6 +128,7 @@ export function NewChatStage({ agents, projects, activeProjectId, channels, defa
   const [projPop, setProjPop] = useState(false);
   const [machine, setMachine] = useState<string | null>(null); // the chip's choice for the NEXT send; null = Auto
   const [repo, setRepo] = useState<string | null>(null); // the repo chip's pick (0144): set, the send births a CODING thread
+  const [codeModel, setCodeModel] = useState<string | null>(null); // the Code chip's pick for that thread: null runs the NeuraMesh brain
   const [attachedSkill, setAttachedSkill] = useState<{ name: string; pack?: string | null } | null>(null);
   const [cmention, setCmention] = useState(0); // nonce → the @ button types "@" + opens the picker
   const [hfocus, setHfocus] = useState(0); // nonce → focuses the composer (the hint's @name insert)
@@ -146,8 +148,8 @@ export function NewChatStage({ agents, projects, activeProjectId, channels, defa
       // and the docs/34 mode + the pill's brain draft ride the birth message — this send BIRTHS
       // the conversation, so what the pill was showing is what the conversation starts on
       await onSend(targetChan.id, marker + consumeWbAttach(text), { id: msgId, attachments: attSpecs, threadId, rootMessageId: msgId, brainOverride: readBrainDraft(), ...sessionBirth?.(machine), ...(repo ? { threadKind: 'coding' as const } : {}) });
-      if (repo) onCodingBirth?.(threadId, repo);
-      setDraft(''); setMachine(null); setRepo(null); setAttachedSkill(null); atts.reset();
+      if (repo) onCodingBirth?.(threadId, repo, codeModel);
+      setDraft(''); setMachine(null); setRepo(null); setCodeModel(null); setAttachedSkill(null); atts.reset();
       // the send animates into its thread — the TARGET room rides along (docs/32)
       onOpenThread(threadId, targetChan.id);
     } catch (e) { flashToast(errMsg(e)); }
@@ -268,15 +270,11 @@ export function NewChatStage({ agents, projects, activeProjectId, channels, defa
             </span>
             {machineChip?.(machine, setMachine)}
             <RepoChip repos={repos} projectId={targetChan?.project_id ?? null} value={repo} onPick={setRepo} onConnect={onConnectRepo} /> {/* the fourth knob (0144): a repository makes the send a coding conversation */}
-            {(() => {
-              // the SAME pill as the thread composer (docs/10 §15) — one switcher, every surface
-              return <BrainChip
-                onConnect={onBrainConnect}
+            {repo ? <CodeModelChip pick={codeModel} machineId={sessionBirth?.(machine).threadMachineId ?? machine} place="start" onPick={setCodeModel} /> /* a repository's session runs the coding runtime: the Code chip picks its model */
+              // else the SAME pill as the thread composer (docs/10 §15): one switcher, every surface
+              : <BrainChip onConnect={onBrainConnect} onSetProjectPack={onSetProjectPack}
                 project={ap ? { id: ap.id, name: ap.name, pack: ap.model_pack ?? null } : null}
-                onSetProjectPack={onSetProjectPack}
-                castAgents={targetChan ? agents.filter((a) => agentInChannel(a.channel_ids, targetChan.id)) : []}
-              />;
-            })()}
+                castAgents={targetChan ? agents.filter((a) => agentInChannel(a.channel_ids, targetChan.id)) : []} />}
             <MentionButton onMention={() => setCmention((n) => n + 1)} />
             <AttachButton onFiles={atts.addFiles} count={atts.count} max={atts.limits.maxPerMessage} />
             <span style={{ flex: 1 }} />

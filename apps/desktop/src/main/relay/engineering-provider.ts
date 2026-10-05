@@ -1,6 +1,9 @@
 import { STARTER_MODEL, providerForModel, type Provider } from '@neuramesh/shared';
 import type { EngineeringBrainResolution } from './engineering-brain';
 import { readFile } from 'node:fs/promises';
+import { keyEnvFor, onCloudMachine } from '../runtime/adapter';
+import { decideAuth, type AuthResolution } from '../runtime/authpolicy';
+import { hasProviderLogin, hasSubscription } from '../runtime/detect';
 
 export interface EngineeringProviderResolution {
   providerId: string;
@@ -39,6 +42,32 @@ const SUBSCRIPTION_PROVIDER: Partial<Record<Provider, string>> = {
   anthropic: 'claude-code',
   openai: 'openai-codex-cli',
 };
+
+const LABEL: Record<Provider, string> = { anthropic: 'Claude', openai: 'ChatGPT', gemini: 'Gemini' };
+
+/** what this machine holds for a provider: the agents' own probes (runtime/detect.ts, adapter.ts) */
+export interface MachineAuthProbe {
+  /** a usable sign-in now */
+  subActive(provider: Provider): Promise<boolean>;
+  /** a sign-in at all, maybe expired */
+  loginPresent(provider: Provider): Promise<boolean>;
+  /** the machine's own API key for the provider */
+  envKey(provider: Provider): string | null;
+}
+
+export const machineAuthProbe: MachineAuthProbe = {
+  subActive: hasSubscription,
+  loginPresent: hasProviderLogin,
+  envKey: (provider) => keyEnvFor(provider).map((k) => process.env[k]).find((v): v is string => !!v) ?? null,
+};
+
+/** the refusal a person reads when this machine holds nothing that runs the brain (STE) */
+function refusal(provider: Provider, auth: AuthResolution): string {
+  const label = LABEL[provider];
+  if (provider === 'gemini') return 'Code runs Gemini on an API key only. Add a Gemini API key, or pick another model.';
+  if (auth.blocked?.reason === 'expired') return `The ${label} sign-in on this machine expired. Sign in again on this machine, or pick another model.`;
+  return `This machine has no ${label} sign-in or API key. Sign in on this machine, add a ${label} API key, or pick another model.`;
+}
 
 async function localProviderKey(path: string, provider: Provider): Promise<string | null> {
   const providerId = API_PROVIDER[provider];
@@ -93,6 +122,7 @@ export async function resolveEngineeringProvider(
   opts: EngineeringProviderOptions,
   brain: EngineeringBrainResolution,
   env: NodeJS.ProcessEnv = process.env,
+  probe: MachineAuthProbe = machineAuthProbe,
 ): Promise<EngineeringProviderResolution> {
   const explicitKey = env['NM_ENGINEERING_API_KEY'];
   const explicitProvider = env['NM_ENGINEERING_PROVIDER'];
@@ -129,14 +159,22 @@ export async function resolveEngineeringProvider(
     headers: await engineeringAuthHeaders(opts),
   });
   if (!response.ok) throw new Error(`Engineering could not resolve the configured ${credential} brain (${response.status}).`);
-  const body = (await response.json()) as { token?: string | null; authMode?: string | null };
-  if (body.authMode === 'apikey' && body.token) {
-    return { apiKey: body.token, providerId: API_PROVIDER[credential], modelId: brain.modelId };
-  }
-  if (body.authMode === 'subscription') {
+  const body = (await response.json()) as { token?: string | null; authMode?: string | null; autoFailover?: boolean };
+  const stored = body.authMode === 'apikey' || body.authMode === 'subscription' ? body.authMode : null;
+  const token = body.token ?? null;
+  // model setup lives on the machine (George, 2026-10-04): the agents' own rule (runtime/authpolicy.ts) reads this
+  // machine's sign-ins and keys beside the stored preference, so a sign-in made here runs code with no stored row,
+  // and a lapsed sign-in never silently bills a key
+  const [subActive, loginPresent] = stored === 'apikey' ? [false, false] : await Promise.all([probe.subActive(credential), probe.loginPresent(credential)]);
+  const envKey = probe.envKey(credential);
+  const auth = decideAuth({ provider: credential, storedAuthMode: stored, storedToken: token, autoFailover: !!body.autoFailover, subActive, loginPresent, envKey, cloudMachine: onCloudMachine(env) });
+  if (auth.authMode === 'apikey' && auth.token) return { apiKey: auth.token, providerId: API_PROVIDER[credential], modelId: brain.modelId };
+  if (auth.authMode === 'subscription') {
     const providerId = SUBSCRIPTION_PROVIDER[credential];
     if (providerId) return { providerId, modelId: brain.modelId };
-    throw new Error('Engineering cannot use the configured Gemini subscription on this machine. Connect a Gemini API key or select a developer brain supported by the machine login.');
+    // the coding runtime has no lane for a Google sign-in: a Gemini key on this machine still runs it
+    const key = token ?? envKey;
+    if (key) return { apiKey: key, providerId: API_PROVIDER[credential], modelId: brain.modelId };
   }
-  throw new Error(`The configured developer brain (${brain.modelId}) has no usable ${credential} connection. Connect it in Settings → Models or choose another project brain.`);
+  throw new Error(refusal(credential, auth));
 }

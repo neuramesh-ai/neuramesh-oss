@@ -4,7 +4,6 @@ import {
   STARTER_MODEL,
   isCustomPackId,
   resolvePackRoles,
-  seatModel,
   type CustomModelPack,
 } from '@neuramesh/shared';
 import type { EngineeringMachineOpenMeta } from '../../engineering-protocol';
@@ -62,8 +61,10 @@ async function selectedPackModel(opts: EngineeringBrainOptions, packId: string):
   return roles.developer;
 }
 
-/** Resolve the Engineering model exactly like any other developer wake.
- * Manual developer pin > repository project's brain > materialized workspace developer seat. */
+/** Resolve the Engineering model: the conversation's own pick, else its brain pack, else the NeuraMesh brain.
+ * A coding conversation runs the model picked FOR IT (George, 2026-10-04): the developer seat and the
+ * project's pack no longer leak in, so a seat on a model this machine cannot run never strands the first prompt.
+ * The seat still names the agent whose credentials the provider lookup reads. */
 export async function resolveEngineeringBrain(
   db: ReplicaReader,
   opts: EngineeringBrainOptions,
@@ -94,7 +95,6 @@ export async function resolveEngineeringBrain(
   const seat = seats[0] ?? null;
   const project = projects[0] ?? null;
   if (meta.projectId && !project) throw new Error('The selected project is not connected to this repository in the workspace.');
-  const currentModel = seat?.model || STARTER_MODEL;
   // A direct Code model selection is machine-validated against the shared allow-list. The
   // browser chooses an id, never a provider credential or endpoint; provider resolution below
   // still proves the workspace can serve it.
@@ -111,15 +111,5 @@ export async function resolveEngineeringBrain(
       ...(seat?.id ? { agentId: seat.id } : {}),
     };
   }
-  const packs = await customPacks(opts, project?.model_pack ?? null);
-  return {
-    modelId: seatModel({
-      role: 'developer',
-      currentModel,
-      modelSource: seat?.model_source,
-      projectPack: project?.model_pack,
-      custom: packs,
-    }),
-    ...(seat?.id ? { agentId: seat.id } : {}),
-  };
+  return { modelId: STARTER_MODEL, ...(seat?.id ? { agentId: seat.id } : {}) };
 }

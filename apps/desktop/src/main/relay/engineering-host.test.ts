@@ -7,6 +7,10 @@ import type { EngineeringRuntimeEvent } from '../../engineering-protocol';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 
 const keyFetch: typeof fetch = async () => new Response(JSON.stringify({ token: 'sk-test', authMode: 'apikey' }), { status: 200 });
+/** a machine with exactly these sign-ins and keys, never the laptop the test runs on */
+const machine = (has: { sub?: boolean; login?: boolean; env?: string | null } = {}) => ({
+  subActive: async () => has.sub ?? false, loginPresent: async () => has.login ?? has.sub ?? false, envKey: () => has.env ?? null,
+});
 
 test('Engineering provider resolution uses workspace API-key credentials', async () => {
   let resolvedUrl = '';
@@ -44,7 +48,7 @@ test('Engineering provider resolution uses the configured brain subscription tra
       requests.push({ url, authorization: new Headers(init?.headers).get('authorization') });
       return new Response(JSON.stringify({ token: null, authMode: 'subscription' }), { status: 200 });
     },
-  }, { modelId: 'gpt-5.5', agentId: 'patch-1' }, {});
+  }, { modelId: 'gpt-5.5', agentId: 'patch-1' }, {}, machine({ sub: true }));
   assert.deepEqual(provider, { providerId: 'openai-codex-cli', modelId: 'gpt-5.5' });
   assert.deepEqual(requests.map((request) => new URL(request.url).searchParams.get('provider')), ['openai']);
   assert.equal(requests.every((request) => request.authorization === 'Bearer nmm_test'), true);
@@ -66,14 +70,34 @@ test('local web validation uses the configured brain with the machine provider s
   }
 });
 
-test('Engineering provider resolution ends with an actionable error when no API key works', async () => {
+test('Engineering provider resolution ends with an actionable error when nothing on the machine runs the brain', async () => {
   await assert.rejects(
     resolveEngineeringProvider({
       apiUrl: 'https://api.test', machineToken: 'nmm_test', workspaceId: 'w1',
       fetchImpl: async () => new Response(JSON.stringify({ authMode: null }), { status: 200 }),
-    }, { modelId: 'claude-sonnet-5' }, {}),
-    /configured developer brain.*has no usable anthropic connection/,
+    }, { modelId: 'claude-sonnet-5' }, {}, machine()),
+    /^Error: This machine has no Claude sign-in or API key\. Sign in on this machine, add a Claude API key, or pick another model\.$/,
   );
+});
+
+// George, 2026-10-04: model setup lives on the machine. The coding runtime reads this machine's sign-ins and keys
+// with the agents' own rule (runtime/authpolicy.ts), so a sign-in made on a cloud machine runs code with no stored
+// row, and a Google sign-in, which the coding runtime has no lane for, gets a refusal that names the fix
+test('the coding runtime reads the machine\'s own sign-ins and keys, as agents do', async () => {
+  const opts = (body: Record<string, unknown>) => ({ apiUrl: 'https://api.test', machineToken: 'nmm_test', workspaceId: 'w1', fetchImpl: async () => new Response(JSON.stringify(body), { status: 200 }) });
+  const cloud = { NM_MACHINE_KIND: 'member' };
+  // a sign-in on the machine with no stored row: the CLI lane
+  assert.deepEqual(await resolveEngineeringProvider(opts({ authMode: null }), { modelId: 'claude-opus-5' }, cloud, machine({ sub: true })), { providerId: 'claude-code', modelId: 'claude-opus-5' });
+  // the machine's own key with no stored row: the key lane
+  assert.deepEqual(await resolveEngineeringProvider(opts({ authMode: null }), { modelId: 'claude-opus-5' }, cloud, machine({ env: 'sk-env' })), { providerId: 'anthropic', modelId: 'claude-opus-5', apiKey: 'sk-env' });
+  // a stored preference for a sign-in that lapsed here: a refusal, never a silent key
+  await assert.rejects(resolveEngineeringProvider(opts({ authMode: 'subscription', token: null }), { modelId: 'claude-opus-5' }, cloud, machine({ sub: false, login: true, env: 'sk-env' })),
+    /^Error: The Claude sign-in on this machine expired\. Sign in again on this machine, or pick another model\.$/);
+  // Gemini: a Google sign-in never runs code, a Gemini key on the machine does
+  await assert.rejects(resolveEngineeringProvider(opts({ authMode: 'subscription', token: null }), { modelId: 'gemini-3.1-pro-preview' }, cloud, machine({ sub: true })),
+    /^Error: Code runs Gemini on an API key only\. Add a Gemini API key, or pick another model\.$/);
+  assert.deepEqual(await resolveEngineeringProvider(opts({ authMode: 'subscription', token: null }), { modelId: 'gemini-3.1-pro-preview' }, cloud, machine({ sub: true, env: 'g-env' })), { providerId: 'gemini', modelId: 'gemini-3.1-pro-preview', apiKey: 'g-env' });
+  assert.deepEqual(await resolveEngineeringProvider(opts({ authMode: 'apikey', token: 'g-stored' }), { modelId: 'gemini-3.1-pro-preview' }, cloud, machine()), { providerId: 'gemini', modelId: 'gemini-3.1-pro-preview', apiKey: 'g-stored' });
 });
 
 test('starter brain requests stay on the authenticated metered control-plane route', async () => {

@@ -99,10 +99,13 @@ const GenerateSchema = z.object({
   contents: z.unknown(),
   system: z.string().optional(),
   tools: z.unknown().optional(),
+  /** the machine shows the turn's thought summaries. only on request: an older machine joins every
+   *  part's text, so a thought part would print in its reply */
+  thoughts: z.boolean().optional(),
 });
 type StarterBody = z.infer<typeof GenerateSchema>;
 
-export interface GeminiUsage { promptTokenCount?: number; candidatesTokenCount?: number }
+export interface GeminiUsage { promptTokenCount?: number; candidatesTokenCount?: number; thoughtsTokenCount?: number }
 export type StarterFetch = (url: string, init: RequestInit) => Promise<Response>;
 export const STARTER_MODEL_URL = `https://generativelanguage.googleapis.com/v1beta/models/${STARTER_MODEL}`;
 
@@ -135,13 +138,14 @@ export async function starterPreflight(c: Context, store: Store, ledger: Ledger 
   return { ledger, body: body.data, key };
 }
 
-/** the request Google gets, from either door */
+/** the request Google gets, from either door. without `thoughts` it is byte for byte the request
+ *  from before the flag existed */
 export function starterRequest(b: StarterBody): Record<string, unknown> {
   return {
     contents: b.contents,
     ...(b.system ? { systemInstruction: { parts: [{ text: b.system }] } } : {}),
     ...(b.tools ? { tools: b.tools } : {}),
-    generationConfig: { thinkingConfig: { thinkingLevel: STARTER_THINKING_LEVEL } },
+    generationConfig: { thinkingConfig: { thinkingLevel: STARTER_THINKING_LEVEL, ...(b.thoughts ? { includeThoughts: true } : {}) } },
   };
 }
 
@@ -151,7 +155,8 @@ export function starterRequest(b: StarterBody): Record<string, unknown> {
  *  it: the answer is served, and the NEXT call is the one that stops. */
 export async function chargeStarterCall(ledger: Ledger, workspace: string, usage: GeminiUsage | undefined): Promise<{ remaining: number; spentMicros: number }> {
   const inTok = usage?.promptTokenCount ?? 0;
-  const outTok = usage?.candidatesTokenCount ?? 0;
+  // google bills thinking at the output rate, and thoughtsTokenCount is not inside candidatesTokenCount
+  const outTok = (usage?.candidatesTokenCount ?? 0) + (usage?.thoughtsTokenCount ?? 0);
   const micros = priceModelCall(STARTER_MODEL, inTok, outTok);
   const spent = await ledger.spend(workspace, micros, { inTokens: inTok, outTokens: outTok });
   return { remaining: microsToCredits(spent ? spent.remainingMicros : 0), spentMicros: micros };

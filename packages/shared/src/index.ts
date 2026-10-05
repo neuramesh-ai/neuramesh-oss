@@ -82,6 +82,7 @@ export * from './email/templates-lifecycle';
 export * from './email/templates-announce';
 export * from './model-labels';
 export * from './model-selection';
+export * from './code-models';
 export * from './agent-models';
 export * from './engineering/index';
 export * from './releasescan';

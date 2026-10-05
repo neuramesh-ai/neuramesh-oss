@@ -7,8 +7,9 @@
 // side panel (thread/CodeFace; the Workbench card until the side-panel round, 2026-10-03), which
 // comes out by itself on a coding thread, so the conversation is never covered.
 // The session id IS the thread id: the machine's history discovery (actor + repo + thread) and
-// the synced code_sessions row agree. Ruling 2 (George, 2026-09-26): the runtime, the voice and
-// the brain rule are exactly the Code floor's. Who starts the session: the CLIENT that opens the
+// the synced code_sessions row agree. Ruling 2 (George, 2026-09-26): the runtime and the voice are
+// exactly the Code floor's. The brain is the conversation's own pick, else the NeuraMesh brain (George,
+// 2026-10-04, shared code-models.ts), never the project's developer seat. Who starts the session: the CLIENT that opens the
 // thread — door 1 with the root message as the first prompt, door 2 the same on the next open; a
 // thread whose session another client started is opened without a prompt.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -60,7 +61,7 @@ function ThreadRows({ rows, agents, repoName, onOpenTask, answers, hideNeeds = f
   });
 }
 
-export function CodingThread({ threadId, thread, back, channelSlug, channelId, crumbProject, repos, onReposChanged, projects, projectId, workspaceId, codeSession, pickedRepoId, marks, machineChip, machineName, defaultMachineId, plan, onUpgrade, onClose, agents, decisions, onOpenTask, codeSlot, codeTab, onCodeTab, onCodeCounts }: {
+export function CodingThread({ threadId, thread, back, channelSlug, channelId, crumbProject, repos, onReposChanged, projects, projectId, workspaceId, codeSession, pickedRepoId, pickedModelId, marks, machineChip, machineName, defaultMachineId, plan, onUpgrade, onClose, agents, decisions, onOpenTask, codeSlot, codeTab, onCodeTab, onCodeCounts }: {
   threadId: string;
   thread: ThreadRow | null;
   back: string;
@@ -79,6 +80,8 @@ export function CodingThread({ threadId, thread, back, channelSlug, channelId, c
   codeSession: CodeSessionRow | null;
   /** the repo chip's pick when THIS client birthed the thread (door 1) */
   pickedRepoId: string | null;
+  /** the model chip's pick at that birth: the session starts on it (null = the NeuraMesh brain) */
+  pickedModelId?: string | null;
   marks?: HeadStatus | null;
   machineChip?: MachineChipSlot;
   /** the subline's third fact: where the session runs */
@@ -132,7 +135,7 @@ export function CodingThread({ threadId, thread, back, channelSlug, channelId, c
     if (!local && !root) return;
     adopted.current = threadId;
     engineering.adopt({
-      id: threadId, repo: repoOf(repoRow), project: project ? projectOf(project) : null, machineId: codeSession?.machine_id ?? null,
+      id: threadId, repo: repoOf(repoRow), project: project ? projectOf(project) : null, machineId: codeSession?.machine_id ?? null, modelOverride: pickedModelId ?? null,
       // the harness simulates every turn; live, a session another client already started is resumed, never re-prompted
       firstPrompt: local ? null : harness ? root?.body ?? null : codeSession ? null : root?.body ?? null,
     });
@@ -207,7 +210,7 @@ export function CodingThread({ threadId, thread, back, channelSlug, channelId, c
                 <CodingGate session={active} threadId={threadId} channelId={channelId} room={channelSlug} title={title} repoRow={repoRow} repoName={repoName ?? 'the repository'} root={root?.body ?? null}
                   unitId={unitId} hasTask={!!thread?.task_id} onApproval={act.approve} onReviewChanges={reviewChanges} onContinueInAct={act.continueInAct} onDismissHandoff={act.dismissHandoff} onMade={setMade} onReopen={() => engineering.reopen(active)} />
               </div>
-              <div className="tcompose"><CodingComposer session={active} project={project} plan={plan} onUpgrade={onUpgrade} machineChip={machineChip}
+              <div className="tcompose"><CodingComposer session={active} plan={plan} onUpgrade={onUpgrade} machineChip={machineChip}
                 onSend={act.send} onMode={act.mode} onPermission={act.permission} onModel={act.model} /></div>
             </>
           ) : !repoRow && !codeSession ? (

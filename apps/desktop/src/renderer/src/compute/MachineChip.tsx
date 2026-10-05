@@ -20,8 +20,8 @@ import { IconAuto, IconCloud, IconMachine } from '../ui/icons';
  *  opens: above by default, BELOW on the ledgered Home, where the composer stands at the top of the page and
  *  tokens.css turns every composer menu downward (`.stagewrap.ledgered .hcomposer .cprojpop`). The cap has
  *  to measure the side the CSS picks, or a Home menu would be squeezed to the room above a chip that opens
- *  down. */
-function roomOn(el: HTMLElement | null): number {
+ *  down. The model chip (models/ModelChip.tsx) caps its menu by it too. */
+export function roomOn(el: HTMLElement | null): number {
   if (!el) return 600;
   const down = !!el.closest('.stagewrap.ledgered');
   const r = el.getBoundingClientRect();

@@ -30,8 +30,9 @@ import { invokeTool, outputToText, toolsForTurn, type ToolHost } from '../harnes
 import { beatsAdapter } from '../harness/turntools';
 import { geminiOrchestratorTurn } from '../host/orchturn';
 import { starterGenerate, starterStream } from '../host/starterproxy';
+import { replyText, starterThoughts } from '../host/starterthoughts';
 import { instructionsFor } from '../host/turnkit';
-import { buildCodingPrompt, codingSystemPrompt, type PermissionGate, type PromptOverride, type TurnOpts } from './adapter';
+import { buildCodingPrompt, codingSystemPrompt, type DeltaFn, type PermissionGate, type PromptOverride, type TurnOpts } from './adapter';
 import type { OrchTool } from '../host/orchtools';
 import type { ExecTask, HostedAgent, SkillRef } from '../agents';
 import type { LogFn } from '../agentlog';
@@ -124,13 +125,18 @@ const STARTER_NOTE = '\n\n[YOUR RUNTIME — the NeuraMesh Starter brain. You hav
 
 // ── The three seats of the adapter, on the proxy ───────────────────────────────────────────────
 /** one tool-less reply. With `onDelta` (a chat reply someone watches) it streams, and the bubble
- *  gets the words so far as they arrive; without, the whole-reply door, as before. */
-export async function starterComplete(system: string, user: string, onDelta?: (text: string) => void): Promise<string> {
+ *  gets the words so far as they arrive, with the thoughts beside them; without, the whole-reply door, as before. */
+export async function starterComplete(system: string, user: string, onDelta?: DeltaFn): Promise<string> {
   const l = laneOrThrow();
   const call = { apiUrl: l.apiUrl, workspace: l.workspace, actorId: l.actorId, contents: [{ role: 'user', parts: [{ text: user }] }], config: { systemInstruction: system } };
+  if (!onDelta) return replyText(await starterGenerate(call)).trim();
+  const th = starterThoughts();
   let said = '';
-  const r: any = onDelta ? await starterStream({ ...call, onText: (d) => { said += d; onDelta(said); } }) : await starterGenerate(call);
-  return ((r.candidates?.[0]?.content?.parts ?? []).map((p: any) => p?.text).filter(Boolean).join('') as string).trim();
+  const r = await starterStream({ ...call, thoughts: true, onText: (d) => { said += d; onDelta(said, th.text()); }, onThought: (d) => { th.thought(d); onDelta(said, th.text()); } });
+  const answer = replyText(r).trim();
+  // the bubble ends on the answer: the old door typed nothing, and the streamed words may differ by a trim
+  if (answer !== said) { try { onDelta(answer, th.text()); } catch { /* a live bubble is never worth the turn */ } }
+  return answer;
 }
 
 export async function starterRunQuery(

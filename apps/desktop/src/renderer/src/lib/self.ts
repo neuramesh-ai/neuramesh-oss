@@ -28,3 +28,8 @@ export let selfMachine: string | null = null;
 /** The shell learns this machine's name at boot and publishes it here. Readers import the
  *  binding and see the update — only this module may assign it. */
 export function setSelfMachine(name: string | null) { selfMachine = name; }
+
+export let selfUser: string | null = null;
+/** the signed-in member's id, published by the shell once auth resolves: a composer or a card deep in a
+ *  transcript reads the member's own rows by it. Only this module may assign it. */
+export function setSelfUser(id: string | null) { selfUser = id; }

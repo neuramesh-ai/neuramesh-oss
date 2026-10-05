@@ -95,8 +95,9 @@ function geminiContents(transcript: string, attachments?: AgentAttachment[]): st
 export const geminiAdapter: RuntimeAdapter = {
   async streamTurn(agent, channelSlug, transcript, token, log, onDelta, attachments) {
     // THE STARTER LANE (runtime/starter.ts, 2026-09-16): the house model is served by the metered proxy,
-    // never by the user's Google login — the same rule geminiDispatch applies to the orchestrator
-    if (isStarterSeat(agent.model, token)) { const t = await starterComplete(chatSystemPrompt(agent.name, channelSlug, instructionsFor(agent)), transcript, onDelta); onDelta?.(t); return t || '(no reply)'; }
+    // never by the user's Google login — the same rule geminiDispatch applies to the orchestrator.
+    // starterComplete makes the bubble's last update itself: one here without the thoughts would erase them
+    if (isStarterSeat(agent.model, token)) { const t = await starterComplete(chatSystemPrompt(agent.name, channelSlug, instructionsFor(agent)), transcript, onDelta); return t || '(no reply)'; }
     if (!token) return agyExec({ prompt: `${chatSystemPrompt(agent.name, channelSlug, agent.brief)}\n\n${transcript}`, log, onDelta });
     const { GoogleGenAI } = await import('@google/genai');
     const ai = new GoogleGenAI({ apiKey: token });

@@ -7915,6 +7915,55 @@ var init_model_selection = __esm({
   }
 });
 
+// ../shared/src/code-models.ts
+function codeMachineOf(machines, named, me) {
+  return machines.find((m) => m.id === named) ?? machines.find((m) => isCloudMachineRow(m) && m.owner_user_id === me) ?? null;
+}
+function machineRuntimeList(m) {
+  try {
+    const r = JSON.parse(m?.runtimes ?? "[]");
+    return Array.isArray(r) ? r.filter((x) => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+function codeProviderStates(machine, configured, geminiKey) {
+  const runtimes2 = machineRuntimeList(machine);
+  const state = (p2) => runtimes2.includes(RUNTIME[p2]) ? "ready" : configured.has(p2) ? "signin" : "connect";
+  const gemini = state("gemini");
+  return { anthropic: state("anthropic"), openai: state("openai"), gemini: gemini === "ready" && geminiKey ? "ready" : "connect" };
+}
+function codeVendorOf(model2) {
+  if (model2 === STARTER_MODEL) return null;
+  try {
+    return providerForModel(model2);
+  } catch {
+    return null;
+  }
+}
+function codeRunsHere(model2, states) {
+  const vendor = codeVendorOf(model2);
+  return vendor === null || states[vendor] === "ready";
+}
+function codeFootText(model2, states, place) {
+  const vendor = codeVendorOf(model2);
+  if (vendor && states[vendor] !== "ready") return `${VENDOR[vendor]} cannot run code on this machine. Pick another model.`;
+  return place === "start" ? "The session starts on this model. With no pick, it runs on the NeuraMesh brain." : "This session runs on this model. A pick here changes it.";
+}
+var RUNTIME, codeModelOf, isCloudMachineRow, VENDOR, CODE_GEMINI_NOTE;
+var init_code_models = __esm({
+  "../shared/src/code-models.ts"() {
+    "use strict";
+    init_model_packs();
+    init_rates();
+    RUNTIME = { anthropic: "claude-code", openai: "codex", gemini: "gemini" };
+    codeModelOf = (pick) => pick || STARTER_MODEL;
+    isCloudMachineRow = (m) => m?.kind === "member" || m?.kind === "runner";
+    VENDOR = { anthropic: "Claude", openai: "ChatGPT", gemini: "Gemini" };
+    CODE_GEMINI_NOTE = "Code needs a Gemini API key. A Google sign-in cannot run code.";
+  }
+});
+
 // ../shared/src/engineering/protocol.ts
 function isEngineeringOpenMeta(value) {
   if (!value || typeof value !== "object") return false;
@@ -9182,6 +9231,7 @@ __export(src_exports, {
   CLAUDE_DESIGN_MCP_URL: () => CLAUDE_DESIGN_MCP_URL,
   CLOUD_SEAT_MONTHLY_CREDITS: () => CLOUD_SEAT_MONTHLY_CREDITS,
   CODE_APPROVAL_CATEGORIES: () => CODE_APPROVAL_CATEGORIES,
+  CODE_GEMINI_NOTE: () => CODE_GEMINI_NOTE,
   CODE_SESSION_COMMANDS: () => CODE_SESSION_COMMANDS,
   CODE_SESSION_MODES: () => CODE_SESSION_MODES,
   CODE_SESSION_STATES: () => CODE_SESSION_STATES,
@@ -9447,9 +9497,15 @@ __export(src_exports, {
   cleanNextItems: () => cleanNextItems,
   cleanReplies: () => cleanReplies,
   cloudMachineFor: () => cloudMachineFor,
+  codeFootText: () => codeFootText,
+  codeMachineOf: () => codeMachineOf,
+  codeModelOf: () => codeModelOf,
+  codeProviderStates: () => codeProviderStates,
+  codeRunsHere: () => codeRunsHere,
   codeSessionEndState: () => codeSessionEndState,
   codeSessionTitle: () => codeSessionTitle,
   codeThreadStatus: () => codeThreadStatus,
+  codeVendorOf: () => codeVendorOf,
   combinedDiff: () => combinedDiff,
   commRulesFrom: () => commRulesFrom,
   compareVersions: () => compareVersions,
@@ -9552,6 +9608,7 @@ __export(src_exports, {
   isAddress: () => isAddress,
   isChatThread: () => isChatThread,
   isCloudBorn: () => isCloudBorn,
+  isCloudMachineRow: () => isCloudMachineRow,
   isCodingThread: () => isCodingThread,
   isCustomPackId: () => isCustomPackId,
   isEchoArtifact: () => isEchoArtifact,
@@ -9609,6 +9666,7 @@ __export(src_exports, {
   machineAvailableTo: () => machineAvailableTo,
   machineKindLabel: () => machineKindLabel,
   machineOnline: () => machineOnline,
+  machineRuntimeList: () => machineRuntimeList,
   machineState: () => machineState,
   machineWaitLine: () => machineWaitLine,
   machineWakeCommand: () => machineWakeCommand,
@@ -10035,6 +10093,7 @@ var init_src = __esm({
     init_templates_announce();
     init_model_labels();
     init_model_selection();
+    init_code_models();
     init_agent_models();
     init_engineering();
     init_releasescan();
@@ -14628,24 +14687,27 @@ function starterAssembly() {
   let usage;
   const top = {};
   return {
-    /** fold one chunk in; answers the words it carried (thought parts are never shown) */
+    /** fold one chunk in; answers the words it carried and, apart from them, its thought summary.
+     *  `thought` is read per part, because one chunk can carry both */
     add(chunk2) {
       const { candidates, usageMetadata, ...rest } = chunk2;
       Object.assign(top, rest);
       if (usageMetadata) usage = { ...usage, ...usageMetadata };
       const first = candidates?.[0];
-      if (!first) return "";
+      if (!first) return { text: "", thought: "" };
       const { content, ...fields } = first;
       cand = { ...cand, ...fields };
       let text2 = "";
+      let thought = "";
       for (const p2 of content?.parts ?? []) {
         if (typeof p2.text === "string" && !p2.thought) text2 += p2.text;
+        if (typeof p2.text === "string" && p2.thought) thought += p2.text;
         if (plainText(p2) && !p2.text) continue;
         const last = parts[parts.length - 1];
         if (last && plainText(p2) && plainText(last)) last.text = `${last.text ?? ""}${p2.text ?? ""}`;
         else parts.push({ ...p2 });
       }
-      return text2;
+      return { text: text2, thought };
     },
     usage: () => usage,
     response: () => ({
@@ -14678,12 +14740,13 @@ function starterReplyStream(o) {
           failure = "UPSTREAM";
           break;
         }
-        const text2 = acc.add(chunk2);
+        const { text: text2, thought } = acc.add(chunk2);
         if (gone) {
           o.abortUpstream();
           failure = "CLIENT_GONE";
           break;
         }
+        if (thought) send({ t: "thought", text: thought });
         if (text2) send({ t: "text", text: text2 });
       }
     } catch {
@@ -14695,7 +14758,7 @@ function starterReplyStream(o) {
       credits = await o.settle(acc.usage());
     } catch (e) {
       const u = acc.usage();
-      o.log?.(`starter_stream_charge_failed in=${u?.promptTokenCount ?? 0} out=${u?.candidatesTokenCount ?? 0}: ${e instanceof Error ? e.message : String(e)}`);
+      o.log?.(`starter_stream_charge_failed in=${u?.promptTokenCount ?? 0} out=${u?.candidatesTokenCount ?? 0} thoughts=${u?.thoughtsTokenCount ?? 0}: ${e instanceof Error ? e.message : String(e)}`);
     }
     if (!credits) send({ t: "error", error: "the charge for this call did not record", code: "INTERNAL" });
     else if (failure) send({ t: "error", error: "starter brain call failed", code: failure });
@@ -14899,7 +14962,10 @@ var GenerateSchema = z13.object({
   /** the turn, already assembled by the caller — this proxy is a transport, not a prompt author */
   contents: z13.unknown(),
   system: z13.string().optional(),
-  tools: z13.unknown().optional()
+  tools: z13.unknown().optional(),
+  /** the machine shows the turn's thought summaries. only on request: an older machine joins every
+   *  part's text, so a thought part would print in its reply */
+  thoughts: z13.boolean().optional()
 });
 var STARTER_MODEL_URL = `https://generativelanguage.googleapis.com/v1beta/models/${STARTER_MODEL}`;
 var houseBrainServes = () => !localMode() && !!process.env["STARTER_GOOGLE_API_KEY"];
@@ -14924,12 +14990,12 @@ function starterRequest(b2) {
     contents: b2.contents,
     ...b2.system ? { systemInstruction: { parts: [{ text: b2.system }] } } : {},
     ...b2.tools ? { tools: b2.tools } : {},
-    generationConfig: { thinkingConfig: { thinkingLevel: STARTER_THINKING_LEVEL } }
+    generationConfig: { thinkingConfig: { thinkingLevel: STARTER_THINKING_LEVEL, ...b2.thoughts ? { includeThoughts: true } : {} } }
   };
 }
 async function chargeStarterCall(ledger, workspace, usage) {
   const inTok = usage?.promptTokenCount ?? 0;
-  const outTok = usage?.candidatesTokenCount ?? 0;
+  const outTok = (usage?.candidatesTokenCount ?? 0) + (usage?.thoughtsTokenCount ?? 0);
   const micros = priceModelCall(STARTER_MODEL, inTok, outTok);
   const spent = await ledger.spend(workspace, micros, { inTokens: inTok, outTokens: outTok });
   return { remaining: microsToCredits(spent ? spent.remainingMicros : 0), spentMicros: micros };

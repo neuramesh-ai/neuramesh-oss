@@ -24,6 +24,7 @@ export const IconFile = ({ s }: { s?: number }) => <Svg s={s}><path d="M14 2H6a2
 export const IconSend = ({ s }: { s?: number }) => <Svg s={s}><path d="M12 19V5" /><path d="m5 12 7-7 7 7" /></Svg>;
 export const IconImage = ({ s }: { s?: number }) => <Svg s={s}><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><circle cx="9" cy="9" r="1.6" /><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21" /></Svg>;
 // message hover-action glyphs (copy · pin · resend)
+export const IconCopy = ({ s }: { s?: number }) => <Svg s={s}><rect x="8" y="8" width="13" height="13" rx="2" /><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3" /></Svg>;
 export const IconResend = ({ s }: { s?: number }) => <Svg s={s}><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" /><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" /><path d="M3 21v-5h5" /></Svg>;
 // repo-connect + code-workspace glyphs (folder · git branch)
 export const IconFolder = ({ s }: { s?: number }) => <Svg s={s}><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" /></Svg>;

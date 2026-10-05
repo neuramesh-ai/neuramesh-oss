@@ -23,7 +23,7 @@ import { failRemoteEngineeringTransport } from './transport-state';
 import { engineeringSessionStorageReady, loadEngineeringSessions, persistEngineeringSessions } from './session-storage';
 import { flashToast } from '../lib/toast';
 import { closeInactiveEngineeringHandles } from './handle-lifecycle';
-import { codeSessionTitle } from '@neuramesh/shared';
+import { codeModelOf, codeSessionTitle } from '@neuramesh/shared';
 
 type RuntimeState = 'checking' | 'ready' | 'unavailable';
 type Handle = ReturnType<NonNullable<NMBridge['openEngineering']>>;
@@ -109,7 +109,8 @@ export function useEngineeringRuntime(harness: boolean, repos: EngineeringRepo[]
       ...(session.project?.id ? { projectId: session.project.id } : {}),
       ...(session.repo.root ? { cwd: session.repo.root } : {}),
       mode: session.mode, permissions: session.permissions, policy: session.policy,
-      modelId: session.modelOverride, brainPack: session.brainPack,
+      // the conversation's own pick, else the NeuraMesh brain (shared code-models.ts): never the project's developer seat
+      modelId: codeModelOf(session.modelOverride), brainPack: session.brainPack,
       // rule D9: which machine hosts this session — the desktop routes its own id in process
       ...(session.machineId ? { machineId: session.machineId } : {}),
     }, (event) => setSessions((all) => all.map((item) => item.id === session.id ? applyRemoteEngineeringEvent(item, event as unknown as Record<string, unknown>) : item)), () => {
@@ -164,10 +165,10 @@ export function useEngineeringRuntime(harness: boolean, repos: EngineeringRepo[]
    *  when it has one, is reopened; else the shell is minted WITH the thread's id and connected, and
    *  the root message goes as the first prompt only when nothing has started the session yet — a
    *  session another client started is resumed through the machine's history discovery instead. */
-  const adopt = (spec: { id: string; repo: EngineeringRepo; project?: EngineeringSession['project']; machineId?: string | null; firstPrompt?: string | null }) => {
+  const adopt = (spec: { id: string; repo: EngineeringRepo; project?: EngineeringSession['project']; machineId?: string | null; firstPrompt?: string | null; modelOverride?: string | null }) => {
     const existing = sessionsRef.current.find((item) => item.id === spec.id); if (existing) { setActiveId(existing.id); connect(existing); return; }
     const text = spec.firstPrompt?.trim() ?? '';
-    const created: EngineeringSession = { ...createEngineeringSession(spec.repo, text ? codeSessionTitle(text) : 'Code thread', spec.project ?? null, spec.machineId ?? defaultMachineId), id: spec.id, ...(harness ? {} : { checkpoints: [] }) };
+    const created: EngineeringSession = { ...createEngineeringSession(spec.repo, text ? codeSessionTitle(text) : 'Code thread', spec.project ?? null, spec.machineId ?? defaultMachineId), id: spec.id, modelOverride: spec.modelOverride ?? null, ...(harness ? {} : { checkpoints: [] }) };
     if (!text) { setSessions((all) => [...all, { ...created, state: 'resumable' }]); setActiveId(spec.id); connect(created); return; }
     setSessions((all) => [...all, harness ? submitEngineeringPrompt(created, text) : beginRemoteEngineeringPrompt(created, text, [])]); setActiveId(spec.id);
     if (harness) return;

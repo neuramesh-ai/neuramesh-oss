@@ -2,9 +2,11 @@
 //
 // The same call as /v1/starter/generate, behind the same guards and priced by the same function,
 // but the reply leaves as the model writes it: one NDJSON line per text delta, then ONE terminal
-// line. `done` carries the exact body the whole-reply door returns (Google's response, assembled
-// here, plus `credits`), so a machine's tool loop cannot tell the two doors apart. `error` means
-// the call failed after the reply began. The platform key never leaves this process.
+// line. A chunk that carries a thought summary (only when the caller asked with `thoughts`) sends
+// it first, on its own `thought` line, so the words never hold a thought. `done` carries the exact
+// body the whole-reply door returns (Google's response, assembled here, plus `credits`), so a
+// machine's tool loop cannot tell the two doors apart. `error` means the call failed after the
+// reply began. The platform key never leaves this process.
 //
 // THE CHARGE IS MADE ONCE, and always after a model call began: `settle` runs exactly once, after
 // the upstream ends, fails, or is stopped, with the vendor's LAST reported usage (Gemini sends
@@ -59,24 +61,27 @@ export function starterAssembly() {
   let usage: GeminiUsage | undefined;
   const top: Record<string, unknown> = {};
   return {
-    /** fold one chunk in; answers the words it carried (thought parts are never shown) */
-    add(chunk: StarterChunk): string {
+    /** fold one chunk in; answers the words it carried and, apart from them, its thought summary.
+     *  `thought` is read per part, because one chunk can carry both */
+    add(chunk: StarterChunk): { text: string; thought: string } {
       const { candidates, usageMetadata, ...rest } = chunk;
       Object.assign(top, rest);
       if (usageMetadata) usage = { ...usage, ...usageMetadata };
       const first = candidates?.[0];
-      if (!first) return '';
+      if (!first) return { text: '', thought: '' };
       const { content, ...fields } = first;
       cand = { ...cand, ...fields };
       let text = '';
+      let thought = '';
       for (const p of content?.parts ?? []) {
         if (typeof p.text === 'string' && !p.thought) text += p.text;
+        if (typeof p.text === 'string' && p.thought) thought += p.text;
         if (plainText(p) && !p.text) continue;
         const last = parts[parts.length - 1];
         if (last && plainText(p) && plainText(last)) last.text = `${last.text ?? ''}${p.text ?? ''}`;
         else parts.push({ ...p });
       }
-      return text;
+      return { text, thought };
     },
     usage: (): GeminiUsage | undefined => usage,
     response: (): Record<string, unknown> => ({
@@ -100,7 +105,8 @@ export interface ReplyStreamOpts {
   log?: (line: string) => void;
 }
 
-/** the NDJSON body: `{"t":"text"}` per delta, then `{"t":"done","response":…}` or `{"t":"error"}` */
+/** the NDJSON body: per chunk `{"t":"thought"}` then `{"t":"text"}`, each only when the chunk carried
+ *  one, then `{"t":"done","response":…}` or `{"t":"error"}` */
 export function starterReplyStream(o: ReplyStreamOpts): ReadableStream<Uint8Array> {
   const enc = new TextEncoder();
   const acc = starterAssembly();
@@ -116,9 +122,10 @@ export function starterReplyStream(o: ReplyStreamOpts): ReadableStream<Uint8Arra
     try {
       for await (const chunk of sseChunks(o.upstream)) {
         if (chunk.error) { failure = 'UPSTREAM'; break; }
-        const text = acc.add(chunk);
+        const { text, thought } = acc.add(chunk);
         // the client left and the vendor's numbers are in hand: stop the call, then charge it
         if (gone) { o.abortUpstream(); failure = 'CLIENT_GONE'; break; }
+        if (thought) send({ t: 'thought', text: thought });
         if (text) send({ t: 'text', text });
       }
     } catch { failure = gone ? 'CLIENT_GONE' : 'UPSTREAM'; }
@@ -126,7 +133,7 @@ export function starterReplyStream(o: ReplyStreamOpts): ReadableStream<Uint8Arra
     let credits: StarterCredits | null = null;
     try { credits = await o.settle(acc.usage()); } catch (e) {
       const u = acc.usage();
-      o.log?.(`starter_stream_charge_failed in=${u?.promptTokenCount ?? 0} out=${u?.candidatesTokenCount ?? 0}: ${e instanceof Error ? e.message : String(e)}`);
+      o.log?.(`starter_stream_charge_failed in=${u?.promptTokenCount ?? 0} out=${u?.candidatesTokenCount ?? 0} thoughts=${u?.thoughtsTokenCount ?? 0}: ${e instanceof Error ? e.message : String(e)}`);
     }
     if (!credits) send({ t: 'error', error: 'the charge for this call did not record', code: 'INTERNAL' });
     else if (failure) send({ t: 'error', error: 'starter brain call failed', code: failure });

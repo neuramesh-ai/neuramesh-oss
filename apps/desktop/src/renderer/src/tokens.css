@@ -6354,7 +6354,9 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 .hcomposer:focus-within { border-color: var(--ring); box-shadow: var(--shadow-lift); }
 .hcomposer textarea { min-height: 40px; }
 .hcomposer textarea::placeholder { color: var(--dim); }
-.hrow { display: flex; align-items: center; gap: 6px; margin-top: 8px; position: relative; }
+/* the row WRAPS, as the coding composer's does: a side panel open on Home narrows the box, and a chip that
+   joins the row (the Code model chip, 2026-10-04) must push the tail to a second row, never under its neighbour */
+.hrow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; position: relative; }
 .hchip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 9px; border-radius: var(--r-md); border: 1px solid var(--border); background: var(--panel); color: var(--muted); font-size: 11.5px; font-weight: 600; cursor: pointer; transition: color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease); }
 .hchip:hover { color: var(--text); border-color: var(--hover-border); }
 /* The brain pill is a shared .cchip and used to arrive here wearing the CHANNEL composer's skin,
@@ -6429,6 +6431,9 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
    `.stagesugg` / `.stagepill` retired with it. */
 .cfoot { display: flex; align-items: center; gap: 8px; margin: 10px -14px -11px; padding: 8px 14px; min-height: 43px; border-top: 1px solid color-mix(in srgb, var(--border) 50%, transparent); background: color-mix(in srgb, var(--panel2) 30%, transparent); border-radius: inherit; border-top-left-radius: 0; border-top-right-radius: 0; }
 .cfootpills { display: flex; align-items: center; gap: 5px; min-width: 0; transition: opacity var(--dur-fast) var(--ease); }
+/* a narrow box (a side panel open on Home) scrolls the pills under their own edge, never under the marks */
+.cfootpills { overflow-x: auto; scrollbar-width: none; }
+.cfootpills::-webkit-scrollbar { display: none; }
 /* a draft in the box: the pills leave, the marks stay, and the foot keeps its height — the seat stays
    reserved so the box never jumps under the first keystroke (the settle control's rule, docs/33 §4) */
 .cfoot.drafting .cfootpills { opacity: 0; pointer-events: none; }
@@ -6489,6 +6494,13 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 .connhint b, .connpopbody p b { color: var(--text); font-weight: 600; }
 .connwait { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); }
 .connwait i { width: 6px; height: 6px; border-radius: var(--r-full); background: var(--warn); }
+/* the GitHub wait (George, 2026-10-04): the countdown to the next check holds its width as the digit turns, the copy
+   door is a square beside the act it backs up, and what Check again found sits under the acts */
+.connwait[role='timer'] { font-variant-numeric: tabular-nums; }
+.btn.ghcopy { width: 28px; height: 28px; padding: 0; justify-content: center; color: var(--muted); }
+.btn.ghcopy:hover { color: var(--text); }
+.hgateacts .btn.ghcopy { width: 34px; height: 34px; padding: 0; }
+.connheard { margin: 6px 0 0; font-size: 11.5px; color: var(--muted); line-height: 1.45; }
 .inpick { border: 1px solid var(--border2); border-radius: 6px; background: var(--panel2); padding: 3px 4px; margin: 2px 0 6px; }
 .inpick .picklist { margin: 0; }
 .mkconnpick { padding: 6px 2px 8px; border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent); }
@@ -6585,6 +6597,7 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, [contentedita
 .codingthread .codingbox .codingknobs { display: flex; align-items: center; gap: 9px; margin-left: auto; flex: none; }
 .codingthread .codingbox .codingseg { flex: none; }
 .codingthread .codingbox .codingperm { position: relative; }
+.codingthread .codingbox .engpermtrigger { max-width: 260px; }
 .codingthread .codingbox .engpermtrigger .lbl { white-space: nowrap; max-width: 220px; }
 .codingthread .codingbox .trow .tsend { margin-left: 0; }
 .codingthread .cbox.codingbox.waiting { padding-bottom: 12px; }
@@ -8982,3 +8995,59 @@ button.dprovideropt:hover:not(:disabled), .dprovideropt.external:hover { border-
 .bnacts { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px; }
 .bnacts .authcard { margin: 0; max-width: none; flex: 1 1 360px; }
 .authcard.switched { border-color: var(--border2); }
+
+/* ── the model chip (models-and-replies round, boards D1 and D2), on the desktop for the Code chip ────────────
+   A coding session's model knob (models/CodeModelChip, 2026-10-04): the browser client's chip and menu, on the
+   composer-menu frame (.cprojpop) and tokens only, so graphite and cream oak follow without a second rule. The
+   desktop's main composers keep the brain pill, so the agent chip's rules stay on the web. */
+.cchip.cmodel .g { flex: none; display: inline-grid; place-items: center; }
+.cchip.cmodel .lbl { max-width: 150px; }
+.cchip .lv { color: var(--dim); font-weight: 500; flex: none; }
+.cchip .wdot { width: 6px; height: 6px; border-radius: 50%; background: var(--warn); flex: none; }
+.cprojpop.cmodpop { width: 330px; padding: 0; overflow-y: auto; }
+.cprojpop.cmodpop.flip { left: auto; right: 0; } /* a chip near the pane's right edge opens leftward (ModelChipView) */
+.cmodhead { display: flex; align-items: center; gap: 6px; padding: 10px 12px 8px; margin: 0; border-bottom: 1px solid var(--border); }
+.cmodhead b { color: var(--text); font-weight: 600; }
+.cmodhead span { color: var(--dim); }
+.cmodgroup { padding: 4px 6px; }
+.cmodgroup + .cmodgroup { border-top: 1px solid var(--border); }
+.cmodprov { display: flex; align-items: center; gap: 7px; min-height: 28px; padding: 3px 6px; color: var(--muted); font-size: 11px; }
+.cmodprov b { color: var(--body); font-weight: 500; flex: 1; }
+.cmodst { display: inline-flex; align-items: center; gap: 5px; font: 600 9.5px var(--fmono); text-transform: uppercase; letter-spacing: -.02em; color: var(--done); }
+.cmodst i { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+.cmodfix { padding: 3px 8px; border: 1px solid color-mix(in srgb, var(--brand) 52%, var(--border)); border-radius: var(--r-xs); background: color-mix(in srgb, var(--brand) 10%, transparent); color: var(--link); font: 600 10px var(--fmono); text-transform: uppercase; letter-spacing: -.02em; cursor: pointer; }
+.cmodfix:hover { background: color-mix(in srgb, var(--brand) 18%, transparent); }
+.cmodnote { padding: 0 6px 4px; font-size: 11px; color: var(--dim); line-height: 1.4; }
+.cmodrow { display: flex; flex-wrap: wrap; align-items: center; border-radius: var(--r-sm); }
+.cmodrow.on { background: var(--sel-bg); }
+.cmodpick { flex: 1; min-width: 0; display: flex; align-items: center; gap: 9px; min-height: 34px; padding: 5px 4px 5px 8px; border: none; background: none; color: var(--text); font: inherit; font-size: 13px; text-align: left; cursor: pointer; border-radius: var(--r-sm); }
+.cmodrow:not(.on) .cmodpick:hover:not(:disabled) { background: var(--hover-bg); }
+.cmodpick:disabled { cursor: default; }
+.cmodpick .mk { width: 18px; height: 18px; display: grid; place-items: center; flex: none; }
+.cmodpick .nm { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cmodpick .lv { font-size: 12px; color: var(--muted); flex: none; }
+.cmodpick .cr { font: 600 9.5px var(--fmono); text-transform: uppercase; letter-spacing: -.02em; color: var(--dim); flex: none; }
+.cmodpick .cprojck { color: var(--done); }
+.cmodrow.off .cmodpick { color: var(--dim); }
+.cmodrow.off .cmodpick .mk { opacity: .55; }
+.cmodchev { flex: none; width: 24px; height: 28px; margin-right: 4px; border: none; background: none; color: var(--dim); font-size: 15px; line-height: 1; cursor: pointer; border-radius: var(--r-sm); }
+.cmodchev:hover, .cmodrow.lvopen .cmodchev { color: var(--text); background: var(--hover-bg); }
+.cmodlv { flex-basis: 100%; display: flex; align-items: center; gap: 2px; margin: 0 8px 7px 35px; padding: 2px; background: var(--panel2); border: 1px solid var(--border2); border-radius: var(--r-md); }
+.cmodlv .k { padding: 0 8px 0 6px; font: 500 9.5px var(--fmono); text-transform: uppercase; letter-spacing: -.02em; color: var(--dim); }
+.cmodlv button { flex: 1; padding: 4px 6px; border: none; border-radius: 4px; background: none; color: var(--muted); font: 500 10.5px var(--fmono); text-transform: uppercase; letter-spacing: -.02em; cursor: pointer; }
+.cmodlv button:hover { color: var(--text); }
+.cmodlv button.on { background: var(--sel-bg); color: var(--text); box-shadow: inset 0 0 0 1px var(--border2); }
+.cmodmenu .cmachfoot { padding: 8px 12px; border-top: 1px solid var(--border); font-size: 11px; }
+/* THE CODING THREAD'S PERMISSIONS (George, 2026-10-04: "too slim"): the house popover from the chip's right
+   edge, one row per category, its state word in the model menu's mono at the right */
+.cprojpop.cpermpop { width: 320px; padding: 0; left: auto; right: 0; max-height: min(460px, calc(100vh - 120px)); overflow-y: auto; }
+.cpermlist { padding: 4px 6px; }
+.cpermrow { width: 100%; display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; align-items: center; gap: 10px; min-height: 44px; padding: 6px 8px; border: none; border-radius: var(--r-sm); background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.cpermrow:hover:not(:disabled) { background: var(--hover-bg); }
+.cpermrow:disabled { opacity: .5; cursor: default; }
+.cpermtxt { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.cpermtxt b { font-size: 13px; font-weight: 500; color: var(--text); }
+.cpermtxt small { font-size: 11px; color: var(--muted); line-height: 1.35; }
+.cpermst { font: 600 9.5px var(--fmono); text-transform: uppercase; letter-spacing: -.02em; color: var(--dim); white-space: nowrap; }
+.cpermst.auto { color: var(--done); }
+.cpermpop .cmachfoot { padding: 8px 12px; border-top: 1px solid var(--border); font-size: 11px; }
