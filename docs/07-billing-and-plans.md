@@ -102,7 +102,7 @@ ledger: `packages/control-api/src/credit-ledger.ts` · dashboard: the **Credits*
 
 | Draw | Rate |
 |---|---|
-| Brain (starter model via `POST /v1/starter/generate`, or `/v1/starter/stream` for a reply that types itself out, one price for both: docs/10 §15.9) | vendor-reported tokens × list price (`MODEL_RATES`); unknown model = 0, never a guess |
+| Brain (starter model via `POST /v1/starter/generate`, or `/v1/starter/stream` for a reply that types itself out, one price for both: docs/10 §15.9) | vendor-reported tokens × list price (`MODEL_RATES`), and the thinking tokens at the output rate, as Google bills them (2026-10-04). An unknown model costs 0, never a guess. |
 | Machine, **active** | **1 credit / 10 worked minutes** (`MACHINE_MICROS_PER_ACTIVE_MINUTE`); the daemon samples work every 5 s and reports `activeSeconds` on each heartbeat |
 | Machine, standby | free — bounded by the **48 h idle stop** (`NM_IDLE_STOP_MIN`, default 2880; `idle_stop_min IS NULL` = never) |
 | Storage | included per plan (10 GB free / 50 GB cloud, `planDiskGb`); `STORAGE_MICROS_PER_GB_HOUR` is `null` — **not metered yet** |

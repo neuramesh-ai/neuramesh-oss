@@ -12,12 +12,13 @@ import { createElement as h, type ReactElement, type ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { githubConnectedMarker, needDecisionQuestion, parseNeed } from '@neuramesh/shared';
 import { answersResolver } from '../answers';
-import type { GitHubGrant } from '../settings/GitHubStep';
+import { heardOf, type GitHubGrant } from '../settings/GitHubStep';
 import { connectedSigns, GitHubGateFace } from './GitHubGate';
 
 const grant = (over: Partial<GitHubGrant>): GitHubGrant => ({
   phase: 'idle', repos: null, hint: null, pick: null, setPick: () => {}, note: null, connected: null,
-  ask: async () => false, grant: async () => {}, connect: async () => {}, ...over,
+  ask: async () => false, grant: async () => {}, wait: () => {}, connect: async () => {},
+  install: null, nextIn: null, check: async () => {}, checking: false, heard: null, ...over,
 });
 const gate = { channelId: 'c-1', room: 'dev', repoName: 'flowe-mobile', folder: true };
 const draw = (props: Parameters<typeof GitHubGateFace>[0]) => renderToStaticMarkup(h(GitHubGateFace, props));
@@ -91,4 +92,28 @@ test('the gate asks again when a sign moves, never at mount: the quiet ask draws
   assert.match(src, /const signs = useContext\(GitHubSigns\);/);
   assert.match(src, /const was = useRef\(signs\);/);
   assert.match(src, /useEffect\(\(\) => \{ if \(was\.current === signs\) return; was\.current = signs; void ask\(\); \}, \[signs, ask\]\);/);
+});
+
+// George, 2026-10-04: "clicking check again does nothing", a copy icon for the link, and a countdown in place of
+// "This card checks every 5 s"
+test('the wait counts down to the next check, offers the link to copy, and says what Check again found', () => {
+  const link = 'https://github.com/apps/neuramesh/installations/new?state=s';
+  const waiting = draw({ ...gate, g: grant({ phase: 'waiting', nextIn: 4, install: link }), onConnected: () => {} });
+  assert.match(waiting, /Refreshes in 4 s/);
+  assert.doesNotMatch(waiting, /checks every/i);
+  assert.match(waiting, /<button[^>]*>Check again<\/button>/);
+  assert.match(waiting, /aria-label="Copy the GitHub link"/);
+  // a check in flight says so, and a check that found nothing says that too
+  assert.match(draw({ ...gate, g: grant({ phase: 'waiting', nextIn: 5, checking: true }), onConnected: () => {} }), /<button[^>]*disabled[^>]*>Checking…<\/button>/);
+  const heard = draw({ ...gate, g: grant({ phase: 'waiting', nextIn: 5, heard: heardOf([]) }), onConnected: () => {} });
+  assert.match(heard, /role="status">GitHub shows no access yet\. Finish the steps there, then check again\.</);
+  // the grant face offers the same link beside its door, and no link means no copy door
+  assert.match(draw({ ...gate, g: grant({ install: link }), onConnected: () => {} }), /aria-label="Copy the GitHub link"/);
+  assert.doesNotMatch(draw({ ...gate, g: grant({}), onConnected: () => {} }), /Copy the GitHub link/);
+});
+
+test('Check again names what it found: no answer, no access yet, or nothing to say when the pick shows', () => {
+  assert.equal(heardOf(null), 'The check did not get an answer. Try again.');
+  assert.equal(heardOf([]), 'GitHub shows no access yet. Finish the steps there, then check again.');
+  assert.equal(heardOf(['acme/app']), null);
 });

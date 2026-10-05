@@ -12,7 +12,7 @@ import { useEffect, useRef, useState } from 'react';
 import { nm as nmBridge } from '../bridge/nm';
 import { needDecisionQuestion, type ConnectProvider, type NmNeed } from '@neuramesh/shared';
 import { ConnectorMark } from '../settings/connector-marks';
-import { PickActs, RepoPick, useGitHubGrant } from '../settings/GitHubStep';
+import { CopyInstall, PickActs, RepoPick, useGitHubGrant } from '../settings/GitHubStep';
 import { IconCheck } from '../ui/icons';
 import { AttachRepo } from './AttachRepo';
 
@@ -54,15 +54,16 @@ function GitHubNeed({ channelId, why, answer, connected, onConnected }: { channe
     );
   }
   const waiting = g.phase === 'waiting';
-  const word = g.phase === 'busy' ? 'Please wait…' : waiting ? 'Finish on GitHub, then check again' : 'Connect GitHub';
+  const word = g.phase === 'busy' ? 'Please wait…' : g.checking ? 'Checking…' : waiting ? 'Finish on GitHub, then check again' : 'Connect GitHub';
   return (
     <>
       <div className="ndwhy">{why}</div>
-      <button className="ndopt primary" disabled={g.phase === 'busy' || g.phase === 'asking'} onClick={() => void (waiting ? g.ask(true) : g.grant())}>
+      <button className="ndopt primary" disabled={g.phase === 'busy' || g.phase === 'asking' || g.checking} onClick={() => void (waiting ? g.check() : g.grant())}>
         <span className="g" aria-hidden><ConnectorMark id="github" s={14} /></span>
         <span className="ndtxt"><b>{word}</b><span>{waiting ? 'GitHub is open in a new tab.' : 'One minute on GitHub. You pick the repositories.'}</span></span>
       </button>
-      {waiting && <div className="connacts"><span className="connwait"><i aria-hidden />This card checks every 5 s</span></div>}
+      {waiting && <div className="connacts"><CopyInstall href={g.install} />{g.nextIn !== null && <span className="connwait" role="timer" aria-live="off"><i aria-hidden />Refreshes in {g.nextIn} s</span>}</div>}
+      {waiting && g.heard && <p className="connheard" role="status">{g.heard}</p>}
       {g.note && <div className="nderr">{g.note}</div>}
     </>
   );

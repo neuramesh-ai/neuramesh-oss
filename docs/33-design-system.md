@@ -752,7 +752,10 @@ real work — if it is decoration, drop it and keep the pill.
   monochrome geometry** (`IconX` … `IconTikTokAds`, the provider-marks precedent), never a colour logo
   and never a text glyph, and the Connections rows wear the same marks. **With a draft in the box the
   pills leave and the marks stay, and the foot keeps its height** (`.cfoot.drafting`) — the reserved
-  seat, so the box never jumps under the first keystroke. State is ONE derivation
+  seat, so the box never jumps under the first keystroke. A box made narrow (a side panel open on
+  Home) scrolls the pills sideways under their own edge (`.cfootpills`, no scrollbar), never under
+  the marks, and the chips row above WRAPS (`.hrow`), as the coding composer's does (2026-10-04).
+  State is ONE derivation
   (`settings/connectors.ts`, tested) shared with the room's Connections list, read for the room the
   composer targets; the connect step is ONE component (`settings/ConnectPanel.tsx`) rendered by both.
   Only Home wears the foot. The thread composer, the launcher and the phone do not.
@@ -811,6 +814,13 @@ real work — if it is decoration, drop it and keep the pill.
   agent is a form in the same body, with role pills, never a select. Off the composer (Settings ›
   Models, the agent page) the list opens in place of the table or under the field, the rule for a
   container that scrolls. The brain pill below stays the desktop's until it ports these.
+  **On a coding session** (2026-10-04, [code model chip](design/code-model-chip-2026-10/plan.md)) the
+  same chip and menu (`ModelChipView`) name the SESSION's model (`models/CodeModelChip.tsx`): the
+  conversation's own pick, else the NeuraMesh brain, never the project's developer seat. Its groups
+  read the one machine the session runs on (shared `code-models.ts`), Gemini is ready on an API key only
+  (the group note says why: the coding runtime has no lane for a Google sign-in), and the menu has
+  no levels, because the coding protocol carries none. A composer with a repository picked keeps
+  the chip, and the pick rides the birth into the coding thread.
 - **The code face** (same round; visual contract `Thread.dc.html`) is what a coding thread ADDS to
   the one session surface, never a second surface. `.threadpanel.convo.codingthread` keeps the
   session head (crumb, title, the mode chip `c-plan` | `c-act`, the status chip, and the Workbench
@@ -824,7 +834,10 @@ real work — if it is decoration, drop it and keep the pill.
   `.tcompose > .cbox.codingbox`: the chips row (attach · model · machine: the room and the
   repository are not switchable in a coding thread, so they are not chips, and the branch shows in
   the code pane's foot, George, 2026-09-26) and the two knobs, the `Plan | Act` `.threadseg` and
-  the permissions chip (`Reads run · edits ask`). The row WRAPS: the knobs and Send travel as one
+  the permissions chip (`Reads run · edits ask`), whose menu is the house popover hung from the
+  chip's right edge (`.cprojpop.cpermpop`, 320px): one `.cpermrow` per category, its checkbox, its
+  name and detail, and the state word in mono at the right (`Runs` in `--done`, `Asks`, `Not in
+  Plan`), the same words as the chip. The row WRAPS: the knobs and Send travel as one
   group (`.codingknobs`) that takes its own row when the chips fill the first, and the box grows
   (nothing is cut off). No chint in the thread: the consequence line lives on New chat, where the
   pick is made, not on every reply. **The Workbench holds the
@@ -853,7 +866,7 @@ real work — if it is decoration, drop it and keep the pill.
   connected`) in `--done`. The faces follow the GitHub step's one state machine (`useGitHubGrant`):
   the grant (`.ndwhy` + one `.ndopt.primary` row, `Connect GitHub` · `One minute on GitHub. You pick
   the repositories.`), the wait (the same row reads `Finish on GitHub, then check again`, and
-  `.needcard .connacts` holds the 5 s `.connwait` line), the pick (`.inpick` rows, the folder's
+  `.needcard .connacts` holds the copy door and the countdown), the pick (`.inpick` rows, the folder's
   namesake marked `your folder`, `Connect` primary and `Add more on GitHub` ghost), and connected
   (`.ndopt .g.ok`, the repository and `The neuramesh app reads it for this project.`). The foot is
   the card's own `after` line (`rex continues here when GitHub is connected.`), then `The work
@@ -861,7 +874,13 @@ real work — if it is decoration, drop it and keep the pill.
   says "read only". The grant's divider is the run divider (`.srundiv`): `You connected GitHub ·
   owner/repo · Today, 21:36`. A coding thread holds the same card in its gate seat: `.hgate.coding`
   with a warm eyebrow (`.hgateeye.warm` in `--warn`, `coding · #room · repo · waits for GitHub`) and the faces
-  `Connect GitHub to code here`, `Finish on GitHub`, `Pick the repository` (`.hgate .inpick`). The
+  `Connect GitHub to code here`, `Finish on GitHub`, `Pick the repository` (`.hgate .inpick`).
+  Every wait (2026-10-04, George: "clicking check again does nothing") counts down to its next check
+  (`.connwait[role=timer]`: `Refreshes in 5 s`, then 4 to 1, tabular digits), shows `Checking…` on
+  Check again and then says what it found (`.connheard`, quiet `--muted` under the acts), and carries
+  the **copy door** (`.btn.ghcopy`, a square with `IconCopy`): GitHub's install link from the
+  server's own answer, for a browser tab of the person's choosing. A copy from the grant face starts
+  the wait, as the grant's own tab does. The
   Workbench's foot reads `waits for GitHub`, and while it waits the transcript hides the session's
   `Ready in` greeting and any GitHub card rex posted before the thread turned to code: the gate seat
   holds the one card. The gate is quiet: its mount ask never opens the session. A connected answer the

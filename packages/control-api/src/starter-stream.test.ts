@@ -5,7 +5,7 @@
 // in Google's own shape, CRLF included, as recorded from gemini-3.5-flash-lite on 2026-09-25.
 import { Hono } from 'hono';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { STARTER_MODEL, priceModelCall } from '@neuramesh/shared';
+import { STARTER_MODEL, STARTER_THINKING_LEVEL, priceModelCall } from '@neuramesh/shared';
 import { creditRoutes, type Ledger } from './credits.js';
 import { sseChunks, starterAssembly, starterReplyStream, type StarterChunk } from './starter-stream.js';
 import type { Store } from './store';
@@ -23,6 +23,17 @@ const CALL_ROUND: StarterChunk[] = [
   textChunk('', 23, { finishReason: 'STOP' }),
 ];
 const REPLY: StarterChunk[] = [textChunk('Hel', 1), textChunk('lo, ', 3), textChunk('world', 4), textChunk('', 4, { finishReason: 'STOP' })];
+const partsChunk = (parts: Array<{ text?: string; thought?: boolean; thoughtSignature?: string }>, out: number): StarterChunk =>
+  ({ candidates: [{ content: { parts, role: 'model' }, index: 0 }], usageMetadata: usage(72, out), modelVersion: STARTER_MODEL, responseId: 'r-2' });
+/** a round with thought summaries on, in the shape Google's thinking docs give (not a recording: at
+ *  the starter's level the model seldom thinks). A chunk with only a thought, then one chunk with a
+ *  thought and words, and the signature on the last thought */
+const THINK_ROUND: StarterChunk[] = [
+  partsChunk([{ text: '**Reading the ask**', thought: true }], 0),
+  partsChunk([{ text: ' The user wants the time.', thought: true, thoughtSignature: 'dGhvdWdodA==' }, { text: 'It is' }], 3),
+  textChunk(' noon.', 5),
+  textChunk('', 5, { finishReason: 'STOP' }),
+];
 
 const sseBytes = (chunks: StarterChunk[]): Uint8Array => enc.encode(chunks.map((c) => `data: ${JSON.stringify(c)}\r\n\r\n`).join(''));
 
@@ -48,11 +59,14 @@ function sseBody(chunks: StarterChunk[], o: { pieces?: number; then?: 'close' | 
   });
 }
 
+/** the turn a machine posts, as the machines before the thoughts flag post it */
+const ASK = { workspace: WS, contents: [{ role: 'user', parts: [{ text: 'hi' }] }], system: 'be brief' };
+
 type Script = { status?: number; json?: unknown; sse?: StarterChunk[]; then?: 'close' | 'error' | 'hang'; delayMs?: number };
 function upstream(script: Script) {
-  const calls: Array<{ url: string; body: unknown; signal?: AbortSignal | null }> = [];
+  const calls: Array<{ url: string; raw: string; body: unknown; signal?: AbortSignal | null }> = [];
   const fetchFn = async (url: string, init: RequestInit): Promise<Response> => {
-    calls.push({ url, body: JSON.parse(String(init.body)), signal: init.signal });
+    calls.push({ url, raw: String(init.body), body: JSON.parse(String(init.body)), signal: init.signal });
     if (script.sse) return new Response(sseBody(script.sse, { then: script.then, signal: init.signal ?? undefined, delayMs: script.delayMs }), { status: script.status ?? 200, headers: { 'content-type': 'text/event-stream' } });
     return new Response(JSON.stringify(script.json ?? {}), { status: script.status ?? 200, headers: { 'content-type': 'application/json' } });
   };
@@ -72,7 +86,7 @@ function mk(script: Script, over: { balance?: number; members?: string[] } = {})
   const app = new Hono();
   app.use('/v1/*', async (c, next) => { c.set('actor' as never, { kind: 'human', id: 'u-me' } as never); await next(); });
   creditRoutes(app as never, store, ledger, up.fetchFn);
-  const post = (path: string, body: unknown = { workspace: WS, contents: [{ role: 'user', parts: [{ text: 'hi' }] }], system: 'be brief' }) =>
+  const post = (path: string, body: unknown = ASK) =>
     app.request(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
   return { post, spends, chargedOnce, calls: up.calls };
 }
@@ -125,6 +139,17 @@ describe('the streamed door answers as the model writes', () => {
     expect(gres.headers.get('x-nm-credits-remaining')).toBe(String(done.response.credits.remaining));
   });
 
+  it('charges the thinking tokens at the output rate, on both doors, as Google bills them', async () => {
+    const final = { ...usage(11_700, 400), thoughtsTokenCount: 269 };
+    const s = mk({ sse: [{ ...textChunk('ok', 1), usageMetadata: usage(11_700, 1) }, { ...textChunk('', 400, { finishReason: 'STOP' }), usageMetadata: final }] });
+    await lines(await s.post('/v1/starter/stream'));
+    const g = mk({ json: { candidates: [{ content: { role: 'model', parts: [{ text: 'ok' }] }, finishReason: 'STOP' }], usageMetadata: final } });
+    await g.post('/v1/starter/generate');
+    const want = [{ workspace: WS, micros: priceModelCall(STARTER_MODEL, 11_700, 669), tokens: { inTokens: 11_700, outTokens: 669 } }];
+    expect(s.spends).toEqual(want);
+    expect(g.spends).toEqual(want);
+  });
+
   it('a function-call round arrives intact: the call, its id, its signature', async () => {
     const out = await lines(await mk({ sse: CALL_ROUND }).post('/v1/starter/stream'));
     expect(out.filter((l) => l.t === 'text').map((l) => l.text)).toEqual(['I will', ' check the time now.']);
@@ -133,6 +158,73 @@ describe('the streamed door answers as the model writes', () => {
       { text: 'I will check the time now.' },
       { functionCall: { name: 'get_time', args: { zone: 'UTC' }, id: 'call_1' }, thoughtSignature: 'c2lnbmVk' },
     ]);
+  });
+});
+
+describe('thought summaries, only when the machine asks (the starter-thoughts round)', () => {
+  const THINK = { ...ASK, thoughts: true };
+  const thinkingConfig = (t: { calls: Array<{ body: unknown }> }): unknown =>
+    (t.calls[0]!.body as { generationConfig: { thinkingConfig: unknown } }).generationConfig.thinkingConfig;
+
+  it('with the flag, both doors ask Google for thought summaries at the same level', async () => {
+    const s = mk({ sse: THINK_ROUND });
+    await (await s.post('/v1/starter/stream', THINK)).text();
+    const g = mk({ json: {} });
+    await (await g.post('/v1/starter/generate', THINK)).text();
+    expect(thinkingConfig(s)).toEqual({ thinkingLevel: STARTER_THINKING_LEVEL, includeThoughts: true });
+    expect(g.calls[0]!.body).toEqual(s.calls[0]!.body);
+  });
+
+  it('without the flag, Google gets the request from before the flag, byte for byte (a guard)', async () => {
+    // an older machine joins every part's text, so a thought part it never asked for would print in its reply
+    const before = JSON.stringify({ contents: ASK.contents, systemInstruction: { parts: [{ text: ASK.system }] }, generationConfig: { thinkingConfig: { thinkingLevel: STARTER_THINKING_LEVEL } } });
+    const s = mk({ sse: REPLY });
+    await (await s.post('/v1/starter/stream')).text();
+    const off = mk({ sse: REPLY });
+    await (await off.post('/v1/starter/stream', { ...ASK, thoughts: false })).text();
+    const g = mk({ json: {} });
+    await (await g.post('/v1/starter/generate')).text();
+    expect([s, off, g].map((t) => t.calls[0]!.raw)).toEqual([before, before, before]);
+  });
+
+  it('a thoughts flag that is not a boolean is 400, before any model call', async () => {
+    const t = mk({ sse: REPLY });
+    expect((await t.post('/v1/starter/stream', { ...ASK, thoughts: 'yes' })).status).toBe(400);
+    expect(t.calls).toHaveLength(0);
+  });
+
+  it('a chunk with a thought and words sends the thought line first, and a chunk with only a thought sends only a thought line', async () => {
+    const out = await lines(await mk({ sse: THINK_ROUND }).post('/v1/starter/stream', THINK));
+    expect(out.slice(0, -1)).toEqual([
+      { t: 'thought', text: '**Reading the ask**' },
+      { t: 'thought', text: ' The user wants the time.' },
+      { t: 'text', text: 'It is' },
+      { t: 'text', text: ' noon.' },
+    ]);
+    expect(out.at(-1)!.t).toBe('done');
+  });
+
+  it('a thought never reaches a text line, and every thought part reaches the thought line, in whatever order one chunk holds its parts (a guard)', async () => {
+    const mixed = partsChunk([{ text: 'A', thought: true }, { text: 'one' }, { text: 'B', thought: true }, { text: ' two' }], 4);
+    const out = await lines(await mk({ sse: [mixed] }).post('/v1/starter/stream', THINK));
+    expect(out.filter((l) => l.t === 'text')).toEqual([{ t: 'text', text: 'one two' }]);
+    expect(out.filter((l) => l.t === 'thought')).toEqual([{ t: 'thought', text: 'AB' }]);
+  });
+
+  it('done keeps each thought part as Google sent it: apart, unmerged, the signature intact (a guard)', async () => {
+    const out = await lines(await mk({ sse: THINK_ROUND }).post('/v1/starter/stream', THINK));
+    expect(out.at(-1)!.response.candidates[0].content.parts).toEqual([
+      { text: '**Reading the ask**', thought: true },
+      { text: ' The user wants the time.', thought: true, thoughtSignature: 'dGhvdWdodA==' },
+      { text: 'It is noon.' },
+    ]);
+  });
+
+  it('two unsigned thought pieces in a row stay two parts in done, as Google streamed them (a guard)', async () => {
+    const pieces = [partsChunk([{ text: 'one', thought: true }], 0), partsChunk([{ text: ' two', thought: true }], 0), textChunk('ok', 1), textChunk('', 1, { finishReason: 'STOP' })];
+    const out = await lines(await mk({ sse: pieces }).post('/v1/starter/stream', THINK));
+    expect(out.filter((l) => l.t === 'thought')).toEqual([{ t: 'thought', text: 'one' }, { t: 'thought', text: ' two' }]);
+    expect(out.at(-1)!.response.candidates[0].content.parts).toEqual([{ text: 'one', thought: true }, { text: ' two', thought: true }, { text: 'ok' }]);
   });
 });
 
@@ -271,8 +363,8 @@ describe('the pure parts', () => {
     const r = a.response() as { candidates: Array<{ content: { parts: unknown[] }; finishReason: string }> };
     expect(r.candidates[0]!.content.parts).toEqual([{ text: 'ab' }, { text: '', thoughtSignature: 'sig' }, { text: 'thinking', thought: true }]);
     expect(r.candidates[0]!.finishReason).toBe('STOP');
-    // a thought part is never words for the bubble
-    expect(starterAssembly().add({ candidates: [{ content: { parts: [{ text: 'hidden', thought: true }, { text: 'shown' }] } }] })).toBe('shown');
+    // a thought part is never words for the bubble: it comes back apart
+    expect(starterAssembly().add({ candidates: [{ content: { parts: [{ text: 'hidden', thought: true }, { text: 'shown' }] } }] })).toEqual({ text: 'shown', thought: 'hidden' });
   });
 
   it('a blocked prompt (no candidates) assembles to Google\'s own shape', () => {

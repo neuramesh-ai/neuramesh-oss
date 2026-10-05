@@ -1,27 +1,30 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { STARTER_MODEL } from '@neuramesh/shared';
 import { resolveEngineeringBrain } from './engineering-brain';
 
 const opts = { apiUrl: 'https://api.test', machineToken: 'nmm_test', workspaceId: 'workspace-1' };
 
-test('Engineering resolves the configured project developer brain', async () => {
+// George, 2026-10-04: a coding conversation runs the model picked for it, else the NeuraMesh brain. The
+// developer seat and the project's pack no longer set it (a Gemini seat stranded the first prompt)
+test('with no pick, Code runs the NeuraMesh brain, never the project developer brain', async () => {
   const calls: Array<{ sql: string; parameters?: unknown[] }> = [];
   const db = { getAll: async <T>(sql: string, parameters?: unknown[]) => {
     calls.push({ sql, parameters });
     if (sql.includes('from agents')) return [{ id: 'patch-1', model: 'claude-sonnet-4-6', model_source: 'pack' } as T];
     return [{ model_pack: 'openai-core' } as T];
   } };
-  assert.deepEqual(await resolveEngineeringBrain(db, opts, { repoId: 'repo-1' }), { modelId: 'gpt-5.6-terra', agentId: 'patch-1' });
+  assert.deepEqual(await resolveEngineeringBrain(db, opts, { repoId: 'repo-1' }), { modelId: STARTER_MODEL, agentId: 'patch-1' });
   assert.deepEqual(calls.find((call) => call.sql.includes('from projects'))?.parameters, ['workspace-1', 'repo-1', null, null]);
 });
 
-test('Engineering scopes inherited brains to the selected project and repository pair', async () => {
+test('Engineering still checks the selected project against the repository', async () => {
   const calls: Array<unknown[] | undefined> = [];
   const db = { getAll: async <T>(sql: string, parameters?: unknown[]) => {
     calls.push(parameters);
     return [(sql.includes('from agents') ? { id: 'patch-1', model: 'claude-sonnet-4-6', model_source: 'pack' } : { model_pack: 'openai-core' }) as T];
   } };
-  assert.deepEqual(await resolveEngineeringBrain(db, opts, { repoId: 'repo-1', projectId: 'project-2' }), { modelId: 'gpt-5.6-terra', agentId: 'patch-1' });
+  assert.deepEqual(await resolveEngineeringBrain(db, opts, { repoId: 'repo-1', projectId: 'project-2' }), { modelId: STARTER_MODEL, agentId: 'patch-1' });
   assert.deepEqual(calls[1], ['workspace-1', 'repo-1', 'project-2', 'project-2']);
 });
 
@@ -32,11 +35,11 @@ test('Engineering rejects a project that is not connected to the selected reposi
   await assert.rejects(resolveEngineeringBrain(db, opts, { repoId: 'repo-1', projectId: 'foreign-project' }), /not connected to this repository/);
 });
 
-test('a manual developer pin remains stronger than the project brain', async () => {
+test('a manual developer pin no longer sets the Code model either', async () => {
   const db = { getAll: async <T>(sql: string) => [(sql.includes('from agents')
     ? { id: 'patch-1', model: 'claude-opus-4-8', model_source: 'manual' }
     : { model_pack: 'openai-core' }) as T] };
-  assert.deepEqual(await resolveEngineeringBrain(db, opts, { repoId: 'repo-1' }), { modelId: 'claude-opus-4-8', agentId: 'patch-1' });
+  assert.deepEqual(await resolveEngineeringBrain(db, opts, { repoId: 'repo-1' }), { modelId: STARTER_MODEL, agentId: 'patch-1' });
 });
 
 test('an explicit Engineering brain pack overrides normal seat and project inheritance', async () => {
@@ -75,7 +78,7 @@ test('an unavailable task-scoped brain pack is rejected on the machine', async (
   );
 });
 
-test('a custom project brain is loaded through the authenticated control plane', async () => {
+test('a custom brain pack is loaded through the authenticated control plane', async () => {
   let authorization = '';
   const db = { getAll: async <T>(sql: string) => [(sql.includes('from agents')
     ? { id: 'patch-1', model: 'claude-sonnet-4-6', model_source: 'pack' }
@@ -86,7 +89,7 @@ test('a custom project brain is loaded through the authenticated control plane',
       authorization = new Headers(init?.headers).get('authorization') ?? '';
       return new Response(JSON.stringify({ packs: [{ id: 'custom:brain-1', name: 'Project brain', roles: { developer: 'gemini-3.5-flash' } }] }));
     },
-  }, { repoId: 'repo-1' });
+  }, { repoId: 'repo-1', brainPack: 'custom:brain-1' });
   assert.deepEqual(resolved, { modelId: 'gemini-3.5-flash', agentId: 'patch-1' });
   assert.equal(authorization, 'Bearer nmm_test');
 });

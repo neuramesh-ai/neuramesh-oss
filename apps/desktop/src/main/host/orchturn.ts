@@ -6,6 +6,7 @@
 // — an empty turn means something different in each — and collapsing them would hide that.
 import { drainQuery, claudeAgentPrompt, partialMessages } from './turnkit';
 import { starterGenerate, starterStream } from './starterproxy';
+import { replyText, starterThoughts } from './starterthoughts';
 import { claudePathOption, codexSandboxMode, keyEnvFor, providerEnv, type AgentAttachment } from '../runtime/adapter';
 import { ORCH_EMPTY_TURN } from '../replypolicy';
 import { claudeEffort, codexEffort, geminiThinking } from '../runtime/thinking';
@@ -82,8 +83,8 @@ export async function geminiOrchestratorTurn(args: {
   starter?: boolean; apiUrl?: string; workspace?: string; actorId?: string;
   /** a WORKER on the lane (runtime/starter.ts) takes more rounds than a routing turn, and a human Stop must end it */
   maxTurns?: number; abort?: AbortSignal;
-  /** the live bubble: on the metered lane, each round's words, growing, as the model writes them */
-  onDelta?: (t: string) => void;
+  /** the live bubble: on the metered lane, each round's words, growing, as the model writes them, and the turn's thoughts */
+  onDelta?: (t: string, thinking?: string) => void;
 }): Promise<string> {
   const { GoogleGenAI, Type } = await import('@google/genai');
   const shapeToParams = (shape: Record<string, any>): any | undefined => zodShapeToGemini(shape, Type);
@@ -105,25 +106,34 @@ export async function geminiOrchestratorTurn(args: {
   const contents: any[] = [{ role: 'user', parts: [{ text: args.transcript }] }];
   // the person's level rides an API key only: the metered lane's level is fixed, and part of its price
   const config = { systemInstruction: args.systemPrompt, tools: [{ functionDeclarations }], temperature: 0.4, ...(viaProxy ? {} : geminiThinking(args)) };
+  // the bubble's Thoughts (host/starterthoughts.ts): the metered lane only, and only while someone
+  // watches. The person's own key through the SDK types no words, so it shows no thoughts either
+  const th = viaProxy && args.onDelta ? starterThoughts() : null;
+  // the bubble's words outlive their round: a thought or a tool step keeps them, and only the next round's
+  // first word replaces them, as on codex and Claude (an update with no words opens the folded Thoughts again)
+  let shown = '';
+  const show = (): void => { try { args.onDelta?.(shown, th?.text()); } catch { /* a live bubble is never worth the turn */ } };
 
   let lastText = '';
   for (let turn = 0; turn < (args.maxTurns ?? 14); turn++) {
     if (args.abort?.aborted) throw new Error('stopped by a human');
-    const call = { apiUrl: args.apiUrl ?? '', workspace: args.workspace ?? '', actorId: args.actorId ?? '', contents, config };
+    const call = { apiUrl: args.apiUrl ?? '', workspace: args.workspace ?? '', actorId: args.actorId ?? '', contents, config, ...(th ? { thoughts: true } : {}) };
     // a watched round streams: the bubble types this round's words, filtered as the posted reply is
-    // below (a narrated call never types itself out); the next round's words replace them, as on Claude
+    // below (a narrated call never types itself out); the next round's words replace them, as on Claude.
+    // every update carries the thoughts so far: the desktop's stream store drops them from an update that lacks them
     const onDelta = args.onDelta;
     let said = '';
+    th?.round();
     const r: any = !viaProxy
       ? await ai!.models.generateContent({ model: args.model, contents, config })
-      : onDelta ? await starterStream({ ...call, onText: (d) => { said += d; onDelta(stripPseudoToolCalls(said, byName.keys()).text); } })
+      : onDelta ? await starterStream({ ...call, onText: (d) => { said += d; shown = stripPseudoToolCalls(said, byName.keys()).text; show(); }, onThought: (d) => { th?.thought(d); show(); } })
         : await starterGenerate(call);
     // the SDK exposes r.functionCalls; the proxy returns raw REST json, where the same calls
     // live on the candidate's parts. normalize so the loop below cannot tell them apart.
     const calls = (r.functionCalls ?? (r.candidates?.[0]?.content?.parts ?? [])
       .map((p: any) => p?.functionCall).filter(Boolean)) as Array<{ name: string; args?: any; id?: string }>;
     if (!calls.length) {
-      const raw = (r.text ?? (r.candidates?.[0]?.content?.parts ?? []).map((p: any) => p?.text).filter(Boolean).join('') ?? '').trim();
+      const raw = (r.text ?? replyText(r)).trim();
       // a call the model NARRATED instead of making never reaches the room (host/pseudocalls.ts)
       const clean = stripPseudoToolCalls(raw, byName.keys());
       if (clean.stripped) args.log?.({ kind: 'result', phase: 'warn', summary: `dropped ${clean.stripped} narrated tool call${clean.stripped === 1 ? '' : 's'} from the reply`, level: 'warn' });
@@ -136,6 +146,7 @@ export async function geminiOrchestratorTurn(args: {
     const responseParts: any[] = [];
     for (const call of calls) {
       const t = byName.get(call.name);
+      if (th) { th.step(call.name, call.args); show(); } // the bubble shows the step before the tool runs
       let out: string;
       try { out = t ? await t.run(call.args ?? {}) : `error: unknown tool ${call.name}`; }
       catch (e) { out = `error: ${e instanceof Error ? e.message : 'tool failed'}`; }

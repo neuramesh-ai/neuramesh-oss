@@ -11,7 +11,7 @@
 import { createContext, useContext, useEffect, useRef } from 'react';
 import { needDecisionQuestion, parseGitHubConnected, parseNeed } from '@neuramesh/shared';
 import { githubFace } from '../cards/DependencyCard';
-import { PickActs, RepoPick, useGitHubGrant, type GitHubGrant } from '../settings/GitHubStep';
+import { CopyInstall, PickActs, RepoPick, WaitActs, useGitHubGrant, type GitHubGrant } from '../settings/GitHubStep';
 import { IconGitHub } from '../ui/icons';
 
 interface GateProps {
@@ -88,7 +88,7 @@ export function GitHubGateFace({ g, room, repoName, folder, onConnected }: GateP
         {eye}
         <h2 className="hgateh">Finish on GitHub</h2>
         <p className="hgatep">Pick {repoName ?? 'the repository'} on GitHub, then come back. The session starts with your message.</p>
-        <div className="hgateacts"><button className="btn sm" onClick={() => void g.ask(true)}>Check again</button><span className="connwait"><i aria-hidden />This card checks every 5 s</span></div>
+        <WaitActs g={g} row="hgateacts" />
       </div>
     );
   }
@@ -103,6 +103,7 @@ export function GitHubGateFace({ g, room, repoName, folder, onConnected }: GateP
           : 'This project has no repository yet. Connect GitHub and pick it, and the session starts with your message.'}</p>
       <div className="hgateacts">
         <button className="btn primary" disabled={g.phase === 'busy' || g.phase === 'asking'} onClick={() => void g.grant()}><IconGitHub s={13} /><span>{g.phase === 'busy' ? 'Please wait…' : 'Connect GitHub'}</span></button>
+        <CopyInstall href={g.install} onCopied={g.wait} />
         {g.note && <span className="hgatenote" role="status">{g.note}</span>}
       </div>
     </div>
