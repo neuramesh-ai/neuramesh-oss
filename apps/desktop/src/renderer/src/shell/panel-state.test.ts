@@ -6,7 +6,7 @@
 // moves by itself only inside one session, and only the way the round says.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { openWithSession, panelFoldAfter, panelFront, panelGuests, panelKeyTarget, panelSessionOf, sessionTabId, sessionTabKeyOf, sessionTabsOf } from './panel-state';
+import { panelFoldAfter, panelFront, panelGuests, panelKeyTarget, panelSessionOf, sessionTabId, sessionTabKeyOf, sessionTabsOf } from './panel-state';
 import { closeTab, openTab, rekeyOwner, reviveTabs, serializeTabs, type WTab } from '../wtabs';
 
 test('a task named in a session is one tab in that session, and it never persists', () => {
@@ -139,11 +139,11 @@ test('the fold moves by itself only inside one session', () => {
   assert.equal(panelFoldAfter(at('task:T', 's:overview', 0), at('thread:H', 'b', 1)), null);
 });
 
-test('opening a task or a coding thread brings the panel out; a conversation only when a verdict waits', () => {
-  assert.equal(openWithSession('task', false), true);
-  assert.equal(openWithSession('coding', false), true);
-  assert.equal(openWithSession('thread', false), false, 'the 2026-08-26 ruling: no pop-open for every conversation');
-  assert.equal(openWithSession('thread', true), true);
-  assert.equal(openWithSession('room', false), false);
-  assert.equal(openWithSession(null, false), false);
+test('a move into another session never opens the panel, whatever kind it is (George, 2026-10-05)', () => {
+  const at = (owner: string | null, front: string | null, guests: number, sessionTabs = 1) => ({ owner, front, guests, sessionTabs });
+  for (const owner of ['task:T', 'thread:H', 'room:R']) {
+    assert.equal(panelFoldAfter(at(null, null, 0), at(owner, 's:overview', 0, 1)), null, owner);
+  }
+  // a coding thread's own tabs in front: Changes is a session tab, so it opens nothing either
+  assert.equal(panelFoldAfter(at(null, null, 0), at('thread:C', 's:changes', 0, 5)), null);
 });

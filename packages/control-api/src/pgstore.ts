@@ -13,9 +13,9 @@ import { latestHumanWordSql, setThreadSettledSql, threadTaskIdSql } from './stor
 import { markScheduleResultSql, setScheduleCursorSql } from './store/release-routine';
 import { runScheduleNowSql } from './store/schedule-now';
 import { linkRoutineSessionSql } from './store/routine-session';
-import { seedBundledPacksSql } from './store/skillpack-seed';
+import { seedBundledPacksSql } from './store/skillpack-seed';   import { addMarketersToChannelSql } from './store/marketing-crew';
 import { PgAnnounceStore } from './store/announce';
-import { PgFilmStore } from './store/films';   import { PgReplyStore } from './store/replies';   import { PgAgentModelStore } from './store/agent-models';
+import { PgFilmStore } from './store/films';   import { PgReplyStore } from './store/replies';   import { PgAgentModelStore } from './store/agent-models';   import { PgGitHubProofStore } from './store/github-proofs';
 import { computeRetro } from './retro';
 import { SKILL_SEED } from './seed/skill-seed';
 import { MARKETING_SKILL_SEED } from './seed/marketing-skill-seed';
@@ -65,7 +65,7 @@ export class PostgresStore implements Store {
   readonly sql: postgres.Sql;
   private ann?: PgAnnounceStore;
   get announcements(): PgAnnounceStore { return (this.ann ??= new PgAnnounceStore(this.sql)); }
-  private filmStore: PgFilmStore | undefined;   get films(): PgFilmStore { return (this.filmStore ??= new PgFilmStore(this.sql)); }   private replyStore: PgReplyStore | undefined;   get replies(): PgReplyStore { return (this.replyStore ??= new PgReplyStore(this.sql)); }   private modelStore: PgAgentModelStore | undefined;   get agentModels(): PgAgentModelStore { return (this.modelStore ??= new PgAgentModelStore(this.sql)); }
+  private filmStore: PgFilmStore | undefined;   get films(): PgFilmStore { return (this.filmStore ??= new PgFilmStore(this.sql)); }   private replyStore: PgReplyStore | undefined;   get replies(): PgReplyStore { return (this.replyStore ??= new PgReplyStore(this.sql)); }   private modelStore: PgAgentModelStore | undefined;   get agentModels(): PgAgentModelStore { return (this.modelStore ??= new PgAgentModelStore(this.sql)); }   private proofStore: PgGitHubProofStore | undefined;   get githubProofs(): PgGitHubProofStore { return (this.proofStore ??= new PgGitHubProofStore(this.sql)); }
 
   constructor(url: string) {
     // prepare:false keeps Supavisor pooler compatibility.
@@ -1693,6 +1693,7 @@ export class PostgresStore implements Store {
   // the orchestrator WITHOUT auto-adding the rest of the team (workspace-scoped agents are brought
   // into a channel explicitly — the live-panel "+" / the orchestrator's add card). This is the
   // isolation default: a fresh room starts with just the orchestrator. Returns NEW rows created.
+  // the one other exception: a room that becomes a marketing room gets the marketers (store/marketing-crew.ts).
   private async addOrchestratorsToChannels(sql: postgres.Sql, workspace: string): Promise<number> {
     const inserted = await sql`
       insert into agent_channels (agent_id, channel_id)
@@ -1748,10 +1749,13 @@ export class PostgresStore implements Store {
           const [ch] = await sql`insert into channels (workspace_id, slug, topic, project_id, kind)
             values (${input.workspace}::uuid, ${chSlug}, ${''}, ${projectId}::uuid, ${kind}) returning id`;
           if (kind === 'marketing') await this.ensureSetupTask(sql, input.workspace, ch!['id'] as string);
+          // ...and its crew: the workspace's active marketers (store/marketing-crew.ts)
+          if (kind === 'marketing') await addMarketersToChannelSql(sql, input.workspace, ch!['id'] as string);
         }
       }
-      // a new project's rooms start with just the orchestrator — the team is brought in per-channel
-      // (workspace-scoped agents, channel-scoped membership). Isolation by default.
+      // a new project's rooms start with just the orchestrator (a marketing room also gets the
+      // marketers, above) — the team is brought in per-channel (workspace-scoped agents,
+      // channel-scoped membership). Isolation by default.
       await this.addOrchestratorsToChannels(sql, input.workspace);
       await this.insertEvent(sql, { ...event, workspace: input.workspace }, null);
       return { id: projectId, slug };
@@ -2033,11 +2037,13 @@ export class PostgresStore implements Store {
   ): Promise<{ id: string }> {
     return this.sql.begin(async (_tx) => {
       const sql = asSql(_tx);
-      const [ch] = await sql`select workspace_id from channels where id = ${channelId}::uuid`;
+      const [ch] = await sql`select workspace_id, kind from channels where id = ${channelId}::uuid`;
       if (!ch) throw new DomainError('NOT_FOUND', 'channel not found');
       await sql`update channels set kind = ${kind} where id = ${channelId}::uuid`;
       // becoming a marketing room is one of the doors into its setup flow (setupflows.ts)
       if (kind === 'marketing') await this.ensureSetupTask(sql, ch['workspace_id'] as string, channelId);
+      // ...and it brings in the marketers on the change only, so a repeat flip leaves a removal standing
+      if (kind === 'marketing' && ch['kind'] !== 'marketing') await addMarketersToChannelSql(sql, ch['workspace_id'] as string, channelId);
       await this.insertEvent(sql, makeEvent(ch['workspace_id'] as string), null);
       return { id: channelId };
     }) as Promise<{ id: string }>;

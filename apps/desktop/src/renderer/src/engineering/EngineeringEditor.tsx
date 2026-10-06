@@ -8,6 +8,7 @@ import type { EngineeringSession } from './domain';
 import { combinedDiff, restoreEngineeringCheckpoint } from './checkpoints';
 import { scrollEngineeringPane } from './layout';
 import { engineeringPlanItems } from './activity';
+import { noteApproval, seenStart, type SeenState } from '../shell/arrivals';
 
 export type EngineeringWorkspaceTab = 'changes' | 'files' | 'plan' | 'checkpoints' | 'terminal';
 
@@ -107,10 +108,17 @@ export function EngineeringEditor({ session, onSession, onRestore, tab, onTab }:
     const frame = requestAnimationFrame(() => terminal.current?.fit());
     return () => cancelAnimationFrame(frame);
   }, [tab]);
+  // a NEW approval brings its changes to the front. One that already waited when the editor mounted
+  // does not, and a file pick never jumps (George, 2026-10-05: only a new artifact opens the panel)
+  const approvals = useRef<SeenState | null>(null);
   useEffect(() => {
-    if (session.pendingApproval?.changes?.length) onTab('changes');
+    const now = Date.now();
+    if (approvals.current?.key !== session.id) approvals.current = seenStart(session.id, now);
+    if (noteApproval(approvals.current, session.pendingApproval?.id, now) && session.pendingApproval?.changes?.length) onTab('changes');
+  }, [session.id, session.pendingApproval?.id, onTab]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
     if (filePath && !visibleChanges.some((change) => change.path === filePath)) setFilePath(null);
-  }, [session.pendingApproval?.changes?.length, session.pendingApproval?.id, visibleChanges, filePath, onTab]);
+  }, [visibleChanges, filePath]);
   const file = visibleChanges.find((change) => change.path === filePath) ?? visibleChanges[0] ?? null;
   const source = file?.after || file?.before || '';
   const highlighted = useMemo(() => file ? highlightCode(source, file.path) : '', [file, source]);

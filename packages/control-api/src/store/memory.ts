@@ -8,7 +8,7 @@ import { applyShare, type BrainOverride, parseBrainOverride, attachmentUpgradeRe
 import { DomainError } from '../errors';
 import { deleteScheduleMem, markScheduleResultMem, setScheduleCursorMem, setScheduleStatusMem } from './release-routine';
 import { runScheduleNowMem } from './schedule-now';   import { routineSessionMem } from './routine-session';
-import { MemAnnounceStore } from './announce';   import { MemFilmStore } from './films';   import { MemReplyStore } from './replies';   import { MemAgentModelStore } from './agent-models';
+import { MemAnnounceStore } from './announce';   import { MemFilmStore } from './films';   import { MemReplyStore } from './replies';   import { MemAgentModelStore } from './agent-models';   import { MemGitHubProofStore } from './github-proofs';
 import { pickHumanWord, settleMemoryThread } from './thread-settle';
 import { anchorContentItemMem } from './content-anchor';
 import { threadRoutineIdMem } from './routine-rule';   import { sessionTitle } from './session-title';
@@ -18,7 +18,7 @@ import type { MutationResult, ArtifactRow, AttachmentInput, ScheduleInput, NMMes
 import type { Store } from './contract';   import type { VideoMeta } from './films';
 
 export class MemoryStore implements Store {
-  readonly announcements = new MemAnnounceStore(() => ({ decisions: this.decisionRows, messages: this.messages, channels: this.channels, connectors: this.connectors, events: this.events, tasks: this.tasks }));   readonly films = new MemFilmStore();   readonly replies = new MemReplyStore((id) => this.messages.find((m) => m.id === id));   readonly agentModels = new MemAgentModelStore((ws, u) => this.wsMembers.get(ws)?.has(u) ?? false, (id) => { const m = this.agentMeta.get(id); return m && { workspace: m.workspace, retired: this.retiredAgents.has(id) }; });
+  readonly announcements = new MemAnnounceStore(() => ({ decisions: this.decisionRows, messages: this.messages, channels: this.channels, connectors: this.connectors, events: this.events, tasks: this.tasks }));   readonly films = new MemFilmStore();   readonly replies = new MemReplyStore((id) => this.messages.find((m) => m.id === id));   readonly agentModels = new MemAgentModelStore((ws, u) => this.wsMembers.get(ws)?.has(u) ?? false, (id) => { const m = this.agentMeta.get(id); return m && { workspace: m.workspace, retired: this.retiredAgents.has(id) }; });   readonly githubProofs = new MemGitHubProofStore((ws, u) => this.wsMembers.get(ws)?.has(u) ?? false);
   // readable in tests like `threads` — the memory store IS the test double
   tasks = new Map<string, Task>();
   private events: NMEvent[] = [];

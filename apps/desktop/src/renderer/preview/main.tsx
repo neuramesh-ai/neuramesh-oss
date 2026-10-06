@@ -2,7 +2,7 @@ import { makeMockNm } from './mock-nm';
 import { mountShell } from './shell';
 // registers window.__nmAgentSays / __nmHumanSays / __nmHumanSaysInConvo — the states a shot
 // cannot reach by clicking (see harness-hooks.ts)
-import './harness-hooks';
+import { unfoldOnBoot } from './harness-hooks';
 // ?perf=1 splices the long thread + the streamed-reply fixture in (render-smoothness round)
 import './mock-perf';
 // match the production renderer entry (main.tsx): self-hosted Geist + serifs +
@@ -58,9 +58,9 @@ if (wtabsSeed) {
 } else localStorage.removeItem('nm:workspaceTabs');
 localStorage.removeItem('nm:dockTabs');
 localStorage.setItem('nm:wtabsPane', params.get('wtpane') === '1' ? '1' : '0');
-// ?dock=1 unfolds the side dock (rail-ink round 3); a seeded tab set unfolds it on its own, the way
-// a tab coming to the front does in the app
-localStorage.setItem('nm:sideDock', params.get('dock') === '1' || !!wtabsSeed ? '1' : '0');
+// ?dock=1 unfolds the side panel (rail-ink round 3), and so does a seeded tab set. The app stores
+// no fold (2026-10-05), so the harness presses ⌘J (harness-hooks.ts).
+if (params.get('dock') === '1' || !!wtabsSeed) unfoldOnBoot();
 
 // skip the first-send welcome coach + the guided tour so screenshots show the steady-state app.
 localStorage.setItem('nm:welcomed', '1');

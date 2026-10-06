@@ -69,9 +69,10 @@ export function parseRepoInput(text: string): { slug: string } | null {
 }
 
 /** A GitHub answer the caller must act on: the status rides the error so the announce door can
- *  tell private-or-missing (403, 404) from everything else. */
+ *  tell private-or-missing (403, 404) from everything else. `headers`, when a helper keeps them,
+ *  tell a rate limit's 403 from a refusal's. */
 export class GitHubApiError extends Error {
-  constructor(message: string, readonly status: number) {
+  constructor(message: string, readonly status: number, readonly headers?: Headers) {
     super(message);
     this.name = 'GitHubApiError';
   }
@@ -111,7 +112,7 @@ export function githubGet(path: string, opts: GitHubOpts = {}): Promise<GitHubRe
 export async function findInstallation(slug: string, opts: AppOpts = {}): Promise<{ id: number; account: string } | null> {
   const r = await request('GET', `/repos/${slug}/installation`, { ...opts, token: appJwt(opts.env, opts.now) });
   if (r.status === 404) return null;
-  if (!ok(r)) throw new GitHubApiError(`GitHub answered ${r.status} for the ${slug} installation`, r.status);
+  if (!ok(r)) throw new GitHubApiError(`GitHub answered ${r.status} for the ${slug} installation`, r.status, r.headers);
   const b = r.json as { id: number; account?: { login?: string; slug?: string } | null };
   return { id: b.id, account: b.account?.login ?? b.account?.slug ?? '' };
 }
@@ -125,7 +126,7 @@ export interface TokenScope { repositories?: string[]; permissions?: Record<stri
 export async function installationToken(installationId: number, opts: AppOpts & { scope?: TokenScope } = {}): Promise<{ token: string; expiresAt: string }> {
   const r = await request('POST', `/app/installations/${installationId}/access_tokens`, { ...opts, token: appJwt(opts.env, opts.now), ...(opts.scope ? { body: opts.scope } : {}) });
   const b = r.json as { token?: string; expires_at?: string } | null;
-  if (!ok(r) || !b?.token) throw new GitHubApiError(`GitHub refused an installation token (${r.status})`, r.status);
+  if (!ok(r) || !b?.token) throw new GitHubApiError(`GitHub refused an installation token (${r.status})`, r.status, r.headers);
   return { token: b.token, expiresAt: b.expires_at ?? '' };
 }
 

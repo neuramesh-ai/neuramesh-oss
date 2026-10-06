@@ -4962,7 +4962,7 @@ var SUPPORTED_DESKTOP_VERSIONS, MIN_DESKTOP_VERSION, versionSegments, belowFloor
 var init_desktop_floor = __esm({
   "../shared/src/desktop-floor.ts"() {
     "use strict";
-    SUPPORTED_DESKTOP_VERSIONS = ["0.151.0", "0.150.0"];
+    SUPPORTED_DESKTOP_VERSIONS = ["0.152.0", "0.151.0"];
     MIN_DESKTOP_VERSION = SUPPORTED_DESKTOP_VERSIONS[1];
     versionSegments = (v) => v.split(".").map((n) => Number.parseInt(n, 10) || 0);
     belowFloor = (version, floor) => !!floor && /^\d+\.\d+/.test(floor) && compareVersions(version, floor) < 0;
@@ -10104,7 +10104,7 @@ var init_src = __esm({
 
 // src/app.ts
 init_src();
-import { createHash as createHash7, randomBytes as randomBytes7 } from "node:crypto";
+import { createHash as createHash8, randomBytes as randomBytes8 } from "node:crypto";
 
 // src/need-cards.ts
 init_src();
@@ -11087,7 +11087,7 @@ var MemAnnounceStore = class {
       hit.account = input.account;
       hit.repos = repos;
       hit.selection = input.selection ?? hit.selection;
-      if (input.workspaceId) hit.workspaceId = input.workspaceId;
+      if (input.workspaceId && !(input.keepWorkspace && hit.workspaceId)) hit.workspaceId = input.workspaceId;
     } else this.installations.push({ installationId: input.installationId, account: input.account, repos, selection: input.selection ?? "selected", workspaceId: input.workspaceId ?? null });
   }
   async installationForRepo(slug, opts = {}) {
@@ -11186,7 +11186,8 @@ var PgAnnounceStore = class {
     await this.sql`insert into github_installations (installation_id, account, repos, selection, workspace_id)
       values (${input.installationId}, ${input.account}, ${input.repos.map(norm2)}, ${input.selection ?? "selected"}, ${input.workspaceId ?? null})
       on conflict (installation_id) do update set account = excluded.account, repos = excluded.repos, selection = excluded.selection,
-        workspace_id = coalesce(excluded.workspace_id, github_installations.workspace_id), updated_at = now()`;
+        workspace_id = case when ${!!input.keepWorkspace}::boolean then coalesce(github_installations.workspace_id, excluded.workspace_id)
+          else coalesce(excluded.workspace_id, github_installations.workspace_id) end, updated_at = now()`;
   }
   async installationForRepo(slug, opts = {}) {
     const s = norm2(slug);
@@ -11465,6 +11466,66 @@ var PgAgentModelStore = class {
   }
 };
 
+// src/store/github-proofs.ts
+var PROOF_TTL_MS = 24 * 36e5;
+var norm3 = (s) => s.trim().toLowerCase();
+var MemGitHubProofStore = class {
+  constructor(isMember = () => false) {
+    this.isMember = isMember;
+  }
+  isMember;
+  rows = [];
+  async replace(workspace, actor, proofs) {
+    await this.forget(workspace, actor);
+    const provenAt = (/* @__PURE__ */ new Date()).toISOString();
+    for (const p2 of proofs) this.rows.push({ ...p2, repos: p2.repos.map(norm3), repoIds: [...p2.repoIds], provenAt, workspace, actor });
+  }
+  async fresh(workspace, actor) {
+    if (!this.isMember(workspace, actor)) return [];
+    const since = Date.now() - PROOF_TTL_MS;
+    return this.rows.filter((r) => r.workspace === workspace && r.actor === actor && Date.parse(r.provenAt) > since).map(({ workspace: _w, actor: _a, ...p2 }) => ({ ...p2, repos: [...p2.repos], repoIds: [...p2.repoIds] }));
+  }
+  async forget(workspace, actor) {
+    this.rows = this.rows.filter((r) => !(r.workspace === workspace && r.actor === actor));
+  }
+};
+var PgGitHubProofStore = class {
+  constructor(sql) {
+    this.sql = sql;
+  }
+  sql;
+  async replace(workspace, actor, proofs) {
+    await this.sql.begin(async (tx) => {
+      const sql = tx;
+      await sql`delete from github_repo_proofs where workspace_id = ${workspace}::uuid and actor_id = ${actor}::uuid`;
+      for (const p2 of proofs) {
+        await sql`insert into github_repo_proofs (workspace_id, actor_id, installation_id, github_user_id, github_login, repo_ids, repos)
+          values (${workspace}::uuid, ${actor}::uuid, ${p2.installationId}::bigint, ${p2.githubUserId}::bigint, ${p2.githubLogin},
+                  ${p2.repoIds}::bigint[], ${p2.repos.map(norm3)}::text[])`;
+      }
+    });
+  }
+  async fresh(workspace, actor) {
+    const rows2 = await this.sql`select p.installation_id, p.github_user_id, p.github_login, p.repo_ids, p.repos, p.proven_at
+      from github_repo_proofs p
+      join workspace_members m on m.workspace_id = p.workspace_id and m.user_id = p.actor_id
+      where p.workspace_id = ${workspace}::uuid and p.actor_id = ${actor}::uuid
+        and p.proven_at > now() - make_interval(secs => ${PROOF_TTL_MS / 1e3})
+      order by p.installation_id`;
+    return rows2.map((r) => ({
+      installationId: Number(r["installation_id"]),
+      githubUserId: Number(r["github_user_id"]),
+      githubLogin: r["github_login"] ?? "",
+      repoIds: (r["repo_ids"] ?? []).map(Number),
+      repos: r["repos"] ?? [],
+      provenAt: new Date(r["proven_at"]).toISOString()
+    }));
+  }
+  async forget(workspace, actor) {
+    await this.sql`delete from github_repo_proofs where workspace_id = ${workspace}::uuid and actor_id = ${actor}::uuid`;
+  }
+};
+
 // src/store/thread-settle.ts
 init_src();
 async function threadTaskIdSql(sql, workspace, threadId) {
@@ -11541,6 +11602,7 @@ var MemoryStore = class {
     const m = this.agentMeta.get(id);
     return m && { workspace: m.workspace, retired: this.retiredAgents.has(id) };
   });
+  githubProofs = new MemGitHubProofStore((ws, u) => this.wsMembers.get(ws)?.has(u) ?? false);
   // readable in tests like `threads` — the memory store IS the test double
   tasks = /* @__PURE__ */ new Map();
   events = [];
@@ -17737,8 +17799,8 @@ function cronRoutes(app, store2, push2) {
 
 // src/announce.ts
 import { cors } from "hono/cors";
-import { createHash as createHash5 } from "node:crypto";
-import { z as z18 } from "zod";
+import { createHash as createHash6 } from "node:crypto";
+import { z as z19 } from "zod";
 
 // src/announce-job.ts
 init_src();
@@ -17984,12 +18046,14 @@ function parseRepoInput(text2) {
   return { slug: `${owner}/${repo}` };
 }
 var GitHubApiError = class extends Error {
-  constructor(message2, status) {
+  constructor(message2, status, headers2) {
     super(message2);
     this.status = status;
+    this.headers = headers2;
     this.name = "GitHubApiError";
   }
   status;
+  headers;
 };
 async function request(method, path, opts) {
   const env = opts.env ?? process.env;
@@ -18016,14 +18080,14 @@ function githubGet(path, opts = {}) {
 async function findInstallation(slug, opts = {}) {
   const r = await request("GET", `/repos/${slug}/installation`, { ...opts, token: appJwt(opts.env, opts.now) });
   if (r.status === 404) return null;
-  if (!ok(r)) throw new GitHubApiError(`GitHub answered ${r.status} for the ${slug} installation`, r.status);
+  if (!ok(r)) throw new GitHubApiError(`GitHub answered ${r.status} for the ${slug} installation`, r.status, r.headers);
   const b2 = r.json;
   return { id: b2.id, account: b2.account?.login ?? b2.account?.slug ?? "" };
 }
 async function installationToken(installationId, opts = {}) {
   const r = await request("POST", `/app/installations/${installationId}/access_tokens`, { ...opts, token: appJwt(opts.env, opts.now), ...opts.scope ? { body: opts.scope } : {} });
   const b2 = r.json;
-  if (!ok(r) || !b2?.token) throw new GitHubApiError(`GitHub refused an installation token (${r.status})`, r.status);
+  if (!ok(r) || !b2?.token) throw new GitHubApiError(`GitHub refused an installation token (${r.status})`, r.status, r.headers);
   return { token: b2.token, expiresAt: b2.expires_at ?? "" };
 }
 function installUrl(state, env = process.env) {
@@ -19564,7 +19628,203 @@ Drafted at neuramesh.app/announce.`;
 }
 
 // src/github-connect.ts
+import { z as z18 } from "zod";
+
+// src/github-proof.ts
+import { createHash as createHash5, createHmac as createHmac4, randomBytes as randomBytes6 } from "node:crypto";
+var UA3 = "neuramesh-announce";
+function ownerProofConfigured(env = process.env) {
+  return githubAppConfigured(env) && !!env["GITHUB_APP_CLIENT_ID"] && !!env["GITHUB_APP_CLIENT_SECRET"] && !!env["NM_CONNECTOR_KEY"];
+}
+var STATE_TTL_S = 3600;
+function sealProofState(client2, s, now = Date.now()) {
+  const state = { ...s, iat: Math.floor(now / 1e3), nonce: randomBytes6(16).toString("base64url") };
+  return `${client2}.${seal(state)}`;
+}
+function unsealProofState(raw) {
+  const m = /^([wp])\.([\w-]+)$/.exec(raw);
+  if (!m) return null;
+  try {
+    const s = unseal(m[2]);
+    const whole = s?.github === 1 && typeof s.workspace === "string" && !!s.workspace && typeof s.actor === "string" && !!s.actor && typeof s.iat === "number" && Number.isFinite(s.iat) && typeof s.nonce === "string" && !!s.nonce;
+    return whole ? { client: m[1], state: s } : null;
+  } catch {
+    return null;
+  }
+}
+var isProofState = (raw) => /^[wp]\./.test(raw);
+var proofRedirectUri = () => `${HQ_URL}/github/callback`;
+var grantStartUrl = (channel) => `${HQ_URL}/github/start${channel ? `?${new URLSearchParams({ channel }).toString()}` : ""}`;
+var pkceVerifier = (state) => createHmac4("sha256", keyBytes()).update(`github-pkce:${state}`).digest("base64url");
+function authorizeUrl(state, env = process.env) {
+  const challenge = createHash5("sha256").update(pkceVerifier(state)).digest("base64url");
+  const q = new URLSearchParams({ client_id: env["GITHUB_APP_CLIENT_ID"] ?? "", redirect_uri: proofRedirectUri(), state, code_challenge: challenge, code_challenge_method: "S256" });
+  return `https://github.com/login/oauth/authorize?${q.toString()}`;
+}
+var PROOF_WORDS = {
+  OTHER_ACCOUNT: "This grant started for another neuramesh account. Sign in as that account, or start the grant again from your own room.",
+  NOT_MEMBER: "You are not a member of the workspace that holds this room.",
+  EXPIRED: "This grant is more than an hour old. Start again from neuramesh.",
+  BAD_STATE: "This grant link is not valid. Start again from neuramesh.",
+  // a code that GitHub refused: used, older than ten minutes, or from another grant's link
+  CODE_REFUSED: "GitHub did not accept this grant. Start again from neuramesh.",
+  SSO: "Your organization on GitHub uses single sign-on. Sign in to it on GitHub, then grant access again.",
+  NO_ACCESS: "Your GitHub account has no access to this repository. Get access from an owner, or use another GitHub account. Then grant access again.",
+  EMAIL: "GitHub needs a verified email on your account. Verify your primary email on GitHub, then grant access again.",
+  DENIED: "You did not let the neuramesh app confirm your GitHub account. Nothing changed. Grant access again from neuramesh.",
+  REQUEST: "GitHub sent your request to the owners of the account. When an owner approves it, grant access again from neuramesh.",
+  GITHUB_DOWN: "GitHub did not answer. Nothing changed. Try again in a few minutes.",
+  MISCONFIGURED: "neuramesh cannot finish the grant now.",
+  NOT_CONFIGURED: "neuramesh cannot finish the grant now."
+};
+var ProofRefusal = class extends Error {
+  constructor(code, words2 = PROOF_WORDS[code], names = {}) {
+    super(words2);
+    this.code = code;
+    this.names = names;
+    this.name = "ProofRefusal";
+  }
+  code;
+  names;
+};
+function misconfigured(why) {
+  console.error(`github owner proof: the App cannot finish a grant (${why.replace(/[^\w ./-]/g, "").slice(0, 80)}). Check GITHUB_APP_CLIENT_ID, GITHUB_APP_CLIENT_SECRET and the App's Callback URL.`);
+  return new ProofRefusal("MISCONFIGURED");
+}
+var ssoRefusal = (org) => org ? new ProofRefusal("SSO", `The organization ${org} uses single sign-on. Sign in to it on GitHub, then grant access again.`, { sso: `https://github.com/orgs/${encodeURIComponent(org)}/sso` }) : new ProofRefusal("SSO");
+function noAccessRefusal(login, slug) {
+  const account = login ? `Your GitHub account ${login}` : "Your GitHub account";
+  const words2 = `${account} has no access to ${slug}. Get access from an owner of ${slug.split("/")[0]}, or use another GitHub account. Then grant access again.`;
+  return new ProofRefusal("NO_ACCESS", words2, { login, slug });
+}
+function authorizeRefusal(error) {
+  if (error === "access_denied") return new ProofRefusal("DENIED");
+  if (error === "request") return new ProofRefusal("REQUEST");
+  return misconfigured(error);
+}
+var busy = (status, headers2) => status >= 500 || status === 429 || status === 403 && (headers2?.get("x-ratelimit-remaining") === "0" || !!headers2?.has("retry-after"));
+var unreachable = (e) => e instanceof GitHubApiError && busy(e.status, e.headers) || e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError" || e instanceof TypeError && e.message === "fetch failed");
+async function exchangeCode(code, state, fetchFn, env = process.env) {
+  let res;
+  try {
+    res = await fetchFn("https://github.com/login/oauth/access_token", {
+      method: "POST",
+      headers: { accept: "application/json", "content-type": "application/json", "user-agent": UA3 },
+      body: JSON.stringify({ client_id: env["GITHUB_APP_CLIENT_ID"], client_secret: env["GITHUB_APP_CLIENT_SECRET"], code, redirect_uri: proofRedirectUri(), code_verifier: pkceVerifier(state) }),
+      signal: AbortSignal.timeout(1e4)
+    });
+  } catch {
+    throw new ProofRefusal("GITHUB_DOWN");
+  }
+  const body = await res.json().catch(() => null);
+  if (body && typeof body.error === "string") {
+    if (body.error === "unverified_user_email") throw new ProofRefusal("EMAIL");
+    if (body.error === "bad_verification_code") throw new ProofRefusal("CODE_REFUSED");
+    throw misconfigured(body.error);
+  }
+  if (busy(res.status, res.headers) || !body) throw new ProofRefusal("GITHUB_DOWN");
+  if (!res.ok) throw misconfigured(`the code exchange answered ${res.status}`);
+  if (typeof body.access_token !== "string" || !body.access_token) throw new ProofRefusal("GITHUB_DOWN");
+  return body.access_token;
+}
+async function userRead(path, token, fetchFn) {
+  const r = await githubGet(path, { token, fetchFn }).catch(() => null);
+  if (!r || busy(r.status, r.headers)) throw new ProofRefusal("GITHUB_DOWN");
+  return r;
+}
+async function githubUser(token, fetchFn) {
+  const r = await userRead("/user", token, fetchFn);
+  const b2 = r.json;
+  if (r.status !== 200 || typeof b2?.id !== "number") throw misconfigured(`GET /user answered ${r.status}`);
+  return { id: b2.id, login: typeof b2.login === "string" ? b2.login : "" };
+}
+var PER_PAGE = 100;
+var PAGES = 10;
+var REPO_PAGE_BUDGET = 30;
+async function walkInstallations(token, fetchFn) {
+  const listed = await listInstallations(token, fetchFn);
+  let truncated = listed.truncated;
+  const budget = { pages: REPO_PAGE_BUDGET };
+  const installations = [];
+  for (const inst of listed.rows) {
+    if (inst.suspended_at) continue;
+    const read = await listRepositories(inst, token, fetchFn, budget);
+    truncated ||= read.truncated;
+    if (read.proven.repos.length) installations.push(read.proven);
+  }
+  return { installations, truncated };
+}
+async function listInstallations(token, fetchFn) {
+  const rows2 = [];
+  for (let page2 = 1; page2 <= PAGES; page2++) {
+    const r = await userRead(`/user/installations?per_page=${PER_PAGE}&page=${page2}`, token, fetchFn);
+    if (r.status !== 200) throw misconfigured(`GET /user/installations answered ${r.status}`);
+    const b2 = r.json;
+    const got = b2?.installations ?? [];
+    rows2.push(...got);
+    if (got.length < PER_PAGE || rows2.length >= (b2?.total_count ?? Infinity)) return { rows: rows2, truncated: false };
+  }
+  return { rows: rows2, truncated: true };
+}
+async function listRepositories(inst, token, fetchFn, budget) {
+  const proven2 = { installationId: inst.id, account: inst.account?.login ?? "", selection: inst.repository_selection === "all" ? "all" : "selected", repoIds: [], repos: [] };
+  for (let page2 = 1; page2 <= PAGES; page2++) {
+    if (budget.pages-- <= 0) return { proven: proven2, truncated: true };
+    const r = await userRead(`/user/installations/${inst.id}/repositories?per_page=${PER_PAGE}&page=${page2}`, token, fetchFn);
+    if (r.status !== 200) return { proven: { ...proven2, repoIds: [], repos: [] }, truncated: false };
+    const b2 = r.json;
+    const got = b2?.repositories ?? [];
+    for (const repo of got) {
+      proven2.repoIds.push(repo.id);
+      proven2.repos.push(repo.full_name.toLowerCase());
+    }
+    if (got.length < PER_PAGE || proven2.repos.length >= (b2?.total_count ?? Infinity)) return { proven: proven2, truncated: false };
+  }
+  return { proven: proven2, truncated: true };
+}
+async function appInstallation(slug, fetchFn, env = process.env) {
+  let r = null;
+  try {
+    r = await githubGet(`/repos/${slug}/installation`, { token: appJwt(env), fetchFn });
+  } catch (e) {
+    if (unreachable(e)) throw new ProofRefusal("GITHUB_DOWN");
+    return null;
+  }
+  if (busy(r.status, r.headers)) throw new ProofRefusal("GITHUB_DOWN");
+  const b2 = r.json;
+  if (r.status !== 200 || typeof b2?.id !== "number") return null;
+  return { id: b2.id, account: b2.account?.login ?? "", org: (b2.target_type ?? b2.account?.type) === "Organization" };
+}
+async function directRepo(slug, token, fetchFn) {
+  const r = await userRead(`/repos/${slug}`, token, fetchFn);
+  const b2 = r.json;
+  if (r.status === 403 && (r.headers.has("x-github-sso") || /\bSAML\b/i.test(String(b2?.message ?? "")))) return "sso";
+  if (r.status !== 200 || typeof b2?.id !== "number") return null;
+  const role = b2.permissions ?? {};
+  if (b2.private !== true && !role["triage"] && !role["push"] && !role["maintain"] && !role["admin"]) return null;
+  return { id: b2.id, name: (b2.full_name ?? slug).toLowerCase() };
+}
+async function dropAuthorization(token, what, fetchFn, env = process.env) {
+  const id = env["GITHUB_APP_CLIENT_ID"] ?? "";
+  const basic = Buffer.from(`${id}:${env["GITHUB_APP_CLIENT_SECRET"] ?? ""}`).toString("base64");
+  try {
+    const r = await fetchFn(`https://api.github.com/applications/${encodeURIComponent(id)}/${what}`, {
+      method: "DELETE",
+      headers: { accept: "application/vnd.github+json", "content-type": "application/json", "x-github-api-version": "2022-11-28", "user-agent": UA3, authorization: `Basic ${basic}` },
+      body: JSON.stringify({ access_token: token }),
+      signal: AbortSignal.timeout(1e4)
+    });
+    if (r.status !== 204) console.warn(`github owner proof: the ${what} delete answered ${r.status}`);
+  } catch {
+    console.warn(`github owner proof: the ${what} delete did not reach GitHub`);
+  }
+}
+
+// src/github-prove.ts
 import { z as z17 } from "zod";
+
+// src/github-resolve.ts
+init_src();
 
 // src/github-reads.ts
 var FILE_TEXT_CAP = 6e4;
@@ -19618,9 +19878,6 @@ async function installationFacts(installationId, opts = {}) {
   const b2 = r.json;
   return { account: b2.account?.login ?? b2.account?.slug ?? "", selection: b2.repository_selection === "all" ? "all" : "selected" };
 }
-
-// src/github-resolve.ts
-init_src();
 
 // src/github-resume.ts
 init_src();
@@ -19935,7 +20192,7 @@ function slugOf(repo) {
   if (!hasGitHubAddress(repo) || !repo.orgName || !repo.name) return null;
   return `${repo.orgName}/${repo.name}`;
 }
-async function installationFor(ann, slug, fetchFn, workspaceId = null) {
+async function installationFor(ann, slug, fetchFn, workspaceId = null, strict = false) {
   if (!githubAppConfigured()) return null;
   const known = await ann.installationForRepo(slug);
   if (known) {
@@ -19948,21 +20205,25 @@ async function installationFor(ann, slug, fetchFn, workspaceId = null) {
       else throw e;
     }
   }
-  const found = await findInstallation(slug, { fetchFn }).catch(() => null);
+  const quiet = (e) => {
+    if (strict && unreachable(e)) throw e;
+    return null;
+  };
+  const found = await findInstallation(slug, { fetchFn }).catch(quiet);
   if (!found) return null;
-  const token = await tokenFor(found.id, fetchFn).catch(() => null);
+  const token = await tokenFor(found.id, fetchFn).catch(quiet);
   if (!token) return null;
-  await rememberInstallation(ann, found.id, fetchFn, workspaceId).catch(() => {
+  if (!strict) await rememberInstallation(ann, found.id, fetchFn, workspaceId).catch(() => {
   });
   return { installationId: found.id, token };
 }
 var PAGE = 100;
-async function rememberInstallation(ann, installationId, fetchFn, workspaceId) {
+async function rememberInstallation(ann, installationId, fetchFn, workspaceId, keepWorkspace = false) {
   const tok = await tokenFor(installationId, fetchFn);
   const repos = await githubGet(`/installation/repositories?per_page=${PAGE}`, { token: tok, fetchFn });
   const names = repos.status === 200 ? (repos.json.repositories ?? []).map((r) => r.full_name.toLowerCase()) : [];
   const facts = await installationFacts(installationId, { fetchFn }).catch(() => ({ account: names[0]?.split("/")[0] ?? "", selection: "selected" }));
-  await ann.upsertInstallation({ installationId, account: facts.account, repos: names, selection: facts.selection, workspaceId });
+  await ann.upsertInstallation({ installationId, account: facts.account, repos: names, selection: facts.selection, workspaceId, keepWorkspace });
   return names;
 }
 var tokens = /* @__PURE__ */ new Map();
@@ -20005,12 +20266,15 @@ async function attachRepo(store2, ctx, slug, defaultBranch) {
 }
 async function resolveConnector(store2, ctx, fetchFn, opts = {}) {
   const pick = opts.pick ?? null;
+  const proofs = opts.proofs ?? null;
   const ann = store2.announcements;
   const repo = await ann.repoForChannel(ctx.channel);
   const slug = repo ? slugOf(repo) : null;
   let refreshed = null;
-  const readable = () => refreshed ??= readableRepos(ann, ctx.workspace, fetchFn);
+  const readable = () => refreshed ??= proofs ? Promise.resolve([...new Set(proofs.flatMap((p2) => p2.repos))].sort()) : readableRepos(ann, ctx.workspace, fetchFn);
+  const proofOf = (target) => proofs?.find((p2) => p2.repos.includes(target.toLowerCase())) ?? null;
   const installed = async (target) => {
+    if (proofs) return proofOf(target)?.installationId ?? null;
     const t2 = target.toLowerCase();
     const covers = (i) => i.repos.includes(t2) || i.selection === "all" && i.account.toLowerCase() === t2.split("/")[0];
     const known = (await ann.installationsForWorkspace(ctx.workspace)).find(covers);
@@ -20023,20 +20287,30 @@ async function resolveConnector(store2, ctx, fetchFn, opts = {}) {
     const found = await findInstallation(target, { fetchFn }).catch(() => null);
     return found && rows2.some((i) => i.installationId === found.id) ? found.id : null;
   };
+  const down = (e) => {
+    if (opts.strict && unreachable(e)) throw new ProofRefusal("GITHUB_DOWN");
+    return null;
+  };
   const connect = async (target) => {
     const id = await installed(target).catch(() => null);
-    const token = id === null ? null : await tokenFor(id, fetchFn).catch(() => null);
+    const token = id === null ? null : await tokenFor(id, fetchFn).catch(down);
     if (!token) return null;
     const r = await githubGet(`/repos/${target}`, { token, fetchFn });
-    return r.status === 200 ? { facts: r.json } : null;
+    if (opts.strict && busy(r.status, r.headers)) throw new ProofRefusal("GITHUB_DOWN");
+    const facts = r.json;
+    if (r.status !== 200 || proofs && !proofOf(target)?.repoIds.includes(Number(facts?.id))) return null;
+    return { facts: facts ?? {} };
   };
   const holds = async (target) => {
     const row = await store2.connectorWithSecret(ctx.workspace, "github", ctx.channel).catch(() => null);
     if (row?.status !== "connected" || row.handle.toLowerCase() !== target.toLowerCase()) return false;
-    const inst = await installationFor(ann, target, fetchFn).catch(() => null);
-    return !!inst && (await githubGet(`/repos/${target}`, { token: inst.token, fetchFn }).catch(() => null))?.status === 200;
+    const inst = await installationFor(ann, target, fetchFn, null, opts.strict).catch(down);
+    const r = inst && await githubGet(`/repos/${target}`, { token: inst.token, fetchFn }).catch(down);
+    if (opts.strict && r && busy(r.status, r.headers)) throw new ProofRefusal("GITHUB_DOWN");
+    return r?.status === 200;
   };
   const stranded = async (target) => {
+    if (proofs) return null;
     if (await installed(target).then((id) => id !== null, () => true)) return null;
     const door = await ann.installationForRepo(target, { unrecorded: true }).catch(() => null);
     const live = door && await tokenFor(door.installationId, fetchFn).then(() => true, async (e) => {
@@ -20046,25 +20320,107 @@ async function resolveConnector(store2, ctx, fetchFn, opts = {}) {
     });
     return live ? `The neuramesh app reads ${target}, but this workspace did not install it. On GitHub, uninstall the neuramesh app from ${target.split("/")[0]}, then grant access again here.` : null;
   };
+  const recorded = async (target) => {
+    const id = proofOf(target)?.installationId;
+    if (!id || (await ann.installationsForWorkspace(ctx.workspace)).some((i) => i.installationId === id)) return;
+    await rememberInstallation(ann, id, fetchFn, ctx.workspace, true);
+  };
   const written = async (target, attached) => {
     await store2.upsertConnector({ workspace: ctx.workspace, channelId: ctx.channel, provider: "github", handle: target, connectedBy: ctx.actor, scopes: GITHUB_SCOPES });
     if (opts.resume) await resumeAfterGitHub(store2, ctx, target).catch((e) => console.warn(`github resume failed: ${e instanceof Error ? e.message : String(e)}`));
+    if (proofs) await recorded(target).catch(() => {
+    });
     return { ok: true, handle: target, attached };
   };
   if (pick) {
     const target = parseRepoInput(pick)?.slug ?? null;
     const read = target ? await connect(target) : null;
     if (!target || !read) return { ok: false, code: "NOT_INSTALLED", error: target && await stranded(target) || `The neuramesh app cannot read ${target ?? pick}. Add the repository on GitHub, then pick it.`, slug: target, repos: await readable(), hint: null };
-    if (target !== slug) await attachRepo(store2, ctx, target, read.facts.default_branch || "main");
-    return written(target, target !== slug);
+    const same = !!slug && target.toLowerCase() === slug.toLowerCase();
+    if (!same) await attachRepo(store2, ctx, target, read.facts.default_branch || "main");
+    return written(same ? slug : target, !same);
   }
-  if (slug && (await connect(slug) || await holds(slug))) return written(slug, false);
+  if (slug && proofs && !opts.strict) {
+    if (await holds(slug)) return written(slug, false);
+    if (await connect(slug)) {
+      const repos2 = await readable();
+      return { ok: false, code: "NOT_INSTALLED", error: `Connect ${slug} to this room.`, slug, repos: repos2, hint: repos2.find((s) => s === slug.toLowerCase()) ?? slug, proven: true };
+    }
+  } else if (slug && (await connect(slug) || await holds(slug))) return written(slug, false);
   const repos = await readable();
   const hint = hintFor(repo, repos);
   if (!repo) return { ok: false, code: "NO_REPO", error: repos.length ? "Pick the repository this project lives in." : "This project has no repository yet. Grant access on GitHub and pick it there.", slug: null, repos, hint };
   if (!slug) return { ok: false, code: "NO_REPO", error: repos.length ? `Pick the repository ${repo.name} lives in.` : `${repo.name} is a folder on a machine. Grant access on GitHub and pick its repository there.`, slug: null, repos, hint };
   const error = await stranded(slug) ?? (repos.length ? `The neuramesh app cannot read ${slug}. Add it on GitHub, or pick another repository.` : `The neuramesh app is not installed on ${slug}. Grant access on GitHub.`);
   return { ok: false, code: "NOT_INSTALLED", error, slug, repos, hint };
+}
+
+// src/github-prove.ts
+var Body = z17.object({ code: z17.string().nullish(), error: z17.string().nullish(), state: z17.string().min(1) });
+async function proveGrant(store2, actor, body, fetchFn) {
+  try {
+    const grant = await checked(store2, actor, body);
+    const token = await exchangeCode(grant.code, grant.state, fetchFn);
+    let sso = false;
+    try {
+      return await proven(store2, grant, token, fetchFn);
+    } catch (e) {
+      sso = e instanceof ProofRefusal && e.code === "SSO";
+      throw e;
+    } finally {
+      await dropAuthorization(token, sso ? "grant" : "token", fetchFn);
+    }
+  } catch (e) {
+    const r = e instanceof ProofRefusal ? e : unreachable(e) ? new ProofRefusal("GITHUB_DOWN") : null;
+    if (r) return { ok: false, code: r.code, error: r.message, ...r.names };
+    throw e;
+  }
+}
+async function checked(store2, actor, body) {
+  if (!ownerProofConfigured() || !store2.announcements || !store2.githubProofs) throw new ProofRefusal("NOT_CONFIGURED");
+  const input = Body.safeParse(body);
+  const grant = input.success ? unsealProofState(input.data.state) : null;
+  if (!input.success || !grant) throw new ProofRefusal("BAD_STATE");
+  const s = grant.state;
+  if (Date.now() / 1e3 - s.iat > STATE_TTL_S) throw new ProofRefusal("EXPIRED");
+  if (actor.kind !== "human" || actor.id !== s.actor) throw new ProofRefusal("OTHER_ACCOUNT");
+  const room = s.channel ? await store2.channelProject(s.workspace, s.channel).catch(() => null) : null;
+  if (!s.channel || !room) throw new ProofRefusal("BAD_STATE");
+  if (!await actorInWorkspace(store2, actor, s.workspace)) throw new ProofRefusal("NOT_MEMBER");
+  if (input.data.error) throw authorizeRefusal(input.data.error);
+  if (!input.data.code) throw new ProofRefusal("BAD_STATE");
+  return { workspace: s.workspace, channel: s.channel, actor: actor.id, room: room.slug, state: input.data.state, code: input.data.code };
+}
+async function proven(store2, grant, token, fetchFn) {
+  const ann = store2.announcements;
+  const user = await githubUser(token, fetchFn);
+  const found = (await walkInstallations(token, fetchFn)).installations;
+  const repo = await ann.repoForChannel(grant.channel);
+  const slug = repo ? slugOf(repo) : null;
+  const refusal = slug && !found.some((i) => i.repos.includes(slug.toLowerCase())) ? await unlisted(slug, user.login, token, found, fetchFn) : null;
+  const rows2 = found.map((i) => ({ installationId: i.installationId, githubUserId: user.id, githubLogin: user.login, repoIds: i.repoIds, repos: i.repos }));
+  const readable = [...new Set(rows2.flatMap((r) => r.repos))].sort();
+  const namesakes = repo && !slug ? readable.filter((s) => s.split("/")[1] === repo.name.toLowerCase()) : [];
+  const ctx = { workspace: grant.workspace, channel: grant.channel, actor: grant.actor };
+  const out = await resolveConnector(store2, ctx, fetchFn, { proofs: rows2, pick: namesakes.length === 1 ? namesakes[0] : null, resume: true, strict: true });
+  await store2.githubProofs.replace(grant.workspace, grant.actor, rows2);
+  if (out.ok) return { ok: true, outcome: "connected", handle: out.handle, room: grant.room };
+  if (refusal) throw refusal;
+  if (!slug && readable.length) return { ok: true, outcome: "pick", repos: readable, hint: hintFor(repo, readable) };
+  return { ok: true, outcome: "install", install: installUrl(grant.state), slug };
+}
+async function unlisted(slug, login, token, found, fetchFn) {
+  const inst = await appInstallation(slug, fetchFn);
+  if (!inst) return null;
+  const direct = await directRepo(slug, token, fetchFn);
+  if (direct === "sso") return ssoRefusal(inst.account);
+  if (!direct) return noAccessRefusal(login, slug);
+  const row = found.find((i) => i.installationId === inst.id);
+  if (row) {
+    row.repoIds.push(direct.id);
+    row.repos.push(direct.name);
+  } else found.push({ installationId: inst.id, account: inst.account, selection: "selected", repoIds: [direct.id], repos: [direct.name] });
+  return null;
 }
 
 // src/github-write.ts
@@ -20125,11 +20481,15 @@ function githubWriteRoutes(app, store2, fetchFn) {
 var page = (title, lines) => `<!doctype html><meta charset="utf-8"><title>${title}</title><body style="font:15px system-ui;display:grid;place-items:center;height:100vh;margin:0;background:#1d1d1d;color:#e6e6e6"><div style="text-align:center;max-width:36em">${lines.map((l) => `<p>${l}</p>`).join("")}</div></body>`;
 var tryUnseal = (state) => {
   try {
-    const s = unseal(state);
+    const s = unseal(state.replace(/^[wp]\./, ""));
     return s?.github === 1 && s.workspace && s.actor ? s : null;
   } catch {
     return null;
   }
+};
+var setupHop = (state, action, error) => {
+  const ended = error ? error.replace(/[^\w-]/g, "").slice(0, 60) || "error" : action === "request" ? "request" : null;
+  return ended ? `${HQ_URL}/github/callback?${new URLSearchParams({ error: ended, state }).toString()}` : authorizeUrl(state);
 };
 function githubConnectRoutes(app, store2, opts = {}) {
   const fetchFn = opts.fetchFn ?? fetch;
@@ -20140,8 +20500,9 @@ function githubConnectRoutes(app, store2, opts = {}) {
     const workspace = c.req.query("workspace");
     const actor = c.req.query("actor");
     if (workspace && actor) {
-      if (!process.env["NM_CONNECTOR_KEY"] || !ann()) return c.text("github connect is not configured on this server", 501);
       const channel = c.req.query("channel") ?? null;
+      if (ownerProofConfigured()) return c.redirect(grantStartUrl(channel || null), 302);
+      if (!process.env["NM_CONNECTOR_KEY"] || !ann()) return c.text("github connect is not configured on this server", 501);
       const repo = channel ? await ann().repoForChannel(channel) : null;
       const state = { github: 1, workspace, channel, actor, slug: repo ? slugOf(repo) : null };
       return c.redirect(installUrl(seal(state)), 302);
@@ -20152,8 +20513,10 @@ function githubConnectRoutes(app, store2, opts = {}) {
   app.get("/connect/github/callback", async (c) => {
     const id = Number(c.req.query("installation_id"));
     const raw = c.req.query("state") ?? "";
+    if (ownerProofConfigured() && isProofState(raw)) return c.redirect(setupHop(raw, c.req.query("setup_action"), c.req.query("error")), 302);
     const grant = tryUnseal(raw);
     if (grant) {
+      if (ownerProofConfigured()) return c.html(page("GitHub", ["The grant did not land.", "Start again from neuramesh."]), 400);
       if (!ann() || !githubAppConfigured() || !Number.isFinite(id) || id <= 0) return c.html(page("GitHub", ["The grant did not land.", "Try again from Connections in neuramesh."]), 400);
       try {
         const names = await rememberInstallation(ann(), id, fetchFn, grant.workspace);
@@ -20175,23 +20538,31 @@ function githubConnectRoutes(app, store2, opts = {}) {
     return c.redirect(`${APP_URL2}/announce?granted=1${slug ? `&repo=${encodeURIComponent(slug)}` : ""}`, 302);
   });
 }
+var proveWords = (slug) => slug ? `GitHub must confirm that your account can read ${slug}. Grant access on GitHub.` : "GitHub must confirm which repositories your account can read. Grant access on GitHub.";
 function githubApiRoutes(app, store2, opts = {}) {
   const fetchFn = opts.fetchFn ?? fetch;
   const ann = () => store2.announcements;
   app.post("/v1/github/resolve", async (c) => {
     const actor = c.get("actor");
     if (actor.kind !== "human") return c.json({ error: "a person connects GitHub", code: "HUMAN_ONLY" }, 403);
-    const body = z17.object({ channel: z17.string().min(1), repo: z17.string().min(1).optional() }).safeParse(await c.req.json().catch(() => null));
+    const body = z18.object({ channel: z18.string().min(1), repo: z18.string().min(1).optional(), client: z18.string().nullish() }).safeParse(await c.req.json().catch(() => null));
     if (!body.success) return c.json({ error: "invalid body", code: "INVALID_INPUT" }, 400);
     if (!githubAppConfigured() || !ann()) return c.json({ ok: false, code: "NOT_CONFIGURED", error: "GitHub connecting is not configured on this server." });
     const { workspace } = await store2.channelWorkspace(body.data.channel).catch(() => ({ workspace: null }));
     if (!workspace) return c.json({ error: "channel not found", code: "NOT_FOUND" }, 404);
     if (!await actorInWorkspace(store2, actor, workspace)) return c.json({ error: "not your workspace", code: "NOT_PERMITTED" }, 403);
-    const out = await resolveConnector(store2, { workspace, channel: body.data.channel, actor: actor.id }, fetchFn, { pick: body.data.repo ?? null, resume: true });
+    const proofs = ownerProofConfigured() && store2.githubProofs ? await store2.githubProofs.fresh(workspace, actor.id) : null;
+    const out = await resolveConnector(store2, { workspace, channel: body.data.channel, actor: actor.id }, fetchFn, { pick: body.data.repo ?? null, resume: true, proofs });
     if (out.ok) return c.json({ ok: true, handle: out.handle, attached: out.attached });
     const state = { github: 1, workspace, channel: body.data.channel, actor: actor.id, slug: out.slug };
-    return c.json({ ok: false, code: out.code, error: out.error, repos: out.repos, hint: out.hint, install: process.env["NM_CONNECTOR_KEY"] ? installUrl(seal(state)) : null });
+    if (proofs) {
+      const sealed = sealProofState(body.data.client === "phone" ? "p" : "w", state);
+      const prove = !proofs.length || out.code === "NOT_INSTALLED" && !body.data.repo && !out.proven;
+      return c.json({ ok: false, code: prove ? "PROVE" : out.code, error: prove ? proveWords(proofs.length ? out.slug : null) : out.error, repos: out.repos, hint: out.hint, install: installUrl(sealed), authorize: authorizeUrl(sealed) });
+    }
+    return c.json({ ok: false, code: out.code, error: out.error, repos: out.repos, hint: out.hint, install: process.env["NM_CONNECTOR_KEY"] ? installUrl(seal(state)) : null, authorize: null });
   });
+  app.post("/v1/github/prove", async (c) => c.json(await proveGrant(store2, c.get("actor"), await c.req.json().catch(() => null), fetchFn)));
   const open = async (c) => {
     const channel = c.req.query("channel");
     if (!channel) return { status: 400, body: { error: "channel is required", code: "INVALID_INPUT" } };
@@ -20263,13 +20634,13 @@ var cap = (name, fallback) => {
   const n = Number(process.env[name]);
   return Number.isFinite(n) && n > 0 ? n : fallback;
 };
-var ipHashOf = (ip) => ip ? createHash5("sha256").update(ip.trim()).digest("hex").slice(0, 32) : null;
+var ipHashOf = (ip) => ip ? createHash6("sha256").update(ip.trim()).digest("hex").slice(0, 32) : null;
 var maskEmail = (e) => {
   const [u = "", d = ""] = e.split("@");
   return `${u.slice(0, 1)}\u2022\u2022\u2022@${d}`;
 };
-var CreateSchema = z18.object({ repo: z18.string().min(3).max(200), tag: z18.string().max(120).nullable().optional(), website: z18.string().trim().min(3).max(400), email: z18.string().trim().max(200) });
-var DetectSchema = z18.object({ repo: z18.string().min(3).max(200) });
+var CreateSchema = z19.object({ repo: z19.string().min(3).max(200), tag: z19.string().max(120).nullable().optional(), website: z19.string().trim().min(3).max(400), email: z19.string().trim().max(200) });
+var DetectSchema = z19.object({ repo: z19.string().min(3).max(200) });
 async function latestOf(slug, token, fetchFn) {
   const rel = await githubGet(`/repos/${slug}/releases?per_page=5`, { token, fetchFn });
   const rows2 = rel.status === 200 && Array.isArray(rel.json) ? rel.json : [];
@@ -20405,7 +20776,7 @@ function announceClaimRoute(app, store2, opts = {}) {
     if (!ann) return c.json({ error: "announcements not served by this store" }, 501);
     const actor = c.get("actor");
     if (actor.kind !== "human") return c.json({ error: "a person claims a draft set", code: "HUMAN_ONLY" }, 403);
-    const body = z18.object({ workspace: z18.string().min(1) }).safeParse(await c.req.json().catch(() => null));
+    const body = z19.object({ workspace: z19.string().min(1) }).safeParse(await c.req.json().catch(() => null));
     if (!body.success) return c.json({ error: "invalid body" }, 400);
     if (!await actorInWorkspace(store2, actor, body.data.workspace)) return c.json({ error: "not your workspace", code: "NOT_PERMITTED" }, 403);
     const row = await ann.get(c.req.param("id"));
@@ -20419,10 +20790,10 @@ function announceClaimRoute(app, store2, opts = {}) {
 
 // src/relay.ts
 import { timingSafeEqual as timingSafeEqual5 } from "node:crypto";
-import { z as z19 } from "zod";
-var ValidateMachineSchema = z19.object({ token: z19.string().min(1) });
-var ValidateClientSchema = z19.object({ clerkToken: z19.string().min(1), machineId: z19.string().uuid() });
-var DevRelayUserSchema = z19.string().uuid();
+import { z as z20 } from "zod";
+var ValidateMachineSchema = z20.object({ token: z20.string().min(1) });
+var ValidateClientSchema = z20.object({ clerkToken: z20.string().min(1), machineId: z20.string().uuid() });
+var DevRelayUserSchema = z20.string().uuid();
 function devRelayUser(token) {
   if (process.env["NM_ALLOW_DEV_RELAY"] !== "1") return null;
   const expected = process.env["NM_DEV_RELAY_TOKEN"];
@@ -20500,13 +20871,13 @@ async function resolveBearerActor(store2, userId, rawHeader) {
 }
 
 // src/local-auth.ts
-import { createHash as createHash6, createHmac as createHmac4, randomBytes as randomBytes6 } from "node:crypto";
+import { createHash as createHash7, createHmac as createHmac5, randomBytes as randomBytes7 } from "node:crypto";
 var LOCAL_USER = { clerkUserId: "local", email: "local@neuramesh.local" };
 var LOCAL_SYNC_KID = "nm-local";
 var LOCAL_SYNC_AUD = "powersync-local";
 var LOCAL_SYNC_TTL_SECONDS = 6 * 3600;
 function hashLocalToken(token) {
-  return createHash6("sha256").update(token).digest("hex");
+  return createHash7("sha256").update(token).digest("hex");
 }
 async function localUserIdForBearer(store2, bearer) {
   if (!localMode() || !bearer.startsWith("nmh_")) return null;
@@ -20527,7 +20898,7 @@ var b64 = (v) => Buffer.from(JSON.stringify(v)).toString("base64url");
 function signLocalSyncToken(sub, keyB64url, nowMs = Date.now()) {
   const now = Math.floor(nowMs / 1e3);
   const input = `${b64({ alg: "HS256", typ: "JWT", kid: LOCAL_SYNC_KID })}.${b64({ sub, aud: LOCAL_SYNC_AUD, iat: now, exp: now + LOCAL_SYNC_TTL_SECONDS })}`;
-  return `${input}.${createHmac4("sha256", Buffer.from(keyB64url, "base64url")).update(input).digest("base64url")}`;
+  return `${input}.${createHmac5("sha256", Buffer.from(keyB64url, "base64url")).update(input).digest("base64url")}`;
 }
 function safeJson(raw) {
   try {
@@ -20541,13 +20912,13 @@ function safeJson(raw) {
 init_src();
 
 // src/devtoken.ts
-import { createHmac as createHmac5 } from "node:crypto";
+import { createHmac as createHmac6 } from "node:crypto";
 var key = Buffer.from("TkVVUkFNRVNILVNQSUtFLUtFWS0wMDEtTkVVUkFNRVNILVNQSUtFLUtFWS0wMDE", "base64url");
 var b642 = (v) => Buffer.from(JSON.stringify(v)).toString("base64url");
 function signDevToken(sub) {
   const now = Math.floor(Date.now() / 1e3);
   const input = `${b642({ alg: "HS256", typ: "JWT", kid: "nm-dev" })}.${b642({ sub, aud: "powersync-dev", iat: now, exp: now + 6 * 3600 })}`;
-  return `${input}.${createHmac5("sha256", key).update(input).digest("base64url")}`;
+  return `${input}.${createHmac6("sha256", key).update(input).digest("base64url")}`;
 }
 
 // src/version.ts
@@ -20606,7 +20977,7 @@ function meRoute(app, store2) {
 
 // src/app.ts
 import { cors as cors2 } from "hono/cors";
-import { z as z22 } from "zod";
+import { z as z23 } from "zod";
 
 // src/trial.ts
 init_src();
@@ -20804,7 +21175,7 @@ function exportRoutes(app, store2) {
 
 // src/import.ts
 init_src();
-import { z as z20 } from "zod";
+import { z as z21 } from "zod";
 
 // src/import-batch.ts
 init_src();
@@ -20981,26 +21352,26 @@ async function slugMapOf(sql, ws, table, ids, sent) {
 
 // src/import.ts
 var UUID2 = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-var uuid = z20.string().uuid();
+var uuid = z21.string().uuid();
 var PRO_REFUSAL = "This workspace needs Pro. Get Pro to migrate a workspace into it.";
 var STORAGE_REFUSAL = "Not enough storage on this plan. Delete files in this workspace, or migrate a smaller workspace.";
 var SIZE_REFUSAL = "The batch is over 4 MB. Send smaller batches.";
-var ManifestSchema = z20.object({
-  format: z20.literal(EXPORT_FORMAT),
-  version: z20.literal(EXPORT_VERSION),
-  workspace: z20.object({ id: z20.string(), name: z20.string(), slug: z20.string() }),
-  exportedAt: z20.string(),
-  counts: z20.record(z20.number().int().min(0))
+var ManifestSchema = z21.object({
+  format: z21.literal(EXPORT_FORMAT),
+  version: z21.literal(EXPORT_VERSION),
+  workspace: z21.object({ id: z21.string(), name: z21.string(), slug: z21.string() }),
+  exportedAt: z21.string(),
+  counts: z21.record(z21.number().int().min(0))
 });
-var ImportBatchSchema = z20.object({
+var ImportBatchSchema = z21.object({
   importId: uuid,
-  seq: z20.number().int().min(0),
-  table: z20.enum(EXPORT_TABLES),
-  rows: z20.array(z20.object({ id: uuid }).passthrough()),
-  first: z20.object({ manifest: ManifestSchema, totalBytes: z20.number().int().min(0) }).optional(),
-  links: z20.literal(true).optional(),
-  idMap: z20.record(uuid, uuid).optional(),
-  last: z20.literal(true).optional()
+  seq: z21.number().int().min(0),
+  table: z21.enum(EXPORT_TABLES),
+  rows: z21.array(z21.object({ id: uuid }).passthrough()),
+  first: z21.object({ manifest: ManifestSchema, totalBytes: z21.number().int().min(0) }).optional(),
+  links: z21.literal(true).optional(),
+  idMap: z21.record(uuid, uuid).optional(),
+  last: z21.literal(true).optional()
 }).superRefine((b2, ctx) => {
   if (b2.first && (b2.seq !== 0 || b2.rows.length)) ctx.addIssue({ code: "custom", message: "The opening batch has seq 0 and no rows." });
   if (b2.links && !lateKeys(b2.table).length) ctx.addIssue({ code: "custom", message: `${b2.table} has no link pass.` });
@@ -21133,7 +21504,7 @@ function webFrameRoute(app) {
 
 // src/starter-video.ts
 init_src();
-import { z as z21 } from "zod";
+import { z as z22 } from "zod";
 
 // src/fal.ts
 var FAL_QUEUE = "https://queue.fal.run";
@@ -21288,7 +21659,7 @@ async function composeShots(key2, clipUrl, seconds, shots, opts = {}) {
 var FILM_MAX_BYTES = 4e7;
 var filmTimeoutMs = (seconds) => Math.max(12 * 6e4, seconds * 4e4);
 var SYSTEM = { kind: "agent", id: "00000000-0000-0000-0000-000000000000" };
-var FilmSchema = z21.object({ workspace: z21.string().uuid(), item: z21.string().uuid(), prompt: z21.string().min(8).max(2e3) });
+var FilmSchema = z22.object({ workspace: z22.string().uuid(), item: z22.string().uuid(), prompt: z22.string().min(8).max(2e3) });
 var tierView = (t2) => ({ tier: t2.tier, label: t2.label, model: t2.model.label, vendor: t2.model.vendor, seconds: t2.seconds, credits: t2.credits, lengths: t2.lengths, perSecondMicros: t2.model.perSecondMicros });
 function starterVideoRoutes(app, store2, opts = {}) {
   const ledger = opts.ledger === void 0 ? ledgerFor(store2) : opts.ledger;
@@ -21639,84 +22010,84 @@ function expoFetchSender(accessToken) {
 }
 
 // src/app.ts
-var MessageInputSchema = z22.object({
+var MessageInputSchema = z23.object({
   // Client-supplied id keeps optimistic local rows identical to server rows
   // (PowerSync echo-back would otherwise duplicate-then-swap them).
-  id: z22.string().uuid().optional(),
-  workspace: z22.string().min(1),
-  channel: z22.string().min(1),
+  id: z23.string().uuid().optional(),
+  workspace: z23.string().min(1),
+  channel: z23.string().min(1),
   // may be empty when the message carries only attachments (no caption)
-  body: z22.string(),
-  taskId: z22.string().min(1).optional(),
+  body: z23.string(),
+  taskId: z23.string().min(1).optional(),
   // the conversation thread this message belongs to (conversation-first shell). A
   // fresh client-generated id births the thread transactionally with the message.
-  threadId: z22.string().uuid().optional(),
+  threadId: z23.string().uuid().optional(),
   // docs/34: the composer's Tasks toggle, applied ONLY when this send births the thread.
   // A later message carrying it is ignored — the mode is the thread's, and changing it is
   // thread.set_mode (human-only), never a side effect of typing.
-  threadMode: z22.enum(["tasks", "chat"]).optional(),
+  threadMode: z23.enum(["tasks", "chat"]).optional(),
   // docs/10 §15: the composer's brain draft, applied ONLY when this send births the thread —
   // the same birth-time contract as threadMode above, and for the same reason. Moving it
   // afterwards is thread.set_brain (human-only), never a side effect of typing.
-  brainOverride: z22.record(z22.string(), z22.string()).nullable().optional(),
+  brainOverride: z23.record(z23.string(), z23.string()).nullable().optional(),
   // docs/31: when this send BIRTHS a thread, the room message it hangs off. The root is
   // referenced, never moved — it keeps its place in the feed and grows a replies footer.
-  rootMessageId: z22.string().uuid().optional(),
+  rootMessageId: z23.string().uuid().optional(),
   // 0119: the automation whose slot fired this send, applied ONLY when it births the thread —
   // the same birth-time contract as threadMode/brainOverride. It is what lets the Automations
   // card list a routine's runs without pattern-matching the marker in its opening line.
-  scheduleId: z22.string().uuid().optional(),
+  scheduleId: z23.string().uuid().optional(),
   // 0134, rule D9: WHERE the session runs and WHICH client bore it, applied ONLY when this send
   // births the thread — the same birth-time contract as the three above. Moving the machine
   // afterwards is thread.set_machine (human-only); the origin never moves.
   // 0144, coding threads: the kind this send births the thread with — `coding` when the composer's
   // repo chip was set, so the coding runtime works on that repository in it. Birth-only, like the
   // rest; moving it afterwards is thread.set_kind (a human, or the room's orchestrator at triage).
-  threadMachineId: z22.string().uuid().nullable().optional(),
-  threadOrigin: z22.enum(["desktop", "web", "routine"]).optional(),
-  threadKind: z22.enum(["chat", "coding"]).optional(),
+  threadMachineId: z23.string().uuid().nullable().optional(),
+  threadOrigin: z23.enum(["desktop", "web", "routine"]).optional(),
+  threadKind: z23.enum(["chat", "coding"]).optional(),
   // the message this reply ANSWERS (agent wake replies) — the server enforces one
   // reply per (agent, trigger) so concurrent daemons can't double-reply (0060).
-  replyTo: z22.string().uuid().optional(),
+  replyTo: z23.string().uuid().optional(),
   // the routine writer: set by propose_routine and offer_routine_session only, never by an agent's words. An
   // agent's routine card without it is dropped (routineCardGuard), so the tools' checks cannot be skipped
   // …and the repo-connect round's needCard: set by the tools that post a GitHub card, so it mints its Needs-you row (need-cards.ts)
-  routineCard: z22.literal(true).optional(),
-  needCard: z22.literal(true).optional()
+  routineCard: z23.literal(true).optional(),
+  needCard: z23.literal(true).optional()
 });
-var ArtifactCreateSchema = z22.object({
-  id: z22.string().uuid(),
-  workspace: z22.string().min(1),
-  channel: z22.string().min(1),
-  taskId: z22.string().min(1).optional(),
-  messageId: z22.string().uuid(),
-  kind: z22.enum(["screenshot", "file", "doc", "diff", "test_report"]).default("file"),
-  name: z22.string().min(1).max(512),
-  mime: z22.string().max(255).optional(),
-  inlineContent: z22.string().max(4e5).optional(),
-  sizeBytes: z22.number().int().nonnegative().optional(),
-  width: z22.number().int().positive().optional(),
-  height: z22.number().int().positive().optional()
+var ArtifactCreateSchema = z23.object({
+  id: z23.string().uuid(),
+  workspace: z23.string().min(1),
+  channel: z23.string().min(1),
+  taskId: z23.string().min(1).optional(),
+  messageId: z23.string().uuid(),
+  kind: z23.enum(["screenshot", "file", "doc", "diff", "test_report"]).default("file"),
+  name: z23.string().min(1).max(512),
+  mime: z23.string().max(255).optional(),
+  inlineContent: z23.string().max(4e5).optional(),
+  sizeBytes: z23.number().int().nonnegative().optional(),
+  width: z23.number().int().positive().optional(),
+  height: z23.number().int().positive().optional()
 });
-var WhiteboardPutSchema = z22.object({
-  id: z22.string().uuid(),
-  workspace: z22.string().min(1),
-  channel: z22.string().min(1),
-  threadId: z22.string().uuid().optional(),
-  taskId: z22.string().optional(),
-  title: z22.string().trim().min(1).max(WB_TITLE_MAX).catch("Untitled board"),
-  scene: z22.string().max(WB_SCENE_MAX).optional(),
-  snapshotSvg: z22.string().max(WB_SNAPSHOT_MAX).optional(),
-  snapshotRev: z22.number().int().nonnegative().optional(),
-  rev: z22.number().int().min(1).default(1)
+var WhiteboardPutSchema = z23.object({
+  id: z23.string().uuid(),
+  workspace: z23.string().min(1),
+  channel: z23.string().min(1),
+  threadId: z23.string().uuid().optional(),
+  taskId: z23.string().optional(),
+  title: z23.string().trim().min(1).max(WB_TITLE_MAX).catch("Untitled board"),
+  scene: z23.string().max(WB_SCENE_MAX).optional(),
+  snapshotSvg: z23.string().max(WB_SNAPSHOT_MAX).optional(),
+  snapshotRev: z23.number().int().nonnegative().optional(),
+  rev: z23.number().int().min(1).default(1)
 });
-var WhiteboardPatchSchema = z22.object({
-  rev: z22.number().int().min(1),
-  title: z22.string().trim().min(1).max(WB_TITLE_MAX).optional(),
-  scene: z22.string().max(WB_SCENE_MAX).optional(),
-  snapshotSvg: z22.string().max(WB_SNAPSHOT_MAX).optional(),
-  snapshotRev: z22.number().int().nonnegative().optional(),
-  archivedAt: z22.string().nullable().optional()
+var WhiteboardPatchSchema = z23.object({
+  rev: z23.number().int().min(1),
+  title: z23.string().trim().min(1).max(WB_TITLE_MAX).optional(),
+  scene: z23.string().max(WB_SCENE_MAX).optional(),
+  snapshotSvg: z23.string().max(WB_SNAPSHOT_MAX).optional(),
+  snapshotRev: z23.number().int().nonnegative().optional(),
+  archivedAt: z23.string().nullable().optional()
 });
 var webOrigin = (origin) => origin === "https://neuramesh.app" || origin === "https://www.neuramesh.app" || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin) ? origin : null;
 function createApp(store2, opts = {}) {
@@ -21824,9 +22195,9 @@ function createApp(store2, opts = {}) {
     allowHeaders: ["content-type"]
   }));
   app.post("/auth/desktop/start", async (c) => {
-    const nonce = randomBytes7(32).toString("base64url");
-    const pollSecret = randomBytes7(32).toString("base64url");
-    await store2.startDesktopAuth({ nonce, pollSecretHash: createHash7("sha256").update(pollSecret).digest("hex"), ttlSeconds: DESKTOP_AUTH_TTL_MS / 1e3 });
+    const nonce = randomBytes8(32).toString("base64url");
+    const pollSecret = randomBytes8(32).toString("base64url");
+    await store2.startDesktopAuth({ nonce, pollSecretHash: createHash8("sha256").update(pollSecret).digest("hex"), ttlSeconds: DESKTOP_AUTH_TTL_MS / 1e3 });
     return c.json({ nonce, pollSecret, expiresIn: DESKTOP_AUTH_TTL_MS / 1e3 });
   });
   app.post("/auth/desktop/complete", async (c) => {
@@ -21851,7 +22222,7 @@ function createApp(store2, opts = {}) {
   app.post("/auth/desktop/poll", async (c) => {
     const body = await c.req.json().catch(() => ({}));
     if (!body.nonce || !body.pollSecret) return c.json({ error: "nonce and pollSecret required", code: "INVALID_INPUT" }, 400);
-    const out = await store2.claimDesktopAuth(body.nonce, createHash7("sha256").update(body.pollSecret).digest("hex"));
+    const out = await store2.claimDesktopAuth(body.nonce, createHash8("sha256").update(body.pollSecret).digest("hex"));
     if (out.status === "done") return c.json({ status: "done", ...out.result });
     return c.json({ status: out.status });
   });
@@ -21969,7 +22340,7 @@ function createApp(store2, opts = {}) {
     return c.json({ ok: ok2 }, ok2 ? 200 : 400);
   });
   app.get("/invites/:token", async (c) => {
-    const hash = createHash7("sha256").update(c.req.param("token")).digest("hex");
+    const hash = createHash8("sha256").update(c.req.param("token")).digest("hex");
     const inv = await store2.inviteByToken(hash);
     if (!inv) return c.json({ error: "this invitation has expired or been revoked", code: "NOT_FOUND" }, 404);
     return c.json({ workspace: inv.workspaceName, email: inv.email, role: inv.role });
@@ -22415,7 +22786,7 @@ function trackDomainEvent(e) {
 }
 
 // src/pgstore.ts
-import { createHash as createHash9, randomBytes as randomBytes8 } from "node:crypto";
+import { createHash as createHash10, randomBytes as randomBytes9 } from "node:crypto";
 import postgres from "postgres";
 
 // src/embedder.ts
@@ -22502,10 +22873,10 @@ async function setThreadKindSql(sql, workspace, threadId, kind) {
 }
 
 // src/seed/packversion.ts
-import { createHash as createHash8 } from "node:crypto";
+import { createHash as createHash9 } from "node:crypto";
 var field = (s) => `${s.length}:${s}`;
 function bundledPackVersion(entry) {
-  const h = createHash8("sha256");
+  const h = createHash9("sha256");
   h.update(field(entry.pack.description));
   h.update(field(entry.pack.source_url));
   h.update(field(entry.pack.source_ref));
@@ -22560,6 +22931,18 @@ async function refreshBundledPack(sql, workspaceId, channelId, packId2, entry, v
       where pack_id = ${packId2}::uuid and status = 'active' and version = 1
         and author_id = ${NOBODY}::uuid and name <> all(${names}::text[])`;
   }
+}
+
+// src/store/marketing-crew.ts
+async function addMarketersToChannelSql(sql, workspace, channelId) {
+  const inserted = await sql`
+    insert into agent_channels (agent_id, channel_id)
+    select a.id, c.id from agents a
+    join channels c on c.workspace_id = a.workspace_id and c.id = ${channelId}::uuid
+    where a.workspace_id = ${workspace}::uuid and a.role = 'marketer' and a.retired_at is null
+    on conflict do nothing
+    returning agent_id`;
+  return inserted.length;
 }
 
 // src/retro-queries.ts
@@ -23657,6 +24040,10 @@ var PostgresStore = class {
   get agentModels() {
     return this.modelStore ??= new PgAgentModelStore(this.sql);
   }
+  proofStore;
+  get githubProofs() {
+    return this.proofStore ??= new PgGitHubProofStore(this.sql);
+  }
   constructor(url) {
     const serverless = !!process.env["VERCEL"];
     this.sql = postgres(url, {
@@ -23977,8 +24364,8 @@ var PostgresStore = class {
     const [already] = await this.sql`select 1 from workspace_members wm join nm_users u on u.id = wm.user_id
       where wm.workspace_id = ${input.workspace}::uuid and lower(u.email) = ${email}`;
     if (already) throw new DomainError("CONFLICT", "that address is already a member of this workspace");
-    const token = randomBytes8(24).toString("base64url");
-    const tokenHash = createHash9("sha256").update(token).digest("hex");
+    const token = randomBytes9(24).toString("base64url");
+    const tokenHash = createHash10("sha256").update(token).digest("hex");
     const [ws] = await this.sql`select name from workspaces where id = ${input.workspace}::uuid`;
     return this.sql.begin(async (_tx) => {
       const sql = asSql2(_tx);
@@ -25003,6 +25390,7 @@ var PostgresStore = class {
   // the orchestrator WITHOUT auto-adding the rest of the team (workspace-scoped agents are brought
   // into a channel explicitly — the live-panel "+" / the orchestrator's add card). This is the
   // isolation default: a fresh room starts with just the orchestrator. Returns NEW rows created.
+  // the one other exception: a room that becomes a marketing room gets the marketers (store/marketing-crew.ts).
   async addOrchestratorsToChannels(sql, workspace) {
     const inserted = await sql`
       insert into agent_channels (agent_id, channel_id)
@@ -25045,6 +25433,7 @@ var PostgresStore = class {
           const [ch] = await sql`insert into channels (workspace_id, slug, topic, project_id, kind)
             values (${input.workspace}::uuid, ${chSlug}, ${""}, ${projectId}::uuid, ${kind}) returning id`;
           if (kind === "marketing") await this.ensureSetupTask(sql, input.workspace, ch["id"]);
+          if (kind === "marketing") await addMarketersToChannelSql(sql, input.workspace, ch["id"]);
         }
       }
       await this.addOrchestratorsToChannels(sql, input.workspace);
@@ -25254,10 +25643,11 @@ var PostgresStore = class {
   async setChannelKind(channelId, kind, makeEvent) {
     return this.sql.begin(async (_tx) => {
       const sql = asSql2(_tx);
-      const [ch] = await sql`select workspace_id from channels where id = ${channelId}::uuid`;
+      const [ch] = await sql`select workspace_id, kind from channels where id = ${channelId}::uuid`;
       if (!ch) throw new DomainError("NOT_FOUND", "channel not found");
       await sql`update channels set kind = ${kind} where id = ${channelId}::uuid`;
       if (kind === "marketing") await this.ensureSetupTask(sql, ch["workspace_id"], channelId);
+      if (kind === "marketing" && ch["kind"] !== "marketing") await addMarketersToChannelSql(sql, ch["workspace_id"], channelId);
       await this.insertEvent(sql, makeEvent(ch["workspace_id"]), null);
       return { id: channelId };
     });

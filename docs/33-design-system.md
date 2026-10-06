@@ -78,6 +78,13 @@ The window is a **colored frame** that owns all chrome; content floats on an **e
   the panel is open, its bottom line belongs to its own actions (a review tab's verdict bar, the
   code pane's foot), so the reply reminders rise above that line. The three notes below describe
   the card. They stay as history.
+  ▸ **Amended 2026-10-05: only a new artifact opens the panel by itself** (George: "the right pane
+  should only open automatically when there's new artifact generated within a conversation
+  thread"). Every load starts with the panel folded, and the app stores no fold (`nm:sideDock`
+  stays in browsers, unread). A move into a session never opens it: a task, a coding thread, a
+  plan that waits for your verdict and drafts that wait all open folded. A coding thread's
+  approval fronts Changes only when it appears while you look (`noteApproval`, tested). Your own
+  actions still open it: `⌘J`, the side-panel glyph, a card in the thread and `＋`.
   ▸ **(Retired 2026-10-03.) The Workbench is a CARD inside the sheet** — the open thread's own object, floating at the
   sheet's right edge on the thread's ground (`--card`, the card radius and shadow, the way a
   question card is), with the conversation recentring in what is left. It is toggled from the
@@ -868,7 +875,12 @@ real work — if it is decoration, drop it and keep the pill.
   the repositories.`), the wait (the same row reads `Finish on GitHub, then check again`, and
   `.needcard .connacts` holds the copy door and the countdown), the pick (`.inpick` rows, the folder's
   namesake marked `your folder`, `Connect` primary and `Add more on GitHub` ghost), and connected
-  (`.ndopt .g.ok`, the repository and `The neuramesh app reads it for this project.`). The foot is
+  (`.ndopt .g.ok`, the repository and `The neuramesh app reads it for this project.`). Under the owner
+  proof (`docs/design/github-owner-proof-2026-10`) the grant opens GitHub's authorize page, where nobody
+  picks: the row reads `One minute on GitHub.`, the gate's wait reads `GitHub is open in a new tab.`, and
+  the pick adds a `Check again` ghost that opens the authorize page again. A card never connects by
+  itself: when the person's proof reads the room's repository, the card shows the pick with that row
+  chosen, and `Connect` is the click. The foot is
   the card's own `after` line (`rex continues here when GitHub is connected.`), then `The work
   continues below.` once connected. No access line: the app also opens pull requests, so no copy
   says "read only". The grant's divider is the run divider (`.srundiv`): `You connected GitHub ·
@@ -888,6 +900,35 @@ real work — if it is decoration, drop it and keep the pill.
   connected`, `The session starts with your message.`, the primary `Start the session`). The card
   reads its own decision row: an answered row shows the connected face, and a card with no row shows no
   foot under it. The `.sysline` rule (the Tasks flip, the coding divider) is back after #208.
+- **GitHub's return page and hq's start page** (the owner proof, 2026-10-04 ·
+  `docs/design/github-owner-proof-2026-10`, `views/GitHubReturn.tsx`): a GitHub grant passes two hq
+  pages outside a room, and each shows the gate card alone on the sign-in ground. `.appauth` (the
+  Login screen's full-height ground, a soft `--accent-soft` glow over `--bg`) and `.appauthbody`
+  (centered, a 24px gutter) hold ONE `.hgate.stage.ghreturn`. That is the stage card (the sheet
+  shadow, the 20px title), 440px wide with `max-width: 100%` at phone width. Its title is balanced
+  (`text-wrap: balance`), and a link in its line is `--link`. No rail, no top bar, and no static Home
+  shell (`index.html` skips these paths). Top to bottom: the eye (`.hgateeye`), the title (`.hgateh`),
+  at most one line (`.hgatep`), the pick when the answer lists repositories (`.inpick`, the step's own
+  `RepoPick` rows), and ONE door in `.hgateacts`. The eye reads `#room · GitHub` when the answer names
+  the room, else `GitHub`, and it is warm (`.hgateeye.warm`) on the pick, the install and the start
+  page's door faces. The door is primary when it is the next move (`Connect`, `Connect GitHub`,
+  `Install on GitHub`, `Sign in as that account`, `Open the neuramesh app`, `Return to the room`).
+  `Return to neuramesh` is plain. A `.hgatenote` status line sits beside the door. The words are the
+  plan's outcomes. While the API answers, the card reads `Please wait…` with no door, and a
+  signed-out person signs in first and then returns to the page. The return page (`/github/callback`)
+  shows the prove call's outcome, and a phone's grant reads `Return to the neuramesh app.` with
+  `Open the neuramesh app`. The start page (`/github/start`, the door of the supported desktops) is
+  the same card. It reads `Connect GitHub to a room in neuramesh.` and
+  `Connect only when you started the grant from neuramesh.`, with the primary `Connect GitHub`. Only
+  that click asks the resolve, because GitHub sends a person who authorized before back at once, and
+  the return connects the room as that person: a link alone does nothing. The door reads `Please wait…` while the resolve answers. Then the card
+  shows the connected face for a connected room, or the tab goes to GitHub: the install page for the
+  desktop's pick, else the authorize page. An answer with no authorize link shows its refusal on the
+  same card.
+  ▸ **No refusal is a dead end.** Every refusal face has a door: `Sign in as that account` for
+  another account, else `Return to neuramesh`. A grant that this browser did not start knows no room
+  here, so no face offers the room. Its pick reads `Return to neuramesh, then pick the one this
+  project lives in.` with no list.
 - **The live thoughts** (same round, Option A · `thread/StreamBubble.tsx` over
   `engineering/ThinkingReasoning.tsx`): a turn's thoughts (codex reasoning summaries and tool steps
   as `› tool · arg` lines, Claude's summarized thinking) render in the live bubble above the reply.

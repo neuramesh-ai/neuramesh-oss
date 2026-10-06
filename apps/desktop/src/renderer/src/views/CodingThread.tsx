@@ -28,6 +28,7 @@ import { CodingComposer } from '../thread/CodingComposer';
 import { CodingGate } from '../thread/CodingGate';
 import { connectedSigns, GitHubGate, GitHubSigns } from '../thread/GitHubGate';
 import { CodingTranscript } from '../thread/CodingTranscript';
+import { noteApproval, seenStart, type SeenState } from '../shell/arrivals';
 import { ThreadCrumb, ThreadStatusChip, type HeadStatus } from '../thread/parts';
 import { AgentAvatar } from '../components/AgentAvatar';
 import { Md } from '../md/Md';
@@ -149,7 +150,15 @@ export function CodingThread({ threadId, thread, back, channelSlug, channelId, c
   const onCodeTabRef = useRef(onCodeTab);
   onCodeTabRef.current = onCodeTab;
   const setWbTab = useCallback((tab: EngineeringWorkspaceTab) => onCodeTabRef.current?.(tab), []);
-  useEffect(() => { if (active?.pendingApproval?.changes?.length) setWbTab('changes'); }, [active?.pendingApproval?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  // a NEW approval fronts Changes, and the panel opens with it. One that already waited when the
+  // thread opened does not (George, 2026-10-05: only a new artifact opens the panel by itself)
+  const approvals = useRef<SeenState | null>(null);
+  useEffect(() => {
+    if (!active) return;
+    const now = Date.now();
+    if (approvals.current?.key !== active.id) approvals.current = seenStart(active.id, now);
+    if (noteApproval(approvals.current, active.pendingApproval?.id, now) && active.pendingApproval?.changes?.length) setWbTab('changes');
+  }, [active?.id, active?.pendingApproval?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   // the strip's counts: the changes, the checkpoints, the Work Plan's mark
   const counts = active ? codeCountsOf(active) : null;
   const countKey = counts ? `${counts.changes}|${counts.checkpoints}|${counts.plan}` : '';

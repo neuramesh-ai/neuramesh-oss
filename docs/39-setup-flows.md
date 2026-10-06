@@ -18,9 +18,16 @@ the person who abandoned it.
 - **Creating the room creates ONE setup task** — `kind='setup'`, state `todo`, planted by the
   server at every door into a flow-bearing room (onboarding seed, `channel.set_kind`, a new
   project's starter `marketing` room) and by the release-day backfill (`setup.backfill`,
-  fired from the daemon's boot; only rooms with an UNTOUCHED profile get one). Idempotent at
+  which the desktop daemon fires at its boot and a cloud runner fires once per process from
+  `machined-seeds.ts`. Only rooms with an UNTOUCHED profile get one). Idempotent at
   the DB: `tasks_one_setup_per_channel` (0117), partial-unique on channel where kind='setup'.
   A closed row keeps the slot — cancel is the opt-out, never "ask me again".
+- **The room gets the marketers too.** At two of these doors (a new project's starter
+  `marketing` room, and `channel.set_kind` to marketing from another kind), the server links
+  every active marketer of the workspace to the room. It does this in the transaction that
+  plants the setup task (`store/marketing-crew.ts`). This is the one exception to the isolation
+  rule beside the orchestrator's. Every other agent joins a room only through the "+" or rex's
+  add card. A repeat flip adds no one, so a removal stands.
 - **The lean life** (`SETUP_TASK_TRANSITIONS`): `finish` and `cancel`, nothing else. No agent
   can offer/claim/design/plan/block one, `task.create` cannot mint the kind (schema-excluded),
   triage's stall sweep skips them, and `isUnroutableTodo` ignores them — a setup task is the
