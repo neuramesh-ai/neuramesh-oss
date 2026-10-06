@@ -67,11 +67,11 @@ export function useWorkspaceTabs(meta: { repos: RepoUI[] }, ownerRef: { readonly
   const wstartup = useRef<Record<string, string>>({}); // a pty's spawn-time command, read once at mount and never stored
   const [wfind, setWfind] = useState(0); // ⌘P — bumped to focus the Files tab's finder
   // the SIDE PANEL's fold (rail-ink round 3, 2026-09-04; the one right panel since 2026-10-03).
-  // Machine-local, never synced. It also unfolds itself when a tab comes to the front and folds
-  // when the last one closes (shell/panel-state.ts), so the stored value is only ever what the
-  // human last chose while there was something to show.
-  const [dockOpen, setDockOpen] = useState(() => localStorage.getItem('nm:sideDock') === '1');
-  const openDock = (open: boolean) => { setDockOpen(open); try { localStorage.setItem('nm:sideDock', open ? '1' : '0'); } catch { /* private */ } };
+  // Every load starts FOLDED, and the fold is never stored (George, 2026-10-05: the panel opens by
+  // itself only for a new artifact in a conversation). A stored fold reopened the panel on every
+  // load once anything had opened it, empty, over Home. `nm:sideDock` is left in place, unread.
+  const [dockOpen, setDockOpen] = useState(false);
+  const openDock = (open: boolean) => setDockOpen(open);
   // serializeTabs decides which KINDS survive a relaunch. The artifact filter beside it is not a
   // second copy of that rule — it is a fact about where the bytes live.
   const persistW = (next: WTab[]) => { try { localStorage.setItem('nm:workspaceTabs', JSON.stringify(serializeTabs(next.filter((t) => !t.artifactId)))); } catch { /* private */ } };

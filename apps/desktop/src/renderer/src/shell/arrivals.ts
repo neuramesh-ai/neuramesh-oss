@@ -67,6 +67,18 @@ export function noteRows<T extends ArrivalRow>(st: SeenState, rows: readonly T[]
   return fresh;
 }
 
+/**
+ * A coding session's pending approval, as an arrival (George, 2026-10-05: only a new artifact opens
+ * the panel). It carries no server time, so the settle window is its whole baseline: an approval the
+ * session showed in its first `SETTLE_MS` already waited (the cache at mount, the first events after
+ * a load), and only one that appears later is new. Records `id`, so each approval counts once.
+ */
+export function noteApproval(st: SeenState, id: string | null | undefined, now: number): boolean {
+  if (!id || st.ids.has(id)) return false;
+  st.ids.add(id);
+  return now - st.openedAt >= SETTLE_MS;
+}
+
 /** what kind of thing landed — the order one of a burst opens in front */
 export type ArrivalKind = 'gate' | 'drafts' | 'doc' | 'page' | 'article' | 'board' | 'image' | 'diff';
 export const ARRIVAL_RANK: Record<ArrivalKind, number> = { gate: 0, drafts: 1, doc: 2, page: 2, article: 2, board: 3, image: 4, diff: 5 };

@@ -8,7 +8,8 @@
 //     continues the ask. a task blocked for another reason stays blocked.
 // the card's decision closes first, as answered by that person: the card polls the resolve every
 // 5 s while it waits, so the resume runs on every connected answer and must find nothing the second time.
-// only the /v1 resolve runs this (github-resolve.ts `resume`), because it proves the person.
+// only the /v1 calls run this (the resolve and the owner proof's prove call, github-resolve.ts `resume`),
+// because their session proves the person.
 import { createEvent, formatAddress, githubConnectedMarker, GITHUB_WAIT_REASON, type Actor } from '@neuramesh/shared';
 import { fireWakeBump } from './fleet-lifecycle';
 import { executeCommand } from './handler';

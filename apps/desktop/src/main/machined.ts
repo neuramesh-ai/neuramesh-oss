@@ -49,6 +49,9 @@ import { onCloudMachine } from './runtime/adapter';
 import { chromiumBin } from './browser/chromium';
 import { createBrowserService } from './browser/service';
 import { setBrowserService } from './browser/registry';
+import { apiAuthHeaders } from './apiauth';
+import { readActivePackRoles } from './host/hire';
+import { startRunnerSeeds } from './machined-seeds';
 
 // the machine's sync credentials: machine token in, short-lived RS256 JWT out
 // (control-api /v1/machines/sync-token, verified against the static key in PowerSync).
@@ -120,6 +123,11 @@ export async function main(): Promise<void> {
       ...(process.env['NM_MACHINED_NODE_SQLITE'] === '1' ? { implementation: { type: 'node:sqlite' as const } } : {}),
     },
   });
+  // the replica lives on the volume, and PowerSync restores hasSynced from the file: after a sleep,
+  // waitForFirstSync below returns before this process downloads anything. the runner's seed waits
+  // for a checkpoint later than the file's own (machined-seeds.ts)
+  await db.waitForReady();
+  const syncedBefore = db.currentStatus.lastSyncedAt?.getTime() ?? 0;
   console.log(`[machined] connecting to PowerSync ${cfg.powersyncUrl}`);
   await db.connect(new MachineConnector(cfg), { connectionMethod: SyncStreamConnectionMethod.HTTP });
   console.log('[machined] waiting for first sync');
@@ -234,6 +242,17 @@ export async function main(): Promise<void> {
       killTaskPtys: (taskNumber) => relay?.killTask(taskNumber),
     });
     console.log('[machined] agent host started');
+    // the runner gives a browser workspace's marketing rooms their packs and plume, as a Mac's boot
+    // seed does (machined-seeds.ts). a member machine returns at once. not awaited: it runs its own passes
+    startRunnerSeeds({
+      db,
+      cfg,
+      // the core stamps a checkpoint to the second, and a restart takes longer than a second
+      synced: () => db.waitForStatus((s) => (s.lastSyncedAt?.getTime() ?? 0) > syncedBefore),
+      post: async (path, actor, body) => fetch(`${cfg.apiUrl}${path}`, { method: 'POST', headers: await apiAuthHeaders(cfg.apiUrl, actor), body: JSON.stringify(body) }),
+      packRoles: (workspaceId) => readActivePackRoles(cfg.apiUrl, cfg.ownerUserId, workspaceId),
+      log: (line) => console.log(line),
+    });
   } else {
     console.log('[machined] Engineering-only harness — room agent host disabled');
   }

@@ -85,8 +85,10 @@ export function panelKeyTarget(sessionTabs: SessionTabKey[], guests: WTab[], dig
 /**
  * What a change inside ONE session does to the fold: a tab that comes to the front unfolds the panel
  * (a file you just opened must be visible), and the last tab leaving folds it when the session has
- * no tab of its own to show. A move to another session never moves the fold: `openWithSession`
- * decides that. A switch between the session's own tabs is a click, and a click means the panel is open.
+ * no tab of its own to show. A move to another session never moves the fold, and opening a session
+ * never opens it (George, 2026-10-05: only a new artifact in a conversation opens the panel by itself,
+ * shell/arrivals.ts, which retired the 2026-08-26 rule that a task or a coding thread brought it out).
+ * A switch between the session's own tabs is a click, and a click means the panel is open.
  */
 export function panelFoldAfter(
   prev: { owner: string | null; front: string | null; guests: number },
@@ -96,14 +98,4 @@ export function panelFoldAfter(
   if (next.guests === 0 && prev.guests > 0 && next.sessionTabs === 0) return 'close';
   if (next.front && next.front !== prev.front && !sessionTabKeyOf(next.front)) return 'open';
   return null;
-}
-
-/**
- * What opening a session does to the fold (George, 2026-08-26, kept by the side-panel round): a task
- * brings the panel out, so its progress is in view, and so does a coding thread, whose code lives
- * there. A conversation leaves the panel where your toggle put it, unless something in it waits for
- * your verdict.
- */
-export function openWithSession(kind: PanelSessionKind | null, waitsForYou: boolean): boolean {
-  return kind === 'task' || kind === 'coding' || waitsForYou;
 }

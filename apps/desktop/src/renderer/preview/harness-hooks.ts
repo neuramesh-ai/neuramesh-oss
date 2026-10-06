@@ -55,4 +55,18 @@ export const agentDelivers = (taskId: string, file: { name: string; kind?: strin
   pingArts(taskId);
 };
 
+/** the app starts with its side panel folded and stores no fold (2026-10-05), so ?dock=1 and a
+ *  seeded tab set open it the way a person does: ⌘J, pressed again until the shell listens. ⌘J
+ *  toggles, so a press gets time to land before the next one, or it folds what it opened. */
+export const unfoldOnBoot = () => {
+  let tries = 0;
+  let pressedAt = 0;
+  const press = setInterval(() => {
+    if (document.querySelector('.sidedockwrap[data-open="1"]') || ++tries > 100) { clearInterval(press); return; }
+    if (!document.querySelector('.main') || Date.now() - pressedAt < 500) return;
+    pressedAt = Date.now();
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'j', metaKey: true }));
+  }, 100);
+};
+
 if (typeof window !== 'undefined') Object.assign(window, { __nmAgentSays: agentSays, __nmHumanSays: humanSays, __nmHumanSaysInConvo: humanSaysInConvo, __nmAgentDelivers: agentDelivers });

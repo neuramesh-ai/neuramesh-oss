@@ -33,8 +33,8 @@ import { NM_PLATFORM } from './lib/platform';
 import { SidePanel } from './shell/SidePanel';
 import { FilesPane } from './shell/FilesPane';
 import { OverviewPane } from './shell/OverviewPane';
-import { decideArrivals, VERDICT_STATES, type PanelArrival } from './shell/arrivals';
-import { openWithSession, ownerSlot, panelFoldAfter, panelFront, panelGuests, panelKeyTarget, panelSessionOf, SESSION_TAB_LABEL, sessionTabId, sessionTabKeyOf, sessionTabsOf, type SessionTabKey } from './shell/panel-state';
+import { decideArrivals, type PanelArrival } from './shell/arrivals';
+import { ownerSlot, panelFoldAfter, panelFront, panelGuests, panelKeyTarget, panelSessionOf, SESSION_TAB_LABEL, sessionTabId, sessionTabKeyOf, sessionTabsOf, type SessionTabKey } from './shell/panel-state';
 // A LOCAL alias on purpose: TS keeps control-flow narrowing inside closures for local
 // consts but drops it for imported bindings — the hundreds of `if (!nm) …` guards rely on it.
 const nm = nmBridge;
@@ -528,9 +528,6 @@ export function App() {
   const [draftsInfo, setDraftsInfo] = useState({ count: 0, waiting: 0 });
   /** the Drafts tab's portal target: the thread draws its post cards in there */
   const [panelDraftsSlot, setPanelDraftsSlot] = useState<HTMLDivElement | null>(null);
-  /** when the session in front opened, and which sessions already opened their waiting drafts */
-  const sessionOpenedAt = useRef(0);
-  const draftsOpenedFor = useRef(new Set<string>());
   /** what the coding thread's own tabs wear: the change count, the checkpoints, the Work Plan's mark */
   const [codeCounts, setCodeCounts] = useState<CodeCounts | null>(null);
   /** the quick disk read, fetched once for the shell — the workspace face's Footprint gauge */
@@ -1943,16 +1940,9 @@ export function App() {
     panelPrev.current = { owner: next.owner, front: next.front, guests: next.guests };
     if (verdict) openDock(verdict === 'open');
   }, [panelSession.key, front, panelTabs.length, sessionTabs.length]); // eslint-disable-line react-hooks/exhaustive-deps
-  // opening a task or a coding thread brings the panel out (George, 2026-08-26: progress in view);
-  // a conversation leaves the fold where your toggle put it. Expand never outlives its session.
-  useEffect(() => {
-    setPanelExpanded(false);
-    sessionOpenedAt.current = Date.now();
-    const gate = !!openTask && VERDICT_STATES.has(openTask.state);
-    if (panelSession.key && openWithSession(panelSession.kind, gate)) openDock(true);
-    // a review that waits for your verdict opens with its session: it needs you (shell/arrivals.ts)
-    if (gate && openTask) void openTaskArtifact(openTask, null, { auto: true });
-  }, [panelSession.key]); // eslint-disable-line react-hooks/exhaustive-deps
+  // opening a session never opens the panel, whatever it holds (George, 2026-10-05: only a new
+  // artifact in a conversation opens it by itself). Expand never outlives its session.
+  useEffect(() => { setPanelExpanded(false); }, [panelSession.key]);
   const wtab = panelTabs.find((t) => t.id === front) ?? null;
   const wtabDoc = wtab ? wdocs[wtab.id] : null;
   /** what the ＋ flyout and the Files tab are pointed at: the coding thread's repository, the front tab's worktree, else the task's */
@@ -2054,16 +2044,6 @@ export function App() {
   };
   /** one of the coding thread's own tabs in front: a click opens the panel, the editor's own jump to Changes obeys the hold */
   const onCodeTab = (k: SessionTabKey, explicit = false) => { setFront(panelOwnerRef.current, sessionTabId(k)); if (explicit || !held) openDock(true); };
-  // drafts that already wait for your approval open with their session, once: they need you. A
-  // task's own gate opens first, a fold made during the run still holds, and a tab you opened
-  // yourself in the meantime keeps the front.
-  useEffect(() => {
-    const key = panelSession.key;
-    if (!key || draftsInfo.waiting === 0 || draftsOpenedFor.current.has(key) || Date.now() - sessionOpenedAt.current > 6000) return;
-    draftsOpenedFor.current.add(key);
-    if (held || (openTask && VERDICT_STATES.has(openTask.state)) || (front && front !== sessionTabId(sessionTabs[0]!))) return;
-    setFront(key, sessionTabId('drafts')); openDock(true);
-  }, [draftsInfo.waiting, panelSession.key]); // eslint-disable-line react-hooks/exhaustive-deps
   /** the Drafts tab as a thread sees it: where its cards draw, what it reports, and its door */
   const draftsDoor = { slot: panelDraftsSlot, onInfo: setDraftsInfo, onShow: () => showSessionTab('drafts') };
   /** what the panel shows in front, for the threads' one-row cards (thread/RefCard.tsx) */

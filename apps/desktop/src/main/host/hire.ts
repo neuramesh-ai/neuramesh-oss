@@ -13,6 +13,27 @@ import type { HostQueue } from '../harness/hostqueue';
 import type { makeFlows } from './flows';
 import type { HostCtx } from './ctx';
 
+/**
+ * the active pack's role→model map, read as the owner: null when the workspace runs no pack, and a
+ * throw when a read fails. module scope (it was makeHire's) so the runner's seed reads the pack the
+ * same way and can tell the two apart: the seed holds plume on a failed read (machined-seeds.ts),
+ * and the hire reads a failure as no pack.
+ */
+export async function readActivePackRoles(apiUrl: string, ownerActorId: string, workspaceId: string): Promise<Record<AgentRole, string> | null> {
+  const hdrs = { headers: await apiAuthHeaders(apiUrl, { kind: 'human', id: ownerActorId }) };
+  const r = await fetch(`${apiUrl}/v1/workspaces`, hdrs);
+  if (!r.ok) throw new Error(`GET /v1/workspaces answered ${r.status}`);
+  const j = (await r.json()) as { workspaces?: Array<{ id: string; activeModelPack?: string | null }> };
+  const packId = j.workspaces?.find((w) => w.id === workspaceId)?.activeModelPack ?? null;
+  let custom: CustomModelPack[] = [];
+  if (packId && isCustomPackId(packId)) {
+    const pr = await fetch(`${apiUrl}/v1/model-packs?workspace=${workspaceId}`, hdrs);
+    if (!pr.ok) throw new Error(`GET /v1/model-packs answered ${pr.status}`);
+    custom = ((await pr.json()) as { packs?: CustomModelPack[] }).packs ?? [];
+  }
+  return resolvePackRoles(packId, custom);
+}
+
 export function makeHire(ctx: HostCtx & {
   agents: Map<string, HostedAgent>;
   apiUrl: string;
@@ -72,22 +93,9 @@ async function threadBrain(scope: { threadId?: string | null; taskId?: string | 
   return parseBrainOverride(row?.brain_override ?? null);
 }
 
+// a failed read is no pack for the hire and the legs (host/legs.ts): each keeps a brain it already has
 async function activePackRoles(workspaceId: string): Promise<Record<AgentRole, string> | null> {
-  const hdrs = { headers: await apiAuthHeaders(apiUrl, { kind: 'human', id: ownerActorId }) };
-  try {
-    const r = await fetch(`${apiUrl}/v1/workspaces`, hdrs);
-    if (!r.ok) return null;
-    const j = (await r.json()) as { workspaces?: Array<{ id: string; activeModelPack?: string | null }> };
-    const packId = j.workspaces?.find((w) => w.id === workspaceId)?.activeModelPack ?? null;
-    let custom: CustomModelPack[] = [];
-    if (packId && isCustomPackId(packId)) {
-      const pr = await fetch(`${apiUrl}/v1/model-packs?workspace=${workspaceId}`, hdrs);
-      custom = pr.ok ? ((await pr.json()) as { packs?: CustomModelPack[] }).packs ?? [] : [];
-    }
-    return resolvePackRoles(packId, custom);
-  } catch {
-    return null;
-  }
+  return readActivePackRoles(apiUrl, ownerActorId, workspaceId).catch(() => null);
 }
 
 // Resolve + execute a hire the human approved: look up the name, run the pure

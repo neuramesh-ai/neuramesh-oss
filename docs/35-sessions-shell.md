@@ -148,9 +148,10 @@ sheet, no dimmed plane behind it. Both of today's sheets become this one surface
   the mode chip (`plan` in the plan hue, `act` in the build hue). The middle is the coding
   runtime's transcript with the thread's own messages above it (rex's one line, the kind divider).
   The composer is the thread's own, with the Plan | Act segment and the permissions chip added.
-  The side panel opens with the session and holds the code: Changes, Files, Work Plan, Checkpoints
-  and Terminal are the coding thread's own tabs there (the Workbench card until the side-panel
-  round, 2026-10-03). The gate seat above the composer holds one card: the approval, else the Act
+  The side panel holds the code: Changes, Files, Work Plan, Checkpoints and Terminal are the
+  coding thread's own tabs there (the Workbench card until the side-panel round, 2026-10-03). It
+  opens by itself only for a new approval with changes, never with the session (2026-10-05,
+  docs/33 §2). The gate seat above the composer holds one card: the approval, else the Act
   handoff, else the valve, `Make this a unit` (HUMAN_ONLY), which
   creates a plan-first unit anchored to the conversation, and the thread stays a coding thread
   with the unit card in it. Nothing reaches the board without that card. The session id IS the

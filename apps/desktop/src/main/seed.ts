@@ -122,6 +122,9 @@ export interface MarketerSeedFacts {
   workspace: string;
   machineId: string;
   channelId: string;
+  /** every room plume joins on its first register: the runner passes every marketing room,
+   * oldest first. absent, plume joins channelId alone (the Mac) */
+  channelIds?: string[];
 }
 
 export type MarketerSeedPlan =
@@ -149,11 +152,63 @@ export function planMarketerSeed(f: MarketerSeedFacts): MarketerSeedPlan {
       role: 'marketer',
       emoji: '🦚',
       description: ROLE_DESCRIPTION.marketer,
-      brief: 'Brand and growth: study the product and its market for real, write the brand docs, draft platform-native content in the brand voice — and never publish anything; humans approve everything outbound.',
-      channels: [f.channelId],
+      brief: 'Brand and growth work. Study the product and its market. Write the brand docs. Draft content for each platform in the brand voice. Never publish. A person approves every outbound post.',
+      channels: f.channelIds?.length ? f.channelIds : [f.channelId],
       ...(model ? { model, runtime: runtimeForModel(model) } : {}),
     },
   };
+}
+
+// the runner's marketing seed (plume for browser workspaces, 2026-10-04): the Mac's
+// ensureMarketingSeeds (sync/seeds.ts) as one pure pass, for the cloud runner of a workspace that
+// no Mac may ever open. machined-seeds.ts reads the facts from the replica and posts the commands
+// as the owner. it calls planMarketerSeed for the register, so the two seeds cannot drift.
+export interface MarketingRoomSeedFacts {
+  workspace: string;
+  /** the runner's own machine id, the one Launch registers the crew with */
+  machineId: string;
+  /** an active orchestrator exists. any agent row marks a workspace onboarded, and the wizard
+   * resumes only while it is not, so a plume registered before Launch would hide the wizard */
+  hasOrchestrator: boolean;
+  /** the marketing-kind rooms, oldest first (created_at, then id) */
+  rooms: string[];
+  /** any role='marketer' agent, retired included (the Mac's guard, sync/seeds.ts) */
+  hasMarketer: boolean;
+  plumeRole: string | null;
+  packRoles: Record<AgentRole, string> | null;
+  /** the pack read failed. the Mac reads that as no pack, and the schema then seats a legacy
+   * model that a starter workspace has no key for, so plume waits for the next pass instead */
+  packReadFailed: boolean;
+  /** what this process sent and the server settled with a 2xx or a refusal (machined-seeds.ts) */
+  settled: { rooms: ReadonlySet<string>; backfill: boolean; register: boolean };
+}
+
+export interface MarketingRoomSeedPlan {
+  /** in send order: the packs for each new room, one backfill, then plume */
+  cmds: Array<Record<string, unknown>>;
+  /** why a command did not go out, one line per reason */
+  skipped: string[];
+  /** plume waits for a pack read that failed, so the runner runs the pass again later. a final
+   * skip (a marketer exists, or plume has another role) holds nothing */
+  held: boolean;
+}
+
+export function planMarketingRoomSeeds(f: MarketingRoomSeedFacts): MarketingRoomSeedPlan {
+  if (!f.hasOrchestrator) return { cmds: [], skipped: ['the workspace has no active orchestrator yet, so the seed waits'], held: false };
+  if (!f.rooms.length) return { cmds: [], skipped: ['the workspace has no marketing room'], held: false };
+  const cmds: Array<Record<string, unknown>> = f.rooms
+    .filter((room) => !f.settled.rooms.has(room))
+    .map((room) => ({ type: 'skillpack.seed_defaults', workspace: f.workspace, channel: room, kind: 'marketing' }));
+  // one per process: idempotent server-side, so each boot repeats it, as each Mac launch does
+  if (!f.settled.backfill) cmds.push({ type: 'setup.backfill', workspace: f.workspace });
+  if (f.settled.register) return { cmds, skipped: [], held: false };
+  const plume = planMarketerSeed({
+    hasMarketer: f.hasMarketer, plumeRole: f.plumeRole, packRoles: f.packRoles,
+    workspace: f.workspace, machineId: f.machineId, channelId: f.rooms[0]!, channelIds: f.rooms,
+  });
+  if (plume.action === 'skip') return { cmds, skipped: [plume.reason], held: false };
+  if (f.packReadFailed) return { cmds, skipped: ['the pack read failed, so plume waits for the next pass'], held: true };
+  return { cmds: [...cmds, plume.cmd], skipped: [], held: false };
 }
 
 export type HireableRole = (typeof HIREABLE_ROLES)[number];

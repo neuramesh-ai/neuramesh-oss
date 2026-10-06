@@ -49,8 +49,10 @@ export interface AnnounceStore {
   countSince(filter: { email?: string; ipHash?: string; sinceIso: string }): Promise<number>;
   claim(id: string, by: { userId: string; workspaceId: string; threadId: string }): Promise<void>;
   /** `selection: 'all'` = every repository of the account reads through it (0142); `workspaceId` names
-   *  the workspace whose member granted it, when the grant came through the app rather than the door */
-  upsertInstallation(input: { installationId: number; account: string; repos: string[]; selection?: 'all' | 'selected'; workspaceId?: string | null }): Promise<void>;
+   *  the workspace whose member granted it, when the grant came through the app rather than the door.
+   *  A workspace given wins over the one recorded, except with `keepWorkspace` (the owner proof's
+   *  connect): then a recorded workspace stays, and only a record that names none takes the new one */
+  upsertInstallation(input: { installationId: number; account: string; repos: string[]; selection?: 'all' | 'selected'; workspaceId?: string | null; keepWorkspace?: boolean }): Promise<void>;
   /** the installation that reads `owner/repo`: named in its list, or its account on an all-repositories grant.
    *  `unrecorded`: only a grant no workspace recorded (the public door's, or a read's repair) */
   installationForRepo(slug: string, opts?: { unrecorded?: boolean }): Promise<{ installationId: number } | null>;
@@ -154,10 +156,10 @@ export class MemAnnounceStore implements AnnounceStore {
     const r = this.rows.find((x) => x.id === id);
     if (r) { r.claimedBy = by.userId; r.claimedWorkspaceId = by.workspaceId; r.claimedThreadId = by.threadId; }
   }
-  async upsertInstallation(input: { installationId: number; account: string; repos: string[]; selection?: 'all' | 'selected'; workspaceId?: string | null }): Promise<void> {
+  async upsertInstallation(input: { installationId: number; account: string; repos: string[]; selection?: 'all' | 'selected'; workspaceId?: string | null; keepWorkspace?: boolean }): Promise<void> {
     const repos = input.repos.map(norm);
     const hit = this.installations.find((i) => i.installationId === input.installationId);
-    if (hit) { hit.account = input.account; hit.repos = repos; hit.selection = input.selection ?? hit.selection; if (input.workspaceId) hit.workspaceId = input.workspaceId; }
+    if (hit) { hit.account = input.account; hit.repos = repos; hit.selection = input.selection ?? hit.selection; if (input.workspaceId && !(input.keepWorkspace && hit.workspaceId)) hit.workspaceId = input.workspaceId; }
     else this.installations.push({ installationId: input.installationId, account: input.account, repos, selection: input.selection ?? 'selected', workspaceId: input.workspaceId ?? null });
   }
   async installationForRepo(slug: string, opts: { unrecorded?: boolean } = {}): Promise<{ installationId: number } | null> {
@@ -238,12 +240,13 @@ export class PgAnnounceStore implements AnnounceStore {
   async claim(id: string, by: { userId: string; workspaceId: string; threadId: string }): Promise<void> {
     await this.sql`update announcements set claimed_by = ${by.userId}::uuid, claimed_workspace_id = ${by.workspaceId}::uuid, claimed_thread_id = ${by.threadId}::uuid, claimed_at = now() where id = ${id}::uuid`;
   }
-  async upsertInstallation(input: { installationId: number; account: string; repos: string[]; selection?: 'all' | 'selected'; workspaceId?: string | null }): Promise<void> {
+  async upsertInstallation(input: { installationId: number; account: string; repos: string[]; selection?: 'all' | 'selected'; workspaceId?: string | null; keepWorkspace?: boolean }): Promise<void> {
     // a workspace named once is never forgotten by a later door callback that names none
     await this.sql`insert into github_installations (installation_id, account, repos, selection, workspace_id)
       values (${input.installationId}, ${input.account}, ${input.repos.map(norm)}, ${input.selection ?? 'selected'}, ${input.workspaceId ?? null})
       on conflict (installation_id) do update set account = excluded.account, repos = excluded.repos, selection = excluded.selection,
-        workspace_id = coalesce(excluded.workspace_id, github_installations.workspace_id), updated_at = now()`;
+        workspace_id = case when ${!!input.keepWorkspace}::boolean then coalesce(github_installations.workspace_id, excluded.workspace_id)
+          else coalesce(excluded.workspace_id, github_installations.workspace_id) end, updated_at = now()`;
   }
   async installationForRepo(slug: string, opts: { unrecorded?: boolean } = {}): Promise<{ installationId: number } | null> {
     const s = norm(slug);

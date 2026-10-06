@@ -356,6 +356,93 @@ test('an old custom brain without a marketer seat falls back designer → develo
   assert.equal((viaDev as { cmd: Record<string, unknown> }).cmd['model'], 'gpt-5.5');
 });
 
+// ── the runner's marketing seed (plume for browser workspaces, 2026-10-04) ────────────────────
+// the Mac's ensureMarketingSeeds (sync/seeds.ts) as one pure pass for a cloud runner: the runner
+// reads these facts from its replica and posts what comes back (machined-seeds.ts).
+import { planMarketingRoomSeeds, type MarketingRoomSeedFacts } from './seed';
+import { ROLE_DESCRIPTION, STARTER_MODEL, resolvePackRoles, runtimeForModel } from '@neuramesh/shared';
+
+const ROOMS = ['c-mkt-old', 'c-mkt-new'];
+const runnerFacts: MarketingRoomSeedFacts = {
+  workspace: 'ws1', machineId: 'runner-1', hasOrchestrator: true, rooms: ROOMS,
+  hasMarketer: false, plumeRole: null, packRoles: null, packReadFailed: false,
+  settled: { rooms: new Set(), backfill: false, register: false },
+};
+type SeedCmds = { cmds: Array<Record<string, unknown>> };
+const typesOf = (p: SeedCmds) => p.cmds.map((c) => c['type']);
+const registerOf = (p: SeedCmds) => p.cmds.find((c) => c['type'] === 'agent.register');
+
+test('a workspace with no orchestrator gets no marketing seed', () => {
+  // any agent row marks a workspace onboarded, so a plume before Launch would hide the wizard
+  const p = planMarketingRoomSeeds({ ...runnerFacts, hasOrchestrator: false });
+  assert.deepEqual(p.cmds, []);
+  assert.match(p.skipped.join('\n'), /orchestrator/);
+});
+
+test('an onboarded workspace gets the packs, one backfill, then plume', () => {
+  const packRoles = PACKS['claude-core']!.roles;
+  const p = planMarketingRoomSeeds({ ...runnerFacts, packRoles });
+  const mac = planMarketerSeed({ hasMarketer: false, plumeRole: null, packRoles, workspace: 'ws1', machineId: 'runner-1', channelId: ROOMS[0]!, channelIds: ROOMS });
+  assert.deepEqual(p.cmds, [
+    { type: 'skillpack.seed_defaults', workspace: 'ws1', channel: 'c-mkt-old', kind: 'marketing' },
+    { type: 'skillpack.seed_defaults', workspace: 'ws1', channel: 'c-mkt-new', kind: 'marketing' },
+    { type: 'setup.backfill', workspace: 'ws1' },
+    (mac as { cmd: Record<string, unknown> }).cmd,
+  ]);
+  // what the Mac's register test leaves out
+  const reg = registerOf(p)!;
+  assert.equal(reg['machineId'], 'runner-1');
+  assert.equal(reg['model'], packRoles.marketer);
+  assert.equal(reg['runtime'], runtimeForModel(packRoles.marketer));
+  assert.deepEqual(reg['channels'], ROOMS);
+  assert.equal(reg['description'], ROLE_DESCRIPTION.marketer);
+  assert.deepEqual(p.skipped, []);
+});
+
+test('plume joins every marketing room on its first register', () => {
+  const rooms = ['c-oldest', 'c-middle', 'c-newest'];
+  assert.deepEqual(registerOf(planMarketingRoomSeeds({ ...runnerFacts, rooms }))!['channels'], rooms);
+  // the Mac passes no list, and its plume keeps the one room it names
+  const mac = planMarketerSeed({ ...mkBase, channelId: 'c-oldest' });
+  assert.deepEqual((mac as { cmd: Record<string, unknown> }).cmd['channels'], ['c-oldest']);
+});
+
+test('a retired marketer keeps plume out', () => {
+  // hasMarketer counts retired rows: a retirement is a person's call, and a register would undo it
+  const p = planMarketingRoomSeeds({ ...runnerFacts, hasMarketer: true });
+  assert.equal(registerOf(p), undefined);
+  assert.deepEqual(typesOf(p), ['skillpack.seed_defaults', 'skillpack.seed_defaults', 'setup.backfill']);
+  assert.match(p.skipped.join('\n'), /already has a marketer/);
+});
+
+test('a plume with another role is never repointed', () => {
+  const p = planMarketingRoomSeeds({ ...runnerFacts, plumeRole: 'developer' });
+  assert.equal(registerOf(p), undefined);
+  assert.match(p.skipped.join('\n'), /plume.*developer/);
+  // a final skip holds nothing for a later pass, even when the pack read failed too
+  assert.equal(planMarketingRoomSeeds({ ...runnerFacts, plumeRole: 'developer', packReadFailed: true }).held, false);
+});
+
+test('a second pass sends only what is new', () => {
+  const p = planMarketingRoomSeeds({ ...runnerFacts, settled: { rooms: new Set(['c-mkt-old']), backfill: true, register: true } });
+  assert.deepEqual(p.cmds, [{ type: 'skillpack.seed_defaults', workspace: 'ws1', channel: 'c-mkt-new', kind: 'marketing' }]);
+});
+
+test('the house brain seats plume on gemini-3.5-flash-lite with runtime gemini', () => {
+  const reg = registerOf(planMarketingRoomSeeds({ ...runnerFacts, packRoles: resolvePackRoles('starter', []) }))!;
+  assert.equal(reg['model'], STARTER_MODEL);
+  assert.equal(reg['runtime'], 'gemini');
+});
+
+test('a failed pack read holds plume for the next pass', () => {
+  // the Mac reads a failed read as no pack, and the schema then seats a legacy model that a
+  // starter workspace has no key for
+  const p = planMarketingRoomSeeds({ ...runnerFacts, packReadFailed: true });
+  assert.deepEqual(typesOf(p), ['skillpack.seed_defaults', 'skillpack.seed_defaults', 'setup.backfill']);
+  assert.match(p.skipped.join('\n'), /pack read failed/);
+  assert.equal(p.held, true, 'the runner runs the pass again later');
+});
+
 // ── The two agent strings (0110) ─────────────────────────────────────────────
 // `description` ROUTES (the orchestrator reads it in list_agents to pick an agent); `brief`
 // INSTRUCTS (injected into the agent's own turns). The orchestrator writes both at hire — but

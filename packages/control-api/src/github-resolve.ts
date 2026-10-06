@@ -9,13 +9,20 @@
 //     repository a fresh grant reads, so that costs one click);
 //   - the App reads none for this workspace → nothing to pick from: the grant. A grant that no
 //     workspace recorded (the public door's, or a read's repair) gets words that name the way out.
+// With the owner proof on (docs/design/github-owner-proof-2026-10), "what the App reads for the
+// workspace" is what the ASKING PERSON's fresh proof holds (`proofs`): the installation records give
+// no new connects, the pick lists the person's own proven repositories, a connection the room
+// already holds keeps answering (holds()), and only a click connects: an ask with no pick gets the
+// pick with the room's repository chosen, and the grant the person started is the click (strict).
 // The installation helpers (the verified lookup, the memo, the hourly token) live here too, shared by
 // the routes (github-connect.ts) and the public announce door.
 import { createEvent, formatAddress } from '@neuramesh/shared';
 import { GitHubApiError, findInstallation, githubAppConfigured, githubGet, installationToken, parseRepoInput } from './github-app';
+import { busy, ProofRefusal, unreachable } from './github-proof';
 import { installationFacts } from './github-reads';
 import type { Store } from './store';
 import { hasGitHubAddress, type AnnounceStore, type Installation, type PrimaryRepo } from './store/announce';
+import type { GitHubProof } from './store/github-proofs';
 import { resumeAfterGitHub } from './github-resume';
 
 type Fetch = typeof fetch;
@@ -33,8 +40,10 @@ export function slugOf(repo: PrimaryRepo): string | null {
 /** the App's installation for a repository, VERIFIED: the table's row must still mint a token (a
  *  row GitHub answers 404 for is dead and forgotten: the live harness held a fake id for the same
  *  repository and it won the lookup), else GitHub's own answer, remembered with the installation's
- *  repository list. The token comes back with it, so a caller never mints twice. */
-export async function installationFor(ann: AnnounceStore, slug: string, fetchFn: Fetch, workspaceId: string | null = null): Promise<{ installationId: number; token: string } | null> {
+ *  repository list. The token comes back with it, so a caller never mints twice. `strict`: the
+ *  prove call. GitHub busy or down on the lookup or the token throws, and nothing is remembered:
+ *  the caller's own read decides, and an outage writes nothing. */
+export async function installationFor(ann: AnnounceStore, slug: string, fetchFn: Fetch, workspaceId: string | null = null, strict = false): Promise<{ installationId: number; token: string } | null> {
   if (!githubAppConfigured()) return null;
   const known = await ann.installationForRepo(slug);
   if (known) {
@@ -45,23 +54,25 @@ export async function installationFor(ann: AnnounceStore, slug: string, fetchFn:
       else throw e;
     }
   }
-  const found = await findInstallation(slug, { fetchFn }).catch(() => null);
+  const quiet = (e: unknown): null => { if (strict && unreachable(e)) throw e; return null; };
+  const found = await findInstallation(slug, { fetchFn }).catch(quiet);
   if (!found) return null;
-  const token = await tokenFor(found.id, fetchFn).catch(() => null);
+  const token = await tokenFor(found.id, fetchFn).catch(quiet);
   if (!token) return null;
-  await rememberInstallation(ann, found.id, fetchFn, workspaceId).catch(() => { /* the id is the answer; the memo is a convenience */ });
+  if (!strict) await rememberInstallation(ann, found.id, fetchFn, workspaceId).catch(() => { /* the id is the answer; the memo is a convenience */ });
   return { installationId: found.id, token };
 }
 
 const PAGE = 100;   // GitHub's largest page
 /** what GitHub says the installation covers, written down (account, selection, the first page of
- *  repositories) and returned: the repositories, lowercased slugs */
-export async function rememberInstallation(ann: AnnounceStore, installationId: number, fetchFn: Fetch, workspaceId: string | null): Promise<string[]> {
+ *  repositories) and returned: the repositories, lowercased slugs. `keepWorkspace`: a workspace
+ *  that the record names already stays (store/announce.ts) */
+export async function rememberInstallation(ann: AnnounceStore, installationId: number, fetchFn: Fetch, workspaceId: string | null, keepWorkspace = false): Promise<string[]> {
   const tok = await tokenFor(installationId, fetchFn);
   const repos = await githubGet(`/installation/repositories?per_page=${PAGE}`, { token: tok, fetchFn });
   const names = repos.status === 200 ? ((repos.json as { repositories?: Array<{ full_name: string }> }).repositories ?? []).map((r) => r.full_name.toLowerCase()) : [];
   const facts = await installationFacts(installationId, { fetchFn }).catch(() => ({ account: names[0]?.split('/')[0] ?? '', selection: 'selected' as const }));
-  await ann.upsertInstallation({ installationId, account: facts.account, repos: names, selection: facts.selection, workspaceId });
+  await ann.upsertInstallation({ installationId, account: facts.account, repos: names, selection: facts.selection, workspaceId, keepWorkspace });
   return names;
 }
 
@@ -111,22 +122,32 @@ async function attachRepo(store: Store, ctx: { workspace: string; channel: strin
 
 export type Resolve =
   | { ok: true; handle: string; attached: boolean }
-  | { ok: false; code: 'NO_REPO' | 'NOT_INSTALLED'; error: string; slug: string | null; repos: string[]; hint: string | null };
+  | { ok: false; code: 'NO_REPO' | 'NOT_INSTALLED'; error: string; slug: string | null; repos: string[]; hint: string | null; proven?: boolean };
+
+/** what a proof row lends the resolve: the installation, and the repositories by id and by name */
+export type Proven = Pick<GitHubProof, 'installationId' | 'repoIds' | 'repos'>;
 
 /** can the App read the room's project's repository? Then the row exists, now. `pick`: the human
  *  chose one of the readable repositories, attached and connected in one move. `resume`: the /v1
- *  resolve, which proves the person, resumes the project's open GitHub cards. */
-export async function resolveConnector(store: Store, ctx: { workspace: string; channel: string; actor: string }, fetchFn: Fetch, opts: { pick?: string | null; resume?: boolean } = {}): Promise<Resolve> {
+ *  calls, whose session proves the person, resume the project's open GitHub cards. `proofs`: the
+ *  owner proof is on, and these are the asking person's fresh proof rows (empty: no proof). `strict`:
+ *  the prove call, where GitHub busy or down on the App's own calls (the lookup, the token and the
+ *  read, in connect() and holds()) throws GITHUB_DOWN before any write. The resolve reads it as
+ *  "cannot read" and keeps its own codes. */
+export async function resolveConnector(store: Store, ctx: { workspace: string; channel: string; actor: string }, fetchFn: Fetch, opts: { pick?: string | null; resume?: boolean; proofs?: Proven[] | null; strict?: boolean } = {}): Promise<Resolve> {
   const pick = opts.pick ?? null;
+  const proofs = opts.proofs ?? null;
   const ann = store.announcements!;
   const repo = await ann.repoForChannel(ctx.channel);
   const slug = repo ? slugOf(repo) : null;
   let refreshed: Promise<string[]> | null = null;   // one refresh from GitHub per resolve
-  const readable = (): Promise<string[]> => (refreshed ??= readableRepos(ann, ctx.workspace, fetchFn));
+  const readable = (): Promise<string[]> => (refreshed ??= proofs ? Promise.resolve([...new Set(proofs.flatMap((p) => p.repos))].sort()) : readableRepos(ann, ctx.workspace, fetchFn));
+  const proofOf = (target: string): Proven | null => proofs?.find((p) => p.repos.includes(target.toLowerCase())) ?? null;
   // only an installation recorded for THIS workspace connects a repository: the GitHub-wide lookup
   // (installationFor) answers for any workspace's grant, and its fallback stamps the grant onto
   // the caller's workspace
   const installed = async (target: string): Promise<number | null> => {
+    if (proofs) return proofOf(target)?.installationId ?? null;
     const t = target.toLowerCase();
     const covers = (i: Installation): boolean => i.repos.includes(t) || (i.selection === 'all' && i.account.toLowerCase() === t.split('/')[0]);
     const known = (await ann.installationsForWorkspace(ctx.workspace)).find(covers);
@@ -141,25 +162,34 @@ export async function resolveConnector(store: Store, ctx: { workspace: string; c
     const found = await findInstallation(target, { fetchFn }).catch(() => null);
     return found && rows.some((i) => i.installationId === found.id) ? found.id : null;
   };
+  // the prove call (strict): GitHub busy or down on the App's own calls is GITHUB_DOWN, never "cannot read"
+  const down = (e: unknown): null => { if (opts.strict && unreachable(e)) throw new ProofRefusal('GITHUB_DOWN'); return null; };
   const connect = async (target: string): Promise<{ facts: { default_branch?: string } } | null> => {
     const id = await installed(target).catch(() => null);
-    const token = id === null ? null : await tokenFor(id, fetchFn).catch(() => null);
+    const token = id === null ? null : await tokenFor(id, fetchFn).catch(down);
     if (!token) return null;
     const r = await githubGet(`/repos/${target}`, { token, fetchFn });
-    return r.status === 200 ? { facts: r.json as { default_branch?: string } } : null;
+    if (opts.strict && busy(r.status, r.headers)) throw new ProofRefusal('GITHUB_DOWN');
+    const facts = r.json as { id?: number; default_branch?: string } | null;
+    // the proof names the repository by id too: a name that GitHub gave to another repository since is not the one proven
+    if (r.status !== 200 || (proofs && !proofOf(target)?.repoIds.includes(Number(facts?.id)))) return null;
+    return { facts: facts ?? {} };
   };
   // a connection this project already holds keeps answering: the reads (github-connect.ts open()) serve
   // it through any installation, so a room whose grant was recorded before the scoping never strands
   const holds = async (target: string): Promise<boolean> => {
     const row = await store.connectorWithSecret(ctx.workspace, 'github', ctx.channel).catch(() => null);
     if (row?.status !== 'connected' || row.handle.toLowerCase() !== target.toLowerCase()) return false;
-    const inst = await installationFor(ann, target, fetchFn).catch(() => null);
-    return !!inst && (await githubGet(`/repos/${target}`, { token: inst.token, fetchFn }).catch(() => null))?.status === 200;
+    const inst = await installationFor(ann, target, fetchFn, null, opts.strict).catch(down);
+    const r = inst && await githubGet(`/repos/${target}`, { token: inst.token, fetchFn }).catch(down);
+    if (opts.strict && r && busy(r.status, r.headers)) throw new ProofRefusal('GITHUB_DOWN');
+    return r?.status === 200;
   };
   // a live grant that no workspace recorded (the public door's, or a read's repair after a reinstall
   // on GitHub's own pages): GitHub sends no callback for an installation that exists already, so the
   // grant door alone never connects it. Another workspace's grant keeps the plain words.
   const stranded = async (target: string): Promise<string | null> => {
+    if (proofs) return null;   // a fresh proof finds the grant: the person grants again, nobody uninstalls
     if (await installed(target).then((id) => id !== null, () => true)) return null;   // this workspace's own grant, or no answer
     const door = await ann.installationForRepo(target, { unrecorded: true }).catch(() => null);
     const live = door && await tokenFor(door.installationId, fetchFn).then(() => true, async (e: unknown) => {
@@ -168,21 +198,41 @@ export async function resolveConnector(store: Store, ctx: { workspace: string; c
     });
     return live ? `The neuramesh app reads ${target}, but this workspace did not install it. On GitHub, uninstall the neuramesh app from ${target.split('/')[0]}, then grant access again here.` : null;
   };
+  // a connect with the proof on keeps the old doors' record: the proven installation names this workspace when its
+  // record names none, so a rollback (the client values removed) finds it in the workspace's other rooms. A record
+  // that names a workspace keeps it, so a proof never moves an installation. Best effort: the connection is the answer
+  const recorded = async (target: string): Promise<void> => {
+    const id = proofOf(target)?.installationId;
+    if (!id || (await ann.installationsForWorkspace(ctx.workspace)).some((i) => i.installationId === id)) return;
+    await rememberInstallation(ann, id, fetchFn, ctx.workspace, true);
+  };
   const written = async (target: string, attached: boolean): Promise<Resolve> => {
     await store.upsertConnector({ workspace: ctx.workspace, channelId: ctx.channel, provider: 'github', handle: target, connectedBy: ctx.actor, scopes: GITHUB_SCOPES });
     // the grant arms the work: every open GitHub card in the project resumes (github-resume.ts), and
     // only from the /v1 resolve, because only its session proves the person
     if (opts.resume) await resumeAfterGitHub(store, ctx, target).catch((e) => console.warn(`github resume failed: ${e instanceof Error ? e.message : String(e)}`));
+    if (proofs) await recorded(target).catch(() => {});
     return { ok: true, handle: target, attached };
   };
   if (pick) {
     const target = parseRepoInput(pick)?.slug ?? null;
     const read = target ? await connect(target) : null;
     if (!target || !read) return { ok: false, code: 'NOT_INSTALLED', error: (target && await stranded(target)) || `The neuramesh app cannot read ${target ?? pick}. Add the repository on GitHub, then pick it.`, slug: target, repos: await readable(), hint: null };
-    if (target !== slug) await attachRepo(store, ctx, target, read.facts.default_branch || 'main');
-    return written(target, target !== slug);
+    // GitHub names are not case sensitive: the pick of the room's own repository from a lowercased list attaches nothing
+    const same = !!slug && target.toLowerCase() === slug.toLowerCase();
+    if (!same) await attachRepo(store, ctx, target, read.facts.default_branch || 'main');
+    return written(same ? slug! : target, !same);
   }
-  if (slug && (await connect(slug) || await holds(slug))) return written(slug, false);
+  if (slug && proofs && !opts.strict) {
+    // with the proof on, an ask that nobody clicked (a card's mount, the poll, a teammate's start link) connects nothing.
+    // the room keeps a connection it holds, and a proof that reads the room's repository gives the pick with that
+    // repository chosen, so the person connects it with one click. the grant that the person started (strict) connects
+    if (await holds(slug)) return written(slug, false);
+    if (await connect(slug)) {
+      const repos = await readable();
+      return { ok: false, code: 'NOT_INSTALLED', error: `Connect ${slug} to this room.`, slug, repos, hint: repos.find((s) => s === slug.toLowerCase()) ?? slug, proven: true };
+    }
+  } else if (slug && (await connect(slug) || await holds(slug))) return written(slug, false);
   const repos = await readable();
   const hint = hintFor(repo, repos);
   if (!repo) return { ok: false, code: 'NO_REPO', error: repos.length ? 'Pick the repository this project lives in.' : 'This project has no repository yet. Grant access on GitHub and pick it there.', slug: null, repos, hint };

@@ -30,7 +30,7 @@ export interface Store {
   machineUsageToday?(workspaceId: string): Promise<{ day: string; minutes: number }>;
   /** the public announce door (0139): one object, two implementations (store/announce.ts) */
   announcements?: import('./announce').AnnounceStore;   replies?: import('./replies').ReplyStore; // the reply queue (0146): the person queues, the minute cron reminds
-  films?: import('./films').FilmStore;   agentModels?: import('./agent-models').AgentModelStore; // the video rung's job rows (0140): the door writes, the minute cron works, the history reads · a person's model for each agent (0148)
+  films?: import('./films').FilmStore;   agentModels?: import('./agent-models').AgentModelStore;   githubProofs?: import('./github-proofs').GitHubProofStore; // the video rung's job rows (0140): the door writes, the minute cron works, the history reads · a person's model for each agent (0148) · the GitHub owner proof (0149)
   createTask(task: Task, event: NMEvent): Promise<Task>;
   // Duplicate-create guard (handler createTask): the newest OPEN non-backlog task in the
   // channel whose normalizeTaskTitle(title) matches, created at/after sinceIso — else null.

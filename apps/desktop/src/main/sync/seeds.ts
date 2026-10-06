@@ -48,7 +48,8 @@ export async function ensureMarketingSeeds(conn: Connection, db: PowerSyncDataba
   if (hasMarketer.length) return;
   const packRoles = await packRolesFor(conn, workspaceId);
   const [plume] = await db.getAll<{ role: string }>(`select role from agents where workspace_id = ? and name = 'plume' limit 1`, [workspaceId]).catch(() => [] as Array<{ role: string }>);
-  const plan = planMarketerSeed({ hasMarketer: false, plumeRole: plume?.role ?? null, packRoles, workspace: workspaceId, machineId: machineIdForSeed, channelId: channelIds[0]! });
+  // plume joins every marketing room on its first register (George, 2026-10-04), as the cloud runner's seed does
+  const plan = planMarketerSeed({ hasMarketer: false, plumeRole: plume?.role ?? null, packRoles, workspace: workspaceId, machineId: machineIdForSeed, channelId: channelIds[0]!, channelIds });
   if (plan.action === 'register') await send(plan.cmd);
   else console.warn(`marketer_seed skipped: ${plan.reason}`);
 }
@@ -106,7 +107,7 @@ export async function backfillSeeds(conn: Connection, db: PowerSyncDatabase, mac
       // marketing-kind rooms: the marketing-core pack + plume 🦚, via the same helper the
       // kind-set IPC fires — boot covers rooms that predate this machine; the IPC covers rooms
       // flipped to marketing mid-session.
-      const mkAll = await db.getAll<{ id: string }>(`select id from channels where kind = 'marketing' and workspace_id = ?`, [d.workspace_id]).catch(() => []);
+      const mkAll = await db.getAll<{ id: string }>(`select id from channels where kind = 'marketing' and workspace_id = ? order by created_at, id`, [d.workspace_id]).catch(() => []);
       await ensureMarketingSeeds(conn, db, d.workspace_id, mkAll.map((m) => m.id));
     }
     return;

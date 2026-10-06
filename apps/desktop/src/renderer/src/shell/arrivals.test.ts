@@ -5,7 +5,7 @@
 // front, a gate first, and never in front of your unsaved work or through a fold you made mid-run.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { decideArrivals, EMPTY_FLOOR_MS, fileArrivalKind, noteRows, seenStart, serverMs, SETTLE_MS, type ArrivalKind } from './arrivals';
+import { decideArrivals, EMPTY_FLOOR_MS, fileArrivalKind, noteApproval, noteRows, seenStart, serverMs, SETTLE_MS, type ArrivalKind } from './arrivals';
 
 const T0 = Date.parse('2026-10-03T20:00:00Z');
 const at = (min: number) => new Date(T0 + min * 60_000).toISOString();
@@ -75,4 +75,15 @@ test('never in front of your unsaved work, and never through a fold you made whi
   assert.equal(held.front, null);
   assert.equal(held.unfold, false, 'the fold holds until the run ends');
   assert.deepEqual(held.behind.map((x) => x.id), ['plan'], 'it still joins the strip, and the panel button counts it');
+});
+
+test('a coding approval that already waited when the session opened is not new; one that appears later is, once', () => {
+  const st = seenStart('code:S', 1_000);
+  assert.equal(noteApproval(st, 'a1', 1_000), false, 'the cache at mount: it already waited');
+  assert.equal(noteApproval(st, 'a2', 1_000 + SETTLE_MS - 1), false, 'the first events after a load: still the baseline');
+  assert.equal(noteApproval(st, null, 1_000 + SETTLE_MS), false, 'no approval is no arrival');
+  // positive control: an approval that appears after the settle window opens Changes and the panel
+  assert.equal(noteApproval(st, 'a3', 1_000 + SETTLE_MS), true);
+  assert.equal(noteApproval(st, 'a3', 1_000 + SETTLE_MS + 500), false, 'each approval counts once');
+  assert.equal(noteApproval(st, 'a1', 9_000), false, 'the one that waited never turns new later');
 });

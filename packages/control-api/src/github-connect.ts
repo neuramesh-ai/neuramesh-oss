@@ -15,16 +15,25 @@
 // resolve reads only the installations recorded for the room's workspace, never GitHub's answer for
 // any workspace's grant, so a grant whose callback lands on a deployment with another database does
 // not count here. The public announce door keeps its slug-state branch on the same routes.
+//
+// The owner proof (docs/design/github-owner-proof-2026-10), on when ownerProofConfigured(): every grant
+// starts at GitHub's authorize page, and the signed-in prove call (`POST /v1/github/prove`,
+// github-prove.ts) is the second door that writes. Only the signed-in resolve seals a grant's state, so
+// the state names the session's person: the public start sends the browser to hq's start page, which
+// asks the resolve. The Setup URL only sends the browser on (it records nothing), and the resolve
+// connects only a repository in the asking person's fresh proof. Off, every door works as above.
 import type { Env, Hono } from 'hono';
 import { z } from 'zod';
 import type { Actor } from '@neuramesh/shared';
 import { seal, unseal } from './connector-crypto';
 import { actorInWorkspace } from './credits';
 import { GitHubApiError, githubAppConfigured, installUrl, parseRepoInput, readRepoSignals } from './github-app';
+import { authorizeUrl, grantStartUrl, isProofState, ownerProofConfigured, sealProofState, type GrantState } from './github-proof';
+import { proveGrant } from './github-prove';
 import { readRepoCommits, readRepoFile, readRepoTree } from './github-reads';
 import { installationFor, rememberInstallation, resolveConnector, slugOf } from './github-resolve';
 import { githubWriteRoutes } from './github-write';
-import { APP_URL } from './mail';
+import { APP_URL, HQ_URL } from './mail';
 import type { Store } from './store';
 import type { PrimaryRepo } from './store/announce';
 
@@ -33,14 +42,20 @@ export { GITHUB_SCOPES, forgetToken, installationFor, rememberInstallation, reso
 
 type Fetch = typeof fetch;
 type ActorEnv = Env & { Variables: { actor: Actor } };
-/** the sealed state of an in-app grant; `github: 1` keeps a social state from ever parsing as one */
-interface GrantState { github: 1; workspace: string; channel: string | null; actor: string; slug: string | null }
 
 const page = (title: string, lines: string[]): string =>
   `<!doctype html><meta charset="utf-8"><title>${title}</title><body style="font:15px system-ui;display:grid;place-items:center;height:100vh;margin:0;background:#1d1d1d;color:#e6e6e6"><div style="text-align:center;max-width:36em">${lines.map((l) => `<p>${l}</p>`).join('')}</div></body>`;
 
+// a proof state (`w.` or `p.`) reads as a plain in-app state when the proof is off again: every door works as before
 const tryUnseal = (state: string): GrantState | null => {
-  try { const s = unseal<Partial<GrantState>>(state); return s?.github === 1 && s.workspace && s.actor ? (s as GrantState) : null; } catch { return null; }
+  try { const s = unseal<Partial<GrantState>>(state.replace(/^[wp]\./, '')); return s?.github === 1 && s.workspace && s.actor ? (s as GrantState) : null; } catch { return null; }
+};
+
+/** the Setup URL with the proof on: GitHub's error and a member's request end on hq's page, which asks
+ *  the prove call for the words; an install or an update goes on to the authorize page. Same state. */
+const setupHop = (state: string, action: string | undefined, error: string | undefined): string => {
+  const ended = error ? error.replace(/[^\w-]/g, '').slice(0, 60) || 'error' : action === 'request' ? 'request' : null;
+  return ended ? `${HQ_URL}/github/callback?${new URLSearchParams({ error: ended, state }).toString()}` : authorizeUrl(state);
 };
 
 // ── the doors ──────────────────────────────────────────────────────────────────────────────────
@@ -56,8 +71,11 @@ export function githubConnectRoutes<E extends Env>(app: Hono<E>, store: Store, o
     const workspace = c.req.query('workspace');
     const actor = c.req.query('actor');
     if (workspace && actor) {
-      if (!process.env['NM_CONNECTOR_KEY'] || !ann()) return c.text('github connect is not configured on this server', 501);
       const channel = c.req.query('channel') ?? null;
+      // the supported desktops open this start with no session. With the proof on, the query proves nobody,
+      // so nothing here names a person: hq's start page asks the signed-in resolve for the grant link
+      if (ownerProofConfigured()) return c.redirect(grantStartUrl(channel || null), 302);
+      if (!process.env['NM_CONNECTOR_KEY'] || !ann()) return c.text('github connect is not configured on this server', 501);
       const repo = channel ? await ann()!.repoForChannel(channel) : null;
       const state: GrantState = { github: 1, workspace, channel, actor, slug: repo ? slugOf(repo) : null };
       return c.redirect(installUrl(seal(state)), 302);
@@ -69,8 +87,11 @@ export function githubConnectRoutes<E extends Env>(app: Hono<E>, store: Store, o
   app.get('/connect/github/callback', async (c) => {
     const id = Number(c.req.query('installation_id'));
     const raw = c.req.query('state') ?? '';
+    // the owner proof: GitHub does not sign installation_id, so this route records nothing for a grant
+    if (ownerProofConfigured() && isProofState(raw)) return c.redirect(setupHop(raw, c.req.query('setup_action'), c.req.query('error')), 302);
     const grant = tryUnseal(raw);
     if (grant) {
+      if (ownerProofConfigured()) return c.html(page('GitHub', ['The grant did not land.', 'Start again from neuramesh.']), 400);
       if (!ann() || !githubAppConfigured() || !Number.isFinite(id) || id <= 0) return c.html(page('GitHub', ['The grant did not land.', 'Try again from Connections in neuramesh.']), 400);
       try {
         // the record only: the state and the installation_id prove no person, so the row, the attach
@@ -95,6 +116,11 @@ export function githubConnectRoutes<E extends Env>(app: Hono<E>, store: Store, o
 }
 
 // ── the /v1 lane: the resolve and the reads (after the guard: the actor is known) ─────────────
+/** the next move is GitHub's authorize page: the person holds no fresh proof, or one that does not connect
+ *  the room's own repository (GitHub may read it for the person since the proof) */
+const proveWords = (slug: string | null): string => slug
+  ? `GitHub must confirm that your account can read ${slug}. Grant access on GitHub.`
+  : 'GitHub must confirm which repositories your account can read. Grant access on GitHub.';
 type Opened = { slug: string; token: string; repo: PrimaryRepo; connId: string };
 type Refusal = { status: 400 | 403 | 409 | 501 | 502; body: { error: string; code: string } };
 
@@ -105,18 +131,31 @@ export function githubApiRoutes<E extends ActorEnv>(app: Hono<E>, store: Store, 
   app.post('/v1/github/resolve', async (c) => {
     const actor = c.get('actor');
     if (actor.kind !== 'human') return c.json({ error: 'a person connects GitHub', code: 'HUMAN_ONLY' }, 403);
-    const body = z.object({ channel: z.string().min(1), repo: z.string().min(1).optional() }).safeParse(await c.req.json().catch(() => null));
+    const body = z.object({ channel: z.string().min(1), repo: z.string().min(1).optional(), client: z.string().nullish() }).safeParse(await c.req.json().catch(() => null));
     if (!body.success) return c.json({ error: 'invalid body', code: 'INVALID_INPUT' }, 400);
     if (!githubAppConfigured() || !ann()) return c.json({ ok: false, code: 'NOT_CONFIGURED', error: 'GitHub connecting is not configured on this server.' });
     // the room names the workspace, not the repository: a project with no repository resolves too
     const { workspace } = await store.channelWorkspace(body.data.channel).catch(() => ({ workspace: null as string | null }));
     if (!workspace) return c.json({ error: 'channel not found', code: 'NOT_FOUND' }, 404);
     if (!(await actorInWorkspace(store, actor, workspace))) return c.json({ error: 'not your workspace', code: 'NOT_PERMITTED' }, 403);
-    const out = await resolveConnector(store, { workspace, channel: body.data.channel, actor: actor.id }, fetchFn, { pick: body.data.repo ?? null, resume: true });
+    // the owner proof: only the asking person's fresh proof connects, on the person's pick or the grant the person
+    // started, and the next move is GitHub's authorize page
+    const proofs = ownerProofConfigured() && store.githubProofs ? await store.githubProofs.fresh(workspace, actor.id) : null;
+    const out = await resolveConnector(store, { workspace, channel: body.data.channel, actor: actor.id }, fetchFn, { pick: body.data.repo ?? null, resume: true, proofs });
     if (out.ok) return c.json({ ok: true, handle: out.handle, attached: out.attached });
     const state: GrantState = { github: 1, workspace, channel: body.data.channel, actor: actor.id, slug: out.slug };
-    return c.json({ ok: false, code: out.code, error: out.error, repos: out.repos, hint: out.hint, install: process.env['NM_CONNECTOR_KEY'] ? installUrl(seal(state)) : null });
+    if (proofs) {
+      const sealed = sealProofState(body.data.client === 'phone' ? 'p' : 'w', state);
+      // a pick that does not connect keeps its own answer: the person named that repository. a proof that reads the
+      // room's repository keeps the pick too: the person connects it with one click (resolveConnector)
+      const prove = !proofs.length || (out.code === 'NOT_INSTALLED' && !body.data.repo && !out.proven);
+      return c.json({ ok: false, code: prove ? 'PROVE' : out.code, error: prove ? proveWords(proofs.length ? out.slug : null) : out.error, repos: out.repos, hint: out.hint, install: installUrl(sealed), authorize: authorizeUrl(sealed) });
+    }
+    return c.json({ ok: false, code: out.code, error: out.error, repos: out.repos, hint: out.hint, install: process.env['NM_CONNECTOR_KEY'] ? installUrl(seal(state)) : null, authorize: null });
   });
+
+  // the owner proof's second leg (github-prove.ts): GitHub's code, sent back with the person's own session
+  app.post('/v1/github/prove', async (c) => c.json(await proveGrant(store, c.get('actor'), await c.req.json().catch(() => null), fetchFn)));
 
   /** the ACL, once, for every read: the room → its project's repository → the connected row → a token */
   const open = async (c: { req: { query: (k: string) => string | undefined }; get: (k: 'actor') => Actor }): Promise<Opened | Refusal> => {
