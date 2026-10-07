@@ -15,7 +15,7 @@
 // 2026-09-24 with no successor, and Anthropic has no video model, so neither seat can film. The
 // next options (ByteDance Seedance 2.0, Kling 3.0, MiniMax H3) each need their own key, which
 // NeuraMesh does not hold yet: a rung here is one entry once such a connection exists.
-import { filmMinutes, filmPrompt, sniffVideoMime } from '@neuramesh/shared';
+import { filmPrompt, filmStartLine, sniffVideoMime } from '@neuramesh/shared';
 import { designerImageCred, type HostedAgent } from '../agents';
 import type { PowerSyncDatabase } from '@powersync/node';
 
@@ -155,11 +155,11 @@ export async function askDoor(post: (path: string, actor: { kind: string; id: st
 }
 
 /** the script beside the caption (media.script), the brief, and the length the draft asks for; an older draft carried the script as the body */
-function scriptOf(d: { body: string; media: string | null }): { script: string; brief: string; seconds: number } {
+function scriptOf(d: { body: string; media: string | null }): { script: string; brief: string; seconds: number; frame: boolean } {
   try {
-    const m = JSON.parse(d.media ?? 'null') as { brief?: string; script?: string; seconds?: number } | null;
-    return { script: m?.script || d.body, brief: m?.brief ?? '', seconds: Math.max(1, Math.round(Number(m?.seconds) || 8)) };
-  } catch { return { script: d.body, brief: '', seconds: 8 }; }
+    const m = JSON.parse(d.media ?? 'null') as { brief?: string; script?: string; seconds?: number; frame?: string | null } | null;
+    return { script: m?.script || d.body, brief: m?.brief ?? '', seconds: Math.max(1, Math.round(Number(m?.seconds) || 8)), frame: !!m?.frame };
+  } catch { return { script: d.body, brief: '', seconds: 8, frame: false }; }
 }
 
 /** why a draft has no film when the platform said no and the workspace holds no Google key */
@@ -190,12 +190,13 @@ export function makeFilm(ctx: {
       [itemId, ch.id],
     ).catch(() => [] as Array<{ body: string; media: string | null }>);
     if (!d) return `That draft is not available to film (already scheduled or gone).`;
-    const { script, brief, seconds } = scriptOf(d);
+    const { script, brief, seconds, frame } = scriptOf(d);
     const postCmd = async (cmd: unknown): Promise<boolean> => {
       const r = await post('/v1/commands', { kind: 'agent', id: agent.id, role: agent.role }, cmd).catch(() => null);
       return !!(r && (r as { ok?: boolean }).ok);
     };
-    const prompt = filmPrompt(script, brief, seconds);
+    // a draft with a reference frame films on the lane that shows that screen, so the screens rule stays out (filmprompt.ts)
+    const prompt = filmPrompt(script, brief, seconds, { frame });
     // THE PLATFORM FIRST (the video rung, issue #539): a film on credits, the model the server's env
     // names for the workspace's tier. A 202 means the server films and lands it on the card itself;
     // no credits or no lane sends the rung down to the person's own Google key, exactly the lane
@@ -203,15 +204,15 @@ export function makeFilm(ctx: {
     const actor = { kind: 'agent', id: agent.id, role: agent.role };
     const answer = await door(post, actor, { workspace: ch.workspace_id, item: itemId, prompt });
     if (answer.filming) {
-      console.log(`agent_gen_video agent=${agent.name} room=#${ch.slug} item=${itemId.slice(0, 8)} filming on ${answer.model} seconds=${answer.seconds} credits=${answer.credits}`);
-      // the door holds a length inside its tier's range: a 30 s pick on a 15 s tier is said, not hidden
-      const held = answer.seconds < seconds ? ` (${answer.tier} films up to ${answer.seconds} s)` : '';
-      return `Filming ${answer.seconds} s on ${answer.tier} (${answer.model})${held}. It takes about ${filmMinutes(answer.seconds)} minutes and costs ${answer.credits} credits. The film lands on the card.`;
+      console.log(`agent_gen_video agent=${agent.name} room=#${ch.slug} item=${itemId.slice(0, 8)} filming on ${answer.tier} seconds=${answer.seconds} credits=${answer.credits}`);
+      // the door holds a length inside its tier's range: a 30 s pick on a 15 s tier is said, not hidden.
+      // the line names the tier's house name only (George, 2026-10-06): the model behind it is the platform's business
+      return filmStartLine({ seconds: answer.seconds, tier: answer.tier, asked: seconds, credits: answer.credits });
     }
     if (answer.code === 'UPSTREAM' || answer.code === 'IN_FLIGHT' || answer.code === 'OTHER') {
-      const why = answer.error.replace(/\.$/, '');
-      await postCmd({ type: 'content.revise', item: itemId, videoError: why });
-      return `The film did not start: ${why}. The reason is on the card.`;
+      // the door says why in house words (the lane's own reason stays in the server log), and the card shows it whole
+      await postCmd({ type: 'content.revise', item: itemId, videoError: answer.error });
+      return `The film did not start. The reason is on the card: ${answer.error.replace(/\.$/, '')}.`;
     }
     // the workspace's Google key: the designer's seat when it is Gemini, else the image ladder's
     // Gemini rung, else the machine's own env. Only a Google key reaches a video model (see the
@@ -226,7 +227,9 @@ export function makeFilm(ctx: {
     }
     // the own key films at most ten seconds (Omni) or eight (Veo): the prompt is rebuilt for that length
     const own = ownKeySeconds(seconds, 'omni');
-    const out = await film(key, own === seconds ? prompt : filmPrompt(script, brief, own), {}, own);
+    // the own key has no reference lane: its film always carries the screens rule
+    const ownPrompt = filmPrompt(script, brief, own);
+    const out = await film(key, ownPrompt, {}, own);
     if (!out.bytes) {
       const why = (out.error ?? 'the film came back empty').replace(/\.$/, '');
       await postCmd({ type: 'content.revise', item: itemId, videoError: why });

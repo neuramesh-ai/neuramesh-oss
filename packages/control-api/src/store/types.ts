@@ -35,6 +35,7 @@ export interface ArtifactRow {
   promoted?: boolean;
   channel?: string; // the shelf it sits on (the frame lookup, store/frames.ts)
   mime?: string | null;
+  createdByKind?: string; source?: string | null; // a film's product shot is a person's image or a repository file (0150)
 }
 
 // A chat attachment (image/file) added to a message. Persisted as an artifact row so it shows

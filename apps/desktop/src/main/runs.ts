@@ -44,10 +44,10 @@ export interface WorkLeg {
 export const MAX_LEGS = 6;
 export const MAX_LEG_CONCURRENCY = 3;
 
-/** what the parent's step line says while N legs are in flight */
+/** what the parent's step line says while N legs are in flight (the simple present, docs/26) */
 export function fanoutStep(done: number, total: number, live: string[]): string {
-  if (done >= total) return 'synthesizing the report';
-  const head = live.length ? live.slice(0, 2).join(' · ') : 'starting the legs';
+  if (done >= total) return 'writes the report';
+  const head = live.length ? live.slice(0, 2).join(' · ') : 'starts the subagents';
   return `${head}${live.length > 2 ? ` +${live.length - 2}` : ''}`;
 }
 

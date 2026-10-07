@@ -14,8 +14,9 @@ export type CardMedia = {
   seconds?: number;
 };
 
-/** the tiers this server films on, as GET /v1/starter/video answers them */
-export type StarterVideoCatalog = { served: boolean; tier: string | null; tiers: Array<{ tier: string; label: string; model: string; seconds: number; credits: number; lengths?: number[]; perSecondMicros?: number }> } | null;
+/** the tiers this server films on, as GET /v1/starter/video answers them. `model` is on the wire for
+ *  the older desktops and the card never prints it (George, 2026-10-06: the house name only) */
+export type StarterVideoCatalog = { served: boolean; tier: string | null; tiers: Array<{ tier: string; label: string; model?: string; seconds: number; credits: number; lengths?: number[]; perSecondMicros?: number }> } | null;
 
 /** the length a draft's next film takes: its own pick, held inside the tier's lengths, else the tier's default */
 export function filmSeconds(media: CardMedia | null, tier: { seconds: number; lengths?: number[] } | null | undefined): number {
@@ -29,7 +30,8 @@ export function filmSeconds(media: CardMedia | null, tier: { seconds: number; le
 /** The facts line under a video card's buttons: what will film it, or what did, in one quiet mono
  *  row. Before a film: the workspace's tier from the catalog. After: the draft's own record. A film
  *  on the person's own key says so, and that it cost no credits. Null when there is nothing honest
- *  to say (no catalog yet, no film yet, no key known). */
+ *  to say (no catalog yet, no film yet, no key known). A platform film names its TIER only, never the
+ *  model behind it, and a record stored before 2026-10-06 that names one is not printed either. */
 export function filmFacts(media: CardMedia | null, catalog: StarterVideoCatalog, script: string | null = null): string[] | null {
   const v = media?.video;
   if (v) {
@@ -41,7 +43,7 @@ export function filmFacts(media: CardMedia | null, catalog: StarterVideoCatalog,
     const shots = v.shots ? [v.shots.applied ? `product shot${v.shots.asked > 1 ? `s · ${v.shots.applied} of ${v.shots.asked}` : ''}` : `product shot · not applied${v.shots.why ? ` · ${v.shots.why}` : ''}`] : [];
     if (v.tier === 'own') return [v.model, `${v.seconds} s`, 'your key', 'no credits', at, ...frame, ...shots].filter(Boolean);
     const tier = catalog?.tiers.find((t) => t.tier === v.tier);
-    return [tier?.label ?? v.tier, v.model, `${v.seconds} s`, `${v.credits} credits`, at, ...frame, ...shots].filter(Boolean);
+    return [tier?.label ?? v.tier, `${v.seconds} s`, `${v.credits} credits`, at, ...frame, ...shots].filter(Boolean);
   }
   if (media?.video_pending) return null;
   const active = catalog?.served ? catalog.tiers.find((t) => t.tier === catalog.tier) : null;
@@ -50,13 +52,13 @@ export function filmFacts(media: CardMedia | null, catalog: StarterVideoCatalog,
   const seconds = filmSeconds(media, active);
   const credits = active.perSecondMicros ? filmCredits(active.perSecondMicros, seconds) : active.credits;
   const shows = [...new Set((script ? productShots(script) : []).map((p) => p.show))];
-  return [active.label, active.model, `${seconds} s`, `about ${credits} credits`, `${filmMinutes(seconds)} min`, ...(media?.frame ? [`frame · ${media.frame}`] : []), ...(shows.length ? [`product shot · ${shows.join(', ')}`] : [])];
+  return [active.label, `${seconds} s`, `about ${credits} credits`, `${filmMinutes(seconds)} min`, ...(media?.frame ? [`frame · ${media.frame}`] : []), ...(shows.length ? [`product shot · ${shows.join(', ')}`] : [])];
 }
 
-/** the film in flight: its tier and model from the catalog, for the pending row */
+/** the film in flight: its tier from the catalog, for the pending row */
 export function filmingOn(catalog: StarterVideoCatalog): string {
   const active = catalog?.served ? catalog.tiers.find((t) => t.tier === catalog.tier) : null;
-  return active ? `${active.label} (${active.model})` : 'the platform';
+  return active ? active.label : 'the platform';
 }
 
 /** a UGC script: timestamped beats. The card folds it (the thread is not a teleprompter) and films its hook. */

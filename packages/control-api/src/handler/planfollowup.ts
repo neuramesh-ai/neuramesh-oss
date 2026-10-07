@@ -5,15 +5,14 @@
 //     posted at birth (createtask.ts) and on every propose_plan revision (handler.ts);
 //   · the routine auto-accept — a routine-born unit passes its LAST gate the moment review
 //     lands it done, server-verified like execute_ship's path.
-import { createEvent, formatAddress, planRefMarker, type Actor, type Task } from '@neuramesh/shared';
+import { createEvent, formatAddress, planMessage, type Actor, type PlanPostKind, type Task } from '@neuramesh/shared';
 import type { Command } from '../commands';
 import type { MutationResult, Store } from '../store';
 import { actorAddress, taskTarget } from './guards';
 import { DomainError } from '../errors';
-import { implementationPlanName } from './fsm';
 
-/** the ONE plan-message poster: body prose + the ‹plan:vN› marker, onto the task's thread */
-export async function postPlanMessage(store: Store, task: Task, actor: Actor, version: number, prose: string): Promise<void> {
+/** the ONE plan-message poster: the readable line + the ‹plan:vN› marker (shared planMessage), onto the task's thread */
+export async function postPlanMessage(store: Store, task: Task, actor: Actor, version: number, kind: PlanPostKind): Promise<void> {
   await store
     .postMessage(
       {
@@ -23,7 +22,7 @@ export async function postPlanMessage(store: Store, task: Task, actor: Actor, ve
         taskId: task.id,
         threadId: null,
         author: { kind: actor.kind, id: actor.id },
-        body: `${prose}\n${planRefMarker(version)}`,
+        body: planMessage(version, kind),
         createdAt: new Date().toISOString(),
       },
       createEvent({
@@ -41,7 +40,7 @@ export async function postPlanMessage(store: Store, task: Task, actor: Actor, ve
 export async function planRevisionFollowup(store: Store, actor: Actor, cmd: Command, outcome: MutationResult): Promise<void> {
   if (cmd.type !== 'task.propose_plan' || !outcome.events.length || !outcome.task.workPlan) return;
   const v = outcome.task.workPlan.version;
-  await postPlanMessage(store, outcome.task, actor, v, `Implementation plan **v${v}** (revised) — ${implementationPlanName(v)}`);
+  await postPlanMessage(store, outcome.task, actor, v, 'revised');
 }
 
 /** Routines are hands-off through the PLAN gate too (2026-08-22, founder report: a routine-born

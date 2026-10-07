@@ -15,21 +15,35 @@ export interface FrameImage { name: string; mime: string; dataUrl: string }
 
 /** the newest image with that name (case-insensitive) on the room's shelf, else on a shelf of the
  *  room's PROJECT (a product is one project's, and its screenshots sit where they were uploaded:
- *  George 2026-09-20, "search the project files for actual product images"), else null */
-export async function libraryImage(store: Store, channelId: string, name: string): Promise<FrameImage | null> {
+ *  George 2026-09-20, "search the project files for actual product images"), else null.
+ *
+ *  REAL APP SCREENSHOTS ONLY (George, 2026-10-06): a film shows an image that a person created, or
+ *  one the platform took from the project's repository (`source` repo:, set by POST /v1/repo/shelve
+ *  alone). An agent's web capture or drawn picture never counts. `any` finds the image whatever made
+ *  it, so a refusal can say why a name does not count. */
+export async function libraryImage(store: Store, channelId: string, name: string, opts: { any?: boolean } = {}): Promise<FrameImage | null> {
   const sql = sqlOf(store);
+  const any = !!opts.any;
   if (sql) {
     const [row] = await sql<Array<{ name: string; mime: string | null; inline_content: string }>>`
       select name, mime, inline_content from artifacts
        where lower(name) = lower(${name}) and inline_content like 'data:image/%'
+         and (${any}::boolean or created_by_kind = 'human' or source like 'repo:%')
          and (channel_id = ${channelId}::uuid
               or channel_id in (select id from channels where project_id = (select project_id from channels where id = ${channelId}::uuid)))
        order by (channel_id = ${channelId}::uuid) desc, created_at desc limit 1`;
     return row ? frameOf(row.name, row.mime, row.inline_content) : null;
   }
-  const mem = store as { libraryImage?: (channelId: string, name: string) => Promise<{ name: string; mime: string | null; content: string } | null> };
-  const hit = mem.libraryImage ? await mem.libraryImage(channelId, name) : null;
+  const mem = store as { libraryImage?: (channelId: string, name: string, any?: boolean) => Promise<{ name: string; mime: string | null; content: string } | null> };
+  const hit = mem.libraryImage ? await mem.libraryImage(channelId, name, any) : null;
   return hit ? frameOf(hit.name, hit.mime, hit.content) : null;
+}
+
+/** marks an artifact as the platform's copy of a repository file: POST /v1/repo/shelve alone calls this */
+export async function setArtifactSource(store: Store, artifactId: string, source: string): Promise<void> {
+  const sql = sqlOf(store);
+  if (sql) { await sql`update artifacts set source = ${source} where id = ${artifactId}::uuid`; return; }
+  await (store as { setArtifactSource?: (id: string, source: string) => Promise<void> }).setArtifactSource?.(artifactId, source);
 }
 
 const frameOf = (name: string, mime: string | null, dataUrl: string): FrameImage => ({ name, mime: mime ?? (/^data:(image\/[a-z0-9.+-]+)/i.exec(dataUrl)?.[1] ?? 'image/png'), dataUrl });

@@ -42,8 +42,15 @@ import type { makeBeats } from './beats';
 import type { makePark } from './park';
 import type { RepoCred } from './repocred';
 
-
-
+/** scout's approval line. smoke-sync matches `Auto-review of` and `Approved`, and the server lands or
+ *  closes the task only on a person's word in this thread (handler.ts), so the line asks for that word.
+ *  `ci` is what the CI gate saw: a pass says CI ok, a repository with no CI says so, and a gate that is
+ *  off or did not run says nothing */
+export function approvalLine(a: { number: number; dod: boolean; prNumber: number | null; prUrl?: string | null; pushedSha?: string | null; ci?: 'pass' | 'none' | 'off' | null }): string {
+  const ci = a.ci === 'pass' ? ', CI ok' : a.ci === 'none' ? ', no CI' : '';
+  const ref = a.prNumber && a.prUrl ? ` ([PR #${a.prNumber}](${a.prUrl})${ci})` : a.pushedSha ? ` (pushed ${a.pushedSha.slice(0, 7)})` : '';
+  return `Auto-review of #${a.number}: the deliverables match the ${a.dod ? 'Definition of Done' : 'requirements'}${ref}. Approved. ${a.prNumber ? 'Say merge in this thread to land the PR.' : 'Say accept in this thread to close it.'}`;
+}
 
 export function makeReviewFlow(ctx: HostCtx & {
   db: PowerSyncDatabase;
@@ -174,6 +181,7 @@ async function reviewFlow(agent: HostedAgent, t: { id: string; number: number; t
     // half-started pipeline and bounces on "CI pending" (the #1013 loop). CI being
     // still-running, or not-yet-registered right after a push, is not a verdict.
     let ciNote = '';
+    let ciVerdict: 'pass' | 'none' | 'off' | null = null; // what the approval line may say about CI
     if (repoRequired && pushed && prNumber && full?.repo_clone && ciPolicy.runCiBeforeMerge) {
       const slug = repoSlug(full.repo_clone);
       rlog({ kind: 'tool', phase: 'ci', summary: `PR #${prNumber} — settling CI before review` });
@@ -191,11 +199,13 @@ async function reviewFlow(agent: HostedAgent, t: { id: string; number: number; t
         rlog({ kind: 'lifecycle', phase: 'reviewed', summary: `blocked #${t.number}: CI unreadable`, level: 'warn' });
         return;
       }
+      ciVerdict = ci.verdict;
       ciNote = ci.verdict === 'pass'
         ? `\n\nSystem CI gate: the PR's CI checks have PASSED (verified by the host) — treat any "CI passes / checks green" Definition-of-Done item as SATISFIED.`
         : `\n\nSystem CI gate: no CI is configured on this repo — any CI-related Definition-of-Done item is not applicable here.`;
       if (ci.verdict === 'pass') rlog({ kind: 'tool', phase: 'ci', summary: `PR #${prNumber} CI green (${ci.detail})` });
     } else if (repoRequired && pushed && prNumber && !ciPolicy.runCiBeforeMerge) {
+      ciVerdict = 'off';
       ciNote = `\n\nSystem CI gate: CI gating is disabled for this project — do not gate on CI.`;
       rlog({ kind: 'tool', phase: 'ci', summary: `CI gate off for this project — reviewing on the diff + DoD` });
     }
@@ -299,10 +309,9 @@ async function reviewFlow(agent: HostedAgent, t: { id: string; number: number; t
     const approve = await post('/v1/commands', actor, { type: 'task.approve', taskId: t.id });
     if (approve.status >= 400 && approve.status < 500) return; // another reviewer won
     if (!approve.ok) throw new Error(`approve ${approve.status}: ${await approve.text()}`);
-    const prRef = prNumber && full?.pr_url ? ` — [PR #${prNumber}](${full.pr_url}), CI ok` : repoRequired && pushed ? ` (pushed ${full?.submitted_sha?.slice(0, 7)})` : '';
     await post('/v1/messages', actor, {
       workspace: ch.workspace_id, channel: ch.id, taskId: t.id,
-      body: `Auto-review of #${t.number}: deliverables present and consistent with the ${dod ? 'Definition of Done' : 'requirements'}${prRef}. Approved${prNumber ? ' — accept to merge the PR to its base' : ''} — human acceptance still required.`,
+      body: approvalLine({ number: t.number, dod: !!dod, prNumber, prUrl: full?.pr_url, pushedSha: repoRequired && pushed ? full?.submitted_sha : null, ci: ciVerdict }),
     });
     console.log(`agent_review agent=${agent.name} task=${t.number} approved`);
     rlog({ kind: 'lifecycle', phase: 'reviewed', summary: `auto-review of #${t.number}: approved` });

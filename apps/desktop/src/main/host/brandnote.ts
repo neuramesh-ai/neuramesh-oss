@@ -17,6 +17,7 @@
 // task note and the conversation note cannot drift apart on which docs count.
 import { BRAND_DOC_NAMES } from '@neuramesh/shared';
 import type { AttDbLike } from '../agents';
+import { isAppShot } from './frames';
 
 export interface BrandFacts {
   marketing: boolean;
@@ -25,7 +26,7 @@ export interface BrandFacts {
   profile: { website?: string; focus?: string[]; goal?: string };
   /** the newest of each named brand doc on this room's shelf, by name */
   docs: Map<string, string>;
-  /** the images on the shelf, by name: what a video post can name as its frame (plan §6) */
+  /** the real app screenshots on the shelf, by name: what a video post can show (plan §6, host/frames.ts isAppShot) */
   images: string[];
   conns: Array<{ provider: string; handle: string | null }>;
 }
@@ -40,15 +41,17 @@ export async function readBrand(db: AttDbLike, channelId: string): Promise<Brand
     [channelId],
   ).catch(() => [] as Array<{ kind: string; marketing: string | null; website: string | null; logo: string | null }>);
   if (!ch || ch.kind !== 'marketing') return NONE;
-  const rows = await db.getAll<{ name: string; kind: string; inline_content: string | null }>(
-    `select name, kind, inline_content from artifacts where channel_id = ? and inline_content is not null order by created_at desc`,
+  const rows = await db.getAll<{ name: string; kind: string; inline_content: string | null; created_by_kind: string | null; source: string | null }>(
+    `select name, kind, inline_content, created_by_kind, source from artifacts where channel_id = ? and inline_content is not null order by created_at desc`,
     [channelId],
-  ).catch(() => [] as Array<{ name: string; kind: string; inline_content: string | null }>);
+  ).catch(() => [] as Array<{ name: string; kind: string; inline_content: string | null; created_by_kind: string | null; source: string | null }>);
   const docs = new Map<string, string>();
   const images: string[] = [];
   for (const r of rows) {
     if (r.kind === 'doc' && BRAND_DOC_NAMES.includes(r.name) && r.inline_content && !docs.has(r.name)) docs.set(r.name, r.inline_content);
-    else if (r.inline_content?.startsWith('data:image/') && !images.includes(r.name)) images.push(r.name);
+    // an agent's web capture or drawn picture is not a screenshot of the product (George, 2026-10-06): the note named
+    // every image "a screenshot", and an agent filmed the X profile capture as the app
+    else if (r.inline_content?.startsWith('data:image/') && isAppShot(r) && !images.includes(r.name)) images.push(r.name);
   }
   // by PROJECT (0106): `channel_id` only records where the OAuth round-trip was started, so a
   // channel-keyed read told the marketer "nothing is connected" in every room but that one.
@@ -84,7 +87,7 @@ export async function brandNote(db: AttDbLike, channelId: string): Promise<strin
     lines.push(`This room has no brand docs yet (the marketing setup writes ${BRAND_DOC_NAMES.join(', ')}). Call list_library with scope project in case they live in another room of this project. If none exist, ask the human for the product facts you need before you draft, or to finish the marketing setup, and shelve what you learn with propose_library_doc.`);
   }
   // the frame (plan §6): a video post names a shelf image, and the film shows that screen instead of an invented one
-  if (b.images.length) lines.push(`Screenshots on the shelf: ${b.images.join(', ')}. A video post that shows the product names one of them as its frame (draft_posts frame, revise_posts frame), so the film shows the real screen.`);
-  else lines.push('No screenshot of the product is on this room\'s shelf, so a film would invent the interface. Ask the human to upload a real screenshot to this room\'s Files, then name it as the frame on the video post.');
+  if (b.images.length) lines.push(`App screenshots on the shelf: ${b.images.join(', ')}. A beat that puts the app's screen on camera names one of them (SHOW, or the post's frame), so the film shows the real screen. A beat with no screen needs none.`);
+  else lines.push('No app screenshot is on this room\'s shelf. A film shows only a real one: take one from the project\'s repository with shelve_repo_screenshot, or ask the human to upload one to this room\'s Files. A beat with no screen needs none.');
   return `\n\n[MARKETING CONTEXT — this conversation is in a marketing room. Where its brand lives:\n- ${lines.join('\n- ')}]`;
 }

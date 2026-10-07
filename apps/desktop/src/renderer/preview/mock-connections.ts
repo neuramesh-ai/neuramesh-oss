@@ -43,13 +43,13 @@ const task = (over: Record<string, unknown>) => ({
 });
 const cloudTasks = [
   task({ id: 'tkw-201', number: 201, title: 'X content schedule', state: 'in_progress', assignee_kind: 'agent', assignee_id: 'aw-plume', updated_at: seedIso(60_000), thread_id: 'thw-201' }),
-  task({ id: 'tkw-214', number: 214, title: 'Set up your marketing HQ', kind: 'setup', state: 'todo', updated_at: seedIso(900_000), thread_id: 'thw-214' }),
+  task({ id: 'tkw-214', number: 214, title: 'Prepare your marketing HQ', kind: 'setup', state: 'todo', updated_at: seedIso(900_000), thread_id: 'thw-214' }),
   task({ id: 'tkw-198', number: 198, title: 'Reply radar, @joinflowe on X', kind: 'research', state: 'accepted', assignee_kind: 'agent', assignee_id: 'aw-plume', updated_at: seedIso(7_200_000), thread_id: 'thw-198', settled_at: seedIso(7_000_000) }),
 ];
 const thread = (over: Record<string, unknown>) => ({ channel_id: 'cw-marketing', channel_slug: 'marketing', task_id: null, schedule_id: null, last_author_kind: 'agent', settled_at: null, ...over });
 const cloudThreads = [
   thread({ id: 'thw-201', title: 'X content schedule', task_id: 'tkw-201', updated_at: seedIso(60_000), last_body: 'plume · Drafting the week-two cadence now.', last_at: seedIso(60_000) }),
-  thread({ id: 'thw-214', title: 'Set up your marketing HQ', task_id: 'tkw-214', updated_at: seedIso(900_000), last_body: 'Step 2 of 5 · connect X.', last_at: seedIso(900_000) }),
+  thread({ id: 'thw-214', title: 'Prepare your marketing HQ', task_id: 'tkw-214', updated_at: seedIso(900_000), last_body: 'Step 2 of 5 · connect X.', last_at: seedIso(900_000) }),
   thread({ id: 'thw-scan', title: 'Flowe competitor social media scan', updated_at: seedIso(5_400_000), last_body: 'Three accounts post daily; none reply to customers.', last_at: seedIso(5_400_000), settled_at: seedIso(5_000_000) }),
   thread({ id: 'thw-198', title: 'Reply radar, @joinflowe on X', task_id: 'tkw-198', updated_at: seedIso(7_200_000), last_body: 'Report attached. 14 reply opportunities.', last_at: seedIso(7_200_000), settled_at: seedIso(7_000_000) }),
   thread({ id: 'thw-hello', channel_id: 'cw-general', channel_slug: 'general', title: 'Welcome to Flowe', updated_at: seedIso(86_400_000), last_body: 'Say hello to the crew.', last_author_kind: 'human', last_at: seedIso(86_400_000), settled_at: seedIso(80_000_000) }),

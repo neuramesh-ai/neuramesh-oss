@@ -3,14 +3,13 @@
 import { resolveToken } from '../agents';
 import { starterFallback, unavailableOf, whyUnavailable } from './starterfallback';
 import type { ExecTask, HostedAgent, OfferedTask, SkillRef } from '../agents';
-import { TURN_BUDGETS, type ClaimVerdict } from '@neuramesh/shared';
+import { STATIC_CHECKLIST, TURN_BUDGETS, type ClaimVerdict } from '@neuramesh/shared';
 import { a2aArtifactsToSubmit, a2aSend } from './a2a';
 import { assemble, assemblyLine, contextBudget, transcriptBlock } from '../harness/assemble';
 import { type SubjectRef } from '../harness/brain';
 import { isStandDown } from '../replypolicy';
 import { type LogFn } from '../agentlog';
 import { withTimeout } from './turnkit';
-import { STATIC_CHECKLIST } from './flows';
 import type { AdmitTask, OwnedTask } from './claimflow';
 import type { HostCtx } from './ctx';
 import type { PowerSyncDatabase } from '@powersync/node';
@@ -130,7 +129,7 @@ async function ownFlow(orch: HostedAgent, t: OwnedTask): Promise<void> {
       // "Owning #N — …", never the bare task title: this row is the owner's TURN, and a
       // task-titled row wearing DONE reads as the TASK being done while the header says
       // designing (founder screenshot, #1055).
-      kind: 'work', title: `Owning #${t.number} — ${t.title}`, step: 'taking stock', id: logRunId,
+      kind: 'work', title: `Owning #${t.number} — ${t.title}`, step: 'reads the task', id: logRunId,
     });
     const skills = await discoverSkills(ch.id, ch.workspace_id);
     const transcript = await owningContext(orch, t, ch, log);
@@ -234,7 +233,7 @@ async function remoteDelegate(remote: { id: string; name: string; role: string; 
     const ch = await db.get<{ id: string; slug: string; workspace_id: string }>('select id, slug, workspace_id from channels where id = ?', [t.channel_id]);
     const { log } = arun(proxy, t, ch.slug);
     const preConfirmed = Number(t.requirements_confirmed) === 1;
-    let checklist: string[] = [];
+    let checklist: readonly string[] = [];
     try { checklist = preConfirmed ? (JSON.parse(t.requirements ?? '[]') as string[]) : []; } catch { checklist = []; }
     if (!checklist.length) checklist = STATIC_CHECKLIST;
     if (!preConfirmed) await post('/v1/commands', actor, { type: 'task.confirm_requirements', taskId: t.id, checklist });

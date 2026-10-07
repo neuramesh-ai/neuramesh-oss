@@ -35,13 +35,16 @@ export interface SetupFlow {
   kind: string;
   /** the setup task's title, verbatim */
   title: string;
+  /** the setup task's description, verbatim: the side panel's Overview shows it beside the wizard */
+  description: string;
   steps: SetupStep[];
 }
 
 export const MARKETING_SETUP_FLOW: SetupFlow = {
   id: 'marketing.v1',
   kind: 'marketing',
-  title: 'Set up your marketing HQ',
+  title: 'Prepare your marketing HQ',
+  description: 'Answer the questions in the thread. Each answer saves when you press Next, so you can stop and finish later. Close this task to skip setup.',
   steps: [
     { id: 'product', label: 'Product', writes: 'website' },
     { id: 'goal', label: 'Goal', writes: 'goal', optional: true },
@@ -101,9 +104,9 @@ export function setupProgress(flow: SetupFlow, profileJson: string | null | unde
   return { done, total: flow.steps.length, next, complete };
 }
 
-/** The one-line progress note surfaces show beside the task ("step 2 of 4 — Focus"). */
+/** The one-line progress note surfaces show beside the task ("step 2 of 5 · Goal"). */
 export function setupProgressLabel(flow: SetupFlow, p: SetupProgress): string {
   if (p.complete) return 'complete';
   const at = flow.steps.find((s) => s.id === p.next);
-  return `step ${Math.min(p.done + 1, p.total)} of ${p.total}${at ? ` — ${at.label}` : ''}`;
+  return `step ${Math.min(p.done + 1, p.total)} of ${p.total}${at ? ` · ${at.label}` : ''}`;
 }

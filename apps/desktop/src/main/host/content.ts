@@ -119,7 +119,7 @@ async function generateShareImage(agent: HostedAgent, ch: { id: string; slug: st
   const g = await generateBrandImage(cred, reviewSeat, brand, brief, 'x', agent.name);
   if (g.error || !g.thumb) return { error: g.error ?? 'the image came back empty' };
   console.log(`agent_share_image agent=${agent.name} room=#${ch.slug} ok model=${g.model ?? '?'}`);
-  return { thumb: g.thumb, bytes: g.bytes }; // the bytes too: make_product_image shelves a copy (chattools-product.ts)
+  return { thumb: g.thumb, bytes: g.bytes }; // the bytes too, for a caller that keeps a copy
 }
 async function reviseContentDrafts(agent: HostedAgent, ch: { id: string; slug: string; workspace_id: string }, t: ThreadTask, m: { id: string; body: string }, mode: string, token: string, onDelta: DeltaFn): Promise<string | null> {
   // draft AND scheduled: a human's free-form "change the drafts" reaches every unpublished post,

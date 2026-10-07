@@ -115,14 +115,17 @@ test('the platform first: a 202 from the door means the server films, and the la
   try {
     let filmed = 0;
     const l = lane(JSON.stringify({ brief: 'handheld' }), async () => { filmed += 1; return { bytes: MP4, mime: 'video/mp4' }; }, async (_post, _actor, body) => { assert.equal(body.workspace, 'w1'); assert.equal(body.item, 'item-1'); assert.match(body.prompt, /8 seconds.*handheld/); return { filming: true, tier: 'NeuraMesh Video Starter', model: 'Seedance 2.0', credits: 194, seconds: 8 }; });
-    assert.match(await l.run(), /Filming 8 s on NeuraMesh Video Starter \(Seedance 2\.0\)\. It takes about 2 minutes and costs 194 credits/);
+    // the door's answer may still carry a model name (an older server): the reply names the tier only (George, 2026-10-06)
+    const said = await l.run();
+    assert.match(said, /The 8 s film starts on NeuraMesh Video Starter\. It takes about 2 minutes and costs 194 credits/);
+    assert.doesNotMatch(said, /seedance/i);
     assert.equal(filmed, 0);
     assert.deepEqual(l.posted, []);
     // the draft's length (media.seconds, the angle card's pick) shapes the prompt and the reply; a length the tier holds down is said
     const long = lane(JSON.stringify({ brief: 'handheld', seconds: 15 }), async () => ({ bytes: MP4, mime: 'video/mp4' }), async (_post, _actor, body) => { assert.match(body.prompt, /^Vertical 9:16 phone video, 15 seconds/); return { filming: true, tier: 'NeuraMesh Video Starter', model: 'Seedance 2.0', credits: 363, seconds: 15 }; });
-    assert.match(await long.run(), /Filming 15 s on NeuraMesh Video Starter \(Seedance 2\.0\)\. It takes about 4 minutes and costs 363 credits/);
+    assert.match(await long.run(), /The 15 s film starts on NeuraMesh Video Starter\. It takes about 4 minutes and costs 363 credits/);
     const held = lane(JSON.stringify({ brief: 'handheld', seconds: 30 }), async () => ({ bytes: MP4, mime: 'video/mp4' }), async () => ({ filming: true, tier: 'NeuraMesh Video Starter', model: 'Seedance 2.0', credits: 363, seconds: 15 }));
-    assert.match(await held.run(), /Filming 15 s on NeuraMesh Video Starter \(Seedance 2\.0\) \(NeuraMesh Video Starter films up to 15 s\)/);
+    assert.match(await held.run(), /The 15 s film starts on NeuraMesh Video Starter \(NeuraMesh Video Starter films up to 15 s\)\./);
   } finally { delete process.env['GEMINI_API_KEY']; }
 });
 
@@ -136,9 +139,9 @@ test('no credits and no Google key: the card says the price and the two ways for
 test('an upstream refusal from the door lands on the card and never falls to the own key', async () => {
   process.env['GEMINI_API_KEY'] = 'env-key';
   try {
-    const l = lane(null, async () => ({ bytes: MP4, mime: 'video/mp4' }), async () => ({ filming: false, code: 'UPSTREAM', error: 'Seedance 2.0 did not accept the film.' }));
-    assert.match(await l.run(), /The film did not start: Seedance 2\.0 did not accept the film\. The reason is on the card/);
-    assert.deepEqual(l.posted[0], { type: 'content.revise', item: 'item-1', videoError: 'Seedance 2.0 did not accept the film' });
+    const l = lane(null, async () => ({ bytes: MP4, mime: 'video/mp4' }), async () => ({ filming: false, code: 'UPSTREAM', error: 'NeuraMesh Video did not start the film. Your credits are back. Try again later.' }));
+    assert.match(await l.run(), /The film did not start\. The reason is on the card: NeuraMesh Video did not start the film\. Your credits are back\. Try again later\./);
+    assert.deepEqual(l.posted[0], { type: 'content.revise', item: 'item-1', videoError: 'NeuraMesh Video did not start the film. Your credits are back. Try again later.' });
   } finally { delete process.env['GEMINI_API_KEY']; }
 });
 

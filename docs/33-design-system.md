@@ -382,7 +382,7 @@ real work — if it is decoration, drop it and keep the pill.
 
   | moment | orb state |
   | --- | --- |
-  | writing the reply ("composing…") | `composing` |
+  | writing the reply ("writes the reply", "drafts the posts") | `composing` |
   | tool burst (checks / files / commands) | `working` |
   | search tools · deep-work research legs | `searching` |
   | fanning out subagents | `weaving` |
@@ -1398,8 +1398,9 @@ real work — if it is decoration, drop it and keep the pill.
   FSM's own actor list, never from prose), the subject in plain words (*Your call on **the
   plan***), the pending-batch count as a `--link`-filled mono pip, then the buttons — affirmative
   in `.btn.accept`, the counter-verdict in `.btn.primary`. **A settled or superseded round shows
-  the same bar with the buttons gone** and a sentence where they were (*Settled — revised into
-  v5* · `Open v5 →`): the geometry does not move when the decision is no longer yours to make, so
+  the same bar with the buttons gone** and a sentence where they were (*Settled: revised into
+  v5* · `Open v5 →` in hq, and the desktop keeps its old words until someone ports them): the
+  geometry does not move when the decision is no longer yours to make, so
   the absence of buttons is legible as an absence rather than as a different screen.
 
   Comments are **inline under the block they are about**, not in a right gutter — the overlay

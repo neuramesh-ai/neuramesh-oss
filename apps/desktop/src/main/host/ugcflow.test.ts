@@ -59,7 +59,7 @@ test('the length row: the lengths the door serves, priced; no row for one length
 
 test('a video draft waits for the card, then for the pick, then goes', async () => {
   const card = { author_kind: 'agent', body: angleCard(ANGLES, ['x']) };
-  assert.match((await unpicked(fakeDb({ msgs: [{ author_kind: 'human', body: 'Run the ugc scripts playbook.' }] }), { threadId: 't' })) ?? '', /propose_angles/);
+  assert.match((await unpicked(fakeDb({ msgs: [{ author_kind: 'human', body: 'Run the UGC scripts playbook.' }] }), { threadId: 't' })) ?? '', /propose_angles/);
   assert.match((await unpicked(fakeDb({ msgs: [{ author_kind: 'human', body: 'run it' }, card] }), { threadId: 't' })) ?? '', /has not picked yet/);
   assert.equal(await unpicked(fakeDb({ msgs: [{ author_kind: 'human', body: 'run it' }, card, { author_kind: 'human', body: '**Which angle…** → The 2am spiral · platforms: x' }] }), { threadId: 't' }), null);
   // a later card without a later pick asks again: the pick answers the CARD above it, not one below

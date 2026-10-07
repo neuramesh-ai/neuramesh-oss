@@ -66,9 +66,10 @@ export interface WaitTask { state: string; kind?: string | null; assignee_kind?:
  * A CONVERSATION always has a responder: the room's orchestrator, which is the choice the wake
  * path makes and the choice the phone's strip and the machine rung already show. A TASK thread
  * does not, and that is the whole difference — `unaddressedWake` is the wake's own policy, so a
- * settled task (in_review, done, accepted, closed, a parked backlog item) draws no orb here for
- * the same reason it wakes nobody there. Guessing from the FSM a second time is how the two would
- * drift, and a drifted orb promises a reply nobody will send.
+ * settled task (in_review, accepted, closed, a parked backlog item) draws no orb here for the same
+ * reason it wakes nobody there. A done unit wakes the orchestrator whatever its kind (the person's
+ * merge word lands there, 2026-10-05), so its orb names the room's orchestrator. Guessing from the
+ * FSM a second time is how the two would drift, and a drifted orb promises a reply nobody will send.
  */
 export function responderFor(body: string, agents: AgentRow[], channelId: string, task?: WaitTask | null): AgentRow | null {
   const inRoom = agents.filter((a) => agentInChannel(a.channel_ids, channelId));

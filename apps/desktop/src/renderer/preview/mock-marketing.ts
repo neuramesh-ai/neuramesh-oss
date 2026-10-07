@@ -4,10 +4,12 @@
 // tile's dial, the catalog row's fact) and an armed cadence (the `armed · weekly` tok). Flowe's room
 // stays mid-setup with nothing, on purpose: the desk's three honest states are all on one screen.
 import { PLAYBOOKS, playbookAsk } from '@neuramesh/shared';
+// ?fixes=writing stages the shelf of a brand bootstrap with its second doc in flight (mock-fixes.ts)
+import { fixesShelf } from './mock-fixes';
 
 const ago = (ms: number) => new Date(Date.now() - ms).toISOString();
 
-export const marketingArtifacts = (channelId: string) => channelId !== 'c-marketing' ? [] : [
+export const marketingArtifacts = (channelId: string) => channelId !== 'c-marketing' ? [] : fixesShelf([
       { id: 'la-1', kind: 'doc', name: 'brand-guidelines.md', mime: 'text/markdown', inline_content: '# NeuraMesh · Brand guidelines\n\n**Mood:** warm, understated, analog-meets-digital. Intentionally different from the cold blues of AI tools.\n\n- Voice: dry, confident, developer-native\n- "→" as a recurring motif\n- Named agents have personalities', size_bytes: 1430, promoted: 1, message_id: null, task_id: 't-1204', created_at: new Date(Date.now() - 3 * 3600e3).toISOString() },
       { id: 'la-2', kind: 'doc', name: 'business-profile.md', mime: 'text/markdown', inline_content: '# NeuraMesh · Business profile\n\nAn AI agent orchestration platform for software teams.', size_bytes: 1470, promoted: 1, message_id: null, task_id: 't-1204', created_at: new Date(Date.now() - 3 * 3600e3).toISOString() },
       { id: 'la-3', kind: 'doc', name: 'social-strategy.md', mime: 'text/markdown', inline_content: '# NeuraMesh · Social strategy\n\nX first — developer audiences live there.', size_bytes: 2038, promoted: 1, message_id: null, task_id: 't-1204', created_at: new Date(Date.now() - 2 * 3600e3).toISOString() },
@@ -24,7 +26,7 @@ export const marketingArtifacts = (channelId: string) => channelId !== 'c-market
       // the desk's scored state: a report the way shared/reports.ts parses one (title, the score line in
       // the head, the gaps section), named the way playbookOfReport recognises it
       { id: 'la-10', kind: 'file', name: 'audit-report-2026-09-14.md', mime: 'text/markdown', inline_content: '# Site & funnel audit \u00b7 flowe.app\n2026-09-14 \u00b7 Score: 72/100 \u00b7 Basis: the live site, the pricing page, one product page\n\n## Scorecard\n| Dimension | Score |\n|---|---|\n| Messaging | 78 |\n| Conversion | 64 |\n\n## Fix these first\n1. The hero names the category, not the pain.\n\n## What\u2019s already working\n- The pricing page loads fast.\n\n## What I couldn\u2019t determine\n- Search traffic: no analytics access.', size_bytes: 640, promoted: 0, message_id: null, task_id: 'tk-1005', created_at: ago(3 * 86_400e3) },
-    ];
+    ]);
 
 /** an armed playbook cadence in the marketing room — the prompt is the ask, so playbookFromAsk finds it */
 export const marketingSchedules = [

@@ -20,8 +20,8 @@ export type DraftView = { letter: string; platform: string; status: string; capt
 export async function readDrafts(db: AttDbLike, at: { threadId?: string | null; taskId?: string | null }): Promise<DraftView[]> {
   const rows = await runDrafts<DraftRow>(db, at, 'id, platform, body, status, media');
   return rows.map((r, i) => {
-    const m = ((): { brief?: string; script?: string; frame?: string; seconds?: number; video_id?: string; video_pending?: boolean; video_error?: string; video?: { model?: string; seconds?: number } } => { try { return JSON.parse(r.media ?? '{}') as never; } catch { return {}; } })();
-    const film = m.video_pending ? 'filming now' : m.video_id ? `filmed${m.video?.seconds ? `, ${m.video.seconds} s` : ''}${m.video?.model ? ` on ${m.video.model}` : ''}` : m.video_error ? `no film: ${m.video_error}` : 'not filmed yet';
+    const m = ((): { brief?: string; script?: string; frame?: string; seconds?: number; video_id?: string; video_pending?: boolean; video_error?: string; video?: { tier?: string; model?: string; seconds?: number } } => { try { return JSON.parse(r.media ?? '{}') as never; } catch { return {}; } })();
+    const film = m.video_pending ? 'filming now' : m.video_id ? `filmed${m.video?.seconds ? `, ${m.video.seconds} s` : ''}${m.video?.tier === 'own' ? ' on your Google key' : ''}` : m.video_error ? `no film: ${m.video_error}` : 'not filmed yet';
     return { letter: String.fromCharCode(97 + i), platform: r.platform, status: r.status, caption: r.body, script: m.script ?? null, brief: m.brief ?? null, frame: m.frame ?? null, seconds: m.seconds ?? null, film };
   });
 }

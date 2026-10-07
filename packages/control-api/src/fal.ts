@@ -7,7 +7,8 @@ export const FAL_QUEUE = 'https://queue.fal.run';
 export type FalFetch = typeof fetch;
 
 export interface FalSubmit { requestId?: string; error?: string; status?: number; unavailable?: boolean }
-export interface FalStatus { state: 'queued' | 'running' | 'done' | 'failed'; error?: string; position?: number }
+/** `errorType` is fal's class of a failure (`content_policy` is the one the card names in house words) */
+export interface FalStatus { state: 'queued' | 'running' | 'done' | 'failed'; error?: string; errorType?: string; position?: number }
 export interface FalResult { url?: string; contentType?: string; error?: string }
 
 const headers = (key: string) => ({ authorization: `Key ${key}`, 'content-type': 'application/json' });
@@ -34,7 +35,7 @@ export async function falStatus(key: string, endpoint: string, requestId: string
     .catch((e: unknown) => new Response(JSON.stringify({ detail: String(e) }), { status: 599 }));
   const body = (await res.json().catch(() => null)) as { status?: string; error?: string; error_type?: string; queue_position?: number; detail?: unknown } | null;
   if (!res.ok) return { state: 'failed', error: typeof body?.detail === 'string' ? body.detail : `fal status ${res.status}` };
-  if (body?.error) return { state: 'failed', error: body.error };
+  if (body?.error) return { state: 'failed', error: body.error, ...(body.error_type ? { errorType: body.error_type } : {}) };
   if (body?.status === 'COMPLETED') return { state: 'done' };
   if (body?.status === 'IN_PROGRESS') return { state: 'running' };
   return { state: 'queued', ...(typeof body?.queue_position === 'number' ? { position: body.queue_position } : {}) };

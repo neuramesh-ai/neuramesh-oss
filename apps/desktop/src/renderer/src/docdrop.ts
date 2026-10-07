@@ -17,7 +17,9 @@ export interface DocDrop {
   pending: boolean;
 }
 
-const SHAPE = /^📄 \*\*(.+?)\*\* — (saved to|proposed for) the library as `(.+?)`\.\n\n([\s\S]+)$/;
+// the separator is the em dash the producers write (shared docDropBody), or the comma the server's dash
+// scrub makes of it in an agent's message (commrules.ts scrubEmdash, on by default since #308)
+const SHAPE = /^📄 \*\*(.+?)\*\*(?: —|,) (saved to|proposed for) the library as `(.+?)`\.\n\n([\s\S]+)$/;
 
 export function docDropParts(body: string): DocDrop | null {
   const m = SHAPE.exec(body);

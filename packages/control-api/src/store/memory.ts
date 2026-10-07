@@ -228,7 +228,7 @@ export class MemoryStore implements Store {
     this.artifacts.push({
       id: input.id,
       taskId: input.taskId ?? '',
-      kind: input.kind, channel: input.channel, mime: input.mime ?? null,
+      kind: input.kind, channel: input.channel, mime: input.mime ?? null, createdByKind: input.author.kind,
       name: input.name,
       content: input.inlineContent,
       createdAt: new Date().toISOString(),
@@ -236,7 +236,8 @@ export class MemoryStore implements Store {
     });
     return { id: input.id };
   }
-  async libraryImage(channelId: string, name: string): Promise<{ name: string; mime: string | null; content: string } | null> { const project = this.channels.find((c) => c.id === channelId)?.projectId; const rooms = new Set(this.channels.filter((c) => c.projectId === project).map((c) => c.id)); const hits = [...this.artifacts].reverse().filter((x) => (x.channel === channelId || rooms.has(x.channel ?? '')) && x.name.toLowerCase() === name.toLowerCase() && (x.content ?? '').startsWith('data:image/')); const a = hits.find((x) => x.channel === channelId) ?? hits[0]; return a ? { name: a.name, mime: a.mime ?? null, content: a.content! } : null; } // the room's shelf first, then the project's (store/frames.ts)
+  async libraryImage(channelId: string, name: string, any = false): Promise<{ name: string; mime: string | null; content: string } | null> { const project = this.channels.find((c) => c.id === channelId)?.projectId; const rooms = new Set(this.channels.filter((c) => c.projectId === project).map((c) => c.id)); const hits = [...this.artifacts].reverse().filter((x) => (x.channel === channelId || rooms.has(x.channel ?? '')) && x.name.toLowerCase() === name.toLowerCase() && (x.content ?? '').startsWith('data:image/') && (any || x.createdByKind === 'human' || (x.source ?? '').startsWith('repo:'))); const a = hits.find((x) => x.channel === channelId) ?? hits[0]; return a ? { name: a.name, mime: a.mime ?? null, content: a.content! } : null; } // the room's shelf first, then the project's (store/frames.ts)
+  async setArtifactSource(id: string, source: string): Promise<void> { const a = this.artifacts.find((x) => x.id === id); if (a) a.source = source; } // store/frames.ts setArtifactSource
 
   async promoteArtifact(artifactId: string, _promotedByAgent: string | null, makeEvent: (workspace: string) => NMEvent): Promise<{ workspace: string }> {
     const art = this.artifacts.find((a) => a.id === artifactId);
@@ -1267,7 +1268,7 @@ export class MemoryStore implements Store {
     const now = new Date().toISOString();
     const task = TaskSchema.parse({
       id: crypto.randomUUID(), workspace: c.workspace, channel: c.slug, number: await this.nextTaskNumber(c.workspace),
-      title: flow.title, description: 'Walk the steps below to set this room up — your answers save as you go, so you can leave and finish any time. Closing this task skips setup.',
+      title: flow.title, description: flow.description,
       state: 'todo', kind: 'setup', creator: { kind: 'human', id: '00000000-0000-0000-0000-000000000001' },
       createdAt: now, updatedAt: now,
     });
@@ -1347,7 +1348,7 @@ export class MemoryStore implements Store {
     this.schedules = rest as typeof this.schedules;
     return { id: scheduleId };
   }
-  private contentItems: Array<{ id: string; workspace: string; channelId: string; taskId: string | null; threadId: string | null; platform: string; body: string; scheduleId: string | null; status: string; scheduledAt: string | null; approvedBy: string | null; mediaUrl: string | null; mediaId?: string | null; brief?: string | null; script?: string | null; videoPending?: boolean; videoMeta?: VideoMeta | null; videoErrorCode?: 'NO_CREDITS' | 'UNAVAILABLE' | null; frame?: string | null; seconds?: number | null; lastError?: string | null }> = [];
+  private contentItems: Array<{ id: string; workspace: string; channelId: string; taskId: string | null; threadId: string | null; platform: string; body: string; scheduleId: string | null; status: string; scheduledAt: string | null; approvedBy: string | null; mediaUrl: string | null; mediaId?: string | null; brief?: string | null; script?: string | null; videoPending?: boolean; videoMeta?: VideoMeta | null; videoErrorCode?: 'NO_CREDITS' | 'UNAVAILABLE' | null; videoError?: string | null; frame?: string | null; seconds?: number | null; lastError?: string | null }> = [];
   async createContentItem(input: { channelId: string; taskId?: string | null; threadId?: string | null; platform: string; body: string; scheduleId: string | null; slotAt?: string | null; mediaUrl?: string | null; imageBrief?: string | null; script?: string | null; frame?: string | null; seconds?: number | null; thumb?: string | null; imageError?: string | null; createdByKind: string; createdBy: string }, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }> {
     const c = this.channels.find((x) => x.id === input.channelId);
     if (!c) throw new DomainError('NOT_FOUND', 'channel not found');
@@ -1384,7 +1385,7 @@ export class MemoryStore implements Store {
     if (!it) throw new DomainError('NOT_FOUND', 'content item not found (already published or gone)');
     const isRevision = patch.body !== null || patch.imageBrief !== null || !!patch.script;
     if (patch.body !== null) it.body = patch.body;
-    if (patch.imageBrief !== null) it.brief = patch.imageBrief;   if (patch.script) it.script = patch.script;   if (patch.frame !== undefined) { it.frame = patch.frame; it.videoMeta = null; }   if (patch.seconds !== undefined) it.seconds = patch.seconds;   if (patch.videoPending !== undefined) it.videoPending = patch.videoPending;   if (patch.videoMeta !== undefined) it.videoMeta = patch.videoMeta;   if (patch.videoErrorCode !== undefined) it.videoErrorCode = patch.videoErrorCode;
+    if (patch.imageBrief !== null) it.brief = patch.imageBrief;   if (patch.script) it.script = patch.script;   if (patch.frame !== undefined) { it.frame = patch.frame; it.videoMeta = null; }   if (patch.seconds !== undefined) it.seconds = patch.seconds;   if (patch.videoPending !== undefined) it.videoPending = patch.videoPending;   if (patch.videoMeta !== undefined) it.videoMeta = patch.videoMeta;   if (patch.videoErrorCode !== undefined) it.videoErrorCode = patch.videoErrorCode; if (patch.videoError !== undefined) it.videoError = patch.videoError || null;
     // thumb tracked in the mem store only for parity; the card reads it from media in pg
     // rewriting the copy/brief of a SCHEDULED post unschedules it back to draft (pg parity), so the
     // changed text can't auto-publish on the old slot without a fresh human approve
@@ -1420,7 +1421,7 @@ export class MemoryStore implements Store {
     const c = this.channels.find((x) => x.id === input.channelId);
     if (!c) throw new DomainError('NOT_FOUND', 'channel not found');
     const id = crypto.randomUUID();
-    this.channelArtifacts.push({ id, workspace: c.workspace, channelId: input.channelId, kind: input.kind, name: input.name });
+    this.channelArtifacts.push({ id, workspace: c.workspace, channelId: input.channelId, kind: input.kind, name: input.name }); this.artifacts.push({ id, taskId: '', kind: input.kind, name: input.name, content: input.inlineContent, createdAt: new Date().toISOString(), channel: input.channelId, mime: input.mime, createdByKind: input.createdByKind }); // the shelf's row, as pgstore inserts it (store/frames.ts reads it)
     this.events.push(makeEvent(c.workspace));
     return { id };
   }

@@ -187,9 +187,15 @@ describe('a task thread promises only what the wake path delivers', () => {
   });
 
   test('a SETTLED task draws no orb, because a reply there wakes nobody', () => {
-    for (const s of ['in_review', 'done', 'accepted', 'closed', 'backlog']) {
+    for (const s of ['in_review', 'accepted', 'closed', 'backlog']) {
       assert.equal(ghost(task(s)), null, s);
     }
+  });
+
+  // the person's "merge it" on a done unit wakes the orchestrator (2026-10-05), so the orb says who answers
+  test('a DONE unit names the orchestrator, who takes the merge word', () => {
+    assert.equal(ghost(task('done'))?.agent.name, 'rex');
+    assert.equal(waitGhostFor({ rows: human, agents: [dev], channelId: 'c1', machine: 'online', task: task('done') }), null, 'no orchestrator in the room, no promise');
   });
 
   test('…unless it names somebody, which is exactly what makes it answerable', () => {
@@ -206,7 +212,7 @@ describe('a task thread promises only what the wake path delivers', () => {
   });
 
   test('the machine rung obeys the same gate: a settled task waits on nothing', () => {
-    assert.equal(waitGhostFor({ rows: human, agents: [rex, dev], channelId: 'c1', machine: 'waking', task: task('done') }), null);
+    assert.equal(waitGhostFor({ rows: human, agents: [rex, dev], channelId: 'c1', machine: 'waking', task: task('accepted') }), null);
   });
 });
 
@@ -264,7 +270,7 @@ describe('the wait gives up honestly', () => {
   });
 
   test('and a settled task still says nothing at all, deadline or not', () => {
-    const g = waitGhostFor({ rows: at(45 * 60_000), agents: [rex, dev], channelId: 'c1', machine: 'online', now: NOW, task: { state: 'done' } });
+    const g = waitGhostFor({ rows: at(45 * 60_000), agents: [rex, dev], channelId: 'c1', machine: 'online', now: NOW, task: { state: 'accepted' } });
     assert.equal(g, null);
   });
 });
@@ -278,8 +284,11 @@ describe('responderFor is the one answer to "who takes this"', () => {
 
   test('a task asks the wake policy instead, so the two can never drift', () => {
     assert.equal(responderFor('', [rex, dev], 'c1', { state: 'plan_review' })?.name, 'rex');
-    assert.equal(responderFor('', [rex, dev], 'c1', { state: 'done' }), null);
+    assert.equal(responderFor('', [rex, dev], 'c1', { state: 'in_review' }), null);
+    assert.equal(responderFor('', [rex, dev], 'c1', { state: 'done' })?.name, 'rex');
     // a content task is its conversation, even in_review (docs/16 §4.5)
     assert.equal(responderFor('', [rex, dev], 'c1', { state: 'in_review', kind: 'content', assignee_kind: 'agent', assignee_id: 'a2' })?.name, 'patch');
+    // …until done: its marketer cannot accept, so the merge word reaches the orchestrator (2026-10-05)
+    assert.equal(responderFor('', [rex, dev], 'c1', { state: 'done', kind: 'content', assignee_kind: 'agent', assignee_id: 'a2' })?.name, 'rex');
   });
 });

@@ -10,6 +10,7 @@
 import { styled } from './housestyle';
 import { join } from 'node:path';
 import { brainRoot, subjectSlug } from './harness/brain';
+import { docDropBody } from '@neuramesh/shared';
 
 /** The subset of a hosted agent these decisions need. */
 export interface ChatAgent {
@@ -144,7 +145,7 @@ export function isImageFile(name: string): boolean {
 
 /** The message body that renders a produced file as an inline card (docs/30's doc-drop shape). */
 export function fileDropBody(label: string, file: string, content: string): string {
-  return `📄 **${label}** — saved to the library as \`${file}\`.\n\n${content}`;
+  return docDropBody(label, file, content);
 }
 
 /**
