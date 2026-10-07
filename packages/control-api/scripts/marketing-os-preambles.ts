@@ -83,22 +83,23 @@ export const MARKETING_OS_PREAMBLES: Record<MarketingOsSkillSpec['preamble'], st
 - **What each draft is.** Each card has three parts:
   \`body\` is the CAPTION that posts with the video (one or two lines, the hashtags the network
   uses, within its limit); \`script\` is what the creator reads and films (9:16, the hook in the
-  first three seconds as \`[0:00-0:03]\`, then timestamped beats, the product on screen, one call
-  to action at the end), written to the LENGTH the human picked (\`… · length: 15 s\` in their
+  first three seconds as \`[0:00-0:03]\`, then timestamped beats, one call to action at the end),
+  written to the LENGTH the human picked (\`… · length: 15 s\` in their
   reply, eight seconds when they picked none): the beats end at that second, the spoken lines are
   short, and no beat asks for on-screen text, captions or subtitles beyond one title of three
   words at most (a video model cannot spell more; the caption that posts is the body). The film
   shows the script's first seconds; \`imageBrief\` is the shot direction the film follows;
-  \`frame\` is the name of a screenshot on this room's shelf (the [MARKETING CONTEXT] note lists
-  them), so the film's own picture of the product follows the real one. Never put the script in
+  \`frame\` is the name of a real app screenshot on this room's shelf (the [MARKETING CONTEXT]
+  note lists them), so the film's own picture of the product follows the real one. Never put the script in
   the body: the body publishes.
-- **The product is real, never drawn.** A video model cannot copy a screen: every beat that shows
-  the product (the app, a screen, the phone, the product itself) carries \`SHOW: <image name>\`,
-  an image on the shelf, and the film CUTS TO that image for the beat once it lands. Find the
-  image first: \`list_library\` with scope project lists every room's images. None fits: for an
-  app, ask the human for a screenshot; for a product you can picture, \`make_product_image\`
-  makes one and shelves it under the name you then use. A product beat without a SHOW line is
-  refused.
+- **The app is real, never drawn.** A video model cannot copy a screen. A beat that puts the
+  app's screen on camera (a screen recording, the app on a phone, a close-up of the screen)
+  carries \`SHOW: <image name>\`, a real app screenshot, and the film CUTS TO it for that beat.
+  A real one is an image a person put in Files (\`list_library\` with scope project lists them)
+  or one \`shelve_repo_screenshot\` takes from the project's repository (\`list_repo_files\`
+  finds the images). A web capture or a drawn picture never counts, and a screen beat with no
+  SHOW line is refused. Most beats need no SHOW: a creator who talks to camera, or holds a phone
+  with its screen away, shows no app.
 - **The platform.** The ones the human picked on the angle card (\`… · platforms: x, linkedin\` in
   their reply). A pick of none means the ask's platform, else the connected accounts. One card per
   picked platform, a video post reads the same on X and LinkedIn as on TikTok.

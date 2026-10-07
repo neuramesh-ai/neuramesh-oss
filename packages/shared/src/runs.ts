@@ -101,80 +101,157 @@ export const TOOL_CATS = ['file', 'cmd', 'search', 'check'] as const;
 export type ToolCat = (typeof TOOL_CATS)[number];
 
 // the platform tools (mcp__nm__* → logged as "nm.{name}") in plain words — an identifier
-// must never reach the pill; anything unmapped gets its underscores spoken instead
+// must never reach the pill; anything unmapped gets its underscores spoken instead. the words are
+// the simple present with the agent as the subject ("rex checks the board", 2026-10-05): a person
+// reads them on the run card, so they follow the house writing rules
 export const NM_VERBS: Record<string, { verb: string; cat?: ToolCat }> = {
-  task_status: { verb: 'checking the board', cat: 'check' },
-  list_tasks: { verb: 'checking the board', cat: 'check' },
-  list_backlog: { verb: 'checking the backlog', cat: 'check' },
-  list_agents: { verb: 'checking the roster', cat: 'check' },
-  list_repos: { verb: 'checking the repos', cat: 'check' },
-  list_projects: { verb: 'checking the projects', cat: 'check' },
-  recall: { verb: 'recalling context', cat: 'search' },
-  load_skill: { verb: 'reading a team skill', cat: 'check' },
-  set_thread_title: { verb: 'naming the conversation' },
-  create_task: { verb: 'creating the task' },
-  offer_task: { verb: 'handing off the task' },
-  add_subtask: { verb: 'adding a subtask' },
-  add_backlog_item: { verb: 'parking it on the backlog' },
-  create_whiteboard: { verb: 'drawing a whiteboard' },
-  update_whiteboard: { verb: 'redrawing the whiteboard' },
-  list_whiteboards: { verb: 'checking the whiteboards', cat: 'check' },
-  read_whiteboard: { verb: 'reading a whiteboard', cat: 'check' },
-  promote_backlog_item: { verb: 'promoting from the backlog' },
-  update_backlog_item: { verb: 'updating the backlog item' },
-  request_plan: { verb: 'routing to the architect' },
-  request_design: { verb: 'routing to the designer' },
-  revise_design: { verb: 'sending design feedback' },
-  revise_plan: { verb: 'sending plan feedback' },
-  revise_ship_plan: { verb: 'sending ship-plan feedback' },
-  request_changes: { verb: 'sending it back with notes' },
-  post_thread: { verb: 'posting to the thread' },
-  register_repo: { verb: 'registering the repo' },
-  create_project: { verb: 'creating the project' },
-  create_agent: { verb: 'hiring the agent' },
-  add_agent_to_channel: { verb: 'adding a teammate to the room' },
-  record_lesson: { verb: 'writing down a lesson' },
-  propose_skill: { verb: 'proposing a skill' },
-  screenshot: { verb: 'taking a screenshot' },
-  start_deep_work: { verb: 'starting the deep work' },
+  task_status: { verb: 'checks the board', cat: 'check' },
+  list_tasks: { verb: 'checks the board', cat: 'check' },
+  list_backlog: { verb: 'checks the backlog', cat: 'check' },
+  list_agents: { verb: 'checks the roster', cat: 'check' },
+  list_repos: { verb: 'checks the repositories', cat: 'check' },
+  list_projects: { verb: 'checks the projects', cat: 'check' },
+  recall: { verb: 'recalls context', cat: 'search' },
+  load_skill: { verb: 'reads a team skill', cat: 'check' },
+  set_thread_title: { verb: 'names the conversation' },
+  create_task: { verb: 'creates the task' },
+  offer_task: { verb: 'offers the task' },
+  add_subtask: { verb: 'adds a subtask' },
+  add_backlog_item: { verb: 'adds an item to the backlog' },
+  create_whiteboard: { verb: 'draws a whiteboard' },
+  update_whiteboard: { verb: 'redraws the whiteboard' },
+  list_whiteboards: { verb: 'checks the whiteboards', cat: 'check' },
+  read_whiteboard: { verb: 'reads a whiteboard', cat: 'check' },
+  promote_backlog_item: { verb: 'promotes a backlog item' },
+  update_backlog_item: { verb: 'updates the backlog item' },
+  request_plan: { verb: 'sends the task to the architect' },
+  request_design: { verb: 'sends the task to the designer' },
+  revise_design: { verb: 'sends notes on the design' },
+  revise_plan: { verb: 'sends notes on the plan' },
+  revise_ship_plan: { verb: 'sends notes on the release plan' },
+  request_changes: { verb: 'asks for changes' },
+  post_thread: { verb: 'posts to the thread' },
+  register_repo: { verb: 'registers the repository' },
+  create_project: { verb: 'creates the project' },
+  create_agent: { verb: 'hires the agent' },
+  add_agent_to_channel: { verb: 'adds a teammate to the room' },
+  record_lesson: { verb: 'records a lesson' },
+  propose_skill: { verb: 'proposes a skill' },
+  screenshot: { verb: 'takes a screenshot' },
+  start_deep_work: { verb: 'starts the deep work' },
+  // the tools a lane logs by the bare name (the NeuraMesh brain's turn, the harness tools)
+  read_repo_file: { verb: 'reads a repository file', cat: 'file' },
+  list_repo_files: { verb: 'lists the repository files', cat: 'check' },
+  list_repo_changes: { verb: 'reads the repository changes', cat: 'check' },
+  read_workspace_file: { verb: 'reads a workspace file', cat: 'file' },
+  list_library: { verb: 'checks the library', cat: 'check' },
+  read_library_doc: { verb: 'reads a library document', cat: 'check' },
+  propose_library_doc: { verb: 'proposes a library document' },
+  list_playbooks: { verb: 'checks the playbooks', cat: 'check' },
+  run_playbook: { verb: 'runs a playbook' },
+  propose_design_round: { verb: 'proposes a design round' },
+  take_task: { verb: 'takes the task' },
+  declare_beats: { verb: 'plans the steps' },
+  advance_beat: { verb: 'moves to the next step' },
+  search_x: { verb: 'searches posts on X', cat: 'search' },
+  draft_posts: { verb: 'drafts the posts' },
+  revise_posts: { verb: 'revises the posts' },
+  read_drafts: { verb: 'reads the drafts', cat: 'check' },
+  draft_replies: { verb: 'drafts the replies' },
+  revise_replies: { verb: 'revises the replies' },
+  draft_article: { verb: 'drafts the article' },
+  propose_angles: { verb: 'proposes the angles' },
+  generate_image: { verb: 'draws an image' },
+  make_product_image: { verb: 'makes a product image' }, // retired 2026-10-06; past runs still show the step
+  shelve_repo_screenshot: { verb: 'takes a screenshot from the repository' },
+  share_images: { verb: 'shares the images' },
+  spawn: { verb: 'starts a subagent' },
+  // the rest of the registries (2026-10-05, the review of round 2): a tool with no row here spoke its
+  // underscores ("accept task"), so every name a registry hands a turn has words (the desktop's
+  // registry test reads the built registries against this table)
+  accept_task: { verb: 'accepts the task' },
+  request_verdict: { verb: 'asks for a verdict' },
+  propose_impl_plan: { verb: 'proposes a plan' },
+  schedule_posts: { verb: 'proposes a schedule for the posts' },
+  unschedule_posts: { verb: 'asks to remove posts from the schedule' },
+  list_workspace: { verb: 'checks the conversation files', cat: 'check' },
+  propose_routine: { verb: 'drafts the routine' },
+  offer_routine_session: { verb: 'offers a routine session' },
+  open_code_session: { verb: 'opens a code session' },
+  file_conversation: { verb: 'moves the conversation to a room' },
+  park: { verb: 'pauses the work' },
+  // the NeuraMesh brain worker's own file tools (runtime/starter.ts)
+  write_file: { verb: 'writes a file', cat: 'file' },
+  read_file: { verb: 'reads a file', cat: 'file' },
+  list_files: { verb: 'lists the files', cat: 'check' },
+  // the agents' browser (harness.ts NM_TOOLS)
+  web_open: { verb: 'opens a page', cat: 'search' },
+  web_read: { verb: 'reads the page', cat: 'search' },
+  web_click: { verb: 'clicks an item on the page', cat: 'search' },
+  web_type: { verb: 'types text on the page', cat: 'search' },
+  web_screenshot: { verb: 'takes a screenshot of the page', cat: 'search' },
 };
+
+// the Claude Code tools a summary names bare (host/turnkit.ts toolSummary). null = plumbing worth no words
+const SDK_VERBS: Record<string, { verb: string; cat?: ToolCat } | null> = {
+  Task: { verb: 'starts a subagent' },
+  Agent: { verb: 'starts a subagent' },
+  MultiEdit: { verb: 'edits a file', cat: 'file' },
+  NotebookEdit: { verb: 'edits a notebook', cat: 'file' },
+  ToolSearch: null,
+};
+/** a tool's own row, never a key the table inherits ("constructor") */
+const nmVerb = (name: string): { verb: string; cat?: ToolCat } | null => (Object.hasOwn(NM_VERBS, name) ? NM_VERBS[name]! : null);
 
 /** humanize one activity row into the live line. Returns null for rows worth no words. */
 export function toolVerb(row: { kind: string; phase: string | null; summary: string }): { verb: string; cat?: ToolCat } | null {
-  if (row.kind === 'turn') return { verb: 'composing…' };
+  // the model's own words are the reply. a phased turn row (the context it was given, the architect's
+  // rounds, the plan review) and the CLI's opening inventory ("tools: …", "claude: …") are no reply
+  if (row.kind === 'turn') return row.phase || /^(?:tools|claude):/.test(row.summary ?? '') ? null : { verb: 'writes the reply' };
   if (row.kind !== 'tool' || row.phase !== 'call') return null;
   const s = row.summary ?? '';
   const base = (p: string) => p.split('/').pop() ?? p;
   let m = s.match(/^Read (.+)/);
-  if (m) return { verb: `reading ${base(m[1]!)}`, cat: 'file' };
+  if (m) return { verb: `reads ${base(m[1]!)}`, cat: 'file' };
   m = s.match(/^(?:Write|Edit) (.+?)(?: \(|$)/);
-  if (m) return { verb: `editing ${base(m[1]!)}`, cat: 'file' };
-  m = s.match(/^Bash: (.+)/);
-  if (m) return { verb: `running ${m[1]!.split(' ').slice(0, 3).join(' ')}`, cat: 'cmd' };
-  if (/^(?:Grep|Glob) /.test(s)) return { verb: 'searching the repo', cat: 'search' };
+  if (m) return { verb: `edits ${base(m[1]!)}`, cat: 'file' };
+  // the Claude lane logs "Bash: cmd", the codex lane "bash cmd" (runtime/codexsdk.ts)
+  m = s.match(/^(?:Bash: |bash )(.+)/);
+  if (m) return { verb: `runs ${m[1]!.split(' ').slice(0, 3).join(' ')}`, cat: 'cmd' };
+  if (/^(?:Grep|Glob) /.test(s)) return { verb: 'searches the repository', cat: 'search' };
   m = s.match(/^nm\.(\w+)/);
-  if (m) return NM_VERBS[m[1]!] ?? { verb: m[1]!.replace(/_/g, ' ') };
+  if (m) return nmVerb(m[1]!) ?? { verb: m[1]!.replace(/_/g, ' ') };
   // the WHAT, not just the verb: the summary carries url/query since toolSummary learned to
-  // include them — show "reading neuramesh.app/pricing", "searching “…”"
+  // include them — show "reads neuramesh.app/pricing", "searches “…”"
   m = s.match(/^WebSearch (.+)/);
-  if (m) return { verb: `searching “${m[1]!.slice(0, 34)}${m[1]!.length > 34 ? '…' : ''}”`, cat: 'search' };
-  if (/^WebSearch/.test(s)) return { verb: 'searching the web', cat: 'search' };
+  if (m) return { verb: `searches “${m[1]!.slice(0, 34)}${m[1]!.length > 34 ? '…' : ''}”`, cat: 'search' };
+  if (/^WebSearch/.test(s)) return { verb: 'searches the web', cat: 'search' };
   m = s.match(/^WebFetch (\S+)/);
   if (m) {
     try {
       const u = new URL(m[1]!);
       const path = u.pathname !== '/' ? u.pathname : '';
-      return { verb: `reading ${(u.hostname.replace(/^www\./, '') + path).slice(0, 40)}`, cat: 'search' };
+      return { verb: `reads ${(u.hostname.replace(/^www\./, '') + path).slice(0, 40)}`, cat: 'search' };
     } catch { /* not a url — fall through */ }
   }
-  if (/^WebFetch/.test(s)) return { verb: 'reading a page', cat: 'search' };
+  if (/^WebFetch/.test(s)) return { verb: 'reads a page', cat: 'search' };
   m = s.match(/^mcp__(\w+?)__(\w+)/);
   if (m) return { verb: `${m[1]}: ${m[2]!.replace(/[._-]+/g, ' ')}`.slice(0, 40), cat: 'search' };
-  if (/^TodoWrite/.test(s)) return { verb: 'updating the plan' };
-  if (/recall/i.test(s)) return { verb: 'recalling context', cat: 'search' };
+  if (/^TodoWrite/.test(s)) return { verb: 'updates the plan' };
+  // a subagent's start line (host/legs.ts, which named the model there until 2026-10-05): the words only
+  if (/^leg "/.test(s)) return { verb: 'starts a subagent' };
+  // a tool logged by its bare name, with its arguments or its raw JSON after it (the NeuraMesh
+  // brain's turn logs `create_task {…}`): the tool's words, never its name or its JSON
+  m = s.match(/^([a-z][a-z0-9_]*)(?=[\s({[]|$)/);
+  if (m && (nmVerb(m[1]!) || m[1]!.includes('_'))) return nmVerb(m[1]!) ?? { verb: m[1]!.replace(/_/g, ' ') };
+  m = s.match(/^([A-Z]\w*)(?=[\s({[]|$)/);
+  if (m && Object.hasOwn(SDK_VERBS, m[1]!)) return SDK_VERBS[m[1]!] ?? null;
+  if (/recall/i.test(s)) return { verb: 'recalls context', cat: 'search' };
   // identifier-shaped leftovers (mcp__x__y and friends) get spoken, never shown raw
-  if (/^[\w.]+$/.test(s)) return { verb: s.replace(/^mcp__/, '').replace(/[._]+/g, ' ').trim() };
-  return { verb: s.length > 46 ? `${s.slice(0, 46)}…` : s };
+  if (/^[\w.]+$/.test(s)) return { verb: s.replace(/^mcp__/, '').replace(/[._]+/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase().trim() };
+  // a line that ends in raw arguments keeps its words and drops the JSON
+  const words = s.replace(/\s+[{[][\s\S]*$/, '');
+  return { verb: words.length > 46 ? `${words.slice(0, 46)}…` : words };
 }
 
 // A run that stops moving is the failure the docs/19 watchdog exists to catch — a host that

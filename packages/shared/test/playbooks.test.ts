@@ -95,10 +95,18 @@ describe('input resolution', () => {
 
   it('subject shortens URLs to hostnames; titles and asks carry it', () => {
     const { values } = resolvePlaybookInputs(audit, null, profile);
-    expect(playbookUnitTitle(audit, values)).toBe('Site & funnel audit — joinflowe.com');
+    expect(playbookUnitTitle(audit, values)).toBe('Site & funnel audit · joinflowe.com');
     expect(playbookAsk(audit, values)).toBe('Run the site & funnel audit playbook on https://www.joinflowe.com.');
     const teardown = playbookById('teardown')!;
-    expect(playbookUnitTitle(teardown, { competitor: 'Linear' })).toBe('Competitor teardown — Linear');
+    expect(playbookUnitTitle(teardown, { competitor: 'Linear' })).toBe('Competitor teardown · Linear');
+  });
+
+  // the ask lower-cased the whole title, so it read "Run the ugc scripts playbook." (2026-10-06)
+  it('an ask keeps an acronym in capitals and lower-cases only a first word that is not one', () => {
+    expect(playbookAsk(playbookById('ugc')!)).toBe('Run the UGC scripts playbook.');
+    expect(playbookAsk(playbookById('geo')!)).toBe('Run the AI search (GEO) playbook.');
+    expect(playbookAsk(playbookById('audit')!)).toBe('Run the site & funnel audit playbook.');
+    expect(playbookAsk(playbookById('release')!)).toBe('Run the release drafts playbook.');
   });
 });
 

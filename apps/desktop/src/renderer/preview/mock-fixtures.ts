@@ -9,7 +9,7 @@ import { composeFailover, buildFailoverCard, PACKS } from '@neuramesh/shared';
 import { DOOR_MARKETING_PROFILE, DOOR_RELEASE_SCHEDULE, DOOR_SETUP_TASK_ID, DOOR_TASKS } from './mock-doors'; export * from './mock-doors';
 // the release session (board B of the release-drafts round) lives in its own file and splices in below
 import { spliceRelease } from './mock-release'; import { spliceUgc } from './mock-ugc'; import { spliceRoutines } from './mock-routines'; // the splice worlds (this file sits at its cap)
-import { stageThinking } from './mock-thinking';
+import { stageThinking } from './mock-thinking'; import { stageFixes } from './mock-fixes';
 export { releaseBriefArt } from './mock-release';
 // Preview-only mock of the Electron `window.nm` bridge. NOT shipped — it exists so the
 // real <App/> renders against the design handoff's sample data for screenshot evidence
@@ -843,7 +843,7 @@ export const mockWorkRuns: any[] = [
 ];
 // ?thinking=<name> stages a wake served by ANOTHER machine (mock-thinking.ts): a 'thinking' status
 // with no local stream, and a bare wake run for the agent in th-flowe-before, on sam-mbp
-stageThinking({ agents, mockWorkRuns }, qp('thinking'));
+stageThinking({ agents, mockWorkRuns }, qp('thinking')); stageFixes({ mockThreads, convoMsgs }, qp('fixes')); // ?fixes=1|writing: the brand bootstrap's session as the server stores it (mock-fixes.ts)
 
 export const beatsByTask: Record<string, Array<{ id: string; run_id: string; phase: string; role: string; seq: number; title: string; status: string; started_at: string | null; done_at: string | null; created_at: string }>> = {
   'tk-1046': [

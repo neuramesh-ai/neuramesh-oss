@@ -1,5 +1,9 @@
+var __create = Object.create;
 var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getProtoOf = Object.getPrototypeOf;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
 var __esm = (fn, res, err) => function __init() {
   if (err) throw err[0];
   try {
@@ -8,10 +12,33 @@ var __esm = (fn, res, err) => function __init() {
     throw err = [e], e;
   }
 };
+var __commonJS = (cb, mod) => function __require() {
+  try {
+    return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
+  } catch (e) {
+    throw mod = 0, e;
+  }
+};
 var __export = (target, all) => {
   for (var name in all)
     __defProp(target, name, { get: all[name], enumerable: true });
 };
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key2 of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key2) && key2 !== except)
+        __defProp(to, key2, { get: () => from[key2], enumerable: !(desc = __getOwnPropDesc(from, key2)) || desc.enumerable });
+  }
+  return to;
+};
+var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+  // If the importer is in node compatibility mode or this is not an ESM
+  // file that has been converted to a CommonJS file using a Babel-
+  // compatible transform (i.e. "__esModule" has not been set), then set
+  // "default" to the CommonJS "module.exports" for node compatibility.
+  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+  mod
+));
 
 // ../shared/src/alerts.ts
 function deriveAlerts(connectors, schedules, posts, dismissals = {}) {
@@ -412,7 +439,7 @@ function lookFrom(brief) {
   const kept = (plain.match(/[^.!?]+[.!?]*/g) ?? []).map((s) => s.trim()).filter((s) => /\w/.test(s) && !CAPTION_ASK_RE.test(s));
   return trimEndChars(cut(kept.join(" "), LOOK_WORDS), ".:");
 }
-function filmPrompt(body, brief, seconds = 8) {
+function filmPrompt(body, brief, seconds = 8, opts = {}) {
   const beats = beatsWithin(body, seconds);
   const shots = beats.map((b2, i) => {
     const dir = cut(b2.direction, DIRECTION_WORDS);
@@ -427,6 +454,7 @@ function filmPrompt(body, brief, seconds = 8) {
     `Vertical 9:16 phone video, ${seconds} seconds, handheld, natural light, a creator talking to camera, raw and real.`,
     ...cuts,
     title ? `One on-screen title, large and centered in the lower third, exactly: "${title}". No other text.` : "No on-screen text, no subtitles, no captions, no logos.",
+    opts.frame ? "" : SCREENS_RULE,
     withLook && look ? `Look: ${look}.` : "",
     "Audio: the creator's voice and room tone, no music."
   ].filter(Boolean).join(" ");
@@ -435,7 +463,7 @@ function filmPrompt(body, brief, seconds = 8) {
   for (let n = shots.length - 1; out.length > FILM_PROMPT_MAX && n >= 1; n -= 1) out = assemble(shots.slice(0, n), false);
   return out.slice(0, FILM_PROMPT_MAX);
 }
-var BLANKS, STAMP_RE, MAX_BEATS, DIRECTION_WORDS, SPOKEN_WORDS, LOOK_WORDS, FILM_PROMPT_MAX, unquote, words, tidyDirection, CAPTION_LABEL, SPOKEN_LABEL, SHOW_LABEL, oneSpaced, newBeat, PRODUCT_WORDS_RE, looksLikeProductBeat, firstBeat, CAPTION_ASK_RE, filmMinutes;
+var BLANKS, STAMP_RE, MAX_BEATS, DIRECTION_WORDS, SPOKEN_WORDS, LOOK_WORDS, FILM_PROMPT_MAX, unquote, words, tidyDirection, CAPTION_LABEL, SPOKEN_LABEL, SHOW_LABEL, oneSpaced, newBeat, APP_SCREEN_RE, looksLikeProductBeat, SCREENS_RULE, firstBeat, CAPTION_ASK_RE, filmMinutes;
 var init_filmprompt = __esm({
   "../shared/src/filmprompt.ts"() {
     "use strict";
@@ -455,8 +483,9 @@ var init_filmprompt = __esm({
     SHOW_LABEL = /^show ?:/i;
     oneSpaced = (s) => s.replace(/[ \t]+/g, " ").trim();
     newBeat = (start, end) => ({ start, end, direction: "", spoken: "", caption: "", show: "" });
-    PRODUCT_WORDS_RE = /\b(app|screen|phone|product|interface|dashboard|recording|ui|home screen|the board|laptop screen)\b/i;
-    looksLikeProductBeat = (b2) => PRODUCT_WORDS_RE.test(b2.direction);
+    APP_SCREEN_RE = /\b(screen ?(recording|capture|cast)s?|screenshots?|(phone|laptop|tablet|computer|app|home|lock|the) screens?|on[- ]screen(?! (text|title|titles|caption|captions|lettering|words))|ui|interface|dashboard|close(-| )?(up )?on the (phone|app|laptop)|(scrolls?|taps?|swipes?|clicks?) (through|around|in|on) the app|(opens?|shows?|holds? up|demos?) the app|the app's)\b/i;
+    looksLikeProductBeat = (b2) => APP_SCREEN_RE.test(b2.direction);
+    SCREENS_RULE = "Every phone and laptop screen stays dark or faces away from the camera.";
     firstBeat = (body) => scriptBeats(body)[0];
     CAPTION_ASK_RE = /\b(captions?|subtitles?|on-screen text|text overlays?|overlay text|text on screen|lettering|title cards?|lower thirds?|watermarks?|logos?|headlines?|burned[- ]in|the words)\b/i;
     filmMinutes = (seconds) => Math.max(2, Math.ceil(seconds / 4));
@@ -1774,38 +1803,44 @@ function runElapsed(run2, now = Date.now()) {
   return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}` : `${m}:${String(s).padStart(2, "0")}`;
 }
 function toolVerb(row) {
-  if (row.kind === "turn") return { verb: "composing\u2026" };
+  if (row.kind === "turn") return row.phase || /^(?:tools|claude):/.test(row.summary ?? "") ? null : { verb: "writes the reply" };
   if (row.kind !== "tool" || row.phase !== "call") return null;
   const s = row.summary ?? "";
   const base = (p2) => p2.split("/").pop() ?? p2;
   let m = s.match(/^Read (.+)/);
-  if (m) return { verb: `reading ${base(m[1])}`, cat: "file" };
+  if (m) return { verb: `reads ${base(m[1])}`, cat: "file" };
   m = s.match(/^(?:Write|Edit) (.+?)(?: \(|$)/);
-  if (m) return { verb: `editing ${base(m[1])}`, cat: "file" };
-  m = s.match(/^Bash: (.+)/);
-  if (m) return { verb: `running ${m[1].split(" ").slice(0, 3).join(" ")}`, cat: "cmd" };
-  if (/^(?:Grep|Glob) /.test(s)) return { verb: "searching the repo", cat: "search" };
+  if (m) return { verb: `edits ${base(m[1])}`, cat: "file" };
+  m = s.match(/^(?:Bash: |bash )(.+)/);
+  if (m) return { verb: `runs ${m[1].split(" ").slice(0, 3).join(" ")}`, cat: "cmd" };
+  if (/^(?:Grep|Glob) /.test(s)) return { verb: "searches the repository", cat: "search" };
   m = s.match(/^nm\.(\w+)/);
-  if (m) return NM_VERBS[m[1]] ?? { verb: m[1].replace(/_/g, " ") };
+  if (m) return nmVerb(m[1]) ?? { verb: m[1].replace(/_/g, " ") };
   m = s.match(/^WebSearch (.+)/);
-  if (m) return { verb: `searching \u201C${m[1].slice(0, 34)}${m[1].length > 34 ? "\u2026" : ""}\u201D`, cat: "search" };
-  if (/^WebSearch/.test(s)) return { verb: "searching the web", cat: "search" };
+  if (m) return { verb: `searches \u201C${m[1].slice(0, 34)}${m[1].length > 34 ? "\u2026" : ""}\u201D`, cat: "search" };
+  if (/^WebSearch/.test(s)) return { verb: "searches the web", cat: "search" };
   m = s.match(/^WebFetch (\S+)/);
   if (m) {
     try {
       const u = new URL(m[1]);
       const path = u.pathname !== "/" ? u.pathname : "";
-      return { verb: `reading ${(u.hostname.replace(/^www\./, "") + path).slice(0, 40)}`, cat: "search" };
+      return { verb: `reads ${(u.hostname.replace(/^www\./, "") + path).slice(0, 40)}`, cat: "search" };
     } catch {
     }
   }
-  if (/^WebFetch/.test(s)) return { verb: "reading a page", cat: "search" };
+  if (/^WebFetch/.test(s)) return { verb: "reads a page", cat: "search" };
   m = s.match(/^mcp__(\w+?)__(\w+)/);
   if (m) return { verb: `${m[1]}: ${m[2].replace(/[._-]+/g, " ")}`.slice(0, 40), cat: "search" };
-  if (/^TodoWrite/.test(s)) return { verb: "updating the plan" };
-  if (/recall/i.test(s)) return { verb: "recalling context", cat: "search" };
-  if (/^[\w.]+$/.test(s)) return { verb: s.replace(/^mcp__/, "").replace(/[._]+/g, " ").trim() };
-  return { verb: s.length > 46 ? `${s.slice(0, 46)}\u2026` : s };
+  if (/^TodoWrite/.test(s)) return { verb: "updates the plan" };
+  if (/^leg "/.test(s)) return { verb: "starts a subagent" };
+  m = s.match(/^([a-z][a-z0-9_]*)(?=[\s({[]|$)/);
+  if (m && (nmVerb(m[1]) || m[1].includes("_"))) return nmVerb(m[1]) ?? { verb: m[1].replace(/_/g, " ") };
+  m = s.match(/^([A-Z]\w*)(?=[\s({[]|$)/);
+  if (m && Object.hasOwn(SDK_VERBS, m[1])) return SDK_VERBS[m[1]] ?? null;
+  if (/recall/i.test(s)) return { verb: "recalls context", cat: "search" };
+  if (/^[\w.]+$/.test(s)) return { verb: s.replace(/^mcp__/, "").replace(/[._]+/g, " ").replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase().trim() };
+  const words2 = s.replace(/\s+[{[][\s\S]*$/, "");
+  return { verb: words2.length > 46 ? `${words2.slice(0, 46)}\u2026` : words2 };
 }
 function isRunStale(run2, now = Date.now()) {
   return run2.state === "running" && now - Date.parse(run2.updatedAt) > RUN_STALE_MS;
@@ -1847,7 +1882,7 @@ function deepestActive(t2) {
   walk(t2, []);
   return best;
 }
-var RUN_STATES, RUN_TERMINAL_STATES, RUN_SETTLE_STATES, isRunOpen, RUN_KINDS, RunSchema, TOOL_CATS, NM_VERBS, RUN_STALE_MS;
+var RUN_STATES, RUN_TERMINAL_STATES, RUN_SETTLE_STATES, isRunOpen, RUN_KINDS, RunSchema, TOOL_CATS, NM_VERBS, SDK_VERBS, nmVerb, RUN_STALE_MS;
 var init_runs = __esm({
   "../shared/src/runs.ts"() {
     "use strict";
@@ -1889,41 +1924,101 @@ var init_runs = __esm({
     });
     TOOL_CATS = ["file", "cmd", "search", "check"];
     NM_VERBS = {
-      task_status: { verb: "checking the board", cat: "check" },
-      list_tasks: { verb: "checking the board", cat: "check" },
-      list_backlog: { verb: "checking the backlog", cat: "check" },
-      list_agents: { verb: "checking the roster", cat: "check" },
-      list_repos: { verb: "checking the repos", cat: "check" },
-      list_projects: { verb: "checking the projects", cat: "check" },
-      recall: { verb: "recalling context", cat: "search" },
-      load_skill: { verb: "reading a team skill", cat: "check" },
-      set_thread_title: { verb: "naming the conversation" },
-      create_task: { verb: "creating the task" },
-      offer_task: { verb: "handing off the task" },
-      add_subtask: { verb: "adding a subtask" },
-      add_backlog_item: { verb: "parking it on the backlog" },
-      create_whiteboard: { verb: "drawing a whiteboard" },
-      update_whiteboard: { verb: "redrawing the whiteboard" },
-      list_whiteboards: { verb: "checking the whiteboards", cat: "check" },
-      read_whiteboard: { verb: "reading a whiteboard", cat: "check" },
-      promote_backlog_item: { verb: "promoting from the backlog" },
-      update_backlog_item: { verb: "updating the backlog item" },
-      request_plan: { verb: "routing to the architect" },
-      request_design: { verb: "routing to the designer" },
-      revise_design: { verb: "sending design feedback" },
-      revise_plan: { verb: "sending plan feedback" },
-      revise_ship_plan: { verb: "sending ship-plan feedback" },
-      request_changes: { verb: "sending it back with notes" },
-      post_thread: { verb: "posting to the thread" },
-      register_repo: { verb: "registering the repo" },
-      create_project: { verb: "creating the project" },
-      create_agent: { verb: "hiring the agent" },
-      add_agent_to_channel: { verb: "adding a teammate to the room" },
-      record_lesson: { verb: "writing down a lesson" },
-      propose_skill: { verb: "proposing a skill" },
-      screenshot: { verb: "taking a screenshot" },
-      start_deep_work: { verb: "starting the deep work" }
+      task_status: { verb: "checks the board", cat: "check" },
+      list_tasks: { verb: "checks the board", cat: "check" },
+      list_backlog: { verb: "checks the backlog", cat: "check" },
+      list_agents: { verb: "checks the roster", cat: "check" },
+      list_repos: { verb: "checks the repositories", cat: "check" },
+      list_projects: { verb: "checks the projects", cat: "check" },
+      recall: { verb: "recalls context", cat: "search" },
+      load_skill: { verb: "reads a team skill", cat: "check" },
+      set_thread_title: { verb: "names the conversation" },
+      create_task: { verb: "creates the task" },
+      offer_task: { verb: "offers the task" },
+      add_subtask: { verb: "adds a subtask" },
+      add_backlog_item: { verb: "adds an item to the backlog" },
+      create_whiteboard: { verb: "draws a whiteboard" },
+      update_whiteboard: { verb: "redraws the whiteboard" },
+      list_whiteboards: { verb: "checks the whiteboards", cat: "check" },
+      read_whiteboard: { verb: "reads a whiteboard", cat: "check" },
+      promote_backlog_item: { verb: "promotes a backlog item" },
+      update_backlog_item: { verb: "updates the backlog item" },
+      request_plan: { verb: "sends the task to the architect" },
+      request_design: { verb: "sends the task to the designer" },
+      revise_design: { verb: "sends notes on the design" },
+      revise_plan: { verb: "sends notes on the plan" },
+      revise_ship_plan: { verb: "sends notes on the release plan" },
+      request_changes: { verb: "asks for changes" },
+      post_thread: { verb: "posts to the thread" },
+      register_repo: { verb: "registers the repository" },
+      create_project: { verb: "creates the project" },
+      create_agent: { verb: "hires the agent" },
+      add_agent_to_channel: { verb: "adds a teammate to the room" },
+      record_lesson: { verb: "records a lesson" },
+      propose_skill: { verb: "proposes a skill" },
+      screenshot: { verb: "takes a screenshot" },
+      start_deep_work: { verb: "starts the deep work" },
+      // the tools a lane logs by the bare name (the NeuraMesh brain's turn, the harness tools)
+      read_repo_file: { verb: "reads a repository file", cat: "file" },
+      list_repo_files: { verb: "lists the repository files", cat: "check" },
+      list_repo_changes: { verb: "reads the repository changes", cat: "check" },
+      read_workspace_file: { verb: "reads a workspace file", cat: "file" },
+      list_library: { verb: "checks the library", cat: "check" },
+      read_library_doc: { verb: "reads a library document", cat: "check" },
+      propose_library_doc: { verb: "proposes a library document" },
+      list_playbooks: { verb: "checks the playbooks", cat: "check" },
+      run_playbook: { verb: "runs a playbook" },
+      propose_design_round: { verb: "proposes a design round" },
+      take_task: { verb: "takes the task" },
+      declare_beats: { verb: "plans the steps" },
+      advance_beat: { verb: "moves to the next step" },
+      search_x: { verb: "searches posts on X", cat: "search" },
+      draft_posts: { verb: "drafts the posts" },
+      revise_posts: { verb: "revises the posts" },
+      read_drafts: { verb: "reads the drafts", cat: "check" },
+      draft_replies: { verb: "drafts the replies" },
+      revise_replies: { verb: "revises the replies" },
+      draft_article: { verb: "drafts the article" },
+      propose_angles: { verb: "proposes the angles" },
+      generate_image: { verb: "draws an image" },
+      make_product_image: { verb: "makes a product image" },
+      // retired 2026-10-06; past runs still show the step
+      shelve_repo_screenshot: { verb: "takes a screenshot from the repository" },
+      share_images: { verb: "shares the images" },
+      spawn: { verb: "starts a subagent" },
+      // the rest of the registries (2026-10-05, the review of round 2): a tool with no row here spoke its
+      // underscores ("accept task"), so every name a registry hands a turn has words (the desktop's
+      // registry test reads the built registries against this table)
+      accept_task: { verb: "accepts the task" },
+      request_verdict: { verb: "asks for a verdict" },
+      propose_impl_plan: { verb: "proposes a plan" },
+      schedule_posts: { verb: "proposes a schedule for the posts" },
+      unschedule_posts: { verb: "asks to remove posts from the schedule" },
+      list_workspace: { verb: "checks the conversation files", cat: "check" },
+      propose_routine: { verb: "drafts the routine" },
+      offer_routine_session: { verb: "offers a routine session" },
+      open_code_session: { verb: "opens a code session" },
+      file_conversation: { verb: "moves the conversation to a room" },
+      park: { verb: "pauses the work" },
+      // the NeuraMesh brain worker's own file tools (runtime/starter.ts)
+      write_file: { verb: "writes a file", cat: "file" },
+      read_file: { verb: "reads a file", cat: "file" },
+      list_files: { verb: "lists the files", cat: "check" },
+      // the agents' browser (harness.ts NM_TOOLS)
+      web_open: { verb: "opens a page", cat: "search" },
+      web_read: { verb: "reads the page", cat: "search" },
+      web_click: { verb: "clicks an item on the page", cat: "search" },
+      web_type: { verb: "types text on the page", cat: "search" },
+      web_screenshot: { verb: "takes a screenshot of the page", cat: "search" }
     };
+    SDK_VERBS = {
+      Task: { verb: "starts a subagent" },
+      Agent: { verb: "starts a subagent" },
+      MultiEdit: { verb: "edits a file", cat: "file" },
+      NotebookEdit: { verb: "edits a notebook", cat: "file" },
+      ToolSearch: null
+    };
+    nmVerb = (name) => Object.hasOwn(NM_VERBS, name) ? NM_VERBS[name] : null;
     RUN_STALE_MS = 30 * 6e4;
   }
 });
@@ -4617,10 +4712,28 @@ function parsePlanRef(body) {
   const prose2 = trimLineEnds(body.replace(PLAN_REF_RE, "")).replace(/\n{3,}/g, "\n\n").trim();
   return { version: Number(m[1]), prose: prose2 };
 }
+function planPostLine(version, kind = "birth") {
+  const name = planArtifactName(version);
+  switch (kind) {
+    case "revised":
+      return `Implementation plan **v${version}** (revised): ${name}`;
+    case "routine":
+      return `\u23F1 Routine run: implementation plan **v${version}** (${name}). The work starts now and runs to the end without you. You get a notification when it is done.`;
+    case "playbook":
+      return `\u25B6 Playbook run: plan **v${version}** (${name}) comes from the playbook. The work starts now. When the deliverable is ready, say accept in this thread to close it.`;
+    default:
+      return `Implementation plan **v${version}**: ${name}`;
+  }
+}
+function planMessage(version, kind = "birth") {
+  return `${planPostLine(version, kind)}
+${planRefMarker(version)}`;
+}
 function renderPlanMarkdown(p2) {
-  const journey = ["plan", ...p2.legs.filter((l) => l !== "build"), executionLegLabel(p2.kind).toLowerCase(), "accept"].filter((l, i, a) => a.indexOf(l) === i);
+  const legs = [.../* @__PURE__ */ new Set(["build", ...p2.legs])].sort((a, b2) => (LEG_RANK[a] ?? 3) - (LEG_RANK[b2] ?? 3));
+  const journey = ["plan", ...legs.map((l) => l === "build" ? executionLegLabel(p2.kind).toLowerCase() : l), p2.repo ? "merge" : "accept"].filter((l, i, a) => a.indexOf(l) === i);
   const lines = [
-    `# Implementation plan \xB7 v${p2.version} \u2014 #${p2.number} ${p2.title}`,
+    `# Implementation plan \xB7 v${p2.version} \xB7 #${p2.number} ${p2.title}`,
     "",
     `**Journey:** ${journey.join(" \u2192 ")}`
   ];
@@ -4630,13 +4743,14 @@ function renderPlanMarkdown(p2) {
   lines.push("", "## Approach", "", p2.approach.trim(), "");
   return lines.join("\n");
 }
-var PLAN_REF_RE;
+var PLAN_REF_RE, LEG_RANK;
 var init_planmd = __esm({
   "../shared/src/planmd.ts"() {
     "use strict";
     init_journey();
     init_linear();
     PLAN_REF_RE = /‹plan:v(\d+)›/;
+    LEG_RANK = { design: 0, build: 1, review: 2 };
   }
 });
 
@@ -4962,7 +5076,7 @@ var SUPPORTED_DESKTOP_VERSIONS, MIN_DESKTOP_VERSION, versionSegments, belowFloor
 var init_desktop_floor = __esm({
   "../shared/src/desktop-floor.ts"() {
     "use strict";
-    SUPPORTED_DESKTOP_VERSIONS = ["0.152.0", "0.151.0"];
+    SUPPORTED_DESKTOP_VERSIONS = ["0.153.0", "0.152.0"];
     MIN_DESKTOP_VERSION = SUPPORTED_DESKTOP_VERSIONS[1];
     versionSegments = (v) => v.split(".").map((n) => Number.parseInt(n, 10) || 0);
     belowFloor = (version, floor) => !!floor && /^\d+\.\d+/.test(floor) && compareVersions(version, floor) < 0;
@@ -6053,12 +6167,75 @@ function unaddressedWake(state, kind, button2 = false) {
   if (state === "todo" || state === "plan_review") return "orchestrator";
   if (state === "in_progress" || state === "blocked") return "assignee";
   if (state === "designing" || state === "design_review") return "assignee";
+  if (state === "done") return "orchestrator";
   if (kind === "content" && !["accepted", "closed"].includes(state)) return "assignee";
   return button2 ? "orchestrator" : null;
 }
 var init_threadwake = __esm({
   "../shared/src/threadwake.ts"() {
     "use strict";
+  }
+});
+
+// ../shared/src/acceptword.ts
+function isCardOrMarker(body) {
+  return body.trimStart().startsWith("\u2039") || CARD_ANSWER.test(body);
+}
+function opensWithVerb(clause) {
+  const c = clause.replace(LEAD, "");
+  if (VERB_FIRST.test(c)) return true;
+  const m = ONE_WORD_FIRST.exec(c);
+  return !!m && !NOT_A_NAME.test(m[1]);
+}
+function isAcceptWord(body) {
+  if (isCardOrMarker(body)) return false;
+  const text2 = body.toLowerCase().replace(/[’`]/g, "'").replace(/(^|\s)@[\w.-]+/g, " ").replace(/[ \t]+/g, " ").trim();
+  if (!new RegExp(`\\b${VERB}\\b`).test(text2) || HOLD.test(text2)) return false;
+  const clauses = text2.split(/[.!?;,:\n—–]+|\s-\s/).map((c) => c.trim()).filter(Boolean);
+  const said = clauses.find(opensWithVerb);
+  if (!said) return false;
+  return !text2.includes("?") || POLITE_ASK.test(said);
+}
+var CARD_ANSWER, VERB, VERB_FIRST, ONE_WORD_FIRST, LEAD, NOT_A_NAME, HOLD, POLITE_ASK;
+var init_acceptword = __esm({
+  "../shared/src/acceptword.ts"() {
+    "use strict";
+    CARD_ANSWER = /^\s*\*\*[^\n]*\*\*\s*(?:→|->)/;
+    VERB = "(?:merge|accept|land|ship)";
+    VERB_FIRST = new RegExp(`^${VERB}\\b`);
+    ONE_WORD_FIRST = new RegExp(`^(\\S+) (?:and )?${VERB}\\b`);
+    LEAD = /^(?:(?:please|pls|ok|okay|yes|yeah|yep|sure|great|cool|perfect|thanks|lgtm|then|now|so|and|just|i|we|go ahead and|you can|you may|feel free to|let's|lets|can you|could you|would you|will you)\s+)+/;
+    NOT_A_NAME = /^(?:a|an|the|this|that|any|no|one|some|each|every|my|our|your|its|their|git|to|will|would|should|could|can|might|may|must|shall|do|does|did|is|was|[a-z]+'(?:ll|d|ve|re|m))$/;
+    HOLD = /\b(?:not|never|dont|do not|wait|hold|stop|cancel|yet|before|until|unless|later|tomorrow|tonight|after|once|if|myself|ourselves|manually)\b|n't\b/;
+    POLITE_ASK = /^(?:please |pls )?(?:can|could|would|will) you\b/;
+  }
+});
+
+// ../shared/src/claimline.ts
+function claimWorkspace(t2) {
+  if (!t2.repo) return "a scratch workspace. The files I make attach to this thread.";
+  return t2.branch ? `a worktree on branch \`${t2.branch}\`. I push the branch before the review.` : "a worktree of the repository. I push my branch before the review.";
+}
+function claimLine(c) {
+  return [
+    `I claimed #${c.number} \u201C${c.title}\u201D. I start now, and the live run on this task shows what I do.`,
+    `- **${CHECKLIST_LABEL[c.source]}:** ${c.checklist.join(" \xB7 ")}`,
+    `- **Estimate:** ${c.estimate}`,
+    `- **Workspace:** ${c.workspace}`
+  ].join("\n");
+}
+var STATIC_CHECKLIST, PLAN_CHECKLIST, CHECKLIST_LABEL;
+var init_claimline = __esm({
+  "../shared/src/claimline.ts"() {
+    "use strict";
+    STATIC_CHECKLIST = ["The title and the room give the scope", "I am a member of this room", "No open question stops the work"];
+    PLAN_CHECKLIST = ["The approved plan gives the scope", "I am a member of this room", "No open question stops the work"];
+    CHECKLIST_LABEL = {
+      intake: "Checklist from the intake",
+      worker: "My checklist",
+      plan: "Checklist",
+      default: "Checklist"
+    };
   }
 });
 
@@ -6090,7 +6267,7 @@ function setupProgress(flow, profileJson) {
 function setupProgressLabel(flow, p2) {
   if (p2.complete) return "complete";
   const at = flow.steps.find((s) => s.id === p2.next);
-  return `step ${Math.min(p2.done + 1, p2.total)} of ${p2.total}${at ? ` \u2014 ${at.label}` : ""}`;
+  return `step ${Math.min(p2.done + 1, p2.total)} of ${p2.total}${at ? ` \xB7 ${at.label}` : ""}`;
 }
 var MARKETING_SETUP_FLOW, SETUP_FLOWS;
 var init_setupflows = __esm({
@@ -6099,7 +6276,8 @@ var init_setupflows = __esm({
     MARKETING_SETUP_FLOW = {
       id: "marketing.v1",
       kind: "marketing",
-      title: "Set up your marketing HQ",
+      title: "Prepare your marketing HQ",
+      description: "Answer the questions in the thread. Each answer saves when you press Next, so you can stop and finish later. Close this task to skip setup.",
       steps: [
         { id: "product", label: "Product", writes: "website" },
         { id: "goal", label: "Goal", writes: "goal", optional: true },
@@ -6431,13 +6609,12 @@ function playbookSubject(pb, values2) {
 }
 function playbookUnitTitle(pb, values2) {
   const subject = playbookSubject(pb, values2);
-  return subject ? `${pb.title} \u2014 ${subject}` : pb.title;
+  return subject ? `${pb.title} \xB7 ${subject}` : pb.title;
 }
 function playbookAsk(pb, values2 = {}) {
   const subject = pb.inputs[0] ? values2[pb.inputs[0].key] : void 0;
   const on = subject ? ` on ${subject}` : "";
-  if (pb.engine === "chat") return `Run the ${pb.title.toLowerCase()} playbook${on}.`;
-  return `Run the ${pb.title.toLowerCase()} playbook${on}.`;
+  return `Run the ${askTitle(pb.title)} playbook${on}.`;
 }
 function playbookFromAsk(prompt) {
   let want = null;
@@ -6493,7 +6670,7 @@ function parsePlaybookRecs(body) {
 function stripPlaybookRecs(body) {
   return body.replace(NMPLAYS_RE, "").replace(/\n{3,}/g, "\n\n").trim();
 }
-var UNIT_PLAYBOOK_IDS, RUNTIME_SLOTS, NMPLAYS_RE;
+var UNIT_PLAYBOOK_IDS, RUNTIME_SLOTS, askTitle, NMPLAYS_RE;
 var init_playbooks = __esm({
   "../shared/src/playbooks.ts"() {
     "use strict";
@@ -6502,7 +6679,73 @@ var init_playbooks = __esm({
     init_playbooks_registry();
     UNIT_PLAYBOOK_IDS = PLAYBOOKS.filter((p2) => p2.engine === "unit").map((p2) => p2.id);
     RUNTIME_SLOTS = ["coverage"];
+    askTitle = (title) => title.replace(/^\S+/, (w) => /^[A-Z0-9]{2,}$/.test(w) ? w : w.toLowerCase());
     NMPLAYS_RE = /```nmplays[ \t]*\n([\s\S]*?)```/;
+  }
+});
+
+// ../shared/src/brandlines.ts
+function docDropBody(label, file, doc, verb = "saved to") {
+  return `\u{1F4C4} **${label}** \u2014 ${verb} the library as \`${file}\`.
+
+${doc}`;
+}
+function docInFlight(summary) {
+  return /^writes (\S+\.md)(?:\s|$)/.exec(summary ?? "")?.[1] ?? null;
+}
+function bootstrapOpening(o) {
+  if (o.research) {
+    const reads = o.site ? `First I read ${o.site}${o.repo ? ", its key pages and the project code" : " and its key pages"}. I also search the web for the product's market.` : `${o.repo ? "First I read the project code. I also search" : "First I search"} the web for the product and its market.`;
+    return `${reads} Then I write ${DOCS}. Each doc goes to ${SHELF} when it is done. Each doc takes a few minutes.`;
+  }
+  const colors = o.site ? ` I also try to read the colors and fonts from ${o.site}.` : "";
+  return `I write ${DOCS}. I write them from your answers.${colors} Each doc goes to ${SHELF} when it is done.`;
+}
+function bootstrapResume(files) {
+  return files.length === 1 ? `I write \`${files[0]}\` now.` : `I write the last ${files.length} docs now.`;
+}
+function bootstrapDocStatus(file, n, total, research) {
+  return `*${research ? "I research and write" : "I write"} \`${file}\` (${n}/${total})\u2026*`;
+}
+function bootstrapNudgeDone(files) {
+  const names = files.map((f) => `\`${f}\``);
+  const list = names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}` : names[0] ?? "";
+  return `${list} ${files.length === 1 ? "is" : "are"} in ${SHELF}. The brand docs are complete.`;
+}
+function bootstrapClosing(schedBlock, playsBlock) {
+  return `The brand docs are done. They are in ${SHELF}, and later drafts use them. Here is a first cadence. Arm the rows that you want. Nothing posts until you approve it.
+
+${schedBlock}
+
+The next step is a baseline. Run the audit once to get a score. Run it again later to see what changed.
+
+${playsBlock}`;
+}
+function filmStartLine(f) {
+  const held = f.seconds < f.asked ? ` (${f.tier} films up to ${f.seconds} s)` : "";
+  return `The ${f.seconds} s film starts on ${f.tier}${held}. It takes about ${filmMinutes(f.seconds)} minutes and costs ${f.credits} credits. The film lands on the card.`;
+}
+var docWriteLog, DOCS, SHELF, bootstrapStart, bootstrapDocFailed, BOOTSTRAP_ERROR, bootstrapPartial, BOOTSTRAP_SCHED_FALLBACK, BOOTSTRAP_PLAYS;
+var init_brandlines = __esm({
+  "../shared/src/brandlines.ts"() {
+    "use strict";
+    init_filmprompt();
+    docWriteLog = (file) => `writes ${file}`;
+    DOCS = "four brand docs here: the business profile, the brand guidelines, the market research and the social strategy";
+    SHELF = "the room's **Library** tab";
+    bootstrapStart = (subject) => `*I start the brand docs for ${subject}\u2026*`;
+    bootstrapDocFailed = (label) => `\u26A0\uFE0F I could not write **${label}** this time. Reply here, and I write it again.`;
+    BOOTSTRAP_ERROR = "\u26A0\uFE0F An error stopped the brand docs. Reply here, and I continue.";
+    bootstrapPartial = (done2, total) => `This time I wrote ${done2} of ${total} docs. Reply here, and I write the rest.`;
+    BOOTSTRAP_SCHED_FALLBACK = [
+      { title: "Weekday post drafts", cadence: "weekdays", atTime: "09:00", prompt: "Draft one X post from the narrative pillars in social-strategy.md, in the brand voice." },
+      { title: "Weekly thread", cadence: "weekly", weekday: 2, atTime: "10:00", prompt: "Draft a thread on the strongest narrative pillar of the week. Use the brand docs." },
+      { title: "Weekly competitor scan", cadence: "weekly", weekday: 1, atTime: "08:00", prompt: "Run the competitor scan again with the competitor-scan skill. Write the changes since market-research.md as a room note." }
+    ];
+    BOOTSTRAP_PLAYS = [
+      { id: "audit", why: "one score out of 100 across six dimensions" },
+      { id: "geo", why: "who AI search cites for your questions today" }
+    ];
   }
 });
 
@@ -9220,6 +9463,9 @@ __export(src_exports, {
   AgentMessageSchema: () => AgentMessageSchema,
   BEAT_PHASE_ROLES: () => BEAT_PHASE_ROLES,
   BEAT_STATUSES: () => BEAT_STATUSES,
+  BOOTSTRAP_ERROR: () => BOOTSTRAP_ERROR,
+  BOOTSTRAP_PLAYS: () => BOOTSTRAP_PLAYS,
+  BOOTSTRAP_SCHED_FALLBACK: () => BOOTSTRAP_SCHED_FALLBACK,
   BRAND_DOC_NAMES: () => BRAND_DOC_NAMES,
   BROWSER_FRAME_WINDOW: () => BROWSER_FRAME_WINDOW,
   BROWSER_LANE: () => BROWSER_LANE,
@@ -9319,6 +9565,7 @@ __export(src_exports, {
   PACK_PREVIEW_ROLES: () => PACK_PREVIEW_ROLES,
   PACK_SUPPORT_ROLES: () => PACK_SUPPORT_ROLES,
   PERMISSION_LABELS: () => PERMISSION_LABELS,
+  PLAN_CHECKLIST: () => PLAN_CHECKLIST,
   PLAN_ENTITLEMENTS: () => PLAN_ENTITLEMENTS,
   PLAN_LABELS: () => PLAN_LABELS,
   PLAN_RE: () => PLAN_RE,
@@ -9363,6 +9610,7 @@ __export(src_exports, {
   RunSchema: () => RunSchema,
   SCHEDULE_CADENCES: () => SCHEDULE_CADENCES,
   SCHED_WEEKDAYS: () => SCHED_WEEKDAYS,
+  SCREENS_RULE: () => SCREENS_RULE,
   SESSION_RUN_WORD: () => SESSION_RUN_WORD,
   SETUP_FLOWS: () => SETUP_FLOWS,
   SETUP_TASK_TRANSITIONS: () => SETUP_TASK_TRANSITIONS,
@@ -9377,6 +9625,7 @@ __export(src_exports, {
   STARTER_MODEL: () => STARTER_MODEL,
   STARTER_PACK_ID: () => STARTER_PACK_ID,
   STARTER_THINKING_LEVEL: () => STARTER_THINKING_LEVEL,
+  STATIC_CHECKLIST: () => STATIC_CHECKLIST,
   STORAGE_MICROS_PER_GB_HOUR: () => STORAGE_MICROS_PER_GB_HOUR,
   SUBTASK_TRANSITIONS: () => SUBTASK_TRANSITIONS,
   SUPPORTED_DESKTOP_VERSIONS: () => SUPPORTED_DESKTOP_VERSIONS,
@@ -9452,6 +9701,14 @@ __export(src_exports, {
   beginRemoteEngineeringPrompt: () => beginRemoteEngineeringPrompt,
   belowFloor: () => belowFloor,
   bestAlternativeProvider: () => bestAlternativeProvider,
+  bootstrapClosing: () => bootstrapClosing,
+  bootstrapDocFailed: () => bootstrapDocFailed,
+  bootstrapDocStatus: () => bootstrapDocStatus,
+  bootstrapNudgeDone: () => bootstrapNudgeDone,
+  bootstrapOpening: () => bootstrapOpening,
+  bootstrapPartial: () => bootstrapPartial,
+  bootstrapResume: () => bootstrapResume,
+  bootstrapStart: () => bootstrapStart,
   brainCast: () => brainCast,
   brainNoticeLine: () => brainNoticeLine,
   brainNoticeOf: () => brainNoticeOf,
@@ -9490,6 +9747,8 @@ __export(src_exports, {
   changedParts: () => changedParts,
   checkNeeds: () => checkNeeds,
   choosableMachines: () => choosableMachines,
+  claimLine: () => claimLine,
+  claimWorkspace: () => claimWorkspace,
   classifyShellCommand: () => classifyShellCommand,
   claudeDesignProjectUrl: () => claudeDesignProjectUrl,
   claudeDesignPromptBlock: () => claudeDesignPromptBlock,
@@ -9544,6 +9803,9 @@ __export(src_exports, {
   dialFraction: () => dialFraction,
   digestMeta: () => digestMeta,
   dismissEngineeringModeHandoff: () => dismissEngineeringModeHandoff,
+  docDropBody: () => docDropBody,
+  docInFlight: () => docInFlight,
+  docWriteLog: () => docWriteLog,
   done: () => done,
   dotLines: () => dotLines,
   draftIsLive: () => draftIsLive,
@@ -9577,6 +9839,7 @@ __export(src_exports, {
   filmLengthsWithin: () => filmLengthsWithin,
   filmMinutes: () => filmMinutes,
   filmPrompt: () => filmPrompt,
+  filmStartLine: () => filmStartLine,
   findTransition: () => findTransition,
   firstBeat: () => firstBeat,
   firstSentence: () => firstSentence,
@@ -9605,7 +9868,9 @@ __export(src_exports, {
   inSessionRun: () => inSessionRun,
   initialWizard: () => initialWizard,
   inviteMeta: () => inviteMeta,
+  isAcceptWord: () => isAcceptWord,
   isAddress: () => isAddress,
+  isCardOrMarker: () => isCardOrMarker,
   isChatThread: () => isChatThread,
   isCloudBorn: () => isCloudBorn,
   isCloudMachineRow: () => isCloudMachineRow,
@@ -9758,7 +10023,9 @@ __export(src_exports, {
   planBatches: () => planBatches,
   planFailoverAgentUpdates: () => planFailoverAgentUpdates,
   planLabel: () => planLabel,
+  planMessage: () => planMessage,
   planOf: () => planOf,
+  planPostLine: () => planPostLine,
   planRefMarker: () => planRefMarker,
   playbookAsk: () => playbookAsk,
   playbookById: () => playbookById,
@@ -10070,9 +10337,12 @@ var init_src = __esm({
     init_browse();
     init_threads();
     init_threadwake();
+    init_acceptword();
+    init_claimline();
     init_waiting();
     init_setupflows();
     init_playbooks();
+    init_brandlines();
     init_commrules();
     init_nextsteps();
     init_replyops();
@@ -10099,6 +10369,2157 @@ var init_src = __esm({
     init_releasescan();
     init_releasebrief();
     init_brandread();
+  }
+});
+
+// ../../node_modules/.pnpm/jpeg-js@0.4.4/node_modules/jpeg-js/lib/encoder.js
+var require_encoder = __commonJS({
+  "../../node_modules/.pnpm/jpeg-js@0.4.4/node_modules/jpeg-js/lib/encoder.js"(exports, module) {
+    var btoa = btoa || function(buf) {
+      return Buffer.from(buf).toString("base64");
+    };
+    function JPEGEncoder(quality) {
+      var self2 = this;
+      var fround = Math.round;
+      var ffloor = Math.floor;
+      var YTable = new Array(64);
+      var UVTable = new Array(64);
+      var fdtbl_Y = new Array(64);
+      var fdtbl_UV = new Array(64);
+      var YDC_HT;
+      var UVDC_HT;
+      var YAC_HT;
+      var UVAC_HT;
+      var bitcode = new Array(65535);
+      var category = new Array(65535);
+      var outputfDCTQuant = new Array(64);
+      var DU = new Array(64);
+      var byteout = [];
+      var bytenew = 0;
+      var bytepos = 7;
+      var YDU = new Array(64);
+      var UDU = new Array(64);
+      var VDU = new Array(64);
+      var clt = new Array(256);
+      var RGB_YUV_TABLE = new Array(2048);
+      var currentQuality;
+      var ZigZag = [
+        0,
+        1,
+        5,
+        6,
+        14,
+        15,
+        27,
+        28,
+        2,
+        4,
+        7,
+        13,
+        16,
+        26,
+        29,
+        42,
+        3,
+        8,
+        12,
+        17,
+        25,
+        30,
+        41,
+        43,
+        9,
+        11,
+        18,
+        24,
+        31,
+        40,
+        44,
+        53,
+        10,
+        19,
+        23,
+        32,
+        39,
+        45,
+        52,
+        54,
+        20,
+        22,
+        33,
+        38,
+        46,
+        51,
+        55,
+        60,
+        21,
+        34,
+        37,
+        47,
+        50,
+        56,
+        59,
+        61,
+        35,
+        36,
+        48,
+        49,
+        57,
+        58,
+        62,
+        63
+      ];
+      var std_dc_luminance_nrcodes = [0, 0, 1, 5, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0];
+      var std_dc_luminance_values = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+      var std_ac_luminance_nrcodes = [0, 0, 2, 1, 3, 3, 2, 4, 3, 5, 5, 4, 4, 0, 0, 1, 125];
+      var std_ac_luminance_values = [
+        1,
+        2,
+        3,
+        0,
+        4,
+        17,
+        5,
+        18,
+        33,
+        49,
+        65,
+        6,
+        19,
+        81,
+        97,
+        7,
+        34,
+        113,
+        20,
+        50,
+        129,
+        145,
+        161,
+        8,
+        35,
+        66,
+        177,
+        193,
+        21,
+        82,
+        209,
+        240,
+        36,
+        51,
+        98,
+        114,
+        130,
+        9,
+        10,
+        22,
+        23,
+        24,
+        25,
+        26,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        52,
+        53,
+        54,
+        55,
+        56,
+        57,
+        58,
+        67,
+        68,
+        69,
+        70,
+        71,
+        72,
+        73,
+        74,
+        83,
+        84,
+        85,
+        86,
+        87,
+        88,
+        89,
+        90,
+        99,
+        100,
+        101,
+        102,
+        103,
+        104,
+        105,
+        106,
+        115,
+        116,
+        117,
+        118,
+        119,
+        120,
+        121,
+        122,
+        131,
+        132,
+        133,
+        134,
+        135,
+        136,
+        137,
+        138,
+        146,
+        147,
+        148,
+        149,
+        150,
+        151,
+        152,
+        153,
+        154,
+        162,
+        163,
+        164,
+        165,
+        166,
+        167,
+        168,
+        169,
+        170,
+        178,
+        179,
+        180,
+        181,
+        182,
+        183,
+        184,
+        185,
+        186,
+        194,
+        195,
+        196,
+        197,
+        198,
+        199,
+        200,
+        201,
+        202,
+        210,
+        211,
+        212,
+        213,
+        214,
+        215,
+        216,
+        217,
+        218,
+        225,
+        226,
+        227,
+        228,
+        229,
+        230,
+        231,
+        232,
+        233,
+        234,
+        241,
+        242,
+        243,
+        244,
+        245,
+        246,
+        247,
+        248,
+        249,
+        250
+      ];
+      var std_dc_chrominance_nrcodes = [0, 0, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0];
+      var std_dc_chrominance_values = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+      var std_ac_chrominance_nrcodes = [0, 0, 2, 1, 2, 4, 4, 3, 4, 7, 5, 4, 4, 0, 1, 2, 119];
+      var std_ac_chrominance_values = [
+        0,
+        1,
+        2,
+        3,
+        17,
+        4,
+        5,
+        33,
+        49,
+        6,
+        18,
+        65,
+        81,
+        7,
+        97,
+        113,
+        19,
+        34,
+        50,
+        129,
+        8,
+        20,
+        66,
+        145,
+        161,
+        177,
+        193,
+        9,
+        35,
+        51,
+        82,
+        240,
+        21,
+        98,
+        114,
+        209,
+        10,
+        22,
+        36,
+        52,
+        225,
+        37,
+        241,
+        23,
+        24,
+        25,
+        26,
+        38,
+        39,
+        40,
+        41,
+        42,
+        53,
+        54,
+        55,
+        56,
+        57,
+        58,
+        67,
+        68,
+        69,
+        70,
+        71,
+        72,
+        73,
+        74,
+        83,
+        84,
+        85,
+        86,
+        87,
+        88,
+        89,
+        90,
+        99,
+        100,
+        101,
+        102,
+        103,
+        104,
+        105,
+        106,
+        115,
+        116,
+        117,
+        118,
+        119,
+        120,
+        121,
+        122,
+        130,
+        131,
+        132,
+        133,
+        134,
+        135,
+        136,
+        137,
+        138,
+        146,
+        147,
+        148,
+        149,
+        150,
+        151,
+        152,
+        153,
+        154,
+        162,
+        163,
+        164,
+        165,
+        166,
+        167,
+        168,
+        169,
+        170,
+        178,
+        179,
+        180,
+        181,
+        182,
+        183,
+        184,
+        185,
+        186,
+        194,
+        195,
+        196,
+        197,
+        198,
+        199,
+        200,
+        201,
+        202,
+        210,
+        211,
+        212,
+        213,
+        214,
+        215,
+        216,
+        217,
+        218,
+        226,
+        227,
+        228,
+        229,
+        230,
+        231,
+        232,
+        233,
+        234,
+        242,
+        243,
+        244,
+        245,
+        246,
+        247,
+        248,
+        249,
+        250
+      ];
+      function initQuantTables(sf) {
+        var YQT = [
+          16,
+          11,
+          10,
+          16,
+          24,
+          40,
+          51,
+          61,
+          12,
+          12,
+          14,
+          19,
+          26,
+          58,
+          60,
+          55,
+          14,
+          13,
+          16,
+          24,
+          40,
+          57,
+          69,
+          56,
+          14,
+          17,
+          22,
+          29,
+          51,
+          87,
+          80,
+          62,
+          18,
+          22,
+          37,
+          56,
+          68,
+          109,
+          103,
+          77,
+          24,
+          35,
+          55,
+          64,
+          81,
+          104,
+          113,
+          92,
+          49,
+          64,
+          78,
+          87,
+          103,
+          121,
+          120,
+          101,
+          72,
+          92,
+          95,
+          98,
+          112,
+          100,
+          103,
+          99
+        ];
+        for (var i = 0; i < 64; i++) {
+          var t2 = ffloor((YQT[i] * sf + 50) / 100);
+          if (t2 < 1) {
+            t2 = 1;
+          } else if (t2 > 255) {
+            t2 = 255;
+          }
+          YTable[ZigZag[i]] = t2;
+        }
+        var UVQT = [
+          17,
+          18,
+          24,
+          47,
+          99,
+          99,
+          99,
+          99,
+          18,
+          21,
+          26,
+          66,
+          99,
+          99,
+          99,
+          99,
+          24,
+          26,
+          56,
+          99,
+          99,
+          99,
+          99,
+          99,
+          47,
+          66,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99
+        ];
+        for (var j = 0; j < 64; j++) {
+          var u = ffloor((UVQT[j] * sf + 50) / 100);
+          if (u < 1) {
+            u = 1;
+          } else if (u > 255) {
+            u = 255;
+          }
+          UVTable[ZigZag[j]] = u;
+        }
+        var aasf = [
+          1,
+          1.387039845,
+          1.306562965,
+          1.175875602,
+          1,
+          0.785694958,
+          0.5411961,
+          0.275899379
+        ];
+        var k = 0;
+        for (var row = 0; row < 8; row++) {
+          for (var col = 0; col < 8; col++) {
+            fdtbl_Y[k] = 1 / (YTable[ZigZag[k]] * aasf[row] * aasf[col] * 8);
+            fdtbl_UV[k] = 1 / (UVTable[ZigZag[k]] * aasf[row] * aasf[col] * 8);
+            k++;
+          }
+        }
+      }
+      function computeHuffmanTbl(nrcodes, std_table) {
+        var codevalue = 0;
+        var pos_in_table = 0;
+        var HT = new Array();
+        for (var k = 1; k <= 16; k++) {
+          for (var j = 1; j <= nrcodes[k]; j++) {
+            HT[std_table[pos_in_table]] = [];
+            HT[std_table[pos_in_table]][0] = codevalue;
+            HT[std_table[pos_in_table]][1] = k;
+            pos_in_table++;
+            codevalue++;
+          }
+          codevalue *= 2;
+        }
+        return HT;
+      }
+      function initHuffmanTbl() {
+        YDC_HT = computeHuffmanTbl(std_dc_luminance_nrcodes, std_dc_luminance_values);
+        UVDC_HT = computeHuffmanTbl(std_dc_chrominance_nrcodes, std_dc_chrominance_values);
+        YAC_HT = computeHuffmanTbl(std_ac_luminance_nrcodes, std_ac_luminance_values);
+        UVAC_HT = computeHuffmanTbl(std_ac_chrominance_nrcodes, std_ac_chrominance_values);
+      }
+      function initCategoryNumber() {
+        var nrlower = 1;
+        var nrupper = 2;
+        for (var cat = 1; cat <= 15; cat++) {
+          for (var nr = nrlower; nr < nrupper; nr++) {
+            category[32767 + nr] = cat;
+            bitcode[32767 + nr] = [];
+            bitcode[32767 + nr][1] = cat;
+            bitcode[32767 + nr][0] = nr;
+          }
+          for (var nrneg = -(nrupper - 1); nrneg <= -nrlower; nrneg++) {
+            category[32767 + nrneg] = cat;
+            bitcode[32767 + nrneg] = [];
+            bitcode[32767 + nrneg][1] = cat;
+            bitcode[32767 + nrneg][0] = nrupper - 1 + nrneg;
+          }
+          nrlower <<= 1;
+          nrupper <<= 1;
+        }
+      }
+      function initRGBYUVTable() {
+        for (var i = 0; i < 256; i++) {
+          RGB_YUV_TABLE[i] = 19595 * i;
+          RGB_YUV_TABLE[i + 256 >> 0] = 38470 * i;
+          RGB_YUV_TABLE[i + 512 >> 0] = 7471 * i + 32768;
+          RGB_YUV_TABLE[i + 768 >> 0] = -11059 * i;
+          RGB_YUV_TABLE[i + 1024 >> 0] = -21709 * i;
+          RGB_YUV_TABLE[i + 1280 >> 0] = 32768 * i + 8421375;
+          RGB_YUV_TABLE[i + 1536 >> 0] = -27439 * i;
+          RGB_YUV_TABLE[i + 1792 >> 0] = -5329 * i;
+        }
+      }
+      function writeBits(bs) {
+        var value = bs[0];
+        var posval = bs[1] - 1;
+        while (posval >= 0) {
+          if (value & 1 << posval) {
+            bytenew |= 1 << bytepos;
+          }
+          posval--;
+          bytepos--;
+          if (bytepos < 0) {
+            if (bytenew == 255) {
+              writeByte(255);
+              writeByte(0);
+            } else {
+              writeByte(bytenew);
+            }
+            bytepos = 7;
+            bytenew = 0;
+          }
+        }
+      }
+      function writeByte(value) {
+        byteout.push(value);
+      }
+      function writeWord(value) {
+        writeByte(value >> 8 & 255);
+        writeByte(value & 255);
+      }
+      function fDCTQuant(data, fdtbl) {
+        var d0, d1, d2, d3, d4, d5, d6, d7;
+        var dataOff = 0;
+        var i;
+        var I8 = 8;
+        var I64 = 64;
+        for (i = 0; i < I8; ++i) {
+          d0 = data[dataOff];
+          d1 = data[dataOff + 1];
+          d2 = data[dataOff + 2];
+          d3 = data[dataOff + 3];
+          d4 = data[dataOff + 4];
+          d5 = data[dataOff + 5];
+          d6 = data[dataOff + 6];
+          d7 = data[dataOff + 7];
+          var tmp0 = d0 + d7;
+          var tmp7 = d0 - d7;
+          var tmp1 = d1 + d6;
+          var tmp6 = d1 - d6;
+          var tmp2 = d2 + d5;
+          var tmp5 = d2 - d5;
+          var tmp3 = d3 + d4;
+          var tmp4 = d3 - d4;
+          var tmp10 = tmp0 + tmp3;
+          var tmp13 = tmp0 - tmp3;
+          var tmp11 = tmp1 + tmp2;
+          var tmp12 = tmp1 - tmp2;
+          data[dataOff] = tmp10 + tmp11;
+          data[dataOff + 4] = tmp10 - tmp11;
+          var z1 = (tmp12 + tmp13) * 0.707106781;
+          data[dataOff + 2] = tmp13 + z1;
+          data[dataOff + 6] = tmp13 - z1;
+          tmp10 = tmp4 + tmp5;
+          tmp11 = tmp5 + tmp6;
+          tmp12 = tmp6 + tmp7;
+          var z52 = (tmp10 - tmp12) * 0.382683433;
+          var z24 = 0.5411961 * tmp10 + z52;
+          var z42 = 1.306562965 * tmp12 + z52;
+          var z32 = tmp11 * 0.707106781;
+          var z112 = tmp7 + z32;
+          var z132 = tmp7 - z32;
+          data[dataOff + 5] = z132 + z24;
+          data[dataOff + 3] = z132 - z24;
+          data[dataOff + 1] = z112 + z42;
+          data[dataOff + 7] = z112 - z42;
+          dataOff += 8;
+        }
+        dataOff = 0;
+        for (i = 0; i < I8; ++i) {
+          d0 = data[dataOff];
+          d1 = data[dataOff + 8];
+          d2 = data[dataOff + 16];
+          d3 = data[dataOff + 24];
+          d4 = data[dataOff + 32];
+          d5 = data[dataOff + 40];
+          d6 = data[dataOff + 48];
+          d7 = data[dataOff + 56];
+          var tmp0p2 = d0 + d7;
+          var tmp7p2 = d0 - d7;
+          var tmp1p2 = d1 + d6;
+          var tmp6p2 = d1 - d6;
+          var tmp2p2 = d2 + d5;
+          var tmp5p2 = d2 - d5;
+          var tmp3p2 = d3 + d4;
+          var tmp4p2 = d3 - d4;
+          var tmp10p2 = tmp0p2 + tmp3p2;
+          var tmp13p2 = tmp0p2 - tmp3p2;
+          var tmp11p2 = tmp1p2 + tmp2p2;
+          var tmp12p2 = tmp1p2 - tmp2p2;
+          data[dataOff] = tmp10p2 + tmp11p2;
+          data[dataOff + 32] = tmp10p2 - tmp11p2;
+          var z1p2 = (tmp12p2 + tmp13p2) * 0.707106781;
+          data[dataOff + 16] = tmp13p2 + z1p2;
+          data[dataOff + 48] = tmp13p2 - z1p2;
+          tmp10p2 = tmp4p2 + tmp5p2;
+          tmp11p2 = tmp5p2 + tmp6p2;
+          tmp12p2 = tmp6p2 + tmp7p2;
+          var z5p2 = (tmp10p2 - tmp12p2) * 0.382683433;
+          var z2p2 = 0.5411961 * tmp10p2 + z5p2;
+          var z4p2 = 1.306562965 * tmp12p2 + z5p2;
+          var z3p2 = tmp11p2 * 0.707106781;
+          var z11p2 = tmp7p2 + z3p2;
+          var z13p2 = tmp7p2 - z3p2;
+          data[dataOff + 40] = z13p2 + z2p2;
+          data[dataOff + 24] = z13p2 - z2p2;
+          data[dataOff + 8] = z11p2 + z4p2;
+          data[dataOff + 56] = z11p2 - z4p2;
+          dataOff++;
+        }
+        var fDCTQuant2;
+        for (i = 0; i < I64; ++i) {
+          fDCTQuant2 = data[i] * fdtbl[i];
+          outputfDCTQuant[i] = fDCTQuant2 > 0 ? fDCTQuant2 + 0.5 | 0 : fDCTQuant2 - 0.5 | 0;
+        }
+        return outputfDCTQuant;
+      }
+      function writeAPP0() {
+        writeWord(65504);
+        writeWord(16);
+        writeByte(74);
+        writeByte(70);
+        writeByte(73);
+        writeByte(70);
+        writeByte(0);
+        writeByte(1);
+        writeByte(1);
+        writeByte(0);
+        writeWord(1);
+        writeWord(1);
+        writeByte(0);
+        writeByte(0);
+      }
+      function writeAPP1(exifBuffer) {
+        if (!exifBuffer) return;
+        writeWord(65505);
+        if (exifBuffer[0] === 69 && exifBuffer[1] === 120 && exifBuffer[2] === 105 && exifBuffer[3] === 102) {
+          writeWord(exifBuffer.length + 2);
+        } else {
+          writeWord(exifBuffer.length + 5 + 2);
+          writeByte(69);
+          writeByte(120);
+          writeByte(105);
+          writeByte(102);
+          writeByte(0);
+        }
+        for (var i = 0; i < exifBuffer.length; i++) {
+          writeByte(exifBuffer[i]);
+        }
+      }
+      function writeSOF0(width, height) {
+        writeWord(65472);
+        writeWord(17);
+        writeByte(8);
+        writeWord(height);
+        writeWord(width);
+        writeByte(3);
+        writeByte(1);
+        writeByte(17);
+        writeByte(0);
+        writeByte(2);
+        writeByte(17);
+        writeByte(1);
+        writeByte(3);
+        writeByte(17);
+        writeByte(1);
+      }
+      function writeDQT() {
+        writeWord(65499);
+        writeWord(132);
+        writeByte(0);
+        for (var i = 0; i < 64; i++) {
+          writeByte(YTable[i]);
+        }
+        writeByte(1);
+        for (var j = 0; j < 64; j++) {
+          writeByte(UVTable[j]);
+        }
+      }
+      function writeDHT() {
+        writeWord(65476);
+        writeWord(418);
+        writeByte(0);
+        for (var i = 0; i < 16; i++) {
+          writeByte(std_dc_luminance_nrcodes[i + 1]);
+        }
+        for (var j = 0; j <= 11; j++) {
+          writeByte(std_dc_luminance_values[j]);
+        }
+        writeByte(16);
+        for (var k = 0; k < 16; k++) {
+          writeByte(std_ac_luminance_nrcodes[k + 1]);
+        }
+        for (var l = 0; l <= 161; l++) {
+          writeByte(std_ac_luminance_values[l]);
+        }
+        writeByte(1);
+        for (var m = 0; m < 16; m++) {
+          writeByte(std_dc_chrominance_nrcodes[m + 1]);
+        }
+        for (var n = 0; n <= 11; n++) {
+          writeByte(std_dc_chrominance_values[n]);
+        }
+        writeByte(17);
+        for (var o = 0; o < 16; o++) {
+          writeByte(std_ac_chrominance_nrcodes[o + 1]);
+        }
+        for (var p2 = 0; p2 <= 161; p2++) {
+          writeByte(std_ac_chrominance_values[p2]);
+        }
+      }
+      function writeCOM(comments) {
+        if (typeof comments === "undefined" || comments.constructor !== Array) return;
+        comments.forEach((e) => {
+          if (typeof e !== "string") return;
+          writeWord(65534);
+          var l = e.length;
+          writeWord(l + 2);
+          var i;
+          for (i = 0; i < l; i++)
+            writeByte(e.charCodeAt(i));
+        });
+      }
+      function writeSOS() {
+        writeWord(65498);
+        writeWord(12);
+        writeByte(3);
+        writeByte(1);
+        writeByte(0);
+        writeByte(2);
+        writeByte(17);
+        writeByte(3);
+        writeByte(17);
+        writeByte(0);
+        writeByte(63);
+        writeByte(0);
+      }
+      function processDU(CDU, fdtbl, DC, HTDC, HTAC) {
+        var EOB = HTAC[0];
+        var M16zeroes = HTAC[240];
+        var pos;
+        var I16 = 16;
+        var I63 = 63;
+        var I64 = 64;
+        var DU_DCT = fDCTQuant(CDU, fdtbl);
+        for (var j = 0; j < I64; ++j) {
+          DU[ZigZag[j]] = DU_DCT[j];
+        }
+        var Diff = DU[0] - DC;
+        DC = DU[0];
+        if (Diff == 0) {
+          writeBits(HTDC[0]);
+        } else {
+          pos = 32767 + Diff;
+          writeBits(HTDC[category[pos]]);
+          writeBits(bitcode[pos]);
+        }
+        var end0pos = 63;
+        for (; end0pos > 0 && DU[end0pos] == 0; end0pos--) {
+        }
+        ;
+        if (end0pos == 0) {
+          writeBits(EOB);
+          return DC;
+        }
+        var i = 1;
+        var lng;
+        while (i <= end0pos) {
+          var startpos = i;
+          for (; DU[i] == 0 && i <= end0pos; ++i) {
+          }
+          var nrzeroes = i - startpos;
+          if (nrzeroes >= I16) {
+            lng = nrzeroes >> 4;
+            for (var nrmarker = 1; nrmarker <= lng; ++nrmarker)
+              writeBits(M16zeroes);
+            nrzeroes = nrzeroes & 15;
+          }
+          pos = 32767 + DU[i];
+          writeBits(HTAC[(nrzeroes << 4) + category[pos]]);
+          writeBits(bitcode[pos]);
+          i++;
+        }
+        if (end0pos != I63) {
+          writeBits(EOB);
+        }
+        return DC;
+      }
+      function initCharLookupTable() {
+        var sfcc = String.fromCharCode;
+        for (var i = 0; i < 256; i++) {
+          clt[i] = sfcc(i);
+        }
+      }
+      this.encode = function(image, quality2) {
+        var time_start = (/* @__PURE__ */ new Date()).getTime();
+        if (quality2) setQuality(quality2);
+        byteout = new Array();
+        bytenew = 0;
+        bytepos = 7;
+        writeWord(65496);
+        writeAPP0();
+        writeCOM(image.comments);
+        writeAPP1(image.exifBuffer);
+        writeDQT();
+        writeSOF0(image.width, image.height);
+        writeDHT();
+        writeSOS();
+        var DCY = 0;
+        var DCU = 0;
+        var DCV = 0;
+        bytenew = 0;
+        bytepos = 7;
+        this.encode.displayName = "_encode_";
+        var imageData = image.data;
+        var width = image.width;
+        var height = image.height;
+        var quadWidth = width * 4;
+        var tripleWidth = width * 3;
+        var x, y = 0;
+        var r, g, b2;
+        var start, p2, col, row, pos;
+        while (y < height) {
+          x = 0;
+          while (x < quadWidth) {
+            start = quadWidth * y + x;
+            p2 = start;
+            col = -1;
+            row = 0;
+            for (pos = 0; pos < 64; pos++) {
+              row = pos >> 3;
+              col = (pos & 7) * 4;
+              p2 = start + row * quadWidth + col;
+              if (y + row >= height) {
+                p2 -= quadWidth * (y + 1 + row - height);
+              }
+              if (x + col >= quadWidth) {
+                p2 -= x + col - quadWidth + 4;
+              }
+              r = imageData[p2++];
+              g = imageData[p2++];
+              b2 = imageData[p2++];
+              YDU[pos] = (RGB_YUV_TABLE[r] + RGB_YUV_TABLE[g + 256 >> 0] + RGB_YUV_TABLE[b2 + 512 >> 0] >> 16) - 128;
+              UDU[pos] = (RGB_YUV_TABLE[r + 768 >> 0] + RGB_YUV_TABLE[g + 1024 >> 0] + RGB_YUV_TABLE[b2 + 1280 >> 0] >> 16) - 128;
+              VDU[pos] = (RGB_YUV_TABLE[r + 1280 >> 0] + RGB_YUV_TABLE[g + 1536 >> 0] + RGB_YUV_TABLE[b2 + 1792 >> 0] >> 16) - 128;
+            }
+            DCY = processDU(YDU, fdtbl_Y, DCY, YDC_HT, YAC_HT);
+            DCU = processDU(UDU, fdtbl_UV, DCU, UVDC_HT, UVAC_HT);
+            DCV = processDU(VDU, fdtbl_UV, DCV, UVDC_HT, UVAC_HT);
+            x += 32;
+          }
+          y += 8;
+        }
+        if (bytepos >= 0) {
+          var fillbits = [];
+          fillbits[1] = bytepos + 1;
+          fillbits[0] = (1 << bytepos + 1) - 1;
+          writeBits(fillbits);
+        }
+        writeWord(65497);
+        if (typeof module === "undefined") return new Uint8Array(byteout);
+        return Buffer.from(byteout);
+        var jpegDataUri = "data:image/jpeg;base64," + btoa(byteout.join(""));
+        byteout = [];
+        var duration = (/* @__PURE__ */ new Date()).getTime() - time_start;
+        return jpegDataUri;
+      };
+      function setQuality(quality2) {
+        if (quality2 <= 0) {
+          quality2 = 1;
+        }
+        if (quality2 > 100) {
+          quality2 = 100;
+        }
+        if (currentQuality == quality2) return;
+        var sf = 0;
+        if (quality2 < 50) {
+          sf = Math.floor(5e3 / quality2);
+        } else {
+          sf = Math.floor(200 - quality2 * 2);
+        }
+        initQuantTables(sf);
+        currentQuality = quality2;
+      }
+      function init() {
+        var time_start = (/* @__PURE__ */ new Date()).getTime();
+        if (!quality) quality = 50;
+        initCharLookupTable();
+        initHuffmanTbl();
+        initCategoryNumber();
+        initRGBYUVTable();
+        setQuality(quality);
+        var duration = (/* @__PURE__ */ new Date()).getTime() - time_start;
+      }
+      init();
+    }
+    if (typeof module !== "undefined") {
+      module.exports = encode2;
+    } else if (typeof window !== "undefined") {
+      window["jpeg-js"] = window["jpeg-js"] || {};
+      window["jpeg-js"].encode = encode2;
+    }
+    function encode2(imgData, qu) {
+      if (typeof qu === "undefined") qu = 50;
+      var encoder = new JPEGEncoder(qu);
+      var data = encoder.encode(imgData, qu);
+      return {
+        data,
+        width: imgData.width,
+        height: imgData.height
+      };
+    }
+  }
+});
+
+// ../../node_modules/.pnpm/jpeg-js@0.4.4/node_modules/jpeg-js/lib/decoder.js
+var require_decoder = __commonJS({
+  "../../node_modules/.pnpm/jpeg-js@0.4.4/node_modules/jpeg-js/lib/decoder.js"(exports, module) {
+    var JpegImage = (function jpegImage() {
+      "use strict";
+      var dctZigZag = new Int32Array([
+        0,
+        1,
+        8,
+        16,
+        9,
+        2,
+        3,
+        10,
+        17,
+        24,
+        32,
+        25,
+        18,
+        11,
+        4,
+        5,
+        12,
+        19,
+        26,
+        33,
+        40,
+        48,
+        41,
+        34,
+        27,
+        20,
+        13,
+        6,
+        7,
+        14,
+        21,
+        28,
+        35,
+        42,
+        49,
+        56,
+        57,
+        50,
+        43,
+        36,
+        29,
+        22,
+        15,
+        23,
+        30,
+        37,
+        44,
+        51,
+        58,
+        59,
+        52,
+        45,
+        38,
+        31,
+        39,
+        46,
+        53,
+        60,
+        61,
+        54,
+        47,
+        55,
+        62,
+        63
+      ]);
+      var dctCos1 = 4017;
+      var dctSin1 = 799;
+      var dctCos3 = 3406;
+      var dctSin3 = 2276;
+      var dctCos6 = 1567;
+      var dctSin6 = 3784;
+      var dctSqrt2 = 5793;
+      var dctSqrt1d2 = 2896;
+      function constructor() {
+      }
+      function buildHuffmanTable(codeLengths, values2) {
+        var k = 0, code = [], i, j, length = 16;
+        while (length > 0 && !codeLengths[length - 1])
+          length--;
+        code.push({ children: [], index: 0 });
+        var p2 = code[0], q;
+        for (i = 0; i < length; i++) {
+          for (j = 0; j < codeLengths[i]; j++) {
+            p2 = code.pop();
+            p2.children[p2.index] = values2[k];
+            while (p2.index > 0) {
+              if (code.length === 0)
+                throw new Error("Could not recreate Huffman Table");
+              p2 = code.pop();
+            }
+            p2.index++;
+            code.push(p2);
+            while (code.length <= i) {
+              code.push(q = { children: [], index: 0 });
+              p2.children[p2.index] = q.children;
+              p2 = q;
+            }
+            k++;
+          }
+          if (i + 1 < length) {
+            code.push(q = { children: [], index: 0 });
+            p2.children[p2.index] = q.children;
+            p2 = q;
+          }
+        }
+        return code[0].children;
+      }
+      function decodeScan(data, offset, frame, components, resetInterval, spectralStart, spectralEnd, successivePrev, successive, opts) {
+        var precision = frame.precision;
+        var samplesPerLine = frame.samplesPerLine;
+        var scanLines = frame.scanLines;
+        var mcusPerLine = frame.mcusPerLine;
+        var progressive = frame.progressive;
+        var maxH = frame.maxH, maxV = frame.maxV;
+        var startOffset = offset, bitsData = 0, bitsCount = 0;
+        function readBit() {
+          if (bitsCount > 0) {
+            bitsCount--;
+            return bitsData >> bitsCount & 1;
+          }
+          bitsData = data[offset++];
+          if (bitsData == 255) {
+            var nextByte = data[offset++];
+            if (nextByte) {
+              throw new Error("unexpected marker: " + (bitsData << 8 | nextByte).toString(16));
+            }
+          }
+          bitsCount = 7;
+          return bitsData >>> 7;
+        }
+        function decodeHuffman(tree) {
+          var node = tree, bit;
+          while ((bit = readBit()) !== null) {
+            node = node[bit];
+            if (typeof node === "number")
+              return node;
+            if (typeof node !== "object")
+              throw new Error("invalid huffman sequence");
+          }
+          return null;
+        }
+        function receive(length) {
+          var n2 = 0;
+          while (length > 0) {
+            var bit = readBit();
+            if (bit === null) return;
+            n2 = n2 << 1 | bit;
+            length--;
+          }
+          return n2;
+        }
+        function receiveAndExtend(length) {
+          var n2 = receive(length);
+          if (n2 >= 1 << length - 1)
+            return n2;
+          return n2 + (-1 << length) + 1;
+        }
+        function decodeBaseline(component2, zz) {
+          var t2 = decodeHuffman(component2.huffmanTableDC);
+          var diff = t2 === 0 ? 0 : receiveAndExtend(t2);
+          zz[0] = component2.pred += diff;
+          var k2 = 1;
+          while (k2 < 64) {
+            var rs = decodeHuffman(component2.huffmanTableAC);
+            var s = rs & 15, r = rs >> 4;
+            if (s === 0) {
+              if (r < 15)
+                break;
+              k2 += 16;
+              continue;
+            }
+            k2 += r;
+            var z24 = dctZigZag[k2];
+            zz[z24] = receiveAndExtend(s);
+            k2++;
+          }
+        }
+        function decodeDCFirst(component2, zz) {
+          var t2 = decodeHuffman(component2.huffmanTableDC);
+          var diff = t2 === 0 ? 0 : receiveAndExtend(t2) << successive;
+          zz[0] = component2.pred += diff;
+        }
+        function decodeDCSuccessive(component2, zz) {
+          zz[0] |= readBit() << successive;
+        }
+        var eobrun = 0;
+        function decodeACFirst(component2, zz) {
+          if (eobrun > 0) {
+            eobrun--;
+            return;
+          }
+          var k2 = spectralStart, e = spectralEnd;
+          while (k2 <= e) {
+            var rs = decodeHuffman(component2.huffmanTableAC);
+            var s = rs & 15, r = rs >> 4;
+            if (s === 0) {
+              if (r < 15) {
+                eobrun = receive(r) + (1 << r) - 1;
+                break;
+              }
+              k2 += 16;
+              continue;
+            }
+            k2 += r;
+            var z24 = dctZigZag[k2];
+            zz[z24] = receiveAndExtend(s) * (1 << successive);
+            k2++;
+          }
+        }
+        var successiveACState = 0, successiveACNextValue;
+        function decodeACSuccessive(component2, zz) {
+          var k2 = spectralStart, e = spectralEnd, r = 0;
+          while (k2 <= e) {
+            var z24 = dctZigZag[k2];
+            var direction = zz[z24] < 0 ? -1 : 1;
+            switch (successiveACState) {
+              case 0:
+                var rs = decodeHuffman(component2.huffmanTableAC);
+                var s = rs & 15, r = rs >> 4;
+                if (s === 0) {
+                  if (r < 15) {
+                    eobrun = receive(r) + (1 << r);
+                    successiveACState = 4;
+                  } else {
+                    r = 16;
+                    successiveACState = 1;
+                  }
+                } else {
+                  if (s !== 1)
+                    throw new Error("invalid ACn encoding");
+                  successiveACNextValue = receiveAndExtend(s);
+                  successiveACState = r ? 2 : 3;
+                }
+                continue;
+              case 1:
+              // skipping r zero items
+              case 2:
+                if (zz[z24])
+                  zz[z24] += (readBit() << successive) * direction;
+                else {
+                  r--;
+                  if (r === 0)
+                    successiveACState = successiveACState == 2 ? 3 : 0;
+                }
+                break;
+              case 3:
+                if (zz[z24])
+                  zz[z24] += (readBit() << successive) * direction;
+                else {
+                  zz[z24] = successiveACNextValue << successive;
+                  successiveACState = 0;
+                }
+                break;
+              case 4:
+                if (zz[z24])
+                  zz[z24] += (readBit() << successive) * direction;
+                break;
+            }
+            k2++;
+          }
+          if (successiveACState === 4) {
+            eobrun--;
+            if (eobrun === 0)
+              successiveACState = 0;
+          }
+        }
+        function decodeMcu(component2, decode2, mcu2, row, col) {
+          var mcuRow = mcu2 / mcusPerLine | 0;
+          var mcuCol = mcu2 % mcusPerLine;
+          var blockRow = mcuRow * component2.v + row;
+          var blockCol = mcuCol * component2.h + col;
+          if (component2.blocks[blockRow] === void 0 && opts.tolerantDecoding)
+            return;
+          decode2(component2, component2.blocks[blockRow][blockCol]);
+        }
+        function decodeBlock(component2, decode2, mcu2) {
+          var blockRow = mcu2 / component2.blocksPerLine | 0;
+          var blockCol = mcu2 % component2.blocksPerLine;
+          if (component2.blocks[blockRow] === void 0 && opts.tolerantDecoding)
+            return;
+          decode2(component2, component2.blocks[blockRow][blockCol]);
+        }
+        var componentsLength = components.length;
+        var component, i, j, k, n;
+        var decodeFn;
+        if (progressive) {
+          if (spectralStart === 0)
+            decodeFn = successivePrev === 0 ? decodeDCFirst : decodeDCSuccessive;
+          else
+            decodeFn = successivePrev === 0 ? decodeACFirst : decodeACSuccessive;
+        } else {
+          decodeFn = decodeBaseline;
+        }
+        var mcu = 0, marker;
+        var mcuExpected;
+        if (componentsLength == 1) {
+          mcuExpected = components[0].blocksPerLine * components[0].blocksPerColumn;
+        } else {
+          mcuExpected = mcusPerLine * frame.mcusPerColumn;
+        }
+        if (!resetInterval) resetInterval = mcuExpected;
+        var h, v;
+        while (mcu < mcuExpected) {
+          for (i = 0; i < componentsLength; i++)
+            components[i].pred = 0;
+          eobrun = 0;
+          if (componentsLength == 1) {
+            component = components[0];
+            for (n = 0; n < resetInterval; n++) {
+              decodeBlock(component, decodeFn, mcu);
+              mcu++;
+            }
+          } else {
+            for (n = 0; n < resetInterval; n++) {
+              for (i = 0; i < componentsLength; i++) {
+                component = components[i];
+                h = component.h;
+                v = component.v;
+                for (j = 0; j < v; j++) {
+                  for (k = 0; k < h; k++) {
+                    decodeMcu(component, decodeFn, mcu, j, k);
+                  }
+                }
+              }
+              mcu++;
+              if (mcu === mcuExpected) break;
+            }
+          }
+          if (mcu === mcuExpected) {
+            do {
+              if (data[offset] === 255) {
+                if (data[offset + 1] !== 0) {
+                  break;
+                }
+              }
+              offset += 1;
+            } while (offset < data.length - 2);
+          }
+          bitsCount = 0;
+          marker = data[offset] << 8 | data[offset + 1];
+          if (marker < 65280) {
+            throw new Error("marker was not found");
+          }
+          if (marker >= 65488 && marker <= 65495) {
+            offset += 2;
+          } else
+            break;
+        }
+        return offset - startOffset;
+      }
+      function buildComponentData(frame, component) {
+        var lines = [];
+        var blocksPerLine = component.blocksPerLine;
+        var blocksPerColumn = component.blocksPerColumn;
+        var samplesPerLine = blocksPerLine << 3;
+        var R = new Int32Array(64), r = new Uint8Array(64);
+        function quantizeAndInverse(zz, dataOut, dataIn) {
+          var qt = component.quantizationTable;
+          var v0, v1, v2, v3, v4, v5, v6, v7, t2;
+          var p2 = dataIn;
+          var i2;
+          for (i2 = 0; i2 < 64; i2++)
+            p2[i2] = zz[i2] * qt[i2];
+          for (i2 = 0; i2 < 8; ++i2) {
+            var row = 8 * i2;
+            if (p2[1 + row] == 0 && p2[2 + row] == 0 && p2[3 + row] == 0 && p2[4 + row] == 0 && p2[5 + row] == 0 && p2[6 + row] == 0 && p2[7 + row] == 0) {
+              t2 = dctSqrt2 * p2[0 + row] + 512 >> 10;
+              p2[0 + row] = t2;
+              p2[1 + row] = t2;
+              p2[2 + row] = t2;
+              p2[3 + row] = t2;
+              p2[4 + row] = t2;
+              p2[5 + row] = t2;
+              p2[6 + row] = t2;
+              p2[7 + row] = t2;
+              continue;
+            }
+            v0 = dctSqrt2 * p2[0 + row] + 128 >> 8;
+            v1 = dctSqrt2 * p2[4 + row] + 128 >> 8;
+            v2 = p2[2 + row];
+            v3 = p2[6 + row];
+            v4 = dctSqrt1d2 * (p2[1 + row] - p2[7 + row]) + 128 >> 8;
+            v7 = dctSqrt1d2 * (p2[1 + row] + p2[7 + row]) + 128 >> 8;
+            v5 = p2[3 + row] << 4;
+            v6 = p2[5 + row] << 4;
+            t2 = v0 - v1 + 1 >> 1;
+            v0 = v0 + v1 + 1 >> 1;
+            v1 = t2;
+            t2 = v2 * dctSin6 + v3 * dctCos6 + 128 >> 8;
+            v2 = v2 * dctCos6 - v3 * dctSin6 + 128 >> 8;
+            v3 = t2;
+            t2 = v4 - v6 + 1 >> 1;
+            v4 = v4 + v6 + 1 >> 1;
+            v6 = t2;
+            t2 = v7 + v5 + 1 >> 1;
+            v5 = v7 - v5 + 1 >> 1;
+            v7 = t2;
+            t2 = v0 - v3 + 1 >> 1;
+            v0 = v0 + v3 + 1 >> 1;
+            v3 = t2;
+            t2 = v1 - v2 + 1 >> 1;
+            v1 = v1 + v2 + 1 >> 1;
+            v2 = t2;
+            t2 = v4 * dctSin3 + v7 * dctCos3 + 2048 >> 12;
+            v4 = v4 * dctCos3 - v7 * dctSin3 + 2048 >> 12;
+            v7 = t2;
+            t2 = v5 * dctSin1 + v6 * dctCos1 + 2048 >> 12;
+            v5 = v5 * dctCos1 - v6 * dctSin1 + 2048 >> 12;
+            v6 = t2;
+            p2[0 + row] = v0 + v7;
+            p2[7 + row] = v0 - v7;
+            p2[1 + row] = v1 + v6;
+            p2[6 + row] = v1 - v6;
+            p2[2 + row] = v2 + v5;
+            p2[5 + row] = v2 - v5;
+            p2[3 + row] = v3 + v4;
+            p2[4 + row] = v3 - v4;
+          }
+          for (i2 = 0; i2 < 8; ++i2) {
+            var col = i2;
+            if (p2[1 * 8 + col] == 0 && p2[2 * 8 + col] == 0 && p2[3 * 8 + col] == 0 && p2[4 * 8 + col] == 0 && p2[5 * 8 + col] == 0 && p2[6 * 8 + col] == 0 && p2[7 * 8 + col] == 0) {
+              t2 = dctSqrt2 * dataIn[i2 + 0] + 8192 >> 14;
+              p2[0 * 8 + col] = t2;
+              p2[1 * 8 + col] = t2;
+              p2[2 * 8 + col] = t2;
+              p2[3 * 8 + col] = t2;
+              p2[4 * 8 + col] = t2;
+              p2[5 * 8 + col] = t2;
+              p2[6 * 8 + col] = t2;
+              p2[7 * 8 + col] = t2;
+              continue;
+            }
+            v0 = dctSqrt2 * p2[0 * 8 + col] + 2048 >> 12;
+            v1 = dctSqrt2 * p2[4 * 8 + col] + 2048 >> 12;
+            v2 = p2[2 * 8 + col];
+            v3 = p2[6 * 8 + col];
+            v4 = dctSqrt1d2 * (p2[1 * 8 + col] - p2[7 * 8 + col]) + 2048 >> 12;
+            v7 = dctSqrt1d2 * (p2[1 * 8 + col] + p2[7 * 8 + col]) + 2048 >> 12;
+            v5 = p2[3 * 8 + col];
+            v6 = p2[5 * 8 + col];
+            t2 = v0 - v1 + 1 >> 1;
+            v0 = v0 + v1 + 1 >> 1;
+            v1 = t2;
+            t2 = v2 * dctSin6 + v3 * dctCos6 + 2048 >> 12;
+            v2 = v2 * dctCos6 - v3 * dctSin6 + 2048 >> 12;
+            v3 = t2;
+            t2 = v4 - v6 + 1 >> 1;
+            v4 = v4 + v6 + 1 >> 1;
+            v6 = t2;
+            t2 = v7 + v5 + 1 >> 1;
+            v5 = v7 - v5 + 1 >> 1;
+            v7 = t2;
+            t2 = v0 - v3 + 1 >> 1;
+            v0 = v0 + v3 + 1 >> 1;
+            v3 = t2;
+            t2 = v1 - v2 + 1 >> 1;
+            v1 = v1 + v2 + 1 >> 1;
+            v2 = t2;
+            t2 = v4 * dctSin3 + v7 * dctCos3 + 2048 >> 12;
+            v4 = v4 * dctCos3 - v7 * dctSin3 + 2048 >> 12;
+            v7 = t2;
+            t2 = v5 * dctSin1 + v6 * dctCos1 + 2048 >> 12;
+            v5 = v5 * dctCos1 - v6 * dctSin1 + 2048 >> 12;
+            v6 = t2;
+            p2[0 * 8 + col] = v0 + v7;
+            p2[7 * 8 + col] = v0 - v7;
+            p2[1 * 8 + col] = v1 + v6;
+            p2[6 * 8 + col] = v1 - v6;
+            p2[2 * 8 + col] = v2 + v5;
+            p2[5 * 8 + col] = v2 - v5;
+            p2[3 * 8 + col] = v3 + v4;
+            p2[4 * 8 + col] = v3 - v4;
+          }
+          for (i2 = 0; i2 < 64; ++i2) {
+            var sample2 = 128 + (p2[i2] + 8 >> 4);
+            dataOut[i2] = sample2 < 0 ? 0 : sample2 > 255 ? 255 : sample2;
+          }
+        }
+        requestMemoryAllocation(samplesPerLine * blocksPerColumn * 8);
+        var i, j;
+        for (var blockRow = 0; blockRow < blocksPerColumn; blockRow++) {
+          var scanLine = blockRow << 3;
+          for (i = 0; i < 8; i++)
+            lines.push(new Uint8Array(samplesPerLine));
+          for (var blockCol = 0; blockCol < blocksPerLine; blockCol++) {
+            quantizeAndInverse(component.blocks[blockRow][blockCol], r, R);
+            var offset = 0, sample = blockCol << 3;
+            for (j = 0; j < 8; j++) {
+              var line = lines[scanLine + j];
+              for (i = 0; i < 8; i++)
+                line[sample + i] = r[offset++];
+            }
+          }
+        }
+        return lines;
+      }
+      function clampTo8bit(a) {
+        return a < 0 ? 0 : a > 255 ? 255 : a;
+      }
+      constructor.prototype = {
+        load: function load(path) {
+          var xhr = new XMLHttpRequest();
+          xhr.open("GET", path, true);
+          xhr.responseType = "arraybuffer";
+          xhr.onload = (function() {
+            var data = new Uint8Array(xhr.response || xhr.mozResponseArrayBuffer);
+            this.parse(data);
+            if (this.onload)
+              this.onload();
+          }).bind(this);
+          xhr.send(null);
+        },
+        parse: function parse(data) {
+          var maxResolutionInPixels = this.opts.maxResolutionInMP * 1e3 * 1e3;
+          var offset = 0, length = data.length;
+          function readUint16() {
+            var value = data[offset] << 8 | data[offset + 1];
+            offset += 2;
+            return value;
+          }
+          function readDataBlock() {
+            var length2 = readUint16();
+            var array = data.subarray(offset, offset + length2 - 2);
+            offset += array.length;
+            return array;
+          }
+          function prepareComponents(frame2) {
+            var maxH2 = 1, maxV2 = 1;
+            var component2, componentId2;
+            for (componentId2 in frame2.components) {
+              if (frame2.components.hasOwnProperty(componentId2)) {
+                component2 = frame2.components[componentId2];
+                if (maxH2 < component2.h) maxH2 = component2.h;
+                if (maxV2 < component2.v) maxV2 = component2.v;
+              }
+            }
+            var mcusPerLine = Math.ceil(frame2.samplesPerLine / 8 / maxH2);
+            var mcusPerColumn = Math.ceil(frame2.scanLines / 8 / maxV2);
+            for (componentId2 in frame2.components) {
+              if (frame2.components.hasOwnProperty(componentId2)) {
+                component2 = frame2.components[componentId2];
+                var blocksPerLine = Math.ceil(Math.ceil(frame2.samplesPerLine / 8) * component2.h / maxH2);
+                var blocksPerColumn = Math.ceil(Math.ceil(frame2.scanLines / 8) * component2.v / maxV2);
+                var blocksPerLineForMcu = mcusPerLine * component2.h;
+                var blocksPerColumnForMcu = mcusPerColumn * component2.v;
+                var blocksToAllocate = blocksPerColumnForMcu * blocksPerLineForMcu;
+                var blocks = [];
+                requestMemoryAllocation(blocksToAllocate * 256);
+                for (var i2 = 0; i2 < blocksPerColumnForMcu; i2++) {
+                  var row = [];
+                  for (var j2 = 0; j2 < blocksPerLineForMcu; j2++)
+                    row.push(new Int32Array(64));
+                  blocks.push(row);
+                }
+                component2.blocksPerLine = blocksPerLine;
+                component2.blocksPerColumn = blocksPerColumn;
+                component2.blocks = blocks;
+              }
+            }
+            frame2.maxH = maxH2;
+            frame2.maxV = maxV2;
+            frame2.mcusPerLine = mcusPerLine;
+            frame2.mcusPerColumn = mcusPerColumn;
+          }
+          var jfif = null;
+          var adobe = null;
+          var pixels = null;
+          var frame, resetInterval;
+          var quantizationTables = [], frames = [];
+          var huffmanTablesAC = [], huffmanTablesDC = [];
+          var fileMarker = readUint16();
+          var malformedDataOffset = -1;
+          this.comments = [];
+          if (fileMarker != 65496) {
+            throw new Error("SOI not found");
+          }
+          fileMarker = readUint16();
+          while (fileMarker != 65497) {
+            var i, j, l;
+            switch (fileMarker) {
+              case 65280:
+                break;
+              case 65504:
+              // APP0 (Application Specific)
+              case 65505:
+              // APP1
+              case 65506:
+              // APP2
+              case 65507:
+              // APP3
+              case 65508:
+              // APP4
+              case 65509:
+              // APP5
+              case 65510:
+              // APP6
+              case 65511:
+              // APP7
+              case 65512:
+              // APP8
+              case 65513:
+              // APP9
+              case 65514:
+              // APP10
+              case 65515:
+              // APP11
+              case 65516:
+              // APP12
+              case 65517:
+              // APP13
+              case 65518:
+              // APP14
+              case 65519:
+              // APP15
+              case 65534:
+                var appData = readDataBlock();
+                if (fileMarker === 65534) {
+                  var comment = String.fromCharCode.apply(null, appData);
+                  this.comments.push(comment);
+                }
+                if (fileMarker === 65504) {
+                  if (appData[0] === 74 && appData[1] === 70 && appData[2] === 73 && appData[3] === 70 && appData[4] === 0) {
+                    jfif = {
+                      version: { major: appData[5], minor: appData[6] },
+                      densityUnits: appData[7],
+                      xDensity: appData[8] << 8 | appData[9],
+                      yDensity: appData[10] << 8 | appData[11],
+                      thumbWidth: appData[12],
+                      thumbHeight: appData[13],
+                      thumbData: appData.subarray(14, 14 + 3 * appData[12] * appData[13])
+                    };
+                  }
+                }
+                if (fileMarker === 65505) {
+                  if (appData[0] === 69 && appData[1] === 120 && appData[2] === 105 && appData[3] === 102 && appData[4] === 0) {
+                    this.exifBuffer = appData.subarray(5, appData.length);
+                  }
+                }
+                if (fileMarker === 65518) {
+                  if (appData[0] === 65 && appData[1] === 100 && appData[2] === 111 && appData[3] === 98 && appData[4] === 101 && appData[5] === 0) {
+                    adobe = {
+                      version: appData[6],
+                      flags0: appData[7] << 8 | appData[8],
+                      flags1: appData[9] << 8 | appData[10],
+                      transformCode: appData[11]
+                    };
+                  }
+                }
+                break;
+              case 65499:
+                var quantizationTablesLength = readUint16();
+                var quantizationTablesEnd = quantizationTablesLength + offset - 2;
+                while (offset < quantizationTablesEnd) {
+                  var quantizationTableSpec = data[offset++];
+                  requestMemoryAllocation(64 * 4);
+                  var tableData = new Int32Array(64);
+                  if (quantizationTableSpec >> 4 === 0) {
+                    for (j = 0; j < 64; j++) {
+                      var z24 = dctZigZag[j];
+                      tableData[z24] = data[offset++];
+                    }
+                  } else if (quantizationTableSpec >> 4 === 1) {
+                    for (j = 0; j < 64; j++) {
+                      var z24 = dctZigZag[j];
+                      tableData[z24] = readUint16();
+                    }
+                  } else
+                    throw new Error("DQT: invalid table spec");
+                  quantizationTables[quantizationTableSpec & 15] = tableData;
+                }
+                break;
+              case 65472:
+              // SOF0 (Start of Frame, Baseline DCT)
+              case 65473:
+              // SOF1 (Start of Frame, Extended DCT)
+              case 65474:
+                readUint16();
+                frame = {};
+                frame.extended = fileMarker === 65473;
+                frame.progressive = fileMarker === 65474;
+                frame.precision = data[offset++];
+                frame.scanLines = readUint16();
+                frame.samplesPerLine = readUint16();
+                frame.components = {};
+                frame.componentsOrder = [];
+                var pixelsInFrame = frame.scanLines * frame.samplesPerLine;
+                if (pixelsInFrame > maxResolutionInPixels) {
+                  var exceededAmount = Math.ceil((pixelsInFrame - maxResolutionInPixels) / 1e6);
+                  throw new Error(`maxResolutionInMP limit exceeded by ${exceededAmount}MP`);
+                }
+                var componentsCount = data[offset++], componentId;
+                var maxH = 0, maxV = 0;
+                for (i = 0; i < componentsCount; i++) {
+                  componentId = data[offset];
+                  var h = data[offset + 1] >> 4;
+                  var v = data[offset + 1] & 15;
+                  var qId = data[offset + 2];
+                  if (h <= 0 || v <= 0) {
+                    throw new Error("Invalid sampling factor, expected values above 0");
+                  }
+                  frame.componentsOrder.push(componentId);
+                  frame.components[componentId] = {
+                    h,
+                    v,
+                    quantizationIdx: qId
+                  };
+                  offset += 3;
+                }
+                prepareComponents(frame);
+                frames.push(frame);
+                break;
+              case 65476:
+                var huffmanLength = readUint16();
+                for (i = 2; i < huffmanLength; ) {
+                  var huffmanTableSpec = data[offset++];
+                  var codeLengths = new Uint8Array(16);
+                  var codeLengthSum = 0;
+                  for (j = 0; j < 16; j++, offset++) {
+                    codeLengthSum += codeLengths[j] = data[offset];
+                  }
+                  requestMemoryAllocation(16 + codeLengthSum);
+                  var huffmanValues = new Uint8Array(codeLengthSum);
+                  for (j = 0; j < codeLengthSum; j++, offset++)
+                    huffmanValues[j] = data[offset];
+                  i += 17 + codeLengthSum;
+                  (huffmanTableSpec >> 4 === 0 ? huffmanTablesDC : huffmanTablesAC)[huffmanTableSpec & 15] = buildHuffmanTable(codeLengths, huffmanValues);
+                }
+                break;
+              case 65501:
+                readUint16();
+                resetInterval = readUint16();
+                break;
+              case 65500:
+                readUint16();
+                readUint16();
+                break;
+              case 65498:
+                var scanLength = readUint16();
+                var selectorsCount = data[offset++];
+                var components = [], component;
+                for (i = 0; i < selectorsCount; i++) {
+                  component = frame.components[data[offset++]];
+                  var tableSpec = data[offset++];
+                  component.huffmanTableDC = huffmanTablesDC[tableSpec >> 4];
+                  component.huffmanTableAC = huffmanTablesAC[tableSpec & 15];
+                  components.push(component);
+                }
+                var spectralStart = data[offset++];
+                var spectralEnd = data[offset++];
+                var successiveApproximation = data[offset++];
+                var processed = decodeScan(
+                  data,
+                  offset,
+                  frame,
+                  components,
+                  resetInterval,
+                  spectralStart,
+                  spectralEnd,
+                  successiveApproximation >> 4,
+                  successiveApproximation & 15,
+                  this.opts
+                );
+                offset += processed;
+                break;
+              case 65535:
+                if (data[offset] !== 255) {
+                  offset--;
+                }
+                break;
+              default:
+                if (data[offset - 3] == 255 && data[offset - 2] >= 192 && data[offset - 2] <= 254) {
+                  offset -= 3;
+                  break;
+                } else if (fileMarker === 224 || fileMarker == 225) {
+                  if (malformedDataOffset !== -1) {
+                    throw new Error(`first unknown JPEG marker at offset ${malformedDataOffset.toString(16)}, second unknown JPEG marker ${fileMarker.toString(16)} at offset ${(offset - 1).toString(16)}`);
+                  }
+                  malformedDataOffset = offset - 1;
+                  const nextOffset = readUint16();
+                  if (data[offset + nextOffset - 2] === 255) {
+                    offset += nextOffset - 2;
+                    break;
+                  }
+                }
+                throw new Error("unknown JPEG marker " + fileMarker.toString(16));
+            }
+            fileMarker = readUint16();
+          }
+          if (frames.length != 1)
+            throw new Error("only single frame JPEGs supported");
+          for (var i = 0; i < frames.length; i++) {
+            var cp = frames[i].components;
+            for (var j in cp) {
+              cp[j].quantizationTable = quantizationTables[cp[j].quantizationIdx];
+              delete cp[j].quantizationIdx;
+            }
+          }
+          this.width = frame.samplesPerLine;
+          this.height = frame.scanLines;
+          this.jfif = jfif;
+          this.adobe = adobe;
+          this.components = [];
+          for (var i = 0; i < frame.componentsOrder.length; i++) {
+            var component = frame.components[frame.componentsOrder[i]];
+            this.components.push({
+              lines: buildComponentData(frame, component),
+              scaleX: component.h / frame.maxH,
+              scaleY: component.v / frame.maxV
+            });
+          }
+        },
+        getData: function getData(width, height) {
+          var scaleX = this.width / width, scaleY = this.height / height;
+          var component1, component2, component3, component4;
+          var component1Line, component2Line, component3Line, component4Line;
+          var x, y;
+          var offset = 0;
+          var Y, Cb, Cr, K, C2, M, Ye, R, G, B;
+          var colorTransform;
+          var dataLength = width * height * this.components.length;
+          requestMemoryAllocation(dataLength);
+          var data = new Uint8Array(dataLength);
+          switch (this.components.length) {
+            case 1:
+              component1 = this.components[0];
+              for (y = 0; y < height; y++) {
+                component1Line = component1.lines[0 | y * component1.scaleY * scaleY];
+                for (x = 0; x < width; x++) {
+                  Y = component1Line[0 | x * component1.scaleX * scaleX];
+                  data[offset++] = Y;
+                }
+              }
+              break;
+            case 2:
+              component1 = this.components[0];
+              component2 = this.components[1];
+              for (y = 0; y < height; y++) {
+                component1Line = component1.lines[0 | y * component1.scaleY * scaleY];
+                component2Line = component2.lines[0 | y * component2.scaleY * scaleY];
+                for (x = 0; x < width; x++) {
+                  Y = component1Line[0 | x * component1.scaleX * scaleX];
+                  data[offset++] = Y;
+                  Y = component2Line[0 | x * component2.scaleX * scaleX];
+                  data[offset++] = Y;
+                }
+              }
+              break;
+            case 3:
+              colorTransform = true;
+              if (this.adobe && this.adobe.transformCode)
+                colorTransform = true;
+              else if (typeof this.opts.colorTransform !== "undefined")
+                colorTransform = !!this.opts.colorTransform;
+              component1 = this.components[0];
+              component2 = this.components[1];
+              component3 = this.components[2];
+              for (y = 0; y < height; y++) {
+                component1Line = component1.lines[0 | y * component1.scaleY * scaleY];
+                component2Line = component2.lines[0 | y * component2.scaleY * scaleY];
+                component3Line = component3.lines[0 | y * component3.scaleY * scaleY];
+                for (x = 0; x < width; x++) {
+                  if (!colorTransform) {
+                    R = component1Line[0 | x * component1.scaleX * scaleX];
+                    G = component2Line[0 | x * component2.scaleX * scaleX];
+                    B = component3Line[0 | x * component3.scaleX * scaleX];
+                  } else {
+                    Y = component1Line[0 | x * component1.scaleX * scaleX];
+                    Cb = component2Line[0 | x * component2.scaleX * scaleX];
+                    Cr = component3Line[0 | x * component3.scaleX * scaleX];
+                    R = clampTo8bit(Y + 1.402 * (Cr - 128));
+                    G = clampTo8bit(Y - 0.3441363 * (Cb - 128) - 0.71413636 * (Cr - 128));
+                    B = clampTo8bit(Y + 1.772 * (Cb - 128));
+                  }
+                  data[offset++] = R;
+                  data[offset++] = G;
+                  data[offset++] = B;
+                }
+              }
+              break;
+            case 4:
+              if (!this.adobe)
+                throw new Error("Unsupported color mode (4 components)");
+              colorTransform = false;
+              if (this.adobe && this.adobe.transformCode)
+                colorTransform = true;
+              else if (typeof this.opts.colorTransform !== "undefined")
+                colorTransform = !!this.opts.colorTransform;
+              component1 = this.components[0];
+              component2 = this.components[1];
+              component3 = this.components[2];
+              component4 = this.components[3];
+              for (y = 0; y < height; y++) {
+                component1Line = component1.lines[0 | y * component1.scaleY * scaleY];
+                component2Line = component2.lines[0 | y * component2.scaleY * scaleY];
+                component3Line = component3.lines[0 | y * component3.scaleY * scaleY];
+                component4Line = component4.lines[0 | y * component4.scaleY * scaleY];
+                for (x = 0; x < width; x++) {
+                  if (!colorTransform) {
+                    C2 = component1Line[0 | x * component1.scaleX * scaleX];
+                    M = component2Line[0 | x * component2.scaleX * scaleX];
+                    Ye = component3Line[0 | x * component3.scaleX * scaleX];
+                    K = component4Line[0 | x * component4.scaleX * scaleX];
+                  } else {
+                    Y = component1Line[0 | x * component1.scaleX * scaleX];
+                    Cb = component2Line[0 | x * component2.scaleX * scaleX];
+                    Cr = component3Line[0 | x * component3.scaleX * scaleX];
+                    K = component4Line[0 | x * component4.scaleX * scaleX];
+                    C2 = 255 - clampTo8bit(Y + 1.402 * (Cr - 128));
+                    M = 255 - clampTo8bit(Y - 0.3441363 * (Cb - 128) - 0.71413636 * (Cr - 128));
+                    Ye = 255 - clampTo8bit(Y + 1.772 * (Cb - 128));
+                  }
+                  data[offset++] = 255 - C2;
+                  data[offset++] = 255 - M;
+                  data[offset++] = 255 - Ye;
+                  data[offset++] = 255 - K;
+                }
+              }
+              break;
+            default:
+              throw new Error("Unsupported color mode");
+          }
+          return data;
+        },
+        copyToImageData: function copyToImageData(imageData, formatAsRGBA) {
+          var width = imageData.width, height = imageData.height;
+          var imageDataArray = imageData.data;
+          var data = this.getData(width, height);
+          var i = 0, j = 0, x, y;
+          var Y, K, C2, M, R, G, B;
+          switch (this.components.length) {
+            case 1:
+              for (y = 0; y < height; y++) {
+                for (x = 0; x < width; x++) {
+                  Y = data[i++];
+                  imageDataArray[j++] = Y;
+                  imageDataArray[j++] = Y;
+                  imageDataArray[j++] = Y;
+                  if (formatAsRGBA) {
+                    imageDataArray[j++] = 255;
+                  }
+                }
+              }
+              break;
+            case 3:
+              for (y = 0; y < height; y++) {
+                for (x = 0; x < width; x++) {
+                  R = data[i++];
+                  G = data[i++];
+                  B = data[i++];
+                  imageDataArray[j++] = R;
+                  imageDataArray[j++] = G;
+                  imageDataArray[j++] = B;
+                  if (formatAsRGBA) {
+                    imageDataArray[j++] = 255;
+                  }
+                }
+              }
+              break;
+            case 4:
+              for (y = 0; y < height; y++) {
+                for (x = 0; x < width; x++) {
+                  C2 = data[i++];
+                  M = data[i++];
+                  Y = data[i++];
+                  K = data[i++];
+                  R = 255 - clampTo8bit(C2 * (1 - K / 255) + K);
+                  G = 255 - clampTo8bit(M * (1 - K / 255) + K);
+                  B = 255 - clampTo8bit(Y * (1 - K / 255) + K);
+                  imageDataArray[j++] = R;
+                  imageDataArray[j++] = G;
+                  imageDataArray[j++] = B;
+                  if (formatAsRGBA) {
+                    imageDataArray[j++] = 255;
+                  }
+                }
+              }
+              break;
+            default:
+              throw new Error("Unsupported color mode");
+          }
+        }
+      };
+      var totalBytesAllocated = 0;
+      var maxMemoryUsageBytes = 0;
+      function requestMemoryAllocation(increaseAmount = 0) {
+        var totalMemoryImpactBytes = totalBytesAllocated + increaseAmount;
+        if (totalMemoryImpactBytes > maxMemoryUsageBytes) {
+          var exceededAmount = Math.ceil((totalMemoryImpactBytes - maxMemoryUsageBytes) / 1024 / 1024);
+          throw new Error(`maxMemoryUsageInMB limit exceeded by at least ${exceededAmount}MB`);
+        }
+        totalBytesAllocated = totalMemoryImpactBytes;
+      }
+      constructor.resetMaxMemoryUsage = function(maxMemoryUsageBytes_) {
+        totalBytesAllocated = 0;
+        maxMemoryUsageBytes = maxMemoryUsageBytes_;
+      };
+      constructor.getBytesAllocated = function() {
+        return totalBytesAllocated;
+      };
+      constructor.requestMemoryAllocation = requestMemoryAllocation;
+      return constructor;
+    })();
+    if (typeof module !== "undefined") {
+      module.exports = decode;
+    } else if (typeof window !== "undefined") {
+      window["jpeg-js"] = window["jpeg-js"] || {};
+      window["jpeg-js"].decode = decode;
+    }
+    function decode(jpegData, userOpts = {}) {
+      var defaultOpts = {
+        // "undefined" means "Choose whether to transform colors based on the image’s color model."
+        colorTransform: void 0,
+        useTArray: false,
+        formatAsRGBA: true,
+        tolerantDecoding: true,
+        maxResolutionInMP: 100,
+        // Don't decode more than 100 megapixels
+        maxMemoryUsageInMB: 512
+        // Don't decode if memory footprint is more than 512MB
+      };
+      var opts = { ...defaultOpts, ...userOpts };
+      var arr = new Uint8Array(jpegData);
+      var decoder = new JpegImage();
+      decoder.opts = opts;
+      JpegImage.resetMaxMemoryUsage(opts.maxMemoryUsageInMB * 1024 * 1024);
+      decoder.parse(arr);
+      var channels2 = opts.formatAsRGBA ? 4 : 3;
+      var bytesNeeded = decoder.width * decoder.height * channels2;
+      try {
+        JpegImage.requestMemoryAllocation(bytesNeeded);
+        var image = {
+          width: decoder.width,
+          height: decoder.height,
+          exifBuffer: decoder.exifBuffer,
+          data: opts.useTArray ? new Uint8Array(bytesNeeded) : Buffer.alloc(bytesNeeded)
+        };
+        if (decoder.comments.length > 0) {
+          image["comments"] = decoder.comments;
+        }
+      } catch (err) {
+        if (err instanceof RangeError) {
+          throw new Error("Could not allocate enough memory for the image. Required: " + bytesNeeded);
+        }
+        if (err instanceof ReferenceError) {
+          if (err.message === "Buffer is not defined") {
+            throw new Error("Buffer is not globally defined in this environment. Consider setting useTArray to true");
+          }
+        }
+        throw err;
+      }
+      decoder.copyToImageData(image, opts.formatAsRGBA);
+      return image;
+    }
+  }
+});
+
+// ../../node_modules/.pnpm/jpeg-js@0.4.4/node_modules/jpeg-js/index.js
+var require_jpeg_js = __commonJS({
+  "../../node_modules/.pnpm/jpeg-js@0.4.4/node_modules/jpeg-js/index.js"(exports, module) {
+    var encode2 = require_encoder();
+    var decode = require_decoder();
+    module.exports = {
+      encode: encode2,
+      decode
+    };
   }
 });
 
@@ -11538,12 +13959,13 @@ async function setThreadSettledSql(sql, workspace, threadId, settled) {
   if (!row) throw new DomainError("NOT_FOUND", `thread ${threadId} not found`);
 }
 async function latestHumanWordSql(sql, taskId3) {
-  const [row] = await sql`select m.id, m.created_at
+  const rows2 = await sql`select m.id, m.created_at, m.body
     from messages m join tasks t on t.id = ${taskId3}::uuid and m.workspace_id = t.workspace_id
-    where m.author_kind = 'human' and m.body not like '‹github:connected:%'
+    where m.author_kind = 'human'
       and (m.task_id = t.id or m.thread_id in (select th.id from threads th where th.task_id = t.id))
       and m.created_at > coalesce(t.approved_at, t.updated_at)
-    order by m.created_at desc limit 1`;
+    order by m.created_at desc limit 50`;
+  const row = rows2.find((r) => !isCardOrMarker(r.body));
   return row ? { id: row.id, createdAt: row.created_at } : null;
 }
 function settleMemoryThread(threads, workspace, threadId, settled) {
@@ -11553,7 +13975,7 @@ function settleMemoryThread(threads, workspace, threadId, settled) {
 }
 function pickHumanWord(messages, threads, taskId3, since) {
   const threadIds = new Set(threads.filter((t2) => t2.taskId === taskId3).map((t2) => t2.id));
-  const words2 = messages.filter((m) => m.author.kind === "human" && !parseGitHubConnected(m.body) && (m.taskId === taskId3 || !!m.threadId && threadIds.has(m.threadId)) && m.createdAt > since).sort((a, b2) => a.createdAt < b2.createdAt ? 1 : -1);
+  const words2 = messages.filter((m) => m.author.kind === "human" && !isCardOrMarker(m.body) && (m.taskId === taskId3 || !!m.threadId && threadIds.has(m.threadId)) && m.createdAt > since).sort((a, b2) => a.createdAt < b2.createdAt ? 1 : -1);
   const w = words2[0];
   return w ? { id: w.id, createdAt: w.createdAt } : null;
 }
@@ -11809,6 +14231,7 @@ var MemoryStore = class {
       kind: input.kind,
       channel: input.channel,
       mime: input.mime ?? null,
+      createdByKind: input.author.kind,
       name: input.name,
       content: input.inlineContent,
       createdAt: (/* @__PURE__ */ new Date()).toISOString(),
@@ -11816,14 +14239,19 @@ var MemoryStore = class {
     });
     return { id: input.id };
   }
-  async libraryImage(channelId, name) {
+  async libraryImage(channelId, name, any = false) {
     const project = this.channels.find((c) => c.id === channelId)?.projectId;
     const rooms = new Set(this.channels.filter((c) => c.projectId === project).map((c) => c.id));
-    const hits = [...this.artifacts].reverse().filter((x) => (x.channel === channelId || rooms.has(x.channel ?? "")) && x.name.toLowerCase() === name.toLowerCase() && (x.content ?? "").startsWith("data:image/"));
+    const hits = [...this.artifacts].reverse().filter((x) => (x.channel === channelId || rooms.has(x.channel ?? "")) && x.name.toLowerCase() === name.toLowerCase() && (x.content ?? "").startsWith("data:image/") && (any || x.createdByKind === "human" || (x.source ?? "").startsWith("repo:")));
     const a = hits.find((x) => x.channel === channelId) ?? hits[0];
     return a ? { name: a.name, mime: a.mime ?? null, content: a.content } : null;
   }
   // the room's shelf first, then the project's (store/frames.ts)
+  async setArtifactSource(id, source) {
+    const a = this.artifacts.find((x) => x.id === id);
+    if (a) a.source = source;
+  }
+  // store/frames.ts setArtifactSource
   async promoteArtifact(artifactId, _promotedByAgent, makeEvent) {
     const art = this.artifacts.find((a) => a.id === artifactId);
     if (!art) throw new DomainError("NOT_FOUND", `artifact ${artifactId} not found`);
@@ -12754,7 +15182,7 @@ var MemoryStore = class {
       channel: c.slug,
       number: await this.nextTaskNumber(c.workspace),
       title: flow.title,
-      description: "Walk the steps below to set this room up \u2014 your answers save as you go, so you can leave and finish any time. Closing this task skips setup.",
+      description: flow.description,
       state: "todo",
       kind: "setup",
       creator: { kind: "human", id: "00000000-0000-0000-0000-000000000001" },
@@ -12878,6 +15306,7 @@ var MemoryStore = class {
     if (patch.videoPending !== void 0) it.videoPending = patch.videoPending;
     if (patch.videoMeta !== void 0) it.videoMeta = patch.videoMeta;
     if (patch.videoErrorCode !== void 0) it.videoErrorCode = patch.videoErrorCode;
+    if (patch.videoError !== void 0) it.videoError = patch.videoError || null;
     if (isRevision && it.status === "scheduled") {
       it.status = "draft";
       it.scheduledAt = null;
@@ -12918,6 +15347,7 @@ var MemoryStore = class {
     if (!c) throw new DomainError("NOT_FOUND", "channel not found");
     const id = crypto.randomUUID();
     this.channelArtifacts.push({ id, workspace: c.workspace, channelId: input.channelId, kind: input.kind, name: input.name });
+    this.artifacts.push({ id, taskId: "", kind: input.kind, name: input.name, content: input.inlineContent, createdAt: (/* @__PURE__ */ new Date()).toISOString(), channel: input.channelId, mime: input.mime, createdByKind: input.createdByKind });
     this.events.push(makeEvent(c.workspace));
     return { id };
   }
@@ -13834,7 +16264,7 @@ function payloadFor(cmd) {
 
 // src/handler/planfollowup.ts
 init_src();
-async function postPlanMessage(store2, task, actor, version, prose2) {
+async function postPlanMessage(store2, task, actor, version, kind) {
   await store2.postMessage(
     {
       id: crypto.randomUUID(),
@@ -13843,8 +16273,7 @@ async function postPlanMessage(store2, task, actor, version, prose2) {
       taskId: task.id,
       threadId: null,
       author: { kind: actor.kind, id: actor.id },
-      body: `${prose2}
-${planRefMarker(version)}`,
+      body: planMessage(version, kind),
       createdAt: (/* @__PURE__ */ new Date()).toISOString()
     },
     createEvent({
@@ -13860,7 +16289,7 @@ ${planRefMarker(version)}`,
 async function planRevisionFollowup(store2, actor, cmd, outcome) {
   if (cmd.type !== "task.propose_plan" || !outcome.events.length || !outcome.task.workPlan) return;
   const v = outcome.task.workPlan.version;
-  await postPlanMessage(store2, outcome.task, actor, v, `Implementation plan **v${v}** (revised) \u2014 ${implementationPlanName(v)}`);
+  await postPlanMessage(store2, outcome.task, actor, v, "revised");
 }
 function routinePlanApprove(task, scheduleId) {
   if (task.state !== "plan_review") throw new DomainError("ILLEGAL_TRANSITION", `a routine plan auto-approve fires from plan_review, not ${task.state}`);
@@ -14963,6 +17392,7 @@ var VIDEO_MODELS = {
     input: (prompt, seconds) => ({ prompt, duration: seconds, resolution: "768P", aspect_ratio: "9:16" })
   }
 };
+var houseModel = (m) => (m?.resolution ?? "").toLowerCase();
 var DEFAULT_TIERS = "starter=seedance-2.0-fast,xpress=minimax-h3,premium=seedance-2.0";
 var FILM_SECONDS = 8;
 var filmCredits2 = (model2, seconds) => filmCredits(model2.perSecondMicros, seconds);
@@ -15118,7 +17548,7 @@ function creditRoutes(app, store2, ledger = ledgerFor(store2), fetchFn = (u, i) 
         note: g["note"] ?? null,
         day: String(g["on_day"])
       })),
-      films: films.map((f) => ({ id: f.id, item: f.itemId, tier: f.tier, model: VIDEO_MODELS[f.model]?.label ?? f.model, seconds: f.seconds, credits: Math.ceil(f.micros / CREDIT_MICROS), status: f.status, day: f.createdAt.slice(0, 10), at: f.createdAt }))
+      films: films.map((f) => ({ id: f.id, item: f.itemId, tier: f.tier, model: houseModel(VIDEO_MODELS[f.model]), seconds: f.seconds, credits: Math.ceil(f.micros / CREDIT_MICROS), status: f.status, day: f.createdAt.slice(0, 10), at: f.createdAt }))
     });
   });
   app.get("/v1/usage", async (c) => {
@@ -15711,20 +18141,30 @@ async function connectorCommands(store2, actor, cmd) {
 init_src();
 
 // src/store/frames.ts
-async function libraryImage(store2, channelId, name) {
+async function libraryImage(store2, channelId, name, opts = {}) {
   const sql = sqlOf(store2);
+  const any = !!opts.any;
   if (sql) {
     const [row] = await sql`
       select name, mime, inline_content from artifacts
        where lower(name) = lower(${name}) and inline_content like 'data:image/%'
+         and (${any}::boolean or created_by_kind = 'human' or source like 'repo:%')
          and (channel_id = ${channelId}::uuid
               or channel_id in (select id from channels where project_id = (select project_id from channels where id = ${channelId}::uuid)))
        order by (channel_id = ${channelId}::uuid) desc, created_at desc limit 1`;
     return row ? frameOf(row.name, row.mime, row.inline_content) : null;
   }
   const mem = store2;
-  const hit = mem.libraryImage ? await mem.libraryImage(channelId, name) : null;
+  const hit = mem.libraryImage ? await mem.libraryImage(channelId, name, any) : null;
   return hit ? frameOf(hit.name, hit.mime, hit.content) : null;
+}
+async function setArtifactSource(store2, artifactId, source) {
+  const sql = sqlOf(store2);
+  if (sql) {
+    await sql`update artifacts set source = ${source} where id = ${artifactId}::uuid`;
+    return;
+  }
+  await store2.setArtifactSource?.(artifactId, source);
 }
 var frameOf = (name, mime, dataUrl) => ({ name, mime: mime ?? (/^data:(image\/[a-z0-9.+-]+)/i.exec(dataUrl)?.[1] ?? "image/png"), dataUrl });
 
@@ -15737,8 +18177,9 @@ async function frameName(store2, channelId, frame) {
   if (frame === void 0) return void 0;
   if (frame === null || frame === "") return null;
   const hit = channelId ? await libraryImage(store2, channelId, frame) : null;
-  if (!hit) throw new DomainError("NOT_FOUND", `no image named "${frame}" on this room's shelf. list_library names the shelf, and a human can upload a screenshot to the room's Files`);
-  return hit.name;
+  if (hit) return hit.name;
+  const made = channelId ? await libraryImage(store2, channelId, frame, { any: true }) : null;
+  throw new DomainError("NOT_FOUND", made ? `"${frame}" is not an app screenshot: an agent made it (a web capture or a drawn picture), and a film shows only a real screenshot of the app. Take one from the project's repository with shelve_repo_screenshot, or ask a person to upload a screenshot of the app to this room's Files` : `no image named "${frame}" on this room's shelf. list_library names the shelf, and a person can upload a screenshot of the app to the room's Files`);
 }
 async function styledBy(store2, actor, workspace) {
   if (actor.kind !== "agent") return (t2) => t2;
@@ -17091,6 +19532,7 @@ async function codeSessionCommands(store2, actor, cmd) {
 
 // src/handler/createtask.ts
 init_src();
+var CODE_KINDS = /* @__PURE__ */ new Set(["bug", "feature", "refactor", "chore"]);
 async function createTask(store2, actor, cmd) {
   const mayCreate = actor.kind === "human" || actor.role === "orchestrator" || cmd.backlog || !!cmd.parent;
   if (!mayCreate) {
@@ -17239,17 +19681,18 @@ async function createTask(store2, actor, cmd) {
   }
   if (task.workPlan) {
     const planName = planArtifactName(1);
+    const repo = task.repo !== null || CODE_KINDS.has(task.kind ?? "") && !!await store2.announcements?.repoForChannel(task.channel).catch(() => null);
     await store2.mutate(task.id, async (t2) => ({
       task: t2,
       events: [],
       artifacts: [{
         kind: "doc",
         name: planName,
-        content: renderPlanMarkdown({ number: task.number, title: task.title, kind: task.kind, legs: task.workPlan.legs, subtasks: task.workPlan.subtasks, approach: task.workPlan.approach, version: 1 })
+        content: renderPlanMarkdown({ number: task.number, title: task.title, kind: task.kind, legs: task.workPlan.legs, subtasks: task.workPlan.subtasks, approach: task.workPlan.approach, version: 1, repo })
       }]
     })).catch(() => {
     });
-    await postPlanMessage(store2, task, actor, 1, routine ? `\u23F1 Routine run \u2014 implementation plan **v1** (${planName}). Work starts now, hands-off; you'll be notified when it's done.` : playbookRun ? `\u25B6 Playbook run \u2014 plan **v1** (${planName}), the registry's template. Work starts now; your gate is accepting the deliverable.` : `Implementation plan **v1** \u2014 ${planName}`);
+    await postPlanMessage(store2, task, actor, 1, routine ? "routine" : playbookRun ? "playbook" : "birth");
   }
   if (handsOff && task.workPlan?.subtasks.length) {
     for (const title of task.workPlan.subtasks) {
@@ -17505,7 +19948,7 @@ async function executeCommand(store2, actor, cmd) {
   const planVersion = cmd.type === "task.propose_plan" ? nextPlanVersion((await store2.listArtifacts(cmd.taskId)).map((a) => a.name)) : 0;
   const word = cmd.type === "task.accept" && actor.kind !== "human" ? await store2.latestHumanWord(cmd.taskId) : null;
   if (cmd.type === "task.accept" && actor.kind !== "human" && !word) {
-    throw new DomainError("HUMAN_ONLY", "accept needs the human's word: no human message in this thread since the review verdict");
+    throw new DomainError("HUMAN_ONLY", "accept needs the human's word: nobody typed in this thread since the review verdict, and a card click is no word");
   }
   let outcome = await store2.mutate(cmd.taskId, async (task) => {
     if (cmd.type === "task.confirm_requirements") return confirmRequirements(task, actor, cmd.checklist);
@@ -19628,6 +22071,7 @@ Drafted at neuramesh.app/announce.`;
 }
 
 // src/github-connect.ts
+init_src();
 import { z as z18 } from "zod";
 
 // src/github-proof.ts
@@ -19851,6 +22295,36 @@ async function readRepoFile(slug, path, ref, opts) {
   if (looksBinary(buf)) throw new GitHubApiError(`${p2} is a binary file`, 415);
   const text2 = buf.toString("utf8");
   return { path: p2, ref, size, sha: b2.sha ?? "", content: text2.length > FILE_TEXT_CAP ? text2.slice(0, FILE_TEXT_CAP) : text2, truncated: text2.length > FILE_TEXT_CAP };
+}
+var IMAGE_SIZE_CAP = 8e6;
+function sniffShot(b2) {
+  if (b2[0] === 137 && b2[1] === 80 && b2[2] === 78 && b2[3] === 71) return "image/png";
+  if (b2[0] === 255 && b2[1] === 216 && b2[2] === 255) return "image/jpeg";
+  if (String.fromCharCode(...b2.subarray(0, 4)) === "RIFF" && String.fromCharCode(...b2.subarray(8, 12)) === "WEBP") return "image/webp";
+  return null;
+}
+async function readRepoImage(slug, path, opts) {
+  const p2 = cleanPath(path);
+  if (!p2) throw new GitHubApiError("name an image file path", 400);
+  const r = await githubGet(`/repos/${slug}/contents/${p2.split("/").map(encodeURIComponent).join("/")}`, opts);
+  if (r.status === 404) throw new GitHubApiError(`no file at ${p2}`, 404);
+  if (r.status < 200 || r.status >= 300) throw new GitHubApiError(`GitHub answered ${r.status} for ${p2}`, r.status);
+  if (Array.isArray(r.json)) throw new GitHubApiError(`${p2} is a directory: list it with the tree read`, 400);
+  const b2 = r.json;
+  if (b2.type !== "file" || !b2.sha) throw new GitHubApiError(`${p2} is a ${b2.type ?? "link"}, not a file`, 400);
+  const size = b2.size ?? 0;
+  if (size > IMAGE_SIZE_CAP) throw new GitHubApiError(`${p2} is larger than ${IMAGE_SIZE_CAP / 1e6} MB: pick a smaller screenshot`, 413);
+  let base64 = b2.encoding === "base64" && b2.content ? b2.content : null;
+  if (!base64) {
+    const blob = await githubGet(`/repos/${slug}/git/blobs/${b2.sha}`, opts);
+    const bb = blob.json;
+    if (blob.status < 200 || blob.status >= 300 || bb?.encoding !== "base64" || !bb.content) throw new GitHubApiError(`GitHub answered ${blob.status} for the blob of ${p2}`, blob.status >= 400 ? blob.status : 502);
+    base64 = bb.content;
+  }
+  const bytes = new Uint8Array(Buffer.from(base64.replace(/\n/g, ""), "base64"));
+  const mime = sniffShot(bytes);
+  if (!mime) throw new GitHubApiError(`${p2} is not a PNG, JPEG or WebP image`, 415);
+  return { path: p2, sha: b2.sha, size: bytes.length, mime, bytes };
 }
 async function readRepoTree(slug, path, ref, opts) {
   const p2 = cleanPath(path);
@@ -20477,6 +22951,189 @@ function githubWriteRoutes(app, store2, fetchFn) {
   });
 }
 
+// src/shelf-image.ts
+var jpeg = __toESM(require_jpeg_js(), 1);
+
+// src/fal.ts
+var FAL_QUEUE = "https://queue.fal.run";
+var headers = (key2) => ({ authorization: `Key ${key2}`, "content-type": "application/json" });
+var queueBase = (endpoint) => endpoint.split("/").slice(0, 2).join("/");
+var unavailable = (status, msg2) => status === 404 || status === 422 && /not found|unavailable|deprecated|no longer/i.test(msg2);
+async function falSubmit(key2, endpoint, input, fetchFn = fetch, timeoutSeconds = 480) {
+  const res = await fetchFn(`${FAL_QUEUE}/${endpoint}`, { method: "POST", headers: { ...headers(key2), "x-fal-request-timeout": String(timeoutSeconds) }, body: JSON.stringify(input) }).catch((e) => new Response(JSON.stringify({ detail: String(e) }), { status: 599 }));
+  const body = await res.json().catch(() => null);
+  if (res.ok && body?.request_id) return { requestId: body.request_id, status: res.status };
+  const msg2 = typeof body?.detail === "string" ? body.detail : Array.isArray(body?.detail) ? JSON.stringify(body.detail) : body?.error ?? `fal ${res.status}`;
+  return { error: msg2, status: res.status, unavailable: unavailable(res.status, msg2) };
+}
+async function falStatus(key2, endpoint, requestId, fetchFn = fetch) {
+  const res = await fetchFn(`${FAL_QUEUE}/${queueBase(endpoint)}/requests/${requestId}/status`, { headers: headers(key2) }).catch((e) => new Response(JSON.stringify({ detail: String(e) }), { status: 599 }));
+  const body = await res.json().catch(() => null);
+  if (!res.ok) return { state: "failed", error: typeof body?.detail === "string" ? body.detail : `fal status ${res.status}` };
+  if (body?.error) return { state: "failed", error: body.error, ...body.error_type ? { errorType: body.error_type } : {} };
+  if (body?.status === "COMPLETED") return { state: "done" };
+  if (body?.status === "IN_PROGRESS") return { state: "running" };
+  return { state: "queued", ...typeof body?.queue_position === "number" ? { position: body.queue_position } : {} };
+}
+async function falResult(key2, endpoint, requestId, fetchFn = fetch) {
+  const res = await fetchFn(`${FAL_QUEUE}/${queueBase(endpoint)}/requests/${requestId}`, { headers: headers(key2) }).catch((e) => new Response(JSON.stringify({ detail: String(e) }), { status: 599 }));
+  const body = await res.json().catch(() => null);
+  if (!res.ok) return { error: typeof body?.detail === "string" ? body.detail : body?.error ?? `fal result ${res.status}` };
+  if (!body?.video?.url) return { error: "the film came back without a video" };
+  return { url: body.video.url, contentType: body.video.content_type };
+}
+async function falUpload(key2, bytes, contentType, fileName, fetchFn = fetch) {
+  const init = await fetchFn("https://rest.alpha.fal.ai/storage/upload/initiate?storage_type=fal-cdn-v3", { method: "POST", headers: headers(key2), body: JSON.stringify({ content_type: contentType, file_name: fileName }) }).catch((e) => new Response(JSON.stringify({ detail: String(e) }), { status: 599 }));
+  const body = await init.json().catch(() => null);
+  if (!init.ok || !body?.upload_url || !body.file_url) return { error: typeof body?.detail === "string" ? body.detail : `fal upload ${init.status}` };
+  const put = await fetchFn(body.upload_url, { method: "PUT", headers: { "content-type": contentType }, body: bytes }).catch(() => null);
+  if (!put?.ok) return { error: `fal upload put ${put?.status ?? "no answer"}` };
+  return { url: body.file_url };
+}
+async function falRun(key2, endpoint, input, fetchFn = fetch, timeoutMs = 9e4) {
+  const res = await fetchFn(`https://fal.run/${endpoint}`, { method: "POST", headers: headers(key2), body: JSON.stringify(input), signal: AbortSignal.timeout(timeoutMs) }).catch((e) => new Response(JSON.stringify({ detail: e instanceof Error && e.name === "TimeoutError" ? "timed out" : String(e) }), { status: 599 }));
+  const body = await res.json().catch(() => null);
+  if (!res.ok || !body) return { error: typeof body?.detail === "string" ? body.detail : `fal ${endpoint} ${res.status}` };
+  return { result: body };
+}
+
+// src/film-compose.ts
+var SHOT_NOT_CUT = "the shot could not be cut in";
+var FRAME_W = 720;
+var FRAME_H = 1280;
+var FPS = 24;
+var MIN_PIECE = 0.25;
+var GROUND = "#141414";
+function imageSize(dataUrl) {
+  const m = /^data:image\/([a-z0-9.+-]+);base64,/i.exec(dataUrl);
+  if (!m) return null;
+  const b2 = Buffer.from(dataUrl.slice(m[0].length, m[0].length + 2e5), "base64");
+  if (b2.length > 24 && b2[0] === 137 && b2[1] === 80) return { w: b2.readUInt32BE(16), h: b2.readUInt32BE(20) };
+  if (b2.length > 4 && b2[0] === 255 && b2[1] === 216) {
+    for (let at = 2; at + 9 < b2.length; ) {
+      if (b2[at] !== 255) {
+        at += 1;
+        continue;
+      }
+      const marker = b2[at + 1];
+      if (marker === 216 || marker >= 208 && marker <= 215 || marker === 1) {
+        at += 2;
+        continue;
+      }
+      const len = b2.readUInt16BE(at + 2);
+      if (marker >= 192 && marker <= 207 && marker !== 196 && marker !== 200 && marker !== 204) return { h: b2.readUInt16BE(at + 5), w: b2.readUInt16BE(at + 7) };
+      at += 2 + len;
+    }
+  }
+  return null;
+}
+function productFrameSvg(dataUrl, w = FRAME_W, h = FRAME_H) {
+  const pad = Math.round(w * 0.04);
+  const iw = w - pad * 2;
+  const size = imageSize(dataUrl);
+  const wide = !!size && size.w / size.h > 1.25;
+  const ih = wide ? Math.round(iw * 1.25) : h - pad * 2;
+  const y = wide ? Math.round((h - ih) / 2) : pad;
+  const r = Math.round(w * 0.03);
+  return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><defs><clipPath id="c"><rect x="${pad}" y="${y}" width="${iw}" height="${ih}" rx="${r}" ry="${r}"/></clipPath></defs><rect width="${w}" height="${h}" fill="${GROUND}"/><image x="${pad}" y="${y}" width="${iw}" height="${ih}" preserveAspectRatio="xMidYMid ${wide ? "slice" : "meet"}" clip-path="url(#c)" xlink:href="${dataUrl}" href="${dataUrl}"/></svg>`;
+}
+async function renderProductFrame(dataUrl, opts = {}) {
+  const { Resvg } = await resvgModule(opts.initWasm !== false);
+  const r = new Resvg(productFrameSvg(dataUrl), { fitTo: { mode: "original" } });
+  try {
+    const img = r.render();
+    try {
+      return img.asPng();
+    } finally {
+      img.free();
+    }
+  } finally {
+    r.free();
+  }
+}
+function timeline(seconds, shots) {
+  const out = [];
+  let at = 0;
+  for (const shot of [...shots].sort((a, b2) => a.start - b2.start)) {
+    const start = Math.max(at, Math.min(shot.start, seconds));
+    const end = Math.min(shot.end, seconds);
+    if (end - start < MIN_PIECE) continue;
+    if (start - at >= MIN_PIECE) out.push({ kind: "film", start: at, end: start });
+    out.push({ kind: "shot", start, end, shot });
+    at = end;
+  }
+  if (seconds - at >= MIN_PIECE) out.push({ kind: "film", start: at, end: seconds });
+  return out;
+}
+async function composeShots(key2, clipUrl, seconds, shots, opts = {}) {
+  const fetchFn = opts.fetchFn ?? fetch;
+  const pieces = timeline(seconds, shots);
+  const wanted = pieces.filter((p2) => p2.kind === "shot").length;
+  if (!wanted) return { applied: 0, why: "no product beat fell inside the film" };
+  const frames = /* @__PURE__ */ new Map();
+  for (const p2 of pieces) {
+    if (p2.kind !== "shot" || frames.has(p2.shot.show)) continue;
+    let png;
+    try {
+      png = await renderProductFrame(p2.shot.dataUrl, { initWasm: opts.initWasm });
+    } catch (e) {
+      return { applied: 0, why: SHOT_NOT_CUT, detail: `the product frame for ${p2.shot.show} did not render (${e instanceof Error ? e.message : String(e)})` };
+    }
+    const up = await falUpload(key2, png, "image/png", `${p2.shot.show.replace(/[^\w.-]+/g, "-")}.png`, fetchFn);
+    if (!up.url) return { applied: 0, why: SHOT_NOT_CUT, detail: `the product frame did not upload (${up.error ?? "no answer"})` };
+    frames.set(p2.shot.show, up.url);
+  }
+  const urls = [];
+  for (const p2 of pieces) {
+    if (p2.kind === "film") {
+      const r = await falRun(key2, "fal-ai/workflow-utilities/trim-video", { video_url: clipUrl, start_time: p2.start, end_time: p2.end }, fetchFn);
+      if (!r.result?.video?.url) return { applied: 0, why: SHOT_NOT_CUT, detail: `the film did not trim at ${p2.start}-${p2.end} s (${r.error ?? "no video"})` };
+      urls.push(r.result.video.url);
+    } else {
+      const r = await falRun(key2, "fal-ai/ffmpeg-api/images-to-video", { fps: FPS, images: [{ url: frames.get(p2.shot.show), frames: Math.max(1, Math.round((p2.end - p2.start) * FPS)) }] }, fetchFn);
+      if (!r.result?.video?.url) return { applied: 0, why: SHOT_NOT_CUT, detail: `the product shot ${p2.shot.show} did not render as a clip (${r.error ?? "no video"})` };
+      urls.push(r.result.video.url);
+    }
+  }
+  const tracks = [
+    { id: "video", type: "video", keyframes: pieces.map((p2, i) => ({ timestamp: Math.round(p2.start * 1e3), url: urls[i], duration: Math.round((p2.end - p2.start) * 1e3) })) },
+    { id: "audio", type: "audio", keyframes: [{ timestamp: 0, url: clipUrl, duration: Math.round(seconds * 1e3) }] }
+  ];
+  const c = await falRun(key2, "fal-ai/ffmpeg-api/compose", { tracks }, fetchFn, 12e4);
+  if (!c.result?.video_url) return { applied: 0, why: SHOT_NOT_CUT, detail: `the pieces did not compose (${c.error ?? "no video"})` };
+  return { url: c.result.video_url, applied: wanted };
+}
+
+// src/shelf-image.ts
+var SHELF_MAX_CHARS = 3e5;
+var WIDTHS = [1080, 900, 720, 600, 480, 360];
+async function shelfCopy(bytes, mime, opts = {}) {
+  const asIs = `data:${mime};base64,${Buffer.from(bytes).toString("base64")}`;
+  if (asIs.length <= SHELF_MAX_CHARS) return { dataUrl: asIs, mime };
+  const size = mime === "image/webp" ? null : imageSize(asIs);
+  if (!size || !size.w || !size.h) return null;
+  const { Resvg } = await resvgModule(opts.initWasm !== false);
+  for (const w of [...new Set(WIDTHS.map((t2) => Math.min(t2, size.w)))]) {
+    const h = Math.max(1, Math.round(size.h * w / size.w));
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><rect width="${w}" height="${h}" fill="#ffffff"/><image width="${w}" height="${h}" preserveAspectRatio="none" xlink:href="${asIs}" href="${asIs}"/></svg>`;
+    const r = new Resvg(svg, { fitTo: { mode: "original" } });
+    let out;
+    try {
+      const img = r.render();
+      try {
+        out = jpeg.encode({ data: img.pixels, width: img.width, height: img.height }, 85).data;
+      } finally {
+        img.free();
+      }
+    } finally {
+      r.free();
+    }
+    const url = `data:image/jpeg;base64,${Buffer.from(out).toString("base64")}`;
+    if (url.length <= SHELF_MAX_CHARS) return { dataUrl: url, mime: "image/jpeg" };
+  }
+  return null;
+}
+
 // src/github-connect.ts
 var page = (title, lines) => `<!doctype html><meta charset="utf-8"><title>${title}</title><body style="font:15px system-ui;display:grid;place-items:center;height:100vh;margin:0;background:#1d1d1d;color:#e6e6e6"><div style="text-align:center;max-width:36em">${lines.map((l) => `<p>${l}</p>`).join("")}</div></body>`;
 var tryUnseal = (state) => {
@@ -20620,6 +23277,30 @@ function githubApiRoutes(app, store2, opts = {}) {
     if (isRefusal(o)) return c.json(o.body, o.status);
     try {
       return c.json({ slug: o.slug, ...await readRepoTree(o.slug, c.req.query("path") ?? "", c.req.query("ref") || null, { token: o.token, fetchFn }) });
+    } catch (e) {
+      const f = failed(e);
+      return c.json(f.body, f.status);
+    }
+  });
+  app.post("/v1/repo/shelve", async (c) => {
+    const o = await open(c);
+    if (isRefusal(o)) return c.json(o.body, o.status);
+    const body = z18.object({ path: z18.string().trim().min(1).max(400), name: z18.string().trim().min(1).max(120).optional() }).safeParse(await c.req.json().catch(() => null));
+    if (!body.success) return c.json({ error: "name the image file: { path, name? }", code: "INVALID_INPUT" }, 400);
+    const channel = c.req.query("channel");
+    const actor = c.get("actor");
+    try {
+      const img = await readRepoImage(o.slug, body.data.path, { token: o.token, fetchFn });
+      const copy = await shelfCopy(img.bytes, img.mime);
+      if (!copy) return c.json({ error: `${img.path} does not fit the shelf at any size. Pick a PNG or JPEG screenshot.`, code: "TOO_LARGE" }, 413);
+      const leaf = img.path.split("/").pop();
+      const name = (body.data.name ?? leaf).replace(/\.(png|jpe?g|webp)$/i, "") + (copy.mime === "image/jpeg" ? ".jpg" : leaf.slice(leaf.lastIndexOf(".")));
+      const { id } = await store2.createChannelArtifact(
+        { channelId: channel, kind: "file", name, inlineContent: copy.dataUrl, mime: copy.mime, createdByKind: actor.kind, createdBy: actor.id },
+        (ws) => createEvent({ type: "artifact.created", source: formatAddress({ kind: actor.kind, id: actor.id }), target: formatAddress({ kind: "channel", slug: channel }), workspace: ws, payload: { channel, name, kind: "file", from: `${o.slug}/${img.path}` } })
+      );
+      await setArtifactSource(store2, id, `repo:${o.slug}/${img.path}@${img.sha}`);
+      return c.json({ ok: true, id, name, path: img.path, sha: img.sha }, 201);
     } catch (e) {
       const f = failed(e);
       return c.json(f.body, f.status);
@@ -21505,162 +24186,16 @@ function webFrameRoute(app) {
 // src/starter-video.ts
 init_src();
 import { z as z22 } from "zod";
-
-// src/fal.ts
-var FAL_QUEUE = "https://queue.fal.run";
-var headers = (key2) => ({ authorization: `Key ${key2}`, "content-type": "application/json" });
-var queueBase = (endpoint) => endpoint.split("/").slice(0, 2).join("/");
-var unavailable = (status, msg2) => status === 404 || status === 422 && /not found|unavailable|deprecated|no longer/i.test(msg2);
-async function falSubmit(key2, endpoint, input, fetchFn = fetch, timeoutSeconds = 480) {
-  const res = await fetchFn(`${FAL_QUEUE}/${endpoint}`, { method: "POST", headers: { ...headers(key2), "x-fal-request-timeout": String(timeoutSeconds) }, body: JSON.stringify(input) }).catch((e) => new Response(JSON.stringify({ detail: String(e) }), { status: 599 }));
-  const body = await res.json().catch(() => null);
-  if (res.ok && body?.request_id) return { requestId: body.request_id, status: res.status };
-  const msg2 = typeof body?.detail === "string" ? body.detail : Array.isArray(body?.detail) ? JSON.stringify(body.detail) : body?.error ?? `fal ${res.status}`;
-  return { error: msg2, status: res.status, unavailable: unavailable(res.status, msg2) };
-}
-async function falStatus(key2, endpoint, requestId, fetchFn = fetch) {
-  const res = await fetchFn(`${FAL_QUEUE}/${queueBase(endpoint)}/requests/${requestId}/status`, { headers: headers(key2) }).catch((e) => new Response(JSON.stringify({ detail: String(e) }), { status: 599 }));
-  const body = await res.json().catch(() => null);
-  if (!res.ok) return { state: "failed", error: typeof body?.detail === "string" ? body.detail : `fal status ${res.status}` };
-  if (body?.error) return { state: "failed", error: body.error };
-  if (body?.status === "COMPLETED") return { state: "done" };
-  if (body?.status === "IN_PROGRESS") return { state: "running" };
-  return { state: "queued", ...typeof body?.queue_position === "number" ? { position: body.queue_position } : {} };
-}
-async function falResult(key2, endpoint, requestId, fetchFn = fetch) {
-  const res = await fetchFn(`${FAL_QUEUE}/${queueBase(endpoint)}/requests/${requestId}`, { headers: headers(key2) }).catch((e) => new Response(JSON.stringify({ detail: String(e) }), { status: 599 }));
-  const body = await res.json().catch(() => null);
-  if (!res.ok) return { error: typeof body?.detail === "string" ? body.detail : body?.error ?? `fal result ${res.status}` };
-  if (!body?.video?.url) return { error: "the film came back without a video" };
-  return { url: body.video.url, contentType: body.video.content_type };
-}
-async function falUpload(key2, bytes, contentType, fileName, fetchFn = fetch) {
-  const init = await fetchFn("https://rest.alpha.fal.ai/storage/upload/initiate?storage_type=fal-cdn-v3", { method: "POST", headers: headers(key2), body: JSON.stringify({ content_type: contentType, file_name: fileName }) }).catch((e) => new Response(JSON.stringify({ detail: String(e) }), { status: 599 }));
-  const body = await init.json().catch(() => null);
-  if (!init.ok || !body?.upload_url || !body.file_url) return { error: typeof body?.detail === "string" ? body.detail : `fal upload ${init.status}` };
-  const put = await fetchFn(body.upload_url, { method: "PUT", headers: { "content-type": contentType }, body: bytes }).catch(() => null);
-  if (!put?.ok) return { error: `fal upload put ${put?.status ?? "no answer"}` };
-  return { url: body.file_url };
-}
-async function falRun(key2, endpoint, input, fetchFn = fetch, timeoutMs = 9e4) {
-  const res = await fetchFn(`https://fal.run/${endpoint}`, { method: "POST", headers: headers(key2), body: JSON.stringify(input), signal: AbortSignal.timeout(timeoutMs) }).catch((e) => new Response(JSON.stringify({ detail: e instanceof Error && e.name === "TimeoutError" ? "timed out" : String(e) }), { status: 599 }));
-  const body = await res.json().catch(() => null);
-  if (!res.ok || !body) return { error: typeof body?.detail === "string" ? body.detail : `fal ${endpoint} ${res.status}` };
-  return { result: body };
-}
-
-// src/film-compose.ts
-var FRAME_W = 720;
-var FRAME_H = 1280;
-var FPS = 24;
-var MIN_PIECE = 0.25;
-var GROUND = "#141414";
-function imageSize(dataUrl) {
-  const m = /^data:image\/([a-z0-9.+-]+);base64,/i.exec(dataUrl);
-  if (!m) return null;
-  const b2 = Buffer.from(dataUrl.slice(m[0].length, m[0].length + 2e5), "base64");
-  if (b2.length > 24 && b2[0] === 137 && b2[1] === 80) return { w: b2.readUInt32BE(16), h: b2.readUInt32BE(20) };
-  if (b2.length > 4 && b2[0] === 255 && b2[1] === 216) {
-    for (let at = 2; at + 9 < b2.length; ) {
-      if (b2[at] !== 255) {
-        at += 1;
-        continue;
-      }
-      const marker = b2[at + 1];
-      if (marker === 216 || marker >= 208 && marker <= 215 || marker === 1) {
-        at += 2;
-        continue;
-      }
-      const len = b2.readUInt16BE(at + 2);
-      if (marker >= 192 && marker <= 207 && marker !== 196 && marker !== 200 && marker !== 204) return { h: b2.readUInt16BE(at + 5), w: b2.readUInt16BE(at + 7) };
-      at += 2 + len;
-    }
-  }
-  return null;
-}
-function productFrameSvg(dataUrl, w = FRAME_W, h = FRAME_H) {
-  const pad = Math.round(w * 0.04);
-  const iw = w - pad * 2;
-  const size = imageSize(dataUrl);
-  const wide = !!size && size.w / size.h > 1.25;
-  const ih = wide ? Math.round(iw * 1.25) : h - pad * 2;
-  const y = wide ? Math.round((h - ih) / 2) : pad;
-  const r = Math.round(w * 0.03);
-  return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><defs><clipPath id="c"><rect x="${pad}" y="${y}" width="${iw}" height="${ih}" rx="${r}" ry="${r}"/></clipPath></defs><rect width="${w}" height="${h}" fill="${GROUND}"/><image x="${pad}" y="${y}" width="${iw}" height="${ih}" preserveAspectRatio="xMidYMid ${wide ? "slice" : "meet"}" clip-path="url(#c)" xlink:href="${dataUrl}" href="${dataUrl}"/></svg>`;
-}
-async function renderProductFrame(dataUrl, opts = {}) {
-  const { Resvg } = await resvgModule(opts.initWasm !== false);
-  const r = new Resvg(productFrameSvg(dataUrl), { fitTo: { mode: "original" } });
-  try {
-    const img = r.render();
-    try {
-      return img.asPng();
-    } finally {
-      img.free();
-    }
-  } finally {
-    r.free();
-  }
-}
-function timeline(seconds, shots) {
-  const out = [];
-  let at = 0;
-  for (const shot of [...shots].sort((a, b2) => a.start - b2.start)) {
-    const start = Math.max(at, Math.min(shot.start, seconds));
-    const end = Math.min(shot.end, seconds);
-    if (end - start < MIN_PIECE) continue;
-    if (start - at >= MIN_PIECE) out.push({ kind: "film", start: at, end: start });
-    out.push({ kind: "shot", start, end, shot });
-    at = end;
-  }
-  if (seconds - at >= MIN_PIECE) out.push({ kind: "film", start: at, end: seconds });
-  return out;
-}
-async function composeShots(key2, clipUrl, seconds, shots, opts = {}) {
-  const fetchFn = opts.fetchFn ?? fetch;
-  const pieces = timeline(seconds, shots);
-  const wanted = pieces.filter((p2) => p2.kind === "shot").length;
-  if (!wanted) return { applied: 0, why: "no product beat fell inside the film" };
-  const frames = /* @__PURE__ */ new Map();
-  for (const p2 of pieces) {
-    if (p2.kind !== "shot" || frames.has(p2.shot.show)) continue;
-    let png;
-    try {
-      png = await renderProductFrame(p2.shot.dataUrl, { initWasm: opts.initWasm });
-    } catch (e) {
-      return { applied: 0, why: `the product frame for ${p2.shot.show} did not render (${e instanceof Error ? e.message : String(e)})` };
-    }
-    const up = await falUpload(key2, png, "image/png", `${p2.shot.show.replace(/[^\w.-]+/g, "-")}.png`, fetchFn);
-    if (!up.url) return { applied: 0, why: `the product frame did not upload (${up.error ?? "no answer"})` };
-    frames.set(p2.shot.show, up.url);
-  }
-  const urls = [];
-  for (const p2 of pieces) {
-    if (p2.kind === "film") {
-      const r = await falRun(key2, "fal-ai/workflow-utilities/trim-video", { video_url: clipUrl, start_time: p2.start, end_time: p2.end }, fetchFn);
-      if (!r.result?.video?.url) return { applied: 0, why: `the film did not trim at ${p2.start}-${p2.end} s (${r.error ?? "no video"})` };
-      urls.push(r.result.video.url);
-    } else {
-      const r = await falRun(key2, "fal-ai/ffmpeg-api/images-to-video", { fps: FPS, images: [{ url: frames.get(p2.shot.show), frames: Math.max(1, Math.round((p2.end - p2.start) * FPS)) }] }, fetchFn);
-      if (!r.result?.video?.url) return { applied: 0, why: `the product shot ${p2.shot.show} did not render as a clip (${r.error ?? "no video"})` };
-      urls.push(r.result.video.url);
-    }
-  }
-  const tracks = [
-    { id: "video", type: "video", keyframes: pieces.map((p2, i) => ({ timestamp: Math.round(p2.start * 1e3), url: urls[i], duration: Math.round((p2.end - p2.start) * 1e3) })) },
-    { id: "audio", type: "audio", keyframes: [{ timestamp: 0, url: clipUrl, duration: Math.round(seconds * 1e3) }] }
-  ];
-  const c = await falRun(key2, "fal-ai/ffmpeg-api/compose", { tracks }, fetchFn, 12e4);
-  if (!c.result?.video_url) return { applied: 0, why: `the pieces did not compose (${c.error ?? "no video"})` };
-  return { url: c.result.video_url, applied: wanted };
-}
-
-// src/starter-video.ts
 var FILM_MAX_BYTES = 4e7;
 var filmTimeoutMs = (seconds) => Math.max(12 * 6e4, seconds * 4e4);
 var SYSTEM = { kind: "agent", id: "00000000-0000-0000-0000-000000000000" };
 var FilmSchema = z22.object({ workspace: z22.string().uuid(), item: z22.string().uuid(), prompt: z22.string().min(8).max(2e3) });
-var tierView = (t2) => ({ tier: t2.tier, label: t2.label, model: t2.model.label, vendor: t2.model.vendor, seconds: t2.seconds, credits: t2.credits, lengths: t2.lengths, perSecondMicros: t2.model.perSecondMicros });
+var FILM_FAILED = "The film failed. Your credits are back. Try again.";
+var FILM_REFUSED = "NeuraMesh Video refused this script. Change the script, then try again. Your credits are back.";
+var FILM_LOST = "The film did not reach this card. Your credits are back. Try again.";
+var FILM_NOT_STARTED = "NeuraMesh Video did not start the film. Your credits are back. Try again later.";
+var filmSlow = (minutes) => `The film took longer than ${minutes} minutes. Your credits are back. Try again.`;
+var tierView = (t2) => ({ tier: t2.tier, label: t2.label, model: houseModel(t2.model), seconds: t2.seconds, credits: t2.credits, lengths: t2.lengths, perSecondMicros: t2.model.perSecondMicros });
 function starterVideoRoutes(app, store2, opts = {}) {
   const ledger = opts.ledger === void 0 ? ledgerFor(store2) : opts.ledger;
   const env = opts.env ?? process.env;
@@ -21702,8 +24237,9 @@ function starterVideoRoutes(app, store2, opts = {}) {
     const key2 = env["FAL_KEY"];
     const sub = await falSubmit(key2, endpoint, input, fetchFn, Math.ceil(filmTimeoutMs(seconds) / 1e3));
     if (!sub.requestId) {
-      await ledger.refundFilm(workspace, { grantMicros: spent.grantMicros, purchasedMicros: spent.purchasedMicros, seconds }, `refund: ${tier.model.label} did not accept the film`);
-      return c.json({ error: sub.error ?? "the film was not accepted", code: sub.unavailable ? "UNAVAILABLE" : "UPSTREAM" }, sub.unavailable ? 503 : 502);
+      await ledger.refundFilm(workspace, { grantMicros: spent.grantMicros, purchasedMicros: spent.purchasedMicros, seconds }, `refund: ${tier.label} did not start the film`);
+      console.warn(`starter_film item=${item.slice(0, 8)} not accepted (${sub.status ?? "no status"}): ${sub.error ?? "no reason"}`);
+      return c.json({ error: FILM_NOT_STARTED, code: sub.unavailable ? "UNAVAILABLE" : "UPSTREAM" }, sub.unavailable ? 503 : 502);
     }
     const { id } = await store2.films.create({ workspaceId: workspace, itemId: item, tier: tier.tier, model: tier.model.key, endpoint, requestId: sub.requestId, seconds, micros, grantMicros: spent.grantMicros, purchasedMicros: spent.purchasedMicros, createdBy: actor.kind === "human" ? actor.id : null, frame: media.frame ?? null, frameUsed: !!lane });
     await store2.reviseDraft(item, { body: null, imageBrief: null, thumb: null, videoPending: true, videoError: "" }, (ws) => createEvent({ type: "content.updated", source: formatAddress({ kind: actor.kind, id: actor.id }), target: formatAddress({ kind: "resource", type: "content", id: item }), workspace: ws, payload: { item, filming: id } })).catch(() => {
@@ -21729,14 +24265,16 @@ async function filmsDue(store2, opts = {}) {
   if (!store2.films || !ledger || !key2) return [];
   const out = [];
   for (const row of await store2.films.open(opts.limit ?? 10)) {
-    const fail = async (why) => {
-      await ledger.refundFilm(row.workspaceId, { grantMicros: row.grantMicros, purchasedMicros: row.purchasedMicros, seconds: row.seconds }, `refund: film ${row.id.slice(0, 8)} on ${row.model} failed`);
+    const fail = async (why, said = FILM_FAILED) => {
+      await ledger.refundFilm(row.workspaceId, { grantMicros: row.grantMicros, purchasedMicros: row.purchasedMicros, seconds: row.seconds }, `refund: film ${row.id.slice(0, 8)} on the ${row.tier} tier failed`);
       await store2.films.update(row.id, { status: "failed", error: why, finishedAt: new Date(now()).toISOString() });
-      await patchDraft(store2, row, { videoPending: false, videoError: why });
+      console.warn(`starter_film film=${row.id.slice(0, 8)} failed: ${why}`);
+      await patchDraft(store2, row, { videoPending: false, videoError: said });
       out.push({ id: row.id, outcome: `failed: ${why}` });
     };
+    const limit = Math.round(filmTimeoutMs(row.seconds) / 6e4);
     if (now() - new Date(row.createdAt).getTime() > filmTimeoutMs(row.seconds)) {
-      await fail(`the film took longer than ${Math.round(filmTimeoutMs(row.seconds) / 6e4)} minutes`);
+      await fail(`the film took longer than ${limit} minutes`, filmSlow(limit));
       continue;
     }
     if (!row.requestId) {
@@ -21745,7 +24283,7 @@ async function filmsDue(store2, opts = {}) {
     }
     const st = await falStatus(key2, row.endpoint, row.requestId, fetchFn);
     if (st.state === "failed") {
-      await fail(st.error ?? "the film failed");
+      await fail(st.error ?? "the film failed", st.errorType === "content_policy" ? FILM_REFUSED : FILM_FAILED);
       continue;
     }
     if (st.state !== "done") {
@@ -21764,31 +24302,32 @@ async function filmsDue(store2, opts = {}) {
     if (shots.asked) {
       const c = shots.list.length ? await composeShots(key2, res.url, row.seconds, shots.list, { fetchFn, initWasm: opts.initWasm }) : { applied: 0, why: shots.why };
       if (c.url) clipUrl = c.url;
+      if ("detail" in c && c.detail) console.warn(`starter_film film=${row.id.slice(0, 8)} shots not cut in: ${c.detail}`);
       shotsMeta = { asked: shots.asked, applied: c.applied, ...c.why ? { why: c.why } : {} };
     }
     const dl = await fetchFn(clipUrl, { redirect: "follow" }).catch(() => null);
     if (!dl?.ok) {
-      await fail(`the film could not be downloaded (${dl?.status ?? "no answer"})`);
+      await fail(`the film could not be downloaded (${dl?.status ?? "no answer"})`, FILM_LOST);
       continue;
     }
     const bytes = Buffer.from(await dl.arrayBuffer());
     if (!bytes.length) {
-      await fail("the film downloaded empty");
+      await fail("the film downloaded empty", FILM_LOST);
       continue;
     }
     if (bytes.length > FILM_MAX_BYTES) {
-      await fail(`the film is too large to attach (${Math.round(bytes.length / 1e6)} MB, max ${FILM_MAX_BYTES / 1e6} MB)`);
+      await fail(`the film is too large to attach (${Math.round(bytes.length / 1e6)} MB, max ${FILM_MAX_BYTES / 1e6} MB)`, FILM_LOST);
       continue;
     }
     const mime = sniffVideoMime(new Uint8Array(bytes.subarray(0, 16))) ?? res.contentType ?? "video/mp4";
     try {
       await store2.attachContentMedia(row.itemId, mime, bytes, SYSTEM, (ws) => createEvent({ type: "content.updated", source: formatAddress(SYSTEM), target: formatAddress({ kind: "resource", type: "content", id: row.itemId }), workspace: ws, payload: { item: row.itemId, media: "hosted", film: row.id } }));
     } catch (e) {
-      await fail(`the film did not attach to the draft (${e instanceof Error ? e.message : String(e)})`);
+      await fail(`the film did not attach to the draft (${e instanceof Error ? e.message : String(e)})`, FILM_LOST);
       continue;
     }
     const at = new Date(now()).toISOString();
-    await patchDraft(store2, row, { videoPending: false, videoError: "", videoMeta: { tier: row.tier, model: VIDEO_MODELS[row.model]?.label ?? row.model, seconds: row.seconds, credits: Math.ceil(row.micros / CREDIT_MICROS), at, frame: row.frame, frameUsed: row.frameUsed, ...shotsMeta ? { shots: shotsMeta } : {} } });
+    await patchDraft(store2, row, { videoPending: false, videoError: "", videoMeta: { tier: row.tier, model: houseModel(VIDEO_MODELS[row.model]), seconds: row.seconds, credits: Math.ceil(row.micros / CREDIT_MICROS), at, frame: row.frame, frameUsed: row.frameUsed, ...shotsMeta ? { shots: shotsMeta } : {} } });
     await store2.films.update(row.id, { status: "done", finishedAt: at });
     out.push({ id: row.id, outcome: "done" });
   }
@@ -23783,7 +26322,7 @@ var MARKETING_OS_SKILL_SEED = [
       {
         "name": "ugc-strategy",
         "description": "UGC \u2014 creator-style scripts and briefs, rights, disclosure; campaigns and curation",
-        "body": '## In NeuraMesh (read first \u2014 it overrides the module\'s delivery notes)\n\n- **Two turns, in this order.** (1) RESEARCH: read the room\'s brand docs (`read_library_doc`\n  scope room, `business-profile.md` first) plus the [MARKETING CONTEXT] note in your prompt; in a\n  release session the digest and the release brief in the thread are the facts. (2) THE ANGLE\n  CARD: call `propose_angles` with the product\'s name and two to five angles, each resting on a\n  fact you just read (a first-person walkthrough, a before-and-after, a "three things I did not\n  expect", a reply to a real objection, a duet-style react), then STOP with one line: the human\n  picks an angle, the platforms and the film\'s length on the card, or types their own angle. (3)\n  THE DRAFTS, on the human\'s pick (their reply wakes you): `draft_posts` with one VIDEO post per\n  picked platform, all in the chosen angle. A script drafted before the pick is refused, so never\n  skip the card.\n- **What each draft is.** Each card has three parts:\n  `body` is the CAPTION that posts with the video (one or two lines, the hashtags the network\n  uses, within its limit); `script` is what the creator reads and films (9:16, the hook in the\n  first three seconds as `[0:00-0:03]`, then timestamped beats, the product on screen, one call\n  to action at the end), written to the LENGTH the human picked (`\u2026 \xB7 length: 15 s` in their\n  reply, eight seconds when they picked none): the beats end at that second, the spoken lines are\n  short, and no beat asks for on-screen text, captions or subtitles beyond one title of three\n  words at most (a video model cannot spell more; the caption that posts is the body). The film\n  shows the script\'s first seconds; `imageBrief` is the shot direction the film follows;\n  `frame` is the name of a screenshot on this room\'s shelf (the [MARKETING CONTEXT] note lists\n  them), so the film\'s own picture of the product follows the real one. Never put the script in\n  the body: the body publishes.\n- **The product is real, never drawn.** A video model cannot copy a screen: every beat that shows\n  the product (the app, a screen, the phone, the product itself) carries `SHOW: <image name>`,\n  an image on the shelf, and the film CUTS TO that image for the beat once it lands. Find the\n  image first: `list_library` with scope project lists every room\'s images. None fits: for an\n  app, ask the human for a screenshot; for a product you can picture, `make_product_image`\n  makes one and shelves it under the name you then use. A product beat without a SHOW line is\n  refused.\n- **The platform.** The ones the human picked on the angle card (`\u2026 \xB7 platforms: x, linkedin` in\n  their reply). A pick of none means the ask\'s platform, else the connected accounts. One card per\n  picked platform, a video post reads the same on X and LinkedIn as on TikTok.\n- **A change to a draft.** "\u21A9 Re draft b: \u2026" is the human asking for a change on card b: call\n  `read_drafts`, then `revise_posts` with the script or caption changed from what the card\n  holds, in full. Never redraft from memory, never add a second card.\n- **The creator brief.** Fill the module\'s "Creator Briefs for UGC Ads" template for this\n  campaign and shelve it through `propose_library_doc` as `ugc-brief-YYYY-MM-DD.md`, with the\n  rights line and the disclosure line ("#ad", "gifted") the module prescribes.\n- **Honesty.** No invented customers, quotes, numbers or testimonials: a script speaks as "I",\n  a creator, about what the release does, and cites nothing it cannot cite. Say `[NEED: x]`\n  for a claim the human must confirm. Run the `slop-patterns` checks before hand-over.\n- **Custody.** You draft. Approving, scheduling, publishing and paying creators stay human.\n\n---\n\n# UGC Strategy\n\n## When to Activate\n\n- Building social proof for a new or growing brand\n- Ad creative costs are high and performance is declining (UGC ads often outperform polished creative)\n- Customer reviews and testimonials are sparse or unstructured\n- Launching a UGC campaign or contest\n- Scaling content production without proportionally scaling the content team\n- Community building is a strategic priority\n- Exploring influencer or creator partnerships that include UGC components\n\n## First Questions\n\n1. What type of UGC is most valuable for your business? (Reviews, photos, videos, testimonials, social posts?)\n2. Where do customers already talk about you organically? (Social, forums, review sites?)\n3. What incentive (if any) will motivate customers to create content?\n4. Do you have a process for obtaining content rights and permissions?\n5. Where will UGC be used? (Social, website, ads, email, packaging?)\n6. What is the quality bar? (Authentic and raw vs semi-polished?)\n7. What is the legal landscape? (FTC guidelines, platform terms, privacy requirements?)\n\n## UGC Types\n\n### Reviews and Ratings\n- Product reviews on your site, Amazon, G2, Capterra, Yelp\n- Star ratings and aggregate scores\n- Review response strategy (responding to both positive and negative reviews)\n- Review solicitation campaigns (post-purchase email sequences)\n\n### Testimonials\n- Written quotes from happy customers\n- Video testimonials (short-form, interview-style, or self-recorded)\n- Case study quotes\n- Social proof snippets for landing pages and ads\n\n### Social Media Posts\n- Photos of customers using the product\n- Unboxing and first-impression content\n- Stories, Reels, and TikToks featuring the product\n- Brand mentions and tags\n- Hashtag campaign contributions\n\n### Video Content\n- Unboxing videos\n- Product reviews and tutorials\n- Before/after transformations\n- "Day in the life" featuring the product\n- Reaction and first-impression videos\n- How-to content created by users\n\n### Community Content\n- Forum posts and discussions\n- Community Q&A contributions\n- User-created templates, workflows, or resources\n- Fan art and creative interpretations\n- User-submitted tips and hacks\n\n## UGC Campaign Design\n\n### Campaign Structure\n\n```\n1. GOAL\n   What business objective does this campaign serve?\n   (Social proof, content volume, community engagement, product launch buzz)\n\n2. AUDIENCE\n   Who are you asking to create content?\n   (Existing customers, new buyers, fans, creators, employees)\n\n3. PROMPT\n   What specific content are you asking for?\n   (Be specific \u2014 "Share a video of..." not "Post something about us")\n\n4. MECHANIC\n   How do people participate?\n   (Hashtag, form submission, direct upload, email, contest entry)\n\n5. INCENTIVE\n   What do participants get?\n   (Recognition, prizes, features, discounts, early access, nothing but community)\n\n6. CURATION\n   How will you select and surface the best content?\n   (Manual review, community voting, algorithm, editorial selection)\n\n7. AMPLIFICATION\n   Where will the best UGC be shared?\n   (Brand social, website, ads, email, retail displays)\n\n8. TIMELINE\n   When does the campaign run?\n   (Always-on vs time-bound, launch windows, seasonal alignment)\n```\n\n### Campaign Examples\n\n**Product launch buzz:**\n"Show us your first five minutes with [Product]. Tag #FirstFiveMinutes for a chance to be featured on our page and win a year free."\n\n**Community building:**\n"What\'s the most creative way you use [Product]? Share your setup with #My[Product]Setup. We\'ll feature the best ones every Friday."\n\n**Social proof at scale:**\n"Love [Product]? Leave a 30-second video review and get 20% off your next order. Honest reviews only \u2014 we want the real story."\n\n**Seasonal:**\n"Show us how [Product] fits into your holiday routine. Best entries get featured in our holiday campaign and receive a gift box."\n\n## Incentive Structures\n\n| Incentive Type | Effectiveness | Cost | Best For |\n|---|---|---|---|\n| **Featured/recognition** | High for engaged communities | Free | Brand advocates, creators who want exposure |\n| **Discounts/credits** | Medium-high, reliable | Low-medium | Review solicitation, repeat customers |\n| **Contest/sweepstakes** | High for volume, lower quality | Medium | Large-scale campaigns, viral moments |\n| **Free product** | High for detailed content | Medium | Unboxing, review, tutorial content |\n| **Cash/payment** | Highest for quality | High | Creator partnerships, produced content |\n| **Early access** | High for power users | Free | Product launches, beta features |\n| **No incentive** | Works for strong brands with loyal communities | Free | Organic advocacy, authentic social proof |\n\n### Incentive Rules\n\n- Match the incentive to the effort required. A 10% discount is not enough for a 5-minute video review.\n- Overly generous incentives can attract low-quality submissions motivated only by the reward.\n- Non-monetary incentives (recognition, featuring, access) often produce more authentic content.\n- Always disclose when content was incentivized (FTC requirement in the US).\n\n## Rights Management and Permissions\n\n### Getting Content Rights\n\nYou MUST have explicit permission to use customer content in your marketing. Approaches:\n\n**1. Terms of participation.** Campaign terms and conditions state that submissions grant the brand a license to use the content. Common for hashtag campaigns and contests.\n\n**2. Direct permission request.** DM or email the creator asking for permission to use their content. Document the approval.\n\n**3. Creator agreements.** For paid or partnership UGC, use a content license agreement specifying:\n- Usage rights (which channels, which formats)\n- Duration (perpetual, 12 months, campaign-only)\n- Exclusivity (can the creator post the same content for competitors?)\n- Modification rights (can you edit, crop, add text?)\n- Attribution requirements (must you credit the creator?)\n\n### Rights Management Template\n\n```\nCreator: [Name / Handle]\nContent: [Description / Link]\nDate obtained: [Date]\nPermission method: [ToS / DM approval / Agreement]\nUsage rights: [Social, web, ads, email, print \u2014 specify]\nDuration: [Perpetual / Time-bound]\nAttribution required: [Yes \u2014 format / No]\nIncentive provided: [None / Discount / Payment / Product]\nDisclosure required: [Yes \u2014 #ad, #sponsored, #gifted / No]\nNotes: [Any restrictions or special terms]\n```\n\n## Content Curation Workflow\n\n### Monitoring\n\n- Set up social listening for brand mentions, product hashtags, and relevant keywords\n- Monitor review platforms on a set cadence (daily for high-volume, weekly for low-volume)\n- Tools: Sprout Social, Brandwatch, Mention, Google Alerts, native platform search\n\n### Selection Criteria\n\nRate incoming UGC on:\n\n| Criterion | Weight | Notes |\n|---|---|---|\n| Quality (visual/audio clarity) | High | Must meet minimum quality for intended use |\n| Authenticity | High | Feels real, not staged or scripted |\n| Brand alignment | High | Matches brand values and visual standards |\n| Diversity | Medium | Represents diverse users and use cases |\n| Message clarity | Medium | The value proposition or experience is clear |\n| Engagement potential | Medium | Will this resonate when amplified? |\n| Legal safety | Must pass | No IP issues, no minors without consent, no misleading claims |\n\n### Curation Process\n\n```\n1. COLLECT \u2014 Aggregate UGC from all sources into a central library\n2. SCREEN \u2014 Filter for quality, brand safety, and legal compliance\n3. OBTAIN RIGHTS \u2014 Secure usage permissions (do not skip this step)\n4. CATEGORIZE \u2014 Tag by theme, product, format, platform, and use case\n5. STORE \u2014 Archive with metadata in a searchable asset library\n6. DEPLOY \u2014 Match curated UGC to marketing needs (ads, social, web, email)\n7. TRACK \u2014 Monitor performance of deployed UGC\n```\n\n## UGC in Ads\n\nUGC ads frequently outperform brand-produced creative, especially on social platforms.\n\n### UGC Ad Formats\n\n**Whitelisting / Spark Ads:** Run ads from the creator\'s account (not your brand account). Appears native in the feed. Available on TikTok (Spark Ads) and Meta (partnership ads).\n\n**Brand account with UGC creative:** Use UGC footage/images in ads run from your brand account. Feels more authentic than polished brand creative.\n\n**Testimonial ads:** Customer quotes or video testimonials formatted as ad creative.\n\n**Mashup ads:** Combine multiple UGC clips into a single compilation ad.\n\n### UGC Ad Best Practices\n\n- **Keep it raw.** Over-editing UGC removes its authenticity advantage. Light editing only.\n- **First 3 seconds.** The hook must grab attention immediately. Lead with the most compelling moment.\n- **Include the product.** UGC ads still need to clearly show or mention the product.\n- **Add captions.** Most social video is watched without sound. Caption all spoken content.\n- **Test at scale.** UGC ads thrive on volume and variation. Test multiple creators and angles.\n- **Disclose properly.** If the creator was paid or gifted, the ad must disclose the relationship.\n\n### Creator Briefs for UGC Ads\n\nWhen commissioning UGC from creators, provide:\n\n```\nProduct: [What they\'re reviewing/showing]\nKey message: [The one thing viewers should take away]\nFormat: [Video length, orientation (9:16 vertical), platform]\nMust include: [Product visible, specific feature mention, CTA]\nMust avoid: [Competitor mentions, specific claims, inappropriate content]\nTone: [Authentic, excited, educational, casual]\nDeadline: [When raw footage is due]\nDelivery: [How and where to submit files]\nCompensation: [Payment, product, or other incentive]\nUsage rights: [How the content will be used and for how long]\n```\n\n## Quality Control\n\n### Content Moderation\n\n- Review all UGC before amplifying \u2014 never auto-publish without review\n- Check for brand safety issues (offensive content, competitor products in frame, inappropriate language)\n- Verify factual claims in reviews and testimonials (do not amplify false claims about your product)\n- Ensure diversity in featured UGC \u2014 do not inadvertently represent only one demographic\n\n### Maintaining Authenticity\n\n- Do not over-edit UGC \u2014 imperfections are part of its value\n- Do not script UGC so heavily that it sounds like a commercial\n- Do not fake UGC \u2014 fabricated "customer" content is a legal and reputational risk\n- Do not cherry-pick only positive content \u2014 balanced representation builds more trust\n\n## Legal Considerations\n\n### FTC Disclosure Requirements (US)\n\n- **Material connection = disclosure required.** If the creator received anything of value (payment, free product, discount, early access), the relationship must be disclosed.\n- **Disclosure must be clear and conspicuous.** "#ad" or "#sponsored" at the beginning of the post, not buried in 30 hashtags.\n- **Platform tools preferred.** Use built-in partnership/sponsored content labels where available.\n- **Applies to all formats.** Written, photo, video, audio, Stories, Reels, TikToks \u2014 all require disclosure.\n\n### Other Legal Considerations\n\n- **Privacy.** Do not use content featuring identifiable individuals (especially minors) without explicit consent.\n- **Copyright.** The creator owns their content. Reposting without permission is copyright infringement.\n- **Trademark.** Ensure UGC does not misuse third-party trademarks.\n- **Claims.** If UGC makes product efficacy claims (especially in health, finance, education), verify compliance with advertising regulations.\n- **International.** Privacy and disclosure laws vary by country. GDPR in EU, PIPEDA in Canada, etc.\n\n**Disclaimer:** This is general guidance, not legal advice. Consult with a lawyer for your specific situation and jurisdictions.\n\n## Common Pitfalls\n\n1. **No rights management.** Using customer content without permission exposes you to legal risk and damages creator relationships.\n2. **Over-controlling the content.** If you script and direct every detail, it is not UGC \u2014 it is a commercial with an amateur actor.\n3. **Ignoring negative UGC.** Negative reviews and critical posts are feedback. Respond professionally, do not hide from them.\n4. **One-and-done campaigns.** UGC should be an ongoing program, not a single campaign. Build systems, not events.\n5. **No curation process.** Without a system for collecting, screening, and deploying UGC, valuable content gets lost.\n6. **Mismatched incentives.** Asking for a 5-minute video review in exchange for a 10% discount is a bad deal for the creator.\n\n## Quality Gate\n\nBefore launching a UGC program or campaign:\n\n- [ ] UGC types and formats are defined with clear examples\n- [ ] Campaign mechanic is simple and specific (participants know exactly what to create)\n- [ ] Incentive structure matches the effort required from participants\n- [ ] Rights management process is established with templates for permission requests\n- [ ] Content moderation and curation workflow is defined\n- [ ] Legal requirements are understood (FTC disclosure, privacy, copyright)\n- [ ] Deployment plan specifies where UGC will be used (social, ads, web, email)\n- [ ] Creator briefs are ready (for paid/commissioned UGC)\n- [ ] Success metrics are defined (submission volume, engagement, ad performance, conversion lift)\n- [ ] Escalation plan exists for negative or brand-unsafe submissions'
+        "body": '## In NeuraMesh (read first \u2014 it overrides the module\'s delivery notes)\n\n- **Two turns, in this order.** (1) RESEARCH: read the room\'s brand docs (`read_library_doc`\n  scope room, `business-profile.md` first) plus the [MARKETING CONTEXT] note in your prompt; in a\n  release session the digest and the release brief in the thread are the facts. (2) THE ANGLE\n  CARD: call `propose_angles` with the product\'s name and two to five angles, each resting on a\n  fact you just read (a first-person walkthrough, a before-and-after, a "three things I did not\n  expect", a reply to a real objection, a duet-style react), then STOP with one line: the human\n  picks an angle, the platforms and the film\'s length on the card, or types their own angle. (3)\n  THE DRAFTS, on the human\'s pick (their reply wakes you): `draft_posts` with one VIDEO post per\n  picked platform, all in the chosen angle. A script drafted before the pick is refused, so never\n  skip the card.\n- **What each draft is.** Each card has three parts:\n  `body` is the CAPTION that posts with the video (one or two lines, the hashtags the network\n  uses, within its limit); `script` is what the creator reads and films (9:16, the hook in the\n  first three seconds as `[0:00-0:03]`, then timestamped beats, one call to action at the end),\n  written to the LENGTH the human picked (`\u2026 \xB7 length: 15 s` in their\n  reply, eight seconds when they picked none): the beats end at that second, the spoken lines are\n  short, and no beat asks for on-screen text, captions or subtitles beyond one title of three\n  words at most (a video model cannot spell more; the caption that posts is the body). The film\n  shows the script\'s first seconds; `imageBrief` is the shot direction the film follows;\n  `frame` is the name of a real app screenshot on this room\'s shelf (the [MARKETING CONTEXT]\n  note lists them), so the film\'s own picture of the product follows the real one. Never put the script in\n  the body: the body publishes.\n- **The app is real, never drawn.** A video model cannot copy a screen. A beat that puts the\n  app\'s screen on camera (a screen recording, the app on a phone, a close-up of the screen)\n  carries `SHOW: <image name>`, a real app screenshot, and the film CUTS TO it for that beat.\n  A real one is an image a person put in Files (`list_library` with scope project lists them)\n  or one `shelve_repo_screenshot` takes from the project\'s repository (`list_repo_files`\n  finds the images). A web capture or a drawn picture never counts, and a screen beat with no\n  SHOW line is refused. Most beats need no SHOW: a creator who talks to camera, or holds a phone\n  with its screen away, shows no app.\n- **The platform.** The ones the human picked on the angle card (`\u2026 \xB7 platforms: x, linkedin` in\n  their reply). A pick of none means the ask\'s platform, else the connected accounts. One card per\n  picked platform, a video post reads the same on X and LinkedIn as on TikTok.\n- **A change to a draft.** "\u21A9 Re draft b: \u2026" is the human asking for a change on card b: call\n  `read_drafts`, then `revise_posts` with the script or caption changed from what the card\n  holds, in full. Never redraft from memory, never add a second card.\n- **The creator brief.** Fill the module\'s "Creator Briefs for UGC Ads" template for this\n  campaign and shelve it through `propose_library_doc` as `ugc-brief-YYYY-MM-DD.md`, with the\n  rights line and the disclosure line ("#ad", "gifted") the module prescribes.\n- **Honesty.** No invented customers, quotes, numbers or testimonials: a script speaks as "I",\n  a creator, about what the release does, and cites nothing it cannot cite. Say `[NEED: x]`\n  for a claim the human must confirm. Run the `slop-patterns` checks before hand-over.\n- **Custody.** You draft. Approving, scheduling, publishing and paying creators stay human.\n\n---\n\n# UGC Strategy\n\n## When to Activate\n\n- Building social proof for a new or growing brand\n- Ad creative costs are high and performance is declining (UGC ads often outperform polished creative)\n- Customer reviews and testimonials are sparse or unstructured\n- Launching a UGC campaign or contest\n- Scaling content production without proportionally scaling the content team\n- Community building is a strategic priority\n- Exploring influencer or creator partnerships that include UGC components\n\n## First Questions\n\n1. What type of UGC is most valuable for your business? (Reviews, photos, videos, testimonials, social posts?)\n2. Where do customers already talk about you organically? (Social, forums, review sites?)\n3. What incentive (if any) will motivate customers to create content?\n4. Do you have a process for obtaining content rights and permissions?\n5. Where will UGC be used? (Social, website, ads, email, packaging?)\n6. What is the quality bar? (Authentic and raw vs semi-polished?)\n7. What is the legal landscape? (FTC guidelines, platform terms, privacy requirements?)\n\n## UGC Types\n\n### Reviews and Ratings\n- Product reviews on your site, Amazon, G2, Capterra, Yelp\n- Star ratings and aggregate scores\n- Review response strategy (responding to both positive and negative reviews)\n- Review solicitation campaigns (post-purchase email sequences)\n\n### Testimonials\n- Written quotes from happy customers\n- Video testimonials (short-form, interview-style, or self-recorded)\n- Case study quotes\n- Social proof snippets for landing pages and ads\n\n### Social Media Posts\n- Photos of customers using the product\n- Unboxing and first-impression content\n- Stories, Reels, and TikToks featuring the product\n- Brand mentions and tags\n- Hashtag campaign contributions\n\n### Video Content\n- Unboxing videos\n- Product reviews and tutorials\n- Before/after transformations\n- "Day in the life" featuring the product\n- Reaction and first-impression videos\n- How-to content created by users\n\n### Community Content\n- Forum posts and discussions\n- Community Q&A contributions\n- User-created templates, workflows, or resources\n- Fan art and creative interpretations\n- User-submitted tips and hacks\n\n## UGC Campaign Design\n\n### Campaign Structure\n\n```\n1. GOAL\n   What business objective does this campaign serve?\n   (Social proof, content volume, community engagement, product launch buzz)\n\n2. AUDIENCE\n   Who are you asking to create content?\n   (Existing customers, new buyers, fans, creators, employees)\n\n3. PROMPT\n   What specific content are you asking for?\n   (Be specific \u2014 "Share a video of..." not "Post something about us")\n\n4. MECHANIC\n   How do people participate?\n   (Hashtag, form submission, direct upload, email, contest entry)\n\n5. INCENTIVE\n   What do participants get?\n   (Recognition, prizes, features, discounts, early access, nothing but community)\n\n6. CURATION\n   How will you select and surface the best content?\n   (Manual review, community voting, algorithm, editorial selection)\n\n7. AMPLIFICATION\n   Where will the best UGC be shared?\n   (Brand social, website, ads, email, retail displays)\n\n8. TIMELINE\n   When does the campaign run?\n   (Always-on vs time-bound, launch windows, seasonal alignment)\n```\n\n### Campaign Examples\n\n**Product launch buzz:**\n"Show us your first five minutes with [Product]. Tag #FirstFiveMinutes for a chance to be featured on our page and win a year free."\n\n**Community building:**\n"What\'s the most creative way you use [Product]? Share your setup with #My[Product]Setup. We\'ll feature the best ones every Friday."\n\n**Social proof at scale:**\n"Love [Product]? Leave a 30-second video review and get 20% off your next order. Honest reviews only \u2014 we want the real story."\n\n**Seasonal:**\n"Show us how [Product] fits into your holiday routine. Best entries get featured in our holiday campaign and receive a gift box."\n\n## Incentive Structures\n\n| Incentive Type | Effectiveness | Cost | Best For |\n|---|---|---|---|\n| **Featured/recognition** | High for engaged communities | Free | Brand advocates, creators who want exposure |\n| **Discounts/credits** | Medium-high, reliable | Low-medium | Review solicitation, repeat customers |\n| **Contest/sweepstakes** | High for volume, lower quality | Medium | Large-scale campaigns, viral moments |\n| **Free product** | High for detailed content | Medium | Unboxing, review, tutorial content |\n| **Cash/payment** | Highest for quality | High | Creator partnerships, produced content |\n| **Early access** | High for power users | Free | Product launches, beta features |\n| **No incentive** | Works for strong brands with loyal communities | Free | Organic advocacy, authentic social proof |\n\n### Incentive Rules\n\n- Match the incentive to the effort required. A 10% discount is not enough for a 5-minute video review.\n- Overly generous incentives can attract low-quality submissions motivated only by the reward.\n- Non-monetary incentives (recognition, featuring, access) often produce more authentic content.\n- Always disclose when content was incentivized (FTC requirement in the US).\n\n## Rights Management and Permissions\n\n### Getting Content Rights\n\nYou MUST have explicit permission to use customer content in your marketing. Approaches:\n\n**1. Terms of participation.** Campaign terms and conditions state that submissions grant the brand a license to use the content. Common for hashtag campaigns and contests.\n\n**2. Direct permission request.** DM or email the creator asking for permission to use their content. Document the approval.\n\n**3. Creator agreements.** For paid or partnership UGC, use a content license agreement specifying:\n- Usage rights (which channels, which formats)\n- Duration (perpetual, 12 months, campaign-only)\n- Exclusivity (can the creator post the same content for competitors?)\n- Modification rights (can you edit, crop, add text?)\n- Attribution requirements (must you credit the creator?)\n\n### Rights Management Template\n\n```\nCreator: [Name / Handle]\nContent: [Description / Link]\nDate obtained: [Date]\nPermission method: [ToS / DM approval / Agreement]\nUsage rights: [Social, web, ads, email, print \u2014 specify]\nDuration: [Perpetual / Time-bound]\nAttribution required: [Yes \u2014 format / No]\nIncentive provided: [None / Discount / Payment / Product]\nDisclosure required: [Yes \u2014 #ad, #sponsored, #gifted / No]\nNotes: [Any restrictions or special terms]\n```\n\n## Content Curation Workflow\n\n### Monitoring\n\n- Set up social listening for brand mentions, product hashtags, and relevant keywords\n- Monitor review platforms on a set cadence (daily for high-volume, weekly for low-volume)\n- Tools: Sprout Social, Brandwatch, Mention, Google Alerts, native platform search\n\n### Selection Criteria\n\nRate incoming UGC on:\n\n| Criterion | Weight | Notes |\n|---|---|---|\n| Quality (visual/audio clarity) | High | Must meet minimum quality for intended use |\n| Authenticity | High | Feels real, not staged or scripted |\n| Brand alignment | High | Matches brand values and visual standards |\n| Diversity | Medium | Represents diverse users and use cases |\n| Message clarity | Medium | The value proposition or experience is clear |\n| Engagement potential | Medium | Will this resonate when amplified? |\n| Legal safety | Must pass | No IP issues, no minors without consent, no misleading claims |\n\n### Curation Process\n\n```\n1. COLLECT \u2014 Aggregate UGC from all sources into a central library\n2. SCREEN \u2014 Filter for quality, brand safety, and legal compliance\n3. OBTAIN RIGHTS \u2014 Secure usage permissions (do not skip this step)\n4. CATEGORIZE \u2014 Tag by theme, product, format, platform, and use case\n5. STORE \u2014 Archive with metadata in a searchable asset library\n6. DEPLOY \u2014 Match curated UGC to marketing needs (ads, social, web, email)\n7. TRACK \u2014 Monitor performance of deployed UGC\n```\n\n## UGC in Ads\n\nUGC ads frequently outperform brand-produced creative, especially on social platforms.\n\n### UGC Ad Formats\n\n**Whitelisting / Spark Ads:** Run ads from the creator\'s account (not your brand account). Appears native in the feed. Available on TikTok (Spark Ads) and Meta (partnership ads).\n\n**Brand account with UGC creative:** Use UGC footage/images in ads run from your brand account. Feels more authentic than polished brand creative.\n\n**Testimonial ads:** Customer quotes or video testimonials formatted as ad creative.\n\n**Mashup ads:** Combine multiple UGC clips into a single compilation ad.\n\n### UGC Ad Best Practices\n\n- **Keep it raw.** Over-editing UGC removes its authenticity advantage. Light editing only.\n- **First 3 seconds.** The hook must grab attention immediately. Lead with the most compelling moment.\n- **Include the product.** UGC ads still need to clearly show or mention the product.\n- **Add captions.** Most social video is watched without sound. Caption all spoken content.\n- **Test at scale.** UGC ads thrive on volume and variation. Test multiple creators and angles.\n- **Disclose properly.** If the creator was paid or gifted, the ad must disclose the relationship.\n\n### Creator Briefs for UGC Ads\n\nWhen commissioning UGC from creators, provide:\n\n```\nProduct: [What they\'re reviewing/showing]\nKey message: [The one thing viewers should take away]\nFormat: [Video length, orientation (9:16 vertical), platform]\nMust include: [Product visible, specific feature mention, CTA]\nMust avoid: [Competitor mentions, specific claims, inappropriate content]\nTone: [Authentic, excited, educational, casual]\nDeadline: [When raw footage is due]\nDelivery: [How and where to submit files]\nCompensation: [Payment, product, or other incentive]\nUsage rights: [How the content will be used and for how long]\n```\n\n## Quality Control\n\n### Content Moderation\n\n- Review all UGC before amplifying \u2014 never auto-publish without review\n- Check for brand safety issues (offensive content, competitor products in frame, inappropriate language)\n- Verify factual claims in reviews and testimonials (do not amplify false claims about your product)\n- Ensure diversity in featured UGC \u2014 do not inadvertently represent only one demographic\n\n### Maintaining Authenticity\n\n- Do not over-edit UGC \u2014 imperfections are part of its value\n- Do not script UGC so heavily that it sounds like a commercial\n- Do not fake UGC \u2014 fabricated "customer" content is a legal and reputational risk\n- Do not cherry-pick only positive content \u2014 balanced representation builds more trust\n\n## Legal Considerations\n\n### FTC Disclosure Requirements (US)\n\n- **Material connection = disclosure required.** If the creator received anything of value (payment, free product, discount, early access), the relationship must be disclosed.\n- **Disclosure must be clear and conspicuous.** "#ad" or "#sponsored" at the beginning of the post, not buried in 30 hashtags.\n- **Platform tools preferred.** Use built-in partnership/sponsored content labels where available.\n- **Applies to all formats.** Written, photo, video, audio, Stories, Reels, TikToks \u2014 all require disclosure.\n\n### Other Legal Considerations\n\n- **Privacy.** Do not use content featuring identifiable individuals (especially minors) without explicit consent.\n- **Copyright.** The creator owns their content. Reposting without permission is copyright infringement.\n- **Trademark.** Ensure UGC does not misuse third-party trademarks.\n- **Claims.** If UGC makes product efficacy claims (especially in health, finance, education), verify compliance with advertising regulations.\n- **International.** Privacy and disclosure laws vary by country. GDPR in EU, PIPEDA in Canada, etc.\n\n**Disclaimer:** This is general guidance, not legal advice. Consult with a lawyer for your specific situation and jurisdictions.\n\n## Common Pitfalls\n\n1. **No rights management.** Using customer content without permission exposes you to legal risk and damages creator relationships.\n2. **Over-controlling the content.** If you script and direct every detail, it is not UGC \u2014 it is a commercial with an amateur actor.\n3. **Ignoring negative UGC.** Negative reviews and critical posts are feedback. Respond professionally, do not hide from them.\n4. **One-and-done campaigns.** UGC should be an ongoing program, not a single campaign. Build systems, not events.\n5. **No curation process.** Without a system for collecting, screening, and deploying UGC, valuable content gets lost.\n6. **Mismatched incentives.** Asking for a 5-minute video review in exchange for a 10% discount is a bad deal for the creator.\n\n## Quality Gate\n\nBefore launching a UGC program or campaign:\n\n- [ ] UGC types and formats are defined with clear examples\n- [ ] Campaign mechanic is simple and specific (participants know exactly what to create)\n- [ ] Incentive structure matches the effort required from participants\n- [ ] Rights management process is established with templates for permission requests\n- [ ] Content moderation and curation workflow is defined\n- [ ] Legal requirements are understood (FTC disclosure, privacy, copyright)\n- [ ] Deployment plan specifies where UGC will be used (social, ads, web, email)\n- [ ] Creator briefs are ready (for paid/commissioned UGC)\n- [ ] Success metrics are defined (submission volume, engagement, ad performance, conversion lift)\n- [ ] Escalation plan exists for negative or brand-unsafe submissions'
       },
       {
         "name": "honest-analytics",
@@ -25672,7 +28211,7 @@ var PostgresStore = class {
     const [n] = await sql`select nm_next_task_number(${workspace}::uuid) as n`;
     const inserted = await sql`insert into tasks (workspace_id, channel_id, project_id, number, title, description, state, kind, creator_kind, creator_id)
       select ${workspace}::uuid, ${channelId}::uuid, c.project_id, ${Number(n["n"])}, ${flow.title},
-             ${"Walk the steps below to set this room up \u2014 your answers save as you go, so you can leave and finish any time. Closing this task skips setup."},
+             ${flow.description},
              'todo'::task_state, 'setup'::task_kind, 'human'::actor_kind,
              coalesce(
                case when c.created_by ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then c.created_by::uuid end,

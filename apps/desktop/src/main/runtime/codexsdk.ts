@@ -15,7 +15,7 @@ import { instructionsFor } from '../host/turnkit';
 import { beatMarkerSink, stripBeatMarkers } from '../beats';
 import { openBusBridge, userDataDir, beatsAdapter } from '../harness/turntools';
 import type { ToolHost } from '../harness/toolbus';
-import type { TurnKind } from '@neuramesh/shared';
+import { toolVerb, type TurnKind } from '@neuramesh/shared';
 import { ensureCli } from './cli';
 
 // Minimal shapes from @openai/codex-sdk (dynamically imported to keep the main bundle lean).
@@ -49,14 +49,16 @@ async function mkCodex(token: string, opts?: { config?: Record<string, unknown> 
   return new Codex({ codexPathOverride: bin, apiKey: token || undefined, env, config: { model_reasoning_summary: 'detailed', ...opts?.config } });
 }
 
-/** one tool step as the Thoughts block shows it: the tool, and what it was asked, on one line */
+/** one tool step as the Thoughts block shows it: what the agent does, in the run card's words (shared
+ *  toolVerb, never the tool's name), and what it was asked, on one line */
 export function thoughtStep(it: CodexItem): string | null {
   if (it.type === 'mcp_tool_call' && it.tool) {
     const a = it.arguments && typeof it.arguments === 'object' ? Object.values(it.arguments as Record<string, unknown>).find((v) => typeof v === 'string' && v.trim()) : null;
-    return `› ${it.tool}${typeof a === 'string' ? ` · ${a.replace(/\s+/g, ' ').slice(0, 120)}` : ''}`;
+    const words = toolVerb({ kind: 'tool', phase: 'call', summary: it.tool })?.verb ?? it.tool.replace(/_/g, ' ');
+    return `› ${words}${typeof a === 'string' ? ` · ${a.replace(/\s+/g, ' ').slice(0, 120)}` : ''}`;
   }
-  if (it.type === 'command_execution' && it.command) return `› ${String(it.command).replace(/\s+/g, ' ').slice(0, 120)}`;
-  if (it.type === 'web_search' && it.query) return `› web search · ${it.query.slice(0, 120)}`;
+  if (it.type === 'command_execution' && it.command) return `› runs ${String(it.command).replace(/\s+/g, ' ').slice(0, 120)}`;
+  if (it.type === 'web_search' && it.query) return `› searches the web · ${it.query.slice(0, 120)}`;
   return null;
 }
 

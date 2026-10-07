@@ -86,10 +86,11 @@ export function makeLegs(ctx: {
       // and "which config is this running on" was gone for the rest of the run.
       const run = await openRun(seated, where, {
         kind: 'leg', title: label, parentRunId: parentRunOf(task.id) ?? undefined,
-        step: 'starting', seat: seatLabel(resolved),
+        step: 'starts the work', seat: seatLabel(resolved),
       });
       subtree.add({ turnId: run.id || runKey, role: i.role as AgentRole, label, state: 'running' });
-      log?.({ kind: 'tool', phase: 'call', summary: `leg "${label}" · ${i.role} · ${seated.model} · ${Math.round(decision.budget.wallMs / 60_000)}m` });
+      // the model rides in the detail: the step log prints the summary to a person, and the seat chip names the brain
+      log?.({ kind: 'tool', phase: 'call', summary: `leg "${label}" · ${i.role} · ${Math.round(decision.budget.wallMs / 60_000)}m`, detail: { model: seated.model } });
       try {
         const cred = await resolveToken(apiUrl, where.workspace, seated, ownerActorId);
         const out = await withTimeout(

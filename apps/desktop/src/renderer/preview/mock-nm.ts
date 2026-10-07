@@ -550,9 +550,11 @@ const explicit: Record<string, any> = {
   creditsHistory: async () => ({
     days: Array.from({ length: 14 }, (_, i) => ({ day: `2026-08-${String(15 + i).padStart(2, '0')}`, activeSeconds: [0, 600, 1800, 3600, 900][i % 5]!, modelCalls: [0, 2, 5, 9, 3][i % 5]!, modelInTokens: 12000, modelOutTokens: 900, brainCredits: [0, 1, 4, 7, 2][i % 5]!, machineCredits: [0, 1, 3, 6, 1][i % 5]! })),
     grants: [{ credits: 500, kind: 'purchase', note: 'pack', day: '2026-08-20' }, { credits: 500, kind: 'monthly', note: 'monthly refill (free)', day: '2026-08-01' }],
+    // two films as the server lists them since 2026-10-06: the tier and the picture size, never the model
+    films: [{ id: 'f1', item: 'i1', tier: 'premium', model: '720p', seconds: 10, credits: 473, status: 'done', day: '2026-08-27', at: '2026-08-27T09:14:00Z' }, { id: 'f2', item: 'i2', tier: 'premium', model: '720p', seconds: 10, credits: 473, status: 'failed', day: '2026-08-26', at: '2026-08-26T16:02:00Z' }],
   }),
   creditsCheckout: async () => ({ ok: true }),
-  starterVideo: async () => ({ served: true, tier: 'starter', pick: null, canPick: localStorage.getItem('nm:plan') === 'cloud', tiers: [{ tier: 'starter', label: 'NeuraMesh Video Starter', model: 'Seedance 2.0', vendor: 'ByteDance', seconds: 8, credits: 194, lengths: [5, 8, 10, 15], perSecondMicros: 241_900 }, { tier: 'xpress', label: 'NeuraMesh Video Xpress', model: 'MiniMax H3', vendor: 'MiniMax', seconds: 8, credits: 48, lengths: [5, 8, 10, 15], perSecondMicros: 60_000 }, { tier: 'premium', label: 'NeuraMesh Video Premium', model: 'Seedance 2.0 Standard', vendor: 'ByteDance', seconds: 8, credits: 243, lengths: [5, 8, 10, 15], perSecondMicros: 303_400 }] }),
+  starterVideo: async () => ({ served: true, tier: 'starter', pick: null, canPick: localStorage.getItem('nm:plan') === 'cloud', tiers: [{ tier: 'starter', label: 'NeuraMesh Video Starter', model: '720p', seconds: 8, credits: 194, lengths: [5, 8, 10, 15], perSecondMicros: 241_900 }, { tier: 'xpress', label: 'NeuraMesh Video Xpress', model: '768p', seconds: 8, credits: 48, lengths: [5, 8, 10, 15], perSecondMicros: 60_000 }, { tier: 'premium', label: 'NeuraMesh Video Premium', model: '720p', seconds: 8, credits: 243, lengths: [5, 8, 10, 15], perSecondMicros: 303_400 }] }),
   billingPortal: async () => ({ ok: true }),
   // ?machinelimit=1 surfaces the Free single-machine transfer-or-upgrade card for capture/preview
   machineLimitInfo: async () =>

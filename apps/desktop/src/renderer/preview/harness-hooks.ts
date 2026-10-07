@@ -12,10 +12,12 @@
 //   window.__nmHumanSays(taskId, body, agoMs?)       — you replied, and nothing has answered
 //   window.__nmHumanSaysInConvo(threadId, body, ms?) — the same, in a conversation
 //   window.__nmAgentDelivers(taskId, file)           — an agent delivers a file to a task (it opens in the side panel)
+//   window.__nmDocWrites(agentId, file, slug?)       — an agent's log says it writes a brand doc (the brand rail's row)
 //
 // `agoMs` ages the message, which is what makes the WAIT DEADLINE reachable (docs/26 §5): a state
 // that by definition only exists minutes after a send.
-import { allTasks, artifacts, baseThreadRows, convoMsgs, pingArts, pingConvo, taskThreadExtra, taskThreadWatchers } from './mock-fixtures';
+import { docWriteLog } from '@neuramesh/shared';
+import { agents, allTasks, artifacts, baseThreadRows, convoMsgs, emitLog, pingArts, pingConvo, taskThreadExtra, taskThreadWatchers } from './mock-fixtures';
 
 const push = (rows: any[], key: string, row: Record<string, unknown>) => {
   rows.push({ id: `${key}-${rows.length + 1}`, created_at: new Date().toISOString(), ...row });
@@ -55,6 +57,13 @@ export const agentDelivers = (taskId: string, file: { name: string; kind?: strin
   pingArts(taskId);
 };
 
+/** the daemon's log line while an agent writes a brand doc (host/marketing.ts, shared docWriteLog), after
+ *  first paint: the brand rail's row names the agent and the doc until the doc lands on the shelf */
+export const docWrites = (agentId: string, file: string, channelSlug = 'marketing') => {
+  const name = agents.find((a) => a.id === agentId)?.name ?? agentId;
+  emitLog({ kind: 'tool', phase: 'call', agent_id: agentId, agent_name: name, channel_slug: channelSlug, summary: docWriteLog(file) });
+};
+
 /** the app starts with its side panel folded and stores no fold (2026-10-05), so ?dock=1 and a
  *  seeded tab set open it the way a person does: ⌘J, pressed again until the shell listens. ⌘J
  *  toggles, so a press gets time to land before the next one, or it folds what it opened. */
@@ -69,4 +78,4 @@ export const unfoldOnBoot = () => {
   }, 100);
 };
 
-if (typeof window !== 'undefined') Object.assign(window, { __nmAgentSays: agentSays, __nmHumanSays: humanSays, __nmHumanSaysInConvo: humanSaysInConvo, __nmAgentDelivers: agentDelivers });
+if (typeof window !== 'undefined') Object.assign(window, { __nmAgentSays: agentSays, __nmHumanSays: humanSays, __nmHumanSaysInConvo: humanSaysInConvo, __nmAgentDelivers: agentDelivers, __nmDocWrites: docWrites });

@@ -18,7 +18,7 @@ import { CONTENT_OUTPUT_CONTRACT, RESEARCH_OUTPUT_CONTRACT, EXEC_FAIL_BLOCK_AFTE
 import { EVIDENCE_IMAGE_BUDGET, IMAGE_EXT, evidenceDropNote, planEvidenceBudget, sweepEvidenceImages } from '../evidence';
 import { approvedPlanNote } from './planinject';
 import { FINISH_NOW_NOTE, claimsPendingWork, shouldBlockEcho } from '../runtime/honesty';
-import { PACKS, TURN_BUDGETS, UNBLOCK_MARKER, type DraftedPost, type ClaimVerdict } from '@neuramesh/shared';
+import { claimWorkspace, PACKS, STATIC_CHECKLIST, TURN_BUDGETS, UNBLOCK_MARKER, type DraftedPost, type ClaimVerdict } from '@neuramesh/shared';
 
 
 
@@ -61,11 +61,7 @@ import { makeReviewFlow } from './reviewflow';
 import { makeShipFlow } from './shipflow';
 import { makeWorkerTurn } from './workerturn';
 
-export const STATIC_CHECKLIST = ['scope understood from title + channel context', 'registered to this channel', 'no blocking questions'];
-export const workspaceFor = (t: ExecTask): string =>
-  t.repo_id
-    ? `\`~/.neuramesh/worktrees/nm-${t.number}\`${t.branch ? ` on branch \`${t.branch}\`` : ''} (pushed before review)`
-    : 'scratch workspace — produced files attach to this thread as artifacts';
+export const workspaceFor = (t: ExecTask): string => claimWorkspace({ repo: !!t.repo_id, branch: t.branch });
 
 /** the shape the ship + verify flows read a task in — shared with host/releasedocs.ts */
 export type ShipTask = { id: string; number: number; title: string; channel_id: string; pr_number: number | null; ship_plan: string | null };
@@ -150,7 +146,7 @@ async function resumeFlow(agent: HostedAgent, t: ExecTask & { requirements_confi
       const conf = await post('/v1/commands', actor, {
         type: 'task.confirm_requirements',
         taskId: t.id,
-        checklist: ['scope understood from title + channel context', 'registered to this channel', 'no blocking questions'],
+        checklist: STATIC_CHECKLIST,
       });
       if (!conf.ok) throw new Error(`confirm ${conf.status}`);
     }
@@ -304,7 +300,7 @@ async function executeFlow(agent: HostedAgent, t: ExecTask, ch: { id: string; sl
     // off the same activity stream the ghost reads, settled on every exit path below.
     if (mode === 'claude') {
       workRun = await openRun(agent, { workspace: ch.workspace_id, channelId: ch.id, taskId: t.id },
-        { kind: 'work', title: `#${t.number} ${t.title}`.slice(0, 120), step: 'starting the run', id: workLogRunId }).catch(() => NO_RUN);
+        { kind: 'work', title: `#${t.number} ${t.title}`.slice(0, 120), step: 'starts the run', id: workLogRunId }).catch(() => NO_RUN);
       // Record the exec run so a SPAWNED LEG hangs off it (docs/harness/04). Found live: without
       // this, `parentRunOf` returned null and every subagent opened as a ROOT run — the fan-out
       // ran correctly but rendered as separate top-level cards, so the tree could never nest.

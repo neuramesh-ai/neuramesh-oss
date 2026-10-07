@@ -1,27 +1,27 @@
-// make_product_image (chattools-product.ts): the image made on the room's key, shrunk for the shelf,
-// shelved under the name the script will use; every failure named, never claimed.
+// shelve_repo_screenshot (chattools-product.ts): the agent names a repository file, the platform shelves
+// it as the repository's own screenshot, and the answer names the SHOW line; every refusal is said, never claimed.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { makeProductImage } from './chattools-product';
+import { shelveRepoScreenshot } from './chattools-product';
 
-const agent = { id: 'a1', name: 'plume', role: 'marketer' } as never;
 const ch = { id: 'c1', slug: 'marketing', workspace_id: 'w1' };
 const actor = { kind: 'agent', id: 'a1', role: 'marketer' };
-// a 1×1 PNG: electron's nativeImage is not here, so shelfDataUrl answers null unless the bytes decode; the shelving path is exercised with a stub
-const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
+const answer = (status: number, body: unknown) => ({ ok: status >= 200 && status < 300, status, json: async () => body }) as never;
 
-test('a failed image is said, never shelved; a shelved image answers with the SHOW line to write', async () => {
-  const posted: Array<Record<string, unknown>> = [];
-  const t = { agent, ch, log: () => {}, post: async (_p: string, _a: unknown, body: unknown) => { posted.push(body as Record<string, unknown>); return { ok: true, status: 200 } as never; }, generateShareImage: async () => ({ error: 'no image key connected' }) };
-  assert.match(await makeProductImage(t as never, actor, { name: 'bottle', brief: 'a bottle on a desk' }), /was not made: no image key connected/);
-  assert.deepEqual(posted, []);
-  // the bytes come back: the shelf copy is a JPEG data URI (or the shrink says why), the name gets its extension
-  const made = { ...t, generateShareImage: async () => ({ bytes: PNG, thumb: 'data:image/jpeg;base64,x' }) };
-  const out = await makeProductImage(made as never, actor, { name: 'bottle-on-desk', brief: 'a bottle on a desk' });
-  if (posted.length) {
-    assert.match(out, /^bottle-on-desk\.jpg is on this room's shelf\. Write `SHOW: bottle-on-desk\.jpg`/);
-    assert.deepEqual(Object.keys(posted[0]!).sort(), ['channel', 'inlineContent', 'kind', 'mime', 'name', 'type']);
-  } else {
-    assert.match(out, /could not be shrunk for the shelf/); // no electron in this process: the honest answer
-  }
+test('the platform shelves the file: the answer names the shelf name, the repository path and the SHOW line', async () => {
+  const calls: Array<{ path: string; body: unknown }> = [];
+  const t = { ch, log: () => {}, post: async (path: string, _a: unknown, body: unknown) => { calls.push({ path, body }); return answer(201, { ok: true, name: 'home.png', path: 'docs/screens/home.png', sha: 's1' }); } };
+  const out = await shelveRepoScreenshot(t as never, actor, { path: 'docs/screens/home.png' });
+  assert.match(out, /^home\.png is on this room's shelf, the repository's own docs\/screens\/home\.png\. Write `SHOW: home\.png` on the beat that puts the app's screen on camera/);
+  // the route reads the room from the query and the file from the body; the agent never sends bytes
+  assert.deepEqual(calls, [{ path: '/v1/repo/shelve?channel=c1', body: { path: 'docs/screens/home.png' } }]);
+  await shelveRepoScreenshot(t as never, actor, { path: 'store/pricing.jpg', name: 'pricing' });
+  assert.deepEqual(calls[1]!.body, { path: 'store/pricing.jpg', name: 'pricing' });
+});
+
+test('a refusal is said in the server\'s words, and no image is claimed', async () => {
+  const refused = { ch, log: () => {}, post: async () => answer(409, { error: 'this room\'s project has no GitHub repository', code: 'NO_REPO' }) };
+  assert.match(await shelveRepoScreenshot(refused as never, actor, { path: 'a.png' }), /^The screenshot did not reach the shelf: this room's project has no GitHub repository\. Say so plainly, and do not claim an image exists\./);
+  const silent = { ch, log: () => {}, post: async () => { throw new Error('offline'); } };
+  assert.match(await shelveRepoScreenshot(silent as never, actor, { path: 'a.png' }), /did not reach the shelf: the server answered nothing/);
 });

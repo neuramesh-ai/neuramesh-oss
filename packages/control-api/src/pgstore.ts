@@ -2074,7 +2074,7 @@ export class PostgresStore implements Store {
     // tasks.creator_id is `uuid not null`, so this coalesce is load-bearing, not cosmetic.
     const inserted = await sql`insert into tasks (workspace_id, channel_id, project_id, number, title, description, state, kind, creator_kind, creator_id)
       select ${workspace}::uuid, ${channelId}::uuid, c.project_id, ${Number(n!['n'])}, ${flow.title},
-             ${'Walk the steps below to set this room up — your answers save as you go, so you can leave and finish any time. Closing this task skips setup.'},
+             ${flow.description},
              'todo'::task_state, 'setup'::task_kind, 'human'::actor_kind,
              coalesce(
                case when c.created_by ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then c.created_by::uuid end,

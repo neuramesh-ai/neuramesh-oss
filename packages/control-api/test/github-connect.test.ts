@@ -8,6 +8,8 @@ import { createApp } from '../src/app';
 import { unseal } from '../src/connector-crypto';
 import { forgetToken } from '../src/github-connect';
 import { MemoryStore } from '../src/store';
+import { libraryImage } from '../src/store/frames';
+import * as jpeg from 'jpeg-js';
 
 const george: Actor = { kind: 'human', id: 'george' };
 const rex: Actor = { kind: 'agent', id: 'rex', role: 'orchestrator' };
@@ -19,6 +21,19 @@ const pem = generateKeyPairSync('rsa', { modulusLength: 2048 }).privateKey.expor
 const RELEASE = { tag_name: 'v0.1.0', name: 'v0.1.0', body: 'The first cut.', published_at: '2026-09-16T15:00:00Z', html_url: 'https://github.com/acme/site/releases/tag/v0.1.0', draft: false, prerelease: false };
 const PULL = { number: 7, title: 'The shared inbox', body: '', labels: [], merged_at: '2026-09-16T10:00:00Z', html_url: 'https://github.com/acme/site/pull/7', user: { login: 'maya' } };
 const README = Buffer.from('# Site\n\nThe marketing site.\n').toString('base64');
+/** a one-pixel PNG: an app screenshot small enough to shelve as it is */
+const HOME_PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+/** a synthetic phone screen (a bar, cards, rows of text-like stripes) past the shelf's cap, so the copy is shrunk */
+const SCREEN_JPG = (() => {
+  const w = 900, h = 1950, data = new Uint8Array(w * h * 4);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = (y * w + x) * 4; let v = [250, 248, 245];
+    if (y < 120) v = [30, 30, 34];
+    else if (y % 220 > 20 && y % 220 < 200 && x > 30 && x < w - 30) v = (y % 220 > 60 && y % 220 < 180 && y % 12 < 7 && x > 60 && x < w - 60 - ((y * 37) % 300)) ? [40 + ((x * 7) % 30), 40, 50] : [255, 255, 255];
+    data[i] = v[0]!; data[i + 1] = v[1]!; data[i + 2] = v[2]!; data[i + 3] = 255;
+  }
+  return Buffer.from(jpeg.encode({ data, width: w, height: h }, 98).data);
+})();
 
 let app: ReturnType<typeof createApp>;
 let store: MemoryStore;
@@ -52,6 +67,10 @@ const github: typeof fetch = async (input, init) => {
   if (path.startsWith('/repos/acme/site/commits')) return json([{ sha: 'abc1234', html_url: 'https://github.com/acme/site/commit/abc1234', commit: { message: 'Ship the inbox\n\nlong body', author: { date: '2026-09-16T09:00:00Z', name: 'Maya' } }, author: { login: 'maya' } }]);
   if (path === '/repos/acme/site/contents/README.md') return json({ type: 'file', size: 30, sha: 'r1', encoding: 'base64', content: README });
   if (path === '/repos/acme/site/contents/logo.png') return json({ type: 'file', size: 4, sha: 'p1', encoding: 'base64', content: Buffer.from([0x89, 0, 0x4e, 0x47]).toString('base64') });
+  if (path === '/repos/acme/site/contents/screens/home.png') return json({ type: 'file', size: 70, sha: 'shot1', encoding: 'base64', content: HOME_PNG });
+  // past 1 MB the contents API answers a pointer, and the bytes come from the blob by its sha
+  if (path === '/repos/acme/site/contents/screens/big.jpg') return json({ type: 'file', size: SCREEN_JPG.length, sha: 'big1', encoding: 'none', content: '' });
+  if (path === '/repos/acme/site/git/blobs/big1') return json({ sha: 'big1', size: SCREEN_JPG.length, encoding: 'base64', content: SCREEN_JPG.toString('base64') });
   if (path === '/repos/acme/site/contents/docs') return json([{ type: 'file', path: 'docs/a.md' }]);
   if (path === '/repos/acme/site/git/trees/HEAD?recursive=1') return json({ truncated: false, tree: [{ path: 'README.md', type: 'blob', size: 30 }, { path: 'docs', type: 'tree' }, { path: 'docs/a.md', type: 'blob', size: 5 }, { path: 'src/x.ts', type: 'blob', size: 9 }] });
   return json({ message: 'Not Found' }, 404);
@@ -327,6 +346,27 @@ describe('the reads', () => {
     expect((await read('file?path=nope.md', channel)).status).toBe(400);
     expect((await j(await read('file?path=nope.md', channel))).code).toBe('NOT_FOUND');
     expect((await j(await read('file?path=../etc', channel))).error).toContain('climb');
+  });
+  it('shelve (George, 2026-10-06): an image file of the repository lands on the room\'s shelf as the platform\'s copy, a real app screenshot a film may show', async () => {
+    await resolve(channel);
+    const shelve = (body: unknown, actor: Actor = rex) => app.request(`/v1/repo/shelve?channel=${channel}`, { method: 'POST', headers: { 'content-type': 'application/json', ...as(actor) }, body: JSON.stringify(body) });
+    const r = await shelve({ path: 'screens/home.png' });
+    expect(r.status).toBe(201);
+    expect(await j(r)).toMatchObject({ ok: true, name: 'home.png', path: 'screens/home.png', sha: 'shot1' });
+    // an agent asked, and the image counts all the same: the platform read it from the code
+    expect(await libraryImage(store, channel, 'home.png')).toMatchObject({ name: 'home.png', mime: 'image/png' });
+    // a screenshot past the shelf's cap: read through the blob, shrunk to a JPEG that fits, named as asked
+    expect(SCREEN_JPG.toString('base64').length).toBeGreaterThan(300_000);
+    expect(await j(await shelve({ path: 'screens/big.jpg', name: 'pricing' }))).toMatchObject({ ok: true, name: 'pricing.jpg', sha: 'big1' });
+    const copy = await libraryImage(store, channel, 'pricing.jpg');
+    expect(copy?.mime).toBe('image/jpeg');
+    expect(copy!.dataUrl.length).toBeLessThanOrEqual(300_000);
+    expect(calls).toContain('GET /repos/acme/site/git/blobs/big1 installation');
+    // a text file is not an image whatever it is called, a path cannot climb out, a stranger meets the room's ACL
+    const text = await shelve({ path: 'README.md' });
+    expect([text.status, (await j(text)).error]).toEqual([400, 'README.md is not a PNG, JPEG or WebP image']);
+    expect((await j(await shelve({ path: '../secret.png' }))).error).toContain('climb');
+    expect((await shelve({ path: 'screens/home.png' }, stranger)).status).toBe(403);
   });
   it('tree: the whole tree, or the entries under a path', async () => {
     await resolve(channel);

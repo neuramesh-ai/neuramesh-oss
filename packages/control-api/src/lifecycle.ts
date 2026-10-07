@@ -71,7 +71,8 @@ export function dueFor(row: LifecycleRow): LifecycleTemplate | null {
 }
 
 /** where the lifecycle emails send a person. the workspace is in the browser (hq), Get Pro is the
- *  site's /pro on its sign-in face (it opens Stripe for the owner's workspace), and buying credits
+ *  site's /pro on its sign-in face, which sends the person to hq's Pro sheet (`/?pro=1`,
+ *  apps/web/src/start-door.ts) for the workspace that hq opens, and buying credits
  *  is hq's Credits view, which hq opens from `?view=credits` (wtabs/guests.tsx viewFromUrl). the
  *  old links all went to the Mac download, and day 7's Get Pro went to /billing, a path the site
  *  does not serve, so it showed the homepage. */

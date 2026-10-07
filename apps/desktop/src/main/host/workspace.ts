@@ -62,7 +62,7 @@ const { brain, db } = ctx;
  * rows always say WHICH room a document came from so the agent can cite it.
  */
 async function libraryDocs(channelId: string, limit = 60, scope: 'room' | 'project' | 'workspace' = 'room'): Promise<LibDoc[]> {
-  const cols = `a.name, a.kind, a.created_at, a.promoted, a.inline_content, a.mime, c.slug as room, p.name as project`;
+  const cols = `a.name, a.kind, a.created_at, a.promoted, a.inline_content, a.mime, a.created_by_kind, a.source, c.slug as room, p.name as project`;
   const from = `from artifacts a join channels c on c.id = a.channel_id left join projects p on p.id = c.project_id`;
   const [where, args]: [string, unknown[]] =
     scope === 'room' ? [`a.channel_id = ?`, [channelId]]

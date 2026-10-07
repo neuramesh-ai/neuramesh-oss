@@ -27,24 +27,31 @@ test('codex\'s shape: the summary grows in its own section, each step is its own
   th.thought('Next round.');
   assert.equal(th.text(), [
     '**Reading the tree**',
-    '› list_repo_files · src/storage',
-    '› read_repo_file · src/storage/ adapter.ts',
+    '› lists the repository files · src/storage',
+    '› reads a repository file · src/storage/ adapter.ts',
     'Found it.',
     'Next round.',
   ].join('\n\n'));
 });
 
-test('a step reads exactly as codex\'s thoughtStep reads the same call', () => {
+// the review of round 2 (2026-10-05): a step printed the tool's name ("› create_task · …"), and the
+// homepage clip shows rex's thoughts. it reads the run card's words now, and an unknown tool its words
+test('a step reads exactly as codex\'s thoughtStep reads the same call, in words and never a tool name', () => {
   const args = { query: 'x'.repeat(300), limit: 5 };
   const th = starterThoughts();
   th.step('search_x', args);
   th.step('list_tasks', {});
   th.step('get_board', undefined);
+  th.step('create_task', { title: 'Add an annual price toggle', kind: 'feature' });
   assert.equal(th.text(), [
     thoughtStep({ type: 'mcp_tool_call', tool: 'search_x', arguments: args }),
-    '› list_tasks',
-    '› get_board',
+    '› checks the board',
+    '› get board',
+    '› creates the task · Add an annual price toggle',
   ].join('\n\n'));
+  assert.doesNotMatch(th.text()!, /_/);
+  assert.equal(thoughtStep({ type: 'command_execution', command: 'pnpm  test --run' }), '› runs pnpm test --run');
+  assert.equal(thoughtStep({ type: 'web_search', query: 'annual pricing' }), '› searches the web · annual pricing');
 });
 
 test('the cap holds at 8000: past it, one … section, and the thoughts stop growing', () => {

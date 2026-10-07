@@ -182,7 +182,7 @@ async function startDeepWork(
   const parent = await openRun(
     agent,
     { workspace: ch.workspace_id, channelId: ch.id, threadId: where.threadId ?? null, taskId: where.taskId ?? null },
-    { kind: 'work', title, total: legs.length + 1, step: 'starting the legs' },
+    { kind: 'work', title, total: legs.length + 1, step: 'starts the subagents' },
   );
   if (!parent.id) return null; // no row ⇒ no promise: the tool tells the model to answer now instead
 
@@ -205,7 +205,7 @@ async function startDeepWork(
         const legRun = await openRun(
           agent,
           { workspace: ch.workspace_id, channelId: ch.id, threadId: where.threadId ?? null, taskId: where.taskId ?? null },
-          { kind: 'leg', title: leg.name, parentRunId: parent.id, step: 'starting' },
+          { kind: 'leg', title: leg.name, parentRunId: parent.id, step: 'starts the work' },
         );
         live.add(leg.name);
         await bump();
@@ -233,7 +233,7 @@ async function startDeepWork(
         await bump();
       });
 
-      await parent.step('synthesizing the report', legs.length);
+      await parent.step('writes the report', legs.length);
       const synthesis = await withTimeout(
         deepWorkQuery(
           agent,

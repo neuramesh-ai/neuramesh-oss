@@ -97,7 +97,7 @@ export interface ToolCtx {
 }
 
 
-export interface LibDoc { name: string; kind: string; created_at: string; promoted: number | null; inline_content: string | null; mime?: string | null; room?: string | null; project?: string | null }
+export interface LibDoc { name: string; kind: string; created_at: string; promoted: number | null; inline_content: string | null; mime?: string | null; room?: string | null; project?: string | null; created_by_kind?: string | null; source?: string | null }
 /** one drafted post row, as `draft_posts`/`revise_posts` see it */
 export type DraftRow = { id: string; platform: string; body: string; status: string; scheduled_at: string | null; letter: string };
 

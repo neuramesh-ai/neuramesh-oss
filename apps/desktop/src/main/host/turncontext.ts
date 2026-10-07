@@ -121,7 +121,7 @@ function orchSpawnFor(
     const seated = resolved.agent;
     const run = await openRun(seated, { workspace: ch.workspace_id, channelId: ch.id, threadId }, {
       kind: 'leg', title: label, ...(parentRun.id ? { parentRunId: parentRun.id } : {}),
-      step: 'starting', seat: seatLabel(resolved),
+      step: 'starts the work', seat: seatLabel(resolved),
     });
     subtree.add({ turnId: run.id || label, role: i.role as AgentRole, label, state: 'running' });
     log?.({ kind: 'tool', phase: 'call', summary: `spawn ${i.role} · ${label} · ${Math.round(decision.budget.wallMs / 60_000)}m` });

@@ -70,6 +70,10 @@ export const artifacts = new Table({
   height: column.integer,
   promoted: column.integer,
   tags: column.text, // pg text[] arrives as its JSON text — e.g. ["brand"], the rail's filter
+  // who made it, and where the platform took it from (0150): a film's product shot is a real app
+  // screenshot, so only a person's image or a repository file counts (host/frames.ts, 2026-10-06)
+  created_by_kind: column.text,
+  source: column.text,
   created_at: column.text,
 }, {
   indexes: {

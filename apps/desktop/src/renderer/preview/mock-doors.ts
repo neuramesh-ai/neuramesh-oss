@@ -20,7 +20,7 @@ export const DOOR_MARKETING_PROFILE = JSON.stringify({
 // the setup task (docs/39): kind='setup', open, so its thread mounts the wizard — a bare task
 // (no linked thread), which the rail lists as a task row the ?openTask= driver can click
 export const DOOR_TASKS = [
-  { id: DOOR_SETUP_TASK_ID, number: 1070, title: 'Set up your marketing HQ', kind: 'setup', description: '', state: 'in_progress', assignee_kind: null, assignee_id: null, offered_agent_id: null, requirements: null, requirements_confirmed: 0, definition_of_done: null, project_id: DOOR_PROJECT_ID, channel_id: DOOR_CHANNEL_ID, branch: null, repo_id: null, submitted_sha: null, pr_url: '', pr_number: null, artifact_count: 0 },
+  { id: DOOR_SETUP_TASK_ID, number: 1070, title: 'Prepare your marketing HQ', kind: 'setup', description: '', state: 'in_progress', assignee_kind: null, assignee_id: null, offered_agent_id: null, requirements: null, requirements_confirmed: 0, definition_of_done: null, project_id: DOOR_PROJECT_ID, channel_id: DOOR_CHANNEL_ID, branch: null, repo_id: null, submitted_sha: null, pr_url: '', pr_number: null, artifact_count: 0 },
 ];
 
 // the project's repository, primary to it — what step 5 shows as the chip (RepoUI, rows-board.ts)

@@ -14,7 +14,7 @@ import { resolveToken } from '../agents';
 import type { ExecTask, HostedAgent, OfferedTask, SkillRef } from '../agents';
 
 
-import { GITHUB_WAIT_REASON, isCloudBorn, type ClaimVerdict, type SessionOrigin } from '@neuramesh/shared';
+import { claimLine, GITHUB_WAIT_REASON, isCloudBorn, PLAN_CHECKLIST, STATIC_CHECKLIST, type ChecklistSource, type ClaimVerdict, type SessionOrigin } from '@neuramesh/shared';
 
 
 
@@ -37,7 +37,7 @@ import { type LogFn } from '../agentlog';
 
 
 import type { makeFlows } from './flows';
-import { STATIC_CHECKLIST, workspaceFor } from './flows';
+import { workspaceFor } from './flows';
 import type { HostCtx } from './ctx';
 import type { PowerSyncDatabase } from '@powersync/node';
 import type { Brain } from '../harness/brain';
@@ -267,30 +267,32 @@ async function claimFlow(agent: HostedAgent, t: OfferedTask) {
     const token = cred.token ?? ''; // apikey → the key; subscription → '' (providerEnv strips keys)
     const live = process.env['NM_AGENT_MODE'] !== 'echo' && cred.authMode !== 'none';
     const preConfirmed = Number(t.requirements_confirmed) === 1;
-    let checklist: string[];
+    let checklist: readonly string[];
+    let source: ChecklistSource;
     if (preConfirmed) {
       // intake already resolved these in the thread — run them, don't invent
-      try { checklist = JSON.parse(t.requirements ?? '[]') as string[]; } catch { checklist = []; }
-      if (!checklist.length) checklist = STATIC_CHECKLIST;
+      let given: string[] = [];
+      try { given = JSON.parse(t.requirements ?? '[]') as string[]; } catch { given = []; }
+      // none written: the person's plan approval confirmed the requirements (handler/fsm.ts approvePlan),
+      // so the plan is the scope. a subtask has neither, and runs the default checks
+      const planned = !given.length && !!(await db.getAll<{ at: string | null }>('select plan_approved_at as at from tasks where id = ?', [t.id]).catch(() => [] as Array<{ at: string | null }>))[0]?.at;
+      [checklist, source] = given.length ? [given, 'intake'] : planned ? [PLAN_CHECKLIST, 'plan'] : [STATIC_CHECKLIST, 'default'];
     } else {
       checklist = live ? await checklistFor(agent, t, token) : STATIC_CHECKLIST;
+      source = checklist === STATIC_CHECKLIST ? 'default' : 'worker';
       const conf = await post('/v1/commands', actor, { type: 'task.confirm_requirements', taskId: t.id, checklist });
       if (!conf.ok) throw new Error(`confirm ${conf.status}`);
     }
-    const estimate = await estimateFor(agent, t, token, live, checklist);
+    const estimate = await estimateFor(agent, t, token, live, [...checklist]);
     await post('/v1/messages', actor, {
       workspace: ch.workspace_id,
       channel: ch.id,
       taskId: t.id,
-      body: `Claimed #${t.number} “${t.title}”.
-- **Checklist${preConfirmed ? ' (intake-resolved)' : ' (confirmed)'}:** ${checklist.join(' · ')}
-- **Estimate:** ${estimate}
-- **Workspace:** ${workspaceFor(t)}
-
-Starting now — the live run on this task shows what I'm doing; I'll post here when there's something to say.`,
+      // the words live in shared claimline.ts, so the preview story reads the same line
+      body: claimLine({ number: t.number, title: t.title, checklist, source, estimate, workspace: workspaceFor(t) }),
     });
     console.log(`agent_claim agent=${agent.name} task=${t.number} ok`);
-    alog(agent, t, ch.slug)({ kind: 'lifecycle', phase: 'claimed', summary: `claimed #${t.number} "${t.title}" — ${preConfirmed ? 'intake-resolved' : 'confirmed'} checklist` });
+    alog(agent, t, ch.slug)({ kind: 'lifecycle', phase: 'claimed', summary: `claimed #${t.number} "${t.title}" · checklist: ${source}` });
     await executeFlow(agent, t, ch); // never throws — reports its own failures
   } catch (err) {
     claimed.delete(t.id);

@@ -1,7 +1,7 @@
 // Brand context in a thread — the marketing room's document rail and the sections it opens.
 // A section renders a conversation, hence the import cycle with ConvoThread (see
 // ThreadMessage.tsx for why that is safe). Split out of thread/convo.tsx.
-import { BRAND_DOC_NAMES } from '@neuramesh/shared';
+import { BRAND_DOC_NAMES, docInFlight } from '@neuramesh/shared';
 import { ConnectionsList } from '../settings/ConnectionsList';
 import { Orb } from '../ui/Orb';
 import { UpcomingList } from '../schedule/schedule';
@@ -37,7 +37,7 @@ export function BrandSections({ channelId, channelSlug, onOpen, marketing }: {
   marketing?: string | null; // the room profile json — the MCP toggle state
 }) {
   const [docs, setDocs] = useState<ChannelArtifactRow[]>([]);
-  const [writing, setWriting] = useState<{ file: string; at: number } | null>(null);
+  const [writing, setWriting] = useState<{ file: string; agent: string; at: number } | null>(null);
   useEffect(() => {
     const load = () => {
       // BRAND docs only (2026-08-22, George: result.md × 7, posts.json and article drafts had
@@ -59,14 +59,15 @@ export function BrandSections({ channelId, channelSlug, onOpen, marketing }: {
   useEffect(() => {
     const un = nm?.watchAgentLogs((row) => {
       if (channelSlug && row.channel_slug && row.channel_slug !== channelSlug) return;
-      const mm = /^drafting (\S+\.md)/.exec(row.summary ?? '');
-      if (mm) setWriting({ file: mm[1]!, at: Date.now() });
+      // the daemon's own line (shared docWriteLog)
+      const file = docInFlight(row.summary);
+      if (file) setWriting({ file, agent: row.agent_name, at: Date.now() });
     });
     return () => un?.();
   }, [channelSlug]);
   // The doc landing retires the ghost; a stale signal (run died mid-doc) ages out. Round 3:
   // the row used to render for ANY live agent — "writing the next doc" over a playbook run
-  // that writes no doc at all — so now only a fresh `drafting <file>` narration shows it.
+  // that writes no doc at all — so now only a fresh `writes <file>` narration shows it.
   useEffect(() => {
     if (!writing) return undefined;
     if (docs.some((d) => d.name === writing.file)) { setWriting(null); return undefined; }
@@ -88,7 +89,7 @@ export function BrandSections({ channelId, channelSlug, onOpen, marketing }: {
       ))}
       {/* an agent is ALIVE here, so it wears the orb like every other live moment — this rail was
           still drawing the pre-orb border-spinner */}
-      {writing && <div className="mkrailgen"><Orb state="composing" label={`writing ${writing.file}`} /> writing {writing.file}…</div>}
+      {writing && <div className="mkrailgen"><Orb state="composing" label={`${writing.agent} writes ${writing.file}`} /> {writing.agent} writes {writing.file}</div>}
       <div className="mkrailhead mkrailhead2">Upcoming</div>
       <UpcomingList channelId={channelId} />
       <div className="mkrailhead mkrailhead2">Connections</div>

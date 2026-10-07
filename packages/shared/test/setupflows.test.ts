@@ -17,6 +17,15 @@ const ctx = (partial: Partial<TransitionContext>): TransitionContext => ({
 });
 
 describe('the registry', () => {
+  // the title names the setup task in every list, and the Overview shows the description (2026-10-06)
+  it('names the setup task in the house words', () => {
+    expect(MARKETING_SETUP_FLOW.title).toBe('Prepare your marketing HQ');
+    expect(MARKETING_SETUP_FLOW.description).toBe('Answer the questions in the thread. Each answer saves when you press Next, so you can stop and finish later. Close this task to skip setup.');
+    for (const f of Object.values(SETUP_FLOWS)) {
+      for (const words of [f.title, f.description, ...f.steps.map((s) => s.label)]) expect(words, words).not.toMatch(/[—–;]|\bset (?:\w+ )?up\b/i);
+    }
+  });
+
   it('marketing has a flow; build deliberately has none yet', () => {
     expect(flowForChannelKind('marketing')).toBe(MARKETING_SETUP_FLOW);
     expect(flowForChannelKind('build')).toBeNull();
@@ -39,7 +48,7 @@ describe('setupProgress — derived from the synced profile, never from UI state
     expect(p.done).toBe(2);
     expect(p.next).toBe('focus');
     expect(p.complete).toBe(false);
-    expect(setupProgressLabel(MARKETING_SETUP_FLOW, p)).toBe('step 3 of 5 — Focus');
+    expect(setupProgressLabel(MARKETING_SETUP_FLOW, p)).toBe('step 3 of 5 · Focus');
   });
 
   it('the progress marker covers skipped-optional and write-less steps', () => {

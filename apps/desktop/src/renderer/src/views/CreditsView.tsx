@@ -160,7 +160,7 @@ export function CreditsView() {
             <tbody>
               {history.films!.map((f) => (
                 <tr key={f.id}>
-                  <td>{f.day} <span className="credv-k">· {tierName(f.tier)} · {f.model} · {f.seconds} s{f.status === 'failed' ? ' · failed, refunded' : f.status === 'done' ? '' : ' · filming'}</span></td>
+                  <td>{f.day} <span className="credv-k">· {tierName(f.tier)} · {f.seconds} s{f.status === 'failed' ? ' · failed, refunded' : f.status === 'done' ? '' : ' · filming'}</span></td>
                   <td className={f.status === 'failed' ? 'credv-cr' : 'credv-sp'}>{f.status === 'failed' ? `+${fmt(f.credits)}` : `−${fmt(f.credits)}`} cr</td>
                 </tr>
               ))}

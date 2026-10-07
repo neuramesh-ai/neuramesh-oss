@@ -15,6 +15,9 @@ export interface PlanDocInput {
   subtasks: readonly string[];
   approach: string;
   version: number;
+  /** a repository is bound, or the offer binds one later (control-api createtask.ts: a code unit in a
+   *  room whose project has a repository), so the person's last word merges a pull request. else accept */
+  repo?: boolean;
 }
 
 export function planArtifactName(version: number): string {
@@ -47,11 +50,39 @@ export function parsePlanRef(body: string | null | undefined): PlanRef | null {
   return { version: Number(m[1]), prose };
 }
 
+/** how a plan version reaches the thread: a unit's birth plan, a revision, or a hands-off run's plan */
+export type PlanPostKind = 'birth' | 'revised' | 'routine' | 'playbook';
+
+/**
+ * the readable line a plan message leads with (2026-10-05: one function for the server and the preview
+ * story, in the house words). it always carries the plan's file name: a published desktop's Md and the
+ * phone's thread prose find that name and link it to the plan (the contract test in planmd.test.ts).
+ */
+export function planPostLine(version: number, kind: PlanPostKind = 'birth'): string {
+  const name = planArtifactName(version);
+  switch (kind) {
+    case 'revised': return `Implementation plan **v${version}** (revised): ${name}`;
+    case 'routine': return `⏱ Routine run: implementation plan **v${version}** (${name}). The work starts now and runs to the end without you. You get a notification when it is done.`;
+    case 'playbook': return `▶ Playbook run: plan **v${version}** (${name}) comes from the playbook. The work starts now. When the deliverable is ready, say accept in this thread to close it.`;
+    default: return `Implementation plan **v${version}**: ${name}`;
+  }
+}
+
+/** the whole plan message the server posts: the readable line, then the ‹plan:vN› marker on its own line */
+export function planMessage(version: number, kind: PlanPostKind = 'birth'): string {
+  return `${planPostLine(version, kind)}\n${planRefMarker(version)}`;
+}
+
+// the causal order (docs/41, and journeyFor's declared branch): a declared design round, the
+// execution leg, a declared review. an unknown leg keeps its place after them
+const LEG_RANK: Record<string, number> = { design: 0, build: 1, review: 2 };
+
 export function renderPlanMarkdown(p: PlanDocInput): string {
-  const journey = ['plan', ...p.legs.filter((l) => l !== 'build'), executionLegLabel(p.kind).toLowerCase(), 'accept']
+  const legs = [...new Set(['build', ...p.legs])].sort((a, b) => (LEG_RANK[a] ?? 3) - (LEG_RANK[b] ?? 3));
+  const journey = ['plan', ...legs.map((l) => (l === 'build' ? executionLegLabel(p.kind).toLowerCase() : l)), p.repo ? 'merge' : 'accept']
     .filter((l, i, a) => a.indexOf(l) === i);
   const lines = [
-    `# Implementation plan · v${p.version} — #${p.number} ${p.title}`,
+    `# Implementation plan · v${p.version} · #${p.number} ${p.title}`,
     '',
     `**Journey:** ${journey.join(' → ')}`,
   ];

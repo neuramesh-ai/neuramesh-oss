@@ -52,8 +52,12 @@ async function frameName(store: Store, channelId: string | undefined, frame: str
   if (frame === undefined) return undefined;
   if (frame === null || frame === '') return null;
   const hit = channelId ? await libraryImage(store, channelId, frame) : null;
-  if (!hit) throw new DomainError('NOT_FOUND', `no image named "${frame}" on this room's shelf. list_library names the shelf, and a human can upload a screenshot to the room's Files`);
-  return hit.name;
+  if (hit) return hit.name;
+  // real app screenshots only (store/frames.ts): an image an agent made is named as such, so the next call can be right
+  const made = channelId ? await libraryImage(store, channelId, frame, { any: true }) : null;
+  throw new DomainError('NOT_FOUND', made
+    ? `"${frame}" is not an app screenshot: an agent made it (a web capture or a drawn picture), and a film shows only a real screenshot of the app. Take one from the project's repository with shelve_repo_screenshot, or ask a person to upload a screenshot of the app to this room's Files`
+    : `no image named "${frame}" on this room's shelf. list_library names the shelf, and a person can upload a screenshot of the app to the room's Files`);
 }
 
 /** The house style's teeth for a draft (docs/design/agent-comm-rules-2026-08): a post is the copy a

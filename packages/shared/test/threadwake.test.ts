@@ -44,10 +44,25 @@ test('a setup task talks in every state but closed — done included', () => {
 test('settled and mention-only states stay silent', () => {
   // a build task in review is mention-only on purpose — the reviewer owns the verdict
   expect(unaddressedWake('in_review')).toBe(null);
-  expect(unaddressedWake('done')).toBe(null);
   expect(unaddressedWake('accepted')).toBe(null);
   expect(unaddressedWake('closed')).toBe(null);
   expect(unaddressedWake('backlog')).toBe(null);
+});
+
+// the done line, the verdict card and scout's approval all tell the person to say "merge it" in the
+// unit's thread (2026-10-05). until this rule that word woke nobody: a dead letter until the
+// stale_done sweep a day later. the coordinator takes it, and accept_task's gate (the person's newest
+// typed message says merge or accept) and the server floor decide whether anything merges.
+// a content unit too: its marketer has no accept_task, so "accept" on a done launch run woke an
+// agent that could not apply it (the review of round 2, 2026-10-05)
+test('a done unit hands the person\'s word to the coordinator, whatever its kind', () => {
+  expect(unaddressedWake('done')).toBe('orchestrator');
+  expect(unaddressedWake('done', 'feature')).toBe('orchestrator');
+  expect(unaddressedWake('done', 'content')).toBe('orchestrator');
+  expect(unaddressedWake('done', 'setup')).toBe('orchestrator');
+  // before done and after it, a content unit keeps its own rule
+  expect(unaddressedWake('in_review', 'content')).toBe('assignee');
+  expect(unaddressedWake('accepted', 'content')).toBe(null);
 });
 
 // A draw or a film is a button, not a reply (2026-09-27): a tab's picture ask on a finished unit's
@@ -59,5 +74,5 @@ test('a draw or a film finds a hand in every state; live work keeps its assignee
   expect(unaddressedWake('in_progress', null, true)).toBe('assignee');
   expect(unaddressedWake('in_review', 'content', true)).toBe('assignee');
   // a plain reply is unchanged
-  expect(unaddressedWake('done', null, false)).toBe(null);
+  expect(unaddressedWake('accepted', null, false)).toBe(null);
 });

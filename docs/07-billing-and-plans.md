@@ -175,8 +175,11 @@ list: [docs/export-format.md](export-format.md). A member who is not the owner g
 
 **First hosted sign-in creates the workspace.** `onAuthArrival` (every sign-in route) creates one
 through `workspace.create` when the person has no membership and no invitation waiting
-(`first-workspace.ts`), named from the Clerk first name, else the address's local part. The site's
-`/pro` page polls `GET /v1/workspaces` for it, then opens checkout. Idempotent by the membership.
+(`first-workspace.ts`), named from the Clerk first name, else the address's local part. hq's boot
+calls `/auth/clerk` itself (`webnm-auth.ts` `restoreSession`), so a sign-up on the site gets its
+workspace when hq first opens. The site's `/pro` page polls `GET /v1/workspaces` for it only on its
+own flow (2026-10-05): the Mac app's Get Pro (`?nonce`), which then opens checkout, and the /announce
+claim (`?announce`), which opens none. Idempotent by the membership.
 The desktop handoff (`/auth/desktop/*`) lives **fifteen minutes** (`DESKTOP_AUTH_TTL_MS`), because
 sign-up plus checkout takes longer than a sign-in.
 
@@ -189,6 +192,26 @@ says "$0 today" plainly, and keeps a muted way past it. The design is the canvas
 - **Where.** hq's setup wizard has a Pro step, 5 of 6, after the team step and before the crew's
   reveal. The Pro sheet (`UpgradeSheet.tsx`) shows the same offer after a skip. The phone has no card
   step (App Store rule 3.1.1).
+- **The site's doors** (2026-10-05, `apps/web/src/start-door.ts`). No button on the site opens a
+  checkout. Every Clerk face on the site returns to the site, and no Clerk redirect names hq. The
+  page then opens hq for a signed-in person:
+  - **Start free** (`/signup`) lands on `/welcome`, which opens hq at once. A new account meets the
+    wizard, and its Pro step is the trial.
+  - **`/pro`** (a link, the README, the day-7 email's `?mode=signin`) opens its Clerk face, returns
+    to itself, and opens hq at `/?pro=1`. hq reads the param once at load and drops it from the
+    address bar (`pro/pro-open.ts`). The first boot of the page answers the ask once, and the Pro
+    sheet opens in the shell only. The wizard drops the ask, and so does an invitation that this
+    first boot knows about. A browser that booted hq before paints the first boot from its own copy
+    of the membership list. That copy holds no invitations (`web/webnm-boot.ts`). On that browser,
+    an invitation shows a moment later as the home's card, under the sheet. The ask waits for the
+    plan of the workspace that the boot opens (a first visit has no stored workspace, so the plan
+    read takes the boot's pick, `web/webnm-boot.ts`), and only plan `free` opens the sheet, so a Pro
+    workspace sees nothing. A workspace that had a subscription before sees the two plan cards, and
+    their Get Pro opens Checkout at $22 at once.
+  - **The Mac app's Get Pro** (`/pro?nonce=…&mode=signup`) and the **/announce claim**
+    (`/pro?announce=<id>`) keep the page's own flow, unchanged. The Mac app's checkout has no trial.
+  - The pages that installed apps open (`/pro?nonce`, `/desktop-signin?nonce`) are outside the
+    docs/46 contract set, so `start-door.test.ts` pins their shapes.
 - **What it is.** A Stripe Checkout Session in the `custom` UI mode (`createTrialSession`,
   `billing.ts`): the same subscription as hosted Checkout, with `trial_period_days` =
   `PRO_TRIAL_DAYS` (14) and `payment_method_collection: 'always'`. hq draws Stripe's Express

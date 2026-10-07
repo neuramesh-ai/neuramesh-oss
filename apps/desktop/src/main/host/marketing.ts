@@ -21,7 +21,10 @@ import type { makePark } from './park';
 
 import type { HostCtx } from './ctx';
 import { makeMarketingResearch } from './marketing-research';
-import { playbookRecsBlock } from '@neuramesh/shared';
+import {
+  BOOTSTRAP_ERROR, BOOTSTRAP_PLAYS, BOOTSTRAP_SCHED_FALLBACK, bootstrapClosing, bootstrapDocFailed, bootstrapDocStatus, bootstrapNudgeDone,
+  bootstrapOpening, bootstrapPartial, bootstrapResume, bootstrapStart, docDropBody, docWriteLog, playbookRecsBlock,
+} from '@neuramesh/shared';
 
 export function makeMarketing(ctx: HostCtx & {
   apiUrl: string;
@@ -92,16 +95,8 @@ async function runMarketingBootstrap(runner: HostedAgent, s: { id: string; works
       [s.channel_id],
     ).catch(() => [] as Array<{ local_path: string | null }>);
     const repoCwd = repoRow?.local_path && existsSync(repoRow.local_path) ? repoRow.local_path : null;
-    if (opts?.only?.length) {
-      await say(`Picking it back up — ${opts.only.length === 1 ? `writing ${opts.only[0]} now` : `${opts.only.length} docs to go`}.`);
-    } else {
-      await say(
-        `On it. I'll research ${site ? site : 'the product'} properly — the site page by page` +
-        `${repoCwd ? ', the project codebase' : ''}, and the market around it — and build the brand foundation right here: ` +
-        `business profile, brand guidelines, market research, then the social strategy. ` +
-        `Each doc lands in the room library as it's done; give me a few minutes per doc.`,
-      );
-    }
+    const canResearch = runner.runtime === 'claude-code';
+    await say(opts?.only?.length ? bootstrapResume(opts.only) : bootstrapOpening({ site, research: canResearch, repo: !!repoCwd }));
     // Section outlines mirror George's Helena sample docs verbatim
     // (docs/design/marketing-channel-2026-07/samples/) — tight, scannable,
     // table-where-tabular, honest about stage. The outline is the contract;
@@ -163,12 +158,7 @@ async function runMarketingBootstrap(runner: HostedAgent, s: { id: string; works
     // the upgrade card, THE funnel moment). A model extraction that fails shape-checking
     // falls back to sensible defaults, so the block always ships.
     const scheduleRecsBlock = async (): Promise<string> => {
-      const fallback = [
-        { title: 'Daily post drafts', cadence: 'weekdays', atTime: '09:00', prompt: 'Draft one X post from the narrative pillars in social-strategy.md, in the brand voice.' },
-        { title: 'Weekly thread', cadence: 'weekly', weekday: 2, atTime: '10:00', prompt: 'Draft a thread on the strongest narrative pillar this week, grounded in the brand docs.' },
-        { title: 'Weekly competitor scan', cadence: 'weekly', weekday: 1, atTime: '08:00', prompt: 'Re-run the competitor scan per the competitor-scan skill; summarize deltas vs market-research.md as a room note.' },
-      ];
-      let recs = fallback;
+      let recs: Array<{ title: string; cadence: string; weekday?: number | undefined; atTime: string; prompt: string }> = [...BOOTSTRAP_SCHED_FALLBACK];
       const strategy = written['social-strategy.md']
         ?? (await db.getAll<{ inline_content: string | null }>(`select inline_content from artifacts where channel_id = ? and name = 'social-strategy.md' order by created_at desc limit 1`, [s.channel_id]).catch(() => [] as Array<{ inline_content: string | null }>))[0]?.inline_content
         ?? undefined;
@@ -208,11 +198,10 @@ async function runMarketingBootstrap(runner: HostedAgent, s: { id: string; works
     // 'thinking', not 'working': this IS a chat response — the ConvoThread/feed ghost
     // (the animated status text) keys on thinking; 'working' means a claimed task
     // elsewhere and renders nothing here (George noticed the silence, round 6).
-    stream(`*studying ${subject} — the brand foundation is next…*`);
+    stream(bootstrapStart(subject));
     for (const [ti, d] of targets.entries()) {
-      log({ kind: 'tool', phase: 'call', summary: `drafting ${d.file}` });
-      stream(`*researching + writing \`${d.file}\` (${ti + 1}/${targets.length})…*`);
-      const canResearch = runner.runtime === 'claude-code';
+      log({ kind: 'tool', phase: 'call', summary: docWriteLog(d.file) });
+      stream(bootstrapDocStatus(d.file, ti + 1, targets.length, canResearch));
       const system = styled(
         `You are ${runner.name}, the ${runner.role} for #${ch?.slug ?? 'marketing'} in a NeuraMesh workspace.` +
         `${runner.brief ? ` Your specialty: ${runner.brief}.` : ''} ` +
@@ -241,7 +230,7 @@ async function runMarketingBootstrap(runner: HostedAgent, s: { id: string; works
       try {
         body = (await write(prompt)).trim();
         if (body && !isStandDown(body) && !looksLikeDoc(body)) {
-          log({ kind: 'tool', phase: 'call', summary: `${d.file} — reply wasn't the doc; one retry` });
+          log({ kind: 'tool', phase: 'call', summary: `${docWriteLog(d.file)} again`, detail: 'the reply was not the document, so one more try' });
           body = (await write(`${prompt}\n\nYour previous reply was commentary, not the document. Output the COMPLETE ${d.file} markdown document now — start with the # title.`)).trim();
         }
       } catch (err) {
@@ -250,12 +239,12 @@ async function runMarketingBootstrap(runner: HostedAgent, s: { id: string; works
       }
       if (!body || isStandDown(body) || !looksLikeDoc(body)) {
         log({ kind: 'wake', phase: 'stood_down', summary: `${d.file} — nothing produced` });
-        await say(`⚠️ Couldn't produce **${d.label}** this pass — nudge me here and I'll pick it up.`).catch(() => {});
+        await say(bootstrapDocFailed(d.label)).catch(() => {});
         continue;
       }
       const art = await post('/v1/commands', actor, { type: 'artifact.create', channel: s.channel_id, kind: 'doc', name: d.file, inlineContent: body, mime: 'text/markdown', tags: ['brand'] }).catch(() => null);
       if (!art?.ok) console.warn(`mk_bootstrap id=${s.id} artifact ${d.file} failed: ${art ? art.status : 'network'}`);
-      await say(`📄 **${d.label}** — saved to the library as \`${d.file}\`.\n\n${body}`);
+      await say(docDropBody(d.label, d.file, body));
       done.push(d.file);
       written[d.file] = body;
       log({ kind: 'tool', phase: 'result', summary: `${d.file} saved to the library` });
@@ -264,27 +253,20 @@ async function runMarketingBootstrap(runner: HostedAgent, s: { id: string; works
       // a nudge that completes the set closes SHORT — the full recs plan already
       // shipped with the original bootstrap closing; re-recommending would stack cards
       await say(opts?.only?.length
-        ? `Done — ${targets.map((d) => `\`${d.file}\``).join(', ')} ${targets.length === 1 ? 'is' : 'are'} in the **Library**. That completes the brand foundation.`
-        : `That's the brand foundation — the docs are in the **Library** tab, and I'll write from them from here on. ` +
-          `Here's the starting cadence I'd run, straight from the strategy — arm what you like, tweak the rest. ` +
-          `You approve anything before it ever publishes.\n\n${await scheduleRecsBlock()}\n\n` +
-          // the nmplays sibling (marketing-os round): now the foundation exists, the
-          // highest-value next move is a BASELINE — recommended, never auto-run: the
-          // bootstrap's cost stays flat and the plan gate stays the consent (docs/design/
-          // marketing-os-2026-08 §4.7). Deterministic recs — audit first when never run.
-          `And now that the foundation exists, the highest-value next move is a baseline — score the site once so every later change has a number to move.\n\n` +
-          playbookRecsBlock(s.channel_id, [
-            { id: 'audit', why: 'six dimensions, scored — the number your work moves' },
-            { id: 'geo', why: 'who gets cited on your questions today' },
-          ]));
+        ? bootstrapNudgeDone(targets.map((d) => d.file))
+        // the nmplays sibling (marketing-os round): now the foundation exists, the
+        // highest-value next move is a BASELINE — recommended, never auto-run: the
+        // bootstrap's cost stays flat and the plan gate stays the consent (docs/design/
+        // marketing-os-2026-08 §4.7). Deterministic recs — audit first when never run.
+        : bootstrapClosing(await scheduleRecsBlock(), playbookRecsBlock(s.channel_id, [...BOOTSTRAP_PLAYS])));
     } else if (done.length || targets.length) {
-      await say(`${done.length} of ${targets.length} docs made it to the library this pass — reply here and I'll pick up the rest.`);
+      await say(bootstrapPartial(done.length, targets.length));
     }
     log({ kind: 'wake', phase: 'replied', summary: `brand foundation — ${done.length}/${targets.length} docs in the library` });
     console.log(`mk_bootstrap id=${s.id} agent=${runner.name} docs=${done.length}/${targets.length}`);
   } catch (err) {
     console.error(`mk_bootstrap id=${s.id} failed:`, err);
-    await say('⚠️ I hit an error mid-analysis — nudge me here and I\'ll pick it back up.').catch(() => {});
+    await say(BOOTSTRAP_ERROR).catch(() => {});
   } finally {
     stream('', true); // clear the live bubble on every exit — wakeThread's own rule
     setStatus(runner, 'online');
