@@ -1,6 +1,6 @@
 import type { NMEvent } from '@neuramesh/shared';
 import { describe, expect, it } from 'vitest';
-import { eventToCapture, trackDomainEvent } from '../src/analytics';
+import { eventToCapture, taskFacts, trackDomainEvent } from '../src/analytics';
 import { implementationPlanName, nextPlanVersion } from '../src/handler';
 
 // minimal valid domain event; override per-case. The payload deliberately carries
@@ -49,6 +49,48 @@ describe('activation telemetry mapping (event-level only)', () => {
     // POSTHOG_KEY is unset in the test env → disabled → no client, no network
     expect(() => trackDomainEvent(ev())).not.toThrow();
     expect(trackDomainEvent(ev())).toBeUndefined();
+  });
+});
+
+// ── the funnel's two signals: activation is a person's first accepted PR ──────────
+// the store reads the task with the write and hands the mapper one boolean; the mapper
+// stays pure. github.connected is the first write of a project's GitHub connector row.
+describe('nm_repo and github.connected', () => {
+  it('a task event carries nm_repo from the facts the store read with the write', () => {
+    expect(eventToCapture(ev(), { repo: true })).toEqual({
+      distinctId: 'ws-1',
+      event: 'task.accepted',
+      properties: { nm_source: 'human', nm_target: 'task', nm_task_number: 1012, nm_repo: true, $process_person_profile: false },
+    });
+    expect(eventToCapture(ev(), { repo: false })?.properties.nm_repo).toBe(false);
+    // no facts, no flag: an event the store read no task for says nothing about one
+    expect(eventToCapture(ev({ type: 'workspace.created', target: 'resource/workspace/ws-1' }))?.properties.nm_repo).toBeUndefined();
+  });
+
+  it('nm_repo is true only for a task with a repository AND a pull request', () => {
+    const repo = { id: 'b0000000-0000-0000-0000-000000000001', baseRef: 'main', branch: 'nm/1012-fix-nav' };
+    expect(taskFacts({ repo, prNumber: 7 })).toEqual({ repo: true });
+    expect(taskFacts({ repo, prNumber: null })).toEqual({ repo: false }); // pushed, no PR opened
+    expect(taskFacts({ repo: null, prNumber: null })).toEqual({ repo: false });
+  });
+
+  it('github.connected maps like every event: the kind of its target, never the connector id or the repository', () => {
+    const id = '3f6c1d2e-7a1b-4c2d-9e8f-0a1b2c3d4e5f';
+    const cap = eventToCapture(ev({ type: 'github.connected', target: `resource/connector/${id}`, payload: { connector: id, handle: 'acme/private-site' } }));
+    expect(cap).toEqual({
+      distinctId: 'ws-1',
+      event: 'github.connected',
+      properties: { nm_source: 'human', nm_target: 'connector', $process_person_profile: false },
+    });
+    expect(JSON.stringify(cap)).not.toMatch(/3f6c1d2e|private-site/);
+  });
+
+  it('a slash address maps to its kind, never the slug or the id after it', () => {
+    const target = (t: string) => eventToCapture(ev({ type: 'repo.linked', target: t }))?.properties.nm_target;
+    expect(target('channel/launch-plans')).toBe('channel');
+    expect(target('project/acme-secret')).toBe('project');
+    expect(target('resource/repo/acme-private-site')).toBe('repo');
+    expect(target('resource/workspace/a0000000-0000-0000-0000-00000000000a')).toBe('workspace');
   });
 });
 

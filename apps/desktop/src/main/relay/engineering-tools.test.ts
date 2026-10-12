@@ -6,10 +6,47 @@ import { mkdtemp, mkdir, readFile, readlink, realpath, rm, symlink, writeFile } 
 import { createServer } from 'node:http';
 import type { ClineCore, ToolExecutors } from '@cline/sdk';
 import { createEngineeringToolExecutors } from './engineering-tools';
-import { createEngineeringShellExecutor, engineeringBubblewrapArgv, engineeringNetworkSeccompFilter, validatedEngineeringGitMounts } from './engineering-safe-executors';
+import { createEngineeringShellExecutor, engineeringBubblewrapArgv, engineeringNetworkSeccompFilter, engineeringToolchainReadPaths, validatedEngineeringGitMounts } from './engineering-safe-executors';
 import { createClineEngineeringHost } from './engineering-host';
 
 const context = {} as Parameters<NonNullable<ToolExecutors['readFile']>>[1];
+
+test('Code toolchain reads only the adjacent npm package, never an arbitrary symlink target', async () => {
+  const base = await realpath(await mkdtemp('/tmp/nm-code-toolchain-'));
+  const bin = `${base}/node/bin`, npm = `${base}/node/lib/node_modules/npm`;
+  try {
+    await mkdir(bin, { recursive: true }); await mkdir(`${npm}/bin`, { recursive: true });
+    await writeFile(`${npm}/package.json`, JSON.stringify({ name: 'npm' }));
+    await writeFile(`${bin}/node`, '');
+    await writeFile(`${npm}/bin/npm-cli.js`, '');
+    await symlink('../lib/node_modules/npm/bin/npm-cli.js', `${bin}/npm`);
+    assert.deepEqual(engineeringToolchainReadPaths(bin, [base]), [bin, npm]);
+    assert.deepEqual(engineeringToolchainReadPaths(base, [base]), []);
+    await rm(`${bin}/npm`); await writeFile(`${base}/private.txt`, 'secret');
+    await symlink(`${base}/private.txt`, `${bin}/npm`);
+    assert.deepEqual(engineeringToolchainReadPaths(bin, [base]), [bin]);
+  } finally { await rm(base, { recursive: true }); }
+});
+
+test('macOS Code can run the real npm test script inside its mandatory sandbox', { skip: process.platform !== 'darwin' }, async () => {
+  const root = await mkdtemp('/tmp/nm-code-npm-');
+  try {
+    await writeFile(`${root}/package.json`, JSON.stringify({ scripts: { test: 'node --test boundary.test.cjs' } }));
+    await writeFile(`${root}/boundary.test.cjs`, `
+      const {test}=require('node:test'); const assert=require('node:assert/strict');
+      const fs=require('node:fs'); const net=require('node:net');
+      test('home stays private and npm stays read-only',()=>{
+        assert.throws(()=>fs.readdirSync(process.env.HOME),{code:'EPERM'});
+        assert.throws(()=>fs.writeFileSync(process.env.npm_execpath,'bad'),{code:'EPERM'});
+      });
+      test('sockets stay unavailable',()=>new Promise((resolve,reject)=>{
+        const s=net.createServer();s.on('error',e=>{try{assert.equal(e.code,'EPERM');resolve();}catch(e){reject(e);}});
+        s.on('listening',()=>{s.close();reject(new Error('network unexpectedly allowed'));});s.listen(0,'127.0.0.1');
+      }));
+    `);
+    assert.match(await createEngineeringShellExecutor(root, [])('npm test', root, context), /(?:#|ℹ) pass 2/);
+  } finally { await rm(root, { recursive: true }); }
+});
 
 function seccompVerdict(filter: Buffer, arch: number, syscall: number): number {
   let accumulator = 0; let cursor = 0;
@@ -238,9 +275,13 @@ test('macOS Code shell cannot read the pasteboard or broker actions through Laun
   const sentinel = `clipboard-${crypto.randomUUID()}`;
   try {
     execFileSync('/usr/bin/pbcopy', { input: sentinel });
+    assert.equal(execFileSync('/usr/bin/pbpaste', { encoding: 'utf8' }), sentinel);
     const { createDefaultExecutors } = await import('@cline/sdk');
     const managed = await createEngineeringToolExecutors(root, createDefaultExecutors);
-    await assert.rejects(managed.executors.bash!('/usr/bin/pbpaste', root, context));
+    // pbpaste may exit zero with an empty result when its broker is unavailable. Assert the
+    // actual boundary (no clipboard bytes), not a CLI-specific exit convention.
+    const clipboard = await managed.executors.bash!('/usr/bin/pbpaste', root, context).catch(() => '');
+    assert.equal(clipboard, '', 'the sandbox must not return any pasteboard contents');
     await assert.rejects(managed.executors.bash!('/usr/bin/open -Ra Safari', root, context));
     managed.close();
   } finally {

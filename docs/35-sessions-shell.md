@@ -151,10 +151,9 @@ sheet, no dimmed plane behind it. Both of today's sheets become this one surface
   The side panel holds the code: Changes, Files, Work Plan, Checkpoints and Terminal are the
   coding thread's own tabs there (the Workbench card until the side-panel round, 2026-10-03). It
   opens by itself only for a new approval with changes, never with the session (2026-10-05,
-  docs/33 §2). The gate seat above the composer holds one card: the approval, else the Act
-  handoff, else the valve, `Make this a unit` (HUMAN_ONLY), which
-  creates a plan-first unit anchored to the conversation, and the thread stays a coding thread
-  with the unit card in it. Nothing reaches the board without that card. The session id IS the
+  docs/33 §2). The gate seat above the composer holds at most one card: the approval, else the
+  GitHub gate, else the Act handoff. The `Make this a unit` valve retired on 2026-10-12, so a
+  coding thread has no door to the board. The session id IS the
   thread id, so the machine's history discovery and the synced `code_sessions` row agree;
 - a **task** session — which is **today's docs/25 panel, unsheeted**. Its zoning is untouched:
   identity + spectrum + the facts line of toks in the header, at most one drawer, thread owns the

@@ -1,17 +1,13 @@
-// One PowerSync config serves the dev stack and the local stack, with every difference arriving
-// as PS_* env (dev/stack/powersync/powersync.yaml). PowerSync substitutes only PS_-prefixed names
-// and treats an unset one as a boot error, so the two compose files must each supply every `!env`
-// the yaml names — this file is what keeps the three in step. The local compose is also the
-// desktop's contract (U3a renders it), so its shape is pinned here: loopback ports, pinned images,
-// the bind mounts a person can back up, and no Postgres port.
+// Hosted/dev PowerSync retains its environment contract. Local desktop now uses the API
+// snapshot/feed replica: pin its two services, private ports and durable object volume separately.
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { LOCAL_SYNC_AUD, LOCAL_SYNC_KID } from '../src/local-auth';
 
 const read = (rel: string) => readFileSync(new URL(`../../../${rel}`, import.meta.url), 'utf8');
 const yaml = read('dev/stack/powersync/powersync.yaml');
 const devCompose = read('dev/stack/docker-compose.yaml');
 const localCompose = read('apps/desktop/resources/local/docker-compose.yaml');
+const gcsCompose = read('apps/desktop/resources/local/docker-compose.gcs.yaml');
 const envExample = read('apps/desktop/resources/local/.env.example');
 
 const envNames = (text: string): string[] => [...new Set([...text.matchAll(/!env\s+([A-Z0-9_:]+)/g)].map((m) => m[1]!.split('::')[0]!))].sort();
@@ -34,7 +30,7 @@ const uncommented = (text: string): string => text.split('\n').filter((l) => !l.
 describe('dev/stack/powersync/powersync.yaml reads its per-stack values from env', () => {
   const names = envNames(yaml);
 
-  it('names exactly the six PS_ values, all PS_-prefixed', () => {
+  it('names exactly the seven PS_ values, all PS_-prefixed', () => {
     expect(names).toEqual(['PS_NM_ADMIN_TOKEN', 'PS_NM_AUDIENCE', 'PS_NM_CLOUD_AUDIENCE', 'PS_NM_JWKS_URI', 'PS_NM_MACHINE_JWK_N', 'PS_NM_SYNC_KEY', 'PS_NM_SYNC_KID']);
     for (const n of names) expect(n.startsWith('PS_')).toBe(true);
   });
@@ -65,47 +61,44 @@ describe('dev/stack/powersync/powersync.yaml reads its per-stack values from env
     expect(env['PS_NM_MACHINE_JWK_N']).toBe('${PS_NM_MACHINE_JWK_N:-}');
   });
 
-  it('the local compose supplies every name, mapped from the desktop\'s NM_* env, with the local kid and audience', () => {
-    const env = serviceEnv(localCompose, 'powersync');
-    for (const n of names) expect(env[n], n).toBeDefined();
-    expect(env['PS_NM_SYNC_KID']).toBe(LOCAL_SYNC_KID);
-    expect(env['PS_NM_AUDIENCE']).toBe(LOCAL_SYNC_AUD);
-    expect(env['PS_NM_CLOUD_AUDIENCE']).toBe(LOCAL_SYNC_AUD);
-    expect(env['PS_NM_SYNC_KEY']).toBe('${NM_SYNC_KEY}');
-    expect(env['PS_NM_ADMIN_TOKEN']).toMatch(/^\$\{NM_ADMIN_TOKEN/);
-    // no Clerk and no egress: the remote JWKS is the control-api's own
-    expect(env['PS_NM_JWKS_URI']).toBe('http://control-api:8787/v1/sync-jwks');
+  it('Local uses its API replica without removing the hosted/dev PowerSync service', () => {
+    expect(serviceBlock(localCompose, 'powersync')).toBe('');
+    expect(serviceEnv(localCompose, 'control-api')['NM_LOCAL_SYNC']).toBe('"1"');
+    expect(serviceBlock(devCompose, 'powersync')).toMatch(/image: journeyapps\/powersync-service/);
   });
 });
 
 describe('apps/desktop/resources/local/docker-compose.yaml is the desktop\'s contract', () => {
-  it('pins the three images, with the control-api tag from NM_IMAGE_TAG', () => {
+  it('pins the two images, with the control-api tag from NM_IMAGE_TAG', () => {
     expect(localCompose).toMatch(/image: pgvector\/pgvector:pg16/);
-    expect(localCompose).toMatch(/image: journeyapps\/powersync-service:1\.26/);
+    expect([...localCompose.matchAll(/^    image:/gm)]).toHaveLength(2);
     expect(localCompose).toMatch(/image: \$\{NM_IMAGE:-ghcr\.io\/neuramesh-ai\/neuramesh-control-api\}:\$\{NM_IMAGE_TAG/);
-    expect(localCompose).toMatch(/wal_level=logical/);
+    expect(localCompose).not.toMatch(/wal_level=logical/);
+    expect(devCompose).toMatch(/wal_level=logical/);
   });
 
-  it('publishes the API and PowerSync on loopback only, and Postgres not at all', () => {
+  it('publishes only the API on loopback, and Postgres not at all', () => {
     expect(localCompose).toMatch(/"127\.0\.0\.1:\$\{NM_API_PORT:-8788\}:8787"/);
-    expect(localCompose).toMatch(/"127\.0\.0\.1:\$\{NM_POWERSYNC_PORT:-58081\}:8080"/);
+    expect(localCompose).not.toMatch(/NM_POWERSYNC_PORT/);
     expect(serviceBlock(localCompose, 'pg')).not.toMatch(/^\s+ports:/m);
     expect(localCompose).not.toMatch(/"0\.0\.0\.0:/);
   });
 
   it('keeps the data where a person can see and back it up: bind mounts under NM_LOCAL_DIR, and never down -v', () => {
     expect(localCompose).toMatch(/\$\{NM_LOCAL_DIR[^}]*\}\/pgdata:\/var\/lib\/postgresql\/data/);
-    expect(localCompose).toMatch(/\$\{NM_LOCAL_DIR\}\/powersync:\/config:ro/);
+    expect(localCompose).toMatch(/\$\{NM_LOCAL_DIR\}\/brain-objects:\/brain-objects/);
     expect(uncommented(localCompose)).not.toMatch(/down -v/m);
     expect(localCompose).toMatch(/Never run `docker compose down -v`/);
   });
 
-  it('hands the control-api the local facts: NM_LOCAL, the bearer hash, the shared key, the closed header, no fleet, no push, mail dry-run', () => {
+  it('hands the API local authentication, replica and object storage settings with no fleet, push or live mail', () => {
     const env = serviceEnv(localCompose, 'control-api');
     expect(env['NM_LOCAL']).toBe('"1"');
     expect(env['NM_LOCAL_HUMAN_TOKEN_HASH']).toMatch(/^\$\{NM_LOCAL_HUMAN_TOKEN_HASH/);
-    expect(env['NM_SYNC_KEY']).toMatch(/^\$\{NM_SYNC_KEY/);
-    expect(env['NM_POWERSYNC_URL']).toBe('http://127.0.0.1:${NM_POWERSYNC_PORT:-58081}');
+    expect(env['NM_LOCAL_SYNC']).toBe('"1"');
+    expect(env['NM_BRAIN_STORAGE_DIR']).toBe('/brain-objects');
+    expect(env['NM_SYNC_KEY']).toBeUndefined();
+    expect(env['NM_POWERSYNC_URL']).toBeUndefined();
     expect(env['NM_ALLOW_ACTOR_HEADER']).toBe('"0"');
     expect(env['FLEET_AUTOPROVISION']).toBe('"off"');
     expect(env['PUSH_ENABLED']).toBe('"0"');
@@ -115,7 +108,18 @@ describe('apps/desktop/resources/local/docker-compose.yaml is the desktop\'s con
 
   it('.env.example names every NM_* the compose file reads', () => {
     const wanted = [...new Set([...localCompose.matchAll(/\$\{(NM_[A-Z_]+)/g)].map((m) => m[1]!))].sort();
-    expect(wanted).toEqual(['NM_ADMIN_TOKEN', 'NM_API_PORT', 'NM_IMAGE', 'NM_IMAGE_TAG', 'NM_LOCAL_DIR', 'NM_LOCAL_HUMAN_TOKEN_HASH', 'NM_POWERSYNC_PORT', 'NM_SYNC_KEY']);
+    expect(wanted).toEqual(['NM_API_PORT', 'NM_IMAGE', 'NM_IMAGE_TAG', 'NM_LOCAL_DIR', 'NM_LOCAL_HUMAN_TOKEN_HASH']);
     for (const name of wanted) expect(envExample, name).toMatch(new RegExp(`^#? ?${name}=`, 'm'));
+  });
+
+  it('GCS is an explicit override with a read-only credential file and declared inputs', () => {
+    expect(localCompose).not.toMatch(/GOOGLE_APPLICATION_CREDENTIALS|NM_BRAIN_GCS_BUCKET/);
+    expect(serviceEnv(gcsCompose, 'control-api')['GOOGLE_APPLICATION_CREDENTIALS']).toBe('/run/neuramesh/gcp-adc.json');
+    expect(gcsCompose).toMatch(/read_only: true/);
+    expect(gcsCompose).toMatch(/create_host_path: false/);
+    for (const name of ['NM_BRAIN_GCS_BUCKET', 'NM_BRAIN_ADC_FILE']) {
+      expect(gcsCompose).toContain('${' + name + ':?');
+      expect(envExample).toMatch(new RegExp(`^#? ?${name}=`, 'm'));
+    }
   });
 });

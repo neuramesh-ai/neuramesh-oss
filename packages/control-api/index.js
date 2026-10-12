@@ -1,5 +1,9 @@
+var __create = Object.create;
 var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getProtoOf = Object.getPrototypeOf;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
 var __esm = (fn, res, err) => function __init() {
   if (err) throw err[0];
   try {
@@ -8,15 +12,38 @@ var __esm = (fn, res, err) => function __init() {
     throw err = [e], e;
   }
 };
+var __commonJS = (cb, mod) => function __require() {
+  try {
+    return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
+  } catch (e) {
+    throw mod = 0, e;
+  }
+};
 var __export = (target, all) => {
   for (var name in all)
     __defProp(target, name, { get: all[name], enumerable: true });
 };
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key2 of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key2) && key2 !== except)
+        __defProp(to, key2, { get: () => from[key2], enumerable: !(desc = __getOwnPropDesc(from, key2)) || desc.enumerable });
+  }
+  return to;
+};
+var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+  // If the importer is in node compatibility mode or this is not an ESM
+  // file that has been converted to a CommonJS file using a Babel-
+  // compatible transform (i.e. "__esModule" has not been set), then set
+  // "default" to the CommonJS "module.exports" for node compatibility.
+  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+  mod
+));
 
 // ../shared/src/alerts.ts
-function deriveAlerts(connectors, schedules, posts, dismissals = {}) {
+function deriveAlerts(connectors2, schedules2, posts, dismissals = {}) {
   const out = [];
-  const reauth = connectors.filter((c) => c.status === "reauth_required");
+  const reauth = connectors2.filter((c) => c.status === "reauth_required");
   for (const c of reauth) {
     const label = providerLabel(c.provider);
     out.push({
@@ -30,7 +57,7 @@ function deriveAlerts(connectors, schedules, posts, dismissals = {}) {
       provider: c.provider
     });
   }
-  for (const s of schedules.filter((r) => r.status === "active" && !!r.last_error)) {
+  for (const s of schedules2.filter((r) => r.status === "active" && !!r.last_error)) {
     out.push({
       kind: "routine",
       key: `routine:${s.id}`,
@@ -254,41 +281,41 @@ function stripFenced(body, lang) {
     rest = rest.slice(b2.end);
   }
 }
-function dotLines(text2) {
-  return text2.split(LINE_END);
+function dotLines(text3) {
+  return text3.split(LINE_END);
 }
-function lineHas(text2, first, then) {
-  return dotLines(text2).some((line) => {
+function lineHas(text3, first, then) {
+  return dotLines(text3).some((line) => {
     const at = line.indexOf(first);
     return at !== -1 && line.indexOf(then, at + first.length) !== -1;
   });
 }
-function firstSentence(text2) {
-  const m = /[.!?]/.exec(text2);
-  return m ? text2.slice(0, m.index) : text2;
+function firstSentence(text3) {
+  const m = /[.!?]/.exec(text3);
+  return m ? text3.slice(0, m.index) : text3;
 }
-function markerSpans(text2, open, close) {
+function markerSpans(text3, open, close) {
   const out = [];
   let from = 0;
   for (; ; ) {
-    const start = text2.indexOf(open, from);
+    const start = text3.indexOf(open, from);
     if (start === -1) return out;
-    const stop = text2.indexOf(close, start + open.length);
+    const stop = text3.indexOf(close, start + open.length);
     if (stop === -1) return out;
-    out.push({ start, end: stop + close.length, inner: text2.slice(start + open.length, stop) });
+    out.push({ start, end: stop + close.length, inner: text3.slice(start + open.length, stop) });
     from = stop + close.length;
   }
 }
-function stripMarkers(text2, open, close) {
-  const spans = markerSpans(text2, open, close);
-  if (!spans.length) return text2;
+function stripMarkers(text3, open, close) {
+  const spans = markerSpans(text3, open, close);
+  if (!spans.length) return text3;
   let out = "";
   let at = 0;
   for (const sp of spans) {
-    out += text2.slice(at, sp.start);
+    out += text3.slice(at, sp.start);
     at = sp.end;
   }
-  return out + text2.slice(at);
+  return out + text3.slice(at);
 }
 var LINE_END;
 var init_linear = __esm({
@@ -375,26 +402,26 @@ function readLine(raw, beat) {
 }
 function scriptBeats(body) {
   const lines = body.split("\n").map((l) => l.trim()).filter(Boolean);
-  const beats = [];
+  const beats2 = [];
   let cur = null;
   for (const l of lines) {
     const m = STAMP_RE.exec(l);
     if (m) {
       cur = newBeat(Number(m[1]) * 60 + Number(m[2]), Number(m[3]) * 60 + Number(m[4]));
-      beats.push(cur);
+      beats2.push(cur);
       stampLine(m[5], cur);
     } else if (cur) readLine(l, cur);
   }
-  if (beats.length) return beats;
+  if (beats2.length) return beats2;
   const one = newBeat(0, 0);
   for (const l of lines.slice(0, 3)) readLine(l, one);
   return [one];
 }
 function productShots(body) {
-  const beats = scriptBeats(body);
-  return beats.flatMap((b2, i) => {
+  const beats2 = scriptBeats(body);
+  return beats2.flatMap((b2, i) => {
     if (!b2.show) return [];
-    const end = b2.end > b2.start ? b2.end : beats[i + 1]?.start ?? b2.start + 3;
+    const end = b2.end > b2.start ? b2.end : beats2[i + 1]?.start ?? b2.start + 3;
     return [{ start: b2.start, end, show: b2.show }];
   });
 }
@@ -412,21 +439,22 @@ function lookFrom(brief) {
   const kept = (plain.match(/[^.!?]+[.!?]*/g) ?? []).map((s) => s.trim()).filter((s) => /\w/.test(s) && !CAPTION_ASK_RE.test(s));
   return trimEndChars(cut(kept.join(" "), LOOK_WORDS), ".:");
 }
-function filmPrompt(body, brief, seconds = 8) {
-  const beats = beatsWithin(body, seconds);
-  const shots = beats.map((b2, i) => {
+function filmPrompt(body, brief, seconds = 8, opts = {}) {
+  const beats2 = beatsWithin(body, seconds);
+  const shots = beats2.map((b2, i) => {
     const dir = cut(b2.direction, DIRECTION_WORDS);
     const say = cut(b2.spoken, SPOKEN_WORDS);
     const shot = dir ? i === 0 ? `Open on ${dir}.` : `Then cut to ${dir}.` : i === 0 ? "" : "Then cut.";
     const line = say ? i === 0 ? `The creator says to camera, casual: "${say}"` : `"${say}"` : "";
     return [shot, line].filter(Boolean).join(" ");
   }).filter(Boolean);
-  const title = lettering(beats[0]?.caption ?? "");
+  const title = lettering(beats2[0]?.caption ?? "");
   const look = lookFrom(brief);
   const assemble = (cuts, withLook) => [
     `Vertical 9:16 phone video, ${seconds} seconds, handheld, natural light, a creator talking to camera, raw and real.`,
     ...cuts,
     title ? `One on-screen title, large and centered in the lower third, exactly: "${title}". No other text.` : "No on-screen text, no subtitles, no captions, no logos.",
+    opts.frame ? "" : SCREENS_RULE,
     withLook && look ? `Look: ${look}.` : "",
     "Audio: the creator's voice and room tone, no music."
   ].filter(Boolean).join(" ");
@@ -435,7 +463,7 @@ function filmPrompt(body, brief, seconds = 8) {
   for (let n = shots.length - 1; out.length > FILM_PROMPT_MAX && n >= 1; n -= 1) out = assemble(shots.slice(0, n), false);
   return out.slice(0, FILM_PROMPT_MAX);
 }
-var BLANKS, STAMP_RE, MAX_BEATS, DIRECTION_WORDS, SPOKEN_WORDS, LOOK_WORDS, FILM_PROMPT_MAX, unquote, words, tidyDirection, CAPTION_LABEL, SPOKEN_LABEL, SHOW_LABEL, oneSpaced, newBeat, PRODUCT_WORDS_RE, looksLikeProductBeat, firstBeat, CAPTION_ASK_RE, filmMinutes;
+var BLANKS, STAMP_RE, MAX_BEATS, DIRECTION_WORDS, SPOKEN_WORDS, LOOK_WORDS, FILM_PROMPT_MAX, unquote, words, tidyDirection, CAPTION_LABEL, SPOKEN_LABEL, SHOW_LABEL, oneSpaced, newBeat, APP_SCREEN_RE, looksLikeProductBeat, SCREENS_RULE, firstBeat, CAPTION_ASK_RE, filmMinutes;
 var init_filmprompt = __esm({
   "../shared/src/filmprompt.ts"() {
     "use strict";
@@ -455,8 +483,9 @@ var init_filmprompt = __esm({
     SHOW_LABEL = /^show ?:/i;
     oneSpaced = (s) => s.replace(/[ \t]+/g, " ").trim();
     newBeat = (start, end) => ({ start, end, direction: "", spoken: "", caption: "", show: "" });
-    PRODUCT_WORDS_RE = /\b(app|screen|phone|product|interface|dashboard|recording|ui|home screen|the board|laptop screen)\b/i;
-    looksLikeProductBeat = (b2) => PRODUCT_WORDS_RE.test(b2.direction);
+    APP_SCREEN_RE = /\b(screen ?(recording|capture|cast)s?|screenshots?|(phone|laptop|tablet|computer|app|home|lock|the) screens?|on[- ]screen(?! (text|title|titles|caption|captions|lettering|words))|ui|interface|dashboard|close(-| )?(up )?on the (phone|app|laptop)|(scrolls?|taps?|swipes?|clicks?) (through|around|in|on) the app|(opens?|shows?|holds? up|demos?) the app|the app's)\b/i;
+    looksLikeProductBeat = (b2) => APP_SCREEN_RE.test(b2.direction);
+    SCREENS_RULE = "Every phone and laptop screen stays dark or faces away from the camera.";
     firstBeat = (body) => scriptBeats(body)[0];
     CAPTION_ASK_RE = /\b(captions?|subtitles?|on-screen text|text overlays?|overlay text|text on screen|lettering|title cards?|lower thirds?|watermarks?|logos?|headlines?|burned[- ]in|the words)\b/i;
     filmMinutes = (seconds) => Math.max(2, Math.ceil(seconds / 4));
@@ -920,8 +949,8 @@ function machineAvailableTo(m, userId) {
   const shares = m.sharesWith ?? [];
   return shares.includes("*") || shares.includes(userId);
 }
-function availableMachines(machines, userId) {
-  return machines.filter((m) => machineAvailableTo(m, userId));
+function availableMachines(machines2, userId) {
+  return machines2.filter((m) => machineAvailableTo(m, userId));
 }
 function machineOnline(m, now) {
   return !!m.lastSeenAt && now - new Date(m.lastSeenAt).getTime() < MACHINE_ONLINE_MS;
@@ -964,11 +993,11 @@ function designatedMachine(ctx, now) {
   };
   return live(ctx.priorMachineId, false) ?? live(ctx.threadMachineId, !!ctx.originUserId) ?? (ctx.originUserId ? live(ctx.agentId ? ctx.prefs?.agents?.[ctx.agentId] : null, true) ?? live(ctx.prefs?.machine, true) : null);
 }
-function liveCloudMachine(machines, originUserId, need, now) {
+function liveCloudMachine(machines2, originUserId, need, now) {
   const ok2 = (m) => (need === null || runtimeOk(m, need)) && machineOnline(m, now);
-  const mine = originUserId ? machines.find((m) => m.kind === "member" && m.ownerUserId === originUserId && ok2(m)) : void 0;
+  const mine = originUserId ? machines2.find((m) => m.kind === "member" && m.ownerUserId === originUserId && ok2(m)) : void 0;
   if (mine) return mine.machineId;
-  const runner = machines.find((m) => m.kind === "runner" && ok2(m));
+  const runner = machines2.find((m) => m.kind === "runner" && ok2(m));
   return runner?.machineId ?? null;
 }
 function cloudMachineForSession(ctx, now) {
@@ -981,8 +1010,8 @@ function cloudMachineForSession(ctx, now) {
   if (cloud(named) && (named.kind === "runner" || !ctx.originUserId || named.ownerUserId === ctx.originUserId)) return named.machineId;
   return liveCloudMachine(ctx.machines, ctx.originUserId, null, now);
 }
-function placementFor(agent, prefs, machines, selfUserId, now, origin = null) {
-  const reachable = availableMachines(machines, selfUserId);
+function placementFor(agent, prefs, machines2, selfUserId, now, origin = null) {
+  const reachable = availableMachines(machines2, selfUserId);
   const servesAgent = (m) => (isHouseBrain(agent.model) || m.runtimes.includes(agent.runtime)) && machineOnline(m, now);
   const capable = (id) => {
     const m = id ? reachable.find((x) => x.machineId === id) : void 0;
@@ -1000,8 +1029,8 @@ function placementFor(agent, prefs, machines, selfUserId, now, origin = null) {
   const any = reachable.find((m) => servesAgent(m));
   return any ? { machineId: any.machineId, why: "failover" } : { machineId: null, why: "none" };
 }
-function nobodyCanServe(machines, runtime, originUserId, now, model2) {
-  return !availableMachines(machines, originUserId).some((m) => (isHouseBrain(model2) || m.runtimes.includes(runtime)) && machineOnline(m, now));
+function nobodyCanServe(machines2, runtime, originUserId, now, model2) {
+  return !availableMachines(machines2, originUserId).some((m) => (isHouseBrain(model2) || m.runtimes.includes(runtime)) && machineOnline(m, now));
 }
 function applyShare(shares, allMemberIds, selfId, member, on) {
   const others = allMemberIds.filter((id) => id !== selfId);
@@ -1045,9 +1074,9 @@ function machineState(m, cap2, now) {
   }
   return { status: "asleep", reason: "Asleep until someone needs it. A message starts it." };
 }
-function machineWaitLine(status) {
-  const line = status ? MACHINE_WAIT_LINE[status] : void 0;
-  return line ? { line, stalled: !!(status && MACHINE_WAIT_STALLED[status]) } : null;
+function machineWaitLine(status2) {
+  const line = status2 ? MACHINE_WAIT_LINE[status2] : void 0;
+  return line ? { line, stalled: !!(status2 && MACHINE_WAIT_STALLED[status2]) } : null;
 }
 function msUntilCapReset(now) {
   const d = new Date(now);
@@ -1089,11 +1118,11 @@ var init_compute = __esm({
 });
 
 // ../shared/src/compute-voice.ts
-function hostSpeaksForOrigin(machines, originUserId, hostOwnerUserId, hostKind, now) {
+function hostSpeaksForOrigin(machines2, originUserId, hostOwnerUserId, hostKind, now) {
   if (!originUserId) return false;
   if (hostOwnerUserId === originUserId) return true;
   if (hostKind !== "runner") return false;
-  return !machines.some((m) => m.ownerUserId === originUserId && machineOnline(m, now));
+  return !machines2.some((m) => m.ownerUserId === originUserId && machineOnline(m, now));
 }
 var init_compute_voice = __esm({
   "../shared/src/compute-voice.ts"() {
@@ -1149,6 +1178,9 @@ function isChatThread(value) {
 }
 function threadKindOf(value) {
   return value === "coding" ? "coding" : DEFAULT_THREAD_KIND;
+}
+function threadSurfaceKind(row, bornWithRepo) {
+  return row ? threadKindOf(row.kind) : bornWithRepo ? "coding" : DEFAULT_THREAD_KIND;
 }
 function isCodingThread(value) {
   return threadKindOf(value) === "coding";
@@ -1468,8 +1500,8 @@ var init_cardfence = __esm({
 });
 
 // ../shared/src/sessions.ts
-function liveKinOf(tasks) {
-  const byId = new Map(tasks.map((t2) => [t2.id, t2]));
+function liveKinOf(tasks2) {
+  const byId = new Map(tasks2.map((t2) => [t2.id, t2]));
   return (taskId3) => {
     const out = [];
     const t2 = byId.get(taskId3);
@@ -1488,20 +1520,20 @@ function clip(s, max) {
   return flat.length > max ? `${flat.slice(0, max - 1)}\u2026` : flat;
 }
 function historyRows(input) {
-  const { threads, tasks, channelId, channelSlug, query, messages } = input;
+  const { threads: threads2, tasks: tasks2, channelId, channelSlug, query, messages: messages2 } = input;
   const codeByThread = /* @__PURE__ */ new Map();
   for (const c of input.codeSessions ?? []) codeByThread.set(c.thread_id ?? c.id, c);
   const needle = query.trim().toLowerCase();
   const inScope = (r) => channelId === null || r.channel_id === channelId;
-  const scopedThreads = threads.filter((t2) => t2.channel_id === void 0 || inScope(t2));
+  const scopedThreads = threads2.filter((t2) => t2.channel_id === void 0 || inScope(t2));
   const linked = new Set(scopedThreads.map((t2) => t2.task_id).filter(Boolean));
-  const bare = tasks.filter((t2) => inScope(t2) && !linked.has(t2.id) && !t2.parent_task_id && !t2.origin_thread_id);
+  const bare = tasks2.filter((t2) => inScope(t2) && !linked.has(t2.id) && !t2.parent_task_id && !t2.origin_thread_id);
   const ownedElsewhere = (t2, task) => !!task && (!!task.parent_task_id || !!task.origin_thread_id && task.origin_thread_id !== t2.id);
-  const loose = (messages ?? []).filter((m) => m.author_kind === "human" && !m.thread_id && !m.task_id && !m.root_thread_id);
-  const slugOf2 = (id) => tasks.find((t2) => t2.channel_id === id)?.channel_slug ?? channelSlug;
+  const loose = (messages2 ?? []).filter((m) => m.author_kind === "human" && !m.thread_id && !m.task_id && !m.root_thread_id);
+  const slugOf2 = (id) => tasks2.find((t2) => t2.channel_id === id)?.channel_slug ?? channelSlug;
   return [
     ...scopedThreads.flatMap((t2) => {
-      const task = t2.task_id ? tasks.find((x) => x.id === t2.task_id) ?? null : null;
+      const task = t2.task_id ? tasks2.find((x) => x.id === t2.task_id) ?? null : null;
       if (ownedElsewhere(t2, task)) return [];
       const kind = threadKindOf(t2.kind);
       const code = kind === "coding" ? codeByThread.get(t2.id) ?? null : null;
@@ -1577,11 +1609,11 @@ function sessionGroups(rows2, nowMs) {
   }
   return BUCKETS.filter((label) => held.has(label)).map((label) => ({ label, rows: held.get(label) }));
 }
-function roomBriefs(messages, agentIds, limit = 5) {
-  return messages.filter((m) => m.author_kind === "agent" && agentIds.has(m.author_id)).filter((m) => !m.task_id && !m.thread_id).filter((m) => !parseCard(m.body)).sort((a, b2) => a.created_at < b2.created_at ? 1 : -1).slice(0, limit).map((m) => ({ messageId: m.id, body: m.body, at: m.created_at }));
+function roomBriefs(messages2, agentIds, limit = 5) {
+  return messages2.filter((m) => m.author_kind === "agent" && agentIds.has(m.author_id)).filter((m) => !m.task_id && !m.thread_id).filter((m) => !parseCard(m.body)).sort((a, b2) => a.created_at < b2.created_at ? 1 : -1).slice(0, limit).map((m) => ({ messageId: m.id, body: m.body, at: m.created_at }));
 }
-function roomBrief(messages, agentIds) {
-  return roomBriefs(messages, agentIds, 1)[0] ?? null;
+function roomBrief(messages2, agentIds) {
+  return roomBriefs(messages2, agentIds, 1)[0] ?? null;
 }
 function briefPretty(body) {
   let t2 = stripBriefFrame(body);
@@ -1623,20 +1655,20 @@ var init_sessions = __esm({
 });
 
 // ../shared/src/machine-choice.ts
-function choosableMachines(machines, selfUserId, now) {
-  const usable = machines.filter((m) => m.kind === "runner" || machineAvailableTo({ machineId: m.id, ownerUserId: m.ownerUserId ?? "", runtimes: [], lastSeenAt: m.lastSeenAt, sharesWith: m.sharesWith }, selfUserId));
+function choosableMachines(machines2, selfUserId, now) {
+  const usable = machines2.filter((m) => m.kind === "runner" || machineAvailableTo({ machineId: m.id, ownerUserId: m.ownerUserId ?? "", runtimes: [], lastSeenAt: m.lastSeenAt, sharesWith: m.sharesWith }, selfUserId));
   const rank = (m) => (m.ownerUserId === selfUserId ? 0 : 1) * 2 + (machineOnline({ machineId: m.id, ownerUserId: "", runtimes: [], lastSeenAt: m.lastSeenAt }, now) ? 0 : 1);
   return [...usable].sort((a, b2) => rank(a) - rank(b2) || a.name.localeCompare(b2.name));
 }
-function cloudMachineFor(machines, selfUserId, now) {
+function cloudMachineFor(machines2, selfUserId, now) {
   const live = (m) => machineOnline({ machineId: m.id, ownerUserId: "", runtimes: [], lastSeenAt: m.lastSeenAt }, now);
-  return machines.find((m) => m.kind === "member" && m.ownerUserId === selfUserId && live(m)) ?? machines.find((m) => m.kind === "runner" && live(m)) ?? null;
+  return machines2.find((m) => m.kind === "member" && m.ownerUserId === selfUserId && live(m)) ?? machines2.find((m) => m.kind === "runner" && live(m)) ?? null;
 }
 function forecastMachine(input) {
-  const { origin, chosen, prefs, machines, selfUserId, selfMachineId, now } = input;
+  const { origin, chosen, prefs, machines: machines2, selfUserId, selfMachineId, now } = input;
   if (chosen) return { machineId: chosen, why: "chosen" };
   if (origin === "desktop" && prefs?.desktopSessions === "here" && selfMachineId) return { machineId: selfMachineId, why: "here" };
-  const cloud = cloudMachineFor(machines, selfUserId, now);
+  const cloud = cloudMachineFor(machines2, selfUserId, now);
   if (cloud) return { machineId: cloud.id, why: "cloud" };
   if (origin === "desktop" && selfMachineId) return { machineId: selfMachineId, why: "this-machine" };
   return { machineId: null, why: "auto" };
@@ -1668,6 +1700,7 @@ var init_commands_code = __esm({
     init_code_sessions();
     init_threads();
     CODE_SESSION_COMMANDS = [
+      z.object({ type: z.literal("code_session.name"), workspace: z.string().min(1), codeSessionId: z.string().uuid(), title: z.string().trim().min(1).max(100) }),
       // create-or-update the session's synced row. `createdBy` names the member the session belongs
       // to; only the owner of the hosting machine may name someone other than themselves (a cloud
       // runner speaks as its owner and works for every member). Every other field is a patch.
@@ -1774,38 +1807,44 @@ function runElapsed(run2, now = Date.now()) {
   return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}` : `${m}:${String(s).padStart(2, "0")}`;
 }
 function toolVerb(row) {
-  if (row.kind === "turn") return { verb: "composing\u2026" };
+  if (row.kind === "turn") return row.phase || /^(?:tools|claude):/.test(row.summary ?? "") ? null : { verb: "writes the reply" };
   if (row.kind !== "tool" || row.phase !== "call") return null;
   const s = row.summary ?? "";
   const base = (p2) => p2.split("/").pop() ?? p2;
   let m = s.match(/^Read (.+)/);
-  if (m) return { verb: `reading ${base(m[1])}`, cat: "file" };
+  if (m) return { verb: `reads ${base(m[1])}`, cat: "file" };
   m = s.match(/^(?:Write|Edit) (.+?)(?: \(|$)/);
-  if (m) return { verb: `editing ${base(m[1])}`, cat: "file" };
-  m = s.match(/^Bash: (.+)/);
-  if (m) return { verb: `running ${m[1].split(" ").slice(0, 3).join(" ")}`, cat: "cmd" };
-  if (/^(?:Grep|Glob) /.test(s)) return { verb: "searching the repo", cat: "search" };
+  if (m) return { verb: `edits ${base(m[1])}`, cat: "file" };
+  m = s.match(/^(?:Bash: |bash )(.+)/);
+  if (m) return { verb: `runs ${m[1].split(" ").slice(0, 3).join(" ")}`, cat: "cmd" };
+  if (/^(?:Grep|Glob) /.test(s)) return { verb: "searches the repository", cat: "search" };
   m = s.match(/^nm\.(\w+)/);
-  if (m) return NM_VERBS[m[1]] ?? { verb: m[1].replace(/_/g, " ") };
+  if (m) return nmVerb(m[1]) ?? { verb: m[1].replace(/_/g, " ") };
   m = s.match(/^WebSearch (.+)/);
-  if (m) return { verb: `searching \u201C${m[1].slice(0, 34)}${m[1].length > 34 ? "\u2026" : ""}\u201D`, cat: "search" };
-  if (/^WebSearch/.test(s)) return { verb: "searching the web", cat: "search" };
+  if (m) return { verb: `searches \u201C${m[1].slice(0, 34)}${m[1].length > 34 ? "\u2026" : ""}\u201D`, cat: "search" };
+  if (/^WebSearch/.test(s)) return { verb: "searches the web", cat: "search" };
   m = s.match(/^WebFetch (\S+)/);
   if (m) {
     try {
       const u = new URL(m[1]);
       const path = u.pathname !== "/" ? u.pathname : "";
-      return { verb: `reading ${(u.hostname.replace(/^www\./, "") + path).slice(0, 40)}`, cat: "search" };
+      return { verb: `reads ${(u.hostname.replace(/^www\./, "") + path).slice(0, 40)}`, cat: "search" };
     } catch {
     }
   }
-  if (/^WebFetch/.test(s)) return { verb: "reading a page", cat: "search" };
+  if (/^WebFetch/.test(s)) return { verb: "reads a page", cat: "search" };
   m = s.match(/^mcp__(\w+?)__(\w+)/);
   if (m) return { verb: `${m[1]}: ${m[2].replace(/[._-]+/g, " ")}`.slice(0, 40), cat: "search" };
-  if (/^TodoWrite/.test(s)) return { verb: "updating the plan" };
-  if (/recall/i.test(s)) return { verb: "recalling context", cat: "search" };
-  if (/^[\w.]+$/.test(s)) return { verb: s.replace(/^mcp__/, "").replace(/[._]+/g, " ").trim() };
-  return { verb: s.length > 46 ? `${s.slice(0, 46)}\u2026` : s };
+  if (/^TodoWrite/.test(s)) return { verb: "updates the plan" };
+  if (/^leg "/.test(s)) return { verb: "starts a subagent" };
+  m = s.match(/^([a-z][a-z0-9_]*)(?=[\s({[]|$)/);
+  if (m && (nmVerb(m[1]) || m[1].includes("_"))) return nmVerb(m[1]) ?? { verb: m[1].replace(/_/g, " ") };
+  m = s.match(/^([A-Z]\w*)(?=[\s({[]|$)/);
+  if (m && Object.hasOwn(SDK_VERBS, m[1])) return SDK_VERBS[m[1]] ?? null;
+  if (/recall/i.test(s)) return { verb: "recalls context", cat: "search" };
+  if (/^[\w.]+$/.test(s)) return { verb: s.replace(/^mcp__/, "").replace(/[._]+/g, " ").replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase().trim() };
+  const words2 = withoutArgs(s);
+  return { verb: words2.length > 46 ? `${words2.slice(0, 46)}\u2026` : words2 };
 }
 function isRunStale(run2, now = Date.now()) {
   return run2.state === "running" && now - Date.parse(run2.updatedAt) > RUN_STALE_MS;
@@ -1847,7 +1886,7 @@ function deepestActive(t2) {
   walk(t2, []);
   return best;
 }
-var RUN_STATES, RUN_TERMINAL_STATES, RUN_SETTLE_STATES, isRunOpen, RUN_KINDS, RunSchema, TOOL_CATS, NM_VERBS, RUN_STALE_MS;
+var RUN_STATES, RUN_TERMINAL_STATES, RUN_SETTLE_STATES, isRunOpen, RUN_KINDS, RunSchema, TOOL_CATS, NM_VERBS, SDK_VERBS, nmVerb, withoutArgs, RUN_STALE_MS;
 var init_runs = __esm({
   "../shared/src/runs.ts"() {
     "use strict";
@@ -1889,40 +1928,109 @@ var init_runs = __esm({
     });
     TOOL_CATS = ["file", "cmd", "search", "check"];
     NM_VERBS = {
-      task_status: { verb: "checking the board", cat: "check" },
-      list_tasks: { verb: "checking the board", cat: "check" },
-      list_backlog: { verb: "checking the backlog", cat: "check" },
-      list_agents: { verb: "checking the roster", cat: "check" },
-      list_repos: { verb: "checking the repos", cat: "check" },
-      list_projects: { verb: "checking the projects", cat: "check" },
-      recall: { verb: "recalling context", cat: "search" },
-      load_skill: { verb: "reading a team skill", cat: "check" },
-      set_thread_title: { verb: "naming the conversation" },
-      create_task: { verb: "creating the task" },
-      offer_task: { verb: "handing off the task" },
-      add_subtask: { verb: "adding a subtask" },
-      add_backlog_item: { verb: "parking it on the backlog" },
-      create_whiteboard: { verb: "drawing a whiteboard" },
-      update_whiteboard: { verb: "redrawing the whiteboard" },
-      list_whiteboards: { verb: "checking the whiteboards", cat: "check" },
-      read_whiteboard: { verb: "reading a whiteboard", cat: "check" },
-      promote_backlog_item: { verb: "promoting from the backlog" },
-      update_backlog_item: { verb: "updating the backlog item" },
-      request_plan: { verb: "routing to the architect" },
-      request_design: { verb: "routing to the designer" },
-      revise_design: { verb: "sending design feedback" },
-      revise_plan: { verb: "sending plan feedback" },
-      revise_ship_plan: { verb: "sending ship-plan feedback" },
-      request_changes: { verb: "sending it back with notes" },
-      post_thread: { verb: "posting to the thread" },
-      register_repo: { verb: "registering the repo" },
-      create_project: { verb: "creating the project" },
-      create_agent: { verb: "hiring the agent" },
-      add_agent_to_channel: { verb: "adding a teammate to the room" },
-      record_lesson: { verb: "writing down a lesson" },
-      propose_skill: { verb: "proposing a skill" },
-      screenshot: { verb: "taking a screenshot" },
-      start_deep_work: { verb: "starting the deep work" }
+      task_status: { verb: "checks the board", cat: "check" },
+      list_tasks: { verb: "checks the board", cat: "check" },
+      list_backlog: { verb: "checks the backlog", cat: "check" },
+      list_agents: { verb: "checks the roster", cat: "check" },
+      list_repos: { verb: "checks the repositories", cat: "check" },
+      list_projects: { verb: "checks the projects", cat: "check" },
+      recall: { verb: "recalls context", cat: "search" },
+      load_skill: { verb: "reads a team skill", cat: "check" },
+      set_thread_title: { verb: "names the conversation" },
+      create_task: { verb: "creates the task" },
+      offer_task: { verb: "offers the task" },
+      add_subtask: { verb: "adds a subtask" },
+      add_backlog_item: { verb: "adds an item to the backlog" },
+      create_whiteboard: { verb: "draws a whiteboard" },
+      update_whiteboard: { verb: "redraws the whiteboard" },
+      list_whiteboards: { verb: "checks the whiteboards", cat: "check" },
+      read_whiteboard: { verb: "reads a whiteboard", cat: "check" },
+      promote_backlog_item: { verb: "promotes a backlog item" },
+      update_backlog_item: { verb: "updates the backlog item" },
+      request_plan: { verb: "sends the task to the architect" },
+      request_design: { verb: "sends the task to the designer" },
+      revise_design: { verb: "sends notes on the design" },
+      revise_plan: { verb: "sends notes on the plan" },
+      revise_ship_plan: { verb: "sends notes on the release plan" },
+      request_changes: { verb: "asks for changes" },
+      post_thread: { verb: "posts to the thread" },
+      register_repo: { verb: "registers the repository" },
+      create_project: { verb: "creates the project" },
+      create_agent: { verb: "hires the agent" },
+      add_agent_to_channel: { verb: "adds a teammate to the room" },
+      record_lesson: { verb: "records a lesson" },
+      propose_skill: { verb: "proposes a skill" },
+      screenshot: { verb: "takes a screenshot" },
+      start_deep_work: { verb: "starts the deep work" },
+      // the tools a lane logs by the bare name (the NeuraMesh brain's turn, the harness tools)
+      read_repo_file: { verb: "reads a repository file", cat: "file" },
+      list_repo_files: { verb: "lists the repository files", cat: "check" },
+      list_repo_changes: { verb: "reads the repository changes", cat: "check" },
+      read_workspace_file: { verb: "reads a workspace file", cat: "file" },
+      list_library: { verb: "checks the library", cat: "check" },
+      read_library_doc: { verb: "reads a library document", cat: "check" },
+      propose_library_doc: { verb: "proposes a library document" },
+      list_playbooks: { verb: "checks the playbooks", cat: "check" },
+      run_playbook: { verb: "runs a playbook" },
+      propose_design_round: { verb: "proposes a design round" },
+      take_task: { verb: "takes the task" },
+      declare_beats: { verb: "plans the steps" },
+      advance_beat: { verb: "moves to the next step" },
+      search_x: { verb: "searches posts on X", cat: "search" },
+      draft_posts: { verb: "drafts the posts" },
+      revise_posts: { verb: "revises the posts" },
+      read_drafts: { verb: "reads the drafts", cat: "check" },
+      draft_replies: { verb: "drafts the replies" },
+      revise_replies: { verb: "revises the replies" },
+      draft_article: { verb: "drafts the article" },
+      propose_angles: { verb: "proposes the angles" },
+      generate_image: { verb: "draws an image" },
+      make_product_image: { verb: "makes a product image" },
+      // retired 2026-10-06; past runs still show the step
+      shelve_repo_screenshot: { verb: "takes a screenshot from the repository" },
+      share_images: { verb: "shares the images" },
+      spawn: { verb: "starts a subagent" },
+      // the rest of the registries (2026-10-05, the review of round 2): a tool with no row here spoke its
+      // underscores ("accept task"), so every name a registry hands a turn has words (the desktop's
+      // registry test reads the built registries against this table)
+      accept_task: { verb: "accepts the task" },
+      request_verdict: { verb: "asks for a verdict" },
+      propose_impl_plan: { verb: "proposes a plan" },
+      schedule_posts: { verb: "proposes a schedule for the posts" },
+      unschedule_posts: { verb: "asks to remove posts from the schedule" },
+      list_workspace: { verb: "checks the conversation files", cat: "check" },
+      propose_routine: { verb: "drafts the routine" },
+      offer_routine_session: { verb: "offers a routine session" },
+      open_code_session: { verb: "opens a code session" },
+      file_conversation: { verb: "moves the conversation to a room" },
+      park: { verb: "pauses the work" },
+      // the NeuraMesh brain worker's own file tools (runtime/starter.ts)
+      write_file: { verb: "writes a file", cat: "file" },
+      read_file: { verb: "reads a file", cat: "file" },
+      list_files: { verb: "lists the files", cat: "check" },
+      // the agents' browser (harness.ts NM_TOOLS)
+      web_open: { verb: "opens a page", cat: "search" },
+      web_read: { verb: "reads the page", cat: "search" },
+      web_click: { verb: "clicks an item on the page", cat: "search" },
+      web_type: { verb: "types text on the page", cat: "search" },
+      web_screenshot: { verb: "takes a screenshot of the page", cat: "search" }
+    };
+    SDK_VERBS = {
+      Task: { verb: "starts a subagent" },
+      Agent: { verb: "starts a subagent" },
+      MultiEdit: { verb: "edits a file", cat: "file" },
+      NotebookEdit: { verb: "edits a notebook", cat: "file" },
+      ToolSearch: null
+    };
+    nmVerb = (name) => Object.hasOwn(NM_VERBS, name) ? NM_VERBS[name] : null;
+    withoutArgs = (s) => {
+      for (let k = 1; k < s.length; k++) {
+        if (s[k] !== "{" && s[k] !== "[" || !/\s/.test(s[k - 1])) continue;
+        let start = k - 1;
+        while (start > 0 && /\s/.test(s[start - 1])) start--;
+        return s.slice(0, start);
+      }
+      return s;
     };
     RUN_STALE_MS = 30 * 6e4;
   }
@@ -2014,11 +2122,11 @@ function isStandDown(reply) {
 function fenceWork(tag) {
   return /^(revise|cards|posts)$/i.test(tag) ? "drafts" : "card";
 }
-function visibleStream(text2) {
-  if (isStandDown(text2)) return { text: "", forming: null };
-  const lines = text2.trimEnd().split("\n");
-  if (SENTINEL_FORMING.test(lines[lines.length - 1] ?? "")) text2 = lines.slice(0, -1).join("\n");
-  const closed = text2.replace(CLOSED_RE, "");
+function visibleStream(text3) {
+  if (isStandDown(text3)) return { text: "", forming: null };
+  const lines = text3.trimEnd().split("\n");
+  if (SENTINEL_FORMING.test(lines[lines.length - 1] ?? "")) text3 = lines.slice(0, -1).join("\n");
+  const closed = text3.replace(CLOSED_RE, "");
   const open = OPEN_RE.exec(closed);
   const visible = (open ? closed.slice(0, open.index) : closed).replace(/\n{3,}/g, "\n\n").trimEnd();
   return { text: visible, forming: open ? fenceWork(open[1] ?? "") : null };
@@ -2384,22 +2492,22 @@ function humanHandles(labels, reserved = []) {
   }
   return out;
 }
-function tokenizeDraft(text2, people) {
-  if (!text2) return [];
+function tokenizeDraft(text3, people) {
+  if (!text3) return [];
   const byName = new Map(people.map((p2) => [p2.name.toLowerCase(), p2]));
   const spans = [];
   let bare = null;
   for (const p2 of people) {
     if (p2.kind !== "agent" || !p2.here) continue;
-    const m = bareAddressRe(p2.name).exec(text2);
+    const m = bareAddressRe(p2.name).exec(text3);
     if (m && (!bare || p2.name.length > bare.name.length)) {
       const start = m[0].length - p2.name.length;
       bare = { name: p2.name, start, end: m[0].length };
     }
   }
-  if (bare) spans.push({ kind: "bare", text: text2.slice(bare.start, bare.end), name: bare.name, start: bare.start, end: bare.end });
+  if (bare) spans.push({ kind: "bare", text: text3.slice(bare.start, bare.end), name: bare.name, start: bare.start, end: bare.end });
   const at = /@([\w-]+)/g;
-  for (let m = at.exec(text2); m; m = at.exec(text2)) {
+  for (let m = at.exec(text3); m; m = at.exec(text3)) {
     const p2 = byName.get(m[1].toLowerCase());
     if (!p2) continue;
     spans.push({ kind: "mention", text: m[0], name: p2.name, here: p2.here, who: p2.kind, start: m.index, end: m.index + m[0].length });
@@ -2408,12 +2516,12 @@ function tokenizeDraft(text2, people) {
   const out = [];
   let pos = 0;
   for (const s of spans) {
-    if (s.start > pos) out.push({ kind: "text", text: text2.slice(pos, s.start) });
+    if (s.start > pos) out.push({ kind: "text", text: text3.slice(pos, s.start) });
     const { start: _s, end: _e, ...seg } = s;
     out.push(seg);
     pos = s.end;
   }
-  if (pos < text2.length) out.push({ kind: "text", text: text2.slice(pos) });
+  if (pos < text3.length) out.push({ kind: "text", text: text3.slice(pos) });
   return out;
 }
 var escapeRe, slugWord, slugName;
@@ -2797,6 +2905,8 @@ var init_events = __esm({
       // a Code session's synced row was born / closed (0135) — updates in between are silent, like heartbeats
       "code_session.created",
       "code_session.closed",
+      "brain.committed",
+      "brain.artifact_created",
       "agent.registered",
       "agent.updated",
       "agent.retired",
@@ -2854,6 +2964,8 @@ var init_events = __esm({
       "content.updated",
       "content.deleted",
       "connector.revoked",
+      // the first write of a project's GitHub connector row (the activation funnel, analytics.ts)
+      "github.connected",
       "channel.deleted",
       "repo.linked",
       "agent.connected_remote"
@@ -2923,8 +3035,8 @@ function designProviderFromEvents(events) {
   }
   return null;
 }
-function claudeDesignUrlFromText(text2) {
-  const candidates = (text2 ?? "").match(/https:\/\/claude\.ai\/design(?:\/[A-Za-z0-9._~!$&'()*+,;=:@%/-]*)?(?:\?[A-Za-z0-9._~!$&'()*+,;=:@%/?-]*)?/g) ?? [];
+function claudeDesignUrlFromText(text3) {
+  const candidates = (text3 ?? "").match(/https:\/\/claude\.ai\/design(?:\/[A-Za-z0-9._~!$&'()*+,;=:@%/-]*)?(?:\?[A-Za-z0-9._~!$&'()*+,;=:@%/?-]*)?/g) ?? [];
   for (const raw of candidates) {
     try {
       const url = new URL(trimEndChars(raw, "),.;"));
@@ -2994,10 +3106,10 @@ function shipItemsPending(plan) {
 function shipPlanName(round) {
   return `ship-plan-v${round}.md`;
 }
-function parseWorkPlanLegs(text2) {
-  if (!text2) return null;
+function parseWorkPlanLegs(text3) {
+  if (!text3) return null;
   try {
-    return JSON.parse(text2).legs ?? null;
+    return JSON.parse(text3).legs ?? null;
   } catch {
     return null;
   }
@@ -3185,7 +3297,7 @@ function legOfState(state) {
       return null;
   }
 }
-function journeyFor(task, roster, beats) {
+function journeyFor(task, roster, beats2) {
   const state = task.state === "blocked" ? task.blockedFrom ?? "in_progress" : task.state;
   const declared = task.workPlanLegs ?? null;
   const keys = [];
@@ -3222,9 +3334,9 @@ function journeyFor(task, roster, beats) {
   return keys.map((k, i) => {
     const meta = k === "build" ? { ...LEG_META.build, label: executionLegLabel(task.kind) } : LEG_META[k];
     const owner = ownerOf(k);
-    const status = i < curIdx ? "done" : i === curIdx ? "live" : owner === null ? "gap" : "todo";
-    const fill2 = status === "live" && beats && beats.total > 0 ? Math.max(0.06, Math.min(1, beats.done / beats.total)) : void 0;
-    return { key: k, label: meta.label, status, owner, ...fill2 !== void 0 ? { fill: fill2 } : {}, colorVar: meta.colorVar };
+    const status2 = i < curIdx ? "done" : i === curIdx ? "live" : owner === null ? "gap" : "todo";
+    const fill2 = status2 === "live" && beats2 && beats2.total > 0 ? Math.max(0.06, Math.min(1, beats2.done / beats2.total)) : void 0;
+    return { key: k, label: meta.label, status: status2, owner, ...fill2 !== void 0 ? { fill: fill2 } : {}, colorVar: meta.colorVar };
   });
 }
 var LEG_META;
@@ -3366,9 +3478,9 @@ function cleanReplies(raw) {
     const t2 = o["target"] ?? {};
     const handle = typeof t2["handle"] === "string" ? t2["handle"].trim().replace(/^@+/, "").slice(0, 40) : "";
     const url = typeof t2["url"] === "string" && /^https?:\/\//.test(t2["url"].trim()) ? t2["url"].trim().slice(0, 500) : "";
-    const text2 = typeof t2["text"] === "string" ? t2["text"].trim().slice(0, 2e3) : "";
+    const text3 = typeof t2["text"] === "string" ? t2["text"].trim().slice(0, 2e3) : "";
     const draft = typeof o["draft"] === "string" ? o["draft"].trim().slice(0, 1e3) : "";
-    if (!handle || !url || !text2 || !draft) continue;
+    if (!handle || !url || !text3 || !draft) continue;
     const m = t2["metrics"] ?? {};
     const metrics = { impressions: num2(m["impressions"]), likes: num2(m["likes"]), reposts: num2(m["reposts"]), replies: num2(m["replies"]) };
     const platform = REPLY_PLATFORMS.includes(t2["platform"]) ? t2["platform"] : "x";
@@ -3378,7 +3490,7 @@ function cleanReplies(raw) {
       target: {
         handle,
         url,
-        text: text2,
+        text: text3,
         platform,
         source,
         ...typeof t2["name"] === "string" && t2["name"].trim() ? { name: t2["name"].trim().slice(0, 60) } : {},
@@ -3617,9 +3729,9 @@ function nextScheduleRun(input) {
     return null;
   }
 }
-function scheduleFirings(schedules, from, to) {
+function scheduleFirings(schedules2, from, to) {
   const out = [];
-  for (const s of schedules) {
+  for (const s of schedules2) {
     if (s.cadence === "once") {
       const at = s.next_run_at ? new Date(s.next_run_at) : null;
       if (at && !Number.isNaN(at.getTime()) && at >= from && at < to) out.push({ key: `${s.id}:once`, at, schedule: s });
@@ -3755,9 +3867,9 @@ function routineWhen(d, tz) {
   const base = once ?? cadenceLine({ cadence: d.cadence, at_time: d.atTime, weekday: d.weekday ?? null });
   return zone ? `${base} \xB7 ${zone}` : base;
 }
-function routineDraftsOf(messages) {
+function routineDraftsOf(messages2) {
   const out = [];
-  for (const m of [...messages].sort((a, b2) => Date.parse(a.created_at) - Date.parse(b2.created_at))) {
+  for (const m of [...messages2].sort((a, b2) => Date.parse(a.created_at) - Date.parse(b2.created_at))) {
     if (m.author_kind && m.author_kind !== "agent") continue;
     const b2 = parseRoutineBlock(m.body);
     if (b2?.kind === "draft") out.push({ id: m.id, at: m.created_at, version: out.length + 1, draft: b2.draft, author: m.author_id ?? null });
@@ -3806,8 +3918,8 @@ ${routinePrompt(d)}`;
 function isTryOnce(body) {
   return (body ?? "").startsWith(TRY_ONCE_HEAD);
 }
-function routineChangesPrefix(version) {
-  return `\u21A9 Re routine v${version}: `;
+function routineChangesPrefix(version2) {
+  return `\u21A9 Re routine v${version2}: `;
 }
 function routineAsk(request2 = "") {
   return `${ROUTINE_ASK}${request2.trim()}`;
@@ -3864,9 +3976,9 @@ function dividerIndex(sorted) {
   for (let i = sorted.length - 1; i >= 0; i--) if (isRoutineScheduledMarker(sorted[i].body)) return i;
   return -1;
 }
-function splitSessionRuns(messages, scheduleId) {
-  if (!scheduleId || !messages.length) return null;
-  const sorted = byAt(messages);
+function splitSessionRuns(messages2, scheduleId) {
+  if (!scheduleId || !messages2.length) return null;
+  const sorted = byAt(messages2);
   const cut2 = dividerIndex(sorted);
   const out = [];
   for (const m of cut2 < 0 ? sorted : sorted.slice(cut2 + 1)) {
@@ -3878,8 +3990,8 @@ function splitSessionRuns(messages, scheduleId) {
   });
   return out;
 }
-function sessionSetup(messages) {
-  const sorted = byAt(messages);
+function sessionSetup(messages2) {
+  const sorted = byAt(messages2);
   const cut2 = dividerIndex(sorted);
   if (cut2 < 0) return null;
   const rest = sorted.slice(cut2 + 1);
@@ -3914,10 +4026,10 @@ function sessionRunFacts(f, s) {
     quote: drafts[0]?.body ?? null
   };
 }
-function sessionRunLines(runs, rows2, scheduleId, nowMs) {
+function sessionRunLines(runs2, rows2, scheduleId, nowMs) {
   const of = (xs, thread) => xs.filter((x) => x.thread_id === thread);
   const split = /* @__PURE__ */ new Map();
-  return runs.map((run2) => {
+  return runs2.map((run2) => {
     if (!split.has(run2.thread_id)) split.set(run2.thread_id, splitSessionRuns(of(rows2.messages, run2.thread_id), scheduleId));
     const f = split.get(run2.thread_id)?.find((x) => x.opener.id === run2.id);
     if (!f) return { run: run2, strip: null };
@@ -4035,7 +4147,7 @@ var init_session_runs = __esm({
     init_threadstatus();
     init_waiting();
     ms = (at) => at ? Date.parse(at) : NaN;
-    byAt = (messages) => [...messages].sort((a, b2) => ms(a.created_at) - ms(b2.created_at));
+    byAt = (messages2) => [...messages2].sort((a, b2) => ms(a.created_at) - ms(b2.created_at));
     byTime = (a, b2) => ms(a.created_at) - ms(b2.created_at);
     SESSION_RUN_WORD = { progress: "In progress", needs: "Needs you", failed: "Failed", done: "Done" };
     count = (n, one, many) => n > 0 ? [`${n} ${n === 1 ? one : many}`] : [];
@@ -4601,14 +4713,14 @@ var init_onboarding_wizard = __esm({
 });
 
 // ../shared/src/planmd.ts
-function planArtifactName(version) {
-  return `implementation-plan-v${version}.md`;
+function planArtifactName(version2) {
+  return `implementation-plan-v${version2}.md`;
 }
 function isPlanDoc(name) {
   return /^implementation-plan-v\d+\.md$/.test(name);
 }
-function planRefMarker(version) {
-  return `\u2039plan:v${version}\u203A`;
+function planRefMarker(version2) {
+  return `\u2039plan:v${version2}\u203A`;
 }
 function parsePlanRef(body) {
   if (!body) return null;
@@ -4617,10 +4729,28 @@ function parsePlanRef(body) {
   const prose2 = trimLineEnds(body.replace(PLAN_REF_RE, "")).replace(/\n{3,}/g, "\n\n").trim();
   return { version: Number(m[1]), prose: prose2 };
 }
+function planPostLine(version2, kind = "birth") {
+  const name = planArtifactName(version2);
+  switch (kind) {
+    case "revised":
+      return `Implementation plan **v${version2}** (revised): ${name}`;
+    case "routine":
+      return `\u23F1 Routine run: implementation plan **v${version2}** (${name}). The work starts now and runs to the end without you. You get a notification when it is done.`;
+    case "playbook":
+      return `\u25B6 Playbook run: plan **v${version2}** (${name}) comes from the playbook. The work starts now. When the deliverable is ready, say accept in this thread to close it.`;
+    default:
+      return `Implementation plan **v${version2}**: ${name}`;
+  }
+}
+function planMessage(version2, kind = "birth") {
+  return `${planPostLine(version2, kind)}
+${planRefMarker(version2)}`;
+}
 function renderPlanMarkdown(p2) {
-  const journey = ["plan", ...p2.legs.filter((l) => l !== "build"), executionLegLabel(p2.kind).toLowerCase(), "accept"].filter((l, i, a) => a.indexOf(l) === i);
+  const legs = [.../* @__PURE__ */ new Set(["build", ...p2.legs])].sort((a, b2) => (LEG_RANK[a] ?? 3) - (LEG_RANK[b2] ?? 3));
+  const journey = ["plan", ...legs.map((l) => l === "build" ? executionLegLabel(p2.kind).toLowerCase() : l), p2.repo ? "merge" : "accept"].filter((l, i, a) => a.indexOf(l) === i);
   const lines = [
-    `# Implementation plan \xB7 v${p2.version} \u2014 #${p2.number} ${p2.title}`,
+    `# Implementation plan \xB7 v${p2.version} \xB7 #${p2.number} ${p2.title}`,
     "",
     `**Journey:** ${journey.join(" \u2192 ")}`
   ];
@@ -4630,13 +4760,14 @@ function renderPlanMarkdown(p2) {
   lines.push("", "## Approach", "", p2.approach.trim(), "");
   return lines.join("\n");
 }
-var PLAN_REF_RE;
+var PLAN_REF_RE, LEG_RANK;
 var init_planmd = __esm({
   "../shared/src/planmd.ts"() {
     "use strict";
     init_journey();
     init_linear();
     PLAN_REF_RE = /‹plan:v(\d+)›/;
+    LEG_RANK = { design: 0, build: 1, review: 2 };
   }
 });
 
@@ -4763,13 +4894,13 @@ function bestAlternativeProvider(exhaustedProvider, avail) {
   }
   return null;
 }
-function planFailoverAgentUpdates(rec, agents) {
+function planFailoverAgentUpdates(rec, agents2) {
   if (rec.kind !== "fall_forward") return [];
   const roles = new Set(rec.roles);
-  return agents.filter((a) => (a.model_source ?? "pack") === "pack" && (a.kind ?? "local") !== "remote" && !a.retired_at).filter((a) => roles.has(a.role) && a.model === rec.from).map((a) => ({ id: a.id, role: a.role, model: rec.to, runtime: runtimeForModel(rec.to) }));
+  return agents2.filter((a) => (a.model_source ?? "pack") === "pack" && (a.kind ?? "local") !== "remote" && !a.retired_at).filter((a) => roles.has(a.role) && a.model === rec.from).map((a) => ({ id: a.id, role: a.role, model: rec.to, runtime: runtimeForModel(rec.to) }));
 }
-function manualPinnedOnModel(exhaustedModel, agents) {
-  return agents.filter((a) => a.model === exhaustedModel && a.model_source === "manual" && !a.retired_at && (a.kind ?? "local") !== "remote");
+function manualPinnedOnModel(exhaustedModel, agents2) {
+  return agents2.filter((a) => a.model === exhaustedModel && a.model_source === "manual" && !a.retired_at && (a.kind ?? "local") !== "remote");
 }
 function composeFailover(i) {
   const exhausted = new Set(i.exhausted);
@@ -4962,10 +5093,10 @@ var SUPPORTED_DESKTOP_VERSIONS, MIN_DESKTOP_VERSION, versionSegments, belowFloor
 var init_desktop_floor = __esm({
   "../shared/src/desktop-floor.ts"() {
     "use strict";
-    SUPPORTED_DESKTOP_VERSIONS = ["0.152.0", "0.151.0"];
+    SUPPORTED_DESKTOP_VERSIONS = ["0.153.0", "0.152.0"];
     MIN_DESKTOP_VERSION = SUPPORTED_DESKTOP_VERSIONS[1];
     versionSegments = (v) => v.split(".").map((n) => Number.parseInt(n, 10) || 0);
-    belowFloor = (version, floor) => !!floor && /^\d+\.\d+/.test(floor) && compareVersions(version, floor) < 0;
+    belowFloor = (version2, floor) => !!floor && /^\d+\.\d+/.test(floor) && compareVersions(version2, floor) < 0;
   }
 });
 
@@ -5063,12 +5194,12 @@ function prepareTable(t2, exp, ids, opts, maxBytes, left, tooLarge) {
     out.bytes += bytes;
     out.rows.push(row);
     if (!late.length) continue;
-    const link = { id: row["id"], workspace_id: opts.targetWorkspaceId };
+    const link2 = { id: row["id"], workspace_id: opts.targetWorkspaceId };
     for (const ref of late) {
       const v = repoint(source[ref.column], ref, ids);
-      link[ref.column] = typeof v === "string" && left.has(v) ? null : v;
+      link2[ref.column] = typeof v === "string" && left.has(v) ? null : v;
     }
-    if (late.some((ref) => link[ref.column] != null)) out.links.push(link);
+    if (late.some((ref) => link2[ref.column] != null)) out.links.push(link2);
   }
   return out;
 }
@@ -5108,8 +5239,8 @@ function planBatches(exp, opts) {
   batches[batches.length - 1].last = true;
   return { batches, totalBytes, tooLarge, ids };
 }
-function rewriteTaskRefs(text2, numberMap) {
-  return text2.replace(/(^|[^\w#])#(\d+)(?!\w)/g, (whole, before, n) => {
+function rewriteTaskRefs(text3, numberMap) {
+  return text3.replace(/(^|[^\w#])#(\d+)(?!\w)/g, (whole, before, n) => {
     const to = numberMap[n];
     return to === void 0 ? whole : `${before}#${to}`;
   });
@@ -5233,8 +5364,8 @@ function canFileConversation(actor, subject, target) {
   }
   return { ok: true };
 }
-function fallbackChannel(channels2) {
-  return channels2.find((c) => c.slug === "general") ?? channels2[0] ?? null;
+function fallbackChannel(channels3) {
+  return channels3.find((c) => c.slug === "general") ?? channels3[0] ?? null;
 }
 var init_filing = __esm({
   "../shared/src/filing.ts"() {
@@ -5328,9 +5459,9 @@ var init_cardwords = __esm({
 });
 
 // ../shared/src/brainnotice.ts
-function brainNoticeOf(messages, override) {
+function brainNoticeOf(messages2, override) {
   let last = null;
-  for (const m2 of messages) {
+  for (const m2 of messages2) {
     if (m2.author_kind !== "agent") continue;
     const card3 = parseAuthCard(m2.body);
     if (card3 && (!last || m2.created_at > last.m.created_at)) last = { m: m2, card: card3 };
@@ -5341,7 +5472,7 @@ function brainNoticeOf(messages, override) {
   const onStarter = !!role && override?.[role] === STARTER_MODEL;
   if (onStarter) return { state: "switched", card: card2, messageId: m.id, at: m.created_at, auto: card2.switched === true };
   if (card2.switched) return null;
-  const answered = messages.some((x) => x.author_kind === "agent" && x.created_at > m.created_at && !parseAuthCard(x.body));
+  const answered = messages2.some((x) => x.author_kind === "agent" && x.created_at > m.created_at && !parseAuthCard(x.body));
   return answered ? null : { state: "needs", card: card2, messageId: m.id, at: m.created_at, auto: false };
 }
 function noticeProvider(n) {
@@ -5981,28 +6112,28 @@ var init_policy = __esm({
 });
 
 // ../shared/src/staffing.ts
-function eligibleIn(channelId, agents) {
-  return agents.some(
+function eligibleIn(channelId, agents2) {
+  return agents2.some(
     (a) => a.role !== "orchestrator" && !a.retired_at && (a.channel_ids ?? "").split(",").map((s) => s.trim()).includes(channelId)
   );
 }
-function isUnroutableTodo(t2, agents) {
+function isUnroutableTodo(t2, agents2) {
   if (t2.kind === "setup") return false;
-  return t2.state === "todo" && !t2.assignee_id && !t2.offered_agent_id && !eligibleIn(t2.channel_id, agents);
+  return t2.state === "todo" && !t2.assignee_id && !t2.offered_agent_id && !eligibleIn(t2.channel_id, agents2);
 }
-function unroutableTodos(tasks, agents) {
-  return tasks.filter((t2) => isUnroutableTodo(t2, agents));
+function unroutableTodos(tasks2, agents2) {
+  return tasks2.filter((t2) => isUnroutableTodo(t2, agents2));
 }
-function taskProjectId(task, channels2) {
-  return task.project_id ?? channels2.find((c) => c.id === task.channel_id)?.project_id ?? null;
+function taskProjectId(task, channels3) {
+  return task.project_id ?? channels3.find((c) => c.id === task.channel_id)?.project_id ?? null;
 }
-function tasksInProject(tasks, channels2, projectId) {
-  if (!projectId) return tasks;
-  return tasks.filter((t2) => taskProjectId(t2, channels2) === projectId);
+function tasksInProject(tasks2, channels3, projectId) {
+  if (!projectId) return tasks2;
+  return tasks2.filter((t2) => taskProjectId(t2, channels3) === projectId);
 }
-function rowsInProject(rows2, channels2, projectId) {
+function rowsInProject(rows2, channels3, projectId) {
   if (!projectId) return rows2;
-  const ids = new Set(channels2.filter((c) => c.project_id === projectId).map((c) => c.id));
+  const ids = new Set(channels3.filter((c) => c.project_id === projectId).map((c) => c.id));
   return rows2.filter((r) => ids.has(r.channel_id));
 }
 var init_staffing = __esm({
@@ -6053,12 +6184,75 @@ function unaddressedWake(state, kind, button2 = false) {
   if (state === "todo" || state === "plan_review") return "orchestrator";
   if (state === "in_progress" || state === "blocked") return "assignee";
   if (state === "designing" || state === "design_review") return "assignee";
+  if (state === "done") return "orchestrator";
   if (kind === "content" && !["accepted", "closed"].includes(state)) return "assignee";
   return button2 ? "orchestrator" : null;
 }
 var init_threadwake = __esm({
   "../shared/src/threadwake.ts"() {
     "use strict";
+  }
+});
+
+// ../shared/src/acceptword.ts
+function isCardOrMarker(body) {
+  return body.trimStart().startsWith("\u2039") || CARD_ANSWER.test(body);
+}
+function opensWithVerb(clause) {
+  const c = clause.replace(LEAD, "");
+  if (VERB_FIRST.test(c)) return true;
+  const m = ONE_WORD_FIRST.exec(c);
+  return !!m && !NOT_A_NAME.test(m[1]);
+}
+function isAcceptWord(body) {
+  if (isCardOrMarker(body)) return false;
+  const text3 = body.toLowerCase().replace(/[’`]/g, "'").replace(/(^|\s)@[\w.-]+/g, " ").replace(/[ \t]+/g, " ").trim();
+  if (!new RegExp(`\\b${VERB}\\b`).test(text3) || HOLD.test(text3)) return false;
+  const clauses = text3.split(/[.!?;,:\n—–]+|\s-\s/).map((c) => c.trim()).filter(Boolean);
+  const said = clauses.find(opensWithVerb);
+  if (!said) return false;
+  return !text3.includes("?") || POLITE_ASK.test(said);
+}
+var CARD_ANSWER, VERB, VERB_FIRST, ONE_WORD_FIRST, LEAD, NOT_A_NAME, HOLD, POLITE_ASK;
+var init_acceptword = __esm({
+  "../shared/src/acceptword.ts"() {
+    "use strict";
+    CARD_ANSWER = /^\s*\*\*[^\n]*\*\*\s*(?:→|->)/;
+    VERB = "(?:merge|accept|land|ship)";
+    VERB_FIRST = new RegExp(`^${VERB}\\b`);
+    ONE_WORD_FIRST = new RegExp(`^(\\S+) (?:and )?${VERB}\\b`);
+    LEAD = /^(?:(?:please|pls|ok|okay|yes|yeah|yep|sure|great|cool|perfect|thanks|lgtm|then|now|so|and|just|i|we|go ahead and|you can|you may|feel free to|let's|lets|can you|could you|would you|will you)\s+)+/;
+    NOT_A_NAME = /^(?:a|an|the|this|that|any|no|one|some|each|every|my|our|your|its|their|git|to|will|would|should|could|can|might|may|must|shall|do|does|did|is|was|[a-z]+'(?:ll|d|ve|re|m))$/;
+    HOLD = /\b(?:not|never|dont|do not|wait|hold|stop|cancel|yet|before|until|unless|later|tomorrow|tonight|after|once|if|myself|ourselves|manually)\b|n't\b/;
+    POLITE_ASK = /^(?:please |pls )?(?:can|could|would|will) you\b/;
+  }
+});
+
+// ../shared/src/claimline.ts
+function claimWorkspace(t2) {
+  if (!t2.repo) return "a scratch workspace. The files I make attach to this thread.";
+  return t2.branch ? `a worktree on branch \`${t2.branch}\`. I push the branch before the review.` : "a worktree of the repository. I push my branch before the review.";
+}
+function claimLine(c) {
+  return [
+    `I claimed #${c.number} \u201C${c.title}\u201D. I start now, and the live run on this task shows what I do.`,
+    `- **${CHECKLIST_LABEL[c.source]}:** ${c.checklist.join(" \xB7 ")}`,
+    `- **Estimate:** ${c.estimate}`,
+    `- **Workspace:** ${c.workspace}`
+  ].join("\n");
+}
+var STATIC_CHECKLIST, PLAN_CHECKLIST, CHECKLIST_LABEL;
+var init_claimline = __esm({
+  "../shared/src/claimline.ts"() {
+    "use strict";
+    STATIC_CHECKLIST = ["The title and the room give the scope", "I am a member of this room", "No open question stops the work"];
+    PLAN_CHECKLIST = ["The approved plan gives the scope", "I am a member of this room", "No open question stops the work"];
+    CHECKLIST_LABEL = {
+      intake: "Checklist from the intake",
+      worker: "My checklist",
+      plan: "Checklist",
+      default: "Checklist"
+    };
   }
 });
 
@@ -6087,19 +6281,23 @@ function setupProgress(flow, profileJson) {
   if (complete) return { done: flow.steps.length, total: flow.steps.length, next: null, complete };
   return { done: done2, total: flow.steps.length, next, complete };
 }
+function setupAnswersBody(rows2) {
+  return [SETUP_ANSWERS_HEAD, "", ...rows2.map(([label, value]) => `- ${label}: ${value}`)].join("\n");
+}
 function setupProgressLabel(flow, p2) {
   if (p2.complete) return "complete";
   const at = flow.steps.find((s) => s.id === p2.next);
-  return `step ${Math.min(p2.done + 1, p2.total)} of ${p2.total}${at ? ` \u2014 ${at.label}` : ""}`;
+  return `step ${Math.min(p2.done + 1, p2.total)} of ${p2.total}${at ? ` \xB7 ${at.label}` : ""}`;
 }
-var MARKETING_SETUP_FLOW, SETUP_FLOWS;
+var MARKETING_SETUP_FLOW, SETUP_FLOWS, SETUP_ANSWERS_HEAD, isSetupAnswers;
 var init_setupflows = __esm({
   "../shared/src/setupflows.ts"() {
     "use strict";
     MARKETING_SETUP_FLOW = {
       id: "marketing.v1",
       kind: "marketing",
-      title: "Set up your marketing HQ",
+      title: "Prepare your marketing HQ",
+      description: "Answer the questions in the thread. Each answer saves when you press Next, so you can stop and finish later. Close this task to skip setup.",
       steps: [
         { id: "product", label: "Product", writes: "website" },
         { id: "goal", label: "Goal", writes: "goal", optional: true },
@@ -6113,6 +6311,8 @@ var init_setupflows = __esm({
     SETUP_FLOWS = {
       marketing: MARKETING_SETUP_FLOW
     };
+    SETUP_ANSWERS_HEAD = "**Marketing HQ setup**";
+    isSetupAnswers = (body) => body.startsWith(SETUP_ANSWERS_HEAD);
   }
 });
 
@@ -6157,7 +6357,7 @@ var init_playbooks_campaigns = __esm({
       {
         id: "ads",
         title: "Ads creative audit",
-        tagline: "concept fatigue against its five impostors, needs the ads connector",
+        tagline: "ad fatigue and its five look-alikes, needs the ads connector",
         group: "campaigns",
         skill: "paid-ads-audit",
         engine: "unit",
@@ -6176,7 +6376,7 @@ var init_playbooks_campaigns = __esm({
         // and one draft per connected account. The one-shot "draft the latest release" is the same unit.
         id: "release",
         title: "Release drafts",
-        tagline: "A release becomes posts: the brief, one draft per connected account, a release card.",
+        tagline: "a release becomes posts: the brief and one draft for each connected account",
         group: "campaigns",
         skill: "release-announcement",
         engine: "unit",
@@ -6237,7 +6437,7 @@ var init_playbooks_registry = __esm({
       {
         id: "geo",
         title: "AI search (GEO)",
-        tagline: "who gets cited, page rewrites, then a re-measure",
+        tagline: "who AI search cites, page rewrites, then a new score",
         group: "foundations",
         skill: "geo-citability",
         engine: "unit",
@@ -6269,7 +6469,7 @@ var init_playbooks_registry = __esm({
       {
         id: "positioning",
         title: "Positioning & offer",
-        tagline: "the six-clause statement, tested for pasteability",
+        tagline: "a six-part statement that you can paste into real copy",
         group: "foundations",
         skill: "positioning-offer-pricing",
         engine: "unit",
@@ -6310,7 +6510,7 @@ var init_playbooks_registry = __esm({
       {
         id: "copylab",
         title: "Copy lab",
-        tagline: "15 to 20 variants, panel-scored, then de-slopped, in the thread",
+        tagline: "15 to 20 variants, scored by a panel, with the filler cut, in the thread",
         group: "content",
         skill: "copy-lab",
         engine: "chat",
@@ -6431,13 +6631,12 @@ function playbookSubject(pb, values2) {
 }
 function playbookUnitTitle(pb, values2) {
   const subject = playbookSubject(pb, values2);
-  return subject ? `${pb.title} \u2014 ${subject}` : pb.title;
+  return subject ? `${pb.title} \xB7 ${subject}` : pb.title;
 }
 function playbookAsk(pb, values2 = {}) {
   const subject = pb.inputs[0] ? values2[pb.inputs[0].key] : void 0;
   const on = subject ? ` on ${subject}` : "";
-  if (pb.engine === "chat") return `Run the ${pb.title.toLowerCase()} playbook${on}.`;
-  return `Run the ${pb.title.toLowerCase()} playbook${on}.`;
+  return `Run the ${askTitle(pb.title)} playbook${on}.`;
 }
 function playbookFromAsk(prompt) {
   let want = null;
@@ -6462,10 +6661,10 @@ function playbookPlan(pb, values2) {
     definitionOfDone: pb.dod
   };
 }
-function playbookState(pb, artifacts, schedules) {
-  const mine = artifacts.filter((a) => playbookOfReport(a.name, a.title ?? null) === pb.id).sort((a, b2) => a.created_at < b2.created_at ? 1 : -1);
+function playbookState(pb, artifacts2, schedules2) {
+  const mine = artifacts2.filter((a) => playbookOfReport(a.name, a.title ?? null) === pb.id).sort((a, b2) => a.created_at < b2.created_at ? 1 : -1);
   const scoredRuns = mine.filter((a) => typeof a.score === "number");
-  const armedRow = schedules.find((s) => s.status === "active" && s.payload_playbook === pb.id);
+  const armedRow = schedules2.find((s) => s.status === "active" && s.payload_playbook === pb.id);
   return {
     id: pb.id,
     lastRunAt: mine[0]?.created_at ?? null,
@@ -6493,7 +6692,7 @@ function parsePlaybookRecs(body) {
 function stripPlaybookRecs(body) {
   return body.replace(NMPLAYS_RE, "").replace(/\n{3,}/g, "\n\n").trim();
 }
-var UNIT_PLAYBOOK_IDS, RUNTIME_SLOTS, NMPLAYS_RE;
+var UNIT_PLAYBOOK_IDS, RUNTIME_SLOTS, askTitle, NMPLAYS_RE;
 var init_playbooks = __esm({
   "../shared/src/playbooks.ts"() {
     "use strict";
@@ -6502,7 +6701,73 @@ var init_playbooks = __esm({
     init_playbooks_registry();
     UNIT_PLAYBOOK_IDS = PLAYBOOKS.filter((p2) => p2.engine === "unit").map((p2) => p2.id);
     RUNTIME_SLOTS = ["coverage"];
+    askTitle = (title) => title.replace(/^\S+/, (w) => /^[A-Z0-9]{2,}$/.test(w) ? w : w.toLowerCase());
     NMPLAYS_RE = /```nmplays[ \t]*\n([\s\S]*?)```/;
+  }
+});
+
+// ../shared/src/brandlines.ts
+function docDropBody(label, file, doc, verb = "saved to") {
+  return `\u{1F4C4} **${label}** \u2014 ${verb} the library as \`${file}\`.
+
+${doc}`;
+}
+function docInFlight(summary) {
+  return /^writes (\S+\.md)(?:\s|$)/.exec(summary ?? "")?.[1] ?? null;
+}
+function bootstrapOpening(o) {
+  if (o.research) {
+    const reads = o.site ? `First I read ${o.site}${o.repo ? ", its key pages and the project code" : " and its key pages"}. I also search the web for the product's market.` : `${o.repo ? "First I read the project code. I also search" : "First I search"} the web for the product and its market.`;
+    return `${reads} Then I write ${DOCS}. Each doc goes to ${SHELF} when it is done. Each doc takes a few minutes.`;
+  }
+  const colors = o.site ? ` I also try to read the colors and fonts from ${o.site}.` : "";
+  return `I write ${DOCS}. I write them from your answers.${colors} Each doc goes to ${SHELF} when it is done.`;
+}
+function bootstrapResume(files) {
+  return files.length === 1 ? `I write \`${files[0]}\` now.` : `I write the last ${files.length} docs now.`;
+}
+function bootstrapDocStatus(file, n, total, research) {
+  return `*${research ? "I research and write" : "I write"} \`${file}\` (${n}/${total})\u2026*`;
+}
+function bootstrapNudgeDone(files) {
+  const names = files.map((f) => `\`${f}\``);
+  const list = names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}` : names[0] ?? "";
+  return `${list} ${files.length === 1 ? "is" : "are"} in ${SHELF}. The brand docs are complete.`;
+}
+function bootstrapClosing(schedBlock, playsBlock) {
+  return `The brand docs are done. They are in ${SHELF}, and later drafts use them. Here is a first cadence. Arm the rows that you want. Nothing posts until you approve it.
+
+${schedBlock}
+
+The next step is a baseline. Run the audit once to get a score. Run it again later to see what changed.
+
+${playsBlock}`;
+}
+function filmStartLine(f) {
+  const held = f.seconds < f.asked ? ` (${f.tier} films up to ${f.seconds} s)` : "";
+  return `The ${f.seconds} s film starts on ${f.tier}${held}. It takes about ${filmMinutes(f.seconds)} minutes and costs ${f.credits} credits. The film lands on the card.`;
+}
+var docWriteLog, DOCS, SHELF, bootstrapStart, bootstrapDocFailed, BOOTSTRAP_ERROR, bootstrapPartial, BOOTSTRAP_SCHED_FALLBACK, BOOTSTRAP_PLAYS;
+var init_brandlines = __esm({
+  "../shared/src/brandlines.ts"() {
+    "use strict";
+    init_filmprompt();
+    docWriteLog = (file) => `writes ${file}`;
+    DOCS = "four brand docs here: the business profile, the brand guidelines, the market research and the social strategy";
+    SHELF = "the room's **Library** tab";
+    bootstrapStart = (subject) => `*I start the brand docs for ${subject}\u2026*`;
+    bootstrapDocFailed = (label) => `\u26A0\uFE0F I could not write **${label}** this time. Reply here, and I write it again.`;
+    BOOTSTRAP_ERROR = "\u26A0\uFE0F An error stopped the brand docs. Reply here, and I continue.";
+    bootstrapPartial = (done2, total) => `This time I wrote ${done2} of ${total} docs. Reply here, and I write the rest.`;
+    BOOTSTRAP_SCHED_FALLBACK = [
+      { title: "Weekday post drafts", cadence: "weekdays", atTime: "09:00", prompt: "Draft one X post from the narrative pillars in social-strategy.md, in the brand voice." },
+      { title: "Weekly thread", cadence: "weekly", weekday: 2, atTime: "10:00", prompt: "Draft a thread on the strongest narrative pillar of the week. Use the brand docs." },
+      { title: "Weekly competitor scan", cadence: "weekly", weekday: 1, atTime: "08:00", prompt: "Run the competitor scan again with the competitor-scan skill. Write the changes since market-research.md as a room note." }
+    ];
+    BOOTSTRAP_PLAYS = [
+      { id: "audit", why: "one score out of 100 across six dimensions" },
+      { id: "geo", why: "who AI search cites for your questions today" }
+    ];
   }
 });
 
@@ -6526,32 +6791,32 @@ function withHouseStyle(system, block) {
 
 ${block}` : system;
 }
-function dashPass(text2, capitals) {
+function dashPass(text3, capitals) {
   let out = "";
   let from = 0;
   let i = 0;
-  while (i < text2.length) {
-    if (!isDash(text2[i])) {
+  while (i < text3.length) {
+    if (!isDash(text3[i])) {
       i++;
       continue;
     }
     let end = i + 1;
-    while (end < text2.length && isBlank(text2[end])) end++;
-    const next = text2[end];
+    while (end < text3.length && isBlank(text3[end])) end++;
+    const next = text3[end];
     if (capitals !== (next !== void 0 && next >= "A" && next <= "Z")) {
       i++;
       continue;
     }
     let start = i;
-    while (start > from && isBlank(text2[start - 1])) start--;
-    out += text2.slice(from, start) + (capitals ? ". " : ", ");
+    while (start > from && isBlank(text3[start - 1])) start--;
+    out += text3.slice(from, start) + (capitals ? ". " : ", ");
     from = end;
     i = end;
   }
-  return out + text2.slice(from);
+  return out + text3.slice(from);
 }
-function scrubEmdash(text2) {
-  const parts = text2.split(/(```[\s\S]*?```|`[^`\n]*`)/);
+function scrubEmdash(text3) {
+  const parts = text3.split(/(```[\s\S]*?```|`[^`\n]*`)/);
   for (let i = 0; i < parts.length; i += 2) {
     parts[i] = dashPass(dashPass(parts[i], true), false);
   }
@@ -6689,14 +6954,14 @@ function reportFacts(r) {
   return parts.join(" \xB7 ");
 }
 function reportTrend(rows2) {
-  const runs = [...rows2].sort((a, b2) => a.created_at < b2.created_at ? -1 : 1);
-  const latest = runs[runs.length - 1] ?? null;
-  const prev = runs[runs.length - 2] ?? null;
+  const runs2 = [...rows2].sort((a, b2) => a.created_at < b2.created_at ? -1 : 1);
+  const latest = runs2[runs2.length - 1] ?? null;
+  const prev = runs2[runs2.length - 2] ?? null;
   return {
     latest,
     delta: latest && prev ? latest.score - prev.score : null,
     prevAt: prev?.created_at ?? null,
-    runs
+    runs: runs2
   };
 }
 var SCORE_RE, GAPS_HEAD_RE;
@@ -6736,10 +7001,10 @@ var init_review_reminder = __esm({
 function whiteboardSource(kind, value) {
   return JSON.stringify({ kind, value });
 }
-function parseWhiteboardSource(text2) {
-  if (!text2) return null;
+function parseWhiteboardSource(text3) {
+  if (!text3) return null;
   try {
-    const v = JSON.parse(text2);
+    const v = JSON.parse(text3);
     if ((v.kind === "mermaid" || v.kind === "elements") && typeof v.value === "string" && v.value.length > 0) {
       return { kind: v.kind, value: v.value };
     }
@@ -6747,10 +7012,10 @@ function parseWhiteboardSource(text2) {
   }
   return null;
 }
-function parseWhiteboardScene(text2) {
-  if (!text2) return null;
+function parseWhiteboardScene(text3) {
+  if (!text3) return null;
   try {
-    const v = JSON.parse(text2);
+    const v = JSON.parse(text3);
     if (!Array.isArray(v.elements)) return null;
     const appState = v.appState && typeof v.appState === "object" ? v.appState : void 0;
     return { elements: v.elements, appState };
@@ -6818,13 +7083,13 @@ function splitBody(raw) {
     imageBrief: brief.join(" ").trim() || void 0
   };
 }
-function liftScript(text2) {
-  const lines = text2.split("\n");
+function liftScript(text3) {
+  const lines = text3.split("\n");
   const at = lines.findIndex(isScriptHead);
-  if (at === -1) return { rest: text2 };
+  if (at === -1) return { rest: text3 };
   const script = lines.slice(at + 1).join("\n").trim();
   const rest = lines.slice(0, at).join("\n").trim();
-  return script ? { rest, script } : { rest: text2 };
+  return script ? { rest, script } : { rest: text3 };
 }
 function normalizeDraft(input) {
   const platform = String(input.platform ?? "x").toLowerCase().trim();
@@ -7888,17 +8153,17 @@ var init_model_labels = __esm({
 });
 
 // ../shared/src/model-selection.ts
-function preferredDeveloperSeat(agents) {
-  return agents.filter((agent) => agent.role === "developer" && agent.retired_at == null && (agent.kind ?? "local") !== "remote").slice().sort((a, b2) => {
+function preferredDeveloperSeat(agents2) {
+  return agents2.filter((agent) => agent.role === "developer" && agent.retired_at == null && (agent.kind ?? "local") !== "remote").slice().sort((a, b2) => {
     const patch = Number(a.name.toLowerCase() !== "patch") - Number(b2.name.toLowerCase() !== "patch");
     if (patch !== 0) return patch;
     const manual = Number(a.model_source !== "manual") - Number(b2.model_source !== "manual");
     return manual !== 0 ? manual : a.name.localeCompare(b2.name, void 0, { sensitivity: "base" });
   })[0] ?? null;
 }
-function projectDeveloperModel(sessionModel, projectPack, agents, customPacks = []) {
+function projectDeveloperModel(sessionModel, projectPack, agents2, customPacks = []) {
   if (sessionModel) return sessionModel;
-  const seat = preferredDeveloperSeat(agents);
+  const seat = preferredDeveloperSeat(agents2);
   return seatModel({
     role: "developer",
     currentModel: seat?.model || STARTER_MODEL,
@@ -7916,8 +8181,8 @@ var init_model_selection = __esm({
 });
 
 // ../shared/src/code-models.ts
-function codeMachineOf(machines, named, me) {
-  return machines.find((m) => m.id === named) ?? machines.find((m) => isCloudMachineRow(m) && m.owner_user_id === me) ?? null;
+function codeMachineOf(machines2, named, me) {
+  return machines2.find((m) => m.id === named) ?? machines2.find((m) => isCloudMachineRow(m) && m.owner_user_id === me) ?? null;
 }
 function machineRuntimeList(m) {
   try {
@@ -7927,9 +8192,9 @@ function machineRuntimeList(m) {
     return [];
   }
 }
-function codeProviderStates(machine, configured, geminiKey) {
+function codeProviderStates(machine, configured2, geminiKey) {
   const runtimes2 = machineRuntimeList(machine);
-  const state = (p2) => runtimes2.includes(RUNTIME[p2]) ? "ready" : configured.has(p2) ? "signin" : "connect";
+  const state = (p2) => runtimes2.includes(RUNTIME[p2]) ? "ready" : configured2.has(p2) ? "signin" : "connect";
   const gemini = state("gemini");
   return { anthropic: state("anthropic"), openai: state("openai"), gemini: gemini === "ready" && geminiKey ? "ready" : "connect" };
 }
@@ -7964,11 +8229,29 @@ var init_code_models = __esm({
   }
 });
 
+// ../shared/src/engineering/selection.ts
+function isEngineeringSelection(value) {
+  if (!value || typeof value !== "object") return false;
+  const v = value;
+  return (v.agentId === null || typeof v.agentId === "string" && v.agentId.length > 0 && v.agentId.length <= 200) && (v.modelId === null || MODEL_ID_SET.has(v.modelId)) && (v.reasoningEffort === null || THINKING_LEVELS.includes(v.reasoningEffort));
+}
+var DEFAULT_ENGINEERING_AGENT, engineeringEffort;
+var init_selection = __esm({
+  "../shared/src/engineering/selection.ts"() {
+    "use strict";
+    init_agent_models();
+    init_model_packs();
+    init_rates();
+    DEFAULT_ENGINEERING_AGENT = { id: "", name: "rex", role: "orchestrator" };
+    engineeringEffort = (model2, effort) => takesThinking(model2 ?? STARTER_MODEL) ? effort ?? DEFAULT_THINKING : null;
+  }
+});
+
 // ../shared/src/engineering/protocol.ts
 function isEngineeringOpenMeta(value) {
   if (!value || typeof value !== "object") return false;
   const v = value;
-  return typeof v["threadId"] === "string" && v["threadId"].length > 0 && typeof v["repoId"] === "string" && typeof v["repoName"] === "string" && typeof v["branch"] === "string" && (v["projectId"] === void 0 || isBoundedString(v["projectId"], 200)) && isModelId(v["modelId"]) && isBrainPack(v["brainPack"]) && isEngineeringControls(v);
+  return typeof v["threadId"] === "string" && v["threadId"].length > 0 && typeof v["repoId"] === "string" && typeof v["repoName"] === "string" && typeof v["branch"] === "string" && (v["projectId"] === void 0 || isBoundedString(v["projectId"], 200)) && isEngineeringSelection({ agentId: v["agentId"] ?? null, modelId: v["modelId"] ?? null, reasoningEffort: v["reasoningEffort"] ?? null }) && isModelId(v["modelId"]) && isBrainPack(v["brainPack"]) && isEngineeringControls(v);
 }
 function isBrainPack(value) {
   return value === void 0 || value === null || typeof value === "string" && value.length > 0 && value.length <= 200;
@@ -7994,6 +8277,7 @@ function isEngineeringCommand(value) {
   if (v["type"] === "attachment_chunk") return isAttachmentId(v["id"]) && typeof v["index"] === "number" && Number.isInteger(v["index"]) && v["index"] >= 0 && typeof v["data"] === "string" && v["data"].length > 0 && v["data"].length <= 192 * 1024;
   if (v["type"] === "attachment_end") return isAttachmentId(v["id"]);
   if (v["type"] === "prompt") return typeof v["prompt"] === "string" && v["prompt"].trim().length > 0 && (v["attachments"] === void 0 || Array.isArray(v["attachments"]) && v["attachments"].length <= MAX_ATTACHMENT_LIMITS.maxPerMessage && v["attachments"].every(isAttachmentRef));
+  if (v["type"] === "configure") return isEngineeringSelection(v["selection"]);
   if (v["type"] === "controls") return isEngineeringControls(v["controls"]);
   if (v["type"] === "model") return isModelId(v["modelId"]) && v["modelId"] !== void 0;
   if (v["type"] === "brain") return isBrainPack(v["brainPack"]) && v["brainPack"] !== void 0;
@@ -8014,6 +8298,7 @@ var CATEGORIES, isBoundedString, isAttachmentId, MAX_ATTACHMENT_LIMITS, isAttach
 var init_protocol = __esm({
   "../shared/src/engineering/protocol.ts"() {
     "use strict";
+    init_selection();
     init_model_packs();
     init_entitlements();
     CATEGORIES = /* @__PURE__ */ new Set(["read", "edit", "command", "web", "mcp"]);
@@ -8035,6 +8320,10 @@ var init_protocol = __esm({
     };
     ENGINEERING_CLINE_TOOL_POLICIES = {
       "*": { enabled: true, autoApprove: false },
+      // Host-owned metadata tool. It cannot execute file, command, or network actions.
+      set_thread_title: { enabled: true, autoApprove: true },
+      propose_work_plan: { enabled: true, autoApprove: true },
+      update_plan_progress: { enabled: true, autoApprove: true },
       read_files: { enabled: true, autoApprove: false },
       search_codebase: { enabled: true, autoApprove: false },
       run_commands: { enabled: true, autoApprove: false },
@@ -8045,27 +8334,30 @@ var init_protocol = __esm({
   }
 });
 
-// ../shared/src/engineering/patch.ts
-function engineeringPatchPaths(patch) {
-  const paths = [];
-  const pattern = /^\*\*\* (?:Add|Update|Delete) File: (.+)$|^\*\*\* Move to: (.+)$/gm;
-  for (const match of patch.matchAll(pattern)) paths.push((match[1] ?? match[2] ?? "").trim());
-  return paths.filter(Boolean);
-}
-var init_patch = __esm({
-  "../shared/src/engineering/patch.ts"() {
-    "use strict";
-  }
-});
-
 // ../shared/src/engineering/handoff.ts
 function engineeringModeHandoff(category, toolName) {
   return {
     category,
     toolName,
-    prompt: category === "edit" ? "Continue with the implementation in Act mode. Apply the planned changes and verify them." : "Continue in Act mode. Apply the planned changes, run the requested commands, and finish the verification.",
+    actionable: true,
+    prompt: category === "edit" ? "Continue with the implementation in Act mode. Apply the planned changes and verify them." : "Continue in Act mode with the proposed command. Review its permissions before execution.",
     createdAt: (/* @__PURE__ */ new Date()).toISOString()
   };
+}
+function canContinueEngineering(session) {
+  return session.mode === "plan" && session.state === "completed" && !session.activeActivity && !session.pendingApproval && session.pendingModeHandoff?.actionable === true;
+}
+function isEngineeringPlanReport(value) {
+  if (!value || typeof value !== "object") return false;
+  const report = value;
+  const line = (text3, max) => typeof text3 === "string" && !!text3.trim() && text3.length <= max && !/[\r\n]/.test(text3);
+  return line(report.investigation, 600) && line(report.nextStep, 300) && Array.isArray(report.decisions) && report.decisions.length >= 1 && report.decisions.length <= 4 && report.decisions.every((point2) => line(point2, 300));
+}
+function isEngineeringWorkPlan(value) {
+  if (!value || typeof value !== "object") return false;
+  const plan = value;
+  const points = (value2, min, max) => value2 === void 0 || Array.isArray(value2) && value2.length >= min && value2.length <= max && value2.every((item) => typeof item === "string" && !!item.trim() && item.length <= 600 && !/[\r\n]/.test(item));
+  return (plan.report === void 0 || isEngineeringPlanReport(plan.report)) && points(plan.keyPoints, 1, 5) && points(plan.considerations, 0, 3) && typeof plan.summary === "string" && !!plan.summary.trim() && plan.summary.length <= 8e3 && Array.isArray(plan.steps) && plan.steps.length > 0 && plan.steps.length <= 30 && plan.steps.every((step) => step && (step.action === "edit" || step.action === "command") && (step.label === void 0 || typeof step.label === "string" && !!step.label.trim() && step.label.length <= 100 && !/[\r\n]/.test(step.label)) && typeof step.target === "string" && !!step.target.trim() && step.target.length <= 2e3 && typeof step.description === "string" && !!step.description.trim() && step.description.length <= 2e3);
 }
 var init_handoff = __esm({
   "../shared/src/engineering/handoff.ts"() {
@@ -8073,236 +8365,1203 @@ var init_handoff = __esm({
   }
 });
 
-// ../shared/src/engineering/domain.ts
-function effectivePermission(mode, category, session, policy) {
-  if (!policy[category]) return "blocked";
-  if (mode === "plan" && (category === "edit" || category === "command")) return "blocked";
-  return session[category] ? "auto" : "ask";
+// ../shared/src/engineering/transcript-state.ts
+function lastMessageIndex(messages2, role, streamingOnly = false) {
+  for (let index = messages2.length - 1; index >= 0; index -= 1) {
+    const current = messages2[index];
+    if (current?.role === role && (!streamingOnly || current.streaming)) return index;
+  }
+  return -1;
 }
-function createEngineeringSession(repo, title = "New Code task", project = null, machineId = null) {
-  const now = stamp();
-  const hello = msg("assistant", `Ready in **${repo.name}**. I\u2019ll begin in Plan mode and ask before any side effect.`, "plain");
-  const checkpoint = initialCheckpoint();
-  checkpoint.messageCount = 1;
+function collapseReasoning(messages2) {
+  return messages2.map((current) => current.role === "reasoning" && !current.collapsed ? { ...current, streaming: false, collapsed: true } : current);
+}
+function finishStreamingMessages(messages2, collapseThoughts) {
+  return (collapseThoughts ? collapseReasoning(messages2) : messages2).map((current) => current.streaming ? { ...current, streaming: false } : current);
+}
+var updateMessage;
+var init_transcript_state = __esm({
+  "../shared/src/engineering/transcript-state.ts"() {
+    "use strict";
+    updateMessage = (messages2, index, next) => messages2.map((current, at) => at === index ? next : current);
+  }
+});
+
+// ../shared/src/engineering/plan-progress.ts
+function isEngineeringPlanProgress(value) {
+  if (!value || typeof value !== "object") return false;
+  const p2 = value;
+  return typeof p2.id === "string" && p2.id.length > 0 && p2.id.length <= 200 && isEngineeringWorkPlan(p2.plan) && typeof p2.started === "boolean" && Array.isArray(p2.statuses) && p2.statuses.length === p2.plan.steps.length && p2.statuses.every(status) && p2.statuses.filter((s) => s === "in_progress").length <= 1 && (p2.started || p2.statuses.every((s) => s === "pending"));
+}
+function createEngineeringPlanProgress(plan, id) {
+  return { id, plan: JSON.parse(JSON.stringify(plan)), statuses: plan.steps.map(() => "pending"), started: false };
+}
+function updateEngineeringPlanProgress(progress, updates) {
+  if (!Array.isArray(updates) || !updates.length || updates.length > progress.statuses.length) throw new Error("Supply one or more plan step updates.");
+  const statuses = [...progress.statuses];
+  const seen = /* @__PURE__ */ new Set();
+  for (const update of updates) {
+    if (!update || !Number.isInteger(update.step) || update.step < 1 || update.step > statuses.length || seen.has(update.step) || !status(update.status)) throw new Error("Each update needs a unique existing step number and a valid status.");
+    seen.add(update.step);
+    statuses[update.step - 1] = update.status;
+  }
+  if (statuses.filter((s) => s === "in_progress").length > 1) throw new Error("Only one step can be in progress. Update the previous step in the same call.");
+  return { ...progress, statuses, started: true };
+}
+function recoverEngineeringPlanProgress(messages2) {
+  if (!Array.isArray(messages2)) return null;
+  const calls = /* @__PURE__ */ new Map();
+  let progress = null;
+  for (const message2 of messages2) {
+    if (!Array.isArray(message2?.content)) continue;
+    for (const block of message2.content) {
+      if (message2.role === "assistant" && block?.type === "tool_use") calls.set(block.id, block);
+      if (block?.type !== "tool_result" || block.is_error) continue;
+      const call = calls.get(block.tool_use_id);
+      if (!call || !["propose_work_plan", "update_plan_progress"].includes(call.name)) continue;
+      calls.delete(block.tool_use_id);
+      let result;
+      try {
+        result = typeof block.content === "string" ? JSON.parse(block.content) : block.content;
+      } catch {
+        continue;
+      }
+      if (!result || result.recorded !== true) continue;
+      if (call.name === "propose_work_plan" && isEngineeringWorkPlan(call.input)) {
+        progress = isEngineeringPlanProgress(result.planProgress) ? result.planProgress : createEngineeringPlanProgress(call.input, block.tool_use_id);
+      } else if (call.name === "update_plan_progress" && isEngineeringPlanProgress(result.planProgress) && progress?.id === result.planProgress.id && JSON.stringify(progress.plan) === JSON.stringify(result.planProgress.plan)) {
+        progress = result.planProgress;
+      }
+    }
+  }
+  return progress;
+}
+var status, ENGINEERING_PLAN_PROGRESS_PROMPT;
+var init_plan_progress = __esm({
+  "../shared/src/engineering/plan-progress.ts"() {
+    "use strict";
+    init_handoff();
+    status = (value) => typeof value === "string" && ["pending", "in_progress", "completed"].includes(value);
+    ENGINEERING_PLAN_PROGRESS_PROMPT = "In Act mode, when executing a previously proposed work plan, use update_plan_progress before starting the first step and after each meaningful step. Use the original one-based step numbers. Mark a step completed only after its work actually succeeds; a requested approval is not completion, and a test step remains unfinished until the test result passes. Update the previous step and the next in_progress step together. Reopen a step if more work is needed. Keep steps pending when blocked or declined. Do not mark the whole plan completed merely because the turn is ending. Do not call this tool for an unrelated question or invent a plan to fill a progress indicator.";
+  }
+});
+
+// ../shared/src/engineering/selection-events.ts
+function applyEngineeringSelection(session, wire) {
+  if (wire["type"] !== "ready" && wire["type"] !== "model_changed") return session;
+  const agent = wire["agent"];
+  if (agent && typeof agent.id === "string" && typeof agent.name === "string" && typeof agent.role === "string") {
+    const welcomeOnly = session.messages.length <= 2 && session.messages[0]?.body.startsWith("Ready in **");
+    const previous = session.agent ?? (welcomeOnly ? agent : DEFAULT_ENGINEERING_AGENT);
+    session = { ...session, agent, agentId: agent.id || null, messages: session.messages.map((m) => m.role !== "user" && !m.agent ? { ...m, agent: { ...previous } } : m) };
+  }
+  const effort = wire["reasoningEffort"];
+  return effort === null || effort === "low" || effort === "medium" || effort === "high" ? { ...session, reasoningEffort: effort } : session;
+}
+function recordEngineeringAuthors(previous, next) {
+  if (next === previous) return previous;
+  const prior = new Set(previous.messages.map((m) => m.id));
+  const agent = next.agent ?? DEFAULT_ENGINEERING_AGENT;
+  return { ...next, messages: next.messages.map((m) => m.role !== "user" && !m.agent && !prior.has(m.id) ? { ...m, agent: { ...agent } } : m) };
+}
+var init_selection_events = __esm({
+  "../shared/src/engineering/selection-events.ts"() {
+    "use strict";
+    init_selection();
+  }
+});
+
+// ../shared/src/engineering/work-plan.ts
+function engineeringWorkPlanMessages(session) {
+  const { messages: messages2, workPlan } = session;
+  if (!workPlan?.trim() || messages2.some((item) => item.kind === "work_plan" && item.body === workPlan)) return messages2;
+  const lastIndex = (test) => {
+    for (let i = messages2.length - 1; i >= 0; i--) if (test(messages2[i])) return i;
+    return -1;
+  };
+  let index = lastIndex((item) => item.role === "tool" && /propose[_ ]work[_ ]plan/i.test(item.body));
+  if (index < 0 && session.pendingModeHandoff?.toolName !== "propose_work_plan" && !messages2.some((item) => item.tone === "plan" && item.body === workPlan)) return messages2;
+  const createdAt = session.pendingModeHandoff?.createdAt;
+  if (index < 0 && createdAt) index = lastIndex((item) => item.createdAt <= createdAt);
+  if (index < 0) index = messages2.length - 1;
+  const anchor = messages2[index];
+  const plan = { id: `stored-plan-${session.id}`, role: "assistant", kind: "work_plan", tone: "plan", body: workPlan, createdAt: createdAt ?? anchor?.createdAt ?? session.updatedAt };
+  return [...messages2.slice(0, index + 1), plan, ...messages2.slice(index + 1)];
+}
+function engineeringWorkPlanText(plan) {
+  return [
+    plan.summary.trim(),
+    plan.keyPoints?.length ? `## Key points
+
+${plan.keyPoints.map((point2) => `- ${point2.trim()}`).join("\n")}` : "",
+    plan.considerations?.length ? `## Before starting
+
+${plan.considerations.map((point2) => `- ${point2.trim()}`).join("\n")}` : "",
+    `${plan.keyPoints?.length || plan.considerations?.length ? "## Steps\n\n" : ""}${plan.steps.map((step, i) => `${i + 1}. ${step.description} (${step.target})`).join("\n")}`
+  ].filter(Boolean).join("\n\n");
+}
+var init_work_plan = __esm({
+  "../shared/src/engineering/work-plan.ts"() {
+    "use strict";
+  }
+});
+
+// ../../node_modules/.pnpm/diff@8.0.2/node_modules/diff/libesm/diff/base.js
+var Diff;
+var init_base = __esm({
+  "../../node_modules/.pnpm/diff@8.0.2/node_modules/diff/libesm/diff/base.js"() {
+    Diff = class {
+      diff(oldStr, newStr, options = {}) {
+        let callback;
+        if (typeof options === "function") {
+          callback = options;
+          options = {};
+        } else if ("callback" in options) {
+          callback = options.callback;
+        }
+        const oldString = this.castInput(oldStr, options);
+        const newString = this.castInput(newStr, options);
+        const oldTokens = this.removeEmpty(this.tokenize(oldString, options));
+        const newTokens = this.removeEmpty(this.tokenize(newString, options));
+        return this.diffWithOptionsObj(oldTokens, newTokens, options, callback);
+      }
+      diffWithOptionsObj(oldTokens, newTokens, options, callback) {
+        var _a;
+        const done2 = (value) => {
+          value = this.postProcess(value, options);
+          if (callback) {
+            setTimeout(function() {
+              callback(value);
+            }, 0);
+            return void 0;
+          } else {
+            return value;
+          }
+        };
+        const newLen = newTokens.length, oldLen = oldTokens.length;
+        let editLength = 1;
+        let maxEditLength = newLen + oldLen;
+        if (options.maxEditLength != null) {
+          maxEditLength = Math.min(maxEditLength, options.maxEditLength);
+        }
+        const maxExecutionTime = (_a = options.timeout) !== null && _a !== void 0 ? _a : Infinity;
+        const abortAfterTimestamp = Date.now() + maxExecutionTime;
+        const bestPath = [{ oldPos: -1, lastComponent: void 0 }];
+        let newPos = this.extractCommon(bestPath[0], newTokens, oldTokens, 0, options);
+        if (bestPath[0].oldPos + 1 >= oldLen && newPos + 1 >= newLen) {
+          return done2(this.buildValues(bestPath[0].lastComponent, newTokens, oldTokens));
+        }
+        let minDiagonalToConsider = -Infinity, maxDiagonalToConsider = Infinity;
+        const execEditLength = () => {
+          for (let diagonalPath = Math.max(minDiagonalToConsider, -editLength); diagonalPath <= Math.min(maxDiagonalToConsider, editLength); diagonalPath += 2) {
+            let basePath;
+            const removePath = bestPath[diagonalPath - 1], addPath = bestPath[diagonalPath + 1];
+            if (removePath) {
+              bestPath[diagonalPath - 1] = void 0;
+            }
+            let canAdd = false;
+            if (addPath) {
+              const addPathNewPos = addPath.oldPos - diagonalPath;
+              canAdd = addPath && 0 <= addPathNewPos && addPathNewPos < newLen;
+            }
+            const canRemove = removePath && removePath.oldPos + 1 < oldLen;
+            if (!canAdd && !canRemove) {
+              bestPath[diagonalPath] = void 0;
+              continue;
+            }
+            if (!canRemove || canAdd && removePath.oldPos < addPath.oldPos) {
+              basePath = this.addToPath(addPath, true, false, 0, options);
+            } else {
+              basePath = this.addToPath(removePath, false, true, 1, options);
+            }
+            newPos = this.extractCommon(basePath, newTokens, oldTokens, diagonalPath, options);
+            if (basePath.oldPos + 1 >= oldLen && newPos + 1 >= newLen) {
+              return done2(this.buildValues(basePath.lastComponent, newTokens, oldTokens)) || true;
+            } else {
+              bestPath[diagonalPath] = basePath;
+              if (basePath.oldPos + 1 >= oldLen) {
+                maxDiagonalToConsider = Math.min(maxDiagonalToConsider, diagonalPath - 1);
+              }
+              if (newPos + 1 >= newLen) {
+                minDiagonalToConsider = Math.max(minDiagonalToConsider, diagonalPath + 1);
+              }
+            }
+          }
+          editLength++;
+        };
+        if (callback) {
+          (function exec() {
+            setTimeout(function() {
+              if (editLength > maxEditLength || Date.now() > abortAfterTimestamp) {
+                return callback(void 0);
+              }
+              if (!execEditLength()) {
+                exec();
+              }
+            }, 0);
+          })();
+        } else {
+          while (editLength <= maxEditLength && Date.now() <= abortAfterTimestamp) {
+            const ret = execEditLength();
+            if (ret) {
+              return ret;
+            }
+          }
+        }
+      }
+      addToPath(path, added, removed, oldPosInc, options) {
+        const last = path.lastComponent;
+        if (last && !options.oneChangePerToken && last.added === added && last.removed === removed) {
+          return {
+            oldPos: path.oldPos + oldPosInc,
+            lastComponent: { count: last.count + 1, added, removed, previousComponent: last.previousComponent }
+          };
+        } else {
+          return {
+            oldPos: path.oldPos + oldPosInc,
+            lastComponent: { count: 1, added, removed, previousComponent: last }
+          };
+        }
+      }
+      extractCommon(basePath, newTokens, oldTokens, diagonalPath, options) {
+        const newLen = newTokens.length, oldLen = oldTokens.length;
+        let oldPos = basePath.oldPos, newPos = oldPos - diagonalPath, commonCount = 0;
+        while (newPos + 1 < newLen && oldPos + 1 < oldLen && this.equals(oldTokens[oldPos + 1], newTokens[newPos + 1], options)) {
+          newPos++;
+          oldPos++;
+          commonCount++;
+          if (options.oneChangePerToken) {
+            basePath.lastComponent = { count: 1, previousComponent: basePath.lastComponent, added: false, removed: false };
+          }
+        }
+        if (commonCount && !options.oneChangePerToken) {
+          basePath.lastComponent = { count: commonCount, previousComponent: basePath.lastComponent, added: false, removed: false };
+        }
+        basePath.oldPos = oldPos;
+        return newPos;
+      }
+      equals(left, right, options) {
+        if (options.comparator) {
+          return options.comparator(left, right);
+        } else {
+          return left === right || !!options.ignoreCase && left.toLowerCase() === right.toLowerCase();
+        }
+      }
+      removeEmpty(array) {
+        const ret = [];
+        for (let i = 0; i < array.length; i++) {
+          if (array[i]) {
+            ret.push(array[i]);
+          }
+        }
+        return ret;
+      }
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      castInput(value, options) {
+        return value;
+      }
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      tokenize(value, options) {
+        return Array.from(value);
+      }
+      join(chars) {
+        return chars.join("");
+      }
+      postProcess(changeObjects, options) {
+        return changeObjects;
+      }
+      get useLongestToken() {
+        return false;
+      }
+      buildValues(lastComponent, newTokens, oldTokens) {
+        const components = [];
+        let nextComponent;
+        while (lastComponent) {
+          components.push(lastComponent);
+          nextComponent = lastComponent.previousComponent;
+          delete lastComponent.previousComponent;
+          lastComponent = nextComponent;
+        }
+        components.reverse();
+        const componentLen = components.length;
+        let componentPos = 0, newPos = 0, oldPos = 0;
+        for (; componentPos < componentLen; componentPos++) {
+          const component = components[componentPos];
+          if (!component.removed) {
+            if (!component.added && this.useLongestToken) {
+              let value = newTokens.slice(newPos, newPos + component.count);
+              value = value.map(function(value2, i) {
+                const oldValue = oldTokens[oldPos + i];
+                return oldValue.length > value2.length ? oldValue : value2;
+              });
+              component.value = this.join(value);
+            } else {
+              component.value = this.join(newTokens.slice(newPos, newPos + component.count));
+            }
+            newPos += component.count;
+            if (!component.added) {
+              oldPos += component.count;
+            }
+          } else {
+            component.value = this.join(oldTokens.slice(oldPos, oldPos + component.count));
+            oldPos += component.count;
+          }
+        }
+        return components;
+      }
+    };
+  }
+});
+
+// ../../node_modules/.pnpm/diff@8.0.2/node_modules/diff/libesm/diff/line.js
+function diffLines(oldStr, newStr, options) {
+  return lineDiff.diff(oldStr, newStr, options);
+}
+function tokenize(value, options) {
+  if (options.stripTrailingCr) {
+    value = value.replace(/\r\n/g, "\n");
+  }
+  const retLines = [], linesAndNewlines = value.split(/(\n|\r\n)/);
+  if (!linesAndNewlines[linesAndNewlines.length - 1]) {
+    linesAndNewlines.pop();
+  }
+  for (let i = 0; i < linesAndNewlines.length; i++) {
+    const line = linesAndNewlines[i];
+    if (i % 2 && !options.newlineIsToken) {
+      retLines[retLines.length - 1] += line;
+    } else {
+      retLines.push(line);
+    }
+  }
+  return retLines;
+}
+var LineDiff, lineDiff;
+var init_line = __esm({
+  "../../node_modules/.pnpm/diff@8.0.2/node_modules/diff/libesm/diff/line.js"() {
+    init_base();
+    LineDiff = class extends Diff {
+      constructor() {
+        super(...arguments);
+        this.tokenize = tokenize;
+      }
+      equals(left, right, options) {
+        if (options.ignoreWhitespace) {
+          if (!options.newlineIsToken || !left.includes("\n")) {
+            left = left.trim();
+          }
+          if (!options.newlineIsToken || !right.includes("\n")) {
+            right = right.trim();
+          }
+        } else if (options.ignoreNewlineAtEof && !options.newlineIsToken) {
+          if (left.endsWith("\n")) {
+            left = left.slice(0, -1);
+          }
+          if (right.endsWith("\n")) {
+            right = right.slice(0, -1);
+          }
+        }
+        return super.equals(left, right, options);
+      }
+    };
+    lineDiff = new LineDiff();
+  }
+});
+
+// ../../node_modules/.pnpm/diff@8.0.2/node_modules/diff/libesm/patch/create.js
+function structuredPatch(oldFileName, newFileName, oldStr, newStr, oldHeader, newHeader, options) {
+  let optionsObj;
+  if (!options) {
+    optionsObj = {};
+  } else if (typeof options === "function") {
+    optionsObj = { callback: options };
+  } else {
+    optionsObj = options;
+  }
+  if (typeof optionsObj.context === "undefined") {
+    optionsObj.context = 4;
+  }
+  const context = optionsObj.context;
+  if (optionsObj.newlineIsToken) {
+    throw new Error("newlineIsToken may not be used with patch-generation functions, only with diffing functions");
+  }
+  if (!optionsObj.callback) {
+    return diffLinesResultToPatch(diffLines(oldStr, newStr, optionsObj));
+  } else {
+    const { callback } = optionsObj;
+    diffLines(oldStr, newStr, Object.assign(Object.assign({}, optionsObj), { callback: (diff) => {
+      const patch = diffLinesResultToPatch(diff);
+      callback(patch);
+    } }));
+  }
+  function diffLinesResultToPatch(diff) {
+    if (!diff) {
+      return;
+    }
+    diff.push({ value: "", lines: [] });
+    function contextLines(lines) {
+      return lines.map(function(entry) {
+        return " " + entry;
+      });
+    }
+    const hunks = [];
+    let oldRangeStart = 0, newRangeStart = 0, curRange = [], oldLine = 1, newLine = 1;
+    for (let i = 0; i < diff.length; i++) {
+      const current = diff[i], lines = current.lines || splitLines(current.value);
+      current.lines = lines;
+      if (current.added || current.removed) {
+        if (!oldRangeStart) {
+          const prev = diff[i - 1];
+          oldRangeStart = oldLine;
+          newRangeStart = newLine;
+          if (prev) {
+            curRange = context > 0 ? contextLines(prev.lines.slice(-context)) : [];
+            oldRangeStart -= curRange.length;
+            newRangeStart -= curRange.length;
+          }
+        }
+        for (const line of lines) {
+          curRange.push((current.added ? "+" : "-") + line);
+        }
+        if (current.added) {
+          newLine += lines.length;
+        } else {
+          oldLine += lines.length;
+        }
+      } else {
+        if (oldRangeStart) {
+          if (lines.length <= context * 2 && i < diff.length - 2) {
+            for (const line of contextLines(lines)) {
+              curRange.push(line);
+            }
+          } else {
+            const contextSize = Math.min(lines.length, context);
+            for (const line of contextLines(lines.slice(0, contextSize))) {
+              curRange.push(line);
+            }
+            const hunk = {
+              oldStart: oldRangeStart,
+              oldLines: oldLine - oldRangeStart + contextSize,
+              newStart: newRangeStart,
+              newLines: newLine - newRangeStart + contextSize,
+              lines: curRange
+            };
+            hunks.push(hunk);
+            oldRangeStart = 0;
+            newRangeStart = 0;
+            curRange = [];
+          }
+        }
+        oldLine += lines.length;
+        newLine += lines.length;
+      }
+    }
+    for (const hunk of hunks) {
+      for (let i = 0; i < hunk.lines.length; i++) {
+        if (hunk.lines[i].endsWith("\n")) {
+          hunk.lines[i] = hunk.lines[i].slice(0, -1);
+        } else {
+          hunk.lines.splice(i + 1, 0, "\\ No newline at end of file");
+          i++;
+        }
+      }
+    }
+    return {
+      oldFileName,
+      newFileName,
+      oldHeader,
+      newHeader,
+      hunks
+    };
+  }
+}
+function formatPatch(patch) {
+  if (Array.isArray(patch)) {
+    return patch.map(formatPatch).join("\n");
+  }
+  const ret = [];
+  if (patch.oldFileName == patch.newFileName) {
+    ret.push("Index: " + patch.oldFileName);
+  }
+  ret.push("===================================================================");
+  ret.push("--- " + patch.oldFileName + (typeof patch.oldHeader === "undefined" ? "" : "	" + patch.oldHeader));
+  ret.push("+++ " + patch.newFileName + (typeof patch.newHeader === "undefined" ? "" : "	" + patch.newHeader));
+  for (let i = 0; i < patch.hunks.length; i++) {
+    const hunk = patch.hunks[i];
+    if (hunk.oldLines === 0) {
+      hunk.oldStart -= 1;
+    }
+    if (hunk.newLines === 0) {
+      hunk.newStart -= 1;
+    }
+    ret.push("@@ -" + hunk.oldStart + "," + hunk.oldLines + " +" + hunk.newStart + "," + hunk.newLines + " @@");
+    for (const line of hunk.lines) {
+      ret.push(line);
+    }
+  }
+  return ret.join("\n") + "\n";
+}
+function createTwoFilesPatch(oldFileName, newFileName, oldStr, newStr, oldHeader, newHeader, options) {
+  if (typeof options === "function") {
+    options = { callback: options };
+  }
+  if (!(options === null || options === void 0 ? void 0 : options.callback)) {
+    const patchObj = structuredPatch(oldFileName, newFileName, oldStr, newStr, oldHeader, newHeader, options);
+    if (!patchObj) {
+      return;
+    }
+    return formatPatch(patchObj);
+  } else {
+    const { callback } = options;
+    structuredPatch(oldFileName, newFileName, oldStr, newStr, oldHeader, newHeader, Object.assign(Object.assign({}, options), { callback: (patchObj) => {
+      if (!patchObj) {
+        callback(void 0);
+      } else {
+        callback(formatPatch(patchObj));
+      }
+    } }));
+  }
+}
+function splitLines(text3) {
+  const hasTrailingNl = text3.endsWith("\n");
+  const result = text3.split("\n").map((line) => line + "\n");
+  if (hasTrailingNl) {
+    result.pop();
+  } else {
+    result.push(result.pop().slice(0, -1));
+  }
+  return result;
+}
+var init_create = __esm({
+  "../../node_modules/.pnpm/diff@8.0.2/node_modules/diff/libesm/patch/create.js"() {
+    init_line();
+  }
+});
+
+// ../../node_modules/.pnpm/diff@8.0.2/node_modules/diff/libesm/index.js
+var init_libesm = __esm({
+  "../../node_modules/.pnpm/diff@8.0.2/node_modules/diff/libesm/index.js"() {
+    init_create();
+  }
+});
+
+// ../shared/src/engineering/patch.ts
+function engineeringPatchPaths(patch) {
+  const paths = [];
+  const pattern = /^\*\*\* (?:Add|Update|Delete) File: (.+)$|^\*\*\* Move to: (.+)$/gm;
+  for (const match of patch.matchAll(pattern)) paths.push((match[1] ?? match[2] ?? "").trim());
+  return [...new Set(paths.filter(Boolean))];
+}
+function parseEngineeringPatch(patch) {
+  const operations = [];
+  let current;
+  for (const line of patch.replace(/\r\n/g, "\n").split("\n")) {
+    const header = /^\*\*\* (Add|Update|Delete) File: (.+)$/.exec(line);
+    if (header) {
+      current = { kind: header[1], path: header[2].trim(), lines: [] };
+      operations.push(current);
+    } else if (line === "*** End Patch") break;
+    else if (current && line.startsWith("*** Move to: ")) {
+      current.previousPath = current.path;
+      current.path = line.slice(13).trim();
+    } else if (current) current.lines.push(line);
+  }
+  return operations;
+}
+var init_patch = __esm({
+  "../shared/src/engineering/patch.ts"() {
+    "use strict";
+  }
+});
+
+// ../shared/src/engineering/changes.ts
+function engineeringUnifiedDiff(change) {
+  const oldPath = change.previousPath ?? change.path;
+  const from = change.kind === "added" ? "/dev/null" : `a/${oldPath}`;
+  const to = change.kind === "deleted" ? "/dev/null" : `b/${change.path}`;
+  const patch = createTwoFilesPatch(from, to, change.before, change.after, "", "", { context: 3 });
+  const start = patch.indexOf("--- ");
+  const mode = change.kind === "added" ? "new file mode 100644\n" : change.kind === "deleted" ? "deleted file mode 100644\n" : "";
+  const rename = change.previousPath ? `rename from ${change.previousPath}
+rename to ${change.path}
+` : "";
+  return `diff --git a/${oldPath} b/${change.path}
+${mode}${rename}${patch.slice(start)}`;
+}
+function engineeringPatchChanges(patch) {
+  const changes = /* @__PURE__ */ new Map();
+  for (const operation of parseEngineeringPatch(patch)) {
+    const prior = changes.get(operation.path);
+    const before = linesText(operation.lines.filter((line) => line.startsWith("-") || line.startsWith(" ")).map((line) => line.slice(1)));
+    const after = linesText(operation.lines.filter((line) => line.startsWith("+") || line.startsWith(" ")).map((line) => line.slice(1)));
+    const kind = operation.kind === "Add" ? prior?.kind === "deleted" ? "modified" : "added" : operation.kind === "Delete" ? "deleted" : "modified";
+    const incomplete = operation.kind !== "Add" || prior?.kind === "deleted" || !patch.includes("*** End Patch");
+    const change = {
+      path: operation.path,
+      ...operation.previousPath ? { previousPath: operation.previousPath } : {},
+      kind,
+      before: "",
+      after: operation.kind === "Add" ? after : "",
+      diff: "",
+      ...incomplete ? { previewError: UNKNOWN_SOURCE } : {}
+    };
+    change.diff = engineeringUnifiedDiff({ ...change, before, after });
+    changes.set(change.path, change);
+  }
+  return [...changes.values()];
+}
+function engineeringToolChanges(toolName, input) {
+  const value = input && typeof input === "object" ? input : {};
+  if (toolName === "apply_patch") return engineeringPatchChanges(typeof input === "string" ? input : typeof value["input"] === "string" ? value["input"] : "");
+  if (toolName !== "editor" || typeof value["path"] !== "string" || typeof value["new_text"] !== "string") return [];
+  const before = typeof value["old_text"] === "string" ? value["old_text"] : "";
+  const after = typeof value["new_text"] === "string" ? value["new_text"] : "";
+  const change = { path: value["path"], kind: "modified", before: "", after: "", diff: "", previewError: UNKNOWN_SOURCE };
+  return [{ ...change, diff: engineeringUnifiedDiff({ ...change, before, after }) }];
+}
+function normalizeEngineeringChanges(changes) {
+  const result = /* @__PURE__ */ new Map();
+  const seenPatches = /* @__PURE__ */ new Set();
+  for (const change of changes) {
+    if (change.after === change.diff && /^\*\*\* (Begin Patch|(?:Add|Update|Delete) File:)/.test(change.diff)) {
+      if (seenPatches.has(change.diff)) continue;
+      seenPatches.add(change.diff);
+      for (const normalized of engineeringPatchChanges(change.diff)) result.set(normalized.path, normalized);
+    } else result.set(change.path, change);
+  }
+  return [...result.values()];
+}
+var UNKNOWN_SOURCE, linesText;
+var init_changes = __esm({
+  "../shared/src/engineering/changes.ts"() {
+    "use strict";
+    init_libesm();
+    init_patch();
+    UNKNOWN_SOURCE = "The original file snapshot is unavailable. This diff shows the patch excerpt only.";
+    linesText = (lines) => lines.length ? `${lines.join("\n")}
+` : "";
+  }
+});
+
+// ../shared/src/engineering/review-history.ts
+function changeReviewMessage(id, changes, status2, createdAt) {
+  const files = normalizeEngineeringChanges(changes).map((change) => ({ ...change }));
   return {
-    // a BARE uuid (the mobile-cloud round, S5): the session id is the thread id, and the thread id is
-    // the synced code_sessions row's id (0135, a uuid pk) — a prefixed id could never become a row
-    id: globalThis.crypto.randomUUID(),
-    title,
-    repo,
-    project,
-    mode: "plan",
-    permissions: { ...RECOMMENDED_ENGINEERING_PERMISSIONS },
-    policy: { ...OPEN_ENGINEERING_POLICY },
-    state: "idle",
+    id: `change-review-${id}`,
+    role: "assistant",
+    kind: "change_review",
+    body: `${files.length} file${files.length === 1 ? "" : "s"} in this change set`,
+    createdAt,
+    review: { id, status: status2, changes: files }
+  };
+}
+function engineeringReviewMessages(session) {
+  let messages2 = session.messages;
+  if (session.changes.length && !messages2.some((m) => m.review)) {
+    messages2 = [...messages2, changeReviewMessage(`legacy-${session.id}`, session.changes, "recorded", session.updatedAt)];
+  }
+  const approval = session.pendingApproval;
+  if (approval?.changes?.length && !messages2.some((m) => m.review?.id === approval.id)) {
+    messages2 = [...messages2, changeReviewMessage(approval.id, approval.changes, "proposed", session.updatedAt)];
+  }
+  return messages2;
+}
+function updateReviewStatus(messages2, id, status2) {
+  return messages2.map((m) => m.review?.id === id && (m.review.status === "proposed" || m.review.status === "approved" || m.review.status === "interrupted") ? { ...m, review: { ...m.review, status: status2 } } : m);
+}
+function interruptReviews(messages2) {
+  return messages2.map((m) => m.review && (m.review.status === "proposed" || m.review.status === "approved") ? { ...m, review: { ...m.review, status: "interrupted" } } : m);
+}
+function finishChangeReview(session, failed, createdAt) {
+  const messages2 = engineeringReviewMessages(session);
+  const active = [...messages2].reverse().find((m) => m.review?.status === "approved" || m.review?.status === "proposed");
+  const status2 = failed ? "failed" : "applied";
+  if (active?.review) return updateReviewStatus(messages2, active.review.id, status2);
+  if (!session.proposedChanges.length) return messages2;
+  return [...messages2, changeReviewMessage(`edit-${globalThis.crypto.randomUUID()}`, session.proposedChanges, status2, createdAt)];
+}
+var init_review_history = __esm({
+  "../shared/src/engineering/review-history.ts"() {
+    "use strict";
+    init_changes();
+  }
+});
+
+// ../shared/src/engineering/copy.ts
+function engineeringSystemText(value) {
+  return value.replace(/\bcline(?:[\s_-]*core)?(?=$|[^a-z0-9])/gi, "Engineering").replace(/\bEngineering\s+Engineering\b/g, "Engineering").replace(/\bRestored Engineering checkpoint\b/g, "Restored checkpoint").replace(/\bBefore first Engineering turn\b/g, "Before first run").replace(/\bBefore Engineering turn (\d+)\b/g, "Before run $1");
+}
+function productizeStoredEngineeringSession(session) {
+  return {
+    ...session,
+    planProgress: isEngineeringPlanProgress(session.planProgress) ? session.planProgress : null,
+    modelOverride: typeof session.modelOverride === "string" && MODEL_ID_SET.has(session.modelOverride) ? session.modelOverride : null,
+    brainPack: typeof session.brainPack === "string" ? session.brainPack : null,
+    activeActivity: session.activeActivity && ["thinking", "tool", "composing"].includes(session.activeActivity.phase) ? session.activeActivity : null,
+    pendingModeHandoff: session.pendingModeHandoff && (session.pendingModeHandoff.category === "edit" || session.pendingModeHandoff.category === "command") ? session.pendingModeHandoff : null,
+    messages: engineeringWorkPlanMessages({ ...session, messages: engineeringReviewMessages(session) }).map((message2) => {
+      const productized = message2.role === "tool" || message2.tone === "warning" ? { ...message2, body: engineeringSystemText(message2.body) } : message2;
+      return productized.role === "reasoning" ? { ...productized, streaming: false, collapsed: true } : productized.streaming ? { ...productized, streaming: false } : productized;
+    }),
+    pendingApproval: session.pendingApproval ? {
+      ...session.pendingApproval,
+      title: engineeringSystemText(session.pendingApproval.title),
+      detail: engineeringSystemText(session.pendingApproval.detail)
+    } : null,
+    checkpoints: session.checkpoints.map((checkpoint) => ({
+      ...checkpoint,
+      label: engineeringSystemText(checkpoint.label)
+    })),
+    ...session.provider ? { provider: engineeringSystemText(session.provider) } : {},
+    ...session.model ? { model: engineeringSystemText(session.model) } : {}
+  };
+}
+function persistableEngineeringSession(session) {
+  const interrupted = session.state === "streaming" || session.state === "awaiting_approval";
+  return {
+    ...session,
+    state: interrupted ? "resumable" : session.state,
     activeActivity: null,
-    pendingModeHandoff: null,
-    messages: [hello],
     pendingApproval: null,
     proposedChanges: [],
     changes: [],
-    checkpoints: [checkpoint],
-    workPlan: null,
-    modelOverride: null,
-    brainPack: null,
-    machineId,
-    createdAt: now,
-    updatedAt: now
+    checkpoints: session.checkpoints.map(({ changes: _changes, ...checkpoint }) => ({ ...checkpoint, changes: [] })),
+    // Tool receipts can contain unrestricted command output. User and model-authored transcript
+    // remains available for the recent-thread experience described by the product contract.
+    messages: interruptReviews(engineeringReviewMessages(session).filter((message2) => message2.role !== "tool"))
   };
 }
-function setEngineeringMode(session, mode) {
-  if (session.state === "streaming" || session.state === "awaiting_approval") return session;
-  return { ...session, mode, ...mode === "act" ? { pendingModeHandoff: null } : {}, updatedAt: stamp() };
+function engineeringShellSession(session) {
+  const latest = session.messages.slice().reverse().find((message2) => message2.role !== "tool" && message2.kind !== "change_review");
+  return { ...persistableEngineeringSession(session), messages: latest ? [latest] : [], checkpoints: [], workPlan: "" };
 }
-function setEngineeringPermission(session, category, value) {
-  if (session.state === "streaming" || session.state === "awaiting_approval") return session;
-  return { ...session, permissions: { ...session.permissions, [category]: value }, updatedAt: stamp() };
-}
-function setEngineeringPolicy(session, policy) {
-  return { ...session, policy: { ...session.policy, ...policy }, updatedAt: stamp() };
-}
-function readApproval() {
-  return {
-    id: uid("approval"),
-    category: "read",
-    title: "Inspect repository files",
-    detail: "Read package.json, the app shell, navigation model, and existing tests.",
-    continuation: "inspect"
-  };
-}
-function afterInspection(session) {
-  if (session.mode === "plan") {
-    return {
-      ...session,
-      state: "completed",
-      activeActivity: null,
-      workPlan: WORK_PLAN,
-      pendingApproval: null,
-      pendingModeHandoff: engineeringModeHandoff("edit", "apply_patch"),
-      messages: [
-        ...session.messages,
-        msg("tool", "Read 4 files \xB7 package.json \xB7 AuthCallback.tsx \xB7 auth-client.ts \xB7 auth tests"),
-        msg("assistant", `${WORK_PLAN}
+var init_copy = __esm({
+  "../shared/src/engineering/copy.ts"() {
+    "use strict";
+    init_plan_progress();
+    init_model_packs();
+    init_review_history();
+    init_work_plan();
+  }
+});
 
-No files were changed in Plan mode. Switch to **Act** when you want me to implement it.`, "plan")
-      ],
-      updatedAt: stamp()
-    };
-  }
-  const proposal = {
-    id: uid("approval"),
-    category: "edit",
-    title: "Apply 2-file patch",
-    detail: "Cancel the stale callback exchange and add regression coverage.",
-    changes: SAMPLE_CHANGES,
-    continuation: "apply"
-  };
-  const decision = effectivePermission(session.mode, "edit", session.permissions, session.policy);
-  if (decision === "blocked") {
-    return { ...session, state: "error", activeActivity: null, pendingApproval: null, messages: [...session.messages, msg("assistant", "File edits are blocked by the effective workspace policy.", "warning")], updatedAt: stamp() };
-  }
-  const proposed = { ...session, activeActivity: null, proposedChanges: SAMPLE_CHANGES, pendingApproval: proposal, state: "awaiting_approval", updatedAt: stamp() };
-  return decision === "auto" ? applyProposedChanges(proposed) : proposed;
+// ../shared/src/engineering/remote.ts
+function applyReasoningDelta(session, event) {
+  const redacted = event["redacted"] === true;
+  const chunk2 = typeof event["reasoning"] === "string" ? event["reasoning"] : "";
+  if (!chunk2 && !redacted) return session;
+  const index = lastMessageIndex(session.messages, "reasoning", true);
+  const body = redacted ? "Reasoning is private for the selected model." : chunk2;
+  const messages2 = index < 0 ? [...session.messages, { ...message("reasoning", body), streaming: true, collapsed: false, redacted }] : updateMessage(session.messages, index, {
+    ...session.messages[index],
+    body: redacted ? session.messages[index].body || body : `${session.messages[index].body}${chunk2}`,
+    streaming: true,
+    collapsed: false,
+    redacted: session.messages[index].redacted || redacted
+  });
+  return { ...session, activeActivity: { phase: "thinking", startedAt: stamp() }, messages: messages2, updatedAt: stamp() };
 }
-function applyProposedChanges(session) {
-  const changes = session.pendingApproval?.changes ?? session.proposedChanges;
-  const checkpoint = {
-    id: uid("cp"),
-    label: "Before file edits",
-    createdAt: stamp(),
-    messageCount: session.messages.length,
-    changes: session.changes.map((c) => ({ ...c })),
-    workPlan: session.workPlan
-  };
-  const next = {
-    ...session,
-    changes,
-    proposedChanges: [],
-    checkpoints: [...session.checkpoints, checkpoint],
-    pendingApproval: null,
-    state: "streaming",
-    activeActivity: { phase: "thinking", startedAt: stamp() },
-    messages: [...session.messages, msg("tool", `Applied ${changes.length} files \xB7 +${changes.reduce((n, c) => n + c.after.split("\n").length, 0)} lines`, "success")],
-    updatedAt: stamp()
-  };
-  const verify2 = {
-    id: uid("approval"),
-    category: "command",
-    title: "Run verification",
-    detail: "Run the focused auth test and TypeScript typecheck.",
-    command: "pnpm test AuthCallback.test.tsx && pnpm typecheck",
-    continuation: "verify"
-  };
-  const decision = effectivePermission(next.mode, "command", next.permissions, next.policy);
-  if (decision === "blocked") {
-    return { ...next, state: "resumable", activeActivity: null, messages: [...next.messages, msg("assistant", "The patch is applied, but command execution is blocked by workspace policy. Verification remains outstanding.", "warning")] };
-  }
-  return decision === "auto" ? finishVerification(next) : { ...next, pendingApproval: verify2, state: "awaiting_approval", activeActivity: null };
+function applyTextDelta(session, event) {
+  const chunk2 = typeof event["text"] === "string" ? event["text"] : "";
+  const accumulated = typeof event["accumulated"] === "string" ? event["accumulated"] : null;
+  const collapsed = collapseReasoning(session.messages);
+  const index = lastMessageIndex(collapsed, "assistant", true);
+  if (!chunk2 && accumulated === null) return { ...session, activeActivity: { phase: "composing", startedAt: stamp() }, messages: collapsed, updatedAt: stamp() };
+  const body = accumulated ?? (index >= 0 ? `${collapsed[index].body}${chunk2}` : chunk2);
+  const messages2 = index < 0 ? [...collapsed, { ...message("assistant", body), streaming: true }] : updateMessage(collapsed, index, { ...collapsed[index], body, streaming: true });
+  return { ...session, activeActivity: { phase: "composing", startedAt: stamp() }, messages: messages2, updatedAt: stamp() };
 }
-function finishVerification(session) {
-  const done2 = msg("assistant", "Implemented and verified. The focused regression test, typecheck, and build all pass.", "success");
-  const messages = [...session.messages, msg("tool", "\u2713 AuthCallback.test.tsx \xB7 \u2713 typecheck \xB7 \u2713 build", "success"), done2];
-  const checkpoint = {
-    id: uid("cp"),
-    label: "Verified implementation",
-    createdAt: stamp(),
-    messageCount: messages.length,
-    changes: session.changes.map((c) => ({ ...c })),
-    workPlan: session.workPlan
-  };
-  return { ...session, messages, pendingApproval: null, state: "completed", activeActivity: null, checkpoints: [...session.checkpoints, checkpoint], updatedAt: stamp() };
+function mergeChanges(current, incoming) {
+  const paths = new Set(incoming.map((change) => change.path));
+  return [...current.filter((change) => !paths.has(change.path)), ...incoming];
 }
-function submitEngineeringPrompt(session, prompt) {
-  const text2 = prompt.trim();
-  if (!text2 || session.state === "streaming" || session.state === "awaiting_approval") return session;
-  const title = session.title === "New Code task" || session.title === "New engineering task" ? firstSentence(text2).slice(0, 64) || session.title : session.title;
-  const started = {
+function beginRemoteEngineeringPrompt(session, prompt, attachments = []) {
+  const text3 = prompt.trim();
+  if (!text3 || session.state === "streaming" || session.state === "awaiting_approval") return session;
+  const title = session.title === "New Code task" || session.title === "New engineering task" ? firstSentence(text3).slice(0, 64) || session.title : session.title;
+  return {
     ...session,
     title,
+    ...session.mode === "act" && session.planProgress ? { planProgress: { ...session.planProgress, started: true } } : {},
     state: "streaming",
     activeActivity: { phase: "thinking", startedAt: stamp() },
     pendingModeHandoff: null,
     pendingApproval: null,
     proposedChanges: [],
-    messages: [...session.messages, msg("user", text2)],
+    messages: [...interruptReviews(engineeringReviewMessages(session)), { ...message("user", text3), ...attachments.length ? { attachments } : {} }],
     updatedAt: stamp()
   };
-  const decision = effectivePermission(started.mode, "read", started.permissions, started.policy);
-  if (decision === "blocked") return { ...started, state: "error", activeActivity: null, messages: [...started.messages, msg("assistant", "Repository reads are blocked by workspace policy.", "warning")] };
-  if (decision === "ask") return { ...started, state: "awaiting_approval", activeActivity: null, pendingApproval: readApproval() };
-  return afterInspection(started);
 }
-function continueEngineeringInAct(session) {
-  const handoff = session.pendingModeHandoff;
-  if (!handoff || session.mode !== "plan" || session.state === "streaming" || session.state === "awaiting_approval") return session;
-  return submitEngineeringPrompt({ ...session, mode: "act", pendingModeHandoff: null, updatedAt: stamp() }, handoff.prompt);
+function resolveRemoteEngineeringApproval(session, approved) {
+  if (!session.pendingApproval) return session;
+  const messages2 = updateReviewStatus(engineeringReviewMessages(session), session.pendingApproval.id, approved ? "approved" : "declined");
+  return {
+    ...session,
+    messages: messages2,
+    pendingApproval: null,
+    proposedChanges: approved ? session.proposedChanges : [],
+    state: approved ? "streaming" : "resumable",
+    activeActivity: approved ? { phase: "thinking", startedAt: stamp() } : null,
+    ...!approved ? { messages: [...messages2, message("assistant", "The requested action was declined.", "warning")] } : {},
+    updatedAt: stamp()
+  };
 }
-function resolveEngineeringApproval(session, approved) {
-  const approval = session.pendingApproval;
-  if (!approval || session.state !== "awaiting_approval") return session;
-  if (!approved) {
+function applySnapshot(session, core) {
+  const payload = core["payload"];
+  const snapshot = payload?.["snapshot"];
+  const checkpoint = snapshot?.["checkpoint"];
+  const history = Array.isArray(checkpoint?.["history"]) ? checkpoint["history"] : [];
+  const checkpoints = history.flatMap((entry) => {
+    const runCount = entry["runCount"];
+    if (typeof runCount !== "number") return [];
+    const existing = session.checkpoints.find((item) => item.id === `cline-run-${runCount}`);
+    if (existing) return [existing];
+    return [{ id: `cline-run-${runCount}`, label: runCount === 1 ? "Before first run" : `Before run ${runCount}`, createdAt: new Date(typeof entry["createdAt"] === "number" ? entry["createdAt"] : Date.now()).toISOString(), messageCount: session.messages.length, changes: session.changes.map((change) => ({ ...change })), workPlan: session.workPlan, planProgress: session.planProgress ? JSON.parse(JSON.stringify(session.planProgress)) : null }];
+  });
+  return checkpoints.length ? { ...session, checkpoints, updatedAt: stamp() } : session;
+}
+function applyContentEvent(session, event) {
+  if (event["type"] === "content_start" && event["contentType"] === "tool") {
+    const changes = remoteChange(String(event["toolName"] ?? "tool"), event["input"]);
     return {
       ...session,
-      state: "resumable",
-      activeActivity: null,
-      pendingApproval: null,
-      proposedChanges: [],
-      messages: [...session.messages, msg("assistant", `${approval.title} was declined. No further action was taken.`, "warning")],
+      activeActivity: { phase: "tool", toolName: String(event["toolName"] ?? "tool"), startedAt: stamp() },
+      messages: finishStreamingMessages(session.messages, true),
+      ...changes.length ? { proposedChanges: changes } : {},
       updatedAt: stamp()
     };
   }
-  if (approval.continuation === "inspect") return afterInspection({ ...session, pendingApproval: null, state: "streaming", activeActivity: { phase: "thinking", startedAt: stamp() } });
-  if (approval.continuation === "apply") return applyProposedChanges(session);
-  return finishVerification(session);
+  if (event["type"] === "content_start" && event["contentType"] === "reasoning") {
+    return applyReasoningDelta(session, event);
+  }
+  if (event["type"] === "content_start" && event["contentType"] === "text") {
+    return applyTextDelta(session, event);
+  }
+  if (event["type"] === "notice" && typeof event["message"] === "string" && event["message"].trim()) {
+    if (isPlanCeiling(session, event["message"])) return session;
+    return { ...session, messages: [...session.messages, message("tool", engineeringSystemText(event["message"]))], updatedAt: stamp() };
+  }
+  if (event["type"] === "content_end" && event["contentType"] === "reasoning") {
+    const index = lastMessageIndex(session.messages, "reasoning", true);
+    if (index < 0) return session;
+    const final = typeof event["reasoning"] === "string" && event["reasoning"].trim() && !session.messages[index].redacted ? event["reasoning"] : session.messages[index].body;
+    return { ...session, messages: updateMessage(session.messages, index, { ...session.messages[index], body: final, streaming: false }), updatedAt: stamp() };
+  }
+  if (event["type"] === "content_end" && event["contentType"] === "text" && typeof event["text"] === "string" && event["text"].trim()) {
+    const body = event["text"];
+    const collapsed = collapseReasoning(session.messages);
+    const index = lastMessageIndex(collapsed, "assistant", true);
+    const messages2 = index < 0 ? collapsed.at(-1)?.role === "assistant" && collapsed.at(-1)?.body === body ? collapsed : [...collapsed, message("assistant", body)] : updateMessage(collapsed, index, { ...collapsed[index], body, streaming: false });
+    return {
+      ...session,
+      activeActivity: null,
+      messages: messages2,
+      updatedAt: stamp()
+    };
+  }
+  if (event["type"] === "content_end" && event["contentType"] === "tool") {
+    const toolName = String(event["toolName"] ?? "tool");
+    const changed = toolName === "editor" || toolName === "apply_patch";
+    const errorText = event["error"] ? textValue(event["error"]) : "";
+    const planBlocked = isPlanCeiling(session, errorText);
+    const detail = event["error"] ? engineeringSystemText(`${toolName} failed \xB7 ${errorText}`) : `${toolName} completed`;
+    return {
+      ...session,
+      activeActivity: { phase: "thinking", startedAt: stamp() },
+      changes: changed && !event["error"] ? mergeChanges(session.changes, session.proposedChanges) : session.changes,
+      proposedChanges: changed ? [] : session.proposedChanges,
+      messages: planBlocked ? session.messages : [...changed ? finishChangeReview(session, !!event["error"], stamp()) : session.messages, message("tool", detail, event["error"] ? "warning" : "success")],
+      updatedAt: stamp()
+    };
+  }
+  if (event["type"] === "done") {
+    const body = typeof event["text"] === "string" ? event["text"] : "";
+    const finished = interruptReviews(finishStreamingMessages(session.messages, Boolean(body)));
+    const state = terminalState(event["reason"]);
+    return { ...session, state, activeActivity: null, pendingApproval: null, messages: body && finished.at(-1)?.body !== body ? [...finished, message("assistant", body, state === "completed" ? "success" : "warning")] : finished, updatedAt: stamp() };
+  }
+  if (event["type"] === "error") {
+    const error = event["error"];
+    if (isPlanCeiling(session, error?.["message"] ?? event["message"])) return session;
+    const recovering = event["recoverable"] === true && session.state === "streaming";
+    return { ...session, state: recovering ? "streaming" : event["recoverable"] ? "resumable" : "error", activeActivity: recovering ? { phase: "thinking", startedAt: stamp() } : null, pendingApproval: null, messages: [...interruptReviews(finishStreamingMessages(session.messages, false)), message("assistant", engineeringSystemText(String(error?.["message"] ?? "Engineering encountered an error.")), "warning")], updatedAt: stamp() };
+  }
+  return session;
 }
-var PERMISSION_LABELS, RECOMMENDED_ENGINEERING_PERMISSIONS, OPEN_ENGINEERING_POLICY, stamp, uid, msg, initialCheckpoint, dismissEngineeringModeHandoff, setEngineeringBrainPack, setEngineeringMachine, setEngineeringModel, SAMPLE_CHANGES, WORK_PLAN;
-var init_domain = __esm({
-  "../shared/src/engineering/domain.ts"() {
+function reduceRemoteEngineeringEvent(session, wire) {
+  const type = wire["type"];
+  session = applyEngineeringSelection(session, wire);
+  if (type === "ready") {
+    const provider = engineeringSystemText(String(wire["provider"]));
+    const model2 = engineeringSystemText(String(wire["model"]));
+    const brainPack = typeof wire["brainPack"] === "string" ? wire["brainPack"] : null;
+    const modelOverride = typeof wire["modelId"] === "string" ? wire["modelId"] : null;
+    return { ...session, provider, model: model2, modelOverride, brainPack, updatedAt: stamp() };
+  }
+  if (type === "model_changed") {
+    const provider = engineeringSystemText(String(wire["provider"]));
+    const model2 = engineeringSystemText(String(wire["model"]));
+    const brainPack = typeof wire["brainPack"] === "string" ? wire["brainPack"] : null;
+    const modelOverride = typeof wire["modelId"] === "string" ? wire["modelId"] : null;
+    return { ...session, provider, model: model2, modelOverride, brainPack, messages: [...session.messages, message("tool", `Model switched \xB7 ${provider} \xB7 ${modelLabel(model2)}`)], updatedAt: stamp() };
+  }
+  if (type === "brain_changed") {
+    const provider = engineeringSystemText(String(wire["provider"]));
+    const model2 = engineeringSystemText(String(wire["model"]));
+    const brainPack = typeof wire["brainPack"] === "string" ? wire["brainPack"] : null;
+    return { ...session, provider, model: model2, modelOverride: null, brainPack, messages: [...session.messages, message("tool", `Model switched \xB7 ${provider} \xB7 ${modelLabel(model2)}`)], updatedAt: stamp() };
+  }
+  if (type === "status") return wire["status"] === "running" ? { ...session, state: "streaming", activeActivity: session.activeActivity ?? { phase: "thinking", startedAt: stamp() }, updatedAt: stamp() } : session.state === "streaming" ? { ...session, state: "idle", activeActivity: null, messages: finishStreamingMessages(session.messages, false), updatedAt: stamp() } : session;
+  if (type === "plan_progress") return wire["progress"] === null || isEngineeringPlanProgress(wire["progress"]) ? { ...session, planProgress: wire["progress"], ...wire["progress"] ? { workPlan: engineeringWorkPlanText(wire["progress"].plan) } : {}, updatedAt: stamp() } : session;
+  if (type === "work_plan" && session.mode === "plan" && isEngineeringWorkPlan(wire["plan"])) {
+    const plan = wire["plan"];
+    const workPlan = engineeringWorkPlanText(plan);
+    return {
+      ...session,
+      workPlan,
+      planProgress: createEngineeringPlanProgress(plan, typeof wire["planId"] === "string" ? wire["planId"] : `legacy-plan-${session.id}`),
+      messages: [...finishStreamingMessages(session.messages, true), { ...message("assistant", workPlan, "plan", "work-plan"), kind: "work_plan", ...plan.report ? { planReport: { ...plan.report, decisions: [...plan.report.decisions] } } : {} }],
+      pendingModeHandoff: engineeringModeHandoff(plan.steps.some((step) => step.action === "edit") ? "edit" : "command", "propose_work_plan"),
+      updatedAt: stamp()
+    };
+  }
+  if (type === "mode_blocked" && session.mode === "plan" && wire["category"] === "edit") {
+    const toolName = String(wire["toolName"] ?? "");
+    if (!engineeringToolChanges(toolName, wire["input"]).length) return session;
+    return { ...session, pendingModeHandoff: engineeringModeHandoff("edit", toolName), updatedAt: stamp() };
+  }
+  if (type === "approval") {
+    const category = wire["category"];
+    const toolName = String(wire["toolName"] ?? "tool");
+    const changes = Array.isArray(wire["changes"]) ? normalizeEngineeringChanges(wire["changes"]) : remoteChange(toolName, wire["input"]);
+    const command = toolName === "run_commands" || toolName === "fetch_web_content" ? textValue(wire["input"]) : void 0;
+    const messages2 = engineeringReviewMessages(session);
+    const approvalId = String(wire["approvalId"]);
+    return { ...session, messages: changes.length && !messages2.some((m) => m.review?.id === approvalId) ? [...finishStreamingMessages(messages2, true), changeReviewMessage(approvalId, changes, "proposed", stamp())] : messages2, state: "awaiting_approval", activeActivity: null, proposedChanges: changes, pendingApproval: {
+      id: String(wire["approvalId"]),
+      category,
+      title: category === "edit" ? "Apply proposed file changes" : category === "command" ? "Execute command" : category === "web" ? "Fetch web content" : category === "mcp" ? "Use MCP tool" : "Read repository files",
+      detail: `${toolName} requested by Engineering`,
+      ...command ? { command } : {},
+      ...changes.length ? { changes } : {},
+      continuation: category === "edit" ? "apply" : category === "command" ? "verify" : "inspect"
+    }, updatedAt: stamp() };
+  }
+  if (type === "approval_resolved") {
+    const id = String(wire["approvalId"]);
+    if (session.pendingApproval?.id === id) return resolveRemoteEngineeringApproval(session, wire["approved"] === true);
+    return { ...session, messages: updateReviewStatus(session.messages, id, wire["approved"] === true ? "approved" : "declined") };
+  }
+  if (type === "error") {
+    if (isPlanCeiling(session, wire["message"])) return session;
+    if (wire["code"] === "ENGINEERING_GITHUB_REQUIRED") return { ...session, state: "error", blockedOn: "github", activeActivity: null, pendingApproval: null, messages: withWarning(interruptReviews(finishStreamingMessages(session.messages, false)), message("assistant", engineeringSystemText(String(wire["message"] ?? "Connect GitHub to code here.")), "warning", GITHUB_WAIT)), updatedAt: stamp() };
+    return { ...session, state: wire["recoverable"] ? "resumable" : "error", activeActivity: null, pendingApproval: null, messages: withWarning(interruptReviews(finishStreamingMessages(session.messages, false)), message("assistant", engineeringSystemText(String(wire["message"] ?? "Engineering failed.")), "warning")), updatedAt: stamp() };
+  }
+  if (type === "changes" && Array.isArray(wire["changes"])) return { ...session, changes: normalizeEngineeringChanges(wire["changes"]), proposedChanges: [], updatedAt: stamp() };
+  if (type === "restored") {
+    const checkpoint = session.checkpoints.find((item) => item.id === `cline-run-${String(wire["checkpointRunCount"])}`);
+    const restoredMessages = checkpoint ? session.messages.slice(0, checkpoint.messageCount) : session.messages;
+    return { ...session, state: "resumable", activeActivity: null, pendingModeHandoff: null, pendingApproval: null, proposedChanges: [], changes: checkpoint?.changes.map((change) => ({ ...change })) ?? [], workPlan: checkpoint?.workPlan ?? session.workPlan, planProgress: checkpoint?.planProgress ?? null, messages: [...finishStreamingMessages(restoredMessages, true), message("tool", `Restored checkpoint \xB7 run ${String(wire["checkpointRunCount"])}`, "success")], updatedAt: stamp() };
+  }
+  if (type === "ended") return { ...session, state: terminalState(wire["reason"]), activeActivity: null, pendingApproval: null, messages: interruptReviews(finishStreamingMessages(session.messages, false)), updatedAt: stamp() };
+  if (type !== "agent_event") return session;
+  const core = wire["event"];
+  if (core?.["type"] === "session_snapshot") return applySnapshot(session, core);
+  if (core?.["type"] !== "agent_event") return session;
+  const payload = core["payload"];
+  const event = payload?.["event"];
+  return event ? applyContentEvent(session, event) : session;
+}
+function applyRemoteEngineeringEvent(session, wire) {
+  return recordEngineeringAuthors(session, reduceRemoteEngineeringEvent(session, wire));
+}
+var serial, stamp, message, GITHUB_WAIT, isEngineeringGitHubWait, textValue, isPlanCeiling, terminalState, withWarning, remoteChange;
+var init_remote = __esm({
+  "../shared/src/engineering/remote.ts"() {
     "use strict";
+    init_transcript_state();
+    init_plan_progress();
+    init_selection_events();
     init_linear();
+    init_model_labels();
     init_handoff();
-    PERMISSION_LABELS = {
-      read: { label: "Read files", detail: "Inspect files and search the repository" },
-      edit: { label: "Edit files", detail: "Create, modify, rename, or delete files" },
-      command: { label: "Execute commands", detail: "Run shell commands and test suites" },
-      web: { label: "Fetch web content", detail: "Open URLs and search the web" },
-      mcp: { label: "Use MCP servers", detail: "Call tools exposed by connected MCP servers" }
-    };
-    RECOMMENDED_ENGINEERING_PERMISSIONS = {
-      read: true,
-      edit: false,
-      command: false,
-      web: false,
-      mcp: false
-    };
-    OPEN_ENGINEERING_POLICY = {
-      read: true,
-      edit: true,
-      command: true,
-      web: true,
-      mcp: true
-    };
+    init_work_plan();
+    init_copy();
+    init_changes();
+    init_review_history();
+    serial = 0;
     stamp = () => (/* @__PURE__ */ new Date()).toISOString();
-    uid = (prefix) => `${prefix}-${globalThis.crypto.randomUUID()}`;
-    msg = (role, body, tone = "plain") => ({
-      id: uid("msg"),
+    message = (role, body, tone = "plain", kind = "remote") => ({
+      id: `${kind}-${Date.now().toString(36)}-${(++serial).toString(36)}`,
       role,
       body,
       tone,
       createdAt: stamp()
     });
-    initialCheckpoint = () => ({
-      id: uid("cp"),
-      label: "Session start",
-      createdAt: stamp(),
-      messageCount: 1,
-      changes: [],
-      workPlan: null
-    });
-    dismissEngineeringModeHandoff = (session) => ({ ...session, pendingModeHandoff: null, updatedAt: stamp() });
-    setEngineeringBrainPack = (session, brainPack) => session.state === "streaming" || session.state === "awaiting_approval" || session.brainPack === brainPack ? session : { ...session, brainPack, updatedAt: stamp() };
-    setEngineeringMachine = (session, machineId) => session.state === "streaming" || session.state === "awaiting_approval" || (session.machineId ?? null) === machineId ? session : { ...session, machineId, updatedAt: stamp() };
-    setEngineeringModel = (session, modelOverride) => session.state === "streaming" || session.state === "awaiting_approval" || session.modelOverride === modelOverride && session.brainPack === null ? session : { ...session, modelOverride, brainPack: null, updatedAt: stamp() };
+    GITHUB_WAIT = "github-wait";
+    isEngineeringGitHubWait = (m) => m.id.startsWith(`${GITHUB_WAIT}-`);
+    textValue = (value) => typeof value === "string" ? value : JSON.stringify(value, null, 2);
+    isPlanCeiling = (session, value) => session.mode === "plan" && lineHas(textValue(value).toLowerCase(), "blocked by", "plan mode");
+    terminalState = (reason) => reason === "completed" ? "completed" : reason === "error" ? "error" : "resumable";
+    withWarning = (messages2, warning) => {
+      const last = messages2.at(-1);
+      return last?.role === "assistant" && last.tone === "warning" && last.kind === warning.kind && last.body === warning.body ? messages2 : [...messages2, warning];
+    };
+    remoteChange = engineeringToolChanges;
+  }
+});
+
+// ../shared/src/engineering/brain-restore.ts
+function progressAfterCheckpoint(snapshot, progress) {
+  const count2 = snapshot.metadata?.["recordedEventCount"];
+  const start = typeof count2 === "number" && Number.isInteger(count2) && count2 >= 0 && count2 <= snapshot.events.length ? count2 : progress ? snapshot.events.length : 0;
+  for (const record of snapshot.events.slice(start)) {
+    if (record.type !== "runtime.event") continue;
+    const core = object(record.payload);
+    if (core.type !== "agent_event") continue;
+    const event = object(core.payload?.event);
+    if (event.type !== "content_end" || event.contentType !== "tool" || event.error || typeof event.toolCallId !== "string" || !event.toolCallId) continue;
+    let output;
+    try {
+      output = object(typeof event.output === "string" ? JSON.parse(event.output) : event.output);
+    } catch {
+      continue;
+    }
+    const next = output.planProgress;
+    if (output.recorded !== true || !isEngineeringPlanProgress(next)) continue;
+    if (event.toolName === "propose_work_plan" && !next.started && progress?.id !== next.id) progress = next;
+    else if (event.toolName === "update_plan_progress" && progress?.id === next.id && JSON.stringify(progress.plan) === JSON.stringify(next.plan)) progress = next;
+  }
+  return progress;
+}
+function restoreEngineeringBrain(shell, snapshot) {
+  if (snapshot.threadId !== shell.id) throw new Error("The recorded conversation belongs to another thread.");
+  if (snapshot.events.some((e) => object(e.payload).brainEncoding === "neuramesh.gzip.v1") || snapshot.runtimeMessages?.some((m) => object(m).brainEncoding === "neuramesh.gzip.v1")) throw new Error("Update the server to decode this recorded conversation, then retry.");
+  const metadataOnly = !snapshot.runtimeMessages?.length && snapshot.events.every((event) => event.type === "model.change");
+  let session = {
+    ...shell,
+    ...metadataOnly ? {} : { messages: [], changes: [], checkpoints: [], workPlan: null, planProgress: null, pendingModeHandoff: null, state: "resumable" },
+    pendingApproval: null,
+    activeActivity: null
+  };
+  const plans = /* @__PURE__ */ new Map();
+  const successful = /* @__PURE__ */ new Set();
+  for (const message2 of snapshot.runtimeMessages ?? []) {
+    const m = object(message2);
+    for (const block of Array.isArray(m.content) ? m.content : []) {
+      if (block.type === "tool_use" && block.name === "propose_work_plan" && isEngineeringWorkPlan(block.input)) plans.set(block.id, block.input);
+      if (block.type === "tool_result" && !block.is_error) successful.add(block.tool_use_id);
+    }
+  }
+  const reviews = new Map(snapshot.events.filter((e) => e.type === "review.proposed").map((e) => {
+    const p2 = object(e.payload);
+    return [p2.approvalId, p2];
+  }));
+  const renderedPlans = /* @__PURE__ */ new Set();
+  for (const record of snapshot.events) {
+    const before = new Set(session.messages.map((m) => m.id));
+    const p2 = object(record.payload);
+    const apply = (wire) => {
+      session = applyRemoteEngineeringEvent(session, wire);
+    };
+    if (record.type === "user.message" && typeof p2.text === "string") {
+      if (isEngineeringSelection(p2.selection)) session = { ...session, agentId: p2.selection.agentId, modelOverride: p2.selection.modelId, reasoningEffort: p2.selection.reasoningEffort };
+      if (typeof p2.agent?.name === "string") session = { ...session, agent: p2.agent };
+      session = beginRemoteEngineeringPrompt({ ...session, state: "resumable", mode: p2.mode === "act" ? "act" : "plan" }, p2.text);
+    } else if (record.type === "runtime.event") {
+      if (p2.type === "status") apply({ type: "status", status: p2.payload?.status });
+      else if (p2.type === "ended") apply({ type: "ended", reason: p2.payload?.reason });
+      else if (p2.type === "agent_event" || p2.type === "session_snapshot") {
+        apply({ type: "agent_event", event: p2 });
+        const event = object(p2.payload?.event);
+        const call = event.toolCallId;
+        if (event.type === "content_end" && event.contentType === "tool" && successful.has(call) && plans.has(call) && !renderedPlans.has(call)) {
+          renderedPlans.add(call);
+          apply({ type: "work_plan", plan: plans.get(call), planId: call });
+        }
+      }
+    } else if (record.type === "tool.approval" && p2.toolCallId && p2.toolName) {
+      const category = p2.toolName === "apply_patch" || p2.toolName === "editor" ? "edit" : p2.toolName === "run_commands" ? "command" : "read";
+      apply({ type: "approval", approvalId: p2.toolCallId, category, toolName: p2.toolName, input: p2.input, ...reviews.get(p2.toolCallId)?.changes ? { changes: reviews.get(p2.toolCallId).changes } : {} });
+    } else if (record.type === "approval.resolved") apply({ type: "approval_resolved", ...p2 });
+    session = { ...session, messages: session.messages.map((m, i) => before.has(m.id) ? m : { ...m, id: `brain-${record.id}-${i}`, createdAt: record.timestamp }) };
+  }
+  const metadata = snapshot.metadata ?? {};
+  if (isEngineeringSelection(metadata.selection)) session = { ...session, agentId: metadata.selection.agentId, modelOverride: metadata.selection.modelId, reasoningEffort: metadata.selection.reasoningEffort };
+  if (typeof object(metadata.agent).name === "string") session = { ...session, agent: metadata.agent };
+  const planProgress = progressAfterCheckpoint(snapshot, recoverEngineeringPlanProgress(snapshot.runtimeMessages));
+  if (planProgress) session = applyRemoteEngineeringEvent(session, { type: "plan_progress", progress: planProgress });
+  const interrupted = session.state === "streaming" || session.state === "awaiting_approval";
+  return {
+    ...session,
+    mode: metadata.mode === "act" ? "act" : session.mode,
+    state: interrupted ? "resumable" : session.state === "error" ? "error" : "completed",
+    activeActivity: null,
+    pendingApproval: null,
+    proposedChanges: [],
+    pendingModeHandoff: metadata.mode === "act" || interrupted ? null : session.pendingModeHandoff,
+    messages: interruptReviews(session.messages).map((m) => ({ ...m, streaming: false })),
+    updatedAt: snapshot.events.at(-1)?.timestamp ?? shell.updatedAt
+  };
+}
+var object;
+var init_brain_restore = __esm({
+  "../shared/src/engineering/brain-restore.ts"() {
+    "use strict";
+    init_handoff();
+    init_remote();
+    init_selection();
+    init_review_history();
+    init_plan_progress();
+    object = (v) => v && typeof v === "object" ? v : {};
+  }
+});
+
+// ../shared/src/engineering/restore-connection.ts
+function awaitingEngineeringHistory(session) {
+  return { ...session, state: "streaming", activeActivity: { phase: "restoring", startedAt: (/* @__PURE__ */ new Date()).toISOString() }, pendingApproval: null };
+}
+function restoreEngineeringConnection(input) {
+  let closed = false;
+  let handle;
+  const ready = (async () => {
+    const snapshot = await input.read();
+    if (closed) throw new Error("The Code connection closed while loading its history.");
+    if (snapshot.workspace !== input.workspace) throw new Error("The recorded conversation belongs to another workspace.");
+    if (snapshot.threadId !== input.session.id) throw new Error("The recorded conversation belongs to another thread.");
+    const unrecorded = snapshot.revision === 0 && snapshot.events.length === 0 && !snapshot.runtimeMessages?.length;
+    const session = unrecorded ? input.session : restoreEngineeringBrain(input.session, snapshot);
+    input.restored(session);
+    handle = input.open(session);
+    return handle;
+  })();
+  void ready.catch((error) => {
+    if (!closed) input.failed(error);
+  });
+  return {
+    subId: `restore-${input.session.id}`,
+    async send(command) {
+      const current = await ready;
+      if (closed) throw new Error("The Code connection is closed.");
+      await current.send(command);
+    },
+    close() {
+      closed = true;
+      handle?.close();
+    }
+  };
+}
+var init_restore_connection = __esm({
+  "../shared/src/engineering/restore-connection.ts"() {
+    "use strict";
+    init_brain_restore();
+  }
+});
+
+// ../shared/src/engineering/demo-plan.ts
+var SAMPLE_CHANGES, WORK_PLAN;
+var init_demo_plan = __esm({
+  "../shared/src/engineering/demo-plan.ts"() {
+    "use strict";
     SAMPLE_CHANGES = [
       {
         path: "src/components/AuthCallback.tsx",
@@ -8365,333 +9624,238 @@ index 0000000..78ce3d1
   }
 });
 
-// ../shared/src/engineering/copy.ts
-function engineeringSystemText(value) {
-  return value.replace(/\bcline(?:[\s_-]*core)?(?=$|[^a-z0-9])/gi, "Engineering").replace(/\bEngineering\s+Engineering\b/g, "Engineering").replace(/\bRestored Engineering checkpoint\b/g, "Restored checkpoint").replace(/\bBefore first Engineering turn\b/g, "Before first run").replace(/\bBefore Engineering turn (\d+)\b/g, "Before run $1");
+// ../shared/src/engineering/domain.ts
+function effectivePermission(mode, category, session, policy) {
+  if (!policy[category]) return "blocked";
+  if (mode === "plan" && (category === "edit" || category === "command")) return "blocked";
+  return session[category] ? "auto" : "ask";
 }
-function productizeStoredEngineeringSession(session) {
+function createEngineeringSession(repo, title = "New Code task", project = null, machineId = null) {
+  const now = stamp2();
+  const hello = msg("assistant", `Ready in **${repo.name}**. I\u2019ll begin in Plan mode and ask before any side effect.`, "plain");
+  const checkpoint = initialCheckpoint();
+  checkpoint.messageCount = 1;
   return {
-    ...session,
-    modelOverride: typeof session.modelOverride === "string" && MODEL_ID_SET.has(session.modelOverride) ? session.modelOverride : null,
-    brainPack: typeof session.brainPack === "string" ? session.brainPack : null,
-    activeActivity: session.activeActivity && ["thinking", "tool", "composing"].includes(session.activeActivity.phase) ? session.activeActivity : null,
-    pendingModeHandoff: session.pendingModeHandoff && (session.pendingModeHandoff.category === "edit" || session.pendingModeHandoff.category === "command") ? session.pendingModeHandoff : null,
-    messages: session.messages.map((message2) => {
-      const productized = message2.role === "tool" || message2.tone === "warning" ? { ...message2, body: engineeringSystemText(message2.body) } : message2;
-      return productized.role === "reasoning" ? { ...productized, streaming: false, collapsed: true } : productized.streaming ? { ...productized, streaming: false } : productized;
-    }),
-    pendingApproval: session.pendingApproval ? {
-      ...session.pendingApproval,
-      title: engineeringSystemText(session.pendingApproval.title),
-      detail: engineeringSystemText(session.pendingApproval.detail)
-    } : null,
-    checkpoints: session.checkpoints.map((checkpoint) => ({
-      ...checkpoint,
-      label: engineeringSystemText(checkpoint.label)
-    })),
-    ...session.provider ? { provider: engineeringSystemText(session.provider) } : {},
-    ...session.model ? { model: engineeringSystemText(session.model) } : {}
-  };
-}
-function persistableEngineeringSession(session) {
-  const interrupted = session.state === "streaming" || session.state === "awaiting_approval";
-  return {
-    ...session,
-    state: interrupted ? "resumable" : session.state,
+    // a BARE uuid (the mobile-cloud round, S5): the session id is the thread id, and the thread id is
+    // the synced code_sessions row's id (0135, a uuid pk) — a prefixed id could never become a row
+    id: globalThis.crypto.randomUUID(),
+    title,
+    repo,
+    project,
+    mode: "plan",
+    permissions: { ...RECOMMENDED_ENGINEERING_PERMISSIONS },
+    policy: { ...OPEN_ENGINEERING_POLICY },
+    state: "idle",
     activeActivity: null,
+    pendingModeHandoff: null,
+    messages: [hello],
     pendingApproval: null,
     proposedChanges: [],
     changes: [],
-    checkpoints: session.checkpoints.map(({ changes: _changes, ...checkpoint }) => ({ ...checkpoint, changes: [] })),
-    // Tool receipts can contain unrestricted command output. User and model-authored transcript
-    // remains available for the recent-thread experience described by the product contract.
-    messages: session.messages.filter((message2) => message2.role !== "tool")
+    checkpoints: [checkpoint],
+    workPlan: null,
+    modelOverride: null,
+    brainPack: null,
+    machineId,
+    createdAt: now,
+    updatedAt: now
   };
 }
-function engineeringShellSession(session) {
-  const latest = session.messages.slice().reverse().find((message2) => message2.role !== "tool");
-  return { ...persistableEngineeringSession(session), messages: latest ? [latest] : [], checkpoints: [], workPlan: "" };
+function setEngineeringMode(session, mode) {
+  if (session.state === "streaming" || session.state === "awaiting_approval") return session;
+  return { ...session, mode, ...mode === "act" ? { pendingModeHandoff: null } : {}, updatedAt: stamp2() };
 }
-var init_copy = __esm({
-  "../shared/src/engineering/copy.ts"() {
-    "use strict";
-    init_model_packs();
-  }
-});
-
-// ../shared/src/engineering/remote.ts
-function lastMessageIndex(messages, role, streamingOnly = false) {
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    const current = messages[index];
-    if (current?.role === role && (!streamingOnly || current.streaming)) return index;
-  }
-  return -1;
+function setEngineeringPermission(session, category, value) {
+  if (session.state === "streaming" || session.state === "awaiting_approval") return session;
+  return { ...session, permissions: { ...session.permissions, [category]: value }, updatedAt: stamp2() };
 }
-function collapseReasoning(messages) {
-  return messages.map((current) => current.role === "reasoning" && !current.collapsed ? { ...current, streaming: false, collapsed: true } : current);
+function setEngineeringPolicy(session, policy) {
+  return { ...session, policy: { ...session.policy, ...policy }, updatedAt: stamp2() };
 }
-function finishStreamingMessages(messages, collapseThoughts) {
-  return (collapseThoughts ? collapseReasoning(messages) : messages).map((current) => current.streaming ? { ...current, streaming: false } : current);
-}
-function applyReasoningDelta(session, event) {
-  const redacted = event["redacted"] === true;
-  const chunk2 = typeof event["reasoning"] === "string" ? event["reasoning"] : "";
-  if (!chunk2 && !redacted) return session;
-  const index = lastMessageIndex(session.messages, "reasoning", true);
-  const body = redacted ? "Reasoning is private for the selected model." : chunk2;
-  const messages = index < 0 ? [...session.messages, { ...message("reasoning", body), streaming: true, collapsed: false, redacted }] : updateMessage(session.messages, index, {
-    ...session.messages[index],
-    body: redacted ? session.messages[index].body || body : `${session.messages[index].body}${chunk2}`,
-    streaming: true,
-    collapsed: false,
-    redacted: session.messages[index].redacted || redacted
-  });
-  return { ...session, activeActivity: { phase: "thinking", startedAt: stamp2() }, messages, updatedAt: stamp2() };
-}
-function applyTextDelta(session, event) {
-  const chunk2 = typeof event["text"] === "string" ? event["text"] : "";
-  const accumulated = typeof event["accumulated"] === "string" ? event["accumulated"] : null;
-  const collapsed = collapseReasoning(session.messages);
-  const index = lastMessageIndex(collapsed, "assistant", true);
-  if (!chunk2 && accumulated === null) return { ...session, activeActivity: { phase: "composing", startedAt: stamp2() }, messages: collapsed, updatedAt: stamp2() };
-  const body = accumulated ?? (index >= 0 ? `${collapsed[index].body}${chunk2}` : chunk2);
-  const messages = index < 0 ? [...collapsed, { ...message("assistant", body), streaming: true }] : updateMessage(collapsed, index, { ...collapsed[index], body, streaming: true });
-  return { ...session, activeActivity: { phase: "composing", startedAt: stamp2() }, messages, updatedAt: stamp2() };
-}
-function mergeChanges(current, incoming) {
-  const paths = new Set(incoming.map((change) => change.path));
-  return [...current.filter((change) => !paths.has(change.path)), ...incoming];
-}
-function remoteChange(toolName, input) {
-  const value = input && typeof input === "object" ? input : {};
-  if (toolName === "editor") {
-    const path = typeof value["path"] === "string" ? value["path"] : "proposed-edit";
-    const before = typeof value["old_text"] === "string" ? value["old_text"] : "";
-    const after = typeof value["new_text"] === "string" ? value["new_text"] : "";
-    return [{
-      path,
-      kind: before ? "modified" : "added",
-      before,
-      after,
-      diff: `diff --git a/${path} b/${path}
---- a/${path}
-+++ b/${path}
-@@ proposed change @@
-${before.split("\n").filter(Boolean).map((line) => `-${line}`).join("\n")}
-${after.split("\n").filter(Boolean).map((line) => `+${line}`).join("\n")}
-`
-    }];
-  }
-  if (toolName !== "apply_patch") return [];
-  const patch = typeof input === "string" ? input : typeof value["input"] === "string" ? value["input"] : textValue(input);
-  const paths = engineeringPatchPaths(patch);
-  return (paths.length ? paths : ["proposed.patch"]).map((path) => ({
-    path,
-    kind: patch.includes(`*** Add File: ${path}`) ? "added" : patch.includes(`*** Delete File: ${path}`) ? "deleted" : "modified",
-    before: "",
-    after: patch,
-    diff: patch
-  }));
-}
-function beginRemoteEngineeringPrompt(session, prompt, attachments = []) {
-  const text2 = prompt.trim();
-  if (!text2 || session.state === "streaming" || session.state === "awaiting_approval") return session;
-  const title = session.title === "New Code task" || session.title === "New engineering task" ? firstSentence(text2).slice(0, 64) || session.title : session.title;
+function readApproval() {
   return {
+    id: uid("approval"),
+    category: "read",
+    title: "Inspect repository files",
+    detail: "Read package.json, the app shell, navigation model, and existing tests.",
+    continuation: "inspect"
+  };
+}
+function afterInspection(session) {
+  if (session.mode === "plan") {
+    return {
+      ...session,
+      state: "completed",
+      activeActivity: null,
+      workPlan: WORK_PLAN,
+      pendingApproval: null,
+      pendingModeHandoff: engineeringModeHandoff("edit", "apply_patch"),
+      messages: [
+        ...session.messages,
+        msg("tool", "Read 4 files \xB7 package.json \xB7 AuthCallback.tsx \xB7 auth-client.ts \xB7 auth tests"),
+        msg("assistant", `${WORK_PLAN}
+
+No files were changed in Plan mode. Switch to **Act** when you want me to implement it.`, "plan")
+      ],
+      updatedAt: stamp2()
+    };
+  }
+  const proposal = {
+    id: uid("approval"),
+    category: "edit",
+    title: "Apply 2-file patch",
+    detail: "Cancel the stale callback exchange and add regression coverage.",
+    changes: SAMPLE_CHANGES,
+    continuation: "apply"
+  };
+  const decision = effectivePermission(session.mode, "edit", session.permissions, session.policy);
+  if (decision === "blocked") {
+    return { ...session, state: "error", activeActivity: null, pendingApproval: null, messages: [...session.messages, msg("assistant", "File edits are blocked by the effective workspace policy.", "warning")], updatedAt: stamp2() };
+  }
+  const proposed = { ...session, activeActivity: null, proposedChanges: SAMPLE_CHANGES, pendingApproval: proposal, state: "awaiting_approval", updatedAt: stamp2() };
+  return decision === "auto" ? applyProposedChanges(proposed) : { ...proposed, messages: engineeringReviewMessages(proposed) };
+}
+function applyProposedChanges(session) {
+  const changes = session.pendingApproval?.changes ?? session.proposedChanges;
+  const checkpoint = {
+    id: uid("cp"),
+    label: "Before file edits",
+    createdAt: stamp2(),
+    messageCount: session.messages.length,
+    changes: session.changes.map((c) => ({ ...c })),
+    workPlan: session.workPlan
+  };
+  const next = {
+    ...session,
+    changes,
+    proposedChanges: [],
+    checkpoints: [...session.checkpoints, checkpoint],
+    pendingApproval: null,
+    state: "streaming",
+    activeActivity: { phase: "thinking", startedAt: stamp2() },
+    messages: [...finishChangeReview(session, false, stamp2()), msg("tool", `Applied ${changes.length} files \xB7 +${changes.reduce((n, c) => n + c.after.split("\n").length, 0)} lines`, "success")],
+    updatedAt: stamp2()
+  };
+  const verify2 = {
+    id: uid("approval"),
+    category: "command",
+    title: "Run verification",
+    detail: "Run the focused auth test and TypeScript typecheck.",
+    command: "pnpm test AuthCallback.test.tsx && pnpm typecheck",
+    continuation: "verify"
+  };
+  const decision = effectivePermission(next.mode, "command", next.permissions, next.policy);
+  if (decision === "blocked") {
+    return { ...next, state: "resumable", activeActivity: null, messages: [...next.messages, msg("assistant", "The patch is applied, but command execution is blocked by workspace policy. Verification remains outstanding.", "warning")] };
+  }
+  return decision === "auto" ? finishVerification(next) : { ...next, pendingApproval: verify2, state: "awaiting_approval", activeActivity: null };
+}
+function finishVerification(session) {
+  const done2 = msg("assistant", "Implemented and verified. The focused regression test, typecheck, and build all pass.", "success");
+  const messages2 = [...session.messages, msg("tool", "\u2713 AuthCallback.test.tsx \xB7 \u2713 typecheck \xB7 \u2713 build", "success"), done2];
+  const checkpoint = {
+    id: uid("cp"),
+    label: "Verified implementation",
+    createdAt: stamp2(),
+    messageCount: messages2.length,
+    changes: session.changes.map((c) => ({ ...c })),
+    workPlan: session.workPlan
+  };
+  return { ...session, messages: messages2, pendingApproval: null, state: "completed", activeActivity: null, checkpoints: [...session.checkpoints, checkpoint], updatedAt: stamp2() };
+}
+function submitEngineeringPrompt(session, prompt) {
+  const text3 = prompt.trim();
+  if (!text3 || session.state === "streaming" || session.state === "awaiting_approval") return session;
+  const title = session.title === "New Code task" || session.title === "New engineering task" ? firstSentence(text3).slice(0, 64) || session.title : session.title;
+  const started = {
     ...session,
     title,
     state: "streaming",
     activeActivity: { phase: "thinking", startedAt: stamp2() },
     pendingModeHandoff: null,
-    messages: [...session.messages, { ...message("user", text2), ...attachments.length ? { attachments } : {} }],
-    updatedAt: stamp2()
-  };
-}
-function resolveRemoteEngineeringApproval(session, approved) {
-  if (!session.pendingApproval) return session;
-  return {
-    ...session,
     pendingApproval: null,
-    proposedChanges: approved ? session.proposedChanges : [],
-    state: approved ? "streaming" : "resumable",
-    activeActivity: approved ? { phase: "thinking", startedAt: stamp2() } : null,
-    ...!approved ? { messages: [...session.messages, message("assistant", "The requested action was declined.", "warning")] } : {},
+    proposedChanges: [],
+    messages: [...session.messages, msg("user", text3)],
     updatedAt: stamp2()
   };
+  const decision = effectivePermission(started.mode, "read", started.permissions, started.policy);
+  if (decision === "blocked") return { ...started, state: "error", activeActivity: null, messages: [...started.messages, msg("assistant", "Repository reads are blocked by workspace policy.", "warning")] };
+  if (decision === "ask") return { ...started, state: "awaiting_approval", activeActivity: null, pendingApproval: readApproval() };
+  return afterInspection(started);
 }
-function applySnapshot(session, core) {
-  const payload = core["payload"];
-  const snapshot = payload?.["snapshot"];
-  const checkpoint = snapshot?.["checkpoint"];
-  const history = Array.isArray(checkpoint?.["history"]) ? checkpoint["history"] : [];
-  const checkpoints = history.flatMap((entry) => {
-    const runCount = entry["runCount"];
-    if (typeof runCount !== "number") return [];
-    return [{ id: `cline-run-${runCount}`, label: runCount === 1 ? "Before first run" : `Before run ${runCount}`, createdAt: new Date(typeof entry["createdAt"] === "number" ? entry["createdAt"] : Date.now()).toISOString(), messageCount: session.messages.length, changes: session.changes.map((change) => ({ ...change })), workPlan: session.workPlan }];
-  });
-  return checkpoints.length ? { ...session, checkpoints, updatedAt: stamp2() } : session;
+function continueEngineeringInAct(session) {
+  const handoff = session.pendingModeHandoff;
+  if (!handoff || !canContinueEngineering(session)) return session;
+  return submitEngineeringPrompt({ ...session, mode: "act", pendingModeHandoff: null, updatedAt: stamp2() }, handoff.prompt);
 }
-function applyContentEvent(session, event) {
-  if (event["type"] === "content_start" && event["contentType"] === "tool") {
-    const changes = remoteChange(String(event["toolName"] ?? "tool"), event["input"]);
+function resolveEngineeringApproval(session, approved) {
+  const approval = session.pendingApproval;
+  if (!approval || session.state !== "awaiting_approval") return session;
+  if (!approved) {
     return {
       ...session,
-      activeActivity: { phase: "tool", toolName: String(event["toolName"] ?? "tool"), startedAt: stamp2() },
-      messages: finishStreamingMessages(session.messages, true),
-      ...changes.length ? { proposedChanges: changes } : {},
-      updatedAt: stamp2()
-    };
-  }
-  if (event["type"] === "content_start" && event["contentType"] === "reasoning") {
-    return applyReasoningDelta(session, event);
-  }
-  if (event["type"] === "content_start" && event["contentType"] === "text") {
-    return applyTextDelta(session, event);
-  }
-  if (event["type"] === "notice" && typeof event["message"] === "string" && event["message"].trim()) {
-    if (isPlanCeiling(session, event["message"])) return session;
-    return { ...session, messages: [...session.messages, message("tool", engineeringSystemText(event["message"]))], updatedAt: stamp2() };
-  }
-  if (event["type"] === "content_end" && event["contentType"] === "reasoning") {
-    const index = lastMessageIndex(session.messages, "reasoning", true);
-    if (index < 0) return session;
-    const final = typeof event["reasoning"] === "string" && event["reasoning"].trim() && !session.messages[index].redacted ? event["reasoning"] : session.messages[index].body;
-    return { ...session, messages: updateMessage(session.messages, index, { ...session.messages[index], body: final, streaming: false }), updatedAt: stamp2() };
-  }
-  if (event["type"] === "content_end" && event["contentType"] === "text" && typeof event["text"] === "string" && event["text"].trim()) {
-    const body = event["text"];
-    const collapsed = collapseReasoning(session.messages);
-    const index = lastMessageIndex(collapsed, "assistant", true);
-    const messages = index < 0 ? collapsed.at(-1)?.role === "assistant" && collapsed.at(-1)?.body === body ? collapsed : [...collapsed, message("assistant", body)] : updateMessage(collapsed, index, { ...collapsed[index], body, streaming: false });
-    return {
-      ...session,
+      state: "resumable",
       activeActivity: null,
-      messages,
-      ...session.mode === "plan" ? {
-        workPlan: body,
-        // A well-behaved model normally stops itself before requesting a forbidden
-        // Plan-mode mutation. Treat the completed plan as the same structured
-        // handoff as a machine-side denial so the user never has to copy a prompt
-        // or manually toggle modes just because the model respected the boundary.
-        pendingModeHandoff: session.pendingModeHandoff ?? engineeringModeHandoff("edit", "plan")
-      } : {},
+      pendingApproval: null,
+      proposedChanges: [],
+      messages: [...updateReviewStatus(engineeringReviewMessages(session), approval.id, "declined"), msg("assistant", `${approval.title} was declined. No further action was taken.`, "warning")],
       updatedAt: stamp2()
     };
   }
-  if (event["type"] === "content_end" && event["contentType"] === "tool") {
-    const toolName = String(event["toolName"] ?? "tool");
-    const changed = toolName === "editor" || toolName === "apply_patch";
-    const errorText = event["error"] ? textValue(event["error"]) : "";
-    const planBlocked = isPlanCeiling(session, errorText);
-    const detail = event["error"] ? engineeringSystemText(`${toolName} failed \xB7 ${errorText}`) : `${toolName} completed`;
-    return {
-      ...session,
-      activeActivity: { phase: "thinking", startedAt: stamp2() },
-      changes: changed && !event["error"] ? mergeChanges(session.changes, session.proposedChanges) : session.changes,
-      proposedChanges: changed ? [] : session.proposedChanges,
-      messages: planBlocked ? session.messages : [...session.messages, message("tool", detail, event["error"] ? "warning" : "success")],
-      updatedAt: stamp2()
-    };
-  }
-  if (event["type"] === "done") {
-    const body = typeof event["text"] === "string" ? event["text"] : "";
-    const finished = finishStreamingMessages(session.messages, Boolean(body));
-    const state = terminalState(event["reason"]);
-    return { ...session, state, activeActivity: null, pendingApproval: null, messages: body && finished.at(-1)?.body !== body ? [...finished, message("assistant", body, state === "completed" ? "success" : "warning")] : finished, updatedAt: stamp2() };
-  }
-  if (event["type"] === "error") {
-    const error = event["error"];
-    if (isPlanCeiling(session, error?.["message"] ?? event["message"])) return session;
-    return { ...session, state: event["recoverable"] ? "resumable" : "error", activeActivity: null, messages: [...finishStreamingMessages(session.messages, false), message("assistant", engineeringSystemText(String(error?.["message"] ?? "Engineering encountered an error.")), "warning")], updatedAt: stamp2() };
-  }
-  return session;
+  if (approval.continuation === "inspect") return afterInspection({ ...session, pendingApproval: null, state: "streaming", activeActivity: { phase: "thinking", startedAt: stamp2() } });
+  if (approval.continuation === "apply") return applyProposedChanges(session);
+  return finishVerification(session);
 }
-function applyRemoteEngineeringEvent(session, wire) {
-  const type = wire["type"];
-  if (type === "ready") {
-    const provider = engineeringSystemText(String(wire["provider"]));
-    const model2 = engineeringSystemText(String(wire["model"]));
-    const brainPack = typeof wire["brainPack"] === "string" ? wire["brainPack"] : null;
-    const modelOverride = typeof wire["modelId"] === "string" ? wire["modelId"] : null;
-    return { ...session, provider, model: model2, modelOverride, brainPack, updatedAt: stamp2() };
-  }
-  if (type === "model_changed") {
-    const provider = engineeringSystemText(String(wire["provider"]));
-    const model2 = engineeringSystemText(String(wire["model"]));
-    const brainPack = typeof wire["brainPack"] === "string" ? wire["brainPack"] : null;
-    const modelOverride = typeof wire["modelId"] === "string" ? wire["modelId"] : null;
-    return { ...session, provider, model: model2, modelOverride, brainPack, messages: [...session.messages, message("tool", `Model switched \xB7 ${provider} \xB7 ${modelLabel(model2)}`)], updatedAt: stamp2() };
-  }
-  if (type === "brain_changed") {
-    const provider = engineeringSystemText(String(wire["provider"]));
-    const model2 = engineeringSystemText(String(wire["model"]));
-    const brainPack = typeof wire["brainPack"] === "string" ? wire["brainPack"] : null;
-    return { ...session, provider, model: model2, modelOverride: null, brainPack, messages: [...session.messages, message("tool", `Model switched \xB7 ${provider} \xB7 ${modelLabel(model2)}`)], updatedAt: stamp2() };
-  }
-  if (type === "status") return wire["status"] === "running" ? { ...session, state: "streaming", activeActivity: session.activeActivity ?? { phase: "thinking", startedAt: stamp2() }, updatedAt: stamp2() } : session.state === "streaming" ? { ...session, state: "idle", activeActivity: null, messages: finishStreamingMessages(session.messages, false), updatedAt: stamp2() } : session;
-  if (type === "mode_blocked" && session.mode === "plan" && (wire["category"] === "edit" || wire["category"] === "command")) {
-    if (session.pendingModeHandoff?.category === "edit" && wire["category"] === "command") return session;
-    return { ...session, pendingModeHandoff: engineeringModeHandoff(wire["category"], String(wire["toolName"] ?? "tool")), updatedAt: stamp2() };
-  }
-  if (type === "approval") {
-    const category = wire["category"];
-    const toolName = String(wire["toolName"] ?? "tool");
-    const changes = remoteChange(toolName, wire["input"]);
-    const command = toolName === "run_commands" || toolName === "fetch_web_content" ? textValue(wire["input"]) : void 0;
-    return { ...session, state: "awaiting_approval", activeActivity: null, proposedChanges: changes, pendingApproval: {
-      id: String(wire["approvalId"]),
-      category,
-      title: category === "edit" ? "Apply proposed file changes" : category === "command" ? "Execute command" : category === "web" ? "Fetch web content" : category === "mcp" ? "Use MCP tool" : "Read repository files",
-      detail: `${toolName} requested by Engineering`,
-      ...command ? { command } : {},
-      ...changes.length ? { changes } : {},
-      continuation: category === "edit" ? "apply" : category === "command" ? "verify" : "inspect"
-    }, updatedAt: stamp2() };
-  }
-  if (type === "error") {
-    if (isPlanCeiling(session, wire["message"])) return session;
-    if (wire["code"] === "ENGINEERING_GITHUB_REQUIRED") return { ...session, state: "error", blockedOn: "github", activeActivity: null, pendingApproval: null, messages: [...finishStreamingMessages(session.messages, false), message("assistant", engineeringSystemText(String(wire["message"] ?? "Connect GitHub to code here.")), "warning", GITHUB_WAIT)], updatedAt: stamp2() };
-    return { ...session, state: wire["recoverable"] ? "resumable" : "error", activeActivity: null, pendingApproval: null, messages: [...finishStreamingMessages(session.messages, false), message("assistant", engineeringSystemText(String(wire["message"] ?? "Engineering failed.")), "warning")], updatedAt: stamp2() };
-  }
-  if (type === "changes" && Array.isArray(wire["changes"])) return { ...session, changes: wire["changes"], proposedChanges: [], updatedAt: stamp2() };
-  if (type === "restored") {
-    const checkpoint = session.checkpoints.find((item) => item.id === `cline-run-${String(wire["checkpointRunCount"])}`);
-    const restoredMessages = checkpoint ? session.messages.slice(0, checkpoint.messageCount) : session.messages;
-    return { ...session, state: "resumable", activeActivity: null, pendingModeHandoff: null, pendingApproval: null, proposedChanges: [], changes: checkpoint?.changes.map((change) => ({ ...change })) ?? [], workPlan: checkpoint?.workPlan ?? session.workPlan, messages: [...finishStreamingMessages(restoredMessages, true), message("tool", `Restored checkpoint \xB7 run ${String(wire["checkpointRunCount"])}`, "success")], updatedAt: stamp2() };
-  }
-  if (type === "ended") return { ...session, state: terminalState(wire["reason"]), activeActivity: null, pendingApproval: null, messages: finishStreamingMessages(session.messages, false), updatedAt: stamp2() };
-  if (type !== "agent_event") return session;
-  const core = wire["event"];
-  if (core?.["type"] === "session_snapshot") return applySnapshot(session, core);
-  if (core?.["type"] !== "agent_event") return session;
-  const payload = core["payload"];
-  const event = payload?.["event"];
-  return event ? applyContentEvent(session, event) : session;
-}
-var serial, stamp2, message, GITHUB_WAIT, isEngineeringGitHubWait, textValue, isPlanCeiling, terminalState, updateMessage;
-var init_remote = __esm({
-  "../shared/src/engineering/remote.ts"() {
+var PERMISSION_LABELS, RECOMMENDED_ENGINEERING_PERMISSIONS, OPEN_ENGINEERING_POLICY, stamp2, uid, msg, initialCheckpoint, dismissEngineeringModeHandoff, setEngineeringBrainPack, setEngineeringMachine, setEngineeringModel;
+var init_domain = __esm({
+  "../shared/src/engineering/domain.ts"() {
     "use strict";
+    init_demo_plan();
+    init_review_history();
     init_linear();
-    init_model_labels();
     init_handoff();
-    init_copy();
-    init_patch();
-    serial = 0;
+    PERMISSION_LABELS = {
+      read: { label: "Read files", detail: "Inspect files and search the repository" },
+      edit: { label: "Edit files", detail: "Create, modify, rename, or delete files" },
+      command: { label: "Execute commands", detail: "Run shell commands and test suites" },
+      web: { label: "Fetch web content", detail: "Open URLs and search the web" },
+      mcp: { label: "Use MCP servers", detail: "Call tools exposed by connected MCP servers" }
+    };
+    RECOMMENDED_ENGINEERING_PERMISSIONS = {
+      read: true,
+      edit: false,
+      command: false,
+      web: false,
+      mcp: false
+    };
+    OPEN_ENGINEERING_POLICY = {
+      read: true,
+      edit: true,
+      command: true,
+      web: true,
+      mcp: true
+    };
     stamp2 = () => (/* @__PURE__ */ new Date()).toISOString();
-    message = (role, body, tone = "plain", kind = "remote") => ({
-      id: `${kind}-${Date.now().toString(36)}-${(++serial).toString(36)}`,
+    uid = (prefix) => `${prefix}-${globalThis.crypto.randomUUID()}`;
+    msg = (role, body, tone = "plain") => ({
+      id: uid("msg"),
       role,
       body,
       tone,
       createdAt: stamp2()
     });
-    GITHUB_WAIT = "github-wait";
-    isEngineeringGitHubWait = (m) => m.id.startsWith(`${GITHUB_WAIT}-`);
-    textValue = (value) => typeof value === "string" ? value : JSON.stringify(value, null, 2);
-    isPlanCeiling = (session, value) => session.mode === "plan" && lineHas(textValue(value).toLowerCase(), "blocked by", "plan mode");
-    terminalState = (reason) => reason === "completed" ? "completed" : reason === "error" ? "error" : "resumable";
-    updateMessage = (messages, index, next) => messages.map((current, at) => at === index ? next : current);
+    initialCheckpoint = () => ({
+      id: uid("cp"),
+      label: "Session start",
+      createdAt: stamp2(),
+      messageCount: 1,
+      changes: [],
+      workPlan: null
+    });
+    dismissEngineeringModeHandoff = (session) => ({ ...session, pendingModeHandoff: null, updatedAt: stamp2() });
+    setEngineeringBrainPack = (session, brainPack) => session.state === "streaming" || session.state === "awaiting_approval" || session.brainPack === brainPack ? session : { ...session, brainPack, updatedAt: stamp2() };
+    setEngineeringMachine = (session, machineId) => session.state === "streaming" || session.state === "awaiting_approval" || (session.machineId ?? null) === machineId ? session : { ...session, machineId, updatedAt: stamp2() };
+    setEngineeringModel = (session, modelOverride) => session.state === "streaming" || session.state === "awaiting_approval" || session.modelOverride === modelOverride && session.brainPack === null ? session : { ...session, modelOverride, brainPack: null, updatedAt: stamp2() };
   }
 });
 
@@ -8708,6 +9872,7 @@ function restoreEngineeringCheckpoint(session, checkpointId) {
     proposedChanges: [],
     changes: checkpoint.changes.map((change) => ({ ...change })),
     workPlan: checkpoint.workPlan,
+    planProgress: checkpoint.planProgress ?? null,
     messages: [...session.messages.slice(0, checkpoint.messageCount), restoredMessage(checkpoint.label)],
     updatedAt: (/* @__PURE__ */ new Date()).toISOString()
   };
@@ -8730,7 +9895,7 @@ var init_checkpoints = __esm({
 // ../shared/src/engineering/transport-state.ts
 function failRemoteEngineeringTransport(session, error) {
   const detail = error instanceof Error ? error.message : String(error || "The Code connection was interrupted.");
-  const messages = session.messages.map((item) => item.streaming ? { ...item, streaming: false } : item);
+  const messages2 = session.messages.map((item) => item.streaming ? { ...item, streaming: false } : item);
   const warning = {
     id: `transport-${Date.now().toString(36)}`,
     role: "assistant",
@@ -8738,11 +9903,12 @@ function failRemoteEngineeringTransport(session, error) {
     createdAt: (/* @__PURE__ */ new Date()).toISOString(),
     body: engineeringSystemText(`${detail} Retry when the workspace connection is ready.`)
   };
-  return { ...session, state: "resumable", activeActivity: null, pendingApproval: null, messages: [...messages, warning], updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
+  return { ...session, state: "resumable", activeActivity: null, pendingApproval: null, messages: [...interruptReviews(messages2), warning], updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
 }
 var init_transport_state = __esm({
   "../shared/src/engineering/transport-state.ts"() {
     "use strict";
+    init_review_history();
     init_copy();
   }
 });
@@ -8761,13 +9927,13 @@ function engineeringPlanItems(value) {
     const numbered = line.match(/^\s*\d+[.)]\s+(\S.*)$/);
     if (!checkbox && !numbered) return [];
     const marker = checkbox?.[1]?.toLowerCase();
-    const text2 = (checkbox?.[2] ?? numbered?.[1] ?? "").replace(/\*\*/g, "").replace(/`/g, "").replace(/^\d+[.)]\s+/, "").trim();
-    if (!text2) return [];
+    const text3 = (checkbox?.[2] ?? numbered?.[1] ?? "").replace(/\*\*/g, "").replace(/`/g, "").replace(/^\d+[.)]\s+/, "").trim();
+    if (!text3) return [];
     return [{
-      text: text2,
+      text: text3,
       status: marker === "x" ? "complete" : marker && marker !== " " ? "active" : "pending"
     }];
-  }).slice(0, 20);
+  }).slice(0, 30);
 }
 function toolCopy(toolName) {
   if (TOOL_COPY[toolName]) return TOOL_COPY[toolName];
@@ -8800,6 +9966,7 @@ function engineeringActivityPresentation(message2) {
   return { kind: "other", title: warning ? "Action needs attention" : "Engineering activity", detail: body, status: warning ? "warning" : message2.tone === "success" ? "success" : "info" };
 }
 function engineeringActivePresentation(activity, mode) {
+  if (activity?.phase === "restoring") return { kind: "runtime", title: "Loading conversation", detail: "Restoring recorded history", status: "info" };
   if (activity?.phase === "tool" && activity.toolName) {
     const copy = toolCopy(activity.toolName);
     return { kind: copy.kind, title: copy.active, detail: "Repository tool is running", status: "info" };
@@ -8807,9 +9974,9 @@ function engineeringActivePresentation(activity, mode) {
   if (activity?.phase === "composing") return { kind: "brain", title: "Writing the response", detail: "Turning the work into a clear handoff", status: "info" };
   return mode === "plan" ? { kind: "search", title: "Investigating the repository", detail: "Building a safe, reviewable plan", status: "info" } : { kind: "edit", title: "Working in the repository", detail: "Changes and checks will appear here as they finish", status: "info" };
 }
-function groupEngineeringTranscript(messages) {
+function groupEngineeringTranscript(messages2) {
   const blocks = [];
-  for (const message2 of messages) {
+  for (const message2 of messages2) {
     if (message2.role !== "tool") {
       blocks.push({ kind: "message", message: message2 });
       continue;
@@ -8841,7 +10008,85 @@ var init_activity = __esm({
       neuramesh: "NeuraMesh"
     })[value.toLowerCase()] ?? value.replace(/[-_]+/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
     titleCase = (value) => value.replace(/__+/g, " \xB7 ").replace(/[_-]+/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
-    streamingEngineeringText = (value) => value.replace(/^#{1,6}\s+/gm, "").replace(/\*\*/g, "").replace(/`/g, "");
+    streamingEngineeringText = (value) => value.replace(/```nmpreview\b[\s\S]*?(?:```|$)/g, "").replace(/^#{1,6}\s+/gm, "").replace(/\*\*/g, "").replace(/`/g, "");
+  }
+});
+
+// ../shared/src/engineering/approval-display.ts
+function engineeringApprovalCommands(approval) {
+  const raw = approval.command;
+  if (!raw) return [];
+  if (approval.category === "command") {
+    try {
+      const input = JSON.parse(raw);
+      if (input && typeof input === "object" && !Array.isArray(input) && Object.keys(input).length === 1 && "commands" in input && Array.isArray(input.commands) && input.commands.length > 0 && input.commands.every((command) => typeof command === "string" && command.trim().length > 0)) {
+        return input.commands;
+      }
+    } catch {
+    }
+  }
+  return [raw];
+}
+var init_approval_display = __esm({
+  "../shared/src/engineering/approval-display.ts"() {
+    "use strict";
+  }
+});
+
+// ../shared/src/engineering/change-review.ts
+function reviewLines(diff) {
+  const rows2 = [];
+  let oldLine = null;
+  let newLine = null;
+  let inHunk = false;
+  for (const text3 of diff.replace(/\r\n/g, "\n").split("\n")) {
+    if (text3.startsWith("@@")) {
+      const hunk = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(text3);
+      oldLine = hunk ? Number(hunk[1]) : null;
+      newLine = hunk ? Number(hunk[2]) : null;
+      inHunk = true;
+      rows2.push({ kind: "hunk", oldLine: null, newLine: null, text: text3 });
+    } else if (inHunk && text3.startsWith("\\")) {
+      rows2.push({ kind: "note", oldLine: null, newLine: null, text: text3.slice(2) });
+    } else if (inHunk && /^[ +\-]/.test(text3)) {
+      const kind = text3[0] === "+" ? "added" : text3[0] === "-" ? "removed" : "context";
+      rows2.push({ kind, oldLine: kind === "added" ? null : oldLine, newLine: kind === "removed" ? null : newLine, text: text3.slice(1) });
+      if (kind !== "added" && oldLine !== null) oldLine++;
+      if (kind !== "removed" && newLine !== null) newLine++;
+    }
+  }
+  return rows2;
+}
+function reviewFiles(changes) {
+  return normalizeEngineeringChanges(changes).map((change) => {
+    const previousPath = change.previousPath ?? /^rename from (.+)$/m.exec(change.diff)?.[1];
+    const binary = /^(?:Binary files |GIT binary patch)/m.test(change.diff) || /\0/.test(change.before + change.after) || [change.before, change.after].includes("[binary file]");
+    const lines = binary ? [] : reviewLines(change.diff);
+    return {
+      change,
+      kind: previousPath ? "renamed" : change.kind,
+      ...previousPath ? { previousPath } : {},
+      binary,
+      lines,
+      additions: lines.filter((line) => line.kind === "added").length,
+      deletions: lines.filter((line) => line.kind === "removed").length
+    };
+  });
+}
+function reviewSource(file) {
+  if (/^\[(?:file too large|preview omitted)/.test(file.change.before + file.change.after)) return { text: "", notice: "This file exceeds the available preview size. Open it in the repository to review it." };
+  if (file.change.previewError) return { text: "", notice: file.change.previewError };
+  if (file.binary) return { text: "", notice: "This is a binary file. A text preview is not available." };
+  const text3 = file.change.kind === "deleted" ? file.change.before : file.change.after;
+  if (/^(?:\*\*\* Begin Patch|diff --git |@@ )/m.test(text3) && text3 === file.change.diff) {
+    return { text: "", notice: "The full file content is not available. Use Changes to review the patch." };
+  }
+  return { text: text3 };
+}
+var init_change_review = __esm({
+  "../shared/src/engineering/change-review.ts"() {
+    "use strict";
+    init_changes();
   }
 });
 
@@ -8850,7 +10095,10 @@ var init_engineering = __esm({
   "../shared/src/engineering/index.ts"() {
     "use strict";
     init_protocol();
+    init_selection();
+    init_restore_connection();
     init_patch();
+    init_changes();
     init_domain();
     init_handoff();
     init_copy();
@@ -8858,6 +10106,12 @@ var init_engineering = __esm({
     init_checkpoints();
     init_transport_state();
     init_activity();
+    init_work_plan();
+    init_review_history();
+    init_approval_display();
+    init_plan_progress();
+    init_change_review();
+    init_brain_restore();
   }
 });
 
@@ -9036,10 +10290,10 @@ function briefMarker(artifactId) {
   return `\u2039brief:${artifactId}\u203A`;
 }
 function parseBriefRef(body) {
-  const text2 = body ?? "";
-  const hit = markerSpans(text2, "\u2039brief:", "\u203A").find((sp) => sp.inner.length === 36 && /^[0-9a-fA-F-]{36}$/.test(sp.inner));
+  const text3 = body ?? "";
+  const hit = markerSpans(text3, "\u2039brief:", "\u203A").find((sp) => sp.inner.length === 36 && /^[0-9a-fA-F-]{36}$/.test(sp.inner));
   if (!hit) return null;
-  return { id: hit.inner.toLowerCase(), prose: trimLineEnds(stripMarkers(text2, "\u2039brief:", "\u203A")).replace(/\n{3,}/g, "\n\n").trim() };
+  return { id: hit.inner.toLowerCase(), prose: trimLineEnds(stripMarkers(text3, "\u2039brief:", "\u203A")).replace(/\n{3,}/g, "\n\n").trim() };
 }
 var HEAD_RE, VERDICT_RE, VERDICTS;
 var init_releasebrief = __esm({
@@ -9207,6 +10461,70 @@ var init_brandread = __esm({
   }
 });
 
+// ../shared/src/brain-sync.ts
+var init_brain_sync = __esm({
+  "../shared/src/brain-sync.ts"() {
+    "use strict";
+  }
+});
+
+// ../shared/src/web-preview.ts
+function webPreviewUrl(value) {
+  if (typeof value !== "string" || value.length > 4096 || /[\s\u0000-\u001f\u007f]/.test(value)) return null;
+  if (!/^https?:\/\//i.test(value)) return null;
+  try {
+    const url = new URL(value);
+    return url.hostname && !url.username && !url.password ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+function parseWebPreview(json) {
+  if (json.length > 8192) return null;
+  try {
+    const value = JSON.parse(json);
+    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+    const v = value;
+    const url = webPreviewUrl(v.url);
+    if (!url || v.title !== void 0 && (typeof v.title !== "string" || !v.title.trim() || v.title.length > 120)) return null;
+    if (v.description !== void 0 && (typeof v.description !== "string" || v.description.length > 240)) return null;
+    return { url, title: typeof v.title === "string" ? v.title.trim() : "Web preview", ...typeof v.description === "string" && v.description.trim() ? { description: v.description.trim() } : {} };
+  } catch {
+    return null;
+  }
+}
+var WEB_PREVIEW_PROMPT;
+var init_web_preview = __esm({
+  "../shared/src/web-preview.ts"() {
+    "use strict";
+    WEB_PREVIEW_PROMPT = `When handing the user a website or app preview to inspect, you can render an inline Web preview card in your reply using a fenced nmpreview JSON block:
+\`\`\`nmpreview
+{"url":"https://example.com/preview","title":"App preview","description":"Optional short description of what to try"}
+\`\`\`
+Use only an actual URL supplied by the user or established by tool output; never invent a port, deployment, or running server. This renders a link card with Open in NeuraMesh browser and external browser actions; it does not start a server, deploy, or verify availability. Keep ordinary references as Markdown links. Do not label a preview live or tested without evidence. Localhost URLs work on the viewing device only. Put the card next to the relevant explanation, with a short title (120 characters max), optional description (240 characters max), and an absolute http(s) URL without credentials. Do not wrap the card in another code block.`;
+  }
+});
+
+// ../shared/src/brain-endpoint.ts
+function brainApiBaseUrl(apiUrl) {
+  const base = withoutTrailingSlashes(apiUrl);
+  return base === "https://api.neuramesh.app" || base === "https://hq.neuramesh.app" ? "https://relay.neuramesh.app" : base;
+}
+function controlApiRequestUrl(apiUrl, path) {
+  return `${path.startsWith("/v1/brain/") ? brainApiBaseUrl(apiUrl) : withoutTrailingSlashes(apiUrl)}${path}`;
+}
+var withoutTrailingSlashes;
+var init_brain_endpoint = __esm({
+  "../shared/src/brain-endpoint.ts"() {
+    "use strict";
+    withoutTrailingSlashes = (url) => {
+      let end = url.length;
+      while (end > 0 && url.charCodeAt(end - 1) === 47) end--;
+      return url.slice(0, end);
+    };
+  }
+});
+
 // ../shared/src/index.ts
 var src_exports = {};
 __export(src_exports, {
@@ -9220,6 +10538,9 @@ __export(src_exports, {
   AgentMessageSchema: () => AgentMessageSchema,
   BEAT_PHASE_ROLES: () => BEAT_PHASE_ROLES,
   BEAT_STATUSES: () => BEAT_STATUSES,
+  BOOTSTRAP_ERROR: () => BOOTSTRAP_ERROR,
+  BOOTSTRAP_PLAYS: () => BOOTSTRAP_PLAYS,
+  BOOTSTRAP_SCHED_FALLBACK: () => BOOTSTRAP_SCHED_FALLBACK,
   BRAND_DOC_NAMES: () => BRAND_DOC_NAMES,
   BROWSER_FRAME_WINDOW: () => BROWSER_FRAME_WINDOW,
   BROWSER_LANE: () => BROWSER_LANE,
@@ -9246,6 +10567,7 @@ __export(src_exports, {
   CURRENT_MODELS: () => CURRENT_MODELS,
   CUSTOM_PACK_ID: () => CUSTOM_PACK_ID,
   CUSTOM_PACK_PREFIX: () => CUSTOM_PACK_PREFIX,
+  DEFAULT_ENGINEERING_AGENT: () => DEFAULT_ENGINEERING_AGENT,
   DEFAULT_GRACE_MS: () => DEFAULT_GRACE_MS,
   DEFAULT_THINKING: () => DEFAULT_THINKING,
   DEFAULT_THREAD_KIND: () => DEFAULT_THREAD_KIND,
@@ -9260,6 +10582,7 @@ __export(src_exports, {
   DOC_SHAPE_DOD: () => DOC_SHAPE_DOD,
   EMPTY_BRAND: () => EMPTY_BRAND,
   ENGINEERING_CLINE_TOOL_POLICIES: () => ENGINEERING_CLINE_TOOL_POLICIES,
+  ENGINEERING_PLAN_PROGRESS_PROMPT: () => ENGINEERING_PLAN_PROGRESS_PROMPT,
   EVENT_TYPES: () => EVENT_TYPES,
   EXPORT_FORMAT: () => EXPORT_FORMAT,
   EXPORT_MANIFEST_NAME: () => EXPORT_MANIFEST_NAME,
@@ -9319,6 +10642,7 @@ __export(src_exports, {
   PACK_PREVIEW_ROLES: () => PACK_PREVIEW_ROLES,
   PACK_SUPPORT_ROLES: () => PACK_SUPPORT_ROLES,
   PERMISSION_LABELS: () => PERMISSION_LABELS,
+  PLAN_CHECKLIST: () => PLAN_CHECKLIST,
   PLAN_ENTITLEMENTS: () => PLAN_ENTITLEMENTS,
   PLAN_LABELS: () => PLAN_LABELS,
   PLAN_RE: () => PLAN_RE,
@@ -9363,7 +10687,9 @@ __export(src_exports, {
   RunSchema: () => RunSchema,
   SCHEDULE_CADENCES: () => SCHEDULE_CADENCES,
   SCHED_WEEKDAYS: () => SCHED_WEEKDAYS,
+  SCREENS_RULE: () => SCREENS_RULE,
   SESSION_RUN_WORD: () => SESSION_RUN_WORD,
+  SETUP_ANSWERS_HEAD: () => SETUP_ANSWERS_HEAD,
   SETUP_FLOWS: () => SETUP_FLOWS,
   SETUP_TASK_TRANSITIONS: () => SETUP_TASK_TRANSITIONS,
   SHELL_CLASSES: () => SHELL_CLASSES,
@@ -9377,6 +10703,7 @@ __export(src_exports, {
   STARTER_MODEL: () => STARTER_MODEL,
   STARTER_PACK_ID: () => STARTER_PACK_ID,
   STARTER_THINKING_LEVEL: () => STARTER_THINKING_LEVEL,
+  STATIC_CHECKLIST: () => STATIC_CHECKLIST,
   STORAGE_MICROS_PER_GB_HOUR: () => STORAGE_MICROS_PER_GB_HOUR,
   SUBTASK_TRANSITIONS: () => SUBTASK_TRANSITIONS,
   SUPPORTED_DESKTOP_VERSIONS: () => SUPPORTED_DESKTOP_VERSIONS,
@@ -9414,6 +10741,7 @@ __export(src_exports, {
   WB_SCENE_MAX: () => WB_SCENE_MAX,
   WB_SNAPSHOT_MAX: () => WB_SNAPSHOT_MAX,
   WB_TITLE_MAX: () => WB_TITLE_MAX,
+  WEB_PREVIEW_PROMPT: () => WEB_PREVIEW_PROMPT,
   WIZARD_CHANNELS: () => WIZARD_CHANNELS,
   WIZARD_LABEL: () => WIZARD_LABEL,
   WIZARD_STEPS: () => WIZARD_STEPS,
@@ -9445,6 +10773,7 @@ __export(src_exports, {
   authDecisionQuestion: () => authDecisionQuestion,
   availableMachines: () => availableMachines,
   awaitingAgent: () => awaitingAgent,
+  awaitingEngineeringHistory: () => awaitingEngineeringHistory,
   b: () => b,
   b64Length: () => b64Length,
   bareAddressRe: () => bareAddressRe,
@@ -9452,6 +10781,15 @@ __export(src_exports, {
   beginRemoteEngineeringPrompt: () => beginRemoteEngineeringPrompt,
   belowFloor: () => belowFloor,
   bestAlternativeProvider: () => bestAlternativeProvider,
+  bootstrapClosing: () => bootstrapClosing,
+  bootstrapDocFailed: () => bootstrapDocFailed,
+  bootstrapDocStatus: () => bootstrapDocStatus,
+  bootstrapNudgeDone: () => bootstrapNudgeDone,
+  bootstrapOpening: () => bootstrapOpening,
+  bootstrapPartial: () => bootstrapPartial,
+  bootstrapResume: () => bootstrapResume,
+  bootstrapStart: () => bootstrapStart,
+  brainApiBaseUrl: () => brainApiBaseUrl,
   brainCast: () => brainCast,
   brainNoticeLine: () => brainNoticeLine,
   brainNoticeOf: () => brainNoticeOf,
@@ -9474,6 +10812,7 @@ __export(src_exports, {
   buildShipUserPrompt: () => buildShipUserPrompt,
   button: () => button,
   cadenceLine: () => cadenceLine,
+  canContinueEngineering: () => canContinueEngineering,
   canFileConversation: () => canFileConversation,
   canSettle: () => canSettle,
   canTighten: () => canTighten,
@@ -9487,9 +10826,12 @@ __export(src_exports, {
   cardTitle: () => cardTitle,
   cardsAsWords: () => cardsAsWords,
   carryCards: () => carryCards,
+  changeReviewMessage: () => changeReviewMessage,
   changedParts: () => changedParts,
   checkNeeds: () => checkNeeds,
   choosableMachines: () => choosableMachines,
+  claimLine: () => claimLine,
+  claimWorkspace: () => claimWorkspace,
   classifyShellCommand: () => classifyShellCommand,
   claudeDesignProjectUrl: () => claudeDesignProjectUrl,
   claudeDesignPromptBlock: () => claudeDesignPromptBlock,
@@ -9518,7 +10860,9 @@ __export(src_exports, {
   contentUpdateCommand: () => contentUpdateCommand,
   continueEngineeringInAct: () => continueEngineeringInAct,
   contrast: () => contrast,
+  controlApiRequestUrl: () => controlApiRequestUrl,
   coverageNote: () => coverageNote,
+  createEngineeringPlanProgress: () => createEngineeringPlanProgress,
   createEngineeringSession: () => createEngineeringSession,
   createEvent: () => createEvent,
   credentialSetCommand: () => credentialSetCommand,
@@ -9544,6 +10888,9 @@ __export(src_exports, {
   dialFraction: () => dialFraction,
   digestMeta: () => digestMeta,
   dismissEngineeringModeHandoff: () => dismissEngineeringModeHandoff,
+  docDropBody: () => docDropBody,
+  docInFlight: () => docInFlight,
+  docWriteLog: () => docWriteLog,
   done: () => done,
   dotLines: () => dotLines,
   draftIsLive: () => draftIsLive,
@@ -9553,14 +10900,22 @@ __export(src_exports, {
   effectivePermission: () => effectivePermission,
   engineeringActivePresentation: () => engineeringActivePresentation,
   engineeringActivityPresentation: () => engineeringActivityPresentation,
+  engineeringApprovalCommands: () => engineeringApprovalCommands,
+  engineeringEffort: () => engineeringEffort,
   engineeringModeHandoff: () => engineeringModeHandoff,
+  engineeringPatchChanges: () => engineeringPatchChanges,
   engineeringPatchPaths: () => engineeringPatchPaths,
   engineeringPlanItems: () => engineeringPlanItems,
   engineeringReasoningSeconds: () => engineeringReasoningSeconds,
+  engineeringReviewMessages: () => engineeringReviewMessages,
   engineeringShellSession: () => engineeringShellSession,
   engineeringSystemText: () => engineeringSystemText,
   engineeringToolCategory: () => engineeringToolCategory,
+  engineeringToolChanges: () => engineeringToolChanges,
   engineeringToolDecision: () => engineeringToolDecision,
+  engineeringUnifiedDiff: () => engineeringUnifiedDiff,
+  engineeringWorkPlanMessages: () => engineeringWorkPlanMessages,
+  engineeringWorkPlanText: () => engineeringWorkPlanText,
   esc: () => esc,
   evaluatePolicy: () => evaluatePolicy,
   evaluateTransition: () => evaluateTransition,
@@ -9577,7 +10932,9 @@ __export(src_exports, {
   filmLengthsWithin: () => filmLengthsWithin,
   filmMinutes: () => filmMinutes,
   filmPrompt: () => filmPrompt,
+  filmStartLine: () => filmStartLine,
   findTransition: () => findTransition,
+  finishChangeReview: () => finishChangeReview,
   firstBeat: () => firstBeat,
   firstSentence: () => firstSentence,
   flattenRunTree: () => flattenRunTree,
@@ -9604,8 +10961,11 @@ __export(src_exports, {
   humanHandles: () => humanHandles,
   inSessionRun: () => inSessionRun,
   initialWizard: () => initialWizard,
+  interruptReviews: () => interruptReviews,
   inviteMeta: () => inviteMeta,
+  isAcceptWord: () => isAcceptWord,
   isAddress: () => isAddress,
+  isCardOrMarker: () => isCardOrMarker,
   isChatThread: () => isChatThread,
   isCloudBorn: () => isCloudBorn,
   isCloudMachineRow: () => isCloudMachineRow,
@@ -9616,6 +10976,10 @@ __export(src_exports, {
   isEngineeringControls: () => isEngineeringControls,
   isEngineeringGitHubWait: () => isEngineeringGitHubWait,
   isEngineeringOpenMeta: () => isEngineeringOpenMeta,
+  isEngineeringPlanProgress: () => isEngineeringPlanProgress,
+  isEngineeringPlanReport: () => isEngineeringPlanReport,
+  isEngineeringSelection: () => isEngineeringSelection,
+  isEngineeringWorkPlan: () => isEngineeringWorkPlan,
   isGateArtifact: () => isGateArtifact,
   isGitHubNeedQuestion: () => isGitHubNeedQuestion,
   isGrey: () => isGrey,
@@ -9635,6 +10999,7 @@ __export(src_exports, {
   isRunOpen: () => isRunOpen,
   isRunStale: () => isRunStale,
   isSessionRunNotice: () => isSessionRunNotice,
+  isSetupAnswers: () => isSetupAnswers,
   isStandDown: () => isStandDown,
   isTryOnce: () => isTryOnce,
   isUnroutableTodo: () => isUnroutableTodo,
@@ -9702,6 +11067,7 @@ __export(src_exports, {
   nextStepsBlock: () => nextStepsBlock,
   nobodyCanServe: () => nobodyCanServe,
   normalizeDraft: () => normalizeDraft,
+  normalizeEngineeringChanges: () => normalizeEngineeringChanges,
   normalizeHex: () => normalizeHex,
   normalizeUrlInput: () => normalizeUrlInput,
   noticeProvider: () => noticeProvider,
@@ -9724,6 +11090,7 @@ __export(src_exports, {
   parseCard: () => parseCard,
   parseDraftRevisions: () => parseDraftRevisions,
   parseDraftedPosts: () => parseDraftedPosts,
+  parseEngineeringPatch: () => parseEngineeringPatch,
   parseExport: () => parseExport,
   parseGitHubConnected: () => parseGitHubConnected,
   parseKindMarker: () => parseKindMarker,
@@ -9745,6 +11112,7 @@ __export(src_exports, {
   parseSkillFiles: () => parseSkillFiles,
   parseSuggestions: () => parseSuggestions,
   parseTaskUnitRef: () => parseTaskUnitRef,
+  parseWebPreview: () => parseWebPreview,
   parseWhiteboardRef: () => parseWhiteboardRef,
   parseWhiteboardScene: () => parseWhiteboardScene,
   parseWhiteboardSource: () => parseWhiteboardSource,
@@ -9758,7 +11126,9 @@ __export(src_exports, {
   planBatches: () => planBatches,
   planFailoverAgentUpdates: () => planFailoverAgentUpdates,
   planLabel: () => planLabel,
+  planMessage: () => planMessage,
   planOf: () => planOf,
+  planPostLine: () => planPostLine,
   planRefMarker: () => planRefMarker,
   playbookAsk: () => playbookAsk,
   playbookById: () => playbookById,
@@ -9791,6 +11161,7 @@ __export(src_exports, {
   rateOrNull: () => rateOrNull,
   readAnswers: () => readAnswers,
   readyProviders: () => readyProviders,
+  recoverEngineeringPlanProgress: () => recoverEngineeringPlanProgress,
   releaseBriefFrom: () => releaseBriefFrom,
   releaseDigest: () => releaseDigest,
   releaseLogNote: () => releaseLogNote,
@@ -9831,9 +11202,14 @@ __export(src_exports, {
   resolvePackRoles: () => resolvePackRoles,
   resolvePlaybookInputs: () => resolvePlaybookInputs,
   resolveRemoteEngineeringApproval: () => resolveRemoteEngineeringApproval,
+  restoreEngineeringBrain: () => restoreEngineeringBrain,
   restoreEngineeringCheckpoint: () => restoreEngineeringCheckpoint,
+  restoreEngineeringConnection: () => restoreEngineeringConnection,
   retroWindow: () => retroWindow,
+  reviewFiles: () => reviewFiles,
+  reviewLines: () => reviewLines,
   reviewPushFor: () => reviewPushFor,
+  reviewSource: () => reviewSource,
   rewriteTaskRefs: () => rewriteTaskRefs,
   rolesActivatable: () => rolesActivatable,
   roomBrief: () => roomBrief,
@@ -9893,6 +11269,7 @@ __export(src_exports, {
   setWizardName: () => setWizardName,
   setWizardProvider: () => setWizardProvider,
   setWizardSlug: () => setWizardSlug,
+  setupAnswersBody: () => setupAnswersBody,
   setupProgress: () => setupProgress,
   setupProgressLabel: () => setupProgressLabel,
   shipItemsPending: () => shipItemsPending,
@@ -9962,6 +11339,7 @@ __export(src_exports, {
   threadSetMachineCommand: () => threadSetMachineCommand,
   threadSettleCommand: () => threadSettleCommand,
   threadStatus: () => threadStatus,
+  threadSurfaceKind: () => threadSurfaceKind,
   threadTitle: () => threadTitle,
   threadUnsettleCommand: () => threadUnsettleCommand,
   toText: () => toText,
@@ -9978,12 +11356,15 @@ __export(src_exports, {
   unaddressedWake: () => unaddressedWake,
   unblockNote: () => unblockNote,
   unroutableTodos: () => unroutableTodos,
+  updateEngineeringPlanProgress: () => updateEngineeringPlanProgress,
+  updateReviewStatus: () => updateReviewStatus,
   usdForCredits: () => usdForCredits,
   validateWorkPlanLegs: () => validateWorkPlanLegs,
   visibleStream: () => visibleStream,
   waitTimedOut: () => waitTimedOut,
   waitTimeoutLine: () => waitTimeoutLine,
   wakeCandidates: () => wakeCandidates,
+  webPreviewUrl: () => webPreviewUrl,
   welcomeMeta: () => welcomeMeta,
   whenChanged: () => whenChanged,
   whiteboardShareBody: () => whiteboardShareBody,
@@ -10070,9 +11451,12 @@ var init_src = __esm({
     init_browse();
     init_threads();
     init_threadwake();
+    init_acceptword();
+    init_claimline();
     init_waiting();
     init_setupflows();
     init_playbooks();
+    init_brandlines();
     init_commrules();
     init_nextsteps();
     init_replyops();
@@ -10099,12 +11483,2166 @@ var init_src = __esm({
     init_releasescan();
     init_releasebrief();
     init_brandread();
+    init_brain_sync();
+    init_web_preview();
+    init_brain_endpoint();
+  }
+});
+
+// ../../node_modules/.pnpm/jpeg-js@0.4.4/node_modules/jpeg-js/lib/encoder.js
+var require_encoder = __commonJS({
+  "../../node_modules/.pnpm/jpeg-js@0.4.4/node_modules/jpeg-js/lib/encoder.js"(exports, module) {
+    var btoa = btoa || function(buf) {
+      return Buffer.from(buf).toString("base64");
+    };
+    function JPEGEncoder(quality) {
+      var self2 = this;
+      var fround = Math.round;
+      var ffloor = Math.floor;
+      var YTable = new Array(64);
+      var UVTable = new Array(64);
+      var fdtbl_Y = new Array(64);
+      var fdtbl_UV = new Array(64);
+      var YDC_HT;
+      var UVDC_HT;
+      var YAC_HT;
+      var UVAC_HT;
+      var bitcode = new Array(65535);
+      var category = new Array(65535);
+      var outputfDCTQuant = new Array(64);
+      var DU = new Array(64);
+      var byteout = [];
+      var bytenew = 0;
+      var bytepos = 7;
+      var YDU = new Array(64);
+      var UDU = new Array(64);
+      var VDU = new Array(64);
+      var clt = new Array(256);
+      var RGB_YUV_TABLE = new Array(2048);
+      var currentQuality;
+      var ZigZag = [
+        0,
+        1,
+        5,
+        6,
+        14,
+        15,
+        27,
+        28,
+        2,
+        4,
+        7,
+        13,
+        16,
+        26,
+        29,
+        42,
+        3,
+        8,
+        12,
+        17,
+        25,
+        30,
+        41,
+        43,
+        9,
+        11,
+        18,
+        24,
+        31,
+        40,
+        44,
+        53,
+        10,
+        19,
+        23,
+        32,
+        39,
+        45,
+        52,
+        54,
+        20,
+        22,
+        33,
+        38,
+        46,
+        51,
+        55,
+        60,
+        21,
+        34,
+        37,
+        47,
+        50,
+        56,
+        59,
+        61,
+        35,
+        36,
+        48,
+        49,
+        57,
+        58,
+        62,
+        63
+      ];
+      var std_dc_luminance_nrcodes = [0, 0, 1, 5, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0];
+      var std_dc_luminance_values = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+      var std_ac_luminance_nrcodes = [0, 0, 2, 1, 3, 3, 2, 4, 3, 5, 5, 4, 4, 0, 0, 1, 125];
+      var std_ac_luminance_values = [
+        1,
+        2,
+        3,
+        0,
+        4,
+        17,
+        5,
+        18,
+        33,
+        49,
+        65,
+        6,
+        19,
+        81,
+        97,
+        7,
+        34,
+        113,
+        20,
+        50,
+        129,
+        145,
+        161,
+        8,
+        35,
+        66,
+        177,
+        193,
+        21,
+        82,
+        209,
+        240,
+        36,
+        51,
+        98,
+        114,
+        130,
+        9,
+        10,
+        22,
+        23,
+        24,
+        25,
+        26,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        52,
+        53,
+        54,
+        55,
+        56,
+        57,
+        58,
+        67,
+        68,
+        69,
+        70,
+        71,
+        72,
+        73,
+        74,
+        83,
+        84,
+        85,
+        86,
+        87,
+        88,
+        89,
+        90,
+        99,
+        100,
+        101,
+        102,
+        103,
+        104,
+        105,
+        106,
+        115,
+        116,
+        117,
+        118,
+        119,
+        120,
+        121,
+        122,
+        131,
+        132,
+        133,
+        134,
+        135,
+        136,
+        137,
+        138,
+        146,
+        147,
+        148,
+        149,
+        150,
+        151,
+        152,
+        153,
+        154,
+        162,
+        163,
+        164,
+        165,
+        166,
+        167,
+        168,
+        169,
+        170,
+        178,
+        179,
+        180,
+        181,
+        182,
+        183,
+        184,
+        185,
+        186,
+        194,
+        195,
+        196,
+        197,
+        198,
+        199,
+        200,
+        201,
+        202,
+        210,
+        211,
+        212,
+        213,
+        214,
+        215,
+        216,
+        217,
+        218,
+        225,
+        226,
+        227,
+        228,
+        229,
+        230,
+        231,
+        232,
+        233,
+        234,
+        241,
+        242,
+        243,
+        244,
+        245,
+        246,
+        247,
+        248,
+        249,
+        250
+      ];
+      var std_dc_chrominance_nrcodes = [0, 0, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0];
+      var std_dc_chrominance_values = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+      var std_ac_chrominance_nrcodes = [0, 0, 2, 1, 2, 4, 4, 3, 4, 7, 5, 4, 4, 0, 1, 2, 119];
+      var std_ac_chrominance_values = [
+        0,
+        1,
+        2,
+        3,
+        17,
+        4,
+        5,
+        33,
+        49,
+        6,
+        18,
+        65,
+        81,
+        7,
+        97,
+        113,
+        19,
+        34,
+        50,
+        129,
+        8,
+        20,
+        66,
+        145,
+        161,
+        177,
+        193,
+        9,
+        35,
+        51,
+        82,
+        240,
+        21,
+        98,
+        114,
+        209,
+        10,
+        22,
+        36,
+        52,
+        225,
+        37,
+        241,
+        23,
+        24,
+        25,
+        26,
+        38,
+        39,
+        40,
+        41,
+        42,
+        53,
+        54,
+        55,
+        56,
+        57,
+        58,
+        67,
+        68,
+        69,
+        70,
+        71,
+        72,
+        73,
+        74,
+        83,
+        84,
+        85,
+        86,
+        87,
+        88,
+        89,
+        90,
+        99,
+        100,
+        101,
+        102,
+        103,
+        104,
+        105,
+        106,
+        115,
+        116,
+        117,
+        118,
+        119,
+        120,
+        121,
+        122,
+        130,
+        131,
+        132,
+        133,
+        134,
+        135,
+        136,
+        137,
+        138,
+        146,
+        147,
+        148,
+        149,
+        150,
+        151,
+        152,
+        153,
+        154,
+        162,
+        163,
+        164,
+        165,
+        166,
+        167,
+        168,
+        169,
+        170,
+        178,
+        179,
+        180,
+        181,
+        182,
+        183,
+        184,
+        185,
+        186,
+        194,
+        195,
+        196,
+        197,
+        198,
+        199,
+        200,
+        201,
+        202,
+        210,
+        211,
+        212,
+        213,
+        214,
+        215,
+        216,
+        217,
+        218,
+        226,
+        227,
+        228,
+        229,
+        230,
+        231,
+        232,
+        233,
+        234,
+        242,
+        243,
+        244,
+        245,
+        246,
+        247,
+        248,
+        249,
+        250
+      ];
+      function initQuantTables(sf) {
+        var YQT = [
+          16,
+          11,
+          10,
+          16,
+          24,
+          40,
+          51,
+          61,
+          12,
+          12,
+          14,
+          19,
+          26,
+          58,
+          60,
+          55,
+          14,
+          13,
+          16,
+          24,
+          40,
+          57,
+          69,
+          56,
+          14,
+          17,
+          22,
+          29,
+          51,
+          87,
+          80,
+          62,
+          18,
+          22,
+          37,
+          56,
+          68,
+          109,
+          103,
+          77,
+          24,
+          35,
+          55,
+          64,
+          81,
+          104,
+          113,
+          92,
+          49,
+          64,
+          78,
+          87,
+          103,
+          121,
+          120,
+          101,
+          72,
+          92,
+          95,
+          98,
+          112,
+          100,
+          103,
+          99
+        ];
+        for (var i = 0; i < 64; i++) {
+          var t2 = ffloor((YQT[i] * sf + 50) / 100);
+          if (t2 < 1) {
+            t2 = 1;
+          } else if (t2 > 255) {
+            t2 = 255;
+          }
+          YTable[ZigZag[i]] = t2;
+        }
+        var UVQT = [
+          17,
+          18,
+          24,
+          47,
+          99,
+          99,
+          99,
+          99,
+          18,
+          21,
+          26,
+          66,
+          99,
+          99,
+          99,
+          99,
+          24,
+          26,
+          56,
+          99,
+          99,
+          99,
+          99,
+          99,
+          47,
+          66,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99,
+          99
+        ];
+        for (var j = 0; j < 64; j++) {
+          var u = ffloor((UVQT[j] * sf + 50) / 100);
+          if (u < 1) {
+            u = 1;
+          } else if (u > 255) {
+            u = 255;
+          }
+          UVTable[ZigZag[j]] = u;
+        }
+        var aasf = [
+          1,
+          1.387039845,
+          1.306562965,
+          1.175875602,
+          1,
+          0.785694958,
+          0.5411961,
+          0.275899379
+        ];
+        var k = 0;
+        for (var row = 0; row < 8; row++) {
+          for (var col = 0; col < 8; col++) {
+            fdtbl_Y[k] = 1 / (YTable[ZigZag[k]] * aasf[row] * aasf[col] * 8);
+            fdtbl_UV[k] = 1 / (UVTable[ZigZag[k]] * aasf[row] * aasf[col] * 8);
+            k++;
+          }
+        }
+      }
+      function computeHuffmanTbl(nrcodes, std_table) {
+        var codevalue = 0;
+        var pos_in_table = 0;
+        var HT = new Array();
+        for (var k = 1; k <= 16; k++) {
+          for (var j = 1; j <= nrcodes[k]; j++) {
+            HT[std_table[pos_in_table]] = [];
+            HT[std_table[pos_in_table]][0] = codevalue;
+            HT[std_table[pos_in_table]][1] = k;
+            pos_in_table++;
+            codevalue++;
+          }
+          codevalue *= 2;
+        }
+        return HT;
+      }
+      function initHuffmanTbl() {
+        YDC_HT = computeHuffmanTbl(std_dc_luminance_nrcodes, std_dc_luminance_values);
+        UVDC_HT = computeHuffmanTbl(std_dc_chrominance_nrcodes, std_dc_chrominance_values);
+        YAC_HT = computeHuffmanTbl(std_ac_luminance_nrcodes, std_ac_luminance_values);
+        UVAC_HT = computeHuffmanTbl(std_ac_chrominance_nrcodes, std_ac_chrominance_values);
+      }
+      function initCategoryNumber() {
+        var nrlower = 1;
+        var nrupper = 2;
+        for (var cat = 1; cat <= 15; cat++) {
+          for (var nr = nrlower; nr < nrupper; nr++) {
+            category[32767 + nr] = cat;
+            bitcode[32767 + nr] = [];
+            bitcode[32767 + nr][1] = cat;
+            bitcode[32767 + nr][0] = nr;
+          }
+          for (var nrneg = -(nrupper - 1); nrneg <= -nrlower; nrneg++) {
+            category[32767 + nrneg] = cat;
+            bitcode[32767 + nrneg] = [];
+            bitcode[32767 + nrneg][1] = cat;
+            bitcode[32767 + nrneg][0] = nrupper - 1 + nrneg;
+          }
+          nrlower <<= 1;
+          nrupper <<= 1;
+        }
+      }
+      function initRGBYUVTable() {
+        for (var i = 0; i < 256; i++) {
+          RGB_YUV_TABLE[i] = 19595 * i;
+          RGB_YUV_TABLE[i + 256 >> 0] = 38470 * i;
+          RGB_YUV_TABLE[i + 512 >> 0] = 7471 * i + 32768;
+          RGB_YUV_TABLE[i + 768 >> 0] = -11059 * i;
+          RGB_YUV_TABLE[i + 1024 >> 0] = -21709 * i;
+          RGB_YUV_TABLE[i + 1280 >> 0] = 32768 * i + 8421375;
+          RGB_YUV_TABLE[i + 1536 >> 0] = -27439 * i;
+          RGB_YUV_TABLE[i + 1792 >> 0] = -5329 * i;
+        }
+      }
+      function writeBits(bs) {
+        var value = bs[0];
+        var posval = bs[1] - 1;
+        while (posval >= 0) {
+          if (value & 1 << posval) {
+            bytenew |= 1 << bytepos;
+          }
+          posval--;
+          bytepos--;
+          if (bytepos < 0) {
+            if (bytenew == 255) {
+              writeByte(255);
+              writeByte(0);
+            } else {
+              writeByte(bytenew);
+            }
+            bytepos = 7;
+            bytenew = 0;
+          }
+        }
+      }
+      function writeByte(value) {
+        byteout.push(value);
+      }
+      function writeWord(value) {
+        writeByte(value >> 8 & 255);
+        writeByte(value & 255);
+      }
+      function fDCTQuant(data, fdtbl) {
+        var d0, d1, d2, d3, d4, d5, d6, d7;
+        var dataOff = 0;
+        var i;
+        var I8 = 8;
+        var I64 = 64;
+        for (i = 0; i < I8; ++i) {
+          d0 = data[dataOff];
+          d1 = data[dataOff + 1];
+          d2 = data[dataOff + 2];
+          d3 = data[dataOff + 3];
+          d4 = data[dataOff + 4];
+          d5 = data[dataOff + 5];
+          d6 = data[dataOff + 6];
+          d7 = data[dataOff + 7];
+          var tmp0 = d0 + d7;
+          var tmp7 = d0 - d7;
+          var tmp1 = d1 + d6;
+          var tmp6 = d1 - d6;
+          var tmp2 = d2 + d5;
+          var tmp5 = d2 - d5;
+          var tmp3 = d3 + d4;
+          var tmp4 = d3 - d4;
+          var tmp10 = tmp0 + tmp3;
+          var tmp13 = tmp0 - tmp3;
+          var tmp11 = tmp1 + tmp2;
+          var tmp12 = tmp1 - tmp2;
+          data[dataOff] = tmp10 + tmp11;
+          data[dataOff + 4] = tmp10 - tmp11;
+          var z1 = (tmp12 + tmp13) * 0.707106781;
+          data[dataOff + 2] = tmp13 + z1;
+          data[dataOff + 6] = tmp13 - z1;
+          tmp10 = tmp4 + tmp5;
+          tmp11 = tmp5 + tmp6;
+          tmp12 = tmp6 + tmp7;
+          var z52 = (tmp10 - tmp12) * 0.382683433;
+          var z25 = 0.5411961 * tmp10 + z52;
+          var z42 = 1.306562965 * tmp12 + z52;
+          var z32 = tmp11 * 0.707106781;
+          var z112 = tmp7 + z32;
+          var z132 = tmp7 - z32;
+          data[dataOff + 5] = z132 + z25;
+          data[dataOff + 3] = z132 - z25;
+          data[dataOff + 1] = z112 + z42;
+          data[dataOff + 7] = z112 - z42;
+          dataOff += 8;
+        }
+        dataOff = 0;
+        for (i = 0; i < I8; ++i) {
+          d0 = data[dataOff];
+          d1 = data[dataOff + 8];
+          d2 = data[dataOff + 16];
+          d3 = data[dataOff + 24];
+          d4 = data[dataOff + 32];
+          d5 = data[dataOff + 40];
+          d6 = data[dataOff + 48];
+          d7 = data[dataOff + 56];
+          var tmp0p2 = d0 + d7;
+          var tmp7p2 = d0 - d7;
+          var tmp1p2 = d1 + d6;
+          var tmp6p2 = d1 - d6;
+          var tmp2p2 = d2 + d5;
+          var tmp5p2 = d2 - d5;
+          var tmp3p2 = d3 + d4;
+          var tmp4p2 = d3 - d4;
+          var tmp10p2 = tmp0p2 + tmp3p2;
+          var tmp13p2 = tmp0p2 - tmp3p2;
+          var tmp11p2 = tmp1p2 + tmp2p2;
+          var tmp12p2 = tmp1p2 - tmp2p2;
+          data[dataOff] = tmp10p2 + tmp11p2;
+          data[dataOff + 32] = tmp10p2 - tmp11p2;
+          var z1p2 = (tmp12p2 + tmp13p2) * 0.707106781;
+          data[dataOff + 16] = tmp13p2 + z1p2;
+          data[dataOff + 48] = tmp13p2 - z1p2;
+          tmp10p2 = tmp4p2 + tmp5p2;
+          tmp11p2 = tmp5p2 + tmp6p2;
+          tmp12p2 = tmp6p2 + tmp7p2;
+          var z5p2 = (tmp10p2 - tmp12p2) * 0.382683433;
+          var z2p2 = 0.5411961 * tmp10p2 + z5p2;
+          var z4p2 = 1.306562965 * tmp12p2 + z5p2;
+          var z3p2 = tmp11p2 * 0.707106781;
+          var z11p2 = tmp7p2 + z3p2;
+          var z13p2 = tmp7p2 - z3p2;
+          data[dataOff + 40] = z13p2 + z2p2;
+          data[dataOff + 24] = z13p2 - z2p2;
+          data[dataOff + 8] = z11p2 + z4p2;
+          data[dataOff + 56] = z11p2 - z4p2;
+          dataOff++;
+        }
+        var fDCTQuant2;
+        for (i = 0; i < I64; ++i) {
+          fDCTQuant2 = data[i] * fdtbl[i];
+          outputfDCTQuant[i] = fDCTQuant2 > 0 ? fDCTQuant2 + 0.5 | 0 : fDCTQuant2 - 0.5 | 0;
+        }
+        return outputfDCTQuant;
+      }
+      function writeAPP0() {
+        writeWord(65504);
+        writeWord(16);
+        writeByte(74);
+        writeByte(70);
+        writeByte(73);
+        writeByte(70);
+        writeByte(0);
+        writeByte(1);
+        writeByte(1);
+        writeByte(0);
+        writeWord(1);
+        writeWord(1);
+        writeByte(0);
+        writeByte(0);
+      }
+      function writeAPP1(exifBuffer) {
+        if (!exifBuffer) return;
+        writeWord(65505);
+        if (exifBuffer[0] === 69 && exifBuffer[1] === 120 && exifBuffer[2] === 105 && exifBuffer[3] === 102) {
+          writeWord(exifBuffer.length + 2);
+        } else {
+          writeWord(exifBuffer.length + 5 + 2);
+          writeByte(69);
+          writeByte(120);
+          writeByte(105);
+          writeByte(102);
+          writeByte(0);
+        }
+        for (var i = 0; i < exifBuffer.length; i++) {
+          writeByte(exifBuffer[i]);
+        }
+      }
+      function writeSOF0(width, height) {
+        writeWord(65472);
+        writeWord(17);
+        writeByte(8);
+        writeWord(height);
+        writeWord(width);
+        writeByte(3);
+        writeByte(1);
+        writeByte(17);
+        writeByte(0);
+        writeByte(2);
+        writeByte(17);
+        writeByte(1);
+        writeByte(3);
+        writeByte(17);
+        writeByte(1);
+      }
+      function writeDQT() {
+        writeWord(65499);
+        writeWord(132);
+        writeByte(0);
+        for (var i = 0; i < 64; i++) {
+          writeByte(YTable[i]);
+        }
+        writeByte(1);
+        for (var j = 0; j < 64; j++) {
+          writeByte(UVTable[j]);
+        }
+      }
+      function writeDHT() {
+        writeWord(65476);
+        writeWord(418);
+        writeByte(0);
+        for (var i = 0; i < 16; i++) {
+          writeByte(std_dc_luminance_nrcodes[i + 1]);
+        }
+        for (var j = 0; j <= 11; j++) {
+          writeByte(std_dc_luminance_values[j]);
+        }
+        writeByte(16);
+        for (var k = 0; k < 16; k++) {
+          writeByte(std_ac_luminance_nrcodes[k + 1]);
+        }
+        for (var l = 0; l <= 161; l++) {
+          writeByte(std_ac_luminance_values[l]);
+        }
+        writeByte(1);
+        for (var m = 0; m < 16; m++) {
+          writeByte(std_dc_chrominance_nrcodes[m + 1]);
+        }
+        for (var n = 0; n <= 11; n++) {
+          writeByte(std_dc_chrominance_values[n]);
+        }
+        writeByte(17);
+        for (var o = 0; o < 16; o++) {
+          writeByte(std_ac_chrominance_nrcodes[o + 1]);
+        }
+        for (var p2 = 0; p2 <= 161; p2++) {
+          writeByte(std_ac_chrominance_values[p2]);
+        }
+      }
+      function writeCOM(comments) {
+        if (typeof comments === "undefined" || comments.constructor !== Array) return;
+        comments.forEach((e) => {
+          if (typeof e !== "string") return;
+          writeWord(65534);
+          var l = e.length;
+          writeWord(l + 2);
+          var i;
+          for (i = 0; i < l; i++)
+            writeByte(e.charCodeAt(i));
+        });
+      }
+      function writeSOS() {
+        writeWord(65498);
+        writeWord(12);
+        writeByte(3);
+        writeByte(1);
+        writeByte(0);
+        writeByte(2);
+        writeByte(17);
+        writeByte(3);
+        writeByte(17);
+        writeByte(0);
+        writeByte(63);
+        writeByte(0);
+      }
+      function processDU(CDU, fdtbl, DC, HTDC, HTAC) {
+        var EOB = HTAC[0];
+        var M16zeroes = HTAC[240];
+        var pos;
+        var I16 = 16;
+        var I63 = 63;
+        var I64 = 64;
+        var DU_DCT = fDCTQuant(CDU, fdtbl);
+        for (var j = 0; j < I64; ++j) {
+          DU[ZigZag[j]] = DU_DCT[j];
+        }
+        var Diff2 = DU[0] - DC;
+        DC = DU[0];
+        if (Diff2 == 0) {
+          writeBits(HTDC[0]);
+        } else {
+          pos = 32767 + Diff2;
+          writeBits(HTDC[category[pos]]);
+          writeBits(bitcode[pos]);
+        }
+        var end0pos = 63;
+        for (; end0pos > 0 && DU[end0pos] == 0; end0pos--) {
+        }
+        ;
+        if (end0pos == 0) {
+          writeBits(EOB);
+          return DC;
+        }
+        var i = 1;
+        var lng;
+        while (i <= end0pos) {
+          var startpos = i;
+          for (; DU[i] == 0 && i <= end0pos; ++i) {
+          }
+          var nrzeroes = i - startpos;
+          if (nrzeroes >= I16) {
+            lng = nrzeroes >> 4;
+            for (var nrmarker = 1; nrmarker <= lng; ++nrmarker)
+              writeBits(M16zeroes);
+            nrzeroes = nrzeroes & 15;
+          }
+          pos = 32767 + DU[i];
+          writeBits(HTAC[(nrzeroes << 4) + category[pos]]);
+          writeBits(bitcode[pos]);
+          i++;
+        }
+        if (end0pos != I63) {
+          writeBits(EOB);
+        }
+        return DC;
+      }
+      function initCharLookupTable() {
+        var sfcc = String.fromCharCode;
+        for (var i = 0; i < 256; i++) {
+          clt[i] = sfcc(i);
+        }
+      }
+      this.encode = function(image, quality2) {
+        var time_start = (/* @__PURE__ */ new Date()).getTime();
+        if (quality2) setQuality(quality2);
+        byteout = new Array();
+        bytenew = 0;
+        bytepos = 7;
+        writeWord(65496);
+        writeAPP0();
+        writeCOM(image.comments);
+        writeAPP1(image.exifBuffer);
+        writeDQT();
+        writeSOF0(image.width, image.height);
+        writeDHT();
+        writeSOS();
+        var DCY = 0;
+        var DCU = 0;
+        var DCV = 0;
+        bytenew = 0;
+        bytepos = 7;
+        this.encode.displayName = "_encode_";
+        var imageData = image.data;
+        var width = image.width;
+        var height = image.height;
+        var quadWidth = width * 4;
+        var tripleWidth = width * 3;
+        var x, y = 0;
+        var r, g, b2;
+        var start, p2, col, row, pos;
+        while (y < height) {
+          x = 0;
+          while (x < quadWidth) {
+            start = quadWidth * y + x;
+            p2 = start;
+            col = -1;
+            row = 0;
+            for (pos = 0; pos < 64; pos++) {
+              row = pos >> 3;
+              col = (pos & 7) * 4;
+              p2 = start + row * quadWidth + col;
+              if (y + row >= height) {
+                p2 -= quadWidth * (y + 1 + row - height);
+              }
+              if (x + col >= quadWidth) {
+                p2 -= x + col - quadWidth + 4;
+              }
+              r = imageData[p2++];
+              g = imageData[p2++];
+              b2 = imageData[p2++];
+              YDU[pos] = (RGB_YUV_TABLE[r] + RGB_YUV_TABLE[g + 256 >> 0] + RGB_YUV_TABLE[b2 + 512 >> 0] >> 16) - 128;
+              UDU[pos] = (RGB_YUV_TABLE[r + 768 >> 0] + RGB_YUV_TABLE[g + 1024 >> 0] + RGB_YUV_TABLE[b2 + 1280 >> 0] >> 16) - 128;
+              VDU[pos] = (RGB_YUV_TABLE[r + 1280 >> 0] + RGB_YUV_TABLE[g + 1536 >> 0] + RGB_YUV_TABLE[b2 + 1792 >> 0] >> 16) - 128;
+            }
+            DCY = processDU(YDU, fdtbl_Y, DCY, YDC_HT, YAC_HT);
+            DCU = processDU(UDU, fdtbl_UV, DCU, UVDC_HT, UVAC_HT);
+            DCV = processDU(VDU, fdtbl_UV, DCV, UVDC_HT, UVAC_HT);
+            x += 32;
+          }
+          y += 8;
+        }
+        if (bytepos >= 0) {
+          var fillbits = [];
+          fillbits[1] = bytepos + 1;
+          fillbits[0] = (1 << bytepos + 1) - 1;
+          writeBits(fillbits);
+        }
+        writeWord(65497);
+        if (typeof module === "undefined") return new Uint8Array(byteout);
+        return Buffer.from(byteout);
+        var jpegDataUri = "data:image/jpeg;base64," + btoa(byteout.join(""));
+        byteout = [];
+        var duration = (/* @__PURE__ */ new Date()).getTime() - time_start;
+        return jpegDataUri;
+      };
+      function setQuality(quality2) {
+        if (quality2 <= 0) {
+          quality2 = 1;
+        }
+        if (quality2 > 100) {
+          quality2 = 100;
+        }
+        if (currentQuality == quality2) return;
+        var sf = 0;
+        if (quality2 < 50) {
+          sf = Math.floor(5e3 / quality2);
+        } else {
+          sf = Math.floor(200 - quality2 * 2);
+        }
+        initQuantTables(sf);
+        currentQuality = quality2;
+      }
+      function init() {
+        var time_start = (/* @__PURE__ */ new Date()).getTime();
+        if (!quality) quality = 50;
+        initCharLookupTable();
+        initHuffmanTbl();
+        initCategoryNumber();
+        initRGBYUVTable();
+        setQuality(quality);
+        var duration = (/* @__PURE__ */ new Date()).getTime() - time_start;
+      }
+      init();
+    }
+    if (typeof module !== "undefined") {
+      module.exports = encode3;
+    } else if (typeof window !== "undefined") {
+      window["jpeg-js"] = window["jpeg-js"] || {};
+      window["jpeg-js"].encode = encode3;
+    }
+    function encode3(imgData, qu) {
+      if (typeof qu === "undefined") qu = 50;
+      var encoder = new JPEGEncoder(qu);
+      var data = encoder.encode(imgData, qu);
+      return {
+        data,
+        width: imgData.width,
+        height: imgData.height
+      };
+    }
+  }
+});
+
+// ../../node_modules/.pnpm/jpeg-js@0.4.4/node_modules/jpeg-js/lib/decoder.js
+var require_decoder = __commonJS({
+  "../../node_modules/.pnpm/jpeg-js@0.4.4/node_modules/jpeg-js/lib/decoder.js"(exports, module) {
+    var JpegImage = (function jpegImage() {
+      "use strict";
+      var dctZigZag = new Int32Array([
+        0,
+        1,
+        8,
+        16,
+        9,
+        2,
+        3,
+        10,
+        17,
+        24,
+        32,
+        25,
+        18,
+        11,
+        4,
+        5,
+        12,
+        19,
+        26,
+        33,
+        40,
+        48,
+        41,
+        34,
+        27,
+        20,
+        13,
+        6,
+        7,
+        14,
+        21,
+        28,
+        35,
+        42,
+        49,
+        56,
+        57,
+        50,
+        43,
+        36,
+        29,
+        22,
+        15,
+        23,
+        30,
+        37,
+        44,
+        51,
+        58,
+        59,
+        52,
+        45,
+        38,
+        31,
+        39,
+        46,
+        53,
+        60,
+        61,
+        54,
+        47,
+        55,
+        62,
+        63
+      ]);
+      var dctCos1 = 4017;
+      var dctSin1 = 799;
+      var dctCos3 = 3406;
+      var dctSin3 = 2276;
+      var dctCos6 = 1567;
+      var dctSin6 = 3784;
+      var dctSqrt2 = 5793;
+      var dctSqrt1d2 = 2896;
+      function constructor() {
+      }
+      function buildHuffmanTable(codeLengths, values2) {
+        var k = 0, code = [], i, j, length2 = 16;
+        while (length2 > 0 && !codeLengths[length2 - 1])
+          length2--;
+        code.push({ children: [], index: 0 });
+        var p2 = code[0], q;
+        for (i = 0; i < length2; i++) {
+          for (j = 0; j < codeLengths[i]; j++) {
+            p2 = code.pop();
+            p2.children[p2.index] = values2[k];
+            while (p2.index > 0) {
+              if (code.length === 0)
+                throw new Error("Could not recreate Huffman Table");
+              p2 = code.pop();
+            }
+            p2.index++;
+            code.push(p2);
+            while (code.length <= i) {
+              code.push(q = { children: [], index: 0 });
+              p2.children[p2.index] = q.children;
+              p2 = q;
+            }
+            k++;
+          }
+          if (i + 1 < length2) {
+            code.push(q = { children: [], index: 0 });
+            p2.children[p2.index] = q.children;
+            p2 = q;
+          }
+        }
+        return code[0].children;
+      }
+      function decodeScan(data, offset, frame, components, resetInterval, spectralStart, spectralEnd, successivePrev, successive, opts) {
+        var precision = frame.precision;
+        var samplesPerLine = frame.samplesPerLine;
+        var scanLines = frame.scanLines;
+        var mcusPerLine = frame.mcusPerLine;
+        var progressive = frame.progressive;
+        var maxH = frame.maxH, maxV = frame.maxV;
+        var startOffset = offset, bitsData = 0, bitsCount = 0;
+        function readBit() {
+          if (bitsCount > 0) {
+            bitsCount--;
+            return bitsData >> bitsCount & 1;
+          }
+          bitsData = data[offset++];
+          if (bitsData == 255) {
+            var nextByte = data[offset++];
+            if (nextByte) {
+              throw new Error("unexpected marker: " + (bitsData << 8 | nextByte).toString(16));
+            }
+          }
+          bitsCount = 7;
+          return bitsData >>> 7;
+        }
+        function decodeHuffman(tree) {
+          var node = tree, bit;
+          while ((bit = readBit()) !== null) {
+            node = node[bit];
+            if (typeof node === "number")
+              return node;
+            if (typeof node !== "object")
+              throw new Error("invalid huffman sequence");
+          }
+          return null;
+        }
+        function receive(length2) {
+          var n2 = 0;
+          while (length2 > 0) {
+            var bit = readBit();
+            if (bit === null) return;
+            n2 = n2 << 1 | bit;
+            length2--;
+          }
+          return n2;
+        }
+        function receiveAndExtend(length2) {
+          var n2 = receive(length2);
+          if (n2 >= 1 << length2 - 1)
+            return n2;
+          return n2 + (-1 << length2) + 1;
+        }
+        function decodeBaseline(component2, zz) {
+          var t2 = decodeHuffman(component2.huffmanTableDC);
+          var diff = t2 === 0 ? 0 : receiveAndExtend(t2);
+          zz[0] = component2.pred += diff;
+          var k2 = 1;
+          while (k2 < 64) {
+            var rs = decodeHuffman(component2.huffmanTableAC);
+            var s = rs & 15, r = rs >> 4;
+            if (s === 0) {
+              if (r < 15)
+                break;
+              k2 += 16;
+              continue;
+            }
+            k2 += r;
+            var z25 = dctZigZag[k2];
+            zz[z25] = receiveAndExtend(s);
+            k2++;
+          }
+        }
+        function decodeDCFirst(component2, zz) {
+          var t2 = decodeHuffman(component2.huffmanTableDC);
+          var diff = t2 === 0 ? 0 : receiveAndExtend(t2) << successive;
+          zz[0] = component2.pred += diff;
+        }
+        function decodeDCSuccessive(component2, zz) {
+          zz[0] |= readBit() << successive;
+        }
+        var eobrun = 0;
+        function decodeACFirst(component2, zz) {
+          if (eobrun > 0) {
+            eobrun--;
+            return;
+          }
+          var k2 = spectralStart, e = spectralEnd;
+          while (k2 <= e) {
+            var rs = decodeHuffman(component2.huffmanTableAC);
+            var s = rs & 15, r = rs >> 4;
+            if (s === 0) {
+              if (r < 15) {
+                eobrun = receive(r) + (1 << r) - 1;
+                break;
+              }
+              k2 += 16;
+              continue;
+            }
+            k2 += r;
+            var z25 = dctZigZag[k2];
+            zz[z25] = receiveAndExtend(s) * (1 << successive);
+            k2++;
+          }
+        }
+        var successiveACState = 0, successiveACNextValue;
+        function decodeACSuccessive(component2, zz) {
+          var k2 = spectralStart, e = spectralEnd, r = 0;
+          while (k2 <= e) {
+            var z25 = dctZigZag[k2];
+            var direction = zz[z25] < 0 ? -1 : 1;
+            switch (successiveACState) {
+              case 0:
+                var rs = decodeHuffman(component2.huffmanTableAC);
+                var s = rs & 15, r = rs >> 4;
+                if (s === 0) {
+                  if (r < 15) {
+                    eobrun = receive(r) + (1 << r);
+                    successiveACState = 4;
+                  } else {
+                    r = 16;
+                    successiveACState = 1;
+                  }
+                } else {
+                  if (s !== 1)
+                    throw new Error("invalid ACn encoding");
+                  successiveACNextValue = receiveAndExtend(s);
+                  successiveACState = r ? 2 : 3;
+                }
+                continue;
+              case 1:
+              // skipping r zero items
+              case 2:
+                if (zz[z25])
+                  zz[z25] += (readBit() << successive) * direction;
+                else {
+                  r--;
+                  if (r === 0)
+                    successiveACState = successiveACState == 2 ? 3 : 0;
+                }
+                break;
+              case 3:
+                if (zz[z25])
+                  zz[z25] += (readBit() << successive) * direction;
+                else {
+                  zz[z25] = successiveACNextValue << successive;
+                  successiveACState = 0;
+                }
+                break;
+              case 4:
+                if (zz[z25])
+                  zz[z25] += (readBit() << successive) * direction;
+                break;
+            }
+            k2++;
+          }
+          if (successiveACState === 4) {
+            eobrun--;
+            if (eobrun === 0)
+              successiveACState = 0;
+          }
+        }
+        function decodeMcu(component2, decode2, mcu2, row, col) {
+          var mcuRow = mcu2 / mcusPerLine | 0;
+          var mcuCol = mcu2 % mcusPerLine;
+          var blockRow = mcuRow * component2.v + row;
+          var blockCol = mcuCol * component2.h + col;
+          if (component2.blocks[blockRow] === void 0 && opts.tolerantDecoding)
+            return;
+          decode2(component2, component2.blocks[blockRow][blockCol]);
+        }
+        function decodeBlock(component2, decode2, mcu2) {
+          var blockRow = mcu2 / component2.blocksPerLine | 0;
+          var blockCol = mcu2 % component2.blocksPerLine;
+          if (component2.blocks[blockRow] === void 0 && opts.tolerantDecoding)
+            return;
+          decode2(component2, component2.blocks[blockRow][blockCol]);
+        }
+        var componentsLength = components.length;
+        var component, i, j, k, n;
+        var decodeFn;
+        if (progressive) {
+          if (spectralStart === 0)
+            decodeFn = successivePrev === 0 ? decodeDCFirst : decodeDCSuccessive;
+          else
+            decodeFn = successivePrev === 0 ? decodeACFirst : decodeACSuccessive;
+        } else {
+          decodeFn = decodeBaseline;
+        }
+        var mcu = 0, marker;
+        var mcuExpected;
+        if (componentsLength == 1) {
+          mcuExpected = components[0].blocksPerLine * components[0].blocksPerColumn;
+        } else {
+          mcuExpected = mcusPerLine * frame.mcusPerColumn;
+        }
+        if (!resetInterval) resetInterval = mcuExpected;
+        var h, v;
+        while (mcu < mcuExpected) {
+          for (i = 0; i < componentsLength; i++)
+            components[i].pred = 0;
+          eobrun = 0;
+          if (componentsLength == 1) {
+            component = components[0];
+            for (n = 0; n < resetInterval; n++) {
+              decodeBlock(component, decodeFn, mcu);
+              mcu++;
+            }
+          } else {
+            for (n = 0; n < resetInterval; n++) {
+              for (i = 0; i < componentsLength; i++) {
+                component = components[i];
+                h = component.h;
+                v = component.v;
+                for (j = 0; j < v; j++) {
+                  for (k = 0; k < h; k++) {
+                    decodeMcu(component, decodeFn, mcu, j, k);
+                  }
+                }
+              }
+              mcu++;
+              if (mcu === mcuExpected) break;
+            }
+          }
+          if (mcu === mcuExpected) {
+            do {
+              if (data[offset] === 255) {
+                if (data[offset + 1] !== 0) {
+                  break;
+                }
+              }
+              offset += 1;
+            } while (offset < data.length - 2);
+          }
+          bitsCount = 0;
+          marker = data[offset] << 8 | data[offset + 1];
+          if (marker < 65280) {
+            throw new Error("marker was not found");
+          }
+          if (marker >= 65488 && marker <= 65495) {
+            offset += 2;
+          } else
+            break;
+        }
+        return offset - startOffset;
+      }
+      function buildComponentData(frame, component) {
+        var lines = [];
+        var blocksPerLine = component.blocksPerLine;
+        var blocksPerColumn = component.blocksPerColumn;
+        var samplesPerLine = blocksPerLine << 3;
+        var R = new Int32Array(64), r = new Uint8Array(64);
+        function quantizeAndInverse(zz, dataOut, dataIn) {
+          var qt = component.quantizationTable;
+          var v0, v1, v2, v3, v4, v5, v6, v7, t2;
+          var p2 = dataIn;
+          var i2;
+          for (i2 = 0; i2 < 64; i2++)
+            p2[i2] = zz[i2] * qt[i2];
+          for (i2 = 0; i2 < 8; ++i2) {
+            var row = 8 * i2;
+            if (p2[1 + row] == 0 && p2[2 + row] == 0 && p2[3 + row] == 0 && p2[4 + row] == 0 && p2[5 + row] == 0 && p2[6 + row] == 0 && p2[7 + row] == 0) {
+              t2 = dctSqrt2 * p2[0 + row] + 512 >> 10;
+              p2[0 + row] = t2;
+              p2[1 + row] = t2;
+              p2[2 + row] = t2;
+              p2[3 + row] = t2;
+              p2[4 + row] = t2;
+              p2[5 + row] = t2;
+              p2[6 + row] = t2;
+              p2[7 + row] = t2;
+              continue;
+            }
+            v0 = dctSqrt2 * p2[0 + row] + 128 >> 8;
+            v1 = dctSqrt2 * p2[4 + row] + 128 >> 8;
+            v2 = p2[2 + row];
+            v3 = p2[6 + row];
+            v4 = dctSqrt1d2 * (p2[1 + row] - p2[7 + row]) + 128 >> 8;
+            v7 = dctSqrt1d2 * (p2[1 + row] + p2[7 + row]) + 128 >> 8;
+            v5 = p2[3 + row] << 4;
+            v6 = p2[5 + row] << 4;
+            t2 = v0 - v1 + 1 >> 1;
+            v0 = v0 + v1 + 1 >> 1;
+            v1 = t2;
+            t2 = v2 * dctSin6 + v3 * dctCos6 + 128 >> 8;
+            v2 = v2 * dctCos6 - v3 * dctSin6 + 128 >> 8;
+            v3 = t2;
+            t2 = v4 - v6 + 1 >> 1;
+            v4 = v4 + v6 + 1 >> 1;
+            v6 = t2;
+            t2 = v7 + v5 + 1 >> 1;
+            v5 = v7 - v5 + 1 >> 1;
+            v7 = t2;
+            t2 = v0 - v3 + 1 >> 1;
+            v0 = v0 + v3 + 1 >> 1;
+            v3 = t2;
+            t2 = v1 - v2 + 1 >> 1;
+            v1 = v1 + v2 + 1 >> 1;
+            v2 = t2;
+            t2 = v4 * dctSin3 + v7 * dctCos3 + 2048 >> 12;
+            v4 = v4 * dctCos3 - v7 * dctSin3 + 2048 >> 12;
+            v7 = t2;
+            t2 = v5 * dctSin1 + v6 * dctCos1 + 2048 >> 12;
+            v5 = v5 * dctCos1 - v6 * dctSin1 + 2048 >> 12;
+            v6 = t2;
+            p2[0 + row] = v0 + v7;
+            p2[7 + row] = v0 - v7;
+            p2[1 + row] = v1 + v6;
+            p2[6 + row] = v1 - v6;
+            p2[2 + row] = v2 + v5;
+            p2[5 + row] = v2 - v5;
+            p2[3 + row] = v3 + v4;
+            p2[4 + row] = v3 - v4;
+          }
+          for (i2 = 0; i2 < 8; ++i2) {
+            var col = i2;
+            if (p2[1 * 8 + col] == 0 && p2[2 * 8 + col] == 0 && p2[3 * 8 + col] == 0 && p2[4 * 8 + col] == 0 && p2[5 * 8 + col] == 0 && p2[6 * 8 + col] == 0 && p2[7 * 8 + col] == 0) {
+              t2 = dctSqrt2 * dataIn[i2 + 0] + 8192 >> 14;
+              p2[0 * 8 + col] = t2;
+              p2[1 * 8 + col] = t2;
+              p2[2 * 8 + col] = t2;
+              p2[3 * 8 + col] = t2;
+              p2[4 * 8 + col] = t2;
+              p2[5 * 8 + col] = t2;
+              p2[6 * 8 + col] = t2;
+              p2[7 * 8 + col] = t2;
+              continue;
+            }
+            v0 = dctSqrt2 * p2[0 * 8 + col] + 2048 >> 12;
+            v1 = dctSqrt2 * p2[4 * 8 + col] + 2048 >> 12;
+            v2 = p2[2 * 8 + col];
+            v3 = p2[6 * 8 + col];
+            v4 = dctSqrt1d2 * (p2[1 * 8 + col] - p2[7 * 8 + col]) + 2048 >> 12;
+            v7 = dctSqrt1d2 * (p2[1 * 8 + col] + p2[7 * 8 + col]) + 2048 >> 12;
+            v5 = p2[3 * 8 + col];
+            v6 = p2[5 * 8 + col];
+            t2 = v0 - v1 + 1 >> 1;
+            v0 = v0 + v1 + 1 >> 1;
+            v1 = t2;
+            t2 = v2 * dctSin6 + v3 * dctCos6 + 2048 >> 12;
+            v2 = v2 * dctCos6 - v3 * dctSin6 + 2048 >> 12;
+            v3 = t2;
+            t2 = v4 - v6 + 1 >> 1;
+            v4 = v4 + v6 + 1 >> 1;
+            v6 = t2;
+            t2 = v7 + v5 + 1 >> 1;
+            v5 = v7 - v5 + 1 >> 1;
+            v7 = t2;
+            t2 = v0 - v3 + 1 >> 1;
+            v0 = v0 + v3 + 1 >> 1;
+            v3 = t2;
+            t2 = v1 - v2 + 1 >> 1;
+            v1 = v1 + v2 + 1 >> 1;
+            v2 = t2;
+            t2 = v4 * dctSin3 + v7 * dctCos3 + 2048 >> 12;
+            v4 = v4 * dctCos3 - v7 * dctSin3 + 2048 >> 12;
+            v7 = t2;
+            t2 = v5 * dctSin1 + v6 * dctCos1 + 2048 >> 12;
+            v5 = v5 * dctCos1 - v6 * dctSin1 + 2048 >> 12;
+            v6 = t2;
+            p2[0 * 8 + col] = v0 + v7;
+            p2[7 * 8 + col] = v0 - v7;
+            p2[1 * 8 + col] = v1 + v6;
+            p2[6 * 8 + col] = v1 - v6;
+            p2[2 * 8 + col] = v2 + v5;
+            p2[5 * 8 + col] = v2 - v5;
+            p2[3 * 8 + col] = v3 + v4;
+            p2[4 * 8 + col] = v3 - v4;
+          }
+          for (i2 = 0; i2 < 64; ++i2) {
+            var sample2 = 128 + (p2[i2] + 8 >> 4);
+            dataOut[i2] = sample2 < 0 ? 0 : sample2 > 255 ? 255 : sample2;
+          }
+        }
+        requestMemoryAllocation(samplesPerLine * blocksPerColumn * 8);
+        var i, j;
+        for (var blockRow = 0; blockRow < blocksPerColumn; blockRow++) {
+          var scanLine = blockRow << 3;
+          for (i = 0; i < 8; i++)
+            lines.push(new Uint8Array(samplesPerLine));
+          for (var blockCol = 0; blockCol < blocksPerLine; blockCol++) {
+            quantizeAndInverse(component.blocks[blockRow][blockCol], r, R);
+            var offset = 0, sample = blockCol << 3;
+            for (j = 0; j < 8; j++) {
+              var line = lines[scanLine + j];
+              for (i = 0; i < 8; i++)
+                line[sample + i] = r[offset++];
+            }
+          }
+        }
+        return lines;
+      }
+      function clampTo8bit(a) {
+        return a < 0 ? 0 : a > 255 ? 255 : a;
+      }
+      constructor.prototype = {
+        load: function load(path) {
+          var xhr = new XMLHttpRequest();
+          xhr.open("GET", path, true);
+          xhr.responseType = "arraybuffer";
+          xhr.onload = (function() {
+            var data = new Uint8Array(xhr.response || xhr.mozResponseArrayBuffer);
+            this.parse(data);
+            if (this.onload)
+              this.onload();
+          }).bind(this);
+          xhr.send(null);
+        },
+        parse: function parse(data) {
+          var maxResolutionInPixels = this.opts.maxResolutionInMP * 1e3 * 1e3;
+          var offset = 0, length2 = data.length;
+          function readUint16() {
+            var value = data[offset] << 8 | data[offset + 1];
+            offset += 2;
+            return value;
+          }
+          function readDataBlock() {
+            var length3 = readUint16();
+            var array = data.subarray(offset, offset + length3 - 2);
+            offset += array.length;
+            return array;
+          }
+          function prepareComponents(frame2) {
+            var maxH2 = 1, maxV2 = 1;
+            var component2, componentId2;
+            for (componentId2 in frame2.components) {
+              if (frame2.components.hasOwnProperty(componentId2)) {
+                component2 = frame2.components[componentId2];
+                if (maxH2 < component2.h) maxH2 = component2.h;
+                if (maxV2 < component2.v) maxV2 = component2.v;
+              }
+            }
+            var mcusPerLine = Math.ceil(frame2.samplesPerLine / 8 / maxH2);
+            var mcusPerColumn = Math.ceil(frame2.scanLines / 8 / maxV2);
+            for (componentId2 in frame2.components) {
+              if (frame2.components.hasOwnProperty(componentId2)) {
+                component2 = frame2.components[componentId2];
+                var blocksPerLine = Math.ceil(Math.ceil(frame2.samplesPerLine / 8) * component2.h / maxH2);
+                var blocksPerColumn = Math.ceil(Math.ceil(frame2.scanLines / 8) * component2.v / maxV2);
+                var blocksPerLineForMcu = mcusPerLine * component2.h;
+                var blocksPerColumnForMcu = mcusPerColumn * component2.v;
+                var blocksToAllocate = blocksPerColumnForMcu * blocksPerLineForMcu;
+                var blocks = [];
+                requestMemoryAllocation(blocksToAllocate * 256);
+                for (var i2 = 0; i2 < blocksPerColumnForMcu; i2++) {
+                  var row = [];
+                  for (var j2 = 0; j2 < blocksPerLineForMcu; j2++)
+                    row.push(new Int32Array(64));
+                  blocks.push(row);
+                }
+                component2.blocksPerLine = blocksPerLine;
+                component2.blocksPerColumn = blocksPerColumn;
+                component2.blocks = blocks;
+              }
+            }
+            frame2.maxH = maxH2;
+            frame2.maxV = maxV2;
+            frame2.mcusPerLine = mcusPerLine;
+            frame2.mcusPerColumn = mcusPerColumn;
+          }
+          var jfif = null;
+          var adobe = null;
+          var pixels = null;
+          var frame, resetInterval;
+          var quantizationTables = [], frames = [];
+          var huffmanTablesAC = [], huffmanTablesDC = [];
+          var fileMarker = readUint16();
+          var malformedDataOffset = -1;
+          this.comments = [];
+          if (fileMarker != 65496) {
+            throw new Error("SOI not found");
+          }
+          fileMarker = readUint16();
+          while (fileMarker != 65497) {
+            var i, j, l;
+            switch (fileMarker) {
+              case 65280:
+                break;
+              case 65504:
+              // APP0 (Application Specific)
+              case 65505:
+              // APP1
+              case 65506:
+              // APP2
+              case 65507:
+              // APP3
+              case 65508:
+              // APP4
+              case 65509:
+              // APP5
+              case 65510:
+              // APP6
+              case 65511:
+              // APP7
+              case 65512:
+              // APP8
+              case 65513:
+              // APP9
+              case 65514:
+              // APP10
+              case 65515:
+              // APP11
+              case 65516:
+              // APP12
+              case 65517:
+              // APP13
+              case 65518:
+              // APP14
+              case 65519:
+              // APP15
+              case 65534:
+                var appData = readDataBlock();
+                if (fileMarker === 65534) {
+                  var comment = String.fromCharCode.apply(null, appData);
+                  this.comments.push(comment);
+                }
+                if (fileMarker === 65504) {
+                  if (appData[0] === 74 && appData[1] === 70 && appData[2] === 73 && appData[3] === 70 && appData[4] === 0) {
+                    jfif = {
+                      version: { major: appData[5], minor: appData[6] },
+                      densityUnits: appData[7],
+                      xDensity: appData[8] << 8 | appData[9],
+                      yDensity: appData[10] << 8 | appData[11],
+                      thumbWidth: appData[12],
+                      thumbHeight: appData[13],
+                      thumbData: appData.subarray(14, 14 + 3 * appData[12] * appData[13])
+                    };
+                  }
+                }
+                if (fileMarker === 65505) {
+                  if (appData[0] === 69 && appData[1] === 120 && appData[2] === 105 && appData[3] === 102 && appData[4] === 0) {
+                    this.exifBuffer = appData.subarray(5, appData.length);
+                  }
+                }
+                if (fileMarker === 65518) {
+                  if (appData[0] === 65 && appData[1] === 100 && appData[2] === 111 && appData[3] === 98 && appData[4] === 101 && appData[5] === 0) {
+                    adobe = {
+                      version: appData[6],
+                      flags0: appData[7] << 8 | appData[8],
+                      flags1: appData[9] << 8 | appData[10],
+                      transformCode: appData[11]
+                    };
+                  }
+                }
+                break;
+              case 65499:
+                var quantizationTablesLength = readUint16();
+                var quantizationTablesEnd = quantizationTablesLength + offset - 2;
+                while (offset < quantizationTablesEnd) {
+                  var quantizationTableSpec = data[offset++];
+                  requestMemoryAllocation(64 * 4);
+                  var tableData = new Int32Array(64);
+                  if (quantizationTableSpec >> 4 === 0) {
+                    for (j = 0; j < 64; j++) {
+                      var z25 = dctZigZag[j];
+                      tableData[z25] = data[offset++];
+                    }
+                  } else if (quantizationTableSpec >> 4 === 1) {
+                    for (j = 0; j < 64; j++) {
+                      var z25 = dctZigZag[j];
+                      tableData[z25] = readUint16();
+                    }
+                  } else
+                    throw new Error("DQT: invalid table spec");
+                  quantizationTables[quantizationTableSpec & 15] = tableData;
+                }
+                break;
+              case 65472:
+              // SOF0 (Start of Frame, Baseline DCT)
+              case 65473:
+              // SOF1 (Start of Frame, Extended DCT)
+              case 65474:
+                readUint16();
+                frame = {};
+                frame.extended = fileMarker === 65473;
+                frame.progressive = fileMarker === 65474;
+                frame.precision = data[offset++];
+                frame.scanLines = readUint16();
+                frame.samplesPerLine = readUint16();
+                frame.components = {};
+                frame.componentsOrder = [];
+                var pixelsInFrame = frame.scanLines * frame.samplesPerLine;
+                if (pixelsInFrame > maxResolutionInPixels) {
+                  var exceededAmount = Math.ceil((pixelsInFrame - maxResolutionInPixels) / 1e6);
+                  throw new Error(`maxResolutionInMP limit exceeded by ${exceededAmount}MP`);
+                }
+                var componentsCount = data[offset++], componentId;
+                var maxH = 0, maxV = 0;
+                for (i = 0; i < componentsCount; i++) {
+                  componentId = data[offset];
+                  var h = data[offset + 1] >> 4;
+                  var v = data[offset + 1] & 15;
+                  var qId = data[offset + 2];
+                  if (h <= 0 || v <= 0) {
+                    throw new Error("Invalid sampling factor, expected values above 0");
+                  }
+                  frame.componentsOrder.push(componentId);
+                  frame.components[componentId] = {
+                    h,
+                    v,
+                    quantizationIdx: qId
+                  };
+                  offset += 3;
+                }
+                prepareComponents(frame);
+                frames.push(frame);
+                break;
+              case 65476:
+                var huffmanLength = readUint16();
+                for (i = 2; i < huffmanLength; ) {
+                  var huffmanTableSpec = data[offset++];
+                  var codeLengths = new Uint8Array(16);
+                  var codeLengthSum = 0;
+                  for (j = 0; j < 16; j++, offset++) {
+                    codeLengthSum += codeLengths[j] = data[offset];
+                  }
+                  requestMemoryAllocation(16 + codeLengthSum);
+                  var huffmanValues = new Uint8Array(codeLengthSum);
+                  for (j = 0; j < codeLengthSum; j++, offset++)
+                    huffmanValues[j] = data[offset];
+                  i += 17 + codeLengthSum;
+                  (huffmanTableSpec >> 4 === 0 ? huffmanTablesDC : huffmanTablesAC)[huffmanTableSpec & 15] = buildHuffmanTable(codeLengths, huffmanValues);
+                }
+                break;
+              case 65501:
+                readUint16();
+                resetInterval = readUint16();
+                break;
+              case 65500:
+                readUint16();
+                readUint16();
+                break;
+              case 65498:
+                var scanLength = readUint16();
+                var selectorsCount = data[offset++];
+                var components = [], component;
+                for (i = 0; i < selectorsCount; i++) {
+                  component = frame.components[data[offset++]];
+                  var tableSpec = data[offset++];
+                  component.huffmanTableDC = huffmanTablesDC[tableSpec >> 4];
+                  component.huffmanTableAC = huffmanTablesAC[tableSpec & 15];
+                  components.push(component);
+                }
+                var spectralStart = data[offset++];
+                var spectralEnd = data[offset++];
+                var successiveApproximation = data[offset++];
+                var processed = decodeScan(
+                  data,
+                  offset,
+                  frame,
+                  components,
+                  resetInterval,
+                  spectralStart,
+                  spectralEnd,
+                  successiveApproximation >> 4,
+                  successiveApproximation & 15,
+                  this.opts
+                );
+                offset += processed;
+                break;
+              case 65535:
+                if (data[offset] !== 255) {
+                  offset--;
+                }
+                break;
+              default:
+                if (data[offset - 3] == 255 && data[offset - 2] >= 192 && data[offset - 2] <= 254) {
+                  offset -= 3;
+                  break;
+                } else if (fileMarker === 224 || fileMarker == 225) {
+                  if (malformedDataOffset !== -1) {
+                    throw new Error(`first unknown JPEG marker at offset ${malformedDataOffset.toString(16)}, second unknown JPEG marker ${fileMarker.toString(16)} at offset ${(offset - 1).toString(16)}`);
+                  }
+                  malformedDataOffset = offset - 1;
+                  const nextOffset = readUint16();
+                  if (data[offset + nextOffset - 2] === 255) {
+                    offset += nextOffset - 2;
+                    break;
+                  }
+                }
+                throw new Error("unknown JPEG marker " + fileMarker.toString(16));
+            }
+            fileMarker = readUint16();
+          }
+          if (frames.length != 1)
+            throw new Error("only single frame JPEGs supported");
+          for (var i = 0; i < frames.length; i++) {
+            var cp = frames[i].components;
+            for (var j in cp) {
+              cp[j].quantizationTable = quantizationTables[cp[j].quantizationIdx];
+              delete cp[j].quantizationIdx;
+            }
+          }
+          this.width = frame.samplesPerLine;
+          this.height = frame.scanLines;
+          this.jfif = jfif;
+          this.adobe = adobe;
+          this.components = [];
+          for (var i = 0; i < frame.componentsOrder.length; i++) {
+            var component = frame.components[frame.componentsOrder[i]];
+            this.components.push({
+              lines: buildComponentData(frame, component),
+              scaleX: component.h / frame.maxH,
+              scaleY: component.v / frame.maxV
+            });
+          }
+        },
+        getData: function getData(width, height) {
+          var scaleX = this.width / width, scaleY = this.height / height;
+          var component1, component2, component3, component4;
+          var component1Line, component2Line, component3Line, component4Line;
+          var x, y;
+          var offset = 0;
+          var Y, Cb, Cr, K, C2, M, Ye, R, G, B;
+          var colorTransform;
+          var dataLength = width * height * this.components.length;
+          requestMemoryAllocation(dataLength);
+          var data = new Uint8Array(dataLength);
+          switch (this.components.length) {
+            case 1:
+              component1 = this.components[0];
+              for (y = 0; y < height; y++) {
+                component1Line = component1.lines[0 | y * component1.scaleY * scaleY];
+                for (x = 0; x < width; x++) {
+                  Y = component1Line[0 | x * component1.scaleX * scaleX];
+                  data[offset++] = Y;
+                }
+              }
+              break;
+            case 2:
+              component1 = this.components[0];
+              component2 = this.components[1];
+              for (y = 0; y < height; y++) {
+                component1Line = component1.lines[0 | y * component1.scaleY * scaleY];
+                component2Line = component2.lines[0 | y * component2.scaleY * scaleY];
+                for (x = 0; x < width; x++) {
+                  Y = component1Line[0 | x * component1.scaleX * scaleX];
+                  data[offset++] = Y;
+                  Y = component2Line[0 | x * component2.scaleX * scaleX];
+                  data[offset++] = Y;
+                }
+              }
+              break;
+            case 3:
+              colorTransform = true;
+              if (this.adobe && this.adobe.transformCode)
+                colorTransform = true;
+              else if (typeof this.opts.colorTransform !== "undefined")
+                colorTransform = !!this.opts.colorTransform;
+              component1 = this.components[0];
+              component2 = this.components[1];
+              component3 = this.components[2];
+              for (y = 0; y < height; y++) {
+                component1Line = component1.lines[0 | y * component1.scaleY * scaleY];
+                component2Line = component2.lines[0 | y * component2.scaleY * scaleY];
+                component3Line = component3.lines[0 | y * component3.scaleY * scaleY];
+                for (x = 0; x < width; x++) {
+                  if (!colorTransform) {
+                    R = component1Line[0 | x * component1.scaleX * scaleX];
+                    G = component2Line[0 | x * component2.scaleX * scaleX];
+                    B = component3Line[0 | x * component3.scaleX * scaleX];
+                  } else {
+                    Y = component1Line[0 | x * component1.scaleX * scaleX];
+                    Cb = component2Line[0 | x * component2.scaleX * scaleX];
+                    Cr = component3Line[0 | x * component3.scaleX * scaleX];
+                    R = clampTo8bit(Y + 1.402 * (Cr - 128));
+                    G = clampTo8bit(Y - 0.3441363 * (Cb - 128) - 0.71413636 * (Cr - 128));
+                    B = clampTo8bit(Y + 1.772 * (Cb - 128));
+                  }
+                  data[offset++] = R;
+                  data[offset++] = G;
+                  data[offset++] = B;
+                }
+              }
+              break;
+            case 4:
+              if (!this.adobe)
+                throw new Error("Unsupported color mode (4 components)");
+              colorTransform = false;
+              if (this.adobe && this.adobe.transformCode)
+                colorTransform = true;
+              else if (typeof this.opts.colorTransform !== "undefined")
+                colorTransform = !!this.opts.colorTransform;
+              component1 = this.components[0];
+              component2 = this.components[1];
+              component3 = this.components[2];
+              component4 = this.components[3];
+              for (y = 0; y < height; y++) {
+                component1Line = component1.lines[0 | y * component1.scaleY * scaleY];
+                component2Line = component2.lines[0 | y * component2.scaleY * scaleY];
+                component3Line = component3.lines[0 | y * component3.scaleY * scaleY];
+                component4Line = component4.lines[0 | y * component4.scaleY * scaleY];
+                for (x = 0; x < width; x++) {
+                  if (!colorTransform) {
+                    C2 = component1Line[0 | x * component1.scaleX * scaleX];
+                    M = component2Line[0 | x * component2.scaleX * scaleX];
+                    Ye = component3Line[0 | x * component3.scaleX * scaleX];
+                    K = component4Line[0 | x * component4.scaleX * scaleX];
+                  } else {
+                    Y = component1Line[0 | x * component1.scaleX * scaleX];
+                    Cb = component2Line[0 | x * component2.scaleX * scaleX];
+                    Cr = component3Line[0 | x * component3.scaleX * scaleX];
+                    K = component4Line[0 | x * component4.scaleX * scaleX];
+                    C2 = 255 - clampTo8bit(Y + 1.402 * (Cr - 128));
+                    M = 255 - clampTo8bit(Y - 0.3441363 * (Cb - 128) - 0.71413636 * (Cr - 128));
+                    Ye = 255 - clampTo8bit(Y + 1.772 * (Cb - 128));
+                  }
+                  data[offset++] = 255 - C2;
+                  data[offset++] = 255 - M;
+                  data[offset++] = 255 - Ye;
+                  data[offset++] = 255 - K;
+                }
+              }
+              break;
+            default:
+              throw new Error("Unsupported color mode");
+          }
+          return data;
+        },
+        copyToImageData: function copyToImageData(imageData, formatAsRGBA) {
+          var width = imageData.width, height = imageData.height;
+          var imageDataArray = imageData.data;
+          var data = this.getData(width, height);
+          var i = 0, j = 0, x, y;
+          var Y, K, C2, M, R, G, B;
+          switch (this.components.length) {
+            case 1:
+              for (y = 0; y < height; y++) {
+                for (x = 0; x < width; x++) {
+                  Y = data[i++];
+                  imageDataArray[j++] = Y;
+                  imageDataArray[j++] = Y;
+                  imageDataArray[j++] = Y;
+                  if (formatAsRGBA) {
+                    imageDataArray[j++] = 255;
+                  }
+                }
+              }
+              break;
+            case 3:
+              for (y = 0; y < height; y++) {
+                for (x = 0; x < width; x++) {
+                  R = data[i++];
+                  G = data[i++];
+                  B = data[i++];
+                  imageDataArray[j++] = R;
+                  imageDataArray[j++] = G;
+                  imageDataArray[j++] = B;
+                  if (formatAsRGBA) {
+                    imageDataArray[j++] = 255;
+                  }
+                }
+              }
+              break;
+            case 4:
+              for (y = 0; y < height; y++) {
+                for (x = 0; x < width; x++) {
+                  C2 = data[i++];
+                  M = data[i++];
+                  Y = data[i++];
+                  K = data[i++];
+                  R = 255 - clampTo8bit(C2 * (1 - K / 255) + K);
+                  G = 255 - clampTo8bit(M * (1 - K / 255) + K);
+                  B = 255 - clampTo8bit(Y * (1 - K / 255) + K);
+                  imageDataArray[j++] = R;
+                  imageDataArray[j++] = G;
+                  imageDataArray[j++] = B;
+                  if (formatAsRGBA) {
+                    imageDataArray[j++] = 255;
+                  }
+                }
+              }
+              break;
+            default:
+              throw new Error("Unsupported color mode");
+          }
+        }
+      };
+      var totalBytesAllocated = 0;
+      var maxMemoryUsageBytes = 0;
+      function requestMemoryAllocation(increaseAmount = 0) {
+        var totalMemoryImpactBytes = totalBytesAllocated + increaseAmount;
+        if (totalMemoryImpactBytes > maxMemoryUsageBytes) {
+          var exceededAmount = Math.ceil((totalMemoryImpactBytes - maxMemoryUsageBytes) / 1024 / 1024);
+          throw new Error(`maxMemoryUsageInMB limit exceeded by at least ${exceededAmount}MB`);
+        }
+        totalBytesAllocated = totalMemoryImpactBytes;
+      }
+      constructor.resetMaxMemoryUsage = function(maxMemoryUsageBytes_) {
+        totalBytesAllocated = 0;
+        maxMemoryUsageBytes = maxMemoryUsageBytes_;
+      };
+      constructor.getBytesAllocated = function() {
+        return totalBytesAllocated;
+      };
+      constructor.requestMemoryAllocation = requestMemoryAllocation;
+      return constructor;
+    })();
+    if (typeof module !== "undefined") {
+      module.exports = decode;
+    } else if (typeof window !== "undefined") {
+      window["jpeg-js"] = window["jpeg-js"] || {};
+      window["jpeg-js"].decode = decode;
+    }
+    function decode(jpegData, userOpts = {}) {
+      var defaultOpts = {
+        // "undefined" means "Choose whether to transform colors based on the image’s color model."
+        colorTransform: void 0,
+        useTArray: false,
+        formatAsRGBA: true,
+        tolerantDecoding: true,
+        maxResolutionInMP: 100,
+        // Don't decode more than 100 megapixels
+        maxMemoryUsageInMB: 512
+        // Don't decode if memory footprint is more than 512MB
+      };
+      var opts = { ...defaultOpts, ...userOpts };
+      var arr = new Uint8Array(jpegData);
+      var decoder = new JpegImage();
+      decoder.opts = opts;
+      JpegImage.resetMaxMemoryUsage(opts.maxMemoryUsageInMB * 1024 * 1024);
+      decoder.parse(arr);
+      var channels3 = opts.formatAsRGBA ? 4 : 3;
+      var bytesNeeded = decoder.width * decoder.height * channels3;
+      try {
+        JpegImage.requestMemoryAllocation(bytesNeeded);
+        var image = {
+          width: decoder.width,
+          height: decoder.height,
+          exifBuffer: decoder.exifBuffer,
+          data: opts.useTArray ? new Uint8Array(bytesNeeded) : Buffer.alloc(bytesNeeded)
+        };
+        if (decoder.comments.length > 0) {
+          image["comments"] = decoder.comments;
+        }
+      } catch (err) {
+        if (err instanceof RangeError) {
+          throw new Error("Could not allocate enough memory for the image. Required: " + bytesNeeded);
+        }
+        if (err instanceof ReferenceError) {
+          if (err.message === "Buffer is not defined") {
+            throw new Error("Buffer is not globally defined in this environment. Consider setting useTArray to true");
+          }
+        }
+        throw err;
+      }
+      decoder.copyToImageData(image, opts.formatAsRGBA);
+      return image;
+    }
+  }
+});
+
+// ../../node_modules/.pnpm/jpeg-js@0.4.4/node_modules/jpeg-js/index.js
+var require_jpeg_js = __commonJS({
+  "../../node_modules/.pnpm/jpeg-js@0.4.4/node_modules/jpeg-js/index.js"(exports, module) {
+    var encode3 = require_encoder();
+    var decode = require_decoder();
+    module.exports = {
+      encode: encode3,
+      decode
+    };
   }
 });
 
 // src/app.ts
 init_src();
-import { createHash as createHash8, randomBytes as randomBytes8 } from "node:crypto";
+import { createHash as createHash10, randomBytes as randomBytes8 } from "node:crypto";
 
 // src/need-cards.ts
 init_src();
@@ -10924,10 +14462,10 @@ function setScheduleCursorMem(rows2, scheduleId, cursor, log) {
   s.payload = releaseCursorPatch(s.payload, cursor, log);
   return s;
 }
-function setScheduleStatusMem(rows2, scheduleId, status) {
+function setScheduleStatusMem(rows2, scheduleId, status2) {
   const s = rows2.find((x) => x.id === scheduleId);
   if (!s) throw new DomainError("NOT_FOUND", "schedule not found");
-  s.status = status;
+  s.status = status2;
   return s;
 }
 function deleteScheduleMem(rows2, scheduleId) {
@@ -11020,12 +14558,12 @@ var MemAnnounceStore = class {
   installations = [];
   /** the memory world tracks no project_repos: a test seeds the room's repository here */
   repoLinks = [];
-  seedRepo(link) {
-    this.repoLinks.push(link);
+  seedRepo(link2) {
+    this.repoLinks.push(link2);
   }
   /** the memory store's linkRepo lands here, once per room and repo */
-  linkRoom(link) {
-    if (!this.repoLinks.some((l) => l.channelId === link.channelId && l.repoId === link.repoId)) this.repoLinks.push(link);
+  linkRoom(link2) {
+    if (!this.repoLinks.some((l) => l.channelId === link2.channelId && l.repoId === link2.repoId)) this.repoLinks.push(link2);
   }
   async repoForChannel(channelId) {
     const links = this.repoLinks.filter((r) => r.channelId === channelId);
@@ -11081,14 +14619,14 @@ var MemAnnounceStore = class {
     }
   }
   async upsertInstallation(input) {
-    const repos = input.repos.map(norm2);
+    const repos2 = input.repos.map(norm2);
     const hit = this.installations.find((i) => i.installationId === input.installationId);
     if (hit) {
       hit.account = input.account;
-      hit.repos = repos;
+      hit.repos = repos2;
       hit.selection = input.selection ?? hit.selection;
       if (input.workspaceId && !(input.keepWorkspace && hit.workspaceId)) hit.workspaceId = input.workspaceId;
-    } else this.installations.push({ installationId: input.installationId, account: input.account, repos, selection: input.selection ?? "selected", workspaceId: input.workspaceId ?? null });
+    } else this.installations.push({ installationId: input.installationId, account: input.account, repos: repos2, selection: input.selection ?? "selected", workspaceId: input.workspaceId ?? null });
   }
   async installationForRepo(slug, opts = {}) {
     const s = norm2(slug);
@@ -11099,7 +14637,7 @@ var MemAnnounceStore = class {
     this.installations = this.installations.filter((i) => i.installationId !== installationId);
   }
   async installationsForWorkspace(workspaceId) {
-    return this.installations.filter((i) => i.workspaceId === workspaceId).map(({ installationId, account, repos, selection }) => ({ installationId, account, repos, selection }));
+    return this.installations.filter((i) => i.workspaceId === workspaceId).map(({ installationId, account, repos: repos2, selection }) => ({ installationId, account, repos: repos2, selection }));
   }
 };
 var rowOf = (r) => ({
@@ -11538,22 +15076,23 @@ async function setThreadSettledSql(sql, workspace, threadId, settled) {
   if (!row) throw new DomainError("NOT_FOUND", `thread ${threadId} not found`);
 }
 async function latestHumanWordSql(sql, taskId3) {
-  const [row] = await sql`select m.id, m.created_at
+  const rows2 = await sql`select m.id, m.created_at, m.body
     from messages m join tasks t on t.id = ${taskId3}::uuid and m.workspace_id = t.workspace_id
-    where m.author_kind = 'human' and m.body not like '‹github:connected:%'
+    where m.author_kind = 'human'
       and (m.task_id = t.id or m.thread_id in (select th.id from threads th where th.task_id = t.id))
       and m.created_at > coalesce(t.approved_at, t.updated_at)
-    order by m.created_at desc limit 1`;
+    order by m.created_at desc limit 50`;
+  const row = rows2.find((r) => !isCardOrMarker(r.body));
   return row ? { id: row.id, createdAt: row.created_at } : null;
 }
-function settleMemoryThread(threads, workspace, threadId, settled) {
-  const t2 = threads.find((x) => x.id === threadId && x.workspace === workspace);
+function settleMemoryThread(threads2, workspace, threadId, settled) {
+  const t2 = threads2.find((x) => x.id === threadId && x.workspace === workspace);
   if (!t2) throw new DomainError("NOT_FOUND", `thread ${threadId} not found`);
   t2.settledAt = settled ? (/* @__PURE__ */ new Date()).toISOString() : null;
 }
-function pickHumanWord(messages, threads, taskId3, since) {
-  const threadIds = new Set(threads.filter((t2) => t2.taskId === taskId3).map((t2) => t2.id));
-  const words2 = messages.filter((m) => m.author.kind === "human" && !parseGitHubConnected(m.body) && (m.taskId === taskId3 || !!m.threadId && threadIds.has(m.threadId)) && m.createdAt > since).sort((a, b2) => a.createdAt < b2.createdAt ? 1 : -1);
+function pickHumanWord(messages2, threads2, taskId3, since) {
+  const threadIds = new Set(threads2.filter((t2) => t2.taskId === taskId3).map((t2) => t2.id));
+  const words2 = messages2.filter((m) => m.author.kind === "human" && !isCardOrMarker(m.body) && (m.taskId === taskId3 || !!m.threadId && threadIds.has(m.threadId)) && m.createdAt > since).sort((a, b2) => a.createdAt < b2.createdAt ? 1 : -1);
   const w = words2[0];
   return w ? { id: w.id, createdAt: w.createdAt } : null;
 }
@@ -11570,9 +15109,9 @@ async function anchorContentItemSql(sql, itemId, threadId, event) {
   await event(row.workspace_id);
   return { id: itemId };
 }
-function anchorContentItemMem(items, threads, itemId, threadId) {
+function anchorContentItemMem(items, threads2, itemId, threadId) {
   const it = items.find((x) => x.id === itemId && !x.threadId && !x.taskId && (x.status === "draft" || x.status === "scheduled"));
-  if (!it || !threads.some((t2) => t2.id === threadId && t2.channel === it.channelId && t2.workspace === it.workspace)) throw new DomainError("NOT_FOUND", REFUSED);
+  if (!it || !threads2.some((t2) => t2.id === threadId && t2.channel === it.channelId && t2.workspace === it.workspace)) throw new DomainError("NOT_FOUND", REFUSED);
   it.threadId = threadId;
   return it.workspace;
 }
@@ -11587,10 +15126,10 @@ async function threadRoutineIdSql(sql, workspace, threadId) {
        and ((s.payload -> 'routine') = 'true'::jsonb or coalesce(c.kind, 'build') <> 'marketing')`;
   return row?.id ?? null;
 }
-function threadRoutineIdMem(threads, schedules, channels2, workspace, threadId) {
-  const t2 = threads.find((x) => x.id === threadId && x.workspace === workspace);
-  const s = t2?.scheduleId ? schedules.find((x) => x.id === t2.scheduleId) : void 0;
-  return s && isRoutineSchedule(s.payload, channels2.find((c) => c.id === s.channelId)?.kind) ? s.id : null;
+function threadRoutineIdMem(threads2, schedules2, channels3, workspace, threadId) {
+  const t2 = threads2.find((x) => x.id === threadId && x.workspace === workspace);
+  const s = t2?.scheduleId ? schedules2.find((x) => x.id === t2.scheduleId) : void 0;
+  return s && isRoutineSchedule(s.payload, channels3.find((c) => c.id === s.channelId)?.kind) ? s.id : null;
 }
 
 // src/store/memory.ts
@@ -11710,16 +15249,16 @@ var MemoryStore = class {
     });
     return { runId };
   }
-  async advanceBeat(taskId3, seq, status) {
+  async advanceBeat(taskId3, seq, status2) {
     const forTask = this.beats.filter((b2) => b2.taskId === taskId3);
     const latestRun = forTask[forTask.length - 1]?.runId;
     const beat = latestRun ? this.beats.find((b2) => b2.runId === latestRun && b2.seq === seq) : void 0;
     if (!beat) return;
     const now = (/* @__PURE__ */ new Date()).toISOString();
-    beat.status = status;
+    beat.status = status2;
     beat.updatedAt = now;
-    if (status === "active" && !beat.startedAt) beat.startedAt = now;
-    if (status === "done") beat.doneAt = now;
+    if (status2 === "active" && !beat.startedAt) beat.startedAt = now;
+    if (status2 === "done") beat.doneAt = now;
   }
   async listBeats(taskId3) {
     return this.beats.filter((b2) => b2.taskId === taskId3);
@@ -11809,6 +15348,7 @@ var MemoryStore = class {
       kind: input.kind,
       channel: input.channel,
       mime: input.mime ?? null,
+      createdByKind: input.author.kind,
       name: input.name,
       content: input.inlineContent,
       createdAt: (/* @__PURE__ */ new Date()).toISOString(),
@@ -11816,14 +15356,19 @@ var MemoryStore = class {
     });
     return { id: input.id };
   }
-  async libraryImage(channelId, name) {
+  async libraryImage(channelId, name, any = false) {
     const project = this.channels.find((c) => c.id === channelId)?.projectId;
     const rooms = new Set(this.channels.filter((c) => c.projectId === project).map((c) => c.id));
-    const hits = [...this.artifacts].reverse().filter((x) => (x.channel === channelId || rooms.has(x.channel ?? "")) && x.name.toLowerCase() === name.toLowerCase() && (x.content ?? "").startsWith("data:image/"));
+    const hits = [...this.artifacts].reverse().filter((x) => (x.channel === channelId || rooms.has(x.channel ?? "")) && x.name.toLowerCase() === name.toLowerCase() && (x.content ?? "").startsWith("data:image/") && (any || x.createdByKind === "human" || (x.source ?? "").startsWith("repo:")));
     const a = hits.find((x) => x.channel === channelId) ?? hits[0];
     return a ? { name: a.name, mime: a.mime ?? null, content: a.content } : null;
   }
   // the room's shelf first, then the project's (store/frames.ts)
+  async setArtifactSource(id, source) {
+    const a = this.artifacts.find((x) => x.id === id);
+    if (a) a.source = source;
+  }
+  // store/frames.ts setArtifactSource
   async promoteArtifact(artifactId, _promotedByAgent, makeEvent) {
     const art = this.artifacts.find((a) => a.id === artifactId);
     if (!art) throw new DomainError("NOT_FOUND", `artifact ${artifactId} not found`);
@@ -12295,7 +15840,7 @@ var MemoryStore = class {
     const t2 = this.threads.find((x) => x.id === threadId && x.workspace === workspace);
     if (t2 && t2.taskId === null) t2.taskId = taskId3;
   }
-  async postMessage(msg2, event, decisions) {
+  async postMessage(msg2, event, decisions2) {
     if (msg2.threadId && !this.threads.some((t2) => t2.id === msg2.threadId)) {
       const namedRoot = msg2.rootMessageId && this.messages.some((m) => m.id === msg2.rootMessageId) ? msg2.rootMessageId : null;
       this.threads.push({ id: msg2.threadId, workspace: msg2.workspace, channel: msg2.channel, title: sessionTitle(this.schedules.find((x) => x.id === msg2.scheduleId && x.workspace === msg2.workspace)?.title, msg2.body), description: "", createdBy: `${msg2.author.kind}:${msg2.author.id}`, taskId: null, rootMessageId: namedRoot ?? msg2.id, mode: threadModeOf(msg2.threadMode), kind: threadKindOf(msg2.threadKind), brainOverride: parseBrainOverride(msg2.brainOverride), scheduleId: this.schedules.some((x) => x.id === msg2.scheduleId && x.workspace === msg2.workspace) ? msg2.scheduleId : null });
@@ -12316,7 +15861,7 @@ var MemoryStore = class {
     }
     this.messages.push({ ...msg2, scheduleId: this.schedules.some((x) => x.id === msg2.scheduleId && x.workspace === msg2.workspace) ? msg2.scheduleId : null });
     this.events.push(event);
-    for (const d of decisions ?? []) {
+    for (const d of decisions2 ?? []) {
       for (const prior2 of this.decisionRows) {
         if (prior2.status === "open" && prior2.workspace === msg2.workspace && prior2.channel === msg2.channel && prior2.taskId === (msg2.taskId ?? null) && prior2.question === d.question && (!isGitHubNeedQuestion(d.question) || (this.messages.find((m) => m.id === prior2.messageId)?.threadId ?? null) === (msg2.threadId ?? null))) {
           prior2.status = "dismissed";
@@ -12754,7 +16299,7 @@ var MemoryStore = class {
       channel: c.slug,
       number: await this.nextTaskNumber(c.workspace),
       title: flow.title,
-      description: "Walk the steps below to set this room up \u2014 your answers save as you go, so you can leave and finish any time. Closing this task skips setup.",
+      description: flow.description,
       state: "todo",
       kind: "setup",
       creator: { kind: "human", id: "00000000-0000-0000-0000-000000000001" },
@@ -12813,14 +16358,14 @@ var MemoryStore = class {
     const c = this.channels.find((x) => x.id === input.channelId);
     if (!c) throw new DomainError("NOT_FOUND", "channel not found");
     const id = crypto.randomUUID();
-    const link = routineSessionMem({ threads: this.threads, messages: this.messages, events: this.events }, c.workspace, input);
+    const link2 = routineSessionMem({ threads: this.threads, messages: this.messages, events: this.events }, c.workspace, input);
     this.schedules.push({ id, workspace: c.workspace, channelId: input.channelId, title: input.title, prompt: input.prompt, cadence: input.cadence, atTime: input.atTime, tz: input.tz, weekday: input.weekday, nextRunAt: input.nextRunAt, runCount: 0, status: "active", payload: { prompt: input.prompt, ...input.payloadExtra ?? {} } });
     this.events.push(makeEvent(c.workspace));
-    link?.(id);
+    link2?.(id);
     return { id };
   }
-  async setScheduleStatus(scheduleId, status, makeEvent) {
-    this.events.push(makeEvent(setScheduleStatusMem(this.schedules, scheduleId, status).workspace));
+  async setScheduleStatus(scheduleId, status2, makeEvent) {
+    this.events.push(makeEvent(setScheduleStatusMem(this.schedules, scheduleId, status2).workspace));
     return { id: scheduleId };
   }
   async updateSchedule(scheduleId, patch, makeEvent) {
@@ -12878,6 +16423,7 @@ var MemoryStore = class {
     if (patch.videoPending !== void 0) it.videoPending = patch.videoPending;
     if (patch.videoMeta !== void 0) it.videoMeta = patch.videoMeta;
     if (patch.videoErrorCode !== void 0) it.videoErrorCode = patch.videoErrorCode;
+    if (patch.videoError !== void 0) it.videoError = patch.videoError || null;
     if (isRevision && it.status === "scheduled") {
       it.status = "draft";
       it.scheduledAt = null;
@@ -12918,6 +16464,7 @@ var MemoryStore = class {
     if (!c) throw new DomainError("NOT_FOUND", "channel not found");
     const id = crypto.randomUUID();
     this.channelArtifacts.push({ id, workspace: c.workspace, channelId: input.channelId, kind: input.kind, name: input.name });
+    this.artifacts.push({ id, taskId: "", kind: input.kind, name: input.name, content: input.inlineContent, createdAt: (/* @__PURE__ */ new Date()).toISOString(), channel: input.channelId, mime: input.mime, createdByKind: input.createdByKind });
     this.events.push(makeEvent(c.workspace));
     return { id };
   }
@@ -12989,7 +16536,7 @@ var MemoryStore = class {
   }
   connectors = [];
   connectorSecrets = /* @__PURE__ */ new Map();
-  async upsertConnector(input) {
+  async upsertConnector(input, makeEvent) {
     const projectId = input.channelId ? this.channels.find((c) => c.id === input.channelId)?.projectId ?? null : null;
     const existing = this.connectors.find((x) => x.workspace === input.workspace && x.provider === input.provider && x.projectId === projectId);
     if (existing) {
@@ -13000,6 +16547,7 @@ var MemoryStore = class {
     }
     const id = crypto.randomUUID();
     this.connectors.push({ id, workspace: input.workspace, channelId: input.channelId, projectId, provider: input.provider, handle: input.handle, status: "connected" });
+    if (makeEvent) this.events.push(makeEvent(input.workspace, id));
     return { id };
   }
   async setConnectorSecret(connectorId, ciphertext) {
@@ -13411,8 +16959,8 @@ async function requireConfirmCard(store2, workspace, needle, what) {
   const RECENT_MS = 24 * 60 * 60 * 1e3;
   const now = Date.now();
   const target = needle.trim().toLowerCase();
-  const decisions = await store2.listDecisions(workspace);
-  const card2 = decisions.find(
+  const decisions2 = await store2.listDecisions(workspace);
+  const card2 = decisions2.find(
     (d) => d.status !== "dismissed" && d.question.toLowerCase().includes(target) && now - Date.parse(d.createdAt) < RECENT_MS
   );
   if (!card2) {
@@ -13734,8 +17282,8 @@ function transition(task, actor, cmd, subtasksPending = 0, planVersion = 0, onHu
     return { task: next, events, artifacts: [{ kind: "doc", name, content: cmd.plan }] };
   }
   if (verdict.spec.name === "propose_design" && cmd.type === "task.propose_design") {
-    const artifacts = cmd.mockups.map((m) => ({ kind: "design", name: designMockupName(cmd.round, m.name), content: m.html }));
-    return { task: next, events, artifacts };
+    const artifacts2 = cmd.mockups.map((m) => ({ kind: "design", name: designMockupName(cmd.round, m.name), content: m.html }));
+    return { task: next, events, artifacts: artifacts2 };
   }
   if (verdict.spec.name === "approve_design") {
     return { task: next, events, promoteLatestDesignRound: true };
@@ -13796,7 +17344,7 @@ function nextPlanVersion(existingNames) {
   }, 0);
   return highest + 1;
 }
-var implementationPlanName = (version) => `implementation-plan-v${version}.md`;
+var implementationPlanName = (version2) => `implementation-plan-v${version2}.md`;
 function designMockupName(round, name) {
   const slug = name.toLowerCase().replace(/\.html?$/, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60) || "mockup";
   return `design-mockup-v${round}-${slug}.html`;
@@ -13834,7 +17382,7 @@ function payloadFor(cmd) {
 
 // src/handler/planfollowup.ts
 init_src();
-async function postPlanMessage(store2, task, actor, version, prose2) {
+async function postPlanMessage(store2, task, actor, version2, kind) {
   await store2.postMessage(
     {
       id: crypto.randomUUID(),
@@ -13843,8 +17391,7 @@ async function postPlanMessage(store2, task, actor, version, prose2) {
       taskId: task.id,
       threadId: null,
       author: { kind: actor.kind, id: actor.id },
-      body: `${prose2}
-${planRefMarker(version)}`,
+      body: planMessage(version2, kind),
       createdAt: (/* @__PURE__ */ new Date()).toISOString()
     },
     createEvent({
@@ -13852,7 +17399,7 @@ ${planRefMarker(version)}`,
       source: actorAddress(actor),
       target: taskTarget(task),
       workspace: task.workspace,
-      payload: { preview: `implementation plan v${version} \u2014 #${task.number}` }
+      payload: { preview: `implementation plan v${version2} \u2014 #${task.number}` }
     })
   ).catch(() => {
   });
@@ -13860,7 +17407,7 @@ ${planRefMarker(version)}`,
 async function planRevisionFollowup(store2, actor, cmd, outcome) {
   if (cmd.type !== "task.propose_plan" || !outcome.events.length || !outcome.task.workPlan) return;
   const v = outcome.task.workPlan.version;
-  await postPlanMessage(store2, outcome.task, actor, v, `Implementation plan **v${v}** (revised) \u2014 ${implementationPlanName(v)}`);
+  await postPlanMessage(store2, outcome.task, actor, v, "revised");
 }
 function routinePlanApprove(task, scheduleId) {
   if (task.state !== "plan_review") throw new DomainError("ILLEGAL_TRANSITION", `a routine plan auto-approve fires from plan_review, not ${task.state}`);
@@ -14361,15 +17908,15 @@ function planPatchFromEvent(event) {
   }
   if (event.type === "customer.subscription.created" || event.type === "customer.subscription.updated" || event.type === "customer.subscription.deleted") {
     if (!metaWorkspace) return null;
-    const status = event.type === "customer.subscription.deleted" ? "canceled" : obj["status"];
+    const status2 = event.type === "customer.subscription.deleted" ? "canceled" : obj["status"];
     const item0 = obj["items"]?.data?.[0];
     const quantity = item0?.quantity;
     const periodEnd = obj["current_period_end"] ?? item0?.current_period_end;
     return {
       workspace: metaWorkspace,
       patch: {
-        plan: CLOUD_STATUSES.has(status) ? "cloud" : "free",
-        subscriptionStatus: status,
+        plan: CLOUD_STATUSES.has(status2) ? "cloud" : "free",
+        subscriptionStatus: status2,
         ...quantity ? { seats: quantity } : {},
         ...periodEnd ? { currentPeriodEnd: new Date(periodEnd * 1e3).toISOString() } : {},
         stripeCustomerId: obj["customer"] ?? null,
@@ -14759,17 +18306,17 @@ function starterAssembly() {
       if (!first) return { text: "", thought: "" };
       const { content, ...fields } = first;
       cand = { ...cand, ...fields };
-      let text2 = "";
+      let text3 = "";
       let thought = "";
       for (const p2 of content?.parts ?? []) {
-        if (typeof p2.text === "string" && !p2.thought) text2 += p2.text;
+        if (typeof p2.text === "string" && !p2.thought) text3 += p2.text;
         if (typeof p2.text === "string" && p2.thought) thought += p2.text;
         if (plainText(p2) && !p2.text) continue;
         const last = parts[parts.length - 1];
         if (last && plainText(p2) && plainText(last)) last.text = `${last.text ?? ""}${p2.text ?? ""}`;
         else parts.push({ ...p2 });
       }
-      return { text: text2, thought };
+      return { text: text3, thought };
     },
     usage: () => usage,
     response: () => ({
@@ -14802,14 +18349,14 @@ function starterReplyStream(o) {
           failure = "UPSTREAM";
           break;
         }
-        const { text: text2, thought } = acc.add(chunk2);
+        const { text: text3, thought } = acc.add(chunk2);
         if (gone) {
           o.abortUpstream();
           failure = "CLIENT_GONE";
           break;
         }
         if (thought) send({ t: "thought", text: thought });
-        if (text2) send({ t: "text", text: text2 });
+        if (text3) send({ t: "text", text: text3 });
       }
     } catch {
       failure = gone ? "CLIENT_GONE" : "UPSTREAM";
@@ -14963,6 +18510,7 @@ var VIDEO_MODELS = {
     input: (prompt, seconds) => ({ prompt, duration: seconds, resolution: "768P", aspect_ratio: "9:16" })
   }
 };
+var houseModel = (m) => (m?.resolution ?? "").toLowerCase();
 var DEFAULT_TIERS = "starter=seedance-2.0-fast,xpress=minimax-h3,premium=seedance-2.0";
 var FILM_SECONDS = 8;
 var filmCredits2 = (model2, seconds) => filmCredits(model2.perSecondMicros, seconds);
@@ -15118,7 +18666,7 @@ function creditRoutes(app, store2, ledger = ledgerFor(store2), fetchFn = (u, i) 
         note: g["note"] ?? null,
         day: String(g["on_day"])
       })),
-      films: films.map((f) => ({ id: f.id, item: f.itemId, tier: f.tier, model: VIDEO_MODELS[f.model]?.label ?? f.model, seconds: f.seconds, credits: Math.ceil(f.micros / CREDIT_MICROS), status: f.status, day: f.createdAt.slice(0, 10), at: f.createdAt }))
+      films: films.map((f) => ({ id: f.id, item: f.itemId, tier: f.tier, model: houseModel(VIDEO_MODELS[f.model]), seconds: f.seconds, credits: Math.ceil(f.micros / CREDIT_MICROS), status: f.status, day: f.createdAt.slice(0, 10), at: f.createdAt }))
     });
   });
   app.get("/v1/usage", async (c) => {
@@ -15710,21 +19258,488 @@ async function connectorCommands(store2, actor, cmd) {
 // src/handler/content.ts
 init_src();
 
-// src/store/frames.ts
-async function libraryImage(store2, channelId, name) {
+// src/brain-objects.ts
+import { createHash as createHash5, randomUUID } from "node:crypto";
+import { link, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { dirname, resolve, sep } from "node:path";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+import { GoogleAuth } from "google-auth-library";
+var brainHash = (bytes) => createHash5("sha256").update(bytes).digest("hex");
+function verified(bytes, ref) {
+  if (bytes.length !== ref.sizeBytes || brainHash(bytes) !== ref.sha256) throw new Error("Brain object checksum does not match");
+  return bytes;
+}
+var FileBrainObjects = class {
+  constructor(root) {
+    this.root = root;
+  }
+  root;
+  path(key2) {
+    const root = resolve(this.root);
+    const path = resolve(root, key2);
+    if (!path.startsWith(root + sep)) throw new Error("Invalid brain object path");
+    return path;
+  }
+  async put(key2, bytes, mime) {
+    const ref = { backend: "file", key: key2, sha256: brainHash(bytes), sizeBytes: bytes.length, mime };
+    const path = this.path(key2);
+    await mkdir(dirname(path), { recursive: true, mode: 448 });
+    const temp = `${path}.${randomUUID()}.tmp`;
+    try {
+      await writeFile(temp, bytes, { mode: 384, flag: "wx", flush: true });
+      try {
+        await link(temp, path);
+      } catch (error) {
+        if (error.code !== "EEXIST") throw error;
+      }
+    } finally {
+      await rm(temp, { force: true });
+    }
+    verified(await readFile(path), ref);
+    return ref;
+  }
+  async get(ref) {
+    if (ref.backend !== "file") throw new Error("Brain object backend does not match");
+    return verified(await readFile(this.path(ref.key)), ref);
+  }
+};
+var GcsBrainObjects = class {
+  constructor(bucket) {
+    this.bucket = bucket;
+  }
+  bucket;
+  auth = new GoogleAuth({ scopes: ["https://www.googleapis.com/auth/devstorage.read_write"] });
+  localToken;
+  async request(url, init) {
+    let token;
+    const localHarness = process.env["NM_ALLOW_ACTOR_HEADER"] === "1" && ["127.0.0.1", "::1", "localhost"].includes(process.env["HOST"] ?? "");
+    if (process.env["NM_BRAIN_GCS_AUTH"] === "gcloud" && process.env["NODE_ENV"] !== "production" && (process.env["NM_LOCAL"] === "1" || localHarness)) {
+      if (!this.localToken || this.localToken.expiresAt < Date.now()) {
+        const configuration = process.env["NM_BRAIN_GCS_GCLOUD_CONFIGURATION"];
+        const { stdout } = await promisify(execFile)("gcloud", [...configuration ? [`--configuration=${configuration}`] : [], "auth", "print-access-token"], { timeout: 3e4, maxBuffer: 64e3 }).catch(() => {
+          throw new Error("The local Google Cloud sign-in is unavailable. Sign in to the selected gcloud configuration, then retry.");
+        });
+        this.localToken = { token: stdout.trim(), expiresAt: Date.now() + 5 * 6e4 };
+      }
+      token = this.localToken.token;
+    } else token = await this.auth.getAccessToken();
+    if (!token) throw new Error("Google Application Default Credentials are unavailable");
+    return fetch(url, { ...init, signal: AbortSignal.timeout(6e4), headers: { ...init?.headers, authorization: `Bearer ${token}` } });
+  }
+  async put(key2, bytes, mime) {
+    const ref = { backend: "gcs", bucket: this.bucket, key: key2, sha256: brainHash(bytes), sizeBytes: bytes.length, mime };
+    const url = `https://storage.googleapis.com/upload/storage/v1/b/${encodeURIComponent(this.bucket)}/o?uploadType=media&ifGenerationMatch=0&name=${encodeURIComponent(key2)}`;
+    const response = await this.request(url, { method: "POST", headers: { "content-type": mime }, body: new Uint8Array(bytes) });
+    if (response.status === 412) {
+      const metadata = await this.request(`https://storage.googleapis.com/storage/v1/b/${encodeURIComponent(this.bucket)}/o/${encodeURIComponent(key2)}`);
+      if (!metadata.ok) throw new Error(`Brain object metadata failed (${metadata.status})`);
+      ref.generation = (await metadata.json()).generation;
+    } else {
+      if (!response.ok) throw new Error(`Brain object upload failed (${response.status})`);
+      ref.generation = (await response.json()).generation;
+    }
+    await this.get(ref);
+    return ref;
+  }
+  async get(ref) {
+    if (ref.backend !== "gcs" || ref.bucket !== this.bucket || !ref.generation) throw new Error("Brain object backend does not match");
+    const response = await this.request(`https://storage.googleapis.com/storage/v1/b/${encodeURIComponent(this.bucket)}/o/${encodeURIComponent(ref.key)}?alt=media&generation=${encodeURIComponent(ref.generation)}`);
+    if (!response.ok) throw new Error(`Brain object download failed (${response.status})`);
+    return verified(Buffer.from(await response.arrayBuffer()), ref);
+  }
+};
+var configured;
+function configuredBrainObjects() {
+  const bucket = process.env["NM_BRAIN_GCS_BUCKET"];
+  const root = process.env["NM_BRAIN_STORAGE_DIR"];
+  const key2 = JSON.stringify([bucket, root, process.env["NM_LOCAL"], process.env["NM_BRAIN_GCS_AUTH"], process.env["NM_BRAIN_GCS_GCLOUD_CONFIGURATION"], process.env["HOST"], process.env["NODE_ENV"], process.env["NM_ALLOW_ACTOR_HEADER"]]);
+  if (configured?.key === key2) return configured.store;
+  const local = root && process.env["NM_LOCAL"] === "1" ? new FileBrainObjects(root) : null;
+  const gcs = bucket ? new GcsBrainObjects(bucket) : null;
+  const store2 = gcs && local ? {
+    put: (key3, bytes, mime) => gcs.put(key3, bytes, mime),
+    get: (ref) => ref.backend === "file" ? local.get(ref) : gcs.get(ref)
+  } : gcs ?? local;
+  configured = store2 ? { key: key2, store: store2 } : void 0;
+  return store2;
+}
+
+// src/brain-error.ts
+var BrainError = class extends Error {
+  constructor(code, message2, status2 = 409) {
+    super(message2);
+    this.code = code;
+    this.status = status2;
+  }
+  code;
+  status;
+};
+
+// src/brain-compatibility.ts
+function brainCloudOnly(workspace) {
+  return process.env["NM_BRAIN_CLOUD_ONLY_ARTIFACTS"] === "1" || (process.env["NM_BRAIN_CLOUD_ONLY_WORKSPACES"] ?? "").split(",").map((s) => s.trim()).filter(Boolean).includes(workspace);
+}
+function brainArtifactInline(bytes, mime, workspace, privateCode = false) {
+  if (brainCloudOnly(workspace)) return null;
+  if (privateCode) throw new BrainError(
+    "BRAIN_READER_UPGRADE_REQUIRED",
+    "Private coding artifacts require compatible readers. Enable this workspace after its clients are upgraded; the upload remains queued.",
+    409
+  );
+  const value = /^(text\/|application\/(json|xml|javascript)(;|$))/.test(mime) ? bytes.toString("utf8") : `data:${mime};base64,${bytes.toString("base64")}`;
+  if (Buffer.byteLength(value) > 4e5) throw new BrainError(
+    "BRAIN_READER_UPGRADE_REQUIRED",
+    "This server retains compatibility with older artifact readers. Use an artifact under 400 kB until cloud-only storage is enabled after the client upgrade.",
+    413
+  );
+  return value;
+}
+
+// src/brain-store.ts
+init_src();
+
+// src/brain-read-events.ts
+async function readBrainEvents(objects, commits, project) {
+  const events = [];
+  const limit = 64 * 1024 * 1024;
+  const oversized = () => new BrainError("BRAIN_RESTORE_TOO_LARGE", "This conversation needs a compact restore in an updated NeuraMesh client. Its complete archive remains saved.", 413);
+  if (!project && commits.reduce((bytes, commit) => bytes + commit.segment.sizeBytes, 0) > limit) throw oversized();
+  let size = 0;
+  for (let offset = 0; offset < commits.length; offset += 8) {
+    const batch = commits.slice(offset, offset + 8);
+    const downloaded = await Promise.allSettled(batch.map((commit) => objects.get(commit.segment)));
+    const failure = downloaded.find((result) => result.status === "rejected");
+    if (failure?.status === "rejected") throw failure.reason;
+    for (const [index, result] of downloaded.entries()) {
+      if (result.status !== "fulfilled") continue;
+      const lines = result.value.toString("utf8").split("\n").filter(Boolean);
+      if (lines.length !== batch[index].event_count) throw new Error("Brain event count does not match");
+      for (const line of lines) {
+        const value = JSON.parse(line);
+        const event = project ? project(value) : value;
+        size += Buffer.byteLength(project ? JSON.stringify(event) : line);
+        if (size > limit) throw oversized();
+        events.push(event);
+      }
+    }
+  }
+  return events;
+}
+
+// src/brain-decoded.ts
+import { gunzipSync } from "node:zlib";
+function decodedBrainSnapshot(snapshot, limit = 128 * 1024 * 1024) {
+  let remaining = limit;
+  const charge = (value) => {
+    const json = JSON.stringify(value);
+    remaining -= json === void 0 ? 0 : Buffer.byteLength(json);
+    if (remaining < 0) throw new BrainError("TOO_LARGE", "The decoded conversation exceeds the restore limit.", 413);
+  };
+  const decode = (value) => {
+    const packed = value;
+    if (packed?.brainEncoding !== "neuramesh.gzip.v1") {
+      charge(value);
+      return value;
+    }
+    if (typeof packed.data !== "string") throw new Error("The recorded conversation has an invalid compressed value.");
+    if (remaining <= 0) throw new BrainError("TOO_LARGE", "The decoded conversation exceeds the restore limit.", 413);
+    let bytes;
+    try {
+      bytes = gunzipSync(Buffer.from(packed.data, "base64"), { maxOutputLength: remaining });
+    } catch (error) {
+      if (error.code === "ERR_BUFFER_TOO_LARGE") throw new BrainError("TOO_LARGE", "The decoded conversation exceeds the restore limit.", 413);
+      throw new Error("The recorded conversation has invalid compressed bytes.");
+    }
+    remaining -= bytes.length;
+    return JSON.parse(bytes.toString("utf8"));
+  };
+  let runtimeMessages = snapshot.runtimeMessages;
+  if (runtimeMessages?.length === 1) {
+    const decoded = decode(runtimeMessages[0]);
+    if (decoded !== runtimeMessages[0]) {
+      if (!Array.isArray(decoded)) throw new Error("The recorded runtime snapshot must contain messages.");
+      runtimeMessages = decoded;
+    }
+  } else charge(runtimeMessages);
+  charge({ ...snapshot, runtimeMessages: void 0, events: void 0 });
+  return { ...snapshot, runtimeMessages, events: snapshot.events.map((e) => {
+    charge({ ...e, payload: void 0 });
+    return { ...e, payload: decode(e.payload) };
+  }) };
+}
+
+// src/brain-restore-projection.ts
+var object2 = (value) => value && typeof value === "object" ? value : {};
+var textStart = (event) => event.type === "content_start" && event.contentType === "text" && typeof event.text === "string";
+function brainRestoreProjection() {
+  const streams = /* @__PURE__ */ new Map();
+  return (value) => {
+    const record = object2(value);
+    if (record.type !== "runtime.event") return value;
+    const raw = object2(record.payload);
+    const core = raw.brainEncoding === "neuramesh.gzip.v1" ? object2(decodedBrainSnapshot({ workspace: "", threadId: "", revision: 0, events: [value] }).events[0].payload) : raw;
+    const payload = object2(core.payload);
+    if (typeof payload.sessionId !== "string") return value;
+    const stream = streams.get(payload.sessionId) ?? { text: "" };
+    streams.set(payload.sessionId, stream);
+    let projected = core;
+    if (core.type === "agent_event") {
+      const event = object2(payload.event);
+      let compact = event;
+      if (textStart(event)) {
+        if (typeof event.accumulated === "string") {
+          if (event.accumulated === stream.text + event.text) {
+            compact = { ...event };
+            delete compact.accumulated;
+          }
+          stream.text = event.accumulated;
+        } else stream.text += event.text;
+      } else if (event.type === "done" || event.type === "content_end" && event.contentType === "text") stream.text = "";
+      stream.original = JSON.stringify(event);
+      stream.compact = JSON.stringify(compact);
+      if (compact !== event) projected = { ...core, payload: { ...payload, event: compact } };
+    } else if (core.type === "chunk" && payload.stream === "agent" && typeof payload.chunk === "string" && payload.chunk === stream.original && stream.compact !== stream.original) {
+      projected = { ...core, payload: { ...payload, chunk: stream.compact } };
+    }
+    return projected === core ? value : { ...record, payload: projected };
+  };
+}
+
+// src/brain-store.ts
+function canonicalJson(value) {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (value !== null && typeof value === "object") return `{${Object.entries(value).filter(([, v]) => v !== void 0).sort(([a], [b2]) => a.localeCompare(b2)).map(([k, v]) => `${JSON.stringify(k)}:${canonicalJson(v)}`).join(",")}}`;
+  return JSON.stringify(value);
+}
+async function brainThreadAccess(sql, actor, workspace, threadId) {
+  const rows2 = await sql`
+    select t.channel_id, t.task_id, ch.project_id, t.kind from threads t
+    join channels ch on ch.id = t.channel_id
+    left join code_sessions cs on cs.id = t.id
+    left join machines m on m.id = coalesce(cs.machine_id, t.machine_id)
+    where t.id = ${threadId}::uuid and t.workspace_id = ${workspace}::uuid
+      and (
+        (${actor.kind} = 'human' and exists (select 1 from workspace_members wm where wm.workspace_id = t.workspace_id and wm.user_id = ${actor.id}::uuid)
+          and (t.kind <> 'coding' or t.created_by = ${`human:${actor.id}`} or cs.created_by = ${actor.id}::uuid or m.owner_user_id = ${actor.id}::uuid))
+        or (${actor.kind} = 'agent' and t.kind <> 'coding' and exists (
+          select 1 from agent_channels ac join agents a on a.id = ac.agent_id
+          where ac.channel_id = t.channel_id and a.id = ${actor.id}::uuid and a.workspace_id = t.workspace_id and a.retired_at is null))
+      )`;
+  if (!rows2[0]) throw new BrainError("NOT_FOUND", "No accessible brain thread exists in this workspace.", 404);
+  return rows2[0];
+}
+var BrainStore = class {
+  constructor(sql, objects) {
+    this.sql = sql;
+    this.objects = objects;
+  }
+  sql;
+  objects;
+  async commit(actor, threadId, input) {
+    await brainThreadAccess(this.sql, actor, input.workspace, threadId);
+    const digest2 = brainHash(canonicalJson(input));
+    const previous = await this.sql`select revision, commit_id, request_sha256 from brain_commits where thread_id = ${threadId}::uuid and commit_id = ${input.commitId}::uuid`;
+    const retry = (row) => {
+      if (row.request_sha256 !== digest2) throw new BrainError("BRAIN_COMMIT_REUSED", "This commit ID names different content. Use a new commit ID.");
+      return { ok: true, revision: Number(row.revision), commitId: row.commit_id, sha256: digest2, duplicate: true };
+    };
+    if (previous[0]) return retry(previous[0]);
+    const uniqueIds = new Set(input.events.map((e) => e.id));
+    if (uniqueIds.size !== input.events.length) throw new BrainError("BRAIN_EVENT_REUSED", "Each event in a commit needs a unique ID.", 400);
+    const prefix = `v1/workspaces/${input.workspace}/threads/${threadId}/commits/${input.commitId}/${digest2}`;
+    const segment = await this.objects.put(`${prefix}/events.jsonl`, Buffer.from(input.events.map((e) => JSON.stringify(e)).join("\n") + (input.events.length ? "\n" : "")), "application/x-ndjson");
+    const snapshot = input.runtimeMessages !== void 0 || input.metadata !== void 0 ? await this.objects.put(`${prefix}/runtime.json`, Buffer.from(JSON.stringify({ runtimeMessages: input.runtimeMessages, metadata: input.metadata })), "application/json") : null;
+    return this.sql.begin(async (transaction) => {
+      const tx = transaction;
+      await tx`select id from threads where id = ${threadId}::uuid for update`;
+      await brainThreadAccess(tx, actor, input.workspace, threadId);
+      const again = await tx`select revision, commit_id, request_sha256 from brain_commits where thread_id = ${threadId}::uuid and commit_id = ${input.commitId}::uuid`;
+      if (again[0]) return retry(again[0]);
+      const [head] = await tx`select coalesce(max(revision), 0)::text as revision from brain_commits where thread_id = ${threadId}::uuid`;
+      const revision = Number(head["revision"]);
+      if (revision !== input.expectedRevision) throw new BrainError("BRAIN_CONFLICT", `The thread is at revision ${revision}. Restore that revision before another commit.`);
+      if (input.events.length) {
+        const duplicates = await tx`select event_id from brain_event_ids where thread_id = ${threadId}::uuid and event_id in ${tx([...uniqueIds])} limit 1`;
+        if (duplicates.length) throw new BrainError("BRAIN_EVENT_REUSED", "An event ID already belongs to an earlier commit.");
+      }
+      if (input.artifactIds?.length) {
+        const refs = await tx`select artifact_id from brain_artifacts where workspace_id = ${input.workspace}::uuid and thread_id = ${threadId}::uuid and artifact_id in ${tx(input.artifactIds)} for share`;
+        if (refs.length !== new Set(input.artifactIds).size) throw new BrainError("BRAIN_ARTIFACT_MISSING", "Upload each referenced artifact before this commit.", 400);
+      }
+      const next = revision + 1;
+      await tx`insert into brain_commits (thread_id, revision, commit_id, workspace_id, device_id, actor_kind, actor_id, request_sha256, segment, snapshot, event_count)
+        values (${threadId}::uuid, ${next}, ${input.commitId}::uuid, ${input.workspace}::uuid, ${input.deviceId}, ${actor.kind}::actor_kind, ${actor.id}::uuid, ${digest2}, ${tx.json(segment)}, ${snapshot ? tx.json(snapshot) : null}, ${input.events.length})`;
+      if (input.events.length) await tx`insert into brain_event_ids ${tx(input.events.map((e) => ({ thread_id: threadId, event_id: e.id, revision: next })))}`;
+      const event = createEvent({ type: "brain.committed", workspace: input.workspace, source: `${actor.kind}:${actor.id}`, target: `resource/thread/${threadId}`, payload: { threadId, revision: next, commitId: input.commitId, eventCount: input.events.length, sha256: digest2 } });
+      await tx`insert into events (id, workspace_id, type, source, target, payload)
+        values (${event.id}, ${event.workspace}::uuid, ${event.type}, ${event.source}, ${event.target}, ${tx.json(event.payload)})`;
+      return { ok: true, revision: next, commitId: input.commitId, sha256: digest2, duplicate: false };
+    });
+  }
+  async read(actor, workspace, threadId, compact = false) {
+    await brainThreadAccess(this.sql, actor, workspace, threadId);
+    const commits = await this.sql`select revision, commit_id, segment, snapshot, event_count from brain_commits where thread_id = ${threadId}::uuid order by revision`;
+    const events = await readBrainEvents(this.objects, commits, compact ? brainRestoreProjection() : void 0);
+    let runtimeMessages;
+    let metadata;
+    for (const commit of [...commits].reverse()) {
+      if (!commit.snapshot) continue;
+      const snapshot = JSON.parse((await this.objects.get(commit.snapshot)).toString("utf8"));
+      runtimeMessages ??= snapshot.runtimeMessages;
+      metadata ??= snapshot.metadata;
+      if (runtimeMessages !== void 0 && metadata !== void 0) break;
+    }
+    await brainThreadAccess(this.sql, actor, workspace, threadId);
+    const head = commits.at(-1);
+    return {
+      workspace,
+      threadId,
+      revision: Number(head?.revision ?? 0),
+      commitId: head?.commit_id ?? null,
+      events,
+      runtimeMessages,
+      metadata,
+      artifacts: await this.artifacts(actor, workspace, threadId)
+    };
+  }
+  async artifacts(actor, workspace, threadId) {
+    await brainThreadAccess(this.sql, actor, workspace, threadId);
+    const rows2 = await this.sql`select a.id, a.name, a.kind, a.tags, a.mime, a.size_bytes, a.content_hash, a.created_at from brain_artifacts b join artifacts a on a.id = b.artifact_id where b.thread_id = ${threadId}::uuid and b.workspace_id = ${workspace}::uuid order by b.created_at`;
+    return rows2.map((r) => ({ id: r["id"], name: r["name"], kind: r["kind"], tags: r["tags"], mime: r["mime"], sizeBytes: Number(r["size_bytes"]), sha256: r["content_hash"], createdAt: new Date(r["created_at"]).toISOString(), storagePath: `brain:${r["id"]}`, url: `/v1/brain/artifacts/${r["id"]}?workspace=${workspace}` }));
+  }
+  async artifact(actor, input) {
+    const scope = await brainThreadAccess(this.sql, actor, input.workspace, input.threadId);
+    if (input.channel && input.channel !== scope.channel_id) throw new BrainError("NOT_FOUND", "The artifact channel does not belong to this thread.", 404);
+    if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(input.contentBase64)) throw new BrainError("INVALID_INPUT", "Artifact content must use valid base64.", 400);
+    const bytes = Buffer.from(input.contentBase64, "base64");
+    if (bytes.length > 16 * 1024 * 1024) throw new BrainError("TOO_LARGE", "An artifact must be at most 16 MiB.", 413);
+    const sha256 = brainHash(bytes);
+    if (input.sha256 && input.sha256 !== sha256) throw new BrainError("BRAIN_CHECKSUM_MISMATCH", "The artifact checksum does not match its bytes.", 400);
+    brainArtifactInline(bytes, input.mime, input.workspace, scope.kind === "coding");
+    const digest2 = brainHash(canonicalJson({ workspace: input.workspace, threadId: input.threadId, id: input.id, name: input.name, mime: input.mime, sha256, messageId: input.messageId, kind: input.kind, tags: input.tags, channel: input.channel }));
+    const ref = await this.objects.put(`v1/workspaces/${input.workspace}/threads/${input.threadId}/artifacts/${input.id}/${sha256}`, bytes, input.mime);
+    await this.sql.begin(async (transaction) => {
+      const tx = transaction;
+      await tx`select id from threads where id = ${input.threadId}::uuid for update`;
+      const thread = await brainThreadAccess(tx, actor, input.workspace, input.threadId);
+      const inline = brainArtifactInline(bytes, input.mime, input.workspace, thread.kind === "coding");
+      const [existing] = await tx`select request_sha256 from brain_artifacts where artifact_id = ${input.id}::uuid`;
+      if (existing) {
+        if (existing["request_sha256"] !== digest2) throw new BrainError("BRAIN_ARTIFACT_REUSED", "This artifact ID names different content. Use a new artifact ID.");
+        return;
+      }
+      let messageId = input.messageId;
+      if (messageId) {
+        const message2 = await tx`select id from messages where id = ${messageId}::uuid and thread_id = ${input.threadId}::uuid and workspace_id = ${input.workspace}::uuid`;
+        if (!message2.length) throw new BrainError("NOT_FOUND", "The artifact message does not belong to this thread.", 404);
+      } else messageId = (await tx`select id from messages where thread_id = ${input.threadId}::uuid and workspace_id = ${input.workspace}::uuid order by created_at, id limit 1`)[0]?.["id"];
+      const collision = await tx`select id from artifacts where id = ${input.id}::uuid`;
+      if (collision.length) throw new BrainError("BRAIN_ARTIFACT_REUSED", "This artifact ID already exists. Use a new artifact ID.");
+      await tx`insert into artifacts (id, workspace_id, channel_id, project_id, task_id, message_id, kind, name, mime, tags, content_hash, storage_path, size_bytes, inline_content, created_by_kind, created_by)
+        values (${input.id}::uuid, ${input.workspace}::uuid, ${thread.channel_id}::uuid, ${thread.project_id}::uuid, ${thread.task_id}::uuid, ${messageId ?? null}::uuid, ${input.kind ?? (input.mime.startsWith("image/") ? "screenshot" : "file")}::artifact_kind, ${input.name}, ${input.mime}, ${input.tags ?? []}, ${sha256}, ${`brain:${input.id}`}, ${bytes.length}, ${inline}, ${actor.kind}::actor_kind, ${actor.id}::uuid)`;
+      await tx`insert into brain_artifacts (artifact_id, thread_id, workspace_id, object_ref, request_sha256) values (${input.id}::uuid, ${input.threadId}::uuid, ${input.workspace}::uuid, ${tx.json(ref)}, ${digest2})`;
+      const event = createEvent({ type: "brain.artifact_created", workspace: input.workspace, source: `${actor.kind}:${actor.id}`, target: `resource/artifact/${input.id}`, payload: { artifactId: input.id, threadId: input.threadId, sha256, sizeBytes: bytes.length } });
+      await tx`insert into events (id, workspace_id, type, source, target, payload)
+        values (${event.id}, ${event.workspace}::uuid, ${event.type}, ${event.source}, ${event.target}, ${tx.json(event.payload)})`;
+    });
+    return { ok: true, id: input.id, artifactId: input.id, sha256, sizeBytes: bytes.length, url: `/v1/brain/artifacts/${input.id}?workspace=${input.workspace}` };
+  }
+  async download(actor, workspace, id) {
+    const [row] = await this.sql`select b.thread_id, b.object_ref, a.name from brain_artifacts b join artifacts a on a.id = b.artifact_id where b.artifact_id = ${id}::uuid and b.workspace_id = ${workspace}::uuid`;
+    if (!row) throw new BrainError("NOT_FOUND", "No artifact exists in this workspace.", 404);
+    await brainThreadAccess(this.sql, actor, workspace, row["thread_id"]);
+    const ref = row["object_ref"];
+    const bytes = await this.objects.get(ref);
+    await brainThreadAccess(this.sql, actor, workspace, row["thread_id"]);
+    return { bytes, ref, name: row["name"] };
+  }
+  async artifactMetadata(actor, workspace, id) {
+    const [row] = await this.sql`select b.thread_id, a.id, a.name, a.kind, a.tags, a.mime, a.size_bytes, a.content_hash, a.created_at
+      from brain_artifacts b join artifacts a on a.id = b.artifact_id where b.artifact_id = ${id}::uuid and b.workspace_id = ${workspace}::uuid`;
+    if (!row) throw new BrainError("NOT_FOUND", "No artifact exists in this workspace.", 404);
+    await brainThreadAccess(this.sql, actor, workspace, row["thread_id"]);
+    return {
+      id,
+      name: row["name"],
+      kind: row["kind"],
+      tags: row["tags"],
+      mime: row["mime"],
+      sizeBytes: Number(row["size_bytes"]),
+      sha256: row["content_hash"],
+      createdAt: new Date(row["created_at"]).toISOString(),
+      storagePath: `brain:${id}`,
+      url: `/v1/brain/artifacts/${id}?workspace=${workspace}`
+    };
+  }
+};
+
+// src/store/artifact-content.ts
+async function artifactContent(inline, ref) {
+  if (!ref) return inline;
+  const objects = configuredBrainObjects();
+  if (!objects) {
+    if (inline === null) throw new Error("Configure brain object storage to read this artifact.");
+    const prefix = `data:${ref.mime};base64,`;
+    const bytes2 = inline.startsWith(prefix) ? Buffer.from(inline.slice(prefix.length), "base64") : Buffer.from(inline);
+    if (bytes2.length !== ref.sizeBytes || brainHash(bytes2) !== ref.sha256) throw new Error("Artifact compatibility copy failed verification.");
+    return inline;
+  }
+  const bytes = await objects.get(ref);
+  return /^(text\/|application\/(json|xml|javascript)(;|$))/.test(ref.mime) ? bytes.toString("utf8") : `data:${ref.mime};base64,${bytes.toString("base64")}`;
+}
+async function assertTaskArtifactRead(store2, actor, taskId3, workspace, authorization2) {
   const sql = sqlOf(store2);
+  if (!sql) return;
+  const token = /^Bearer\s+(nmm_.+)$/i.exec(authorization2 ?? "")?.[1];
+  if (token && (await store2.machineByTokenHash?.(hashMachineToken(token)))?.workspace_id !== workspace) throw new BrainError("NOT_FOUND", "No accessible task exists.", 404);
+  if (!await actorInWorkspace(store2, actor, workspace)) throw new BrainError("NOT_FOUND", "No accessible task exists.", 404);
+  if (actor.kind === "agent") {
+    const [allowed] = await sql`select 1 from tasks t join agent_channels ac on ac.channel_id = t.channel_id join agents a on a.id = ac.agent_id
+      where t.id = ${taskId3}::uuid and a.id = ${actor.id}::uuid and a.retired_at is null`;
+    if (!allowed) throw new BrainError("NOT_FOUND", "No accessible task exists.", 404);
+  }
+}
+function taskDetailRoute(app, store2) {
+  app.get("/v1/tasks/:id", async (c) => {
+    const task = await store2.getTask(c.req.param("id"));
+    if (!task) return c.json({ error: "not found", code: "NOT_FOUND" }, 404);
+    await assertTaskArtifactRead(store2, c.get("actor"), task.id, task.workspace, c.req.header("authorization"));
+    const events = (await store2.listEvents(`task:${task.number}`)).filter((event) => event.workspace === task.workspace);
+    const artifacts2 = await store2.listArtifacts(task.id);
+    await assertTaskArtifactRead(store2, c.get("actor"), task.id, task.workspace, c.req.header("authorization"));
+    return c.json({ task, events, artifacts: artifacts2 });
+  });
+}
+
+// src/store/frames.ts
+async function libraryImage(store2, channelId, name, opts = {}) {
+  const sql = sqlOf(store2);
+  const any = !!opts.any;
   if (sql) {
     const [row] = await sql`
-      select name, mime, inline_content from artifacts
-       where lower(name) = lower(${name}) and inline_content like 'data:image/%'
-         and (channel_id = ${channelId}::uuid
-              or channel_id in (select id from channels where project_id = (select project_id from channels where id = ${channelId}::uuid)))
-       order by (channel_id = ${channelId}::uuid) desc, created_at desc limit 1`;
-    return row ? frameOf(row.name, row.mime, row.inline_content) : null;
+      select a.name, a.mime, a.inline_content, b.object_ref from artifacts a
+       left join brain_artifacts b on b.artifact_id = a.id left join threads t on t.id = b.thread_id
+       where lower(a.name) = lower(${name}) and (a.inline_content like 'data:image/%' or (a.mime like 'image/%' and b.object_ref is not null))
+         and (t.id is null or t.kind <> 'coding')
+         and (${any}::boolean or a.created_by_kind = 'human' or a.source like 'repo:%')
+         and (a.channel_id = ${channelId}::uuid
+              or a.channel_id in (select id from channels where project_id = (select project_id from channels where id = ${channelId}::uuid)))
+       order by (a.channel_id = ${channelId}::uuid) desc, a.created_at desc limit 1`;
+    const content = row ? await artifactContent(row.inline_content, row.object_ref) : null;
+    return row && content ? frameOf(row.name, row.mime, content) : null;
   }
   const mem = store2;
-  const hit = mem.libraryImage ? await mem.libraryImage(channelId, name) : null;
+  const hit = mem.libraryImage ? await mem.libraryImage(channelId, name, any) : null;
   return hit ? frameOf(hit.name, hit.mime, hit.content) : null;
+}
+async function setArtifactSource(store2, artifactId, source) {
+  const sql = sqlOf(store2);
+  if (sql) {
+    await sql`update artifacts set source = ${source} where id = ${artifactId}::uuid`;
+    return;
+  }
+  await store2.setArtifactSource?.(artifactId, source);
 }
 var frameOf = (name, mime, dataUrl) => ({ name, mime: mime ?? (/^data:(image\/[a-z0-9.+-]+)/i.exec(dataUrl)?.[1] ?? "image/png"), dataUrl });
 
@@ -15737,8 +19752,9 @@ async function frameName(store2, channelId, frame) {
   if (frame === void 0) return void 0;
   if (frame === null || frame === "") return null;
   const hit = channelId ? await libraryImage(store2, channelId, frame) : null;
-  if (!hit) throw new DomainError("NOT_FOUND", `no image named "${frame}" on this room's shelf. list_library names the shelf, and a human can upload a screenshot to the room's Files`);
-  return hit.name;
+  if (hit) return hit.name;
+  const made = channelId ? await libraryImage(store2, channelId, frame, { any: true }) : null;
+  throw new DomainError("NOT_FOUND", made ? `"${frame}" is not an app screenshot: an agent made it (a web capture or a drawn picture), and a film shows only a real screenshot of the app. Take one from the project's repository with shelve_repo_screenshot, or ask a person to upload a screenshot of the app to this room's Files` : `no image named "${frame}" on this room's shelf. list_library names the shelf, and a person can upload a screenshot of the app to the room's Files`);
 }
 async function styledBy(store2, actor, workspace) {
   if (actor.kind !== "agent") return (t2) => t2;
@@ -17007,16 +21023,26 @@ async function threadIdFor(sql, workspaceId, id) {
 }
 async function insertCodeSession(sql, input, event) {
   const cols = columnsOf(input);
-  await sql.begin(async (tx) => {
-    await tx`insert into code_sessions ${tx({ id: input.id, workspace_id: input.workspaceId, created_by: input.createdBy, ...cols })}`;
+  return sql.begin(async (tx) => {
+    const inserted = await tx`insert into code_sessions ${tx({ id: input.id, workspace_id: input.workspaceId, created_by: input.createdBy, ...cols })}
+      on conflict (id) do nothing returning id`;
+    if (!inserted.length) return false;
     await tx`insert into events (id, workspace_id, type, source, target, payload, in_reply_to)
       values (${event.id}, ${event.workspace}::uuid, ${event.type}, ${event.source}, ${event.target}, ${tx.json(event.payload)}, ${event.in_reply_to})`;
+    return true;
   });
 }
 async function patchCodeSession(sql, id, patch, ended, event) {
   const cols = columnsOf(patch);
   await sql.begin(async (tx) => {
+    const [thread] = await tx`select title, titled_at from threads where id = ${id}::uuid for update`;
+    if (patch.title !== void 0 && thread?.["titled_at"]) cols["title"] = thread["title"];
     await tx`update code_sessions set ${tx({ ...cols, updated_at: (/* @__PURE__ */ new Date()).toISOString(), ended_at: ended ? (/* @__PURE__ */ new Date()).toISOString() : null })} where id = ${id}::uuid`;
+    if (patch.lastLine !== void 0 || patch.state === "awaiting_approval") {
+      await tx`update threads t set settled_at = null from code_sessions c
+        where c.id = ${id}::uuid and t.id = c.thread_id and t.workspace_id = c.workspace_id
+          and t.settled_at is not null`;
+    }
     if (event) {
       await tx`insert into events (id, workspace_id, type, source, target, payload, in_reply_to)
         values (${event.id}, ${event.workspace}::uuid, ${event.type}, ${event.source}, ${event.target}, ${tx.json(event.payload)}, ${event.in_reply_to})`;
@@ -17049,13 +21075,14 @@ async function codeSessionCommands(store2, actor, cmd) {
         if (!(await store2.humanMemberIds(workspace)).includes(createdBy)) throw new DomainError("NOT_FOUND", "that member is not in this workspace");
       }
       const threadId = await threadIdFor(sql, workspace, codeSessionId);
-      await insertCodeSession(sql, { id: codeSessionId, workspaceId: workspace, createdBy, ...patch, ...machineId !== void 0 ? { machineId } : {}, ...threadId ? { threadId } : {} }, createEvent({
+      const inserted = await insertCodeSession(sql, { id: codeSessionId, workspaceId: workspace, createdBy, ...patch, ...machineId !== void 0 ? { machineId } : {}, ...threadId ? { threadId } : {} }, createEvent({
         type: "code_session.created",
         source: actorAddress(actor),
         workspace,
         target: formatAddress({ kind: "resource", type: "code_session", id: codeSessionId }),
         payload: { createdBy, machineId, repoName: patch.repoName ?? null, branch: patch.branch ?? null }
       }));
+      if (!inserted) return codeSessionCommands(store2, actor, c);
       return { ok: true, codeSessionId, created: true };
     }
     if (!mayWrite(existing)) throw new DomainError("NOT_PERMITTED", "only the session's member or the hosting machine's owner may update it");
@@ -17064,6 +21091,21 @@ async function codeSessionCommands(store2, actor, cmd) {
   }
   if (!existing) throw new DomainError("NOT_FOUND", "no such Code session");
   if (!mayWrite(existing)) throw new DomainError("NOT_PERMITTED", "only the session's member or the hosting machine's owner may update it");
+  if (c.type === "code_session.name") {
+    const title = plainTitle(c.title);
+    if (!title) throw new DomainError("INVALID_INPUT", "Supply a plain-text title.");
+    const [thread] = await sql`select id, title from threads where id = ${c.codeSessionId}::uuid
+      and workspace_id = ${c.workspace}::uuid and created_by = ${`human:${existing.createdBy}`}
+      and kind = 'coding' and task_id is null and schedule_id is null`;
+    if (!thread) throw new DomainError("NOT_FOUND", "No matching durable coding thread exists.");
+    try {
+      await store2.updateThread(c.workspace, c.codeSessionId, { title }, { agentTitleOnce: true });
+    } catch (error) {
+      if (!(error instanceof DomainError) || error.code !== "THREAD_ALREADY_TITLED") throw error;
+    }
+    const [named] = await sql`select title from threads where id = ${c.codeSessionId}::uuid and workspace_id = ${c.workspace}::uuid`;
+    return { ok: true, codeSessionId: c.codeSessionId, title: named?.["title"] };
+  }
   if (c.type === "code_session.close") {
     const state = c.state ?? "resumable";
     await patchCodeSession(sql, c.codeSessionId, { state, ...c.lastLine !== void 0 ? { lastLine: c.lastLine } : {} }, true, createEvent({
@@ -17091,6 +21133,7 @@ async function codeSessionCommands(store2, actor, cmd) {
 
 // src/handler/createtask.ts
 init_src();
+var CODE_KINDS = /* @__PURE__ */ new Set(["bug", "feature", "refactor", "chore"]);
 async function createTask(store2, actor, cmd) {
   const mayCreate = actor.kind === "human" || actor.role === "orchestrator" || cmd.backlog || !!cmd.parent;
   if (!mayCreate) {
@@ -17239,17 +21282,18 @@ async function createTask(store2, actor, cmd) {
   }
   if (task.workPlan) {
     const planName = planArtifactName(1);
+    const repo = task.repo !== null || CODE_KINDS.has(task.kind ?? "") && !!await store2.announcements?.repoForChannel(task.channel).catch(() => null);
     await store2.mutate(task.id, async (t2) => ({
       task: t2,
       events: [],
       artifacts: [{
         kind: "doc",
         name: planName,
-        content: renderPlanMarkdown({ number: task.number, title: task.title, kind: task.kind, legs: task.workPlan.legs, subtasks: task.workPlan.subtasks, approach: task.workPlan.approach, version: 1 })
+        content: renderPlanMarkdown({ number: task.number, title: task.title, kind: task.kind, legs: task.workPlan.legs, subtasks: task.workPlan.subtasks, approach: task.workPlan.approach, version: 1, repo })
       }]
     })).catch(() => {
     });
-    await postPlanMessage(store2, task, actor, 1, routine ? `\u23F1 Routine run \u2014 implementation plan **v1** (${planName}). Work starts now, hands-off; you'll be notified when it's done.` : playbookRun ? `\u25B6 Playbook run \u2014 plan **v1** (${planName}), the registry's template. Work starts now; your gate is accepting the deliverable.` : `Implementation plan **v1** \u2014 ${planName}`);
+    await postPlanMessage(store2, task, actor, 1, routine ? "routine" : playbookRun ? "playbook" : "birth");
   }
   if (handsOff && task.workPlan?.subtasks.length) {
     for (const title of task.workPlan.subtasks) {
@@ -17453,10 +21497,10 @@ async function executeCommand(store2, actor, cmd) {
   }
   if (cmd.type === "decision.answer" || cmd.type === "decision.dismiss") {
     if (actor.kind !== "human") throw new DomainError("HUMAN_ONLY", "decisions are answered by a human");
-    const status = cmd.type === "decision.answer" ? "answered" : "dismissed";
+    const status2 = cmd.type === "decision.answer" ? "answered" : "dismissed";
     const result = await store2.answerDecision(
       cmd.decisionId,
-      { status, answer: cmd.type === "decision.answer" ? cmd.answer : null, by: { kind: actor.kind, id: actor.id } },
+      { status: status2, answer: cmd.type === "decision.answer" ? cmd.answer : null, by: { kind: actor.kind, id: actor.id } },
       (workspace) => createEvent({
         type: cmd.type === "decision.answer" ? "decision.answered" : "decision.dismissed",
         source: actorAddress(actor),
@@ -17505,7 +21549,7 @@ async function executeCommand(store2, actor, cmd) {
   const planVersion = cmd.type === "task.propose_plan" ? nextPlanVersion((await store2.listArtifacts(cmd.taskId)).map((a) => a.name)) : 0;
   const word = cmd.type === "task.accept" && actor.kind !== "human" ? await store2.latestHumanWord(cmd.taskId) : null;
   if (cmd.type === "task.accept" && actor.kind !== "human" && !word) {
-    throw new DomainError("HUMAN_ONLY", "accept needs the human's word: no human message in this thread since the review verdict");
+    throw new DomainError("HUMAN_ONLY", "accept needs the human's word: nobody typed in this thread since the review verdict, and a card click is no word");
   }
   let outcome = await store2.mutate(cmd.taskId, async (task) => {
     if (cmd.type === "task.confirm_requirements") return confirmRequirements(task, actor, cmd.checklist);
@@ -17705,7 +21749,7 @@ async function runLifecyclePass(store2, limit = 50) {
         out.skipped += 1;
         continue;
       }
-      const status = await queueAndSend(store2, {
+      const status2 = await queueAndSend(store2, {
         workspace: row.workspaceId,
         userId: row.userId,
         toEmail: row.email,
@@ -17713,8 +21757,8 @@ async function runLifecyclePass(store2, limit = 50) {
         kind: "lifecycle",
         dedupeKey: `${template}:${row.userId}`
       }, rendered, unsubscribeUrl(row.userId));
-      if (status === "sent") out.sent += 1;
-      else if (status === "failed") out.failed += 1;
+      if (status2 === "sent") out.sent += 1;
+      else if (status2 === "failed") out.failed += 1;
       else out.skipped += 1;
     } catch (e) {
       out.failed += 1;
@@ -17799,7 +21843,7 @@ function cronRoutes(app, store2, push2) {
 
 // src/announce.ts
 import { cors } from "hono/cors";
-import { createHash as createHash6 } from "node:crypto";
+import { createHash as createHash7 } from "node:crypto";
 import { z as z19 } from "zod";
 
 // src/announce-job.ts
@@ -17977,12 +22021,12 @@ async function starterText(system, user, fetchFn = fetch, env = process.env) {
   });
   const payload = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(`starter brain call failed (${res.status})`);
-  const text2 = (payload.candidates?.[0]?.content?.parts ?? []).map((p2) => p2.text ?? "").join("");
-  if (!text2.trim()) throw new Error("starter brain answered with no text");
-  return text2;
+  const text3 = (payload.candidates?.[0]?.content?.parts ?? []).map((p2) => p2.text ?? "").join("");
+  if (!text3.trim()) throw new Error("starter brain answered with no text");
+  return text3;
 }
-function parseDraftAnswer(text2) {
-  const raw = text2.replace(/^\s*```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "").trim();
+function parseDraftAnswer(text3) {
+  const raw = text3.replace(/^\s*```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "").trim();
   let j;
   try {
     j = JSON.parse(raw);
@@ -18033,8 +22077,8 @@ function appJwt(env = process.env, now = Date.now()) {
   return `${head}.${body}.${sig}`;
 }
 var RESERVED = /* @__PURE__ */ new Set(["orgs", "organizations", "apps", "settings", "marketplace", "topics", "explore", "search", "login", "join", "features", "sponsors", "notifications", "issues", "pulls", "new", "about", "pricing", "enterprise", "users", "collections", "trending", "codespaces"]);
-function parseRepoInput(text2) {
-  let s = (text2 ?? "").trim().replace(/^git@github\.com:/i, "github.com/").replace(/^(?:https?|ssh|git):\/\/(?:[^@/\s]+@)?/i, "").replace(/^www\./i, "");
+function parseRepoInput(text3) {
+  let s = (text3 ?? "").trim().replace(/^git@github\.com:/i, "github.com/").replace(/^(?:https?|ssh|git):\/\/(?:[^@/\s]+@)?/i, "").replace(/^www\./i, "");
   const hosted = /^github\.com\//i.test(s);
   if (hosted) s = s.slice("github.com/".length);
   const parts = s.split(/[/?#]/);
@@ -18046,9 +22090,9 @@ function parseRepoInput(text2) {
   return { slug: `${owner}/${repo}` };
 }
 var GitHubApiError = class extends Error {
-  constructor(message2, status, headers2) {
+  constructor(message2, status2, headers2) {
     super(message2);
-    this.status = status;
+    this.status = status2;
     this.headers = headers2;
     this.name = "GitHubApiError";
   }
@@ -18119,7 +22163,7 @@ async function readRepoSignals(slug, since, opts = {}) {
 }
 
 // src/releasecard.ts
-import { readFile } from "node:fs/promises";
+import { readFile as readFile2 } from "node:fs/promises";
 
 // src/colorspace.ts
 init_src();
@@ -18184,15 +22228,15 @@ function releaseCardSvg(input) {
   const lineH = Math.round(size * LEADING);
   const blockTop = d.h - d.pad - lines.length * lineH;
   const mark = d.small * 2;
-  const text2 = (x, y, weight, px, tracking, body, extra = "") => `<text x="${x}" y="${y}" font-family="${family}" font-weight="${weight}" font-size="${px}" letter-spacing="${tracking.toFixed(1)}" fill="${ink}"${extra}>${escapeXml(body)}</text>`;
-  const title = lines.map((l, i) => text2(d.pad, blockTop + Math.round(size * 0.8) + i * lineH, 500, size, -size * 0.02, l)).join("\n");
+  const text3 = (x, y, weight, px, tracking, body, extra = "") => `<text x="${x}" y="${y}" font-family="${family}" font-weight="${weight}" font-size="${px}" letter-spacing="${tracking.toFixed(1)}" fill="${ink}"${extra}>${escapeXml(body)}</text>`;
+  const title = lines.map((l, i) => text3(d.pad, blockTop + Math.round(size * 0.8) + i * lineH, 500, size, -size * 0.02, l)).join("\n");
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${d.w}" height="${d.h}" viewBox="0 0 ${d.w} ${d.h}">
 <defs><radialGradient id="wash" cx="100%" cy="0%" r="80%"><stop offset="0" stop-color="${accent}" stop-opacity="0.1"/><stop offset="1" stop-color="${accent}" stop-opacity="0"/></radialGradient></defs>
 <rect width="${d.w}" height="${d.h}" fill="${bg}"/>
 <rect width="${d.w}" height="${d.h}" fill="url(#wash)"/>
 <rect x="${d.pad}" y="${d.pad}" width="${mark}" height="${mark}" rx="3" fill="${accent}"/>
-${text2(d.pad + mark + Math.round(d.small * 0.9), d.pad + Math.round(mark / 2 + d.small * 0.36), 400, d.small, d.small * 0.18, input.product.toUpperCase())}
-${text2(d.pad, blockTop - Math.round(size * 0.55), 400, Math.round(d.small * 0.93), d.small * 0.12, input.tag.toUpperCase(), ' fill-opacity="0.72"')}
+${text3(d.pad + mark + Math.round(d.small * 0.9), d.pad + Math.round(mark / 2 + d.small * 0.36), 400, d.small, d.small * 0.18, input.product.toUpperCase())}
+${text3(d.pad, blockTop - Math.round(size * 0.55), 400, Math.round(d.small * 0.93), d.small * 0.12, input.tag.toUpperCase(), ' fill-opacity="0.72"')}
 ${title}
 </svg>`;
 }
@@ -18202,7 +22246,7 @@ var fonts = null;
 async function resvgModule(init) {
   const mod = await import("@resvg/resvg-wasm");
   if (init) {
-    wasmReady ??= readFile(require2.resolve("@resvg/resvg-wasm/index_bg.wasm")).then((bytes) => mod.initWasm(bytes));
+    wasmReady ??= readFile2(require2.resolve("@resvg/resvg-wasm/index_bg.wasm")).then((bytes) => mod.initWasm(bytes));
     await wasmReady;
   }
   return mod;
@@ -18386,8 +22430,8 @@ function voiceOf(html) {
   const h12 = /<h1\b[^>]*>([\s\S]*?)<\/h1>/i.exec(body);
   const headline = h12 ? clean(h12[1]) : "";
   if (h12) body = body.replace(h12[0], " ");
-  const text2 = clean(body);
-  return `${headline}${headline && text2 ? "\n" : ""}${text2}`.slice(0, VOICE_CAP);
+  const text3 = clean(body);
+  return `${headline}${headline && text3 ? "\n" : ""}${text3}`.slice(0, VOICE_CAP);
 }
 async function readSheet(url, fetchFn, signal) {
   try {
@@ -18523,8 +22567,8 @@ async function runAnnounceJob(ann, row, deps) {
     }
     const brand = await deps.site(row.website).catch(() => null);
     await ann.update(row.id, { brand });
-    const text2 = await deps.brain(systemPrompt(), userPrompt(row.repo, scan, brand, row.website));
-    const answer = parseDraftAnswer(text2);
+    const text3 = await deps.brain(systemPrompt(), userPrompt(row.repo, scan, brand, row.website));
+    const answer = parseDraftAnswer(text3);
     if (!answer) return fail("The drafts did not come back in a shape I could read. Try again.");
     const posts = answer.verdict === "none" ? [] : doorPosts(answer.posts);
     if (answer.verdict !== "none" && !posts.length) return fail("The drafts came back empty. Try again.");
@@ -18542,8 +22586,8 @@ async function runAnnounceJob(ann, row, deps) {
       }
     }
     await ann.update(row.id, { status: "ready", readyAt: (deps.now ?? (() => /* @__PURE__ */ new Date()))().toISOString(), posts, brief, error: null });
-    const link = `${APP_URL2}/announce/${row.id}`;
-    const email = renderAnnounceReady({ repo: row.repo, tag: candidate.tag ?? candidate.key, title, networks: posts.map((p2) => NETWORK_NAME[p2.platform] ?? p2.platform), site: brand ? hostOf2(row.website) : null, link, verdict: answer.verdict });
+    const link2 = `${APP_URL2}/announce/${row.id}`;
+    const email = renderAnnounceReady({ repo: row.repo, tag: candidate.tag ?? candidate.key, title, networks: posts.map((p2) => NETWORK_NAME[p2.platform] ?? p2.platform), site: brand ? hostOf2(row.website) : null, link: link2, verdict: answer.verdict });
     await deps.mail({ ...row, tag: candidate.key, posts, brief }, email).catch((e) => console.warn(`announce ${row.id}: mail failed: ${e instanceof Error ? e.message : String(e)}`));
     return { status: "ready" };
   } catch (e) {
@@ -19606,9 +23650,9 @@ async function claimAnnouncement(store2, ann, actor, workspace, row) {
 ${releaseDigest(row.repo, scan, { since: null, checkedAt: "on the site" })}` : `Release drafts \xB7 ${tag} \xB7 ${row.repo}
 
 Drafted at neuramesh.app/announce.`;
-  const post = (text2) => store2.postMessage(
-    { id: crypto.randomUUID(), workspace, channel: channelId, taskId: null, threadId, author: { kind: actor.kind, id: actor.id }, body: text2, createdAt: (/* @__PURE__ */ new Date()).toISOString(), threadOrigin: null },
-    createEvent({ type: "message.posted", source: formatAddress({ kind: actor.kind, id: actor.id }), target: `channel/${channelId}`, workspace, payload: { preview: text2.slice(0, 120) } })
+  const post = (text3) => store2.postMessage(
+    { id: crypto.randomUUID(), workspace, channel: channelId, taskId: null, threadId, author: { kind: actor.kind, id: actor.id }, body: text3, createdAt: (/* @__PURE__ */ new Date()).toISOString(), threadOrigin: null },
+    createEvent({ type: "message.posted", source: formatAddress({ kind: actor.kind, id: actor.id }), target: `channel/${channelId}`, workspace, payload: { preview: text3.slice(0, 120) } })
   );
   await post(body);
   if (row.brief) {
@@ -19628,10 +23672,11 @@ Drafted at neuramesh.app/announce.`;
 }
 
 // src/github-connect.ts
+init_src();
 import { z as z18 } from "zod";
 
 // src/github-proof.ts
-import { createHash as createHash5, createHmac as createHmac4, randomBytes as randomBytes6 } from "node:crypto";
+import { createHash as createHash6, createHmac as createHmac4, randomBytes as randomBytes6 } from "node:crypto";
 var UA3 = "neuramesh-announce";
 function ownerProofConfigured(env = process.env) {
   return githubAppConfigured(env) && !!env["GITHUB_APP_CLIENT_ID"] && !!env["GITHUB_APP_CLIENT_SECRET"] && !!env["NM_CONNECTOR_KEY"];
@@ -19657,7 +23702,7 @@ var proofRedirectUri = () => `${HQ_URL}/github/callback`;
 var grantStartUrl = (channel) => `${HQ_URL}/github/start${channel ? `?${new URLSearchParams({ channel }).toString()}` : ""}`;
 var pkceVerifier = (state) => createHmac4("sha256", keyBytes()).update(`github-pkce:${state}`).digest("base64url");
 function authorizeUrl(state, env = process.env) {
-  const challenge = createHash5("sha256").update(pkceVerifier(state)).digest("base64url");
+  const challenge = createHash6("sha256").update(pkceVerifier(state)).digest("base64url");
   const q = new URLSearchParams({ client_id: env["GITHUB_APP_CLIENT_ID"] ?? "", redirect_uri: proofRedirectUri(), state, code_challenge: challenge, code_challenge_method: "S256" });
   return `https://github.com/login/oauth/authorize?${q.toString()}`;
 }
@@ -19702,7 +23747,7 @@ function authorizeRefusal(error) {
   if (error === "request") return new ProofRefusal("REQUEST");
   return misconfigured(error);
 }
-var busy = (status, headers2) => status >= 500 || status === 429 || status === 403 && (headers2?.get("x-ratelimit-remaining") === "0" || !!headers2?.has("retry-after"));
+var busy = (status2, headers2) => status2 >= 500 || status2 === 429 || status2 === 403 && (headers2?.get("x-ratelimit-remaining") === "0" || !!headers2?.has("retry-after"));
 var unreachable = (e) => e instanceof GitHubApiError && busy(e.status, e.headers) || e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError" || e instanceof TypeError && e.message === "fetch failed");
 async function exchangeCode(code, state, fetchFn, env = process.env) {
   let res;
@@ -19849,8 +23894,38 @@ async function readRepoFile(slug, path, ref, opts) {
   if (size > FILE_SIZE_CAP || b2.encoding !== "base64" || typeof b2.content !== "string") throw new GitHubApiError(`${p2} is larger than 1 MB: read a smaller file`, 413);
   const buf = Buffer.from(b2.content.replace(/\n/g, ""), "base64");
   if (looksBinary(buf)) throw new GitHubApiError(`${p2} is a binary file`, 415);
-  const text2 = buf.toString("utf8");
-  return { path: p2, ref, size, sha: b2.sha ?? "", content: text2.length > FILE_TEXT_CAP ? text2.slice(0, FILE_TEXT_CAP) : text2, truncated: text2.length > FILE_TEXT_CAP };
+  const text3 = buf.toString("utf8");
+  return { path: p2, ref, size, sha: b2.sha ?? "", content: text3.length > FILE_TEXT_CAP ? text3.slice(0, FILE_TEXT_CAP) : text3, truncated: text3.length > FILE_TEXT_CAP };
+}
+var IMAGE_SIZE_CAP = 8e6;
+function sniffShot(b2) {
+  if (b2[0] === 137 && b2[1] === 80 && b2[2] === 78 && b2[3] === 71) return "image/png";
+  if (b2[0] === 255 && b2[1] === 216 && b2[2] === 255) return "image/jpeg";
+  if (String.fromCharCode(...b2.subarray(0, 4)) === "RIFF" && String.fromCharCode(...b2.subarray(8, 12)) === "WEBP") return "image/webp";
+  return null;
+}
+async function readRepoImage(slug, path, opts) {
+  const p2 = cleanPath(path);
+  if (!p2) throw new GitHubApiError("name an image file path", 400);
+  const r = await githubGet(`/repos/${slug}/contents/${p2.split("/").map(encodeURIComponent).join("/")}`, opts);
+  if (r.status === 404) throw new GitHubApiError(`no file at ${p2}`, 404);
+  if (r.status < 200 || r.status >= 300) throw new GitHubApiError(`GitHub answered ${r.status} for ${p2}`, r.status);
+  if (Array.isArray(r.json)) throw new GitHubApiError(`${p2} is a directory: list it with the tree read`, 400);
+  const b2 = r.json;
+  if (b2.type !== "file" || !b2.sha) throw new GitHubApiError(`${p2} is a ${b2.type ?? "link"}, not a file`, 400);
+  const size = b2.size ?? 0;
+  if (size > IMAGE_SIZE_CAP) throw new GitHubApiError(`${p2} is larger than ${IMAGE_SIZE_CAP / 1e6} MB: pick a smaller screenshot`, 413);
+  let base64 = b2.encoding === "base64" && b2.content ? b2.content : null;
+  if (!base64) {
+    const blob = await githubGet(`/repos/${slug}/git/blobs/${b2.sha}`, opts);
+    const bb = blob.json;
+    if (blob.status < 200 || blob.status >= 300 || bb?.encoding !== "base64" || !bb.content) throw new GitHubApiError(`GitHub answered ${blob.status} for the blob of ${p2}`, blob.status >= 400 ? blob.status : 502);
+    base64 = bb.content;
+  }
+  const bytes = new Uint8Array(Buffer.from(base64.replace(/\n/g, ""), "base64"));
+  const mime = sniffShot(bytes);
+  if (!mime) throw new GitHubApiError(`${p2} is not a PNG, JPEG or WebP image`, 415);
+  return { path: p2, sha: b2.sha, size: bytes.length, mime, bytes };
 }
 async function readRepoTree(slug, path, ref, opts) {
   const p2 = cleanPath(path);
@@ -20125,10 +24200,10 @@ function lifecycleRoutes(app, store2) {
     const plan = await store2.workspacePlan(workspace);
     const capMinutes = null;
     const sql = sqlOf(store2);
-    const machines = sql ? await machineIntent(sql, workspace) : [];
+    const machines2 = sql ? await machineIntent(sql, workspace) : [];
     const bal = sql ? await creditBalance(sql, workspace) : null;
-    const yours = machines.find((m) => m.kind === "member" && m.ownerUserId === actor.id)?.id ?? null;
-    return c.json({ ...usage, capMinutes, plan, machines, yours, outOfCredits: bal ? bal.remainingMicros <= 0 : false });
+    const yours = machines2.find((m) => m.kind === "member" && m.ownerUserId === actor.id)?.id ?? null;
+    return c.json({ ...usage, capMinutes, plan, machines: machines2, yours, outOfCredits: bal ? bal.remainingMicros <= 0 : false });
   });
   app.post("/v1/machines/wake", async (c) => {
     const { workspace, machineId } = await c.req.json().catch(() => ({}));
@@ -20220,8 +24295,8 @@ async function installationFor(ann, slug, fetchFn, workspaceId = null, strict = 
 var PAGE = 100;
 async function rememberInstallation(ann, installationId, fetchFn, workspaceId, keepWorkspace = false) {
   const tok = await tokenFor(installationId, fetchFn);
-  const repos = await githubGet(`/installation/repositories?per_page=${PAGE}`, { token: tok, fetchFn });
-  const names = repos.status === 200 ? (repos.json.repositories ?? []).map((r) => r.full_name.toLowerCase()) : [];
+  const repos2 = await githubGet(`/installation/repositories?per_page=${PAGE}`, { token: tok, fetchFn });
+  const names = repos2.status === 200 ? (repos2.json.repositories ?? []).map((r) => r.full_name.toLowerCase()) : [];
   const facts = await installationFacts(installationId, { fetchFn }).catch(() => ({ account: names[0]?.split("/")[0] ?? "", selection: "selected" }));
   await ann.upsertInstallation({ installationId, account: facts.account, repos: names, selection: facts.selection, workspaceId, keepWorkspace });
   return names;
@@ -20252,7 +24327,7 @@ async function readableRepos(ann, workspaceId, fetchFn) {
   }
   return [...out].sort();
 }
-var hintFor = (repo, repos) => (repo && repos.find((s) => s.split("/")[1] === repo.name.toLowerCase())) ?? null;
+var hintFor = (repo, repos2) => (repo && repos2.find((s) => s.split("/")[1] === repo.name.toLowerCase())) ?? null;
 async function attachRepo(store2, ctx, slug, defaultBranch) {
   const [orgName = "", name = ""] = slug.split("/");
   const event = createEvent({
@@ -20326,7 +24401,13 @@ async function resolveConnector(store2, ctx, fetchFn, opts = {}) {
     await rememberInstallation(ann, id, fetchFn, ctx.workspace, true);
   };
   const written = async (target, attached) => {
-    await store2.upsertConnector({ workspace: ctx.workspace, channelId: ctx.channel, provider: "github", handle: target, connectedBy: ctx.actor, scopes: GITHUB_SCOPES });
+    await store2.upsertConnector({ workspace: ctx.workspace, channelId: ctx.channel, provider: "github", handle: target, connectedBy: ctx.actor, scopes: GITHUB_SCOPES }, (workspace, id) => createEvent({
+      type: "github.connected",
+      source: formatAddress({ kind: "human", id: ctx.actor }),
+      target: formatAddress({ kind: "resource", type: "connector", id }),
+      workspace,
+      payload: { connector: id, handle: target }
+    }));
     if (opts.resume) await resumeAfterGitHub(store2, ctx, target).catch((e) => console.warn(`github resume failed: ${e instanceof Error ? e.message : String(e)}`));
     if (proofs) await recorded(target).catch(() => {
     });
@@ -20343,16 +24424,16 @@ async function resolveConnector(store2, ctx, fetchFn, opts = {}) {
   if (slug && proofs && !opts.strict) {
     if (await holds(slug)) return written(slug, false);
     if (await connect(slug)) {
-      const repos2 = await readable();
-      return { ok: false, code: "NOT_INSTALLED", error: `Connect ${slug} to this room.`, slug, repos: repos2, hint: repos2.find((s) => s === slug.toLowerCase()) ?? slug, proven: true };
+      const repos3 = await readable();
+      return { ok: false, code: "NOT_INSTALLED", error: `Connect ${slug} to this room.`, slug, repos: repos3, hint: repos3.find((s) => s === slug.toLowerCase()) ?? slug, proven: true };
     }
   } else if (slug && (await connect(slug) || await holds(slug))) return written(slug, false);
-  const repos = await readable();
-  const hint = hintFor(repo, repos);
-  if (!repo) return { ok: false, code: "NO_REPO", error: repos.length ? "Pick the repository this project lives in." : "This project has no repository yet. Grant access on GitHub and pick it there.", slug: null, repos, hint };
-  if (!slug) return { ok: false, code: "NO_REPO", error: repos.length ? `Pick the repository ${repo.name} lives in.` : `${repo.name} is a folder on a machine. Grant access on GitHub and pick its repository there.`, slug: null, repos, hint };
-  const error = await stranded(slug) ?? (repos.length ? `The neuramesh app cannot read ${slug}. Add it on GitHub, or pick another repository.` : `The neuramesh app is not installed on ${slug}. Grant access on GitHub.`);
-  return { ok: false, code: "NOT_INSTALLED", error, slug, repos, hint };
+  const repos2 = await readable();
+  const hint = hintFor(repo, repos2);
+  if (!repo) return { ok: false, code: "NO_REPO", error: repos2.length ? "Pick the repository this project lives in." : "This project has no repository yet. Grant access on GitHub and pick it there.", slug: null, repos: repos2, hint };
+  if (!slug) return { ok: false, code: "NO_REPO", error: repos2.length ? `Pick the repository ${repo.name} lives in.` : `${repo.name} is a folder on a machine. Grant access on GitHub and pick its repository there.`, slug: null, repos: repos2, hint };
+  const error = await stranded(slug) ?? (repos2.length ? `The neuramesh app cannot read ${slug}. Add it on GitHub, or pick another repository.` : `The neuramesh app is not installed on ${slug}. Grant access on GitHub.`);
+  return { ok: false, code: "NOT_INSTALLED", error, slug, repos: repos2, hint };
 }
 
 // src/github-prove.ts
@@ -20475,6 +24556,189 @@ function githubWriteRoutes(app, store2, fetchFn) {
       return c.json({ error: e instanceof Error ? e.message : "GitHub did not answer", code: "GITHUB_ERROR" }, 502);
     }
   });
+}
+
+// src/shelf-image.ts
+var jpeg = __toESM(require_jpeg_js(), 1);
+
+// src/fal.ts
+var FAL_QUEUE = "https://queue.fal.run";
+var headers = (key2) => ({ authorization: `Key ${key2}`, "content-type": "application/json" });
+var queueBase = (endpoint) => endpoint.split("/").slice(0, 2).join("/");
+var unavailable = (status2, msg2) => status2 === 404 || status2 === 422 && /not found|unavailable|deprecated|no longer/i.test(msg2);
+async function falSubmit(key2, endpoint, input, fetchFn = fetch, timeoutSeconds = 480) {
+  const res = await fetchFn(`${FAL_QUEUE}/${endpoint}`, { method: "POST", headers: { ...headers(key2), "x-fal-request-timeout": String(timeoutSeconds) }, body: JSON.stringify(input) }).catch((e) => new Response(JSON.stringify({ detail: String(e) }), { status: 599 }));
+  const body = await res.json().catch(() => null);
+  if (res.ok && body?.request_id) return { requestId: body.request_id, status: res.status };
+  const msg2 = typeof body?.detail === "string" ? body.detail : Array.isArray(body?.detail) ? JSON.stringify(body.detail) : body?.error ?? `fal ${res.status}`;
+  return { error: msg2, status: res.status, unavailable: unavailable(res.status, msg2) };
+}
+async function falStatus(key2, endpoint, requestId, fetchFn = fetch) {
+  const res = await fetchFn(`${FAL_QUEUE}/${queueBase(endpoint)}/requests/${requestId}/status`, { headers: headers(key2) }).catch((e) => new Response(JSON.stringify({ detail: String(e) }), { status: 599 }));
+  const body = await res.json().catch(() => null);
+  if (!res.ok) return { state: "failed", error: typeof body?.detail === "string" ? body.detail : `fal status ${res.status}` };
+  if (body?.error) return { state: "failed", error: body.error, ...body.error_type ? { errorType: body.error_type } : {} };
+  if (body?.status === "COMPLETED") return { state: "done" };
+  if (body?.status === "IN_PROGRESS") return { state: "running" };
+  return { state: "queued", ...typeof body?.queue_position === "number" ? { position: body.queue_position } : {} };
+}
+async function falResult(key2, endpoint, requestId, fetchFn = fetch) {
+  const res = await fetchFn(`${FAL_QUEUE}/${queueBase(endpoint)}/requests/${requestId}`, { headers: headers(key2) }).catch((e) => new Response(JSON.stringify({ detail: String(e) }), { status: 599 }));
+  const body = await res.json().catch(() => null);
+  if (!res.ok) return { error: typeof body?.detail === "string" ? body.detail : body?.error ?? `fal result ${res.status}` };
+  if (!body?.video?.url) return { error: "the film came back without a video" };
+  return { url: body.video.url, contentType: body.video.content_type };
+}
+async function falUpload(key2, bytes, contentType, fileName, fetchFn = fetch) {
+  const init = await fetchFn("https://rest.alpha.fal.ai/storage/upload/initiate?storage_type=fal-cdn-v3", { method: "POST", headers: headers(key2), body: JSON.stringify({ content_type: contentType, file_name: fileName }) }).catch((e) => new Response(JSON.stringify({ detail: String(e) }), { status: 599 }));
+  const body = await init.json().catch(() => null);
+  if (!init.ok || !body?.upload_url || !body.file_url) return { error: typeof body?.detail === "string" ? body.detail : `fal upload ${init.status}` };
+  const put = await fetchFn(body.upload_url, { method: "PUT", headers: { "content-type": contentType }, body: bytes }).catch(() => null);
+  if (!put?.ok) return { error: `fal upload put ${put?.status ?? "no answer"}` };
+  return { url: body.file_url };
+}
+async function falRun(key2, endpoint, input, fetchFn = fetch, timeoutMs = 9e4) {
+  const res = await fetchFn(`https://fal.run/${endpoint}`, { method: "POST", headers: headers(key2), body: JSON.stringify(input), signal: AbortSignal.timeout(timeoutMs) }).catch((e) => new Response(JSON.stringify({ detail: e instanceof Error && e.name === "TimeoutError" ? "timed out" : String(e) }), { status: 599 }));
+  const body = await res.json().catch(() => null);
+  if (!res.ok || !body) return { error: typeof body?.detail === "string" ? body.detail : `fal ${endpoint} ${res.status}` };
+  return { result: body };
+}
+
+// src/film-compose.ts
+var SHOT_NOT_CUT = "the shot could not be cut in";
+var FRAME_W = 720;
+var FRAME_H = 1280;
+var FPS = 24;
+var MIN_PIECE = 0.25;
+var GROUND = "#141414";
+function imageSize(dataUrl) {
+  const m = /^data:image\/([a-z0-9.+-]+);base64,/i.exec(dataUrl);
+  if (!m) return null;
+  const b2 = Buffer.from(dataUrl.slice(m[0].length, m[0].length + 2e5), "base64");
+  if (b2.length > 24 && b2[0] === 137 && b2[1] === 80) return { w: b2.readUInt32BE(16), h: b2.readUInt32BE(20) };
+  if (b2.length > 4 && b2[0] === 255 && b2[1] === 216) {
+    for (let at = 2; at + 9 < b2.length; ) {
+      if (b2[at] !== 255) {
+        at += 1;
+        continue;
+      }
+      const marker = b2[at + 1];
+      if (marker === 216 || marker >= 208 && marker <= 215 || marker === 1) {
+        at += 2;
+        continue;
+      }
+      const len = b2.readUInt16BE(at + 2);
+      if (marker >= 192 && marker <= 207 && marker !== 196 && marker !== 200 && marker !== 204) return { h: b2.readUInt16BE(at + 5), w: b2.readUInt16BE(at + 7) };
+      at += 2 + len;
+    }
+  }
+  return null;
+}
+function productFrameSvg(dataUrl, w = FRAME_W, h = FRAME_H) {
+  const pad = Math.round(w * 0.04);
+  const iw = w - pad * 2;
+  const size = imageSize(dataUrl);
+  const wide = !!size && size.w / size.h > 1.25;
+  const ih = wide ? Math.round(iw * 1.25) : h - pad * 2;
+  const y = wide ? Math.round((h - ih) / 2) : pad;
+  const r = Math.round(w * 0.03);
+  return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><defs><clipPath id="c"><rect x="${pad}" y="${y}" width="${iw}" height="${ih}" rx="${r}" ry="${r}"/></clipPath></defs><rect width="${w}" height="${h}" fill="${GROUND}"/><image x="${pad}" y="${y}" width="${iw}" height="${ih}" preserveAspectRatio="xMidYMid ${wide ? "slice" : "meet"}" clip-path="url(#c)" xlink:href="${dataUrl}" href="${dataUrl}"/></svg>`;
+}
+async function renderProductFrame(dataUrl, opts = {}) {
+  const { Resvg } = await resvgModule(opts.initWasm !== false);
+  const r = new Resvg(productFrameSvg(dataUrl), { fitTo: { mode: "original" } });
+  try {
+    const img = r.render();
+    try {
+      return img.asPng();
+    } finally {
+      img.free();
+    }
+  } finally {
+    r.free();
+  }
+}
+function timeline(seconds, shots) {
+  const out = [];
+  let at = 0;
+  for (const shot of [...shots].sort((a, b2) => a.start - b2.start)) {
+    const start = Math.max(at, Math.min(shot.start, seconds));
+    const end = Math.min(shot.end, seconds);
+    if (end - start < MIN_PIECE) continue;
+    if (start - at >= MIN_PIECE) out.push({ kind: "film", start: at, end: start });
+    out.push({ kind: "shot", start, end, shot });
+    at = end;
+  }
+  if (seconds - at >= MIN_PIECE) out.push({ kind: "film", start: at, end: seconds });
+  return out;
+}
+async function composeShots(key2, clipUrl, seconds, shots, opts = {}) {
+  const fetchFn = opts.fetchFn ?? fetch;
+  const pieces = timeline(seconds, shots);
+  const wanted = pieces.filter((p2) => p2.kind === "shot").length;
+  if (!wanted) return { applied: 0, why: "no product beat fell inside the film" };
+  const frames = /* @__PURE__ */ new Map();
+  for (const p2 of pieces) {
+    if (p2.kind !== "shot" || frames.has(p2.shot.show)) continue;
+    let png;
+    try {
+      png = await renderProductFrame(p2.shot.dataUrl, { initWasm: opts.initWasm });
+    } catch (e) {
+      return { applied: 0, why: SHOT_NOT_CUT, detail: `the product frame for ${p2.shot.show} did not render (${e instanceof Error ? e.message : String(e)})` };
+    }
+    const up = await falUpload(key2, png, "image/png", `${p2.shot.show.replace(/[^\w.-]+/g, "-")}.png`, fetchFn);
+    if (!up.url) return { applied: 0, why: SHOT_NOT_CUT, detail: `the product frame did not upload (${up.error ?? "no answer"})` };
+    frames.set(p2.shot.show, up.url);
+  }
+  const urls = [];
+  for (const p2 of pieces) {
+    if (p2.kind === "film") {
+      const r = await falRun(key2, "fal-ai/workflow-utilities/trim-video", { video_url: clipUrl, start_time: p2.start, end_time: p2.end }, fetchFn);
+      if (!r.result?.video?.url) return { applied: 0, why: SHOT_NOT_CUT, detail: `the film did not trim at ${p2.start}-${p2.end} s (${r.error ?? "no video"})` };
+      urls.push(r.result.video.url);
+    } else {
+      const r = await falRun(key2, "fal-ai/ffmpeg-api/images-to-video", { fps: FPS, images: [{ url: frames.get(p2.shot.show), frames: Math.max(1, Math.round((p2.end - p2.start) * FPS)) }] }, fetchFn);
+      if (!r.result?.video?.url) return { applied: 0, why: SHOT_NOT_CUT, detail: `the product shot ${p2.shot.show} did not render as a clip (${r.error ?? "no video"})` };
+      urls.push(r.result.video.url);
+    }
+  }
+  const tracks = [
+    { id: "video", type: "video", keyframes: pieces.map((p2, i) => ({ timestamp: Math.round(p2.start * 1e3), url: urls[i], duration: Math.round((p2.end - p2.start) * 1e3) })) },
+    { id: "audio", type: "audio", keyframes: [{ timestamp: 0, url: clipUrl, duration: Math.round(seconds * 1e3) }] }
+  ];
+  const c = await falRun(key2, "fal-ai/ffmpeg-api/compose", { tracks }, fetchFn, 12e4);
+  if (!c.result?.video_url) return { applied: 0, why: SHOT_NOT_CUT, detail: `the pieces did not compose (${c.error ?? "no video"})` };
+  return { url: c.result.video_url, applied: wanted };
+}
+
+// src/shelf-image.ts
+var SHELF_MAX_CHARS = 3e5;
+var WIDTHS = [1080, 900, 720, 600, 480, 360];
+async function shelfCopy(bytes, mime, opts = {}) {
+  const asIs = `data:${mime};base64,${Buffer.from(bytes).toString("base64")}`;
+  if (asIs.length <= SHELF_MAX_CHARS) return { dataUrl: asIs, mime };
+  const size = mime === "image/webp" ? null : imageSize(asIs);
+  if (!size || !size.w || !size.h) return null;
+  const { Resvg } = await resvgModule(opts.initWasm !== false);
+  for (const w of [...new Set(WIDTHS.map((t2) => Math.min(t2, size.w)))]) {
+    const h = Math.max(1, Math.round(size.h * w / size.w));
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><rect width="${w}" height="${h}" fill="#ffffff"/><image width="${w}" height="${h}" preserveAspectRatio="none" xlink:href="${asIs}" href="${asIs}"/></svg>`;
+    const r = new Resvg(svg, { fitTo: { mode: "original" } });
+    let out;
+    try {
+      const img = r.render();
+      try {
+        out = jpeg.encode({ data: img.pixels, width: img.width, height: img.height }, 85).data;
+      } finally {
+        img.free();
+      }
+    } finally {
+      r.free();
+    }
+    const url = `data:image/jpeg;base64,${Buffer.from(out).toString("base64")}`;
+    if (url.length <= SHELF_MAX_CHARS) return { dataUrl: url, mime: "image/jpeg" };
+  }
+  return null;
 }
 
 // src/github-connect.ts
@@ -20625,6 +24889,30 @@ function githubApiRoutes(app, store2, opts = {}) {
       return c.json(f.body, f.status);
     }
   });
+  app.post("/v1/repo/shelve", async (c) => {
+    const o = await open(c);
+    if (isRefusal(o)) return c.json(o.body, o.status);
+    const body = z18.object({ path: z18.string().trim().min(1).max(400), name: z18.string().trim().min(1).max(120).optional() }).safeParse(await c.req.json().catch(() => null));
+    if (!body.success) return c.json({ error: "name the image file: { path, name? }", code: "INVALID_INPUT" }, 400);
+    const channel = c.req.query("channel");
+    const actor = c.get("actor");
+    try {
+      const img = await readRepoImage(o.slug, body.data.path, { token: o.token, fetchFn });
+      const copy = await shelfCopy(img.bytes, img.mime);
+      if (!copy) return c.json({ error: `${img.path} does not fit the shelf at any size. Pick a PNG or JPEG screenshot.`, code: "TOO_LARGE" }, 413);
+      const leaf = img.path.split("/").pop();
+      const name = (body.data.name ?? leaf).replace(/\.(png|jpe?g|webp)$/i, "") + (copy.mime === "image/jpeg" ? ".jpg" : leaf.slice(leaf.lastIndexOf(".")));
+      const { id } = await store2.createChannelArtifact(
+        { channelId: channel, kind: "file", name, inlineContent: copy.dataUrl, mime: copy.mime, createdByKind: actor.kind, createdBy: actor.id },
+        (ws) => createEvent({ type: "artifact.created", source: formatAddress({ kind: actor.kind, id: actor.id }), target: formatAddress({ kind: "channel", slug: channel }), workspace: ws, payload: { channel, name, kind: "file", from: `${o.slug}/${img.path}` } })
+      );
+      await setArtifactSource(store2, id, `repo:${o.slug}/${img.path}@${img.sha}`);
+      return c.json({ ok: true, id, name, path: img.path, sha: img.sha }, 201);
+    } catch (e) {
+      const f = failed(e);
+      return c.json(f.body, f.status);
+    }
+  });
 }
 
 // src/announce.ts
@@ -20634,7 +24922,7 @@ var cap = (name, fallback) => {
   const n = Number(process.env[name]);
   return Number.isFinite(n) && n > 0 ? n : fallback;
 };
-var ipHashOf = (ip) => ip ? createHash6("sha256").update(ip.trim()).digest("hex").slice(0, 32) : null;
+var ipHashOf = (ip) => ip ? createHash7("sha256").update(ip.trim()).digest("hex").slice(0, 32) : null;
 var maskEmail = (e) => {
   const [u = "", d = ""] = e.split("@");
   return `${u.slice(0, 1)}\u2022\u2022\u2022@${d}`;
@@ -20871,13 +25159,13 @@ async function resolveBearerActor(store2, userId, rawHeader) {
 }
 
 // src/local-auth.ts
-import { createHash as createHash7, createHmac as createHmac5, randomBytes as randomBytes7 } from "node:crypto";
+import { createHash as createHash8, createHmac as createHmac5, randomBytes as randomBytes7 } from "node:crypto";
 var LOCAL_USER = { clerkUserId: "local", email: "local@neuramesh.local" };
 var LOCAL_SYNC_KID = "nm-local";
 var LOCAL_SYNC_AUD = "powersync-local";
 var LOCAL_SYNC_TTL_SECONDS = 6 * 3600;
 function hashLocalToken(token) {
-  return createHash7("sha256").update(token).digest("hex");
+  return createHash8("sha256").update(token).digest("hex");
 }
 async function localUserIdForBearer(store2, bearer) {
   if (!localMode() || !bearer.startsWith("nmh_")) return null;
@@ -20939,7 +25227,7 @@ function nmVersion() {
 }
 
 // src/local-routes.ts
-var bearerOf = (authorization) => /^Bearer\s+(.+)$/i.exec(authorization ?? "")?.[1];
+var bearerOf = (authorization2) => /^Bearer\s+(.+)$/i.exec(authorization2 ?? "")?.[1];
 function localAuthRoutes(app, store2) {
   app.post("/auth/dev/token", async (c) => {
     if (process.env["NM_ALLOW_DEV_TOKENS"] !== "1" || localMode()) return c.json({ error: "not found", code: "NOT_FOUND" }, 404);
@@ -20977,7 +25265,7 @@ function meRoute(app, store2) {
 
 // src/app.ts
 import { cors as cors2 } from "hono/cors";
-import { z as z23 } from "zod";
+import { z as z24 } from "zod";
 
 // src/trial.ts
 init_src();
@@ -21403,11 +25691,11 @@ function importRoutes(app, store2) {
     if (!me) return c.json({ error: "Only the workspace owner can migrate a workspace into it.", code: "NOT_PERMITTED" }, 403);
     const plan = me["plan"] ?? "free";
     if (plan !== "cloud") return c.json({ error: PRO_REFUSAL, code: "PLAN_LIMIT" }, 402);
-    const text2 = await c.req.text();
-    if (Buffer.byteLength(text2, "utf8") > IMPORT_BATCH_MAX_BYTES) return c.json({ error: SIZE_REFUSAL, code: "IMPORT_TOO_LARGE" }, 413);
+    const text3 = await c.req.text();
+    if (Buffer.byteLength(text3, "utf8") > IMPORT_BATCH_MAX_BYTES) return c.json({ error: SIZE_REFUSAL, code: "IMPORT_TOO_LARGE" }, 413);
     let raw = null;
     try {
-      raw = JSON.parse(text2);
+      raw = JSON.parse(text3);
     } catch {
       raw = null;
     }
@@ -21426,8 +25714,31 @@ function importRoutes(app, store2) {
 
 // src/content-media-route.ts
 var STREAM_CHUNK = 1e6;
+function publicContentMediaRoute(app, store2) {
+  app.get("/media/:id", async (c) => {
+    const mediaId = c.req.param("id");
+    const sig = c.req.query("s") ?? "";
+    if (!process.env["NM_CONNECTOR_KEY"] || !verifyMediaSig(mediaId, sig)) return c.text("forbidden", 403);
+    const media = await store2.contentMediaBytes(mediaId);
+    if (!media) return c.text("not found", 404);
+    return new Response(new Uint8Array(media.bytes), {
+      headers: { "content-type": media.mime, "content-length": String(media.bytes.length), "cache-control": "public, max-age=300", "x-content-type-options": "nosniff", "content-security-policy": "default-src 'none'; sandbox" }
+    });
+  });
+}
 function contentMediaRoute(app, store2) {
   app.get("/v1/content/media/:id", async (c) => {
+    const sql = sqlOf(store2);
+    if (sql) {
+      const [scope] = await sql`select m.workspace_id, i.channel_id from content_media m join content_items i on i.id = m.content_item_id where m.id = ${c.req.param("id")}::uuid`;
+      if (!scope) return c.json({ error: "not found" }, 404);
+      const actor = c.get("actor");
+      if (!await actorInWorkspace(store2, actor, scope["workspace_id"])) return c.json({ error: "not your workspace", code: "NOT_PERMITTED" }, 403);
+      if (actor.kind === "agent") {
+        const registration = await sql`select 1 from agent_channels ac join agents a on a.id = ac.agent_id where ac.agent_id = ${actor.id}::uuid and ac.channel_id = ${scope["channel_id"]}::uuid and a.retired_at is null`;
+        if (!registration.length) return c.json({ error: "not your channel", code: "NOT_PERMITTED" }, 403);
+      }
+    }
     const media = await store2.contentMediaBytes(c.req.param("id"));
     if (!media) return c.json({ error: "not found" }, 404);
     if (!await actorInWorkspace(store2, c.get("actor"), media.workspace)) return c.json({ error: "not your workspace", code: "NOT_PERMITTED" }, 403);
@@ -21436,7 +25747,5988 @@ function contentMediaRoute(app, store2) {
       for (let at = 0; at < bytes.length; at += STREAM_CHUNK) ctl.enqueue(bytes.subarray(at, at + STREAM_CHUNK));
       ctl.close();
     } });
-    return new Response(body, { headers: { "content-type": media.mime, "content-length": String(bytes.length), "cache-control": "private, max-age=300" } });
+    return new Response(body, { headers: { "content-type": media.mime, "content-length": String(bytes.length), "cache-control": "private, max-age=300", "x-content-type-options": "nosniff", "content-security-policy": "default-src 'none'; sandbox" } });
+  });
+}
+
+// src/brain-routes.ts
+import { compress } from "hono/compress";
+import { z as z22 } from "zod";
+var CommitSchema = z22.object({
+  workspace: z22.string().uuid(),
+  commitId: z22.string().uuid(),
+  expectedRevision: z22.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER - 1),
+  deviceId: z22.string().min(1).max(256),
+  events: z22.array(z22.object({ id: z22.string().min(1).max(256), type: z22.string().min(1).max(128), timestamp: z22.string().datetime({ offset: true }) }).passthrough()).max(4096),
+  runtimeMessages: z22.array(z22.unknown()).optional(),
+  metadata: z22.record(z22.unknown()).optional(),
+  artifactIds: z22.array(z22.string().uuid()).max(256).optional()
+}).strict();
+var ArtifactSchema = z22.object({
+  workspace: z22.string().uuid(),
+  threadId: z22.string().uuid(),
+  id: z22.string().uuid(),
+  name: z22.string().min(1).max(512),
+  mime: z22.string().max(255).regex(/^[a-zA-Z0-9!#$&^_.+-]+\/[a-zA-Z0-9!#$&^_.+-]+$/),
+  contentBase64: z22.string(),
+  sha256: z22.string().regex(/^[a-f0-9]{64}$/).optional(),
+  messageId: z22.string().uuid().optional(),
+  kind: z22.enum(["screenshot", "file", "doc", "diff", "test_report", "design", "ship"]).optional(),
+  tags: z22.array(z22.string().min(1).max(100)).max(50).optional(),
+  channel: z22.string().uuid().optional()
+}).strict();
+var ScopeSchema = z22.object({ workspace: z22.string().uuid(), id: z22.string().uuid() });
+async function boundedJson(request2, limit) {
+  if (Number(request2.headers.get("content-length") ?? 0) > limit) throw new BrainError("TOO_LARGE", "This brain upload exceeds the request limit.", 413);
+  const reader = request2.body?.getReader();
+  if (!reader) throw new BrainError("INVALID_INPUT", "Supply a JSON request body.", 400);
+  const chunks = [];
+  let size = 0;
+  try {
+    while (true) {
+      const { done: done2, value } = await reader.read();
+      if (done2) break;
+      size += value.length;
+      if (size > limit) {
+        await reader.cancel();
+        throw new BrainError("TOO_LARGE", "This brain upload exceeds the request limit.", 413);
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  try {
+    return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+  } catch {
+    throw new BrainError("INVALID_INPUT", "Supply a valid JSON request body.", 400);
+  }
+}
+function brainRoutes(app, store2, options = {}) {
+  let objects = options.objects;
+  const service = () => {
+    const sql = sqlOf(store2);
+    objects ??= configuredBrainObjects() ?? void 0;
+    if (!sql || !objects) throw new BrainError("BRAIN_UNAVAILABLE", "Configure brain object storage on the server, then retry.", 503);
+    return new BrainStore(sql, objects);
+  };
+  const machineScope = async (authorization2, workspace) => {
+    const token = /^Bearer\s+(nmm_.+)$/i.exec(authorization2 ?? "")?.[1];
+    if (!token) return;
+    const machine = await store2.machineByTokenHash?.(hashMachineToken(token));
+    if (!machine || machine.workspace_id !== workspace) throw new BrainError("NOT_FOUND", "This machine has no access to that workspace.", 404);
+  };
+  app.post("/v1/brain/threads/:id/commits", async (c) => {
+    const parsed = CommitSchema.safeParse(await boundedJson(c.req.raw, 16 * 1024 * 1024));
+    if (!parsed.success || !z22.string().uuid().safeParse(c.req.param("id")).success) return c.json({ error: "Supply a valid brain commit.", code: "INVALID_INPUT" }, 400);
+    await machineScope(c.req.header("authorization"), parsed.data.workspace);
+    return c.json(await service().commit(c.get("actor"), c.req.param("id"), parsed.data));
+  });
+  app.get("/v1/brain/threads/:id", compress(), async (c) => {
+    const scope = ScopeSchema.safeParse({ workspace: c.req.query("workspace"), id: c.req.param("id") });
+    if (!scope.success) return c.json({ error: "Supply a valid workspace and thread ID.", code: "INVALID_INPUT" }, 400);
+    await machineScope(c.req.header("authorization"), scope.data.workspace);
+    c.header("cache-control", "no-store");
+    c.header("vary", "Accept-Encoding");
+    const format = c.req.query("format");
+    const snapshot = await service().read(c.get("actor"), scope.data.workspace, scope.data.id, format === "compact" || format === "compact-decoded");
+    return c.json(format === "decoded" || format === "compact-decoded" ? decodedBrainSnapshot(snapshot, format === "compact-decoded" ? 64 * 1024 * 1024 : void 0) : snapshot);
+  });
+  app.post("/v1/brain/artifacts", async (c) => {
+    const parsed = ArtifactSchema.safeParse(await boundedJson(c.req.raw, 24 * 1024 * 1024));
+    if (!parsed.success) return c.json({ error: "Supply a valid artifact.", code: "INVALID_INPUT" }, 400);
+    await machineScope(c.req.header("authorization"), parsed.data.workspace);
+    return c.json(await service().artifact(c.get("actor"), parsed.data));
+  });
+  app.get("/v1/brain/threads/:id/artifacts", async (c) => {
+    const scope = ScopeSchema.safeParse({ workspace: c.req.query("workspace"), id: c.req.param("id") });
+    if (!scope.success) return c.json({ error: "Supply a valid workspace and thread ID.", code: "INVALID_INPUT" }, 400);
+    await machineScope(c.req.header("authorization"), scope.data.workspace);
+    c.header("cache-control", "no-store");
+    return c.json({ artifacts: await service().artifacts(c.get("actor"), scope.data.workspace, scope.data.id) });
+  });
+  app.get("/v1/brain/artifacts/:id", async (c) => {
+    const scope = ScopeSchema.safeParse({ workspace: c.req.query("workspace"), id: c.req.param("id") });
+    if (!scope.success) return c.json({ error: "Supply a valid workspace and artifact ID.", code: "INVALID_INPUT" }, 400);
+    await machineScope(c.req.header("authorization"), scope.data.workspace);
+    const result = await service().download(c.get("actor"), scope.data.workspace, scope.data.id);
+    return new Response(new Uint8Array(result.bytes), { headers: {
+      "content-type": result.ref.mime,
+      "content-length": String(result.bytes.length),
+      "content-disposition": `attachment; filename*=UTF-8''${encodeURIComponent(result.name)}`,
+      "content-security-policy": "default-src 'none'; sandbox",
+      "x-content-type-options": "nosniff",
+      "cache-control": "private, no-store",
+      "etag": `"${result.ref.sha256}"`
+    } });
+  });
+  app.get("/v1/brain/artifacts/:id/metadata", async (c) => {
+    const scope = ScopeSchema.safeParse({ workspace: c.req.query("workspace"), id: c.req.param("id") });
+    if (!scope.success) return c.json({ error: "Supply a valid workspace and artifact ID.", code: "INVALID_INPUT" }, 400);
+    await machineScope(c.req.header("authorization"), scope.data.workspace);
+    c.header("cache-control", "no-store");
+    return c.json(await service().artifactMetadata(c.get("actor"), scope.data.workspace, scope.data.id));
+  });
+}
+
+// src/local-sync.ts
+import { createHash as createHash9 } from "node:crypto";
+
+// ../../node_modules/.pnpm/@powersync+common@1.57.3/node_modules/@powersync/common/dist/bundle.node.mjs
+import { Buffer as Buffer2 } from "node:buffer";
+var ColumnType;
+(function(ColumnType2) {
+  ColumnType2["TEXT"] = "TEXT";
+  ColumnType2["INTEGER"] = "INTEGER";
+  ColumnType2["REAL"] = "REAL";
+})(ColumnType || (ColumnType = {}));
+var text2 = {
+  type: ColumnType.TEXT
+};
+var integer = {
+  type: ColumnType.INTEGER
+};
+var real = {
+  type: ColumnType.REAL
+};
+var MAX_AMOUNT_OF_COLUMNS = 1999;
+var column = {
+  text: text2,
+  integer,
+  real
+};
+var Column = class {
+  options;
+  constructor(options) {
+    this.options = options;
+  }
+  get name() {
+    return this.options.name;
+  }
+  get type() {
+    return this.options.type;
+  }
+  toJSON() {
+    return {
+      name: this.name,
+      type: this.type
+    };
+  }
+};
+var DEFAULT_INDEX_COLUMN_OPTIONS = {
+  ascending: true
+};
+var IndexedColumn = class _IndexedColumn {
+  options;
+  static createAscending(column2) {
+    return new _IndexedColumn({
+      name: column2,
+      ascending: true
+    });
+  }
+  constructor(options) {
+    this.options = { ...DEFAULT_INDEX_COLUMN_OPTIONS, ...options };
+  }
+  get name() {
+    return this.options.name;
+  }
+  get ascending() {
+    return this.options.ascending;
+  }
+  toJSON(table) {
+    return {
+      name: this.name,
+      ascending: this.ascending,
+      type: table.columns.find((column2) => column2.name === this.name)?.type ?? ColumnType.TEXT
+    };
+  }
+};
+var DEFAULT_INDEX_OPTIONS = {
+  columns: []
+};
+var Index = class _Index {
+  options;
+  static createAscending(options, columnNames) {
+    return new _Index({
+      ...options,
+      columns: columnNames.map((name) => IndexedColumn.createAscending(name))
+    });
+  }
+  constructor(options) {
+    this.options = options;
+    this.options = { ...DEFAULT_INDEX_OPTIONS, ...options };
+  }
+  get name() {
+    return this.options.name;
+  }
+  get columns() {
+    return this.options.columns ?? [];
+  }
+  toJSON(table) {
+    return {
+      name: this.name,
+      columns: this.columns.map((c) => c.toJSON(table))
+    };
+  }
+};
+function encodeTableOptions(options) {
+  const trackPrevious = options.trackPrevious;
+  return {
+    local_only: options.localOnly,
+    insert_only: options.insertOnly,
+    include_old: trackPrevious && (trackPrevious.columns ?? true),
+    include_old_only_when_changed: typeof trackPrevious == "object" && trackPrevious.onlyWhenChanged == true,
+    include_metadata: options.trackMetadata,
+    ignore_empty_update: options.ignoreEmptyUpdates
+  };
+}
+var DEFAULT_TABLE_OPTIONS = {
+  indexes: [],
+  insertOnly: false,
+  localOnly: false,
+  trackPrevious: false,
+  trackMetadata: false,
+  ignoreEmptyUpdates: false
+};
+var InvalidSQLCharacters = /["'%,.#\s[\]]/;
+var Table = class _Table {
+  options;
+  _mappedColumns;
+  static createLocalOnly(options) {
+    return new _Table({ ...options, localOnly: true, insertOnly: false });
+  }
+  static createInsertOnly(options) {
+    return new _Table({ ...options, localOnly: false, insertOnly: true });
+  }
+  /**
+   * Create a table.
+   * @deprecated This was only only included for TableV2 and is no longer necessary.
+   * Prefer to use new Table() directly.
+   *
+   * TODO remove in the next major release.
+   */
+  static createTable(name, table) {
+    return new _Table({
+      name,
+      columns: table.columns,
+      indexes: table.indexes,
+      localOnly: table.options.localOnly,
+      insertOnly: table.options.insertOnly,
+      viewName: table.options.viewName
+    });
+  }
+  constructor(optionsOrColumns, v2Options) {
+    if (this.isTableV1(optionsOrColumns)) {
+      this.initTableV1(optionsOrColumns);
+    } else {
+      this.initTableV2(optionsOrColumns, v2Options);
+    }
+  }
+  copyWithName(name) {
+    return new _Table({
+      ...this.options,
+      name
+    });
+  }
+  isTableV1(arg) {
+    return "columns" in arg && Array.isArray(arg.columns);
+  }
+  initTableV1(options) {
+    this.options = {
+      ...options,
+      indexes: options.indexes || []
+    };
+    this.applyDefaultOptions();
+  }
+  initTableV2(columns, options) {
+    const convertedColumns = Object.entries(columns).map(([name, columnInfo]) => new Column({ name, type: columnInfo.type }));
+    const convertedIndexes = Object.entries(options?.indexes ?? {}).map(([name, columnNames]) => new Index({
+      name,
+      columns: columnNames.map((name2) => new IndexedColumn({
+        name: name2.replace(/^-/, ""),
+        ascending: !name2.startsWith("-")
+      }))
+    }));
+    this.options = {
+      name: "",
+      columns: convertedColumns,
+      indexes: convertedIndexes,
+      viewName: options?.viewName,
+      insertOnly: options?.insertOnly,
+      localOnly: options?.localOnly,
+      trackPrevious: options?.trackPrevious,
+      trackMetadata: options?.trackMetadata,
+      ignoreEmptyUpdates: options?.ignoreEmptyUpdates
+    };
+    this.applyDefaultOptions();
+    this._mappedColumns = columns;
+  }
+  applyDefaultOptions() {
+    this.options.insertOnly ??= DEFAULT_TABLE_OPTIONS.insertOnly;
+    this.options.localOnly ??= DEFAULT_TABLE_OPTIONS.localOnly;
+    this.options.trackPrevious ??= DEFAULT_TABLE_OPTIONS.trackPrevious;
+    this.options.trackMetadata ??= DEFAULT_TABLE_OPTIONS.trackMetadata;
+    this.options.ignoreEmptyUpdates ??= DEFAULT_TABLE_OPTIONS.ignoreEmptyUpdates;
+  }
+  get name() {
+    return this.options.name;
+  }
+  get viewNameOverride() {
+    return this.options.viewName;
+  }
+  get viewName() {
+    return this.viewNameOverride ?? this.name;
+  }
+  get columns() {
+    return this.options.columns;
+  }
+  get columnMap() {
+    return this._mappedColumns ?? this.columns.reduce((hash, column2) => {
+      hash[column2.name] = { type: column2.type ?? ColumnType.TEXT };
+      return hash;
+    }, {});
+  }
+  get indexes() {
+    return this.options.indexes ?? [];
+  }
+  get localOnly() {
+    return this.options.localOnly;
+  }
+  get insertOnly() {
+    return this.options.insertOnly;
+  }
+  get trackPrevious() {
+    return this.options.trackPrevious;
+  }
+  get trackMetadata() {
+    return this.options.trackMetadata;
+  }
+  get ignoreEmptyUpdates() {
+    return this.options.ignoreEmptyUpdates;
+  }
+  get internalName() {
+    if (this.options.localOnly) {
+      return `ps_data_local__${this.name}`;
+    }
+    return `ps_data__${this.name}`;
+  }
+  get validName() {
+    if (InvalidSQLCharacters.test(this.name)) {
+      return false;
+    }
+    if (this.viewNameOverride != null && InvalidSQLCharacters.test(this.viewNameOverride)) {
+      return false;
+    }
+    return true;
+  }
+  validate() {
+    if (InvalidSQLCharacters.test(this.name)) {
+      throw new Error(`Invalid characters in table name: ${this.name}`);
+    }
+    if (this.viewNameOverride && InvalidSQLCharacters.test(this.viewNameOverride)) {
+      throw new Error(`Invalid characters in view name: ${this.viewNameOverride}`);
+    }
+    if (this.columns.length > MAX_AMOUNT_OF_COLUMNS) {
+      throw new Error(`Table has too many columns. The maximum number of columns is ${MAX_AMOUNT_OF_COLUMNS}.`);
+    }
+    if (this.trackMetadata && this.localOnly) {
+      throw new Error(`Can't include metadata for local-only tables.`);
+    }
+    if (this.trackPrevious != false && this.localOnly) {
+      throw new Error(`Can't include old values for local-only tables.`);
+    }
+    const columnNames = /* @__PURE__ */ new Set();
+    columnNames.add("id");
+    for (const column2 of this.columns) {
+      const { name: columnName } = column2;
+      if (column2.name === "id") {
+        throw new Error(`An id column is automatically added, custom id columns are not supported`);
+      }
+      if (columnNames.has(columnName)) {
+        throw new Error(`Duplicate column ${columnName}`);
+      }
+      if (InvalidSQLCharacters.test(columnName)) {
+        throw new Error(`Invalid characters in column name: ${column2.name}`);
+      }
+      columnNames.add(columnName);
+    }
+    const indexNames = /* @__PURE__ */ new Set();
+    for (const index of this.indexes) {
+      if (indexNames.has(index.name)) {
+        throw new Error(`Duplicate index ${index.name}`);
+      }
+      if (InvalidSQLCharacters.test(index.name)) {
+        throw new Error(`Invalid characters in index name: ${index.name}`);
+      }
+      for (const column2 of index.columns) {
+        if (!columnNames.has(column2.name)) {
+          throw new Error(`Column ${column2.name} not found for index ${index.name}`);
+        }
+      }
+      indexNames.add(index.name);
+    }
+  }
+  toJSON() {
+    return {
+      name: this.name,
+      view_name: this.viewName,
+      columns: this.columns.map((c) => c.toJSON()),
+      indexes: this.indexes.map((e) => e.toJSON(this)),
+      ...encodeTableOptions(this)
+    };
+  }
+};
+var AttachmentState;
+(function(AttachmentState2) {
+  AttachmentState2[AttachmentState2["QUEUED_UPLOAD"] = 0] = "QUEUED_UPLOAD";
+  AttachmentState2[AttachmentState2["QUEUED_DOWNLOAD"] = 1] = "QUEUED_DOWNLOAD";
+  AttachmentState2[AttachmentState2["QUEUED_DELETE"] = 2] = "QUEUED_DELETE";
+  AttachmentState2[AttachmentState2["SYNCED"] = 3] = "SYNCED";
+  AttachmentState2[AttachmentState2["ARCHIVED"] = 4] = "ARCHIVED";
+})(AttachmentState || (AttachmentState = {}));
+var ATTACHMENT_TABLE_COLUMNS = {
+  filename: column.text,
+  local_uri: column.text,
+  timestamp: column.integer,
+  size: column.integer,
+  media_type: column.text,
+  state: column.integer,
+  // Corresponds to AttachmentState
+  has_synced: column.integer,
+  meta_data: column.text
+};
+var WatchedQueryListenerEvent;
+(function(WatchedQueryListenerEvent2) {
+  WatchedQueryListenerEvent2["ON_DATA"] = "onData";
+  WatchedQueryListenerEvent2["ON_ERROR"] = "onError";
+  WatchedQueryListenerEvent2["ON_STATE_CHANGE"] = "onStateChange";
+  WatchedQueryListenerEvent2["SETTINGS_WILL_UPDATE"] = "settingsWillUpdate";
+  WatchedQueryListenerEvent2["CLOSED"] = "closed";
+})(WatchedQueryListenerEvent || (WatchedQueryListenerEvent = {}));
+var EncodingType;
+(function(EncodingType2) {
+  EncodingType2["UTF8"] = "utf8";
+  EncodingType2["Base64"] = "base64";
+})(EncodingType || (EncodingType = {}));
+function getDefaultExportFromCjs(x) {
+  return x && x.__esModule && Object.prototype.hasOwnProperty.call(x, "default") ? x["default"] : x;
+}
+var logger$1 = { exports: {} };
+var logger = logger$1.exports;
+var hasRequiredLogger;
+function requireLogger() {
+  if (hasRequiredLogger) return logger$1.exports;
+  hasRequiredLogger = 1;
+  (function(module) {
+    (function(global2) {
+      var Logger2 = {};
+      Logger2.VERSION = "1.6.1";
+      var logHandler;
+      var contextualLoggersByNameMap = {};
+      var bind = function(scope, func) {
+        return function() {
+          return func.apply(scope, arguments);
+        };
+      };
+      var merge = function() {
+        var args = arguments, target = args[0], key2, i;
+        for (i = 1; i < args.length; i++) {
+          for (key2 in args[i]) {
+            if (!(key2 in target) && args[i].hasOwnProperty(key2)) {
+              target[key2] = args[i][key2];
+            }
+          }
+        }
+        return target;
+      };
+      var defineLogLevel = function(value, name) {
+        return { value, name };
+      };
+      Logger2.TRACE = defineLogLevel(1, "TRACE");
+      Logger2.DEBUG = defineLogLevel(2, "DEBUG");
+      Logger2.INFO = defineLogLevel(3, "INFO");
+      Logger2.TIME = defineLogLevel(4, "TIME");
+      Logger2.WARN = defineLogLevel(5, "WARN");
+      Logger2.ERROR = defineLogLevel(8, "ERROR");
+      Logger2.OFF = defineLogLevel(99, "OFF");
+      var ContextualLogger = function(defaultContext) {
+        this.context = defaultContext;
+        this.setLevel(defaultContext.filterLevel);
+        this.log = this.info;
+      };
+      ContextualLogger.prototype = {
+        // Changes the current logging level for the logging instance.
+        setLevel: function(newLevel) {
+          if (newLevel && "value" in newLevel) {
+            this.context.filterLevel = newLevel;
+          }
+        },
+        // Gets the current logging level for the logging instance
+        getLevel: function() {
+          return this.context.filterLevel;
+        },
+        // Is the logger configured to output messages at the supplied level?
+        enabledFor: function(lvl) {
+          var filterLevel = this.context.filterLevel;
+          return lvl.value >= filterLevel.value;
+        },
+        trace: function() {
+          this.invoke(Logger2.TRACE, arguments);
+        },
+        debug: function() {
+          this.invoke(Logger2.DEBUG, arguments);
+        },
+        info: function() {
+          this.invoke(Logger2.INFO, arguments);
+        },
+        warn: function() {
+          this.invoke(Logger2.WARN, arguments);
+        },
+        error: function() {
+          this.invoke(Logger2.ERROR, arguments);
+        },
+        time: function(label) {
+          if (typeof label === "string" && label.length > 0) {
+            this.invoke(Logger2.TIME, [label, "start"]);
+          }
+        },
+        timeEnd: function(label) {
+          if (typeof label === "string" && label.length > 0) {
+            this.invoke(Logger2.TIME, [label, "end"]);
+          }
+        },
+        // Invokes the logger callback if it's not being filtered.
+        invoke: function(level, msgArgs) {
+          if (logHandler && this.enabledFor(level)) {
+            logHandler(msgArgs, merge({ level }, this.context));
+          }
+        }
+      };
+      var globalLogger = new ContextualLogger({ filterLevel: Logger2.OFF });
+      (function() {
+        var L = Logger2;
+        L.enabledFor = bind(globalLogger, globalLogger.enabledFor);
+        L.trace = bind(globalLogger, globalLogger.trace);
+        L.debug = bind(globalLogger, globalLogger.debug);
+        L.time = bind(globalLogger, globalLogger.time);
+        L.timeEnd = bind(globalLogger, globalLogger.timeEnd);
+        L.info = bind(globalLogger, globalLogger.info);
+        L.warn = bind(globalLogger, globalLogger.warn);
+        L.error = bind(globalLogger, globalLogger.error);
+        L.log = L.info;
+      })();
+      Logger2.setHandler = function(func) {
+        logHandler = func;
+      };
+      Logger2.setLevel = function(level) {
+        globalLogger.setLevel(level);
+        for (var key2 in contextualLoggersByNameMap) {
+          if (contextualLoggersByNameMap.hasOwnProperty(key2)) {
+            contextualLoggersByNameMap[key2].setLevel(level);
+          }
+        }
+      };
+      Logger2.getLevel = function() {
+        return globalLogger.getLevel();
+      };
+      Logger2.get = function(name) {
+        return contextualLoggersByNameMap[name] || (contextualLoggersByNameMap[name] = new ContextualLogger(merge({ name }, globalLogger.context)));
+      };
+      Logger2.createDefaultHandler = function(options) {
+        options = options || {};
+        options.formatter = options.formatter || function defaultMessageFormatter(messages2, context) {
+          if (context.name) {
+            messages2.unshift("[" + context.name + "]");
+          }
+        };
+        var timerStartTimeByLabelMap = {};
+        var invokeConsoleMethod = function(hdlr, messages2) {
+          Function.prototype.apply.call(hdlr, console, messages2);
+        };
+        if (typeof console === "undefined") {
+          return function() {
+          };
+        }
+        return function(messages2, context) {
+          messages2 = Array.prototype.slice.call(messages2);
+          var hdlr = console.log;
+          var timerLabel;
+          if (context.level === Logger2.TIME) {
+            timerLabel = (context.name ? "[" + context.name + "] " : "") + messages2[0];
+            if (messages2[1] === "start") {
+              if (console.time) {
+                console.time(timerLabel);
+              } else {
+                timerStartTimeByLabelMap[timerLabel] = (/* @__PURE__ */ new Date()).getTime();
+              }
+            } else {
+              if (console.timeEnd) {
+                console.timeEnd(timerLabel);
+              } else {
+                invokeConsoleMethod(hdlr, [timerLabel + ": " + ((/* @__PURE__ */ new Date()).getTime() - timerStartTimeByLabelMap[timerLabel]) + "ms"]);
+              }
+            }
+          } else {
+            if (context.level === Logger2.WARN && console.warn) {
+              hdlr = console.warn;
+            } else if (context.level === Logger2.ERROR && console.error) {
+              hdlr = console.error;
+            } else if (context.level === Logger2.INFO && console.info) {
+              hdlr = console.info;
+            } else if (context.level === Logger2.DEBUG && console.debug) {
+              hdlr = console.debug;
+            } else if (context.level === Logger2.TRACE && console.trace) {
+              hdlr = console.trace;
+            }
+            options.formatter(messages2, context);
+            invokeConsoleMethod(hdlr, messages2);
+          }
+        };
+      };
+      Logger2.useDefaults = function(options) {
+        Logger2.setLevel(options && options.defaultLevel || Logger2.DEBUG);
+        Logger2.setHandler(Logger2.createDefaultHandler(options));
+      };
+      Logger2.setDefaults = Logger2.useDefaults;
+      if (module.exports) {
+        module.exports = Logger2;
+      } else {
+        Logger2._prevLogger = global2.Logger;
+        Logger2.noConflict = function() {
+          global2.Logger = Logger2._prevLogger;
+          return Logger2;
+        };
+        global2.Logger = Logger2;
+      }
+    })(logger);
+  })(logger$1);
+  return logger$1.exports;
+}
+var loggerExports = requireLogger();
+var Logger = /* @__PURE__ */ getDefaultExportFromCjs(loggerExports);
+function DBGetUtilsDefaultMixin(Base) {
+  return class extends Base {
+    async getAll(sql, parameters) {
+      const res = await this.execute(sql, parameters);
+      return res.rows?._array ?? [];
+    }
+    async getOptional(sql, parameters) {
+      const res = await this.execute(sql, parameters);
+      return res.rows?.item(0) ?? null;
+    }
+    async get(sql, parameters) {
+      const res = await this.execute(sql, parameters);
+      const first = res.rows?.item(0);
+      if (!first) {
+        throw new Error("Result set is empty");
+      }
+      return first;
+    }
+    async executeBatch(query, params = []) {
+      if (super.executeBatch) {
+        return super.executeBatch(query, params);
+      }
+      let lastInsertId;
+      let rowsAffected = 0;
+      for (const set of params) {
+        const result = await this.execute(query, set);
+        lastInsertId = result.insertId;
+        rowsAffected += result.rowsAffected;
+      }
+      return {
+        rowsAffected,
+        insertId: lastInsertId
+      };
+    }
+  };
+}
+var RowUpdateType;
+(function(RowUpdateType2) {
+  RowUpdateType2[RowUpdateType2["SQLITE_INSERT"] = 18] = "SQLITE_INSERT";
+  RowUpdateType2[RowUpdateType2["SQLITE_DELETE"] = 9] = "SQLITE_DELETE";
+  RowUpdateType2[RowUpdateType2["SQLITE_UPDATE"] = 23] = "SQLITE_UPDATE";
+})(RowUpdateType || (RowUpdateType = {}));
+var BaseTransaction = class {
+  inner;
+  finalized = false;
+  constructor(inner) {
+    this.inner = inner;
+  }
+  async commit() {
+    if (this.finalized) {
+      return { rowsAffected: 0 };
+    }
+    this.finalized = true;
+    return this.inner.execute("COMMIT");
+  }
+  async rollback() {
+    if (this.finalized) {
+      return { rowsAffected: 0 };
+    }
+    this.finalized = true;
+    return this.inner.execute("ROLLBACK");
+  }
+  execute(query, params) {
+    return this.inner.execute(query, params);
+  }
+  executeRaw(query, params) {
+    return this.inner.executeRaw(query, params);
+  }
+  executeBatch(query, params) {
+    return this.inner.executeBatch(query, params);
+  }
+};
+var TransactionImplementation = class _TransactionImplementation extends DBGetUtilsDefaultMixin(BaseTransaction) {
+  static async runWith(ctx, fn) {
+    let tx = new _TransactionImplementation(ctx);
+    const useBeginImmediate = ctx.connectionType != "queryOnly";
+    try {
+      await ctx.execute(useBeginImmediate ? "BEGIN IMMEDIATE" : "BEGIN");
+      const result = await fn(tx);
+      await tx.commit();
+      return result;
+    } catch (ex) {
+      try {
+        await tx.rollback();
+      } catch (ex2) {
+      }
+      throw ex;
+    }
+  }
+};
+var _finalizer = "FinalizationRegistry" in globalThis ? new FinalizationRegistry((sub) => {
+  sub.logger.warn(`A subscription to ${sub.name} with params ${JSON.stringify(sub.parameters)} leaked! Please ensure calling unsubscribe() when you don't need a subscription anymore. For global subscriptions, consider storing them in global fields to avoid this warning.`);
+}) : null;
+var PSInternalTable;
+(function(PSInternalTable2) {
+  PSInternalTable2["DATA"] = "ps_data";
+  PSInternalTable2["CRUD"] = "ps_crud";
+  PSInternalTable2["BUCKETS"] = "ps_buckets";
+  PSInternalTable2["OPLOG"] = "ps_oplog";
+  PSInternalTable2["UNTYPED"] = "ps_untyped";
+})(PSInternalTable || (PSInternalTable = {}));
+var PowerSyncControlCommand;
+(function(PowerSyncControlCommand2) {
+  PowerSyncControlCommand2["PROCESS_TEXT_LINE"] = "line_text";
+  PowerSyncControlCommand2["PROCESS_BSON_LINE"] = "line_binary";
+  PowerSyncControlCommand2["STOP"] = "stop";
+  PowerSyncControlCommand2["START"] = "start";
+  PowerSyncControlCommand2["NOTIFY_TOKEN_REFRESHED"] = "refreshed_token";
+  PowerSyncControlCommand2["NOTIFY_CRUD_UPLOAD_COMPLETED"] = "completed_upload";
+  PowerSyncControlCommand2["UPDATE_SUBSCRIPTIONS"] = "update_subscriptions";
+  PowerSyncControlCommand2["CONNECTION_STATE"] = "connection";
+})(PowerSyncControlCommand || (PowerSyncControlCommand = {}));
+var UpdateType;
+(function(UpdateType2) {
+  UpdateType2["PUT"] = "PUT";
+  UpdateType2["PATCH"] = "PATCH";
+  UpdateType2["DELETE"] = "DELETE";
+})(UpdateType || (UpdateType = {}));
+var dist = {};
+var Codecs = {};
+var Frames = {};
+var hasRequiredFrames;
+function requireFrames() {
+  if (hasRequiredFrames) return Frames;
+  hasRequiredFrames = 1;
+  (function(exports$1) {
+    Object.defineProperty(exports$1, "__esModule", { value: true });
+    exports$1.Frame = exports$1.Lengths = exports$1.Flags = exports$1.FrameTypes = void 0;
+    var FrameTypes;
+    (function(FrameTypes2) {
+      FrameTypes2[FrameTypes2["RESERVED"] = 0] = "RESERVED";
+      FrameTypes2[FrameTypes2["SETUP"] = 1] = "SETUP";
+      FrameTypes2[FrameTypes2["LEASE"] = 2] = "LEASE";
+      FrameTypes2[FrameTypes2["KEEPALIVE"] = 3] = "KEEPALIVE";
+      FrameTypes2[FrameTypes2["REQUEST_RESPONSE"] = 4] = "REQUEST_RESPONSE";
+      FrameTypes2[FrameTypes2["REQUEST_FNF"] = 5] = "REQUEST_FNF";
+      FrameTypes2[FrameTypes2["REQUEST_STREAM"] = 6] = "REQUEST_STREAM";
+      FrameTypes2[FrameTypes2["REQUEST_CHANNEL"] = 7] = "REQUEST_CHANNEL";
+      FrameTypes2[FrameTypes2["REQUEST_N"] = 8] = "REQUEST_N";
+      FrameTypes2[FrameTypes2["CANCEL"] = 9] = "CANCEL";
+      FrameTypes2[FrameTypes2["PAYLOAD"] = 10] = "PAYLOAD";
+      FrameTypes2[FrameTypes2["ERROR"] = 11] = "ERROR";
+      FrameTypes2[FrameTypes2["METADATA_PUSH"] = 12] = "METADATA_PUSH";
+      FrameTypes2[FrameTypes2["RESUME"] = 13] = "RESUME";
+      FrameTypes2[FrameTypes2["RESUME_OK"] = 14] = "RESUME_OK";
+      FrameTypes2[FrameTypes2["EXT"] = 63] = "EXT";
+    })(FrameTypes = exports$1.FrameTypes || (exports$1.FrameTypes = {}));
+    (function(Flags) {
+      Flags[Flags["NONE"] = 0] = "NONE";
+      Flags[Flags["COMPLETE"] = 64] = "COMPLETE";
+      Flags[Flags["FOLLOWS"] = 128] = "FOLLOWS";
+      Flags[Flags["IGNORE"] = 512] = "IGNORE";
+      Flags[Flags["LEASE"] = 64] = "LEASE";
+      Flags[Flags["METADATA"] = 256] = "METADATA";
+      Flags[Flags["NEXT"] = 32] = "NEXT";
+      Flags[Flags["RESPOND"] = 128] = "RESPOND";
+      Flags[Flags["RESUME_ENABLE"] = 128] = "RESUME_ENABLE";
+    })(exports$1.Flags || (exports$1.Flags = {}));
+    (function(Flags) {
+      function hasMetadata(flags) {
+        return (flags & Flags.METADATA) === Flags.METADATA;
+      }
+      Flags.hasMetadata = hasMetadata;
+      function hasComplete(flags) {
+        return (flags & Flags.COMPLETE) === Flags.COMPLETE;
+      }
+      Flags.hasComplete = hasComplete;
+      function hasNext(flags) {
+        return (flags & Flags.NEXT) === Flags.NEXT;
+      }
+      Flags.hasNext = hasNext;
+      function hasFollows(flags) {
+        return (flags & Flags.FOLLOWS) === Flags.FOLLOWS;
+      }
+      Flags.hasFollows = hasFollows;
+      function hasIgnore(flags) {
+        return (flags & Flags.IGNORE) === Flags.IGNORE;
+      }
+      Flags.hasIgnore = hasIgnore;
+      function hasRespond(flags) {
+        return (flags & Flags.RESPOND) === Flags.RESPOND;
+      }
+      Flags.hasRespond = hasRespond;
+      function hasLease(flags) {
+        return (flags & Flags.LEASE) === Flags.LEASE;
+      }
+      Flags.hasLease = hasLease;
+      function hasResume(flags) {
+        return (flags & Flags.RESUME_ENABLE) === Flags.RESUME_ENABLE;
+      }
+      Flags.hasResume = hasResume;
+    })(exports$1.Flags || (exports$1.Flags = {}));
+    (function(Lengths) {
+      Lengths[Lengths["FRAME"] = 3] = "FRAME";
+      Lengths[Lengths["HEADER"] = 6] = "HEADER";
+      Lengths[Lengths["METADATA"] = 3] = "METADATA";
+      Lengths[Lengths["REQUEST"] = 3] = "REQUEST";
+    })(exports$1.Lengths || (exports$1.Lengths = {}));
+    (function(Frame) {
+      function isConnection(frame) {
+        return frame.streamId === 0;
+      }
+      Frame.isConnection = isConnection;
+      function isRequest(frame) {
+        return FrameTypes.REQUEST_RESPONSE <= frame.type && frame.type <= FrameTypes.REQUEST_CHANNEL;
+      }
+      Frame.isRequest = isRequest;
+    })(exports$1.Frame || (exports$1.Frame = {}));
+  })(Frames);
+  return Frames;
+}
+var hasRequiredCodecs;
+function requireCodecs() {
+  if (hasRequiredCodecs) return Codecs;
+  hasRequiredCodecs = 1;
+  (function(exports$1) {
+    var __generator = Codecs && Codecs.__generator || function(thisArg, body) {
+      var _ = { label: 0, sent: function() {
+        if (t2[0] & 1) throw t2[1];
+        return t2[1];
+      }, trys: [], ops: [] }, f, y, t2, g;
+      return g = { next: verb(0), "throw": verb(1), "return": verb(2) }, typeof Symbol === "function" && (g[Symbol.iterator] = function() {
+        return this;
+      }), g;
+      function verb(n) {
+        return function(v) {
+          return step([n, v]);
+        };
+      }
+      function step(op) {
+        if (f) throw new TypeError("Generator is already executing.");
+        while (_) try {
+          if (f = 1, y && (t2 = op[0] & 2 ? y["return"] : op[0] ? y["throw"] || ((t2 = y["return"]) && t2.call(y), 0) : y.next) && !(t2 = t2.call(y, op[1])).done) return t2;
+          if (y = 0, t2) op = [op[0] & 2, t2.value];
+          switch (op[0]) {
+            case 0:
+            case 1:
+              t2 = op;
+              break;
+            case 4:
+              _.label++;
+              return { value: op[1], done: false };
+            case 5:
+              _.label++;
+              y = op[1];
+              op = [0];
+              continue;
+            case 7:
+              op = _.ops.pop();
+              _.trys.pop();
+              continue;
+            default:
+              if (!(t2 = _.trys, t2 = t2.length > 0 && t2[t2.length - 1]) && (op[0] === 6 || op[0] === 2)) {
+                _ = 0;
+                continue;
+              }
+              if (op[0] === 3 && (!t2 || op[1] > t2[0] && op[1] < t2[3])) {
+                _.label = op[1];
+                break;
+              }
+              if (op[0] === 6 && _.label < t2[1]) {
+                _.label = t2[1];
+                t2 = op;
+                break;
+              }
+              if (t2 && _.label < t2[2]) {
+                _.label = t2[2];
+                _.ops.push(op);
+                break;
+              }
+              if (t2[2]) _.ops.pop();
+              _.trys.pop();
+              continue;
+          }
+          op = body.call(thisArg, _);
+        } catch (e) {
+          op = [6, e];
+          y = 0;
+        } finally {
+          f = t2 = 0;
+        }
+        if (op[0] & 5) throw op[1];
+        return { value: op[0] ? op[1] : void 0, done: true };
+      }
+    };
+    Object.defineProperty(exports$1, "__esModule", { value: true });
+    exports$1.Deserializer = exports$1.sizeOfFrame = exports$1.serializeFrame = exports$1.deserializeFrame = exports$1.serializeFrameWithLength = exports$1.deserializeFrames = exports$1.deserializeFrameWithLength = exports$1.writeUInt64BE = exports$1.readUInt64BE = exports$1.writeUInt24BE = exports$1.readUInt24BE = exports$1.MAX_VERSION = exports$1.MAX_TTL = exports$1.MAX_STREAM_ID = exports$1.MAX_RESUME_LENGTH = exports$1.MAX_REQUEST_N = exports$1.MAX_REQUEST_COUNT = exports$1.MAX_MIME_LENGTH = exports$1.MAX_METADATA_LENGTH = exports$1.MAX_LIFETIME = exports$1.MAX_KEEPALIVE = exports$1.MAX_CODE = exports$1.FRAME_TYPE_OFFFSET = exports$1.FLAGS_MASK = void 0;
+    var Frames_1 = requireFrames();
+    exports$1.FLAGS_MASK = 1023;
+    exports$1.FRAME_TYPE_OFFFSET = 10;
+    exports$1.MAX_CODE = 2147483647;
+    exports$1.MAX_KEEPALIVE = 2147483647;
+    exports$1.MAX_LIFETIME = 2147483647;
+    exports$1.MAX_METADATA_LENGTH = 16777215;
+    exports$1.MAX_MIME_LENGTH = 255;
+    exports$1.MAX_REQUEST_COUNT = 2147483647;
+    exports$1.MAX_REQUEST_N = 2147483647;
+    exports$1.MAX_RESUME_LENGTH = 65535;
+    exports$1.MAX_STREAM_ID = 2147483647;
+    exports$1.MAX_TTL = 2147483647;
+    exports$1.MAX_VERSION = 65535;
+    var BITWISE_OVERFLOW = 4294967296;
+    function readUInt24BE(buffer, offset) {
+      var val1 = buffer.readUInt8(offset) << 16;
+      var val2 = buffer.readUInt8(offset + 1) << 8;
+      var val3 = buffer.readUInt8(offset + 2);
+      return val1 | val2 | val3;
+    }
+    exports$1.readUInt24BE = readUInt24BE;
+    function writeUInt24BE(buffer, value, offset) {
+      offset = buffer.writeUInt8(value >>> 16, offset);
+      offset = buffer.writeUInt8(value >>> 8 & 255, offset);
+      return buffer.writeUInt8(value & 255, offset);
+    }
+    exports$1.writeUInt24BE = writeUInt24BE;
+    function readUInt64BE(buffer, offset) {
+      var high = buffer.readUInt32BE(offset);
+      var low = buffer.readUInt32BE(offset + 4);
+      return high * BITWISE_OVERFLOW + low;
+    }
+    exports$1.readUInt64BE = readUInt64BE;
+    function writeUInt64BE(buffer, value, offset) {
+      var high = value / BITWISE_OVERFLOW | 0;
+      var low = value % BITWISE_OVERFLOW;
+      offset = buffer.writeUInt32BE(high, offset);
+      return buffer.writeUInt32BE(low, offset);
+    }
+    exports$1.writeUInt64BE = writeUInt64BE;
+    var FRAME_HEADER_SIZE = 6;
+    var UINT24_SIZE = 3;
+    function deserializeFrameWithLength(buffer) {
+      var frameLength = readUInt24BE(buffer, 0);
+      return deserializeFrame(buffer.slice(UINT24_SIZE, UINT24_SIZE + frameLength));
+    }
+    exports$1.deserializeFrameWithLength = deserializeFrameWithLength;
+    function deserializeFrames(buffer) {
+      var offset, frameLength, frameStart, frameEnd, frameBuffer, frame;
+      return __generator(this, function(_a) {
+        switch (_a.label) {
+          case 0:
+            offset = 0;
+            _a.label = 1;
+          case 1:
+            if (!(offset + UINT24_SIZE < buffer.length)) return [3, 3];
+            frameLength = readUInt24BE(buffer, offset);
+            frameStart = offset + UINT24_SIZE;
+            frameEnd = frameStart + frameLength;
+            if (frameEnd > buffer.length) {
+              return [3, 3];
+            }
+            frameBuffer = buffer.slice(frameStart, frameEnd);
+            frame = deserializeFrame(frameBuffer);
+            offset = frameEnd;
+            return [4, [frame, offset]];
+          case 2:
+            _a.sent();
+            return [3, 1];
+          case 3:
+            return [
+              2
+              /*return*/
+            ];
+        }
+      });
+    }
+    exports$1.deserializeFrames = deserializeFrames;
+    function serializeFrameWithLength(frame) {
+      var buffer = serializeFrame(frame);
+      var lengthPrefixed = Buffer2.allocUnsafe(buffer.length + UINT24_SIZE);
+      writeUInt24BE(lengthPrefixed, buffer.length, 0);
+      buffer.copy(lengthPrefixed, UINT24_SIZE);
+      return lengthPrefixed;
+    }
+    exports$1.serializeFrameWithLength = serializeFrameWithLength;
+    function deserializeFrame(buffer) {
+      var offset = 0;
+      var streamId = buffer.readInt32BE(offset);
+      offset += 4;
+      var typeAndFlags = buffer.readUInt16BE(offset);
+      offset += 2;
+      var type = typeAndFlags >>> exports$1.FRAME_TYPE_OFFFSET;
+      var flags = typeAndFlags & exports$1.FLAGS_MASK;
+      switch (type) {
+        case Frames_1.FrameTypes.SETUP:
+          return deserializeSetupFrame(buffer, streamId, flags);
+        case Frames_1.FrameTypes.PAYLOAD:
+          return deserializePayloadFrame(buffer, streamId, flags);
+        case Frames_1.FrameTypes.ERROR:
+          return deserializeErrorFrame(buffer, streamId, flags);
+        case Frames_1.FrameTypes.KEEPALIVE:
+          return deserializeKeepAliveFrame(buffer, streamId, flags);
+        case Frames_1.FrameTypes.REQUEST_FNF:
+          return deserializeRequestFnfFrame(buffer, streamId, flags);
+        case Frames_1.FrameTypes.REQUEST_RESPONSE:
+          return deserializeRequestResponseFrame(buffer, streamId, flags);
+        case Frames_1.FrameTypes.REQUEST_STREAM:
+          return deserializeRequestStreamFrame(buffer, streamId, flags);
+        case Frames_1.FrameTypes.REQUEST_CHANNEL:
+          return deserializeRequestChannelFrame(buffer, streamId, flags);
+        case Frames_1.FrameTypes.METADATA_PUSH:
+          return deserializeMetadataPushFrame(buffer, streamId, flags);
+        case Frames_1.FrameTypes.REQUEST_N:
+          return deserializeRequestNFrame(buffer, streamId, flags);
+        case Frames_1.FrameTypes.RESUME:
+          return deserializeResumeFrame(buffer, streamId, flags);
+        case Frames_1.FrameTypes.RESUME_OK:
+          return deserializeResumeOkFrame(buffer, streamId, flags);
+        case Frames_1.FrameTypes.CANCEL:
+          return deserializeCancelFrame(buffer, streamId, flags);
+        case Frames_1.FrameTypes.LEASE:
+          return deserializeLeaseFrame(buffer, streamId, flags);
+      }
+    }
+    exports$1.deserializeFrame = deserializeFrame;
+    function serializeFrame(frame) {
+      switch (frame.type) {
+        case Frames_1.FrameTypes.SETUP:
+          return serializeSetupFrame(frame);
+        case Frames_1.FrameTypes.PAYLOAD:
+          return serializePayloadFrame(frame);
+        case Frames_1.FrameTypes.ERROR:
+          return serializeErrorFrame(frame);
+        case Frames_1.FrameTypes.KEEPALIVE:
+          return serializeKeepAliveFrame(frame);
+        case Frames_1.FrameTypes.REQUEST_FNF:
+        case Frames_1.FrameTypes.REQUEST_RESPONSE:
+          return serializeRequestFrame(frame);
+        case Frames_1.FrameTypes.REQUEST_STREAM:
+        case Frames_1.FrameTypes.REQUEST_CHANNEL:
+          return serializeRequestManyFrame(frame);
+        case Frames_1.FrameTypes.METADATA_PUSH:
+          return serializeMetadataPushFrame(frame);
+        case Frames_1.FrameTypes.REQUEST_N:
+          return serializeRequestNFrame(frame);
+        case Frames_1.FrameTypes.RESUME:
+          return serializeResumeFrame(frame);
+        case Frames_1.FrameTypes.RESUME_OK:
+          return serializeResumeOkFrame(frame);
+        case Frames_1.FrameTypes.CANCEL:
+          return serializeCancelFrame(frame);
+        case Frames_1.FrameTypes.LEASE:
+          return serializeLeaseFrame(frame);
+      }
+    }
+    exports$1.serializeFrame = serializeFrame;
+    function sizeOfFrame(frame) {
+      switch (frame.type) {
+        case Frames_1.FrameTypes.SETUP:
+          return sizeOfSetupFrame(frame);
+        case Frames_1.FrameTypes.PAYLOAD:
+          return sizeOfPayloadFrame(frame);
+        case Frames_1.FrameTypes.ERROR:
+          return sizeOfErrorFrame(frame);
+        case Frames_1.FrameTypes.KEEPALIVE:
+          return sizeOfKeepAliveFrame(frame);
+        case Frames_1.FrameTypes.REQUEST_FNF:
+        case Frames_1.FrameTypes.REQUEST_RESPONSE:
+          return sizeOfRequestFrame(frame);
+        case Frames_1.FrameTypes.REQUEST_STREAM:
+        case Frames_1.FrameTypes.REQUEST_CHANNEL:
+          return sizeOfRequestManyFrame(frame);
+        case Frames_1.FrameTypes.METADATA_PUSH:
+          return sizeOfMetadataPushFrame(frame);
+        case Frames_1.FrameTypes.REQUEST_N:
+          return sizeOfRequestNFrame();
+        case Frames_1.FrameTypes.RESUME:
+          return sizeOfResumeFrame(frame);
+        case Frames_1.FrameTypes.RESUME_OK:
+          return sizeOfResumeOkFrame();
+        case Frames_1.FrameTypes.CANCEL:
+          return sizeOfCancelFrame();
+        case Frames_1.FrameTypes.LEASE:
+          return sizeOfLeaseFrame(frame);
+      }
+    }
+    exports$1.sizeOfFrame = sizeOfFrame;
+    var SETUP_FIXED_SIZE = 14;
+    var RESUME_TOKEN_LENGTH_SIZE = 2;
+    function serializeSetupFrame(frame) {
+      var resumeTokenLength = frame.resumeToken != null ? frame.resumeToken.byteLength : 0;
+      var metadataMimeTypeLength = frame.metadataMimeType != null ? Buffer2.byteLength(frame.metadataMimeType, "ascii") : 0;
+      var dataMimeTypeLength = frame.dataMimeType != null ? Buffer2.byteLength(frame.dataMimeType, "ascii") : 0;
+      var payloadLength = getPayloadLength(frame);
+      var buffer = Buffer2.allocUnsafe(FRAME_HEADER_SIZE + SETUP_FIXED_SIZE + //
+      (resumeTokenLength ? RESUME_TOKEN_LENGTH_SIZE + resumeTokenLength : 0) + metadataMimeTypeLength + dataMimeTypeLength + payloadLength);
+      var offset = writeHeader(frame, buffer);
+      offset = buffer.writeUInt16BE(frame.majorVersion, offset);
+      offset = buffer.writeUInt16BE(frame.minorVersion, offset);
+      offset = buffer.writeUInt32BE(frame.keepAlive, offset);
+      offset = buffer.writeUInt32BE(frame.lifetime, offset);
+      if (frame.flags & Frames_1.Flags.RESUME_ENABLE) {
+        offset = buffer.writeUInt16BE(resumeTokenLength, offset);
+        if (frame.resumeToken != null) {
+          offset += frame.resumeToken.copy(buffer, offset);
+        }
+      }
+      offset = buffer.writeUInt8(metadataMimeTypeLength, offset);
+      if (frame.metadataMimeType != null) {
+        offset += buffer.write(frame.metadataMimeType, offset, offset + metadataMimeTypeLength, "ascii");
+      }
+      offset = buffer.writeUInt8(dataMimeTypeLength, offset);
+      if (frame.dataMimeType != null) {
+        offset += buffer.write(frame.dataMimeType, offset, offset + dataMimeTypeLength, "ascii");
+      }
+      writePayload(frame, buffer, offset);
+      return buffer;
+    }
+    function sizeOfSetupFrame(frame) {
+      var resumeTokenLength = frame.resumeToken != null ? frame.resumeToken.byteLength : 0;
+      var metadataMimeTypeLength = frame.metadataMimeType != null ? Buffer2.byteLength(frame.metadataMimeType, "ascii") : 0;
+      var dataMimeTypeLength = frame.dataMimeType != null ? Buffer2.byteLength(frame.dataMimeType, "ascii") : 0;
+      var payloadLength = getPayloadLength(frame);
+      return FRAME_HEADER_SIZE + SETUP_FIXED_SIZE + //
+      (resumeTokenLength ? RESUME_TOKEN_LENGTH_SIZE + resumeTokenLength : 0) + metadataMimeTypeLength + dataMimeTypeLength + payloadLength;
+    }
+    function deserializeSetupFrame(buffer, streamId, flags) {
+      buffer.length;
+      var offset = FRAME_HEADER_SIZE;
+      var majorVersion = buffer.readUInt16BE(offset);
+      offset += 2;
+      var minorVersion = buffer.readUInt16BE(offset);
+      offset += 2;
+      var keepAlive = buffer.readInt32BE(offset);
+      offset += 4;
+      var lifetime = buffer.readInt32BE(offset);
+      offset += 4;
+      var resumeToken = null;
+      if (flags & Frames_1.Flags.RESUME_ENABLE) {
+        var resumeTokenLength = buffer.readInt16BE(offset);
+        offset += 2;
+        resumeToken = buffer.slice(offset, offset + resumeTokenLength);
+        offset += resumeTokenLength;
+      }
+      var metadataMimeTypeLength = buffer.readUInt8(offset);
+      offset += 1;
+      var metadataMimeType = buffer.toString("ascii", offset, offset + metadataMimeTypeLength);
+      offset += metadataMimeTypeLength;
+      var dataMimeTypeLength = buffer.readUInt8(offset);
+      offset += 1;
+      var dataMimeType = buffer.toString("ascii", offset, offset + dataMimeTypeLength);
+      offset += dataMimeTypeLength;
+      var frame = {
+        data: null,
+        dataMimeType,
+        flags,
+        keepAlive,
+        lifetime,
+        majorVersion,
+        metadata: null,
+        metadataMimeType,
+        minorVersion,
+        resumeToken,
+        // streamId,
+        streamId: 0,
+        type: Frames_1.FrameTypes.SETUP
+      };
+      readPayload(buffer, frame, offset);
+      return frame;
+    }
+    var ERROR_FIXED_SIZE = 4;
+    function serializeErrorFrame(frame) {
+      var messageLength = frame.message != null ? Buffer2.byteLength(frame.message, "utf8") : 0;
+      var buffer = Buffer2.allocUnsafe(FRAME_HEADER_SIZE + ERROR_FIXED_SIZE + messageLength);
+      var offset = writeHeader(frame, buffer);
+      offset = buffer.writeUInt32BE(frame.code, offset);
+      if (frame.message != null) {
+        buffer.write(frame.message, offset, offset + messageLength, "utf8");
+      }
+      return buffer;
+    }
+    function sizeOfErrorFrame(frame) {
+      var messageLength = frame.message != null ? Buffer2.byteLength(frame.message, "utf8") : 0;
+      return FRAME_HEADER_SIZE + ERROR_FIXED_SIZE + messageLength;
+    }
+    function deserializeErrorFrame(buffer, streamId, flags) {
+      buffer.length;
+      var offset = FRAME_HEADER_SIZE;
+      var code = buffer.readInt32BE(offset);
+      offset += 4;
+      var messageLength = buffer.length - offset;
+      var message2 = "";
+      if (messageLength > 0) {
+        message2 = buffer.toString("utf8", offset, offset + messageLength);
+        offset += messageLength;
+      }
+      return {
+        code,
+        flags,
+        message: message2,
+        streamId,
+        type: Frames_1.FrameTypes.ERROR
+      };
+    }
+    var KEEPALIVE_FIXED_SIZE = 8;
+    function serializeKeepAliveFrame(frame) {
+      var dataLength = frame.data != null ? frame.data.byteLength : 0;
+      var buffer = Buffer2.allocUnsafe(FRAME_HEADER_SIZE + KEEPALIVE_FIXED_SIZE + dataLength);
+      var offset = writeHeader(frame, buffer);
+      offset = writeUInt64BE(buffer, frame.lastReceivedPosition, offset);
+      if (frame.data != null) {
+        frame.data.copy(buffer, offset);
+      }
+      return buffer;
+    }
+    function sizeOfKeepAliveFrame(frame) {
+      var dataLength = frame.data != null ? frame.data.byteLength : 0;
+      return FRAME_HEADER_SIZE + KEEPALIVE_FIXED_SIZE + dataLength;
+    }
+    function deserializeKeepAliveFrame(buffer, streamId, flags) {
+      buffer.length;
+      var offset = FRAME_HEADER_SIZE;
+      var lastReceivedPosition = readUInt64BE(buffer, offset);
+      offset += 8;
+      var data = null;
+      if (offset < buffer.length) {
+        data = buffer.slice(offset, buffer.length);
+      }
+      return {
+        data,
+        flags,
+        lastReceivedPosition,
+        // streamId,
+        streamId: 0,
+        type: Frames_1.FrameTypes.KEEPALIVE
+      };
+    }
+    var LEASE_FIXED_SIZE = 8;
+    function serializeLeaseFrame(frame) {
+      var metaLength = frame.metadata != null ? frame.metadata.byteLength : 0;
+      var buffer = Buffer2.allocUnsafe(FRAME_HEADER_SIZE + LEASE_FIXED_SIZE + metaLength);
+      var offset = writeHeader(frame, buffer);
+      offset = buffer.writeUInt32BE(frame.ttl, offset);
+      offset = buffer.writeUInt32BE(frame.requestCount, offset);
+      if (frame.metadata != null) {
+        frame.metadata.copy(buffer, offset);
+      }
+      return buffer;
+    }
+    function sizeOfLeaseFrame(frame) {
+      var metaLength = frame.metadata != null ? frame.metadata.byteLength : 0;
+      return FRAME_HEADER_SIZE + LEASE_FIXED_SIZE + metaLength;
+    }
+    function deserializeLeaseFrame(buffer, streamId, flags) {
+      var offset = FRAME_HEADER_SIZE;
+      var ttl = buffer.readUInt32BE(offset);
+      offset += 4;
+      var requestCount = buffer.readUInt32BE(offset);
+      offset += 4;
+      var metadata = null;
+      if (offset < buffer.length) {
+        metadata = buffer.slice(offset, buffer.length);
+      }
+      return {
+        flags,
+        metadata,
+        requestCount,
+        // streamId,
+        streamId: 0,
+        ttl,
+        type: Frames_1.FrameTypes.LEASE
+      };
+    }
+    function serializeRequestFrame(frame) {
+      var payloadLength = getPayloadLength(frame);
+      var buffer = Buffer2.allocUnsafe(FRAME_HEADER_SIZE + payloadLength);
+      var offset = writeHeader(frame, buffer);
+      writePayload(frame, buffer, offset);
+      return buffer;
+    }
+    function sizeOfRequestFrame(frame) {
+      var payloadLength = getPayloadLength(frame);
+      return FRAME_HEADER_SIZE + payloadLength;
+    }
+    function serializeMetadataPushFrame(frame) {
+      var metadata = frame.metadata;
+      if (metadata != null) {
+        var buffer = Buffer2.allocUnsafe(FRAME_HEADER_SIZE + metadata.byteLength);
+        var offset = writeHeader(frame, buffer);
+        metadata.copy(buffer, offset);
+        return buffer;
+      } else {
+        var buffer = Buffer2.allocUnsafe(FRAME_HEADER_SIZE);
+        writeHeader(frame, buffer);
+        return buffer;
+      }
+    }
+    function sizeOfMetadataPushFrame(frame) {
+      return FRAME_HEADER_SIZE + (frame.metadata != null ? frame.metadata.byteLength : 0);
+    }
+    function deserializeRequestFnfFrame(buffer, streamId, flags) {
+      buffer.length;
+      var frame = {
+        data: null,
+        flags,
+        // length,
+        metadata: null,
+        streamId,
+        type: Frames_1.FrameTypes.REQUEST_FNF
+      };
+      readPayload(buffer, frame, FRAME_HEADER_SIZE);
+      return frame;
+    }
+    function deserializeRequestResponseFrame(buffer, streamId, flags) {
+      var frame = {
+        data: null,
+        flags,
+        // length,
+        metadata: null,
+        streamId,
+        type: Frames_1.FrameTypes.REQUEST_RESPONSE
+      };
+      readPayload(buffer, frame, FRAME_HEADER_SIZE);
+      return frame;
+    }
+    function deserializeMetadataPushFrame(buffer, streamId, flags) {
+      return {
+        flags,
+        // length,
+        metadata: length === FRAME_HEADER_SIZE ? null : buffer.slice(FRAME_HEADER_SIZE, length),
+        // streamId,
+        streamId: 0,
+        type: Frames_1.FrameTypes.METADATA_PUSH
+      };
+    }
+    var REQUEST_MANY_HEADER = 4;
+    function serializeRequestManyFrame(frame) {
+      var payloadLength = getPayloadLength(frame);
+      var buffer = Buffer2.allocUnsafe(FRAME_HEADER_SIZE + REQUEST_MANY_HEADER + payloadLength);
+      var offset = writeHeader(frame, buffer);
+      offset = buffer.writeUInt32BE(frame.requestN, offset);
+      writePayload(frame, buffer, offset);
+      return buffer;
+    }
+    function sizeOfRequestManyFrame(frame) {
+      var payloadLength = getPayloadLength(frame);
+      return FRAME_HEADER_SIZE + REQUEST_MANY_HEADER + payloadLength;
+    }
+    function deserializeRequestStreamFrame(buffer, streamId, flags) {
+      buffer.length;
+      var offset = FRAME_HEADER_SIZE;
+      var requestN = buffer.readInt32BE(offset);
+      offset += 4;
+      var frame = {
+        data: null,
+        flags,
+        // length,
+        metadata: null,
+        requestN,
+        streamId,
+        type: Frames_1.FrameTypes.REQUEST_STREAM
+      };
+      readPayload(buffer, frame, offset);
+      return frame;
+    }
+    function deserializeRequestChannelFrame(buffer, streamId, flags) {
+      buffer.length;
+      var offset = FRAME_HEADER_SIZE;
+      var requestN = buffer.readInt32BE(offset);
+      offset += 4;
+      var frame = {
+        data: null,
+        flags,
+        // length,
+        metadata: null,
+        requestN,
+        streamId,
+        type: Frames_1.FrameTypes.REQUEST_CHANNEL
+      };
+      readPayload(buffer, frame, offset);
+      return frame;
+    }
+    var REQUEST_N_HEADER = 4;
+    function serializeRequestNFrame(frame) {
+      var buffer = Buffer2.allocUnsafe(FRAME_HEADER_SIZE + REQUEST_N_HEADER);
+      var offset = writeHeader(frame, buffer);
+      buffer.writeUInt32BE(frame.requestN, offset);
+      return buffer;
+    }
+    function sizeOfRequestNFrame(frame) {
+      return FRAME_HEADER_SIZE + REQUEST_N_HEADER;
+    }
+    function deserializeRequestNFrame(buffer, streamId, flags) {
+      buffer.length;
+      var requestN = buffer.readInt32BE(FRAME_HEADER_SIZE);
+      return {
+        flags,
+        // length,
+        requestN,
+        streamId,
+        type: Frames_1.FrameTypes.REQUEST_N
+      };
+    }
+    function serializeCancelFrame(frame) {
+      var buffer = Buffer2.allocUnsafe(FRAME_HEADER_SIZE);
+      writeHeader(frame, buffer);
+      return buffer;
+    }
+    function sizeOfCancelFrame(frame) {
+      return FRAME_HEADER_SIZE;
+    }
+    function deserializeCancelFrame(buffer, streamId, flags) {
+      buffer.length;
+      return {
+        flags,
+        // length,
+        streamId,
+        type: Frames_1.FrameTypes.CANCEL
+      };
+    }
+    function serializePayloadFrame(frame) {
+      var payloadLength = getPayloadLength(frame);
+      var buffer = Buffer2.allocUnsafe(FRAME_HEADER_SIZE + payloadLength);
+      var offset = writeHeader(frame, buffer);
+      writePayload(frame, buffer, offset);
+      return buffer;
+    }
+    function sizeOfPayloadFrame(frame) {
+      var payloadLength = getPayloadLength(frame);
+      return FRAME_HEADER_SIZE + payloadLength;
+    }
+    function deserializePayloadFrame(buffer, streamId, flags) {
+      buffer.length;
+      var frame = {
+        data: null,
+        flags,
+        // length,
+        metadata: null,
+        streamId,
+        type: Frames_1.FrameTypes.PAYLOAD
+      };
+      readPayload(buffer, frame, FRAME_HEADER_SIZE);
+      return frame;
+    }
+    var RESUME_FIXED_SIZE = 22;
+    function serializeResumeFrame(frame) {
+      var resumeTokenLength = frame.resumeToken.byteLength;
+      var buffer = Buffer2.allocUnsafe(FRAME_HEADER_SIZE + RESUME_FIXED_SIZE + resumeTokenLength);
+      var offset = writeHeader(frame, buffer);
+      offset = buffer.writeUInt16BE(frame.majorVersion, offset);
+      offset = buffer.writeUInt16BE(frame.minorVersion, offset);
+      offset = buffer.writeUInt16BE(resumeTokenLength, offset);
+      offset += frame.resumeToken.copy(buffer, offset);
+      offset = writeUInt64BE(buffer, frame.serverPosition, offset);
+      writeUInt64BE(buffer, frame.clientPosition, offset);
+      return buffer;
+    }
+    function sizeOfResumeFrame(frame) {
+      var resumeTokenLength = frame.resumeToken.byteLength;
+      return FRAME_HEADER_SIZE + RESUME_FIXED_SIZE + resumeTokenLength;
+    }
+    function deserializeResumeFrame(buffer, streamId, flags) {
+      buffer.length;
+      var offset = FRAME_HEADER_SIZE;
+      var majorVersion = buffer.readUInt16BE(offset);
+      offset += 2;
+      var minorVersion = buffer.readUInt16BE(offset);
+      offset += 2;
+      var resumeTokenLength = buffer.readInt16BE(offset);
+      offset += 2;
+      var resumeToken = buffer.slice(offset, offset + resumeTokenLength);
+      offset += resumeTokenLength;
+      var serverPosition = readUInt64BE(buffer, offset);
+      offset += 8;
+      var clientPosition = readUInt64BE(buffer, offset);
+      offset += 8;
+      return {
+        clientPosition,
+        flags,
+        // length,
+        majorVersion,
+        minorVersion,
+        resumeToken,
+        serverPosition,
+        // streamId,
+        streamId: 0,
+        type: Frames_1.FrameTypes.RESUME
+      };
+    }
+    var RESUME_OK_FIXED_SIZE = 8;
+    function serializeResumeOkFrame(frame) {
+      var buffer = Buffer2.allocUnsafe(FRAME_HEADER_SIZE + RESUME_OK_FIXED_SIZE);
+      var offset = writeHeader(frame, buffer);
+      writeUInt64BE(buffer, frame.clientPosition, offset);
+      return buffer;
+    }
+    function sizeOfResumeOkFrame(frame) {
+      return FRAME_HEADER_SIZE + RESUME_OK_FIXED_SIZE;
+    }
+    function deserializeResumeOkFrame(buffer, streamId, flags) {
+      buffer.length;
+      var clientPosition = readUInt64BE(buffer, FRAME_HEADER_SIZE);
+      return {
+        clientPosition,
+        flags,
+        // length,
+        // streamId,
+        streamId: 0,
+        type: Frames_1.FrameTypes.RESUME_OK
+      };
+    }
+    function writeHeader(frame, buffer) {
+      var offset = buffer.writeInt32BE(frame.streamId, 0);
+      return buffer.writeUInt16BE(frame.type << exports$1.FRAME_TYPE_OFFFSET | frame.flags & exports$1.FLAGS_MASK, offset);
+    }
+    function getPayloadLength(frame) {
+      var payloadLength = 0;
+      if (frame.data != null) {
+        payloadLength += frame.data.byteLength;
+      }
+      if (Frames_1.Flags.hasMetadata(frame.flags)) {
+        payloadLength += UINT24_SIZE;
+        if (frame.metadata != null) {
+          payloadLength += frame.metadata.byteLength;
+        }
+      }
+      return payloadLength;
+    }
+    function writePayload(frame, buffer, offset) {
+      if (Frames_1.Flags.hasMetadata(frame.flags)) {
+        if (frame.metadata != null) {
+          var metaLength = frame.metadata.byteLength;
+          offset = writeUInt24BE(buffer, metaLength, offset);
+          offset += frame.metadata.copy(buffer, offset);
+        } else {
+          offset = writeUInt24BE(buffer, 0, offset);
+        }
+      }
+      if (frame.data != null) {
+        frame.data.copy(buffer, offset);
+      }
+    }
+    function readPayload(buffer, frame, offset) {
+      if (Frames_1.Flags.hasMetadata(frame.flags)) {
+        var metaLength = readUInt24BE(buffer, offset);
+        offset += UINT24_SIZE;
+        if (metaLength > 0) {
+          frame.metadata = buffer.slice(offset, offset + metaLength);
+          offset += metaLength;
+        }
+      }
+      if (offset < buffer.length) {
+        frame.data = buffer.slice(offset, buffer.length);
+      }
+    }
+    var Deserializer = (
+      /** @class */
+      (function() {
+        function Deserializer2() {
+        }
+        Deserializer2.prototype.deserializeFrame = function(buffer) {
+          return deserializeFrame(buffer);
+        };
+        Deserializer2.prototype.deserializeFrameWithLength = function(buffer) {
+          return deserializeFrameWithLength(buffer);
+        };
+        Deserializer2.prototype.deserializeFrames = function(buffer) {
+          return deserializeFrames(buffer);
+        };
+        return Deserializer2;
+      })()
+    );
+    exports$1.Deserializer = Deserializer;
+  })(Codecs);
+  return Codecs;
+}
+var Common = {};
+var hasRequiredCommon;
+function requireCommon() {
+  if (hasRequiredCommon) return Common;
+  hasRequiredCommon = 1;
+  Object.defineProperty(Common, "__esModule", { value: true });
+  return Common;
+}
+var Deferred = {};
+var hasRequiredDeferred;
+function requireDeferred() {
+  if (hasRequiredDeferred) return Deferred;
+  hasRequiredDeferred = 1;
+  var __values = Deferred && Deferred.__values || function(o) {
+    var s = typeof Symbol === "function" && Symbol.iterator, m = s && o[s], i = 0;
+    if (m) return m.call(o);
+    if (o && typeof o.length === "number") return {
+      next: function() {
+        if (o && i >= o.length) o = void 0;
+        return { value: o && o[i++], done: !o };
+      }
+    };
+    throw new TypeError(s ? "Object is not iterable." : "Symbol.iterator is not defined.");
+  };
+  Object.defineProperty(Deferred, "__esModule", { value: true });
+  Deferred.Deferred = void 0;
+  var Deferred$1 = (
+    /** @class */
+    (function() {
+      function Deferred2() {
+        this._done = false;
+        this.onCloseCallbacks = [];
+      }
+      Object.defineProperty(Deferred2.prototype, "done", {
+        get: function() {
+          return this._done;
+        },
+        enumerable: false,
+        configurable: true
+      });
+      Deferred2.prototype.close = function(error) {
+        var e_1, _a, e_2, _b;
+        if (this.done) {
+          console.warn("Trying to close for the second time. ".concat(error ? "Dropping error [".concat(error, "].") : ""));
+          return;
+        }
+        this._done = true;
+        this._error = error;
+        if (error) {
+          try {
+            for (var _c = __values(this.onCloseCallbacks), _d = _c.next(); !_d.done; _d = _c.next()) {
+              var callback = _d.value;
+              callback(error);
+            }
+          } catch (e_1_1) {
+            e_1 = { error: e_1_1 };
+          } finally {
+            try {
+              if (_d && !_d.done && (_a = _c.return)) _a.call(_c);
+            } finally {
+              if (e_1) throw e_1.error;
+            }
+          }
+          return;
+        }
+        try {
+          for (var _e = __values(this.onCloseCallbacks), _f = _e.next(); !_f.done; _f = _e.next()) {
+            var callback = _f.value;
+            callback();
+          }
+        } catch (e_2_1) {
+          e_2 = { error: e_2_1 };
+        } finally {
+          try {
+            if (_f && !_f.done && (_b = _e.return)) _b.call(_e);
+          } finally {
+            if (e_2) throw e_2.error;
+          }
+        }
+      };
+      Deferred2.prototype.onClose = function(callback) {
+        if (this._done) {
+          callback(this._error);
+          return;
+        }
+        this.onCloseCallbacks.push(callback);
+      };
+      return Deferred2;
+    })()
+  );
+  Deferred.Deferred = Deferred$1;
+  return Deferred;
+}
+var Errors = {};
+var hasRequiredErrors;
+function requireErrors() {
+  if (hasRequiredErrors) return Errors;
+  hasRequiredErrors = 1;
+  (function(exports$1) {
+    var __extends = Errors && Errors.__extends || /* @__PURE__ */ (function() {
+      var extendStatics = function(d, b2) {
+        extendStatics = Object.setPrototypeOf || { __proto__: [] } instanceof Array && function(d2, b3) {
+          d2.__proto__ = b3;
+        } || function(d2, b3) {
+          for (var p2 in b3) if (Object.prototype.hasOwnProperty.call(b3, p2)) d2[p2] = b3[p2];
+        };
+        return extendStatics(d, b2);
+      };
+      return function(d, b2) {
+        if (typeof b2 !== "function" && b2 !== null)
+          throw new TypeError("Class extends value " + String(b2) + " is not a constructor or null");
+        extendStatics(d, b2);
+        function __() {
+          this.constructor = d;
+        }
+        d.prototype = b2 === null ? Object.create(b2) : (__.prototype = b2.prototype, new __());
+      };
+    })();
+    Object.defineProperty(exports$1, "__esModule", { value: true });
+    exports$1.ErrorCodes = exports$1.RSocketError = void 0;
+    var RSocketError = (
+      /** @class */
+      (function(_super) {
+        __extends(RSocketError2, _super);
+        function RSocketError2(code, message2) {
+          var _this = _super.call(this, message2) || this;
+          _this.code = code;
+          return _this;
+        }
+        return RSocketError2;
+      })(Error)
+    );
+    exports$1.RSocketError = RSocketError;
+    (function(ErrorCodes) {
+      ErrorCodes[ErrorCodes["RESERVED"] = 0] = "RESERVED";
+      ErrorCodes[ErrorCodes["INVALID_SETUP"] = 1] = "INVALID_SETUP";
+      ErrorCodes[ErrorCodes["UNSUPPORTED_SETUP"] = 2] = "UNSUPPORTED_SETUP";
+      ErrorCodes[ErrorCodes["REJECTED_SETUP"] = 3] = "REJECTED_SETUP";
+      ErrorCodes[ErrorCodes["REJECTED_RESUME"] = 4] = "REJECTED_RESUME";
+      ErrorCodes[ErrorCodes["CONNECTION_CLOSE"] = 258] = "CONNECTION_CLOSE";
+      ErrorCodes[ErrorCodes["CONNECTION_ERROR"] = 257] = "CONNECTION_ERROR";
+      ErrorCodes[ErrorCodes["APPLICATION_ERROR"] = 513] = "APPLICATION_ERROR";
+      ErrorCodes[ErrorCodes["REJECTED"] = 514] = "REJECTED";
+      ErrorCodes[ErrorCodes["CANCELED"] = 515] = "CANCELED";
+      ErrorCodes[ErrorCodes["INVALID"] = 516] = "INVALID";
+      ErrorCodes[ErrorCodes["RESERVED_EXTENSION"] = 4294967295] = "RESERVED_EXTENSION";
+    })(exports$1.ErrorCodes || (exports$1.ErrorCodes = {}));
+  })(Errors);
+  return Errors;
+}
+var RSocket = {};
+var hasRequiredRSocket;
+function requireRSocket() {
+  if (hasRequiredRSocket) return RSocket;
+  hasRequiredRSocket = 1;
+  Object.defineProperty(RSocket, "__esModule", { value: true });
+  return RSocket;
+}
+var RSocketConnector = {};
+var ClientServerMultiplexerDemultiplexer = {};
+var hasRequiredClientServerMultiplexerDemultiplexer;
+function requireClientServerMultiplexerDemultiplexer() {
+  if (hasRequiredClientServerMultiplexerDemultiplexer) return ClientServerMultiplexerDemultiplexer;
+  hasRequiredClientServerMultiplexerDemultiplexer = 1;
+  (function(exports$1) {
+    var __extends = ClientServerMultiplexerDemultiplexer && ClientServerMultiplexerDemultiplexer.__extends || /* @__PURE__ */ (function() {
+      var extendStatics = function(d, b2) {
+        extendStatics = Object.setPrototypeOf || { __proto__: [] } instanceof Array && function(d2, b3) {
+          d2.__proto__ = b3;
+        } || function(d2, b3) {
+          for (var p2 in b3) if (Object.prototype.hasOwnProperty.call(b3, p2)) d2[p2] = b3[p2];
+        };
+        return extendStatics(d, b2);
+      };
+      return function(d, b2) {
+        if (typeof b2 !== "function" && b2 !== null)
+          throw new TypeError("Class extends value " + String(b2) + " is not a constructor or null");
+        extendStatics(d, b2);
+        function __() {
+          this.constructor = d;
+        }
+        d.prototype = b2 === null ? Object.create(b2) : (__.prototype = b2.prototype, new __());
+      };
+    })();
+    var __awaiter = ClientServerMultiplexerDemultiplexer && ClientServerMultiplexerDemultiplexer.__awaiter || function(thisArg, _arguments, P, generator) {
+      function adopt(value) {
+        return value instanceof P ? value : new P(function(resolve2) {
+          resolve2(value);
+        });
+      }
+      return new (P || (P = Promise))(function(resolve2, reject) {
+        function fulfilled(value) {
+          try {
+            step(generator.next(value));
+          } catch (e) {
+            reject(e);
+          }
+        }
+        function rejected(value) {
+          try {
+            step(generator["throw"](value));
+          } catch (e) {
+            reject(e);
+          }
+        }
+        function step(result) {
+          result.done ? resolve2(result.value) : adopt(result.value).then(fulfilled, rejected);
+        }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+      });
+    };
+    var __generator = ClientServerMultiplexerDemultiplexer && ClientServerMultiplexerDemultiplexer.__generator || function(thisArg, body) {
+      var _ = { label: 0, sent: function() {
+        if (t2[0] & 1) throw t2[1];
+        return t2[1];
+      }, trys: [], ops: [] }, f, y, t2, g;
+      return g = { next: verb(0), "throw": verb(1), "return": verb(2) }, typeof Symbol === "function" && (g[Symbol.iterator] = function() {
+        return this;
+      }), g;
+      function verb(n) {
+        return function(v) {
+          return step([n, v]);
+        };
+      }
+      function step(op) {
+        if (f) throw new TypeError("Generator is already executing.");
+        while (_) try {
+          if (f = 1, y && (t2 = op[0] & 2 ? y["return"] : op[0] ? y["throw"] || ((t2 = y["return"]) && t2.call(y), 0) : y.next) && !(t2 = t2.call(y, op[1])).done) return t2;
+          if (y = 0, t2) op = [op[0] & 2, t2.value];
+          switch (op[0]) {
+            case 0:
+            case 1:
+              t2 = op;
+              break;
+            case 4:
+              _.label++;
+              return { value: op[1], done: false };
+            case 5:
+              _.label++;
+              y = op[1];
+              op = [0];
+              continue;
+            case 7:
+              op = _.ops.pop();
+              _.trys.pop();
+              continue;
+            default:
+              if (!(t2 = _.trys, t2 = t2.length > 0 && t2[t2.length - 1]) && (op[0] === 6 || op[0] === 2)) {
+                _ = 0;
+                continue;
+              }
+              if (op[0] === 3 && (!t2 || op[1] > t2[0] && op[1] < t2[3])) {
+                _.label = op[1];
+                break;
+              }
+              if (op[0] === 6 && _.label < t2[1]) {
+                _.label = t2[1];
+                t2 = op;
+                break;
+              }
+              if (t2 && _.label < t2[2]) {
+                _.label = t2[2];
+                _.ops.push(op);
+                break;
+              }
+              if (t2[2]) _.ops.pop();
+              _.trys.pop();
+              continue;
+          }
+          op = body.call(thisArg, _);
+        } catch (e) {
+          op = [6, e];
+          y = 0;
+        } finally {
+          f = t2 = 0;
+        }
+        if (op[0] & 5) throw op[1];
+        return { value: op[0] ? op[1] : void 0, done: true };
+      }
+    };
+    Object.defineProperty(exports$1, "__esModule", { value: true });
+    exports$1.ResumeOkAwaitingResumableClientServerInputMultiplexerDemultiplexer = exports$1.ResumableClientServerInputMultiplexerDemultiplexer = exports$1.ClientServerInputMultiplexerDemultiplexer = exports$1.StreamIdGenerator = void 0;
+    var _1 = requireDist();
+    var Deferred_1 = requireDeferred();
+    var Errors_1 = requireErrors();
+    var Frames_1 = requireFrames();
+    (function(StreamIdGenerator) {
+      function create(seedId) {
+        return new StreamIdGeneratorImpl(seedId);
+      }
+      StreamIdGenerator.create = create;
+      var StreamIdGeneratorImpl = (
+        /** @class */
+        (function() {
+          function StreamIdGeneratorImpl2(currentId) {
+            this.currentId = currentId;
+          }
+          StreamIdGeneratorImpl2.prototype.next = function(handler) {
+            var nextId = this.currentId + 2;
+            if (!handler(nextId)) {
+              return;
+            }
+            this.currentId = nextId;
+          };
+          return StreamIdGeneratorImpl2;
+        })()
+      );
+    })(exports$1.StreamIdGenerator || (exports$1.StreamIdGenerator = {}));
+    var ClientServerInputMultiplexerDemultiplexer = (
+      /** @class */
+      (function(_super) {
+        __extends(ClientServerInputMultiplexerDemultiplexer2, _super);
+        function ClientServerInputMultiplexerDemultiplexer2(streamIdSupplier, outbound, closeable) {
+          var _this = _super.call(this) || this;
+          _this.streamIdSupplier = streamIdSupplier;
+          _this.outbound = outbound;
+          _this.closeable = closeable;
+          _this.registry = {};
+          closeable.onClose(_this.close.bind(_this));
+          return _this;
+        }
+        ClientServerInputMultiplexerDemultiplexer2.prototype.handle = function(frame) {
+          if (Frames_1.Frame.isConnection(frame)) {
+            if (frame.type === _1.FrameTypes.RESERVED) {
+              return;
+            }
+            this.connectionFramesHandler.handle(frame);
+          } else if (Frames_1.Frame.isRequest(frame)) {
+            if (this.registry[frame.streamId]) {
+              return;
+            }
+            this.requestFramesHandler.handle(frame, this);
+          } else {
+            var handler = this.registry[frame.streamId];
+            if (!handler) {
+              return;
+            }
+            handler.handle(frame);
+          }
+        };
+        ClientServerInputMultiplexerDemultiplexer2.prototype.connectionInbound = function(handler) {
+          if (this.connectionFramesHandler) {
+            throw new Error("Connection frame handler has already been installed");
+          }
+          this.connectionFramesHandler = handler;
+        };
+        ClientServerInputMultiplexerDemultiplexer2.prototype.handleRequestStream = function(handler) {
+          if (this.requestFramesHandler) {
+            throw new Error("Stream handler has already been installed");
+          }
+          this.requestFramesHandler = handler;
+        };
+        ClientServerInputMultiplexerDemultiplexer2.prototype.send = function(frame) {
+          this.outbound.send(frame);
+        };
+        Object.defineProperty(ClientServerInputMultiplexerDemultiplexer2.prototype, "connectionOutbound", {
+          get: function() {
+            return this;
+          },
+          enumerable: false,
+          configurable: true
+        });
+        ClientServerInputMultiplexerDemultiplexer2.prototype.createRequestStream = function(streamHandler) {
+          var _this = this;
+          if (this.done) {
+            streamHandler.handleReject(new Error("Already closed"));
+            return;
+          }
+          var registry = this.registry;
+          this.streamIdSupplier.next(function(streamId) {
+            return streamHandler.handleReady(streamId, _this);
+          }, Object.keys(registry));
+        };
+        ClientServerInputMultiplexerDemultiplexer2.prototype.connect = function(handler) {
+          this.registry[handler.streamId] = handler;
+        };
+        ClientServerInputMultiplexerDemultiplexer2.prototype.disconnect = function(stream) {
+          delete this.registry[stream.streamId];
+        };
+        ClientServerInputMultiplexerDemultiplexer2.prototype.close = function(error) {
+          if (this.done) {
+            _super.prototype.close.call(this, error);
+            return;
+          }
+          for (var streamId in this.registry) {
+            var stream = this.registry[streamId];
+            stream.close(new Error("Closed. ".concat(error ? "Original cause [".concat(error, "].") : "")));
+          }
+          _super.prototype.close.call(this, error);
+        };
+        return ClientServerInputMultiplexerDemultiplexer2;
+      })(Deferred_1.Deferred)
+    );
+    exports$1.ClientServerInputMultiplexerDemultiplexer = ClientServerInputMultiplexerDemultiplexer;
+    var ResumableClientServerInputMultiplexerDemultiplexer = (
+      /** @class */
+      (function(_super) {
+        __extends(ResumableClientServerInputMultiplexerDemultiplexer2, _super);
+        function ResumableClientServerInputMultiplexerDemultiplexer2(streamIdSupplier, outbound, closeable, frameStore, token, sessionStoreOrReconnector, sessionTimeout) {
+          var _this = _super.call(this, streamIdSupplier, outbound, new Deferred_1.Deferred()) || this;
+          _this.frameStore = frameStore;
+          _this.token = token;
+          _this.sessionTimeout = sessionTimeout;
+          if (sessionStoreOrReconnector instanceof Function) {
+            _this.reconnector = sessionStoreOrReconnector;
+          } else {
+            _this.sessionStore = sessionStoreOrReconnector;
+          }
+          closeable.onClose(_this.handleConnectionClose.bind(_this));
+          return _this;
+        }
+        ResumableClientServerInputMultiplexerDemultiplexer2.prototype.send = function(frame) {
+          if (Frames_1.Frame.isConnection(frame)) {
+            if (frame.type === _1.FrameTypes.KEEPALIVE) {
+              frame.lastReceivedPosition = this.frameStore.lastReceivedFramePosition;
+            } else if (frame.type === _1.FrameTypes.ERROR) {
+              this.outbound.send(frame);
+              if (this.sessionStore) {
+                delete this.sessionStore[this.token];
+              }
+              _super.prototype.close.call(this, new Errors_1.RSocketError(frame.code, frame.message));
+              return;
+            }
+          } else {
+            this.frameStore.store(frame);
+          }
+          this.outbound.send(frame);
+        };
+        ResumableClientServerInputMultiplexerDemultiplexer2.prototype.handle = function(frame) {
+          if (Frames_1.Frame.isConnection(frame)) {
+            if (frame.type === _1.FrameTypes.KEEPALIVE) {
+              try {
+                this.frameStore.dropTo(frame.lastReceivedPosition);
+              } catch (re) {
+                this.outbound.send({
+                  type: _1.FrameTypes.ERROR,
+                  streamId: 0,
+                  flags: _1.Flags.NONE,
+                  code: re.code,
+                  message: re.message
+                });
+                this.close(re);
+              }
+            } else if (frame.type === _1.FrameTypes.ERROR) {
+              _super.prototype.handle.call(this, frame);
+              if (this.sessionStore) {
+                delete this.sessionStore[this.token];
+              }
+              _super.prototype.close.call(this, new Errors_1.RSocketError(frame.code, frame.message));
+              return;
+            }
+          } else {
+            this.frameStore.record(frame);
+          }
+          _super.prototype.handle.call(this, frame);
+        };
+        ResumableClientServerInputMultiplexerDemultiplexer2.prototype.resume = function(frame, outbound, closeable) {
+          this.outbound = outbound;
+          switch (frame.type) {
+            case _1.FrameTypes.RESUME: {
+              clearTimeout(this.timeoutId);
+              if (this.frameStore.lastReceivedFramePosition < frame.clientPosition) {
+                var e = new Errors_1.RSocketError(_1.ErrorCodes.REJECTED_RESUME, "Impossible to resume since first available client frame position is greater than last received server frame position");
+                this.outbound.send({
+                  type: _1.FrameTypes.ERROR,
+                  streamId: 0,
+                  flags: _1.Flags.NONE,
+                  code: e.code,
+                  message: e.message
+                });
+                this.close(e);
+                return;
+              }
+              try {
+                this.frameStore.dropTo(frame.serverPosition);
+              } catch (re) {
+                this.outbound.send({
+                  type: _1.FrameTypes.ERROR,
+                  streamId: 0,
+                  flags: _1.Flags.NONE,
+                  code: re.code,
+                  message: re.message
+                });
+                this.close(re);
+                return;
+              }
+              this.outbound.send({
+                type: _1.FrameTypes.RESUME_OK,
+                streamId: 0,
+                flags: _1.Flags.NONE,
+                clientPosition: this.frameStore.lastReceivedFramePosition
+              });
+              break;
+            }
+            case _1.FrameTypes.RESUME_OK: {
+              try {
+                this.frameStore.dropTo(frame.clientPosition);
+              } catch (re) {
+                this.outbound.send({
+                  type: _1.FrameTypes.ERROR,
+                  streamId: 0,
+                  flags: _1.Flags.NONE,
+                  code: re.code,
+                  message: re.message
+                });
+                this.close(re);
+              }
+              break;
+            }
+          }
+          this.frameStore.drain(this.outbound.send.bind(this.outbound));
+          closeable.onClose(this.handleConnectionClose.bind(this));
+          this.connectionFramesHandler.resume();
+        };
+        ResumableClientServerInputMultiplexerDemultiplexer2.prototype.handleConnectionClose = function(_error) {
+          return __awaiter(this, void 0, void 0, function() {
+            var e_1;
+            return __generator(this, function(_a) {
+              switch (_a.label) {
+                case 0:
+                  this.connectionFramesHandler.pause();
+                  if (!this.reconnector) return [3, 5];
+                  _a.label = 1;
+                case 1:
+                  _a.trys.push([1, 3, , 4]);
+                  return [4, this.reconnector(this, this.frameStore)];
+                case 2:
+                  _a.sent();
+                  return [3, 4];
+                case 3:
+                  e_1 = _a.sent();
+                  this.close(e_1);
+                  return [3, 4];
+                case 4:
+                  return [3, 6];
+                case 5:
+                  this.timeoutId = setTimeout(this.close.bind(this), this.sessionTimeout);
+                  _a.label = 6;
+                case 6:
+                  return [
+                    2
+                    /*return*/
+                  ];
+              }
+            });
+          });
+        };
+        return ResumableClientServerInputMultiplexerDemultiplexer2;
+      })(ClientServerInputMultiplexerDemultiplexer)
+    );
+    exports$1.ResumableClientServerInputMultiplexerDemultiplexer = ResumableClientServerInputMultiplexerDemultiplexer;
+    var ResumeOkAwaitingResumableClientServerInputMultiplexerDemultiplexer = (
+      /** @class */
+      (function() {
+        function ResumeOkAwaitingResumableClientServerInputMultiplexerDemultiplexer2(outbound, closeable, delegate) {
+          this.outbound = outbound;
+          this.closeable = closeable;
+          this.delegate = delegate;
+          this.resumed = false;
+        }
+        ResumeOkAwaitingResumableClientServerInputMultiplexerDemultiplexer2.prototype.close = function() {
+          this.delegate.close();
+        };
+        ResumeOkAwaitingResumableClientServerInputMultiplexerDemultiplexer2.prototype.onClose = function(callback) {
+          this.delegate.onClose(callback);
+        };
+        Object.defineProperty(ResumeOkAwaitingResumableClientServerInputMultiplexerDemultiplexer2.prototype, "connectionOutbound", {
+          get: function() {
+            return this.delegate.connectionOutbound;
+          },
+          enumerable: false,
+          configurable: true
+        });
+        ResumeOkAwaitingResumableClientServerInputMultiplexerDemultiplexer2.prototype.createRequestStream = function(streamHandler) {
+          this.delegate.createRequestStream(streamHandler);
+        };
+        ResumeOkAwaitingResumableClientServerInputMultiplexerDemultiplexer2.prototype.connectionInbound = function(handler) {
+          this.delegate.connectionInbound(handler);
+        };
+        ResumeOkAwaitingResumableClientServerInputMultiplexerDemultiplexer2.prototype.handleRequestStream = function(handler) {
+          this.delegate.handleRequestStream(handler);
+        };
+        ResumeOkAwaitingResumableClientServerInputMultiplexerDemultiplexer2.prototype.handle = function(frame) {
+          var _this = this;
+          if (!this.resumed) {
+            if (frame.type === _1.FrameTypes.RESUME_OK) {
+              this.resumed = true;
+              this.delegate.resume(frame, this.outbound, this.closeable);
+              return;
+            } else {
+              this.outbound.send({
+                type: _1.FrameTypes.ERROR,
+                streamId: 0,
+                code: _1.ErrorCodes.CONNECTION_ERROR,
+                message: "Incomplete RESUME handshake. Unexpected frame ".concat(frame.type, " received"),
+                flags: _1.Flags.NONE
+              });
+              this.closeable.close();
+              this.closeable.onClose(function() {
+                return _this.delegate.close(new Errors_1.RSocketError(_1.ErrorCodes.CONNECTION_ERROR, "Incomplete RESUME handshake. Unexpected frame ".concat(frame.type, " received")));
+              });
+            }
+            return;
+          }
+          this.delegate.handle(frame);
+        };
+        return ResumeOkAwaitingResumableClientServerInputMultiplexerDemultiplexer2;
+      })()
+    );
+    exports$1.ResumeOkAwaitingResumableClientServerInputMultiplexerDemultiplexer = ResumeOkAwaitingResumableClientServerInputMultiplexerDemultiplexer;
+  })(ClientServerMultiplexerDemultiplexer);
+  return ClientServerMultiplexerDemultiplexer;
+}
+var RSocketSupport = {};
+var RequestChannelStream = {};
+var Fragmenter = {};
+var hasRequiredFragmenter;
+function requireFragmenter() {
+  if (hasRequiredFragmenter) return Fragmenter;
+  hasRequiredFragmenter = 1;
+  var __generator = Fragmenter && Fragmenter.__generator || function(thisArg, body) {
+    var _ = { label: 0, sent: function() {
+      if (t2[0] & 1) throw t2[1];
+      return t2[1];
+    }, trys: [], ops: [] }, f, y, t2, g;
+    return g = { next: verb(0), "throw": verb(1), "return": verb(2) }, typeof Symbol === "function" && (g[Symbol.iterator] = function() {
+      return this;
+    }), g;
+    function verb(n) {
+      return function(v) {
+        return step([n, v]);
+      };
+    }
+    function step(op) {
+      if (f) throw new TypeError("Generator is already executing.");
+      while (_) try {
+        if (f = 1, y && (t2 = op[0] & 2 ? y["return"] : op[0] ? y["throw"] || ((t2 = y["return"]) && t2.call(y), 0) : y.next) && !(t2 = t2.call(y, op[1])).done) return t2;
+        if (y = 0, t2) op = [op[0] & 2, t2.value];
+        switch (op[0]) {
+          case 0:
+          case 1:
+            t2 = op;
+            break;
+          case 4:
+            _.label++;
+            return { value: op[1], done: false };
+          case 5:
+            _.label++;
+            y = op[1];
+            op = [0];
+            continue;
+          case 7:
+            op = _.ops.pop();
+            _.trys.pop();
+            continue;
+          default:
+            if (!(t2 = _.trys, t2 = t2.length > 0 && t2[t2.length - 1]) && (op[0] === 6 || op[0] === 2)) {
+              _ = 0;
+              continue;
+            }
+            if (op[0] === 3 && (!t2 || op[1] > t2[0] && op[1] < t2[3])) {
+              _.label = op[1];
+              break;
+            }
+            if (op[0] === 6 && _.label < t2[1]) {
+              _.label = t2[1];
+              t2 = op;
+              break;
+            }
+            if (t2 && _.label < t2[2]) {
+              _.label = t2[2];
+              _.ops.push(op);
+              break;
+            }
+            if (t2[2]) _.ops.pop();
+            _.trys.pop();
+            continue;
+        }
+        op = body.call(thisArg, _);
+      } catch (e) {
+        op = [6, e];
+        y = 0;
+      } finally {
+        f = t2 = 0;
+      }
+      if (op[0] & 5) throw op[1];
+      return { value: op[0] ? op[1] : void 0, done: true };
+    }
+  };
+  Object.defineProperty(Fragmenter, "__esModule", { value: true });
+  Fragmenter.fragmentWithRequestN = Fragmenter.fragment = Fragmenter.isFragmentable = void 0;
+  var Frames_1 = requireFrames();
+  function isFragmentable(payload, fragmentSize, frameType) {
+    if (fragmentSize === 0) {
+      return false;
+    }
+    return payload.data.byteLength + (payload.metadata ? payload.metadata.byteLength + Frames_1.Lengths.METADATA : 0) + (frameType == Frames_1.FrameTypes.REQUEST_STREAM || frameType == Frames_1.FrameTypes.REQUEST_CHANNEL ? Frames_1.Lengths.REQUEST : 0) > fragmentSize;
+  }
+  Fragmenter.isFragmentable = isFragmentable;
+  function fragment(streamId, payload, fragmentSize, frameType, isComplete) {
+    var dataLength, firstFrame, remaining, metadata, metadataLength, metadataPosition, nextMetadataPosition, nextMetadataPosition, dataPosition, data, nextDataPosition, nextDataPosition;
+    var _a, _b;
+    if (isComplete === void 0) {
+      isComplete = false;
+    }
+    return __generator(this, function(_c) {
+      switch (_c.label) {
+        case 0:
+          dataLength = (_b = (_a = payload.data) === null || _a === void 0 ? void 0 : _a.byteLength) !== null && _b !== void 0 ? _b : 0;
+          firstFrame = frameType !== Frames_1.FrameTypes.PAYLOAD;
+          remaining = fragmentSize;
+          if (!payload.metadata) return [3, 6];
+          metadataLength = payload.metadata.byteLength;
+          if (!(metadataLength === 0)) return [3, 1];
+          remaining -= Frames_1.Lengths.METADATA;
+          metadata = Buffer2.allocUnsafe(0);
+          return [3, 6];
+        case 1:
+          metadataPosition = 0;
+          if (!firstFrame) return [3, 3];
+          remaining -= Frames_1.Lengths.METADATA;
+          nextMetadataPosition = Math.min(metadataLength, metadataPosition + remaining);
+          metadata = payload.metadata.slice(metadataPosition, nextMetadataPosition);
+          remaining -= metadata.byteLength;
+          metadataPosition = nextMetadataPosition;
+          if (!(remaining === 0)) return [3, 3];
+          firstFrame = false;
+          return [4, {
+            type: frameType,
+            flags: Frames_1.Flags.FOLLOWS | Frames_1.Flags.METADATA,
+            data: void 0,
+            metadata,
+            streamId
+          }];
+        case 2:
+          _c.sent();
+          metadata = void 0;
+          remaining = fragmentSize;
+          _c.label = 3;
+        case 3:
+          if (!(metadataPosition < metadataLength)) return [3, 6];
+          remaining -= Frames_1.Lengths.METADATA;
+          nextMetadataPosition = Math.min(metadataLength, metadataPosition + remaining);
+          metadata = payload.metadata.slice(metadataPosition, nextMetadataPosition);
+          remaining -= metadata.byteLength;
+          metadataPosition = nextMetadataPosition;
+          if (!(remaining === 0 || dataLength === 0)) return [3, 5];
+          return [4, {
+            type: Frames_1.FrameTypes.PAYLOAD,
+            flags: Frames_1.Flags.NEXT | Frames_1.Flags.METADATA | (metadataPosition === metadataLength && isComplete && dataLength === 0 ? Frames_1.Flags.COMPLETE : Frames_1.Flags.FOLLOWS),
+            data: void 0,
+            metadata,
+            streamId
+          }];
+        case 4:
+          _c.sent();
+          metadata = void 0;
+          remaining = fragmentSize;
+          _c.label = 5;
+        case 5:
+          return [3, 3];
+        case 6:
+          dataPosition = 0;
+          if (!firstFrame) return [3, 8];
+          nextDataPosition = Math.min(dataLength, dataPosition + remaining);
+          data = payload.data.slice(dataPosition, nextDataPosition);
+          remaining -= data.byteLength;
+          dataPosition = nextDataPosition;
+          return [4, {
+            type: frameType,
+            flags: Frames_1.Flags.FOLLOWS | (metadata ? Frames_1.Flags.METADATA : Frames_1.Flags.NONE),
+            data,
+            metadata,
+            streamId
+          }];
+        case 7:
+          _c.sent();
+          metadata = void 0;
+          data = void 0;
+          remaining = fragmentSize;
+          _c.label = 8;
+        case 8:
+          if (!(dataPosition < dataLength)) return [3, 10];
+          nextDataPosition = Math.min(dataLength, dataPosition + remaining);
+          data = payload.data.slice(dataPosition, nextDataPosition);
+          remaining -= data.byteLength;
+          dataPosition = nextDataPosition;
+          return [4, {
+            type: Frames_1.FrameTypes.PAYLOAD,
+            flags: dataPosition === dataLength ? (isComplete ? Frames_1.Flags.COMPLETE : Frames_1.Flags.NONE) | Frames_1.Flags.NEXT | (metadata ? Frames_1.Flags.METADATA : 0) : Frames_1.Flags.FOLLOWS | Frames_1.Flags.NEXT | (metadata ? Frames_1.Flags.METADATA : 0),
+            data,
+            metadata,
+            streamId
+          }];
+        case 9:
+          _c.sent();
+          metadata = void 0;
+          data = void 0;
+          remaining = fragmentSize;
+          return [3, 8];
+        case 10:
+          return [
+            2
+            /*return*/
+          ];
+      }
+    });
+  }
+  Fragmenter.fragment = fragment;
+  function fragmentWithRequestN(streamId, payload, fragmentSize, frameType, requestN, isComplete) {
+    var dataLength, firstFrame, remaining, metadata, metadataLength, metadataPosition, nextMetadataPosition, nextMetadataPosition, dataPosition, data, nextDataPosition, nextDataPosition;
+    var _a, _b;
+    if (isComplete === void 0) {
+      isComplete = false;
+    }
+    return __generator(this, function(_c) {
+      switch (_c.label) {
+        case 0:
+          dataLength = (_b = (_a = payload.data) === null || _a === void 0 ? void 0 : _a.byteLength) !== null && _b !== void 0 ? _b : 0;
+          firstFrame = true;
+          remaining = fragmentSize;
+          if (!payload.metadata) return [3, 6];
+          metadataLength = payload.metadata.byteLength;
+          if (!(metadataLength === 0)) return [3, 1];
+          remaining -= Frames_1.Lengths.METADATA;
+          metadata = Buffer2.allocUnsafe(0);
+          return [3, 6];
+        case 1:
+          metadataPosition = 0;
+          if (!firstFrame) return [3, 3];
+          remaining -= Frames_1.Lengths.METADATA + Frames_1.Lengths.REQUEST;
+          nextMetadataPosition = Math.min(metadataLength, metadataPosition + remaining);
+          metadata = payload.metadata.slice(metadataPosition, nextMetadataPosition);
+          remaining -= metadata.byteLength;
+          metadataPosition = nextMetadataPosition;
+          if (!(remaining === 0)) return [3, 3];
+          firstFrame = false;
+          return [4, {
+            type: frameType,
+            flags: Frames_1.Flags.FOLLOWS | Frames_1.Flags.METADATA,
+            data: void 0,
+            requestN,
+            metadata,
+            streamId
+          }];
+        case 2:
+          _c.sent();
+          metadata = void 0;
+          remaining = fragmentSize;
+          _c.label = 3;
+        case 3:
+          if (!(metadataPosition < metadataLength)) return [3, 6];
+          remaining -= Frames_1.Lengths.METADATA;
+          nextMetadataPosition = Math.min(metadataLength, metadataPosition + remaining);
+          metadata = payload.metadata.slice(metadataPosition, nextMetadataPosition);
+          remaining -= metadata.byteLength;
+          metadataPosition = nextMetadataPosition;
+          if (!(remaining === 0 || dataLength === 0)) return [3, 5];
+          return [4, {
+            type: Frames_1.FrameTypes.PAYLOAD,
+            flags: Frames_1.Flags.NEXT | Frames_1.Flags.METADATA | (metadataPosition === metadataLength && isComplete && dataLength === 0 ? Frames_1.Flags.COMPLETE : Frames_1.Flags.FOLLOWS),
+            data: void 0,
+            metadata,
+            streamId
+          }];
+        case 4:
+          _c.sent();
+          metadata = void 0;
+          remaining = fragmentSize;
+          _c.label = 5;
+        case 5:
+          return [3, 3];
+        case 6:
+          dataPosition = 0;
+          if (!firstFrame) return [3, 8];
+          remaining -= Frames_1.Lengths.REQUEST;
+          nextDataPosition = Math.min(dataLength, dataPosition + remaining);
+          data = payload.data.slice(dataPosition, nextDataPosition);
+          remaining -= data.byteLength;
+          dataPosition = nextDataPosition;
+          return [4, {
+            type: frameType,
+            flags: Frames_1.Flags.FOLLOWS | (metadata ? Frames_1.Flags.METADATA : Frames_1.Flags.NONE),
+            data,
+            requestN,
+            metadata,
+            streamId
+          }];
+        case 7:
+          _c.sent();
+          metadata = void 0;
+          data = void 0;
+          remaining = fragmentSize;
+          _c.label = 8;
+        case 8:
+          if (!(dataPosition < dataLength)) return [3, 10];
+          nextDataPosition = Math.min(dataLength, dataPosition + remaining);
+          data = payload.data.slice(dataPosition, nextDataPosition);
+          remaining -= data.byteLength;
+          dataPosition = nextDataPosition;
+          return [4, {
+            type: Frames_1.FrameTypes.PAYLOAD,
+            flags: dataPosition === dataLength ? (isComplete ? Frames_1.Flags.COMPLETE : Frames_1.Flags.NONE) | Frames_1.Flags.NEXT | (metadata ? Frames_1.Flags.METADATA : 0) : Frames_1.Flags.FOLLOWS | Frames_1.Flags.NEXT | (metadata ? Frames_1.Flags.METADATA : 0),
+            data,
+            metadata,
+            streamId
+          }];
+        case 9:
+          _c.sent();
+          metadata = void 0;
+          data = void 0;
+          remaining = fragmentSize;
+          return [3, 8];
+        case 10:
+          return [
+            2
+            /*return*/
+          ];
+      }
+    });
+  }
+  Fragmenter.fragmentWithRequestN = fragmentWithRequestN;
+  return Fragmenter;
+}
+var Reassembler = {};
+var hasRequiredReassembler;
+function requireReassembler() {
+  if (hasRequiredReassembler) return Reassembler;
+  hasRequiredReassembler = 1;
+  Object.defineProperty(Reassembler, "__esModule", { value: true });
+  Reassembler.cancel = Reassembler.reassemble = Reassembler.add = void 0;
+  function add(holder, dataFragment, metadataFragment) {
+    if (!holder.hasFragments) {
+      holder.hasFragments = true;
+      holder.data = dataFragment;
+      if (metadataFragment) {
+        holder.metadata = metadataFragment;
+      }
+      return true;
+    }
+    holder.data = holder.data ? Buffer2.concat([holder.data, dataFragment]) : dataFragment;
+    if (holder.metadata && metadataFragment) {
+      holder.metadata = Buffer2.concat([holder.metadata, metadataFragment]);
+    }
+    return true;
+  }
+  Reassembler.add = add;
+  function reassemble(holder, dataFragment, metadataFragment) {
+    holder.hasFragments = false;
+    var data = holder.data ? Buffer2.concat([holder.data, dataFragment]) : dataFragment;
+    holder.data = void 0;
+    if (holder.metadata) {
+      var metadata = metadataFragment ? Buffer2.concat([holder.metadata, metadataFragment]) : holder.metadata;
+      holder.metadata = void 0;
+      return {
+        data,
+        metadata
+      };
+    }
+    return {
+      data
+    };
+  }
+  Reassembler.reassemble = reassemble;
+  function cancel(holder) {
+    holder.hasFragments = false;
+    holder.data = void 0;
+    holder.metadata = void 0;
+  }
+  Reassembler.cancel = cancel;
+  return Reassembler;
+}
+var hasRequiredRequestChannelStream;
+function requireRequestChannelStream() {
+  if (hasRequiredRequestChannelStream) return RequestChannelStream;
+  hasRequiredRequestChannelStream = 1;
+  var __createBinding = RequestChannelStream && RequestChannelStream.__createBinding || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === void 0) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() {
+      return m[k];
+    } });
+  }) : (function(o, m, k, k2) {
+    if (k2 === void 0) k2 = k;
+    o[k2] = m[k];
+  }));
+  var __setModuleDefault = RequestChannelStream && RequestChannelStream.__setModuleDefault || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+  }) : function(o, v) {
+    o["default"] = v;
+  });
+  var __importStar = RequestChannelStream && RequestChannelStream.__importStar || function(mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) {
+      for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    }
+    __setModuleDefault(result, mod);
+    return result;
+  };
+  var __values = RequestChannelStream && RequestChannelStream.__values || function(o) {
+    var s = typeof Symbol === "function" && Symbol.iterator, m = s && o[s], i = 0;
+    if (m) return m.call(o);
+    if (o && typeof o.length === "number") return {
+      next: function() {
+        if (o && i >= o.length) o = void 0;
+        return { value: o && o[i++], done: !o };
+      }
+    };
+    throw new TypeError(s ? "Object is not iterable." : "Symbol.iterator is not defined.");
+  };
+  Object.defineProperty(RequestChannelStream, "__esModule", { value: true });
+  RequestChannelStream.RequestChannelResponderStream = RequestChannelStream.RequestChannelRequesterStream = void 0;
+  var Errors_1 = requireErrors();
+  var Fragmenter_1 = requireFragmenter();
+  var Frames_1 = requireFrames();
+  var Reassembler2 = __importStar(requireReassembler());
+  var RequestChannelRequesterStream = (
+    /** @class */
+    (function() {
+      function RequestChannelRequesterStream2(payload, isComplete, receiver, fragmentSize, initialRequestN, leaseManager) {
+        this.payload = payload;
+        this.isComplete = isComplete;
+        this.receiver = receiver;
+        this.fragmentSize = fragmentSize;
+        this.initialRequestN = initialRequestN;
+        this.leaseManager = leaseManager;
+        this.streamType = Frames_1.FrameTypes.REQUEST_CHANNEL;
+      }
+      RequestChannelRequesterStream2.prototype.handleReady = function(streamId, stream) {
+        var e_1, _a;
+        if (this.outboundDone) {
+          return false;
+        }
+        this.streamId = streamId;
+        this.stream = stream;
+        stream.connect(this);
+        var isCompleted = this.isComplete;
+        if (isCompleted) {
+          this.outboundDone = isCompleted;
+        }
+        if ((0, Fragmenter_1.isFragmentable)(this.payload, this.fragmentSize, Frames_1.FrameTypes.REQUEST_CHANNEL)) {
+          try {
+            for (var _b = __values((0, Fragmenter_1.fragmentWithRequestN)(streamId, this.payload, this.fragmentSize, Frames_1.FrameTypes.REQUEST_CHANNEL, this.initialRequestN, isCompleted)), _c = _b.next(); !_c.done; _c = _b.next()) {
+              var frame = _c.value;
+              this.stream.send(frame);
+            }
+          } catch (e_1_1) {
+            e_1 = { error: e_1_1 };
+          } finally {
+            try {
+              if (_c && !_c.done && (_a = _b.return)) _a.call(_b);
+            } finally {
+              if (e_1) throw e_1.error;
+            }
+          }
+        } else {
+          this.stream.send({
+            type: Frames_1.FrameTypes.REQUEST_CHANNEL,
+            data: this.payload.data,
+            metadata: this.payload.metadata,
+            requestN: this.initialRequestN,
+            flags: (this.payload.metadata !== void 0 ? Frames_1.Flags.METADATA : Frames_1.Flags.NONE) | (isCompleted ? Frames_1.Flags.COMPLETE : Frames_1.Flags.NONE),
+            streamId
+          });
+        }
+        if (this.hasExtension) {
+          this.stream.send({
+            type: Frames_1.FrameTypes.EXT,
+            streamId,
+            extendedContent: this.extendedContent,
+            extendedType: this.extendedType,
+            flags: this.flags
+          });
+        }
+        return true;
+      };
+      RequestChannelRequesterStream2.prototype.handleReject = function(error) {
+        if (this.inboundDone) {
+          return;
+        }
+        this.inboundDone = true;
+        this.outboundDone = true;
+        this.receiver.onError(error);
+      };
+      RequestChannelRequesterStream2.prototype.handle = function(frame) {
+        var errorMessage;
+        var frameType = frame.type;
+        switch (frameType) {
+          case Frames_1.FrameTypes.PAYLOAD: {
+            var hasComplete = Frames_1.Flags.hasComplete(frame.flags);
+            var hasNext = Frames_1.Flags.hasNext(frame.flags);
+            if (hasComplete || !Frames_1.Flags.hasFollows(frame.flags)) {
+              if (hasComplete) {
+                this.inboundDone = true;
+                if (this.outboundDone) {
+                  this.stream.disconnect(this);
+                }
+                if (!hasNext) {
+                  this.receiver.onComplete();
+                  return;
+                }
+              }
+              var payload = this.hasFragments ? Reassembler2.reassemble(this, frame.data, frame.metadata) : {
+                data: frame.data,
+                metadata: frame.metadata
+              };
+              this.receiver.onNext(payload, hasComplete);
+              return;
+            }
+            if (Reassembler2.add(this, frame.data, frame.metadata)) {
+              return;
+            }
+            errorMessage = "Unexpected frame size";
+            break;
+          }
+          case Frames_1.FrameTypes.CANCEL: {
+            if (this.outboundDone) {
+              return;
+            }
+            this.outboundDone = true;
+            if (this.inboundDone) {
+              this.stream.disconnect(this);
+            }
+            this.receiver.cancel();
+            return;
+          }
+          case Frames_1.FrameTypes.REQUEST_N: {
+            if (this.outboundDone) {
+              return;
+            }
+            if (this.hasFragments) {
+              errorMessage = "Unexpected frame type [".concat(frameType, "] during reassembly");
+              break;
+            }
+            this.receiver.request(frame.requestN);
+            return;
+          }
+          case Frames_1.FrameTypes.ERROR: {
+            var outboundDone = this.outboundDone;
+            this.inboundDone = true;
+            this.outboundDone = true;
+            this.stream.disconnect(this);
+            Reassembler2.cancel(this);
+            if (!outboundDone) {
+              this.receiver.cancel();
+            }
+            this.receiver.onError(new Errors_1.RSocketError(frame.code, frame.message));
+            return;
+          }
+          case Frames_1.FrameTypes.EXT:
+            this.receiver.onExtension(frame.extendedType, frame.extendedContent, Frames_1.Flags.hasIgnore(frame.flags));
+            return;
+          default: {
+            errorMessage = "Unexpected frame type [".concat(frameType, "]");
+          }
+        }
+        this.close(new Errors_1.RSocketError(Errors_1.ErrorCodes.CANCELED, errorMessage));
+        this.stream.send({
+          type: Frames_1.FrameTypes.CANCEL,
+          streamId: this.streamId,
+          flags: Frames_1.Flags.NONE
+        });
+        this.stream.disconnect(this);
+      };
+      RequestChannelRequesterStream2.prototype.request = function(n) {
+        if (this.inboundDone) {
+          return;
+        }
+        if (!this.streamId) {
+          this.initialRequestN += n;
+          return;
+        }
+        this.stream.send({
+          type: Frames_1.FrameTypes.REQUEST_N,
+          flags: Frames_1.Flags.NONE,
+          requestN: n,
+          streamId: this.streamId
+        });
+      };
+      RequestChannelRequesterStream2.prototype.cancel = function() {
+        var _a;
+        var inboundDone = this.inboundDone;
+        var outboundDone = this.outboundDone;
+        if (inboundDone && outboundDone) {
+          return;
+        }
+        this.inboundDone = true;
+        this.outboundDone = true;
+        if (!outboundDone) {
+          this.receiver.cancel();
+        }
+        if (!this.streamId) {
+          (_a = this.leaseManager) === null || _a === void 0 ? void 0 : _a.cancelRequest(this);
+          return;
+        }
+        this.stream.send({
+          type: inboundDone ? Frames_1.FrameTypes.ERROR : Frames_1.FrameTypes.CANCEL,
+          flags: Frames_1.Flags.NONE,
+          streamId: this.streamId,
+          code: Errors_1.ErrorCodes.CANCELED,
+          message: "Cancelled"
+        });
+        this.stream.disconnect(this);
+        Reassembler2.cancel(this);
+      };
+      RequestChannelRequesterStream2.prototype.onNext = function(payload, isComplete) {
+        var e_2, _a;
+        if (this.outboundDone) {
+          return;
+        }
+        if (isComplete) {
+          this.outboundDone = true;
+          if (this.inboundDone) {
+            this.stream.disconnect(this);
+          }
+        }
+        if ((0, Fragmenter_1.isFragmentable)(payload, this.fragmentSize, Frames_1.FrameTypes.PAYLOAD)) {
+          try {
+            for (var _b = __values((0, Fragmenter_1.fragment)(this.streamId, payload, this.fragmentSize, Frames_1.FrameTypes.PAYLOAD, isComplete)), _c = _b.next(); !_c.done; _c = _b.next()) {
+              var frame = _c.value;
+              this.stream.send(frame);
+            }
+          } catch (e_2_1) {
+            e_2 = { error: e_2_1 };
+          } finally {
+            try {
+              if (_c && !_c.done && (_a = _b.return)) _a.call(_b);
+            } finally {
+              if (e_2) throw e_2.error;
+            }
+          }
+        } else {
+          this.stream.send({
+            type: Frames_1.FrameTypes.PAYLOAD,
+            streamId: this.streamId,
+            flags: Frames_1.Flags.NEXT | (payload.metadata ? Frames_1.Flags.METADATA : Frames_1.Flags.NONE) | (isComplete ? Frames_1.Flags.COMPLETE : Frames_1.Flags.NONE),
+            data: payload.data,
+            metadata: payload.metadata
+          });
+        }
+      };
+      RequestChannelRequesterStream2.prototype.onComplete = function() {
+        if (!this.streamId) {
+          this.isComplete = true;
+          return;
+        }
+        if (this.outboundDone) {
+          return;
+        }
+        this.outboundDone = true;
+        this.stream.send({
+          type: Frames_1.FrameTypes.PAYLOAD,
+          streamId: this.streamId,
+          flags: Frames_1.Flags.COMPLETE,
+          data: null,
+          metadata: null
+        });
+        if (this.inboundDone) {
+          this.stream.disconnect(this);
+        }
+      };
+      RequestChannelRequesterStream2.prototype.onError = function(error) {
+        if (this.outboundDone) {
+          return;
+        }
+        var inboundDone = this.inboundDone;
+        this.outboundDone = true;
+        this.inboundDone = true;
+        this.stream.send({
+          type: Frames_1.FrameTypes.ERROR,
+          streamId: this.streamId,
+          flags: Frames_1.Flags.NONE,
+          code: error instanceof Errors_1.RSocketError ? error.code : Errors_1.ErrorCodes.APPLICATION_ERROR,
+          message: error.message
+        });
+        this.stream.disconnect(this);
+        if (!inboundDone) {
+          this.receiver.onError(error);
+        }
+      };
+      RequestChannelRequesterStream2.prototype.onExtension = function(extendedType, content, canBeIgnored) {
+        if (this.outboundDone) {
+          return;
+        }
+        if (!this.streamId) {
+          this.hasExtension = true;
+          this.extendedType = extendedType;
+          this.extendedContent = content;
+          this.flags = canBeIgnored ? Frames_1.Flags.IGNORE : Frames_1.Flags.NONE;
+          return;
+        }
+        this.stream.send({
+          streamId: this.streamId,
+          type: Frames_1.FrameTypes.EXT,
+          extendedType,
+          extendedContent: content,
+          flags: canBeIgnored ? Frames_1.Flags.IGNORE : Frames_1.Flags.NONE
+        });
+      };
+      RequestChannelRequesterStream2.prototype.close = function(error) {
+        if (this.inboundDone && this.outboundDone) {
+          return;
+        }
+        var inboundDone = this.inboundDone;
+        var outboundDone = this.outboundDone;
+        this.inboundDone = true;
+        this.outboundDone = true;
+        Reassembler2.cancel(this);
+        if (!outboundDone) {
+          this.receiver.cancel();
+        }
+        if (!inboundDone) {
+          if (error) {
+            this.receiver.onError(error);
+          } else {
+            this.receiver.onComplete();
+          }
+        }
+      };
+      return RequestChannelRequesterStream2;
+    })()
+  );
+  RequestChannelStream.RequestChannelRequesterStream = RequestChannelRequesterStream;
+  var RequestChannelResponderStream = (
+    /** @class */
+    (function() {
+      function RequestChannelResponderStream2(streamId, stream, fragmentSize, handler, frame) {
+        this.streamId = streamId;
+        this.stream = stream;
+        this.fragmentSize = fragmentSize;
+        this.handler = handler;
+        this.streamType = Frames_1.FrameTypes.REQUEST_CHANNEL;
+        stream.connect(this);
+        if (Frames_1.Flags.hasFollows(frame.flags)) {
+          Reassembler2.add(this, frame.data, frame.metadata);
+          this.initialRequestN = frame.requestN;
+          this.isComplete = Frames_1.Flags.hasComplete(frame.flags);
+          return;
+        }
+        var payload = {
+          data: frame.data,
+          metadata: frame.metadata
+        };
+        var hasComplete = Frames_1.Flags.hasComplete(frame.flags);
+        this.inboundDone = hasComplete;
+        try {
+          this.receiver = handler(payload, frame.requestN, hasComplete, this);
+          if (this.outboundDone && this.defferedError) {
+            this.receiver.onError(this.defferedError);
+          }
+        } catch (error) {
+          if (this.outboundDone && !this.inboundDone) {
+            this.cancel();
+          } else {
+            this.inboundDone = true;
+          }
+          this.onError(error);
+        }
+      }
+      RequestChannelResponderStream2.prototype.handle = function(frame) {
+        var errorMessage;
+        var frameType = frame.type;
+        switch (frameType) {
+          case Frames_1.FrameTypes.PAYLOAD: {
+            if (Frames_1.Flags.hasFollows(frame.flags)) {
+              if (Reassembler2.add(this, frame.data, frame.metadata)) {
+                return;
+              }
+              errorMessage = "Unexpected frame size";
+              break;
+            }
+            var payload = this.hasFragments ? Reassembler2.reassemble(this, frame.data, frame.metadata) : {
+              data: frame.data,
+              metadata: frame.metadata
+            };
+            var hasComplete = Frames_1.Flags.hasComplete(frame.flags);
+            if (!this.receiver) {
+              var inboundDone = this.isComplete || hasComplete;
+              if (inboundDone) {
+                this.inboundDone = true;
+                if (this.outboundDone) {
+                  this.stream.disconnect(this);
+                }
+              }
+              try {
+                this.receiver = this.handler(payload, this.initialRequestN, inboundDone, this);
+                if (this.outboundDone && this.defferedError) {
+                }
+              } catch (error2) {
+                if (this.outboundDone && !this.inboundDone) {
+                  this.cancel();
+                } else {
+                  this.inboundDone = true;
+                }
+                this.onError(error2);
+              }
+            } else {
+              if (hasComplete) {
+                this.inboundDone = true;
+                if (this.outboundDone) {
+                  this.stream.disconnect(this);
+                }
+                if (!Frames_1.Flags.hasNext(frame.flags)) {
+                  this.receiver.onComplete();
+                  return;
+                }
+              }
+              this.receiver.onNext(payload, hasComplete);
+            }
+            return;
+          }
+          case Frames_1.FrameTypes.REQUEST_N: {
+            if (!this.receiver || this.hasFragments) {
+              errorMessage = "Unexpected frame type [".concat(frameType, "] during reassembly");
+              break;
+            }
+            this.receiver.request(frame.requestN);
+            return;
+          }
+          case Frames_1.FrameTypes.ERROR:
+          case Frames_1.FrameTypes.CANCEL: {
+            var inboundDone = this.inboundDone;
+            var outboundDone = this.outboundDone;
+            this.inboundDone = true;
+            this.outboundDone = true;
+            this.stream.disconnect(this);
+            Reassembler2.cancel(this);
+            if (!this.receiver) {
+              return;
+            }
+            if (!outboundDone) {
+              this.receiver.cancel();
+            }
+            if (!inboundDone) {
+              var error = frameType === Frames_1.FrameTypes.CANCEL ? new Errors_1.RSocketError(Errors_1.ErrorCodes.CANCELED, "Cancelled") : new Errors_1.RSocketError(frame.code, frame.message);
+              this.receiver.onError(error);
+            }
+            return;
+          }
+          case Frames_1.FrameTypes.EXT: {
+            if (!this.receiver || this.hasFragments) {
+              errorMessage = "Unexpected frame type [".concat(frameType, "] during reassembly");
+              break;
+            }
+            this.receiver.onExtension(frame.extendedType, frame.extendedContent, Frames_1.Flags.hasIgnore(frame.flags));
+            return;
+          }
+          default: {
+            errorMessage = "Unexpected frame type [".concat(frameType, "]");
+          }
+        }
+        this.stream.send({
+          type: Frames_1.FrameTypes.ERROR,
+          flags: Frames_1.Flags.NONE,
+          code: Errors_1.ErrorCodes.CANCELED,
+          message: errorMessage,
+          streamId: this.streamId
+        });
+        this.stream.disconnect(this);
+        this.close(new Errors_1.RSocketError(Errors_1.ErrorCodes.CANCELED, errorMessage));
+      };
+      RequestChannelResponderStream2.prototype.onError = function(error) {
+        if (this.outboundDone) {
+          console.warn("Trying to error for the second time. ".concat(error ? "Dropping error [".concat(error, "].") : ""));
+          return;
+        }
+        var inboundDone = this.inboundDone;
+        this.outboundDone = true;
+        this.inboundDone = true;
+        this.stream.send({
+          type: Frames_1.FrameTypes.ERROR,
+          flags: Frames_1.Flags.NONE,
+          code: error instanceof Errors_1.RSocketError ? error.code : Errors_1.ErrorCodes.APPLICATION_ERROR,
+          message: error.message,
+          streamId: this.streamId
+        });
+        this.stream.disconnect(this);
+        if (!inboundDone) {
+          if (this.receiver) {
+            this.receiver.onError(error);
+          } else {
+            this.defferedError = error;
+          }
+        }
+      };
+      RequestChannelResponderStream2.prototype.onNext = function(payload, isCompletion) {
+        var e_3, _a;
+        if (this.outboundDone) {
+          return;
+        }
+        if (isCompletion) {
+          this.outboundDone = true;
+        }
+        if ((0, Fragmenter_1.isFragmentable)(payload, this.fragmentSize, Frames_1.FrameTypes.PAYLOAD)) {
+          try {
+            for (var _b = __values((0, Fragmenter_1.fragment)(this.streamId, payload, this.fragmentSize, Frames_1.FrameTypes.PAYLOAD, isCompletion)), _c = _b.next(); !_c.done; _c = _b.next()) {
+              var frame = _c.value;
+              this.stream.send(frame);
+            }
+          } catch (e_3_1) {
+            e_3 = { error: e_3_1 };
+          } finally {
+            try {
+              if (_c && !_c.done && (_a = _b.return)) _a.call(_b);
+            } finally {
+              if (e_3) throw e_3.error;
+            }
+          }
+        } else {
+          this.stream.send({
+            type: Frames_1.FrameTypes.PAYLOAD,
+            flags: Frames_1.Flags.NEXT | (isCompletion ? Frames_1.Flags.COMPLETE : Frames_1.Flags.NONE) | (payload.metadata ? Frames_1.Flags.METADATA : Frames_1.Flags.NONE),
+            data: payload.data,
+            metadata: payload.metadata,
+            streamId: this.streamId
+          });
+        }
+        if (isCompletion && this.inboundDone) {
+          this.stream.disconnect(this);
+        }
+      };
+      RequestChannelResponderStream2.prototype.onComplete = function() {
+        if (this.outboundDone) {
+          return;
+        }
+        this.outboundDone = true;
+        this.stream.send({
+          type: Frames_1.FrameTypes.PAYLOAD,
+          flags: Frames_1.Flags.COMPLETE,
+          streamId: this.streamId,
+          data: null,
+          metadata: null
+        });
+        if (this.inboundDone) {
+          this.stream.disconnect(this);
+        }
+      };
+      RequestChannelResponderStream2.prototype.onExtension = function(extendedType, content, canBeIgnored) {
+        if (this.outboundDone && this.inboundDone) {
+          return;
+        }
+        this.stream.send({
+          type: Frames_1.FrameTypes.EXT,
+          streamId: this.streamId,
+          flags: canBeIgnored ? Frames_1.Flags.IGNORE : Frames_1.Flags.NONE,
+          extendedType,
+          extendedContent: content
+        });
+      };
+      RequestChannelResponderStream2.prototype.request = function(n) {
+        if (this.inboundDone) {
+          return;
+        }
+        this.stream.send({
+          type: Frames_1.FrameTypes.REQUEST_N,
+          flags: Frames_1.Flags.NONE,
+          streamId: this.streamId,
+          requestN: n
+        });
+      };
+      RequestChannelResponderStream2.prototype.cancel = function() {
+        if (this.inboundDone) {
+          return;
+        }
+        this.inboundDone = true;
+        this.stream.send({
+          type: Frames_1.FrameTypes.CANCEL,
+          flags: Frames_1.Flags.NONE,
+          streamId: this.streamId
+        });
+        if (this.outboundDone) {
+          this.stream.disconnect(this);
+        }
+      };
+      RequestChannelResponderStream2.prototype.close = function(error) {
+        if (this.inboundDone && this.outboundDone) {
+          console.warn("Trying to close for the second time. ".concat(error ? "Dropping error [".concat(error, "].") : ""));
+          return;
+        }
+        var inboundDone = this.inboundDone;
+        var outboundDone = this.outboundDone;
+        this.inboundDone = true;
+        this.outboundDone = true;
+        Reassembler2.cancel(this);
+        var receiver = this.receiver;
+        if (!receiver) {
+          return;
+        }
+        if (!outboundDone) {
+          receiver.cancel();
+        }
+        if (!inboundDone) {
+          if (error) {
+            receiver.onError(error);
+          } else {
+            receiver.onComplete();
+          }
+        }
+      };
+      return RequestChannelResponderStream2;
+    })()
+  );
+  RequestChannelStream.RequestChannelResponderStream = RequestChannelResponderStream;
+  return RequestChannelStream;
+}
+var RequestFnFStream = {};
+var hasRequiredRequestFnFStream;
+function requireRequestFnFStream() {
+  if (hasRequiredRequestFnFStream) return RequestFnFStream;
+  hasRequiredRequestFnFStream = 1;
+  var __createBinding = RequestFnFStream && RequestFnFStream.__createBinding || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === void 0) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() {
+      return m[k];
+    } });
+  }) : (function(o, m, k, k2) {
+    if (k2 === void 0) k2 = k;
+    o[k2] = m[k];
+  }));
+  var __setModuleDefault = RequestFnFStream && RequestFnFStream.__setModuleDefault || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+  }) : function(o, v) {
+    o["default"] = v;
+  });
+  var __importStar = RequestFnFStream && RequestFnFStream.__importStar || function(mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) {
+      for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    }
+    __setModuleDefault(result, mod);
+    return result;
+  };
+  var __values = RequestFnFStream && RequestFnFStream.__values || function(o) {
+    var s = typeof Symbol === "function" && Symbol.iterator, m = s && o[s], i = 0;
+    if (m) return m.call(o);
+    if (o && typeof o.length === "number") return {
+      next: function() {
+        if (o && i >= o.length) o = void 0;
+        return { value: o && o[i++], done: !o };
+      }
+    };
+    throw new TypeError(s ? "Object is not iterable." : "Symbol.iterator is not defined.");
+  };
+  Object.defineProperty(RequestFnFStream, "__esModule", { value: true });
+  RequestFnFStream.RequestFnfResponderStream = RequestFnFStream.RequestFnFRequesterStream = void 0;
+  var Errors_1 = requireErrors();
+  var Fragmenter_1 = requireFragmenter();
+  var Frames_1 = requireFrames();
+  var Reassembler2 = __importStar(requireReassembler());
+  var RequestFnFRequesterStream = (
+    /** @class */
+    (function() {
+      function RequestFnFRequesterStream2(payload, receiver, fragmentSize, leaseManager) {
+        this.payload = payload;
+        this.receiver = receiver;
+        this.fragmentSize = fragmentSize;
+        this.leaseManager = leaseManager;
+        this.streamType = Frames_1.FrameTypes.REQUEST_FNF;
+      }
+      RequestFnFRequesterStream2.prototype.handleReady = function(streamId, stream) {
+        var e_1, _a;
+        if (this.done) {
+          return false;
+        }
+        this.streamId = streamId;
+        if ((0, Fragmenter_1.isFragmentable)(this.payload, this.fragmentSize, Frames_1.FrameTypes.REQUEST_FNF)) {
+          try {
+            for (var _b = __values((0, Fragmenter_1.fragment)(streamId, this.payload, this.fragmentSize, Frames_1.FrameTypes.REQUEST_FNF)), _c = _b.next(); !_c.done; _c = _b.next()) {
+              var frame = _c.value;
+              stream.send(frame);
+            }
+          } catch (e_1_1) {
+            e_1 = { error: e_1_1 };
+          } finally {
+            try {
+              if (_c && !_c.done && (_a = _b.return)) _a.call(_b);
+            } finally {
+              if (e_1) throw e_1.error;
+            }
+          }
+        } else {
+          stream.send({
+            type: Frames_1.FrameTypes.REQUEST_FNF,
+            data: this.payload.data,
+            metadata: this.payload.metadata,
+            flags: this.payload.metadata ? Frames_1.Flags.METADATA : 0,
+            streamId
+          });
+        }
+        this.done = true;
+        this.receiver.onComplete();
+        return true;
+      };
+      RequestFnFRequesterStream2.prototype.handleReject = function(error) {
+        if (this.done) {
+          return;
+        }
+        this.done = true;
+        this.receiver.onError(error);
+      };
+      RequestFnFRequesterStream2.prototype.cancel = function() {
+        var _a;
+        if (this.done) {
+          return;
+        }
+        this.done = true;
+        (_a = this.leaseManager) === null || _a === void 0 ? void 0 : _a.cancelRequest(this);
+      };
+      RequestFnFRequesterStream2.prototype.handle = function(frame) {
+        if (frame.type == Frames_1.FrameTypes.ERROR) {
+          this.close(new Errors_1.RSocketError(frame.code, frame.message));
+          return;
+        }
+        this.close(new Errors_1.RSocketError(Errors_1.ErrorCodes.CANCELED, "Received invalid frame"));
+      };
+      RequestFnFRequesterStream2.prototype.close = function(error) {
+        if (this.done) {
+          console.warn("Trying to close for the second time. ".concat(error ? "Dropping error [".concat(error, "].") : ""));
+          return;
+        }
+        if (error) {
+          this.receiver.onError(error);
+        } else {
+          this.receiver.onComplete();
+        }
+      };
+      return RequestFnFRequesterStream2;
+    })()
+  );
+  RequestFnFStream.RequestFnFRequesterStream = RequestFnFRequesterStream;
+  var RequestFnfResponderStream = (
+    /** @class */
+    (function() {
+      function RequestFnfResponderStream2(streamId, stream, handler, frame) {
+        this.streamId = streamId;
+        this.stream = stream;
+        this.handler = handler;
+        this.streamType = Frames_1.FrameTypes.REQUEST_FNF;
+        if (Frames_1.Flags.hasFollows(frame.flags)) {
+          Reassembler2.add(this, frame.data, frame.metadata);
+          stream.connect(this);
+          return;
+        }
+        var payload = {
+          data: frame.data,
+          metadata: frame.metadata
+        };
+        try {
+          this.cancellable = handler(payload, this);
+        } catch (e) {
+        }
+      }
+      RequestFnfResponderStream2.prototype.handle = function(frame) {
+        var errorMessage;
+        if (frame.type == Frames_1.FrameTypes.PAYLOAD) {
+          if (Frames_1.Flags.hasFollows(frame.flags)) {
+            if (Reassembler2.add(this, frame.data, frame.metadata)) {
+              return;
+            }
+            errorMessage = "Unexpected fragment size";
+          } else {
+            this.stream.disconnect(this);
+            var payload = Reassembler2.reassemble(this, frame.data, frame.metadata);
+            try {
+              this.cancellable = this.handler(payload, this);
+            } catch (e) {
+            }
+            return;
+          }
+        } else {
+          errorMessage = "Unexpected frame type [".concat(frame.type, "]");
+        }
+        this.done = true;
+        if (frame.type != Frames_1.FrameTypes.CANCEL && frame.type != Frames_1.FrameTypes.ERROR) {
+          this.stream.send({
+            type: Frames_1.FrameTypes.ERROR,
+            streamId: this.streamId,
+            flags: Frames_1.Flags.NONE,
+            code: Errors_1.ErrorCodes.CANCELED,
+            message: errorMessage
+          });
+        }
+        this.stream.disconnect(this);
+        Reassembler2.cancel(this);
+      };
+      RequestFnfResponderStream2.prototype.close = function(error) {
+        var _a;
+        if (this.done) {
+          console.warn("Trying to close for the second time. ".concat(error ? "Dropping error [".concat(error, "].") : ""));
+          return;
+        }
+        this.done = true;
+        Reassembler2.cancel(this);
+        (_a = this.cancellable) === null || _a === void 0 ? void 0 : _a.cancel();
+      };
+      RequestFnfResponderStream2.prototype.onError = function(error) {
+      };
+      RequestFnfResponderStream2.prototype.onComplete = function() {
+      };
+      return RequestFnfResponderStream2;
+    })()
+  );
+  RequestFnFStream.RequestFnfResponderStream = RequestFnfResponderStream;
+  return RequestFnFStream;
+}
+var RequestResponseStream = {};
+var hasRequiredRequestResponseStream;
+function requireRequestResponseStream() {
+  if (hasRequiredRequestResponseStream) return RequestResponseStream;
+  hasRequiredRequestResponseStream = 1;
+  var __createBinding = RequestResponseStream && RequestResponseStream.__createBinding || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === void 0) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() {
+      return m[k];
+    } });
+  }) : (function(o, m, k, k2) {
+    if (k2 === void 0) k2 = k;
+    o[k2] = m[k];
+  }));
+  var __setModuleDefault = RequestResponseStream && RequestResponseStream.__setModuleDefault || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+  }) : function(o, v) {
+    o["default"] = v;
+  });
+  var __importStar = RequestResponseStream && RequestResponseStream.__importStar || function(mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) {
+      for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    }
+    __setModuleDefault(result, mod);
+    return result;
+  };
+  var __values = RequestResponseStream && RequestResponseStream.__values || function(o) {
+    var s = typeof Symbol === "function" && Symbol.iterator, m = s && o[s], i = 0;
+    if (m) return m.call(o);
+    if (o && typeof o.length === "number") return {
+      next: function() {
+        if (o && i >= o.length) o = void 0;
+        return { value: o && o[i++], done: !o };
+      }
+    };
+    throw new TypeError(s ? "Object is not iterable." : "Symbol.iterator is not defined.");
+  };
+  Object.defineProperty(RequestResponseStream, "__esModule", { value: true });
+  RequestResponseStream.RequestResponseResponderStream = RequestResponseStream.RequestResponseRequesterStream = void 0;
+  var Errors_1 = requireErrors();
+  var Fragmenter_1 = requireFragmenter();
+  var Frames_1 = requireFrames();
+  var Reassembler2 = __importStar(requireReassembler());
+  var RequestResponseRequesterStream = (
+    /** @class */
+    (function() {
+      function RequestResponseRequesterStream2(payload, receiver, fragmentSize, leaseManager) {
+        this.payload = payload;
+        this.receiver = receiver;
+        this.fragmentSize = fragmentSize;
+        this.leaseManager = leaseManager;
+        this.streamType = Frames_1.FrameTypes.REQUEST_RESPONSE;
+      }
+      RequestResponseRequesterStream2.prototype.handleReady = function(streamId, stream) {
+        var e_1, _a;
+        if (this.done) {
+          return false;
+        }
+        this.streamId = streamId;
+        this.stream = stream;
+        stream.connect(this);
+        if ((0, Fragmenter_1.isFragmentable)(this.payload, this.fragmentSize, Frames_1.FrameTypes.REQUEST_RESPONSE)) {
+          try {
+            for (var _b = __values((0, Fragmenter_1.fragment)(streamId, this.payload, this.fragmentSize, Frames_1.FrameTypes.REQUEST_RESPONSE)), _c = _b.next(); !_c.done; _c = _b.next()) {
+              var frame = _c.value;
+              this.stream.send(frame);
+            }
+          } catch (e_1_1) {
+            e_1 = { error: e_1_1 };
+          } finally {
+            try {
+              if (_c && !_c.done && (_a = _b.return)) _a.call(_b);
+            } finally {
+              if (e_1) throw e_1.error;
+            }
+          }
+        } else {
+          this.stream.send({
+            type: Frames_1.FrameTypes.REQUEST_RESPONSE,
+            data: this.payload.data,
+            metadata: this.payload.metadata,
+            flags: this.payload.metadata ? Frames_1.Flags.METADATA : 0,
+            streamId
+          });
+        }
+        if (this.hasExtension) {
+          this.stream.send({
+            type: Frames_1.FrameTypes.EXT,
+            streamId,
+            extendedContent: this.extendedContent,
+            extendedType: this.extendedType,
+            flags: this.flags
+          });
+        }
+        return true;
+      };
+      RequestResponseRequesterStream2.prototype.handleReject = function(error) {
+        if (this.done) {
+          return;
+        }
+        this.done = true;
+        this.receiver.onError(error);
+      };
+      RequestResponseRequesterStream2.prototype.handle = function(frame) {
+        var errorMessage;
+        var frameType = frame.type;
+        switch (frameType) {
+          case Frames_1.FrameTypes.PAYLOAD: {
+            var hasComplete = Frames_1.Flags.hasComplete(frame.flags);
+            var hasPayload = Frames_1.Flags.hasNext(frame.flags);
+            if (hasComplete || !Frames_1.Flags.hasFollows(frame.flags)) {
+              this.done = true;
+              this.stream.disconnect(this);
+              if (!hasPayload) {
+                this.receiver.onComplete();
+                return;
+              }
+              var payload = this.hasFragments ? Reassembler2.reassemble(this, frame.data, frame.metadata) : {
+                data: frame.data,
+                metadata: frame.metadata
+              };
+              this.receiver.onNext(payload, true);
+              return;
+            }
+            if (!Reassembler2.add(this, frame.data, frame.metadata)) {
+              errorMessage = "Unexpected fragment size";
+              break;
+            }
+            return;
+          }
+          case Frames_1.FrameTypes.ERROR: {
+            this.done = true;
+            this.stream.disconnect(this);
+            Reassembler2.cancel(this);
+            this.receiver.onError(new Errors_1.RSocketError(frame.code, frame.message));
+            return;
+          }
+          case Frames_1.FrameTypes.EXT: {
+            if (this.hasFragments) {
+              errorMessage = "Unexpected frame type [".concat(frameType, "] during reassembly");
+              break;
+            }
+            this.receiver.onExtension(frame.extendedType, frame.extendedContent, Frames_1.Flags.hasIgnore(frame.flags));
+            return;
+          }
+          default: {
+            errorMessage = "Unexpected frame type [".concat(frameType, "]");
+          }
+        }
+        this.close(new Errors_1.RSocketError(Errors_1.ErrorCodes.CANCELED, errorMessage));
+        this.stream.send({
+          type: Frames_1.FrameTypes.CANCEL,
+          streamId: this.streamId,
+          flags: Frames_1.Flags.NONE
+        });
+        this.stream.disconnect(this);
+      };
+      RequestResponseRequesterStream2.prototype.cancel = function() {
+        var _a;
+        if (this.done) {
+          return;
+        }
+        this.done = true;
+        if (!this.streamId) {
+          (_a = this.leaseManager) === null || _a === void 0 ? void 0 : _a.cancelRequest(this);
+          return;
+        }
+        this.stream.send({
+          type: Frames_1.FrameTypes.CANCEL,
+          flags: Frames_1.Flags.NONE,
+          streamId: this.streamId
+        });
+        this.stream.disconnect(this);
+        Reassembler2.cancel(this);
+      };
+      RequestResponseRequesterStream2.prototype.onExtension = function(extendedType, content, canBeIgnored) {
+        if (this.done) {
+          return;
+        }
+        if (!this.streamId) {
+          this.hasExtension = true;
+          this.extendedType = extendedType;
+          this.extendedContent = content;
+          this.flags = canBeIgnored ? Frames_1.Flags.IGNORE : Frames_1.Flags.NONE;
+          return;
+        }
+        this.stream.send({
+          streamId: this.streamId,
+          type: Frames_1.FrameTypes.EXT,
+          extendedType,
+          extendedContent: content,
+          flags: canBeIgnored ? Frames_1.Flags.IGNORE : Frames_1.Flags.NONE
+        });
+      };
+      RequestResponseRequesterStream2.prototype.close = function(error) {
+        if (this.done) {
+          return;
+        }
+        this.done = true;
+        Reassembler2.cancel(this);
+        if (error) {
+          this.receiver.onError(error);
+        } else {
+          this.receiver.onComplete();
+        }
+      };
+      return RequestResponseRequesterStream2;
+    })()
+  );
+  RequestResponseStream.RequestResponseRequesterStream = RequestResponseRequesterStream;
+  var RequestResponseResponderStream = (
+    /** @class */
+    (function() {
+      function RequestResponseResponderStream2(streamId, stream, fragmentSize, handler, frame) {
+        this.streamId = streamId;
+        this.stream = stream;
+        this.fragmentSize = fragmentSize;
+        this.handler = handler;
+        this.streamType = Frames_1.FrameTypes.REQUEST_RESPONSE;
+        stream.connect(this);
+        if (Frames_1.Flags.hasFollows(frame.flags)) {
+          Reassembler2.add(this, frame.data, frame.metadata);
+          return;
+        }
+        var payload = {
+          data: frame.data,
+          metadata: frame.metadata
+        };
+        try {
+          this.receiver = handler(payload, this);
+        } catch (error) {
+          this.onError(error);
+        }
+      }
+      RequestResponseResponderStream2.prototype.handle = function(frame) {
+        var _a;
+        var errorMessage;
+        if (!this.receiver || this.hasFragments) {
+          if (frame.type === Frames_1.FrameTypes.PAYLOAD) {
+            if (Frames_1.Flags.hasFollows(frame.flags)) {
+              if (Reassembler2.add(this, frame.data, frame.metadata)) {
+                return;
+              }
+              errorMessage = "Unexpected fragment size";
+            } else {
+              var payload = Reassembler2.reassemble(this, frame.data, frame.metadata);
+              try {
+                this.receiver = this.handler(payload, this);
+              } catch (error) {
+                this.onError(error);
+              }
+              return;
+            }
+          } else {
+            errorMessage = "Unexpected frame type [".concat(frame.type, "] during reassembly");
+          }
+        } else if (frame.type === Frames_1.FrameTypes.EXT) {
+          this.receiver.onExtension(frame.extendedType, frame.extendedContent, Frames_1.Flags.hasIgnore(frame.flags));
+          return;
+        } else {
+          errorMessage = "Unexpected frame type [".concat(frame.type, "]");
+        }
+        this.done = true;
+        (_a = this.receiver) === null || _a === void 0 ? void 0 : _a.cancel();
+        if (frame.type !== Frames_1.FrameTypes.CANCEL && frame.type !== Frames_1.FrameTypes.ERROR) {
+          this.stream.send({
+            type: Frames_1.FrameTypes.ERROR,
+            flags: Frames_1.Flags.NONE,
+            code: Errors_1.ErrorCodes.CANCELED,
+            message: errorMessage,
+            streamId: this.streamId
+          });
+        }
+        this.stream.disconnect(this);
+        Reassembler2.cancel(this);
+      };
+      RequestResponseResponderStream2.prototype.onError = function(error) {
+        if (this.done) {
+          console.warn("Trying to error for the second time. ".concat(error ? "Dropping error [".concat(error, "].") : ""));
+          return;
+        }
+        this.done = true;
+        this.stream.send({
+          type: Frames_1.FrameTypes.ERROR,
+          flags: Frames_1.Flags.NONE,
+          code: error instanceof Errors_1.RSocketError ? error.code : Errors_1.ErrorCodes.APPLICATION_ERROR,
+          message: error.message,
+          streamId: this.streamId
+        });
+        this.stream.disconnect(this);
+      };
+      RequestResponseResponderStream2.prototype.onNext = function(payload, isCompletion) {
+        var e_2, _a;
+        if (this.done) {
+          return;
+        }
+        this.done = true;
+        if ((0, Fragmenter_1.isFragmentable)(payload, this.fragmentSize, Frames_1.FrameTypes.PAYLOAD)) {
+          try {
+            for (var _b = __values((0, Fragmenter_1.fragment)(this.streamId, payload, this.fragmentSize, Frames_1.FrameTypes.PAYLOAD, true)), _c = _b.next(); !_c.done; _c = _b.next()) {
+              var frame = _c.value;
+              this.stream.send(frame);
+            }
+          } catch (e_2_1) {
+            e_2 = { error: e_2_1 };
+          } finally {
+            try {
+              if (_c && !_c.done && (_a = _b.return)) _a.call(_b);
+            } finally {
+              if (e_2) throw e_2.error;
+            }
+          }
+        } else {
+          this.stream.send({
+            type: Frames_1.FrameTypes.PAYLOAD,
+            flags: Frames_1.Flags.NEXT | Frames_1.Flags.COMPLETE | (payload.metadata ? Frames_1.Flags.METADATA : 0),
+            data: payload.data,
+            metadata: payload.metadata,
+            streamId: this.streamId
+          });
+        }
+        this.stream.disconnect(this);
+      };
+      RequestResponseResponderStream2.prototype.onComplete = function() {
+        if (this.done) {
+          return;
+        }
+        this.done = true;
+        this.stream.send({
+          type: Frames_1.FrameTypes.PAYLOAD,
+          flags: Frames_1.Flags.COMPLETE,
+          streamId: this.streamId,
+          data: null,
+          metadata: null
+        });
+        this.stream.disconnect(this);
+      };
+      RequestResponseResponderStream2.prototype.onExtension = function(extendedType, content, canBeIgnored) {
+        if (this.done) {
+          return;
+        }
+        this.stream.send({
+          type: Frames_1.FrameTypes.EXT,
+          streamId: this.streamId,
+          flags: canBeIgnored ? Frames_1.Flags.IGNORE : Frames_1.Flags.NONE,
+          extendedType,
+          extendedContent: content
+        });
+      };
+      RequestResponseResponderStream2.prototype.close = function(error) {
+        var _a;
+        if (this.done) {
+          console.warn("Trying to close for the second time. ".concat(error ? "Dropping error [".concat(error, "].") : ""));
+          return;
+        }
+        Reassembler2.cancel(this);
+        (_a = this.receiver) === null || _a === void 0 ? void 0 : _a.cancel();
+      };
+      return RequestResponseResponderStream2;
+    })()
+  );
+  RequestResponseStream.RequestResponseResponderStream = RequestResponseResponderStream;
+  return RequestResponseStream;
+}
+var RequestStreamStream = {};
+var hasRequiredRequestStreamStream;
+function requireRequestStreamStream() {
+  if (hasRequiredRequestStreamStream) return RequestStreamStream;
+  hasRequiredRequestStreamStream = 1;
+  var __createBinding = RequestStreamStream && RequestStreamStream.__createBinding || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === void 0) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() {
+      return m[k];
+    } });
+  }) : (function(o, m, k, k2) {
+    if (k2 === void 0) k2 = k;
+    o[k2] = m[k];
+  }));
+  var __setModuleDefault = RequestStreamStream && RequestStreamStream.__setModuleDefault || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+  }) : function(o, v) {
+    o["default"] = v;
+  });
+  var __importStar = RequestStreamStream && RequestStreamStream.__importStar || function(mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) {
+      for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    }
+    __setModuleDefault(result, mod);
+    return result;
+  };
+  var __values = RequestStreamStream && RequestStreamStream.__values || function(o) {
+    var s = typeof Symbol === "function" && Symbol.iterator, m = s && o[s], i = 0;
+    if (m) return m.call(o);
+    if (o && typeof o.length === "number") return {
+      next: function() {
+        if (o && i >= o.length) o = void 0;
+        return { value: o && o[i++], done: !o };
+      }
+    };
+    throw new TypeError(s ? "Object is not iterable." : "Symbol.iterator is not defined.");
+  };
+  Object.defineProperty(RequestStreamStream, "__esModule", { value: true });
+  RequestStreamStream.RequestStreamResponderStream = RequestStreamStream.RequestStreamRequesterStream = void 0;
+  var Errors_1 = requireErrors();
+  var Fragmenter_1 = requireFragmenter();
+  var Frames_1 = requireFrames();
+  var Reassembler2 = __importStar(requireReassembler());
+  var RequestStreamRequesterStream = (
+    /** @class */
+    (function() {
+      function RequestStreamRequesterStream2(payload, receiver, fragmentSize, initialRequestN, leaseManager) {
+        this.payload = payload;
+        this.receiver = receiver;
+        this.fragmentSize = fragmentSize;
+        this.initialRequestN = initialRequestN;
+        this.leaseManager = leaseManager;
+        this.streamType = Frames_1.FrameTypes.REQUEST_STREAM;
+      }
+      RequestStreamRequesterStream2.prototype.handleReady = function(streamId, stream) {
+        var e_1, _a;
+        if (this.done) {
+          return false;
+        }
+        this.streamId = streamId;
+        this.stream = stream;
+        stream.connect(this);
+        if ((0, Fragmenter_1.isFragmentable)(this.payload, this.fragmentSize, Frames_1.FrameTypes.REQUEST_STREAM)) {
+          try {
+            for (var _b = __values((0, Fragmenter_1.fragmentWithRequestN)(streamId, this.payload, this.fragmentSize, Frames_1.FrameTypes.REQUEST_STREAM, this.initialRequestN)), _c = _b.next(); !_c.done; _c = _b.next()) {
+              var frame = _c.value;
+              this.stream.send(frame);
+            }
+          } catch (e_1_1) {
+            e_1 = { error: e_1_1 };
+          } finally {
+            try {
+              if (_c && !_c.done && (_a = _b.return)) _a.call(_b);
+            } finally {
+              if (e_1) throw e_1.error;
+            }
+          }
+        } else {
+          this.stream.send({
+            type: Frames_1.FrameTypes.REQUEST_STREAM,
+            data: this.payload.data,
+            metadata: this.payload.metadata,
+            requestN: this.initialRequestN,
+            flags: this.payload.metadata !== void 0 ? Frames_1.Flags.METADATA : 0,
+            streamId
+          });
+        }
+        if (this.hasExtension) {
+          this.stream.send({
+            type: Frames_1.FrameTypes.EXT,
+            streamId,
+            extendedContent: this.extendedContent,
+            extendedType: this.extendedType,
+            flags: this.flags
+          });
+        }
+        return true;
+      };
+      RequestStreamRequesterStream2.prototype.handleReject = function(error) {
+        if (this.done) {
+          return;
+        }
+        this.done = true;
+        this.receiver.onError(error);
+      };
+      RequestStreamRequesterStream2.prototype.handle = function(frame) {
+        var errorMessage;
+        var frameType = frame.type;
+        switch (frameType) {
+          case Frames_1.FrameTypes.PAYLOAD: {
+            var hasComplete = Frames_1.Flags.hasComplete(frame.flags);
+            var hasNext = Frames_1.Flags.hasNext(frame.flags);
+            if (hasComplete || !Frames_1.Flags.hasFollows(frame.flags)) {
+              if (hasComplete) {
+                this.done = true;
+                this.stream.disconnect(this);
+                if (!hasNext) {
+                  this.receiver.onComplete();
+                  return;
+                }
+              }
+              var payload = this.hasFragments ? Reassembler2.reassemble(this, frame.data, frame.metadata) : {
+                data: frame.data,
+                metadata: frame.metadata
+              };
+              this.receiver.onNext(payload, hasComplete);
+              return;
+            }
+            if (!Reassembler2.add(this, frame.data, frame.metadata)) {
+              errorMessage = "Unexpected fragment size";
+              break;
+            }
+            return;
+          }
+          case Frames_1.FrameTypes.ERROR: {
+            this.done = true;
+            this.stream.disconnect(this);
+            Reassembler2.cancel(this);
+            this.receiver.onError(new Errors_1.RSocketError(frame.code, frame.message));
+            return;
+          }
+          case Frames_1.FrameTypes.EXT: {
+            if (this.hasFragments) {
+              errorMessage = "Unexpected frame type [".concat(frameType, "] during reassembly");
+              break;
+            }
+            this.receiver.onExtension(frame.extendedType, frame.extendedContent, Frames_1.Flags.hasIgnore(frame.flags));
+            return;
+          }
+          default: {
+            errorMessage = "Unexpected frame type [".concat(frameType, "]");
+          }
+        }
+        this.close(new Errors_1.RSocketError(Errors_1.ErrorCodes.CANCELED, errorMessage));
+        this.stream.send({
+          type: Frames_1.FrameTypes.CANCEL,
+          streamId: this.streamId,
+          flags: Frames_1.Flags.NONE
+        });
+        this.stream.disconnect(this);
+      };
+      RequestStreamRequesterStream2.prototype.request = function(n) {
+        if (this.done) {
+          return;
+        }
+        if (!this.streamId) {
+          this.initialRequestN += n;
+          return;
+        }
+        this.stream.send({
+          type: Frames_1.FrameTypes.REQUEST_N,
+          flags: Frames_1.Flags.NONE,
+          requestN: n,
+          streamId: this.streamId
+        });
+      };
+      RequestStreamRequesterStream2.prototype.cancel = function() {
+        var _a;
+        if (this.done) {
+          return;
+        }
+        this.done = true;
+        if (!this.streamId) {
+          (_a = this.leaseManager) === null || _a === void 0 ? void 0 : _a.cancelRequest(this);
+          return;
+        }
+        this.stream.send({
+          type: Frames_1.FrameTypes.CANCEL,
+          flags: Frames_1.Flags.NONE,
+          streamId: this.streamId
+        });
+        this.stream.disconnect(this);
+        Reassembler2.cancel(this);
+      };
+      RequestStreamRequesterStream2.prototype.onExtension = function(extendedType, content, canBeIgnored) {
+        if (this.done) {
+          return;
+        }
+        if (!this.streamId) {
+          this.hasExtension = true;
+          this.extendedType = extendedType;
+          this.extendedContent = content;
+          this.flags = canBeIgnored ? Frames_1.Flags.IGNORE : Frames_1.Flags.NONE;
+          return;
+        }
+        this.stream.send({
+          streamId: this.streamId,
+          type: Frames_1.FrameTypes.EXT,
+          extendedType,
+          extendedContent: content,
+          flags: canBeIgnored ? Frames_1.Flags.IGNORE : Frames_1.Flags.NONE
+        });
+      };
+      RequestStreamRequesterStream2.prototype.close = function(error) {
+        if (this.done) {
+          return;
+        }
+        this.done = true;
+        Reassembler2.cancel(this);
+        if (error) {
+          this.receiver.onError(error);
+        } else {
+          this.receiver.onComplete();
+        }
+      };
+      return RequestStreamRequesterStream2;
+    })()
+  );
+  RequestStreamStream.RequestStreamRequesterStream = RequestStreamRequesterStream;
+  var RequestStreamResponderStream = (
+    /** @class */
+    (function() {
+      function RequestStreamResponderStream2(streamId, stream, fragmentSize, handler, frame) {
+        this.streamId = streamId;
+        this.stream = stream;
+        this.fragmentSize = fragmentSize;
+        this.handler = handler;
+        this.streamType = Frames_1.FrameTypes.REQUEST_STREAM;
+        stream.connect(this);
+        if (Frames_1.Flags.hasFollows(frame.flags)) {
+          this.initialRequestN = frame.requestN;
+          Reassembler2.add(this, frame.data, frame.metadata);
+          return;
+        }
+        var payload = {
+          data: frame.data,
+          metadata: frame.metadata
+        };
+        try {
+          this.receiver = handler(payload, frame.requestN, this);
+        } catch (error) {
+          this.onError(error);
+        }
+      }
+      RequestStreamResponderStream2.prototype.handle = function(frame) {
+        var _a;
+        var errorMessage;
+        if (!this.receiver || this.hasFragments) {
+          if (frame.type === Frames_1.FrameTypes.PAYLOAD) {
+            if (Frames_1.Flags.hasFollows(frame.flags)) {
+              if (Reassembler2.add(this, frame.data, frame.metadata)) {
+                return;
+              }
+              errorMessage = "Unexpected frame size";
+            } else {
+              var payload = Reassembler2.reassemble(this, frame.data, frame.metadata);
+              try {
+                this.receiver = this.handler(payload, this.initialRequestN, this);
+              } catch (error) {
+                this.onError(error);
+              }
+              return;
+            }
+          } else {
+            errorMessage = "Unexpected frame type [".concat(frame.type, "] during reassembly");
+          }
+        } else if (frame.type === Frames_1.FrameTypes.REQUEST_N) {
+          this.receiver.request(frame.requestN);
+          return;
+        } else if (frame.type === Frames_1.FrameTypes.EXT) {
+          this.receiver.onExtension(frame.extendedType, frame.extendedContent, Frames_1.Flags.hasIgnore(frame.flags));
+          return;
+        } else {
+          errorMessage = "Unexpected frame type [".concat(frame.type, "]");
+        }
+        this.done = true;
+        Reassembler2.cancel(this);
+        (_a = this.receiver) === null || _a === void 0 ? void 0 : _a.cancel();
+        if (frame.type !== Frames_1.FrameTypes.CANCEL && frame.type !== Frames_1.FrameTypes.ERROR) {
+          this.stream.send({
+            type: Frames_1.FrameTypes.ERROR,
+            flags: Frames_1.Flags.NONE,
+            code: Errors_1.ErrorCodes.CANCELED,
+            message: errorMessage,
+            streamId: this.streamId
+          });
+        }
+        this.stream.disconnect(this);
+      };
+      RequestStreamResponderStream2.prototype.onError = function(error) {
+        if (this.done) {
+          console.warn("Trying to error for the second time. ".concat(error ? "Dropping error [".concat(error, "].") : ""));
+          return;
+        }
+        this.done = true;
+        this.stream.send({
+          type: Frames_1.FrameTypes.ERROR,
+          flags: Frames_1.Flags.NONE,
+          code: error instanceof Errors_1.RSocketError ? error.code : Errors_1.ErrorCodes.APPLICATION_ERROR,
+          message: error.message,
+          streamId: this.streamId
+        });
+        this.stream.disconnect(this);
+      };
+      RequestStreamResponderStream2.prototype.onNext = function(payload, isCompletion) {
+        var e_2, _a;
+        if (this.done) {
+          return;
+        }
+        if (isCompletion) {
+          this.done = true;
+        }
+        if ((0, Fragmenter_1.isFragmentable)(payload, this.fragmentSize, Frames_1.FrameTypes.PAYLOAD)) {
+          try {
+            for (var _b = __values((0, Fragmenter_1.fragment)(this.streamId, payload, this.fragmentSize, Frames_1.FrameTypes.PAYLOAD, isCompletion)), _c = _b.next(); !_c.done; _c = _b.next()) {
+              var frame = _c.value;
+              this.stream.send(frame);
+            }
+          } catch (e_2_1) {
+            e_2 = { error: e_2_1 };
+          } finally {
+            try {
+              if (_c && !_c.done && (_a = _b.return)) _a.call(_b);
+            } finally {
+              if (e_2) throw e_2.error;
+            }
+          }
+        } else {
+          this.stream.send({
+            type: Frames_1.FrameTypes.PAYLOAD,
+            flags: Frames_1.Flags.NEXT | (isCompletion ? Frames_1.Flags.COMPLETE : Frames_1.Flags.NONE) | (payload.metadata ? Frames_1.Flags.METADATA : Frames_1.Flags.NONE),
+            data: payload.data,
+            metadata: payload.metadata,
+            streamId: this.streamId
+          });
+        }
+        if (isCompletion) {
+          this.stream.disconnect(this);
+        }
+      };
+      RequestStreamResponderStream2.prototype.onComplete = function() {
+        if (this.done) {
+          return;
+        }
+        this.done = true;
+        this.stream.send({
+          type: Frames_1.FrameTypes.PAYLOAD,
+          flags: Frames_1.Flags.COMPLETE,
+          streamId: this.streamId,
+          data: null,
+          metadata: null
+        });
+        this.stream.disconnect(this);
+      };
+      RequestStreamResponderStream2.prototype.onExtension = function(extendedType, content, canBeIgnored) {
+        if (this.done) {
+          return;
+        }
+        this.stream.send({
+          type: Frames_1.FrameTypes.EXT,
+          streamId: this.streamId,
+          flags: canBeIgnored ? Frames_1.Flags.IGNORE : Frames_1.Flags.NONE,
+          extendedType,
+          extendedContent: content
+        });
+      };
+      RequestStreamResponderStream2.prototype.close = function(error) {
+        var _a;
+        if (this.done) {
+          console.warn("Trying to close for the second time. ".concat(error ? "Dropping error [".concat(error, "].") : ""));
+          return;
+        }
+        Reassembler2.cancel(this);
+        (_a = this.receiver) === null || _a === void 0 ? void 0 : _a.cancel();
+      };
+      return RequestStreamResponderStream2;
+    })()
+  );
+  RequestStreamStream.RequestStreamResponderStream = RequestStreamResponderStream;
+  return RequestStreamStream;
+}
+var hasRequiredRSocketSupport;
+function requireRSocketSupport() {
+  if (hasRequiredRSocketSupport) return RSocketSupport;
+  hasRequiredRSocketSupport = 1;
+  Object.defineProperty(RSocketSupport, "__esModule", { value: true });
+  RSocketSupport.KeepAliveSender = RSocketSupport.KeepAliveHandler = RSocketSupport.DefaultConnectionFrameHandler = RSocketSupport.DefaultStreamRequestHandler = RSocketSupport.LeaseHandler = RSocketSupport.RSocketRequester = void 0;
+  var Errors_1 = requireErrors();
+  var Frames_1 = requireFrames();
+  var RequestChannelStream_1 = requireRequestChannelStream();
+  var RequestFnFStream_1 = requireRequestFnFStream();
+  var RequestResponseStream_1 = requireRequestResponseStream();
+  var RequestStreamStream_1 = requireRequestStreamStream();
+  var RSocketRequester = (
+    /** @class */
+    (function() {
+      function RSocketRequester2(connection, fragmentSize, leaseManager) {
+        this.connection = connection;
+        this.fragmentSize = fragmentSize;
+        this.leaseManager = leaseManager;
+      }
+      RSocketRequester2.prototype.fireAndForget = function(payload, responderStream) {
+        var handler = new RequestFnFStream_1.RequestFnFRequesterStream(payload, responderStream, this.fragmentSize, this.leaseManager);
+        if (this.leaseManager) {
+          this.leaseManager.requestLease(handler);
+        } else {
+          this.connection.multiplexerDemultiplexer.createRequestStream(handler);
+        }
+        return handler;
+      };
+      RSocketRequester2.prototype.requestResponse = function(payload, responderStream) {
+        var handler = new RequestResponseStream_1.RequestResponseRequesterStream(payload, responderStream, this.fragmentSize, this.leaseManager);
+        if (this.leaseManager) {
+          this.leaseManager.requestLease(handler);
+        } else {
+          this.connection.multiplexerDemultiplexer.createRequestStream(handler);
+        }
+        return handler;
+      };
+      RSocketRequester2.prototype.requestStream = function(payload, initialRequestN, responderStream) {
+        var handler = new RequestStreamStream_1.RequestStreamRequesterStream(payload, responderStream, this.fragmentSize, initialRequestN, this.leaseManager);
+        if (this.leaseManager) {
+          this.leaseManager.requestLease(handler);
+        } else {
+          this.connection.multiplexerDemultiplexer.createRequestStream(handler);
+        }
+        return handler;
+      };
+      RSocketRequester2.prototype.requestChannel = function(payload, initialRequestN, isCompleted, responderStream) {
+        var handler = new RequestChannelStream_1.RequestChannelRequesterStream(payload, isCompleted, responderStream, this.fragmentSize, initialRequestN, this.leaseManager);
+        if (this.leaseManager) {
+          this.leaseManager.requestLease(handler);
+        } else {
+          this.connection.multiplexerDemultiplexer.createRequestStream(handler);
+        }
+        return handler;
+      };
+      RSocketRequester2.prototype.metadataPush = function(metadata, responderStream) {
+        throw new Error("Method not implemented.");
+      };
+      RSocketRequester2.prototype.close = function(error) {
+        this.connection.close(error);
+      };
+      RSocketRequester2.prototype.onClose = function(callback) {
+        this.connection.onClose(callback);
+      };
+      return RSocketRequester2;
+    })()
+  );
+  RSocketSupport.RSocketRequester = RSocketRequester;
+  var LeaseHandler = (
+    /** @class */
+    (function() {
+      function LeaseHandler2(maxPendingRequests, multiplexer) {
+        this.maxPendingRequests = maxPendingRequests;
+        this.multiplexer = multiplexer;
+        this.pendingRequests = [];
+        this.expirationTime = 0;
+        this.availableLease = 0;
+      }
+      LeaseHandler2.prototype.handle = function(frame) {
+        this.expirationTime = frame.ttl + Date.now();
+        this.availableLease = frame.requestCount;
+        while (this.availableLease > 0 && this.pendingRequests.length > 0) {
+          var handler = this.pendingRequests.shift();
+          this.availableLease--;
+          this.multiplexer.createRequestStream(handler);
+        }
+      };
+      LeaseHandler2.prototype.requestLease = function(handler) {
+        var availableLease = this.availableLease;
+        if (availableLease > 0 && Date.now() < this.expirationTime) {
+          this.availableLease = availableLease - 1;
+          this.multiplexer.createRequestStream(handler);
+          return;
+        }
+        if (this.pendingRequests.length >= this.maxPendingRequests) {
+          handler.handleReject(new Errors_1.RSocketError(Errors_1.ErrorCodes.REJECTED, "No available lease given"));
+          return;
+        }
+        this.pendingRequests.push(handler);
+      };
+      LeaseHandler2.prototype.cancelRequest = function(handler) {
+        var index = this.pendingRequests.indexOf(handler);
+        if (index > -1) {
+          this.pendingRequests.splice(index, 1);
+        }
+      };
+      return LeaseHandler2;
+    })()
+  );
+  RSocketSupport.LeaseHandler = LeaseHandler;
+  var DefaultStreamRequestHandler = (
+    /** @class */
+    (function() {
+      function DefaultStreamRequestHandler2(rsocket, fragmentSize) {
+        this.rsocket = rsocket;
+        this.fragmentSize = fragmentSize;
+      }
+      DefaultStreamRequestHandler2.prototype.handle = function(frame, stream) {
+        switch (frame.type) {
+          case Frames_1.FrameTypes.REQUEST_FNF:
+            if (this.rsocket.fireAndForget) {
+              new RequestFnFStream_1.RequestFnfResponderStream(frame.streamId, stream, this.rsocket.fireAndForget.bind(this.rsocket), frame);
+            }
+            return;
+          case Frames_1.FrameTypes.REQUEST_RESPONSE:
+            if (this.rsocket.requestResponse) {
+              new RequestResponseStream_1.RequestResponseResponderStream(frame.streamId, stream, this.fragmentSize, this.rsocket.requestResponse.bind(this.rsocket), frame);
+              return;
+            }
+            this.rejectRequest(frame.streamId, stream);
+            return;
+          case Frames_1.FrameTypes.REQUEST_STREAM:
+            if (this.rsocket.requestStream) {
+              new RequestStreamStream_1.RequestStreamResponderStream(frame.streamId, stream, this.fragmentSize, this.rsocket.requestStream.bind(this.rsocket), frame);
+              return;
+            }
+            this.rejectRequest(frame.streamId, stream);
+            return;
+          case Frames_1.FrameTypes.REQUEST_CHANNEL:
+            if (this.rsocket.requestChannel) {
+              new RequestChannelStream_1.RequestChannelResponderStream(frame.streamId, stream, this.fragmentSize, this.rsocket.requestChannel.bind(this.rsocket), frame);
+              return;
+            }
+            this.rejectRequest(frame.streamId, stream);
+            return;
+        }
+      };
+      DefaultStreamRequestHandler2.prototype.rejectRequest = function(streamId, stream) {
+        stream.send({
+          type: Frames_1.FrameTypes.ERROR,
+          streamId,
+          flags: Frames_1.Flags.NONE,
+          code: Errors_1.ErrorCodes.REJECTED,
+          message: "No available handler found"
+        });
+      };
+      DefaultStreamRequestHandler2.prototype.close = function() {
+      };
+      return DefaultStreamRequestHandler2;
+    })()
+  );
+  RSocketSupport.DefaultStreamRequestHandler = DefaultStreamRequestHandler;
+  var DefaultConnectionFrameHandler = (
+    /** @class */
+    (function() {
+      function DefaultConnectionFrameHandler2(connection, keepAliveHandler, keepAliveSender, leaseHandler, rsocket) {
+        this.connection = connection;
+        this.keepAliveHandler = keepAliveHandler;
+        this.keepAliveSender = keepAliveSender;
+        this.leaseHandler = leaseHandler;
+        this.rsocket = rsocket;
+      }
+      DefaultConnectionFrameHandler2.prototype.handle = function(frame) {
+        switch (frame.type) {
+          case Frames_1.FrameTypes.KEEPALIVE:
+            this.keepAliveHandler.handle(frame);
+            return;
+          case Frames_1.FrameTypes.LEASE:
+            if (this.leaseHandler) {
+              this.leaseHandler.handle(frame);
+              return;
+            }
+            return;
+          case Frames_1.FrameTypes.ERROR:
+            this.connection.close(new Errors_1.RSocketError(frame.code, frame.message));
+            return;
+          case Frames_1.FrameTypes.METADATA_PUSH:
+            if (this.rsocket.metadataPush) ;
+            return;
+          default:
+            this.connection.multiplexerDemultiplexer.connectionOutbound.send({
+              type: Frames_1.FrameTypes.ERROR,
+              streamId: 0,
+              flags: Frames_1.Flags.NONE,
+              message: "Received unknown frame type",
+              code: Errors_1.ErrorCodes.CONNECTION_ERROR
+            });
+        }
+      };
+      DefaultConnectionFrameHandler2.prototype.pause = function() {
+        var _a;
+        this.keepAliveHandler.pause();
+        (_a = this.keepAliveSender) === null || _a === void 0 ? void 0 : _a.pause();
+      };
+      DefaultConnectionFrameHandler2.prototype.resume = function() {
+        var _a;
+        this.keepAliveHandler.start();
+        (_a = this.keepAliveSender) === null || _a === void 0 ? void 0 : _a.start();
+      };
+      DefaultConnectionFrameHandler2.prototype.close = function(error) {
+        var _a;
+        this.keepAliveHandler.close();
+        (_a = this.rsocket.close) === null || _a === void 0 ? void 0 : _a.call(this.rsocket, error);
+      };
+      return DefaultConnectionFrameHandler2;
+    })()
+  );
+  RSocketSupport.DefaultConnectionFrameHandler = DefaultConnectionFrameHandler;
+  var KeepAliveHandlerStates;
+  (function(KeepAliveHandlerStates2) {
+    KeepAliveHandlerStates2[KeepAliveHandlerStates2["Paused"] = 0] = "Paused";
+    KeepAliveHandlerStates2[KeepAliveHandlerStates2["Running"] = 1] = "Running";
+    KeepAliveHandlerStates2[KeepAliveHandlerStates2["Closed"] = 2] = "Closed";
+  })(KeepAliveHandlerStates || (KeepAliveHandlerStates = {}));
+  var KeepAliveHandler = (
+    /** @class */
+    (function() {
+      function KeepAliveHandler2(connection, keepAliveTimeoutDuration) {
+        this.connection = connection;
+        this.keepAliveTimeoutDuration = keepAliveTimeoutDuration;
+        this.state = KeepAliveHandlerStates.Paused;
+        this.outbound = connection.multiplexerDemultiplexer.connectionOutbound;
+      }
+      KeepAliveHandler2.prototype.handle = function(frame) {
+        this.keepAliveLastReceivedMillis = Date.now();
+        if (Frames_1.Flags.hasRespond(frame.flags)) {
+          this.outbound.send({
+            type: Frames_1.FrameTypes.KEEPALIVE,
+            streamId: 0,
+            data: frame.data,
+            flags: frame.flags ^ Frames_1.Flags.RESPOND,
+            lastReceivedPosition: 0
+          });
+        }
+      };
+      KeepAliveHandler2.prototype.start = function() {
+        if (this.state !== KeepAliveHandlerStates.Paused) {
+          return;
+        }
+        this.keepAliveLastReceivedMillis = Date.now();
+        this.state = KeepAliveHandlerStates.Running;
+        this.activeTimeout = setTimeout(this.timeoutCheck.bind(this), this.keepAliveTimeoutDuration);
+      };
+      KeepAliveHandler2.prototype.pause = function() {
+        if (this.state !== KeepAliveHandlerStates.Running) {
+          return;
+        }
+        this.state = KeepAliveHandlerStates.Paused;
+        clearTimeout(this.activeTimeout);
+      };
+      KeepAliveHandler2.prototype.close = function() {
+        this.state = KeepAliveHandlerStates.Closed;
+        clearTimeout(this.activeTimeout);
+      };
+      KeepAliveHandler2.prototype.timeoutCheck = function() {
+        var now = Date.now();
+        var noKeepAliveDuration = now - this.keepAliveLastReceivedMillis;
+        if (noKeepAliveDuration >= this.keepAliveTimeoutDuration) {
+          this.connection.close(new Error("No keep-alive acks for ".concat(this.keepAliveTimeoutDuration, " millis")));
+        } else {
+          this.activeTimeout = setTimeout(this.timeoutCheck.bind(this), Math.max(100, this.keepAliveTimeoutDuration - noKeepAliveDuration));
+        }
+      };
+      return KeepAliveHandler2;
+    })()
+  );
+  RSocketSupport.KeepAliveHandler = KeepAliveHandler;
+  var KeepAliveSenderStates;
+  (function(KeepAliveSenderStates2) {
+    KeepAliveSenderStates2[KeepAliveSenderStates2["Paused"] = 0] = "Paused";
+    KeepAliveSenderStates2[KeepAliveSenderStates2["Running"] = 1] = "Running";
+    KeepAliveSenderStates2[KeepAliveSenderStates2["Closed"] = 2] = "Closed";
+  })(KeepAliveSenderStates || (KeepAliveSenderStates = {}));
+  var KeepAliveSender = (
+    /** @class */
+    (function() {
+      function KeepAliveSender2(outbound, keepAlivePeriodDuration) {
+        this.outbound = outbound;
+        this.keepAlivePeriodDuration = keepAlivePeriodDuration;
+        this.state = KeepAliveSenderStates.Paused;
+      }
+      KeepAliveSender2.prototype.sendKeepAlive = function() {
+        this.outbound.send({
+          type: Frames_1.FrameTypes.KEEPALIVE,
+          streamId: 0,
+          data: void 0,
+          flags: Frames_1.Flags.RESPOND,
+          lastReceivedPosition: 0
+        });
+      };
+      KeepAliveSender2.prototype.start = function() {
+        if (this.state !== KeepAliveSenderStates.Paused) {
+          return;
+        }
+        this.state = KeepAliveSenderStates.Running;
+        this.activeInterval = setInterval(this.sendKeepAlive.bind(this), this.keepAlivePeriodDuration);
+      };
+      KeepAliveSender2.prototype.pause = function() {
+        if (this.state !== KeepAliveSenderStates.Running) {
+          return;
+        }
+        this.state = KeepAliveSenderStates.Paused;
+        clearInterval(this.activeInterval);
+      };
+      KeepAliveSender2.prototype.close = function() {
+        this.state = KeepAliveSenderStates.Closed;
+        clearInterval(this.activeInterval);
+      };
+      return KeepAliveSender2;
+    })()
+  );
+  RSocketSupport.KeepAliveSender = KeepAliveSender;
+  return RSocketSupport;
+}
+var Resume = {};
+var hasRequiredResume;
+function requireResume() {
+  if (hasRequiredResume) return Resume;
+  hasRequiredResume = 1;
+  var __values = Resume && Resume.__values || function(o) {
+    var s = typeof Symbol === "function" && Symbol.iterator, m = s && o[s], i = 0;
+    if (m) return m.call(o);
+    if (o && typeof o.length === "number") return {
+      next: function() {
+        if (o && i >= o.length) o = void 0;
+        return { value: o && o[i++], done: !o };
+      }
+    };
+    throw new TypeError(s ? "Object is not iterable." : "Symbol.iterator is not defined.");
+  };
+  Object.defineProperty(Resume, "__esModule", { value: true });
+  Resume.FrameStore = void 0;
+  var _1 = requireDist();
+  var Codecs_1 = requireCodecs();
+  var FrameStore = (
+    /** @class */
+    (function() {
+      function FrameStore2() {
+        this.storedFrames = [];
+        this._lastReceivedFramePosition = 0;
+        this._firstAvailableFramePosition = 0;
+        this._lastSentFramePosition = 0;
+      }
+      Object.defineProperty(FrameStore2.prototype, "lastReceivedFramePosition", {
+        get: function() {
+          return this._lastReceivedFramePosition;
+        },
+        enumerable: false,
+        configurable: true
+      });
+      Object.defineProperty(FrameStore2.prototype, "firstAvailableFramePosition", {
+        get: function() {
+          return this._firstAvailableFramePosition;
+        },
+        enumerable: false,
+        configurable: true
+      });
+      Object.defineProperty(FrameStore2.prototype, "lastSentFramePosition", {
+        get: function() {
+          return this._lastSentFramePosition;
+        },
+        enumerable: false,
+        configurable: true
+      });
+      FrameStore2.prototype.store = function(frame) {
+        this._lastSentFramePosition += (0, Codecs_1.sizeOfFrame)(frame);
+        this.storedFrames.push(frame);
+      };
+      FrameStore2.prototype.record = function(frame) {
+        this._lastReceivedFramePosition += (0, Codecs_1.sizeOfFrame)(frame);
+      };
+      FrameStore2.prototype.dropTo = function(lastReceivedPosition) {
+        var bytesToDrop = lastReceivedPosition - this._firstAvailableFramePosition;
+        while (bytesToDrop > 0 && this.storedFrames.length > 0) {
+          var storedFrame = this.storedFrames.shift();
+          bytesToDrop -= (0, Codecs_1.sizeOfFrame)(storedFrame);
+        }
+        if (bytesToDrop !== 0) {
+          throw new _1.RSocketError(_1.ErrorCodes.CONNECTION_ERROR, "State inconsistency. Expected bytes to drop ".concat(lastReceivedPosition - this._firstAvailableFramePosition, " but actual ").concat(bytesToDrop));
+        }
+        this._firstAvailableFramePosition = lastReceivedPosition;
+      };
+      FrameStore2.prototype.drain = function(consumer) {
+        var e_1, _a;
+        try {
+          for (var _b = __values(this.storedFrames), _c = _b.next(); !_c.done; _c = _b.next()) {
+            var frame = _c.value;
+            consumer(frame);
+          }
+        } catch (e_1_1) {
+          e_1 = { error: e_1_1 };
+        } finally {
+          try {
+            if (_c && !_c.done && (_a = _b.return)) _a.call(_b);
+          } finally {
+            if (e_1) throw e_1.error;
+          }
+        }
+      };
+      return FrameStore2;
+    })()
+  );
+  Resume.FrameStore = FrameStore;
+  return Resume;
+}
+var hasRequiredRSocketConnector;
+function requireRSocketConnector() {
+  if (hasRequiredRSocketConnector) return RSocketConnector;
+  hasRequiredRSocketConnector = 1;
+  var __awaiter = RSocketConnector && RSocketConnector.__awaiter || function(thisArg, _arguments, P, generator) {
+    function adopt(value) {
+      return value instanceof P ? value : new P(function(resolve2) {
+        resolve2(value);
+      });
+    }
+    return new (P || (P = Promise))(function(resolve2, reject) {
+      function fulfilled(value) {
+        try {
+          step(generator.next(value));
+        } catch (e) {
+          reject(e);
+        }
+      }
+      function rejected(value) {
+        try {
+          step(generator["throw"](value));
+        } catch (e) {
+          reject(e);
+        }
+      }
+      function step(result) {
+        result.done ? resolve2(result.value) : adopt(result.value).then(fulfilled, rejected);
+      }
+      step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+  };
+  var __generator = RSocketConnector && RSocketConnector.__generator || function(thisArg, body) {
+    var _ = { label: 0, sent: function() {
+      if (t2[0] & 1) throw t2[1];
+      return t2[1];
+    }, trys: [], ops: [] }, f, y, t2, g;
+    return g = { next: verb(0), "throw": verb(1), "return": verb(2) }, typeof Symbol === "function" && (g[Symbol.iterator] = function() {
+      return this;
+    }), g;
+    function verb(n) {
+      return function(v) {
+        return step([n, v]);
+      };
+    }
+    function step(op) {
+      if (f) throw new TypeError("Generator is already executing.");
+      while (_) try {
+        if (f = 1, y && (t2 = op[0] & 2 ? y["return"] : op[0] ? y["throw"] || ((t2 = y["return"]) && t2.call(y), 0) : y.next) && !(t2 = t2.call(y, op[1])).done) return t2;
+        if (y = 0, t2) op = [op[0] & 2, t2.value];
+        switch (op[0]) {
+          case 0:
+          case 1:
+            t2 = op;
+            break;
+          case 4:
+            _.label++;
+            return { value: op[1], done: false };
+          case 5:
+            _.label++;
+            y = op[1];
+            op = [0];
+            continue;
+          case 7:
+            op = _.ops.pop();
+            _.trys.pop();
+            continue;
+          default:
+            if (!(t2 = _.trys, t2 = t2.length > 0 && t2[t2.length - 1]) && (op[0] === 6 || op[0] === 2)) {
+              _ = 0;
+              continue;
+            }
+            if (op[0] === 3 && (!t2 || op[1] > t2[0] && op[1] < t2[3])) {
+              _.label = op[1];
+              break;
+            }
+            if (op[0] === 6 && _.label < t2[1]) {
+              _.label = t2[1];
+              t2 = op;
+              break;
+            }
+            if (t2 && _.label < t2[2]) {
+              _.label = t2[2];
+              _.ops.push(op);
+              break;
+            }
+            if (t2[2]) _.ops.pop();
+            _.trys.pop();
+            continue;
+        }
+        op = body.call(thisArg, _);
+      } catch (e) {
+        op = [6, e];
+        y = 0;
+      } finally {
+        f = t2 = 0;
+      }
+      if (op[0] & 5) throw op[1];
+      return { value: op[0] ? op[1] : void 0, done: true };
+    }
+  };
+  Object.defineProperty(RSocketConnector, "__esModule", { value: true });
+  RSocketConnector.RSocketConnector = void 0;
+  var ClientServerMultiplexerDemultiplexer_1 = requireClientServerMultiplexerDemultiplexer();
+  var Frames_1 = requireFrames();
+  var RSocketSupport_1 = requireRSocketSupport();
+  var Resume_1 = requireResume();
+  var RSocketConnector$1 = (
+    /** @class */
+    (function() {
+      function RSocketConnector2(config) {
+        this.config = config;
+      }
+      RSocketConnector2.prototype.connect = function() {
+        var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v;
+        return __awaiter(this, void 0, void 0, function() {
+          var config, setupFrame, connection, keepAliveSender, keepAliveHandler, leaseHandler, responder, connectionFrameHandler, streamsHandler;
+          var _this = this;
+          return __generator(this, function(_w) {
+            switch (_w.label) {
+              case 0:
+                config = this.config;
+                setupFrame = {
+                  type: Frames_1.FrameTypes.SETUP,
+                  dataMimeType: (_b = (_a = config.setup) === null || _a === void 0 ? void 0 : _a.dataMimeType) !== null && _b !== void 0 ? _b : "application/octet-stream",
+                  metadataMimeType: (_d = (_c = config.setup) === null || _c === void 0 ? void 0 : _c.metadataMimeType) !== null && _d !== void 0 ? _d : "application/octet-stream",
+                  keepAlive: (_f = (_e = config.setup) === null || _e === void 0 ? void 0 : _e.keepAlive) !== null && _f !== void 0 ? _f : 6e4,
+                  lifetime: (_h = (_g = config.setup) === null || _g === void 0 ? void 0 : _g.lifetime) !== null && _h !== void 0 ? _h : 3e5,
+                  metadata: (_k = (_j = config.setup) === null || _j === void 0 ? void 0 : _j.payload) === null || _k === void 0 ? void 0 : _k.metadata,
+                  data: (_m = (_l = config.setup) === null || _l === void 0 ? void 0 : _l.payload) === null || _m === void 0 ? void 0 : _m.data,
+                  resumeToken: (_p = (_o = config.resume) === null || _o === void 0 ? void 0 : _o.tokenGenerator()) !== null && _p !== void 0 ? _p : null,
+                  streamId: 0,
+                  majorVersion: 1,
+                  minorVersion: 0,
+                  flags: (((_r = (_q = config.setup) === null || _q === void 0 ? void 0 : _q.payload) === null || _r === void 0 ? void 0 : _r.metadata) ? Frames_1.Flags.METADATA : Frames_1.Flags.NONE) | (config.lease ? Frames_1.Flags.LEASE : Frames_1.Flags.NONE) | (config.resume ? Frames_1.Flags.RESUME_ENABLE : Frames_1.Flags.NONE)
+                };
+                return [4, config.transport.connect(function(outbound) {
+                  return config.resume ? new ClientServerMultiplexerDemultiplexer_1.ResumableClientServerInputMultiplexerDemultiplexer(
+                    ClientServerMultiplexerDemultiplexer_1.StreamIdGenerator.create(-1),
+                    outbound,
+                    outbound,
+                    new Resume_1.FrameStore(),
+                    // TODO: add size control
+                    setupFrame.resumeToken.toString(),
+                    function(self2, frameStore) {
+                      return __awaiter(_this, void 0, void 0, function() {
+                        var multiplexerDemultiplexerProvider, reconnectionAttempts, reconnector;
+                        return __generator(this, function(_a2) {
+                          switch (_a2.label) {
+                            case 0:
+                              multiplexerDemultiplexerProvider = function(outbound2) {
+                                outbound2.send({
+                                  type: Frames_1.FrameTypes.RESUME,
+                                  streamId: 0,
+                                  flags: Frames_1.Flags.NONE,
+                                  clientPosition: frameStore.firstAvailableFramePosition,
+                                  serverPosition: frameStore.lastReceivedFramePosition,
+                                  majorVersion: setupFrame.minorVersion,
+                                  minorVersion: setupFrame.majorVersion,
+                                  resumeToken: setupFrame.resumeToken
+                                });
+                                return new ClientServerMultiplexerDemultiplexer_1.ResumeOkAwaitingResumableClientServerInputMultiplexerDemultiplexer(outbound2, outbound2, self2);
+                              };
+                              reconnectionAttempts = -1;
+                              reconnector = function() {
+                                reconnectionAttempts++;
+                                return config.resume.reconnectFunction(reconnectionAttempts).then(function() {
+                                  return config.transport.connect(multiplexerDemultiplexerProvider).catch(reconnector);
+                                });
+                              };
+                              return [4, reconnector()];
+                            case 1:
+                              _a2.sent();
+                              return [
+                                2
+                                /*return*/
+                              ];
+                          }
+                        });
+                      });
+                    }
+                  ) : new ClientServerMultiplexerDemultiplexer_1.ClientServerInputMultiplexerDemultiplexer(ClientServerMultiplexerDemultiplexer_1.StreamIdGenerator.create(-1), outbound, outbound);
+                })];
+              case 1:
+                connection = _w.sent();
+                keepAliveSender = new RSocketSupport_1.KeepAliveSender(connection.multiplexerDemultiplexer.connectionOutbound, setupFrame.keepAlive);
+                keepAliveHandler = new RSocketSupport_1.KeepAliveHandler(connection, setupFrame.lifetime);
+                leaseHandler = config.lease ? new RSocketSupport_1.LeaseHandler((_s = config.lease.maxPendingRequests) !== null && _s !== void 0 ? _s : 256, connection.multiplexerDemultiplexer) : void 0;
+                responder = (_t = config.responder) !== null && _t !== void 0 ? _t : {};
+                connectionFrameHandler = new RSocketSupport_1.DefaultConnectionFrameHandler(connection, keepAliveHandler, keepAliveSender, leaseHandler, responder);
+                streamsHandler = new RSocketSupport_1.DefaultStreamRequestHandler(responder, 0);
+                connection.onClose(function(e) {
+                  keepAliveSender.close();
+                  keepAliveHandler.close();
+                  connectionFrameHandler.close(e);
+                });
+                connection.multiplexerDemultiplexer.connectionInbound(connectionFrameHandler);
+                connection.multiplexerDemultiplexer.handleRequestStream(streamsHandler);
+                connection.multiplexerDemultiplexer.connectionOutbound.send(setupFrame);
+                keepAliveHandler.start();
+                keepAliveSender.start();
+                return [2, new RSocketSupport_1.RSocketRequester(connection, (_v = (_u = config.fragmentation) === null || _u === void 0 ? void 0 : _u.maxOutboundFragmentSize) !== null && _v !== void 0 ? _v : 0, leaseHandler)];
+            }
+          });
+        });
+      };
+      return RSocketConnector2;
+    })()
+  );
+  RSocketConnector.RSocketConnector = RSocketConnector$1;
+  return RSocketConnector;
+}
+var RSocketServer = {};
+var hasRequiredRSocketServer;
+function requireRSocketServer() {
+  if (hasRequiredRSocketServer) return RSocketServer;
+  hasRequiredRSocketServer = 1;
+  var __awaiter = RSocketServer && RSocketServer.__awaiter || function(thisArg, _arguments, P, generator) {
+    function adopt(value) {
+      return value instanceof P ? value : new P(function(resolve2) {
+        resolve2(value);
+      });
+    }
+    return new (P || (P = Promise))(function(resolve2, reject) {
+      function fulfilled(value) {
+        try {
+          step(generator.next(value));
+        } catch (e) {
+          reject(e);
+        }
+      }
+      function rejected(value) {
+        try {
+          step(generator["throw"](value));
+        } catch (e) {
+          reject(e);
+        }
+      }
+      function step(result) {
+        result.done ? resolve2(result.value) : adopt(result.value).then(fulfilled, rejected);
+      }
+      step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+  };
+  var __generator = RSocketServer && RSocketServer.__generator || function(thisArg, body) {
+    var _ = { label: 0, sent: function() {
+      if (t2[0] & 1) throw t2[1];
+      return t2[1];
+    }, trys: [], ops: [] }, f, y, t2, g;
+    return g = { next: verb(0), "throw": verb(1), "return": verb(2) }, typeof Symbol === "function" && (g[Symbol.iterator] = function() {
+      return this;
+    }), g;
+    function verb(n) {
+      return function(v) {
+        return step([n, v]);
+      };
+    }
+    function step(op) {
+      if (f) throw new TypeError("Generator is already executing.");
+      while (_) try {
+        if (f = 1, y && (t2 = op[0] & 2 ? y["return"] : op[0] ? y["throw"] || ((t2 = y["return"]) && t2.call(y), 0) : y.next) && !(t2 = t2.call(y, op[1])).done) return t2;
+        if (y = 0, t2) op = [op[0] & 2, t2.value];
+        switch (op[0]) {
+          case 0:
+          case 1:
+            t2 = op;
+            break;
+          case 4:
+            _.label++;
+            return { value: op[1], done: false };
+          case 5:
+            _.label++;
+            y = op[1];
+            op = [0];
+            continue;
+          case 7:
+            op = _.ops.pop();
+            _.trys.pop();
+            continue;
+          default:
+            if (!(t2 = _.trys, t2 = t2.length > 0 && t2[t2.length - 1]) && (op[0] === 6 || op[0] === 2)) {
+              _ = 0;
+              continue;
+            }
+            if (op[0] === 3 && (!t2 || op[1] > t2[0] && op[1] < t2[3])) {
+              _.label = op[1];
+              break;
+            }
+            if (op[0] === 6 && _.label < t2[1]) {
+              _.label = t2[1];
+              t2 = op;
+              break;
+            }
+            if (t2 && _.label < t2[2]) {
+              _.label = t2[2];
+              _.ops.push(op);
+              break;
+            }
+            if (t2[2]) _.ops.pop();
+            _.trys.pop();
+            continue;
+        }
+        op = body.call(thisArg, _);
+      } catch (e) {
+        op = [6, e];
+        y = 0;
+      } finally {
+        f = t2 = 0;
+      }
+      if (op[0] & 5) throw op[1];
+      return { value: op[0] ? op[1] : void 0, done: true };
+    }
+  };
+  Object.defineProperty(RSocketServer, "__esModule", { value: true });
+  RSocketServer.RSocketServer = void 0;
+  var ClientServerMultiplexerDemultiplexer_1 = requireClientServerMultiplexerDemultiplexer();
+  var Errors_1 = requireErrors();
+  var Frames_1 = requireFrames();
+  var RSocketSupport_1 = requireRSocketSupport();
+  var Resume_1 = requireResume();
+  var RSocketServer$1 = (
+    /** @class */
+    (function() {
+      function RSocketServer2(config) {
+        var _a, _b;
+        this.acceptor = config.acceptor;
+        this.transport = config.transport;
+        this.lease = config.lease;
+        this.serverSideKeepAlive = config.serverSideKeepAlive;
+        this.sessionStore = config.resume ? {} : void 0;
+        this.sessionTimeout = (_b = (_a = config.resume) === null || _a === void 0 ? void 0 : _a.sessionTimeout) !== null && _b !== void 0 ? _b : void 0;
+      }
+      RSocketServer2.prototype.bind = function() {
+        return __awaiter(this, void 0, void 0, function() {
+          var _this = this;
+          return __generator(this, function(_a) {
+            switch (_a.label) {
+              case 0:
+                return [4, this.transport.bind(function(frame, connection) {
+                  return __awaiter(_this, void 0, void 0, function() {
+                    var _a2, error, error, leaseHandler, requester, responder, keepAliveHandler_1, keepAliveSender_1, connectionFrameHandler_1, streamsHandler, e_1;
+                    var _b, _c, _d, _e;
+                    return __generator(this, function(_f) {
+                      switch (_f.label) {
+                        case 0:
+                          _a2 = frame.type;
+                          switch (_a2) {
+                            case Frames_1.FrameTypes.SETUP:
+                              return [3, 1];
+                            case Frames_1.FrameTypes.RESUME:
+                              return [3, 5];
+                          }
+                          return [3, 6];
+                        case 1:
+                          _f.trys.push([1, 3, , 4]);
+                          if (this.lease && !Frames_1.Flags.hasLease(frame.flags)) {
+                            error = new Errors_1.RSocketError(Errors_1.ErrorCodes.REJECTED_SETUP, "Lease has to be enabled");
+                            connection.multiplexerDemultiplexer.connectionOutbound.send({
+                              type: Frames_1.FrameTypes.ERROR,
+                              streamId: 0,
+                              flags: Frames_1.Flags.NONE,
+                              code: error.code,
+                              message: error.message
+                            });
+                            connection.close(error);
+                            return [
+                              2
+                              /*return*/
+                            ];
+                          }
+                          if (Frames_1.Flags.hasLease(frame.flags) && !this.lease) {
+                            error = new Errors_1.RSocketError(Errors_1.ErrorCodes.REJECTED_SETUP, "Lease has to be disabled");
+                            connection.multiplexerDemultiplexer.connectionOutbound.send({
+                              type: Frames_1.FrameTypes.ERROR,
+                              streamId: 0,
+                              flags: Frames_1.Flags.NONE,
+                              code: error.code,
+                              message: error.message
+                            });
+                            connection.close(error);
+                            return [
+                              2
+                              /*return*/
+                            ];
+                          }
+                          leaseHandler = Frames_1.Flags.hasLease(frame.flags) ? new RSocketSupport_1.LeaseHandler((_b = this.lease.maxPendingRequests) !== null && _b !== void 0 ? _b : 256, connection.multiplexerDemultiplexer) : void 0;
+                          requester = new RSocketSupport_1.RSocketRequester(connection, (_d = (_c = this.fragmentation) === null || _c === void 0 ? void 0 : _c.maxOutboundFragmentSize) !== null && _d !== void 0 ? _d : 0, leaseHandler);
+                          return [4, this.acceptor.accept({
+                            data: frame.data,
+                            dataMimeType: frame.dataMimeType,
+                            metadata: frame.metadata,
+                            metadataMimeType: frame.metadataMimeType,
+                            flags: frame.flags,
+                            keepAliveMaxLifetime: frame.lifetime,
+                            keepAliveInterval: frame.keepAlive,
+                            resumeToken: frame.resumeToken
+                          }, requester)];
+                        case 2:
+                          responder = _f.sent();
+                          keepAliveHandler_1 = new RSocketSupport_1.KeepAliveHandler(connection, frame.lifetime);
+                          keepAliveSender_1 = this.serverSideKeepAlive ? new RSocketSupport_1.KeepAliveSender(connection.multiplexerDemultiplexer.connectionOutbound, frame.keepAlive) : void 0;
+                          connectionFrameHandler_1 = new RSocketSupport_1.DefaultConnectionFrameHandler(connection, keepAliveHandler_1, keepAliveSender_1, leaseHandler, responder);
+                          streamsHandler = new RSocketSupport_1.DefaultStreamRequestHandler(responder, 0);
+                          connection.onClose(function(e) {
+                            keepAliveSender_1 === null || keepAliveSender_1 === void 0 ? void 0 : keepAliveSender_1.close();
+                            keepAliveHandler_1.close();
+                            connectionFrameHandler_1.close(e);
+                          });
+                          connection.multiplexerDemultiplexer.connectionInbound(connectionFrameHandler_1);
+                          connection.multiplexerDemultiplexer.handleRequestStream(streamsHandler);
+                          keepAliveHandler_1.start();
+                          keepAliveSender_1 === null || keepAliveSender_1 === void 0 ? void 0 : keepAliveSender_1.start();
+                          return [3, 4];
+                        case 3:
+                          e_1 = _f.sent();
+                          connection.multiplexerDemultiplexer.connectionOutbound.send({
+                            type: Frames_1.FrameTypes.ERROR,
+                            streamId: 0,
+                            code: Errors_1.ErrorCodes.REJECTED_SETUP,
+                            message: (_e = e_1.message) !== null && _e !== void 0 ? _e : "",
+                            flags: Frames_1.Flags.NONE
+                          });
+                          connection.close(e_1 instanceof Errors_1.RSocketError ? e_1 : new Errors_1.RSocketError(Errors_1.ErrorCodes.REJECTED_SETUP, e_1.message));
+                          return [3, 4];
+                        case 4:
+                          return [
+                            2
+                            /*return*/
+                          ];
+                        case 5: {
+                          return [
+                            2
+                            /*return*/
+                          ];
+                        }
+                        case 6:
+                          {
+                            connection.multiplexerDemultiplexer.connectionOutbound.send({
+                              type: Frames_1.FrameTypes.ERROR,
+                              streamId: 0,
+                              code: Errors_1.ErrorCodes.UNSUPPORTED_SETUP,
+                              message: "Unsupported setup",
+                              flags: Frames_1.Flags.NONE
+                            });
+                            connection.close(new Errors_1.RSocketError(Errors_1.ErrorCodes.UNSUPPORTED_SETUP));
+                          }
+                          _f.label = 7;
+                        case 7:
+                          return [
+                            2
+                            /*return*/
+                          ];
+                      }
+                    });
+                  });
+                }, function(frame, outbound) {
+                  if (frame.type === Frames_1.FrameTypes.RESUME) {
+                    if (_this.sessionStore) {
+                      var multiplexerDemultiplexer = _this.sessionStore[frame.resumeToken.toString()];
+                      if (!multiplexerDemultiplexer) {
+                        outbound.send({
+                          type: Frames_1.FrameTypes.ERROR,
+                          streamId: 0,
+                          code: Errors_1.ErrorCodes.REJECTED_RESUME,
+                          message: "No session found for the given resume token",
+                          flags: Frames_1.Flags.NONE
+                        });
+                        outbound.close();
+                        return;
+                      }
+                      multiplexerDemultiplexer.resume(frame, outbound, outbound);
+                      return multiplexerDemultiplexer;
+                    }
+                    outbound.send({
+                      type: Frames_1.FrameTypes.ERROR,
+                      streamId: 0,
+                      code: Errors_1.ErrorCodes.REJECTED_RESUME,
+                      message: "Resume is not enabled",
+                      flags: Frames_1.Flags.NONE
+                    });
+                    outbound.close();
+                    return;
+                  } else if (frame.type === Frames_1.FrameTypes.SETUP) {
+                    if (Frames_1.Flags.hasResume(frame.flags)) {
+                      if (!_this.sessionStore) {
+                        var error = new Errors_1.RSocketError(Errors_1.ErrorCodes.REJECTED_SETUP, "No resume support");
+                        outbound.send({
+                          type: Frames_1.FrameTypes.ERROR,
+                          streamId: 0,
+                          flags: Frames_1.Flags.NONE,
+                          code: error.code,
+                          message: error.message
+                        });
+                        outbound.close(error);
+                        return;
+                      }
+                      var multiplexerDumiltiplexer = new ClientServerMultiplexerDemultiplexer_1.ResumableClientServerInputMultiplexerDemultiplexer(
+                        ClientServerMultiplexerDemultiplexer_1.StreamIdGenerator.create(0),
+                        outbound,
+                        outbound,
+                        new Resume_1.FrameStore(),
+                        // TODO: add size parameter
+                        frame.resumeToken.toString(),
+                        _this.sessionStore,
+                        _this.sessionTimeout
+                      );
+                      _this.sessionStore[frame.resumeToken.toString()] = multiplexerDumiltiplexer;
+                      return multiplexerDumiltiplexer;
+                    }
+                  }
+                  return new ClientServerMultiplexerDemultiplexer_1.ClientServerInputMultiplexerDemultiplexer(ClientServerMultiplexerDemultiplexer_1.StreamIdGenerator.create(0), outbound, outbound);
+                })];
+              case 1:
+                return [2, _a.sent()];
+            }
+          });
+        });
+      };
+      return RSocketServer2;
+    })()
+  );
+  RSocketServer.RSocketServer = RSocketServer$1;
+  return RSocketServer;
+}
+var Transport = {};
+var hasRequiredTransport;
+function requireTransport() {
+  if (hasRequiredTransport) return Transport;
+  hasRequiredTransport = 1;
+  Object.defineProperty(Transport, "__esModule", { value: true });
+  return Transport;
+}
+var hasRequiredDist;
+function requireDist() {
+  if (hasRequiredDist) return dist;
+  hasRequiredDist = 1;
+  (function(exports$1) {
+    var __createBinding = dist && dist.__createBinding || (Object.create ? (function(o, m, k, k2) {
+      if (k2 === void 0) k2 = k;
+      Object.defineProperty(o, k2, { enumerable: true, get: function() {
+        return m[k];
+      } });
+    }) : (function(o, m, k, k2) {
+      if (k2 === void 0) k2 = k;
+      o[k2] = m[k];
+    }));
+    var __exportStar = dist && dist.__exportStar || function(m, exports$12) {
+      for (var p2 in m) if (p2 !== "default" && !Object.prototype.hasOwnProperty.call(exports$12, p2)) __createBinding(exports$12, m, p2);
+    };
+    Object.defineProperty(exports$1, "__esModule", { value: true });
+    __exportStar(requireCodecs(), exports$1);
+    __exportStar(requireCommon(), exports$1);
+    __exportStar(requireDeferred(), exports$1);
+    __exportStar(requireErrors(), exports$1);
+    __exportStar(requireFrames(), exports$1);
+    __exportStar(requireRSocket(), exports$1);
+    __exportStar(requireRSocketConnector(), exports$1);
+    __exportStar(requireRSocketServer(), exports$1);
+    __exportStar(requireTransport(), exports$1);
+  })(dist);
+  return dist;
+}
+var distExports = requireDist();
+var version = "1.57.3";
+var PACKAGE = {
+  version
+};
+var WebsocketDuplexConnection = {};
+var hasRequiredWebsocketDuplexConnection;
+function requireWebsocketDuplexConnection() {
+  if (hasRequiredWebsocketDuplexConnection) return WebsocketDuplexConnection;
+  hasRequiredWebsocketDuplexConnection = 1;
+  var __extends = WebsocketDuplexConnection && WebsocketDuplexConnection.__extends || /* @__PURE__ */ (function() {
+    var extendStatics = function(d, b2) {
+      extendStatics = Object.setPrototypeOf || { __proto__: [] } instanceof Array && function(d2, b3) {
+        d2.__proto__ = b3;
+      } || function(d2, b3) {
+        for (var p2 in b3) if (Object.prototype.hasOwnProperty.call(b3, p2)) d2[p2] = b3[p2];
+      };
+      return extendStatics(d, b2);
+    };
+    return function(d, b2) {
+      if (typeof b2 !== "function" && b2 !== null)
+        throw new TypeError("Class extends value " + String(b2) + " is not a constructor or null");
+      extendStatics(d, b2);
+      function __() {
+        this.constructor = d;
+      }
+      d.prototype = b2 === null ? Object.create(b2) : (__.prototype = b2.prototype, new __());
+    };
+  })();
+  Object.defineProperty(WebsocketDuplexConnection, "__esModule", { value: true });
+  WebsocketDuplexConnection.WebsocketDuplexConnection = void 0;
+  var rsocket_core_1 = requireDist();
+  var WebsocketDuplexConnection$1 = (
+    /** @class */
+    (function(_super) {
+      __extends(WebsocketDuplexConnection2, _super);
+      function WebsocketDuplexConnection2(websocket, deserializer, multiplexerDemultiplexerFactory) {
+        var _this = _super.call(this) || this;
+        _this.websocket = websocket;
+        _this.deserializer = deserializer;
+        _this.handleClosed = function(e) {
+          _this.close(new Error(e.reason || "WebsocketDuplexConnection: Socket closed unexpectedly."));
+        };
+        _this.handleError = function(e) {
+          _this.close(e.error);
+        };
+        _this.handleMessage = function(message2) {
+          try {
+            var buffer = Buffer2.from(message2.data);
+            var frame = _this.deserializer.deserializeFrame(buffer);
+            _this.multiplexerDemultiplexer.handle(frame);
+          } catch (error) {
+            _this.close(error);
+          }
+        };
+        websocket.addEventListener("close", _this.handleClosed);
+        websocket.addEventListener("error", _this.handleError);
+        websocket.addEventListener("message", _this.handleMessage);
+        _this.multiplexerDemultiplexer = multiplexerDemultiplexerFactory(_this);
+        return _this;
+      }
+      Object.defineProperty(WebsocketDuplexConnection2.prototype, "availability", {
+        get: function() {
+          return this.done ? 0 : 1;
+        },
+        enumerable: false,
+        configurable: true
+      });
+      WebsocketDuplexConnection2.prototype.close = function(error) {
+        if (this.done) {
+          _super.prototype.close.call(this, error);
+          return;
+        }
+        this.websocket.removeEventListener("close", this.handleClosed);
+        this.websocket.removeEventListener("error", this.handleError);
+        this.websocket.removeEventListener("message", this.handleMessage);
+        this.websocket.close();
+        delete this.websocket;
+        _super.prototype.close.call(this, error);
+      };
+      WebsocketDuplexConnection2.prototype.send = function(frame) {
+        if (this.done) {
+          return;
+        }
+        var buffer = (0, rsocket_core_1.serializeFrame)(frame);
+        this.websocket.send(buffer);
+      };
+      return WebsocketDuplexConnection2;
+    })(rsocket_core_1.Deferred)
+  );
+  WebsocketDuplexConnection.WebsocketDuplexConnection = WebsocketDuplexConnection$1;
+  return WebsocketDuplexConnection;
+}
+var WebsocketDuplexConnectionExports = requireWebsocketDuplexConnection();
+var POWERSYNC_JS_VERSION = PACKAGE.version;
+var DEFAULT_REMOTE_LOGGER = Logger.get("PowerSyncRemote");
+var FetchStrategy;
+(function(FetchStrategy2) {
+  FetchStrategy2["Buffered"] = "buffered";
+  FetchStrategy2["Sequential"] = "sequential";
+})(FetchStrategy || (FetchStrategy = {}));
+var FetchImplementationProvider = class {
+  getFetch() {
+    throw new Error("Unspecified fetch implementation");
+  }
+};
+var DEFAULT_REMOTE_OPTIONS = {
+  socketUrlTransformer: (url) => url.replace(/^https?:\/\//, function(match) {
+    return match === "https://" ? "wss://" : "ws://";
+  }),
+  fetchImplementation: new FetchImplementationProvider(),
+  fetchOptions: {}
+};
+var LockType;
+(function(LockType2) {
+  LockType2["CRUD"] = "crud";
+  LockType2["SYNC"] = "sync";
+})(LockType || (LockType = {}));
+var SyncStreamConnectionMethod;
+(function(SyncStreamConnectionMethod2) {
+  SyncStreamConnectionMethod2["HTTP"] = "http";
+  SyncStreamConnectionMethod2["WEB_SOCKET"] = "web-socket";
+})(SyncStreamConnectionMethod || (SyncStreamConnectionMethod = {}));
+var SyncClientImplementation;
+(function(SyncClientImplementation2) {
+  SyncClientImplementation2["RUST"] = "rust";
+})(SyncClientImplementation || (SyncClientImplementation = {}));
+var DEFAULT_SYNC_CLIENT_IMPLEMENTATION = SyncClientImplementation.RUST;
+var DEFAULT_STREAM_CONNECTION_OPTIONS = {
+  appMetadata: {},
+  connectionMethod: SyncStreamConnectionMethod.WEB_SOCKET,
+  clientImplementation: DEFAULT_SYNC_CLIENT_IMPLEMENTATION,
+  fetchStrategy: FetchStrategy.Buffered,
+  params: {},
+  serializedSchema: void 0,
+  includeDefaultStreams: true
+};
+var DiffTriggerOperation;
+(function(DiffTriggerOperation2) {
+  DiffTriggerOperation2["INSERT"] = "INSERT";
+  DiffTriggerOperation2["UPDATE"] = "UPDATE";
+  DiffTriggerOperation2["DELETE"] = "DELETE";
+})(DiffTriggerOperation || (DiffTriggerOperation = {}));
+var Schema = class _Schema {
+  /*
+    Only available when constructing with mapped typed definition columns
+  */
+  types;
+  props;
+  tables;
+  rawTables;
+  constructor(tables) {
+    if (Array.isArray(tables)) {
+      for (const table of tables) {
+        if (table.name === "") {
+          throw new Error("It appears you are trying to create a new Schema with an array instead of an object. Passing in an object instead of an array into 'new Schema()' may resolve your issue.");
+        }
+      }
+      this.tables = tables;
+    } else {
+      this.props = Object.fromEntries(Object.entries(tables).map(([tableName, table]) => [tableName, table.copyWithName(tableName)]));
+      this.tables = Object.values(this.props);
+    }
+    this.rawTables = [];
+  }
+  /**
+   * Adds raw tables to this schema. Raw tables are identified by their name, but entirely managed by the application
+   * developer instead of automatically by PowerSync.
+   * Since raw tables are not backed by JSON, running complex queries on them may be more efficient. Further, they allow
+   * using client-side table and column constraints.
+   *
+   * @param tables - An object of (table name, raw table definition) entries.
+   */
+  withRawTables(tables) {
+    for (const [name, rawTableDefinition] of Object.entries(tables)) {
+      this.rawTables.push({ name, ...rawTableDefinition });
+    }
+  }
+  validate() {
+    for (const table of this.tables) {
+      table.validate();
+    }
+  }
+  toJSON() {
+    return {
+      tables: this.tables.map((t2) => t2.toJSON()),
+      raw_tables: this.rawTables.map(_Schema.rawTableToJson)
+    };
+  }
+  /**
+   * Returns a representation of the raw table that is understood by the PowerSync SQLite core extension.
+   *
+   * The output of this can be passed through `JSON.serialize` and then used in `powersync_create_raw_table_crud_trigger`
+   * to define triggers for this table.
+   */
+  static rawTableToJson(table) {
+    const serialized = {
+      name: table.name,
+      put: table.put,
+      delete: table.delete,
+      clear: table.clear
+    };
+    if ("schema" in table) {
+      const schema2 = table.schema;
+      serialized.table_name = schema2.tableName ?? table.name;
+      serialized.synced_columns = schema2.syncedColumns;
+      Object.assign(serialized, encodeTableOptions(table.schema));
+    }
+    return serialized;
+  }
+};
+var TypedLogger = Logger;
+var LogLevel = {
+  TRACE: TypedLogger.TRACE,
+  DEBUG: TypedLogger.DEBUG,
+  INFO: TypedLogger.INFO,
+  TIME: TypedLogger.TIME,
+  WARN: TypedLogger.WARN,
+  ERROR: TypedLogger.ERROR,
+  OFF: TypedLogger.OFF
+};
+
+// ../client-core/src/tables/rooms.ts
+var channels2 = new Table({ workspace_id: column.text, slug: column.text, topic: column.text, project_id: column.text, kind: column.text, marketing: column.text, created_by_kind: column.text, created_by: column.text, created_at: column.text }, {
+  indexes: { by_project: ["project_id"] }
+});
+var messages = new Table({
+  workspace_id: column.text,
+  channel_id: column.text,
+  task_id: column.text,
+  thread_id: column.text,
+  // LOCAL-ONLY transport (docs/31): when this send births a thread by replying to a room
+  // message, the root rides here so uploadData can pass it to /v1/messages. The server keeps
+  // the root on `threads`, never on a message, so sync never sends this back down.
+  root_message_id: column.text,
+  // LOCAL-ONLY transport (docs/34), same shape: the composer's Tasks toggle at the moment of
+  // sending. The server applies it ONLY when this message BIRTHS the thread and stores it on
+  // `threads.mode`, so — like the root — it never comes back down on a message row.
+  // Named `birth_mode`, NOT thread_mode: `channels.thread_mode` is the unrelated docs/20 view
+  // lens (threads on/off in a room), and one grep returning both would be a trap.
+  birth_mode: column.text,
+  // docs/10 §15: the composer's brain draft, carried on the send that BIRTHS the thread. Local
+  // only, like birth_mode — the server keeps it on `threads`, so sync never writes it back.
+  birth_brain: column.text,
+  // 0134, rule D9: the session's designated machine and the client that bore it, carried on the
+  // send that BIRTHS the thread. Local only, like the two above — the server keeps them on `threads`.
+  birth_machine: column.text,
+  birth_origin: column.text,
+  // 0144, coding threads: the kind the send births the thread with (`coding` when the composer's
+  // repo chip was set). Local only, like the four above — the server keeps it on `threads.kind`.
+  birth_kind: column.text,
+  author_kind: column.text,
+  author_id: column.text,
+  body: column.text,
+  created_at: column.text,
+  pinned: column.integer,
+  // 0145, routine sessions: the schedule whose run this message opens. Synced, unlike the birth_*
+  // transport above: every client splits a routine's one session into its runs by it.
+  schedule_id: column.text
+}, {
+  indexes: {
+    by_thread: ["thread_id", "created_at"],
+    by_task: ["task_id", "created_at"],
+    by_channel: ["channel_id", "created_at"]
+  }
+});
+var threads = new Table({
+  workspace_id: column.text,
+  channel_id: column.text,
+  title: column.text,
+  description: column.text,
+  created_by: column.text,
+  task_id: column.text,
+  // docs/31: the room message this thread hangs off. The root STAYS in the feed and grows a
+  // replies footer; only the replies live in the thread.
+  root_message_id: column.text,
+  // Archived conversations (0108): set means the human filed it away — it leaves Recents, its
+  // room's session list and search, and lives only in Settings › Archived chats. Null is live.
+  archived_at: column.text,
+  // 0137: when a human settled the thread (thread.settle). A gate or card newer than the stamp
+  // brings it back to Needs you; the stamp itself is never a flag (shared/threadstatus.ts).
+  settled_at: column.text,
+  // docs/34: 'tasks' (the orchestrator triages this into board work) or 'chat' (the agent
+  // answers here and nothing reaches the board). Frozen at birth; moved only by a human.
+  mode: column.text,
+  // 0119: the automation that opened this thread — a routine run wears its own marker (2026-08-22)
+  schedule_id: column.text,
+  // 0134, rule D9: the session's designated machine and the client that bore it (the thread head's toks)
+  machine_id: column.text,
+  origin: column.text,
+  // 0144: 'chat' (a conversation) or 'coding' (the coding runtime works on a repository in it —
+  // the one session surface wears the code face, docs/design/coding-threads-2026-09). Born at the
+  // send, or moved by thread.set_kind (a human, or the room's orchestrator from its triage turn).
+  kind: column.text,
+  // docs/10 §15: role → model, for THIS conversation. jsonb server-side, text here (PowerSync
+  // has no json type) — `parseBrainOverride` is the one reader. Null = the project's brain.
+  brain_override: column.text,
+  created_at: column.text,
+  updated_at: column.text
+}, {
+  indexes: {
+    by_channel: ["channel_id", "updated_at"],
+    by_task: ["task_id", "created_at"],
+    by_root: ["root_message_id"]
+  }
+});
+var channel_members = new Table({ channel_id: column.text, user_id: column.text, created_by: column.text, created_at: column.text });
+
+// ../client-core/src/tables/board.ts
+var tasks = new Table({
+  workspace_id: column.text,
+  channel_id: column.text,
+  number: column.integer,
+  title: column.text,
+  description: column.text,
+  state: column.text,
+  kind: column.text,
+  creator_kind: column.text,
+  creator_id: column.text,
+  assignee_kind: column.text,
+  assignee_id: column.text,
+  offered_agent_id: column.text,
+  requirements: column.text,
+  requirements_confirmed: column.integer,
+  plan_approved_at: column.text,
+  definition_of_done: column.text,
+  repo_id: column.text,
+  base_ref: column.text,
+  branch: column.text,
+  submitted_sha: column.text,
+  pr_url: column.text,
+  pr_number: column.integer,
+  project_id: column.text,
+  artifact_count: column.integer,
+  // the ship gate's release plan (docs/23) — jsonb on the server, JSON text here
+  ship_plan: column.text,
+  // plan-first units (docs/41): the implementation plan — declared journey legs + proposed
+  // subtasks + approach — jsonb on the server, JSON text here (the ship_plan precedent)
+  work_plan: column.text,
+  // thread-owned work (docs/41): the conversation that OWNS this unit (N:1)
+  origin_thread_id: column.text,
+  // subtasks (docs/24): set = this row rides that parent, rendered under it
+  parent_task_id: column.text,
+  // lifecycle timestamps — already in every sync stream (rules `select *`);
+  // declaring them here just materializes them into the client views
+  created_at: column.text,
+  updated_at: column.text,
+  claimed_at: column.text,
+  submitted_at: column.text,
+  approved_at: column.text,
+  accepted_at: column.text,
+  closed_at: column.text
+}, {
+  // indexes: see the note in rooms.ts
+  indexes: {
+    by_channel: ["channel_id", "number"],
+    by_project: ["project_id", "state"]
+  }
+});
+var artifacts = new Table({
+  // Immutable brain object reference. Bytes are fetched through the authorized artifact route.
+  storage_path: column.text,
+  content_hash: column.text,
+  workspace_id: column.text,
+  channel_id: column.text,
+  task_id: column.text,
+  message_id: column.text,
+  // chat attachments: the message this artifact was attached to
+  kind: column.text,
+  name: column.text,
+  mime: column.text,
+  inline_content: column.text,
+  size_bytes: column.integer,
+  width: column.integer,
+  height: column.integer,
+  promoted: column.integer,
+  tags: column.text,
+  // pg text[] arrives as its JSON text — e.g. ["brand"], the rail's filter
+  // who made it, and where the platform took it from (0150): a film's product shot is a real app
+  // screenshot, so only a person's image or a repository file counts (host/frames.ts, 2026-10-06)
+  created_by_kind: column.text,
+  source: column.text,
+  created_at: column.text
+}, {
+  indexes: {
+    by_task: ["task_id", "created_at"],
+    by_channel: ["channel_id", "created_at"]
+  }
+});
+var beats = new Table({
+  workspace_id: column.text,
+  task_id: column.text,
+  run_id: column.text,
+  phase: column.text,
+  role: column.text,
+  seq: column.integer,
+  title: column.text,
+  status: column.text,
+  started_at: column.text,
+  done_at: column.text,
+  created_at: column.text,
+  updated_at: column.text
+}, {
+  indexes: { by_task: ["task_id", "created_at"] }
+});
+var runs = new Table({
+  workspace_id: column.text,
+  channel_id: column.text,
+  thread_id: column.text,
+  task_id: column.text,
+  agent_id: column.text,
+  parent_run_id: column.text,
+  kind: column.text,
+  title: column.text,
+  state: column.text,
+  step: column.text,
+  // `role·model[·@specialist]` — which config a leg runs on (0103). Stored, not derived: a subagent
+  // has no `agents` row, so a leg's agent_id is its PARENT's and the roster cannot answer it.
+  seat: column.text,
+  done: column.integer,
+  total: column.integer,
+  summary: column.text,
+  // Shared compute (0114): WHICH member's machine served this run, and (for wake runs) the
+  // message it answers — the pair the run lease is built on. Declared here or the replica has no
+  // such column and any query naming it throws; the runs watches swallow onError, so that failure
+  // is INVISIBLE — the Activity view and the rail simply go empty.
+  machine_id: column.text,
+  trigger_message_id: column.text,
+  started_at: column.text,
+  ended_at: column.text,
+  updated_at: column.text
+}, {
+  indexes: {
+    by_channel: ["channel_id", "started_at"],
+    by_state: ["workspace_id", "state"],
+    by_agent: ["agent_id", "state"]
+  }
+});
+var decisions = new Table({
+  workspace_id: column.text,
+  channel_id: column.text,
+  task_id: column.text,
+  message_id: column.text,
+  asker_kind: column.text,
+  asker_id: column.text,
+  question: column.text,
+  options: column.text,
+  // jsonb arrives as JSON text — the renderer parses
+  allow_other: column.integer,
+  // PowerSync has no boolean type — 0/1
+  status: column.text,
+  answer: column.text,
+  answered_by_kind: column.text,
+  answered_by_id: column.text,
+  created_at: column.text,
+  answered_at: column.text
+}, {
+  indexes: { by_workspace: ["workspace_id", "created_at"] }
+});
+
+// ../client-core/src/tables/crew.ts
+var machines = new Table({
+  workspace_id: column.text,
+  // Shared compute (0114): a workspace's agents run on MEMBERS' machines, so a host has to be
+  // able to answer "whose machine is that, and can it serve this runtime?" about its PEERS —
+  // both are inputs to the origin-affinity policy in shared/src/compute.ts. The sync rule is
+  // `select * from machines`, so these already arrive; they just had to be declared to be read.
+  owner_user_id: column.text,
+  runtimes: column.text,
+  // jsonb array, surfaced as text by the SQLite replica
+  name: column.text,
+  platform: column.text,
+  // local | member | runner (0126) — the browser client resolves the workspace's RUNNER to
+  // register its starter crew against, since a browser has no machine of its own
+  kind: column.text,
+  daemon_version: column.text,
+  last_seen_at: column.text
+});
+var agents = new Table({
+  workspace_id: column.text,
+  machine_id: column.text,
+  name: column.text,
+  role: column.text,
+  model: column.text,
+  runtime: column.text,
+  model_source: column.text,
+  // 'pack' | 'manual' — drives the per-agent "pinned" badge + pack-apply targeting
+  emoji: column.text,
+  card: column.text,
+  kind: column.text,
+  endpoint_url: column.text,
+  status: column.text,
+  retired_at: column.text,
+  // soft retirement (0054): null = active; selection paths filter on it
+  // The two agent strings (0110), two readers: `description` ROUTES — what it does + when to
+  // route work here, read by the orchestrator in list_agents and published on the A2A card;
+  // `brief` INSTRUCTS — how it works, injected into every turn. Surfaced as "Instructions".
+  description: column.text,
+  brief: column.text
+});
+var agent_channels = new Table({ agent_id: column.text, channel_id: column.text, created_by_kind: column.text, created_by: column.text, created_at: column.text }, {
+  indexes: { by_agent: ["agent_id"], by_channel: ["channel_id"] }
+});
+var workspace_members = new Table({ workspace_id: column.text, user_id: column.text, role: column.text, display_name: column.text, compute: column.text, agent_models: column.text });
+var policies = new Table({
+  workspace_id: column.text,
+  scope: column.text,
+  project_id: column.text,
+  channel_id: column.text,
+  agent_id: column.text,
+  capability: column.text,
+  selector: column.text,
+  verdict: column.text,
+  rationale: column.text,
+  locked: column.integer,
+  created_by_kind: column.text,
+  created_by_id: column.text,
+  created_at: column.text,
+  updated_at: column.text
+});
+
+// ../client-core/src/tables/content.ts
+var schedules = new Table({
+  workspace_id: column.text,
+  channel_id: column.text,
+  title: column.text,
+  cadence: column.text,
+  at_time: column.text,
+  tz: column.text,
+  weekday: column.integer,
+  next_run_at: column.text,
+  run_count: column.integer,
+  agent_id: column.text,
+  payload: column.text,
+  status: column.text,
+  created_by_kind: column.text,
+  created_by: column.text,
+  last_run_at: column.text,
+  last_error: column.text,
+  created_at: column.text
+});
+var content_items = new Table({
+  workspace_id: column.text,
+  channel_id: column.text,
+  schedule_id: column.text,
+  task_id: column.text,
+  // 0115 — a draft written in a CONVERSATION rather than on a content task
+  thread_id: column.text,
+  platform: column.text,
+  body: column.text,
+  media: column.text,
+  status: column.text,
+  scheduled_at: column.text,
+  published_at: column.text,
+  external_url: column.text,
+  approved_by: column.text,
+  approved_at: column.text,
+  created_by_kind: column.text,
+  created_by: column.text,
+  last_error: column.text,
+  created_at: column.text
+});
+var reply_reminders = new Table({
+  workspace_id: column.text,
+  thread_id: column.text,
+  message_id: column.text,
+  member_id: column.text,
+  letter: column.text,
+  platform: column.text,
+  handle: column.text,
+  draft: column.text,
+  open_url: column.text,
+  due_at: column.text,
+  state: column.text,
+  notified_at: column.text,
+  created_at: column.text,
+  updated_at: column.text
+});
+var connectors = new Table({
+  workspace_id: column.text,
+  // the room the OAuth round-trip was started from; `project_id` is what IDENTITY belongs to and
+  // what the uniqueness reads (0106) — one X account per PROJECT, not per workspace.
+  channel_id: column.text,
+  project_id: column.text,
+  provider: column.text,
+  handle: column.text,
+  status: column.text,
+  scopes: column.text,
+  connected_by: column.text,
+  created_at: column.text
+});
+var skills = new Table({
+  workspace_id: column.text,
+  channel_id: column.text,
+  name: column.text,
+  description: column.text,
+  scope: column.text,
+  body: column.text,
+  status: column.text,
+  author_kind: column.text,
+  author_id: column.text,
+  version: column.integer,
+  pack_id: column.text,
+  enabled: column.integer,
+  // PowerSync has no boolean type — 0/1
+  created_at: column.text,
+  updated_at: column.text
+});
+var skill_packs = new Table({
+  workspace_id: column.text,
+  channel_id: column.text,
+  name: column.text,
+  description: column.text,
+  source_url: column.text,
+  source_ref: column.text,
+  version: column.text,
+  origin: column.text,
+  enabled: column.integer,
+  status: column.text,
+  step: column.text,
+  progress: column.integer,
+  error: column.text,
+  created_at: column.text,
+  updated_at: column.text
+});
+var whiteboards = new Table({
+  workspace_id: column.text,
+  channel_id: column.text,
+  thread_id: column.text,
+  task_id: column.text,
+  title: column.text,
+  scene: column.text,
+  source: column.text,
+  snapshot_svg: column.text,
+  snapshot_rev: column.integer,
+  rev: column.integer,
+  archived_at: column.text,
+  created_by_kind: column.text,
+  created_by: column.text,
+  updated_by_kind: column.text,
+  updated_by: column.text,
+  created_at: column.text,
+  updated_at: column.text
+});
+var code_sessions = new Table({
+  workspace_id: column.text,
+  // 0144: the coding thread this session belongs to (its id is the thread id); null on a legacy session
+  thread_id: column.text,
+  project_id: column.text,
+  repo_id: column.text,
+  repo_name: column.text,
+  branch: column.text,
+  title: column.text,
+  mode: column.text,
+  state: column.text,
+  machine_id: column.text,
+  created_by: column.text,
+  last_line: column.text,
+  changes_count: column.integer,
+  checkpoints_count: column.integer,
+  created_at: column.text,
+  updated_at: column.text,
+  ended_at: column.text
+});
+
+// ../client-core/src/tables/infra.ts
+var projects = new Table({ workspace_id: column.text, channel_id: column.text, slug: column.text, name: column.text, description: column.text, status: column.text, is_default: column.integer, auto_open_pr: column.integer, run_ci_before_merge: column.integer, ship_gate: column.integer, website: column.text, logo_url: column.text, model_pack: column.text });
+var repos = new Table({
+  workspace_id: column.text,
+  provider: column.text,
+  org_name: column.text,
+  name: column.text,
+  default_branch: column.text,
+  clone_url: column.text,
+  local_path: column.text
+});
+var project_repos = new Table({
+  project_id: column.text,
+  repo_id: column.text,
+  is_primary: column.integer
+});
+var memory_blocks = new Table({
+  workspace_id: column.text,
+  channel_id: column.text,
+  project_id: column.text,
+  kind: column.text,
+  content: column.text,
+  basis_count: column.integer,
+  updated_at: column.text
+});
+
+// ../client-core/src/schema.ts
+var TABLES = { channels: channels2, projects, messages, threads, tasks, machines, agents, agent_channels, repos, project_repos, artifacts, beats, runs, decisions, policies, memory_blocks, skills, skill_packs, schedules, content_items, connectors, workspace_members, channel_members, whiteboards, code_sessions, reply_reminders };
+var AppSchema = new Schema(TABLES);
+var TABLE_COLUMNS = Object.fromEntries(
+  Object.entries(TABLES).map(([name, table]) => [
+    name,
+    Object.fromEntries(Object.entries(table.columnMap).map(([col, def]) => [col, def.type === ColumnType.INTEGER ? "integer" : "text"]))
+  ])
+);
+
+// ../client-core/src/replica.ts
+var LOCAL_SYNC_SCHEMA_VERSION = 1;
+
+// src/local-sync.ts
+var schema = createHash9("sha256").update(JSON.stringify(TABLE_COLUMNS)).digest("hex");
+var nextPruneAt = 0;
+var encode2 = (cursor) => Buffer.from(JSON.stringify(cursor)).toString("base64url");
+function decodeLocalCursor(raw) {
+  try {
+    const c = JSON.parse(Buffer.from(raw, "base64url").toString("utf8"));
+    return /^\d+$/.test(c.revision) && typeof c.scope === "string" && typeof c.schema === "string" ? c : null;
+  } catch {
+    return null;
+  }
+}
+function localReplicaRow(table, source) {
+  const row = { id: source["id"] };
+  for (const [column2, type] of Object.entries(TABLE_COLUMNS[table] ?? {})) {
+    const value = source[column2];
+    row[column2] = value == null ? null : type === "integer" ? Number(value) : typeof value === "object" ? JSON.stringify(value) : String(value);
+  }
+  return row;
+}
+async function authorization(sql, actor) {
+  const members = await sql`
+    select workspace_id, id, created_at::text from workspace_members where user_id = ${actor.id} order by workspace_id`;
+  return { workspaces: members.map((m) => m.workspace_id), scope: createHash9("sha256").update(JSON.stringify([actor.id, members])).digest("hex") };
+}
+function workspaceExpression(table) {
+  if (table === "agent_channels") return "(select workspace_id from agents where id = t.agent_id)";
+  if (table === "project_repos") return "(select workspace_id from repos where id = t.repo_id)";
+  if (table === "channel_members") return "(select workspace_id from channels where id = t.channel_id)";
+  return "t.workspace_id";
+}
+async function pruneLocalChanges(sql) {
+  await sql.begin(async (tx) => {
+    await tx`select revision from local_sync_state where singleton for update`;
+    const [cut2] = await tx`
+      select max(revision)::text as revision from (
+        select revision from local_sync_changes
+        where revision < coalesce((select min(revision) from local_sync_changes where created_at >= now() - interval '30 days'), 9223372036854775807)
+        order by revision limit 10000
+      ) expired`;
+    if (!cut2?.revision) return;
+    await tx`delete from local_sync_changes where revision <= ${cut2.revision}::bigint`;
+    await tx`update local_sync_state set retained_after = greatest(retained_after, ${cut2.revision}::bigint) where singleton`;
+  });
+}
+async function localBootstrap(sql, actor) {
+  const [current] = await sql`select enabled from local_sync_state where singleton`;
+  if (!current?.enabled) {
+    await sql.begin(async (tx) => {
+      await tx.unsafe(`lock table ${Object.keys(TABLE_COLUMNS).sort().map((table) => `"${table}"`).join(",")} in share row exclusive mode`);
+      await tx`update local_sync_state set enabled = true where singleton and not enabled`;
+    });
+  }
+  return sql.begin("isolation level repeatable read read only", async (tx) => {
+    const auth = await authorization(tx, actor);
+    const [state] = await tx`select revision::text from local_sync_state where singleton`;
+    const changes = [];
+    if (auth.workspaces.length) {
+      for (const table of Object.keys(TABLE_COLUMNS)) {
+        const rows2 = await tx.unsafe(
+          `select to_jsonb(t) as row from "${table}" t where ${workspaceExpression(table)} = any($1::uuid[]) order by t.id`,
+          [auth.workspaces]
+        );
+        for (const { row } of rows2) changes.push({ table, id: String(row["id"]), row: localReplicaRow(table, row) });
+      }
+    }
+    return { schemaVersion: LOCAL_SYNC_SCHEMA_VERSION, cursor: encode2({ revision: state.revision, scope: auth.scope, schema }), workspaces: auth.workspaces, changes, hasMore: false };
+  });
+}
+async function localChanges(sql, actor, cursor, limit = 1e3) {
+  return sql.begin("isolation level repeatable read read only", async (tx) => {
+    const auth = await authorization(tx, actor);
+    const [state] = await tx`
+      select revision::text, retained_after::text from local_sync_state where singleton`;
+    if (cursor.scope !== auth.scope || cursor.schema !== schema || BigInt(cursor.revision) < BigInt(state.retained_after) || BigInt(cursor.revision) > BigInt(state.revision)) return null;
+    const page2 = await tx`
+      select revision::text, transaction_id::text from local_sync_changes where revision > ${cursor.revision}::bigint
+      order by revision limit ${limit}`;
+    const last = page2.at(-1);
+    const [end] = last ? await tx`
+      select max(revision)::text as revision from local_sync_changes where transaction_id = ${last.transaction_id}::bigint` : [];
+    const revision = end?.revision ?? state.revision;
+    const rows2 = auth.workspaces.length ? await tx`
+      select table_name, row_id, row_data from local_sync_changes
+      where revision > ${cursor.revision}::bigint and revision <= ${revision}::bigint and workspace_id = any(${auth.workspaces}::uuid[]) order by revision` : [];
+    return {
+      schemaVersion: LOCAL_SYNC_SCHEMA_VERSION,
+      cursor: encode2({ revision, scope: auth.scope, schema }),
+      workspaces: auth.workspaces,
+      changes: rows2.filter((r) => TABLE_COLUMNS[r.table_name]).map((r) => ({ table: r.table_name, id: r.row_id, row: r.row_data ? localReplicaRow(r.table_name, r.row_data) : null })),
+      hasMore: BigInt(revision) < BigInt(state.revision)
+    };
+  });
+}
+function localSyncRoutes(app, store2) {
+  app.get("/v1/sync/:operation", async (c) => {
+    if (!localMode() && process.env["NM_LOCAL_SYNC"] !== "1") return c.json({ error: "Local sync is disabled", code: "NOT_FOUND" }, 404);
+    const actor = c.get("actor");
+    if (localMode() && !/^Bearer nmh_/i.test(c.req.header("authorization") ?? "")) return c.json({ error: "Local sync requires the local human credential", code: "NOT_PERMITTED" }, 403);
+    if (actor.kind !== "human") return c.json({ error: "Local sync requires a human identity", code: "NOT_PERMITTED" }, 403);
+    const sql = store2.sql;
+    if (!sql) return c.json({ error: "Local sync requires Postgres", code: "UNAVAILABLE" }, 503);
+    if (Date.now() >= nextPruneAt) {
+      nextPruneAt = Date.now() + 36e5;
+      await pruneLocalChanges(sql);
+    }
+    if (c.req.param("operation") === "bootstrap") return c.json(await localBootstrap(sql, actor));
+    if (c.req.param("operation") !== "changes") return c.json({ error: "Unknown sync operation" }, 404);
+    const cursor = decodeLocalCursor(c.req.query("cursor") ?? "");
+    if (!cursor) return c.json({ error: "Invalid sync cursor", code: "INVALID_CURSOR" }, 400);
+    const batch = await localChanges(sql, actor, cursor);
+    return batch ? c.json(batch) : c.json({ error: "A fresh replica snapshot is required", code: "RESET_REQUIRED" }, 409);
   });
 }
 
@@ -21504,163 +31796,17 @@ function webFrameRoute(app) {
 
 // src/starter-video.ts
 init_src();
-import { z as z22 } from "zod";
-
-// src/fal.ts
-var FAL_QUEUE = "https://queue.fal.run";
-var headers = (key2) => ({ authorization: `Key ${key2}`, "content-type": "application/json" });
-var queueBase = (endpoint) => endpoint.split("/").slice(0, 2).join("/");
-var unavailable = (status, msg2) => status === 404 || status === 422 && /not found|unavailable|deprecated|no longer/i.test(msg2);
-async function falSubmit(key2, endpoint, input, fetchFn = fetch, timeoutSeconds = 480) {
-  const res = await fetchFn(`${FAL_QUEUE}/${endpoint}`, { method: "POST", headers: { ...headers(key2), "x-fal-request-timeout": String(timeoutSeconds) }, body: JSON.stringify(input) }).catch((e) => new Response(JSON.stringify({ detail: String(e) }), { status: 599 }));
-  const body = await res.json().catch(() => null);
-  if (res.ok && body?.request_id) return { requestId: body.request_id, status: res.status };
-  const msg2 = typeof body?.detail === "string" ? body.detail : Array.isArray(body?.detail) ? JSON.stringify(body.detail) : body?.error ?? `fal ${res.status}`;
-  return { error: msg2, status: res.status, unavailable: unavailable(res.status, msg2) };
-}
-async function falStatus(key2, endpoint, requestId, fetchFn = fetch) {
-  const res = await fetchFn(`${FAL_QUEUE}/${queueBase(endpoint)}/requests/${requestId}/status`, { headers: headers(key2) }).catch((e) => new Response(JSON.stringify({ detail: String(e) }), { status: 599 }));
-  const body = await res.json().catch(() => null);
-  if (!res.ok) return { state: "failed", error: typeof body?.detail === "string" ? body.detail : `fal status ${res.status}` };
-  if (body?.error) return { state: "failed", error: body.error };
-  if (body?.status === "COMPLETED") return { state: "done" };
-  if (body?.status === "IN_PROGRESS") return { state: "running" };
-  return { state: "queued", ...typeof body?.queue_position === "number" ? { position: body.queue_position } : {} };
-}
-async function falResult(key2, endpoint, requestId, fetchFn = fetch) {
-  const res = await fetchFn(`${FAL_QUEUE}/${queueBase(endpoint)}/requests/${requestId}`, { headers: headers(key2) }).catch((e) => new Response(JSON.stringify({ detail: String(e) }), { status: 599 }));
-  const body = await res.json().catch(() => null);
-  if (!res.ok) return { error: typeof body?.detail === "string" ? body.detail : body?.error ?? `fal result ${res.status}` };
-  if (!body?.video?.url) return { error: "the film came back without a video" };
-  return { url: body.video.url, contentType: body.video.content_type };
-}
-async function falUpload(key2, bytes, contentType, fileName, fetchFn = fetch) {
-  const init = await fetchFn("https://rest.alpha.fal.ai/storage/upload/initiate?storage_type=fal-cdn-v3", { method: "POST", headers: headers(key2), body: JSON.stringify({ content_type: contentType, file_name: fileName }) }).catch((e) => new Response(JSON.stringify({ detail: String(e) }), { status: 599 }));
-  const body = await init.json().catch(() => null);
-  if (!init.ok || !body?.upload_url || !body.file_url) return { error: typeof body?.detail === "string" ? body.detail : `fal upload ${init.status}` };
-  const put = await fetchFn(body.upload_url, { method: "PUT", headers: { "content-type": contentType }, body: bytes }).catch(() => null);
-  if (!put?.ok) return { error: `fal upload put ${put?.status ?? "no answer"}` };
-  return { url: body.file_url };
-}
-async function falRun(key2, endpoint, input, fetchFn = fetch, timeoutMs = 9e4) {
-  const res = await fetchFn(`https://fal.run/${endpoint}`, { method: "POST", headers: headers(key2), body: JSON.stringify(input), signal: AbortSignal.timeout(timeoutMs) }).catch((e) => new Response(JSON.stringify({ detail: e instanceof Error && e.name === "TimeoutError" ? "timed out" : String(e) }), { status: 599 }));
-  const body = await res.json().catch(() => null);
-  if (!res.ok || !body) return { error: typeof body?.detail === "string" ? body.detail : `fal ${endpoint} ${res.status}` };
-  return { result: body };
-}
-
-// src/film-compose.ts
-var FRAME_W = 720;
-var FRAME_H = 1280;
-var FPS = 24;
-var MIN_PIECE = 0.25;
-var GROUND = "#141414";
-function imageSize(dataUrl) {
-  const m = /^data:image\/([a-z0-9.+-]+);base64,/i.exec(dataUrl);
-  if (!m) return null;
-  const b2 = Buffer.from(dataUrl.slice(m[0].length, m[0].length + 2e5), "base64");
-  if (b2.length > 24 && b2[0] === 137 && b2[1] === 80) return { w: b2.readUInt32BE(16), h: b2.readUInt32BE(20) };
-  if (b2.length > 4 && b2[0] === 255 && b2[1] === 216) {
-    for (let at = 2; at + 9 < b2.length; ) {
-      if (b2[at] !== 255) {
-        at += 1;
-        continue;
-      }
-      const marker = b2[at + 1];
-      if (marker === 216 || marker >= 208 && marker <= 215 || marker === 1) {
-        at += 2;
-        continue;
-      }
-      const len = b2.readUInt16BE(at + 2);
-      if (marker >= 192 && marker <= 207 && marker !== 196 && marker !== 200 && marker !== 204) return { h: b2.readUInt16BE(at + 5), w: b2.readUInt16BE(at + 7) };
-      at += 2 + len;
-    }
-  }
-  return null;
-}
-function productFrameSvg(dataUrl, w = FRAME_W, h = FRAME_H) {
-  const pad = Math.round(w * 0.04);
-  const iw = w - pad * 2;
-  const size = imageSize(dataUrl);
-  const wide = !!size && size.w / size.h > 1.25;
-  const ih = wide ? Math.round(iw * 1.25) : h - pad * 2;
-  const y = wide ? Math.round((h - ih) / 2) : pad;
-  const r = Math.round(w * 0.03);
-  return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><defs><clipPath id="c"><rect x="${pad}" y="${y}" width="${iw}" height="${ih}" rx="${r}" ry="${r}"/></clipPath></defs><rect width="${w}" height="${h}" fill="${GROUND}"/><image x="${pad}" y="${y}" width="${iw}" height="${ih}" preserveAspectRatio="xMidYMid ${wide ? "slice" : "meet"}" clip-path="url(#c)" xlink:href="${dataUrl}" href="${dataUrl}"/></svg>`;
-}
-async function renderProductFrame(dataUrl, opts = {}) {
-  const { Resvg } = await resvgModule(opts.initWasm !== false);
-  const r = new Resvg(productFrameSvg(dataUrl), { fitTo: { mode: "original" } });
-  try {
-    const img = r.render();
-    try {
-      return img.asPng();
-    } finally {
-      img.free();
-    }
-  } finally {
-    r.free();
-  }
-}
-function timeline(seconds, shots) {
-  const out = [];
-  let at = 0;
-  for (const shot of [...shots].sort((a, b2) => a.start - b2.start)) {
-    const start = Math.max(at, Math.min(shot.start, seconds));
-    const end = Math.min(shot.end, seconds);
-    if (end - start < MIN_PIECE) continue;
-    if (start - at >= MIN_PIECE) out.push({ kind: "film", start: at, end: start });
-    out.push({ kind: "shot", start, end, shot });
-    at = end;
-  }
-  if (seconds - at >= MIN_PIECE) out.push({ kind: "film", start: at, end: seconds });
-  return out;
-}
-async function composeShots(key2, clipUrl, seconds, shots, opts = {}) {
-  const fetchFn = opts.fetchFn ?? fetch;
-  const pieces = timeline(seconds, shots);
-  const wanted = pieces.filter((p2) => p2.kind === "shot").length;
-  if (!wanted) return { applied: 0, why: "no product beat fell inside the film" };
-  const frames = /* @__PURE__ */ new Map();
-  for (const p2 of pieces) {
-    if (p2.kind !== "shot" || frames.has(p2.shot.show)) continue;
-    let png;
-    try {
-      png = await renderProductFrame(p2.shot.dataUrl, { initWasm: opts.initWasm });
-    } catch (e) {
-      return { applied: 0, why: `the product frame for ${p2.shot.show} did not render (${e instanceof Error ? e.message : String(e)})` };
-    }
-    const up = await falUpload(key2, png, "image/png", `${p2.shot.show.replace(/[^\w.-]+/g, "-")}.png`, fetchFn);
-    if (!up.url) return { applied: 0, why: `the product frame did not upload (${up.error ?? "no answer"})` };
-    frames.set(p2.shot.show, up.url);
-  }
-  const urls = [];
-  for (const p2 of pieces) {
-    if (p2.kind === "film") {
-      const r = await falRun(key2, "fal-ai/workflow-utilities/trim-video", { video_url: clipUrl, start_time: p2.start, end_time: p2.end }, fetchFn);
-      if (!r.result?.video?.url) return { applied: 0, why: `the film did not trim at ${p2.start}-${p2.end} s (${r.error ?? "no video"})` };
-      urls.push(r.result.video.url);
-    } else {
-      const r = await falRun(key2, "fal-ai/ffmpeg-api/images-to-video", { fps: FPS, images: [{ url: frames.get(p2.shot.show), frames: Math.max(1, Math.round((p2.end - p2.start) * FPS)) }] }, fetchFn);
-      if (!r.result?.video?.url) return { applied: 0, why: `the product shot ${p2.shot.show} did not render as a clip (${r.error ?? "no video"})` };
-      urls.push(r.result.video.url);
-    }
-  }
-  const tracks = [
-    { id: "video", type: "video", keyframes: pieces.map((p2, i) => ({ timestamp: Math.round(p2.start * 1e3), url: urls[i], duration: Math.round((p2.end - p2.start) * 1e3) })) },
-    { id: "audio", type: "audio", keyframes: [{ timestamp: 0, url: clipUrl, duration: Math.round(seconds * 1e3) }] }
-  ];
-  const c = await falRun(key2, "fal-ai/ffmpeg-api/compose", { tracks }, fetchFn, 12e4);
-  if (!c.result?.video_url) return { applied: 0, why: `the pieces did not compose (${c.error ?? "no video"})` };
-  return { url: c.result.video_url, applied: wanted };
-}
-
-// src/starter-video.ts
+import { z as z23 } from "zod";
 var FILM_MAX_BYTES = 4e7;
 var filmTimeoutMs = (seconds) => Math.max(12 * 6e4, seconds * 4e4);
 var SYSTEM = { kind: "agent", id: "00000000-0000-0000-0000-000000000000" };
-var FilmSchema = z22.object({ workspace: z22.string().uuid(), item: z22.string().uuid(), prompt: z22.string().min(8).max(2e3) });
-var tierView = (t2) => ({ tier: t2.tier, label: t2.label, model: t2.model.label, vendor: t2.model.vendor, seconds: t2.seconds, credits: t2.credits, lengths: t2.lengths, perSecondMicros: t2.model.perSecondMicros });
+var FilmSchema = z23.object({ workspace: z23.string().uuid(), item: z23.string().uuid(), prompt: z23.string().min(8).max(2e3) });
+var FILM_FAILED = "The film failed. Your credits are back. Try again.";
+var FILM_REFUSED = "NeuraMesh Video refused this script. Change the script, then try again. Your credits are back.";
+var FILM_LOST = "The film did not reach this card. Your credits are back. Try again.";
+var FILM_NOT_STARTED = "NeuraMesh Video did not start the film. Your credits are back. Try again later.";
+var filmSlow = (minutes) => `The film took longer than ${minutes} minutes. Your credits are back. Try again.`;
+var tierView = (t2) => ({ tier: t2.tier, label: t2.label, model: houseModel(t2.model), seconds: t2.seconds, credits: t2.credits, lengths: t2.lengths, perSecondMicros: t2.model.perSecondMicros });
 function starterVideoRoutes(app, store2, opts = {}) {
   const ledger = opts.ledger === void 0 ? ledgerFor(store2) : opts.ledger;
   const env = opts.env ?? process.env;
@@ -21702,8 +31848,9 @@ function starterVideoRoutes(app, store2, opts = {}) {
     const key2 = env["FAL_KEY"];
     const sub = await falSubmit(key2, endpoint, input, fetchFn, Math.ceil(filmTimeoutMs(seconds) / 1e3));
     if (!sub.requestId) {
-      await ledger.refundFilm(workspace, { grantMicros: spent.grantMicros, purchasedMicros: spent.purchasedMicros, seconds }, `refund: ${tier.model.label} did not accept the film`);
-      return c.json({ error: sub.error ?? "the film was not accepted", code: sub.unavailable ? "UNAVAILABLE" : "UPSTREAM" }, sub.unavailable ? 503 : 502);
+      await ledger.refundFilm(workspace, { grantMicros: spent.grantMicros, purchasedMicros: spent.purchasedMicros, seconds }, `refund: ${tier.label} did not start the film`);
+      console.warn(`starter_film item=${item.slice(0, 8)} not accepted (${sub.status ?? "no status"}): ${sub.error ?? "no reason"}`);
+      return c.json({ error: FILM_NOT_STARTED, code: sub.unavailable ? "UNAVAILABLE" : "UPSTREAM" }, sub.unavailable ? 503 : 502);
     }
     const { id } = await store2.films.create({ workspaceId: workspace, itemId: item, tier: tier.tier, model: tier.model.key, endpoint, requestId: sub.requestId, seconds, micros, grantMicros: spent.grantMicros, purchasedMicros: spent.purchasedMicros, createdBy: actor.kind === "human" ? actor.id : null, frame: media.frame ?? null, frameUsed: !!lane });
     await store2.reviseDraft(item, { body: null, imageBrief: null, thumb: null, videoPending: true, videoError: "" }, (ws) => createEvent({ type: "content.updated", source: formatAddress({ kind: actor.kind, id: actor.id }), target: formatAddress({ kind: "resource", type: "content", id: item }), workspace: ws, payload: { item, filming: id } })).catch(() => {
@@ -21729,14 +31876,16 @@ async function filmsDue(store2, opts = {}) {
   if (!store2.films || !ledger || !key2) return [];
   const out = [];
   for (const row of await store2.films.open(opts.limit ?? 10)) {
-    const fail = async (why) => {
-      await ledger.refundFilm(row.workspaceId, { grantMicros: row.grantMicros, purchasedMicros: row.purchasedMicros, seconds: row.seconds }, `refund: film ${row.id.slice(0, 8)} on ${row.model} failed`);
+    const fail = async (why, said = FILM_FAILED) => {
+      await ledger.refundFilm(row.workspaceId, { grantMicros: row.grantMicros, purchasedMicros: row.purchasedMicros, seconds: row.seconds }, `refund: film ${row.id.slice(0, 8)} on the ${row.tier} tier failed`);
       await store2.films.update(row.id, { status: "failed", error: why, finishedAt: new Date(now()).toISOString() });
-      await patchDraft(store2, row, { videoPending: false, videoError: why });
+      console.warn(`starter_film film=${row.id.slice(0, 8)} failed: ${why}`);
+      await patchDraft(store2, row, { videoPending: false, videoError: said });
       out.push({ id: row.id, outcome: `failed: ${why}` });
     };
+    const limit = Math.round(filmTimeoutMs(row.seconds) / 6e4);
     if (now() - new Date(row.createdAt).getTime() > filmTimeoutMs(row.seconds)) {
-      await fail(`the film took longer than ${Math.round(filmTimeoutMs(row.seconds) / 6e4)} minutes`);
+      await fail(`the film took longer than ${limit} minutes`, filmSlow(limit));
       continue;
     }
     if (!row.requestId) {
@@ -21745,7 +31894,7 @@ async function filmsDue(store2, opts = {}) {
     }
     const st = await falStatus(key2, row.endpoint, row.requestId, fetchFn);
     if (st.state === "failed") {
-      await fail(st.error ?? "the film failed");
+      await fail(st.error ?? "the film failed", st.errorType === "content_policy" ? FILM_REFUSED : FILM_FAILED);
       continue;
     }
     if (st.state !== "done") {
@@ -21764,31 +31913,32 @@ async function filmsDue(store2, opts = {}) {
     if (shots.asked) {
       const c = shots.list.length ? await composeShots(key2, res.url, row.seconds, shots.list, { fetchFn, initWasm: opts.initWasm }) : { applied: 0, why: shots.why };
       if (c.url) clipUrl = c.url;
+      if ("detail" in c && c.detail) console.warn(`starter_film film=${row.id.slice(0, 8)} shots not cut in: ${c.detail}`);
       shotsMeta = { asked: shots.asked, applied: c.applied, ...c.why ? { why: c.why } : {} };
     }
     const dl = await fetchFn(clipUrl, { redirect: "follow" }).catch(() => null);
     if (!dl?.ok) {
-      await fail(`the film could not be downloaded (${dl?.status ?? "no answer"})`);
+      await fail(`the film could not be downloaded (${dl?.status ?? "no answer"})`, FILM_LOST);
       continue;
     }
     const bytes = Buffer.from(await dl.arrayBuffer());
     if (!bytes.length) {
-      await fail("the film downloaded empty");
+      await fail("the film downloaded empty", FILM_LOST);
       continue;
     }
     if (bytes.length > FILM_MAX_BYTES) {
-      await fail(`the film is too large to attach (${Math.round(bytes.length / 1e6)} MB, max ${FILM_MAX_BYTES / 1e6} MB)`);
+      await fail(`the film is too large to attach (${Math.round(bytes.length / 1e6)} MB, max ${FILM_MAX_BYTES / 1e6} MB)`, FILM_LOST);
       continue;
     }
     const mime = sniffVideoMime(new Uint8Array(bytes.subarray(0, 16))) ?? res.contentType ?? "video/mp4";
     try {
       await store2.attachContentMedia(row.itemId, mime, bytes, SYSTEM, (ws) => createEvent({ type: "content.updated", source: formatAddress(SYSTEM), target: formatAddress({ kind: "resource", type: "content", id: row.itemId }), workspace: ws, payload: { item: row.itemId, media: "hosted", film: row.id } }));
     } catch (e) {
-      await fail(`the film did not attach to the draft (${e instanceof Error ? e.message : String(e)})`);
+      await fail(`the film did not attach to the draft (${e instanceof Error ? e.message : String(e)})`, FILM_LOST);
       continue;
     }
     const at = new Date(now()).toISOString();
-    await patchDraft(store2, row, { videoPending: false, videoError: "", videoMeta: { tier: row.tier, model: VIDEO_MODELS[row.model]?.label ?? row.model, seconds: row.seconds, credits: Math.ceil(row.micros / CREDIT_MICROS), at, frame: row.frame, frameUsed: row.frameUsed, ...shotsMeta ? { shots: shotsMeta } : {} } });
+    await patchDraft(store2, row, { videoPending: false, videoError: "", videoMeta: { tier: row.tier, model: houseModel(VIDEO_MODELS[row.model]), seconds: row.seconds, credits: Math.ceil(row.micros / CREDIT_MICROS), at, frame: row.frame, frameUsed: row.frameUsed, ...shotsMeta ? { shots: shotsMeta } : {} } });
     await store2.films.update(row.id, { status: "done", finishedAt: at });
     out.push({ id: row.id, outcome: "done" });
   }
@@ -21954,8 +32104,8 @@ var PushService = class {
     if (recipients.length === 0) return;
     const devices = await this.store.devicesForUsers(recipients);
     if (devices.length === 0) return;
-    const messages = devices.map((d) => ({ to: d.token, title: p2.title, body: p2.body, data: p2.data, sound: "default" }));
-    const tickets = await this.sender.send(messages);
+    const messages2 = devices.map((d) => ({ to: d.token, title: p2.title, body: p2.body, data: p2.data, sound: "default" }));
+    const tickets = await this.sender.send(messages2);
     await Promise.all(
       tickets.map((t2, i) => {
         if (t2.status === "error" && t2.details?.error === "DeviceNotRegistered") {
@@ -21983,10 +32133,10 @@ function pushAfterCommand(push2, actorId, cmd, outcome) {
 }
 function expoFetchSender(accessToken) {
   return {
-    async send(messages) {
+    async send(messages2) {
       const out = [];
-      for (let i = 0; i < messages.length; i += 100) {
-        const chunk2 = messages.slice(i, i + 100);
+      for (let i = 0; i < messages2.length; i += 100) {
+        const chunk2 = messages2.slice(i, i + 100);
         try {
           const res = await fetch("https://exp.host/--/api/v2/push/send", {
             method: "POST",
@@ -22010,89 +32160,90 @@ function expoFetchSender(accessToken) {
 }
 
 // src/app.ts
-var MessageInputSchema = z23.object({
+var MessageInputSchema = z24.object({
   // Client-supplied id keeps optimistic local rows identical to server rows
   // (PowerSync echo-back would otherwise duplicate-then-swap them).
-  id: z23.string().uuid().optional(),
-  workspace: z23.string().min(1),
-  channel: z23.string().min(1),
+  id: z24.string().uuid().optional(),
+  workspace: z24.string().min(1),
+  channel: z24.string().min(1),
   // may be empty when the message carries only attachments (no caption)
-  body: z23.string(),
-  taskId: z23.string().min(1).optional(),
+  body: z24.string(),
+  taskId: z24.string().min(1).optional(),
   // the conversation thread this message belongs to (conversation-first shell). A
   // fresh client-generated id births the thread transactionally with the message.
-  threadId: z23.string().uuid().optional(),
+  threadId: z24.string().uuid().optional(),
   // docs/34: the composer's Tasks toggle, applied ONLY when this send births the thread.
   // A later message carrying it is ignored — the mode is the thread's, and changing it is
   // thread.set_mode (human-only), never a side effect of typing.
-  threadMode: z23.enum(["tasks", "chat"]).optional(),
+  threadMode: z24.enum(["tasks", "chat"]).optional(),
   // docs/10 §15: the composer's brain draft, applied ONLY when this send births the thread —
   // the same birth-time contract as threadMode above, and for the same reason. Moving it
   // afterwards is thread.set_brain (human-only), never a side effect of typing.
-  brainOverride: z23.record(z23.string(), z23.string()).nullable().optional(),
+  brainOverride: z24.record(z24.string(), z24.string()).nullable().optional(),
   // docs/31: when this send BIRTHS a thread, the room message it hangs off. The root is
   // referenced, never moved — it keeps its place in the feed and grows a replies footer.
-  rootMessageId: z23.string().uuid().optional(),
+  rootMessageId: z24.string().uuid().optional(),
   // 0119: the automation whose slot fired this send, applied ONLY when it births the thread —
   // the same birth-time contract as threadMode/brainOverride. It is what lets the Automations
   // card list a routine's runs without pattern-matching the marker in its opening line.
-  scheduleId: z23.string().uuid().optional(),
+  scheduleId: z24.string().uuid().optional(),
   // 0134, rule D9: WHERE the session runs and WHICH client bore it, applied ONLY when this send
   // births the thread — the same birth-time contract as the three above. Moving the machine
   // afterwards is thread.set_machine (human-only); the origin never moves.
   // 0144, coding threads: the kind this send births the thread with — `coding` when the composer's
   // repo chip was set, so the coding runtime works on that repository in it. Birth-only, like the
   // rest; moving it afterwards is thread.set_kind (a human, or the room's orchestrator at triage).
-  threadMachineId: z23.string().uuid().nullable().optional(),
-  threadOrigin: z23.enum(["desktop", "web", "routine"]).optional(),
-  threadKind: z23.enum(["chat", "coding"]).optional(),
+  threadMachineId: z24.string().uuid().nullable().optional(),
+  threadOrigin: z24.enum(["desktop", "web", "routine"]).optional(),
+  threadKind: z24.enum(["chat", "coding"]).optional(),
   // the message this reply ANSWERS (agent wake replies) — the server enforces one
   // reply per (agent, trigger) so concurrent daemons can't double-reply (0060).
-  replyTo: z23.string().uuid().optional(),
+  replyTo: z24.string().uuid().optional(),
   // the routine writer: set by propose_routine and offer_routine_session only, never by an agent's words. An
   // agent's routine card without it is dropped (routineCardGuard), so the tools' checks cannot be skipped
   // …and the repo-connect round's needCard: set by the tools that post a GitHub card, so it mints its Needs-you row (need-cards.ts)
-  routineCard: z23.literal(true).optional(),
-  needCard: z23.literal(true).optional()
+  routineCard: z24.literal(true).optional(),
+  needCard: z24.literal(true).optional()
 });
-var ArtifactCreateSchema = z23.object({
-  id: z23.string().uuid(),
-  workspace: z23.string().min(1),
-  channel: z23.string().min(1),
-  taskId: z23.string().min(1).optional(),
-  messageId: z23.string().uuid(),
-  kind: z23.enum(["screenshot", "file", "doc", "diff", "test_report"]).default("file"),
-  name: z23.string().min(1).max(512),
-  mime: z23.string().max(255).optional(),
-  inlineContent: z23.string().max(4e5).optional(),
-  sizeBytes: z23.number().int().nonnegative().optional(),
-  width: z23.number().int().positive().optional(),
-  height: z23.number().int().positive().optional()
+var ArtifactCreateSchema = z24.object({
+  id: z24.string().uuid(),
+  workspace: z24.string().min(1),
+  channel: z24.string().min(1),
+  taskId: z24.string().min(1).optional(),
+  messageId: z24.string().uuid(),
+  kind: z24.enum(["screenshot", "file", "doc", "diff", "test_report"]).default("file"),
+  name: z24.string().min(1).max(512),
+  mime: z24.string().max(255).optional(),
+  inlineContent: z24.string().max(4e5).optional(),
+  sizeBytes: z24.number().int().nonnegative().optional(),
+  width: z24.number().int().positive().optional(),
+  height: z24.number().int().positive().optional()
 });
-var WhiteboardPutSchema = z23.object({
-  id: z23.string().uuid(),
-  workspace: z23.string().min(1),
-  channel: z23.string().min(1),
-  threadId: z23.string().uuid().optional(),
-  taskId: z23.string().optional(),
-  title: z23.string().trim().min(1).max(WB_TITLE_MAX).catch("Untitled board"),
-  scene: z23.string().max(WB_SCENE_MAX).optional(),
-  snapshotSvg: z23.string().max(WB_SNAPSHOT_MAX).optional(),
-  snapshotRev: z23.number().int().nonnegative().optional(),
-  rev: z23.number().int().min(1).default(1)
+var WhiteboardPutSchema = z24.object({
+  id: z24.string().uuid(),
+  workspace: z24.string().min(1),
+  channel: z24.string().min(1),
+  threadId: z24.string().uuid().optional(),
+  taskId: z24.string().optional(),
+  title: z24.string().trim().min(1).max(WB_TITLE_MAX).catch("Untitled board"),
+  scene: z24.string().max(WB_SCENE_MAX).optional(),
+  snapshotSvg: z24.string().max(WB_SNAPSHOT_MAX).optional(),
+  snapshotRev: z24.number().int().nonnegative().optional(),
+  rev: z24.number().int().min(1).default(1)
 });
-var WhiteboardPatchSchema = z23.object({
-  rev: z23.number().int().min(1),
-  title: z23.string().trim().min(1).max(WB_TITLE_MAX).optional(),
-  scene: z23.string().max(WB_SCENE_MAX).optional(),
-  snapshotSvg: z23.string().max(WB_SNAPSHOT_MAX).optional(),
-  snapshotRev: z23.number().int().nonnegative().optional(),
-  archivedAt: z23.string().nullable().optional()
+var WhiteboardPatchSchema = z24.object({
+  rev: z24.number().int().min(1),
+  title: z24.string().trim().min(1).max(WB_TITLE_MAX).optional(),
+  scene: z24.string().max(WB_SCENE_MAX).optional(),
+  snapshotSvg: z24.string().max(WB_SNAPSHOT_MAX).optional(),
+  snapshotRev: z24.number().int().nonnegative().optional(),
+  archivedAt: z24.string().nullable().optional()
 });
 var webOrigin = (origin) => origin === "https://neuramesh.app" || origin === "https://www.neuramesh.app" || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin) ? origin : null;
 function createApp(store2, opts = {}) {
   const app = new Hono();
   app.onError((err, c) => {
+    if (err instanceof BrainError) return c.json({ error: err.message, code: err.code }, err.status);
     const pgCode = err.code;
     if (pgCode === "P0001") {
       return c.json({ error: err.message, code: "ILLEGAL_TRANSITION" }, 409);
@@ -22123,6 +32274,7 @@ function createApp(store2, opts = {}) {
     });
   });
   for (const path of ["/invites/*", "/auth/clerk", "/v1/workspaces", "/v1/billing/*", "/v1/announce/*"]) app.use(path, cors2({ origin: webOrigin, allowMethods: ["GET", "POST", "OPTIONS"], allowHeaders: ["authorization", "content-type"] }));
+  app.use("/v1/brain/*", cors2({ origin: (origin) => origin === "https://hq.neuramesh.app" ? origin : webOrigin(origin), allowMethods: ["GET", "POST", "OPTIONS"], allowHeaders: ["authorization", "content-type", "x-nm-actor"], exposeHeaders: ["etag", "content-disposition"] }));
   app.post("/auth/clerk", async (c) => {
     const body = await c.req.json().catch(() => ({}));
     const token = body.token ?? c.req.header("authorization")?.replace(/^Bearer\s+/i, "");
@@ -22197,7 +32349,7 @@ function createApp(store2, opts = {}) {
   app.post("/auth/desktop/start", async (c) => {
     const nonce = randomBytes8(32).toString("base64url");
     const pollSecret = randomBytes8(32).toString("base64url");
-    await store2.startDesktopAuth({ nonce, pollSecretHash: createHash8("sha256").update(pollSecret).digest("hex"), ttlSeconds: DESKTOP_AUTH_TTL_MS / 1e3 });
+    await store2.startDesktopAuth({ nonce, pollSecretHash: createHash10("sha256").update(pollSecret).digest("hex"), ttlSeconds: DESKTOP_AUTH_TTL_MS / 1e3 });
     return c.json({ nonce, pollSecret, expiresIn: DESKTOP_AUTH_TTL_MS / 1e3 });
   });
   app.post("/auth/desktop/complete", async (c) => {
@@ -22222,7 +32374,7 @@ function createApp(store2, opts = {}) {
   app.post("/auth/desktop/poll", async (c) => {
     const body = await c.req.json().catch(() => ({}));
     if (!body.nonce || !body.pollSecret) return c.json({ error: "nonce and pollSecret required", code: "INVALID_INPUT" }, 400);
-    const out = await store2.claimDesktopAuth(body.nonce, createHash8("sha256").update(body.pollSecret).digest("hex"));
+    const out = await store2.claimDesktopAuth(body.nonce, createHash10("sha256").update(body.pollSecret).digest("hex"));
     if (out.status === "done") return c.json({ status: "done", ...out.result });
     return c.json({ status: out.status });
   });
@@ -22283,16 +32435,7 @@ function createApp(store2, opts = {}) {
       return c.text("connection failed \u2014 close this tab and try again from NeuraMesh", 400);
     }
   });
-  app.get("/media/:id", async (c) => {
-    const mediaId = c.req.param("id");
-    const sig = c.req.query("s") ?? "";
-    if (!process.env["NM_CONNECTOR_KEY"] || !verifyMediaSig(mediaId, sig)) return c.text("forbidden", 403);
-    const media = await store2.contentMediaBytes(mediaId);
-    if (!media) return c.text("not found", 404);
-    return new Response(new Uint8Array(media.bytes), {
-      headers: { "content-type": media.mime, "content-length": String(media.bytes.length), "cache-control": "public, max-age=300" }
-    });
-  });
+  publicContentMediaRoute(app, store2);
   app.get("/connect/tiktok/media/:item", async (c) => {
     const itemId = c.req.param("item");
     const sig = c.req.query("s") ?? "";
@@ -22340,7 +32483,7 @@ function createApp(store2, opts = {}) {
     return c.json({ ok: ok2 }, ok2 ? 200 : 400);
   });
   app.get("/invites/:token", async (c) => {
-    const hash = createHash8("sha256").update(c.req.param("token")).digest("hex");
+    const hash = createHash10("sha256").update(c.req.param("token")).digest("hex");
     const inv = await store2.inviteByToken(hash);
     if (!inv) return c.json({ error: "this invitation has expired or been revoked", code: "NOT_FOUND" }, 404);
     return c.json({ workspace: inv.workspaceName, email: inv.email, role: inv.role });
@@ -22385,6 +32528,8 @@ function createApp(store2, opts = {}) {
   importRoutes(app, store2);
   announceClaimRoute(app, store2, opts.announce);
   contentMediaRoute(app, store2);
+  brainRoutes(app, store2, opts.brain);
+  localSyncRoutes(app, store2);
   webFrameRoute(app);
   starterVideoRoutes(app, store2, opts.starterVideo);
   app.post("/v1/commands", async (c) => {
@@ -22465,18 +32610,18 @@ function createApp(store2, opts = {}) {
     });
     const inChatThread = actor.kind === "agent" && msg2.threadId ? await store2.getThreadMode(msg2.workspace, msg2.threadId) === "chat" : false;
     const cards = actor.kind === "agent" && !inChatThread ? parseQuestions(styledBody) : [];
-    const decisions = cards.map((q) => ({
+    const decisions2 = cards.map((q) => ({
       id: crypto.randomUUID(),
       question: q.question,
       options: q.options ?? [],
       allowOther: q.allowOther !== false
     }));
     const auth = actor.kind === "agent" && !inChatThread ? parseAuthCard(styledBody) : null;
-    if (auth && !auth.switched) decisions.push({ id: crypto.randomUUID(), question: authDecisionQuestion(auth), options: [], allowOther: true });
+    if (auth && !auth.switched) decisions2.push({ id: crypto.randomUUID(), question: authDecisionQuestion(auth), options: [], allowOther: true });
     const routineQ = actor.kind === "agent" && !inChatThread && msg2.threadId && styledBody.includes("```nmroutine") ? routineDecisionQuestion(styledBody, !!(await store2.threadFiling(msg2.workspace, msg2.threadId))?.scheduleId) : null;
-    if (routineQ) decisions.push({ id: crypto.randomUUID(), question: routineQ, options: [], allowOther: true });
+    if (routineQ) decisions2.push({ id: crypto.randomUUID(), question: routineQ, options: [], allowOther: true });
     const needRow = actor.kind === "agent" && !inChatThread ? needDecision(styledBody, parsed.data.needCard === true) : null;
-    if (needRow) decisions.push(needRow);
+    if (needRow) decisions2.push(needRow);
     try {
       if (actor.kind === "human" && msg2.taskId) {
         for (const [question, answer] of readAnswers([msg2.body])) {
@@ -22487,7 +32632,7 @@ function createApp(store2, opts = {}) {
           if (open) await executeCommand(store2, actor, { type: "decision.answer", decisionId: open.id, answer });
         }
       }
-      const saved = await store2.postMessage(msg2, event, decisions.length ? decisions : void 0);
+      const saved = await store2.postMessage(msg2, event, decisions2.length ? decisions2 : void 0);
       fireWakeBump(store2, saved.workspace, actor.kind === "human" ? actor.id : null);
       if (opts.push && actor.kind === "agent" && parseCard(saved.body)) {
         const room = await store2.channelProject(saved.workspace, saved.channel).catch(() => null);
@@ -22715,13 +32860,7 @@ function createApp(store2, opts = {}) {
     const hits = await store2.recall(b2.workspace, b2.channel ?? null, b2.query, Math.min(b2.k ?? 8, 25));
     return c.json({ hits, ms: Math.round(performance.now() - t0) });
   });
-  app.get("/v1/tasks/:id", async (c) => {
-    const task = await store2.getTask(c.req.param("id"));
-    if (!task) return c.json({ error: "not found", code: "NOT_FOUND" }, 404);
-    const events = await store2.listEvents(`task:${task.number}`);
-    const artifacts = await store2.listArtifacts(task.id);
-    return c.json({ task, events, artifacts });
-  });
+  taskDetailRoute(app, store2);
   return app;
 }
 function safeJson2(raw) {
@@ -22750,13 +32889,18 @@ var SKIP = /* @__PURE__ */ new Set(["message.posted"]);
 function kindOf(addr) {
   if (!addr) return void 0;
   const i = addr.indexOf(":");
-  return i > 0 ? addr.slice(0, i) : addr;
+  if (i > 0) return addr.slice(0, i);
+  const [head, type] = addr.split("/");
+  return head === "resource" ? type : head;
 }
 function taskNumber(target) {
   const m = /^task:(\d+)$/.exec(target ?? "");
   return m ? Number(m[1]) : void 0;
 }
-function eventToCapture(e) {
+function taskFacts(t2) {
+  return { repo: !!t2.repo && !!t2.prNumber };
+}
+function eventToCapture(e, facts = {}) {
   if (SKIP.has(e.type)) return null;
   return {
     distinctId: e.workspace,
@@ -22767,17 +32911,19 @@ function eventToCapture(e) {
       nm_source: kindOf(e.source),
       // 'human' | 'agent' — who triggered it
       nm_target: kindOf(e.target),
-      // 'task' | 'channel' | 'workspace' | ...
+      // 'task' | 'channel' | 'workspace' | 'connector' | ...
       nm_task_number: taskNumber(e.target),
+      nm_repo: facts.repo,
+      // set on the events of a task write (pgstore.mutate), else absent
       $process_person_profile: false
       // server events: no person profiles
     }
   };
 }
-function trackDomainEvent(e) {
+function trackDomainEvent(e, facts) {
   const c = ph();
   if (!c) return;
-  const cap2 = eventToCapture(e);
+  const cap2 = eventToCapture(e, facts);
   if (!cap2) return;
   try {
     c.capture(cap2);
@@ -22786,7 +32932,7 @@ function trackDomainEvent(e) {
 }
 
 // src/pgstore.ts
-import { createHash as createHash10, randomBytes as randomBytes9 } from "node:crypto";
+import { createHash as createHash12, randomBytes as randomBytes9 } from "node:crypto";
 import postgres from "postgres";
 
 // src/embedder.ts
@@ -22858,6 +33004,45 @@ async function dueContentItemsSql(sql, nowIso, limit) {
   });
 }
 
+// src/store/content-media.ts
+import { randomUUID as randomUUID2 } from "node:crypto";
+async function attachContentMediaSql(pool, itemId, mime, bytes, actor, makeEvent, objects = configuredBrainObjects()) {
+  const [scope] = await pool`select workspace_id from content_items where id = ${itemId}::uuid and status in ('draft', 'scheduled')`;
+  if (!scope) throw new DomainError("NOT_FOUND", "The content item does not exist or is published.");
+  const workspace = scope["workspace_id"];
+  const id = randomUUID2();
+  const ref = objects ? await objects.put(`v1/workspaces/${workspace}/content/${itemId}/${id}/${brainHash(bytes)}`, bytes, mime) : null;
+  await pool.begin(async (tx) => {
+    const [item] = await tx`select workspace_id from content_items where id = ${itemId}::uuid and status in ('draft', 'scheduled') for update`;
+    if (!item || item["workspace_id"] !== workspace) throw new DomainError("NOT_FOUND", "The content item does not exist or is published.");
+    if (!objects) await tx`delete from content_media where content_item_id = ${itemId}::uuid and object_ref is null`;
+    await tx`insert into content_media (id, workspace_id, content_item_id, mime, bytes, object_ref, size_bytes, created_by_kind, created_by)
+      values (${id}::uuid, ${workspace}::uuid, ${itemId}::uuid, ${mime}, ${ref && brainCloudOnly(workspace) ? null : bytes}, ${ref ? tx.json(ref) : null}, ${bytes.length}, ${actor.kind}, ${actor.id})`;
+    const film = mime.startsWith("video/");
+    const patch = film ? { video_id: id } : { image_id: id };
+    await tx`update content_items set media = (((coalesce(media, '{}'::jsonb) || ${tx.json(patch)}::jsonb) - ${film ? "video_error" : "image_error"}) - ${film ? "image_id" : "video_id"}) - ${film ? "thumb" : "video_error"} where id = ${itemId}::uuid`;
+    const event = makeEvent(workspace);
+    await tx`insert into events (id, workspace_id, type, source, target, payload, in_reply_to)
+      values (${event.id}, ${workspace}::uuid, ${event.type}, ${event.source}, ${event.target}, ${tx.json(event.payload)}, ${event.in_reply_to})`;
+    trackDomainEvent(event);
+  });
+  return { id };
+}
+async function contentMediaBytesSql(sql, mediaId, objects) {
+  const [row] = await sql`select mime, bytes, object_ref, workspace_id from content_media where id = ${mediaId}::uuid limit 1`;
+  if (!row) return null;
+  const ref = row["object_ref"];
+  const storage = objects ?? (ref ? configuredBrainObjects() : null);
+  if (ref && !storage && row["bytes"] != null) {
+    const bytes2 = Buffer.from(row["bytes"]);
+    if (bytes2.length !== ref.sizeBytes || brainHash(bytes2) !== ref.sha256) throw new Error("Media compatibility copy failed checksum verification.");
+    return { mime: row["mime"], bytes: bytes2, workspace: row["workspace_id"] };
+  }
+  if (ref && !storage) throw new Error("Configure brain object storage to read this media.");
+  const bytes = ref ? await storage.get(ref) : Buffer.from(row["bytes"]);
+  return { mime: row["mime"], bytes, workspace: row["workspace_id"] };
+}
+
 // src/store/thread-machine.ts
 async function workspaceMachine(sql, workspace, machineId) {
   return (await sql`select id from machines where id = ${machineId}::uuid and workspace_id = ${workspace}::uuid`)[0]?.id ?? null;
@@ -22872,11 +33057,28 @@ async function setThreadKindSql(sql, workspace, threadId, kind) {
   if (!row) throw new DomainError("NOT_FOUND", `thread ${threadId} not found`);
 }
 
+// src/store/thread-title.ts
+async function updateThreadTitleSql(sql, workspace, threadId, patch, opts) {
+  await sql.begin(async (tx) => {
+    const [current] = await tx`select titled_at from threads where id = ${threadId}::uuid and workspace_id = ${workspace}::uuid for update`;
+    if (!current) throw new DomainError("NOT_FOUND", `thread ${threadId} not found`);
+    if (patch.title !== void 0 && opts?.agentTitleOnce && current["titled_at"]) {
+      throw new DomainError("THREAD_ALREADY_TITLED", "this conversation is already named \u2014 only the human renames it");
+    }
+    await tx`update threads set title = coalesce(${patch.title ?? null}, title),
+      titled_at = case when ${patch.title ?? null}::text is not null then now() else titled_at end,
+      description = coalesce(${patch.description ?? null}, description), updated_at = now()
+      where id = ${threadId}::uuid and workspace_id = ${workspace}::uuid`;
+    if (patch.title !== void 0) await tx`update code_sessions set title = ${patch.title}
+      where id = ${threadId}::uuid and workspace_id = ${workspace}::uuid`;
+  });
+}
+
 // src/seed/packversion.ts
-import { createHash as createHash9 } from "node:crypto";
+import { createHash as createHash11 } from "node:crypto";
 var field = (s) => `${s.length}:${s}`;
 function bundledPackVersion(entry) {
-  const h = createHash9("sha256");
+  const h = createHash11("sha256");
   h.update(field(entry.pack.description));
   h.update(field(entry.pack.source_url));
   h.update(field(entry.pack.source_ref));
@@ -22890,31 +33092,31 @@ async function seedBundledPacksSql(sql, workspaceId, channelId, seed) {
   let added = 0;
   let refreshed = 0;
   for (const entry of seed) {
-    const { pack, skills } = entry;
-    const version = bundledPackVersion(entry);
+    const { pack, skills: skills2 } = entry;
+    const version2 = bundledPackVersion(entry);
     const [exists] = await sql`select id, origin, version from skill_packs
       where workspace_id = ${workspaceId}::uuid and channel_id = ${channelId} and name = ${pack.name} for update`;
     if (exists) {
-      if (exists["origin"] !== "bundled" || exists["version"] === version) continue;
-      await refreshBundledPack(sql, workspaceId, channelId, exists["id"], entry, version);
+      if (exists["origin"] !== "bundled" || exists["version"] === version2) continue;
+      await refreshBundledPack(sql, workspaceId, channelId, exists["id"], entry, version2);
       refreshed++;
       continue;
     }
     const [row] = await sql`insert into skill_packs (workspace_id, channel_id, name, description, source_url, source_ref, version, origin, status)
-      values (${workspaceId}::uuid, ${channelId}, ${pack.name}, ${pack.description}, ${pack.source_url}, ${pack.source_ref}, ${version}, 'bundled', 'ready') returning id`;
+      values (${workspaceId}::uuid, ${channelId}, ${pack.name}, ${pack.description}, ${pack.source_url}, ${pack.source_ref}, ${version2}, 'bundled', 'ready') returning id`;
     const packId2 = row["id"];
-    for (const s of skills) await insertSkill(sql, workspaceId, channelId, packId2, s);
+    for (const s of skills2) await insertSkill(sql, workspaceId, channelId, packId2, s);
     added++;
   }
   return { added, refreshed };
 }
 var insertSkill = (sql, workspaceId, channelId, packId2, s) => sql`insert into skills (workspace_id, channel_id, name, description, scope, body, status, author_kind, author_id, pack_id, enabled)
     values (${workspaceId}::uuid, ${channelId}, ${s.name}, ${s.description}, 'channel', ${s.body}, 'active', 'agent'::actor_kind, ${NOBODY}::uuid, ${packId2}::uuid, true)`;
-async function refreshBundledPack(sql, workspaceId, channelId, packId2, entry, version) {
-  const { pack, skills } = entry;
+async function refreshBundledPack(sql, workspaceId, channelId, packId2, entry, version2) {
+  const { pack, skills: skills2 } = entry;
   await sql`update skill_packs set description = ${pack.description}, source_url = ${pack.source_url},
-    source_ref = ${pack.source_ref}, version = ${version}, updated_at = now() where id = ${packId2}`;
-  for (const s of skills) {
+    source_ref = ${pack.source_ref}, version = ${version2}, updated_at = now() where id = ${packId2}`;
+  for (const s of skills2) {
     const [row] = await sql`select id, status, version, author_id from skills
       where workspace_id = ${workspaceId}::uuid and channel_id = ${channelId}::uuid and pack_id = ${packId2}::uuid and name = ${s.name}
       order by (status = 'active') desc, updated_at desc limit 1 for update`;
@@ -22925,7 +33127,7 @@ async function refreshBundledPack(sql, workspaceId, channelId, packId2, entry, v
     if (row["status"] !== "active" || Number(row["version"]) > 1 || row["author_id"] !== NOBODY) continue;
     await sql`update skills set description = ${s.description}, body = ${s.body}, updated_at = now() where id = ${row["id"]}`;
   }
-  const names = skills.map((s) => s.name);
+  const names = skills2.map((s) => s.name);
   if (names.length) {
     await sql`update skills set status = 'deprecated', updated_at = now()
       where pack_id = ${packId2}::uuid and status = 'active' and version = 1
@@ -22951,7 +33153,7 @@ var iso2 = (ms2) => new Date(ms2).toISOString();
 async function retroRows(a) {
   const { sql, workspaceId, dayStart: dayStart2, w } = a;
   const [from, to, prevFrom, prevTo] = [iso2(w.from), iso2(w.to), iso2(w.prevFrom), iso2(w.prevTo)];
-  const agents = await sql`
+  const agents2 = await sql`
     select id, name, role from agents where workspace_id = ${workspaceId} and retired_at is null order by created_at
   `;
   const acceptedRows = await sql`
@@ -23099,7 +33301,7 @@ async function retroRows(a) {
       and f.created_at >= ${from} and f.created_at < ${to}
     order by f.created_at desc limit 12
   `;
-  return { acceptedRows, agents, curveRows, firstTryRows, learnedRows, lessonList, lessonRows, orgLessons, orgRows, planRows, reviewRows, routedRows, skillRows, sparkAccepted, sparkReviews };
+  return { acceptedRows, agents: agents2, curveRows, firstTryRows, learnedRows, lessonList, lessonRows, orgLessons, orgRows, planRows, reviewRows, routedRows, skillRows, sparkAccepted, sparkReviews };
 }
 
 // src/retro.ts
@@ -23117,7 +33319,7 @@ async function computeRetro(sql, workspaceId, range, dayStart2) {
   const w = retroWindow(range, dayStart2);
   const [from, to] = [iso3(w.from), iso3(w.to)];
   const bucketCount = Math.ceil((w.to - w.from) / w.bucketMs);
-  const { acceptedRows, agents, curveRows, firstTryRows, learnedRows, lessonList, lessonRows, orgLessons, orgRows, planRows, reviewRows, routedRows, skillRows, sparkAccepted, sparkReviews } = await retroRows({ sql, workspaceId, dayStart: dayStart2, w });
+  const { acceptedRows, agents: agents2, curveRows, firstTryRows, learnedRows, lessonList, lessonRows, orgLessons, orgRows, planRows, reviewRows, routedRows, skillRows, sparkAccepted, sparkReviews } = await retroRows({ sql, workspaceId, dayStart: dayStart2, w });
   const byId = (rows2) => {
     const m = /* @__PURE__ */ new Map();
     for (const r of rows2) m.set(r.agent_id ?? r.assignee_id, r);
@@ -23131,7 +33333,7 @@ async function computeRetro(sql, workspaceId, range, dayStart2) {
   const routed = byId(routedRows);
   const lessons = byId(lessonRows);
   const learned = byId(learnedRows);
-  const skills = byId(skillRows);
+  const skills2 = byId(skillRows);
   const sparkOf = (agentId) => {
     const spark = Array.from({ length: bucketCount }, () => 0);
     for (const rows2 of [sparkAccepted, sparkReviews]) {
@@ -23148,10 +33350,10 @@ async function computeRetro(sql, workspaceId, range, dayStart2) {
     reviews: num3(reviews.get(id)?.[edge]),
     plansApproved: num3(plans.get(id)?.[edge === "cum_end" ? "approved_cum_end" : "approved_cum_start"]),
     lessons: num3(lessons.get(id)?.[edge]),
-    skillsProposed: num3(skills.get(id)?.[edge])
+    skillsProposed: num3(skills2.get(id)?.[edge])
   });
   let leveledUpCount = 0;
-  const agentStats = agents.map((a) => {
+  const agentStats = agents2.map((a) => {
     const xpEnd = xpOf(cumCounts(a.id, "cum_end"));
     const xpStart = xpOf(cumCounts(a.id, "cum_start"));
     const level = levelOf(xpEnd);
@@ -23207,7 +33409,7 @@ async function computeRetro(sql, workspaceId, range, dayStart2) {
         reviews: num3(reviews.get(a.id)?.cur),
         plansApproved: num3(plans.get(a.id)?.["approved_cur"]),
         lessons: num3(lessons.get(a.id)?.cur),
-        skillsProposed: num3(skills.get(a.id)?.cur)
+        skillsProposed: num3(skills2.get(a.id)?.cur)
       },
       spark: sparkOf(a.id),
       learned: learned.get(a.id)?.content ?? null
@@ -23783,7 +33985,7 @@ var MARKETING_OS_SKILL_SEED = [
       {
         "name": "ugc-strategy",
         "description": "UGC \u2014 creator-style scripts and briefs, rights, disclosure; campaigns and curation",
-        "body": '## In NeuraMesh (read first \u2014 it overrides the module\'s delivery notes)\n\n- **Two turns, in this order.** (1) RESEARCH: read the room\'s brand docs (`read_library_doc`\n  scope room, `business-profile.md` first) plus the [MARKETING CONTEXT] note in your prompt; in a\n  release session the digest and the release brief in the thread are the facts. (2) THE ANGLE\n  CARD: call `propose_angles` with the product\'s name and two to five angles, each resting on a\n  fact you just read (a first-person walkthrough, a before-and-after, a "three things I did not\n  expect", a reply to a real objection, a duet-style react), then STOP with one line: the human\n  picks an angle, the platforms and the film\'s length on the card, or types their own angle. (3)\n  THE DRAFTS, on the human\'s pick (their reply wakes you): `draft_posts` with one VIDEO post per\n  picked platform, all in the chosen angle. A script drafted before the pick is refused, so never\n  skip the card.\n- **What each draft is.** Each card has three parts:\n  `body` is the CAPTION that posts with the video (one or two lines, the hashtags the network\n  uses, within its limit); `script` is what the creator reads and films (9:16, the hook in the\n  first three seconds as `[0:00-0:03]`, then timestamped beats, the product on screen, one call\n  to action at the end), written to the LENGTH the human picked (`\u2026 \xB7 length: 15 s` in their\n  reply, eight seconds when they picked none): the beats end at that second, the spoken lines are\n  short, and no beat asks for on-screen text, captions or subtitles beyond one title of three\n  words at most (a video model cannot spell more; the caption that posts is the body). The film\n  shows the script\'s first seconds; `imageBrief` is the shot direction the film follows;\n  `frame` is the name of a screenshot on this room\'s shelf (the [MARKETING CONTEXT] note lists\n  them), so the film\'s own picture of the product follows the real one. Never put the script in\n  the body: the body publishes.\n- **The product is real, never drawn.** A video model cannot copy a screen: every beat that shows\n  the product (the app, a screen, the phone, the product itself) carries `SHOW: <image name>`,\n  an image on the shelf, and the film CUTS TO that image for the beat once it lands. Find the\n  image first: `list_library` with scope project lists every room\'s images. None fits: for an\n  app, ask the human for a screenshot; for a product you can picture, `make_product_image`\n  makes one and shelves it under the name you then use. A product beat without a SHOW line is\n  refused.\n- **The platform.** The ones the human picked on the angle card (`\u2026 \xB7 platforms: x, linkedin` in\n  their reply). A pick of none means the ask\'s platform, else the connected accounts. One card per\n  picked platform, a video post reads the same on X and LinkedIn as on TikTok.\n- **A change to a draft.** "\u21A9 Re draft b: \u2026" is the human asking for a change on card b: call\n  `read_drafts`, then `revise_posts` with the script or caption changed from what the card\n  holds, in full. Never redraft from memory, never add a second card.\n- **The creator brief.** Fill the module\'s "Creator Briefs for UGC Ads" template for this\n  campaign and shelve it through `propose_library_doc` as `ugc-brief-YYYY-MM-DD.md`, with the\n  rights line and the disclosure line ("#ad", "gifted") the module prescribes.\n- **Honesty.** No invented customers, quotes, numbers or testimonials: a script speaks as "I",\n  a creator, about what the release does, and cites nothing it cannot cite. Say `[NEED: x]`\n  for a claim the human must confirm. Run the `slop-patterns` checks before hand-over.\n- **Custody.** You draft. Approving, scheduling, publishing and paying creators stay human.\n\n---\n\n# UGC Strategy\n\n## When to Activate\n\n- Building social proof for a new or growing brand\n- Ad creative costs are high and performance is declining (UGC ads often outperform polished creative)\n- Customer reviews and testimonials are sparse or unstructured\n- Launching a UGC campaign or contest\n- Scaling content production without proportionally scaling the content team\n- Community building is a strategic priority\n- Exploring influencer or creator partnerships that include UGC components\n\n## First Questions\n\n1. What type of UGC is most valuable for your business? (Reviews, photos, videos, testimonials, social posts?)\n2. Where do customers already talk about you organically? (Social, forums, review sites?)\n3. What incentive (if any) will motivate customers to create content?\n4. Do you have a process for obtaining content rights and permissions?\n5. Where will UGC be used? (Social, website, ads, email, packaging?)\n6. What is the quality bar? (Authentic and raw vs semi-polished?)\n7. What is the legal landscape? (FTC guidelines, platform terms, privacy requirements?)\n\n## UGC Types\n\n### Reviews and Ratings\n- Product reviews on your site, Amazon, G2, Capterra, Yelp\n- Star ratings and aggregate scores\n- Review response strategy (responding to both positive and negative reviews)\n- Review solicitation campaigns (post-purchase email sequences)\n\n### Testimonials\n- Written quotes from happy customers\n- Video testimonials (short-form, interview-style, or self-recorded)\n- Case study quotes\n- Social proof snippets for landing pages and ads\n\n### Social Media Posts\n- Photos of customers using the product\n- Unboxing and first-impression content\n- Stories, Reels, and TikToks featuring the product\n- Brand mentions and tags\n- Hashtag campaign contributions\n\n### Video Content\n- Unboxing videos\n- Product reviews and tutorials\n- Before/after transformations\n- "Day in the life" featuring the product\n- Reaction and first-impression videos\n- How-to content created by users\n\n### Community Content\n- Forum posts and discussions\n- Community Q&A contributions\n- User-created templates, workflows, or resources\n- Fan art and creative interpretations\n- User-submitted tips and hacks\n\n## UGC Campaign Design\n\n### Campaign Structure\n\n```\n1. GOAL\n   What business objective does this campaign serve?\n   (Social proof, content volume, community engagement, product launch buzz)\n\n2. AUDIENCE\n   Who are you asking to create content?\n   (Existing customers, new buyers, fans, creators, employees)\n\n3. PROMPT\n   What specific content are you asking for?\n   (Be specific \u2014 "Share a video of..." not "Post something about us")\n\n4. MECHANIC\n   How do people participate?\n   (Hashtag, form submission, direct upload, email, contest entry)\n\n5. INCENTIVE\n   What do participants get?\n   (Recognition, prizes, features, discounts, early access, nothing but community)\n\n6. CURATION\n   How will you select and surface the best content?\n   (Manual review, community voting, algorithm, editorial selection)\n\n7. AMPLIFICATION\n   Where will the best UGC be shared?\n   (Brand social, website, ads, email, retail displays)\n\n8. TIMELINE\n   When does the campaign run?\n   (Always-on vs time-bound, launch windows, seasonal alignment)\n```\n\n### Campaign Examples\n\n**Product launch buzz:**\n"Show us your first five minutes with [Product]. Tag #FirstFiveMinutes for a chance to be featured on our page and win a year free."\n\n**Community building:**\n"What\'s the most creative way you use [Product]? Share your setup with #My[Product]Setup. We\'ll feature the best ones every Friday."\n\n**Social proof at scale:**\n"Love [Product]? Leave a 30-second video review and get 20% off your next order. Honest reviews only \u2014 we want the real story."\n\n**Seasonal:**\n"Show us how [Product] fits into your holiday routine. Best entries get featured in our holiday campaign and receive a gift box."\n\n## Incentive Structures\n\n| Incentive Type | Effectiveness | Cost | Best For |\n|---|---|---|---|\n| **Featured/recognition** | High for engaged communities | Free | Brand advocates, creators who want exposure |\n| **Discounts/credits** | Medium-high, reliable | Low-medium | Review solicitation, repeat customers |\n| **Contest/sweepstakes** | High for volume, lower quality | Medium | Large-scale campaigns, viral moments |\n| **Free product** | High for detailed content | Medium | Unboxing, review, tutorial content |\n| **Cash/payment** | Highest for quality | High | Creator partnerships, produced content |\n| **Early access** | High for power users | Free | Product launches, beta features |\n| **No incentive** | Works for strong brands with loyal communities | Free | Organic advocacy, authentic social proof |\n\n### Incentive Rules\n\n- Match the incentive to the effort required. A 10% discount is not enough for a 5-minute video review.\n- Overly generous incentives can attract low-quality submissions motivated only by the reward.\n- Non-monetary incentives (recognition, featuring, access) often produce more authentic content.\n- Always disclose when content was incentivized (FTC requirement in the US).\n\n## Rights Management and Permissions\n\n### Getting Content Rights\n\nYou MUST have explicit permission to use customer content in your marketing. Approaches:\n\n**1. Terms of participation.** Campaign terms and conditions state that submissions grant the brand a license to use the content. Common for hashtag campaigns and contests.\n\n**2. Direct permission request.** DM or email the creator asking for permission to use their content. Document the approval.\n\n**3. Creator agreements.** For paid or partnership UGC, use a content license agreement specifying:\n- Usage rights (which channels, which formats)\n- Duration (perpetual, 12 months, campaign-only)\n- Exclusivity (can the creator post the same content for competitors?)\n- Modification rights (can you edit, crop, add text?)\n- Attribution requirements (must you credit the creator?)\n\n### Rights Management Template\n\n```\nCreator: [Name / Handle]\nContent: [Description / Link]\nDate obtained: [Date]\nPermission method: [ToS / DM approval / Agreement]\nUsage rights: [Social, web, ads, email, print \u2014 specify]\nDuration: [Perpetual / Time-bound]\nAttribution required: [Yes \u2014 format / No]\nIncentive provided: [None / Discount / Payment / Product]\nDisclosure required: [Yes \u2014 #ad, #sponsored, #gifted / No]\nNotes: [Any restrictions or special terms]\n```\n\n## Content Curation Workflow\n\n### Monitoring\n\n- Set up social listening for brand mentions, product hashtags, and relevant keywords\n- Monitor review platforms on a set cadence (daily for high-volume, weekly for low-volume)\n- Tools: Sprout Social, Brandwatch, Mention, Google Alerts, native platform search\n\n### Selection Criteria\n\nRate incoming UGC on:\n\n| Criterion | Weight | Notes |\n|---|---|---|\n| Quality (visual/audio clarity) | High | Must meet minimum quality for intended use |\n| Authenticity | High | Feels real, not staged or scripted |\n| Brand alignment | High | Matches brand values and visual standards |\n| Diversity | Medium | Represents diverse users and use cases |\n| Message clarity | Medium | The value proposition or experience is clear |\n| Engagement potential | Medium | Will this resonate when amplified? |\n| Legal safety | Must pass | No IP issues, no minors without consent, no misleading claims |\n\n### Curation Process\n\n```\n1. COLLECT \u2014 Aggregate UGC from all sources into a central library\n2. SCREEN \u2014 Filter for quality, brand safety, and legal compliance\n3. OBTAIN RIGHTS \u2014 Secure usage permissions (do not skip this step)\n4. CATEGORIZE \u2014 Tag by theme, product, format, platform, and use case\n5. STORE \u2014 Archive with metadata in a searchable asset library\n6. DEPLOY \u2014 Match curated UGC to marketing needs (ads, social, web, email)\n7. TRACK \u2014 Monitor performance of deployed UGC\n```\n\n## UGC in Ads\n\nUGC ads frequently outperform brand-produced creative, especially on social platforms.\n\n### UGC Ad Formats\n\n**Whitelisting / Spark Ads:** Run ads from the creator\'s account (not your brand account). Appears native in the feed. Available on TikTok (Spark Ads) and Meta (partnership ads).\n\n**Brand account with UGC creative:** Use UGC footage/images in ads run from your brand account. Feels more authentic than polished brand creative.\n\n**Testimonial ads:** Customer quotes or video testimonials formatted as ad creative.\n\n**Mashup ads:** Combine multiple UGC clips into a single compilation ad.\n\n### UGC Ad Best Practices\n\n- **Keep it raw.** Over-editing UGC removes its authenticity advantage. Light editing only.\n- **First 3 seconds.** The hook must grab attention immediately. Lead with the most compelling moment.\n- **Include the product.** UGC ads still need to clearly show or mention the product.\n- **Add captions.** Most social video is watched without sound. Caption all spoken content.\n- **Test at scale.** UGC ads thrive on volume and variation. Test multiple creators and angles.\n- **Disclose properly.** If the creator was paid or gifted, the ad must disclose the relationship.\n\n### Creator Briefs for UGC Ads\n\nWhen commissioning UGC from creators, provide:\n\n```\nProduct: [What they\'re reviewing/showing]\nKey message: [The one thing viewers should take away]\nFormat: [Video length, orientation (9:16 vertical), platform]\nMust include: [Product visible, specific feature mention, CTA]\nMust avoid: [Competitor mentions, specific claims, inappropriate content]\nTone: [Authentic, excited, educational, casual]\nDeadline: [When raw footage is due]\nDelivery: [How and where to submit files]\nCompensation: [Payment, product, or other incentive]\nUsage rights: [How the content will be used and for how long]\n```\n\n## Quality Control\n\n### Content Moderation\n\n- Review all UGC before amplifying \u2014 never auto-publish without review\n- Check for brand safety issues (offensive content, competitor products in frame, inappropriate language)\n- Verify factual claims in reviews and testimonials (do not amplify false claims about your product)\n- Ensure diversity in featured UGC \u2014 do not inadvertently represent only one demographic\n\n### Maintaining Authenticity\n\n- Do not over-edit UGC \u2014 imperfections are part of its value\n- Do not script UGC so heavily that it sounds like a commercial\n- Do not fake UGC \u2014 fabricated "customer" content is a legal and reputational risk\n- Do not cherry-pick only positive content \u2014 balanced representation builds more trust\n\n## Legal Considerations\n\n### FTC Disclosure Requirements (US)\n\n- **Material connection = disclosure required.** If the creator received anything of value (payment, free product, discount, early access), the relationship must be disclosed.\n- **Disclosure must be clear and conspicuous.** "#ad" or "#sponsored" at the beginning of the post, not buried in 30 hashtags.\n- **Platform tools preferred.** Use built-in partnership/sponsored content labels where available.\n- **Applies to all formats.** Written, photo, video, audio, Stories, Reels, TikToks \u2014 all require disclosure.\n\n### Other Legal Considerations\n\n- **Privacy.** Do not use content featuring identifiable individuals (especially minors) without explicit consent.\n- **Copyright.** The creator owns their content. Reposting without permission is copyright infringement.\n- **Trademark.** Ensure UGC does not misuse third-party trademarks.\n- **Claims.** If UGC makes product efficacy claims (especially in health, finance, education), verify compliance with advertising regulations.\n- **International.** Privacy and disclosure laws vary by country. GDPR in EU, PIPEDA in Canada, etc.\n\n**Disclaimer:** This is general guidance, not legal advice. Consult with a lawyer for your specific situation and jurisdictions.\n\n## Common Pitfalls\n\n1. **No rights management.** Using customer content without permission exposes you to legal risk and damages creator relationships.\n2. **Over-controlling the content.** If you script and direct every detail, it is not UGC \u2014 it is a commercial with an amateur actor.\n3. **Ignoring negative UGC.** Negative reviews and critical posts are feedback. Respond professionally, do not hide from them.\n4. **One-and-done campaigns.** UGC should be an ongoing program, not a single campaign. Build systems, not events.\n5. **No curation process.** Without a system for collecting, screening, and deploying UGC, valuable content gets lost.\n6. **Mismatched incentives.** Asking for a 5-minute video review in exchange for a 10% discount is a bad deal for the creator.\n\n## Quality Gate\n\nBefore launching a UGC program or campaign:\n\n- [ ] UGC types and formats are defined with clear examples\n- [ ] Campaign mechanic is simple and specific (participants know exactly what to create)\n- [ ] Incentive structure matches the effort required from participants\n- [ ] Rights management process is established with templates for permission requests\n- [ ] Content moderation and curation workflow is defined\n- [ ] Legal requirements are understood (FTC disclosure, privacy, copyright)\n- [ ] Deployment plan specifies where UGC will be used (social, ads, web, email)\n- [ ] Creator briefs are ready (for paid/commissioned UGC)\n- [ ] Success metrics are defined (submission volume, engagement, ad performance, conversion lift)\n- [ ] Escalation plan exists for negative or brand-unsafe submissions'
+        "body": '## In NeuraMesh (read first \u2014 it overrides the module\'s delivery notes)\n\n- **Two turns, in this order.** (1) RESEARCH: read the room\'s brand docs (`read_library_doc`\n  scope room, `business-profile.md` first) plus the [MARKETING CONTEXT] note in your prompt; in a\n  release session the digest and the release brief in the thread are the facts. (2) THE ANGLE\n  CARD: call `propose_angles` with the product\'s name and two to five angles, each resting on a\n  fact you just read (a first-person walkthrough, a before-and-after, a "three things I did not\n  expect", a reply to a real objection, a duet-style react), then STOP with one line: the human\n  picks an angle, the platforms and the film\'s length on the card, or types their own angle. (3)\n  THE DRAFTS, on the human\'s pick (their reply wakes you): `draft_posts` with one VIDEO post per\n  picked platform, all in the chosen angle. A script drafted before the pick is refused, so never\n  skip the card.\n- **What each draft is.** Each card has three parts:\n  `body` is the CAPTION that posts with the video (one or two lines, the hashtags the network\n  uses, within its limit); `script` is what the creator reads and films (9:16, the hook in the\n  first three seconds as `[0:00-0:03]`, then timestamped beats, one call to action at the end),\n  written to the LENGTH the human picked (`\u2026 \xB7 length: 15 s` in their\n  reply, eight seconds when they picked none): the beats end at that second, the spoken lines are\n  short, and no beat asks for on-screen text, captions or subtitles beyond one title of three\n  words at most (a video model cannot spell more; the caption that posts is the body). The film\n  shows the script\'s first seconds; `imageBrief` is the shot direction the film follows;\n  `frame` is the name of a real app screenshot on this room\'s shelf (the [MARKETING CONTEXT]\n  note lists them), so the film\'s own picture of the product follows the real one. Never put the script in\n  the body: the body publishes.\n- **The app is real, never drawn.** A video model cannot copy a screen. A beat that puts the\n  app\'s screen on camera (a screen recording, the app on a phone, a close-up of the screen)\n  carries `SHOW: <image name>`, a real app screenshot, and the film CUTS TO it for that beat.\n  A real one is an image a person put in Files (`list_library` with scope project lists them)\n  or one `shelve_repo_screenshot` takes from the project\'s repository (`list_repo_files`\n  finds the images). A web capture or a drawn picture never counts, and a screen beat with no\n  SHOW line is refused. Most beats need no SHOW: a creator who talks to camera, or holds a phone\n  with its screen away, shows no app.\n- **The platform.** The ones the human picked on the angle card (`\u2026 \xB7 platforms: x, linkedin` in\n  their reply). A pick of none means the ask\'s platform, else the connected accounts. One card per\n  picked platform, a video post reads the same on X and LinkedIn as on TikTok.\n- **A change to a draft.** "\u21A9 Re draft b: \u2026" is the human asking for a change on card b: call\n  `read_drafts`, then `revise_posts` with the script or caption changed from what the card\n  holds, in full. Never redraft from memory, never add a second card.\n- **The creator brief.** Fill the module\'s "Creator Briefs for UGC Ads" template for this\n  campaign and shelve it through `propose_library_doc` as `ugc-brief-YYYY-MM-DD.md`, with the\n  rights line and the disclosure line ("#ad", "gifted") the module prescribes.\n- **Honesty.** No invented customers, quotes, numbers or testimonials: a script speaks as "I",\n  a creator, about what the release does, and cites nothing it cannot cite. Say `[NEED: x]`\n  for a claim the human must confirm. Run the `slop-patterns` checks before hand-over.\n- **Custody.** You draft. Approving, scheduling, publishing and paying creators stay human.\n\n---\n\n# UGC Strategy\n\n## When to Activate\n\n- Building social proof for a new or growing brand\n- Ad creative costs are high and performance is declining (UGC ads often outperform polished creative)\n- Customer reviews and testimonials are sparse or unstructured\n- Launching a UGC campaign or contest\n- Scaling content production without proportionally scaling the content team\n- Community building is a strategic priority\n- Exploring influencer or creator partnerships that include UGC components\n\n## First Questions\n\n1. What type of UGC is most valuable for your business? (Reviews, photos, videos, testimonials, social posts?)\n2. Where do customers already talk about you organically? (Social, forums, review sites?)\n3. What incentive (if any) will motivate customers to create content?\n4. Do you have a process for obtaining content rights and permissions?\n5. Where will UGC be used? (Social, website, ads, email, packaging?)\n6. What is the quality bar? (Authentic and raw vs semi-polished?)\n7. What is the legal landscape? (FTC guidelines, platform terms, privacy requirements?)\n\n## UGC Types\n\n### Reviews and Ratings\n- Product reviews on your site, Amazon, G2, Capterra, Yelp\n- Star ratings and aggregate scores\n- Review response strategy (responding to both positive and negative reviews)\n- Review solicitation campaigns (post-purchase email sequences)\n\n### Testimonials\n- Written quotes from happy customers\n- Video testimonials (short-form, interview-style, or self-recorded)\n- Case study quotes\n- Social proof snippets for landing pages and ads\n\n### Social Media Posts\n- Photos of customers using the product\n- Unboxing and first-impression content\n- Stories, Reels, and TikToks featuring the product\n- Brand mentions and tags\n- Hashtag campaign contributions\n\n### Video Content\n- Unboxing videos\n- Product reviews and tutorials\n- Before/after transformations\n- "Day in the life" featuring the product\n- Reaction and first-impression videos\n- How-to content created by users\n\n### Community Content\n- Forum posts and discussions\n- Community Q&A contributions\n- User-created templates, workflows, or resources\n- Fan art and creative interpretations\n- User-submitted tips and hacks\n\n## UGC Campaign Design\n\n### Campaign Structure\n\n```\n1. GOAL\n   What business objective does this campaign serve?\n   (Social proof, content volume, community engagement, product launch buzz)\n\n2. AUDIENCE\n   Who are you asking to create content?\n   (Existing customers, new buyers, fans, creators, employees)\n\n3. PROMPT\n   What specific content are you asking for?\n   (Be specific \u2014 "Share a video of..." not "Post something about us")\n\n4. MECHANIC\n   How do people participate?\n   (Hashtag, form submission, direct upload, email, contest entry)\n\n5. INCENTIVE\n   What do participants get?\n   (Recognition, prizes, features, discounts, early access, nothing but community)\n\n6. CURATION\n   How will you select and surface the best content?\n   (Manual review, community voting, algorithm, editorial selection)\n\n7. AMPLIFICATION\n   Where will the best UGC be shared?\n   (Brand social, website, ads, email, retail displays)\n\n8. TIMELINE\n   When does the campaign run?\n   (Always-on vs time-bound, launch windows, seasonal alignment)\n```\n\n### Campaign Examples\n\n**Product launch buzz:**\n"Show us your first five minutes with [Product]. Tag #FirstFiveMinutes for a chance to be featured on our page and win a year free."\n\n**Community building:**\n"What\'s the most creative way you use [Product]? Share your setup with #My[Product]Setup. We\'ll feature the best ones every Friday."\n\n**Social proof at scale:**\n"Love [Product]? Leave a 30-second video review and get 20% off your next order. Honest reviews only \u2014 we want the real story."\n\n**Seasonal:**\n"Show us how [Product] fits into your holiday routine. Best entries get featured in our holiday campaign and receive a gift box."\n\n## Incentive Structures\n\n| Incentive Type | Effectiveness | Cost | Best For |\n|---|---|---|---|\n| **Featured/recognition** | High for engaged communities | Free | Brand advocates, creators who want exposure |\n| **Discounts/credits** | Medium-high, reliable | Low-medium | Review solicitation, repeat customers |\n| **Contest/sweepstakes** | High for volume, lower quality | Medium | Large-scale campaigns, viral moments |\n| **Free product** | High for detailed content | Medium | Unboxing, review, tutorial content |\n| **Cash/payment** | Highest for quality | High | Creator partnerships, produced content |\n| **Early access** | High for power users | Free | Product launches, beta features |\n| **No incentive** | Works for strong brands with loyal communities | Free | Organic advocacy, authentic social proof |\n\n### Incentive Rules\n\n- Match the incentive to the effort required. A 10% discount is not enough for a 5-minute video review.\n- Overly generous incentives can attract low-quality submissions motivated only by the reward.\n- Non-monetary incentives (recognition, featuring, access) often produce more authentic content.\n- Always disclose when content was incentivized (FTC requirement in the US).\n\n## Rights Management and Permissions\n\n### Getting Content Rights\n\nYou MUST have explicit permission to use customer content in your marketing. Approaches:\n\n**1. Terms of participation.** Campaign terms and conditions state that submissions grant the brand a license to use the content. Common for hashtag campaigns and contests.\n\n**2. Direct permission request.** DM or email the creator asking for permission to use their content. Document the approval.\n\n**3. Creator agreements.** For paid or partnership UGC, use a content license agreement specifying:\n- Usage rights (which channels, which formats)\n- Duration (perpetual, 12 months, campaign-only)\n- Exclusivity (can the creator post the same content for competitors?)\n- Modification rights (can you edit, crop, add text?)\n- Attribution requirements (must you credit the creator?)\n\n### Rights Management Template\n\n```\nCreator: [Name / Handle]\nContent: [Description / Link]\nDate obtained: [Date]\nPermission method: [ToS / DM approval / Agreement]\nUsage rights: [Social, web, ads, email, print \u2014 specify]\nDuration: [Perpetual / Time-bound]\nAttribution required: [Yes \u2014 format / No]\nIncentive provided: [None / Discount / Payment / Product]\nDisclosure required: [Yes \u2014 #ad, #sponsored, #gifted / No]\nNotes: [Any restrictions or special terms]\n```\n\n## Content Curation Workflow\n\n### Monitoring\n\n- Set up social listening for brand mentions, product hashtags, and relevant keywords\n- Monitor review platforms on a set cadence (daily for high-volume, weekly for low-volume)\n- Tools: Sprout Social, Brandwatch, Mention, Google Alerts, native platform search\n\n### Selection Criteria\n\nRate incoming UGC on:\n\n| Criterion | Weight | Notes |\n|---|---|---|\n| Quality (visual/audio clarity) | High | Must meet minimum quality for intended use |\n| Authenticity | High | Feels real, not staged or scripted |\n| Brand alignment | High | Matches brand values and visual standards |\n| Diversity | Medium | Represents diverse users and use cases |\n| Message clarity | Medium | The value proposition or experience is clear |\n| Engagement potential | Medium | Will this resonate when amplified? |\n| Legal safety | Must pass | No IP issues, no minors without consent, no misleading claims |\n\n### Curation Process\n\n```\n1. COLLECT \u2014 Aggregate UGC from all sources into a central library\n2. SCREEN \u2014 Filter for quality, brand safety, and legal compliance\n3. OBTAIN RIGHTS \u2014 Secure usage permissions (do not skip this step)\n4. CATEGORIZE \u2014 Tag by theme, product, format, platform, and use case\n5. STORE \u2014 Archive with metadata in a searchable asset library\n6. DEPLOY \u2014 Match curated UGC to marketing needs (ads, social, web, email)\n7. TRACK \u2014 Monitor performance of deployed UGC\n```\n\n## UGC in Ads\n\nUGC ads frequently outperform brand-produced creative, especially on social platforms.\n\n### UGC Ad Formats\n\n**Whitelisting / Spark Ads:** Run ads from the creator\'s account (not your brand account). Appears native in the feed. Available on TikTok (Spark Ads) and Meta (partnership ads).\n\n**Brand account with UGC creative:** Use UGC footage/images in ads run from your brand account. Feels more authentic than polished brand creative.\n\n**Testimonial ads:** Customer quotes or video testimonials formatted as ad creative.\n\n**Mashup ads:** Combine multiple UGC clips into a single compilation ad.\n\n### UGC Ad Best Practices\n\n- **Keep it raw.** Over-editing UGC removes its authenticity advantage. Light editing only.\n- **First 3 seconds.** The hook must grab attention immediately. Lead with the most compelling moment.\n- **Include the product.** UGC ads still need to clearly show or mention the product.\n- **Add captions.** Most social video is watched without sound. Caption all spoken content.\n- **Test at scale.** UGC ads thrive on volume and variation. Test multiple creators and angles.\n- **Disclose properly.** If the creator was paid or gifted, the ad must disclose the relationship.\n\n### Creator Briefs for UGC Ads\n\nWhen commissioning UGC from creators, provide:\n\n```\nProduct: [What they\'re reviewing/showing]\nKey message: [The one thing viewers should take away]\nFormat: [Video length, orientation (9:16 vertical), platform]\nMust include: [Product visible, specific feature mention, CTA]\nMust avoid: [Competitor mentions, specific claims, inappropriate content]\nTone: [Authentic, excited, educational, casual]\nDeadline: [When raw footage is due]\nDelivery: [How and where to submit files]\nCompensation: [Payment, product, or other incentive]\nUsage rights: [How the content will be used and for how long]\n```\n\n## Quality Control\n\n### Content Moderation\n\n- Review all UGC before amplifying \u2014 never auto-publish without review\n- Check for brand safety issues (offensive content, competitor products in frame, inappropriate language)\n- Verify factual claims in reviews and testimonials (do not amplify false claims about your product)\n- Ensure diversity in featured UGC \u2014 do not inadvertently represent only one demographic\n\n### Maintaining Authenticity\n\n- Do not over-edit UGC \u2014 imperfections are part of its value\n- Do not script UGC so heavily that it sounds like a commercial\n- Do not fake UGC \u2014 fabricated "customer" content is a legal and reputational risk\n- Do not cherry-pick only positive content \u2014 balanced representation builds more trust\n\n## Legal Considerations\n\n### FTC Disclosure Requirements (US)\n\n- **Material connection = disclosure required.** If the creator received anything of value (payment, free product, discount, early access), the relationship must be disclosed.\n- **Disclosure must be clear and conspicuous.** "#ad" or "#sponsored" at the beginning of the post, not buried in 30 hashtags.\n- **Platform tools preferred.** Use built-in partnership/sponsored content labels where available.\n- **Applies to all formats.** Written, photo, video, audio, Stories, Reels, TikToks \u2014 all require disclosure.\n\n### Other Legal Considerations\n\n- **Privacy.** Do not use content featuring identifiable individuals (especially minors) without explicit consent.\n- **Copyright.** The creator owns their content. Reposting without permission is copyright infringement.\n- **Trademark.** Ensure UGC does not misuse third-party trademarks.\n- **Claims.** If UGC makes product efficacy claims (especially in health, finance, education), verify compliance with advertising regulations.\n- **International.** Privacy and disclosure laws vary by country. GDPR in EU, PIPEDA in Canada, etc.\n\n**Disclaimer:** This is general guidance, not legal advice. Consult with a lawyer for your specific situation and jurisdictions.\n\n## Common Pitfalls\n\n1. **No rights management.** Using customer content without permission exposes you to legal risk and damages creator relationships.\n2. **Over-controlling the content.** If you script and direct every detail, it is not UGC \u2014 it is a commercial with an amateur actor.\n3. **Ignoring negative UGC.** Negative reviews and critical posts are feedback. Respond professionally, do not hide from them.\n4. **One-and-done campaigns.** UGC should be an ongoing program, not a single campaign. Build systems, not events.\n5. **No curation process.** Without a system for collecting, screening, and deploying UGC, valuable content gets lost.\n6. **Mismatched incentives.** Asking for a 5-minute video review in exchange for a 10% discount is a bad deal for the creator.\n\n## Quality Gate\n\nBefore launching a UGC program or campaign:\n\n- [ ] UGC types and formats are defined with clear examples\n- [ ] Campaign mechanic is simple and specific (participants know exactly what to create)\n- [ ] Incentive structure matches the effort required from participants\n- [ ] Rights management process is established with templates for permission requests\n- [ ] Content moderation and curation workflow is defined\n- [ ] Legal requirements are understood (FTC disclosure, privacy, copyright)\n- [ ] Deployment plan specifies where UGC will be used (social, ads, web, email)\n- [ ] Creator briefs are ready (for paid/commissioned UGC)\n- [ ] Success metrics are defined (submission volume, engagement, ad performance, conversion lift)\n- [ ] Escalation plan exists for negative or brand-unsafe submissions'
       },
       {
         "name": "honest-analytics",
@@ -24137,10 +34339,10 @@ var PostgresStore = class {
       updatedAt: new Date(r["updated_at"]).toISOString()
     };
   }
-  async insertEvent(sql, e, taskId3) {
+  async insertEvent(sql, e, taskId3, facts) {
     await sql`insert into events (id, workspace_id, type, source, target, task_id, payload, in_reply_to)
       values (${e.id}, ${e.workspace}::uuid, ${e.type}, ${e.source}, ${e.target}, ${taskId3}, ${sql.json(e.payload)}, ${e.in_reply_to})`;
-    trackDomainEvent(e);
+    trackDomainEvent(e, facts);
   }
   async createTask(task, event) {
     await this.sql.begin(async (_tx) => {
@@ -24213,7 +34415,7 @@ var PostgresStore = class {
           work_plan = ${t2.workPlan ? sql.json(t2.workPlan) : null},
           plan_approved_at = ${t2.planApprovedAt}
         where id = ${id}`;
-      for (const e of out.events) await this.insertEvent(sql, e, id);
+      for (const e of out.events) await this.insertEvent(sql, e, id, taskFacts(t2));
       for (const a of out.artifacts ?? []) {
         const by = t2.assignee ?? t2.creator;
         const artTask = out.artifactTaskId ?? id;
@@ -24255,8 +34457,8 @@ var PostgresStore = class {
       const [creator] = await sql`select email from nm_users where id = ${input.createdBy}::uuid`;
       await sql`insert into workspace_members (workspace_id, user_id, role, display_name, compute)
         values (${workspaceId}, ${input.createdBy}::uuid, 'owner', ${creator?.["email"]?.split("@")[0] ?? "owner"}, '{"shares":["*"]}'::jsonb)`;
-      const [proj] = await sql`insert into projects (workspace_id, name, slug, is_default, status)
-        values (${workspaceId}, 'Default', 'default', true, 'active') returning id`;
+      const [proj] = await sql`insert into projects (workspace_id, name, slug, is_default, status, ship_gate)
+        values (${workspaceId}, 'Default', 'default', true, 'active', false) returning id`;
       const defaultProjectId = proj["id"];
       const defaults = [
         ["general", "Team home base", "build"],
@@ -24365,7 +34567,7 @@ var PostgresStore = class {
       where wm.workspace_id = ${input.workspace}::uuid and lower(u.email) = ${email}`;
     if (already) throw new DomainError("CONFLICT", "that address is already a member of this workspace");
     const token = randomBytes9(24).toString("base64url");
-    const tokenHash = createHash10("sha256").update(token).digest("hex");
+    const tokenHash = createHash12("sha256").update(token).digest("hex");
     const [ws] = await this.sql`select name from workspaces where id = ${input.workspace}::uuid`;
     return this.sql.begin(async (_tx) => {
       const sql = asSql2(_tx);
@@ -24833,16 +35035,17 @@ var PostgresStore = class {
     });
   }
   async listArtifacts(taskId3) {
-    const rows2 = await this.sql`select id, task_id, kind, name, inline_content, created_at
-      from artifacts where task_id = ${taskId3} order by created_at`;
-    return rows2.map((r) => ({
+    const rows2 = await this.sql`select a.id, a.task_id, a.kind, a.name, a.inline_content, a.created_at, b.object_ref
+      from artifacts a left join brain_artifacts b on b.artifact_id = a.id left join threads t on t.id = b.thread_id
+      where a.task_id = ${taskId3} and (t.id is null or t.kind <> 'coding') order by a.created_at`;
+    return Promise.all(rows2.map(async (r) => ({
       id: r["id"],
       taskId: r["task_id"],
       kind: r["kind"],
       name: r["name"],
-      content: r["inline_content"],
+      content: await artifactContent(r["inline_content"], r["object_ref"]),
       createdAt: new Date(r["created_at"]).toISOString()
-    }));
+    })));
   }
   // Beats (docs/17) — one run (set) per declare; advance targets the task's latest run.
   async declareBeats(task, role, items) {
@@ -24856,10 +35059,10 @@ var PostgresStore = class {
     });
     return { runId };
   }
-  async advanceBeat(taskId3, seq, status) {
-    await this.sql`update beats set status = ${status}::beat_status, updated_at = now(),
-        started_at = case when ${status} = 'active' and started_at is null then now() else started_at end,
-        done_at = case when ${status} = 'done' then now() else done_at end
+  async advanceBeat(taskId3, seq, status2) {
+    await this.sql`update beats set status = ${status2}::beat_status, updated_at = now(),
+        started_at = case when ${status2} = 'active' and started_at is null then now() else started_at end,
+        done_at = case when ${status2} = 'done' then now() else done_at end
       where run_id = (select run_id from beats where task_id = ${taskId3}::uuid order by created_at desc limit 1) and seq = ${seq}`;
   }
   async settleBeats(taskId3) {
@@ -25162,8 +35365,8 @@ var PostgresStore = class {
     if (row["retired_at"]) throw new DomainError("NOT_PERMITTED", `agent ${agentName} is retired \u2014 rehire it or offer to someone else`);
     return row["id"];
   }
-  async setAgentStatus(agentId, status) {
-    await this.sql`update agents set status = ${status} where id = ${agentId}`;
+  async setAgentStatus(agentId, status2) {
+    await this.sql`update agents set status = ${status2} where id = ${agentId}`;
   }
   async createSkill(input, event) {
     return this.sql.begin(async (_tx) => {
@@ -25263,11 +35466,11 @@ var PostgresStore = class {
     return this.sql.begin(async (_tx) => {
       const sql = asSql2(_tx);
       const chId = await resolveChannelId(sql, input.workspace, input.channel);
-      const status = input.origin === "bundled" ? "ready" : "importing";
+      const status2 = input.origin === "bundled" ? "ready" : "importing";
       let id;
       try {
         const [row] = await sql`insert into skill_packs (workspace_id, channel_id, name, description, source_url, source_ref, origin, status)
-          values (${input.workspace}::uuid, ${chId}, ${input.name}, ${input.description}, ${input.sourceUrl}, ${input.sourceRef}, ${input.origin}, ${status})
+          values (${input.workspace}::uuid, ${chId}, ${input.name}, ${input.description}, ${input.sourceUrl}, ${input.sourceRef}, ${input.origin}, ${status2})
           returning id`;
         id = row["id"];
       } catch (e) {
@@ -25672,7 +35875,7 @@ var PostgresStore = class {
     const [n] = await sql`select nm_next_task_number(${workspace}::uuid) as n`;
     const inserted = await sql`insert into tasks (workspace_id, channel_id, project_id, number, title, description, state, kind, creator_kind, creator_id)
       select ${workspace}::uuid, ${channelId}::uuid, c.project_id, ${Number(n["n"])}, ${flow.title},
-             ${"Walk the steps below to set this room up \u2014 your answers save as you go, so you can leave and finish any time. Closing this task skips setup."},
+             ${flow.description},
              'todo'::task_state, 'setup'::task_kind, 'human'::actor_kind,
              coalesce(
                case when c.created_by ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then c.created_by::uuid end,
@@ -25767,10 +35970,10 @@ var PostgresStore = class {
       return { id: row["id"] };
     });
   }
-  async setScheduleStatus(scheduleId, status, makeEvent) {
+  async setScheduleStatus(scheduleId, status2, makeEvent) {
     return this.sql.begin(async (_tx) => {
       const sql = asSql2(_tx);
-      const [row] = await sql`update schedules set status = ${status} where id = ${scheduleId}::uuid returning workspace_id`;
+      const [row] = await sql`update schedules set status = ${status2} where id = ${scheduleId}::uuid returning workspace_id`;
       if (!row) throw new DomainError("NOT_FOUND", "schedule not found");
       await this.insertEvent(sql, makeEvent(row["workspace_id"]), null);
       return { id: scheduleId };
@@ -25929,25 +36132,10 @@ var PostgresStore = class {
     return this.sql.begin((tx) => anchorContentItemSql(asSql2(tx), itemId, threadId, (ws) => this.insertEvent(asSql2(tx), makeEvent(ws), null)));
   }
   async attachContentMedia(itemId, mime, bytes, actor, makeEvent) {
-    return this.sql.begin(async (_tx) => {
-      const sql = asSql2(_tx);
-      const [item] = await sql`select workspace_id from content_items where id = ${itemId}::uuid and status in ('draft', 'scheduled')`;
-      if (!item) throw new DomainError("NOT_FOUND", "content item not found (or already published)");
-      const ws = item["workspace_id"];
-      await sql`delete from content_media where content_item_id = ${itemId}::uuid`;
-      const [row] = await sql`insert into content_media (workspace_id, content_item_id, mime, bytes, size_bytes, created_by_kind, created_by)
-        values (${ws}::uuid, ${itemId}::uuid, ${mime}, ${bytes}, ${bytes.length}, ${actor.kind}, ${actor.id}) returning id`;
-      const mediaId = row["id"];
-      const film = mime.startsWith("video/");
-      const patch = film ? { video_id: mediaId } : { image_id: mediaId };
-      await sql`update content_items set media = (((coalesce(media, '{}'::jsonb) || ${sql.json(patch)}::jsonb) - ${film ? "video_error" : "image_error"}) - ${film ? "image_id" : "video_id"}) - ${film ? "thumb" : "video_error"} where id = ${itemId}::uuid`;
-      await this.insertEvent(sql, makeEvent(ws), null);
-      return { id: mediaId };
-    });
+    return attachContentMediaSql(this.sql, itemId, mime, bytes, actor, makeEvent);
   }
   async contentMediaBytes(mediaId) {
-    const [r] = await this.sql`select mime, bytes, workspace_id from content_media where id = ${mediaId}::uuid limit 1`;
-    return r ? { mime: r["mime"], bytes: Buffer.from(r["bytes"]), workspace: r["workspace_id"] } : null;
+    return contentMediaBytesSql(this.sql, mediaId);
   }
   async createChannelArtifact(input, makeEvent) {
     return this.sql.begin(async (_tx) => {
@@ -25967,10 +36155,10 @@ var PostgresStore = class {
   // scene/source as jsonb strings, which reads fine on the writing machine (its local row is
   // the source of truth) and arrives DOUBLE-ENCODED on every other device. Parse the validated
   // JSON text and hand postgres.js the real value via sql.json.
-  wbJson(text2, what) {
-    if (text2 == null) return null;
+  wbJson(text3, what) {
+    if (text3 == null) return null;
     try {
-      return this.sql.json(JSON.parse(text2));
+      return this.sql.json(JSON.parse(text3));
     } catch {
       throw new DomainError("INVALID_INPUT", `${what} is not valid JSON`);
     }
@@ -26102,20 +36290,26 @@ var PostgresStore = class {
   // meant connecting X in a second project silently OVERWROTE the first product's account
   // instead of adding one — the same row, its channel_id repointed. The project is derived from
   // the room the OAuth round-trip started in, so callers keep passing a channel.
-  async upsertConnector(input) {
-    const [row] = await this.sql`insert into connectors (workspace_id, channel_id, project_id, provider, handle, status, scopes, connected_by)
-      values (
-        ${input.workspace}::uuid, ${input.channelId},
-        coalesce(
-          (select ch.project_id from channels ch where ch.id = ${input.channelId}),
-          (select p.id from projects p where p.workspace_id = ${input.workspace}::uuid and p.is_default limit 1)
-        ),
-        ${input.provider}, ${input.handle}, 'connected', ${input.scopes}, ${input.connectedBy})
-      on conflict (workspace_id, project_id, provider) where project_id is not null do update
-        set handle = excluded.handle, status = 'connected', channel_id = excluded.channel_id,
-            scopes = excluded.scopes, connected_by = excluded.connected_by
-      returning id`;
-    return { id: row["id"] };
+  // `makeEvent` is written only when the row is NEW (xmax = 0), in the same transaction: the GitHub
+  // doors pass github.connected, so a step that resolves again on every mount never repeats it.
+  async upsertConnector(input, makeEvent) {
+    return this.sql.begin(async (_tx) => {
+      const sql = asSql2(_tx);
+      const [row] = await sql`insert into connectors (workspace_id, channel_id, project_id, provider, handle, status, scopes, connected_by)
+        values (
+          ${input.workspace}::uuid, ${input.channelId},
+          coalesce(
+            (select ch.project_id from channels ch where ch.id = ${input.channelId}),
+            (select p.id from projects p where p.workspace_id = ${input.workspace}::uuid and p.is_default limit 1)
+          ),
+          ${input.provider}, ${input.handle}, 'connected', ${input.scopes}, ${input.connectedBy})
+        on conflict (workspace_id, project_id, provider) where project_id is not null do update
+          set handle = excluded.handle, status = 'connected', channel_id = excluded.channel_id,
+              scopes = excluded.scopes, connected_by = excluded.connected_by
+        returning id, (xmax = 0) as inserted`;
+      if (row["inserted"] && makeEvent) await this.insertEvent(sql, makeEvent(input.workspace, row["id"]), null);
+      return { id: row["id"] };
+    });
   }
   async setConnectorSecret(connectorId, ciphertext) {
     await this.sql`insert into connector_secrets (connector_id, ciphertext) values (${connectorId}::uuid, ${ciphertext})
@@ -26286,19 +36480,7 @@ var PostgresStore = class {
     return { id: messageId };
   }
   async updateThread(workspace, threadId, patch, opts) {
-    if (patch.title !== void 0 && opts?.agentTitleOnce) {
-      const [cur] = await this.sql`select titled_at from threads where id = ${threadId}::uuid and workspace_id = ${workspace}::uuid`;
-      if (!cur) throw new DomainError("NOT_FOUND", `thread ${threadId} not found`);
-      if (cur.titled_at) throw new DomainError("THREAD_ALREADY_TITLED", "this conversation is already named \u2014 only the human renames it");
-    }
-    const [row] = await this.sql`update threads set
-        title = coalesce(${patch.title ?? null}, title),
-        titled_at = case when ${patch.title ?? null}::text is not null then now() else titled_at end,
-        description = coalesce(${patch.description ?? null}, description),
-        updated_at = now()
-      where id = ${threadId}::uuid and workspace_id = ${workspace}::uuid
-      returning id`;
-    if (!row) throw new DomainError("NOT_FOUND", `thread ${threadId} not found`);
+    await updateThreadTitleSql(this.sql, workspace, threadId, patch, opts);
   }
   async createThread(workspace, channelId, threadId, title, description, createdBy) {
     await this.sql`insert into threads (id, workspace_id, channel_id, title, description, created_by)
@@ -26449,7 +36631,7 @@ var PostgresStore = class {
     await this.sql`update threads set task_id = ${taskId3}::uuid, updated_at = now()
       where id = ${threadId}::uuid and workspace_id = ${workspace}::uuid and task_id is null`;
   }
-  async postMessage(msg2, event, decisions) {
+  async postMessage(msg2, event, decisions2) {
     try {
       await this.sql.begin(async (_tx) => {
         const sql = asSql2(_tx);
@@ -26472,7 +36654,7 @@ var PostgresStore = class {
         await sql`insert into events (id, workspace_id, type, source, target, channel_id, task_id, payload, in_reply_to)
           values (${event.id}, ${event.workspace}::uuid, ${event.type}, ${event.source}, ${event.target},
             ${chId}, ${msg2.taskId ?? null}, ${sql.json(event.payload)}, ${event.in_reply_to})`;
-        for (const d of decisions ?? []) {
+        for (const d of decisions2 ?? []) {
           await sql`update decisions set status = 'dismissed', answered_at = now()
             where workspace_id = ${msg2.workspace}::uuid and channel_id = ${chId}
               and task_id is not distinct from ${msg2.taskId ?? null} and (${!isGitHubNeedQuestion(d.question)}::boolean or (select m.thread_id from messages m where m.id = decisions.message_id) is not distinct from ${msg2.threadId ?? null}::uuid)
@@ -26641,12 +36823,12 @@ var PostgresStore = class {
       return rows2.length;
     };
     const msgRows = await this.sql`select id, body as text from messages where embedding is null and body <> '' order by created_at limit ${batch}`;
-    const messages = await fill2(msgRows, (ids, vecs) => this.sql`update messages m set embedding = u.vec::vector
+    const messages2 = await fill2(msgRows, (ids, vecs) => this.sql`update messages m set embedding = u.vec::vector
       from unnest(${ids}::uuid[], ${vecs}::text[]) as u(id, vec) where m.id = u.id`);
     const factRows = await this.sql`select id, content as text from facts where embedding is null order by created_at limit ${batch}`;
     const facts = await fill2(factRows, (ids, vecs) => this.sql`update facts f set embedding = u.vec::vector
       from unnest(${ids}::uuid[], ${vecs}::text[]) as u(id, vec) where f.id = u.id`);
-    return { messages, facts };
+    return { messages: messages2, facts };
   }
   async createAttachment(input, limits) {
     if ((input.sizeBytes ?? 0) > limits.maxBytes) throw new DomainError("PLAN_LIMIT", attachmentUpgradeReason("size"));
@@ -26745,3 +36927,12 @@ var vercel_default = createApp(store, { push });
 export {
   vercel_default as default
 };
+/*! Bundled license information:
+
+@powersync/common/dist/bundle.node.mjs:
+  (*!
+   * js-logger - http://github.com/jonnyreeves/js-logger
+   * Jonny Reeves, http://jonnyreeves.co.uk/
+   * js-logger may be freely distributed under the MIT license.
+   *)
+*/

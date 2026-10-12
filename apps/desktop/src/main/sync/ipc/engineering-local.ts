@@ -3,8 +3,8 @@
 // the app's own (relay/engineering-local-host.ts). Registered beside the terminals, from startSync,
 // because that is where the replica the host reads lives.
 import { ipcMain } from 'electron';
-import type { PowerSyncDatabase } from '@powersync/node';
-import type { Actor } from '@neuramesh/shared';
+import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
+import { controlApiRequestUrl, type Actor } from '@neuramesh/shared';
 import type { EngineeringOpenMeta } from '../../../engineering-protocol';
 import { apiAuthHeaders } from '../../apiauth';
 import { createLocalEngineeringHost, LocalEngineeringSessions } from '../../relay/engineering-local-host';
@@ -17,7 +17,17 @@ export function localCodeSessionOpen(threadId: string): boolean {
   return live?.hasThread(threadId) ?? false;
 }
 
-export function registerLocalEngineering({ db }: { db: () => PowerSyncDatabase }): void {
+export function registerLocalEngineering({ db }: { db: () => ReplicaDatabase }): void {
+  ipcMain.removeHandler('nm:engineering-history');
+  ipcMain.handle('nm:engineering-history', async (_event, { threadId, workspace }: { threadId: string; workspace: string }) => {
+    if (workspace !== ws()) throw new Error('The active workspace changed. Reopen this thread.');
+    const path = `/v1/brain/threads/${encodeURIComponent(threadId)}?workspace=${encodeURIComponent(workspace)}&format=compact-decoded`;
+    const response = await fetch(controlApiRequestUrl(apiUrl(), path), {
+      headers: await apiAuthHeaders(apiUrl(), { kind: 'human', id: actorId() }), signal: AbortSignal.timeout(30_000),
+    });
+    if (!response.ok) throw new Error(`The recorded conversation could not be loaded (${response.status}). Reopen this thread to retry.`);
+    return response.json();
+  });
   // the coding runtime is a dynamic import, external to the main bundle (electron.vite.config.ts),
   // and the honest answer to "can this Mac host Code" is whether it loads — asked once, off the
   // critical path, never at open time where a missing module would read as a session failure

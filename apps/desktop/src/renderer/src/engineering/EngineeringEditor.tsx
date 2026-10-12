@@ -1,42 +1,20 @@
+import type { EngineeringChangeReview } from '@neuramesh/shared';
+import { changeReviewLabel } from './EngineeringChangeCard';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { highlightCode } from '../lib/highlight';
-import { Md } from '../md/Md';
-import { IconBranch, IconCheck, IconCode, IconFile, IconHistory, IconSearch, IconTerm, IconThreads } from '../ui/icons';
-import { DiffView } from '../views/docpreview';
+import { IconBranch, IconCode, IconFile, IconHistory, IconTerm, IconThreads } from '../ui/icons';
 import { TerminalView, type TermHandle } from '../wtabs/guests';
 import type { EngineeringSession } from './domain';
-import { combinedDiff, restoreEngineeringCheckpoint } from './checkpoints';
+import { restoreEngineeringCheckpoint } from './checkpoints';
 import { scrollEngineeringPane } from './layout';
-import { engineeringPlanItems } from './activity';
-import { noteApproval, seenStart, type SeenState } from '../shell/arrivals';
+import { EngineeringWorkPlan } from './EngineeringWorkPlan';
+import { EngineeringReview } from './EngineeringReview';
+import { reviewFiles } from './change-review';
 
 export type EngineeringWorkspaceTab = 'changes' | 'files' | 'plan' | 'checkpoints' | 'terminal';
 
 const stateLabel = (state: EngineeringSession['state']) => ({
   idle: 'Ready', streaming: 'Working', awaiting_approval: 'Needs approval', resumable: 'Paused', completed: 'Complete', error: 'Blocked',
 })[state];
-
-function EngineeringWorkPlan({ text }: { text: string }) {
-  const items = engineeringPlanItems(text);
-  const complete = items.filter((item) => item.status === 'complete').length;
-  if (!items.length) return <div className="engplan plBody"><Md text={text} /></div>;
-  return (
-    <div className="engplan">
-      <section className="engplantasks" aria-label="Work plan steps">
-        <header><span><IconThreads s={13} /><b>Work plan</b></span><em>{complete ? `${complete} of ${items.length} complete` : `${items.length} steps`}</em></header>
-        <ol>
-          {items.map((item, index) => (
-            <li className={item.status} key={`${index}-${item.text}`}>
-              <span className="engplanmarker">{item.status === 'complete' ? <IconCheck s={12} /> : <i />}</span>
-              <span><small>Step {index + 1}</small><b>{item.text}</b></span>
-            </li>
-          ))}
-        </ol>
-      </section>
-      <details className="engplansource"><summary>Full plan and guardrails</summary><div className="plBody"><Md text={text} /></div></details>
-    </div>
-  );
-}
 
 export function EngineeringWorkspaceTabs({ tab, onTab, changeCount = 0, disabled = false }: {
   tab: EngineeringWorkspaceTab;
@@ -86,19 +64,25 @@ export function EngineeringWorkspaceHeader({ session, sessionCount, tab, onTab, 
         {session ? <span className={`engstate ${session.state}`}>{session.state === 'streaming' ? null : <i />}{stateLabel(session.state)}</span> : null}
       </div>
       <EngineeringWorkspaceTabs tab={tab} onTab={onTab}
-        disabled={!session} changeCount={(session?.pendingApproval?.changes ?? session?.changes ?? []).length} />
+        disabled={!session} changeCount={reviewFiles(session?.pendingApproval?.changes ?? session?.changes ?? []).length} />
     </div>
   );
 }
 
-export function EngineeringEditor({ session, onSession, onRestore, tab, onTab }: {
+export function EngineeringEditor({ session, onSession, onRestore, restoreUnavailable, tab, selectedPath, onSelectPath, selectedPlan, selectedReview }: {
   session: EngineeringSession;
   onSession: (session: EngineeringSession) => void;
   onRestore?: (checkpointId: string) => void;
+  /** no machine runs this thread: a restore must move files, so it waits for one */
+  restoreUnavailable?: boolean | undefined;
   tab: EngineeringWorkspaceTab;
   onTab: (tab: EngineeringWorkspaceTab) => void;
+  selectedPath?: string | null;
+  selectedPlan?: string | null;
+  selectedReview?: EngineeringChangeReview | null;
+  onSelectPath?: (path: string) => void;
 }) {
-  const visibleChanges = useMemo(() => session.pendingApproval?.changes ?? session.changes, [session.pendingApproval?.changes, session.changes]);
+  const files = useMemo(() => reviewFiles(selectedReview?.changes ?? session.pendingApproval?.changes ?? session.changes), [selectedReview, session.pendingApproval?.changes, session.changes]);
   const [filePath, setFilePath] = useState<string | null>(null);
   const terminal = useRef<TermHandle>(null);
   const [terminalStarted, setTerminalStarted] = useState(tab === 'terminal');
@@ -108,42 +92,22 @@ export function EngineeringEditor({ session, onSession, onRestore, tab, onTab }:
     const frame = requestAnimationFrame(() => terminal.current?.fit());
     return () => cancelAnimationFrame(frame);
   }, [tab]);
-  // a NEW approval brings its changes to the front. One that already waited when the editor mounted
-  // does not, and a file pick never jumps (George, 2026-10-05: only a new artifact opens the panel)
-  const approvals = useRef<SeenState | null>(null);
   useEffect(() => {
-    const now = Date.now();
-    if (approvals.current?.key !== session.id) approvals.current = seenStart(session.id, now);
-    if (noteApproval(approvals.current, session.pendingApproval?.id, now) && session.pendingApproval?.changes?.length) onTab('changes');
-  }, [session.id, session.pendingApproval?.id, onTab]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    if (filePath && !visibleChanges.some((change) => change.path === filePath)) setFilePath(null);
-  }, [visibleChanges, filePath]);
-  const file = visibleChanges.find((change) => change.path === filePath) ?? visibleChanges[0] ?? null;
-  const source = file?.after || file?.before || '';
-  const highlighted = useMemo(() => file ? highlightCode(source, file.path) : '', [file, source]);
+    if (filePath && !files.some((file) => file.change.path === filePath)) setFilePath(null);
+  }, [files, filePath]);
+  const selectFile = (path: string) => { setFilePath(path); onSelectPath?.(path); };
+  const selectedFile = selectedPath ?? filePath;
   return (
     <section className="engeditor">
       <div className="engeditorbody">
+        {selectedReview && (tab === 'changes' || tab === 'files') ? <div className="engreviewversion" role="status">{changeReviewLabel(selectedReview.status)} · Selected change set</div> : null}
         <button className="engeditorback" onClick={() => scrollEngineeringPane('.engconversation')} aria-label="Return to Code conversation"><IconThreads s={12} /></button>
-        {tab === 'changes' && (visibleChanges.length
-          ? <DiffView text={combinedDiff(visibleChanges)} />
+        {tab === 'changes' && (files.length
+          ? <EngineeringReview files={files} selectedPath={selectedFile} onSelectPath={selectFile} />
           : <div className="engeditorempty"><IconCode s={30} /><b>No changes yet</b><span>Plan first, then switch to Act. Proposed patches appear here in full before approval.</span></div>)}
-        {tab === 'files' && (
-          <div className="engfiles">
-            <aside>
-              <div className="engfileshead"><IconSearch s={12} /> Session files</div>
-              {visibleChanges.map((change) => <button key={change.path} className={(file?.path === change.path ? 'on ' : '') + change.kind} onClick={() => setFilePath(change.path)}><i>{change.kind === 'added' ? 'A' : change.kind === 'deleted' ? 'D' : 'M'}</i><span>{change.path}</span></button>)}
-              {!visibleChanges.length && <small>No files opened by this session.</small>}
-            </aside>
-            <div className="engsource">
-              {file ? <><div className="engsourcehead"><b>{file.path}</b><span>{session.pendingApproval?.changes ? 'Proposed · read-only' : 'Applied by Engineering'}</span></div><pre><code dangerouslySetInnerHTML={{ __html: highlighted + '\n' }} /></pre></>
-                : <div className="engeditorempty"><IconFile s={28} /><b>No session file selected</b><span>Files created or changed by this session will be available here.</span></div>}
-            </div>
-          </div>
-        )}
-        {tab === 'plan' && (session.workPlan
-          ? <EngineeringWorkPlan text={session.workPlan} />
+        {tab === 'files' && <EngineeringReview files={files} selectedPath={selectedFile} onSelectPath={selectFile} source />}
+        {tab === 'plan' && ((selectedPlan ?? session.workPlan)
+          ? <EngineeringWorkPlan progress={!selectedPlan || selectedPlan === session.workPlan ? session.planProgress : null} earlier={!!selectedPlan && selectedPlan !== session.workPlan} text={(selectedPlan ?? session.workPlan)!} />
           : <div className="engeditorempty"><IconThreads s={30} /><b>No Work Plan yet</b><span>Send a request in Plan mode. The durable plan stays here when you switch to Act.</span></div>)}
         {tab === 'checkpoints' && (
           <div className="engcheckpoints">
@@ -152,7 +116,7 @@ export function EngineeringEditor({ session, onSession, onRestore, tab, onTab }:
               <div className="engcheckpoint" key={checkpoint.id}>
                 <span className="engcheckpointico"><IconHistory s={13} /></span>
                 <span><b>{checkpoint.label}</b><small>{new Date(checkpoint.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · {checkpoint.changes.length} changed files</small></span>
-                <button disabled={session.state === 'streaming' || session.state === 'awaiting_approval'} onClick={() => onRestore ? onRestore(checkpoint.id) : onSession(restoreEngineeringCheckpoint(session, checkpoint.id))}>Restore</button>
+                <button disabled={!!restoreUnavailable || session.state === 'streaming' || session.state === 'awaiting_approval'} title={restoreUnavailable ? 'Connect a machine to restore the files.' : undefined} onClick={() => onRestore ? onRestore(checkpoint.id) : onSession(restoreEngineeringCheckpoint(session, checkpoint.id))}>Restore</button>
               </div>
             ))}
           </div>

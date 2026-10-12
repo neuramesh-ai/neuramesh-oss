@@ -617,7 +617,7 @@ command an agent may also fire must report `false` — because without one the f
 | posture | when | what it wears |
 |---|---|---|
 | **open** | this round, at its own review state | the verdict bar |
-| **superseded** | a newer round of the same kind exists | `Settled — revised into v5` + `Open v5 →`, **no** buttons and **no** comment affordances |
+| **superseded** | a newer round of the same kind exists | `Settled: revised into v5` + `Open v5 →` (hq, and the desktop keeps its old words until someone ports them), **no** buttons and **no** comment affordances |
 | **settled** | the task has left the gate — **or its state cannot be read** | the record, and the reason |
 
 **The superseded posture is the rule the overlay did not have.** It offered Approve on any round

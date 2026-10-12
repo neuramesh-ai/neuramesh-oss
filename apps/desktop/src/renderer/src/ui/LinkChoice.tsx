@@ -14,7 +14,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { nm } from '../bridge/nm';
 import { NM_PLATFORM } from '../lib/platform';
-import { modGlyph, openLink, setExternalOpener, setLinkChooser, splitUrl, watchLinks, type LinkAsk } from '../lib/links';
+import { setInAppOpener, modGlyph, openLink, setExternalOpener, setLinkChooser, splitUrl, watchLinks, type LinkAsk } from '../lib/links';
 import { anchorPoint } from './anchor';
 import { IconExternal, IconGlobe } from './icons';
 import { PorchMark } from '../brand';
@@ -25,6 +25,7 @@ let browserOnce: Promise<Browser> | null = null;
 const defaultBrowser = () => (browserOnce ??= (nm?.defaultBrowser?.() ?? Promise.resolve(null)).catch(() => null));
 
 export function LinkChoiceHost({ openInApp }: { openInApp: (url: string) => void }) {
+  useEffect(() => { setInAppOpener(openInApp); return () => setInAppOpener(null); }, [openInApp]);
   const [ask, setAsk] = useState<LinkAsk | null>(null);
   const [browser, setBrowser] = useState<Browser>(null);
   useEffect(() => {

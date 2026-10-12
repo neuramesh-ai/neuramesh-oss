@@ -6,11 +6,11 @@
 //
 // REGISTRATION POSITION IS LOAD-BEARING (see whiteboards.ts) — called from where these sat.
 import { ipcMain } from 'electron';
-import type { PowerSyncDatabase } from '@powersync/node';
+import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 
 export function registerRoomIpc(deps: {
   ws: () => string;
-  db: () => PowerSyncDatabase;
+  db: () => ReplicaDatabase;
   /** the room's crew, resolved by startSync (it owns the agent map) */
   loadRoster: () => Promise<unknown>;
 }): void {

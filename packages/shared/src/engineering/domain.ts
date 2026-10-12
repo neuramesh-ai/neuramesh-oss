@@ -1,5 +1,10 @@
+import { SAMPLE_CHANGES, WORK_PLAN } from './demo-plan';
+import type { EngineeringPlanProgress } from './plan-progress';
+import type { ThinkingLevel } from '../agent-models';
+import type { EngineeringAgent } from './selection';
+import { engineeringReviewMessages, finishChangeReview, updateReviewStatus } from './review-history';
 import { firstSentence } from '../linear';
-import { engineeringModeHandoff, type EngineeringModeHandoff } from './handoff';
+import { engineeringModeHandoff, canContinueEngineering, type EngineeringModeHandoff, type EngineeringPlanReport } from './handoff';
 import type { EngineeringMode } from './protocol';
 export type { EngineeringMode };
 
@@ -32,21 +37,28 @@ export interface EngineeringProject {
   logoUrl?: string | null;
 }
 
-export interface EngineeringAttachment {
-  name: string;
-  mime: string;
-}
+export interface EngineeringAttachment { name: string; mime: string }
 
-export interface EngineeringMessage { id: string; role: 'user' | 'assistant' | 'tool' | 'reasoning'; body: string; createdAt: string; tone?: 'plain' | 'plan' | 'success' | 'warning'; streaming?: boolean; collapsed?: boolean; redacted?: boolean; attachments?: EngineeringAttachment[] }
+export interface EngineeringMessage { agent?: EngineeringAgent; id: string; role: 'user' | 'assistant' | 'tool' | 'reasoning'; body: string; createdAt: string; kind?: 'work_plan' | 'change_review'; planReport?: EngineeringPlanReport; review?: EngineeringChangeReview; tone?: 'plain' | 'plan' | 'success' | 'warning'; streaming?: boolean; collapsed?: boolean; redacted?: boolean; attachments?: EngineeringAttachment[] }
 
-export interface EngineeringActiveActivity { phase: 'thinking' | 'tool' | 'composing'; toolName?: string; startedAt: string }
+export interface EngineeringActiveActivity { phase: 'thinking' | 'tool' | 'composing' | 'restoring'; toolName?: string; startedAt: string }
 
 export interface EngineeringChange {
   path: string;
+  previousPath?: string;
+  /** The source snapshot is unavailable or incomplete. Do not present before/after as whole files. */
+  previewError?: string;
   kind: 'added' | 'modified' | 'deleted';
   before: string;
   after: string;
   diff: string;
+}
+
+/** An immutable file batch at its position in the conversation. Status changes never replace its files. */
+export interface EngineeringChangeReview {
+  id: string;
+  status: 'proposed' | 'approved' | 'applied' | 'declined' | 'failed' | 'interrupted' | 'recorded';
+  changes: EngineeringChange[];
 }
 
 export interface EngineeringApproval {
@@ -65,10 +77,12 @@ export interface EngineeringCheckpoint {
   createdAt: string;
   messageCount: number;
   changes: EngineeringChange[];
+  planProgress?: EngineeringPlanProgress | null;
   workPlan: string | null;
 }
 
 export interface EngineeringSession {
+  agentId?: string | null; agent?: EngineeringAgent; reasoningEffort?: ThinkingLevel | null;
   id: string;
   title: string;
   repo: EngineeringRepo;
@@ -88,6 +102,7 @@ export interface EngineeringSession {
   changes: EngineeringChange[];
   checkpoints: EngineeringCheckpoint[];
   /** Task-scoped model override. Null inherits the repository/project developer model. */
+  planProgress?: EngineeringPlanProgress | null;
   workPlan: string | null; modelOverride: string | null;
   /** WHERE THIS SESSION RUNS (rule D9): the machine the engineering channel opens to — this Mac's
    *  id routes to the app's own host, anything else to the relay; null = the lane's default. */
@@ -111,19 +126,11 @@ export const PERMISSION_LABELS: Record<PermissionCategory, { label: string; deta
 
 /** Recommended session posture: reads flow; every side effect is reviewed. */
 export const RECOMMENDED_ENGINEERING_PERMISSIONS: EngineeringPermissions = {
-  read: true,
-  edit: false,
-  command: false,
-  web: false,
-  mcp: false,
+  read: true, edit: false, command: false, web: false, mcp: false,
 };
 
 export const OPEN_ENGINEERING_POLICY: EngineeringPolicy = {
-  read: true,
-  edit: true,
-  command: true,
-  web: true,
-  mcp: true,
+  read: true, edit: true, command: true, web: true, mcp: true,
 };
 
 const stamp = () => new Date().toISOString();
@@ -199,21 +206,6 @@ function readApproval(): EngineeringApproval {
   };
 }
 
-const SAMPLE_CHANGES: EngineeringChange[] = [
-  {
-    path: 'src/components/AuthCallback.tsx', kind: 'modified',
-    before: `useEffect(() => {\n  exchangeCode(code).then(navigateHome)\n}, [code])\n`,
-    after: `useEffect(() => {\n  const request = new AbortController()\n  exchangeCode(code, request.signal).then(navigateHome)\n  return () => request.abort()\n}, [code])\n`,
-    diff: `diff --git a/src/components/AuthCallback.tsx b/src/components/AuthCallback.tsx\nindex e421af0..bc21e2a 100644\n--- a/src/components/AuthCallback.tsx\n+++ b/src/components/AuthCallback.tsx\n@@ -1,3 +1,5 @@\n useEffect(() => {\n-  exchangeCode(code).then(navigateHome)\n+  const request = new AbortController()\n+  exchangeCode(code, request.signal).then(navigateHome)\n+  return () => request.abort()\n }, [code])\n`,
-  },
-  {
-    path: 'src/components/AuthCallback.test.tsx', kind: 'added', before: '',
-    after: `it('cancels the exchange when the route unmounts', async () => {\n  const { unmount } = render(<AuthCallback code="demo" />)\n  unmount()\n  expect(exchangeSignal.aborted).toBe(true)\n})\n`,
-    diff: `diff --git a/src/components/AuthCallback.test.tsx b/src/components/AuthCallback.test.tsx\nnew file mode 100644\nindex 0000000..78ce3d1\n--- /dev/null\n+++ b/src/components/AuthCallback.test.tsx\n@@ -0,0 +1,5 @@\n+it('cancels the exchange when the route unmounts', async () => {\n+  const { unmount } = render(<AuthCallback code="demo" />)\n+  unmount()\n+  expect(exchangeSignal.aborted).toBe(true)\n+})\n`,
-  },
-];
-
-const WORK_PLAN = `## Work Plan\n\n1. Trace the callback lifecycle and reproduce the duplicate exchange.\n2. Make the in-flight request cancellable when the route unmounts.\n3. Add regression coverage for unmount and a successful callback.\n4. Run the focused test, typecheck, and the application build.\n\n**Guardrails:** no auth protocol changes; no token material leaves the machine.`;
 
 function afterInspection(session: EngineeringSession): EngineeringSession {
   if (session.mode === 'plan') {
@@ -235,7 +227,7 @@ function afterInspection(session: EngineeringSession): EngineeringSession {
     return { ...session, state: 'error', activeActivity: null, pendingApproval: null, messages: [...session.messages, msg('assistant', 'File edits are blocked by the effective workspace policy.', 'warning')], updatedAt: stamp() };
   }
   const proposed = { ...session, activeActivity: null, proposedChanges: SAMPLE_CHANGES, pendingApproval: proposal, state: 'awaiting_approval' as const, updatedAt: stamp() };
-  return decision === 'auto' ? applyProposedChanges(proposed) : proposed;
+  return decision === 'auto' ? applyProposedChanges(proposed) : { ...proposed, messages: engineeringReviewMessages(proposed) };
 }
 
 function applyProposedChanges(session: EngineeringSession): EngineeringSession {
@@ -247,7 +239,7 @@ function applyProposedChanges(session: EngineeringSession): EngineeringSession {
   const next: EngineeringSession = {
     ...session, changes, proposedChanges: [], checkpoints: [...session.checkpoints, checkpoint],
     pendingApproval: null, state: 'streaming', activeActivity: { phase: 'thinking', startedAt: stamp() },
-    messages: [...session.messages, msg('tool', `Applied ${changes.length} files · +${changes.reduce((n, c) => n + c.after.split('\n').length, 0)} lines`, 'success')],
+    messages: [...finishChangeReview(session, false, stamp()), msg('tool', `Applied ${changes.length} files · +${changes.reduce((n, c) => n + c.after.split('\n').length, 0)} lines`, 'success')],
     updatedAt: stamp(),
   };
   const verify: EngineeringApproval = {
@@ -288,7 +280,7 @@ export function submitEngineeringPrompt(session: EngineeringSession, prompt: str
 
 export function continueEngineeringInAct(session: EngineeringSession): EngineeringSession {
   const handoff = session.pendingModeHandoff;
-  if (!handoff || session.mode !== 'plan' || session.state === 'streaming' || session.state === 'awaiting_approval') return session;
+  if (!handoff || !canContinueEngineering(session)) return session;
   return submitEngineeringPrompt({ ...session, mode: 'act', pendingModeHandoff: null, updatedAt: stamp() }, handoff.prompt);
 }
 
@@ -298,7 +290,7 @@ export function resolveEngineeringApproval(session: EngineeringSession, approved
   if (!approved) {
     return {
       ...session, state: 'resumable', activeActivity: null, pendingApproval: null, proposedChanges: [],
-      messages: [...session.messages, msg('assistant', `${approval.title} was declined. No further action was taken.`, 'warning')], updatedAt: stamp(),
+      messages: [...updateReviewStatus(engineeringReviewMessages(session), approval.id, 'declined'), msg('assistant', `${approval.title} was declined. No further action was taken.`, 'warning')], updatedAt: stamp(),
     };
   }
   if (approval.continuation === 'inspect') return afterInspection({ ...session, pendingApproval: null, state: 'streaming', activeActivity: { phase: 'thinking', startedAt: stamp() } });

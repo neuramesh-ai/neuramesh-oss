@@ -149,8 +149,10 @@ export const THREAD_ARTIFACTS =
 
 // Code sessions (0135) — the Code tab's list, newest first. params: [workspaceId]
 export const CODE_SESSIONS_FOR_WORKSPACE =
-  `select id, thread_id, project_id, repo_id, repo_name, branch, title, mode, state, machine_id, created_by, last_line, changes_count, checkpoints_count, created_at, updated_at, ended_at
-     from code_sessions where workspace_id = ? order by updated_at desc limit 200`;
+  `select c.id, c.thread_id, c.project_id, c.repo_id, c.repo_name, c.branch, coalesce(nullif(t.title, ''), c.title) as title,
+          c.mode, c.state, c.machine_id, c.created_by, c.last_line, c.changes_count, c.checkpoints_count, c.created_at, c.updated_at, c.ended_at
+     from code_sessions c left join threads t on t.id = c.id and t.workspace_id = c.workspace_id
+     where c.workspace_id = ? order by c.updated_at desc limit 200`;
 
 // Routines — every armed or paused schedule with its room. params: [workspaceId]
 export const SCHEDULES_FOR_WORKSPACE =

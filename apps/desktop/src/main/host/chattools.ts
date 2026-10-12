@@ -30,7 +30,7 @@ import type { HostCtx } from './ctx';
 import type { DraftRow } from './orchtools';
 
 
-type PowerSyncDatabase = import('@powersync/node').PowerSyncDatabase;
+type ReplicaDatabase = import('@neuramesh/client-core/replica').ReplicaDatabase;
 
 export interface ChatToolCtx {
   z: typeof import('zod')['z'];
@@ -43,7 +43,7 @@ export interface ChatToolCtx {
   log: LogFn;
   // the host services the registry calls — passed, never closed over, so the module is a
   // function of its turn and its dependencies and nothing else
-  db: PowerSyncDatabase;
+  db: ReplicaDatabase;
   post: HostCtx['post'];
   apiGet: (path: string, actor: { kind: string; id: string; role?: string }) => Promise<any>;
   recallFor: (workspaceId: string, channelId: string, query: string) => Promise<string>;

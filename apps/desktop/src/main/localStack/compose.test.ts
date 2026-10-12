@@ -15,18 +15,15 @@ const BEARER = `nmh_${'a'.repeat(48)}`;
 let n = 0;
 const random = (k: number) => Buffer.alloc(k, ++n);
 
-test('the env holds EXACTLY the seven keys, in table order', () => {
+test('the env holds EXACTLY the six keys, in table order', () => {
   const plan = planEnv({ existing: {}, version: '0.132.0', dir: '/home/dana/.neuramesh/local', bearer: BEARER, random });
   assert.deepEqual(Object.keys(plan.env), [...ENV_KEYS]);
-  assert.deepEqual([...ENV_KEYS], ['NM_IMAGE_TAG', 'NM_LOCAL_DIR', 'NM_SYNC_KEY', 'NM_ADMIN_TOKEN', 'NM_LOCAL_HUMAN_TOKEN_HASH', 'NM_API_PORT', 'NM_POWERSYNC_PORT']);
+  assert.deepEqual([...ENV_KEYS], ['NM_IMAGE_TAG', 'NM_LOCAL_DIR', 'NM_LOCAL_HUMAN_TOKEN_HASH', 'NM_API_PORT', 'NM_BRAIN_GCS_BUCKET', 'NM_BRAIN_ADC_FILE']);
   assert.equal(plan.env.NM_IMAGE_TAG, '0.132.0');
   assert.equal(plan.env.NM_LOCAL_DIR, '/home/dana/.neuramesh/local');
   assert.equal(plan.env.NM_API_PORT, '8788');
-  assert.equal(plan.env.NM_POWERSYNC_PORT, '58081');
   assert.equal(plan.env.NM_LOCAL_HUMAN_TOKEN_HASH, sha256Hex(BEARER), 'the hash, never the bearer');
   assert.ok(!renderEnv(plan.env).includes(BEARER), 'the secret is not in the file');
-  assert.match(plan.env.NM_SYNC_KEY, /^[A-Za-z0-9_-]{43}$/, '32 random bytes, base64url');
-  assert.match(plan.env.NM_ADMIN_TOKEN, /^[0-9a-f]{48}$/);
   assert.equal(plan.firstRun, true);
   assert.equal(plan.tagChanged, false, 'a first run downloads, it does not update');
   assert.equal(plan.changed, true);
@@ -46,8 +43,6 @@ test('a new app version changes the tag and nothing else — the Update state', 
   const next = planEnv({ existing: parseEnv(renderEnv(first.env)), version: '0.133.0', dir: '/d', bearer: BEARER, random });
   assert.equal(next.tagChanged, true);
   assert.equal(next.changed, true);
-  assert.equal(next.env.NM_SYNC_KEY, first.env.NM_SYNC_KEY);
-  assert.equal(next.env.NM_ADMIN_TOKEN, first.env.NM_ADMIN_TOKEN);
   assert.equal(next.env.NM_IMAGE_TAG, '0.133.0');
 });
 
@@ -60,15 +55,24 @@ test('a re-minted bearer (the keychain was lost) lands as a new hash on the next
   assert.equal(next.tagChanged, false);
 });
 
-test('parseEnv keeps the seven keys and drops anything a hand edit added', () => {
+test('parseEnv keeps the six keys and drops anything a hand edit added', () => {
   assert.deepEqual(parseEnv('NM_IMAGE_TAG=1.2.3\nFOO=bar\n# comment\nNM_API_PORT=9999\n\nNM_IMAGE=ghcr.io/x\n'), { NM_IMAGE_TAG: '1.2.3', NM_API_PORT: '9999' });
   assert.deepEqual(parseEnv(null), {});
 });
 
-test('mintSecrets: 32 bytes base64url, 48 hex, and an nmh_ bearer of 48 hex', () => {
+test('the GCS opt-in survives app updates and adds the ADC override only when selected', () => {
+  const plan = planEnv({ existing: { NM_BRAIN_GCS_BUCKET: 'private-brain', NM_BRAIN_ADC_FILE: '/secure/adc.json' }, version: '1', dir: '/d', bearer: BEARER });
+  assert.equal(plan.env.NM_BRAIN_GCS_BUCKET, 'private-brain');
+  assert.equal(plan.env.NM_BRAIN_ADC_FILE, '/secure/adc.json');
+  const command = composeCommand({ dockerBin: 'docker', root: '/r', dir: '/d', hasStandalone: false, gcs: true }, ['up', '-d']);
+  assert.ok(command.args.includes('/d/docker-compose.gcs.yaml'));
+  assert.match(COMPOSE, /NM_BRAIN_STORAGE_DIR: \/brain-objects/);
+  assert.match(COMPOSE, /\$\{NM_LOCAL_DIR\}\/brain-objects:\/brain-objects/);
+  assert.ok(!COMPOSE.includes('powersync:'));
+});
+
+test('mintSecrets: an nmh_ bearer of 48 hex', () => {
   const s = mintSecrets();
-  assert.match(s.syncKey, /^[A-Za-z0-9_-]{43}$/);
-  assert.match(s.adminToken, /^[0-9a-f]{48}$/);
   assert.ok(isHumanBearer(s.humanBearer));
   assert.equal(isHumanBearer('nmh_short'), false);
   assert.equal(isHumanBearer(null), false);
@@ -80,14 +84,14 @@ test('substitute handles the three compose forms', () => {
   assert.throws(() => substitute('${NM_IMAGE_TAG:?set it}', {}), /NM_IMAGE_TAG is not set: set it/);
 });
 
-test('the shipped compose file names three images and the pull asks for them by service, versioned by the app', () => {
+test('the shipped compose file names two images and the pull asks for them by service, versioned by the app', () => {
   const env = planEnv({ existing: {}, version: '0.132.0', dir: '/d', bearer: BEARER, random }).env;
   const images = composeImages(COMPOSE, env);
-  assert.deepEqual(images.map((i) => i.service), ['pg', 'control-api', 'powersync']);
-  assert.deepEqual(images.map((i) => i.label), ['Postgres', 'NeuraMesh API', 'PowerSync']);
+  assert.deepEqual(images.map((i) => i.service), ['pg', 'control-api']);
+  assert.deepEqual(images.map((i) => i.label), ['Postgres', 'NeuraMesh API']);
   assert.equal(images.find((i) => i.service === 'control-api')!.image, 'ghcr.io/neuramesh-ai/neuramesh-control-api:0.132.0');
   assert.equal(images.find((i) => i.service === 'pg')!.image, 'pgvector/pgvector:pg16');
-  // the whole file renders with the seven keys and nothing else — no `${…:?}` is left unfed
+  // the whole file renders with the six keys and nothing else — no `${…:?}` is left unfed
   assert.doesNotThrow(() => substitute(COMPOSE, env));
   assert.ok(!COMPOSE.includes('down -v') || /Never run `docker compose down -v`/.test(COMPOSE), 'down -v appears only as the warning');
 });

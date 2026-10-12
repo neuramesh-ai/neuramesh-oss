@@ -1,5 +1,5 @@
-import { existsSync, mkdirSync, readdirSync, realpathSync } from 'node:fs';
-import { basename, dirname } from 'node:path';
+import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync } from 'node:fs';
+import { basename, join, resolve } from 'node:path';
 import type { AbstractPowerSyncDatabase } from '@powersync/node';
 import type { EngineeringMachineOpenMeta } from '../../engineering-protocol';
 import { withRepoLock } from '../agents';
@@ -8,6 +8,7 @@ import { worktreeCloneDir } from '../harness/workspaces';
 import { git, repoSlug, type GhEnv } from '../host/gh';
 import { ENGINEERING_WORKTREE_PREFIX, engineeringBranchName, engineeringWorktreeName, safeSegment as safe } from '../harness/worktree-rows';
 import type { RepoCredResult } from '../host/repocred';
+import { validatedEngineeringGitMounts } from './engineering-safe-executors';
 
 interface RepoRow { name: string | null; clone_url: string | null; default_branch: string | null; local_path: string | null }
 
@@ -15,9 +16,9 @@ export const engineeringRepoRoot = (repoId: string): string => cachePath('repos'
 
 /** where a thread works: its worktree, and the clone the shell checks the worktree's git pointer
  *  against, which is the cache clone the worktree came from (a twin's included). A desktop checkout
- *  keeps its cache path, as before the twin, and the check refuses there: the checkout's refs, objects
- *  and logs hold the person's own work, and a match mounts them writable for every agent command. */
-export interface EngineeringWorkspace { cwd: string; repoRoot: string }
+ *  passes null: commands can use the worktree, but receive no mounts of the person's own Git
+ *  refs, objects or logs. Only a machine-owned cache clone may supply those mounts. */
+export interface EngineeringWorkspace { cwd: string; repoRoot: string | null; privateRepoRoot?: string }
 
 /** a cloud session that cannot reach its code until GitHub is connected: the relay names it, and the
  *  thread's gate seat puts up the GitHub card instead of a raw error (docs/design/repo-connect-2026-10) */
@@ -78,17 +79,49 @@ function cloneRefusal(error: unknown, name: string, cloud: boolean, cred: RepoCr
   return new Error(`This cloud machine cannot reach ${name}: ${cred.error}`);
 }
 
-const real = (path: string): string | null => { try { return realpathSync(path); } catch { return null; } };
-
 /** the worktree an earlier open cut for this thread, whichever clone it came from: a later pick can
  *  change the twin, and a reopen lands on its own files. Only a cache clone is the shell's check root.
- *  A worktree of a desktop checkout keeps the folder's cache path, as at its cut, so the check refuses there. */
-function earlierWorktree(meta: EngineeringMachineOpenMeta): EngineeringWorkspace | null {
+ *  The directory name was created by the host, outside the command's writable subtree. Its clone
+ *  segment selects the cache root; the editable .git pointer only confirms it. A local checkout
+ *  comes from the host's repo row and is validated the same way, but never receives Git mounts. */
+function earlierWorktree(meta: EngineeringMachineOpenMeta, local: string | null): EngineeringWorkspace | null {
   const head = `${ENGINEERING_WORKTREE_PREFIX}${safe(meta.actorId)}-`; const tail = `-${safe(meta.threadId)}`;
   const name = (existsSync(cachePath('worktrees')) ? readdirSync(cachePath('worktrees')) : []).find((n) => n.length > head.length + tail.length && n.startsWith(head) && n.endsWith(tail));
   if (!name) return null;
-  const cwd = cachePath('worktrees', name); const clone = worktreeCloneDir(cwd); const repos = real(cachePath('repos'));
-  return { cwd, repoRoot: clone && repos && real(dirname(clone)) === repos ? cachePath('repos', basename(clone)) : engineeringRepoRoot(meta.repoId) };
+  const cwd = cachePath('worktrees', name);
+  const cloneId = name.slice(head.length, -tail.length);
+  const privateRepoRoot = local && cloneId === safe(meta.repoId) ? realpathSync(worktreeCloneDir(local) ?? local) : null;
+  if (local && privateRepoRoot) {
+    confirmCheckoutWorktree(cwd, local);
+    return { cwd, repoRoot: null, privateRepoRoot };
+  }
+  const origin = engineeringRepoRoot(cloneId);
+  if (!existsSync(`${origin}/.git`)) throw new Error('Code cannot identify the original repository for this worktree. Reconnect its checkout before continuing.');
+  validatedEngineeringGitMounts(cwd, origin);
+  return { cwd, repoRoot: origin };
+}
+
+/** where git keeps a checkout's shared metadata: its .git folder, the folder a .git file names (a
+ *  submodule's modules entry, a separate git dir), or for a linked worktree, its repository's common
+ *  folder (the gitdir's `commondir`), which is where a bare repository's worktrees point too */
+export function gitCommonDir(checkout: string): string {
+  const marker = join(checkout, '.git');
+  if (lstatSync(marker).isDirectory()) return realpathSync(marker);
+  const value = readFileSync(marker, 'utf8').trim();
+  if (!value.startsWith('gitdir:')) throw new Error('Code found malformed repository metadata.');
+  const gitDir = resolve(checkout, value.slice('gitdir:'.length).trim());
+  const common = join(gitDir, 'commondir');
+  return realpathSync(existsSync(common) ? resolve(gitDir, readFileSync(common, 'utf8').trim()) : gitDir);
+}
+
+/** a reopen of a person's checkout: the host chose the checkout from its repo row, and the thread
+ *  worktree's editable .git pointer may only confirm its place in that checkout's metadata */
+function confirmCheckoutWorktree(cwd: string, checkout: string): void {
+  const expected = realpathSync(join(gitCommonDir(checkout), 'worktrees', basename(cwd)));
+  const value = readFileSync(join(cwd, '.git'), 'utf8').trim();
+  if (!value.startsWith('gitdir:')) throw new Error('Code found malformed worktree metadata.');
+  const claimed = realpathSync(resolve(cwd, value.slice('gitdir:'.length).trim()));
+  if (claimed !== expected) throw new Error('Code refused worktree metadata outside the selected repository.');
 }
 
 /** Give every Engineering thread its own durable git worktree. It is intentionally retained when
@@ -114,14 +147,14 @@ export async function ensureEngineeringWorkspace(
   ).catch(() => null);
   // a late replica, or another project's repository: no grant and no pick adds the row, so no GitHub card
   if (!repo) throw new Error(`${meta.repoName} is not in this project on this machine.`);
-  const earlier = earlierWorktree(meta);
-  if (earlier) return earlier;
   const local = opts.preferLocal && repo.local_path && existsSync(repo.local_path) ? repo.local_path : null;
+  const earlier = earlierWorktree(meta, local);
+  if (earlier) return earlier;
   const target = local ? null : await cloneTarget(db, workspaceId, meta, repo, !!opts.credFor);
   const clone = target?.id ?? meta.repoId;
   const cloneDir = local ?? engineeringRepoRoot(clone);
   const worktreeDir = cachePath('worktrees', engineeringWorktreeName(meta.actorId, clone, meta.threadId));
-  const workspace: EngineeringWorkspace = { cwd: worktreeDir, repoRoot: engineeringRepoRoot(clone) };
+  const workspace: EngineeringWorkspace = { cwd: worktreeDir, repoRoot: local ? null : engineeringRepoRoot(clone), ...(local ? { privateRepoRoot: realpathSync(worktreeCloneDir(local) ?? local) } : {}) };
   if (existsSync(worktreeDir)) return workspace;
   mkdirSync(cachePath('repos'), { recursive: true });
   mkdirSync(cachePath('worktrees'), { recursive: true });

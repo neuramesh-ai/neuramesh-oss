@@ -173,8 +173,11 @@ export function playbookSubject(pb: Playbook, values: Record<string, string>): s
 
 export function playbookUnitTitle(pb: Playbook, values: Record<string, string>): string {
   const subject = playbookSubject(pb, values);
-  return subject ? `${pb.title} — ${subject}` : pb.title;
+  return subject ? `${pb.title} · ${subject}` : pb.title;
 }
+
+/** the title as a sentence reads it: the first word in lower case, unless it is an acronym (UGC, AI) */
+const askTitle = (title: string): string => title.replace(/^\S+/, (w) => (/^[A-Z0-9]{2,}$/.test(w) ? w : w.toLowerCase()));
 
 /**
  * The one pre-drafted ask — a pill, a catalog row and an nmplays Run › all send THIS
@@ -184,8 +187,7 @@ export function playbookUnitTitle(pb: Playbook, values: Record<string, string>):
 export function playbookAsk(pb: Playbook, values: Record<string, string> = {}): string {
   const subject = pb.inputs[0] ? values[pb.inputs[0].key] : undefined;
   const on = subject ? ` on ${subject}` : '';
-  if (pb.engine === 'chat') return `Run the ${pb.title.toLowerCase()} playbook${on}.`;
-  return `Run the ${pb.title.toLowerCase()} playbook${on}.`;
+  return `Run the ${askTitle(pb.title)} playbook${on}.`;
 }
 
 /**

@@ -1,0 +1,46 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { engineeringPlanTool, engineeringProgressTool } from './engineering-plan';
+import { engineeringRuntimeInput } from './engineering-runtime-input';
+import { ENGINEERING_CLINE_TOOL_POLICIES, type EngineeringRuntimeEvent } from '@neuramesh/shared';
+const plan = { summary: 'Implement', steps: [{ action: 'edit', target: 'a.ts', description: 'Fix the issue' }] };
+test('progress uses successful current history, including rewind and errors', async () => {
+  const events: EngineeringRuntimeEvent[] = [];
+  const emit = (e: EngineeringRuntimeEvent) => events.push(e);
+  const result = engineeringPlanTool(emit).execute(plan);
+  let history: unknown[] = [
+    { role: 'assistant', content: [{ type: 'tool_use', id: 'p', name: 'propose_work_plan', input: plan }] },
+    { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'p', content: JSON.stringify(result) }] },
+  ];
+  const tool = engineeringProgressTool(emit, async () => history);
+  const update = await tool.execute({ updates: [{ step: 1, status: 'completed' }] });
+  assert.deepEqual(update.planProgress.statuses, ['completed']);
+  assert.equal(events.at(-1)?.type, 'plan_progress');
+  await assert.rejects(tool.execute({ updates: [{ step: 2, status: 'completed' }] }));
+  history = []; // checkpoint before proposal
+  await assert.rejects(engineeringProgressTool(emit, async () => history).execute({ updates: [{ step: 1, status: 'completed' }] }), /No recorded/);
+});
+test('Act and Plan register only their own side-effect-free plan tools', () => {
+  const permissions = { read: true, edit: false, command: false, web: false, mcp: false };
+  for (const mode of ['act', 'plan'] as const) {
+    const input = engineeringRuntimeInput({ meta: { threadId: 't', repoId: 'r', repoName: 'r', branch: 'main', actorId: 'a', mode, permissions, policy: permissions }, cwd: '/tmp', provider: { providerId: 'anthropic', modelId: 'claude-haiku-4-5' }, modelId: null, brainPack: null, controls: { mode, permissions, policy: permissions }, emit: () => {} });
+    assert.deepEqual(input.localRuntime?.extraTools?.map(tool => tool.name), [mode === 'act' ? 'update_plan_progress' : 'propose_work_plan']);
+  }
+  assert.equal(ENGINEERING_CLINE_TOOL_POLICIES.update_plan_progress?.autoApprove, true);
+});
+
+test('successive and concurrent progress calls preserve prior steps while native snapshots lag', async () => {
+  const p = { ...plan, steps: [...plan.steps, { ...plan.steps[0]!, target: 'b.ts' }, { ...plan.steps[0]!, target: 'c.ts' }] };
+  const proposal = engineeringPlanTool(() => {}).execute(p);
+  const history = [
+    { role: 'assistant', content: [{ type: 'tool_use', id: 'p', name: 'propose_work_plan', input: p }] },
+    { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'p', content: JSON.stringify(proposal) }] },
+  ];
+  const tool = engineeringProgressTool(() => {}, async () => history);
+  await tool.execute({ updates: [{ step: 1, status: 'in_progress' }] });
+  const a = tool.execute({ updates: [{ step: 1, status: 'completed' }, { step: 2, status: 'in_progress' }] });
+  const b = tool.execute({ updates: [{ step: 2, status: 'completed' }, { step: 3, status: 'in_progress' }] });
+  assert.deepEqual((await a).planProgress.statuses, ['completed', 'in_progress', 'pending']);
+  assert.deepEqual((await b).planProgress.statuses, ['completed', 'completed', 'in_progress']);
+  assert.deepEqual((await tool.execute({ updates: [{ step: 3, status: 'completed' }] })).planProgress.statuses, ['completed', 'completed', 'completed']);
+});

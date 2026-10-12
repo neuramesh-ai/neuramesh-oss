@@ -37,13 +37,14 @@ export async function readLibraryDoc(libraryDocs: LibraryReader, channelId: stri
   const docs = await libraryDocs(channelId, 60, scope);
   const hit = docs.find((d) => d.name === want) ?? docs.find((d) => d.name.toLowerCase() === want.toLowerCase());
   if (!hit) return `no document named "${want}" in this ${scope} — call list_library${scope === 'room' ? ' (or widen it with scope)' : ` with scope:'${scope}'`} for the names`;
-  const body = hit.inline_content ?? '';
+  let body = hit.inline_content ?? '';
   // An image's `inline_content` is a data URI, not prose. Returning it raw spent the turn's
   // context on base64; returning '' let the model report the document as empty. Say what it
   // is instead, so the agent reports the limit rather than inventing the contents.
   if ((hit.mime ?? '').startsWith('image/') || body.startsWith('data:image')) {
     return `"${hit.name}" is an image (${hit.mime ?? 'image'}), not a text document — it cannot be read as text. It is in the library and a human can view it.`;
   }
+  if (!body && hit.readContent) body = await hit.readContent();
   if (!body.trim()) return `"${hit.name}" is in the library but has no readable text body.`;
   grounding.read.add(hit.name);
   // capped so one long report cannot eat the turn's context; the model is TOLD it was cut

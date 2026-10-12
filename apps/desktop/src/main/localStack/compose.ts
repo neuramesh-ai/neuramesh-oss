@@ -1,16 +1,13 @@
 // THE STACK'S FILES: the compose file the app renders into ~/.neuramesh/local and the .env beside
 // it (review F7, F8). Rendered, never typed — the person never sees a compose command.
 //
-// The env file holds EXACTLY seven keys. Two are secrets minted once and reused on every later
-// boot (the sync key and the admin token); one is the sha256 of the `nmh_` human bearer, whose
-// secret lives in the keychain and never touches this file; the rest are the version, the
-// folder and the two loopback ports. `NM_IMAGE_TAG` is the app's own version, so a new desktop
-// pulls the stack that matches it — a changed tag since the last boot is the Update state.
+// The env records the API port, version and optional GCS configuration. The human bearer stays
+// in the keychain. Only its hash reaches the container. Local object bytes use a durable bind mount.
 import { createHash, randomBytes } from 'node:crypto';
 import { join } from 'node:path';
 import { nmBinDir } from './engine';
 
-export const ENV_KEYS = ['NM_IMAGE_TAG', 'NM_LOCAL_DIR', 'NM_SYNC_KEY', 'NM_ADMIN_TOKEN', 'NM_LOCAL_HUMAN_TOKEN_HASH', 'NM_API_PORT', 'NM_POWERSYNC_PORT'] as const;
+export const ENV_KEYS = ['NM_IMAGE_TAG', 'NM_LOCAL_DIR', 'NM_LOCAL_HUMAN_TOKEN_HASH', 'NM_API_PORT', 'NM_BRAIN_GCS_BUCKET', 'NM_BRAIN_ADC_FILE'] as const;
 export type EnvKey = (typeof ENV_KEYS)[number];
 export type StackEnv = Record<EnvKey, string>;
 
@@ -21,18 +18,16 @@ export const localDir = (env: NodeJS.ProcessEnv, root: string): string => env['N
 
 export const sha256Hex = (s: string): string => createHash('sha256').update(s).digest('hex');
 
-/** the three secrets the stack needs, minted once per install */
-export function mintSecrets(random: (n: number) => Buffer = randomBytes): { syncKey: string; adminToken: string; humanBearer: string } {
+/** the human credential, minted once per install */
+export function mintSecrets(random: (n: number) => Buffer = randomBytes): { humanBearer: string } {
   return {
-    syncKey: random(32).toString('base64url'),
-    adminToken: random(24).toString('hex'),
     humanBearer: `nmh_${random(24).toString('hex')}`,
   };
 }
 
 export const isHumanBearer = (s: string | null | undefined): s is string => !!s && /^nmh_[0-9a-f]{48}$/.test(s);
 
-/** KEY=value lines, the seven keys only, in table order — anything else in a hand-edited file is dropped */
+/** KEY=value lines, the declared keys only, in table order — anything else in a hand-edited file is dropped */
 export function parseEnv(raw: string | null | undefined): Partial<StackEnv> {
   const out: Partial<StackEnv> = {};
   for (const line of (raw ?? '').split('\n')) {
@@ -62,32 +57,26 @@ export interface EnvPlan {
  * keychain lands here and the container restarts with it). `bearer` is the SECRET from the
  * keychain — only its hash is written.
  */
-export function planEnv(input: { existing: Partial<StackEnv>; version: string; dir: string; bearer: string; ports?: { api: number; powersync: number }; random?: (n: number) => Buffer }): EnvPlan {
+export function planEnv(input: { existing: Partial<StackEnv>; version: string; dir: string; bearer: string; ports?: { api: number }; random?: (n: number) => Buffer }): EnvPlan {
   const { existing } = input;
-  const ports = input.ports ?? { api: 8788, powersync: 58081 };
-  const minted = mintSecrets(input.random);
+  const ports = input.ports ?? { api: 8788 };
   const env: StackEnv = {
     NM_IMAGE_TAG: input.version,
     NM_LOCAL_DIR: input.dir,
-    NM_SYNC_KEY: existing.NM_SYNC_KEY || minted.syncKey,
-    NM_ADMIN_TOKEN: existing.NM_ADMIN_TOKEN || minted.adminToken,
     NM_LOCAL_HUMAN_TOKEN_HASH: sha256Hex(input.bearer),
     NM_API_PORT: String(ports.api),
-    NM_POWERSYNC_PORT: String(ports.powersync),
+    NM_BRAIN_GCS_BUCKET: existing.NM_BRAIN_GCS_BUCKET || '',
+    NM_BRAIN_ADC_FILE: existing.NM_BRAIN_ADC_FILE || '',
   };
   const firstRun = !existing.NM_IMAGE_TAG;
   const changed = ENV_KEYS.some((k) => existing[k] !== env[k]);
   return { env, tagChanged: !firstRun && existing.NM_IMAGE_TAG !== input.version, firstRun, changed };
 }
 
-/** the compose services in BOOT order (each `depends_on` the one above it), which is the order
- *  the card lists them: the chain reads top to bottom as the containers come up (2026-09-18: it
- *  used to list PowerSync second, and PowerSync is the last to start, so a person watched the
- *  middle row wait for a container that was never asked to start) */
+/** The boot order drives the first-run card: Postgres, then the API. */
 export const SERVICES: ReadonlyArray<{ service: string; label: string }> = [
   { service: 'pg', label: 'Postgres' },
   { service: 'control-api', label: 'NeuraMesh API' },
-  { service: 'powersync', label: 'PowerSync' },
 ];
 
 /** `${VAR}`, `${VAR:-default}` and `${VAR:?message}` — the three forms the compose file uses */
@@ -124,8 +113,9 @@ export function composeImages(yamlText: string, env: Record<string, string | und
  * has the plugin, so `docker compose`. Every call names the project and the env file, from the
  * stack's own folder — never `down -v`, which nothing here can produce.
  */
-export function composeCommand(opts: { dockerBin: string; root: string; dir: string; hasStandalone: boolean }, args: string[]): { bin: string; args: string[]; cwd: string } {
+export function composeCommand(opts: { dockerBin: string; root: string; dir: string; hasStandalone: boolean; gcs?: boolean }, args: string[]): { bin: string; args: string[]; cwd: string } {
   const common = ['--project-name', PROJECT_NAME, '--project-directory', opts.dir, '--env-file', join(opts.dir, '.env'), '-f', join(opts.dir, 'docker-compose.yaml')];
+  if (opts.gcs) common.push('-f', join(opts.dir, 'docker-compose.gcs.yaml'));
   if (args[0] === 'down' && args.includes('-v')) throw new Error('compose down -v is never run — the data folder is the person\'s (review F8)');
   return opts.hasStandalone
     ? { bin: join(nmBinDir(opts.root), 'docker-compose'), args: [...common, ...args], cwd: opts.dir }

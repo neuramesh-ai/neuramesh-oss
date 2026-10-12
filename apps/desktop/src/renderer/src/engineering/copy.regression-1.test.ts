@@ -48,7 +48,7 @@ test('product-owned Engineering copy never exposes the implementation harness', 
 test('static Engineering UI surfaces contain no vendor branding', () => {
   const surfaces = [
     join(import.meta.dirname, '../views/EngineeringOS.tsx'),
-    join(import.meta.dirname, 'EngineeringModelSelector.tsx'),
+    join(import.meta.dirname, 'EngineeringComposer.tsx'),
     join(import.meta.dirname, 'EngineeringActivity.tsx'),
     join(import.meta.dirname, 'EngineeringEditor.tsx'),
     join(import.meta.dirname, '../App.tsx'),
@@ -59,15 +59,8 @@ test('static Engineering UI surfaces contain no vendor branding', () => {
   }
 });
 
-test('the Code model picker keeps the managed starter model opaque', () => {
-  const selector = readFileSync(join(import.meta.dirname, 'EngineeringModelSelector.tsx'), 'utf8');
-  assert.match(selector, /modelId === STARTER_MODEL \? 'NeuraMesh managed'/);
-  assert.match(selector, /projectDeveloperModel\(session\.model, project\?\.model_pack, agents, customPacks\)/);
-  assert.match(selector, /<span className="lbl" title=\{triggerLabel\}>\{triggerLabel\}<\/span>/);
-  assert.doesNotMatch(selector, /<small>\{modelId\}<\/small>/);
-});
 
-test('browser persistence excludes machine-authoritative repository and tool output', () => {
+test('browser persistence retains review snapshots but excludes mutable workspace and tool output', () => {
   const created = createEngineeringSession({ id: 'r1', name: 'app', owner: 'acme', branch: 'main', root: null });
   const at = new Date().toISOString();
   const change = { path: 'secret.ts', kind: 'modified' as const, before: 'old secret', after: 'new secret', diff: '-old secret\n+new secret' };
@@ -92,8 +85,10 @@ test('browser persistence excludes machine-authoritative repository and tool out
   assert.deepEqual(persisted.proposedChanges, []);
   assert.deepEqual(persisted.changes, []);
   assert.deepEqual(persisted.checkpoints[0]?.changes, []);
-  assert.deepEqual(persisted.messages.map((message) => message.id), [created.messages[0]!.id, 'answer']);
-  assert.doesNotMatch(JSON.stringify(persisted), /old secret|new secret|unrestricted command output/);
+  assert.deepEqual(persisted.messages.filter((m) => !m.review).map((message) => message.id), [created.messages[0]!.id, 'answer']);
+  assert.equal(persisted.messages.find((m) => m.review?.id === 'approval')?.review?.status, 'interrupted');
+  assert.equal(persisted.messages.find((m) => m.review?.id === 'approval')?.review?.changes[0]?.after, 'new secret');
+  assert.doesNotMatch(JSON.stringify(persisted), /unrestricted command output/);
 });
 
 test('workspace shell projection keeps one snippet and no transcript or editor payloads', () => {

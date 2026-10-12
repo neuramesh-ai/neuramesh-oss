@@ -7,6 +7,7 @@ import { CODE_APPROVAL_CATEGORIES, CODE_SESSION_MODES, CODE_SESSION_STATES } fro
 import { THREAD_KINDS } from './threads';
 
 export const CODE_SESSION_COMMANDS = [
+  z.object({ type: z.literal('code_session.name'), workspace: z.string().min(1), codeSessionId: z.string().uuid(), title: z.string().trim().min(1).max(100) }),
   // create-or-update the session's synced row. `createdBy` names the member the session belongs
   // to; only the owner of the hosting machine may name someone other than themselves (a cloud
   // runner speaks as its owner and works for every member). Every other field is a patch.

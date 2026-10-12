@@ -46,7 +46,7 @@ describe('the setup task exists because the room does', () => {
     const setups = tasksOf(store).filter((t) => t.kind === 'setup');
     expect(setups).toHaveLength(1);
     expect(setups[0]!.state).toBe('todo');
-    expect(setups[0]!.title).toBe('Set up your marketing HQ');
+    expect(setups[0]!.title).toBe('Prepare your marketing HQ');
   });
 
   it('a build room gets nothing — no flow, no task', async () => {

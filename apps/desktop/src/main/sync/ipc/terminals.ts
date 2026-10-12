@@ -7,7 +7,7 @@
 // state (procEvents is a module-level bus, so it is imported, not passed).
 import { ipcMain, type WebContents } from 'electron';
 import { existsSync as existsSyncTop, mkdirSync as mkdirSyncTop } from 'node:fs';
-import type { PowerSyncDatabase } from '@powersync/node';
+import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 import { emitProcChange, procEvents } from '../../procbus';
 import { executing, stopExecuting } from '../../agents';
 import { brainRoot, cachePath, deliverablePath } from '../../harness/brain';
@@ -15,7 +15,7 @@ import { brainRoot, cachePath, deliverablePath } from '../../harness/brain';
 export type PtyTerm = { write: (d: string) => void; resize: (c: number, r: number) => void; kill: () => void; taskNumber: number };
 
 export interface TerminalDeps {
-  db: () => PowerSyncDatabase;
+  db: () => ReplicaDatabase;
   /** created by startSync so the host's reclaim path can kill a task's shells */
   ptys: Map<string, PtyTerm>;
   procWatchers: Map<string, () => void>;

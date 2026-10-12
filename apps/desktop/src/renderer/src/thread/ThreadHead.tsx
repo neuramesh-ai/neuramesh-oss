@@ -10,10 +10,11 @@ import { IconActivity, IconArrowUp, IconPause, IconTerm, IconTrash } from '../ui
 import { KindChip, ThreadCrumb, ThreadSettleBtn, ThreadStatusChip, type HeadStatus } from './parts';
 import type { TaskRow } from '../bridge/rows-board';
 import type { JourneyLeg } from '@neuramesh/shared';
-import type { Dispatch, SetStateAction } from 'react';
+import type { Dispatch, SetStateAction, ReactNode } from 'react';
 
-export function ThreadHead({ act, back, blocking, busy, channelSlug, crumbProject, editDetails, isContent, marks, onClose, onOpenTerminal, onSettle, onViewLogs, peek, setBlocking, setClosing, spectrumLegs, task }: {
+export function ThreadHead({ act, back, blocking, busy, channelSlug, crumbProject, editDetails, isContent, marks, onClose, onOpenTerminal, onSettle, onViewLogs, peek, setBlocking, setClosing, spectrumLegs, task, overviewToggle }: {
   /** what this task's thread is doing, and the act its stamp offers (shell/rowstatus.ts) */
+  overviewToggle?: ReactNode;
   marks?: HeadStatus | null;
   onSettle?: (threadId: string) => void;
   /** issue a command against this task — the panel's one write path (thread/task/Data.ts) */
@@ -76,6 +77,7 @@ export function ThreadHead({ act, back, blocking, busy, channelSlug, crumbProjec
         modal, so a glance can't delete anything by accident. Gated here rather than hidden
         in CSS: a control that exists but cannot be seen is the worse of the two bugs. */}
     <div className="theadact">
+      {overviewToggle}
       {/* SETTLE, leading the cluster (settle round, 2026-09-09): it is not an accept — the board
           does not move and the pull request stays open. It only says you have seen this, so the
           thread leaves the needs-you queue. Merging still takes your word in the thread. */}

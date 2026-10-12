@@ -19,7 +19,7 @@ import { composePrompt } from '@neuramesh/shared';
 import { contractFor } from '../contracts';
 import type { MonitorSignals } from '../sweepgate';
 import type { OrchTransportArgs } from './orchturn';
-import type { PowerSyncDatabase } from '@powersync/node';
+import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 import type { HostedAgent, SkillRef } from '../agents';
 import type { LogFn } from '../agentlog';
 import type { HostGuards } from './guards';
@@ -27,7 +27,7 @@ import type { makeOrchTools } from './orchtools';
 import type { makeRoutineResume } from './routineresume';
 
 export function makeOrchSweeps(ctx: {
-  db: PowerSyncDatabase;
+  db: ReplicaDatabase;
   post: (path: string, actor: { kind: string; id: string; role?: string }, body: unknown) => Promise<Response>;
   agents: Map<string, HostedAgent>;
   claimed: { has: (id: string) => boolean };

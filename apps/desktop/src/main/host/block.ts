@@ -28,7 +28,7 @@ import { type LogFn } from '../agentlog';
 
 import { withTimeout } from './turnkit';
 import type { HostCtx } from './ctx';
-import type { PowerSyncDatabase } from '@powersync/node';
+import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 import type { Brain } from '../harness/brain';
 import type { AgentAttachment } from '../runtime/adapter';
 import type { HostQueue } from '../harness/hostqueue';
@@ -39,7 +39,7 @@ import type { makeBeats } from './beats';
 import type { makePark } from './park';
 
 export function makeBlock(ctx: HostCtx & {
-  db: PowerSyncDatabase;
+  db: ReplicaDatabase;
   apiUrl: string;
   workspace: string;
   ownerActorId: string;

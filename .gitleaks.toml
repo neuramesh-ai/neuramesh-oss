@@ -18,3 +18,13 @@ regexes = [
   # and its bundle) are vendor-version names, never values: the generic rule reads `key:` plus entropy
   '''^(seedance|kling|minimax|wan|veo|hailuo)-[0-9]+(\.[0-9]+)?(-[a-z0-9]+)*$''',
 ]
+
+[[allowlists]]
+description = "recorded test command flag; the generic rule joins control-api and the following command line"
+condition = "AND"
+paths = [
+  '''^docs/design/mobile-brain-coding-2026-10/evidence/(api-suite|workspace-check-pass)\.txt$''',
+  # the same literal flag was retained in the October 11 hook summary's Git history
+  '''^docs/design/mobile-brain-coding-2026-10/evidence/production-gates/workspace-check-summary\.txt$''',
+]
+regexes = ['''^NM_ALLOW_ACTOR_HEADER=1$''']

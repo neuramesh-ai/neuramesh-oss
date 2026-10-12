@@ -76,6 +76,87 @@ The store is chosen at boot from the DB env: `DATABASE_URL` → `SUPABASE_DB_POO
 
 ## Environment (Vercel project settings)
 
+### Portable brain storage
+
+The brain API stores complete conversation segments and runtime checkpoints as immutable objects.
+Postgres stores verified object references, event IDs, revisions, and artifact metadata.
+PowerSync remains available for existing clients.
+
+| Route | Purpose |
+|---|---|
+| `POST /v1/brain/threads/:id/commits` | Commit a segment with a unique `commitId` and the current `expectedRevision` |
+| `GET /v1/brain/threads/:id?workspace=<uuid>` | Restore all committed events and the latest runtime snapshot |
+| `GET /v1/brain/threads/:id/artifacts?workspace=<uuid>` | List artifact metadata, including files with no message anchor |
+| `POST /v1/brain/artifacts` | Store bytes from `contentBase64`, then create the existing library row |
+| `GET /v1/brain/artifacts/:id?workspace=<uuid>` | Read verified bytes through the current actor's permissions |
+| `GET /v1/brain/artifacts/:id/metadata?workspace=<uuid>` | Read authorized file metadata before the replica catches up |
+
+Every route uses the existing authenticated `/v1` lane. Code traces require the session member
+or the current host's owner. Other conversations use workspace membership and agent channel
+registration. Native hosts request `format=compact`; UI readers use `format=compact-decoded`.
+These preserve all event identities, order and complete conversation content, while replacing
+exactly reconstructible accumulated text and its transport mirrors with equivalent deltas.
+Immutable archive objects remain unchanged. The decoded form expands gzip envelopes with a
+64 MiB aggregate content budget, including plain content and metadata. Downloads use batches
+of at most eight verified segments and projection runs in revision order.
+Legacy default/`format=decoded` responses remain supported for event histories up to 64 MiB;
+larger legacy reads return `413 BRAIN_RESTORE_TOO_LARGE` before downloading objects. The
+legacy decoded form retains its 128 MiB aggregate content limit. Thread responses negotiate
+HTTP compression and remain `no-store`. Deploy this API before publishing compact readers.
+An artifact ID alone grants no access. Access checks repeat after object reads
+and before publication. A stale revision returns `409 BRAIN_CONFLICT`. A retry with the same
+commit ID returns its original revision only when its payload checksum matches.
+
+Set `NM_BRAIN_GCS_BUCKET=your-private-brain-bucket` on a trusted API process. Production uses
+Application Default Credentials, including GKE Workload Identity. Agent pods receive no bucket
+credentials. Local development can use the active gcloud login without a change to global ADC:
+
+```bash
+NM_LOCAL=1
+NM_BRAIN_GCS_AUTH=gcloud
+NM_BRAIN_GCS_GCLOUD_CONFIGURATION=your-gcloud-configuration
+NM_BRAIN_GCS_BUCKET=your-private-brain-bucket
+```
+
+The server refreshes the local token in memory. It never returns that token to a client.
+An explicit test harness can instead set `NM_ALLOW_ACTOR_HEADER=1` and `HOST=127.0.0.1`.
+The gcloud adapter is disabled when `NODE_ENV=production`.
+For a local stack without GCS, set `NM_LOCAL=1` and `NM_BRAIN_STORAGE_DIR` to a persistent directory.
+The filesystem adapter uses flushed temporary files and atomic links. It verifies bytes on every read.
+When a Local stack later selects GCS, keep this directory mounted. New objects go to GCS while
+existing file references still read the local directory. Those older bytes do not move automatically.
+An absent configuration returns `503 BRAIN_UNAVAILABLE`.
+
+The initial transfer API accepts 16 MiB per commit or artifact. Runtime content is never truncated.
+It requires a Node server for uploads above Vercel's request limit. Direct signed uploads and
+large history pagination remain future work. The temporary GCS bucket is reserved for that path.
+Orphan objects from failed publications stay unreferenced and need a later collection job.
+The API does not restore repository working files or transfer provider credentials.
+
+With object storage configured, `content.attach_media` stores each new image or film in that object store.
+`content_media` keeps its object reference and the draft keeps its small preview.
+Each replacement retains prior media IDs so recorded turns and signed URLs still resolve.
+Existing inline media stays readable. Both the authenticated media endpoint and the signed public
+endpoint read the stored object and verify its checksum. Public URLs retain the existing HMAC gate.
+
+`test/brain.pg.test.ts` exercises the real schema with complete turns, independent device revisions,
+retry conflicts, concurrent writers, image byte checksums, access denial, and an object-store outage.
+Run it through `scripts/test-pg.sh`. The browser preflight permits the verified app origins and local development.
+
+For a running isolated local API, the opt-in GCS test verifies actual private bucket generations:
+
+```bash
+NM_BRAIN_GCS_INTEGRATION=1 NM_BRAIN_GCS_AUTH=gcloud \
+NM_BRAIN_GCS_BUCKET=your-private-brain-bucket \
+NM_BRAIN_GCS_GCLOUD_CONFIGURATION=your-gcloud-configuration \
+NM_ALLOW_ACTOR_HEADER=1 HOST=127.0.0.1 \
+pnpm --filter @neuramesh/control-api exec vitest run test/brain-gcs.integration.test.ts
+```
+
+Defaults are API port 8898 and Postgres port 56435. Override `NM_BRAIN_TEST_API`, `NM_BRAIN_TEST_DB`,
+`NM_BRAIN_TEST_USER`, and `NM_BRAIN_TEST_WORKSPACE` for another isolated setup.
+The test rejects nonlocal API and database hosts. It creates a labeled storage fixture without a model call.
+
 Set in the Vercel project — and mirrored in a **gitignored** local `.env` / `.env.production` for scripts. **Never commit secrets.**
 
 | Group | Vars |

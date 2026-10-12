@@ -5,7 +5,8 @@ import { createEvent, formatAddress, type Actor } from '@neuramesh/shared';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from '../src/app';
 import type { Ledger } from '../src/credits';
-import { filmTimeoutMs, filmsDue } from '../src/starter-video';
+import { FILM_NOT_STARTED, FILM_REFUSED, filmSlow, filmTimeoutMs, filmsDue } from '../src/starter-video';
+import { libraryImage, setArtifactSource } from '../src/store/frames';
 import { MemoryStore } from '../src/store';
 import { clampSeconds, filmCredits, tierFor, videoTiers } from '../src/video-registry';
 import { filmCredits as sharedFilmCredits } from '@neuramesh/shared';
@@ -117,7 +118,9 @@ describe('the door', () => {
     const r = await j(await send(george, `/v1/starter/video?workspace=${ws}`, undefined, 'GET'));
     expect(r.served).toBe(true);
     expect(r.tier).toBe('starter');
-    expect(r.tiers.map((t: { tier: string; model: string; credits: number }) => [t.tier, t.model, t.credits])).toEqual([['starter', 'Seedance 2.0', 194], ['xpress', 'MiniMax H3', 48], ['premium', 'Seedance 2.0 Standard', 243]]);
+    // the house names only (George, 2026-10-06): `model` carries the picture size for the desktops that print it
+    expect(r.tiers.map((t: { tier: string; model: string; credits: number }) => [t.tier, t.model, t.credits])).toEqual([['starter', '720p', 194], ['xpress', '768p', 48], ['premium', '720p', 243]]);
+    expect(JSON.stringify(r)).not.toMatch(/seedance|minimax|kling|bytedance|kuaishou|fal\b|vendor/i);
     // the lengths a card offers and the rate it prices them at (the shared formula), so the facts line says what the door will charge
     expect(r.tiers[0]).toMatchObject({ lengths: [5, 8, 10, 15], perSecondMicros: 241_900, seconds: 8 });
     // the pick is a Pro setting: Free is refused, Pro picks, an agent never may
@@ -155,7 +158,7 @@ describe('the door', () => {
     expect(r.status).toBe(202);
     const body = await j(r);
     expect(body.credits).toBe(194);
-    expect(body.tier.model).toBe('Seedance 2.0');
+    expect(body.tier.model).toBe('720p'); // the picture size, never the model's name
     expect(led.calls[0]).toEqual({ op: 'spendFilm', micros: 1_940_000, seconds: 8 });
     expect(fal.calls[0]!.url).toBe('https://queue.fal.run/bytedance/seedance-2.0/fast/text-to-video');
     // the high bitrate rides every Seedance lane (the same price, less smear on lettering, plan §8)
@@ -171,6 +174,8 @@ describe('the door', () => {
     door(led.ledger, fakeFal({ submit: 'refuse' }).fetchFn);
     const r = await send(george, '/v1/starter/film', { workspace: ws, item, prompt: 'a vertical clip of the hook' });
     expect(r.status).toBe(502);
+    // the lane's own words ("prompt too long") stay in the log: the card and the agent read the house sentence
+    expect(await j(r)).toMatchObject({ error: FILM_NOT_STARTED, code: 'UPSTREAM' });
     expect(led.calls.map((c) => c['op'])).toEqual(['spendFilm', 'refundFilm']);
     expect(led.remaining()).toBe(5_000_000);
     door(led.ledger, fakeFal({ submit: 'gone' }).fetchFn);
@@ -192,7 +197,7 @@ describe('the door', () => {
     const it = (store as unknown as { contentItems: Array<{ id: string; videoPending?: boolean; mediaId?: string | null; videoMeta?: unknown }> }).contentItems.find((x) => x.id === item)!;
     expect(it.videoPending).toBe(false);
     expect(it.mediaId).toBeTruthy();
-    expect(it.videoMeta).toMatchObject({ tier: 'starter', model: 'Seedance 2.0', seconds: 8, credits: 194 });
+    expect(it.videoMeta).toMatchObject({ tier: 'starter', model: '720p', seconds: 8, credits: 194 });
     expect((await store.contentMediaBytes(it.mediaId!))?.mime).toBe('video/mp4');
     expect(store.films.rows[0]!.status).toBe('done');
     expect(await pass()).toEqual([]); // nothing open
@@ -205,8 +210,9 @@ describe('the door', () => {
     const before = led.remaining();
     expect((await filmsDue(store, { ledger: led.ledger, env: ENV, fetchFn: bad.fetchFn })).map((r) => r.outcome)).toEqual(['failed: content policy']);
     expect(led.remaining()).toBe(before + 1_940_000);
-    expect((store as unknown as { contentItems: Array<{ id: string; videoPending?: boolean; mediaId?: string | null; videoMeta?: unknown }> }).contentItems.find((x) => x.id === item)).toMatchObject({ videoPending: false });
-    expect(store.films.rows[1]!.status).toBe('failed');
+    // the card reads a house sentence (fal's class `content_policy` names the script); fal's own words stay on the films row
+    expect((store as unknown as { contentItems: Array<{ id: string; videoPending?: boolean; videoError?: string }> }).contentItems.find((x) => x.id === item)).toMatchObject({ videoPending: false, videoError: FILM_REFUSED });
+    expect(store.films.rows[1]).toMatchObject({ status: 'failed', error: 'content policy' });
 
     // a film nobody answers for twelve minutes
     ({ itemId: item } = await j(await send(plume, '/v1/commands', { type: 'content.create', channel, platform: 'x', body: 'three', script: '[0:00-0:03] hook' })));
@@ -215,6 +221,7 @@ describe('the door', () => {
     await send(george, '/v1/starter/film', { workspace: ws, item, prompt: 'a vertical clip of the hook' });
     const t1 = Date.parse(store.films.rows[2]!.createdAt);
     expect((await filmsDue(store, { ledger: led.ledger, env: ENV, fetchFn: slow.fetchFn, now: () => t1 + 13 * 60_000 })).map((r) => r.outcome)).toEqual(['failed: the film took longer than 12 minutes']);
+    expect((store as unknown as { contentItems: Array<{ id: string; videoError?: string }> }).contentItems.find((x) => x.id === item)?.videoError).toBe(filmSlow(12));
     expect(led.calls.filter((c) => c['op'] === 'refundFilm')).toHaveLength(2);
   });
 
@@ -343,6 +350,23 @@ describe('the door', () => {
     expect(it.videoMeta?.shots).toEqual({ asked: 1, applied: 0, why: 'not on the shelf: gone.png' });
     expect(fal2.calls.some((c) => /\/\/fal\.run\//.test(c.url))).toBe(false); // nothing composed
     expect((await store.contentMediaBytes(it.mediaId!))?.bytes.length).toBe(MP4.length);
+  });
+
+  it('real app screenshots only (George, 2026-10-06): an image an agent made is never a product shot or a frame, a repository file is', async () => {
+    const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+    // the agent's browser saved a capture of the X profile, as George's room held
+    const capture = '00000000-0000-4000-8000-00000000aa09';
+    await send(plume, '/v1/artifacts', { id: capture, workspace: ws, channel, messageId: '00000000-0000-4000-8000-00000000bb09', kind: 'file', name: 'x-profile-capture.png', mime: 'image/png', inlineContent: PNG, sizeBytes: 70 });
+    const script = '[0:00-0:03] Hook to camera.\n[0:03-0:07] Cut to the app home screen. SHOW: x-profile-capture.png';
+    const refused = await send(plume, '/v1/commands', { type: 'content.create', channel, platform: 'x', body: 'ten', script, seconds: 8 });
+    expect(refused.status).toBe(404);
+    expect((await j(refused)).error).toMatch(/"x-profile-capture.png" is not an app screenshot: an agent made it.*shelve_repo_screenshot/);
+    // the same name as a frame is refused the same way
+    expect((await j(await send(plume, '/v1/commands', { type: 'content.create', channel, platform: 'x', body: 'eleven', script: '[0:00-0:03] hook', frame: 'x-profile-capture.png' }))).error).toMatch(/is not an app screenshot/);
+    // positive control: the platform's copy of a repository file counts, whoever asked for it
+    await setArtifactSource(store, capture, 'repo:acme/app/screens/home.png@3f2a9c1');
+    expect((await send(plume, '/v1/commands', { type: 'content.create', channel, platform: 'x', body: 'twelve', script, seconds: 8 })).status).toBe(200);
+    expect(await libraryImage(store, channel, 'x-profile-capture.png')).toMatchObject({ name: 'x-profile-capture.png' });
   });
 
   it('the cron door wants the secret', async () => {

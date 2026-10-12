@@ -50,7 +50,7 @@ export function engineeringPlanItems(value: string): EngineeringPlanItem[] {
       text,
       status: marker === 'x' ? 'complete' as const : marker && marker !== ' ' ? 'active' as const : 'pending' as const,
     }];
-  }).slice(0, 20);
+  }).slice(0, 30);
 }
 
 interface ToolCopy {
@@ -124,6 +124,7 @@ export function engineeringActivePresentation(
   activity: EngineeringActiveActivity | null | undefined,
   mode: EngineeringMode,
 ): EngineeringActivityPresentation {
+  if (activity?.phase === 'restoring') return { kind: 'runtime', title: 'Loading conversation', detail: 'Restoring recorded history', status: 'info' };
   if (activity?.phase === 'tool' && activity.toolName) {
     const copy = toolCopy(activity.toolName);
     return { kind: copy.kind, title: copy.active, detail: 'Repository tool is running', status: 'info' };
@@ -140,6 +141,8 @@ export type EngineeringTranscriptBlock =
 
 /** Keep partial Markdown readable without reparsing an incomplete document on every token. */
 export const streamingEngineeringText = (value: string): string => value
+  // A preview's transport JSON is never prose. The finished message renders its card.
+  .replace(/```nmpreview\b[\s\S]*?(?:```|$)/g, '')
   .replace(/^#{1,6}\s+/gm, '')
   .replace(/\*\*/g, '')
   .replace(/`/g, '');

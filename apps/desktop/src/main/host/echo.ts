@@ -6,7 +6,7 @@ import type { HostedAgent, ThreadTask } from '../agents';
 import { bareAddressRe, mentionRe } from '@neuramesh/shared';
 import { buildHireCard } from '../hirecards';
 
-import type { PowerSyncDatabase } from '@powersync/node';
+import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 
 
 
@@ -17,7 +17,7 @@ import type { HostCtx } from './ctx';
 
 export function makeEcho(ctx: HostCtx & {
   agents: Map<string, HostedAgent>;
-  db: PowerSyncDatabase;
+  db: ReplicaDatabase;
   hireProposed: Set<string>;
   offerPlanToWorker: ReturnType<typeof makePlanFlow>['offerPlanToWorker'];
   post: any;

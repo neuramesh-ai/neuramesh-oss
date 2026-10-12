@@ -32,6 +32,14 @@ export function unaddressedWake(state: string, kind?: string | null, button = fa
   // a design round IS its conversation — the studio's composer posts plain thread
   // messages so a question or a note reaches Iris without moving the FSM
   if (state === 'designing' || state === 'design_review') return 'assignee';
+  // a done unit waits for the person's word ("merge it", "accept"), and the verdict card, the done
+  // line and the reviewer's approval ask for it in this thread (2026-10-05). the coordinator takes
+  // every reply there, a content unit's too: only it holds accept_task (a marketer's turn cannot
+  // accept), and it holds revise_posts and request_changes for a note on the drafts. the orchestrator
+  // decides what the reply asks for: accept_task refuses unless the person's newest typed message says
+  // merge or accept (host/acceptgate.ts), and the server refuses an agent accept when no typed human
+  // message is newer than the verdict
+  if (state === 'done') return 'orchestrator';
   // a content task is its conversation too, even in_review where build tasks are
   // mention-only: a reply on a draft addresses the marketer (docs/16 §4.5)
   if (kind === 'content' && !['accepted', 'closed'].includes(state)) return 'assignee';

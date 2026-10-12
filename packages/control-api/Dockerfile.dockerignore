@@ -9,13 +9,12 @@
 !tsconfig.base.json
 !patches/**
 !packages/shared/**
+!packages/client-core/**
 !packages/control-api/**
 !supabase/migrations/**
 !supabase/validate/auth-shim.sql
 !dev/stack/init/98-storage.sql
 !dev/stack/init/99-publication.sql
-!dev/stack/powersync/powersync.yaml
-!dev/stack/powersync/sync-config.yaml
 # never the installed trees, the bundles, or the tests
 **/node_modules
 **/dist

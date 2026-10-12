@@ -1,3 +1,7 @@
+import type { ConvoThreadProps } from './ConvoThreadProps';
+import { overviewSourceFiles, overviewOutputFiles } from './overview-model';
+import { ThreadOverviewBody, useThreadOverview } from './ThreadOverview';
+import { artifactOverviewSection, sourceOverviewSection, runOverviewSection } from './overview-sections';
 // What hangs off a message — attachments, a whiteboard snapshot card, a dropped document.
 // Split out of thread/convo.tsx.
 
@@ -8,12 +12,12 @@ import { useConvoPresence } from './convo-presence';
 import { AttachButton, AttachTray, consumeWbAttach, useAttachments } from '../composer/attach';
 import { AttachLightbox } from './AttachLightbox';
 import { BrainChip } from '../brain/BrainChip';
-import { ComposerInput } from '../composer/ComposerInput';
+import { SessionComposer } from '../composer/SessionComposer';
 
 import { DeliveryStrip } from './DeliveryStrip';
 import { IconClose, IconPaperclip, IconReply, IconSend, IconSkill } from '../ui/icons';
 
-import { MentionButton, ThreadCrumb, ThreadRoomChip, ThreadRootPin, ThreadSettleBtn, ThreadStatusChip, TypistChip, filesFromPaste, groupByMessage, streamContent, type ComposerPerson, type HeadStatus, type PostVCard, useDropZone } from './parts';
+import { MentionButton, ThreadCrumb, ThreadRoomChip, ThreadRootPin, ThreadSettleBtn, ThreadStatusChip, TypistChip, filesFromPaste, groupByMessage, streamContent, type PostVCard, useDropZone } from './parts';
 
 import { PostPreviewModal } from '../marketing/PostPreviewModal';
 import { RunCard } from './RunCard';
@@ -33,12 +37,12 @@ import { isWatchableRun, runTrees, type RunTree } from '../runs/runs';
 import { nm as nmBridge } from '../bridge/nm';
 
 
-import { suggestionTarget, type TaskRefInfo } from '../cards/parse';
+import { suggestionTarget } from '../cards/parse';
 
-import { type AgentRow, type MachineRow, type MemberRow } from '../bridge/rows-crew';
-import { type ArtifactUI, type AttachmentRow, type DecisionAllRow, type TaskAllRow } from '../bridge/rows-board';
-import { type ChannelArtifactRow, type MessageRow, type ThreadRow } from '../bridge/rows-rooms';
-import { type SkillPackRow, type SkillRow } from '../bridge/rows-content';
+
+import { type ArtifactUI, type AttachmentRow, type TaskAllRow } from '../bridge/rows-board';
+import { type ChannelArtifactRow, type MessageRow } from '../bridge/rows-rooms';
+
 import { useLandedGrace, useRuns, useThreadStream } from './hooks';
 import { useStickToBottom } from './useStickToBottom';
 import { createPortal } from 'react-dom';
@@ -51,67 +55,14 @@ import { useThreadPosts } from './usePosts';
 import { useOwnedUnitPosts } from './useOwnedUnitPosts';
 import { convoArtifactSection, useThreadArtifacts } from './useArtifacts';
 import { convoArrivals, markerArrivals, useArrivals } from './useArrivals';
-import { DraftsRow, DraftsTab, stripCards, useDraftsTab, type DraftsDoor } from './DraftsPane';
-import type { PanelArrival } from '../shell/arrivals';
+import { DraftsRow, DraftsTab, stripCards, useDraftsTab } from './DraftsPane';
+
 import { RoutineChip, SessionRuns, draftStrips } from './SessionRuns';
 
 // Imported bindings lose control-flow narrowing inside closures, so re-bind (same as App.tsx).
 const nm = nmBridge;
 
-export function ConvoThread({ threadId, back, thread, channelId, channelSlug, channelKind, channelMarketing, agents, machines, members, selfEmail, people, skills, packs, plan, decisions, railSlot, detailsShown, onDetails, onArrive, drafts, onUpgrade, onClose, onActivity, onUpgradeReason, onSeeUsage, taskRef, onOpenTask, onOpenDoc, onOpenArticle, onOpenWhiteboard, brainProject, crumbProject, onSetProjectPack, onBrainConnect, marks, onSettle, hostedGate }: {
-  threadId: string;
-  /** what this conversation is doing, and the act its stamp offers (shell/rowstatus.ts) */
-  marks?: HeadStatus | null; onSettle?: (threadId: string) => void;
-  /** the side panel's Overview slot: this thread's sections portal in there and nowhere else
-   *  (the side-panel round, 2026-10-03; see ThreadRail's note) */
-  railSlot?: HTMLElement | null;
-  /** the Overview tab is in view, so the toks under the head stand down */
-  detailsShown?: boolean;
-  /** show the Overview tab (the toks' door) */
-  onDetails?: () => void;
-  /** what this conversation makes while you look at it, for the side panel to open (shell/arrivals.ts) */
-  onArrive?: (list: PanelArrival[]) => void;
-  /** the side panel's Drafts tab: the cards portal in there, and its count and its door (the side-panel round) */
-  drafts?: DraftsDoor;
-  /** where the back crumb goes — the room's list, or Home when the session was opened there */
-  back: string;
-  thread: ThreadRow | null; // null during the optimistic window before the server-born row syncs down
-  channelId: string;
-  channelSlug: string;
-  channelKind?: string | null; // 'marketing' opens the brand-docs rail (round 6)
-  channelMarketing?: string | null; // the room profile json for the rail's connections
-  agents: AgentRow[];
-  machines: MachineRow[];
-  members: MemberRow[];
-  selfEmail?: string | null;
-  people: ComposerPerson[];
-  skills: SkillRow[];
-  packs: SkillPackRow[];
-  plan: string; /** a free hosted workspace (shell/hostedrule.ts): the gate card docks where the composer stood */ hostedGate?: boolean;
-  decisions: DecisionAllRow[]; // the channel's non-task nmq-card state — answers land + collapse here too
-  onUpgrade: (reason: string) => void;
-  onClose: () => void;
-  onActivity?: (a: AgentRow) => void;
-  /** the cap gate's two doors: open the shared upgrade surface with the cap as its reason, and
-   *  open Compute. Both are App-level surfaces, so the thread only forwards the intent. */
-  onUpgradeReason: (reason: string) => void;
-  onSeeUsage: () => void;
-  taskRef?: (n: number) => TaskRefInfo | null;
-  onOpenTask?: (id: string) => void;
-  /** docs/36 §6 — a brand doc is a FILE: it opens as a tab and stays there while you keep typing */
-  onOpenDoc?: (d: { label: string; file: string; doc: string }) => void;
-  /** the ‹article:id› card's Open — the reading tab (article round) */
-  onOpenArticle?: (a: import('./ArticleCard').ArticleOpen) => void;
-  /** docs/10 §15 — the brain chip's inputs. A plain conversation is the PUREST case of "who am I
-   *  actually talking to", and it was the one thread that could not answer it. */
-  brainProject?: { id: string; name: string; pack: string | null } | null;
-  /** the thread's project, for the header place-crumb (project › #room) */
-  crumbProject?: { name: string; logo_url?: string | null } | null;
-  onSetProjectPack?: (packId: string) => Promise<void>;
-  onBrainConnect?: () => void;
-  onOpenWhiteboard?: (b: { id: string; title: string }) => void;
-  onApproveDoc?: (file: string) => void | Promise<void>;
-}) {
+export function ConvoThread({ threadId, back, thread, channelId, channelSlug, channelKind, channelMarketing, agents, machines, members, selfEmail, people, skills, packs, plan, decisions, railSlot, detailsShown, onDetails, onArrive, drafts, onUpgrade, onClose, onActivity, onUpgradeReason, onSeeUsage, taskRef, onOpenTask, onOpenDoc, onOpenArticle, onOpenWhiteboard, brainProject, crumbProject, onSetProjectPack, onBrainConnect, marks, onSettle, hostedGate }: ConvoThreadProps) {
   const [rows, setRows] = useState<MessageRow[]>([]);
   useEffect(() => (nm ? nm.watchConvo(threadId, setRows) : undefined), [threadId]);
   // who's working IN this conversation (thread-keyed emit): presence from the wake,
@@ -238,6 +189,7 @@ export function ConvoThread({ threadId, back, thread, channelId, channelSlug, ch
   // THE DRAFTS TAB (the side-panel round): every strip's cards once, with the unit each came from
   const draftEntries = useMemo(() => stripCards<PostVCard & { unit?: TaskAllRow }, { unit?: TaskAllRow }>(stream1, (it) => (it.unit ? { unit: it.unit } : {})), [stream1]);
   useDraftsTab(draftEntries, mkPosts, `thread:${threadId}`, drafts, onArrive);
+  const overview = useThreadOverview(`thread:${threadId}`, [artifactOverviewSection(overviewOutputFiles(convoArts, rows), onOpenDoc), sourceOverviewSection(overviewSourceFiles(convoAtts, rows), setConvoLightbox), runOverviewSection(trees, listRef)]);
   return (
     <aside
       className="threadpanel convo"
@@ -257,7 +209,7 @@ export function ConvoThread({ threadId, back, thread, channelId, channelSlug, ch
             setup task wears, and since routine sessions (2026-09-28) it names the cadence */}
         <RoutineChip scheduleId={thread?.schedule_id} />
         {/* Settle leads the act cluster; the details are the side panel's Overview tab (the side-panel round) */}
-        <div className="theadact"><ThreadSettleBtn head={marks} onSettle={onSettle} /></div>
+        <div className="theadact">{overview.toggle}<ThreadSettleBtn head={marks} onSettle={onSettle} /></div>
       </div>
       {/* what the Overview tab holds, while it is not in view (see ThreadRail's note) */}
       {!detailsShown && onDetails && (
@@ -271,6 +223,7 @@ export function ConvoThread({ threadId, back, thread, channelId, channelSlug, ch
       <ThreadLiveBar trees={trees} agents={agents} />
       <div className="convobody">
       <div className="convomain">
+      <ThreadOverviewBody overview={overview} label={crumbProject?.name ?? title}>
       <div className="tmsgs convomsgs" ref={listRef}>
         <ThreadRootPin thread={thread} rows={rows} agents={agents} members={members} />
         {rows.length === 0 && !stream && <div className="tempty">Say the word — the channel's agents see this thread.</div>}
@@ -318,6 +271,7 @@ export function ConvoThread({ threadId, back, thread, channelId, channelSlug, ch
         )}
         {streaming && <StreamBubble live={streaming} role={agents.find((a) => a.name === streaming.agent)?.role} taskRef={taskRef} onOpenTask={onOpenTask} />}
       </div>
+      </ThreadOverviewBody>
       <div className="tcompose">
         <RunDock trees={trees} agents={agents} onOpen={onActivity} scrollRef={listRef} />
         {(() => {
@@ -381,7 +335,7 @@ export function ConvoThread({ threadId, back, thread, channelId, channelSlug, ch
             </div>
           )}
           <AttachTray items={atts.items} onRemove={atts.remove} />
-          <ComposerInput
+          <SessionComposer rowClass="trow" input={<SessionComposer.Input
             value={draft}
             onChange={setDraft}
             onSend={() => void send()}
@@ -396,8 +350,7 @@ export function ConvoThread({ threadId, back, thread, channelId, channelSlug, ch
             placeholder={armed ? `What should change on draft ${armed.letter}? · esc cancels` : mode === 'chat' ? 'Ask anything — ↵ send' : 'Reply — @ mention · / skill · ↵ send'}
             focusSignal={cfocus}
             mentionSignal={cmention}
-          />
-          <div className="trow">
+          />} controls={<>
             <MentionButton onMention={() => setCmention((n) => n + 1)} />
             <AttachButton onFiles={atts.addFiles} count={atts.count} max={atts.limits.maxPerMessage} />
             <ThreadRoomChip slug={channelSlug} />
@@ -412,7 +365,7 @@ export function ConvoThread({ threadId, back, thread, channelId, channelSlug, ch
               onSetThreadBrain={async (override) => { await nm?.threadSetBrain(threadId, override as Record<string, string> | null); }}
             />
             <button className="btn primary tsend" disabled={(!draft.trim() && !atts.count) || atts.busy} onClick={() => void send()} aria-label={atts.busy ? 'Uploading attachments' : 'Send reply'} data-tip="Send · ↵">{atts.busy ? '…' : <IconSend s={20} />}</button>
-          </div>
+          </>} />
           {convoDrop.dragging && <div className="drophint"><IconPaperclip s={15} /> Drop to attach</div>}
         </div>
         )}

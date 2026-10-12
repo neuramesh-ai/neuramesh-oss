@@ -16,7 +16,7 @@ import { TASK_KINDS, isCodingThread, toolAvailable, type NmTool, type TurnKind }
 import { primaryRepoRow } from './reporead';
 import { WB_CREATE_DESC, WB_LIST_DESC, WB_READ_DESC, WB_UPDATE_DESC } from '../harness/tooldesc';
 
-import type { PowerSyncDatabase } from '@powersync/node';
+import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 import { type HostedAgent, type SkillRef } from '../agents';
 import type { LogFn } from '../agentlog';
 import type { HostCtx } from './ctx';
@@ -45,7 +45,7 @@ export interface ToolCtx {
   /** what this turn has read from the shelf (host/grounding.ts): draft_posts asks it before it writes */
   grounding: Grounding;
   z: typeof import('zod')['z'];
-  db: PowerSyncDatabase;
+  db: ReplicaDatabase;
   post: HostCtx['post'];
   ch: { id: string; slug: string; workspace_id: string };
   agent: HostedAgent;
@@ -97,7 +97,7 @@ export interface ToolCtx {
 }
 
 
-export interface LibDoc { name: string; kind: string; created_at: string; promoted: number | null; inline_content: string | null; mime?: string | null; room?: string | null; project?: string | null }
+export interface LibDoc { name: string; kind: string; created_at: string; promoted: number | null; inline_content: string | null; mime?: string | null; room?: string | null; project?: string | null; created_by_kind?: string | null; source?: string | null; readContent?: () => Promise<string> }
 /** one drafted post row, as `draft_posts`/`revise_posts` see it */
 export type DraftRow = { id: string; platform: string; body: string; status: string; scheduled_at: string | null; letter: string };
 
@@ -134,7 +134,7 @@ const SWEEP_TOOLSETS: Record<'digest' | 'watchdog' | 'monitor', readonly string[
 };
 
 export function makeOrchTools(ctx: HostCtx & {
-  db: PowerSyncDatabase;
+  db: ReplicaDatabase;
   agents: Map<string, HostedAgent>;
   apiGet: (path: string, actor: { kind: string; id: string; role?: string }) => Promise<any>;
   brain: Brain;

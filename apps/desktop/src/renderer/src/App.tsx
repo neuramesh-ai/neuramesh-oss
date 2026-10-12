@@ -1,3 +1,5 @@
+import { ThreadOverviewEnvironment } from './thread/ThreadOverview'; import { openLink } from './lib/links';
+import type { EngineeringSelection } from '@neuramesh/shared';
 import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { agentInChannel, type ShipPlan, awaitingAgent, actionableByHuman, decisionHandled, tasksInProject, rowsInProject, replyPreview, MARKETING_SETUP_FLOW, setupProgress, placementFor, type MachineCapability, type ThreadStatus , planLabel } from '@neuramesh/shared';
 import { historyRows, plainTitle, resolveRoomSurface, roomBriefs, roomTabsFor, type HistoryRow, type RoomSurface, liveKinOf } from './room-tabs';
@@ -10,7 +12,7 @@ import { type ChannelRow, type ChannelPersonRow, type ChannelHistoryRow, type Me
 import { CodingThread } from './views/CodingThread';
 import { RepoChip, repoLabel } from './composer/RepoChip';
 import { repoForProject } from './views/EngineeringOS';
-import { threadKindOf } from '@neuramesh/shared';
+import { threadSurfaceKind } from '@neuramesh/shared';
 import { type ContentItemWide, type SkillRow, type SkillPackRow } from './bridge/rows-content';
 import { type TaskRow, type TaskAllRow, type DecisionAllRow, type ProjectRow, type WorkspaceProjectRow, type RepoUI, type RunUI, type ArtifactUI, type AttachmentRow } from './bridge/rows-board';
 import { type AgentRow, type MachineRow, type MemberRow, type WorkspaceMembership, type PendingInvite } from './bridge/rows-crew';
@@ -85,7 +87,7 @@ import { ImageKeyForm, setCreditsOpener, setImageConnectOpener } from './setting
 
 import { BrainChip } from './brain/BrainChip';
 import { readBrainDraft } from './brain/draft';
-import { publishModelRoster } from './models/roster'; import { CodeModelChip } from './models/CodeModelChip';
+import { publishModelRoster } from './models/roster'; import { CodingBrains } from './models/CodingBrains';
 
 
 import { ComputePanel } from './compute/ComputePanel';
@@ -812,7 +814,8 @@ export function App() {
    * have re-created it in a new place.
    */
   const openTaskArtifact = async (task: { id: string; number: number; channel_id: string }, name?: string | null, how: OpenHow = {}) => {
-    const d = await nm?.taskDetail(task.id).catch(() => null);
+    // the session that asked owns the tab, even when the person moves on while the detail loads (tab-owner.ts)
+    const owned: OpenHow = { ...how, owner: how.owner !== undefined ? how.owner : panelOwnerRef.current }; const d = await nm?.taskDetail(task.id).catch(() => null);
     const arts = (d?.artifacts ?? []) as Array<{ id: string; kind: string; name: string; content?: string | null }>;
     if (!arts.length) return;
     const rounds: ReviewRound[] = arts.map((a) => ({ name: a.name, content: a.content ?? '' }));
@@ -827,8 +830,8 @@ export function App() {
     if (!pick) return;
     const one = { id: pick.id, kind: pick.kind, name: pick.name, content: pick.content ?? '' };
     const kind = reviewKind(one.name, one.kind);
-    if (kind) openReviewTab(kind, one, kind === 'design' ? roundMockupsOf(arts, designVer(one.name)) : [], name ? one.name : null, rounds, task, how);
-    else openArtifactTab(one, task, how);
+    if (kind) openReviewTab(kind, one, kind === 'design' ? roundMockupsOf(arts, designVer(one.name)) : [], name ? one.name : null, rounds, task, owned);
+    else openArtifactTab(one, task, owned);
   };
   /** an article deliverable: the reading tab (article round) — one artifact = one tab (wtabs dedupe) */
   const openArticleTab = (a: { id: string; name: string; content: string; channelSlug: string | null }, how: OpenHow = {}) =>
@@ -1004,7 +1007,9 @@ export function App() {
    * call sites, so the next list someone adds cannot reintroduce it.
    */
   // a CODING thread (0144) opens on the one surface too, wearing the code face (views/CodingThread)
-  const openCodingThread = !!openThreadId && threadKindOf((chanThreads.find((t) => t.id === openThreadId) ?? histAll.find((t) => t.id === openThreadId))?.kind) === 'coding';
+  const [codingRepoPicks, setCodingRepoPicks] = useState<Map<string, { repo: string; selection: EngineeringSelection }>>(() => new Map());
+  const openThreadRow = chanThreads.find((t) => t.id === openThreadId) ?? histAll.find((t) => t.id === openThreadId) ?? null;
+  const openCodingThread = !!openThreadId && threadSurfaceKind(openThreadRow, codingRepoPicks.has(openThreadId)) === 'coding';
   const openConversation = (threadId: string, channelId?: string | null): void => {
     setOpenTaskId(null);
     if (channelId) {
@@ -1137,7 +1142,7 @@ export function App() {
   const [chatDraft, setChatDraft] = useState<string | null>(null);
   // coding threads (0144): the repo chip's pre-set for the next New chat ('primary' = the room's primary repo), and the repo a
   // thread was BORN with on this client (door 1), read by the surface that opens until its synced session row lands
-  const [chatRepo, setChatRepo] = useState<string | null>(null); const [codingRepoPicks, setCodingRepoPicks] = useState<Map<string, { repo: string; model: string | null }>>(() => new Map()); // a coding birth's repository and model, by thread
+  const [chatRepo, setChatRepo] = useState<string | null>(null);
   const openMarketingAsk = (channelId: string, text: string) => {
     // the stage's room chip lists the ACTIVE project's rooms — follow the ask's room there,
     // or the pre-set target silently falls back to whatever room the chip lands on
@@ -1606,10 +1611,23 @@ export function App() {
     // Workspace-settings open (undefined.length). The handler is fixed, but an older main
     // process is exactly the case where a renderer must degrade rather than blank — the same
     // rule the roster and mcpKeys reads already follow.
-    void nm.channelMeta(current.id)
-      .then((r) => setMeta({ projects: r?.projects ?? [], repos: r?.repos ?? [], reposAll: r?.reposAll ?? [] }))
-      .catch(() => {});
-    return nm.watchTasks(current.id, setTasks);
+    // Repository membership can arrive after this room's first render. Refresh the local
+    // projection so a newly connected repository is selectable without reloading the app.
+    let alive = true;
+    let loading = false;
+    const refreshMeta = async () => {
+      if (loading) return;
+      loading = true;
+      try {
+        const r = await nm.channelMeta(current.id);
+        if (alive) setMeta({ projects: r?.projects ?? [], repos: r?.repos ?? [], reposAll: r?.reposAll ?? [] });
+      } catch { /* the next local-replica read retries */ }
+      finally { loading = false; }
+    };
+    void refreshMeta();
+    const timer = setInterval(() => void refreshMeta(), 2500);
+    const unwatch = nm.watchTasks(current.id, setTasks);
+    return () => { alive = false; clearInterval(timer); unwatch(); };
   }, [current?.id]);
 
 
@@ -2255,7 +2273,7 @@ export function App() {
   // send writes — the choice, or the desktop default's Mac; Auto writes nothing and the ladder decides
   const [sessionMachine, setSessionMachine] = useState<string | null>(null);
   const [sessionRepo, setSessionRepo] = useState<string | null>(null); // the repo chip's pick for the next send (0144): set, it births a coding thread
-  const [sessionCodeModel, setSessionCodeModel] = useState<string | null>(null); // the Code chip's pick for that thread: null runs the NeuraMesh brain
+  const [sessionCodeSelection, setSessionCodeSelection] = useState<EngineeringSelection>({ agentId: null, modelId: null, reasoningEffort: null }); // the Code chip's pick for that thread: null runs the NeuraMesh brain
   const sessionOrigin = NM_PLATFORM === 'web' ? 'web' as const : 'desktop' as const;
   const selfMachineId = boot?.machineName ? roster.machines.find((m) => m.name === boot.machineName)?.id ?? null : null;
   const sessionDesignation = (chosen: string | null) => designationFor({ origin: sessionOrigin, chosen, prefs: parseComputePrefs(members.find((m) => m.user_id === meId)?.compute), selfMachineId });
@@ -2298,8 +2316,8 @@ export function App() {
       threadOrigin: thread ? null : sessionOrigin,
       ...(!thread && sessionRepo ? { threadKind: 'coding' as const } : {}), // …and the kind (0144): a repository picked makes this a coding conversation
     });
-    if (!thread && sessionRepo) setCodingRepoPicks((m) => new Map(m).set(threadId, { repo: sessionRepo, model: sessionCodeModel }));
-    setSessionMachine(null); setSessionRepo(null); setSessionCodeModel(null);
+    if (!thread && sessionRepo) setCodingRepoPicks((m) => new Map(m).set(threadId, { repo: sessionRepo, selection: sessionCodeSelection }));
+    setSessionMachine(null); setSessionRepo(null); setSessionCodeSelection({ agentId: null, modelId: null, reasoningEffort: null });
     openConversation(threadId); // …and land in the session you just started
     setNote(`✓ sent in ${Math.max(1, Math.round(performance.now() - t0))}ms · syncing to team`);
     setTimeout(() => setNote(''), 2500);
@@ -3369,6 +3387,9 @@ export function App() {
       <div className="shellbody">
       {/* what the side panel shows in front, so a thread's one-row card can say "In the panel" */}
       <PanelShownContext.Provider value={panelShown}>
+      <ThreadOverviewEnvironment.Provider value={{ workspace: boot?.workspaceId ?? 'workspace', owner: panelSession.key, paneOpen: dockOpen, expanded: panelExpanded, openLink: (url: string) => openLink(url),
+        processes: procsView.terminals.flatMap((proc) => { const tab = wtabs.find((t) => t.id === subIdToTab[proc.subId] && t.owner === panelSession.key && t.kind === 'terminal'); return tab ? [{ id: tab.id, label: proc.title, detail: 'Terminal', open: () => { activateWTab(tab.id); openDock(true); } }] : []; }),
+      }}>
       <div className="main">
         {/* docs/36 — THE WORKSPACE STRIP. `.main` is tabbed: tab one is the conversation, pinned
             and unclosable and following the room, and files, terminals and browsers open BESIDE
@@ -3588,7 +3609,7 @@ export function App() {
             initialTarget={chatTarget}
             initialDraft={chatDraft}
             repos={meta.reposAll.length ? meta.reposAll : meta.repos} initialRepo={chatRepo} onConnectRepo={() => setAddRepoOpen(true)}
-            onCodingBirth={(id, repoId, model) => setCodingRepoPicks((m) => new Map(m).set(id, { repo: repoId, model }))}
+            onCodingBirth={(id, repoId, selection) => setCodingRepoPicks((m) => new Map(m).set(id, { repo: repoId, selection }))}
             onSend={(channelId, text, opts) => {
               // the stage targets a room that may not be the "current" one — align them so the
               // conversation watch, history and the session surface all read the room addressed
@@ -3943,7 +3964,7 @@ export function App() {
               {/* the SAME pill as the thread composer (George, 2026-07-31): a message sent here
                   becomes a conversation too, so the crew and the roles table read identically. A repository
                   makes it a coding conversation, whose model the Code chip picks (2026-10-04) */}
-              {sessionRepo && !replyTo ? <CodeModelChip pick={sessionCodeModel} machineId={sessionDesignation(sessionMachine)} place="start" onPick={setSessionCodeModel} />
+              {sessionRepo && !replyTo ? <CodingBrains selection={sessionCodeSelection} onChange={setSessionCodeSelection} machineId={sessionDesignation(sessionMachine)} roomId={current?.id ?? null} roomSlug={current?.slug ?? ''} />
                 : <BrainChip
                   onConnect={(p) => { setFocusProvider(p); setWsOpen(true); void refreshCreds(); }}
                   project={activeProj ? { id: activeProj.id, name: activeProj.name, pack: activeProj.model_pack ?? null } : null}
@@ -3971,13 +3992,13 @@ export function App() {
       {openThreadId && !openTask && openCodingThread && (
         <div className="sessionsurf">
           <div className="sscol">
-          <CodingThread threadId={openThreadId} thread={chanThreads.find((t) => t.id === openThreadId) ?? null} back={sessionBack} channelSlug={current?.slug ?? ''} channelId={current?.id ?? ''} onOpenTask={peekTask} machineName={boot?.machineName ?? null}
+          <CodingThread onOpenDoc={openDocTab} threadId={openThreadId} thread={openThreadRow} back={sessionBack} channelSlug={current?.slug ?? ''} channelId={current?.id ?? ''} onOpenTask={peekTask} machineName={boot?.machineName ?? null}
             // the code face is the coding thread's own tabs in the side panel (the side-panel round)
             codeSlot={panelCodeSlot} codeTab={panelSession.kind === 'coding' ? sessionTabKeyOf(front) as EngineeringWorkspaceTab | null : null} onCodeTab={onCodeTab} onCodeCounts={setCodeCounts}
             crumbProject={(() => { const p = wsProjects.find((x) => x.id === (currentLive?.project_id ?? activeProject)); return p ? { name: p.name, logo_url: p.logo_url } : null; })()}
             repos={meta.reposAll.length ? meta.reposAll : meta.repos} projects={wsProjects} projectId={currentLive?.project_id ?? activeProject ?? null} workspaceId={boot?.workspaceId ?? 'workspace'}
             onReposChanged={() => { if (current && nm) void nm.channelMeta(current.id).then((r) => setMeta({ projects: r?.projects ?? [], repos: r?.repos ?? [], reposAll: r?.reposAll ?? [] })).catch(() => {}); }}
-            codeSession={codeSessionsAll.find((c) => c.thread_id === openThreadId || c.id === openThreadId) ?? null} pickedRepoId={codingRepoPicks.get(openThreadId)?.repo ?? null} pickedModelId={codingRepoPicks.get(openThreadId)?.model ?? null} marks={headMarks}
+            codeSession={codeSessionsAll.find((c) => c.thread_id === openThreadId || c.id === openThreadId) ?? null} pickedRepoId={codingRepoPicks.get(openThreadId)?.repo ?? null} pickedSelection={codingRepoPicks.get(openThreadId)?.selection} marks={headMarks}
             machineChip={(value, onPick, disabled) => <MachineChip machines={roster.machines} members={members} selfUserId={meId} selfMachineName={boot?.machineName ?? null} origin={sessionOrigin} value={value} onPick={onPick} cloud={computeState} disabled={disabled} />}
             defaultMachineId={sessionDesignation(null)} plan={plan} onUpgrade={openUpgrade} onClose={closeConvo} agents={roster.agents} decisions={decisionsAll.filter((d) => !d.task_id && d.channel_id === current?.id)} />
           </div>
@@ -3986,7 +4007,7 @@ export function App() {
       {openThreadId && !openTask && !openCodingThread && (
         <div className="sessionsurf">
           <div className="sscol">
-          <ConvoThread
+          <ConvoThread key={openThreadId}
             // a conversation's details go where a task's do: the side panel's Overview tab
             railSlot={panelSlot} detailsShown={detailsShown} onDetails={showDetails} onArrive={onArrive}
             drafts={draftsDoor}
@@ -4055,7 +4076,7 @@ export function App() {
       {openTask && (
         <div className="sessionsurf">
         <div className="sscol">
-        <TaskThread
+        <TaskThread key={openTask.id}
           // the details render in the side panel's Overview tab, and only there (the side-panel
           // round, 2026-10-03): one panel at one edge with one door
           railSlot={panelSlot} detailsShown={detailsShown} onDetails={showDetails} onArrive={onArrive}
@@ -4223,6 +4244,7 @@ export function App() {
         ))}
         </SidePanel>
       )}
+      </ThreadOverviewEnvironment.Provider>
       </PanelShownContext.Provider>
       </div>
       {cmdkOpen && <CmdKPalette items={buildCmdkItems()} onClose={() => setCmdkOpen(false)} />}

@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { applyRemoteEngineeringEvent, beginRemoteEngineeringPrompt, createEngineeringSession } from '@neuramesh/shared';
-import { transcriptMessages } from './CodingTranscript';
+import { transcriptMessages } from './coding-transcript';
 
 const repo = { id: 'r1', name: 'app', owner: 'acme', branch: 'main', root: null };
 const asked = beginRemoteEngineeringPrompt(createEngineeringSession(repo), 'Fix the login');

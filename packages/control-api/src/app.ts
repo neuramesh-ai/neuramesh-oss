@@ -27,7 +27,11 @@ import { ActorSchema, CommandSchema } from './commands';
 import { DomainError } from './errors';
 import { exportRoutes } from './export';
 import { importRoutes } from './import';
-import { contentMediaRoute } from './content-media-route';
+import { contentMediaRoute, publicContentMediaRoute } from './content-media-route';
+import { brainRoutes } from './brain-routes';
+import { BrainError } from './brain-store';
+import { taskDetailRoute } from './store/artifact-content';
+import { localSyncRoutes } from './local-sync';
 import { webFrameRoute } from './web-frame';
 import { filmsCronRoute, starterVideoRoutes } from './starter-video';
 import { executeCommand } from './handler';
@@ -131,13 +135,14 @@ const webOrigin = (origin: string): string | null =>
   origin === 'https://neuramesh.app' || origin === 'https://www.neuramesh.app'
   || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin) ? origin : null;
 
-export function createApp(store: Store, opts: { push?: PushService; announce?: Parameters<typeof announceRoutes>[2]; starterVideo?: Parameters<typeof starterVideoRoutes>[2] } = {}) {
+export function createApp(store: Store, opts: { push?: PushService; announce?: Parameters<typeof announceRoutes>[2]; starterVideo?: Parameters<typeof starterVideoRoutes>[2]; brain?: Parameters<typeof brainRoutes>[2] } = {}) {
   const app = new Hono<Env>();
 
   // errors NEVER leave as text/html: clients parse JSON envelopes. P0001 is
   // the DB state-guard raising (defense-in-depth, e.g. an app/schema version
   // skew) — same 409 contract as the app-level FSM verdict.
   app.onError((err, c) => {
+    if (err instanceof BrainError) return c.json({ error: err.message, code: err.code }, err.status);
     const pgCode = (err as { code?: string }).code;
     if (pgCode === 'P0001') {
       return c.json({ error: err.message, code: 'ILLEGAL_TRANSITION' }, 409);
@@ -188,6 +193,7 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
   // runs middleware in declaration order, a `use` below a handler never fires for it, and an
   // OPTIONS carries no bearer, so the guard would answer it 401 before cors could.
   for (const path of ['/invites/*', '/auth/clerk', '/v1/workspaces', '/v1/billing/*', '/v1/announce/*']) app.use(path, cors({ origin: webOrigin, allowMethods: ['GET', 'POST', 'OPTIONS'], allowHeaders: ['authorization', 'content-type'] }));
+  app.use('/v1/brain/*', cors({ origin: (origin) => origin === 'https://hq.neuramesh.app' ? origin : webOrigin(origin), allowMethods: ['GET', 'POST', 'OPTIONS'], allowHeaders: ['authorization', 'content-type', 'x-nm-actor'], exposeHeaders: ['etag', 'content-disposition'] }));
   app.post('/auth/clerk', async (c) => {
     const body = (await c.req.json().catch(() => ({}))) as { token?: string };
     const token = body.token ?? c.req.header('authorization')?.replace(/^Bearer\s+/i, '');
@@ -425,19 +431,7 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
   // stream the draft's real image through. mediaSig gates it per-item — without the
   // connector key the URL is unforgeable, so this is not an open proxy. Image-only,
   // size-capped, and public hosts only (no loopback/private targets).
-  // The draft's own hosted image (0090). PUBLIC by necessity — Instagram publishes by handing
-  // Meta a URL that META fetches, so this route can carry no session. It is gated instead by the
-  // per-media HMAC (unforgeable without NM_CONNECTOR_KEY) and serves nothing but image bytes.
-  app.get('/media/:id', async (c) => {
-    const mediaId = c.req.param('id');
-    const sig = c.req.query('s') ?? '';
-    if (!process.env['NM_CONNECTOR_KEY'] || !verifyMediaSig(mediaId, sig)) return c.text('forbidden', 403);
-    const media = await store.contentMediaBytes(mediaId);
-    if (!media) return c.text('not found', 404);
-    return new Response(new Uint8Array(media.bytes), {
-      headers: { 'content-type': media.mime, 'content-length': String(media.bytes.length), 'cache-control': 'public, max-age=300' },
-    });
-  });
+  publicContentMediaRoute(app, store);
 
   app.get('/connect/tiktok/media/:item', async (c) => {
     const itemId = c.req.param('item');
@@ -564,6 +558,8 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
   importRoutes(app, store); // POST /v1/workspaces/:id/import/batches, owner only, cloud target only (import.ts)
   announceClaimRoute(app, store, opts.announce); // POST /v1/announce/:id/claim — the signed-in save, plus the GitHub connector's /v1 lane (announce.ts → github-connect.ts)
   contentMediaRoute(app, store); // GET /v1/content/media/:id — a draft's film or picture for the card, members only
+  brainRoutes(app, store, opts.brain);
+  localSyncRoutes(app, store);
   webFrameRoute(app); // GET /v1/web/frame: may the web client frame this page? (web-frame.ts)
   starterVideoRoutes(app, store, opts.starterVideo); // GET /v1/starter/video + POST /v1/starter/film — the video rung on credits (starter-video.ts)
 
@@ -1003,13 +999,7 @@ export function createApp(store: Store, opts: { push?: PushService; announce?: P
     return c.json({ hits, ms: Math.round(performance.now() - t0) });
   });
 
-  app.get('/v1/tasks/:id', async (c) => {
-    const task = await store.getTask(c.req.param('id'));
-    if (!task) return c.json({ error: 'not found', code: 'NOT_FOUND' }, 404);
-    const events = await store.listEvents(`task:${task.number}`);
-    const artifacts = await store.listArtifacts(task.id);
-    return c.json({ task, events, artifacts });
-  });
+  taskDetailRoute(app, store);
 
   return app;
 }

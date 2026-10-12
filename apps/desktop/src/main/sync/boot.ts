@@ -1,3 +1,7 @@
+import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
+import { LocalReplica } from './local-replica';
+import { apiBearerHeader } from '../apiauth';
+import type { UploadIdentity } from '@neuramesh/client-core/crud-upload';
 // THE REPLICA'S BOOT, per connection: open the replica, resolve the workspace, connect the
 // stream, register this machine, start the agent host, arm the watches. Linear and ordered, and
 // it must READ that way — moving a step past an await is how a whole layer once silently never
@@ -17,7 +21,7 @@ import { membershipChanged, parseWorkspaceIdent, pickBootWorkspace, shouldWipeRe
 import { ApiError, actorId, apiOn } from '../sync';
 import { Connector } from './connector';
 import { registerThisMachine } from './machine';
-import { AppSchema } from '@neuramesh/client-core/schema';
+import { connectLocalReplica, powerSyncReplica } from './local-upgrade';
 import { backfillSeeds } from './seeds';
 
 export interface BootDeps {
@@ -90,7 +94,15 @@ export async function connectStream(conn: Connection): Promise<void> {
   }
   // a resolved EMPTY list is authoritative too (onboarding) — but there is no workspace to stamp
   if (conn.wsAuthoritative && conn.ws) writeWorkspaceMarker(conn);
-  await target.connect(new Connector(conn, actorId), { connectionMethod: SyncStreamConnectionMethod.HTTP });
+  if (target instanceof LocalReplica) {
+    const identity = async (): Promise<UploadIdentity> => ({
+      apiUrl: conn.apiUrl, workspaceFallback: conn.ws, defaultActor: { kind: 'human', id: actorId(conn) },
+      authHeaders: await apiBearerHeader(conn.apiUrl),
+    });
+    await connectLocalReplica(target, conn.replicaPath, conn.apiUrl, identity);
+  } else if (target instanceof PowerSyncDatabase) {
+    await target.connect(new Connector(conn, actorId), { connectionMethod: SyncStreamConnectionMethod.HTTP });
+  } else throw new Error('Unknown replica transport');
 }
 
 // Re-resolve the active workspace and reconnect — for when a workspace appears or changes AFTER
@@ -122,14 +134,13 @@ export async function resyncWorkspace(conn: Connection): Promise<void> {
 /** open the connection's replica — CREATE the directory first: neither better-sqlite3 nor PowerSync
  *  will mkdir for you, and a throw here before the IPC wall registers is a HANG behind the splash,
  *  not an error (2026-08-01). */
-export function openReplica(conn: Connection): PowerSyncDatabase {
+export function openReplica(conn: Connection): ReplicaDatabase {
   mkdirSync(dirname(conn.replicaPath), { recursive: true });
-  const db = new PowerSyncDatabase({
-    schema: AppSchema,
-    // better-sqlite3 (electron-rebuilt): the node:sqlite implementation wedges
-    // checkpoint application after the first upload (probe-isolated 2026-06-11).
-    database: { dbFilename: conn.replicaPath.split('/').pop()!, dbLocation: conn.replicaPath.slice(0, conn.replicaPath.lastIndexOf('/')) },
-  });
+  // Local connections use the repository-owned sync protocol. A separate file preserves
+  // the existing PowerSync cache and queue for rollback. Never reinterpret SDK internal tables.
+  const useLocalSync = conn.authMode === 'local' || (conn.authMode === 'dev' && process.env['NM_LOCAL_SYNC'] === '1');
+  const db = useLocalSync ? new LocalReplica(`${conn.replicaPath}.local.sqlite`) : powerSyncReplica(conn.replicaPath);
+  if (db instanceof LocalReplica) db.adoptPowerSyncCache(conn.replicaPath);
   conn.db = db;
   // the registry's list did not change, its SHAPE did: the rail's union (watch-rail.ts) has
   // nothing to read on this connection until now
@@ -137,7 +148,8 @@ export function openReplica(conn: Connection): PowerSyncDatabase {
   return db;
 }
 
-function startHost(conn: Connection, db: PowerSyncDatabase, machineId: string, deps: BootDeps): void {
+
+function startHost(conn: Connection, db: ReplicaDatabase, machineId: string, deps: BootDeps): void {
   startAgentHost({ db, machineId, workspace: conn.ws, apiUrl: conn.apiUrl, ownerActorId: actorId(conn), agentLog: deps.agentLog, killTaskPtys: deps.killTaskPtys });
   conn.agentHostStarted = true;
 }
@@ -145,7 +157,7 @@ function startHost(conn: Connection, db: PowerSyncDatabase, machineId: string, d
 // Resolution FAILURE is not a license to do anything destructive: keep the marker identity
 // (cached data stays readable offline), retry in the background, and only a definitive 401 sends
 // the user back to sign-in.
-async function lateResolveWorkspace(conn: Connection, db: PowerSyncDatabase, deps: BootDeps): Promise<void> {
+async function lateResolveWorkspace(conn: Connection, db: ReplicaDatabase, deps: BootDeps): Promise<void> {
   for (let delay = 5_000; !conn.wsAuthoritative; delay = Math.min(delay * 2, 60_000)) {
     await new Promise((r) => setTimeout(r, delay));
     if (conn.wsAuthoritative) return; // a login/onboard resolved it meanwhile
@@ -182,7 +194,7 @@ async function lateResolveWorkspace(conn: Connection, db: PowerSyncDatabase, dep
 }
 
 /** which workspace this connection stands in — the dev pin, or the signed-in identity's list */
-async function resolveWorkspace(conn: Connection, db: PowerSyncDatabase, deps: BootDeps): Promise<'ok' | 'dead'> {
+async function resolveWorkspace(conn: Connection, db: ReplicaDatabase, deps: BootDeps): Promise<'ok' | 'dead'> {
   // The dev stack resolves too (0113). It used to hard-pin DEV_WS and skip every path below,
   // which meant the local stack could not exercise multi-workspace membership AT ALL — no
   // switcher, no boot pick, no way to dogfood the thing we just built (CLAUDE.md: this repo is
@@ -219,6 +231,7 @@ async function resolveWorkspace(conn: Connection, db: PowerSyncDatabase, deps: B
   conn.ws = pick.ws;
   conn.wsInfo = pick.info;
   conn.needsOnboarding = pick.needsOnboarding;
+  conn.resumeWorkspaceId = pick.resumeWorkspaceId;
   conn.wsAuthoritative = pick.authoritative;
   // BEFORE the wizard can claim the screen (0113). An invited newcomer has zero memberships,
   // which is exactly the onboarding signal — so without this check the wizard walks someone
@@ -231,7 +244,7 @@ async function resolveWorkspace(conn: Connection, db: PowerSyncDatabase, deps: B
 }
 
 /** the hourly-rotation reconnector and the membership watch — the two timers a cloud stream needs */
-function armCloudWatches(conn: Connection, db: PowerSyncDatabase): void {
+function armCloudWatches(conn: Connection): void {
   if (conn.authMode !== 'supabase' && conn.authMode !== 'clerk') return;
   // ── membership watch (2026-08-13) ──────────────────────────────────────────────────────────
   // PowerSync fixes a connection's buckets at connect time from `my_workspaces`, so a workspace
@@ -266,7 +279,7 @@ function armCloudWatches(conn: Connection, db: PowerSyncDatabase): void {
     const window = conn.authMode === 'clerk' ? 120_000 : 240_000;
     if (exp && exp - Date.now() < window) {
       console.log('sync_reconnect: token nearing expiry — re-establishing stream');
-      db.connect(new Connector(conn, actorId), { connectionMethod: SyncStreamConnectionMethod.HTTP }).catch((err) => console.error('sync_reconnect failed:', err));
+      connectStream(conn).catch((err) => console.error('sync_reconnect failed:', err));
     }
   }, 60_000);
   reconnector.unref?.();
@@ -274,7 +287,7 @@ function armCloudWatches(conn: Connection, db: PowerSyncDatabase): void {
 
 /** desktop push notifications for this connection: ping the human when something needs them and
  *  the app is unfocused — click deep-links back in. Every connection rings its own bell. */
-function armNotifications(db: PowerSyncDatabase): void {
+function armNotifications(db: ReplicaDatabase): void {
   const mainWin = () => BrowserWindow.getAllWindows().find((w) => !w.isDestroyed());
   startNotifications(db, {
     supported: () => Notification.isSupported(),
@@ -324,7 +337,7 @@ export async function bootConnection(conn: Connection, deps: BootDeps): Promise<
       }
     },
   });
-  armCloudWatches(conn, db);
+  armCloudWatches(conn);
   // presence v0: this machine registers itself and heartbeats (docs/03 §4); the AgentHost starts
   // once the machine id is known. A workspace still to be created means the wizard runs first.
   if (process.env['NM_FORCE_ONBOARDING'] === '1') { conn.needsOnboarding = true; return; }

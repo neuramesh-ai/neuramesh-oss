@@ -63,21 +63,36 @@ export async function threadIdFor(sql: postgres.Sql, workspaceId: string, id: st
   return row?.id ?? null;
 }
 
-export async function insertCodeSession(sql: postgres.Sql, input: { id: string; workspaceId: string; createdBy: string } & CodeSessionPatch, event: NMEvent): Promise<void> {
+export async function insertCodeSession(sql: postgres.Sql, input: { id: string; workspaceId: string; createdBy: string } & CodeSessionPatch, event: NMEvent): Promise<boolean> {
   const cols = columnsOf(input);
-  await sql.begin(async (tx) => {
-    await tx`insert into code_sessions ${tx({ id: input.id, workspace_id: input.workspaceId, created_by: input.createdBy, ...cols })}`;
+  return sql.begin(async (tx) => {
+    const inserted = await tx`insert into code_sessions ${tx({ id: input.id, workspace_id: input.workspaceId, created_by: input.createdBy, ...cols })}
+      on conflict (id) do nothing returning id`;
+    if (!inserted.length) return false;
     await tx`insert into events (id, workspace_id, type, source, target, payload, in_reply_to)
       values (${event.id}, ${event.workspace}::uuid, ${event.type}, ${event.source}, ${event.target}, ${tx.json(event.payload as never)}, ${event.in_reply_to})`;
+    return true;
   });
 }
 
 export async function patchCodeSession(sql: postgres.Sql, id: string, patch: CodeSessionPatch, ended: boolean, event?: NMEvent): Promise<void> {
   const cols = columnsOf(patch);
   await sql.begin(async (tx) => {
+    // A reconnecting host's prompt-derived fallback must not replace a deliberate title.
+    // All paths take the thread lock before the Code row, including settlement updates below.
+    // This matches the human/generated rename transaction and prevents a reverse-order deadlock.
+    const [thread] = await tx`select title, titled_at from threads where id = ${id}::uuid for update`;
+    if (patch.title !== undefined && thread?.['titled_at']) cols['title'] = thread['title'] as string;
     // a session that re-opens after a close is live again: a live upsert CLEARS ended_at (the phone
     // re-dials the lane it left, and a row that says both "streaming" and "ended" is two answers)
     await tx`update code_sessions set ${tx({ ...cols, updated_at: new Date().toISOString(), ended_at: ended ? new Date().toISOString() : null })} where id = ${id}::uuid`;
+    // Opening or closing the connection also touches updated_at. Only a real prompt/reply
+    // (lastLine) or a fresh approval reopens a manually settled coding conversation.
+    if (patch.lastLine !== undefined || patch.state === 'awaiting_approval') {
+      await tx`update threads t set settled_at = null from code_sessions c
+        where c.id = ${id}::uuid and t.id = c.thread_id and t.workspace_id = c.workspace_id
+          and t.settled_at is not null`;
+    }
     if (event) {
       await tx`insert into events (id, workspace_id, type, source, target, payload, in_reply_to)
         values (${event.id}, ${event.workspace}::uuid, ${event.type}, ${event.source}, ${event.target}, ${tx.json(event.payload as never)}, ${event.in_reply_to})`;

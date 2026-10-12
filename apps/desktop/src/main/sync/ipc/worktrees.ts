@@ -5,7 +5,7 @@
 import { ipcMain } from 'electron';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import type { PowerSyncDatabase } from '@powersync/node';
+import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 import { executing, withRepoLock } from '../../agents';
 import { appendFootprintHistory, assembleFootprint, fleetLocations, scanFleet, type FootprintDbRows } from '../../footprint';
 import { brainRoot, cachePath, deliverablePath } from '../../harness/brain';
@@ -27,7 +27,7 @@ export type WorktreeRemoveReply =
   | { ok: false; code: 'WORKTREE_BUSY' | 'NOT_FOUND'; payload: WorktreesPayload };
 
 export interface WorktreesDeps {
-  db: () => PowerSyncDatabase;
+  db: () => ReplicaDatabase;
   /** the review shells, by subId (created by startSync) */
   ptys: Map<string, PtyTerm>;
   killTaskPtys: (taskNumber: number) => void;

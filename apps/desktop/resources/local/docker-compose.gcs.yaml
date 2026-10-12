@@ -1,0 +1,14 @@
+# Optional, explicit GCS storage. The desktop adds this override only when both fields exist
+# in the local .env file. Use ADC with bucket-scoped permissions. No gcloud binary runs here.
+services:
+  control-api:
+    environment:
+      NM_BRAIN_GCS_BUCKET: ${NM_BRAIN_GCS_BUCKET:?set NM_BRAIN_GCS_BUCKET to the private bucket name}
+      GOOGLE_APPLICATION_CREDENTIALS: /run/neuramesh/gcp-adc.json
+    volumes:
+      - type: bind
+        source: ${NM_BRAIN_ADC_FILE:?set NM_BRAIN_ADC_FILE to an absolute ADC file path}
+        target: /run/neuramesh/gcp-adc.json
+        read_only: true
+        bind:
+          create_host_path: false

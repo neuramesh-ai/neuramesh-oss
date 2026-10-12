@@ -1,3 +1,4 @@
+import { bindConversationCallback } from '../harness/brain-sync';
 // CHAT MODE (docs/34) — the turn an agent runs when the composer's Tasks toggle is OFF.
 //
 // Enforced twice, never by prompt: this registry has no create_task in it, and the server
@@ -31,9 +32,10 @@ import { makeChatSupport } from './chatsupport';
 import { makeChatTools } from './chattools';
 import { WEB_TOOL_NAMES } from '../runtime/nmtools-web';
 import { browserService } from '../browser/registry';
+import { conversationInput } from '../runtime/brain-recording';
 
 export function makeChatTurn(ctx: HostCtx & {
-  db: import('@powersync/node').PowerSyncDatabase;
+  db: import('@neuramesh/client-core/replica').ReplicaDatabase;
   agents: Map<string, HostedAgent>;
   apiGet: (path: string, actor: { kind: string; id: string; role?: string }) => Promise<any>;
   discoverSkills: (channelId: string, workspaceId: string) => Promise<SkillRef[]>;
@@ -118,7 +120,7 @@ async function chatTurn(args: {
   const text = (t: string) => ({ content: [{ type: 'text' as const, text: t }] });
 
   // The conversation registry (host/chattools.ts) — turn-scoped, so it takes the turn.
-  const nm = makeChatTools({ z, tool, createSdkMcpServer, text, agent, ch, threadId, log,
+  const nm = makeChatTools({ z, tool: (name, description, shape, handler, extras) => tool(name, description, shape, bindConversationCallback(handler), extras), createSdkMcpServer, text, agent, ch, threadId, log,
     db, post, apiGet, recallFor, loadSkillBody, whiteboardClosures, draftsForAnchor, generateDraftImage, generateShareImage, libraryDocs });
 
   const jail = sandboxFsEnabled()
@@ -131,7 +133,7 @@ async function chatTurn(args: {
 
   const reply = await drainQuery(
     query({
-      prompt: claudeAgentPrompt(transcript, attachments),
+      prompt: claudeAgentPrompt(conversationInput('claude', agent.model, system + skillsNote, transcript, token), attachments),
       options: {
         ...claudePathOption(),
         ...jail,

@@ -28,7 +28,7 @@ import { type LogFn } from '../agentlog';
 
 import type { HostCtx } from './ctx';
 import type { ShipTask } from './flows';
-import type { PowerSyncDatabase } from '@powersync/node';
+import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 import type { Brain } from '../harness/brain';
 import type { AgentAttachment } from '../runtime/adapter';
 import type { HostQueue } from '../harness/hostqueue';
@@ -40,7 +40,7 @@ import type { makePark } from './park';
 import type { RepoCred } from './repocred';
 
 export function makeReleaseDocs(ctx: HostCtx & {
-  db: PowerSyncDatabase;
+  db: ReplicaDatabase;
   apiUrl: string;
   workspace: string;
   ownerActorId: string;

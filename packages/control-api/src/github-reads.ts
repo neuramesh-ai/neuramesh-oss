@@ -44,6 +44,43 @@ export async function readRepoFile(slug: string, path: string, ref: string | nul
   return { path: p, ref, size, sha: b.sha ?? '', content: text.length > FILE_TEXT_CAP ? text.slice(0, FILE_TEXT_CAP) : text, truncated: text.length > FILE_TEXT_CAP };
 }
 
+/** an app screenshot may weigh this much in the repository; the shelf copy is shrunk to fit (shelf-image.ts) */
+export const IMAGE_SIZE_CAP = 8_000_000;
+export interface RepoImage { path: string; sha: string; size: number; mime: 'image/png' | 'image/jpeg' | 'image/webp'; bytes: Uint8Array }
+/** the format by the file's own first bytes, never by its name: a renamed text file is not an image */
+export function sniffShot(b: Uint8Array): RepoImage['mime'] | null {
+  if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return 'image/png';
+  if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'image/jpeg';
+  if (String.fromCharCode(...b.subarray(0, 4)) === 'RIFF' && String.fromCharCode(...b.subarray(8, 12)) === 'WEBP') return 'image/webp';
+  return null;
+}
+
+/** one image file of the repository, as bytes (George, 2026-10-06: an app screenshot from the code).
+ *  Up to 1 MB the contents API carries it; past that, the Git blob by its sha (to IMAGE_SIZE_CAP). */
+export async function readRepoImage(slug: string, path: string, opts: GitHubOpts): Promise<RepoImage> {
+  const p = cleanPath(path);
+  if (!p) throw new GitHubApiError('name an image file path', 400);
+  const r = await githubGet(`/repos/${slug}/contents/${p.split('/').map(encodeURIComponent).join('/')}`, opts);
+  if (r.status === 404) throw new GitHubApiError(`no file at ${p}`, 404);
+  if (r.status < 200 || r.status >= 300) throw new GitHubApiError(`GitHub answered ${r.status} for ${p}`, r.status);
+  if (Array.isArray(r.json)) throw new GitHubApiError(`${p} is a directory: list it with the tree read`, 400);
+  const b = r.json as { type?: string; size?: number; sha?: string; content?: string; encoding?: string };
+  if (b.type !== 'file' || !b.sha) throw new GitHubApiError(`${p} is a ${b.type ?? 'link'}, not a file`, 400);
+  const size = b.size ?? 0;
+  if (size > IMAGE_SIZE_CAP) throw new GitHubApiError(`${p} is larger than ${IMAGE_SIZE_CAP / 1e6} MB: pick a smaller screenshot`, 413);
+  let base64 = b.encoding === 'base64' && b.content ? b.content : null;
+  if (!base64) {
+    const blob = await githubGet(`/repos/${slug}/git/blobs/${b.sha}`, opts);
+    const bb = blob.json as { content?: string; encoding?: string } | null;
+    if (blob.status < 200 || blob.status >= 300 || bb?.encoding !== 'base64' || !bb.content) throw new GitHubApiError(`GitHub answered ${blob.status} for the blob of ${p}`, blob.status >= 400 ? blob.status : 502);
+    base64 = bb.content;
+  }
+  const bytes = new Uint8Array(Buffer.from(base64.replace(/\n/g, ''), 'base64'));
+  const mime = sniffShot(bytes);
+  if (!mime) throw new GitHubApiError(`${p} is not a PNG, JPEG or WebP image`, 415);
+  return { path: p, sha: b.sha, size: bytes.length, mime, bytes };
+}
+
 /** the tree under `path` (the whole repository when empty), one recursive read, capped */
 export async function readRepoTree(slug: string, path: string | null, ref: string | null, opts: GitHubOpts): Promise<RepoTree> {
   const p = cleanPath(path);

@@ -11,6 +11,7 @@ import { useRef, useState } from 'react';
 
 import { activateTab, closeTab, migrateDockTabs, openTab, reviveTabs, serializeTabs, setMode, type WTab, type WTabMode } from '../wtabs';
 import { ownerSlot } from '../shell/panel-state';
+import { tabOwner } from './tab-owner';
 import type { WDoc } from './filetree';
 import type { RepoUI } from '../bridge/rows-board';
 import type { ReviewComment, ReviewMode } from '../review-types';
@@ -22,7 +23,8 @@ import type { ReviewEntry } from '../review-round';
  * panel opened it by itself (shell/arrivals.ts), not your click. `retitle`: a tab that is already
  * open takes the new title (a review family's tab names the version on stage).
  */
-export type OpenHow = { behind?: boolean; auto?: boolean; retitle?: boolean };
+/** `owner`: the session that asked, captured before a slow load (tab-owner.ts) */
+export type OpenHow = { behind?: boolean; auto?: boolean; retitle?: boolean; owner?: string | null };
 
 export function useWorkspaceTabs(meta: { repos: RepoUI[] }, ownerRef: { readonly current: string | null }) {
   const [wtabs, setWtabs] = useState<WTab[]>(() => {
@@ -76,7 +78,7 @@ export function useWorkspaceTabs(meta: { repos: RepoUI[] }, ownerRef: { readonly
   // second copy of that rule — it is a fact about where the bytes live.
   const persistW = (next: WTab[]) => { try { localStorage.setItem('nm:workspaceTabs', JSON.stringify(serializeTabs(next.filter((t) => !t.artifactId)))); } catch { /* private */ } };
   const openWTab = (spec: WTab, doc?: WDoc, how: OpenHow = {}) => setWtabs((prev) => {
-    const tagged: WTab = { ...spec, owner: spec.owner !== undefined ? spec.owner : ownerRef.current, ...(how.behind ? { fresh: true } : {}) };
+    const tagged: WTab = { ...spec, owner: tabOwner(spec, how.owner, ownerRef.current), ...(how.behind ? { fresh: true } : {}) };
     const r = openTab(prev, tagged);
     if (doc && r.activeId) setWdocs((d) => ({ ...d, [r.activeId!]: doc }));
     // in front, unless it arrived behind: then the session keeps its front and the tab wears a dot

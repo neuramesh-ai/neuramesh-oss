@@ -2,8 +2,9 @@
 import { AgentAvatar, ProjLogo } from '../components/AgentAvatar';
 import { AttachButton, AttachTray, consumeWbAttach, useAttachments } from '../composer/attach';
 import { BrainChip } from '../brain/BrainChip';
-import { CodeModelChip } from '../models/CodeModelChip';
-import { ComposerInput } from '../composer/ComposerInput';
+import { CodingBrains } from '../models/CodingBrains';
+import type { EngineeringSelection } from '@neuramesh/shared';
+import { SessionComposer } from '../composer/SessionComposer';
 import { ConnectorMarks } from '../composer/ConnectorMarks';
 import { HomeLedger, type HomeLedgerProps } from './HomeLedger';
 import { HomeWatermark } from '../brand';
@@ -106,7 +107,7 @@ export function NewChatStage({ agents, projects, activeProjectId, channels, defa
    * same rows and marks the rail, the bell and ⌘Y read; absent on a client that has no history yet */
   ledger?: HomeLedgerProps;
   /** the repo chip (coding threads, 0144 — door 1): the repositories, the pick a door pre-sets ('primary' = the room's primary repo, the Code rail's New session), the connect door, and the birth the shell remembers */
-  repos?: RepoUI[]; initialRepo?: string | null; onConnectRepo?: () => void; onCodingBirth?: (threadId: string, repoId: string, modelId: string | null) => void;
+  repos?: RepoUI[]; initialRepo?: string | null; onConnectRepo?: () => void; onCodingBirth?: (threadId: string, repoId: string, selection: EngineeringSelection) => void;
 }) {
   // no machine can run, so the stage shows WHY instead of a composer that cannot deliver
   const capped = useCompute(true)?.status === 'capped';
@@ -128,7 +129,7 @@ export function NewChatStage({ agents, projects, activeProjectId, channels, defa
   const [projPop, setProjPop] = useState(false);
   const [machine, setMachine] = useState<string | null>(null); // the chip's choice for the NEXT send; null = Auto
   const [repo, setRepo] = useState<string | null>(null); // the repo chip's pick (0144): set, the send births a CODING thread
-  const [codeModel, setCodeModel] = useState<string | null>(null); // the Code chip's pick for that thread: null runs the NeuraMesh brain
+  const [codeSelection, setCodeSelection] = useState<EngineeringSelection>({ agentId: null, modelId: null, reasoningEffort: null }); // the Code chip's pick for that thread: null runs the NeuraMesh brain
   const [attachedSkill, setAttachedSkill] = useState<{ name: string; pack?: string | null } | null>(null);
   const [cmention, setCmention] = useState(0); // nonce → the @ button types "@" + opens the picker
   const [hfocus, setHfocus] = useState(0); // nonce → focuses the composer (the hint's @name insert)
@@ -148,8 +149,8 @@ export function NewChatStage({ agents, projects, activeProjectId, channels, defa
       // and the docs/34 mode + the pill's brain draft ride the birth message — this send BIRTHS
       // the conversation, so what the pill was showing is what the conversation starts on
       await onSend(targetChan.id, marker + consumeWbAttach(text), { id: msgId, attachments: attSpecs, threadId, rootMessageId: msgId, brainOverride: readBrainDraft(), ...sessionBirth?.(machine), ...(repo ? { threadKind: 'coding' as const } : {}) });
-      if (repo) onCodingBirth?.(threadId, repo, codeModel);
-      setDraft(''); setMachine(null); setRepo(null); setCodeModel(null); setAttachedSkill(null); atts.reset();
+      if (repo) onCodingBirth?.(threadId, repo, codeSelection);
+      setDraft(''); setMachine(null); setRepo(null); setCodeSelection({ agentId: null, modelId: null, reasoningEffort: null }); setAttachedSkill(null); atts.reset();
       // the send animates into its thread — the TARGET room rides along (docs/32)
       onOpenThread(threadId, targetChan.id);
     } catch (e) { flashToast(errMsg(e)); }
@@ -232,7 +233,7 @@ export function NewChatStage({ agents, projects, activeProjectId, channels, defa
             </div>
           )}
           <AttachTray items={atts.items} onRemove={atts.remove} />
-          <ComposerInput
+          <SessionComposer rowClass="hrow" input={<SessionComposer.Input
             value={draft}
             onChange={setDraft}
             onSend={() => void sendDraft()}
@@ -247,8 +248,7 @@ export function NewChatStage({ agents, projects, activeProjectId, channels, defa
             placeholder={repo ? 'Describe what to investigate or change in the repository.' : 'Describe the work, or just ask. Use @ to mention an agent or a user, and / for skills.'}
             mentionSignal={cmention}
             focusSignal={hfocus}
-          />
-          <div className="hrow">
+          />} controls={<>
             {/* the chip menu anchors to ITS OWN chip (2026-08-07) — the wrapper is the context.
                 No project chip in this row: the headline carries that fact now. */}
             <span className="chipmenu">
@@ -270,7 +270,7 @@ export function NewChatStage({ agents, projects, activeProjectId, channels, defa
             </span>
             {machineChip?.(machine, setMachine)}
             <RepoChip repos={repos} projectId={targetChan?.project_id ?? null} value={repo} onPick={setRepo} onConnect={onConnectRepo} /> {/* the fourth knob (0144): a repository makes the send a coding conversation */}
-            {repo ? <CodeModelChip pick={codeModel} machineId={sessionBirth?.(machine).threadMachineId ?? machine} place="start" onPick={setCodeModel} /> /* a repository's session runs the coding runtime: the Code chip picks its model */
+            {repo ? <CodingBrains selection={codeSelection} onChange={setCodeSelection} machineId={sessionBirth?.(machine).threadMachineId ?? machine} roomId={targetChan?.id ?? null} roomSlug={targetChan?.slug ?? ''} disabled={sending} /> /* a repository's session runs the coding runtime: the Code chip picks its model */
               // else the SAME pill as the thread composer (docs/10 §15): one switcher, every surface
               : <BrainChip onConnect={onBrainConnect} onSetProjectPack={onSetProjectPack}
                 project={ap ? { id: ap.id, name: ap.name, pack: ap.model_pack ?? null } : null}
@@ -281,7 +281,7 @@ export function NewChatStage({ agents, projects, activeProjectId, channels, defa
             <button className="hsend" disabled={sending || atts.busy || (!draft.trim() && !atts.count) || !targetChan} onClick={() => void sendDraft()} data-tip="Send · ↵" aria-label={atts.busy ? 'Uploading attachments' : 'Send'}>
               {sending || atts.busy ? '…' : <IconSend s={20} />}
             </button>
-          </div>
+          </>} />
           {/* THE FOOT (docs/design/composer-foot-2026-09, 2026-09-11): the cap's material mirrored at
               the bottom of the same card — one object, three zones. Left, the ghost recipe: a pill is
               a PRE-DRAFTED MESSAGE, never a command (the rex-pills ruling), so clicking fills the

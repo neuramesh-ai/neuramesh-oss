@@ -8,7 +8,7 @@
 //   · update as the creator, or as the owner of the hosting machine
 //
 // SQL rides sqlOf(store) (code-sessions.ts), so the Store contract grows no delegates.
-import { createEvent, formatAddress, type Actor } from '@neuramesh/shared';
+import { createEvent, formatAddress, plainTitle, type Actor } from '@neuramesh/shared';
 import type { Command } from '../commands';
 import { insertCodeSession, machineOwnerIn, patchCodeSession, readCodeSession, threadIdFor, type CodeSessionHead } from '../code-sessions';
 import { actorInWorkspace, sqlOf } from '../credits';
@@ -48,11 +48,15 @@ export async function codeSessionCommands(store: Store, actor: Actor, cmd: Comma
       }
       // 0144: a session whose id is a coding thread's id belongs to that thread — linked here, once
       const threadId = await threadIdFor(sql, workspace, codeSessionId);
-      await insertCodeSession(sql, { id: codeSessionId, workspaceId: workspace, createdBy, ...patch, ...(machineId !== undefined ? { machineId } : {}), ...(threadId ? { threadId } : {}) }, createEvent({
+      const inserted = await insertCodeSession(sql, { id: codeSessionId, workspaceId: workspace, createdBy, ...patch, ...(machineId !== undefined ? { machineId } : {}), ...(threadId ? { threadId } : {}) }, createEvent({
         type: 'code_session.created', source: actorAddress(actor), workspace,
         target: formatAddress({ kind: 'resource', type: 'code_session', id: codeSessionId }),
         payload: { createdBy, machineId, repoName: patch.repoName ?? null, branch: patch.branch ?? null },
       }));
+      // A prompt/state write can create the row before the opening metadata request lands.
+      // Re-read and authorize against the winner before applying this patch; never overwrite
+      // ownership or workspace through an unconditional ON CONFLICT update.
+      if (!inserted) return codeSessionCommands(store, actor, c);
       return { ok: true, codeSessionId, created: true } as never;
     }
     if (!mayWrite(existing)) throw new DomainError('NOT_PERMITTED', 'only the session\'s member or the hosting machine\'s owner may update it');
@@ -61,6 +65,18 @@ export async function codeSessionCommands(store: Store, actor: Actor, cmd: Comma
   }
   if (!existing) throw new DomainError('NOT_FOUND', 'no such Code session');
   if (!mayWrite(existing)) throw new DomainError('NOT_PERMITTED', 'only the session\'s member or the hosting machine\'s owner may update it');
+  if (c.type === 'code_session.name') {
+    const title = plainTitle(c.title);
+    if (!title) throw new DomainError('INVALID_INPUT', 'Supply a plain-text title.');
+    const [thread] = await sql`select id, title from threads where id = ${c.codeSessionId}::uuid
+      and workspace_id = ${c.workspace}::uuid and created_by = ${`human:${existing.createdBy}`}
+      and kind = 'coding' and task_id is null and schedule_id is null`;
+    if (!thread) throw new DomainError('NOT_FOUND', 'No matching durable coding thread exists.');
+    try { await store.updateThread(c.workspace, c.codeSessionId, { title }, { agentTitleOnce: true }); }
+    catch (error) { if (!(error instanceof DomainError) || error.code !== 'THREAD_ALREADY_TITLED') throw error; }
+    const [named] = await sql`select title from threads where id = ${c.codeSessionId}::uuid and workspace_id = ${c.workspace}::uuid`;
+    return { ok: true, codeSessionId: c.codeSessionId, title: named?.['title'] } as never;
+  }
   if (c.type === 'code_session.close') {
     const state = c.state ?? 'resumable';
     await patchCodeSession(sql, c.codeSessionId, { state, ...(c.lastLine !== undefined ? { lastLine: c.lastLine } : {}) }, true, createEvent({

@@ -76,3 +76,33 @@ test('quota pressure falls back to metadata while preserving every thread identi
   assert.deepEqual(restored.map(({ id, title }) => ({ id, title })), [{ id: 'one', title: 'Task one' }, { id: 'two', title: 'Task two' }]);
   assert.deepEqual(restored.map((session) => session.messages), [[], []]);
 });
+
+test('a stale window cannot remove another thread or overwrite its newer preview reply', () => {
+  const storage = new MemoryStorage();
+  const repo = { id: 'repo', name: 'app', owner: 'acme', branch: 'main', root: null };
+  const first = { ...createEngineeringSession(repo), id: 'first', updatedAt: '2026-10-10T10:00:00.000Z' };
+  persistEngineeringSessions('workspace-a', [first], storage);
+  const stale = loadEngineeringSessions('workspace-a', [], storage);
+  const preview = { ...createEngineeringSession(repo), id: 'preview', updatedAt: '2026-10-10T10:01:00.000Z', messages: [{ id: 'card', role: 'assistant' as const, createdAt: '2026-10-10T10:01:00.000Z', body: '```nmpreview\n{"url":"http://localhost:3000","title":"App"}\n```' }] };
+  persistEngineeringSessions('workspace-a', [first, preview], storage);
+  const newer = { ...first, title: 'Newer reply', updatedAt: '2026-10-10T10:02:00.000Z' };
+  persistEngineeringSessions('workspace-a', [newer, preview], storage);
+  persistEngineeringSessions('workspace-a', stale, storage);
+  const restored = loadEngineeringSessions('workspace-a', [], storage);
+  assert.equal(restored.find(s => s.id === 'first')?.title, 'Newer reply');
+  assert.equal(restored.find(s => s.id === 'preview')?.messages[0]?.body, preview.messages[0]?.body);
+  assert.equal(loadEngineeringSessions('workspace-b', [], storage).length, 0);
+});
+
+test('simultaneous saves acquire the same workspace lock before reading storage', async () => {
+  const { persistEngineeringSessionsLocked } = await import('./session-storage');
+  const storage = new MemoryStorage();
+  const keys: string[] = [];
+  let tail = Promise.resolve();
+  const locks = { request: (key: string, callback: () => unknown) => { keys.push(key); const result = tail.then(callback); tail = result.then(() => undefined); return result; } } as unknown as Pick<LockManager, 'request'>;
+  const repo = { id: 'r', name: 'app', owner: 'acme', branch: 'main', root: null };
+  const sessions = ['a', 'b'].map(id => ({ ...createEngineeringSession(repo), id }));
+  assert.deepEqual(await Promise.all(sessions.map(session => persistEngineeringSessionsLocked('w', [session], storage, locks))), ['full', 'full']);
+  assert.deepEqual(keys, [engineeringSessionStoreKey('w'), engineeringSessionStoreKey('w')]);
+  assert.deepEqual(loadEngineeringSessions('w', [], storage).map(s => s.id), ['a', 'b']);
+});

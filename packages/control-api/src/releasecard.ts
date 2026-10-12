@@ -18,7 +18,7 @@ export interface ReleaseCardInput { tag: string; title: string; product: string;
 interface ResvgModule {
   initWasm(input: Uint8Array | ArrayBuffer): Promise<void>;
   Resvg: new (svg: string, opts?: { font?: { fontBuffers: Uint8Array[]; defaultFontFamily?: string }; fitTo?: { mode: 'original' } }) => {
-    render(): { asPng(): Uint8Array; width: number; height: number; free(): void };
+    render(): { asPng(): Uint8Array; pixels: Uint8Array; width: number; height: number; free(): void };
     free(): void;
   };
 }

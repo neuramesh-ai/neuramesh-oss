@@ -14,6 +14,25 @@ const rex = agent('rex', 'orchestrator'); const patch = agent('patch', 'worker')
 const ROOM = [rex, patch, scout, iris];
 const DIVIDER = githubConnectedMarker('acme/app');
 const QUESTION = needDecisionQuestion({ channel: 'c1', ask: 'Read the PR', why: '', connect: ['github'] })!;
+
+test('an optimistic Local message cannot start a host action before its upload commits', async () => {
+  let release!: (synced: boolean) => void;
+  const committed = new Promise<boolean>((resolve) => { release = resolve; });
+  const processed = new Set<string>();
+  const actions: string[] = [];
+  const { handleFeedMessage } = makeWakeRouting({
+    db: { waitForRowSync: () => committed }, agents: new Map([['rex', rex]]), processed,
+    confirmAddAgent: async (_agent: unknown, _channel: string, name: string) => { actions.push(name); },
+  } as unknown as Parameters<typeof makeWakeRouting>[0]);
+  handleFeedMessage({ id: 'pending', channel_id: 'c1', author_kind: 'human', author_id: 'human', body: '**Add @patch to #c1?** → Add @patch' });
+  await Promise.resolve();
+  assert.deepEqual(actions, []);
+  assert.equal(processed.has('pending'), false);
+  release(true);
+  await Promise.resolve();
+  assert.deepEqual(actions, ['patch']);
+  assert.equal(processed.has('pending'), true);
+});
 /** a decision row as the server writes it for a card on task t1 */
 const card = (asker: string, status: string, answeredAt: string | null, question = QUESTION) =>
   `insert into decisions values ('d-${asker}-${status}', 't1', 'agent', '${asker}', '${question.replace(/'/g, "''")}', '${status}', ${answeredAt ? `'${answeredAt}'` : 'null'});`;

@@ -74,7 +74,8 @@ test('apply_patch rename destinations appear in the approval change list', () =>
   const session = applyRemoteEngineeringEvent(createEngineeringSession(repo), {
     type: 'approval', approvalId: 'move-1', category: 'edit', toolName: 'apply_patch', input: { input: patch },
   });
-  assert.deepEqual(session.pendingApproval?.changes?.map((change) => change.path), ['src/old.ts', 'src/new.ts']);
+  assert.deepEqual(session.pendingApproval?.changes?.map((change) => change.path), ['src/new.ts']);
+  assert.equal(session.pendingApproval?.changes?.[0]?.previousPath, 'src/old.ts');
 });
 
 test('ready and restore events retain actual model and checkpoint file state', () => {
@@ -195,7 +196,7 @@ test('redacted provider reasoning never exposes its payload', () => {
 
 test('a typed Plan-mode block offers Act continuation without a duplicate failure warning', () => {
   let session = beginRemoteEngineeringPrompt(createEngineeringSession(repo), 'Implement the plan');
-  session = applyRemoteEngineeringEvent(session, { type: 'mode_blocked', category: 'edit', toolName: 'apply_patch' });
+  session = applyRemoteEngineeringEvent(session, { type: 'mode_blocked', category: 'edit', toolName: 'apply_patch', input: { input: '*** Begin Patch\n*** Add File: src/new.ts\n+export const value = 1;\n*** End Patch' } });
   assert.equal(session.pendingModeHandoff?.category, 'edit');
   const before = session.messages.length;
   session = applyRemoteEngineeringEvent(session, { type: 'agent_event', event: { type: 'agent_event', payload: { event: {
@@ -229,38 +230,36 @@ test('Plan-ceiling failures never flash as errors when their receipt beats the h
   assert.equal(session.messages.length, before);
   assert.equal(session.state, 'streaming');
   session = applyRemoteEngineeringEvent(session, { type: 'mode_blocked', category: 'command', toolName: 'run_commands' });
-  assert.equal(session.pendingModeHandoff?.category, 'command');
+  assert.equal(session.pendingModeHandoff, null);
 });
 
-test('a Plan-blocked command continues with implementation before verification', () => {
-  let session = beginRemoteEngineeringPrompt(createEngineeringSession(repo), 'Plan and verify the fix');
-  session = applyRemoteEngineeringEvent(session, { type: 'mode_blocked', category: 'command', toolName: 'run_commands' });
-  assert.equal(session.pendingModeHandoff?.category, 'command');
-  assert.match(session.pendingModeHandoff?.prompt ?? '', /Apply the planned changes, run the requested commands/);
+test('a blocked command without a typed plan cannot invent implementation work', () => {
+  let session = beginRemoteEngineeringPrompt(createEngineeringSession(repo), 'What does this project do?');
+  for (const input of [undefined, { commands: ['git status'] }, { commands: ['node --test'] }]) {
+    session = applyRemoteEngineeringEvent(session, { type: 'mode_blocked', category: 'command', toolName: 'run_commands', input });
+    assert.equal(session.pendingModeHandoff, null);
+  }
 });
 
-test('a verification probe cannot downgrade a completed implementation Plan', () => {
-  let session = beginRemoteEngineeringPrompt(createEngineeringSession(repo), 'Plan and verify the fix');
-  session = applyRemoteEngineeringEvent(session, { type: 'agent_event', event: { type: 'agent_event', payload: { event: {
-    type: 'content_end', contentType: 'text', text: 'Update the greeting and run its focused test.',
-  } } } });
-  assert.equal(session.pendingModeHandoff?.category, 'edit');
-  session = applyRemoteEngineeringEvent(session, { type: 'mode_blocked', category: 'command', toolName: 'run_commands' });
-  assert.equal(session.pendingModeHandoff?.category, 'edit');
-  assert.match(session.pendingModeHandoff?.prompt ?? '', /Apply the planned changes and verify them/);
+test('completed text replies never become work plans, including implementation-like prose', () => {
+  for (const text of ['This is a greeting app.', 'You could build a dashboard.', 'Update the greeting and run its focused test.']) {
+    let session = beginRemoteEngineeringPrompt(createEngineeringSession(repo), 'What is this project about?');
+    session = applyRemoteEngineeringEvent(session, { type: 'agent_event', event: { type: 'agent_event', payload: { event: { type: 'content_end', contentType: 'text', text } } } });
+    session = applyRemoteEngineeringEvent(session, { type: 'ended', reason: 'completed' });
+    assert.equal(session.pendingModeHandoff, null);
+    assert.equal(session.workPlan, null);
+  }
 });
 
-test('a completed Plan offers the same Act handoff when the model respects read-only mode', () => {
-  let session = beginRemoteEngineeringPrompt(createEngineeringSession(repo), 'Plan the smallest safe fix');
-  session = applyRemoteEngineeringEvent(session, { type: 'agent_event', event: { type: 'agent_event', payload: { event: {
-    type: 'content_end', contentType: 'text', text: 'Inspect the parser, update the guard, and run its focused test.',
-  } } } });
-  session = applyRemoteEngineeringEvent(session, { type: 'agent_event', event: { type: 'agent_event', payload: { event: {
-    type: 'done', reason: 'completed', text: 'Inspect the parser, update the guard, and run its focused test.', iterations: 1,
-  } } } });
+test('a typed implementation plan survives a verification probe and completes with an actionable handoff', () => {
+  let session = beginRemoteEngineeringPrompt(createEngineeringSession(repo), 'Plan the fix');
+  session = applyRemoteEngineeringEvent(session, { type: 'work_plan', plan: { summary: 'Fix the greeting', steps: [{ action: 'edit', target: 'src/greeting.ts', description: 'Correct the greeting' }] } });
+  assert.match(session.workPlan ?? '', /src\/greeting.ts/);
+  assert.equal(session.pendingModeHandoff?.actionable, true);
+  session = applyRemoteEngineeringEvent(session, { type: 'mode_blocked', category: 'command', toolName: 'run_commands', input: { commands: ['node --test'] } });
+  session = applyRemoteEngineeringEvent(session, { type: 'ended', reason: 'completed' });
   assert.equal(session.state, 'completed');
   assert.equal(session.pendingModeHandoff?.category, 'edit');
-  assert.match(session.pendingModeHandoff?.prompt ?? '', /Continue with the implementation in Act mode/);
 });
 
 test('remote Cline snapshots become real restorable checkpoint ids', () => {
@@ -297,4 +296,19 @@ test('a session the machine refused for GitHub waits on the grant, with the pers
   assert.equal(failed.blockedOn ?? null, null);
   assert.equal(failed.messages.at(-1)?.tone, 'warning');
   assert.equal(isEngineeringGitHubWait(failed.messages.at(-1)!), false);
+});
+
+// a host that refuses every redial (the phone refreshes on each focus, #716) repeats one sentence: the
+// thread keeps one row for it, and a new reason still gets its own row
+test('a refusal that repeats the last warning adds no second row', () => {
+  const refuse = (s: ReturnType<typeof createEngineeringSession>, message: string) => applyRemoteEngineeringEvent(s, { type: 'error', recoverable: true, message });
+  const first = refuse(createEngineeringSession(repo), 'You do not have access to this workspace machine.');
+  const again = refuse(refuse(first, 'You do not have access to this workspace machine.'), 'You do not have access to this workspace machine.');
+  assert.equal(again.messages.filter((m) => m.tone === 'warning').length, 1);
+  assert.equal(again.state, 'resumable');
+  const other = refuse(again, 'The clone failed.');
+  assert.deepEqual(other.messages.filter((m) => m.tone === 'warning').map((m) => m.body), ['You do not have access to this workspace machine.', 'The clone failed.']);
+  const github = { type: 'error', code: 'ENGINEERING_GITHUB_REQUIRED', message: 'Connect GitHub, and the session starts.' };
+  const waits = applyRemoteEngineeringEvent(applyRemoteEngineeringEvent(createEngineeringSession(repo), github), github);
+  assert.equal(waits.messages.filter(isEngineeringGitHubWait).length, 1);
 });

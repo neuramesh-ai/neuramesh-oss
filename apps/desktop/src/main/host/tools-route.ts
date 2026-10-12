@@ -11,6 +11,7 @@
 
 
 import type { OrchTool, ToolCtx } from './orchtools';
+import { acceptRefusal } from './acceptgate';
 export function routeTools(tc: ToolCtx): OrchTool[] {
   const { z, db, post, ch, agent, actor, thread, convoThreadId, spawnLeg, log,
           kindField, taskByNumber, resolveRepoBinding,
@@ -264,13 +265,16 @@ export function routeTools(tc: ToolCtx): OrchTool[] {
       return `sent #${input.taskNumber} back to its assignee with the change request`;
     } },
     // ACCEPT ON THE HUMAN'S WORD (George, 2026-09-08). The Accept button left every surface; this is
-    // the road that replaced it. The server proves a human spoke in the thread after the verdict
-    // (handler.ts: HUMAN_ONLY otherwise); reading what they meant is this seat's judgment.
-    { name: 'accept_task', description: 'Accept a DONE task (review passed) ON THE HUMAN\'S WORD: only when a human in THIS thread has just told you to, in their own words ("merge it", "accept", "land it", "ship it"). Acceptance closes the task, and a repo task squash-merges its pull request, which cannot be undone. The server refuses (HUMAN_ONLY) unless a human message newer than the review verdict exists in the thread, so a guess cannot merge anything — but a misread can: never call it on a maybe, a question, praise without an instruction, or a message about something else. Never suggest the word to them. In your reply, say what happened and name the message you acted on.', schema: {
+    // the road that replaced it. The server proves a human typed in the thread after the verdict
+    // (handler.ts: HUMAN_ONLY otherwise), and this tool reads the words first (host/acceptgate.ts).
+    { name: 'accept_task', description: 'Accept a DONE task (review passed) ON THE HUMAN\'S WORD: only when a human in THIS thread has just told you to, in their own words ("merge it", "accept", "land it", "ship it"). Acceptance closes the task, and a repo task squash-merges its pull request, which cannot be undone. It refuses unless the human\'s newest typed message here tells you to merge or accept: never call it on a maybe, a question, praise without an instruction, or a message about something else. Never suggest the word to them. In your reply, say what happened and name the message you acted on.', schema: {
       taskNumber: z.number().int().describe('the done task the human told you to accept or merge'),
     }, run: async (input) => {
       const t = await taskByNumber(input.taskNumber);
       if (!t) return `error: no task #${input.taskNumber} in #${ch.slug}`;
+      // the words, read (host/acceptgate.ts): a question on a done unit wakes this turn too
+      const refused = await acceptRefusal(db, { id: t.id, number: input.taskNumber });
+      if (refused) { log?.({ kind: 'tool', phase: 'call', summary: `accept_task #${input.taskNumber} (no merge word)`, level: 'warn' }); return refused; }
       const res = await post('/v1/commands', actor, { type: 'task.accept', taskId: t.id });
       const b = (await res.json().catch(() => ({}))) as any;
       log?.({ kind: 'tool', phase: 'call', summary: `accept_task #${input.taskNumber}${res.ok ? ' on the human\'s word' : ' (refused)'}`, level: res.ok ? 'info' : 'warn' });

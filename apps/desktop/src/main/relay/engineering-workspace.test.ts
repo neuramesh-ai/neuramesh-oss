@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync,
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { EngineeringNeedsGitHub, engineeringRepoRoot, ensureEngineeringWorkspace } from './engineering-workspace';
-import { validatedEngineeringGitMounts } from './engineering-safe-executors';
+import { createEngineeringShellExecutor, validatedEngineeringGitMounts } from './engineering-safe-executors';
 import { gitChildEnv } from '../harness/workspaces';
 import type { RepoCredResult } from '../host/repocred';
 
@@ -140,14 +140,69 @@ test('Engineering cuts a desktop folder\'s worktree from its own checkout, and t
     insert into project_repos values ('p1', 'repo-folder', 1);`);
   const dir = await ensureEngineeringWorkspace(db, 'w1', session(), { preferLocal: true });
   assert.equal(git(['show', 'HEAD:README.md'], dir.cwd), '# Folder');
-  // the checkout's refs, objects and logs hold the person's own work, which can be unpushed. The shell
-  // keeps the cache path it had before this round, so no agent command gets a writable mount of them.
-  assert.equal(dir.repoRoot, engineeringRepoRoot('repo-folder'));
-  assert.throws(() => validatedEngineeringGitMounts(dir.cwd, dir.repoRoot));
+  // Tests may run in the thread, but no command can read or write the person's Git metadata.
+  assert.equal(dir.repoRoot, null);
+  assert.deepEqual(validatedEngineeringGitMounts(dir.cwd, dir.repoRoot), { readonly: [], writable: [] });
   // a reopen finds the worktree by its thread, and the checkout its pointer names is still never the root
   const again = await ensureEngineeringWorkspace(db, 'w1', session(), { preferLocal: true });
   assert.deepEqual(again, dir);
-  assert.throws(() => validatedEngineeringGitMounts(again.cwd, again.repoRoot));
+  assert.deepEqual(validatedEngineeringGitMounts(again.cwd, again.repoRoot), { readonly: [], writable: [] });
+  // An approved command can edit this marker. Reopening must not let it redirect the
+  // denial away from the original checkout, or claim a different cache clone's mounts.
+  const marker = readFileSync(join(dir.cwd, '.git'), 'utf8');
+  writeFileSync(join(dir.cwd, '.git'), `gitdir: ${join(root, 'decoy', '.git', 'worktrees', 'fake')}\n`);
+  await assert.rejects(ensureEngineeringWorkspace(db, 'w1', session(), { preferLocal: true }), /ENOENT|refused/, 'the editable Git pointer cannot select a private boundary');
+  writeFileSync(join(dir.cwd, '.git'), marker);
+  assert.deepEqual(await ensureEngineeringWorkspace(db, 'w1', session(), { preferLocal: true }), dir);
+  const missingBoundary = createEngineeringShellExecutor(dir.cwd, [], null);
+  await assert.rejects(missingBoundary('npm test', dir.cwd, {} as Parameters<typeof missingBoundary>[2]), /cannot isolate/);
+  if (process.platform === 'darwin') {
+    const secret = join(realpathSync(checkout), '.git', 'private-canary');
+    writeFileSync(secret, 'personal history');
+    writeFileSync(join(dir.cwd, 'package.json'), JSON.stringify({ scripts: { test: 'node --test boundary.test.cjs' } }));
+    writeFileSync(join(dir.cwd, 'boundary.test.cjs'), `
+      const { test } = require('node:test'); const assert = require('node:assert/strict');
+      const fs = require('node:fs');
+      test('worktree tests run without access to the original Git metadata', () => {
+        assert.match(fs.readFileSync('README.md', 'utf8'), /Folder/);
+        assert.throws(() => fs.readFileSync(${JSON.stringify(secret)}, 'utf8'), { code: 'EPERM' });
+        assert.throws(() => fs.writeFileSync(${JSON.stringify(secret)}, 'overwritten'), { code: 'EPERM' });
+      });
+    `);
+    const shell = createEngineeringShellExecutor(dir.cwd, [], dir.repoRoot, dir.privateRepoRoot);
+    assert.match(await shell('npm test', dir.cwd, {} as Parameters<typeof shell>[2]), /(?:#|ℹ) pass 1/);
+    assert.equal(readFileSync(secret, 'utf8'), 'personal history');
+  }
+}));
+
+// a person's checkout can keep its Git metadata away from its folder: a submodule (.git/modules), a
+// separate git dir, or a worktree of a bare repository. The first open and every reopen land on the
+// thread's own worktree, and the editable pointer still selects nothing.
+test('Engineering reopens a thread cut from a submodule, a separate git dir or a bare repository worktree', () => inBrain(async (root) => {
+  const seed = (dir: string) => {
+    git(['config', 'user.email', 'test@neuramesh.local'], dir); git(['config', 'user.name', 'NeuraMesh Test'], dir);
+    writeFileSync(join(dir, 'README.md'), '# Folder\n'); git(['add', 'README.md'], dir); git(['commit', '-m', 'initial'], dir);
+  };
+  const separate = join(root, 'code', 'separate'); mkdirSync(separate, { recursive: true }); mkdirSync(join(root, 'gitdirs'), { recursive: true });
+  git(['init', '-b', 'main', `--separate-git-dir=${join(root, 'gitdirs', 'separate.git')}`, separate]); seed(separate);
+  const lib = join(root, 'src', 'lib'); mkdirSync(lib, { recursive: true }); git(['init', '-b', 'main', lib]); seed(lib);
+  const superproject = join(root, 'code', 'super'); mkdirSync(superproject, { recursive: true }); git(['init', '-b', 'main', superproject]); seed(superproject);
+  git(['-c', 'protocol.file.allow=always', 'submodule', 'add', lib, 'lib'], superproject);
+  const bare = join(root, 'code', 'bare.git'); git(['init', '--bare', '-b', 'main', bare]); git(['push', bare, 'main'], lib);
+  const bareTree = join(root, 'code', 'bare-main'); git(['worktree', 'add', bareTree, 'main'], bare);
+  for (const [i, checkout] of [separate, join(superproject, 'lib'), bareTree].entries()) {
+    const db = replica(`
+      insert into repos values ('repo-folder', 'w1', 'local', 'local', 'neuramesh', 'main', null, '${checkout}');
+      insert into project_repos values ('p1', 'repo-folder', 1);`);
+    const meta = session({ threadId: ['eng-a', 'eng-b', 'eng-c'][i]! });
+    const dir = await ensureEngineeringWorkspace(db, 'w1', meta, { preferLocal: true });
+    assert.equal(git(['show', 'HEAD:README.md'], dir.cwd), '# Folder', checkout);
+    assert.deepEqual(await ensureEngineeringWorkspace(db, 'w1', meta, { preferLocal: true }), dir, `a reopen of ${checkout}`);
+    const marker = readFileSync(join(dir.cwd, '.git'), 'utf8');
+    writeFileSync(join(dir.cwd, '.git'), `gitdir: ${join(root, 'decoy', '.git', 'worktrees', 'fake')}\n`);
+    await assert.rejects(ensureEngineeringWorkspace(db, 'w1', meta, { preferLocal: true }), /ENOENT|refused/, `a decoy pointer in ${checkout}`);
+    writeFileSync(join(dir.cwd, '.git'), marker);
+  }
 }));
 
 // a folder attached from a desktop has no clone URL, and the GitHub pick attaches its twin beside it

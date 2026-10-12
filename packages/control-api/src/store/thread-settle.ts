@@ -5,7 +5,7 @@
 // not float to the top of a recency list), not the board. The human's word is the evidence an agent
 // accept is refused without: a HUMAN message in the task's thread NEWER than the review verdict.
 import type postgres from 'postgres';
-import { parseGitHubConnected } from '@neuramesh/shared';
+import { isCardOrMarker } from '@neuramesh/shared';
 import { DomainError } from '../errors';
 
 /** undefined = no such thread, null = a chat thread (the archive and settle handlers' first read) */
@@ -22,14 +22,19 @@ export async function setThreadSettledSql(sql: postgres.Sql, workspace: string, 
 
 /** the task's own messages, or its thread's (thread-per-task); after the verdict, else after the
  *  task's last change — `done` is frozen, so for a done task that IS the moment review passed.
- *  The connected divider the GitHub grant posts as the person is a record, never their word. */
+ *  What a client posts for the person is a click or a record, never their word (shared
+ *  isCardOrMarker): the connected divider the GitHub grant posts, a marker line, and a card's answer.
+ *  The verdict card's Approve posts "**…** → Approve #N" right after the approve stamps approved_at,
+ *  so a click that said Approve once counted as the word an agent accept needs (2026-10-05). The rule
+ *  is read in code, the same function the memory twin reads, so the two stores cannot drift. */
 export async function latestHumanWordSql(sql: postgres.Sql, taskId: string): Promise<{ id: string; createdAt: string } | null> {
-  const [row] = await sql<Array<{ id: string; created_at: string }>>`select m.id, m.created_at
+  const rows = await sql<Array<{ id: string; created_at: string; body: string }>>`select m.id, m.created_at, m.body
     from messages m join tasks t on t.id = ${taskId}::uuid and m.workspace_id = t.workspace_id
-    where m.author_kind = 'human' and m.body not like '‹github:connected:%'
+    where m.author_kind = 'human'
       and (m.task_id = t.id or m.thread_id in (select th.id from threads th where th.task_id = t.id))
       and m.created_at > coalesce(t.approved_at, t.updated_at)
-    order by m.created_at desc limit 1`;
+    order by m.created_at desc limit 50`;
+  const row = rows.find((r) => !isCardOrMarker(r.body));
   return row ? { id: row.id, createdAt: row.created_at } : null;
 }
 
@@ -50,7 +55,7 @@ export function pickHumanWord(
 ): { id: string; createdAt: string } | null {
   const threadIds = new Set(threads.filter((t) => t.taskId === taskId).map((t) => t.id));
   const words = messages
-    .filter((m) => m.author.kind === 'human' && !parseGitHubConnected(m.body) && (m.taskId === taskId || (!!m.threadId && threadIds.has(m.threadId))) && m.createdAt > since)
+    .filter((m) => m.author.kind === 'human' && !isCardOrMarker(m.body) && (m.taskId === taskId || (!!m.threadId && threadIds.has(m.threadId))) && m.createdAt > since)
     .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
   const w = words[0];
   return w ? { id: w.id, createdAt: w.createdAt } : null;

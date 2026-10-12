@@ -33,7 +33,7 @@ export const PLAYBOOKS: Playbook[] = [
   {
     id: 'geo',
     title: 'AI search (GEO)',
-    tagline: 'who gets cited, page rewrites, then a re-measure',
+    tagline: 'who AI search cites, page rewrites, then a new score',
     group: 'foundations',
     skill: 'geo-citability',
     engine: 'unit',
@@ -71,7 +71,7 @@ export const PLAYBOOKS: Playbook[] = [
   {
     id: 'positioning',
     title: 'Positioning & offer',
-    tagline: 'the six-clause statement, tested for pasteability',
+    tagline: 'a six-part statement that you can paste into real copy',
     group: 'foundations',
     skill: 'positioning-offer-pricing',
     engine: 'unit',
@@ -129,7 +129,7 @@ export const PLAYBOOKS: Playbook[] = [
   {
     id: 'copylab',
     title: 'Copy lab',
-    tagline: '15 to 20 variants, panel-scored, then de-slopped, in the thread',
+    tagline: '15 to 20 variants, scored by a panel, with the filler cut, in the thread',
     group: 'content',
     skill: 'copy-lab',
     engine: 'chat',

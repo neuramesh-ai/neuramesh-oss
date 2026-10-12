@@ -49,7 +49,11 @@ test('Engineering provider resolution uses the configured brain subscription tra
       return new Response(JSON.stringify({ token: null, authMode: 'subscription' }), { status: 200 });
     },
   }, { modelId: 'gpt-5.5', agentId: 'patch-1' }, {}, machine({ sub: true }));
-  assert.deepEqual(provider, { providerId: 'openai-codex-cli', modelId: 'gpt-5.5' });
+  assert.equal(provider.providerId, 'openai-codex');
+  assert.equal(provider.modelId, 'gpt-5.5');
+  assert.equal(provider.apiKey, 'neuramesh-local-chatgpt');
+  assert.equal(typeof provider.runtimeFetch, 'function');
+  assert.doesNotMatch(JSON.stringify(provider), /access_token|refresh_token/);
   assert.deepEqual(requests.map((request) => new URL(request.url).searchParams.get('provider')), ['openai']);
   assert.equal(requests.every((request) => request.authorization === 'Bearer nmm_test'), true);
   assert.equal(new URL(requests[0]!.url).searchParams.get('workspace'), 'w 1');
@@ -86,8 +90,8 @@ test('Engineering provider resolution ends with an actionable error when nothing
 test('the coding runtime reads the machine\'s own sign-ins and keys, as agents do', async () => {
   const opts = (body: Record<string, unknown>) => ({ apiUrl: 'https://api.test', machineToken: 'nmm_test', workspaceId: 'w1', fetchImpl: async () => new Response(JSON.stringify(body), { status: 200 }) });
   const cloud = { NM_MACHINE_KIND: 'member' };
-  // a sign-in on the machine with no stored row: the CLI lane
-  assert.deepEqual(await resolveEngineeringProvider(opts({ authMode: null }), { modelId: 'claude-opus-5' }, cloud, machine({ sub: true })), { providerId: 'claude-code', modelId: 'claude-opus-5' });
+  // A Claude CLI sign-in cannot run NeuraMesh's managed tools. Never silently bill its env key.
+  await assert.rejects(resolveEngineeringProvider(opts({ authMode: null }), { modelId: 'claude-opus-5' }, cloud, machine({ sub: true, env: 'sk-env' })), /cannot use NeuraMesh coding tools and approvals/);
   // the machine's own key with no stored row: the key lane
   assert.deepEqual(await resolveEngineeringProvider(opts({ authMode: null }), { modelId: 'claude-opus-5' }, cloud, machine({ env: 'sk-env' })), { providerId: 'anthropic', modelId: 'claude-opus-5', apiKey: 'sk-env' });
   // a stored preference for a sign-in that lapsed here: a refusal, never a silent key
@@ -98,6 +102,14 @@ test('the coding runtime reads the machine\'s own sign-ins and keys, as agents d
     /^Error: Code runs Gemini on an API key only\. Add a Gemini API key, or pick another model\.$/);
   assert.deepEqual(await resolveEngineeringProvider(opts({ authMode: 'subscription', token: null }), { modelId: 'gemini-3.1-pro-preview' }, cloud, machine({ sub: true, env: 'g-env' })), { providerId: 'gemini', modelId: 'gemini-3.1-pro-preview', apiKey: 'g-env' });
   assert.deepEqual(await resolveEngineeringProvider(opts({ authMode: 'apikey', token: 'g-stored' }), { modelId: 'gemini-3.1-pro-preview' }, cloud, machine()), { providerId: 'gemini', modelId: 'gemini-3.1-pro-preview', apiKey: 'g-stored' });
+});
+
+test('explicit provider overrides cannot enable a subprocess that bypasses managed coding tools', async () => {
+  for (const provider of ['claude-code', 'openai-codex-cli']) {
+    await assert.rejects(resolveEngineeringProvider({ apiUrl: 'https://api.test', machineToken: 'test', workspaceId: 'w1' }, { modelId: 'gpt-6-astra' }, {
+      NM_ENGINEERING_PROVIDER: provider, NM_ENGINEERING_API_KEY: 'placeholder', NM_ENGINEERING_MODEL: 'gpt-6-astra',
+    }), /cannot use NeuraMesh coding tools and approvals/);
+  }
 });
 
 test('starter brain requests stay on the authenticated metered control-plane route', async () => {
@@ -162,7 +174,7 @@ test('machine-side Cline approvals enforce Plan and current session controls', a
     },
   });
   const pending = capability!(request('editor', 'edit-ask'));
-  await new Promise((resolve) => setImmediate(resolve));
+  for (let attempt = 0; attempt < 100 && !events.some((event) => event.type === 'approval' && event.approvalId === 'edit-ask'); attempt++) await new Promise((resolve) => setTimeout(resolve, 20));
   assert.equal(events.some((event) => event.type === 'approval' && event.approvalId === 'edit-ask'), true);
   session.command({ type: 'approval', approvalId: 'edit-ask', approved: true });
   assert.deepEqual(await pending, { approved: true });
@@ -296,12 +308,19 @@ test('Code keeps prompts, controls, and restores locked until the active Cline t
   session.command({ type: 'prompt', prompt: 'after completion' });
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(sent.length, 1);
+  // A reusable SDK session may end only the agent turn, without session-ended or idle.
+  forward({ type: 'agent_event', payload: { sessionId: 'cline-running', event: { type: 'done', reason: 'completed', text: 'Ready', iterations: 1 } } });
+  session.command({ type: 'prompt', prompt: 'after agent completion' });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(sent.length, 2);
+  assert.ok(events.some((event) => event.type === 'ended' && event.reason === 'completed'));
   session.close();
 });
 
 test('switching Plan to Act resumes history in a new Cline session with Act tools', async () => {
   const starts: Array<Record<string, unknown>> = [];
   const stopped: string[] = [];
+  const events: EngineeringRuntimeEvent[] = [];
   let forward: (event: unknown) => void = () => {};
   const fake = {
     subscribe: (listener: (event: unknown) => void) => { forward = listener; return () => {}; },
@@ -313,7 +332,7 @@ test('switching Plan to Act resumes history in a new Cline session with Act tool
     },
     send: async () => undefined,
     abort: async () => {},
-    stop: async (sessionId: string) => { stopped.push(sessionId); },
+    stop: async (sessionId: string) => { stopped.push(sessionId); forward({ type: 'ended', payload: { reason: 'completed', sessionId } }); },
     dispose: async () => {},
     restore: async () => ({ messages: [], checkpoint: { ref: 'x', createdAt: Date.now(), runCount: 1 } }),
   } as unknown as ClineCore;
@@ -326,7 +345,7 @@ test('switching Plan to Act resumes history in a new Cline session with Act tool
     threadId: 'e-mode', actorId: 'u1', repoId: 'r1', repoName: 'app', branch: 'main', mode: 'plan',
     permissions: { read: true, edit: false, command: false, web: false, mcp: false },
     policy: { read: true, edit: true, command: true, web: true, mcp: true },
-  }, () => {});
+  }, (event) => events.push(event));
 
   session.command({ type: 'prompt', prompt: 'plan this' });
   await new Promise((resolve) => setImmediate(resolve));
@@ -351,6 +370,7 @@ test('switching Plan to Act resumes history in a new Cline session with Act tool
   );
   assert.deepEqual(starts[1]!.initialMessages, [{ role: 'user', content: 'history:cline-1' }]);
   assert.deepEqual(stopped, ['cline-1']);
+  assert.equal(events.filter((event) => event.type === 'ended').length, 1, 'Retired Plan completion must not end the Act turn');
   session.close();
 });
 
@@ -450,7 +470,7 @@ test('restoring a Cline checkpoint rewinds workspace and seeds the next session 
   const restoreStart = restores[0]?.['start'] as Record<string, unknown>;
   assert.equal((restoreStart['config'] as Record<string, unknown>)['mode'], 'act');
   assert.equal((restoreStart['config'] as Record<string, unknown>)['checkpoint'] instanceof Object, true);
-  assert.deepEqual(restoreStart['sessionMetadata'], { neurameshThreadId: 'e-restore', repoId: 'r1', repoName: 'app', actorId: 'u1' });
+  assert.deepEqual(restoreStart['sessionMetadata'], { neurameshThreadId: 'e-restore', repoId: 'r1', repoName: 'app', actorId: 'u1', agent: { id: '', name: 'rex', role: 'orchestrator' }, reasoningEffort: null });
   assert.deepEqual(stopped, ['cline-1']);
   assert.equal(events.some((event) => event.type === 'restored' && event.checkpointRunCount === 2), true);
 

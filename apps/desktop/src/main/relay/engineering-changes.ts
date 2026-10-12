@@ -3,6 +3,7 @@ import { constants } from 'node:fs';
 import { open, realpath, type FileHandle } from 'node:fs/promises';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 import { promisify } from 'node:util';
+import { engineeringUnifiedDiff } from '@neuramesh/shared';
 import type { EngineeringRuntimeChange } from '../../engineering-protocol';
 import { gitChildEnv } from '../harness/workspaces';
 
@@ -52,7 +53,7 @@ const openedPaths = async (handles: FileHandle[]): Promise<Map<number, string>> 
 
 /** Validate the kernel path of the opened descriptor itself. This remains bound to the vnode even
  * when a writable parent is swapped before or after open, unlike a second lookup of `candidate`. */
-const workspaceTexts = async (canonicalRoot: string, paths: string[]): Promise<Map<string, { safe: boolean; exists: boolean; value: string }>> => {
+export const workspaceTexts = async (canonicalRoot: string, paths: string[]): Promise<Map<string, { safe: boolean; exists: boolean; value: string }>> => {
   const results = new Map<string, { safe: boolean; exists: boolean; value: string }>(); let remaining = SNAPSHOT_READ_BUDGET_BYTES;
   const opened: Array<{ path: string; handle: FileHandle }> = [];
   for (const path of paths) {
@@ -89,18 +90,8 @@ const headText = async (cwd: string, path: string, budget: { remaining: number }
   return value.includes('\0') ? '[binary file]' : value;
 };
 const cappedDiff = (value: string): string => value.length <= MAX_CHANGE_FILE_BYTES ? value : `${value.slice(0, MAX_CHANGE_FILE_BYTES)}\n[diff truncated]`;
-const lineCount = (value: string): number => {
-  if (!value) return 0;
-  let count = 1;
-  for (let index = 0; index < value.length; index += 1) if (value.charCodeAt(index) === 10) count += 1;
-  return count;
-};
-const snapshotDiff = (path: string, before: string, after: string, headExists: boolean, currentExists: boolean): string => {
-  const oldText = before.replace(/\n$/, ''); const newText = after.replace(/\n$/, '');
-  const oldLines = lineCount(oldText); const newLines = lineCount(newText);
-  const header = `diff --git a/${path} b/${path}\n--- ${headExists ? `a/${path}` : '/dev/null'}\n+++ ${currentExists ? `b/${path}` : '/dev/null'}\n`;
-  return cappedDiff(`${header}@@ -1,${oldLines} +1,${newLines} @@\n${oldText ? `-${oldText.replace(/\n/g, '\n-')}\n` : ''}${newText ? `+${newText.replace(/\n/g, '\n+')}\n` : ''}`);
-};
+const snapshotDiff = (path: string, before: string, after: string, headExists: boolean, currentExists: boolean): string =>
+  cappedDiff(engineeringUnifiedDiff({ path, before, after, kind: !currentExists ? 'deleted' : headExists ? 'modified' : 'added' }));
 const aggregatePlaceholder = (change: EngineeringRuntimeChange): EngineeringRuntimeChange => ({
   ...change,
   before: change.before ? '[preview omitted: aggregate change limit]' : '',

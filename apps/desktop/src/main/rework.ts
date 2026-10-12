@@ -1,3 +1,4 @@
+import { readArtifactBytes, type ArtifactContentRow } from './host/artifact-content';
 // Rework continuity for repo-less (scratch) tasks. Electron-free (the
 // execpolicy/replypolicy idiom) so the colocated test runs in plain node.
 //
@@ -25,13 +26,13 @@ import { join, dirname, resolve, sep } from 'node:path';
 export type ReworkDbLike = { getAll<T = Record<string, unknown>>(sql: string, params?: unknown[]): Promise<T[]> };
 
 export async function prepareScratchWorkspace(db: ReworkDbLike, taskId: string, dir: string): Promise<string> {
-  const rows = await db.getAll<{ name: string; inline_content: string | null }>(
-    `select name, inline_content from artifacts where task_id = ? and kind = 'file' order by created_at desc`,
+  const rows = await db.getAll<ArtifactContentRow & { name: string }>(
+    `select id, workspace_id, name, storage_path, content_hash, inline_content from artifacts where task_id = ? and kind = 'file' order by created_at desc`,
     [taskId],
-  ).catch(() => [] as Array<{ name: string; inline_content: string | null }>);
+  ).catch(() => [] as Array<ArtifactContentRow & { name: string }>);
   // newest submission wins per name (a re-submit re-writes the same names)
-  const latest = new Map<string, string>();
-  for (const r of rows) if (r.inline_content != null && !latest.has(r.name)) latest.set(r.name, r.inline_content);
+  const latest = new Map<string, Buffer>();
+  for (const r of rows) if ((r.inline_content != null || r.storage_path?.startsWith('brain:')) && !latest.has(r.name)) latest.set(r.name, await readArtifactBytes(db, r));
   if (!latest.size) {
     await rm(dir, { recursive: true, force: true }).catch(() => {});
     await mkdir(dir, { recursive: true });

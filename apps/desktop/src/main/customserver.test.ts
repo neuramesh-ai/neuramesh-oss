@@ -26,6 +26,12 @@ test('a good pair: the address answers with a mode, the bearer names a human, th
   assert.deepEqual(v, { ok: true, apiUrl: 'http://box.local:8788', powersyncUrl: 'http://box.local:58081', mode: 'local', version: '0.132.0', actorId: 'u-local', workspaces: ME.workspaces });
 });
 
+test('a Local server syncs through its API without a PowerSync address', async () => {
+  const v = await validateCustomServer({ apiUrl: 'http://box.local:8788', bearer: 'nmh_good' }, server({ cfg: { mode: 'local', powersyncUrl: null } }));
+  assert.ok(v.ok);
+  assert.equal(v.powersyncUrl, '');
+});
+
 test('a pasted PowerSync address wins over the server-named one', async () => {
   const v = await validateCustomServer({ apiUrl: 'https://nm.example', powersyncUrl: 'https://ps.example/', bearer: 'nmh_good' }, server());
   assert.ok(v.ok && v.powersyncUrl === 'https://ps.example');
@@ -56,7 +62,7 @@ test('a bad address: not a url, a file scheme, or nothing answers', async () => 
   assert.ok(!file.ok && file.code === 'ADDRESS');
   const dead = await validateCustomServer({ apiUrl: 'https://nm.example', bearer: 'nmh_good' }, async () => { throw new TypeError('fetch failed'); });
   assert.deepEqual(dead, { ok: false, code: 'UNREACHABLE', message: 'The address did not answer.' });
-  const noPs = await validateCustomServer({ apiUrl: 'https://nm.example', bearer: 'nmh_good' }, server({ cfg: { mode: 'local' } }));
+  const noPs = await validateCustomServer({ apiUrl: 'https://nm.example', bearer: 'nmh_good' }, server({ cfg: { mode: 'cloud' } }));
   assert.ok(!noPs.ok && noPs.code === 'ADDRESS');
 });
 

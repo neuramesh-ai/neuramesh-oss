@@ -24,7 +24,7 @@ import { nodeSpawnFn } from './proc';
 import type { Runtime } from './install';
 
 export interface LocalStackPayload { state: StackState; blocking: boolean; aboutMb: number | null }
-export interface LocalStackInfo { dir: string; ports: { api: number; powersync: number }; engine: string | null; engineVersion: string | null; stackVersion: string | null; appVersion: string }
+export interface LocalStackInfo { dir: string; ports: { api: number }; engine: string | null; engineVersion: string | null; stackVersion: string | null; appVersion: string }
 
 /** the one machine-local setting this half adds: keep the containers up after quit (review F9, default off) */
 const settingFile = (userData: string) => join(userData, 'local.json');

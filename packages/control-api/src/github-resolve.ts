@@ -207,7 +207,12 @@ export async function resolveConnector(store: Store, ctx: { workspace: string; c
     await rememberInstallation(ann, id, fetchFn, ctx.workspace, true);
   };
   const written = async (target: string, attached: boolean): Promise<Resolve> => {
-    await store.upsertConnector({ workspace: ctx.workspace, channelId: ctx.channel, provider: 'github', handle: target, connectedBy: ctx.actor, scopes: GITHUB_SCOPES });
+    // the row's first write is the funnel's github.connected (analytics.ts): the store writes the
+    // event only for a new row, so the step's next poll and every later mount add nothing
+    await store.upsertConnector({ workspace: ctx.workspace, channelId: ctx.channel, provider: 'github', handle: target, connectedBy: ctx.actor, scopes: GITHUB_SCOPES }, (workspace, id) => createEvent({
+      type: 'github.connected', source: formatAddress({ kind: 'human', id: ctx.actor }),
+      target: formatAddress({ kind: 'resource', type: 'connector', id }), workspace, payload: { connector: id, handle: target },
+    }));
     // the grant arms the work: every open GitHub card in the project resumes (github-resume.ts), and
     // only from the /v1 resolve, because only its session proves the person
     if (opts.resume) await resumeAfterGitHub(store, ctx, target).catch((e) => console.warn(`github resume failed: ${e instanceof Error ? e.message : String(e)}`));

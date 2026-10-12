@@ -4,13 +4,16 @@ import { readFile } from 'node:fs/promises';
 import { keyEnvFor, onCloudMachine } from '../runtime/adapter';
 import { decideAuth, type AuthResolution } from '../runtime/authpolicy';
 import { hasProviderLogin, hasSubscription } from '../runtime/detect';
+import { CHATGPT_LOCAL_CREDENTIAL, createChatGPTSubscriptionFetch } from './engineering-chatgpt';
 
 export interface EngineeringProviderResolution {
+  agent?: import('@neuramesh/shared').EngineeringAgent;
+  instructions?: string;
   providerId: string;
   modelId: string;
   apiKey?: string;
   baseUrl?: string;
-  /** Used by the platform brain to keep its key and credit meter in the control plane. */
+  /** Final transport hop for platform metering or machine-local subscription credentials. */
   runtimeFetch?: typeof fetch;
 }
 
@@ -38,10 +41,11 @@ const API_PROVIDER: Record<Provider, string> = {
   gemini: 'gemini',
 };
 
-const SUBSCRIPTION_PROVIDER: Partial<Record<Provider, string>> = {
-  anthropic: 'claude-code',
-  openai: 'openai-codex-cli',
-};
+function requireManagedTools(providerId: string): void {
+  if (providerId === 'openai-codex-cli' || providerId === 'claude-code') {
+    throw new Error('This subscription adapter cannot use NeuraMesh coding tools and approvals. Choose ChatGPT with a local Codex sign-in, or explicitly select an API-key provider.');
+  }
+}
 
 const LABEL: Record<Provider, string> = { anthropic: 'Claude', openai: 'ChatGPT', gemini: 'Gemini' };
 
@@ -132,6 +136,7 @@ export async function resolveEngineeringProvider(
     if (!explicitKey || !explicitProvider || !explicitModel) {
       throw new Error('NM_ENGINEERING_API_KEY, NM_ENGINEERING_PROVIDER, and NM_ENGINEERING_MODEL must be configured together.');
     }
+    requireManagedTools(explicitProvider);
     return { apiKey: explicitKey, providerId: explicitProvider, modelId: explicitModel, ...(explicitBaseUrl ? { baseUrl: explicitBaseUrl } : {}) };
   }
 
@@ -170,8 +175,12 @@ export async function resolveEngineeringProvider(
   const auth = decideAuth({ provider: credential, storedAuthMode: stored, storedToken: token, autoFailover: !!body.autoFailover, subActive, loginPresent, envKey, cloudMachine: onCloudMachine(env) });
   if (auth.authMode === 'apikey' && auth.token) return { apiKey: auth.token, providerId: API_PROVIDER[credential], modelId: brain.modelId };
   if (auth.authMode === 'subscription') {
-    const providerId = SUBSCRIPTION_PROVIDER[credential];
-    if (providerId) return { providerId, modelId: brain.modelId };
+    if (credential === 'openai') return {
+      providerId: 'openai-codex', modelId: brain.modelId,
+      apiKey: CHATGPT_LOCAL_CREDENTIAL,
+      runtimeFetch: createChatGPTSubscriptionFetch(),
+    };
+    if (credential === 'anthropic') requireManagedTools('claude-code');
     // the coding runtime has no lane for a Google sign-in: a Gemini key on this machine still runs it
     const key = token ?? envKey;
     if (key) return { apiKey: key, providerId: API_PROVIDER[credential], modelId: brain.modelId };

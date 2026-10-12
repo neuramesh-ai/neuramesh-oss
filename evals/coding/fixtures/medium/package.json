@@ -1,0 +1,8 @@
+{
+  "name": "nm-coding-eval-medium",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  }
+}

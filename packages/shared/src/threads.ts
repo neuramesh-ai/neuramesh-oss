@@ -52,6 +52,13 @@ export function threadKindOf(value: unknown): ThreadKind {
   return value === 'coding' ? 'coding' : DEFAULT_THREAD_KIND;
 }
 
+/** Keep a locally created coding conversation on its coding surface while its row syncs.
+ * A replicated row always wins, including a later human conversion back to chat.
+ * This is a display hint only; it must never authorize starting the runtime. */
+export function threadSurfaceKind(row: { kind?: unknown } | null | undefined, bornWithRepo: boolean): ThreadKind {
+  return row ? threadKindOf(row.kind) : bornWithRepo ? 'coding' : DEFAULT_THREAD_KIND;
+}
+
 /** True when the coding runtime owns this thread's turns. */
 export function isCodingThread(value: unknown): boolean {
   return threadKindOf(value) === 'coding';

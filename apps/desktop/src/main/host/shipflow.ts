@@ -1,3 +1,4 @@
+import { readArtifactText, type ArtifactContentRow } from './artifact-content';
 // THE SHIP FLOW (docs/23) — the shipper claiming a reviewer-approved PR task, studying the
 // change, and proposing a release plan. The claim IS the cross-machine dedupe.
 // Split out of host/flows.ts.
@@ -31,7 +32,7 @@ import { type LogFn } from '../agentlog';
 import type { makeReleaseDocs } from './releasedocs';
 import type { HostCtx } from './ctx';
 import type { ShipTask } from './flows';
-import type { PowerSyncDatabase } from '@powersync/node';
+import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 import type { Brain } from '../harness/brain';
 import type { AgentAttachment } from '../runtime/adapter';
 import type { HostQueue } from '../harness/hostqueue';
@@ -45,7 +46,7 @@ import type { RepoCred } from './repocred';
 
 
 export function makeShipFlow(ctx: HostCtx & {
-  db: PowerSyncDatabase;
+  db: ReplicaDatabase;
   apiUrl: string;
   workspace: string;
   ownerActorId: string;
@@ -152,8 +153,8 @@ async function shipperFlow(agent: HostedAgent, t: ShipTask, opts: { resume: bool
       : ci.verdict === 'pending' ? `CI on PR #${prNumber}: still pending after the wait window.`
       : ci.verdict === 'unknown' ? `CI on PR #${prNumber}: COULD NOT BE READ (${ci.detail}). The plan must surface this, and it is not "no CI".`
       : 'CI: none configured on this repo.';
-    const diffArt = await db.get<{ inline_content: string | null }>(`select inline_content from artifacts where task_id = ? and kind = 'diff' order by created_at desc limit 1`, [t.id]).catch(() => null);
-    const diffText = diffArt?.inline_content ?? '';
+    const diffArt = await db.get<ArtifactContentRow>(`select id, workspace_id, name, storage_path, content_hash, inline_content from artifacts where task_id = ? and kind = 'diff' order by created_at desc limit 1`, [t.id]).catch(() => null);
+    const diffText = await readArtifactText(db, diffArt);
     const scan = scanDiff(diffText);
     const scanLine = scanNote(scan);
     await beats.next(); // studied → scanning noted

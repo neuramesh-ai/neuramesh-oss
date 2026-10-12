@@ -41,6 +41,8 @@ export interface HostQueueOpts {
    * pair without touching a single flow, which is what keeps this diff reviewable.
    */
   turns?: TurnRecorder;
+  /** The durable conversation context must surround the flow and all of its async runtime calls. */
+  around?: (work: QueuedWork, run: () => Promise<unknown>) => Promise<unknown>;
 }
 
 export interface TurnRecorder {
@@ -78,12 +80,14 @@ export class HostQueue {
   private draining = false;
   private log?: (line: string) => void;
   private turns?: TurnRecorder;
+  private around?: HostQueueOpts['around'];
   private meta = new Map<string, QueuedWork>();
 
   constructor(opts: HostQueueOpts = {}) {
     const caps = opts.caps ?? defaultCaps(cpuCount());
     this.log = opts.log;
     this.turns = opts.turns;
+    this.around = opts.around;
     this.d = new Dispatcher(opts.seen ?? new MemorySeenStore(), caps, {
       onShed: (shed) => opts.onShed?.(shed.map((t) => t.id)),
     });
@@ -132,7 +136,7 @@ export class HostQueue {
           let outcome: 'done' | 'failed' = 'done';
           let thrown: unknown;
           try {
-            await fn();
+            await (this.around ? this.around(work, fn) : fn());
           } catch (err) {
             outcome = 'failed';
             thrown = err;

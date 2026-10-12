@@ -80,16 +80,17 @@ test('Code home keeps creation lazy, reuses the launch character, and incrementa
   assert.doesNotMatch(app, /onHome=\{engineeringNav\.home\}/);
 });
 
-test('Code handoff and approvals use borderless symmetric entrance and exit motion', () => {
+test('Code handoff and pending command approvals use borderless entrance motion', () => {
   const css = readFileSync(join(import.meta.dirname, '../tokens.css'), 'utf8');
   const composer = readFileSync(join(import.meta.dirname, 'EngineeringComposer.tsx'), 'utf8');
-  const view = readFileSync(join(import.meta.dirname, '../views/EngineeringOS.tsx'), 'utf8');
+  const view = readFileSync(join(import.meta.dirname, 'EngineeringApproval.tsx'), 'utf8');
   assert.match(css, /\.engmodegate \{[^}]*border: 0;[^}]*transform-origin: bottom center;/);
   assert.match(css, /\.engapproval \{[^}]*border: 0;[^}]*transform-origin: bottom center;/);
   assert.match(css, /@keyframes eng-prompt-in/);
   assert.match(css, /@keyframes eng-prompt-out/);
   assert.match(composer, /data-state=\{closing \? 'closing' : 'open'\}/);
-  assert.match(view, /data-state=\{closing \? 'closing' : 'open'\}/);
+  assert.match(view, /if \(!approval\) return null/);
+  assert.match(view, /className="engapproval" data-state="open"/);
 });
 
 test('Code history uses mode markers and the left-nav thread typography', () => {
@@ -116,10 +117,12 @@ test('Code landing reserves runtime chrome for actionable connection states', ()
 test('Code primary approvals and context selectors stay inside the shared composer surface', () => {
   const css = readFileSync(join(import.meta.dirname, '../tokens.css'), 'utf8');
   const composer = readFileSync(join(import.meta.dirname, 'EngineeringComposer.tsx'), 'utf8');
+  const coding = readFileSync(join(import.meta.dirname, '../thread/CodingComposer.tsx'), 'utf8');
   assert.match(css, /\.engapprovalactions \.primary \{[^}]*background: var\(--brand\);[^}]*border-color: var\(--brand\);/);
   assert.match(css, /\.engapprovalactions \.primary:hover \{[^}]*background: color-mix\(in srgb, var\(--brand\) 88%, var\(--text\)\);/);
-  assert.match(composer, /<div className="engcompose cbox">[\s\S]*<div className="engcomposebar row">[\s\S]*<div className="engmodebar row">[\s\S]*<\/div>[\s\S]*\{permissionsOpen/);
-  assert.equal(composer.match(/<div className="engmodebar row">/g)?.length, 1);
+  assert.match(composer, /<CodingComposer[\s\S]*contextChips=\{project \? <ProjectChip/);
+  assert.match(coding, /<SessionComposer[\s\S]*controls=\{<>[\s\S]*\{contextChips\}[\s\S]*<ModeSeg[\s\S]*<PermissionsPop[\s\S]*aria-label="Send"/);
+  assert.equal(coding.match(/<ModeSeg /g)?.length, 1);
   assert.match(css, /\.cbox \.engmodebar\.row \{[^}]*flex-wrap: nowrap;/);
   assert.match(css, /\.engmodebar \.cchip \{ min-height: 30px; \}/);
   assert.match(css, /\.engmodebar \.engmodes\.threadseg \{[^}]*min-height: 30px;[^}]*border-color: transparent;[^}]*border-radius: var\(--r-pill\);[^}]*background: transparent;/);

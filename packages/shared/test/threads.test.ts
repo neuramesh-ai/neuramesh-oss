@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isCodingThread, kindMarker, parseKindMarker, stripMarkdownInline, threadKindOf, threadTitle } from '../src/threads';
+import { isCodingThread, kindMarker, parseKindMarker, stripMarkdownInline, threadKindOf, threadSurfaceKind, threadTitle } from '../src/threads';
 import { codeThreadStatus } from '../src/code-sessions';
 import { plainTitle } from '../src/sessions';
 
@@ -58,6 +58,14 @@ describe('titles are plain text (2026-09-12)', () => {
 });
 
 describe('the thread KIND (0144, coding threads)', () => {
+  it('keeps a coding birth on its surface through delayed replication, then follows authoritative changes', () => {
+    expect(threadSurfaceKind(undefined, true)).toBe('coding');
+    expect(threadSurfaceKind({ kind: 'coding' }, true)).toBe('coding');
+    expect(threadSurfaceKind({ kind: 'chat' }, true)).toBe('chat');
+    expect(threadSurfaceKind({}, true)).toBe('chat');
+    expect(threadSurfaceKind(undefined, false)).toBe('chat');
+    expect(threadSurfaceKind({ kind: 'coding' }, false)).toBe('coding');
+  });
   it('absent, unknown and legacy read as chat; only the word coding is coding', () => {
     expect(threadKindOf(undefined)).toBe('chat');
     expect(threadKindOf(null)).toBe('chat');

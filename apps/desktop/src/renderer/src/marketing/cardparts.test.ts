@@ -23,30 +23,30 @@ test('a plain post: the body is the caption and there is nothing to film', () =>
 const CATALOG = { served: true, tier: 'starter', tiers: [{ tier: 'starter', label: 'NeuraMesh Video Starter', model: 'Seedance 2.0', seconds: 8, credits: 194, lengths: [5, 8, 10, 15], perSecondMicros: 241_900 }, { tier: 'xpress', label: 'NeuraMesh Video Xpress', model: 'MiniMax H3', seconds: 8, credits: 48 }] };
 
 test('the length on the facts line (plan §8): the draft\'s pick priced by the door\'s own formula, held inside the tier\'s lengths, the default when it has none', () => {
-  assert.deepEqual(filmFacts({ seconds: 15 }, CATALOG), ['NeuraMesh Video Starter', 'Seedance 2.0', '15 s', 'about 363 credits', '4 min']);
-  assert.deepEqual(filmFacts({ seconds: 30 }, CATALOG)!.slice(2, 4), ['15 s', 'about 363 credits']); // 30 s on a 15 s tier: the door films 15, the card says 15
-  assert.deepEqual(filmFacts({ seconds: 5 }, CATALOG)!.slice(2, 5), ['5 s', 'about 121 credits', '2 min']);
+  assert.deepEqual(filmFacts({ seconds: 15 }, CATALOG), ['NeuraMesh Video Starter', '15 s', 'about 363 credits', '4 min']);
+  assert.deepEqual(filmFacts({ seconds: 30 }, CATALOG)!.slice(1, 3), ['15 s', 'about 363 credits']); // 30 s on a 15 s tier: the door films 15, the card says 15
+  assert.deepEqual(filmFacts({ seconds: 5 }, CATALOG)!.slice(1, 4), ['5 s', 'about 121 credits', '2 min']);
   assert.equal(filmSeconds(null, CATALOG.tiers[0]), 8);
   assert.equal(filmSeconds({ seconds: 12 }, CATALOG.tiers[1]), 12); // a tier without lengths takes the pick as it is
   assert.equal(filmSeconds({ seconds: 12 }, null), 12);
 });
 
 test('the facts line: the tier and the price before a film, the record after, the own key named, nothing when nothing is known', () => {
-  assert.deepEqual(filmFacts(null, CATALOG), ['NeuraMesh Video Starter', 'Seedance 2.0', '8 s', 'about 194 credits', '2 min']);
-  assert.deepEqual(filmFacts({ video: { tier: 'starter', model: 'seedance-2.0-fast', seconds: 8, credits: 194, at: '2026-09-19T09:14:00.000Z' } }, CATALOG)!.slice(0, 4), ['NeuraMesh Video Starter', 'seedance-2.0-fast', '8 s', '194 credits']);
+  assert.deepEqual(filmFacts(null, CATALOG), ['NeuraMesh Video Starter', '8 s', 'about 194 credits', '2 min']);
+  assert.deepEqual(filmFacts({ video: { tier: 'starter', model: 'seedance-2.0-fast', seconds: 8, credits: 194, at: '2026-09-19T09:14:00.000Z' } }, CATALOG)!.slice(0, 3), ['NeuraMesh Video Starter', '8 s', '194 credits']);
   assert.deepEqual(filmFacts({ video: { tier: 'own', model: 'gemini-omni-1.1-flash', seconds: 8, credits: 0, at: 'bad' } }, null), ['gemini-omni-1.1-flash', '8 s', 'your key', 'no credits']);
   assert.equal(filmFacts({ video_pending: true }, CATALOG), null);
   assert.equal(filmFacts(null, { served: false, tier: null, tiers: [] }), null);
   assert.equal(filmFacts(null, null), null);
-  assert.equal(filmingOn(CATALOG), 'NeuraMesh Video Starter (Seedance 2.0)');
+  assert.equal(filmingOn(CATALOG), 'NeuraMesh Video Starter');
   assert.equal(filmingOn(null), 'the platform');
 });
 
 test('the frame on the facts line: named before the film, and after it whether the lane took it', () => {
   assert.deepEqual(filmFacts({ frame: 'App-Home.png' }, CATALOG)!.at(-1), 'frame · App-Home.png');
-  assert.deepEqual(filmFacts({ video: { tier: 'starter', model: 'Seedance 2.0', seconds: 8, credits: 194, at: 'bad', frame: 'App-Home.png', frameUsed: true } }, CATALOG), ['NeuraMesh Video Starter', 'Seedance 2.0', '8 s', '194 credits', 'frame · App-Home.png']);
+  assert.deepEqual(filmFacts({ video: { tier: 'starter', model: 'Seedance 2.0', seconds: 8, credits: 194, at: 'bad', frame: 'App-Home.png', frameUsed: true } }, CATALOG), ['NeuraMesh Video Starter', '8 s', '194 credits', 'frame · App-Home.png']);
   assert.deepEqual(filmFacts({ video: { tier: 'xpress', model: 'MiniMax H3', seconds: 8, credits: 48, at: 'bad', frame: 'App-Home.png', frameUsed: false } }, CATALOG)!.at(-1), 'frame · App-Home.png · not used');
-  assert.deepEqual(filmFacts({ video: { tier: 'starter', model: 'Seedance 2.0', seconds: 8, credits: 194, at: 'bad' } }, CATALOG), ['NeuraMesh Video Starter', 'Seedance 2.0', '8 s', '194 credits']);
+  assert.deepEqual(filmFacts({ video: { tier: 'starter', model: 'Seedance 2.0', seconds: 8, credits: 194, at: 'bad' } }, CATALOG), ['NeuraMesh Video Starter', '8 s', '194 credits']);
 });
 
 
@@ -70,5 +70,13 @@ test('the product shots on the facts line (plan §9): the script\'s SHOW images 
   assert.equal(filmFacts({ video: { ...v, shots: { asked: 1, applied: 1 } } }, CATALOG)!.at(-1), 'product shot');
   assert.equal(filmFacts({ video: { ...v, shots: { asked: 2, applied: 2 } } }, CATALOG)!.at(-1), 'product shots · 2 of 2');
   assert.equal(filmFacts({ video: { ...v, shots: { asked: 1, applied: 0, why: 'not on the shelf: gone.png' } } }, CATALOG)!.at(-1), 'product shot · not applied · not on the shelf: gone.png');
-  assert.deepEqual(filmFacts({ video: v }, CATALOG), ['NeuraMesh Video Starter', 'Seedance 2.0', '15 s', '363 credits']);
+  assert.deepEqual(filmFacts({ video: v }, CATALOG), ['NeuraMesh Video Starter', '15 s', '363 credits']);
+});
+
+test('no vendor reaches the card (George, 2026-10-06): a catalog or a record that still names a model prints the tier only', () => {
+  // the fixtures above keep 'Seedance 2.0' and 'MiniMax H3' on purpose: an older server, and drafts filmed before the rule, still carry them
+  const lines = [filmFacts(null, CATALOG), filmFacts({ video: { tier: 'xpress', model: 'MiniMax H3', seconds: 8, credits: 48, at: 'bad' } }, CATALOG), [filmingOn(CATALOG)]];
+  for (const l of lines) assert.doesNotMatch(l!.join(' · '), /seedance|minimax|kling/i);
+  // positive control: a film on the person's own key names their model, because the key is theirs
+  assert.match(filmFacts({ video: { tier: 'own', model: 'veo-3.1', seconds: 8, credits: 0, at: 'bad' } }, null)!.join(' · '), /veo-3\.1 · 8 s · your key/);
 });

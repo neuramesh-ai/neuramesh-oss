@@ -9,11 +9,11 @@ import { HOST_NOT_RUNNING, directActs } from '../../host/directacts';
 import { fetchImageDataUrl } from '../../mediafetch';
 import { apiAuthHeaders } from '../../apiauth';
 import { ipcMain } from 'electron';
-import type { PowerSyncDatabase } from '@powersync/node';
+import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 import { scheduleRunsFor } from './session-runs';
 
 export interface ContentDeps {
-  db: () => PowerSyncDatabase;
+  db: () => ReplicaDatabase;
   ws: () => string;
 }
 

@@ -7,7 +7,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 # NM_API_PORT lets a second worktree run its OWN control-api beside another session's: the stack
-# (pg + powersync) is shared, but the API must be the one built from THIS source or a command this
+# (Postgres) is shared, but the API must be the one built from THIS source or a command this
 # branch adds will not exist. Defaults to the shared 8789.
 #
 # 8789 IS THE CONNECTOR PORT (2026-08-26, George). An OAuth connect only completes on a callback
@@ -43,13 +43,13 @@ for k in ANTHROPIC_API_KEY CODEX_API_KEY OPENAI_API_KEY GEMINI_API_KEY GOOGLE_AP
 done
 
 # the stack may already be live under another runtime — only reach for compose when it isn't
-if ! (nc -z -w 1 127.0.0.1 55435 && nc -z -w 1 127.0.0.1 58081) >/dev/null 2>&1; then
+if ! (nc -z -w 1 127.0.0.1 55435) >/dev/null 2>&1; then
   docker compose -f dev/stack/docker-compose.yaml up -d --wait
 fi
 
 if ! curl -sf "http://127.0.0.1:${API_PORT}/healthz" >/dev/null 2>&1; then
   # NM_ALLOW_ACTOR_HEADER=1: NM_AUTH=dev speaks through the bare header, closed by default
-  (cd packages/control-api && DATABASE_URL="postgresql://postgres:nm@127.0.0.1:55435/nm" PORT="${API_PORT}" NM_EMBED=on NM_ALLOW_ACTOR_HEADER=1 pnpm exec tsx src/server.ts) &
+  (cd packages/control-api && DATABASE_URL="postgresql://postgres:nm@127.0.0.1:55435/nm" PORT="${API_PORT}" NM_EMBED=on NM_ALLOW_ACTOR_HEADER=1 NM_LOCAL_SYNC=1 NM_BRAIN_STORAGE_DIR="${NM_BRAIN_STORAGE_DIR:-${NM_USERDATA:-$HOME/.neuramesh-dev}/brain-objects}" pnpm exec tsx src/server.ts) &
   API_PID=$!
   trap 'kill $API_PID >/dev/null 2>&1 || true' EXIT
   until curl -sf "http://127.0.0.1:${API_PORT}/healthz" >/dev/null 2>&1; do sleep 0.3; done
@@ -68,5 +68,5 @@ pnpm --filter @neuramesh/desktop build
 NM_USERDATA="${NM_USERDATA/#\~/$HOME}"
 export NM_USERDATA="${NM_USERDATA:-$HOME/.neuramesh-dev}"
 
-cd apps/desktop && NM_AUTH="${NM_AUTH:-dev}" NM_API="http://127.0.0.1:${API_PORT}" NM_POWERSYNC=http://127.0.0.1:58081 \
+cd apps/desktop && NM_AUTH="${NM_AUTH:-dev}" NM_API="http://127.0.0.1:${API_PORT}" NM_LOCAL_SYNC=1 \
   pnpm exec electron . --sync --remote-debugging-port="${PORT:-9223}"

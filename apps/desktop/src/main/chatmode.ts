@@ -10,6 +10,7 @@
 import { styled } from './housestyle';
 import { join } from 'node:path';
 import { brainRoot, subjectSlug } from './harness/brain';
+import { WEB_PREVIEW_PROMPT, docDropBody } from '@neuramesh/shared';
 
 /** The subset of a hosted agent these decisions need. */
 export interface ChatAgent {
@@ -144,7 +145,7 @@ export function isImageFile(name: string): boolean {
 
 /** The message body that renders a produced file as an inline card (docs/30's doc-drop shape). */
 export function fileDropBody(label: string, file: string, content: string): string {
-  return `📄 **${label}** — saved to the library as \`${file}\`.\n\n${content}`;
+  return docDropBody(label, file, content);
 }
 
 /**
@@ -189,6 +190,8 @@ export function chatSystemPrompt(agent: ChatAgent, channelSlug: string, opts: { 
 ${board}
 
 ${tools}
+
+${WEB_PREVIEW_PROMPT}
 
 How to talk: like a sharp colleague, not a chat assistant. Answer the question that was asked, lead with the answer, and let the length follow the question — one line for one line, and real depth when the question has depth. Markdown where it aids scanning. No preamble, no restating the request, no "great question", no offering three options when you have a view. Say plainly when you don't know or when the evidence is thin; a clear "the evidence is thin here" is worth more than a confident guess.
 

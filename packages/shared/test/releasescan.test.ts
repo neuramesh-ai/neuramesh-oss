@@ -2,7 +2,7 @@
 // merged pull requests only for a repository with neither. Noise never reaches the digest, the
 // cursor advances to the scan instant, and the marker names the newest candidate.
 import { describe, expect, it } from 'vitest';
-import { isNoisePr, parseReleaseRef, releaseDigest, releaseLogNote, releaseMarker, releaseTitle, scanWindow, type ScanPr } from '../src/releasescan';
+import { isNoisePr, isReleasePayload, parseReleaseRef, releaseDigest, releaseLogNote, releaseMarker, releaseTitle, scanWindow, type ScanPr } from '../src/releasescan';
 
 const pr = (n: number, title: string, mergedAt: string, extra: Partial<ScanPr> = {}): ScanPr => ({ number: n, title, mergedAt, labels: [], url: `https://github.com/o/r/pull/${n}`, ...extra });
 const NOW = '2026-09-17T09:00:00Z';
@@ -149,5 +149,17 @@ describe('the title line and the ledger note', () => {
     const quiet = scanWindow({ releases: [], tags: [], prs: [], cursor: CURSOR, now: NOW });
     expect(releaseTitle('o/r', quiet)).toBe('Release drafts · nothing new · o/r');
     expect(releaseLogNote(quiet, 'v0.133.0')).toBe('nothing new since v0.133.0');
+  });
+});
+
+// two readers (2026-10-07): the daemon's tick routes a release watch by it (host/schedules.ts), and hq's
+// Upcoming list keeps the slot hint off a release watch, which drafts when a release ships, not before a slot
+describe('isReleasePayload', () => {
+  it('reads a release watch and nothing else', () => {
+    expect(isReleasePayload({ routine: true, release: { repo: 'r1', slug: 'acme/site', cursor: { at: '2026-10-07T09:00:00Z', tag: null }, log: [] } })).toBe(true);
+    expect(isReleasePayload({ routine: true, release: { repo: 'r1', latest: true } })).toBe(true);
+    expect(isReleasePayload({ routine: true })).toBe(false);
+    expect(isReleasePayload({ release: 'acme/site' })).toBe(false);
+    expect(isReleasePayload(null)).toBe(false);
   });
 });

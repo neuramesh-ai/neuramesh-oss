@@ -12,10 +12,10 @@ import { brainRoot } from '../../harness/brain';
 import { sandboxEnvForced, sandboxFsEnabled, setSandboxFsCache } from '../../runtime/adapter';
 import { writeSandboxSetting } from '../../sandbox/setting';
 import { ipcMain } from 'electron';
-import type { PowerSyncDatabase } from '@powersync/node';
+import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 
 export interface SettingsDeps {
-  db: () => PowerSyncDatabase;
+  db: () => ReplicaDatabase;
   ws: () => string;
 }
 

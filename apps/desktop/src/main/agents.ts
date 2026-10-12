@@ -37,7 +37,7 @@ export function emitStream(key: string, agent: string, text: string, done: boole
   liveStreams.publish(key, agent, body, done, thinking);
 }
 
-import type { PowerSyncDatabase } from '@powersync/node';
+import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 import type { AgentLog, LogFn } from './agentlog';
 import { buildDesignPrompt, designSystemPrompt, claudeDesignPromptBlock, designProviderFromEvents, mentionRe, bareAddressRe, defaultBaselineRules, visibleStream, STARTER_MODEL, TURN_BUDGETS, type Actor, type DesignProvider, type NMEvent, type SessionOrigin } from '@neuramesh/shared';
 
@@ -45,6 +45,9 @@ import { HostQueue, durableStore } from './harness/hostqueue';
 // shared compute (0114): one origin-affinity rule, shared with every other client
 import { shouldClaim, type ClaimVerdict, type ComputePrefs, type MachineCapability } from '@neuramesh/shared';
 import { Brain, type SubjectRef, cachePath, deliverablePath } from './harness/brain';
+import { hostConversationRecorder } from './host/brain-recording';
+import { recordedRuntime } from './runtime/brain-recording';
+import { publishConversationArtifact } from './harness/brain-sync';
 import { removeTaskWorkspace } from './harness/workspaces';
 import { stagePriorDesignRound } from './staging';
 import { claudeCode } from './runtime/claudecode';
@@ -53,6 +56,7 @@ import { makeSchedules } from './host/schedules';
 import { makeOrchSweeps } from './host/orchsweeps';
 import { makeWake } from './host/wake';
 import { makeWakeRouting } from './host/wakerouting';
+import { feedMessagesQuery } from './host/chat-message-queries';
 import { makeSleeperWake } from './host/sleepers';
 import { makeLegs } from './host/legs';
 import { makeOrchTurn } from './host/orchestratorturn';
@@ -74,7 +78,7 @@ import { ParkBook } from './harness/park';
 import { readAnswers } from '@neuramesh/shared';
 
 import { pickImageProvider, generateImage, reviewImage, thumbDataUrl, publishDataUrl, type ImageCred } from './imagegen';
-import { parseBrandGuidelines, buildImagePrompt, EMPTY_BRAND, type BrandTokens } from '@neuramesh/shared';
+import { buildImagePrompt, type BrandTokens } from '@neuramesh/shared';
 import type { RuntimeAdapter, ProviderName, PromptOverride } from './runtime/adapter';
 import { providerFor, keyEnvFor, setAgentProxy, sandboxFsEnabled, setSandboxFsCache, onCloudMachine, codexSandboxMode } from './runtime/adapter';
 import { startEgressProxy } from './sandbox/egress';
@@ -141,7 +145,7 @@ export interface HostedAgent {
 export type SkillRef = { name: string; description: string; body: string; pack_name?: string | null };
 
 interface HostOpts {
-  db: PowerSyncDatabase;
+  db: ReplicaDatabase;
   machineId: string;
   /** the workspace this host is standing in — agents are workspace-level resources now (0114),
    *  so this, not machineId, is what decides which agents this daemon may serve */
@@ -383,9 +387,9 @@ const anthropicAdapter: RuntimeAdapter = {
 export function runtimeFor(runtime: string): RuntimeAdapter {
   // OpenAI agents run the in-process @openai/codex-sdk (worker/chat/reason) — the local codex harness
   // on the user's ChatGPT login or an OpenAI key. e2e-validated on the subscription in the live daemon.
-  if (runtime === 'codex') return codexSdkAdapter;
-  if (runtime === 'gemini') return geminiAdapter;
-  return anthropicAdapter;
+  if (runtime === 'codex') return recordedRuntime(codexSdkAdapter, 'codex');
+  if (runtime === 'gemini') return recordedRuntime(geminiAdapter, 'gemini');
+  return recordedRuntime(anthropicAdapter, 'claude');
 }
 
 // ── "Give me ideas" — the launcher's live assessment ──────────────────────────
@@ -501,7 +505,7 @@ export function stopExecuting(taskId: string): void {
  * fallback reads and whether an abort can cancel the wait — a chat has no execution to abort.
  */
 export async function awaitDecision(
-  db: PowerSyncDatabase,
+  db: ReplicaDatabase,
   messageId: string,
   where: { taskId: string } | { threadId: string },
   question: string,
@@ -642,24 +646,7 @@ Set it ONLY when the post should carry a visual — because the human asked for 
 The system turns each entry into a reviewable post card in the task thread; the human approves and schedules them and you NEVER publish. Write ONLY posts.json (plus any media files you reference) — no README, no prose summary.]`;
 
 
-// The same brand doc stageBrandContext hands the marketer as prose, read back as STRUCTURE so
-// the image generator can bind the real palette (marketing-workflow §4.6). The bootstrap already
-// writes a `| Role | Hex |` table into brand-guidelines.md — this is where that pays off. A room
-// with no brand doc yet still generates, just without the colour constraint.
-export async function brandTokensFor(db: AttDbLike, channelId: string): Promise<{ tokens: BrandTokens; product?: string }> {
-  const [ch] = await db.getAll<{ marketing: string | null; website: string | null }>(
-    `select c.marketing as marketing, p.website as website
-       from channels c left join projects p on p.id = c.project_id where c.id = ?`,
-    [channelId],
-  ).catch(() => [] as Array<{ marketing: string | null; website: string | null }>);
-  const [doc] = await db.getAll<{ inline_content: string | null }>(
-    `select inline_content from artifacts where channel_id = ? and kind = 'doc' and name = 'brand-guidelines.md' order by created_at desc limit 1`,
-    [channelId],
-  ).catch(() => [] as Array<{ inline_content: string | null }>);
-  let product = ch?.website ?? undefined;
-  try { if (ch?.marketing) product = (JSON.parse(ch.marketing) as { website?: string }).website || product; } catch { /* keep the project's */ }
-  return { tokens: doc?.inline_content ? parseBrandGuidelines(doc.inline_content) : EMPTY_BRAND, product };
-}
+export { brandTokensFor } from './host/brandtokens';
 
 // Which key draws the pictures: the BYOK credential the user stored in the app first (the same
 // provider_credentials row a Codex or Gemini agent resolves), then this machine's env. Note a
@@ -943,6 +930,7 @@ export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId,
   const brain = new Brain();
   const execQueue = new HostQueue({
     log: (line) => console.log(`agent_host ${line}`),
+    around: hostConversationRecorder({ db, workspace, actorId: ownerActorId, apiUrl, headers: () => apiAuthHeaders(apiUrl, { kind: 'human', id: ownerActorId }), headersForActor: (actor) => apiAuthHeaders(apiUrl, actor as Actor), log: (line) => console.warn(`agent_host ${line}`) }),
     turns: {
       open: (w) => {
         const subject = w.subject;
@@ -1010,6 +998,8 @@ export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId,
   }
 
   async function post(path: string, actor: { kind: string; id: string; role?: string }, body: unknown) {
+    const artifact = publishConversationArtifact(path, body, actor);
+    if (artifact) return artifact;
     const res = await fetch(`${apiUrl}${path}`, {
       method: 'POST',
       headers: await apiAuthHeaders(apiUrl, actor as Actor),
@@ -1134,7 +1124,7 @@ export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId,
   // The conversation workspace + deep work (host/workspace.ts).
   const { libraryDocs, subjectFor, ensureChatWorkspace, sweepLegacyChatDirs, workspaceListing, workspaceRead,
           readOnlyStudy, startDeepWork } = makeWorkspace({
-    post, machineId, guards, db, workspace, alog, brain, claimed, narrate, openRun, recordLegResult: (...a: Parameters<typeof recordLegResult>) => recordLegResult(...a),
+    post, machineId, guards, db, workspace, apiUrl, ownerActorId, alog, brain, claimed, narrate, openRun, recordLegResult: (...a: Parameters<typeof recordLegResult>) => recordLegResult(...a),
     // a THUNK: wake.ts is built below and takes services from here — the cycle has to break somewhere
     wake: (...a) => wake(...a),
   });
@@ -1820,8 +1810,7 @@ export function startAgentHost({ db, machineId, workspace, apiUrl, ownerActorId,
 
 
   db.watch(
-    `select id, channel_id, thread_id, author_kind, author_id, body from messages
-     where task_id is null and created_at > ? order by created_at desc limit 30`,
+    feedMessagesQuery,
     [startedAt],
     {
       onResult: (r) => {

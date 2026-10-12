@@ -183,3 +183,6 @@ export const IconMail = ({ s }: { s?: number }) => <Svg s={s}><rect x="3" y="5" 
 export const IconRocket = ({ s }: { s?: number }) => <Svg s={s}><path d="M5 15c-1.5 1.5-2 5-2 5s3.5-.5 5-2" /><path d="M14 4c3-1 6-1 6-1s0 3-1 6c-2 4-6 7-8 8l-4-4c1-2 4-6 7-9z" /><circle cx="15" cy="9" r="1.5" /></Svg>;
 export const IconSpeaker = ({ s }: { s?: number }) => <Svg s={s}><path d="M3 11v2a2 2 0 0 0 2 2h1l4 4V5L6 9H5a2 2 0 0 0-2 2z" /><path d="M15 9a3 3 0 0 1 0 6" /><path d="M18 6a7 7 0 0 1 0 12" /></Svg>;
 export const IconPhone = ({ s }: { s?: number }) => <Svg s={s}><rect x="6" y="2.5" width="12" height="19" rx="2.5" /><path d="M11 18h2" /></Svg>;
+
+/** Compact thread context; distinct from chat and the split-pane toggle. */
+export const IconOverview = ({ s }: { s?: number }) => <Svg s={s}><circle cx="4" cy="6" r="1" /><circle cx="4" cy="12" r="1" /><circle cx="4" cy="18" r="1" /><path d="M9 6h11M9 12h11M9 18h7" /></Svg>;

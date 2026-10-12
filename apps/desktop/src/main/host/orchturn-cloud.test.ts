@@ -68,15 +68,16 @@ test('the codex transport answers outside electron, and its shim lands in NM_USE
     `echo '{"type":"turn.completed","usage":{"input_tokens":1,"cached_input_tokens":0,"output_tokens":1}}'`,
   ].join('\n'));
 
-  // the bubble's feed: the thoughts stream before the reply, and never become it (the repo-connect round's Option A)
+  // the bubble's feed: the thoughts stream before the reply, and never become it (the repo-connect round's Option A).
+  // a tool step reads in the run card's words, never the tool's name (2026-10-05)
   const fed: Array<[string, string | undefined]> = [];
   const reply = await codexSdkOrchestratorTurn({ ...ARGS, onDelta: (t, th) => { fed.push([t, th]); } });
 
   assert.equal(reply, 'hello from codex');
   assert.deepEqual(fed, [
     ['', '**Comparing the storage adapters**'],
-    ['', '**Comparing the storage adapters**\n\n› list_tasks · open'],
-    ['hello from codex', '**Comparing the storage adapters**\n\n› list_tasks · open'],
+    ['', '**Comparing the storage adapters**\n\n› checks the board · open'],
+    ['hello from codex', '**Comparing the storage adapters**\n\n› checks the board · open'],
   ]);
   assert.match(readFileSync(join(root, 'codex.argv'), 'utf8'), /model_reasoning_summary="detailed"/, 'codex is asked for the summaries the bubble shows');
   const shim = join(state, 'nm-orch-mcp-shim.mjs');

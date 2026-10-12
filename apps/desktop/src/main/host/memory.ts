@@ -10,7 +10,7 @@ import type { HostedAgent } from '../agents';
 import { formatRecallNote } from '../recallnote';
 
 import { type LogFn } from '../agentlog';
-import type { PowerSyncDatabase } from '@powersync/node';
+import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 
 
 
@@ -28,7 +28,7 @@ import type { HostCtx } from './ctx';
 
 export function makeMemory(ctx: HostCtx & {
   apiUrl: string;
-  db: PowerSyncDatabase;
+  db: ReplicaDatabase;
   ownerActorId: string;
   post: unknown;
   workspace: string;

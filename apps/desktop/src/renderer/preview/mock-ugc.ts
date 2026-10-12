@@ -4,8 +4,12 @@
 // LENGTH as chips (the pick that prices the film); the other holds the pick answered and the two
 // video drafts it produced, one filmed at fifteen seconds, so the card's facts line, the pending
 // row and the labelled Request changes control are all on screen.
+import { filmStartLine } from '@neuramesh/shared';
+
 const ago = (ms: number) => new Date(Date.now() - ms).toISOString();
 const MIN = 60_000;
+// plume's film line, from the daemon's own words (host/videogen.ts)
+const FILM_LINE = filmStartLine({ seconds: 15, tier: 'NeuraMesh Video Starter', asked: 15, credits: 363 });
 
 export const UGC_ANGLES_THREAD_ID = 'th-ugc-angles';
 export const UGC_DRAFTS_THREAD_ID = 'th-ugc-drafts';
@@ -51,30 +55,35 @@ export const UGC_FILM = 'data:video/mp4;base64,AAAAIGZ0eXBpc29tAAACAGlzb21pc28yY
 
 export const ugcThreads: any[] = [
   { id: UGC_ANGLES_THREAD_ID, title: 'UGC scripts for Flowe AI', description: '', created_by: 'human:u-george', task_id: null, created_at: ago(9 * MIN), updated_at: ago(8 * MIN), msg_count: 2, last_body: 'Three angles on the card. Pick one, the platforms and the length, or type your own.', last_author_kind: 'agent', last_at: ago(8 * MIN) },
-  { id: UGC_DRAFTS_THREAD_ID, title: 'UGC scripts, fifteen seconds', description: '', created_by: 'human:u-george', task_id: null, created_at: ago(40 * MIN), updated_at: ago(3 * MIN), msg_count: 5, last_body: 'Filming 15 s on NeuraMesh Video Starter (Seedance 2.0). It takes about 4 minutes and costs 363 credits. The film lands on the card.', last_author_kind: 'agent', last_at: ago(3 * MIN) },
+  { id: UGC_DRAFTS_THREAD_ID, title: 'UGC scripts, fifteen seconds', description: '', created_by: 'human:u-george', task_id: null, created_at: ago(40 * MIN), updated_at: ago(3 * MIN), msg_count: 5, last_body: FILM_LINE, last_author_kind: 'agent', last_at: ago(3 * MIN) },
 ];
 
 export const ugcMsgs: Record<string, any[]> = {
   [UGC_ANGLES_THREAD_ID]: [
-    { id: 'ug1', author_kind: 'human', author_id: 'u-george', created_at: ago(9 * MIN), body: 'Run the ugc scripts playbook for Flowe AI.' },
+    { id: 'ug1', author_kind: 'human', author_id: 'u-george', created_at: ago(9 * MIN), body: 'Run the UGC scripts playbook for Flowe AI.' },
     { id: 'ug2', author_kind: 'agent', author_id: 'a-plume', created_at: ago(8 * MIN), body: `I read business-profile.md and market-research.md. Three angles on the card. Pick one, the platforms and the length, or type your own.\n\n${ANGLE_CARD}` },
   ],
   [UGC_DRAFTS_THREAD_ID]: [
-    { id: 'ug3', author_kind: 'human', author_id: 'u-george', created_at: ago(40 * MIN), body: 'Run the ugc scripts playbook for Flowe AI.' },
+    { id: 'ug3', author_kind: 'human', author_id: 'u-george', created_at: ago(40 * MIN), body: 'Run the UGC scripts playbook for Flowe AI.' },
     { id: 'ug4', author_kind: 'agent', author_id: 'a-plume', created_at: ago(38 * MIN), body: `I read business-profile.md and market-research.md. Three angles on the card. Pick one, the platforms and the length, or type your own.\n\n${ANGLE_CARD}` },
     { id: 'ug5', author_kind: 'human', author_id: 'u-george', created_at: ago(30 * MIN), body: '**Which angle should the UGC scripts take for Flowe AI?** → Before and after · platforms: x, linkedin · length: 15 s' },
     { id: 'ug6', author_kind: 'agent', author_id: 'a-plume', created_at: ago(28 * MIN), body: 'Two video drafts below, one for X and one for LinkedIn, both fifteen seconds in the before-and-after angle. Say the word on either and I rework it in place.' },
     { id: 'ug7', author_kind: 'human', author_id: 'u-george', created_at: ago(5 * MIN), body: 'Film the hook for draft a.‹gen-video:00000000-0000-4000-8000-00000000a00a›' },
-    { id: 'ug8', author_kind: 'agent', author_id: 'a-plume', created_at: ago(3 * MIN), body: 'Filming 15 s on NeuraMesh Video Starter (Seedance 2.0). It takes about 4 minutes and costs 363 credits. The film lands on the card.' },
+    { id: 'ug8', author_kind: 'agent', author_id: 'a-plume', created_at: ago(3 * MIN), body: FILM_LINE },
   ],
 };
 
 // the two drafts: a is filmed at fifteen seconds (its facts line says so), b waits with its length picked
 export const ugcItems: any[] = [
   { id: '00000000-0000-4000-8000-00000000a00a', channelId: 'c-marketing', thread_id: UGC_DRAFTS_THREAD_ID, platform: 'x', body: 'Fourteen tabs to know what my agents did today. Now it is one list, and what needs me is at the top. #FloweAI', status: 'draft', scheduled_at: null, published_at: null, external_url: null, created_at: ago(28 * MIN + 1000), schedule_id: null,
-    media: JSON.stringify({ script: SCRIPT_A, brief: 'Handheld phone footage, natural window light, the app on the creator\'s phone screen in the second beat. No studio.', seconds: 15, frame: 'app-home.jpg', video_id: 'film-ugc-a', video: { tier: 'starter', model: 'Seedance 2.0', seconds: 15, credits: 363, at: ago(2 * MIN), frame: 'app-home.jpg', frameUsed: true, shots: { asked: 1, applied: 1 } } }) },
+    media: JSON.stringify({ script: SCRIPT_A, brief: 'Handheld phone footage, natural window light, the app on the creator\'s phone screen in the second beat. No studio.', seconds: 15, frame: 'app-home.jpg', video_id: 'film-ugc-a', video: { tier: 'starter', model: '720p', seconds: 15, credits: 363, at: ago(2 * MIN), frame: 'app-home.jpg', frameUsed: true, shots: { asked: 1, applied: 1 } } }) },
   { id: '00000000-0000-4000-8000-00000000a00b', channelId: 'c-marketing', thread_id: UGC_DRAFTS_THREAD_ID, platform: 'linkedin', body: 'I stopped opening fourteen tabs to find out what my agents did. One list, what needs me on top, and the state of every piece of work at a glance.', status: 'draft', scheduled_at: null, published_at: null, external_url: null, created_at: ago(28 * MIN), schedule_id: null,
     media: JSON.stringify({ script: SCRIPT_B, brief: 'A cluttered desk, then the app: one room, the day grouped, the needs-you row on top. Warm desk lamp, shot on a phone.', seconds: 15 }) },
+  // c failed and d films now (2026-10-06): the card reads the house sentence and the tier, never the lane's own words or the model
+  { id: '00000000-0000-4000-8000-00000000a00c', channelId: 'c-marketing', thread_id: UGC_DRAFTS_THREAD_ID, platform: 'x', body: 'One list for every agent, and the work that needs me sits on top. #FloweAI', status: 'draft', scheduled_at: null, published_at: null, external_url: null, created_at: ago(9 * MIN), schedule_id: null,
+    media: JSON.stringify({ script: SCRIPT_A, brief: 'Handheld, window light, the creator to camera.', seconds: 10, video_error: 'The film failed. Your credits are back. Try again.' }) },
+  { id: '00000000-0000-4000-8000-00000000a00d', channelId: 'c-marketing', thread_id: UGC_DRAFTS_THREAD_ID, platform: 'x', body: 'I check one list now. That is the whole post. #FloweAI', status: 'draft', scheduled_at: null, published_at: null, external_url: null, created_at: ago(8 * MIN), schedule_id: null,
+    media: JSON.stringify({ script: SCRIPT_B, brief: 'A warm desk lamp, the creator to camera.', seconds: 10, video_pending: true }) },
 ];
 
 /** the one splice mock-fixtures.ts makes: mutation, never reassignment (see mock-release.ts) */

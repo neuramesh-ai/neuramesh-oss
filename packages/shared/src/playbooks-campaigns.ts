@@ -32,7 +32,7 @@ export const CAMPAIGN_PLAYBOOKS: Playbook[] = [
   {
     id: 'ads',
     title: 'Ads creative audit',
-    tagline: 'concept fatigue against its five impostors, needs the ads connector',
+    tagline: 'ad fatigue and its five look-alikes, needs the ads connector',
     group: 'campaigns',
     skill: 'paid-ads-audit',
     engine: 'unit',
@@ -54,7 +54,7 @@ export const CAMPAIGN_PLAYBOOKS: Playbook[] = [
     // and one draft per connected account. The one-shot "draft the latest release" is the same unit.
     id: 'release',
     title: 'Release drafts',
-    tagline: 'A release becomes posts: the brief, one draft per connected account, a release card.',
+    tagline: 'a release becomes posts: the brief and one draft for each connected account',
     group: 'campaigns',
     skill: 'release-announcement',
     engine: 'unit',

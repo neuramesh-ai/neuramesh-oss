@@ -185,5 +185,5 @@ test('the local stack\'s two ports move with NM_LOCAL_API_PORT and NM_LOCAL_POWE
   assert.deepEqual(localPortsFor({ NM_LOCAL_API_PORT: 'nope', NM_LOCAL_POWERSYNC_PORT: '0' }), { api: 8788, powersync: 58081 });
   const [local] = planConnections({ NM_LOCAL_API_PORT: '8795', NM_LOCAL_POWERSYNC_PORT: '58095' }, { clerkSignedIn: false, custom: [], baked: { apiUrl: 'https://api.example', powersyncUrl: 'https://ps.example', webUrl: 'https://web.example' } });
   assert.equal(local!.apiUrl, 'http://127.0.0.1:8795');
-  assert.equal(local!.powersyncUrl, 'http://127.0.0.1:58095');
+  assert.equal(local!.powersyncUrl, '', 'Local sync uses only the API port');
 });

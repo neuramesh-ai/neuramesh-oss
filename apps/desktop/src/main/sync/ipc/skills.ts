@@ -2,10 +2,10 @@
 // extracted from sync.ts.
 import { ipcMain, type WebContents } from 'electron';
 import { api, watchFailed } from '../../sync';
-import type { PowerSyncDatabase } from '@powersync/node';
+import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 
 export interface SkillsDeps {
-  db: () => PowerSyncDatabase;
+  db: () => ReplicaDatabase;
   ws: () => string;
   /** startSync's subscription registry — a watch registered here stays abortable there */
   watchers: Map<string, AbortController>;

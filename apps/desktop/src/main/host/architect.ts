@@ -8,7 +8,7 @@ import { buildImplementationPlan, extractDefinitionOfDone } from './plan';
 import { type SubjectRef } from '../harness/brain';
 import { type LogFn } from '../agentlog';
 import type { HostCtx } from './ctx';
-import type { PowerSyncDatabase } from '@powersync/node';
+import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 import type { Brain } from '../harness/brain';
 import type { AgentAttachment } from '../runtime/adapter';
 import type { HostQueue } from '../harness/hostqueue';
@@ -19,7 +19,7 @@ import type { makeBeats } from './beats';
 import type { makePark } from './park';
 
 export function makeArchitect(ctx: HostCtx & {
-  db: PowerSyncDatabase;
+  db: ReplicaDatabase;
   apiUrl: string;
   workspace: string;
   ownerActorId: string;

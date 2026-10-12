@@ -4,6 +4,8 @@
 // markdown, the shared renderer splits out below this rather than the arrow reversing.
 import { Children, createContext, useContext, useMemo } from 'react';
 import { type Components } from 'react-markdown';
+import { parseWebPreview } from '@neuramesh/shared';
+import { WebPreviewCard } from '../cards/WebPreviewCard';
 import { MdBody } from './MdBody';
 import { parseQuestionBlock, stripSuggestions } from '@neuramesh/shared';
 import { openLink } from '../lib/links';
@@ -36,7 +38,7 @@ export function swatchify(children: React.ReactNode): React.ReactNode {
 }
 
 /** the doors a link inside the markdown opens — per Md, read from context by the one component set */
-export type MdLinks = { taskRef?: (n: number) => TaskRefInfo | null; onOpenTask?: (id: string) => void; onOpenPlan?: (planName?: string) => void; onOpenFile?: (name: string) => void };
+export type MdLinks = { fileRef?: (name: string) => boolean; taskRef?: (n: number) => TaskRefInfo | null; onOpenTask?: (id: string) => void; onOpenPlan?: (planName?: string) => void; onOpenFile?: (name: string) => void };
 const MdLinksCtx = createContext<MdLinks>({});
 
 /** the plain text inside rendered children (a streaming code block carries the caret element) */
@@ -47,12 +49,13 @@ function textOf(n: React.ReactNode): string {
 }
 
 function MdA({ href, children }: { href?: string; children?: React.ReactNode }) {
-  const { taskRef, onOpenTask, onOpenPlan, onOpenFile } = useContext(MdLinksCtx);
+  const { taskRef, onOpenTask, onOpenPlan, onOpenFile, fileRef } = useContext(MdLinksCtx);
   // nm:task/<n> — the inline reference renders as its own component (hover card + click-to-open)
   if (href?.startsWith('nm:task/') && taskRef && onOpenTask) {
     const info = taskRef(Number(href.slice('nm:task/'.length)));
     if (info) return <TaskRefLink info={info} onOpen={onOpenTask} />;
   }
+  if (href && fileRef?.(href) && onOpenFile) return <button type="button" className="fileref" onClick={() => onOpenFile(href)}>{children}<span className="fx" aria-hidden>↗</span></button>;
   if (href?.startsWith('nm:file/') && onOpenFile) {
     const name = decodeURIComponent(href.slice('nm:file/'.length));
     return <button type="button" className="fileref" title={`${name} — open`} onClick={() => onOpenFile(name)}>{children}<span className="fx" aria-hidden>↗</span></button>;
@@ -95,6 +98,10 @@ export const MD_COMPONENTS: Components = {
     const lang = /language-(\w+)/.exec(code?.props?.className ?? '')?.[1];
     if (!lang) return <pre>{children}</pre>;
     const codeText = textOf(code?.props?.children);
+    if (lang === 'nmpreview') {
+      const preview = parseWebPreview(codeText);
+      if (preview) return <WebPreviewCard preview={preview} />;
+    }
     return (
       <div className="codeblock">
         <div className="codehead">
@@ -226,7 +233,7 @@ export function Md({ text, onAnswer, onDismissCard, answers, onOpenPlan, taskRef
   );
   // The link handlers ride CONTEXT, not closures, so the component set is one module constant: a
   // parsed block renders the same in any Md, which is what lets MdBody cache and share it.
-  const links = useMemo<MdLinks>(() => ({ taskRef, onOpenTask, onOpenPlan, onOpenFile }), [taskRef, onOpenTask, onOpenPlan, onOpenFile]);
+  const links = useMemo<MdLinks>(() => ({ taskRef, onOpenTask, onOpenPlan, onOpenFile, fileRef }), [taskRef, onOpenTask, onOpenPlan, onOpenFile, fileRef]);
   return (
     <div className="md">
       {skillTag && <span className="skillchip"><IconSkill s={12} /> skill: {(skillTag as { name: string }).name}{(skillTag as { pack?: string }).pack ? ` · ${(skillTag as { pack: string }).pack}` : ''}</span>}

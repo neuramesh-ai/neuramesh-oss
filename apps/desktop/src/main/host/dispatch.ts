@@ -5,7 +5,7 @@ import { DESIGN_PROVIDER_QUESTION, designProviderQuestionBlock } from '@neurames
 import type { DesignTask, ExecTask, HostedAgent, PlanTask } from '../agents';
 import { buildPlanningArchitectCard } from '../hirecards';
 
-import type { PowerSyncDatabase } from '@powersync/node';
+import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 
 import type { HostQueue } from '../harness/hostqueue';
 
@@ -28,7 +28,7 @@ export function makeDispatch(ctx: HostCtx & {
   agents: Map<string, HostedAgent>;
   architectFlow: ReturnType<typeof makePlanFlow>['architectFlow'];
   claimed: { has: (id: string) => boolean; add: (id: string) => unknown; delete: (id: string) => boolean };
-  db: PowerSyncDatabase;
+  db: ReplicaDatabase;
   designProviderFor: (taskId: string) => Promise<{ provider: DesignProvider; runKey: string } | null>;
   designerFlow: ReturnType<typeof makeDesignFlow>['designerFlow'];
   execQueue: HostQueue;

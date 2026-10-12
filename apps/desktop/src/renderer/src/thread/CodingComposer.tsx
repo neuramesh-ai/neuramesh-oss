@@ -1,17 +1,13 @@
-// THE ONE COMPOSER, WEARING THE CODING KNOBS (coding threads §5, docs/33 §8): the thread's own
-// cbox — the input, the chips row (attach · model · machine; the room and the repository are not
-// switchable here, so they are not chips: the branch shows in the code pane's foot, George,
-// 2026-09-26) — plus the two knobs a coding thread ADDS: the Plan | Act segment and
-// the permissions chip. The row WRAPS (George, 2026-09-26): with more chips than a row holds, the
-// knobs and Send stack cleanly on a second row and the composer grows, so nothing is ever cut off
-// (docs/34 §13: the third chip pushed Send off the screen once). The model chip is the main
-// composer's (models/CodeModelChip, George 2026-10-04), and both menus open in the house popover.
+import { EngineeringPlanProgress } from '../engineering/EngineeringPlanProgress';
+// Coding is the shared session composer with repository permissions and Plan/Act controls.
+import { filesFromPaste } from './parts';
 import { useEffect, useState } from 'react';
 import { AttachButton, AttachTray } from '../composer/attach';
-import { ComposerInput } from '../composer/ComposerInput';
+import { SessionComposer } from '../composer/SessionComposer';
 import { PERMISSION_LABELS, effectivePermission, type EngineeringSession, type PermissionCategory } from '../engineering/domain';
 import { useEngineeringAttachments, type EngineeringAttachmentUpload } from '../engineering/attachments';
-import { CodeModelChip } from '../models/CodeModelChip';
+import { CodingBrains } from '../models/CodingBrains';
+import type { EngineeringSelection } from '@neuramesh/shared';
 import type { MachineChipSlot } from '../views/EngineeringOS';
 import { IconCheck, IconChevron, IconSend, IconSettings } from '../ui/icons';
 
@@ -70,20 +66,22 @@ function ModeSeg({ session, locked, onMode }: { session: EngineeringSession; loc
   );
 }
 
-export function CodingComposer({ session, plan, onUpgrade, machineChip, onSend, onMode, onPermission, onModel }: {
+export function CodingComposer({ session, plan, onUpgrade, machineChip, onSend, onMode, onPermission, onConfigure, onOpenPlan, roomId = null, roomSlug = '', disabled = false, contextChips }: {
   session: EngineeringSession;
+  onOpenPlan?: () => void;
   plan: string;
   onUpgrade: (reason: string) => void;
   machineChip?: MachineChipSlot | undefined;
   onSend: (text: string, uploads: EngineeringAttachmentUpload[]) => void;
   onMode: (mode: 'plan' | 'act') => void;
   onPermission: (category: PermissionCategory, value: boolean) => void;
-  onModel: (modelId: string | null) => void;
+  roomId?: string | null; roomSlug?: string; disabled?: boolean; contextChips?: React.ReactNode;
+  onConfigure: (selection: EngineeringSelection) => void;
 }) {
   const [draft, setDraft] = useState('');
   const [permOpen, setPermOpen] = useState(false);
   const atts = useEngineeringAttachments(plan, onUpgrade);
-  const locked = session.state === 'streaming' || session.state === 'awaiting_approval';
+  const locked = disabled || session.state === 'streaming' || session.state === 'awaiting_approval';
   useEffect(() => { if (locked) setPermOpen(false); }, [locked]);
   const send = () => {
     const text = draft.trim();
@@ -92,14 +90,17 @@ export function CodingComposer({ session, plan, onUpgrade, machineChip, onSend, 
     setDraft(''); atts.reset();
   };
   return (
+    <>
+    <EngineeringPlanProgress session={session} onOpenPlan={onOpenPlan} />
     <div className="cbox codingbox">
       <AttachTray items={atts.items} onRemove={atts.remove} />
-      <ComposerInput value={draft} onChange={setDraft} onSend={send} people={[]} skills={[]} packs={[]} attachedSkill={null} onPickSkill={() => {}} onClearSkill={() => {}}
-        placeholder={session.mode === 'plan' ? 'Describe what to investigate or plan · ↵ send' : 'Describe what to build, fix, or test · ↵ send'} />
-      <div className="trow">
+      <SessionComposer rowClass="trow" input={<SessionComposer.Input value={draft} onChange={setDraft} onSend={send} people={[]} skills={[]} packs={[]} attachedSkill={null} onPickSkill={() => {}} onClearSkill={() => {}}
+        onPaste={(event) => { const files = filesFromPaste(event); if (files.length) { event.preventDefault(); atts.addFiles(files); } }}
+        placeholder={session.mode === 'plan' ? 'Describe what to investigate or plan · ↵ send' : 'Describe what to build, fix, or test · ↵ send'} />} controls={<>
         <AttachButton onFiles={atts.addFiles} count={atts.count} max={atts.limits.maxPerMessage} includeWhiteboard={false} />
-        <CodeModelChip pick={session.modelOverride} machineId={session.machineId ?? null} place="session" disabled={locked} onPick={onModel} />
+        <CodingBrains selection={{ agentId: session.agentId ?? null, modelId: session.modelOverride, reasoningEffort: session.reasoningEffort ?? null }} machineId={session.machineId ?? null} roomId={roomId} roomSlug={roomSlug} disabled={locked} onChange={onConfigure} />
         {machineChip?.(session.machineId ?? null, () => {}, true)}
+        {contextChips}
         {/* the knobs and Send travel as one group: on a narrow box the group wraps to its own row */}
         <span className="codingknobs">
         <ModeSeg session={session} locked={locked} onMode={onMode} />
@@ -112,7 +113,8 @@ export function CodingComposer({ session, plan, onUpgrade, machineChip, onSend, 
         </span>
         <button className="btn primary tsend" disabled={!draft.trim() || locked || atts.busy} onClick={send} aria-label="Send" data-tip="Send · ↵"><IconSend s={14} /></button>
         </span>
-      </div>
+      </>} />
     </div>
+    </>
   );
 }

@@ -411,3 +411,41 @@ Elsewhere in the film the model still draws its own laptop, with its own pseudo-
 a beat that shows the product without a SHOW line is refused at the draft, but the model adds screens
 the script never asked for, and those stay drawn. The next lever there is the prompt's look line
 ("no screens in shot" outside the SHOW beats), not tried this round.
+
+## 10. House names, house errors, real app screenshots (2026-10-06)
+
+George, on a Flowe AI routine's drafts card: (1) the card showed fal.ai's own error when a film failed or our fal balance ran out, (2) it named the model behind the tier ("NeuraMesh Video Premium (Seedance 2.5)"), and "users don't need our backend implementation details", (3) the scripts always showed an X profile capture, "we don't always need that; and when we need an actual screenshot, it should be an actual screenshot of the app from our codebase or workspace files instead of a social platform or random screenshot". He picked two rules: a shot only when the app's screen is on camera, and real app screenshots only. These reverse §6's "name the models".
+
+### 10.1 No vendor and no fal error reaches a person
+
+- **Errors.** The film door and the minute cron write a house sentence to the card (`FILM_FAILED`, `FILM_REFUSED` for fal's `content_policy` class, `FILM_LOST`, `FILM_NOT_STARTED`, `filmSlow`). fal's own words stay in the server log and on the `films` row, which no client reads. A product shot that fal could not cut in says `the shot could not be cut in`, with the lane's reason in `detail` for the log only (`film-compose.ts`).
+- **Names.** The catalog (`tierView`), each film's record (`videoMeta`) and the Credits film list send no vendor and no model name. Their `model` field carries the picture size (`houseModel`: 720p), because desktops up to 0.153.0 print it beside the tier. hq and the desktop print the tier only: the facts line, the pending line, Settings' video tiers and the Credits rows. A film on the person's own Google key still names their model, because the key is theirs. The daemon's reply reads "Filming 10 s on NeuraMesh Video Premium", and `read_drafts` no longer gives the agent the model.
+
+### 10.2 A shot only when the app's screen is on camera
+
+`looksLikeProductBeat` (shared `filmprompt.ts`) fired on "app", "phone" and "product" alone, so nearly every UGC script had to name a shelf image. It now fires on a screen on camera: a screen recording, a phone, laptop or home screen, the UI, a dashboard, a close-up on the phone, a tap through the app. A creator who holds a phone, a line about "apps" and on-screen lettering need no shot. Every film without a reference frame carries `SCREENS_RULE` ("Every phone and laptop screen stays dark or faces away from the camera."), so a beat with no shot shows no invented interface. The cap drops the look and the late cuts first, never this rule.
+
+### 10.3 Real app screenshots only
+
+A frame or a product shot is an image that a person created (Files, a chat), or the platform's copy of a repository file. An agent's web capture (the X profile) or drawn picture never counts. Enforced, not prompted:
+
+- **The column.** `artifacts.source` (0150) holds `repo:<owner>/<name>/<path>@<sha>`. Only `POST /v1/repo/shelve` writes it, and no command can. `created_by_kind` already rode every replica (`select *`), so `client-core` now declares both.
+- **The server.** `libraryImage` (`store/frames.ts`) returns only `created_by_kind = 'human' or source like 'repo:%'`, so the command (`content.create`/`revise`, frame and SHOW), the film door's frame and the cron's cut-in all hold the rule. A refusal names an agent's image as such (`{ any: true }`).
+- **The daemon.** `host/frames.ts` (`isAppShot`, `appShots`) refuses before the command, and lists only real screenshots. The brand note (`brandnote.ts`) named every shelf image a "screenshot", which is how an agent filmed the X profile capture as the app. It now names only real ones.
+- **From the code.** `shelve_repo_screenshot` (orchestrator and chat registries) names one image file of the project's repository. The platform reads it through the GitHub App (`readRepoImage`: the contents API to 1 MB, the Git blob past it, 8 MB cap, the format by its own bytes), makes the shelf copy (`shelf-image.ts`: as it is when it fits 300,000 characters, else a JPEG drawn by resvg and encoded by `jpeg-js` at the widest width that fits) and marks it. The agent never handles the bytes. `make_product_image` retired: a drawn picture of an app is an invented interface.
+
+### 10.4 Evidence
+
+`node docs/design/video-rung-2026-09/evidence/capture.mjs web house` and `… desktop house` drive the built preview harnesses in arm64 Chrome (the side-panel round's tool, copied), in Graphite and Cream oak. [web-house/](evidence/web-house/) and [desktop-house/](evidence/desktop-house/) hold six shots each, and every `report.json` fact reads `vendorOnPage: false`:
+
+- `vh-01-drafts`: plume's reply "Filming 15 s on NeuraMesh Video Starter", every facts line with the tier and no model, the filming line "The 10 s film is in progress on NeuraMesh Video Starter" (the desktop: "Filming 10 s on …"), and a failed film that reads "Video didn't generate. The film failed. Your credits are back. Try again."
+- `vh-02-video-tiers`: the three tiers as "NeuraMesh Video Starter · 5 to 15 s · 194 credits for 8 s", with no model (hq: Customizations › Connections, the desktop: Marketing OS scoped to one project).
+- `vh-03-credits`: the film rows as "NeuraMesh Video Premium · 10 s" and "… · failed, refunded".
+
+The harness fixtures carry what the new server sends (`model: '720p'`), plus a failed and a filming draft.
+
+### 10.5 Not proven here
+
+- A live film. The rules are proven by tests against fal fakes, and no clip was paid for.
+- `POST /v1/repo/shelve` against a real installation. The route test fakes GitHub (a 1-pixel PNG as it is, a 1 MB synthetic phone screen through the blob, shrunk to a JPEG under the cap).
+- Old drafts. A draft that already names an agent's image keeps the name. Its next film skips that frame or shot and says so, and a person or the agent rewrites the beat.

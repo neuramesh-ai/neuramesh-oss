@@ -16,11 +16,11 @@ import { defaultBaselineRules, mergePolicies } from '@neuramesh/shared';
 import { buildPermissionCardBody, cleanIntent, intentPrompt, permissionQuestion, policyGateOutcome, protectedPathsFromRules, rowsToRules, taskWhere, toolCallToAction, type PolicyRowLite } from '../policygate';
 import type { LogFn } from '../agentlog';
 import type { HostCtx } from './ctx';
-import type { PowerSyncDatabase } from '@powersync/node';
+import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 import type { PermissionGate, RuntimeAdapter } from '../runtime/adapter';
 
 export function makeWorkerTurn(ctx: HostCtx & {
-  db: PowerSyncDatabase;
+  db: ReplicaDatabase;
   brainNotesFor: (task: ExecTask, cap?: number, perNote?: number) => string;
   channelLessons: (workspaceId: string, channelId: string) => Promise<string>;
   discoverSkills: (channelId: string, workspaceId: string) => Promise<SkillRef[]>;

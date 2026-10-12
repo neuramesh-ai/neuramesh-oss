@@ -82,6 +82,12 @@ export const VIDEO_MODELS: Record<string, VideoModel> = {
   },
 };
 
+// NO VENDOR REACHES A PERSON (George, 2026-10-06: "users don't need our backend implementation
+// details"). A tier is NeuraMesh Video Starter, Xpress or Premium, and no client reads the model or
+// the lane behind it. A client's `model` field stays on the wire because the desktops up to 0.153.0
+// print it beside the tier ("NeuraMesh Video Premium (…)"), so it carries the picture size instead.
+export const houseModel = (m: VideoModel | undefined): string => (m?.resolution ?? '').toLowerCase();
+
 export const DEFAULT_TIERS = 'starter=seedance-2.0-fast,xpress=minimax-h3,premium=seedance-2.0';
 export const FILM_SECONDS = 8;
 

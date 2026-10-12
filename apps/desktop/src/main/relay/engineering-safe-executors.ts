@@ -42,7 +42,10 @@ interface GitMounts { readonly: string[]; writable: string[] }
 
 /** Validate a linked-worktree pointer against the machine-owned bare clone path. The editable .git
  * file may confirm that exact path, but can never choose a mount. */
-export function validatedEngineeringGitMounts(root: string, managedRepoRoot?: string): GitMounts {
+export function validatedEngineeringGitMounts(root: string, managedRepoRoot?: string | null): GitMounts {
+  // A local checkout's linked worktree is usable without granting the shell access to the
+  // person's original repository metadata. Null is explicit; unknown roots still fail closed.
+  if (managedRepoRoot === null) return { readonly: [], writable: [] };
   const marker = join(root, '.git');
   try {
     if (lstatSync(marker).isDirectory()) return { readonly: [], writable: [] };
@@ -67,7 +70,7 @@ export function validatedEngineeringGitMounts(root: string, managedRepoRoot?: st
 
 /** Bubblewrap owns the Linux command boundary: a fresh user/PID/mount/network namespace sees only
  * the selected worktree, its Git metadata, the runtime toolchain, and an empty temporary home. */
-export function engineeringBubblewrapArgv(root: string, command: string, managedRepoRoot?: string): string[] {
+export function engineeringBubblewrapArgv(root: string, command: string, managedRepoRoot?: string | null): string[] {
   const git = validatedEngineeringGitMounts(root, managedRepoRoot);
   const writable = [root, ...git.writable];
   const readonly = [...new Set(['/usr', '/bin', '/lib', '/lib64', '/usr/local', '/app', '/etc', ...git.readonly].filter(existsSync))];
@@ -158,25 +161,48 @@ function pathIsBroad(path: string, protectedPaths: readonly string[]): boolean {
   return protectedPaths.some((protectedPath) => path === protectedPath || strictlyWithin(path, protectedPath));
 }
 
-export function engineeringSeatbeltProfile(root: string, rules: readonly PolicyRule[], managedRepoRoot?: string, commandTemp?: string): string {
+/** npm ships beside bin/, not inside it. Permit that package read-only when the trusted PATH
+ * entry points to the expected installation; never follow an arbitrary link into user data. */
+export function engineeringToolchainReadPaths(path: string, protectedPaths: readonly string[]): string[] {
+  const paths: string[] = [];
+  for (const entry of path.split(':').filter(Boolean)) {
+    try {
+      const bin = realpathSync(entry);
+      if (pathIsBroad(bin, protectedPaths)) continue;
+      paths.push(bin);
+      if (basename(bin) !== 'bin') continue;
+      const expected = join(dirname(bin), 'lib', 'node_modules', 'npm');
+      const npm = realpathSync(expected);
+      if (npm !== expected || pathIsBroad(npm, protectedPaths)) continue;
+      const entrypoint = join(bin, 'npm');
+      // mise uses a regular shell wrapper; standard Node distributions use a symlink.
+      if (lstatSync(entrypoint).isSymbolicLink() && realpathSync(entrypoint) !== join(npm, 'bin', 'npm-cli.js')) continue;
+      if (!existsSync(join(bin, 'node')) || !existsSync(join(npm, 'bin', 'npm-cli.js'))) continue;
+      if (JSON.parse(readFileSync(join(npm, 'package.json'), 'utf8')).name !== 'npm') continue;
+      paths.push(npm);
+    } catch { /* Missing or unconventional tools do not expand the readable boundary. */ }
+  }
+  return [...new Set(paths)];
+}
+
+export function engineeringSeatbeltProfile(root: string, rules: readonly PolicyRule[], managedRepoRoot?: string | null, commandTemp?: string, privateRepoRoot?: string): string {
   const jail = computeFsJail({
     worktree: root,
     userDataDir: brainRoot(),
     extraPaths: protectedPathsFromRules(rules),
   });
-  const denied = [...jail.denySubpaths, homedir(), '/nm'];
+  const denied = [...jail.denySubpaths, homedir(), '/nm', ...(privateRepoRoot ? [privateRepoRoot] : [])];
   const git = validatedEngineeringGitMounts(root, managedRepoRoot);
   const protectedPaths = [homedir(), brainRoot(), '/nm'];
-  const toolchainPaths = (process.env['PATH'] ?? '').split(':').filter(Boolean).map((path) => {
-    try { return realpathSync(path); } catch { return ''; }
-  }).filter((path) => path && !pathIsBroad(path, protectedPaths));
+  const toolchainPaths = engineeringToolchainReadPaths(process.env['PATH'] ?? '', protectedPaths);
   return strictCodeSeatbeltProfile([...new Set(denied)], [root, ...git.writable, ...(commandTemp ? [commandTemp] : [])], [...new Set([...toolchainPaths, ...git.readonly])]);
 }
 
 /** Shell execution gets an exact allowlisted environment and a mandatory kernel boundary. Generic
  * shell commands have no network; approved web reads use the structured, DNS-pinned web executor. */
-export function createEngineeringShellExecutor(root: string, rules: readonly PolicyRule[], managedRepoRoot?: string): NonNullable<ToolExecutors['bash']> {
+export function createEngineeringShellExecutor(root: string, rules: readonly PolicyRule[], managedRepoRoot?: string | null, privateRepoRoot?: string): NonNullable<ToolExecutors['bash']> {
   return async (command) => {
+    if (managedRepoRoot === null && !privateRepoRoot) throw new Error('Code cannot isolate the original repository metadata.');
     const text = commandText(command);
     const env: NodeJS.ProcessEnv = { ...agentBaseEnv(), HOME: process.platform === 'linux' ? '/tmp/home' : homedir() };
     delete env.HTTP_PROXY; delete env.HTTPS_PROXY; delete env.http_proxy; delete env.https_proxy;
@@ -188,7 +214,7 @@ export function createEngineeringShellExecutor(root: string, rules: readonly Pol
     if (process.platform === 'darwin' && sandboxExecAvailable()) {
       commandTemp = mkdtempSync(join(tmpdir(), 'nm-code-command-'));
       env.TMPDIR = commandTemp;
-      profile = writeTempProfile(engineeringSeatbeltProfile(root, rules, managedRepoRoot, commandTemp));
+      profile = writeTempProfile(engineeringSeatbeltProfile(root, rules, managedRepoRoot, commandTemp, privateRepoRoot));
       const wrapped = sandboxExecArgv(executable, args, profile);
       executable = wrapped[0]!; args = wrapped.slice(1);
     } else if (process.platform === 'linux' && existsSync(BWRAP)) {

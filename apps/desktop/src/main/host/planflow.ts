@@ -1,3 +1,4 @@
+import { readArtifactText, type ArtifactContentRow } from './artifact-content';
 // THE PLAN FLOW — the architect drafting an implementation plan, and the orchestrator relaying
 // the human's verdict on it. Split out of host/flows.ts.
 import { notifyDesktop, resolveToken, runtimeFor } from '../agents';
@@ -27,7 +28,7 @@ import { type LogFn } from '../agentlog';
 
 
 import type { HostCtx } from './ctx';
-import type { PowerSyncDatabase } from '@powersync/node';
+import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 import type { Brain } from '../harness/brain';
 import type { AgentAttachment } from '../runtime/adapter';
 import type { HostQueue } from '../harness/hostqueue';
@@ -42,7 +43,7 @@ import { makeArchitect } from './architect';
 
 
 export function makePlanFlow(ctx: HostCtx & {
-  db: PowerSyncDatabase;
+  db: ReplicaDatabase;
   apiUrl: string;
   workspace: string;
   ownerActorId: string;
@@ -121,11 +122,11 @@ async function orchPlanDecision(orch: HostedAgent, t: PlanTask) {
   const say = (body: string) => post('/v1/messages', actor, { workspace: ch.workspace_id, channel: ch.id, taskId: t.id, body });
   try {
     // point at the latest plan version (a revise may have produced v2+)
-    const lp = await db.get<{ name: string; inline_content: string | null }>(
-      `select name, inline_content from artifacts where task_id = ? and name like 'implementation-plan%' order by created_at desc limit 1`, [t.id],
+    const lp = await db.get<ArtifactContentRow & { name: string }>(
+      `select id, workspace_id, name, storage_path, content_hash, inline_content from artifacts where task_id = ? and name like 'implementation-plan%' order by created_at desc limit 1`, [t.id],
     );
     const planName = lp?.name ?? 'implementation-plan.md';
-    const planBody = lp?.inline_content ?? '';
+    const planBody = await readArtifactText(db, lp);
     let checklist: string[] = [];
     try { checklist = JSON.parse(t.requirements ?? '[]') as string[]; } catch { /* none */ }
 

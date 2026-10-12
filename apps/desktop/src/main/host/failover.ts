@@ -4,7 +4,7 @@ import type { ExecTask, HostedAgent } from '../agents';
 import { PACKS, buildFailoverCard, composeFailover, manualPinnedOnModel, planFailoverAgentUpdates, resolvePackRoles, runtimeForModel as runtimeForModelId, type AgentRole } from '@neuramesh/shared';
 import { detectProviders } from '../runtime/detect';
 
-import type { PowerSyncDatabase } from '@powersync/node';
+import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 import type { Brain } from '../harness/brain';
 import type { HostQueue } from '../harness/hostqueue';
 import type { makeFlows } from './flows';
@@ -17,7 +17,7 @@ export function makeFailover(ctx: HostCtx & {
   apiUrl: string;
   brain: Brain;
   claimed: { has: (id: string) => boolean; add: (id: string) => unknown; delete: (id: string) => boolean };
-  db: PowerSyncDatabase;
+  db: ReplicaDatabase;
   execQueue: HostQueue;
   machineId: string;
   ownerActorId: string;

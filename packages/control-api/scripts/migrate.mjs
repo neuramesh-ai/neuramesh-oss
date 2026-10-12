@@ -52,7 +52,7 @@ const AUTH_SHIM = join(REPO_ROOT, 'supabase/validate/auth-shim.sql');
 // grow a role on prod.
 const STORAGE_SQL = join(REPO_ROOT, 'dev/stack/init/98-storage.sql');
 const PUBLICATION_SQL = join(REPO_ROOT, 'dev/stack/init/99-publication.sql');
-const selfHostedPowerSync = process.env.NM_LOCAL === '1';
+const selfHostedPowerSync = process.env.NM_LOCAL === '1' && process.env.NM_LEGACY_POWERSYNC === '1';
 
 const env = process.env.VERCEL_ENV || process.env.NODE_ENV || 'development';
 const onVercel = process.env.VERCEL === '1';
