@@ -8,7 +8,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { currentUser, loadSession } from './auth';
 import { currentClerkUser, loadClerkSession } from './auth-clerk';
-import { artifactMime, bootDormant, initConnections, resyncWorkspace, setForeground, startSync, DEV_USER } from './sync';
+import { bootDormant, initConnections, resyncWorkspace, setForeground, startSync, DEV_USER } from './sync';
+import { registerAttachmentProtocol } from './attachment-protocol';
 import { connections, type Connection } from './connections';
 import { startLocalStack } from './localStack/ipc';
 import { registerFirstRunIpc } from './firstrunipc';
@@ -19,7 +20,6 @@ import { customReachable } from './customserver';
 import { systemKeychain } from './keychain';
 import { readFileSync } from 'node:fs';
 import { parseWorkspaceIdent } from './wsident';
-import { readAttachment } from './attachments';
 import { initAutoUpdate } from './update';
 import { claudeExecutablePath } from './runtime/adapter';
 import { allowedWebviewSrc, navPolicy, popupPolicy } from './browser-guard';
@@ -331,18 +331,7 @@ app.whenReady().then(async () => {
   // a connection that can boot without a sign-in (dev, local), or one whose sign-in is stored
   const bootable = connections.all().some((c) => c.authMode === 'dev' || c.authMode === 'local' || (c.authMode === 'clerk' && currentClerkUser()) || (c.authMode === 'supabase' && currentUser()));
   if (withSync && bootable) ensureSync();
-  // serve local attachment bytes to the renderer (full-res images + file previews). The id is
-  // validated as a uuid inside readAttachment, so the hostname can't escape the store dir.
-  protocol.handle('nm-attachment', async (req) => {
-    const id = new URL(req.url).hostname;
-    const bytes = await readAttachment(id);
-    if (!bytes) return new Response('not found', { status: 404 });
-    const mime = (await artifactMime(id)) ?? 'application/octet-stream';
-    return new Response(new Uint8Array(bytes), {
-      status: 200,
-      headers: { 'content-type': mime, 'cache-control': 'private, max-age=31536000, immutable' },
-    });
-  });
+  registerAttachmentProtocol();
   // auto-update runs independent of sync/auth; checks only fire in a packaged build
   initAutoUpdate();
   createWindow();

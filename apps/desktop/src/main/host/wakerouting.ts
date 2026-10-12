@@ -12,8 +12,11 @@ import type { HostedAgent, ThreadTask } from '../agents';
 import { pickDeadLetters, type SweepCandidate } from '../chatsweep';
 import { HIRE_CONFIRM_RE } from '../hirecards';
 import { type RunHandle } from './runs';
-import { addressedIn, GITHUB_NEED_PREFIX, hostSpeaksForOrigin, isCodingThread, isRoutineScheduledMarker, mentionRe, modelFreeItemId, nobodyCanServe, parseCard, parseGitHubConnected, parseKindMarker, parseModeMarker, unaddressedWake } from '@neuramesh/shared';
-import type { PowerSyncDatabase } from '@powersync/node';
+import { addressedIn, hostSpeaksForOrigin, isCodingThread, isRoutineScheduledMarker, isSetupAnswers, mentionRe, modelFreeItemId, nobodyCanServe, parseCard, parseGitHubConnected, parseKindMarker, parseModeMarker, unaddressedWake } from '@neuramesh/shared';
+import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
+import { afterMessageSync } from './message-commit-gate';
+import { sweepMessagesQuery } from './chat-message-queries';
+import { githubAsker } from './github-asker';
 import type { ClaimVerdict, MachineCapability, SessionOrigin } from '@neuramesh/shared';
 import type { HostGuards } from './guards';
 import type { HostQueue } from '../harness/hostqueue';
@@ -29,7 +32,7 @@ import { PROVIDER_LABEL, resolveToken } from '../agents';
 import { providerFor } from '../runtime/adapter';
 
 export function makeWakeRouting(ctx: {
-  db: PowerSyncDatabase;
+  db: ReplicaDatabase;
   /** the credential probe behind the no-compute notice needs the API (2026-09-16) */
   apiUrl: string;
   LEASE_LOST: ReturnType<typeof makeRuns>['LEASE_LOST'];
@@ -163,7 +166,8 @@ export function makeWakeRouting(ctx: {
 
   // One human feed message → the wake decision. Shared verbatim by the live watch
   // below and the boot dead-letter sweep (sweepDeadLetters) — same rules, one path.
-  function handleFeedMessage(m: { id: string; channel_id: string; thread_id?: string | null; author_kind: string; author_id: string; body: string }): void {
+  const handleFeedMessage = afterMessageSync(db, handleCommittedFeedMessage);
+  function handleCommittedFeedMessage(m: { id: string; channel_id: string; thread_id?: string | null; author_kind: string; author_id: string; body: string }): void {
     if (processed.has(m.id)) return;
     // human-authored only — same law as threads: agent messages never
     // wake agents (a digest mentioning @tracy is information, not a
@@ -197,7 +201,7 @@ export function makeWakeRouting(ctx: {
     // conversation thread — the one-shot bootstrap SCHEDULE is the response path, so no
     // LLM wake here (a wake would re-triage the setup into a board task, the exact bug).
     // Nudge the tick so the analysis starts seconds after submit, not on the next minute.
-    if (/^\*\*Marketing HQ setup\*\*/.test(m.body)) {
+    if (isSetupAnswers(m.body)) {
       processed.add(m.id);
       setTimeout(() => { void runDueSchedules().catch(() => {}); }, 1500); // grace for the schedule row to reach the replica
       return;
@@ -267,27 +271,20 @@ export function makeWakeRouting(ctx: {
     if (orchMentioned || live) { processed.add(m.id); queueWake(orch, m); }
   }
 
-  /** who a task's connected divider wakes: the agent that posted its newest answered GitHub card, while it
-   *  is in the room, else the room's coordinator. The state policy names neither (repo-connect-2026-10). */
-  async function githubAsker(t: ThreadTask): Promise<HostedAgent | undefined> {
-    const [card] = await db.getAll<{ asker_id: string }>(`select asker_id from decisions where task_id = ? and question like ? and status = 'answered' order by answered_at desc limit 1`, [t.id, `${GITHUB_NEED_PREFIX}%`]).catch(() => [] as Array<{ asker_id: string }>);
-    const asker = card ? agents.get(card.asker_id) : undefined;
-    return asker?.channels.has(t.channel_id) ? asker : [...agents.values()].find((a) => a.role === 'orchestrator' && a.channels.has(t.channel_id));
-  }
-
   async function routeThreadMessage(m: { id: string; task_id: string; channel_id: string; body: string }) {
+    if (db.waitForRowSync && !await db.waitForRowSync('messages', m.id)) return;
     // the marketing setup card's submit, task-anchored (round 3: the setup TASK's thread owns
     // the whole first-run) — same law as the conversation shape in handleFeedMessage: the
     // one-shot bootstrap SCHEDULE is the response path, so no LLM wake answers the wizard
     // summary; just nudge the tick so the analysis starts seconds after submit.
-    if (/^\*\*Marketing HQ setup\*\*/.test(m.body)) {
+    if (isSetupAnswers(m.body)) {
       setTimeout(() => { void runDueSchedules().catch(() => {}); }, 1500); // grace for the schedule row to reach the replica
       return;
     }
     const [t] = await db.getAll<ThreadTask>(`select id, number, title, description, state, channel_id, assignee_kind, assignee_id, kind from tasks where id = ?`, [m.task_id]);
     if (!t) { processed.delete(m.id); return; } // task row not synced yet — the watch refires
     // the grant's divider is not a reply: it continues the ask its card waited for, in any state
-    let target: HostedAgent | undefined = parseGitHubConnected(m.body) ? await githubAsker(t) : undefined;
+    let target: HostedAgent | undefined = parseGitHubConnected(m.body) ? await githubAsker(db, agents, t) : undefined;
     const liveThread = process.env['NM_AGENT_MODE'] !== 'echo';
     // round 9's "nudge me here", task-anchored (round 3): a human reply in the setup task's
     // thread while brand docs are MISSING resumes the bootstrap deterministically — the same
@@ -345,8 +342,7 @@ export function makeWakeRouting(ctx: {
   async function sweepDeadLetters(): Promise<void> {
     const cutoff = new Date(Date.now() - SWEEP_LOOKBACK_MS).toISOString();
     const humans = await db.getAll<SweepCandidate>(
-      `select id, channel_id, task_id, thread_id, author_kind, author_id, body, created_at from messages
-       where author_kind = 'human' and created_at > ? order by created_at asc limit 40`,
+      sweepMessagesQuery,
       [cutoff],
     ).catch(() => [] as SweepCandidate[]);
     if (!humans.length) return;

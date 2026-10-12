@@ -1,3 +1,7 @@
+import { overviewSourceFiles, overviewOutputFiles } from './overview-model';
+import { useContext } from 'react';
+import { ThreadOverviewBody, ThreadOverviewEnvironment, useThreadOverview } from './ThreadOverview';
+import { sourceOverviewSection, runOverviewSection } from './overview-sections';
 // The task thread (docs/25) — the conversation on a board task, its zoned panel and the gate
 // card above the composer. A design round reads in the side panel's review tab (2026-10-03).
 // Extracted from App.tsx (track A3).
@@ -545,6 +549,14 @@ export function TaskThread({
     });
   }
 
+  const overviewEnv = useContext(ThreadOverviewEnvironment);
+  const overview = useThreadOverview(`task:${task.id}`, [
+    { id: 'progress', label: 'Progress', items: latestPlan ? [{ id: 'plan', label: 'Work plan', open: () => openPlan() }] : [] },
+    { id: 'code', label: 'Code', items: task.branch ? [{ id: 'branch', label: task.branch, open: onDetails }] : [] },
+    { id: 'prs', label: 'Pull requests', items: task.pr_url && /^https?:\/\//.test(task.pr_url) ? [{ id: 'pr', label: task.pr_number ? `Pull request #${task.pr_number}` : 'Pull request', open: () => overviewEnv?.openLink(task.pr_url!) }] : [] },
+    { id: 'artifacts', label: 'Artifacts', items: overviewOutputFiles(arts, rows).map((a) => ({ id: a.id, label: a.name, open: () => onPreview(a.name) })) },
+    runOverviewSection(runTrees_, listRef), sourceOverviewSection(overviewSourceFiles([...threadAttByMsg.values()].flat(), rows), setThreadLightbox),
+  ], !peek);
   return (
     <aside
       className="threadpanel"
@@ -570,7 +582,7 @@ export function TaskThread({
           {actErr && <div className="acterr" style={{ marginTop: 8 }}>{actErr}</div>}
         </Modal>
       )}
-      <ThreadHead {...{ act, back, blocking, busy, channelSlug, crumbProject, editDetails, isContent, marks, onClose, onOpenTerminal, onSettle, onViewLogs, peek, setBlocking, setClosing, spectrumLegs, task }} />
+      <ThreadHead overviewToggle={overview.toggle} {...{ act, back, blocking, busy, channelSlug, crumbProject, editDetails, isContent, marks, onClose, onOpenTerminal, onSettle, onViewLogs, peek, setBlocking, setClosing, spectrumLegs, task }} />
       {/* the header zone (v0.36): identity + journey. The journey lives HERE — it IS the
           status summary — and the facts line folds every auxiliary surface into one row of
           toks; clicking one opens a single drawer under the tabs. v0.68: the journey is a
@@ -615,6 +627,7 @@ export function TaskThread({
           {/* same bar as the conversation thread: a task worked on someone else's machine reads
               as messages appearing from nowhere unless the surface says who and where */}
           <ThreadLiveBar trees={runTrees_} agents={agents} />
+          <ThreadOverviewBody overview={overview} label={crumbProject?.name ?? `Task #${task.number}`}>
           <div className="jumpwrap">
           <div className="tmsgs" ref={listRef} data-streamkey={`${channelId}:${task.id}`}>
       <ThreadRootPin thread={convoThread ?? null} rows={rows} agents={agents} members={members} />
@@ -875,6 +888,7 @@ export function TaskThread({
         )}
       </div>
       </div>
+      </ThreadOverviewBody>
       {/* the brain notice leads the dock (docs/10 §15.7): a seat that cannot run is the thing no
           gate below it can move past. It reads the OWNING conversation's brain, and Reset returns it. */}
       <BrainNotice rows={rows} override={parseBrainOverride(threadBrain ?? null)} onReset={convoThreadId ? async () => { await nm?.threadSetBrain(convoThreadId, null); } : undefined} />

@@ -12,12 +12,12 @@
 // the app switches workspace, and a value captured at registration would seed into the
 // workspace you started in.
 import { ipcMain } from 'electron';
-import type { PowerSyncDatabase } from '@powersync/node';
+import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 import type { AgentLog } from '../../agentlog';
 import { actorId, apiUrl, ws } from '../../sync';
 
 export interface DebugSeedDeps {
-  db: () => PowerSyncDatabase;
+  db: () => ReplicaDatabase;
   agentLog: AgentLog;
 }
 

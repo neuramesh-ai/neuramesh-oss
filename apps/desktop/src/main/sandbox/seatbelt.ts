@@ -84,9 +84,27 @@ export function strictCodeSeatbeltProfile(
     for (const path of readable) lines.push(`  (subpath ${sbpl(path)})`);
     lines.push(')');
   }
+  // Node resolves entry files with lstat on each parent, including brain and toolchain directories.
+  // Exact ancestor metadata permits that traversal without allowing enumeration or sibling bytes.
+  const ancestors = new Set<string>();
+  for (const path of [...writable, ...readable]) {
+    for (let parent = dirname(path); parent !== dirname(parent); parent = dirname(parent)) ancestors.add(parent);
+  }
+  if (ancestors.size) {
+    lines.push('(allow file-read-metadata');
+    for (const path of ancestors) lines.push(`  (literal ${sbpl(path)})`);
+    lines.push(')');
+  }
   lines.push(
-    '(deny network*)', '(deny process-info*)', '(deny signal (target others))', '(deny appleevent-send)',
+    '(deny network*)', '(deny process-info*)',
+    // libdispatch requests its own unique PID during CoreFoundation startup. Denying that query
+    // traps Node before main() when the command has a clean environment. Other processes stay denied.
+    '(allow process-info-pidinfo (target self))',
+    '(deny signal (target others))', '(deny appleevent-send)',
     '(deny mach-lookup',
+    // Launchd labels are not necessarily Mach service names. The legacy keychain broker is
+    // SecurityServer; pboard publishes pasteboard.1 rather than its launchd label.
+    '  (global-name "com.apple.SecurityServer")',
     '  (global-name "com.apple.securityd")',
     '  (global-name "com.apple.securityd.xpc")',
     '  (global-name "com.apple.securityd.general")',
@@ -95,6 +113,8 @@ export function strictCodeSeatbeltProfile(
     '  (global-name "com.apple.security.XPCKeychainSandboxCheck")',
     '  (global-name "com.apple.secd")',
     '  (global-name "com.apple.pboard")',
+    '  (global-name "com.apple.pasteboard.1")',
+    '  (global-name "com.apple.coreservices.uauseractivitypasteboardclient.xpc")',
     '  (global-name "com.apple.coreservices.launchservicesd")',
     '  (global-name "com.apple.lsd.mapdb")',
     '  (global-name "com.apple.lsd.modifydb")',

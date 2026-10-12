@@ -1,6 +1,7 @@
 import type { EngineeringCommand, EngineeringOpenMeta, EngineeringRuntimeEvent } from '../../../engineering-protocol';
 
 export interface EngineeringNMBridge {
+  engineeringHistory?(threadId: string, workspace: string): Promise<import('@neuramesh/shared').BrainThreadSnapshot>;
   /** the desktop's relay facts, answered by main (the desktop Code bridge, 2026-09-04) and composed
    *  into the browser's relay bridge before the app renders (bridge/desktop-relay.ts). Absent on the
    *  web, which builds its own config; the preview harness answers with no relay. */

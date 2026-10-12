@@ -13,7 +13,7 @@
 // import. The registry is process state; what boots a connection lives in sync/boot.ts.
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import type { PowerSyncDatabase } from '@powersync/node';
+import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 import type { Session } from './sync/ipc/membership';
 
 export type ConnectionKind = 'local' | 'cloud' | 'custom';
@@ -33,7 +33,7 @@ export interface Connection extends ConnectionUrls {
   replicaPath: string;
   /** the workspace-identity marker (wsident.ts) this connection's replica is bound to */
   markerPath: string;
-  db: PowerSyncDatabase | null;
+  db: ReplicaDatabase | null;
   agentHostStarted: boolean;
   /** the workspace this connection stands in, and its display identity */
   ws: string;
@@ -106,7 +106,7 @@ export function localPortsFor(env: NodeJS.ProcessEnv): { api: number; powersync:
 
 export const localUrls = (ports: { api: number; powersync: number } = LOCAL_PORTS): ConnectionUrls => ({
   apiUrl: `http://127.0.0.1:${ports.api}`,
-  powersyncUrl: `http://127.0.0.1:${ports.powersync}`,
+  powersyncUrl: '', // Local sync uses the control API.
   webUrl: '',
 });
 

@@ -15,5 +15,20 @@ export const THEMES: ThemeDef[] = [
 export const isThemePref = (s: string): s is ThemePref => s === 'system' || THEMES.some((t) => t.id === s);
 export function systemTheme(): ThemeId { return typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: light)').matches ? 'light' : 'dark'; }
 export function resolveTheme(pref: ThemePref): ThemeId { return pref === 'system' ? systemTheme() : pref; }
-export function applyTheme(id: ThemeId) { document.documentElement.dataset['theme'] = id; }
+let themeFrame: number | undefined;
+export function applyTheme(id: ThemeId) {
+  const root = document.documentElement;
+  if (root.dataset['theme'] === id) return;
+  if (themeFrame !== undefined) cancelAnimationFrame(themeFrame);
+  // Text and surface tokens must change in the same paint. Background-only transitions
+  // otherwise briefly put light-theme ink on the previous dark surface (and vice versa).
+  root.dataset['themeSwitch'] = '';
+  root.dataset['theme'] = id;
+  themeFrame = requestAnimationFrame(() => {
+    themeFrame = requestAnimationFrame(() => {
+      delete root.dataset['themeSwitch'];
+      themeFrame = undefined;
+    });
+  });
+}
 export function loadThemePref(): ThemePref { const s = (typeof localStorage !== 'undefined' && localStorage.getItem('nm:theme')) || 'system'; return isThemePref(s) ? s : 'system'; }

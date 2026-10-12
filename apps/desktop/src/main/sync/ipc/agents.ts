@@ -8,10 +8,10 @@ import { CLAUDE_DESIGN_APP_URL, CLAUDE_DESIGN_MCP_URL } from '@neuramesh/shared'
 import { claudeDesignCliCommand, claudeDesignWorkspace } from '../../claudedesign';
 import { contractFor, localContractPath, localInstructions, writeLocalInstructions } from '../../contracts';
 import { setNotificationsEnabled } from '../../notify';
-import type { PowerSyncDatabase } from '@powersync/node';
+import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 
 export interface AgentsDeps {
-  db: () => PowerSyncDatabase;
+  db: () => ReplicaDatabase;
   ws: () => string;
 }
 

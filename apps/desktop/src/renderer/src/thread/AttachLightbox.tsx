@@ -37,7 +37,7 @@ export function AttachLightbox({ att, onClose }: { att: AttachmentRow; onClose: 
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
   return (
-    <div className="alightbox" onClick={onClose} role="dialog" aria-modal="true">
+    <div className="alightbox" onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); onClose(); } }} onClick={onClose} role="dialog" aria-modal="true">
       <button type="button" className="alightboxclose" onClick={onClose} aria-label="Close"><IconClose s={18} /></button>
       <div className="alightboxinner" onClick={(e) => e.stopPropagation()}>
         {isImageAtt(att)

@@ -1,3 +1,6 @@
+import { awaitingEngineeringHistory, restoreEngineeringConnection } from '@neuramesh/shared';
+import { engineeringEffort, type EngineeringSelection } from '@neuramesh/shared';
+import { canContinueEngineering } from '@neuramesh/shared';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { bridgeReady, nm, type NMBridge } from '../bridge/nm';
 import { codeBridge } from '../bridge/desktop-relay';
@@ -20,7 +23,7 @@ import type { EngineeringAttachmentUpload } from './attachments';
 import { scheduleEngineeringSync } from './sync';
 import { sendEngineeringPrompt } from './transport';
 import { failRemoteEngineeringTransport } from './transport-state';
-import { engineeringSessionStorageReady, loadEngineeringSessions, persistEngineeringSessions } from './session-storage';
+import { engineeringSessionStorageReady, loadEngineeringSessions, persistEngineeringSessionsLocked } from './session-storage';
 import { flashToast } from '../lib/toast';
 import { closeInactiveEngineeringHandles } from './handle-lifecycle';
 import { codeModelOf, codeSessionTitle } from '@neuramesh/shared';
@@ -41,6 +44,10 @@ export function useEngineeringRuntime(harness: boolean, repos: EngineeringRepo[]
   const [runtime, setRuntime] = useState<RuntimeState>(harness ? 'ready' : 'checking');
   const [reason, setReason] = useState<string | undefined>(harness ? 'Deterministic local harness: permission gates, diffs, and checkpoints are simulated without model billing.' : undefined);
   const handles = useRef(new Map<string, Handle>());
+  const [historyReady, setHistoryReady] = useState<Set<string>>(() => new Set());
+  const markHistoryReady = useCallback((id: string, ready: boolean) => setHistoryReady(previous => {
+    const next = new Set(previous); if (ready) next.add(id); else next.delete(id); return next;
+  }), []);
   const sessionsRef = useRef(sessions);
   sessionsRef.current = sessions;
   const appliedNavigationId = useRef<string | null>(activeId && activeId === initialActiveId ? initialActiveId : null);
@@ -52,15 +59,15 @@ export function useEngineeringRuntime(harness: boolean, repos: EngineeringRepo[]
     persistenceReady.current = engineeringSessionStorageReady(workspaceId);
     persistenceWarned.current = false;
   }
-  useEffect(() => scheduleEngineeringSync(() => {
+  useEffect(() => scheduleEngineeringSync(() => { void (async () => {
     if (!persistenceReady.current) return;
-    const result = persistEngineeringSessions(workspaceId, sessions);
+    const result = await persistEngineeringSessionsLocked(workspaceId, sessions);
     if (result === 'full' || persistenceWarned.current) return;
     persistenceWarned.current = true;
     flashToast(result === 'metadata'
       ? 'Code history storage is full — thread identities are safe, but older transcript details were trimmed.'
       : 'Code history could not be saved. Keep this window open and free browser storage.');
-  }), [sessions, workspaceId]);
+  })(); }), [sessions, workspaceId]);
   useEffect(() => {
     if (persistenceReady.current || !repos.length) return;
     const migrated = loadEngineeringSessions(workspaceId, repos);
@@ -99,18 +106,18 @@ export function useEngineeringRuntime(harness: boolean, repos: EngineeringRepo[]
   const fail = useCallback((sessionId: string, error: unknown) => setSessions((all) => all.map((item) => item.id === sessionId
     ? failRemoteEngineeringTransport(item, error)
     : item)), []);
-  const connect = useCallback((session: EngineeringSession): Handle | null => {
+  const connect = useCallback((session: EngineeringSession, restore = false): Handle | null => {
     closeInactiveEngineeringHandles(handles.current, sessionsRef.current, session.id);
     const existing = handles.current.get(session.id);
     const code = codeBridge();
     if (existing || harness || !code?.openEngineering) return existing ?? null;
-    const handle = code.openEngineering({
+    const open = (session: EngineeringSession): Handle => code!.openEngineering!({
       threadId: session.id, repoId: session.repo.id, repoName: session.repo.name, branch: session.repo.branch,
       ...(session.project?.id ? { projectId: session.project.id } : {}),
       ...(session.repo.root ? { cwd: session.repo.root } : {}),
       mode: session.mode, permissions: session.permissions, policy: session.policy,
       // the conversation's own pick, else the NeuraMesh brain (shared code-models.ts): never the project's developer seat
-      modelId: codeModelOf(session.modelOverride), brainPack: session.brainPack,
+      agentId: session.agentId ?? null, reasoningEffort: session.reasoningEffort ?? null, modelId: codeModelOf(session.modelOverride), brainPack: session.brainPack,
       // rule D9: which machine hosts this session — the desktop routes its own id in process
       ...(session.machineId ? { machineId: session.machineId } : {}),
     }, (event) => setSessions((all) => all.map((item) => item.id === session.id ? applyRemoteEngineeringEvent(item, event as unknown as Record<string, unknown>) : item)), () => {
@@ -119,9 +126,17 @@ export function useEngineeringRuntime(harness: boolean, repos: EngineeringRepo[]
         ? failRemoteEngineeringTransport(item, new Error('The Code workspace connection closed.'))
         : item));
     });
+    markHistoryReady(session.id, !restore);
+    const handle = restore ? restoreEngineeringConnection({
+      workspace: workspaceId, session,
+      read: () => nm?.engineeringHistory?.(session.id, workspaceId) ?? Promise.reject(new Error('Update the app to restore this recorded conversation.')),
+      restored: next => { setSessions(all => all.map(item => item.id === next.id ? next : item)); markHistoryReady(next.id, true); },
+      open,
+      failed: error => { fail(session.id, error); markHistoryReady(session.id, true); },
+    }) : open(session);
     handles.current.set(session.id, handle);
     return handle;
-  }, [harness]);
+  }, [harness, workspaceId, fail, markHistoryReady]);
   // A click in the workspace-wide All threads rail arrives as a requested Engineering session.
   // Resolve it inside the already-mounted destination so global navigation and the in-pane
   // history button share the same runtime connection rather than remounting an active runner.
@@ -130,7 +145,7 @@ export function useEngineeringRuntime(harness: boolean, repos: EngineeringRepo[]
     if (!session) return;
     appliedNavigationId.current = session.id;
     setActiveId(session.id);
-    connect(session);
+    connect(session, true);
   }, [connect, initialActiveId, sessions]);
   const create = (repo: EngineeringRepo, project: EngineeringSession['project'] = null) => {
     if (runtime !== 'ready') return;
@@ -138,7 +153,7 @@ export function useEngineeringRuntime(harness: boolean, repos: EngineeringRepo[]
     const session = harness ? created : { ...created, checkpoints: [] };
     setSessions((all) => [...all, session]); setActiveId(session.id); connect(session);
   };
-  const start = (repo: EngineeringRepo, prompt: string, preferences: Pick<EngineeringSession, 'mode' | 'permissions' | 'modelOverride' | 'brainPack' | 'machineId'>, uploads: EngineeringAttachmentUpload[] = [], project: EngineeringSession['project'] = null) => {
+  const start = (repo: EngineeringRepo, prompt: string, preferences: Pick<EngineeringSession, 'mode' | 'permissions' | 'modelOverride' | 'brainPack' | 'machineId' | 'agentId' | 'reasoningEffort'>, uploads: EngineeringAttachmentUpload[] = [], project: EngineeringSession['project'] = null) => {
     const text = prompt.trim();
     if (runtime !== 'ready' || !text) return;
     const created = createEngineeringSession(repo, 'New Code task', project, preferences.machineId ?? defaultMachineId);
@@ -146,7 +161,7 @@ export function useEngineeringRuntime(harness: boolean, repos: EngineeringRepo[]
       ...created,
       mode: preferences.mode,
       permissions: { ...preferences.permissions },
-      modelOverride: preferences.modelOverride,
+      modelOverride: preferences.modelOverride, agentId: preferences.agentId ?? null, reasoningEffort: preferences.reasoningEffort ?? null,
       brainPack: preferences.brainPack,
       ...(harness ? {} : { checkpoints: [] }),
     };
@@ -160,16 +175,16 @@ export function useEngineeringRuntime(harness: boolean, repos: EngineeringRepo[]
       else fail(started.id, new Error('The Code workspace connection is unavailable.'));
     }
   };
-  const open = (id: string) => { setActiveId(id); const session = sessions.find((item) => item.id === id); if (session) connect(session); };
+  const open = (id: string) => { setActiveId(id); const session = sessions.find((item) => item.id === id); if (session) connect(session, true); };
   /** A CODING THREAD (0144): the session keyed by the thread's own id. This device's local session,
    *  when it has one, is reopened; else the shell is minted WITH the thread's id and connected, and
    *  the root message goes as the first prompt only when nothing has started the session yet — a
    *  session another client started is resumed through the machine's history discovery instead. */
-  const adopt = (spec: { id: string; repo: EngineeringRepo; project?: EngineeringSession['project']; machineId?: string | null; firstPrompt?: string | null; modelOverride?: string | null }) => {
-    const existing = sessionsRef.current.find((item) => item.id === spec.id); if (existing) { setActiveId(existing.id); connect(existing); return; }
+  const adopt = (spec: { id: string; repo: EngineeringRepo; project?: EngineeringSession['project']; machineId?: string | null; firstPrompt?: string | null; modelOverride?: string | null; agentId?: string | null; reasoningEffort?: EngineeringSelection['reasoningEffort'] }) => {
+    const existing = sessionsRef.current.find((item) => item.id === spec.id); if (existing) { setActiveId(existing.id); connect(existing, true); return; }
     const text = spec.firstPrompt?.trim() ?? '';
-    const created: EngineeringSession = { ...createEngineeringSession(spec.repo, text ? codeSessionTitle(text) : 'Code thread', spec.project ?? null, spec.machineId ?? defaultMachineId), id: spec.id, modelOverride: spec.modelOverride ?? null, ...(harness ? {} : { checkpoints: [] }) };
-    if (!text) { setSessions((all) => [...all, { ...created, state: 'resumable' }]); setActiveId(spec.id); connect(created); return; }
+    const created: EngineeringSession = { ...createEngineeringSession(spec.repo, text ? codeSessionTitle(text) : 'Code thread', spec.project ?? null, spec.machineId ?? defaultMachineId), id: spec.id, agentId: spec.agentId ?? null, reasoningEffort: spec.reasoningEffort ?? null, modelOverride: spec.modelOverride ?? null, ...(harness ? {} : { checkpoints: [] }) };
+    if (!text) { setSessions((all) => [...all, { ...created, state: 'resumable' }]); setActiveId(spec.id); connect(created, true); return; }
     setSessions((all) => [...all, harness ? submitEngineeringPrompt(created, text) : beginRemoteEngineeringPrompt(created, text, [])]); setActiveId(spec.id);
     if (harness) return;
     const handle = connect(created); if (handle) void sendEngineeringPrompt(handle, text, []).catch((error: unknown) => fail(spec.id, error)); else fail(spec.id, new Error('The Code workspace connection is unavailable.'));
@@ -195,7 +210,7 @@ export function useEngineeringRuntime(harness: boolean, repos: EngineeringRepo[]
   };
   const continueInAct = (session: EngineeringSession) => {
     const handoff = session.pendingModeHandoff;
-    if (!handoff || session.mode !== 'plan' || session.state === 'streaming' || session.state === 'awaiting_approval') return;
+    if (!handoff || !canContinueEngineering(session)) return;
     const next = setEngineeringMode(session, 'act');
     const started = beginRemoteEngineeringPrompt(next, handoff.prompt);
     update(started);
@@ -215,6 +230,13 @@ export function useEngineeringRuntime(harness: boolean, repos: EngineeringRepo[]
     const next = setEngineeringModel(session, modelId); if (next === session) return; update(next);
     sendCommand(connect(next), { type: 'model', modelId }, (error) => fail(next.id, error));
   };
+  const configure = (session: EngineeringSession, selection: EngineeringSelection) => {
+    if ((session.agentId ?? null) === selection.agentId && session.modelOverride === selection.modelId && engineeringEffort(session.modelOverride, session.reasoningEffort) === engineeringEffort(selection.modelId, selection.reasoningEffort)) return;
+    if (session.state === 'streaming' || session.state === 'awaiting_approval') return;
+    // The host acknowledges the entire selection together. Do not display an unaccepted choice.
+    update({ ...session, state: 'streaming' });
+    sendCommand(connect(session), { type: 'configure', selection: { ...selection, reasoningEffort: engineeringEffort(selection.modelId, selection.reasoningEffort) } }, (error) => fail(session.id, error));
+  };
   const approve = (session: EngineeringSession, approved: boolean) => {
     const approvalId = session.pendingApproval?.id; if (!approvalId) return;
     update(resolveRemoteEngineeringApproval(session, approved)); sendCommand(connect(session), { type: 'approval', approvalId, approved }, (error) => fail(session.id, error));
@@ -224,5 +246,8 @@ export function useEngineeringRuntime(harness: boolean, repos: EngineeringRepo[]
     if (Number.isInteger(checkpointRunCount) && checkpointRunCount > 0) sendCommand(connect(session), { type: 'restore', checkpointRunCount }, (error) => fail(session.id, error));
   };
   const home = () => { closeInactiveEngineeringHandles(handles.current, sessions, null); setActiveId(null); };
-  return { sessions, active: sessions.find((session) => session.id === activeId) ?? null, runtime, reason, update, create, start, open, adopt, reopen, home, send, setMode, continueInAct, dismissModeHandoff, setPermission, setModel, approve, restore };
+  const active = sessions.find(session => session.id === activeId) ?? null;
+  // Cached text can paint immediately; actions wait for the recording, even before adoption runs.
+  const visible = active && !harness && !historyReady.has(active.id) ? awaitingEngineeringHistory(active) : active;
+  return { sessions, active: visible, runtime, reason, update, create, start, open, adopt, reopen, home, send, setMode, continueInAct, dismissModeHandoff, setPermission, setModel, configure, approve, restore };
 }

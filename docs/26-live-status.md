@@ -27,9 +27,15 @@ of receipts. It is replaced in place by the streaming bubble, then by the synced
    step count (v0.42.5).
 2. **Release checklist leg** (`shipBeat`, docs/23 §12) — while `releasing`/`verifying`:
    *waiting on CI green on PR #N* · *waiting on you — {human step}* · the merge leg.
-3. **Activity verb** — humanized from the `LogRow` stream the activity panel already reads:
-   `Read x` → *reading {basename}* · `Bash: c` → *running {cmd head}* · `Grep/Glob` →
-   *searching the repo* · `nm.task_status` → *checking the board* (see `NM_VERBS`).
+3. **Activity verb**: humanized from the `LogRow` stream the activity panel already reads, in
+   the simple present with the agent as the subject (2026-10-05): `Read x` → *reads {basename}* ·
+   `Bash: c` → *runs {cmd head}* · `Grep/Glob` → *searches the repository* · `nm.task_status` →
+   *checks the board* (see `NM_VERBS`). A tool that a lane logs by its bare name
+   (`create_task {…}`, `read_repo_file x`, the codex lane's `bash c`) gets the same words, never
+   its name, its JSON or a model id: every tool that a built registry hands a turn has a row
+   (`orchregistry.test.ts` reads them). A `turn` row is *writes the reply* only when it holds the
+   model's own words. The context line, the architect's rounds and the CLI's inventory say nothing.
+   The NeuraMesh brain's Thoughts block reads its tool steps in the same words.
 4. **"thinking…"** — the floor, before any activity row lands.
 
 **Rules learned the hard way:**
@@ -144,9 +150,16 @@ second path nobody exercises.
 **Who it names.** A conversation always has a responder (the room's orchestrator, the
 choice the wake path makes). A task thread does not, so the rule asks `unaddressedWake` —
 the wake's own policy, moved to `@neuramesh/shared` for this. A reply on a settled task
-(`in_review`, `done`, `accepted`, `closed`, a parked backlog item) wakes nobody, so it draws
-no orb either. An @mention (or a bare leading name) wins everywhere, which is what makes a
-reply on a settled task answerable at all.
+(`in_review`, `accepted`, `closed`, a parked backlog item) wakes nobody, so it draws no orb
+either. A reply on a `done` unit wakes the room's orchestrator (2026-10-05), whatever the unit's
+kind: only the orchestrator holds `accept_task`, so a content unit's marketer does not take the
+word. The done line, the verdict card and the reviewer's approval tell the person to say merge
+(or accept) in the unit's thread, so the orb names the orchestrator there. Two floors keep a
+question from merging anything. `accept_task` refuses unless the person's newest typed message in
+the thread tells it to merge or accept (shared `isAcceptWord`, the daemon's `host/acceptgate.ts`).
+The server refuses an agent accept unless a person typed in the thread after the verdict, and a
+card's answer or a marker line is no typing (`isCardOrMarker`). An @mention (or a bare leading
+name) wins everywhere, which is what makes a reply on a settled task answerable at all.
 
 **One live surface per agent still holds** (§3). The wait ghost stands down for an agent
 whose own run card is on screen, and the composer's typist chip stands down for the wait

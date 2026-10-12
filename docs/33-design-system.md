@@ -103,6 +103,13 @@ The window is a **colored frame** that owns all chrome; content floats on an **e
   in for the card while it is shut is a row of toks under the thread head, not a second panel.
   **Amended 2026-10-03:** the sheet's right edge holds nothing now. The side panel is the one
   panel at the right, and the toks under a head open its Overview tab.
+  **Amended 2026-10-12 (George, #717):** the sheet's right edge holds the **Thread overview** card, and
+  nothing else. The card is an index of recorded facts (Needs you, Progress, Code, Pull requests,
+  Artifacts, Subagents, Processes, Sources), never a summary, and each row opens the side panel or the
+  thing itself. It folds when the side panel opens, and the person can open it again beside the panel
+  until the panel closes. In a conversation under 690px it starts folded, and when the person opens it,
+  it sits ABOVE the transcript, in flow, so it never covers a message, an inline approval, the composer or
+  the gate seat. The toks under the head stay: the card shows beside the detail doors, never instead.
 - **Sheet** (`--bg`/`--panel`): the content surface — rounded (18px family), shadowed
   (`--shadow-sheet`), holding *content only*. No tab ears protruding above it; lenses and
   segmented controls live inside it.
@@ -160,13 +167,32 @@ in an agent message — question, verdict, schedule, plan — is the ONE elevate
 `--panel` around prose, with a second hairline on `--card` inside it, was two edges and no
 material (trap 12).
 
-**The details read on the second sheet, not on a card** (the side-panel round, 2026-10-03). The
+**The details read on the second sheet, not on a card** (the side-panel round, 2026-10-03; the one
+exception since 2026-10-12 is the Thread overview card, §2 and below). The
 Workbench put a session's details on an elevated card inside the thread. They render in the side
 panel's Overview tab now, which is the main sheet's recipe at the frame's right edge (§2). In the
 thread, a thing that the panel shows keeps ONE elevated row (`.refcard`, `thread/RefCard.tsx`): the
 glyph, the name, the kind and its facts, the gate in the warm tone, and "In the panel" or "Open".
 The gate text never truncates: the facts give way first. The inline previews of a delivered file
 and the full post cards left the web thread for that row. The phone keeps its own cards.
+
+**Coding work plans retain an inline preview** (George, 2026-10-10). A typed proposal shows its
+separate agent report as normal prose: what was actually investigated, the findings and reasons behind key choices, and the next step for the user. This is authored by the agent and stored with that version; it is never a copy of the formal plan summary or checklist. Older plans without a report keep their original replies and preview only. The elevated card contains a two-line step excerpt and step count. The entire card is a keyboard-accessible button, marked “Preview”, with “steps in the full plan” beside “Open plan”. “Open plan”
+shows that version with all steps and guardrails in the Work Plan pane. The conversation preview
+has no step rows or full-source disclosure. Each new proposal opens the pane once. A manual close holds for that version.
+Earlier versions stay beside their own conversation turn and show “Earlier work plan” in the pane.
+This is an explicit exception to the compact reference row above. It uses the existing card,
+typography, and button tokens. [Implementation and evidence](design/code-review-2026-10/work-plan.md).
+
+**Coding change sets remain inline** (George, 2026-10-10). Each proposed file batch owns a card at
+its conversation turn with file count, separate green additions and red removals, the first three
+clickable files, and “Show more” for the rest. “View changes” and every file link open that exact
+batch in the pane. The pending card owns Approve and Decline. Those actions disappear after a
+decision, while the card, outcome and file snapshots remain through later edits and reloads.
+Approval is distinct from successful application. Failures and unconfirmed outcomes stay explicit.
+Non-file approvals still use the composer gate. [Implementation and evidence](design/code-review-2026-10/inline-history.md).
+
+The web and desktop rail show a labeled **Settle** button on hover or keyboard focus, with space reserved so long titles cannot overlap it. Undo remains on the toast; a new message resumes a settled thread. [Report and evidence](design/code-review-2026-10/plan-report-and-settle.md).
 
 Plus one deliberate exception: **selected state** may wear the accent wash (`--accent-soft`) — a
 chosen pack card, an active filter. Warm-as-selection is idiom; warm-as-default is the bug.
@@ -253,6 +279,15 @@ Rules of use:
   settle toast** (`.nmtoastundo`, 5.2s, spent when taken) — the phone's model. The test for any
   reverse act: if the forward act is common and the reverse is not, the reverse belongs in the
   seconds after the forward one, not in the furniture.
+
+- **Web Recents separates quiet from settled** (George, 2026-10-10). Three collapsible sections
+  show Working, Idle, and Settled in that order. Working includes live work and requests for
+  attention. Idle holds quiet threads without a current human settle. Settled holds the threads
+  the user explicitly settled. Each section sorts by recency and pages separately. The headers
+  use quiet type and a count, with no new status colors. Settle returns to coding rows on hover,
+  keyboard focus, and in the row menu. A live agent must finish or pause before Settle appears.
+  Undo stays on the toast. A new prompt, reply, or approval request reopens a coding thread.
+  A connection open or close does not. [Behavior and evidence](design/code-review-2026-10/recents.md).
 
 ## 5. Type
 
@@ -344,6 +379,9 @@ real work — if it is decoration, drop it and keep the pill.
 
 ## 7. Motion
 
+- **Theme colors change together** (2026-10-10). A theme change suspends CSS transitions for
+  the first paint. Text must never use the new palette against the previous surface color.
+  Normal hover and layout transitions return after that paint. Animations remain independent.
 - **Signature ease:** `cubic-bezier(.22, 1, .36, 1)` (`--ease`) — everything uses it.
 - **Durations:** enter `.22s` (non-blocking — content is interactive during entrance), exit
   `.13s`, micro-interactions `--dur-fast`. **Blocking transitions respect the ≤150ms budget**
@@ -382,7 +420,7 @@ real work — if it is decoration, drop it and keep the pill.
 
   | moment | orb state |
   | --- | --- |
-  | writing the reply ("composing…") | `composing` |
+  | writing the reply ("writes the reply", "drafts the posts") | `composing` |
   | tool burst (checks / files / commands) | `working` |
   | search tools · deep-work research legs | `searching` |
   | fanning out subagents | `weaving` |
@@ -750,7 +788,7 @@ real work — if it is decoration, drop it and keep the pill.
   pre-drafted message, never a command). Right, the **connector marks** (`.cfootapp`): the four
   publishing connectors as 16px SVGs on 24px targets — `--dim` until connected, then `--body` ink with a
   5px `--green` dot, `--warn` when the grant died and the honest verb is Reconnect — then `⋯` for the
-  rest. **Four marks, not eight**: at the stage's 640px measure the three pills and eight targets do not
+  rest. **Four marks, not eight**: at the stage's original 640px measure the three pills and eight targets do not
   share one line, so PostHog · Meta Ads · TikTok Ads · image generation live behind the door, in a
   FIXED order never sorted by state. A mark is a **door**: not connected opens the connect step in the
   composer's own popover recipe (the machine chip's `.cprojpop.cmachpop`, hung from the cluster's
@@ -821,23 +859,27 @@ real work — if it is decoration, drop it and keep the pill.
   agent is a form in the same body, with role pills, never a select. Off the composer (Settings ›
   Models, the agent page) the list opens in place of the table or under the field, the rule for a
   container that scrolls. The brain pill below stays the desktop's until it ports these.
-  **On a coding session** (2026-10-04, [code model chip](design/code-model-chip-2026-10/plan.md)) the
-  same chip and menu (`ModelChipView`) name the SESSION's model (`models/CodeModelChip.tsx`): the
-  conversation's own pick, else the NeuraMesh brain, never the project's developer seat. Its groups
-  read the one machine the session runs on (shared `code-models.ts`), Gemini is ready on an API key only
-  (the group note says why: the coding runtime has no lane for a Google sign-in), and the menu has
-  no levels, because the coding protocol carries none. A composer with a repository picked keeps
-  the chip, and the pick rides the birth into the coding thread.
+  **On a coding session** (updated 2026-10-10, [unified composer](design/unified-composer-2026-10/implementation.md)),
+  `SessionComposer` supplies the same input and control row for new sessions and replies;
+  `ComposerAgentControls` supplies the same agent and model menus. Picking a repository changes
+  routing and adds coding controls; it keeps the input, draft and agent selector. Rex is the main
+  agent by default. Selecting another agent adopts that agent's personal model preference, then
+  coding choices belong to this conversation. Low, Medium and High appear for supported models
+  and reach the runtime through the same atomic agent/model/effort selection. Both controls lock
+  during a turn and update after the host acknowledges a change. Transcript rows retain their
+  original agent name and avatar when the selected agent changes. Provider groups still read the
+  session's machine (`code-models.ts`); Gemini coding requires an API key. The legacy Engineering
+  entry point wraps the same coding composer instead of maintaining a separate input or selector.
 - **The code face** (same round; visual contract `Thread.dc.html`) is what a coding thread ADDS to
   the one session surface, never a second surface. `.threadpanel.convo.codingthread` keeps the
   session head (crumb, title, the mode chip `c-plan` | `c-act`, the status chip, and the Workbench
   toggle retired 2026-10-03) and adds `.codinghead` under it: the subline `.sssub` (branch · repository · machine,
-  mono, and `a unit ✓` once the valve made one). The transcript is the thread's own `.tmsgs`: the human's hairline
+  mono). The transcript is the thread's own `.tmsgs`: the human's hairline
   bubble, the Engineering rows (`.av.eng`, the folded `.think` line, the `.receipts`, the prose),
   the thread's own messages around them (the `‹kind:coding›` divider as a `.sysline`, the unit card
-  as a `.unitline`). The `.gateseat` holds exactly ONE card above the composer: the approval card,
-  else the Act handoff, else the valve (`.hgate.coding`, eyebrow `coding · n changes · ⎇ branch ·
-  not a unit`, `Make it a unit` primary and `Keep it here` quiet). The composer is the thread's
+  as a `.unitline`). The `.gateseat` holds at most ONE card above the composer: the approval card
+  (a file approval stays inline instead), else the GitHub gate (`.hgate.coding`), else the Act
+  handoff. The valve card (`Make it a unit`) retired on 2026-10-12. The composer is the thread's
   `.tcompose > .cbox.codingbox`: the chips row (attach · model · machine: the room and the
   repository are not switchable in a coding thread, so they are not chips, and the branch shows in
   the code pane's foot, George, 2026-09-26) and the two knobs, the `Plan | Act` `.threadseg` and
@@ -1398,8 +1440,9 @@ real work — if it is decoration, drop it and keep the pill.
   FSM's own actor list, never from prose), the subject in plain words (*Your call on **the
   plan***), the pending-batch count as a `--link`-filled mono pip, then the buttons — affirmative
   in `.btn.accept`, the counter-verdict in `.btn.primary`. **A settled or superseded round shows
-  the same bar with the buttons gone** and a sentence where they were (*Settled — revised into
-  v5* · `Open v5 →`): the geometry does not move when the decision is no longer yours to make, so
+  the same bar with the buttons gone** and a sentence where they were (*Settled: revised into
+  v5* · `Open v5 →` in hq, and the desktop keeps its old words until someone ports them): the
+  geometry does not move when the decision is no longer yours to make, so
   the absence of buttons is legible as an absence rather than as a different screen.
 
   Comments are **inline under the block they are about**, not in a right gutter — the overlay
@@ -1624,6 +1667,9 @@ real work — if it is decoration, drop it and keep the pill.
      overlay, which stays the everything-lens**. No composer and no search field on Home: ⌘K is
      global chrome, and composing is the stage's whole job.
   5. **The New chat stage.** ⌘N, the nav pill and a project head's ＋ land on a centered column:
+     Since 2026-10-10 the column caps at 820px, with a 96px minimum writing area so the room,
+     machine, repository, model and agent controls fit together at desktop widths. Thread writing
+     areas start at 48px. Controls wrap when the available pane is narrower; they never overflow.
      the serif greeting whose **project name is the switcher** — the one `--fital` italic moment
      (docs/33 §5), `--link`-colored with a dotted underline; picking retargets the room chip and
      moves the active project. Below it THE composer (moved, never rebuilt) minus its project
@@ -1908,6 +1954,15 @@ real work — if it is decoration, drop it and keep the pill.
   design canvas standing in for a screen that changed. A designed frame is legal, but only when its
   art matches the shipped shell, and App Review 2.3.3 is the reason rather than taste.
 
+- **The Thread overview card** (`thread/ThreadOverview.tsx`, #717, 2026-10-12): the elevated stratum (`--card`,
+  `--card-border`, `--shadow-card`, `--r-lg`), 252px at the sheet's right edge, its own scroll inside the
+  transcript's height. A head (the thread's name, then a quiet close), then sections in a fixed order with an
+  11px `--muted` label. Rows are buttons on `--hover-bg` at `--r-sm`, a 14px icon, the label, and a `--muted`
+  detail. A section shows three rows, then `Show all N`. A row that waits on a load keeps its words and says
+  `aria-busy`. The toggle in the head is `Thread overview` (a `data-tip`, never a native title). It enters
+  with `nm-rise` at `--dur-fast`. The narrow form (`.overview-inline`) is the same card, in flow above the
+  transcript, at most 45% of its height.
+
 ## 9. The traps (etched — check these in review)
 
 Each of these shipped as a real defect at least once during the revamp:
@@ -1989,3 +2044,21 @@ skipping this.
    the PR; check the traps list (§9); motion within budget; reduced-motion path works.
 5. **This doc is alive.** Founder rulings on look and feel get recorded here (with date) so the
    next feature inherits them instead of relitigating them.
+
+### Web preview handoffs (2026-10-10)
+
+A website handed back by an agent can appear as an inline preview card, next to its explanation. The card shows a globe, a short title, the destination host/path and an optional sentence about what to try. Clicking its body opens the existing NeuraMesh browser pane. **Open in** offers that same destination or the external browser; Escape dismisses the menu and restores focus. Cards use the current palette and wrap on narrow screens. They do not fetch thumbnails, embed pages, auto-open tabs or imply the server is live.
+
+The shared Markdown renderer recognizes a fenced `nmpreview` JSON object with `url`, optional `title` (120 characters) and optional `description` (240 characters). Only absolute HTTP(S) addresses without credentials are accepted. Ordinary links remain ordinary links. Invalid payloads remain readable source. The body itself is the storage format, so earlier handoffs keep their positions on reload and after model changes. Agent prompts require an observed or user-supplied URL, never an invented server or port. A loopback address still refers to the viewing device.
+
+Web and desktop use the same parser and matching cards. The rendering fixture is `apps/hq/preview/web-preview.html`; `scripts/web-preview-browser.mjs` exercises keyboard actions, themes and narrow layouts via Ego. Run it in an existing taskspace with `PREVIEW_SPACE_ID`, `PREVIEW_PAGE` and an absolute `PREVIEW_EVIDENCE` path set inside the Ego script. Also run the real coding UI suite from `evals/coding/README.md`, and verify an actual agent reply opens its preview and survives reload while another tab updates a different thread. Coding history saves merge thread revisions under a workspace Web Lock to prevent stale tab snapshots replacing newer history.
+
+### Coding plan execution progress
+
+Once a proposed work plan enters Act, center a 44px circular progress control above the composer. The number is **completed steps / total steps**, beginning at 0; starting a step or approving a tool does not increment it. Reuse the beats tracker's neutral ring, checked markers, and active-step treatment. Hover or keyboard focus reveals a compact checklist; click pins it, Escape or an outside click dismisses it. Each row uses the agent's short step label on one line, with the full description available on hover and through Open full plan. The list scrolls for long plans and fits the composer on narrow screens. Waiting, paused, and completed states must not animate as active execution.
+
+Progress is recorded by the side-effect-free `update_plan_progress` tool. The agent marks a step complete after its work succeeds, including actual passing test results for verification steps. Never derive completion from an approval, a final assistant response, or tool-call counts. Successful tool receipts carry a versioned plan identity and immutable steps, plus pending/in_progress/completed statuses. These travel in the portable conversation so another model or device can recover them. New proposals reset their own checklist; checkpoint restoration recovers the earlier progress. The full Work Plan pane reflects the same statuses while historical plan cards remain unchanged.
+
+Validation: `packages/shared/test/engineering-plan-progress.test.ts`, the relay's `engineering-plan-progress.test.ts`, `scripts/plan-progress-browser.mjs` against the labelled `/plan-progress.html` rendering fixture, and all three real coding UI evals. The UI evals capture progress transitions and verify explicit completion and reload persistence.
+
+Recoverable core errors do not end execution: keep the composer locked and the progress state active until an explicit runtime completion or terminal error. A failed tool may lead to another model iteration in the same turn. Follow-up evals wait for a fresh test checkpoint from the new model rather than accepting an earlier passing result.

@@ -9,11 +9,16 @@
 // task.accepted) plus IC-drop signals (task.changes_requested / task.blocked)
 // without ever shipping user content off the machine.
 //
+// activation is a person's first accepted PR: `task.accepted`, or `task.release_confirmed` (the
+// release gate's own accept), with `nm_repo: true`. the store sets nm_repo from the task row it
+// already holds for the write (taskFacts), so this file stays a pure mapper. `github.connected` is
+// the first write of a project's GitHub connector row (both doors, github-resolve.ts).
+//
 // Gated on POSTHOG_KEY. Absent -> a hard no-op, so OSS/local users, CI, and the
 // deterministic `echo` test mode emit nothing. `NM_TELEMETRY=off` is a kill switch
 // even when a key is present.
 import { PostHog } from 'posthog-node';
-import type { NMEvent } from '@neuramesh/shared';
+import type { NMEvent, Task } from '@neuramesh/shared';
 
 const KEY = process.env['POSTHOG_KEY'];
 const HOST = process.env['POSTHOG_HOST'] ?? 'https://us.i.posthog.com';
@@ -31,11 +36,15 @@ function ph(): PostHog | null {
 // lifecycle signal and flows through verbatim (as its own funnel-readable event name).
 const SKIP = new Set(['message.posted']);
 
-// 'agent:uuid' -> 'agent', 'human:uuid' -> 'human', 'task:1012' -> 'task'
+// the kind, never the id or the slug after it (a slug is a person's own words):
+// 'agent:uuid' -> 'agent', 'task:1012' -> 'task', 'channel/general' -> 'channel',
+// 'resource/connector/<uuid>' -> 'connector'
 function kindOf(addr: string | null | undefined): string | undefined {
   if (!addr) return undefined;
   const i = addr.indexOf(':');
-  return i > 0 ? addr.slice(0, i) : addr;
+  if (i > 0) return addr.slice(0, i);
+  const [head, type] = addr.split('/');
+  return head === 'resource' ? type : head;
 }
 // task number is a non-sensitive integer (not content) — useful for ordering the funnel
 function taskNumber(target: string | null | undefined): number | undefined {
@@ -49,31 +58,43 @@ export interface Capture {
   properties: Record<string, unknown>;
 }
 
+/** what the store already read with the write about the event's task, never a query of its own */
+export interface EventFacts {
+  /** the task has a repository and a pull request */
+  repo?: boolean;
+}
+
+/** a task with a repository and a pull request: its accept is an accepted PR, the activation */
+export function taskFacts(t: Pick<Task, 'repo' | 'prNumber'>): EventFacts {
+  return { repo: !!t.repo && !!t.prNumber };
+}
+
 /**
  * Pure mapping from a domain event to a PostHog capture — or null to drop it.
  * No env, no client, no I/O: this is the unit-testable core of the funnel, and
  * it is where the "event-level only, no content" guarantee lives (it copies the
  * type + safe scalars and NOTHING from e.payload).
  */
-export function eventToCapture(e: NMEvent): Capture | null {
+export function eventToCapture(e: NMEvent, facts: EventFacts = {}): Capture | null {
   if (SKIP.has(e.type)) return null;
   return {
     distinctId: e.workspace, // the workspace = the activation unit (a founder's org)
     event: e.type, // e.g. 'task.accepted' — funnels read straight off these names
     properties: {
       nm_source: kindOf(e.source), // 'human' | 'agent' — who triggered it
-      nm_target: kindOf(e.target), // 'task' | 'channel' | 'workspace' | ...
+      nm_target: kindOf(e.target), // 'task' | 'channel' | 'workspace' | 'connector' | ...
       nm_task_number: taskNumber(e.target),
+      nm_repo: facts.repo, // set on the events of a task write (pgstore.mutate), else absent
       $process_person_profile: false, // server events: no person profiles
     },
   };
 }
 
 /** Fire-and-forget activation telemetry for one domain event. Never throws. */
-export function trackDomainEvent(e: NMEvent): void {
+export function trackDomainEvent(e: NMEvent, facts?: EventFacts): void {
   const c = ph();
   if (!c) return;
-  const cap = eventToCapture(e);
+  const cap = eventToCapture(e, facts);
   if (!cap) return;
   try {
     c.capture(cap);

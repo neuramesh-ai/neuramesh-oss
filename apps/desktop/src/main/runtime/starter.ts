@@ -65,7 +65,7 @@ export function insideDir(dir: string, rel: string): string | null {
   return full === root || full.startsWith(root + sep) ? full : null;
 }
 
-function fileTools(dir: string, gate: PermissionGate | undefined, log?: LogFn): OrchTool[] {
+export function fileTools(dir: string, gate: PermissionGate | undefined, log?: LogFn): OrchTool[] {
   const allowed = async (tool: 'Write' | 'Read', file_path: string): Promise<string | null> => {
     if (!gate) return null;
     const g = await gate(tool, { file_path });

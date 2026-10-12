@@ -1,5 +1,8 @@
+import { isEngineeringPlanProgress } from './plan-progress';
 import { MODEL_ID_SET } from '../model-packs';
 import type { EngineeringSession } from './domain';
+import { engineeringReviewMessages, interruptReviews } from './review-history';
+import { engineeringWorkPlanMessages } from './work-plan';
 
 /** The coding harness is an implementation detail. Product-owned status, error, and persisted
  * session copy crosses this boundary before it reaches the Engineering UI. Repository content,
@@ -18,6 +21,7 @@ export function engineeringSystemText(value: string): string {
 export function productizeStoredEngineeringSession(session: EngineeringSession): EngineeringSession {
   return {
     ...session,
+    planProgress: isEngineeringPlanProgress(session.planProgress) ? session.planProgress : null,
     modelOverride: typeof session.modelOverride === 'string' && MODEL_ID_SET.has(session.modelOverride) ? session.modelOverride : null,
     brainPack: typeof session.brainPack === 'string' ? session.brainPack : null,
     activeActivity: session.activeActivity && ['thinking', 'tool', 'composing'].includes(session.activeActivity.phase)
@@ -27,7 +31,7 @@ export function productizeStoredEngineeringSession(session: EngineeringSession):
       && (session.pendingModeHandoff.category === 'edit' || session.pendingModeHandoff.category === 'command')
       ? session.pendingModeHandoff
       : null,
-    messages: session.messages.map((message) => {
+    messages: engineeringWorkPlanMessages({ ...session, messages: engineeringReviewMessages(session) }).map((message) => {
       const productized = message.role === 'tool' || message.tone === 'warning'
         ? { ...message, body: engineeringSystemText(message.body) }
         : message;
@@ -49,8 +53,8 @@ export function productizeStoredEngineeringSession(session: EngineeringSession):
   };
 }
 
-/** Keep the browser's thread rail useful without turning localStorage into a repository cache.
- * Machine-side history and the retained worktree remain authoritative for execution details. */
+/** Retain review snapshots with the transcript so an approved batch remains reviewable after reload.
+ * The mutable workspace diff and tool output are not cached. Execution stays machine-authoritative. */
 export function persistableEngineeringSession(session: EngineeringSession): EngineeringSession {
   const interrupted = session.state === 'streaming' || session.state === 'awaiting_approval';
   return {
@@ -63,13 +67,13 @@ export function persistableEngineeringSession(session: EngineeringSession): Engi
     checkpoints: session.checkpoints.map(({ changes: _changes, ...checkpoint }) => ({ ...checkpoint, changes: [] })),
     // Tool receipts can contain unrestricted command output. User and model-authored transcript
     // remains available for the recent-thread experience described by the product contract.
-    messages: session.messages.filter((message) => message.role !== 'tool'),
+    messages: interruptReviews(engineeringReviewMessages(session).filter((message) => message.role !== 'tool')),
   };
 }
 
 /** The workspace shell needs thread identity and one snippet, never a live transcript or editor
  * payload. Keeping this projection small prevents token streaming from fanning out through App. */
 export function engineeringShellSession(session: EngineeringSession): EngineeringSession {
-  const latest = session.messages.slice().reverse().find((message) => message.role !== 'tool');
+  const latest = session.messages.slice().reverse().find((message) => message.role !== 'tool' && message.kind !== 'change_review');
   return { ...persistableEngineeringSession(session), messages: latest ? [latest] : [], checkpoints: [], workPlan: '' };
 }

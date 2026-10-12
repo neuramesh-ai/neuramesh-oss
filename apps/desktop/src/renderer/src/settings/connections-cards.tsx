@@ -14,7 +14,7 @@ export const CONNECTIONS_COPY = {
   mac: { name: 'This Mac', runs: 'runs', wait: 'please wait…', restart: 'Restart', engine: 'Engine', stack: 'Stack', upToDate: 'up to date', data: 'Data', show: 'Show in Finder', ports: 'Ports', afterQuit: 'After quit', keep: 'Keep the stack running', keepSub: 'Routines run only while the stack runs.' },
   cloud: { name: 'neuramesh.app', connected: 'connected', signOut: 'Sign out', account: 'Account', plan: 'Plan', seats: (n: number) => `${n} ${n === 1 ? 'seat' : 'seats'}`, billing: 'Manage billing', status: 'Status', renews: 'Renews', workspaces: 'Workspaces', door: 'Pro is the hosted cloud around this Mac.', get: 'Get Pro' },
   custom: { remove: 'Remove', address: 'Address', workspaces: 'Workspaces' },
-  manual: { name: 'Manual setup', sub: 'Run the stack yourself, from a terminal or on a server you own.', api: 'API URL', powersync: 'PowerSync URL', bearer: 'Bearer', connect: 'Connect', busy: 'Please wait…' },
+  manual: { name: 'Manual setup', sub: 'Run the stack yourself, from a terminal or on a server you own.', api: 'API URL', powersync: 'PowerSync URL (optional for Local)', bearer: 'Bearer', connect: 'Connect', busy: 'Please wait…' },
 } as const;
 
 export function Row({ k, children, sub }: { k: string; children: React.ReactNode; sub?: string }) {
@@ -61,7 +61,7 @@ export function ThisMacCard({ info, stack, keep, busy, door, moved, onKeep, onRe
       <Row k={c.engine}>{engine ? `${engine}${info?.engineVersion ? ` ${info.engineVersion}` : ''}` : '…'}</Row>
       <Row k={c.stack}>{info?.stackVersion ?? '…'}{info?.stackVersion && info.stackVersion === info.appVersion && <span className="cxtag">{c.upToDate}</span>}</Row>
       <Row k={c.data}>{info ? <><code title={info.dir}>{homeShort(info.dir)}</code><button type="button" className="cxlnk" onClick={() => onShow(info.dir)}>{c.show}</button></> : '…'}</Row>
-      <Row k={c.ports}>{info ? <><code>127.0.0.1:{info.ports.api}</code><code>127.0.0.1:{info.ports.powersync}</code></> : '…'}</Row>
+      <Row k={c.ports}>{info ? <><code>127.0.0.1:{info.ports.api}</code></> : '…'}</Row>
       <div className="cxrow">
         <span className="cxk">{c.afterQuit}</span>
         <span className="cxv">{c.keep}<span className="cxsub">{c.keepSub}</span></span>

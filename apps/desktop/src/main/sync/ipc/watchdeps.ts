@@ -1,10 +1,10 @@
 // What a watch module needs from startSync. Declared once so the three watch modules cannot
 // drift on it, and so the registry's ownership is stated: `watchers` belongs to the SESSION —
 // a watch registers an abort handle there and the renderer's unsubscribe finds it by subId.
-import type { PowerSyncDatabase } from '@powersync/node';
+import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 
 export interface WatchDeps {
-  db: () => PowerSyncDatabase;
+  db: () => ReplicaDatabase;
   /** subId → abort handle. Owned by startSync; a watch only ever adds to it. */
   watchers: Map<string, AbortController>;
   /** one place to report a query that failed, so a dead watch is visible rather than silent */

@@ -7,7 +7,7 @@ import { openConnectionsSettings, openMoveToCloud, openUpgrade } from '../src/li
 import { FLOW, FRESH_CLOUD, HAS_INVITE, LIVE_RUNS, MOCK_WS_ID, MSG_DELAY, NOKEY, TERM_PALETTE_PROOF, agents, allTasks, artWatchers, artifacts, baseThreadRows, beatsByTask, chanRunWatchers, channels, convoMsgs, convoWatchers, customPacks, decisionWatchers, designProviders, emitLog, emitMockStream, failoverWatchers, historyAllWatchers, homeIsClear, mockCodeSessions, codeSessionsWatchers, liveTerms, logWatchers, logs, machines, members, memoryBlock, mockArticleArt, mockConnectors, mockContentItems, mockConvoAtts, mockDecisions, mockFailover, mockMcpPresence, mockReplyCounts, mockRuns, mockSchedules, mockThreadArts, mockThreads, mockUpdateState, mockWhiteboards, mockWorkRuns, mockWorkspaces, msgWatchers, msgsByChannel, noop, notifyProcs, openMockTerm, openRunWatchers, packs, pingArts, pingConvo, pingDecisions, pingFailover, pingOpenRuns, pingTasksAll, pingThreads, pingWb, procWatchers, projects, promotedArtifacts, releaseBriefArt, roomMessagesFor, rosterWatchers, screen, seedIso, setMockFailover, skills, streamWatchers, stripThumb, t, taskChanWatchers, taskThreadExtra, taskThreadWatchers, tasksAllWatchers, tasksByChannel, threadWatchers, threadsAllSnapshot, threadsAllWatchers, wbListWatchers, wbRowWatchers, wbRowsFor, wsLibraryRows, libAllWatchers, deleteMockArtifact, DOOR_REPOS, DOOR_SCHEDULE_RUNS } from './mock-fixtures';
 import { marketingArtifacts, marketingSchedules } from './mock-marketing'; import { UGC_FILM } from './mock-ugc';
 import { CONNS, connectionList, foregroundTasks, foregroundThreads, mockForeground, mockForegroundWorkspace, railRowsSnapshot, swapForeground, watchForeground } from './mock-connections';
-import { githubLanes } from './mock-github'; import { codeGateLanes, codeGateRepos, repoConnectArc, resolveWithResume } from './mock-repo-connect';
+import { githubLanes } from './mock-github'; import { codingArts, codingHistoryLanes } from './mock-coding-history'; import { codeGateLanes, codeGateRepos, repoConnectArc, resolveWithResume } from './mock-repo-connect';
 import { worktreeRemoveMock, worktreesFixture } from './mock-worktrees';
 import { mockRunsFor, routineRun } from './mock-routines'; mockWorkRuns.push(routineRun); // today's routine run is live (one session per routine)
 
@@ -358,9 +358,9 @@ const explicit: Record<string, any> = {
   // connectors: Connect "finishes in the browser" after a beat, and the GitHub resolve (mock-github.ts;
   // the two entries stay literal here for the drift guard)
   connectorStart: githubLanes(mockConnectors).connectorStart,
-  githubResolve: resolveWithResume(githubLanes(mockConnectors).githubResolve), ...codeGateLanes, // the grant's resume + the coding gate (mock-repo-connect.ts)
+  githubResolve: resolveWithResume(githubLanes(mockConnectors).githubResolve), ...codeGateLanes, ...codingHistoryLanes, // the grant's resume + the coding gate (mock-repo-connect.ts)
   // the \u2039article:id\u203a card's self-read (article round) + its OS-browser export
-  artifact: async (artifactId: string) => { const hit = [mockArticleArt, releaseBriefArt].find((a) => a.id === artifactId); return { artifact: hit ? { ...hit } : null }; },
+  artifact: async (artifactId: string) => { const hit = [mockArticleArt, releaseBriefArt, ...codingArts].find((a) => a.id === artifactId); return { artifact: hit ? { ...hit } : null }; },
   articleExternal: async () => ({ ok: true }),
   connectors: async () => ({ connectors: [...mockConnectors] }),
   // the attention bar's three row sets (failure-alerts round) — the same conditions the real
@@ -550,9 +550,11 @@ const explicit: Record<string, any> = {
   creditsHistory: async () => ({
     days: Array.from({ length: 14 }, (_, i) => ({ day: `2026-08-${String(15 + i).padStart(2, '0')}`, activeSeconds: [0, 600, 1800, 3600, 900][i % 5]!, modelCalls: [0, 2, 5, 9, 3][i % 5]!, modelInTokens: 12000, modelOutTokens: 900, brainCredits: [0, 1, 4, 7, 2][i % 5]!, machineCredits: [0, 1, 3, 6, 1][i % 5]! })),
     grants: [{ credits: 500, kind: 'purchase', note: 'pack', day: '2026-08-20' }, { credits: 500, kind: 'monthly', note: 'monthly refill (free)', day: '2026-08-01' }],
+    // two films as the server lists them since 2026-10-06: the tier and the picture size, never the model
+    films: [{ id: 'f1', item: 'i1', tier: 'premium', model: '720p', seconds: 10, credits: 473, status: 'done', day: '2026-08-27', at: '2026-08-27T09:14:00Z' }, { id: 'f2', item: 'i2', tier: 'premium', model: '720p', seconds: 10, credits: 473, status: 'failed', day: '2026-08-26', at: '2026-08-26T16:02:00Z' }],
   }),
   creditsCheckout: async () => ({ ok: true }),
-  starterVideo: async () => ({ served: true, tier: 'starter', pick: null, canPick: localStorage.getItem('nm:plan') === 'cloud', tiers: [{ tier: 'starter', label: 'NeuraMesh Video Starter', model: 'Seedance 2.0', vendor: 'ByteDance', seconds: 8, credits: 194, lengths: [5, 8, 10, 15], perSecondMicros: 241_900 }, { tier: 'xpress', label: 'NeuraMesh Video Xpress', model: 'MiniMax H3', vendor: 'MiniMax', seconds: 8, credits: 48, lengths: [5, 8, 10, 15], perSecondMicros: 60_000 }, { tier: 'premium', label: 'NeuraMesh Video Premium', model: 'Seedance 2.0 Standard', vendor: 'ByteDance', seconds: 8, credits: 243, lengths: [5, 8, 10, 15], perSecondMicros: 303_400 }] }),
+  starterVideo: async () => ({ served: true, tier: 'starter', pick: null, canPick: localStorage.getItem('nm:plan') === 'cloud', tiers: [{ tier: 'starter', label: 'NeuraMesh Video Starter', model: '720p', seconds: 8, credits: 194, lengths: [5, 8, 10, 15], perSecondMicros: 241_900 }, { tier: 'xpress', label: 'NeuraMesh Video Xpress', model: '768p', seconds: 8, credits: 48, lengths: [5, 8, 10, 15], perSecondMicros: 60_000 }, { tier: 'premium', label: 'NeuraMesh Video Premium', model: '720p', seconds: 8, credits: 243, lengths: [5, 8, 10, 15], perSecondMicros: 303_400 }] }),
   billingPortal: async () => ({ ok: true }),
   // ?machinelimit=1 surfaces the Free single-machine transfer-or-upgrade card for capture/preview
   machineLimitInfo: async () =>

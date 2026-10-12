@@ -11,7 +11,7 @@ docker compose -f dev/stack/docker-compose.yaml up -d --wait
 # NULL embeddings backfill at boot. Gates/CI stay hermetic: only launch scripts opt in.
 # NM_ALLOW_ACTOR_HEADER=1: the dev desktop (NM_AUTH=dev) has no Clerk session and speaks through
 # the bare x-nm-actor header, which the control-api refuses unless told to (closed by default).
-(cd packages/control-api && DATABASE_URL="postgresql://postgres:nm@127.0.0.1:55435/nm" PORT=8788 NM_EMBED=on NM_ALLOW_ACTOR_HEADER=1 pnpm exec tsx src/server.ts) &
+(cd packages/control-api && DATABASE_URL="postgresql://postgres:nm@127.0.0.1:55435/nm" PORT=8788 NM_EMBED=on NM_ALLOW_ACTOR_HEADER=1 NM_LOCAL_SYNC=1 NM_BRAIN_STORAGE_DIR="${NM_BRAIN_STORAGE_DIR:-${NM_USERDATA:-$HOME/.neuramesh-dev}/brain-objects}" pnpm exec tsx src/server.ts) &
 API_PID=$!
 trap 'kill $API_PID >/dev/null 2>&1 || true' EXIT
 until curl -sf http://127.0.0.1:8788/healthz >/dev/null 2>&1; do sleep 0.3; done
@@ -36,4 +36,4 @@ done
 # single-instance lock. Keeps dev's local-stack replica/session on its own profile.
 export NM_USERDATA="${NM_USERDATA:-$HOME/.neuramesh-dev}"
 
-cd apps/desktop && NM_AUTH=dev NM_API=http://127.0.0.1:8788 NM_POWERSYNC=http://127.0.0.1:58081 pnpm exec electron . --sync
+cd apps/desktop && NM_AUTH=dev NM_API=http://127.0.0.1:8788 NM_LOCAL_SYNC=1 pnpm exec electron . --sync

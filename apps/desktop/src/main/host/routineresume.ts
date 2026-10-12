@@ -27,7 +27,7 @@ import { resolveToken } from '../agents';
 import { isComputeNotice } from '../computenotice';
 import { isRoutineSchedule, schedulePayload } from '@neuramesh/shared';
 import type { HostedAgent } from '../agents';
-import type { PowerSyncDatabase } from '@powersync/node';
+import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 
 export interface RoutineThreadState {
   threadId: string;
@@ -126,7 +126,7 @@ export async function sweepMessages(db: ReadDb, channelId: string): Promise<Arra
 }
 
 export function makeRoutineResume(ctx: {
-  db: PowerSyncDatabase;
+  db: ReplicaDatabase;
   apiUrl: string;
   ownerActorId: string;
   post: (path: string, actor: { kind: string; id: string; role?: string }, body: unknown) => Promise<Response>;

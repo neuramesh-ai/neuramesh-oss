@@ -4,7 +4,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-COMPOSE="docker compose -f dev/stack/docker-compose.yaml"
+COMPOSE="docker compose --profile legacy-sync -f dev/stack/docker-compose.yaml"
 API_PID=""
 # A hermetic state root for the gate (see the NM_USERDATA note at the smoke step below).
 E2E_PROFILE="$(mktemp -d "${TMPDIR:-/tmp}/nm-e2e-XXXXXX")"

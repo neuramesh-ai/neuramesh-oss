@@ -1,9 +1,14 @@
+import { lastMessageIndex, updateMessage, collapseReasoning, finishStreamingMessages } from './transcript-state';
+import { createEngineeringPlanProgress, isEngineeringPlanProgress } from './plan-progress';
+import { applyEngineeringSelection, recordEngineeringAuthors } from './selection-events';
 import type { EngineeringAttachment, EngineeringChange, EngineeringMessage, EngineeringSession, EngineeringTurnState, PermissionCategory } from './domain';
 import { firstSentence, lineHas } from '../linear';
 import { modelLabel } from '../model-labels';
-import { engineeringModeHandoff } from './handoff';
+import { engineeringModeHandoff, isEngineeringWorkPlan } from './handoff';
+import { engineeringWorkPlanText } from './work-plan';
 import { engineeringSystemText } from './copy';
-import { engineeringPatchPaths } from './patch';
+import { engineeringToolChanges, normalizeEngineeringChanges } from './changes';
+import { changeReviewMessage, engineeringReviewMessages, updateReviewStatus, finishChangeReview, interruptReviews } from './review-history';
 let serial = 0; const stamp = () => new Date().toISOString();
 const message = (role: EngineeringMessage['role'], body: string, tone: EngineeringMessage['tone'] = 'plain', kind = 'remote'): EngineeringMessage => ({
   id: `${kind}-${Date.now().toString(36)}-${(++serial).toString(36)}`, role, body, tone, createdAt: stamp(),
@@ -15,24 +20,13 @@ export const isEngineeringGitHubWait = (m: Pick<EngineeringMessage, 'id'>): bool
 const textValue = (value: unknown): string => typeof value === 'string' ? value : JSON.stringify(value, null, 2);
 const isPlanCeiling = (session: EngineeringSession, value: unknown): boolean => session.mode === 'plan' && lineHas(textValue(value).toLowerCase(), 'blocked by', 'plan mode');
 const terminalState = (reason: unknown): EngineeringTurnState => reason === 'completed' ? 'completed' : reason === 'error' ? 'error' : 'resumable';
+// a host that refuses each redial (the phone refreshes on every focus) repeats one sentence: the thread
+// keeps one row for it, not one row for each try
+const withWarning = (messages: EngineeringMessage[], warning: EngineeringMessage): EngineeringMessage[] => {
+  const last = messages.at(-1);
+  return last?.role === 'assistant' && last.tone === 'warning' && last.kind === warning.kind && last.body === warning.body ? messages : [...messages, warning];
+};
 
-function lastMessageIndex(messages: EngineeringMessage[], role: EngineeringMessage['role'], streamingOnly = false): number {
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    const current = messages[index];
-    if (current?.role === role && (!streamingOnly || current.streaming)) return index;
-  }
-  return -1;
-}
-
-const updateMessage = (messages: EngineeringMessage[], index: number, next: EngineeringMessage): EngineeringMessage[] => messages.map((current, at) => at === index ? next : current);
-function collapseReasoning(messages: EngineeringMessage[]): EngineeringMessage[] {
-  return messages.map((current) => current.role === 'reasoning' && !current.collapsed ? { ...current, streaming: false, collapsed: true } : current);
-}
-function finishStreamingMessages(messages: EngineeringMessage[], collapseThoughts: boolean): EngineeringMessage[] {
-  return (collapseThoughts ? collapseReasoning(messages) : messages).map((current) => current.streaming
-    ? { ...current, streaming: false }
-    : current);
-}
 
 function applyReasoningDelta(session: EngineeringSession, event: Record<string, unknown>): EngineeringSession {
   const redacted = event['redacted'] === true;
@@ -70,44 +64,26 @@ function mergeChanges(current: EngineeringChange[], incoming: EngineeringChange[
   return [...current.filter((change) => !paths.has(change.path)), ...incoming];
 }
 
-function remoteChange(toolName: string, input: unknown): EngineeringChange[] {
-  const value = input && typeof input === 'object' ? input as Record<string, unknown> : {};
-  if (toolName === 'editor') {
-    const path = typeof value['path'] === 'string' ? value['path'] : 'proposed-edit';
-    const before = typeof value['old_text'] === 'string' ? value['old_text'] : '';
-    const after = typeof value['new_text'] === 'string' ? value['new_text'] : '';
-    return [{
-      path, kind: before ? 'modified' : 'added', before, after,
-      diff: `diff --git a/${path} b/${path}\n--- a/${path}\n+++ b/${path}\n@@ proposed change @@\n${before.split('\n').filter(Boolean).map((line) => `-${line}`).join('\n')}\n${after.split('\n').filter(Boolean).map((line) => `+${line}`).join('\n')}\n`,
-    }];
-  }
-  if (toolName !== 'apply_patch') return [];
-  const patch = typeof input === 'string' ? input : typeof value['input'] === 'string' ? value['input'] : textValue(input);
-  const paths = engineeringPatchPaths(patch);
-  return (paths.length ? paths : ['proposed.patch']).map((path): EngineeringChange => ({
-    path,
-    kind: patch.includes(`*** Add File: ${path}`) ? 'added' : patch.includes(`*** Delete File: ${path}`) ? 'deleted' : 'modified',
-    before: '', after: patch, diff: patch,
-  }));
-}
+const remoteChange = engineeringToolChanges;
 
 export function beginRemoteEngineeringPrompt(session: EngineeringSession, prompt: string, attachments: EngineeringAttachment[] = []): EngineeringSession {
   const text = prompt.trim();
   if (!text || session.state === 'streaming' || session.state === 'awaiting_approval') return session;
   const title = session.title === 'New Code task' || session.title === 'New engineering task' ? firstSentence(text).slice(0, 64) || session.title : session.title;
   return {
-    ...session, title, state: 'streaming', activeActivity: { phase: 'thinking', startedAt: stamp() }, pendingModeHandoff: null,
-    messages: [...session.messages, { ...message('user', text), ...(attachments.length ? { attachments } : {}) }], updatedAt: stamp(),
+    ...session, title, ...(session.mode === 'act' && session.planProgress ? { planProgress: { ...session.planProgress, started: true } } : {}), state: 'streaming', activeActivity: { phase: 'thinking', startedAt: stamp() }, pendingModeHandoff: null, pendingApproval: null, proposedChanges: [],
+    messages: [...interruptReviews(engineeringReviewMessages(session)), { ...message('user', text), ...(attachments.length ? { attachments } : {}) }], updatedAt: stamp(),
   };
 }
 
 export function resolveRemoteEngineeringApproval(session: EngineeringSession, approved: boolean): EngineeringSession {
   if (!session.pendingApproval) return session;
+  const messages = updateReviewStatus(engineeringReviewMessages(session), session.pendingApproval.id, approved ? 'approved' : 'declined');
   return {
-    ...session, pendingApproval: null, proposedChanges: approved ? session.proposedChanges : [],
+    ...session, messages, pendingApproval: null, proposedChanges: approved ? session.proposedChanges : [],
     state: approved ? 'streaming' : 'resumable',
     activeActivity: approved ? { phase: 'thinking', startedAt: stamp() } : null,
-    ...(!approved ? { messages: [...session.messages, message('assistant', 'The requested action was declined.', 'warning')] } : {}),
+    ...(!approved ? { messages: [...messages, message('assistant', 'The requested action was declined.', 'warning')] } : {}),
     updatedAt: stamp(),
   };
 }
@@ -120,7 +96,9 @@ function applySnapshot(session: EngineeringSession, core: Record<string, unknown
   const checkpoints = history.flatMap((entry) => {
     const runCount = entry['runCount'];
     if (typeof runCount !== 'number') return [];
-    return [{ id: `cline-run-${runCount}`, label: runCount === 1 ? 'Before first run' : `Before run ${runCount}`, createdAt: new Date(typeof entry['createdAt'] === 'number' ? entry['createdAt'] : Date.now()).toISOString(), messageCount: session.messages.length, changes: session.changes.map((change) => ({ ...change })), workPlan: session.workPlan }];
+    const existing = session.checkpoints.find(item => item.id === `cline-run-${runCount}`);
+    if (existing) return [existing];
+    return [{ id: `cline-run-${runCount}`, label: runCount === 1 ? 'Before first run' : `Before run ${runCount}`, createdAt: new Date(typeof entry['createdAt'] === 'number' ? entry['createdAt'] : Date.now()).toISOString(), messageCount: session.messages.length, changes: session.changes.map((change) => ({ ...change })), workPlan: session.workPlan, planProgress: session.planProgress ? JSON.parse(JSON.stringify(session.planProgress)) : null }];
   });
   return checkpoints.length ? { ...session, checkpoints, updatedAt: stamp() } : session;
 }
@@ -167,14 +145,6 @@ function applyContentEvent(session: EngineeringSession, event: Record<string, un
       ...session,
       activeActivity: null,
       messages,
-      ...(session.mode === 'plan' ? {
-        workPlan: body,
-        // A well-behaved model normally stops itself before requesting a forbidden
-        // Plan-mode mutation. Treat the completed plan as the same structured
-        // handoff as a machine-side denial so the user never has to copy a prompt
-        // or manually toggle modes just because the model respected the boundary.
-        pendingModeHandoff: session.pendingModeHandoff ?? engineeringModeHandoff('edit', 'plan'),
-      } : {}),
       updatedAt: stamp(),
     };
   }
@@ -189,27 +159,32 @@ function applyContentEvent(session: EngineeringSession, event: Record<string, un
       activeActivity: { phase: 'thinking', startedAt: stamp() },
       changes: changed && !event['error'] ? mergeChanges(session.changes, session.proposedChanges) : session.changes,
       proposedChanges: changed ? [] : session.proposedChanges,
-      messages: planBlocked ? session.messages : [...session.messages, message('tool', detail, event['error'] ? 'warning' : 'success')],
+      messages: planBlocked ? session.messages : [...(changed ? finishChangeReview(session, !!event['error'], stamp()) : session.messages), message('tool', detail, event['error'] ? 'warning' : 'success')],
       updatedAt: stamp(),
     };
   }
   if (event['type'] === 'done') {
     const body = typeof event['text'] === 'string' ? event['text'] : '';
-    const finished = finishStreamingMessages(session.messages, Boolean(body));
+    const finished = interruptReviews(finishStreamingMessages(session.messages, Boolean(body)));
     const state = terminalState(event['reason']);
     return { ...session, state, activeActivity: null, pendingApproval: null, messages: body && finished.at(-1)?.body !== body ? [...finished, message('assistant', body, state === 'completed' ? 'success' : 'warning')] : finished, updatedAt: stamp() };
   }
   if (event['type'] === 'error') {
     const error = event['error'] as Record<string, unknown> | undefined;
     if (isPlanCeiling(session, error?.['message'] ?? event['message'])) return session;
-    return { ...session, state: event['recoverable'] ? 'resumable' : 'error', activeActivity: null, messages: [...finishStreamingMessages(session.messages, false), message('assistant', engineeringSystemText(String(error?.['message'] ?? 'Engineering encountered an error.')), 'warning')], updatedAt: stamp() };
+    // A recoverable core error can be followed by another model iteration in the same turn.
+    // Keep the composer and progress live until the runtime's done/ended event, rather than
+    // treating a rejected tool as a finished turn. Transport/start failures use the wire error path.
+    const recovering = event['recoverable'] === true && session.state === 'streaming';
+    return { ...session, state: recovering ? 'streaming' : event['recoverable'] ? 'resumable' : 'error', activeActivity: recovering ? { phase: 'thinking', startedAt: stamp() } : null, pendingApproval: null, messages: [...interruptReviews(finishStreamingMessages(session.messages, false)), message('assistant', engineeringSystemText(String(error?.['message'] ?? 'Engineering encountered an error.')), 'warning')], updatedAt: stamp() };
   }
   return session;
 }
 
 /** Project Cline Core's transport events into the stable Engineering UI model. */
-export function applyRemoteEngineeringEvent(session: EngineeringSession, wire: Record<string, unknown>): EngineeringSession {
+function reduceRemoteEngineeringEvent(session: EngineeringSession, wire: Record<string, unknown>): EngineeringSession {
   const type = wire['type'];
+  session = applyEngineeringSelection(session, wire);
   if (type === 'ready') {
     const provider = engineeringSystemText(String(wire['provider']));
     const model = engineeringSystemText(String(wire['model']));
@@ -236,24 +211,38 @@ export function applyRemoteEngineeringEvent(session: EngineeringSession, wire: R
   if (type === 'status') return wire['status'] === 'running'
     ? { ...session, state: 'streaming', activeActivity: session.activeActivity ?? { phase: 'thinking', startedAt: stamp() }, updatedAt: stamp() }
     : session.state === 'streaming' ? { ...session, state: 'idle', activeActivity: null, messages: finishStreamingMessages(session.messages, false), updatedAt: stamp() } : session;
-  if (type === 'mode_blocked' && session.mode === 'plan' && (wire['category'] === 'edit' || wire['category'] === 'command')) {
-    // A completed implementation plan already carries the stronger edit+verify
-    // continuation. Do not downgrade it when the model subsequently probes the
-    // verification command and hits the same Plan ceiling.
-    if (session.pendingModeHandoff?.category === 'edit' && wire['category'] === 'command') return session;
-    return { ...session, pendingModeHandoff: engineeringModeHandoff(wire['category'], String(wire['toolName'] ?? 'tool')), updatedAt: stamp() };
+  if (type === 'plan_progress') return wire['progress'] === null || isEngineeringPlanProgress(wire['progress'])
+    ? { ...session, planProgress: wire['progress'], ...(wire['progress'] ? { workPlan: engineeringWorkPlanText(wire['progress'].plan) } : {}), updatedAt: stamp() } : session;
+  if (type === 'work_plan' && session.mode === 'plan' && isEngineeringWorkPlan(wire['plan'])) {
+    const plan = wire['plan'];
+    const workPlan = engineeringWorkPlanText(plan);
+    return { ...session, workPlan, planProgress: createEngineeringPlanProgress(plan, typeof wire['planId'] === 'string' ? wire['planId'] : `legacy-plan-${session.id}`), messages: [...finishStreamingMessages(session.messages, true), { ...message('assistant', workPlan, 'plan', 'work-plan'), kind: 'work_plan', ...(plan.report ? { planReport: { ...plan.report, decisions: [...plan.report.decisions] } } : {}) }],
+      pendingModeHandoff: engineeringModeHandoff(plan.steps.some((step) => step.action === 'edit') ? 'edit' : 'command', 'propose_work_plan'), updatedAt: stamp() };
+  }
+  if (type === 'mode_blocked' && session.mode === 'plan' && wire['category'] === 'edit') {
+    const toolName = String(wire['toolName'] ?? '');
+    if (!engineeringToolChanges(toolName, wire['input']).length) return session;
+    return { ...session, pendingModeHandoff: engineeringModeHandoff('edit', toolName), updatedAt: stamp() };
   }
   if (type === 'approval') {
     const category = wire['category'] as PermissionCategory;
     const toolName = String(wire['toolName'] ?? 'tool');
-    const changes = remoteChange(toolName, wire['input']);
+    const changes = Array.isArray(wire['changes']) ? normalizeEngineeringChanges(wire['changes'] as EngineeringChange[]) : remoteChange(toolName, wire['input']);
     const command = toolName === 'run_commands' || toolName === 'fetch_web_content' ? textValue(wire['input']) : undefined;
-    return { ...session, state: 'awaiting_approval', activeActivity: null, proposedChanges: changes, pendingApproval: {
+    const messages = engineeringReviewMessages(session);
+    const approvalId = String(wire['approvalId']);
+    return { ...session, messages: changes.length && !messages.some((m) => m.review?.id === approvalId)
+      ? [...finishStreamingMessages(messages, true), changeReviewMessage(approvalId, changes, 'proposed', stamp())] : messages, state: 'awaiting_approval', activeActivity: null, proposedChanges: changes, pendingApproval: {
       id: String(wire['approvalId']), category,
       title: category === 'edit' ? 'Apply proposed file changes' : category === 'command' ? 'Execute command' : category === 'web' ? 'Fetch web content' : category === 'mcp' ? 'Use MCP tool' : 'Read repository files',
       detail: `${toolName} requested by Engineering`, ...(command ? { command } : {}), ...(changes.length ? { changes } : {}),
       continuation: category === 'edit' ? 'apply' : category === 'command' ? 'verify' : 'inspect',
     }, updatedAt: stamp() };
+  }
+  if (type === 'approval_resolved') {
+    const id = String(wire['approvalId']);
+    if (session.pendingApproval?.id === id) return resolveRemoteEngineeringApproval(session, wire['approved'] === true);
+    return { ...session, messages: updateReviewStatus(session.messages, id, wire['approved'] === true ? 'approved' : 'declined') };
   }
   if (type === 'error') {
     // Core can project the same Plan ceiling twice: first as the typed
@@ -264,15 +253,15 @@ export function applyRemoteEngineeringEvent(session: EngineeringSession, wire: R
     // the machine cannot reach the code until GitHub is connected: the gate seat shows the GitHub card, and the
     // grant opens the session again (docs/design/repo-connect-2026-10). The machine's sentence stays, marked
     // (isEngineeringGitHubWait), so a client with no gate (the phone) still shows a reason
-    if (wire['code'] === 'ENGINEERING_GITHUB_REQUIRED') return { ...session, state: 'error', blockedOn: 'github', activeActivity: null, pendingApproval: null, messages: [...finishStreamingMessages(session.messages, false), message('assistant', engineeringSystemText(String(wire['message'] ?? 'Connect GitHub to code here.')), 'warning', GITHUB_WAIT)], updatedAt: stamp() };
-    return { ...session, state: wire['recoverable'] ? 'resumable' : 'error', activeActivity: null, pendingApproval: null, messages: [...finishStreamingMessages(session.messages, false), message('assistant', engineeringSystemText(String(wire['message'] ?? 'Engineering failed.')), 'warning')], updatedAt: stamp() };
+    if (wire['code'] === 'ENGINEERING_GITHUB_REQUIRED') return { ...session, state: 'error', blockedOn: 'github', activeActivity: null, pendingApproval: null, messages: withWarning(interruptReviews(finishStreamingMessages(session.messages, false)), message('assistant', engineeringSystemText(String(wire['message'] ?? 'Connect GitHub to code here.')), 'warning', GITHUB_WAIT)), updatedAt: stamp() };
+    return { ...session, state: wire['recoverable'] ? 'resumable' : 'error', activeActivity: null, pendingApproval: null, messages: withWarning(interruptReviews(finishStreamingMessages(session.messages, false)), message('assistant', engineeringSystemText(String(wire['message'] ?? 'Engineering failed.')), 'warning')), updatedAt: stamp() };
   }
-  if (type === 'changes' && Array.isArray(wire['changes'])) return { ...session, changes: wire['changes'] as EngineeringChange[], proposedChanges: [], updatedAt: stamp() };
+  if (type === 'changes' && Array.isArray(wire['changes'])) return { ...session, changes: normalizeEngineeringChanges(wire['changes'] as EngineeringChange[]), proposedChanges: [], updatedAt: stamp() };
   if (type === 'restored') {
     const checkpoint = session.checkpoints.find((item) => item.id === `cline-run-${String(wire['checkpointRunCount'])}`); const restoredMessages = checkpoint ? session.messages.slice(0, checkpoint.messageCount) : session.messages;
-    return { ...session, state: 'resumable', activeActivity: null, pendingModeHandoff: null, pendingApproval: null, proposedChanges: [], changes: checkpoint?.changes.map((change) => ({ ...change })) ?? [], workPlan: checkpoint?.workPlan ?? session.workPlan, messages: [...finishStreamingMessages(restoredMessages, true), message('tool', `Restored checkpoint · run ${String(wire['checkpointRunCount'])}`, 'success')], updatedAt: stamp() };
+    return { ...session, state: 'resumable', activeActivity: null, pendingModeHandoff: null, pendingApproval: null, proposedChanges: [], changes: checkpoint?.changes.map((change) => ({ ...change })) ?? [], workPlan: checkpoint?.workPlan ?? session.workPlan, planProgress: checkpoint?.planProgress ?? null, messages: [...finishStreamingMessages(restoredMessages, true), message('tool', `Restored checkpoint · run ${String(wire['checkpointRunCount'])}`, 'success')], updatedAt: stamp() };
   }
-  if (type === 'ended') return { ...session, state: terminalState(wire['reason']), activeActivity: null, pendingApproval: null, messages: finishStreamingMessages(session.messages, false), updatedAt: stamp() };
+  if (type === 'ended') return { ...session, state: terminalState(wire['reason']), activeActivity: null, pendingApproval: null, messages: interruptReviews(finishStreamingMessages(session.messages, false)), updatedAt: stamp() };
   if (type !== 'agent_event') return session;
   const core = wire['event'] as Record<string, unknown> | undefined;
   if (core?.['type'] === 'session_snapshot') return applySnapshot(session, core);
@@ -280,4 +269,9 @@ export function applyRemoteEngineeringEvent(session: EngineeringSession, wire: R
   const payload = core['payload'] as Record<string, unknown> | undefined;
   const event = payload?.['event'] as Record<string, unknown> | undefined;
   return event ? applyContentEvent(session, event) : session;
+}
+
+/** Snapshot the speaking identity when a row is recorded, never when history is rendered. */
+export function applyRemoteEngineeringEvent(session: EngineeringSession, wire: Record<string, unknown>): EngineeringSession {
+  return recordEngineeringAuthors(session, reduceRemoteEngineeringEvent(session, wire));
 }

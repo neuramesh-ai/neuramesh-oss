@@ -157,7 +157,7 @@ export function AgentGhost({ agent, beat, onActivity }: { agent: AgentRow; beat?
           <button type="button" className="liveact ghoststep" aria-expanded={logOpen}
             title={logOpen ? 'collapse the step log' : `what ${agent.name} has done — expand`}
             onClick={() => setLogOpen((v) => !v)}>
-            <Orb state={orbStateFor(shown, cat, agent.role)} label={`${agent.name} is ${shown}`} />
+            <Orb state={orbStateFor(shown, cat, agent.role)} label={`${agent.name}: ${shown}`} />
             {/* key on the text so the sheen + enter animation replay when the step advances */}
             <span className="liveact-txt" key={shown}>{shown}</span>
             <span className="ghostchev" aria-hidden>▶</span>

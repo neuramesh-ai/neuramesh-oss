@@ -1,3 +1,4 @@
+import type { EngineeringSelection } from '@neuramesh/shared';
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import type { RepoUI, WorkspaceProjectRow } from '../bridge/rows-board';
 import { CaughtUpPeek } from '../brand';
@@ -9,12 +10,18 @@ import type { EngineeringAttachmentUpload } from '../engineering/attachments';
 import { scheduleEngineeringSync } from '../engineering/sync';
 import { engineeringShellSession } from '../engineering/copy';
 import { useEngineeringRuntime } from '../engineering/useEngineeringRuntime';
+import { ApprovalCard } from '../engineering/EngineeringApproval';
+import type { OpenChangeReview } from '../engineering/EngineeringChangeCard';
+import { engineeringReviewMessages, engineeringWorkPlanMessages } from '@neuramesh/shared';
+import { useWorkPlan } from '../engineering/useWorkPlan';
+import { useCodeReview } from '../engineering/useCodeReview';
+export { ApprovalCard } from '../engineering/EngineeringApproval';
 import { EngineeringComposer } from '../engineering/EngineeringComposer';
 import { EngineeringComposerSplitter, useEngineeringComposerResize } from '../engineering/EngineeringComposerResize';
 import { ProjectChip } from '../projects/ProjectChip';
 import { Popover } from '../ui/Popover';
 import { anchorPoint } from '../ui/anchor';
-import { IconAlert, IconChevron, IconCode, IconHistory, IconLock, IconSearch } from '../ui/icons';
+import { IconAlert, IconChevron, IconCode, IconHistory, IconSearch } from '../ui/icons';
 
 /** the shell renders the chip (it owns the fleet); Code says which session it edits and whether it is locked */
 export type MachineChipSlot = (value: string | null, onPick: (machineId: string | null) => void, disabled: boolean) => ReactNode;
@@ -28,39 +35,17 @@ export const engineeringHarnessOn = (): boolean => (NM_PLATFORM === 'preview' &&
 
 const stateLabel = (state: EngineeringSession['state']) => ({ idle: 'Ready', streaming: 'Working', awaiting_approval: 'Needs approval', resumable: 'Paused', completed: 'Complete', error: 'Blocked' })[state];
 
-export function ApprovalCard({ session, onResolve, onReview }: { session: EngineeringSession; onResolve: (approved: boolean) => void; onReview?: (() => void) | undefined }) {
-  const approval = session.pendingApproval;
-  const [shown, setShown] = useState(approval);
-  const [closing, setClosing] = useState(false);
-  useEffect(() => {
-    if (approval) { setShown(approval); setClosing(false); return undefined; }
-    if (!shown) return undefined;
-    setClosing(true);
-    const timer = window.setTimeout(() => { setShown(null); setClosing(false); }, 140);
-    return () => window.clearTimeout(timer);
-  }, [approval, shown]);
-  if (!shown) return null;
-  return (
-    <div className="engapproval" data-state={closing ? 'closing' : 'open'} role="alert">
-      <div className="engapprovaltop"><span className="engapprovalico"><IconLock s={13} /></span><span><b>{shown.title}</b><small>{shown.detail}</small></span></div>
-      {shown.command && <code>{shown.command}</code>}
-      {shown.changes?.length ? (onReview ? <div className="paths">{shown.changes.map((c) => { const add = c.after.split('\n').length, del = c.before ? c.before.split('\n').length : 0; return <span key={c.path}><i>{c.kind === 'deleted' ? `−${del}` : c.kind === 'added' ? `+${add}` : `+${add} −${del}`}</i>{c.path}</span>; })}</div> : <div className="engapprovalstat">{shown.changes.length} files · complete patch open on the right</div>) : null}
-      <div className="engapprovalactions">{onReview && shown.changes?.length ? <button className="btn sm" onClick={onReview}>Review the patch</button> : null}
-        <button className="btn sm" onClick={() => onResolve(false)}>Decline</button>
-        <button className="btn primary sm" onClick={() => onResolve(true)}>Approve once</button>
-      </div>
-    </div>
-  );
-}
-
-export function EngineeringConversation({ session, projects, project, plan, onUpgrade, onNewProject, onProject, onSession, onSend, onMode, onPermission, onModel, onContinueInAct, onDismissModeHandoff, onApproval, machineChip, prelude, postlude, gate }: {
+export function EngineeringConversation({ session, projects, project, plan, onUpgrade, onNewProject, onProject, onSession, onSend, onMode, onPermission, onConfigure, onContinueInAct, onDismissModeHandoff, onApproval, onReviewChanges, onOpenWorkPlan, onOpenReview, machineChip, prelude, postlude, gate }: {
   session: EngineeringSession; onSession: (session: EngineeringSession) => void;
   projects: WorkspaceProjectRow[]; project: WorkspaceProjectRow | null; plan: string;
   onUpgrade: (reason: string) => void; onNewProject: (origin: { x: number; y: number } | null) => void; onProject?: (id: string) => void;
   prelude?: ReactNode; postlude?: ReactNode; gate?: ReactNode; // a coding THREAD's own messages around the runtime's transcript (rex's line and the kind divider above, the unit card below), and its ONE gate card above the composer (docs/25)
   onSend?: (prompt: string, uploads: EngineeringAttachmentUpload[]) => void; onMode?: (mode: 'plan' | 'act') => void;
-  onPermission?: (category: PermissionCategory, value: boolean) => void; onModel?: (modelId: string | null) => void;
+  onPermission?: (category: PermissionCategory, value: boolean) => void; onConfigure?: (selection: EngineeringSelection) => void;
   onContinueInAct?: () => void; onDismissModeHandoff?: () => void;
+  onOpenWorkPlan?: (text: string) => void;
+  onReviewChanges?: (path?: string) => void;
+  onOpenReview?: OpenChangeReview;
   onApproval?: (approved: boolean) => void; machineChip?: MachineChipSlot;
 }) {
   const scroll = useRef<HTMLDivElement>(null);
@@ -89,15 +74,15 @@ export function EngineeringConversation({ session, projects, project, plan, onUp
           followsStream.current = atBottom;
           setShowJumpToBottom(!atBottom);
         }}>
-          {prelude}<EngineeringTranscript messages={session.messages} />{postlude}
+          {prelude}<EngineeringTranscript onOpenReview={onOpenReview} pendingApprovalId={session.pendingApproval?.id} onApproval={(approved) => onApproval ? onApproval(approved) : onSession(resolveEngineeringApproval(session, approved))} messages={engineeringWorkPlanMessages({ ...session, messages: engineeringReviewMessages(session) })} onOpenWorkPlan={onOpenWorkPlan} />{postlude}
           {session.state === 'streaming' && !streamingReasoning ? <EngineeringWorking session={session} /> : null}
-          <ApprovalCard session={session} onResolve={(approved) => onApproval ? onApproval(approved) : onSession(resolveEngineeringApproval(session, approved))} />
+          {!session.pendingApproval?.changes?.length && <ApprovalCard session={session} onReview={onReviewChanges} onResolve={(approved) => onApproval ? onApproval(approved) : onSession(resolveEngineeringApproval(session, approved))} />}
         </div>
         {showJumpToBottom ? <button className="engscrollbottom" onClick={jumpToBottom} aria-label="Scroll to latest message" data-tip="Scroll to latest"><IconChevron s={14} /></button> : null}
       </div>{gate}
       <EngineeringComposer session={session} onSession={onSession}
         onSend={(prompt, uploads) => onSend ? onSend(prompt, uploads) : onSession(submitEngineeringPrompt(session, prompt))}
-        onMode={onMode} onPermission={onPermission} onModel={onModel}
+        onMode={onMode} onPermission={onPermission} onConfigure={onConfigure}
         onContinueInAct={onContinueInAct} onDismissModeHandoff={onDismissModeHandoff}
         projects={projects} project={project} onProject={onProject} onNewProject={onNewProject}
         plan={plan} onUpgrade={onUpgrade}
@@ -131,7 +116,7 @@ function EngineeringStart({ repoRows, projects, initialProjectId, sessions, runt
   onOpen: (id: string) => void;
   plan: string; onUpgrade: (reason: string) => void;
   onNewProject: (origin: { x: number; y: number } | null) => void;
-  onStart: (repo: EngineeringRepo, prompt: string, preferences: Pick<EngineeringSession, 'mode' | 'permissions' | 'modelOverride' | 'brainPack' | 'machineId'>, uploads: EngineeringAttachmentUpload[], project: EngineeringProject | null) => void;
+  onStart: (repo: EngineeringRepo, prompt: string, preferences: Pick<EngineeringSession, 'mode' | 'permissions' | 'modelOverride' | 'brainPack' | 'machineId' | 'agentId' | 'reasoningEffort'>, uploads: EngineeringAttachmentUpload[], project: EngineeringProject | null) => void;
   machineChip?: MachineChipSlot; defaultMachineId?: string | null;
 }) {
   const ready = runtime === 'ready';
@@ -223,11 +208,13 @@ export function EngineeringOS({ repos: repoRows, projects, activeProjectId = nul
   /** rule D9: the composer's machine chip (the shell builds it — it needs the fleet) and the machine a new session starts on */
   machineChip?: MachineChipSlot; defaultMachineId?: string | null;
 }) {
-  // `?engruntime=unavailable` lets the preview harness render the unavailable notice: the mock bridge has no Code methods, so the hook lands in its "no bridge" branch
+  // `?engineeringHarness=1` runs the deterministic local runtime (simulated gates, diffs and checkpoints, no model billing)
   const harness = engineeringHarnessOn();
   const repos = useMemo(() => repoRows.map(repoOf), [repoRows]);
   const engineering = useEngineeringRuntime(harness, repos, workspaceId, initialSessionId, defaultMachineId);
   const { active, sessions, runtime, reason } = engineering;
+  const workPlan = useWorkPlan(active, () => onEditorTab('plan'));
+  const review = useCodeReview(active, () => onEditorTab('changes'));
   const activeProject = projects.find((project) => project.id === active?.project?.id) ?? projects.find((project) => project.id === activeProjectId) ?? projects.find((project) => project.status === 'active') ?? null;
   const createForProject = (projectId: string) => {
     const project = projects.find((candidate) => candidate.id === projectId) ?? null;
@@ -256,13 +243,13 @@ export function EngineeringOS({ repos: repoRows, projects, activeProjectId = nul
         {active ? (
           <EngineeringConversation session={active} projects={projects.filter((project) => project.status === 'active')} project={activeProject}
             plan={plan} onUpgrade={onUpgrade} onNewProject={onNewProject} onProject={createForProject}
-            onSession={engineering.update} machineChip={machineChip}
-            {...(!harness ? { onSend: (prompt: string, uploads: EngineeringAttachmentUpload[]) => engineering.send(active, prompt, uploads), onMode: (mode: 'plan' | 'act') => engineering.setMode(active, mode), onContinueInAct: () => engineering.continueInAct(active), onDismissModeHandoff: () => engineering.dismissModeHandoff(active), onPermission: (category: PermissionCategory, value: boolean) => engineering.setPermission(active, category, value), onModel: (modelId: string | null) => engineering.setModel(active, modelId), onApproval: (approved: boolean) => engineering.approve(active, approved) } : {})} />
+            onSession={engineering.update} machineChip={machineChip} onReviewChanges={review.open} onOpenReview={review.openReview} onOpenWorkPlan={workPlan.open}
+            {...(!harness ? { onSend: (prompt: string, uploads: EngineeringAttachmentUpload[]) => engineering.send(active, prompt, uploads), onMode: (mode: 'plan' | 'act') => engineering.setMode(active, mode), onContinueInAct: () => engineering.continueInAct(active), onDismissModeHandoff: () => engineering.dismissModeHandoff(active), onPermission: (category: PermissionCategory, value: boolean) => engineering.setPermission(active, category, value), onConfigure: (selection: EngineeringSelection) => engineering.configure(active, selection), onApproval: (approved: boolean) => engineering.approve(active, approved) } : {})} />
         ) : <EngineeringStart repoRows={repoRows} projects={projects} initialProjectId={activeProjectId} sessions={sessions} runtime={runtime} reason={reason}
           plan={plan} onUpgrade={onUpgrade} onNewProject={onNewProject}
           onOpen={engineering.open} onStart={engineering.start} machineChip={machineChip} defaultMachineId={defaultMachineId} />}
         <EngineeringComposerSplitter {...composerResize} />
-        {active ? <EngineeringEditor session={active} onSession={engineering.update} tab={editorTab} onTab={onEditorTab} {...(!harness ? { onRestore: (checkpointId: string) => engineering.restore(active, checkpointId) } : {})} /> : <EngineeringStandby repos={repos} />}
+        {active ? <EngineeringEditor selectedReview={review.selectedReview} selectedPlan={workPlan.text} selectedPath={review.path} onSelectPath={review.select} session={active} onSession={engineering.update} tab={editorTab} onTab={onEditorTab} {...(!harness ? { onRestore: (checkpointId: string) => engineering.restore(active, checkpointId) } : {})} /> : <EngineeringStandby repos={repos} />}
       </div>
     </div>
   );

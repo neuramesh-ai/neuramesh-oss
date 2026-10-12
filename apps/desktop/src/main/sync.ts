@@ -1,3 +1,5 @@
+import { controlApiRequestUrl } from '@neuramesh/shared';
+import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 import { initHouseStyle } from './housestyle';
 import { registerWhiteboardIpc } from './sync/ipc/whiteboards';
 import { registerAccountIpc } from './sync/ipc/account';
@@ -11,7 +13,7 @@ import { existsSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { app, BrowserWindow, ipcMain } from 'electron';
 
-import { createBaseLogger, LogLevel, type PowerSyncDatabase } from '@powersync/node';
+import { createBaseLogger, LogLevel } from '@powersync/node';
 
 if (process.env['NM_SYNC_DEBUG']) {
   const logger = createBaseLogger();
@@ -83,7 +85,7 @@ export const machineLimit = (): { message: string } | null => cur().machineLimit
 // a transfer clears the limit from sync/ipc/settings — the write goes through a setter
 export const setMachineLimit = (v: { message: string } | null) => { cur().machineLimit = v; };
 /** the foreground replica. Throws before it opens: a query then is a boot-order bug, not an empty list. */
-export const activeDb = (): PowerSyncDatabase => {
+export const activeDb = (): ReplicaDatabase => {
   const db = cur().db;
   if (!db) throw new Error('replica not open yet');
   return db;
@@ -166,7 +168,7 @@ export const api = (path: string, body?: unknown, method?: string) => apiOn(cur(
  */
 export async function apiOn(c: Connection, path: string, body?: unknown, method = body ? 'POST' : 'GET') {
   const headers = () => apiAuthHeaders(c.apiUrl, { kind: 'human', id: actorId(c) });
-  let res = await fetch(`${c.apiUrl}${path}`, {
+  let res = await fetch(controlApiRequestUrl(c.apiUrl, path), {
     method,
     headers: await headers(),
     body: body ? JSON.stringify(body) : undefined,
@@ -176,7 +178,7 @@ export async function apiOn(c: Connection, path: string, body?: unknown, method 
   // a hard failure on a call that was always going to be allowed.
   if (res.status === 401 && c.authMode === 'clerk') {
     clearClerkApiToken();
-    res = await fetch(`${c.apiUrl}${path}`, {
+    res = await fetch(controlApiRequestUrl(c.apiUrl, path), {
       method,
       headers: await headers(),
       body: body ? JSON.stringify(body) : undefined,
@@ -193,7 +195,7 @@ export async function apiOn(c: Connection, path: string, body?: unknown, method 
 }
 
 export interface SyncHandle {
-  db: PowerSyncDatabase;
+  db: ReplicaDatabase;
   agentLog: AgentLog;
 }
 

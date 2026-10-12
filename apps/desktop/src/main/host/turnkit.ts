@@ -12,6 +12,7 @@ import { contractFor, localInstructions } from '../contracts';
 import { isStandDown } from '../replypolicy';
 import type { LogFn } from '../agentlog';
 import type { HostedAgent } from '../agents';
+import { recordRuntimeEvent } from '../runtime/brain-recording';
 
 
 export function withTimeout<T>(p: Promise<T>, ms: number, msg: string): Promise<T> {
@@ -109,6 +110,7 @@ export async function drainQuery(stream: AsyncIterable<any>, fallback: string, l
   // rule would otherwise drop when a later tool call and its confirmation close the turn
   const spoken: string[] = [];
   for await (const m of stream) {
+    recordRuntimeEvent('claude', m);
     if (m.type === 'stream_event') { typedText(m, live, onDelta); continue; }
     if (m.type === 'system' && m.subtype === 'init' && expect) {
       const inv = await settledInventory(stream, m, expect.mcp);
@@ -229,6 +231,7 @@ export async function claudeTurn(
     });
     if (onDelta) stream.on('text', (_delta, snapshot) => onDelta(snapshot));
     const final = await stream.finalMessage();
+    recordRuntimeEvent('claude', { type: 'assistant', message: final });
     const text = final.content.map((b) => (b.type === 'text' ? b.text : '')).join('').trim();
     log?.({ kind: 'result', phase: 'success', summary: `replied (${final.usage.output_tokens} tok, ${Date.now() - started}ms)`, detail: final.usage, tokens: final.usage.input_tokens + final.usage.output_tokens });
     return text || '(no reply)';
@@ -255,6 +258,7 @@ export async function directComplete(system: string, user: string, token: string
   const { default: Anthropic } = await import('@anthropic-ai/sdk');
   const client = new Anthropic({ apiKey: token });
   const m = await client.messages.create({ model, max_tokens: maxTokens, system, messages: [{ role: 'user', content: user }] });
+  recordRuntimeEvent('claude', { type: 'assistant', message: m });
   return m.content.map((b) => (b.type === 'text' ? b.text : '')).join('').trim();
 }
 

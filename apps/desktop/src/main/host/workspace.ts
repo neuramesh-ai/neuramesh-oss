@@ -18,27 +18,32 @@ import * as os_ from 'node:os';
 import { resolveInWorkspace, type SubjectRef } from '../harness/brain';
 import { type LibDoc } from './orchtools';
 import { type LogFn } from '../agentlog';
-import type { PowerSyncDatabase } from '@powersync/node';
+import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 import type { Brain } from '../harness/brain';
 import type { makeRuns } from './runs';
 
 
 import type { HostCtx } from './ctx';
 import { makeDeepWork } from './deepwork';
+import { apiAuthHeaders } from '../apiauth';
+import { readArtifactText, registerArtifactReader } from './artifact-content';
 
 export function makeWorkspace(ctx: HostCtx & {
   alog: (agent: HostedAgent, t?: { id: string; number: number; channel_id?: string } | null, channelSlug?: string | null, runId?: string | null) => LogFn;
   brain: Brain;
   claimed: { has: (id: string) => boolean; add: (id: string) => unknown; delete: (id: string) => boolean };
-  db: PowerSyncDatabase;
+  db: ReplicaDatabase;
   narrate: ReturnType<typeof makeRuns>['narrate'];
   openRun: ReturnType<typeof makeRuns>['openRun'];
   post: any;
   recordLegResult: (subject: SubjectRef, where: { channelId: string; taskId?: string | null }, leg: { role: string; label: string; turnId: string; out: string }) => void;
   wake: (agent: HostedAgent, m: { id: string; channel_id: string; body: string; thread_id?: string | null }) => Promise<void>;
   workspace: string;
+  apiUrl?: string;
+  ownerActorId?: string;
 }) {
 const { brain, db } = ctx;
+if (ctx.apiUrl && ctx.ownerActorId) registerArtifactReader(db, { workspace: ctx.workspace, apiUrl: ctx.apiUrl, headers: () => apiAuthHeaders(ctx.apiUrl!, { kind: 'human', id: ctx.ownerActorId! }) });
 
   // Split-out neighbours: same ctx, so every call below keeps the name it always used.
   const { deepWorkQuery, stageBrief, startDeepWork, readOnlyStudy } = makeDeepWork({ ...ctx, libraryDocs });
@@ -49,9 +54,8 @@ const { brain, db } = ctx;
 // "did you check the channel library", the honest answer was no — and rex instead blamed
 // memory and a disconnected Drive, which is the worse failure of the two.
 //
-// Nothing new syncs: `artifacts.inline_content` is already in the replica (client-core
-// schema), and the marketing bootstrap already reads a doc out of it by name. This only
-// generalizes that read so every orchestrator turn — and every research leg — can do it.
+// The replica supplies artifact metadata. GCS document contents load on demand through
+// the same authenticated reader used by the brand, plan, and release flows.
 /**
  * The documents an agent may read, by scope.
  *
@@ -62,17 +66,17 @@ const { brain, db } = ctx;
  * rows always say WHICH room a document came from so the agent can cite it.
  */
 async function libraryDocs(channelId: string, limit = 60, scope: 'room' | 'project' | 'workspace' = 'room'): Promise<LibDoc[]> {
-  const cols = `a.name, a.kind, a.created_at, a.promoted, a.inline_content, a.mime, c.slug as room, p.name as project`;
+  const cols = `a.id, a.workspace_id, a.storage_path, a.content_hash, a.name, a.kind, a.created_at, a.promoted, a.inline_content, a.mime, a.created_by_kind, a.source, c.slug as room, p.name as project`;
   const from = `from artifacts a join channels c on c.id = a.channel_id left join projects p on p.id = c.project_id`;
   const [where, args]: [string, unknown[]] =
     scope === 'room' ? [`a.channel_id = ?`, [channelId]]
       : scope === 'project' ? [`c.project_id = (select project_id from channels where id = ?)`, [channelId]]
         : [`a.workspace_id = (select workspace_id from channels where id = ?)`, [channelId]];
-  const rows = await db.getAll<LibDoc>(
-    `select ${cols} ${from} where ${where} and a.inline_content is not null
+  const rows = await db.getAll<LibDoc & { id: string; storage_path?: string | null; content_hash?: string | null }>(
+    `select ${cols} ${from} where ${where} and (a.inline_content is not null or a.storage_path like 'brain:%')
       order by a.created_at desc limit ?`,
     [...args, limit * 3],
-  ).catch(() => [] as LibDoc[]);
+  ).catch(() => [] as Array<LibDoc & { id: string; storage_path?: string | null; content_hash?: string | null }>);
   // Supersede by name only WITHIN a room. Two projects may each keep a `brand-guidelines.md`,
   // and collapsing those to one would hand the agent another team's document under the name it
   // asked for, so the dedupe key carries the room. (latestByName keys on `name` alone, which is
@@ -80,7 +84,8 @@ async function libraryDocs(channelId: string, limit = 60, scope: 'room' | 'proje
   const seen = new Set<string>();
   return rows
     .filter((r) => { const k = `${r.room ?? ''}\u0000${r.name}`; return seen.has(k) ? false : (seen.add(k), true); })
-    .slice(0, limit);
+    .slice(0, limit)
+    .map((row) => ({ ...row, ...(row.storage_path?.startsWith('brain:') ? { readContent: () => readArtifactText(db, row) } : {}) }));
 }
 
 // ── A subject's brain, as something an agent can actually reach ────────────────────────────

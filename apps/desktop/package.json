@@ -1,12 +1,12 @@
 {
   "name": "@neuramesh/desktop",
-  "version": "0.153.0",
+  "version": "0.154.0",
   "private": true,
   "license": "Elastic-2.0",
   "main": "out/main/index.js",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "node -e \"new (require('better-sqlite3'))(':memory:')\" >/dev/null 2>&1 || pnpm rebuild better-sqlite3 >/dev/null 2>&1; tsx --test 'src/main/**/*.test.ts' 'src/renderer/src/**/*.test.ts'",
+    "test": "node -e \"new (require('better-sqlite3'))(':memory:')\" >/dev/null 2>&1 || pnpm rebuild better-sqlite3 >/dev/null 2>&1; tsx --test --test-concurrency=${NM_DESKTOP_TEST_CONCURRENCY:-4} 'src/main/**/*.test.ts' 'src/renderer/src/**/*.test.ts'",
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "rebuild:native": "electron-rebuild -f -w better-sqlite3 -w node-pty",

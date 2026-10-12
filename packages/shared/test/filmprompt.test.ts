@@ -2,7 +2,7 @@
 // rule, the brief cut to a look, and the cap. The old prompt's traps are pinned here: the caption
 // handed to the model beside "no text", a brief that asks for burned-in captions, 1,400 characters.
 import { describe, expect, it } from 'vitest';
-import { FILM_PROMPT_MAX, beatsWithin, filmMinutes, filmPrompt, firstBeat, lettering, looksLikeProductBeat, lookFrom, productShots, scriptBeats } from '../src/filmprompt';
+import { FILM_PROMPT_MAX, SCREENS_RULE, beatsWithin, filmMinutes, filmPrompt, firstBeat, lettering, looksLikeProductBeat, lookFrom, productShots, scriptBeats } from '../src/filmprompt';
 
 const SCRIPT = `[0:00-0:03] HOOK — handheld, walking, no laptop bag
 Spoken: "My laptop's in my bag. My code isn't waiting for me."
@@ -75,6 +75,28 @@ SHOW: pricing.png`;
     // the words that make a beat a product beat, for the gate that asks for a SHOW line
     expect(scriptBeats(script).map(looksLikeProductBeat)).toEqual([false, true, false, true]);
     expect(looksLikeProductBeat(firstBeat('[0:00-0:03] An apple on the desk.'))).toBe(false);
+  });
+  it('a beat needs a product shot only when it puts the app\'s screen on camera (George, 2026-10-06)', () => {
+    const beat = (d: string) => firstBeat(`[0:00-0:03] ${d}`);
+    // the screen is on camera: the gate asks for a real screenshot
+    for (const d of ['Screen recording of the app\'s home screen.', 'Close-up on the phone as she taps through the app.', 'The dashboard fills the frame.', 'Over-the-shoulder shot of the laptop screen.', 'She opens the app.', 'Cut to the app home screen.', 'The UI slides in.']) {
+      expect(looksLikeProductBeat(beat(d)), d).toBe(true);
+    }
+    // a phone in hand, a line about apps, on-screen lettering: no screen, no shot (the old list fired on all of these)
+    for (const d of ['Creator holds her phone and talks to camera.', 'She sets the phone down on the desk.', 'Most wellness apps give you a breathing circle.', 'Product of the year energy, straight to camera.', 'On-screen text: Sleep better.', 'A recording studio, warm light.']) {
+      expect(looksLikeProductBeat(beat(d)), d).toBe(false);
+    }
+  });
+  it('the screens rule rides every film with no reference frame, and survives the cap', () => {
+    const script = '[0:00-0:03] Creator to camera at dusk. Spoken: "I could not switch off."\n[0:03-0:07] She holds up her phone, smiling.';
+    expect(filmPrompt(script, '', 8)).toContain(SCREENS_RULE);
+    // a reference frame asks the model to show that screen: the rule would fight it
+    expect(filmPrompt(script, '', 8, { frame: true })).not.toContain(SCREENS_RULE);
+    // a long brief and long beats: the look and the late cuts go first, never the screens rule
+    const long = Array.from({ length: 3 }, (_, i) => `[0:0${i * 3}-0:0${i * 3 + 3}] ${'A long, winding description of the room and the light. '.repeat(6)} Spoken: "${'word '.repeat(30)}"`).join('\n');
+    const p = filmPrompt(long, 'warm '.repeat(80), 8);
+    expect(p.length).toBeLessThanOrEqual(FILM_PROMPT_MAX);
+    expect(p).toContain(SCREENS_RULE);
   });
   it('a film shows the beats that start inside it, three at most', () => {
     expect(beatsWithin(SCRIPT, 5).map((b) => b.start)).toEqual([0, 3]);

@@ -1,3 +1,4 @@
+import { AgentAvatar } from '../components/AgentAvatar';
 // THE CODING TRANSCRIPT (coding threads §5, visual contract Thread.dc.html): the runtime's rows in
 // the THREAD's anatomy — the human's hairline bubble, the developer's prose on the ground with the
 // folded thought and the tool receipts above it, one Engineering voice (ruling 2, 2026-09-26).
@@ -5,10 +6,13 @@
 // too: a run of receipts and the thought that preceded them fold into the Engineering row whose
 // prose follows, so one turn reads as one row, never as a stack of TOOL labels.
 import { useMemo } from 'react';
+import { transcriptMessages } from './coding-transcript';
 import type { OrbState } from 'thinking-orbs';
-import { isEngineeringGitHubWait } from '@neuramesh/shared';
+import { DEFAULT_ENGINEERING_AGENT, engineeringReviewMessages, engineeringWorkPlanMessages } from '@neuramesh/shared';
 import { engineeringActivePresentation, engineeringActivityPresentation, engineeringReasoningSeconds, groupEngineeringTranscript, streamingEngineeringText, type EngineeringActivityKind } from '../engineering/activity';
 import type { EngineeringMessage, EngineeringSession } from '../engineering/domain';
+import { EngineeringChangeCard, type OpenChangeReview } from '../engineering/EngineeringChangeCard';
+import { EngineeringWorkPlan } from '../engineering/EngineeringWorkPlan';
 import { Md } from '../md/Md';
 import { Orb } from '../ui/Orb';
 import { IconActivity, IconAlert, IconBrain, IconCheck, IconCode, IconFile, IconGlobe, IconHistory, IconSearch, IconTerm } from '../ui/icons';
@@ -57,14 +61,16 @@ function thinkLine(row: Extract<Row, { kind: 'eng' }>): string {
   return parts.join(' · ');
 }
 
-function EngineeringRow({ row }: { row: Extract<Row, { kind: 'eng' }> }) {
+type ReviewProps = { fileRef?: (name: string) => boolean; onOpenFile?: (name: string) => void; onOpenReview?: OpenChangeReview; pendingApprovalId?: string; onApproval?: (approved: boolean) => void };
+function EngineeringRow({ row, onOpenWorkPlan, onOpenReview, pendingApprovalId, onApproval, fileRef, onOpenFile }: { row: Extract<Row, { kind: 'eng' }>; onOpenWorkPlan?: (text: string) => void } & ReviewProps) {
   const stamp = (row.message ?? row.receipts[0] ?? row.reasoning)?.createdAt;
   const line = thinkLine(row);
+  const agent = (row.message ?? row.reasoning ?? row.receipts[0])?.agent ?? DEFAULT_ENGINEERING_AGENT;
   return (
     <div className="msg">
-      <span className="av eng" aria-hidden><IconCode s={13} /></span>
+      <span className="av" aria-hidden><AgentAvatar name={agent.name} emoji={agent.emoji} role={agent.role} size={26} radius={4} /></span>
       <div className="body">
-        <div className="head"><b>Engineering</b>{stamp ? <span className="time">{clock(stamp)}</span> : null}</div>
+        <div className="head"><b>{agent.name}</b>{stamp ? <span className="time">{clock(stamp)}</span> : null}</div>
         {line ? <div className="think"><span className="tw"><IconBrain s={9} /></span><span>{line}</span></div> : null}
         {row.receipts.length ? (
           <div className="receipts">
@@ -81,31 +87,25 @@ function EngineeringRow({ row }: { row: Extract<Row, { kind: 'eng' }> }) {
             })}
           </div>
         ) : null}
-        {row.message ? (row.message.streaming ? <p>{streamingEngineeringText(row.message.body)}<span className="tcaret" /></p> : <Md text={row.message.body} />) : null}
+        {row.message?.kind === 'change_review' && row.message.review ? <EngineeringChangeCard review={row.message.review} pending={row.message.review.id === pendingApprovalId} onOpen={onOpenReview} onResolve={onApproval} /> : row.message?.kind === 'work_plan' ? <EngineeringWorkPlan text={row.message.body} report={row.message.planReport} inline onOpen={onOpenWorkPlan ? () => onOpenWorkPlan(row.message!.body) : undefined} /> : row.message ? (row.message.streaming ? <p>{streamingEngineeringText(row.message.body)}<span className="tcaret" /></p> : <Md text={row.message.body} fileRef={fileRef} onOpenFile={onOpenFile} />) : null}
       </div>
     </div>
   );
 }
 
-/** the session's greeting says "Ready in <repo>": while the machine cannot reach the code, it would say the opposite of
- *  the gate below. The machine's GitHub sentence is the phone's reason (it has no gate): here the gate and the
- *  connected divider say it, and after the grant the sentence would be stale, so it never shows */
-export function transcriptMessages(messages: EngineeringMessage[], blocked: boolean): EngineeringMessage[] {
-  return (blocked && messages[0]?.role === 'assistant' ? messages.slice(1) : messages).filter((m) => !isEngineeringGitHubWait(m));
-}
-
-export function CodingTranscript({ session }: { session: EngineeringSession }) {
-  const rows = useMemo(() => rowsOf(transcriptMessages(session.messages, !!session.blockedOn)), [session.messages, session.blockedOn]);
+export function CodingTranscript({ session, onOpenWorkPlan, onOpenReview, onApproval, fileRef, onOpenFile }: { session: EngineeringSession; onOpenWorkPlan?: (text: string) => void } & ReviewProps) {
+  const rows = useMemo(() => rowsOf(transcriptMessages(engineeringWorkPlanMessages({ ...session, messages: engineeringReviewMessages(session) }), !!session.blockedOn)), [session]);
+  const agent = session.agent ?? DEFAULT_ENGINEERING_AGENT;
   const live = session.state === 'streaming' ? engineeringActivePresentation(session.activeActivity, session.mode) : null;
   return (
     <>
       {rows.map((row) => row.kind === 'human'
         ? <div key={row.key} className="msg human mine"><div className="body"><div className="head"><b>you</b><span className="time">{clock(row.message.createdAt)}</span></div><Md text={row.message.body} /></div></div>
-        : <EngineeringRow key={row.key} row={row} />)}
+        : <EngineeringRow fileRef={fileRef} onOpenFile={onOpenFile} key={row.key} row={row} onOpenReview={onOpenReview} onApproval={onApproval} pendingApprovalId={session.pendingApproval?.id} onOpenWorkPlan={onOpenWorkPlan} />)}
       {live ? (
         <div className="msg" role="status" aria-live="polite">
-          <span className="av eng" aria-hidden><IconCode s={13} /></span>
-          <div className="body"><div className="head"><b>Engineering</b></div><div className="think live"><span className="tw"><Orb state={orbOf(live.kind)} label={live.title} /></span><span>{live.title} · {live.detail}</span></div></div>
+          <span className="av" aria-hidden><AgentAvatar name={agent.name} emoji={agent.emoji} role={agent.role} size={26} radius={4} /></span>
+          <div className="body"><div className="head"><b>{agent.name}</b></div><div className="think live"><span className="tw"><Orb state={orbOf(live.kind)} label={live.title} /></span><span>{live.title} · {live.detail}</span></div></div>
         </div>
       ) : null}
     </>

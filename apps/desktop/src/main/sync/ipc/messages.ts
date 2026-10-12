@@ -7,11 +7,11 @@
 // REGISTRATION POSITION IS LOAD-BEARING (see whiteboards.ts) — called from where these sat.
 import { ipcMain } from 'electron';
 import { randomUUID } from 'node:crypto';
-import type { PowerSyncDatabase } from '@powersync/node';
+import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 
 export function registerMessageIpc(deps: {
   ws: () => string;
-  db: () => PowerSyncDatabase;
+  db: () => ReplicaDatabase;
   api: (path: string, body?: unknown) => Promise<Record<string, unknown>>;
   actorId: () => string;
   /** startSync's own closures and registry — passed by reference, not re-created */

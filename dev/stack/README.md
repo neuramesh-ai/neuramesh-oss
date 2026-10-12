@@ -1,6 +1,8 @@
-# Dev stack — Postgres + PowerSync
+# Dev stack — Postgres and the Local API
 
-Local mirror of the cloud backend: `pnpm app:local` runs `docker compose -f dev/stack/docker-compose.yaml up -d --wait` (Postgres on `127.0.0.1:55435`, PowerSync on `127.0.0.1:58081`). `docker compose -f dev/stack/docker-compose.yaml down -v` to stop.
+The desktop development stack uses Postgres on `127.0.0.1:55435` and the control API for SQLite synchronization. `pnpm app:local` starts Postgres, the API, and the desktop with `NM_LOCAL_SYNC=1`. Stop the containers with `docker compose -f dev/stack/docker-compose.yaml stop`; their data stays on disk.
+
+PowerSync remains available for hosted compatibility tests through the explicit `legacy-sync` profile: `docker compose --profile legacy-sync -f dev/stack/docker-compose.yaml up -d --wait`. Those tests use `127.0.0.1:58081`; the Local desktop does not.
 
 ## Web Engineering harness
 

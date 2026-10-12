@@ -14,8 +14,10 @@ import { type ToolCat } from '@neuramesh/shared';
 export function orbStateFor(verb: string, cat?: ToolCat | null, role?: string | null): OrbState {
   if (cat === 'search') return 'searching';
   if (cat) return role === 'designer' ? 'shaping' : 'working';
-  if (/composing|writing|drafting/i.test(verb)) return 'composing';
-  if (/spawn|fan|leg/i.test(verb)) return 'weaving';
+  // the step words are the simple present since 2026-10-05 ("writes the reply", "drafts the posts",
+  // "starts a subagent"), and a step a stored run kept from before still reads "composing…"
+  if (/\b(?:composing|writes|writing|drafts|drafting)\b/i.test(verb)) return 'composing';
+  if (/spawn|fan|leg|subagent/i.test(verb)) return 'weaving';
   if (/review|judg|verdict/i.test(verb)) return 'solving';
   if (/waiting|listen/i.test(verb)) return 'listening';
   return 'breathing'; // thinking… / idle presence

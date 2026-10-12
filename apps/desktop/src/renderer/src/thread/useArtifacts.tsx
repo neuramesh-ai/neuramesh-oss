@@ -13,15 +13,15 @@ export function useThreadArtifacts(threadId: string, rowCount: number) {
 // This conversation's own produced files — the Artifacts section of its rail. A chat writes
 // real files (docs/34) and until now they carded in the transcript and were reachable nowhere
 // else; the rail is where standing reference lives, whether or not a task stands behind it.
-const [convoArts, setConvoArts] = useState<ChannelArtifactRow[]>([]);
+const [loaded, setLoaded] = useState<{ threadId: string; rows: ChannelArtifactRow[] } | null>(null);
 useEffect(() => {
   let dead = false;
-  const load = () => { void nm?.threadArtifacts(threadId).then((r) => { if (!dead) setConvoArts(r.artifacts); }, () => {}); };
+  const load = () => { void nm?.threadArtifacts(threadId).then((r) => { if (!dead) setLoaded({ threadId, rows: r.artifacts }); }, () => {}); };
   load();
   const iv = setInterval(load, 5000);
   return () => { dead = true; clearInterval(iv); };
 }, [threadId, rowCount]);
-  return convoArts;
+  return loaded?.threadId === threadId ? loaded.rows : [];
 }
 
 /**

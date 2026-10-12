@@ -87,8 +87,8 @@ describe('the compose', () => {
     expect(compose.tracks[1]).toEqual({ id: 'audio', type: 'audio', keyframes: [{ timestamp: 0, url: 'https://v3b.fal.media/files/clip.mp4', duration: 15000 }] });
   });
   it('a failing step names itself and applies nothing; a shot outside the film applies nothing', async () => {
-    expect(await composeShots('key', 'https://v3b.fal.media/files/clip.mp4', 15, [{ start: 3, end: 7, show: 'app.png', dataUrl: PNG }], { fetchFn: fakeFal({ failAt: 'trim-video' }).fetchFn })).toEqual({ applied: 0, why: 'the film did not trim at 0-3 s (nope)' });
-    expect(await composeShots('key', 'https://v3b.fal.media/files/clip.mp4', 15, [{ start: 3, end: 7, show: 'app.png', dataUrl: PNG }], { fetchFn: fakeFal({ failAt: 'upload/initiate' }).fetchFn })).toEqual({ applied: 0, why: 'the product frame did not upload (nope)' });
+    expect(await composeShots('key', 'https://v3b.fal.media/files/clip.mp4', 15, [{ start: 3, end: 7, show: 'app.png', dataUrl: PNG }], { fetchFn: fakeFal({ failAt: 'trim-video' }).fetchFn })).toEqual({ applied: 0, why: 'the shot could not be cut in', detail: 'the film did not trim at 0-3 s (nope)' });
+    expect(await composeShots('key', 'https://v3b.fal.media/files/clip.mp4', 15, [{ start: 3, end: 7, show: 'app.png', dataUrl: PNG }], { fetchFn: fakeFal({ failAt: 'upload/initiate' }).fetchFn })).toEqual({ applied: 0, why: 'the shot could not be cut in', detail: 'the product frame did not upload (nope)' });
     expect(await composeShots('key', 'https://v3b.fal.media/files/clip.mp4', 8, [{ start: 20, end: 25, show: 'app.png', dataUrl: PNG }], { fetchFn: fakeFal().fetchFn })).toEqual({ applied: 0, why: 'no product beat fell inside the film' });
   });
 });

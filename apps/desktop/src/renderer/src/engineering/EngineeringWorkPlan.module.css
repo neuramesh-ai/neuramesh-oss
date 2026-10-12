@@ -1,0 +1,34 @@
+.inline { min-width: 0; width: 100%; margin-block: 12px; overflow-wrap: anywhere; }
+.card.card { width: 100%; text-align: left; }
+.card.card > header b { font-size: 13px; }
+.card.card > header em { font-size: 11px; }
+.summary { padding: 14px; color: var(--body); font-size: 13px; line-height: 1.65; }
+.summary > :first-child { margin-top: 0; }
+.summary > :last-child { margin-bottom: 0; }
+.preview { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.card > ol { border-top: 1px solid var(--border); }
+.card.card > ol > li { padding: 11px 14px; }
+.card.card > ol > li b { font-size: 13px; font-weight: 450; overflow-wrap: anywhere; }
+.card.card > ol > li small { font-size: 10px; line-height: 1.5; }
+.previewCard { width: 100%; display: block; padding: 0; border: 1px solid var(--border); border-radius: var(--r-lg, 8px); background: var(--panel2); color: var(--body); text-align: left; font: inherit; cursor: pointer; overflow: hidden; }
+.previewCard:hover { border-color: var(--muted); background: var(--hover-bg); }
+.previewCard:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
+.previewCard:disabled { cursor: default; }
+.previewHead { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--border); color: var(--text); }
+.previewHead > span { display: flex; align-items: center; gap: 8px; }
+.previewHead b { font-size: 13px; font-weight: 500; }
+.previewHead small { font: 10px var(--fmono); color: var(--muted); border: 1px solid var(--border); padding: 2px 5px; border-radius: 4px; }
+.previewHead em { font: 11px var(--fmono); color: var(--muted); white-space: nowrap; }
+.previewCard .summary { display: block; }
+.footer { display: flex; justify-content: space-between; align-items: center; gap: 12px; border-top: 1px solid var(--border); padding: 10px 14px; font-size: 11px; color: var(--muted); }
+.footer b { color: var(--text); font-size: 12px; font-weight: 500; white-space: nowrap; }
+
+.proposal { min-width: 0; width: 100%; margin-block: 12px; }
+.overview { color: var(--body); font-size: 14px; line-height: 1.65; overflow-wrap: anywhere; }
+.overview > :first-child { margin-top: 0; }
+.overview > :global(.md) > p { margin-block: 0 10px; }
+.overview ul { margin-block: 8px 14px; padding-left: 20px; }
+.overview li + li { margin-top: 6px; }
+.overview li :global(.md) > p { margin: 0; }
+.nextStep { margin-top: 12px; }
+.nextStep :global(.md) > p { margin: 0; }

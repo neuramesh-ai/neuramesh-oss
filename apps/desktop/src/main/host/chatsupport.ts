@@ -15,7 +15,7 @@ import type { LogFn } from '../agentlog';
 import type { HostCtx } from './ctx';
 
 export function makeChatSupport(ctx: HostCtx & {
-  db: import('@powersync/node').PowerSyncDatabase;
+  db: import('@neuramesh/client-core/replica').ReplicaDatabase;
   agents: Map<string, HostedAgent>;
   apiGet: (path: string, actor: { kind: string; id: string; role?: string }) => Promise<any>;
   discoverSkills: (channelId: string, workspaceId: string) => Promise<SkillRef[]>;

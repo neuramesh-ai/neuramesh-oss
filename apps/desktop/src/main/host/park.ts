@@ -9,7 +9,7 @@
 // it. The thunk defers the lookup to call time, which is when it actually happens.
 import { planPark, resumeNote, type ParkBook, type WakeCondition } from '../harness/park';
 import { ghPrChecks, repoSlugFor } from './gh';
-import type { PowerSyncDatabase } from '@powersync/node';
+import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 import type { HostQueue } from '../harness/hostqueue';
 import type { HostedAgent, ExecTask } from '../agents';
 import type { ToolHost } from '../harness/toolbus';
@@ -19,7 +19,7 @@ import type { RepoCred } from './repocred';
 export interface ParkWiring {
   /** the claim facade — ephemeral by design, so a crashed host's work can be resumed */
   claimed: { has: (id: string) => boolean; add: (id: string) => unknown; delete: (id: string) => boolean };
-  db: PowerSyncDatabase;
+  db: ReplicaDatabase;
   parkBook: ParkBook;
   execQueue: HostQueue;
   agents: Map<string, HostedAgent>;

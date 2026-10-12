@@ -10,7 +10,9 @@
     "./api": "./src/api.ts",
     "./crud-upload": "./src/crud-upload.ts",
     "./projmeta": "./src/projmeta.ts",
-    "./library": "./src/library.ts"
+    "./library": "./src/library.ts",
+    "./replica": "./src/replica.ts",
+    "./brain-artifacts": "./src/brain-artifacts.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

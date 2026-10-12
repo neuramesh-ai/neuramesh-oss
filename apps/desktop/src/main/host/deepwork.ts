@@ -19,7 +19,7 @@ import type { RepoReader } from './reporead';
 import { type SubjectRef } from '../harness/brain';
 import { type LibDoc } from './orchtools';
 import { type LogFn } from '../agentlog';
-import type { PowerSyncDatabase } from '@powersync/node';
+import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 import type { Brain } from '../harness/brain';
 import type { makeRuns } from './runs';
 import type { HostCtx } from './ctx';
@@ -29,7 +29,7 @@ export function makeDeepWork(ctx: HostCtx & {
   alog: (agent: HostedAgent, t?: { id: string; number: number; channel_id?: string } | null, channelSlug?: string | null, runId?: string | null) => LogFn;
   brain: Brain;
   claimed: { has: (id: string) => boolean; add: (id: string) => unknown; delete: (id: string) => boolean };
-  db: PowerSyncDatabase;
+  db: ReplicaDatabase;
   narrate: ReturnType<typeof makeRuns>['narrate'];
   openRun: ReturnType<typeof makeRuns>['openRun'];
   post: any;
@@ -152,7 +152,7 @@ async function deepWorkQuery(agent: HostedAgent, prompt: string, token: string, 
  * point it at. Returns null when the library is empty, so the no-docs path is byte-identical.
  */
 async function stageBrief(channelId: string, runId: string): Promise<string | null> {
-  const docs = (await libraryDocs(channelId)).filter((d) => (d.inline_content ?? '').trim());
+  const docs = (await Promise.all((await libraryDocs(channelId)).map(async (doc) => ({ ...doc, inline_content: doc.inline_content ?? (doc.readContent && !doc.mime?.startsWith('image/') ? await doc.readContent() : null) })))).filter((d) => (d.inline_content ?? '').trim());
   if (!docs.length) return null;
   const os = await import('node:os');
   const { join } = await import('node:path');
@@ -182,7 +182,7 @@ async function startDeepWork(
   const parent = await openRun(
     agent,
     { workspace: ch.workspace_id, channelId: ch.id, threadId: where.threadId ?? null, taskId: where.taskId ?? null },
-    { kind: 'work', title, total: legs.length + 1, step: 'starting the legs' },
+    { kind: 'work', title, total: legs.length + 1, step: 'starts the subagents' },
   );
   if (!parent.id) return null; // no row ⇒ no promise: the tool tells the model to answer now instead
 
@@ -205,7 +205,7 @@ async function startDeepWork(
         const legRun = await openRun(
           agent,
           { workspace: ch.workspace_id, channelId: ch.id, threadId: where.threadId ?? null, taskId: where.taskId ?? null },
-          { kind: 'leg', title: leg.name, parentRunId: parent.id, step: 'starting' },
+          { kind: 'leg', title: leg.name, parentRunId: parent.id, step: 'starts the work' },
         );
         live.add(leg.name);
         await bump();
@@ -233,7 +233,7 @@ async function startDeepWork(
         await bump();
       });
 
-      await parent.step('synthesizing the report', legs.length);
+      await parent.step('writes the report', legs.length);
       const synthesis = await withTimeout(
         deepWorkQuery(
           agent,

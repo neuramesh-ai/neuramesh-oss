@@ -77,6 +77,22 @@ describe('accept on the human\'s word', () => {
     expect((await j(res)).code).toBe('HUMAN_ONLY');
   });
 
+  // the review of round 2 (2026-10-05): the verdict card's Approve posts its answer as the person right
+  // after the approve, so the answer is newer than the verdict. a click is no word (George, 2026-09-08),
+  // and since every reply on a done unit wakes the orchestrator, it must not count as one
+  it('a card\'s answer and a marker line are no word, and the typed word after them is', async () => {
+    const t = await throughReview('card click');
+    await say(george, t.id, `**Approve #${t.number} — card click?** → Approve #${t.number}`);
+    await say(george, t.id, '‹wb:3f9c2a1d-0000-4000-8000-000000000001›');
+    const res = await send(rex, { type: 'task.accept', taskId: t.id });
+    expect(res.status).toBe(403);
+    expect((await j(res)).code).toBe('HUMAN_ONLY');
+    await say(george, t.id, 'merge it');
+    const ok = await send(rex, { type: 'task.accept', taskId: t.id });
+    expect(ok.status).toBe(200);
+    expect((await j(ok)).task.state).toBe('accepted');
+  });
+
   it('an AGENT\'s message is not the human\'s word', async () => {
     const t = await throughReview('agent chatter');
     await say(patch, t.id, 'merge it');

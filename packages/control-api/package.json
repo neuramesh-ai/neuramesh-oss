@@ -8,19 +8,22 @@
   "types": "src/index.ts",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "NM_ALLOW_ACTOR_HEADER=1 vitest run",
+    "test": "NM_ALLOW_ACTOR_HEADER=1 vitest run --no-file-parallelism",
     "dev": "tsx watch src/server.ts",
     "gen:skill-seed": "tsx scripts/gen-skill-seed.ts",
     "gen:marketing-os-seed": "tsx scripts/gen-marketing-os-seed.ts",
     "migrate": "node scripts/migrate.mjs",
-    "build:server": "esbuild src/server.ts --bundle --platform=node --format=esm --outfile=dist/server.mjs --external:hono --external:@hono/node-server --external:postgres --external:posthog-node --external:stripe --external:zod --external:fastembed --external:@resvg/resvg-wasm",
-    "build:vercel": "esbuild src/vercel.ts --bundle --platform=node --format=esm --outfile=index.js --external:hono --external:@hono/node-server --external:postgres --external:posthog-node --external:stripe --external:zod --external:fastembed --external:@resvg/resvg-wasm"
+    "build:server": "esbuild src/server.ts --bundle --platform=node --format=esm --outfile=dist/server.mjs --external:hono --external:@hono/node-server --external:postgres --external:posthog-node --external:stripe --external:zod --external:fastembed --external:@resvg/resvg-wasm --external:google-auth-library && esbuild src/brain-server.ts --bundle --platform=node --format=esm --outfile=dist/brain-server.mjs --external:hono --external:@hono/node-server --external:postgres --external:posthog-node --external:stripe --external:zod --external:fastembed --external:@resvg/resvg-wasm --external:google-auth-library",
+    "build:vercel": "esbuild src/vercel.ts --bundle --platform=node --format=esm --outfile=index.js --external:hono --external:@hono/node-server --external:postgres --external:posthog-node --external:stripe --external:zod --external:fastembed --external:@resvg/resvg-wasm --external:google-auth-library"
   },
   "dependencies": {
+    "@neuramesh/client-core": "workspace:*",
     "@hono/node-server": "^1.13.7",
     "@neuramesh/shared": "workspace:*",
     "@resvg/resvg-wasm": "2.6.2",
     "hono": "^4.6.14",
+    "google-auth-library": "^9.15.1",
+    "jpeg-js": "^0.4.4",
     "postgres": "^3.4.5",
     "posthog-node": "^5.38.4",
     "stripe": "^18.5.0",

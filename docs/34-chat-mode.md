@@ -328,7 +328,6 @@ Two doors open a coding thread, and both are enforced twice:
   command from any other agent (`NOT_PERMITTED`), on a task thread (`TASK_THREAD`), and when the
   project has no repository (`REPO_REQUIRED`).
 
-A coding thread reaches the board through one valve: the `Make this a unit` card on a resting
-thread, HUMAN_ONLY. It creates a plan-first unit anchored to the conversation (docs/41), so the
-thread keeps its kind and wears the unit card. rex can name the card in one line and can never
-press it.
+A coding thread has no door to the board. The `Make this a unit` valve retired on 2026-10-12
+(George, #716), so the work of a coding thread stays in the thread and on its branch. A unit that
+the valve made before keeps its card in the thread.

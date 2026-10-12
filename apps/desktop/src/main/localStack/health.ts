@@ -1,5 +1,5 @@
 // THE BOOT'S CHECKS (the first-run round, 2026-09-18): what the driver asks Docker BEFORE it makes a
-// container (are our two ports free, is a container wedged) and WHILE the containers come up (each
+// container (is our API port free, is a container wedged) and WHILE the containers come up (each
 // one's status, exit code and restart count, every poll), so the card draws the boot order and a
 // failure arrives as a cause, the container's own last line, and a remedy — in seconds, never as
 // a 90-second "not healthy". The story behind every check: a first start failed on a taken port
@@ -85,13 +85,13 @@ export async function wedgedServices(c: HealthCtx): Promise<string[]> {
 }
 
 /**
- * The two loopback ports, before a container is made. A port another container or program holds
+ * The API loopback port, before a container is made. A port another container or program holds
  * fails the start in Docker's words and wedges the container; said up front it is one sentence and
  * one fix. Our own container from a previous session is fine: Docker holds the port for us, so
  * `docker ps` names it and the OS probe is skipped.
  */
-export async function preflightPorts(c: HealthCtx, ports: { api: number; powersync: number }): Promise<void> {
-  for (const { port, service } of [{ port: ports.api, service: 'control-api' }, { port: ports.powersync, service: 'powersync' }]) {
+export async function preflightPorts(c: HealthCtx, ports: { api: number }): Promise<void> {
+  for (const { port, service } of [{ port: ports.api, service: 'control-api' }]) {
     const r = await run(c.spawn, c.dockerBin, ['ps', '--filter', `publish=${port}`, '--format', '{{.Names}}'], { env: c.dockerEnv, timeoutMs: 10_000 });
     const names = r.code === 0 ? r.out.split('\n').map((l) => l.trim()).filter(Boolean) : [];
     if (names.includes(container(service))) continue;

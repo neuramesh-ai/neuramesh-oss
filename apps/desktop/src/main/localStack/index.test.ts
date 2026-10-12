@@ -96,7 +96,7 @@ const compose = (calls: string[]) => calls.filter((c) => c.startsWith('docker co
 test('parseInspect reads the five fields, and refuses anything else', () => {
   assert.deepEqual(parseInspect('running|0|44|starting|0\n'), { status: 'running', exitCode: 0, restarts: 44, health: 'starting', networks: 0 });
   assert.deepEqual(parseInspect('exited|150|3|none|1'), { status: 'exited', exitCode: 150, restarts: 3, health: 'none', networks: 1 });
-  assert.equal(parseInspect('Error: No such object: neuramesh-local-powersync-1'), null);
+  assert.equal(parseInspect('Error: No such object: neuramesh-local-control-api-1'), null);
 });
 
 test('pickLastLine prefers the last error-level JSON message, else the last line, one row long', () => {
@@ -108,11 +108,11 @@ test('pickLastLine prefers the last error-level JSON message, else the last line
 });
 
 test('a port another container holds ends the boot before any container is made, and names the holder', async () => {
-  const t = stackOn({ ps: { 58081: ['stack-powersync-1'] } });
+  const t = stackOn({ ps: { 8788: ['stack-control-api-1'] } });
   const done = t.stack.boot();
   const e = await t.errored();
-  assert.equal(e.message, 'Port 58081 is in use by another program.');
-  assert.equal(e.detail, '127.0.0.1:58081 · held by stack-powersync-1 (Docker)');
+  assert.equal(e.message, 'Port 8788 is in use by another program.');
+  assert.equal(e.detail, '127.0.0.1:8788 · held by stack-control-api-1 (Docker)');
   assert.equal(e.remedy, 'Stop that program, then try again.');
   assert.equal(compose(t.calls).length, 0, 'no compose command ran');
   // the port freed, Try again walks to ready
@@ -124,7 +124,7 @@ test('a port another container holds ends the boot before any container is made,
 });
 
 test('our own container on the port from a previous session is not a clash; a program outside Docker is, by name', async () => {
-  const ok = stackOn({ ps: { 8788: ['neuramesh-local-control-api-1'], 58081: ['neuramesh-local-powersync-1'] } });
+  const ok = stackOn({ ps: { 8788: ['neuramesh-local-control-api-1'] } });
   await ok.stack.boot();
   assert.equal(ok.stack.state.phase, 'ready');
   const bad = stackOn({ portFree: false });
@@ -135,33 +135,33 @@ test('our own container on the port from a previous session is not a clash; a pr
 });
 
 test('a container with no network is wedged: it is removed before up, so one Try again is enough', async () => {
-  const t = stackOn({ pre: { powersync: 'running|0|44|starting|0' } });
+  const t = stackOn({ pre: { 'control-api': 'running|0|44|starting|0' } });
   await t.stack.boot();
   assert.equal(t.stack.state.phase, 'ready');
-  assert.deepEqual(compose(t.calls), ['rm -sf powersync', 'up -d --remove-orphans']);
-  assert.ok(t.logs.some((l) => /powersync has no network/.test(l)));
+  assert.deepEqual(compose(t.calls), ['rm -sf control-api', 'up -d --remove-orphans']);
+  assert.ok(t.logs.some((l) => /control-api has no network/.test(l)));
 });
 
 test('a crash loop ends the wait in seconds with the container\'s own last line, and Try again recreates that container', async () => {
-  const log = '{"level":"info","message":"Booting PowerSync Service v1.26.1"}\n{"level":"error","message":"Fatal startup error - exiting with code 150. postgres query failed","stack":"…"}\n';
-  const t = stackOn({ inspect: { powersync: ['running|0|0|starting|1', 'restarting|150|1|unhealthy|1', 'restarting|150|1|unhealthy|1', 'restarting|150|1|unhealthy|1'] }, logs: { powersync: log } });
+  const log = '{"level":"info","message":"Booting NeuraMesh API Service v1.26.1"}\n{"level":"error","message":"Fatal startup error - exiting with code 150. postgres query failed","stack":"…"}\n';
+  const t = stackOn({ inspect: { 'control-api': ['running|0|0|starting|1', 'restarting|150|1|unhealthy|1', 'restarting|150|1|unhealthy|1', 'restarting|150|1|unhealthy|1'] }, logs: { 'control-api': log } });
   const done = t.stack.boot();
   const e = await t.errored();
-  assert.equal(e.message, 'PowerSync stopped 3 times.');
+  assert.equal(e.message, 'NeuraMesh API stopped 3 times.');
   assert.equal(e.detail, 'Fatal startup error - exiting with code 150. postgres query failed');
-  assert.equal(e.remedy, 'Try again starts a fresh PowerSync container.');
+  assert.equal(e.remedy, 'Try again starts a fresh NeuraMesh API container.');
   assert.ok(t.clockMs() < 15_000, `ended at ${t.clockMs()} ms, not the 90 s budget`);
   // the card saw the order: queued → starting → stopped (with the count), the others ready
   const starting = t.states.filter((s): s is StackState & { phase: 'starting' } => s.phase === 'starting' && s.services.length > 0);
-  const ps = starting.map((s) => s.services.find((x) => x.name === 'PowerSync')!.status);
+  const ps = starting.map((s) => s.services.find((x) => x.name === 'NeuraMesh API')!.status);
   assert.deepEqual([...new Set(ps)], ['queued', 'starting', 'stopped']);
-  assert.equal(starting[starting.length - 1]!.services.find((x) => x.name === 'PowerSync')!.restarts, 1);
+  assert.equal(starting[starting.length - 1]!.services.find((x) => x.name === 'NeuraMesh API')!.restarts, 1);
   // Try again: the loop is gone, and the wedged container was removed first
   t.world.inspect = {};
   t.stack.rescan();
   await done;
   assert.equal(t.stack.state.phase, 'ready');
-  assert.deepEqual(compose(t.calls), ['up -d --remove-orphans', 'rm -sf powersync', 'up -d --remove-orphans']);
+  assert.deepEqual(compose(t.calls), ['up -d --remove-orphans', 'rm -sf control-api', 'up -d --remove-orphans']);
 });
 
 test('deaths the poll never saw count too: the restart counter jumping by two is a loop', async () => {
@@ -173,23 +173,23 @@ test('deaths the poll never saw count too: the restart counter jumping by two is
 });
 
 test('a compose error names the container that failed, a taken port in its words becomes the port card, and that container is recreated next', async () => {
-  const err = 'Error response from daemon: driver failed programming external connectivity on endpoint neuramesh-local-powersync-1 (2f0d): Bind for 127.0.0.1:58081 failed: port is already allocated\n';
+  const err = 'Error response from daemon: driver failed programming external connectivity on endpoint neuramesh-local-control-api-1 (2f0d): Bind for 127.0.0.1:8788 failed: port is already allocated\n';
   const t = stackOn({ up: [{ code: 1, err }, { code: 0 }] });
   const done = t.stack.boot();
   const e = await t.errored();
-  assert.equal(e.message, 'Port 58081 is in use by another program.');
+  assert.equal(e.message, 'Port 8788 is in use by another program.');
   assert.equal(e.remedy, 'Stop that program, then try again.');
   t.stack.rescan();
   await done;
-  assert.deepEqual(compose(t.calls), ['up -d --remove-orphans', 'rm -sf powersync', 'up -d --remove-orphans']);
+  assert.deepEqual(compose(t.calls), ['up -d --remove-orphans', 'rm -sf control-api', 'up -d --remove-orphans']);
 });
 
 test('a stack that is merely slow still gets the whole budget, then the honest 90-second card', async () => {
-  const t = stackOn({ inspect: { powersync: ['running|0|0|starting|1'] } });
+  const t = stackOn({ inspect: { 'control-api': ['running|0|0|starting|1'] } });
   void t.stack.boot();
   const e = await t.errored();
   assert.equal(e.message, 'The local stack did not start in 90 seconds.');
-  assert.equal(e.detail, 'PowerSync not healthy');
+  assert.equal(e.detail, 'NeuraMesh API not healthy');
   assert.equal(e.remedy, 'Try again starts fresh containers.');
   assert.ok(t.clockMs() >= 90_000);
 });

@@ -70,13 +70,14 @@ export function ModelChipView({ model, level, states, cannot, tip, menuLabel, he
   );
 }
 
-export function ModelChip({ who, seat, states, onPick, onConnect, disabled }: {
+export function ModelChip({ who, seat, states, onPick, onConnect, disabled, notes }: {
   who: { name: string };
   seat: SeatView;
   states: Record<ProviderKey, ProviderState>;
   onPick: (model: string, thinking: ThinkingLevel | null) => void;
   onConnect: (provider: ProviderKey) => void;
   disabled?: boolean;
+  notes?: Partial<Record<ProviderKey, string>>;
 }) {
   const label = chipLabel(modelLabel(seat.model));
   const vendor = vendorForModel(seat.model) as ProviderKey | null;
@@ -91,7 +92,7 @@ export function ModelChip({ who, seat, states, onPick, onConnect, disabled }: {
         : <><b>{who.name}</b> uses this model from your next message.</>;
   return (
     <ModelChipView model={seat.model} level={seat.thinking} states={states} cannot={cannot} tip={`${who.name} runs on ${label}`} menuLabel={`Model for ${who.name}`}
-      head={<div className="cprojhint cmodhead"><b>Model</b><span>for {who.name}</span></div>} foot={foot} locked={automation}
+      notes={notes} head={<div className="cprojhint cmodhead"><b>Model</b><span>for {who.name}</span></div>} foot={foot} locked={automation}
       onPick={onPick} onConnect={onConnect} disabled={disabled} />
   );
 }

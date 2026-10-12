@@ -5,9 +5,11 @@
 // you picked, and the branch and the state in the foot. The coding thread portals it into the
 // panel, the way a conversation portals its details into Overview. It was a strip of its own inside
 // the Workbench card; the card retired, and the strip is the panel's.
+import type { EngineeringChangeReview } from '@neuramesh/shared';
 import type { ReactElement } from 'react';
 import { EngineeringEditor, type EngineeringWorkspaceTab } from '../engineering/EngineeringEditor';
 import type { EngineeringSession } from '../engineering/domain';
+import { reviewFiles } from '../engineering/change-review';
 import { IconBranch } from '../ui/icons';
 
 const STATE_LINE: Record<string, string> = { idle: 'at rest', streaming: 'working', awaiting_approval: 'waits for you', resumable: 'paused', completed: 'complete', error: 'blocked' };
@@ -16,21 +18,26 @@ const STATE_LINE: Record<string, string> = { idle: 'at rest', streaming: 'workin
 export type CodeCounts = { changes: number; checkpoints: number; plan: boolean };
 
 export function codeCountsOf(session: EngineeringSession): CodeCounts {
-  return { changes: (session.pendingApproval?.changes ?? session.changes).length, checkpoints: session.checkpoints.length, plan: !!session.workPlan };
+  return { changes: reviewFiles(session.pendingApproval?.changes ?? session.changes).length, checkpoints: session.checkpoints.length, plan: !!session.workPlan };
 }
 
-export function CodePanel({ session, tab, onTab, onSession, onRestore }: {
+export function CodePanel({ session, tab, onTab, onSession, onRestore, restoreUnavailable, selectedPath, onSelectPath, selectedPlan, selectedReview }: {
+  selectedPath: string | null;
+  selectedPlan?: string | null;
+  selectedReview?: EngineeringChangeReview | null;
+  onSelectPath: (path: string) => void;
   session: EngineeringSession;
   tab: EngineeringWorkspaceTab;
   onTab: (tab: EngineeringWorkspaceTab) => void;
   onSession: (session: EngineeringSession) => void;
   onRestore?: ((checkpointId: string) => void) | undefined;
+  restoreUnavailable?: boolean | undefined;
 }): ReactElement {
-  const proposed = session.pendingApproval?.changes?.length ?? 0;
+  const proposed = reviewFiles(session.pendingApproval?.changes ?? []).length;
   return (
     <div className="codeface">
-      <EngineeringEditor session={session} onSession={onSession} tab={tab} onTab={onTab} {...(onRestore ? { onRestore } : {})} />
-      <div className="dockfoot"><IconBranch s={11} /><span>{session.repo.branch}</span><span className="dockfootstate">{proposed ? `${proposed} proposed · not written yet` : session.blockedOn === 'github' ? 'waits for GitHub' : STATE_LINE[session.state] ?? session.state}</span></div>
+      <EngineeringEditor selectedReview={selectedReview} selectedPlan={selectedPlan} selectedPath={selectedPath} onSelectPath={onSelectPath} session={session} onSession={onSession} tab={tab} onTab={onTab} {...(onRestore ? { onRestore } : {})} restoreUnavailable={restoreUnavailable} />
+      <div className="dockfoot"><IconBranch s={11} /><span>{session.repo.branch}</span><span className="dockfootstate">{selectedReview ? 'selected change set' : proposed ? `${proposed} proposed · not written yet` : session.blockedOn === 'github' ? 'waits for GitHub' : STATE_LINE[session.state] ?? session.state}</span></div>
     </div>
   );
 }

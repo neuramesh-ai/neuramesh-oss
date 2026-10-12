@@ -10,11 +10,11 @@
 //
 // REGISTRATION POSITION IS LOAD-BEARING (see whiteboards.ts) — called from where these sat.
 import { ipcMain } from 'electron';
-import type { PowerSyncDatabase } from '@powersync/node';
+import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 
 export function registerTaskIpc(deps: {
   ws: () => string;
-  db: () => PowerSyncDatabase;
+  db: () => ReplicaDatabase;
   api: (path: string, body?: unknown) => Promise<Record<string, unknown>>;
   /** a getter: sign-in can change the actor mid-session */
   actorId: () => string;

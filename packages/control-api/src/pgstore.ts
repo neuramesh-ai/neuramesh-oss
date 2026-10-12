@@ -1,13 +1,16 @@
 import { applyShare, type BrainOverride, parseBrainOverride, serializeBrainOverride, attachmentUpgradeReason, buildAgentCard, flowForChannelKind, FREE_SEAT_CAP, isGitHubNeedQuestion, planLabel, seatLimitReason, readAnswers, taskBranch, threadKindOf, threadModeOf, type ActorRef, type Beat, type BeatStatus, type NMEvent, type Run, type RunSettleState, type RetroPayload, type RetroRange, type Task, type TaskKind, type TaskState, type ThreadKind, type ThreadMode, priceActiveSeconds } from '@neuramesh/shared';
-import { trackDomainEvent } from './analytics';
+import { taskFacts, trackDomainEvent, type EventFacts } from './analytics';
 import { createHash, randomBytes } from 'node:crypto';
 import postgres from 'postgres';
 import { embed } from './embedder';
 import { DomainError } from './errors';
 import { dueContentItemsSql, upcomingContentItemsSql, type DueItem, type UpcomingItem } from './store/content-reads';
 import { anchorContentItemSql } from './store/content-anchor';
+import { attachContentMediaSql, contentMediaBytesSql } from './store/content-media';
+import { artifactContent } from './store/artifact-content';
 import { threadRoutineIdSql } from './store/routine-rule';
 import { setThreadKindSql, setThreadMachineSql, workspaceMachine } from './store/thread-machine';
+import { updateThreadTitleSql } from './store/thread-title';
 import { sessionTitleSql } from './store/session-title';
 import { latestHumanWordSql, setThreadSettledSql, threadTaskIdSql } from './store/thread-settle';
 import { markScheduleResultSql, setScheduleCursorSql } from './store/release-routine';
@@ -163,13 +166,14 @@ export class PostgresStore implements Store {
     };
   }
 
-  private async insertEvent(sql: postgres.Sql, e: NMEvent, taskId: string | null) {
+  private async insertEvent(sql: postgres.Sql, e: NMEvent, taskId: string | null, facts?: EventFacts) {
     await sql`insert into events (id, workspace_id, type, source, target, task_id, payload, in_reply_to)
       values (${e.id}, ${e.workspace}::uuid, ${e.type}, ${e.source}, ${e.target}, ${taskId}, ${sql.json(e.payload as never)}, ${e.in_reply_to})`;
     // Activation-funnel telemetry: event-level only, no content, no-op without POSTHOG_KEY.
     // Enqueued (not awaited) so it never adds latency to the command path; over-counting on
     // the rare txn rollback is acceptable analytics imprecision. See analytics.ts.
-    trackDomainEvent(e);
+    // `facts`: what the caller read with the write (a task write passes taskFacts)
+    trackDomainEvent(e, facts);
   }
 
   async createTask(task: Task, event: NMEvent): Promise<Task> {
@@ -267,7 +271,8 @@ export class PostgresStore implements Store {
           work_plan = ${t.workPlan ? sql.json(t.workPlan as never) : null},
           plan_approved_at = ${t.planApprovedAt}
         where id = ${id}`;
-      for (const e of out.events) await this.insertEvent(sql, e, id);
+      // the funnel's nm_repo comes from the row this write already holds, never a second read
+      for (const e of out.events) await this.insertEvent(sql, e, id, taskFacts(t));
       for (const a of out.artifacts ?? []) {
         const by = t.assignee ?? t.creator;
         // a finishing subtask's deliverables attach to the PARENT (docs/24)
@@ -323,8 +328,11 @@ export class PostgresStore implements Store {
       // one default project per workspace (the work axis) — all starter channels
       // live in it; the user creates more projects and moves channels into them.
       // named 'Default' (not 'general') so it never collides with the #general channel.
-      const [proj] = await sql`insert into projects (workspace_id, name, slug, is_default, status)
-        values (${workspaceId}, 'Default', 'default', true, 'active') returning id`;
+      // the first project starts with the release gate OFF (docs/23): a person's first pull
+      // request ends on their word, with no release plan to approve. every later project keeps
+      // the column default (on), and Project settings turns this one on.
+      const [proj] = await sql`insert into projects (workspace_id, name, slug, is_default, status, ship_gate)
+        values (${workspaceId}, 'Default', 'default', true, 'active', false) returning id`;
       const defaultProjectId = proj!['id'] as string;
       const defaults: Array<[string, string, string]> = [
         ['general', 'Team home base', 'build'],
@@ -1019,16 +1027,17 @@ export class PostgresStore implements Store {
   }
 
   async listArtifacts(taskId: string): Promise<ArtifactRow[]> {
-    const rows = await this.sql`select id, task_id, kind, name, inline_content, created_at
-      from artifacts where task_id = ${taskId} order by created_at`;
-    return rows.map((r) => ({
+    const rows = await this.sql`select a.id, a.task_id, a.kind, a.name, a.inline_content, a.created_at, b.object_ref
+      from artifacts a left join brain_artifacts b on b.artifact_id = a.id left join threads t on t.id = b.thread_id
+      where a.task_id = ${taskId} and (t.id is null or t.kind <> 'coding') order by a.created_at`;
+    return Promise.all(rows.map(async (r) => ({
       id: r['id'],
       taskId: r['task_id'],
       kind: r['kind'],
       name: r['name'],
-      content: r['inline_content'],
+      content: await artifactContent(r['inline_content'], r['object_ref']),
       createdAt: new Date(r['created_at']).toISOString(),
-    }));
+    })));
   }
 
   // Beats (docs/17) — one run (set) per declare; advance targets the task's latest run.
@@ -2074,7 +2083,7 @@ export class PostgresStore implements Store {
     // tasks.creator_id is `uuid not null`, so this coalesce is load-bearing, not cosmetic.
     const inserted = await sql`insert into tasks (workspace_id, channel_id, project_id, number, title, description, state, kind, creator_kind, creator_id)
       select ${workspace}::uuid, ${channelId}::uuid, c.project_id, ${Number(n!['n'])}, ${flow.title},
-             ${'Walk the steps below to set this room up — your answers save as you go, so you can leave and finish any time. Closing this task skips setup.'},
+             ${flow.description},
              'todo'::task_state, 'setup'::task_kind, 'human'::actor_kind,
              coalesce(
                case when c.created_by ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then c.created_by::uuid end,
@@ -2355,31 +2364,11 @@ export class PostgresStore implements Store {
   async anchorContentItem(itemId: string, threadId: string, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }> { return this.sql.begin((tx) => anchorContentItemSql(asSql(tx), itemId, threadId, (ws) => this.insertEvent(asSql(tx), makeEvent(ws), null))) as Promise<{ id: string }>; }
 
   async attachContentMedia(itemId: string, mime: string, bytes: Buffer, actor: { kind: string; id: string }, makeEvent: (workspace: string) => NMEvent): Promise<{ id: string }> {
-    return this.sql.begin(async (_tx) => {
-      const sql = asSql(_tx);
-      const [item] = await sql`select workspace_id from content_items where id = ${itemId}::uuid and status in ('draft', 'scheduled')`;
-      if (!item) throw new DomainError('NOT_FOUND', 'content item not found (or already published)');
-      const ws = item['workspace_id'] as string;
-      // one hosted image per draft: replacing it must not leave the old bytes orphaned
-      await sql`delete from content_media where content_item_id = ${itemId}::uuid`;
-      const [row] = await sql`insert into content_media (workspace_id, content_item_id, mime, bytes, size_bytes, created_by_kind, created_by)
-        values (${ws}::uuid, ${itemId}::uuid, ${mime}, ${bytes}, ${bytes.length}, ${actor.kind}, ${actor.id}) returning id`;
-      const mediaId = row!['id'] as string;
-      // MERGE — the same jsonb carries the marketer's brief and the card's inline thumbnail; a
-      // hosted image clears any prior image_error (the card now shows the picture, not the reason).
-      // A FILM (video/*) takes the one media slot the same way: video_id in, video_error out, and the
-      // picture's keys out with it, because the bytes it pointed at are gone.
-      const film = mime.startsWith('video/');
-      const patch = film ? { video_id: mediaId } : { image_id: mediaId };
-      await sql`update content_items set media = (((coalesce(media, '{}'::jsonb) || ${sql.json(patch as never)}::jsonb) - ${film ? 'video_error' : 'image_error'}) - ${film ? 'image_id' : 'video_id'}) - ${film ? 'thumb' : 'video_error'} where id = ${itemId}::uuid`;
-      await this.insertEvent(sql, makeEvent(ws), null);
-      return { id: mediaId };
-    }) as Promise<{ id: string }>;
+    return attachContentMediaSql(this.sql, itemId, mime, bytes, actor, makeEvent);
   }
 
   async contentMediaBytes(mediaId: string): Promise<{ mime: string; bytes: Buffer; workspace: string } | null> {
-    const [r] = await this.sql`select mime, bytes, workspace_id from content_media where id = ${mediaId}::uuid limit 1`;
-    return r ? { mime: r['mime'] as string, bytes: Buffer.from(r['bytes'] as Uint8Array), workspace: r['workspace_id'] as string } : null;
+    return contentMediaBytesSql(this.sql, mediaId);
   }
 
   async createChannelArtifact(
@@ -2558,20 +2547,25 @@ export class PostgresStore implements Store {
   // meant connecting X in a second project silently OVERWROTE the first product's account
   // instead of adding one — the same row, its channel_id repointed. The project is derived from
   // the room the OAuth round-trip started in, so callers keep passing a channel.
-  async upsertConnector(input: { workspace: string; channelId: string | null; provider: string; handle: string; connectedBy: string; scopes: string }): Promise<{ id: string }> {
-    const [row] = await this.sql`insert into connectors (workspace_id, channel_id, project_id, provider, handle, status, scopes, connected_by)
-      values (
-        ${input.workspace}::uuid, ${input.channelId},
-        coalesce(
-          (select ch.project_id from channels ch where ch.id = ${input.channelId}),
-          (select p.id from projects p where p.workspace_id = ${input.workspace}::uuid and p.is_default limit 1)
-        ),
-        ${input.provider}, ${input.handle}, 'connected', ${input.scopes}, ${input.connectedBy})
-      on conflict (workspace_id, project_id, provider) where project_id is not null do update
-        set handle = excluded.handle, status = 'connected', channel_id = excluded.channel_id,
-            scopes = excluded.scopes, connected_by = excluded.connected_by
-      returning id`;
-    return { id: row!['id'] as string };
+  // `makeEvent` is written only when the row is NEW (xmax = 0), in the same transaction: the GitHub
+  // doors pass github.connected, so a step that resolves again on every mount never repeats it.
+  async upsertConnector(input: { workspace: string; channelId: string | null; provider: string; handle: string; connectedBy: string; scopes: string }, makeEvent?: (workspace: string, connectorId: string) => NMEvent): Promise<{ id: string }> {
+    return this.sql.begin(async (_tx) => { const sql = asSql(_tx);
+      const [row] = await sql`insert into connectors (workspace_id, channel_id, project_id, provider, handle, status, scopes, connected_by)
+        values (
+          ${input.workspace}::uuid, ${input.channelId},
+          coalesce(
+            (select ch.project_id from channels ch where ch.id = ${input.channelId}),
+            (select p.id from projects p where p.workspace_id = ${input.workspace}::uuid and p.is_default limit 1)
+          ),
+          ${input.provider}, ${input.handle}, 'connected', ${input.scopes}, ${input.connectedBy})
+        on conflict (workspace_id, project_id, provider) where project_id is not null do update
+          set handle = excluded.handle, status = 'connected', channel_id = excluded.channel_id,
+              scopes = excluded.scopes, connected_by = excluded.connected_by
+        returning id, (xmax = 0) as inserted`;
+      if (row!['inserted'] && makeEvent) await this.insertEvent(sql, makeEvent(input.workspace, row!['id'] as string), null);
+      return { id: row!['id'] as string };
+    }) as Promise<{ id: string }>;
   }
 
   async setConnectorSecret(connectorId: string, ciphertext: string): Promise<void> {
@@ -2767,22 +2761,7 @@ export class PostgresStore implements Store {
   }
 
   async updateThread(workspace: string, threadId: string, patch: { title?: string; description?: string }, opts?: { agentTitleOnce?: boolean }): Promise<void> {
-    // the titled-once invariant (0124): an agent names a conversation ONCE — the christening
-    // stamps titled_at, and later agent renames are refused (a subtask arm must never re-title
-    // its parent thread). Humans rename freely; their rename stamps too, closing agent renames.
-    if (patch.title !== undefined && opts?.agentTitleOnce) {
-      const [cur] = await this.sql<Array<{ titled_at: string | null }>>`select titled_at from threads where id = ${threadId}::uuid and workspace_id = ${workspace}::uuid`;
-      if (!cur) throw new DomainError('NOT_FOUND', `thread ${threadId} not found`);
-      if (cur.titled_at) throw new DomainError('THREAD_ALREADY_TITLED', 'this conversation is already named — only the human renames it');
-    }
-    const [row] = await this.sql<Array<{ id: string }>>`update threads set
-        title = coalesce(${patch.title ?? null}, title),
-        titled_at = case when ${patch.title ?? null}::text is not null then now() else titled_at end,
-        description = coalesce(${patch.description ?? null}, description),
-        updated_at = now()
-      where id = ${threadId}::uuid and workspace_id = ${workspace}::uuid
-      returning id`;
-    if (!row) throw new DomainError('NOT_FOUND', `thread ${threadId} not found`);
+    await updateThreadTitleSql(this.sql, workspace, threadId, patch, opts);
   }
 
   async createThread(workspace: string, channelId: string, threadId: string, title: string, description: string, createdBy: string): Promise<void> {

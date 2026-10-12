@@ -146,9 +146,19 @@ export function productShots(body: string): Array<{ start: number; end: number; 
   });
 }
 
-const PRODUCT_WORDS_RE = /\b(app|screen|phone|product|interface|dashboard|recording|ui|home screen|the board|laptop screen)\b/i;
-/** a beat that shows the product on screen, by its words: the gate that asks for a SHOW line reads this */
-export const looksLikeProductBeat = (b: FilmBeat): boolean => PRODUCT_WORDS_RE.test(b.direction);
+// A beat needs a product shot only when it puts the APP'S SCREEN on camera (George, 2026-10-06: "we
+// don't always need that"). A creator who holds a phone, or a line about "apps", shows no screen,
+// and a video model told to keep screens dark draws none. The old list fired on "app", "phone" and
+// "product" alone, so nearly every UGC script was forced to name a shelf image, and the agent
+// reached for whatever the shelf held (an X profile capture, a cover picture). "On-screen text" is
+// lettering, not a screen.
+const APP_SCREEN_RE = /\b(screen ?(recording|capture|cast)s?|screenshots?|(phone|laptop|tablet|computer|app|home|lock|the) screens?|on[- ]screen(?! (text|title|titles|caption|captions|lettering|words))|ui|interface|dashboard|close(-| )?(up )?on the (phone|app|laptop)|(scrolls?|taps?|swipes?|clicks?) (through|around|in|on) the app|(opens?|shows?|holds? up|demos?) the app|the app's)\b/i;
+/** a beat that puts the app's screen on camera, by its words: the gate that asks for a SHOW line reads this */
+export const looksLikeProductBeat = (b: FilmBeat): boolean => APP_SCREEN_RE.test(b.direction);
+
+/** the screens rule (George, 2026-10-06): a beat with no product shot shows no app, so no screen in the
+ *  film carries an invented interface. A SHOW beat's window is the real image, cut in after the film. */
+export const SCREENS_RULE = 'Every phone and laptop screen stays dark or faces away from the camera.';
 
 /** the first beat, for the callers that want the hook alone */
 export const firstBeat = (body: string): FilmBeat => scriptBeats(body)[0]!;
@@ -183,9 +193,11 @@ export const filmMinutes = (seconds: number): number => Math.max(2, Math.ceil(se
 
 /**
  * The prompt a draft is filmed from: a vertical creator clip of the script's first `seconds`,
- * the spoken lines in quotes, one text rule, the look, the audio. Under FILM_PROMPT_MAX.
+ * the spoken lines in quotes, one text rule, the screens rule, the look, the audio. Under
+ * FILM_PROMPT_MAX. `frame`: the draft films on a reference image, whose lane asks the model to show
+ * that screen, so the screens rule stays out.
  */
-export function filmPrompt(body: string, brief: string, seconds = 8): string {
+export function filmPrompt(body: string, brief: string, seconds = 8, opts: { frame?: boolean } = {}): string {
   const beats = beatsWithin(body, seconds);
   const shots = beats.map((b, i) => {
     const dir = cut(b.direction, DIRECTION_WORDS);
@@ -200,10 +212,11 @@ export function filmPrompt(body: string, brief: string, seconds = 8): string {
     `Vertical 9:16 phone video, ${seconds} seconds, handheld, natural light, a creator talking to camera, raw and real.`,
     ...cuts,
     title ? `One on-screen title, large and centered in the lower third, exactly: "${title}". No other text.` : 'No on-screen text, no subtitles, no captions, no logos.',
+    opts.frame ? '' : SCREENS_RULE,
     withLook && look ? `Look: ${look}.` : '',
     "Audio: the creator's voice and room tone, no music.",
   ].filter(Boolean).join(' ');
-  // over the cap: the look goes first, then the last cut, never the text rule
+  // over the cap: the look goes first, then the last cut, never the text rule or the screens rule
   let out = assemble(shots, true);
   if (out.length > FILM_PROMPT_MAX) out = assemble(shots, false);
   for (let n = shots.length - 1; out.length > FILM_PROMPT_MAX && n >= 1; n -= 1) out = assemble(shots.slice(0, n), false);

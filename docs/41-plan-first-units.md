@@ -119,7 +119,10 @@ propose_impl_plan) doesn't set `origin_thread_id`, so no unit card lands in the 
 anchor it; (b) a verdict-less `done` task has no in-UI Accept (by design `done` docks nothing
 and the card is rex's to raise — but the needs-you row that says READY should carry the button
 it promises); (c) a human reply on a done task woke nobody visible — check the done-state reply
-pump.
+pump. (c) is fixed (2026-10-05): a reply that names nobody on a `done` unit wakes the room's
+orchestrator, whatever the unit's kind (`unaddressedWake`, shared `threadwake.ts`). Its
+`accept_task` merges only when the person's newest typed message says merge or accept
+(`host/acceptgate.ts`).
 
 ## 6. Hands-off units: routines through every gate (2026-09-16)
 
@@ -172,4 +175,5 @@ approved the plan (`cards/planapprover.ts`), so a person's approval in a draft's
 plan on any path; the design-review notify skips routine units; the `create_task` tool result says
 the unit *started*; the stall classifier treats an approved `plan_review` as a todo waiting on its
 offer; the plan card's compact record reads **auto-approved · routine** (a routine approved the
-plan: the unit is repo-less, and a routine opened its conversation); the unit card reads *approved · awaiting its offer*.
+plan: the unit is repo-less, and a routine opened its conversation); the unit card reads *approved · not claimed yet*
+in hq, and the desktop keeps its old words until someone ports them.

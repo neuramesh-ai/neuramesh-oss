@@ -65,6 +65,9 @@ import { postPlanMessage } from './planfollowup';
 
 import type { CommandOutcome } from '../handler';
 
+/** the kinds of work that change code (shared TASK_KINDS): in a room with a repository they end in a merge */
+const CODE_KINDS: ReadonlySet<string> = new Set(['bug', 'feature', 'refactor', 'chore']);
+
 export async function createTask(
   store: Store,
   actor: Actor,
@@ -298,6 +301,10 @@ export async function createTask(
   // like the unit card: the task is real even if the materialization races.
   if (task.workPlan) {
     const planName = planArtifactName(1);
+    // the journey ends in the person's merge word for a unit with a repository. the orchestrator binds
+    // one at the offer, after the plan (tools-route.ts offer_task), so a code unit in a room whose project
+    // has a repository counts as one here (2026-10-05)
+    const repo = task.repo !== null || (CODE_KINDS.has(task.kind ?? '') && !!(await store.announcements?.repoForChannel(task.channel).catch(() => null)));
     await store
       .mutate(task.id, async (t) => ({
         task: t,
@@ -305,15 +312,12 @@ export async function createTask(
         artifacts: [{
           kind: 'doc',
           name: planName,
-          content: renderPlanMarkdown({ number: task.number, title: task.title, kind: task.kind, legs: task.workPlan!.legs, subtasks: task.workPlan!.subtasks, approach: task.workPlan!.approach, version: 1 }),
+          content: renderPlanMarkdown({ number: task.number, title: task.title, kind: task.kind, legs: task.workPlan!.legs, subtasks: task.workPlan!.subtasks, approach: task.workPlan!.approach, version: 1, repo }),
         }],
       }))
       .catch(() => {});
-    await postPlanMessage(store, task, actor, 1, routine
-      ? `⏱ Routine run — implementation plan **v1** (${planName}). Work starts now, hands-off; you'll be notified when it's done.`
-      : playbookRun
-        ? `▶ Playbook run — plan **v1** (${planName}), the registry's template. Work starts now; your gate is accepting the deliverable.`
-        : `Implementation plan **v1** — ${planName}`);
+    // the words live in shared planmd.ts (planPostLine), so the preview story reads the same line
+    await postPlanMessage(store, task, actor, 1, routine ? 'routine' : playbookRun ? 'playbook' : 'birth');
   }
   // a hands-off unit's proposed subtasks mint at CREATE — approval never comes, and the run
   // needs them (routines since 2026-08-19; playbook runs since round 3 — `routine` alone here

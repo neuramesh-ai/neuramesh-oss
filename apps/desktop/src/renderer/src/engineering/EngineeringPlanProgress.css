@@ -1,0 +1,23 @@
+/* Shared beats material, with the count inside a circle above the coding composer. */
+.codeplanprogress { --beat: var(--text); position: relative; display: flex; justify-content: center; width: 100%; margin: 0 0 8px; z-index: 6; }
+.codeplandial { position: relative; display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 50%; background: var(--card); color: var(--muted); box-shadow: var(--shadow-card); cursor: pointer; font: 10px var(--fmono); font-variant-numeric: tabular-nums; }
+.codeplandial b { color: var(--text); font-weight: 600; }
+.codeplandial svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); fill: none; stroke-width: 2; }
+.codeplantrack { stroke: var(--border2); }
+.codeplanarc { stroke: var(--beat); stroke-linecap: round; transition: stroke-dasharray .25s ease; }
+.codeplandial:hover, .codeplandial:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
+.codeplanpeek { position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%); width: min(460px, 100%); box-sizing: border-box; border: 1px solid var(--card-border); border-radius: 12px; background: var(--card); color: var(--body); box-shadow: var(--shadow-pop, var(--shadow-card)); padding: 12px; }
+.codeplanpeek::after { content: ''; position: absolute; top: 100%; left: 0; right: 0; height: 10px; }
+.codeplanpeek header { display: flex; align-items: center; gap: 12px; padding: 0 4px 10px; font-size: 12px; }
+.codeplanpeek header b { color: var(--text); font-weight: 600; }
+.codeplanpeek header > span { margin-left: auto; color: var(--muted); font: 10px var(--fmono); white-space: nowrap; }
+.codeplanpeek ol { margin: 0; padding: 0; list-style: none; max-height: min(300px, 40vh); overflow-y: auto; }
+.codeplanpeek li { display: flex; align-items: center; gap: 9px; padding: 8px 5px; border-radius: 6px; font-size: 12px; line-height: 1.4; }
+.codeplanpeek li.in_progress { background: var(--sel-bg); color: var(--text); }
+.codeplanpeek li.completed { color: var(--muted); }
+.codeplanstep { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.codeplanpeek li small { color: var(--muted); font-size: 10px; }
+.codeplanopen { width: 100%; display: flex; justify-content: space-between; padding: 10px 4px 0; margin-top: 6px; border: 0; border-top: 1px solid var(--border); background: none; color: var(--text); font: inherit; font-size: 12px; cursor: pointer; }
+.codeplanopen:hover { color: var(--accent); }
+.codeplanannounce { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { .codeplanarc { transition: none; } .codeplanpeek .beatdot, .codeplanpeek .beatcheck { animation: none; } }

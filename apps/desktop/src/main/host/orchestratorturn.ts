@@ -17,8 +17,8 @@ import { HIRE_CARD_SPEC } from '../hirecards';
 import { type AgentAttachment } from '../runtime/adapter';
 import { type OrchTransportArgs } from './orchturn';
 import { type RunHandle } from './runs';
-import { composePrompt } from '@neuramesh/shared';
-import type { PowerSyncDatabase } from '@powersync/node';
+import { WEB_PREVIEW_PROMPT, composePrompt } from '@neuramesh/shared';
+import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 import type { makeRuns } from './runs';
 import type { makeOrchTools } from './orchtools';
 import type { makeContent } from './content';
@@ -38,7 +38,7 @@ export async function routineNoteFor(db: { getAll: <T>(sql: string, params?: unk
 }
 
 export function makeOrchTurn(ctx: {
-  db: PowerSyncDatabase;
+  db: ReplicaDatabase;
   NO_RUN: ReturnType<typeof makeRuns>['NO_RUN'];
   buildOrchestratorTools: ReturnType<typeof makeOrchTools>['buildOrchestratorTools'];
   draftsForAnchor: ReturnType<typeof makeContent>['draftsForAnchor'];
@@ -128,7 +128,7 @@ export function makeOrchTurn(ctx: {
   - Draft them and hand them over with **draft_posts**, which renders each as a platform-native card the human approves, schedules, or asks you to change right here. That IS the deliverable. Never write a posts.json file and never paste the posts as markdown — a file gives them nothing to click and pasted prose gives them nothing to approve.
   - If a MARKETER is in this room (check list_agents), spawn it as a subagent to write the copy — it opens with this room's brand docs, guidelines and connected accounts staged as files. Take what it returns and call draft_posts yourself. Draft them directly only when no marketer is here.
   - Ask FIRST only what genuinely changes the copy — which networks, how many, the angle — and only when you cannot infer it. One nmq card, prefilled from the room's brand goal. A reasonable guess you can revise beats a card that stalls the ask; drafts are cheap to redo (**revise_posts** rewrites one in place, keeping its letter and its history).
-  - CREATOR VIDEO (the UGC playbook, "ugc scripts", "creator videos") is TWO turns: read the shelf, then **propose_angles** (the angle card: two to five angles from the product's facts, the platforms and the film's length as chips) and STOP. The human's pick wakes you; only then draft_posts, one video post per picked platform in that angle, the script written to the picked length. A script drafted before the pick is refused. A beat that shows the product carries a SHOW line naming an image on the shelf (list_library scope project finds the team's images; make_product_image makes one when none fits and it is not an app): the film cuts to the real image there, because a video model invents any screen it draws.
+  - CREATOR VIDEO (the UGC playbook, "ugc scripts", "creator videos") is TWO turns: read the shelf, then **propose_angles** (the angle card: two to five angles from the product's facts, the platforms and the film's length as chips) and STOP. The human's pick wakes you; only then draft_posts, one video post per picked platform in that angle, the script written to the picked length. A script drafted before the pick is refused. A beat that puts the app's screen on camera carries a SHOW line naming a real app screenshot: one a person put in Files (list_library scope project) or one shelve_repo_screenshot takes from the project's repository (list_repo_files finds the images). The film cuts to it there, because a video model invents any screen it draws. A creator holding a phone needs no SHOW, and a web capture or a drawn picture never stands in for the app.
   - When the human asks to change a draft ("↩ Re draft b: …"), read_drafts then revise_posts, never draft_posts — a second card beside the old one is the wrong answer to "change this", and a rewrite from memory drops what they kept. Scheduling is schedule_posts, whose card is the human's approval gate; you can never publish.
   - YOU CAN DRAW. A picture is **generate_image** (re-runs the brief already on the card) or **revise_posts** with a new imageBrief (different art direction, redraws on its own). Never tell the human to press a button — if they asked for an image, make it. Give a post an imageBrief when it should carry a visual; Instagram and TikTok always need one.
   - A content ask becomes a TASK only on the normal bar: they asked for tracked work, or it is a campaign that must outlive this conversation across sessions and owners. Then create_task with kind:'content' (a lean plan — legs [build] with the drafting approach; born in plan review) and offerTo the marketer — never request_design or request_plan (drafting posts has no mockup gate and no plan step), and its Definition of Done is publish-readiness, never a pull request.${
@@ -260,7 +260,7 @@ export function makeOrchTurn(ctx: {
     // The token is whatever resolveToken returned for the agent's provider (our free GEMINI_API_KEY
     // by default for a Gemini orchestrator; the user's subscription/key once they change the model).
     const args: OrchTransportArgs = {
-      model: agent.model, thinking: agent.thinking ?? null, token, systemPrompt: styled(threadPrompt), transcript, tools: otools, log, attachments, onDelta,
+      model: agent.model, thinking: agent.thinking ?? null, token, systemPrompt: styled(threadPrompt + '\n\n' + WEB_PREVIEW_PROMPT), transcript, tools: otools, log, attachments, onDelta,
       // The turn used to run in os.tmpdir() with no file tools at all, which is why an
       // orchestrator asked to write a document truthfully said it could not. This is the SAME
       // directory its subagents work in (ensureChatWorkspace), so a file a leg produces is one

@@ -10,11 +10,11 @@
 import { apiAuthHeaders } from '../../apiauth';
 import { ipcMain } from 'electron';
 import { randomUUID } from 'node:crypto';
-import type { PowerSyncDatabase } from '@powersync/node';
+import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 
 export function registerWhiteboardIpc(deps: {
   ws: () => string;
-  db: () => PowerSyncDatabase;
+  db: () => ReplicaDatabase;
   /** this desktop's actor id — a function, because sign-in can change it mid-session */
   actorId: () => string;
   /** a GETTER: API_URL is a reassigned `let` in sync.ts, and importing it would make the

@@ -23,6 +23,10 @@ PUBLIC_EXCLUDE=(
   scripts/fleet-e2e.sh                         # the operator's k3d proving ground
   scripts/fleet-local.sh                       # the operator against a local cluster
   scripts/fleet-gke-smoke.sh                   # the operator against the production cluster
+  scripts/brain-storage-bootstrap.sh           # production bucket imports and dedicated GCP identity
+  scripts/deploy-brain-api.sh                   # production GKE ingress and secret deployment
+  packages/control-api/scripts/brain-canary.mjs # authenticated production acceptance probe
+  packages/control-api/scripts/brain-inventory.mjs # production compatibility inventory
   scripts/egress-floor-gke-test.sh             # the egress floor proved on the production cluster
   scripts/pin-machine-image.mjs                # the machine image pin in the cluster manifests
   scripts/pin-machine-image.test.mjs           # the machine image's inputs, held to its private Dockerfile and workflow

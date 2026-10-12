@@ -1,4 +1,5 @@
 import {
+  type EngineeringAgent,
   PACKS,
   MODEL_ID_SET,
   STARTER_MODEL,
@@ -16,6 +17,8 @@ interface ReplicaReader {
 export interface EngineeringBrainResolution {
   modelId: string;
   agentId?: string;
+  agent?: EngineeringAgent;
+  instructions?: string;
 }
 
 interface EngineeringBrainOptions {
@@ -29,6 +32,7 @@ interface EngineeringBrainOptions {
 
 interface DeveloperSeatRow {
   id: string;
+  name?: string; role?: string; emoji?: string | null; brief?: string | null;
   model: string | null;
   model_source: string | null;
 }
@@ -68,19 +72,18 @@ async function selectedPackModel(opts: EngineeringBrainOptions, packId: string):
 export async function resolveEngineeringBrain(
   db: ReplicaReader,
   opts: EngineeringBrainOptions,
-  meta: Pick<EngineeringMachineOpenMeta, 'repoId' | 'modelId' | 'brainPack' | 'projectId'>,
+  meta: Pick<EngineeringMachineOpenMeta, 'repoId' | 'modelId' | 'brainPack' | 'projectId' | 'agentId'>,
 ): Promise<EngineeringBrainResolution> {
   const [seats, projects] = await Promise.all([
     db.getAll<DeveloperSeatRow>(
-      `select id, model, model_source
+      `select id, name, role, emoji, brief, model, model_source
          from agents
-        where workspace_id = ? and role = 'developer' and retired_at is null
+        where workspace_id = ? and retired_at is null
           and coalesce(kind, 'local') != 'remote'
-        order by case when lower(name) = 'patch' then 0 else 1 end,
-                 case when model_source = 'manual' then 0 else 1 end,
-                 lower(name)
+          and ((? is not null and id = ?) or (? is null and role = 'orchestrator'))
+        order by case when lower(name) = 'rex' then 0 else 1 end, lower(name)
         limit 1`,
-      [opts.workspaceId],
+      [opts.workspaceId, meta.agentId ?? null, meta.agentId ?? null, meta.agentId ?? null],
     ),
     db.getAll<ProjectBrainRow>(
       `select p.model_pack
@@ -93,6 +96,8 @@ export async function resolveEngineeringBrain(
     ),
   ]);
   const seat = seats[0] ?? null;
+  if (meta.agentId && (!seat || seat.id !== meta.agentId)) throw new Error('The selected agent is not available in this workspace.');
+  const identity = seat ? { agentId: seat.id, ...(seat.name && seat.role ? { agent: { id: seat.id, name: seat.name, role: seat.role, emoji: seat.emoji ?? null }, instructions: seat.brief ?? '' } : {}) } : {};
   const project = projects[0] ?? null;
   if (meta.projectId && !project) throw new Error('The selected project is not connected to this repository in the workspace.');
   // A direct Code model selection is machine-validated against the shared allow-list. The
@@ -100,7 +105,7 @@ export async function resolveEngineeringBrain(
   // still proves the workspace can serve it.
   if (meta.modelId) {
     if (!MODEL_ID_SET.has(meta.modelId)) throw new Error('The selected Code model is not available in this workspace.');
-    return { modelId: meta.modelId, ...(seat?.id ? { agentId: seat.id } : {}) };
+    return { modelId: meta.modelId, ...identity };
   }
   // An explicit composer selection is a per-task brain, so it is stronger than the normal
   // developer-seat/project inheritance. The browser supplies only a pack id; this machine-owned
@@ -108,8 +113,8 @@ export async function resolveEngineeringBrain(
   if (meta.brainPack) {
     return {
       modelId: await selectedPackModel(opts, meta.brainPack),
-      ...(seat?.id ? { agentId: seat.id } : {}),
+      ...identity,
     };
   }
-  return { modelId: STARTER_MODEL, ...(seat?.id ? { agentId: seat.id } : {}) };
+  return { modelId: STARTER_MODEL, ...identity };
 }

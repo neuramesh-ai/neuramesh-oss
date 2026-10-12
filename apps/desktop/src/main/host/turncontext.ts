@@ -12,7 +12,7 @@ import { type LogFn } from '../agentlog';
 import { type RunHandle } from './runs';
 import { type SubjectRef } from '../harness/brain';
 import { withTimeout } from './turnkit';
-import type { PowerSyncDatabase } from '@powersync/node';
+import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 import type { PromptOverride } from '../runtime/adapter';
 import type { Seat } from './lookups';
 import type { makeRuns } from './runs';
@@ -27,7 +27,7 @@ export function makeTurnContext(ctx: HostCtx & {
   apiUrl: string;
   blockFor: ReturnType<typeof makeBlock>['blockFor'];
   brainBriefing: (subject: SubjectRef | null, dir: string) => string;
-  db: PowerSyncDatabase;
+  db: ReplicaDatabase;
   designerOverride: (a: { ch: { id: string; slug: string; workspace_id: string }; taskId: string | null; label: string; brief: string; dir: string; brainSubject: SubjectRef | null }) => Promise<PromptOverride>;
   ensureChatWorkspace: (threadId: string) => string;
   legSummary: (out: string) => string;
@@ -121,7 +121,7 @@ function orchSpawnFor(
     const seated = resolved.agent;
     const run = await openRun(seated, { workspace: ch.workspace_id, channelId: ch.id, threadId }, {
       kind: 'leg', title: label, ...(parentRun.id ? { parentRunId: parentRun.id } : {}),
-      step: 'starting', seat: seatLabel(resolved),
+      step: 'starts the work', seat: seatLabel(resolved),
     });
     subtree.add({ turnId: run.id || label, role: i.role as AgentRole, label, state: 'running' });
     log?.({ kind: 'tool', phase: 'call', summary: `spawn ${i.role} · ${label} · ${Math.round(decision.budget.wallMs / 60_000)}m` });

@@ -16,6 +16,7 @@ import { readLibraryDoc } from './grounding';
 import { makeRepoReader } from './reporead';
 import { postRepoNeed, repoReadable } from './reponeed';
 import { referencedTasks } from './taskrefs';
+import { docDropBody } from '@neuramesh/shared';
 
 export function contextTools(tc: ToolCtx): OrchTool[] {
   const { z, db, post, ch, agent, actor, thread, convoThreadId, deepWorkToken, log, skills,
@@ -139,7 +140,7 @@ export function contextTools(tc: ToolCtx): OrchTool[] {
         // and titles it from the message body (pgstore.ts) — so every proposal spawned its own
         // session named after the document, which is what looked like duplicate threads per task.
         ...(convoThreadId ? { threadId: convoThreadId } : thread?.id ? { taskId: thread.id } : {}),
-        body: `📄 **${String(input.title).trim()}** — proposed for the library as \`${name}\`.\n\n${String(input.content)}`,
+        body: docDropBody(String(input.title).trim(), name, String(input.content), 'proposed for'),
       }).catch(() => {});
       log?.({ kind: 'tool', phase: 'result', summary: `proposed ${name} (${String(input.content).length} chars)` });
       return `"${name}" is drafted and posted in the thread as a card for approval${existing ? ` — it REPLACES the current version (${existing.inline_content?.length ?? 0} characters) once approved` : ''}. Do NOT claim it is in the library: say it is waiting for their approval, and keep your reply to one line since the document itself is already on screen.`;

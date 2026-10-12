@@ -101,7 +101,7 @@ export type FirstRunState =
 /** Settings › Connections (main/connectionsipc.ts): one card per connection */
 export interface ConnectionWorkspace { id: string; name: string; slug: string; plan: string | null; seats: number | null; subscriptionStatus: string | null; currentPeriodEnd: string | null }
 export interface ConnectionCard { id: string; kind: ConnectionKind; authMode: AuthMode; foreground: boolean; apiUrl: string; powersyncUrl: string; webUrl: string; account: { email: string } | null; workspaceId: string; workspaces: ConnectionWorkspace[]; moved?: MovedMarker }
-export interface LocalStackInfo { dir: string; ports: { api: number; powersync: number }; engine: string | null; engineVersion: string | null; stackVersion: string | null; appVersion: string }
+export interface LocalStackInfo { dir: string; ports: { api: number }; engine: string | null; engineVersion: string | null; stackVersion: string | null; appVersion: string }
 export type CustomServerResult = { ok: true; id: string } | { ok: false; code: 'ADDRESS' | 'NM_CONFIG' | 'BEARER' | 'UNREACHABLE'; message: string };
 export type WorkspaceExportResult = { ok: true; path: string } | { ok: false; code: 'NOT_AVAILABLE' | 'CANCELLED' | 'FAILED'; message?: string };
 /** the upgrade handoff's phase (main/upgradeipc.ts): the sheet draws it and never decides */

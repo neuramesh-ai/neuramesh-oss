@@ -1,3 +1,4 @@
+import { readArtifactText, type ArtifactContentRow } from './artifact-content';
 // Playbook tools (docs/design/marketing-os-2026-08) — the marketing flow catalog on rex's
 // belt. `list_playbooks` answers "what can you do for marketing" with the registry joined to
 // THIS room's derived state (last run + score from report-tagged artifacts, armed cadence
@@ -30,13 +31,18 @@ async function roomStates(db: ReplicaDb, roomId: string): Promise<Map<string, Ro
   // `doc` if a human promotes it — the round-3 live run proved the doc-only filter told
   // list_playbooks "never run" while the destination (which reads all kinds) said 86/100.
   // One derivation truth: name/title contract + inline content, whatever the kind.
-  const arts = await db.getAll<{ id: string; name: string; created_at: string; inline_content: string | null }>(
-    `select id, name, created_at, inline_content from artifacts where channel_id = ? and kind in ('doc', 'file') and inline_content is not null order by created_at desc limit 200`,
+  const arts = await db.getAll<ArtifactContentRow & { id: string; name: string; created_at: string; mime: string | null }>(
+    `select id, workspace_id, name, mime, created_at, storage_path, content_hash, inline_content from artifacts where channel_id = ? and kind in ('doc', 'file') and (inline_content is not null or storage_path like 'brain:%') order by created_at desc limit 200`,
     [roomId],
   ).catch(() => []);
   for (const a of arts) {
-    // identity = the name/title contract (playbooks.ts) — artifacts.tags never synced
-    const meta = a.inline_content ? reportFrom(a.name, a.inline_content) : null;
+    // Avoid byte downloads for images and superseded reports. A renamed text report can
+    // still identify its playbook by title, so it must pass through the parser.
+    if (a.mime && !/^(?:text\/|application\/(?:json|xml))/.test(a.mime)) continue;
+    const named = playbookOfReport(a.name, null);
+    if (named && out.get(named)?.lastAt) continue;
+    const body = await readArtifactText(db, a);
+    const meta = body ? reportFrom(a.name, body) : null;
     const pb = playbookOfReport(a.name, meta?.title ?? null);
     if (!pb || out.get(pb)?.lastAt) continue;
     out.set(pb, { lastAt: a.created_at, lastScore: meta?.score ?? null, armed: null });

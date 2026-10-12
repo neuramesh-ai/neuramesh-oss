@@ -64,8 +64,9 @@ the person who abandoned it.
 `marketing.v1` gained an optional fifth step, `releases` (docs/44). It writes an object,
 `{ repoId, slug, now, watch }`, and only that step does (`setup.step` refuses a text value there
 and an object anywhere else). The completing command reads the same object from `marketing.setup`
-and plants the routines: `now` is a free one-shot (`cadence: 'once'`, `payload.release.latest`),
-`watch` is a daily routine and meets the plan gate schedule.create enforces (`releases.watch:
-'plan_limit'` in the answer on Free, and the card opens the Upgrade sheet). The flow id stays
+and plants the routines: `now` is a one-shot (`cadence: 'once'`, `payload.release.latest`), and
+`watch` is a daily routine. Routines run on every plan (2026-10-03), so the server no longer
+answers `releases.watch: 'plan_limit'`. The type keeps that value for the desktops that still read
+it. Neither switch is free: a run spends credits on the NeuraMesh brain. The flow id stays
 `marketing.v1`: progress is profile-derived, a finished room reads complete through `setup_at`,
 and a room mid-wizard resumes at the new step only when it has not passed it.

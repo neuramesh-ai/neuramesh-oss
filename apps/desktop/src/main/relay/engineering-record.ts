@@ -90,7 +90,9 @@ export class CodeSessionRecord {
   wrap(session: EngineeringMachineSession): EngineeringMachineSession {
     return {
       command: (value) => { this.command(value); session.command(value); },
-      close: () => { this.closed(); session.close(); },
+      close: () => { this.closed(); return session.close(); },
+      get busy() { return session.busy ?? false; },
+      ...(session.flush ? { flush: () => session.flush!() } : {}),
     };
   }
 

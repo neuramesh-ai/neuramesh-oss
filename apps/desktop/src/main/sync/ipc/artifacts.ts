@@ -14,9 +14,11 @@ import { app, dialog, ipcMain, shell } from 'electron';
 import { discardAttachment, stageAttachment } from '../../attachments';
 import { channelLibrary, type DraftedPost, type LibraryRow } from '@neuramesh/client-core/library';
 import { readFile, writeFile } from 'node:fs/promises';
-import type { PowerSyncDatabase } from '@powersync/node';
+import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 import { basename, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { brainArtifactRows, hydrateArtifact, type CloudArtifactRow, type BrainArtifactMetadata } from '@neuramesh/client-core/brain-artifacts';
+import { readBrainArtifact } from '../../brain-artifact-reader';
 
 
 /**
@@ -49,7 +51,7 @@ function registerSaveAs(): void {
 }
 
 export function registerArtifactIpc(deps: {
-  db: () => PowerSyncDatabase;
+  db: () => ReplicaDatabase;
   api: (path: string, body?: unknown) => Promise<Record<string, unknown>>;
   /** getters, both: API_URL is a reassigned `let` in sync.ts and sign-in can change the actor */
   apiUrl: () => string;
@@ -58,6 +60,8 @@ export function registerArtifactIpc(deps: {
   ws: () => string;
 }): void {
   const { db, api, apiUrl, actorId, ws } = deps;
+  const hydrate = (row: (CloudArtifactRow & Record<string, unknown>) | null) => hydrateArtifact(row,
+    (id) => readBrainArtifact({ apiUrl: apiUrl(), actorId: actorId(), workspace: ws(), cacheRoot: join(app.getPath('userData'), 'brain-artifacts') }, id, row?.content_hash, row?.mime ?? undefined));
 
   // stage an attachment: write the bytes locally + compute a thumbnail/dims; the row is written on send
   registerSaveAs();
@@ -156,24 +160,33 @@ export function registerArtifactIpc(deps: {
   // ONE artifact by id (article round): the ‹article:id› card is self-contained like WbCard —
   // it reads its own row rather than requiring every thread renderer to thread a lookup through.
   // Workspace-scoped like every read here (the replica holds every workspace you belong to).
-  ipcMain.handle('nm:artifact', async (_e, { artifactId }: { artifactId: string }) => ({
-    artifact: (await db().getAll(
-      `select a.id, a.kind, a.name, a.mime, a.inline_content, a.size_bytes, a.promoted, a.channel_id,
+  ipcMain.handle('nm:artifact', async (_e, { artifactId }: { artifactId: string }) => {
+    let row = (await db().getAll<CloudArtifactRow & Record<string, unknown>>(
+      `select a.id, a.kind, a.name, a.mime, a.inline_content, a.storage_path, a.content_hash, a.size_bytes, a.promoted, a.channel_id,
               a.task_id, a.created_at, c.slug as channel_slug
          from artifacts a left join channels c on c.id = a.channel_id
         where a.id = ? and a.workspace_id = ? limit 1`,
       [artifactId, ws()],
-    ).catch(() => []))[0] ?? null,
-  }));
+    ).catch(() => []))[0] ?? null;
+    if (!row) {
+      const metadata = await api(`/v1/brain/artifacts/${encodeURIComponent(artifactId)}/metadata?workspace=${encodeURIComponent(ws())}`);
+      row = brainArtifactRows([metadata as unknown as BrainArtifactMetadata])[0] ?? null;
+    }
+    return { artifact: await hydrate(row) };
+  });
 
-  ipcMain.handle('nm:thread-artifacts', async (_e, { threadId }: { threadId: string }) => ({
-    artifacts: await db().getAll(
+  ipcMain.handle('nm:thread-artifacts', async (_e, { threadId }: { threadId: string }) => {
+    const local = await db().getAll<{ id: string }>(
       `select a.id, a.kind, a.name, a.mime, a.inline_content, a.size_bytes, a.promoted, a.message_id, a.task_id, a.created_at
          from artifacts a join messages m on m.id = a.message_id
         where m.thread_id = ? order by a.created_at asc`,
       [threadId],
-    ).catch(() => []),
-  }));
+    ).catch(() => []);
+    const remote = await api(`/v1/brain/threads/${encodeURIComponent(threadId)}/artifacts?workspace=${encodeURIComponent(ws())}`)
+      .catch((error: unknown) => { if (local.length) return { artifacts: [] }; throw error; });
+    const artifacts = brainArtifactRows((remote['artifacts'] ?? []) as BrainArtifactMetadata[]);
+    return { artifacts: [...new Map([...local, ...artifacts].map((row) => [row.id, row])).values()] };
+  });
 
   ipcMain.handle('nm:channel-artifacts', async (_e, { channelId }: { channelId: string }) => {
     const [artifacts, posts] = await Promise.all([

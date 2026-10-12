@@ -8,14 +8,14 @@ import { drainQuery } from './turnkit';
 
 import { mcpServersFor } from '../mkmcp';
 import { type LogFn } from '../agentlog';
-import type { PowerSyncDatabase } from '@powersync/node';
+import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 import type { makePark } from './park';
 import type { HostCtx } from './ctx';
 
 export function makeMarketingResearch(ctx: HostCtx & {
   apiUrl: string;
   arun: (agent: HostedAgent, t?: { id: string; number: number; channel_id?: string } | null, channelSlug?: string | null) => { log: LogFn; runId: string };
-  db: PowerSyncDatabase;
+  db: ReplicaDatabase;
   ownerActorId: string;
   post: any;
   runDueParks: ReturnType<typeof makePark>['runDueParks'];

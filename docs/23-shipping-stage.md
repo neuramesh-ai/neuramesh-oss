@@ -10,6 +10,9 @@
 > (pack-aware brain, never repointing a human's same-named agent — [seed.ts](../apps/desktop/src/main/seed.ts));
 > `projects.ship_gate` defaults **ON**, and the gate arms only when a task has an open PR, so
 > non-repo projects and scratch tasks are untouched.
+>
+> **A workspace's first project starts with the gate off (2026-10-03):** `workspace.create` writes `ship_gate = false` on the default project, so a person's first pull request ends on their word.
+> Every later project starts with the gate on, and the **Release gate** switch in Project settings arms the first project's gate at any time.
 
 ## 1. Goal
 

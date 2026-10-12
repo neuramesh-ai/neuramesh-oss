@@ -1,0 +1,53 @@
+.review { width: 100%; min-width: 0; min-height: 0; display: flex; flex-direction: column; container: code-review / inline-size; background: var(--bg); }
+.summary { display: flex; align-items: center; gap: 12px; min-height: 43px; padding: 10px 16px; border-bottom: 1px solid var(--border); color: var(--text); font-size: 12px; }
+.summary b { font-weight: 500; }
+.counts { display: inline-flex; flex: none; gap: 7px; font: 11px/1.4 var(--fmono); font-variant-numeric: tabular-nums; }
+.additions { color: var(--term-green); }
+.deletions { color: var(--term-red); }
+.workspace { flex: 1; min-height: 0; min-width: 0; display: grid; grid-template-columns: 190px minmax(0, 1fr); }
+.fileList { min-height: 0; overflow: auto; padding: 8px; border-right: 1px solid var(--border); }
+.fileButton { width: 100%; display: flex; align-items: center; gap: 7px; padding: 8px; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--body); text-align: left; cursor: pointer; }
+.fileButton:hover { background: var(--hover-bg); }
+.fileButton.selected { color: var(--text); background: var(--sel-bg); }
+.fileButton:focus-visible, .codeScroll:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
+.filePath { flex: 1; min-width: 0; font: 11px/1.5 var(--fmono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.badge { width: 16px; flex: none; font: 10px var(--fmono); text-align: center; }
+.badge.added, .status.added { color: var(--term-green); }
+.badge.deleted, .status.deleted { color: var(--term-red); }
+.badge.modified, .status.modified { color: var(--prog); }
+.badge.renamed, .status.renamed { color: var(--body); }
+.detail { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.fileHeader { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+.fileHeader > div { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+.fileHeader svg { flex: none; color: var(--muted); }
+.fileHeader b { font: 500 12px/1.5 var(--fmono); color: var(--text); overflow-wrap: anywhere; }
+.fileHeader small { width: 100%; color: var(--muted); font: 11px/1.5 var(--fmono); overflow-wrap: anywhere; }
+.status { flex: none; font-size: 11px; }
+.codeScroll { flex: 1; min-height: 0; min-width: 0; overflow: auto; background: var(--bg); color: var(--text); }
+.diffCode, .sourceCode { width: max-content; min-width: 100%; padding-bottom: 12px; font: 12px/1.8 var(--fmono); tab-size: 2; }
+.diffLine { display: grid; grid-template-columns: 4.3ch 4.3ch 2.5ch minmax(0, 1fr); min-height: 22px; }
+.diffLine code, .sourceLine code { padding-right: 18px; font: inherit; color: inherit; white-space: pre; }
+.lineNumber { padding-inline: 6px; color: var(--muted); text-align: right; user-select: none; font-variant-numeric: tabular-nums; }
+.marker { text-align: center; user-select: none; }
+.diffLine.added { background: color-mix(in srgb, var(--term-green) 13%, var(--bg)); }
+.diffLine.removed { background: color-mix(in srgb, var(--term-red) 13%, var(--bg)); }
+.added .marker { color: var(--term-green); }
+.removed .marker { color: var(--term-red); }
+.diffLine.hunk { margin-block: 8px 4px; background: color-mix(in srgb, var(--prog) 8%, var(--bg)); color: var(--muted); }
+.diffLine.hunk code, .diffLine.note code { grid-column: 3 / -1; padding-left: 8px; }
+.diffLine.hunk .marker, .diffLine.note .marker { display: none; }
+.diffLine.note { color: var(--muted); font-style: italic; }
+.gutterLabels { display: grid; grid-template-columns: 4.3ch 4.3ch; padding-top: 4px; color: var(--muted); font-size: 10px; text-align: right; }
+.gutterLabels span { padding-right: 6px; }
+.sourceCode { padding-top: 10px; }
+.sourceLine { display: grid; grid-template-columns: 5ch minmax(0, 1fr); gap: 12px; min-height: 22px; }
+.sourceNotice { padding: 10px 16px; margin: 0; color: var(--muted); font-size: 12px; }
+.empty { padding: 28px 20px; margin-block: auto; color: var(--muted); font-size: 13px; line-height: 1.6; text-align: center; }
+.noFiles { padding: 8px; color: var(--muted); font-size: 12px; }
+@container code-review (max-width: 620px) {
+  .workspace { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  .fileList { max-height: 160px; border-right: 0; border-bottom: 1px solid var(--border); }
+  .fileButton { padding-block: 7px; }
+  .fileHeader { padding: 10px 12px; }
+  .summary { padding-inline: 12px; }
+}

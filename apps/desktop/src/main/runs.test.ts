@@ -10,23 +10,23 @@ const call = (summary: string) => ({ kind: 'tool', phase: 'call' as string | nul
 
 test('the narrator speaks the first verb immediately', () => {
   const n = makeNarrator();
-  assert.equal(n.next(call('Read src/session/timer.ts'), 1_000), 'reading timer.ts');
+  assert.equal(n.next(call('Read src/session/timer.ts'), 1_000), 'reads timer.ts');
 });
 
 test('a tool burst is rationed — a status line nobody can read is a write storm, not progress', () => {
   const n = makeNarrator();
-  assert.equal(n.next(call('Read a.ts'), 0), 'reading a.ts');
+  assert.equal(n.next(call('Read a.ts'), 0), 'reads a.ts');
   // the SDK fires these ~100ms apart; every one of them would be a server write
   assert.equal(n.next(call('Read b.ts'), 100), null);
   assert.equal(n.next(call('Read c.ts'), 900), null);
-  assert.equal(n.next(call('Read d.ts'), STEP_MIN_MS), 'reading d.ts');
+  assert.equal(n.next(call('Read d.ts'), STEP_MIN_MS), 'reads d.ts');
 });
 
 test('the same words twice is not news', () => {
   const n = makeNarrator(0);
-  assert.equal(n.next(call('WebSearch flowe reviews'), 0), 'searching “flowe reviews”');
+  assert.equal(n.next(call('WebSearch flowe reviews'), 0), 'searches “flowe reviews”');
   assert.equal(n.next(call('WebSearch flowe reviews'), 10_000), null);
-  assert.equal(n.next(call('WebSearch flowe pricing'), 20_000), 'searching “flowe pricing”');
+  assert.equal(n.next(call('WebSearch flowe pricing'), 20_000), 'searches “flowe pricing”');
 });
 
 test('rows worth no words produce no write', () => {
@@ -36,7 +36,7 @@ test('rows worth no words produce no write', () => {
 });
 
 test('no identifier ever reaches the step line (the docs/26 rule, now synced)', () => {
-  assert.equal(toolVerb(call('nm.task_status'))?.verb, 'checking the board');
+  assert.equal(toolVerb(call('nm.task_status'))?.verb, 'checks the board');
   assert.equal(toolVerb(call('nm.some_new_tool'))?.verb, 'some new tool');
   assert.equal(toolVerb(call('mcp__github__list_prs'))?.verb, 'github: list prs');
 });
@@ -54,10 +54,10 @@ test('normalizeLegs trims, drops the unusable, dedupes by name, and caps', () =>
 });
 
 test('the parent step names the live legs, then the synthesis', () => {
-  assert.equal(fanoutStep(0, 3, []), 'starting the legs');
+  assert.equal(fanoutStep(0, 3, []), 'starts the subagents');
   assert.equal(fanoutStep(1, 3, ['reviews']), 'reviews');
   assert.equal(fanoutStep(0, 4, ['a', 'b', 'c']), 'a · b +1');
-  assert.equal(fanoutStep(3, 3, []), 'synthesizing the report');
+  assert.equal(fanoutStep(3, 3, []), 'writes the report');
 });
 
 test('mapCapped runs everything, caps concurrency, and keeps input order', async () => {
@@ -97,7 +97,7 @@ test('a run whose host died goes stale — the watchdog\'s handle on an eternal 
 
 test('the one-line status prefers the live step, then falls back to something true', () => {
   const base = { title: 'Research: how to improve Flowe', done: 1, total: 3 };
-  assert.equal(runLine({ ...base, state: 'running', step: 'reading g2.com', summary: null }), 'reading g2.com');
+  assert.equal(runLine({ ...base, state: 'running', step: 'reads g2.com', summary: null }), 'reads g2.com');
   assert.equal(runLine({ ...base, state: 'running', step: null, summary: null }), 'Research: how to improve Flowe');
   assert.equal(runLine({ ...base, state: 'done', step: 'stale', summary: '3 angles · report posted' }), '3 angles · report posted');
   assert.equal(runLine({ ...base, state: 'stopped', step: null, summary: null }), 'Research: how to improve Flowe — stopped');

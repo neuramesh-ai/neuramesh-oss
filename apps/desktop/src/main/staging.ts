@@ -1,3 +1,4 @@
+import { readArtifactText, type ArtifactContentRow } from './host/artifact-content';
 // STAGING — putting the right files in an agent's workspace before it starts.
 //
 // Six functions split out of agents.ts. They answer one question at six moments: what does this
@@ -96,12 +97,12 @@ export async function stageTaskAttachments(db: AttDbLike, taskId: string, dir: s
 // .nm-evidence/design/ — git-excluded, so they inform the build but can never
 // reach the commit or PR. Returns a prompt note binding the build to them.
 export async function stageApprovedDesigns(db: AttDbLike, taskId: string, dir: string, repoBacked: boolean): Promise<string> {
-  const rows = await db.getAll<{ name: string; inline_content: string | null }>(
-    `select name, inline_content from artifacts where task_id = ? and kind = 'design' order by name asc`,
+  const rows = await db.getAll<ArtifactContentRow & { name: string }>(
+    `select id, workspace_id, name, storage_path, content_hash, inline_content from artifacts where task_id = ? and kind = 'design' order by name asc`,
     [taskId],
-  ).catch(() => [] as Array<{ name: string; inline_content: string | null }>);
+  ).catch(() => [] as Array<ArtifactContentRow & { name: string }>);
   const latest = rows.reduce((m, a) => Math.max(m, Number(/^design-mockup-v(\d+)-/.exec(a.name)?.[1] ?? 0)), 0);
-  const picked = rows.filter((a) => a.name.startsWith(`design-mockup-v${latest}-`) && a.inline_content);
+  const picked = rows.filter((a) => a.name.startsWith(`design-mockup-v${latest}-`) && (a.inline_content || a.storage_path?.startsWith('brain:')));
   if (!picked.length) return '';
   const { mkdir, writeFile } = await import('node:fs/promises');
   const { join } = await import('node:path');
@@ -110,7 +111,8 @@ export async function stageApprovedDesigns(db: AttDbLike, taskId: string, dir: s
   if (repoBacked) await excludeFromGit(dir, STAGING_EXCLUDES);
   const staged: string[] = [];
   for (const a of picked) {
-    try { await writeFile(join(dest, a.name), a.inline_content!); staged.push(a.name); } catch { /* skip unreadable */ }
+    const body = await readArtifactText(db, a);
+    try { await writeFile(join(dest, a.name), body); staged.push(a.name); } catch { /* skip unreadable */ }
   }
   if (!staged.length) return '';
   return `\n\n[This task has HUMAN-APPROVED design mockups — saved in ./.nm-evidence/design/ (${staged.join(', ')}). Open them first: they are the visual contract, and your implementation must match them (layout, spacing, tokens, both themes). Material deviation from the approved design is a review-blocking defect.]`;
@@ -194,14 +196,14 @@ export async function stagePriorDesignRound(
   taskId: string,
   dir: string,
 ): Promise<{ names: string[]; round: number; staged: Map<string, string> }> {
-  const rows = await db.getAll<{ name: string; inline_content: string | null }>(
-    `select name, inline_content from artifacts where task_id = ? and kind = 'design' order by name asc`,
+  const rows = await db.getAll<ArtifactContentRow & { name: string }>(
+    `select id, workspace_id, name, storage_path, content_hash, inline_content from artifacts where task_id = ? and kind = 'design' order by name asc`,
     [taskId],
-  ).catch(() => [] as Array<{ name: string; inline_content: string | null }>);
+  ).catch(() => [] as Array<ArtifactContentRow & { name: string }>);
   const empty = { names: [] as string[], round: 0, staged: new Map<string, string>() };
   const round = rows.reduce((m, a) => Math.max(m, Number(/^design-mockup-v(\d+)-/.exec(a.name)?.[1] ?? 0)), 0);
   if (!round) return empty;
-  const picked = rows.filter((a) => a.name.startsWith(`design-mockup-v${round}-`) && a.inline_content);
+  const picked = rows.filter((a) => a.name.startsWith(`design-mockup-v${round}-`) && (a.inline_content || a.storage_path?.startsWith('brain:')));
   if (!picked.length) return empty;
   const { mkdir, writeFile } = await import('node:fs/promises');
   const { join } = await import('node:path');
@@ -211,10 +213,11 @@ export async function stagePriorDesignRound(
   const staged = new Map<string, string>();
   for (const a of picked) {
     const bare = a.name.replace(/^design-mockup-v\d+-/, '');
+    const body = await readArtifactText(db, a);
     try {
-      await writeFile(join(dest, bare), a.inline_content!);
+      await writeFile(join(dest, bare), body);
       names.push(bare);
-      staged.set(bare, a.inline_content!);
+      staged.set(bare, body);
     } catch { /* skip unwritable */ }
   }
   return names.length ? { names, round, staged } : empty;

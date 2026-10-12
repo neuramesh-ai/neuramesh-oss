@@ -30,7 +30,7 @@ import { type LogFn } from '../agentlog';
 
 import type { makePlanFlow } from './planflow';
 import type { HostCtx } from './ctx';
-import type { PowerSyncDatabase } from '@powersync/node';
+import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 import type { Brain } from '../harness/brain';
 import type { AgentAttachment } from '../runtime/adapter';
 import type { HostQueue } from '../harness/hostqueue';
@@ -45,7 +45,7 @@ import { makeDesignNotify } from './designnotify';
 
 
 export function makeDesignFlow(ctx: HostCtx & {
-  db: PowerSyncDatabase;
+  db: ReplicaDatabase;
   apiUrl: string;
   workspace: string;
   ownerActorId: string;

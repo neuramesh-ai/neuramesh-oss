@@ -1,0 +1,10 @@
+.files { display: flex; flex-direction: column; gap: 3px; margin: 0 12px 10px 44px; max-height: 180px; overflow: auto; }
+.file { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 7px 8px; color: var(--body); background: transparent; border: 1px solid var(--border); border-radius: var(--r-sm); text-align: left; cursor: pointer; }
+.file:hover { background: var(--hover-bg); color: var(--text); }
+.file:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
+.kind { font: 10px var(--fmono); color: var(--muted); }
+.path { flex: 1; min-width: 0; font: 11px var(--fmono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.commands { min-width: 0; max-height: min(32vh, 280px); overflow-y: auto; }
+.commands .command { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 11.5px; line-height: 1.6; }
+.commandLabel { margin: 0 10px 5px; color: var(--muted); font: 10px var(--fmono); }

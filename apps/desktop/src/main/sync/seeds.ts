@@ -1,7 +1,7 @@
 // THE BOOT SEEDS, per connection: the bundled skill packs, the curator, the designer, the shipper
 // and the marketer a workspace onboarded before each existed. Idempotent server-side; best-effort.
 import { isCustomPackId, resolvePackRoles, type CustomModelPack } from '@neuramesh/shared';
-import type { PowerSyncDatabase } from '@powersync/node';
+import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 import type { Connection } from '../connections';
 import { planDesignerSeed, planMarketerSeed, planShipperSeed } from '../seed';
 import { apiOn } from '../sync';
@@ -32,7 +32,7 @@ const packRolesFor = async (conn: Connection, workspaceId: string) => {
 // boot backfill AND the moment a room becomes marketing-kind (George hit the gap:
 // boot → create room → run setup in one session left the HQ without its marketer
 // until the next restart, and rex fronted the foundation). Idempotent server-side.
-export async function ensureMarketingSeeds(conn: Connection, db: PowerSyncDatabase, workspaceId: string, channelIds: string[]): Promise<void> {
+export async function ensureMarketingSeeds(conn: Connection, db: ReplicaDatabase, workspaceId: string, channelIds: string[]): Promise<void> {
   if (!channelIds.length) return;
   const send = post(conn);
   for (const ch of channelIds) {
@@ -57,7 +57,7 @@ export async function ensureMarketingSeeds(conn: Connection, db: PowerSyncDataba
 // bundled default skill packs: backfill every #dev channel the user is in
 // that lacks them (new workspaces are seeded at creation; this covers
 // already-created channels). Idempotent server-side; best-effort.
-export async function backfillSeeds(conn: Connection, db: PowerSyncDatabase, machineId: string | null): Promise<void> {
+export async function backfillSeeds(conn: Connection, db: ReplicaDatabase, machineId: string | null): Promise<void> {
   const send = post(conn);
   for (let i = 0; i < 40; i++) {
     // seed packs + a Curator into THIS workspace's #dev rooms, addressed by channel id —

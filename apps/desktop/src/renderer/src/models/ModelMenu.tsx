@@ -26,7 +26,7 @@ export function ModelMenu({ head, current, level, states, onPick, onConnect, foo
   foot?: ReactNode;
   /** an automation's agent: the NeuraMesh brain only */
   locked?: boolean;
-  /** false on a coding session: the coding runtime takes no thinking level */
+  /** A caller can hide reasoning controls for a runtime that cannot accept them. */
   thinking?: boolean;
   /** a group's note in place of its own (the Code chip's Gemini note) */
   notes?: Partial<Record<ProviderKey, string>>;

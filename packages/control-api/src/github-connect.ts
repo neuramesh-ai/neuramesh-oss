@@ -24,17 +24,19 @@
 // connects only a repository in the asking person's fresh proof. Off, every door works as above.
 import type { Env, Hono } from 'hono';
 import { z } from 'zod';
-import type { Actor } from '@neuramesh/shared';
+import { createEvent, formatAddress, type Actor } from '@neuramesh/shared';
 import { seal, unseal } from './connector-crypto';
 import { actorInWorkspace } from './credits';
 import { GitHubApiError, githubAppConfigured, installUrl, parseRepoInput, readRepoSignals } from './github-app';
 import { authorizeUrl, grantStartUrl, isProofState, ownerProofConfigured, sealProofState, type GrantState } from './github-proof';
 import { proveGrant } from './github-prove';
-import { readRepoCommits, readRepoFile, readRepoTree } from './github-reads';
+import { readRepoCommits, readRepoFile, readRepoImage, readRepoTree } from './github-reads';
 import { installationFor, rememberInstallation, resolveConnector, slugOf } from './github-resolve';
 import { githubWriteRoutes } from './github-write';
 import { APP_URL, HQ_URL } from './mail';
+import { shelfCopy } from './shelf-image';
 import type { Store } from './store';
+import { setArtifactSource } from './store/frames';
 import type { PrimaryRepo } from './store/announce';
 
 // the resolver and the installation helpers moved to github-resolve.ts (plan §7); the same names
@@ -209,5 +211,33 @@ export function githubApiRoutes<E extends ActorEnv>(app: Hono<E>, store: Store, 
     if (isRefusal(o)) return c.json(o.body, o.status);
     try { return c.json({ slug: o.slug, ...(await readRepoTree(o.slug, c.req.query('path') ?? '', c.req.query('ref') || null, { token: o.token, fetchFn })) }); }
     catch (e) { const f = failed(e); return c.json(f.body, f.status); }
+  });
+
+  // AN APP SCREENSHOT FROM THE CODE (George, 2026-10-06: "an actual screenshot of the app from our
+  // codebase or workspace files"). An agent names one image file of the room's repository, and the
+  // platform reads it through the App, makes the shelf copy and shelves it in the room as the
+  // platform's copy of that file (`source` repo:…, store/frames.ts). That mark is what lets a film
+  // show an image an agent asked for: the agent never handles the bytes, so a web capture or a drawn
+  // picture can never pass as the app.
+  app.post('/v1/repo/shelve', async (c) => {
+    const o = await open(c);
+    if (isRefusal(o)) return c.json(o.body, o.status);
+    const body = z.object({ path: z.string().trim().min(1).max(400), name: z.string().trim().min(1).max(120).optional() }).safeParse(await c.req.json().catch(() => null));
+    if (!body.success) return c.json({ error: 'name the image file: { path, name? }', code: 'INVALID_INPUT' }, 400);
+    const channel = c.req.query('channel')!;
+    const actor = c.get('actor');
+    try {
+      const img = await readRepoImage(o.slug, body.data.path, { token: o.token, fetchFn });
+      const copy = await shelfCopy(img.bytes, img.mime);
+      if (!copy) return c.json({ error: `${img.path} does not fit the shelf at any size. Pick a PNG or JPEG screenshot.`, code: 'TOO_LARGE' }, 413);
+      const leaf = img.path.split('/').pop()!;
+      const name = (body.data.name ?? leaf).replace(/\.(png|jpe?g|webp)$/i, '') + (copy.mime === 'image/jpeg' ? '.jpg' : leaf.slice(leaf.lastIndexOf('.')));
+      const { id } = await store.createChannelArtifact(
+        { channelId: channel, kind: 'file', name, inlineContent: copy.dataUrl, mime: copy.mime, createdByKind: actor.kind, createdBy: actor.id },
+        (ws) => createEvent({ type: 'artifact.created', source: formatAddress({ kind: actor.kind, id: actor.id }), target: formatAddress({ kind: 'channel', slug: channel }), workspace: ws, payload: { channel, name, kind: 'file', from: `${o.slug}/${img.path}` } }),
+      );
+      await setArtifactSource(store, id, `repo:${o.slug}/${img.path}@${img.sha}`);
+      return c.json({ ok: true, id, name, path: img.path, sha: img.sha }, 201);
+    } catch (e) { const f = failed(e); return c.json(f.body, f.status); }
   });
 }

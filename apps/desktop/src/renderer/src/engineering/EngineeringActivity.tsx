@@ -1,5 +1,7 @@
 import { memo, useId, useMemo, useState } from 'react';
 import type { OrbState } from 'thinking-orbs';
+import { EngineeringChangeCard, type OpenChangeReview } from './EngineeringChangeCard';
+import { EngineeringWorkPlan } from './EngineeringWorkPlan';
 import { Md } from '../md/Md';
 import { Orb } from '../ui/Orb';
 import {
@@ -92,7 +94,7 @@ const EngineeringMessageView = memo(function EngineeringMessageView({ message }:
   }
   return (
     <div className={`engmessage ${message.role} ${message.tone ?? ''}${message.streaming ? ' streaming' : ''}`}>
-      <div className="engmessagerole">{message.role === 'user' ? 'You' : 'Engineering'}</div>
+      <div className="engmessagerole">{message.role === 'user' ? 'You' : message.agent?.name ?? 'rex'}</div>
       {message.attachments?.length ? <div className="engmessageattachments">{message.attachments.map((attachment, index) => <span key={`${attachment.name}-${index}`}><IconFile s={12} />{attachment.name}</span>)}</div> : null}
       {message.streaming
         ? <div className="engstreamtext" aria-live="polite">{streamingEngineeringText(message.body)}<span className="tcaret" /></div>
@@ -116,10 +118,12 @@ const EngineeringReasoningView = memo(function EngineeringReasoningView({ messag
   );
 });
 
-export function EngineeringTranscript({ messages }: { messages: EngineeringMessage[] }) {
+export function EngineeringTranscript({ messages, onOpenWorkPlan, onOpenReview, pendingApprovalId, onApproval }: { messages: EngineeringMessage[]; onOpenWorkPlan?: (text: string) => void; onOpenReview?: OpenChangeReview; pendingApprovalId?: string; onApproval?: (approved: boolean) => void }) {
   const blocks = useMemo(() => groupEngineeringTranscript(messages), [messages]);
   return blocks.map((block, index) => {
     if (block.kind === 'activity') return <EngineeringActivityGroup key={block.messages[0]?.id} messages={block.messages} />;
+    if (block.message.kind === 'change_review' && block.message.review) return <EngineeringChangeCard key={block.message.id} review={block.message.review} pending={block.message.review.id === pendingApprovalId} onOpen={onOpenReview} onResolve={onApproval} />;
+    if (block.message.kind === 'work_plan') return <EngineeringWorkPlan key={block.message.id} text={block.message.body} report={block.message.planReport} inline onOpen={onOpenWorkPlan ? () => onOpenWorkPlan(block.message.body) : undefined} />;
     if (block.message.role !== 'reasoning') return <EngineeringMessageView key={block.message.id} message={block.message} />;
     const nextBlock = blocks[index + 1];
     const next = nextBlock?.kind === 'message' ? nextBlock.message : nextBlock?.messages[0];

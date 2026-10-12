@@ -128,7 +128,8 @@ the orchestrator's `open_code_session` rung instead. The tool marks the conversa
 thread (`thread.set_kind`, server-checked) and the coding runtime takes the thread from there. The
 tool is present only when the project holds a primary repository and the thread is not coding yet.
 The bar for the board is unchanged: the person asked for a unit, or the work must outlive the
-conversation. A coding thread that later needs the board takes the human's `Make this a unit` card.
+conversation. A coding thread has no door to the board: the `Make this a unit` valve retired on 2026-10-12, so its work
+stays in the thread.
 
 > **Cause vs. approach (v0.17.1 refinement).** The one distinction that keeps triage honest: an unknown
 > **cause** (why is it broken? why did prior fixes fail?) is resolved by *investigation* — a developer with

@@ -28,7 +28,7 @@ export default [
       'packages/control-api/src/seed/skill-seed.ts', // gen-skill-seed.ts output — marketing-skill-seed.ts is hand-authored and stays linted
       // build-mobile-terminal.mjs output — the WebView's xterm page as one string (S8)
       // non-product trees
-      'mockups/**', 'docs/**', 'supabase/**', 'patches/**', '.claude/**',
+      '.nm-evidence/**', 'mockups/**', 'docs/**', 'supabase/**', 'patches/**', '.claude/**',
       'apps/desktop/build/**', // Phase 0 lints TypeScript only; scripts/*.mjs and config js join in a later phase
       '**/*.js', '**/*.mjs', '**/*.cjs',
     ],

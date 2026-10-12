@@ -1,0 +1,41 @@
+// Validate the completed real QA thread in the existing browser TaskSpace. No messages are sent by this check.
+const assert = (await import('node:assert/strict')).default;
+const { writeFile } = await import('node:fs/promises');
+const { resolve } = await import('node:path');
+const task = await taskSpace(Number(process.env.REVIEW_SPACE_ID));
+const page = task.page('p1');
+const threadId = process.env.REVIEW_THREAD_ID;
+if (!threadId) throw new Error('Set REVIEW_THREAD_ID to the completed live QA thread.');
+const evidence = resolve('docs/design/code-review-2026-10/evidence');
+await page.goto('http://127.0.0.1:5302/acme?db=brain-device-a');
+await page.waitForSelector('[aria-label="Search (⌘K)"]');
+if (await page.evaluate(() => !!document.querySelector('[aria-label="Show the sidebar"]'))) await page.click('[aria-label="Show the sidebar"]');
+await page.waitForSelector(`[data-thread-id="${threadId}"] > button`);
+await page.click(`[data-thread-id="${threadId}"] > button`);
+await page.waitForFunction(() => document.querySelectorAll('[data-change-review][data-status="applied"]').length === 2);
+assert.equal(await page.evaluate(() => document.querySelectorAll('[data-change-review] footer').length), 0);
+const cards = await page.evaluate(() => [...document.querySelectorAll('[data-change-review]')].map((e) => ({ id: e.dataset.changeReview, status: e.dataset.status, text: e.innerText })));
+const openFile = async (id) => {
+  const selector = `[data-change-review="${id}"] button[aria-label^="Review "]`;
+  await page.evaluate((s) => document.querySelector(s)?.scrollIntoView({ block: 'center' }), selector);
+  await page.click(selector);
+  await page.waitForSelector('[aria-label="Code changes"]');
+  return page.evaluate(() => document.querySelector('[aria-label="Code changes"]')?.innerText);
+};
+const old = await openFile(cards[0].id);
+assert.match(old, /review version one/);
+assert.doesNotMatch(old, /review version two/);
+const latest = await openFile(cards[1].id);
+assert.match(latest, /review version one/);
+assert.match(latest, /review version two/);
+await page.cdp('Emulation.setDeviceMetricsOverride', { width: 1600, height: 1250, deviceScaleFactor: 1, mobile: false });
+await page.click('[aria-label="Hide the sidebar"]');
+await page.evaluate((id) => {
+  const list = document.querySelector('.codingthread .tmsgs');
+  const card = document.querySelector(`[data-change-review="${id}"]`);
+  list.scrollTop += card.getBoundingClientRect().top - list.getBoundingClientRect().top - 35;
+}, cards[0].id);
+await page.screenshot({ path: `${evidence}/inline-review-real-history-dark.png` });
+const result = { passed: true, threadId, model: 'Claude Haiku 4.5', cards, checks: ['two real file edits each generated their own inline card', 'both cards remain after successful tool execution', 'reload retains both applied cards without approval controls', 'first file link restores the original addition', 'second file link shows the subsequent modification', 'the two snapshots remain independent after reload'] };
+await writeFile(`${evidence}/inline-review-real-checks.json`, JSON.stringify(result, null, 2));
+console.log(result);

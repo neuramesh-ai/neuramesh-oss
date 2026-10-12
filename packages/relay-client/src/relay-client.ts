@@ -28,7 +28,7 @@ export interface RelayConfig {
   machineId(): Promise<string | null>;
 }
 
-type Handler = { onData(d: string): void; onExit(): void };
+type Handler = { onData(d: string): void; onExit(): void; onError?(message: string): void };
 
 interface Conn {
   sock: WebSocket;
@@ -63,7 +63,7 @@ function connect(cfg: RelayConfig, machineId: string): Conn {
   // every open channel hears about a socket-level failure — silence here is the exact
   // ambiguity this lane exists to remove
   const failAll = (text: string): void => {
-    for (const h of channels.values()) { h.onData(notice(text)); h.onExit(); }
+    for (const h of channels.values()) { if (h.onError) h.onError(text); else h.onData(notice(text)); h.onExit(); }
     channels.clear();
     decoders.clear();
   };
@@ -183,9 +183,16 @@ export function openRelayJsonChannel(
   const queued: Array<{ message: unknown; resolve(): void; reject(error: unknown): void }> = [];
   let incoming = '';
 
+  const exit = (): void => {
+    if (closed) return;
+    closed = true; incoming = '';
+    for (const item of queued.splice(0)) item.reject(new Error('The Engineering relay channel is closed.'));
+    opts.onExit();
+  };
   const fail = (message: string): void => {
+    if (closed) return;
     for (const item of queued.splice(0)) item.reject(new Error(message));
-    opts.onError(message); opts.onExit();
+    opts.onError(message); exit();
   };
   void (async () => {
     let machineId: string | null = null;
@@ -202,13 +209,16 @@ export function openRelayJsonChannel(
             const line = incoming.slice(0, newline);
             incoming = incoming.slice(newline + 1);
             if (line) {
-              try { opts.onMessage(JSON.parse(line) as unknown); }
-              catch { opts.onError('The machine returned an invalid message.'); }
+              let message: unknown;
+              try { message = JSON.parse(line) as unknown; }
+              catch { opts.onError('The machine returned an invalid message.'); newline = incoming.indexOf('\n'); continue; }
+              try { opts.onMessage(message); }
+              catch (error) { console.error('The relay event handler failed', error); opts.onError('This client could not apply a machine update. Reload the thread.'); }
             }
             newline = incoming.indexOf('\n');
           }
         },
-        onExit: opts.onExit,
+        onExit: exit, onError: fail,
       });
       await c.ready;
     } catch (error: unknown) {

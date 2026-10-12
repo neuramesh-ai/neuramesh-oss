@@ -20,6 +20,7 @@ export function restoreEngineeringCheckpoint(session: EngineeringSession, checkp
     proposedChanges: [],
     changes: checkpoint.changes.map((change) => ({ ...change })),
     workPlan: checkpoint.workPlan,
+    planProgress: checkpoint.planProgress ?? null,
     messages: [...session.messages.slice(0, checkpoint.messageCount), restoredMessage(checkpoint.label)],
     updatedAt: new Date().toISOString(),
   };

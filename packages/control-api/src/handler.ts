@@ -373,11 +373,12 @@ export async function executeCommand(
   // ACCEPT ON THE HUMAN'S WORD (George, 2026-09-08: "a user should explicitly tell the model in chat
   // e.g. merge for those actions to happen, not a button click"). The Accept button is gone from
   // every surface; the orchestrator's accept_task carries the human's instruction here. What the
-  // server can PROVE is that a person spoke in this task's thread after the review verdict — the
-  // reading of the words stays the agent's judgment. Without that evidence the old floor holds.
+  // server can PROVE is that a person typed in this task's thread after the review verdict (a card's
+  // click and a marker line are no typing, store/thread-settle.ts) — the reading of the words is the
+  // agent's tool's (the daemon's host/acceptgate.ts). Without that evidence the old floor holds.
   const word = cmd.type === 'task.accept' && actor.kind !== 'human' ? await store.latestHumanWord(cmd.taskId) : null;
   if (cmd.type === 'task.accept' && actor.kind !== 'human' && !word) {
-    throw new DomainError('HUMAN_ONLY', 'accept needs the human\'s word: no human message in this thread since the review verdict');
+    throw new DomainError('HUMAN_ONLY', 'accept needs the human\'s word: nobody typed in this thread since the review verdict, and a card click is no word');
   }
 
   let outcome = await store.mutate(cmd.taskId, async (task) => {

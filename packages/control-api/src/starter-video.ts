@@ -15,7 +15,7 @@ import type { Store } from './store';
 import type { FilmRow } from './store/films';
 import { libraryImage } from './store/frames';
 import { composeShots, type ProductShot } from './film-compose';
-import { VIDEO_MODELS, clampSeconds, priceFilm, tierFor, videoTiers, type VideoTierSpec } from './video-registry';
+import { VIDEO_MODELS, clampSeconds, houseModel, priceFilm, tierFor, videoTiers, type VideoTierSpec } from './video-registry';
 
 // a 30-second clip at the high bitrate (plan §8): sized from the 3.4 MB an 8-second standard
 // clip weighed live, doubled for the rate and the length, with room. X takes 512 MB; the media
@@ -27,8 +27,15 @@ const SYSTEM: Actor = { kind: 'agent', id: '00000000-0000-0000-0000-000000000000
 
 const FilmSchema = z.object({ workspace: z.string().uuid(), item: z.string().uuid(), prompt: z.string().min(8).max(2_000) });
 
-/** the tiers as a client reads them: what each films on, what the default length costs, the lengths it offers and the rate the card prices them at */
-export const tierView = (t: VideoTierSpec) => ({ tier: t.tier, label: t.label, model: t.model.label, vendor: t.model.vendor, seconds: t.seconds, credits: t.credits, lengths: t.lengths, perSecondMicros: t.model.perSecondMicros });
+/** what a person reads when a film fails: the lane's own reason stays in the log and on the films row, which no client reads */
+export const FILM_FAILED = 'The film failed. Your credits are back. Try again.';
+export const FILM_REFUSED = 'NeuraMesh Video refused this script. Change the script, then try again. Your credits are back.';
+export const FILM_LOST = 'The film did not reach this card. Your credits are back. Try again.';
+export const FILM_NOT_STARTED = 'NeuraMesh Video did not start the film. Your credits are back. Try again later.';
+export const filmSlow = (minutes: number): string => `The film took longer than ${minutes} minutes. Your credits are back. Try again.`;
+
+/** the tiers as a client reads them: the house name, what the default length costs, the lengths it offers and the rate the card prices them at */
+export const tierView = (t: VideoTierSpec) => ({ tier: t.tier, label: t.label, model: houseModel(t.model), seconds: t.seconds, credits: t.credits, lengths: t.lengths, perSecondMicros: t.model.perSecondMicros });
 
 export function starterVideoRoutes<E extends Env & { Variables: { actor: Actor } }>(app: Hono<E>, store: Store, opts: { ledger?: Ledger | null; env?: NodeJS.ProcessEnv; fetchFn?: FalFetch } = {}): void {
   const ledger = opts.ledger === undefined ? ledgerFor(store) : opts.ledger;
@@ -83,8 +90,10 @@ export function starterVideoRoutes<E extends Env & { Variables: { actor: Actor }
     const key = env['FAL_KEY']!;
     const sub = await falSubmit(key, endpoint, input, fetchFn, Math.ceil(filmTimeoutMs(seconds) / 1000));
     if (!sub.requestId) {
-      await ledger.refundFilm(workspace, { grantMicros: spent.grantMicros, purchasedMicros: spent.purchasedMicros, seconds }, `refund: ${tier.model.label} did not accept the film`);
-      return c.json({ error: sub.error ?? 'the film was not accepted', code: sub.unavailable ? 'UNAVAILABLE' : 'UPSTREAM' }, sub.unavailable ? 503 : 502);
+      await ledger.refundFilm(workspace, { grantMicros: spent.grantMicros, purchasedMicros: spent.purchasedMicros, seconds }, `refund: ${tier.label} did not start the film`);
+      // the lane's own answer is for the log; the card and the agent read the house sentence
+      console.warn(`starter_film item=${item.slice(0, 8)} not accepted (${sub.status ?? 'no status'}): ${sub.error ?? 'no reason'}`);
+      return c.json({ error: FILM_NOT_STARTED, code: sub.unavailable ? 'UNAVAILABLE' : 'UPSTREAM' }, sub.unavailable ? 503 : 502);
     }
     const { id } = await store.films.create({ workspaceId: workspace, itemId: item, tier: tier.tier, model: tier.model.key, endpoint, requestId: sub.requestId, seconds, micros, grantMicros: spent.grantMicros, purchasedMicros: spent.purchasedMicros, createdBy: actor.kind === 'human' ? actor.id : null, frame: media.frame ?? null, frameUsed: !!lane });
     await store.reviseDraft(item, { body: null, imageBrief: null, thumb: null, videoPending: true, videoError: '' }, (ws) => createEvent({ type: 'content.updated', source: formatAddress({ kind: actor.kind, id: actor.id }), target: formatAddress({ kind: 'resource', type: 'content', id: item }), workspace: ws, payload: { item, filming: id } })).catch(() => {});
@@ -113,16 +122,20 @@ export async function filmsDue(store: Store, opts: { ledger?: Ledger | null; env
   if (!store.films || !ledger || !key) return [];
   const out: Array<{ id: string; outcome: string }> = [];
   for (const row of await store.films.open(opts.limit ?? 10)) {
-    const fail = async (why: string): Promise<void> => {
-      await ledger.refundFilm(row.workspaceId, { grantMicros: row.grantMicros, purchasedMicros: row.purchasedMicros, seconds: row.seconds }, `refund: film ${row.id.slice(0, 8)} on ${row.model} failed`);
+    // `why` is the lane's own reason: the films row, the log and the cron's answer keep it. The
+    // card gets `said`, a house sentence (George, 2026-10-06: fal's words never reach a person).
+    const fail = async (why: string, said: string = FILM_FAILED): Promise<void> => {
+      await ledger.refundFilm(row.workspaceId, { grantMicros: row.grantMicros, purchasedMicros: row.purchasedMicros, seconds: row.seconds }, `refund: film ${row.id.slice(0, 8)} on the ${row.tier} tier failed`);
       await store.films!.update(row.id, { status: 'failed', error: why, finishedAt: new Date(now()).toISOString() });
-      await patchDraft(store, row, { videoPending: false, videoError: why });
+      console.warn(`starter_film film=${row.id.slice(0, 8)} failed: ${why}`);
+      await patchDraft(store, row, { videoPending: false, videoError: said });
       out.push({ id: row.id, outcome: `failed: ${why}` });
     };
-    if (now() - new Date(row.createdAt).getTime() > filmTimeoutMs(row.seconds)) { await fail(`the film took longer than ${Math.round(filmTimeoutMs(row.seconds) / 60_000)} minutes`); continue; }
+    const limit = Math.round(filmTimeoutMs(row.seconds) / 60_000);
+    if (now() - new Date(row.createdAt).getTime() > filmTimeoutMs(row.seconds)) { await fail(`the film took longer than ${limit} minutes`, filmSlow(limit)); continue; }
     if (!row.requestId) { await fail('the film was never submitted'); continue; }
     const st = await falStatus(key, row.endpoint, row.requestId, fetchFn);
-    if (st.state === 'failed') { await fail(st.error ?? 'the film failed'); continue; }
+    if (st.state === 'failed') { await fail(st.error ?? 'the film failed', st.errorType === 'content_policy' ? FILM_REFUSED : FILM_FAILED); continue; }
     if (st.state !== 'done') {
       if (st.state === 'running' && row.status !== 'running') await store.films.update(row.id, { status: 'running' });
       out.push({ id: row.id, outcome: st.state });
@@ -138,20 +151,22 @@ export async function filmsDue(store: Store, opts: { ledger?: Ledger | null; env
     if (shots.asked) {
       const c = shots.list.length ? await composeShots(key, res.url, row.seconds, shots.list, { fetchFn, initWasm: opts.initWasm }) : { applied: 0, why: shots.why };
       if (c.url) clipUrl = c.url;
+      if ('detail' in c && c.detail) console.warn(`starter_film film=${row.id.slice(0, 8)} shots not cut in: ${c.detail}`);
       shotsMeta = { asked: shots.asked, applied: c.applied, ...(c.why ? { why: c.why } : {}) };
     }
     const dl = await fetchFn(clipUrl, { redirect: 'follow' }).catch(() => null);
-    if (!dl?.ok) { await fail(`the film could not be downloaded (${dl?.status ?? 'no answer'})`); continue; }
+    if (!dl?.ok) { await fail(`the film could not be downloaded (${dl?.status ?? 'no answer'})`, FILM_LOST); continue; }
     const bytes = Buffer.from(await dl.arrayBuffer());
-    if (!bytes.length) { await fail('the film downloaded empty'); continue; }
-    if (bytes.length > FILM_MAX_BYTES) { await fail(`the film is too large to attach (${Math.round(bytes.length / 1e6)} MB, max ${FILM_MAX_BYTES / 1e6} MB)`); continue; }
+    if (!bytes.length) { await fail('the film downloaded empty', FILM_LOST); continue; }
+    if (bytes.length > FILM_MAX_BYTES) { await fail(`the film is too large to attach (${Math.round(bytes.length / 1e6)} MB, max ${FILM_MAX_BYTES / 1e6} MB)`, FILM_LOST); continue; }
     const mime = sniffVideoMime(new Uint8Array(bytes.subarray(0, 16))) ?? res.contentType ?? 'video/mp4';
     try {
       await store.attachContentMedia(row.itemId, mime, bytes, SYSTEM, (ws) => createEvent({ type: 'content.updated', source: formatAddress(SYSTEM), target: formatAddress({ kind: 'resource', type: 'content', id: row.itemId }), workspace: ws, payload: { item: row.itemId, media: 'hosted', film: row.id } }));
-    } catch (e) { await fail(`the film did not attach to the draft (${e instanceof Error ? e.message : String(e)})`); continue; }
+    } catch (e) { await fail(`the film did not attach to the draft (${e instanceof Error ? e.message : String(e)})`, FILM_LOST); continue; }
     const at = new Date(now()).toISOString();
-    // the model's NAME on the card (Seedance 2.0), the registry key stays on the row
-    await patchDraft(store, row, { videoPending: false, videoError: '', videoMeta: { tier: row.tier, model: VIDEO_MODELS[row.model]?.label ?? row.model, seconds: row.seconds, credits: Math.ceil(row.micros / CREDIT_MICROS), at, frame: row.frame, frameUsed: row.frameUsed, ...(shotsMeta ? { shots: shotsMeta } : {}) } });
+    // the card's record names the tier, never the model: `model` carries the picture size for the
+    // desktops that print it (houseModel), and the registry key stays on the films row
+    await patchDraft(store, row, { videoPending: false, videoError: '', videoMeta: { tier: row.tier, model: houseModel(VIDEO_MODELS[row.model]), seconds: row.seconds, credits: Math.ceil(row.micros / CREDIT_MICROS), at, frame: row.frame, frameUsed: row.frameUsed, ...(shotsMeta ? { shots: shotsMeta } : {}) } });
     await store.films.update(row.id, { status: 'done', finishedAt: at });
     out.push({ id: row.id, outcome: 'done' });
   }

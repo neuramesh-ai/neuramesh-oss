@@ -2,16 +2,15 @@
 // worker executes instead of inventing its own. Split out of host/claimflow.ts.
 import { runtimeFor } from '../agents';
 import type { ExecTask, HostedAgent, OfferedTask, SkillRef } from '../agents';
-import { type ClaimVerdict } from '@neuramesh/shared';
+import { STATIC_CHECKLIST, type ClaimVerdict } from '@neuramesh/shared';
 
 
 import { type SubjectRef } from '../harness/brain';
 
 import { type LogFn } from '../agentlog';
 import { withTimeout } from './turnkit';
-import { STATIC_CHECKLIST } from './flows';
 import type { HostCtx } from './ctx';
-import type { PowerSyncDatabase } from '@powersync/node';
+import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 import type { Brain } from '../harness/brain';
 import type { AgentAttachment } from '../runtime/adapter';
 import type { HostQueue } from '../harness/hostqueue';
@@ -22,7 +21,7 @@ import type { makeBeats } from './beats';
 import type { makePark } from './park';
 
 export function makeClaimResolve(ctx: HostCtx & {
-  db: PowerSyncDatabase;
+  db: ReplicaDatabase;
   apiUrl: string;
   workspace: string;
   ownerActorId: string;
@@ -96,7 +95,7 @@ async function estimateFor(agent: HostedAgent, t: ExecTask, token: string | null
 
 // a real requirements read, generated after the claim is won (claims stay
 // fast and atomic); any failure falls back to the static checks
-async function checklistFor(agent: HostedAgent, t: OfferedTask, token: string): Promise<string[]> {
+async function checklistFor(agent: HostedAgent, t: OfferedTask, token: string): Promise<readonly string[]> {
   try {
     const raw = await withTimeout(
       runtimeFor(agent.runtime).streamTurn(

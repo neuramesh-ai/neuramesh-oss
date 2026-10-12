@@ -1,3 +1,4 @@
+import { webPreviewUrl } from '@neuramesh/shared';
 // The link seam (the link choice, 2026-09-17, George): every "open a web page" action in the
 // app goes through ONE door, `openLink`, which asks where the page should open. Here, in the
 // browser tab beside the sheet, or in the browser the OS uses. The asking surface is
@@ -93,4 +94,14 @@ export function watchLinks(): () => void {
   document.addEventListener('click', onClick, true);
   document.addEventListener('auxclick', onAux, true);
   return () => { document.removeEventListener('click', onClick, true); document.removeEventListener('auxclick', onAux, true); };
+}
+
+/** Explicit preview cards choose their destination without changing ordinary link behavior. */
+let _inApp: ((url: string) => void) | null = null;
+export function setInAppOpener(fn: ((url: string) => void) | null): void { _inApp = fn; }
+export function openPreviewLink(value: string, where: 'inapp' | 'external'): void {
+  const url = webPreviewUrl(value);
+  if (!url) return;
+  if (where === 'inapp' && _inApp) _inApp(url);
+  else openLink(url, { skip: true });
 }

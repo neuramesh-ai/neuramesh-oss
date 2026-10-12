@@ -11,7 +11,7 @@ import { STATE_LABEL } from '../task/labels';
 import { timeAgoShort } from '../lib/time';
 import { renamable } from '../lib/rowglyph';
 import { ENG_LABEL, archivableThreadId, kindOf, titleOf, type Anchor as RowAnchor, type RailRow } from './HistoryRail';
-import { IconArchive, IconCheck, IconCheckCircle, IconPen } from '../ui/icons';
+import { IconArchive, IconCheck, IconPen } from '../ui/icons';
 
 type Anchor = { id: string; name: string; count: number; hasAsk: boolean; rooms: string[]; top: number; left: number };
 const HOVER_DELAY_MS = 350;
@@ -233,8 +233,8 @@ export function RowActs({ title, settle, menuOpen, onRename, onSettle, onMenu }:
           onClick={(e) => { e.stopPropagation(); onRename(); }}><IconPen s={12} /></button>
       )}
       {settle && (
-        <button type="button" className="navhistbtn nhsettle" data-tip="Settle" aria-label={`Settle ${title}`}
-          onClick={(e) => { e.stopPropagation(); onSettle(); }}><IconCheckCircle s={13} /></button>
+        <button type="button" className="navhistbtn nhsettle" aria-label={`Settle ${title}`}
+          onClick={(e) => { e.stopPropagation(); onSettle(); }}>Settle</button>
       )}
       <button type="button" className="navhistbtn" data-tip="More" aria-label="More" aria-haspopup="menu" aria-expanded={menuOpen}
         onClick={(e) => { e.stopPropagation(); onMenu((e.currentTarget.closest('.navhistwrap') ?? e.currentTarget).getBoundingClientRect()); }}

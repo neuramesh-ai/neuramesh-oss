@@ -14,12 +14,12 @@ import { postDraftRun } from './draftrun';
 import { continueSession } from './runsession';
 import { ghLive, githubConnected, readSignalsViaConnector } from './reporead';
 import type { ApiGetFn } from './searchx';
-import type { PowerSyncDatabase } from '@powersync/node';
+import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 import type { HostedAgent } from '../agents';
 import type { LogFn } from '../agentlog';
 
 export function makeSchedules(ctx: {
-  db: PowerSyncDatabase;
+  db: ReplicaDatabase;
   apiUrl: string;
   ownerActorId: string;
   post: (path: string, actor: { kind: string; id: string; role?: string }, body: unknown) => Promise<Response>;

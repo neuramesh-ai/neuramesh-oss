@@ -27,7 +27,7 @@ import { creditBalance, grantCredits, spendCredits, usageToday, type CreditBalan
 import { planDiskGb } from './fleet';
 import { localMode } from './localmode';
 import { starterStreamRoute } from './starter-stream';
-import { VIDEO_MODELS } from './video-registry';
+import { VIDEO_MODELS, houseModel } from './video-registry';
 import type { Store } from './store';
 
 export function sqlOf(store: Store): postgres.Sql | null {
@@ -232,7 +232,7 @@ export function creditRoutes<E extends Env & { Variables: { actor: Actor } }>(ap
         note: (g['note'] as string | null) ?? null,
         day: String(g['on_day']),
       })),
-      films: films.map((f) => ({ id: f.id, item: f.itemId, tier: f.tier, model: VIDEO_MODELS[f.model]?.label ?? f.model, seconds: f.seconds, credits: Math.ceil(f.micros / CREDIT_MICROS), status: f.status, day: f.createdAt.slice(0, 10), at: f.createdAt })),
+      films: films.map((f) => ({ id: f.id, item: f.itemId, tier: f.tier, model: houseModel(VIDEO_MODELS[f.model]), seconds: f.seconds, credits: Math.ceil(f.micros / CREDIT_MICROS), status: f.status, day: f.createdAt.slice(0, 10), at: f.createdAt })),
     });
   });
 

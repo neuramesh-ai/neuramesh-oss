@@ -4,13 +4,13 @@
 // was injected into no prompt at all (the daemon read it only for design-leg routing), and the
 // worker got title + checklist, re-deriving the approach the human just signed off. This note
 // rides the attachments note (flows.ts) so every runtime carries it, rework rounds included.
-import type { PowerSyncDatabase } from '@powersync/node';
+import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 import type { LogFn } from '../agentlog';
 
 const DESCRIPTION_CAP = 2_000;
 const APPROACH_CAP = 6_000;
 
-export async function approvedPlanNote(db: PowerSyncDatabase, taskId: string, log?: LogFn): Promise<string> {
+export async function approvedPlanNote(db: ReplicaDatabase, taskId: string, log?: LogFn): Promise<string> {
   const [row] = await db.getAll<{ description: string | null; work_plan: string | null }>(
     'select description, work_plan from tasks where id = ?', [taskId],
   ).catch(() => [] as Array<{ description: string | null; work_plan: string | null }>);

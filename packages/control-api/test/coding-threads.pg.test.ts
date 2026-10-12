@@ -62,6 +62,31 @@ beforeAll(async () => {
 afterAll(async () => { await store?.close(); await sql?.end(); });
 
 describe.skipIf(!DB)('coding threads (0144) against real postgres', () => {
+  it('settle survives reconnects and clears only for new code conversation activity', async () => {
+    const id = await born(DEV, { threadKind: 'coding' });
+    const command = (body: Record<string, unknown>) => post(george, '/v1/commands', { workspace: WS, ...body });
+    const patch = (body: Record<string, unknown>) => command({ type: 'code_session.upsert', codeSessionId: id, ...body });
+    const stamp = async () => (await sql!`select settled_at from threads where id = ${id}::uuid`)[0]?.['settled_at'];
+    expect((await patch({ state: 'completed', lastLine: 'Plan ready' })).status).toBe(200);
+    expect((await command({ type: 'thread.settle', threadId: id })).status).toBe(200);
+    const settled = await stamp();
+    expect(settled).not.toBeNull();
+    expect((await patch({ state: 'idle', mode: 'plan' })).status).toBe(200);
+    expect(await stamp()).toEqual(settled);
+    expect((await command({ type: 'code_session.close', codeSessionId: id, state: 'resumable' })).status).toBe(200);
+    expect(await stamp()).toEqual(settled);
+    // The host records the prompt with its state, even for the same text sent twice.
+    expect((await patch({ state: 'streaming', lastLine: 'Continue the plan' })).status).toBe(200);
+    expect(await stamp()).toBeNull();
+    expect((await patch({ state: 'completed', lastLine: 'Finished' })).status).toBe(200);
+    await command({ type: 'thread.settle', threadId: id });
+    expect(await stamp()).not.toBeNull();
+    expect((await command({ type: 'code_session.approval_waiting', codeSessionId: id, approvalId: 'new-review', category: 'edit', toolName: 'apply_patch' })).status).toBe(200);
+    expect(await stamp()).toBeNull();
+    const row = (await sql!`select kind, task_id from threads where id = ${id}::uuid`)[0];
+    expect(row).toMatchObject({ kind: 'coding', task_id: null });
+  });
+
   it('the kind is born with the send, and defaults to chat', async () => {
     expect(await kindOf(await born(DEV, { threadKind: 'coding' }))).toBe('coding');
     expect(await kindOf(await born(DEV))).toBe('chat');

@@ -4,11 +4,11 @@ import { app } from 'electron';
 import { api, ensureMarketingSeedsRef } from '../../sync';
 import { ipcMain } from 'electron';
 import { parseBrainOverride } from '@neuramesh/shared';
-import type { PowerSyncDatabase } from '@powersync/node';
+import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 
 export interface ProjectsDeps {
   /** the replica, for the one handler that merges into a thread's current brain override */
-  db: () => PowerSyncDatabase;
+  db: () => ReplicaDatabase;
   ws: () => string;
 }
 

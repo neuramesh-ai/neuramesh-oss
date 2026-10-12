@@ -13,11 +13,11 @@ import { decideSweep, capsFromEnv, classifyBerth } from '../harness/berths';
 import { cachePath, deliverablePath } from '../harness/brain';
 import { treeBytes, readManifest } from '../harness/donors';
 import { removeTaskWorkspace } from '../harness/workspaces';
-import type { PowerSyncDatabase } from '@powersync/node';
+import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 import type { Brain } from '../harness/brain';
 
 export function makeBerthSweep(ctx: {
-  db: PowerSyncDatabase;
+  db: ReplicaDatabase;
   brain: Brain;
   withRepoLock: <T>(key: string, fn: () => Promise<T>) => Promise<T>;
   /** startAgentHost's own option — a dead berth's terminals die with it */

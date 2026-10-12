@@ -19,14 +19,14 @@ import { workerWeb } from './webshot';
 import { makeRepoReader } from './reporead';
 import { runtimeForModel, type AgentRole } from '@neuramesh/shared';
 import { join } from 'node:path';
-import type { PowerSyncDatabase } from '@powersync/node';
+import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 import type { Brain } from '../harness/brain';
 import type { makeRuns } from './runs';
 import type { makeStaffing } from './staffing';
 import type { makeWorkspace } from './workspace';
 
 export function makeLegs(ctx: {
-  db: PowerSyncDatabase;
+  db: ReplicaDatabase;
   apiUrl: string;
   ownerActorId: string;
   brain: Brain;
@@ -86,10 +86,11 @@ export function makeLegs(ctx: {
       // and "which config is this running on" was gone for the rest of the run.
       const run = await openRun(seated, where, {
         kind: 'leg', title: label, parentRunId: parentRunOf(task.id) ?? undefined,
-        step: 'starting', seat: seatLabel(resolved),
+        step: 'starts the work', seat: seatLabel(resolved),
       });
       subtree.add({ turnId: run.id || runKey, role: i.role as AgentRole, label, state: 'running' });
-      log?.({ kind: 'tool', phase: 'call', summary: `leg "${label}" · ${i.role} · ${seated.model} · ${Math.round(decision.budget.wallMs / 60_000)}m` });
+      // the model rides in the detail: the step log prints the summary to a person, and the seat chip names the brain
+      log?.({ kind: 'tool', phase: 'call', summary: `leg "${label}" · ${i.role} · ${Math.round(decision.budget.wallMs / 60_000)}m`, detail: { model: seated.model } });
       try {
         const cred = await resolveToken(apiUrl, where.workspace, seated, ownerActorId);
         const out = await withTimeout(

@@ -2,6 +2,8 @@
 // the workspace machine. It stays independent of React, Electron, and Cline so both relay edges
 // can validate messages before they cross a trust boundary.
 
+import { isEngineeringSelection, type EngineeringSelection, type EngineeringAgent } from './selection';
+import type { ThinkingLevel } from '../agent-models';
 import { MODEL_ID_SET } from '../model-packs';
 import { PLAN_ENTITLEMENTS } from '../entitlements';
 
@@ -15,6 +17,8 @@ export interface EngineeringControls {
 }
 
 export interface EngineeringOpenMeta extends EngineeringControls {
+  agentId?: string | null;
+  reasoningEffort?: ThinkingLevel | null;
   threadId: string;
   /** Selected project. Optional only for sessions persisted by older clients. */
   projectId?: string;
@@ -45,6 +49,7 @@ export type EngineeringCommand =
   | { type: 'attachment_end'; id: string }
   | { type: 'prompt'; prompt: string; attachments?: EngineeringAttachmentRef[] }
   | { type: 'controls'; controls: EngineeringControls }
+  | { type: 'configure'; selection: EngineeringSelection }
   | { type: 'model'; modelId: string | null }
   /** @deprecated Older clients selected the developer seat indirectly through a pack. */
   | { type: 'brain'; brainPack: string | null }
@@ -59,16 +64,18 @@ export interface EngineeringAttachmentRef {
 }
 
 export type EngineeringRuntimeEvent =
-  | { type: 'ready'; provider: string; model: string; cwd: string; modelId: string | null; brainPack: string | null }
-  | { type: 'model_changed'; provider: string; model: string; modelId: string | null; brainPack: string | null }
+  | { type: 'ready'; provider: string; model: string; cwd: string; modelId: string | null; brainPack: string | null; agent?: EngineeringAgent; reasoningEffort?: ThinkingLevel | null }
+  | { type: 'model_changed'; provider: string; model: string; modelId: string | null; brainPack: string | null; agent?: EngineeringAgent; reasoningEffort?: ThinkingLevel | null }
   /** @deprecated Accepted so an older machine can finish an already-open browser session. */
   | { type: 'brain_changed'; provider: string; model: string; brainPack: string | null }
   | { type: 'session_started'; sessionId: string }
   | { type: 'attachment_ack'; id: string; index: number }
   | { type: 'agent_event'; event: Record<string, unknown> }
   | { type: 'status'; status: string }
-  | { type: 'mode_blocked'; category: 'edit' | 'command'; toolName: string }
-  | { type: 'approval'; approvalId: string; category: EngineeringPermissionCategory; toolName: string; input: unknown }
+  | { type: 'mode_blocked'; category: 'edit' | 'command'; toolName: string; input?: unknown }
+  | { type: 'work_plan'; planId?: string; plan: import('./handoff').EngineeringWorkPlan }
+  | { type: 'plan_progress'; progress: import('./plan-progress').EngineeringPlanProgress | null }
+  | { type: 'approval'; approvalId: string; category: EngineeringPermissionCategory; toolName: string; input: unknown; changes?: EngineeringRuntimeChange[] }
   | { type: 'approval_resolved'; approvalId: string; approved: boolean }
   | { type: 'usage'; inputTokens: number; outputTokens: number; cost?: number }
   | { type: 'restored'; checkpointRunCount: number }
@@ -78,6 +85,8 @@ export type EngineeringRuntimeEvent =
 
 export interface EngineeringRuntimeChange {
   path: string;
+  previousPath?: string;
+  previewError?: string;
   kind: 'added' | 'modified' | 'deleted';
   before: string;
   after: string;
@@ -92,6 +101,7 @@ export function isEngineeringOpenMeta(value: unknown): value is EngineeringOpenM
   return typeof v['threadId'] === 'string' && v['threadId'].length > 0
     && typeof v['repoId'] === 'string' && typeof v['repoName'] === 'string' && typeof v['branch'] === 'string'
     && (v['projectId'] === undefined || isBoundedString(v['projectId'], 200))
+    && isEngineeringSelection({ agentId: v['agentId'] ?? null, modelId: v['modelId'] ?? null, reasoningEffort: v['reasoningEffort'] ?? null })
     && isModelId(v['modelId'])
     && isBrainPack(v['brainPack'])
     && isEngineeringControls(v);
@@ -138,6 +148,7 @@ export function isEngineeringCommand(value: unknown): value is EngineeringComman
   if (v['type'] === 'attachment_end') return isAttachmentId(v['id']);
   if (v['type'] === 'prompt') return typeof v['prompt'] === 'string' && v['prompt'].trim().length > 0
     && (v['attachments'] === undefined || (Array.isArray(v['attachments']) && v['attachments'].length <= MAX_ATTACHMENT_LIMITS.maxPerMessage && v['attachments'].every(isAttachmentRef)));
+  if (v['type'] === 'configure') return isEngineeringSelection(v['selection']);
   if (v['type'] === 'controls') return isEngineeringControls(v['controls']);
   if (v['type'] === 'model') return isModelId(v['modelId']) && v['modelId'] !== undefined;
   if (v['type'] === 'brain') return isBrainPack(v['brainPack']) && v['brainPack'] !== undefined;
@@ -173,6 +184,10 @@ export function engineeringToolDecision(
  * tools reach that gate; unknown native tools are still denied by engineeringToolCategory(). */
 export const ENGINEERING_CLINE_TOOL_POLICIES: Record<string, { enabled: boolean; autoApprove: boolean }> = {
   '*': { enabled: true, autoApprove: false },
+  // Host-owned metadata tool. It cannot execute file, command, or network actions.
+  set_thread_title: { enabled: true, autoApprove: true },
+  propose_work_plan: { enabled: true, autoApprove: true },
+  update_plan_progress: { enabled: true, autoApprove: true },
   read_files: { enabled: true, autoApprove: false },
   search_codebase: { enabled: true, autoApprove: false },
   run_commands: { enabled: true, autoApprove: false },

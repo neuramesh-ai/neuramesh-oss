@@ -28,6 +28,8 @@ services:
       retries: 60
 
   powersync:
+    # Hosted-client compatibility tests can still request the legacy transport.
+    profiles: ["legacy-sync"]
     image: journeyapps/powersync-service:latest
     command: ["start", "-r", "unified"]
     # belt to the healthcheck fix above: the unpinned :latest has already changed

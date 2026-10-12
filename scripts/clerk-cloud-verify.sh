@@ -12,7 +12,7 @@ cd "$(dirname "$0")/.."
 set -a; source .env; set +a
 
 [ -n "${CLERK_SECRET_KEY:-}" ] || { echo "CLERK_SECRET_KEY missing in .env"; exit 1; }
-COMPOSE="docker compose -f dev/stack/docker-compose.yaml"
+COMPOSE="docker compose --profile legacy-sync -f dev/stack/docker-compose.yaml"
 TOKEN_FILE="$(mktemp)"; chmod 600 "$TOKEN_FILE"
 cleanup() {
   rm -f "$TOKEN_FILE"

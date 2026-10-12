@@ -1,6 +1,6 @@
 // A SERVER SOMEONE RUNS THEMSELVES — the `custom` connection's validator and boot hook (Settings ›
-// Connections › Manual setup, artboard D). The person pastes an API address, a PowerSync address
-// and the `nmh_` bearer their stack minted; before anything is written the pair is PROVED: the
+// Connections › Manual setup, artboard D). The person pastes an API address and the `nmh_`
+// bearer their stack minted (hosted servers also name a PowerSync address); before anything is written the pair is PROVED: the
 // address must answer `/.well-known/nm-config` with a `mode`, and the bearer must be accepted by
 // `GET /v1/me`. Only then does the server land in the connections store and the bearer in the
 // keychain, held exactly like the local stack's own (memory at boot, never on disk in the clear).
@@ -58,7 +58,7 @@ export async function validateCustomServer(input: CustomServerInput, fetchImpl: 
   if (typeof me.actor?.id !== 'string' || me.actor.kind !== 'human') return { ok: false, code: 'BEARER', message: 'The bearer is not a human bearer.' };
 
   const powersyncUrl = trimSlash((input.powersyncUrl?.trim() || (typeof cfg.powersyncUrl === 'string' ? cfg.powersyncUrl : '')));
-  if (!powersyncUrl) return { ok: false, code: 'ADDRESS', message: 'Paste the PowerSync address. The server did not name one.' };
+  if (!powersyncUrl && cfg.mode !== 'local') return { ok: false, code: 'ADDRESS', message: 'Paste the PowerSync address. The server did not name one.' };
   return { ok: true, apiUrl, powersyncUrl, mode: cfg.mode, version: typeof cfg.version === 'string' ? cfg.version : null, actorId: me.actor.id, workspaces: me.workspaces ?? [] };
 }
 

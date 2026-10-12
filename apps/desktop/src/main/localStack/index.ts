@@ -6,9 +6,9 @@
 // keychain) → pull when the tag moved or an image is missing → up → health → nm-config → ready.
 // The replica opened before any of this (sync/boot.ts), so a warm boot renders the shell from it
 // while the two waits show as the sync mark rather than a blocking card.
-import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { localPortsFor } from '../connections';
-import { join } from 'node:path';
+import { dirname, isAbsolute, join } from 'node:path';
 import type { Keychain } from '../keychain';
 import { PullProgress, SERVICES, composeCommand, composeImages, isHumanBearer, mintSecrets, parseEnv, planEnv, renderEnv, type StackEnv } from './compose';
 import { initialState, reduce, stackBehind, type StackEvent, type StackState } from './driver';
@@ -150,13 +150,13 @@ export class LocalStack {
   private async precheck(dockerBin: string): Promise<void> {
     for (const svc of await wedgedServices(this.health(dockerBin))) this.recreate.add(svc);
     const env = this.stackEnv!;
-    await preflightPorts(this.health(dockerBin), { api: Number(env.NM_API_PORT), powersync: Number(env.NM_POWERSYNC_PORT) });
+    await preflightPorts(this.health(dockerBin), { api: Number(env.NM_API_PORT) });
   }
 
   /** the compose file rendered, the .env written 0600, the bearer in the keychain — never in the clear on disk */
   private async prepareFiles(): Promise<{ firstRun: boolean; tagChanged: boolean }> {
     const { dir } = this.d;
-    for (const sub of ['', 'pgdata', 'powersync']) mkdirSync(join(dir, sub), { recursive: true });
+    for (const sub of ['', 'pgdata', 'brain-objects']) mkdirSync(join(dir, sub), { recursive: true });
     copyFileSync(this.d.composeSource, join(dir, 'docker-compose.yaml'));
     let bearer = await this.d.keychain.get(BEARER_ACCOUNT);
     if (!isHumanBearer(bearer)) {
@@ -168,6 +168,13 @@ export class LocalStack {
     const envPath = join(dir, '.env');
     const existing = parseEnv(existsSync(envPath) ? readFileSync(envPath, 'utf8') : null);
     const plan = planEnv({ existing, version: this.d.version, dir, bearer, ports: localPortsFor(process.env) });
+    if (plan.env.NM_BRAIN_GCS_BUCKET || plan.env.NM_BRAIN_ADC_FILE) {
+      const adc = plan.env.NM_BRAIN_ADC_FILE;
+      if (!plan.env.NM_BRAIN_GCS_BUCKET || !isAbsolute(adc) || !existsSync(adc) || !statSync(adc).isFile()) {
+        throw new Error('Set a GCS bucket and an absolute ADC file path in the local .env file.');
+      }
+      copyFileSync(join(dirname(this.d.composeSource), 'docker-compose.gcs.yaml'), join(dir, 'docker-compose.gcs.yaml'));
+    }
     if (plan.changed) { writeFileSync(envPath, renderEnv(plan.env), { mode: 0o600 }); chmodSync(envPath, 0o600); }
     this.stackEnv = plan.env;
     this.d.log(`stack files at ${dir} firstRun=${plan.firstRun} tagChanged=${plan.tagChanged} tag=${plan.env.NM_IMAGE_TAG}`);
@@ -204,7 +211,7 @@ export class LocalStack {
   }
 
   private compose(dockerBin: string, args: string[]) {
-    return composeCommand({ dockerBin, root: this.d.root, dir: this.d.dir, hasStandalone: existsSync(join(nmBinDir(this.d.root), 'docker-compose')) }, args);
+    return composeCommand({ dockerBin, root: this.d.root, dir: this.d.dir, hasStandalone: existsSync(join(nmBinDir(this.d.root), 'docker-compose')), gcs: !!this.stackEnv?.NM_BRAIN_GCS_BUCKET }, args);
   }
 
   /** the services marked for recreation are stopped and removed first (`compose rm -sf`, never a
@@ -257,10 +264,10 @@ export class LocalStack {
     }
   }
 
-  /** the facts Settings › Connections prints for This Mac: where the data lives, the two loopback ports */
-  info(): { dir: string; ports: { api: number; powersync: number }; engine: EngineKind | null } {
+  /** the facts Settings › Connections prints for This Mac: where the data lives, the API loopback port */
+  info(): { dir: string; ports: { api: number }; engine: EngineKind | null } {
     const env = this.stackEnv;
-    return { dir: this.d.dir, ports: { api: Number(env?.NM_API_PORT) || 8788, powersync: Number(env?.NM_POWERSYNC_PORT) || 58081 }, engine: this.probe?.engine ?? null };
+    return { dir: this.d.dir, ports: { api: Number(env?.NM_API_PORT) || 8788 }, engine: this.probe?.engine ?? null };
   }
 
   /** the engine's own version, asked once per ready: Colima says it in `colima version`, the

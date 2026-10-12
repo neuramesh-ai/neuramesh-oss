@@ -1,3 +1,4 @@
+import { preparedEngineeringPatch } from './engineering-preview';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { realpath } from 'node:fs/promises';
 import type { ApplyPatchInput, EditFileInput, ToolExecutors } from '@cline/sdk';
@@ -58,7 +59,8 @@ export async function createEngineeringToolExecutors(
   cwd: string,
   createDefaults: CreateDefaultExecutors,
   policyRules: readonly PolicyRule[] = [],
-  managedRepoRoot?: string,
+  managedRepoRoot?: string | null,
+  privateRepoRoot?: string,
 ): Promise<{ executors: ToolExecutors; close(): void }> {
   const root = await realpath(cwd);
   const defaults = createDefaults({
@@ -76,7 +78,7 @@ export async function createEngineeringToolExecutors(
     ...(defaults.search ? {
       search: (query, _cwd, context) => defaults.search!(query, root, context),
     } : {}),
-    ...(defaults.bash ? { bash: createEngineeringShellExecutor(root, policyRules, managedRepoRoot) } : {}),
+    ...(defaults.bash ? { bash: createEngineeringShellExecutor(root, policyRules, managedRepoRoot, privateRepoRoot) } : {}),
     ...(defaults.webFetch ? { webFetch: createEngineeringWebExecutor(policyRules) } : {}),
     ...(defaults.editor ? {
       editor: async (input: EditFileInput, _cwd, context) => defaults.editor!(
@@ -86,7 +88,7 @@ export async function createEngineeringToolExecutors(
     ...(defaults.applyPatch ? {
       applyPatch: async (input: ApplyPatchInput, _cwd, context) => {
         await Promise.all(engineeringPatchPaths(input.input).map((path) => writableWorkspacePath(root, path)));
-        return defaults.applyPatch!(input, root, context);
+        return defaults.applyPatch!({ ...input, input: await preparedEngineeringPatch(root, input.input) }, root, context);
       },
     } : {}),
     ...(defaults.skills ? { skills: defaults.skills } : {}),

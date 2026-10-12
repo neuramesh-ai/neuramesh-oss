@@ -118,7 +118,11 @@ jobs:
         run: ./scripts/ci-db-bootstrap.sh
 
       - name: Test (unit + control-api pg integration)
-        run: pnpm -r ${{ steps.scope.outputs.filter }} test
+        # Each package already schedules its own workers. Running several packages together
+        # oversubscribes the runner; real JPEG decoding in the API shelf test exceeded its
+        # default deadline while desktop SDK tests were also starting. Keep every assertion
+        # and timeout, and give one package at a time the runner's CPU budget.
+        run: pnpm -r --workspace-concurrency=1 ${{ steps.scope.outputs.filter }} test
         env:
           # The bare x-nm-actor lane is CLOSED by default (review F1, source-release round): the
           # suites speak through it, so the gate opens here and in the package's own test script.

@@ -441,7 +441,8 @@ export interface Store {
   getWhiteboard(id: string): Promise<WhiteboardRow | null>;
   listWhiteboards(q: { workspace?: string; channel?: string; includeArchived?: boolean; limit?: number }): Promise<WhiteboardMeta[]>;
   // connectors + the publish pass (marketing-channel plan §4.8) — secrets stay server-side
-  upsertConnector(input: { workspace: string; channelId: string | null; provider: string; handle: string; connectedBy: string; scopes: string }): Promise<{ id: string }>;
+  // `makeEvent` is written only when the row is new (the GitHub doors' github.connected)
+  upsertConnector(input: { workspace: string; channelId: string | null; provider: string; handle: string; connectedBy: string; scopes: string }, makeEvent?: (workspace: string, connectorId: string) => NMEvent): Promise<{ id: string }>;
   setConnectorSecret(connectorId: string, ciphertext: string): Promise<void>;
   connectorWithSecret(workspace: string, provider: string, channelId?: string | null): Promise<{ id: string; status: string; handle: string; ciphertext: string | null } | null>;
   /** The provider refused to renew the stored grant (refresh token revoked/expired/spent):

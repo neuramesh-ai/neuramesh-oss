@@ -91,6 +91,28 @@ describe.skipIf(!DB)('code_sessions (0135) — who writes a Code session\'s row'
     expect((await rowOf(id))?.['title']).toBe('');
   });
 
+  it('concurrent opening metadata and prompt patches preserve both and create one event', async () => {
+    const id = uuid();
+    const patches = [{ repoName: 'concurrent-repo', branch: 'main' }, { title: 'First prompt', lastLine: 'Inspect the repo' },
+      ...Array.from({ length: 8 }, () => ({ state: 'streaming' }))];
+    const responses = await Promise.all(patches.map(patch => send(mate, { type: 'code_session.upsert', workspace: WS, codeSessionId: id, ...patch })));
+    expect(responses.map(r => r.status)).toEqual(patches.map(() => 200));
+    expect(await rowOf(id)).toMatchObject({ created_by: mate.id, workspace_id: WS, repo_name: 'concurrent-repo', branch: 'main', title: 'First prompt', last_line: 'Inspect the repo' });
+    const events = await sql!`select id from events where workspace_id = ${WS}::uuid and type = 'code_session.created' and target like ${`%${id}`} `;
+    expect(events).toHaveLength(1);
+  });
+
+  it('concurrent creators cannot overwrite the winning member or cross a workspace boundary', async () => {
+    for (const [otherActor, otherWorkspace, denied] of [[owner, WS, 403], [stranger, OTHER, 404]] as const) {
+      const id = uuid();
+      const attempts = [{ actor: mate, workspace: WS, title: 'mate' }, { actor: otherActor, workspace: otherWorkspace, title: 'other' }];
+      const responses = await Promise.all(attempts.map(a => send(a.actor, { type: 'code_session.upsert', workspace: a.workspace, codeSessionId: id, title: a.title })));
+      expect(responses.map(r => r.status).sort()).toEqual([200, denied]);
+      const winner = attempts[responses.findIndex(r => r.status === 200)]!;
+      expect(await rowOf(id)).toMatchObject({ workspace_id: winner.workspace, created_by: winner.actor.id, title: winner.title });
+    }
+  });
+
   it('the hosting machine\'s owner records a session FOR the member it works for, and may update it', async () => {
     const id = uuid();
     const r = await send(owner, { type: 'code_session.upsert', workspace: WS, codeSessionId: id, createdBy: mate.id, machineId: machine, repoName: 'nm', branch: 'b', mode: 'act', state: 'idle' });

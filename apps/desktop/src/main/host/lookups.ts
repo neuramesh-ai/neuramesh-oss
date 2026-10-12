@@ -7,7 +7,7 @@
 //
 // resolveSeat deliberately stayed behind: it calls seatFor, which is declared thousands of
 // lines further down startAgentHost, and a lookup module is the wrong place to invert that.
-import type { PowerSyncDatabase } from '@powersync/node';
+import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 import { machineOnline, type SessionOrigin } from '@neuramesh/shared';
 import type { HostCtx } from './ctx';
 import type { HostedAgent } from '../agents';
@@ -21,7 +21,7 @@ const isOrigin = (v: unknown): v is SessionOrigin => v === 'desktop' || v === 'w
 export interface Seat { agent: HostedAgent; from: { id: string; name: string } | null }
 
 export interface LookupWiring {
-  db: PowerSyncDatabase;
+  db: ReplicaDatabase;
   /** this host's `machines` row: what "another machine" means below */
   machineId: string;
 }

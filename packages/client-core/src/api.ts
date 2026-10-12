@@ -1,3 +1,4 @@
+import { controlApiRequestUrl } from '@neuramesh/shared';
 import type { HumanCommandInput } from '@neuramesh/shared';
 
 // The typed control-api client shared by every non-desktop surface. Commands and
@@ -43,7 +44,11 @@ export function isUnrecoverableUploadError(err: unknown): boolean {
 }
 
 export interface ControlApiOptions {
+  /** Native clients supply a streaming fetch for bounded artifact downloads. */
+  fetchBytes?: typeof fetch;
   baseUrl: string;
+  /** Desktop local/machine authentication includes scoped authorship as well as a bearer. */
+  getAuthHeaders?: (force: boolean) => Promise<Record<string, string>>;
   // Resolves the current Bearer token (the Clerk-signed PowerSync JWT), or null
   // when signed out. Called per request so token rotation is transparent.
   //
@@ -131,6 +136,7 @@ export class ControlApiClient {
   /** the /v1 auth headers — PUBLIC so a host can compose a second edge on the same identity (the
    *  phone's relay lane reads them for its machine and wake calls; the mobile-cloud round, S5) */
   async authHeaders(force = false): Promise<Record<string, string>> {
+    if (this.opts.getAuthHeaders) return this.opts.getAuthHeaders(force);
     if (this.opts.devActor) return { 'x-nm-actor': JSON.stringify({ kind: 'human', id: this.opts.devActor }) };
     const token = this.opts.getToken ? await this.opts.getToken(force) : null;
     return token ? { authorization: `Bearer ${token}` } : {};
@@ -147,11 +153,11 @@ export class ControlApiClient {
   private async send(path: string, init: RequestInit, authed = true): Promise<unknown> {
     for (const force of [false, true]) {
       const auth = authed ? await this.authHeaders(force) : {};
-      const res = await fetch(`${this.opts.baseUrl}${path}`, { ...init, headers: { ...(init.headers as Record<string, string>), ...auth } });
+      const res = await fetch(controlApiRequestUrl(this.opts.baseUrl, path), { ...init, headers: { ...(init.headers as Record<string, string>), ...auth } });
       const raw = await res.text();
       if (res.ok) return parseJson(raw);
       // only a 401 is worth a second attempt, and only while a fresh token is still unasked for
-      if (res.status !== 401 || force || !authed || !this.opts.getToken) throw failure(path, res.status, raw);
+      if (res.status !== 401 || force || !authed || (!this.opts.getToken && !this.opts.getAuthHeaders)) throw failure(path, res.status, raw);
     }
     /* c8 ignore next */ throw failure(path, 401, '');
   }
@@ -168,6 +174,40 @@ export class ControlApiClient {
    *  envelope. The browser client calls most of /v1 through these two (apps/hq/web/webnm.ts). */
   getJson<T = unknown>(path: string): Promise<T> {
     return this.get(path) as Promise<T>;
+  }
+
+  /** Private object bytes use the same refreshed authentication as JSON calls. */
+  async getBytes(path: string, limit = 16 * 1024 * 1024): Promise<{ bytes: Uint8Array; mime: string; sha256: string | null }> {
+    for (const force of [false, true]) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 60_000);
+      try {
+        const res = await (this.opts.fetchBytes ?? fetch)(controlApiRequestUrl(this.opts.baseUrl, path), { headers: await this.authHeaders(force), signal: controller.signal });
+        if (!res.ok) {
+          if (res.status === 401 && !force && (this.opts.getToken || this.opts.getAuthHeaders)) { await res.body?.cancel(); continue; }
+          throw failure(path, res.status, await res.text());
+        }
+        if (Number(res.headers.get('content-length') ?? 0) > limit) { await res.body?.cancel(); throw new Error('The artifact exceeds the download limit.'); }
+        const reader = res.body?.getReader();
+        if (!reader) throw new Error('The artifact response has no body.');
+        const chunks: Uint8Array[] = [];
+        let size = 0;
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            size += value.length;
+            if (size > limit) { await reader.cancel(); throw new Error('The artifact exceeds the download limit.'); }
+            chunks.push(value);
+          }
+        } finally { reader.releaseLock(); }
+        const bytes = new Uint8Array(size);
+        let offset = 0;
+        for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
+        return { bytes, mime: res.headers.get('content-type') ?? 'application/octet-stream', sha256: res.headers.get('etag')?.replace(/^"|"$/g, '') ?? null };
+      } finally { clearTimeout(timer); }
+    }
+    throw failure(path, 401, '');
   }
 
   /** `authed: false` for the few routes whose body IS the credential (the /auth/* exchanges) */

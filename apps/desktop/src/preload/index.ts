@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
+import { openLocalEngineeringChannel } from './engineering-local-channel';
 
 export interface ChannelRow {
   id: string;
@@ -591,6 +592,7 @@ contextBridge.exposeInMainWorld('nm', {
   terminalInfo: (taskNumber: number, hasRepo: boolean) => ipcRenderer.invoke('nm:terminal-info', { taskNumber, hasRepo }),
   // the desktop Code bridge (2026-09-04): main's relay facts, composed into the browser's relay
   // bridge by the renderer (src/bridge/desktop-relay.ts) — the terminals above stay local
+  engineeringHistory: (threadId: string, workspace: string) => ipcRenderer.invoke('nm:engineering-history', { threadId, workspace }),
   relayEnv: () => ipcRenderer.invoke('nm:relay-env'),
   relayHeaders: () => ipcRenderer.invoke('nm:relay-headers'),
   relayBearer: () => ipcRenderer.invoke('nm:relay-bearer'),
@@ -598,13 +600,7 @@ contextBridge.exposeInMainWorld('nm', {
   // subId, a stream of events, an exit, exactly the terminals' shape
   engineeringLocalInfo: () => ipcRenderer.invoke('nm:engineering-local-info'),
   openEngineeringLocal: (meta: unknown, onEvent: (event: unknown) => void, onExit: () => void): { subId: string; send: (command: unknown) => Promise<void>; close: () => void } => {
-    const subId = crypto.randomUUID();
-    const evL = (_e: unknown, p: { subId: string; event: unknown }) => { if (p.subId === subId) onEvent(p.event); };
-    const off = () => { ipcRenderer.removeListener('nm:engineering-event', evL); ipcRenderer.removeListener('nm:engineering-exit', exL); };
-    const exL = (_e: unknown, p: { subId: string }) => { if (p.subId === subId) { off(); onExit(); } };
-    ipcRenderer.on('nm:engineering-event', evL); ipcRenderer.on('nm:engineering-exit', exL);
-    void ipcRenderer.invoke('nm:engineering-local-open', { subId, meta });
-    return { subId, send: (command) => ipcRenderer.invoke('nm:engineering-local-command', { subId, command }), close: () => { off(); void ipcRenderer.invoke('nm:engineering-local-close', { subId }); } };
+    return openLocalEngineeringChannel(ipcRenderer, meta, onEvent, onExit);
   },
   openTerminalCwd: (cwd: string, cols: number, rows: number, onData: (d: string) => void, onExit: () => void, startupCommand?: string): { subId: string; input: (d: string) => void; resize: (c: number, r: number) => void; close: () => void } => {
     const subId = crypto.randomUUID();

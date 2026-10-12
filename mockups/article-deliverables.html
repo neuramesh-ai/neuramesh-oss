@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Article deliverables — the article card + the reading tab (design round 2026-08-19)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  /* ────────────────────────────────────────────────────────────────────────────
+     ARTICLE DELIVERABLES — what a research/article output looks like as a first-
+     class citizen instead of an essay crammed into a tweet-preview card.
+     Mockup for docs/design/article-deliverables-2026-08/plan.md. Tokens verbatim
+     from apps/desktop/src/renderer/src/tokens.css (graphite dark + cream-oak);
+     if a value here disagrees with tokens.css, tokens.css wins.
+     ──────────────────────────────────────────────────────────────────────────── */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { background: #4a4640; }
+  body { font-family: 'Geist Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+         padding: 28px 30px 60px; color: #ddd; }
+  h1 { font: 640 19px/1.3 Georgia, serif; color: #f0ede6; margin-bottom: 4px; }
+  .sub { font-size: 12.5px; color: #b5b0a6; margin-bottom: 26px; max-width: 920px; line-height: 1.55; }
+  .cols { display: flex; gap: 26px; align-items: flex-start; flex-wrap: wrap; }
+  .col { flex: 1 1 560px; min-width: 540px; max-width: 720px; }
+  .collabel { font: 600 10.5px ui-monospace, Menlo, monospace; letter-spacing: .14em; text-transform: uppercase; color: #a59f93; margin: 0 0 10px 2px; }
+  .statelabel { font: 600 10px ui-monospace, Menlo, monospace; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 22px 0 8px 4px; }
+  .statelabel:first-of-type { margin-top: 0; }
+
+  .t-dark {
+    --win:#0d0d0d; --bg:#141414; --panel:#191919; --panel2:#212121; --panel3:#2b2b2b;
+    --border:#272727; --border2:#383838;
+    --text:#eaeaea; --body:#b6b6b6; --muted:#898989; --dim:#676767;
+    --accent:#eaeaea; --accent-ink:#101010; --warn:#c9a15e; --link:#d19a72;
+    --btn:#232323; --btn-fg:#efefef; --btn-hover:#2f2f2f;
+    --card:#1e1e1e; --card-border:#2c2c2c;
+    --shadow-card:0 1px 2px rgba(0,0,0,.25); --shadow-pop:0 20px 55px -14px rgba(0,0,0,.65);
+    --r-md:10px; --r-lg:14px;
+    --fdisp:'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+    --fmono:'Geist Mono Variable', ui-monospace, 'SF Mono', Menlo, monospace;
+    --hero-a:#2a2420; --hero-b:#1c1f26; --hero-line:#c9a15e;
+  }
+  .t-cream {
+    --win:#f0e5d3; --bg:#fbf8f4; --panel:#fbf8f4; --panel2:#f6eee1; --panel3:#efe1cd;
+    --border:#e6dbca; --border2:#d3c2a8;
+    --text:#2a1c13; --body:#574838; --muted:#97846c; --dim:#b5a289;
+    --accent:#834a2b; --accent-ink:#fff7ee; --warn:#a06a1f; --link:#9c5730;
+    --btn:#f8f2e8; --btn-fg:#43301f; --btn-hover:#efe4d2;
+    --card:#ffffff; --card-border:#eadfce;
+    --shadow-card:0 1px 2px rgba(70,42,18,.05); --shadow-pop:0 20px 55px -14px rgba(70,42,18,.30);
+    --r-md:10px; --r-lg:14px;
+    --fdisp:'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+    --fmono:'Geist Mono Variable', ui-monospace, 'SF Mono', Menlo, monospace;
+    --hero-a:#f3e2c8; --hero-b:#e7ded2; --hero-line:#a06a1f;
+  }
+
+  .frame { background: var(--bg); border: 1px solid var(--border); border-radius: 12px;
+           padding: 22px 24px 24px; box-shadow: 0 8px 30px rgba(0,0,0,.28); }
+  .frame + .frame { margin-top: 14px; }
+
+  /* ── a thread message shell (agent full-width, chat-authorship rule) ── */
+  .msg { display: flex; gap: 10px; }
+  .avatar { flex: none; width: 26px; height: 26px; border-radius: 8px; background: var(--panel3);
+            display: grid; place-items: center; font-size: 14px; }
+  .msgbody { flex: 1; min-width: 0; }
+  .msghead { display: flex; align-items: baseline; gap: 7px; margin-bottom: 6px; }
+  .msghead b { font-size: 12.5px; color: var(--text); }
+  .rolechip { font: 600 8.5px var(--fmono); letter-spacing: .1em; color: var(--muted);
+              border: 1px solid var(--border2); border-radius: 999px; padding: 1px 6px; text-transform: uppercase; }
+  .when { font: 500 10px var(--fmono); color: var(--dim); }
+  .prose { font-size: 12.5px; color: var(--body); line-height: 1.55; margin-bottom: 10px; }
+
+  /* ════════════════════════════════════════════════════════════════════════
+     THE ARTICLE CARD — the thread-native preview for a written deliverable.
+     A magazine tile, not a tweet: kicker · serif title · dek · hero · facts
+     line (reading time · sources · words) · two actions. One derivation from
+     the doc artifact, same as postCardsFrom. Never the full text — the card
+     sells the read; the TAB is the read.
+     ════════════════════════════════════════════════════════════════════════ */
+  .artcard { background: var(--card); border: 1px solid var(--card-border); border-radius: var(--r-lg);
+             box-shadow: var(--shadow-card); overflow: hidden; max-width: 560px; }
+  .artkick { display: flex; align-items: center; gap: 8px; padding: 9px 14px 0; }
+  .artkick .k { font: 600 9px var(--fmono); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+  .artkick .chip { margin-left: auto; font: 600 9px var(--fmono); letter-spacing: .1em; text-transform: uppercase;
+                   color: var(--muted); border: 1px solid var(--border2); border-radius: 999px; padding: 2px 8px; }
+  .arthero { margin: 10px 14px 0; height: 118px; border-radius: var(--r-md); position: relative; overflow: hidden;
+             background: linear-gradient(120deg, var(--hero-a), var(--hero-b)); border: 1px solid var(--border); }
+  .arthero svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  /* the download affordance every embedded image carries — quiet chip, obvious on hover */
+  .imgsave { position: absolute; right: 8px; bottom: 8px; display: flex; align-items: center; gap: 5px;
+             font: 600 10px var(--fmono); color: var(--text); background: color-mix(in srgb, var(--card) 82%, transparent);
+             border: 1px solid var(--border2); border-radius: 999px; padding: 3px 9px; backdrop-filter: blur(4px); }
+  .artmain { padding: 12px 14px 13px; }
+  .arttitle { font: 640 17px/1.3 var(--fdisp); color: var(--text); margin-bottom: 5px; }
+  .artdek { font-size: 12px; line-height: 1.55; color: var(--body); margin-bottom: 9px;
+            display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .artfacts { display: flex; gap: 6px; align-items: center; font: 500 10.5px var(--fmono); color: var(--muted); margin-bottom: 11px; }
+  .artfacts .sep { color: var(--dim); }
+  .artfoot { display: flex; align-items: center; gap: 8px; }
+  .artby { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); }
+  .artby .pav { width: 16px; height: 16px; border-radius: 6px; background: var(--panel3); display: grid; place-items: center; font-size: 9px; }
+  .artfoot .actions { margin-left: auto; display: flex; gap: 6px; }
+  .btn { font-family: inherit; font-size: 11.5px; font-weight: 600; border-radius: 999px;
+         padding: 4px 12px; cursor: pointer; border: 1px solid var(--border2);
+         background: var(--btn); color: var(--btn-fg); }
+  .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+  .btn.ghost { background: transparent; border-color: transparent; color: var(--muted); }
+
+  /* ════════════════════════════════════════════════════════════════════════
+     THE READING TAB — Open lands here: a workspace tab (docs on tabs already
+     exist; this is the md container grown up for LONG-FORM). Reading measure,
+     the serif ramp, images with the save chip, and a Sources block that makes
+     "citable" a first-class section instead of a markdown afterthought.
+     ════════════════════════════════════════════════════════════════════════ */
+  .tabstrip { display: flex; gap: 6px; align-items: center; margin-bottom: 14px; }
+  .wtab { display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: var(--muted);
+          border: 1px solid var(--border); border-radius: 9px 9px 0 0; padding: 6px 12px; background: transparent; }
+  .wtab.on { background: var(--panel2); color: var(--text); border-bottom-color: var(--panel2); font-weight: 600; }
+  .wtab .x { color: var(--dim); margin-left: 2px; }
+  .readwrap { background: var(--panel2); border: 1px solid var(--border); border-radius: 0 var(--r-lg) var(--r-lg) var(--r-lg); padding: 26px 0 30px; }
+  .readbar { display: flex; align-items: center; gap: 8px; max-width: 60ch; margin: 0 auto 18px; padding: 0 8px; }
+  .readbar .k { font: 600 9px var(--fmono); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+  .readbar .actions { margin-left: auto; display: flex; gap: 6px; }
+  .read { max-width: 60ch; margin: 0 auto; padding: 0 8px; }
+  .read h1 { font: 680 26px/1.22 var(--fdisp); color: var(--text); margin-bottom: 10px; }
+  .readby { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--muted);
+            padding-bottom: 14px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+  .readby .pav { width: 18px; height: 18px; border-radius: 6px; background: var(--panel3); display: grid; place-items: center; font-size: 10px; }
+  .read p { font-size: 13.5px; line-height: 1.72; color: var(--body); margin-bottom: 14px; }
+  .read p b { color: var(--text); }
+  .read .fig { position: relative; border-radius: var(--r-md); overflow: hidden; border: 1px solid var(--border);
+               height: 150px; background: linear-gradient(120deg, var(--hero-a), var(--hero-b)); margin: 18px 0 6px; }
+  .read .fig svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .figcap { font: 500 10.5px var(--fmono); color: var(--dim); margin-bottom: 16px; }
+  .cite { font: 600 9.5px var(--fmono); color: var(--link); vertical-align: super; }
+  .sources { margin-top: 20px; border-top: 1px solid var(--border); padding-top: 14px; }
+  .sources h3 { font: 600 10px var(--fmono); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+  .srcrow { display: flex; gap: 9px; align-items: baseline; margin-bottom: 8px; }
+  .srcrow .n { flex: none; font: 600 10px var(--fmono); color: var(--dim); }
+  .srcrow a { font-size: 12px; color: var(--link); text-decoration: none; }
+  .srcrow .host { font: 500 10px var(--fmono); color: var(--dim); }
+
+  .note { max-width: 1160px; margin-top: 30px; font-size: 12px; line-height: 1.65; color: #b5b0a6; }
+  .note b { color: #e8e4dc; }
+  .note code { font-family: ui-monospace, Menlo, monospace; font-size: 11px; color: #d8d3c8; }
+</style>
+</head>
+<body>
+
+<h1>Article deliverables — the article card + the reading tab</h1>
+<p class="sub">A research routine produced a proper article — and the only garment it had was the tweet-preview
+card, so an essay rendered as an overgrown draft post (live, 2026-08-19). Written deliverables get their own
+form: a <b>magazine-tile card</b> in the thread that sells the read, and a <b>reading tab</b> that is the read —
+comfortable measure, the serif ramp, embedded images you can save, and sources as a first-class section.</p>
+
+<div class="cols">
+
+  <!-- ═════════════════ GRAPHITE DARK ═════════════════ -->
+  <div class="col t-dark">
+    <div class="collabel">graphite dark</div>
+
+    <div class="statelabel">in the thread · the article card (replaces the tweet-card misfit)</div>
+    <div class="frame">
+      <div class="msg">
+        <span class="avatar">🦚</span>
+        <div class="msgbody">
+          <div class="msghead"><b>plume</b><span class="rolechip">marketer</span><span class="when">1h ago</span></div>
+          <div class="prose">Research done — 9 sources read, the angle that held up is “knowing when to stop talking.” The article, below; the X-post drafts ride separately.</div>
+          <div class="artcard">
+            <div class="artkick">
+              <span class="k">Article · research deliverable</span>
+              <span class="chip">draft</span>
+            </div>
+            <div class="arthero">
+              <svg viewBox="0 0 560 118" preserveAspectRatio="none" aria-hidden>
+                <path d="M0 92 C 90 60, 150 96, 230 70 S 400 30, 560 58" fill="none" stroke="var(--hero-line)" stroke-width="1.6" opacity=".7"/>
+                <path d="M0 104 C 110 84, 200 108, 300 88 S 470 62, 560 78" fill="none" stroke="var(--hero-line)" stroke-width="1" opacity=".35"/>
+                <circle cx="230" cy="70" r="3.4" fill="var(--hero-line)"/><circle cx="430" cy="42" r="2.6" fill="var(--hero-line)" opacity=".7"/>
+              </svg>
+              <span class="imgsave">⤓ Save image</span>
+            </div>
+            <div class="artmain">
+              <div class="arttitle">The Next Era of Mental Health AI Will Know When to Stop Talking</div>
+              <div class="artdek">AI is already part of how people handle stress and difficult moments. The question is no longer whether people will use it — it is what kind of AI deserves their trust.</div>
+              <div class="artfacts"><span>6 min read</span><span class="sep">·</span><span>1,240 words</span><span class="sep">·</span><span>9 sources</span><span class="sep">·</span><span>1 image</span></div>
+              <div class="artfoot">
+                <span class="artby"><span class="pav">🦚</span>plume · #marketing</span>
+                <span class="actions">
+                  <button class="btn ghost">⤓ Save</button>
+                  <button class="btn primary">Open article</button>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="statelabel">open article · the reading tab (a workspace tab, beside the conversation)</div>
+    <div class="frame">
+      <div class="tabstrip">
+        <span class="wtab">◳ AI Mental Health Outlook</span>
+        <span class="wtab on">▤ The Next Era of Mental Health AI… <span class="x">✕</span></span>
+      </div>
+      <div class="readwrap">
+        <div class="readbar">
+          <span class="k">Article · #marketing · draft</span>
+          <span class="actions"><button class="btn ghost">⤓ Save</button><button class="btn">Open in browser</button></span>
+        </div>
+        <div class="read">
+          <h1>The Next Era of Mental Health AI Will Know When to Stop Talking</h1>
+          <div class="readby"><span class="pav">🦚</span> plume · marketer &nbsp;·&nbsp; Aug 19 &nbsp;·&nbsp; 6 min read · 9 sources</div>
+          <p>AI is already becoming part of how people handle stress, anxiety, and difficult moments. The important question is no longer whether people will use it. It is what kind of AI deserves their trust.<span class="cite">[1]</span></p>
+          <p>The strongest answer may not be an “AI therapist” that keeps the conversation going forever. It may be a <b>smaller, safer kind of system</b>: one that notices what you need, chooses a fitting intervention, guides you through it, checks whether it helped, and knows when to hand off.<span class="cite">[2]</span></p>
+          <div class="fig">
+            <svg viewBox="0 0 560 150" preserveAspectRatio="none" aria-hidden>
+              <path d="M0 118 C 120 78, 210 126, 320 92 S 480 40, 560 72" fill="none" stroke="var(--hero-line)" stroke-width="1.6" opacity=".7"/>
+              <circle cx="320" cy="92" r="3.6" fill="var(--hero-line)"/><circle cx="490" cy="50" r="2.8" fill="var(--hero-line)" opacity=".7"/>
+            </svg>
+            <span class="imgsave">⤓ Save image</span>
+          </div>
+          <div class="figcap">fig 1 · notice → intervene → verify → hand off, the loop the evidence favors</div>
+          <p>What the evidence is starting to show: structured, protocol-shaped support — brief NSDR-style resets, CBT-pattern reframes — outperforms open-ended chat on the outcomes that matter, and the failure mode of “keep them engaged” is precisely the thing a trustworthy system refuses to do.<span class="cite">[3]</span></p>
+          <div class="sources">
+            <h3>Sources</h3>
+            <div class="srcrow"><span class="n">[1]</span><a>The state of digital mental-health interventions, 2026 review</a><span class="host">nature.com</span></div>
+            <div class="srcrow"><span class="n">[2]</span><a>Guardrails and hand-off design in conversational health agents</a><span class="host">jmir.org</span></div>
+            <div class="srcrow"><span class="n">[3]</span><a>Protocol-based digital resets vs open-ended chat — RCT</a><span class="host">thelancet.com</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═════════════════ CREAM OAK ═════════════════ -->
+  <div class="col t-cream">
+    <div class="collabel">cream oak</div>
+
+    <div class="statelabel">in the thread · the article card (replaces the tweet-card misfit)</div>
+    <div class="frame">
+      <div class="msg">
+        <span class="avatar">🦚</span>
+        <div class="msgbody">
+          <div class="msghead"><b>plume</b><span class="rolechip">marketer</span><span class="when">1h ago</span></div>
+          <div class="prose">Research done — 9 sources read, the angle that held up is “knowing when to stop talking.” The article, below; the X-post drafts ride separately.</div>
+          <div class="artcard">
+            <div class="artkick">
+              <span class="k">Article · research deliverable</span>
+              <span class="chip">draft</span>
+            </div>
+            <div class="arthero">
+              <svg viewBox="0 0 560 118" preserveAspectRatio="none" aria-hidden>
+                <path d="M0 92 C 90 60, 150 96, 230 70 S 400 30, 560 58" fill="none" stroke="var(--hero-line)" stroke-width="1.6" opacity=".7"/>
+                <path d="M0 104 C 110 84, 200 108, 300 88 S 470 62, 560 78" fill="none" stroke="var(--hero-line)" stroke-width="1" opacity=".35"/>
+                <circle cx="230" cy="70" r="3.4" fill="var(--hero-line)"/><circle cx="430" cy="42" r="2.6" fill="var(--hero-line)" opacity=".7"/>
+              </svg>
+              <span class="imgsave">⤓ Save image</span>
+            </div>
+            <div class="artmain">
+              <div class="arttitle">The Next Era of Mental Health AI Will Know When to Stop Talking</div>
+              <div class="artdek">AI is already part of how people handle stress and difficult moments. The question is no longer whether people will use it — it is what kind of AI deserves their trust.</div>
+              <div class="artfacts"><span>6 min read</span><span class="sep">·</span><span>1,240 words</span><span class="sep">·</span><span>9 sources</span><span class="sep">·</span><span>1 image</span></div>
+              <div class="artfoot">
+                <span class="artby"><span class="pav">🦚</span>plume · #marketing</span>
+                <span class="actions">
+                  <button class="btn ghost">⤓ Save</button>
+                  <button class="btn primary">Open article</button>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="statelabel">open article · the reading tab (a workspace tab, beside the conversation)</div>
+    <div class="frame">
+      <div class="tabstrip">
+        <span class="wtab">◳ AI Mental Health Outlook</span>
+        <span class="wtab on">▤ The Next Era of Mental Health AI… <span class="x">✕</span></span>
+      </div>
+      <div class="readwrap">
+        <div class="readbar">
+          <span class="k">Article · #marketing · draft</span>
+          <span class="actions"><button class="btn ghost">⤓ Save</button><button class="btn">Open in browser</button></span>
+        </div>
+        <div class="read">
+          <h1>The Next Era of Mental Health AI Will Know When to Stop Talking</h1>
+          <div class="readby"><span class="pav">🦚</span> plume · marketer &nbsp;·&nbsp; Aug 19 &nbsp;·&nbsp; 6 min read · 9 sources</div>
+          <p>AI is already becoming part of how people handle stress, anxiety, and difficult moments. The important question is no longer whether people will use it. It is what kind of AI deserves their trust.<span class="cite">[1]</span></p>
+          <p>The strongest answer may not be an “AI therapist” that keeps the conversation going forever. It may be a <b>smaller, safer kind of system</b>: one that notices what you need, chooses a fitting intervention, guides you through it, checks whether it helped, and knows when to hand off.<span class="cite">[2]</span></p>
+          <div class="fig">
+            <svg viewBox="0 0 560 150" preserveAspectRatio="none" aria-hidden>
+              <path d="M0 118 C 120 78, 210 126, 320 92 S 480 40, 560 72" fill="none" stroke="var(--hero-line)" stroke-width="1.6" opacity=".7"/>
+              <circle cx="320" cy="92" r="3.6" fill="var(--hero-line)"/><circle cx="490" cy="50" r="2.8" fill="var(--hero-line)" opacity=".7"/>
+            </svg>
+            <span class="imgsave">⤓ Save image</span>
+          </div>
+          <div class="figcap">fig 1 · notice → intervene → verify → hand off, the loop the evidence favors</div>
+          <p>What the evidence is starting to show: structured, protocol-shaped support — brief NSDR-style resets, CBT-pattern reframes — outperforms open-ended chat on the outcomes that matter, and the failure mode of “keep them engaged” is precisely the thing a trustworthy system refuses to do.<span class="cite">[3]</span></p>
+          <div class="sources">
+            <h3>Sources</h3>
+            <div class="srcrow"><span class="n">[1]</span><a>The state of digital mental-health interventions, 2026 review</a><span class="host">nature.com</span></div>
+            <div class="srcrow"><span class="n">[2]</span><a>Guardrails and hand-off design in conversational health agents</a><span class="host">jmir.org</span></div>
+            <div class="srcrow"><span class="n">[3]</span><a>Protocol-based digital resets vs open-ended chat — RCT</a><span class="host">thelancet.com</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<p class="note"><b>Reading notes.</b> The article is a <b>doc artifact</b> — no new synced table: the card derives
+from the artifact row plus a parsed head (title · dek · hero), exactly as <code>postCardsFrom</code> derives post
+cards from content rows. The card never shows the full text (the card sells the read; the tab IS the read).
+<b>Open article</b> lands in a workspace tab beside the conversation — the existing artifact-tab seam grown up
+for long-form: ~60ch measure, the serif ramp, cite markers that jump to a first-class <b>Sources</b> block.
+Every embedded image (and the hero) wears a quiet <b>⤓ Save image</b> chip riding the existing
+<code>saveFileAs</code> bridge; <b>⤓ Save</b> on the card/tab exports the whole article (markdown now, PDF later).
+<b>Open in browser</b> renders the same markdown to a local HTML file for the OS browser — the "new tab" ask,
+honest offline. Agents get ONE new tool (<code>draft_article</code>: writes the artifact + drops the
+<code>‹article:id›</code> marker) — the tool inventory beats a prompt rule, which is exactly how an essay ended
+up inside a tweet card.</p>
+
+</body>
+</html>

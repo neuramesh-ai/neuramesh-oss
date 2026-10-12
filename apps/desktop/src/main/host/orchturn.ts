@@ -15,10 +15,14 @@ import { stripPseudoToolCalls } from './pseudocalls';
 import type { LogFn } from '../agentlog';
 import type { OrchTool } from './orchtools';
 import type { CodexCtor } from '../runtime/codexsdk';
+import { conversationInput, recordRuntimeEvent, recordedTools } from '../runtime/brain-recording';
+import { recordConversationEvent } from '../harness/brain-sync';
 
 // The three orchestrator transports share ONE signature so `orchestratorTurn` dispatches by
 // provider with no coupling — each runs the SAME buildOrchestratorTools registry its own way.
 export type OrchTransportArgs = { model: string; token: string; systemPrompt: string; transcript: string; tools: OrchTool[]; log?: LogFn; attachments?: AgentAttachment[]; cwd?: string; onDelta?: (t: string, thinking?: string) => void; thinking?: ThinkingLevel | null };
+
+
 
 
 /** Which Gemini transport a turn takes. Lives here with the transports rather than in the host's
@@ -86,6 +90,7 @@ export async function geminiOrchestratorTurn(args: {
   /** the live bubble: on the metered lane, each round's words, growing, as the model writes them, and the turn's thoughts */
   onDelta?: (t: string, thinking?: string) => void;
 }): Promise<string> {
+  args = { ...args, transcript: conversationInput('gemini', args.model, args.systemPrompt, args.transcript, args.token), tools: recordedTools(args.tools) };
   const { GoogleGenAI, Type } = await import('@google/genai');
   const shapeToParams = (shape: Record<string, any>): any | undefined => zodShapeToGemini(shape, Type);
 
@@ -128,6 +133,7 @@ export async function geminiOrchestratorTurn(args: {
       ? await ai!.models.generateContent({ model: args.model, contents, config })
       : onDelta ? await starterStream({ ...call, onText: (d) => { said += d; shown = stripPseudoToolCalls(said, byName.keys()).text; show(); }, onThought: (d) => { th?.thought(d); show(); } })
         : await starterGenerate(call);
+    recordRuntimeEvent('gemini', r);
     // the SDK exposes r.functionCalls; the proxy returns raw REST json, where the same calls
     // live on the candidate's parts. normalize so the loop below cannot tell them apart.
     const calls = (r.functionCalls ?? (r.candidates?.[0]?.content?.parts ?? [])
@@ -138,6 +144,7 @@ export async function geminiOrchestratorTurn(args: {
       const clean = stripPseudoToolCalls(raw, byName.keys());
       if (clean.stripped) args.log?.({ kind: 'result', phase: 'warn', summary: `dropped ${clean.stripped} narrated tool call${clean.stripped === 1 ? '' : 's'} from the reply`, level: 'warn' });
       lastText = clean.text;
+      recordConversationEvent('assistant.message', { text: lastText, provider: 'gemini', model: args.model });
       args.log?.({ kind: 'result', phase: 'success', summary: `replied · gemini (${args.model})` });
       return lastText || ORCH_EMPTY_TURN; // empty text → stand down, never a posted placeholder
     }
@@ -161,6 +168,7 @@ export async function geminiOrchestratorTurn(args: {
 
 // ANTHROPIC: the Agent SDK (query) with the tools as an in-process MCP server.
 export async function anthropicOrchestratorTurn(args: OrchTransportArgs): Promise<string> {
+  args = { ...args, transcript: conversationInput('claude', args.model, args.systemPrompt, args.transcript, args.token), tools: recordedTools(args.tools) };
   const os = await import('node:os');
   const { query, tool, createSdkMcpServer } = await import('@anthropic-ai/claude-agent-sdk');
   const text = (t: string) => ({ content: [{ type: 'text' as const, text: t }] });
@@ -246,6 +254,7 @@ export function orchToolsToBridge(tools: OrchTransportArgs['tools']) {
 }
 
 export async function agyOrchestratorTurn(args: OrchTransportArgs): Promise<string> {
+  args = { ...args, transcript: conversationInput('agy', args.model, args.systemPrompt, args.transcript, args.token), tools: recordedTools(args.tools) };
   const { randomUUID } = await import('node:crypto');
   const { spawn } = await import('node:child_process');
   // userDataDir, never electron's app: a cloud machine runs this under plain node, where importing
@@ -306,6 +315,7 @@ export async function agyOrchestratorTurn(args: OrchTransportArgs): Promise<stri
 // forwards it to the shim) — all verified in Gate 0. finalResponse is the agent's reply with no step
 // narration, so (unlike agy --print) no marker fencing is needed.
 export async function codexSdkOrchestratorTurn(args: OrchTransportArgs): Promise<string> {
+  args = { ...args, transcript: conversationInput('codex', args.model, args.systemPrompt, args.transcript, args.token), tools: recordedTools(args.tools) };
   const { randomUUID } = await import('node:crypto');
   const os = await import('node:os');
   const { mkdtempSync, rmSync } = await import('node:fs');

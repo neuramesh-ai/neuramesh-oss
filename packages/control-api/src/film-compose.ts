@@ -16,7 +16,11 @@ import { falRun, falUpload, type FalFetch } from './fal';
 import { resvgModule } from './releasecard';
 
 export interface ProductShot { start: number; end: number; show: string; dataUrl: string }
-export interface ShotsResult { url?: string; applied: number; why?: string }
+/** `why` is what the card says, in house words. `detail` is the reason a lane gave (fal's or the
+ *  renderer's own text): the log keeps it, and no client ever reads it (George, 2026-10-06). */
+export interface ShotsResult { url?: string; applied: number; why?: string; detail?: string }
+/** the card's line when a lane failed: the vendor's words stay in `detail` */
+export const SHOT_NOT_CUT = 'the shot could not be cut in';
 
 export const FRAME_W = 720;
 export const FRAME_H = 1280;
@@ -108,9 +112,9 @@ export async function composeShots(key: string, clipUrl: string, seconds: number
   for (const p of pieces) {
     if (p.kind !== 'shot' || frames.has(p.shot.show)) continue;
     let png: Uint8Array;
-    try { png = await renderProductFrame(p.shot.dataUrl, { initWasm: opts.initWasm }); } catch (e) { return { applied: 0, why: `the product frame for ${p.shot.show} did not render (${e instanceof Error ? e.message : String(e)})` }; }
+    try { png = await renderProductFrame(p.shot.dataUrl, { initWasm: opts.initWasm }); } catch (e) { return { applied: 0, why: SHOT_NOT_CUT, detail: `the product frame for ${p.shot.show} did not render (${e instanceof Error ? e.message : String(e)})` }; }
     const up = await falUpload(key, png, 'image/png', `${p.shot.show.replace(/[^\w.-]+/g, '-')}.png`, fetchFn);
-    if (!up.url) return { applied: 0, why: `the product frame did not upload (${up.error ?? 'no answer'})` };
+    if (!up.url) return { applied: 0, why: SHOT_NOT_CUT, detail: `the product frame did not upload (${up.error ?? 'no answer'})` };
     frames.set(p.shot.show, up.url);
   }
   // each piece as its own clip: the film trimmed, or the frame held for the window
@@ -118,11 +122,11 @@ export async function composeShots(key: string, clipUrl: string, seconds: number
   for (const p of pieces) {
     if (p.kind === 'film') {
       const r = await falRun<FileOut>(key, 'fal-ai/workflow-utilities/trim-video', { video_url: clipUrl, start_time: p.start, end_time: p.end }, fetchFn);
-      if (!r.result?.video?.url) return { applied: 0, why: `the film did not trim at ${p.start}-${p.end} s (${r.error ?? 'no video'})` };
+      if (!r.result?.video?.url) return { applied: 0, why: SHOT_NOT_CUT, detail: `the film did not trim at ${p.start}-${p.end} s (${r.error ?? 'no video'})` };
       urls.push(r.result.video.url);
     } else {
       const r = await falRun<FileOut>(key, 'fal-ai/ffmpeg-api/images-to-video', { fps: FPS, images: [{ url: frames.get(p.shot.show), frames: Math.max(1, Math.round((p.end - p.start) * FPS)) }] }, fetchFn);
-      if (!r.result?.video?.url) return { applied: 0, why: `the product shot ${p.shot.show} did not render as a clip (${r.error ?? 'no video'})` };
+      if (!r.result?.video?.url) return { applied: 0, why: SHOT_NOT_CUT, detail: `the product shot ${p.shot.show} did not render as a clip (${r.error ?? 'no video'})` };
       urls.push(r.result.video.url);
     }
   }
@@ -132,6 +136,6 @@ export async function composeShots(key: string, clipUrl: string, seconds: number
     { id: 'audio', type: 'audio', keyframes: [{ timestamp: 0, url: clipUrl, duration: Math.round(seconds * 1000) }] },
   ];
   const c = await falRun<ComposeOut>(key, 'fal-ai/ffmpeg-api/compose', { tracks }, fetchFn, 120_000);
-  if (!c.result?.video_url) return { applied: 0, why: `the pieces did not compose (${c.error ?? 'no video'})` };
+  if (!c.result?.video_url) return { applied: 0, why: SHOT_NOT_CUT, detail: `the pieces did not compose (${c.error ?? 'no video'})` };
   return { url: c.result.video_url, applied: wanted };
 }

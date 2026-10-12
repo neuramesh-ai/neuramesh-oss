@@ -3,7 +3,7 @@
 // the wizard was a card rendered from a null profile, so its state died with it and the room
 // held no object to come back to.
 import { describe, it, expect } from 'vitest';
-import { MARKETING_SETUP_FLOW, SETUP_FLOWS, flowForChannelKind, setupProgress, setupProgressLabel } from '../src/setupflows';
+import { MARKETING_SETUP_FLOW, SETUP_ANSWERS_HEAD, SETUP_FLOWS, flowForChannelKind, isSetupAnswers, setupAnswersBody, setupProgress, setupProgressLabel } from '../src/setupflows';
 import { evaluateTransition, type Actor, type TransitionContext } from '../src/states';
 
 const human: Actor = { kind: 'human', id: 'george' };
@@ -17,6 +17,26 @@ const ctx = (partial: Partial<TransitionContext>): TransitionContext => ({
 });
 
 describe('the registry', () => {
+  // the title names the setup task in every list, and the Overview shows the description (2026-10-06)
+  it('names the setup task in the house words', () => {
+    expect(MARKETING_SETUP_FLOW.title).toBe('Prepare your marketing HQ');
+    expect(MARKETING_SETUP_FLOW.description).toBe('Answer the questions in the thread. Each answer saves when you press Next, so you can stop and finish later. Close this task to skip setup.');
+    for (const f of Object.values(SETUP_FLOWS)) {
+      for (const words of [f.title, f.description, ...f.steps.map((s) => s.label)]) expect(words, words).not.toMatch(/[—–;]|\bset (?:\w+ )?up\b/i);
+    }
+  });
+
+  // single line breaks join into one paragraph in markdown, so the answers ran together (2026-10-07)
+  it('posts the answers as one list row each, under the head the daemon reads', () => {
+    const body = setupAnswersBody([['Website', 'northwind.example'], ['Focus', 'social, content']]);
+    expect(body).toBe('**Marketing HQ setup**\n\n- Website: northwind.example\n- Focus: social, content');
+    expect(body.startsWith(SETUP_ANSWERS_HEAD)).toBe(true);
+    expect(isSetupAnswers(body)).toBe(true);
+    // a desktop at 0.153.0 posts the old shape, and the daemon must still start the bootstrap on it
+    expect(isSetupAnswers('**Marketing HQ setup**\nWebsite: acme.dev')).toBe(true);
+    expect(isSetupAnswers('Marketing HQ setup')).toBe(false);
+  });
+
   it('marketing has a flow; build deliberately has none yet', () => {
     expect(flowForChannelKind('marketing')).toBe(MARKETING_SETUP_FLOW);
     expect(flowForChannelKind('build')).toBeNull();
@@ -39,7 +59,7 @@ describe('setupProgress — derived from the synced profile, never from UI state
     expect(p.done).toBe(2);
     expect(p.next).toBe('focus');
     expect(p.complete).toBe(false);
-    expect(setupProgressLabel(MARKETING_SETUP_FLOW, p)).toBe('step 3 of 5 — Focus');
+    expect(setupProgressLabel(MARKETING_SETUP_FLOW, p)).toBe('step 3 of 5 · Focus');
   });
 
   it('the progress marker covers skipped-optional and write-less steps', () => {

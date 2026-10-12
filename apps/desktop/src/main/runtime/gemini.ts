@@ -5,6 +5,7 @@
 // in-process). WORKERS always go through agy (the SDK can't do the file/bash loop); a worker needs
 // an agy login — a GEMINI_API_KEY alone only powers the SDK (chat/reason/orchestrator) paths.
 import { spawn } from 'node:child_process';
+import { recordRuntimeEvent } from './brain-recording';
 import type { LogFn } from '../agentlog';
 import type { TurnOpts, RuntimeAdapter, ProposeSkillFn, RecordLessonFn, AddBacklogItemFn, BeatsFn, AgentAttachment, PromptOverride, PermissionGate } from './adapter';
 import { agentBaseEnv, buildCodingPrompt, chatSystemPrompt, isInlineImage, sandboxFsEnabled } from './adapter';
@@ -72,6 +73,7 @@ async function agyExec(args: { dir?: string; prompt: string; ac?: AbortControlle
     let out = '';
     let errTail = '';
     child.stdout.on('data', (d) => { out += String(d); args.onDelta?.(out.trim()); });
+    child.stdout.on('data', (d) => recordRuntimeEvent('agy', { type: 'stdout', text: String(d), completeness: 'stdout-only' }));
     child.stderr.on('data', (d) => { errTail = (errTail + String(d)).slice(-400); });
     child.on('error', (e) => { sbx?.cleanup(); reject(new Error(`agy CLI failed to start: ${e.message}`)); });
     child.on('close', (code) => {
@@ -112,6 +114,7 @@ export const geminiAdapter: RuntimeAdapter = {
       });
       let text = '';
       for await (const chunk of stream) {
+        recordRuntimeEvent('gemini', chunk);
         if (chunk.text) { text += chunk.text; onDelta?.(text); }
       }
       log?.({ kind: 'result', phase: 'success', summary: `replied (${Date.now() - started}ms · gemini)` });
@@ -131,6 +134,7 @@ export const geminiAdapter: RuntimeAdapter = {
       contents: user,
       config: { systemInstruction: system, maxOutputTokens: maxTokens },
     });
+    recordRuntimeEvent('gemini', r);
     return (r.text ?? '').trim();
   },
   async runQuery(agent, t, dir, token, channelBlock, repoBacked, ac, log, skills, proposeSkill?: ProposeSkillFn, reworkNotes?: string, attachmentsNote?: string, recordLesson?: RecordLessonFn, lessonsNote?: string, promptOverride?: PromptOverride, addBacklogItem?: AddBacklogItemFn, beats?: BeatsFn, _permissionGate?: PermissionGate, protectedPaths?: string[], opts?: TurnOpts) {

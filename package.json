@@ -2,7 +2,7 @@
   "name": "neuramesh",
   "private": true,
   "license": "Elastic-2.0",
-  "version": "0.153.0",
+  "version": "0.154.0",
   "engines": {
     "node": ">=22"
   },
@@ -20,6 +20,8 @@
     "e2e": "bash scripts/dev-e2e.sh",
     "app": "bash scripts/cloud-app.sh",
     "app:local": "bash scripts/dev-app.sh",
+    "eval:coding": "node scripts/coding-evals/cli.mjs",
+    "eval:coding:test": "node --test scripts/coding-evals/*.test.mjs",
     "db:dev-migrate": "bash scripts/dev-migrate.sh",
     "db:cloud-migrate": "bash scripts/cloud-migrate.sh",
     "sync:dev-validate": "bash scripts/dev-sync-validate.sh",

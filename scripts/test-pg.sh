@@ -11,9 +11,11 @@ cd "$(dirname "$0")/.."
 # one agent per unit in its own worktree). Defaults keep the single-checkout habit.
 NAME="${NM_PG_NAME:-nm-pg-test}"
 PORT="${NM_PG_PORT:-55434}"
-docker rm -f "$NAME" >/dev/null 2>&1 || true
+# -v: the postgres image declares a VOLUME, so a plain `rm -f` strands an anonymous volume every
+# run. 432 of them (about 67 GB) had piled up before one initdb died on "No space left on device".
+docker rm -f -v "$NAME" >/dev/null 2>&1 || true
 docker run -d --name "$NAME" -e POSTGRES_PASSWORD=nm -e POSTGRES_DB=nm -p $PORT:5432 pgvector/pgvector:pg16 >/dev/null
-trap 'docker rm -f "$NAME" >/dev/null' EXIT
+trap 'docker rm -f -v "$NAME" >/dev/null' EXIT
 # pg_isready can pass during initdb's temp server; require a real query.
 until docker exec "$NAME" psql -U postgres -d nm -tAc "select 1" >/dev/null 2>&1; do sleep 0.4; done
 
@@ -37,5 +39,5 @@ q dev/stack/init/99-publication.sql    # the powersync publication, all tables a
 # meant to. Off here keeps the test schema a control-api concern, not a fleet one.
 # NM_ALLOW_ACTOR_HEADER=1: the suites speak through the bare x-nm-actor header, closed by default.
 DATABASE_URL="postgresql://postgres:nm@127.0.0.1:$PORT/nm" FLEET_AUTOPROVISION=off NM_ALLOW_ACTOR_HEADER=1 \
-  pnpm --filter @neuramesh/control-api exec vitest run .pg.test "$@"
+  pnpm --filter @neuramesh/control-api exec vitest run .pg.test --no-file-parallelism "$@"
 echo "PG TESTS: OK"

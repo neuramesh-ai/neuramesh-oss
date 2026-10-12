@@ -28,7 +28,7 @@ import { isStandDown } from '../replypolicy';
 import { TURN_BUDGETS, genVideoItemId, isChatThread, isRoutineScheduledMarker, modelFreeItemId, parseKindMarker, parseModeMarker, cardsAsWords } from '@neuramesh/shared';
 import { makeFilm } from './videogen';
 import { streamFixture } from './streamfixture';
-import type { PowerSyncDatabase } from '@powersync/node';
+import type { ReplicaDatabase } from '@neuramesh/client-core/replica';
 import type { HostedAgent, SkillRef, ThreadTask } from '../agents';
 import type { LogFn } from '../agentlog';
 import { runWindow } from './runwindow';
@@ -52,7 +52,7 @@ type OrchestratorTurn = (agent: HostedAgent, ch: { id: string; slug: string; wor
 // path touches nearly everything the host does, and until now that was true but invisible.
 // Every type here is INFERRED from the maker that produces it — never restated.
 export function makeWake(ctx: {
-  db: PowerSyncDatabase;
+  db: ReplicaDatabase;
   agents: Map<string, HostedAgent>;
   NO_RUN: ReturnType<typeof makeRuns>['NO_RUN'];
   alog: (agent: HostedAgent, t?: { id: string; number: number; channel_id?: string } | null, channelSlug?: string | null, runId?: string | null) => LogFn;

@@ -214,7 +214,7 @@ describe('a watched house turn types as it is written', () => {
 });
 
 describe('a watched house turn shows its thoughts (starterthoughts.ts)', () => {
-  const STEP = '› list_repo_files · src/storage';
+  const STEP = '› lists the repository files · src/storage';
 
   test('the summary and each tool step ride every update, the step shows before the tool runs, and the reply carries none', async () => {
     const fed: Array<[string, string | undefined]> = [];
@@ -268,10 +268,10 @@ describe('a watched house turn shows its thoughts (starterthoughts.ts)', () => {
     assert.equal(out, 'You have two tasks.');
     // every bubble folds the block at the first word and opens it again on an update with no words (StreamBubble: thinking={!words && !done})
     assert.equal(fed.findIndex(([t]) => t === ''), -1, `an update dropped the words: ${JSON.stringify(fed)}`);
-    const steps = '› list_tasks · todo\n\n› list_tasks · done';
+    const steps = '› checks the board · todo\n\n› checks the board · done';
     assert.deepEqual(fed, [
       ['Checking the board.', undefined],
-      ['Checking the board.', '› list_tasks · todo'],
+      ['Checking the board.', '› checks the board · todo'],
       ['Checking the board.', steps],
       ['Checking the board.', `${steps}\n\nFound two.`],
       ['You have', `${steps}\n\nFound two.`],

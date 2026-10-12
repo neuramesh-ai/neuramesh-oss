@@ -51,6 +51,8 @@ export const EVENT_TYPES = [
   // a Code session's synced row was born / closed (0135) — updates in between are silent, like heartbeats
   'code_session.created',
   'code_session.closed',
+  'brain.committed',
+  'brain.artifact_created',
   'agent.registered',
   'agent.updated',
   'agent.retired',
@@ -108,6 +110,8 @@ export const EVENT_TYPES = [
   'content.updated',
   'content.deleted',
   'connector.revoked',
+  // the first write of a project's GitHub connector row (the activation funnel, analytics.ts)
+  'github.connected',
   'channel.deleted',
   'repo.linked',
   'agent.connected_remote',
