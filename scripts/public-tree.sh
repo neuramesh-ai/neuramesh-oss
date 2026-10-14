@@ -180,7 +180,8 @@ public_docs_private() {
   local e
   git ls-files docs | awk -F/ '{ print ($2 == "design") ? $1"/"$2"/"$3 : $1"/"$2 }' | sort -u |
   while IFS= read -r e; do
-    printf '%s\n' "${PUBLIC_DOCS[@]}" | grep -qx "$e" || printf '%s\n' "$e"
+    # Consume the full pipe: grep -q can SIGPIPE printf and reverse this match under pipefail.
+    printf '%s\n' "${PUBLIC_DOCS[@]}" | grep -Fx -- "$e" >/dev/null || printf '%s\n' "$e"
   done
 }
 
@@ -204,7 +205,7 @@ public_exclude_pathspec() {
   while IFS= read -r p; do printf ':!%s\n' "$p"; done < <(public_docs_private)
   for f in .github/workflows/*.yml; do
     [ -e "$f" ] || continue
-    printf '%s\n' "${PUBLIC_WORKFLOWS[@]}" | grep -qx "$(basename "$f" .yml)" || printf ':!%s\n' "$f"
+    printf '%s\n' "${PUBLIC_WORKFLOWS[@]}" | grep -Fx -- "$(basename "$f" .yml)" >/dev/null || printf ':!%s\n' "$f"
   done
 }
 
@@ -243,13 +244,27 @@ self_test() {
     got=$(public_private_paths | grep '^docs/' | sort)
     want=$(printf '%s\n' docs/b.md docs/design/loose.md docs/design/r1/evidence/x.png docs/design/r2 docs/evidence | sort)
     expect "the paths the snapshot removes: the evidence glob expanded, then the private documents, nothing that is not there" "$got" "$want"
+    # A quiet grep can close its pipe after an early match. Under the snapshot's pipefail,
+    # printf then fails with SIGPIPE and an allowed document is mistakenly removed.
+    set -o pipefail
+    printf -v padding '%070000d' 0
+    PUBLIC_DOCS+=("docs/$padding.md")
+    got=$(public_docs_private)
+    want=$(printf '%s\n' docs/b.md docs/design/loose.md docs/design/r2 docs/evidence)
+    expect "a large allowlist keeps early matches under pipefail" "$got" "$want"
+    : > docs/aXmd
+    git add docs/aXmd
+    PUBLIC_DOCS=(docs/aXmd docs/design/r1 docs/harness)
+    got=$(public_docs_private)
+    want=$(printf '%s\n' docs/a.md docs/b.md docs/design/loose.md docs/design/r2 docs/evidence)
+    expect "allowlist names are literal paths, not regular expressions" "$got" "$want"
     exit "$bad"
   ) || bad=1
   # this repository: every named document exists in git, or the list holds a typo
   for e in "${PUBLIC_DOCS[@]}"; do git ls-files --error-unmatch "$e" >/dev/null 2>&1 || missing="$missing $e"; done
   if [ -z "$missing" ]; then printf '✓ self-test: every entry of PUBLIC_DOCS names a tracked document (%s)\n' "${#PUBLIC_DOCS[@]}"; else bad=1; printf '✗ self-test: PUBLIC_DOCS names nothing in git:%s\n' "$missing"; fi
   if [ "$bad" -ne 0 ]; then echo "public-tree: self-test FAILED"; exit 1; fi
-  echo "public-tree: self-test passed (5 cases)"
+  echo "public-tree: self-test passed (7 cases)"
 }
 
 if [ "${BASH_SOURCE[0]}" = "$0" ]; then
