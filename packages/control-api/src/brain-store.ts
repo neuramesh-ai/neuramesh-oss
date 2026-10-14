@@ -105,8 +105,15 @@ export class BrainStore {
     });
   }
 
-  async read(actor: Actor, workspace: string, threadId: string, compact = false) {
+  async read(actor: Actor, workspace: string, threadId: string, compact = false, since?: number) {
     await brainThreadAccess(this.sql, actor, workspace, threadId);
+    // a reader that already holds the head says so with `since`, and nothing else is read: no segment, no snapshot.
+    // A phone asks again on each focus, and a long recording takes many seconds to read in full
+    if (since !== undefined) {
+      const [head] = await this.sql<{ revision: string; commit_id: string }[]>`select revision::text as revision, commit_id from brain_commits where thread_id = ${threadId}::uuid order by revision desc limit 1`;
+      const revision = Number(head?.revision ?? 0);
+      if (revision === since) return { workspace, threadId, revision, commitId: head?.commit_id ?? null, events: [], unchanged: true as const };
+    }
     // One query takes a consistent committed prefix. Later uploads cannot enter this restore.
     const commits = await this.sql<CommitRow[]>`select revision, commit_id, segment, snapshot, event_count from brain_commits where thread_id = ${threadId}::uuid order by revision`;
     const events = await readBrainEvents(this.objects, commits, compact ? brainRestoreProjection() : undefined);

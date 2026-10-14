@@ -40,6 +40,8 @@ export class ClineChannelSession {
     private readonly log: (line: string) => void,
     private readonly conversation?: EngineeringConversation,
     private readonly setThreadTitle?: (title: string) => Promise<unknown>,
+    /** why this machine refused the open model: nothing runs until a new pick replaces it (engineering-host.ts) */
+    private refusal: string | null = null,
   ) {
     this.provider = provider;
     this.modelId = modelId;
@@ -59,7 +61,7 @@ export class ClineChannelSession {
       && record.metadata?.['actorId'] === this.meta.actorId);
     if (!this.resumeMessages?.length && prior) this.resumeMessages = await this.core.readMessages(prior.sessionId).catch(() => undefined);
     this.emit({ type: 'plan_progress', progress: recoverEngineeringPlanProgress(this.resumeMessages) });
-    this.emit({ type: 'ready', provider: this.provider.providerId, model: this.provider.modelId, cwd: this.cwd, modelId: this.modelId, brainPack: this.brainPack, agent: this.provider.agent, reasoningEffort: engineeringEffort(this.modelId, this.meta.reasoningEffort) });
+    this.emit({ type: 'ready', provider: this.provider.providerId, model: this.provider.modelId, cwd: this.cwd, modelId: this.modelId, brainPack: this.brainPack, agent: this.provider.agent, reasoningEffort: engineeringEffort(this.modelId, this.meta.reasoningEffort), ...(this.conversation ? { recordedRevision: this.conversation.brain.revision() } : {}) }); if (this.refusal) this.emit({ type: 'error', code: 'MODEL_REFUSED', recoverable: true, message: this.refusal });
   }
 
   private readPlanMessages = async (): Promise<unknown> => this.core && this.sessionId ? readRuntimeMessages(this.core, this.sessionId) : this.resumeMessages;
@@ -125,6 +127,8 @@ export class ClineChannelSession {
 
   private async runPrompt(command: Extract<EngineeringCommand, { type: 'prompt' }>): Promise<void> {
     if (this.closed || !this.core) return;
+    // a refused model runs nothing: the reason again, and idle, so the thread's row stops at once
+    if (this.refusal) { this.emit({ type: 'error', code: 'MODEL_REFUSED', recoverable: true, message: this.refusal }); this.emit({ type: 'status', status: 'idle' }); return; }
     if (this.running || this.pending.size > 0 || this.promptQueue.queued) return this.emit({ type: 'error', code: 'TURN_RUNNING', recoverable: true, message: 'Engineering is already working on this thread.' });
     this.running = true;
     this.emit({ type: 'status', status: 'running' });
@@ -191,7 +195,7 @@ export class ClineChannelSession {
       this.conversation?.excludeSecret(nextProvider.apiKey);
       this.conversation?.record('model.change', { from: this.provider.modelId, to: nextProvider.modelId, provider: nextProvider.providerId });
       this.core = nextCore;
-      this.provider = nextProvider;
+      this.provider = nextProvider; this.refusal = null;
       this.modelId = modelId;
       if (selection) { this.meta.agentId = selection.agentId; this.meta.reasoningEffort = engineeringEffort(modelId, selection.reasoningEffort); }
       this.brainPack = brainPack;

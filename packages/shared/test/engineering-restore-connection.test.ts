@@ -94,7 +94,69 @@ it('preserves the existing cache when an authorized legacy host has no checkpoin
   });
   await handle.send({ type: 'prompt', prompt: 'Continue' });
   expect(restored).toHaveBeenCalledWith(cached);
-  expect(open).toHaveBeenCalledWith(cached);
+  expect(open).toHaveBeenCalledWith(cached, expect.any(Function));
   expect(transport.send).toHaveBeenCalledOnce();
   handle.close();
+});
+
+// a reload read the cloud before the last turn's checkpoint landed: the plan showed 2/3 and the last reply was missing
+// until the next restore (the #717 eval). The host flushes on the old connection's close, and its ready names the
+// revision that its recording reaches, so the restore reads again until it covers that revision
+const turn = (id: string, text: string) => ({ id, type: 'user.message', timestamp: '2026-10-11T00:00:01Z', payload: { text, mode: 'act' } });
+const latest: BrainThreadSnapshot = { ...snapshot, revision: 3, events: [...snapshot.events, turn('second', 'Second task')] };
+type Observe = (event: { type?: unknown; recordedRevision?: unknown }) => void;
+const opened = () => {
+  let observe: Observe = () => {};
+  const open = vi.fn((_session: unknown, seen: Observe) => { observe = seen; return lane(); });
+  return { open, observe: (event: { type?: unknown; recordedRevision?: unknown }) => observe(event) };
+};
+const settle = () => new Promise(resolve => setTimeout(resolve, 20));
+
+it('reads again when the host names a newer recorded revision, and shows the newer turns', async () => {
+  const read = vi.fn().mockResolvedValueOnce({ ...snapshot, revision: 2 }).mockResolvedValueOnce(latest);
+  const restored = vi.fn(), host = opened();
+  const handle = restoreEngineeringConnection({ workspace: 'workspace', session, read, restored, open: host.open, failed: vi.fn() });
+  await vi.waitFor(() => expect(host.open).toHaveBeenCalledOnce());
+  host.observe({ type: 'ready', recordedRevision: 3 });
+  await vi.waitFor(() => expect(restored).toHaveBeenCalledTimes(2));
+  expect(read).toHaveBeenCalledTimes(2);
+  expect(restored.mock.calls[1]?.[0].messages.map((m: { body: string }) => m.body)).toEqual(['Original task', 'Second task']);
+  handle.close();
+});
+
+it('reads once when the host is older, or when the restore already covers its revision', async () => {
+  for (const ready of [{ type: 'ready' }, { type: 'ready', recordedRevision: 3 }, { type: 'ready', recordedRevision: 2 }]) {
+    const read = vi.fn().mockResolvedValue(latest);
+    const host = opened();
+    const handle = restoreEngineeringConnection({ workspace: 'workspace', session, read, restored: vi.fn(), open: host.open, failed: vi.fn() });
+    await vi.waitFor(() => expect(host.open).toHaveBeenCalledOnce());
+    host.observe(ready);
+    await settle();
+    expect(read).toHaveBeenCalledOnce();
+    handle.close();
+  }
+});
+
+it('never reads over a turn that started: a command before the ready, or during the second read', async () => {
+  const early = vi.fn().mockResolvedValue({ ...snapshot, revision: 2 });
+  const first = opened();
+  const one = restoreEngineeringConnection({ workspace: 'workspace', session, read: early, restored: vi.fn(), open: first.open, failed: vi.fn() });
+  await one.send({ type: 'prompt', prompt: 'Next step' });
+  first.observe({ type: 'ready', recordedRevision: 3 });
+  await settle();
+  expect(early).toHaveBeenCalledOnce();
+  one.close();
+
+  let finish!: (value: BrainThreadSnapshot) => void;
+  const late = vi.fn().mockResolvedValueOnce({ ...snapshot, revision: 2 }).mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+  const restored = vi.fn(), second = opened();
+  const two = restoreEngineeringConnection({ workspace: 'workspace', session, read: late, restored, open: second.open, failed: vi.fn() });
+  await vi.waitFor(() => expect(second.open).toHaveBeenCalledOnce());
+  second.observe({ type: 'ready', recordedRevision: 3 });
+  await vi.waitFor(() => expect(late).toHaveBeenCalledTimes(2));
+  await two.send({ type: 'prompt', prompt: 'Next step' });
+  finish(latest);
+  await settle();
+  expect(restored).toHaveBeenCalledOnce();
+  two.close();
 });

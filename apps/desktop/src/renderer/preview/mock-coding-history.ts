@@ -51,12 +51,39 @@ const snapshot = (workspace: string): BrainThreadSnapshot => ({
   ],
 });
 
+// ?coderefused=1 (with ?engruntime=unavailable, the live path): the host opens the thread on a saved model this machine
+// refuses, a Claude sign-in. It sends ready, then the reason once, as engineering-host.ts and engineering-channel.ts do.
+const REFUSED = typeof location !== 'undefined' && new URLSearchParams(location.search).get('coderefused') === '1';
+const REFUSAL = 'Coding with a Claude subscription is off. Pick another model, or add a Claude API key.';
+// ?codestale=1 (with ?engruntime=unavailable, the live path): the immediate-reload race. The first read comes before
+// the last turn's checkpoint lands (revision 6, no final reply), and the host's ready names revision 7, so the restore
+// reads again (shared restore-connection.ts). window.__nmHistoryReads counts the reads.
+const STALE = typeof location !== 'undefined' && new URLSearchParams(location.search).get('codestale') === '1';
+const LAST_TURN = new Set(['e8', 'e8b', 'e9']);
+const historyRead = (): number => { const w = window as unknown as { __nmHistoryReads?: number }; w.__nmHistoryReads = (w.__nmHistoryReads ?? 0) + 1; return w.__nmHistoryReads; };
+
 export const codingHistoryLanes = {
+  ...(REFUSED || STALE ? { engineeringInfo: async () => ({ available: true }) } : {}),
   // the bridge with no machine (the web build with no relay, web/webnm-local.ts): a handle that refuses work.
   // The catch-all answers an empty promise, and a restore's close on unmount calls close on it.
-  openEngineering: () => ({ subId: '', send: async () => { throw new Error('No machine is available for this workspace yet.'); }, close: () => {} }),
+  openEngineering: STALE
+    ? (_meta: unknown, onEvent: (event: Record<string, unknown>) => void) => {
+      setTimeout(() => onEvent({ type: 'ready', provider: 'openai', model: 'gpt-6-astra', cwd: '/repo', modelId: 'gpt-6-astra', brainPack: null, recordedRevision: 7 }), 200);
+      return { subId: 'stale', send: async () => {}, close: () => {} };
+    }
+    : REFUSED
+    ? (_meta: unknown, onEvent: (event: Record<string, unknown>) => void) => {
+      setTimeout(() => {
+        onEvent({ type: 'ready', provider: 'none', model: 'claude-opus-5', cwd: '/repo', modelId: 'claude-opus-5', brainPack: null });
+        onEvent({ type: 'error', code: 'MODEL_REFUSED', recoverable: true, message: REFUSAL });
+      }, 200);
+      return { subId: 'refused', send: async () => {}, close: () => {} };
+    }
+    : () => ({ subId: '', send: async () => { throw new Error('No machine is available for this workspace yet.'); }, close: () => {} }),
   engineeringHistory: async (threadId: string, workspace: string): Promise<BrainThreadSnapshot> => {
     if (threadId !== CODING_THREAD_ID) throw new Error('The harness records one coding thread.');
-    return snapshot(workspace);
+    const full = snapshot(workspace);
+    if (!STALE) return full;
+    return historyRead() === 1 ? { ...full, revision: 6, events: full.events.filter((e) => !LAST_TURN.has(e.id)) } : full;
   },
 };

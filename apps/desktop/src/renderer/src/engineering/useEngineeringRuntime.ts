@@ -111,7 +111,7 @@ export function useEngineeringRuntime(harness: boolean, repos: EngineeringRepo[]
     const existing = handles.current.get(session.id);
     const code = codeBridge();
     if (existing || harness || !code?.openEngineering) return existing ?? null;
-    const open = (session: EngineeringSession): Handle => code!.openEngineering!({
+    const open = (session: EngineeringSession, observe?: (event: { type?: unknown; recordedRevision?: unknown }) => void): Handle => code!.openEngineering!({
       threadId: session.id, repoId: session.repo.id, repoName: session.repo.name, branch: session.repo.branch,
       ...(session.project?.id ? { projectId: session.project.id } : {}),
       ...(session.repo.root ? { cwd: session.repo.root } : {}),
@@ -120,7 +120,7 @@ export function useEngineeringRuntime(harness: boolean, repos: EngineeringRepo[]
       agentId: session.agentId ?? null, reasoningEffort: session.reasoningEffort ?? null, modelId: codeModelOf(session.modelOverride), brainPack: session.brainPack,
       // rule D9: which machine hosts this session — the desktop routes its own id in process
       ...(session.machineId ? { machineId: session.machineId } : {}),
-    }, (event) => setSessions((all) => all.map((item) => item.id === session.id ? applyRemoteEngineeringEvent(item, event as unknown as Record<string, unknown>) : item)), () => {
+    }, (event) => { observe?.(event); setSessions((all) => all.map((item) => item.id === session.id ? applyRemoteEngineeringEvent(item, event as unknown as Record<string, unknown>) : item)); }, () => {
       handles.current.delete(session.id);
       setSessions((all) => all.map((item) => item.id === session.id && (item.state === 'streaming' || item.state === 'awaiting_approval')
         ? failRemoteEngineeringTransport(item, new Error('The Code workspace connection closed.'))

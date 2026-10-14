@@ -132,6 +132,26 @@ describe.skipIf(!DB)('portable brain against real Postgres and durable filesyste
     expect((await request(mate, path)).status).toBe(404);
   });
 
+  // a phone reads the recording again on each focus, and a long one takes many seconds: a reader that holds the head
+  // names it with since, and the API answers unchanged without reading a segment or a snapshot
+  it('a reader at the head reads nothing more, a newer head reads in full, and access still holds', async () => {
+    const { id } = await thread();
+    expect((await put(id, commit())).status).toBe(200);
+    const at = (since: string, actor = owner) => request(actor, `/v1/brain/threads/${id}?workspace=${workspace}&format=compact-decoded&since=${since}`);
+    const gets = vi.spyOn(objects, 'get');
+    expect(await json(await at('1'))).toMatchObject({ workspace, threadId: id, revision: 1, events: [], unchanged: true });
+    expect(gets).not.toHaveBeenCalled();
+    expect((await put(id, commit([event('next')], 1))).status).toBe(200);
+    const newer = await json(await at('1'));
+    expect(newer.unchanged).toBeUndefined();
+    expect(newer.revision).toBe(2);
+    expect(newer.events).toHaveLength(2);
+    expect(gets).toHaveBeenCalled();
+    for (const odd of ['-1', 'two', '1.5']) expect((await json(await at(odd))).events).toHaveLength(2);
+    expect((await at('2', stranger)).status).toBe(404);
+    gets.mockRestore();
+  });
+
   it('makes a lost-response retry idempotent and refuses changed content or reused event IDs', async () => {
     const { id } = await thread();
     const body = commit();

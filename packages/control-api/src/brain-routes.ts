@@ -71,7 +71,11 @@ export function brainRoutes<E extends Env & { Variables: { actor: Actor } }>(app
     c.header('cache-control', 'no-store');
     c.header('vary', 'Accept-Encoding');
     const format = c.req.query('format');
-    const snapshot = await service().read(c.get('actor'), scope.data.workspace, scope.data.id, format === 'compact' || format === 'compact-decoded');
+    // `since`: the revision the reader holds. The head at that revision reads as unchanged, and anything else reads in full
+    const held = c.req.query('since');
+    const since = held !== undefined && /^\d{1,12}$/.test(held) ? Number(held) : undefined;
+    const snapshot = await service().read(c.get('actor'), scope.data.workspace, scope.data.id, format === 'compact' || format === 'compact-decoded', since);
+    if ('unchanged' in snapshot && snapshot.unchanged) return c.json(snapshot);
     return c.json(format === 'decoded' || format === 'compact-decoded'
       ? decodedBrainSnapshot(snapshot as BrainThreadSnapshot, format === 'compact-decoded' ? 64 * 1024 * 1024 : undefined) : snapshot);
   });

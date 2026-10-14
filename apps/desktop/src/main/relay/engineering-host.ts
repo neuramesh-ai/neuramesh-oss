@@ -4,7 +4,7 @@ import { defaultBaselineRules, isEngineeringSelection, type PolicyRule } from '@
 import type { EngineeringMachineOpenMeta, EngineeringRuntimeEvent } from '../../engineering-protocol';
 import type { EngineeringBrainResolution } from './engineering-brain';
 import { ClineChannelSession } from './engineering-channel';
-import { engineeringAuthHeaders, resolveEngineeringProvider } from './engineering-provider';
+import { EngineeringModelRefused, engineeringAuthHeaders, resolveEngineeringProvider, type EngineeringProviderResolution, type MachineAuthProbe } from './engineering-provider';
 import { EngineeringConversation } from './engineering-conversation';
 import { createEngineeringToolExecutors } from './engineering-tools';
 import { engineeringRepoRoot, type EngineeringWorkspace } from './engineering-workspace';
@@ -44,6 +44,8 @@ export interface ClineEngineeringHostOptions {
   recorder?: CodeSessionRecorder;
   createCore?: typeof import('@cline/sdk').ClineCore.create;
   createDefaultExecutors?: typeof import('@cline/sdk').createDefaultExecutors;
+  /** this machine's sign-ins and keys (engineering-provider.ts): a test hands in its own */
+  authProbe?: MachineAuthProbe;
   log?(line: string): void;
 }
 
@@ -69,7 +71,16 @@ export function createClineEngineeringHost(opts: ClineEngineeringHostOptions): E
       const saved = conversation?.brain.metadata()?.['selection'];
       if (isEngineeringSelection(saved)) meta = { ...meta, ...saved };
       const brain = await opts.resolveBrain(meta);
-      const provider = { ...await resolveEngineeringProvider(opts, brain), agent: brain.agent, instructions: brain.instructions };
+      // a model this machine refuses still opens the thread: it reads, says why once, and a new pick replaces the model.
+      // The stand-in has no credential, and the channel starts nothing on it (engineering-channel.ts runPrompt)
+      let refused: string | null = null;
+      let resolved: EngineeringProviderResolution;
+      try { resolved = await resolveEngineeringProvider(opts, brain, undefined, opts.authProbe); } catch (error) {
+        if (!(error instanceof EngineeringModelRefused)) throw error;
+        refused = error.message;
+        resolved = { providerId: 'none', modelId: brain.modelId };
+      }
+      const provider = { ...resolved, agent: brain.agent, instructions: brain.instructions };
       // The desktop package is CommonJS while the coding runtime is import-only ESM. This must
       // remain dynamic or machined's tsx boot resolves Node's require condition and exits early.
       const runtimeModule = opts.createCore ? null : await import('@cline/sdk');
@@ -80,9 +91,9 @@ export function createClineEngineeringHost(opts: ClineEngineeringHostOptions): E
         : undefined;
       const resolveProvider = async (modelId: string | null, brainPack: string | null, agentId = meta.agentId) => {
         const selected = await opts.resolveBrain({ ...meta, modelId, brainPack, ...(agentId !== undefined ? { agentId } : {}) });
-        return { ...await resolveEngineeringProvider(opts, selected), agent: selected.agent, instructions: selected.instructions };
+        return { ...await resolveEngineeringProvider(opts, selected, undefined, opts.authProbe), agent: selected.agent, instructions: selected.instructions };
       };
-      const session = new ClineChannelSession(meta, cwd, provider, meta.modelId ?? null, meta.brainPack ?? null, resolveProvider, policyRules, emitTo, createCore, managedTools?.executors, managedTools?.close, log, conversation, engineeringThreadNamer({ apiUrl: opts.apiUrl, workspaceId: opts.workspaceId, threadId: meta.threadId, headers: () => engineeringAuthHeaders(opts), fetchImpl: opts.fetchImpl }));
+      const session = new ClineChannelSession(meta, cwd, provider, meta.modelId ?? null, meta.brainPack ?? null, resolveProvider, policyRules, emitTo, createCore, managedTools?.executors, managedTools?.close, log, conversation, engineeringThreadNamer({ apiUrl: opts.apiUrl, workspaceId: opts.workspaceId, threadId: meta.threadId, headers: () => engineeringAuthHeaders(opts), fetchImpl: opts.fetchImpl }), refused);
       try { await session.init(messages); } catch (error) { managedTools?.close(); throw error; }
       record?.opened();
       return record ? record.wrap(session) : session;

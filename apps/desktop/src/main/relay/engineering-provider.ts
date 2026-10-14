@@ -41,6 +41,10 @@ const API_PROVIDER: Record<Provider, string> = {
   gemini: 'gemini',
 };
 
+/** a model this machine cannot run for code (a Claude sign-in, a missing or expired sign-in or key): the thread still
+ *  opens and says why, and a new pick replaces the model. The name stays Error, so a message reads the same. */
+export class EngineeringModelRefused extends Error { readonly code = 'MODEL_REFUSED'; }
+
 function requireManagedTools(providerId: string): void {
   if (providerId === 'openai-codex-cli' || providerId === 'claude-code') {
     throw new Error('This subscription adapter cannot use NeuraMesh coding tools and approvals. Choose ChatGPT with a local Codex sign-in, or explicitly select an API-key provider.');
@@ -180,10 +184,11 @@ export async function resolveEngineeringProvider(
       apiKey: CHATGPT_LOCAL_CREDENTIAL,
       runtimeFetch: createChatGPTSubscriptionFetch(),
     };
-    if (credential === 'anthropic') requireManagedTools('claude-code');
+    // the claude-code adapter runs its own tools outside NeuraMesh approvals, so a Claude sign-in never runs code
+    if (credential === 'anthropic') throw new EngineeringModelRefused('Coding with a Claude subscription is off. Pick another model, or add a Claude API key.');
     // the coding runtime has no lane for a Google sign-in: a Gemini key on this machine still runs it
     const key = token ?? envKey;
     if (key) return { apiKey: key, providerId: API_PROVIDER[credential], modelId: brain.modelId };
   }
-  throw new Error(refusal(credential, auth));
+  throw new EngineeringModelRefused(refusal(credential, auth));
 }

@@ -5093,7 +5093,7 @@ var SUPPORTED_DESKTOP_VERSIONS, MIN_DESKTOP_VERSION, versionSegments, belowFloor
 var init_desktop_floor = __esm({
   "../shared/src/desktop-floor.ts"() {
     "use strict";
-    SUPPORTED_DESKTOP_VERSIONS = ["0.153.0", "0.152.0"];
+    SUPPORTED_DESKTOP_VERSIONS = ["0.154.0", "0.153.0"];
     MIN_DESKTOP_VERSION = SUPPORTED_DESKTOP_VERSIONS[1];
     versionSegments = (v) => v.split(".").map((n) => Number.parseInt(n, 10) || 0);
     belowFloor = (version2, floor) => !!floor && /^\d+\.\d+/.test(floor) && compareVersions(version2, floor) < 0;
@@ -9523,15 +9523,44 @@ function awaitingEngineeringHistory(session) {
 function restoreEngineeringConnection(input) {
   let closed = false;
   let handle;
+  let shown = -1;
+  let sent = false;
+  let heard = false;
+  const own = (snapshot) => {
+    if (snapshot.workspace !== input.workspace) throw new Error("The recorded conversation belongs to another workspace.");
+    if (snapshot.threadId !== input.session.id) throw new Error("The recorded conversation belongs to another thread.");
+  };
+  const catchUp = async (head) => {
+    const until = Date.now() + 3e4;
+    while (!closed && !sent && shown < head && Date.now() < until) {
+      const next = await input.read().catch(() => null);
+      if (!next || closed || sent) return;
+      try {
+        own(next);
+      } catch {
+        return;
+      }
+      if (next.revision > shown) {
+        shown = next.revision;
+        input.restored(restoreEngineeringBrain(input.session, next));
+      }
+      if (shown < head) await new Promise((resolve2) => setTimeout(resolve2, 1e3));
+    }
+  };
+  const observe = (event) => {
+    if (heard || event.type !== "ready") return;
+    heard = true;
+    if (typeof event.recordedRevision === "number" && event.recordedRevision > shown && !sent) void catchUp(event.recordedRevision);
+  };
   const ready = (async () => {
     const snapshot = await input.read();
     if (closed) throw new Error("The Code connection closed while loading its history.");
-    if (snapshot.workspace !== input.workspace) throw new Error("The recorded conversation belongs to another workspace.");
-    if (snapshot.threadId !== input.session.id) throw new Error("The recorded conversation belongs to another thread.");
+    own(snapshot);
     const unrecorded = snapshot.revision === 0 && snapshot.events.length === 0 && !snapshot.runtimeMessages?.length;
     const session = unrecorded ? input.session : restoreEngineeringBrain(input.session, snapshot);
+    shown = snapshot.revision;
     input.restored(session);
-    handle = input.open(session);
+    handle = input.open(session, observe);
     return handle;
   })();
   void ready.catch((error) => {
@@ -9542,6 +9571,7 @@ function restoreEngineeringConnection(input) {
     async send(command) {
       const current = await ready;
       if (closed) throw new Error("The Code connection is closed.");
+      sent = true;
       await current.send(command);
     },
     close() {
@@ -19577,8 +19607,13 @@ var BrainStore = class {
       return { ok: true, revision: next, commitId: input.commitId, sha256: digest2, duplicate: false };
     });
   }
-  async read(actor, workspace, threadId, compact = false) {
+  async read(actor, workspace, threadId, compact = false, since) {
     await brainThreadAccess(this.sql, actor, workspace, threadId);
+    if (since !== void 0) {
+      const [head2] = await this.sql`select revision::text as revision, commit_id from brain_commits where thread_id = ${threadId}::uuid order by revision desc limit 1`;
+      const revision = Number(head2?.revision ?? 0);
+      if (revision === since) return { workspace, threadId, revision, commitId: head2?.commit_id ?? null, events: [], unchanged: true };
+    }
     const commits = await this.sql`select revision, commit_id, segment, snapshot, event_count from brain_commits where thread_id = ${threadId}::uuid order by revision`;
     const events = await readBrainEvents(this.objects, commits, compact ? brainRestoreProjection() : void 0);
     let runtimeMessages;
@@ -25831,7 +25866,10 @@ function brainRoutes(app, store2, options = {}) {
     c.header("cache-control", "no-store");
     c.header("vary", "Accept-Encoding");
     const format = c.req.query("format");
-    const snapshot = await service().read(c.get("actor"), scope.data.workspace, scope.data.id, format === "compact" || format === "compact-decoded");
+    const held = c.req.query("since");
+    const since = held !== void 0 && /^\d{1,12}$/.test(held) ? Number(held) : void 0;
+    const snapshot = await service().read(c.get("actor"), scope.data.workspace, scope.data.id, format === "compact" || format === "compact-decoded", since);
+    if ("unchanged" in snapshot && snapshot.unchanged) return c.json(snapshot);
     return c.json(format === "decoded" || format === "compact-decoded" ? decodedBrainSnapshot(snapshot, format === "compact-decoded" ? 64 * 1024 * 1024 : void 0) : snapshot);
   });
   app.post("/v1/brain/artifacts", async (c) => {

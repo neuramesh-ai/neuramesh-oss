@@ -19,13 +19,14 @@ optimizes for **calm legibility with warmth** — a workshop, not a dashboard:
 - **Warmth lives in the frame and the accents, not in the content ground.** The cream gutter, the
   oak accent, the warm identity tiles — those carry the personality. The surfaces you read and
   type on stay quiet.
-- **Elevation over outline.** State changes read as light (shadow, lift, wash), not as louder
+- **Elevation over outline in the elevated look.** State changes read as light (shadow, lift, wash), not as louder
   borders. Hairlines define shape; shadow defines importance.
 - **Motion is a heartbeat, not a show.** Entrances rise softly and never block; the few constant
   animations (typing dots, the onboarding step ring's halo) signal *something is alive here* and
   are stilled under `prefers-reduced-motion`.
-- **One system, four themes.** Cream Oak is the signature; graphite dark, soft dark, and light
-  mirror the same model token-for-token. A surface that only looks right in one theme is a bug.
+- **One system, two looks.** The web has four elevated palettes plus Paper light, Paper dark and Paper Cream Oak.
+  The desktop retains its four elevated palettes until the paper port. Each palette uses the same tokens.
+  A surface that only looks right in one theme is a bug.
 
 ## 2. The frame model (the Cabinet lesson)
 
@@ -197,11 +198,52 @@ The web and desktop rail show a labeled **Settle** button on hover or keyboard f
 Plus one deliberate exception: **selected state** may wear the accent wash (`--accent-soft`) — a
 chosen pack card, an active filter. Warm-as-selection is idiom; warm-as-default is the bug.
 
+## Two looks: elevated and paper
+
+The browser client offers two groups in Appearance. Paper has Paper light, Paper dark, Paper Cream Oak and its own
+Sync with system. Paper Cream Oak is a fixed light palette with warm cream and oak-brown ink.
+Elevated retains Dark, Soft Dark, Light, Cream Oak and Sync with system.
+One local preference, `nm:theme`, selects both the look and palette. The default is `paper-system`.
+An unset or invalid preference follows the OS with Paper light or Paper dark. Saved choices stay unchanged.
+`paper-system` follows the OS within the paper pair. The boot script applies both attributes before paint.
+
+`data-theme` selects colors. `data-look="paper"` selects structure. Paper has one ground across the
+frame, rail, sheet and side panel. Panes meet at a single rule, without a gap, radius or shadow.
+Objects have one outline. Passive wells have a wash and no outline. A control inside an outlined
+object has no outline of its own. Hover uses a wash without lift or a louder edge.
+Menus and modals retain an edge and a small shadow. Their veils have no blur.
+Needs you stays amber. Chrome, links, agent marks and primary buttons use ink. The Porch brand mark
+keeps oak. Board phases, charts, diffs and terminal output retain data colors.
+
+| Token | Elevated | Paper |
+|---|---|---|
+| `--lift` | `translateY(-1px)` | `none` |
+| `--btn-primary` / `--btn-primary-ink` | Brand / brand ink | Text / ground |
+| `--card-hover` | Card | Hover wash |
+| `--diff-add` / `--diff-add-bg` | Existing diff rules | Accessible add ink / fill |
+| `--diff-del` / `--diff-del-bg` | Existing diff rules | Accessible remove ink / fill |
+| `--snapshot-filter` | Existing thumbnail rules | No filter in light, inverted snapshot in dark |
+
+| Paper token | Paper light | Paper dark | Paper Cream Oak |
+|---|---|---|---|
+| Ground: win, bg, panel, card | `#f7f6f3` | `#212121` | `#f7efe2` |
+| Rule / edge | `#e4e1dc` / `#c9c4bd` | `#313131` / `#4a4a4a` | `#e1d3be` / `#c2ad91` |
+| Wash / selected | `#efede9` / `#e8e6e1` | `#282828` / `#2e2e2e` | `#f1e6d5` / `#e9dbc5` |
+| Text / body | `#141310` / `#4a4640` | `#d9d9d9` / `#b8b8b8` | `#3a2c22` / `#5b4c3d` |
+| Muted / dim | `#5e5952` / `#6b665f` | `#a6a6a6` / `#959595` | `#6b5844` / `#705c46` |
+| Needs you | `#8a5e1f` | `#d0a862` | `#7b551c` |
+| Overlay | `#f7f6f3` | `#282828` | `#f7efe2` |
+| Diff add ink / fill | `#2f7a52` / `#e8f1ea` | `#86ba9b` / `#22302a` | `#2f7a52` / `#e8f1ea` |
+| Diff remove ink / fill | `#a8433f` / `#f6e8e5` | `#d89494` / `#352424` | `#a8433f` / `#f6e8e5` |
+
+All paper text tokens pass 4.5:1 on the ground, wash and selected row. Tests enforce that floor.
+The full contract and port boundaries live in [the paper design](design/paper-look-2026-10/design.md).
+
 ## 4. Color tokens
 
 Per-theme, defined in `tokens.css` and mirrored in `client-core` THEMES (CI-enforced, §10):
 
-| Token | Role | Paper (reference, the Foundry light since 2026-09-09; Cream Oak keeps its own warm values) |
+| Token | Role | Light (reference, the Foundry light since 2026-09-09; Cream Oak keeps its own warm values) |
 |---|---|---|
 | `--win` | frame / gutter (literal, never an alias) | `#ebe9e6` |
 | `--bg` / `--panel` | sheet ground | `#f5f4f2` |
@@ -211,7 +253,7 @@ Per-theme, defined in `tokens.css` and mirrored in `client-core` THEMES (CI-enfo
 | `--text` / `--body` / `--muted` / `--dim` | ink ramp — **retreated 2026-09-04** (rail-ink round): graphite `#cbcbcb · #a6a6a6 · #848484 · #6a6a6a`, cream oak `#3a2c22 · #5b4c3d · #8b7861 · #a99680`; chrome rests in `--body`, `--text` is for titles and the selected row, `--dim` is decorative (never body copy) | `#3a2c22` / `#5b4c3d` / … |
 | `--accent` / `--accent-ink` | oak + text-on-oak | `#834a2b` / `#fff7ee` |
 | `--link` | every hyperlinked resource — task refs, file refs, PRs, markdown links | `#9c5730` |
-| `--brand` / `--brand-ink` | the Porch mark plus decisive primary actions — **constant `#834a2b` / `#fff7ee` in every theme** | identity, not theme |
+| `--brand` / `--brand-ink` | the Porch mark and elevated primary actions. Paper actions use `--btn-primary`. Brand values stay `#834a2b` / `#fff7ee` | identity, not theme |
 | `--accent-soft` | selection wash | oak at low alpha |
 | `--hover-bg` / `--sel-bg` | interaction washes — **alpha, never opaque panel steps** | |
 | `--ring` | quiet focus ring (≈42% accent) | |
@@ -232,14 +274,14 @@ Rules of use:
   Porch and true primary buttons ride `--brand`/`--brand-ink` (never `--accent`, which remains
   achromatic for selection/status in the darks) and stay oak everywhere. The small, deliberate
   action islands keep Graphite calm while making the product's primary move unmistakably ours
-  (primary-action ruling, 2026-08-30).
+  (primary-action ruling, 2026-08-30). The paper look uses ink for primary actions, as specified above.
 - **Status/FSM hues are theme-independent** — board-state colors never restyle per theme.
-- **Links wear the theme's own oak, never an imported blue** (ruling 2026-07-28). `--link` is the
+- **Elevated links wear the theme's own oak, never an imported blue** (ruling 2026-07-28). `--link` is the
   single token behind every task ref, file ref, PR link and markdown link, so it is retuned per
-  theme and never overridden per component: `#9c5730` cream · `#8f4f2a` Paper · `#d19a72`
+  theme and never overridden per component: `#9c5730` cream · `#8f4f2a` Light · `#d19a72`
   Graphite · `#d3a07a` soft dark. The dark values are the *deliberate* second warm object,
   alongside the Porch mark — chosen because task refs are scanned, not read, and an achromatic
-  link costs that scan in the themes where most work happens.
+  link costs that scan in the themes where most work happens. Paper links use ink with an underline or a ref chip.
 - Never hardcode a hex in a component; if a needed value doesn't exist, add a token.
 - **Chart series wear `--viz-*`, validated, never eyeballed** (2026-08-11): the soft chip hues
   FAILED the colorblind checks as adjacent fills (blue↔violet ΔE 2.3 under protanopia), so charts
@@ -290,6 +332,35 @@ Rules of use:
   A connection open or close does not. [Behavior and evidence](design/code-review-2026-10/recents.md).
 
 ## 5. Type
+
+**Web update, 2026-10-13:** George requested Geist Mono across the browser app after the Paper review.
+The web tokens `--fbody`, `--fdisp`, `--fital`, `--fbrand`, and `--font` now resolve to `--fmono`.
+Headings, navigation, messages, the composer, menus, settings, whiteboard controls, and checkout fields use the same bundled face.
+Native form controls inherit the same face, including the sign-in email and password fields.
+The browser preloads the Latin Geist Mono file. Other Unicode subsets load when needed.
+Web text uses `letter-spacing: -0.02em`, matching the original filter heading at George's request.
+This tight spacing applies to thread labels, controls, headings, and prose. The old mixed tracking values no longer apply.
+Recents and Projects retain the original uppercase 10px headings, weight 500, and tight spacing.
+Their counts and separator also use 10px. The smaller headings sit above the 12px conversation labels.
+Role chips use 10px / 14px, with weight 500. The old 6.5px chips were too small for clear role names.
+Paper outlines each agent's original DiceBear icon. The original face and transforms stay intact.
+The colored background disappears, the head uses a 4.5-unit stroke, and the eyes and mouth use the theme ink.
+A CSS mask applies that ink. Rex alone uses the Porch outline.
+The icon shapes remain distinct. No agent uses a letter fallback.
+
+The rail uses **12px / 18px** for main labels and **11px / 16.5px** for section labels, status, counts, and timestamps.
+Thread titles keep weight 450. Main controls keep weight 500. Row heights and the 320px default width stay the same.
+The transcript uses **12px / 1.55**, matching the rail conversation labels through `--text-conversation`.
+Human replies, agent replies, and live replies share that size. The composer and its highlight layer use **12px / 1.5**.
+Transcript headings use 16px, 14px, and 13px. Code and tables use 12px. Author names use 12px and timestamps use 11px.
+New Session retains its 29px greeting. The project switcher inherits that size and uses 700 weight. Composer guidance uses 11px.
+Other screen headings retain their existing hierarchy.
+Thread icons use muted state colors in both Recents and Projects: purple for Idle, blue for Working, and green for Settled.
+The `--thread-idle`, `--thread-working`, and `--thread-settled` tokens mix 75% of the theme hue with the body ink.
+Icon shape and the existing group labels keep state clear without color alone. The live orb retains its monochrome animation.
+The trailing amber needs-you signal stays independent of the activity color.
+This update covers the browser app. The desktop, phone, and public site retain their existing faces.
+The earlier type rounds below describe that lineage. This update supersedes their face, tracking, rail-size, and transcript-size choices for the web app.
 
 - **The Foundry type system (2026-09-09, George: "the complete thing")** — the app wears the
   site's faces. `--fdisp` and `--fbody` are both **NeuraMesh Sans** (the house face, 2026-09-11:
@@ -677,7 +748,7 @@ real work — if it is decoration, drop it and keep the pill.
   muted ink, then a lock line in dim ink. Words lead with the value, and money comes second.
   ▸ **Stripe is one more renderer of the tokens.** Stripe draws its fields in its own frames, so
   `pro/look.ts` hands its Appearance API the page's tokens as plain colours (`--bg`, `--text`,
-  `--body`, `--dim`, `--border2`, `--accent`, `--term-red`), NeuraMesh Sans by URL, and the `night`
+  `--body`, `--dim`, `--border2`, `--accent`, `--term-red`), Geist Mono by URL, and the `night`
   or `stripe` base by the card's luminance, and it re-themes on a `data-theme` change. A `color-mix()`
   token never reaches Stripe: its fallback stands in. Wallet buttons follow the ground: white on
   graphite, black on light.
@@ -779,6 +850,13 @@ real work — if it is decoration, drop it and keep the pill.
   textarea, then a chips row: `#channel` chip · pickers as chips · attach · contextual chips ·
   round accent send. Every composer in the product (rooms, Home, thread, launcher) is this one
   idiom — new features **inherit the composer**, never rebuild it.
+  Web thread replies omit the channel chip. The breadcrumbs identify the fixed channel.
+  New Session places the project picker first and the channel picker second.
+  Its control row uses 4px gaps and 5px horizontal padding. Project, channel and repository labels cap at 110px.
+  The model control caps at 150px. Long labels truncate so desktop controls share one row.
+  Both the greeting and the composer project pickers update the same project and reset the target channel.
+  The channel menu ends with New channel, including when the project has no channels.
+  Creation uses the existing channel form. Send stays disabled until the new channel reaches the local replica.
   ▸ **The foot** (the composer-foot round, 2026-09-11, George — visual contract
   [docs/design/composer-foot-2026-09](design/composer-foot-2026-09/plan.md)): Home's composer wears a
   third zone under the chips row, the **chint cap's material mirrored at the bottom of the same card**
@@ -841,10 +919,10 @@ real work — if it is decoration, drop it and keep the pill.
   the machine: the `.cchip.crepo` pill (branch glyph, `repo` or `owner/name`, lit when set) opens
   the same upward `.cprojpop.cmachpop` menu the machine chip uses. One row per repository of the
   target room's project, the primary tagged `default`, `None · a conversation` first, `Connect a
-  repository…` when the project holds none, and a foot that names the consequence: a repository
-  makes the send a coding conversation. The chint cap, the placeholder and the routing hint move
+  repository…` as the fixed bottom row. The menu has no explanatory footer. It fits above the chip.
+  Only its repository list scrolls, so the connect action stays visible with long lists. The chint cap, the placeholder and the routing hint move
   with the pick (docs/34 §7). The Code rail's `New session` opens New chat with the chip pre-set
-  to the room's primary repository.
+  to the room's primary repository. The chip reads `None` when no repository is selected.
 - **The model chip and the agent chip** (2026-10-02, [models and replies §4](design/models-and-replies-2026-10/plan.md),
   boards D1 to D12) replace the brain pill on the web's four composers and on the phone. The
   **model chip** (`.cchip.cmodel`: the provider's mark, the model's name, `· Level` when the person
@@ -1962,6 +2040,13 @@ real work — if it is decoration, drop it and keep the pill.
   `aria-busy`. The toggle in the head is `Thread overview` (a `data-tip`, never a native title). It enters
   with `nm-rise` at `--dur-fast`. The narrow form (`.overview-inline`) is the same card, in flow above the
   transcript, at most 45% of its height.
+  The transcript and composer share the same horizontal center when the card is visible.
+  The card width, gap, and outer inset define one CSS reservation. Hidden and inline cards reserve no width.
+  Full threads keep breadcrumbs and actions on the first row, then a single ellipsized title on its
+  own row. Repository, branch, runtime and the legacy task link live in the coding overview.
+  Task and chat status belongs in the overview; task assignment, description, subtasks, review history
+  and marketing brand doors live there too. These doors open the existing details tab. Task editing
+  remains beside the title. Task peeks retain their compact facts because they have no floating card.
 
 ## 9. The traps (etched — check these in review)
 
@@ -2011,6 +2096,12 @@ Each of these shipped as a real defect at least once during the revamp:
     silently decided who survived; it read correct for a year purely because every caller happened
     to hand it a sorted array. Sorting the visible slice makes the *row* look right while the
     *choice* of what is in the row is arbitrary.
+
+### Paper traps
+
+- Do not key paper structure on a theme name. Use `data-look` so both palettes share it.
+- Do not remove a hover lift without a visible wash. A still card must retain feedback.
+- Do not add a line inside an outlined object. Inspect the composer hint and its chips together.
 
 ## 10. Enforcement & verification
 
@@ -2062,3 +2153,17 @@ Progress is recorded by the side-effect-free `update_plan_progress` tool. The ag
 Validation: `packages/shared/test/engineering-plan-progress.test.ts`, the relay's `engineering-plan-progress.test.ts`, `scripts/plan-progress-browser.mjs` against the labelled `/plan-progress.html` rendering fixture, and all three real coding UI evals. The UI evals capture progress transitions and verify explicit completion and reload persistence.
 
 Recoverable core errors do not end execution: keep the composer locked and the progress state active until an explicit runtime completion or terminal error. A failed tool may lead to another model iteration in the same turn. Follow-up evals wait for a fresh test checkpoint from the new model rather than accepting an earlier passing result.
+
+### Paper review fixes, 2026-10-13
+
+The setup checklist uses a muted green mixed with the current palette's muted ink. Completed boxes
+have a faint wash, a quiet border and a green tick instead of a solid green fill. The expanded card
+and collapsed progress indicator share that same color; completion state still comes from setup data.
+
+The New Session repository cap names only the repository. It no longer states a fixed approval policy.
+The in-thread permissions control still shows the current policy.
+Notification In flight rows use native buttons with the same click, Enter, and Space path.
+Each row has a 38px minimum height, an 8px gap, a flexible 12px title, and bounded secondary fields.
+Hover and keyboard focus mark the whole row. Text cannot overlap or enlarge the popover.
+The composer shares the transcript center when the overview card occupies the right column.
+The overview's width, gap, and inset use shared component variables. A hidden or inline overview reserves no horizontal space.
