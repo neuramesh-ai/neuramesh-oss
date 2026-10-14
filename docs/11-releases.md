@@ -91,9 +91,10 @@ Rules of thumb for what needs a rule change at all:
    ```
    (or run **Release Desktop** via `workflow_dispatch` with a tag/SHA.)
 3. **The desktop tag does not roll the fleet** (since 2026-09-26). From 2026-09-19 it did, so a daemon fix waited for a desktop release. The cloud machines now roll on their own tag (§2a).
-4. **[`release.yml`](../.github/workflows/release.yml) builds it:** arm64 (macos-14) + x64 (macos-13), each compiling native modules natively, then **sign (Developer ID, Team <id>) → notarize → staple → publish** to a **draft** release in the public releases repo.
+4. **[`release.yml`](../.github/workflows/release.yml) builds both Mac architectures on one `macos-14` runner.** The release install includes optional native dependencies for both arm64 and x64. The job signs, notarizes and staples each app, then uploads a **draft** to the public releases repo.
    - **Bake guard:** the build *fails* unless `NM_POWERSYNC` and `CLERK_PUBLISHABLE_KEY` are set (repo `vars`) — a release can never ship pointing at localhost or keyless. `NM_API` defaults to `https://api.neuramesh.app`.
-   - **Known flake:** the x64/macos-13 leg can sit waiting for a runner; **arm64 is the primary asset** and lands first. Don't block on x64.
+   - **Native CLI guard:** both packaged apps must pass `--smoke-cli`. The runner tests the Intel app through Rosetta. A pass on arm64 does not prove that the Intel app contains its CLI. Keep the draft unpublished if either check fails.
+   - **Native Intel check:** dispatch `release.yml` with `ref=main` and `verify_tag=vX.Y.Z` to check an existing draft on `macos-15-intel`. This mode skips the build. It checks the signed app, CLI, fresh-profile startup budget and both first-run themes. Review the uploaded screenshots. Rosetta timing does not prove native Intel performance.
 5. **Review the draft, then publish it** — run the **[Publish Desktop Release](../.github/workflows/publish-release.yml)** workflow (Actions tab → Run workflow; blank `tag` = newest draft, or name one; `dry_run` to validate first). It refuses to publish a draft that's missing `latest-mac.yml` or a `.dmg`, then flips it to published + latest. (Equivalent by hand: `gh release edit vX.Y.Z --repo alonge-dev/neuramesh-desktop-releases --draft=false --latest`, or the GitHub UI.) Assets: `NeuraMesh-X.Y.Z-arm64.dmg`/`.dmg` + `.zip`s + `latest-mac.yml` + blockmaps. Publishing (un-drafting) is what flips the switch: `electron-updater` reads `latest-mac.yml` from the **latest** release to auto-update installed apps, and the marketing site's Download screen reads the assets via the GitHub API. **Don't publish until the backend it needs is live (§0).**
 6. **After the publish, the ledger-header PR.** It names the new version as the newest published desktop in the ledger header. In the same PR, set `SUPPORTED_DESKTOP_VERSIONS` in `packages/shared/src/desktop-floor.ts` to the new version and the one before it ([docs/46](46-client-contracts.md#when-each-part-moves)). `MIN_DESKTOP_VERSION` follows, so the floor moves up when this PR deploys. Never move the list in the bump PR. If you do, the check no longer holds the tree to the older supported desktop, and the floor rises before the new desktop is published.
 
@@ -184,7 +185,7 @@ A coupled feature (backend + desktop):
 - [ ] Ledger rows closed, header updated ([desktop-parity-ledger.md](desktop-parity-ledger.md))
 - [ ] Version bumped in **both** `package.json`s
 - [ ] Contract snapshot committed in the bump PR ([docs/46](46-client-contracts.md#when-each-part-moves))
-- [ ] `vX.Y.Z` tag pushed → `release.yml` green (arm64)
+- [ ] Tag pushed or release dispatched with a SHA, then `release.yml` passes for both Mac architectures
 - [ ] Draft reviewed → **published**
 - [ ] Ledger-header PR: the newest published desktop named, and `SUPPORTED_DESKTOP_VERSIONS` moved to it and the one before it (§2 step 6)
 - [ ] Installed app auto-updates / fresh DMG installs and boots (both themes if UI changed)

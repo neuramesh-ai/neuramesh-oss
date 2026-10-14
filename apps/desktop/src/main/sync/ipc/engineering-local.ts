@@ -29,9 +29,11 @@ export function registerLocalEngineering({ db }: { db: () => ReplicaDatabase }):
     return response.json();
   });
   // the coding runtime is a dynamic import, external to the main bundle (electron.vite.config.ts),
-  // and the honest answer to "can this Mac host Code" is whether it loads — asked once, off the
-  // critical path, never at open time where a missing module would read as a session failure
-  const runtime = import('@cline/sdk').then(() => true, () => false);
+  // and the honest answer to "can this Mac host Code" is whether it loads. Probe once when Code
+  // asks, not while registering IPC: importing the provider catalog blocks the main event loop
+  // and delays the first window, even though the import returns a promise.
+  let runtime: Promise<boolean> | undefined;
+  const runtimeAvailable = () => runtime ??= import('@cline/sdk').then(() => true, () => false);
   // the host speaks as the signed-in member; the workspace is the one the app stands in, re-read
   // per host so a workspace switch does not leave a stale host serving the old one
   let host: { workspaceId: string; sessions: LocalEngineeringSessions } | null = null;
@@ -46,7 +48,7 @@ export function registerLocalEngineering({ db }: { db: () => ReplicaDatabase }):
   };
   for (const name of ['nm:engineering-local-info', 'nm:engineering-local-open', 'nm:engineering-local-command', 'nm:engineering-local-close']) ipcMain.removeHandler(name);
   ipcMain.handle('nm:engineering-local-info', async () => {
-    const available = await runtime;
+    const available = await runtimeAvailable();
     return { available, ...(available ? {} : { reason: 'The coding runtime is not installed in this build of the app.' }), machineId: thisMachineId(), machineName: thisMachineName() };
   });
   ipcMain.handle('nm:engineering-local-open', async (event, { subId, meta }: { subId: string; meta: EngineeringOpenMeta }) => {
