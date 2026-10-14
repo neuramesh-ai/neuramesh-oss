@@ -191,7 +191,9 @@ test('a fresh device restores the selected agent, model and reasoning from the b
   try {
     await original.hydrate();
     original.setRuntime([{ role: 'user', content: 'Remember selection restore.' }], { selection, agent });
-    await original.flush(); await original.close();
+    await original.flush();
+    const head = original.revision();
+    await original.close();
     let chosen: unknown;
     const events: unknown[] = [];
     const fake = { subscribe: () => {}, listHistory: async () => [], dispose: async () => {} } as unknown as ClineCore;
@@ -202,6 +204,9 @@ test('a fresh device restores the selected agent, model and reasoning from the b
     }).open({ threadId, actorId: 'owner', repoId: 'repo', repoName: 'app', branch: 'main', mode: 'plan', permissions: { read: true, edit: false, command: false, web: false, mcp: false }, policy: { read: true, edit: true, command: true, web: true, mcp: true } }, (event) => events.push(event));
     assert.deepEqual(chosen, selection);
     assert.ok(events.some((event: any) => event.type === 'ready' && event.agent.id === agent.id && event.reasoningEffort === 'high'));
+    // ready names the revision the recording reaches, so a client whose restore read an older one reads again
+    assert.ok(head > 0);
+    assert.ok(events.some((event: any) => event.type === 'ready' && event.recordedRevision === head));
     session.close();
     await new Promise((resolve) => setTimeout(resolve, 50));
   } finally { await rm(root, { recursive: true, force: true }); }

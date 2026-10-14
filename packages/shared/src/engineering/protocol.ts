@@ -64,7 +64,9 @@ export interface EngineeringAttachmentRef {
 }
 
 export type EngineeringRuntimeEvent =
-  | { type: 'ready'; provider: string; model: string; cwd: string; modelId: string | null; brainPack: string | null; agent?: EngineeringAgent; reasoningEffort?: ThinkingLevel | null }
+  /** `recordedRevision`: the cloud revision the host's recording reaches as it opens. A client whose restore read an
+   *  older revision reads again (restore-connection.ts). An older host sends none. */
+  | { type: 'ready'; provider: string; model: string; cwd: string; modelId: string | null; brainPack: string | null; agent?: EngineeringAgent; reasoningEffort?: ThinkingLevel | null; recordedRevision?: number }
   | { type: 'model_changed'; provider: string; model: string; modelId: string | null; brainPack: string | null; agent?: EngineeringAgent; reasoningEffort?: ThinkingLevel | null }
   /** @deprecated Accepted so an older machine can finish an already-open browser session. */
   | { type: 'brain_changed'; provider: string; model: string; brainPack: string | null }

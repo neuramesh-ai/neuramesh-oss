@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { ClineCore, ToolApprovalRequest } from '@cline/sdk';
 import { createClineEngineeringHost, resolveEngineeringProvider } from './engineering-host';
-import { createStarterEngineeringFetch } from './engineering-provider';
+import { EngineeringModelRefused, createStarterEngineeringFetch } from './engineering-provider';
 import type { EngineeringRuntimeEvent } from '../../engineering-protocol';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 
@@ -90,8 +90,10 @@ test('Engineering provider resolution ends with an actionable error when nothing
 test('the coding runtime reads the machine\'s own sign-ins and keys, as agents do', async () => {
   const opts = (body: Record<string, unknown>) => ({ apiUrl: 'https://api.test', machineToken: 'nmm_test', workspaceId: 'w1', fetchImpl: async () => new Response(JSON.stringify(body), { status: 200 }) });
   const cloud = { NM_MACHINE_KIND: 'member' };
-  // A Claude CLI sign-in cannot run NeuraMesh's managed tools. Never silently bill its env key.
-  await assert.rejects(resolveEngineeringProvider(opts({ authMode: null }), { modelId: 'claude-opus-5' }, cloud, machine({ sub: true, env: 'sk-env' })), /cannot use NeuraMesh coding tools and approvals/);
+  // A Claude CLI sign-in cannot run NeuraMesh's managed tools. Never silently bill its env key. It is a model refusal:
+  // the thread opens, says why, and a new pick replaces the model (engineering-host.ts)
+  await assert.rejects(resolveEngineeringProvider(opts({ authMode: null }), { modelId: 'claude-opus-5' }, cloud, machine({ sub: true, env: 'sk-env' })),
+    (error: unknown) => error instanceof EngineeringModelRefused && error.message === 'Coding with a Claude subscription is off. Pick another model, or add a Claude API key.');
   // the machine's own key with no stored row: the key lane
   assert.deepEqual(await resolveEngineeringProvider(opts({ authMode: null }), { modelId: 'claude-opus-5' }, cloud, machine({ env: 'sk-env' })), { providerId: 'anthropic', modelId: 'claude-opus-5', apiKey: 'sk-env' });
   // a stored preference for a sign-in that lapsed here: a refusal, never a silent key
@@ -108,7 +110,8 @@ test('explicit provider overrides cannot enable a subprocess that bypasses manag
   for (const provider of ['claude-code', 'openai-codex-cli']) {
     await assert.rejects(resolveEngineeringProvider({ apiUrl: 'https://api.test', machineToken: 'test', workspaceId: 'w1' }, { modelId: 'gpt-6-astra' }, {
       NM_ENGINEERING_PROVIDER: provider, NM_ENGINEERING_API_KEY: 'placeholder', NM_ENGINEERING_MODEL: 'gpt-6-astra',
-    }), /cannot use NeuraMesh coding tools and approvals/);
+    // a misconfigured machine still fails its open: no pick can fix it, so it is no model refusal
+    }), (error: unknown) => !(error instanceof EngineeringModelRefused) && /cannot use NeuraMesh coding tools and approvals/.test(String(error)));
   }
 });
 

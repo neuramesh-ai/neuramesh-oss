@@ -25,6 +25,8 @@ export interface BrainThreadSnapshot {
   events: BrainConversationEvent[];
   runtimeMessages?: unknown[];
   metadata?: Record<string, unknown>;
+  /** the reader named this head with `since`: no events, and nothing else was read */
+  unchanged?: true;
 }
 
 export interface BrainCommitResult {

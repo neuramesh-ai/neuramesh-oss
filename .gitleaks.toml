@@ -28,3 +28,9 @@ paths = [
   '''^docs/design/mobile-brain-coding-2026-10/evidence/production-gates/workspace-check-summary\.txt$''',
 ]
 regexes = ['''^NM_ALLOW_ACTOR_HEADER=1$''']
+
+[[allowlists]]
+description = "Paper validation records the SHA-256 of tokens.css at 24db9fe5, not a credential"
+condition = "AND"
+paths = ['''^docs/design/paper-look-2026-10/evidence/web/validation-summary\.json$''']
+regexes = ['''^f3ea328f3165b63aad09530a2cff7d6fae29960dfc99d82ddb70a9674e2388b4$''']

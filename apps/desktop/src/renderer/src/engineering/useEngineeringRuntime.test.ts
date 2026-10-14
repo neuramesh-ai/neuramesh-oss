@@ -33,3 +33,11 @@ test('send() takes the composer step', () => {
   const src = readFileSync(join(import.meta.dirname, 'useEngineeringRuntime.ts'), 'utf8');
   assert.match(src, /update\(beginComposerPrompt\(session, prompt, uploads\.map\(/);
 });
+
+// a reload reads the cloud before the last turn's checkpoint lands (the #717 eval): each host event reaches the shared
+// restore first, so the host's ready can make it read again (shared engineering/restore-connection.ts)
+test('each host event reaches the restore before the client applies it', () => {
+  const src = readFileSync(join(import.meta.dirname, 'useEngineeringRuntime.ts'), 'utf8');
+  assert.match(src, /const open = \(session: EngineeringSession, observe\?: \(event: \{ type\?: unknown; recordedRevision\?: unknown \}\) => void\): Handle =>/);
+  assert.match(src, /\(event\) => \{ observe\?\.\(event\); setSessions\(/);
+});

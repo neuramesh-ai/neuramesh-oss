@@ -56,8 +56,8 @@ export async function threadLayout(p,url,out) {
  try {
   for(const theme of ['dark','light'])for(const width of [1440,1000]) {
    await p.cdp('Emulation.setDeviceMetricsOverride',{width,height:1000,deviceScaleFactor:1,mobile:false});await p.evaluate(value=>document.documentElement.dataset.theme=value,theme);
-   const m=await p.evaluate(()=>({input:document.querySelector('.codingthread textarea').getBoundingClientRect().toJSON(),box:document.querySelector('.codingbox').getBoundingClientRect().toJSON(),controls:[...document.querySelectorAll('.codingbox .trow button')].map(b=>b.getBoundingClientRect().toJSON()).filter(r=>r.width&&r.height)}));
-   const values={'thread writing space':m.input.height>=48,'thread composer fits':m.box.right<=width+1&&m.box.bottom<=1000+1,'thread controls do not overlap':m.controls.every((a,i)=>m.controls.slice(i+1).every(b=>a.right<=b.left+1||b.right<=a.left+1||a.bottom<=b.top+1||b.bottom<=a.top+1))};
+   const m=await p.evaluate(()=>({input:document.querySelector('.codingthread textarea').getBoundingClientRect().toJSON(),box:document.querySelector('.codingbox').getBoundingClientRect().toJSON(),transcript:document.querySelector('.codingthread .thread-overview-transcript').getBoundingClientRect().toJSON(),controls:[...document.querySelectorAll('.codingbox .trow button')].map(b=>b.getBoundingClientRect().toJSON()).filter(r=>r.width&&r.height)}));
+   const values={'thread composer centers on transcript':Math.abs((m.box.left+m.box.right)-(m.transcript.left+m.transcript.right))<=2,'thread writing space':m.input.height>=48,'thread composer fits':m.box.right<=width+1&&m.box.bottom<=1000+1,'thread controls do not overlap':m.controls.every((a,i)=>m.controls.slice(i+1).every(b=>a.right<=b.left+1||b.right<=a.left+1||a.bottom<=b.top+1||b.bottom<=a.top+1))};
    for(const [name,passed]of Object.entries(values)){checks.push({name:`${theme}/${width}: ${name}`,passed});assert.ok(passed,name);}
    measurements.push({theme,width,...m});await capture(p,out,`thread-${theme}-${width}`);
   }

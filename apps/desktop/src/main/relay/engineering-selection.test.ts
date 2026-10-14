@@ -54,3 +54,32 @@ test('same-model agent/effort changes restart the native session with its conver
   assert.match(String(starts[1]!.config?.systemPrompt), /You are patch/);
   session.close();
 });
+
+// a thread whose saved model is a Claude sign-in could not open, and a new pick never landed: the host refused the model
+// before the session existed, so the pick's configure had no session (a known limit of #716). Now the thread opens, says
+// why once, runs nothing on that model, and a new pick runs the next prompt
+test('a refused saved model opens the thread, says why once, runs nothing, and takes a new pick', async () => {
+  const starts: Parameters<ClineCore['start']>[0][] = [];
+  const events: EngineeringRuntimeEvent[] = [];
+  const fake = { subscribe: () => {}, listHistory: async () => [], readMessages: async () => [],
+    start: async (input: Parameters<ClineCore['start']>[0]) => { starts.push(input); return { sessionId: `s${starts.length}` }; }, send: async () => {}, stop: async () => {}, dispose: async () => {} } as unknown as ClineCore;
+  // the machine has a Claude sign-in and an OpenAI key, and the workspace stores no preference
+  const host = createClineEngineeringHost({ ...opts, brainSync: false, resolveCwd: async () => '/repo', resolveBrain: async (m) => ({ modelId: m.modelId!, agent: rex }),
+    authProbe: { subActive: async (p) => p === 'anthropic', loginPresent: async (p) => p === 'anthropic', envKey: (p) => (p === 'openai' ? 'sk-openai' : null) },
+    fetchImpl: async () => new Response(JSON.stringify({ authMode: null })), createCore: (async () => fake) as typeof ClineCore.create });
+  const session = await host.open({ ...meta, modelId: 'claude-opus-5' }, (e) => events.push(e));
+  const refusals = () => events.filter((e) => e.type === 'error' && e.code === 'MODEL_REFUSED');
+  const wait = async (check: () => boolean) => { for (let i = 0; i < 100 && !check(); i++) await new Promise((r) => setTimeout(r, 10)); assert.ok(check()); };
+  assert.ok(events.findIndex((e) => e.type === 'ready') < events.findIndex((e) => e.type === 'error'), 'ready first, then the reason');
+  assert.equal(refusals().length, 1);
+  assert.deepEqual(refusals()[0], { type: 'error', code: 'MODEL_REFUSED', recoverable: true, message: 'Coding with a Claude subscription is off. Pick another model, or add a Claude API key.' });
+  session.command({ type: 'prompt', prompt: 'Fix the login bug' });
+  await wait(() => refusals().length === 2);
+  assert.equal(starts.length, 0, 'nothing runs on the refused model');
+  session.command({ type: 'configure', selection: { agentId: rex.id, modelId: 'gpt-5.6-sol', reasoningEffort: 'medium' } });
+  await wait(() => events.some((e) => e.type === 'model_changed'));
+  session.command({ type: 'prompt', prompt: 'Fix the login bug' });
+  await wait(() => starts.length === 1);
+  assert.equal(refusals().length, 2, 'the new pick clears the refusal');
+  session.close();
+});
