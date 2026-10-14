@@ -12,14 +12,16 @@ with the next desktop tag, because the desktop's renderer copy already carries t
   version in the last column. Keep the closed rows of the last two releases, then trim.
 - **`not this app`** rows move to the second table with the gate that keeps them out, once.
 
-**Newest published desktop:** v0.154.0 (published 2026-10-12, cut at `2339b6b9`). No tag is in
-flight. The PR after the publish moves this line ([docs/11 §2](11-releases.md), step 6).
+**Newest published desktop:** [v0.154.2](https://github.com/alonge-dev/neuramesh-desktop-releases/releases/tag/v0.154.2)
+(published 2026-10-14, built from `6e111b9b`, landed as `eb5d8d11`). The signed runtime matches
+the merged source. v0.154.1 remains an unpublished, superseded draft. The previous published
+desktop is v0.154.0.
 
 The raw list since the newest published desktop, from git (the ledger names features, git names
 commits, and the two must agree):
 
 ```bash
-git log v0.154.0..origin/main --oneline -- apps/desktop/src/renderer apps/desktop/src/main packages/shared packages/client-core defaults
+git log eb5d8d11..origin/main --oneline -- apps/desktop/src/renderer apps/desktop/src/main packages/shared packages/client-core defaults
 ```
 
 ## Open
@@ -27,7 +29,7 @@ git log v0.154.0..origin/main --oneline -- apps/desktop/src/renderer apps/deskto
 | Opened | Feature | PR | Plan | Live on | Desktop needs | Closed in |
 |---|---|---|---|---|---|---|
 | 2026-10-13 | Saved-model refusals retain an open thread so a new model can be selected. A reload waits for the host recording revision before it restores history. | #722, #723 | [Coding rollout](design/mobile-brain-coding-2026-10/rollout.md) | web, cloud, desktop candidate | Includes the host recovery and renderer restore fixes. The v0.154.1 draft remains unpublished. The replacement also defers the coding runtime probe until Code is requested and includes both native CLI packages. | v0.154.2 |
-| 2026-10-13 | **Paper appearance.** Paper light, Paper dark and Paper system beside the elevated themes | #726 design, web implementation | [paper look](design/paper-look-2026-10/implementation.md) | web | Port the theme model, boot attributes, Appearance groups, agent marks and scoped CSS. Keep desktop palettes and native phone themes unchanged until that port. | |
+| 2026-10-13 | **Paper appearance.** Paper Light, Paper Dark, Paper Cream Oak and Paper system beside the elevated themes | #726 design, #727 implementation | [paper look](design/paper-look-2026-10/implementation.md) | web | Port the theme model, boot attributes, Appearance groups, agent marks and scoped CSS. Keep desktop palettes and native phone themes unchanged until that port. | |
 | 2026-10-11 | Portable GCS coding conversations and artifacts; shared agent/model/effort controls, plans, persistent file review, previews, settlement and canonical titles; repository-owned metadata replica for Local connections | #713 | [Rollout](design/mobile-brain-coding-2026-10/rollout.md) | web, iOS preview; production brain API | Ports and Local migration included. Hosted desktop connections still use PowerSync; its removal has a separate migration gate. | v0.154.0 |
 | 2026-10-05 | **The words of a run and a thread.** The typist chip says "rex writes" only while text arrives, "rex is thinking" before it and "patch is at work". The seat chip names the house brain the NeuraMesh brain and wears the house mark, and its hover keeps a person's own model id | (this PR) | [docs/26](26-live-status.md) | web, cloud (the daemon's step words, the claim line and the done-unit wake, the next fleet tag) | the renderer: hq's `thread/typist-words.ts` and its call sites (`thread/parts.tsx` TypistChip, `thread/task/Presence.tsx`, `App.tsx`), `runs/runs.ts` parseSeat, `thread/RunCard.tsx` and the house mark in `ui/icons.tsx` ProviderMark. The shared step words reach the next desktop on their own, and this PR ports what they would break there: the orb's words (`views/SessionList.tsx`) and the ghost's label (`thread/AgentGhost.tsx`). The desktop's own daemon takes the step words and the wake rule with its next tag | |
 | 2026-10-02 | **A person's model for each agent.** The brain chip retires for two composer knobs: the model of the agent the composer talks to, and who answers. A pick is the person's own and holds on every interface. Settings › Models, the agent page and onboarding's Team step set the same pick. Automations run on the NeuraMesh brain | (this PR) | [models and replies §4](design/models-and-replies-2026-10/plan.md#4-one-main-agent-a-model-selector-the-crew-boards-d1-to-d12) | web, phone, api (0148, `member.set_agent_model`), cloud (the seat, the next fleet tag) | the renderer: hq's `models/` (the two chips, Settings › Models, the agent field), the Team step, and the retired brain chip in `brain/`. The desktop's own daemon takes the seat with its next tag. Until the port, a pick made on the web still holds for that person on a desktop, because the daemon reads it | |

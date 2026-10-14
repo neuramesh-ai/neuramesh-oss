@@ -5093,7 +5093,7 @@ var SUPPORTED_DESKTOP_VERSIONS, MIN_DESKTOP_VERSION, versionSegments, belowFloor
 var init_desktop_floor = __esm({
   "../shared/src/desktop-floor.ts"() {
     "use strict";
-    SUPPORTED_DESKTOP_VERSIONS = ["0.154.0", "0.153.0"];
+    SUPPORTED_DESKTOP_VERSIONS = ["0.154.2", "0.154.0"];
     MIN_DESKTOP_VERSION = SUPPORTED_DESKTOP_VERSIONS[1];
     versionSegments = (v) => v.split(".").map((n) => Number.parseInt(n, 10) || 0);
     belowFloor = (version2, floor) => !!floor && /^\d+\.\d+/.test(floor) && compareVersions(version2, floor) < 0;
