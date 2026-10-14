@@ -3,7 +3,7 @@ import { IconClose, IconOverview } from '../ui/icons';
 import { overviewState, overviewVisible, reconcileOverview, toggleOverview, overviewStorageKey, readOverviewPreferences, saveOverviewPreference } from './overview-state';
 import './thread-overview.css';
 
-export type OverviewItem = { id: string; label: string; detail?: string | undefined; focus?: 'pane' | 'attachment' | 'preserve'; icon?: ReactNode; tone?: 'attention' | undefined; open?: (() => void | Promise<(() => void) | void>) | undefined };
+export type OverviewItem = { id: string; label: string; detail?: string | undefined; focus?: 'pane' | 'attachment' | 'preserve'; icon?: ReactNode; iconDecorative?: boolean; tone?: 'attention' | undefined; open?: (() => void | Promise<(() => void) | void>) | undefined };
 export type OverviewSection = { id: string; label: string; items: OverviewItem[] };
 export type OverviewEnvironment = { workspace: string; owner: string | null; paneOpen: boolean; expanded: boolean; processes: OverviewItem[]; openLink: (url: string) => void };
 export const ThreadOverviewEnvironment = createContext<OverviewEnvironment | null>(null);
@@ -71,7 +71,7 @@ function OverviewRow({ item, onNavigate }: { item: OverviewItem; onNavigate: () 
     } catch (reason) { if (alive.current) setError(reason instanceof Error ? reason.message : 'Unable to open this item.'); }
     finally { if (alive.current) setBusy(false); }
   };
-  const content = <>{item.icon && <span className="overview-icon" aria-hidden>{item.icon}</span>}<span className="overview-copy"><span>{item.label}</span>{item.detail && <small>{item.detail}</small>}</span></>;
+  const content = <>{item.icon && <span className="overview-icon" aria-hidden={item.iconDecorative ?? true}>{item.icon}</span>}<span className="overview-copy"><span>{item.label}</span>{item.detail && <small>{item.detail}</small>}</span></>;
   return <div className={`overview-item${item.tone ? ` ${item.tone}` : ''}`}>
     {item.open ? <button disabled={busy} aria-busy={busy} onClick={() => void open()}>{content}</button> : <div className="overview-fact">{content}</div>}
     {error && <small className="overview-error" role="alert">{error}</small>}

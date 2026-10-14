@@ -46,7 +46,7 @@ export async function lessons({ win, dir, js, sleep, waitFor }: ShotCtx): Promis
     for (let i = 0; i < 10 && !saved; i++) {
       if (!(await driveToMemory())) continue;
       await ensureShotStyle();
-      await js(`document.documentElement.dataset.theme = '${theme}'`);
+      await js(`document.documentElement.dataset.theme = '${theme}'; document.documentElement.dataset.look = '${theme}'.startsWith('paper-') ? 'paper' : 'elevated'`);
       await sleep(250);
       const before = Number(await js(`document.querySelectorAll('.factdot.lesson').length`));
       const png = (await win.webContents.capturePage()).toPNG();
@@ -81,7 +81,7 @@ export async function lessons({ win, dir, js, sleep, waitFor }: ShotCtx): Promis
     let saved = false;
     for (let i = 0; i < 8 && !saved; i++) {
       if (!(await openCorrect())) continue;
-      await js(`document.documentElement.dataset.theme = '${theme}'`);
+      await js(`document.documentElement.dataset.theme = '${theme}'; document.documentElement.dataset.look = '${theme}'.startsWith('paper-') ? 'paper' : 'elevated'`);
       await sleep(250);
       const png = (await win.webContents.capturePage()).toPNG();
       if (await js(`!!document.querySelector('.lessonedit textarea') && document.documentElement.dataset.theme === '${theme}'`)) {
@@ -112,7 +112,7 @@ export async function lessons({ win, dir, js, sleep, waitFor }: ShotCtx): Promis
     let saved = false;
     for (let i = 0; i < 8 && !saved; i++) {
       if (!(await armRetire())) continue;
-      await js(`document.documentElement.dataset.theme = '${theme}'`);
+      await js(`document.documentElement.dataset.theme = '${theme}'; document.documentElement.dataset.look = '${theme}'.startsWith('paper-') ? 'paper' : 'elevated'`);
       await sleep(250);
       const png = (await win.webContents.capturePage()).toPNG();
       if (await js(`!!document.querySelector('.factact.danger') && document.documentElement.dataset.theme === '${theme}'`)) {
@@ -140,7 +140,7 @@ export async function lessons({ win, dir, js, sleep, waitFor }: ShotCtx): Promis
     for (let i = 0; i < 10 && !saved; i++) {
       if (!(await driveToMemory())) continue;
       await ensureShotStyle();
-      await js(`document.documentElement.dataset.theme = '${theme}'`);
+      await js(`document.documentElement.dataset.theme = '${theme}'; document.documentElement.dataset.look = '${theme}'.startsWith('paper-') ? 'paper' : 'elevated'`);
       await sleep(250);
       const png = (await win.webContents.capturePage()).toPNG();
       if (await js(`${deadCount} > ${deadBefore} && !!document.getElementById('nm-shot-style') && document.documentElement.dataset.theme === '${theme}'`)) {

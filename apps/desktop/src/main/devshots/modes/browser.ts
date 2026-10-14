@@ -40,7 +40,7 @@ export async function browser({ win, dir, js, sleep, waitFor }: ShotCtx): Promis
   console.log(`browser_shot guest_url=${await js(`document.querySelector('webview.bwview')?.getURL?.() ?? null`)} allowpopups=${await js(`document.querySelector('webview.bwview')?.hasAttribute('allowpopups')`)} tab_title=${JSON.stringify(await js(`document.querySelector('.docktab.on .docktabtitle')?.textContent ?? null`))}`);
   const prefix = external ? 'browser-external' : 'browser';
   for (const theme of ['dark', 'cream-oak'] as const) {
-    await js(`document.documentElement.dataset.theme = '${theme}'`);
+    await js(`document.documentElement.dataset.theme = '${theme}'; document.documentElement.dataset.look = '${theme}'.startsWith('paper-') ? 'paper' : 'elevated'`);
     await sleep(350);
     writeFileSync(join(dir, `${prefix}-${theme}.png`), (await win.webContents.capturePage()).toPNG());
     console.log(`shot_saved=${join(dir, `${prefix}-${theme}.png`)}`);
@@ -51,7 +51,7 @@ export async function browser({ win, dir, js, sleep, waitFor }: ShotCtx): Promis
     if (!(await waitFor('.cwemptybtns', 40))) console.log('browser_shot WARN no empty state');
     await sleep(300);
     for (const theme of ['dark', 'cream-oak'] as const) {
-      await js(`document.documentElement.dataset.theme = '${theme}'`);
+      await js(`document.documentElement.dataset.theme = '${theme}'; document.documentElement.dataset.look = '${theme}'.startsWith('paper-') ? 'paper' : 'elevated'`);
       await sleep(350);
       writeFileSync(join(dir, `browser-newtab-${theme}.png`), (await win.webContents.capturePage()).toPNG());
       console.log(`shot_saved=${join(dir, `browser-newtab-${theme}.png`)}`);
@@ -88,7 +88,7 @@ export async function stream({ win, dir, js, sleep, waitFor }: ShotCtx): Promise
   if (!(await waitFor('.msg.streaming', 20))) console.log('stream_shot WARN no .msg.streaming');
   await sleep(400);
   for (const theme of ['dark', 'light'] as const) {
-    await js(`document.documentElement.dataset.theme = '${theme}'`);
+    await js(`document.documentElement.dataset.theme = '${theme}'; document.documentElement.dataset.look = '${theme}'.startsWith('paper-') ? 'paper' : 'elevated'`);
     await sleep(350);
     const img = await win.webContents.capturePage();
     writeFileSync(join(dir, `stream-chat-${theme}.png`), img.toPNG());
@@ -110,7 +110,7 @@ export async function unread({ win, dir, js, sleep, waitFor }: ShotCtx): Promise
   if (!(await waitFor('.unreadcard', 40))) console.log('unread_shot WARN no .unreadcard');
   await sleep(400);
   for (const theme of ['dark', 'light'] as const) {
-    await js(`document.documentElement.dataset.theme = '${theme}'`);
+    await js(`document.documentElement.dataset.theme = '${theme}'; document.documentElement.dataset.look = '${theme}'.startsWith('paper-') ? 'paper' : 'elevated'`);
     await sleep(350);
     const img = await win.webContents.capturePage();
     writeFileSync(join(dir, `unread-board-${theme}.png`), img.toPNG());
@@ -138,7 +138,7 @@ export async function logs({ win, dir, js, sleep, waitFor }: ShotCtx): Promise<v
   if (!(await waitFor('.logtok', 20))) console.log('logs_shot WARN no .logtok');
   await sleep(400);
   for (const theme of ['dark', 'light'] as const) {
-    await js(`document.documentElement.dataset.theme = '${theme}'`);
+    await js(`document.documentElement.dataset.theme = '${theme}'; document.documentElement.dataset.look = '${theme}'.startsWith('paper-') ? 'paper' : 'elevated'`);
     await sleep(350);
     const img = await win.webContents.capturePage();
     writeFileSync(join(dir, `logs-task-${theme}.png`), img.toPNG());

@@ -6,7 +6,7 @@ import { resolve } from 'node:path';
 import { agentVerification, verifyRecording } from './recording.mjs';
 import { report } from './report.mjs';
 import { mkdtemp, writeFile, readFile, rm } from 'node:fs/promises';
-import { capture, turnSettled } from './flow.mjs';
+import { capture, turnSettled, confirmTurn } from './flow.mjs';
 
 test('evidence capture retries transient snapshot races without replaying UI actions', async () => {
   const dir=await mkdtemp('/tmp/nm-eval-capture-');
@@ -128,4 +128,23 @@ test('turn completion rejects partial progress and approvals arriving during evi
   assert.equal(turnSettled({...completed,approval:{commands:['npm test']}},1),false);
   assert.equal(turnSettled({...completed,busy:true},1),false);
   assert.equal(turnSettled(completed,2),false);
+});
+
+
+test('a handoff cannot finish on the old complete plan or an approval arriving during recording checks', async () => {
+  let current = { text: 'complete', busy: false, cards: [], approval: null, replies: ['old', 'new'], progress: { done: 3, total: 3 } };
+  const page = { evaluate: async () => current };
+  assert.equal(await confirmTurn(page, 1, 'complete', async () => false), false, 'old recording does not complete a new turn');
+  assert.equal(await confirmTurn(page, 1, 'complete', async () => true), true);
+  assert.equal(await confirmTurn(page, 1, 'complete', async () => { current = { ...current, cards: [{ status: 'proposed' }] }; return true; }), false, 'new review stays actionable');
+});
+
+
+test('a reassessed case never becomes a first-pass success in the report', async () => {
+  const out = await mkdtemp('/tmp/nm-eval-reassessment-');
+  try {
+    await save(resolve(out, 'run.json'), { version: 1, id: 'reassessed', revision: 'abc123', cases: [{ id: 'simple', title: 'Simple' }] });
+    await save(resolve(out, 'simple/result.json'), { id: 'simple', title: 'Simple', status: 'passed', checks: [], reassessedAt: new Date().toISOString() });
+    assert.equal((await report(out)).firstPass, false);
+  } finally { await rm(out, { recursive: true }); }
 });

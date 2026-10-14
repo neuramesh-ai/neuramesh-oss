@@ -132,18 +132,16 @@ export function BellPopover({
           <>
             <div className="bellsect">In flight <span className="rule" /> {flight.length}</div>
             {flight.map((r) => (r.kind === 'run' ? (
-              <div key={r.r.id} className="frow" role="button" tabIndex={0}
-                onClick={() => { if (r.r.task_id) onOpenTask(r.r.task_id); else if (r.r.thread_id) onOpenConvo(r.r.channel_id, r.r.thread_id); onClose(); }}
-                onKeyDown={(e) => { if (e.key === 'Enter' && r.r.task_id) { onOpenTask(r.r.task_id); onClose(); } }}>
+              <button key={r.r.id} type="button" className="bellflight"
+                onClick={() => { if (r.r.task_id) onOpenTask(r.r.task_id); else if (r.r.thread_id) onOpenConvo(r.r.channel_id, r.r.thread_id); onClose(); }}>
                 <Orb state={orbState(r.r.step ?? '', agentRole(r.r.agent_id)) as never} label={r.r.step ?? 'working'} />
                 <span className="ftitle">{plainTitle(r.r.title)}</span>
                 <span className="fbeat">{agentName(r.r.agent_id) ?? 'agent'}{r.r.total > 0 ? ` · ${r.r.done} of ${r.r.total}` : ''}</span>
                 <span className="fwhen">{runElapsed({ startedAt: r.r.started_at, endedAt: r.r.ended_at })}</span>
-              </div>
+              </button>
             ) : r.kind === 'task' ? (
-              <div key={r.t.id} className="frow" role="button" tabIndex={0}
-                onClick={() => { onOpenTask(r.t.id); onClose(); }}
-                onKeyDown={(e) => { if (e.key === 'Enter') { onOpenTask(r.t.id); onClose(); } }}>
+              <button key={r.t.id} type="button" className="bellflight"
+                onClick={() => { onOpenTask(r.t.id); onClose(); }}>
                 <span className={`chip c-${r.t.state}`}>{STATE_LABEL[r.t.state as keyof typeof STATE_LABEL] ?? r.t.state}</span>
                 <span className="ftitle">#{r.t.number} · {plainTitle(r.t.title)}</span>
                 <span className="fbeat">{agentName(r.t.assignee_id) ?? `#${r.t.channel_slug}`}</span>
@@ -152,11 +150,10 @@ export function BellPopover({
                 {answered(r.t)
                   ? <span className="fwhen fanswered">you replied · {timeAgo(r.t.last_human_msg_at ?? r.t.updated_at)}</span>
                   : <span className="fwhen">{timeAgo(r.t.updated_at)}</span>}
-              </div>
+              </button>
             ) : (
-              <div key={r.c.id} className="frow" role="button" tabIndex={0}
-                onClick={() => { onOpenConvo(r.c.channel_id, r.c.id); onClose(); }}
-                onKeyDown={(e) => { if (e.key === 'Enter') { onOpenConvo(r.c.channel_id, r.c.id); onClose(); } }}>
+              <button key={r.c.id} type="button" className="bellflight"
+                onClick={() => { onOpenConvo(r.c.channel_id, r.c.id); onClose(); }}>
                 <span className="chip c-chat">chat</span>
                 <span className="ftitle">{plainTitle(r.c.title)}</span>
                 <span className="fbeat">#{r.c.channel_slug}</span>
@@ -166,7 +163,7 @@ export function BellPopover({
                   if (r.c.last_author_kind === 'agent') return <span className="fwhen flive">awaiting your reply</span>;
                   return <span className="fwhen">{timeAgo(r.c.updated_at)}</span>;
                 })()}
-              </div>
+              </button>
             )))}
           </>
         )}

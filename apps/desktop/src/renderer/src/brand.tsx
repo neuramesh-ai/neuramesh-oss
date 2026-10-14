@@ -5,7 +5,7 @@
 //
 // Color contract: the mark rides --brand/--brand-ink (constant oak/cream in ALL
 // themes, like status hues) — never --accent, which is achromatic in the dark
-// themes. The wordmark is always lowercase `neuramesh`, Bricolage 600, ink --text.
+// themes. The wordmark is always lowercase `neuramesh`, Geist Mono 600, ink --text.
 import { useEffect, useId, useRef, useState } from 'react';
 
 // Geometry verbatim from the handoff SVGs (48-unit grid).
@@ -77,7 +77,7 @@ export function Wordmark({ size = 13, mark = true, gap }: { size?: number; mark?
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: gap ?? Math.round(markPx * 0.28) }}>
       {mark && <PorchMark size={markPx} />}
-      <span style={{ font: `600 ${size}px/1 var(--fbrand)`, letterSpacing: '-0.015em', color: 'var(--text)' }}>
+      <span style={{ font: `600 ${size}px/1 var(--fbrand)`, letterSpacing: '-0.02em', color: 'var(--text)' }}>
         neuramesh
       </span>
     </span>

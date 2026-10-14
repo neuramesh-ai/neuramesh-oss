@@ -12,9 +12,10 @@ import type { TaskRow } from '../bridge/rows-board';
 import type { JourneyLeg } from '@neuramesh/shared';
 import type { Dispatch, SetStateAction, ReactNode } from 'react';
 
-export function ThreadHead({ act, back, blocking, busy, channelSlug, crumbProject, editDetails, isContent, marks, onClose, onOpenTerminal, onSettle, onViewLogs, peek, setBlocking, setClosing, spectrumLegs, task, overviewToggle }: {
+export function ThreadHead({ act, back, blocking, busy, channelSlug, crumbProject, editDetails, isContent, marks, onClose, onEdit, onOpenTerminal, onSettle, onViewLogs, peek, setBlocking, setClosing, spectrumLegs, task, overviewToggle }: {
   /** what this task's thread is doing, and the act its stamp offers (shell/rowstatus.ts) */
   overviewToggle?: ReactNode;
+  onEdit?: (() => void) | undefined;
   marks?: HeadStatus | null;
   onSettle?: (threadId: string) => void;
   /** issue a command against this task — the panel's one write path (thread/task/Data.ts) */
@@ -38,7 +39,8 @@ export function ThreadHead({ act, back, blocking, busy, channelSlug, crumbProjec
   spectrumLegs: JourneyLeg[];
 }) {
   return (
-  <div className="thead">
+  <>
+  <div className={`thead${peek ? '' : ' thread-crumb-row'}`}>
     {/* the crumb leads the header — same anatomy as a chat session (docs/35 §3.4): this
         surface replaced the list it was opened from, so it names the way back.
         IN A TASK TAB (the side-panel round, 2026-10-03; the task peek of 2026-08-10 before it)
@@ -61,6 +63,7 @@ export function ThreadHead({ act, back, blocking, busy, channelSlug, crumbProjec
         the task; the project name is the part that was only ever repeating the frame. */}
     {peek ? <span className="pkroom">#{channelSlug}</span> : <ThreadCrumb project={crumbProject} slug={channelSlug} />}
     <span className="tid">#{task.number}</span>
+    {peek && <>
     <span className={`chip c-${task.state}`}>{STATE_LABEL[task.state]}</span>
     <KindChip kind={task.kind} />
     {/* the journey rides WITH the state chip: the chip says where you are in the FSM,
@@ -69,6 +72,7 @@ export function ThreadHead({ act, back, blocking, busy, channelSlug, crumbProjec
     {/* the thread's own word, beside the task's (settle round): the state chip says where the WORK
         is, this says whether it waits on you — they are different questions and always were */}
     <ThreadStatusChip head={marks} />
+    </>}
     {/* …and the header's ACTIONS mostly stay on the full surface: opening a terminal in the
         worktree or trawling activity are "I am working this now" moves, which is what
         `Open full ›` is one click away for. CLOSING THE TASK IS THE EXCEPTION (George live,
@@ -103,5 +107,7 @@ export function ThreadHead({ act, back, blocking, busy, channelSlug, crumbProjec
           details are the side panel's Overview tab, and the panel's one switch is the frame top's */}
     </div>
   </div>
+  {!peek && <div className="thread-title-row"><span className="convotitle" title={task.title}>{task.title}</span>{onEdit && <button className="dodedit" title="Edit title and description" onClick={onEdit}>✎ Edit</button>}</div>}
+  </>
   );
 }

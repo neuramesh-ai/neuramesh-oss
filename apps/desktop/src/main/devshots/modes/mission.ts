@@ -21,7 +21,7 @@ export async function mission({ win, dir, js, sleep, waitFor }: ShotCtx): Promis
   if (probe) for (let i = 0; i < 160; i++) { if (await js(probeSel)) break; await sleep(300); }
   console.log(`mission_probe_visible=${probe ? await js(probeSel) : 'n/a'}`);
   for (const theme of ['dark', 'cream-oak'] as const) {
-    await js(`document.documentElement.dataset.theme = '${theme}'`);
+    await js(`document.documentElement.dataset.theme = '${theme}'; document.documentElement.dataset.look = '${theme}'.startsWith('paper-') ? 'paper' : 'elevated'`);
     await sleep(350);
     writeFileSync(join(dir, `mission-home-${theme}.png`), (await win.webContents.capturePage()).toPNG());
     console.log(`shot_saved=${join(dir, `mission-home-${theme}.png`)}`);
@@ -71,7 +71,7 @@ export async function mission({ win, dir, js, sleep, waitFor }: ShotCtx): Promis
     await sleep(250);
     // both-theme decision-card close-ups
     for (const theme of ['dark', 'cream-oak'] as const) {
-      await js(`document.documentElement.dataset.theme = '${theme}'`);
+      await js(`document.documentElement.dataset.theme = '${theme}'; document.documentElement.dataset.look = '${theme}'.startsWith('paper-') ? 'paper' : 'elevated'`);
       await sleep(350);
       writeFileSync(join(dir, `mission-decision-${theme}.png`), (await win.webContents.capturePage()).toPNG());
       console.log(`shot_saved=${join(dir, `mission-decision-${theme}.png`)}`);
@@ -132,7 +132,7 @@ export async function retro({ win, dir, js, sleep, waitFor }: ShotCtx): Promise<
     `retro_agents=${await js(`document.querySelectorAll('.rtcard').length`)} retro_lessons=${await js(`document.querySelectorAll('.rtlesson').length`)} retro_levelups=${await js(`document.querySelectorAll('.rtup').length`)}`,
   );
   for (const theme of ['dark', 'cream-oak'] as const) {
-    await js(`document.documentElement.dataset.theme = '${theme}'`);
+    await js(`document.documentElement.dataset.theme = '${theme}'; document.documentElement.dataset.look = '${theme}'.startsWith('paper-') ? 'paper' : 'elevated'`);
     await sleep(350);
     writeFileSync(join(dir, `retro-${theme}.png`), (await win.webContents.capturePage()).toPNG());
     console.log(`shot_saved=${join(dir, `retro-${theme}.png`)}`);

@@ -90,7 +90,7 @@ export function PolicyPanel() {
       </div>
 
       <div style={{ marginBottom: 18 }}>
-        <div style={{ fontFamily: 'var(--mono)', fontSize: 10.5, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--dim)', marginBottom: 5 }}>Protected paths</div>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 10.5, letterSpacing: '-0.02em', textTransform: 'uppercase', color: 'var(--dim)', marginBottom: 5 }}>Protected paths</div>
         <p className="fldhint" style={{ margin: '0 0 9px' }}>Never readable by agents. Credential stores are locked; add your own below.</p>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 9 }}>
           {DEFAULT_PROTECTED.map((p) => (
@@ -122,7 +122,7 @@ export function PolicyPanel() {
         if (!grp.length) return null;
         return (
           <div key={g.title} style={{ marginBottom: 16 }}>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: 10.5, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--dim)', marginBottom: 4 }}>{g.title}</div>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: 10.5, letterSpacing: '-0.02em', textTransform: 'uppercase', color: 'var(--dim)', marginBottom: 4 }}>{g.title}</div>
             {grp.map((r) => (
               <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 2px', borderBottom: '1px solid var(--border)' }}>
                 <div style={{ flex: 1, minWidth: 0 }}>

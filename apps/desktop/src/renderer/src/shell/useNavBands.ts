@@ -11,14 +11,15 @@
 //
 // Fold state persists per machine as `nm:navBandFold`, beside the folders' `nm:navGroupFold`.
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { historyRows, liveKinOf } from '@neuramesh/shared';
+import { historyRows, liveKinOf, type HistoryRow } from '@neuramesh/shared';
 import { nm, type ConnectionSummary, type RailRowsPayload } from '../bridge/nm';
 import type { TaskAllRow } from '../bridge/rows-board';
 import { navGrouped, type NavFlatRowMeta, type NavGroupedResult, type NavTreeRowMeta } from '../navtree';
 import { navBands, type NavBand, type NavConnTag, type NavConnection } from '../navbands';
 export type { NavConnTag } from '../navbands';
 import { isAskDecision, isAskTask } from './asks';
-import { makeRowMarks, type RowMarks } from './rowstatus';
+import { makeRecentMarks, type RecentMarks } from './recents';
+import { makeRowMarks } from './rowstatus';
 
 const FOLD_KEY = 'nm:navBandFold';
 function loadFold(): Set<string> {
@@ -53,7 +54,7 @@ export function useNavBands<R extends RowLike>(opts: {
   bands: Array<RailBand<R>> | null;
   toggleFold: (connectionId: string) => void;
   /** the status word for a row on another connection, from that connection's own rows */
-  marksOf: (r: { task: TaskAllRow | null; threadId: string | null } & NavConnTag) => RowMarks | null;
+  marksOf: (r: HistoryRow<TaskAllRow> & NavConnTag) => RecentMarks | null;
   /** the rows of every other connection, tagged — the rail's list is the union of both lanes */
   background: R[];
   /** the connections a band is drawn for, in the rail's order */
@@ -77,7 +78,7 @@ export function useNavBands<R extends RowLike>(opts: {
     const rows: R[] = [];
     const askIds = new Set<string>();
     const liveIds = new Set<string>();
-    const marks = new Map<string, (r: { task: TaskAllRow | null; threadId: string | null }) => RowMarks>();
+    const marks = new Map<string, (r: HistoryRow<TaskAllRow>) => RecentMarks>();
     for (const id of ids) {
       const kind = union.threads.find((t) => t.connectionId === id)?.connectionKind ?? union.tasks.find((t) => t.connectionId === id)!.connectionKind;
       const threads = union.threads.filter((t) => t.connectionId === id);
@@ -90,14 +91,14 @@ export function useNavBands<R extends RowLike>(opts: {
       for (const x of live) liveIds.add(x);
       for (const t of tasks) if (isAskTask(t, agents)) askIds.add(t.id);
       for (const d of decisions) if (isAskDecision(d)) { if (d.task_id) askIds.add(d.task_id); else if (d.thread_id) askIds.add(d.thread_id); }
-      marks.set(id, makeRowMarks({ decisions, liveIds: live, threads, tasks }));
+      marks.set(id, makeRecentMarks({ threads, liveIds: live, marksOf: makeRowMarks({ decisions, liveIds: live, threads, tasks }) }));
       // the SAME builder the foreground's rows go through (shared/sessions.ts) — one row shape, two lanes
       for (const r of historyRows({ threads, tasks, channelId: null, channelSlug: '', query: '' })) rows.push({ ...r, connectionId: id, connectionKind: kind, foreign: true } as unknown as R);
     }
     return { rows, askIds, liveIds, marks };
   }, [union]);
 
-  const marksOf = useCallback((r: { task: TaskAllRow | null; threadId: string | null } & NavConnTag): RowMarks | null => {
+  const marksOf = useCallback((r: HistoryRow<TaskAllRow> & NavConnTag): RecentMarks | null => {
     const m = r.connectionId ? derived.marks.get(r.connectionId) : undefined;
     return m ? m(r) : null;
   }, [derived]);

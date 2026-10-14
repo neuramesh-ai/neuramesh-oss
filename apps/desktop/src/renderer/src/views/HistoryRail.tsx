@@ -7,12 +7,14 @@ import { NavScopeRow } from './NavScopeRow';
 import { Orb } from '../ui/Orb';
 import { STATE_LABEL } from '../task/labels';
 
+import { kindOf, titleOf, ENG_LABEL, codeDriven, archivableThreadId } from './history-row';
+export { kindOf, titleOf, ENG_LABEL, archivableThreadId } from './history-row';
 import { THREAD_STATUS_LABEL } from '@neuramesh/shared';
-import { historyRows, plainTitle, type HistoryRow } from '../room-tabs';
+import { historyRows } from '../room-tabs';
 import { orbStateFor } from './SessionList';
 import { stripChannels, type NavFlatResult, type NavGroupedResult, type NavTreeChannel } from '../navtree';
 import { timeAgoShort } from '../lib/time';
-import { renamable, rowGlyphFor, rowTrailFor, type RowKind } from '../lib/rowglyph';
+import { renamable, rowGlyphFor, rowTrailFor } from '../lib/rowglyph';
 import { type TaskAllRow } from '../bridge/rows-board';
 
 /** a rail row, tagged with the connection it came from when that is not the one the shell stands in (U3b) */
@@ -26,13 +28,6 @@ export type Anchor = { key: string; row: RailRow; top: number; left: number };
  *  flash a card per row (Gemini's tooltip has the same patience) */
 const HOVER_DELAY_MS = 350;
 const CARD_H = 150;
-
-export function kindOf(r: RailRow): RowKind { return r.engineeringSessionId || r.kind === 'coding' ? 'code' : r.task ? 'task' : r.scheduleId ? 'routine' : 'chat'; }
-/** a row the coding runtime drives: a legacy Engineering session (its own floor) or a coding THREAD (0144, the one surface) */
-const codeDriven = (r: RailRow): boolean => !!r.engineeringSessionId || r.kind === 'coding';
-/** an engineering session's state, in the vocabulary a human reads (#391's runtime states) */
-export const ENG_LABEL: Record<string, string> = { idle: 'idle', streaming: 'working', awaiting_approval: 'needs your approval', resumable: 'paused', completed: 'completed', error: 'failed' };
-export function titleOf(r: RailRow): string { return r.task ? plainTitle(r.task.title) : r.title; }
 
 /**
  * The rail's resting list — the nav's width is the whole design constraint here.
@@ -97,7 +92,7 @@ export function HistoryRail({ nav, liveIds, liveRuns, askIds, collapsed, openId,
   onRename?: (row: { task: { id: string } | null; threadId: string | null }, title: string) => void;
   /** the three words a thread can wear, plus whether a settle control belongs on the row at all
    *  (shell/rowstatus.ts): the row wears the word, and the hover check settles it */
-  marksOf?: (row: RailRow) => { status: 'needs_you' | 'in_progress' | 'settled'; settle: boolean };
+  marksOf?: (row: RailRow) => { status: 'needs_you' | 'in_progress' | 'settled'; settle: boolean; group?: 'idle' | 'working' | 'settled' };
   onSettle?: (threadId: string) => void;
   /** Code mode (the Chat | Code switch): the list is already code work (navtree's isCodeRow), so
    *  the row's one fact is its BRANCH — short unscoped, full inside a project — not its room */
@@ -202,21 +197,23 @@ export function HistoryRail({ nav, liveIds, liveRuns, askIds, collapsed, openId,
                 : r.branch ? `⎇ ${scopeProject ? r.branch : shortBranch}` : null)
             : (!scopeChannel && r.channelSlug ? `#${r.channelSlug}` : null);
           const status = statusOf(r);
+          const recentGroup = marksOf?.(r).group ?? (live || ask || status !== 'settled' ? 'working' : 'idle');
           const trail = rowTrailFor({ status, ask, run: run ? { done: run.done, total: run.total } : null, fact, when: timeAgoShort(r.when) });
           const canRename = !foreign && !!onRename && renamable(kind, state);
           const canArchive = !foreign && !!onArchive && !!archivableThreadId(r);
           const canSettle = !foreign && settleOf(r);
           const editing = renaming?.key === r.key;
           const title = titleOf(r);
+          const when = timeAgoShort(r.when);
           const label = r.engineeringSessionId
             ? `${title} · Code · ${r.engineeringRepo ?? 'repository'}${r.engineeringState ? ` · ${ENG_LABEL[r.engineeringState] ?? r.engineeringState}` : ''}`
             : `${r.task ? `#${r.task.number} · ` : ''}${title}${state ? ` · ${STATE_LABEL[state] ?? state}` : ''}${status ? ` · ${THREAD_STATUS_LABEL[status]}` : ''}${r.channelSlug ? ` · #${r.channelSlug}` : ''}`;
           const glyphEl = (
             /* THE GLYPH GUTTER: the kind of thing this row is (lib/rowglyph.ts). The orb takes the
                gutter while an agent works in there — a SWAP, not an addition (orb round,
-               2026-08-17), and it stands bare (2026-08-19). Colour survives only for an active
-               task's state; a settled task is a check, a waiting one a hollow circle. */
-            <span className={`navhistglyph g-${glyph}`} aria-hidden>
+               2026-08-17), and it stands bare (2026-08-19). The activity group supplies its
+               muted colour. Shape still identifies the thread kind or task state. */
+            <span className={`navhistglyph g-${glyph}`} data-thread-state={recentGroup} aria-hidden>
               {glyph === 'orb' ? <Orb state={run ? orbStateFor(run.step ?? '', null, run.role) : 'working'} label={run?.step ?? (kind === 'code' ? 'Code is working' : 'working')} />
                 : glyph === 'clock' ? <IconRoutineClock s={12} />
                 : glyph === 'code' ? <IconCode s={13} />
@@ -262,10 +259,11 @@ export function HistoryRail({ nav, liveIds, liveRuns, askIds, collapsed, openId,
               <span className="navhisttrail">
                 {/* THE STATUS WORD (settle round, mark M4): the row says which of the three it is,
                     so the control beside it never names a state the row hid. */}
-                {trail.kind === 'status' ? <span className={`navhiststat st-${trail.status}`}>{THREAD_STATUS_LABEL[trail.status]}</span>
+                {trail.kind === 'status' ? (trail.status === 'settled' ? null : <span className={`navhiststat st-${trail.status}`}>{THREAD_STATUS_LABEL[trail.status]}</span>)
                   : trail.kind === 'ask' ? <span className="navhistask" aria-label="Needs you" />
                   : trail.kind === 'frac' ? <span className="nhlfrac">{trail.text}</span>
                   : <span className="navhistfact">{trail.text}</span>}
+                {trail.kind !== 'when' && when && <span className="navhistwhen">{when}</span>}
               </span>
             </button>
           )}
@@ -348,16 +346,4 @@ export function HistoryRail({ nav, liveIds, liveRuns, askIds, collapsed, openId,
       </>)}
     </div>
   );
-}
-
-/**
- * Can this row be archived (0108)?
- *
- * CHAT THREADS ONLY, decided in the design round: a task thread is the board's record of a work
- * attempt, so hiding it would leave a task that still counts as open with nowhere to read it. A
- * legacy loose room message (`rootMessageId`, no thread of its own) has nothing to archive either.
- */
-export function archivableThreadId(row: HistoryRow<TaskAllRow>): string | null {
-  if (row.state || row.task || row.rootMessageId) return null;
-  return row.threadId;
 }

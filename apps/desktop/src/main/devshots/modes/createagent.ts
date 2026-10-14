@@ -17,7 +17,7 @@ export async function createagent({ win, dir, js, sleep, waitFor }: ShotCtx): Pr
   if (!(await waitFor('.rseldrop', 20))) console.log('createagent_shot WARN no role dropdown');
   await sleep(300);
   for (const theme of ['dark', 'light'] as const) {
-    await js(`document.documentElement.dataset.theme = '${theme}'`);
+    await js(`document.documentElement.dataset.theme = '${theme}'; document.documentElement.dataset.look = '${theme}'.startsWith('paper-') ? 'paper' : 'elevated'`);
     await sleep(350);
     const img = await win.webContents.capturePage();
     writeFileSync(join(dir, `create-agent-${theme}.png`), img.toPNG());

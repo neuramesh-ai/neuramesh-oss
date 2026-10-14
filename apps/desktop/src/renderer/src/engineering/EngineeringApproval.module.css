@@ -8,3 +8,5 @@
 .commands { min-width: 0; max-height: min(32vh, 280px); overflow-y: auto; }
 .commands .command { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 11.5px; line-height: 1.6; }
 .commandLabel { margin: 0 10px 5px; color: var(--muted); font: 10px var(--fmono); }
+
+:global(:root[data-look='paper']) .file { border-color: transparent; }

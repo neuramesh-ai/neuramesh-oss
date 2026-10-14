@@ -1,8 +1,8 @@
-// The small parts a thread is made of — the crumb, the room chip, the pinned root, the
+// The small parts a thread is made of — the crumb, the pinned root, the
 // typist chip, and the handful of helpers that group and read messages.
 // Extracted from App.tsx (track A3).
 import { AgentAvatar, ProjLogo } from '../components/AgentAvatar';
-import { IconCheckCircle, IconLock, IconReply } from '../ui/icons';
+import { IconCheckCircle, IconReply } from '../ui/icons';
 import { Orb } from '../ui/Orb';
 import { humanHandles, replyPreview, THREAD_STATUS_LABEL, type ThreadStatus } from '@neuramesh/shared';
 import { selfLabel } from '../lib/self';
@@ -234,27 +234,6 @@ export function ThreadCrumb({ project, slug }: { project?: { name: string; logo_
         </>
       )}
       <span className="h" aria-hidden>#</span>{slug}
-    </span>
-  );
-}
-
-/**
- * The thread composer's room — a chip that is deliberately NOT a control (2026-08-09).
- *
- * A thread's channel is frozen at birth (threads.mode and the room both are), so inside a
- * thread the composer used to show no room at all — the one surface where you type had no
- * answer to "where does this go". Showing it as the pickable chip the Home launcher wears
- * would promise a move the server refuses; hiding it left the question. So: same chip anatomy,
- * no chevron, a lock, and a title that says WHY rather than going quiet. Disabled controls
- * that explain themselves read as facts; ones that don't read as broken.
- */
-export function ThreadRoomChip({ slug }: { slug: string }) {
-  return (
-    <span className="cchips">
-      <span className="cchip roomlocked" title="A thread stays in the room it was born in" aria-disabled="true">
-        <span className="rlk" aria-hidden><IconLock s={9} /></span>
-        <span className="h">#</span> {slug}
-      </span>
     </span>
   );
 }

@@ -3,12 +3,18 @@ import type { EngineeringSession } from '../engineering/domain';
 import type { AttachmentRow } from '../bridge/rows-board';
 import type { ChannelArtifactRow } from '../bridge/rows-rooms';
 import type { RunTree } from '../runs/runs';
+import { THREAD_STATUS_LABEL } from '@neuramesh/shared';
+import type { HeadStatus } from './parts';
 import { nm } from '../bridge/nm';
-import { IconAgents, IconAlert, IconBranch, IconCode, IconFile, IconPaperclip } from '../ui/icons';
+import { IconAgents, IconAlert, IconBranch, IconCode, IconFile, IconMachine, IconPaperclip } from '../ui/icons';
 import { overviewChanges, overviewPlan, overviewRuns } from './overview-model';
 import type { OverviewSection } from './ThreadOverview';
 
-export function codingOverviewSections(session: EngineeringSession | null, branch: string | null, actions: { plan: () => void; changes: () => void; files: () => void; approval: () => void }): OverviewSection[] {
+export function threadStatusOverviewSection(head?: HeadStatus | null): OverviewSection {
+  return { id: 'status', label: 'Status', items: head ? [{ id: 'thread-status', label: THREAD_STATUS_LABEL[head.status], tone: head.status === 'needs_you' ? 'attention' : undefined }] : [] };
+}
+
+export function codingOverviewSections(session: EngineeringSession | null, branch: string | null, actions: { plan: () => void; changes: () => void; files: () => void; approval: () => void }, context?: { machine?: string | null; task?: (() => void) | undefined }): OverviewSection[] {
   const sections: OverviewSection[] = [];
   if (session?.pendingApproval) sections.push({ id: 'attention', label: 'Needs you', items: [{ id: session.pendingApproval.id, label: session.pendingApproval.title, icon: <IconAlert s={14} />, tone: 'attention', open: actions.approval }] });
   if (session?.workPlan?.trim()) {
@@ -20,6 +26,8 @@ export function codingOverviewSections(session: EngineeringSession | null, branc
   sections.push({ id: 'code', label: 'Code', items: [
     ...(changes.files ? [{ id: 'changes', label: proposed?.length ? 'Proposed changes' : 'Session changes', detail: `${changes.files} ${changes.files === 1 ? 'file' : 'files'}${changes.additions !== null ? ` · +${changes.additions} −${changes.deletions}` : ' · no line counts'}`, icon: <IconCode s={14} />, open: actions.changes }] : []),
     ...(branch ? [{ id: 'branch', label: branch, icon: <IconBranch s={14} />, open: actions.files }] : []),
+    ...(context?.machine ? [{ id: 'machine', label: context.machine, icon: <IconMachine s={14} /> }] : []),
+    ...(context?.task ? [{ id: 'task', label: 'View task', icon: <IconFile s={14} />, open: context.task }] : []),
   ] });
   return sections;
 }

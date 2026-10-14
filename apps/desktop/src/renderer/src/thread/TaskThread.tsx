@@ -1,7 +1,7 @@
 import { overviewSourceFiles, overviewOutputFiles } from './overview-model';
 import { useContext } from 'react';
 import { ThreadOverviewBody, ThreadOverviewEnvironment, useThreadOverview } from './ThreadOverview';
-import { sourceOverviewSection, runOverviewSection } from './overview-sections';
+import { sourceOverviewSection, runOverviewSection, threadStatusOverviewSection } from './overview-sections';
 // The task thread (docs/25) — the conversation on a board task, its zoned panel and the gate
 // card above the composer. A design round reads in the side panel's review tab (2026-10-03).
 // Extracted from App.tsx (track A3).
@@ -13,14 +13,15 @@ import { WaitGhost, useWaitGhost } from './WaitGhost';
 import { waitRunFor } from './waitghost-rule';
 import { AttachButton, AttachTray, consumeWbAttach, useAttachments } from '../composer/attach';
 import { AttachLightbox } from './AttachLightbox';
-import { BeatsTracker } from '../task/BeatsTracker';
+import { BeatsTracker, PhaseRing } from '../task/BeatsTracker';
+import { STATE_LABEL } from '../task/labels';
 import { BrainChip } from '../brain/BrainChip';
 import { BrandSections } from '../marketing/BrandSections';
 import { ComposerInput } from '../composer/ComposerInput';
 import { DeliveryStrip } from './DeliveryStrip';
 
 import { DiffView } from '../views/docpreview';
-import { DraftingCard, MentionButton, ThreadRoomChip, ThreadRootPin, TypistChip, filesFromPaste, memberPeople, streamContent, type ComposerPerson, type HeadStatus, type PostVCard, type RailSection, useDropZone } from './parts';
+import { DraftingCard, MentionButton, ThreadRootPin, TypistChip, filesFromPaste, memberPeople, streamContent, type ComposerPerson, type HeadStatus, type PostVCard, type RailSection, useDropZone } from './parts';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { IconClose, IconPaperclip, IconReply, IconSend, IconSkill } from '../ui/icons';
@@ -551,6 +552,15 @@ export function TaskThread({
 
   const overviewEnv = useContext(ThreadOverviewEnvironment);
   const overview = useThreadOverview(`task:${task.id}`, [
+    { id: 'status', label: 'Status', items: [
+      ...threadStatusOverviewSection(marks).items,
+      { id: 'work-status', label: STATE_LABEL[task.state] ?? task.state, detail: task.kind ?? undefined, icon: <PhaseRing legs={spectrumLegs} />, iconDecorative: false },
+      ...(!isContent ? [{ id: 'assignment', label: factcap, icon: factHolder ? <AgentAvatar name={factHolder} size={18} /> : undefined }] : []),
+    ] },
+    { id: 'details', label: 'Details', items: [
+      ...railSections.filter((section) => !['artifacts', 'pr'].includes(section.key)).map((section) => ({ id: section.key, label: section.head, detail: section.key === 'subtasks' ? (subs.length ? `${doneSubs} of ${subs.length} done` : 'No subtasks yet') : section.meta, tone: section.warm ? 'attention' as const : undefined, open: onDetails })),
+      ...(channelKind === 'marketing' ? [{ id: 'brand', label: 'Brand', open: onDetails }] : []),
+    ] },
     { id: 'progress', label: 'Progress', items: latestPlan ? [{ id: 'plan', label: 'Work plan', open: () => openPlan() }] : [] },
     { id: 'code', label: 'Code', items: task.branch ? [{ id: 'branch', label: task.branch, open: onDetails }] : [] },
     { id: 'prs', label: 'Pull requests', items: task.pr_url && /^https?:\/\//.test(task.pr_url) ? [{ id: 'pr', label: task.pr_number ? `Pull request #${task.pr_number}` : 'Pull request', open: () => overviewEnv?.openLink(task.pr_url!) }] : [] },
@@ -582,19 +592,14 @@ export function TaskThread({
           {actErr && <div className="acterr" style={{ marginTop: 8 }}>{actErr}</div>}
         </Modal>
       )}
-      <ThreadHead overviewToggle={overview.toggle} {...{ act, back, blocking, busy, channelSlug, crumbProject, editDetails, isContent, marks, onClose, onOpenTerminal, onSettle, onViewLogs, peek, setBlocking, setClosing, spectrumLegs, task }} />
+      <ThreadHead overviewToggle={overview.toggle} onEdit={detailsEditable && !editDetails ? () => { setTitleDraft(task.title); setDescDraft(task.description ?? ''); setEditDetails(true); } : undefined} {...{ act, back, blocking, busy, channelSlug, crumbProject, editDetails, isContent, marks, onClose, onOpenTerminal, onSettle, onViewLogs, peek, setBlocking, setClosing, spectrumLegs, task }} />
       {/* the header zone (v0.36): identity + journey. The journey lives HERE — it IS the
           status summary — and the facts line folds every auxiliary surface into one row of
           toks; clicking one opens a single drawer under the tabs. v0.68: the journey is a
           30px ring at the title's right edge, not a full-width ribbon above the facts. */}
-      <div className="phead">
+      {peek && <div className="phead">
         <div className="pheadtitle">
           {task.title}
-          {/* rewriting the task's own title/description is a full-surface act, like the header
-              actions above — a peek reads the task and answers its gate (docs/25 §1b) */}
-          {detailsEditable && !editDetails && !peek && (
-            <button className="dodedit" title="edit the title & description (editable while pre-work)" onClick={() => { setTitleDraft(task.title); setDescDraft(task.description ?? ''); setEditDetails(true); }}>✎ Edit</button>
-          )}
         </div>
         {/* what remains of the facts row: the ASSIGNMENT caption only. Its toks became rail
             sections (docs/25 round 2). A content task still carries none — it reads as one
@@ -618,7 +623,7 @@ export function TaskThread({
           <RailToks sections={railSections} label={`#${task.number} details`} onOpen={onDetails}
             extraLabel={channelKind === 'marketing' ? 'brand' : null} />
         )}
-      </div>
+      </div>}
       {/* the thread column: the design studio that once shared this row retired into the side
           panel's review tab (the side-panel round, 2026-10-03) */}
       <div className="tsplit">
@@ -981,7 +986,6 @@ export function TaskThread({
           <div className="trow">
             <MentionButton onMention={() => setCmention((n) => n + 1)} />
             <AttachButton onFiles={atts.addFiles} count={atts.count} max={atts.limits.maxPerMessage} />
-            <ThreadRoomChip slug={channelSlug} />
             {/* docs/10 §15 — the conversation's brain. It lives on the THREAD composer because
                 that is where "who am I actually talking to" is asked, and because the override
                 it edits belongs to this thread and no other. */}

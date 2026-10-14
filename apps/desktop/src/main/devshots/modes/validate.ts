@@ -34,7 +34,7 @@ export async function validate({ win, dir, js, sleep, waitFor }: ShotCtx): Promi
   await sleep(300);
   console.log(`validate_shot reqchg_btn=${await js(`[...document.querySelectorAll('.tfaccept .btn')].some(b => /Request changes/.test(b.textContent))`)}`);
   for (const theme of ['dark', 'light'] as const) {
-    await js(`document.documentElement.dataset.theme = '${theme}'`);
+    await js(`document.documentElement.dataset.theme = '${theme}'; document.documentElement.dataset.look = '${theme}'.startsWith('paper-') ? 'paper' : 'elevated'`);
     await sleep(350);
     writeFileSync(join(dir, `reopen-fulltask-${theme}.png`), (await win.webContents.capturePage()).toPNG());
     console.log(`shot_saved=${join(dir, `reopen-fulltask-${theme}.png`)}`);
@@ -44,7 +44,7 @@ export async function validate({ win, dir, js, sleep, waitFor }: ShotCtx): Promi
   await sleep(400);
   // 1) the task view with the validation-artifacts row (chips, not raw dumps)
   for (const theme of ['dark', 'light'] as const) {
-    await js(`document.documentElement.dataset.theme = '${theme}'`);
+    await js(`document.documentElement.dataset.theme = '${theme}'; document.documentElement.dataset.look = '${theme}'.startsWith('paper-') ? 'paper' : 'elevated'`);
     await sleep(350);
     writeFileSync(join(dir, `validate-task-${theme}.png`), (await win.webContents.capturePage()).toPNG());
     console.log(`shot_saved=${join(dir, `validate-task-${theme}.png`)}`);
@@ -55,7 +55,7 @@ export async function validate({ win, dir, js, sleep, waitFor }: ShotCtx): Promi
   if (!(await waitFor('.apvframe', 40))) console.log('validate_shot WARN no apvframe');
   await sleep(800);
   for (const theme of ['dark', 'light'] as const) {
-    await js(`document.documentElement.dataset.theme = '${theme}'`);
+    await js(`document.documentElement.dataset.theme = '${theme}'; document.documentElement.dataset.look = '${theme}'.startsWith('paper-') ? 'paper' : 'elevated'`);
     await sleep(350);
     writeFileSync(join(dir, `validate-html-${theme}.png`), (await win.webContents.capturePage()).toPNG());
     console.log(`shot_saved=${join(dir, `validate-html-${theme}.png`)}`);
@@ -73,7 +73,7 @@ export async function validate({ win, dir, js, sleep, waitFor }: ShotCtx): Promi
   if (!(await waitFor('.planreview', 40))) console.log('validate_shot WARN no planreview');
   await sleep(400);
   for (const theme of ['dark', 'light'] as const) {
-    await js(`document.documentElement.dataset.theme = '${theme}'`);
+    await js(`document.documentElement.dataset.theme = '${theme}'; document.documentElement.dataset.look = '${theme}'.startsWith('paper-') ? 'paper' : 'elevated'`);
     await sleep(350);
     writeFileSync(join(dir, `validate-plan-${theme}.png`), (await win.webContents.capturePage()).toPNG());
     console.log(`shot_saved=${join(dir, `validate-plan-${theme}.png`)}`);

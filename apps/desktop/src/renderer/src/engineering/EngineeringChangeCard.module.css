@@ -18,3 +18,7 @@
 .actions > button { color: var(--text); background: var(--card); }
 .actions > button.primary { background: var(--accent); color: var(--accent-ink); }
 .note { margin: 0; padding: 10px 14px; border-top: 1px solid var(--border); font-size: 12px; color: var(--muted); }
+
+:global(:root[data-look='paper']) .card { background: var(--card); border-color: var(--card-border); }
+:global(:root[data-look='paper']) .view { border-color: transparent; background: transparent; }
+:global(:root[data-look='paper']) .view:hover { background: var(--hover-bg); }

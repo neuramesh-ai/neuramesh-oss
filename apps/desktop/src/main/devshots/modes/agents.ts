@@ -14,7 +14,7 @@ export async function remoteagent({ win, dir, js, sleep, waitFor }: ShotCtx): Pr
   await waitFor('.agentcard', 60);
   console.log(`remoteagent_shot remote_present=${await js(`document.querySelectorAll('.rmchip').length`)}`);
   for (const theme of ['dark', 'light'] as const) {
-    await js(`document.documentElement.dataset.theme = '${theme}'`);
+    await js(`document.documentElement.dataset.theme = '${theme}'; document.documentElement.dataset.look = '${theme}'.startsWith('paper-') ? 'paper' : 'elevated'`);
     await sleep(350);
     writeFileSync(join(dir, `remoteagent-roster-${theme}.png`), (await win.webContents.capturePage()).toPNG());
     console.log(`shot_saved=${join(dir, `remoteagent-roster-${theme}.png`)}`);
@@ -25,7 +25,7 @@ export async function remoteagent({ win, dir, js, sleep, waitFor }: ShotCtx): Pr
     await js(`(() => { const i = document.querySelector('.modal .fld input'); if (i) { Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(i, 'https://acme-agents.example.com/.well-known/a2a/agent-card.json'); i.dispatchEvent(new Event('input', { bubbles: true })); } })()`);
     await sleep(300);
     for (const theme of ['dark', 'light'] as const) {
-      await js(`document.documentElement.dataset.theme = '${theme}'`);
+      await js(`document.documentElement.dataset.theme = '${theme}'; document.documentElement.dataset.look = '${theme}'.startsWith('paper-') ? 'paper' : 'elevated'`);
       await sleep(350);
       writeFileSync(join(dir, `remoteagent-modal-${theme}.png`), (await win.webContents.capturePage()).toPNG());
       console.log(`shot_saved=${join(dir, `remoteagent-modal-${theme}.png`)}`);
@@ -52,7 +52,7 @@ export async function agentcard({ win, dir, js, sleep, waitFor }: ShotCtx): Prom
   await sleep(400);
   console.log(`agentcard_shot has_card=${await js(`!!document.querySelector('.cardjson')`)}`);
   for (const theme of ['dark', 'light'] as const) {
-    await js(`document.documentElement.dataset.theme = '${theme}'`);
+    await js(`document.documentElement.dataset.theme = '${theme}'; document.documentElement.dataset.look = '${theme}'.startsWith('paper-') ? 'paper' : 'elevated'`);
     await sleep(350);
     writeFileSync(join(dir, `agentcard-${theme}.png`), (await win.webContents.capturePage()).toPNG());
     console.log(`shot_saved=${join(dir, `agentcard-${theme}.png`)}`);
@@ -81,7 +81,7 @@ export async function runtime({ win, dir, js, sleep, waitFor }: ShotCtx): Promis
   await sleep(400);
   console.log(`runtime_shot codex_selected=${await js(`[...document.querySelectorAll('.modal .fld select')].some((s) => s.value === 'codex')`)}`);
   for (const theme of ['dark', 'light'] as const) {
-    await js(`document.documentElement.dataset.theme = '${theme}'`);
+    await js(`document.documentElement.dataset.theme = '${theme}'; document.documentElement.dataset.look = '${theme}'.startsWith('paper-') ? 'paper' : 'elevated'`);
     await sleep(350);
     writeFileSync(join(dir, `runtime-picker-${theme}.png`), (await win.webContents.capturePage()).toPNG());
     console.log(`shot_saved=${join(dir, `runtime-picker-${theme}.png`)}`);
@@ -113,7 +113,7 @@ export async function repolink({ win, dir, js, sleep, waitFor }: ShotCtx): Promi
   await js(`(() => { const i = document.querySelector('.modal .fld input'); if (i) { Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(i, 'https://github.com/galonge/nmesh-static'); i.dispatchEvent(new Event('input', { bubbles: true })); } })()`);
   await sleep(300);
   for (const theme of ['dark', 'light'] as const) {
-    await js(`document.documentElement.dataset.theme = '${theme}'`);
+    await js(`document.documentElement.dataset.theme = '${theme}'; document.documentElement.dataset.look = '${theme}'.startsWith('paper-') ? 'paper' : 'elevated'`);
     await sleep(350);
     writeFileSync(join(dir, `repolink-modal-${theme}.png`), (await win.webContents.capturePage()).toPNG());
     console.log(`shot_saved=${join(dir, `repolink-modal-${theme}.png`)}`);
@@ -132,7 +132,7 @@ export async function repolink({ win, dir, js, sleep, waitFor }: ShotCtx): Promi
   await js(`[...document.querySelectorAll('.modal .sect')].find((s) => /Repositories/.test(s.textContent))?.scrollIntoView({ block: 'center' })`);
   await sleep(400);
   for (const theme of ['dark', 'light'] as const) {
-    await js(`document.documentElement.dataset.theme = '${theme}'`);
+    await js(`document.documentElement.dataset.theme = '${theme}'; document.documentElement.dataset.look = '${theme}'.startsWith('paper-') ? 'paper' : 'elevated'`);
     await sleep(350);
     writeFileSync(join(dir, `repolink-settings-${theme}.png`), (await win.webContents.capturePage()).toPNG());
     console.log(`shot_saved=${join(dir, `repolink-settings-${theme}.png`)}`);

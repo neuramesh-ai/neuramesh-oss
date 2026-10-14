@@ -16,7 +16,7 @@ export async function projects({ win, dir, js, sleep, waitFor }: ShotCtx): Promi
   await sleep(300);
   console.log(`projects_shot items=${await js(`document.querySelectorAll('.projmenu-item').length`)}`);
   for (const theme of ['dark', 'cream-oak'] as const) {
-    await js(`document.documentElement.dataset.theme = '${theme}'`);
+    await js(`document.documentElement.dataset.theme = '${theme}'; document.documentElement.dataset.look = '${theme}'.startsWith('paper-') ? 'paper' : 'elevated'`);
     await sleep(350);
     writeFileSync(join(dir, `projects-switcher-${theme}.png`), (await win.webContents.capturePage()).toPNG());
     console.log(`shot_saved=${join(dir, `projects-switcher-${theme}.png`)}`);
@@ -28,7 +28,7 @@ export async function projects({ win, dir, js, sleep, waitFor }: ShotCtx): Promi
   await js(`[...document.querySelectorAll('.chiptoggle')].filter((b) => /#marketing|#dev/.test(b.textContent)).forEach((b) => b.click())`);
   await sleep(300);
   for (const theme of ['dark', 'cream-oak'] as const) {
-    await js(`document.documentElement.dataset.theme = '${theme}'`);
+    await js(`document.documentElement.dataset.theme = '${theme}'; document.documentElement.dataset.look = '${theme}'.startsWith('paper-') ? 'paper' : 'elevated'`);
     await sleep(350);
     writeFileSync(join(dir, `projects-create-${theme}.png`), (await win.webContents.capturePage()).toPNG());
     console.log(`shot_saved=${join(dir, `projects-create-${theme}.png`)}`);
@@ -50,7 +50,7 @@ export async function appearance({ win, dir, js, sleep, waitFor }: ShotCtx): Pro
   await sleep(300);
   // 1) the whole app in each of the four themes — proves every theme renders
   for (const theme of ['dark', 'soft-dark', 'light', 'cream-oak'] as const) {
-    await js(`document.documentElement.dataset.theme = '${theme}'`);
+    await js(`document.documentElement.dataset.theme = '${theme}'; document.documentElement.dataset.look = '${theme}'.startsWith('paper-') ? 'paper' : 'elevated'`);
     await sleep(350);
     writeFileSync(join(dir, `appearance-${theme}.png`), (await win.webContents.capturePage()).toPNG());
     console.log(`shot_saved=${join(dir, `appearance-${theme}.png`)}`);
@@ -62,7 +62,7 @@ export async function appearance({ win, dir, js, sleep, waitFor }: ShotCtx): Pro
   await sleep(400);
   console.log(`appearance_shot cards=${await js(`document.querySelectorAll('.themecard').length`)} sel=${await js(`!!document.querySelector('.themecard.sel')`)}`);
   for (const theme of ['dark', 'cream-oak'] as const) {
-    await js(`document.documentElement.dataset.theme = '${theme}'`);
+    await js(`document.documentElement.dataset.theme = '${theme}'; document.documentElement.dataset.look = '${theme}'.startsWith('paper-') ? 'paper' : 'elevated'`);
     await sleep(350);
     writeFileSync(join(dir, `appearance-panel-${theme}.png`), (await win.webContents.capturePage()).toPNG());
     console.log(`shot_saved=${join(dir, `appearance-panel-${theme}.png`)}`);
@@ -78,7 +78,7 @@ export async function appearance({ win, dir, js, sleep, waitFor }: ShotCtx): Pro
 export async function attachments({ win, dir, js, sleep, waitFor }: ShotCtx): Promise<void> {
   const shoot = async (name: string, themes: readonly string[] = ['dark', 'cream-oak']) => {
     for (const theme of themes) {
-      await js(`document.documentElement.dataset.theme = '${theme}'`);
+      await js(`document.documentElement.dataset.theme = '${theme}'; document.documentElement.dataset.look = '${theme}'.startsWith('paper-') ? 'paper' : 'elevated'`);
       await sleep(300);
       writeFileSync(join(dir, `${name}-${theme}.png`), (await win.webContents.capturePage()).toPNG());
       console.log(`shot_saved=${join(dir, `${name}-${theme}.png`)}`);

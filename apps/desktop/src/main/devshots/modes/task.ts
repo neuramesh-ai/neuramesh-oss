@@ -26,7 +26,7 @@ export async function planreview({ win, dir, js, sleep, waitFor }: ShotCtx): Pro
   // first: the plan_review task view itself (plan card, no completion/validation
   // section, clickable plan artifact)
   for (const theme of ['dark', 'light'] as const) {
-    await js(`document.documentElement.dataset.theme = '${theme}'`);
+    await js(`document.documentElement.dataset.theme = '${theme}'; document.documentElement.dataset.look = '${theme}'.startsWith('paper-') ? 'paper' : 'elevated'`);
     await sleep(350);
     const img = await win.webContents.capturePage();
     writeFileSync(join(dir, `plan-task-${theme}.png`), img.toPNG());
@@ -64,7 +64,7 @@ export async function planreview({ win, dir, js, sleep, waitFor }: ShotCtx): Pro
   console.log(`planreview_overlay=${ov} pills=${await js(`document.querySelectorAll('.plPill').length`)}`);
   if (ov === 'none' || /^0x/.test(String(ov))) console.log('planreview_shot WARN overlay not visible at capture');
   for (const theme of ['dark', 'light'] as const) {
-    await js(`document.documentElement.dataset.theme = '${theme}'`);
+    await js(`document.documentElement.dataset.theme = '${theme}'; document.documentElement.dataset.look = '${theme}'.startsWith('paper-') ? 'paper' : 'elevated'`);
     await sleep(350);
     const img = await win.webContents.capturePage();
     writeFileSync(join(dir, `plan-review-${theme}.png`), img.toPNG());
@@ -96,7 +96,7 @@ export async function stop({ win, dir, js, sleep, waitFor }: ShotCtx): Promise<v
   console.log(`stop_shot stopbtn=${await js(`[...document.querySelectorAll('.tfbar .btn')].some(b => /Stop/.test(b.textContent))`)}`);
   // 1) the in_progress task showing the 🛑 Stop button
   for (const theme of ['dark', 'cream-oak'] as const) {
-    await js(`document.documentElement.dataset.theme = '${theme}'`);
+    await js(`document.documentElement.dataset.theme = '${theme}'; document.documentElement.dataset.look = '${theme}'.startsWith('paper-') ? 'paper' : 'elevated'`);
     await sleep(350);
     writeFileSync(join(dir, `stop-button-${theme}.png`), (await win.webContents.capturePage()).toPNG());
     console.log(`shot_saved=${join(dir, `stop-button-${theme}.png`)}`);
@@ -105,7 +105,7 @@ export async function stop({ win, dir, js, sleep, waitFor }: ShotCtx): Promise<v
   await js(`[...document.querySelectorAll('.tfbar .btn.danger')].find(b => /Stop/.test(b.textContent))?.click()`);
   await sleep(300);
   for (const theme of ['dark', 'cream-oak'] as const) {
-    await js(`document.documentElement.dataset.theme = '${theme}'`);
+    await js(`document.documentElement.dataset.theme = '${theme}'; document.documentElement.dataset.look = '${theme}'.startsWith('paper-') ? 'paper' : 'elevated'`);
     await sleep(350);
     writeFileSync(join(dir, `stop-confirm-${theme}.png`), (await win.webContents.capturePage()).toPNG());
     console.log(`shot_saved=${join(dir, `stop-confirm-${theme}.png`)}`);
@@ -140,7 +140,7 @@ export async function dod({ win, dir, js, sleep, waitFor }: ShotCtx): Promise<vo
   console.log(`dod_shot editbtn=${await js(`!!document.querySelector('.dodedit')`)} hasdod=${await js(`!!document.querySelector('.tfdod')`)}`);
   // 1) the rendered DoD contract + Edit affordance
   for (const theme of ['dark', 'cream-oak'] as const) {
-    await js(`document.documentElement.dataset.theme = '${theme}'`);
+    await js(`document.documentElement.dataset.theme = '${theme}'; document.documentElement.dataset.look = '${theme}'.startsWith('paper-') ? 'paper' : 'elevated'`);
     await sleep(350);
     writeFileSync(join(dir, `dod-card-${theme}.png`), (await win.webContents.capturePage()).toPNG());
     console.log(`shot_saved=${join(dir, `dod-card-${theme}.png`)}`);
@@ -151,7 +151,7 @@ export async function dod({ win, dir, js, sleep, waitFor }: ShotCtx): Promise<vo
   await js(`document.querySelector('.dodbox')?.scrollIntoView({ block: 'center' })`);
   await sleep(300);
   for (const theme of ['dark', 'cream-oak'] as const) {
-    await js(`document.documentElement.dataset.theme = '${theme}'`);
+    await js(`document.documentElement.dataset.theme = '${theme}'; document.documentElement.dataset.look = '${theme}'.startsWith('paper-') ? 'paper' : 'elevated'`);
     await sleep(350);
     writeFileSync(join(dir, `dod-edit-${theme}.png`), (await win.webContents.capturePage()).toPNG());
     console.log(`shot_saved=${join(dir, `dod-edit-${theme}.png`)}`);
@@ -182,7 +182,7 @@ export async function pr({ win, dir, js, sleep, waitFor }: ShotCtx): Promise<voi
   if (!(await waitFor('.railpr', 40))) console.log('pr_shot WARN no .railpr (PR link)');
   console.log(`pr_shot prlink=${await js(`document.querySelector('.railpr')?.textContent?.trim() || 'none'`)}`);
   for (const theme of ['dark', 'cream-oak'] as const) {
-    await js(`document.documentElement.dataset.theme = '${theme}'`);
+    await js(`document.documentElement.dataset.theme = '${theme}'; document.documentElement.dataset.look = '${theme}'.startsWith('paper-') ? 'paper' : 'elevated'`);
     await sleep(350);
     writeFileSync(join(dir, `pr-link-${theme}.png`), (await win.webContents.capturePage()).toPNG());
     console.log(`shot_saved=${join(dir, `pr-link-${theme}.png`)}`);

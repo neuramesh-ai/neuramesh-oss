@@ -15,9 +15,8 @@ import { type RailSection } from './parts';
  * in (`shell/panel-state.ts`). `RailSections` — the body both surfaces always shared — is
  * unchanged and is what gets portalled in.
  *
- * What stands in for it while Overview is not in view is `RailToks`: one line under the thread
- * head naming what Overview holds, each tok a door to it — with the tab out of view the sections
- * are off-screen, so the thread has to say they exist.
+ * Full threads expose these details through the floating thread overview. `RailToks` remains
+ * the compact details door for task peeks, which have no floating overview of their own.
  */
 
 /** The rail's contents — portalled into the side panel's Overview slot. */

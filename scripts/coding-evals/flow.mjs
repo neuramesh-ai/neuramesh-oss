@@ -57,8 +57,16 @@ export async function start(p,run,spec) {
 export const turnSettled = (s, initial) => !s.busy && !s.cards.some(c => c.status === 'proposed') && !s.approval
   && s.replies.length > initial && s.progress?.total > 0 && s.progress.done === s.progress.total;
 
+/** A quiet UI can occur between provider tools while the previous plan is still complete.
+ * Require this turn's recorded verification, then recheck the UI after that async read. */
+export async function confirmTurn(p, initial, text, completionCheck) {
+  if (completionCheck && !await completionCheck()) return false;
+  const latest = await state(p);
+  return turnSettled(latest, initial) && latest.text === text;
+}
+
 /** Drives only visible user controls. Approvals remain scoped to the fixture's declared paths/commands. */
-export async function turn(p,spec,result,dir,{planning=false,replyCount,cancelFile}={}) {
+export async function turn(p,spec,result,dir,{planning=false,replyCount,cancelFile,completionCheck}={}) {
   const until=Date.now()+spec.timeoutSeconds*1000;
   const seen=new Set(), initial=replyCount??(await state(p)).replies.length;
   let tick=0, stable=0, nextProgress=Date.now()+15000, lastText='', changedAt=Date.now();
@@ -113,8 +121,7 @@ export async function turn(p,spec,result,dir,{planning=false,replyCount,cancelFi
     if(!planning && turnSettled(current, initial)) {
       if(++stable>=2) {
         await capture(p,dir,`${++tick}-response`);
-        const confirmed = await state(p);
-        if(turnSettled(confirmed, initial) && confirmed.text === current.text) return;
+        if(await confirmTurn(p, initial, current.text, completionCheck)) return;
         stable=0;
       }
     } else stable=0;

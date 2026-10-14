@@ -65,3 +65,20 @@ export function thumbAvatar(name: string): string {
   }
   return uri;
 }
+
+// Paper uses the original seeded face geometry as a currentColor mask. The two SVG
+// paths remain the agent's own eyes and mouth. Only the solid head becomes a stroke.
+const OUTLINE_CACHE = new Map<string, string>();
+export function thumbOutline(name: string): string {
+  const original = thumbAvatar(name);
+  let uri = OUTLINE_CACHE.get(original);
+  if (uri === undefined) {
+    const svg = decodeURIComponent(original.slice('data:image/svg+xml;utf8,'.length))
+      .replace(/(<g mask="url\(#viewboxMask\)">)<rect[^>]*\/>/, '$1')
+      .replace(/(<path\b[^>]*\b)fill="[^"]*"/g, '$1fill="#000"')
+      .replace(/(<path\b[^>]*\b)fill="#000"/, '$1fill="none" stroke="#000" stroke-width="4.5" stroke-linejoin="round"');
+    uri = `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+    OUTLINE_CACHE.set(original, uri);
+  }
+  return uri;
+}
