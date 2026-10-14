@@ -102,7 +102,7 @@ rm -rf "$PUBLIC_OWN"
 echo "· workflows"
 for f in .github/workflows/*.yml; do
   name=$(basename "$f" .yml)
-  if printf '%s\n' "${PUBLIC_WORKFLOWS[@]}" | grep -qx "$name"; then
+  if printf '%s\n' "${PUBLIC_WORKFLOWS[@]}" | grep -Fx -- "$name" >/dev/null; then
     printf '  %-24s public: runs in neuramesh-ai/neuramesh-oss\n' "$name"
   else
     git rm -q --cached "$f"
