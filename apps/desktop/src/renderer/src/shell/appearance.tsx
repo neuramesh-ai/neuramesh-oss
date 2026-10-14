@@ -3,7 +3,7 @@
 import { Modal } from '../ui/Modal';
 import { PorchMark } from '../brand';
 import { Switch } from '../ui/Switch';
-import { THEMES, type ThemeId, type ThemePref } from '../theme/theme';
+import { THEMES, type ThemeDef, type ThemeId, type ThemePref } from '../theme/theme';
 import { nm as nmBridge } from '../bridge/nm';
 import { type UpdateState } from '../bridge/rows-infra';
 import { useState } from 'react';
@@ -69,48 +69,57 @@ function FloorLine({ floor }: { floor?: string }) {
   return floor ? <span className="updatecard-floor">This version is too old for the cloud. Update the app to continue.</span> : null;
 }
 
-// GitHub-style appearance picker — a "sync with system" card + the 4 themes, each
-// with a live mini-preview built from its own token colors. Selecting applies +
-// persists immediately (the app re-themes behind the modal).
+function ThemePreview({ theme }: { theme: ThemeDef }) {
+  const { sw, look } = theme;
+  return <div aria-hidden="true" className={`themeprev ${look}`} style={{ background: sw.bg, borderColor: sw.border }}>
+    {look === 'paper' ? <>
+      <span className="tprail" style={{ borderColor: sw.border }} />
+      <span className="tptitle" style={{ background: sw.text }} />
+      <span className="tpcomposer" style={{ borderColor: sw.border }} />
+    </> : <>
+      <div className="tprow"><span className="tpbar" style={{ background: sw.accent }} /><span className="tpbar sm" style={{ background: sw.border }} /></div>
+      <div className="tppanel" style={{ background: sw.panel, borderColor: sw.border }}>
+        <span className="tpline" style={{ background: sw.text }} /><span className="tpline sm" style={{ background: sw.text }} />
+      </div>
+    </>}
+  </div>;
+}
+
 export function AppearancePanel({ pref, active, onPick, onClose }: { pref: ThemePref; active: ThemeId; onPick: (p: ThemePref) => void; onClose: () => void }) {
   const [notif, setNotif] = useState(() => localStorage.getItem('nm:notifications') !== 'off');
-  const toggleNotif = () => setNotif((v) => { const next = !v; localStorage.setItem('nm:notifications', next ? 'on' : 'off'); void nm?.setNotificationsEnabled?.(next); return next; });
+  const toggleNotif = () => setNotif((v) => { const next = !v; localStorage.setItem('nm:notifications', next ? 'on' : 'off'); void nm?.setNotificationsEnabled(next); return next; });
   return (
     <Modal title="Appearance" onClose={onClose}>
-      <p className="modalhint">Choose how neuramesh looks. Pick a single theme, or sync with your system to switch automatically between light and dark.</p>
-      <div className="themegrid">
-        <button className={`themecard${pref === 'system' ? ' sel' : ''}`} onClick={() => onPick('system')}>
-          <div className="themeprev" style={{ background: 'linear-gradient(135deg, #1d1d1d 0 50%, #fbf3e8 50% 100%)', borderColor: 'var(--border2)' }}>
-            <span className="tpsys" />
-          </div>
-          <div className="themeinfo">
-            <div className="themename">Sync with system{pref === 'system' && <span className="themeon"> · {THEMES.find((t) => t.id === active)?.label.toLowerCase()}</span>}</div>
-            <div className="themedesc">Follow your OS — light by day, dark by night.</div>
-          </div>
-          <span className="themeradio" aria-checked={pref === 'system'} role="radio" />
-        </button>
-        {THEMES.map((t) => (
-          <button key={t.id} className={`themecard${pref === t.id ? ' sel' : ''}`} onClick={() => onPick(t.id)}>
-            <div className="themeprev" style={{ background: t.sw.bg, borderColor: t.sw.border }}>
-              <div className="tprow"><span className="tpbar" style={{ background: t.sw.accent }} /><span className="tpbar sm" style={{ background: t.sw.border }} /></div>
-              <div className="tppanel" style={{ background: t.sw.panel, borderColor: t.sw.border }}>
-                <span className="tpline" style={{ background: t.sw.text }} />
-                <span className="tpline sm" style={{ background: t.sw.text }} />
-              </div>
+      <div role="radiogroup" aria-label="Theme">
+        {(['paper', 'elevated'] as const).map((look) => {
+          const system = look === 'paper' ? 'paper-system' : 'system';
+          const label = look === 'paper' ? 'Paper' : 'Elevated';
+          const choices: { id: ThemePref; label: string; desc: string; theme?: ThemeDef }[] = [
+            { id: system, label: 'Sync with system', desc: look === 'paper' ? 'Paper light by day, paper dark by night.' : 'Light by day, dark by night.' },
+            ...THEMES.filter((t) => t.look === look).map((theme) => ({ ...theme, theme })),
+          ];
+          return <section key={look} aria-label={label}>
+            <div className="sect themegroup">{label}</div>
+            <div className="themegrid">
+              {choices.map((choice) => <label key={choice.id} className={`themecard${pref === choice.id ? ' sel' : ''}`}>
+                <input className="themeinput" type="radio" name="appearance-theme" value={choice.id} checked={pref === choice.id} onChange={() => onPick(choice.id)}
+                  aria-label={choice.id === system ? `${label}: Sync with system` : choice.label} aria-describedby={`theme-desc-${choice.id}`} />
+                {choice.theme ? <ThemePreview theme={choice.theme} /> : <div aria-hidden="true" className={`themeprev ${look}`} style={{ background: look === 'paper' ? 'linear-gradient(135deg, #212121 0 50%, #f7f6f3 50% 100%)' : 'linear-gradient(135deg, #1d1d1d 0 50%, #fbf3e8 50% 100%)', borderColor: 'var(--border2)' }}><span className="tpsys" /></div>}
+                <div className="themeinfo">
+                  <div className="themename">{choice.label}{choice.id === system && pref === system && <span className="themeon"> · {THEMES.find((t) => t.id === active)?.label}</span>}</div>
+                  <div className="themedesc" id={`theme-desc-${choice.id}`}>{choice.desc}</div>
+                </div>
+                <span className="themeradio" aria-hidden="true" />
+              </label>)}
             </div>
-            <div className="themeinfo">
-              <div className="themename">{t.label}</div>
-              <div className="themedesc">{t.desc}</div>
-            </div>
-            <span className="themeradio" aria-checked={pref === t.id} role="radio" />
-          </button>
-        ))}
+          </section>;
+        })}
       </div>
       <div className="sect" style={{ padding: '16px 0 5px' }}>Notifications</div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '2px 0 4px' }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ fontWeight: 500, fontSize: 13 }}>Desktop notifications</div>
-          <div style={{ fontSize: 11, color: 'var(--dim)', marginTop: 2 }}>Get a desktop alert when an agent needs you, or a task is ready to accept — even when neuramesh is in the background. Click it to jump straight to the thread.</div>
+          <div style={{ fontSize: 11, color: 'var(--dim)', marginTop: 2 }}>Get an alert when an agent needs you or a task is ready to accept.</div>
         </div>
         <Switch on={notif} onToggle={toggleNotif} title={notif ? 'on' : 'off'} />
       </div>
@@ -118,7 +127,7 @@ export function AppearancePanel({ pref, active, onPick, onClose }: { pref: Theme
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '2px 0 4px' }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ fontWeight: 500, fontSize: 13 }}>Porch says hello</div>
-          <div style={{ fontSize: 11, color: 'var(--dim)', marginTop: 2 }}>Replay the launch animation — the full first-open peek, over the current theme.</div>
+          <div style={{ fontSize: 11, color: 'var(--dim)', marginTop: 2 }}>Play the launch animation again.</div>
         </div>
         <button className="btn sm" onClick={() => window.dispatchEvent(new Event('nm:replay-peek'))}>↻ Replay</button>
       </div>

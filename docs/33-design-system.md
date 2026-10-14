@@ -24,8 +24,8 @@ optimizes for **calm legibility with warmth** — a workshop, not a dashboard:
 - **Motion is a heartbeat, not a show.** Entrances rise softly and never block; the few constant
   animations (typing dots, the onboarding step ring's halo) signal *something is alive here* and
   are stilled under `prefers-reduced-motion`.
-- **One system, two looks.** The web has four elevated palettes plus Paper light, Paper dark and Paper Cream Oak.
-  The desktop retains its four elevated palettes until the paper port. Each palette uses the same tokens.
+- **One system, two looks.** The web and desktop have four elevated palettes plus Paper light, Paper dark and Paper Cream Oak.
+  Each palette uses the same tokens.
   A surface that only looks right in one theme is a bug.
 
 ## 2. The frame model (the Cabinet lesson)
@@ -200,7 +200,7 @@ chosen pack card, an active filter. Warm-as-selection is idiom; warm-as-default 
 
 ## Two looks: elevated and paper
 
-The browser client offers two groups in Appearance. Paper has Paper light, Paper dark, Paper Cream Oak and its own
+The browser and desktop clients offer two groups in Appearance. Paper has Paper light, Paper dark, Paper Cream Oak and its own
 Sync with system. Paper Cream Oak is a fixed light palette with warm cream and oak-brown ink.
 Elevated retains Dark, Soft Dark, Light, Cream Oak and Sync with system.
 One local preference, `nm:theme`, selects both the look and palette. The default is `paper-system`.
@@ -333,12 +333,12 @@ Rules of use:
 
 ## 5. Type
 
-**Web update, 2026-10-13:** George requested Geist Mono across the browser app after the Paper review.
-The web tokens `--fbody`, `--fdisp`, `--fital`, `--fbrand`, and `--font` now resolve to `--fmono`.
+**Web and desktop update, 2026-10-14:** George requested Geist Mono across both apps after the Paper review.
+The web and desktop tokens `--fbody`, `--fdisp`, `--fital`, `--fbrand`, and `--font` now resolve to `--fmono`.
 Headings, navigation, messages, the composer, menus, settings, whiteboard controls, and checkout fields use the same bundled face.
 Native form controls inherit the same face, including the sign-in email and password fields.
 The browser preloads the Latin Geist Mono file. Other Unicode subsets load when needed.
-Web text uses `letter-spacing: -0.02em`, matching the original filter heading at George's request.
+Web and desktop text uses `letter-spacing: -0.02em`, matching the original filter heading at George's request.
 This tight spacing applies to thread labels, controls, headings, and prose. The old mixed tracking values no longer apply.
 Recents and Projects retain the original uppercase 10px headings, weight 500, and tight spacing.
 Their counts and separator also use 10px. The smaller headings sit above the 12px conversation labels.
@@ -359,8 +359,8 @@ Thread icons use muted state colors in both Recents and Projects: purple for Idl
 The `--thread-idle`, `--thread-working`, and `--thread-settled` tokens mix 75% of the theme hue with the body ink.
 Icon shape and the existing group labels keep state clear without color alone. The live orb retains its monochrome animation.
 The trailing amber needs-you signal stays independent of the activity color.
-This update covers the browser app. The desktop, phone, and public site retain their existing faces.
-The earlier type rounds below describe that lineage. This update supersedes their face, tracking, rail-size, and transcript-size choices for the web app.
+This update covers the browser and desktop apps. The phone and public site retain their existing faces.
+The earlier type rounds below describe that lineage. This update supersedes their face, tracking, rail-size, and transcript-size choices for the web and desktop apps.
 
 - **The Foundry type system (2026-09-09, George: "the complete thing")** — the app wears the
   site's faces. `--fdisp` and `--fbody` are both **NeuraMesh Sans** (the house face, 2026-09-11:

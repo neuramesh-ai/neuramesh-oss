@@ -45,7 +45,7 @@ import { selfInitial, selfLabel, setSelfMachine, setSelfUser } from './lib/self'
 import { errMsg } from './lib/text';
 
 import { IconActivity, IconAgents, IconBoard, IconBranch, IconBurger, IconCalendar, IconCheck, IconChevron, IconClose, IconCode, IconDockLeft, IconDockRight, IconCredits, IconFootprint, IconGrid, IconHistory, IconHome, IconInbox, IconLibrary, IconMachine, IconMedal, IconMemory, IconPaperclip, IconProject, IconRepeat, IconReply, IconSend, IconSkill, IconThreads, IconTrend, IconWhiteboard, IconCompose, IconFolder, IconPost, IconTerm } from './ui/icons';
-import { type ThemeId, type ThemePref, systemTheme, resolveTheme, applyTheme, loadThemePref } from './theme/theme';
+import { type ThemeId, type ThemePref, resolveTheme, applyTheme, loadThemePref } from './theme/theme';
 import { flashToast, useToast, setProviderSettingsOpener, setPolicySettingsOpener, setUpgradeOpener, setConnectionsSettingsOpener, setMoveToCloudOpener , openMoveToCloud } from './lib/toast';
 import { hostedGateFor } from './shell/hostedrule';
 import { moveDoorFor } from './shell/move-copy';
@@ -150,6 +150,7 @@ import { BellButton, BellPopover } from './shell/BellPopover';
 import { bellFlight, bellQueue } from './shell/bell';
 import { useBell, useBellHover } from './shell/useBell';
 import { type FaceHoverEvent, type FaceState, faceHover, initialFace } from './shell/facehover';
+import { makeRecentMarks } from './shell/recents';
 import { makeRowMarks } from './shell/rowstatus';
 import { type HeadStatus } from './thread/parts';
 import { BootSplash } from './shell/boot';
@@ -175,7 +176,8 @@ import { BellAlerts, useAlerts } from './views/AlertsBar';
 import { ArticleView } from './views/ArticleView';
 import { HomeTop } from './views/HomeTop';
 import { SetupCards } from './views/SetupCards';
-import { ComposerHint, NewChatStage, leadFor } from './views/NewChatStage';
+import { NewChatStage } from './views/NewChatStage';
+import { ComposerHint, leadFor } from './composer/ComposerHint';
 import { AddRemoteAgent } from './crew/AddRemoteAgent';
 import { HistoryOverlay } from './shell/HistoryOverlay';
 import { anchorPoint, watchAnchors } from './ui/anchor';
@@ -1782,7 +1784,6 @@ export function App() {
     [histAll, tasksAll, codeSessionsAll, histQ],
   );
   const projectOfChannel = useMemo(() => new Map(chans.map((c) => [c.id, c.project_id ?? null])), [chans]);
-  const homeRows = useMemo(() => historyRows({ threads: histAll, tasks: tasksAll, codeSessions: codeSessionsAll, channelId: null, channelSlug: '', query: '' }), [histAll, tasksAll, codeSessionsAll]); // Home's ledger: the overlay's rows, never its search
   // which rows have an agent in them right now — open runs carry the task or the thread they
   // belong to, and they are synced, so this is honest on every machine. ONE liveness signal for
   // every list that renders a session row (docs/29 §10 / docs/35 §3.2): the Recents rail's dot,
@@ -1795,6 +1796,7 @@ export function App() {
   }, [openRuns, liveKin]);
   // the three words a thread can wear (shared/threadstatus.ts), for the ⌘Y overlay's chips and filter
   const rowMarks = useMemo(() => makeRowMarks({ decisions: decisionsAll, liveIds: histLiveIds, threads: histAll, tasks: tasksAll, drafts: comingPosts, codeSessions: codeSessionsAll }), [decisionsAll, histLiveIds, histAll, tasksAll, comingPosts, codeSessionsAll]);
+  const recentMarks = useMemo(() => makeRecentMarks({ threads: histAll, liveIds: histLiveIds, marksOf: rowMarks }), [histAll, histLiveIds, rowMarks]);
   // …and for the OPEN session's head (settle round, 2026-09-09). The same derivation the rail's
   // rows run, asked about the one session on screen — a task's thread id lives on TaskAllRow, not
   // on the TaskRow the panel holds, so it is resolved here rather than inside the head.
@@ -2350,9 +2352,9 @@ export function App() {
   };
   // when following the OS, track its day/night changes live
   useEffect(() => {
-    if (themePref !== 'system' || !window.matchMedia) return;
+    if ((themePref !== 'system' && themePref !== 'paper-system') || !window.matchMedia) return;
     const mq = window.matchMedia('(prefers-color-scheme: light)');
-    const onChange = () => { const r = systemTheme(); setTheme(r); applyTheme(r); };
+    const onChange = () => { const r = resolveTheme(themePref); setTheme(r); applyTheme(r); };
     mq.addEventListener('change', onChange);
     return () => mq.removeEventListener('change', onChange);
   }, [themePref]);
@@ -2722,7 +2724,7 @@ export function App() {
   return (
     <AgentDirectory.Provider value={agentDirectory}>
     <FailoverBannerContext.Provider value={!!flyupOn}>
-    <div className="shell" data-navpos={navPos}>
+    <div className="shell" data-navpos={navPos} style={{ '--nm-navw': `${navW}px` } as React.CSSProperties}>
       {/* frame top bar — the window frame owns the global chrome (Cabinet-grade shell):
           wordmark · the fold · ⌘K. Hidden in top-dock mode (that row IS the chrome).
           The project › surface crumb RETIRED 2026-09-04 (rail-ink round, George — the Gemini
@@ -3034,7 +3036,6 @@ export function App() {
         data-dragging={navWDragging ? '1' : undefined}
         // the width rides a CSS var, not an inline width: the folded rule ([data-folded]) must
         // keep winning, and an inline style would outrank it (the shell round, 2026-08-10)
-        style={navPos !== 'top' ? ({ '--nm-navw': `${navW}px` } as React.CSSProperties) : undefined}
         // the face's hover region is the spine AND the column it opens into — a diagonal move
         // from the strip onto a project row must not cross "outside" and dismiss it mid-reach
         // Opening is the FOOT's job; closing is leaving the column. Splitting the two is what
@@ -3251,7 +3252,7 @@ export function App() {
               liveIds={histLiveIds}
               liveRuns={histLiveRuns}
               askIds={askIds}
-              marksOf={(r) => navBandsState.marksOf(r) ?? rowMarks(r)}
+              marksOf={(r) => navBandsState.marksOf(r) ?? recentMarks(r)}
               onSettle={(threadId) => void settleThread(threadId)}
               collapsed={!!navSec.recents}
               openId={openTaskId ?? openThreadId}
@@ -3593,8 +3594,8 @@ export function App() {
           // became the bell. `dashboard` stays the view key because it is also the state a thread
           // or task mounts OVER; what changed is what it renders when nothing is open.
           <NewChatStage
+            onRoutine={() => setLauncher({ mode: 'routine' })}
             onSeeUsage={() => { setNav('home'); setView('compute'); }}
-            ledger={{ rows: homeRows, marksOf: rowMarks, projects: wsProjects, projectOf: projectOfChannel, scope: scopeOf('home'), setScope: (x) => setScope('home', x), onOpenThread: (id, channelId) => goConversation(() => openConversation(id, channelId)), onOpenTask: (id) => goConversation(() => setOpenTaskId(id)), onSettle: (threadId) => void settleThread(threadId), onArchive: archiveConversation, onHistory: () => setHistOpen(true) }}
             agents={roster.agents}
             projects={wsProjects}
             activeProjectId={activeProject}
@@ -3624,6 +3625,7 @@ export function App() {
             onPickProject={(pid) => { if (pid !== activeProj?.id) setActiveProject(pid); }}
             onNewProject={() => { setCreateProjectOrigin(null); setCreateProjectOpen(true); }}
             onAllProjects={() => setNav('projects')}
+            onChannelCreated={refreshProjectsSoon}
             onBrainConnect={(p) => { setFocusProvider(p); setWsOpen(true); void refreshCreds(); }}
             onSetProjectPack={(packId) => setProjectPack(activeProject, packId)}
             onUpgrade={openUpgrade}

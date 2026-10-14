@@ -5,9 +5,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { THEMES, isThemePref, resolveTheme, systemTheme, loadThemePref } from '../renderer/src/theme/theme';
 
-test('the four themes are the contract: two dark, two light, stable ids', () => {
-  assert.deepEqual(THEMES.map((t) => t.id), ['dark', 'soft-dark', 'light', 'cream-oak']);
-  assert.deepEqual(THEMES.map((t) => t.group), ['dark', 'dark', 'light', 'light']);
+test('elevated themes retain their stable ids and groups', () => {
+  assert.deepEqual(THEMES.filter((t) => t.look === 'elevated').map((t) => t.id), ['dark', 'soft-dark', 'light', 'cream-oak']);
+  assert.deepEqual(THEMES.filter((t) => t.look === 'elevated').map((t) => t.group), ['dark', 'dark', 'light', 'light']);
 });
 
 test('isThemePref accepts exactly the ids + system', () => {
@@ -25,5 +25,5 @@ test('resolveTheme: a concrete pref is itself; system falls back to dark under n
 });
 
 test('loadThemePref survives node (no localStorage) and garbage values', () => {
-  assert.equal(loadThemePref(), 'system');
+  assert.equal(loadThemePref(), 'paper-system');
 });

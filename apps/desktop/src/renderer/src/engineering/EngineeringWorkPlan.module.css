@@ -24,7 +24,7 @@
 .footer b { color: var(--text); font-size: 12px; font-weight: 500; white-space: nowrap; }
 
 .proposal { min-width: 0; width: 100%; margin-block: 12px; }
-.overview { color: var(--body); font-size: 14px; line-height: 1.65; overflow-wrap: anywhere; }
+.overview { color: var(--body); font-size: var(--text-conversation); line-height: 1.55; overflow-wrap: anywhere; }
 .overview > :first-child { margin-top: 0; }
 .overview > :global(.md) > p { margin-block: 0 10px; }
 .overview ul { margin-block: 8px 14px; padding-left: 20px; }
@@ -32,3 +32,9 @@
 .overview li :global(.md) > p { margin: 0; }
 .nextStep { margin-top: 12px; }
 .nextStep :global(.md) > p { margin: 0; }
+
+:global(:root[data-look='paper']) :is(.card, .previewCard) { background: var(--card); border-color: var(--card-border); }
+:global(:root[data-look='paper']) .previewCard:hover { background: var(--hover-bg); border-color: var(--card-border); }
+:global(:root[data-look='paper']) .previewHead small { border-color: transparent; }
+
+.overview :global(.md) { font-size: inherit; }

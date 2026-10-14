@@ -1,10 +1,14 @@
-.thread-overview-body { position:relative; display:flex; flex:1; min-width:0; min-height:0; gap:12px; }
+/* Shared measurements keep the transcript and composer centered beside the overview. */
+.threadpanel { --overview-width:252px; --overview-gap:12px; --overview-inset:16px; }
+.thread-overview-body { position:relative; display:flex; flex:1; min-width:0; min-height:0; gap:var(--overview-gap); }
 .thread-overview-transcript { display:flex; flex:1; min-width:0; min-height:0; flex-direction:column; }
-.thread-overview { align-self:flex-start; flex:0 0 252px; width:252px; max-height:calc(100% - 16px); overflow:auto; margin:8px 16px 8px 0; padding:14px; box-sizing:border-box; border:1px solid var(--card-border); border-radius:var(--r-lg); background:var(--card); box-shadow:var(--shadow-card); color:var(--text); scrollbar-width:thin; font-size:12px; line-height:1.45; }
+.thread-overview { align-self:flex-start; flex:0 0 var(--overview-width); width:var(--overview-width); max-height:calc(100% - 16px); overflow:auto; margin:8px var(--overview-inset) 8px 0; padding:14px; box-sizing:border-box; border:1px solid var(--card-border); border-radius:var(--r-lg); background:var(--card); box-shadow:var(--shadow-card); color:var(--text); scrollbar-width:thin; font-size:12px; line-height:1.45; }
 .thread-overview:focus { outline:none; }
 .overview-head { display:flex; align-items:center; gap:8px; color:var(--muted); margin-bottom:14px; }
 .overview-head > span { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .overview-head button { display:grid; place-items:center; width:24px; height:24px; flex-shrink:0; border:0; background:transparent; color:var(--muted); border-radius:var(--r-sm); cursor:pointer; }
+.overview-head [data-tip]::after { left:auto; right:0; transform:translateY(-3px) scale(.97); }
+.overview-head [data-tip]:hover::after { transform:translateY(0) scale(1); }
 .thread-overview section + section { margin-top:18px; }
 .thread-overview h3 { margin:0 0 5px; font-size:11px; font-weight:500; color:var(--muted); }
 .overview-item > button, .overview-fact { display:flex; align-items:flex-start; gap:9px; padding:7px 5px; width:100%; min-width:0; border:0; border-radius:var(--r-sm); background:transparent; color:inherit; font:inherit; text-align:left; }
@@ -25,3 +29,10 @@
 
 .overview-more { border:0; background:transparent; color:var(--muted); font:inherit; padding:6px 5px; cursor:pointer; }
 .overview-more:hover { color:var(--text); }
+
+/* The narrow inline card consumes no horizontal space. Hidden cards also leave the full column. */
+.threadpanel .thread-overview-body.with-overview ~ .tcompose {
+  --overview-reserve:calc(var(--overview-width) + var(--overview-gap) + var(--overview-inset));
+  width:calc(100% - var(--overview-reserve));
+  margin-right:calc(var(--overview-reserve) + max(0px, (100% - var(--overview-reserve) - var(--col)) / 2));
+}

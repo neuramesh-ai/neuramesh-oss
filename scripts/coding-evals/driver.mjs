@@ -48,7 +48,7 @@ export async function drive(taskSpace,config) {
             result.feedbacks??=[];
             result.feedbacks.push({prompt:config.feedback,at:new Date().toISOString()});
             await p.fill('.codingthread textarea',config.feedback);await p.click('.codingthread button[aria-label="Send"]');
-            await turn(p,spec,result,join(dir,`feedback-${result.feedbacks.length}`),{replyCount:current.replies.length,cancelFile});
+            await turn(p,spec,result,join(dir,`feedback-${result.feedbacks.length}`),{replyCount:current.replies.length,cancelFile,completionCheck:async()=>(await verifyRecording(run,result,dir,'feedback',beforeFeedback.index)).passed});
           }
         } else {
         console.log(`[${spec.id}] starting real UI task`);
@@ -63,7 +63,7 @@ export async function drive(taskSpace,config) {
         check('planning left repository unchanged',!(await exec('git',['status','--porcelain'],{cwd:result.cwd})).stdout.trim());
         const beforeAct=(await state(p)).replies.length;
         await p.click('[aria-label="Continue in Act mode"] .primary');
-        await turn(p,spec,result,join(dir,'implementation'),{replyCount:beforeAct,cancelFile});
+        await turn(p,spec,result,join(dir,'implementation'),{replyCount:beforeAct,cancelFile,completionCheck:async()=>(await verifyRecording(run,result,dir,'implementation')).passed});
         result.implementationVerification=await verifyRecording(run,result,dir,'implementation');
         check('agent tests passed inside the coding sandbox',result.implementationVerification.passed);
         const execution=(await state(p)).progress;
@@ -76,7 +76,7 @@ export async function drive(taskSpace,config) {
           result.events.push({type:'model-handoff',to:run.handoffModel});
           const beforeFollowup=(await state(p)).replies.length;
           await p.fill('.codingthread textarea',spec.followup);await p.click('.codingthread button[aria-label="Send"]');
-          await turn(p,spec,result,join(dir,'followup'),{replyCount:beforeFollowup,cancelFile});
+          await turn(p,spec,result,join(dir,'followup'),{replyCount:beforeFollowup,cancelFile,completionCheck:async()=>(await verifyRecording(run,result,dir,'followup')).passed});
         }
         }
         if(continuing) check('agent tests passed inside the coding sandbox',(await verifyRecording(run,result,dir,'reassessment',beforeFeedback?.index??-1)).passed);

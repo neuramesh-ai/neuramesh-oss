@@ -1,13 +1,17 @@
 // The new-chat stage (docs/35) — where ⌘N lands. Extracted from App.tsx (track A4).
-import { AgentAvatar, ProjLogo } from '../components/AgentAvatar';
+import { ProjLogo } from '../components/AgentAvatar';
 import { AttachButton, AttachTray, consumeWbAttach, useAttachments } from '../composer/attach';
 import { BrainChip } from '../brain/BrainChip';
 import { CodingBrains } from '../models/CodingBrains';
 import type { EngineeringSelection } from '@neuramesh/shared';
+import { ComposerHint, leadFor } from '../composer/ComposerHint';
 import { SessionComposer } from '../composer/SessionComposer';
-import { ConnectorMarks } from '../composer/ConnectorMarks';
-import { HomeLedger, type HomeLedgerProps } from './HomeLedger';
-import { HomeWatermark } from '../brand';
+import { HomeComposerFoot } from './HomeComposerFoot';
+import { HomeCards } from './HomeCards';
+import { ProjectChip } from '../projects/ProjectChip';
+import { CreateChannelModal } from '../projects/rooms';
+import { homeChannel } from '../lib/home-channel';
+import { HomeWatermark, PorchMark } from '../brand';
 import { IconClose, IconCode, IconGrid, IconSend, IconSkill } from '../ui/icons';
 import { RepoChip, repoLabel } from '../composer/RepoChip'; import { repoForProject } from './EngineeringOS';
 import { MentionButton, filesFromPaste, type ComposerPerson } from '../thread/parts';
@@ -26,38 +30,6 @@ import { CapGate } from '../compute/CapGate';
 import { HostedGate } from '../shell/HostedGate';
 import { useCompute } from '../compute/useCompute';
 
-/**
- * The room's "you can just ask" cap, sitting at the top of a composer box.
- *
- * Mentions are how work starts here and nothing on screen said so — the placeholder's "@ mention"
- * is a syntax note, not an invitation. It names a ROOM'S orchestrator (never a hardcoded "rex":
- * the name is per workspace, and a room may have been staffed with someone else), and the name is
- * a button, so reading the hint and acting on it are one gesture.
- */
-export function ComposerHint({ lead, onInsert }: { lead: AgentRow; onInsert: (name: string) => void }) {
-  return (
-    <div className="chint">
-      <AgentAvatar name={lead.name} emoji={lead.emoji} size={15} radius={4} role={lead.role} />
-      {/* docs/34 §14: one composer, one consequence — the orchestrator triages every send and
-          decides what becomes a task, so the hint no longer branches on a mode. */}
-      <span>
-        Mention{' '}
-        <button type="button" className="chintat" onClick={() => onInsert(lead.name)}>@{lead.name}</button>{' '}
-        or another teammate whenever you want their help.
-      </span>
-    </div>
-  );
-}
-
-/** An IPC failure as a human sentence — the Electron wrapper prefix is noise, not information. */
-/** the orchestrator a given room would route through — the one this hint should introduce */
-export function leadFor(agents: AgentRow[], channelId: string | null | undefined): AgentRow | null {
-  if (!channelId) return null;
-  return agents.find((a) => a.role === 'orchestrator' && !a.retired_at && agentInChannel(a.channel_ids, channelId)) ?? null;
-}
-
-/** the ghost recipe — three asks the stage offers before you type */
-const SUGGESTIONS = ['Give me ideas', 'What moved while I was away?', 'Plan the next release'];
 
 // ── THE LANDING (the shell round 2026-08-10, re-merged 2026-08-16) ───────────────────────────
 // ⌘N, the nav's pill, a project head's ＋ — and now boot itself — land HERE. Home stopped being a
@@ -70,7 +42,7 @@ const SUGGESTIONS = ['Give me ideas', 'What moved while I was away?', 'Plan the 
 // (the report line George deleted from Home was exactly that mistake). The project name inside it
 // IS the project switcher — the chips-row pill, promoted into the sentence: one control, one
 // fact. Picking it moves the active project so the tree follows, and retargets the room chip.
-export function NewChatStage({ agents, projects, activeProjectId, channels, defaultChannelId, people, skills, packs, plan, greeting, composeSignal, initialTarget, initialDraft, topSections, onSend, onOpenThread, onPickProject, onNewProject, onAllProjects, onBrainConnect, onSetProjectPack, onUpgrade, onSeeUsage, machineChip, sessionBirth, ledger, hostedGate , repos = [], initialRepo = null, onConnectRepo, onCodingBirth }: {
+export function NewChatStage({ agents, projects, activeProjectId, channels, defaultChannelId, people, skills, packs, plan, greeting, composeSignal, initialTarget, initialDraft, topSections, onSend, onOpenThread, onPickProject, onNewProject, onAllProjects, onChannelCreated, onBrainConnect, onSetProjectPack, onUpgrade, onSeeUsage, onRoutine, machineChip, sessionBirth, hostedGate , repos = [], initialRepo = null, onConnectRepo, onCodingBirth }: {
   agents: AgentRow[];
   projects: WorkspaceProjectRow[];
   activeProjectId: string;
@@ -98,14 +70,13 @@ export function NewChatStage({ agents, projects, activeProjectId, channels, defa
   onPickProject: (projectId: string) => void;
   onNewProject: () => void;
   onAllProjects: () => void;
+  onChannelCreated: () => void;
   onBrainConnect: (provider: Provider) => void;
   onSetProjectPack?: (packId: string) => Promise<void>;
   onUpgrade: (reason: string) => void;
   /** the cap gate's second door — Compute, where the meter and "Wake now" live */
   onSeeUsage: () => void;
-  /** the thread list under the composer (docs/design/home-threads-2026-09) — the shell hands over the
-   * same rows and marks the rail, the bell and ⌘Y read; absent on a client that has no history yet */
-  ledger?: HomeLedgerProps;
+  onRoutine: () => void;
   /** the repo chip (coding threads, 0144 — door 1): the repositories, the pick a door pre-sets ('primary' = the room's primary repo, the Code rail's New session), the connect door, and the birth the shell remembers */
   repos?: RepoUI[]; initialRepo?: string | null; onConnectRepo?: () => void; onCodingBirth?: (threadId: string, repoId: string, selection: EngineeringSelection) => void;
 }) {
@@ -122,11 +93,14 @@ export function NewChatStage({ agents, projects, activeProjectId, channels, defa
   useEffect(() => {
     if (!composeSignal) return;
     setTarget(initialTarget ?? null);
+    setPendingChannel(null);
     if (initialDraft != null) setDraft(initialDraft);
     setRepo(initialRepo === 'primary' ? repoForProject(repos, channels.find((c) => c.id === (initialTarget ?? defaultChannelId))?.project_id ?? null)?.id ?? null : initialRepo ?? null); // the Code rail's New session pre-sets the repo chip to the room's primary repository (door 1)
   }, [composeSignal]); // eslint-disable-line react-hooks/exhaustive-deps
   const [chanPop, setChanPop] = useState(false);
   const [projPop, setProjPop] = useState(false);
+  const [channelProject, setChannelProject] = useState<WorkspaceProjectRow | null>(null);
+  const [pendingChannel, setPendingChannel] = useState<string | null>(null);
   const [machine, setMachine] = useState<string | null>(null); // the chip's choice for the NEXT send; null = Auto
   const [repo, setRepo] = useState<string | null>(null); // the repo chip's pick (0144): set, the send births a CODING thread
   const [codeSelection, setCodeSelection] = useState<EngineeringSelection>({ agentId: null, modelId: null, reasoningEffort: null }); // the Code chip's pick for that thread: null runs the NeuraMesh brain
@@ -135,7 +109,10 @@ export function NewChatStage({ agents, projects, activeProjectId, channels, defa
   const [hfocus, setHfocus] = useState(0); // nonce → focuses the composer (the hint's @name insert)
   useEffect(() => { if (composeSignal) setHfocus((n) => n + 1); }, [composeSignal]);
   const atts = useAttachments(plan, onUpgrade);
-  const targetChan = channels.find((c) => c.id === target) ?? channels.find((c) => c.id === defaultChannelId) ?? channels[0] ?? null;
+  const targetChan = homeChannel(channels, target, defaultChannelId, pendingChannel);
+  useEffect(() => {
+    if (pendingChannel && channels.some((c) => c.id === pendingChannel)) setPendingChannel(null);
+  }, [channels, pendingChannel]);
   const sendDraft = async () => {
     const text = draft.trim();
     const attSpecs = atts.specs();
@@ -157,24 +134,32 @@ export function NewChatStage({ agents, projects, activeProjectId, channels, defa
     finally { setSending(false); }
   };
   const ap = projects.find((p) => p.id === activeProjectId);
+  const pickProject = (projectId: string) => {
+    setProjPop(false);
+    setChanPop(false);
+    if (projectId !== activeProjectId) {
+      setTarget(null);
+      setPendingChannel(null);
+      onPickProject(projectId);
+    }
+  };
   const hour = new Date().getHours();
   const hello = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
-  // with rows to read, the stage is a page you read down: top-aligned, on the reading column, scrolling
-  const ledgered = (ledger?.rows.length ?? 0) > 0;
   // the next visit's static first frame draws from these (lib/staticshell.ts); written after a
   // settle so a boot's passing states are not what it remembers
   const targetSlug = targetChan?.slug ?? null;
   useEffect(() => {
-    const t = setTimeout(() => writeShellFacts({ name: greeting, project: ap?.slug ?? null, room: targetSlug, ledgered }), 800);
+    const t = setTimeout(() => writeShellFacts({ name: greeting, project: ap?.slug ?? null, room: targetSlug, ledgered: false }), 800);
     return () => clearTimeout(t);
-  }, [greeting, ap?.slug, targetSlug, ledgered]);
+  }, [greeting, ap?.slug, targetSlug]);
   return (
-    <div className={`stagewrap${ledgered ? ' ledgered' : ''}`}>
+    <div className="stagewrap">
       {/* the identity, behind the stage now that the stage owns the composer — it recedes the
           moment there is something to read (fill is "how much is on this page") */}
-      <HomeWatermark fill={draft || ledgered ? 1 : 0} />
+      <HomeWatermark fill={draft ? 1 : 0} />
       <div className="stagecol">
         {topSections}
+        <span className="stagemark" aria-hidden><PorchMark size={40} cut="std" animated /></span>
         {/* Home's date line, kept: the one fact a landing owes you before it asks a question */}
         <div className="stageeyebrow">{new Date().toLocaleDateString([], { weekday: 'long' })} · {new Date().toLocaleDateString([], { month: 'short', day: 'numeric' })}</div>
         <h1 className="stagehead">
@@ -186,14 +171,7 @@ export function NewChatStage({ agents, projects, activeProjectId, channels, defa
                 <div className="chpop projpop stagepop" role="menu">
                   {projects.filter((p) => p.status === 'active').map((p) => (
                     <button key={p.id} className={p.id === activeProjectId ? 'on' : ''} role="menuitem"
-                      onClick={() => {
-                        setProjPop(false);
-                        if (p.id !== activeProjectId) {
-                          // the room chip follows: the new project's rooms are a different set
-                          setTarget(null);
-                          onPickProject(p.id);
-                        }
-                      }}>
+                      onClick={() => pickProject(p.id)}>
                       <ProjLogo logo={p.logo_url} name={p.name || p.slug} size={15} />
                       {p.slug}
                     </button>
@@ -218,7 +196,7 @@ export function NewChatStage({ agents, projects, activeProjectId, channels, defa
           {(() => {
             // the stage lands in ONE room (the chip), so it introduces THAT room's orchestrator
             // a repository picked: the cap names THAT consequence (docs/34 §7) — the coding runtime, not the orchestrator
-            if (repo) return <div className="chint coding"><span className="chintcode" aria-hidden><IconCode s={13} /></span><span>This conversation works on <b>{(() => { const picked = repos.find((x) => x.id === repo); return picked ? repoLabel(picked) : 'the repository'; })()}</b>. Reads run freely. Every edit and every command asks you first.</span></div>;
+            if (repo) return <div className="chint coding"><span className="chintcode" aria-hidden><IconCode s={13} /></span><span>This conversation works on <b>{(() => { const picked = repos.find((x) => x.id === repo); return picked ? repoLabel(picked) : 'the repository'; })()}</b>.</span></div>;
             const lead = leadFor(agents, targetChan?.id);
             if (!lead) return null;
             return <ComposerHint lead={lead} onInsert={(nm2) => {
@@ -249,23 +227,25 @@ export function NewChatStage({ agents, projects, activeProjectId, channels, defa
             mentionSignal={cmention}
             focusSignal={hfocus}
           />} controls={<>
-            {/* the chip menu anchors to ITS OWN chip (2026-08-07) — the wrapper is the context.
-                No project chip in this row: the headline carries that fact now. */}
+            <ProjectChip projects={projects} active={ap ?? null} onSwitch={pickProject} onNew={onNewProject} />
+            {/* Each destination menu anchors to its own chip. Choose the project before its room. */}
             <span className="chipmenu">
-              {chanPop && targetChan && (
+              {chanPop && ap && (
                 <>
                   <div className="projmenu-scrim" onClick={() => setChanPop(false)} />
                   <div className="chpop" role="menu">
                     {channels.map((c) => (
-                      <button key={c.id} className={c.id === targetChan.id ? 'on' : ''} role="menuitem" onClick={() => { setTarget(c.id); setChanPop(false); }}>
+                      <button key={c.id} className={c.id === targetChan?.id ? 'on' : ''} role="menuitem" onClick={() => { setTarget(c.id); setPendingChannel(null); setChanPop(false); }}>
                         <span className="h">#</span> {c.slug}
                       </button>
                     ))}
+                    <div className="chpopsep" />
+                    <button role="menuitem" className="chpopact" onClick={() => { setChanPop(false); setChannelProject(ap); }}>＋ New channel</button>
                   </div>
                 </>
               )}
-              <button className="hchip chan" onClick={() => setChanPop((v) => !v)} disabled={!targetChan} aria-haspopup="menu" aria-expanded={chanPop} data-tip="The room this lands in">
-                <span className="h">#</span> {targetChan?.slug ?? '…'} <span className="cv">⌄</span>
+              <button className="hchip chan" onClick={() => setChanPop((v) => !v)} disabled={!ap} aria-haspopup="menu" aria-expanded={chanPop} data-tip="The room this lands in">
+                <span className="h">#</span> <span className="lbl">{targetChan?.slug ?? (pendingChannel ? 'Sync channel…' : 'channel')}</span> <span className="cv">⌄</span>
               </button>
             </span>
             {machineChip?.(machine, setMachine)}
@@ -282,24 +262,19 @@ export function NewChatStage({ agents, projects, activeProjectId, channels, defa
               {sending || atts.busy ? '…' : <IconSend s={20} />}
             </button>
           </>} />
-          {/* THE FOOT (docs/design/composer-foot-2026-09, 2026-09-11): the cap's material mirrored at
-              the bottom of the same card — one object, three zones. Left, the ghost recipe: a pill is
-              a PRE-DRAFTED MESSAGE, never a command (the rex-pills ruling), so clicking fills the
-              draft and focuses, and the human still sends. Right, the connector marks. With a draft
-              in the box the pills leave and the marks stay; the foot keeps its height so nothing
-              jumps (the settle control's reserved-seat rule, docs/33 §4). */}
-          <div className={`cfoot${draft ? ' drafting' : ''}`}>
-            <div className="cfootpills" aria-hidden={!!draft}>
-              {SUGGESTIONS.map((s) => (
-                <button key={s} type="button" className="cfootpill" tabIndex={draft ? -1 : 0} onClick={() => { setDraft(s); setHfocus((n) => n + 1); }}>{s}</button>
-              ))}
-            </div>
-            <ConnectorMarks channelId={targetChan?.id ?? null} marketing={targetChan?.marketing} />
-          </div>
+          <HomeComposerFoot draft={draft} channel={targetChan} onPrompt={(prompt) => { setDraft(prompt); setHfocus((n) => n + 1); }} />
         </div>
-        {ledger && <HomeLedger {...ledger} />}
+        <HomeCards onRoutine={onRoutine} onPrompt={(prompt) => { setDraft(prompt); setHfocus((n) => n + 1); }} />
         </>}
       </div>
+      {channelProject && <CreateChannelModal projectId={channelProject.id} projectName={channelProject.name || channelProject.slug}
+        onClose={() => setChannelProject(null)} onCreated={(id) => {
+          if (channelProject.id === activeProjectId) {
+            setTarget(id);
+            setPendingChannel(id);
+          }
+          onChannelCreated();
+        }} />}
     </div>
   );
 }

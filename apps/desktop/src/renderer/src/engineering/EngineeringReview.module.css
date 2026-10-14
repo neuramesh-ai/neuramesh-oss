@@ -44,6 +44,13 @@
 .sourceNotice { padding: 10px 16px; margin: 0; color: var(--muted); font-size: 12px; }
 .empty { padding: 28px 20px; margin-block: auto; color: var(--muted); font-size: 13px; line-height: 1.6; text-align: center; }
 .noFiles { padding: 8px; color: var(--muted); font-size: 12px; }
+:global(:root[data-look='paper']) .codeScroll { background: var(--code); color: var(--codeink); }
+:global(:root[data-look='paper']) .diffLine.added { background: var(--diff-add-bg); color: var(--diff-add); }
+:global(:root[data-look='paper']) .diffLine.removed { background: var(--diff-del-bg); color: var(--diff-del); }
+:global(:root[data-look='paper']) :is(.additions, .badge.added, .status.added, .added .marker) { color: var(--diff-add); }
+:global(:root[data-look='paper']) :is(.deletions, .badge.deleted, .status.deleted, .removed .marker) { color: var(--diff-del); }
+:global(:root[data-look='paper']) :is(.badge.modified, .status.modified) { color: var(--body); }
+:global(:root[data-look='paper']) .diffLine.hunk { background: var(--panel3); }
 @container code-review (max-width: 620px) {
   .workspace { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
   .fileList { max-height: 160px; border-right: 0; border-bottom: 1px solid var(--border); }

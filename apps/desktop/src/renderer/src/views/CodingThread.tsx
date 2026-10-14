@@ -43,7 +43,7 @@ import { Md } from '../md/Md';
 import { MARKER_RE } from '../thread/markers';
 import { UnitCard } from '../thread/ThreadMessage';
 import { repoLabel } from '../composer/RepoChip';
-import { IconAlert, IconBranch, IconCode, IconMachine, IconThreads } from '../ui/icons';
+import { IconAlert, IconCode, IconThreads } from '../ui/icons';
 import { parseGitHubConnected, parseKindMarker, parseModeMarker, parseNeed, parseTaskUnitRef, sessionRunLabel, threadTitle } from '@neuramesh/shared';
 
 /** the thread's own messages around the runtime's transcript: rex's line and the kind divider
@@ -191,27 +191,23 @@ export function CodingThread({ threadId, thread, back, channelSlug, channelId, c
   const [source, setSource] = useState<{ owner: string; row: AttachmentRow } | null>(null);
   useEffect(() => nm?.watchConvoAttachments(threadId, (rows) => setSources({ owner: threadId, rows })), [threadId]);
   const overview = useThreadOverview(`thread:${threadId}`, [
-    ...codingOverviewSections(active?.id === threadId ? active : null, (active?.id === threadId ? active.repo.branch : null) ?? codeSession?.branch ?? null, {
+    ...codingOverviewSections(active?.id === threadId ? active : null, (active?.id === threadId ? active.repo.branch : null) ?? codeSession?.branch ?? repoRow?.default_branch ?? 'main', {
       plan: () => workPlan.open(), changes: () => review.open(), files: () => onCodeTab?.('files', true),
       approval: () => { if (active?.pendingApproval?.changes?.length) review.open(); else { const gate = listRef.current?.closest('.codingthread')?.querySelector<HTMLElement>('.gateseat button'); gate?.focus(); } },
-    }),
+    }, { machine: machineName, task: unitId && onOpenTask ? () => onOpenTask(unitId) : undefined }),
     artifactOverviewSection(overviewOutputFiles(artifacts.rows, rows), onOpenDoc), sourceOverviewSection(overviewSourceFiles(sources.owner === threadId ? sources.rows : [], rows), (row) => setSource({ owner: threadId, row })),
   ]);
   return (
     <div className="threadpanel convo codingthread" onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}>
-      <div className="thead">
+      <div className="thead thread-crumb-row">
         <button className="scrumb" title="back — Esc" aria-label={`Back to ${back}`} onClick={onClose}>‹ {back}</button>
         <ThreadCrumb project={crumbProject} slug={channelSlug} />
-        <span className="convotitle" title={title}>{title}</span>
         {/* the mode is the thread's chip: plan in the plan hue, act in the build hue */}
         {active ? <span className={`chip c-${active.mode}`}>{active.mode}</span> : <span className="chip c-code">code</span>}
         <ThreadStatusChip head={marks} />
         {overview.toggle}
       </div>
-      {/* the subline: branch · repository · machine (the facts live as counts on the panel's code tabs) */}
-      <div className="codinghead">
-        <div className="sssub"><IconBranch s={11} /><span>{active?.repo.branch ?? codeSession?.branch ?? repoRow?.default_branch ?? 'main'}</span><span>·</span><span>{repoName ?? 'no repository'}</span>{machineName ? <><span>·</span><IconMachine s={11} /><span>{machineName}</span></> : null}{unitId ? <><span>·</span><button className="sssublink" onClick={() => onOpenTask?.(unitId)}>View task</button></> : null}</div>
-      </div>
+      <div className="thread-title-row"><span className="convotitle" title={title}>{title}</span></div>
       {codeSlot && active ? createPortal(<CodePanel selectedReview={review.selectedReview} selectedPlan={workPlan.text} selectedPath={review.path} onSelectPath={review.select} session={active} tab={wbTab} onTab={setWbTab} onSession={engineering.update} onRestore={restore} restoreUnavailable={!harness && !canExecute} />, codeSlot) : null}
       {!harness && runtime !== 'ready' && (
         <div className={`engnotice engruntime codingnotice${runtime === 'checking' ? '' : ' warning'}`} role="status">

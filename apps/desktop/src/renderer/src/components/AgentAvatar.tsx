@@ -1,8 +1,9 @@
 // Agent + project faces — extracted from App.tsx (track A3).
 import { useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { PorchMark } from '../brand';
 import { AgentDirectory } from '../context/AgentDirectory';
-import { thumbAvatar } from '../lib/persona';
+import { thumbAvatar, thumbOutline } from '../lib/persona';
 import { runtimeLabel } from '../lib/runtimes';
 import type { AgentRow } from '../bridge/rows-crew';
 
@@ -11,9 +12,13 @@ export function AgentAvatar({ name, size = 26, radius, interactive }: { name: st
   const tile = (
     <span
       className="pav"
+      data-agent={name.trim().toLowerCase()}
       style={{ width: size, height: size, minWidth: size, borderRadius: radius ?? Math.max(6, Math.round(size * 0.29)) }}
       aria-hidden
     >
+      {name.trim().toLowerCase() === 'rex'
+        ? <span className="pavmark"><PorchMark variant="outline" size={Math.round(size * 0.75)} /></span>
+        : <span className="pavoutline" style={{ maskImage: `url("${thumbOutline(name)}")` }} />}
       <img className="pavg" src={thumbAvatar(name)} alt="" draggable={false} />
     </span>
   );

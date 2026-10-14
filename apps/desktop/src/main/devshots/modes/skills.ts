@@ -33,7 +33,7 @@ export async function skills({ win, dir, js, sleep, waitFor }: ShotCtx): Promise
   await js(`(document.querySelector('.skillcard.draft .skillhead') ?? document.querySelector('.skillcard .skillhead'))?.click()`);
   await sleep(500);
   for (const theme of ['dark', 'light'] as const) {
-    await js(`document.documentElement.dataset.theme = '${theme}'`);
+    await js(`document.documentElement.dataset.theme = '${theme}'; document.documentElement.dataset.look = '${theme}'.startsWith('paper-') ? 'paper' : 'elevated'`);
     await sleep(350);
     const img = await win.webContents.capturePage();
     writeFileSync(join(dir, `skills-${theme}.png`), img.toPNG());
@@ -51,7 +51,7 @@ export async function skillpacks({ win, dir, js, sleep, waitFor }: ShotCtx): Pro
   // 1) packs are COLLAPSED by default — capture that clean overview
   console.log(`skillpacks_shot packs=${await js(`document.querySelectorAll('.packsec').length`)} collapsed=${await js(`document.querySelectorAll('.packbody').length`)}`);
   for (const theme of ['dark', 'light'] as const) {
-    await js(`document.documentElement.dataset.theme = '${theme}'`);
+    await js(`document.documentElement.dataset.theme = '${theme}'; document.documentElement.dataset.look = '${theme}'.startsWith('paper-') ? 'paper' : 'elevated'`);
     await sleep(350);
     writeFileSync(join(dir, `skillpacks-${theme}.png`), (await win.webContents.capturePage()).toPNG());
     console.log(`shot_saved=${join(dir, `skillpacks-${theme}.png`)}`);
@@ -68,7 +68,7 @@ export async function skillpacks({ win, dir, js, sleep, waitFor }: ShotCtx): Pro
   await sleep(500);
   console.log(`skillpacks_shot expanded_off=${await js(`document.querySelectorAll('.skillcard.off').length`)}`);
   for (const theme of ['dark', 'light'] as const) {
-    await js(`document.documentElement.dataset.theme = '${theme}'`);
+    await js(`document.documentElement.dataset.theme = '${theme}'; document.documentElement.dataset.look = '${theme}'.startsWith('paper-') ? 'paper' : 'elevated'`);
     await sleep(350);
     writeFileSync(join(dir, `skillpacks-expanded-${theme}.png`), (await win.webContents.capturePage()).toPNG());
     console.log(`shot_saved=${join(dir, `skillpacks-expanded-${theme}.png`)}`);
@@ -78,7 +78,7 @@ export async function skillpacks({ win, dir, js, sleep, waitFor }: ShotCtx): Pro
   if (!(await waitFor('.skillpanel', 40))) console.log('skillpacks_shot WARN no .skillpanel');
   await sleep(400);
   for (const theme of ['dark', 'light'] as const) {
-    await js(`document.documentElement.dataset.theme = '${theme}'`);
+    await js(`document.documentElement.dataset.theme = '${theme}'; document.documentElement.dataset.look = '${theme}'.startsWith('paper-') ? 'paper' : 'elevated'`);
     await sleep(350);
     writeFileSync(join(dir, `skillpanel-${theme}.png`), (await win.webContents.capturePage()).toPNG());
     console.log(`shot_saved=${join(dir, `skillpanel-${theme}.png`)}`);
@@ -105,7 +105,7 @@ export async function skillimport({ win, dir, js, sleep, waitFor }: ShotCtx): Pr
   await sleep(700);
   console.log(`skillimport_shot packs=${await js(`document.querySelectorAll('.packsec').length`)} prog=${await js(`document.querySelectorAll('.packprog').length`)} err=${await js(`document.querySelectorAll('.packprog.err').length`)}`);
   for (const theme of ['dark', 'light'] as const) {
-    await js(`document.documentElement.dataset.theme = '${theme}'`);
+    await js(`document.documentElement.dataset.theme = '${theme}'; document.documentElement.dataset.look = '${theme}'.startsWith('paper-') ? 'paper' : 'elevated'`);
     await sleep(350);
     writeFileSync(join(dir, `skillimport-${theme}.png`), (await win.webContents.capturePage()).toPNG());
     console.log(`shot_saved=${join(dir, `skillimport-${theme}.png`)}`);
@@ -117,7 +117,7 @@ export async function skillimport({ win, dir, js, sleep, waitFor }: ShotCtx): Pr
   await js(`(() => { const i = document.querySelector('.modal .fld input'); if (i) { Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(i, 'https://github.com/anthropics/skills'); i.dispatchEvent(new Event('input', { bubbles: true })); } })()`);
   await sleep(300);
   for (const theme of ['dark', 'light'] as const) {
-    await js(`document.documentElement.dataset.theme = '${theme}'`);
+    await js(`document.documentElement.dataset.theme = '${theme}'; document.documentElement.dataset.look = '${theme}'.startsWith('paper-') ? 'paper' : 'elevated'`);
     await sleep(350);
     writeFileSync(join(dir, `skillimport-modal-${theme}.png`), (await win.webContents.capturePage()).toPNG());
     console.log(`shot_saved=${join(dir, `skillimport-modal-${theme}.png`)}`);
@@ -141,7 +141,7 @@ export async function skillconsider({ win, dir, js, sleep, waitFor }: ShotCtx): 
   await sleep(500);
   console.log(`skillconsider_shot rows=${await js(`document.querySelectorAll('.logrow').length`)} skillrows=${await js(`[...document.querySelectorAll('.logrow')].filter(r => /skill/i.test(r.textContent)).length`)}`);
   for (const theme of ['dark', 'light'] as const) {
-    await js(`document.documentElement.dataset.theme = '${theme}'`);
+    await js(`document.documentElement.dataset.theme = '${theme}'; document.documentElement.dataset.look = '${theme}'.startsWith('paper-') ? 'paper' : 'elevated'`);
     await sleep(350);
     writeFileSync(join(dir, `skillconsider-${theme}.png`), (await win.webContents.capturePage()).toPNG());
     console.log(`shot_saved=${join(dir, `skillconsider-${theme}.png`)}`);
@@ -170,7 +170,7 @@ export async function slashpicker({ win, dir, js, sleep, waitFor }: ShotCtx): Pr
   await sleep(400);
   console.log(`slashpicker_shot items=${await js(`document.querySelectorAll('.slashitem').length`)}`);
   for (const theme of ['dark', 'light'] as const) {
-    await js(`document.documentElement.dataset.theme = '${theme}'`);
+    await js(`document.documentElement.dataset.theme = '${theme}'; document.documentElement.dataset.look = '${theme}'.startsWith('paper-') ? 'paper' : 'elevated'`);
     await sleep(350);
     writeFileSync(join(dir, `slashpicker-${theme}.png`), (await win.webContents.capturePage()).toPNG());
     console.log(`shot_saved=${join(dir, `slashpicker-${theme}.png`)}`);
@@ -182,7 +182,7 @@ export async function slashpicker({ win, dir, js, sleep, waitFor }: ShotCtx): Pr
   await sleep(300);
   console.log(`slashpicker_shot chip=${await js(`document.querySelectorAll('.skillattach .skillchip').length`)}`);
   for (const theme of ['dark', 'light'] as const) {
-    await js(`document.documentElement.dataset.theme = '${theme}'`);
+    await js(`document.documentElement.dataset.theme = '${theme}'; document.documentElement.dataset.look = '${theme}'.startsWith('paper-') ? 'paper' : 'elevated'`);
     await sleep(350);
     writeFileSync(join(dir, `slashchip-${theme}.png`), (await win.webContents.capturePage()).toPNG());
     console.log(`shot_saved=${join(dir, `slashchip-${theme}.png`)}`);
@@ -209,7 +209,7 @@ export async function slashempty({ win, dir, js, sleep, waitFor }: ShotCtx): Pro
   await sleep(400);
   console.log(`slashempty_shot empty=${await js(`document.querySelectorAll('.slashempty').length`)} link=${await js(`document.querySelectorAll('.slashlink').length`)}`);
   for (const theme of ['dark', 'light'] as const) {
-    await js(`document.documentElement.dataset.theme = '${theme}'`);
+    await js(`document.documentElement.dataset.theme = '${theme}'; document.documentElement.dataset.look = '${theme}'.startsWith('paper-') ? 'paper' : 'elevated'`);
     await sleep(350);
     writeFileSync(join(dir, `slashempty-${theme}.png`), (await win.webContents.capturePage()).toPNG());
     console.log(`shot_saved=${join(dir, `slashempty-${theme}.png`)}`);

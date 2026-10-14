@@ -7,7 +7,7 @@ export async function report(out) {
   const results=await Promise.all(run.cases.map(c=>readJson(join(out,c.id,'result.json')).catch(()=>({id:c.id,title:c.title,status:'not-run',checks:[]}))));
   const attempts=(await readdir(out)).filter(name=>/^(simple|medium|complex)-attempt-\d+$/.test(name));
   const summary={suiteVersion:run.version,runId:run.id,revision:run.revision,dirty:run.dirty,status:results.every(r=>r.status==='passed')?'passed':'incomplete',visualReview:await readJson(join(out,'visual-review.json')).catch(()=>({status:'pending'})),layout:await readJson(join(out,'layout/layout-checks.json')).catch(()=>null),validation:await readJson(join(out,'validation/checks.json')).catch(()=>null),reliability:await readJson(join(out,'runtime-reliability.json')).catch(()=>null),threadLayout:await readJson(join(out,'layout/thread-layout-checks.json')).catch(()=>null),previousAttempts:attempts,results};
-  summary.firstPass=summary.status==='passed'&&!attempts.length&&!results.some(r=>r.feedbacks?.length);
+  summary.firstPass=summary.status==='passed'&&!attempts.length&&!results.some(r=>r.feedbacks?.length||r.reassessedAt);
   await save(join(out,'summary.json'),summary);
   const cards=(await Promise.all(results.map(async r=>{
     const files=await readdir(join(out,r.id),{recursive:true}).catch(()=>[]);

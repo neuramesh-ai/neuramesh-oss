@@ -8,8 +8,8 @@ import type { ShotCtx } from '../driver';
 export async function clerklogin({ win, dir, js, sleep }: ShotCtx): Promise<void> {
   // Clerk sign-in screen (NM_AUTH=clerk, no session) — both themes
   await sleep(1500);
-  for (const theme of ['dark', 'cream-oak'] as const) {
-    await js(`document.documentElement.dataset.theme = '${theme}'`);
+  for (const theme of ['paper-dark', 'paper-light', 'paper-cream-oak', 'dark', 'cream-oak'] as const) {
+    await js(`document.documentElement.dataset.theme = '${theme}'; document.documentElement.dataset.look = '${theme}'.startsWith('paper-') ? 'paper' : 'elevated'`);
     await sleep(350);
     writeFileSync(join(dir, `clerk-login-${theme}.png`), (await win.webContents.capturePage()).toPNG());
     console.log(`shot_saved=${join(dir, `clerk-login-${theme}.png`)} loginshown=${await js(`!!document.querySelector('.loginwrap')`)}`);
@@ -32,8 +32,8 @@ export async function signedin({ win, dir, js, sleep }: ShotCtx): Promise<void> 
     await sleep(300);
   }
   console.log(`signedin_shot loginshown=${await js(`!!document.querySelector('.loginwrap')`)} ws=${await js(`document.querySelector('.ws b')?.textContent || '?'`)} pill=${JSON.stringify(pill)}`);
-  for (const theme of ['dark', 'cream-oak'] as const) {
-    await js(`document.documentElement.dataset.theme = '${theme}'`);
+  for (const theme of ['paper-dark', 'paper-light', 'paper-cream-oak', 'dark', 'cream-oak'] as const) {
+    await js(`document.documentElement.dataset.theme = '${theme}'; document.documentElement.dataset.look = '${theme}'.startsWith('paper-') ? 'paper' : 'elevated'`);
     await sleep(350);
     writeFileSync(join(dir, `clerk-signedin-${theme}.png`), (await win.webContents.capturePage()).toPNG());
     console.log(`shot_saved=${join(dir, `clerk-signedin-${theme}.png`)}`);
@@ -53,8 +53,8 @@ export async function update({ win, dir, js, sleep, waitFor }: ShotCtx): Promise
     if (!(await waitFor('.updatecard', 40))) console.log(`update_shot WARN no .updatecard at ${phase}`);
     await sleep(300);
     console.log(`update_shot phase=${phase} card=${await js(`document.querySelector('.updatecard')?.dataset.phase || 'none'`)}`);
-    for (const theme of ['dark', 'cream-oak'] as const) {
-      await js(`document.documentElement.dataset.theme = '${theme}'`);
+    for (const theme of ['paper-dark', 'paper-light', 'paper-cream-oak', 'dark', 'cream-oak'] as const) {
+      await js(`document.documentElement.dataset.theme = '${theme}'; document.documentElement.dataset.look = '${theme}'.startsWith('paper-') ? 'paper' : 'elevated'`);
       await sleep(300);
       writeFileSync(join(dir, `update-${phase}-${theme}.png`), (await win.webContents.capturePage()).toPNG());
       console.log(`shot_saved=${join(dir, `update-${phase}-${theme}.png`)}`);

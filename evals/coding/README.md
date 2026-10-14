@@ -105,7 +105,7 @@ Run the NeuraMesh coding UI evals against the existing local real-provider stack
 
 Set the URL, database and machine cache paths to **your** local stack. Only loopback app/database addresses are accepted. Defaults target the dev fixture workspace/user; override with `--workspace` and `--actor` if needed. The selected room must belong to the default project containing the eval repositories.
 
-`--layout` sends no messages: it measures writing space and controls at desktop and narrower widths, and saves screenshots. The full eval also reads the local conversation recording to verify actual agent tool outcomes; the brain directory defaults to the cache's parent, or set `--brain PATH` when preparing a run.
+`--layout` sends no messages: it measures writing space and controls at desktop and narrower widths, and saves screenshots. A quiet UI does not end a turn until its recording contains a fresh passing test run. After a model handoff, that record must also name the new model. The full eval reads the local conversation recording to verify actual agent tool outcomes; the brain directory defaults to the cache's parent, or set `--brain PATH` when preparing a run.
 
 For both normal and repository-selected layouts, add `--repo 'org/repository'` using a repo visible in the picker. Layout checks cover 1440px and 1000px viewports in dark and light palettes, restore the original palette, and write `layout-checks.json` with measurements. This tests palette rendering without changing saved appearance preferences. Add `--thread-url` with an existing idle coding-thread URL to also verify its 48px writing area, control layout and screenshots.
 
