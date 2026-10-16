@@ -42,6 +42,8 @@ export interface ChannelHistoryRow {
 // the Library surface (marketing-channel plan §4.9): a room's artifacts, foldered by kind
 export interface ChannelArtifactRow {
   id: string;
+  storage_path?: string | null;
+  content_hash?: string | null;
   kind: string; // doc | file | screenshot | design | diff | test_report | ship
   name: string;
   mime: string | null;

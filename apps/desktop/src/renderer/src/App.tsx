@@ -44,7 +44,7 @@ import { isOnline, agentLive, agentBusy, agentFocus } from './lib/presence';
 import { selfInitial, selfLabel, setSelfMachine, setSelfUser } from './lib/self';
 import { errMsg } from './lib/text';
 
-import { IconActivity, IconAgents, IconBoard, IconBranch, IconBurger, IconCalendar, IconCheck, IconChevron, IconClose, IconCode, IconDockLeft, IconDockRight, IconCredits, IconFootprint, IconGrid, IconHistory, IconHome, IconInbox, IconLibrary, IconMachine, IconMedal, IconMemory, IconPaperclip, IconProject, IconRepeat, IconReply, IconSend, IconSkill, IconThreads, IconTrend, IconWhiteboard, IconCompose, IconFolder, IconPost, IconTerm } from './ui/icons';
+import { IconFile, IconActivity, IconAgents, IconBoard, IconBranch, IconBurger, IconCalendar, IconCheck, IconChevron, IconClose, IconCode, IconDockLeft, IconDockRight, IconCredits, IconFootprint, IconGrid, IconHistory, IconHome, IconInbox, IconLibrary, IconMachine, IconMedal, IconMemory, IconPaperclip, IconProject, IconRepeat, IconReply, IconSearch, IconSend, IconSkill, IconThreads, IconTrend, IconWhiteboard, IconCompose, IconFolder, IconPost, IconTerm } from './ui/icons';
 import { type ThemeId, type ThemePref, resolveTheme, applyTheme, loadThemePref } from './theme/theme';
 import { flashToast, useToast, setProviderSettingsOpener, setPolicySettingsOpener, setUpgradeOpener, setConnectionsSettingsOpener, setMoveToCloudOpener , openMoveToCloud } from './lib/toast';
 import { hostedGateFor } from './shell/hostedrule';
@@ -141,7 +141,7 @@ import { FileBody, richFileBody } from './thread/FileBody';
 import { PanelShownContext } from './thread/RefCard';
 import { WFileView, type WScope, wtabBase } from './wtabs/filetree';
 import { BrowserPane, type MainView, type TermHandle, TerminalView, viewFromUrl, WhiteboardView } from './wtabs/guests';
-import { DockBar, NavWorkspaceFoot, UtilCluster } from './shell/chrome';
+import { DockBar, NavWorkspaceFoot, SidePanelToggle, UtilCluster } from './shell/chrome';
 import { StatusCluster } from './shell/statuscluster';
 import { useCompute } from './compute/useCompute';
 import { isScheduledView } from './shell/navdest';
@@ -2028,9 +2028,9 @@ export function App() {
   /** the strip's own tabs, as it draws them: the code face's carry the coding thread's counts */
   const sessionTabSpecs: SessionTabSpec[] = sessionTabs.map((k) => ({
     key: k, label: SESSION_TAB_LABEL[k],
-    icon: k === 'overview' ? <IconGrid s={12} /> : k === 'files' ? <IconFolder s={12} /> : k === 'drafts' ? <IconPost s={12} /> : k === 'changes' ? <IconCode s={12} /> : k === 'plan' ? <IconThreads s={12} /> : k === 'checkpoints' ? <IconHistory s={12} /> : <IconTerm s={12} />,
+    icon: k === 'overview' ? <IconGrid s={12} /> : k === 'artifacts' ? <IconFile s={12} /> : k === 'files' ? <IconFolder s={12} /> : k === 'drafts' ? <IconPost s={12} /> : k === 'changes' ? <IconCode s={12} /> : k === 'plan' ? <IconThreads s={12} /> : k === 'checkpoints' ? <IconHistory s={12} /> : <IconTerm s={12} />,
     count: k === 'drafts' ? draftsInfo.count : panelSession.kind !== 'coding' || !codeCounts ? null
-      : k === 'changes' ? (codeCounts.changes || null) : k === 'checkpoints' ? (codeCounts.checkpoints || null) : k === 'plan' ? (codeCounts.plan ? '✓' : null) : null,
+      : k === 'artifacts' ? (codeCounts.artifacts || null) : k === 'changes' ? (codeCounts.changes || null) : k === 'checkpoints' ? (codeCounts.checkpoints || null) : k === 'plan' ? (codeCounts.plan ? '✓' : null) : null,
     // drafts that wait for your approval hold a gate
     warm: k === 'drafts' && draftsInfo.waiting > 0,
     // the code face drew Terminal as its glyph alone, and five labelled tabs do not fit 460px
@@ -2725,45 +2725,6 @@ export function App() {
     <AgentDirectory.Provider value={agentDirectory}>
     <FailoverBannerContext.Provider value={!!flyupOn}>
     <div className="shell" data-navpos={navPos} style={{ '--nm-navw': `${navW}px` } as React.CSSProperties}>
-      {/* frame top bar — the window frame owns the global chrome (Cabinet-grade shell):
-          wordmark · the fold · ⌘K. Hidden in top-dock mode (that row IS the chrome).
-          The project › surface crumb RETIRED 2026-09-04 (rail-ink round, George — the Gemini
-          head): the project already lives in the rail's scope row and the surface in its
-          workspace tab, so the crumb was saying two things twice. */}
-      {navPos !== 'top' && (
-        <header className="frametop">
-          <span className="ftbrand"><BrandLockup size={13} /></span>
-          {/* THE fold control. It lives here, not on the rail, because the frame top is the one
-              strip that is chrome in every view — so the rail can be folded (and found again)
-              from a full-screen task or a board, not only from the rail itself. It wears the
-              same dock glyph as the position segment in the account menu (a chevron here would
-              read as another crumb separator), pressed-in while the rail is away. */}
-          <button
-            className={`ftfold${navFolded ? ' folded' : ''}`}
-            aria-pressed={navFolded}
-            aria-label={navFolded ? 'Show the sidebar' : 'Hide the sidebar'}
-            data-tip={navFolded ? 'Show the sidebar · ⌘\\' : 'Hide the sidebar · ⌘\\'}
-            onClick={() => foldNav(!navFolded)}
-          >{navPos === 'right' ? <IconDockRight s={14} /> : <IconDockLeft s={14} />}
-            {/* folded, the nav's workspace foot is gone with the column — so its unread dot rides
-                here. A fold must not cost information (docs/33 §8's rail rule, applied to the nav). */}
-            {navIsFolded && anyRoomUnread && <span className="ftfolddot" aria-hidden />}</button>
-          {/* the label is a SPAN so the pill can shrink beside the utilities — a bare text
-              node has no min-width and drags the frame top into overflow at narrow widths */}
-          <button className="ftsearch" onClick={() => setCmdkOpen(true)} aria-label="Search (⌘K)">⌕ <span className="ftslbl">Search — channels, tasks, artifacts</span> <b>⌘K</b></button>
-          {/* the topbar's ＋New task ▾ moved into the rail's New chat caret (2026-07-30):
-              two creation verbs at opposite corners of the frame answered one question twice */}
-          {/* the ambient utilities (the shell round, 2026-08-10) — the bottom dock strip's whole
-              cluster, rehomed after the search: they show on almost every page, so they live on
-              the chrome row that does. No ⌘K tile here — the search pill IS that door. */}
-          <span className="ftutils">
-            <UtilCluster activeKind={dockOpen ? wtab?.kind ?? (front === sessionTabId('terminal') ? 'terminal' : null) : null} onKind={openKindTab}
-              dockOpen={dockOpen} onDock={togglePanel} dockCount={panelFreshCount}
-              procCount={procCount} procOpen={procOpen} onProc={() => setProcOpen((v) => !v)}
-              procs={procsView} onKill={onKillProc} status={statusCluster} overflow />
-          </span>
-        </header>
-      )}
       {launcher && (
         <LauncherModal
           mode={launcher.mode}
@@ -3018,17 +2979,8 @@ export function App() {
       )}
       {showUpdate && navPos === 'top' && <UpdateCard floating state={update} onClose={() => setUpdateHidden(updKey)} />}
       {tourOpen && rosterReady && <Walkthrough onDone={() => setTourOpen(false)} />}
-      {/* THE SPINE RETIRED (2026-08-16) — its 30px went back to the sheet and the workspace
-          moved to the FOOT of the nav column (`NavWorkspaceFoot`, rendered inside the rooms face
-          below). Everything it carried came along: the live pulse, the unread dot, the face's
-          hover/click trigger and the account. The fold's chevron did not — with no strip at the
-          edge there is nothing to unfold from, and the frame top's `.ftfold` has always been the
-          control docs/33 §2 names. */}
-      {/* unified dockable nav — channels · recents, plus the top dock's view strip.
-          one panel, placed left (default) / top / right; data-pos drives the compact top variant.
-          data-folded collapses a side dock to nothing — the spine beside it is already the strip
-          (tokens.css: "one fold idiom, not two"). The panel stays mounted so the width animates
-          and every scroll position survives the fold. */}
+      {/* Global chrome stays in the sidebar. Folding keeps a compact tool rail so search,
+          the panel and workspace status remain reachable without covering the conversation. */}
       <nav
         className="navpanel"
         data-pos={navPos}
@@ -3044,6 +2996,19 @@ export function App() {
         onMouseEnter={() => cancelArm()}
         onMouseLeave={() => { if (!navIsFolded) armFace(false); }}
       >
+        {navPos !== 'top' && (
+          <header className="frametop">
+            <span className="ftbrand"><BrandLockup size={13} /></span>
+            <button
+              className={`ftfold${navFolded ? ' folded' : ''}`}
+              aria-pressed={navFolded}
+              aria-label={navFolded ? 'Show the sidebar' : 'Hide the sidebar'}
+              data-tip={navFolded ? 'Show the sidebar · ⌘\\' : 'Hide the sidebar · ⌘\\'}
+              onClick={() => foldNav(!navFolded)}
+            >{navPos === 'right' ? <IconDockRight s={14} /> : <IconDockLeft s={14} />}
+              {navIsFolded && anyRoomUnread && <span className="ftfolddot" aria-hidden />}</button>
+          </header>
+        )}
         {/* THE TWO FACES — same column, same width, no shadow (v0.76 slice 2). BOTH stay mounted,
             stacked in one grid cell: unmounting the loser gave the swap an entrance and no exit
             (an instant cut, docs/33 §7) and threw away the rooms face's Recents scroll every time.
@@ -3321,6 +3286,18 @@ export function App() {
             it left the bottom-right corner. Folded nav and the top dock keep the floating card. */}
         {navPos !== 'top' && !navIsFolded && <SetupCards variant="dock" connection={boot?.connection?.kind} />}
         {navPos !== 'top' && (
+          <div className="navtools" role="group" aria-label="Workspace tools">
+            <button className="ftsearch" onClick={() => setCmdkOpen(true)} aria-label="Search (⌘K)" aria-keyshortcuts="Meta+K Control+K">
+              <IconSearch s={14} /><span className="ftslbl">Search</span><kbd>⌘K</kbd>
+            </button>
+            <span className="ftutils">
+              <UtilCluster activeKind={dockOpen ? wtab?.kind ?? (front === sessionTabId('terminal') ? 'terminal' : null) : null} onKind={openKindTab}
+                procCount={procCount} procOpen={procOpen} onProc={() => setProcOpen((v) => !v)}
+                procs={procsView} onKill={onKillProc} status={statusCluster} />
+            </span>
+          </div>
+        )}
+        {navPos !== 'top' && (
           <NavWorkspaceFoot
             workspace={boot?.workspace.name || ''}
             initial={(boot?.workspace.name?.[0] ?? 'N').toUpperCase()}
@@ -3407,32 +3384,6 @@ export function App() {
           context={null}
           aux={(
             <>
-              {/* THE BELL leads the rail (2026-08-16) — Home's needs-you queue, on chrome. Unlike
-                  the clusters beside it, it is NEVER gated: they stand down the moment a task or
-                  thread opens, which is most of the time, and a queue you can only see from one
-                  surface is a queue you forget. The scope pills that used to lead this rail went
-                  with Home — every destination carries its own ScopeBar, and two filters on a
-                  notification tray is exactly the chrome this round is deleting. */}
-              <span className="bellwrap" {...bellHover.wrap}>
-                <BellButton count={bell.count} open={bellOpen} onToggle={bellHover.toggle} />
-                {bellOpen && (
-                  <BellPopover
-                    alertCount={alerts.length}
-                    alertsSection={<BellAlerts alerts={alerts} onOpen={() => { setBellOpen(false); setNav('home'); setView('dashboard'); }} />}
-                    rows={bell.rows} count={bell.count} flight={bellFlightRows}
-                    leaving={bellLeaving} busyId={bellBusy} liveThreads={liveThreads}
-                    agentName={(id) => (id ? roster.agents.find((a) => a.id === id)?.name ?? null : null)}
-                    agentRole={(id) => (id ? roster.agents.find((a) => a.id === id)?.role ?? null : null)}
-                    orbState={(step, role) => orbStateFor(step, null, role)}
-                    answered={awaitingAgent}
-                    onOpenTask={setOpenTaskId}
-                    onOpenConvo={(channelId, threadId) => openConversation(threadId, channelId)}
-                    onSettle={(threadId, rowId) => void bellSettleThread(threadId, rowId)}
-                    onHistory={() => setHistOpen(true)}
-                    onClose={() => setBellOpen(false)}
-                  />
-                )}
-              </span>
               {/* the room's crew — facts ABOUT the room you are standing in, so they keep their
                   gate: an open task or thread is not a room, and the rail would be lying. */}
               {channelScoped && !onWorkspaceDestination && !(openTaskId || openThreadId) && current && !!railPeople.length && (
@@ -3466,6 +3417,28 @@ export function App() {
                   <IconBurger s={15} />
                 </button>
               )}
+              {/* Global controls remain visible in every destination and open thread. */}
+              <span className="bellwrap" {...bellHover.wrap}>
+                <BellButton count={bell.count} open={bellOpen} onToggle={bellHover.toggle} />
+                {bellOpen && (
+                  <BellPopover
+                    alertCount={alerts.length}
+                    alertsSection={<BellAlerts alerts={alerts} onOpen={() => { setBellOpen(false); setNav('home'); setView('dashboard'); }} />}
+                    rows={bell.rows} count={bell.count} flight={bellFlightRows}
+                    leaving={bellLeaving} busyId={bellBusy} liveThreads={liveThreads}
+                    agentName={(id) => (id ? roster.agents.find((a) => a.id === id)?.name ?? null : null)}
+                    agentRole={(id) => (id ? roster.agents.find((a) => a.id === id)?.role ?? null : null)}
+                    orbState={(step, role) => orbStateFor(step, null, role)}
+                    answered={awaitingAgent}
+                    onOpenTask={setOpenTaskId}
+                    onOpenConvo={(channelId, threadId) => openConversation(threadId, channelId)}
+                    onSettle={(threadId, rowId) => void bellSettleThread(threadId, rowId)}
+                    onHistory={() => setHistOpen(true)}
+                    onClose={() => setBellOpen(false)}
+                  />
+                )}
+              </span>
+              <SidePanelToggle open={dockOpen} onToggle={togglePanel} freshCount={panelFreshCount} />
             </>
           )}
         />
@@ -3994,7 +3967,7 @@ export function App() {
       {openThreadId && !openTask && openCodingThread && (
         <div className="sessionsurf">
           <div className="sscol">
-          <CodingThread onOpenDoc={openDocTab} threadId={openThreadId} thread={openThreadRow} back={sessionBack} channelSlug={current?.slug ?? ''} channelId={current?.id ?? ''} onOpenTask={peekTask} machineName={boot?.machineName ?? null}
+          <CodingThread onOpenWhiteboard={openWhiteboardTab} onOpenArticle={openArticleTab} onOpenDoc={openDocTab} threadId={openThreadId} thread={openThreadRow} back={sessionBack} channelSlug={current?.slug ?? ''} channelId={current?.id ?? ''} onOpenTask={peekTask} machineName={boot?.machineName ?? null}
             // the code face is the coding thread's own tabs in the side panel (the side-panel round)
             codeSlot={panelCodeSlot} codeTab={panelSession.kind === 'coding' ? sessionTabKeyOf(front) as EngineeringWorkspaceTab | null : null} onCodeTab={onCodeTab} onCodeCounts={setCodeCounts}
             crumbProject={(() => { const p = wsProjects.find((x) => x.id === (currentLive?.project_id ?? activeProject)); return p ? { name: p.name, logo_url: p.logo_url } : null; })()}
@@ -4141,12 +4114,9 @@ export function App() {
         </div>
         </div>
         </div>
-        {/* the bottom strip survives ONLY in top-dock mode, which hides the frame top the
-            cluster moved to (the shell round, 2026-08-10) — everywhere else it is gone and
-            the frame's 38px bottom band went back to the sheet */}
+        {/* Top-dock navigation has no sidebar column for workspace tools. */}
         {navPos === 'top' && (
           <DockBar activeKind={wtab?.kind ?? (front === sessionTabId('terminal') ? 'terminal' : null)} onKind={openKindTab}
-            dockOpen={dockOpen} onDock={togglePanel} dockCount={panelFreshCount}
             procCount={procCount} procOpen={procOpen} onProc={() => setProcOpen((v) => !v)}
             procs={procsView} onKill={onKillProc} status={statusCluster} onCmdK={() => setCmdkOpen(true)} />
         )}

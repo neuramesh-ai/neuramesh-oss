@@ -44,3 +44,12 @@ test('successive and concurrent progress calls preserve prior steps while native
   assert.deepEqual((await b).planProgress.statuses, ['completed', 'completed', 'in_progress']);
   assert.deepEqual((await tool.execute({ updates: [{ step: 3, status: 'completed' }] })).planProgress.statuses, ['completed', 'completed', 'completed']);
 });
+
+test('a resumed progress tool starts from durable progress when the native snapshot omits updates', async () => {
+  const initial = engineeringPlanTool(() => {}).execute(plan).planProgress;
+  const complete = { ...initial, started: true, statuses: initial.statuses.map(() => 'completed' as const) };
+  const tool = engineeringProgressTool(() => {}, async () => [], async () => complete);
+  const result = await tool.execute({ updates: [{ step: 1, status: 'in_progress' }] });
+  assert.equal(result.planProgress.statuses[0], 'in_progress');
+  assert.deepEqual(result.planProgress.statuses.slice(1), complete.statuses.slice(1));
+});

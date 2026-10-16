@@ -1,3 +1,5 @@
+import { CodingMessageBody, type CodingDisplayDoors } from './CodingMessageBody';
+import { answersFrom } from '../answers';
 import { AgentAvatar } from '../components/AgentAvatar';
 // THE CODING TRANSCRIPT (coding threads §5, visual contract Thread.dc.html): the runtime's rows in
 // the THREAD's anatomy — the human's hairline bubble, the developer's prose on the ground with the
@@ -5,7 +7,9 @@ import { AgentAvatar } from '../components/AgentAvatar';
 // The rows come from the shared reducer (groupEngineeringTranscript), the blocks the phone draws
 // too: a run of receipts and the thought that preceded them fold into the Engineering row whose
 // prose follows, so one turn reads as one row, never as a stack of TOOL labels.
-import { useMemo } from 'react';
+import { Fragment, useMemo, type ReactNode } from 'react';
+import type { ChannelArtifactRow } from '../bridge/rows-rooms';
+import { codingArtifactTurns } from './coding-artifacts';
 import { transcriptMessages } from './coding-transcript';
 import type { OrbState } from 'thinking-orbs';
 import { DEFAULT_ENGINEERING_AGENT, engineeringReviewMessages, engineeringWorkPlanMessages } from '@neuramesh/shared';
@@ -61,8 +65,8 @@ function thinkLine(row: Extract<Row, { kind: 'eng' }>): string {
   return parts.join(' · ');
 }
 
-type ReviewProps = { fileRef?: (name: string) => boolean; onOpenFile?: (name: string) => void; onOpenReview?: OpenChangeReview; pendingApprovalId?: string; onApproval?: (approved: boolean) => void };
-function EngineeringRow({ row, onOpenWorkPlan, onOpenReview, pendingApprovalId, onApproval, fileRef, onOpenFile }: { row: Extract<Row, { kind: 'eng' }>; onOpenWorkPlan?: (text: string) => void } & ReviewProps) {
+type ReviewProps = CodingDisplayDoors & { onOpenReview?: OpenChangeReview; pendingApprovalId?: string; onApproval?: (approved: boolean) => void };
+function EngineeringRow({ row, onOpenWorkPlan, onOpenReview, pendingApprovalId, onApproval, ...display }: { row: Extract<Row, { kind: 'eng' }>; onOpenWorkPlan?: (text: string) => void } & ReviewProps) {
   const stamp = (row.message ?? row.receipts[0] ?? row.reasoning)?.createdAt;
   const line = thinkLine(row);
   const agent = (row.message ?? row.reasoning ?? row.receipts[0])?.agent ?? DEFAULT_ENGINEERING_AGENT;
@@ -87,21 +91,30 @@ function EngineeringRow({ row, onOpenWorkPlan, onOpenReview, pendingApprovalId, 
             })}
           </div>
         ) : null}
-        {row.message?.kind === 'change_review' && row.message.review ? <EngineeringChangeCard review={row.message.review} pending={row.message.review.id === pendingApprovalId} onOpen={onOpenReview} onResolve={onApproval} /> : row.message?.kind === 'work_plan' ? <EngineeringWorkPlan text={row.message.body} report={row.message.planReport} inline onOpen={onOpenWorkPlan ? () => onOpenWorkPlan(row.message!.body) : undefined} /> : row.message ? (row.message.streaming ? <p>{streamingEngineeringText(row.message.body)}<span className="tcaret" /></p> : <Md text={row.message.body} fileRef={fileRef} onOpenFile={onOpenFile} />) : null}
+        {row.message?.kind === 'change_review' && row.message.review ? <EngineeringChangeCard review={row.message.review} pending={row.message.review.id === pendingApprovalId} onOpen={onOpenReview} onResolve={onApproval} /> : row.message?.kind === 'work_plan' ? <EngineeringWorkPlan text={row.message.body} report={row.message.planReport} inline onOpen={onOpenWorkPlan ? () => onOpenWorkPlan(row.message!.body) : undefined} /> : row.message ? (row.message.streaming ? <p>{streamingEngineeringText(row.message.body)}<span className="tcaret" /></p> : <CodingMessageBody text={row.message.body} {...display} />) : null}
       </div>
     </div>
   );
 }
 
-export function CodingTranscript({ session, onOpenWorkPlan, onOpenReview, onApproval, fileRef, onOpenFile }: { session: EngineeringSession; onOpenWorkPlan?: (text: string) => void } & ReviewProps) {
+export function CodingTranscript({ session, artifacts, onOpenWorkPlan, onOpenReview, onApproval, ...display }: { session: EngineeringSession; artifacts?: { rows: ChannelArtifactRow[]; card: (rows: ChannelArtifactRow[]) => ReactNode }; onOpenWorkPlan?: (text: string) => void } & ReviewProps) {
+  const answers = useMemo(() => answersFrom(session.messages.filter(message => message.role === 'user').map(message => ({ author_kind: 'human', body: message.body }))), [session.messages]);
   const rows = useMemo(() => rowsOf(transcriptMessages(engineeringWorkPlanMessages({ ...session, messages: engineeringReviewMessages(session) }), !!session.blockedOn)), [session]);
+  const deliveries = codingArtifactTurns(artifacts?.rows ?? [], session.messages);
+  let turn: string | null = null;
   const agent = session.agent ?? DEFAULT_ENGINEERING_AGENT;
   const live = session.state === 'streaming' ? engineeringActivePresentation(session.activeActivity, session.mode) : null;
   return (
     <>
-      {rows.map((row) => row.kind === 'human'
-        ? <div key={row.key} className="msg human mine"><div className="body"><div className="head"><b>you</b><span className="time">{clock(row.message.createdAt)}</span></div><Md text={row.message.body} /></div></div>
-        : <EngineeringRow fileRef={fileRef} onOpenFile={onOpenFile} key={row.key} row={row} onOpenReview={onOpenReview} onApproval={onApproval} pendingApprovalId={session.pendingApproval?.id} onOpenWorkPlan={onOpenWorkPlan} />)}
+      {artifacts?.card(deliveries.get(null) ?? [])}
+      {rows.map((row, index) => {
+        if (row.kind === 'human') turn = row.message.id;
+        return <Fragment key={row.key}>{row.kind === 'human'
+          ? <div className="msg human mine"><div className="body"><div className="head"><b>you</b><span className="time">{clock(row.message.createdAt)}</span></div><Md text={row.message.body} /></div></div>
+          : <EngineeringRow {...display} answers={answers} row={row} onOpenReview={onOpenReview} onApproval={onApproval} pendingApprovalId={session.pendingApproval?.id} onOpenWorkPlan={onOpenWorkPlan} />}
+          {turn && (index === rows.length - 1 || rows[index + 1]?.kind === 'human') ? artifacts?.card(deliveries.get(turn) ?? []) : null}
+        </Fragment>;
+      })}
       {live ? (
         <div className="msg" role="status" aria-live="polite">
           <span className="av" aria-hidden><AgentAvatar name={agent.name} emoji={agent.emoji} role={agent.role} size={26} radius={4} /></span>

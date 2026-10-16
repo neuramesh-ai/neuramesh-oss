@@ -5,7 +5,7 @@
 import type { ChatToolCtx } from './chattools';
 
 export function shareChatTools(t: Pick<ChatToolCtx, 'z' | 'tool' | 'text' | 'agent' | 'ch' | 'threadId' | 'log' | 'post' | 'generateShareImage' | 'generateDraftImage' | 'draftsForAnchor'>) {
-  const { z, tool, text, agent, ch, threadId, log, post, generateShareImage, generateDraftImage, draftsForAnchor } = t;
+  const { z, tool, text, agent, ch, threadId, log, generateDraftImage, draftsForAnchor } = t;
   return [
     // the chat half of the orchestrator's generate_image — same function, same rules. A
     // conversation is where "regenerate that picture" is actually said.
@@ -31,7 +31,16 @@ export function shareChatTools(t: Pick<ChatToolCtx, 'z' | 'tool' | 'text' | 'age
     ),
 
     // ── Deliver an ARTICLE: a doc artifact + the ‹article:id› card ──────────────────────────
-    tool(
+    articleChatTool(t),
+    // ── SHOW images: generate → message attachments (preview · expand · download) ────────────
+    imagesChatTool(t),
+  ];
+}
+
+/** The same article delivery tool is available to coding runtimes. */
+export function articleChatTool(t: Pick<ChatToolCtx, 'z' | 'tool' | 'text' | 'agent' | 'ch' | 'threadId' | 'log' | 'post'>) {
+  const { z, tool, text, agent, ch, threadId, log, post } = t;
+  return tool(
       'draft_article',
       'Deliver an ARTICLE or long-form research write-up as a reviewable ARTICLE CARD in this conversation — the reader opens it in a reading tab, saves it to Workspace Files, or downloads it. Use it whenever the ask is an article, essay, report or research write-up (a post is draft_posts). Markdown is the WHOLE piece: start with a single `# Title`, then the dek paragraph; end citable work with a `## Sources` section of numbered links. NEVER paste the article into your reply — the card is the delivery.',
       {
@@ -49,9 +58,12 @@ export function shareChatTools(t: Pick<ChatToolCtx, 'z' | 'tool' | 'text' | 'age
         if (!posted?.ok) return text('the article saved but its card did not post — mention it exists in Files');
         return text('the article is delivered as a card in this conversation — the human opens, saves or downloads it there. Do NOT repeat the article in your reply: one short line on the angle you took.');
       },
-    ),
-    // ── SHOW images: generate → message attachments (preview · expand · download) ────────────
-    tool(
+    );
+}
+
+export function imagesChatTool(t: Pick<ChatToolCtx, 'z' | 'tool' | 'text' | 'agent' | 'ch' | 'threadId' | 'log' | 'post' | 'generateShareImage'>) {
+  const { z, tool, text, agent, ch, threadId, log, post, generateShareImage } = t;
+  return tool(
       'share_images',
       'Generate one or more images and SHOW them in this conversation as image attachments — previews inline, expandable, downloadable. Use it whenever the human asks you to generate/create/show a picture, cover, illustration or visual that is NOT attached to a drafted post (a post\'s picture rides its card via imageBrief/generate_image). Each brief is full art direction: subject, composition, light, mood, on-brand look. NEVER claim an image exists without calling this — if the call fails, report the failure.',
       {
@@ -89,6 +101,5 @@ export function shareChatTools(t: Pick<ChatToolCtx, 'z' | 'tool' | 'text' | 'age
         if (!attached) return text('the images generated but could not attach — report the failure');
         return text(`${attached} image${attached === 1 ? ' is' : 's are'} now SHOWING in the conversation${failed.length ? ` (${failed.length} failed: ${failed[0]})` : ''}. Do not describe them — the human can see them; one short line at most.`);
       },
-    ),
-  ];
+    );
 }

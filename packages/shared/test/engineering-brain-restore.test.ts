@@ -93,8 +93,8 @@ it('restores explicit progress recorded after the last runtime checkpoint', () =
     const tail = core({ type: 'content_end', contentType: 'tool', toolName: 'update_plan_progress', toolCallId: 'progress-call', ...invalid }, 'invalid');
     expect(restoreEngineeringBrain(shell(), { ...recorded, events: [recorded.events[0]!, tail] }).planProgress).toEqual(initial);
   }
-  // An event already covered by the checkpoint cannot overwrite its newer result.
-  expect(restoreEngineeringBrain(shell(), { ...recorded, metadata: { mode: 'act', recordedEventCount: 2 } }).planProgress).toEqual(initial);
+  // Saving a later snapshot does not prove it retained every earlier plan receipt.
+  expect(restoreEngineeringBrain(shell(), { ...recorded, metadata: { mode: 'act', recordedEventCount: 2 } }).planProgress).toEqual(complete);
 });
 
 it('a receipt that replays the proposal of the plan in progress keeps its steps', () => {
@@ -136,4 +136,25 @@ it('a newer recorded proposal resets the plan and only its own later receipts ca
   const reopened = { ...completed, statuses: ['in_progress'] };
   events.push(receipt('update_plan_progress', reopened, 'reopen'));
   expect(restoreEngineeringBrain(shell(), snapshot(events)).planProgress).toEqual(reopened);
+});
+
+it('recovers completed steps omitted from a later snapshot and respects a deliberate rewind', () => {
+  const plan = { summary: 'Deliver video', steps: [{ action: 'edit' as const, target: 'clip.mp4', description: 'Render and verify video' }] };
+  const initial = { id: 'video-plan', plan, statuses: ['pending'], started: false };
+  const completed = { ...initial, statuses: ['completed'], started: true };
+  const output = (toolName: string, progress: unknown, id: string) => core({ type: 'content_end', contentType: 'tool', toolName, toolCallId: id, output: { recorded: true, planProgress: progress } }, id);
+  const events = [output('propose_work_plan', initial, 'proposal'), output('update_plan_progress', completed, 'complete'), event('user.message', { text: 'Show the deliverables', mode: 'act' }, 'followup')];
+  const recorded = snapshot(events, { metadata: { mode: 'act', recordedEventCount: 3 }, runtimeMessages: [
+    { role: 'assistant', content: [{ type: 'tool_use', id: 'proposal', name: 'propose_work_plan', input: plan }] },
+    { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'proposal', content: JSON.stringify({ recorded: true, planProgress: initial }) }] },
+    { role: 'user', content: [{ type: 'text', text: 'Show the deliverables' }] },
+  ] });
+  expect(restoreEngineeringBrain(shell(), recorded).planProgress).toEqual(completed);
+  expect(restoreEngineeringBrain(shell(), { ...recorded, runtimeMessages: [] }).planProgress).toEqual(completed);
+  events.push(event('plan.restored', { checkpointRunCount: 1, progress: initial }, 'rewind'));
+  expect(restoreEngineeringBrain(shell(), recorded).planProgress).toEqual(initial);
+  events.push(output('update_plan_progress', { ...completed, statuses: ['in_progress'] }, 'rework'));
+  expect(restoreEngineeringBrain(shell(), recorded).planProgress?.statuses).toEqual(['in_progress']);
+  events.push(event('plan.restored', { checkpointRunCount: 0, progress: null }, 'before-plan'));
+  expect(restoreEngineeringBrain(shell(), recorded).planProgress).toBeNull();
 });

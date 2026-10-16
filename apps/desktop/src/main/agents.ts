@@ -692,7 +692,7 @@ async function imageCredFor(apiUrl: string, workspace: string, agentId: string, 
 export async function designerImageCred(
   apiUrl: string,
   workspace: string,
-  designer: HostedAgent | undefined,
+  designer: Pick<HostedAgent, 'id' | 'name' | 'runtime' | 'model'> | undefined,
   ownerActorId: string,
 ): Promise<{ cred: ImageCred | null; note?: string }> {
   const seat = designer ? providerFor(designer.runtime) : null;

@@ -1,3 +1,4 @@
+import { resolveEngineeringDisplayContext } from './engineering-display-context';
 // THE DESKTOP'S OWN CODE HOST (the desktop Code bridge, slice B1, 2026-09-04) — pure, so it is
 // tested with a fake coding core the way the machine daemon's host is.
 //
@@ -38,6 +39,7 @@ export function createLocalEngineeringHost(o: LocalEngineeringHostOptions): Engi
   return createClineEngineeringHost({
     ...auth,
     resolveCwd: o.resolveCwd ?? ((meta) => ensureEngineeringWorkspace(o.db, o.workspaceId, meta, { preferLocal: true })),
+    resolveDisplayContext: meta => resolveEngineeringDisplayContext(o.db, o.apiUrl, o.workspaceId, meta),
     resolveBrain: o.resolveBrain ?? ((meta) => resolveEngineeringBrain(o.db, auth, meta)),
     resolvePolicyRules: (meta) => loadEngineeringPolicyRules(o.db, o.workspaceId, meta.projectId ?? null),
     // the session's synced row (0135), written as the member this host speaks for

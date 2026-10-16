@@ -39,6 +39,22 @@ export async function selectModel(p,scope,name,level='Medium') {
   await p.waitForFunction(()=>!document.querySelector('.cmodpop'),undefined,{timeout:15000});
 }
 
+/** Exercise approvals even when a new cloud session allows edits and commands by default. */
+export async function requireApprovals(p) {
+  await p.click('.codingthread .engpermtrigger');
+  await p.waitForSelector('[aria-label="Permissions for this session"]');
+  for(const label of ['Edit files','Execute commands']) {
+    const selector=`.cpermrow:has-text("${label}")`;
+    const checked=await p.evaluate(name=>[...document.querySelectorAll('.cpermrow')]
+      .find(row=>row.querySelector('b')?.textContent===name)?.getAttribute('aria-checked'),label);
+    assert.ok(checked==='true'||checked==='false',`${label} permission must be available`);
+    if(checked==='true') await p.click(selector);
+    await p.waitForSelector(`.cpermrow[aria-checked="false"]:has-text("${label}")`);
+  }
+  await p.keyboard.press('Escape');
+  await p.waitForSelector('.cpermpop',{state:'hidden'});
+}
+
 export async function start(p,run,spec) {
   await p.goto(run.url);
   await p.waitForSelector('[aria-label="Agent: rex"]',{timeout:30000});
@@ -53,14 +69,15 @@ export async function start(p,run,spec) {
   return (await p.url()).match(/\/c\/([^?]+)/)?.[1];
 }
 
-/** A receipt or a tool transition is not a finished response. Every fixture requires completed steps. */
+/** A hidden dial is only a candidate for completion; confirmTurn separately requires recorded
+ * completed steps and a fresh passing test run, then checks for intervening activity again. */
 export const turnSettled = (s, initial) => !s.busy && !s.cards.some(c => c.status === 'proposed') && !s.approval
-  && s.replies.length > initial && s.progress?.total > 0 && s.progress.done === s.progress.total;
+  && s.replies.length > initial && !s.progress;
 
 /** A quiet UI can occur between provider tools while the previous plan is still complete.
  * Require this turn's recorded verification, then recheck the UI after that async read. */
 export async function confirmTurn(p, initial, text, completionCheck) {
-  if (completionCheck && !await completionCheck()) return false;
+  if (!completionCheck || !await completionCheck()) return false;
   const latest = await state(p);
   return turnSettled(latest, initial) && latest.text === text;
 }
@@ -81,12 +98,17 @@ export async function turn(p,spec,result,dir,{planning=false,replyCount,cancelFi
     if(s.progress && !seen.has(`progress-${s.progress.done}`)) {
       // Focus follows the dial when a command approval changes composer height. Hover alone
       // can leave its moving hit target; hover behavior has a separate component check.
-      await p.focus('.codeplandial');
-      await p.waitForSelector('[aria-label="Plan execution steps"]');
-      await capture(p,dir,`plan-progress-${s.progress.done}-of-${s.progress.total}`);
-      result.events.push({type:'plan-progress',...s.progress,at:new Date().toISOString()});
-      seen.add(`progress-${s.progress.done}`);
-      await p.focus('.codingthread textarea');
+      // Completion may remove the dial between observation and focus.
+      const present=await p.evaluate(()=>{const dial=document.querySelector('.codeplandial');dial?.focus();return !!dial;});
+      if(present) {
+        await p.waitForFunction(()=>document.querySelector('[aria-label="Plan execution steps"]')||!document.querySelector('.codeplandial'));
+        if(await p.evaluate(()=>!!document.querySelector('[aria-label="Plan execution steps"]'))) {
+          await capture(p,dir,`plan-progress-${s.progress.done}-of-${s.progress.total}`);
+          result.events.push({type:'plan-progress',...s.progress,at:new Date().toISOString()});
+          seen.add(`progress-${s.progress.done}`);
+        }
+        await p.focus('.codingthread textarea');
+      }
     }
     const proposed=s.cards.find(c=>c.status==='proposed');
     if(proposed&&!seen.has(proposed.id)) {

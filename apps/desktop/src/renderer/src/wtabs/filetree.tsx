@@ -1,6 +1,8 @@
 // The file tree beside the editor — a task's worktree, as a browsable list.
 // Split out of wtabs/panes.tsx.
 import { DiffView, previewType } from '../views/docpreview';
+import { artifactContent } from './artifact-content';
+import { ArtifactMedia, useArtifactUrl } from './ArtifactMedia';
 import { Md } from '../md/Md';
 import { highlightCode } from '../lib/highlight';
 import { nm as nmBridge } from '../bridge/nm';
@@ -83,7 +85,10 @@ export function WFileView({ tab, doc, onMode, onDirty }: {
     window.addEventListener('nm:fs-changed', onFs);
     return () => window.removeEventListener('nm:fs-changed', onFs);
   }, [tab.root]);
-  const content = doc?.content ?? file?.content ?? '';
+  const raw = doc?.content ?? file?.content ?? '';
+  const artifact = useMemo(() => artifactContent(tab.title, raw), [tab.title, raw]);
+  const downloadUrl = useArtifactUrl(doc ? artifact.blob : null);
+  const content = artifact.binary ? '' : artifact.text;
   useEffect(() => { setDraft(content); setSave('idle'); }, [content]);
   const mode: WTabMode = tab.mode ?? (caps.canEdit ? 'edit' : 'preview');
   const type = previewType(tab.title, doc ? 'doc' : 'file', content);
@@ -115,26 +120,29 @@ export function WFileView({ tab, doc, onMode, onDirty }: {
   };
   // the segment is relabelled by what the tab MAY do, over the same two reads of the same bytes:
   // Edit·Preview·Diff on a workspace file, Source·Preview on a read-only artifact (docs/36 §3.1)
-  const modes: Array<[WTabMode, string]> = caps.canEdit
+  const modes: Array<[WTabMode, string]> = artifact.binary ? [] : caps.canEdit
     ? [['edit', 'Edit'], ['preview', 'Preview'], ['diff', 'Diff']]
     : [['source', 'Source'], ['preview', 'Preview']];
   const imgSrc = content.startsWith('data:') ? content : `data:image/svg+xml;utf8,${encodeURIComponent(content)}`;
   return (
     <>
-      <div className="wfhead">
+      <div className="wfhead" style={{ flexWrap: 'wrap' }}>
         {(doc || tab.path) && <span className="wfpath">{doc ? `${doc.taskNumber != null ? `#${doc.taskNumber} ` : ''}artifacts /` : `${wtabDir(rel) || wtabBase(tab.root ?? '')} /`}</span>}
-        <b className="wfname">{tab.title}</b>
+        <b className="wfname" style={{ flexShrink: 1, minWidth: 0, overflowWrap: 'anywhere' }}>{tab.title}</b>
         {tab.readOnly && <span className="wfro" title="an artifact is a record of what an agent produced, never an editing surface">READ-ONLY</span>}
         {save !== 'idle' && <span className={`wfsave${save === 'error' ? ' error' : ''}`}>{save === 'saving' ? 'saving…' : save === 'saved' ? 'saved ✓' : `save failed — ${saveErr}`}</span>}
-        <div className="wfseg" role="group" aria-label="Render mode">
+        {doc && downloadUrl && <a className="btn wfdownload" href={downloadUrl} download={tab.title.split('/').pop()}>Download</a>}
+        {!!modes.length && <div className="wfseg" role="group" aria-label="Render mode">
           {modes.map(([m, label]) => (
             <button key={m} className={mode === m ? 'on' : ''} aria-pressed={mode === m} onClick={() => onMode(m)}>{label}</button>
           ))}
-        </div>
+        </div>}
       </div>
       <div className="wfbody">
-        {!content && !file && <div className="wfempty">Reading {tab.title}…</div>}
-        {!content && file && <div className="wfempty">{file.binary ? 'Binary file — not shown.' : 'Empty file.'}</div>}
+        {artifact.error && <div className="wfempty" role="alert">{artifact.error}</div>}
+        {artifact.kind && downloadUrl && <ArtifactMedia key={downloadUrl} name={tab.title} kind={artifact.kind} url={downloadUrl} />}
+        {!content && !file && !doc && <div className="wfempty">Reading {tab.title}…</div>}
+        {!content && (file || doc) && !artifact.binary && <div className="wfempty">{file?.binary ? 'Binary file — not shown.' : 'Empty file.'}</div>}
         {!!content && mode === 'edit' && editable && (
           <div className="codeeditwrap">
             <pre className="codehl" aria-hidden ref={hlRef}><code dangerouslySetInnerHTML={{ __html: hl + '\n' }} /></pre>

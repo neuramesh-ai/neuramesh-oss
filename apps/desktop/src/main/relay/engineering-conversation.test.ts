@@ -211,3 +211,34 @@ test('a fresh device restores the selected agent, model and reasoning from the b
     await new Promise((resolve) => setTimeout(resolve, 50));
   } finally { await rm(root, { recursive: true, force: true }); }
 });
+
+test('outputs skip installed dependencies and publish real media types before the final turn', async () => {
+  const root = await mkdtemp('/tmp/nm-media-artifacts-'), remote = cloud();
+  const conversation = new EngineeringConversation({ ...options, root: join(root, 'brain'), fetchImpl: remote.fetchImpl }, root);
+  try {
+    await mkdir(join(root, '.nm-artifacts/launch/src/node_modules/.bin'), { recursive: true });
+    await symlink('/private/not-an-output', join(root, '.nm-artifacts/launch/src/node_modules/.bin/tool'));
+    await writeFile(join(root, '.nm-artifacts/launch/clip.mp4'), Buffer.from([0, 1, 2, 3]));
+    await writeFile(join(root, '.nm-artifacts/launch/captions.srt'), '1\n00:00:00,000 --> 00:00:01,000\nHello');
+    await assert.rejects(conversation.publishArtifact('launch/missing.mp4'), /ENOENT/);
+    assert.equal((await conversation.publishArtifact('.nm-artifacts/launch/clip.mp4')).mime, 'video/mp4');
+    assert.equal(remote.bytes.size, 1);
+    await conversation.checkpoint({ readMessages: async () => [] } as unknown as ClineCore, 'session', {});
+    assert.equal(remote.bytes.size, 2);
+    for (const path of ['../private.txt', '/tmp/private.txt', 'launch/../clip.mp4', 'launch\\clip.mp4']) await assert.rejects(conversation.publishArtifact(path));
+  } finally { await conversation.close().catch(() => {}); await rm(root, { recursive: true, force: true }); }
+});
+
+test('one bad deliverable cannot suppress good files or the conversation checkpoint', async () => {
+  const root = await mkdtemp('/tmp/nm-partial-artifacts-'), remote = cloud();
+  const conversation = new EngineeringConversation({ ...options, root: join(root, 'brain'), fetchImpl: remote.fetchImpl }, root);
+  const messages = [{ role: 'assistant', content: 'The work is complete.' }];
+  try {
+    await mkdir(join(root, '.nm-artifacts'));
+    await symlink('/private/secret', join(root, '.nm-artifacts/a-bad.txt'));
+    await writeFile(join(root, '.nm-artifacts/z-good.md'), '# Saved');
+    await assert.rejects(conversation.checkpoint({ readMessages: async () => messages } as unknown as ClineCore, 'session', {}), /a-bad.txt.*symbolic links/);
+    assert.equal(remote.bytes.size, 1);
+    assert.deepEqual(remote.head().runtimeMessages, messages);
+  } finally { await conversation.close().catch(() => {}); await rm(root, { recursive: true, force: true }); }
+});

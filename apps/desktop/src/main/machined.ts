@@ -1,3 +1,4 @@
+import { resolveEngineeringDisplayContext } from './relay/engineering-display-context';
 // nm-machined — the headless daemon boot (docs/design/cloud-first-2026-08, W1).
 //
 // the same daemon the desktop app runs, minus the window: electronlazy already returns
@@ -211,6 +212,7 @@ export async function main(): Promise<void> {
     workspaceId: cfg.workspaceId,
     // a login-less machine clones a private repository through the App (host/repocred.ts, docs/design/repo-connect-2026-10)
     resolveCwd: (meta) => ensureEngineeringWorkspace(db, cfg.workspaceId, meta, { credFor: (slug, channel) => engineeringCred.forRepo(slug, channel) }),
+    resolveDisplayContext: meta => resolveEngineeringDisplayContext(db, cfg.apiUrl, cfg.workspaceId, meta),
     resolveBrain: (meta) => resolveEngineeringBrain(db, {
       apiUrl: cfg.apiUrl,
       machineToken: cfg.machineToken,

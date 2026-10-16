@@ -517,6 +517,55 @@ var init_artifacts = __esm({
   }
 });
 
+// ../shared/src/artifact-mime.ts
+function artifactMime(name) {
+  return MIME[name.split(".").pop()?.toLowerCase() ?? ""] ?? "application/octet-stream";
+}
+function artifactTextMime(mime) {
+  return /^text\//i.test(mime) || /^application\/(?:json|xml|javascript)$/i.test(mime);
+}
+var MIME;
+var init_artifact_mime = __esm({
+  "../shared/src/artifact-mime.ts"() {
+    "use strict";
+    MIME = {
+      png: "image/png",
+      jpg: "image/jpeg",
+      jpeg: "image/jpeg",
+      webp: "image/webp",
+      gif: "image/gif",
+      svg: "image/svg+xml",
+      mp4: "video/mp4",
+      webm: "video/webm",
+      mov: "video/quicktime",
+      wav: "audio/wav",
+      mp3: "audio/mpeg",
+      m4a: "audio/mp4",
+      ogg: "audio/ogg",
+      flac: "audio/flac",
+      pdf: "application/pdf",
+      json: "application/json",
+      html: "text/html",
+      htm: "text/html",
+      md: "text/markdown",
+      txt: "text/plain",
+      srt: "text/plain",
+      vtt: "text/vtt",
+      csv: "text/csv",
+      js: "text/javascript",
+      mjs: "text/javascript",
+      ts: "text/plain",
+      tsx: "text/plain",
+      jsx: "text/plain",
+      css: "text/css",
+      yaml: "text/plain",
+      yml: "text/plain",
+      xml: "text/xml",
+      sh: "text/plain"
+    };
+  }
+});
+
 // ../shared/src/states.ts
 function findTransition(from, to, name) {
   return TRANSITIONS.find((t2) => t2.from === from && t2.to === to && (name === void 0 || t2.name === name));
@@ -8311,6 +8360,13 @@ var init_protocol = __esm({
       return isAttachmentId(ref["id"]) && isBoundedString(ref["name"], 255) && isBoundedString(ref["mime"], 200);
     };
     NATIVE_TOOL_CATEGORY = {
+      show_artifact: "read",
+      list_whiteboards: "read",
+      read_whiteboard: "read",
+      create_whiteboard: "edit",
+      update_whiteboard: "edit",
+      draft_article: "edit",
+      share_images: "edit",
       read_files: "read",
       search_codebase: "read",
       run_commands: "command",
@@ -8409,9 +8465,13 @@ function updateEngineeringPlanProgress(progress, updates) {
   return { ...progress, statuses, started: true };
 }
 function recoverEngineeringPlanProgress(messages2) {
+  return recoverEngineeringPlanReceipt(messages2)?.progress ?? null;
+}
+function recoverEngineeringPlanReceipt(messages2) {
   if (!Array.isArray(messages2)) return null;
   const calls = /* @__PURE__ */ new Map();
   let progress = null;
+  let toolCallId = "";
   for (const message2 of messages2) {
     if (!Array.isArray(message2?.content)) continue;
     for (const block of message2.content) {
@@ -8429,12 +8489,14 @@ function recoverEngineeringPlanProgress(messages2) {
       if (!result || result.recorded !== true) continue;
       if (call.name === "propose_work_plan" && isEngineeringWorkPlan(call.input)) {
         progress = isEngineeringPlanProgress(result.planProgress) ? result.planProgress : createEngineeringPlanProgress(call.input, block.tool_use_id);
+        toolCallId = block.tool_use_id;
       } else if (call.name === "update_plan_progress" && isEngineeringPlanProgress(result.planProgress) && progress?.id === result.planProgress.id && JSON.stringify(progress.plan) === JSON.stringify(result.planProgress.plan)) {
         progress = result.planProgress;
+        toolCallId = block.tool_use_id;
       }
     }
   }
-  return progress;
+  return progress ? { progress, toolCallId } : null;
 }
 var status, ENGINEERING_PLAN_PROGRESS_PROMPT;
 var init_plan_progress = __esm({
@@ -9333,14 +9395,15 @@ function reduceRemoteEngineeringEvent(session, wire) {
     const category = wire["category"];
     const toolName = String(wire["toolName"] ?? "tool");
     const changes = Array.isArray(wire["changes"]) ? normalizeEngineeringChanges(wire["changes"]) : remoteChange(toolName, wire["input"]);
+    const displayTitle = { show_artifact: "Share artifact", create_whiteboard: "Create whiteboard", update_whiteboard: "Update whiteboard", list_whiteboards: "List whiteboards", read_whiteboard: "Read whiteboard", draft_article: "Create article", share_images: "Generate images" };
     const command = toolName === "run_commands" || toolName === "fetch_web_content" ? textValue(wire["input"]) : void 0;
     const messages2 = engineeringReviewMessages(session);
     const approvalId = String(wire["approvalId"]);
     return { ...session, messages: changes.length && !messages2.some((m) => m.review?.id === approvalId) ? [...finishStreamingMessages(messages2, true), changeReviewMessage(approvalId, changes, "proposed", stamp())] : messages2, state: "awaiting_approval", activeActivity: null, proposedChanges: changes, pendingApproval: {
       id: String(wire["approvalId"]),
       category,
-      title: category === "edit" ? "Apply proposed file changes" : category === "command" ? "Execute command" : category === "web" ? "Fetch web content" : category === "mcp" ? "Use MCP tool" : "Read repository files",
-      detail: `${toolName} requested by Engineering`,
+      title: displayTitle[toolName] ?? (category === "edit" ? "Apply proposed file changes" : category === "command" ? "Execute command" : category === "web" ? "Fetch web content" : category === "mcp" ? "Use MCP tool" : "Read repository files"),
+      detail: `${toolName} requested by ${session.agent?.name || DEFAULT_ENGINEERING_AGENT.name}`,
       ...command ? { command } : {},
       ...changes.length ? { changes } : {},
       continuation: category === "edit" ? "apply" : category === "command" ? "verify" : "inspect"
@@ -9378,6 +9441,7 @@ var serial, stamp, message, GITHUB_WAIT, isEngineeringGitHubWait, textValue, isP
 var init_remote = __esm({
   "../shared/src/engineering/remote.ts"() {
     "use strict";
+    init_selection();
     init_transcript_state();
     init_plan_progress();
     init_selection_events();
@@ -9410,14 +9474,23 @@ var init_remote = __esm({
   }
 });
 
-// ../shared/src/engineering/brain-restore.ts
-function progressAfterCheckpoint(snapshot, progress) {
+// ../shared/src/engineering/recorded-plan-progress.ts
+function recoverRecordedEngineeringPlan(snapshot) {
+  const receipt = recoverEngineeringPlanReceipt(snapshot.runtimeMessages);
+  let progress = receipt?.progress ?? null;
+  const anchor = receipt ? snapshot.events.findIndex((record) => {
+    const core = object(record.payload), event = object(core.payload?.event);
+    return record.type === "runtime.event" && core.type === "agent_event" && event.type === "content_end" && event.contentType === "tool" && !event.error && event.toolCallId === receipt.toolCallId;
+  }) : -1;
   const count2 = snapshot.metadata?.["recordedEventCount"];
-  const start = typeof count2 === "number" && Number.isInteger(count2) && count2 >= 0 && count2 <= snapshot.events.length ? count2 : progress ? snapshot.events.length : 0;
+  const start = anchor >= 0 ? anchor + 1 : !progress ? 0 : typeof count2 === "number" && Number.isInteger(count2) && count2 >= 0 && count2 <= snapshot.events.length ? count2 : progress ? snapshot.events.length : 0;
   for (const record of snapshot.events.slice(start)) {
-    if (record.type !== "runtime.event") continue;
     const core = object(record.payload);
-    if (core.type !== "agent_event") continue;
+    if (record.type === "plan.restored") {
+      if (core.progress === null || isEngineeringPlanProgress(core.progress)) progress = core.progress;
+      continue;
+    }
+    if (record.type !== "runtime.event" || core.type !== "agent_event") continue;
     const event = object(core.payload?.event);
     if (event.type !== "content_end" || event.contentType !== "tool" || event.error || typeof event.toolCallId !== "string" || !event.toolCallId) continue;
     let output;
@@ -9433,9 +9506,19 @@ function progressAfterCheckpoint(snapshot, progress) {
   }
   return progress;
 }
+var object;
+var init_recorded_plan_progress = __esm({
+  "../shared/src/engineering/recorded-plan-progress.ts"() {
+    "use strict";
+    init_plan_progress();
+    object = (value) => value && typeof value === "object" ? value : {};
+  }
+});
+
+// ../shared/src/engineering/brain-restore.ts
 function restoreEngineeringBrain(shell, snapshot) {
   if (snapshot.threadId !== shell.id) throw new Error("The recorded conversation belongs to another thread.");
-  if (snapshot.events.some((e) => object(e.payload).brainEncoding === "neuramesh.gzip.v1") || snapshot.runtimeMessages?.some((m) => object(m).brainEncoding === "neuramesh.gzip.v1")) throw new Error("Update the server to decode this recorded conversation, then retry.");
+  if (snapshot.events.some((e) => object2(e.payload).brainEncoding === "neuramesh.gzip.v1") || snapshot.runtimeMessages?.some((m) => object2(m).brainEncoding === "neuramesh.gzip.v1")) throw new Error("Update the server to decode this recorded conversation, then retry.");
   const metadataOnly = !snapshot.runtimeMessages?.length && snapshot.events.every((event) => event.type === "model.change");
   let session = {
     ...shell,
@@ -9446,20 +9529,20 @@ function restoreEngineeringBrain(shell, snapshot) {
   const plans = /* @__PURE__ */ new Map();
   const successful = /* @__PURE__ */ new Set();
   for (const message2 of snapshot.runtimeMessages ?? []) {
-    const m = object(message2);
+    const m = object2(message2);
     for (const block of Array.isArray(m.content) ? m.content : []) {
       if (block.type === "tool_use" && block.name === "propose_work_plan" && isEngineeringWorkPlan(block.input)) plans.set(block.id, block.input);
       if (block.type === "tool_result" && !block.is_error) successful.add(block.tool_use_id);
     }
   }
   const reviews = new Map(snapshot.events.filter((e) => e.type === "review.proposed").map((e) => {
-    const p2 = object(e.payload);
+    const p2 = object2(e.payload);
     return [p2.approvalId, p2];
   }));
   const renderedPlans = /* @__PURE__ */ new Set();
   for (const record of snapshot.events) {
     const before = new Set(session.messages.map((m) => m.id));
-    const p2 = object(record.payload);
+    const p2 = object2(record.payload);
     const apply = (wire) => {
       session = applyRemoteEngineeringEvent(session, wire);
     };
@@ -9472,7 +9555,7 @@ function restoreEngineeringBrain(shell, snapshot) {
       else if (p2.type === "ended") apply({ type: "ended", reason: p2.payload?.reason });
       else if (p2.type === "agent_event" || p2.type === "session_snapshot") {
         apply({ type: "agent_event", event: p2 });
-        const event = object(p2.payload?.event);
+        const event = object2(p2.payload?.event);
         const call = event.toolCallId;
         if (event.type === "content_end" && event.contentType === "tool" && successful.has(call) && plans.has(call) && !renderedPlans.has(call)) {
           renderedPlans.add(call);
@@ -9487,9 +9570,9 @@ function restoreEngineeringBrain(shell, snapshot) {
   }
   const metadata = snapshot.metadata ?? {};
   if (isEngineeringSelection(metadata.selection)) session = { ...session, agentId: metadata.selection.agentId, modelOverride: metadata.selection.modelId, reasoningEffort: metadata.selection.reasoningEffort };
-  if (typeof object(metadata.agent).name === "string") session = { ...session, agent: metadata.agent };
-  const planProgress = progressAfterCheckpoint(snapshot, recoverEngineeringPlanProgress(snapshot.runtimeMessages));
-  if (planProgress) session = applyRemoteEngineeringEvent(session, { type: "plan_progress", progress: planProgress });
+  if (typeof object2(metadata.agent).name === "string") session = { ...session, agent: metadata.agent };
+  const planProgress = recoverRecordedEngineeringPlan(snapshot);
+  if (!metadataOnly) session = applyRemoteEngineeringEvent(session, { type: "plan_progress", progress: planProgress });
   const interrupted = session.state === "streaming" || session.state === "awaiting_approval";
   return {
     ...session,
@@ -9503,7 +9586,7 @@ function restoreEngineeringBrain(shell, snapshot) {
     updatedAt: snapshot.events.at(-1)?.timestamp ?? shell.updatedAt
   };
 }
-var object;
+var object2;
 var init_brain_restore = __esm({
   "../shared/src/engineering/brain-restore.ts"() {
     "use strict";
@@ -9511,8 +9594,8 @@ var init_brain_restore = __esm({
     init_remote();
     init_selection();
     init_review_history();
-    init_plan_progress();
-    object = (v) => v && typeof v === "object" ? v : {};
+    init_recorded_plan_progress();
+    object2 = (v) => v && typeof v === "object" ? v : {};
   }
 });
 
@@ -10140,6 +10223,7 @@ var init_engineering = __esm({
     init_review_history();
     init_approval_display();
     init_plan_progress();
+    init_recorded_plan_progress();
     init_change_review();
     init_brain_restore();
   }
@@ -10796,6 +10880,8 @@ __export(src_exports, {
   applyShare: () => applyShare,
   articleFacts: () => articleFacts,
   articleFrom: () => articleFrom,
+  artifactMime: () => artifactMime,
+  artifactTextMime: () => artifactTextMime,
   assertPacksValid: () => assertPacksValid,
   attachmentLimits: () => attachmentLimits,
   attachmentUpgradeReason: () => attachmentUpgradeReason,
@@ -11192,6 +11278,8 @@ __export(src_exports, {
   readAnswers: () => readAnswers,
   readyProviders: () => readyProviders,
   recoverEngineeringPlanProgress: () => recoverEngineeringPlanProgress,
+  recoverEngineeringPlanReceipt: () => recoverEngineeringPlanReceipt,
+  recoverRecordedEngineeringPlan: () => recoverRecordedEngineeringPlan,
   releaseBriefFrom: () => releaseBriefFrom,
   releaseDigest: () => releaseDigest,
   releaseLogNote: () => releaseLogNote,
@@ -11425,6 +11513,7 @@ var init_src = __esm({
     init_images();
     init_filmprompt();
     init_artifacts();
+    init_artifact_mime();
     init_states();
     init_workspaces();
     init_compute();
@@ -17915,9 +18004,9 @@ async function createPortalSession(input) {
   const session = await stripe().billingPortal.sessions.create({ customer: input.customerId, return_url: `${RETURN_BASE}/portal-return` });
   return session.url;
 }
-function constructWebhookEvent(rawBody, signature) {
+function constructWebhookEvent(rawBody, signature2) {
   if (!WEBHOOK_SECRET) throw new Error("billing not configured (STRIPE_WEBHOOK_SECRET unset)");
-  return stripe().webhooks.constructEvent(rawBody, signature, WEBHOOK_SECRET);
+  return stripe().webhooks.constructEvent(rawBody, signature2, WEBHOOK_SECRET);
 }
 var CLOUD_STATUSES = /* @__PURE__ */ new Set(["active", "trialing", "past_due"]);
 function planPatchFromEvent(event) {
@@ -18037,8 +18126,8 @@ function signMachineSyncJwt(claims, privatePem, ttlSeconds = 900) {
     })
   );
   const input = `${header}.${payload}`;
-  const signature = cryptoSign("RSA-SHA256", Buffer.from(input), createPrivateKey(privatePem));
-  return `${input}.${b64url(signature)}`;
+  const signature2 = cryptoSign("RSA-SHA256", Buffer.from(input), createPrivateKey(privatePem));
+  return `${input}.${b64url(signature2)}`;
 }
 async function resolveMachineActor(store2, bearer, actorHeader) {
   if (!bearer.startsWith("nmm_") || !store2.machineByTokenHash) return null;
@@ -19395,6 +19484,57 @@ function configuredBrainObjects() {
   return store2;
 }
 
+// src/brain-object-reader.ts
+import { createHmac as createHmac3, timingSafeEqual as timingSafeEqual4 } from "node:crypto";
+var OBJECT_READ_PATH = "/v1/brain/internal/objects/read";
+var MAX_BYTES = 64 * 1024 * 1024;
+var signature = (key2, expires, body) => createHmac3("sha256", key2).update(`${expires}
+${body}`).digest("hex");
+var readerKey = () => process.env["NM_BRAIN_OBJECT_READ_KEY"] ?? "";
+function validRef(value) {
+  if (!value || typeof value !== "object") return false;
+  const r = value;
+  return r.backend === "gcs" && typeof r.bucket === "string" && !!r.bucket && typeof r.key === "string" && /^v1\/workspaces\/[a-f0-9-]{36}\//.test(r.key) && !r.key.split("/").includes("..") && typeof r.generation === "string" && /^\d+$/.test(r.generation) && typeof r.sha256 === "string" && /^[a-f0-9]{64}$/.test(r.sha256) && Number.isSafeInteger(r.sizeBytes) && r.sizeBytes >= 0 && r.sizeBytes <= MAX_BYTES && typeof r.mime === "string" && r.mime.length <= 200;
+}
+async function readBrainObject(ref) {
+  const local = configuredBrainObjects();
+  if (local) return local.get(ref);
+  const url = process.env["NM_BRAIN_OBJECT_READ_URL"];
+  const key2 = readerKey();
+  if (!url || key2.length < 32) throw new Error("Configure brain object storage to read this artifact.");
+  const target = new URL(url);
+  if (target.protocol !== "https:" || target.pathname !== OBJECT_READ_PATH || target.username || target.password || target.search || target.hash) throw new Error("Invalid private brain reader endpoint.");
+  if (!validRef(ref)) throw new Error("Invalid cloud artifact reference.");
+  const body = JSON.stringify(ref);
+  const expires = String(Math.floor(Date.now() / 1e3) + 60);
+  const response = await fetch(url, { method: "POST", body, redirect: "error", signal: AbortSignal.timeout(6e4), headers: {
+    "content-type": "application/json",
+    "x-nm-object-expires": expires,
+    "x-nm-object-signature": signature(key2, expires, body)
+  } });
+  if (!response.ok) throw new Error(`The private artifact reader failed (${response.status}).`);
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error("The private artifact reader returned no content.");
+  const chunks = [];
+  let size = 0;
+  try {
+    for (; ; ) {
+      const chunk2 = await reader.read();
+      if (chunk2.done) break;
+      size += chunk2.value.length;
+      if (size > ref.sizeBytes) throw new Error("The private artifact reader exceeded the expected size.");
+      chunks.push(chunk2.value);
+    }
+  } finally {
+    await reader.cancel().catch(() => {
+    });
+    reader.releaseLock();
+  }
+  const bytes = Buffer.concat(chunks);
+  if (size !== ref.sizeBytes || brainHash(bytes) !== ref.sha256) throw new Error("Brain object checksum does not match");
+  return bytes;
+}
+
 // src/brain-error.ts
 var BrainError = class extends Error {
   constructor(code, message2, status2 = 409) {
@@ -19424,6 +19564,18 @@ function brainArtifactInline(bytes, mime, workspace, privateCode = false) {
     413
   );
   return value;
+}
+
+// src/brain-artifact-bytes.ts
+function brainArtifactBytes(encoded) {
+  const padding = encoded.endsWith("==") ? 2 : encoded.endsWith("=") ? 1 : 0;
+  if (encoded.length % 4 !== 0 || /[^A-Za-z0-9+/]/.test(encoded.slice(0, encoded.length - padding))) {
+    throw new BrainError("INVALID_INPUT", "Artifact content must use valid base64.", 400);
+  }
+  if (encoded.length / 4 * 3 - padding > 16 * 1024 * 1024) {
+    throw new BrainError("TOO_LARGE", "An artifact must be at most 16 MiB.", 413);
+  }
+  return Buffer.from(encoded, "base64");
 }
 
 // src/brain-store.ts
@@ -19500,22 +19652,22 @@ function decodedBrainSnapshot(snapshot, limit = 128 * 1024 * 1024) {
 }
 
 // src/brain-restore-projection.ts
-var object2 = (value) => value && typeof value === "object" ? value : {};
+var object3 = (value) => value && typeof value === "object" ? value : {};
 var textStart = (event) => event.type === "content_start" && event.contentType === "text" && typeof event.text === "string";
 function brainRestoreProjection() {
   const streams = /* @__PURE__ */ new Map();
   return (value) => {
-    const record = object2(value);
+    const record = object3(value);
     if (record.type !== "runtime.event") return value;
-    const raw = object2(record.payload);
-    const core = raw.brainEncoding === "neuramesh.gzip.v1" ? object2(decodedBrainSnapshot({ workspace: "", threadId: "", revision: 0, events: [value] }).events[0].payload) : raw;
-    const payload = object2(core.payload);
+    const raw = object3(record.payload);
+    const core = raw.brainEncoding === "neuramesh.gzip.v1" ? object3(decodedBrainSnapshot({ workspace: "", threadId: "", revision: 0, events: [value] }).events[0].payload) : raw;
+    const payload = object3(core.payload);
     if (typeof payload.sessionId !== "string") return value;
     const stream = streams.get(payload.sessionId) ?? { text: "" };
     streams.set(payload.sessionId, stream);
     let projected = core;
     if (core.type === "agent_event") {
-      const event = object2(payload.event);
+      const event = object3(payload.event);
       let compact = event;
       if (textStart(event)) {
         if (typeof event.accumulated === "string") {
@@ -19646,9 +19798,7 @@ var BrainStore = class {
   async artifact(actor, input) {
     const scope = await brainThreadAccess(this.sql, actor, input.workspace, input.threadId);
     if (input.channel && input.channel !== scope.channel_id) throw new BrainError("NOT_FOUND", "The artifact channel does not belong to this thread.", 404);
-    if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(input.contentBase64)) throw new BrainError("INVALID_INPUT", "Artifact content must use valid base64.", 400);
-    const bytes = Buffer.from(input.contentBase64, "base64");
-    if (bytes.length > 16 * 1024 * 1024) throw new BrainError("TOO_LARGE", "An artifact must be at most 16 MiB.", 413);
+    const bytes = brainArtifactBytes(input.contentBase64);
     const sha256 = brainHash(bytes);
     if (input.sha256 && input.sha256 !== sha256) throw new BrainError("BRAIN_CHECKSUM_MISMATCH", "The artifact checksum does not match its bytes.", 400);
     brainArtifactInline(bytes, input.mime, input.workspace, scope.kind === "coding");
@@ -19712,15 +19862,13 @@ var BrainStore = class {
 // src/store/artifact-content.ts
 async function artifactContent(inline, ref) {
   if (!ref) return inline;
-  const objects = configuredBrainObjects();
-  if (!objects) {
-    if (inline === null) throw new Error("Configure brain object storage to read this artifact.");
+  if (inline !== null) {
     const prefix = `data:${ref.mime};base64,`;
     const bytes2 = inline.startsWith(prefix) ? Buffer.from(inline.slice(prefix.length), "base64") : Buffer.from(inline);
     if (bytes2.length !== ref.sizeBytes || brainHash(bytes2) !== ref.sha256) throw new Error("Artifact compatibility copy failed verification.");
     return inline;
   }
-  const bytes = await objects.get(ref);
+  const bytes = await readBrainObject(ref);
   return /^(text\/|application\/(json|xml|javascript)(;|$))/.test(ref.mime) ? bytes.toString("utf8") : `data:${ref.mime};base64,${bytes.toString("base64")}`;
 }
 async function assertTaskArtifactRead(store2, actor, taskId3, workspace, authorization2) {
@@ -22088,7 +22236,7 @@ function parseDraftAnswer(text3) {
 }
 
 // src/github-app.ts
-import { createHmac as createHmac3, createPrivateKey as createPrivateKey2, createSign, timingSafeEqual as timingSafeEqual4 } from "node:crypto";
+import { createHmac as createHmac4, createPrivateKey as createPrivateKey2, createSign, timingSafeEqual as timingSafeEqual5 } from "node:crypto";
 var API = "https://api.github.com";
 var UA = "neuramesh-announce";
 function githubAppConfigured(env = process.env) {
@@ -23711,7 +23859,7 @@ init_src();
 import { z as z18 } from "zod";
 
 // src/github-proof.ts
-import { createHash as createHash6, createHmac as createHmac4, randomBytes as randomBytes6 } from "node:crypto";
+import { createHash as createHash6, createHmac as createHmac5, randomBytes as randomBytes6 } from "node:crypto";
 var UA3 = "neuramesh-announce";
 function ownerProofConfigured(env = process.env) {
   return githubAppConfigured(env) && !!env["GITHUB_APP_CLIENT_ID"] && !!env["GITHUB_APP_CLIENT_SECRET"] && !!env["NM_CONNECTOR_KEY"];
@@ -23735,7 +23883,7 @@ function unsealProofState(raw) {
 var isProofState = (raw) => /^[wp]\./.test(raw);
 var proofRedirectUri = () => `${HQ_URL}/github/callback`;
 var grantStartUrl = (channel) => `${HQ_URL}/github/start${channel ? `?${new URLSearchParams({ channel }).toString()}` : ""}`;
-var pkceVerifier = (state) => createHmac4("sha256", keyBytes()).update(`github-pkce:${state}`).digest("base64url");
+var pkceVerifier = (state) => createHmac5("sha256", keyBytes()).update(`github-pkce:${state}`).digest("base64url");
 function authorizeUrl(state, env = process.env) {
   const challenge = createHash6("sha256").update(pkceVerifier(state)).digest("base64url");
   const q = new URLSearchParams({ client_id: env["GITHUB_APP_CLIENT_ID"] ?? "", redirect_uri: proofRedirectUri(), state, code_challenge: challenge, code_challenge_method: "S256" });
@@ -25112,7 +25260,7 @@ function announceClaimRoute(app, store2, opts = {}) {
 }
 
 // src/relay.ts
-import { timingSafeEqual as timingSafeEqual5 } from "node:crypto";
+import { timingSafeEqual as timingSafeEqual6 } from "node:crypto";
 import { z as z20 } from "zod";
 var ValidateMachineSchema = z20.object({ token: z20.string().min(1) });
 var ValidateClientSchema = z20.object({ clerkToken: z20.string().min(1), machineId: z20.string().uuid() });
@@ -25124,7 +25272,7 @@ function devRelayUser(token) {
   if (!expected || expected.length < 32 || !parsed.success) return null;
   const actualBytes = Buffer.from(token);
   const expectedBytes = Buffer.from(expected);
-  if (actualBytes.length !== expectedBytes.length || !timingSafeEqual5(actualBytes, expectedBytes)) return null;
+  if (actualBytes.length !== expectedBytes.length || !timingSafeEqual6(actualBytes, expectedBytes)) return null;
   return parsed.data;
 }
 function relayRoutes(app, store2, deps = {}) {
@@ -25194,7 +25342,7 @@ async function resolveBearerActor(store2, userId, rawHeader) {
 }
 
 // src/local-auth.ts
-import { createHash as createHash8, createHmac as createHmac5, randomBytes as randomBytes7 } from "node:crypto";
+import { createHash as createHash8, createHmac as createHmac6, randomBytes as randomBytes7 } from "node:crypto";
 var LOCAL_USER = { clerkUserId: "local", email: "local@neuramesh.local" };
 var LOCAL_SYNC_KID = "nm-local";
 var LOCAL_SYNC_AUD = "powersync-local";
@@ -25221,7 +25369,7 @@ var b64 = (v) => Buffer.from(JSON.stringify(v)).toString("base64url");
 function signLocalSyncToken(sub, keyB64url, nowMs = Date.now()) {
   const now = Math.floor(nowMs / 1e3);
   const input = `${b64({ alg: "HS256", typ: "JWT", kid: LOCAL_SYNC_KID })}.${b64({ sub, aud: LOCAL_SYNC_AUD, iat: now, exp: now + LOCAL_SYNC_TTL_SECONDS })}`;
-  return `${input}.${createHmac5("sha256", Buffer.from(keyB64url, "base64url")).update(input).digest("base64url")}`;
+  return `${input}.${createHmac6("sha256", Buffer.from(keyB64url, "base64url")).update(input).digest("base64url")}`;
 }
 function safeJson(raw) {
   try {
@@ -25235,13 +25383,13 @@ function safeJson(raw) {
 init_src();
 
 // src/devtoken.ts
-import { createHmac as createHmac6 } from "node:crypto";
+import { createHmac as createHmac7 } from "node:crypto";
 var key = Buffer.from("TkVVUkFNRVNILVNQSUtFLUtFWS0wMDEtTkVVUkFNRVNILVNQSUtFLUtFWS0wMDE", "base64url");
 var b642 = (v) => Buffer.from(JSON.stringify(v)).toString("base64url");
 function signDevToken(sub) {
   const now = Math.floor(Date.now() / 1e3);
   const input = `${b642({ alg: "HS256", typ: "JWT", kid: "nm-dev" })}.${b642({ sub, aud: "powersync-dev", iat: now, exp: now + 6 * 3600 })}`;
-  return `${input}.${createHmac6("sha256", key).update(input).digest("base64url")}`;
+  return `${input}.${createHmac7("sha256", key).update(input).digest("base64url")}`;
 }
 
 // src/version.ts
@@ -33071,13 +33219,12 @@ async function contentMediaBytesSql(sql, mediaId, objects) {
   if (!row) return null;
   const ref = row["object_ref"];
   const storage = objects ?? (ref ? configuredBrainObjects() : null);
-  if (ref && !storage && row["bytes"] != null) {
+  if (ref && row["bytes"] != null) {
     const bytes2 = Buffer.from(row["bytes"]);
     if (bytes2.length !== ref.sizeBytes || brainHash(bytes2) !== ref.sha256) throw new Error("Media compatibility copy failed checksum verification.");
     return { mime: row["mime"], bytes: bytes2, workspace: row["workspace_id"] };
   }
-  if (ref && !storage) throw new Error("Configure brain object storage to read this media.");
-  const bytes = ref ? await storage.get(ref) : Buffer.from(row["bytes"]);
+  const bytes = ref ? await (storage ? storage.get(ref) : readBrainObject(ref)) : Buffer.from(row["bytes"]);
   return { mime: row["mime"], bytes, workspace: row["workspace_id"] };
 }
 

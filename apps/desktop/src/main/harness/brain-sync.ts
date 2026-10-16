@@ -138,7 +138,11 @@ export class ConversationBrain {
       for (const file of files) {
       const pending = readJSON<{ actor: { kind: string; id: string; role?: string }; request: { id: string; name: string; sha256: string; mime: string } }>(join(dir, file), null!);
       const response = await this.call(`${brainApiBaseUrl(this.options.apiUrl)}/v1/brain/artifacts`, { method: 'POST', headers: { 'content-type': 'application/json', ...(await (this.options.headersForActor?.(pending.actor) ?? this.options.headers())) }, body: JSON.stringify(pending.request), signal: AbortSignal.timeout(60_000) });
-      if (!response.ok) throw new Error(`The artifact upload failed (${response.status}). Its bytes remain queued on this device.`);
+      if (!response.ok) {
+        const body = await response.json().catch(() => null) as { code?: string } | null;
+        if (body?.code === 'BRAIN_READER_UPGRADE_REQUIRED') throw new Error('Artifact uploads are not enabled for this workspace yet. Your files remain saved on this machine; ask the workspace administrator to enable artifact storage after updating its clients.');
+        throw new Error(`The artifact upload failed (${response.status}). Its bytes remain queued on this device.`);
+      }
       this.record('artifact.created', { id: pending.request.id, name: pending.request.name, sha256: pending.request.sha256, mime: pending.request.mime }, `artifact:${pending.request.id}`);
       unlinkSync(join(dir, file));
       }

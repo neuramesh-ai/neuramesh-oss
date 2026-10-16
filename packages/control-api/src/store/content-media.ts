@@ -5,6 +5,7 @@ import { configuredBrainObjects, brainHash, type BrainObjectRef, type BrainObjec
 import { DomainError } from '../errors';
 import { trackDomainEvent } from '../analytics';
 import { brainCloudOnly } from '../brain-compatibility';
+import { readBrainObject } from '../brain-object-reader';
 
 export async function attachContentMediaSql(
   pool: postgres.Sql, itemId: string, mime: string, bytes: Buffer, actor: { kind: string; id: string },
@@ -40,12 +41,11 @@ export async function contentMediaBytesSql(sql: postgres.Sql, mediaId: string, o
   if (!row) return null;
   const ref = row['object_ref'] as BrainObjectRef | null;
   const storage = objects ?? (ref ? configuredBrainObjects() : null);
-  if (ref && !storage && row['bytes'] != null) {
+  if (ref && row['bytes'] != null) {
     const bytes = Buffer.from(row['bytes'] as Uint8Array);
     if (bytes.length !== ref.sizeBytes || brainHash(bytes) !== ref.sha256) throw new Error('Media compatibility copy failed checksum verification.');
     return { mime: row['mime'] as string, bytes, workspace: row['workspace_id'] as string };
   }
-  if (ref && !storage) throw new Error('Configure brain object storage to read this media.');
-  const bytes = ref ? await storage!.get(ref) : Buffer.from(row['bytes'] as Uint8Array);
+  const bytes = ref ? await (storage ? storage.get(ref) : readBrainObject(ref)) : Buffer.from(row['bytes'] as Uint8Array);
   return { mime: row['mime'] as string, bytes, workspace: row['workspace_id'] as string };
 }

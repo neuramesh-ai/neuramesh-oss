@@ -7,7 +7,7 @@ export type ThemeId = 'dark' | 'light' | 'soft-dark' | 'cream-oak' | 'paper-ligh
 export type Look = 'elevated' | 'paper';
 export type ThemePref = ThemeId | 'system' | 'paper-system';
 // Keep public/theme-boot.js in step. The boot parity test checks this default.
-export const DEFAULT_THEME_PREF: ThemePref = 'paper-system';
+export const DEFAULT_THEME_PREF: ThemePref = 'system';
 export interface ThemeDef { id: ThemeId; label: string; look: Look; group: 'dark' | 'light'; desc: string; sw: { bg: string; panel: string; accent: string; text: string; border: string } }
 export const THEMES: ThemeDef[] = [
   { id: 'paper-light', look: 'paper', label: 'Paper light', group: 'light', desc: 'One flat ground with clean lines.', sw: { bg: '#f7f6f3', panel: '#efede9', accent: '#141310', text: '#141310', border: '#c9c4bd' } },
@@ -22,7 +22,7 @@ export const lookOf = (id: ThemeId): Look => THEMES.find((t) => t.id === id)?.lo
 export const isThemePref = (s: string): s is ThemePref => s === 'system' || s === 'paper-system' || THEMES.some((t) => t.id === s);
 export function systemTheme(look: Look = 'elevated'): ThemeId {
   const light = typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-color-scheme: light)').matches;
-  return look === 'paper' ? (light ? 'paper-light' : 'paper-dark') : (light ? 'light' : 'dark');
+  return look === 'paper' ? (light ? 'paper-light' : 'paper-dark') : (light ? 'light' : 'soft-dark');
 }
 export function resolveTheme(pref: ThemePref): ThemeId {
   return pref === 'system' ? systemTheme() : pref === 'paper-system' ? systemTheme('paper') : pref;

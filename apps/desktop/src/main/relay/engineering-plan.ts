@@ -31,7 +31,7 @@ export function engineeringPlanTool(emit: (event: EngineeringRuntimeEvent) => vo
 }
 
 /** Progress lives in tool receipts, so a resumed model/device sees exactly the same checklist. */
-export function engineeringProgressTool(emit: (event: EngineeringRuntimeEvent) => void, readMessages: () => Promise<unknown>) {
+export function engineeringProgressTool(emit: (event: EngineeringRuntimeEvent) => void, readMessages: () => Promise<unknown>, readProgress?: () => Promise<EngineeringPlanProgress | null>) {
   // Native messages may only checkpoint at turn boundaries. Keep accepted updates within this
   // runtime, then reconstruct from receipts when a mode/model/device/checkpoint creates a new one.
   let current: EngineeringPlanProgress | null | undefined;
@@ -48,7 +48,7 @@ export function engineeringProgressTool(emit: (event: EngineeringRuntimeEvent) =
     },
     execute: (input: unknown) => {
       const result = queue.then(async () => {
-        if (current === undefined) current = recoverEngineeringPlanProgress(await readMessages());
+        if (current === undefined) current = readProgress ? await readProgress() : recoverEngineeringPlanProgress(await readMessages());
         if (!current) throw new Error('No recorded work plan is available. Continue the task without inventing progress.');
         const planProgress = updateEngineeringPlanProgress(current, (input as { updates?: unknown } | null)?.updates);
         current = planProgress;

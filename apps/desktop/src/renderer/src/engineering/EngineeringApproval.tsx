@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { engineeringApprovalCommands } from '@neuramesh/shared';
+import { DEFAULT_ENGINEERING_AGENT, engineeringApprovalCommands } from '@neuramesh/shared';
 import type { EngineeringSession } from './domain';
 import { IconLock } from '../ui/icons';
 import { reviewFiles } from './change-review';
 import { ChangeCounts } from './EngineeringReview';
+import { highlightCode } from '../lib/highlight';
 import styles from './EngineeringApproval.module.css';
 
 export function ApprovalCard({ session, onResolve, onReview }: {
@@ -21,12 +22,12 @@ export function ApprovalCard({ session, onResolve, onReview }: {
   return <section className="engapproval" data-state="open" aria-label="Pending approval">
     <div className="engapprovaltop"><span className="engapprovalico"><IconLock s={13} /></span>
       <span><b>{files.length ? 'Review file changes' : approval.category === 'command' && commands.length > 1 ? 'Execute commands' : approval.title}</b>
-        <small>{files.length ? `${files.length} ${files.length === 1 ? 'file' : 'files'} proposed. Review the diff before approving.` : approval.detail}</small></span>
+        <small>{files.length ? `${files.length} ${files.length === 1 ? 'file' : 'files'} proposed. Review the diff before approving.` : approval.category === 'command' ? `Requested by ${session.agent?.name || DEFAULT_ENGINEERING_AGENT.name}` : approval.detail}</small></span>
     </div>
-    {!files.length && commands.length > 0 && <div className={styles.commands}>
-      {commands.map((command, index) => <div key={index}>
-        {commands.length > 1 && <div className={styles.commandLabel}>Command {index + 1} of {commands.length}</div>}
-        <code className={styles.command} aria-label={approval.category === 'command' ? `Command ${index + 1} of ${commands.length}` : undefined}>{command}</code>
+    {!files.length && commands.length > 0 && <div className={styles.commands} role="region" aria-label="Commands awaiting approval" tabIndex={0}>
+      {commands.map((command, index) => <div className={styles.commandFrame} key={index}>
+        <div className={styles.commandLabel}>{commands.length > 1 ? `Command ${index + 1} of ${commands.length}` : 'Shell command'}</div>
+        <pre className={styles.commandPre}><code className={styles.command} aria-label={approval.category === 'command' ? `Command ${index + 1} of ${commands.length}` : undefined} dangerouslySetInnerHTML={{ __html: highlightCode(command, 'command.sh') }} /></pre>
       </div>)}
     </div>}
     {!!files.length && <div className={styles.files}>

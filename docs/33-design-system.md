@@ -203,8 +203,9 @@ chosen pack card, an active filter. Warm-as-selection is idiom; warm-as-default 
 The browser and desktop clients offer two groups in Appearance. Paper has Paper light, Paper dark, Paper Cream Oak and its own
 Sync with system. Paper Cream Oak is a fixed light palette with warm cream and oak-brown ink.
 Elevated retains Dark, Soft Dark, Light, Cream Oak and Sync with system.
-One local preference, `nm:theme`, selects both the look and palette. The default is `paper-system`.
-An unset or invalid preference follows the OS with Paper light or Paper dark. Saved choices stay unchanged.
+One local preference, `nm:theme`, selects both the look and palette. The default is `system`.
+An unset or invalid preference follows the OS with elevated Light or Soft Dark. Saved fixed palettes stay unchanged.
+The elevated system choice uses the same Light and Soft Dark pair.
 `paper-system` follows the OS within the paper pair. The boot script applies both attributes before paint.
 
 `data-theme` selects colors. `data-look="paper"` selects structure. Paper has one ground across the
@@ -322,14 +323,25 @@ Rules of use:
   reverse act: if the forward act is common and the reverse is not, the reverse belongs in the
   seconds after the forward one, not in the furniture.
 
-- **Web Recents separates quiet from settled** (George, 2026-10-10). Three collapsible sections
-  show Working, Idle, and Settled in that order. Working includes live work and requests for
-  attention. Idle holds quiet threads without a current human settle. Settled holds the threads
-  the user explicitly settled. Each section sorts by recency and pages separately. The headers
-  use quiet type and a count, with no new status colors. Settle returns to coding rows on hover,
+- **Web Projects separates conversations from automations** (George, 2026-10-15). The rail starts
+  in Projects, including when the saved view was the retired Recents option. Projects and
+  Automations are remembered choices, without numeric counts beside their headings. Within each
+  project, Working comes before Idle, then Settled, newest activity first within each state.
+  Ordering happens before the five-row cap, so older asks cannot displace newer working threads.
+  Working includes live work and requests for attention. Idle holds quiet threads without a
+  current human settle. Settled holds the threads the user explicitly settled. Settle moves the
+  row down with a 150ms transition; reduced motion changes the order immediately. Automations
+  holds schedule-linked threads separately, newest run first, in pages of 30. Its order uses the
+  latest scheduled opener in each thread, independent of later replies. The history search door
+  remains an icon; the bottom-left ⌘K control reads **Quick search**. Settle remains on hover,
   keyboard focus, and in the row menu. A live agent must finish or pause before Settle appears.
   Undo stays on the toast. A new prompt, reply, or approval request reopens a coding thread.
   A connection open or close does not. [Behavior and evidence](design/code-review-2026-10/recents.md).
+  Paused and failed coding threads belong in Working with a needs-you label until the user settles them.
+  An automation row starts with a muted project prefix and a colon. Names of up to six characters stay whole.
+  Longer names use up to six characters from the first word. Labels use lowercase, with numeric suffixes to prevent collisions.
+  The prefix stays fixed while the title truncates. The hover card and accessible name retain the full project name.
+  In a narrow rail, an automation status takes the age slot so the project and title retain space.
 
 ## 5. Type
 
@@ -340,8 +352,9 @@ Native form controls inherit the same face, including the sign-in email and pass
 The browser preloads the Latin Geist Mono file. Other Unicode subsets load when needed.
 Web and desktop text uses `letter-spacing: -0.02em`, matching the original filter heading at George's request.
 This tight spacing applies to thread labels, controls, headings, and prose. The old mixed tracking values no longer apply.
-Recents and Projects retain the original uppercase 10px headings, weight 500, and tight spacing.
-Their counts and separator also use 10px. The smaller headings sit above the 12px conversation labels.
+Web Projects and Automations retain the original uppercase 10px headings, weight 500, and tight spacing.
+Their separator also uses 10px. The smaller headings sit above the 12px conversation labels.
+The web thread lists and search results use the same 12px title token as the sidebar, with 11.5px preview text.
 Role chips use 10px / 14px, with weight 500. The old 6.5px chips were too small for clear role names.
 Paper outlines each agent's original DiceBear icon. The original face and transforms stay intact.
 The colored background disappears, the head uses a 4.5-unit stroke, and the eyes and mouth use the theme ink.
@@ -1633,6 +1646,18 @@ real work — if it is decoration, drop it and keep the pill.
   hint carry the "this makes something" job; the caret lights on the row's hover, the way a channel
   row's gear does — and it is a **14px chevron at `--muted`**, not a 9px `▾` at .6 opacity, because
   that caret is the only sign the launcher holds a task and a routine mode as well.
+
+- **HQ workspace settings** (2026-10-15) replaces the web workspace menu and the settings tab
+  strip with one modal. The workspace bar, the top-dock account button, and `⌘⇧P` open it on
+  General. A 224px left column groups Workspace and Personal settings; the right pane scrolls
+  independently. Search filters section names and keywords. Workspaces, profile, appearance,
+  credits, and the existing settings panels live inside this frame. All projects, Agents &
+  machines, and Retro remain links to their full pages. Existing provider, policy, and invitation
+  links open their target section. At widths below 600px, a section selector replaces the left
+  column. Open motion takes 150ms; close takes 130ms. Reduced motion skips both. Background
+  content is inert, focus stays in the top dialog, Escape dismisses it, and focus returns to the
+  opener. The following second-face rules remain historical for HQ and still describe desktop.
+  [Design and validation](design/workspace-settings-2026-10/plan.md).
 
 - **The second face** (v0.76) — the spine swaps what the nav column *draws*: `rooms` (channels +
   Recents) or `projects` (the switcher). **Same column, same 266px, same transparent ground, no

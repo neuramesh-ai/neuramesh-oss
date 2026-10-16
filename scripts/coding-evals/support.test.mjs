@@ -3,10 +3,26 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { localUrl, allowedCommand, allowedPath, approvalCommands, statusOf, exec, root, suite, save } from './support.mjs';
 import { resolve } from 'node:path';
-import { agentVerification, verifyRecording } from './recording.mjs';
+import { agentVerification, agentPlanProgress, verifyRecording } from './recording.mjs';
 import { report } from './report.mjs';
 import { mkdtemp, writeFile, readFile, rm } from 'node:fs/promises';
-import { capture, turnSettled, confirmTurn } from './flow.mjs';
+import { capture, turnSettled, confirmTurn, requireApprovals } from './flow.mjs';
+
+test('eval permissions require approvals under cloud and legacy defaults without toggling asks on',async()=>{
+  for(const initial of [true,false]) {
+    const values={'Edit files':initial,'Execute commands':initial};
+    const page={
+      click:async selector=>{for(const label of Object.keys(values)) if(selector.includes(label)) values[label]=!values[label];},
+      evaluate:async(_fn,label)=>String(values[label]),
+      waitForSelector:async selector=>{if(selector.includes('aria-checked="false"')) {
+        const label=Object.keys(values).find(name=>selector.includes(name));assert.equal(values[label],false);
+      }},
+      keyboard:{press:async key=>assert.equal(key,'Escape')},
+    };
+    await requireApprovals(page);
+    assert.deepEqual(values,{'Edit files':false,'Execute commands':false});
+  }
+});
 
 test('evidence capture retries transient snapshot races without replaying UI actions', async () => {
   const dir=await mkdtemp('/tmp/nm-eval-capture-');
@@ -96,7 +112,8 @@ test('follow-up verification waits for a new model checkpoint instead of accepti
   ];
   let refresh;
   try {
-    const before = turn('first', 'old');
+    const progress = { id: 'plan', plan: { steps: [{}] }, statuses: ['completed'], started: true };
+    const before = [...turn('first', 'old'), { role: 'assistant', content: [{ type: 'tool_use', id: 'plan', name: 'propose_work_plan' }] }, { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'plan', content: { recorded: true, planProgress: progress } }] }];
     await save(file, { messages: before });
     const waiting = verifyRecording({ brain: out, workspace: 'workspace', actor: 'actor' }, { threadId: 'thread', implementationVerification: { index: 1, model: 'old' } }, out, 'followup');
     refresh = new Promise((resolveRefresh, reject) => setTimeout(() => save(file, { messages: [...before, ...turn('second', 'new')] }).then(resolveRefresh, reject), 100));
@@ -104,7 +121,7 @@ test('follow-up verification waits for a new model checkpoint instead of accepti
     await refresh;
     assert.equal(result.passed, true);
     assert.equal(result.model, 'new');
-    assert.equal(result.index, 3);
+    assert.equal(result.index, 5);
   } finally { if (refresh) await refresh; await rm(out, { recursive: true }); }
 });
 
@@ -121,7 +138,7 @@ test('command policy permits only an exact safe eval cwd prefix', () => {
 });
 
 test('turn completion rejects partial progress and approvals arriving during evidence capture', () => {
-  const completed = {busy:false,cards:[],approval:null,replies:['prior','reply'],progress:{done:4,total:4}};
+  const completed = {busy:false,cards:[],approval:null,replies:['prior','reply'],progress:null};
   assert.equal(turnSettled(completed,1),true);
   assert.equal(turnSettled({...completed,progress:{done:0,total:4}},1),false);
   assert.equal(turnSettled({...completed,cards:[{status:'proposed'}]},1),false);
@@ -132,7 +149,7 @@ test('turn completion rejects partial progress and approvals arriving during evi
 
 
 test('a handoff cannot finish on the old complete plan or an approval arriving during recording checks', async () => {
-  let current = { text: 'complete', busy: false, cards: [], approval: null, replies: ['old', 'new'], progress: { done: 3, total: 3 } };
+  let current = { text: 'complete', busy: false, cards: [], approval: null, replies: ['old', 'new'], progress: null };
   const page = { evaluate: async () => current };
   assert.equal(await confirmTurn(page, 1, 'complete', async () => false), false, 'old recording does not complete a new turn');
   assert.equal(await confirmTurn(page, 1, 'complete', async () => true), true);
@@ -147,4 +164,16 @@ test('a reassessed case never becomes a first-pass success in the report', async
     await save(resolve(out, 'simple/result.json'), { id: 'simple', title: 'Simple', status: 'passed', checks: [], reassessedAt: new Date().toISOString() });
     assert.equal((await report(out)).firstPass, false);
   } finally { await rm(out, { recursive: true }); }
+});
+
+test('a hidden completed dial still requires explicit successful recorded plan steps', () => {
+  const progress = { id: 'plan', plan: { steps: [{}, {}] }, statuses: ['completed', 'pending'], started: true };
+  const receipt = (name, id, planProgress, is_error = false) => [
+    { role: 'assistant', content: [{ type: 'tool_use', name, id }] },
+    { role: 'user', content: [{ type: 'tool_result', tool_use_id: id, is_error, content: { recorded: true, planProgress } }] },
+  ];
+  const proposed = receipt('propose_work_plan', 'proposal', progress);
+  assert.deepEqual(agentPlanProgress(proposed), { done: 1, total: 2 });
+  assert.deepEqual(agentPlanProgress([...proposed, ...receipt('update_plan_progress', 'done', { ...progress, statuses: ['completed', 'completed'] })]), { done: 2, total: 2 });
+  for (const update of [receipt('update_plan_progress', 'failed', { ...progress, statuses: ['completed', 'completed'] }, true), receipt('update_plan_progress', 'other', { ...progress, id: 'other', statuses: ['completed', 'completed'] })]) assert.deepEqual(agentPlanProgress([...proposed, ...update]), { done: 1, total: 2 });
 });

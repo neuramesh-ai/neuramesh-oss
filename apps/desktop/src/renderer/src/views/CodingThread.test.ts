@@ -16,7 +16,7 @@ test('the coding thread builds the cards\' answers from its rows and the room\'s
 });
 
 test('each row hands its card the answers, above the transcript and below it', () => {
-  assert.match(src, /<Md text=\{m\.body\.replace\(MARKER_RE, ''\)\.trim\(\)\} answers=\{answers\(m\.id\)\} \/>/);
+  assert.match(src, /<CodingMessageBody text=\{m\.body\} [^>]*answers=\{answers\(m\.id\)\} \/>/);
   assert.equal(src.match(/<ThreadRows [^>]*answers=\{answersFor\}/g)?.length, 2);
 });
 
@@ -39,7 +39,7 @@ test('the gate seat hears the thread\'s signs that GitHub connected', () => {
 // stale wait hid a live approval. The card hides exactly when the seat holds the GitHub gate, and an approval ranks first.
 test('the card hides exactly when the seat holds the GitHub gate', () => {
   assert.match(src, /const seatAsksGitHub = active \? active\.blockedOn === 'github' && !active\.pendingApproval : !repoRow && !codeSession;/);
-  assert.match(src, /<ThreadRows rows=\{prelude\} [^>]*hideNeeds=\{seatAsksGitHub\} \/>/);
+  assert.match(src, /<ThreadRows [^>]*rows=\{prelude\} [^>]*hideNeeds=\{seatAsksGitHub\} \/>/);
   assert.match(src, /\{active && act \? \([\s\S]*?\) : !repoRow && !codeSession \? \(/);
   const gate = readFileSync(join(import.meta.dirname, '..', 'thread', 'CodingGate.tsx'), 'utf8');
   const approval = gate.indexOf('if (session.pendingApproval) return <ApprovalCard');
@@ -49,5 +49,5 @@ test('the card hides exactly when the seat holds the GitHub gate', () => {
 // with no session open, nothing drew the root: the gate said "the session starts with your message" under no message
 test('the person\'s own first message stays in view until a session draws it', () => {
   assert.match(src, /const opened = !!active;/);
-  assert.match(src, /const prelude = useMemo\(\(\) => rows\.filter\(\(m\) => \(m\.id !== root\?\.id \|\| !opened\) && !parseTaskUnitRef\(m\.body\)\), \[rows, root\?\.id, opened\]\);/);
+  assert.match(src, /const prelude = useMemo\(\(\) => rows\.filter\(\(m\) => \(m\.id !== root\?\.id \|\| !opened\) && !codingDelivery\(m\.body\)\), \[rows, root\?\.id, opened\]\);/);
 });

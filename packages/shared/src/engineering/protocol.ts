@@ -160,6 +160,13 @@ export function isEngineeringCommand(value: unknown): value is EngineeringComman
 }
 
 const NATIVE_TOOL_CATEGORY: Record<string, EngineeringPermissionCategory> = {
+  show_artifact: 'read',
+  list_whiteboards: 'read',
+  read_whiteboard: 'read',
+  create_whiteboard: 'edit',
+  update_whiteboard: 'edit',
+  draft_article: 'edit',
+  share_images: 'edit',
   read_files: 'read',
   search_codebase: 'read',
   run_commands: 'command',

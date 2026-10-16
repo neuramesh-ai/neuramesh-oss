@@ -19,12 +19,13 @@ export function EngineeringPlanProgress({ session, onOpenPlan }: { session: Engi
     document.addEventListener('pointerdown', outside);
     return () => { document.removeEventListener('keydown', key); document.removeEventListener('pointerdown', outside); };
   }, [open]);
-  if (!progress?.started || session.mode !== 'act') return null;
+  if (!progress) return null;
   const done = progress.statuses.filter(s => s === 'completed').length;
   const total = progress.statuses.length;
-  const running = session.state === 'streaming';
+  if (!total || done === total) return null;
+  const running = progress.started && session.mode === 'act' && session.state === 'streaming';
   const current = progress.statuses.indexOf('in_progress');
-  const state = done === total ? 'Plan complete' : session.state === 'awaiting_approval' ? 'Waiting for approval' : running ? 'Executing plan' : 'Plan paused';
+  const state = !progress.started ? 'Ready to start' : session.state === 'awaiting_approval' ? 'Waiting for approval' : running ? 'Executing plan' : 'Plan paused';
   return <div className="codeplanprogress" ref={root} data-plan-progress data-completed={done} data-total={total}
     onMouseLeave={() => { if (!pinned && !root.current?.contains(document.activeElement)) setOpen(false); }}
     onBlur={event => { if (!pinned && !event.currentTarget.contains(event.relatedTarget)) setOpen(false); }}>

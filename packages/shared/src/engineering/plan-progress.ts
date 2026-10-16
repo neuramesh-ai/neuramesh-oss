@@ -38,9 +38,14 @@ export function updateEngineeringPlanProgress(progress: EngineeringPlanProgress,
 /** Recover from successful tool receipts in the portable conversation, including older proposals.
  * A call without a recorded result, a failed result, or arbitrary assistant prose is not progress. */
 export function recoverEngineeringPlanProgress(messages: unknown): EngineeringPlanProgress | null {
+  return recoverEngineeringPlanReceipt(messages)?.progress ?? null;
+}
+
+export function recoverEngineeringPlanReceipt(messages: unknown): { progress: EngineeringPlanProgress; toolCallId: string } | null {
   if (!Array.isArray(messages)) return null;
   const calls = new Map<string, { name: string; input: unknown }>();
   let progress: EngineeringPlanProgress | null = null;
+  let toolCallId = '';
   for (const message of messages) {
     if (!Array.isArray(message?.content)) continue;
     for (const block of message.content) {
@@ -54,13 +59,15 @@ export function recoverEngineeringPlanProgress(messages: unknown): EngineeringPl
       if (!result || result.recorded !== true) continue;
       if (call.name === 'propose_work_plan' && isEngineeringWorkPlan(call.input)) {
         progress = isEngineeringPlanProgress(result.planProgress) ? result.planProgress : createEngineeringPlanProgress(call.input, block.tool_use_id);
+        toolCallId = block.tool_use_id;
       } else if (call.name === 'update_plan_progress' && isEngineeringPlanProgress(result.planProgress)
         && progress?.id === result.planProgress.id && JSON.stringify(progress.plan) === JSON.stringify(result.planProgress.plan)) {
         progress = result.planProgress;
+        toolCallId = block.tool_use_id;
       }
     }
   }
-  return progress;
+  return progress ? { progress, toolCallId } : null;
 }
 
 export const ENGINEERING_PLAN_PROGRESS_PROMPT = 'In Act mode, when executing a previously proposed work plan, use update_plan_progress before starting the first step and after each meaningful step. Use the original one-based step numbers. Mark a step completed only after its work actually succeeds; a requested approval is not completion, and a test step remains unfinished until the test result passes. Update the previous step and the next in_progress step together. Reopen a step if more work is needed. Keep steps pending when blocked or declined. Do not mark the whole plan completed merely because the turn is ending. Do not call this tool for an unrelated question or invent a plan to fill a progress indicator.';

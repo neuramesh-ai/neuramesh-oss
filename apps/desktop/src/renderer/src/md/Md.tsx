@@ -40,6 +40,7 @@ export function swatchify(children: React.ReactNode): React.ReactNode {
 /** the doors a link inside the markdown opens — per Md, read from context by the one component set */
 export type MdLinks = { fileRef?: (name: string) => boolean; taskRef?: (n: number) => TaskRefInfo | null; onOpenTask?: (id: string) => void; onOpenPlan?: (planName?: string) => void; onOpenFile?: (name: string) => void };
 const MdLinksCtx = createContext<MdLinks>({});
+const ProtectedCodeCtx = createContext(false);
 
 /** the plain text inside rendered children (a streaming code block carries the caret element) */
 function textOf(n: React.ReactNode): string {
@@ -50,6 +51,7 @@ function textOf(n: React.ReactNode): string {
 
 function MdA({ href, children }: { href?: string; children?: React.ReactNode }) {
   const { taskRef, onOpenTask, onOpenPlan, onOpenFile, fileRef } = useContext(MdLinksCtx);
+  children = <ProtectedCodeCtx.Provider value>{children}</ProtectedCodeCtx.Provider>;
   // nm:task/<n> — the inline reference renders as its own component (hover card + click-to-open)
   if (href?.startsWith('nm:task/') && taskRef && onOpenTask) {
     const info = taskRef(Number(href.slice('nm:task/'.length)));
@@ -75,6 +77,17 @@ function MdA({ href, children }: { href?: string; children?: React.ReactNode }) 
   );
 }
 
+function MdCode({ className, children }: { className?: string; children?: React.ReactNode }) {
+  const protectedCode = useContext(ProtectedCodeCtx);
+  const { fileRef, onOpenFile } = useContext(MdLinksCtx);
+  const t = String(children ?? '');
+  if (!protectedCode && !className && fileRef?.(t) && onOpenFile) {
+    return <button type="button" className="fileref" title={`Open ${t}`} onClick={() => onOpenFile(t)}><code>{t}</code><span className="fx" aria-hidden>↗</span></button>;
+  }
+  if (!className && isHexColor(t)) return <code className="hexcode"><i className="swatch" style={{ background: t.trim() }} aria-hidden />{t}</code>;
+  return <code className={className}>{children}</code>;
+}
+
 // ONE component set for every Md, so react-markdown keeps the same component identity across
 // live-sync re-renders (a fresh closure each render remounted every inline TaskRefLink, wiping its
 // hover card and replaying its animation) and a parsed block can be cached and shared (MdBody).
@@ -82,13 +95,7 @@ export const MD_COMPONENTS: Components = {
   a: MdA,
   // brand palettes read at a glance: hex colors get a live swatch — inline code that IS
   // a hex, plus plain-text hexes inside table cells and list items (where the docs put them)
-  code: ({ className, children }) => {
-    const t = String(children ?? '');
-    if (!className && isHexColor(t)) {
-      return <code className="hexcode"><i className="swatch" style={{ background: t.trim() }} aria-hidden />{t}</code>;
-    }
-    return <code className={className}>{children}</code>;
-  },
+  code: MdCode,
   td: ({ children }) => <td>{swatchify(children)}</td>,
   li: ({ children }) => <li>{swatchify(children)}</li>,
   p: ({ children }) => <p>{swatchify(children)}</p>,
@@ -96,7 +103,7 @@ export const MD_COMPONENTS: Components = {
   pre: ({ children }) => {
     const code = children as { props?: { className?: string; children?: React.ReactNode } };
     const lang = /language-(\w+)/.exec(code?.props?.className ?? '')?.[1];
-    if (!lang) return <pre>{children}</pre>;
+    if (!lang) return <pre><ProtectedCodeCtx.Provider value>{children}</ProtectedCodeCtx.Provider></pre>;
     const codeText = textOf(code?.props?.children);
     if (lang === 'nmpreview') {
       const preview = parseWebPreview(codeText);
@@ -108,7 +115,7 @@ export const MD_COMPONENTS: Components = {
           <span>{lang}</span>
           <button title="copy" onClick={() => void navigator.clipboard?.writeText(codeText)}>⧉</button>
         </div>
-        <pre>{children}</pre>
+        <pre><ProtectedCodeCtx.Provider value>{children}</ProtectedCodeCtx.Provider></pre>
       </div>
     );
   },

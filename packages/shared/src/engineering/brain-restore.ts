@@ -4,31 +4,9 @@ import { isEngineeringWorkPlan } from './handoff';
 import { applyRemoteEngineeringEvent, beginRemoteEngineeringPrompt } from './remote';
 import { isEngineeringSelection } from './selection';
 import { interruptReviews } from './review-history';
-import { isEngineeringPlanProgress, recoverEngineeringPlanProgress, type EngineeringPlanProgress } from './plan-progress';
+import { recoverRecordedEngineeringPlan } from './recorded-plan-progress';
 
 const object = (v: unknown): Record<string, any> => v && typeof v === 'object' ? v as Record<string, any> : {};
-
-/** Events can reach the cloud before the next runtime checkpoint. Only successful tool
- * receipts after that checkpoint may advance (or explicitly reopen) its recorded plan. */
-function progressAfterCheckpoint(snapshot: BrainThreadSnapshot, progress: EngineeringPlanProgress | null): EngineeringPlanProgress | null {
-  const count = snapshot.metadata?.['recordedEventCount'];
-  const start = typeof count === 'number' && Number.isInteger(count) && count >= 0 && count <= snapshot.events.length
-    ? count : progress ? snapshot.events.length : 0;
-  for (const record of snapshot.events.slice(start)) {
-    if (record.type !== 'runtime.event') continue;
-    const core = object(record.payload);
-    if (core.type !== 'agent_event') continue;
-    const event = object(core.payload?.event);
-    if (event.type !== 'content_end' || event.contentType !== 'tool' || event.error || typeof event.toolCallId !== 'string' || !event.toolCallId) continue;
-    let output: Record<string, any>;
-    try { output = object(typeof event.output === 'string' ? JSON.parse(event.output) : event.output); } catch { continue; }
-    const next = output.planProgress;
-    if (output.recorded !== true || !isEngineeringPlanProgress(next)) continue;
-    if (event.toolName === 'propose_work_plan' && !next.started && progress?.id !== next.id) progress = next;
-    else if (event.toolName === 'update_plan_progress' && progress?.id === next.id && JSON.stringify(progress.plan) === JSON.stringify(next.plan)) progress = next;
-  }
-  return progress;
-}
 
 /** Rebuild display state from committed events. Historical approvals are receipts, never live permissions. */
 export function restoreEngineeringBrain(shell: EngineeringSession, snapshot: BrainThreadSnapshot): EngineeringSession {
@@ -82,8 +60,8 @@ export function restoreEngineeringBrain(shell: EngineeringSession, snapshot: Bra
   const metadata = snapshot.metadata ?? {};
   if (isEngineeringSelection(metadata.selection)) session = { ...session, agentId: metadata.selection.agentId, modelOverride: metadata.selection.modelId, reasoningEffort: metadata.selection.reasoningEffort };
   if (typeof object(metadata.agent).name === 'string') session = { ...session, agent: metadata.agent as EngineeringSession['agent'] };
-  const planProgress = progressAfterCheckpoint(snapshot, recoverEngineeringPlanProgress(snapshot.runtimeMessages));
-  if (planProgress) session = applyRemoteEngineeringEvent(session, { type: 'plan_progress', progress: planProgress });
+  const planProgress = recoverRecordedEngineeringPlan(snapshot);
+  if (!metadataOnly) session = applyRemoteEngineeringEvent(session, { type: 'plan_progress', progress: planProgress });
   const interrupted = session.state === 'streaming' || session.state === 'awaiting_approval';
   return { ...session, mode: metadata.mode === 'act' ? 'act' : session.mode,
     state: interrupted ? 'resumable' : session.state === 'error' ? 'error' : 'completed',

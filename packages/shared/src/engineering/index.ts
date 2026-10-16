@@ -22,6 +22,7 @@ export * from './review-history';
 export * from './approval-display';
 
 export * from './plan-progress';
+export * from './recorded-plan-progress';
 
 export * from './change-review';
 export * from './brain-restore';

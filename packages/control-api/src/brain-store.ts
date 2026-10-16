@@ -1,4 +1,5 @@
 import { brainArtifactInline } from './brain-compatibility';
+import { brainArtifactBytes } from './brain-artifact-bytes';
 import { createEvent, type Actor } from '@neuramesh/shared';
 import type postgres from 'postgres';
 import { brainHash, type BrainObjectRef, type BrainObjectStore } from './brain-objects';
@@ -142,9 +143,7 @@ export class BrainStore {
   async artifact(actor: Actor, input: BrainArtifact) {
     const scope = await brainThreadAccess(this.sql, actor, input.workspace, input.threadId);
     if (input.channel && input.channel !== scope.channel_id) throw new BrainError('NOT_FOUND', 'The artifact channel does not belong to this thread.', 404);
-    if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(input.contentBase64)) throw new BrainError('INVALID_INPUT', 'Artifact content must use valid base64.', 400);
-    const bytes = Buffer.from(input.contentBase64, 'base64');
-    if (bytes.length > 16 * 1024 * 1024) throw new BrainError('TOO_LARGE', 'An artifact must be at most 16 MiB.', 413);
+    const bytes = brainArtifactBytes(input.contentBase64);
     const sha256 = brainHash(bytes);
     if (input.sha256 && input.sha256 !== sha256) throw new BrainError('BRAIN_CHECKSUM_MISMATCH', 'The artifact checksum does not match its bytes.', 400);
     // Fail before uploading if this workspace has not completed the private-reader rollout.

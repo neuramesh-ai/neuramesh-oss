@@ -10,7 +10,7 @@
 import type { WTab } from '../wtabs';
 
 export type PanelSessionKind = 'task' | 'thread' | 'coding' | 'room';
-export type SessionTabKey = 'overview' | 'files' | 'drafts' | 'changes' | 'plan' | 'checkpoints' | 'terminal';
+export type SessionTabKey = 'overview' | 'artifacts' | 'files' | 'drafts' | 'changes' | 'plan' | 'checkpoints' | 'terminal';
 
 export interface PanelSession {
   /** the owner key of the tabs it opens: `task:<id>` · `thread:<id>` · `room:<id>` · null = the workspace set */
@@ -38,13 +38,13 @@ export function sessionTabsOf(s: PanelSession): SessionTabKey[] {
     case 'task': return ['overview', ...(s.files ? ['files' as const] : []), ...(s.drafts ? ['drafts' as const] : [])];
     case 'thread': return s.drafts ? ['overview', 'drafts'] : ['overview'];
     case 'room': return s.roomSections ? ['overview'] : [];
-    case 'coding': return ['changes', 'files', 'plan', 'checkpoints', 'terminal'];
+    case 'coding': return ['changes', 'files', 'artifacts', 'plan', 'checkpoints', 'terminal'];
     default: return [];
   }
 }
 
 export const SESSION_TAB_LABEL: Record<SessionTabKey, string> = {
-  overview: 'Overview', files: 'Files', drafts: 'Drafts', changes: 'Changes', plan: 'Work Plan', checkpoints: 'Checkpoints', terminal: 'Terminal',
+  overview: 'Overview', artifacts: 'Artifacts', files: 'Files', drafts: 'Drafts', changes: 'Changes', plan: 'Work Plan', checkpoints: 'Checkpoints', terminal: 'Terminal',
 };
 
 /** a session tab's id in the strip: never a UUID, so it can never collide with a record's id */

@@ -6,7 +6,7 @@
 // panel, the way a conversation portals its details into Overview. It was a strip of its own inside
 // the Workbench card; the card retired, and the strip is the panel's.
 import type { EngineeringChangeReview } from '@neuramesh/shared';
-import type { ReactElement } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 import { EngineeringEditor, type EngineeringWorkspaceTab } from '../engineering/EngineeringEditor';
 import type { EngineeringSession } from '../engineering/domain';
 import { reviewFiles } from '../engineering/change-review';
@@ -15,16 +15,19 @@ import { IconBranch } from '../ui/icons';
 const STATE_LINE: Record<string, string> = { idle: 'at rest', streaming: 'working', awaiting_approval: 'waits for you', resumable: 'paused', completed: 'complete', error: 'blocked' };
 
 /** what the coding thread's own tabs wear in the strip */
-export type CodeCounts = { changes: number; checkpoints: number; plan: boolean };
+export type CodeCounts = { changes: number; artifacts: number; checkpoints: number; plan: boolean };
 
-export function codeCountsOf(session: EngineeringSession): CodeCounts {
-  return { changes: reviewFiles(session.pendingApproval?.changes ?? session.changes).length, checkpoints: session.checkpoints.length, plan: !!session.workPlan };
+export function codeCountsOf(session: EngineeringSession, artifacts = 0): CodeCounts {
+  return { artifacts, changes: reviewFiles(session.pendingApproval?.changes ?? session.changes).length, checkpoints: session.checkpoints.length, plan: !!session.workPlan };
 }
 
-export function CodePanel({ session, tab, onTab, onSession, onRestore, restoreUnavailable, selectedPath, onSelectPath, selectedPlan, selectedReview }: {
+export function CodePanel({ session, tab, onTab, onSession, onRestore, restoreUnavailable, selectedPath, onSelectPath, selectedPlan, selectedReview, artifacts, artifactRef, onOpenArtifact }: {
   selectedPath: string | null;
   selectedPlan?: string | null;
   selectedReview?: EngineeringChangeReview | null;
+  artifacts?: ReactNode;
+  artifactRef?: (path: string) => boolean;
+  onOpenArtifact?: (path: string) => void;
   onSelectPath: (path: string) => void;
   session: EngineeringSession;
   tab: EngineeringWorkspaceTab;
@@ -36,7 +39,7 @@ export function CodePanel({ session, tab, onTab, onSession, onRestore, restoreUn
   const proposed = reviewFiles(session.pendingApproval?.changes ?? []).length;
   return (
     <div className="codeface">
-      <EngineeringEditor selectedReview={selectedReview} selectedPlan={selectedPlan} selectedPath={selectedPath} onSelectPath={onSelectPath} session={session} onSession={onSession} tab={tab} onTab={onTab} {...(onRestore ? { onRestore } : {})} restoreUnavailable={restoreUnavailable} />
+      <EngineeringEditor artifacts={artifacts} artifactRef={artifactRef} onOpenArtifact={onOpenArtifact} selectedReview={selectedReview} selectedPlan={selectedPlan} selectedPath={selectedPath} onSelectPath={onSelectPath} session={session} onSession={onSession} tab={tab} onTab={onTab} {...(onRestore ? { onRestore } : {})} restoreUnavailable={restoreUnavailable} />
       <div className="dockfoot"><IconBranch s={11} /><span>{session.repo.branch}</span><span className="dockfootstate">{selectedReview ? 'selected change set' : proposed ? `${proposed} proposed · not written yet` : session.blockedOn === 'github' ? 'waits for GitHub' : STATE_LINE[session.state] ?? session.state}</span></div>
     </div>
   );

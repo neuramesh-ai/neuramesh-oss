@@ -77,7 +77,7 @@ export function WTabStrip({ sessionTabs, tabs, activeId, scope, canFind, onActiv
             const id = sessionTabId(st.key);
             const on = id === activeId;
             return (
-              <button key={id} role="tab" aria-selected={on} data-session={st.key} aria-label={st.iconOnly ? st.label : undefined}
+              <button key={id} role="tab" aria-selected={on} data-session={st.key} aria-label={st.label}
                 className={`wtab pin${on ? ' on' : ''}${st.warm ? ' warm' : ''}`} title={`${st.label}${i < 8 ? ` · ⌘${i + 2}` : ''}`} onClick={() => onActivate(id)}>
                 <span className="wtabic">{st.icon}</span>
                 {!st.iconOnly && <span className="wtablbl">{st.label}</span>}

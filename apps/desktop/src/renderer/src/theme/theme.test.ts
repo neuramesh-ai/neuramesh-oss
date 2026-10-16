@@ -22,7 +22,7 @@ function withGlobals(values: Record<string, unknown>, run: () => void) {
 }
 
 test('every preference resolves consistently before paint and at runtime, for both system palettes', () => {
-  assert.equal(DEFAULT_THEME_PREF, 'paper-system');
+  assert.equal(DEFAULT_THEME_PREF, 'system');
   assert.equal(boot.match(/var DEFAULT = '([^']+)'/)![1], DEFAULT_THEME_PREF);
   for (const light of [false, true]) {
     const matchMedia = () => ({ matches: light });
@@ -36,7 +36,7 @@ test('every preference resolves consistently before paint and at runtime, for bo
         assert.equal(dataset['look'], lookOf(id));
       }
       assert.equal(resolveTheme('paper-system'), light ? 'paper-light' : 'paper-dark');
-      assert.equal(resolveTheme('system'), light ? 'light' : 'dark');
+      assert.equal(resolveTheme('system'), light ? 'light' : 'soft-dark');
     });
   }
 });
@@ -52,8 +52,8 @@ test('saved choices, invalid values, and blocked storage', () => {
   const dataset: Record<string, string> = {};
   const matchMedia = () => ({ matches: true });
   runInNewContext(boot, { window: { localStorage, matchMedia }, matchMedia, document: { documentElement: { dataset } } });
-  assert.equal(dataset['theme'], 'paper-light');
-  assert.equal(dataset['look'], 'paper');
+  assert.equal(dataset['theme'], 'light');
+  assert.equal(dataset['look'], 'elevated');
   for (const value of ['paper', '', 'graphite']) assert.equal(isThemePref(value), false);
   for (const theme of THEMES) assert.equal(lookOf(theme.id), theme.id.startsWith('paper-') ? 'paper' : 'elevated');
 });
